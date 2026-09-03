@@ -1,0 +1,120 @@
+# Verificacion del backend de `rentas`. Lo que este workflow ejecuta son las dos barreras
+# bloqueantes del corte, sin atajos:
+#
+#   ./gradlew verificarAislamiento    aislamiento multi-tenant. Requiere Docker.
+#   ./gradlew verificarArquitectura   ArchUnit, escaner de fuentes, aserciones y frontera de sistema.
+#
+# Van en PASOS SEPARADOS a proposito, aunque una sola invocacion pudiera correr las dos: cuando algo
+# se rompe, el nombre del paso ya dice que barrera cayo. Es el mismo reparto que
+# `sgtm/.github/workflows/backend.yml`, y esta copiado con su comentario para que no se pierda al
+# separarse los repositorios.
+#
+# Las pruebas de persistencia NO se omiten sin Docker: fallan. Una verificacion bloqueante que se
+# salta a si misma deja el build en verde sin haber verificado nada, que es peor que no tenerla.
+#
+# Y las barreras viven en `infrastructure/librerias-backend`, que se consume como composite build:
+# por eso este workflow hace checkout de DOS repositorios. Sin el segundo, `settings.gradle.kts` se
+# para diciendo que falta, que es mejor que un fallo de Gradle sobre un directorio inexistente.
+
+name: Backend
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: backend-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verificar:
+    name: Verificaciones bloqueantes
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Este repositorio
+        uses: actions/checkout@v4
+        with:
+          path: rentas
+
+      # El composite build de las barreras. `settings.gradle.kts` lo busca en
+      # `../../infrastructure/librerias-backend`, asi que los dos clones tienen que quedar
+      # hermanos: por eso el `path` de arriba y el de aqui.
+      - name: Las librerias comunes de backend
+        uses: actions/checkout@v4
+        with:
+          repository: hneyra/infrastructure
+          path: infrastructure
+
+      # ADR-0001 fija Java 25. Se comprueba en vez de suponerse: si alguien cambiara la propiedad,
+      # CI verificaria en silencio una version de Java distinta de la que se despliega.
+      - name: La version de Java declarada es la que instala CI
+        working-directory: rentas/backend
+        run: |
+          declarada=$(sed -n 's/^kamayuk\.java\.version=//p' gradle.properties)
+          if [ "$declarada" != "25" ]; then
+            echo "::error file=backend/gradle.properties::gradle.properties declara Java $declarada y este workflow instala Java 25."
+            exit 1
+          fi
+
+      - name: Instalar JDK 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 25
+
+      - name: Preparar Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      # El wrapper descarga la distribucion de services.gradle.org, que devuelve 502 de vez en
+      # cuando. Sin este paso, ese 502 aparece como un build rojo indistinguible de un fallo real,
+      # y la reaccion natural —relanzar— acaba normalizando el relanzamiento como respuesta a
+      # cualquier rojo.
+      - name: Descargar la distribucion de Gradle, con reintentos
+        working-directory: rentas/backend
+        run: |
+          for intento in 1 2 3 4; do
+            if ./gradlew --version; then exit 0; fi
+            echo "Intento $intento fallido; se reintenta en $((intento * 10))s"
+            sleep $((intento * 10))
+          done
+          echo "No se pudo descargar la distribucion de Gradle tras cuatro intentos"
+          exit 1
+
+      # Por el mismo motivo: sin esto, un runner sin Docker o un registro caido salen en rojo como
+      # si fueran un fallo de aislamiento, y el rojo que mas importa del proyecto es justo el que no
+      # puede confundirse con otra cosa.
+      - name: Docker y la imagen de PostgreSQL
+        run: |
+          if ! docker info > /dev/null 2>&1; then
+            echo "::error::Sin Docker no hay prueba de aislamiento. La salida documentada es apuntar a un PostgreSQL existente con -Dkamayuk.pruebas.postgres.url; omitir la prueba no lo es."
+            exit 1
+          fi
+          docker pull postgis/postgis:16-3.4-alpine
+
+      - name: Aislamiento multi-tenant
+        working-directory: rentas/backend
+        run: ./gradlew verificarAislamiento --no-daemon
+
+      - name: Arquitectura, escaner de fuentes y frontera de sistema
+        working-directory: rentas/backend
+        run: ./gradlew verificarArquitectura --no-daemon
+
+      - name: Build completo
+        working-directory: rentas/backend
+        run: ./gradlew build --no-daemon
+
+      - name: Publicar los informes de prueba
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: informes-de-prueba
+          path: rentas/backend/**/build/reports/tests/**
+          if-no-files-found: ignore
+          retention-days: 7

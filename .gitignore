@@ -3,10 +3,12 @@ node_modules/
 dist/
 *.tsbuildinfo
 
-# Gradle: llegara en la etapa 5, con el codigo de negocio
+# Gradle: el esquema y las verificaciones llegaron en P3; el negocio, en P5
 .gradle/
 build/
 */build/
+backend/**/build/
+backend/.gradle/
 
 # IDE
 .idea/
