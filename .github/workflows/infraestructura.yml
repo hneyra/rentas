@@ -1,0 +1,49 @@
+name: Infraestructura
+
+# Por ahora solo verifica el DESCRIPTOR: en este repositorio todavia no hay codigo de negocio.
+# Cuando lo haya (etapa 5) se anade su trabajo, no se cambia este.
+#
+# `yarn verificar` no necesita Pulumi, ni token, ni cluster. Es deliberado, y es lo que ADR-0011
+# compro: la parte que puede equivocarse a diario —un limite que falta, una sonda sin plazo, una
+# ruta fuera del prefijo— se detecta en la maquina de quien lo escribe y en el PR de cualquiera.
+
+on:
+  push:
+    branches: [main]
+    paths: ["infrastructure/**", ".github/workflows/infraestructura.yml"]
+  pull_request:
+    paths: ["infrastructure/**", ".github/workflows/infraestructura.yml"]
+
+# Sin permisos de escritura: este trabajo lee y verifica, no publica nada.
+permissions:
+  contents: read
+
+jobs:
+  descriptor:
+    name: El descriptor cumple el contrato
+    runs-on: ubuntu-latest
+    # Un colgado no consume cuota sin limite: la leccion de `observabilidad-alertas`.
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      # El contrato vive en `infrastructure`, y la dependencia es `link:` a un repositorio
+      # hermano. En CI ese hermano no esta, asi que se clona al lado — con la MISMA estructura
+      # de directorios que en local, o el `link:` no resuelve.
+      - name: Traer el contrato de `infrastructure`
+        uses: actions/checkout@v4
+        with:
+          repository: hneyra/infrastructure
+          path: ../infrastructure
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Instalar
+        working-directory: infrastructure
+        run: yarn install --frozen-lockfile
+
+      - name: Verificar el descriptor
+        working-directory: infrastructure
+        run: yarn verificar

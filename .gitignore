@@ -1,0 +1,21 @@
+# Node: el descriptor de infraestructura
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Gradle: llegara en la etapa 5, con el codigo de negocio
+.gradle/
+build/
+*/build/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# Sistema
+.DS_Store
+
+# Secretos: nunca, y `.gitleaks.toml` vigila que no se cuelen
+*.local.*
+.env

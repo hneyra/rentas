@@ -1,0 +1,26 @@
+{
+  "name": "@sgtm/infra-rentas",
+  "version": "0.1.0",
+  "private": true,
+  "description": "El descriptor de infraestructura de rentas (ADR-0031 §2). Funciones puras que devuelven manifiestos; `infrastructure` las compone y las audita.",
+  "type": "module",
+  "types": "src/descriptor.ts",
+  "main": "src/descriptor.ts",
+  "exports": { ".": "./src/descriptor.ts" },
+  "scripts": {
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "verificar": "yarn lint && yarn typecheck && yarn test"
+  },
+  "dependencies": {
+    "@sgtm/infra-contrato": "link:../../infrastructure/infra/contrato"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.17.0",
+    "eslint": "^9.17.0",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.18.1",
+    "vitest": "^3.0.0"
+  }
+}

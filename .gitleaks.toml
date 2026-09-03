@@ -1,0 +1,19 @@
+# Escaneo de secretos sobre todo el repositorio (issue #154, INF-06).
+#
+# Extiende el conjunto de reglas por omision de gitleaks —claves privadas, tokens de los
+# proveedores mas comunes, patrones de alta entropia— y agrega una sola exclusion: la
+# muestra que el propio escaneo tiene que detectar cuando se la apunta directamente,
+# la unica clave de mentira que existe a proposito en este repositorio.
+#
+# `.github/workflows/secretos.yml` corre esto contra el arbol de trabajo completo
+# (`--no-git`, sin recorrer el historial) en cada PR y en cada integracion a `main`.
+title = "sgtm gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "La muestra que demuestra que el escaneo detecta algo, no que todo esta limpio"
+paths = [
+  '''infra/verificaciones/secretos/muestras/.*''',
+]
