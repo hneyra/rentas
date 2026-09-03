@@ -4,20 +4,27 @@ Contribuyentes, declaraciones juradas, determinacion, cuenta corriente, valores,
 fiscalizacion, coactiva, sanciones y licencias. **Es quien decide cuanto se debe.**
 
 > **Todavia no hay una sola linea de codigo de negocio, y este README lo dice antes que nada.**
-> Lo que hay es el **descriptor de infraestructura**: como se desplegaria este sistema el dia que
-> exista. El codigo llega en la etapa 5 de [ADR-0029](https://github.com/hneyra/infrastructure/blob/main/docs/30-arquitectura/adr/ADR-0029-cuatro-sistemas-separados.md).
+> Lo que hay es el **descriptor de infraestructura** —como se desplegaria este sistema el dia que
+> exista— y las **dos barreras bloqueantes**, que se construyeron antes que el negocio a proposito.
+> El negocio llega en la etapa 5 de [ADR-0029](https://github.com/hneyra/infrastructure/blob/main/docs/30-arquitectura/adr/ADR-0029-cuatro-sistemas-separados.md).
 
 ## Que hay hoy, y que falta
 
 | Pieza | Estado |
 |---|---|
 | `infrastructure/` — el descriptor (ADR-0031 §2) | **Existe y verifica**: `yarn verificar` en verde, sin Pulumi, sin token y sin cluster |
-| `.github/workflows/` — su CI | **Existe**, y por ahora **solo verifica el descriptor**. Cuando haya codigo se le anade su trabajo |
+| `.github/workflows/` — su CI | **Existe**, con tres flujos: el descriptor, las **dos barreras bloqueantes** del backend y la guarda del registro |
 | `docs/30-arquitectura/adr/` | **Existe**, con 11 ADR propio(s) y su indice ⚠ ver la nota de abajo |
-| `backend/` — el codigo | **NO existe.** Etapa 5 |
+| `backend/` — dos modulos y **cero clases de negocio** | **Existe desde P3**: `kamayuk-esquema` con su prueba de aislamiento (9 pruebas) y `kamayuk-verificaciones` con las barreras (79). El **negocio** llega en la etapa 5 |
 | `docs/40-datos/baselines/V1__baseline.sql` — su esquema | **NO esta aqui todavia.** Generado y verificado, vive en [`sgtm/docs/40-datos/baselines/rentas/`](https://github.com/hneyra/sgtm/blob/migracion-a-microservicios/docs/40-datos/baselines/rentas/V1__baseline.sql) hasta que la extraccion lo traiga |
 | Su frontend (`rentas-web`, ADR-0030 §1) | **NO existe** |
 | La imagen `ghcr.io/hneyra/kamayuk-rentas` | **NO existe.** El `Deployment` del descriptor la nombra igual: es correcto, y en esta etapa no se despliega nada |
+
+## Por donde entrar
+
+- **Montar el entorno y ejecutarlo**: [`docs/D0-desarrollo/README.md`](docs/D0-desarrollo/README.md).
+- **Contexto para agentes**, con las diez reglas y lo que este repositorio no hace:
+  [`CLAUDE.md`](CLAUDE.md).
 
 ## El descriptor
 
