@@ -3,6 +3,7 @@ package kamayuk.rentas.tesoreria.pagos;
 import java.time.LocalDate;
 import java.util.Objects;
 import kamayuk.rentas.dominio.Dinero;
+import kamayuk.rentas.dominio.Observacion;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -39,6 +40,9 @@ public interface OrdenesDeCobro {
      * @param detalle lo que se quiera anadir debajo; <b>es la puerta de D-20</b>, que sigue abierta
      * @param importe cuanto, a la fecha de {@code actualizadoA}
      * @param actualizadoA a que fecha esta el importe (regla 9)
+     * @param observacion por que se emite; la escribe quien atiende y viaja a la auditoria de la
+     *     caja, que la exige (regla 10, RNF-052). <b>No la compone este sistema</b>: aqui hay una
+     *     persona delante, al reves que en el publicador del buzon
      */
     record Peticion(
             ReferenciaDeObligacion referencia,
@@ -47,6 +51,7 @@ public interface OrdenesDeCobro {
             Dinero importe,
             LocalDate fechaExigibilidad,
             LocalDate actualizadoA,
+            Observacion observacion,
             @Nullable String pagadorDocumento,
             @Nullable String pagadorNombre,
             long contribuyenteId) {
@@ -57,6 +62,7 @@ public interface OrdenesDeCobro {
             Objects.requireNonNull(importe, "La orden dice cuanto");
             Objects.requireNonNull(fechaExigibilidad, "La orden dice desde cuando se cobra");
             Objects.requireNonNull(actualizadoA, "Toda cifra indica su fecha (regla 9)");
+            Objects.requireNonNull(observacion, "Sin observacion no se guarda (regla 10, RNF-052)");
             if (contribuyenteId <= 0) {
                 throw new IllegalArgumentException("La orden es de un contribuyente del padron");
             }

@@ -3246,6 +3246,40 @@ const OPERACIONES_ADICIONALES = {
   // Aqui `cargar-cajas.sh` es el paso 4 de la siembra desde #460 y la tabla
   // tiene filas en cuanto una municipalidad se implanta.
   caja_tributaria: [
+    // LA EMISION DE LA ORDEN DE COBRO (P5D, ADR-0026 §1). Es la PRIMERA MITAD de lo
+    // que hasta P5D era un solo `POST /api/v1/tesoreria/caja/cobranza`: la ventanilla
+    // marca las filas de la consulta de deuda y este endpoint compone las ordenes
+    // contra el libro. La segunda mitad la sirve `caja` —`POST /caja/api/v1/cobros`—,
+    // y entre las dos ya no hay una transaccion sino una conciliacion diaria.
+    //
+    // Cuelga de `caja_tributaria` porque es literalmente lo que esa pantalla hacia al
+    // pulsar «Cobrar»; darle una opcion propia crearia un permiso que nadie abre.
+    {
+      operationId: 'emitir_ordenes_de_cobro',
+      metodo: 'post',
+      antes: true,
+      ruta: '/api/v1/ordenes-de-cobro',
+      titulo: 'Emitir las órdenes de cobro de una deuda marcada',
+      descripcion:
+        'La primera mitad de lo que hasta la separación era un solo cobro: quien atiende marca' +
+        ' las filas de la consulta de deuda y esto compone **una orden por obligación** contra' +
+        ' `caja`, que después la cobra e imprime el recibo. **El cuerpo no trae ningún importe**,' +
+        ' y esa ausencia es deliberada: cuánto se debe lo dice el libro releyéndose (ARQ-01' +
+        ' §3.8), de modo que la pantalla no puede mandar el que leyó hace cinco minutos ni la' +
+        ' caja recalcular nada. Tampoco trae la campaña de beneficio —su descuento sigue' +
+        ' bloqueado por D-02b— ni el medio de pago, que es de la caja y se elige al cobrar.' +
+        ' **Toda cifra indica su fecha** (regla 9): `aLaFecha` no acompaña al importe, lo' +
+        ' **decide**, y por eso va dentro de la referencia con la que la caja identifica la' +
+        ' orden — dos emisiones del mismo día son un reintento y devuelven la orden que ya' +
+        ' estaba (`nueva: false`); dos de días distintos son dos importes y son dos órdenes. Una' +
+        ' obligación ya pagada **no llega hasta aquí**: el libro ya no tiene su deuda y la' +
+        ' emisión se rechaza con 422, porque una orden de cero soles se cobraría, imprimiría un' +
+        ' recibo y no abonaría nada. Lo que se marcó y no debe **sale nombrado en `sinDeuda`**,' +
+        ' no se calla: una fila que desaparece del total se lee como un error de la pantalla. Y' +
+        ' si `caja` no contesta, la respuesta es **503 y ninguna orden**: una orden que se crea' +
+        ' emitida y no lo está deja al contribuyente delante de una ventanilla que no encuentra' +
+        ' su deuda.',
+    },
     // EL BUZON DE ENTRADA DE PAGOS (P5D, ADR-0026 §3). Cuelga de `caja_tributaria`
     // porque hace exactamente lo que la ventanilla hacia cuando el cobro era una sola
     // transaccion —asentar el abono—, y darle una opcion propia crearia un permiso que

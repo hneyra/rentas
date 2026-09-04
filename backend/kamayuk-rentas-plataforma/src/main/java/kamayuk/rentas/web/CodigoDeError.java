@@ -79,6 +79,21 @@ public enum CodigoDeError {
     CONFLICTO(HttpStatus.CONFLICT, "El estado actual no admite esta operacion"),
 
     /**
+     * Otro sistema del que este depende no contesta (P5D, ADR-0026).
+     *
+     * <p>Es un codigo propio y no {@link #ERROR_INTERNO} porque la respuesta correcta del cliente
+     * es la contraria: ante un 500 reintentar no cambia nada y ante esto <b>si</b>. Y no es {@link
+     * #VALIDACION}, porque no hay nada que el cliente pueda arreglar en su peticion.
+     *
+     * <p>Hoy lo produce una sola cosa: que {@code caja} no conteste al emitir una orden de cobro.
+     * No devolver un identificador inventado ni dejar la orden «por emitir» es deliberado — una
+     * orden que se cree emitida y no lo esta deja al contribuyente delante de una ventanilla que no
+     * encuentra su deuda, y el sintoma no se parece a la causa.
+     */
+    SERVICIO_NO_DISPONIBLE(
+            HttpStatus.SERVICE_UNAVAILABLE, "Un sistema del que este depende no contesta"),
+
+    /**
      * Cualquier otra cosa.
      *
      * <p>Su mensaje es deliberadamente inutil para quien lo recibe y util para quien lo investiga:

@@ -3933,6 +3933,31 @@
     "numeroDeDuplicado": "entero",
     "estado": "texto"
   },
+  "POST /ordenes-de-cobro": {
+    "aLaFecha": "texto",
+    "total": "texto",
+    "ordenes": [
+      {
+        "ordenId": "entero",
+        "referenciaExterna": "texto",
+        "tributo": "texto",
+        "ejercicio": "entero",
+        "predioId": "entero",
+        "vehiculoId": "entero",
+        "importe": "texto",
+        "actualizadoA": "texto",
+        "nueva": "booleano"
+      }
+    ],
+    "sinDeuda": [
+      {
+        "tributo": "texto",
+        "ejercicio": "entero",
+        "predioId": "entero",
+        "vehiculoId": "entero"
+      }
+    ]
+  },
   "POST /pagos": {
     "pagoId": "texto",
     "estado": "texto",

@@ -130,6 +130,7 @@
   "POST /licencias/funcionamiento/reportes/padron": [],
   "POST /licencias/funcionamiento/{id}/cancelacion": ["404"],
   "POST /licencias/funcionamiento/{id}/duplicado": ["404"],
+  "POST /ordenes-de-cobro": ["404"],
   "POST /pagos": [],
   "POST /rentas/alcabala": ["404"],
   "POST /rentas/contribuyentes": [],

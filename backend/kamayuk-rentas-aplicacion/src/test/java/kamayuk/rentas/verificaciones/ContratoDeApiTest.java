@@ -59,10 +59,14 @@ class ContratoDeApiTest {
      */
     private static final Set<String> IMPLEMENTADAS =
             Set.of(
-                    // EL BUZON DE ENTRADA DE PAGOS (P5D, ADR-0026 §3). Son las dos unicas
-                    // operaciones de este contrato que NINGUNA PANTALLA LLAMA: quien las llama es
-                    // el publicador de `caja`, despues de su COMMIT. Estan aqui igual porque este
-                    // backend las publica de verdad, y lo que esta lista promete es eso.
+                    // EL CAMINO DEL DINERO, PARTIDO EN DOS (P5D, ADR-0026). La primera es la
+                    // que la ventanilla llama al marcar deuda: compone las ordenes contra el
+                    // libro y `caja` las cobra despues. Las otras dos son el buzon de entrada, y
+                    // son las dos unicas operaciones de este contrato que NINGUNA PANTALLA LLAMA:
+                    // quien las llama es el publicador de `caja`, despues de su COMMIT. Estan
+                    // aqui igual porque este backend las publica de verdad, y lo que esta lista
+                    // promete es eso.
+                    "POST /ordenes-de-cobro",
                     "POST /pagos",
                     "GET /pagos/conciliacion",
                     // Las TRES de `/catastro/` que este backend SI publica, y que no se fueron con

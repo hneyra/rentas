@@ -352,7 +352,7 @@ class PagoInyectadoDosVecesTest {
 
     private static PagoRecibido pagoDe(UUID pagoId, String sufijo, String importe, String tributo) {
         ReferenciaDeObligacion referencia =
-                new ReferenciaDeObligacion(tributo, EJERCICIO, null, null);
+                new ReferenciaDeObligacion(tributo, EJERCICIO, null, null, HOY);
         String cuerpo =
                 "{\"pagoId\":\""
                         + pagoId

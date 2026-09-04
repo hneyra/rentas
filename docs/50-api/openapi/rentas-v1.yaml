@@ -5629,6 +5629,32 @@ paths:
           $ref: "#/components/responses/SinMunicipalidad"
         "422":
           $ref: "#/components/responses/ErrorDeValidacion"
+  "/ordenes-de-cobro":
+    post:
+      operationId: emitir_ordenes_de_cobro
+      summary: "Emitir las órdenes de cobro de una deuda marcada"
+      description: "La primera mitad de lo que hasta la separación era un solo cobro: quien atiende marca las filas de la consulta de deuda y esto compone **una orden por obligación** contra `caja`, que después la cobra e imprime el recibo. **El cuerpo no trae ningún importe**, y esa ausencia es deliberada: cuánto se debe lo dice el libro releyéndose (ARQ-01 §3.8), de modo que la pantalla no puede mandar el que leyó hace cinco minutos ni la caja recalcular nada. Tampoco trae la campaña de beneficio —su descuento sigue bloqueado por D-02b— ni el medio de pago, que es de la caja y se elige al cobrar. **Toda cifra indica su fecha** (regla 9): `aLaFecha` no acompaña al importe, lo **decide**, y por eso va dentro de la referencia con la que la caja identifica la orden — dos emisiones del mismo día son un reintento y devuelven la orden que ya estaba (`nueva: false`); dos de días distintos son dos importes y son dos órdenes. Una obligación ya pagada **no llega hasta aquí**: el libro ya no tiene su deuda y la emisión se rechaza con 422, porque una orden de cero soles se cobraría, imprimiría un recibo y no abonaría nada. Lo que se marcó y no debe **sale nombrado en `sinDeuda`**, no se calla: una fila que desaparece del total se lee como un error de la pantalla. Y si `caja` no contesta, la respuesta es **503 y ninguna orden**: una orden que se crea emitida y no lo está deja al contribuyente delante de una ventanilla que no encuentra su deuda."
+      tags: ["Tesorería"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        201:
+          description: Operacion realizada
+          content:
+            application/json:
+              schema: { type: object }
+        "404":
+          description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "403":
+          $ref: "#/components/responses/SinMunicipalidad"
+        "422":
+          $ref: "#/components/responses/ErrorDeValidacion"
   "/tesoreria/cajas":
     get:
       operationId: cajas_listado

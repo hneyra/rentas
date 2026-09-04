@@ -59,8 +59,8 @@ public class OrdenesDeCobroHttp implements OrdenesDeCobro {
                                         + "\"")
                         + ",\"pagadorIdExterno\":"
                         + peticion.contribuyenteId()
-                        + ",\"observacion\":\"Orden emitida por rentas para "
-                        + peticion.referencia().texto()
+                        + ",\"observacion\":\""
+                        + escapar(peticion.observacion().texto())
                         + "\"}";
 
         JsonNode respuesta;

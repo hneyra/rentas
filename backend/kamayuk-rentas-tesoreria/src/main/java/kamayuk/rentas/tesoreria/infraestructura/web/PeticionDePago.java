@@ -62,7 +62,9 @@ public record PeticionDePago(
      * Una orden cobrada.
      *
      * <p>{@code referenciaExterna} es <b>opaca para la caja</b> y la compuso este sistema: es
-     * {@code TRIBUTO|EJERCICIO|PREDIO|VEHICULO}, y la lee {@code ReferenciaDeObligacion}.
+     * {@code TRIBUTO|EJERCICIO|PREDIO|VEHICULO|FECHA}, y la lee {@code ReferenciaDeObligacion}. La
+     * fecha va dentro porque es la regla 9 aplicada a la identidad de la orden: el mismo predial a
+     * dos fechas distintas son dos importes y son dos ordenes.
      */
     public record LineaDeOrden(
             @Nullable Long ordenId,
