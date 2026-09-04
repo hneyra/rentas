@@ -282,7 +282,7 @@ otras sesiones, y el clúster propio consigue lo mismo sin tocarla.
 
 ---
 
-## 9. Los tres huecos declarados
+## 9. Los cuatro huecos declarados
 
 ### 9.1 `design/` no viaja, pero su entrada del generador sí — y es una desviación
 
