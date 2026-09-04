@@ -1,7 +1,19 @@
 # ADR-0003 — Monolito modular con Spring Modulith
 
-**Estado:** Aceptado
+**Estado:** **Obsoleto** — lo reemplaza [ADR-0029](https://github.com/hneyra/infrastructure/blob/main/docs/30-arquitectura/adr/ADR-0029-cuatro-sistemas-separados.md)
 **Fecha:** 2026-08-17
+**Obsoleto desde:** 2026-09-04
+
+> **Su argumento no se equivocaba: cambio el hecho sobre el que se apoyaba.** ADR-0003
+> descarto los microservicios porque «el equipo que mantendra esto en una municipalidad no
+> opera doce despliegues». El 2026-09-04 la direccion contesto **D-22**: el producto lo opera
+> un equipo central, no cada municipalidad. Con eso la objecion deja de aplicar —y son cuatro
+> despliegues, no doce—. Ver [`D-22`](https://github.com/hneyra/infrastructure/blob/main/docs/00-gobierno/D-22-quien-opera-cuatro-despliegues.md)
+> en `infrastructure`.
+>
+> **Lo que este ADR decidio sigue vigente DENTRO de cada sistema**: `rentas` es un monolito
+> modular con Spring Modulith y sus limites verificados por el build. Lo que se reemplaza es
+> que TODO el producto lo sea.
 
 ## Contexto
 

@@ -2,11 +2,14 @@
 
 | Campo | Valor |
 |---|---|
-| Estado | Propuesto |
+| Estado | **Aceptado** |
 | Fecha | 2026-09-03 |
 | Decide | Dirección del proyecto |
 | Depende de | [ADR-0029](https://github.com/hneyra/infrastructure/blob/main/docs/30-arquitectura/adr/ADR-0029-cuatro-sistemas-separados.md) |
 | Abre | D-21 (el `% propiedad`) |
+
+
+> Aceptado el 2026-09-04 por la direccion del proyecto, al contestar **D-22**: el producto lo opera un equipo central, no cada municipalidad. Ver [`D-22`](https://github.com/hneyra/infrastructure/blob/main/docs/00-gobierno/D-22-quien-opera-cuatro-despliegues.md) en `infrastructure`.
 
 ## Contexto
 
