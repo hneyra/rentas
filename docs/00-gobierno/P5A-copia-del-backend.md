@@ -340,8 +340,9 @@ El criterio pide `git log --oneline | wc -l == 1`. **En `rentas` no aplica**, y 
 el repositorio ya trae los commits de P1C, P3 y P4, y reescribir su historia para que dé 1
 destruiría el rastro de tres etapas ya entregadas para satisfacer una cifra.
 
-Queda en **5 commits**: `first commit`, el descriptor y su CI (P1C), las dos barreras (P3), el
-contexto de agente (P4) y el de esta etapa. El número real, y no un `1` fabricado.
+La historia real de `rentas` es **`first commit` → el descriptor y su CI (P1C) → las dos barreras
+(P3) → el contexto de agente (P4) → esta etapa**, cinco etapas y algún commit de corrección
+encima. El número que `git log --oneline | wc -l` devuelva es el de verdad, no un `1` fabricado.
 
 El `Origen: sgtm@0d33ad7b` sí va, en el mensaje del commit de esta etapa.
 
