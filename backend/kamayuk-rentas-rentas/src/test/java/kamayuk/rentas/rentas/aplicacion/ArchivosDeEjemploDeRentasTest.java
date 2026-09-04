@@ -227,7 +227,7 @@ class ArchivosDeEjemploDeRentasTest {
 
         ComposicionCatastral composicion = ComposicionCatastral.DEL_MANUAL;
         int tramos = composicion.tramos().size();
-        for (FilaCsv fila : LectorDeFilasCsv.leer(abrir("fichas.csv"))) {
+        for (FilaCsv fila : LectorDeFilasCsv.leer(abrirLasFichasDeCatastro())) {
             Map<String, String> porTramo = new LinkedHashMap<>();
             for (int i = 0; i < tramos; i++) {
                 String valor = fila.campos().get(i).strip();
@@ -273,6 +273,36 @@ class ArchivosDeEjemploDeRentasTest {
 
     private static Reader abrir(String nombre) throws IOException {
         return Files.newBufferedReader(ejemplos().resolve(nombre), StandardCharsets.UTF_8);
+    }
+
+    /**
+     * {@code fichas.csv}, que es de {@code catastro} y se lee del repositorio hermano (C-6).
+     *
+     * <p><b>No se copia aqui a proposito.</b> Hasta C-6 habia una copia byte a byte en este
+     * repositorio, y nada impedia que divergiera de la que carga el paso 6: la que se leyera
+     * decidiria contra que predios se cruzan las transferencias y la deuda. Es exactamente el
+     * mecanismo inverso del que usa {@code ArchivosDeEjemploTest} de {@code catastro} para leer
+     * {@code contribuyentes.csv} de aqui (hueco 5 de P5C), y tiene su mismo costo: <b>este modulo
+     * no compila sus pruebas sin `catastro` clonado al lado</b>, y si no esta, la prueba falla
+     * nombrando el {@code git clone}; no se salta.
+     */
+    private static Reader abrirLasFichasDeCatastro() throws IOException {
+        Path csv =
+                ejemplos()
+                        .getParent()
+                        .getParent()
+                        .getParent()
+                        .getParent()
+                        .resolve("catastro/infra/carga-de-datos/ejemplos/fichas.csv");
+        if (!Files.isRegularFile(csv)) {
+            throw new IllegalStateException(
+                    "No esta "
+                            + csv
+                            + ". Las transferencias y la deuda de demostracion cuelgan de los"
+                            + " predios de `fichas.csv`, que desde P5C vive en `catastro`: git"
+                            + " clone https://github.com/hneyra/catastro ../../catastro");
+        }
+        return Files.newBufferedReader(csv, StandardCharsets.UTF_8);
     }
 
     /** {@code infra/carga-de-datos/ejemplos}, buscando la raiz del repositorio hacia arriba. */
