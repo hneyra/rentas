@@ -1,32 +1,62 @@
-// Backend de `rentas`. Un modulo de esquema y uno de verificaciones; los contextos acotados
-// llegan en P5.
-//
 // Las barreras —ArchUnit, el escaner de fuentes, el de aserciones y la frontera de sistema— viven
-// en `infrastructure/librerias-backend` y las comparten los cinco repositorios. Se consumen como
-// *composite build* y no como artefacto publicado, y el motivo es el modo de fallo: un jar
-// publicado a mano se queda viejo sin que nada se ponga rojo, y una verificacion vieja que pasa en
-// verde es lo que este proyecto lleva doscientos issues evitando. Con `includeBuild`, Gradle la
-// recompila desde el fuente en cada build: no puede quedarse vieja.
+// en `infrastructure/librerias-backend` y las comparten los cinco repositorios.
 //
-// LO QUE CUESTA, dicho aqui y no descubierto mas tarde: este backend NO COMPILA sin tener
-// `infrastructure` clonado al lado.
+// Se consume como *composite build* y no como artefacto publicado, y el motivo es el modo de
+// fallo: un jar publicado a mano se queda viejo sin que nada se ponga rojo, y una verificacion
+// vieja que pasa en verde es exactamente lo que este proyecto lleva doscientos issues evitando
+// (#192 §2, y el `verde rancio` de #399). Con `includeBuild`, Gradle recompila la libreria desde
+// el fuente en cada build del backend: no puede quedarse vieja.
+//
+// LO QUE CUESTA, dicho aqui y no descubierto mas tarde: este backend YA NO COMPILA sin tener
+// `infrastructure` clonado al lado. Es una dependencia nueva de la maquina de quien construye, y
+// por eso se comprueba antes con un mensaje que dice que hacer, en vez de dejar que Gradle falle
+// con «project directory does not exist».
 val libreriasComunes = file("../../infrastructure/librerias-backend")
 require(libreriasComunes.isDirectory) {
     "No esta ${libreriasComunes.canonicalPath}. El backend consume comun-verificaciones como" +
-        " composite build, asi que `infrastructure` tiene que estar clonado al lado de" +
-        " `rentas`: git clone https://github.com/hneyra/infrastructure ../../infrastructure"
+        " composite build, asi que `infrastructure` tiene que estar clonado al lado de `rentas`:" +
+        " git clone https://github.com/hneyra/infrastructure ../../infrastructure"
 }
 includeBuild(libreriasComunes)
 
 rootProject.name = "kamayuk-rentas-backend"
 
-// El esquema: las migraciones, el proceso que las aplica y la prueba de aislamiento multi-tenant.
-// Hoy no tiene ni una migracion: el baseline lo genera ADR-0032 y esta etapa no lo inventa.
-include("kamayuk-esquema")
+// Compartido: objetos de valor y contexto de tenant. No depende de ningun
+// contexto acotado (ARQ-01 §4 regla 6).
+include("kamayuk-rentas-dominio-compartido")
 
-// Donde corren las barreras. Es el equivalente de `sgtm-aplicacion` en el monolito: el unico
-// modulo que ve a todos los demas.
-include("kamayuk-verificaciones")
+// Esquema: migraciones Flyway y la prueba de aislamiento multi-tenant.
+// No es un contexto acotado; es infraestructura de datos comun a todos.
+include("kamayuk-rentas-esquema")
+
+// Plataforma: lleva el contexto de tenant hasta la transaccion (ARQ-03 §2).
+// Tampoco es un contexto acotado.
+include("kamayuk-rentas-plataforma")
+
+// Indicadores: el panel de recaudacion (#56, RF-130). Tampoco es un contexto
+// acotado —ARQ-01 §3 fija doce y este no es el trece—: no tiene modelo, no tiene
+// tablas y no decide nada. Agrega lo que cuentacorriente y tesoreria ya publican,
+// y su build declara que solo puede ver esos dos.
+include("kamayuk-rentas-indicadores")
+
+// Los doce contextos acotados de ARQ-01 §3. Nacieron vacios —la estructura fijo
+// los limites antes de que hubiera codigo que los cruzara— y hoy los doce tienen
+// codigo de negocio; el estado por contexto esta en ARQ-01 §5.
+include("kamayuk-rentas-contribuyentes")
+include("kamayuk-rentas-catastro")
+include("kamayuk-rentas-rentas")
+include("kamayuk-rentas-parametros")
+include("kamayuk-rentas-fiscalizacion")
+include("kamayuk-rentas-sanciones")
+include("kamayuk-rentas-cuentacorriente")
+include("kamayuk-rentas-tesoreria")
+include("kamayuk-rentas-valores")
+include("kamayuk-rentas-coactiva")
+include("kamayuk-rentas-licencias")
+include("kamayuk-rentas-seguridad")
+
+// Ensambla el artefacto unico, en perfiles web y batch (ADR-0003).
+include("kamayuk-rentas-aplicacion")
 
 dependencyResolutionManagement {
     repositoriesMode = RepositoriesMode.FAIL_ON_PROJECT_REPOS

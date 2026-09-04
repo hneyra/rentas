@@ -1,0 +1,2 @@
+caso;caso_borde;descripcion;ejercicio;entradas;caracteristicas;parametros_requeridos;reglas_esperadas;conceptos_esperados;estado;esperado;fuente_del_esperado
+RT-016-c01;;reajuste de las cuotas restantes por la variacion acumulada del indice;2026;CUOTA=100;;;RT-016;CUOTA_REAJUSTADA;SIN_REGLA:MOTOR;;

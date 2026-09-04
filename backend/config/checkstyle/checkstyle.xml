@@ -1,0 +1,117 @@
+<?xml version="1.0"?>
+<!DOCTYPE module PUBLIC
+    "-//Checkstyle//DTD Checkstyle Configuration 1.3//EN"
+    "https://checkstyle.org/dtds/configuration_1_3.dtd">
+
+<!--
+  Checkstyle del SGTM (ARQ-04 §5).
+
+  Deliberadamente corto. El formato ya lo impone Spotless con google-java-format,
+  asi que aqui NO se repite nada de formato: una configuracion que pelea con el
+  formateador se acaba desactivando y entonces no queda ninguna de las dos.
+
+  La regla mas importante es la de identificadores en ASCII: español en el dominio,
+  pero sin tildes en identificadores. `alicuota`, no `alícuota`. Es facil de
+  incumplir con el teclado en español y muy caro de arreglar despues, porque cambia
+  firmas publicas.
+-->
+<module name="Checker">
+    <property name="severity" value="error"/>
+    <property name="charset" value="UTF-8"/>
+    <property name="fileExtensions" value="java"/>
+
+    <module name="NewlineAtEndOfFile"/>
+    <module name="FileTabCharacter"/>
+
+    <module name="TreeWalker">
+
+        <!-- Sin tildes ni eñes en identificadores (ARQ-04 §3). -->
+        <module name="TypeName">
+            <property name="format" value="^[A-Z][a-zA-Z0-9]*$"/>
+            <message key="name.invalidPattern"
+                     value="El identificador ''{0}'' debe ser ASCII y en PascalCase: sin tildes ni eñes (ARQ-04 §3)."/>
+        </module>
+        <module name="MethodName">
+            <property name="format" value="^[a-z][a-zA-Z0-9]*$"/>
+            <message key="name.invalidPattern"
+                     value="El identificador ''{0}'' debe ser ASCII y en camelCase: sin tildes ni eñes (ARQ-04 §3)."/>
+        </module>
+        <module name="MemberName">
+            <property name="format" value="^[a-z][a-zA-Z0-9]*$"/>
+            <message key="name.invalidPattern"
+                     value="El identificador ''{0}'' debe ser ASCII y en camelCase: sin tildes ni eñes (ARQ-04 §3)."/>
+        </module>
+        <module name="LocalVariableName">
+            <property name="format" value="^[a-z][a-zA-Z0-9]*$"/>
+            <message key="name.invalidPattern"
+                     value="El identificador ''{0}'' debe ser ASCII y en camelCase: sin tildes ni eñes (ARQ-04 §3)."/>
+        </module>
+        <module name="ParameterName">
+            <property name="format" value="^[a-z][a-zA-Z0-9]*$"/>
+            <message key="name.invalidPattern"
+                     value="El identificador ''{0}'' debe ser ASCII y en camelCase: sin tildes ni eñes (ARQ-04 §3)."/>
+        </module>
+        <!-- `log` es la convencion universal de SLF4J y no vale la pena pelearla.
+             Cualquier otra constante va en MAYUSCULAS. -->
+        <module name="ConstantName">
+            <property name="format" value="^(log|[A-Z][A-Z0-9]*(_[A-Z0-9]+)*)$"/>
+            <message key="name.invalidPattern"
+                     value="La constante ''{0}'' debe ser ASCII en MAYUSCULAS_CON_GUION_BAJO (ARQ-04 §3)."/>
+        </module>
+        <module name="PackageName">
+            <property name="format" value="^[a-z]+(\.[a-z][a-z0-9]*)*$"/>
+        </module>
+
+        <!-- Importes: prohibidos double y float como tipo declarado (regla 1).
+             ArchUnit ya lo verifica sobre el bytecode; esto lo señala en el sitio
+             exacto y al compilar, que es cuando cuesta barato. -->
+        <module name="IllegalType">
+            <property name="illegalClassNames" value="java.lang.Double, java.lang.Float"/>
+            <property name="tokens" value="METHOD_DEF, PARAMETER_DEF, VARIABLE_DEF"/>
+            <message key="illegal.type"
+                     value="Tipo prohibido ''{0}'': los importes van en BigDecimal (RNF-055, regla 1)."/>
+        </module>
+
+        <!-- Un instante lleva zona; una fecha tributaria es LocalDate. -->
+        <module name="IllegalType">
+            <property name="id" value="SinLocalDateTime"/>
+            <property name="illegalClassNames" value="java.time.LocalDateTime, LocalDateTime"/>
+            <property name="tokens" value="METHOD_DEF, PARAMETER_DEF, VARIABLE_DEF"/>
+            <message key="illegal.type"
+                     value="Tipo prohibido ''{0}'': un instante es Instant y una fecha tributaria es LocalDate."/>
+        </module>
+
+        <!-- Prohibido capturar una excepcion sin actuar (ARQ-04 §6). -->
+        <module name="EmptyCatchBlock">
+            <property name="exceptionVariableName" value="expected|ignorado"/>
+        </module>
+        <module name="IllegalCatch"/>
+        <module name="IllegalThrows"/>
+
+        <!-- Trampas del lenguaje que cuestan caro en un sistema de dinero. -->
+        <module name="EqualsHashCode"/>
+        <module name="CovariantEquals"/>
+        <module name="StringLiteralEquality"/>
+        <module name="NoFinalizer"/>
+        <module name="MissingSwitchDefault"/>
+        <module name="FallThrough"/>
+        <module name="SimplifyBooleanExpression"/>
+        <module name="SimplifyBooleanReturn"/>
+        <module name="DefaultComesLast"/>
+        <module name="MultipleVariableDeclarations"/>
+        <module name="OneStatementPerLine"/>
+        <module name="ModifierOrder"/>
+
+        <!-- Imports. -->
+        <module name="AvoidStarImport"/>
+        <module name="RedundantImport"/>
+        <module name="UnusedImports"/>
+        <module name="IllegalImport">
+            <property name="illegalPkgs" value="sun, com.sun, jdk.internal"/>
+        </module>
+
+        <module name="SuppressWarningsHolder"/>
+    </module>
+
+    <module name="SuppressWarningsFilter"/>
+</module>

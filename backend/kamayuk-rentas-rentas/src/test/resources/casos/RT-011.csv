@@ -1,0 +1,6 @@
+caso;caso_borde;descripcion;ejercicio;entradas;caracteristicas;parametros_requeridos;reglas_esperadas;conceptos_esperados;estado;esperado;fuente_del_esperado
+RT-011-c01;;un contribuyente con su predio: el grafo de la partida corre y despues se agrega su aporte;2026;AREA_TERRENO=250|BASE_IMPONIBLE_PREDIO=1000;via=AV-GRAU;ARANCEL:AV-GRAU;RT-001|RT-011;VALOR_TERRENO|BASE_IMPONIBLE_CONTRIBUYENTE;EJECUTABLE;;
+RT-011-c02;copropiedad;cada copropietario tributa por su porcentaje: falta confirmar si hay solidaridad;2026;BASE_IMPONIBLE_PREDIO=600;;;RT-011;BASE_IMPONIBLE_CONTRIBUYENTE;SIN_CRITERIO:NEG-05;;
+RT-011-c03;predios-en-varias-municipalidades;cada municipalidad considera solo los de su jurisdiccion;2026;BASE_IMPONIBLE_PREDIO=1000;;;RT-011;BASE_IMPONIBLE_CONTRIBUYENTE;SIN_CRITERIO:NEG-05;;
+RT-011-c04;sucesion-indivisa;la sucesion indivisa como contribuyente: ligado a D-30 del SRTM;2026;BASE_IMPONIBLE_PREDIO=1000;;;RT-011;BASE_IMPONIBLE_CONTRIBUYENTE;SIN_CRITERIO:NEG-05;;
+RT-011-c05;poseedor-sin-titulo;el poseedor sin titulo: contribuyente o responsable;2026;BASE_IMPONIBLE_PREDIO=1000;;;RT-011;BASE_IMPONIBLE_CONTRIBUYENTE;SIN_CRITERIO:NEG-05;;

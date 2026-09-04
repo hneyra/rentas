@@ -1,0 +1,6732 @@
+{
+  "_": "ARCHIVO GENERADO — no editar a mano. Lo produce FormasDeLaApiTest del tipo de retorno de cada controlador; se regenera con -Dsgtm.formas.regenerar=true. Es la forma del JSON que devuelve cada operacion —nombres de campo y anidamiento, con los tipos reducidos a hojas—, y la lee el frontend para comprobar que su proxy de datos publica la forma que el backend publica (#400, ADR-0010).",
+  "GET /autorizaciones/anuncios": {
+    "contenido": [
+      {
+        "nroAutorizacion": "texto",
+        "est": "texto",
+        "estado": "texto",
+        "estadoALaFecha": "fecha",
+        "contribuyente": "texto",
+        "codContribuyente": "texto",
+        "documentoDelTitular": "texto",
+        "nroLicencia": "texto",
+        "claseAnuncio": "texto",
+        "tipoAnuncio": "texto",
+        "ubicacion": "texto",
+        "forma": "texto",
+        "denominacion": "texto",
+        "direccion": "texto",
+        "area": "texto",
+        "nroLados": "entero",
+        "cantidad": "entero",
+        "fecInicio": "fecha",
+        "fecVenc": "fecha",
+        "nroDeExpediente": "texto",
+        "fechaExp": "fecha",
+        "tasaDevengada": {
+          "importe": "texto",
+          "actualizadoA": "fecha"
+        },
+        "historial": [
+          {
+            "tipo": "texto",
+            "fecha": "fecha",
+            "ejercicio": "entero",
+            "referenciaDelCargo": "texto",
+            "tasa": {
+              "importe": "texto",
+              "actualizadoA": "fecha"
+            },
+            "fecVenc": "fecha",
+            "motivo": "texto",
+            "observacion": "texto"
+          }
+        ]
+      }
+    ],
+    "pagina": "entero",
+    "tamano": "entero",
+    "totalElementos": "entero",
+    "totalPaginas": "entero",
+    "hayMas": "booleano"
+  },
+  "GET /catastro/contribuyentes/{codigo}/ficha.pdf": {
+    "aLaFecha": "texto",
+    "codigo": "texto",
+    "nombre": "texto",
+    "documento": "texto",
+    "domicilioFiscal": "texto",
+    "unidades": [
+      {
+        "codRefCatastral": "texto",
+        "direccion": "texto",
+        "condicion": "texto",
+        "porcentaje": "texto",
+        "areaTerreno": "texto",
+        "uso": "texto",
+        "version": "entero"
+      }
+    ]
+  },
+  "GET /catastro/fichas": {
+    "contenido": [
+      {
+        "id": "entero",
+        "predioId": "entero",
+        "codRefCatastral": "texto",
+        "direccion": "texto",
+        "manzana": "texto",
+        "lote": "texto",
+        "tipo": "texto",
+        "version": "entero",
+        "areaTerreno": "texto",
+        "areaConstruida": "texto",
+        "uso": "texto",
+        "vigenciaDesde": "texto",
+        "titular": "texto"
+      }
+    ],
+    "pagina": "entero",
+    "tamano": "entero",
+    "totalElementos": "entero",
+    "totalPaginas": "entero",
+    "hayMas": "booleano"
+  },
+  "GET /catastro/fichas/bienes-comunes/{codEdificacion}": {
+    "id": "entero",
+    "predioId": "entero",
+    "tipo": "texto",
+    "version": "entero",
+    "areaTerreno": "texto",
+    "uso": "texto",
+    "frontis": "texto",
+    "condicionPropiedad": "texto",
+    "tipoEdificacion": "texto",
+    "vigenciaDesde": "texto",
+    "vigenciaHasta": "texto",
+    "vigente": "booleano",
+    "origen": "texto",
+    "documentoOrigen": "texto",
+    "observacion": "texto",
+    "denominacion": "texto",
+    "construcciones": [
+      {
+        "id": "entero",
+        "piso": "texto",
+        "areaConstruida": "texto",
+        "anioConstruccion": "entero",
+        "material": "texto",
+        "estadoConservacion": "texto",
+        "categorias": "texto",
+        "porcentajeConstruido": "texto"
+      }
+    ],
+    "instalaciones": [
+      {
+        "id": "entero",
+        "descripcion": "texto",
+        "unidad": "texto",
+        "cantidad": "texto",
+        "anioConstruccion": "entero",
+        "estadoConservacion": "texto"
+      }
+    ],
+    "economico": {
+      "actividades": [
+        {
+          "id": "entero",
+          "conductor": "texto",
+          "nombreComercial": "texto",
+          "ciiu": "texto",
+          "areaOcupada": "texto",
+          "licenciaNumero": "texto",
+          "licenciaFecha": "texto",
+          "anuncioNumero": "texto",
+          "anuncioFecha": "texto",
+          "vigenciaDesde": "texto"
+        }
+      ],
+      "informacionComplementaria": "texto",
+      "sinLicencia": "entero"
+    },
+    "bienesComunes": {
+      "bienes": [
+        {
+          "id": "entero",
+          "descripcion": "texto",
+          "area": "texto",
+          "material": "texto",
+          "estadoConservacion": "texto",
+          "anioConstruccion": "entero"
+        }
+      ],
+      "participaciones": [
+        {
+          "predioId": "entero",
+          "porcentaje": "texto"
+        }
+      ],
+      "areaComunTotal": "texto"
+    },
+    "rural": {
+      "tierras": [
+        {
+          "id": "entero",
+          "clasificacion": "texto",
+          "calidadAgrologica": "texto",
+          "riego": "texto",
+          "hectareas": "texto",
+          "hectareasComunes": "texto"
+        }
+      ],
+      "colindantes": [
+        {
+          "orientacion": "texto",
+          "descripcion": "texto"
+        }
+      ],
+      "hectareasTotales": "texto"
+    },
+    "historico": [
+      {
+        "id": "entero",
+        "version": "entero",
+        "areaTerreno": "texto",
+        "uso": "texto",
+        "vigenciaDesde": "texto",
+        "vigenciaHasta": "texto",
+        "vigente": "booleano",
+        "origen": "texto",
+        "documentoOrigen": "texto",
+        "observacion": "texto",
+        "usuario": "texto",
+        "registradaEn": "texto"
+      }
+    ]
+  },
+  "GET /catastro/fichas/conciliacion": {
+    "contenido": [
+      {
+        "id": "entero",
+        "predioId": "entero",
+        "codRefCatastral": "texto",
+        "direccion": "texto",
+        "manzana": "texto",
+        "lote": "texto",
+        "tipo": "texto",
+        "version": "entero",
+        "areaTerreno": "texto",
+        "areaConstruida": "texto",
+        "uso": "texto",
+        "vigenciaDesde": "texto",
+        "titular": "texto",
+        "conciliada": "booleano",
+        "conciliadaA": "entero"
+      }
+    ],
+    "pagina": "entero",
+    "tamano": "entero",
+    "totalElementos": "entero",
+    "totalPaginas": "entero",
+    "hayMas": "booleano"
+  },
+  "GET /catastro/fichas/conciliacion/resumen": {
+    "ejercicio": "entero",
+    "aLaFecha": "fecha",
+    "total": "entero",
+    "conciliados": "entero",
+    "noConciliados": "entero"
+  },
+  "GET /catastro/fichas/economica/{codRefCatastral}": {
+    "id": "entero",
+    "predioId": "entero",
+    "tipo": "texto",
+    "version": "entero",
+    "areaTerreno": "texto",
+    "uso": "texto",
+    "frontis": "texto",
+    "condicionPropiedad": "texto",
+    "tipoEdificacion": "texto",
+    "vigenciaDesde": "texto",
+    "vigenciaHasta": "texto",
+    "vigente": "booleano",
+    "origen": "texto",
+    "documentoOrigen": "texto",
+    "observacion": "texto",
+    "denominacion": "texto",
+    "construcciones": [
+      {
+        "id": "entero",
+        "piso": "texto",
+        "areaConstruida": "texto",
+        "anioConstruccion": "entero",
+        "material": "texto",
+        "estadoConservacion": "texto",
+        "categorias": "texto",
+        "porcentajeConstruido": "texto"
+      }
+    ],
+    "instalaciones": [
+      {
+        "id": "entero",
+        "descripcion": "texto",
+        "unidad": "texto",
+        "cantidad": "texto",
+        "anioConstruccion": "entero",
+        "estadoConservacion": "texto"
+      }
+    ],
+    "economico": {
+      "actividades": [
+        {
+          "id": "entero",
+          "conductor": "texto",
+          "nombreComercial": "texto",
+          "ciiu": "texto",
+          "areaOcupada": "texto",
+          "licenciaNumero": "texto",
+          "licenciaFecha": "texto",
+          "anuncioNumero": "texto",
+          "anuncioFecha": "texto",
+          "vigenciaDesde": "texto"
+        }
+      ],
+      "informacionComplementaria": "texto",
+      "sinLicencia": "entero"
+    },
+    "bienesComunes": {
+      "bienes": [
+        {
+          "id": "entero",
+          "descripcion": "texto",
+          "area": "texto",
+          "material": "texto",
+          "estadoConservacion": "texto",
+          "anioConstruccion": "entero"
+        }
+      ],
+      "participaciones": [
+        {
+          "predioId": "entero",
+          "porcentaje": "texto"
+        }
+      ],
+      "areaComunTotal": "texto"
+    },
+    "rural": {
+      "tierras": [
+        {
+          "id": "entero",
+          "clasificacion": "texto",
+          "calidadAgrologica": "texto",
+          "riego": "texto",
+          "hectareas": "texto",
+          "hectareasComunes": "texto"
+        }
+      ],
+      "colindantes": [
+        {
+          "orientacion": "texto",
+          "descripcion": "texto"
+        }
+      ],
+      "hectareasTotales": "texto"
+    },
+    "historico": [
+      {
+        "id": "entero",
+        "version": "entero",
+        "areaTerreno": "texto",
+        "uso": "texto",
+        "vigenciaDesde": "texto",
+        "vigenciaHasta": "texto",
+        "vigente": "booleano",
+        "origen": "texto",
+        "documentoOrigen": "texto",
+        "observacion": "texto",
+        "usuario": "texto",
+        "registradaEn": "texto"
+      }
+    ]
+  },
+  "GET /catastro/fichas/rural/{codUnidad}": {
+    "id": "entero",
+    "predioId": "entero",
+    "tipo": "texto",
+    "version": "entero",
+    "areaTerreno": "texto",
+    "uso": "texto",
+    "frontis": "texto",
+    "condicionPropiedad": "texto",
+    "tipoEdificacion": "texto",
+    "vigenciaDesde": "texto",
+    "vigenciaHasta": "texto",
+    "vigente": "booleano",
+    "origen": "texto",
+    "documentoOrigen": "texto",
+    "observacion": "texto",
+    "denominacion": "texto",
+    "construcciones": [
+      {
+        "id": "entero",
+        "piso": "texto",
+        "areaConstruida": "texto",
+        "anioConstruccion": "entero",
+        "material": "texto",
+        "estadoConservacion": "texto",
+        "categorias": "texto",
+        "porcentajeConstruido": "texto"
+      }
+    ],
+    "instalaciones": [
+      {
+        "id": "entero",
+        "descripcion": "texto",
+        "unidad": "texto",
+        "cantidad": "texto",
+        "anioConstruccion": "entero",
+        "estadoConservacion": "texto"
+      }
+    ],
+    "economico": {
+      "actividades": [
+        {
+          "id": "entero",
+          "conductor": "texto",
+          "nombreComercial": "texto",
+          "ciiu": "texto",
+          "areaOcupada": "texto",
+          "licenciaNumero": "texto",
+          "licenciaFecha": "texto",
+          "anuncioNumero": "texto",
+          "anuncioFecha": "texto",
+          "vigenciaDesde": "texto"
+        }
+      ],
+      "informacionComplementaria": "texto",
+      "sinLicencia": "entero"
+    },
+    "bienesComunes": {
+      "bienes": [
+        {
+          "id": "entero",
+          "descripcion": "texto",
+          "area": "texto",
+          "material": "texto",
+          "estadoConservacion": "texto",
+          "anioConstruccion": "entero"
+        }
+      ],
+      "participaciones": [
+        {
+          "predioId": "entero",
+          "porcentaje": "texto"
+        }
+      ],
+      "areaComunTotal": "texto"
+    },
+    "rural": {
+      "tierras": [
+        {
+          "id": "entero",
+          "clasificacion": "texto",
+          "calidadAgrologica": "texto",
+          "riego": "texto",
+          "hectareas": "texto",
+          "hectareasComunes": "texto"
+        }
+      ],
+      "colindantes": [
+        {
+          "orientacion": "texto",
+          "descripcion": "texto"
+        }
+      ],
+      "hectareasTotales": "texto"
+    },
+    "historico": [
+      {
+        "id": "entero",
+        "version": "entero",
+        "areaTerreno": "texto",
+        "uso": "texto",
+        "vigenciaDesde": "texto",
+        "vigenciaHasta": "texto",
+        "vigente": "booleano",
+        "origen": "texto",
+        "documentoOrigen": "texto",
+        "observacion": "texto",
+        "usuario": "texto",
+        "registradaEn": "texto"
+      }
+    ]
+  },
+  "GET /catastro/fichas/urbana/{codRefCatastral}": {
+    "id": "entero",
+    "predioId": "entero",
+    "tipo": "texto",
+    "version": "entero",
+    "areaTerreno": "texto",
+    "uso": "texto",
+    "frontis": "texto",
+    "condicionPropiedad": "texto",
+    "tipoEdificacion": "texto",
+    "vigenciaDesde": "texto",
+    "vigenciaHasta": "texto",
+    "vigente": "booleano",
+    "origen": "texto",
+    "documentoOrigen": "texto",
+    "observacion": "texto",
+    "denominacion": "texto",
+    "construcciones": [
+      {
+        "id": "entero",
+        "piso": "texto",
+        "areaConstruida": "texto",
+        "anioConstruccion": "entero",
+        "material": "texto",
+        "estadoConservacion": "texto",
+        "categorias": "texto",
+        "porcentajeConstruido": "texto"
+      }
+    ],
+    "instalaciones": [
+      {
+        "id": "entero",
+        "descripcion": "texto",
+        "unidad": "texto",
+        "cantidad": "texto",
+        "anioConstruccion": "entero",
+        "estadoConservacion": "texto"
+      }
+    ],
+    "economico": {
+      "actividades": [
+        {
+          "id": "entero",
+          "conductor": "texto",
+          "nombreComercial": "texto",
+          "ciiu": "texto",
+          "areaOcupada": "texto",
+          "licenciaNumero": "texto",
+          "licenciaFecha": "texto",
+          "anuncioNumero": "texto",
+          "anuncioFecha": "texto",
+          "vigenciaDesde": "texto"
+        }
+      ],
+      "informacionComplementaria": "texto",
+      "sinLicencia": "entero"
+    },
+    "bienesComunes": {
+      "bienes": [
+        {
+          "id": "entero",
+          "descripcion": "texto",
+          "area": "texto",
+          "material": "texto",
+          "estadoConservacion": "texto",
+          "anioConstruccion": "entero"
+        }
+      ],
+      "participaciones": [
+        {
+          "predioId": "entero",
+          "porcentaje": "texto"
+        }
+      ],
+      "areaComunTotal": "texto"
+    },
+    "rural": {
+      "tierras": [
+        {
+          "id": "entero",
+          "clasificacion": "texto",
+          "calidadAgrologica": "texto",
+          "riego": "texto",
+          "hectareas": "texto",
+          "hectareasComunes": "texto"
+        }
+      ],
+      "colindantes": [
+        {
+          "orientacion": "texto",
+          "descripcion": "texto"
+        }
+      ],
+      "hectareasTotales": "texto"
+    },
+    "historico": [
+      {
+        "id": "entero",
+        "version": "entero",
+        "areaTerreno": "texto",
+        "uso": "texto",
+        "vigenciaDesde": "texto",
+        "vigenciaHasta": "texto",
+        "vigente": "booleano",
+        "origen": "texto",
+        "documentoOrigen": "texto",
+        "observacion": "texto",
+        "usuario": "texto",
+        "registradaEn": "texto"
+      }
+    ]
+  },
+  "GET /catastro/predios": {
+    "contenido": [
+      {
+        "predioId": "entero",
+        "codRefCatastral": "texto",
+        "tipo": "texto",
+        "direccion": "texto",
+        "numeroMunicipal": "texto",
+        "codigoDeVia": "texto",
+        "via": "texto",
+        "codigoDeSector": "texto",
+        "codigoDeManzana": "texto",
+        "lote": "texto",
+        "ubigeo": "texto",
+        "estado": "texto",
+        "fichado": "booleano"
+      }
+    ],
+    "pagina": "entero",
+    "tamano": "entero",
+    "totalElementos": "entero",
+    "totalPaginas": "entero",
+    "hayMas": "booleano"
+  },
+  "GET /catastro/predios/plano": {
+    "lotes": [
+      {
+        "predioId": "entero",
+        "codRefCatastral": "texto",
+        "direccion": "texto",
+        "codigoDeSector": "texto",
+        "codigoDeManzana": "texto",
+        "lote": "texto",
+        "estado": "texto",
+        "geometria": "objeto"
+      }
+    ],
+    "sinGeometria": "entero"
+  },
+  "GET /catastro/predios/plano/marco": {
+    "marco": {
+      "oeste": "numero",
+      "sur": "numero",
+      "este": "numero",
+      "norte": "numero"
+    },
+    "lotes": "entero",
+    "notaDelMarco": "texto"
+  },
+  "GET /catastro/predios/{predioId}/inquilinos": [
+    {
+      "inquilinoId": "entero",
+      "predioId": "entero",
+      "contribuyenteId": "entero",
+      "uso": "texto",
+      "vigenciaDesde": "fecha",
+      "vigenciaHasta": "fecha",
+      "documentoOrigen": "texto"
+    }
+  ],
+  "GET /catastro/predios/{predioId}/titulares": {
+    "predioId": "entero",
+    "vigenteA": "texto",
+    "titulares": [
+      {
+        "codigo": "texto",
+        "nombre": "texto",
+        "condicion": "texto",
+        "porcentaje": "texto"
+      }
+    ]
+  },
+  "GET /catastro/sectores": {
+    "contenido": [
+      {
+        "id": "entero",
+        "codigo": "texto",
+        "nombre": "texto",
+        "zona": "texto",
+        "activo": "booleano",
+        "manzanas": "entero",
+        "predios": "entero",
+        "lotes": "entero"
+      }
+    ],
+    "pagina": "entero",
+    "tamano": "entero",
+    "totalElementos": "entero",
+    "totalPaginas": "entero",
+    "hayMas": "booleano"
+  },
+  "GET /catastro/sectores/{codigo}/manzanas": {
+    "contenido": [
+      {
+        "id": "entero",
+        "sectorId": "entero",
+        "sectorCodigo": "texto",
+        "codigo": "texto",
+        "predios": "entero",
+        "lotes": "entero"
+      }
+    ],
+    "pagina": "entero",
+    "tamano": "entero",
+    "totalElementos": "entero",
+    "totalPaginas": "entero",
+    "hayMas": "booleano"
+  },
+  "GET /catastro/tablas/aranceles": [
+    {
+      "id": "entero",
+      "viaId": "entero",
+      "tramo": "texto",
+      "valorM2": "texto",
+      "documentoFuente": "texto"
+    }
+  ],
+  "GET /catastro/tablas/depreciacion": [
+    {
+      "id": "entero",
+      "uso": "texto",
+      "material": "texto",
+      "estadoConservacion": "texto",
+      "antiguedadHasta": "entero",
+      "porcentaje": "texto",
+      "documentoFuente": "texto"
+    }
+  ],
+  "GET /catastro/tablas/valores-unitarios": [
+    {
+      "id": "entero",
+      "partida": "texto",
+      "categoria": "texto",
+      "anioConstruccionDesde": "entero",
+      "anioConstruccionHasta": "entero",
+      "valorM2": "texto",
+      "documentoFuente": "texto"
+    }
+  ],
+  "GET /catastro/vias": {
+    "contenido": [
+      {
+        "id": "entero",
+        "codigo": "texto",
+        "tipo": "texto",
+        "nombre": "texto",
+        "ubigeo": "texto",
+        "activa": "booleano"
+      }
+    ],
+    "pagina": "entero",
+    "tamano": "entero",
+    "totalElementos": "entero",
+    "totalPaginas": "entero",
+    "hayMas": "booleano"
+  },
+  "GET /coactiva/deudas": {
+    "contenido": [
+      {
+        "expediente": "texto",
+        "ano": "entero",
+        "codContribuyente": "texto",
+        "contribuyente": "texto",
+        "tributos": [
+          "texto"
+        ],
+        "deudaS": "texto",
+        "costasS": "texto",
+        "totalS": "texto",
+        "aLaFecha": "fecha",
+        "estado": "texto",
+        "ultimaActuacion": {
+          "acto": "texto",
+          "numero": "texto",
+          "fecha": "fecha"
+        },
+        "beneficios": [
+          {
+            "tipo": "texto",
+            "clase": "texto",
+            "tributo": "texto",
+            "porcentajeDeclarado": "texto",
+            "montoDeclarado": "texto",
+            "baseLegal": "texto",
+            "vigenciaDesde": "fecha",
+            "vigenciaHasta": "fecha",
+            "efectoSobreElImporte": "texto"
+          }
+        ]
+      }
+    ],
+    "pagina": "entero",
+    "tamano": "entero",
+    "totalElementos": "entero",
+    "totalPaginas": "entero",
+    "hayMas": "booleano"
+  },
+  "GET /coactiva/deudas-en-beneficio": {
+    "contenido": [
+      {
+        "expediente": "texto",
+        "ano": "entero",
+        "codContribuyente": "texto",
+        "contribuyente": "texto",
+        "tributos": [
+          "texto"
+        ],
+        "deudaS": "texto",
+        "costasS": "texto",
+        "totalS": "texto",
+        "aLaFecha": "fecha",
+        "estado": "texto",
+        "ultimaActuacion": {
+          "acto": "texto",
+          "numero": "texto",
+          "fecha": "fecha"
+        },
+        "beneficios": [
+          {
+            "tipo": "texto",
+            "clase": "texto",
+            "tributo": "texto",
+            "porcentajeDeclarado": "texto",
+            "montoDeclarado": "texto",
+            "baseLegal": "texto",
+            "vigenciaDesde": "fecha",
+            "vigenciaHasta": "fecha",
+            "efectoSobreElImporte": "texto"
+          }
+        ]
+      }
+    ],
+    "pagina": "entero",
+    "tamano": "entero",
+    "totalElementos": "entero",
+    "totalPaginas": "entero",
+    "hayMas": "booleano"
+  },
+  "GET /coactiva/expedientes": {
+    "contenido": [
+      {
+        "numero": "texto",
+        "ejercicio": "entero",
+        "correlativo": "entero",
+        "codContribuyente": "texto",
+        "ejecutor": "texto",
+        "auxiliar": "texto",
+        "fechaDeApertura": "fecha",
+        "asunto": "texto",
+        "direccionReferencial": "texto",
+        "estado": "texto",
+        "estadoCodigo": "texto",
+        "valores": "entero",
+        "insoluto": "texto",
+        "reajuste": "texto",
+        "interes": "texto",
+        "gastos": "texto",
+        "deudaMateriaDeCobranza": "texto",
+        "costas": "texto",
+        "totalExigible": "texto",
+        "deudaAlDia": "fecha",
+        "valoresImportados": [
+          {
+            "valorId": "entero",
+            "fechaDeImportacion": "fecha"
+          }
+        ],
+        "historial": [
+          {
+            "tipo": "texto",
+            "estado": "texto",
+            "estadoCodigo": "texto",
+            "direccionReferencial": "texto",
+            "fecha": "fecha",
+            "motivo": "texto",
+            "fecDoc": "fecha",
+            "numDoc": "texto",
+            "activo": "booleano",
+            "usuario": "texto",
+            "observaciones": "texto"
+          }
+        ]
+      }
+    ],
+    "pagina": "entero",
+    "tamano": "entero",
+    "totalElementos": "entero",
+    "totalPaginas": "entero",
+    "hayMas": "booleano"
+  },
+  "GET /coactiva/expedientes/{numero}/deuda": {
+    "expediente": "texto",
+    "codContribuyente": "texto",
+    "contribuyente": "texto",
+    "estado": "texto",
+    "aLaFecha": "fecha",
+    "obligaciones": [
+      {
+        "tributo": "texto",
+        "ejercicio": "entero",
+        "predioId": "entero",
+        "vehiculoId": "entero",
+        "esCosta": "booleano",
+        "insolutoS": "texto",
+        "reajusteS": "texto",
+        "interesS": "texto",
+        "gastosS": "texto",
+        "totalS": "texto"
+      }
+    ],
+    "deudaMateriaDeCobranzaS": "texto",
+    "costasS": "texto",
+    "totalS": "texto"
+  },
+  "GET /coactiva/expedientes/{numero}/proceso": {
+    "expediente": {
+      "numero": "texto",
+      "ejercicio": "entero",
+      "correlativo": "entero",
+      "codContribuyente": "texto",
+      "ejecutor": "texto",
+      "auxiliar": "texto",
+      "fechaDeApertura": "fecha",
+      "asunto": "texto",
+      "direccionReferencial": "texto",
+      "estado": "texto",
+      "estadoCodigo": "texto",
+      "valores": "entero",
+      "insoluto": "texto",
+      "reajuste": "texto",
+      "interes": "texto",
+      "gastos": "texto",
+      "deudaMateriaDeCobranza": "texto",
+      "costas": "texto",
+      "totalExigible": "texto",
+      "deudaAlDia": "fecha",
+      "valoresImportados": [
+        {
+          "valorId": "entero",
+          "fechaDeImportacion": "fecha"
+        }
+      ],
+      "historial": [
+        {
+          "tipo": "texto",
+          "estado": "texto",
+          "estadoCodigo": "texto",
+          "direccionReferencial": "texto",
+          "fecha": "fecha",
+          "motivo": "texto",
+          "fecDoc": "fecha",
+          "numDoc": "texto",
+          "activo": "booleano",
+          "usuario": "texto",
+          "observaciones": "texto"
+        }
+      ]
+    },
+    "actuaciones": [
+      {
+        "tipo": "texto",
+        "titulo": "texto",
+        "numero": "texto",
+        "fecha": "fecha",
+        "descripcion": "texto",
+        "medida": "texto",
+        "exigibleDesde": "fecha",
+        "usuario": "texto",
+        "observaciones": "texto",
+        "diligencias": [
+          {
+            "intento": "entero",
+            "fecha": "fecha",
+            "modalidad": "texto",
+            "resultado": "texto",
+            "surtioEfecto": "booleano",
+            "exigibleDesde": "fecha",
+            "notificador": "texto",
+            "domicilio": "texto",
+            "receptor": "texto",
+            "documentoReceptor": "texto",
+            "vinculo": "texto",
+            "acuse": "texto",
+            "usuario": "texto",
+            "observaciones": "texto"
+          }
+        ]
+      }
+    ]
+  },
+  "GET /coactiva/liquidaciones-costas": {
+    "contenido": [
+      {
+        "nroLiquidacion": "texto",
+        "expedCoact": "texto",
+        "ejercicio": "entero",
+        "fecha": "fecha",
+        "tributo": "texto",
+        "totalS": "texto",
+        "pendienteS": "texto",
+        "aLaFecha": "fecha",
+        "estado": "texto",
+        "conjuntoDeParametros": "entero",
+        "observacion": "texto",
+        "usuarioRegistro": "texto",
+        "costas": [
+          {
+            "actoId": "entero",
+            "acto": "texto",
+            "descripcion": "texto",
+            "montoS": "texto",
+            "arancelFuente": "texto"
+          }
+        ]
+      }
+    ],
+    "pagina": "entero",
+    "tamano": "entero",
+    "totalElementos": "entero",
+    "totalPaginas": "entero",
+    "hayMas": "booleano"
+  },
+  "GET /coactiva/prescripcion": {
+    "contenido": [
+      {
+        "id": "entero",
+        "codContribuyente": "texto",
+        "contribuyente": "texto",
+        "tributo": "texto",
+        "ejercicioDesde": "entero",
+        "ejercicioHasta": "entero",
+        "fechaDePresentacion": "texto",
+        "plazoAplicable": "texto",
+        "plazo": "texto",
+        "resultado": "texto",
+        "nDeResolucion": "texto",
+        "ejerciciosPrescritos": [
+          "entero"
+        ],
+        "usuario": "texto",
+        "observacion": "texto"
+      }
+    ],
+    "pagina": "entero",
+    "tamano": "entero",
+    "totalElementos": "entero",
+    "totalPaginas": "entero",
+    "hayMas": "booleano"
+  },
+  "GET /consultas/altas-bajas": {
+    "contenido": [
+      {
+        "id": "entero",
+        "ejercicio": "entero",
+        "tributo": "texto",
+        "concepto": "texto",
+        "tipo": "texto",
+        "fase": "texto",
+        "periodo": "entero",
+        "predioId": "entero",
+        "vehiculoId": "entero",
+        "referenciaExterna": "texto",
+        "monto": {
+          "importe": "texto",
+          "actualizadoA": "fecha"
+        },
+        "documentoOrigen": "texto",
+        "asientoReversadoId": "entero",
+        "usuarioId": "texto",
+        "motivo": "texto",
+        "causal": "texto"
+      }
+    ],
+    "pagina": "entero",
+    "tamano": "entero",
+    "totalElementos": "entero",
+    "totalPaginas": "entero",
+    "hayMas": "booleano"
+  },
+  "GET /consultas/constancias/no-adeudo": {
+    "codigoContribuyente": "texto",
+    "fechaDeCorte": "texto",
+    "seNiega": "booleano",
+    "obligaciones": [
+      {
+        "tributo": "texto",
+        "ejercicio": "entero",
+        "predioId": "entero",
+        "vehiculoId": "entero",
+        "periodoDesde": "entero",
+        "periodoHasta": "entero",
+        "fase": "texto",
+        "deuda": {
+          "insoluto": {
+            "importe": "texto",
+            "actualizadoA": "fecha"
+          },
+          "reajuste": {
+            "importe": "texto",
+            "actualizadoA": "fecha"
+          },
+          "interes": {
+            "importe": "texto",
+            "actualizadoA": "fecha"
+          },
+          "gasto": {
+            "importe": "texto",
+            "actualizadoA": "fecha"
+          },
+          "total": {
+            "importe": "texto",
+            "actualizadoA": "fecha"
+          }
+        }
+      }
+    ]
+  },
+  "GET /consultas/cuenta-corriente/{codigo}": {
+    "contenido": [
+      {
+        "id": "entero",
+        "ejercicio": "entero",
+        "tributo": "texto",
+        "concepto": "texto",
+        "tipo": "texto",
+        "fase": "texto",
+        "periodo": "entero",
+        "predioId": "entero",
+        "vehiculoId": "entero",
+        "referenciaExterna": "texto",
+        "monto": {
+          "importe": "texto",
+          "actualizadoA": "fecha"
+        },
+        "documentoOrigen": "texto",
+        "asientoReversadoId": "entero",
+        "usuarioId": "texto",
+        "motivo": "texto",
+        "causal": "texto"
+      }
+    ],
+    "pagina": "entero",
+    "tamano": "entero",
+    "totalElementos": "entero",
+    "totalPaginas": "entero",
+    "hayMas": "booleano"
+  },
+  "GET /consultas/deuda": {
+    "contenido": [
+      {
+        "tributo": "texto",
+        "ejercicio": "entero",
+        "predioId": "entero",
+        "vehiculoId": "entero",
+        "periodoDesde": "entero",
+        "periodoHasta": "entero",
+        "fase": "texto",
+        "deuda": {
+          "insoluto": {
+            "importe": "texto",
+            "actualizadoA": "fecha"
+          },
+          "reajuste": {
+            "importe": "texto",
+            "actualizadoA": "fecha"
+          },
+          "interes": {
+            "importe": "texto",
+            "actualizadoA": "fecha"
+          },
+          "gasto": {
+            "importe": "texto",
+            "actualizadoA": "fecha"
+          },
+          "total": {
+            "importe": "texto",
+            "actualizadoA": "fecha"
+          }
+        }
+      }
+    ],
+    "pagina": "entero",
+    "tamano": "entero",
+    "totalElementos": "entero",
+    "totalPaginas": "entero",
+    "hayMas": "booleano"
+  },
+  "GET /consultas/deudas-con-beneficio": {
+    "contribuyente": {
+      "codigo": "texto",
+      "nombre": "texto",
+      "documento": "texto",
+      "domicilioFiscal": "texto"
+    },
+    "aLaFecha": "texto",
+    "deudaTotal": {
+      "importe": "texto",
+      "actualizadoA": "fecha"
+    },
+    "deudaAcogida": {
+      "importe": "texto",
+      "actualizadoA": "fecha"
+    },
+    "registrosAcogidos": "entero",
+    "simulacion": {
+      "campania": "texto",
+      "alicuotaAplicada": "texto",
+      "baseDelBeneficio": "texto",
+      "baseDelBeneficioImporte": {
+        "importe": "texto",
+        "actualizadoA": "fecha"
+      },
+      "ahorro": {
+        "importe": "texto",
+        "actualizadoA": "fecha"
+      },
+      "deudaConBeneficio": {
+        "importe": "texto",
+        "actualizadoA": "fecha"
+      }
+    },
+    "campaniasAplicables": [
+      {
+        "nombre": "texto",
+        "alicuota": "texto",
+        "base": "texto"
+      }
+    ],
+    "estadoDeLaSimulacion": "texto",
+    "obligaciones": {
+      "contenido": [
+        {
+          "tributo": "texto",
+          "ejercicio": "entero",
+          "predioId": "entero",
+          "vehiculoId": "entero",
+          "insoluto": {
+            "importe": "texto",
+            "actualizadoA": "fecha"
+          },
+          "reajuste": {
+            "importe": "texto",
+            "actualizadoA": "fecha"
+          },
+          "interes": {
+            "importe": "texto",
+            "actualizadoA": "fecha"
+          },
+          "gasto": {
+            "importe": "texto",
+            "actualizadoA": "fecha"
+          },
+          "total": {
+            "importe": "texto",
+            "actualizadoA": "fecha"
+          }
+        }
+      ],
+      "pagina": "entero",
+      "tamano": "entero",
+      "totalElementos": "entero",
+      "totalPaginas": "entero",
+      "hayMas": "booleano"
+    }
+  },
+  "GET /consultas/pagos": {
+    "contenido": [
+      {
+        "id": "entero",
+        "ejercicio": "entero",
+        "tributo": "texto",
+        "concepto": "texto",
+        "tipo": "texto",
+        "fase": "texto",
+        "periodo": "entero",
+        "predioId": "entero",
+        "vehiculoId": "entero",
+        "referenciaExterna": "texto",
+        "monto": {
+          "importe": "texto",
+          "actualizadoA": "fecha"
+        },
+        "documentoOrigen": "texto",
+        "asientoReversadoId": "entero",
+        "usuarioId": "texto",
+        "motivo": "texto",
+        "causal": "texto"
+      }
+    ],
+    "pagina": "entero",
+    "tamano": "entero",
+    "totalElementos": "entero",
+    "totalPaginas": "entero",
+    "hayMas": "booleano"
+  },
+  "GET /consultas/predios": {
+    "contenido": [
+      {
+        "predioId": "entero",
+        "codigoReferenciaCatastral": "texto",
+        "tipo": "texto",
+        "direccion": "texto",
+        "porcentajeTitularidad": "texto",
+        "deuda": {
+          "importe": "texto",
+          "actualizadoA": "fecha"
+        }
+      }
+    ],
+    "pagina": "entero",
+    "tamano": "entero",
+    "totalElementos": "entero",
+    "totalPaginas": "entero",
+    "hayMas": "booleano"
+  },
+  "GET /consultas/resumen-predial": {
+    "contenido": [
+      {
+        "fichaId": "entero",
+        "predioId": "entero",
+        "codCatastral": "texto",
+        "codPropietario": "texto",
+        "nombreDelPropietario": "texto",
+        "direccionDelPredio": "texto",
+        "uso": "texto",
+        "tipo": "texto",
+        "version": "entero",
+        "vigenciaDesde": "texto"
+      }
+    ],
+    "pagina": "entero",
+    "tamano": "entero",
+    "totalElementos": "entero",
+    "totalPaginas": "entero",
+    "hayMas": "booleano"
+  },
+  "GET /consultas/unificada": {
+    "contribuyente": {
+      "codigo": "texto",
+      "nombre": "texto",
+      "documento": "texto"
+    },
+    "aLaFecha": "texto",
+    "resumenDeSaldos": {
+      "insoluto": {
+        "importe": "texto",
+        "actualizadoA": "fecha"
+      },
+      "reajuste": {
+        "importe": "texto",
+        "actualizadoA": "fecha"
+      },
+      "interes": {
+        "importe": "texto",
+        "actualizadoA": "fecha"
+      },
+      "gasto": {
+        "importe": "texto",
+        "actualizadoA": "fecha"
+      },
+      "total": {
+        "importe": "texto",
+        "actualizadoA": "fecha"
+      },
+      "estadoDeLaConsulta": "texto"
+    },
+    "deudasPendientes": {
+      "contenido": [
+        {
+          "tributo": "texto",
+          "ejercicio": "entero",
+          "predioId": "entero",
+          "vehiculoId": "entero",
+          "insoluto": {
+            "importe": "texto",
+            "actualizadoA": "fecha"
+          },
+          "reajuste": {
+            "importe": "texto",
+            "actualizadoA": "fecha"
+          },
+          "interes": {
+            "importe": "texto",
+            "actualizadoA": "fecha"
+          },
+          "gasto": {
+            "importe": "texto",
+            "actualizadoA": "fecha"
+          },
+          "total": {
+            "importe": "texto",
+            "actualizadoA": "fecha"
+          }
+        }
+      ],
+      "pagina": "entero",
+      "tamano": "entero",
+      "totalElementos": "entero",
+      "totalPaginas": "entero",
+      "hayMas": "booleano"
+    },
+    "pagosRealizados": {
+      "contenido": [
+        {
+          "id": "entero",
+          "ejercicio": "entero",
+          "tributo": "texto",
+          "concepto": "texto",
+          "tipo": "texto",
+          "fase": "texto",
+          "periodo": "entero",
+          "predioId": "entero",
+          "vehiculoId": "entero",
+          "monto": {
+            "importe": "texto",
+            "actualizadoA": "fecha"
+          },
+          "documentoOrigen": "texto",
+          "motivo": "texto"
+        }
+      ],
+      "pagina": "entero",
+      "tamano": "entero",
+      "totalElementos": "entero",
+      "totalPaginas": "entero",
+      "hayMas": "booleano"
+    },
+    "altasYBajas": {
+      "contenido": [
+        {
+          "id": "entero",
+          "ejercicio": "entero",
+          "tributo": "texto",
+          "concepto": "texto",
+          "tipo": "texto",
+          "fase": "texto",
+          "periodo": "entero",
+          "predioId": "entero",
+          "vehiculoId": "entero",
+          "monto": {
+            "importe": "texto",
+            "actualizadoA": "fecha"
+          },
+          "documentoOrigen": "texto",
+          "motivo": "texto"
+        }
+      ],
+      "pagina": "entero",
+      "tamano": "entero",
+      "totalElementos": "entero",
+      "totalPaginas": "entero",
+      "hayMas": "booleano"
+    },
+    "fraccionamientos": {
+      "contenido": [
+        {
+          "numero": "texto",
+          "fecha": "texto",
+          "deudaAcogida": {
+            "importe": "texto",
+            "actualizadoA": "fecha"
+          },
+          "cuotas": "entero",
+          "pagadas": "entero",
+          "vencidas": "entero",
+          "saldo": {
+            "importe": "texto",
+            "actualizadoA": "fecha"
+          },
+          "estado": "texto",
+          "motivoDelCierre": "texto"
+        }
+      ],
+      "pagina": "entero",
+      "tamano": "entero",
+      "totalElementos": "entero",
+      "totalPaginas": "entero",
+      "hayMas": "booleano"
+    },
+    "valores": {
+      "contenido": [
+        {
+          "tipo": "texto",
+          "numero": "texto",
+          "ejercicio": "entero",
+          "fechaEmision": "texto",
+          "tributos": "texto",
+          "periodo": "texto",
+          "situacion": "texto",
+          "situacionA": "texto",
+          "insoluto": {
+            "importe": "texto",
+            "actualizadoA": "fecha"
+          },
+          "reajuste": {
+            "importe": "texto",
+            "actualizadoA": "fecha"
+          },
+          "interes": {
+            "importe": "texto",
+            "actualizadoA": "fecha"
+          },
+          "gasto": {
+            "importe": "texto",
+            "actualizadoA": "fecha"
+          },
+          "total": {
+            "importe": "texto",
+            "actualizadoA": "fecha"
+          }
+        }
+      ],
+      "pagina": "entero",
+      "tamano": "entero",
+      "totalElementos": "entero",
+      "totalPaginas": "entero",
+      "hayMas": "booleano"
+    },
+    "declaracionesJuradas": {
+      "contenido": [
+        {
+          "id": "entero",
+          "numero": "texto",
+          "ejercicio": "entero",
+          "tipo": "texto",
+          "predioId": "entero",
+          "vehiculoId": "entero",
+          "fichaCatastralId": "entero",
+          "fechaPresentacion": "texto",
+          "fechaLimite": "texto",
+          "fueraDePlazo": "booleano",
+          "estado": "texto",
+          "djRectificaId": "entero"
+        }
+      ],
+      "pagina": "entero",
+      "tamano": "entero",
+      "totalElementos": "entero",
+      "totalPaginas": "entero",
+      "hayMas": "booleano"
+    }
+  },
+  "GET /consultas/valores": {
+    "contenido": [
+      {
+        "id": "entero",
+        "numero": "texto",
+        "tipo": "texto",
+        "codContribuyente": "texto",
+        "contribuyente": "texto",
+        "tributo": "texto",
+        "periodo": "texto",
+        "monto": {
+          "importe": "texto",
+          "actualizadoA": "fecha"
+        },
+        "notificadoEl": "texto",
+        "exigibleDesde": "texto",
+        "situacion": "texto",
+        "estado": "texto",
+        "situacionA": "texto",
+        "fechaEmision": "texto"
+      }
+    ],
+    "pagina": "entero",
+    "tamano": "entero",
+    "totalElementos": "entero",
+    "totalPaginas": "entero",
+    "hayMas": "booleano"
+  },
+  "GET /consultas/vehiculos": {
+    "contenido": [
+      {
+        "vehiculoId": "entero",
+        "placa": "texto",
+        "clase": "texto",
+        "marca": "texto",
+        "modelo": "texto",
+        "anioFabricacion": "entero",
+        "estado": "texto",
+        "afectoDesde": "entero",
+        "afectoHasta": "entero",
+        "contribuyenteId": "entero",
+        "codigoContribuyente": "texto",
+        "titular": "texto",
+        "deuda": {
+          "importe": "texto",
+          "actualizadoA": "fecha"
+        }
+      }
+    ],
+    "pagina": "entero",
+    "tamano": "entero",
+    "totalElementos": "entero",
+    "totalPaginas": "entero",
+    "hayMas": "booleano"
+  },
+  "GET /fiscalizacion/actas": {
+    "contenido": [
+      {
+        "id": "entero",
+        "programaId": "entero",
+        "version": "entero",
+        "contribuyenteId": "entero",
+        "predioId": "entero",
+        "vehiculoId": "entero",
+        "fichaId": "entero",
+        "fechaVisita": "texto",
+        "fiscalizador": "texto",
+        "hallazgo": "texto",
+        "areaHallada": "texto",
+        "usoHallado": "texto",
+        "detalle": "texto",
+        "estado": "texto"
+      }
+    ],
+    "pagina": "entero",
+    "tamano": "entero",
+    "totalElementos": "entero",
+    "totalPaginas": "entero",
+    "hayMas": "booleano"
+  },
+  "GET /fiscalizacion/estado-cuenta": {
+    "codContribuyente": "texto",
+    "fechaDeConsulta": "texto",
+    "fiscalizado": "booleano",
+    "lineas": [
+      {
+        "deuda": "texto",
+        "ano": "entero",
+        "nomTrib": "texto",
+        "unidad": "entero",
+        "estad": "texto",
+        "importe": {
+          "importe": "texto",
+          "actualizadoA": "fecha"
+        }
+      }
+    ],
+    "total": {
+      "importe": "texto",
+      "actualizadoA": "fecha"
+    }
+  },
+  "GET /fiscalizacion/omisos": {
+    "contenido": [
+      {
+        "codRefCatastral": "texto",
+        "titular": "texto",
+        "codigoDelTitular": "texto",
+        "titulares": [
+          {
+            "codigo": "texto",
+            "nombre": "texto"
+          }
+        ],
+        "sector": "texto",
+        "condicion": "texto",
+        "declaroFueraDePlazo": "booleano",
+        "areaCatastral": "texto",
+        "areaDeclarada": "texto",
+        "diferenciaDeArea": "texto",
+        "valorCatastralS": "texto",
+        "valorDeclaradoS": "texto",
+        "diferenciaS": "texto",
+        "impuestoOmitidoS": "texto"
+      }
+    ],
+    "pagina": "entero",
+    "tamano": "entero",
+    "totalElementos": "entero",
+    "totalPaginas": "entero",
+    "hayMas": "booleano"
+  },
+  "GET /fiscalizacion/predial/historico": {
+    "contenido": [
+      {
+        "version": {
+          "numero": "texto",
+          "actaId": "entero",
+          "version": "entero",
+          "liquidacionAnterior": "entero",
+          "periodoDesde": "entero",
+          "periodoHasta": "entero",
+          "tipoDeFiscalizacion": "texto",
+          "motivoDeterminante": "texto",
+          "fecha": "texto",
+          "numeroNotificacion": "texto",
+          "estado": "texto",
+          "esperaSusCifras": "booleano",
+          "lineas": [
+            {
+              "ejercicio": "entero",
+              "predioId": "entero",
+              "vehiculoId": "entero",
+              "condicion": "texto",
+              "areaDeclarada": "texto",
+              "areaHallada": "texto",
+              "diferenciaDeArea": "texto",
+              "usoDeclarado": "texto",
+              "usoHallado": "texto",
+              "insolutoOmitido": "texto",
+              "multaTributaria": "texto"
+            }
+          ],
+          "historial": [
+            {
+              "tipo": "texto",
+              "estado": "texto",
+              "fecha": "texto",
+              "motivo": "texto",
+              "usuario": "texto"
+            }
+          ]
+        },
+        "cambios": [
+          {
+            "concepto": "texto",
+            "antes": "texto",
+            "despues": "texto"
+          }
+        ],
+        "importesSinCifra": [
+          "texto"
+        ]
+      }
+    ],
+    "pagina": "entero",
+    "tamano": "entero",
+    "totalElementos": "entero",
+    "totalPaginas": "entero",
+    "hayMas": "booleano"
+  },
+  "GET /fiscalizacion/programas": {
+    "contenido": [
+      {
+        "id": "entero",
+        "codigo": "texto",
+        "descripcion": "texto",
+        "tipo": "texto",
+        "fechaInicio": "texto",
+        "fechaFin": "texto",
+        "estado": "texto",
+        "ejercicio": "texto",
+        "sector": "texto",
+        "criterio": "texto",
+        "fiscalizador": "texto"
+      }
+    ],
+    "pagina": "entero",
+    "tamano": "entero",
+    "totalElementos": "entero",
+    "totalPaginas": "entero",
+    "hayMas": "booleano"
+  },
+  "GET /fiscalizacion/programas/{id}/muestra": {
+    "contenido": [
+      {
+        "programaId": "entero",
+        "predioId": "entero",
+        "codRefCatastral": "texto",
+        "contribuyenteId": "entero",
+        "codContribuyente": "texto",
+        "titular": "texto",
+        "sector": "texto",
+        "condicion": "texto",
+        "areaCatastral": "texto",
+        "areaDeclarada": "texto",
+        "diferenciaDeArea": "texto",
+        "visitado": "booleano",
+        "fechaSorteo": "texto"
+      }
+    ],
+    "pagina": "entero",
+    "tamano": "entero",
+    "totalElementos": "entero",
+    "totalPaginas": "entero",
+    "hayMas": "booleano"
+  },
+  "GET /fiscalizacion/resoluciones/{numero}": {
+    "numero": "texto",
+    "fecha": "texto",
+    "aLaFecha": "texto",
+    "nLiquidacion": "texto",
+    "versionDeLaLiquidacion": "entero",
+    "periodoDesde": "entero",
+    "periodoHasta": "entero",
+    "codContribuyente": "texto",
+    "contribuyente": "texto",
+    "predioId": "entero",
+    "vehiculoId": "entero",
+    "documentoSustento": "texto",
+    "sustento": "texto",
+    "baseLegal": "texto",
+    "fichaAnteriorId": "entero",
+    "fichaNuevaId": "entero",
+    "usuarioRegistro": "texto",
+    "observacion": "texto",
+    "lineas": [
+      {
+        "ejercicio": "entero",
+        "determinado": "texto",
+        "declarado": "texto",
+        "diferencia": "texto",
+        "multa": "texto",
+        "total": "texto",
+        "condicion": "texto",
+        "areaDeclarada": "texto",
+        "areaHallada": "texto"
+      }
+    ],
+    "cargosAsentados": "entero"
+  },
+  "GET /fiscalizacion/resultados": {
+    "contenido": [
+      {
+        "numero": "texto",
+        "actaId": "entero",
+        "version": "entero",
+        "liquidacionAnterior": "entero",
+        "periodoDesde": "entero",
+        "periodoHasta": "entero",
+        "tipoDeFiscalizacion": "texto",
+        "motivoDeterminante": "texto",
+        "fecha": "texto",
+        "numeroNotificacion": "texto",
+        "estado": "texto",
+        "esperaSusCifras": "booleano",
+        "lineas": [
+          {
+            "ejercicio": "entero",
+            "predioId": "entero",
+            "vehiculoId": "entero",
+            "condicion": "texto",
+            "areaDeclarada": "texto",
+            "areaHallada": "texto",
+            "diferenciaDeArea": "texto",
+            "usoDeclarado": "texto",
+            "usoHallado": "texto",
+            "insolutoOmitido": "texto",
+            "multaTributaria": "texto"
+          }
+        ],
+        "historial": [
+          {
+            "tipo": "texto",
+            "estado": "texto",
+            "fecha": "texto",
+            "motivo": "texto",
+            "usuario": "texto"
+          }
+        ]
+      }
+    ],
+    "pagina": "entero",
+    "tamano": "entero",
+    "totalElementos": "entero",
+    "totalPaginas": "entero",
+    "hayMas": "booleano"
+  },
+  "GET /indicadores/recaudacion": {
+    "ejercicio": "entero",
+    "fechaCalculo": "fecha",
+    "calculadoEn": "instante",
+    "cargado": {
+      "importe": "texto",
+      "actualizadoA": "fecha"
+    },
+    "kpis": [
+      {
+        "label": "texto",
+        "value": "texto",
+        "note": "texto",
+        "importe": {
+          "importe": "texto",
+          "actualizadoA": "fecha"
+        }
+      }
+    ],
+    "paneles": [
+      {
+        "title": "texto",
+        "note": "texto",
+        "rows": [
+          {
+            "label": "texto",
+            "sub": "texto",
+            "value": "texto",
+            "pct": "entero",
+            "avanceConocido": "booleano",
+            "importe": {
+              "importe": "texto",
+              "actualizadoA": "fecha"
+            },
+            "cargado": {
+              "importe": "texto",
+              "actualizadoA": "fecha"
+            },
+            "pendiente": {
+              "importe": "texto",
+              "actualizadoA": "fecha"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "GET /indicadores/trabajo-parado": {
+    "ejercicio": "entero",
+    "fechaCalculo": "fecha",
+    "calculadoEn": "instante",
+    "frentes": [
+      {
+        "frente": "texto",
+        "modulo": "texto",
+        "queEstaParado": "texto",
+        "porQueCuestaDinero": "texto",
+        "cuantos": "entero",
+        "importe": {
+          "importe": "texto",
+          "actualizadoA": "fecha"
+        }
+      }
+    ]
+  },
+  "GET /infracciones/actas": {
+    "contenido": [
+      {
+        "id": "entero",
+        "numeroActa": "texto",
+        "administrado": "texto",
+        "codigoCuis": "texto",
+        "descripcionInfraccion": "texto",
+        "porcentajeInfraccion": "texto",
+        "importeAPagar": "texto",
+        "actualizadoA": "fecha",
+        "medidaComplementaria": "texto",
+        "fase": "texto",
+        "faseAlDia": "fecha",
+        "estadoDeLaDeuda": "texto"
+      }
+    ],
+    "pagina": "entero",
+    "tamano": "entero",
+    "totalElementos": "entero",
+    "totalPaginas": "entero",
+    "hayMas": "booleano"
+  },
+  "GET /infracciones/administrativas/codigos/reporte": {
+    "contenido": [
+      {
+        "id": "entero",
+        "familia": "texto",
+        "codigo": "texto",
+        "descripcion": "texto",
+        "porcentajeUit": "texto",
+        "medida": "texto",
+        "puntos": "entero",
+        "baseLegal": "texto",
+        "vigenciaDesde": "texto",
+        "vigenciaHasta": "texto"
+      }
+    ],
+    "pagina": "entero",
+    "tamano": "entero",
+    "totalElementos": "entero",
+    "totalPaginas": "entero",
+    "hayMas": "booleano"
+  },
+  "GET /infracciones/administrativas/estado-cuenta": {
+    "contenido": [
+      {
+        "id": "entero",
+        "familia": "texto",
+        "numero": "texto",
+        "fechaInfraccion": "texto",
+        "horaInfraccion": "texto",
+        "lugar": "texto",
+        "placa": "texto",
+        "vehiculoId": "entero",
+        "infractorId": "entero",
+        "propietarioId": "entero",
+        "contribuyenteId": "entero",
+        "predioId": "entero",
+        "notificacionPreviaId": "entero",
+        "baseImponible": "texto",
+        "porcentajeInfraccion": "texto",
+        "importeInfraccion": "texto",
+        "porcentajeACobrar": "texto",
+        "importeAPagar": "texto",
+        "importeConBeneficio": "texto",
+        "estado": "texto",
+        "usuarioRegistro": "texto"
+      }
+    ],
+    "pagina": "entero",
+    "tamano": "entero",
+    "totalElementos": "entero",
+    "totalPaginas": "entero",
+    "hayMas": "booleano"
+  },
+  "GET /infracciones/administrativas/reportes/padron-notificaciones": {
+    "contenido": [
+      {
+        "numero": "texto",
+        "fecha": "fecha",
+        "direccion": "texto",
+        "motivo": "texto",
+        "plazoDias": "entero",
+        "estado": "texto",
+        "tienePapeleta": "booleano",
+        "papeletaNumero": "texto",
+        "papeletaEstado": "texto",
+        "importeDeLaPapeleta": "texto",
+        "actualizadoA": "fecha"
+      }
+    ],
+    "pagina": "entero",
+    "tamano": "entero",
+    "totalElementos": "entero",
+    "totalPaginas": "entero",
+    "hayMas": "booleano"
+  },
+  "GET /infracciones/administrativas/reportes/por-contribuyente": {
+    "contenido": [
+      {
+        "id": "entero",
+        "familia": "texto",
+        "numero": "texto",
+        "fechaInfraccion": "texto",
+        "horaInfraccion": "texto",
+        "lugar": "texto",
+        "placa": "texto",
+        "vehiculoId": "entero",
+        "infractorId": "entero",
+        "propietarioId": "entero",
+        "contribuyenteId": "entero",
+        "predioId": "entero",
+        "notificacionPreviaId": "entero",
+        "baseImponible": "texto",
+        "porcentajeInfraccion": "texto",
+        "importeInfraccion": "texto",
+        "porcentajeACobrar": "texto",
+        "importeAPagar": "texto",
+        "importeConBeneficio": "texto",
+        "estado": "texto",
+        "usuarioRegistro": "texto"
+      }
+    ],
+    "pagina": "entero",
+    "tamano": "entero",
+    "totalElementos": "entero",
+    "totalPaginas": "entero",
+    "hayMas": "booleano"
+  },
+  "GET /infracciones/administrativas/reportes/resumen-recaudacion": {
+    "desde": "fecha",
+    "hasta": "fecha",
+    "total": "texto",
+    "abonos": "entero",
+    "actualizadoA": "fecha",
+    "lineas": [
+      {
+        "tributo": "texto",
+        "ejercicio": "entero",
+        "mes": "entero",
+        "fase": "texto",
+        "abonos": "entero",
+        "recaudado": "texto",
+        "actualizadoA": "fecha"
+      }
+    ],
+    "porMes": [
+      {
+        "mes": "entero",
+        "porFase": [
+          {
+            "fase": "texto",
+            "recaudado": "texto",
+            "abonos": "entero",
+            "actualizadoA": "fecha"
+          }
+        ],
+        "total": "texto",
+        "abonos": "entero",
+        "actualizadoA": "fecha"
+      }
+    ]
+  },
+  "GET /infracciones/administrativas/reportes/vencidas": {
+    "contenido": [
+      {
+        "id": "entero",
+        "numero": "texto",
+        "fecha": "texto",
+        "contribuyenteId": "entero",
+        "predioId": "entero",
+        "direccion": "texto",
+        "motivo": "texto",
+        "plazoDias": "entero",
+        "vencimiento": "texto",
+        "estado": "texto",
+        "usuarioRegistro": "texto"
+      }
+    ],
+    "pagina": "entero",
+    "tamano": "entero",
+    "totalElementos": "entero",
+    "totalPaginas": "entero",
+    "hayMas": "booleano"
+  },
+  "GET /infracciones/cuis": {
+    "contenido": [
+      {
+        "id": "entero",
+        "familia": "texto",
+        "codigo": "texto",
+        "descripcion": "texto",
+        "porcentajeUit": "texto",
+        "medida": "texto",
+        "puntos": "entero",
+        "baseLegal": "texto",
+        "vigenciaDesde": "texto",
+        "vigenciaHasta": "texto"
+      }
+    ],
+    "pagina": "entero",
+    "tamano": "entero",
+    "totalElementos": "entero",
+    "totalPaginas": "entero",
+    "hayMas": "booleano"
+  },
+  "GET /licencias/certificados": {
+    "contenido": [
+      {
+        "nCertificado": "texto",
+        "tipo": "texto",
+        "tipoEtiqueta": "texto",
+        "predio": "texto",
+        "direccion": "texto",
+        "solicitante": "texto",
+        "codContribuyente": "texto",
+        "fecha": "fecha",
+        "vigenciaHasta": "fecha",
+        "derechoS": {
+          "importe": "texto",
+          "actualizadoA": "fecha"
+        },
+        "estado": "texto",
+        "estadoALaFecha": "fecha",
+        "nExpediente": "texto",
+        "documento": "texto",
+        "zonificacion": "texto",
+        "alturaMaximaPermitida": "texto",
+        "areaLibreMinima": "texto",
+        "retiroMunicipal": "texto",
+        "coeficienteDeEdificacion": "texto"
+      }
+    ],
+    "pagina": "entero",
+    "tamano": "entero",
+    "totalElementos": "entero",
+    "totalPaginas": "entero",
+    "hayMas": "booleano"
+  },
+  "GET /licencias/ciiu": {
+    "contenido": [
+      {
+        "codigo": "texto",
+        "descripcion": "texto",
+        "seccion": "texto",
+        "riesgoItse": "texto",
+        "zonificacionCompatible": "texto",
+        "requiereSectorial": "booleano",
+        "extendido": "booleano",
+        "activo": "booleano"
+      }
+    ],
+    "pagina": "entero",
+    "tamano": "entero",
+    "totalElementos": "entero",
+    "totalPaginas": "entero",
+    "hayMas": "booleano"
+  },
+  "GET /licencias/edificacion": {
+    "contenido": [
+      {
+        "nroExpediente": "texto",
+        "fechaDeclaracion": "fecha",
+        "nroLicencia": "texto",
+        "est": "texto",
+        "estado": "texto",
+        "estadoALaFecha": "fecha",
+        "contribuyente": "texto",
+        "nombreContribuyente": "texto",
+        "tipoTramite": "texto",
+        "obra": "texto",
+        "modalidad": "texto",
+        "revision": "texto",
+        "nroExpedienteAnterior": "texto",
+        "solicitanteEsPropietario": "booleano",
+        "representanteLegal": {
+          "dni": "texto",
+          "nombre": "texto",
+          "partidaRegistral": "texto",
+          "vigenciaPoder": "fecha"
+        },
+        "terreno": {
+          "version": "entero",
+          "codCatastral": "texto",
+          "direccion": "texto",
+          "mz": "texto",
+          "lt": "texto",
+          "areaDelTerrenoM": "texto",
+          "zonificacion": "texto",
+          "partidaRegistral": "texto",
+          "frenteM": "texto",
+          "fondoM": "texto"
+        },
+        "proyecto": {
+          "version": "entero",
+          "usoDeLaEdificacion": "texto",
+          "nDePisos": "entero",
+          "areaTechadaTotalM": "texto",
+          "areaLibreM": "texto",
+          "nDeEstacionamientos": "entero",
+          "plazoDeEjecucionMeses": "entero"
+        },
+        "valorizacion": [
+          {
+            "piso": "entero",
+            "partida": "texto",
+            "categoria": "texto",
+            "areaM": "texto"
+          }
+        ],
+        "valorDeObra": {
+          "importe": "texto",
+          "actualizadoA": "fecha"
+        },
+        "valorDeObraNoDisponible": "texto",
+        "llaveQueFalta": "texto",
+        "profesionales": [
+          {
+            "tipo": "texto",
+            "nombre": "texto",
+            "colegio": "texto",
+            "colegiatura": "texto"
+          }
+        ],
+        "documentos": [
+          {
+            "requisito": "texto",
+            "presentado": "booleano",
+            "folios": "entero"
+          }
+        ],
+        "historial": [
+          {
+            "tipo": "texto",
+            "fecha": "fecha",
+            "nroLicencia": "texto",
+            "motivo": "texto",
+            "resolucion": "texto",
+            "observacion": "texto"
+          }
+        ],
+        "vigencias": [
+          {
+            "tramo": "entero",
+            "desde": "fecha",
+            "hasta": "fecha"
+          }
+        ],
+        "seccionesFaltantes": [
+          "texto"
+        ],
+        "completo": "booleano"
+      }
+    ],
+    "pagina": "entero",
+    "tamano": "entero",
+    "totalElementos": "entero",
+    "totalPaginas": "entero",
+    "hayMas": "booleano"
+  },
+  "GET /licencias/edificacion/reportes/general": {
+    "contenido": [
+      {
+        "nLicencia": "texto",
+        "expediente": "texto",
+        "fecha": "fecha",
+        "administrado": "texto",
+        "predio": "texto",
+        "modalidad": "texto",
+        "areaAConstruirM": "texto",
+        "valorDeObraS": {
+          "importe": "texto",
+          "actualizadoA": "fecha"
+        },
+        "valorDeObraNoDisponible": "texto",
+        "estado": "texto",
+        "estadoALaFecha": "fecha"
+      }
+    ],
+    "pagina": "entero",
+    "tamano": "entero",
+    "totalElementos": "entero",
+    "totalPaginas": "entero",
+    "hayMas": "booleano"
+  },
+  "GET /licencias/funcionamiento": {
+    "contenido": [
+      {
+        "nroLicencia": "texto",
+        "est": "texto",
+        "estado": "texto",
+        "estadoALaFecha": "fecha",
+        "contribuyente": "texto",
+        "codContribuyente": "texto",
+        "denominacionComercial": "texto",
+        "direccion": "texto",
+        "tipoDeLicencia": "texto",
+        "areaDelEstablecimiento": "texto",
+        "zonificacion": "texto",
+        "aforo": "entero",
+        "fechaDeEmision": "fecha",
+        "fechaDeVencimiento": "fecha",
+        "nExpediente": "texto",
+        "fechaDeExpediente": "fecha",
+        "fichaEconomica": "entero",
+        "giros": [
+          {
+            "codigo": "texto",
+            "descripcion": "texto",
+            "principal": "booleano",
+            "activo": "booleano"
+          }
+        ],
+        "historial": [
+          {
+            "tipo": "texto",
+            "fecha": "fecha",
+            "motivo": "texto",
+            "resolucion": "texto",
+            "observacion": "texto"
+          }
+        ],
+        "duplicados": [
+          {
+            "numero": "entero",
+            "fecha": "fecha",
+            "motivo": "texto",
+            "reimpresion": "entero"
+          }
+        ]
+      }
+    ],
+    "pagina": "entero",
+    "tamano": "entero",
+    "totalElementos": "entero",
+    "totalPaginas": "entero",
+    "hayMas": "booleano"
+  },
+  "GET /licencias/funcionamiento/reportes/resumen-anual": {
+    "aLaFecha": "fecha",
+    "filas": [
+      {
+        "ano": "entero",
+        "emitidas": "entero",
+        "canceladas": "entero",
+        "duplicados": "entero",
+        "vigentesAlCierre": "entero",
+        "derechoDeTramiteS": {
+          "importe": "texto",
+          "actualizadoA": "fecha"
+        },
+        "derechoNoDisponible": "texto",
+        "alCierre": "fecha"
+      }
+    ]
+  },
+  "GET /portal/situacion": {
+    "tipoDocumento": "texto",
+    "numeroDocumento": "texto",
+    "aLaFecha": "texto",
+    "municipalidadesRecorridas": "entero",
+    "totalConsolidado": {
+      "importe": "texto",
+      "actualizadoA": "fecha"
+    },
+    "notaDelTotal": "texto",
+    "sinRegistros": "booleano",
+    "municipalidades": [
+      {
+        "ubigeo": "texto",
+        "nombre": "texto",
+        "codigoContribuyente": "texto",
+        "nombreContribuyente": "texto",
+        "activo": "booleano",
+        "resumenDeSaldos": {
+          "insoluto": {
+            "importe": "texto",
+            "actualizadoA": "fecha"
+          },
+          "reajuste": {
+            "importe": "texto",
+            "actualizadoA": "fecha"
+          },
+          "interes": {
+            "importe": "texto",
+            "actualizadoA": "fecha"
+          },
+          "gasto": {
+            "importe": "texto",
+            "actualizadoA": "fecha"
+          },
+          "total": {
+            "importe": "texto",
+            "actualizadoA": "fecha"
+          },
+          "estadoDeLaConsulta": "texto"
+        },
+        "obligaciones": [
+          {
+            "tributo": "texto",
+            "ejercicio": "entero",
+            "predioId": "entero",
+            "vehiculoId": "entero",
+            "insoluto": {
+              "importe": "texto",
+              "actualizadoA": "fecha"
+            },
+            "reajuste": {
+              "importe": "texto",
+              "actualizadoA": "fecha"
+            },
+            "interes": {
+              "importe": "texto",
+              "actualizadoA": "fecha"
+            },
+            "gasto": {
+              "importe": "texto",
+              "actualizadoA": "fecha"
+            },
+            "total": {
+              "importe": "texto",
+              "actualizadoA": "fecha"
+            }
+          }
+        ],
+        "predios": [
+          {
+            "codigoReferenciaCatastral": "texto",
+            "tipo": "texto",
+            "direccion": "texto",
+            "porcentajeTitularidad": "texto"
+          }
+        ]
+      }
+    ]
+  },
+  "GET /rentas/arbitrios": {
+    "contenido": [
+      {
+        "id": "entero",
+        "ejercicio": "texto",
+        "servicio": "texto",
+        "periodo": "entero",
+        "contribuyenteId": "entero",
+        "predioId": "entero",
+        "monto": "texto",
+        "fechaCalculo": "texto"
+      }
+    ],
+    "pagina": "entero",
+    "tamano": "entero",
+    "totalElementos": "entero",
+    "totalPaginas": "entero",
+    "hayMas": "booleano"
+  },
+  "GET /rentas/beneficios": {
+    "contenido": [
+      {
+        "id": "entero",
+        "contribuyenteId": "entero",
+        "predioId": "entero",
+        "vehiculoId": "entero",
+        "tipo": "texto",
+        "tributo": "texto",
+        "clase": "texto",
+        "porcentaje": "texto",
+        "monto": "texto",
+        "vigenciaDesde": "texto",
+        "vigenciaHasta": "texto",
+        "baseLegal": "texto",
+        "documentoOrigen": "texto"
+      }
+    ],
+    "pagina": "entero",
+    "tamano": "entero",
+    "totalElementos": "entero",
+    "totalPaginas": "entero",
+    "hayMas": "booleano"
+  },
+  "GET /rentas/contribuyentes": {
+    "contenido": [
+      {
+        "id": "entero",
+        "codigo": "texto",
+        "tipoDocumento": "texto",
+        "numeroDocumento": "texto",
+        "tipoPersona": "texto",
+        "nombreRazonSocial": "texto",
+        "condicionEspecial": "texto",
+        "activo": "booleano"
+      }
+    ],
+    "pagina": "entero",
+    "tamano": "entero",
+    "totalElementos": "entero",
+    "totalPaginas": "entero",
+    "hayMas": "booleano"
+  },
+  "GET /rentas/contribuyentes/{id}/ficha": {
+    "contribuyente": {
+      "id": "entero",
+      "codigo": "texto",
+      "tipoDocumento": "texto",
+      "numeroDocumento": "texto",
+      "tipoPersona": "texto",
+      "nombreRazonSocial": "texto",
+      "condicionEspecial": "texto",
+      "activo": "booleano"
+    },
+    "datosPersonales": {
+      "fechaNacimiento": "fecha",
+      "estadoCivil": "texto",
+      "conyugeId": "entero"
+    },
+    "aLaFecha": "fecha",
+    "domicilioFiscal": {
+      "id": "entero",
+      "tipo": "texto",
+      "direccion": "texto",
+      "referencia": "texto",
+      "ubigeo": "texto",
+      "vigenciaDesde": "fecha",
+      "vigenciaHasta": "fecha",
+      "documentoOrigen": "texto"
+    },
+    "domicilioProcesal": {
+      "id": "entero",
+      "tipo": "texto",
+      "direccion": "texto",
+      "referencia": "texto",
+      "ubigeo": "texto",
+      "vigenciaDesde": "fecha",
+      "vigenciaHasta": "fecha",
+      "documentoOrigen": "texto"
+    },
+    "historialDeDomicilios": [
+      {
+        "id": "entero",
+        "tipo": "texto",
+        "direccion": "texto",
+        "referencia": "texto",
+        "ubigeo": "texto",
+        "vigenciaDesde": "fecha",
+        "vigenciaHasta": "fecha",
+        "documentoOrigen": "texto"
+      }
+    ],
+    "contactos": [
+      {
+        "id": "entero",
+        "tipo": "texto",
+        "valor": "texto",
+        "nombre": "texto",
+        "documento": "texto",
+        "observacion": "texto",
+        "vigente": "booleano"
+      }
+    ],
+    "responsables": [
+      {
+        "id": "entero",
+        "responsableId": "entero",
+        "vinculo": "texto",
+        "porcentaje": "texto",
+        "vigenciaDesde": "fecha",
+        "vigenciaHasta": "fecha",
+        "documentoOrigen": "texto"
+      }
+    ]
+  },
+  "GET /rentas/declaraciones/{djNro}": {
+    "id": "entero",
+    "numero": "texto",
+    "ejercicio": "entero",
+    "tipo": "texto",
+    "predioId": "entero",
+    "vehiculoId": "entero",
+    "fichaCatastralId": "entero",
+    "fechaPresentacion": "texto",
+    "fechaLimite": "texto",
+    "fueraDePlazo": "booleano",
+    "estado": "texto",
+    "djRectificaId": "entero"
+  },
+  "GET /rentas/declaraciones/{djNro}/hoja": {
+    "declaracion": {
+      "id": "entero",
+      "numero": "texto",
+      "ejercicio": "entero",
+      "tipo": "texto",
+      "predioId": "entero",
+      "vehiculoId": "entero",
+      "fichaCatastralId": "entero",
+      "fechaPresentacion": "texto",
+      "fechaLimite": "texto",
+      "fueraDePlazo": "booleano",
+      "estado": "texto",
+      "djRectificaId": "entero"
+    },
+    "aLaFecha": "fecha",
+    "declarante": {
+      "codigo": "texto",
+      "nombre": "texto",
+      "documento": "texto",
+      "domicilioFiscal": "texto"
+    },
+    "predios": [
+      {
+        "predioId": "entero",
+        "codRefCatastral": "texto",
+        "direccion": "texto",
+        "tipo": "texto",
+        "porcentajePropiedad": "texto",
+        "autovaluo": "texto",
+        "valuoExonerado": "texto",
+        "valuoAfecto": "texto"
+      }
+    ],
+    "valuoAfectoTotal": "texto",
+    "impuestoInsoluto": "texto",
+    "faltan": [
+      "texto"
+    ]
+  },
+  "GET /rentas/predial/corridas/ultima": {
+    "id": "entero",
+    "ejercicio": "texto",
+    "alcance": "texto",
+    "sector": "texto",
+    "simulacion": "booleano",
+    "conjunto": "texto",
+    "fechaCalculo": "texto",
+    "observados": "entero",
+    "etapas": [
+      {
+        "etapa": "texto",
+        "registros": "entero",
+        "monto": "texto",
+        "observados": "entero",
+        "estado": "texto"
+      }
+    ]
+  },
+  "GET /rentas/predial/corridas/{corridaId}/observados": {
+    "contenido": [
+      {
+        "codContribuyente": "texto",
+        "nombre": "texto",
+        "motivo": "texto"
+      }
+    ],
+    "pagina": "entero",
+    "tamano": "entero",
+    "totalElementos": "entero",
+    "totalPaginas": "entero",
+    "hayMas": "booleano"
+  },
+  "GET /rentas/predios": {
+    "contenido": [
+      {
+        "predioId": "entero",
+        "codigoReferenciaCatastral": "texto",
+        "tipo": "texto",
+        "direccion": "texto",
+        "uso": "texto",
+        "sector": "texto",
+        "areaTerreno": "texto",
+        "porcentajePropiedad": "texto",
+        "condicion": "texto"
+      }
+    ],
+    "pagina": "entero",
+    "tamano": "entero",
+    "totalElementos": "entero",
+    "totalPaginas": "entero",
+    "hayMas": "booleano"
+  },
+  "GET /rentas/vehiculos": {
+    "contenido": [
+      {
+        "vehiculoId": "entero",
+        "placa": "texto",
+        "clase": "texto",
+        "marca": "texto",
+        "modelo": "texto",
+        "anioFabricacion": "entero",
+        "estado": "texto",
+        "afectoDesde": "entero",
+        "afectoHasta": "entero",
+        "contribuyenteId": "entero",
+        "codigoContribuyente": "texto",
+        "titular": "texto",
+        "deuda": {
+          "importe": "texto",
+          "actualizadoA": "fecha"
+        }
+      }
+    ],
+    "pagina": "entero",
+    "tamano": "entero",
+    "totalElementos": "entero",
+    "totalPaginas": "entero",
+    "hayMas": "booleano"
+  },
+  "GET /rentas/vehiculos/{placa}": {
+    "id": "entero",
+    "placa": "texto",
+    "contribuyenteId": "entero",
+    "marca": "texto",
+    "modelo": "texto",
+    "categoria": "texto",
+    "anioFabricacion": "entero",
+    "anioInscripcion": "entero",
+    "numeroMotor": "texto",
+    "numeroSerie": "texto",
+    "estado": "texto",
+    "historialDePlacas": [
+      {
+        "anterior": "texto",
+        "nueva": "texto",
+        "usuario": "texto",
+        "fecha": "texto",
+        "observacion": "texto"
+      }
+    ]
+  },
+  "GET /seguridad/accesos": {
+    "contenido": [
+      {
+        "id": "entero",
+        "moduloId": "entero",
+        "tipo": "texto",
+        "codigo": "texto",
+        "nombre": "texto",
+        "activo": "booleano"
+      }
+    ],
+    "pagina": "entero",
+    "tamano": "entero",
+    "totalElementos": "entero",
+    "totalPaginas": "entero",
+    "hayMas": "booleano"
+  },
+  "GET /seguridad/accesos/{codigo}/usuarios": {
+    "contenido": [
+      {
+        "usuarioId": "entero",
+        "cuenta": "texto",
+        "nombre": "texto",
+        "origen": "texto",
+        "grupoId": "entero"
+      }
+    ],
+    "pagina": "entero",
+    "tamano": "entero",
+    "totalElementos": "entero",
+    "totalPaginas": "entero",
+    "hayMas": "booleano"
+  },
+  "GET /seguridad/auditoria": {
+    "contenido": [
+      {
+        "id": "entero",
+        "ejercicio": "entero",
+        "tabla": "texto",
+        "clave": "texto",
+        "operacion": "texto",
+        "usuario": "texto",
+        "origenEquipo": "texto",
+        "origenIp": "texto",
+        "fecha": "instante",
+        "observacion": "texto",
+        "datosAnteriores": "texto",
+        "datosNuevos": "texto"
+      }
+    ],
+    "pagina": "entero",
+    "tamano": "entero",
+    "totalElementos": "entero",
+    "totalPaginas": "entero",
+    "hayMas": "booleano"
+  },
+  "GET /seguridad/grupos": {
+    "contenido": [
+      {
+        "id": "entero",
+        "nombre": "texto",
+        "descripcion": "texto",
+        "habilitado": "booleano",
+        "vigenciaDesde": "fecha",
+        "vigenciaHasta": "fecha"
+      }
+    ],
+    "pagina": "entero",
+    "tamano": "entero",
+    "totalElementos": "entero",
+    "totalPaginas": "entero",
+    "hayMas": "booleano"
+  },
+  "GET /seguridad/grupos/{grupo}/miembros": {
+    "contenido": [
+      {
+        "id": "entero",
+        "cuenta": "texto",
+        "nombre": "texto",
+        "correo": "texto",
+        "habilitado": "booleano",
+        "vigenciaDesde": "fecha",
+        "vigenciaHasta": "fecha"
+      }
+    ],
+    "pagina": "entero",
+    "tamano": "entero",
+    "totalElementos": "entero",
+    "totalPaginas": "entero",
+    "hayMas": "booleano"
+  },
+  "GET /seguridad/grupos/{id}/permisos": [
+    {
+      "id": "entero",
+      "acceso": "texto",
+      "grupoId": "entero",
+      "usuarioId": "entero",
+      "privilegios": [
+        "texto"
+      ]
+    }
+  ],
+  "GET /seguridad/modulos": {
+    "contenido": [
+      {
+        "id": "entero",
+        "codigo": "texto",
+        "nombre": "texto",
+        "orden": "entero",
+        "activo": "booleano"
+      }
+    ],
+    "pagina": "entero",
+    "tamano": "entero",
+    "totalElementos": "entero",
+    "totalPaginas": "entero",
+    "hayMas": "booleano"
+  },
+  "GET /seguridad/parametros": {
+    "contenido": [
+      {
+        "id": "entero",
+        "ejercicio": "entero",
+        "version": "entero",
+        "estado": "texto",
+        "fechaSellado": "instante",
+        "usuarioSellado": "texto"
+      }
+    ],
+    "pagina": "entero",
+    "tamano": "entero",
+    "totalElementos": "entero",
+    "totalPaginas": "entero",
+    "hayMas": "booleano"
+  },
+  "GET /seguridad/parametros/ejercicios/{ejercicio}": {
+    "ejercicio": "entero",
+    "sellado": "booleano",
+    "conjuntoId": "entero",
+    "version": "entero"
+  },
+  "GET /seguridad/sesion": {
+    "usuarioId": "entero",
+    "cuenta": "texto",
+    "nombre": "texto",
+    "ejercicioDeTrabajo": "entero"
+  },
+  "GET /seguridad/sesion/municipalidad": {
+    "id": "entero",
+    "ubigeo": "texto",
+    "nombre": "texto",
+    "tipo": "texto"
+  },
+  "GET /seguridad/sesion/permisos": "objeto",
+  "GET /seguridad/usuarios": {
+    "contenido": [
+      {
+        "id": "entero",
+        "cuenta": "texto",
+        "nombre": "texto",
+        "correo": "texto",
+        "habilitado": "booleano",
+        "vigenciaDesde": "fecha",
+        "vigenciaHasta": "fecha"
+      }
+    ],
+    "pagina": "entero",
+    "tamano": "entero",
+    "totalElementos": "entero",
+    "totalPaginas": "entero",
+    "hayMas": "booleano"
+  },
+  "GET /seguridad/usuarios/{id}/grupos": {
+    "contenido": [
+      {
+        "id": "entero",
+        "nombre": "texto",
+        "descripcion": "texto",
+        "habilitado": "booleano",
+        "vigenciaDesde": "fecha",
+        "vigenciaHasta": "fecha"
+      }
+    ],
+    "pagina": "entero",
+    "tamano": "entero",
+    "totalElementos": "entero",
+    "totalPaginas": "entero",
+    "hayMas": "booleano"
+  },
+  "GET /seguridad/usuarios/{id}/permisos": [
+    {
+      "acceso": "texto",
+      "privilegios": [
+        "texto"
+      ],
+      "origen": "texto",
+      "grupoId": "entero"
+    }
+  ],
+  "GET /seguridad/usuarios/{id}/permisos/configurados": {
+    "usuarioId": "entero",
+    "cuenta": "texto",
+    "surtenEfectoHoy": "booleano",
+    "permisos": [
+      {
+        "acceso": "texto",
+        "privilegios": [
+          "texto"
+        ],
+        "origen": "texto",
+        "grupoId": "entero"
+      }
+    ]
+  },
+  "GET /tesoreria/cajas": {
+    "contenido": [
+      {
+        "codigo": "texto",
+        "nombre": "texto",
+        "areaCodigo": "texto",
+        "areaNombre": "texto",
+        "activa": "booleano"
+      }
+    ],
+    "pagina": "entero",
+    "tamano": "entero",
+    "totalElementos": "entero",
+    "totalPaginas": "entero",
+    "hayMas": "booleano"
+  },
+  "GET /tesoreria/convenios": {
+    "contenido": [
+      {
+        "nroConvenio": "texto",
+        "contribuyente": "texto",
+        "fecha": "fecha",
+        "fechaCorte": "fecha",
+        "deudaAcogidaS": "texto",
+        "cuotas": "entero",
+        "pagadas": "entero",
+        "vencidas": "entero",
+        "saldoS": "texto",
+        "saldoALaFecha": "fecha",
+        "estado": "texto",
+        "motivo": "texto",
+        "cronograma": [
+          {
+            "nro": "entero",
+            "vencimiento": "fecha",
+            "cuota": "texto",
+            "capital": "texto",
+            "interes": "texto",
+            "gasto": "texto"
+          }
+        ],
+        "deudaOriginal": [
+          {
+            "tributo": "texto",
+            "ejercicio": "entero",
+            "periodo": "entero",
+            "predioId": "entero",
+            "vehiculoId": "entero",
+            "faseOrigen": "texto",
+            "aLaFecha": "fecha",
+            "insoluto": "texto",
+            "reajuste": "texto",
+            "interes": "texto",
+            "gasto": "texto",
+            "total": "texto"
+          }
+        ],
+        "movimientos": [
+          {
+            "tipo": "texto",
+            "fecha": "fecha",
+            "motivo": "texto",
+            "autorizadoPor": "texto",
+            "documentoAutorizacion": "texto",
+            "importe": "texto",
+            "asientos": "entero",
+            "usuarioRegistro": "texto"
+          }
+        ]
+      }
+    ],
+    "pagina": "entero",
+    "tamano": "entero",
+    "totalElementos": "entero",
+    "totalPaginas": "entero",
+    "hayMas": "booleano"
+  },
+  "GET /tesoreria/recaudacion/avance": {
+    "desde": "texto",
+    "hasta": "texto",
+    "aLaFecha": "texto",
+    "filas": [
+      {
+        "tributo": "texto",
+        "cobrado": {
+          "importe": "texto",
+          "actualizadoA": "fecha"
+        },
+        "anulado": {
+          "importe": "texto",
+          "actualizadoA": "fecha"
+        },
+        "neto": {
+          "importe": "texto",
+          "actualizadoA": "fecha"
+        }
+      }
+    ],
+    "cobrado": {
+      "importe": "texto",
+      "actualizadoA": "fecha"
+    },
+    "anulado": {
+      "importe": "texto",
+      "actualizadoA": "fecha"
+    },
+    "neto": {
+      "importe": "texto",
+      "actualizadoA": "fecha"
+    },
+    "turno": {
+      "caja": "texto",
+      "cajero": "texto",
+      "fecha": "texto",
+      "estadoDelTurno": "texto",
+      "arqueo": {
+        "turnoId": "entero",
+        "fecha": "texto",
+        "recibosEmitidos": "entero",
+        "recibosAnulados": "entero",
+        "cobrado": {
+          "importe": "texto",
+          "actualizadoA": "fecha"
+        },
+        "anulado": {
+          "importe": "texto",
+          "actualizadoA": "fecha"
+        },
+        "neto": {
+          "importe": "texto",
+          "actualizadoA": "fecha"
+        },
+        "declarado": {
+          "importe": "texto",
+          "actualizadoA": "fecha"
+        },
+        "diferencia": {
+          "importe": "texto",
+          "actualizadoA": "fecha"
+        },
+        "cuadra": "booleano",
+        "lineas": [
+          {
+            "formaDePago": "texto",
+            "cobrado": {
+              "importe": "texto",
+              "actualizadoA": "fecha"
+            },
+            "anulado": {
+              "importe": "texto",
+              "actualizadoA": "fecha"
+            },
+            "neto": {
+              "importe": "texto",
+              "actualizadoA": "fecha"
+            },
+            "declarado": {
+              "importe": "texto",
+              "actualizadoA": "fecha"
+            },
+            "diferencia": {
+              "importe": "texto",
+              "actualizadoA": "fecha"
+            }
+          }
+        ]
+      }
+    }
+  },
+  "GET /tesoreria/recaudacion/por-area": {
+    "desde": "texto",
+    "hasta": "texto",
+    "aLaFecha": "texto",
+    "filas": [
+      {
+        "area": "texto",
+        "areaNombre": "texto",
+        "partida": "texto",
+        "tributo": "texto",
+        "cobrado": {
+          "importe": "texto",
+          "actualizadoA": "fecha"
+        },
+        "anulado": {
+          "importe": "texto",
+          "actualizadoA": "fecha"
+        },
+        "neto": {
+          "importe": "texto",
+          "actualizadoA": "fecha"
+        }
+      }
+    ],
+    "neto": {
+      "importe": "texto",
+      "actualizadoA": "fecha"
+    },
+    "netoSinPartida": {
+      "importe": "texto",
+      "actualizadoA": "fecha"
+    }
+  },
+  "GET /tesoreria/recibos": {
+    "contenido": [
+      {
+        "numero": "texto",
+        "emitidoEn": "texto",
+        "codContribuyente": "texto",
+        "contribuyente": "texto",
+        "importe": {
+          "importe": "texto",
+          "actualizadoA": "fecha"
+        },
+        "medioDePago": "texto",
+        "duplicados": "entero",
+        "estado": "texto"
+      }
+    ],
+    "pagina": "entero",
+    "tamano": "entero",
+    "totalElementos": "entero",
+    "totalPaginas": "entero",
+    "hayMas": "booleano"
+  },
+  "GET /tesoreria/recibos/{nro}/duplicado": {
+    "estado": "texto",
+    "duplicados": "entero",
+    "anulacion": {
+      "fecha": "texto",
+      "motivo": "texto",
+      "usuario": "texto"
+    },
+    "recibo": {
+      "numero": "texto",
+      "serie": "texto",
+      "correlativo": "entero",
+      "cajero": "texto",
+      "formaDePago": "texto",
+      "tipoDePago": "texto",
+      "beneficioDeclarado": "texto",
+      "emitidoEn": "texto",
+      "total": {
+        "importe": "texto",
+        "actualizadoA": "fecha"
+      },
+      "lineas": [
+        {
+          "tributo": "texto",
+          "concepto": "texto",
+          "ejercicio": "entero",
+          "predioId": "entero",
+          "vehiculoId": "entero",
+          "cantidad": "entero",
+          "precioUnitario": {
+            "importe": "texto",
+            "actualizadoA": "fecha"
+          },
+          "insoluto": {
+            "importe": "texto",
+            "actualizadoA": "fecha"
+          },
+          "reajuste": {
+            "importe": "texto",
+            "actualizadoA": "fecha"
+          },
+          "interes": {
+            "importe": "texto",
+            "actualizadoA": "fecha"
+          },
+          "gasto": {
+            "importe": "texto",
+            "actualizadoA": "fecha"
+          },
+          "monto": {
+            "importe": "texto",
+            "actualizadoA": "fecha"
+          }
+        }
+      ]
+    }
+  },
+  "GET /transito/codigos": {
+    "contenido": [
+      {
+        "id": "entero",
+        "familia": "texto",
+        "codigo": "texto",
+        "descripcion": "texto",
+        "porcentajeUit": "texto",
+        "medida": "texto",
+        "puntos": "entero",
+        "baseLegal": "texto",
+        "vigenciaDesde": "texto",
+        "vigenciaHasta": "texto"
+      }
+    ],
+    "pagina": "entero",
+    "tamano": "entero",
+    "totalElementos": "entero",
+    "totalPaginas": "entero",
+    "hayMas": "booleano"
+  },
+  "GET /transito/estado-cuenta": {
+    "contenido": [
+      {
+        "id": "entero",
+        "familia": "texto",
+        "numero": "texto",
+        "fechaInfraccion": "texto",
+        "horaInfraccion": "texto",
+        "lugar": "texto",
+        "placa": "texto",
+        "vehiculoId": "entero",
+        "infractorId": "entero",
+        "propietarioId": "entero",
+        "contribuyenteId": "entero",
+        "predioId": "entero",
+        "notificacionPreviaId": "entero",
+        "baseImponible": "texto",
+        "porcentajeInfraccion": "texto",
+        "importeInfraccion": "texto",
+        "porcentajeACobrar": "texto",
+        "importeAPagar": "texto",
+        "importeConBeneficio": "texto",
+        "estado": "texto",
+        "usuarioRegistro": "texto"
+      }
+    ],
+    "pagina": "entero",
+    "tamano": "entero",
+    "totalElementos": "entero",
+    "totalPaginas": "entero",
+    "hayMas": "booleano"
+  },
+  "GET /transito/internamientos": {
+    "contenido": [
+      {
+        "id": "entero",
+        "placa": "texto",
+        "papeleta": "texto",
+        "deposito": "texto",
+        "fechaDeIngreso": "fecha",
+        "fechaDeSalida": "fecha",
+        "dias": "entero",
+        "calculadoA": "fecha",
+        "estado": "texto",
+        "tasaDeCustodia": "texto",
+        "acta": "texto"
+      }
+    ],
+    "pagina": "entero",
+    "tamano": "entero",
+    "totalElementos": "entero",
+    "totalPaginas": "entero",
+    "hayMas": "booleano"
+  },
+  "GET /transito/papeletas": {
+    "contenido": [
+      {
+        "id": "entero",
+        "familia": "texto",
+        "numero": "texto",
+        "fechaInfraccion": "texto",
+        "horaInfraccion": "texto",
+        "lugar": "texto",
+        "placa": "texto",
+        "vehiculoId": "entero",
+        "infractorId": "entero",
+        "propietarioId": "entero",
+        "contribuyenteId": "entero",
+        "predioId": "entero",
+        "notificacionPreviaId": "entero",
+        "baseImponible": "texto",
+        "porcentajeInfraccion": "texto",
+        "importeInfraccion": "texto",
+        "porcentajeACobrar": "texto",
+        "importeAPagar": "texto",
+        "importeConBeneficio": "texto",
+        "estado": "texto",
+        "usuarioRegistro": "texto"
+      }
+    ],
+    "pagina": "entero",
+    "tamano": "entero",
+    "totalElementos": "entero",
+    "totalPaginas": "entero",
+    "hayMas": "booleano"
+  },
+  "GET /transito/papeletas/busqueda": {
+    "contenido": [
+      {
+        "id": "entero",
+        "familia": "texto",
+        "numero": "texto",
+        "fechaInfraccion": "texto",
+        "horaInfraccion": "texto",
+        "lugar": "texto",
+        "placa": "texto",
+        "vehiculoId": "entero",
+        "infractorId": "entero",
+        "propietarioId": "entero",
+        "contribuyenteId": "entero",
+        "predioId": "entero",
+        "notificacionPreviaId": "entero",
+        "baseImponible": "texto",
+        "porcentajeInfraccion": "texto",
+        "importeInfraccion": "texto",
+        "porcentajeACobrar": "texto",
+        "importeAPagar": "texto",
+        "importeConBeneficio": "texto",
+        "estado": "texto",
+        "usuarioRegistro": "texto"
+      }
+    ],
+    "pagina": "entero",
+    "tamano": "entero",
+    "totalElementos": "entero",
+    "totalPaginas": "entero",
+    "hayMas": "booleano"
+  },
+  "GET /transito/papeletas/{numero}/actos": {
+    "papeleta": "texto",
+    "familia": "texto",
+    "estado": "texto",
+    "descargos": [
+      {
+        "id": "entero",
+        "nDeExpediente": "texto",
+        "fecha": "fecha",
+        "tipoDeRecurso": "texto",
+        "presentadoHasta": "fecha",
+        "enPlazo": "booleano"
+      }
+    ],
+    "actos": [
+      {
+        "clase": "texto",
+        "tipo": "texto",
+        "numero": "texto",
+        "fecha": "fecha",
+        "documentoId": "entero",
+        "observacion": "texto",
+        "acuses": [
+          {
+            "intento": "entero",
+            "fecha": "fecha",
+            "modalidad": "texto",
+            "resultado": "texto",
+            "recibidoPor": "texto",
+            "acuse": "texto",
+            "exigibleDesde": "fecha"
+          }
+        ]
+      }
+    ]
+  },
+  "GET /transito/papeletas/{numero}/hoja-informativa": {
+    "numero": "texto",
+    "fechaInfraccion": "fecha",
+    "horaInfraccion": "texto",
+    "lugar": "texto",
+    "placa": "texto",
+    "licenciaConducir": "texto",
+    "codigoInfraccion": "texto",
+    "descripcionInfraccion": "texto",
+    "obligadoCodigo": "texto",
+    "obligadoNombre": "texto",
+    "obligadoDocumento": "texto",
+    "obligadoDomicilio": "texto",
+    "estado": "texto",
+    "baseImponible": "texto",
+    "porcentajeInfraccion": "texto",
+    "importeInfraccion": "texto",
+    "porcentajeACobrar": "texto",
+    "importeAPagar": "texto",
+    "importeConBeneficio": "texto",
+    "actualizadoA": "fecha",
+    "emitidaEl": "fecha"
+  },
+  "GET /transito/reportes/padron": {
+    "contenido": [
+      {
+        "numero": "texto",
+        "familia": "texto",
+        "fechaInfraccion": "fecha",
+        "horaInfraccion": "texto",
+        "lugar": "texto",
+        "placa": "texto",
+        "licenciaConducir": "texto",
+        "codigoInfraccion": "texto",
+        "descripcionInfraccion": "texto",
+        "obligadoCodigo": "texto",
+        "obligadoNombre": "texto",
+        "infractorNombre": "texto",
+        "estado": "texto",
+        "pendiente": "booleano",
+        "importeAPagar": "texto",
+        "actualizadoA": "fecha",
+        "valorNumero": "texto"
+      }
+    ],
+    "pagina": "entero",
+    "tamano": "entero",
+    "totalElementos": "entero",
+    "totalPaginas": "entero",
+    "hayMas": "booleano"
+  },
+  "GET /transito/reportes/padron-coactiva": {
+    "contenido": [
+      {
+        "numero": "texto",
+        "familia": "texto",
+        "fechaInfraccion": "fecha",
+        "horaInfraccion": "texto",
+        "lugar": "texto",
+        "placa": "texto",
+        "licenciaConducir": "texto",
+        "codigoInfraccion": "texto",
+        "descripcionInfraccion": "texto",
+        "obligadoCodigo": "texto",
+        "obligadoNombre": "texto",
+        "infractorNombre": "texto",
+        "estado": "texto",
+        "pendiente": "booleano",
+        "importeAPagar": "texto",
+        "actualizadoA": "fecha",
+        "valorNumero": "texto"
+      }
+    ],
+    "pagina": "entero",
+    "tamano": "entero",
+    "totalElementos": "entero",
+    "totalPaginas": "entero",
+    "hayMas": "booleano"
+  },
+  "GET /transito/reportes/padron-constancias": {
+    "contenido": [
+      {
+        "numero": "texto",
+        "placa": "texto",
+        "verificadaAl": "fecha",
+        "fechaEmision": "fecha",
+        "usuarioQueEmitio": "texto",
+        "observacion": "texto"
+      }
+    ],
+    "pagina": "entero",
+    "tamano": "entero",
+    "totalElementos": "entero",
+    "totalPaginas": "entero",
+    "hayMas": "booleano"
+  },
+  "GET /transito/reportes/record-conductor": {
+    "contenido": [
+      {
+        "numero": "texto",
+        "familia": "texto",
+        "fechaInfraccion": "fecha",
+        "horaInfraccion": "texto",
+        "lugar": "texto",
+        "placa": "texto",
+        "licenciaConducir": "texto",
+        "codigoInfraccion": "texto",
+        "descripcionInfraccion": "texto",
+        "obligadoCodigo": "texto",
+        "obligadoNombre": "texto",
+        "infractorNombre": "texto",
+        "estado": "texto",
+        "pendiente": "booleano",
+        "importeAPagar": "texto",
+        "actualizadoA": "fecha",
+        "valorNumero": "texto"
+      }
+    ],
+    "pagina": "entero",
+    "tamano": "entero",
+    "totalElementos": "entero",
+    "totalPaginas": "entero",
+    "hayMas": "booleano"
+  },
+  "GET /transito/reportes/record-vehicular": {
+    "contenido": [
+      {
+        "numero": "texto",
+        "familia": "texto",
+        "fechaInfraccion": "fecha",
+        "horaInfraccion": "texto",
+        "lugar": "texto",
+        "placa": "texto",
+        "licenciaConducir": "texto",
+        "codigoInfraccion": "texto",
+        "descripcionInfraccion": "texto",
+        "obligadoCodigo": "texto",
+        "obligadoNombre": "texto",
+        "infractorNombre": "texto",
+        "estado": "texto",
+        "pendiente": "booleano",
+        "importeAPagar": "texto",
+        "actualizadoA": "fecha",
+        "valorNumero": "texto"
+      }
+    ],
+    "pagina": "entero",
+    "tamano": "entero",
+    "totalElementos": "entero",
+    "totalPaginas": "entero",
+    "hayMas": "booleano"
+  },
+  "GET /transito/reportes/resumen-papeletas": {
+    "agrupadoPor": "texto",
+    "desde": "fecha",
+    "hasta": "fecha",
+    "papeletas": "entero",
+    "importeTotal": "texto",
+    "actualizadoA": "fecha",
+    "lineas": [
+      {
+        "clave": "texto",
+        "descripcion": "texto",
+        "ano": "entero",
+        "cantidad": "entero",
+        "importe": "texto",
+        "pagadas": "entero",
+        "importeDeLasPagadas": "texto",
+        "pendientes": "entero",
+        "importeDeLasPendientes": "texto",
+        "enCoactiva": "entero",
+        "importeEnCoactiva": "texto",
+        "actualizadoA": "fecha"
+      }
+    ]
+  },
+  "GET /transito/reportes/resumen-por-codigo": {
+    "agrupadoPor": "texto",
+    "desde": "fecha",
+    "hasta": "fecha",
+    "papeletas": "entero",
+    "importeTotal": "texto",
+    "actualizadoA": "fecha",
+    "lineas": [
+      {
+        "clave": "texto",
+        "descripcion": "texto",
+        "ano": "entero",
+        "cantidad": "entero",
+        "importe": "texto",
+        "pagadas": "entero",
+        "importeDeLasPagadas": "texto",
+        "pendientes": "entero",
+        "importeDeLasPendientes": "texto",
+        "enCoactiva": "entero",
+        "importeEnCoactiva": "texto",
+        "actualizadoA": "fecha"
+      }
+    ]
+  },
+  "GET /transito/reportes/resumen-por-placa": {
+    "agrupadoPor": "texto",
+    "desde": "fecha",
+    "hasta": "fecha",
+    "papeletas": "entero",
+    "importeTotal": "texto",
+    "actualizadoA": "fecha",
+    "lineas": [
+      {
+        "clave": "texto",
+        "descripcion": "texto",
+        "ano": "entero",
+        "cantidad": "entero",
+        "importe": "texto",
+        "pagadas": "entero",
+        "importeDeLasPagadas": "texto",
+        "pendientes": "entero",
+        "importeDeLasPendientes": "texto",
+        "enCoactiva": "entero",
+        "importeEnCoactiva": "texto",
+        "actualizadoA": "fecha"
+      }
+    ]
+  },
+  "GET /transito/reportes/resumen-recaudacion": {
+    "desde": "fecha",
+    "hasta": "fecha",
+    "total": "texto",
+    "abonos": "entero",
+    "actualizadoA": "fecha",
+    "lineas": [
+      {
+        "tributo": "texto",
+        "ejercicio": "entero",
+        "mes": "entero",
+        "fase": "texto",
+        "abonos": "entero",
+        "recaudado": "texto",
+        "actualizadoA": "fecha"
+      }
+    ],
+    "porMes": [
+      {
+        "mes": "entero",
+        "porFase": [
+          {
+            "fase": "texto",
+            "recaudado": "texto",
+            "abonos": "entero",
+            "actualizadoA": "fecha"
+          }
+        ],
+        "total": "texto",
+        "abonos": "entero",
+        "actualizadoA": "fecha"
+      }
+    ]
+  },
+  "GET /valores": {
+    "contenido": [
+      {
+        "id": "entero",
+        "tipo": "texto",
+        "numero": "texto",
+        "ejercicio": "entero",
+        "codContribuyente": "texto",
+        "nombreContribuyente": "texto",
+        "baseLegal": "texto",
+        "estado": "texto",
+        "proyectadoA": "texto",
+        "total": "texto",
+        "fechaEmision": "texto",
+        "observacion": "texto"
+      }
+    ],
+    "pagina": "entero",
+    "tamano": "entero",
+    "totalElementos": "entero",
+    "totalPaginas": "entero",
+    "hayMas": "booleano"
+  },
+  "PATCH /coactiva/expedientes/{numero}/direccion-referencial": {
+    "numero": "texto",
+    "ejercicio": "entero",
+    "correlativo": "entero",
+    "codContribuyente": "texto",
+    "ejecutor": "texto",
+    "auxiliar": "texto",
+    "fechaDeApertura": "fecha",
+    "asunto": "texto",
+    "direccionReferencial": "texto",
+    "estado": "texto",
+    "estadoCodigo": "texto",
+    "valores": "entero",
+    "insoluto": "texto",
+    "reajuste": "texto",
+    "interes": "texto",
+    "gastos": "texto",
+    "deudaMateriaDeCobranza": "texto",
+    "costas": "texto",
+    "totalExigible": "texto",
+    "deudaAlDia": "fecha",
+    "valoresImportados": [
+      {
+        "valorId": "entero",
+        "fechaDeImportacion": "fecha"
+      }
+    ],
+    "historial": [
+      {
+        "tipo": "texto",
+        "estado": "texto",
+        "estadoCodigo": "texto",
+        "direccionReferencial": "texto",
+        "fecha": "fecha",
+        "motivo": "texto",
+        "fecDoc": "fecha",
+        "numDoc": "texto",
+        "activo": "booleano",
+        "usuario": "texto",
+        "observaciones": "texto"
+      }
+    ]
+  },
+  "PATCH /coactiva/expedientes/{numero}/estados": {
+    "numero": "texto",
+    "ejercicio": "entero",
+    "correlativo": "entero",
+    "codContribuyente": "texto",
+    "ejecutor": "texto",
+    "auxiliar": "texto",
+    "fechaDeApertura": "fecha",
+    "asunto": "texto",
+    "direccionReferencial": "texto",
+    "estado": "texto",
+    "estadoCodigo": "texto",
+    "valores": "entero",
+    "insoluto": "texto",
+    "reajuste": "texto",
+    "interes": "texto",
+    "gastos": "texto",
+    "deudaMateriaDeCobranza": "texto",
+    "costas": "texto",
+    "totalExigible": "texto",
+    "deudaAlDia": "fecha",
+    "valoresImportados": [
+      {
+        "valorId": "entero",
+        "fechaDeImportacion": "fecha"
+      }
+    ],
+    "historial": [
+      {
+        "tipo": "texto",
+        "estado": "texto",
+        "estadoCodigo": "texto",
+        "direccionReferencial": "texto",
+        "fecha": "fecha",
+        "motivo": "texto",
+        "fecDoc": "fecha",
+        "numDoc": "texto",
+        "activo": "booleano",
+        "usuario": "texto",
+        "observaciones": "texto"
+      }
+    ]
+  },
+  "PATCH /fiscalizacion/liquidaciones/{numero}/estados": {
+    "numero": "texto",
+    "actaId": "entero",
+    "version": "entero",
+    "liquidacionAnterior": "entero",
+    "periodoDesde": "entero",
+    "periodoHasta": "entero",
+    "tipoDeFiscalizacion": "texto",
+    "motivoDeterminante": "texto",
+    "fecha": "texto",
+    "numeroNotificacion": "texto",
+    "estado": "texto",
+    "esperaSusCifras": "booleano",
+    "lineas": [
+      {
+        "ejercicio": "entero",
+        "predioId": "entero",
+        "vehiculoId": "entero",
+        "condicion": "texto",
+        "areaDeclarada": "texto",
+        "areaHallada": "texto",
+        "diferenciaDeArea": "texto",
+        "usoDeclarado": "texto",
+        "usoHallado": "texto",
+        "insolutoOmitido": "texto",
+        "multaTributaria": "texto"
+      }
+    ],
+    "historial": [
+      {
+        "tipo": "texto",
+        "estado": "texto",
+        "fecha": "texto",
+        "motivo": "texto",
+        "usuario": "texto"
+      }
+    ]
+  },
+  "PATCH /transito/papeletas/{numero}/codigo": {
+    "id": "entero",
+    "familia": "texto",
+    "numero": "texto",
+    "fechaInfraccion": "texto",
+    "horaInfraccion": "texto",
+    "lugar": "texto",
+    "placa": "texto",
+    "vehiculoId": "entero",
+    "infractorId": "entero",
+    "propietarioId": "entero",
+    "contribuyenteId": "entero",
+    "predioId": "entero",
+    "notificacionPreviaId": "entero",
+    "baseImponible": "texto",
+    "porcentajeInfraccion": "texto",
+    "importeInfraccion": "texto",
+    "porcentajeACobrar": "texto",
+    "importeAPagar": "texto",
+    "importeConBeneficio": "texto",
+    "estado": "texto",
+    "usuarioRegistro": "texto"
+  },
+  "POST /autorizaciones/anuncios": {
+    "nroAutorizacion": "texto",
+    "acto": "texto",
+    "fecha": "fecha",
+    "ejercicio": "entero",
+    "referenciaDelCargo": "texto",
+    "tasa": {
+      "importe": "texto",
+      "actualizadoA": "fecha"
+    },
+    "fecVenc": "fecha",
+    "yaExistia": "booleano"
+  },
+  "POST /autorizaciones/anuncios/reportes": {
+    "aLaFecha": "fecha",
+    "autorizaciones": "entero",
+    "devengado": {
+      "importe": "texto",
+      "actualizadoA": "fecha"
+    },
+    "pagina": "entero",
+    "tamano": "entero",
+    "filas": [
+      {
+        "nroAutorizacion": "texto",
+        "est": "texto",
+        "estado": "texto",
+        "estadoALaFecha": "fecha",
+        "contribuyente": "texto",
+        "codContribuyente": "texto",
+        "documentoDelTitular": "texto",
+        "nroLicencia": "texto",
+        "claseAnuncio": "texto",
+        "tipoAnuncio": "texto",
+        "ubicacion": "texto",
+        "forma": "texto",
+        "denominacion": "texto",
+        "direccion": "texto",
+        "area": "texto",
+        "nroLados": "entero",
+        "cantidad": "entero",
+        "fecInicio": "fecha",
+        "fecVenc": "fecha",
+        "nroDeExpediente": "texto",
+        "fechaExp": "fecha",
+        "tasaDevengada": {
+          "importe": "texto",
+          "actualizadoA": "fecha"
+        },
+        "historial": [
+          {
+            "tipo": "texto",
+            "fecha": "fecha",
+            "ejercicio": "entero",
+            "referenciaDelCargo": "texto",
+            "tasa": {
+              "importe": "texto",
+              "actualizadoA": "fecha"
+            },
+            "fecVenc": "fecha",
+            "motivo": "texto",
+            "observacion": "texto"
+          }
+        ]
+      }
+    ]
+  },
+  "POST /autorizaciones/anuncios/{id}/cese": {
+    "nroAutorizacion": "texto",
+    "acto": "texto",
+    "fecha": "fecha",
+    "ejercicio": "entero",
+    "referenciaDelCargo": "texto",
+    "tasa": {
+      "importe": "texto",
+      "actualizadoA": "fecha"
+    },
+    "fecVenc": "fecha",
+    "yaExistia": "booleano"
+  },
+  "POST /autorizaciones/anuncios/{id}/renovacion": {
+    "nroAutorizacion": "texto",
+    "acto": "texto",
+    "fecha": "fecha",
+    "ejercicio": "entero",
+    "referenciaDelCargo": "texto",
+    "tasa": {
+      "importe": "texto",
+      "actualizadoA": "fecha"
+    },
+    "fecVenc": "fecha",
+    "yaExistia": "booleano"
+  },
+  "POST /autorizaciones/anuncios/{id}/retiro": {
+    "nroAutorizacion": "texto",
+    "acto": "texto",
+    "fecha": "fecha",
+    "ejercicio": "entero",
+    "referenciaDelCargo": "texto",
+    "tasa": {
+      "importe": "texto",
+      "actualizadoA": "fecha"
+    },
+    "fecVenc": "fecha",
+    "yaExistia": "booleano"
+  },
+  "POST /catastro/fichas/bienes-comunes": {
+    "id": "entero",
+    "predioId": "entero",
+    "tipo": "texto",
+    "version": "entero",
+    "areaTerreno": "texto",
+    "uso": "texto",
+    "frontis": "texto",
+    "condicionPropiedad": "texto",
+    "tipoEdificacion": "texto",
+    "vigenciaDesde": "texto",
+    "vigenciaHasta": "texto",
+    "vigente": "booleano",
+    "origen": "texto",
+    "documentoOrigen": "texto",
+    "observacion": "texto",
+    "denominacion": "texto",
+    "construcciones": [
+      {
+        "id": "entero",
+        "piso": "texto",
+        "areaConstruida": "texto",
+        "anioConstruccion": "entero",
+        "material": "texto",
+        "estadoConservacion": "texto",
+        "categorias": "texto",
+        "porcentajeConstruido": "texto"
+      }
+    ],
+    "instalaciones": [
+      {
+        "id": "entero",
+        "descripcion": "texto",
+        "unidad": "texto",
+        "cantidad": "texto",
+        "anioConstruccion": "entero",
+        "estadoConservacion": "texto"
+      }
+    ],
+    "economico": {
+      "actividades": [
+        {
+          "id": "entero",
+          "conductor": "texto",
+          "nombreComercial": "texto",
+          "ciiu": "texto",
+          "areaOcupada": "texto",
+          "licenciaNumero": "texto",
+          "licenciaFecha": "texto",
+          "anuncioNumero": "texto",
+          "anuncioFecha": "texto",
+          "vigenciaDesde": "texto"
+        }
+      ],
+      "informacionComplementaria": "texto",
+      "sinLicencia": "entero"
+    },
+    "bienesComunes": {
+      "bienes": [
+        {
+          "id": "entero",
+          "descripcion": "texto",
+          "area": "texto",
+          "material": "texto",
+          "estadoConservacion": "texto",
+          "anioConstruccion": "entero"
+        }
+      ],
+      "participaciones": [
+        {
+          "predioId": "entero",
+          "porcentaje": "texto"
+        }
+      ],
+      "areaComunTotal": "texto"
+    },
+    "rural": {
+      "tierras": [
+        {
+          "id": "entero",
+          "clasificacion": "texto",
+          "calidadAgrologica": "texto",
+          "riego": "texto",
+          "hectareas": "texto",
+          "hectareasComunes": "texto"
+        }
+      ],
+      "colindantes": [
+        {
+          "orientacion": "texto",
+          "descripcion": "texto"
+        }
+      ],
+      "hectareasTotales": "texto"
+    },
+    "historico": [
+      {
+        "id": "entero",
+        "version": "entero",
+        "areaTerreno": "texto",
+        "uso": "texto",
+        "vigenciaDesde": "texto",
+        "vigenciaHasta": "texto",
+        "vigente": "booleano",
+        "origen": "texto",
+        "documentoOrigen": "texto",
+        "observacion": "texto",
+        "usuario": "texto",
+        "registradaEn": "texto"
+      }
+    ]
+  },
+  "POST /catastro/fichas/economica": {
+    "id": "entero",
+    "predioId": "entero",
+    "tipo": "texto",
+    "version": "entero",
+    "areaTerreno": "texto",
+    "uso": "texto",
+    "frontis": "texto",
+    "condicionPropiedad": "texto",
+    "tipoEdificacion": "texto",
+    "vigenciaDesde": "texto",
+    "vigenciaHasta": "texto",
+    "vigente": "booleano",
+    "origen": "texto",
+    "documentoOrigen": "texto",
+    "observacion": "texto",
+    "denominacion": "texto",
+    "construcciones": [
+      {
+        "id": "entero",
+        "piso": "texto",
+        "areaConstruida": "texto",
+        "anioConstruccion": "entero",
+        "material": "texto",
+        "estadoConservacion": "texto",
+        "categorias": "texto",
+        "porcentajeConstruido": "texto"
+      }
+    ],
+    "instalaciones": [
+      {
+        "id": "entero",
+        "descripcion": "texto",
+        "unidad": "texto",
+        "cantidad": "texto",
+        "anioConstruccion": "entero",
+        "estadoConservacion": "texto"
+      }
+    ],
+    "economico": {
+      "actividades": [
+        {
+          "id": "entero",
+          "conductor": "texto",
+          "nombreComercial": "texto",
+          "ciiu": "texto",
+          "areaOcupada": "texto",
+          "licenciaNumero": "texto",
+          "licenciaFecha": "texto",
+          "anuncioNumero": "texto",
+          "anuncioFecha": "texto",
+          "vigenciaDesde": "texto"
+        }
+      ],
+      "informacionComplementaria": "texto",
+      "sinLicencia": "entero"
+    },
+    "bienesComunes": {
+      "bienes": [
+        {
+          "id": "entero",
+          "descripcion": "texto",
+          "area": "texto",
+          "material": "texto",
+          "estadoConservacion": "texto",
+          "anioConstruccion": "entero"
+        }
+      ],
+      "participaciones": [
+        {
+          "predioId": "entero",
+          "porcentaje": "texto"
+        }
+      ],
+      "areaComunTotal": "texto"
+    },
+    "rural": {
+      "tierras": [
+        {
+          "id": "entero",
+          "clasificacion": "texto",
+          "calidadAgrologica": "texto",
+          "riego": "texto",
+          "hectareas": "texto",
+          "hectareasComunes": "texto"
+        }
+      ],
+      "colindantes": [
+        {
+          "orientacion": "texto",
+          "descripcion": "texto"
+        }
+      ],
+      "hectareasTotales": "texto"
+    },
+    "historico": [
+      {
+        "id": "entero",
+        "version": "entero",
+        "areaTerreno": "texto",
+        "uso": "texto",
+        "vigenciaDesde": "texto",
+        "vigenciaHasta": "texto",
+        "vigente": "booleano",
+        "origen": "texto",
+        "documentoOrigen": "texto",
+        "observacion": "texto",
+        "usuario": "texto",
+        "registradaEn": "texto"
+      }
+    ]
+  },
+  "POST /catastro/fichas/rural": {
+    "id": "entero",
+    "predioId": "entero",
+    "tipo": "texto",
+    "version": "entero",
+    "areaTerreno": "texto",
+    "uso": "texto",
+    "frontis": "texto",
+    "condicionPropiedad": "texto",
+    "tipoEdificacion": "texto",
+    "vigenciaDesde": "texto",
+    "vigenciaHasta": "texto",
+    "vigente": "booleano",
+    "origen": "texto",
+    "documentoOrigen": "texto",
+    "observacion": "texto",
+    "denominacion": "texto",
+    "construcciones": [
+      {
+        "id": "entero",
+        "piso": "texto",
+        "areaConstruida": "texto",
+        "anioConstruccion": "entero",
+        "material": "texto",
+        "estadoConservacion": "texto",
+        "categorias": "texto",
+        "porcentajeConstruido": "texto"
+      }
+    ],
+    "instalaciones": [
+      {
+        "id": "entero",
+        "descripcion": "texto",
+        "unidad": "texto",
+        "cantidad": "texto",
+        "anioConstruccion": "entero",
+        "estadoConservacion": "texto"
+      }
+    ],
+    "economico": {
+      "actividades": [
+        {
+          "id": "entero",
+          "conductor": "texto",
+          "nombreComercial": "texto",
+          "ciiu": "texto",
+          "areaOcupada": "texto",
+          "licenciaNumero": "texto",
+          "licenciaFecha": "texto",
+          "anuncioNumero": "texto",
+          "anuncioFecha": "texto",
+          "vigenciaDesde": "texto"
+        }
+      ],
+      "informacionComplementaria": "texto",
+      "sinLicencia": "entero"
+    },
+    "bienesComunes": {
+      "bienes": [
+        {
+          "id": "entero",
+          "descripcion": "texto",
+          "area": "texto",
+          "material": "texto",
+          "estadoConservacion": "texto",
+          "anioConstruccion": "entero"
+        }
+      ],
+      "participaciones": [
+        {
+          "predioId": "entero",
+          "porcentaje": "texto"
+        }
+      ],
+      "areaComunTotal": "texto"
+    },
+    "rural": {
+      "tierras": [
+        {
+          "id": "entero",
+          "clasificacion": "texto",
+          "calidadAgrologica": "texto",
+          "riego": "texto",
+          "hectareas": "texto",
+          "hectareasComunes": "texto"
+        }
+      ],
+      "colindantes": [
+        {
+          "orientacion": "texto",
+          "descripcion": "texto"
+        }
+      ],
+      "hectareasTotales": "texto"
+    },
+    "historico": [
+      {
+        "id": "entero",
+        "version": "entero",
+        "areaTerreno": "texto",
+        "uso": "texto",
+        "vigenciaDesde": "texto",
+        "vigenciaHasta": "texto",
+        "vigente": "booleano",
+        "origen": "texto",
+        "documentoOrigen": "texto",
+        "observacion": "texto",
+        "usuario": "texto",
+        "registradaEn": "texto"
+      }
+    ]
+  },
+  "POST /catastro/fichas/urbana": {
+    "id": "entero",
+    "predioId": "entero",
+    "tipo": "texto",
+    "version": "entero",
+    "areaTerreno": "texto",
+    "uso": "texto",
+    "frontis": "texto",
+    "condicionPropiedad": "texto",
+    "tipoEdificacion": "texto",
+    "vigenciaDesde": "texto",
+    "vigenciaHasta": "texto",
+    "vigente": "booleano",
+    "origen": "texto",
+    "documentoOrigen": "texto",
+    "observacion": "texto",
+    "denominacion": "texto",
+    "construcciones": [
+      {
+        "id": "entero",
+        "piso": "texto",
+        "areaConstruida": "texto",
+        "anioConstruccion": "entero",
+        "material": "texto",
+        "estadoConservacion": "texto",
+        "categorias": "texto",
+        "porcentajeConstruido": "texto"
+      }
+    ],
+    "instalaciones": [
+      {
+        "id": "entero",
+        "descripcion": "texto",
+        "unidad": "texto",
+        "cantidad": "texto",
+        "anioConstruccion": "entero",
+        "estadoConservacion": "texto"
+      }
+    ],
+    "economico": {
+      "actividades": [
+        {
+          "id": "entero",
+          "conductor": "texto",
+          "nombreComercial": "texto",
+          "ciiu": "texto",
+          "areaOcupada": "texto",
+          "licenciaNumero": "texto",
+          "licenciaFecha": "texto",
+          "anuncioNumero": "texto",
+          "anuncioFecha": "texto",
+          "vigenciaDesde": "texto"
+        }
+      ],
+      "informacionComplementaria": "texto",
+      "sinLicencia": "entero"
+    },
+    "bienesComunes": {
+      "bienes": [
+        {
+          "id": "entero",
+          "descripcion": "texto",
+          "area": "texto",
+          "material": "texto",
+          "estadoConservacion": "texto",
+          "anioConstruccion": "entero"
+        }
+      ],
+      "participaciones": [
+        {
+          "predioId": "entero",
+          "porcentaje": "texto"
+        }
+      ],
+      "areaComunTotal": "texto"
+    },
+    "rural": {
+      "tierras": [
+        {
+          "id": "entero",
+          "clasificacion": "texto",
+          "calidadAgrologica": "texto",
+          "riego": "texto",
+          "hectareas": "texto",
+          "hectareasComunes": "texto"
+        }
+      ],
+      "colindantes": [
+        {
+          "orientacion": "texto",
+          "descripcion": "texto"
+        }
+      ],
+      "hectareasTotales": "texto"
+    },
+    "historico": [
+      {
+        "id": "entero",
+        "version": "entero",
+        "areaTerreno": "texto",
+        "uso": "texto",
+        "vigenciaDesde": "texto",
+        "vigenciaHasta": "texto",
+        "vigente": "booleano",
+        "origen": "texto",
+        "documentoOrigen": "texto",
+        "observacion": "texto",
+        "usuario": "texto",
+        "registradaEn": "texto"
+      }
+    ]
+  },
+  "POST /catastro/predios": {
+    "predioId": "entero",
+    "codRefCatastral": "texto",
+    "tipo": "texto",
+    "direccion": "texto",
+    "numeroMunicipal": "texto",
+    "lote": "texto",
+    "ubigeo": "texto",
+    "estado": "texto"
+  },
+  "POST /catastro/predios/{predioId}/baja": {
+    "predioId": "entero",
+    "codRefCatastral": "texto",
+    "tipo": "texto",
+    "direccion": "texto",
+    "numeroMunicipal": "texto",
+    "lote": "texto",
+    "ubigeo": "texto",
+    "estado": "texto"
+  },
+  "POST /catastro/predios/{predioId}/inquilinos": {
+    "inquilinoId": "entero",
+    "predioId": "entero",
+    "contribuyenteId": "entero",
+    "uso": "texto",
+    "vigenciaDesde": "fecha",
+    "vigenciaHasta": "fecha",
+    "documentoOrigen": "texto"
+  },
+  "POST /catastro/predios/{predioId}/reactivacion": {
+    "predioId": "entero",
+    "codRefCatastral": "texto",
+    "tipo": "texto",
+    "direccion": "texto",
+    "numeroMunicipal": "texto",
+    "lote": "texto",
+    "ubigeo": "texto",
+    "estado": "texto"
+  },
+  "POST /catastro/predios/{predioId}/titulares": {
+    "titularidadId": "entero",
+    "predioId": "entero",
+    "contribuyenteId": "entero",
+    "condicion": "texto",
+    "porcentaje": "texto",
+    "vigenciaDesde": "fecha",
+    "vigenciaHasta": "fecha",
+    "documentoOrigen": "texto"
+  },
+  "POST /catastro/sectores": {
+    "id": "entero",
+    "codigo": "texto",
+    "nombre": "texto",
+    "zona": "texto",
+    "activo": "booleano",
+    "manzanas": "entero",
+    "predios": "entero",
+    "lotes": "entero"
+  },
+  "POST /catastro/sectores/{codigo}/manzanas": {
+    "id": "entero",
+    "sectorId": "entero",
+    "sectorCodigo": "texto",
+    "codigo": "texto",
+    "predios": "entero",
+    "lotes": "entero"
+  },
+  "POST /catastro/vias": {
+    "id": "entero",
+    "codigo": "texto",
+    "tipo": "texto",
+    "nombre": "texto",
+    "ubigeo": "texto",
+    "activa": "booleano"
+  },
+  "POST /coactiva/convenios": {
+    "nroConvenio": "texto",
+    "expedCoact": "texto",
+    "tipo": "texto",
+    "estado": "texto",
+    "fecha": "fecha",
+    "fechaCorte": "fecha",
+    "deudaTotalS": "texto",
+    "cuotaInicialS": "texto",
+    "nroDeCuotas": "entero",
+    "totalDelCronogramaS": "texto",
+    "interesDeFraccionamientoMensual": "texto",
+    "conjuntoDeParametros": "entero",
+    "cronograma": [
+      {
+        "nro": "entero",
+        "vencimiento": "fecha",
+        "cuotaS": "texto",
+        "capitalS": "texto",
+        "interesS": "texto",
+        "gastoS": "texto"
+      }
+    ],
+    "deudaAcogida": [
+      {
+        "tributo": "texto",
+        "ejercicio": "entero",
+        "periodo": "entero",
+        "predioId": "entero",
+        "vehiculoId": "entero",
+        "faseOrigen": "texto",
+        "aLaFecha": "fecha",
+        "insolutoS": "texto",
+        "reajusteS": "texto",
+        "interesS": "texto",
+        "gastoS": "texto",
+        "totalS": "texto"
+      }
+    ]
+  },
+  "POST /coactiva/expedientes/importacion": {
+    "expediente": {
+      "numero": "texto",
+      "ejercicio": "entero",
+      "correlativo": "entero",
+      "codContribuyente": "texto",
+      "ejecutor": "texto",
+      "auxiliar": "texto",
+      "fechaDeApertura": "fecha",
+      "asunto": "texto",
+      "direccionReferencial": "texto",
+      "estado": "texto",
+      "estadoCodigo": "texto",
+      "valores": "entero",
+      "insoluto": "texto",
+      "reajuste": "texto",
+      "interes": "texto",
+      "gastos": "texto",
+      "deudaMateriaDeCobranza": "texto",
+      "costas": "texto",
+      "totalExigible": "texto",
+      "deudaAlDia": "fecha",
+      "valoresImportados": [
+        {
+          "valorId": "entero",
+          "fechaDeImportacion": "fecha"
+        }
+      ],
+      "historial": [
+        {
+          "tipo": "texto",
+          "estado": "texto",
+          "estadoCodigo": "texto",
+          "direccionReferencial": "texto",
+          "fecha": "fecha",
+          "motivo": "texto",
+          "fecDoc": "fecha",
+          "numDoc": "texto",
+          "activo": "booleano",
+          "usuario": "texto",
+          "observaciones": "texto"
+        }
+      ]
+    },
+    "importados": "entero",
+    "rechazados": [
+      {
+        "numero": "texto",
+        "motivo": "texto",
+        "detalle": "texto"
+      }
+    ]
+  },
+  "POST /coactiva/expedientes/{numero}/actos": {
+    "expediente": "texto",
+    "acto": {
+      "tipo": "texto",
+      "titulo": "texto",
+      "numero": "texto",
+      "fecha": "fecha",
+      "descripcion": "texto",
+      "medida": "texto",
+      "exigibleDesde": "fecha",
+      "usuario": "texto",
+      "observaciones": "texto",
+      "diligencias": [
+        {
+          "intento": "entero",
+          "fecha": "fecha",
+          "modalidad": "texto",
+          "resultado": "texto",
+          "surtioEfecto": "booleano",
+          "exigibleDesde": "fecha",
+          "notificador": "texto",
+          "domicilio": "texto",
+          "receptor": "texto",
+          "documentoReceptor": "texto",
+          "vinculo": "texto",
+          "acuse": "texto",
+          "usuario": "texto",
+          "observaciones": "texto"
+        }
+      ]
+    },
+    "documento": {
+      "numero": "texto",
+      "formato": "texto",
+      "nombreDeArchivo": "texto",
+      "resumen": "texto",
+      "fechaDeEmision": "fecha",
+      "reimpresiones": "entero",
+      "bytes": "entero"
+    },
+    "estadoDelExpediente": "texto",
+    "deudaTotal": "texto",
+    "deudaAlDia": "fecha"
+  },
+  "POST /coactiva/liquidaciones-costas": {
+    "nroLiquidacion": "texto",
+    "expedCoact": "texto",
+    "ejercicio": "entero",
+    "fecha": "fecha",
+    "tributo": "texto",
+    "totalS": "texto",
+    "pendienteS": "texto",
+    "aLaFecha": "fecha",
+    "estado": "texto",
+    "conjuntoDeParametros": "entero",
+    "observacion": "texto",
+    "usuarioRegistro": "texto",
+    "costas": [
+      {
+        "actoId": "entero",
+        "acto": "texto",
+        "descripcion": "texto",
+        "montoS": "texto",
+        "arancelFuente": "texto"
+      }
+    ]
+  },
+  "POST /coactiva/notificaciones": {
+    "tipo": "texto",
+    "titulo": "texto",
+    "numero": "texto",
+    "fecha": "fecha",
+    "descripcion": "texto",
+    "medida": "texto",
+    "exigibleDesde": "fecha",
+    "usuario": "texto",
+    "observaciones": "texto",
+    "diligencias": [
+      {
+        "intento": "entero",
+        "fecha": "fecha",
+        "modalidad": "texto",
+        "resultado": "texto",
+        "surtioEfecto": "booleano",
+        "exigibleDesde": "fecha",
+        "notificador": "texto",
+        "domicilio": "texto",
+        "receptor": "texto",
+        "documentoReceptor": "texto",
+        "vinculo": "texto",
+        "acuse": "texto",
+        "usuario": "texto",
+        "observaciones": "texto"
+      }
+    ]
+  },
+  "POST /coactiva/prescripcion": {
+    "id": "entero",
+    "codContribuyente": "texto",
+    "tributo": "texto",
+    "ejercicioDesde": "entero",
+    "ejercicioHasta": "entero",
+    "fechaDePresentacion": "texto",
+    "plazoAplicable": "texto",
+    "plazo": "texto",
+    "resultado": "texto",
+    "nDeResolucion": "texto",
+    "ejercicios": [
+      {
+        "ejercicio": "entero",
+        "inicioDelComputo": "texto",
+        "nuevoInicioDelComputo": "texto",
+        "fechaDePrescripcion": "texto",
+        "prescrita": "booleano"
+      }
+    ],
+    "hechos": [
+      {
+        "clase": "texto",
+        "causal": "texto",
+        "fechaDesde": "texto",
+        "fechaHasta": "texto"
+      }
+    ],
+    "observacion": "texto"
+  },
+  "POST /coactiva/rec/impresion": {
+    "emitidas": [
+      {
+        "expediente": "texto",
+        "acto": {
+          "tipo": "texto",
+          "titulo": "texto",
+          "numero": "texto",
+          "fecha": "fecha",
+          "descripcion": "texto",
+          "medida": "texto",
+          "exigibleDesde": "fecha",
+          "usuario": "texto",
+          "observaciones": "texto",
+          "diligencias": [
+            {
+              "intento": "entero",
+              "fecha": "fecha",
+              "modalidad": "texto",
+              "resultado": "texto",
+              "surtioEfecto": "booleano",
+              "exigibleDesde": "fecha",
+              "notificador": "texto",
+              "domicilio": "texto",
+              "receptor": "texto",
+              "documentoReceptor": "texto",
+              "vinculo": "texto",
+              "acuse": "texto",
+              "usuario": "texto",
+              "observaciones": "texto"
+            }
+          ]
+        },
+        "documento": {
+          "numero": "texto",
+          "formato": "texto",
+          "nombreDeArchivo": "texto",
+          "resumen": "texto",
+          "fechaDeEmision": "fecha",
+          "reimpresiones": "entero",
+          "bytes": "entero"
+        },
+        "estadoDelExpediente": "texto"
+      }
+    ],
+    "rechazadas": [
+      {
+        "expediente": "texto",
+        "motivo": "texto"
+      }
+    ]
+  },
+  "POST /fiscalizacion/liquidaciones": {
+    "numero": "texto",
+    "actaId": "entero",
+    "version": "entero",
+    "liquidacionAnterior": "entero",
+    "periodoDesde": "entero",
+    "periodoHasta": "entero",
+    "tipoDeFiscalizacion": "texto",
+    "motivoDeterminante": "texto",
+    "fecha": "texto",
+    "numeroNotificacion": "texto",
+    "estado": "texto",
+    "esperaSusCifras": "booleano",
+    "lineas": [
+      {
+        "ejercicio": "entero",
+        "predioId": "entero",
+        "vehiculoId": "entero",
+        "condicion": "texto",
+        "areaDeclarada": "texto",
+        "areaHallada": "texto",
+        "diferenciaDeArea": "texto",
+        "usoDeclarado": "texto",
+        "usoHallado": "texto",
+        "insolutoOmitido": "texto",
+        "multaTributaria": "texto"
+      }
+    ],
+    "historial": [
+      {
+        "tipo": "texto",
+        "estado": "texto",
+        "fecha": "texto",
+        "motivo": "texto",
+        "usuario": "texto"
+      }
+    ]
+  },
+  "POST /fiscalizacion/liquidaciones/{numero}/reliquidaciones": {
+    "version": {
+      "numero": "texto",
+      "actaId": "entero",
+      "version": "entero",
+      "liquidacionAnterior": "entero",
+      "periodoDesde": "entero",
+      "periodoHasta": "entero",
+      "tipoDeFiscalizacion": "texto",
+      "motivoDeterminante": "texto",
+      "fecha": "texto",
+      "numeroNotificacion": "texto",
+      "estado": "texto",
+      "esperaSusCifras": "booleano",
+      "lineas": [
+        {
+          "ejercicio": "entero",
+          "predioId": "entero",
+          "vehiculoId": "entero",
+          "condicion": "texto",
+          "areaDeclarada": "texto",
+          "areaHallada": "texto",
+          "diferenciaDeArea": "texto",
+          "usoDeclarado": "texto",
+          "usoHallado": "texto",
+          "insolutoOmitido": "texto",
+          "multaTributaria": "texto"
+        }
+      ],
+      "historial": [
+        {
+          "tipo": "texto",
+          "estado": "texto",
+          "fecha": "texto",
+          "motivo": "texto",
+          "usuario": "texto"
+        }
+      ]
+    },
+    "cambios": [
+      {
+        "concepto": "texto",
+        "antes": "texto",
+        "despues": "texto"
+      }
+    ],
+    "importesSinCifra": [
+      "texto"
+    ]
+  },
+  "POST /fiscalizacion/predial/actas": {
+    "id": "entero",
+    "programaId": "entero",
+    "version": "entero",
+    "contribuyenteId": "entero",
+    "predioId": "entero",
+    "vehiculoId": "entero",
+    "fichaId": "entero",
+    "fechaVisita": "texto",
+    "fiscalizador": "texto",
+    "hallazgo": "texto",
+    "areaHallada": "texto",
+    "usoHallado": "texto",
+    "detalle": "texto",
+    "estado": "texto"
+  },
+  "POST /fiscalizacion/programas": {
+    "id": "entero",
+    "codigo": "texto",
+    "descripcion": "texto",
+    "tipo": "texto",
+    "fechaInicio": "texto",
+    "fechaFin": "texto",
+    "estado": "texto",
+    "ejercicio": "texto",
+    "sector": "texto",
+    "criterio": "texto",
+    "fiscalizador": "texto"
+  },
+  "POST /fiscalizacion/programas/{id}/muestra": {
+    "programaId": "entero",
+    "predios": "entero",
+    "sinTitular": "entero",
+    "detectados": "entero",
+    "excluidosPorOtroPrograma": "entero",
+    "excluidosPorActaDelEjercicio": "entero",
+    "fechaSorteo": "texto"
+  },
+  "POST /fiscalizacion/transferencias": {
+    "numero": "texto",
+    "fecha": "texto",
+    "aLaFecha": "texto",
+    "nLiquidacion": "texto",
+    "versionDeLaLiquidacion": "entero",
+    "periodoDesde": "entero",
+    "periodoHasta": "entero",
+    "codContribuyente": "texto",
+    "contribuyente": "texto",
+    "predioId": "entero",
+    "vehiculoId": "entero",
+    "documentoSustento": "texto",
+    "sustento": "texto",
+    "baseLegal": "texto",
+    "fichaAnteriorId": "entero",
+    "fichaNuevaId": "entero",
+    "usuarioRegistro": "texto",
+    "observacion": "texto",
+    "lineas": [
+      {
+        "ejercicio": "entero",
+        "determinado": "texto",
+        "declarado": "texto",
+        "diferencia": "texto",
+        "multa": "texto",
+        "total": "texto",
+        "condicion": "texto",
+        "areaDeclarada": "texto",
+        "areaHallada": "texto"
+      }
+    ],
+    "cargosAsentados": "entero"
+  },
+  "POST /fiscalizacion/vehicular": {
+    "id": "entero",
+    "programaId": "entero",
+    "version": "entero",
+    "contribuyenteId": "entero",
+    "predioId": "entero",
+    "vehiculoId": "entero",
+    "fichaId": "entero",
+    "fechaVisita": "texto",
+    "fiscalizador": "texto",
+    "hallazgo": "texto",
+    "areaHallada": "texto",
+    "usoHallado": "texto",
+    "detalle": "texto",
+    "estado": "texto"
+  },
+  "POST /infracciones/administrativas/notificaciones": {
+    "id": "entero",
+    "numero": "texto",
+    "fecha": "texto",
+    "contribuyenteId": "entero",
+    "predioId": "entero",
+    "direccion": "texto",
+    "motivo": "texto",
+    "plazoDias": "entero",
+    "vencimiento": "texto",
+    "estado": "texto",
+    "usuarioRegistro": "texto"
+  },
+  "POST /infracciones/administrativas/reportes": "objeto",
+  "POST /infracciones/administrativas/resoluciones": {
+    "id": "entero",
+    "numero": "texto",
+    "tipo": "texto",
+    "papeleta": "texto",
+    "fecha": "fecha",
+    "nDeExpediente": "texto",
+    "sentidoDelFallo": "texto",
+    "efectoSobreLaMulta": "texto",
+    "sancionAccesoria": "texto",
+    "deuda": {
+      "importe": "texto",
+      "actualizadoA": "fecha"
+    },
+    "dadoDeBaja": {
+      "importe": "texto",
+      "actualizadoA": "fecha"
+    },
+    "asientosDeBaja": "entero",
+    "formato": "texto",
+    "resumen": "texto",
+    "nombreDeArchivo": "texto"
+  },
+  "POST /infracciones/administrativas/resoluciones/{id}/notificacion": {
+    "id": "entero",
+    "resolucion": "texto",
+    "numero": "texto",
+    "intento": "entero",
+    "fechaDeNotificacion": "fecha",
+    "modalidad": "texto",
+    "resultado": "texto",
+    "notificador": "texto",
+    "direccion": "texto",
+    "recibidoPor": "texto",
+    "acuse": "texto",
+    "exigibleDesde": "fecha",
+    "abreElPlazoDeLaSancionadora": "booleano"
+  },
+  "POST /infracciones/administrativas/valores/generacion-masiva": {
+    "id": "entero",
+    "familia": "texto",
+    "desde": "fecha",
+    "hasta": "fecha",
+    "fechaCriterio": "fecha",
+    "origen": "texto",
+    "totalCandidatos": "entero",
+    "usuarioRegistro": "texto",
+    "observacion": "texto"
+  },
+  "POST /licencias/certificados": {
+    "nCertificado": "texto",
+    "tipo": "texto",
+    "predio": "texto",
+    "direccion": "texto",
+    "solicitante": "texto",
+    "fecha": "fecha",
+    "vigenciaHasta": "fecha",
+    "derechoS": {
+      "importe": "texto",
+      "actualizadoA": "fecha"
+    },
+    "yaExistia": "booleano",
+    "documento": {
+      "numero": "texto",
+      "formato": "texto",
+      "resumen": "texto",
+      "bytes": "entero",
+      "reimpresiones": "entero"
+    }
+  },
+  "POST /licencias/certificados/{numero}/impresion": "archivo",
+  "POST /licencias/ciiu": {
+    "codigo": "texto",
+    "descripcion": "texto",
+    "seccion": "texto",
+    "riesgoItse": "texto",
+    "zonificacionCompatible": "texto",
+    "requiereSectorial": "booleano",
+    "extendido": "booleano",
+    "activo": "booleano"
+  },
+  "POST /licencias/edificacion": {
+    "nroExpediente": "texto",
+    "fechaDeclaracion": "fecha",
+    "nroLicencia": "texto",
+    "est": "texto",
+    "estado": "texto",
+    "estadoALaFecha": "fecha",
+    "contribuyente": "texto",
+    "nombreContribuyente": "texto",
+    "tipoTramite": "texto",
+    "obra": "texto",
+    "modalidad": "texto",
+    "revision": "texto",
+    "nroExpedienteAnterior": "texto",
+    "solicitanteEsPropietario": "booleano",
+    "representanteLegal": {
+      "dni": "texto",
+      "nombre": "texto",
+      "partidaRegistral": "texto",
+      "vigenciaPoder": "fecha"
+    },
+    "terreno": {
+      "version": "entero",
+      "codCatastral": "texto",
+      "direccion": "texto",
+      "mz": "texto",
+      "lt": "texto",
+      "areaDelTerrenoM": "texto",
+      "zonificacion": "texto",
+      "partidaRegistral": "texto",
+      "frenteM": "texto",
+      "fondoM": "texto"
+    },
+    "proyecto": {
+      "version": "entero",
+      "usoDeLaEdificacion": "texto",
+      "nDePisos": "entero",
+      "areaTechadaTotalM": "texto",
+      "areaLibreM": "texto",
+      "nDeEstacionamientos": "entero",
+      "plazoDeEjecucionMeses": "entero"
+    },
+    "valorizacion": [
+      {
+        "piso": "entero",
+        "partida": "texto",
+        "categoria": "texto",
+        "areaM": "texto"
+      }
+    ],
+    "valorDeObra": {
+      "importe": "texto",
+      "actualizadoA": "fecha"
+    },
+    "valorDeObraNoDisponible": "texto",
+    "llaveQueFalta": "texto",
+    "profesionales": [
+      {
+        "tipo": "texto",
+        "nombre": "texto",
+        "colegio": "texto",
+        "colegiatura": "texto"
+      }
+    ],
+    "documentos": [
+      {
+        "requisito": "texto",
+        "presentado": "booleano",
+        "folios": "entero"
+      }
+    ],
+    "historial": [
+      {
+        "tipo": "texto",
+        "fecha": "fecha",
+        "nroLicencia": "texto",
+        "motivo": "texto",
+        "resolucion": "texto",
+        "observacion": "texto"
+      }
+    ],
+    "vigencias": [
+      {
+        "tramo": "entero",
+        "desde": "fecha",
+        "hasta": "fecha"
+      }
+    ],
+    "seccionesFaltantes": [
+      "texto"
+    ],
+    "completo": "booleano"
+  },
+  "POST /licencias/edificacion/{expediente}/licencia": {
+    "nroExpediente": "texto",
+    "nroLicencia": "texto",
+    "acto": "texto",
+    "fecha": "fecha",
+    "resolucion": {
+      "numero": "texto",
+      "formato": "texto",
+      "resumen": "texto",
+      "bytes": "entero",
+      "reimpresiones": "entero"
+    },
+    "vigencias": [
+      {
+        "tramo": "entero",
+        "desde": "fecha",
+        "hasta": "fecha"
+      }
+    ],
+    "valorDeObraNoDisponible": "texto"
+  },
+  "POST /licencias/edificacion/{expediente}/revalidacion": {
+    "nroExpediente": "texto",
+    "nroLicencia": "texto",
+    "acto": "texto",
+    "fecha": "fecha",
+    "resolucion": {
+      "numero": "texto",
+      "formato": "texto",
+      "resumen": "texto",
+      "bytes": "entero",
+      "reimpresiones": "entero"
+    },
+    "vigencias": [
+      {
+        "tramo": "entero",
+        "desde": "fecha",
+        "hasta": "fecha"
+      }
+    ],
+    "valorDeObraNoDisponible": "texto"
+  },
+  "POST /licencias/edificacion/{expediente}/secciones": {
+    "nroExpediente": "texto",
+    "fechaDeclaracion": "fecha",
+    "nroLicencia": "texto",
+    "est": "texto",
+    "estado": "texto",
+    "estadoALaFecha": "fecha",
+    "contribuyente": "texto",
+    "nombreContribuyente": "texto",
+    "tipoTramite": "texto",
+    "obra": "texto",
+    "modalidad": "texto",
+    "revision": "texto",
+    "nroExpedienteAnterior": "texto",
+    "solicitanteEsPropietario": "booleano",
+    "representanteLegal": {
+      "dni": "texto",
+      "nombre": "texto",
+      "partidaRegistral": "texto",
+      "vigenciaPoder": "fecha"
+    },
+    "terreno": {
+      "version": "entero",
+      "codCatastral": "texto",
+      "direccion": "texto",
+      "mz": "texto",
+      "lt": "texto",
+      "areaDelTerrenoM": "texto",
+      "zonificacion": "texto",
+      "partidaRegistral": "texto",
+      "frenteM": "texto",
+      "fondoM": "texto"
+    },
+    "proyecto": {
+      "version": "entero",
+      "usoDeLaEdificacion": "texto",
+      "nDePisos": "entero",
+      "areaTechadaTotalM": "texto",
+      "areaLibreM": "texto",
+      "nDeEstacionamientos": "entero",
+      "plazoDeEjecucionMeses": "entero"
+    },
+    "valorizacion": [
+      {
+        "piso": "entero",
+        "partida": "texto",
+        "categoria": "texto",
+        "areaM": "texto"
+      }
+    ],
+    "valorDeObra": {
+      "importe": "texto",
+      "actualizadoA": "fecha"
+    },
+    "valorDeObraNoDisponible": "texto",
+    "llaveQueFalta": "texto",
+    "profesionales": [
+      {
+        "tipo": "texto",
+        "nombre": "texto",
+        "colegio": "texto",
+        "colegiatura": "texto"
+      }
+    ],
+    "documentos": [
+      {
+        "requisito": "texto",
+        "presentado": "booleano",
+        "folios": "entero"
+      }
+    ],
+    "historial": [
+      {
+        "tipo": "texto",
+        "fecha": "fecha",
+        "nroLicencia": "texto",
+        "motivo": "texto",
+        "resolucion": "texto",
+        "observacion": "texto"
+      }
+    ],
+    "vigencias": [
+      {
+        "tramo": "entero",
+        "desde": "fecha",
+        "hasta": "fecha"
+      }
+    ],
+    "seccionesFaltantes": [
+      "texto"
+    ],
+    "completo": "booleano"
+  },
+  "POST /licencias/funcionamiento": {
+    "nroLicencia": "texto",
+    "acto": "texto",
+    "fecha": "fecha",
+    "resolucion": {
+      "numero": "texto",
+      "formato": "texto",
+      "resumen": "texto",
+      "bytes": "entero",
+      "reimpresiones": "entero"
+    },
+    "licenciaReimpresa": {
+      "numero": "texto",
+      "formato": "texto",
+      "resumen": "texto",
+      "bytes": "entero",
+      "reimpresiones": "entero"
+    },
+    "numeroDeDuplicado": "entero",
+    "estado": "texto"
+  },
+  "POST /licencias/funcionamiento/reportes/padron": {
+    "aLaFecha": "fecha",
+    "licencias": "entero",
+    "vigentes": "entero",
+    "vencidas": "entero",
+    "canceladas": "entero",
+    "pagina": "entero",
+    "tamano": "entero",
+    "filas": [
+      {
+        "nroLicencia": "texto",
+        "est": "texto",
+        "estado": "texto",
+        "estadoALaFecha": "fecha",
+        "contribuyente": "texto",
+        "codContribuyente": "texto",
+        "denominacionComercial": "texto",
+        "direccion": "texto",
+        "tipoDeLicencia": "texto",
+        "areaDelEstablecimiento": "texto",
+        "zonificacion": "texto",
+        "aforo": "entero",
+        "fechaDeEmision": "fecha",
+        "fechaDeVencimiento": "fecha",
+        "nExpediente": "texto",
+        "fechaDeExpediente": "fecha",
+        "fichaEconomica": "entero",
+        "giros": [
+          {
+            "codigo": "texto",
+            "descripcion": "texto",
+            "principal": "booleano",
+            "activo": "booleano"
+          }
+        ],
+        "historial": [
+          {
+            "tipo": "texto",
+            "fecha": "fecha",
+            "motivo": "texto",
+            "resolucion": "texto",
+            "observacion": "texto"
+          }
+        ],
+        "duplicados": [
+          {
+            "numero": "entero",
+            "fecha": "fecha",
+            "motivo": "texto",
+            "reimpresion": "entero"
+          }
+        ]
+      }
+    ]
+  },
+  "POST /licencias/funcionamiento/{id}/cancelacion": {
+    "nroLicencia": "texto",
+    "acto": "texto",
+    "fecha": "fecha",
+    "resolucion": {
+      "numero": "texto",
+      "formato": "texto",
+      "resumen": "texto",
+      "bytes": "entero",
+      "reimpresiones": "entero"
+    },
+    "licenciaReimpresa": {
+      "numero": "texto",
+      "formato": "texto",
+      "resumen": "texto",
+      "bytes": "entero",
+      "reimpresiones": "entero"
+    },
+    "numeroDeDuplicado": "entero",
+    "estado": "texto"
+  },
+  "POST /licencias/funcionamiento/{id}/duplicado": {
+    "nroLicencia": "texto",
+    "acto": "texto",
+    "fecha": "fecha",
+    "resolucion": {
+      "numero": "texto",
+      "formato": "texto",
+      "resumen": "texto",
+      "bytes": "entero",
+      "reimpresiones": "entero"
+    },
+    "licenciaReimpresa": {
+      "numero": "texto",
+      "formato": "texto",
+      "resumen": "texto",
+      "bytes": "entero",
+      "reimpresiones": "entero"
+    },
+    "numeroDeDuplicado": "entero",
+    "estado": "texto"
+  },
+  "POST /rentas/alcabala": {
+    "id": "entero",
+    "ejercicio": "texto",
+    "predioId": "entero",
+    "contribuyenteId": "entero",
+    "baseImponible": "texto",
+    "montoDeterminado": "texto"
+  },
+  "POST /rentas/contribuyentes": {
+    "id": "entero",
+    "codigo": "texto",
+    "tipoDocumento": "texto",
+    "numeroDocumento": "texto",
+    "tipoPersona": "texto",
+    "nombreRazonSocial": "texto",
+    "condicionEspecial": "texto",
+    "activo": "booleano"
+  },
+  "POST /rentas/contribuyentes/{id}/contactos": {
+    "id": "entero",
+    "tipo": "texto",
+    "valor": "texto",
+    "nombre": "texto",
+    "documento": "texto",
+    "observacion": "texto",
+    "vigente": "booleano"
+  },
+  "POST /rentas/contribuyentes/{id}/domicilios": {
+    "id": "entero",
+    "tipo": "texto",
+    "direccion": "texto",
+    "referencia": "texto",
+    "ubigeo": "texto",
+    "vigenciaDesde": "fecha",
+    "vigenciaHasta": "fecha",
+    "documentoOrigen": "texto"
+  },
+  "POST /rentas/contribuyentes/{id}/responsables": {
+    "id": "entero",
+    "responsableId": "entero",
+    "vinculo": "texto",
+    "porcentaje": "texto",
+    "vigenciaDesde": "fecha",
+    "vigenciaHasta": "fecha",
+    "documentoOrigen": "texto"
+  },
+  "POST /rentas/declaraciones": {
+    "id": "entero",
+    "numero": "texto",
+    "ejercicio": "entero",
+    "tipo": "texto",
+    "predioId": "entero",
+    "vehiculoId": "entero",
+    "fichaCatastralId": "entero",
+    "fechaPresentacion": "texto",
+    "fechaLimite": "texto",
+    "fueraDePlazo": "booleano",
+    "estado": "texto",
+    "djRectificaId": "entero"
+  },
+  "POST /rentas/declaraciones/{djNro}/anulacion": {
+    "id": "entero",
+    "numero": "texto",
+    "ejercicio": "entero",
+    "tipo": "texto",
+    "predioId": "entero",
+    "vehiculoId": "entero",
+    "fichaCatastralId": "entero",
+    "fechaPresentacion": "texto",
+    "fechaLimite": "texto",
+    "fueraDePlazo": "booleano",
+    "estado": "texto",
+    "djRectificaId": "entero"
+  },
+  "POST /rentas/declaraciones/{djNro}/observacion": {
+    "id": "entero",
+    "numero": "texto",
+    "ejercicio": "entero",
+    "tipo": "texto",
+    "predioId": "entero",
+    "vehiculoId": "entero",
+    "fichaCatastralId": "entero",
+    "fechaPresentacion": "texto",
+    "fechaLimite": "texto",
+    "fueraDePlazo": "booleano",
+    "estado": "texto",
+    "djRectificaId": "entero"
+  },
+  "POST /rentas/declaraciones/{djNro}/rectificacion": {
+    "id": "entero",
+    "numero": "texto",
+    "ejercicio": "entero",
+    "tipo": "texto",
+    "predioId": "entero",
+    "vehiculoId": "entero",
+    "fichaCatastralId": "entero",
+    "fechaPresentacion": "texto",
+    "fechaLimite": "texto",
+    "fueraDePlazo": "booleano",
+    "estado": "texto",
+    "djRectificaId": "entero"
+  },
+  "POST /rentas/deuda/altas": {
+    "sentido": "texto",
+    "numeroDeDocumento": "texto",
+    "total": {
+      "importe": "texto",
+      "actualizadoA": "fecha"
+    },
+    "asientos": [
+      {
+        "id": "entero",
+        "ejercicio": "entero",
+        "tributo": "texto",
+        "concepto": "texto",
+        "tipo": "texto",
+        "fase": "texto",
+        "periodo": "entero",
+        "predioId": "entero",
+        "vehiculoId": "entero",
+        "referenciaExterna": "texto",
+        "monto": {
+          "importe": "texto",
+          "actualizadoA": "fecha"
+        },
+        "documentoOrigen": "texto",
+        "asientoReversadoId": "entero",
+        "usuarioId": "texto",
+        "motivo": "texto",
+        "causal": "texto"
+      }
+    ]
+  },
+  "POST /rentas/deuda/bajas": {
+    "sentido": "texto",
+    "numeroDeDocumento": "texto",
+    "total": {
+      "importe": "texto",
+      "actualizadoA": "fecha"
+    },
+    "asientos": [
+      {
+        "id": "entero",
+        "ejercicio": "entero",
+        "tributo": "texto",
+        "concepto": "texto",
+        "tipo": "texto",
+        "fase": "texto",
+        "periodo": "entero",
+        "predioId": "entero",
+        "vehiculoId": "entero",
+        "referenciaExterna": "texto",
+        "monto": {
+          "importe": "texto",
+          "actualizadoA": "fecha"
+        },
+        "documentoOrigen": "texto",
+        "asientoReversadoId": "entero",
+        "usuarioId": "texto",
+        "motivo": "texto",
+        "causal": "texto"
+      }
+    ]
+  },
+  "POST /rentas/espectaculos": {
+    "id": "entero",
+    "ejercicio": "texto",
+    "organizadorId": "entero",
+    "ingresoDeclarado": "texto",
+    "montoDeterminado": "texto"
+  },
+  "POST /rentas/predial/calculo-individual": {
+    "id": "entero",
+    "simulacion": "booleano",
+    "ejercicio": "texto",
+    "codContribuyente": "texto",
+    "sujeto": "texto",
+    "conjuntoId": "entero",
+    "conjunto": "texto",
+    "fechaCalculo": "texto",
+    "predios": [
+      {
+        "predioId": "entero",
+        "codigoPredial": "texto",
+        "ubicacion": "texto",
+        "uso": "texto",
+        "porcentajePropiedad": "texto",
+        "autovaluo": "texto",
+        "valuoExonerado": "texto",
+        "valuoAfecto": "texto",
+        "baseImponible": "texto",
+        "porcentajeRegistradoDelPredio": "texto",
+        "titularidadCompleta": "booleano"
+      }
+    ],
+    "valuoTotal": "texto",
+    "valuoExonerado": "texto",
+    "valuoAfecto": "texto",
+    "baseImponible": "texto",
+    "uit": "texto",
+    "tramos": [
+      {
+        "orden": "entero",
+        "limiteSuperior": "texto",
+        "alicuota": "texto",
+        "porcionGravada": "texto",
+        "aporte": "texto"
+      }
+    ],
+    "minimoImponible": "texto",
+    "impuestoInsoluto": "texto",
+    "derechoDeEmision": "texto",
+    "totalAPagar": "texto",
+    "modalidad": "texto",
+    "cuotas": [
+      {
+        "numero": "entero",
+        "vencimiento": "texto",
+        "importe": "texto"
+      }
+    ],
+    "reglasAplicadas": [
+      "texto"
+    ]
+  },
+  "POST /rentas/predial/calculo-masivo": {
+    "ejercicio": "texto",
+    "alcance": "texto",
+    "simulacion": "booleano",
+    "conjunto": "texto",
+    "fechaCalculo": "texto",
+    "etapas": [
+      {
+        "etapa": "texto",
+        "registros": "entero",
+        "monto": "texto",
+        "observados": "entero",
+        "estado": "texto"
+      }
+    ],
+    "observados": [
+      {
+        "codContribuyente": "texto",
+        "nombre": "texto",
+        "motivo": "texto"
+      }
+    ]
+  },
+  "POST /rentas/transferencias/predio": {
+    "id": "entero",
+    "objeto": "texto",
+    "predioId": "entero",
+    "vehiculoId": "entero",
+    "transferenteId": "entero",
+    "adquirienteId": "entero",
+    "tipoTransferencia": "texto",
+    "fechaTransferencia": "texto",
+    "valorTransferencia": {
+      "importe": "texto",
+      "actualizadoA": "fecha"
+    },
+    "porcentajeTransferido": "texto",
+    "afectaAlcabala": "booleano",
+    "documentoOrigen": "texto"
+  },
+  "POST /rentas/transferencias/vehiculo": {
+    "id": "entero",
+    "objeto": "texto",
+    "predioId": "entero",
+    "vehiculoId": "entero",
+    "transferenteId": "entero",
+    "adquirienteId": "entero",
+    "tipoTransferencia": "texto",
+    "fechaTransferencia": "texto",
+    "valorTransferencia": {
+      "importe": "texto",
+      "actualizadoA": "fecha"
+    },
+    "porcentajeTransferido": "texto",
+    "afectaAlcabala": "booleano",
+    "documentoOrigen": "texto"
+  },
+  "POST /rentas/vehicular/calculo": {
+    "fechaCalculo": "texto",
+    "conjuntoId": "entero",
+    "conjunto": "texto",
+    "alicuota": "texto",
+    "minimoImponible": "texto",
+    "determinaciones": [
+      {
+        "id": "entero",
+        "ejercicio": "texto",
+        "vehiculoId": "entero",
+        "placa": "texto",
+        "contribuyenteId": "entero",
+        "baseImponible": "texto",
+        "montoDeterminado": "texto",
+        "simulacion": "booleano"
+      }
+    ]
+  },
+  "POST /seguridad/grupos": {
+    "id": "entero",
+    "nombre": "texto",
+    "descripcion": "texto",
+    "habilitado": "booleano",
+    "vigenciaDesde": "fecha",
+    "vigenciaHasta": "fecha"
+  },
+  "POST /seguridad/grupos/{grupo}/miembros": {
+    "grupoId": "entero",
+    "usuarioId": "entero",
+    "activo": "booleano"
+  },
+  "POST /seguridad/grupos/{id}/baja": {
+    "id": "entero",
+    "nombre": "texto",
+    "descripcion": "texto",
+    "habilitado": "booleano",
+    "vigenciaDesde": "fecha",
+    "vigenciaHasta": "fecha"
+  },
+  "POST /seguridad/grupos/{id}/reactivacion": {
+    "id": "entero",
+    "nombre": "texto",
+    "descripcion": "texto",
+    "habilitado": "booleano",
+    "vigenciaDesde": "fecha",
+    "vigenciaHasta": "fecha"
+  },
+  "POST /seguridad/respaldos": {
+    "contenido": [
+      {
+        "id": "entero",
+        "inicio": "instante",
+        "fin": "instante",
+        "resultado": "texto",
+        "destino": "texto",
+        "tamanoBytes": "entero",
+        "detalle": "texto",
+        "ultimaRestauracionVerificada": "instante",
+        "ultimaRestauracionVerificadaPor": "texto"
+      }
+    ],
+    "pagina": "entero",
+    "tamano": "entero",
+    "totalElementos": "entero",
+    "totalPaginas": "entero",
+    "hayMas": "booleano"
+  },
+  "POST /seguridad/usuarios": {
+    "id": "entero",
+    "cuenta": "texto",
+    "nombre": "texto",
+    "correo": "texto",
+    "habilitado": "booleano",
+    "vigenciaDesde": "fecha",
+    "vigenciaHasta": "fecha"
+  },
+  "POST /seguridad/usuarios/{id}/baja": {
+    "id": "entero",
+    "cuenta": "texto",
+    "nombre": "texto",
+    "correo": "texto",
+    "habilitado": "booleano",
+    "vigenciaDesde": "fecha",
+    "vigenciaHasta": "fecha"
+  },
+  "POST /seguridad/usuarios/{id}/reactivacion": {
+    "id": "entero",
+    "cuenta": "texto",
+    "nombre": "texto",
+    "correo": "texto",
+    "habilitado": "booleano",
+    "vigenciaDesde": "fecha",
+    "vigenciaHasta": "fecha"
+  },
+  "POST /tesoreria/caja/cierre": {
+    "id": "entero",
+    "turnoId": "entero",
+    "caja": "texto",
+    "cajero": "texto",
+    "tipo": "texto",
+    "secuencia": "entero",
+    "fecha": "texto",
+    "registradoEn": "texto",
+    "estadoDelTurno": "texto",
+    "arqueo": {
+      "turnoId": "entero",
+      "fecha": "texto",
+      "recibosEmitidos": "entero",
+      "recibosAnulados": "entero",
+      "cobrado": {
+        "importe": "texto",
+        "actualizadoA": "fecha"
+      },
+      "anulado": {
+        "importe": "texto",
+        "actualizadoA": "fecha"
+      },
+      "neto": {
+        "importe": "texto",
+        "actualizadoA": "fecha"
+      },
+      "declarado": {
+        "importe": "texto",
+        "actualizadoA": "fecha"
+      },
+      "diferencia": {
+        "importe": "texto",
+        "actualizadoA": "fecha"
+      },
+      "cuadra": "booleano",
+      "lineas": [
+        {
+          "formaDePago": "texto",
+          "cobrado": {
+            "importe": "texto",
+            "actualizadoA": "fecha"
+          },
+          "anulado": {
+            "importe": "texto",
+            "actualizadoA": "fecha"
+          },
+          "neto": {
+            "importe": "texto",
+            "actualizadoA": "fecha"
+          },
+          "declarado": {
+            "importe": "texto",
+            "actualizadoA": "fecha"
+          },
+          "diferencia": {
+            "importe": "texto",
+            "actualizadoA": "fecha"
+          }
+        }
+      ]
+    },
+    "reversaCierreId": "entero",
+    "motivo": "texto",
+    "recaudadoConAsiento": {
+      "importe": "texto",
+      "actualizadoA": "fecha"
+    },
+    "recaudadoSinAsiento": {
+      "importe": "texto",
+      "actualizadoA": "fecha"
+    },
+    "observacion": "texto"
+  },
+  "POST /tesoreria/caja/cobranza": {
+    "numero": "texto",
+    "serie": "texto",
+    "correlativo": "entero",
+    "cajero": "texto",
+    "formaDePago": "texto",
+    "tipoDePago": "texto",
+    "beneficioDeclarado": "texto",
+    "emitidoEn": "texto",
+    "total": {
+      "importe": "texto",
+      "actualizadoA": "fecha"
+    },
+    "lineas": [
+      {
+        "tributo": "texto",
+        "concepto": "texto",
+        "ejercicio": "entero",
+        "predioId": "entero",
+        "vehiculoId": "entero",
+        "cantidad": "entero",
+        "precioUnitario": {
+          "importe": "texto",
+          "actualizadoA": "fecha"
+        },
+        "insoluto": {
+          "importe": "texto",
+          "actualizadoA": "fecha"
+        },
+        "reajuste": {
+          "importe": "texto",
+          "actualizadoA": "fecha"
+        },
+        "interes": {
+          "importe": "texto",
+          "actualizadoA": "fecha"
+        },
+        "gasto": {
+          "importe": "texto",
+          "actualizadoA": "fecha"
+        },
+        "monto": {
+          "importe": "texto",
+          "actualizadoA": "fecha"
+        }
+      }
+    ]
+  },
+  "POST /tesoreria/caja/tasas": {
+    "numero": "texto",
+    "serie": "texto",
+    "correlativo": "entero",
+    "cajero": "texto",
+    "formaDePago": "texto",
+    "tipoDePago": "texto",
+    "beneficioDeclarado": "texto",
+    "emitidoEn": "texto",
+    "total": {
+      "importe": "texto",
+      "actualizadoA": "fecha"
+    },
+    "lineas": [
+      {
+        "tributo": "texto",
+        "concepto": "texto",
+        "ejercicio": "entero",
+        "predioId": "entero",
+        "vehiculoId": "entero",
+        "cantidad": "entero",
+        "precioUnitario": {
+          "importe": "texto",
+          "actualizadoA": "fecha"
+        },
+        "insoluto": {
+          "importe": "texto",
+          "actualizadoA": "fecha"
+        },
+        "reajuste": {
+          "importe": "texto",
+          "actualizadoA": "fecha"
+        },
+        "interes": {
+          "importe": "texto",
+          "actualizadoA": "fecha"
+        },
+        "gasto": {
+          "importe": "texto",
+          "actualizadoA": "fecha"
+        },
+        "monto": {
+          "importe": "texto",
+          "actualizadoA": "fecha"
+        }
+      }
+    ]
+  },
+  "POST /tesoreria/convenios/{numero}/anulacion": {
+    "numero": "texto",
+    "codContribuyente": "texto",
+    "tipo": "texto",
+    "estado": "texto",
+    "fecha": "fecha",
+    "fechaCorte": "fecha",
+    "montoTotal": "texto",
+    "cuotaInicial": "texto",
+    "nroDeCuotas": "entero",
+    "totalDelCronograma": "texto",
+    "interesDeFraccionamientoMensual": "texto",
+    "conjuntoDeParametros": "entero",
+    "tipoDeGarantia": "texto",
+    "detalleDelOfrecimiento": "texto",
+    "resolucion": "texto",
+    "convenioDeOrigen": "texto",
+    "cuotas": [
+      {
+        "nro": "entero",
+        "vencimiento": "fecha",
+        "cuota": "texto",
+        "capital": "texto",
+        "interes": "texto",
+        "gasto": "texto"
+      }
+    ],
+    "deudaOriginal": [
+      {
+        "tributo": "texto",
+        "ejercicio": "entero",
+        "periodo": "entero",
+        "predioId": "entero",
+        "vehiculoId": "entero",
+        "faseOrigen": "texto",
+        "aLaFecha": "fecha",
+        "insoluto": "texto",
+        "reajuste": "texto",
+        "interes": "texto",
+        "gasto": "texto",
+        "total": "texto"
+      }
+    ],
+    "movimientos": [
+      {
+        "tipo": "texto",
+        "fecha": "fecha",
+        "motivo": "texto",
+        "autorizadoPor": "texto",
+        "documentoAutorizacion": "texto",
+        "importe": "texto",
+        "asientos": "entero",
+        "usuarioRegistro": "texto"
+      }
+    ],
+    "aLaFecha": "fecha",
+    "saldo": "texto",
+    "cuotasPagadas": "entero",
+    "cuotasVencidas": "entero"
+  },
+  "POST /tesoreria/fraccionamientos": "objeto",
+  "POST /tesoreria/recibos/{nro}/anulacion": {
+    "numero": "texto",
+    "estado": "texto",
+    "fecha": "texto",
+    "motivo": "texto",
+    "autorizadoPor": "texto",
+    "documentoAutorizacion": "texto",
+    "usuario": "texto",
+    "importe": {
+      "importe": "texto",
+      "actualizadoA": "fecha"
+    },
+    "asientosReversados": "entero",
+    "recibo": {
+      "numero": "texto",
+      "serie": "texto",
+      "correlativo": "entero",
+      "cajero": "texto",
+      "formaDePago": "texto",
+      "tipoDePago": "texto",
+      "beneficioDeclarado": "texto",
+      "emitidoEn": "texto",
+      "total": {
+        "importe": "texto",
+        "actualizadoA": "fecha"
+      },
+      "lineas": [
+        {
+          "tributo": "texto",
+          "concepto": "texto",
+          "ejercicio": "entero",
+          "predioId": "entero",
+          "vehiculoId": "entero",
+          "cantidad": "entero",
+          "precioUnitario": {
+            "importe": "texto",
+            "actualizadoA": "fecha"
+          },
+          "insoluto": {
+            "importe": "texto",
+            "actualizadoA": "fecha"
+          },
+          "reajuste": {
+            "importe": "texto",
+            "actualizadoA": "fecha"
+          },
+          "interes": {
+            "importe": "texto",
+            "actualizadoA": "fecha"
+          },
+          "gasto": {
+            "importe": "texto",
+            "actualizadoA": "fecha"
+          },
+          "monto": {
+            "importe": "texto",
+            "actualizadoA": "fecha"
+          }
+        }
+      ]
+    }
+  },
+  "POST /transito/constancias-libres": "archivo",
+  "POST /transito/descargos": {
+    "id": "entero",
+    "nDeExpediente": "texto",
+    "papeleta": "texto",
+    "fecha": "fecha",
+    "tipoDeRecurso": "texto",
+    "fundamento": "texto",
+    "presentadoHasta": "fecha",
+    "enPlazo": "booleano",
+    "plazo": "texto",
+    "observacion": "texto"
+  },
+  "POST /transito/internamientos": {
+    "id": "entero",
+    "placa": "texto",
+    "deposito": "texto",
+    "acta": "texto",
+    "tasaDeCustodia": "texto",
+    "formato": "texto",
+    "resumen": "texto",
+    "nombreDeArchivo": "texto"
+  },
+  "POST /transito/internamientos/{placa}/liberacion": {
+    "placa": "texto",
+    "fecha": "fecha",
+    "dias": "entero",
+    "estado": "texto",
+    "acta": "texto",
+    "custodiaPagada": {
+      "recibo": "texto",
+      "concepto": "texto",
+      "importe": {
+        "importe": "texto",
+        "actualizadoA": "fecha"
+      }
+    },
+    "formato": "texto",
+    "resumen": "texto",
+    "nombreDeArchivo": "texto"
+  },
+  "POST /transito/reportes": "objeto",
+  "POST /transito/resoluciones/ordinaria": {
+    "id": "entero",
+    "numero": "texto",
+    "tipo": "texto",
+    "papeleta": "texto",
+    "fecha": "fecha",
+    "nDeExpediente": "texto",
+    "sentidoDelFallo": "texto",
+    "efectoSobreLaMulta": "texto",
+    "sancionAccesoria": "texto",
+    "deuda": {
+      "importe": "texto",
+      "actualizadoA": "fecha"
+    },
+    "dadoDeBaja": {
+      "importe": "texto",
+      "actualizadoA": "fecha"
+    },
+    "asientosDeBaja": "entero",
+    "formato": "texto",
+    "resumen": "texto",
+    "nombreDeArchivo": "texto"
+  },
+  "POST /transito/resoluciones/sancionadora": {
+    "id": "entero",
+    "numero": "texto",
+    "tipo": "texto",
+    "papeleta": "texto",
+    "fecha": "fecha",
+    "nDeExpediente": "texto",
+    "sentidoDelFallo": "texto",
+    "efectoSobreLaMulta": "texto",
+    "sancionAccesoria": "texto",
+    "deuda": {
+      "importe": "texto",
+      "actualizadoA": "fecha"
+    },
+    "dadoDeBaja": {
+      "importe": "texto",
+      "actualizadoA": "fecha"
+    },
+    "asientosDeBaja": "entero",
+    "formato": "texto",
+    "resumen": "texto",
+    "nombreDeArchivo": "texto"
+  },
+  "POST /transito/resoluciones/{numero}/notificacion": {
+    "id": "entero",
+    "resolucion": "texto",
+    "numero": "texto",
+    "intento": "entero",
+    "fechaDeNotificacion": "fecha",
+    "modalidad": "texto",
+    "resultado": "texto",
+    "notificador": "texto",
+    "direccion": "texto",
+    "recibidoPor": "texto",
+    "acuse": "texto",
+    "exigibleDesde": "fecha",
+    "abreElPlazoDeLaSancionadora": "booleano"
+  },
+  "POST /transito/valores/generacion-masiva": {
+    "id": "entero",
+    "familia": "texto",
+    "desde": "fecha",
+    "hasta": "fecha",
+    "fechaCriterio": "fecha",
+    "origen": "texto",
+    "totalCandidatos": "entero",
+    "usuarioRegistro": "texto",
+    "observacion": "texto"
+  },
+  "POST /valores": {
+    "id": "entero",
+    "tipo": "texto",
+    "numero": "texto",
+    "ejercicio": "entero",
+    "codContribuyente": "texto",
+    "nombreContribuyente": "texto",
+    "baseLegal": "texto",
+    "estado": "texto",
+    "proyectadoA": "texto",
+    "total": "texto",
+    "fechaEmision": "texto",
+    "observacion": "texto"
+  },
+  "POST /valores/masivo": {
+    "id": "entero",
+    "tipo": "texto",
+    "tributo": "texto",
+    "ejercicioDesde": "entero",
+    "ejercicioHasta": "entero",
+    "fechaCriterio": "texto",
+    "origen": "texto",
+    "totalCandidatos": "entero",
+    "observacion": "texto"
+  },
+  "POST /valores/{nro}/notificacion": {
+    "id": "entero",
+    "numeroDeValor": "texto",
+    "intento": "entero",
+    "fechaDeNotificacion": "texto",
+    "modalidad": "texto",
+    "resultado": "texto",
+    "notificador": "texto",
+    "direccion": "texto",
+    "personaQueRecibe": "texto",
+    "documentoDeQuienRecibe": "texto",
+    "vinculo": "texto",
+    "acuse": "texto",
+    "surtioEfecto": "booleano",
+    "exigibleDesde": "texto",
+    "observacion": "texto"
+  },
+  "POST /valores/{numero}/movimientos": {
+    "id": "entero",
+    "numeroDeValor": "texto",
+    "tipoDeMovimiento": "texto",
+    "descripcion": "texto",
+    "fechaDelMovimiento": "texto",
+    "notificacionId": "entero",
+    "exigibleDesde": "texto",
+    "observacion": "texto"
+  },
+  "PUT /catastro/fichas/bienes-comunes/{codEdificacion}/actualizacion": {
+    "id": "entero",
+    "predioId": "entero",
+    "tipo": "texto",
+    "version": "entero",
+    "areaTerreno": "texto",
+    "uso": "texto",
+    "frontis": "texto",
+    "condicionPropiedad": "texto",
+    "tipoEdificacion": "texto",
+    "vigenciaDesde": "texto",
+    "vigenciaHasta": "texto",
+    "vigente": "booleano",
+    "origen": "texto",
+    "documentoOrigen": "texto",
+    "observacion": "texto",
+    "denominacion": "texto",
+    "construcciones": [
+      {
+        "id": "entero",
+        "piso": "texto",
+        "areaConstruida": "texto",
+        "anioConstruccion": "entero",
+        "material": "texto",
+        "estadoConservacion": "texto",
+        "categorias": "texto",
+        "porcentajeConstruido": "texto"
+      }
+    ],
+    "instalaciones": [
+      {
+        "id": "entero",
+        "descripcion": "texto",
+        "unidad": "texto",
+        "cantidad": "texto",
+        "anioConstruccion": "entero",
+        "estadoConservacion": "texto"
+      }
+    ],
+    "economico": {
+      "actividades": [
+        {
+          "id": "entero",
+          "conductor": "texto",
+          "nombreComercial": "texto",
+          "ciiu": "texto",
+          "areaOcupada": "texto",
+          "licenciaNumero": "texto",
+          "licenciaFecha": "texto",
+          "anuncioNumero": "texto",
+          "anuncioFecha": "texto",
+          "vigenciaDesde": "texto"
+        }
+      ],
+      "informacionComplementaria": "texto",
+      "sinLicencia": "entero"
+    },
+    "bienesComunes": {
+      "bienes": [
+        {
+          "id": "entero",
+          "descripcion": "texto",
+          "area": "texto",
+          "material": "texto",
+          "estadoConservacion": "texto",
+          "anioConstruccion": "entero"
+        }
+      ],
+      "participaciones": [
+        {
+          "predioId": "entero",
+          "porcentaje": "texto"
+        }
+      ],
+      "areaComunTotal": "texto"
+    },
+    "rural": {
+      "tierras": [
+        {
+          "id": "entero",
+          "clasificacion": "texto",
+          "calidadAgrologica": "texto",
+          "riego": "texto",
+          "hectareas": "texto",
+          "hectareasComunes": "texto"
+        }
+      ],
+      "colindantes": [
+        {
+          "orientacion": "texto",
+          "descripcion": "texto"
+        }
+      ],
+      "hectareasTotales": "texto"
+    },
+    "historico": [
+      {
+        "id": "entero",
+        "version": "entero",
+        "areaTerreno": "texto",
+        "uso": "texto",
+        "vigenciaDesde": "texto",
+        "vigenciaHasta": "texto",
+        "vigente": "booleano",
+        "origen": "texto",
+        "documentoOrigen": "texto",
+        "observacion": "texto",
+        "usuario": "texto",
+        "registradaEn": "texto"
+      }
+    ]
+  },
+  "PUT /catastro/fichas/economica/{codRefCatastral}/actualizacion": {
+    "id": "entero",
+    "predioId": "entero",
+    "tipo": "texto",
+    "version": "entero",
+    "areaTerreno": "texto",
+    "uso": "texto",
+    "frontis": "texto",
+    "condicionPropiedad": "texto",
+    "tipoEdificacion": "texto",
+    "vigenciaDesde": "texto",
+    "vigenciaHasta": "texto",
+    "vigente": "booleano",
+    "origen": "texto",
+    "documentoOrigen": "texto",
+    "observacion": "texto",
+    "denominacion": "texto",
+    "construcciones": [
+      {
+        "id": "entero",
+        "piso": "texto",
+        "areaConstruida": "texto",
+        "anioConstruccion": "entero",
+        "material": "texto",
+        "estadoConservacion": "texto",
+        "categorias": "texto",
+        "porcentajeConstruido": "texto"
+      }
+    ],
+    "instalaciones": [
+      {
+        "id": "entero",
+        "descripcion": "texto",
+        "unidad": "texto",
+        "cantidad": "texto",
+        "anioConstruccion": "entero",
+        "estadoConservacion": "texto"
+      }
+    ],
+    "economico": {
+      "actividades": [
+        {
+          "id": "entero",
+          "conductor": "texto",
+          "nombreComercial": "texto",
+          "ciiu": "texto",
+          "areaOcupada": "texto",
+          "licenciaNumero": "texto",
+          "licenciaFecha": "texto",
+          "anuncioNumero": "texto",
+          "anuncioFecha": "texto",
+          "vigenciaDesde": "texto"
+        }
+      ],
+      "informacionComplementaria": "texto",
+      "sinLicencia": "entero"
+    },
+    "bienesComunes": {
+      "bienes": [
+        {
+          "id": "entero",
+          "descripcion": "texto",
+          "area": "texto",
+          "material": "texto",
+          "estadoConservacion": "texto",
+          "anioConstruccion": "entero"
+        }
+      ],
+      "participaciones": [
+        {
+          "predioId": "entero",
+          "porcentaje": "texto"
+        }
+      ],
+      "areaComunTotal": "texto"
+    },
+    "rural": {
+      "tierras": [
+        {
+          "id": "entero",
+          "clasificacion": "texto",
+          "calidadAgrologica": "texto",
+          "riego": "texto",
+          "hectareas": "texto",
+          "hectareasComunes": "texto"
+        }
+      ],
+      "colindantes": [
+        {
+          "orientacion": "texto",
+          "descripcion": "texto"
+        }
+      ],
+      "hectareasTotales": "texto"
+    },
+    "historico": [
+      {
+        "id": "entero",
+        "version": "entero",
+        "areaTerreno": "texto",
+        "uso": "texto",
+        "vigenciaDesde": "texto",
+        "vigenciaHasta": "texto",
+        "vigente": "booleano",
+        "origen": "texto",
+        "documentoOrigen": "texto",
+        "observacion": "texto",
+        "usuario": "texto",
+        "registradaEn": "texto"
+      }
+    ]
+  },
+  "PUT /catastro/fichas/rural/{codUnidad}/actualizacion": {
+    "id": "entero",
+    "predioId": "entero",
+    "tipo": "texto",
+    "version": "entero",
+    "areaTerreno": "texto",
+    "uso": "texto",
+    "frontis": "texto",
+    "condicionPropiedad": "texto",
+    "tipoEdificacion": "texto",
+    "vigenciaDesde": "texto",
+    "vigenciaHasta": "texto",
+    "vigente": "booleano",
+    "origen": "texto",
+    "documentoOrigen": "texto",
+    "observacion": "texto",
+    "denominacion": "texto",
+    "construcciones": [
+      {
+        "id": "entero",
+        "piso": "texto",
+        "areaConstruida": "texto",
+        "anioConstruccion": "entero",
+        "material": "texto",
+        "estadoConservacion": "texto",
+        "categorias": "texto",
+        "porcentajeConstruido": "texto"
+      }
+    ],
+    "instalaciones": [
+      {
+        "id": "entero",
+        "descripcion": "texto",
+        "unidad": "texto",
+        "cantidad": "texto",
+        "anioConstruccion": "entero",
+        "estadoConservacion": "texto"
+      }
+    ],
+    "economico": {
+      "actividades": [
+        {
+          "id": "entero",
+          "conductor": "texto",
+          "nombreComercial": "texto",
+          "ciiu": "texto",
+          "areaOcupada": "texto",
+          "licenciaNumero": "texto",
+          "licenciaFecha": "texto",
+          "anuncioNumero": "texto",
+          "anuncioFecha": "texto",
+          "vigenciaDesde": "texto"
+        }
+      ],
+      "informacionComplementaria": "texto",
+      "sinLicencia": "entero"
+    },
+    "bienesComunes": {
+      "bienes": [
+        {
+          "id": "entero",
+          "descripcion": "texto",
+          "area": "texto",
+          "material": "texto",
+          "estadoConservacion": "texto",
+          "anioConstruccion": "entero"
+        }
+      ],
+      "participaciones": [
+        {
+          "predioId": "entero",
+          "porcentaje": "texto"
+        }
+      ],
+      "areaComunTotal": "texto"
+    },
+    "rural": {
+      "tierras": [
+        {
+          "id": "entero",
+          "clasificacion": "texto",
+          "calidadAgrologica": "texto",
+          "riego": "texto",
+          "hectareas": "texto",
+          "hectareasComunes": "texto"
+        }
+      ],
+      "colindantes": [
+        {
+          "orientacion": "texto",
+          "descripcion": "texto"
+        }
+      ],
+      "hectareasTotales": "texto"
+    },
+    "historico": [
+      {
+        "id": "entero",
+        "version": "entero",
+        "areaTerreno": "texto",
+        "uso": "texto",
+        "vigenciaDesde": "texto",
+        "vigenciaHasta": "texto",
+        "vigente": "booleano",
+        "origen": "texto",
+        "documentoOrigen": "texto",
+        "observacion": "texto",
+        "usuario": "texto",
+        "registradaEn": "texto"
+      }
+    ]
+  },
+  "PUT /catastro/fichas/{codigo}/actualizacion": {
+    "id": "entero",
+    "predioId": "entero",
+    "tipo": "texto",
+    "version": "entero",
+    "areaTerreno": "texto",
+    "uso": "texto",
+    "frontis": "texto",
+    "condicionPropiedad": "texto",
+    "tipoEdificacion": "texto",
+    "vigenciaDesde": "texto",
+    "vigenciaHasta": "texto",
+    "vigente": "booleano",
+    "origen": "texto",
+    "documentoOrigen": "texto",
+    "observacion": "texto",
+    "denominacion": "texto",
+    "construcciones": [
+      {
+        "id": "entero",
+        "piso": "texto",
+        "areaConstruida": "texto",
+        "anioConstruccion": "entero",
+        "material": "texto",
+        "estadoConservacion": "texto",
+        "categorias": "texto",
+        "porcentajeConstruido": "texto"
+      }
+    ],
+    "instalaciones": [
+      {
+        "id": "entero",
+        "descripcion": "texto",
+        "unidad": "texto",
+        "cantidad": "texto",
+        "anioConstruccion": "entero",
+        "estadoConservacion": "texto"
+      }
+    ],
+    "economico": {
+      "actividades": [
+        {
+          "id": "entero",
+          "conductor": "texto",
+          "nombreComercial": "texto",
+          "ciiu": "texto",
+          "areaOcupada": "texto",
+          "licenciaNumero": "texto",
+          "licenciaFecha": "texto",
+          "anuncioNumero": "texto",
+          "anuncioFecha": "texto",
+          "vigenciaDesde": "texto"
+        }
+      ],
+      "informacionComplementaria": "texto",
+      "sinLicencia": "entero"
+    },
+    "bienesComunes": {
+      "bienes": [
+        {
+          "id": "entero",
+          "descripcion": "texto",
+          "area": "texto",
+          "material": "texto",
+          "estadoConservacion": "texto",
+          "anioConstruccion": "entero"
+        }
+      ],
+      "participaciones": [
+        {
+          "predioId": "entero",
+          "porcentaje": "texto"
+        }
+      ],
+      "areaComunTotal": "texto"
+    },
+    "rural": {
+      "tierras": [
+        {
+          "id": "entero",
+          "clasificacion": "texto",
+          "calidadAgrologica": "texto",
+          "riego": "texto",
+          "hectareas": "texto",
+          "hectareasComunes": "texto"
+        }
+      ],
+      "colindantes": [
+        {
+          "orientacion": "texto",
+          "descripcion": "texto"
+        }
+      ],
+      "hectareasTotales": "texto"
+    },
+    "historico": [
+      {
+        "id": "entero",
+        "version": "entero",
+        "areaTerreno": "texto",
+        "uso": "texto",
+        "vigenciaDesde": "texto",
+        "vigenciaHasta": "texto",
+        "vigente": "booleano",
+        "origen": "texto",
+        "documentoOrigen": "texto",
+        "observacion": "texto",
+        "usuario": "texto",
+        "registradaEn": "texto"
+      }
+    ]
+  },
+  "PUT /catastro/predios/{predioId}/inquilinos/{inquilinoId}": {
+    "inquilinoId": "entero",
+    "predioId": "entero",
+    "contribuyenteId": "entero",
+    "uso": "texto",
+    "vigenciaDesde": "fecha",
+    "vigenciaHasta": "fecha",
+    "documentoOrigen": "texto"
+  },
+  "PUT /catastro/sectores/{codigo}": {
+    "id": "entero",
+    "codigo": "texto",
+    "nombre": "texto",
+    "zona": "texto",
+    "activo": "booleano",
+    "manzanas": "entero",
+    "predios": "entero",
+    "lotes": "entero"
+  },
+  "PUT /catastro/vias/{codigo}": {
+    "id": "entero",
+    "codigo": "texto",
+    "tipo": "texto",
+    "nombre": "texto",
+    "ubigeo": "texto",
+    "activa": "booleano"
+  },
+  "PUT /rentas/contribuyentes/{id}": {
+    "id": "entero",
+    "codigo": "texto",
+    "tipoDocumento": "texto",
+    "numeroDocumento": "texto",
+    "tipoPersona": "texto",
+    "nombreRazonSocial": "texto",
+    "condicionEspecial": "texto",
+    "activo": "booleano"
+  },
+  "PUT /rentas/contribuyentes/{id}/contactos/{contactoId}": {
+    "id": "entero",
+    "tipo": "texto",
+    "valor": "texto",
+    "nombre": "texto",
+    "documento": "texto",
+    "observacion": "texto",
+    "vigente": "booleano"
+  },
+  "PUT /rentas/contribuyentes/{id}/responsables/{responsableId}": {
+    "id": "entero",
+    "responsableId": "entero",
+    "vinculo": "texto",
+    "porcentaje": "texto",
+    "vigenciaDesde": "fecha",
+    "vigenciaHasta": "fecha",
+    "documentoOrigen": "texto"
+  },
+  "PUT /seguridad/grupos/{id}/permisos": [
+    {
+      "id": "entero",
+      "acceso": "texto",
+      "grupoId": "entero",
+      "usuarioId": "entero",
+      "privilegios": [
+        "texto"
+      ]
+    }
+  ],
+  "PUT /seguridad/grupos/{id}/vigencia": {
+    "id": "entero",
+    "nombre": "texto",
+    "descripcion": "texto",
+    "habilitado": "booleano",
+    "vigenciaDesde": "fecha",
+    "vigenciaHasta": "fecha"
+  },
+  "PUT /seguridad/sesion/ejercicio": {
+    "id": "entero",
+    "usuarioId": "entero",
+    "inicio": "instante",
+    "ejercicioDeTrabajo": "entero"
+  },
+  "PUT /seguridad/usuarios/{id}/clave": {
+    "gestionadaPor": "texto",
+    "destino": "texto"
+  },
+  "PUT /seguridad/usuarios/{id}/permisos": [
+    {
+      "id": "entero",
+      "acceso": "texto",
+      "grupoId": "entero",
+      "usuarioId": "entero",
+      "privilegios": [
+        "texto"
+      ]
+    }
+  ],
+  "PUT /seguridad/usuarios/{id}/vigencia": {
+    "id": "entero",
+    "cuenta": "texto",
+    "nombre": "texto",
+    "correo": "texto",
+    "habilitado": "booleano",
+    "vigenciaDesde": "fecha",
+    "vigenciaHasta": "fecha"
+  }
+}

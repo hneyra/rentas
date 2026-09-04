@@ -25,19 +25,11 @@
    ese contraste la guarda seria un peaje que todo el mundo aprende a esquivar — y una
    guarda esquivada no protege nada, que es de donde venimos.
 
-   ## De donde viene, y que cambia aqui
-
-   Copiada de `sgtm`, donde nacio con #711. Lo unico que cambia es QUE cuenta como
-   codigo de produccion en ESTE repositorio —la lista `RUTAS_DE_CODIGO` de abajo— y el
-   nombre de la variable de entorno, que aqui es `KAMAYUK_CUERPO_DEL_PR`. La tabla que
-   protege es la de `CLAUDE.md`, que en este repositorio **nace vacia**: el registro
-   anterior es historia de `sgtm` y no viaja.
-
    ## Uso
 
      node docs/00-gobierno/verificar-fila-del-registro.mjs [--base origin/main]
 
-   El cuerpo del PR sale de `KAMAYUK_CUERPO_DEL_PR`; sin esa variable no hay nada que
+   El cuerpo del PR sale de `SGTM_CUERPO_DEL_PR`; sin esa variable no hay nada que
    comprobar y la comprobacion pasa, porque fuera de un PR no existe el dato.
 
    Las tres entradas se pueden dar por archivo —`--cuerpo`, `--archivos`, `--anadido`—,
@@ -52,8 +44,8 @@ import { readFileSync } from 'node:fs';
 /** Lo que hace de un cambio «codigo» a efectos de esta guarda. */
 const RUTAS_DE_CODIGO = [
   /^backend\/[^/]+\/src\/main\//,
-  /^infrastructure\/src\//,
   /^frontend\/src\//,
+  /^infra\//,
 ];
 
 /** Como se declara que un PR cierra un issue. GitHub admite estas y alguna mas. */
@@ -63,7 +55,7 @@ const opciones = leerOpciones(process.argv.slice(2));
 
 const cuerpo = opciones.cuerpo
   ? readFileSync(opciones.cuerpo, 'utf8')
-  : (process.env.KAMAYUK_CUERPO_DEL_PR ?? '');
+  : (process.env.SGTM_CUERPO_DEL_PR ?? '');
 
 const issues = [...cuerpo.matchAll(CIERRA)].map((coincidencia) => coincidencia[1]);
 if (issues.length === 0) {

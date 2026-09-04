@@ -28,7 +28,7 @@ const CASOS = [
   {
     nombre: 'cierra un issue, toca backend y NO deja fila',
     cuerpo: 'Cierra #711.\n\nLo de siempre.',
-    archivos: ['backend/kamayuk-rentas/src/main/java/kamayuk/rentas/Algo.java'],
+    archivos: ['backend/kamayuk-rentas-rentas/src/main/java/kamayuk/rentas/rentas/Algo.java'],
     anadido: '',
     esperado: 'rojo',
     dice: '#711',
@@ -36,7 +36,7 @@ const CASOS = [
   {
     nombre: 'la fila que anade nombra a OTRO issue',
     cuerpo: 'Closes #711',
-    archivos: ['frontend/src/modulos/rentas/Pantalla.tsx'],
+    archivos: ['frontend/src/modulos/rentas/Rentas.tsx'],
     anadido: '+| Otra cosa (#712) | … | … |',
     esperado: 'rojo',
     dice: '#711',
@@ -44,7 +44,7 @@ const CASOS = [
   {
     nombre: 'un numero que solo CONTIENE al del issue no cuenta como su fila',
     cuerpo: 'Cierra #71',
-    archivos: ['infrastructure/src/descriptor.ts'],
+    archivos: ['infra/src/componentes/index.ts'],
     anadido: '+| Una fila cualquiera (#711) | … | … |',
     esperado: 'rojo',
     dice: '#71',
@@ -52,7 +52,7 @@ const CASOS = [
   {
     nombre: 'cierra un issue, toca backend y SI deja su fila',
     cuerpo: 'Cierra #711.',
-    archivos: ['backend/kamayuk-rentas/src/main/java/kamayuk/rentas/Algo.java'],
+    archivos: ['backend/kamayuk-rentas-rentas/src/main/java/kamayuk/rentas/rentas/Algo.java'],
     anadido: `+${FILA}`,
     esperado: 'verde',
   },
@@ -61,7 +61,7 @@ const CASOS = [
     cuerpo: 'Cierra #711.',
     archivos: [
       'docs/00-gobierno/algo.md',
-      'backend/kamayuk-rentas/src/test/java/kamayuk/rentas/AlgoTest.java',
+      'backend/kamayuk-rentas-rentas/src/test/java/kamayuk/rentas/rentas/AlgoTest.java',
     ],
     anadido: '',
     esperado: 'verde',
@@ -69,13 +69,13 @@ const CASOS = [
   {
     nombre: 'toca backend y no declara que cierre nada',
     cuerpo: 'Un arreglo suelto, sin issue.',
-    archivos: ['backend/kamayuk-rentas/src/main/java/kamayuk/rentas/Algo.java'],
+    archivos: ['backend/kamayuk-rentas-rentas/src/main/java/kamayuk/rentas/rentas/Algo.java'],
     anadido: '',
     esperado: 'verde',
   },
 ];
 
-const carpeta = mkdtempSync(join(tmpdir(), 'kamayuk-711-'));
+const carpeta = mkdtempSync(join(tmpdir(), 'sgtm-711-'));
 let fallos = 0;
 
 for (const caso of CASOS) {

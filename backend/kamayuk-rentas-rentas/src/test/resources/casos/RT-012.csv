@@ -1,0 +1,6 @@
+caso;caso_borde;descripcion;ejercicio;entradas;caracteristicas;parametros_requeridos;reglas_esperadas;conceptos_esperados;estado;esperado;fuente_del_esperado
+RT-012-c01;;base afecta = base imponible − exonerada − deducciones;2026;BASE_IMPONIBLE_CONTRIBUYENTE=100000;condicion=PENSIONISTA;;RT-012;BASE_AFECTA;SIN_REGLA:D-11;;
+RT-012-c02;pensionista-con-mas-de-un-predio;la deduccion, si aplica solo al predio de vivienda;2026;BASE_IMPONIBLE_CONTRIBUYENTE=200000;condicion=PENSIONISTA;;RT-012;BASE_AFECTA;SIN_REGLA:NEG-05;;
+RT-012-c03;pensionista-a-mitad-de-ejercicio;adquiere la condicion a mitad de ejercicio: proporcional o desde el siguiente;2026;BASE_IMPONIBLE_CONTRIBUYENTE=100000;condicion=PENSIONISTA;;RT-012;BASE_AFECTA;SIN_REGLA:NEG-05;;
+RT-012-c04;deduccion-mayor-que-la-base;la deduccion supera la base: resultado cero o minimo imponible;2026;BASE_IMPONIBLE_CONTRIBUYENTE=1000;condicion=PENSIONISTA;;RT-012;BASE_AFECTA;SIN_REGLA:NEG-05;;
+RT-012-c05;concurrencia-de-deducciones;dos deducciones sobre el mismo contribuyente: si se acumulan;2026;BASE_IMPONIBLE_CONTRIBUYENTE=100000;condicion=PENSIONISTA|condicion_2=ADULTO_MAYOR;;RT-012;BASE_AFECTA;SIN_REGLA:NEG-05;;

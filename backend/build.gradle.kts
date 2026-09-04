@@ -1,21 +1,17 @@
-// Raiz del build de `rentas`. No produce artefactos: solo agrupa y declara las dos tareas
-// bloqueantes, con los mismos nombres que en los otros cuatro repositorios.
-//
-// Van SEPARADAS a proposito, y en CI son dos pasos: cuando algo se rompe, el nombre del paso ya
-// dice que barrera cayo.
+// Raiz del build del backend. No produce artefactos: solo agrupa.
+// Las convenciones viven en buildSrc/ como plugins precompilados, no en un
+// bloque `subprojects {}`: un modulo debe declarar que convenciones aplica.
 
 tasks.register("verificarAislamiento") {
     group = "verification"
     description =
-        "Aislamiento multi-tenant: RLS, los roles y la trampa del superusuario. " +
-            "Bloqueante. Requiere Docker."
-    dependsOn(":kamayuk-esquema:test")
+        "Aislamiento multi-tenant: la prueba del esquema y la del pool. Bloqueante. Requiere Docker."
+    dependsOn(":kamayuk-rentas-esquema:test", ":kamayuk-rentas-plataforma:test")
 }
 
 tasks.register("verificarArquitectura") {
     group = "verification"
     description =
-        "Reglas de ArchUnit, escaner del codigo fuente, aserciones y frontera de sistema. " +
-            "Bloqueante."
-    dependsOn(":kamayuk-verificaciones:test")
+        "Reglas de ArchUnit, escaner del codigo fuente y limites de Spring Modulith. Bloqueante."
+    dependsOn(":kamayuk-rentas-aplicacion:test")
 }

@@ -1,0 +1,10 @@
+# Lo que no tiene por que entrar en el contexto de compilacion.
+#
+# `build/` es el motivo principal: sin esta linea, el contexto lleva los
+# artefactos de la compilacion de la maquina de quien construye —con otro JDK y
+# otra fecha— y la imagen deja de ser reproducible desde el codigo.
+build/
+*/build/
+.gradle/
+*/.gradle/
+.git/

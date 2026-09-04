@@ -1,0 +1,3 @@
+caso;caso_borde;descripcion;ejercicio;entradas;caracteristicas;parametros_requeridos;reglas_esperadas;conceptos_esperados;estado;esperado;fuente_del_esperado
+RT-004-c01;;depreciacion por material, antiguedad y estado de conservacion;2026;;material=LADRILLO|antiguedad=11|estado=BUENO;;RT-004;DEPRECIACION;SIN_REGLA:D-02a;;
+RT-004-c02;antiguedad-mayor-al-maximo;antiguedad mayor al maximo de la tabla: NEG-05 no dice si se topa;2026;;material=LADRILLO|antiguedad=90|estado=REGULAR;;RT-004;DEPRECIACION;SIN_REGLA:NEG-05;;

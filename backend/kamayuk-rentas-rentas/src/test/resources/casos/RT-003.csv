@@ -1,0 +1,2 @@
+caso;caso_borde;descripcion;ejercicio;entradas;caracteristicas;parametros_requeridos;reglas_esperadas;conceptos_esperados;estado;esperado;fuente_del_esperado
+RT-003-c01;;las siete categorias constructivas de la partida, sumadas;2026;;categoria_muros=A|categoria_techos=B|categoria_pisos=C|anio_construccion=2015;;RT-003;VALOR_UNITARIO_M2;SIN_REGLA:H-4;;

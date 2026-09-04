@@ -1,0 +1,6 @@
+314d313
+< 3|arancel CON arancel_conjunto_fk FOREIGN KEY (municipalidad_id, conjunto_id) REFERENCES conjunto_parametros(municipalidad_id, id) NOT VALID [NV]
+364d362
+< 3|inquilino CON inquilino_contribuyente_fk FOREIGN KEY (municipalidad_id, contribuyente_id) REFERENCES contribuyente(municipalidad_id, id)
+420d417
+< 3|titularidad CON titularidad_contribuyente_fk FOREIGN KEY (municipalidad_id, contribuyente_id) REFERENCES contribuyente(municipalidad_id, id)

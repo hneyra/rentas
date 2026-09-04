@@ -1,0 +1,109 @@
+spring:
+  application:
+    name: sgtm
+  threads:
+    virtual:
+      enabled: true
+  datasource:
+    # La aplicacion se conecta SIEMPRE como sgtm_app: sin DDL, sin BYPASSRLS,
+    # sin ser propietaria de las tablas y sin DELETE (ARQ-03 §4). Las
+    # credenciales de sgtm_owner solo existen en el proceso de migracion.
+    url: ${SGTM_DB_URL}
+    username: ${SGTM_DB_USUARIO:sgtm_app}
+    password: ${SGTM_DB_CLAVE}
+  flyway:
+    # La aplicacion NO migra al arrancar. Las migraciones viven en kamayuk-rentas-esquema y
+    # las aplica el migrador del despliegue, como sgtm_owner, antes de que este
+    # proceso arranque (kamayuk.rentas.esquema.Migrador).
+    enabled: false
+
+# La escala y el modo con que se redondea un importe, mientras D-03a y D-03b sigan
+# abiertas. Van aqui y no en el codigo a proposito: es lo que pide PoliticaDeRedondeo
+# —«el dia que D-03 se cierre habra exactamente un lugar donde escribir la respuesta,
+# y ni una constante que buscar en el codigo»— y lo que el escaner de fuentes exige
+# (regla 5). Este es ese lugar.
+#
+# Los valores de hoy son PROVISIONALES: no salen de ninguna norma verificada, y por
+# eso no hay ninguna regla de calculo que los use todavia. Lo que D-03 tiene que
+# cerrar no es solo la escala y el modo, sino los PUNTOS del calculo donde se
+# redondea (D-03c), que es ingenieria inversa contra el SRTM del MEF.
+sgtm:
+  redondeo:
+    escala: ${SGTM_REDONDEO_ESCALA:2}
+    modo: ${SGTM_REDONDEO_MODO:HALF_UP}
+
+# La sonda de vida y las metricas, y sin detalles en la primera. `health` responde
+# si el proceso esta arriba y llega a la base, y con `show-details: never` no dice
+# cual es la base, ni su version, ni que componentes tiene dentro. `prometheus`
+# expone contadores y medidores —peticiones, JVM, conexiones a la base—, nunca
+# datos de negocio: no hay un padron ahi dentro (issue #156). Un `include: "*"`
+# aqui publicaria la configuracion entera —con la URL de la base— delante de la
+# cadena de seguridad, y SeguridadWeb exige nombrar cada endpoint uno por uno.
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, prometheus
+  endpoint:
+    health:
+      show-details: never
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
+---
+spring:
+  config:
+    activate:
+      on-profile: web
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # El emisor no tiene valor por omision, y eso ES la decision: sin la variable
+          # puesta, la aplicacion no arranca. Un emisor por omision dejaria un despliegue
+          # que atiende peticiones sin poder validar un token de verdad, que es la
+          # situacion que ADR-0005 excluye y que nadie ve hasta que la mira.
+          #
+          # Va en el perfil web y no arriba porque el perfil batch no atiende HTTP: no
+          # hay peticion que autenticar, y exigirle el emisor obligaria a que la maquina
+          # que corre una determinacion masiva de madrugada pudiera ver Keycloak.
+          issuer-uri: ${SGTM_OIDC_EMISOR}
+          # El emisor es una identidad, no una direccion de red, y en un despliegue
+          # con contenedores las dos no coinciden: el navegador va a Keycloak por el
+          # nombre publico y el backend lo alcanza por el nombre interno. Si se usara
+          # el publico para las dos cosas, el backend intentaria descargar el JWKS de
+          # una direccion que dentro de su contenedor es el mismo, y todo token seria
+          # invalido por un motivo que no se parece en nada a su causa.
+          #
+          # `issuer-uri` sigue siendo el publico —es lo que se compara con el `iss`
+          # del token, y es lo que hace que un token de otro realm no valga—; lo que
+          # cambia es de donde se traen las claves.
+          jwk-set-uri: ${SGTM_OIDC_JWKS:${SGTM_OIDC_EMISOR}/protocol/openid-connect/certs}
+
+# El realm del CIUDADANO (ADR-0020). Emisor distinto del de funcionarios, y por eso
+# no cuelga de `spring.security.oauth2.resourceserver`: esa rama es la que monta la
+# autoconfiguracion, y la autoconfiguracion monta UNO. Aqui hacen falta dos cadenas,
+# cada una con su decodificador apuntando a un solo emisor.
+#
+# SIN valor por omision, y a diferencia del de funcionarios eso NO impide arrancar:
+# una instalacion sin portal del contribuyente es legitima. Lo que hace la cadena del
+# portal cuando esto esta vacio es NEGARLO TODO —no dejar de registrarse—, porque si
+# no se registrara, `/api/v1/portal/**` caeria en la cadena general y quedaria servido
+# contra el emisor de funcionarios: la mezcla exacta que las dos cadenas impiden.
+sgtm:
+  portal:
+    oidc:
+      emisor: ${SGTM_PORTAL_OIDC_EMISOR:}
+      # Mismo reparto que arriba: el emisor es una identidad y se compara con el `iss`
+      # del token; el JWKS es una direccion de red, y dentro del cluster no coincide
+      # con el nombre publico.
+      jwks: ${SGTM_PORTAL_OIDC_JWKS:}
+
+---
+spring:
+  config:
+    activate:
+      on-profile: batch
+  main:
+    web-application-type: none

@@ -4,19 +4,19 @@
 
 | Tarea | Qué mide | Necesita | Hoy |
 |---|---|---|---|
-| `./gradlew verificarArquitectura` | 18 reglas de ArchUnit, tres escáneres de fuentes y la frontera de sistema, todas contra sus muestras | nada | **79 pruebas** |
-| `./gradlew verificarAislamiento` | Los cuatro roles, `FORCE ROW LEVEL SECURITY`, el `WITH CHECK`, que sin contexto la consulta **reviente en vez de devolver vacío**, y la trampa del superusuario | PostgreSQL 16 | **9 pruebas** |
-| `./gradlew build` | Lo anterior más Spotless | PostgreSQL 16 | |
+| `./gradlew verificarArquitectura` | 18 reglas de ArchUnit, tres escáneres de fuentes y la frontera de sistema —contra sus muestras **y contra el código de negocio**—, más el contrato de la API, las formas y respuestas publicadas y los límites de Modulith | nada | **130 pruebas** |
+| `./gradlew verificarAislamiento` | Los cuatro roles, `FORCE ROW LEVEL SECURITY`, el `WITH CHECK`, que sin contexto la consulta **reviente en vez de devolver vacío**, la trampa del superusuario, y RLS sobre las **132 tablas** del baseline | PostgreSQL 16 | **223 pruebas** (46 del esquema + 177 del pool) |
+| `./gradlew build` | Lo anterior más Spotless, Checkstyle y NullAway, sobre los 17 módulos | PostgreSQL 16 | **3 756 pruebas** |
 | `yarn verificar` (en `infrastructure/`) | El descriptor de despliegue: lint, tipos y pruebas | nada | |
 | `node docs/00-gobierno/verificar-las-muestras-del-registro.mjs` | Que la guarda de #711 muerde y no muerde de más | nada | **6 muestras** |
 
 **Las dos de Gradle son bloqueantes**, y van en pasos separados en CI a propósito: cuando algo se
 rompe, el nombre del paso ya dice qué barrera cayó.
 
-## 2. Que las 79 no son un verde vacío
+## 2. Que las 130 no son un verde vacío
 
-Con cero clases de negocio, una batería de arquitectura podría estar pasando por no encontrar
-nada que revisar. No es el caso, y el mecanismo es el que lo impide:
+Desde P5A las reglas se aplican **a código de negocio de verdad**, no sólo a las muestras. Aun
+así el mecanismo que impide el verde vacío sigue siendo el mismo, y sigue haciendo falta:
 
 - **Las 40 clases de muestra viajan con las reglas**, dentro de `comun-verificaciones`. Cada regla
   se aplica a la muestra que la viola y se exige que falle.
@@ -44,15 +44,15 @@ sirve para demostrar la fuga.** Con `FORCE ROW LEVEL SECURITY` el dueño de la t
 sujeto a la política, así que esa rotura pasa en **verde** y no demuestra nada. La que hay que
 escribir es la del superusuario del clúster.
 
-**El censo del esquema está eximido a propósito y caduca solo**: hoy no hay ni una tabla, y la
-primera tabla de tenant pone la prueba en rojo pidiendo que se retire la exención.
+**El censo del esquema ya no está eximido**: `V1__baseline.sql` trae las 132 tablas y la prueba
+de aislamiento las censa una a una, que es para lo que la exención caducaba sola.
 
 ## 4. Correr una sola
 
 ```bash
 cd backend
-./gradlew :kamayuk-verificaciones:test --tests '*Frontera*'
-./gradlew :kamayuk-esquema:test --tests '*Aislamiento*'
+./gradlew :kamayuk-rentas-aplicacion:test --tests '*Frontera*'
+./gradlew :kamayuk-rentas-esquema:test --tests '*Aislamiento*'
 ```
 
 **Cuidado con el verde rancio.** Gradle puede dar `UP-TO-DATE` o `FROM-CACHE` y no ejecutar nada;

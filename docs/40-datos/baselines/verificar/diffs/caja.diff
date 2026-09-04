@@ -1,0 +1,2 @@
+345d344
+< 3|recibo CON recibo_contribuyente_fk FOREIGN KEY (municipalidad_id, contribuyente_id) REFERENCES contribuyente(municipalidad_id, id)

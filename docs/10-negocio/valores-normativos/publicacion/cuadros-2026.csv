@@ -1,0 +1,31 @@
+# Manifiesto de cuadros normativos nacionales (D-13, ADR-0017; #188).
+#
+# Una fila por EDICION: la resolución entera, no una celda. Aquí no hay ninguna cifra del
+# cuadro —están en `archivo_de_filas`, el derivado mecánico de la fuente— y por eso este
+# archivo se puede leer entero de un vistazo aunque el cuadro tenga 18 043 filas.
+#
+# `sha256` es la huella del archivo de filas, y está escrita en el archivo del corpus que la
+# fila nombra. `PublicarCuadros` la vuelve a calcular antes de publicar una sola fila y
+# rechaza la edición entera si no coincide; `docs/10-negocio/verificar-cuadros.mjs` la
+# comprueba además en cada PR, junto con el documento fuente y las dos firmas.
+#
+# `transcribio` y `verifico` son la doble firma de ADR-0007, copiadas de la cabecera del archivo
+# del corpus, igual que en `parametros-2026.csv`. Quien corre el proceso no firma nada.
+#
+# La ÚLTIMA columna es `cuadro`, y está al final por lo mismo que `valor_maquina` en
+# `parametros-2026.csv`: **los consumidores de este archivo leen por POSICIÓN y no por cabecera**,
+# y las tres primeras columnas tienen que ser las de la llave —`tipo,clave,vigencia_desde`— porque
+# el mismo archivo sirve para los dos pasos y el segundo lo lee `ImportarParametrosDelConjunto`:
+#
+#   publicar-cuadros.sh          --ambiente stg --archivo cuadros-2026.csv   (publica la edición)
+#   abrir-conjunto-parametros.sh --ambiente stg --conjunto-id N \
+#                                --archivo cuadros-2026.csv --sellar          (la compone)
+#
+# Con `cuadro` delante, ese segundo paso leía `tipo = VALOR_REFERENCIAL` y una fecha que decía
+# «2026»: rechazaba la fila entera y sellaba el conjunto SIN la edición dentro, que es sellar el
+# nombre del cuadro sin su contenido.
+#
+# Qué NO está aquí, y por qué, en README.md de este directorio.
+tipo,clave,vigencia_desde,vigencia_hasta,documento_fuente,archivo_de_filas,sha256,archivo_del_corpus,transcribio,verifico,cuadro
+TABLA_VALORES_REFERENCIALES,2026,2026-01-01,2026-12-31,Resolución Ministerial N.° 008-2026-EF/15,../fuentes/tvr-2026/tvr-2026.csv,239a75a03ef76550018e844c990f4c1bb1a35390cab1b0163e05bd1a0121098a,vehicular-valores-referenciales-2026.md,JNA,HNA,VALOR_REFERENCIAL
+TABLA_DEPRECIACION,ANEXO-I,2016-07-23,,Resolución Ministerial N.º 172-2016-VIVIENDA,../fuentes/depreciacion-rnt-2016/depreciacion.csv,5e919b370b10473570187c33edefd15a6dd372653db5d77b25fc51e31deb6be6,depreciacion.md,JNA,HNA,DEPRECIACION

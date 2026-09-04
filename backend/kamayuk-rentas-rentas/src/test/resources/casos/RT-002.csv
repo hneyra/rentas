@@ -1,0 +1,5 @@
+caso;caso_borde;descripcion;ejercicio;entradas;caracteristicas;parametros_requeridos;reglas_esperadas;conceptos_esperados;estado;esperado;fuente_del_esperado
+RT-002-c01;;secuencia de NEG-05: valor unitario, +5 %, − depreciacion, × area;2026;AREA_CONSTRUIDA=120;categoria=A|anio_construccion=2015;;RT-002;VALOR_CONSTRUCCION;SIN_REGLA:D-11;;
+RT-002-c02;construccion-en-curso;construccion en curso o inconclusa: NEG-05 no dice si se valoriza ni como;2026;AREA_CONSTRUIDA=80;categoria=A|anio_construccion=2026;;RT-002;VALOR_CONSTRUCCION;SIN_REGLA:D-11;;
+RT-002-c03;mas-de-un-material-predominante;edificacion con mas de un material predominante;2026;AREA_CONSTRUIDA=200;categoria=B|anio_construccion=2010;;RT-002;VALOR_CONSTRUCCION;SIN_REGLA:D-11;;
+RT-002-c04;ampliacion-con-antiguedad-distinta;ampliacion posterior: cada construccion con su propia antiguedad;2026;AREA_CONSTRUIDA=150|AREA_AMPLIACION=40;categoria=B|anio_construccion=2000|anio_ampliacion=2018;;RT-002;VALOR_CONSTRUCCION;SIN_REGLA:D-11;;

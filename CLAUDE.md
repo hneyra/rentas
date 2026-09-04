@@ -14,16 +14,17 @@ qué tabla fue a qué repositorio y por qué, [GOB-05](https://github.com/hneyra
 | Pieza | Estado |
 |---|---|
 | `infrastructure/` — el descriptor de despliegue | **Existe.** `yarn verificar` en verde, sin Pulumi, sin token y sin clúster |
-| `backend/kamayuk-esquema` | **Existe el módulo y su prueba de aislamiento (9 pruebas). Cero migraciones**: el baseline es [ADR-0032](https://github.com/hneyra/infrastructure/blob/main/docs/30-arquitectura/adr/ADR-0032-el-esquema-nace-en-baseline.md) y todavía no está aquí |
-| `backend/kamayuk-verificaciones` | **Existe.** `verificarArquitectura` corre **79 pruebas** contra las muestras de la librería común, con cero clases de negocio |
+| `backend/` — **17 módulos** | **Existe entero desde P5A.** `./gradlew build` en verde: **3 756 pruebas**, 0 fallos. Es el monolito modular menos la interfaz: los doce contextos acotados están dentro, `catastro`, `parametros` y `tesoreria` incluidos, y se extraen después uno a uno |
+| `backend/kamayuk-rentas-esquema` | **Existe, con su baseline.** Una sola migración, `V1__baseline.sql` (132 tablas). `verificarAislamiento` corre **223 pruebas** —46 del esquema y 177 del pool—, 0 fallos |
+| `backend/kamayuk-rentas-aplicacion` | **Existe.** `verificarArquitectura` corre **130 pruebas**: las barreras de la librería común más las propias de este sistema (contrato, formas, respuestas, límites de Modulith) |
 | `docs/30-arquitectura/adr/` | **Existe**, 11 ADR propios más los que enlaza |
-| **Código de negocio** | **NO existe. Ni una clase.** Llega en la etapa 5 |
-| Su esquema (`V1__baseline.sql`) | **NO está aquí.** Vive en `sgtm/docs/40-datos/baselines/rentas/` hasta que la extracción lo traiga |
+| **Código de negocio** | **Existe.** Llegó entero en P5A ([P5A](docs/00-gobierno/P5A-copia-del-backend.md)), copiado de `sgtm@0d33ad7b` con el mismo número de pruebas: 3 756 = 3 756 |
+| Su esquema (`V1__baseline.sql`) | **Está aquí**, en `backend/kamayuk-rentas-esquema/src/main/resources/db/migration/`. Es una migración de Flyway y no un `esquema.sql` suelto (ADR-0032 §2) |
 | Su frontend (`rentas-web`) | **NO existe** |
 | Su imagen `ghcr.io/hneyra/kamayuk-rentas` | **NO existe.** El descriptor la nombra igual, y es correcto: aquí no se despliega nada |
 
-**Las barreras se construyeron primero, a propósito.** Hoy este repositorio es exactamente eso:
-dos verificaciones bloqueantes esperando al negocio que van a vigilar.
+**Las barreras se construyeron primero, a propósito**, y el negocio entró después por encima de
+ellas. Lo que hoy vigilan es real: 3 756 pruebas sobre los doce contextos.
 
 ## Lo que este repositorio NO hace
 
@@ -39,9 +40,13 @@ dos verificaciones bloqueantes esperando al negocio que van a vigilar.
 ## Estructura
 
 ```
-backend/                Gradle. Java 25, Spring Boot 4 cuando llegue el negocio
-  kamayuk-esquema/      migraciones (hoy ninguna) y la prueba de aislamiento
-  kamayuk-verificaciones/  donde corren las barreras. Ve a todos los demás módulos
+backend/                Gradle. Java 25, Spring Boot 4. 17 módulos
+  kamayuk-rentas-esquema/         V1__baseline.sql y la prueba de aislamiento
+  kamayuk-rentas-dominio-compartido/  objetos de valor y contexto de tenant
+  kamayuk-rentas-plataforma/      token -> SET LOCAL -> RLS, y el patrón de repositorio
+  kamayuk-rentas-indicadores/     el panel de recaudación (no es contexto acotado)
+  kamayuk-rentas-<contexto>/      los doce de ARQ-01 §3
+  kamayuk-rentas-aplicacion/      ensambla el artefacto, y donde corren las barreras
 infrastructure/         el descriptor de despliegue en TypeScript, con yarn
 docs/                   ADR propios, hallazgos de RLS y esta guía de desarrollo
 ```
@@ -51,7 +56,7 @@ El backend **no compila sin `infrastructure` clonado al lado**: las barreras se 
 comprueba antes y falla diciendo qué `git clone` falta, en vez de dejar reventar a Gradle sobre un
 directorio que no está.
 
-Los paquetes son `kamayuk.rentas.*`; los módulos, `kamayuk-*`. Los **roles de base de datos siguen
+Los paquetes son `kamayuk.rentas.*`; los módulos, `kamayuk-rentas-<contexto>`. Los **roles de base de datos siguen
 llamándose `sgtm_owner`, `sgtm_app`, `sgtm_readonly` y `rol_carga_parametros`**, y es deliberado:
 son del **clúster**, que los cuatro sistemas comparten.
 

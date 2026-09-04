@@ -1,0 +1,2 @@
+caso;caso_borde;descripcion;ejercicio;entradas;caracteristicas;parametros_requeridos;reglas_esperadas;conceptos_esperados;estado;esperado;fuente_del_esperado
+RT-015-c01;;al contado o en cuatro cuotas trimestrales, con sus vencimientos;2026;IMPUESTO_ANUAL=400;;;RT-015;CUOTAS;SIN_REGLA:MOTOR;;

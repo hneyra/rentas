@@ -1,0 +1,5 @@
+caso;caso_borde;descripcion;ejercicio;entradas;caracteristicas;parametros_requeridos;reglas_esperadas;conceptos_esperados;estado;esperado;fuente_del_esperado
+RT-001-c01;;terreno de una via con arancel: area por arancel;2026;AREA_TERRENO=250;via=AV-GRAU;ARANCEL:AV-GRAU;RT-001;VALOR_TERRENO;EJECUTABLE;;
+RT-001-c02;predio-sin-arancel-asignado;la via no tiene arancel en el conjunto sellado: la regla falla nombrandolo, no devuelve cero;2026;AREA_TERRENO=250;via=AV-SIN-ARANCEL;;RT-001;;FALLA_ESPERADA:ParametroAusente;;
+RT-001-c03;dos-vias-con-arancel-distinto;predio con frente a dos vias de arancel distinto: NEG-05 no dice cual manda;2026;AREA_TERRENO=250;via=AV-GRAU;;RT-001;VALOR_TERRENO;SIN_CRITERIO:NEG-05;;
+RT-001-c04;terreno-sin-habilitacion-urbana;terreno en zona sin habilitacion urbana: NEG-05 no fija criterio;2026;AREA_TERRENO=1000;via=RURAL;;RT-001;VALOR_TERRENO;SIN_CRITERIO:NEG-05;;

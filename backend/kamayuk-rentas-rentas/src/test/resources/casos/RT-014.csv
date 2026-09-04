@@ -1,0 +1,4 @@
+caso;caso_borde;descripcion;ejercicio;entradas;caracteristicas;parametros_requeridos;reglas_esperadas;conceptos_esperados;estado;esperado;fuente_del_esperado
+RT-014-c01;;si el impuesto calculado es menor que el minimo, se aplica el minimo;2026;IMPUESTO_CALCULADO=5;;UIT|PREDIAL_MINIMO;RT-014;IMPUESTO_ANUAL;FUERA_DEL_MOTOR:kamayuk.rentas.rentas.dominio.predial.MinimoImponible;33.00;parametros-2026.csv del ejercicio 2026 (UIT del D.S. 301-2025-EF y el minimo del articulo 13 del TUO LTM, ultimo parrafo)
+RT-014-c02;base-cero-por-deduccion;base cero por deduccion: si se cobra el minimo o nada;2026;IMPUESTO_CALCULADO=0;;;RT-014;IMPUESTO_ANUAL;SIN_CRITERIO:NEG-05;;
+RT-014-c03;predio-inafecto;predio inafecto: presumiblemente no se cobra el minimo;2026;IMPUESTO_CALCULADO=0;condicion=INAFECTO;;RT-014;IMPUESTO_ANUAL;SIN_CRITERIO:NEG-05;;

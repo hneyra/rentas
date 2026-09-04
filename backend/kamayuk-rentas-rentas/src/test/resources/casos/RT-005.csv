@@ -1,0 +1,3 @@
+caso;caso_borde;descripcion;ejercicio;entradas;caracteristicas;parametros_requeridos;reglas_esperadas;conceptos_esperados;estado;esperado;fuente_del_esperado
+RT-005-c01;;modo por categorias: metrado redondeado, valor depreciado y factor de oficializacion;2026;CANTIDAD_OBRA=2;tipo_obra=CERCO;;RT-005;VALOR_OBRAS_COMPLEMENTARIAS;SIN_REGLA:D-11;;
+RT-005-c02;;modo con valorizacion: el contribuyente aporta el valor de la obra;2026;VALOR_DECLARADO_OBRA=5000;tipo_obra=PISCINA;;RT-005;VALOR_OBRAS_COMPLEMENTARIAS;SIN_REGLA:NEG-05;;

@@ -15,8 +15,8 @@ fiscalizacion, coactiva, sanciones y licencias. **Es quien decide cuanto se debe
 | `infrastructure/` — el descriptor (ADR-0031 §2) | **Existe y verifica**: `yarn verificar` en verde, sin Pulumi, sin token y sin cluster |
 | `.github/workflows/` — su CI | **Existe**, con tres flujos: el descriptor, las **dos barreras bloqueantes** del backend y la guarda del registro |
 | `docs/30-arquitectura/adr/` | **Existe**, con 11 ADR propio(s) y su indice ⚠ ver la nota de abajo |
-| `backend/` — dos modulos y **cero clases de negocio** | **Existe desde P3**: `kamayuk-esquema` con su prueba de aislamiento (9 pruebas) y `kamayuk-verificaciones` con las barreras (79). El **negocio** llega en la etapa 5 |
-| `docs/40-datos/baselines/V1__baseline.sql` — su esquema | **NO esta aqui todavia.** Generado y verificado, vive en [`sgtm/docs/40-datos/baselines/rentas/`](https://github.com/hneyra/sgtm/blob/migracion-a-microservicios/docs/40-datos/baselines/rentas/V1__baseline.sql) hasta que la extraccion lo traiga |
+| `backend/` — **17 modulos**, con el negocio dentro | **Existe entero desde P5A.** `./gradlew build` en verde: **3 756 pruebas**, 0 fallos, el mismo numero que `sgtm`. `verificarAislamiento` 223 y `verificarArquitectura` 130 |
+| `V1__baseline.sql` — su esquema | **Esta aqui**, en `backend/kamayuk-rentas-esquema/src/main/resources/db/migration/`. Una sola migracion, 132 tablas |
 | Su frontend (`rentas-web`, ADR-0030 §1) | **NO existe** |
 | La imagen `ghcr.io/hneyra/kamayuk-rentas` | **NO existe.** El `Deployment` del descriptor la nombra igual: es correcto, y en esta etapa no se despliega nada |
 
