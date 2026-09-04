@@ -50,18 +50,11 @@ class AccesosCompartidosTest {
      */
     private static final Map<String, Set<String>> LO_QUE_DOS_OPCIONES_CUBREN =
             Map.of(
-                    // #618 — el catalogo de ventanillas. Es la lectura de `caja_tributaria` y las
-                    // otras cuatro opciones son, exactamente, las del catalogo cuya operacion
-                    // EXIGE el codigo de una caja y que sin esta lectura no lo pueden ofrecer:
-                    // `caja_tasas` y `cierre_caja` lo llevan en el cuerpo, `avance_recaudacion` y
-                    // `duplicado_recibo` como parametro de consulta. La alternativa a compartirlo
-                    // es otorgar `caja_tributaria` entera —o sea la ventanilla de cobro— a quien
-                    // solo tiene que cerrar su turno o buscar un recibo, en cada implantacion y a
-                    // mano; y lo que se olvida no avisa: el desplegable contesta 403 y la pantalla
-                    // parece rota por otro motivo. Lo que se comparte no es dinero ni datos de
-                    // nadie: son cuatro filas con el codigo y el rotulo de las ventanillas.
-                    "GET /tesoreria/cajas",
-                    Set.of("caja_tasas", "cierre_caja", "avance_recaudacion", "duplicado_recibo"),
+                    // `GET /tesoreria/cajas` (#618) estaba aqui y sale con P5D: el catalogo de
+                    // ventanillas se fue a `caja` con `V7`. El reparto que justificaba compartirlo
+                    // —cinco opciones de Tesoreria que exigen el codigo de una caja— no
+                    // desaparece; se traslada entero, y quien lo tiene que censar ahora es `caja`.
+                    //
                     // #599 — la grilla de actas de inspeccion. `acta_fiscalizacion` es UNA tabla y
                     // el acta predial y la vehicular son el mismo tipo de dominio y el mismo
                     // recurso, asi que la lectura es una: dos listados serian dos copias de la

@@ -267,11 +267,6 @@ paths:
           content:
             application/json:
               schema: { type: object }
-        "404":
-          description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
-          content:
-            application/problem+json:
-              schema: { $ref: "#/components/schemas/Error" }
         "403":
           $ref: "#/components/responses/SinMunicipalidad"
         "422":
@@ -293,11 +288,6 @@ paths:
           content:
             application/json:
               schema: { type: object }
-        "404":
-          description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
-          content:
-            application/problem+json:
-              schema: { $ref: "#/components/schemas/Error" }
         "403":
           $ref: "#/components/responses/SinMunicipalidad"
         "422":
@@ -346,11 +336,6 @@ paths:
           content:
             application/json:
               schema: { type: object }
-        "404":
-          description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
-          content:
-            application/problem+json:
-              schema: { $ref: "#/components/schemas/Error" }
         "403":
           $ref: "#/components/responses/SinMunicipalidad"
         "422":
@@ -372,11 +357,6 @@ paths:
           content:
             application/json:
               schema: { type: object }
-        "404":
-          description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
-          content:
-            application/problem+json:
-              schema: { $ref: "#/components/schemas/Error" }
         "403":
           $ref: "#/components/responses/SinMunicipalidad"
         "422":
@@ -438,11 +418,6 @@ paths:
           content:
             application/json:
               schema: { type: object }
-        "404":
-          description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
-          content:
-            application/problem+json:
-              schema: { $ref: "#/components/schemas/Error" }
         "403":
           $ref: "#/components/responses/SinMunicipalidad"
         "422":
@@ -464,11 +439,6 @@ paths:
           content:
             application/json:
               schema: { type: object }
-        "404":
-          description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
-          content:
-            application/problem+json:
-              schema: { $ref: "#/components/schemas/Error" }
         "403":
           $ref: "#/components/responses/SinMunicipalidad"
         "422":
@@ -517,11 +487,6 @@ paths:
           content:
             application/json:
               schema: { type: object }
-        "404":
-          description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
-          content:
-            application/problem+json:
-              schema: { $ref: "#/components/schemas/Error" }
         "403":
           $ref: "#/components/responses/SinMunicipalidad"
         "422":
@@ -543,11 +508,6 @@ paths:
           content:
             application/json:
               schema: { type: object }
-        "404":
-          description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
-          content:
-            application/problem+json:
-              schema: { $ref: "#/components/schemas/Error" }
         "403":
           $ref: "#/components/responses/SinMunicipalidad"
         "422":
@@ -889,11 +849,6 @@ paths:
           content:
             application/json:
               schema: { type: object }
-        "404":
-          description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
-          content:
-            application/problem+json:
-              schema: { $ref: "#/components/schemas/Error" }
         "403":
           $ref: "#/components/responses/SinMunicipalidad"
         "422":
@@ -920,11 +875,6 @@ paths:
           content:
             application/json:
               schema: { type: object }
-        "404":
-          description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
-          content:
-            application/problem+json:
-              schema: { $ref: "#/components/schemas/Error" }
         "403":
           $ref: "#/components/responses/SinMunicipalidad"
         "422":
@@ -951,11 +901,6 @@ paths:
           content:
             application/json:
               schema: { type: object }
-        "404":
-          description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
-          content:
-            application/problem+json:
-              schema: { $ref: "#/components/schemas/Error" }
         "403":
           $ref: "#/components/responses/SinMunicipalidad"
         "422":
@@ -1002,11 +947,6 @@ paths:
           content:
             application/json:
               schema: { type: object }
-        "404":
-          description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
-          content:
-            application/problem+json:
-              schema: { $ref: "#/components/schemas/Error" }
         "403":
           $ref: "#/components/responses/SinMunicipalidad"
         "422":
@@ -1096,11 +1036,6 @@ paths:
           content:
             application/json:
               schema: { type: object }
-        "404":
-          description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
-          content:
-            application/problem+json:
-              schema: { $ref: "#/components/schemas/Error" }
         "403":
           $ref: "#/components/responses/SinMunicipalidad"
         "422":
@@ -1139,11 +1074,6 @@ paths:
           content:
             application/json:
               schema: { type: object }
-        "404":
-          description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
-          content:
-            application/problem+json:
-              schema: { $ref: "#/components/schemas/Error" }
         "403":
           $ref: "#/components/responses/SinMunicipalidad"
         "422":
@@ -1183,11 +1113,6 @@ paths:
           content:
             application/json:
               schema: { type: object }
-        "404":
-          description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
-          content:
-            application/problem+json:
-              schema: { $ref: "#/components/schemas/Error" }
         "403":
           $ref: "#/components/responses/SinMunicipalidad"
         "422":
@@ -1261,11 +1186,6 @@ paths:
           content:
             application/json:
               schema: { type: object }
-        "404":
-          description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
-          content:
-            application/problem+json:
-              schema: { $ref: "#/components/schemas/Error" }
         "403":
           $ref: "#/components/responses/SinMunicipalidad"
         "422":
@@ -1293,11 +1213,6 @@ paths:
           content:
             application/json:
               schema: { type: object }
-        "404":
-          description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
-          content:
-            application/problem+json:
-              schema: { $ref: "#/components/schemas/Error" }
         "403":
           $ref: "#/components/responses/SinMunicipalidad"
         "422":
@@ -1324,11 +1239,6 @@ paths:
           content:
             application/json:
               schema: { type: object }
-        "404":
-          description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
-          content:
-            application/problem+json:
-              schema: { $ref: "#/components/schemas/Error" }
         "403":
           $ref: "#/components/responses/SinMunicipalidad"
         "422":
@@ -1362,11 +1272,6 @@ paths:
           content:
             application/json:
               schema: { type: object }
-        "404":
-          description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
-          content:
-            application/problem+json:
-              schema: { $ref: "#/components/schemas/Error" }
         "403":
           $ref: "#/components/responses/SinMunicipalidad"
         "422":
@@ -1483,11 +1388,6 @@ paths:
           content:
             application/json:
               schema: { type: object }
-        "404":
-          description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
-          content:
-            application/problem+json:
-              schema: { $ref: "#/components/schemas/Error" }
         "403":
           $ref: "#/components/responses/SinMunicipalidad"
         "422":
@@ -1629,11 +1529,6 @@ paths:
           content:
             application/json:
               schema: { type: object }
-        "404":
-          description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
-          content:
-            application/problem+json:
-              schema: { $ref: "#/components/schemas/Error" }
         "403":
           $ref: "#/components/responses/SinMunicipalidad"
         "422":
@@ -5791,11 +5686,49 @@ paths:
           content:
             application/json:
               schema: { type: object }
-        "404":
-          description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
+        "403":
+          $ref: "#/components/responses/SinMunicipalidad"
+        "422":
+          $ref: "#/components/responses/ErrorDeValidacion"
+  "/pagos":
+    post:
+      operationId: recibir_pago_de_caja
+      summary: "Recibir un pago cobrado en caja"
+      description: "El segundo `COMMIT` del camino del dinero (ADR-0026 §3). `caja` cobra contra una orden, emite el recibo y publica el pago; aquí se **imputa al libro**. **Es idempotente por `pagoId`, y ese identificador lo genera la caja**: un reintento de entrega manda el mismo, y por eso un pago inyectado dos veces produce **un solo asiento**. La garantía es un índice único, no una comprobación previa: dos entregas simultáneas se ordenan en el motor. **El código de estado dice si el pago era nuevo**: 201 la primera vez, 409 cuando ya estaba — y el 409 no es un error sino «ya lo tengo», que es lo que permite reintentar sin miedo. **Qué parte de la deuda extingue el importe lo decide este sistema**, no la caja (ADR-0026 §2): el orden del art. 31 del Código Tributario vive en un solo sitio. Un pago que el libro no admite **no se pierde y no se reintenta para siempre**: queda RECHAZADO con su motivo y la conciliación del día lo cuenta aparte, porque es dinero cobrado que alguien tiene que mirar. Y una anulación **reversa** — escribe asientos contrarios—: nunca borra, porque el libro es inmutable (ADR-0006)."
+      tags: ["Tesorería"]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        201:
+          description: Operacion realizada
           content:
-            application/problem+json:
-              schema: { $ref: "#/components/schemas/Error" }
+            application/json:
+              schema: { type: object }
+        "403":
+          $ref: "#/components/responses/SinMunicipalidad"
+        "422":
+          $ref: "#/components/responses/ErrorDeValidacion"
+  "/pagos/conciliacion":
+    get:
+      operationId: conciliacion_de_pagos
+      summary: "Lo aplicado un día, para que la caja lo concilie"
+      description: "Cuántos pagos de ese día llegaron, cuántos se imputaron, cuántos se rechazaron y por cuánto dinero. Lo pregunta `caja` para compararlo con su cierre de turno (ADR-0026 §3). **Es la única lectura que la caja hace de este sistema**, y no está en el camino del cobro: si no contesta, la conciliación de ese día no se cierra y la ventanilla sigue cobrando igual — ésa es la asimetría que la separación compra. El importe es el **neto**: las anulaciones restan. Comparar contra la suma bruta daría una diferencia igual al doble de lo anulado en cuanto alguien anule un recibo, que es lo más corriente que pasa en una ventanilla."
+      tags: ["Tesorería"]
+      parameters:
+        - name: fecha
+          in: query
+          required: false
+          description: "El día de caja que se concilia, en ISO. **Obligatorio para el servidor**: sin él habría que elegir uno —«hoy»— y una conciliación que se responde sola con la fecha del reloj no es reproducible al día siguiente (regla 6)."
+          schema: { type: string, format: date }
+      responses:
+        200:
+          description: Operacion realizada
+          content:
+            application/json:
+              schema: { type: object }
         "403":
           $ref: "#/components/responses/SinMunicipalidad"
         "422":
@@ -5823,11 +5756,6 @@ paths:
           content:
             application/json:
               schema: { type: object }
-        "404":
-          description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
-          content:
-            application/problem+json:
-              schema: { $ref: "#/components/schemas/Error" }
         "403":
           $ref: "#/components/responses/SinMunicipalidad"
         "422":
@@ -6088,11 +6016,6 @@ paths:
           content:
             application/json:
               schema: { type: object }
-        "404":
-          description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
-          content:
-            application/problem+json:
-              schema: { $ref: "#/components/schemas/Error" }
         "403":
           $ref: "#/components/responses/SinMunicipalidad"
         "422":
@@ -6119,11 +6042,6 @@ paths:
           content:
             application/json:
               schema: { type: object }
-        "404":
-          description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
-          content:
-            application/problem+json:
-              schema: { $ref: "#/components/schemas/Error" }
         "403":
           $ref: "#/components/responses/SinMunicipalidad"
         "422":
@@ -6206,11 +6124,6 @@ paths:
           content:
             application/json:
               schema: { type: object }
-        "404":
-          description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
-          content:
-            application/problem+json:
-              schema: { $ref: "#/components/schemas/Error" }
         "403":
           $ref: "#/components/responses/SinMunicipalidad"
         "422":
@@ -6288,11 +6201,6 @@ paths:
           content:
             application/json:
               schema: { type: object }
-        "404":
-          description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
-          content:
-            application/problem+json:
-              schema: { $ref: "#/components/schemas/Error" }
         "403":
           $ref: "#/components/responses/SinMunicipalidad"
         "422":

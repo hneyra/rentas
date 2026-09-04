@@ -37,10 +37,10 @@ import kamayuk.rentas.tesoreria.aplicacion.ConsultaDeConvenios;
 import kamayuk.rentas.tesoreria.aplicacion.FormalizarConvenio;
 import kamayuk.rentas.tesoreria.aplicacion.RegistrarPreconvenio;
 import kamayuk.rentas.tesoreria.dobles.AcogimientoDeMentira;
+import kamayuk.rentas.tesoreria.dobles.AnulacionesDeReciboDeMentira;
 import kamayuk.rentas.tesoreria.dobles.ContribuyentesDeMentira;
 import kamayuk.rentas.tesoreria.dobles.ConveniosEnMemoria;
 import kamayuk.rentas.tesoreria.dobles.MovimientosDeConvenioEnMemoria;
-import kamayuk.rentas.tesoreria.dobles.MovimientosEnMemoria;
 import kamayuk.rentas.tesoreria.dominio.Convenio;
 import kamayuk.rentas.web.ConfiguracionDeJson;
 import kamayuk.rentas.web.ManejadorDeErrores;
@@ -156,7 +156,7 @@ class ConvenioControllerTest {
                                     new CerrarConvenio(
                                             convenios,
                                             movimientos,
-                                            new MovimientosEnMemoria(),
+                                            new AnulacionesDeReciboDeMentira(),
                                             acogimiento,
                                             preconvenios,
                                             (RegistroDeAuditoria registro) -> {},

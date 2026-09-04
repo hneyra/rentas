@@ -1362,47 +1362,15 @@ class AnunciosYPropagandaJdbcTest {
      * necesita del establecimiento es <b>que exista y tenga predio</b>, y el ciclo de la licencia
      * ya tiene su propia prueba en {@code LicenciaDeFuncionamientoJdbcTest}. Emitirla de verdad
      * aqui obligaria a montar la caja de tasas entera para comprobar algo que no es de #51.
+     *
+     * <p><b>Y desde P5D la caja no se puede montar ni queriendo</b>: `V7` retiro `area`, `caja`,
+     * `cierre_caja` y `recibo`, que es lo que estas cuatro inserciones sembraban solo para llegar a
+     * un `recibo_id`. Ahora ese identificador es un numero de otro sistema y entra tal cual —la
+     * clave foranea se fue con las tablas—, que es exactamente lo que la migracion cambio.
      */
     private static long crearLicencia(long titular, long predio, String numero) {
         int orden = CONTADOR.incrementAndGet();
-        long areaId =
-                insertarComoOwner(
-                        municipalidad,
-                        "INSERT INTO area (municipalidad_id, codigo, nombre)"
-                                + " VALUES (?, ?, 'Unidad de Rentas') RETURNING id",
-                        municipalidad,
-                        "A-51-" + orden);
-        long cajaId =
-                insertarComoOwner(
-                        municipalidad,
-                        "INSERT INTO caja (municipalidad_id, codigo, nombre, area_id, serie)"
-                                + " VALUES (?, ?, 'Caja de la prueba', ?, ?) RETURNING id",
-                        municipalidad,
-                        "C-51-" + orden,
-                        areaId,
-                        "S51");
-        long turnoId =
-                insertarComoApp(
-                        "INSERT INTO cierre_caja (municipalidad_id, caja_id, cajero, fecha,"
-                                + " fecha_apertura, usuario_apertura, observacion)"
-                                + " VALUES (?, ?, 'prueba', ?, ?, 'prueba',"
-                                + "         'turno de la prueba') RETURNING id",
-                        municipalidad,
-                        cajaId,
-                        HOY,
-                        HOY);
-        long reciboId =
-                insertarComoApp(
-                        "INSERT INTO recibo (municipalidad_id, serie, numero, caja_id, cajero,"
-                                + " contribuyente_id, forma_pago, total, turno_id, actualizado_a,"
-                                + " usuario_registro, observacion)"
-                                + " VALUES (?, 'S51', 1, ?, 'prueba', ?, 'EFECTIVO', 120.00, ?, ?,"
-                                + "         'prueba', 'recibo de la prueba') RETURNING id",
-                        municipalidad,
-                        cajaId,
-                        titular,
-                        turnoId,
-                        HOY);
+        long reciboId = 9_051_000L + orden;
         long documentoId =
                 insertarComoApp(
                         "INSERT INTO documento_emitido (municipalidad_id, tipo, numero, ejercicio,"

@@ -3246,6 +3246,60 @@ const OPERACIONES_ADICIONALES = {
   // Aqui `cargar-cajas.sh` es el paso 4 de la siembra desde #460 y la tabla
   // tiene filas en cuanto una municipalidad se implanta.
   caja_tributaria: [
+    // EL BUZON DE ENTRADA DE PAGOS (P5D, ADR-0026 §3). Cuelga de `caja_tributaria`
+    // porque hace exactamente lo que la ventanilla hacia cuando el cobro era una sola
+    // transaccion —asentar el abono—, y darle una opcion propia crearia un permiso que
+    // ninguna pantalla abre y que nadie administra.
+    //
+    // NINGUNA PANTALLA LAS LLAMA, y hay que decirlo: quien llama es el publicador de
+    // `caja`, despues de su COMMIT. Entran en el contrato igual porque el contrato es lo
+    // que este backend publica —y `ContratoDeApiTest` compara las dos direcciones—, no
+    // porque haya una pantalla detras.
+    {
+      operationId: 'recibir_pago_de_caja',
+      metodo: 'post',
+      ruta: '/api/v1/pagos',
+      titulo: 'Recibir un pago cobrado en caja',
+      descripcion:
+        'El segundo `COMMIT` del camino del dinero (ADR-0026 §3). `caja` cobra contra una orden,' +
+        ' emite el recibo y publica el pago; aquí se **imputa al libro**. **Es idempotente por' +
+        ' `pagoId`, y ese identificador lo genera la caja**: un reintento de entrega manda el' +
+        ' mismo, y por eso un pago inyectado dos veces produce **un solo asiento**. La garantía' +
+        ' es un índice único, no una comprobación previa: dos entregas simultáneas se ordenan en' +
+        ' el motor. **El código de estado dice si el pago era nuevo**: 201 la primera vez, 409' +
+        ' cuando ya estaba — y el 409 no es un error sino «ya lo tengo», que es lo que permite' +
+        ' reintentar sin miedo. **Qué parte de la deuda extingue el importe lo decide este' +
+        ' sistema**, no la caja (ADR-0026 §2): el orden del art. 31 del Código Tributario vive en' +
+        ' un solo sitio. Un pago que el libro no admite **no se pierde y no se reintenta para' +
+        ' siempre**: queda RECHAZADO con su motivo y la conciliación del día lo cuenta aparte,' +
+        ' porque es dinero cobrado que alguien tiene que mirar. Y una anulación **reversa** —' +
+        ' escribe asientos contrarios—: nunca borra, porque el libro es inmutable (ADR-0006).',
+    },
+    {
+      operationId: 'conciliacion_de_pagos',
+      metodo: 'get',
+      ruta: '/api/v1/pagos/conciliacion',
+      titulo: 'Lo aplicado un día, para que la caja lo concilie',
+      descripcion:
+        'Cuántos pagos de ese día llegaron, cuántos se imputaron, cuántos se rechazaron y por' +
+        ' cuánto dinero. Lo pregunta `caja` para compararlo con su cierre de turno (ADR-0026 §3).' +
+        ' **Es la única lectura que la caja hace de este sistema**, y no está en el camino del' +
+        ' cobro: si no contesta, la conciliación de ese día no se cierra y la ventanilla sigue' +
+        ' cobrando igual — ésa es la asimetría que la separación compra. El importe es el' +
+        ' **neto**: las anulaciones restan. Comparar contra la suma bruta daría una diferencia' +
+        ' igual al doble de lo anulado en cuanto alguien anule un recibo, que es lo más corriente' +
+        ' que pasa en una ventanilla.',
+      parametros: [
+        {
+          nombre: 'fecha',
+          descripcion:
+            'El día de caja que se concilia, en ISO. **Obligatorio para el servidor**: sin él' +
+            ' habría que elegir uno —«hoy»— y una conciliación que se responde sola con la fecha' +
+            ' del reloj no es reproducible al día siguiente (regla 6).',
+          esquema: '{ type: string, format: date }',
+        },
+      ],
+    },
     {
       operationId: 'cajas_listado',
       metodo: 'get',

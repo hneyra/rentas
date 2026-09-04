@@ -26,6 +26,7 @@ public final class CobrosDeMentira implements CobrosDeTasas {
 
     private final List<TasaCobrada> cobros = new ArrayList<>();
     private final List<Recaudado> recaudaciones = new ArrayList<>();
+    private final List<String> anulados = new ArrayList<>();
 
     /** Siembra un cobro acreditable: numero de recibo, concepto, importe y fecha. */
     public CobrosDeMentira con(
@@ -40,9 +41,25 @@ public final class CobrosDeMentira implements CobrosDeTasas {
         return this;
     }
 
+    /**
+     * Como si {@code caja} hubiera registrado la anulacion de ese recibo (P5D).
+     *
+     * <p>Un recibo anulado deja de acreditar: el puerto promete «vacio si el recibo no existe, no
+     * cobro ese concepto o esta anulado», y las tres respuestas son la misma para quien emite. Esa
+     * regla vive en {@code caja} —resolver el estado leyendo sus movimientos es suyo (#34)— y aqui
+     * solo se ve el resultado, que es todo lo que este modulo podia ver ya.
+     */
+    public CobrosDeMentira anular(String numeroDeRecibo) {
+        anulados.add(numeroDeRecibo);
+        return this;
+    }
+
     @Override
     public Optional<TasaCobrada> acreditar(String numeroDeRecibo, String codigoDeTasa) {
         String recibo = numeroDeRecibo == null ? "" : numeroDeRecibo.strip();
+        if (anulados.contains(recibo)) {
+            return Optional.empty();
+        }
         String concepto = codigoDeTasa.strip().toUpperCase(Locale.ROOT);
         return cobros.stream()
                 .filter(

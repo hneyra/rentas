@@ -1701,6 +1701,13 @@
       }
     ]
   },
+  "GET /pagos/conciliacion": {
+    "fecha": "texto",
+    "recibidos": "entero",
+    "aplicados": "entero",
+    "rechazados": "entero",
+    "importeAplicado": "texto"
+  },
   "GET /portal/situacion": {
     "tipoDocumento": "texto",
     "numeroDocumento": "texto",
@@ -2268,22 +2275,6 @@
       }
     ]
   },
-  "GET /tesoreria/cajas": {
-    "contenido": [
-      {
-        "codigo": "texto",
-        "nombre": "texto",
-        "areaCodigo": "texto",
-        "areaNombre": "texto",
-        "activa": "booleano"
-      }
-    ],
-    "pagina": "entero",
-    "tamano": "entero",
-    "totalElementos": "entero",
-    "totalPaginas": "entero",
-    "hayMas": "booleano"
-  },
   "GET /tesoreria/convenios": {
     "contenido": [
       {
@@ -2344,210 +2335,6 @@
     "totalElementos": "entero",
     "totalPaginas": "entero",
     "hayMas": "booleano"
-  },
-  "GET /tesoreria/recaudacion/avance": {
-    "desde": "texto",
-    "hasta": "texto",
-    "aLaFecha": "texto",
-    "filas": [
-      {
-        "tributo": "texto",
-        "cobrado": {
-          "importe": "texto",
-          "actualizadoA": "fecha"
-        },
-        "anulado": {
-          "importe": "texto",
-          "actualizadoA": "fecha"
-        },
-        "neto": {
-          "importe": "texto",
-          "actualizadoA": "fecha"
-        }
-      }
-    ],
-    "cobrado": {
-      "importe": "texto",
-      "actualizadoA": "fecha"
-    },
-    "anulado": {
-      "importe": "texto",
-      "actualizadoA": "fecha"
-    },
-    "neto": {
-      "importe": "texto",
-      "actualizadoA": "fecha"
-    },
-    "turno": {
-      "caja": "texto",
-      "cajero": "texto",
-      "fecha": "texto",
-      "estadoDelTurno": "texto",
-      "arqueo": {
-        "turnoId": "entero",
-        "fecha": "texto",
-        "recibosEmitidos": "entero",
-        "recibosAnulados": "entero",
-        "cobrado": {
-          "importe": "texto",
-          "actualizadoA": "fecha"
-        },
-        "anulado": {
-          "importe": "texto",
-          "actualizadoA": "fecha"
-        },
-        "neto": {
-          "importe": "texto",
-          "actualizadoA": "fecha"
-        },
-        "declarado": {
-          "importe": "texto",
-          "actualizadoA": "fecha"
-        },
-        "diferencia": {
-          "importe": "texto",
-          "actualizadoA": "fecha"
-        },
-        "cuadra": "booleano",
-        "lineas": [
-          {
-            "formaDePago": "texto",
-            "cobrado": {
-              "importe": "texto",
-              "actualizadoA": "fecha"
-            },
-            "anulado": {
-              "importe": "texto",
-              "actualizadoA": "fecha"
-            },
-            "neto": {
-              "importe": "texto",
-              "actualizadoA": "fecha"
-            },
-            "declarado": {
-              "importe": "texto",
-              "actualizadoA": "fecha"
-            },
-            "diferencia": {
-              "importe": "texto",
-              "actualizadoA": "fecha"
-            }
-          }
-        ]
-      }
-    }
-  },
-  "GET /tesoreria/recaudacion/por-area": {
-    "desde": "texto",
-    "hasta": "texto",
-    "aLaFecha": "texto",
-    "filas": [
-      {
-        "area": "texto",
-        "areaNombre": "texto",
-        "partida": "texto",
-        "tributo": "texto",
-        "cobrado": {
-          "importe": "texto",
-          "actualizadoA": "fecha"
-        },
-        "anulado": {
-          "importe": "texto",
-          "actualizadoA": "fecha"
-        },
-        "neto": {
-          "importe": "texto",
-          "actualizadoA": "fecha"
-        }
-      }
-    ],
-    "neto": {
-      "importe": "texto",
-      "actualizadoA": "fecha"
-    },
-    "netoSinPartida": {
-      "importe": "texto",
-      "actualizadoA": "fecha"
-    }
-  },
-  "GET /tesoreria/recibos": {
-    "contenido": [
-      {
-        "numero": "texto",
-        "emitidoEn": "texto",
-        "codContribuyente": "texto",
-        "contribuyente": "texto",
-        "importe": {
-          "importe": "texto",
-          "actualizadoA": "fecha"
-        },
-        "medioDePago": "texto",
-        "duplicados": "entero",
-        "estado": "texto"
-      }
-    ],
-    "pagina": "entero",
-    "tamano": "entero",
-    "totalElementos": "entero",
-    "totalPaginas": "entero",
-    "hayMas": "booleano"
-  },
-  "GET /tesoreria/recibos/{nro}/duplicado": {
-    "estado": "texto",
-    "duplicados": "entero",
-    "anulacion": {
-      "fecha": "texto",
-      "motivo": "texto",
-      "usuario": "texto"
-    },
-    "recibo": {
-      "numero": "texto",
-      "serie": "texto",
-      "correlativo": "entero",
-      "cajero": "texto",
-      "formaDePago": "texto",
-      "tipoDePago": "texto",
-      "beneficioDeclarado": "texto",
-      "emitidoEn": "texto",
-      "total": {
-        "importe": "texto",
-        "actualizadoA": "fecha"
-      },
-      "lineas": [
-        {
-          "tributo": "texto",
-          "concepto": "texto",
-          "ejercicio": "entero",
-          "predioId": "entero",
-          "vehiculoId": "entero",
-          "cantidad": "entero",
-          "precioUnitario": {
-            "importe": "texto",
-            "actualizadoA": "fecha"
-          },
-          "insoluto": {
-            "importe": "texto",
-            "actualizadoA": "fecha"
-          },
-          "reajuste": {
-            "importe": "texto",
-            "actualizadoA": "fecha"
-          },
-          "interes": {
-            "importe": "texto",
-            "actualizadoA": "fecha"
-          },
-          "gasto": {
-            "importe": "texto",
-            "actualizadoA": "fecha"
-          },
-          "monto": {
-            "importe": "texto",
-            "actualizadoA": "fecha"
-          }
-        }
-      ]
-    }
   },
   "GET /transito/codigos": {
     "contenido": [
@@ -4146,6 +3933,15 @@
     "numeroDeDuplicado": "entero",
     "estado": "texto"
   },
+  "POST /pagos": {
+    "pagoId": "texto",
+    "estado": "texto",
+    "asientos": "entero",
+    "motivo": "texto",
+    "recibidoEn": "texto",
+    "aplicadoEn": "texto",
+    "nuevo": "booleano"
+  },
   "POST /rentas/alcabala": {
     "id": "entero",
     "ejercicio": "texto",
@@ -4523,176 +4319,6 @@
     "vigenciaDesde": "fecha",
     "vigenciaHasta": "fecha"
   },
-  "POST /tesoreria/caja/cierre": {
-    "id": "entero",
-    "turnoId": "entero",
-    "caja": "texto",
-    "cajero": "texto",
-    "tipo": "texto",
-    "secuencia": "entero",
-    "fecha": "texto",
-    "registradoEn": "texto",
-    "estadoDelTurno": "texto",
-    "arqueo": {
-      "turnoId": "entero",
-      "fecha": "texto",
-      "recibosEmitidos": "entero",
-      "recibosAnulados": "entero",
-      "cobrado": {
-        "importe": "texto",
-        "actualizadoA": "fecha"
-      },
-      "anulado": {
-        "importe": "texto",
-        "actualizadoA": "fecha"
-      },
-      "neto": {
-        "importe": "texto",
-        "actualizadoA": "fecha"
-      },
-      "declarado": {
-        "importe": "texto",
-        "actualizadoA": "fecha"
-      },
-      "diferencia": {
-        "importe": "texto",
-        "actualizadoA": "fecha"
-      },
-      "cuadra": "booleano",
-      "lineas": [
-        {
-          "formaDePago": "texto",
-          "cobrado": {
-            "importe": "texto",
-            "actualizadoA": "fecha"
-          },
-          "anulado": {
-            "importe": "texto",
-            "actualizadoA": "fecha"
-          },
-          "neto": {
-            "importe": "texto",
-            "actualizadoA": "fecha"
-          },
-          "declarado": {
-            "importe": "texto",
-            "actualizadoA": "fecha"
-          },
-          "diferencia": {
-            "importe": "texto",
-            "actualizadoA": "fecha"
-          }
-        }
-      ]
-    },
-    "reversaCierreId": "entero",
-    "motivo": "texto",
-    "recaudadoConAsiento": {
-      "importe": "texto",
-      "actualizadoA": "fecha"
-    },
-    "recaudadoSinAsiento": {
-      "importe": "texto",
-      "actualizadoA": "fecha"
-    },
-    "observacion": "texto"
-  },
-  "POST /tesoreria/caja/cobranza": {
-    "numero": "texto",
-    "serie": "texto",
-    "correlativo": "entero",
-    "cajero": "texto",
-    "formaDePago": "texto",
-    "tipoDePago": "texto",
-    "beneficioDeclarado": "texto",
-    "emitidoEn": "texto",
-    "total": {
-      "importe": "texto",
-      "actualizadoA": "fecha"
-    },
-    "lineas": [
-      {
-        "tributo": "texto",
-        "concepto": "texto",
-        "ejercicio": "entero",
-        "predioId": "entero",
-        "vehiculoId": "entero",
-        "cantidad": "entero",
-        "precioUnitario": {
-          "importe": "texto",
-          "actualizadoA": "fecha"
-        },
-        "insoluto": {
-          "importe": "texto",
-          "actualizadoA": "fecha"
-        },
-        "reajuste": {
-          "importe": "texto",
-          "actualizadoA": "fecha"
-        },
-        "interes": {
-          "importe": "texto",
-          "actualizadoA": "fecha"
-        },
-        "gasto": {
-          "importe": "texto",
-          "actualizadoA": "fecha"
-        },
-        "monto": {
-          "importe": "texto",
-          "actualizadoA": "fecha"
-        }
-      }
-    ]
-  },
-  "POST /tesoreria/caja/tasas": {
-    "numero": "texto",
-    "serie": "texto",
-    "correlativo": "entero",
-    "cajero": "texto",
-    "formaDePago": "texto",
-    "tipoDePago": "texto",
-    "beneficioDeclarado": "texto",
-    "emitidoEn": "texto",
-    "total": {
-      "importe": "texto",
-      "actualizadoA": "fecha"
-    },
-    "lineas": [
-      {
-        "tributo": "texto",
-        "concepto": "texto",
-        "ejercicio": "entero",
-        "predioId": "entero",
-        "vehiculoId": "entero",
-        "cantidad": "entero",
-        "precioUnitario": {
-          "importe": "texto",
-          "actualizadoA": "fecha"
-        },
-        "insoluto": {
-          "importe": "texto",
-          "actualizadoA": "fecha"
-        },
-        "reajuste": {
-          "importe": "texto",
-          "actualizadoA": "fecha"
-        },
-        "interes": {
-          "importe": "texto",
-          "actualizadoA": "fecha"
-        },
-        "gasto": {
-          "importe": "texto",
-          "actualizadoA": "fecha"
-        },
-        "monto": {
-          "importe": "texto",
-          "actualizadoA": "fecha"
-        }
-      }
-    ]
-  },
   "POST /tesoreria/convenios/{numero}/anulacion": {
     "numero": "texto",
     "codContribuyente": "texto",
@@ -4754,68 +4380,6 @@
     "cuotasVencidas": "entero"
   },
   "POST /tesoreria/fraccionamientos": "objeto",
-  "POST /tesoreria/recibos/{nro}/anulacion": {
-    "numero": "texto",
-    "estado": "texto",
-    "fecha": "texto",
-    "motivo": "texto",
-    "autorizadoPor": "texto",
-    "documentoAutorizacion": "texto",
-    "usuario": "texto",
-    "importe": {
-      "importe": "texto",
-      "actualizadoA": "fecha"
-    },
-    "asientosReversados": "entero",
-    "recibo": {
-      "numero": "texto",
-      "serie": "texto",
-      "correlativo": "entero",
-      "cajero": "texto",
-      "formaDePago": "texto",
-      "tipoDePago": "texto",
-      "beneficioDeclarado": "texto",
-      "emitidoEn": "texto",
-      "total": {
-        "importe": "texto",
-        "actualizadoA": "fecha"
-      },
-      "lineas": [
-        {
-          "tributo": "texto",
-          "concepto": "texto",
-          "ejercicio": "entero",
-          "predioId": "entero",
-          "vehiculoId": "entero",
-          "cantidad": "entero",
-          "precioUnitario": {
-            "importe": "texto",
-            "actualizadoA": "fecha"
-          },
-          "insoluto": {
-            "importe": "texto",
-            "actualizadoA": "fecha"
-          },
-          "reajuste": {
-            "importe": "texto",
-            "actualizadoA": "fecha"
-          },
-          "interes": {
-            "importe": "texto",
-            "actualizadoA": "fecha"
-          },
-          "gasto": {
-            "importe": "texto",
-            "actualizadoA": "fecha"
-          },
-          "monto": {
-            "importe": "texto",
-            "actualizadoA": "fecha"
-          }
-        }
-      ]
-    }
-  },
   "POST /transito/constancias-libres": "archivo",
   "POST /transito/descargos": {
     "id": "entero",

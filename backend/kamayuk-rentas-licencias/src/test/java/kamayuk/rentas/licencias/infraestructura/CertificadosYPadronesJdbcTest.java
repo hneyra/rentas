@@ -64,6 +64,8 @@ import kamayuk.rentas.licencias.aplicacion.EmitirLicenciaDeFuncionamiento;
 import kamayuk.rentas.licencias.aplicacion.MantenerCatalogoCiiu;
 import kamayuk.rentas.licencias.aplicacion.ModeloDeLosReportesDeLicencias;
 import kamayuk.rentas.licencias.aplicacion.ResumenAnualDeLicencias;
+import kamayuk.rentas.licencias.dobles.CajaDeMentira;
+import kamayuk.rentas.licencias.dobles.CobrosDeMentira;
 import kamayuk.rentas.licencias.dominio.CriterioDeCertificados;
 import kamayuk.rentas.licencias.dominio.CriterioDeLicencias;
 import kamayuk.rentas.licencias.dominio.EstadoDeLicencia;
@@ -77,19 +79,6 @@ import kamayuk.rentas.parametros.infraestructura.ParametrosRepositoryJdbc;
 import kamayuk.rentas.plataforma.tenant.TenantTransactionManager;
 import kamayuk.rentas.tesoreria.CobrosDeTasas;
 import kamayuk.rentas.tesoreria.RecibosDeTramite;
-import kamayuk.rentas.tesoreria.aplicacion.AbrirCaja;
-import kamayuk.rentas.tesoreria.aplicacion.CobrarTasa;
-import kamayuk.rentas.tesoreria.aplicacion.CobrosDeTasasTesoreria;
-import kamayuk.rentas.tesoreria.aplicacion.RecibosDeTramiteTesoreria;
-import kamayuk.rentas.tesoreria.dominio.FormaDePago;
-import kamayuk.rentas.tesoreria.dominio.LineaDeTasaPedida;
-import kamayuk.rentas.tesoreria.dominio.Recibo;
-import kamayuk.rentas.tesoreria.infraestructura.CajaRepositoryJdbc;
-import kamayuk.rentas.tesoreria.infraestructura.MovimientoDeReciboRepositoryJdbc;
-import kamayuk.rentas.tesoreria.infraestructura.RecaudacionRepositoryJdbc;
-import kamayuk.rentas.tesoreria.infraestructura.ReciboRepositoryJdbc;
-import kamayuk.rentas.tesoreria.infraestructura.TasaRepositoryJdbc;
-import kamayuk.rentas.tesoreria.infraestructura.TurnoDeCajaRepositoryJdbc;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -196,7 +185,18 @@ class CertificadosYPadronesJdbcTest {
     private static CertificadoRepositoryJdbc certificados;
     private static LicenciaRepositoryJdbc licencias;
 
-    private static CobrarTasa cobrarTasa;
+    /**
+     * Los DOS puertos de `caja`, en memoria (P5D).
+     *
+     * <p>Hasta `V7` esta prueba cobraba de verdad —`CobrarTasa` sobre `recibo`, `recibo_detalle` y
+     * `tasa`— y montaba las dos implementaciones reales. Las diez tablas se fueron a `caja` y el
+     * cobro se prueba alli. Lo que el AC 3 mide sigue intacto y hay que decirlo: `licencias` nunca
+     * toco la tabla `recibo` ni supo que la anulacion vive en `recibo_movimiento` desde #34, asi
+     * que lo que decide aqui —y decidia antes— es lo que estos dos puertos contestan.
+     */
+    private static CajaDeMentira caja;
+
+    private static CobrosDeMentira cobrosDeTasas;
     private static EmitirDocumento documentos;
     private static GeneradorDeDocumentos generador;
     private static MantenerCatalogoCiiu mantenerCatalogo;
@@ -237,34 +237,10 @@ class CertificadosYPadronesJdbcTest {
 
         Auditoria auditoria = new AuditoriaJdbc(jdbc, RELOJ);
 
-        ReciboRepositoryJdbc repositorioDeRecibos = new ReciboRepositoryJdbc(jdbc);
-        MovimientoDeReciboRepositoryJdbc movimientosDeRecibo =
-                new MovimientoDeReciboRepositoryJdbc(jdbc);
-        cobrarTasa =
-                envolver(
-                        new CobrarTasa(
-                                envolver(
-                                        new AbrirCaja(
-                                                new CajaRepositoryJdbc(jdbc),
-                                                new TurnoDeCajaRepositoryJdbc(jdbc),
-                                                auditoria,
-                                                RELOJ)),
-                                new TasaRepositoryJdbc(jdbc),
-                                repositorioDeRecibos,
-                                auditoria,
-                                RELOJ));
-
-        // Los DOS puertos publicos de tesoreria, de verdad. Es lo que hace que el AC 3 signifique
-        // algo: `licencias` no toca la tabla `recibo` ni sabe que la anulacion vive en
-        // `recibo_movimiento` desde #34.
-        RecibosDeTramite recibos =
-                envolver(new RecibosDeTramiteTesoreria(repositorioDeRecibos, movimientosDeRecibo));
-        CobrosDeTasas cobros =
-                envolver(
-                        new CobrosDeTasasTesoreria(
-                                repositorioDeRecibos,
-                                movimientosDeRecibo,
-                                new RecaudacionRepositoryJdbc(jdbc)));
+        caja = new CajaDeMentira();
+        cobrosDeTasas = new CobrosDeMentira();
+        RecibosDeTramite recibos = caja;
+        CobrosDeTasas cobros = cobrosDeTasas;
 
         generador =
                 new GeneradorDeDocumentos(
@@ -352,13 +328,8 @@ class CertificadosYPadronesJdbcTest {
         // la prueba del resumen de 2024 a 2026, que es la que lo demuestra—.
         resumenAnual = new ResumenAnualDeLicencias(consultaDeLicencias, cobros, derechos);
 
-        areaId = crearArea(municipalidad, "A-54");
-        crearCaja(municipalidad, CAJA, "S54", areaId);
-        crearTasa(DERECHO_LICENCIA, Dinero.de("120.00"));
-        crearTasa(DERECHO_NUMERACION, Dinero.de("25.00"));
-        crearTasa(DERECHO_ZONIFICACION, Dinero.de("35.00"));
-        crearTasa(DERECHO_PARAMETROS, Dinero.de("48.00"));
-        crearTasa(OTRO_CONCEPTO, Dinero.de("2.00"));
+        // Ni `area`, ni `caja`, ni `tasa` se siembran ya: las tres se fueron con `V7`. El
+        // catalogo del TUPA y su tarifa son de `caja` desde P5D.
     }
 
     @AfterAll
@@ -1229,49 +1200,49 @@ class CertificadosYPadronesJdbcTest {
                 new ParametrosUrbanisticos("RDM", "3 pisos", "30 %", "3 m", "1.5 (a+r)"));
     }
 
-    /** Cobra el concepto en la caja de tasas <b>de verdad</b> y devuelve el numero del recibo. */
+    /**
+     * Como si la caja de tasas hubiera cobrado el concepto; devuelve el numero del recibo.
+     *
+     * <p>Siembra los DOS puertos con el mismo cobro, y no es duplicar: {@code RecibosDeTramite}
+     * dice si el recibo respalda el derecho —y con que identificador se enlaza— y {@code
+     * CobrosDeTasas} dice <b>cuanto</b> cobro por ese concepto, que es la cifra que acaba impresa
+     * en el certificado. En produccion los dos salen de la misma respuesta de `caja`; aqui tambien.
+     */
     private static String cobrar(long contribuyenteId, String concepto) {
-        Recibo recibo =
-                enContexto(
-                        () ->
-                                cobrarTasa.cobrar(
-                                        new CobrarTasa.CobroDeTasas(
-                                                CAJA,
-                                                CAJERO,
-                                                contribuyenteId,
-                                                List.of(new LineaDeTasaPedida(concepto, 1)),
-                                                FormaDePago.EFECTIVO,
-                                                HOY,
-                                                null),
-                                        Observacion.de("Cobro del derecho de tramite")));
-        return recibo.numero().impreso();
+        Dinero tarifa = tarifaDe(concepto);
+        String numero = caja.cobro(contribuyenteId, HOY, tarifa, concepto);
+        cobrosDeTasas.con(numero, concepto, tarifa.valor().toPlainString(), HOY);
+        return numero;
     }
 
     /**
-     * Anula el recibo escribiendo su movimiento como lo hace {@code AnularRecibo}.
+     * Lo que cuesta cada concepto del TUPA, en la prueba.
      *
-     * <p>Va por SQL directo a proposito: lo que esta prueba necesita es el <b>estado</b> —un recibo
-     * anulado— y no el caso de uso de la anulacion, que ya tiene el suyo en #34.
+     * <p>Hasta `V7` salia de la tabla `tasa`, que se fue a `caja`. No hay tarifa por omision: un
+     * concepto que la prueba no declare revienta, porque un importe inventado es exactamente lo que
+     * #48 mide en el otro sentido — el papel que sale con una cifra plausible y falsa.
+     */
+    private static Dinero tarifaDe(String concepto) {
+        return switch (concepto) {
+            case DERECHO_LICENCIA -> Dinero.de("120.00");
+            case DERECHO_NUMERACION -> Dinero.de("25.00");
+            case DERECHO_ZONIFICACION -> Dinero.de("35.00");
+            case DERECHO_PARAMETROS -> Dinero.de("48.00");
+            case OTRO_CONCEPTO -> Dinero.de("2.00");
+            default -> throw new IllegalArgumentException("Concepto sin tarifa: " + concepto);
+        };
+    }
+
+    /**
+     * Como si `caja` hubiera registrado la anulacion del recibo, en los dos puertos.
+     *
+     * <p>Hasta `V7` esto insertaba la fila en `recibo_movimiento` por SQL directo, porque lo que la
+     * prueba necesita es el <b>estado</b> —un recibo anulado— y no el caso de uso de la anulacion,
+     * que ya tiene el suyo en #34. El razonamiento no cambia y el sitio si.
      */
     private static void anular(String numeroImpreso) {
-        int guion = numeroImpreso.lastIndexOf('-');
-        String serie = numeroImpreso.substring(0, guion);
-        long correlativo = Long.parseLong(numeroImpreso.substring(guion + 1));
-        transaccion.executeWithoutResult(
-                estado ->
-                        jdbc.sql(
-                                        "INSERT INTO recibo_movimiento (municipalidad_id, recibo_id,"
-                                                + " tipo, fecha, caja_id, turno_id, motivo, importe,"
-                                                + " usuario_registro, observacion)"
-                                                + " SELECT r.municipalidad_id, r.id, 'ANULACION',"
-                                                + " :fecha, r.caja_id, r.turno_id, 'Anulada en la"
-                                                + " prueba', r.total, 'prueba', 'Se anula para la"
-                                                + " prueba' FROM recibo r WHERE r.serie = :serie AND"
-                                                + " r.numero = :numero")
-                                .param("fecha", HOY)
-                                .param("serie", serie)
-                                .param("numero", correlativo)
-                                .update());
+        caja.anular(numeroImpreso);
+        cobrosDeTasas.anular(numeroImpreso);
     }
 
     private static int aLaVez(int cuantos, Callable<Boolean> accion) throws Exception {
@@ -1488,39 +1459,6 @@ class CertificadosYPadronesJdbcTest {
                         "AV. PEÑA GARCÍA " + orden);
         PREDIOS.con(contribuyenteId, predio, codigo, "AV. PEÑA GARCÍA " + orden);
         return predio;
-    }
-
-    private static long crearArea(long muni, String codigo) {
-        return insertarComoOwner(
-                muni,
-                "INSERT INTO area (municipalidad_id, codigo, nombre)"
-                        + " VALUES (?, ?, 'Unidad de Rentas') RETURNING id",
-                muni,
-                codigo);
-    }
-
-    private static void crearCaja(long muni, String codigo, String serie, long area) {
-        insertarComoOwner(
-                muni,
-                "INSERT INTO caja (municipalidad_id, codigo, nombre, area_id, serie)"
-                        + " VALUES (?, ?, 'Caja de tasas de la prueba', ?, ?) RETURNING id",
-                muni,
-                codigo,
-                area,
-                serie);
-    }
-
-    private static void crearTasa(String codigo, Dinero importe) {
-        insertarComoOwner(
-                municipalidad,
-                "INSERT INTO tasa (municipalidad_id, codigo, descripcion, area_id,"
-                        + " partida_presupuestal, importe, vigencia_desde, documento_fuente)"
-                        + " VALUES (?, ?, 'Concepto del TUPA', ?, '1.3.1.1.1.1', ?,"
-                        + " DATE '2026-01-01', 'TUPA 2026 de la prueba') RETURNING id",
-                municipalidad,
-                codigo,
-                areaId,
-                importe.valor());
     }
 
     private static long insertarComoOwner(long muni, String sql, Object... parametros) {

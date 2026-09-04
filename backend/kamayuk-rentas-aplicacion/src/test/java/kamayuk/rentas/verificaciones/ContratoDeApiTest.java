@@ -59,6 +59,12 @@ class ContratoDeApiTest {
      */
     private static final Set<String> IMPLEMENTADAS =
             Set.of(
+                    // EL BUZON DE ENTRADA DE PAGOS (P5D, ADR-0026 §3). Son las dos unicas
+                    // operaciones de este contrato que NINGUNA PANTALLA LLAMA: quien las llama es
+                    // el publicador de `caja`, despues de su COMMIT. Estan aqui igual porque este
+                    // backend las publica de verdad, y lo que esta lista promete es eso.
+                    "POST /pagos",
+                    "GET /pagos/conciliacion",
                     // Las TRES de `/catastro/` que este backend SI publica, y que no se fueron con
                     // P5C: la conciliacion y su recuento son un derivado de `declaracion_jurada`
                     // —de rentas— que catastro no puede mirar sin depender de rentas (ADR-0015), y
@@ -293,27 +299,23 @@ class ContratoDeApiTest {
                     // en ninguna parte y la decision no se distingue de un descuido.
                     "GET /coactiva/prescripcion",
                     "POST /valores/{numero}/movimientos",
-                    // #618: el catalogo de ventanillas. Cinco opciones de Tesoreria piden el
-                    // codigo de la caja antes de poder pedir nada —dos en el cuerpo del cobro,
-                    // dos para resolver el turno y una como filtro— y ninguna lectura lo
-                    // publicaba: `GET /tesoreria/cajas` contestaba 404 porque no estaba en el
-                    // contrato, y la interfaz ponia una caja de texto.
-                    "GET /tesoreria/cajas",
-                    "POST /tesoreria/caja/cobranza",
-                    "POST /tesoreria/caja/tasas",
-                    // #548: el listado de recibos emitidos. Hasta aqui la unica puerta a
-                    // un recibo era su numero impreso, asi que quien perdia el papel —el
-                    // que viene a pedir un duplicado— no lo podia encontrar, y la grilla
-                    // «Recibos localizados» del manual no tenia con que llenarse.
-                    "GET /tesoreria/recibos",
-                    "GET /tesoreria/recibos/{nro}/duplicado",
-                    "POST /tesoreria/recibos/{nro}/anulacion",
+                    // Las NUEVE de la caja salieron con P5D, y no porque dejaran de existir:
+                    // `GET /tesoreria/cajas` (#618), `GET /tesoreria/recibos` y sus dos actos
+                    // (#548), las dos cobranzas, el cierre y las dos de recaudacion. `V7` retiro
+                    // de esta base las diez tablas del dinero y sus cinco controladores se fueron
+                    // con ellas: las sirve el repositorio `caja`, en su propia raiz. Sus rutas SE
+                    // QUEDAN en el contrato —igual que las de `catastro` tras P5C y `GET
+                    // /seguridad/parametros` tras P5B— porque el contrato describe lo que la
+                    // interfaz pide, y la interfaz las sigue pidiendo; lo que ya no es cierto es
+                    // que las publique ESTE backend.
+                    //
+                    // Las DOS que se quedan son las del CONVENIO, y no es una excepcion sino la
+                    // particion de ADR-0026 §5: un convenio es deuda reprogramada —tiene interes,
+                    // tiene quiebre y tiene consecuencias coactivas— asi que se queda en `rentas`
+                    // aunque se firme en la ventanilla de caja.
                     "POST /tesoreria/fraccionamientos",
                     "GET /tesoreria/convenios",
                     "POST /tesoreria/convenios/{numero}/anulacion",
-                    "POST /tesoreria/caja/cierre",
-                    "GET /tesoreria/recaudacion/avance",
-                    "GET /tesoreria/recaudacion/por-area",
                     "GET /coactiva/expedientes",
                     // #426: la deuda del expediente OBLIGACION POR OBLIGACION. Es la
                     // lectura de la que `fraccionamiento_coactivo` saca sus filas —su

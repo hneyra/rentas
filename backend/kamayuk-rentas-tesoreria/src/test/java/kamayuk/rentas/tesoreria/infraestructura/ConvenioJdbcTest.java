@@ -30,12 +30,10 @@ import kamayuk.rentas.auditoria.Origen;
 import kamayuk.rentas.auditoria.OrigenContext;
 import kamayuk.rentas.compartido.TenantContext;
 import kamayuk.rentas.cuentacorriente.AcogimientoAConvenio;
-import kamayuk.rentas.cuentacorriente.RegistroDeAbonos;
 import kamayuk.rentas.cuentacorriente.SeleccionDeObligacion;
 import kamayuk.rentas.cuentacorriente.aplicacion.AcogimientoAConvenioCuentaCorriente;
 import kamayuk.rentas.cuentacorriente.aplicacion.ConsultarDeuda;
 import kamayuk.rentas.cuentacorriente.aplicacion.RegistrarAsiento;
-import kamayuk.rentas.cuentacorriente.aplicacion.RegistroDeAbonosCuentaCorriente;
 import kamayuk.rentas.cuentacorriente.dominio.Asiento;
 import kamayuk.rentas.cuentacorriente.dominio.CalculoDeDeuda;
 import kamayuk.rentas.cuentacorriente.dominio.Concepto;
@@ -60,26 +58,21 @@ import kamayuk.rentas.parametros.LectorDeParametros;
 import kamayuk.rentas.parametros.ParametrosSellados;
 import kamayuk.rentas.parametros.PoliticasDeRedondeoSelladas;
 import kamayuk.rentas.plataforma.tenant.TenantTransactionManager;
-import kamayuk.rentas.tesoreria.aplicacion.AbrirCaja;
-import kamayuk.rentas.tesoreria.aplicacion.AnularRecibo;
 import kamayuk.rentas.tesoreria.aplicacion.CerrarConvenio;
-import kamayuk.rentas.tesoreria.aplicacion.CobrarDeuda;
 import kamayuk.rentas.tesoreria.aplicacion.CondicionesParametrizadas;
 import kamayuk.rentas.tesoreria.aplicacion.ConsultaDeConvenios;
 import kamayuk.rentas.tesoreria.aplicacion.FormalizarConvenio;
 import kamayuk.rentas.tesoreria.aplicacion.RegistrarPreconvenio;
+import kamayuk.rentas.tesoreria.dobles.AnulacionesDeReciboDeMentira;
 import kamayuk.rentas.tesoreria.dominio.Convenio;
 import kamayuk.rentas.tesoreria.dominio.ConvenioEnConsulta;
 import kamayuk.rentas.tesoreria.dominio.CriterioDeConvenios;
 import kamayuk.rentas.tesoreria.dominio.EstadoDeConvenio;
-import kamayuk.rentas.tesoreria.dominio.FormaDePago;
 import kamayuk.rentas.tesoreria.dominio.MovimientoDeConvenioRepository;
 import kamayuk.rentas.tesoreria.dominio.NumeroDeConvenio;
-import kamayuk.rentas.tesoreria.dominio.Recibo;
 import kamayuk.rentas.tesoreria.dominio.TipoDeConvenio;
 import kamayuk.rentas.tesoreria.dominio.TipoDeGarantia;
 import kamayuk.rentas.tesoreria.dominio.TipoDeMovimientoDeConvenio;
-import kamayuk.rentas.tesoreria.dominio.TipoDePago;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -156,12 +149,32 @@ class ConvenioJdbcTest {
 
     private static ConvenioRepositoryJdbc convenios;
     private static MovimientoDeConvenioRepositoryJdbc movimientos;
-    private static MovimientoDeReciboRepositoryJdbc movimientosDeRecibo;
-    private static ReciboRepositoryJdbc recibos;
+
+    /**
+     * Que recibos de `caja` estan anulados (P5D).
+     *
+     * <p>Hasta `V7` esto era `MovimientoDeReciboRepositoryJdbc` leyendo `recibo_movimiento` de esta
+     * misma base, y la anulacion se sembraba anulando el recibo de verdad. El recibo vive ahora en
+     * `caja` y lo unico que este sistema puede hacer es preguntar; lo que la prueba sigue midiendo
+     * —y es lo que la guarda de CerrarConvenio existe para sostener— es que anular el convenio
+     * DEPENDE de esa respuesta y no de un supuesto.
+     */
+    private static AnulacionesDeReciboDeMentira anulaciones;
+
+    private static FormalizarConvenio formalizar;
+
+    /**
+     * De donde salen los identificadores de recibo, ahora que `recibo` no esta en esta base.
+     *
+     * <p>Desde `V7` no hay clave foranea que los valide —esa es exactamente la garantia que la
+     * migracion retira— asi que un numero de otro sistema entra. Que ENTRE es parte de lo que se
+     * verifica: si algo aqui siguiera exigiendo que el recibo exista localmente, esto fallaria.
+     */
+    private static final AtomicInteger SIGUIENTE_RECIBO = new AtomicInteger(9_000);
+
     private static RegistrarAsiento registrarAsiento;
     private static AcogimientoAConvenio acogimiento;
     private static RegistrarPreconvenio preconvenios;
-    private static CobrarDeuda cobrarDeuda;
     private static CerrarConvenio cerrar;
     private static ConsultaDeConvenios consulta;
     private static ConsultarDeuda deudas;
@@ -185,8 +198,7 @@ class ConvenioJdbcTest {
 
         convenios = new ConvenioRepositoryJdbc(jdbc);
         movimientos = new MovimientoDeConvenioRepositoryJdbc(jdbc);
-        movimientosDeRecibo = new MovimientoDeReciboRepositoryJdbc(jdbc);
-        recibos = new ReciboRepositoryJdbc(jdbc);
+        anulaciones = new AnulacionesDeReciboDeMentira();
 
         Auditoria auditoria = new AuditoriaJdbc(jdbc, RELOJ);
         AsientoRepositoryJdbc asientos = new AsientoRepositoryJdbc(jdbc);
@@ -208,35 +220,30 @@ class ConvenioJdbcTest {
                         new RegistrarPreconvenio(
                                 convenios, acogimiento, condiciones, auditoria, RELOJ));
 
-        CajaRepositoryJdbc cajas = new CajaRepositoryJdbc(jdbc);
-        TurnoDeCajaRepositoryJdbc turnos = new TurnoDeCajaRepositoryJdbc(jdbc);
-        AbrirCaja abrirCaja = envolver(new AbrirCaja(cajas, turnos, auditoria, RELOJ));
-        RegistroDeAbonos abonos =
-                envolver(
-                        new RegistroDeAbonosCuentaCorriente(
-                                asientos, saldos, envolver(registrarAsiento), calculo, redondeo));
-        FormalizarConvenio formalizar =
+        // P5D: la formalizacion se llama directamente y ya no a traves de `CobrarDeuda`.
+        // No es una comodidad de la prueba: `CobrarDeuda` se fue a `caja` con `V7`, y lo que
+        // en produccion la llamara es el evento `PagoRegistrado` (ADR-0026 §3) con el
+        // `reciboId` que la ventanilla acaba de emitir en la OTRA base.
+        formalizar =
                 envolver(
                         new FormalizarConvenio(
                                 convenios, movimientos, acogimiento, auditoria, RELOJ));
-        cobrarDeuda =
-                envolver(new CobrarDeuda(abrirCaja, abonos, recibos, formalizar, auditoria, RELOJ));
         cerrar =
                 envolver(
                         new CerrarConvenio(
                                 convenios,
                                 movimientos,
-                                movimientosDeRecibo,
+                                anulaciones,
                                 acogimiento,
                                 preconvenios,
                                 auditoria,
                                 RELOJ));
         consulta = envolver(new ConsultaDeConvenios(convenios, movimientos, RELOJ));
 
-        long areaId = crearArea(municipalidad, "A-35");
-        crearCaja(municipalidad, "C-35", "R35", areaId);
-        crearArea(otraMunicipalidad, "A-35");
-        crearCaja(otraMunicipalidad, "C-35", "R35", null);
+        // Ni `area` ni `caja` se siembran ya: las dos tablas se fueron con `V7`. Un convenio
+        // no necesita ventanilla para existir —la necesita para COBRARSE, y eso pasa en
+        // `caja`—, y que esta prueba siga midiendo todo su ciclo sin ellas es la evidencia
+        // de que la particion de ADR-0026 §5 estaba bien trazada.
     }
 
     @SuppressWarnings("unchecked")
@@ -292,7 +299,8 @@ class ConvenioJdbcTest {
         }
 
         @Test
-        @DisplayName("cobrar la inicial en caja formaliza el convenio y mueve la deuda a CONVENIO")
+        @DisplayName(
+                "la inicial cobrada en `caja` formaliza el convenio y mueve la deuda a CONVENIO")
         void laInicialFormalizaYAcoge() {
             long titular = contribuyenteConDeuda("CICLO-2");
             Convenio convenio = registrarPreconvenio(titular, 6, "20");
@@ -300,12 +308,17 @@ class ConvenioJdbcTest {
             assertThat(convenio.montoTotal()).isEqualTo(Dinero.de("500.00"));
             assertThat(convenio.cuotaInicial()).isEqualTo(Dinero.de("100.00"));
 
-            Recibo recibo = cobrarLaInicial(titular, convenio);
+            long reciboId = formalizarLaInicial(convenio);
 
-            assertThat(recibo.tipoDePago()).isEqualTo(TipoDePago.PRECONVENIO);
-            assertThat(recibo.total())
-                    .as("el papel dice lo que el cronograma congelo, no lo que mando el cliente")
-                    .isEqualTo(Dinero.de("100.00"));
+            // Lo que este lado puede afirmar del pago es lo que quedo escrito en SU tabla: que
+            // recibo lo respalda y por cuanto. Que el papel diga «PRECONVENIO» y sume 100,00 es
+            // de `caja` desde `V7`, y afirmarlo aqui seria afirmar lo que ya no se puede leer.
+            assertThat(formalizacionDe(convenio).reciboId())
+                    .as("el convenio guarda el recibo de OTRO sistema, sin clave foranea (V7)")
+                    .isEqualTo(reciboId);
+            assertThat(formalizacionDe(convenio).importe())
+                    .as("y lo acogido es lo que el cronograma congelo, no lo que mando el cliente")
+                    .isEqualTo(PREDIAL.mas(ARBITRIOS));
             assertThat(estadoDe(convenio)).isEqualTo(EstadoDeConvenio.VIGENTE);
             assertThat(faseDe(titular, "PREDIAL"))
                     .as("la deuda ordinaria pasa a fase CONVENIO, con asientos")
@@ -325,7 +338,7 @@ class ConvenioJdbcTest {
             assertThat(constancia(codigo).seNiega()).isTrue();
 
             Convenio convenio = registrarPreconvenio(titular, 6, "20");
-            cobrarLaInicial(titular, convenio);
+            formalizarLaInicial(convenio);
 
             ConstanciaDeNoAdeudo tras = constancia(codigo);
             assertThat(tras.seNiega())
@@ -349,7 +362,7 @@ class ConvenioJdbcTest {
             Map<String, Fase> faseAntes = fasePorTributo(titular);
 
             Convenio convenio = registrarPreconvenio(titular, 6, "20");
-            cobrarLaInicial(titular, convenio);
+            formalizarLaInicial(convenio);
             assertThat(faseDe(titular, "ARBITRIO")).isEqualTo(Fase.CONVENIO);
 
             quebrar(convenio, "DOS CUOTAS CONSECUTIVAS IMPAGAS");
@@ -386,7 +399,7 @@ class ConvenioJdbcTest {
         void elActaCongelaLoDevuelto() {
             long titular = contribuyenteConDeuda("CICLO-5");
             Convenio convenio = registrarPreconvenio(titular, 6, "20");
-            cobrarLaInicial(titular, convenio);
+            formalizarLaInicial(convenio);
 
             CerrarConvenio.Cerrado cerrado = quebrar(convenio, "INCUMPLIMIENTO");
 
@@ -405,7 +418,7 @@ class ConvenioJdbcTest {
         void idaYVueltaSeDistinguen() {
             long titular = contribuyenteConDeuda("CICLO-6");
             Convenio convenio = registrarPreconvenio(titular, 6, "20");
-            cobrarLaInicial(titular, convenio);
+            formalizarLaInicial(convenio);
             quebrar(convenio, "INCUMPLIMIENTO");
 
             assertThat(asientosCon(FormalizarConvenio.documentoDelConvenio(convenio.numero())))
@@ -441,9 +454,9 @@ class ConvenioJdbcTest {
         void laSegundaFormalizacionSeRechaza() {
             long titular = contribuyenteConDeuda("LIM-2");
             Convenio convenio = registrarPreconvenio(titular, 6, "20");
-            cobrarLaInicial(titular, convenio);
+            formalizarLaInicial(convenio);
 
-            assertThatThrownBy(() -> cobrarLaInicial(titular, convenio))
+            assertThatThrownBy(() -> formalizarLaInicial(convenio))
                     .isInstanceOf(FormalizarConvenio.ConvenioNoEsPreconvenio.class);
             assertThat(formalizacionesDe(convenio)).isEqualTo(1);
             assertThat(deudaDe(titular, "PREDIAL"))
@@ -456,7 +469,7 @@ class ConvenioJdbcTest {
         void elSegundoCierreSeRechaza() {
             long titular = contribuyenteConDeuda("LIM-3");
             Convenio convenio = registrarPreconvenio(titular, 6, "20");
-            cobrarLaInicial(titular, convenio);
+            formalizarLaInicial(convenio);
             quebrar(convenio, "INCUMPLIMIENTO");
 
             assertThatThrownBy(() -> quebrar(convenio, "OTRA VEZ"))
@@ -472,8 +485,8 @@ class ConvenioJdbcTest {
         void anularYQuebrarSeExcluyen() {
             long titular = contribuyenteConDeuda("LIM-4");
             Convenio convenio = registrarPreconvenio(titular, 6, "20");
-            Recibo recibo = cobrarLaInicial(titular, convenio);
-            anularElRecibo(recibo);
+            long reciboId = formalizarLaInicial(convenio);
+            anularElRecibo(reciboId);
 
             cerrarCon(convenio, TipoDeMovimientoDeConvenio.ANULACION, "NO DEBIO EXISTIR");
 
@@ -502,7 +515,7 @@ class ConvenioJdbcTest {
                             OrigenContext.fijar(new Origen(quien, null, null));
                             salida.await(10, TimeUnit.SECONDS);
                             try {
-                                cobrarLaInicial(titular, convenio, quien);
+                                formalizarLaInicial(convenio);
                                 return true;
                             } catch (RuntimeException rechazada) {
                                 // Se captura lo ancho a proposito: lo que se mide es
@@ -549,7 +562,7 @@ class ConvenioJdbcTest {
         void noSeAnulaConElReciboVigente() {
             long titular = contribuyenteConDeuda("ANUL-1");
             Convenio convenio = registrarPreconvenio(titular, 6, "20");
-            cobrarLaInicial(titular, convenio);
+            formalizarLaInicial(convenio);
 
             assertThatThrownBy(
                             () ->
@@ -571,8 +584,8 @@ class ConvenioJdbcTest {
         void conElReciboAnuladoProcede() {
             long titular = contribuyenteConDeuda("ANUL-2");
             Convenio convenio = registrarPreconvenio(titular, 6, "20");
-            Recibo recibo = cobrarLaInicial(titular, convenio);
-            anularElRecibo(recibo);
+            long reciboId = formalizarLaInicial(convenio);
+            anularElRecibo(reciboId);
 
             CerrarConvenio.Cerrado cerrado =
                     cerrarCon(convenio, TipoDeMovimientoDeConvenio.ANULACION, "NO DEBIO EXISTIR");
@@ -589,14 +602,14 @@ class ConvenioJdbcTest {
         void quebrarNoExigeAnularElRecibo() {
             long titular = contribuyenteConDeuda("ANUL-3");
             Convenio convenio = registrarPreconvenio(titular, 6, "20");
-            Recibo recibo = cobrarLaInicial(titular, convenio);
+            long reciboId = formalizarLaInicial(convenio);
 
             quebrar(convenio, "INCUMPLIMIENTO");
 
             assertThat(estadoDe(convenio)).isEqualTo(EstadoDeConvenio.QUEBRADO);
-            assertThat(enTransaccion(() -> movimientosDeRecibo.anulacionDe(recibo.id())))
+            assertThat(anulaciones.estaAnulado(reciboId))
                     .as("el recibo sigue vigente: el convenio existio y se cobro su inicial")
-                    .isEmpty();
+                    .isFalse();
         }
     }
 
@@ -609,7 +622,7 @@ class ConvenioJdbcTest {
         void reformularQuiebraYAbre() {
             long titular = contribuyenteConDeuda("REF-1");
             Convenio original = registrarPreconvenio(titular, 6, "20");
-            cobrarLaInicial(titular, original);
+            formalizarLaInicial(original);
 
             CerrarConvenio.Cerrado cerrado =
                     cerrar.cerrar(
@@ -759,7 +772,7 @@ class ConvenioJdbcTest {
         void noSePuedeEditarElActa() {
             long titular = contribuyenteConDeuda("PRIV-2");
             Convenio convenio = registrarPreconvenio(titular, 6, "20");
-            cobrarLaInicial(titular, convenio);
+            formalizarLaInicial(convenio);
 
             assertThat(
                             sqlStateAlIntentar(
@@ -938,7 +951,7 @@ class ConvenioJdbcTest {
         void elCierreReenviadoDevuelveElActa() {
             long titular = contribuyenteConDeuda("IDEM-7");
             Convenio convenio = registrarPreconvenio(titular, 6, "20");
-            cobrarLaInicial(titular, convenio);
+            formalizarLaInicial(convenio);
 
             CerrarConvenio.Cerrado primero =
                     cerrarCon(
@@ -972,12 +985,12 @@ class ConvenioJdbcTest {
         void laClaveDeOtroCierreSeRechaza() {
             long unTitular = contribuyenteConDeuda("IDEM-8");
             Convenio uno = registrarPreconvenio(unTitular, 6, "20");
-            cobrarLaInicial(unTitular, uno);
+            formalizarLaInicial(uno);
             cerrarCon(uno, TipoDeMovimientoDeConvenio.QUIEBRE, "INCUMPLIMIENTO", "idem-cierre-2");
 
             long otroTitular = contribuyenteConDeuda("IDEM-9");
             Convenio otro = registrarPreconvenio(otroTitular, 6, "20");
-            cobrarLaInicial(otroTitular, otro);
+            formalizarLaInicial(otro);
 
             assertThatThrownBy(
                             () ->
@@ -997,7 +1010,7 @@ class ConvenioJdbcTest {
         void dosActasConLaMismaClaveNoCaben() {
             long unTitular = contribuyenteConDeuda("IDEM-10");
             Convenio uno = registrarPreconvenio(unTitular, 6, "20");
-            cobrarLaInicial(unTitular, uno);
+            formalizarLaInicial(uno);
             cerrarCon(uno, TipoDeMovimientoDeConvenio.QUIEBRE, "INCUMPLIMIENTO", "idem-acta-unica");
 
             // Sobre OTRO convenio, para que lo unico que pueda chocar sea la clave:
@@ -1018,7 +1031,7 @@ class ConvenioJdbcTest {
         void laReformulacionReenviadaNoAbreOtroPreconvenio() {
             long titular = contribuyenteConDeuda("IDEM-12");
             Convenio original = registrarPreconvenio(titular, 6, "20");
-            cobrarLaInicial(titular, original);
+            formalizarLaInicial(original);
 
             CerrarConvenio.Cerrado primera = reformular(titular, original, "idem-reformula");
             CerrarConvenio.Cerrado segunda = reformular(titular, original, "idem-reformula");
@@ -1050,7 +1063,7 @@ class ConvenioJdbcTest {
             Convenio convenio = registrarPreconvenio(titular, 6, "20");
 
             assertThat(unaFila(convenio).estado()).isEqualTo(EstadoDeConvenio.PRECONVENIO);
-            cobrarLaInicial(titular, convenio);
+            formalizarLaInicial(convenio);
             assertThat(unaFila(convenio).estado()).isEqualTo(EstadoDeConvenio.VIGENTE);
             quebrar(convenio, "INCUMPLIMIENTO");
 
@@ -1067,7 +1080,7 @@ class ConvenioJdbcTest {
         void cadaCifraConSuFecha() {
             long titular = contribuyenteConDeuda("CONS-2");
             Convenio convenio = registrarPreconvenio(titular, 6, "20");
-            cobrarLaInicial(titular, convenio);
+            formalizarLaInicial(convenio);
 
             LocalDate mesQueViene = HOY.plusMonths(1);
             ConvenioEnConsulta fila = unaFila(convenio, mesQueViene);
@@ -1096,7 +1109,7 @@ class ConvenioJdbcTest {
                     .as("sin la inicial cobrada, se debe el cronograma entero")
                     .isEqualTo(total);
 
-            cobrarLaInicial(titular, convenio);
+            formalizarLaInicial(convenio);
             assertThat(unaFila(convenio).saldo()).isEqualTo(total.menos(convenio.cuotaInicial()));
         }
 
@@ -1105,7 +1118,7 @@ class ConvenioJdbcTest {
         void laFichaTraeElDetalle() {
             long titular = contribuyenteConDeuda("CONS-4");
             Convenio convenio = registrarPreconvenio(titular, 6, "20");
-            cobrarLaInicial(titular, convenio);
+            formalizarLaInicial(convenio);
             quebrar(convenio, "INCUMPLIMIENTO");
 
             ConsultaDeConvenios.Ficha ficha =
@@ -1126,7 +1139,7 @@ class ConvenioJdbcTest {
         void elFiltroPorEstadoUsaLaMismaDerivacion() {
             long titular = contribuyenteConDeuda("CONS-5");
             Convenio convenio = registrarPreconvenio(titular, 6, "20");
-            cobrarLaInicial(titular, convenio);
+            formalizarLaInicial(convenio);
 
             assertThat(listar(convenio, EstadoDeConvenio.VIGENTE)).hasSize(1);
             assertThat(listar(convenio, EstadoDeConvenio.QUEBRADO)).isEmpty();
@@ -1175,24 +1188,28 @@ class ConvenioJdbcTest {
                 null);
     }
 
-    private static Recibo cobrarLaInicial(long titular, Convenio convenio) {
-        return cobrarLaInicial(titular, convenio, "cajero.prueba");
-    }
-
-    private static Recibo cobrarLaInicial(long titular, Convenio convenio, String cajero) {
-        return cobrarDeuda.cobrar(
-                new CobrarDeuda.Cobranza(
-                        "C-35",
-                        cajero,
-                        titular,
-                        List.of(),
-                        FormaDePago.EFECTIVO,
-                        TipoDePago.PRECONVENIO,
-                        null,
-                        HOY,
-                        null,
-                        convenio.numero().impreso()),
+    /**
+     * Formaliza el convenio con un recibo de `caja`, y devuelve el identificador de ese recibo.
+     *
+     * <p>Hasta P5D esto se hacia cobrando de verdad en ventanilla —`CobrarDeuda`, con su caja, su
+     * turno y su recibo— porque las dos mitades cabian en la misma transaccion. `V7` retiro las
+     * diez tablas del dinero: lo que queda de este lado es la mitad de `rentas`, y el `reciboId`
+     * entra como argumento, que es como lo traera el evento `PagoRegistrado` (ADR-0026 §3).
+     *
+     * <p><b>El identificador no existe en ninguna tabla de esta base, y eso es a proposito</b>: es
+     * un numero de OTRO SISTEMA, y que la formalizacion lo acepte es la comprobacion de que `V7`
+     * retiro de verdad `convenio_movimiento_recibo_fk`. Antes de la migracion esto habria fallado
+     * con una violacion de clave foranea.
+     */
+    private static long formalizarLaInicial(Convenio convenio) {
+        long reciboId = SIGUIENTE_RECIBO.incrementAndGet();
+        formalizar.formalizar(
+                convenio.numero(),
+                reciboId,
+                convenio.cuotaInicial(),
+                HOY,
                 Observacion.de("Cuota inicial del convenio, prueba de #35"));
+        return reciboId;
     }
 
     private static CerrarConvenio.Cerrado quebrar(Convenio convenio, String motivo) {
@@ -1222,46 +1239,16 @@ class ConvenioJdbcTest {
                 Observacion.de("Se cierra el convenio, prueba de #35"));
     }
 
-    private static void anularElRecibo(Recibo recibo) {
-        AnularRecibo anular =
-                envolver(
-                        new AnularRecibo(
-                                recibos,
-                                movimientosDeRecibo,
-                                new TurnoDeCajaRepositoryJdbc(jdbc),
-                                envolver(
-                                        new RegistroDeAbonosCuentaCorriente(
-                                                new AsientoRepositoryJdbc(jdbc),
-                                                new SaldoRepositoryJdbc(jdbc),
-                                                envolver(registrarAsiento),
-                                                new CalculoDeDeuda(new SinAcumulacion()),
-                                                new PoliticaDeRedondeo(2, RoundingMode.HALF_UP))),
-                                new AuditoriaJdbc(jdbc, RELOJ),
-                                RELOJ));
-        // Un recibo de cuota inicial no abona en el libro -su efecto es el acogimiento-,
-        // asi que no hay asientos que reversar y `reversarAbonos` lo dice. Se anula igual:
-        // lo que importa aqui es que quede la fila de anulacion, que es lo que la
-        // anulacion del convenio exige.
-        try {
-            anular.anular(
-                    new AnularRecibo.Anulacion(
-                            recibo.numero(), "ERROR AL COBRAR LA INICIAL", null, null),
-                    Observacion.de("Se anula el recibo de la inicial"));
-        } catch (RegistroDeAbonos.SinAbonosQueReversar sinAbonos) {
-            // El recibo de la inicial no toco el libro: se registra la anulacion a mano,
-            // que es lo que hara #36 cuando el arqueo distinga los dos casos.
-            enTransaccion(
-                    () ->
-                            movimientosDeRecibo.registrar(
-                                    kamayuk.rentas.tesoreria.dominio.MovimientoDeRecibo.anulacion(
-                                            recibo,
-                                            HOY,
-                                            "ERROR AL COBRAR LA INICIAL",
-                                            null,
-                                            null,
-                                            recibo.total(),
-                                            Observacion.de("Se anula el recibo de la inicial"))));
-        }
+    /**
+     * Como si `caja` hubiera registrado la anulacion de ese recibo (P5D).
+     *
+     * <p>Hasta `V7` esto anulaba el recibo de verdad —con su turno, su autorizacion y el intento de
+     * reversar en el libro, que no encontraba abonos porque una cuota inicial no abona—. Ese acto
+     * es hoy de `caja` y se prueba en `caja`; lo que esta prueba necesita, y lo unico que puede
+     * saber, es QUE CONTESTA `caja` cuando se le pregunta.
+     */
+    private static void anularElRecibo(long reciboId) {
+        anulaciones.anular(reciboId);
     }
 
     private static EstadoDeConvenio estadoDe(Convenio convenio) {
@@ -1546,6 +1533,13 @@ class ConvenioJdbcTest {
         return contar("convenio_deuda", "convenio_id", convenioId, null);
     }
 
+    /** La fila de FORMALIZACION del convenio, leida de `convenio_movimiento`. */
+    private static kamayuk.rentas.tesoreria.dominio.MovimientoDeConvenio formalizacionDe(
+            Convenio convenio) {
+        return enTransaccion(() -> movimientos.formalizacionDe(convenio.idGuardado()))
+                .orElseThrow(() -> new AssertionError("El convenio no esta formalizado"));
+    }
+
     private static long formalizacionesDe(Convenio convenio) {
         return contar(
                 "convenio_movimiento",
@@ -1691,26 +1685,6 @@ class ConvenioJdbcTest {
                 muni,
                 sufijo,
                 String.format("%08d", 40_000_000 + orden));
-    }
-
-    private static long crearArea(long muni, String codigo) {
-        return insertarComoOwner(
-                muni,
-                "INSERT INTO area (municipalidad_id, codigo, nombre)"
-                        + " VALUES (?, ?, 'Unidad de Rentas') RETURNING id",
-                muni,
-                codigo);
-    }
-
-    private static long crearCaja(long muni, String codigo, String serie, @Nullable Long area) {
-        return insertarComoOwner(
-                muni,
-                "INSERT INTO caja (municipalidad_id, codigo, nombre, area_id, serie)"
-                        + " VALUES (?, ?, 'Caja de la prueba', ?, ?) RETURNING id",
-                muni,
-                codigo,
-                area,
-                serie);
     }
 
     private static long insertarComoOwner(long muni, String sql, Object... parametros) {

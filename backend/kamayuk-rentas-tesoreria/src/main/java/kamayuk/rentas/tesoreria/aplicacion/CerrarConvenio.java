@@ -10,13 +10,13 @@ import kamayuk.rentas.auditoria.RegistroDeAuditoria;
 import kamayuk.rentas.cuentacorriente.AcogimientoAConvenio;
 import kamayuk.rentas.cuentacorriente.MovimientoAsentado;
 import kamayuk.rentas.dominio.Observacion;
+import kamayuk.rentas.tesoreria.AnulacionesDeRecibo;
 import kamayuk.rentas.tesoreria.aplicacion.RegistrarPreconvenio.Peticion;
 import kamayuk.rentas.tesoreria.dominio.Convenio;
 import kamayuk.rentas.tesoreria.dominio.ConvenioRepository;
 import kamayuk.rentas.tesoreria.dominio.EstadoDeConvenio;
 import kamayuk.rentas.tesoreria.dominio.MovimientoDeConvenio;
 import kamayuk.rentas.tesoreria.dominio.MovimientoDeConvenioRepository;
-import kamayuk.rentas.tesoreria.dominio.MovimientoDeReciboRepository;
 import kamayuk.rentas.tesoreria.dominio.NumeroDeConvenio;
 import kamayuk.rentas.tesoreria.dominio.TipoDeMovimientoDeConvenio;
 import org.jspecify.annotations.Nullable;
@@ -84,7 +84,7 @@ public class CerrarConvenio {
 
     private final ConvenioRepository convenios;
     private final MovimientoDeConvenioRepository movimientos;
-    private final MovimientoDeReciboRepository movimientosDeRecibo;
+    private final AnulacionesDeRecibo anulacionesDeRecibo;
     private final AcogimientoAConvenio acogimiento;
     private final RegistrarPreconvenio preconvenios;
     private final Auditoria auditoria;
@@ -93,14 +93,14 @@ public class CerrarConvenio {
     public CerrarConvenio(
             ConvenioRepository convenios,
             MovimientoDeConvenioRepository movimientos,
-            MovimientoDeReciboRepository movimientosDeRecibo,
+            AnulacionesDeRecibo anulacionesDeRecibo,
             AcogimientoAConvenio acogimiento,
             RegistrarPreconvenio preconvenios,
             Auditoria auditoria,
             Clock reloj) {
         this.convenios = convenios;
         this.movimientos = movimientos;
-        this.movimientosDeRecibo = movimientosDeRecibo;
+        this.anulacionesDeRecibo = anulacionesDeRecibo;
         this.acogimiento = acogimiento;
         this.preconvenios = preconvenios;
         this.auditoria = auditoria;
@@ -265,7 +265,17 @@ public class CerrarConvenio {
      *
      * <p>Se comprueba aqui y no se anula desde aqui a proposito: un recibo solo se anula el mismo
      * dia del pago (#34), lo autoriza quien responde por la caja, y encadenarlo desde este caso de
-     * uso saltaria esa autorizacion.
+     * uso saltaria esa autorizacion. Desde P5D el argumento es todavia mas fuerte: anular un recibo
+     * es un acto de OTRO SISTEMA.
+     *
+     * <p><b>Y desde P5D esto se pregunta, no se lee.</b> Hasta `V7` la comprobacion era un {@code
+     * SELECT} sobre {@code recibo_movimiento}, que estaba en esta base; ahora es {@link
+     * AnulacionesDeRecibo}, un puerto a {@code caja}. Lo que NO cambia es que la respuesta decide:
+     * el puerto no devuelve {@code false} cuando no se puede preguntar —eso significaria «el recibo
+     * sigue vigente» sin haberlo mirado— sino que lanza, y hoy lanza siempre porque {@code caja}
+     * publica sus recibos por el numero impreso y aqui lo que hay es el identificador interno. Ver
+     * {@code AnulacionesDeReciboSinRuta}, que dice exactamente que se rompe mientras eso dure y que
+     * no se rompe.
      */
     private void exigirQueElReciboDeLaInicialEsteAnulado(Convenio convenio, long convenioId) {
         Optional<MovimientoDeConvenio> formalizacion = movimientos.formalizacionDe(convenioId);
@@ -276,7 +286,7 @@ public class CerrarConvenio {
         if (reciboId == null) {
             return;
         }
-        if (movimientosDeRecibo.anulacionDe(reciboId).isEmpty()) {
+        if (!anulacionesDeRecibo.estaAnulado(reciboId)) {
             throw new ReciboDeLaInicialVigente(convenio.numero());
         }
     }

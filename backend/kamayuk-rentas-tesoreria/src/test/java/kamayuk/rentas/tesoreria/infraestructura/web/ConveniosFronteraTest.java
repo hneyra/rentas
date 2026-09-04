@@ -54,6 +54,7 @@ import kamayuk.rentas.tesoreria.aplicacion.CerrarConvenio;
 import kamayuk.rentas.tesoreria.aplicacion.CondicionesParametrizadas;
 import kamayuk.rentas.tesoreria.aplicacion.ConsultaDeConvenios;
 import kamayuk.rentas.tesoreria.aplicacion.RegistrarPreconvenio;
+import kamayuk.rentas.tesoreria.dobles.AnulacionesDeReciboDeMentira;
 import kamayuk.rentas.tesoreria.dobles.ContribuyentesDeMentira;
 import kamayuk.rentas.tesoreria.dominio.Convenio;
 import kamayuk.rentas.tesoreria.dominio.ConvenioEnConsulta;
@@ -62,7 +63,6 @@ import kamayuk.rentas.tesoreria.dominio.CriterioDeConvenios;
 import kamayuk.rentas.tesoreria.dominio.NumeroDeConvenio;
 import kamayuk.rentas.tesoreria.infraestructura.ConvenioRepositoryJdbc;
 import kamayuk.rentas.tesoreria.infraestructura.MovimientoDeConvenioRepositoryJdbc;
-import kamayuk.rentas.tesoreria.infraestructura.MovimientoDeReciboRepositoryJdbc;
 import kamayuk.rentas.web.ConfiguracionDeJson;
 import kamayuk.rentas.web.ManejadorDeErrores;
 import org.jspecify.annotations.Nullable;
@@ -244,7 +244,12 @@ class ConveniosFronteraTest {
                         new CerrarConvenio(
                                 convenios,
                                 movimientos,
-                                new MovimientoDeReciboRepositoryJdbc(jdbc),
+                                // P5D: el recibo vive en `caja` y aqui solo se pregunta por el
+                                // puerto. Esta prueba no anula ningun convenio formalizado —lo
+                                // que mide es el 422 de lo que falta publicar, RLS y la
+                                // auditoria—, asi que un doble vacio contesta lo unico que se le
+                                // pregunta: que ningun recibo esta anulado.
+                                new AnulacionesDeReciboDeMentira(),
                                 acogimiento,
                                 preconvenios,
                                 auditoria,

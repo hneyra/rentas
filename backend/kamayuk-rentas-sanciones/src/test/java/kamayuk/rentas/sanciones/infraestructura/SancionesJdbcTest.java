@@ -25,6 +25,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 import kamayuk.rentas.auditoria.Auditoria;
 import kamayuk.rentas.auditoria.AuditoriaJdbc;
@@ -76,6 +77,7 @@ import kamayuk.rentas.sanciones.aplicacion.RegistrarDescargo;
 import kamayuk.rentas.sanciones.aplicacion.RegistrarInternamiento;
 import kamayuk.rentas.sanciones.aplicacion.RegistrarPapeleta;
 import kamayuk.rentas.sanciones.aplicacion.ResolverConResolucionDeGerencia;
+import kamayuk.rentas.sanciones.dobles.CobrosDeMentira;
 import kamayuk.rentas.sanciones.dominio.ActoDeLaPapeleta;
 import kamayuk.rentas.sanciones.dominio.AcuseDelActo;
 import kamayuk.rentas.sanciones.dominio.CriterioDeInternamiento;
@@ -90,10 +92,6 @@ import kamayuk.rentas.sanciones.dominio.ResolucionDeGerenciaRepository;
 import kamayuk.rentas.sanciones.dominio.SentidoDelFallo;
 import kamayuk.rentas.sanciones.dominio.TipoDeRecurso;
 import kamayuk.rentas.sanciones.dominio.TipoDeResolucionDeGerencia;
-import kamayuk.rentas.tesoreria.CobrosDeTasas;
-import kamayuk.rentas.tesoreria.aplicacion.CobrosDeTasasTesoreria;
-import kamayuk.rentas.tesoreria.infraestructura.MovimientoDeReciboRepositoryJdbc;
-import kamayuk.rentas.tesoreria.infraestructura.ReciboRepositoryJdbc;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -181,10 +179,17 @@ class SancionesJdbcTest {
     private static long municipalidad;
     private static long otraMunicipalidad;
     private static long conjuntoId;
-    private static long areaId;
-    private static long cajaId;
-    private static long turnoId;
-    private static long tasaDeCustodiaId;
+
+    /**
+     * Lo que `caja` contesta cuando se le pregunta por un cobro (P5D).
+     *
+     * <p>Hasta `V7` esto era la caja de verdad: `area`, `caja`, `cierre_caja`, `tasa`, el recibo y
+     * su detalle, sembrados en esta misma base. Las diez tablas se fueron a `caja`, asi que lo que
+     * queda —y lo unico que este sistema podia ver ya— es la respuesta del puerto.
+     */
+    private static CobrosDeMentira cobros;
+
+    private static final AtomicInteger SIGUIENTE_RECIBO = new AtomicInteger(0);
 
     private static JdbcClient jdbc;
     private static TenantTransactionManager gestor;
@@ -196,8 +201,6 @@ class SancionesJdbcTest {
     private static ResolucionDeGerenciaRepositoryJdbc resoluciones;
     private static NotificacionDeResolucionRepositoryJdbc diligencias;
     private static InternamientoRepositoryJdbc internamientos;
-    private static ReciboRepositoryJdbc recibos;
-    private static MovimientoDeReciboRepositoryJdbc movimientosDeRecibo;
 
     private static RegistrarPapeleta registrarPapeleta;
     private static RegistrarDescargo registrarDescargo;
@@ -231,8 +234,6 @@ class SancionesJdbcTest {
         resoluciones = new ResolucionDeGerenciaRepositoryJdbc(jdbc);
         diligencias = new NotificacionDeResolucionRepositoryJdbc(jdbc);
         internamientos = new InternamientoRepositoryJdbc(jdbc);
-        recibos = new ReciboRepositoryJdbc(jdbc);
-        movimientosDeRecibo = new MovimientoDeReciboRepositoryJdbc(jdbc);
 
         Auditoria auditoria = new AuditoriaJdbc(jdbc, RELOJ);
         AsientoRepositoryJdbc asientos = new AsientoRepositoryJdbc(jdbc);
@@ -254,15 +255,12 @@ class SancionesJdbcTest {
                         new ExtincionDeDeudaCuentaCorriente(
                                 asientos, saldos, registrarAsiento, calculo, redondeo));
 
-        // El tercer colaborador entra con #54: el agregado de recaudacion por concepto, que esta
-        // prueba no ejercita —lo hace el resumen anual de licencias— pero que el constructor pide.
-        CobrosDeTasas cobros =
-                envolver(
-                        new CobrosDeTasasTesoreria(
-                                recibos,
-                                movimientosDeRecibo,
-                                new kamayuk.rentas.tesoreria.infraestructura
-                                        .RecaudacionRepositoryJdbc(jdbc)));
+        // P5D: el cobro se pregunta, no se lee. `CobrosDeTasasTesoreria` leia `recibo`,
+        // `recibo_movimiento` y `recibo_detalle`, que `V7` retiro de esta base. Lo que el AC 3
+        // mide sigue siendo lo mismo —que la liberacion dependa de lo que la caja conteste y no
+        // de una casilla que marca quien entrega el vehiculo— porque `LiberarVehiculoInternado`
+        // nunca leyo esas tablas: ARQ-01 §4 no se lo permitia.
+        cobros = new CobrosDeMentira();
 
         EmitirDocumento documentos =
                 envolver(
@@ -326,11 +324,6 @@ class SancionesJdbcTest {
                 envolver(
                         new ConsultaDeActosDeLaPapeleta(
                                 papeletas, resoluciones, diligencias, internamientos, descargos));
-
-        areaId = crearArea();
-        cajaId = crearCaja();
-        turnoId = crearTurno();
-        tasaDeCustodiaId = crearTasa("CUSTODIA", CUSTODIA);
     }
 
     @AfterAll
@@ -823,9 +816,10 @@ class SancionesJdbcTest {
         void conUnReciboDeOtroConceptoTampoco() {
             Papeleta papeleta = papeletaDeTransito("C03");
             internarVehiculo(papeleta, "T2G-403");
-            long otra = crearTasa("DUPLICADO", Dinero.de("12.00"));
-            String recibo =
-                    cobrarTasa(papeleta.obligadoId(), "DUPLICADO", otra, Dinero.de("12.00"));
+            // El concepto no hace falta darlo de alta en ningun catalogo de esta base: `tasa`
+            // se fue con `V7`, y lo que decide es que cobro EL RECIBO, que es lo que la caja
+            // contesta.
+            String recibo = cobrarTasa(papeleta.obligadoId(), "DUPLICADO", Dinero.de("12.00"));
 
             assertThatThrownBy(() -> liberarVehiculo("T2G-403", recibo))
                     .as(
@@ -1328,82 +1322,29 @@ class SancionesJdbcTest {
         return cuantas == null ? 0 : cuantas;
     }
 
-    /** Cobra la custodia con la caja de verdad: recibo y detalle en sus tablas. */
+    /**
+     * Como si la caja hubiera cobrado la custodia, y devuelve el numero del recibo.
+     *
+     * <p>Hasta `V7` esto emitia el recibo de verdad en `recibo` y `recibo_detalle`. Esas tablas se
+     * fueron a `caja`; lo que este sistema puede saber de un cobro es lo que el puerto conteste, y
+     * eso es lo que el doble siembra.
+     */
     private static String cobrarCustodia(long contribuyenteId) {
-        return cobrarTasa(contribuyenteId, "CUSTODIA", tasaDeCustodiaId, CUSTODIA);
+        return cobrarTasa(contribuyenteId, "CUSTODIA", CUSTODIA);
     }
 
-    private static String cobrarTasa(
-            long contribuyenteId, String codigo, long tasaId, Dinero importe) {
-        kamayuk.rentas.tesoreria.dominio.NumeroDeRecibo numero =
-                enTransaccion(
-                        () ->
-                                recibos.siguienteNumero(
-                                        new kamayuk.rentas.tesoreria.dominio.Caja(
-                                                cajaId,
-                                                "C-01",
-                                                "Caja de la prueba",
-                                                "001",
-                                                areaId,
-                                                true)),
-                        "cajero");
-        enTransaccion(
-                () ->
-                        recibos.emitir(
-                                new kamayuk.rentas.tesoreria.dominio.Recibo(
-                                        null,
-                                        numero,
-                                        cajaId,
-                                        turnoId,
-                                        "cajero",
-                                        contribuyenteId,
-                                        ORDINARIA.atStartOfDay(ZoneOffset.UTC).toInstant(),
-                                        kamayuk.rentas.tesoreria.dominio.FormaDePago.EFECTIVO,
-                                        kamayuk.rentas.tesoreria.dominio.TipoDePago.TASA,
-                                        null,
-                                        ORDINARIA,
-                                        PORQUE,
-                                        List.of(
-                                                new kamayuk.rentas.tesoreria.dominio.LineaDeRecibo(
-                                                        codigo,
-                                                        "TASA",
-                                                        null,
-                                                        null,
-                                                        tasaId,
-                                                        null,
-                                                        null,
-                                                        null,
-                                                        1,
-                                                        importe,
-                                                        importe,
-                                                        Dinero.CERO,
-                                                        Dinero.CERO,
-                                                        Dinero.CERO))),
-                                null),
-                "cajero");
-        return numero.impreso();
+    private static String cobrarTasa(long contribuyenteId, String codigo, Dinero importe) {
+        // El contribuyente no entra en la respuesta del puerto —`TasaCobrada` no lo publica— y aun
+        // asi se recibe: es quien pago, y quitarlo del parametro haria que las llamadas dejaran de
+        // decir a quien se le cobro, que es lo que la prueba esta montando.
+        String numero = String.format("001-%07d", SIGUIENTE_RECIBO.incrementAndGet());
+        cobros.con(numero, codigo, importe, ORDINARIA);
+        return numero;
     }
 
+    /** Como si `caja` hubiera registrado la anulacion: un recibo anulado deja de acreditar. */
     private static void anular(String numeroImpreso) {
-        int guion = numeroImpreso.lastIndexOf('-');
-        kamayuk.rentas.tesoreria.dominio.NumeroDeRecibo numero =
-                new kamayuk.rentas.tesoreria.dominio.NumeroDeRecibo(
-                        numeroImpreso.substring(0, guion),
-                        Long.parseLong(numeroImpreso.substring(guion + 1)));
-        kamayuk.rentas.tesoreria.dominio.Recibo recibo =
-                enTransaccion(() -> recibos.porNumero(numero), "cajero").orElseThrow();
-        enTransaccion(
-                () ->
-                        movimientosDeRecibo.registrar(
-                                kamayuk.rentas.tesoreria.dominio.MovimientoDeRecibo.anulacion(
-                                        recibo,
-                                        ORDINARIA,
-                                        "cobro indebido",
-                                        "supervisor",
-                                        "MEMO-01",
-                                        CUSTODIA,
-                                        PORQUE)),
-                "cajero");
+        cobros.anular(numeroImpreso);
     }
 
     // ------------------------------------------------------------------
@@ -1560,48 +1501,6 @@ class SancionesJdbcTest {
                         + codigo
                         + "', 'Infraccion de la prueba', 8.0000, 'D.S. 016-2009-MTC',"
                         + " DATE '2026-01-01') RETURNING id");
-    }
-
-    private static long crearArea() {
-        return insertar(
-                "INSERT INTO area (municipalidad_id, codigo, nombre) VALUES ("
-                        + municipalidad
-                        + ", 'TRA', 'Transito') RETURNING id");
-    }
-
-    private static long crearCaja() {
-        return insertar(
-                "INSERT INTO caja (municipalidad_id, codigo, nombre, area_id, serie) VALUES ("
-                        + municipalidad
-                        + ", 'C-01', 'Caja de la prueba', "
-                        + areaId
-                        + ", '001') RETURNING id");
-    }
-
-    private static long crearTurno() {
-        return insertar(
-                "INSERT INTO cierre_caja (municipalidad_id, caja_id, cajero, fecha,"
-                        + " fecha_apertura, usuario_apertura, observacion) VALUES ("
-                        + municipalidad
-                        + ", "
-                        + cajaId
-                        + ", 'cajero', DATE '2026-04-01', now(), 'cajero',"
-                        + " 'turno de la prueba') RETURNING id");
-    }
-
-    private static long crearTasa(String codigo, Dinero importe) {
-        return insertar(
-                "INSERT INTO tasa (municipalidad_id, codigo, descripcion, area_id,"
-                        + " partida_presupuestal, importe, vigencia_desde, documento_fuente)"
-                        + " VALUES ("
-                        + municipalidad
-                        + ", '"
-                        + codigo
-                        + "', 'Concepto de la prueba', "
-                        + areaId
-                        + ", '1.3.1', "
-                        + importe.valor().toPlainString()
-                        + ", DATE '2026-01-01', 'TUPA de la prueba') RETURNING id");
     }
 
     /** Un documento emitido suelto, para las pruebas que insertan por SQL directo. */

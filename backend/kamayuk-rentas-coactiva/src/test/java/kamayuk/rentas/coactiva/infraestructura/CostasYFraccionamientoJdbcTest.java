@@ -62,14 +62,12 @@ import kamayuk.rentas.contribuyentes.ResumenDeContribuyente;
 import kamayuk.rentas.cuentacorriente.AcogimientoAConvenio;
 import kamayuk.rentas.cuentacorriente.ConsultaDeDeudaPublica;
 import kamayuk.rentas.cuentacorriente.GeneradorDeCargos;
-import kamayuk.rentas.cuentacorriente.RegistroDeAbonos;
 import kamayuk.rentas.cuentacorriente.SeleccionDeObligacion;
 import kamayuk.rentas.cuentacorriente.aplicacion.AcogimientoAConvenioCuentaCorriente;
 import kamayuk.rentas.cuentacorriente.aplicacion.ConsultaDeDeudaCuentaCorriente;
 import kamayuk.rentas.cuentacorriente.aplicacion.ConsultarDeuda;
 import kamayuk.rentas.cuentacorriente.aplicacion.GeneradorDeCargosCuentaCorriente;
 import kamayuk.rentas.cuentacorriente.aplicacion.RegistrarAsiento;
-import kamayuk.rentas.cuentacorriente.aplicacion.RegistroDeAbonosCuentaCorriente;
 import kamayuk.rentas.cuentacorriente.dominio.Asiento;
 import kamayuk.rentas.cuentacorriente.dominio.CalculoDeDeuda;
 import kamayuk.rentas.cuentacorriente.dominio.Concepto;
@@ -101,28 +99,21 @@ import kamayuk.rentas.parametros.infraestructura.ParametrosRepositoryJdbc;
 import kamayuk.rentas.plataforma.tenant.TenantTransactionManager;
 import kamayuk.rentas.rentas.BeneficioRegistrado;
 import kamayuk.rentas.rentas.BeneficiosDelContribuyente;
+import kamayuk.rentas.tesoreria.AnulacionesDeRecibo;
 import kamayuk.rentas.tesoreria.ConvenioCoactivo;
 import kamayuk.rentas.tesoreria.FraccionamientoCoactivo;
-import kamayuk.rentas.tesoreria.aplicacion.AbrirCaja;
 import kamayuk.rentas.tesoreria.aplicacion.CerrarConvenio;
-import kamayuk.rentas.tesoreria.aplicacion.CobrarDeuda;
 import kamayuk.rentas.tesoreria.aplicacion.CondicionesParametrizadas;
 import kamayuk.rentas.tesoreria.aplicacion.FormalizarConvenio;
 import kamayuk.rentas.tesoreria.aplicacion.FraccionamientoCoactivoTesoreria;
 import kamayuk.rentas.tesoreria.aplicacion.RegistrarPreconvenio;
 import kamayuk.rentas.tesoreria.dominio.Convenio;
 import kamayuk.rentas.tesoreria.dominio.EstadoDeConvenio;
-import kamayuk.rentas.tesoreria.dominio.FormaDePago;
 import kamayuk.rentas.tesoreria.dominio.NumeroDeConvenio;
 import kamayuk.rentas.tesoreria.dominio.TipoDeConvenio;
 import kamayuk.rentas.tesoreria.dominio.TipoDeMovimientoDeConvenio;
-import kamayuk.rentas.tesoreria.dominio.TipoDePago;
-import kamayuk.rentas.tesoreria.infraestructura.CajaRepositoryJdbc;
 import kamayuk.rentas.tesoreria.infraestructura.ConvenioRepositoryJdbc;
 import kamayuk.rentas.tesoreria.infraestructura.MovimientoDeConvenioRepositoryJdbc;
-import kamayuk.rentas.tesoreria.infraestructura.MovimientoDeReciboRepositoryJdbc;
-import kamayuk.rentas.tesoreria.infraestructura.ReciboRepositoryJdbc;
-import kamayuk.rentas.tesoreria.infraestructura.TurnoDeCajaRepositoryJdbc;
 import kamayuk.rentas.valores.ValoresEnCoactiva;
 import kamayuk.rentas.valores.aplicacion.ValoresEnCoactivaValores;
 import kamayuk.rentas.valores.dominio.EstadoDeValor;
@@ -249,8 +240,17 @@ class CostasYFraccionamientoJdbcTest {
     private static ConsultaDeCostas consultaDeCostas;
     private static ConsultaDeDeudasCoactivas consultaDeDeudas;
     private static FraccionarEnCoactiva fraccionar;
-    private static CobrarDeuda cobrarDeuda;
+    private static FormalizarConvenio formalizar;
     private static CerrarConvenio cerrar;
+
+    /**
+     * De donde salen los identificadores de recibo, ahora que `recibo` no esta en esta base (P5D).
+     *
+     * <p>Desde `V7` no hay clave foranea que los valide: son numeros de `caja`. Que entren es parte
+     * de lo que se verifica.
+     */
+    private static final java.util.concurrent.atomic.AtomicInteger SIGUIENTE_RECIBO =
+            new java.util.concurrent.atomic.AtomicInteger(4_200);
 
     /** El mismo caso de uso, con un lector de parametros que NO tiene el arancel dentro. */
     private static LiquidarCostas liquidarSinArancel;
@@ -407,40 +407,39 @@ class CostasYFraccionamientoJdbcTest {
                         new ConsultaDeDeudasCoactivas(
                                 consulta, expedientes, actos, puerto, new BeneficiosDeLaPrueba()));
 
-        // La caja, para poder formalizar el convenio: sin cuota inicial cobrada no hay convenio.
-        ReciboRepositoryJdbc recibos = new ReciboRepositoryJdbc(jdbc);
-        MovimientoDeReciboRepositoryJdbc movimientosDeRecibo =
-                new MovimientoDeReciboRepositoryJdbc(jdbc);
-        AbrirCaja abrirCaja =
-                envolver(
-                        new AbrirCaja(
-                                new CajaRepositoryJdbc(jdbc),
-                                new TurnoDeCajaRepositoryJdbc(jdbc),
-                                auditoria,
-                                RELOJ));
-        RegistroDeAbonos abonos =
-                envolver(
-                        new RegistroDeAbonosCuentaCorriente(
-                                asientos, saldos, envolver(registrarAsiento), calculo, redondeo));
-        FormalizarConvenio formalizar =
+        // P5D: la formalizacion se llama directamente. `CobrarDeuda`, `AbrirCaja` y las tablas
+        // de la ventanilla se fueron a `caja` con `V7`; lo que en produccion llamara a esto es el
+        // evento `PagoRegistrado` (ADR-0026 §3) con el `reciboId` que la caja acaba de emitir.
+        // Lo que esta prueba mide no cambia: que la fase de la deuda vaya a CONVENIO al
+        // formalizar y vuelva a COACTIVA —no a ORDINARIA— al quebrar.
+        formalizar =
                 envolver(
                         new FormalizarConvenio(
                                 convenios, movimientosDeConvenio, acogimiento, auditoria, RELOJ));
-        cobrarDeuda =
-                envolver(new CobrarDeuda(abrirCaja, abonos, recibos, formalizar, auditoria, RELOJ));
+        // Este quiebre no pasa por la guarda del recibo —quebrar no exige anularlo, porque ese
+        // dinero SI entro— asi que el puerto no llega a preguntarse nada. Se pasa uno que lanza
+        // si alguien lo pregunta, en vez de uno que conteste que si: contestar que si dejaria
+        // anular un convenio con su inicial cobrada y viva.
+        AnulacionesDeRecibo sinPreguntar =
+                reciboId -> {
+                    throw new AssertionError(
+                            "Esta prueba no anula ningun convenio formalizado: si se pregunta por"
+                                    + " el recibo "
+                                    + reciboId
+                                    + ", el escenario cambio");
+                };
         cerrar =
                 envolver(
                         new CerrarConvenio(
                                 convenios,
                                 movimientosDeConvenio,
-                                movimientosDeRecibo,
+                                sinPreguntar,
                                 acogimiento,
                                 preconvenios,
                                 auditoria,
                                 RELOJ));
 
-        long areaId = crearArea(municipalidad, "A-42");
-        crearCaja(municipalidad, "C-42", "R42", areaId);
+        // Ni `area` ni `caja` se siembran ya: las dos se fueron con `V7`.
     }
 
     @AfterAll
@@ -1047,7 +1046,7 @@ class CostasYFraccionamientoJdbcTest {
                     .isEqualTo(Fase.COACTIVA);
 
             Convenio guardado = porNumero(convenio.numero());
-            cobrarLaInicial(titular, guardado);
+            formalizarLaInicial(guardado);
             assertThat(faseDe(titular, "PREDIAL"))
                     .as("cobrada la inicial, la deuda pasa a fase de convenio")
                     .isEqualTo(Fase.CONVENIO);
@@ -1351,19 +1350,19 @@ class CostasYFraccionamientoJdbcTest {
                 .orElseThrow();
     }
 
-    private static void cobrarLaInicial(long titular, Convenio convenio) {
-        cobrarDeuda.cobrar(
-                new CobrarDeuda.Cobranza(
-                        "C-42",
-                        "cajero.prueba",
-                        titular,
-                        List.of(),
-                        FormaDePago.EFECTIVO,
-                        TipoDePago.PRECONVENIO,
-                        null,
-                        LIQUIDACION,
-                        null,
-                        convenio.numero().impreso()),
+    /**
+     * Formaliza el convenio con un recibo de `caja`.
+     *
+     * <p>Hasta `V7` esto cobraba de verdad en ventanilla. El identificador que entra no existe en
+     * ninguna tabla de esta base, y eso es a proposito: `V7` retiro `convenio_movimiento_recibo_fk`
+     * y que la formalizacion lo acepte es la comprobacion de que la retiro de verdad.
+     */
+    private static void formalizarLaInicial(Convenio convenio) {
+        formalizar.formalizar(
+                convenio.numero(),
+                SIGUIENTE_RECIBO.incrementAndGet(),
+                convenio.cuotaInicial(),
+                LIQUIDACION,
                 Observacion.de("Cuota inicial del convenio coactivo, prueba de #42"));
     }
 
@@ -1831,26 +1830,6 @@ class CostasYFraccionamientoJdbcTest {
                 return id;
             }
         }
-    }
-
-    private static long crearArea(long muni, String codigo) {
-        return insertarComoOwner(
-                muni,
-                "INSERT INTO area (municipalidad_id, codigo, nombre)"
-                        + " VALUES (?, ?, 'Unidad de Ejecucion Coactiva') RETURNING id",
-                muni,
-                codigo);
-    }
-
-    private static long crearCaja(long muni, String codigo, String serie, long area) {
-        return insertarComoOwner(
-                muni,
-                "INSERT INTO caja (municipalidad_id, codigo, nombre, area_id, serie)"
-                        + " VALUES (?, ?, 'Caja de la prueba', ?, ?) RETURNING id",
-                muni,
-                codigo,
-                area,
-                serie);
     }
 
     private static long insertarComoOwner(long muni, String sql, Object... parametros) {

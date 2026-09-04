@@ -89,7 +89,7 @@ import org.springframework.web.bind.annotation.RestController;
  *
  * <p>El censo de «filtros que no filtran» dejo de describir un silencio y pasa a describir un
  * <b>rechazo</b>: desde que {@code GuardiaDeParametros} esta puesto, mandar uno de esos filtros no
- * devuelve el listado entero, contesta 422 nombrandolo. Los 146 que {@link
+ * devuelve el listado entero, contesta 422 nombrandolo. Los 103 que {@link
  * #loQueElBordeRechazaSoloBaja} cuenta son, literalmente, los filtros que el contrato promete y el
  * servidor no acepta. Eso los hace mas urgentes, no menos: la cifra solo baja, y baja de dos
  * maneras —implementando el filtro, o retirandolo del contrato—.
@@ -151,9 +151,9 @@ class ParametrosDeLaConsultaTest {
                     // El numero de la notificacion administrativa previa.
                     Map.entry(
                             "POST /infracciones/administrativas/notificaciones", Set.of("numero")),
-                    // A quien se le cobra en la ventanilla de tasas. La cobranza tributaria de al
-                    // lado no lo declara `in: query` en el contrato, y por eso no esta aqui.
-                    Map.entry("POST /tesoreria/caja/tasas", Set.of("codContribuyente")),
+                    // `POST /tesoreria/caja/tasas` salio con P5D: la ventanilla de tasas es de
+                    // `caja` desde `V7` y este backend ya no la publica. La promesa viaja con la
+                    // operacion, y quien la tiene que sostener ahora es `caja`.
                     // El escrito y la papeleta que impugna.
                     Map.entry("POST /transito/descargos", Set.of("nDeExpediente", "papeleta")),
                     // Quien diligencio y con que resultado: de esto depende que la deuda quede
@@ -250,14 +250,11 @@ class ParametrosDeLaConsultaTest {
                     // que siga sin declararlo: un filtro nuevo ahi tendria que leerlo
                     // alguien.
                     "GET /seguridad/accesos/{codigo}/usuarios",
-                    "GET /seguridad/usuarios/{id}/permisos/configurados",
-                    // #618 — el catalogo de ventanillas. Estrena controlador, y su promesa es la
-                    // mas estrecha que hay: NO declara ningun parametro propio, solo el dialecto
-                    // de la paginacion, y su controlador lee exactamente esos cuatro. Comprometer
-                    // las dos direcciones cuando la operacion nace no cuesta nada, y lo que fija
-                    // es que un filtro nuevo ahi —«activa», «codigo»— tenga que leerlo alguien:
-                    // desde #539 uno declarado y no leido no se ignora, se contesta con 422.
-                    "GET /tesoreria/cajas");
+                    "GET /seguridad/usuarios/{id}/permisos/configurados");
+
+    // `GET /tesoreria/cajas` (#618) estaba aqui y sale con P5D: el catalogo de ventanillas es de
+    // `caja` desde `V7`. Su promesa era la mas estrecha que hay —ningun parametro propio, solo el
+    // dialecto de la paginacion— y sigue siendolo; lo que cambia es quien la sostiene.
 
     /**
      * Cuantas operaciones arrastran hoy cada mitad del desajuste. Medido, no estimado (#544).
@@ -293,36 +290,38 @@ class ParametrosDeLaConsultaTest {
      * es lo que hace que baje tambien la segunda cifra.
      */
     /**
-     * Baja a 60 con #548: {@code POST /tesoreria/caja/tasas} declaraba {@code partida} y {@code
-     * conceptoTupa}, y su controlador solo enlaza {@code codContribuyente}. Los dos acotan el
-     * catalogo del TUPA —la tabla «Conceptos a cobrar» del prototipo—, que esta operacion no
-     * devuelve: es el POST que COBRA los conceptos que llegan en el cuerpo. Se retiraron del
-     * contrato ({@code SUPRIMIDOS} del generador) en vez de leerlos, porque leerlos aqui no podria
-     * cambiar ni una fila de la respuesta.
+     * <b>Las cinco cifras bajan con P5D, y ninguna se resto a mano.</b>
      *
-     * <p><b>Las dos cifras estan MEDIDAS, no contadas</b>, poniendo el techo a 0 y leyendo el «but
-     * was»: 60 y 18 sobre el arbol ya mezclado con #546. Es la leccion que ese issue aprendio por
-     * las malas —su techo se puso contando y quedo en 62 donde la medida era 61, y con esa holgura
-     * de una sola operacion la mutacion que este criterio existe para cazar no mordia—.
+     * <p>`V7` retiro los cinco controladores de la caja y con ellos NUEVE operaciones, varias de
+     * las cuales arrastraban filtros que nadie leia: la operacion se va y su desajuste se va con
+     * ella. Que la cifra baje no es merito de este PR —el desajuste no se arreglo, se mudo a {@code
+     * caja}, y alli hay que volver a medirlo— y aun asi hay que bajarla: un techo con holgura es un
+     * techo que no muerde, que es exactamente lo que #546 aprendio por las malas con un 62 donde la
+     * medida era 61.
+     *
+     * <p>Medidas poniendo cada techo a 0 y leyendo el «but was», una a una porque las aserciones se
+     * cortan en la primera que falla: <b>45</b> operaciones con filtro que nadie lee (eran 57),
+     * <b>13</b> que leen un filtro sin publicar (eran 18), <b>143</b> y <b>26</b> parametros en
+     * cada mitad (eran 205 y 38), y <b>103</b> filtros que el borde rechaza (eran 133).
      */
-    private static final int OPERACIONES_CON_FILTRO_QUE_NADIE_LEE = 57;
+    private static final int OPERACIONES_CON_FILTRO_QUE_NADIE_LEE = 45;
 
-    private static final int OPERACIONES_QUE_LEEN_UN_FILTRO_SIN_PUBLICAR = 18;
+    private static final int OPERACIONES_QUE_LEEN_UN_FILTRO_SIN_PUBLICAR = 13;
 
     /**
      * Y cuantos <b>parametros</b>, que es la cifra que #539 pide medir.
      *
      * <p>Contar operaciones deja pasar la mitad del caso: una operacion que ya arrastra un filtro
      * que nadie lee puede ganar un segundo sin mover el recuento. Medido sobre el arbol de hoy
-     * —despues de #546, que retiro siete parametros y bajo los dos techos de operaciones—: 218
-     * parametros en las 61 operaciones, y 38 en las 18 de la otra mitad. Medido poniendo el techo a
+     * —despues de P5D, que se llevo nueve operaciones de la caja con sus filtros dentro—: 143
+     * parametros en las 45 operaciones, y 26 en las 13 de la otra mitad. Medido poniendo el techo a
      * 0 y leyendo el «but was», nunca contando a mano: es la leccion que #546 aprendio por las
      * malas, con un techo de 62 donde la medida era 61 y una holgura de una operacion en la que la
      * mutacion no mordia.
      */
-    private static final int PARAMETROS_CON_FILTRO_QUE_NADIE_LEE = 205;
+    private static final int PARAMETROS_CON_FILTRO_QUE_NADIE_LEE = 143;
 
-    private static final int PARAMETROS_QUE_SE_LEEN_SIN_PUBLICAR = 38;
+    private static final int PARAMETROS_QUE_SE_LEEN_SIN_PUBLICAR = 26;
 
     /**
      * De esos, cuantos <b>rechaza hoy el borde</b> (#539).
@@ -330,15 +329,16 @@ class ParametrosDeLaConsultaTest {
      * <p>Desde que {@code GuardiaDeParametros} esta puesto, un filtro que el contrato declara y
      * ningun controlador lee ya no se ignora: se contesta 422 nombrandolo. La excepcion son los
      * cuatro nombres de la paginacion, que se admiten siempre; de ahi que esta cifra sea menor que
-     * la de arriba —218 menos los 72 de paginacion—.
+     * la de arriba —143 menos los de paginacion—.
      *
-     * <p>Es la medida de la <b>promesa rota</b>: 146 filtros que el contrato publica y el servidor
-     * rechaza, en 58 operaciones —tres de las 61 solo arrastraban nombres de paginacion, que se
-     * admiten siempre—. Baja de dos maneras y las dos son buenas: implementando el filtro —pasa a
-     * leerse— o retirandolo del contrato en {@code generar-openapi.mjs} (SUPRIMIDOS). Lo que no
-     * puede es subir: un filtro nuevo que nadie lee nace roto.
+     * <p>Es la medida de la <b>promesa rota</b>: 103 filtros que el contrato publica y el servidor
+     * rechaza. Baja con P5D desde 133 <b>sin que nadie los arreglara</b>: las nueve operaciones de
+     * la caja se fueron con sus filtros dentro, y el desajuste que arrastraban hay que volver a
+     * medirlo en {@code caja}. Baja de dos maneras y las dos son buenas: implementando el filtro
+     * —pasa a leerse— o retirandolo del contrato en {@code generar-openapi.mjs} (SUPRIMIDOS). Lo
+     * que no puede es subir: un filtro nuevo que nadie lee nace roto.
      */
-    private static final int PARAMETROS_QUE_EL_BORDE_RECHAZA = 133;
+    private static final int PARAMETROS_QUE_EL_BORDE_RECHAZA = 103;
 
     /** Una ruta del contrato: {@code "/ruta":} con dos espacios de sangria. */
     private static final Pattern RUTA_DEL_CONTRATO = Pattern.compile("  \"(/[^\"]*)\":");
@@ -589,7 +589,7 @@ class ParametrosDeLaConsultaTest {
     }
 
     @Test
-    @DisplayName("y el borde rechaza hoy 146 filtros que el contrato publica: la cifra solo baja")
+    @DisplayName("y el borde rechaza hoy 103 filtros que el contrato publica: la cifra solo baja")
     void loQueElBordeRechazaSoloBaja() throws IOException {
         Map<String, Set<String>> contrato = parametrosDeConsultaDelContrato();
         Map<String, Handler> publicados = handlersPublicados();

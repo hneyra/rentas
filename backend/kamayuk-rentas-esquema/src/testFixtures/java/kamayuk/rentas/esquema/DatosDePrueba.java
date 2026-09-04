@@ -822,164 +822,56 @@ public final class DatosDePrueba {
     // ------------------------------------------------------------------
 
     /**
-     * La serie de la caja sembrada, {@code varchar(5)} y unica por municipalidad (V29).
+     * El recibo de {@code caja} al que apuntan las filas que lo referencian (P5D).
      *
-     * <p>Se deriva del sufijo del tenant en lugar de ser un {@code '001'} fijo: la unicidad es por
-     * municipalidad, asi que un literal serviria igual, pero sembrar dos cajas en un mismo tenant
-     * -que es lo que hara la prueba de la caja- chocaria, y el fallo apareceria como un choque de
-     * clave unica en el fixture en lugar de como lo que es.
+     * <p>Hasta `V7` el fixture <b>emitia un recibo de verdad</b> —con su area, su ventanilla, su
+     * turno, su serie, su detalle, su duplicado, su cierre y la reversion del cierre— porque las
+     * diez tablas estaban en esta base y `licencia_funcionamiento.recibo_id` tenia clave foranea
+     * hacia ellas. `V7` retiro las diez y las cinco claves foraneas: el recibo vive en {@code
+     * caja}.
+     *
+     * <p>Asi que lo que se siembra es un <b>identificador de otro sistema</b>, y que se pueda es
+     * exactamente lo que `V7` cambio. Se elige un numero alto y fijo, no un correlativo: no hay
+     * ninguna secuencia local que lo produzca, y fingir una diria que este sistema los genera.
      */
-    private static String serieDePrueba(String sufijo) {
-        return String.format("%03d", Math.abs(sufijo.hashCode() % 1000));
-    }
+    private static final long RECIBO_DE_CAJA = 9_000_001L;
 
+    /**
+     * El convenio de fraccionamiento, que es lo que de {@code tesoreria} se quedo (ADR-0026 §5).
+     *
+     * <p>Devuelve el identificador del recibo que lo formalizo —{@link #RECIBO_DE_CAJA}— porque las
+     * licencias lo necesitan para su propia siembra: el derecho de tramite se paga con un recibo, y
+     * ese enlace se conserva aunque el motor ya no lo garantice.
+     */
     private static long sembrarTesoreria(
             Connection app, long muni, String sufijo, long titular, long conjuntoId)
             throws SQLException {
-        long areaId =
-                insertar(
-                        app,
-                        "INSERT INTO area (municipalidad_id, codigo, nombre)"
-                                + " VALUES (?, ?, 'Unidad de Rentas') RETURNING id",
-                        muni,
-                        "A-" + sufijo);
-        ejecutar(
-                app,
-                "INSERT INTO tasa (municipalidad_id, codigo, descripcion, area_id,"
-                        + " partida_presupuestal, importe, vigencia_desde, documento_fuente)"
-                        + " VALUES (?, ?, 'Derecho de tramite', ?, '1.3.1.1.1.1', ?, ?,"
-                        + "         'fixture de la prueba')",
-                muni,
-                "T-" + sufijo,
-                areaId,
-                CIEN,
-                VIGENCIA);
-        // La serie es de la caja y es unica en la municipalidad (V29): se deriva del
-        // sufijo del tenant para que sembrar dos municipalidades no la repita dentro
-        // de ninguna de las dos.
-        long cajaId =
-                insertar(
-                        app,
-                        "INSERT INTO caja (municipalidad_id, codigo, nombre, area_id, serie)"
-                                + " VALUES (?, ?, 'Caja C-3', ?, ?) RETURNING id",
-                        muni,
-                        "C-" + sufijo,
-                        areaId,
-                        serieDePrueba(sufijo));
-        // El contador de la serie, que la cobranza incrementa con un UPSERT (V29).
-        ejecutar(
-                app,
-                "INSERT INTO recibo_correlativo (municipalidad_id, serie, ultimo)"
-                        + " VALUES (?, ?, 1)",
-                muni,
-                serieDePrueba(sufijo));
-        long turnoId =
-                insertar(
-                        app,
-                        // V32 le retiro a `cierre_caja` las columnas de cierre que V3 le habia
-                        // puesto —`estado`, los dos totales, el contador y quien cerro—: decian
-                        // ABIERTO para siempre, porque el turno no se actualiza. El cierre y su
-                        // reversion viven ahora en `cierre_turno`, y el estado se deriva de ahi.
-                        "INSERT INTO cierre_caja (municipalidad_id, caja_id, cajero, fecha,"
-                                + " fecha_apertura, usuario_apertura, observacion)"
-                                + " VALUES (?, ?, 'prueba', ?, ?, 'prueba',"
-                                + "         'turno sembrado por el fixture') RETURNING id",
-                        muni,
-                        cajaId,
-                        VIGENCIA,
-                        java.sql.Timestamp.valueOf(VIGENCIA.atStartOfDay()));
-        long reciboId =
-                insertar(
-                        app,
-                        "INSERT INTO recibo (municipalidad_id, serie, numero, caja_id, cajero,"
-                                + " contribuyente_id, forma_pago, total, turno_id, actualizado_a,"
-                                + " usuario_registro, observacion)"
-                                + " VALUES (?, ?, 1, ?, 'prueba', ?, 'EFECTIVO', ?, ?, ?,"
-                                + "         'prueba', 'recibo sembrado por el fixture')"
-                                + " RETURNING id",
-                        muni,
-                        serieDePrueba(sufijo),
-                        cajaId,
-                        titular,
-                        CIEN,
-                        turnoId,
-                        VIGENCIA);
-        ejecutar(
-                app,
-                "INSERT INTO recibo_detalle (municipalidad_id, recibo_id, tributo, concepto,"
-                        + " ejercicio, periodo, monto, insoluto)"
-                        + " VALUES (?, ?, 'PREDIAL', 'INSOLUTO', ?, 1, ?, ?)",
-                muni,
-                reciboId,
-                EJERCICIO,
-                CIEN,
-                CIEN);
+        long reciboId = RECIBO_DE_CAJA;
 
-        // Un duplicado del recibo (V30, #34): lo que le pasa a un recibo se agrega, no se
-        // escribe encima. Se siembra un DUPLICADO y no una ANULACION a proposito: la
-        // anulacion es unica por recibo y el fixture no debe consumirla, porque la prueba
-        // de la caja necesita poder anular ese mismo recibo.
+        // Y una fila del BUZON DE ENTRADA DE PAGOS (P5D, `V8`), que es lo que llega en lugar de
+        // los recibos que se fueron. Se siembra aqui y no aparte porque el pago y el convenio son
+        // las dos mitades de lo que `tesoreria` quedo siendo: lo que la caja publica y lo que este
+        // sistema hace con ello.
+        //
+        // Con `estado = 'EN_TRANSITO'`, que es el estado en el que un pago pasa mas tiempo siendo
+        // interesante: entre los dos COMMIT. Sembrarlo APLICADO dejaria la prueba de aislamiento
+        // sin ninguna fila del estado que la consulta de deuda lee.
         ejecutar(
                 app,
-                "INSERT INTO recibo_movimiento (municipalidad_id, recibo_id, tipo, fecha, caja_id,"
-                        + " turno_id, resumen, usuario_registro, observacion)"
-                        + " VALUES (?, ?, 'DUPLICADO', ?, ?, ?, ?, 'prueba',"
-                        + "         'duplicado sembrado por el fixture')",
+                "INSERT INTO pago_recibido (municipalidad_id, pago_id, tipo, sistema_caja,"
+                        + " recibo_numero, contribuyente_id, fecha_pago, total, cuerpo, estado,"
+                        + " asientos, recibido_en)"
+                        + " VALUES (?, gen_random_uuid(), 'PAGO_REGISTRADO', 'caja', ?, ?, ?, ?,"
+                        + "         CAST(? AS jsonb), 'EN_TRANSITO', 0, now())",
                 muni,
-                reciboId,
+                "001-" + sufijo,
+                titular,
                 VIGENCIA,
-                cajaId,
-                turnoId,
-                "0".repeat(64));
-
-        // El cierre del turno y su reversion (V32, #36). Se siembran los DOS a proposito:
-        // un cierre solo dejaria el turno cerrado, y el fixture describe una caja viva
-        // —CajaJdbcTest y las pruebas del cierre cobran contra ella—. Con la reversion, el
-        // turno vuelve a estar abierto, que es exactamente lo que #36 decidio que significa
-        // reversar un cierre: el arqueo anterior queda intacto y el turno reabre.
-        long cierreId =
-                insertar(
-                        app,
-                        "INSERT INTO cierre_turno (municipalidad_id, turno_id, tipo, secuencia,"
-                                + " fecha, fecha_registro, total_cobrado, total_anulado, neto,"
-                                + " total_declarado, diferencia, recibos_emitidos,"
-                                + " recibos_anulados, usuario_registro, observacion)"
-                                + " VALUES (?, ?, 'CIERRE', 1, ?, ?, ?, 0, ?, ?, 0, 1, 0,"
-                                + "         'prueba', 'cierre sembrado por el fixture')"
-                                + " RETURNING id",
-                        muni,
-                        turnoId,
-                        VIGENCIA,
-                        java.sql.Timestamp.valueOf(VIGENCIA.atStartOfDay()),
-                        CIEN,
-                        CIEN,
-                        CIEN);
-        ejecutar(
-                app,
-                "INSERT INTO cierre_turno_detalle (municipalidad_id, cierre_id, forma_pago,"
-                        + " cobrado, anulado, neto, declarado)"
-                        + " VALUES (?, ?, 'EFECTIVO', ?, 0, ?, ?)",
-                muni,
-                cierreId,
                 CIEN,
-                CIEN,
-                CIEN);
-        ejecutar(
-                app,
-                "INSERT INTO cierre_turno (municipalidad_id, turno_id, tipo, secuencia, fecha,"
-                        + " fecha_registro, revierte_a_id, motivo, usuario_registro, observacion)"
-                        + " VALUES (?, ?, 'REVERSION', 2, ?, ?, ?, 'el fixture deja la caja"
-                        + "  abierta', 'prueba', 'reversion sembrada por el fixture')",
-                muni,
-                turnoId,
-                VIGENCIA,
-                java.sql.Timestamp.valueOf(VIGENCIA.atStartOfDay()),
-                cierreId);
+                "{\"pagoId\":\"sembrado\",\"sufijo\":\"" + sufijo + "\"}");
 
         // Un convenio de fraccionamiento (V31, #35), con su correlativo, su cronograma, la
-        // deuda que acogio y su formalizacion. Su `recibo_inicial_id` ya no existe: el
-        // recibo que cobro la inicial viaja en el movimiento de FORMALIZACION, que es donde
-        // el hecho ocurre.
+        // deuda que acogio y su formalizacion.
         //
         // Se siembra la FORMALIZACION y no un cierre a proposito: el cierre es unico por
         // convenio y ademas es el que devuelve la deuda a su fase, asi que sembrarlo dejaria

@@ -72,19 +72,16 @@ class AreaEnLaMismaFormaEntreModulosTest {
      *
      * <p>Lo destapo esta misma prueba la primera vez que corrio, y es el filo de cualquier regla
      * anclada al nombre: en castellano <b>«area» tambien es una oficina</b>. {@code
-     * FilaDePartida.area} y {@code areaNombre} son el codigo y el nombre del <i>area generadora</i>
-     * de la recaudacion —una unidad organica del municipio—, y {@code
      * CertificadoResource.areaLibreMinima} es un parametro urbanistico transcrito del certificado
-     * de zonificacion, texto libre por ordenanza (#427). Ninguno es un {@code AreaM2} ni puede
-     * serlo.
+     * de zonificacion, texto libre por ordenanza (#427): no es un {@code AreaM2} ni puede serlo.
      *
-     * <p>Los dos de {@code CajaEnListaResource} son <b>la misma oficina</b> que la de {@code
-     * FilaDePartida}, vista desde el otro lado (#618): {@code caja.area_id} apunta al area a la que
-     * se imputa lo que la ventanilla recauda, y el catalogo la publica legible —codigo y nombre— en
-     * vez del numero, que fuera del servidor no lo puede leer nadie. Se conserva la palabra {@code
-     * area} porque es como la nombran la tabla, la pantalla «Recaudacion por area» y el resto del
-     * modulo; inventarle aqui un sinonimo para esquivar esta regla dejaria el mismo concepto con
-     * dos nombres, que es el defecto que #607 cerro con las superficies.
+     * <p><b>Con P5D queda UNA sola, y las otras cuatro se fueron con la caja.</b> {@code
+     * FilaDePartida.area}/{@code areaNombre} eran el codigo y el nombre del <i>area generadora</i>
+     * de la recaudacion —una unidad organica del municipio— y los dos de {@code
+     * CajaEnListaResource} eran esa misma oficina vista desde la ventanilla (#618). `V7` retiro la
+     * tabla {@code area} y los dos recursos con sus controladores: el reparto por area es de {@code
+     * caja} desde P5D, y esta lista lo tiene que decir alli. Que la entrada rancia no se quede es
+     * lo que comprueba {@code elRecorridoAlcanzaAreas}, y por eso salen aqui.
      *
      * <p>Se nombran por componente y no por clase ni por paquete para que anadir uno sea una linea
      * visible en el diff: la salida comoda ante un rojo aqui es apuntar el campo en la lista, y hay
@@ -96,12 +93,7 @@ class AreaEnLaMismaFormaEntreModulosTest {
      * que decidirlo alli con el mismo criterio.
      */
     private static final Set<String> NO_SON_SUPERFICIES =
-            Set.of(
-                    "FilaDePartida.area",
-                    "FilaDePartida.areaNombre",
-                    "CertificadoResource.areaLibreMinima",
-                    "CajaEnListaResource.areaCodigo",
-                    "CajaEnListaResource.areaNombre");
+            Set.of("CertificadoResource.areaLibreMinima");
 
     /** El predio del issue, con la plantilla de 23 posiciones del manual. */
     private static final String CODIGO = "20010500000026010101001";

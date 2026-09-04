@@ -47,12 +47,15 @@ public final class ConfiguracionDelSgtm implements ConfiguracionDeLasVerificacio
                     Map.entry("kamayuk-rentas-fiscalizacion", "rentas"),
                     Map.entry("kamayuk-rentas-sanciones", "rentas"),
                     Map.entry("kamayuk-rentas-cuentacorriente", "rentas"),
-                    // Se PARTE: 84 clases a caja y 33 a rentas (GOB-05 §1.3). El modulo se declara
-                    // `caja` porque es la mayoria, y las 33 del convenio se nombran una a una en
-                    // CLASES_QUE_NO_SIGUEN_A_SU_MODULO. Al reves seria peor: dejaria sin vigilar
-                    // los ocho cruces de caja hacia rentas, que son los que ADR-0026 convierte en
-                    // dos COMMIT.
-                    Map.entry("kamayuk-rentas-tesoreria", "caja"),
+                    // Se PARTIO en P5D, y lo que queda aqui es `rentas`. Hasta entonces se
+                    // declaraba `caja` —era la mayoria: 84 clases contra 33— y las 33 del convenio
+                    // se nombraban una a una en CLASES_QUE_NO_SIGUEN_A_SU_MODULO. `V7` retiro las
+                    // diez tablas del dinero y con ellas las 84 clases; lo que se quedo es el
+                    // convenio de fraccionamiento —deuda reprogramada, ADR-0026 §5— mas el
+                    // adaptador cliente de `caja`, que no tiene una sola consulta.
+                    //
+                    // El reparto se invierte entero, y por eso la lista de excepciones se vacia.
+                    Map.entry("kamayuk-rentas-tesoreria", "rentas"),
                     Map.entry("kamayuk-rentas-valores", "rentas"),
                     Map.entry("kamayuk-rentas-coactiva", "rentas"),
                     Map.entry("kamayuk-rentas-licencias", "rentas"),
@@ -64,17 +67,24 @@ public final class ConfiguracionDelSgtm implements ConfiguracionDeLasVerificacio
                     Map.entry("kamayuk-rentas-aplicacion", SISTEMA_REPLICADO));
 
     /**
-     * Las clases de {@code kamayuk-rentas-tesoreria} que se van a {@code rentas} con el convenio.
+     * Las clases que no siguen al sistema de su modulo. <b>Desde P5D no hay ninguna, y esa es la
+     * noticia.</b>
      *
-     * <p>GOB-05 §1.3 las lista todas; aqui solo hacen falta las que escriben SQL, que son sus dos
-     * repositorios. Sin esta lista, {@code ConvenioRepositoryJdbc} saldria acusado de leer {@code
-     * contribuyente} —y GOB-05 §6.9 ya midio que eso NO es un cruce: el convenio y el padron van
-     * los dos a {@code rentas}—.
+     * <p>Hasta P5D tenia dos entradas —{@code ConvenioRepositoryJdbc} y {@code
+     * MovimientoDeConvenioRepositoryJdbc}—, porque {@code kamayuk-rentas-tesoreria} se declaraba
+     * {@code caja} y sus dos repositorios del convenio se iban a {@code rentas}. La lista existia
+     * para que no salieran acusados de leer {@code contribuyente}, que no es un cruce: el convenio
+     * y el padron van los dos a {@code rentas}.
+     *
+     * <p>`V7` retiro las diez tablas del dinero y el modulo pasa a declararse {@code rentas}
+     * entero, asi que los dos repositorios ya coinciden con su modulo y la excepcion sobra. <b>Se
+     * conserva vacia y no se borra el mecanismo</b>: es el unico sitio donde se puede declarar que
+     * una clase concreta pertenece a otro sistema que su modulo, y esa situacion vuelve cada vez
+     * que un modulo se parte —le paso a {@code tesoreria} y le puede pasar al siguiente—. Una lista
+     * vacia dice «hoy no hay ninguna», que es una afirmacion; no tener el mecanismo diria que el
+     * caso no existe.
      */
-    private static final Map<String, String> CLASES_QUE_NO_SIGUEN_A_SU_MODULO =
-            Map.of(
-                    "ConvenioRepositoryJdbc", "rentas",
-                    "MovimientoDeConvenioRepositoryJdbc", "rentas");
+    private static final Map<String, String> CLASES_QUE_NO_SIGUEN_A_SU_MODULO = Map.of();
 
     private static final Set<String> DE_RENTAS =
             Set.of(
@@ -194,6 +204,20 @@ public final class ConfiguracionDelSgtm implements ConfiguracionDeLasVerificacio
                     "valor_referencial_vehiculo",
                     "valor_unitario_edificacion");
 
+    /**
+     * Las diez tablas de {@code caja}. <b>Se conservan aunque `V7` las quitara de esta base</b>, y
+     * conviene decir por que.
+     *
+     * <p>Este censo no dice «que tablas hay aqui» sino <b>de que sistema es cada tabla</b>: es lo
+     * que {@code NINGUN_SQL_CRUZA_LA_FRONTERA_DE_SISTEMA} consulta para decidir si un {@code
+     * SELECT} cruza. Vaciarlo dejaria que una consulta nueva contra {@code recibo} o {@code caja}
+     * pasara sin ruido —una tabla que nadie repartio no es un cruce, y esa es la salida por omision
+     * del escaner (#437)—, justo el dia en que ya no existe y el fallo seria en produccion.
+     *
+     * <p>Es el mismo criterio con que P5C dejo {@link #DE_CATASTRO} y P5B {@link #DE_NORMATIVA}
+     * despues de que sus tablas se fueran: <b>el reparto es del corte entero, no del esquema de
+     * hoy</b>.
+     */
     private static final Set<String> DE_CAJA =
             Set.of(
                     "area",
