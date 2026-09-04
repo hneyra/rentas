@@ -15,9 +15,10 @@ import org.springframework.stereotype.Component;
 /**
  * La grilla de fichas, pedida a {@code catastro} (P5C).
  *
- * <p>Es <b>uno de los dos puertos que hoy tienen quien los conteste</b>: `catastro` publica {@code
- * GET /catastro/api/v1/catastro/fichas} con los cinco filtros de la pantalla. Los otros siete
- * lanzan {@link ClienteHttpDeCatastro.SinRutaEnCatastro}; ver el javadoc de esa clase.
+ * <p>`catastro` publica {@code GET /catastro/api/v1/catastro/fichas} con los cinco filtros de la
+ * pantalla. Era uno de los dos puertos que tenian quien los contestara cuando P5C hizo la resta;
+ * desde C-5 son ocho, y lo que queda sin conectar son las dos escrituras — ver el javadoc de {@link
+ * ClienteHttpDeCatastro}.
  *
  * <p>La acotacion por predio (#631) viaja como parametro repetido, y desde C-1 {@code catastro} la
  * LEE. <b>Y el corto-circuito de «solo estos» sin ninguno se conserva</b>: no es una optimizacion,

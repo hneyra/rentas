@@ -26,6 +26,15 @@
       },
       "cuerpo" : { }
     },
+    "GET /catastro/fichas/{fichaId}/area" : {
+      "parametros" : [ ],
+      "respuesta" : {
+        "fichaId" : "entero",
+        "existe" : "booleano",
+        "areaTerreno" : "texto"
+      },
+      "cuerpo" : { }
+    },
     "GET /catastro/predios/huellas" : {
       "parametros" : [ "detalle", "sector" ],
       "respuesta" : {
@@ -41,6 +50,28 @@
       },
       "cuerpo" : { }
     },
+    "GET /catastro/predios/{predioId}" : {
+      "parametros" : [ ],
+      "respuesta" : {
+        "predioId" : "entero",
+        "enElPadron" : "booleano"
+      },
+      "cuerpo" : { }
+    },
+    "GET /catastro/predios/{predioId}/caracteristicas" : {
+      "parametros" : [ "fecha" ],
+      "respuesta" : {
+        "predioId" : "entero",
+        "enElPadron" : "booleano",
+        "fichaId" : "entero",
+        "fichaEconomicaId" : "entero",
+        "uso" : "texto",
+        "sectorCodigo" : "texto",
+        "areaTerreno" : "texto",
+        "aLaFecha" : "fecha"
+      },
+      "cuerpo" : { }
+    },
     "GET /catastro/tablas/valores-unitarios" : {
       "parametros" : [ "ejercicio" ],
       "respuesta" : [ {
@@ -50,6 +81,49 @@
         "anioConstruccionHasta" : "entero",
         "valorM2" : "texto"
       } ],
+      "cuerpo" : { }
+    },
+    "GET /catastro/titularidad" : {
+      "parametros" : [ "fecha", "predio" ],
+      "respuesta" : {
+        "aLaFecha" : "fecha",
+        "predios" : [ {
+          "predioId" : "entero",
+          "cuotas" : [ {
+            "contribuyenteId" : "entero",
+            "condicion" : "texto",
+            "porcentaje" : "texto"
+          } ]
+        } ]
+      },
+      "cuerpo" : { }
+    },
+    "GET /catastro/titularidad/cuota" : {
+      "parametros" : [ "contribuyente", "fecha", "predio" ],
+      "respuesta" : {
+        "predioId" : "entero",
+        "contribuyenteId" : "entero",
+        "aLaFecha" : "fecha",
+        "tieneCuota" : "booleano",
+        "titularidadId" : "entero",
+        "porcentaje" : "texto"
+      },
+      "cuerpo" : { }
+    },
+    "GET /catastro/titularidad/predios" : {
+      "parametros" : [ "contribuyente", "fecha" ],
+      "respuesta" : {
+        "contribuyenteId" : "entero",
+        "aLaFecha" : "fecha",
+        "predios" : [ {
+          "predioId" : "entero",
+          "codRefCatastral" : "texto",
+          "tipo" : "texto",
+          "direccion" : "texto",
+          "porcentajeTitularidad" : "texto",
+          "porcentajeRegistradoDelPredio" : "texto"
+        } ]
+      },
       "cuerpo" : { }
     }
   }

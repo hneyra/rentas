@@ -1,108 +1,62 @@
 package kamayuk.rentas.catastro.infraestructura;
 
 import java.time.LocalDate;
-import java.util.Optional;
-import kamayuk.rentas.catastro.CaracteristicasDelPredio;
-import kamayuk.rentas.catastro.CuotaDeTitularidad;
-import kamayuk.rentas.catastro.GestorDeTitularidad;
-import kamayuk.rentas.catastro.LectorDeCaracteristicas;
-import kamayuk.rentas.catastro.LectorDeFichas;
-import kamayuk.rentas.catastro.LectorDeFichasEconomicas;
 import kamayuk.rentas.catastro.TransferenciaDeFiscalizacion;
 import kamayuk.rentas.catastro.VersionTransferida;
 import kamayuk.rentas.dominio.AreaM2;
 import kamayuk.rentas.dominio.Observacion;
-import kamayuk.rentas.dominio.Porcentaje;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 /**
- * Los SIETE puertos de {@code catastro} que todavia no tienen ruta que los conteste (P5C).
+ * Lo que de {@code catastro} <b>todavia no se puede pedir</b>. Hoy queda un metodo (C-5).
  *
- * <h2>Por que existe esta clase, y por que no devuelve vacio</h2>
+ * <h2>Que era esto y en que quedo</h2>
  *
- * <p>`V6` retiro de esta base las quince tablas de {@code catastro}. Los puertos siguen siendo el
- * contrato —no se tocaron, y por eso las veintisiete clases que los consumen no cambiaron— pero las
- * rutas que ADR-0030 fija para esta frontera <b>todavia no las publica `catastro`</b>: sus
- * controladores sirven hoy la grilla de fichas, el listado de predios, el resumen predial y las
- * escrituras de titularidad e inquilinos.
+ * <p>P5C dejo aqui los SIETE puertos que ninguna ruta contestaba, y su javadoc prometia que esta
+ * clase <b>encoge</b>. C-5 publico las cinco lecturas —{@code GET
+ * /catastro/predios/&#123;id&#125;}, {@code &#8230;/caracteristicas}, {@code
+ * /catastro/fichas/&#123;id&#125;/area}, {@code /catastro/titularidad} y sus dos hermanas— y las
+ * conecto en {@link CaracteristicasDelPredioHttp}, {@link TitularesDelPredioHttp}, {@link
+ * PrediosDelContribuyenteHttp} y {@link TitularidadHttp}.
  *
- * <p>La alternativa a esta clase era que cada uno devolviera <b>vacio</b>, y eso es exactamente lo
- * que no se puede hacer: una lista vacia de predios se lee como «este contribuyente no tiene
- * ninguno» y un {@code Optional.empty()} como «este predio no tiene ficha». Las dos son respuestas
- * plausibles y falsas — la determinacion predial saldria con la base a cero y ninguna cifra
- * pareceria mal. Es el criterio de #48 con la licencia que salia con «valor de obra 0,00», y el que
- * el propio {@code LectorDeValoresUnitarios} ya llevaba escrito: «no devuelve vacio y no devuelve
- * ceros».
+ * <p>Queda <b>una escritura</b>, y no por falta de ruta: por falta de transaccion compartida. La
+ * otra, {@code GestorDeTitularidad.transferir}, vive en {@link TitularidadHttp} porque su interfaz
+ * tiene ademas un metodo que si se puede leer; el motivo es el mismo y esta escrito alli.
  *
- * <p><b>Y esto NO es una regresion que introduzca P5C: es la que P5C hace visible.</b> Mientras las
- * tablas seguian aqui, `rentas` era dueno de un catastro que ya vivia en otro repositorio, y la
- * frontera era mentira. Lo que falta esta declarado en el entregable de la etapa.
+ * <h2>Por que {@code inscribirLoHallado} no se conecta</h2>
  *
- * <p>Son tres clases y no una porque los tres puertos declaran {@code de(long, LocalDate)} y en
- * Java eso es la misma firma borrada. La division no es de diseno: la impone el lenguaje, y la
- * conviene decir para que nadie las junte «por orden».
+ * <p>Su unico llamador es {@code TransferirARentas.transferir}, y dentro de <b>una</b>
+ * {@code @Transactional} hace cuatro cosas en este orden: <b>(1)</b> inscribe lo hallado en el
+ * padron — esto—, <b>(2)</b> compone y emite la resolucion de determinacion con la version que
+ * acaba de quedar inscrita, <b>(3)</b> asienta los cargos de la diferencia y <b>(4)</b> registra la
+ * fila que ata las dos versiones con el documento y la liquidacion.
  *
- * <p>El dia que `catastro` publique cada ruta, lo que se hace es mover ese metodo a un adaptador
- * como {@link FichasDelPadronHttp} y quitarlo de aqui. <b>Esta clase encoge</b>; es la lista de
- * trabajo pendiente de esta frontera, escrita donde se ejecuta.
+ * <p>El comentario de ese paso 1 dice por que va primero: «para que el papel imprima lo que quedo
+ * inscrito de verdad y no lo que se esperaba inscribir». Servido por HTTP, {@code catastro}
+ * confirmaria su version por su cuenta y los pasos 2 a 4 ocurririan despues, en otra base: un fallo
+ * en cualquiera de ellos deja <b>el padron cambiado sin resolucion que lo justifique y sin cargo
+ * que cobrar</b>. Eso no es una hipotesis — es la mutacion que #52 midio, con «12 fichas donde debe
+ * haber 11».
+ *
+ * <p>Y hay un segundo motivo, mas silencioso: la implementacion de {@code catastro} declara {@code
+ * Propagation.MANDATORY} precisamente para que esto no se pueda escribir suelto. Llamada desde un
+ * controlador de {@code catastro}, esa guarda <b>se cumpliria</b> —hay una transaccion, la del
+ * borde— mientras el invariante que protege ya no existiria: una regla que no puede fallar donde
+ * antes mordia.
+ *
+ * <p>Lo que lo desbloquea: que la escritura remota sea la ultima y reversible por compensacion —lo
+ * que obliga a decidir que imprime el papel, porque hoy imprime lo que catastro devuelve—, o el
+ * buzon de eventos de ADR-0027, que P5C dejo declarado como hueco 3.
+ *
+ * <h2>Y sigue lanzando, no devolviendo vacio</h2>
+ *
+ * <p>Eso no cambia y no puede cambiar: {@code VersionTransferida} no tiene forma vacia —su
+ * constructor compacto rechaza una version que no cierre una y abra otra—, y aunque la tuviera,
+ * inventarla dejaria la resolucion diciendo que no cambio nada.
  */
 @Component
-public class SinRutaTodavia
-        implements LectorDeFichas,
-                LectorDeFichasEconomicas,
-                LectorDeCaracteristicas,
-                GestorDeTitularidad,
-                TransferenciaDeFiscalizacion {
-
-    @Override
-    public Optional<Long> fichaVigenteEn(long predioId, LocalDate fecha) {
-        throw falta(
-                "la ficha vigente del predio " + predioId,
-                "GET catastro/api/v1/predios/{id}/caracteristicas");
-    }
-
-    @Override
-    public Optional<AreaM2> areaDeLaVersion(long fichaId) {
-        throw falta(
-                "el area de la version de ficha " + fichaId,
-                "GET catastro/api/v1/predios/{id}/caracteristicas");
-    }
-
-    @Override
-    public Optional<Long> fichaEconomicaVigenteEn(long predioId, LocalDate fecha) {
-        throw falta(
-                "la ficha economica vigente del predio " + predioId,
-                "GET catastro/api/v1/predios/{id}/caracteristicas");
-    }
-
-    @Override
-    public Optional<CaracteristicasDelPredio> de(long predioId, LocalDate fecha) {
-        throw falta(
-                "las caracteristicas del predio " + predioId,
-                "GET catastro/api/v1/predios/{id}/caracteristicas");
-    }
-
-    @Override
-    public Optional<CuotaDeTitularidad> vigenteDe(
-            long predioId, long contribuyenteId, LocalDate fecha) {
-        throw falta(
-                "la cuota de titularidad del predio " + predioId,
-                "GET catastro/api/v1/predios/{id}/titulares");
-    }
-
-    @Override
-    public CuotaDeTitularidad transferir(
-            long titularidadAnteriorId,
-            long adquirienteId,
-            Porcentaje porcentajeTransferido,
-            LocalDate fecha,
-            String documentoOrigen,
-            Observacion observacion) {
-        throw falta(
-                "transferir la titularidad " + titularidadAnteriorId,
-                "POST catastro/api/v1/predios/{id}/titularidad");
-    }
+public class SinRutaTodavia implements TransferenciaDeFiscalizacion {
 
     @Override
     public VersionTransferida inscribirLoHallado(
@@ -112,13 +66,9 @@ public class SinRutaTodavia
             @Nullable AreaM2 areaHallada,
             @Nullable String usoHallado,
             Observacion observacion) {
-        throw falta(
-                "inscribir lo hallado en el predio " + predioId,
-                "POST catastro/api/v1/predios/{id}/transferencia-fiscal");
-    }
 
-    private static ClienteHttpDeCatastro.SinRutaEnCatastro falta(
-            String que, String operacionQueLoServiria) {
-        return new ClienteHttpDeCatastro.SinRutaEnCatastro(que, operacionQueLoServiria);
+        throw new ClienteHttpDeCatastro.EscrituraSinTransaccionCompartida(
+                "inscribir lo hallado en el predio " + predioId,
+                "la resolucion de determinacion, sus cargos y la fila que los ata");
     }
 }

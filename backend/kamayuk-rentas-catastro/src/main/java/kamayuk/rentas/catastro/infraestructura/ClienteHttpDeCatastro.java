@@ -35,33 +35,32 @@ import org.springframework.web.context.request.ServletRequestAttributes;
  * <p>Es exactamente lo que P5B hizo con {@code kamayuk-rentas-parametros}: el modulo se queda como
  * <b>adaptador cliente</b>, con sus puertos y su transporte, sin dominio y sin una sola consulta.
  *
- * <h2>SIETE DE LOS NUEVE PUERTOS NO TIENEN HOY QUIEN LOS CONTESTE, Y HAY QUE DECIRLO</h2>
+ * <h2>Que de `catastro` se puede pedir hoy, y que no (C-5)</h2>
  *
- * <p>Las rutas que ADR-0030 fija para esta frontera —{@code GET /predios/&#123;id&#125;/titulares},
- * {@code GET /predios/&#123;id&#125;/caracteristicas}, {@code POST
- * /predios/&#123;id&#125;/titularidad}, {@code POST /predios/&#123;id&#125;/transferencia-fiscal},
- * las de valuacion— <b>todavia no las publica `catastro`</b>. Sus controladores sirven hoy la
- * grilla de fichas, el listado de predios, el resumen predial y las escrituras de titularidad e
- * inquilinos, y nada mas.
+ * <p>P5C dejo <b>siete de los nueve puertos sin ninguna ruta que los contestara</b>, y lo llamo lo
+ * mas caro que dejaba aquella etapa. C-5 publico las cinco lecturas que faltaban —{@code GET
+ * /catastro/predios/&#123;id&#125;}, {@code &#8230;/caracteristicas}, {@code
+ * /catastro/fichas/&#123;id&#125;/area}, {@code /catastro/titularidad} y sus dos hermanas— y las
+ * conecto. Con las tres que ya salian —la grilla de fichas, el cuadro de valores unitarios y las
+ * huellas del padron—, este cliente pide hoy <b>nueve operaciones</b>.
  *
- * <p>Asi que este cliente hace dos cosas distintas segun el puerto:
+ * <p>Lo que queda son las <b>dos escrituras</b>, y ya no lanzan {@link SinRutaEnCatastro}: eso
+ * seria mentir, porque publicar la ruta no las arregla. Lanzan {@link
+ * EscrituraSinTransaccionCompartida}, que dice lo que de verdad falta — que la escritura de {@code
+ * catastro} y las que la rodean en este backend confirmen o se deshagan juntas. El motivo entero,
+ * con la medida de #52 que lo respalda, esta en {@link TitularidadHttp} y en {@link
+ * SinRutaTodavia}.
  *
- * <ul>
- *   <li><b>Los dos que SI se pueden pedir</b> —la grilla de fichas y el cuadro de valores
- *       unitarios— salen por HTTP contra la ruta que `catastro` publica de verdad.
- *   <li><b>Los siete restantes lanzan {@link SinRutaEnCatastro}</b>, que nombra la operacion de
- *       ADR-0030 que los serviria. <b>No devuelven vacio</b>, y esa es toda la decision: una lista
- *       vacia se lee como «este contribuyente no tiene predios» y un {@code Optional.empty()} como
- *       «este predio no tiene ficha». Las dos son respuestas plausibles y falsas, y la
- *       determinacion predial saldria con la base a cero sin que ninguna cifra pareciera mal. Es el
- *       mismo criterio con que {@code ValorizacionDelFue} devuelve su motivo en vez de un cero
- *       (#48), y el que {@code LectorDeValoresUnitarios} ya tenia escrito: «no devuelve vacio y no
- *       devuelve ceros».
- * </ul>
+ * <p><b>Y lo que no cambia es que ninguna de las dos devuelve vacio.</b> Una lista vacia se lee
+ * como «este contribuyente no tiene predios» y un {@code Optional.empty()} como «este predio no
+ * tiene ficha»: las dos son respuestas plausibles y falsas, y la determinacion predial saldria con
+ * la base a cero sin que ninguna cifra pareciera mal. Es el mismo criterio con que {@code
+ * ValorizacionDelFue} devuelve su motivo en vez de un cero (#48).
  *
- * <p>Esto NO es una regresion que introduzca P5C: es la que P5C <b>hace visible</b>. Mientras las
- * tablas seguian aqui, `rentas` era dueno de un catastro que ya vivia en otro repositorio y la
- * frontera era mentira. Lo que falta esta declarado en `P5C-extraccion.md` §13.
+ * <p>Lo que si cambia, ahora que las lecturas contestan, es <b>cuando</b> una lista vacia es un
+ * dato: lo es cuando la respuesta viene de quien se pregunto y de la fecha que se pregunto, y las
+ * dos cosas se comprueban antes de leer una fila (ver {@link #exigirQueContesteALaFecha} y el
+ * guardia de {@link PrediosDelContribuyenteHttp}).
  *
  * <h2>El contexto de municipalidad no viaja en ningun parametro</h2>
  *
@@ -118,6 +117,60 @@ public class ClienteHttpDeCatastro {
 
         public CatastroInalcanzable(String que, @Nullable Throwable causa) {
             super("No se pudo " + que + ". El sistema del predio vive en `catastro`", causa);
+        }
+    }
+
+    /**
+     * La operacion existe y no se puede pedir por HTTP <b>sin perder la atomicidad</b> (C-5).
+     *
+     * <p>No es {@link SinRutaEnCatastro} y esa distincion es todo el motivo de que sea otra clase:
+     * publicar la ruta no la arregla. Lo que falta es que la escritura de {@code catastro} y las
+     * que la rodean en {@code rentas} confirmen o se deshagan juntas, y dos bases y dos procesos no
+     * comparten transaccion. Se arregla con un protocolo —reserva y confirmacion, o el buzon de
+     * eventos de ADR-0027, que todavia no existe—, no con un controlador.
+     *
+     * <p>Se lanza en vez de escribir a medias, y eso es deliberado: #52 midio la mutacion contraria
+     * —dejar que la ficha nueva sobreviviera al fallo de un paso posterior— y salieron <b>12 fichas
+     * donde debe haber 11</b>, o sea el padron cambiado sin resolucion que lo justifique y sin
+     * cargo que cobrar.
+     */
+    public static final class EscrituraSinTransaccionCompartida extends RuntimeException {
+        @java.io.Serial private static final long serialVersionUID = 1L;
+
+        public EscrituraSinTransaccionCompartida(String que, String conQuePasoTendriaQueConfirmar) {
+            super(
+                    "No se puede "
+                            + que
+                            + " por HTTP: `catastro` confirmaria su escritura por su cuenta y "
+                            + conQuePasoTendriaQueConfirmar
+                            + " ocurre despues, en otra base y en otra transaccion. Un fallo entre"
+                            + " las dos dejaria el padron cambiado sin el acto que lo justifica"
+                            + " (#52). Lo que falta no es la ruta: es el protocolo que las hace"
+                            + " confirmar juntas (ADR-0027)");
+        }
+    }
+
+    /**
+     * Que la respuesta este resuelta con la fecha que se pidio, y no con otra.
+     *
+     * <p>Las lecturas de esta frontera devuelven {@code aLaFecha}: la fecha con la que {@code
+     * catastro} resolvio, no la que llego en la URL. Compararla aqui es lo unico que caza desde
+     * este lado el defecto que C-1 encontro —el parametro viajaba con otro nombre, se descartaba en
+     * silencio y la respuesta salia con el reloj del servidor—, porque el unico que sabe que fecha
+     * se pidio es quien la pidio.
+     */
+    static void exigirQueContesteALaFecha(JsonNode cuerpo, LocalDate pedida, String que) {
+        String contestada = cuerpo.path("aLaFecha").asText("");
+        if (!pedida.toString().equals(contestada)) {
+            throw new CatastroInalcanzable(
+                    que
+                            + ": se pidio al "
+                            + pedida
+                            + " y la respuesta dice estar resuelta al «"
+                            + contestada
+                            + "». Leerla seria contestar con lo vigente en otra fecha, que es lo"
+                            + " que la regla 9 existe para impedir",
+                    null);
         }
     }
 

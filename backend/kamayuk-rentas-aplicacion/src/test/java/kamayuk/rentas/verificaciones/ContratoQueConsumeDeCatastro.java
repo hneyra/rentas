@@ -12,12 +12,19 @@ import org.junit.jupiter.api.DisplayName;
 /**
  * Lo que {@code rentas} le pide a {@code catastro}, publicado para que su CI lo comprueba.
  *
- * <p>Son las <b>dos</b> operaciones que los adaptadores de {@code kamayuk-rentas-catastro} piden
- * hoy: la grilla de fichas ({@code FichasDelPadronHttp}) y el cuadro de valores unitarios ({@code
- * ValoresUnitariosHttp}). Los otros siete puertos de ADR-0030 lanzan {@code SinRutaEnCatastro}
- * nombrando la operacion que los serviria (P5C hueco 2), asi que no piden nada y no hay nada que
- * exigirle a nadie por ellos: un contrato que declarara operaciones que este backend no llama
- * pondria rojo el CI del proveedor por algo que a nadie le importa todavia.
+ * <p>Son las <b>nueve</b> operaciones que los adaptadores de {@code kamayuk-rentas-catastro} piden
+ * hoy. Tres venian de antes —la grilla de fichas, el cuadro de valores unitarios y las huellas del
+ * padron— y <b>cinco las estreno C-5</b>, que publico las rutas que le faltaban a esta frontera: si
+ * el predio esta, lo que tiene inscrito a una fecha, el area de una version de ficha, de quien son
+ * unos predios y que predios son de alguien.
+ *
+ * <p>Lo que sigue sin declararse son las <b>dos escrituras</b>, y no porque falte la ruta: {@code
+ * GestorDeTitularidad.transferir} y {@code TransferenciaDeFiscalizacion.inscribirLoHallado} ocurren
+ * dentro de una transaccion de {@code rentas} que confirma otras escrituras despues de ellas, y dos
+ * bases no comparten transaccion. Lanzan {@code EscrituraSinTransaccionCompartida}, que dice
+ * exactamente eso; el motivo esta en {@code TitularidadHttp} y en {@code SinRutaTodavia}. Un
+ * contrato que las declarara pondria rojo el CI del proveedor por una ruta que este backend no
+ * llama.
  *
  * <h2>La ida y vuelta, que es lo que hace que esto no sea otra copia a mano</h2>
  *
@@ -80,6 +87,73 @@ public class ContratoQueConsumeDeCatastro extends ContratoQueSePublicaTestBase {
                     Map.entry("anioConstruccionDesde", "entero"),
                     Map.entry("anioConstruccionHasta", "entero"),
                     Map.entry("valorM2", "texto"));
+
+    /** «Esta este predio en el padron», tal como lo lee {@code TitularesDelPredioHttp} (C-5). */
+    public static final Map<String, Object> PREDIO_EN_EL_PADRON =
+            ordenados(Map.entry("predioId", "entero"), Map.entry("enElPadron", "booleano"));
+
+    /**
+     * Lo inscrito de un predio a una fecha, tal como lo lee {@code CaracteristicasDelPredioHttp}
+     * (C-5).
+     */
+    public static final Map<String, Object> CARACTERISTICAS_DEL_PREDIO =
+            ordenados(
+                    Map.entry("predioId", "entero"),
+                    Map.entry("enElPadron", "booleano"),
+                    Map.entry("fichaId", "entero"),
+                    Map.entry("fichaEconomicaId", "entero"),
+                    Map.entry("uso", "texto"),
+                    Map.entry("sectorCodigo", "texto"),
+                    // `AreaM2` viaja como cadena: `ConfiguracionDeJson` la serializa con
+                    // `writeString` (RNF-055), y el adaptador la lee con `asText`.
+                    Map.entry("areaTerreno", "texto"),
+                    // La fecha con la que catastro resolvio, no la que se pidio. El adaptador las
+                    // compara: es lo unico que caza desde este lado el defecto de C-1.
+                    Map.entry("aLaFecha", "fecha"));
+
+    /** El area de UNA version de ficha, tal como la lee {@code CaracteristicasDelPredioHttp}. */
+    public static final Map<String, Object> AREA_DE_LA_VERSION =
+            ordenados(
+                    Map.entry("fichaId", "entero"),
+                    Map.entry("existe", "booleano"),
+                    Map.entry("areaTerreno", "texto"));
+
+    /** La cuota de UN titular, con su identificador, tal como la lee {@code TitularidadHttp}. */
+    public static final Map<String, Object> CUOTA_DEL_TITULAR =
+            ordenados(
+                    Map.entry("predioId", "entero"),
+                    Map.entry("contribuyenteId", "entero"),
+                    Map.entry("aLaFecha", "fecha"),
+                    Map.entry("tieneCuota", "booleano"),
+                    Map.entry("titularidadId", "entero"),
+                    Map.entry("porcentaje", "texto"));
+
+    /**
+     * Una cuota de titularidad vigente, tal como la lee {@code TitularesDelPredioHttp} (C-5).
+     *
+     * <p>Sin {@code titularidadId} a proposito: el listado no lo publica, porque es el
+     * identificador con el que se transfiere una cuota. Quien lo necesita lo pide por {@code
+     * /catastro/titularidad/cuota}, de un titular y un predio cada vez.
+     */
+    public static final Map<String, Object> CUOTA_DE_UN_TITULAR =
+            ordenados(
+                    Map.entry("contribuyenteId", "entero"),
+                    // `Porcentaje` viaja como cadena, igual que `AreaM2`: `ConfiguracionDeJson`
+                    // lo serializa con `writeString` (RNF-055, regla 1).
+                    Map.entry("condicion", "texto"),
+                    Map.entry("porcentaje", "texto"));
+
+    /** Un predio de un contribuyente, tal como lo lee {@code PrediosDelContribuyenteHttp} (C-5). */
+    public static final Map<String, Object> PREDIO_DEL_TITULAR =
+            ordenados(
+                    Map.entry("predioId", "entero"),
+                    Map.entry("codRefCatastral", "texto"),
+                    Map.entry("tipo", "texto"),
+                    Map.entry("direccion", "texto"),
+                    // Los DOS: uno pondera la base (#395) y el otro dice si el saneamiento de la
+                    // titularidad esta completo (#690). No se deriva uno del otro.
+                    Map.entry("porcentajeTitularidad", "texto"),
+                    Map.entry("porcentajeRegistradoDelPredio", "texto"));
 
     /**
      * Publico y no protegido: lo lee {@code PeticionesACatastroTest}, que vive en el paquete del
@@ -146,6 +220,67 @@ public class ContratoQueConsumeDeCatastro extends ContratoQueSePublicaTestBase {
                 "GET /catastro/tablas/valores-unitarios",
                 ContratoDelConsumidor.OperacionEsperada.lectura(
                         Set.of("ejercicio"), List.of(FILA_DE_VALOR_UNITARIO)));
+
+        // ------------------------------------------------------------------
+        // C-5 — las cinco lecturas que P5C dejo sin ruta. Ninguna estaba aqui porque ningun
+        // adaptador las pedia: los puertos lanzaban nombrando la operacion que los serviria.
+
+        // «Esta este predio en el padron». Sin parametros y sin fecha: el predio no tiene
+        // vigencia, y darle una sugeriria que se resuelve. La ausencia viaja como campo y no
+        // como 404, para que el 404 siga queriendo decir «esa ruta no existe».
+        operaciones.put(
+                "GET /catastro/predios/{predioId}",
+                ContratoDelConsumidor.OperacionEsperada.lectura(Set.of(), PREDIO_EN_EL_PADRON));
+
+        // Lo inscrito a una fecha, en UNA peticion: la ficha unica, la economica, el uso, el
+        // sector y el area. Tres rutas habrian sido tres transacciones del otro lado, con una
+        // version nueva cabiendo entre la primera y la tercera (#486).
+        operaciones.put(
+                "GET /catastro/predios/{predioId}/caracteristicas",
+                ContratoDelConsumidor.OperacionEsperada.lectura(
+                        Set.of("fecha"), CARACTERISTICAS_DEL_PREDIO));
+
+        // El area de UNA version de ficha, por su identificador (#49, RF-055). Sin fecha: la
+        // version ya lleva su vigencia dentro, y resolverla es justo lo que no se quiere.
+        operaciones.put(
+                "GET /catastro/fichas/{fichaId}/area",
+                ContratoDelConsumidor.OperacionEsperada.lectura(Set.of(), AREA_DE_LA_VERSION));
+
+        // De quien son estos predios. `predio` se repite: una pagina de veinte omisos cuesta UNA
+        // peticion, que es la forma que el puerto conservo desde P5C.
+        operaciones.put(
+                "GET /catastro/titularidad",
+                ContratoDelConsumidor.OperacionEsperada.lectura(
+                        Set.of("predio", "fecha"),
+                        ordenados(
+                                Map.entry("aLaFecha", "fecha"),
+                                Map.entry(
+                                        "predios",
+                                        List.of(
+                                                ordenados(
+                                                        Map.entry("predioId", "entero"),
+                                                        Map.entry(
+                                                                "cuotas",
+                                                                List.of(CUOTA_DE_UN_TITULAR))))))));
+
+        // La cuota de UN titular, con el identificador con el que se transfiere. «No es titular»
+        // viaja como `tieneCuota:false` y no como 404, por lo mismo que arriba.
+        operaciones.put(
+                "GET /catastro/titularidad/cuota",
+                ContratoDelConsumidor.OperacionEsperada.lectura(
+                        Set.of("predio", "contribuyente", "fecha"), CUOTA_DEL_TITULAR));
+
+        // Los predios de un contribuyente: la lectura de la que sale la base del predial. El
+        // contribuyente y la fecha vuelven en el cuerpo, y el adaptador comprueba los dos antes
+        // de leer una fila (#298).
+        operaciones.put(
+                "GET /catastro/titularidad/predios",
+                ContratoDelConsumidor.OperacionEsperada.lectura(
+                        Set.of("contribuyente", "fecha"),
+                        ordenados(
+                                Map.entry("contribuyenteId", "entero"),
+                                Map.entry("aLaFecha", "fecha"),
+                                Map.entry("predios", List.of(PREDIO_DEL_TITULAR)))));
 
         return new ContratoDelConsumidor("rentas", "catastro", "/catastro/api/v1", operaciones);
     }

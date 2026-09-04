@@ -100,6 +100,89 @@ class PeticionesACatastroTest {
                 .isEqualTo(declaradosPara("GET /catastro/tablas/valores-unitarios"));
     }
 
+    @Test
+    @DisplayName("lo inscrito de un predio: solo `fecha`, y obligatoria (C-5)")
+    void loInscritoMandaLoDeclarado() {
+        CatastroQueNoContesta espia = respuestaDe();
+        new CaracteristicasDelPredioHttp(espia).de(11L, A_LA_FECHA);
+
+        assertThat(mandados(espia))
+                .as(
+                        "sin `fecha` en la URL, catastro resolveria con su reloj y la ficha de"
+                                + " marzo saldria siendo la de hoy (#24, #366, C-1)")
+                .isEqualTo(declaradosPara("GET /catastro/predios/{predioId}/caracteristicas"));
+    }
+
+    @Test
+    @DisplayName("si el predio esta en el padron: ningun parametro, y tampoco fecha")
+    void elPadronNoLlevaParametros() {
+        CatastroQueNoContesta espia = respuestaDe();
+        new TitularesDelPredioHttp(espia).estaEnElPadron(11L);
+
+        assertThat(espia.rutas).containsExactly("/catastro/predios/11");
+        assertThat(mandados(espia)).isEqualTo(declaradosPara("GET /catastro/predios/{predioId}"));
+    }
+
+    @Test
+    @DisplayName("el area de una version: por su identificador, sin fecha")
+    void elAreaDeLaVersionNoLlevaFecha() {
+        CatastroQueNoContesta espia = respuestaDe();
+        new CaracteristicasDelPredioHttp(espia).areaDeLaVersion(7L);
+
+        assertThat(espia.rutas).containsExactly("/catastro/fichas/7/area");
+        assertThat(mandados(espia))
+                .isEqualTo(declaradosPara("GET /catastro/fichas/{fichaId}/area"));
+    }
+
+    @Test
+    @DisplayName("los titulares de varios predios: UNA peticion con `predio` repetido")
+    void losTitularesVanEnUnaPeticion() {
+        CatastroQueNoContesta espia = respuestaDe();
+        new TitularesDelPredioHttp(espia).deVarios(List.of(11L, 12L, 13L), A_LA_FECHA);
+
+        assertThat(espia.rutas)
+                .as(
+                        "la forma del puerto se conservo para esto: una pagina de veinte omisos"
+                                + " cuesta una peticion y no veinte")
+                .hasSize(1);
+        assertThat(espia.rutas.get(0))
+                .contains("predio=11")
+                .contains("predio=12")
+                .contains("predio=13");
+        assertThat(mandados(espia)).isEqualTo(declaradosPara("GET /catastro/titularidad"));
+    }
+
+    @Test
+    @DisplayName("y sin ningun predio no sale ninguna peticion")
+    void sinPrediosNoSeMandaNada() {
+        CatastroQueNoContesta espia = respuestaDe();
+
+        assertThat(new TitularesDelPredioHttp(espia).deVarios(List.of(), A_LA_FECHA)).isEmpty();
+        assertThat(espia.rutas)
+                .as(
+                        "un parametro repetido cero veces llega igual que uno ausente: la peticion"
+                                + " seria indistinguible de «no acotes», y catastro la rechaza")
+                .isEmpty();
+    }
+
+    @Test
+    @DisplayName("la cuota de un titular: predio, contribuyente y fecha")
+    void laCuotaMandaLoDeclarado() {
+        CatastroQueNoContesta espia = respuestaDe();
+        new TitularidadHttp(espia).vigenteDe(11L, 22L, A_LA_FECHA);
+
+        assertThat(mandados(espia)).isEqualTo(declaradosPara("GET /catastro/titularidad/cuota"));
+    }
+
+    @Test
+    @DisplayName("los predios de un contribuyente: contribuyente y fecha")
+    void losPrediosDelTitularMandanLoDeclarado() {
+        CatastroQueNoContesta espia = respuestaDe();
+        new PrediosDelContribuyenteHttp(espia).de(22L, A_LA_FECHA);
+
+        assertThat(mandados(espia)).isEqualTo(declaradosPara("GET /catastro/titularidad/predios"));
+    }
+
     // ------------------------------------------------------------------
 
     /**
@@ -117,11 +200,52 @@ class PeticionesACatastroTest {
                     if (ruta.startsWith("/catastro/tablas/")) {
                         return json.createArrayNode();
                     }
-                    ObjectNode sobre = json.createObjectNode();
-                    sobre.putArray("contenido");
-                    sobre.put("totalElementos", 0);
-                    return sobre;
+                    ObjectNode cuerpo = json.createObjectNode();
+                    // Lo que los adaptadores de C-5 COMPRUEBAN antes de leer una fila: la fecha
+                    // con la que se resolvio y el sujeto por el que se pregunto. Se devuelve lo
+                    // que se pidio, porque aqui se mide la peticion y no la respuesta — de eso se
+                    // ocupa `LecturaDeCatastroTest`.
+                    eco(ruta, "fecha").ifPresent(fecha -> cuerpo.put("aLaFecha", fecha));
+                    eco(ruta, "predio").ifPresent(p -> numero(cuerpo, "predioId", p));
+                    eco(ruta, "contribuyente").ifPresent(c -> numero(cuerpo, "contribuyenteId", c));
+                    cuerpo.put("enElPadron", false);
+                    cuerpo.put("existe", false);
+                    cuerpo.put("tieneCuota", false);
+                    cuerpo.putArray("predios");
+                    cuerpo.putArray("contenido");
+                    cuerpo.put("totalElementos", 0);
+                    return cuerpo;
                 });
+    }
+
+    /**
+     * El eco numerico, cuando el valor lo es.
+     *
+     * <p>La grilla de fichas manda {@code ?contribuyente=PEREZ} —ahi el filtro es el NOMBRE— y las
+     * rutas de C-5 mandan el identificador. Es el mismo nombre de parametro para dos cosas
+     * distintas en dos operaciones distintas, y este doble contesta a las dos.
+     */
+    private static void numero(ObjectNode cuerpo, String campo, String valor) {
+        try {
+            cuerpo.put(campo, Long.parseLong(valor));
+        } catch (NumberFormatException noEsUnIdentificador) {
+            // La grilla de fichas: aqui no se mide su respuesta.
+        }
+    }
+
+    /** El valor que la URL lleva para ese parametro, si lo lleva. */
+    private static java.util.Optional<String> eco(String ruta, String parametro) {
+        int interrogacion = ruta.indexOf('?');
+        if (interrogacion < 0) {
+            return java.util.Optional.empty();
+        }
+        for (String par : ruta.substring(interrogacion + 1).split("&")) {
+            String[] partes = par.split("=", 2);
+            if (partes.length == 2 && partes[0].equals(parametro)) {
+                return java.util.Optional.of(partes[1]);
+            }
+        }
+        return java.util.Optional.empty();
     }
 
     /** Los nombres de parametro de todas las URL que el adaptador construyo. */

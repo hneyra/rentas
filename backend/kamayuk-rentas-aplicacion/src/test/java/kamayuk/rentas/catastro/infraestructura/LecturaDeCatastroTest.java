@@ -11,7 +11,11 @@ import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import kamayuk.rentas.catastro.CaracteristicasDelPredio;
+import kamayuk.rentas.catastro.CuotaDeTitularidad;
 import kamayuk.rentas.catastro.FichaDelPadron;
+import kamayuk.rentas.catastro.PredioDelContribuyente;
+import kamayuk.rentas.catastro.TitularDelPredio;
 import kamayuk.rentas.catastro.ValorUnitarioPublicado;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.verificaciones.ContratoQueConsumeDeCatastro;
@@ -135,5 +139,204 @@ class LecturaDeCatastroTest {
                         "un cuadro vacio se leeria como «este ejercicio no tiene cuadro» y la obra"
                                 + " saldria valorizada en 0,00 (#48)")
                 .isInstanceOf(ClienteHttpDeCatastro.CatastroInalcanzable.class);
+    }
+
+    // ------------------------------------------------------------------
+    // C-5 — las cinco lecturas que P5C dejo sin ruta. La misma ida y vuelta: se fabrica una
+    // respuesta con EXACTAMENTE los campos del contrato y se pasa por el adaptador de produccion.
+
+    private static final LocalDate AL_30_DE_JUNIO = LocalDate.of(2024, 6, 30);
+
+    @Test
+    @DisplayName("lo inscrito de un predio se lee entero de la forma declarada")
+    void loInscritoSeLeeEnteroDeLaFormaDeclarada() {
+        Map<String, Object> fabricada = new LinkedHashMap<>();
+        fabricada.put("predioId", 11);
+        fabricada.put("enElPadron", true);
+        fabricada.put("fichaId", 7);
+        fabricada.put("fichaEconomicaId", 9);
+        fabricada.put("uso", "CASA HABITACION");
+        fabricada.put("sectorCodigo", "S-05");
+        fabricada.put("areaTerreno", "120.00");
+        fabricada.put("aLaFecha", AL_30_DE_JUNIO.toString());
+
+        assertThat(fabricada.keySet())
+                .isEqualTo(ContratoQueConsumeDeCatastro.CARACTERISTICAS_DEL_PREDIO.keySet());
+
+        CaracteristicasDelPredioHttp adaptador = new CaracteristicasDelPredioHttp(doble(fabricada));
+        assertThat(adaptador.fichaVigenteEn(11L, AL_30_DE_JUNIO)).contains(7L);
+        assertThat(adaptador.fichaEconomicaVigenteEn(11L, AL_30_DE_JUNIO)).contains(9L);
+
+        CaracteristicasDelPredio caracteristicas = adaptador.de(11L, AL_30_DE_JUNIO).orElseThrow();
+        assertThat(caracteristicas.uso()).isEqualTo("CASA HABITACION");
+        assertThat(caracteristicas.sectorCodigo()).isEqualTo("S-05");
+        assertThat(caracteristicas.areaTerreno()).isNotNull();
+        assertThat(caracteristicas.areaTerreno().valor()).isEqualByComparingTo("120.00");
+    }
+
+    @Test
+    @DisplayName("y una respuesta resuelta con OTRA fecha falla en voz alta, no devuelve la ficha")
+    void unaRespuestaDeOtraFechaFallaEnVozAlta() {
+        Map<String, Object> deOtroDia = new LinkedHashMap<>();
+        deOtroDia.put("predioId", 11);
+        deOtroDia.put("enElPadron", true);
+        deOtroDia.put("fichaId", 7);
+        deOtroDia.put("fichaEconomicaId", null);
+        deOtroDia.put("uso", "COMERCIO");
+        deOtroDia.put("sectorCodigo", "S-05");
+        deOtroDia.put("areaTerreno", "180.50");
+        // Lo que pasaria si el parametro viajara con otro nombre y catastro resolviera con su
+        // reloj: la respuesta llega con 200 y es de otro dia (C-1, #24, #366).
+        deOtroDia.put("aLaFecha", "2026-08-30");
+
+        assertThatThrownBy(
+                        () ->
+                                new CaracteristicasDelPredioHttp(doble(deOtroDia))
+                                        .fichaVigenteEn(11L, AL_30_DE_JUNIO))
+                .isInstanceOf(ClienteHttpDeCatastro.CatastroInalcanzable.class)
+                .hasMessageContaining("2024-06-30")
+                .hasMessageContaining("2026-08-30");
+    }
+
+    @Test
+    @DisplayName("el area de una version se lee entera de la forma declarada")
+    void elAreaDeLaVersionSeLeeEnteraDeLaFormaDeclarada() {
+        Map<String, Object> fabricada = new LinkedHashMap<>();
+        fabricada.put("fichaId", 7);
+        fabricada.put("existe", true);
+        fabricada.put("areaTerreno", "120.00");
+
+        assertThat(fabricada.keySet())
+                .isEqualTo(ContratoQueConsumeDeCatastro.AREA_DE_LA_VERSION.keySet());
+
+        assertThat(
+                        new CaracteristicasDelPredioHttp(doble(fabricada))
+                                .areaDeLaVersion(7L)
+                                .orElseThrow()
+                                .valor())
+                .isEqualByComparingTo("120.00");
+    }
+
+    @Test
+    @DisplayName("«esta en el padron» se lee del campo, no del codigo de estado")
+    void elPadronSeLeeDelCampo() {
+        Map<String, Object> fabricada = new LinkedHashMap<>();
+        fabricada.put("predioId", 11);
+        fabricada.put("enElPadron", true);
+
+        assertThat(fabricada.keySet())
+                .isEqualTo(ContratoQueConsumeDeCatastro.PREDIO_EN_EL_PADRON.keySet());
+
+        assertThat(new TitularesDelPredioHttp(doble(fabricada)).estaEnElPadron(11L)).isTrue();
+    }
+
+    @Test
+    @DisplayName("las cuotas de un predio se leen enteras de la forma declarada")
+    void lasCuotasSeLeenEnterasDeLaFormaDeclarada() {
+        Map<String, Object> cuota = new LinkedHashMap<>();
+        cuota.put("contribuyenteId", 22);
+        cuota.put("condicion", "COPROPIETARIO");
+        cuota.put("porcentaje", "50.0000");
+
+        assertThat(cuota.keySet())
+                .isEqualTo(ContratoQueConsumeDeCatastro.CUOTA_DE_UN_TITULAR.keySet());
+
+        ObjectMapper json = new ObjectMapper();
+        ObjectNode fila = json.createObjectNode();
+        fila.put("predioId", 11);
+        fila.set("cuotas", json.createArrayNode().add(json.valueToTree(cuota)));
+        ObjectNode cuerpo = json.createObjectNode();
+        cuerpo.put("aLaFecha", AL_30_DE_JUNIO.toString());
+        cuerpo.set("predios", json.createArrayNode().add(fila));
+
+        List<TitularDelPredio> cuotas =
+                new TitularesDelPredioHttp(new CatastroQueNoContesta(ruta -> cuerpo))
+                        .de(11L, AL_30_DE_JUNIO);
+
+        assertThat(cuotas).hasSize(1);
+        assertThat(cuotas.get(0).contribuyenteId()).isEqualTo(22L);
+        assertThat(cuotas.get(0).condicion()).isEqualTo("COPROPIETARIO");
+        assertThat(cuotas.get(0).porcentaje().valor()).isEqualByComparingTo("50.0000");
+    }
+
+    @Test
+    @DisplayName("la cuota de un titular trae el identificador con el que se transfiere")
+    void laCuotaDelTitularSeLeeEnteraDeLaFormaDeclarada() {
+        Map<String, Object> fabricada = new LinkedHashMap<>();
+        fabricada.put("predioId", 11);
+        fabricada.put("contribuyenteId", 22);
+        fabricada.put("aLaFecha", AL_30_DE_JUNIO.toString());
+        fabricada.put("tieneCuota", true);
+        fabricada.put("titularidadId", 33);
+        fabricada.put("porcentaje", "100.0000");
+
+        assertThat(fabricada.keySet())
+                .isEqualTo(ContratoQueConsumeDeCatastro.CUOTA_DEL_TITULAR.keySet());
+
+        CuotaDeTitularidad cuota =
+                new TitularidadHttp(doble(fabricada))
+                        .vigenteDe(11L, 22L, AL_30_DE_JUNIO)
+                        .orElseThrow();
+        assertThat(cuota.titularidadId()).isEqualTo(33L);
+        assertThat(cuota.predioId()).isEqualTo(11L);
+        assertThat(cuota.contribuyenteId()).isEqualTo(22L);
+        assertThat(cuota.porcentaje().valor()).isEqualByComparingTo("100.0000");
+    }
+
+    @Test
+    @DisplayName("los predios de un contribuyente se leen enteros, con los DOS porcentajes")
+    void losPrediosDelTitularSeLeenEnterosDeLaFormaDeclarada() {
+        Map<String, Object> predio = new LinkedHashMap<>();
+        predio.put("predioId", 11);
+        predio.put("codRefCatastral", "200105-01-02-003");
+        predio.put("tipo", "URBANO");
+        predio.put("direccion", "AV. CAYETANO HEREDIA 100");
+        predio.put("porcentajeTitularidad", "50.0000");
+        predio.put("porcentajeRegistradoDelPredio", "100.0000");
+
+        assertThat(predio.keySet())
+                .isEqualTo(ContratoQueConsumeDeCatastro.PREDIO_DEL_TITULAR.keySet());
+
+        ObjectMapper json = new ObjectMapper();
+        ObjectNode cuerpo = json.createObjectNode();
+        cuerpo.put("contribuyenteId", 22);
+        cuerpo.put("aLaFecha", AL_30_DE_JUNIO.toString());
+        cuerpo.set("predios", json.createArrayNode().add(json.valueToTree(predio)));
+
+        List<PredioDelContribuyente> predios =
+                new PrediosDelContribuyenteHttp(new CatastroQueNoContesta(ruta -> cuerpo))
+                        .de(22L, AL_30_DE_JUNIO);
+
+        assertThat(predios).hasSize(1);
+        assertThat(predios.get(0).porcentajeTitularidad().valor()).isEqualByComparingTo("50.0000");
+        assertThat(predios.get(0).porcentajeRegistradoDelPredio().valor())
+                .as("sin el segundo, el aviso de titularidad incompleta deja de existir (#690)")
+                .isEqualByComparingTo("100.0000");
+        assertThat(predios.get(0).titularidadCompleta()).isTrue();
+    }
+
+    @Test
+    @DisplayName("y una respuesta de OTRO contribuyente falla: seria determinar con predios ajenos")
+    void unaRespuestaDeOtroContribuyenteFalla() {
+        ObjectMapper json = new ObjectMapper();
+        ObjectNode deOtro = json.createObjectNode();
+        deOtro.put("contribuyenteId", 999);
+        deOtro.put("aLaFecha", AL_30_DE_JUNIO.toString());
+        deOtro.putArray("predios");
+
+        assertThatThrownBy(
+                        () ->
+                                new PrediosDelContribuyenteHttp(
+                                                new CatastroQueNoContesta(ruta -> deOtro))
+                                        .de(22L, AL_30_DE_JUNIO))
+                .as("el guardia de #298: sin comprobar la fila se determina el predial de otro")
+                .isInstanceOf(ClienteHttpDeCatastro.CatastroInalcanzable.class)
+                .hasMessageContaining("999");
+    }
+
+    /** Un catastro que contesta siempre ese objeto, sea cual sea la ruta. */
+    private static CatastroQueNoContesta doble(Map<String, Object> cuerpo) {
+        JsonNode respuesta = new ObjectMapper().valueToTree(cuerpo);
+        return new CatastroQueNoContesta(ruta -> respuesta);
     }
 }

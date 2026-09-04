@@ -12,9 +12,9 @@ import org.springframework.stereotype.Component;
 /**
  * El cuadro de valores unitarios de edificacion, pedido a {@code catastro} (P5C).
  *
- * <p>El segundo de los dos puertos que hoy tienen quien los conteste: `catastro` publica {@code GET
- * /catastro/api/v1/catastro/tablas/valores-unitarios}. Lo consume la valorizacion del FUE, en
- * {@code licencias}.
+ * <p>`catastro` publica {@code GET /catastro/api/v1/catastro/tablas/valores-unitarios}. Lo consume
+ * la valorizacion del FUE, en {@code licencias}. Era el segundo de los dos puertos que tenian quien
+ * los contestara cuando P5C hizo la resta; C-5 conecto cinco mas.
  *
  * <h2>La respuesta es un ARRAY, no un sobre paginado (C-1, desajuste 6)</h2>
  *
