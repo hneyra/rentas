@@ -200,40 +200,71 @@ class CandadoDeEmisionJdbcTest {
     }
 
     private static void cerrarCorrida(int conteo, String huella) throws SQLException {
-        try (Connection ingestor = base.conexion(BaseDeDatosDePrueba.INGESTOR_CATASTRO);
-                PreparedStatement sentencia =
-                        ingestor.prepareStatement(
-                                "INSERT INTO valuacion_corrida (municipalidad_id, ejercicio,"
-                                        + " corrida_id, conjunto_id, fecha_de_corte,"
-                                        + " reglas_version, conteo, huella, cerrada_en,"
-                                        + " recibida_en)"
-                                        + " VALUES (?, 2026, 9, 77, DATE '2025-12-31', 'v1', ?, ?,"
-                                        + " now(), now())")) {
+        try (Connection ingestor = base.conexion(BaseDeDatosDePrueba.INGESTOR_CATASTRO)) {
             ContextoDeTenant.fijar(ingestor, municipalidad);
-            sentencia.setLong(1, municipalidad);
-            sentencia.setInt(2, conteo);
-            sentencia.setString(3, huella);
-            sentencia.executeUpdate();
+            String evento = anotarElEvento(ingestor, "CORRIDA_CERRADA", null, 9);
+            try (PreparedStatement sentencia =
+                    ingestor.prepareStatement(
+                            "INSERT INTO valuacion_corrida (municipalidad_id, ejercicio,"
+                                    + " corrida_id, conjunto_id, fecha_de_corte,"
+                                    + " reglas_version, conteo, huella, cerrada_en,"
+                                    + " recibida_en, evento_id, secuencia)"
+                                    + " VALUES (?, 2026, 9, 77, DATE '2025-12-31', 'v1', ?, ?,"
+                                    + " now(), now(), CAST(? AS uuid), 9)")) {
+                sentencia.setLong(1, municipalidad);
+                sentencia.setInt(2, conteo);
+                sentencia.setString(3, huella);
+                sentencia.setString(4, evento);
+                sentencia.executeUpdate();
+            }
             ingestor.commit();
         }
+    }
+
+    /**
+     * Anota el evento en el buzon y devuelve su identificador (`V9`).
+     *
+     * <p>Sin esto, la clave foranea de `V9` rechaza la fila proyectada: una procedencia que apunta
+     * a un evento que nunca se aplico no es procedencia.
+     */
+    private static String anotarElEvento(
+            Connection ingestor, String tipo, Long predioId, long secuencia) throws SQLException {
+        String eventoId = java.util.UUID.randomUUID().toString();
+        try (PreparedStatement sentencia =
+                ingestor.prepareStatement(
+                        "INSERT INTO catastro_evento_aplicado (municipalidad_id, evento_id,"
+                                + " secuencia, tipo, predio_id, aplicado_en, huella)"
+                                + " VALUES (?, CAST(? AS uuid), ?, ?, ?, now(), ?)")) {
+            sentencia.setLong(1, municipalidad);
+            sentencia.setString(2, eventoId);
+            sentencia.setLong(3, secuencia);
+            sentencia.setString(4, tipo);
+            sentencia.setObject(5, predioId);
+            sentencia.setString(6, sha256(eventoId));
+            sentencia.executeUpdate();
+        }
+        return eventoId;
     }
 
     private static void aplicarValuaciones(int cuantas) throws SQLException {
         try (Connection ingestor = base.conexion(BaseDeDatosDePrueba.INGESTOR_CATASTRO)) {
             ContextoDeTenant.fijar(ingestor, municipalidad);
             for (int i = 1; i <= cuantas; i++) {
+                String evento = anotarElEvento(ingestor, "VALUACION_SELLADA", (long) i, i);
                 try (PreparedStatement sentencia =
                         ingestor.prepareStatement(
                                 "INSERT INTO valuacion_predio (municipalidad_id, ejercicio,"
                                         + " predio_id, fecha_de_corte, motivo, conjunto_id,"
                                         + " reglas_version, reglas_aplicadas, huella, evento_id,"
-                                        + " recibida_en)"
+                                        + " secuencia, recibida_en)"
                                         + " VALUES (?, 2026, ?, DATE '2025-12-31',"
                                         + " 'El sistema no sabe valorizar todavia (D-02a, D-11)',"
-                                        + " 77, 'v1', '', ?, gen_random_uuid(), now())")) {
+                                        + " 77, 'v1', '', ?, CAST(? AS uuid), ?, now())")) {
                     sentencia.setLong(1, municipalidad);
                     sentencia.setLong(2, i);
                     sentencia.setString(3, huellaDe(i));
+                    sentencia.setString(4, evento);
+                    sentencia.setLong(5, i);
                     sentencia.executeUpdate();
                 }
             }

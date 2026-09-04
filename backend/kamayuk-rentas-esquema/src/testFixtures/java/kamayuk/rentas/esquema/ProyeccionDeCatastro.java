@@ -1,8 +1,12 @@
 package kamayuk.rentas.esquema;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.util.UUID;
 
 /**
  * <b>FIXTURE DE PRUEBA</b>: hace correr al ingestor de la proyeccion de {@code catastro} (P5C).
@@ -81,23 +85,41 @@ public final class ProyeccionDeCatastro {
 
         try (Connection ingestor = base.conexion(BaseDeDatosDePrueba.INGESTOR_CATASTRO)) {
             ContextoDeTenant.fijar(ingestor, municipalidadId);
+            // Un evento del que salen las dos tablas, y su procedencia copiada en cada fila
+            // (`V9`). Es UNO porque esta corrida proyecta el catastro entero de la municipalidad
+            // de una vez: el ingestor de verdad recibira uno por hecho, y entonces esta linea es
+            // la que cambia. Lo que no cambia es que ninguna fila se escriba sin nombrarlo.
+            String evento = UUID.randomUUID().toString();
+            String huella = huellaDe(evento);
+            escribir(
+                    ingestor,
+                    """
+                    INSERT INTO catastro_evento_aplicado (municipalidad_id, evento_id, secuencia,
+                                                          tipo, aplicado_en, huella)
+                    VALUES (?, CAST(? AS uuid), 1, 'CATASTRO_PROYECTADO', now(), ?)
+                    ON CONFLICT (municipalidad_id, evento_id) DO NOTHING
+                    """,
+                    municipalidadId,
+                    new Object[] {evento, huella});
             for (Object[] fila : predios) {
                 escribir(
                         ingestor,
                         """
                         INSERT INTO predio_ref (municipalidad_id, predio_id, codigo_ref_catastral,
                                                 direccion, sector_codigo, estado, secuencia,
-                                                proyectado_en)
-                        VALUES (?, ?, ?, ?, ?, ?, 1, now())
+                                                proyectado_en, evento_id, huella)
+                        VALUES (?, ?, ?, ?, ?, ?, 1, now(), CAST(? AS uuid), ?)
                         ON CONFLICT (municipalidad_id, predio_id) DO UPDATE
                            SET codigo_ref_catastral = EXCLUDED.codigo_ref_catastral,
                                direccion = EXCLUDED.direccion,
                                sector_codigo = EXCLUDED.sector_codigo,
                                estado = EXCLUDED.estado,
-                               proyectado_en = EXCLUDED.proyectado_en
+                               proyectado_en = EXCLUDED.proyectado_en,
+                               evento_id = EXCLUDED.evento_id,
+                               huella = EXCLUDED.huella
                         """,
                         municipalidadId,
-                        fila);
+                        conProcedencia(fila, evento, huella));
             }
             for (Object[] fila : fichas) {
                 escribir(
@@ -105,19 +127,52 @@ public final class ProyeccionDeCatastro {
                         """
                         INSERT INTO ficha_ref (municipalidad_id, ficha_id, predio_id, tipo,
                                                version, vigencia_desde, vigencia_hasta,
-                                               area_terreno, uso, secuencia, proyectado_en)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, now())
+                                               area_terreno, uso, secuencia, proyectado_en,
+                                               evento_id, huella)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, now(), CAST(? AS uuid), ?)
                         ON CONFLICT (municipalidad_id, ficha_id) DO UPDATE
                            SET vigencia_desde = EXCLUDED.vigencia_desde,
                                vigencia_hasta = EXCLUDED.vigencia_hasta,
                                area_terreno = EXCLUDED.area_terreno,
                                uso = EXCLUDED.uso,
-                               proyectado_en = EXCLUDED.proyectado_en
+                               proyectado_en = EXCLUDED.proyectado_en,
+                               evento_id = EXCLUDED.evento_id,
+                               huella = EXCLUDED.huella
                         """,
                         municipalidadId,
-                        fila);
+                        conProcedencia(fila, evento, huella));
             }
             ingestor.commit();
+        }
+    }
+
+    /** La fila leida, mas las dos columnas de procedencia que `V9` exige. */
+    private static Object[] conProcedencia(Object[] fila, String evento, String huella) {
+        Object[] con = java.util.Arrays.copyOf(fila, fila.length + 2);
+        con[fila.length] = evento;
+        con[fila.length + 1] = huella;
+        return con;
+    }
+
+    /**
+     * La huella del cuerpo del evento.
+     *
+     * <p><b>Este fixture no la recibe: la fabrica.</b> En produccion la emite {@code catastro}
+     * sobre el cuerpo que mando, y `V9` dice que aqui no se recalcula. Lo que esta siembra puede
+     * sostener es la FORMA, no que el valor signifique nada.
+     */
+    private static String huellaDe(String semilla) {
+        try {
+            byte[] resumen =
+                    MessageDigest.getInstance("SHA-256")
+                            .digest(semilla.getBytes(StandardCharsets.UTF_8));
+            StringBuilder hex = new StringBuilder(64);
+            for (byte b : resumen) {
+                hex.append(String.format("%02x", b));
+            }
+            return hex.toString();
+        } catch (NoSuchAlgorithmException imposible) {
+            throw new IllegalStateException("SHA-256 es obligatorio en toda JVM", imposible);
         }
     }
 

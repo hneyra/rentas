@@ -1,6 +1,9 @@
 package kamayuk.rentas.esquema;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -10,6 +13,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * Siembra una fila en <b>cada</b> tabla de tenant, para las dos municipalidades de la prueba.
@@ -580,31 +584,32 @@ public final class DatosDePrueba {
 
         try (Connection ingestor = base.conexion(BaseDeDatosDePrueba.INGESTOR_CATASTRO)) {
             ContextoDeTenant.fijar(ingestor, muni);
-            ejecutar(
-                    ingestor,
-                    "INSERT INTO catastro_evento_aplicado (municipalidad_id, evento_id, secuencia,"
-                            + " tipo, predio_id, aplicado_en)"
-                            + " VALUES (?, gen_random_uuid(), 1, 'PREDIO_PROYECTADO', ?, now())",
-                    muni,
-                    predioId);
+            // Un evento por hecho, y su procedencia copiada en cada fila que produce (`V9`).
+            // El uuid se genera AQUI y no con `gen_random_uuid()` en el `INSERT` porque la fila
+            // proyectada tiene que llevar el MISMO: ese es el punto de la clave foranea al buzon.
+            String eventoDelPredio = evento(ingestor, muni, "PREDIO_PROYECTADO", predioId, 1);
             ejecutar(
                     ingestor,
                     "INSERT INTO predio_ref (municipalidad_id, predio_id, codigo_ref_catastral,"
-                            + " direccion, sector_codigo, estado, secuencia, proyectado_en)"
-                            + " VALUES (?, ?, ?, ?, ?, ?, 1, now())",
+                            + " direccion, sector_codigo, estado, secuencia, proyectado_en,"
+                            + " evento_id, huella)"
+                            + " VALUES (?, ?, ?, ?, ?, ?, 1, now(), CAST(? AS uuid), ?)",
                     muni,
                     predioId,
                     predio[0],
                     predio[1],
                     predio[2],
-                    predio[3]);
+                    predio[3],
+                    eventoDelPredio,
+                    huellaDe(eventoDelPredio));
             for (Object[] ficha : fichas) {
                 ejecutar(
                         ingestor,
                         "INSERT INTO ficha_ref (municipalidad_id, ficha_id, predio_id, tipo,"
                                 + " version, vigencia_desde, vigencia_hasta, area_terreno, uso,"
-                                + " secuencia, proyectado_en)"
-                                + " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, now())",
+                                + " secuencia, proyectado_en, evento_id, huella)"
+                                + " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, now(),"
+                                + " CAST(? AS uuid), ?)",
                         muni,
                         ficha[0],
                         predioId,
@@ -613,7 +618,9 @@ public final class DatosDePrueba {
                         ficha[3],
                         ficha[4],
                         ficha[5],
-                        ficha[6]);
+                        ficha[6],
+                        eventoDelPredio,
+                        huellaDe(eventoDelPredio));
             }
             sembrarLaValuacion(ingestor, muni, predioId);
             ingestor.commit();
@@ -635,31 +642,35 @@ public final class DatosDePrueba {
      */
     private static void sembrarLaValuacion(Connection ingestor, long muni, long predioId)
             throws SQLException {
+        String eventoDeLaValuacion = evento(ingestor, muni, "VALUACION_SELLADA", predioId, 2);
         ejecutar(
                 ingestor,
                 "INSERT INTO valuacion_predio (municipalidad_id, ejercicio, predio_id,"
                         + " fecha_de_corte, motivo, conjunto_id, reglas_version,"
-                        + " reglas_aplicadas, huella, evento_id, recibida_en)"
+                        + " reglas_aplicadas, huella, evento_id, secuencia, recibida_en)"
                         + " VALUES (?, 2026, ?, DATE '2025-12-31',"
                         + " 'El sistema no sabe valorizar un predio todavia (D-02a, D-11)',"
                         + " 1, 'v1', '', encode(sha256(convert_to('v-' || ?, 'UTF8')), 'hex'),"
-                        + " gen_random_uuid(), now())",
+                        + " CAST(? AS uuid), 2, now())",
                 muni,
                 predioId,
-                predioId);
+                predioId,
+                eventoDeLaValuacion);
+        String eventoDelCierre = evento(ingestor, muni, "CORRIDA_CERRADA", null, 3);
         ejecutar(
                 ingestor,
                 "INSERT INTO valuacion_corrida (municipalidad_id, ejercicio, corrida_id,"
                         + " conjunto_id, fecha_de_corte, reglas_version, conteo, huella,"
-                        + " cerrada_en, recibida_en)"
+                        + " cerrada_en, recibida_en, evento_id, secuencia)"
                         + " SELECT ?, 2026, 1, 1, DATE '2025-12-31', 'v1', count(*),"
                         + "        encode(sha256(convert_to("
                         + "          coalesce(string_agg(v.huella, ',' ORDER BY v.predio_id), ''),"
                         + "          'UTF8')), 'hex'),"
-                        + "        now(), now()"
+                        + "        now(), now(), CAST(? AS uuid), 3"
                         + "   FROM valuacion_predio v"
                         + "  WHERE v.ejercicio = 2026",
-                muni);
+                muni,
+                eventoDelCierre);
     }
 
     private static long sembrarRentas(
@@ -2017,6 +2028,56 @@ public final class DatosDePrueba {
         try (PreparedStatement sentencia = conexion.prepareStatement(sql)) {
             fijar(sentencia, valores);
             return unicoLong(sentencia);
+        }
+    }
+
+    /**
+     * Anota un evento en el buzon y devuelve su identificador, para que las filas que produzca lo
+     * lleven (`V9`).
+     *
+     * <p>El uuid se genera en Java y no con {@code gen_random_uuid()} dentro del {@code INSERT}
+     * porque hace falta a los dos lados: en la fila del buzon y en la fila proyectada que lo
+     * referencia. Con el uuid del motor no habria forma de escribir la segunda sin volver a leerlo,
+     * y una procedencia que hay que ir a buscar no es la misma que una que se escribe.
+     */
+    private static String evento(
+            Connection ingestor, long muni, String tipo, Long predioId, long secuencia)
+            throws SQLException {
+        String eventoId = UUID.randomUUID().toString();
+        ejecutar(
+                ingestor,
+                "INSERT INTO catastro_evento_aplicado (municipalidad_id, evento_id, secuencia,"
+                        + " tipo, predio_id, aplicado_en, huella)"
+                        + " VALUES (?, CAST(? AS uuid), ?, ?, ?, now(), ?)",
+                muni,
+                eventoId,
+                secuencia,
+                tipo,
+                predioId,
+                huellaDe(eventoId));
+        return eventoId;
+    }
+
+    /**
+     * La huella del cuerpo del evento.
+     *
+     * <p><b>Este fixture no la recibe: la fabrica</b>, y hay que decirlo. En produccion la emite
+     * {@code catastro} sobre el cuerpo que mando, y `V9` dice que no se recalcula aqui. Lo que esta
+     * siembra puede sostener es la FORMA —64 caracteres hexadecimales, no nula— y no que el valor
+     * signifique nada.
+     */
+    private static String huellaDe(String semilla) {
+        try {
+            byte[] resumen =
+                    MessageDigest.getInstance("SHA-256")
+                            .digest(semilla.getBytes(StandardCharsets.UTF_8));
+            StringBuilder hex = new StringBuilder(64);
+            for (byte b : resumen) {
+                hex.append(String.format("%02x", b));
+            }
+            return hex.toString();
+        } catch (NoSuchAlgorithmException imposible) {
+            throw new IllegalStateException("SHA-256 es obligatorio en toda JVM", imposible);
         }
     }
 

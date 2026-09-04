@@ -1601,12 +1601,7 @@ CREATE TABLE predio (
     lote character varying(10),
     ubigeo character(6),
     estado character varying(20) DEFAULT 'ACTIVO'::character varying NOT NULL,
-    fecha_registro timestamp with time zone DEFAULT now() NOT NULL,
-    geometria geography(MultiPolygon,4326),
-    marco_oeste double precision GENERATED ALWAYS AS (st_xmin(((geometria)::geometry)::box3d)) STORED,
-    marco_sur double precision GENERATED ALWAYS AS (st_ymin(((geometria)::geometry)::box3d)) STORED,
-    marco_este double precision GENERATED ALWAYS AS (st_xmax(((geometria)::geometry)::box3d)) STORED,
-    marco_norte double precision GENERATED ALWAYS AS (st_ymax(((geometria)::geometry)::box3d)) STORED
+    fecha_registro timestamp with time zone DEFAULT now() NOT NULL
 );
 
 CREATE TABLE prescripcion (
@@ -2346,7 +2341,6 @@ ALTER TABLE ficha_catastral ADD CONSTRAINT ficha_catastral_tipo_check CHECK (((t
 ALTER TABLE ficha_catastral ADD CONSTRAINT ficha_pk PRIMARY KEY (municipalidad_id, id);
 ALTER TABLE ficha_catastral ADD CONSTRAINT ficha_version_uq UNIQUE (municipalidad_id, predio_id, tipo, version);
 ALTER TABLE ficha_catastral ADD CONSTRAINT ficha_vigencia_ck CHECK (((vigencia_hasta IS NULL) OR (vigencia_hasta >= vigencia_desde)));
-ALTER TABLE ficha_catastral ADD CONSTRAINT ficha_vigencias_no_se_pisan EXCLUDE USING gist (municipalidad_id WITH =, predio_id WITH =, tipo WITH =, daterange(vigencia_desde, COALESCE(vigencia_hasta, 'infinity'::date), '[]'::text) WITH &&) DEFERRABLE INITIALLY DEFERRED;
 ALTER TABLE grupo ADD CONSTRAINT grupo_nombre_uq UNIQUE (municipalidad_id, nombre);
 ALTER TABLE grupo ADD CONSTRAINT grupo_pk PRIMARY KEY (municipalidad_id, id);
 ALTER TABLE grupo ADD CONSTRAINT grupo_vigencia_ck CHECK (((vigencia_hasta IS NULL) OR (vigencia_desde IS NULL) OR (vigencia_hasta >= vigencia_desde)));
@@ -2543,7 +2537,6 @@ ALTER TABLE tierra_rural ADD CONSTRAINT tierra_rural_riego_check CHECK (((riego)
 ALTER TABLE titularidad ADD CONSTRAINT titularidad_condicion_check CHECK (((condicion)::text = ANY ((ARRAY['PROPIETARIO_UNICO'::character varying, 'COPROPIETARIO'::character varying, 'CONYUGE'::character varying, 'POSEEDOR'::character varying, 'SUCESION'::character varying, 'USUFRUCTUARIO'::character varying])::text[])));
 ALTER TABLE titularidad ADD CONSTRAINT titularidad_pk PRIMARY KEY (municipalidad_id, id);
 ALTER TABLE titularidad ADD CONSTRAINT titularidad_unico_ck CHECK ((((condicion)::text <> 'PROPIETARIO_UNICO'::text) OR ((porcentaje)::numeric = (100)::numeric)));
-ALTER TABLE titularidad ADD CONSTRAINT titularidad_vigencias_no_se_pisan EXCLUDE USING gist (municipalidad_id WITH =, predio_id WITH =, contribuyente_id WITH =, daterange(vigencia_desde, COALESCE(vigencia_hasta, 'infinity'::date), '[]'::text) WITH &&) DEFERRABLE INITIALLY DEFERRED;
 ALTER TABLE transferencia ADD CONSTRAINT transferencia_objeto_check CHECK (((objeto)::text = ANY ((ARRAY['PREDIO'::character varying, 'VEHICULO'::character varying])::text[])));
 ALTER TABLE transferencia ADD CONSTRAINT transferencia_objeto_ck CHECK (((((objeto)::text = 'PREDIO'::text) AND (predio_id IS NOT NULL) AND (vehiculo_id IS NULL)) OR (((objeto)::text = 'VEHICULO'::text) AND (vehiculo_id IS NOT NULL) AND (predio_id IS NULL))));
 ALTER TABLE transferencia ADD CONSTRAINT transferencia_pk PRIMARY KEY (municipalidad_id, id);
@@ -2996,8 +2989,6 @@ CREATE UNIQUE INDEX permiso_usuario_uq ON public.permiso USING btree (municipali
 CREATE INDEX predio_codigo_prefijo_ix ON public.predio USING btree (municipalidad_id, codigo_ref_catastral text_pattern_ops);
 CREATE INDEX predio_direccion_ix ON public.predio USING btree (municipalidad_id, direccion);
 CREATE INDEX predio_sector_ix ON public.predio USING btree (municipalidad_id, sector_id, manzana_id);
-CREATE INDEX predio_geometria_gix ON public.predio USING gist (geometria) WHERE (geometria IS NOT NULL);
-CREATE INDEX predio_marco_ix ON public.predio USING btree (municipalidad_id, marco_oeste, marco_sur, marco_este, marco_norte) WHERE (geometria IS NOT NULL);
 CREATE INDEX prescripcion_contribuyente_ix ON public.prescripcion USING btree (municipalidad_id, contribuyente_id, tributo);
 CREATE INDEX prescripcion_ejercicio_ix ON public.prescripcion_ejercicio USING btree (municipalidad_id, prescripcion_id);
 CREATE INDEX prescripcion_hecho_ix ON public.prescripcion_hecho USING btree (municipalidad_id, prescripcion_id);

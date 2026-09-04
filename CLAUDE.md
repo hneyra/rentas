@@ -14,19 +14,27 @@ qué tabla fue a qué repositorio y por qué, [GOB-05](https://github.com/hneyra
 | Pieza | Estado |
 |---|---|
 | `infrastructure/` — el descriptor de despliegue | **Existe.** `yarn verificar` en verde, sin Pulumi, sin token y sin clúster |
-| `backend/` — **17 módulos** | **Existe entero desde P5A.** `./gradlew build` en verde: **3 667 pruebas**, 0 fallos. Es el monolito modular menos la interfaz y **menos los valores normativos**, que se fueron en P5B: los contextos acotados que quedan están dentro, `catastro` y `tesoreria` incluidos, y se extraen después uno a uno |
+| `backend/` — **17 módulos** | **Existe, y la resta terminó (P5E).** `./gradlew build` en verde: **3 080 pruebas**, 0 fallos. Es el monolito modular menos la interfaz, menos los valores normativos (P5B), menos el catastro (P5C) y menos la ventanilla (P5D). De los 17 módulos, **quince son de este sistema** y dos —`kamayuk-rentas-catastro` y `kamayuk-rentas-parametros`— son **adaptadores cliente**: puertos y transporte, sin dominio y sin una sola consulta a una tabla ajena |
 | `backend/kamayuk-rentas-parametros` | **Ya no publica ningún valor normativo**: eso es de `normativa` desde P5B (ADR-0025). Lo que queda aquí es el **cliente** —`LectorDeParametros` con la misma firma de siempre, leyendo de la copia local de un conjunto sellado (`V3`)— y las reglas puras, que todavía viven en los dos repositorios (hueco declarado: `normativa/docs/00-gobierno/P5B-extraccion.md` §7.1) |
 | **Un repositorio hermano más** | Desde P5B, `./gradlew test` **no pasa sin `normativa` clonado al lado**: tres clases comprueban que la llave con que su derivado publica un valor es la que este backend pide (#192). Si no está, fallan nombrando el `git clone`; no se saltan |
-| `backend/kamayuk-rentas-esquema` | **Existe, con su baseline.** Una sola migración, `V1__baseline.sql` (132 tablas). `verificarAislamiento` corre **223 pruebas** —46 del esquema y 177 del pool—, 0 fallos |
+| `backend/kamayuk-rentas-esquema` | **Existe, con su baseline y ocho migraciones más.** `V1` nació con 132 tablas; `V2`, `V6` y `V7` retiran las **31** que se fueron a los otros tres sistemas, y `V3`…`V5`, `V8` y `V9` traen las **11** que nacen del corte —la copia sellada de normativa, la proyección de catastro, la valuación recibida, el buzón de pagos y su procedencia—. **113 tablas vivas.** `verificarAislamiento` corre **222 pruebas** —45 del esquema y 177 del pool—, 0 fallos |
+| Las extensiones que pide su base | **Dos, y no cuatro** (P5E): `pg_trgm` y `unaccent`, las dos *trusted*. `postgis` y `btree_gist` salieron de `crear-roles.sql` porque nada del esquema final las usa —medido: ni una columna PostGIS, ni un índice GiST, ni una restricción `EXCLUDE`— y lo que las mantenía vivas era `V1`, que creaba la geometría del predio para dejarla caer en `V6` |
 | `backend/kamayuk-rentas-aplicacion` | **Existe.** `verificarArquitectura` corre **130 pruebas**: las barreras de la librería común más las propias de este sistema (contrato, formas, respuestas, límites de Modulith) |
 | `docs/30-arquitectura/adr/` | **Existe**, 11 ADR propios más los que enlaza |
-| **Código de negocio** | **Existe.** Llegó entero en P5A ([P5A](docs/00-gobierno/P5A-copia-del-backend.md)), copiado de `sgtm@0d33ad7b` con el mismo número de pruebas: 3 756 = 3 756 |
+| **Código de negocio** | **Existe.** Llegó entero en P5A ([P5A](docs/00-gobierno/P5A-copia-del-backend.md)), copiado de `sgtm@0d33ad7b` con el mismo número de pruebas: 3 756 = 3 756. Lo que sigue calculando **da el mismo céntimo**: dos archivos comparados byte a byte contra el árbol anterior a P5C, con las mismas huellas que P5B y P5C publicaron ([P5E](docs/00-gobierno/P5E-cierre.md) §4) |
+| **La lista de cruces de frontera** | **Vacía en los cuatro repositorios** ([P5E](docs/00-gobierno/P5E-cierre.md) §2). Es el criterio de que la separación terminó: no que los repositorios existan, sino que ninguno lea por SQL una tabla que ya no es suya. Y está medido que la regla puede fallar, repositorio por repositorio |
 | Su esquema (`V1__baseline.sql`) | **Está aquí**, en `backend/kamayuk-rentas-esquema/src/main/resources/db/migration/`. Es una migración de Flyway y no un `esquema.sql` suelto (ADR-0032 §2) |
 | Su frontend (`rentas-web`) | **NO existe** |
 | Su imagen `ghcr.io/hneyra/kamayuk-rentas` | **NO existe.** El descriptor la nombra igual, y es correcto: aquí no se despliega nada |
 
 **Las barreras se construyeron primero, a propósito**, y el negocio entró después por encima de
-ellas. Lo que hoy vigilan es real: 3 756 pruebas sobre los doce contextos.
+ellas. Lo que hoy vigilan es real: 3 080 pruebas sobre los contextos que quedan.
+
+**Lo que este repositorio NO tiene todavía, y hay que saberlo antes de tocar la frontera**: los
+clientes HTTP hacia `catastro`, `normativa` y `caja` viven **aquí** y no los publica el dueño de
+cada API, que es lo que ADR-0030 §4 pide. La decisión y sus tres motivos medidos están en
+[P5E §6](docs/00-gobierno/P5E-cierre.md); el orden para cerrarla no admite otro: `comun-dominio`
+(D-23) → contrato derivado en cada dueño → `<sistema>-cliente` con su prueba de contrato.
 
 ## Lo que este repositorio NO hace
 

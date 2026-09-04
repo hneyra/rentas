@@ -60,9 +60,16 @@ Necesita un **PostgreSQL real** todo módulo que arranca la base con los fixture
 Hoy son casi todos: con V56, 14 de los 17 módulos. Una base en memoria no tiene Row Level
 Security y daría falsos verdes (CAL-01 §2).
 
-Por omisión levantan un contenedor con Testcontainers, así que hacen falta Docker y la imagen
-`postgis/postgis:16-3.4-alpine` (ADR-0021: `crear-roles.sql` instala PostGIS y la
-imagen oficial no la trae).
+Por omisión levantan un contenedor con Testcontainers, así que hace falta Docker y la imagen
+`postgis/postgis:16-3.4-alpine`.
+
+**Desde P5E esa imagen ya no hace falta por PostGIS, y se conserva sólo porque nadie ha medido el
+cambio.** `crear-roles.sql` instala **dos** extensiones —`pg_trgm` y `unaccent`, las dos *trusted*—
+y ya no `postgis` ni `btree_gist`: la geometría del predio y las restricciones de exclusión de
+vigencias son de `catastro`, y `V6` retira sus tablas. Medido sobre el esquema final: ni una columna
+PostGIS, ni un índice GiST, ni una restricción `EXCLUDE`. Cambiar la imagen por una simple es
+coherente y **no se hizo**, porque el camino de Testcontainers es el único que la máquina donde se
+midió P5E no puede ejercitar (P5E §10, hueco 1) y no se toca lo que no se puede comprobar.
 
 **Sin Docker** hay una salida documentada —apuntar a un PostgreSQL existente—, y ninguna que omita
 la prueba:

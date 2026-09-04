@@ -60,22 +60,28 @@ GRANT USAGE           ON SCHEMA public TO sgtm_app, sgtm_readonly, rol_carga_par
 --
 -- Las dos son trusted desde PostgreSQL 13, asi que en un ambiente donde
 -- sgtm_owner sea dueño de la base tampoco harian falta privilegios especiales.
---   postgis   la geometria del predio (ADR-0021, V61). A diferencia de las dos
---             anteriores NO es trusted, asi que hace falta un superusuario: no
---             hay forma de que la instale la migracion, que corre como
---             sgtm_owner. Trae consigo la tabla `spatial_ref_sys`, un catalogo
---             de sistemas de coordenadas sin dato municipal, que por eso figura
---             entre las TABLAS_EXENTAS de la prueba de aislamiento.
---   btree_gist  compara bigint y varchar con `=` DENTRO de un indice GiST, que es
---             lo que `EXCLUDE USING gist` necesita para decir «dos vigencias del
---             mismo predio no se pisan» (#669, V72). Es *trusted* —medido:
---             `SELECT trusted FROM pg_available_extension_versions WHERE
---             name='btree_gist'` da `t`— y aun asi va AQUI y no en la migracion,
---             porque una extension trusted la crea quien tiene CREATE sobre la
---             BASE, y `sgtm_owner` no es su dueño: intentarlo desde la migracion
---             da «permission denied to create extension "btree_gist"». Medido
---             ejecutando, no supuesto.
+--
+-- SON DOS Y NO CUATRO DESDE P5E, Y ESO SE MIDIO
+-- ---------------------------------------------
+-- Hasta P5E aqui se creaban tambien `postgis` y `btree_gist`, y `rentas` NO
+-- NECESITA NINGUNA DE LAS DOS: la geometria del predio y las dos restricciones
+-- de exclusion de vigencias son de `catastro`, y `V6` retira sus tablas.
+--
+-- Lo que las mantenia vivas era el baseline: `V1` las creaba para dejarlas caer
+-- cinco migraciones despues. Medido sobre una base con las dos extensiones
+-- fuera, `V1` moria en su linea 1610 con «type "geography" does not exist» —el
+-- mismo modo de fallo exacto que P5D encontro en `caja` con `unaccent`, y el que
+-- dejo `stg` cuatro dias sin desplegar con `V61` (#742)—. Y medido sobre el
+-- esquema final: ni una columna de tipo PostGIS, ni un indice GiST, ni una
+-- restriccion `EXCLUDE`.
+--
+-- P5E quito de `V1` esas nueve lineas —cinco columnas del predio, dos indices y
+-- las dos exclusiones—, todas sobre tablas que `V6` borra y que nunca llegan a
+-- tener una fila. El esquema resultante es el mismo, comprobado con `pg_dump`:
+-- 12 164 lineas identicas a las 12 164 de antes.
+--
+-- Lo que compra: la base de `rentas` se levanta con dos extensiones *trusted* en
+-- vez de con una que exige superusuario. Una ventanilla cuya base necesita
+-- PostGIS no se levanta en cualquier sitio, y aqui no lo necesita.
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 CREATE EXTENSION IF NOT EXISTS unaccent;
-CREATE EXTENSION IF NOT EXISTS postgis;
-CREATE EXTENSION IF NOT EXISTS btree_gist;

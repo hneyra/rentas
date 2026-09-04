@@ -39,16 +39,16 @@ class AislamientoMultiTenantTest {
      * tiene que doler y verse en el diff. {@code flyway_schema_history} la crea y la usa solo
      * {@code sgtm_owner}; la aplicacion no tiene ningun privilegio sobre ella.
      *
-     * <p>{@code spatial_ref_sys} la crea la extension PostGIS (ADR-0021, V61) y es un catalogo de
-     * sistemas de coordenadas: unos miles de filas que describen proyecciones, iguales en toda
-     * instalacion del mundo. No lleva dato municipal y no puede llevarlo, asi que no hay nada que
-     * aislar. Entra aqui y no en {@code TABLAS_DE_CATALOGO} porque aquellas si llevan RLS con
-     * politica propia, y esta no la lleva: la instala la extension y no es nuestra.
+     * <p><b>{@code spatial_ref_sys} salio de esta lista en P5E</b>, y conviene decir por que en vez
+     * de dejar la entrada: la instalaba la extension PostGIS, y {@code rentas} ya no la crea
+     * —`crear-roles.sql` declara dos extensiones y no cuatro—, porque la geometria del predio es de
+     * {@code catastro} y `V6` se llevo sus tablas. Una exencion que ya no exime nada se queda
+     * dentro para siempre y la lista deja de decir lo que exime, que es la misma razon por la que
+     * {@code ningunCruceConsentidoSobra} existe.
      */
     private static final Set<String> TABLAS_EXENTAS =
             Set.of(
                     "flyway_schema_history",
-                    "spatial_ref_sys",
                     // Las seis del escenario de `normativa` (P5B). NO son del esquema: las crea
                     // `BaseDeDatosDePrueba` para que veinte clases de prueba puedan escribir su
                     // premisa —«esta municipalidad tiene un conjunto sellado con estos valores»—
