@@ -1,0 +1,59 @@
+{
+  "PROCEDENCIA" : "ARCHIVO GENERADO — no editar a mano. Lo publica el CONSUMIDOR con lo que su adaptador pide y lee de verdad; lo comprueba el PROVEEDOR en su propio CI (ADR-0030 §4). Un campo que el proveedor deje de publicar, o un parametro que deje de leer, pone rojo el build del proveedor y no el del consumidor: es lo que sustituye a lo que hacia el compilador cuando los contextos compartian repositorio.",
+  "consumidor" : "rentas",
+  "proveedor" : "normativa",
+  "raiz" : "/normativa/api/v1",
+  "operaciones" : {
+    "GET /conjuntos" : {
+      "parametros" : [ "ejercicio" ],
+      "respuesta" : {
+        "conjuntoId" : "entero"
+      },
+      "cuerpo" : { }
+    },
+    "GET /conjuntos/{id}/snapshot" : {
+      "parametros" : [ "ambito" ],
+      "respuesta" : {
+        "conjuntoId" : "entero",
+        "ejercicio" : "entero",
+        "version" : "entero",
+        "ambito" : "texto",
+        "parametros" : [ {
+          "tipo" : "texto",
+          "clave" : "texto",
+          "valorNumerico" : "texto",
+          "valorTexto" : "texto",
+          "vigenciaDesde" : "texto",
+          "vigenciaHasta" : "texto",
+          "documentoFuente" : "texto"
+        } ],
+        "valoresUnitarios" : [ {
+          "partida" : "texto",
+          "categoria" : "texto",
+          "anioConstruccionDesde" : "entero",
+          "anioConstruccionHasta" : "entero",
+          "valorM2" : "texto",
+          "documentoFuente" : "texto"
+        } ],
+        "depreciaciones" : [ {
+          "uso" : "texto",
+          "material" : "texto",
+          "estadoConservacion" : "texto",
+          "antiguedadHasta" : "entero",
+          "porcentaje" : "texto",
+          "documentoFuente" : "texto"
+        } ],
+        "valoresReferenciales" : [ {
+          "ejercicio" : "entero",
+          "categoria" : "texto",
+          "marca" : "texto",
+          "modelo" : "texto",
+          "anioFabricacion" : "entero",
+          "valor" : "texto",
+          "documentoFuente" : "texto"
+        } ]
+      },
+      "cuerpo" : { }
+    }
+  }
+}

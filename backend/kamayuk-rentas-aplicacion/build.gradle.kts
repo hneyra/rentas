@@ -111,7 +111,7 @@ tasks.test {
     // Gradle no propaga las propiedades de sistema del build al proceso de prueba
     // (lo mismo que hace `sgtm.pruebas-postgres` con las suyas). Sin esto,
     // `-Dsgtm.formas.regenerar=true` no llega y el archivo no se puede regenerar.
-    for (propiedad in listOf("sgtm.formas.regenerar", "sgtm.respuestas.regenerar")) {
+    for (propiedad in listOf("sgtm.formas.regenerar", "sgtm.respuestas.regenerar", "kamayuk.contratos.regenerar")) {
         providers.systemProperty(propiedad).orNull?.let { systemProperty(propiedad, it) }
     }
 }

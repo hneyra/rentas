@@ -1,0 +1,43 @@
+{
+  "PROCEDENCIA" : "ARCHIVO GENERADO — no editar a mano. Lo publica el CONSUMIDOR con lo que su adaptador pide y lee de verdad; lo comprueba el PROVEEDOR en su propio CI (ADR-0030 §4). Un campo que el proveedor deje de publicar, o un parametro que deje de leer, pone rojo el build del proveedor y no el del consumidor: es lo que sustituye a lo que hacia el compilador cuando los contextos compartian repositorio.",
+  "consumidor" : "rentas",
+  "proveedor" : "catastro",
+  "raiz" : "/catastro/api/v1",
+  "operaciones" : {
+    "GET /catastro/fichas" : {
+      "parametros" : [ "aLaFecha", "codRefCatastral", "contribuyente", "exceptoPredio", "lote", "manzana", "pagina", "soloPredio", "tamano", "tipo" ],
+      "respuesta" : {
+        "contenido" : [ {
+          "fichaId" : "entero",
+          "predioId" : "entero",
+          "codRefCatastral" : "texto",
+          "direccion" : "texto",
+          "manzana" : "texto",
+          "lote" : "texto",
+          "tipo" : "texto",
+          "version" : "entero",
+          "areaTerreno" : "texto",
+          "areaConstruida" : "texto",
+          "uso" : "texto",
+          "vigenciaDesde" : "fecha",
+          "titular" : "texto"
+        } ],
+        "totalElementos" : "entero"
+      },
+      "cuerpo" : { }
+    },
+    "GET /catastro/tablas/valores-unitarios" : {
+      "parametros" : [ "ejercicio" ],
+      "respuesta" : {
+        "contenido" : [ {
+          "partida" : "texto",
+          "categoria" : "texto",
+          "anioConstruccionDesde" : "entero",
+          "anioConstruccionHasta" : "entero",
+          "valorM2" : "texto"
+        } ]
+      },
+      "cuerpo" : { }
+    }
+  }
+}

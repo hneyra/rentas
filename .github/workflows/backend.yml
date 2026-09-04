@@ -52,6 +52,20 @@ jobs:
           repository: hneyra/infrastructure
           path: infrastructure
 
+      # El contrato que «caja» publica de lo que le pide a este sistema (P6, ADR-0030 §4).
+      # `ContratoConElConsumidorTestBase` lo lee del clon hermano y **se niega a saltarse**: una
+      # prueba de contrato que no encuentra su contrato y pasa en verde es peor que ninguna.
+      #
+      # `sparse-checkout` de un solo directorio: lo unico que hace falta es el archivo, y traer el
+      # repositorio entero por dos kilobytes seria pagar el clon de otro sistema en cada corrida.
+      - name: Traer el contrato que publica «caja»
+        uses: actions/checkout@v4
+        with:
+          repository: hneyra/caja
+          path: caja
+          sparse-checkout: docs/50-api/contratos-que-consume
+          sparse-checkout-cone-mode: false
+
       # ADR-0001 fija Java 25. Se comprueba en vez de suponerse: si alguien cambiara la propiedad,
       # CI verificaria en silencio una version de Java distinta de la que se despliega.
       - name: La version de Java declarada es la que instala CI
