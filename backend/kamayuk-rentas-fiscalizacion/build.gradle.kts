@@ -11,6 +11,9 @@ plugins {
 }
 
 dependencies {
+    // Los dobles en memoria de los puertos de `catastro` (P5C). Sus tablas se fueron con `V6`:
+    // lo que estas pruebas necesitaban de ellas era la premisa, y ahi es donde se escribe.
+    testImplementation(testFixtures(project(":kamayuk-rentas-catastro")))
     testImplementation(testFixtures(project(":kamayuk-rentas-parametros")))
     // El acta predial referencia la version de ficha catastral vigente a la
     // fecha de la visita (RNF-075), igual que declaracion_jurada en rentas

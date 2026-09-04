@@ -22,8 +22,7 @@ import kamayuk.rentas.auditoria.AuditoriaJdbc;
 import kamayuk.rentas.auditoria.Origen;
 import kamayuk.rentas.auditoria.OrigenContext;
 import kamayuk.rentas.catastro.PrediosDelContribuyente;
-import kamayuk.rentas.catastro.aplicacion.PrediosDelContribuyenteCatastro;
-import kamayuk.rentas.catastro.infraestructura.CatastroRepositoryJdbc;
+import kamayuk.rentas.catastro.prueba.PrediosDelEscenario;
 import kamayuk.rentas.compartido.CiudadanoContext;
 import kamayuk.rentas.compartido.TenantContext;
 import kamayuk.rentas.contribuyentes.AcreditacionEnElPadron;
@@ -90,9 +89,11 @@ import org.springframework.transaction.interceptor.TransactionInterceptor;
 @DisplayName("#57 — La situacion del ciudadano contra PostgreSQL")
 class SituacionDelCiudadanoJdbcTest {
 
-    /**
-     * 2026: {@code cuenta_corriente_asiento} se particiona por ejercicio y V2 declara 2026-2027.
-     */
+    private static PrediosDelContribuyente predios;
+    private static Auditoria auditoria;
+
+    private static final AtomicInteger CONTADOR = new AtomicInteger();
+
     private static final Ejercicio EJERCICIO = new Ejercicio(2026);
 
     private static final LocalDate HOY = LocalDate.of(2026, 8, 29);
@@ -135,10 +136,6 @@ class SituacionDelCiudadanoJdbcTest {
     private static RegistrarAsiento registrarAsiento;
     private static AcreditacionEnElPadron acreditacion;
     private static ConsultaDeDeudaPublica deuda;
-    private static PrediosDelContribuyente predios;
-    private static Auditoria auditoria;
-
-    private static final AtomicInteger CONTADOR = new AtomicInteger();
 
     @BeforeAll
     static void provisionar() throws SQLException, IOException {
@@ -177,7 +174,7 @@ class SituacionDelCiudadanoJdbcTest {
                                                 asientos, saldos, calculo, redondeo, RELOJ))));
 
         acreditacion = envolver(new AcreditacionJdbc(new ContribuyenteRepositoryJdbc(jdbc)));
-        predios = envolver(new PrediosDelContribuyenteCatastro(new CatastroRepositoryJdbc(jdbc)));
+        predios = new PrediosDelEscenario(jdbc);
 
         rama = envolver(new RamaDelCiudadano(acreditacion, deuda, predios, auditoria, RELOJ));
         recorrido = new RecorridoPorMunicipalidades(jdbc, gestor);
@@ -654,7 +651,7 @@ class SituacionDelCiudadanoJdbcTest {
             ContextoDeTenant.fijar(owner, muni);
             try (PreparedStatement sentencia =
                     owner.prepareStatement(
-                            "INSERT INTO predio (municipalidad_id, codigo_ref_catastral, tipo,"
+                            "INSERT INTO predio_de_prueba (municipalidad_id, codigo_ref_catastral, tipo,"
                                     + " direccion) VALUES (?, ?, 'URBANO', ?) RETURNING id")) {
                 sentencia.setLong(1, muni);
                 sentencia.setString(2, codigo);
@@ -677,7 +674,7 @@ class SituacionDelCiudadanoJdbcTest {
             ContextoDeTenant.fijar(owner, muni);
             try (PreparedStatement sentencia =
                     owner.prepareStatement(
-                            "INSERT INTO titularidad (municipalidad_id, predio_id,"
+                            "INSERT INTO titularidad_de_prueba (municipalidad_id, predio_id,"
                                     + " contribuyente_id, condicion, porcentaje, vigencia_desde,"
                                     + " documento_origen)"
                                     + " VALUES (?, ?, ?, ?, ?, ?, 'SIEMBRA')")) {

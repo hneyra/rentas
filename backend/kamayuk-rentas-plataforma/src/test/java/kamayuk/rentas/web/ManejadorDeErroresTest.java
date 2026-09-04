@@ -34,7 +34,7 @@ class ManejadorDeErroresTest {
         String mensajeDelMotor =
                 "ERROR: duplicate key value violates unique constraint \"via_codigo_uq\"\n"
                         + "  Detail: Key (municipalidad_id, codigo)=(41, V-1) already exists.\n"
-                        + "  Where: INSERT INTO via (municipalidad_id, codigo) VALUES ($1, $2)";
+                        + "  Where: INSERT INTO via_de_prueba (municipalidad_id, codigo) VALUES ($1, $2)";
 
         ResponseEntity<ProblemDetail> respuesta =
                 manejador.accesoADatos(new DataIntegrityViolationException(mensajeDelMotor));

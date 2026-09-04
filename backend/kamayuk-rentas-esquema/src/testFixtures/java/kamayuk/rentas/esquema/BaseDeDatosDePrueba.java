@@ -154,6 +154,9 @@ public final class BaseDeDatosDePrueba implements AutoCloseable {
         try (Connection admin = conexionAdmin()) {
             admin.setAutoCommit(false);
             EscenarioDeNormativa.crear(admin);
+            // Y las quince de `catastro`, que se fueron con `V6` (P5C) por la misma frontera y por
+            // el mismo motivo: lo que las pruebas necesitan no es la tabla, es la premisa.
+            EscenarioDeCatastro.crear(admin);
         }
     }
 

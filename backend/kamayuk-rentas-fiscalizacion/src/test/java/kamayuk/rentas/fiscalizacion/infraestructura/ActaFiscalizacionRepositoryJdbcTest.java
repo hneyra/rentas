@@ -127,8 +127,8 @@ class ActaFiscalizacionRepositoryJdbcTest {
             long programaId = crearPrograma(municipalidadA, "PF-0002", "PREDIAL");
             long fichaId = crearFicha(municipalidadA, predioId);
 
-            long prediosAntes = transaccion.execute(estado -> contar("predio"));
-            long fichasAntes = transaccion.execute(estado -> contar("ficha_catastral"));
+            long prediosAntes = transaccion.execute(estado -> contar("predio_de_prueba"));
+            long fichasAntes = transaccion.execute(estado -> contar("ficha_catastral_de_prueba"));
 
             transaccion.execute(
                     estado ->
@@ -147,10 +147,10 @@ class ActaFiscalizacionRepositoryJdbcTest {
                                             "area distinta a la declarada",
                                             OBSERVACION)));
 
-            assertThat((long) transaccion.execute(estado -> contar("predio")))
+            assertThat((long) transaccion.execute(estado -> contar("predio_de_prueba")))
                     .as("ninguna fila de predio cambia")
                     .isEqualTo(prediosAntes);
-            assertThat((long) transaccion.execute(estado -> contar("ficha_catastral")))
+            assertThat((long) transaccion.execute(estado -> contar("ficha_catastral_de_prueba")))
                     .as("ninguna fila de ficha_catastral cambia")
                     .isEqualTo(fichasAntes);
         }
@@ -490,7 +490,7 @@ class ActaFiscalizacionRepositoryJdbcTest {
     private static long crearPredio(long municipalidadId, String sufijo) {
         return ejecutarComoApp(
                 municipalidadId,
-                "INSERT INTO predio (municipalidad_id, codigo_ref_catastral, tipo, direccion)"
+                "INSERT INTO predio_de_prueba (municipalidad_id, codigo_ref_catastral, tipo, direccion)"
                         + " VALUES (?, ?, 'URBANO', 'Jr. Union de prueba') RETURNING id",
                 municipalidadId,
                 codigoCatastralDe(sufijo));
@@ -499,7 +499,7 @@ class ActaFiscalizacionRepositoryJdbcTest {
     private static long crearFicha(long municipalidadId, long predioId) {
         return ejecutarComoApp(
                 municipalidadId,
-                "INSERT INTO ficha_catastral (municipalidad_id, predio_id, tipo, version,"
+                "INSERT INTO ficha_catastral_de_prueba (municipalidad_id, predio_id, tipo, version,"
                         + " area_terreno, uso, vigencia_desde, origen, documento_origen,"
                         + " observacion, usuario_registro)"
                         + " VALUES (?, ?, 'UNICA', 1, 120.00, 'CASA_HABITACION', ?,"

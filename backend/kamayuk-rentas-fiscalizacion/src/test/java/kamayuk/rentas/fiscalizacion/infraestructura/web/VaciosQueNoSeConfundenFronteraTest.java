@@ -523,7 +523,7 @@ class VaciosQueNoSeConfundenFronteraTest {
     private static long crearPredio(long municipalidadId, String codigo) {
         return ejecutarComoApp(
                 municipalidadId,
-                "INSERT INTO predio (municipalidad_id, codigo_ref_catastral, tipo, direccion)"
+                "INSERT INTO predio_de_prueba (municipalidad_id, codigo_ref_catastral, tipo, direccion)"
                         + " VALUES (?, ?, 'URBANO', 'Jr. Union de prueba') RETURNING id",
                 municipalidadId,
                 codigo);
@@ -549,7 +549,7 @@ class VaciosQueNoSeConfundenFronteraTest {
                         + " cod_ref_catastral, contribuyente_id, condicion, area_catastral,"
                         + " area_declarada, sector_codigo, fecha_sorteo, observacion,"
                         + " usuario_registro, fecha_registro)"
-                        + " VALUES (?, ?, ?, (SELECT codigo_ref_catastral FROM predio"
+                        + " VALUES (?, ?, ?, (SELECT codigo_ref_catastral FROM predio_de_prueba"
                         + "                    WHERE municipalidad_id = ? AND id = ?), ?, 'OMISO',"
                         + "         300.00, 120.00, '01', ?, 'siembra', 'siembra', now())"
                         + " RETURNING id",

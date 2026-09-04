@@ -18,8 +18,7 @@ import java.util.Map;
 import kamayuk.rentas.auditoria.AuditoriaJdbc;
 import kamayuk.rentas.auditoria.Origen;
 import kamayuk.rentas.auditoria.OrigenContext;
-import kamayuk.rentas.catastro.aplicacion.TitularesDelPredioCatastro;
-import kamayuk.rentas.catastro.infraestructura.CatastroRepositoryJdbc;
+import kamayuk.rentas.catastro.prueba.CatastroEnMemoria;
 import kamayuk.rentas.compartido.TenantContext;
 import kamayuk.rentas.contribuyentes.aplicacion.DirectorioJdbc;
 import kamayuk.rentas.contribuyentes.infraestructura.ContribuyenteRepositoryJdbc;
@@ -111,7 +110,7 @@ class TitularDelPredioJdbcTest {
         // anotacion del caso de uso, que es lo que esta prueba quiere verificar.
         sinTransaccion =
                 new ConsultaDeTitulares(
-                        new TitularesDelPredioCatastro(new CatastroRepositoryJdbc(jdbc)),
+                        CATASTRO.titulares(),
                         new DirectorioJdbc(
                                 new ContribuyenteRepositoryJdbc(jdbc),
                                 new FichaRepositoryJdbc(jdbc)),
@@ -119,6 +118,24 @@ class TitularDelPredioJdbcTest {
                         RELOJ);
         consulta = envolver(sinTransaccion, gestor);
     }
+
+    /**
+     * El catastro de otro sistema, sembrado en memoria (P5C).
+     *
+     * <p>`V6` retiro de esta base `predio` y `titularidad`: el sistema del predio vive en el
+     * repositorio `catastro`. Lo que esta prueba mide es de {@code rentas} —que la lectura registre
+     * su fila de ACCESO, que resuelva los nombres contra el padron, que la fecha VIAJE y que una
+     * municipalidad no vea el predio de la otra— y para todo eso lo que hace falta del vecino es la
+     * premisa, no la tabla. El fixture resuelve por fecha y por municipalidad justamente para que
+     * esas dos aserciones sigan diciendo algo.
+     *
+     * <p>Lo que ya NO se mide aqui es la resolucion de la titularidad vigente contra PostgreSQL:
+     * eso es de `catastro` y sus pruebas viven alli.
+     */
+    private static final CatastroEnMemoria CATASTRO = new CatastroEnMemoria();
+
+    private static final java.util.concurrent.atomic.AtomicLong SIGUIENTE_PREDIO =
+            new java.util.concurrent.atomic.AtomicLong(1);
 
     @SuppressWarnings("unchecked")
     private static <T> T envolver(T objetivo, TenantTransactionManager gestor) {
@@ -471,24 +488,11 @@ class TitularDelPredioJdbcTest {
         }
     }
 
-    private static long crearPredio(long municipalidad, String codigo) throws SQLException {
-        try (Connection app = base.conexion(BaseDeDatosDePrueba.APP)) {
-            ContextoDeTenant.fijar(app, municipalidad);
-            try (PreparedStatement sentencia =
-                    app.prepareStatement(
-                            "INSERT INTO predio (municipalidad_id, codigo_ref_catastral, tipo,"
-                                    + " direccion) VALUES (?, ?, 'URBANO', ?) RETURNING id")) {
-                sentencia.setLong(1, municipalidad);
-                sentencia.setString(2, codigo);
-                sentencia.setString(3, "AV. GRAU " + codigo);
-                try (ResultSet resultado = sentencia.executeQuery()) {
-                    resultado.next();
-                    long id = resultado.getLong(1);
-                    app.commit();
-                    return id;
-                }
-            }
-        }
+    /** Un predio del catastro de al lado: un identificador y su municipalidad, nada mas. */
+    private static long crearPredio(long municipalidad, String codigo) {
+        long predioId = SIGUIENTE_PREDIO.getAndIncrement();
+        CATASTRO.en(municipalidad).conCaracteristicas(predioId, "CASA HABITACION", null, null);
+        return predioId;
     }
 
     /**
@@ -538,26 +542,8 @@ class TitularDelPredioJdbcTest {
             String condicion,
             String porcentaje,
             LocalDate desde,
-            @Nullable LocalDate hasta)
-            throws SQLException {
-        try (Connection app = base.conexion(BaseDeDatosDePrueba.APP)) {
-            ContextoDeTenant.fijar(app, municipalidad);
-            try (PreparedStatement sentencia =
-                    app.prepareStatement(
-                            "INSERT INTO titularidad (municipalidad_id, predio_id,"
-                                    + " contribuyente_id, condicion, porcentaje, vigencia_desde,"
-                                    + " vigencia_hasta, documento_origen)"
-                                    + " VALUES (?, ?, ?, ?, ?, ?, ?, 'SIEMBRA DE LA PRUEBA')")) {
-                sentencia.setLong(1, municipalidad);
-                sentencia.setLong(2, predioId);
-                sentencia.setLong(3, contribuyenteId);
-                sentencia.setString(4, condicion);
-                sentencia.setBigDecimal(5, new BigDecimal(porcentaje));
-                sentencia.setObject(6, desde);
-                sentencia.setObject(7, hasta);
-                sentencia.executeUpdate();
-                app.commit();
-            }
-        }
+            @Nullable LocalDate hasta) {
+        CATASTRO.en(municipalidad)
+                .conTitularEntre(predioId, contribuyenteId, condicion, porcentaje, desde, hasta);
     }
 }

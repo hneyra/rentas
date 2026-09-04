@@ -101,8 +101,12 @@ class FormasDeLaApiTest {
         // devolviera «objeto» para todo. Esta mira una forma concreta y conocida: sin
         // resolver la variable de tipo de `RespuestaPaginada<T>`, `contenido` seria una
         // lista de «objeto» y esto se pone rojo.
-        Method consulta = EndpointsPublicados.porOperacion().get("GET /catastro/vias");
-        assertThat(consulta).as("GET /catastro/vias tiene que estar publicada").isNotNull();
+        // `GET /catastro/vias` era el ejemplo hasta P5C, y se fue con `V6`: su controlador vive
+        // en el repositorio `catastro`. El sustituto tiene que cumplir lo mismo —un sobre
+        // paginado cuyo contenido es un recurso con campos conocidos— y `GET /rentas/predios` lo
+        // hace, con la ventaja de que es de este sistema y no se va a ir.
+        Method consulta = EndpointsPublicados.porOperacion().get("GET /rentas/predios");
+        assertThat(consulta).as("GET /rentas/predios tiene que estar publicada").isNotNull();
 
         Object forma = FormaDeLaRespuesta.de(consulta);
         assertThat(forma).isInstanceOf(Map.class);
@@ -115,8 +119,8 @@ class FormasDeLaApiTest {
         assertThat(contenido).isInstanceOf(List.class);
 
         @SuppressWarnings("unchecked")
-        Map<String, Object> via = (Map<String, Object>) ((List<Object>) contenido).get(0);
-        assertThat(via).containsKeys("codigo", "tipo", "nombre");
+        Map<String, Object> predio = (Map<String, Object>) ((List<Object>) contenido).get(0);
+        assertThat(predio).containsKeys("predioId", "codigoReferenciaCatastral", "direccion");
     }
 
     @Test

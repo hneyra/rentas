@@ -18,10 +18,7 @@ import kamayuk.rentas.auditoria.AuditoriaJdbc;
 import kamayuk.rentas.auditoria.Origen;
 import kamayuk.rentas.auditoria.OrigenContext;
 import kamayuk.rentas.catastro.GestorDeTitularidad;
-import kamayuk.rentas.catastro.aplicacion.GestorDeTitularidadCatastro;
-import kamayuk.rentas.catastro.aplicacion.RegistrarPredio;
-import kamayuk.rentas.catastro.dominio.CatastroRepository;
-import kamayuk.rentas.catastro.infraestructura.CatastroRepositoryJdbc;
+import kamayuk.rentas.catastro.prueba.TitularidadDelEscenario;
 import kamayuk.rentas.compartido.TenantContext;
 import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.dominio.Ejercicio;
@@ -81,7 +78,6 @@ class RegistrarTransferenciaTest {
     private static TransactionTemplate transaccion;
     private static TransferenciaRepositoryJdbc transferenciaRepositorio;
     private static VehiculoRepositoryJdbc vehiculoRepositorio;
-    private static CatastroRepository catastroRepositorio;
     private static RegistrarTransferencia registrar;
 
     @BeforeAll
@@ -100,12 +96,8 @@ class RegistrarTransferenciaTest {
 
         transferenciaRepositorio = new TransferenciaRepositoryJdbc(jdbc);
         vehiculoRepositorio = new VehiculoRepositoryJdbc(jdbc);
-        catastroRepositorio = new CatastroRepositoryJdbc(jdbc);
 
-        RegistrarPredio registrarPredio =
-                new RegistrarPredio(catastroRepositorio, new AuditoriaJdbc(jdbc, RELOJ), RELOJ);
-        GestorDeTitularidad gestorDeTitularidad =
-                new GestorDeTitularidadCatastro(catastroRepositorio, registrarPredio);
+        GestorDeTitularidad gestorDeTitularidad = new TitularidadDelEscenario(jdbc);
 
         registrar =
                 envolver(
@@ -176,7 +168,7 @@ class RegistrarTransferenciaTest {
                             estado ->
                                     jdbc.sql(
                                                     "SELECT COALESCE(sum(porcentaje), 0) FROM"
-                                                            + " titularidad WHERE predio_id = :predio"
+                                                            + " titularidad_de_prueba WHERE predio_id = :predio"
                                                             + " AND vigencia_hasta IS NULL")
                                             .param("predio", predio)
                                             .query(BigDecimal.class)
@@ -192,7 +184,7 @@ class RegistrarTransferenciaTest {
                             estado ->
                                     jdbc.sql(
                                                     "SELECT vigencia_hasta IS NOT NULL FROM"
-                                                            + " titularidad WHERE id = :id")
+                                                            + " titularidad_de_prueba WHERE id = :id")
                                             .param("id", titularidadDeA)
                                             .query(Boolean.class)
                                             .single());
@@ -254,7 +246,8 @@ class RegistrarTransferenciaTest {
             Long filas =
                     transaccion.execute(
                             estado ->
-                                    jdbc.sql("SELECT count(*) FROM titularidad WHERE id = :id")
+                                    jdbc.sql(
+                                                    "SELECT count(*) FROM titularidad_de_prueba WHERE id = :id")
                                             .param("id", titularidadDeA)
                                             .query(Long.class)
                                             .single());
@@ -332,7 +325,7 @@ class RegistrarTransferenciaTest {
                             estado ->
                                     jdbc.sql(
                                                     "SELECT contribuyente_id, porcentaje FROM"
-                                                            + " titularidad WHERE predio_id = :predio"
+                                                            + " titularidad_de_prueba WHERE predio_id = :predio"
                                                             + " AND vigencia_hasta IS NULL ORDER BY"
                                                             + " porcentaje DESC")
                                             .param("predio", predio)
@@ -515,7 +508,7 @@ class RegistrarTransferenciaTest {
             String condicion = "100".equals(porcentaje) ? "PROPIETARIO_UNICO" : "COPROPIETARIO";
             try (PreparedStatement sentencia =
                     app.prepareStatement(
-                            "INSERT INTO titularidad (municipalidad_id, predio_id,"
+                            "INSERT INTO titularidad_de_prueba (municipalidad_id, predio_id,"
                                     + " contribuyente_id, condicion, porcentaje, vigencia_desde,"
                                     + " vigencia_hasta, documento_origen)"
                                     + " VALUES (?, ?, ?, ?, ?, ?, ?, 'Siembra de la prueba')"
@@ -582,7 +575,7 @@ class RegistrarTransferenciaTest {
             ContextoDeTenant.fijar(app, municipalidad);
             try (PreparedStatement sentencia =
                     app.prepareStatement(
-                            "INSERT INTO predio (municipalidad_id, codigo_ref_catastral, tipo,"
+                            "INSERT INTO predio_de_prueba (municipalidad_id, codigo_ref_catastral, tipo,"
                                     + " direccion) VALUES (?, ?, 'URBANO', 'Calle de prueba 123')"
                                     + " RETURNING id")) {
                 sentencia.setLong(1, municipalidad);

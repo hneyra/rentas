@@ -11,6 +11,9 @@ plugins {
 }
 
 dependencies {
+    // Los dobles en memoria de los puertos de `catastro` (P5C). Sus tablas se fueron con `V6`:
+    // lo que estas pruebas necesitaban de ellas era la premisa, y ahi es donde se escribe.
+    testImplementation(testFixtures(project(":kamayuk-rentas-catastro")))
     testImplementation(testFixtures(project(":kamayuk-rentas-parametros")))
     implementation(platform(libs.spring.boot.bom))
     implementation(platform(libs.spring.modulith.bom))

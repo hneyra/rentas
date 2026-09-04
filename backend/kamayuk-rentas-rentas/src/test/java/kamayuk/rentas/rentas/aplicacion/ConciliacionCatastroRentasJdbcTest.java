@@ -21,9 +21,7 @@ import kamayuk.rentas.auditoria.AuditoriaJdbc;
 import kamayuk.rentas.auditoria.Origen;
 import kamayuk.rentas.auditoria.OrigenContext;
 import kamayuk.rentas.catastro.BusquedaDeFichas;
-import kamayuk.rentas.catastro.aplicacion.ConsultaDeFichas;
-import kamayuk.rentas.catastro.aplicacion.FichasDelPadronCatastro;
-import kamayuk.rentas.catastro.infraestructura.FichaCatastralRepositoryJdbc;
+import kamayuk.rentas.catastro.prueba.GrillaDelEscenario;
 import kamayuk.rentas.compartido.Pagina;
 import kamayuk.rentas.compartido.Paginacion;
 import kamayuk.rentas.compartido.TenantContext;
@@ -148,9 +146,7 @@ class ConciliacionCatastroRentasJdbcTest {
         // anotacion del caso de uso, que es lo que esta prueba quiere verificar.
         sinTransaccion =
                 new ConsultaDeConciliacion(
-                        new FichasDelPadronCatastro(
-                                new ConsultaDeFichas(
-                                        new FichaCatastralRepositoryJdbc(jdbc), new PadronVacio())),
+                        new GrillaDelEscenario(jdbc),
                         declaraciones,
                         new ConciliacionRepositoryJdbc(jdbc),
                         new AuditoriaJdbc(jdbc, RELOJ),
@@ -805,10 +801,19 @@ class ConciliacionCatastroRentasJdbcTest {
     private static long contarPredios(long municipalidad) throws SQLException {
         try (Connection app = base.conexion(BaseDeDatosDePrueba.APP)) {
             ContextoDeTenant.fijar(app, municipalidad);
-            try (PreparedStatement sentencia = app.prepareStatement("SELECT count(*) FROM predio");
-                    ResultSet fila = sentencia.executeQuery()) {
-                fila.next();
-                return fila.getLong(1);
+            // El filtro por municipalidad va ESCRITO, y en produccion no haria falta: lo pone
+            // RLS. `predio_de_prueba` no la lleva —ver `EscenarioDeCatastro`—, asi que sin esta
+            // linea la guarda «ya esta sembrado» contaba los predios de LAS CUATRO
+            // municipalidades del archivo y ninguna volvia a sembrarse. Es el primero de los dos
+            // defectos que P5B §11 documenta, y en este archivo se cobro siete pruebas.
+            try (PreparedStatement sentencia =
+                    app.prepareStatement(
+                            "SELECT count(*) FROM predio_de_prueba WHERE municipalidad_id = ?")) {
+                sentencia.setLong(1, municipalidad);
+                try (ResultSet fila = sentencia.executeQuery()) {
+                    fila.next();
+                    return fila.getLong(1);
+                }
             }
         }
     }
@@ -985,7 +990,7 @@ class ConciliacionCatastroRentasJdbcTest {
             ContextoDeTenant.fijar(app, municipalidad);
             try (PreparedStatement sentencia =
                     app.prepareStatement(
-                            "INSERT INTO predio (municipalidad_id, codigo_ref_catastral, tipo,"
+                            "INSERT INTO predio_de_prueba (municipalidad_id, codigo_ref_catastral, tipo,"
                                     + " direccion) VALUES (?, ?, 'URBANO', ?) RETURNING id")) {
                 sentencia.setLong(1, municipalidad);
                 sentencia.setString(2, codigo);
@@ -1005,7 +1010,7 @@ class ConciliacionCatastroRentasJdbcTest {
             ContextoDeTenant.fijar(app, municipalidad);
             try (PreparedStatement sentencia =
                     app.prepareStatement(
-                            "INSERT INTO ficha_catastral (municipalidad_id, predio_id, tipo,"
+                            "INSERT INTO ficha_catastral_de_prueba (municipalidad_id, predio_id, tipo,"
                                     + " version, area_terreno, uso, vigencia_desde, origen,"
                                     + " documento_origen, observacion, usuario_registro)"
                                     + " VALUES (?, ?, 'UNICA', 1, ?, 'CASA HABITACION', ?,"
@@ -1027,7 +1032,7 @@ class ConciliacionCatastroRentasJdbcTest {
             ContextoDeTenant.fijar(app, municipalidad);
             try (PreparedStatement sentencia =
                     app.prepareStatement(
-                            "SELECT id FROM ficha_catastral WHERE predio_id = ? AND tipo = 'UNICA'"
+                            "SELECT id FROM ficha_catastral_de_prueba WHERE predio_id = ? AND tipo = 'UNICA'"
                                     + " ORDER BY version DESC LIMIT 1")) {
                 sentencia.setLong(1, predioId);
                 try (ResultSet resultado = sentencia.executeQuery()) {

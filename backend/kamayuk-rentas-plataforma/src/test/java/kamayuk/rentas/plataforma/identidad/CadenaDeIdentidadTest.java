@@ -374,7 +374,12 @@ class CadenaDeIdentidadTest {
         public List<String> direcciones() {
             LLAMADAS.incrementAndGet();
             return plantilla.queryForList(
-                    "SELECT direccion FROM predio ORDER BY direccion", String.class);
+                    // `predio_ref` y no `predio`: la tabla se fue a `catastro` con `V6` (P5C), y la
+                    // de
+                    // escenario que la sustituye no lleva RLS. Esta prueba mide justamente que RLS
+                    // filtre lo que el token deja ver, asi que tiene que leer una tabla que la
+                    // lleve — y la proyeccion local es ademas la que la aplicacion lee de verdad.
+                    "SELECT direccion FROM predio_ref ORDER BY direccion", String.class);
         }
     }
 }

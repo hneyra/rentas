@@ -15,8 +15,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
-import kamayuk.rentas.catastro.aplicacion.TitularesDelPredioCatastro;
-import kamayuk.rentas.catastro.infraestructura.CatastroRepositoryJdbc;
+import kamayuk.rentas.catastro.prueba.TitularesDelEscenario;
 import kamayuk.rentas.compartido.Pagina;
 import kamayuk.rentas.compartido.Paginacion;
 import kamayuk.rentas.compartido.TenantContext;
@@ -141,8 +140,7 @@ class ConteoDeLaDeteccionTest {
         transaccion = new TransactionTemplate(gestor);
         deteccion =
                 new DeteccionDeOmisos(
-                        new DeteccionRepositoryJdbc(jdbc),
-                        envolver(new TitularesDelPredioCatastro(new CatastroRepositoryJdbc(jdbc))));
+                        new DeteccionRepositoryJdbc(jdbc), new TitularesDelEscenario(jdbc));
         deteccion = envolver(deteccion);
     }
 
@@ -277,15 +275,16 @@ class ConteoDeLaDeteccionTest {
                 .isEqualTo(filasDeLaPagina)
                 .isEqualTo(3L);
 
-        // Y el dato que hacia falta para que dijera 4 ya no se puede escribir: es lo que #669
-        // cerro, y sale de esta misma prueba. Cuando #561 se escribio, este INSERT entraba.
-        // Se compara el texto y no el objeto: `assertThat(Throwable)` es ambiguo aqui, y ademas
-        // asi un `null` —que seria «el INSERT entro»— falla diciendo «null», que es legible.
-        assertThat(String.valueOf(intentarFichaQueSeSuperpone(municipalidadConFichaSuperpuesta)))
-                .as(
-                        "una version abierta y una cerrada que cubren la misma fecha hacen que la"
-                                + " grilla ensene el predio dos veces; V72 lo rechaza")
-                .contains("ficha_vigencias_no_se_pisan");
+        // Y que el dato que haria decir 4 no se pueda escribir YA NO SE COMPRUEBA AQUI (P5C).
+        //
+        // Lo impide `ficha_vigencias_no_se_pisan`, la restriccion de exclusion que `V72` puso
+        // sobre `ficha_catastral` — una tabla que `V6` retiro de esta base. Su prueba vive en
+        // `catastro` (`VigenciasQueNoSePisanTest`), contra PostgreSQL y contra la restriccion de
+        // verdad; repetirla aqui sobre la tabla de escenario, que no la lleva, mediria el
+        // escenario y no el esquema.
+        //
+        // Lo que esta prueba sigue midiendo —y es lo suyo— es que el conteo diga exactamente las
+        // filas que la grilla ensena.
     }
 
     @Test
@@ -512,7 +511,7 @@ class ConteoDeLaDeteccionTest {
             kamayuk.rentas.esquema.ProyeccionDeCatastro.proyectar(base, muni);
         }
 
-        // El ANALYZE va DESPUES de proyectar, y las dos tablas de la proyeccion entran en el:
+        // El ANALYZE vaDESPUES de proyectar, y las dos tablas de la proyeccion entran en el:
         // sin estadisticas el planificador adivina, y la prueba mediria su adivinanza. Se
         // descubrio midiendo — con `predio_ref` sin analizar, el conteo del padron pequeno tocaba
         // 78 paginas para veinticinco predios, porque el planificador prefiere recorrer una tabla
@@ -520,7 +519,7 @@ class ConteoDeLaDeteccionTest {
         try (Connection owner = base.conexion(BaseDeDatosDePrueba.OWNER);
                 PreparedStatement sentencia =
                         owner.prepareStatement(
-                                "ANALYZE predio_ref, ficha_ref, contribuyente, titularidad,"
+                                "ANALYZE predio_ref, ficha_ref, contribuyente, titularidad_de_prueba, "
                                         + " declaracion_jurada")) {
             sentencia.execute();
             owner.commit();
@@ -535,7 +534,7 @@ class ConteoDeLaDeteccionTest {
             ContextoDeTenant.fijar(app, municipalidadId);
             ejecutar(
                     app,
-                    "INSERT INTO sector (municipalidad_id, codigo, nombre)"
+                    "INSERT INTO sector_de_prueba (municipalidad_id, codigo, nombre)"
                             + " SELECT ?, lpad(g::text, 2, '0'), 'SECTOR ' || g"
                             + "   FROM generate_series(1, 12) g",
                     municipalidadId);
@@ -551,39 +550,54 @@ class ConteoDeLaDeteccionTest {
                     predios);
             ejecutar(
                     app,
-                    "INSERT INTO predio (municipalidad_id, codigo_ref_catastral, tipo, direccion,"
+                    "INSERT INTO predio_de_prueba (municipalidad_id, codigo_ref_catastral, tipo, direccion,"
                             + " sector_id, estado)"
                             + " SELECT ?, lpad(g::text, 23, '0'), 'URBANO', 'CALLE ' || g,"
-                            + "        (SELECT s.id FROM sector s"
-                            + "          WHERE s.codigo = lpad((g % 12 + 1)::text, 2, '0')),"
+                            // El filtro por municipalidad va ESCRITO, y en produccion no haria
+                            // falta: lo pone RLS. Las tablas del escenario de catastro no la
+                            // llevan —su `municipalidad_id` es anulable a proposito, ver
+                            // `EscenarioDeCatastro`—, asi que sin esta linea la subconsulta
+                            // encuentra el sector de las cuatro municipalidades y PostgreSQL
+                            // rechaza con «more than one row returned by a subquery». Es el
+                            // primero de los dos defectos que P5B §11 documenta, repetido aqui.
+                            + "        (SELECT s.id FROM sector_de_prueba s"
+                            + "          WHERE s.municipalidad_id = ?"
+                            + "            AND s.codigo = lpad((g % 12 + 1)::text, 2, '0')),"
                             + "        'ACTIVO'"
                             + "   FROM generate_series(1, ?) g",
+                    municipalidadId,
                     municipalidadId,
                     predios);
             ejecutar(
                     app,
-                    "INSERT INTO titularidad (municipalidad_id, predio_id, contribuyente_id,"
+                    "INSERT INTO titularidad_de_prueba (municipalidad_id, predio_id, contribuyente_id,"
                             + " condicion, porcentaje, vigencia_desde, documento_origen)"
                             + " SELECT ?, p.id, c.id, 'PROPIETARIO_UNICO', 100,"
                             + "        DATE '2020-01-01', 'siembra'"
                             + "   FROM generate_series(1, ?) g"
-                            + "   JOIN predio p ON p.codigo_ref_catastral = lpad(g::text, 23, '0')"
+                            + "   JOIN predio_de_prueba p ON p.municipalidad_id = ?"
+                            + "    AND p.codigo_ref_catastral = lpad(g::text, 23, '0')"
                             + "   JOIN contribuyente c"
-                            + "     ON c.codigo_contribuyente = lpad(g::text, 11, '0')",
+                            + "     ON c.municipalidad_id = ?"
+                            + "    AND c.codigo_contribuyente = lpad(g::text, 11, '0')",
                     municipalidadId,
-                    predios);
+                    predios,
+                    municipalidadId,
+                    municipalidadId);
             ejecutar(
                     app,
-                    "INSERT INTO ficha_catastral (municipalidad_id, predio_id, tipo, version,"
+                    "INSERT INTO ficha_catastral_de_prueba (municipalidad_id, predio_id, tipo, version,"
                             + " area_terreno, uso, vigencia_desde, origen, documento_origen,"
                             + " observacion, usuario_registro)"
                             + " SELECT ?, p.id, 'UNICA', 1, 100 + (g % 300), 'CASA HABITACION',"
                             + "        DATE '2020-01-01', 'MIGRACION', 'siembra', 'siembra',"
                             + "        'siembra'"
                             + "   FROM generate_series(1, ?) g"
-                            + "   JOIN predio p ON p.codigo_ref_catastral = lpad(g::text, 23, '0')",
+                            + "   JOIN predio_de_prueba p ON p.municipalidad_id = ?"
+                            + "    AND p.codigo_ref_catastral = lpad(g::text, 23, '0')",
                     municipalidadId,
-                    predios);
+                    predios,
+                    municipalidadId);
             // Uno de cada cinco declara, y su declaracion referencia la ficha que el catastro
             // tiene: asi los que declararon salen CONFORME y los demas OMISO.
             ejecutar(
@@ -596,52 +610,17 @@ class ConteoDeLaDeteccionTest {
                             + "        DATE '2024-02-01', DATE '2024-02-28', 'PRESENTADA',"
                             + "        'siembra', 'siembra'"
                             + "   FROM generate_series(1, ?, 5) g"
-                            + "   JOIN predio p ON p.codigo_ref_catastral = lpad(g::text, 23, '0')"
+                            + "   JOIN predio_de_prueba p ON p.municipalidad_id = ?"
+                            + "    AND p.codigo_ref_catastral = lpad(g::text, 23, '0')"
                             + "   JOIN contribuyente c"
                             + "     ON c.codigo_contribuyente = lpad(g::text, 11, '0')"
-                            + "   JOIN ficha_catastral f ON f.predio_id = p.id",
+                            + "   JOIN ficha_catastral_de_prueba f"
+                            + "     ON f.municipalidad_id = p.municipalidad_id"
+                            + "    AND f.predio_id = p.id",
                     municipalidadId,
-                    predios);
-            app.commit();
-        }
-    }
-
-    /**
-     * <b>Intenta</b> sembrar una segunda version de ficha del primer predio que tambien cubre la
-     * fecha de corte, y devuelve lo que el motor conteste.
-     *
-     * <h2>Por que ya no siembra, y esto es lo que #669 cambio</h2>
-     *
-     * <p>Cuando esta prueba se escribio (#561), el esquema lo admitia: {@code ficha_vigente_uq} es
-     * parcial —{@code WHERE vigencia_hasta IS NULL}—, asi que solo impide dos versiones ABIERTAS y
-     * la cerrada podia solaparse con la abierta. El predio salia dos veces en la grilla y el conteo
-     * tenia que decir dos, y de ahi salio la decision de conservar el {@code JOIN} de {@code
-     * ficha_catastral} en el conteo aunque no lo use.
-     *
-     * <p>Desde {@code V72} ese dato <b>ya no puede existir</b>: {@code ficha_vigencias_no_se_pisan}
-     * lo rechaza (#669, que salio precisamente de este hallazgo). Asi que lo que aqui se comprueba
-     * pasa a ser lo contrario — que el intento se rechaza y por que—, y el {@code JOIN} se queda
-     * por una razon distinta: quitarlo es un cambio de plan que nadie ha medido, y su coste es cero
-     * porque el planificador ya lo elimina solo.
-     */
-    private static SQLException intentarFichaQueSeSuperpone(long municipalidadId) {
-        try (Connection app = base.conexion(BaseDeDatosDePrueba.APP)) {
-            ContextoDeTenant.fijar(app, municipalidadId);
-            ejecutar(
-                    app,
-                    "INSERT INTO ficha_catastral (municipalidad_id, predio_id, tipo, version,"
-                            + " area_terreno, uso, vigencia_desde, vigencia_hasta, origen,"
-                            + " documento_origen, observacion, usuario_registro)"
-                            + " SELECT ?, p.id, 'UNICA', 2, 400, 'CASA HABITACION',"
-                            + "        DATE '2021-01-01', DATE '2027-12-31', 'MIGRACION',"
-                            + "        'siembra', 'siembra', 'siembra'"
-                            + "   FROM predio p"
-                            + "  WHERE p.codigo_ref_catastral = lpad('1', 23, '0')",
+                    predios,
                     municipalidadId);
             app.commit();
-            return null;
-        } catch (SQLException rechazo) {
-            return rechazo;
         }
     }
 

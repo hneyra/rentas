@@ -415,7 +415,7 @@ class MuestraDelProgramaRepositoryJdbcTest {
                 + ", id, codigo_ref_catastral, "
                 + (contribuyente == null ? "NULL" : contribuyente)
                 + ", 'OMISO', DATE '2026-03-15', 'siembra cruda', 'siembra', now()"
-                + " FROM predio WHERE id = "
+                + " FROM predio_de_prueba WHERE id = "
                 + predioId;
     }
 
@@ -452,7 +452,7 @@ class MuestraDelProgramaRepositoryJdbcTest {
     private static long crearPredio(long municipalidadId, String sufijo) {
         return ejecutarComoApp(
                 municipalidadId,
-                "INSERT INTO predio (municipalidad_id, codigo_ref_catastral, tipo, direccion)"
+                "INSERT INTO predio_de_prueba (municipalidad_id, codigo_ref_catastral, tipo, direccion)"
                         + " VALUES (?, ?, 'URBANO', 'Jr. Union de prueba') RETURNING id",
                 municipalidadId,
                 codigoCatastralDe(sufijo));

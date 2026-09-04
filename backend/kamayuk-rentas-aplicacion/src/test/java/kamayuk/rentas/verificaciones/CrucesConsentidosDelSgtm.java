@@ -34,53 +34,34 @@ final class CrucesConsentidosDelSgtm {
     static final List<CruceConsentido> LISTA =
             List.of(
                     // ---------------------------------------------------------------------------
-                    // PENDIENTE-CRUCE-01 — CERRADO EN P5C.
+                    // PENDIENTE-CRUCE-01, -04 y -05 — CERRADOS EN P5C.
                     //
-                    // `DeteccionRepositoryJdbc` (los omisos) y `ConciliacionRepositoryJdbc` (su
-                    // recuento) leian `predio`, `sector` y `ficha_catastral`, tres tablas de
-                    // `catastro`, en la MISMA consulta que pagina y cuenta lo filtrado. Iban
-                    // juntas a proposito: es el mismo padron, paginado en un caso y contado en el
-                    // otro, y dos proyecciones distintas darian dos cifras del mismo dia (#564).
+                    // `V6` retiro de esta base las quince tablas de `catastro`, asi que ninguna de
+                    // las cuatro clases que las leian puede seguir haciendolo. Cada una se cerro
+                    // por el camino que su propia nota anticipaba:
                     //
-                    // Hoy las dos leen `predio_ref` y `ficha_ref`, la proyeccion local que crea
-                    // `V4` — y `sector` ya no se lee de ninguna forma, porque la proyeccion lleva
-                    // el CODIGO del sector, que es lo que los filtros teclean.
+                    //  - `DeteccionRepositoryJdbc` y `ConciliacionRepositoryJdbc` (-01) leen
+                    //    `predio_ref` y `ficha_ref`, la proyeccion local de `V4`. Iban juntas a
+                    //    proposito —es el mismo padron, paginado en un caso y contado en el otro
+                    //    (#564)— y por eso se cierran juntas.
+                    //  - `TitularPrincipalRepositoryJdbc` (-04) desaparecio: lo sustituye
+                    //    `TitularPrincipalPorElPuerto`, que pregunta por `TitularesDelPredio`.
+                    //    Su nota avisaba del desempate, y ese matiz quedo escrito en la clase
+                    //    nueva: el puerto no publica el id de la fila y el desempate entre dos
+                    //    copropietarios EMPATADOS cambia.
+                    //  - `CuotaDeArbitrioRepositoryJdbc` (-05) traduce el codigo predial contra
+                    //    `predio_ref`. Su nota decia «puerto HTTP: el filtro devuelve como mucho
+                    //    un predio», y la proyeccion lo resuelve sin salir de la base, que es
+                    //    mejor: el filtro entra en el MISMO `WHERE` que el conteo.
                     //
-                    // Retirarlas de esta lista no es un tramite: `ningunCruceConsentidoSobra`
-                    // vuelve a escanear SIN la lista y exige que cada entrada siga eximiendo un
-                    // cruce de verdad, asi que dejarlas puestas la habria puesto en rojo. Es la
-                    // lista de trabajo pendiente encogiendose por haberse hecho el trabajo.
+                    // Retirarlas no es un tramite: `ningunCruceConsentidoSobra` vuelve a escanear
+                    // SIN la lista y exige que cada entrada siga eximiendo un cruce de verdad, asi
+                    // que dejar cualquiera de las siete la habria puesto en rojo.
 
                     // ---------------------------------------------------------------------------
-                    // GOB-05 §6.6 — `rentas` -> `catastro`. Sigue abierto.
+                    // GOB-05 §6.8 — `caja` -> `rentas`. El unico que queda, y lo tiene abierto
+                    // D-17.
                     //
-                    new CruceConsentido(
-                            "TitularPrincipalRepositoryJdbc", "titularidad", "PENDIENTE-CRUCE-04"),
-
-                    // ---------------------------------------------------------------------------
-                    // GOB-05 §6.7 — `rentas` -> `catastro`. El mas barato de los siete.
-                    //
-                    // SOLO cuando el usuario filtra por codigo predial: un JOIN para traducir un
-                    // codigo a un identificador. Se resuelve con una llamada previa PORQUE el
-                    // filtro
-                    // devuelve como mucho un predio; lo que no se puede hacer es lo mismo en §6.1,
-                    // donde el JOIN es sobre el padron entero.
-                    //
-                    // Le toca a: rentas.
-                    new CruceConsentido(
-                            "CuotaDeArbitrioRepositoryJdbc", "predio", "PENDIENTE-CRUCE-05"),
-
-                    // ---------------------------------------------------------------------------
-                    // GOB-05 §6.8 — `caja` -> `rentas`. El que D-17 tiene abierto.
-                    //
-                    // Filtrar recibos por contribuyente traduciendo el codigo del padron al
-                    // identificador. Mismo caso que §6.7 y una decision de negocio encima: el dia
-                    // que la caja cobre un puesto de mercado, el pagador puede no estar en
-                    // `contribuyente`. Los dos caminos que D-17 plantea —registro compartido, o
-                    // pagador propio de `caja` que solo enlaza cuando lo hay— cambian esta consulta
-                    // de forma distinta, asi que hasta que se decida va por puerto HTTP.
-                    //
-                    // Le toca a: caja.
                     new CruceConsentido(
                             "ReciboRepositoryJdbc", "contribuyente", "PENDIENTE-CRUCE-06"));
 }

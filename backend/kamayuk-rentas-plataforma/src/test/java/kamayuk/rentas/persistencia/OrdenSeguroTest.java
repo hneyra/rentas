@@ -44,7 +44,7 @@ class OrdenSeguroTest {
     @ValueSource(
             strings = {
                 "(SELECT nombre FROM municipalidad LIMIT 1)",
-                "codigo; DROP TABLE via",
+                "codigo; DROP TABLE via_de_prueba",
                 "codigo, (SELECT 1)",
                 "1",
                 "codigo--",

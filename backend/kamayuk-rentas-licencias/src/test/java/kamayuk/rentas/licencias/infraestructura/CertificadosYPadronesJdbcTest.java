@@ -1481,7 +1481,7 @@ class CertificadosYPadronesJdbcTest {
         String codigo = "200601010150010101" + String.format("%06d", orden);
         long predio =
                 insertarComoApp(
-                        "INSERT INTO predio (municipalidad_id, codigo_ref_catastral, tipo,"
+                        "INSERT INTO predio_de_prueba (municipalidad_id, codigo_ref_catastral, tipo,"
                                 + " direccion, lote) VALUES (?, ?, 'URBANO', ?, '01') RETURNING id",
                         municipalidad,
                         codigo,

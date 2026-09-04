@@ -45,60 +45,45 @@ class ContratoDeApiTest {
      * <p>Se agrega una linea por endpoint nuevo. Es deliberado que cueste una linea: asi el diff de
      * un endpoint nuevo dice que operacion del manual cubre.
      */
+    /**
+     * Las de {@code catastro} salieron con P5C, y no porque dejaran de existir.
+     *
+     * <p>`V6` retiro de esta base las quince tablas del sistema del predio y sus controladores se
+     * fueron con ellas: las sirve el repositorio {@code catastro}, en {@code /catastro/api/v1}. Sus
+     * rutas <b>se quedan en el contrato</b> —igual que {@code GET /portal/deuda} y que {@code GET
+     * /seguridad/parametros} tras P5B— porque el contrato describe lo que la interfaz pide, y la
+     * interfaz las sigue pidiendo; lo que ya no es cierto es que las publique ESTE backend.
+     *
+     * <p>Son 40 entradas, y son exactamente las que empiezan por {@code /catastro/} mas el resumen
+     * predial.
+     */
     private static final Set<String> IMPLEMENTADAS =
             Set.of(
-                    "GET /catastro/vias",
-                    "POST /catastro/vias",
-                    "PUT /catastro/vias/{codigo}",
+                    // Las TRES de `/catastro/` que este backend SI publica, y que no se fueron con
+                    // P5C: la conciliacion y su recuento son un derivado de `declaracion_jurada`
+                    // —de rentas— que catastro no puede mirar sin depender de rentas (ADR-0015), y
+                    // los titulares de un predio los sirve rentas porque `contribuyentes` es la
+                    // base del grafo y catastro ya depende de el (#366, ADR-0015 §2.4).
+                    "GET /catastro/fichas/conciliacion",
+                    "GET /catastro/fichas/conciliacion/resumen",
+                    "GET /catastro/predios/{predioId}/titulares",
                     "GET /rentas/vehiculos/{placa}",
                     "GET /rentas/vehiculos",
-                    "GET /catastro/sectores",
-                    "POST /catastro/sectores",
-                    "PUT /catastro/sectores/{codigo}",
-                    "GET /catastro/sectores/{codigo}/manzanas",
-                    "POST /catastro/sectores/{codigo}/manzanas",
-                    "GET /catastro/fichas/urbana/{codRefCatastral}",
-                    "GET /catastro/fichas/economica/{codRefCatastral}",
-                    "GET /catastro/fichas/bienes-comunes/{codEdificacion}",
-                    "GET /catastro/fichas/rural/{codUnidad}",
-                    "GET /catastro/fichas",
-                    "GET /catastro/contribuyentes/{codigo}/ficha.pdf",
-                    "POST /catastro/fichas/urbana",
-                    "POST /catastro/fichas/economica",
-                    "POST /catastro/fichas/bienes-comunes",
-                    "POST /catastro/fichas/rural",
-                    "PUT /catastro/fichas/{codigo}/actualizacion",
-                    "PUT /catastro/fichas/economica/{codRefCatastral}/actualizacion",
-                    "PUT /catastro/fichas/bienes-comunes/{codEdificacion}/actualizacion",
-                    "PUT /catastro/fichas/rural/{codUnidad}/actualizacion",
-                    "GET /catastro/predios",
                     // #489 — el alta del predio, sin ficha. `RegistrarPredio.registrar` existia
                     // desde #16 y ningun endpoint la llamaba: un predio solo nacia como efecto
                     // secundario de inscribir su ficha, o por la carga cartografica de #487.
-                    "POST /catastro/predios",
                     // #490 — la titularidad y la ocupacion. `registrarTitularidad`,
                     // `registrarInquilino` y `finalizarInquilino` existian desde #16 y #31 y
                     // ninguno se publicaba: el primer titular de un predio no se podia registrar
                     // por HTTP, solo transferir lo que ya tenia dueno.
-                    "POST /catastro/predios/{predioId}/titulares",
-                    "GET /catastro/predios/{predioId}/inquilinos",
-                    "POST /catastro/predios/{predioId}/inquilinos",
-                    "PUT /catastro/predios/{predioId}/inquilinos/{inquilinoId}",
-                    "POST /catastro/predios/{predioId}/baja",
-                    "POST /catastro/predios/{predioId}/reactivacion",
                     // #536 — el plano catastral. El contrato la declaraba desde #500 (ADR-0022) y
                     // ningun controlador la servia: era una de las DOS operaciones sin nadie que
                     // las atendiera, y la otra —`GET /portal/deuda`— no va a tenerlo (ADR-0016
                     // §3).
-                    "GET /catastro/predios/plano",
                     // #612 — donde esta lo levantado. `plano` exige `bbox` y ninguna operacion
                     // decia donde esta la municipalidad, asi que el visor abria sobre el pais
                     // entero: con geometria cargada eso contesta «acercate» y desde la pantalla
                     // no se sabe hacia donde.
-                    "GET /catastro/predios/plano/marco",
-                    "GET /catastro/tablas/aranceles",
-                    "GET /catastro/tablas/valores-unitarios",
-                    "GET /catastro/tablas/depreciacion",
                     "GET /rentas/contribuyentes",
                     // #488 — el padron se leia y no se escribia: `RegistrarContribuyente` y
                     // `ActualizarFicha` existian desde #11 y #15 y ningun controlador los
@@ -153,7 +138,6 @@ class ContratoDeApiTest {
                     "GET /consultas/pagos",
                     "GET /consultas/predios",
                     "GET /consultas/valores",
-                    "GET /consultas/resumen-predial",
                     "GET /consultas/unificada",
                     // #57 — ADR-0020: la unica operacion del portal del contribuyente, y la
                     // unica de toda la API que se sirve con el token del realm del ciudadano.
@@ -435,15 +419,12 @@ class ContratoDeApiTest {
                     // servir catastro, porque el derivado sale de `declaracion_jurada` y
                     // dependerlo cerraria el ciclo de modulos. La sirve rentas, en esta ruta, y
                     // la de catastro redirige alli la peticion que trae el filtro.
-                    "GET /catastro/fichas/conciliacion",
-                    "GET /catastro/fichas/conciliacion/resumen",
                     // #366 — ADR-0015 §2.4: el titular del predio, resuelto al clic. La grilla
                     // sigue publicando el nombre y no el identificador; quien quiera el codigo
                     // del contribuyente lo pide aqui, de un predio cada vez, con el permiso del
                     // padron y dejando fila de ACCESO. La sirve rentas por lo mismo que la
                     // conciliacion: es el unico modulo que ve catastro y contribuyentes a la vez
                     // sin cerrar un ciclo.
-                    "GET /catastro/predios/{predioId}/titulares",
                     // #396 — las dos ultimas operaciones de Transito que el contrato declaraba y
                     // ningun controlador servia. Ninguna es una adicion: las dos estaban desde que
                     // el contrato se derivo del prototipo, y #53 las dejo fuera.

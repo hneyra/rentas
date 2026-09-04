@@ -235,7 +235,7 @@ class ArbitriosFronteraTest {
 
     private static long crearPredio(String codigo) {
         return comoApp(
-                "INSERT INTO predio (municipalidad_id, codigo_ref_catastral, tipo, direccion)"
+                "INSERT INTO predio_de_prueba (municipalidad_id, codigo_ref_catastral, tipo, direccion)"
                         + " VALUES (?, ?, 'URBANO', 'Jr. Union de prueba') RETURNING id",
                 municipalidad,
                 codigo);

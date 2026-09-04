@@ -149,8 +149,8 @@ class LiquidacionJdbcTest {
             TenantContext.fijar(new MunicipalidadId(municipalidadA));
             Escenario escenario = sembrar(municipalidadA);
 
-            long prediosAntes = transaccion.execute(estado -> contar("predio"));
-            long fichasAntes = transaccion.execute(estado -> contar("ficha_catastral"));
+            long prediosAntes = transaccion.execute(estado -> contar("predio_de_prueba"));
+            long fichasAntes = transaccion.execute(estado -> contar("ficha_catastral_de_prueba"));
             long djAntes = transaccion.execute(estado -> contar("declaracion_jurada"));
 
             transaccion.execute(
@@ -159,9 +159,9 @@ class LiquidacionJdbcTest {
                                     primera(escenario),
                                     List.of(linea(escenario, CondicionFiscalizada.SUBVALUADOR))));
 
-            assertThat((long) transaccion.execute(estado -> contar("predio")))
+            assertThat((long) transaccion.execute(estado -> contar("predio_de_prueba")))
                     .isEqualTo(prediosAntes);
-            assertThat((long) transaccion.execute(estado -> contar("ficha_catastral")))
+            assertThat((long) transaccion.execute(estado -> contar("ficha_catastral_de_prueba")))
                     .isEqualTo(fichasAntes);
             assertThat((long) transaccion.execute(estado -> contar("declaracion_jurada")))
                     .as("la comparacion se hace sobre copias: rentas no se toca")
@@ -670,7 +670,7 @@ class LiquidacionJdbcTest {
         long predio =
                 ejecutarComoApp(
                         municipalidadId,
-                        "INSERT INTO predio (municipalidad_id, codigo_ref_catastral, tipo,"
+                        "INSERT INTO predio_de_prueba (municipalidad_id, codigo_ref_catastral, tipo,"
                                 + " direccion)"
                                 + " VALUES (?, ?, 'URBANO', 'Jr. Union de prueba') RETURNING id",
                         municipalidadId,
@@ -678,7 +678,7 @@ class LiquidacionJdbcTest {
         long ficha =
                 ejecutarComoApp(
                         municipalidadId,
-                        "INSERT INTO ficha_catastral (municipalidad_id, predio_id, tipo, version,"
+                        "INSERT INTO ficha_catastral_de_prueba (municipalidad_id, predio_id, tipo, version,"
                                 + " area_terreno, uso, vigencia_desde, origen, documento_origen,"
                                 + " observacion, usuario_registro)"
                                 + " VALUES (?, ?, 'UNICA', 1, 300.00, 'CASA_HABITACION', ?,"

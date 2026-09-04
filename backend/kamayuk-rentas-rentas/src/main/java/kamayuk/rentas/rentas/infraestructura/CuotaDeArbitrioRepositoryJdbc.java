@@ -108,7 +108,12 @@ public class CuotaDeArbitrioRepositoryJdbc extends RepositorioJdbc
         String desde = DESDE;
         String donde = " WHERE d.ejercicio = :ejercicio";
         if (criterio.codigoPredial() != null) {
-            desde = DESDE + " JOIN predio p ON p.id = d.predio_id";
+            // `predio_ref`, la proyeccion local de `V4`, y no `predio`: esa tabla se fue a
+            // `catastro` con `V6` (P5C; cierra `PENDIENTE-CRUCE-05`). El filtro traduce un codigo
+            // de referencia catastral a un predio, y la proyeccion lo lleva — que es justamente
+            // para lo que existe: un predicado de `rentas` que necesita un hecho de catastro
+            // tiene que caber en un `WHERE` de esta base.
+            desde = DESDE + " JOIN predio_ref p ON p.predio_id = d.predio_id";
             donde += " AND p.codigo_ref_catastral = :codigoPredial";
             parametros.put("codigoPredial", criterio.codigoPredial());
         }

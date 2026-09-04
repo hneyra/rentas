@@ -22,10 +22,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import kamayuk.rentas.auditoria.Origen;
 import kamayuk.rentas.auditoria.OrigenContext;
 import kamayuk.rentas.auditoria.RegistroDeAuditoria;
-import kamayuk.rentas.catastro.aplicacion.LectorDeFichasCatastro;
-import kamayuk.rentas.catastro.aplicacion.TitularesDelPredioCatastro;
-import kamayuk.rentas.catastro.infraestructura.CatastroRepositoryJdbc;
-import kamayuk.rentas.catastro.infraestructura.FichaCatastralRepositoryJdbc;
+import kamayuk.rentas.catastro.prueba.FichasDelEscenario;
+import kamayuk.rentas.catastro.prueba.TitularesDelEscenario;
 import kamayuk.rentas.compartido.TenantContext;
 import kamayuk.rentas.contribuyentes.DirectorioDeContribuyentes;
 import kamayuk.rentas.contribuyentes.ResumenDeContribuyente;
@@ -156,10 +154,7 @@ class MuestraDelPredioSinTitularFronteraTest {
 
         DeteccionDeOmisos deteccion =
                 new DeteccionDeOmisos(
-                        new DeteccionRepositoryJdbc(jdbc),
-                        envolver(
-                                new TitularesDelPredioCatastro(new CatastroRepositoryJdbc(jdbc)),
-                                gestor));
+                        new DeteccionRepositoryJdbc(jdbc), new TitularesDelEscenario(jdbc));
 
         GenerarMuestra sorteo =
                 envolver(
@@ -170,13 +165,7 @@ class MuestraDelPredioSinTitularFronteraTest {
         RegistrarActaFiscalizacion registroDeActas =
                 envolver(
                         new RegistrarActaFiscalizacion(
-                                actas,
-                                programas,
-                                envolver(
-                                        new LectorDeFichasCatastro(
-                                                new FichaCatastralRepositoryJdbc(jdbc)),
-                                        gestor),
-                                registro -> {}),
+                                actas, programas, new FichasDelEscenario(jdbc), registro -> {}),
                         gestor);
 
         mvc =
@@ -411,7 +400,7 @@ class MuestraDelPredioSinTitularFronteraTest {
 
     private static void sembrarSector(String codigo) {
         ejecutarComoApp(
-                "INSERT INTO sector (municipalidad_id, codigo, nombre)"
+                "INSERT INTO sector_de_prueba (municipalidad_id, codigo, nombre)"
                         + " VALUES (?, ?, 'Sector de prueba') RETURNING id",
                 municipalidadA,
                 codigo);
@@ -419,10 +408,10 @@ class MuestraDelPredioSinTitularFronteraTest {
 
     private static long sembrarPredio(String sufijo) {
         return ejecutarComoApp(
-                "INSERT INTO predio (municipalidad_id, codigo_ref_catastral, tipo, direccion,"
+                "INSERT INTO predio_de_prueba (municipalidad_id, codigo_ref_catastral, tipo, direccion,"
                         + " sector_id)"
                         + " VALUES (?, ?, 'URBANO', 'Jr. Union de prueba',"
-                        + "  (SELECT id FROM sector WHERE municipalidad_id = ? AND codigo = 'SD'))"
+                        + "  (SELECT id FROM sector_de_prueba WHERE municipalidad_id = ? AND codigo = 'SD'))"
                         + " RETURNING id",
                 municipalidadA,
                 codigoCatastralDe(sufijo),
@@ -431,7 +420,7 @@ class MuestraDelPredioSinTitularFronteraTest {
 
     private static long sembrarFicha(long predioId) {
         return ejecutarComoApp(
-                "INSERT INTO ficha_catastral (municipalidad_id, predio_id, tipo, version,"
+                "INSERT INTO ficha_catastral_de_prueba (municipalidad_id, predio_id, tipo, version,"
                         + " area_terreno, uso, vigencia_desde, origen, documento_origen,"
                         + " observacion, usuario_registro)"
                         + " VALUES (?, ?, 'UNICA', ?, 300.00, 'CASA_HABITACION', DATE '2020-01-01',"
@@ -444,7 +433,7 @@ class MuestraDelPredioSinTitularFronteraTest {
 
     private static long sembrarTitularidad(long predioId, long contribuyenteId) {
         return ejecutarComoApp(
-                "INSERT INTO titularidad (municipalidad_id, predio_id, contribuyente_id, condicion,"
+                "INSERT INTO titularidad_de_prueba (municipalidad_id, predio_id, contribuyente_id, condicion,"
                         + " porcentaje, vigencia_desde, documento_origen)"
                         + " VALUES (?, ?, ?, 'PROPIETARIO_UNICO', 100.00, DATE '2020-01-01',"
                         + " 'DOC-PRUEBA') RETURNING id",
@@ -481,7 +470,7 @@ class MuestraDelPredioSinTitularFronteraTest {
                 "INSERT INTO programa_muestra (municipalidad_id, programa_id, predio_id,"
                         + " cod_ref_catastral, contribuyente_id, condicion, fecha_sorteo,"
                         + " observacion, usuario_registro, fecha_registro)"
-                        + " VALUES (?, ?, ?, (SELECT codigo_ref_catastral FROM predio"
+                        + " VALUES (?, ?, ?, (SELECT codigo_ref_catastral FROM predio_de_prueba"
                         + "                    WHERE municipalidad_id = ? AND id = ?), ?, 'OMISO',"
                         + "         ?, 'siembra', 'siembra', now()) RETURNING id",
                 municipalidadA,

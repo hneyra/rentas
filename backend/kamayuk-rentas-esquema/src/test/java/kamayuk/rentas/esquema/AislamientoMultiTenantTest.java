@@ -61,7 +61,26 @@ class AislamientoMultiTenantTest {
                     "conjunto_parametro_detalle_de_prueba",
                     "valor_unitario_de_prueba",
                     "depreciacion_de_prueba",
-                    "valor_referencial_de_prueba");
+                    "valor_referencial_de_prueba",
+                    // Y las QUINCE del escenario de `catastro` (P5C). Mismo caso: `V6` se
+                    // llevo las de verdad y estas existen para que treinta y cuatro clases
+                    // puedan escribir su premisa —«este predio existe y tiene esta ficha»—.
+                    // Ver `EscenarioDeCatastro`.
+                    "via_de_prueba",
+                    "sector_de_prueba",
+                    "manzana_de_prueba",
+                    "predio_de_prueba",
+                    "ficha_catastral_de_prueba",
+                    "construccion_de_prueba",
+                    "otra_instalacion_de_prueba",
+                    "titularidad_de_prueba",
+                    "inquilino_de_prueba",
+                    "arancel_de_prueba",
+                    "actividad_economica_de_prueba",
+                    "bien_comun_de_prueba",
+                    "colindante_rural_de_prueba",
+                    "participacion_comun_de_prueba",
+                    "tierra_rural_de_prueba");
 
     /**
      * Catalogos: no llevan {@code municipalidad_id NOT NULL}, pero si RLS con politica propia
@@ -622,14 +641,14 @@ class AislamientoMultiTenantTest {
             try (Connection admin = base.conexionAdmin()) {
                 admin.setAutoCommit(false);
                 ContextoDeTenant.fijar(admin, municipalidadA);
-                vistasPorElSuperusuario = contar(admin, "SELECT count(*) FROM predio");
+                vistasPorElSuperusuario = contar(admin, "SELECT count(*) FROM predio_ref");
                 admin.rollback();
             }
 
             long vistasPorLaAplicacion;
             try (Connection app = base.conexion(BaseDeDatosDePrueba.APP)) {
                 ContextoDeTenant.fijar(app, municipalidadA);
-                vistasPorLaAplicacion = contar(app, "SELECT count(*) FROM predio");
+                vistasPorLaAplicacion = contar(app, "SELECT count(*) FROM predio_ref");
                 app.rollback();
             }
 

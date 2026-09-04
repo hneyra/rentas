@@ -17,9 +17,7 @@ import kamayuk.rentas.auditoria.AuditoriaJdbc;
 import kamayuk.rentas.auditoria.Origen;
 import kamayuk.rentas.auditoria.OrigenContext;
 import kamayuk.rentas.catastro.GestorDeTitularidad;
-import kamayuk.rentas.catastro.aplicacion.GestorDeTitularidadCatastro;
-import kamayuk.rentas.catastro.aplicacion.RegistrarPredio;
-import kamayuk.rentas.catastro.infraestructura.CatastroRepositoryJdbc;
+import kamayuk.rentas.catastro.prueba.TitularidadDelEscenario;
 import kamayuk.rentas.compartido.TenantContext;
 import kamayuk.rentas.dominio.MunicipalidadId;
 import kamayuk.rentas.esquema.BaseDeDatosDePrueba;
@@ -104,12 +102,9 @@ class TransferenciasFronteraTest {
 
         TransferenciaRepositoryJdbc transferencias = new TransferenciaRepositoryJdbc(jdbc);
         VehiculoRepositoryJdbc vehiculos = new VehiculoRepositoryJdbc(jdbc);
-        CatastroRepositoryJdbc catastro = new CatastroRepositoryJdbc(jdbc);
-        AuditoriaJdbc auditoria = new AuditoriaJdbc(jdbc, RELOJ);
 
-        RegistrarPredio registrarPredio = new RegistrarPredio(catastro, auditoria, RELOJ);
-        GestorDeTitularidad titularidad =
-                new GestorDeTitularidadCatastro(catastro, registrarPredio);
+        AuditoriaJdbc auditoria = new AuditoriaJdbc(jdbc, RELOJ);
+        GestorDeTitularidad titularidad = new TitularidadDelEscenario(jdbc);
 
         RegistrarTransferencia registrar =
                 conLaTransaccionQueDiceLaAnotacion(
@@ -457,7 +452,7 @@ class TransferenciasFronteraTest {
             ContextoDeTenant.fijar(app, municipalidad);
             try (PreparedStatement sentencia =
                     app.prepareStatement(
-                            "INSERT INTO predio (municipalidad_id, codigo_ref_catastral, tipo,"
+                            "INSERT INTO predio_de_prueba (municipalidad_id, codigo_ref_catastral, tipo,"
                                     + " direccion) VALUES (?, ?, 'URBANO', 'Calle de prueba 123')"
                                     + " RETURNING id")) {
                 sentencia.setLong(1, municipalidad);
@@ -478,7 +473,7 @@ class TransferenciasFronteraTest {
             ContextoDeTenant.fijar(app, municipalidad);
             try (PreparedStatement sentencia =
                     app.prepareStatement(
-                            "INSERT INTO titularidad (municipalidad_id, predio_id,"
+                            "INSERT INTO titularidad_de_prueba (municipalidad_id, predio_id,"
                                     + " contribuyente_id, condicion, porcentaje, vigencia_desde,"
                                     + " documento_origen)"
                                     + " VALUES (?, ?, ?, 'PROPIETARIO_UNICO', ?, DATE '2020-01-01',"

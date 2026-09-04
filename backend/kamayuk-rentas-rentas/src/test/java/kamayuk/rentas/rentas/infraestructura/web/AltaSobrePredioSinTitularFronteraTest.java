@@ -24,8 +24,7 @@ import kamayuk.rentas.auditoria.AuditoriaJdbc;
 import kamayuk.rentas.auditoria.Origen;
 import kamayuk.rentas.auditoria.OrigenContext;
 import kamayuk.rentas.autorizacion.GuardiaDeAcceso;
-import kamayuk.rentas.catastro.aplicacion.TitularesDelPredioCatastro;
-import kamayuk.rentas.catastro.infraestructura.CatastroRepositoryJdbc;
+import kamayuk.rentas.catastro.prueba.TitularesDelEscenario;
 import kamayuk.rentas.compartido.TenantContext;
 import kamayuk.rentas.contribuyentes.DirectorioDeContribuyentes;
 import kamayuk.rentas.contribuyentes.ResumenDeContribuyente;
@@ -199,8 +198,7 @@ class AltaSobrePredioSinTitularFronteraTest {
                                 documentos,
                                 envolver(
                                         new TitularesDeLaUnidadRentas(
-                                                new TitularesDelPredioCatastro(
-                                                        new CatastroRepositoryJdbc(jdbc)),
+                                                new TitularesDelEscenario(jdbc),
                                                 new VehiculoRepositoryJdbc(jdbc),
                                                 new PadronDeLaPrueba()),
                                         gestor)),
@@ -552,7 +550,7 @@ class AltaSobrePredioSinTitularFronteraTest {
             ContextoDeTenant.fijar(app, enLaMunicipalidad);
             try (PreparedStatement sentencia =
                     app.prepareStatement(
-                            "INSERT INTO predio (municipalidad_id, codigo_ref_catastral, tipo,"
+                            "INSERT INTO predio_de_prueba (municipalidad_id, codigo_ref_catastral, tipo,"
                                     + " direccion) VALUES (?, ?, 'URBANO', ?) RETURNING id")) {
                 sentencia.setLong(1, enLaMunicipalidad);
                 sentencia.setString(2, codigo);
@@ -574,7 +572,7 @@ class AltaSobrePredioSinTitularFronteraTest {
             ContextoDeTenant.fijar(app, enLaMunicipalidad);
             try (PreparedStatement sentencia =
                     app.prepareStatement(
-                            "INSERT INTO titularidad (municipalidad_id, predio_id,"
+                            "INSERT INTO titularidad_de_prueba (municipalidad_id, predio_id,"
                                     + " contribuyente_id, condicion, porcentaje, vigencia_desde,"
                                     + " documento_origen)"
                                     + " VALUES (?, ?, ?, 'PROPIETARIO_UNICO', ?, ?,"

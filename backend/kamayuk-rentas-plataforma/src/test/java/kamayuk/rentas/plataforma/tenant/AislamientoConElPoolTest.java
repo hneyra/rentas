@@ -224,7 +224,11 @@ class AislamientoConElPoolTest {
     }
 
     private long predios(JdbcTemplate jdbc) {
-        Long total = jdbc.queryForObject("SELECT count(*) FROM predio", Long.class);
+        // `predio_ref` y no `predio`: esa tabla se fue a `catastro` con `V6` (P5C), y la de
+        // escenario que la sustituye NO lleva RLS a proposito —no son datos de nadie—, de modo
+        // que contar sobre ella no diria nada del aislamiento. La proyeccion local si la lleva, y
+        // es ademas la que la aplicacion lee de verdad desde P5C.
+        Long total = jdbc.queryForObject("SELECT count(*) FROM predio_ref", Long.class);
         return total == null ? -1 : total;
     }
 
@@ -235,7 +239,7 @@ class AislamientoConElPoolTest {
     private long contarPor(JdbcTemplate jdbc, long municipalidadId) {
         Long total =
                 jdbc.queryForObject(
-                        "SELECT count(*) FROM predio WHERE municipalidad_id = ?",
+                        "SELECT count(*) FROM predio_ref WHERE municipalidad_id = ?",
                         Long.class,
                         municipalidadId);
         return total == null ? -1 : total;

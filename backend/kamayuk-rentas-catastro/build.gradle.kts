@@ -1,51 +1,42 @@
-// Contexto acotado `catastro` (ARQ-01 §3).
+// El ADAPTADOR CLIENTE de `catastro`, y nada mas (P5C).
 //
-// Todavia sin funcionalidad de negocio —la primera esta bloqueada por D-01 y
-// D-02—, pero ya con el catalogo vial: es el repositorio de ejemplo del patron
-// de persistencia (issue #5), elegido porque no arrastra ninguna regla de
-// calculo y si tiene municipalidad_id y politica RLS, que es lo que hay que
-// demostrar.
+// Hasta P5C este era el contexto acotado `catastro` entero: doscientas clases, quince tablas y su
+// dominio. `V6` retiro las tablas y el sistema del predio vive en el repositorio `catastro`
+// (ADR-0029). Lo que queda aqui son los NUEVE PUERTOS del paquete raiz —que ya eran el contrato, y
+// por eso las veintisiete clases de `src/main` que los consumen no cambiaron ni una linea— y el
+// transporte que los implementa.
+//
+// Es la misma forma en que P5B dejo `kamayuk-rentas-parametros`: puertos y cliente, sin dominio y
+// sin una sola consulta. Si este modulo volviera a tener un repositorio, `rentas` leeria tablas de
+// `catastro` y el escaner de frontera lo diria.
+//
+// NO lleva `sgtm.pruebas-postgres`: no tiene una sola consulta que probar.
 
 plugins {
     id("sgtm.modulo")
-    id("sgtm.pruebas-postgres")
+    `java-test-fixtures`
 }
 
 dependencies {
-    testImplementation(testFixtures(project(":kamayuk-rentas-parametros")))
-    // Dos dependencias a otro contexto acotado, y las dos aqui para que se vean.
-    //
-    // La titularidad guarda un contribuyente_id y nada mas: el nombre, el codigo y el domicilio
-    // viven en el padron. La consulta de fichas (RF-006) filtra por titular y el reporte de ficha
-    // (RF-010) imprime sus datos, asi que uno de los dos tiene que preguntarle al otro.
-    //
-    // Se importa solo kamayuk.rentas.contribuyentes.DirectorioDeContribuyentes —el paquete raiz, que
-    // es la API publica (ARQ-01 §4.1)—; Spring Modulith rechaza cualquier import a .dominio o
-    // .aplicacion del vecino. La alternativa era un JOIN a la tabla contribuyente desde el SQL de
-    // catastro: mas rapido de escribir, invisible para Modulith, y roto en silencio el dia que el
-    // padron cambie una columna.
-    implementation(project(":kamayuk-rentas-contribuyentes"))
+    // El cliente habla HTTP con la JDK; de Spring solo entran el estereotipo, `@Value` y el acceso
+    // a la peticion en curso —de donde sale el token que se reenvia— y de Jackson el arbol JSON.
+    // Ni un cliente HTTP de framework: ver el javadoc de `ClienteHttpDeNormativa`, que explica por
+    // que hace falta el `String` crudo.
+    implementation("org.springframework:spring-web")
+    implementation("com.fasterxml.jackson.core:jackson-databind")
 
-    // Las tablas de valuacion (#17) cuelgan de un conjunto de parametros sellado, no de un
-    // ejercicio suelto: traducir «ejercicio» a «conjunto» es cosa de `parametros` —es quien sabe
-    // que significa sellado y cual es la version vigente—, igual que ya hizo `rentas` para el valor
-    // referencial vehicular (#141). Se importa solo su paquete raiz, la API publica.
-    implementation(project(":kamayuk-rentas-parametros"))
-
-    // La prueba del repositorio corre contra PostgreSQL de verdad: provisiona la
-    // base como un ambiente real y se conecta como sgtm_app, no como el
-    // superusuario que entrega Testcontainers (CAL-01 §3.2).
-    testImplementation(testFixtures(project(":kamayuk-rentas-esquema")))
-    testImplementation("org.springframework.boot:spring-boot-starter-jdbc")
-
-    // El caso de uso se prueba envuelto en un proxy transaccional de verdad, para
-    // que lo que se verifique sea la anotacion y no un TransactionTemplate escrito
-    // por la propia prueba.
-    testImplementation("org.springframework:spring-aop")
-
-    // MockMvc para el endpoint: se prueba el transporte —forma del JSON, parametros,
-    // traduccion de errores— sin base de datos. Lo que la base verifica ya tiene sus
-    // pruebas aparte, y separarlas hace que cada fallo diga que se rompio.
-    testImplementation("org.springframework:spring-test")
-    testRuntimeOnly(libs.postgresql)
+    // Los dobles en memoria de los nueve puertos, para las pruebas de los otros modulos. Viven
+    // aqui y no en cada uno porque son la misma premisa —«este predio tiene este titular»— y
+    // repetirla en cuatro modulos es repetir la que un dia se corrige a medias.
+    testFixturesApi(platform(libs.spring.boot.bom))
+    testFixturesApi(project(":kamayuk-rentas-dominio-compartido"))
+    testFixturesApi(project(":kamayuk-rentas-plataforma"))
+    // El cuadro en memoria lanza , que es de : es el tipo que los
+    // doce sitios que calculan ya saben cazar, y devolver otro dejaria a la prueba midiendo un
+    // camino que en produccion no existe.
+    testFixturesApi(project(":kamayuk-rentas-parametros"))
+    //  lee las tablas  del escenario con JdbcClient. Es un
+    // FIXTURE: el modulo de produccion no tiene ni una consulta, y eso lo comprueba el escaner de
+    // frontera, que solo recorre .
+    testFixturesImplementation("org.springframework.boot:spring-boot-starter-jdbc")
 }

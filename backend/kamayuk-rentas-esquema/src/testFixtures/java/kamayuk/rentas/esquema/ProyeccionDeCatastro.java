@@ -42,9 +42,13 @@ public final class ProyeccionDeCatastro {
     public static void proyectar(BaseDeDatosDePrueba base, long municipalidadId)
             throws SQLException {
         // Se LEE con `sgtm_app` y se ESCRIBE con el ingestor, en dos conexiones. El rodeo no es
-        // un capricho: el ingestor NO tiene privilegio de lectura sobre `predio` ni sobre
-        // `ficha_catastral` —y no debe tenerlo, porque el de produccion recibe los datos dentro
-        // del evento—, asi que un `INSERT ... SELECT` en una sola conexion no puede existir.
+        // un capricho: el ingestor NO tiene privilegio sobre las tablas de escenario, y el de
+        // produccion recibe los datos DENTRO del evento; un `INSERT ... SELECT` en una sola
+        // conexion no puede existir.
+        //
+        // Y desde P5C lee `predio_de_prueba` y `ficha_catastral_de_prueba`, porque `V6` retiro las
+        // de verdad: el catastro vive en otra base. Es el unico punto en que este fixture se
+        // aparta del ingestor real.
         java.util.List<Object[]> predios = new java.util.ArrayList<>();
         java.util.List<Object[]> fichas = new java.util.ArrayList<>();
         try (Connection app = base.conexion(BaseDeDatosDePrueba.APP)) {
@@ -53,8 +57,8 @@ public final class ProyeccionDeCatastro {
                     app,
                     """
                     SELECT p.id, p.codigo_ref_catastral, p.direccion, s.codigo, p.estado
-                      FROM predio p
-                      LEFT JOIN sector s
+                      FROM predio_de_prueba p
+                      LEFT JOIN sector_de_prueba s
                         ON s.municipalidad_id = p.municipalidad_id AND s.id = p.sector_id
                      WHERE p.municipalidad_id = ?
                     """,
@@ -66,7 +70,7 @@ public final class ProyeccionDeCatastro {
                     """
                     SELECT f.id, f.predio_id, f.tipo, f.version, f.vigencia_desde,
                            f.vigencia_hasta, f.area_terreno, f.uso
-                      FROM ficha_catastral f
+                      FROM ficha_catastral_de_prueba f
                      WHERE f.municipalidad_id = ?
                     """,
                     municipalidadId,

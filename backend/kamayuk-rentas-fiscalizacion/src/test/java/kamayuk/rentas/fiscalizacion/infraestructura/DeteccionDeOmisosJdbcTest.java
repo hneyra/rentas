@@ -13,8 +13,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
-import kamayuk.rentas.catastro.aplicacion.TitularesDelPredioCatastro;
-import kamayuk.rentas.catastro.infraestructura.CatastroRepositoryJdbc;
+import kamayuk.rentas.catastro.prueba.TitularesDelEscenario;
 import kamayuk.rentas.compartido.Pagina;
 import kamayuk.rentas.compartido.Paginacion;
 import kamayuk.rentas.compartido.TenantContext;
@@ -90,8 +89,7 @@ class DeteccionDeOmisosJdbcTest {
         jdbc = JdbcClient.create(pool);
         deteccion =
                 new DeteccionDeOmisos(
-                        new DeteccionRepositoryJdbc(jdbc),
-                        envolver(new TitularesDelPredioCatastro(new CatastroRepositoryJdbc(jdbc))));
+                        new DeteccionRepositoryJdbc(jdbc), new TitularesDelEscenario(jdbc));
     }
 
     @AfterAll
@@ -944,7 +942,7 @@ class DeteccionDeOmisosJdbcTest {
     private static String sembrarSector(String codigo, long municipalidadId) {
         ejecutarComoApp(
                 municipalidadId,
-                "INSERT INTO sector (municipalidad_id, codigo, nombre)"
+                "INSERT INTO sector_de_prueba (municipalidad_id, codigo, nombre)"
                         + " VALUES (?, ?, 'Sector de prueba') RETURNING id",
                 municipalidadId,
                 codigo);
@@ -958,10 +956,10 @@ class DeteccionDeOmisosJdbcTest {
     private static long sembrarPredio(String sectorCodigo, String sufijo, long municipalidadId) {
         return ejecutarComoApp(
                 municipalidadId,
-                "INSERT INTO predio (municipalidad_id, codigo_ref_catastral, tipo, direccion,"
+                "INSERT INTO predio_de_prueba (municipalidad_id, codigo_ref_catastral, tipo, direccion,"
                         + " sector_id)"
                         + " VALUES (?, ?, 'URBANO', 'Jr. Union de prueba',"
-                        + "  (SELECT id FROM sector WHERE municipalidad_id = ? AND codigo = ?))"
+                        + "  (SELECT id FROM sector_de_prueba WHERE municipalidad_id = ? AND codigo = ?))"
                         + " RETURNING id",
                 municipalidadId,
                 codigoCatastralDe(sufijo),
@@ -976,7 +974,7 @@ class DeteccionDeOmisosJdbcTest {
     private static long sembrarFicha(long predioId, String area, long municipalidadId) {
         return ejecutarComoApp(
                 municipalidadId,
-                "INSERT INTO ficha_catastral (municipalidad_id, predio_id, tipo, version,"
+                "INSERT INTO ficha_catastral_de_prueba (municipalidad_id, predio_id, tipo, version,"
                         + " area_terreno, uso, vigencia_desde, origen, documento_origen,"
                         + " observacion, usuario_registro)"
                         + " VALUES (?, ?, 'UNICA', ?, ?, 'CASA_HABITACION', DATE '2020-01-01',"
@@ -997,7 +995,7 @@ class DeteccionDeOmisosJdbcTest {
             long predioId, String area, LocalDate desde, @Nullable LocalDate hasta) {
         return ejecutarComoApp(
                 municipalidadA,
-                "INSERT INTO ficha_catastral (municipalidad_id, predio_id, tipo, version,"
+                "INSERT INTO ficha_catastral_de_prueba (municipalidad_id, predio_id, tipo, version,"
                         + " area_terreno, uso, vigencia_desde, vigencia_hasta, origen,"
                         + " documento_origen, observacion, usuario_registro)"
                         + " VALUES (?, ?, 'UNICA', ?, ?, 'CASA_HABITACION', ?, ?,"
@@ -1017,7 +1015,7 @@ class DeteccionDeOmisosJdbcTest {
     private static void cerrarFicha(long fichaId) {
         conElOwner(
                 municipalidadA,
-                "UPDATE ficha_catastral SET vigencia_hasta = DATE '2020-12-31' WHERE id = ?",
+                "UPDATE ficha_catastral_de_prueba SET vigencia_hasta = DATE '2020-12-31' WHERE id = ?",
                 fichaId);
     }
 
@@ -1029,7 +1027,7 @@ class DeteccionDeOmisosJdbcTest {
             long predioId, long contribuyenteId, String porcentaje, long municipalidadId) {
         return ejecutarComoApp(
                 municipalidadId,
-                "INSERT INTO titularidad (municipalidad_id, predio_id, contribuyente_id, condicion,"
+                "INSERT INTO titularidad_de_prueba (municipalidad_id, predio_id, contribuyente_id, condicion,"
                         + " porcentaje, vigencia_desde, documento_origen)"
                         + " VALUES (?, ?, ?, 'COPROPIETARIO', ?, DATE '2020-01-01', 'DOC-PRUEBA')"
                         + " RETURNING id",
@@ -1048,7 +1046,7 @@ class DeteccionDeOmisosJdbcTest {
             long predioId, long contribuyenteId, LocalDate desde, @Nullable LocalDate hasta) {
         return ejecutarComoApp(
                 municipalidadA,
-                "INSERT INTO titularidad (municipalidad_id, predio_id, contribuyente_id, condicion,"
+                "INSERT INTO titularidad_de_prueba (municipalidad_id, predio_id, contribuyente_id, condicion,"
                         + " porcentaje, vigencia_desde, vigencia_hasta, documento_origen)"
                         + " VALUES (?, ?, ?, 'PROPIETARIO_UNICO', 100.00, ?, ?, 'DOC-PRUEBA')"
                         + " RETURNING id",
@@ -1062,13 +1060,15 @@ class DeteccionDeOmisosJdbcTest {
     private static void cerrarTitularidad(long titularidadId) {
         conElOwner(
                 municipalidadA,
-                "UPDATE titularidad SET vigencia_hasta = DATE '2021-12-31' WHERE id = ?",
+                "UPDATE titularidad_de_prueba SET vigencia_hasta = DATE '2021-12-31' WHERE id = ?",
                 titularidadId);
     }
 
     private static void darDeBaja(long predioId) {
         conElOwner(
-                municipalidadA, "UPDATE predio SET estado = 'DADO_DE_BAJA' WHERE id = ?", predioId);
+                municipalidadA,
+                "UPDATE predio_de_prueba SET estado = 'DADO_DE_BAJA' WHERE id = ?",
+                predioId);
     }
 
     private static void sembrarDeclaracion(

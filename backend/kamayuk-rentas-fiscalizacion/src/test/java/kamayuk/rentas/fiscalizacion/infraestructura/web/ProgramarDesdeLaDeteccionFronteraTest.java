@@ -516,7 +516,7 @@ class ProgramarDesdeLaDeteccionFronteraTest {
     private static void crearSector(long municipalidadId, String codigo) {
         comoApp(
                 municipalidadId,
-                "INSERT INTO sector (municipalidad_id, codigo, nombre)"
+                "INSERT INTO sector_de_prueba (municipalidad_id, codigo, nombre)"
                         + " VALUES (?, ?, 'Sector de prueba') RETURNING id",
                 municipalidadId,
                 codigo);
@@ -525,10 +525,10 @@ class ProgramarDesdeLaDeteccionFronteraTest {
     private static long crearPredio(long municipalidadId, String codigo, String sectorCodigo) {
         return comoApp(
                 municipalidadId,
-                "INSERT INTO predio (municipalidad_id, codigo_ref_catastral, tipo, direccion,"
+                "INSERT INTO predio_de_prueba (municipalidad_id, codigo_ref_catastral, tipo, direccion,"
                         + " sector_id)"
                         + " VALUES (?, ?, 'URBANO', 'Jr. Union de prueba',"
-                        + "  (SELECT id FROM sector WHERE municipalidad_id = ? AND codigo = ?))"
+                        + "  (SELECT id FROM sector_de_prueba WHERE municipalidad_id = ? AND codigo = ?))"
                         + " RETURNING id",
                 municipalidadId,
                 codigo,
@@ -539,7 +539,7 @@ class ProgramarDesdeLaDeteccionFronteraTest {
     private static long crearFicha(long municipalidadId, long predioId, String area) {
         return comoApp(
                 municipalidadId,
-                "INSERT INTO ficha_catastral (municipalidad_id, predio_id, tipo, version,"
+                "INSERT INTO ficha_catastral_de_prueba (municipalidad_id, predio_id, tipo, version,"
                         + " area_terreno, uso, vigencia_desde, origen, documento_origen,"
                         + " observacion, usuario_registro)"
                         + " VALUES (?, ?, 'UNICA', ?, ?, 'CASA_HABITACION', DATE '2020-01-01',"

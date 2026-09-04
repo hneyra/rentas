@@ -378,7 +378,7 @@ class DeterminacionPredialJdbcTest {
             ContextoDeTenant.fijar(app, municipalidad);
             try (PreparedStatement sentencia =
                     app.prepareStatement(
-                            "INSERT INTO predio (municipalidad_id, codigo_ref_catastral, tipo,"
+                            "INSERT INTO predio_de_prueba (municipalidad_id, codigo_ref_catastral, tipo,"
                                     + " direccion) VALUES (?, ?, 'URBANO', 'Calle de prueba 123')"
                                     + " RETURNING id")) {
                 sentencia.setLong(1, municipalidad);

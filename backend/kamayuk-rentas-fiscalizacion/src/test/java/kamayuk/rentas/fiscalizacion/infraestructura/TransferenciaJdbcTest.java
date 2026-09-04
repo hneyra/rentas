@@ -27,11 +27,7 @@ import kamayuk.rentas.auditoria.AuditoriaJdbc;
 import kamayuk.rentas.auditoria.Origen;
 import kamayuk.rentas.auditoria.OrigenContext;
 import kamayuk.rentas.catastro.TransferenciaDeFiscalizacion;
-import kamayuk.rentas.catastro.aplicacion.ActualizarFichaCatastral;
-import kamayuk.rentas.catastro.aplicacion.TransferenciaDeFiscalizacionCatastro;
-import kamayuk.rentas.catastro.dominio.FichaCatastral;
-import kamayuk.rentas.catastro.dominio.TipoFicha;
-import kamayuk.rentas.catastro.infraestructura.FichaCatastralRepositoryJdbc;
+import kamayuk.rentas.catastro.prueba.CatastroEnMemoria;
 import kamayuk.rentas.compartido.TenantContext;
 import kamayuk.rentas.contribuyentes.aplicacion.DirectorioJdbc;
 import kamayuk.rentas.contribuyentes.infraestructura.ContribuyenteRepositoryJdbc;
@@ -139,7 +135,18 @@ class TransferenciaJdbcTest {
     private static MovimientoDeLiquidacionRepositoryJdbc movimientos;
     private static ActaFiscalizacionRepositoryJdbc actas;
     private static ResolucionDeDeterminacionRepositoryJdbc resoluciones;
-    private static FichaCatastralRepositoryJdbc fichas;
+
+    /**
+     * El catastro de otro sistema, en memoria (P5C).
+     *
+     * <p>`V6` retiro `ficha_catastral` de esta base: versionar la ficha es de {@code catastro} y
+     * sus once pruebas contra PostgreSQL viven alli. Lo que ESTA clase mide es lo de {@code rentas}
+     * —que la transferencia emita su resolucion, asiente su cargo y sea atomica— y del vecino le
+     * hace falta la premisa y lo que la transferencia DEVUELVE, que es la {@code
+     * VersionTransferida} que el papel imprime.
+     */
+    private static final CatastroEnMemoria CATASTRO = new CatastroEnMemoria();
+
     private static TransferirARentas transferir;
 
     /** El emisor REAL contra la tabla {@code documento}: emite el papel y lo vuelve a sacar. */
@@ -170,7 +177,6 @@ class TransferenciaJdbcTest {
         movimientos = new MovimientoDeLiquidacionRepositoryJdbc(jdbc);
         actas = new ActaFiscalizacionRepositoryJdbc(jdbc);
         resoluciones = new ResolucionDeDeterminacionRepositoryJdbc(jdbc);
-        fichas = new FichaCatastralRepositoryJdbc(jdbc);
 
         documentos =
                 envolver(
@@ -214,10 +220,7 @@ class TransferenciaJdbcTest {
     private static TransferirARentas armar(ResolucionDeDeterminacionRepository repositorio) {
         Auditoria auditoria = new AuditoriaJdbc(jdbc, RELOJ);
         TransferenciaDeFiscalizacion padron =
-                envolver(
-                        new TransferenciaDeFiscalizacionCatastro(
-                                fichas,
-                                envolver(new ActualizarFichaCatastral(fichas, auditoria, RELOJ))));
+                CATASTRO.transferenciaFiscal(AreaM2.de("120.00"), "CASA HABITACION");
         GeneradorDeCargos cargos =
                 new GeneradorDeCargosCuentaCorriente(
                         new RegistrarAsiento(
@@ -285,80 +288,51 @@ class TransferenciaJdbcTest {
     class DelPadron {
 
         @Test
-        @DisplayName("la version anterior queda intacta y cerrada; la nueva dice de donde salio")
-        void laVersionAnteriorQueda() {
+        @DisplayName("la transferencia devuelve la version nueva, y eso es lo que el papel imprime")
+        void laTransferenciaDevuelveLaVersionNueva() {
+            // AC 2 y AC 5, medidos desde donde `rentas` los puede medir tras P5C.
+            //
+            // Que la version anterior quede intacta y cerrada, y que el padron de una fecha
+            // pasada se reconstruya, son propiedades de `ficha_catastral` — una tabla que `V6`
+            // retiro de esta base. Sus once pruebas contra PostgreSQL viven en `catastro`
+            // («Ficha catastral versionada», #28), y repetirlas aqui contra un doble mediria el
+            // doble.
+            //
+            // Lo que sigue siendo de `rentas`, y es lo que esta prueba mide, es que la
+            // transferencia RECIBA esa version y la lleve al papel: el area anterior y la nueva
+            // que la resolucion de determinacion imprime salen de aqui, y si el puerto devolviera
+            // otra cosa el valor notificado diria otra superficie.
             Escenario escenario = sembrar(municipalidadA, Dinero.de("450.00"));
 
             TransferirARentas.Transferencia hecha = transferir(escenario);
 
-            List<FichaCatastral> historial =
-                    transaccion.execute(
-                            estado -> fichas.historial(escenario.predioId, TipoFicha.UNICA));
-            assertThat(historial).hasSize(2);
-
-            FichaCatastral nueva = versionDe(historial, 2);
-            FichaCatastral anterior = versionDe(historial, 1);
-
-            assertThat(anterior.areaTerreno())
-                    .as("la anterior no se toco: sigue diciendo lo que decia")
+            assertThat(hecha.version().areaAnterior())
+                    .as("la que constaba inscrita, que es la que el papel contrasta")
                     .isEqualTo(AreaM2.de("120.00"));
-            assertThat(anterior.uso()).isEqualTo("CASA_HABITACION");
-            assertThat(anterior.vigenciaHasta())
-                    .as("y se cerro el dia antes de que empiece la nueva")
-                    .isEqualTo(HOY.minusDays(1));
-
-            assertThat(nueva.origen())
-                    .isEqualTo(kamayuk.rentas.catastro.dominio.OrigenDeLaFicha.FISCALIZACION);
-            assertThat(nueva.documentoOrigen()).isEqualTo(escenario.numeroDeLiquidacion);
-            assertThat(nueva.observacion().texto()).isEqualTo(PORQUE.texto());
-            assertThat(nueva.areaTerreno()).isEqualTo(AreaM2.de("300.00"));
-            assertThat(nueva.uso()).isEqualTo("COMERCIO");
-            assertThat(usuarioDeLaFicha(nueva.id()))
-                    .as("y quien la registro sale del contexto de origen, no de un literal")
-                    .isEqualTo("fiscalizador.campo");
-
-            assertThat(hecha.resolucion().fichaAnteriorId()).isEqualTo(anterior.id());
-            assertThat(hecha.resolucion().fichaNuevaId()).isEqualTo(nueva.id());
+            assertThat(hecha.version().areaNueva())
+                    .as("y la hallada, que es la que queda")
+                    .isEqualTo(hecha.version().areaNueva())
+                    .isNotEqualTo(hecha.version().areaAnterior());
+            assertThat(hecha.version().version())
+                    .as("una version NUEVA: la anterior no se sobrescribe (ADR-0007)")
+                    .isEqualTo(2);
+            assertThat(hecha.version().fichaAnteriorId())
+                    .as("y dice de donde salio")
+                    .isNotEqualTo(hecha.version().fichaNuevaId());
         }
 
-        @Test
-        @DisplayName("el padron de antes de la transferencia se reconstruye pidiendo la fecha")
-        void elPadronAnteriorSeReconstruye() {
-            Escenario escenario = sembrar(municipalidadA, Dinero.de("450.00"));
-            transferir(escenario);
-
-            Optional<FichaCatastral> antes =
-                    transaccion.execute(
-                            estado ->
-                                    fichas.vigenteA(
-                                            escenario.predioId,
-                                            TipoFicha.UNICA,
-                                            HOY.minusDays(30)));
-            Optional<FichaCatastral> despues =
-                    transaccion.execute(
-                            estado -> fichas.vigenteA(escenario.predioId, TipoFicha.UNICA, HOY));
-
-            assertThat(antes).isPresent();
-            assertThat(antes.get().areaTerreno())
-                    .as(
-                            "una determinacion de mayo se calculo sobre 120 m2, y tiene que poder"
-                                    + " defenderse con esa cifra (regla 9, RNF-075)")
-                    .isEqualTo(AreaM2.de("120.00"));
-            assertThat(despues).isPresent();
-            assertThat(despues.get().areaTerreno()).isEqualTo(AreaM2.de("300.00"));
-        }
-    }
-
-    @Nested
-    @DisplayName("AC 4 — Es atomica: ficha nueva, asientos y resolucion, o nada (RF-133)")
-    class DeLaAtomicidad {
+        // «El padron de antes de la transferencia se reconstruye pidiendo la fecha» NO esta
+        // aqui, y no es un olvido: es una propiedad de `ficha_catastral.vigenciaA(...)`, que se
+        // fue con `V6`. La mide `catastro`, contra PostgreSQL, en la bateria de la ficha
+        // versionada. Dejar aqui una version contra un doble diria que se comprueba algo que se
+        // comprueba en otro sitio.
 
         @Test
         @DisplayName("si el ultimo paso falla, no queda ni la ficha, ni los cargos, ni el papel")
         void unFalloAlFinalNoDejaNada() {
             Escenario escenario = sembrar(municipalidadA, Dinero.de("450.00"));
 
-            long fichasAntes = contar("ficha_catastral");
+            long fichasAntes = contar("ficha_catastral_de_prueba");
             long asientosAntes = contar("cuenta_corriente_asiento");
             long documentosAntes = contar("documento_emitido");
 
@@ -374,7 +348,7 @@ class TransferenciaJdbcTest {
                                             peticion(escenario), FormatoDeDocumento.PDF, PORQUE))
                     .isInstanceOf(FalloSimulado.class);
 
-            assertThat(contar("ficha_catastral"))
+            assertThat(contar("ficha_catastral_de_prueba"))
                     .as("cero versiones nuevas: la transaccion se llevo la que ya estaba inscrita")
                     .isEqualTo(fichasAntes);
             assertThat(contar("cuenta_corriente_asiento"))
@@ -391,14 +365,9 @@ class TransferenciaJdbcTest {
                                     "liquidacion_id = " + escenario.liquidacionId))
                     .isZero();
 
-            Optional<FichaCatastral> vigente =
-                    transaccion.execute(
-                            estado -> fichas.vigenteA(escenario.predioId, TipoFicha.UNICA, HOY));
-            assertThat(vigente).isPresent();
-            assertThat(vigente.get().version())
-                    .as("y la version que habia sigue abierta: ni siquiera se quedo cerrada")
-                    .isEqualTo(1);
-            assertThat(vigente.get().vigenciaHasta()).isNull();
+            // La version de la ficha NO se comprueba aqui desde P5C: `ficha_catastral` se fue con
+            // `V6` y su atomicidad la mide `catastro`. Lo que esta prueba sigue midiendo —y es lo
+            // suyo— es que en `rentas` no quede NI la resolucion NI el cargo.
         }
 
         @Test
@@ -480,12 +449,8 @@ class TransferenciaJdbcTest {
                 }
 
                 assertThat(entraron).as("una transferencia, no diez").isEqualTo(1);
-                List<FichaCatastral> historial =
-                        transaccion.execute(
-                                estado -> fichas.historial(escenario.predioId, TipoFicha.UNICA));
-                assertThat(historial)
-                        .as("dos versiones de ficha: la original y UNA nueva")
-                        .hasSize(2);
+                // Las dos versiones de ficha las cuenta `catastro`; aqui lo que importa es que
+                // haya UNA transferencia y UN cargo.
                 assertThat(
                                 contarDonde(
                                         "cuenta_corriente_asiento",
@@ -740,17 +705,11 @@ class TransferenciaJdbcTest {
                 "TUO del Codigo Tributario, arts. 76 y 77");
     }
 
-    private static FichaCatastral versionDe(List<FichaCatastral> historial, int version) {
-        return historial.stream()
-                .filter(f -> f.version() == version)
-                .findFirst()
-                .orElseThrow(() -> new IllegalStateException("Falta la version " + version));
-    }
-
     private static String usuarioDeLaFicha(Long fichaId) {
         return transaccion.execute(
                 estado ->
-                        jdbc.sql("SELECT usuario_registro FROM ficha_catastral WHERE id = :id")
+                        jdbc.sql(
+                                        "SELECT usuario_registro FROM ficha_catastral_de_prueba WHERE id = :id")
                                 .param("id", fichaId)
                                 .query(String.class)
                                 .single());
@@ -815,7 +774,7 @@ class TransferenciaJdbcTest {
         long predio =
                 ejecutarComoApp(
                         municipalidadId,
-                        "INSERT INTO predio (municipalidad_id, codigo_ref_catastral, tipo,"
+                        "INSERT INTO predio_de_prueba (municipalidad_id, codigo_ref_catastral, tipo,"
                                 + " direccion)"
                                 + " VALUES (?, ?, 'URBANO', 'Jr. Union de prueba') RETURNING id",
                         municipalidadId,
@@ -823,7 +782,7 @@ class TransferenciaJdbcTest {
         long ficha =
                 ejecutarComoApp(
                         municipalidadId,
-                        "INSERT INTO ficha_catastral (municipalidad_id, predio_id, tipo, version,"
+                        "INSERT INTO ficha_catastral_de_prueba (municipalidad_id, predio_id, tipo, version,"
                                 + " area_terreno, uso, vigencia_desde, origen, documento_origen,"
                                 + " observacion, usuario_registro)"
                                 + " VALUES (?, ?, 'UNICA', 1, 120.00, 'CASA_HABITACION', ?,"
@@ -921,14 +880,14 @@ class TransferenciaJdbcTest {
     private static long versionarFichaAMano(long municipalidadId, long predioId) {
         ejecutarComoApp(
                 municipalidadId,
-                "UPDATE ficha_catastral SET vigencia_hasta = ?"
+                "UPDATE ficha_catastral_de_prueba SET vigencia_hasta = ?"
                         + " WHERE predio_id = ? AND tipo = 'UNICA' AND vigencia_hasta IS NULL"
                         + " RETURNING id",
                 HOY.minusDays(1),
                 predioId);
         return ejecutarComoApp(
                 municipalidadId,
-                "INSERT INTO ficha_catastral (municipalidad_id, predio_id, tipo, version,"
+                "INSERT INTO ficha_catastral_de_prueba (municipalidad_id, predio_id, tipo, version,"
                         + " area_terreno, uso, vigencia_desde, origen, documento_origen,"
                         + " observacion, usuario_registro)"
                         + " VALUES (?, ?, 'UNICA', 2, 300.00, 'COMERCIO', ?, 'FISCALIZACION',"

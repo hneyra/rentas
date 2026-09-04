@@ -18,11 +18,7 @@ import java.util.Set;
 import kamayuk.rentas.catastro.CaracteristicasDelPredio;
 import kamayuk.rentas.catastro.FichaDelPadron;
 import kamayuk.rentas.catastro.PredioDelContribuyente;
-import kamayuk.rentas.catastro.dominio.FichaEncontrada;
-import kamayuk.rentas.catastro.dominio.TipoFicha;
-import kamayuk.rentas.catastro.infraestructura.web.FichaEncontradaResource;
 import kamayuk.rentas.dominio.AreaM2;
-import kamayuk.rentas.dominio.CodigoReferenciaCatastral;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.Porcentaje;
 import kamayuk.rentas.fiscalizacion.dominio.CondicionFiscalizada;
@@ -122,15 +118,25 @@ class AreaEnLaMismaFormaEntreModulosTest {
                     .build();
 
     @Test
-    @DisplayName("catastro y fiscalizacion dicen lo mismo del mismo predio")
-    void catastroYFiscalizacionDicenLoMismo() {
-        String catastro = campoDe(JSON.writeValueAsString(fichaDeCatastro()), "areaTerreno");
+    @DisplayName("la conciliacion y fiscalizacion dicen lo mismo del mismo predio")
+    void laConciliacionYFiscalizacionDicenLoMismo() {
+        // Hasta P5C el par que se comparaba aqui era `FichaEncontradaResource` —de `catastro`—
+        // contra `OmisoResource`. Esa respuesta se fue con `V6`, y su area la sigue vigilando la
+        // MISMA guarda en el repositorio donde ahora vive: `AreaEnLaMismaFormaEntreModulosTest`
+        // no se copio, pero si la prueba estructural que recorre las respuestas publicadas y
+        // exige que ningun componente `area…` sea `String`. Dejar aqui una referencia a una clase
+        // que no esta seria una entrada rancia, que es justo lo que esta prueba existe para no
+        // tener.
+        //
+        // El par que queda es el de las DOS puertas de `rentas`, que es donde #607 encontro las
+        // dos convenciones a la vez.
+        String conciliacion = campoDe(JSON.writeValueAsString(fichaConciliada()), "areaTerreno");
         String fiscalizacion = campoDe(JSON.writeValueAsString(omiso()), "areaCatastral");
 
-        assertThat(catastro)
+        assertThat(conciliacion)
                 .as(
-                        "hasta #607 GET /catastro/fichas decia «360.00 m2» del mismo predio del que"
-                                + " GET /fiscalizacion/omisos decia «360.00»")
+                        "hasta #607 la misma superficie salia «360.00 m2» por una puerta y"
+                                + " «360.00» por la otra")
                 .isEqualTo(fiscalizacion)
                 .isEqualTo(ESPERADO);
     }
@@ -149,11 +155,10 @@ class AreaEnLaMismaFormaEntreModulosTest {
     }
 
     @Test
-    @DisplayName("ninguna de las cuatro respuestas lleva la unidad dentro")
+    @DisplayName("ninguna de las tres respuestas lleva la unidad dentro")
     void ningunaLlevaLaUnidad() {
-        assertThat(JSON.writeValueAsString(fichaDeCatastro())).doesNotContain("m2");
-        assertThat(JSON.writeValueAsString(omiso())).doesNotContain("m2");
         assertThat(JSON.writeValueAsString(fichaConciliada())).doesNotContain("m2");
+        assertThat(JSON.writeValueAsString(omiso())).doesNotContain("m2");
         assertThat(JSON.writeValueAsString(predioDeRentas())).doesNotContain("m2");
     }
 
@@ -220,7 +225,6 @@ class AreaEnLaMismaFormaEntreModulosTest {
                 .as("si el recorrido no llega a ningun area, la prueba de arriba pasa sin mirar")
                 .hasSizeGreaterThan(10)
                 .contains(
-                        "FichaEncontradaResource.areaTerreno",
                         "OmisoResource.areaCatastral",
                         "FichaConciliadaResource.areaTerreno",
                         "PredioDeRentasResource.areaTerreno");
@@ -273,25 +277,6 @@ class AreaEnLaMismaFormaEntreModulosTest {
     }
 
     // ------------------------------------------------------------------
-
-    private static FichaEncontradaResource fichaDeCatastro() {
-        return FichaEncontradaResource.de(
-                new FichaEncontrada(
-                        1L,
-                        2L,
-                        CodigoReferenciaCatastral.de(CODIGO),
-                        "CAL. LIMA 100",
-                        "026",
-                        "01",
-                        TipoFicha.UNICA,
-                        1,
-                        AREA,
-                        AreaM2.de("120.00"),
-                        "CASA HABITACION",
-                        LocalDate.of(2026, 1, 1),
-                        3L,
-                        "TITULAR, PRUEBA"));
-    }
 
     private static OmisoResource omiso() {
         return OmisoResource.de(

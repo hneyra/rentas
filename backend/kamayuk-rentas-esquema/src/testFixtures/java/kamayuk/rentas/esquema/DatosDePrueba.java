@@ -319,7 +319,7 @@ public final class DatosDePrueba {
         long viaId =
                 insertar(
                         app,
-                        "INSERT INTO via (municipalidad_id, codigo, tipo_via, nombre)"
+                        "INSERT INTO via_de_prueba (municipalidad_id, codigo, tipo_via, nombre)"
                                 + " VALUES (?, ?, 'AVENIDA', ?) RETURNING id",
                         muni,
                         "V-" + sufijo,
@@ -327,7 +327,7 @@ public final class DatosDePrueba {
         long sectorId =
                 insertar(
                         app,
-                        "INSERT INTO sector (municipalidad_id, codigo, nombre)"
+                        "INSERT INTO sector_de_prueba (municipalidad_id, codigo, nombre)"
                                 + " VALUES (?, ?, ?) RETURNING id",
                         muni,
                         "S-" + sufijo,
@@ -335,7 +335,7 @@ public final class DatosDePrueba {
         long manzanaId =
                 insertar(
                         app,
-                        "INSERT INTO manzana (municipalidad_id, sector_id, codigo)"
+                        "INSERT INTO manzana_de_prueba (municipalidad_id, sector_id, codigo)"
                                 + " VALUES (?, ?, ?) RETURNING id",
                         muni,
                         sectorId,
@@ -343,7 +343,7 @@ public final class DatosDePrueba {
         long predioId =
                 insertar(
                         app,
-                        "INSERT INTO predio (municipalidad_id, codigo_ref_catastral, tipo, via_id,"
+                        "INSERT INTO predio_de_prueba (municipalidad_id, codigo_ref_catastral, tipo, via_id,"
                                 + " direccion, sector_id, manzana_id, lote)"
                                 + " VALUES (?, ?, 'URBANO', ?, ?, ?, ?, '01') RETURNING id",
                         muni,
@@ -356,7 +356,7 @@ public final class DatosDePrueba {
         long fichaId =
                 insertar(
                         app,
-                        "INSERT INTO ficha_catastral (municipalidad_id, predio_id, tipo, version,"
+                        "INSERT INTO ficha_catastral_de_prueba (municipalidad_id, predio_id, tipo, version,"
                                 + " area_terreno, uso, vigencia_desde, origen, documento_origen,"
                                 + " observacion, usuario_registro)"
                                 + " VALUES (?, ?, 'UNICA', 1, 120.00, 'CASA_HABITACION', ?,"
@@ -367,7 +367,7 @@ public final class DatosDePrueba {
                         VIGENCIA);
         ejecutar(
                 app,
-                "INSERT INTO construccion (municipalidad_id, ficha_id, piso, area_construida,"
+                "INSERT INTO construccion_de_prueba (municipalidad_id, ficha_id, piso, area_construida,"
                         + " anio_construccion, material_estructural, estado_conservacion,"
                         + " categoria_muros)"
                         + " VALUES (?, ?, '1', 80.00, 2010, 'CONCRETO', 'BUENO', 'C')",
@@ -375,7 +375,7 @@ public final class DatosDePrueba {
                 fichaId);
         ejecutar(
                 app,
-                "INSERT INTO otra_instalacion (municipalidad_id, ficha_id, descripcion,"
+                "INSERT INTO otra_instalacion_de_prueba (municipalidad_id, ficha_id, descripcion,"
                         + " unidad_medida, cantidad)"
                         + " VALUES (?, ?, 'Cerco perimetrico', 'ML', 25.00)",
                 muni,
@@ -386,7 +386,7 @@ public final class DatosDePrueba {
         long economica =
                 insertar(
                         app,
-                        "INSERT INTO ficha_catastral (municipalidad_id, predio_id, tipo, version,"
+                        "INSERT INTO ficha_catastral_de_prueba (municipalidad_id, predio_id, tipo, version,"
                                 + " area_terreno, uso, informacion_complementaria, vigencia_desde,"
                                 + " origen, documento_origen, observacion, usuario_registro)"
                                 + " VALUES (?, ?, 'ECONOMICA', 1, 120.00, 'COMERCIO',"
@@ -398,7 +398,7 @@ public final class DatosDePrueba {
                         VIGENCIA);
         ejecutar(
                 app,
-                "INSERT INTO actividad_economica (municipalidad_id, ficha_id, conductor,"
+                "INSERT INTO actividad_economica_de_prueba (municipalidad_id, ficha_id, conductor,"
                         + " nombre_comercial, ciiu, licencia_numero, licencia_fecha)"
                         + " VALUES (?, ?, 'Conductor de prueba', 'Bodega de prueba', '4711',"
                         + "         'LIC-001', ?)",
@@ -409,7 +409,7 @@ public final class DatosDePrueba {
         long comunes =
                 insertar(
                         app,
-                        "INSERT INTO ficha_catastral (municipalidad_id, predio_id, tipo, version,"
+                        "INSERT INTO ficha_catastral_de_prueba (municipalidad_id, predio_id, tipo, version,"
                                 + " area_terreno, uso, denominacion, vigencia_desde, origen,"
                                 + " documento_origen, observacion, usuario_registro)"
                                 + " VALUES (?, ?, 'BIENES_COMUNES', 1, 120.00, 'MULTIFAMILIAR',"
@@ -421,14 +421,14 @@ public final class DatosDePrueba {
                         VIGENCIA);
         ejecutar(
                 app,
-                "INSERT INTO bien_comun (municipalidad_id, ficha_id, descripcion, area,"
+                "INSERT INTO bien_comun_de_prueba (municipalidad_id, ficha_id, descripcion, area,"
                         + " material_estructural, estado_conservacion)"
                         + " VALUES (?, ?, 'Escalera comun', 30.00, 'CONCRETO', 'BUENO')",
                 muni,
                 comunes);
         ejecutar(
                 app,
-                "INSERT INTO participacion_comun (municipalidad_id, ficha_id, predio_id,"
+                "INSERT INTO participacion_comun_de_prueba (municipalidad_id, ficha_id, predio_id,"
                         + " porcentaje) VALUES (?, ?, ?, 100)",
                 muni,
                 comunes,
@@ -437,7 +437,7 @@ public final class DatosDePrueba {
         long rural =
                 insertar(
                         app,
-                        "INSERT INTO ficha_catastral (municipalidad_id, predio_id, tipo, version,"
+                        "INSERT INTO ficha_catastral_de_prueba (municipalidad_id, predio_id, tipo, version,"
                                 + " area_terreno, uso, denominacion, vigencia_desde, origen,"
                                 + " documento_origen, observacion, usuario_registro)"
                                 + " VALUES (?, ?, 'RURAL', 1, 120.00, 'AGRICOLA',"
@@ -448,14 +448,14 @@ public final class DatosDePrueba {
                         VIGENCIA);
         ejecutar(
                 app,
-                "INSERT INTO tierra_rural (municipalidad_id, ficha_id, clasificacion, riego,"
+                "INSERT INTO tierra_rural_de_prueba (municipalidad_id, ficha_id, clasificacion, riego,"
                         + " cantidad_hectareas) VALUES (?, ?, 'CULTIVO_TRANSITORIO', 'SECANO',"
                         + "         2.5000)",
                 muni,
                 rural);
         ejecutar(
                 app,
-                "INSERT INTO colindante_rural (municipalidad_id, ficha_id, orientacion,"
+                "INSERT INTO colindante_rural_de_prueba (municipalidad_id, ficha_id, orientacion,"
                         + " descripcion) VALUES (?, ?, 'NORTE', 'Predio de prueba colindante')",
                 muni,
                 rural);
@@ -474,7 +474,7 @@ public final class DatosDePrueba {
                 VIGENCIA);
         ejecutar(
                 app,
-                "INSERT INTO titularidad (municipalidad_id, predio_id, contribuyente_id, condicion,"
+                "INSERT INTO titularidad_de_prueba (municipalidad_id, predio_id, contribuyente_id, condicion,"
                         + " porcentaje, vigencia_desde, documento_origen)"
                         + " VALUES (?, ?, ?, 'PROPIETARIO_UNICO', 100, ?, 'MINUTA-001')",
                 muni,
@@ -483,7 +483,7 @@ public final class DatosDePrueba {
                 VIGENCIA);
         ejecutar(
                 app,
-                "INSERT INTO inquilino (municipalidad_id, predio_id, contribuyente_id,"
+                "INSERT INTO inquilino_de_prueba (municipalidad_id, predio_id, contribuyente_id,"
                         + " vigencia_desde, documento_origen)"
                         + " VALUES (?, ?, ?, ?, 'CONTRATO-001')",
                 muni,
@@ -495,7 +495,7 @@ public final class DatosDePrueba {
         // conjunto de parametros sembrado por sembrarParametros, no de un ejercicio suelto (#17).
         ejecutar(
                 app,
-                "INSERT INTO arancel (municipalidad_id, conjunto_id, via_id, valor_m2,"
+                "INSERT INTO arancel_de_prueba (municipalidad_id, conjunto_id, via_id, valor_m2,"
                         + " documento_fuente)"
                         + " VALUES (?, ?, ?, 1.000000, 'fixture de la prueba')",
                 muni,
@@ -536,8 +536,8 @@ public final class DatosDePrueba {
             try (PreparedStatement consulta =
                     app.prepareStatement(
                             "SELECT p.codigo_ref_catastral, p.direccion, s.codigo, p.estado"
-                                    + "   FROM predio p"
-                                    + "   LEFT JOIN sector s ON s.municipalidad_id ="
+                                    + "   FROM predio_de_prueba p"
+                                    + "   LEFT JOIN sector_de_prueba s ON s.municipalidad_id ="
                                     + "        p.municipalidad_id AND s.id = p.sector_id"
                                     + "  WHERE p.municipalidad_id = ? AND p.id = ?")) {
                 consulta.setLong(1, muni);
@@ -556,7 +556,7 @@ public final class DatosDePrueba {
             try (PreparedStatement consulta =
                     app.prepareStatement(
                             "SELECT id, tipo, version, vigencia_desde, vigencia_hasta,"
-                                    + " area_terreno, uso FROM ficha_catastral"
+                                    + " area_terreno, uso FROM ficha_catastral_de_prueba"
                                     + " WHERE municipalidad_id = ? AND predio_id = ?")) {
                 consulta.setLong(1, muni);
                 consulta.setLong(2, predioId);
@@ -1536,7 +1536,7 @@ public final class DatosDePrueba {
                         + " cod_ref_catastral, contribuyente_id, condicion, area_catastral,"
                         + " area_declarada, sector_codigo, fecha_sorteo, observacion,"
                         + " usuario_registro, fecha_registro)"
-                        + " VALUES (?, ?, ?, (SELECT codigo_ref_catastral FROM predio WHERE id = ?),"
+                        + " VALUES (?, ?, ?, (SELECT codigo_ref_catastral FROM predio_de_prueba WHERE id = ?),"
                         + "         ?, 'OMISO', 300.00, 120.00, NULL, ?, 'muestra de prueba',"
                         + "         'prueba', now()) RETURNING id",
                 muni,
@@ -1615,7 +1615,7 @@ public final class DatosDePrueba {
         long fichaAnterior =
                 insertar(
                         app,
-                        "UPDATE ficha_catastral SET vigencia_hasta = ?"
+                        "UPDATE ficha_catastral_de_prueba SET vigencia_hasta = ?"
                                 + " WHERE predio_id = ? AND tipo = 'UNICA'"
                                 + "   AND vigencia_hasta IS NULL RETURNING id",
                         VIGENCIA,
@@ -1623,7 +1623,7 @@ public final class DatosDePrueba {
         long fichaNueva =
                 insertar(
                         app,
-                        "INSERT INTO ficha_catastral (municipalidad_id, predio_id, tipo, version,"
+                        "INSERT INTO ficha_catastral_de_prueba (municipalidad_id, predio_id, tipo, version,"
                                 + " area_terreno, uso, vigencia_desde, origen, documento_origen,"
                                 + " observacion, usuario_registro)"
                                 + " VALUES (?, ?, 'UNICA', 2, 300.00, 'CASA_HABITACION', ?,"
@@ -2012,7 +2012,7 @@ public final class DatosDePrueba {
                         + " SELECT ?, ?, 'ZONIFICACION_VIAS', p.id, ?, p.codigo_ref_catastral,"
                         + "        p.direccion, ?, ?, ?, ?, 35.00, ?, ?, ?, 'RDM', '3 pisos', ?,"
                         + "        'prueba', ?, 'certificado de prueba'"
-                        + "   FROM predio p WHERE p.municipalidad_id = ? AND p.id = ?",
+                        + "   FROM predio_de_prueba p WHERE p.municipalidad_id = ? AND p.id = ?",
                 muni,
                 "CN-" + sufijo,
                 titular,

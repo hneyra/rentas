@@ -22,6 +22,9 @@ plugins {
 }
 
 dependencies {
+    // Los dobles en memoria de los puertos de `catastro` (P5C). Sus tablas se fueron con `V6`:
+    // lo que estas pruebas necesitaban de ellas era la premisa, y ahi es donde se escribe.
+    testImplementation(testFixtures(project(":kamayuk-rentas-catastro")))
     testImplementation(testFixtures(project(":kamayuk-rentas-parametros")))
     // Las tres APIs publicas que la licencia consume. Nunca sus tablas: Spring
     // Modulith verifica que no se cruce el limite (ARQ-01 §4).

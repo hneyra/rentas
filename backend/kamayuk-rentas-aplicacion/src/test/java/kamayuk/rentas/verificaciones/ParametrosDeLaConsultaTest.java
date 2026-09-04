@@ -131,20 +131,6 @@ class ParametrosDeLaConsultaTest {
                     Map.entry(
                             "POST /rentas/vehicular/calculo",
                             Set.of("placa", "codContribuyente", "ejercicio")),
-                    // #536 — el plano catastral, y aqui van los CUATRO. Es una lectura, asi que
-                    // no hay cuerpo donde esconder nada; lo que la entrada compromete es que
-                    // sigan viajando por la URL, que es como se comparte la vista de un plano.
-                    // `bbox` ademas es obligatorio: sin el la consulta seria el padron entero.
-                    Map.entry(
-                            "GET /catastro/predios/plano",
-                            Set.of("bbox", "codigoDeSector", "codigoDeManzana", "limite")),
-                    // #612 — el marco de lo levantado. Los dos que tiene, que son los dos del
-                    // plano: el marco tiene que salir del MISMO conjunto de predios que despues
-                    // se dibuja, asi que si uno de los dos deja de acotar aqui el encuadre y el
-                    // dibujo dejan de hablar del mismo territorio.
-                    Map.entry(
-                            "GET /catastro/predios/plano/marco",
-                            Set.of("codigoDeSector", "codigoDeManzana")),
                     // ------------------------------------------------------------------
                     // #425 — las nueve que quedaban. De cada operacion se promete lo que su
                     // cuerpo ya llevaba y el contrato declara `in: query`; los demas parametros
@@ -239,15 +225,6 @@ class ParametrosDeLaConsultaTest {
                     // es la pareja que #541 revisa.
                     "GET /rentas/arbitrios",
                     "GET /rentas/predios",
-                    // #536 — el plano catastral. Se compromete entera desde el primer dia: nace
-                    // con controlador, y sus cuatro parametros son exactamente los cuatro que el
-                    // contrato declara. Una operacion que estrena controlador es el unico momento
-                    // en que esta promesa no cuesta nada.
-                    "GET /catastro/predios/plano",
-                    // #612 — el marco de lo levantado. Nace con controlador y con exactamente
-                    // los dos parametros que el contrato le declara, que es el unico momento en
-                    // que esta promesa no cuesta nada.
-                    "GET /catastro/predios/plano/marco",
                     // #576 — las dos determinaciones de Rentas que declaraban filtros que
                     // ningun controlador leia. `predial_individual` declaraba los tres de la
                     // DECLARACION JURADA que motiva el calculo y `espectaculos` los cuatro de

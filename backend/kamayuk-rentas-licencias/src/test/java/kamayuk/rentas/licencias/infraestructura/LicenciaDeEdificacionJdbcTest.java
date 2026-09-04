@@ -30,9 +30,7 @@ import kamayuk.rentas.auditoria.AuditoriaJdbc;
 import kamayuk.rentas.auditoria.Origen;
 import kamayuk.rentas.auditoria.OrigenContext;
 import kamayuk.rentas.catastro.LectorDeValoresUnitarios;
-import kamayuk.rentas.catastro.aplicacion.TablasDeValuacion;
-import kamayuk.rentas.catastro.aplicacion.ValoresUnitariosPublicados;
-import kamayuk.rentas.catastro.infraestructura.ValuacionRepositoryJdbc;
+import kamayuk.rentas.catastro.prueba.CuadroDeValoresUnitariosEnMemoria;
 import kamayuk.rentas.compartido.Pagina;
 import kamayuk.rentas.compartido.Paginacion;
 import kamayuk.rentas.compartido.TenantContext;
@@ -137,6 +135,11 @@ class LicenciaDeEdificacionJdbcTest {
 
     private static final LocalDate HOY = LocalDate.of(2026, 3, 16);
     private static final LocalDate SIN_CUADRO = LocalDate.of(2027, 3, 16);
+
+    /** El ejercicio de {@link #HOY}: el unico que el cuadro en memoria conoce (P5C). */
+    private static final kamayuk.rentas.dominio.Ejercicio EJERCICIO_CON_CUADRO =
+            new kamayuk.rentas.dominio.Ejercicio(2026);
+
     private static final Clock RELOJ =
             Clock.fixed(HOY.atStartOfDay(ZoneOffset.UTC).toInstant(), ZoneOffset.UTC);
 
@@ -262,11 +265,18 @@ class LicenciaDeEdificacionJdbcTest {
 
         // La valorizacion lee el cuadro por el puerto PUBLICO de catastro, no por su tabla: es lo
         // que el AC 2 pide y lo que Spring Modulith verifica.
-        TablasDeValuacion tablas =
-                envolver(
-                        new TablasDeValuacion(
-                                new ValuacionRepositoryJdbc(jdbc), parametros, auditoria, RELOJ));
-        LectorDeValoresUnitarios cuadro = new ValoresUnitariosPublicados(tablas);
+        //
+        // Desde P5C ese puerto lo implementa un cliente HTTP contra `catastro` —la tabla se fue
+        // con `V6`—, asi que aqui lo sustituye el cuadro en memoria. Lo que esta clase mide sigue
+        // siendo lo suyo: que la licencia salga valorizada, y que SIN cuadro salga con su motivo
+        // en vez de con un cero. El fixture lanza `EjercicioSinSellar` por eso, que es lo mismo
+        // que el cliente hara con el 404 de `catastro`.
+        LectorDeValoresUnitarios cuadro =
+                new CuadroDeValoresUnitariosEnMemoria()
+                        .en(municipalidad)
+                        .conCelda(EJERCICIO_CON_CUADRO, "MUROS", 'A', "120.000000")
+                        .conCelda(EJERCICIO_CON_CUADRO, "TECHOS", 'B', "80.000000")
+                        .conCelda(EJERCICIO_CON_CUADRO, "PUERTAS", 'C', "40.000000");
         ValorizacionDelFue valorizaciones = new ValorizacionDelFue(cuadro);
 
         presentar = envolver(new PresentarFue(expedientes, padron, auditoria, RELOJ));

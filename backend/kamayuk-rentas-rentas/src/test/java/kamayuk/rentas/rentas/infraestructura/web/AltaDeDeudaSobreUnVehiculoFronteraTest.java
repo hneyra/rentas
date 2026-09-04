@@ -22,8 +22,7 @@ import kamayuk.rentas.auditoria.AuditoriaJdbc;
 import kamayuk.rentas.auditoria.Origen;
 import kamayuk.rentas.auditoria.OrigenContext;
 import kamayuk.rentas.autorizacion.GuardiaDeAcceso;
-import kamayuk.rentas.catastro.aplicacion.TitularesDelPredioCatastro;
-import kamayuk.rentas.catastro.infraestructura.CatastroRepositoryJdbc;
+import kamayuk.rentas.catastro.prueba.TitularesDelEscenario;
 import kamayuk.rentas.compartido.TenantContext;
 import kamayuk.rentas.cuentacorriente.aplicacion.ConsultarDeuda;
 import kamayuk.rentas.cuentacorriente.aplicacion.ConsultasDelLibro;
@@ -181,8 +180,7 @@ class AltaDeDeudaSobreUnVehiculoFronteraTest {
                                 documentos,
                                 envolver(
                                         new TitularesDeLaUnidadRentas(
-                                                new TitularesDelPredioCatastro(
-                                                        new CatastroRepositoryJdbc(jdbc)),
+                                                new TitularesDelEscenario(jdbc),
                                                 vehiculos,
                                                 new DirectorioDeUno()),
                                         gestor)),

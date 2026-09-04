@@ -144,14 +144,16 @@ class AuditoriaJdbcTest {
             "sin observacion, la operacion completa se deshace: no queda ni la fila de negocio")
     void sinObservacionSeDeshaceLaOperacionCompleta() throws SQLException {
         long viasAntes =
-                contar("SELECT count(*) FROM via WHERE municipalidad_id = " + municipalidadA);
+                contar(
+                        "SELECT count(*) FROM via_de_prueba WHERE municipalidad_id = "
+                                + municipalidadA);
 
         assertThatThrownBy(
                         () ->
                                 transaccion.execute(
                                         estado -> {
                                             jdbc.sql(
-                                                            "INSERT INTO via (municipalidad_id,"
+                                                            "INSERT INTO via_de_prueba (municipalidad_id,"
                                                                     + " codigo, tipo_via, nombre)"
                                                                     + " VALUES"
                                                                     + " (current_setting('app.municipalidad_id')::bigint,"
@@ -172,10 +174,13 @@ class AuditoriaJdbcTest {
                 .as("el CHECK de al menos cinco caracteres no vacios muerde")
                 .hasMessageContaining("auditoria_observacion_ck");
 
-        assertThat(contar("SELECT count(*) FROM via WHERE municipalidad_id = " + municipalidadA))
+        assertThat(
+                        contar(
+                                "SELECT count(*) FROM via_de_prueba WHERE municipalidad_id = "
+                                        + municipalidadA))
                 .as("y arrastra la operacion completa: la via tampoco queda")
                 .isEqualTo(viasAntes);
-        assertThat(contar("SELECT count(*) FROM via WHERE codigo = 'SIN-OBS'")).isZero();
+        assertThat(contar("SELECT count(*) FROM via_de_prueba WHERE codigo = 'SIN-OBS'")).isZero();
     }
 
     @Test

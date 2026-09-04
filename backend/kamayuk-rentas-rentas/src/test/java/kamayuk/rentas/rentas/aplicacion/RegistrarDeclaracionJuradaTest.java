@@ -943,7 +943,7 @@ class RegistrarDeclaracionJuradaTest {
         @Override
         public Optional<Long> fichaVigenteEn(long predioId, LocalDate fecha) {
             return jdbc().sql(
-                            "SELECT id FROM ficha_catastral WHERE predio_id = :predioId AND"
+                            "SELECT id FROM ficha_catastral_de_prueba WHERE predio_id = :predioId AND"
                                     + " vigencia_desde <= :fecha AND (vigencia_hasta IS NULL OR"
                                     + " vigencia_hasta >= :fecha)")
                     .param("predioId", predioId)
@@ -1207,7 +1207,7 @@ class RegistrarDeclaracionJuradaTest {
             ContextoDeTenant.fijar(app, municipalidad);
             try (PreparedStatement sentencia =
                     app.prepareStatement(
-                            "INSERT INTO predio (municipalidad_id, codigo_ref_catastral, tipo,"
+                            "INSERT INTO predio_de_prueba (municipalidad_id, codigo_ref_catastral, tipo,"
                                     + " direccion) VALUES (?, ?, 'URBANO', 'Calle de prueba 123')"
                                     + " RETURNING id")) {
                 sentencia.setLong(1, municipalidad);
@@ -1227,7 +1227,7 @@ class RegistrarDeclaracionJuradaTest {
             ContextoDeTenant.fijar(app, municipalidad);
             try (PreparedStatement sentencia =
                     app.prepareStatement(
-                            "INSERT INTO ficha_catastral (municipalidad_id, predio_id, tipo,"
+                            "INSERT INTO ficha_catastral_de_prueba (municipalidad_id, predio_id, tipo,"
                                     + " version, area_terreno, uso, vigencia_desde, origen,"
                                     + " documento_origen, observacion, usuario_registro)"
                                     + " VALUES (?, ?, 'UNICA', 1, 120.00, 'CASA HABITACION', DATE"
