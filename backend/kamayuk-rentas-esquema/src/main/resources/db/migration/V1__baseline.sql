@@ -35,6 +35,30 @@
 --  las extensiones se provisionan con una conexion de superusuario, porque las
 --  politicas de §5 NOMBRAN roles que deben existir, y `sgtm_owner` no puede
 --  instalar una extension ni crearse a si mismo.
+--
+--  UN DEFECTO DE SINTAXIS DEL GENERADOR, corregido (C-3): 36 restricciones se
+--  emitian con el sufijo ` NOT VALID` REPETIDO -- «... NOT VALID NOT VALID;» --.
+--  Eran TODAS las no validadas de este baseline, no un caso borde: la causa es
+--  que `pg_get_constraintdef` ya emite el sufijo y el generador le anadia otro.
+--
+--  Es un defecto de FORMA y se midio antes de decidirlo: PostgreSQL 16.15 lo
+--  acepta -el atributo se acumula, comprobado hasta triplicado-, el archivo con
+--  el defecto aplica entero -132 tablas, codigo de salida 0- y el esquema que
+--  resulta es IDENTICO, con diff de `pg_dump` VACIO y el mismo sha256. Lo que se
+--  perdia no era el esquema sino que este archivo fuera estable en ida y vuelta:
+--  regenerarlo daba otro texto para el mismo esquema, y con checksum de Flyway
+--  eso importa.
+--
+--  Se corrigio la EMISION y no solo la salida (`Emitir.java`, en
+--  `docs/40-datos/baselines/verificar/`): corregir el archivo a secas deja que el
+--  siguiente baseline las traiga de vuelta. Y la guarda que impide que vuelva vive
+--  en `infrastructure` -- `infra/verificaciones/sufijo-not-valid-repetido.ts` --,
+--  porque mira las SEIS copias del esquema y no solo esta.
+--
+--  Editar este archivo fue legitimo en la fecha de C-3 y no lo sera siempre: se
+--  comprobo que `rentas` no declara todavia ningun ambiente -no hay
+--  `infra/Pulumi.*.yaml`-, asi que no habia ninguna base que rehacer. En cuanto la
+--  haya, esto se corrige con una migracion nueva y no aqui.
 
 --  ----------------------------------------------------------------------------
 --  LOS CINCO HALLAZGOS DE RLS (DAT-01 §0), VERIFICADOS EJECUTANDO
@@ -2230,13 +2254,13 @@ ALTER TABLE costa_procesal ADD CONSTRAINT costa_monto_ck CHECK (((monto)::numeri
 ALTER TABLE costa_procesal ADD CONSTRAINT costa_pk PRIMARY KEY (municipalidad_id, id);
 ALTER TABLE costa_procesal ADD CONSTRAINT costa_procesal_monto_check CHECK (((monto)::numeric >= (0)::numeric));
 ALTER TABLE cuenta_corriente_asiento ADD CONSTRAINT asiento_acto_ck CHECK (((acto IS NULL) OR ((acto)::text = ANY ((ARRAY['ALTA_DEUDA'::character varying, 'BAJA_DEUDA'::character varying])::text[]))));
-ALTER TABLE cuenta_corriente_asiento ADD CONSTRAINT asiento_baja_con_causal_ck CHECK ((((acto)::text IS DISTINCT FROM 'BAJA_DEUDA'::text) OR (causal IS NOT NULL) OR (asiento_reversado_id IS NOT NULL))) NOT VALID NOT VALID;
+ALTER TABLE cuenta_corriente_asiento ADD CONSTRAINT asiento_baja_con_causal_ck CHECK ((((acto)::text IS DISTINCT FROM 'BAJA_DEUDA'::text) OR (causal IS NOT NULL) OR (asiento_reversado_id IS NOT NULL))) NOT VALID;
 ALTER TABLE cuenta_corriente_asiento ADD CONSTRAINT asiento_causal_ck CHECK (((causal IS NULL) OR ((causal)::text = ANY ((ARRAY['PRESCRIPCION_DECLARADA'::character varying, 'RESOLUCION_QUE_DEJA_SIN_EFECTO'::character varying, 'ERROR_MATERIAL'::character varying, 'COMPENSACION'::character varying, 'DEUDA_DE_COBRANZA_DUDOSA'::character varying, 'CONDONACION_POR_ORDENANZA'::character varying])::text[]))));
 ALTER TABLE cuenta_corriente_asiento ADD CONSTRAINT asiento_causal_del_acto_ck CHECK (((causal IS NULL) OR (NOT ((acto)::text IS DISTINCT FROM 'BAJA_DEUDA'::text))));
 ALTER TABLE cuenta_corriente_asiento ADD CONSTRAINT asiento_motivo_ck CHECK ((((concepto)::text <> ALL ((ARRAY['ANULACION'::character varying, 'CONDONACION'::character varying, 'AJUSTE'::character varying])::text[])) OR (motivo IS NOT NULL)));
 ALTER TABLE cuenta_corriente_asiento ADD CONSTRAINT asiento_pk PRIMARY KEY (municipalidad_id, ejercicio, id);
 ALTER TABLE cuenta_corriente_asiento ADD CONSTRAINT asiento_titular_anterior_ck CHECK (((NOT unidad_de_titular_anterior) OR (predio_id IS NOT NULL) OR (vehiculo_id IS NOT NULL)));
-ALTER TABLE cuenta_corriente_asiento ADD CONSTRAINT asiento_tributo_ck CHECK (((asiento_reversado_id IS NOT NULL) OR ((tributo)::text = ANY ((ARRAY['PREDIAL'::character varying, 'ARBITRIO'::character varying, 'VEHICULAR'::character varying, 'ALCABALA'::character varying, 'ESPECTACULOS'::character varying, 'ANUNCIOS'::character varying, 'JUEGOS'::character varying, 'MULTA_TRIBUTARIA'::character varying, 'MULTA_TRANSITO'::character varying, 'MULTA_ADMINISTRATIVA'::character varying, 'CONVENIO'::character varying, 'COSTAS PROCESALES'::character varying])::text[])))) NOT VALID NOT VALID;
+ALTER TABLE cuenta_corriente_asiento ADD CONSTRAINT asiento_tributo_ck CHECK (((asiento_reversado_id IS NOT NULL) OR ((tributo)::text = ANY ((ARRAY['PREDIAL'::character varying, 'ARBITRIO'::character varying, 'VEHICULAR'::character varying, 'ALCABALA'::character varying, 'ESPECTACULOS'::character varying, 'ANUNCIOS'::character varying, 'JUEGOS'::character varying, 'MULTA_TRIBUTARIA'::character varying, 'MULTA_TRANSITO'::character varying, 'MULTA_ADMINISTRATIVA'::character varying, 'CONVENIO'::character varying, 'COSTAS PROCESALES'::character varying])::text[])))) NOT VALID;
 ALTER TABLE cuenta_corriente_asiento ADD CONSTRAINT cuenta_corriente_asiento_concepto_check CHECK (((concepto)::text = ANY ((ARRAY['INSOLUTO'::character varying, 'REAJUSTE'::character varying, 'INTERES'::character varying, 'GASTO'::character varying, 'PAGO'::character varying, 'COMPENSACION'::character varying, 'ANULACION'::character varying, 'CONDONACION'::character varying, 'AJUSTE'::character varying, 'FRACCIONAMIENTO'::character varying])::text[])));
 ALTER TABLE cuenta_corriente_asiento ADD CONSTRAINT cuenta_corriente_asiento_fase_check CHECK (((fase)::text = ANY ((ARRAY['ORDINARIA'::character varying, 'VALOR'::character varying, 'COACTIVA'::character varying, 'CONVENIO'::character varying])::text[])));
 ALTER TABLE cuenta_corriente_asiento ADD CONSTRAINT cuenta_corriente_asiento_monto_check CHECK (((monto)::numeric > (0)::numeric));
@@ -2540,7 +2564,7 @@ ALTER TABLE titularidad ADD CONSTRAINT titularidad_unico_ck CHECK ((((condicion)
 ALTER TABLE transferencia ADD CONSTRAINT transferencia_objeto_check CHECK (((objeto)::text = ANY ((ARRAY['PREDIO'::character varying, 'VEHICULO'::character varying])::text[])));
 ALTER TABLE transferencia ADD CONSTRAINT transferencia_objeto_ck CHECK (((((objeto)::text = 'PREDIO'::text) AND (predio_id IS NOT NULL) AND (vehiculo_id IS NULL)) OR (((objeto)::text = 'VEHICULO'::text) AND (vehiculo_id IS NOT NULL) AND (predio_id IS NULL))));
 ALTER TABLE transferencia ADD CONSTRAINT transferencia_pk PRIMARY KEY (municipalidad_id, id);
-ALTER TABLE transferencia ADD CONSTRAINT transferencia_tipo_ck CHECK (((tipo_transferencia)::text = ANY ((ARRAY['COMPRA_VENTA'::character varying, 'DONACION'::character varying, 'PERMUTA'::character varying, 'ANTICIPO_DE_LEGITIMA'::character varying, 'ADJUDICACION'::character varying, 'DACION_EN_PAGO'::character varying, 'SUCESION'::character varying, 'REMATE'::character varying, 'HERENCIA'::character varying])::text[]))) NOT VALID NOT VALID;
+ALTER TABLE transferencia ADD CONSTRAINT transferencia_tipo_ck CHECK (((tipo_transferencia)::text = ANY ((ARRAY['COMPRA_VENTA'::character varying, 'DONACION'::character varying, 'PERMUTA'::character varying, 'ANTICIPO_DE_LEGITIMA'::character varying, 'ADJUDICACION'::character varying, 'DACION_EN_PAGO'::character varying, 'SUCESION'::character varying, 'REMATE'::character varying, 'HERENCIA'::character varying])::text[]))) NOT VALID;
 ALTER TABLE transferencia ADD CONSTRAINT transferencia_valor_transferencia_check CHECK (((valor_transferencia)::numeric >= (0)::numeric));
 ALTER TABLE usuario ADD CONSTRAINT usuario_cuenta_uq UNIQUE (municipalidad_id, cuenta);
 ALTER TABLE usuario ADD CONSTRAINT usuario_pk PRIMARY KEY (municipalidad_id, id);
@@ -2584,22 +2608,22 @@ ALTER TABLE via ADD CONSTRAINT via_codigo_uq UNIQUE (municipalidad_id, codigo);
 ALTER TABLE via ADD CONSTRAINT via_pk PRIMARY KEY (municipalidad_id, id);
 ALTER TABLE acceso ADD CONSTRAINT acceso_modulo_fk FOREIGN KEY (municipalidad_id, modulo_id) REFERENCES modulo_sistema(municipalidad_id, id);
 ALTER TABLE acta_fiscalizacion ADD CONSTRAINT acta_fisc_contribuyente_fk FOREIGN KEY (municipalidad_id, contribuyente_id) REFERENCES contribuyente(municipalidad_id, id);
-ALTER TABLE acta_fiscalizacion ADD CONSTRAINT acta_fisc_ficha_fk FOREIGN KEY (municipalidad_id, ficha_id) REFERENCES ficha_catastral(municipalidad_id, id) NOT VALID NOT VALID;
+ALTER TABLE acta_fiscalizacion ADD CONSTRAINT acta_fisc_ficha_fk FOREIGN KEY (municipalidad_id, ficha_id) REFERENCES ficha_catastral(municipalidad_id, id) NOT VALID;
 ALTER TABLE acta_fiscalizacion ADD CONSTRAINT acta_fisc_predio_fk FOREIGN KEY (municipalidad_id, predio_id) REFERENCES predio(municipalidad_id, id);
 ALTER TABLE acta_fiscalizacion ADD CONSTRAINT acta_fisc_programa_fk FOREIGN KEY (municipalidad_id, programa_id) REFERENCES programa_fiscalizacion(municipalidad_id, id);
-ALTER TABLE acta_fiscalizacion ADD CONSTRAINT acta_fisc_vehiculo_fk FOREIGN KEY (municipalidad_id, vehiculo_id) REFERENCES vehiculo(municipalidad_id, id) NOT VALID NOT VALID;
+ALTER TABLE acta_fiscalizacion ADD CONSTRAINT acta_fisc_vehiculo_fk FOREIGN KEY (municipalidad_id, vehiculo_id) REFERENCES vehiculo(municipalidad_id, id) NOT VALID;
 ALTER TABLE actividad_economica ADD CONSTRAINT actividad_ficha_fk FOREIGN KEY (municipalidad_id, ficha_id) REFERENCES ficha_catastral(municipalidad_id, id);
-ALTER TABLE acto_coactivo ADD CONSTRAINT acto_documento_fk FOREIGN KEY (municipalidad_id, documento_id) REFERENCES documento_emitido(municipalidad_id, id) NOT VALID NOT VALID;
+ALTER TABLE acto_coactivo ADD CONSTRAINT acto_documento_fk FOREIGN KEY (municipalidad_id, documento_id) REFERENCES documento_emitido(municipalidad_id, id) NOT VALID;
 ALTER TABLE acto_coactivo ADD CONSTRAINT acto_expediente_fk FOREIGN KEY (municipalidad_id, expediente_id) REFERENCES expediente_coactivo(municipalidad_id, id);
-ALTER TABLE acto_coactivo ADD CONSTRAINT acto_rec1_notificacion_fk FOREIGN KEY (municipalidad_id, rec1_notificacion_id) REFERENCES notificacion(municipalidad_id, id) NOT VALID NOT VALID;
+ALTER TABLE acto_coactivo ADD CONSTRAINT acto_rec1_notificacion_fk FOREIGN KEY (municipalidad_id, rec1_notificacion_id) REFERENCES notificacion(municipalidad_id, id) NOT VALID;
 ALTER TABLE anuncio ADD CONSTRAINT anuncio_contribuyente_fk FOREIGN KEY (municipalidad_id, contribuyente_id) REFERENCES contribuyente(municipalidad_id, id);
-ALTER TABLE anuncio ADD CONSTRAINT anuncio_licencia_fk FOREIGN KEY (municipalidad_id, licencia_id) REFERENCES licencia_funcionamiento(municipalidad_id, id) NOT VALID NOT VALID;
+ALTER TABLE anuncio ADD CONSTRAINT anuncio_licencia_fk FOREIGN KEY (municipalidad_id, licencia_id) REFERENCES licencia_funcionamiento(municipalidad_id, id) NOT VALID;
 ALTER TABLE anuncio ADD CONSTRAINT anuncio_municipalidad_id_fkey FOREIGN KEY (municipalidad_id) REFERENCES municipalidad(id);
 ALTER TABLE anuncio ADD CONSTRAINT anuncio_predio_fk FOREIGN KEY (municipalidad_id, predio_id) REFERENCES predio(municipalidad_id, id);
 ALTER TABLE anuncio_correlativo ADD CONSTRAINT anuncio_correlativo_municipalidad_id_fkey FOREIGN KEY (municipalidad_id) REFERENCES municipalidad(id);
 ALTER TABLE anuncio_movimiento ADD CONSTRAINT anuncio_movimiento_anuncio_fk FOREIGN KEY (municipalidad_id, anuncio_id) REFERENCES anuncio(municipalidad_id, id);
 ALTER TABLE anuncio_movimiento ADD CONSTRAINT anuncio_movimiento_municipalidad_id_fkey FOREIGN KEY (municipalidad_id) REFERENCES municipalidad(id);
-ALTER TABLE arancel ADD CONSTRAINT arancel_conjunto_fk FOREIGN KEY (municipalidad_id, conjunto_id) REFERENCES conjunto_parametros(municipalidad_id, id) NOT VALID NOT VALID;
+ALTER TABLE arancel ADD CONSTRAINT arancel_conjunto_fk FOREIGN KEY (municipalidad_id, conjunto_id) REFERENCES conjunto_parametros(municipalidad_id, id) NOT VALID;
 ALTER TABLE arancel ADD CONSTRAINT arancel_municipalidad_id_fkey FOREIGN KEY (municipalidad_id) REFERENCES municipalidad(id);
 ALTER TABLE arancel ADD CONSTRAINT arancel_via_fk FOREIGN KEY (municipalidad_id, via_id) REFERENCES via(municipalidad_id, id);
 ALTER TABLE area ADD CONSTRAINT area_municipalidad_id_fkey FOREIGN KEY (municipalidad_id) REFERENCES municipalidad(id);
@@ -2628,7 +2652,7 @@ ALTER TABLE colindante_rural ADD CONSTRAINT colindante_ficha_fk FOREIGN KEY (mun
 ALTER TABLE conjunto_parametro_detalle ADD CONSTRAINT conjunto_detalle_fk FOREIGN KEY (municipalidad_id, conjunto_id) REFERENCES conjunto_parametros(municipalidad_id, id);
 ALTER TABLE conjunto_parametro_detalle ADD CONSTRAINT conjunto_parametro_detalle_parametro_id_fkey FOREIGN KEY (parametro_id) REFERENCES parametro_tributario(id);
 ALTER TABLE conjunto_parametros ADD CONSTRAINT conjunto_parametros_municipalidad_id_fkey FOREIGN KEY (municipalidad_id) REFERENCES municipalidad(id);
-ALTER TABLE constancia_libre ADD CONSTRAINT constancia_libre_documento_fk FOREIGN KEY (municipalidad_id, documento_id) REFERENCES documento_emitido(municipalidad_id, id) NOT VALID NOT VALID;
+ALTER TABLE constancia_libre ADD CONSTRAINT constancia_libre_documento_fk FOREIGN KEY (municipalidad_id, documento_id) REFERENCES documento_emitido(municipalidad_id, id) NOT VALID;
 ALTER TABLE constancia_libre ADD CONSTRAINT constancia_libre_municipalidad_id_fkey FOREIGN KEY (municipalidad_id) REFERENCES municipalidad(id);
 ALTER TABLE constancia_libre ADD CONSTRAINT constancia_libre_solicitante_fk FOREIGN KEY (municipalidad_id, solicitante_id) REFERENCES contribuyente(municipalidad_id, id);
 ALTER TABLE constancia_libre ADD CONSTRAINT constancia_libre_vehiculo_fk FOREIGN KEY (municipalidad_id, vehiculo_id) REFERENCES vehiculo(municipalidad_id, id);
@@ -2638,10 +2662,10 @@ ALTER TABLE contribuyente ADD CONSTRAINT contribuyente_conyuge_fk FOREIGN KEY (m
 ALTER TABLE contribuyente ADD CONSTRAINT contribuyente_municipalidad_id_fkey FOREIGN KEY (municipalidad_id) REFERENCES municipalidad(id);
 ALTER TABLE convenio ADD CONSTRAINT convenio_contribuyente_fk FOREIGN KEY (municipalidad_id, contribuyente_id) REFERENCES contribuyente(municipalidad_id, id);
 ALTER TABLE convenio ADD CONSTRAINT convenio_municipalidad_id_fkey FOREIGN KEY (municipalidad_id) REFERENCES municipalidad(id);
-ALTER TABLE convenio ADD CONSTRAINT convenio_origen_fk FOREIGN KEY (municipalidad_id, convenio_origen_id) REFERENCES convenio(municipalidad_id, id) NOT VALID NOT VALID;
+ALTER TABLE convenio ADD CONSTRAINT convenio_origen_fk FOREIGN KEY (municipalidad_id, convenio_origen_id) REFERENCES convenio(municipalidad_id, id) NOT VALID;
 ALTER TABLE convenio_correlativo ADD CONSTRAINT convenio_correlativo_municipalidad_id_fkey FOREIGN KEY (municipalidad_id) REFERENCES municipalidad(id);
 ALTER TABLE convenio_cuota ADD CONSTRAINT convenio_cuota_convenio_fk FOREIGN KEY (municipalidad_id, convenio_id) REFERENCES convenio(municipalidad_id, id);
-ALTER TABLE convenio_cuota ADD CONSTRAINT convenio_cuota_municipalidad_fk FOREIGN KEY (municipalidad_id) REFERENCES municipalidad(id) NOT VALID NOT VALID;
+ALTER TABLE convenio_cuota ADD CONSTRAINT convenio_cuota_municipalidad_fk FOREIGN KEY (municipalidad_id) REFERENCES municipalidad(id) NOT VALID;
 ALTER TABLE convenio_deuda ADD CONSTRAINT convenio_deuda_convenio_fk FOREIGN KEY (municipalidad_id, convenio_id) REFERENCES convenio(municipalidad_id, id);
 ALTER TABLE convenio_deuda ADD CONSTRAINT convenio_deuda_municipalidad_id_fkey FOREIGN KEY (municipalidad_id) REFERENCES municipalidad(id);
 ALTER TABLE convenio_movimiento ADD CONSTRAINT convenio_movimiento_convenio_fk FOREIGN KEY (municipalidad_id, convenio_id) REFERENCES convenio(municipalidad_id, id);
@@ -2653,19 +2677,19 @@ ALTER TABLE corrida_predial_observado ADD CONSTRAINT corrida_predial_observado_c
 ALTER TABLE costa_obligacion ADD CONSTRAINT costa_obligacion_contribuyente_fk FOREIGN KEY (municipalidad_id, contribuyente_id) REFERENCES contribuyente(municipalidad_id, id);
 ALTER TABLE costa_obligacion ADD CONSTRAINT costa_obligacion_expediente_fk FOREIGN KEY (municipalidad_id, expediente_id) REFERENCES expediente_coactivo(municipalidad_id, id);
 ALTER TABLE costa_obligacion ADD CONSTRAINT costa_obligacion_municipalidad_id_fkey FOREIGN KEY (municipalidad_id) REFERENCES municipalidad(id);
-ALTER TABLE costa_procesal ADD CONSTRAINT costa_acto_fk FOREIGN KEY (municipalidad_id, acto_id) REFERENCES acto_coactivo(municipalidad_id, id) NOT VALID NOT VALID;
+ALTER TABLE costa_procesal ADD CONSTRAINT costa_acto_fk FOREIGN KEY (municipalidad_id, acto_id) REFERENCES acto_coactivo(municipalidad_id, id) NOT VALID;
 ALTER TABLE costa_procesal ADD CONSTRAINT costa_expediente_fk FOREIGN KEY (municipalidad_id, expediente_id) REFERENCES expediente_coactivo(municipalidad_id, id);
-ALTER TABLE costa_procesal ADD CONSTRAINT costa_liquidacion_fk FOREIGN KEY (municipalidad_id, liquidacion_id) REFERENCES liquidacion_costas(municipalidad_id, id) NOT VALID NOT VALID;
+ALTER TABLE costa_procesal ADD CONSTRAINT costa_liquidacion_fk FOREIGN KEY (municipalidad_id, liquidacion_id) REFERENCES liquidacion_costas(municipalidad_id, id) NOT VALID;
 ALTER TABLE cuenta_corriente_asiento ADD CONSTRAINT asiento_contribuyente_fk FOREIGN KEY (municipalidad_id, contribuyente_id) REFERENCES contribuyente(municipalidad_id, id);
 ALTER TABLE declaracion_jurada ADD CONSTRAINT declaracion_jurada_municipalidad_id_fkey FOREIGN KEY (municipalidad_id) REFERENCES municipalidad(id);
 ALTER TABLE declaracion_jurada ADD CONSTRAINT dj_contribuyente_fk FOREIGN KEY (municipalidad_id, contribuyente_id) REFERENCES contribuyente(municipalidad_id, id);
-ALTER TABLE declaracion_jurada ADD CONSTRAINT dj_ficha_catastral_fk FOREIGN KEY (municipalidad_id, ficha_catastral_id) REFERENCES ficha_catastral(municipalidad_id, id) NOT VALID NOT VALID;
+ALTER TABLE declaracion_jurada ADD CONSTRAINT dj_ficha_catastral_fk FOREIGN KEY (municipalidad_id, ficha_catastral_id) REFERENCES ficha_catastral(municipalidad_id, id) NOT VALID;
 ALTER TABLE declaracion_jurada ADD CONSTRAINT dj_predio_fk FOREIGN KEY (municipalidad_id, predio_id) REFERENCES predio(municipalidad_id, id);
-ALTER TABLE declaracion_jurada ADD CONSTRAINT dj_rectifica_fk FOREIGN KEY (municipalidad_id, dj_rectifica_id) REFERENCES declaracion_jurada(municipalidad_id, id) NOT VALID NOT VALID;
+ALTER TABLE declaracion_jurada ADD CONSTRAINT dj_rectifica_fk FOREIGN KEY (municipalidad_id, dj_rectifica_id) REFERENCES declaracion_jurada(municipalidad_id, id) NOT VALID;
 ALTER TABLE declaracion_jurada ADD CONSTRAINT dj_vehiculo_fk FOREIGN KEY (municipalidad_id, vehiculo_id) REFERENCES vehiculo(municipalidad_id, id);
 ALTER TABLE depreciacion ADD CONSTRAINT depreciacion_municipalidad_id_fkey FOREIGN KEY (municipalidad_id) REFERENCES municipalidad(id);
 ALTER TABLE depreciacion ADD CONSTRAINT depreciacion_publicacion_fk FOREIGN KEY (publicacion_id) REFERENCES parametro_tributario(id);
-ALTER TABLE descargo ADD CONSTRAINT descargo_conjunto_fk FOREIGN KEY (municipalidad_id, conjunto_id) REFERENCES conjunto_parametros(municipalidad_id, id) NOT VALID NOT VALID;
+ALTER TABLE descargo ADD CONSTRAINT descargo_conjunto_fk FOREIGN KEY (municipalidad_id, conjunto_id) REFERENCES conjunto_parametros(municipalidad_id, id) NOT VALID;
 ALTER TABLE descargo ADD CONSTRAINT descargo_papeleta_fk FOREIGN KEY (municipalidad_id, papeleta_id) REFERENCES papeleta(municipalidad_id, id);
 ALTER TABLE determinacion ADD CONSTRAINT determinacion_conjunto_fk FOREIGN KEY (municipalidad_id, conjunto_id) REFERENCES conjunto_parametros(municipalidad_id, id);
 ALTER TABLE determinacion ADD CONSTRAINT determinacion_contribuyente_fk FOREIGN KEY (municipalidad_id, contribuyente_id) REFERENCES contribuyente(municipalidad_id, id);
@@ -2710,23 +2734,23 @@ ALTER TABLE ficha_catastral ADD CONSTRAINT ficha_predio_fk FOREIGN KEY (municipa
 ALTER TABLE grupo ADD CONSTRAINT grupo_municipalidad_id_fkey FOREIGN KEY (municipalidad_id) REFERENCES municipalidad(id);
 ALTER TABLE inquilino ADD CONSTRAINT inquilino_contribuyente_fk FOREIGN KEY (municipalidad_id, contribuyente_id) REFERENCES contribuyente(municipalidad_id, id);
 ALTER TABLE inquilino ADD CONSTRAINT inquilino_predio_fk FOREIGN KEY (municipalidad_id, predio_id) REFERENCES predio(municipalidad_id, id);
-ALTER TABLE internamiento ADD CONSTRAINT internamiento_documento_fk FOREIGN KEY (municipalidad_id, documento_id) REFERENCES documento_emitido(municipalidad_id, id) NOT VALID NOT VALID;
+ALTER TABLE internamiento ADD CONSTRAINT internamiento_documento_fk FOREIGN KEY (municipalidad_id, documento_id) REFERENCES documento_emitido(municipalidad_id, id) NOT VALID;
 ALTER TABLE internamiento ADD CONSTRAINT internamiento_papeleta_fk FOREIGN KEY (municipalidad_id, papeleta_id) REFERENCES papeleta(municipalidad_id, id);
 ALTER TABLE internamiento ADD CONSTRAINT internamiento_vehiculo_fk FOREIGN KEY (municipalidad_id, vehiculo_id) REFERENCES vehiculo(municipalidad_id, id);
-ALTER TABLE internamiento_movimiento ADD CONSTRAINT internamiento_movimiento_documento_fk FOREIGN KEY (municipalidad_id, documento_id) REFERENCES documento_emitido(municipalidad_id, id) NOT VALID NOT VALID;
+ALTER TABLE internamiento_movimiento ADD CONSTRAINT internamiento_movimiento_documento_fk FOREIGN KEY (municipalidad_id, documento_id) REFERENCES documento_emitido(municipalidad_id, id) NOT VALID;
 ALTER TABLE internamiento_movimiento ADD CONSTRAINT internamiento_movimiento_fk FOREIGN KEY (municipalidad_id, internamiento_id) REFERENCES internamiento(municipalidad_id, id);
 ALTER TABLE internamiento_movimiento ADD CONSTRAINT internamiento_movimiento_municipalidad_id_fkey FOREIGN KEY (municipalidad_id) REFERENCES municipalidad(id);
 ALTER TABLE licencia_correlativo ADD CONSTRAINT licencia_correlativo_municipalidad_id_fkey FOREIGN KEY (municipalidad_id) REFERENCES municipalidad(id);
-ALTER TABLE licencia_duplicado ADD CONSTRAINT licencia_duplicado_documento_fk FOREIGN KEY (municipalidad_id, documento_id) REFERENCES documento_emitido(municipalidad_id, id) NOT VALID NOT VALID;
+ALTER TABLE licencia_duplicado ADD CONSTRAINT licencia_duplicado_documento_fk FOREIGN KEY (municipalidad_id, documento_id) REFERENCES documento_emitido(municipalidad_id, id) NOT VALID;
 ALTER TABLE licencia_duplicado ADD CONSTRAINT licencia_duplicado_fk FOREIGN KEY (municipalidad_id, licencia_id) REFERENCES licencia_funcionamiento(municipalidad_id, id);
 ALTER TABLE licencia_duplicado ADD CONSTRAINT licencia_duplicado_recibo_fk FOREIGN KEY (municipalidad_id, recibo_id) REFERENCES recibo(municipalidad_id, id);
 ALTER TABLE licencia_edificacion ADD CONSTRAINT edificacion_contribuyente_fk FOREIGN KEY (municipalidad_id, contribuyente_id) REFERENCES contribuyente(municipalidad_id, id);
-ALTER TABLE licencia_edificacion ADD CONSTRAINT edificacion_origen_fk FOREIGN KEY (municipalidad_id, licencia_origen_id) REFERENCES licencia_edificacion(municipalidad_id, id) NOT VALID NOT VALID;
+ALTER TABLE licencia_edificacion ADD CONSTRAINT edificacion_origen_fk FOREIGN KEY (municipalidad_id, licencia_origen_id) REFERENCES licencia_edificacion(municipalidad_id, id) NOT VALID;
 ALTER TABLE licencia_edificacion ADD CONSTRAINT edificacion_predio_fk FOREIGN KEY (municipalidad_id, predio_id) REFERENCES predio(municipalidad_id, id);
 ALTER TABLE licencia_edificacion ADD CONSTRAINT licencia_edificacion_municipalidad_id_fkey FOREIGN KEY (municipalidad_id) REFERENCES municipalidad(id);
 ALTER TABLE licencia_funcionamiento ADD CONSTRAINT licencia_contribuyente_fk FOREIGN KEY (municipalidad_id, contribuyente_id) REFERENCES contribuyente(municipalidad_id, id);
-ALTER TABLE licencia_funcionamiento ADD CONSTRAINT licencia_documento_fk FOREIGN KEY (municipalidad_id, documento_id) REFERENCES documento_emitido(municipalidad_id, id) NOT VALID NOT VALID;
-ALTER TABLE licencia_funcionamiento ADD CONSTRAINT licencia_ficha_fk FOREIGN KEY (municipalidad_id, ficha_id) REFERENCES ficha_catastral(municipalidad_id, id) NOT VALID NOT VALID;
+ALTER TABLE licencia_funcionamiento ADD CONSTRAINT licencia_documento_fk FOREIGN KEY (municipalidad_id, documento_id) REFERENCES documento_emitido(municipalidad_id, id) NOT VALID;
+ALTER TABLE licencia_funcionamiento ADD CONSTRAINT licencia_ficha_fk FOREIGN KEY (municipalidad_id, ficha_id) REFERENCES ficha_catastral(municipalidad_id, id) NOT VALID;
 ALTER TABLE licencia_funcionamiento ADD CONSTRAINT licencia_funcionamiento_municipalidad_id_fkey FOREIGN KEY (municipalidad_id) REFERENCES municipalidad(id);
 ALTER TABLE licencia_funcionamiento ADD CONSTRAINT licencia_predio_fk FOREIGN KEY (municipalidad_id, predio_id) REFERENCES predio(municipalidad_id, id);
 ALTER TABLE licencia_funcionamiento ADD CONSTRAINT licencia_recibo_fk FOREIGN KEY (municipalidad_id, recibo_id) REFERENCES recibo(municipalidad_id, id);
@@ -2752,7 +2776,7 @@ ALTER TABLE manzana ADD CONSTRAINT manzana_sector_fk FOREIGN KEY (municipalidad_
 ALTER TABLE miembro ADD CONSTRAINT miembro_grupo_fk FOREIGN KEY (municipalidad_id, grupo_id) REFERENCES grupo(municipalidad_id, id);
 ALTER TABLE miembro ADD CONSTRAINT miembro_usuario_fk FOREIGN KEY (municipalidad_id, usuario_id) REFERENCES usuario(municipalidad_id, id);
 ALTER TABLE modulo_sistema ADD CONSTRAINT modulo_sistema_municipalidad_id_fkey FOREIGN KEY (municipalidad_id) REFERENCES municipalidad(id);
-ALTER TABLE notificacion ADD CONSTRAINT notificacion_conjunto_fk FOREIGN KEY (municipalidad_id, conjunto_id) REFERENCES conjunto_parametros(municipalidad_id, id) NOT VALID NOT VALID;
+ALTER TABLE notificacion ADD CONSTRAINT notificacion_conjunto_fk FOREIGN KEY (municipalidad_id, conjunto_id) REFERENCES conjunto_parametros(municipalidad_id, id) NOT VALID;
 ALTER TABLE notificacion ADD CONSTRAINT notificacion_municipalidad_id_fkey FOREIGN KEY (municipalidad_id) REFERENCES municipalidad(id);
 ALTER TABLE notificacion_administrativa ADD CONSTRAINT notif_adm_contribuyente_fk FOREIGN KEY (municipalidad_id, contribuyente_id) REFERENCES contribuyente(municipalidad_id, id);
 ALTER TABLE notificacion_administrativa ADD CONSTRAINT notif_adm_predio_fk FOREIGN KEY (municipalidad_id, predio_id) REFERENCES predio(municipalidad_id, id);
@@ -2763,14 +2787,14 @@ ALTER TABLE papeleta ADD CONSTRAINT papeleta_contribuyente_fk FOREIGN KEY (munic
 ALTER TABLE papeleta ADD CONSTRAINT papeleta_infractor_fk FOREIGN KEY (municipalidad_id, infractor_id) REFERENCES contribuyente(municipalidad_id, id);
 ALTER TABLE papeleta ADD CONSTRAINT papeleta_municipalidad_id_fkey FOREIGN KEY (municipalidad_id) REFERENCES municipalidad(id);
 ALTER TABLE papeleta ADD CONSTRAINT papeleta_notificacion_fk FOREIGN KEY (municipalidad_id, notificacion_previa_id) REFERENCES notificacion_administrativa(municipalidad_id, id);
-ALTER TABLE papeleta ADD CONSTRAINT papeleta_obligado_fk FOREIGN KEY (municipalidad_id, obligado_id) REFERENCES contribuyente(municipalidad_id, id) NOT VALID NOT VALID;
+ALTER TABLE papeleta ADD CONSTRAINT papeleta_obligado_fk FOREIGN KEY (municipalidad_id, obligado_id) REFERENCES contribuyente(municipalidad_id, id) NOT VALID;
 ALTER TABLE papeleta ADD CONSTRAINT papeleta_propietario_fk FOREIGN KEY (municipalidad_id, propietario_id) REFERENCES contribuyente(municipalidad_id, id);
 ALTER TABLE papeleta ADD CONSTRAINT papeleta_vehiculo_fk FOREIGN KEY (municipalidad_id, vehiculo_id) REFERENCES vehiculo(municipalidad_id, id);
 ALTER TABLE papeleta_cambio_numero ADD CONSTRAINT papeleta_cambio_fk FOREIGN KEY (municipalidad_id, papeleta_id) REFERENCES papeleta(municipalidad_id, id);
 ALTER TABLE papeleta_masivo ADD CONSTRAINT papeleta_masivo_municipalidad_id_fkey FOREIGN KEY (municipalidad_id) REFERENCES municipalidad(id);
 ALTER TABLE papeleta_masivo_item ADD CONSTRAINT papeleta_masivo_item_corrida_fk FOREIGN KEY (municipalidad_id, corrida_id) REFERENCES papeleta_masivo(municipalidad_id, id);
 ALTER TABLE papeleta_masivo_item ADD CONSTRAINT papeleta_masivo_item_papeleta_fk FOREIGN KEY (municipalidad_id, papeleta_id) REFERENCES papeleta(municipalidad_id, id);
-ALTER TABLE papeleta_masivo_item ADD CONSTRAINT papeleta_masivo_item_valor_fk FOREIGN KEY (municipalidad_id, valor_id) REFERENCES valor(municipalidad_id, id) NOT VALID NOT VALID;
+ALTER TABLE papeleta_masivo_item ADD CONSTRAINT papeleta_masivo_item_valor_fk FOREIGN KEY (municipalidad_id, valor_id) REFERENCES valor(municipalidad_id, id) NOT VALID;
 ALTER TABLE parametro_tributario ADD CONSTRAINT parametro_tributario_municipalidad_id_fkey FOREIGN KEY (municipalidad_id) REFERENCES municipalidad(id);
 ALTER TABLE participacion_comun ADD CONSTRAINT participacion_ficha_fk FOREIGN KEY (municipalidad_id, ficha_id) REFERENCES ficha_catastral(municipalidad_id, id);
 ALTER TABLE participacion_comun ADD CONSTRAINT participacion_predio_fk FOREIGN KEY (municipalidad_id, predio_id) REFERENCES predio(municipalidad_id, id);
@@ -2794,7 +2818,7 @@ ALTER TABLE programa_muestra ADD CONSTRAINT programa_muestra_programa_fk FOREIGN
 ALTER TABLE recibo ADD CONSTRAINT recibo_caja_fk FOREIGN KEY (municipalidad_id, caja_id) REFERENCES caja(municipalidad_id, id);
 ALTER TABLE recibo ADD CONSTRAINT recibo_contribuyente_fk FOREIGN KEY (municipalidad_id, contribuyente_id) REFERENCES contribuyente(municipalidad_id, id);
 ALTER TABLE recibo ADD CONSTRAINT recibo_municipalidad_id_fkey FOREIGN KEY (municipalidad_id) REFERENCES municipalidad(id);
-ALTER TABLE recibo ADD CONSTRAINT recibo_turno_fk FOREIGN KEY (municipalidad_id, turno_id) REFERENCES cierre_caja(municipalidad_id, id) NOT VALID NOT VALID;
+ALTER TABLE recibo ADD CONSTRAINT recibo_turno_fk FOREIGN KEY (municipalidad_id, turno_id) REFERENCES cierre_caja(municipalidad_id, id) NOT VALID;
 ALTER TABLE recibo_correlativo ADD CONSTRAINT recibo_correlativo_municipalidad_id_fkey FOREIGN KEY (municipalidad_id) REFERENCES municipalidad(id);
 ALTER TABLE recibo_detalle ADD CONSTRAINT recibo_detalle_recibo_fk FOREIGN KEY (municipalidad_id, recibo_id) REFERENCES recibo(municipalidad_id, id);
 ALTER TABLE recibo_detalle ADD CONSTRAINT recibo_detalle_tasa_fk FOREIGN KEY (municipalidad_id, tasa_id) REFERENCES tasa(municipalidad_id, id);
@@ -2802,18 +2826,18 @@ ALTER TABLE recibo_movimiento ADD CONSTRAINT recibo_movimiento_caja_fk FOREIGN K
 ALTER TABLE recibo_movimiento ADD CONSTRAINT recibo_movimiento_municipalidad_id_fkey FOREIGN KEY (municipalidad_id) REFERENCES municipalidad(id);
 ALTER TABLE recibo_movimiento ADD CONSTRAINT recibo_movimiento_recibo_fk FOREIGN KEY (municipalidad_id, recibo_id) REFERENCES recibo(municipalidad_id, id);
 ALTER TABLE recibo_movimiento ADD CONSTRAINT recibo_movimiento_turno_fk FOREIGN KEY (municipalidad_id, turno_id) REFERENCES cierre_caja(municipalidad_id, id);
-ALTER TABLE resolucion_determinacion ADD CONSTRAINT resolucion_determinacion_contribuyente_fk FOREIGN KEY (municipalidad_id, contribuyente_id) REFERENCES contribuyente(municipalidad_id, id) NOT VALID NOT VALID;
-ALTER TABLE resolucion_determinacion ADD CONSTRAINT resolucion_determinacion_documento_fk FOREIGN KEY (municipalidad_id, documento_id) REFERENCES documento_emitido(municipalidad_id, id) NOT VALID NOT VALID;
-ALTER TABLE resolucion_determinacion ADD CONSTRAINT resolucion_determinacion_ficha_anterior_fk FOREIGN KEY (municipalidad_id, ficha_anterior_id) REFERENCES ficha_catastral(municipalidad_id, id) NOT VALID NOT VALID;
-ALTER TABLE resolucion_determinacion ADD CONSTRAINT resolucion_determinacion_ficha_nueva_fk FOREIGN KEY (municipalidad_id, ficha_nueva_id) REFERENCES ficha_catastral(municipalidad_id, id) NOT VALID NOT VALID;
-ALTER TABLE resolucion_determinacion ADD CONSTRAINT resolucion_determinacion_liquidacion_fk FOREIGN KEY (municipalidad_id, liquidacion_id) REFERENCES liquidacion_fiscalizacion(municipalidad_id, id) NOT VALID NOT VALID;
+ALTER TABLE resolucion_determinacion ADD CONSTRAINT resolucion_determinacion_contribuyente_fk FOREIGN KEY (municipalidad_id, contribuyente_id) REFERENCES contribuyente(municipalidad_id, id) NOT VALID;
+ALTER TABLE resolucion_determinacion ADD CONSTRAINT resolucion_determinacion_documento_fk FOREIGN KEY (municipalidad_id, documento_id) REFERENCES documento_emitido(municipalidad_id, id) NOT VALID;
+ALTER TABLE resolucion_determinacion ADD CONSTRAINT resolucion_determinacion_ficha_anterior_fk FOREIGN KEY (municipalidad_id, ficha_anterior_id) REFERENCES ficha_catastral(municipalidad_id, id) NOT VALID;
+ALTER TABLE resolucion_determinacion ADD CONSTRAINT resolucion_determinacion_ficha_nueva_fk FOREIGN KEY (municipalidad_id, ficha_nueva_id) REFERENCES ficha_catastral(municipalidad_id, id) NOT VALID;
+ALTER TABLE resolucion_determinacion ADD CONSTRAINT resolucion_determinacion_liquidacion_fk FOREIGN KEY (municipalidad_id, liquidacion_id) REFERENCES liquidacion_fiscalizacion(municipalidad_id, id) NOT VALID;
 ALTER TABLE resolucion_determinacion ADD CONSTRAINT resolucion_determinacion_municipalidad_id_fkey FOREIGN KEY (municipalidad_id) REFERENCES municipalidad(id);
-ALTER TABLE resolucion_determinacion ADD CONSTRAINT resolucion_determinacion_predio_fk FOREIGN KEY (municipalidad_id, predio_id) REFERENCES predio(municipalidad_id, id) NOT VALID NOT VALID;
-ALTER TABLE resolucion_determinacion ADD CONSTRAINT resolucion_determinacion_vehiculo_fk FOREIGN KEY (municipalidad_id, vehiculo_id) REFERENCES vehiculo(municipalidad_id, id) NOT VALID NOT VALID;
+ALTER TABLE resolucion_determinacion ADD CONSTRAINT resolucion_determinacion_predio_fk FOREIGN KEY (municipalidad_id, predio_id) REFERENCES predio(municipalidad_id, id) NOT VALID;
+ALTER TABLE resolucion_determinacion ADD CONSTRAINT resolucion_determinacion_vehiculo_fk FOREIGN KEY (municipalidad_id, vehiculo_id) REFERENCES vehiculo(municipalidad_id, id) NOT VALID;
 ALTER TABLE resolucion_gerencia ADD CONSTRAINT resolucion_gerencia_descargo_fk FOREIGN KEY (municipalidad_id, descargo_id) REFERENCES descargo(municipalidad_id, id);
-ALTER TABLE resolucion_gerencia ADD CONSTRAINT resolucion_gerencia_documento_fk FOREIGN KEY (municipalidad_id, documento_id) REFERENCES documento_emitido(municipalidad_id, id) NOT VALID NOT VALID;
+ALTER TABLE resolucion_gerencia ADD CONSTRAINT resolucion_gerencia_documento_fk FOREIGN KEY (municipalidad_id, documento_id) REFERENCES documento_emitido(municipalidad_id, id) NOT VALID;
 ALTER TABLE resolucion_gerencia ADD CONSTRAINT resolucion_gerencia_municipalidad_id_fkey FOREIGN KEY (municipalidad_id) REFERENCES municipalidad(id);
-ALTER TABLE resolucion_gerencia ADD CONSTRAINT resolucion_gerencia_notificacion_fk FOREIGN KEY (municipalidad_id, ordinaria_notificacion_id) REFERENCES notificacion(municipalidad_id, id) NOT VALID NOT VALID;
+ALTER TABLE resolucion_gerencia ADD CONSTRAINT resolucion_gerencia_notificacion_fk FOREIGN KEY (municipalidad_id, ordinaria_notificacion_id) REFERENCES notificacion(municipalidad_id, id) NOT VALID;
 ALTER TABLE resolucion_gerencia ADD CONSTRAINT resolucion_gerencia_papeleta_fk FOREIGN KEY (municipalidad_id, papeleta_id) REFERENCES papeleta(municipalidad_id, id);
 ALTER TABLE responsable_solidario ADD CONSTRAINT responsable_contribuyente_fk FOREIGN KEY (municipalidad_id, contribuyente_id) REFERENCES contribuyente(municipalidad_id, id);
 ALTER TABLE responsable_solidario ADD CONSTRAINT responsable_responsable_fk FOREIGN KEY (municipalidad_id, responsable_id) REFERENCES contribuyente(municipalidad_id, id);

@@ -168,9 +168,35 @@ public final class Emitir {
                 o.append("COMMENT ON ").append(f[0]).append(" IS ").append(f[1]).append(";\n");
             }
         }
+        sinSufijoRepetido(o);
         Files.writeString(Path.of(salida), o.toString());
         System.out.println("baseline " + salida + ": " + t.size() + " tablas, "
                 + o.toString().lines().count() + " lineas");
+    }
+
+    /**
+     * Ninguna sentencia emitida repite el sufijo ` NOT VALID` (C-3).
+     *
+     * <p>Mira el TEXTO y no el catalogo, y no puede ser de otra forma: el motor acepta el
+     * sufijo repetido -acumula el atributo- y su catalogo queda identico, asi que ni las
+     * guardas de `Guardas.java` ni el comparador de `Retrato.java` pueden verlo. Lo que se
+     * pierde es que el archivo sea estable en ida y vuelta, y eso solo se ve en el archivo.
+     *
+     * <p>Se pone roja volviendo a anadir el sufijo a mano en `emitirRestricciones`, que es
+     * exactamente el defecto que dejo 36 sentencias asi en el baseline de `rentas`.
+     */
+    static void sinSufijoRepetido(CharSequence emitido) {
+        List<String> malas = new ArrayList<>();
+        int n = 0;
+        for (String l : emitido.toString().split("\n", -1)) {
+            n++;
+            if (l.startsWith("--")) continue;      // la prosa SI puede nombrarlo
+            if (l.contains("NOT VALID NOT VALID")) malas.add(n + ": " + l);
+        }
+        if (!malas.isEmpty()) {
+            throw new IllegalStateException(malas.size() + " sentencia(s) con el sufijo"
+                    + " ` NOT VALID` repetido:\n  " + String.join("\n  ", malas));
+        }
     }
 
     static String cmd(String p) {
@@ -246,9 +272,26 @@ public final class Emitir {
                      .append(": ").append(f[1]).append('\n');
                     continue;
                 }
+                // `pg_get_constraintdef` YA emite el sufijo ` NOT VALID` de una restriccion
+                // no validada -medido contra PostgreSQL 16.15-, asi que anadirlo aqui lo
+                // DUPLICA. El motor lo acepta -el atributo se acumula y el catalogo queda
+                // identico, comprobado hasta con el sufijo TRIPLICADO-, pero el archivo deja
+                // de ser estable en ida y vuelta: regenerarlo produce otro texto, y con
+                // checksum de Flyway eso importa (C-3).
+                //
+                // No se confia en que siga siendo asi: se COMPRUEBA. Si algun dia el motor
+                // dejara de emitirlo, esto falla nombrando la restriccion en vez de emitir un
+                // baseline que crea validada una restriccion que no lo esta -que si seria un
+                // defecto de fondo: validar es una consulta y el migrador corre sin contexto
+                // de tenant (DAT-01 §0, hallazgo 4)-.
+                boolean noValidada = !"true".equals(f[2]);
+                if (noValidada != f[1].endsWith(" NOT VALID")) {
+                    throw new IllegalStateException("El motor no emite el sufijo NOT VALID como"
+                            + " se esperaba en " + tb + '.' + f[0] + " (convalidated=" + f[2]
+                            + "): " + f[1]);
+                }
                 o.append("ALTER TABLE ").append(tb).append(" ADD CONSTRAINT ").append(f[0])
-                 .append(' ').append(f[1])
-                 .append("true".equals(f[2]) ? "" : " NOT VALID").append(";\n");
+                 .append(' ').append(f[1]).append(";\n");
             }
         }
     }
