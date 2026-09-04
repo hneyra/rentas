@@ -1,6 +1,5 @@
 package kamayuk.rentas.catastro.infraestructura;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import java.time.LocalDate;
 import java.util.Optional;
 import kamayuk.rentas.catastro.CuotaDeTitularidad;
@@ -8,6 +7,7 @@ import kamayuk.rentas.catastro.GestorDeTitularidad;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.dominio.Porcentaje;
 import org.springframework.stereotype.Component;
+import tools.jackson.databind.JsonNode;
 
 /**
  * La titularidad de un predio: la mitad que se lee sale por HTTP; la que escribe, todavia no (C-5).
@@ -96,7 +96,7 @@ public class TitularidadHttp implements GestorDeTitularidad {
                         cuerpo.path("titularidadId").asLong(),
                         predioId,
                         contribuyenteId,
-                        Porcentaje.de(cuerpo.path("porcentaje").asText("0"))));
+                        Porcentaje.de(cuerpo.path("porcentaje").asString("0"))));
     }
 
     @Override

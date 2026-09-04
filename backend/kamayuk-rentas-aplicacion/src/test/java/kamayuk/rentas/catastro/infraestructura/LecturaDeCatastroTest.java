@@ -3,10 +3,6 @@ package kamayuk.rentas.catastro.infraestructura;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -21,6 +17,10 @@ import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.verificaciones.ContratoQueConsumeDeCatastro;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.ArrayNode;
+import tools.jackson.databind.node.ObjectNode;
 
 /**
  * La ida y vuelta que hace que el contrato con {@code catastro} no sea otra copia a mano.
@@ -66,7 +66,7 @@ class LecturaDeCatastroTest {
                                 + " uno de mas la haria pasar aunque el contrato no lo declarase")
                 .isEqualTo(ContratoQueConsumeDeCatastro.FILA_DE_FICHA.keySet());
 
-        JsonNode fila = new ObjectMapper().valueToTree(fabricada);
+        JsonNode fila = new JsonMapper().valueToTree(fabricada);
         FichaDelPadron ficha = ClienteHttpDeCatastro.ficha(fila);
 
         // Ni un cero ni una cadena vacia: cada uno de estos es un campo que el adaptador
@@ -103,7 +103,7 @@ class LecturaDeCatastroTest {
                                 + " declarase")
                 .isEqualTo(ContratoQueConsumeDeCatastro.FILA_DE_VALOR_UNITARIO.keySet());
 
-        ObjectMapper json = new ObjectMapper();
+        JsonMapper json = new JsonMapper();
         ArrayNode cuadro = json.createArrayNode();
         cuadro.add(json.valueToTree(fabricada));
 
@@ -127,7 +127,7 @@ class LecturaDeCatastroTest {
     @DisplayName(
             "y una respuesta que NO es un array falla en voz alta, no devuelve el cuadro vacio")
     void unCuadroQueNoEsUnArrayFallaEnVozAlta() {
-        ObjectMapper json = new ObjectMapper();
+        JsonMapper json = new JsonMapper();
         ObjectNode sobre = json.createObjectNode();
         sobre.putArray("contenido");
 
@@ -241,7 +241,7 @@ class LecturaDeCatastroTest {
         assertThat(cuota.keySet())
                 .isEqualTo(ContratoQueConsumeDeCatastro.CUOTA_DE_UN_TITULAR.keySet());
 
-        ObjectMapper json = new ObjectMapper();
+        JsonMapper json = new JsonMapper();
         ObjectNode fila = json.createObjectNode();
         fila.put("predioId", 11);
         fila.set("cuotas", json.createArrayNode().add(json.valueToTree(cuota)));
@@ -297,7 +297,7 @@ class LecturaDeCatastroTest {
         assertThat(predio.keySet())
                 .isEqualTo(ContratoQueConsumeDeCatastro.PREDIO_DEL_TITULAR.keySet());
 
-        ObjectMapper json = new ObjectMapper();
+        JsonMapper json = new JsonMapper();
         ObjectNode cuerpo = json.createObjectNode();
         cuerpo.put("contribuyenteId", 22);
         cuerpo.put("aLaFecha", AL_30_DE_JUNIO.toString());
@@ -318,7 +318,7 @@ class LecturaDeCatastroTest {
     @Test
     @DisplayName("y una respuesta de OTRO contribuyente falla: seria determinar con predios ajenos")
     void unaRespuestaDeOtroContribuyenteFalla() {
-        ObjectMapper json = new ObjectMapper();
+        JsonMapper json = new JsonMapper();
         ObjectNode deOtro = json.createObjectNode();
         deOtro.put("contribuyenteId", 999);
         deOtro.put("aLaFecha", AL_30_DE_JUNIO.toString());
@@ -336,7 +336,7 @@ class LecturaDeCatastroTest {
 
     /** Un catastro que contesta siempre ese objeto, sea cual sea la ruta. */
     private static CatastroQueNoContesta doble(Map<String, Object> cuerpo) {
-        JsonNode respuesta = new ObjectMapper().valueToTree(cuerpo);
+        JsonNode respuesta = new JsonMapper().valueToTree(cuerpo);
         return new CatastroQueNoContesta(ruta -> respuesta);
     }
 }

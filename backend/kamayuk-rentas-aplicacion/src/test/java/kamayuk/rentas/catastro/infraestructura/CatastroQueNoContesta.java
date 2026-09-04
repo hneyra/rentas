@@ -1,10 +1,10 @@
 package kamayuk.rentas.catastro.infraestructura;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Function;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Un {@code catastro} que no habla con nadie: se queda con la ruta y devuelve lo que se le diga.
@@ -30,7 +30,7 @@ class CatastroQueNoContesta extends ClienteHttpDeCatastro {
      *     cuadro sellado es un array pelado (C-1, desajuste 6)
      */
     CatastroQueNoContesta(Function<String, JsonNode> respuesta) {
-        super(new ObjectMapper(), "http://catastro.invalido");
+        super(new JsonMapper(), "http://catastro.invalido");
         this.respuesta = respuesta;
     }
 

@@ -184,6 +184,18 @@ public final class BaseDeDatosDePrueba implements AutoCloseable {
                                     motor.url(), motor.usuarioAdmin(), motor.claveAdmin());
                     Statement sentencia = admin.createStatement()) {
                 sentencia.execute(guion);
+                // El escenario de `normativa` lo escriben las pruebas conectadas como
+                // `rol_carga_parametros`, que es quien lo escribiria de verdad en la base de
+                // `normativa`. Aqui esas tablas son un ANDAMIO: existen para que este sistema
+                // pueda leerlas sin levantar el otro (P5B). Por eso el `CONNECT` se lo da la
+                // fixture y no `crear-roles.sql`: en la base de verdad de este sistema ese rol
+                // no tiene ni una tabla, y darselo alli seria una credencial de mas apuntando a
+                // un padron (C-7 §6).
+                sentencia.execute(
+                        "GRANT CONNECT ON DATABASE "
+                                + nombreDeLaBase(admin)
+                                + " TO "
+                                + CARGA_PARAMETROS);
                 long cluster = identidadDelCluster(admin);
                 for (String rol : ROLES) {
                     String clave = claveDeRol(cluster, motor.claveAdmin(), rol);
@@ -194,6 +206,15 @@ public final class BaseDeDatosDePrueba implements AutoCloseable {
             exigirQuePuedanEntrar(motor.url(), claves);
         }
         return claves;
+    }
+
+    /** El nombre de la base a la que apunta esta conexion, entrecomillado para `GRANT`. */
+    private static String nombreDeLaBase(Connection admin) throws SQLException {
+        try (Statement sentencia = admin.createStatement();
+                java.sql.ResultSet fila = sentencia.executeQuery("SELECT current_database()")) {
+            fila.next();
+            return "\"" + fila.getString(1).replace("\"", "\"\"") + "\"";
+        }
     }
 
     /**

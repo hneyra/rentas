@@ -1,6 +1,5 @@
 package kamayuk.rentas.catastro.infraestructura;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import java.time.LocalDate;
 import java.util.Optional;
 import kamayuk.rentas.catastro.CaracteristicasDelPredio;
@@ -9,6 +8,7 @@ import kamayuk.rentas.catastro.LectorDeFichas;
 import kamayuk.rentas.catastro.LectorDeFichasEconomicas;
 import kamayuk.rentas.dominio.AreaM2;
 import org.springframework.stereotype.Component;
+import tools.jackson.databind.JsonNode;
 
 /**
  * Lo que {@code catastro} tiene inscrito de un predio, pedido por HTTP (C-5).
@@ -108,7 +108,7 @@ public class CaracteristicasDelPredioHttp
 
     private static @org.jspecify.annotations.Nullable String texto(JsonNode cuerpo, String campo) {
         JsonNode valor = cuerpo.path(campo);
-        return valor.isNull() || valor.isMissingNode() ? null : valor.asText();
+        return valor.isNull() || valor.isMissingNode() ? null : valor.asString();
     }
 
     private static @org.jspecify.annotations.Nullable AreaM2 area(JsonNode cuerpo, String campo) {

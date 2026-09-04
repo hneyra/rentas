@@ -23,7 +23,7 @@ dependencies {
     // Ni un cliente HTTP de framework: ver el javadoc de `ClienteHttpDeNormativa`, que explica por
     // que hace falta el `String` crudo.
     implementation("org.springframework:spring-web")
-    implementation("com.fasterxml.jackson.core:jackson-databind")
+    implementation("tools.jackson.core:jackson-databind")
 
     // Los dobles en memoria de los nueve puertos, para las pruebas de los otros modulos. Viven
     // aqui y no en cada uno porque son la misma premisa —«este predio tiene este titular»— y

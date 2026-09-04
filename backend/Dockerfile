@@ -49,7 +49,19 @@ COPY backend/ ./
 # Sin pruebas: las bloqueantes necesitan Docker y ya corrieron en CI. Una imagen
 # que las repitiera dentro del build las volveria a ejecutar en cada despliegue,
 # con un motor distinto al verificado.
-RUN ./gradlew --no-daemon :kamayuk-rentas-aplicacion:bootJar :kamayuk-rentas-esquema:installDist
+# `-Pkamayuk.sinLibreriasComunes` (C-7, punto 5). Sin ella el build se para en el `require` de
+# `settings.gradle.kts`: el composite build de `comun-verificaciones` vive en el clon hermano
+# `infrastructure/`, que esta FUERA del contexto de esta imagen y no se puede meter dentro —un
+# `.dockerignore` no puede describir un contexto que es el directorio padre—. Era el hueco 9.4 de
+# P5A, heredado de P3, y llevaba ahi sin que nada lo midiera porque ningun CI construye todavia
+# esta imagen.
+#
+# Se puede porque `comun-verificaciones` es `testImplementation` y solo de
+# `kamayuk-rentas-aplicacion`: aqui no corre ni una prueba. Y no abre una puerta, porque el
+# `build.gradle.kts` de la raiz **hace fallar toda tarea de prueba** mientras la propiedad este
+# puesta: o esta la libreria, o no hay verificacion.
+RUN ./gradlew --no-daemon -Pkamayuk.sinLibreriasComunes \
+    :kamayuk-rentas-aplicacion:bootJar :kamayuk-rentas-esquema:installDist
 
 # ---------------------------------------------------------------------------
 FROM eclipse-temurin:25-jre AS aplicacion

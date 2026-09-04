@@ -1,6 +1,5 @@
 package kamayuk.rentas.tesoreria.infraestructura;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -9,6 +8,7 @@ import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.tesoreria.ReciboDeTramite;
 import kamayuk.rentas.tesoreria.RecibosDeTramite;
 import org.springframework.stereotype.Component;
+import tools.jackson.databind.JsonNode;
 
 /**
  * El recibo de caja de tasas, pedido a {@code caja} (P5D).
@@ -59,17 +59,17 @@ public class RecibosDeTramiteHttp implements RecibosDeTramite {
     private static ReciboDeTramite recibo(JsonNode cuerpo) {
         List<String> conceptos = new ArrayList<>();
         for (JsonNode concepto : cuerpo.path("conceptos")) {
-            conceptos.add(concepto.asText());
+            conceptos.add(concepto.asString());
         }
         return new ReciboDeTramite(
                 cuerpo.path("reciboId").asLong(),
-                cuerpo.path("numero").asText(""),
-                LocalDate.parse(cuerpo.path("fechaDePago").asText()),
+                cuerpo.path("numero").asString(""),
+                LocalDate.parse(cuerpo.path("fechaDePago").asString()),
                 cuerpo.path("contribuyenteId").asLong(),
                 cuerpo.path("esDeTasas").asBoolean(),
                 cuerpo.path("anulado").asBoolean(),
                 List.copyOf(conceptos),
-                Dinero.de(cuerpo.path("total").asText("0")),
-                LocalDate.parse(cuerpo.path("actualizadoA").asText()));
+                Dinero.de(cuerpo.path("total").asString("0")),
+                LocalDate.parse(cuerpo.path("actualizadoA").asString()));
     }
 }

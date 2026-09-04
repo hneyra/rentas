@@ -1,11 +1,11 @@
 package kamayuk.rentas.tesoreria.infraestructura;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import java.time.LocalDate;
 import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.tesoreria.AvanceDeCaja;
 import kamayuk.rentas.tesoreria.RecaudadoEnCaja;
 import org.springframework.stereotype.Component;
+import tools.jackson.databind.JsonNode;
 
 /**
  * Lo que la ventanilla lleva cobrado hoy, pedido a {@code caja} (P5D).
@@ -44,9 +44,9 @@ public class AvanceDeCajaHttp implements AvanceDeCaja {
                         "/recaudacion/avance?dia=" + dia + "&aLaFecha=" + aLaFecha,
                         "leer el avance de caja del " + dia);
         return new RecaudadoEnCaja(
-                Dinero.de(cuerpo.path("cobrado").asText("0")),
-                Dinero.de(cuerpo.path("anulado").asText("0")),
-                LocalDate.parse(cuerpo.path("dia").asText()),
-                LocalDate.parse(cuerpo.path("aLaFecha").asText()));
+                Dinero.de(cuerpo.path("cobrado").asString("0")),
+                Dinero.de(cuerpo.path("anulado").asString("0")),
+                LocalDate.parse(cuerpo.path("dia").asString()),
+                LocalDate.parse(cuerpo.path("aLaFecha").asString()));
     }
 }

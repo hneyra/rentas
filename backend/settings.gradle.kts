@@ -12,12 +12,37 @@
 // por eso se comprueba antes con un mensaje que dice que hacer, en vez de dejar que Gradle falle
 // con «project directory does not exist».
 val libreriasComunes = file("../../infrastructure/librerias-backend")
-require(libreriasComunes.isDirectory) {
+
+// LA UNICA SALIDA, Y SOLO PARA CONSTRUIR EL ARTEFACTO (C-7, punto 5).
+//
+// El `Dockerfile` construye con el contexto en la raiz de ESTE repositorio, y
+// `infrastructure/librerias-backend` vive en un clon hermano: fuera del contexto, y sin forma de
+// meterlo dentro —un `.dockerignore` no puede describir un contexto que es el directorio padre—.
+// Asi que la imagen se paraba en el `require` de aqui. Estaba escrito como hueco desde P3 y no lo
+// medía nadie, porque ninguno de los cuatro repositorios construye su imagen en CI todavia.
+//
+// Lo que se midio antes de decidir: `comun-verificaciones` es `testImplementation` y **solo** de
+// `kamayuk-rentas-aplicacion`. La imagen construye `bootJar` e `installDist` y no corre ni una
+// prueba, asi que no necesita la libreria para nada — lo unico que la necesitaba era este
+// `require`.
+//
+// De ahi la propiedad: con ella el build se queda SIN las verificaciones, y para que eso no pueda
+// convertirse en «verificar sin verificar» el `build.gradle.kts` de la raiz **hace fallar toda
+// tarea de prueba** mientras este puesta. O sea: o esta la libreria, o no hay verificacion; nunca
+// una verificacion que pasa en verde sin la libreria, que es el modo de fallo que el composite
+// build existe para impedir (#192).
+val soloElArtefacto = providers.gradleProperty("kamayuk.sinLibreriasComunes").isPresent
+
+// LO QUE CUESTA, dicho aqui y no descubierto mas tarde: este backend NO COMPILA sus pruebas sin
+// tener `infrastructure` clonado al lado.
+require(libreriasComunes.isDirectory || soloElArtefacto) {
     "No esta ${libreriasComunes.canonicalPath}. El backend consume comun-verificaciones como" +
-        " composite build, asi que `infrastructure` tiene que estar clonado al lado de `rentas`:" +
-        " git clone https://github.com/hneyra/infrastructure ../../infrastructure"
+        " composite build, asi que `infrastructure` tiene que estar clonado al lado de" +
+        " `rentas`: git clone https://github.com/hneyra/infrastructure ../../infrastructure"
 }
-includeBuild(libreriasComunes)
+if (!soloElArtefacto) {
+    includeBuild(libreriasComunes)
+}
 
 rootProject.name = "kamayuk-rentas-backend"
 

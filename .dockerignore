@@ -1,0 +1,15 @@
+# Lo que NO viaja al contexto de la imagen.
+#
+# Sin esto el contexto son ~300 MB, y casi todo es `.git`. No es solo tiempo: cada archivo del
+# contexto entra en la huella de la capa, asi que un `git gc` cambiaria la huella y volveria a
+# construir la imagen entera sin que ninguna fuente hubiera cambiado.
+.git
+.github
+.idea
+.claude
+**/build/
+**/node_modules/
+**/.gradle/
+infra/
+infrastructure/
+frontend/

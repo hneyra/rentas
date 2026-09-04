@@ -1,6 +1,5 @@
 package kamayuk.rentas.tesoreria.infraestructura;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import java.time.LocalDate;
 import java.util.Optional;
 import kamayuk.rentas.dominio.Dinero;
@@ -8,6 +7,7 @@ import kamayuk.rentas.tesoreria.CobrosDeTasas;
 import kamayuk.rentas.tesoreria.RecaudacionDeTasa;
 import kamayuk.rentas.tesoreria.TasaCobrada;
 import org.springframework.stereotype.Component;
+import tools.jackson.databind.JsonNode;
 
 /**
  * Lo que la caja cobro por un concepto del TUPA, pedido a {@code caja} (P5D).
@@ -81,19 +81,19 @@ public class CobrosDeTasasHttp implements CobrosDeTasas {
                                 + " y "
                                 + hasta);
         return new RecaudacionDeTasa(
-                cuerpo.path("codigoDeTasa").asText(codigoDeTasa),
-                Dinero.de(cuerpo.path("cobrado").asText("0")),
-                Dinero.de(cuerpo.path("anulado").asText("0")),
-                LocalDate.parse(cuerpo.path("desde").asText()),
-                LocalDate.parse(cuerpo.path("hasta").asText()));
+                cuerpo.path("codigoDeTasa").asString(codigoDeTasa),
+                Dinero.de(cuerpo.path("cobrado").asString("0")),
+                Dinero.de(cuerpo.path("anulado").asString("0")),
+                LocalDate.parse(cuerpo.path("desde").asString()),
+                LocalDate.parse(cuerpo.path("hasta").asString()));
     }
 
     private static TasaCobrada cobrada(JsonNode cuerpo) {
         return new TasaCobrada(
-                cuerpo.path("numeroDeRecibo").asText(""),
-                cuerpo.path("codigoDeTasa").asText(""),
+                cuerpo.path("numeroDeRecibo").asString(""),
+                cuerpo.path("codigoDeTasa").asString(""),
                 cuerpo.path("cantidad").asInt(),
-                Dinero.de(cuerpo.path("importe").asText("0")),
-                LocalDate.parse(cuerpo.path("fecha").asText()));
+                Dinero.de(cuerpo.path("importe").asString("0")),
+                LocalDate.parse(cuerpo.path("fecha").asString()));
     }
 }

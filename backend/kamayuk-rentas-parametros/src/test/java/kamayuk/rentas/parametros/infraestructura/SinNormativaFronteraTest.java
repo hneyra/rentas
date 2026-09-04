@@ -3,7 +3,6 @@ package kamayuk.rentas.parametros.infraestructura;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -44,6 +43,7 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.transaction.annotation.AnnotationTransactionAttributeSource;
 import org.springframework.transaction.interceptor.TransactionInterceptor;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * ADR-0025 §1, criterio de aceptacion 1 de P5B — <b>{@code rentas} calcula con {@code normativa}
@@ -111,8 +111,7 @@ class SinNormativaFronteraTest {
         puertoMuerto = unPuertoQueNadieEscucha();
         PublicadorDeNormativa apagada =
                 new ClienteHttpDeNormativa(
-                        new ObjectMapper(),
-                        "http://127.0.0.1:" + puertoMuerto + "/normativa/api/v1");
+                        new JsonMapper(), "http://127.0.0.1:" + puertoMuerto + "/normativa/api/v1");
 
         conNormativaApagada =
                 envolver(
@@ -248,7 +247,7 @@ class SinNormativaFronteraTest {
             String cuerpo = cuerpoDelSnapshot(8_080L);
             try (ServidorDeMentira servidor = ServidorDeMentira.con(cuerpo, "huella-que-no-es")) {
                 PublicadorDeNormativa cliente =
-                        new ClienteHttpDeNormativa(new ObjectMapper(), servidor.raiz());
+                        new ClienteHttpDeNormativa(new JsonMapper(), servidor.raiz());
 
                 assertThatThrownBy(() -> cliente.descargar(8_080L, "OBLIGACION"))
                         .as(
@@ -268,7 +267,7 @@ class SinNormativaFronteraTest {
             LectorDeParametros conNormativaViva;
             try (ServidorDeMentira servidor = ServidorDeMentira.con(cuerpo, huella)) {
                 PublicadorDeNormativa cliente =
-                        new ClienteHttpDeNormativa(new ObjectMapper(), servidor.raiz());
+                        new ClienteHttpDeNormativa(new JsonMapper(), servidor.raiz());
                 conNormativaViva =
                         envolver(
                                 new LectorDeParametrosCacheados(

@@ -1,7 +1,5 @@
 package kamayuk.rentas.catastro.infraestructura;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URLEncoder;
@@ -20,6 +18,9 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.RequestAttributes;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * El unico camino de {@code rentas} hacia {@code catastro} (P5C, ADR-0029 y ADR-0030).
@@ -77,11 +78,10 @@ public class ClienteHttpDeCatastro {
     private static final Duration ESPERA_DE_LECTURA = Duration.ofSeconds(30);
 
     private final HttpClient cliente;
-    private final ObjectMapper json;
+    private final JsonMapper json;
     private final String raiz;
 
-    public ClienteHttpDeCatastro(
-            ObjectMapper json, @Value("${kamayuk.catastro.url:}") String raiz) {
+    public ClienteHttpDeCatastro(JsonMapper json, @Value("${kamayuk.catastro.url:}") String raiz) {
         this.json = json;
         this.raiz = raiz.endsWith("/") ? raiz.substring(0, raiz.length() - 1) : raiz;
         this.cliente = HttpClient.newBuilder().connectTimeout(ESPERA_DE_CONEXION).build();
@@ -160,7 +160,7 @@ public class ClienteHttpDeCatastro {
      * se pidio es quien la pidio.
      */
     static void exigirQueContesteALaFecha(JsonNode cuerpo, LocalDate pedida, String que) {
-        String contestada = cuerpo.path("aLaFecha").asText("");
+        String contestada = cuerpo.path("aLaFecha").asString("");
         if (!pedida.toString().equals(contestada)) {
             throw new CatastroInalcanzable(
                     que
@@ -187,24 +187,24 @@ public class ClienteHttpDeCatastro {
         return new FichaDelPadron(
                 fila.path("fichaId").asLong(),
                 fila.path("predioId").asLong(),
-                fila.path("codRefCatastral").asText(""),
-                fila.path("direccion").asText(""),
+                fila.path("codRefCatastral").asString(""),
+                fila.path("direccion").asString(""),
                 texto(fila, "manzana"),
                 texto(fila, "lote"),
-                fila.path("tipo").asText(""),
+                fila.path("tipo").asString(""),
                 fila.path("version").asInt(),
-                AreaM2.de(fila.path("areaTerreno").asText("0")),
+                AreaM2.de(fila.path("areaTerreno").asString("0")),
                 fila.path("areaConstruida").isNull() || fila.path("areaConstruida").isMissingNode()
                         ? null
-                        : AreaM2.de(fila.path("areaConstruida").asText()),
-                fila.path("uso").asText(""),
-                LocalDate.parse(fila.path("vigenciaDesde").asText()),
+                        : AreaM2.de(fila.path("areaConstruida").asString()),
+                fila.path("uso").asString(""),
+                LocalDate.parse(fila.path("vigenciaDesde").asString()),
                 texto(fila, "titular"));
     }
 
     private static @Nullable String texto(JsonNode fila, String campo) {
         JsonNode nodo = fila.path(campo);
-        return nodo.isNull() || nodo.isMissingNode() ? null : nodo.asText();
+        return nodo.isNull() || nodo.isMissingNode() ? null : nodo.asString();
     }
 
     JsonNode pedir(String ruta, String que) {
@@ -228,6 +228,12 @@ public class ClienteHttpDeCatastro {
             return json.readTree(respuesta.body());
         } catch (IOException noContesta) {
             throw new CatastroInalcanzable(que, noContesta);
+        } catch (JacksonException ilegible) {
+            // Jackson 3 no lanza `IOException` sino `JacksonException`, que es NO COMPROBADA
+            // (C-7). Sin este `catch` un cuerpo que no es JSON —el HTML de un proxy, por
+            // ejemplo— saldria como una excepcion cruda de una libreria en vez de como «catastro
+            // no contesta lo que dice contestar», que es lo que quien opera necesita leer.
+            throw new CatastroInalcanzable(que, ilegible);
         } catch (InterruptedException interrumpido) {
             Thread.currentThread().interrupt();
             throw new CatastroInalcanzable(que, interrumpido);

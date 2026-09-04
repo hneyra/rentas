@@ -51,7 +51,7 @@ dependencies {
     // `starter-web` del ensamblado, y lo que se necesita aqui —`RequestContextHolder`—
     // vive en el propio `spring-web`, no en el starter.
     implementation("org.springframework:spring-web")
-    implementation("com.fasterxml.jackson.core:jackson-databind")
+    implementation("tools.jackson.core:jackson-databind")
 
     // Las pruebas del convenio corren contra PostgreSQL de verdad: provisionan la base
     // como un ambiente real y se conectan como sgtm_app, no como el superusuario que

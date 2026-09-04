@@ -1,7 +1,5 @@
 package kamayuk.rentas.tesoreria.infraestructura;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URLEncoder;
@@ -17,6 +15,9 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.RequestAttributes;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * El unico camino de {@code rentas} hacia {@code caja} (P5D, ADR-0026 y ADR-0029).
@@ -97,10 +98,10 @@ public class ClienteHttpDeCaja {
     private static final Duration ESPERA_DE_LECTURA = Duration.ofSeconds(30);
 
     private final HttpClient cliente;
-    private final ObjectMapper json;
+    private final JsonMapper json;
     private final String raiz;
 
-    public ClienteHttpDeCaja(ObjectMapper json, @Value("${kamayuk.caja.url:}") String raiz) {
+    public ClienteHttpDeCaja(JsonMapper json, @Value("${kamayuk.caja.url:}") String raiz) {
         this.json = json;
         this.raiz = raiz.endsWith("/") ? raiz.substring(0, raiz.length() - 1) : raiz;
         this.cliente = HttpClient.newBuilder().connectTimeout(ESPERA_DE_CONEXION).build();
@@ -198,6 +199,12 @@ public class ClienteHttpDeCaja {
             return Optional.of(json.readTree(respuesta.body()));
         } catch (IOException noContesta) {
             throw new CajaInalcanzable(que, noContesta);
+        } catch (JacksonException ilegible) {
+            // Jackson 3 no lanza `IOException` sino `JacksonException`, que es NO COMPROBADA
+            // (C-7). Sin este `catch` un cuerpo que no es JSON —el HTML de un proxy, por
+            // ejemplo— saldria como una excepcion cruda de una libreria en vez de como «caja
+            // no contesta lo que dice contestar», que es lo que quien opera necesita leer.
+            throw new CajaInalcanzable(que, ilegible);
         } catch (InterruptedException interrumpido) {
             Thread.currentThread().interrupt();
             throw new CajaInalcanzable(que, interrumpido);
@@ -234,6 +241,12 @@ public class ClienteHttpDeCaja {
             return json.readTree(respuesta.body());
         } catch (IOException noContesta) {
             throw new CajaInalcanzable(que, noContesta);
+        } catch (JacksonException ilegible) {
+            // Jackson 3 no lanza `IOException` sino `JacksonException`, que es NO COMPROBADA
+            // (C-7). Sin este `catch` un cuerpo que no es JSON —el HTML de un proxy, por
+            // ejemplo— saldria como una excepcion cruda de una libreria en vez de como «caja
+            // no contesta lo que dice contestar», que es lo que quien opera necesita leer.
+            throw new CajaInalcanzable(que, ilegible);
         } catch (InterruptedException interrumpido) {
             Thread.currentThread().interrupt();
             throw new CajaInalcanzable(que, interrumpido);

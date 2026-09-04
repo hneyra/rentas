@@ -1,8 +1,8 @@
 package kamayuk.rentas.tesoreria.infraestructura;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import kamayuk.rentas.tesoreria.pagos.OrdenesDeCobro;
 import org.springframework.stereotype.Component;
+import tools.jackson.databind.JsonNode;
 
 /**
  * Da de alta una orden en la caja, por HTTP (P5D, ADR-0026 §1).
@@ -76,7 +76,7 @@ public class OrdenesDeCobroHttp implements OrdenesDeCobro {
         }
         return new Emitida(
                 respuesta.path("ordenId").asLong(),
-                respuesta.path("estado").asText("PENDIENTE"),
+                respuesta.path("estado").asString("PENDIENTE"),
                 respuesta.path("nueva").asBoolean(false));
     }
 

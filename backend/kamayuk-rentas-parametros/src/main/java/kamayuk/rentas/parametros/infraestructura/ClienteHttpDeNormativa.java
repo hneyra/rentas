@@ -1,7 +1,5 @@
 package kamayuk.rentas.parametros.infraestructura;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -20,6 +18,9 @@ import kamayuk.rentas.parametros.dominio.SnapshotDeNormativa;
 import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * El unico cliente HTTP de este backend, y el unico camino hacia {@code normativa}.
@@ -59,11 +60,11 @@ public class ClienteHttpDeNormativa implements PublicadorDeNormativa {
     private static final Duration ESPERA_DE_LECTURA = Duration.ofMinutes(5);
 
     private final HttpClient cliente;
-    private final ObjectMapper json;
+    private final JsonMapper json;
     private final String raiz;
 
     public ClienteHttpDeNormativa(
-            ObjectMapper json, @Value("${kamayuk.normativa.url:}") String raiz) {
+            JsonMapper json, @Value("${kamayuk.normativa.url:}") String raiz) {
         this.json = json;
         this.raiz = raiz.endsWith("/") ? raiz.substring(0, raiz.length() - 1) : raiz;
         this.cliente = HttpClient.newBuilder().connectTimeout(ESPERA_DE_CONEXION).build();
@@ -124,7 +125,7 @@ public class ClienteHttpDeNormativa implements PublicadorDeNormativa {
                 raiz.get("conjuntoId").asLong(),
                 new Ejercicio(raiz.get("ejercicio").asInt()),
                 raiz.get("version").asInt(),
-                raiz.get("ambito").asText(),
+                raiz.get("ambito").asString(),
                 calculada,
                 url,
                 parametros(raiz.get("parametros")),
@@ -172,7 +173,10 @@ public class ClienteHttpDeNormativa implements PublicadorDeNormativa {
     private JsonNode leer(String cuerpo) {
         try {
             return json.readTree(cuerpo);
-        } catch (IOException noEsJson) {
+        } catch (JacksonException noEsJson) {
+            // Jackson 3 lanza `JacksonException`, que NO es comprobada (C-7). Se sigue capturando
+            // a proposito: un cuerpo que no es JSON —el HTML de un proxy— tiene que salir como
+            // «normativa no contesta lo que dice contestar» y no como una excepcion de libreria.
             throw new PublicadorDeNormativa.NormativaInalcanzable(
                     "leer la respuesta de `normativa`", noEsJson);
         }
@@ -192,13 +196,13 @@ public class ClienteHttpDeNormativa implements PublicadorDeNormativa {
         for (JsonNode fila : filas) {
             leidas.add(
                     new SnapshotDeNormativa.Parametro(
-                            fila.get("tipo").asText(),
+                            fila.get("tipo").asString(),
                             texto(fila, "clave"),
                             texto(fila, "valorNumerico"),
                             texto(fila, "valorTexto"),
                             texto(fila, "vigenciaDesde"),
                             texto(fila, "vigenciaHasta"),
-                            fila.get("documentoFuente").asText()));
+                            fila.get("documentoFuente").asString()));
         }
         return leidas;
     }
@@ -208,12 +212,12 @@ public class ClienteHttpDeNormativa implements PublicadorDeNormativa {
         for (JsonNode fila : filas) {
             leidas.add(
                     new SnapshotDeNormativa.ValorUnitario(
-                            fila.get("partida").asText(),
-                            fila.get("categoria").asText(),
+                            fila.get("partida").asString(),
+                            fila.get("categoria").asString(),
                             fila.get("anioConstruccionDesde").asInt(),
                             entero(fila, "anioConstruccionHasta"),
-                            fila.get("valorM2").asText(),
-                            fila.get("documentoFuente").asText()));
+                            fila.get("valorM2").asString(),
+                            fila.get("documentoFuente").asString()));
         }
         return leidas;
     }
@@ -223,12 +227,12 @@ public class ClienteHttpDeNormativa implements PublicadorDeNormativa {
         for (JsonNode fila : filas) {
             leidas.add(
                     new SnapshotDeNormativa.Depreciacion(
-                            fila.get("uso").asText(),
-                            fila.get("material").asText(),
-                            fila.get("estadoConservacion").asText(),
+                            fila.get("uso").asString(),
+                            fila.get("material").asString(),
+                            fila.get("estadoConservacion").asString(),
                             entero(fila, "antiguedadHasta"),
-                            fila.get("porcentaje").asText(),
-                            fila.get("documentoFuente").asText()));
+                            fila.get("porcentaje").asString(),
+                            fila.get("documentoFuente").asString()));
         }
         return leidas;
     }
@@ -239,19 +243,19 @@ public class ClienteHttpDeNormativa implements PublicadorDeNormativa {
             leidas.add(
                     new SnapshotDeNormativa.ValorReferencial(
                             fila.get("ejercicio").asInt(),
-                            fila.get("categoria").asText(),
-                            fila.get("marca").asText(),
-                            fila.get("modelo").asText(),
+                            fila.get("categoria").asString(),
+                            fila.get("marca").asString(),
+                            fila.get("modelo").asString(),
                             fila.get("anioFabricacion").asInt(),
-                            fila.get("valor").asText(),
-                            fila.get("documentoFuente").asText()));
+                            fila.get("valor").asString(),
+                            fila.get("documentoFuente").asString()));
         }
         return leidas;
     }
 
     private static @Nullable String texto(JsonNode fila, String campo) {
         JsonNode valor = fila.get(campo);
-        return valor == null || valor.isNull() ? null : valor.asText();
+        return valor == null || valor.isNull() ? null : valor.asString();
     }
 
     /**

@@ -1,6 +1,5 @@
 package kamayuk.rentas.catastro.infraestructura;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -8,6 +7,7 @@ import kamayuk.rentas.catastro.PredioDelContribuyente;
 import kamayuk.rentas.catastro.PrediosDelContribuyente;
 import kamayuk.rentas.dominio.Porcentaje;
 import org.springframework.stereotype.Component;
+import tools.jackson.databind.JsonNode;
 
 /**
  * Los predios de un contribuyente, pedidos por HTTP (C-5). Sustituye a {@code
@@ -63,11 +63,12 @@ public class PrediosDelContribuyenteHttp implements PrediosDelContribuyente {
             predios.add(
                     new PredioDelContribuyente(
                             fila.path("predioId").asLong(),
-                            fila.path("codRefCatastral").asText(""),
-                            fila.path("tipo").asText(""),
-                            fila.path("direccion").asText(""),
-                            Porcentaje.de(fila.path("porcentajeTitularidad").asText("0")),
-                            Porcentaje.de(fila.path("porcentajeRegistradoDelPredio").asText("0"))));
+                            fila.path("codRefCatastral").asString(""),
+                            fila.path("tipo").asString(""),
+                            fila.path("direccion").asString(""),
+                            Porcentaje.de(fila.path("porcentajeTitularidad").asString("0")),
+                            Porcentaje.de(
+                                    fila.path("porcentajeRegistradoDelPredio").asString("0"))));
         }
         return List.copyOf(predios);
     }

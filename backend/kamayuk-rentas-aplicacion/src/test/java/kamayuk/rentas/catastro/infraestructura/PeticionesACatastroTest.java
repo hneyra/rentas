@@ -2,8 +2,6 @@ package kamayuk.rentas.catastro.infraestructura;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Set;
@@ -16,6 +14,8 @@ import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.verificaciones.ContratoQueConsumeDeCatastro;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 /**
  * La otra mitad de la ida y vuelta: lo que el adaptador PIDE, contra lo que el contrato declara
@@ -192,7 +192,7 @@ class PeticionesACatastroTest {
      * LecturaDeCatastroTest}, que usa el mismo doble con una respuesta fabricada del contrato.
      */
     private static CatastroQueNoContesta respuestaDe() {
-        ObjectMapper json = new ObjectMapper();
+        JsonMapper json = new JsonMapper();
         return new CatastroQueNoContesta(
                 ruta -> {
                     // El cuadro sellado sale como ARRAY y la grilla como sobre paginado

@@ -1,6 +1,5 @@
 package kamayuk.rentas.catastro.infraestructura;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import java.util.ArrayList;
 import java.util.List;
 import kamayuk.rentas.catastro.LectorDeValoresUnitarios;
@@ -8,6 +7,7 @@ import kamayuk.rentas.catastro.ValorUnitarioPublicado;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.ValorNormativo;
 import org.springframework.stereotype.Component;
+import tools.jackson.databind.JsonNode;
 
 /**
  * El cuadro de valores unitarios de edificacion, pedido a {@code catastro} (P5C).
@@ -64,11 +64,11 @@ public class ValoresUnitariosHttp implements LectorDeValoresUnitarios {
             JsonNode hasta = fila.path("anioConstruccionHasta");
             filas.add(
                     new ValorUnitarioPublicado(
-                            fila.path("partida").asText(""),
-                            fila.path("categoria").asText(" ").charAt(0),
+                            fila.path("partida").asString(""),
+                            fila.path("categoria").asString(" ").charAt(0),
                             fila.path("anioConstruccionDesde").asInt(),
                             hasta.isNull() || hasta.isMissingNode() ? null : hasta.asInt(),
-                            ValorNormativo.de(fila.path("valorM2").asText("0"))));
+                            ValorNormativo.de(fila.path("valorM2").asString("0"))));
         }
         return List.copyOf(filas);
     }

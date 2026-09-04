@@ -18,7 +18,7 @@ dependencies {
     // Jackson: la respuesta de `normativa` se lee AQUI, del cuerpo en bruto, porque el ETag es el
     // sha256 de esos bytes y un cliente que deserialice por su cuenta entrega un objeto y no los
     // bytes con que se calculo la huella.
-    implementation("com.fasterxml.jackson.core:jackson-databind")
+    implementation("tools.jackson.core:jackson-databind")
 
     // Los fixtures publican el escenario de `normativa` que veinte clases de prueba de otros
     // modulos usan para sembrar su premisa. Necesitan ver la plataforma -JdbcClient, Auditoria- y

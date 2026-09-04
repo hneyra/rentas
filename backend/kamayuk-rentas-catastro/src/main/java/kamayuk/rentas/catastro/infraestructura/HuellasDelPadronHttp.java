@@ -1,12 +1,12 @@
 package kamayuk.rentas.catastro.infraestructura;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import java.util.ArrayList;
 import java.util.List;
 import kamayuk.rentas.catastro.AntiEntropia;
 import kamayuk.rentas.catastro.HuellasDelPadronDeCatastro;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
+import tools.jackson.databind.JsonNode;
 
 /**
  * Las huellas del padron, pedidas a {@code catastro} por HTTP (P6, punto 4).
@@ -40,9 +40,9 @@ public class HuellasDelPadronHttp implements HuellasDelPadronDeCatastro {
             JsonNode sector = fila.path("sector");
             sectores.add(
                     new AntiEntropia.HuellaDeSector(
-                            sector.isNull() || sector.isMissingNode() ? null : sector.asText(),
+                            sector.isNull() || sector.isMissingNode() ? null : sector.asString(),
                             fila.path("lotes").asInt(),
-                            fila.path("huella").asText("")));
+                            fila.path("huella").asString("")));
         }
         return List.copyOf(sectores);
     }
@@ -61,7 +61,7 @@ public class HuellasDelPadronHttp implements HuellasDelPadronDeCatastro {
         for (JsonNode fila : cuerpo.path("lotes")) {
             lotes.add(
                     new HuellaDeLote(
-                            fila.path("predioId").asLong(), fila.path("huella").asText("")));
+                            fila.path("predioId").asLong(), fila.path("huella").asString("")));
         }
         return List.copyOf(lotes);
     }

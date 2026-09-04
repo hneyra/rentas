@@ -1,6 +1,5 @@
 package kamayuk.rentas.catastro.infraestructura;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -13,6 +12,7 @@ import kamayuk.rentas.catastro.TitularDelPredio;
 import kamayuk.rentas.catastro.TitularesDelPredio;
 import kamayuk.rentas.dominio.Porcentaje;
 import org.springframework.stereotype.Component;
+import tools.jackson.databind.JsonNode;
 
 /**
  * De quien es un predio, pedido por HTTP (C-5). Sustituye a {@code TitularesDelPredioSinRuta}.
@@ -84,8 +84,8 @@ public class TitularesDelPredioHttp implements TitularesDelPredio {
                 suyas.add(
                         new TitularDelPredio(
                                 cuota.path("contribuyenteId").asLong(),
-                                cuota.path("condicion").asText(""),
-                                Porcentaje.de(cuota.path("porcentaje").asText("0"))));
+                                cuota.path("condicion").asString(""),
+                                Porcentaje.de(cuota.path("porcentaje").asString("0"))));
             }
             cuotas.put(predioId, List.copyOf(suyas));
         }

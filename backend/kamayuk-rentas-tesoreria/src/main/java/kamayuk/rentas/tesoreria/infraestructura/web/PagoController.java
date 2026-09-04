@@ -1,6 +1,5 @@
 package kamayuk.rentas.tesoreria.infraestructura.web;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
@@ -29,6 +28,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * El buzon de entrada de pagos y su conciliacion (P5D, ADR-0026 §3).
@@ -64,11 +64,11 @@ public class PagoController {
 
     private final RecibirPago recibir;
     private final ConciliacionDePagos conciliacion;
-    private final ObjectMapper json;
+    private final JsonMapper json;
     private final Clock reloj;
 
     public PagoController(
-            RecibirPago recibir, ConciliacionDePagos conciliacion, ObjectMapper json, Clock reloj) {
+            RecibirPago recibir, ConciliacionDePagos conciliacion, JsonMapper json, Clock reloj) {
         this.recibir = recibir;
         this.conciliacion = conciliacion;
         this.json = json;
@@ -179,7 +179,7 @@ public class PagoController {
     private String congelar(PeticionDePago peticion) {
         try {
             return json.writeValueAsString(peticion);
-        } catch (com.fasterxml.jackson.core.JsonProcessingException noSePuede) {
+        } catch (tools.jackson.core.JacksonException noSePuede) {
             // No puede pasar con un record de campos simples. Si pasara, el pago NO se guarda: un
             // pago sin cuerpo no se puede conciliar ni explicar.
             throw new IllegalStateException("No se pudo congelar el cuerpo del pago", noSePuede);
