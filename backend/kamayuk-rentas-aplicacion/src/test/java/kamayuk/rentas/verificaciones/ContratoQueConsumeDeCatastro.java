@@ -89,6 +89,30 @@ public class ContratoQueConsumeDeCatastro extends ContratoQueSePublicaTestBase {
                                 Map.entry("contenido", List.of(FILA_DE_FICHA)),
                                 Map.entry("totalElementos", "entero"))));
 
+        // La anti-entropia (P6, punto 4). Una sola ruta con dos formas: sin `detalle`, una
+        // cifra por sector; con `detalle=true` y un `sector`, los lotes de ese sector. El
+        // contrato declara las DOS listas porque el proveedor devuelve las dos siempre —la que
+        // no se pidio viaja vacia—, y un campo que a veces no esta obliga a quien lo lee a
+        // distinguir «no lo pedi» de «no hay ninguno», que se leen igual.
+        operaciones.put(
+                "GET /catastro/predios/huellas",
+                ContratoDelConsumidor.OperacionEsperada.lectura(
+                        Set.of("sector", "detalle"),
+                        ordenados(
+                                Map.entry(
+                                        "sectores",
+                                        List.of(
+                                                ordenados(
+                                                        Map.entry("sector", "texto"),
+                                                        Map.entry("lotes", "entero"),
+                                                        Map.entry("huella", "texto")))),
+                                Map.entry(
+                                        "lotes",
+                                        List.of(
+                                                ordenados(
+                                                        Map.entry("predioId", "entero"),
+                                                        Map.entry("huella", "texto")))))));
+
         operaciones.put(
                 "GET /catastro/tablas/valores-unitarios",
                 ContratoDelConsumidor.OperacionEsperada.lectura(

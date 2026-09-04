@@ -1,0 +1,58 @@
+{
+  "PROCEDENCIA" : "ARCHIVO GENERADO — no editar a mano. Fija el algoritmo de la huella de la anti-entropia entre `catastro` y `rentas` (P6, punto 4). Lo publica `rentas` y lo reproducen las dos implementaciones, cada una en su propio CI: si dejan de coincidir, la comparacion de sectores da todo discrepante o nada discrepante, y las dos cosas se leen como un problema de datos siendo un problema de codigo.",
+  "separador" : "U+001F entre campos; salto de linea entre huellas de lote",
+  "orden" : "las huellas de un sector se combinan por predioId ascendente",
+  "lotes" : [ {
+    "predioId" : 1,
+    "codRefCatastral" : "200105-01-02-003",
+    "direccion" : "AV. CAYETANO HEREDIA 100",
+    "sectorCodigo" : "SC-1",
+    "estado" : "ACTIVO",
+    "huella" : "2b6fcf186b1a3205d71907d1c909cd336fbed9855fdabb8c0d1aa9e6c797a7af"
+  }, {
+    "predioId" : 2,
+    "codRefCatastral" : "200105-01-02-004",
+    "direccion" : "CALLE PEÑA GARCÍA 12",
+    "sectorCodigo" : "SC-1",
+    "estado" : "ACTIVO",
+    "huella" : "a3ef96e6504436c0e83bf3e85120ffee7222ccf30f9d93ed22c41585385d6377"
+  }, {
+    "predioId" : 3,
+    "codRefCatastral" : "200105-09-09-001",
+    "direccion" : "SECTOR SIN ASIGNAR S/N",
+    "sectorCodigo" : null,
+    "estado" : "ACTIVO",
+    "huella" : "2a4e689f061994f52f1c3493efddd0c757f4e6951db8607cb215e504302d83bf"
+  }, {
+    "predioId" : 4,
+    "codRefCatastral" : "200105-02-01-001",
+    "direccion" : "AV. GRAU 100",
+    "sectorCodigo" : "A",
+    "estado" : "ACTIVO",
+    "huella" : "c74a45c3497a30c1a0ad21fa1b3fc158713832d6c71f58678f0f6038188a4443"
+  }, {
+    "predioId" : 5,
+    "codRefCatastral" : "200105-02-01-001",
+    "direccion" : "AV. GRAU 10",
+    "sectorCodigo" : "0A",
+    "estado" : "ACTIVO",
+    "huella" : "59523f7adc07180c1e16aaa47f6b5a6693df105da6406b9e7ac51ba59c63bef1"
+  }, {
+    "predioId" : 6,
+    "codRefCatastral" : "200105-01-02-005",
+    "direccion" : "AV. CAYETANO HEREDIA 102",
+    "sectorCodigo" : "SC-1",
+    "estado" : "BAJA",
+    "huella" : "1f7c07a26a6f2bd27f56fe99952806339f6fa6f3552e50af5a4865037f6e2de7"
+  } ],
+  "sectores" : [ {
+    "sector" : "SC-1",
+    "lotes" : [ 1, 2, 6 ],
+    "huella" : "f6ee92226e3e258f73b2bd86316ab52721a8f1e8d8ab66cc78a8013459bc1bb0"
+  } ],
+  "sectoresAlReves" : [ {
+    "sector" : "SC-1 (al reves, para fijar que el orden importa)",
+    "lotes" : [ 6, 2, 1 ],
+    "huella" : "d22feb48fffdae478f513ffaab241278f239da7ecd73ea76e39401c4f5a9ce88"
+  } ]
+}

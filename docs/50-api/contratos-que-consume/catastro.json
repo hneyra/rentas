@@ -26,6 +26,21 @@
       },
       "cuerpo" : { }
     },
+    "GET /catastro/predios/huellas" : {
+      "parametros" : [ "detalle", "sector" ],
+      "respuesta" : {
+        "sectores" : [ {
+          "sector" : "texto",
+          "lotes" : "entero",
+          "huella" : "texto"
+        } ],
+        "lotes" : [ {
+          "predioId" : "entero",
+          "huella" : "texto"
+        } ]
+      },
+      "cuerpo" : { }
+    },
     "GET /catastro/tablas/valores-unitarios" : {
       "parametros" : [ "ejercicio" ],
       "respuesta" : {
