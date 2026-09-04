@@ -108,6 +108,23 @@ tasks.test {
             })
         .withPathSensitivity(PathSensitivity.RELATIVE)
 
+    // EL CONTRATO DEL CONSUMIDOR VIVE EN OTRO CLON, y sin declararlo esta tarea se queda
+    // UP-TO-DATE cuando cambia. `ContratoConCajaTest` lee
+    // `../../caja/docs/50-api/contratos-que-consume/rentas.json` —lo que `caja` espera de este
+    // backend— y ese archivo no estaba en ninguna entrada de Gradle: **medido en C-2**, anadirle
+    // un parametro que este backend no lee daba `BUILD SUCCESSFUL` con la tarea UP-TO-DATE, o sea
+    // **sin que la prueba corriera**. En CI corre fresco y muerde, que es la peor forma de
+    // enterarse. Es la leccion de #192 punto 2 en la frontera entre repositorios, y el mismo
+    // cierre que C-1 le puso a `catastro` y C-2 a `normativa`.
+    //
+    // `optional()` porque el clon hermano puede no estar: si falta, la prueba falla con su propio
+    // mensaje —nombrando el archivo y diciendo que el CI del proveedor tiene que hacer checkout
+    // del consumidor—, que dice mas que un fallo de configuracion de Gradle.
+    inputs
+        .files(rootProject.file("../../caja/docs/50-api/contratos-que-consume/rentas.json"))
+        .optional()
+        .withPathSensitivity(PathSensitivity.NONE)
+
     // Gradle no propaga las propiedades de sistema del build al proceso de prueba
     // (lo mismo que hace `sgtm.pruebas-postgres` con las suyas). Sin esto,
     // `-Dsgtm.formas.regenerar=true` no llega y el archivo no se puede regenerar.
