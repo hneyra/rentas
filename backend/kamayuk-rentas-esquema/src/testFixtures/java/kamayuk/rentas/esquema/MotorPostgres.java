@@ -30,6 +30,101 @@ public final class MotorPostgres implements AutoCloseable {
     private static final String IMAGEN_POR_OMISION = "postgis/postgis:16-3.4-alpine";
 
     /**
+     * La version mayor de PostgreSQL contra la que este producto se prueba y se despliega.
+     *
+     * <p>No es una preferencia: es la que declaran los ambientes y CI. {@code Pulumi.prod.yaml},
+     * {@code Pulumi.stg.yaml}, los dos {@code compose} de la plataforma, el guion de respaldo y el
+     * {@link #IMAGEN_POR_OMISION} de aqui dicen todos {@code postgis/postgis:16-3.4-alpine}.
+     *
+     * <p><b>Por que hay una guarda y no solo una declaracion.</b> Porque nada la comprobaba. El
+     * camino de Testcontainers fija la imagen, pero la salida de emergencia —{@code
+     * kamayuk.pruebas.postgres.url}, la que se usa en toda maquina sin Docker— apunta al motor que
+     * tenga quien construye, y en una maquina con varias versiones instaladas el {@code postgres}
+     * del PATH puede ser cualquiera. Medido en la maquina donde se escribio esto: {@code psql
+     * --version} devuelve 18.6 mientras el producto despliega 16.
+     */
+    static final int MAJOR_SOPORTADA = 16;
+
+    /**
+     * El motivo por el que esa version mayor no se admite, o vacio si se admite.
+     *
+     * <p>Es una funcion pura y no una consulta a proposito: asi {@code VersionDelMotorTest} la
+     * puede ejercitar con 15, 16, 17 y 18 sin tener cuatro motores instalados. Lo que hace falta
+     * medir contra un motor de verdad se midio una vez y esta escrito en {@code
+     * C-4-postgresql-18.md}; lo que esta prueba sujeta es que la decision siga puesta.
+     *
+     * <p><b>Los dos lados no dicen lo mismo, y no deben.</b> De 17 en adelante hay un defecto
+     * medido y reproducible; por debajo de 16 lo unico que hay es que nadie lo ha probado. Dar el
+     * mismo mensaje a las dos cosas haria creer que la segunda tambien esta rota.
+     */
+    static java.util.Optional<String> motivoDeVersionNoSoportada(int major) {
+        if (major == MAJOR_SOPORTADA) {
+            return java.util.Optional.empty();
+        }
+        if (major > MAJOR_SOPORTADA) {
+            return java.util.Optional.of(
+                    "PostgreSQL "
+                            + major
+                            + ", y este producto se prueba y se despliega contra PostgreSQL "
+                            + MAJOR_SOPORTADA
+                            + " (postgis/postgis:16-3.4-alpine, en los dos Pulumi, en los dos"
+                            + " compose y en la imagen por omision de este mismo motor)."
+                            + " De 17 en adelante NO es solo que no este probado: PostgreSQL 17"
+                            + " restringe el search_path de CREATE INDEX a pg_catalog, pg_temp, y"
+                            + " nombre_normalizado resuelve por search_path tanto la funcion"
+                            + " unaccent como el literal 'unaccent'::regdictionary. Medido: el"
+                            + " baseline de rentas muere en V1 linea 2923 y el del monolito en V11"
+                            + " linea 44, los dos con «text search dictionary \"unaccent\" does not"
+                            + " exist ... during inlining». C-4 arreglo la funcion, pero con una"
+                            + " migracion NUEVA —que repara la restauracion logica en 16 y no puede"
+                            + " salvar a V1, porque corre despues—, asi que rentas sigue sin aplicar"
+                            + " en 18. El motivo entero, con lo que se midio, esta en"
+                            + " infrastructure/docs/00-gobierno/C-4-postgresql-18.md");
+        }
+        return java.util.Optional.of(
+                "PostgreSQL "
+                        + major
+                        + ", que es mas antigua que la "
+                        + MAJOR_SOPORTADA
+                        + " contra la que este producto se prueba y se despliega. No hay ningun"
+                        + " defecto medido en ella: lo que no hay es una sola corrida que lo"
+                        + " demuestre, y las pruebas de plan (#313, #536, #561, #565) afirman"
+                        + " planes que el planificador de otra version puede no producir");
+    }
+
+    /**
+     * Exige que el motor sea el de {@link #MAJOR_SOPORTADA}, y lo dice cuando no lo es.
+     *
+     * <p>Es lo que separa un mensaje que se entiende de «text search dictionary "unaccent" does not
+     * exist» a mitad de una migracion, que es lo que hoy recibe quien apunta la salida de
+     * emergencia a un PostgreSQL 18 y que no se parece en nada a su causa.
+     *
+     * <p><b>No tiene puerta de escape</b>, por lo mismo que no la tiene saltarse la prueba de
+     * aislamiento: una que se pudiera poner con una propiedad seria la que alguien pone para que el
+     * build deje de quejarse. Medir otra version se hace fuera de Gradle —asi se midio C-4—, no
+     * apagando esto.
+     */
+    private void exigirVersionSoportada() {
+        String numero = unaCadena(url, "SHOW server_version_num", usuarioAdmin, claveAdmin);
+        int major;
+        try {
+            major = Integer.parseInt(numero.trim()) / 10000;
+        } catch (NumberFormatException e) {
+            throw new IllegalStateException(
+                    "No se pudo leer la version del motor de prueba: SHOW server_version_num"
+                            + " devolvio «"
+                            + numero
+                            + "». Sin saber contra que version se prueba, un verde no dice nada",
+                    e);
+        }
+        motivoDeVersionNoSoportada(major)
+                .ifPresent(
+                        motivo -> {
+                            throw new IllegalStateException("El motor de prueba es " + motivo);
+                        });
+    }
+
+    /**
      * La codificacion que la base de prueba declara, sea cual sea la del anfitrion.
      *
      * <p>{@code CREATE DATABASE} a secas hereda la de {@code template1}, y esa la fija {@code
@@ -109,6 +204,7 @@ public final class MotorPostgres implements AutoCloseable {
     public static MotorPostgres iniciar() {
         MotorPostgres motor = resolver();
         try {
+            motor.exigirVersionSoportada();
             motor.exigirCodificacionUtf8();
             return motor;
         } catch (RuntimeException e) {
