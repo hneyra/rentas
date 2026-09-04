@@ -106,6 +106,7 @@ public class DeterminarPredialMasivo {
     private final DirectorioDeContribuyentes directorio;
     private final LectorDeCaracteristicas caracteristicas;
     private final RegistrarCorridaDeEmision rastro;
+    private final CandadoDeEmision candado;
     private final Clock reloj;
 
     public DeterminarPredialMasivo(
@@ -114,12 +115,14 @@ public class DeterminarPredialMasivo {
             DirectorioDeContribuyentes directorio,
             LectorDeCaracteristicas caracteristicas,
             RegistrarCorridaDeEmision rastro,
+            CandadoDeEmision candado,
             Clock reloj) {
         this.padron = padron;
         this.individual = individual;
         this.directorio = directorio;
         this.caracteristicas = caracteristicas;
         this.rastro = rastro;
+        this.candado = candado;
         this.reloj = reloj;
     }
 
@@ -132,6 +135,14 @@ public class DeterminarPredialMasivo {
     public Corrida ejecutar(Peticion peticion, Observacion observacion) {
         Objects.requireNonNull(peticion, "Hace falta la peticion");
         Objects.requireNonNull(observacion, "Toda modificacion exige la observacion (regla 10)");
+
+        // EL CANDADO VA AQUI, antes de leer un solo contribuyente (ADR-0027 §2, P5C).
+        //
+        // Con `catastro` en otra base, lo que hace falta para calcular llega por eventos, y un
+        // ingestor detenido a mitad no produce ningun sintoma: la corrida arrancaria con las
+        // valuaciones que hubieran llegado y emitiria miles de recibos plausibles y equivocados.
+        // Comprobarlo despues seria descubrirlo con los papeles ya notificados.
+        candado.exigirLaValuacionCompleta(peticion.ejercicio());
 
         LocalDate hoy = LocalDate.now(reloj);
         List<PadronPredialDelEjercicio.DeterminacionConDetalle> declarados =

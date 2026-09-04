@@ -14,6 +14,7 @@ import kamayuk.rentas.parametros.FaltaPublicar;
 import kamayuk.rentas.parametros.LectorDeParametros;
 import kamayuk.rentas.parametros.ParametrosSellados;
 import kamayuk.rentas.parametros.PoliticasDeRedondeoSelladas;
+import kamayuk.rentas.rentas.aplicacion.CandadoDeEmision;
 import kamayuk.rentas.rentas.aplicacion.CuadroPredialParametrizado;
 import kamayuk.rentas.rentas.aplicacion.DeterminarPredial;
 import kamayuk.rentas.rentas.aplicacion.DeterminarPredialMasivo;
@@ -314,6 +315,18 @@ public class PredialController {
                                     Boolean.TRUE.equals(peticion.recalculaYaEmitidos()),
                                     simulacion),
                             observacion));
+        } catch (CandadoDeEmision.ValuacionSinCerrar
+                | CandadoDeEmision.ValuacionIncompleta
+                | CandadoDeEmision.ValuacionQueNoCuadra faltaLaValuacion) {
+            // El candado de ADR-0027 §2, dicho por HTTP (P5C).
+            //
+            // 409 y no 422, y la diferencia importa: un 422 dice «corrige lo que mandaste», y
+            // aqui no hay nada en la peticion que corregir. Lo que pasa es que el sistema NO
+            // ESTA EN ESTADO de emitir —falta que `catastro` cierre su corrida, o que la cola
+            // termine de aplicarse—, y eso se arregla esperando o corriendo otra cosa, no
+            // reescribiendo el formulario. El mensaje del candado dice cual de las tres es y
+            // cuantas valuaciones faltan.
+            throw new ProblemaDeNegocio(CodigoDeError.CONFLICTO, mensajeDe(faltaLaValuacion));
         } catch (CuadroPredialParametrizado.ParametroDelPredialAusente
                 | ParametrosSellados.ParametroAusente
                 | LectorDeParametros.EjercicioSinSellar

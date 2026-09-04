@@ -34,6 +34,7 @@ import kamayuk.rentas.dominio.ValorNormativo;
 import kamayuk.rentas.parametros.IdentificadorDeConjunto;
 import kamayuk.rentas.parametros.LectorDeParametros;
 import kamayuk.rentas.parametros.ParametrosSellados;
+import kamayuk.rentas.rentas.aplicacion.CandadoDeEmision;
 import kamayuk.rentas.rentas.aplicacion.CuadroPredialParametrizado;
 import kamayuk.rentas.rentas.aplicacion.DeterminarPredial;
 import kamayuk.rentas.rentas.aplicacion.DeterminarPredialMasivo;
@@ -45,6 +46,7 @@ import kamayuk.rentas.rentas.dominio.OrigenDeDeterminacion;
 import kamayuk.rentas.rentas.dominio.predial.DetalleDeterminacionPredio;
 import kamayuk.rentas.rentas.dominio.predial.Determinacion;
 import kamayuk.rentas.rentas.dominio.predial.DeterminacionRepository;
+import kamayuk.rentas.rentas.dominio.predial.ValuacionRecibida;
 import kamayuk.rentas.web.ConfiguracionDeJson;
 import kamayuk.rentas.web.ManejadorDeErrores;
 import org.junit.jupiter.api.AfterEach;
@@ -89,6 +91,18 @@ class PredialControllerTest {
     private final ComprobadorDePrueba comprobador = new ComprobadorDePrueba();
     private final DeterminacionesEnMemoria determinaciones = new DeterminacionesEnMemoria();
     private final PrediosDePrueba predios = new PrediosDePrueba();
+
+    /**
+     * En que estado esta la valuacion del ejercicio cuando se monta el controlador (P5C).
+     *
+     * <p>Por omision, cerrada y completa: esta clase mide el TRANSPORTE de la corrida y no el
+     * candado. Lo que si mide aqui es que el candado <b>este puesto</b>, poniendolo a negarse.
+     *
+     * <p>Se declara ANTES de {@code mvc} y no despues: Java inicializa los campos en el orden en
+     * que estan escritos, y {@code montar} lo lee. Con el orden al reves el candado se construia
+     * con {@code null} y cinco pruebas ajenas contestaban 204.
+     */
+    private ValuacionRecibida valuacion = new ValuacionCerradaYCompleta();
 
     private MockMvc mvc = montar(cuadroCompleto());
 
@@ -937,6 +951,55 @@ class PredialControllerTest {
                                 + "\"predios\":[{\"predioId\":11,\"autovaluo\":\"100000.00\"}]}");
     }
 
+    @Test
+    @DisplayName("P5C / AC 3 — con la valuacion sin cerrar, la corrida masiva no arranca")
+    void laCorridaMasivaNoArrancaSinValuacion() throws Exception {
+        // Que el candado exista no basta: hay que comprobar que ESTA PUESTO en el camino de la
+        // corrida. Se midio antes de escribir esta prueba y quitar la llamada de
+        // `DeterminarPredialMasivo` dejaba las 3 674 pruebas del backend en VERDE.
+        valuacion = new SinValuacionDelEjercicio();
+        mvc = montar(cuadroCompleto());
+
+        MvcResult resultado =
+                mvc.perform(
+                                post("/rentas/api/v1/rentas/predial/calculo-masivo")
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(
+                                                "{\"observacion\":\"Emision anual\","
+                                                        + "\"ejercicio\":\"2026\","
+                                                        + "\"alcance\":\"TODOS\","
+                                                        + "\"simulacion\":true}"))
+                        .andReturn();
+
+        String cuerpo = resultado.getResponse().getContentAsString();
+        assertThat(resultado.getResponse().getStatus())
+                .as("409 y no 422: no hay nada en la peticion que corregir. %s", cuerpo)
+                .isEqualTo(409);
+        assertThat(cuerpo)
+                .as("y dice cual de las tres situaciones es, que es lo que se arregla distinto")
+                .contains("no ha cerrado su corrida de valuacion");
+    }
+
+    /** Ninguna corrida cerrada: el estado de hoy en todas las municipalidades. */
+    private static final class SinValuacionDelEjercicio implements ValuacionRecibida {
+
+        @Override
+        public java.util.Optional<CierreDeCorrida> cierreDe(
+                kamayuk.rentas.dominio.Ejercicio ejercicio) {
+            return java.util.Optional.empty();
+        }
+
+        @Override
+        public long valuacionesRecibidasDe(kamayuk.rentas.dominio.Ejercicio ejercicio) {
+            return 0;
+        }
+
+        @Override
+        public String huellaDeLoRecibido(kamayuk.rentas.dominio.Ejercicio ejercicio) {
+            return "";
+        }
+    }
+
     private MockMvc montar(ParametrosSellados sellados) {
         return montarCon(lector(sellados));
     }
@@ -965,6 +1028,7 @@ class PredialControllerTest {
                         new DirectorioDePrueba(),
                         new SinCaracteristicas(),
                         rastro,
+                        new CandadoDeEmision(valuacion),
                         RELOJ);
         return MockMvcBuilders.standaloneSetup(
                         new PredialController(individual, masivo, rastro, RELOJ))
@@ -1372,6 +1436,37 @@ class PredialControllerTest {
                             .map(kamayuk.rentas.rentas.dominio.CorridaDeEmision::observados)
                             .orElse(java.util.List.of());
             return new kamayuk.rentas.compartido.Pagina<>(filas, 0, 20, filas.size());
+        }
+    }
+
+    /**
+     * La valuacion del ejercicio, cerrada y completa (P5C).
+     *
+     * <p>Esta prueba mide el TRANSPORTE de la corrida masiva, no el candado. Que el candado se
+     * niegue cuando falta algo lo mide `CandadoDeEmisionTest` contra PostgreSQL, con las tres
+     * negativas por separado; aqui lo que hace falta es que deje pasar, y decirlo explicito es
+     * mejor que un doble que devuelva lo que sea.
+     */
+    private static final class ValuacionCerradaYCompleta implements ValuacionRecibida {
+
+        private static final String HUELLA = "0".repeat(64);
+
+        @Override
+        public java.util.Optional<CierreDeCorrida> cierreDe(
+                kamayuk.rentas.dominio.Ejercicio ejercicio) {
+            return java.util.Optional.of(
+                    new CierreDeCorrida(
+                            1L, 1L, java.time.LocalDate.of(2025, 12, 31), "v1", 0, HUELLA));
+        }
+
+        @Override
+        public long valuacionesRecibidasDe(kamayuk.rentas.dominio.Ejercicio ejercicio) {
+            return 0;
+        }
+
+        @Override
+        public String huellaDeLoRecibido(kamayuk.rentas.dominio.Ejercicio ejercicio) {
+            return HUELLA;
         }
     }
 }

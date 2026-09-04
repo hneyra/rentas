@@ -615,8 +615,51 @@ public final class DatosDePrueba {
                         ficha[5],
                         ficha[6]);
             }
+            sembrarLaValuacion(ingestor, muni, predioId);
             ingestor.commit();
         }
+    }
+
+    /**
+     * Una valuacion sellada y el cierre de su corrida (P5C, `V5`).
+     *
+     * <p>La valuacion sale SIN cifras y con su motivo, que es el estado real de hoy: el sistema no
+     * sabe valorizar un predio todavia —faltan el cuadro de valores unitarios y la depreciacion
+     * (GOB-03 H-14/H-15), los aranceles (D-02b) y el % actualizacion (D-11)—. `V5` obliga a elegir
+     * una de las dos cosas con un `CHECK`, y sembrar un cero habria sido inventar el dato que ese
+     * `CHECK` existe para impedir.
+     *
+     * <p>La huella agregada se calcula con LA MISMA expresion que {@code
+     * ValuacionRecibidaJdbc.huellaDeLoRecibido}. Escribirla a mano dejaria al candado comparando
+     * contra un valor inventado, y entonces pasaria en verde diga lo que diga.
+     */
+    private static void sembrarLaValuacion(Connection ingestor, long muni, long predioId)
+            throws SQLException {
+        ejecutar(
+                ingestor,
+                "INSERT INTO valuacion_predio (municipalidad_id, ejercicio, predio_id,"
+                        + " fecha_de_corte, motivo, conjunto_id, reglas_version,"
+                        + " reglas_aplicadas, huella, evento_id, recibida_en)"
+                        + " VALUES (?, 2026, ?, DATE '2025-12-31',"
+                        + " 'El sistema no sabe valorizar un predio todavia (D-02a, D-11)',"
+                        + " 1, 'v1', '', encode(sha256(convert_to('v-' || ?, 'UTF8')), 'hex'),"
+                        + " gen_random_uuid(), now())",
+                muni,
+                predioId,
+                predioId);
+        ejecutar(
+                ingestor,
+                "INSERT INTO valuacion_corrida (municipalidad_id, ejercicio, corrida_id,"
+                        + " conjunto_id, fecha_de_corte, reglas_version, conteo, huella,"
+                        + " cerrada_en, recibida_en)"
+                        + " SELECT ?, 2026, 1, 1, DATE '2025-12-31', 'v1', count(*),"
+                        + "        encode(sha256(convert_to("
+                        + "          coalesce(string_agg(v.huella, ',' ORDER BY v.predio_id), ''),"
+                        + "          'UTF8')), 'hex'),"
+                        + "        now(), now()"
+                        + "   FROM valuacion_predio v"
+                        + "  WHERE v.ejercicio = 2026",
+                muni);
     }
 
     private static long sembrarRentas(
