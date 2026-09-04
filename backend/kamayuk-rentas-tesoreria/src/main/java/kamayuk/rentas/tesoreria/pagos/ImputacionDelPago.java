@@ -89,12 +89,25 @@ public class ImputacionDelPago {
                         + pago.reciboNumero());
     }
 
+    /**
+     * La observacion de una reversion, <b>con el motivo que la caja mando</b> (C-1, desajuste 8).
+     *
+     * <p>Aqui si hay un usuario y sus palabras: quien anulo el recibo en ventanilla tuvo que
+     * escribir el sustento —{@code AnularRecibo.Anulacion} lo exige (RNF-052)— y hasta C-1 se
+     * perdia en el borde. Componer la frase sin el seria inventar la observacion, que es la
+     * mutacion que #538 midio y rechazo; llevarlo dentro es lo contrario: es no tirarla.
+     *
+     * <p>Queda como {@code motivo} de cada asiento de reversion, que es donde se lee por que una
+     * deuda volvio a estar viva.
+     */
     private static Observacion porLaAnulacion(PagoRecibido pago) {
         return Observacion.de(
                 "Reversion del pago "
                         + pago.pagoOriginalId()
                         + " por la anulacion del recibo "
-                        + pago.reciboNumero());
+                        + pago.reciboNumero()
+                        + ". Motivo: "
+                        + pago.motivoDeLaAnulacionExigido());
     }
 
     /** Abona en el libro lo que el pago cobro. */
@@ -136,13 +149,20 @@ public class ImputacionDelPago {
      * <p><b>Reversa: escribe asientos contrarios.</b> No borra, y no puede: el libro es inmutable
      * (ADR-0006) y {@code cuenta_corriente_asiento} esta en {@code TABLAS_PROTEGIDAS}, asi que un
      * {@code DELETE} ahi rompe el build antes de llegar a ejecucion. Es el criterio 4 de P5D.
+     *
+     * <p><b>Y la fecha valor es la de la ANULACION, no la del recibo</b> (C-1, desajuste 9). Hasta
+     * C-1 se reversaba con {@code fechaDePago} —la del papel original—, porque la fecha que la caja
+     * manda se descartaba en el borde. Anular en julio un recibo de marzo escribia entonces la
+     * reversion en marzo: un estado de cuenta al 30 de abril recalculado despues cambiaba de
+     * respuesta, cuando lo cierto es que ese recibo estuvo vigente hasta julio. Es la regla 9 y
+     * ADR-0006 —el libro no se reescribe—, y ademas decide en que particion caen los asientos.
      */
     private int reversar(PagoRecibido pago) {
         ReversionDeAbonos reversion =
                 abonos.reversarAbonos(
                         pago.documentoDeOrigen(),
                         pago.documentoDeLaAnulacion(),
-                        pago.fechaDePago(),
+                        pago.fechaDeAnulacionExigida(),
                         porLaAnulacion(pago));
         return reversion.asientos();
     }

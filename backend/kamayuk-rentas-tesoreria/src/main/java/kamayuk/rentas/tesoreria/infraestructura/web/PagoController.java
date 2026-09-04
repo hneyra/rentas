@@ -140,16 +140,23 @@ public class PagoController {
                     Objects.requireNonNullElse(
                             peticion.pagador(),
                             new PeticionDePago.DatosDelPagador(null, null, null));
+            boolean esAnulacion = tipo == TipoDePagoRecibido.PAGO_ANULADO;
             return PagoRecibido.enTransito(
                     UUID.fromString(exigir(peticion.pagoId(), "pagoId")),
                     tipo,
-                    tipo == TipoDePagoRecibido.PAGO_ANULADO
+                    esAnulacion
                             ? UUID.fromString(exigir(peticion.pagoOriginalId(), "pagoOriginalId"))
                             : null,
                     Objects.requireNonNullElse(peticion.sistemaOrigen(), "caja"),
                     exigir(recibo.numero(), "recibo.numero"),
                     pagador.idExterno(),
                     LocalDate.parse(exigir(recibo.fechaDePago(), "recibo.fechaDePago")),
+                    // Los dos SOLO de la anulacion, y EXIGIDOS ahi (C-1). Este es el borde
+                    // donde llega el cuerpo de la caja, o sea el sitio donde el invariante se
+                    // puede sostener en las dos direcciones: `PagoRecibido` solo puede
+                    // sostener una, porque tambien reconstruye filas anteriores a `V10`.
+                    esAnulacion ? exigir(peticion.motivo(), "motivo") : null,
+                    esAnulacion ? LocalDate.parse(exigir(peticion.fecha(), "fecha")) : null,
                     // El importe llega como CADENA (RNF-055): leerlo como numero de coma flotante
                     // volveria a introducir por la puerta de atras el defecto que el serializador
                     // evita.

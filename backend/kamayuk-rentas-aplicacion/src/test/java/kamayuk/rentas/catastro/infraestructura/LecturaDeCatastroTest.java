@@ -1,13 +1,19 @@
 package kamayuk.rentas.catastro.infraestructura;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.time.LocalDate;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import kamayuk.rentas.catastro.FichaDelPadron;
+import kamayuk.rentas.catastro.ValorUnitarioPublicado;
+import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.verificaciones.ContratoQueConsumeDeCatastro;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -74,5 +80,60 @@ class LecturaDeCatastroTest {
         assertThat(ficha.uso()).isEqualTo("CASA HABITACION");
         assertThat(ficha.vigenciaDesde()).isEqualTo(LocalDate.of(2026, 3, 15));
         assertThat(ficha.titular()).isEqualTo("PENA GARCIA, MARIA");
+    }
+
+    @Test
+    @DisplayName("el cuadro sellado se lee entero de un ARRAY con la forma declarada (C-1)")
+    void elCuadroSeLeeEnteroDeLaFormaDeclarada() {
+        Map<String, Object> fabricada = new LinkedHashMap<>();
+        fabricada.put("partida", "MUROS");
+        fabricada.put("categoria", "C");
+        fabricada.put("anioConstruccionDesde", 1990);
+        fabricada.put("anioConstruccionHasta", 2000);
+        fabricada.put("valorM2", "123.45");
+
+        assertThat(fabricada.keySet())
+                .as(
+                        "la respuesta fabricada tiene que tener EXACTAMENTE los campos del"
+                                + " contrato: uno de mas la haria pasar aunque el contrato no lo"
+                                + " declarase")
+                .isEqualTo(ContratoQueConsumeDeCatastro.FILA_DE_VALOR_UNITARIO.keySet());
+
+        ObjectMapper json = new ObjectMapper();
+        ArrayNode cuadro = json.createArrayNode();
+        cuadro.add(json.valueToTree(fabricada));
+
+        List<ValorUnitarioPublicado> filas =
+                new ValoresUnitariosHttp(new CatastroQueNoContesta(ruta -> cuadro))
+                        .valoresUnitariosVigentesEn(new Ejercicio(2026));
+
+        // El defecto que C-1 cerro no daba error: `path("contenido")` sobre un array devuelve
+        // un nodo ausente, asi que el cuadro salia VACIO con un 200 delante — que se lee como
+        // «este ejercicio no tiene cuadro publicado», que es lo contrario de lo que pasa.
+        assertThat(filas).hasSize(1);
+        ValorUnitarioPublicado fila = filas.get(0);
+        assertThat(fila.partida()).isEqualTo("MUROS");
+        assertThat(fila.categoria()).isEqualTo('C');
+        assertThat(fila.anioConstruccionDesde()).isEqualTo(1990);
+        assertThat(fila.anioConstruccionHasta()).isEqualTo(2000);
+        assertThat(fila.valorM2().valor()).isEqualByComparingTo("123.45");
+    }
+
+    @Test
+    @DisplayName(
+            "y una respuesta que NO es un array falla en voz alta, no devuelve el cuadro vacio")
+    void unCuadroQueNoEsUnArrayFallaEnVozAlta() {
+        ObjectMapper json = new ObjectMapper();
+        ObjectNode sobre = json.createObjectNode();
+        sobre.putArray("contenido");
+
+        assertThatThrownBy(
+                        () ->
+                                new ValoresUnitariosHttp(new CatastroQueNoContesta(ruta -> sobre))
+                                        .valoresUnitariosVigentesEn(new Ejercicio(2026)))
+                .as(
+                        "un cuadro vacio se leeria como «este ejercicio no tiene cuadro» y la obra"
+                                + " saldria valorizada en 0,00 (#48)")
+                .isInstanceOf(ClienteHttpDeCatastro.CatastroInalcanzable.class);
     }
 }

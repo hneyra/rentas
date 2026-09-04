@@ -304,6 +304,89 @@ class PagoInyectadoDosVecesTest {
                                     + " donde debe haber una")
                     .isEqualTo(trasLaPrimera);
         }
+
+        @Test
+        @DisplayName("C-1 (9) — la reversion se asienta el dia de la ANULACION, no el del recibo")
+        void laReversionSeAsientaElDiaDeLaAnulacion() {
+            cargarDeuda("C1-F", "180.00");
+            UUID pago = UUID.randomUUID();
+            sinTransaccion(() -> recibir.recibir(pagoDe(pago, "C1-F", "180.00")).pago());
+
+            sinTransaccion(
+                    () ->
+                            recibir.recibir(anulacionDe(UUID.randomUUID(), pago, "C1-F", "180.00"))
+                                    .pago());
+
+            assertThat(fechasValorDe("ANULACION RECIBO 001-C1-F"))
+                    .as(
+                            "hasta C-1 la caja mandaba la fecha y el borde la descartaba, asi que"
+                                    + " se reversaba con la del recibo ORIGINAL: anular en julio"
+                                    + " uno de marzo escribia la reversion en marzo, y un estado de"
+                                    + " cuenta al 30 de abril recalculado despues cambiaba de"
+                                    + " respuesta (regla 9, ADR-0006)")
+                    .isNotEmpty()
+                    .containsOnly(DIA_DE_LA_ANULACION);
+
+            assertThat(fechasValorDe("RECIBO 001-C1-F"))
+                    .as(
+                            "el contraste: los asientos del COBRO siguen con la fecha del cobro. Si"
+                                    + " las dos fechas fueran la misma, la prueba de arriba no"
+                                    + " podria distinguir cual se uso")
+                    .containsOnly(HOY);
+        }
+
+        @Test
+        @DisplayName("C-1 (8) — y cada asiento de la reversion lleva el motivo que mando la caja")
+        void laReversionLlevaElMotivoDeLaCaja() {
+            cargarDeuda("C1-G", "220.00");
+            UUID pago = UUID.randomUUID();
+            sinTransaccion(() -> recibir.recibir(pagoDe(pago, "C1-G", "220.00")).pago());
+
+            sinTransaccion(
+                    () ->
+                            recibir.recibir(anulacionDe(UUID.randomUUID(), pago, "C1-G", "220.00"))
+                                    .pago());
+
+            assertThat(motivosDe("ANULACION RECIBO 001-C1-G"))
+                    .as(
+                            "el motivo de una anulacion es con lo que se explica por que una deuda"
+                                    + " volvio a estar viva. Aqui SI hay un usuario y sus palabras"
+                                    + " —la caja se las exige al anular (RNF-052)—, y hasta C-1 se"
+                                    + " tiraban en el borde")
+                    .isNotEmpty()
+                    .allSatisfy(motivo -> assertThat(motivo).contains(MOTIVO_DE_LA_ANULACION));
+        }
+
+        @Test
+        @DisplayName("y la fila del buzon guarda las dos, en columnas propias y no en el jsonb")
+        void elBuzonGuardaLasDosMitadesDeLaAnulacion() {
+            cargarDeuda("C1-H", "140.00");
+            UUID pago = UUID.randomUUID();
+            sinTransaccion(() -> recibir.recibir(pagoDe(pago, "C1-H", "140.00")).pago());
+            UUID anulacion = UUID.randomUUID();
+
+            PagoRecibido anulado =
+                    sinTransaccion(
+                            () ->
+                                    recibir.recibir(anulacionDe(anulacion, pago, "C1-H", "140.00"))
+                                            .pago());
+
+            // Leidas de las COLUMNAS y no del objeto que se paso: es lo que comprueba que `V10`
+            // las persiste. Y no del `cuerpo` jsonb, que es donde P6 creia que sobrevivian —no
+            // sobrevivian en ninguna parte: `congelar` reserializa el record—.
+            assertThat(columnaDelBuzon(anulacion, "motivo_anulacion"))
+                    .isEqualTo(MOTIVO_DE_LA_ANULACION);
+            assertThat(columnaDelBuzon(anulacion, "fecha_anulacion"))
+                    .isEqualTo(DIA_DE_LA_ANULACION.toString());
+            assertThat(anulado.estado()).isEqualTo(EstadoDelPagoRecibido.APLICADO);
+
+            assertThat(columnaDelBuzon(pago, "motivo_anulacion"))
+                    .as(
+                            "el contraste: un COBRO no puede traerlas. `pago_recibido_anulacion_ck`"
+                                    + " lo sostiene en la base y el constructor de PagoRecibido en"
+                                    + " el dominio")
+                    .isNull();
+        }
     }
 
     @Nested
@@ -346,6 +429,16 @@ class PagoInyectadoDosVecesTest {
 
     // ------------------------------------------------------------------
 
+    /**
+     * Lo que la caja manda al anular, y que hasta C-1 se descartaba en el borde.
+     *
+     * <p>El dia NO es {@code HOY}: una anulacion pasa DESPUES del cobro, y es la fecha valor con la
+     * que se reversa. Que sean distintos es lo unico que permite ver cual de las dos se usa.
+     */
+    private static final String MOTIVO_DE_LA_ANULACION = "ERROR EN EL IMPORTE COBRADO";
+
+    private static final LocalDate DIA_DE_LA_ANULACION = HOY.plusMonths(4);
+
     private static PagoRecibido pagoDe(UUID pagoId, String sufijo, String importe) {
         return pagoDe(pagoId, sufijo, importe, TRIBUTO);
     }
@@ -372,6 +465,8 @@ class PagoInyectadoDosVecesTest {
                 "001-" + sufijo,
                 contribuyente,
                 HOY,
+                null,
+                null,
                 Dinero.de(importe),
                 List.of(referencia),
                 cuerpo,
@@ -385,6 +480,10 @@ class PagoInyectadoDosVecesTest {
                         + pagoId
                         + "\",\"tipo\":\"PAGO_ANULADO\",\"pagoOriginalId\":\""
                         + original
+                        + "\",\"motivo\":\""
+                        + MOTIVO_DE_LA_ANULACION
+                        + "\",\"fecha\":\""
+                        + DIA_DE_LA_ANULACION
                         + "\",\"total\":\""
                         + importe
                         + "\"}";
@@ -396,6 +495,8 @@ class PagoInyectadoDosVecesTest {
                 "001-" + sufijo,
                 contribuyente,
                 HOY,
+                MOTIVO_DE_LA_ANULACION,
+                DIA_DE_LA_ANULACION,
                 Dinero.de(importe),
                 List.of(),
                 cuerpo,
@@ -447,6 +548,66 @@ class PagoInyectadoDosVecesTest {
         return contar(
                 "SELECT count(*) FROM pago_recibido WHERE pago_id = CAST(? AS uuid)",
                 pagoId.toString());
+    }
+
+    /** Las fechas valor de los asientos que ese documento origino. */
+    private static List<LocalDate> fechasValorDe(String documento) {
+        return columnaDe(
+                "SELECT fecha_valor FROM cuenta_corriente_asiento WHERE documento_origen = ?",
+                fila -> fila.getObject(1, LocalDate.class),
+                documento);
+    }
+
+    /** Los motivos con que se asentaron. Es lo que la `Observacion` deja en cada fila. */
+    private static List<String> motivosDe(String documento) {
+        return columnaDe(
+                "SELECT motivo FROM cuenta_corriente_asiento WHERE documento_origen = ?",
+                fila -> fila.getString(1),
+                documento);
+    }
+
+    /**
+     * Una columna de la fila del buzon, como texto y leida de la BASE.
+     *
+     * <p>No se pide por el repositorio a proposito: {@code porPagoId} corre sin transaccion aqui y
+     * la politica RLS revienta —«unrecognized configuration parameter»— en vez de devolver vacio
+     * (#486). Lo que se quiere medir es que la columna esta escrita, no como se lee.
+     */
+    private static @org.jspecify.annotations.Nullable String columnaDelBuzon(
+            UUID pagoId, String columna) {
+        List<String> valores =
+                columnaDe(
+                        "SELECT CAST("
+                                + columna
+                                + " AS text) FROM pago_recibido WHERE pago_id = CAST(? AS uuid)",
+                        fila -> fila.getString(1),
+                        pagoId.toString());
+        return valores.isEmpty() ? null : valores.get(0);
+    }
+
+    private static <T> List<T> columnaDe(String sql, LeeUnaFila<T> como, Object... valores) {
+        try (Connection app = base.conexion(BaseDeDatosDePrueba.APP)) {
+            ContextoDeTenant.fijar(app, municipalidad);
+            try (PreparedStatement sentencia = app.prepareStatement(sql)) {
+                for (int i = 0; i < valores.length; i++) {
+                    sentencia.setObject(i + 1, valores[i]);
+                }
+                List<T> leidas = new java.util.ArrayList<>();
+                try (ResultSet fila = sentencia.executeQuery()) {
+                    while (fila.next()) {
+                        leidas.add(como.de(fila));
+                    }
+                }
+                return leidas;
+            }
+        } catch (SQLException noSePudo) {
+            throw new IllegalStateException("No se pudo leer la columna", noSePudo);
+        }
+    }
+
+    /** Como se lee una fila. Existe para no repetir el try-with-resources tres veces. */
+    private interface LeeUnaFila<T> {
+        T de(ResultSet fila) throws SQLException;
     }
 
     private static int contar(String sql, Object... valores) {

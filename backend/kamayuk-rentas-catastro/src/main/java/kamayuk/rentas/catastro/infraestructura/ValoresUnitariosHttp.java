@@ -16,6 +16,19 @@ import org.springframework.stereotype.Component;
  * /catastro/api/v1/catastro/tablas/valores-unitarios}. Lo consume la valorizacion del FUE, en
  * {@code licencias}.
  *
+ * <h2>La respuesta es un ARRAY, no un sobre paginado (C-1, desajuste 6)</h2>
+ *
+ * <p>Hasta C-1 este adaptador iteraba {@code contenido} y {@code catastro} publica la lista pelada:
+ * {@code path("contenido")} sobre un array devuelve un nodo ausente, asi que el cuadro salia
+ * <b>vacio con un 200 delante</b> — que se lee como «este ejercicio no tiene cuadro publicado», que
+ * es justo lo que el javadoc del puerto prohibe decir.
+ *
+ * <p><b>Paga el consumidor.</b> Un cuadro sellado se lee ENTERO: no tiene pagina, no tiene {@code
+ * totalElementos} y envolverlo inventaria un sobre cuyo recuento nunca significaria nada. Ademas la
+ * forma es la que {@code catastro} usa en sus tres lecturas de cuadro —aranceles, depreciacion y
+ * valores unitarios—, asi que cambiarla por una de ellas las separaria. Quien supuso un sobre que
+ * nunca estuvo fue este adaptador.
+ *
  * <p>Un ejercicio sin conjunto sellado NO devuelve una lista vacia: `catastro` contesta 404 y este
  * cliente lo deja salir como {@code CatastroInalcanzable}. Es lo que el javadoc del puerto ya
  * exigia —«no devuelve vacio y no devuelve ceros»—, porque una lista vacia se leeria como «este
@@ -37,7 +50,17 @@ public class ValoresUnitariosHttp implements LectorDeValoresUnitarios {
                         "/catastro/tablas/valores-unitarios?ejercicio=" + ejercicio.valor(),
                         "leer el cuadro de valores unitarios de " + ejercicio);
         List<ValorUnitarioPublicado> filas = new ArrayList<>();
-        for (JsonNode fila : cuerpo.path("contenido")) {
+        if (!cuerpo.isArray()) {
+            // No es una comodidad: si `catastro` cambiara la forma, iterar un nodo que no es
+            // un array devuelve CERO filas en silencio, y el cuadro vacio se lee como «este
+            // ejercicio no tiene cuadro» — el defecto que este adaptador acaba de cerrar.
+            throw new ClienteHttpDeCatastro.CatastroInalcanzable(
+                    "leer el cuadro de valores unitarios de "
+                            + ejercicio
+                            + ": la respuesta no es la lista que publica esa ruta",
+                    null);
+        }
+        for (JsonNode fila : cuerpo) {
             JsonNode hasta = fila.path("anioConstruccionHasta");
             filas.add(
                     new ValorUnitarioPublicado(

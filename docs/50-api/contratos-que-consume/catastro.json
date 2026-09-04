@@ -5,7 +5,7 @@
   "raiz" : "/catastro/api/v1",
   "operaciones" : {
     "GET /catastro/fichas" : {
-      "parametros" : [ "aLaFecha", "codRefCatastral", "contribuyente", "exceptoPredio", "lote", "manzana", "pagina", "soloPredio", "tamano", "tipo" ],
+      "parametros" : [ "codRefCatastral", "contribuyente", "exceptoPredio", "fecha", "lote", "manzana", "pagina", "soloPredio", "tamano", "tipo" ],
       "respuesta" : {
         "contenido" : [ {
           "fichaId" : "entero",
@@ -19,7 +19,7 @@
           "areaTerreno" : "texto",
           "areaConstruida" : "texto",
           "uso" : "texto",
-          "vigenciaDesde" : "fecha",
+          "vigenciaDesde" : "texto",
           "titular" : "texto"
         } ],
         "totalElementos" : "entero"
@@ -43,15 +43,13 @@
     },
     "GET /catastro/tablas/valores-unitarios" : {
       "parametros" : [ "ejercicio" ],
-      "respuesta" : {
-        "contenido" : [ {
-          "partida" : "texto",
-          "categoria" : "texto",
-          "anioConstruccionDesde" : "entero",
-          "anioConstruccionHasta" : "entero",
-          "valorM2" : "texto"
-        } ]
-      },
+      "respuesta" : [ {
+        "partida" : "texto",
+        "categoria" : "texto",
+        "anioConstruccionDesde" : "entero",
+        "anioConstruccionHasta" : "entero",
+        "valorM2" : "texto"
+      } ],
       "cuerpo" : { }
     }
   }

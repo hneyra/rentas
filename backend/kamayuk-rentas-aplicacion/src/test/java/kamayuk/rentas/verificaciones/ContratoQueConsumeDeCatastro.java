@@ -56,10 +56,24 @@ public class ContratoQueConsumeDeCatastro extends ContratoQueSePublicaTestBase {
                     Map.entry("areaTerreno", "texto"),
                     Map.entry("areaConstruida", "texto"),
                     Map.entry("uso", "texto"),
-                    Map.entry("vigenciaDesde", "fecha"),
+                    // «texto» y no «fecha», y esto es una DECISION medida (C-1, desajuste 2).
+                    // `FichaEncontradaResource` lo publica como `String` —igual que `FichaResource`
+                    // y `PredioDelResumenResource`, tres de las cuatro fichas de catastro—, y el
+                    // adaptador lo lee con `asText()` y lo parsea. El contrato describe el JSON que
+                    // viaja, no el objeto que quien lee construye con el: `LocalDate` y `String`
+                    // salen los DOS como la misma cadena ISO, asi que declarar «fecha» describia lo
+                    // que hace este lado. El contrato con `normativa` ya declara «texto» para el
+                    // mismo campo.
+                    Map.entry("vigenciaDesde", "texto"),
                     Map.entry("titular", "texto"));
 
-    private static final Map<String, Object> FILA_DE_VALOR_UNITARIO =
+    /**
+     * Una fila del cuadro sellado, tal como la lee {@code ValoresUnitariosHttp}.
+     *
+     * <p>Publica por lo mismo que {@link #FILA_DE_FICHA}: la usa la ida y vuelta que fabrica una
+     * respuesta con estos campos y la pasa por el adaptador de produccion (C-1).
+     */
+    public static final Map<String, Object> FILA_DE_VALOR_UNITARIO =
             ordenados(
                     Map.entry("partida", "texto"),
                     Map.entry("categoria", "texto"),
@@ -67,15 +81,25 @@ public class ContratoQueConsumeDeCatastro extends ContratoQueSePublicaTestBase {
                     Map.entry("anioConstruccionHasta", "entero"),
                     Map.entry("valorM2", "texto"));
 
+    /**
+     * Publico y no protegido: lo lee {@code PeticionesACatastroTest}, que vive en el paquete del
+     * adaptador y compara los parametros declarados aqui con los que la URL construida manda de
+     * verdad (C-1). Ampliar la visibilidad de un metodo heredado es legitimo, y la alternativa
+     * —copiar la lista de parametros en la otra prueba— seria una segunda copia del contrato.
+     */
     @Override
-    protected ContratoDelConsumidor contrato() {
+    public ContratoDelConsumidor contrato() {
         Map<String, ContratoDelConsumidor.OperacionEsperada> operaciones = new LinkedHashMap<>();
 
         operaciones.put(
                 "GET /catastro/fichas",
                 ContratoDelConsumidor.OperacionEsperada.lectura(
                         Set.of(
-                                "aLaFecha",
+                                // `fecha` y no `aLaFecha`: es como catastro nombra la fecha de
+                                // corte en su capa web (C-1, desajuste 3). El puerto sigue
+                                // llamandolo `aLaFecha`, que es la regla 9; traducir es lo que
+                                // hace el adaptador.
+                                "fecha",
                                 "pagina",
                                 "tamano",
                                 "codRefCatastral",
@@ -113,11 +137,15 @@ public class ContratoQueConsumeDeCatastro extends ContratoQueSePublicaTestBase {
                                                         Map.entry("predioId", "entero"),
                                                         Map.entry("huella", "texto")))))));
 
+        // El cuadro sellado se lee ENTERO y la respuesta es un ARRAY, no un sobre paginado
+        // (C-1, desajuste 6): no hay pagina que pedir ni `totalElementos` que significara nada.
+        // Y el parametro es `ejercicio`, que es lo que catastro lee desde C-1 (desajuste 7):
+        // lo que acota es el ejercicio del conjunto sellado, no un ano cualquiera —y en esta
+        // misma respuesta viaja un `anioConstruccionDesde`, que si lo es—.
         operaciones.put(
                 "GET /catastro/tablas/valores-unitarios",
                 ContratoDelConsumidor.OperacionEsperada.lectura(
-                        Set.of("ejercicio"),
-                        ordenados(Map.entry("contenido", List.of(FILA_DE_VALOR_UNITARIO)))));
+                        Set.of("ejercicio"), List.of(FILA_DE_VALOR_UNITARIO)));
 
         return new ContratoDelConsumidor("rentas", "catastro", "/catastro/api/v1", operaciones);
     }

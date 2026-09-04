@@ -27,7 +27,8 @@ public class PagoRecibidoRepositoryJdbc extends RepositorioJdbc
 
     private static final String COLUMNAS =
             "id, pago_id, tipo, pago_original_id, sistema_caja, recibo_numero, contribuyente_id,"
-                    + " fecha_pago, total, cuerpo::text AS cuerpo, estado, asientos, motivo,"
+                    + " fecha_pago, motivo_anulacion, fecha_anulacion, total,"
+                    + " cuerpo::text AS cuerpo, estado, asientos, motivo,"
                     + " recibido_en, aplicado_en";
 
     /**
@@ -64,11 +65,13 @@ public class PagoRecibidoRepositoryJdbc extends RepositorioJdbc
                 jdbc().sql(
                                 "INSERT INTO pago_recibido (municipalidad_id, pago_id, tipo,"
                                         + " pago_original_id, sistema_caja, recibo_numero,"
-                                        + " contribuyente_id, fecha_pago, total, cuerpo, estado,"
+                                        + " contribuyente_id, fecha_pago, motivo_anulacion,"
+                                        + " fecha_anulacion, total, cuerpo, estado,"
                                         + " asientos, recibido_en, motivo) VALUES ("
                                         + MUNICIPALIDAD_ACTUAL
                                         + ", :pago, :tipo, :original, :caja, :recibo,"
-                                        + " :contribuyente, :fecha, :total,"
+                                        + " :contribuyente, :fecha, :motivoAnulacion,"
+                                        + " :fechaAnulacion, :total,"
                                         + " CAST(:cuerpo AS jsonb), :estado, 0, :recibido,"
                                         + " :motivo)"
                                         + " ON CONFLICT ON CONSTRAINT pago_recibido_uq"
@@ -80,6 +83,8 @@ public class PagoRecibidoRepositoryJdbc extends RepositorioJdbc
                         .param("recibo", pago.reciboNumero())
                         .param("contribuyente", pago.contribuyenteId())
                         .param("fecha", pago.fechaDePago())
+                        .param("motivoAnulacion", pago.motivoDeLaAnulacion())
+                        .param("fechaAnulacion", pago.fechaDeAnulacion())
                         .param("total", pago.total().valor())
                         .param("cuerpo", pago.cuerpo())
                         .param("recibido", Timestamp.from(pago.recibidoEn()))
@@ -198,6 +203,8 @@ public class PagoRecibidoRepositoryJdbc extends RepositorioJdbc
                 fila.getString("recibo_numero"),
                 contribuyente,
                 fila.getObject("fecha_pago", LocalDate.class),
+                fila.getString("motivo_anulacion"),
+                fila.getObject("fecha_anulacion", LocalDate.class),
                 new Dinero(fila.getBigDecimal("total")),
                 obligacionesDe(fila.getString("cuerpo")),
                 fila.getString("cuerpo"),

@@ -28,6 +28,10 @@ import org.jspecify.annotations.Nullable;
  * @param sistemaOrigen a que sistema iba, tal como la caja lo registro
  * @param total lo que el pago dice que se cobro, <b>como cadena</b> (RNF-055)
  * @param actualizadoA a que fecha estaba ese importe (regla 9)
+ * @param motivo por que se anulo el recibo, en las palabras de quien lo autorizo en ventanilla;
+ *     <b>solo en {@code PAGO_ANULADO}</b>, donde la caja lo exige (RNF-052)
+ * @param fecha el dia en que se anulo; solo en {@code PAGO_ANULADO}. No es la del recibo, que viaja
+ *     en {@code recibo.fechaDePago}: es la fecha valor con la que se reversa
  */
 public record PeticionDePago(
         @Nullable String pagoId,
@@ -36,6 +40,13 @@ public record PeticionDePago(
         @Nullable String sistemaOrigen,
         @Nullable String total,
         @Nullable String actualizadoA,
+        // LOS DOS DE LA ANULACION (C-1, desajustes 8 y 9). `ComponedorDeEventosJson.pagoAnulado`
+        // los escribe desde siempre y este record no los declaraba, asi que Jackson los
+        // descartaba y la caja recibia 201: el evento se marcaba ENTREGADO, el buzon se
+        // vaciaba y el dato no llegaba. Y tampoco sobrevivian en el `cuerpo` congelado, que se
+        // reserializa DESDE ESTE RECORD.
+        @Nullable String motivo,
+        @Nullable String fecha,
         @Nullable DatosDelRecibo recibo,
         @Nullable DatosDelPagador pagador,
         @Nullable List<LineaDeOrden> ordenes) {
