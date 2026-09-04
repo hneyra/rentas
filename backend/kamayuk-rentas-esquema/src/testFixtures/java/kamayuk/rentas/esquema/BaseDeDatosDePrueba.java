@@ -53,8 +53,16 @@ public final class BaseDeDatosDePrueba implements AutoCloseable {
     public static final String READONLY = "sgtm_readonly";
     public static final String CARGA_PARAMETROS = "rol_carga_parametros";
 
+    /**
+     * Quien escribe la proyeccion local de {@code catastro} (P5C, `V4`).
+     *
+     * <p>Separado de {@link #APP} a proposito: que la proyeccion sea de solo lectura para la
+     * aplicacion lo sostiene el privilegio y no el repositorio (ADR-0027 §3).
+     */
+    public static final String INGESTOR_CATASTRO = "rol_ingestor_catastro";
+
     /** Los cuatro roles de ARQ-03 §4, en el orden en que los crea {@code crear-roles.sql}. */
-    static final String[] ROLES = {OWNER, APP, READONLY, CARGA_PARAMETROS};
+    static final String[] ROLES = {OWNER, APP, READONLY, CARGA_PARAMETROS, INGESTOR_CATASTRO};
 
     /**
      * SQLSTATE {@code invalid_password}: la clave no es la que el rol tiene puesta. Es el sintoma

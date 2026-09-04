@@ -15,12 +15,13 @@ import org.springframework.stereotype.Repository;
  * ConciliacionRepository}. Lo que hay que saber para leerla es esto:
  *
  * <ol>
- *   <li><b>La poblacion es la de la grilla, letra por letra.</b> {@code FROM ficha_catastral f JOIN
- *       predio p} y la vigencia a la fecha: es la misma cabecera y la misma condicion que {@code
- *       FichaCatastralRepositoryJdbc.DESDE_LA_GRILLA} y su filtro de version. Un predio sin ficha
- *       no esta en la grilla y tampoco aqui; contarlo cambiaria el denominador y ninguna de las dos
- *       cifras pareceria mal. Que sigan siendo la misma poblacion lo comprueba una prueba, no este
- *       comentario.
+ *   <li><b>La poblacion es la de la grilla, letra por letra.</b> {@code FROM ficha_ref f JOIN
+ *       predio_ref p} y la vigencia a la fecha: desde P5C las dos son la <b>proyeccion local</b> de
+ *       catastro (`V4`), no sus tablas — el recuento y la grilla tienen que contar lo mismo, y con
+ *       dos bases eso solo se sostiene si el predicado cabe en un `WHERE` de esta base (ADR-0029, y
+ *       #631 midio lo que pasa cuando no cabe). Un predio sin ficha no esta en la grilla y tampoco
+ *       aqui; contarlo cambiaria el denominador y ninguna de las dos cifras pareceria mal. Que
+ *       sigan siendo la misma poblacion lo comprueba una prueba, no este comentario.
  *   <li><b>La declaracion se busca con un {@code LATERAL} que trae una fila o ninguna.</b> Un
  *       predio puede tener mas de una declaracion vigente del mismo ejercicio y la respuesta es un
  *       si o un no: con un {@code JOIN} normal ese predio contaria dos veces y el total saldria
@@ -30,8 +31,8 @@ import org.springframework.stereotype.Repository;
  *       daria un «sin conciliar» que no es de nadie.
  * </ol>
  *
- * <p>El {@code LEFT JOIN} sobre {@code predio} no hace falta y seria enganoso: {@code
- * ficha_catastral.predio_id} es obligatorio.
+ * <p>El {@code LEFT JOIN} sobre {@code predio_ref} no hace falta y seria enganoso: {@code
+ * ficha_ref.predio_id} es obligatorio.
  */
 @Repository
 public class ConciliacionRepositoryJdbc extends RepositorioJdbc implements ConciliacionRepository {
@@ -40,12 +41,12 @@ public class ConciliacionRepositoryJdbc extends RepositorioJdbc implements Conci
             """
             SELECT count(*)                                        AS total,
                    count(*) FILTER (WHERE dj.existe IS NOT NULL)    AS conciliados
-              FROM ficha_catastral f
-              JOIN predio p ON p.id = f.predio_id
+              FROM ficha_ref f
+              JOIN predio_ref p ON p.predio_id = f.predio_id
               LEFT JOIN LATERAL (
                   SELECT 1 AS existe
                     FROM declaracion_jurada d
-                   WHERE d.predio_id = p.id
+                   WHERE d.predio_id = p.predio_id
                      AND d.ejercicio = :ejercicio
                      AND d.estado = ANY(:estados)
                    LIMIT 1) dj ON true

@@ -362,6 +362,7 @@ class ProgramarDesdeLaDeteccionFronteraTest {
     // ------------------------------------------------------------------
 
     private static MvcResult omisos(String sector, String condicion) throws Exception {
+        ingestar(municipalidadA);
         MvcResult resultado =
                 mvc.perform(
                                 get("/rentas/api/v1/fiscalizacion/omisos")
@@ -613,6 +614,23 @@ class ProgramarDesdeLaDeteccionFronteraTest {
         @Override
         public Optional<String> domicilioFiscalDe(long contribuyenteId, LocalDate fecha) {
             return Optional.empty();
+        }
+    }
+
+    /**
+     * Hace correr al ingestor de la proyeccion de catastro antes de preguntar (P5C).
+     *
+     * <p>Desde la separacion, la deteccion de omisos lee {@code predio_ref} y {@code ficha_ref} y
+     * no las tablas del vecino: la consulta que paginaba y contaba cruzando cuatro tablas ajenas ya
+     * no puede existir con dos bases (ADR-0029, y #631 midio que componerla en memoria contesta
+     * «722 paginas, 14 422 elementos» y cero filas en todas). Esta llamada es el paso que en
+     * produccion dispara un evento.
+     */
+    private static void ingestar(long municipalidadId) {
+        try {
+            kamayuk.rentas.esquema.ProyeccionDeCatastro.proyectar(base, municipalidadId);
+        } catch (java.sql.SQLException noSePudo) {
+            throw new IllegalStateException("No se pudo proyectar el catastro", noSePudo);
         }
     }
 }

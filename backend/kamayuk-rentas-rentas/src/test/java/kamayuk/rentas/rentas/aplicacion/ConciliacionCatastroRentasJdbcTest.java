@@ -527,6 +527,18 @@ class ConciliacionCatastroRentasJdbcTest {
         }
     }
 
+    /**
+     * Hace correr al ingestor de la proyeccion de catastro (P5C).
+     *
+     * <p>Desde la separacion, el recuento de la conciliacion lee {@code predio_ref} y {@code
+     * ficha_ref} y no las tablas del vecino: es la mitad de {@code PENDIENTE-CRUCE-01} que va con
+     * la otra —la grilla y el recuento tienen que contar la MISMA poblacion (#564), y dos
+     * proyecciones distintas darian dos cifras del mismo dia—.
+     */
+    private static void ingestar(long municipalidadId) throws SQLException {
+        kamayuk.rentas.esquema.ProyeccionDeCatastro.proyectar(base, municipalidadId);
+    }
+
     @Nested
     @DisplayName("La grilla pagina y cuenta LO FILTRADO (#631)")
     class LaGrillaCuentaLoFiltrado {
@@ -547,6 +559,7 @@ class ConciliacionCatastroRentasJdbcTest {
             // de la coherencia no muerde: la prueba mediria una casualidad del juego de datos.
             long observada = declarar(municipalidadDelRecuento, dos, E2026, numeroDeDj("DJ-GRI"));
             cambiarEstado(municipalidadDelRecuento, observada, "OBSERVADA");
+            ingestar(municipalidadDelRecuento);
         }
 
         @AfterEach
@@ -658,6 +671,7 @@ class ConciliacionCatastroRentasJdbcTest {
             crearPredioConFicha(municipalidadDelRecuento, nuevoCodigo());
             declarar(municipalidadDelRecuento, uno, E2026, numeroDeDj("DJ-REC"));
             declarar(municipalidadDelRecuento, dos, E2026, numeroDeDj("DJ-REC"));
+            ingestar(municipalidadDelRecuento);
         }
 
         @AfterEach

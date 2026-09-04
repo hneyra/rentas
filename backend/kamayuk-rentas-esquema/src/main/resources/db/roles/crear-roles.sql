@@ -22,7 +22,12 @@ DO $roles$
 DECLARE
     r text;
 BEGIN
-    FOREACH r IN ARRAY ARRAY['sgtm_owner', 'sgtm_app', 'sgtm_readonly', 'rol_carga_parametros']
+    -- `rol_ingestor_catastro` entra con P5C: es quien escribe la proyeccion local de
+    -- `catastro` (V4), y existe SEPARADO de `sgtm_app` a proposito. Que la proyeccion sea de
+    -- solo lectura para la aplicacion no puede ser disciplina del repositorio: es un privilegio,
+    -- la misma mecanica de `rol_carga_parametros` con los valores normativos.
+    FOREACH r IN ARRAY ARRAY['sgtm_owner', 'sgtm_app', 'sgtm_readonly', 'rol_carga_parametros',
+                             'rol_ingestor_catastro']
     LOOP
         IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = r) THEN
             EXECUTE format('CREATE ROLE %I NOLOGIN', r);
@@ -35,7 +40,8 @@ $roles$;
 
 -- Solo sgtm_owner hace DDL. La aplicacion nunca.
 GRANT USAGE, CREATE ON SCHEMA public TO sgtm_owner;
-GRANT USAGE           ON SCHEMA public TO sgtm_app, sgtm_readonly, rol_carga_parametros;
+GRANT USAGE           ON SCHEMA public TO sgtm_app, sgtm_readonly, rol_carga_parametros,
+                                                rol_ingestor_catastro;
 
 -- Sin GRANT de pertenencia entre roles: sgtm_owner concede privilegios sobre sus
 -- propias tablas sin necesitarla, y ser miembro de sgtm_app le permitiria un

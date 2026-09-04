@@ -667,10 +667,117 @@ class DeteccionDeOmisosJdbcTest {
         }
 
         private FilaDeOmisos unicaFila(String sector, LocalDate aLaFecha) {
-            Pagina<FilaDeOmisos> pagina =
-                    envolver(deteccion).detectar(E2024, sector, null, aLaFecha, PRIMERA);
+            Pagina<FilaDeOmisos> pagina = detectarA(sector, aLaFecha);
             assertThat(pagina.contenido()).hasSize(1);
             return pagina.contenido().get(0);
+        }
+    }
+
+    @Nested
+    @DisplayName("P5C / AC 2 — la pagina y el conteo son del MISMO conjunto filtrado")
+    class LaPaginaYElConteoSonDelMismoConjunto {
+
+        /**
+         * El caso de #631, reproducido sobre la proyeccion local (P5C).
+         *
+         * <p><b>Que fallo entonces y por que.</b> La conciliacion componia el resultado en memoria:
+         * pedia a catastro la pagina del padron y descartaba despues las filas que no cumplian el
+         * predicado —que lo conoce {@code rentas} y no el vecino—. El sobre seguia llevando el
+         * {@code totalElementos} del padron ENTERO, asi que sobre Catacaos contestaba «722 paginas,
+         * 14 422 elementos» y <b>cero filas en todas</b>: una respuesta que afirma dos cosas
+         * incompatibles y no se puede recorrer.
+         *
+         * <p><b>Por que no puede volver a pasar.</b> Porque el predicado esta en el MISMO {@code
+         * WHERE} que la pagina y el {@code count(*)}: {@code PAGINA} y {@code CONTEO_CON_CONDICION}
+         * se componen del mismo texto ({@code INTERIOR} + {@code FILTRO_DE_CONDICION}), asi que no
+         * pueden decir cosas distintas. Es lo que la proyeccion local compra, y lo que un puerto
+         * HTTP no puede dar.
+         */
+        @Test
+        @DisplayName("las dos cifras cuadran, y recorrer las paginas devuelve exactamente esas")
+        void elSobreYLasFilasDicenLoMismo() {
+            String sector = sembrarSector("P5C");
+            long titular = sembrarContribuyente("P5C-T", "70600090");
+
+            // Siete predios, de los que SOLO TRES son subvaluadores. Los otros cuatro declararon
+            // exactamente lo que consta, que es el caso corriente del padron.
+            for (int i = 0; i < 3; i++) {
+                long predio = sembrarPredio(sector, "P5Csub" + i);
+                // La version que DECLARO, ya cerrada, y la que rige hoy: 300 contra 120 es
+                // exactamente lo que `ComparacionHalladoDeclarado` llama subvaluar. Las dos
+                // vigencias no se pisan —`ficha_vigencias_no_se_pisan`, V72— y ese detalle
+                // importa aqui: un padron con dos versiones abiertas no se puede escribir.
+                long declarada =
+                        sembrarFichaEntre(
+                                predio,
+                                "120.00",
+                                LocalDate.of(2019, 1, 1),
+                                LocalDate.of(2019, 12, 31));
+                sembrarFicha(predio, "300.00");
+                sembrarTitularidad(predio, titular, "100.00");
+                sembrarDeclaracion(predio, titular, declarada, false, "PRESENTADA");
+            }
+            for (int i = 0; i < 4; i++) {
+                long predio = sembrarPredio(sector, "P5Ccon" + i);
+                long ficha = sembrarFicha(predio, "150.00");
+                sembrarTitularidad(predio, titular, "100.00");
+                sembrarDeclaracion(predio, titular, ficha, false, "PRESENTADA");
+            }
+
+            Pagina<FilaDeOmisos> primera =
+                    detectar(
+                            sector,
+                            CondicionFiscalizada.SUBVALUADOR,
+                            Paginacion.de(0, 2, "codRefCatastral"));
+
+            assertThat(primera.totalElementos())
+                    .as(
+                            "el sobre cuenta LO FILTRADO. En #631 contaba el padron entero: «722"
+                                    + " paginas, 14 422 elementos» sobre cero filas")
+                    .isEqualTo(3);
+
+            // Y recorrerlas de verdad, que es lo que #631 no podia: la respuesta anunciaba
+            // paginas que no existian.
+            List<String> recorridos = new java.util.ArrayList<>();
+            for (int pagina = 0; pagina < primera.totalPaginas(); pagina++) {
+                for (FilaDeOmisos fila :
+                        detectar(
+                                        sector,
+                                        CondicionFiscalizada.SUBVALUADOR,
+                                        Paginacion.de(pagina, 2, "codRefCatastral"))
+                                .contenido()) {
+                    recorridos.add(fila.codigoReferenciaCatastral());
+                }
+            }
+            assertThat(recorridos)
+                    .as(
+                            "recorriendo las %d paginas que el sobre anuncia salen las %d filas que dice",
+                            primera.totalPaginas(), primera.totalElementos())
+                    .hasSize(3)
+                    .doesNotHaveDuplicates();
+        }
+
+        @Test
+        @DisplayName("y una condicion sin ninguna fila dice cero, no el padron")
+        void laCondicionImposibleDiceCero() {
+            String sector = sembrarSector("P5Cv");
+            long titular = sembrarContribuyente("P5Cv-T", "70600091");
+            long predio = sembrarPredio(sector, "P5Cv0");
+            long ficha = sembrarFicha(predio, "150.00");
+            sembrarTitularidad(predio, titular, "100.00");
+            sembrarDeclaracion(predio, titular, ficha, false, "PRESENTADA");
+
+            Pagina<FilaDeOmisos> vacia =
+                    detectar(
+                            sector,
+                            CondicionFiscalizada.OMISO,
+                            Paginacion.de(0, 20, "codRefCatastral"));
+
+            assertThat(vacia.totalElementos())
+                    .as("cero es una respuesta; «722 paginas de nada» no lo es")
+                    .isZero();
+            assertThat(vacia.totalPaginas()).isZero();
+            assertThat(vacia.contenido()).isEmpty();
         }
     }
 
@@ -734,6 +841,32 @@ class DeteccionDeOmisosJdbcTest {
 
     // ------------------------------------------------------------------
 
+    /**
+     * Hace correr al ingestor antes de preguntar (P5C).
+     *
+     * <p>Desde P5C la deteccion lee la <b>proyeccion local</b> de catastro y no sus tablas: la
+     * consulta que paginaba y contaba cruzando cuatro tablas del vecino ya no puede existir con dos
+     * bases (ADR-0029). Estas pruebas siguen sembrando predios y fichas como siempre, y esta
+     * llamada es el paso que en produccion dispara un evento.
+     *
+     * <p>Va justo antes de preguntar, y no al final de cada siembra, a proposito: asi el desfase de
+     * la proyeccion es <b>visible</b> en el codigo de la prueba. Una siembra que proyectara sola
+     * dejaria creer que la proyeccion se actualiza en la misma transaccion, que es exactamente lo
+     * que no pasa.
+     */
+    private static Pagina<FilaDeOmisos> detectarA(@Nullable String sector, LocalDate aLaFecha) {
+        ingestar(municipalidadA);
+        return envolver(deteccion).detectar(E2024, sector, null, aLaFecha, PRIMERA);
+    }
+
+    private static void ingestar(long municipalidadId) {
+        try {
+            kamayuk.rentas.esquema.ProyeccionDeCatastro.proyectar(base, municipalidadId);
+        } catch (java.sql.SQLException noSePudo) {
+            throw new IllegalStateException("No se pudo proyectar el catastro", noSePudo);
+        }
+    }
+
     private static Pagina<FilaDeOmisos> detectar(
             @Nullable String sector, @Nullable CondicionFiscalizada condicion) {
         return detectar(sector, condicion, PRIMERA);
@@ -743,6 +876,7 @@ class DeteccionDeOmisosJdbcTest {
             @Nullable String sector,
             @Nullable CondicionFiscalizada condicion,
             Paginacion paginacion) {
+        ingestar(municipalidadA);
         return envolver(deteccion).detectar(E2024, sector, condicion, HOY, paginacion);
     }
 

@@ -34,73 +34,26 @@ final class CrucesConsentidosDelSgtm {
     static final List<CruceConsentido> LISTA =
             List.of(
                     // ---------------------------------------------------------------------------
-                    // GOB-05 §6.1 — el mas caro de los siete. `rentas` -> `catastro`.
+                    // PENDIENTE-CRUCE-01 — CERRADO EN P5C.
                     //
-                    // El cruce del padron de predios con las declaraciones juradas de un ejercicio,
-                    // PAGINADO y contando lo filtrado. Componerlo en memoria ya se probo y fallo:
-                    // #631 dejo la conciliacion contestando «722 paginas, 14 422 elementos» y cero
-                    // filas en todas. La salida es una proyeccion local en `rentas`, alimentada por
-                    // evento (ADR-0029 §Consecuencias).
+                    // `DeteccionRepositoryJdbc` (los omisos) y `ConciliacionRepositoryJdbc` (su
+                    // recuento) leian `predio`, `sector` y `ficha_catastral`, tres tablas de
+                    // `catastro`, en la MISMA consulta que pagina y cuenta lo filtrado. Iban
+                    // juntas a proposito: es el mismo padron, paginado en un caso y contado en el
+                    // otro, y dos proyecciones distintas darian dos cifras del mismo dia (#564).
                     //
-                    // Le toca a: rentas (con catastro publicando el evento).
-                    new CruceConsentido("DeteccionRepositoryJdbc", "predio", "PENDIENTE-CRUCE-01"),
-                    new CruceConsentido("DeteccionRepositoryJdbc", "sector", "PENDIENTE-CRUCE-01"),
-                    new CruceConsentido(
-                            "DeteccionRepositoryJdbc", "ficha_catastral", "PENDIENTE-CRUCE-01"),
+                    // Hoy las dos leen `predio_ref` y `ficha_ref`, la proyeccion local que crea
+                    // `V4` — y `sector` ya no se lee de ninguna forma, porque la proyeccion lleva
+                    // el CODIGO del sector, que es lo que los filtros teclean.
+                    //
+                    // Retirarlas de esta lista no es un tramite: `ningunCruceConsentidoSobra`
+                    // vuelve a escanear SIN la lista y exige que cada entrada siga eximiendo un
+                    // cruce de verdad, asi que dejarlas puestas la habria puesto en rojo. Es la
+                    // lista de trabajo pendiente encogiendose por haberse hecho el trabajo.
 
                     // ---------------------------------------------------------------------------
-                    // GOB-05 §6.3 — la mitad numerica de ADR-0015. `rentas` -> `catastro`.
+                    // GOB-05 §6.6 — `rentas` -> `catastro`. Sigue abierto.
                     //
-                    // El RECUENTO de la conciliacion (#564), sobre la MISMA poblacion que la grilla
-                    // de §6.1 —lo dice su propio javadoc, letra por letra—. No es un cruce
-                    // distinto:
-                    // es el mismo padron proyectado, contado en vez de paginado, y por eso va con
-                    // el
-                    // mismo issue. Resolverlos con dos proyecciones distintas dejaria a la grilla y
-                    // a su recuento diciendo cifras distintas del mismo dia, que es exactamente el
-                    // defecto que #564 midio.
-                    //
-                    // Le toca a: rentas.
-                    new CruceConsentido(
-                            "ConciliacionRepositoryJdbc", "ficha_catastral", "PENDIENTE-CRUCE-01"),
-                    new CruceConsentido(
-                            "ConciliacionRepositoryJdbc", "predio", "PENDIENTE-CRUCE-01"),
-
-                    // ---------------------------------------------------------------------------
-                    // GOB-05 §6.4 y §6.5 — CERRADOS EN P5B.
-                    //
-                    // `PENDIENTE-CRUCE-02` (valores unitarios y depreciacion, catastro ->
-                    // normativa)
-                    // y `PENDIENTE-CRUCE-03` (valores referenciales, rentas -> normativa) ya no
-                    // cruzan nada: las tres tablas se fueron a `normativa` con `V2` y lo que
-                    // `ValuacionRepositoryJdbc` y `ValorReferencialRepositoryJdbc` leen ahora es la
-                    // CACHE LOCAL —`normativa_valor_unitario`, `normativa_depreciacion`,
-                    // `normativa_valor_referencial` (`V3`)—, que es de este sistema.
-                    //
-                    // Se retiran de la lista, y esa retirada no es un tramite:
-                    // `ningunCruceConsentido
-                    // Sobra` vuelve a escanear SIN la lista y exige que cada entrada siga eximiendo
-                    // un cruce de verdad, asi que dejarlas puestas habria puesto la prueba en rojo.
-                    // Es la lista de trabajo pendiente encogiendose por haberse hecho el trabajo.
-                    // ---------------------------------------------------------------------------
-
-                    // ---------------------------------------------------------------------------
-                    // GOB-05 §6.6 — `rentas` -> `catastro`. El puerto YA EXISTE.
-                    //
-                    // «¿A quien se le cobra el arbitrio de este predio en esta fecha?» Es una
-                    // lectura de UNA fila por un identificador, sin JOIN y sin paginacion:
-                    // exactamente lo contrario de §6.1. `catastro` ya publica TitularesDelPredio
-                    // (#366) y ADR-0027 §1 mete `titulares[]` dentro del hecho sellado, con la
-                    // condicion y el porcentaje resueltos A LA FECHA DE CORTE.
-                    //
-                    // CUIDADO con el criterio de desempate al cerrarlo, que es propio de esta
-                    // consulta y no del puerto: el titular de mayor porcentaje, y a igualdad el de
-                    // menor id. Si la llamada devuelve la lista de cuotas, el desempate se lleva
-                    // tal
-                    // cual a `rentas`; si lo resuelve `catastro`, esa regla de arbitrios se muda a
-                    // catastro, que es lo que ADR-0024 §2 evita.
-                    //
-                    // Le toca a: rentas.
                     new CruceConsentido(
                             "TitularPrincipalRepositoryJdbc", "titularidad", "PENDIENTE-CRUCE-04"),
 

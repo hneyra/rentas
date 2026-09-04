@@ -96,13 +96,10 @@ public class DeteccionRepositoryJdbc extends RepositorioJdbc implements Deteccio
      */
     private static final String DESDE_EL_PADRON =
             """
-             FROM predio p
-             LEFT JOIN sector s
-               ON s.municipalidad_id = p.municipalidad_id
-              AND s.id = p.sector_id
-             LEFT JOIN ficha_catastral f
+             FROM predio_ref p
+             LEFT JOIN ficha_ref f
                ON f.municipalidad_id = p.municipalidad_id
-              AND f.predio_id = p.id
+              AND f.predio_id = p.predio_id
               AND f.tipo = 'UNICA'
               AND f.vigencia_desde <= :fecha
               AND (f.vigencia_hasta IS NULL OR f.vigencia_hasta >= :fecha)
@@ -131,22 +128,22 @@ public class DeteccionRepositoryJdbc extends RepositorioJdbc implements Deteccio
                    SELECT d.id, d.fuera_de_plazo, d.ficha_catastral_id
                      FROM declaracion_jurada d
                     WHERE d.municipalidad_id = p.municipalidad_id
-                      AND d.predio_id = p.id
+                      AND d.predio_id = p.predio_id
                       AND d.ejercicio = :ejercicio
                       AND d.estado = ANY(:estados)
                     ORDER BY d.fecha_presentacion DESC, d.id DESC
                     LIMIT 1
                  ) dj ON true
-             LEFT JOIN ficha_catastral fd
+             LEFT JOIN ficha_ref fd
                ON fd.municipalidad_id = p.municipalidad_id
-              AND fd.id = dj.ficha_catastral_id
+              AND fd.ficha_id = dj.ficha_catastral_id
             """;
 
     /** Lo que acota el conjunto, y lo hacen las dos formas por igual. */
     private static final String FILTRO_DEL_PADRON =
             """
             WHERE p.estado = :activo
-              AND (NOT :conSector OR s.codigo = :sector)
+              AND (NOT :conSector OR p.sector_codigo = :sector)
             """;
 
     private static final String DESDE = DESDE_EL_PADRON + Y_SU_DECLARACION + FILTRO_DEL_PADRON;
@@ -191,8 +188,8 @@ public class DeteccionRepositoryJdbc extends RepositorioJdbc implements Deteccio
             END""";
 
     private static final String INTERIOR =
-            "SELECT p.id AS predio_id, p.codigo_ref_catastral, p.direccion,"
-                    + " s.codigo AS sector_codigo, f.area_terreno AS area_catastral,"
+            "SELECT p.predio_id, p.codigo_ref_catastral, p.direccion,"
+                    + " p.sector_codigo, f.area_terreno AS area_catastral,"
                     + " fd.area_terreno AS area_declarada,"
                     + " COALESCE(dj.fuera_de_plazo, false) AS fuera_de_plazo, "
                     + DIFERENCIA_DE_AREA

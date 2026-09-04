@@ -8,6 +8,8 @@ import java.sql.SQLException;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Siembra una fila en <b>cada</b> tabla de tenant, para las dos municipalidades de la prueba.
@@ -159,6 +161,17 @@ public final class DatosDePrueba {
 
             // El trigger diferido de titularidad se evalua aqui.
             app.commit();
+
+            // Y AHORA la proyeccion, con OTRA conexion y OTRO rol.
+            //
+            // Las dos cosas son deliberadas y ninguna es comodidad de la prueba. El rol, porque
+            // `sgtm_app` no tiene INSERT sobre la proyeccion (V4) — intentarlo con esta misma
+            // conexion da «permission denied for table catastro_evento_aplicado», que es
+            // exactamente lo que ADR-0027 §3 promete. Y despues del commit, porque el ingestor
+            // es otro proceso: no puede ver lo que esta transaccion todavia no ha confirmado, y
+            // sembrar como si pudiera esconderia el desfase que la proyeccion tiene por
+            // construccion.
+            sembrarLaProyeccionDeCatastro(base, muni, predioId);
         }
     }
 
@@ -503,6 +516,108 @@ public final class DatosDePrueba {
     // ------------------------------------------------------------------
     // Rentas y cuenta corriente
     // ------------------------------------------------------------------
+
+    /**
+     * La proyeccion local de {@code catastro} (P5C, `V4`), sembrada como la escribiria el ingestor.
+     *
+     * <p>Se escribe con la conexion del INGESTOR, que es la unica que puede: `V4` le da a
+     * `sgtm_app` solo `SELECT`. Y se hace despues del commit del escenario, porque el ingestor es
+     * otro proceso y no ve lo que otra transaccion no ha confirmado.
+     */
+    private static void sembrarLaProyeccionDeCatastro(
+            BaseDeDatosDePrueba base, long muni, long predioId) throws SQLException {
+        // Se LEE con la conexion de la aplicacion y se ESCRIBE con la del ingestor, y el rodeo
+        // es fiel: el ingestor no lee `predio` —no tiene privilegio, y no debe tenerlo—, sino
+        // que recibe los datos DENTRO del evento. Aqui el "evento" son estas dos consultas.
+        List<Object[]> fichas = new ArrayList<>();
+        Object[] predio;
+        try (Connection app = base.conexion(BaseDeDatosDePrueba.APP)) {
+            ContextoDeTenant.fijar(app, muni);
+            try (PreparedStatement consulta =
+                    app.prepareStatement(
+                            "SELECT p.codigo_ref_catastral, p.direccion, s.codigo, p.estado"
+                                    + "   FROM predio p"
+                                    + "   LEFT JOIN sector s ON s.municipalidad_id ="
+                                    + "        p.municipalidad_id AND s.id = p.sector_id"
+                                    + "  WHERE p.municipalidad_id = ? AND p.id = ?")) {
+                consulta.setLong(1, muni);
+                consulta.setLong(2, predioId);
+                try (ResultSet fila = consulta.executeQuery()) {
+                    fila.next();
+                    predio =
+                            new Object[] {
+                                fila.getString(1),
+                                fila.getString(2),
+                                fila.getString(3),
+                                fila.getString(4)
+                            };
+                }
+            }
+            try (PreparedStatement consulta =
+                    app.prepareStatement(
+                            "SELECT id, tipo, version, vigencia_desde, vigencia_hasta,"
+                                    + " area_terreno, uso FROM ficha_catastral"
+                                    + " WHERE municipalidad_id = ? AND predio_id = ?")) {
+                consulta.setLong(1, muni);
+                consulta.setLong(2, predioId);
+                try (ResultSet filas = consulta.executeQuery()) {
+                    while (filas.next()) {
+                        fichas.add(
+                                new Object[] {
+                                    filas.getLong(1),
+                                    filas.getString(2),
+                                    filas.getInt(3),
+                                    filas.getDate(4),
+                                    filas.getDate(5),
+                                    filas.getBigDecimal(6),
+                                    filas.getString(7)
+                                });
+                    }
+                }
+            }
+            app.rollback();
+        }
+
+        try (Connection ingestor = base.conexion(BaseDeDatosDePrueba.INGESTOR_CATASTRO)) {
+            ContextoDeTenant.fijar(ingestor, muni);
+            ejecutar(
+                    ingestor,
+                    "INSERT INTO catastro_evento_aplicado (municipalidad_id, evento_id, secuencia,"
+                            + " tipo, predio_id, aplicado_en)"
+                            + " VALUES (?, gen_random_uuid(), 1, 'PREDIO_PROYECTADO', ?, now())",
+                    muni,
+                    predioId);
+            ejecutar(
+                    ingestor,
+                    "INSERT INTO predio_ref (municipalidad_id, predio_id, codigo_ref_catastral,"
+                            + " direccion, sector_codigo, estado, secuencia, proyectado_en)"
+                            + " VALUES (?, ?, ?, ?, ?, ?, 1, now())",
+                    muni,
+                    predioId,
+                    predio[0],
+                    predio[1],
+                    predio[2],
+                    predio[3]);
+            for (Object[] ficha : fichas) {
+                ejecutar(
+                        ingestor,
+                        "INSERT INTO ficha_ref (municipalidad_id, ficha_id, predio_id, tipo,"
+                                + " version, vigencia_desde, vigencia_hasta, area_terreno, uso,"
+                                + " secuencia, proyectado_en)"
+                                + " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, now())",
+                        muni,
+                        ficha[0],
+                        predioId,
+                        ficha[1],
+                        ficha[2],
+                        ficha[3],
+                        ficha[4],
+                        ficha[5],
+                        ficha[6]);
+            }
+            ingestor.commit();
+        }
+    }
 
     private static long sembrarRentas(
             Connection app,

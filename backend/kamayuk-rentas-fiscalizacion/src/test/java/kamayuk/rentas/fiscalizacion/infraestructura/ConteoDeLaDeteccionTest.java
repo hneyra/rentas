@@ -498,14 +498,34 @@ class ConteoDeLaDeteccionTest {
         sembrarMunicipalidad(municipalidadVecina, PREDIOS);
         sembrarMunicipalidad(municipalidadPequena, PREDIOS_DEL_PADRON_PEQUENO);
         sembrarMunicipalidad(municipalidadConFichaSuperpuesta, 3);
+        // El ingestor de la proyeccion de catastro (P5C). Desde la separacion, la deteccion lee
+        // `predio_ref` y `ficha_ref` y no las tablas del vecino: la consulta que paginaba y
+        // contaba cruzando cuatro tablas ajenas ya no puede existir con dos bases (ADR-0029).
+        // Esta llamada es el paso que en produccion dispara un evento.
+        for (long muni :
+                new long[] {
+                    municipalidad,
+                    municipalidadVecina,
+                    municipalidadPequena,
+                    municipalidadConFichaSuperpuesta
+                }) {
+            kamayuk.rentas.esquema.ProyeccionDeCatastro.proyectar(base, muni);
+        }
+
+        // El ANALYZE va DESPUES de proyectar, y las dos tablas de la proyeccion entran en el:
+        // sin estadisticas el planificador adivina, y la prueba mediria su adivinanza. Se
+        // descubrio midiendo — con `predio_ref` sin analizar, el conteo del padron pequeno tocaba
+        // 78 paginas para veinticinco predios, porque el planificador prefiere recorrer una tabla
+        // de la que no sabe el tamano.
         try (Connection owner = base.conexion(BaseDeDatosDePrueba.OWNER);
                 PreparedStatement sentencia =
                         owner.prepareStatement(
-                                "ANALYZE predio, contribuyente, titularidad, ficha_catastral,"
-                                        + " declaracion_jurada, sector")) {
+                                "ANALYZE predio_ref, ficha_ref, contribuyente, titularidad,"
+                                        + " declaracion_jurada")) {
             sentencia.execute();
             owner.commit();
         }
+
         sembrado = true;
     }
 

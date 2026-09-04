@@ -225,6 +225,7 @@ class MuestraDelPredioSinTitularFronteraTest {
     @Order(1)
     @DisplayName("AC 2 y 3 — el 201 dice sobre que padron se sorteo, y el recuento se reconstruye")
     void elSorteoDiceSobreQuePadronSeSorteo() throws Exception {
+        ingestar(municipalidadA);
         MvcResult resultado =
                 mvc.perform(
                                 post("/rentas/api/v1/fiscalizacion/programas/"
@@ -538,6 +539,21 @@ class MuestraDelPredioSinTitularFronteraTest {
             }
         } catch (SQLException excepcion) {
             throw new IllegalStateException(excepcion);
+        }
+    }
+
+    /**
+     * Hace correr al ingestor de la proyeccion de catastro antes de preguntar (P5C).
+     *
+     * <p>Desde la separacion, la deteccion de omisos —de la que sale la muestra— lee {@code
+     * predio_ref} y {@code ficha_ref} y no las tablas del vecino (ADR-0029). Esta llamada es el
+     * paso que en produccion dispara un evento.
+     */
+    private static void ingestar(long municipalidadId) {
+        try {
+            kamayuk.rentas.esquema.ProyeccionDeCatastro.proyectar(base, municipalidadId);
+        } catch (java.sql.SQLException noSePudo) {
+            throw new IllegalStateException("No se pudo proyectar el catastro", noSePudo);
         }
     }
 }
