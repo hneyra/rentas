@@ -12,6 +12,7 @@ plugins {
 }
 
 dependencies {
+    testImplementation(testFixtures(project(":kamayuk-rentas-parametros")))
     // La busqueda por aproximacion se resuelve con pg_trgm y un indice GIN, asi que
     // solo se puede probar contra PostgreSQL de verdad. Una prueba con dobles diria
     // que el metodo se llamo, no que encuentra un nombre mal escrito.

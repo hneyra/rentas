@@ -18,6 +18,7 @@ import kamayuk.rentas.dominio.CalendarioHabil;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.Plazo;
 import kamayuk.rentas.dominio.UnidadDePlazo;
+import kamayuk.rentas.parametros.CorpusDeNormativa;
 import kamayuk.rentas.parametros.IdentificadorDeConjunto;
 import kamayuk.rentas.parametros.LectorDeParametros;
 import kamayuk.rentas.parametros.ParametrosSellados;
@@ -42,10 +43,7 @@ import org.junit.jupiter.api.Test;
 class PlazoDeLaRec1DelDerivadoTest {
 
     /** El derivado que este repositorio versiona, tal como se despliega. */
-    private static final Path DERIVADO =
-            Path.of("../../docs/10-negocio/valores-normativos/publicacion/parametros-2026.csv")
-                    .toAbsolutePath()
-                    .normalize();
+    private static final Path DERIVADO = CorpusDeNormativa.derivadoPublicable();
 
     private static final String TIPO_PLAZO = "PLAZO";
     private static final String CLAVE_REC1 = "REC1_CUMPLIMIENTO";

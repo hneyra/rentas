@@ -46,7 +46,22 @@ class AislamientoMultiTenantTest {
      * politica propia, y esta no la lleva: la instala la extension y no es nuestra.
      */
     private static final Set<String> TABLAS_EXENTAS =
-            Set.of("flyway_schema_history", "spatial_ref_sys");
+            Set.of(
+                    "flyway_schema_history",
+                    "spatial_ref_sys",
+                    // Las seis del escenario de `normativa` (P5B). NO son del esquema: las crea
+                    // `BaseDeDatosDePrueba` para que veinte clases de prueba puedan escribir su
+                    // premisa —«esta municipalidad tiene un conjunto sellado con estos valores»—
+                    // despues de que `V2` se llevara las tablas de verdad. No llevan
+                    // `municipalidad_id NOT NULL` ni RLS porque no son datos de nadie; lo que si la
+                    // lleva es la cache a la que se copian (`normativa_*`, `V3`), que es lo que el
+                    // codigo de produccion lee y lo que esta prueba si censa.
+                    "parametro_tributario_de_prueba",
+                    "conjunto_parametros_de_prueba",
+                    "conjunto_parametro_detalle_de_prueba",
+                    "valor_unitario_de_prueba",
+                    "depreciacion_de_prueba",
+                    "valor_referencial_de_prueba");
 
     /**
      * Catalogos: no llevan {@code municipalidad_id NOT NULL}, pero si RLS con politica propia
@@ -56,20 +71,15 @@ class AislamientoMultiTenantTest {
      * municipalidad. La aplicacion solo la lee (V8): quien hace la copia es el proceso de
      * despliegue.
      *
-     * <p>Las tres tablas de valuacion entran por D-13, cerrada el 2026-08-28 (ADR-0017, V55): el
-     * cuadro de valores unitarios, la tabla de depreciacion y la tabla de valores referenciales del
-     * MEF son de norma nacional, se cargan una vez para todas y llevan {@code municipalidad_id}
-     * nulo (ARQ-09 §2.1). {@code arancel} <b>no</b> esta aqui, y no es un olvido: se carga y se
-     * corrige por municipalidad, y sigue siendo tabla de tenant.
+     * <p><b>Se quedo en dos con P5B.</b> Las cuatro que faltan —{@code parametro_tributario} y las
+     * tres tablas de valuacion nacionales— se fueron a `normativa` con `V2`, y alli siguen siendo
+     * catalogos con su politica. Lo que llega en su lugar es la <b>cache local</b> ({@code
+     * normativa_*}, `V3`), que NO es catalogo sino tabla de tenant: un conjunto sellado pertenece a
+     * la municipalidad que lo sello, asi que la copia lleva `municipalidad_id NOT NULL` y su
+     * politica, y esta prueba la censa como cualquier otra. {@code arancel} sigue siendo de tenant
+     * y se queda, porque se carga y se corrige por municipalidad.
      */
-    private static final Set<String> TABLAS_DE_CATALOGO =
-            Set.of(
-                    "municipalidad",
-                    "parametro_tributario",
-                    "respaldo",
-                    "valor_unitario_edificacion",
-                    "depreciacion",
-                    "valor_referencial_vehiculo");
+    private static final Set<String> TABLAS_DE_CATALOGO = Set.of("municipalidad", "respaldo");
 
     private static BaseDeDatosDePrueba base;
     private static long municipalidadA;

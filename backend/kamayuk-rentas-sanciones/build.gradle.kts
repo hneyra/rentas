@@ -10,6 +10,7 @@ plugins {
 }
 
 dependencies {
+    testImplementation(testFixtures(project(":kamayuk-rentas-parametros")))
     // La papeleta asienta su cargo por referencia externa, sin depender de
     // ninguna clase interna de cuentacorriente (#46, ARQ-01 §4 regla 2): solo se
     // importa el paquete raiz, que es su API publica: GeneradorDeCargos.

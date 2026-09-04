@@ -10,6 +10,7 @@ plugins {
 }
 
 dependencies {
+    testImplementation(testFixtures(project(":kamayuk-rentas-parametros")))
     // La prueba del repositorio corre contra PostgreSQL de verdad: provisiona la
     // base como un ambiente real y se conecta como sgtm_app, no como el
     // superusuario que entrega Testcontainers (CAL-01 §3.2).

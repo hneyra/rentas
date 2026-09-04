@@ -1,14 +1,32 @@
-// Contexto acotado `parametros` (ARQ-01 §3.4).
+// Contexto acotado `parametros` (ARQ-01 §3.4), y desde P5B el CLIENTE de `normativa`.
 //
-// Los demas contextos SOLO leen de aqui. Escribir es un acto administrativo con
-// doble verificacion, no una operacion de negocio.
+// Los demas contextos siguen leyendo solo de aqui, y por la misma interfaz de siempre
+// (`LectorDeParametros`). Lo que cambio es de donde salen los valores: ya no de una tabla
+// de esta base -las seis se fueron en `V2`- sino de la copia local de un conjunto SELLADO,
+// descargada una vez de `normativa` y verificada por su sha256 (ADR-0025 §1).
+//
+// Aqui NO se escribe ningun valor normativo: publicar es un acto administrativo con doble
+// verificacion y ocurre en `normativa`, con su propio rol y su propia base.
 
 plugins {
     id("sgtm.modulo")
     id("sgtm.pruebas-postgres")
+    `java-test-fixtures`
 }
 
 dependencies {
+    // Jackson: la respuesta de `normativa` se lee AQUI, del cuerpo en bruto, porque el ETag es el
+    // sha256 de esos bytes y un cliente que deserialice por su cuenta entrega un objeto y no los
+    // bytes con que se calculo la huella.
+    implementation("com.fasterxml.jackson.core:jackson-databind")
+
+    // Los fixtures publican el escenario de `normativa` que veinte clases de prueba de otros
+    // modulos usan para sembrar su premisa. Necesitan ver la plataforma -JdbcClient, Auditoria- y
+    // el esquema, igual que las pruebas.
+    testFixturesApi(project(":kamayuk-rentas-plataforma"))
+    testFixturesApi(platform(libs.spring.boot.bom))
+    testFixturesApi("org.springframework.boot:spring-boot-starter-jdbc")
+
     testImplementation(testFixtures(project(":kamayuk-rentas-esquema")))
     testImplementation("org.springframework.boot:spring-boot-starter-jdbc")
     testImplementation("org.springframework:spring-aop")
@@ -21,20 +39,7 @@ dependencies {
     testRuntimeOnly(libs.postgresql)
 }
 
-// Las pruebas del derivado publicable y del manifiesto de cuadros leen archivos del
-// repositorio que viven FUERA del modulo (#192, #188). Sin declararlos como entrada, editar
-// uno deja a `test` en UP-TO-DATE y la rotura pasa en verde rancio en local; en CI corre
-// fresco y muerde, pero el sintoma local mentiria —y se comprobo: cambiarle el orden de
-// columnas al manifiesto dio BUILD SUCCESSFUL sin correr una sola prueba—.
-tasks.test {
-    val delCorpus = rootProject.file("../docs/10-negocio/valores-normativos")
-    inputs
-        .file(delCorpus.resolve("publicacion/parametros-2026.csv"))
-        .withPathSensitivity(PathSensitivity.RELATIVE)
-    inputs
-        .file(delCorpus.resolve("publicacion/cuadros-2026.csv"))
-        .withPathSensitivity(PathSensitivity.RELATIVE)
-    inputs
-        .file(delCorpus.resolve("fuentes/depreciacion-rnt-2016/depreciacion.csv"))
-        .withPathSensitivity(PathSensitivity.RELATIVE)
-}
+// Las entradas del corpus normativo se fueron con el a `normativa` (P5B, ADR-0025 §5): las
+// pruebas del derivado publicable y del manifiesto de cuadros ya no estan en este modulo, y
+// declarar aqui archivos que este repositorio no tiene dejaria la tarea sin poder ejecutarse
+// —«An input file was expected to be present but it doesn't exist»—.

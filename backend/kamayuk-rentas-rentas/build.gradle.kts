@@ -10,6 +10,7 @@ plugins {
 }
 
 dependencies {
+    testImplementation(testFixtures(project(":kamayuk-rentas-parametros")))
     // Dos dependencias a otro contexto acotado, y estan aqui para que se vean.
     //
     // Los valores referenciales de vehiculos son datos normativos: cuelgan de un conjunto sellado,
@@ -70,11 +71,12 @@ dependencies {
     testRuntimeOnly(libs.postgresql)
 }
 
-// La prueba del cuadro del predial lee el derivado publicable del corpus (#395, como #192 en
+// La prueba del cuadro del predial lee el derivado publicable del corpus de `normativa`,
+// el repositorio hermano (#395, como #192 en
 // kamayuk-rentas-valores y kamayuk-rentas-coactiva). Sin declararlo como entrada, editar el CSV deja `test` en
 // UP-TO-DATE y una rotura del derivado pasa en verde rancio en local.
 tasks.test {
     inputs
-        .file(rootProject.file("../docs/10-negocio/valores-normativos/publicacion/parametros-2026.csv"))
+        .file(rootProject.file("../../normativa/docs/10-negocio/valores-normativos/publicacion/parametros-2026.csv"))
         .withPathSensitivity(PathSensitivity.RELATIVE)
 }

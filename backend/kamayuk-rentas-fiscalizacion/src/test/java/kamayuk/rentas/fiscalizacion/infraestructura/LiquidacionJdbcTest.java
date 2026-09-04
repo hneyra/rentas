@@ -644,7 +644,7 @@ class LiquidacionJdbcTest {
     private static String estadoDelConjunto(long conjuntoId) {
         return transaccion.execute(
                 estado ->
-                        jdbc.sql("SELECT estado FROM conjunto_parametros WHERE id = :id")
+                        jdbc.sql("SELECT estado FROM conjunto_parametros_de_prueba WHERE id = :id")
                                 .param("id", conjuntoId)
                                 .query(String.class)
                                 .single());
@@ -743,7 +743,7 @@ class LiquidacionJdbcTest {
                 id ->
                         ejecutarComoApp(
                                 id,
-                                "INSERT INTO conjunto_parametros (municipalidad_id, ejercicio,"
+                                "INSERT INTO conjunto_parametros_de_prueba (municipalidad_id, ejercicio,"
                                         + " version, estado, fecha_sellado, usuario_sellado)"
                                         + " VALUES (?, 2024, 1, 'SELLADO', now(), 'siembra')"
                                         + " RETURNING id",

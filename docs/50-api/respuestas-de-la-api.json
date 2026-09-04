@@ -81,7 +81,6 @@
   "GET /seguridad/grupos/{grupo}/miembros": [],
   "GET /seguridad/grupos/{id}/permisos": [],
   "GET /seguridad/modulos": [],
-  "GET /seguridad/parametros": [],
   "GET /seguridad/parametros/ejercicios/{ejercicio}": [],
   "GET /seguridad/sesion": ["404"],
   "GET /seguridad/sesion/municipalidad": [],

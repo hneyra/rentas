@@ -1006,7 +1006,7 @@ class LicenciaDeFuncionamientoJdbcTest {
             long conjunto;
             try (PreparedStatement sentencia =
                     app.prepareStatement(
-                            "INSERT INTO conjunto_parametros (municipalidad_id, ejercicio, version)"
+                            "INSERT INTO conjunto_parametros_de_prueba (municipalidad_id, ejercicio, version)"
                                     + " VALUES (?, 2026, 1) RETURNING id")) {
                 sentencia.setLong(1, municipalidadId);
                 try (ResultSet resultado = sentencia.executeQuery()) {
@@ -1017,7 +1017,7 @@ class LicenciaDeFuncionamientoJdbcTest {
             for (long parametro : new long[] {deLaLicencia, delDuplicado}) {
                 try (PreparedStatement sentencia =
                         app.prepareStatement(
-                                "INSERT INTO conjunto_parametro_detalle (municipalidad_id,"
+                                "INSERT INTO conjunto_parametro_detalle_de_prueba (municipalidad_id,"
                                         + " conjunto_id, parametro_id) VALUES (?, ?, ?)")) {
                     sentencia.setLong(1, municipalidadId);
                     sentencia.setLong(2, conjunto);
@@ -1027,7 +1027,7 @@ class LicenciaDeFuncionamientoJdbcTest {
             }
             try (PreparedStatement sentencia =
                     app.prepareStatement(
-                            "UPDATE conjunto_parametros SET estado = 'SELLADO',"
+                            "UPDATE conjunto_parametros_de_prueba SET estado = 'SELLADO',"
                                     + " fecha_sellado = now(), usuario_sellado = 'siembra'"
                                     + " WHERE municipalidad_id = ? AND id = ?")) {
                 sentencia.setLong(1, municipalidadId);
@@ -1042,7 +1042,7 @@ class LicenciaDeFuncionamientoJdbcTest {
         try (Connection carga = base.conexion(BaseDeDatosDePrueba.CARGA_PARAMETROS);
                 PreparedStatement sentencia =
                         carga.prepareStatement(
-                                "INSERT INTO parametro_tributario (municipalidad_id, tipo, clave,"
+                                "INSERT INTO parametro_tributario_de_prueba (municipalidad_id, tipo, clave,"
                                         + " valor_texto, vigencia_desde, documento_fuente, sellado,"
                                         + " usuario_carga) VALUES (NULL, 'TUPA', ?, ?,"
                                         + " DATE '2026-01-01', 'TUPA 2026 de la prueba', true,"

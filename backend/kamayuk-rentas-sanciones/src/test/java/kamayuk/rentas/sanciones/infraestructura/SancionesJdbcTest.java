@@ -1476,7 +1476,7 @@ class SancionesJdbcTest {
             long conjunto;
             try (PreparedStatement sentencia =
                     app.prepareStatement(
-                            "INSERT INTO conjunto_parametros (municipalidad_id, ejercicio,"
+                            "INSERT INTO conjunto_parametros_de_prueba (municipalidad_id, ejercicio,"
                                     + " version) VALUES (?, 2026, 1) RETURNING id")) {
                 sentencia.setLong(1, municipalidadId);
                 try (ResultSet resultado = sentencia.executeQuery()) {
@@ -1487,7 +1487,7 @@ class SancionesJdbcTest {
             for (long parametro : new long[] {descargo, ordinaria}) {
                 try (PreparedStatement sentencia =
                         app.prepareStatement(
-                                "INSERT INTO conjunto_parametro_detalle (municipalidad_id,"
+                                "INSERT INTO conjunto_parametro_detalle_de_prueba (municipalidad_id,"
                                         + " conjunto_id, parametro_id) VALUES (?, ?, ?)")) {
                     sentencia.setLong(1, municipalidadId);
                     sentencia.setLong(2, conjunto);
@@ -1497,7 +1497,7 @@ class SancionesJdbcTest {
             }
             try (PreparedStatement sentencia =
                     app.prepareStatement(
-                            "UPDATE conjunto_parametros SET estado = 'SELLADO',"
+                            "UPDATE conjunto_parametros_de_prueba SET estado = 'SELLADO',"
                                     + " fecha_sellado = now(), usuario_sellado = 'siembra'"
                                     + " WHERE id = ?")) {
                 sentencia.setLong(1, conjunto);
@@ -1518,7 +1518,7 @@ class SancionesJdbcTest {
         try (Connection carga = base.conexion(BaseDeDatosDePrueba.CARGA_PARAMETROS);
                 PreparedStatement sentencia =
                         carga.prepareStatement(
-                                "INSERT INTO parametro_tributario (municipalidad_id, tipo, clave,"
+                                "INSERT INTO parametro_tributario_de_prueba (municipalidad_id, tipo, clave,"
                                         + " valor_texto, vigencia_desde, documento_fuente, sellado,"
                                         + " usuario_carga) VALUES (NULL, 'PLAZO', ?, ?,"
                                         + " DATE '2026-01-01', ?, true, 'siembra') RETURNING id")) {

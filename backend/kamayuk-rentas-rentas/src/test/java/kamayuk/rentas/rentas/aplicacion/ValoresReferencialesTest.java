@@ -234,7 +234,7 @@ class ValoresReferencialesTest {
             long conjunto;
             try (PreparedStatement sentencia =
                     app.prepareStatement(
-                            "INSERT INTO conjunto_parametros (municipalidad_id, ejercicio, version)"
+                            "INSERT INTO conjunto_parametros_de_prueba (municipalidad_id, ejercicio, version)"
                                     + " VALUES (?, ?, ?) RETURNING id")) {
                 sentencia.setLong(1, municipalidad);
                 sentencia.setInt(2, EJERCICIO.valor());
@@ -246,7 +246,7 @@ class ValoresReferencialesTest {
             }
             try (PreparedStatement sentencia =
                     app.prepareStatement(
-                            "INSERT INTO conjunto_parametro_detalle (municipalidad_id, conjunto_id,"
+                            "INSERT INTO conjunto_parametro_detalle_de_prueba (municipalidad_id, conjunto_id,"
                                     + " parametro_id) VALUES (?, ?, ?)")) {
                 sentencia.setLong(1, municipalidad);
                 sentencia.setLong(2, conjunto);
@@ -255,7 +255,7 @@ class ValoresReferencialesTest {
             }
             try (PreparedStatement sentencia =
                     app.prepareStatement(
-                            "UPDATE conjunto_parametros SET estado = 'SELLADO',"
+                            "UPDATE conjunto_parametros_de_prueba SET estado = 'SELLADO',"
                                     + " fecha_sellado = now(), usuario_sellado = 'prueba'"
                                     + " WHERE municipalidad_id = ? AND id = ?")) {
                 sentencia.setLong(1, municipalidad);
@@ -273,7 +273,7 @@ class ValoresReferencialesTest {
             long edicion;
             try (PreparedStatement sentencia =
                     carga.prepareStatement(
-                            "INSERT INTO parametro_tributario (municipalidad_id, tipo, clave,"
+                            "INSERT INTO parametro_tributario_de_prueba (municipalidad_id, tipo, clave,"
                                     + " valor_texto, vigencia_desde, documento_fuente, usuario_carga,"
                                     + " usuario_aprueba) VALUES (NULL, 'TABLA_DE_LA_PRUEBA', ?,"
                                     + " 'tabla de la prueba, sin valor normativo', DATE '2026-01-01',"
@@ -287,7 +287,7 @@ class ValoresReferencialesTest {
             }
             try (PreparedStatement sentencia =
                     carga.prepareStatement(
-                            "INSERT INTO valor_referencial_vehiculo (publicacion_id, ejercicio,"
+                            "INSERT INTO valor_referencial_de_prueba (publicacion_id, ejercicio,"
                                     + " categoria, marca, modelo, anio_fabricacion, valor,"
                                     + " documento_fuente)"
                                     + " VALUES (?, ?, 'A2', 'TOYOTA', 'YARIS', ?, ?,"

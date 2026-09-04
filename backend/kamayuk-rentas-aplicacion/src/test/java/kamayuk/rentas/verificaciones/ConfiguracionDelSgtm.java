@@ -371,6 +371,15 @@ public final class ConfiguracionDelSgtm implements ConfiguracionDeLasVerificacio
                 ".rentas.aplicacion.ConsultaDeTitulares.resolver(long, java.time.LocalDate)",
                 // La rama del portal del contribuyente (ADR-0020, #57). Misma forma y un motivo
                 // mas fuerte: aqui el usuario ni siquiera es un funcionario.
-                ".rentas.aplicacion.RamaDelCiudadano.leer(java.time.LocalDate)");
+                ".rentas.aplicacion.RamaDelCiudadano.leer(java.time.LocalDate)",
+                // La descarga del conjunto sellado de `normativa` (P5B, ADR-0025 §1). Es el caso
+                // mas claro de la lista: lo que escribe es una COPIA de un dato que este sistema no
+                // produjo, ya sellado en el otro y verificado por su sha256. No hay ningun usuario
+                // que la pida —la dispara la primera lectura que necesita el conjunto— y no hay
+                // ningun «por que» que dar: la copia es identica a la fuente por construccion, y si
+                // no lo fuera no se guardaria. Exigir una observacion aqui produciria la cadena
+                // fija que el javadoc de la regla advierte.
+                ".parametros.aplicacion.DescargaDeNormativa.asegurarDescargado("
+                        + "long, java.lang.String)");
     }
 }

@@ -73,7 +73,7 @@ public final class DatosDePrueba {
             long id =
                     insertar(
                             carga,
-                            "INSERT INTO parametro_tributario"
+                            "INSERT INTO parametro_tributario_de_prueba"
                                     + " (municipalidad_id, tipo, clave, valor_numerico, vigencia_desde,"
                                     + "  documento_fuente, usuario_carga)"
                                     + " VALUES (NULL, 'PRUEBA', 'valor-de-relleno', 1.000000, ?,"
@@ -95,7 +95,7 @@ public final class DatosDePrueba {
         long edicion =
                 insertar(
                         carga,
-                        "INSERT INTO parametro_tributario"
+                        "INSERT INTO parametro_tributario_de_prueba"
                                 + " (municipalidad_id, tipo, clave, valor_texto, vigencia_desde,"
                                 + "  documento_fuente, usuario_carga, usuario_aprueba)"
                                 + " VALUES (NULL, 'PRUEBA_EDICION', 'valuacion', 'edicion de"
@@ -105,20 +105,20 @@ public final class DatosDePrueba {
                         VIGENCIA);
         ejecutar(
                 carga,
-                "INSERT INTO valor_unitario_edificacion (publicacion_id, partida, categoria,"
+                "INSERT INTO valor_unitario_de_prueba (publicacion_id, partida, categoria,"
                         + " anio_construccion_desde, valor_m2, documento_fuente)"
                         + " VALUES (?, 'MUROS', 'C', 2000, 1.000000, 'fixture de la prueba')",
                 edicion);
         ejecutar(
                 carga,
-                "INSERT INTO depreciacion (publicacion_id, uso, material, estado_conservacion,"
+                "INSERT INTO depreciacion_de_prueba (publicacion_id, uso, material, estado_conservacion,"
                         + " antiguedad_hasta, porcentaje, documento_fuente)"
                         + " VALUES (?, '01', 'CONCRETO', 'BUENO', 10, 1.0000, 'fixture de la"
                         + " prueba')",
                 edicion);
         ejecutar(
                 carga,
-                "INSERT INTO valor_referencial_vehiculo (publicacion_id, ejercicio, categoria,"
+                "INSERT INTO valor_referencial_de_prueba (publicacion_id, ejercicio, categoria,"
                         + " marca, modelo, anio_fabricacion, valor, documento_fuente)"
                         + " VALUES (?, ?, 'A1', 'MARCA', 'MODELO', 2020, 1000.00,"
                         + "         'fixture de la prueba')",
@@ -171,18 +171,76 @@ public final class DatosDePrueba {
         long conjuntoId =
                 insertar(
                         app,
-                        "INSERT INTO conjunto_parametros (municipalidad_id, ejercicio, version)"
+                        "INSERT INTO conjunto_parametros_de_prueba (municipalidad_id, ejercicio, version)"
                                 + " VALUES (?, ?, 1) RETURNING id",
                         muni,
                         EJERCICIO);
         ejecutar(
                 app,
-                "INSERT INTO conjunto_parametro_detalle (municipalidad_id, conjunto_id,"
+                "INSERT INTO conjunto_parametro_detalle_de_prueba (municipalidad_id, conjunto_id,"
                         + " parametro_id) VALUES (?, ?, ?)",
                 muni,
                 conjuntoId,
                 parametroId);
+        sembrarCacheDeNormativa(app, muni, conjuntoId);
         return conjuntoId;
+    }
+
+    /**
+     * La cache local del conjunto sellado (`V3`, P5B).
+     *
+     * <p>Son cinco tablas de tenant, asi que {@code AislamientoMultiTenantTest} exige que la
+     * municipalidad A vea filas suyas en las cinco: una tabla vacia haria que «no se ve nada de B»
+     * fuera cierto sin probar nada, que es el modo de fallo contra el que existe esa prueba.
+     *
+     * <p>Las cifras son de relleno y estan marcadas como tales en su documento fuente. Ninguna se
+     * puede leer como un valor normativo: los de verdad los publica {@code normativa}.
+     */
+    private static void sembrarCacheDeNormativa(Connection app, long muni, long conjuntoId)
+            throws SQLException {
+        ejecutar(
+                app,
+                "INSERT INTO normativa_conjunto (municipalidad_id, conjunto_id, ejercicio, version,"
+                        + " ambito, sha256, filas, origen, descargado_en)"
+                        + " VALUES (?, ?, ?, 1, 'OBLIGACION', repeat('0', 64), 4,"
+                        + "         'fixture de la prueba de aislamiento', now())",
+                muni,
+                conjuntoId,
+                EJERCICIO);
+        ejecutar(
+                app,
+                "INSERT INTO normativa_parametro (municipalidad_id, conjunto_id, tipo, clave,"
+                        + " valor_numerico, vigencia_desde, documento_fuente)"
+                        + " VALUES (?, ?, 'PRUEBA', 'valor-de-relleno', 1.000000, ?,"
+                        + "         'fixture de la prueba de aislamiento')",
+                muni,
+                conjuntoId,
+                VIGENCIA);
+        ejecutar(
+                app,
+                "INSERT INTO normativa_valor_unitario (municipalidad_id, conjunto_id, partida,"
+                        + " categoria, anio_construccion_desde, valor_m2, documento_fuente)"
+                        + " VALUES (?, ?, 'MUROS', 'C', 2000, 1.000000,"
+                        + "         'fixture de la prueba de aislamiento')",
+                muni,
+                conjuntoId);
+        ejecutar(
+                app,
+                "INSERT INTO normativa_depreciacion (municipalidad_id, conjunto_id, uso, material,"
+                        + " estado_conservacion, antiguedad_hasta, porcentaje, documento_fuente)"
+                        + " VALUES (?, ?, '01', 'CONCRETO', 'BUENO', 10, 1.0000,"
+                        + "         'fixture de la prueba de aislamiento')",
+                muni,
+                conjuntoId);
+        ejecutar(
+                app,
+                "INSERT INTO normativa_valor_referencial (municipalidad_id, conjunto_id, ejercicio,"
+                        + " categoria, marca, modelo, anio_fabricacion, valor, documento_fuente)"
+                        + " VALUES (?, ?, ?, 'A1', 'MARCA', 'MODELO', 2020, 1000.00,"
+                        + "         'fixture de la prueba de aislamiento')",
+                muni,
+                conjuntoId,
+                EJERCICIO);
     }
 
     // ------------------------------------------------------------------

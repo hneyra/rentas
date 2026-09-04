@@ -684,7 +684,7 @@ class EscrituraDeDeclaracionJuradaJdbcTest {
                                     + " monto_determinado, reglas_aplicadas, usuario_calculo)"
                                     + " SELECT ?, 2026, 'PREDIAL', ?, c.id, CAST(? AS dinero),"
                                     + "        CAST(? AS dinero), ARRAY['RT-011'], 'siembra'"
-                                    + "   FROM conjunto_parametros c"
+                                    + "   FROM conjunto_parametros_de_prueba c"
                                     + "  WHERE c.municipalidad_id = ? AND c.ejercicio = 2026"
                                     + "  ORDER BY c.id DESC LIMIT 1"
                                     + " RETURNING id")) {
@@ -917,7 +917,7 @@ class EscrituraDeDeclaracionJuradaJdbcTest {
         try (Connection carga = base.conexion(BaseDeDatosDePrueba.CARGA_PARAMETROS);
                 PreparedStatement sentencia =
                         carga.prepareStatement(
-                                "INSERT INTO parametro_tributario (municipalidad_id, tipo, clave,"
+                                "INSERT INTO parametro_tributario_de_prueba (municipalidad_id, tipo, clave,"
                                         + " valor_texto, vigencia_desde, documento_fuente,"
                                         + " usuario_carga, usuario_aprueba) VALUES (NULL, 'PLAZO',"
                                         + " 'DECLARACION_JURADA', ?, ?, 'Plazo ficticio de prueba;"
@@ -938,7 +938,7 @@ class EscrituraDeDeclaracionJuradaJdbcTest {
         try (Connection carga = base.conexion(BaseDeDatosDePrueba.CARGA_PARAMETROS);
                 PreparedStatement sentencia =
                         carga.prepareStatement(
-                                "INSERT INTO parametro_tributario (municipalidad_id, tipo, clave,"
+                                "INSERT INTO parametro_tributario_de_prueba (municipalidad_id, tipo, clave,"
                                         + " valor_numerico, vigencia_desde, documento_fuente,"
                                         + " usuario_carga, usuario_aprueba) VALUES (NULL,"
                                         + " 'FICTICIO', ?, 1.000000, DATE '2026-01-01', 'Valor"

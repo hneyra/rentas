@@ -214,7 +214,7 @@ class CargarArancelVialTest {
             ContextoDeTenant.fijar(app, municipalidad);
             try (PreparedStatement sentencia =
                     app.prepareStatement(
-                            "INSERT INTO conjunto_parametros (municipalidad_id, ejercicio, version)"
+                            "INSERT INTO conjunto_parametros_de_prueba (municipalidad_id, ejercicio, version)"
                                     + " VALUES (?, ?, ?) RETURNING id")) {
                 sentencia.setLong(1, municipalidad);
                 sentencia.setInt(2, ejercicio);
@@ -249,7 +249,7 @@ class CargarArancelVialTest {
             }
             try (PreparedStatement sellar =
                     app.prepareStatement(
-                            "UPDATE conjunto_parametros SET estado = 'SELLADO', fecha_sellado ="
+                            "UPDATE conjunto_parametros_de_prueba SET estado = 'SELLADO', fecha_sellado ="
                                     + " now(), usuario_sellado = 'fixture' WHERE"
                                     + " municipalidad_id = ? AND id = ?")) {
                 sellar.setLong(1, municipalidad);

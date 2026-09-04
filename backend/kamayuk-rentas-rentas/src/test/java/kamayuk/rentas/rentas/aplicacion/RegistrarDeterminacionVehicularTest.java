@@ -330,7 +330,7 @@ class RegistrarDeterminacionVehicularTest {
             long edicion;
             try (PreparedStatement sentencia =
                     carga.prepareStatement(
-                            "INSERT INTO parametro_tributario (municipalidad_id, tipo, clave,"
+                            "INSERT INTO parametro_tributario_de_prueba (municipalidad_id, tipo, clave,"
                                     + " valor_texto, vigencia_desde, documento_fuente, usuario_carga,"
                                     + " usuario_aprueba) VALUES (NULL, 'TABLA_DE_LA_PRUEBA', ?,"
                                     + " 'ficticio de prueba', ?, 'ficticio de prueba, no representa"
@@ -345,7 +345,7 @@ class RegistrarDeterminacionVehicularTest {
             }
             try (PreparedStatement sentencia =
                     carga.prepareStatement(
-                            "INSERT INTO valor_referencial_vehiculo (publicacion_id, ejercicio,"
+                            "INSERT INTO valor_referencial_de_prueba (publicacion_id, ejercicio,"
                                     + " categoria, marca, modelo, anio_fabricacion, valor,"
                                     + " documento_fuente)"
                                     + " VALUES (?, ?, 'M1', ?, ?, ?, 10000.00, 'ficticio de"
@@ -366,7 +366,7 @@ class RegistrarDeterminacionVehicularTest {
         try (Connection carga = base.conexion(BaseDeDatosDePrueba.CARGA_PARAMETROS);
                 PreparedStatement sentencia =
                         carga.prepareStatement(
-                                "INSERT INTO parametro_tributario (municipalidad_id, tipo, clave,"
+                                "INSERT INTO parametro_tributario_de_prueba (municipalidad_id, tipo, clave,"
                                         + " valor_numerico, vigencia_desde, documento_fuente,"
                                         + " usuario_carga, usuario_aprueba)"
                                         + " VALUES (NULL, ?, NULL, ?,"

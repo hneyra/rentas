@@ -965,7 +965,7 @@ class TransferenciaJdbcTest {
                 id ->
                         ejecutarComoApp(
                                 id,
-                                "INSERT INTO conjunto_parametros (municipalidad_id, ejercicio,"
+                                "INSERT INTO conjunto_parametros_de_prueba (municipalidad_id, ejercicio,"
                                         + " version, estado, fecha_sellado, usuario_sellado)"
                                         + " VALUES (?, 2026, 1, 'SELLADO', now(), 'siembra')"
                                         + " RETURNING id",

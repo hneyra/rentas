@@ -31,9 +31,9 @@ import org.junit.jupiter.api.Test;
  *       explicito de lo que ya existe: no se puede publicar un endpoint sin anotarlo ahi, ni
  *       retirarlo sin quitarlo. Las operaciones restantes del contrato estan pendientes, y no se
  *       pueden exigir todavia sin dejar el build en rojo permanente —que es la forma segura de que
- *       nadie vuelva a mirar esta prueba—. Hoy queda <b>una</b> de las 210, y no va a dejar de
- *       quedar: {@code GET /portal/deuda} es la vista del funcionario, y ningun controlador la va a
- *       servir (ADR-0016 §3).
+ *       nadie vuelva a mirar esta prueba—. Hoy quedan <b>dos</b>, y ninguna de las dos va a dejar
+ *       de quedar: {@code GET /portal/deuda} es la vista del funcionario, y ningun controlador la
+ *       va a servir (ADR-0016 §3).
  * </ul>
  */
 @DisplayName("Contrato de la API (docs/50-api)")
@@ -230,7 +230,18 @@ class ContratoDeApiTest {
                     "PUT /seguridad/usuarios/{id}/clave",
                     "GET /seguridad/auditoria",
                     "POST /seguridad/respaldos",
-                    "GET /seguridad/parametros",
+                    // «GET /seguridad/parametros» —el listado paginado de los conjuntos— SE FUE
+                    // en P5B y por eso ya no esta aqui. La pantalla que administra los juegos de
+                    // valores es de `normativa`, que es donde estan: servirla desde este sistema
+                    // solo podria enumerar los conjuntos DESCARGADOS, y eso diria «estos son los
+                    // conjuntos de la municipalidad» cuando lo cierto seria «estos son los que
+                    // hemos bajado». Es la clase de cifra plausible y equivocada que no se
+                    // distingue de la correcta (ADR-0025 §5).
+                    //
+                    // La ruta se queda EN EL CONTRATO —el contrato esta derivado del prototipo
+                    // (#312) y no se edita a mano— y sale de esta lista, que es exactamente lo que
+                    // esta lista significa: «lo que este backend promete implementar». Es la
+                    // segunda de las dos que quedan sin controlador, con `GET /portal/deuda`.
                     // #605 — si un ejercicio tiene conjunto sellado, para poder decirlo ANTES
                     // de calcular. Es una ruta que la pantalla `parametros` no declara —declara
                     // su listado— y entra por OPERACIONES_ADICIONALES del generador.

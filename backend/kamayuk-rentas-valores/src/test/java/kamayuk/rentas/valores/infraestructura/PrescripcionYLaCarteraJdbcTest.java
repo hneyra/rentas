@@ -318,7 +318,7 @@ class PrescripcionYLaCarteraJdbcTest {
 
     private static long crearConjuntoSellado() {
         return comoApp(
-                "INSERT INTO conjunto_parametros (municipalidad_id, ejercicio, version)"
+                "INSERT INTO conjunto_parametros_de_prueba (municipalidad_id, ejercicio, version)"
                         + " VALUES (?, 2033, 1) RETURNING id",
                 municipalidad);
     }

@@ -1394,7 +1394,7 @@ class CertificadosYPadronesJdbcTest {
             long conjunto;
             try (PreparedStatement sentencia =
                     app.prepareStatement(
-                            "INSERT INTO conjunto_parametros (municipalidad_id, ejercicio, version)"
+                            "INSERT INTO conjunto_parametros_de_prueba (municipalidad_id, ejercicio, version)"
                                     + " VALUES (?, ?, 1) RETURNING id")) {
                 sentencia.setLong(1, municipalidadId);
                 sentencia.setInt(2, ejercicio);
@@ -1406,7 +1406,7 @@ class CertificadosYPadronesJdbcTest {
             for (long parametro : parametros) {
                 try (PreparedStatement sentencia =
                         app.prepareStatement(
-                                "INSERT INTO conjunto_parametro_detalle (municipalidad_id,"
+                                "INSERT INTO conjunto_parametro_detalle_de_prueba (municipalidad_id,"
                                         + " conjunto_id, parametro_id) VALUES (?, ?, ?)")) {
                     sentencia.setLong(1, municipalidadId);
                     sentencia.setLong(2, conjunto);
@@ -1416,7 +1416,7 @@ class CertificadosYPadronesJdbcTest {
             }
             try (PreparedStatement sentencia =
                     app.prepareStatement(
-                            "UPDATE conjunto_parametros SET estado = 'SELLADO',"
+                            "UPDATE conjunto_parametros_de_prueba SET estado = 'SELLADO',"
                                     + " fecha_sellado = now(), usuario_sellado = 'siembra'"
                                     + " WHERE municipalidad_id = ? AND id = ?")) {
                 sentencia.setLong(1, municipalidadId);
@@ -1429,7 +1429,7 @@ class CertificadosYPadronesJdbcTest {
 
     private static long conceptoDelTupa(String clave, String codigo) throws SQLException {
         return cargarParametro(
-                "INSERT INTO parametro_tributario (municipalidad_id, tipo, clave, valor_texto,"
+                "INSERT INTO parametro_tributario_de_prueba (municipalidad_id, tipo, clave, valor_texto,"
                         + " vigencia_desde, documento_fuente, sellado, usuario_carga)"
                         + " VALUES (NULL, 'TUPA', ?, ?, DATE '2026-01-01',"
                         + " 'TUPA 2026 de la prueba', true, 'siembra') RETURNING id",
@@ -1439,7 +1439,7 @@ class CertificadosYPadronesJdbcTest {
 
     private static long vigenciaDelTupa(String clave, int meses) throws SQLException {
         return cargarParametro(
-                "INSERT INTO parametro_tributario (municipalidad_id, tipo, clave, valor_numerico,"
+                "INSERT INTO parametro_tributario_de_prueba (municipalidad_id, tipo, clave, valor_numerico,"
                         + " vigencia_desde, documento_fuente, sellado, usuario_carga)"
                         + " VALUES (NULL, 'VIGENCIA_CERTIFICADO', ?, ?::numeric,"
                         + " DATE '2026-01-01', 'TUPA 2026 de la prueba', true, 'siembra')"

@@ -381,7 +381,7 @@ class RelacionDePrescripcionesFronteraTest {
     private static long crearConjunto(long municipalidad) {
         return comoApp(
                 municipalidad,
-                "INSERT INTO conjunto_parametros (municipalidad_id, ejercicio, version)"
+                "INSERT INTO conjunto_parametros_de_prueba (municipalidad_id, ejercicio, version)"
                         + " VALUES (?, 2033, 1) RETURNING id",
                 municipalidad);
     }

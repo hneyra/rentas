@@ -2844,23 +2844,6 @@
     "totalPaginas": "entero",
     "hayMas": "booleano"
   },
-  "GET /seguridad/parametros": {
-    "contenido": [
-      {
-        "id": "entero",
-        "ejercicio": "entero",
-        "version": "entero",
-        "estado": "texto",
-        "fechaSellado": "instante",
-        "usuarioSellado": "texto"
-      }
-    ],
-    "pagina": "entero",
-    "tamano": "entero",
-    "totalElementos": "entero",
-    "totalPaginas": "entero",
-    "hayMas": "booleano"
-  },
   "GET /seguridad/parametros/ejercicios/{ejercicio}": {
     "ejercicio": "entero",
     "sellado": "booleano",

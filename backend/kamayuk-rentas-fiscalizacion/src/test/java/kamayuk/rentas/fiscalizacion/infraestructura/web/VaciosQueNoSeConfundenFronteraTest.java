@@ -565,7 +565,7 @@ class VaciosQueNoSeConfundenFronteraTest {
     private static long crearConjuntoSellado(long municipalidadId) {
         return ejecutarComoApp(
                 municipalidadId,
-                "INSERT INTO conjunto_parametros (municipalidad_id, ejercicio, version, estado,"
+                "INSERT INTO conjunto_parametros_de_prueba (municipalidad_id, ejercicio, version, estado,"
                         + " fecha_sellado, usuario_sellado)"
                         + " VALUES (?, 2024, 1, 'SELLADO', now(), 'siembra') RETURNING id",
                 municipalidadId);

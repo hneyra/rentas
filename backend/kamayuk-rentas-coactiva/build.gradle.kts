@@ -18,6 +18,7 @@ plugins {
 }
 
 dependencies {
+    testImplementation(testFixtures(project(":kamayuk-rentas-parametros")))
     // Las tres APIs publicas que el expediente consume. Nunca sus tablas: Spring
     // Modulith verifica que no se cruce el limite (ARQ-01 §4).
     //
@@ -67,11 +68,12 @@ dependencies {
     testRuntimeOnly(libs.postgresql)
 }
 
-// Las pruebas del derivado publicable leen el CSV del repositorio (#192). Sin declararlo
+// Las pruebas del derivado publicable leen el CSV de `normativa`, el repositorio hermano
+// (#192, y desde P5B ADR-0025 §5: el corpus se fue con el servicio). Sin declararlo
 // como entrada, editar el CSV deja a `test` en UP-TO-DATE y una rotura del derivado pasa
 // en verde rancio en local; en CI corre fresco y muerde, pero el sintoma local mentiria.
 tasks.test {
     inputs
-        .file(rootProject.file("../docs/10-negocio/valores-normativos/publicacion/parametros-2026.csv"))
+        .file(rootProject.file("../../normativa/docs/10-negocio/valores-normativos/publicacion/parametros-2026.csv"))
         .withPathSensitivity(PathSensitivity.RELATIVE)
 }

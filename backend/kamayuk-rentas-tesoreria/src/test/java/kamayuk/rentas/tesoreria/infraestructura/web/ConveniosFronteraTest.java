@@ -921,7 +921,7 @@ class ConveniosFronteraTest {
         try (Connection carga = base.conexion(BaseDeDatosDePrueba.CARGA_PARAMETROS);
                 PreparedStatement sentencia =
                         carga.prepareStatement(
-                                "INSERT INTO parametro_tributario (municipalidad_id, tipo, clave,"
+                                "INSERT INTO parametro_tributario_de_prueba (municipalidad_id, tipo, clave,"
                                         + " valor_numerico, valor_texto, vigencia_desde,"
                                         + " documento_fuente, sellado, usuario_carga)"
                                         + " VALUES (NULL, ?, ?, ?::numeric, ?, DATE '2026-01-01',"
@@ -946,7 +946,7 @@ class ConveniosFronteraTest {
             long conjunto;
             try (PreparedStatement sentencia =
                     app.prepareStatement(
-                            "INSERT INTO conjunto_parametros (municipalidad_id, ejercicio, version)"
+                            "INSERT INTO conjunto_parametros_de_prueba (municipalidad_id, ejercicio, version)"
                                     + " VALUES (?, ?, 1) RETURNING id")) {
                 sentencia.setLong(1, municipalidad);
                 sentencia.setInt(2, ejercicio);
@@ -958,7 +958,7 @@ class ConveniosFronteraTest {
             for (long parametro : parametros) {
                 try (PreparedStatement sentencia =
                         app.prepareStatement(
-                                "INSERT INTO conjunto_parametro_detalle (municipalidad_id,"
+                                "INSERT INTO conjunto_parametro_detalle_de_prueba (municipalidad_id,"
                                         + " conjunto_id, parametro_id) VALUES (?, ?, ?)")) {
                     sentencia.setLong(1, municipalidad);
                     sentencia.setLong(2, conjunto);
@@ -968,7 +968,7 @@ class ConveniosFronteraTest {
             }
             try (PreparedStatement sentencia =
                     app.prepareStatement(
-                            "UPDATE conjunto_parametros SET estado = 'SELLADO',"
+                            "UPDATE conjunto_parametros_de_prueba SET estado = 'SELLADO',"
                                     + " fecha_sellado = now(), usuario_sellado = 'siembra'"
                                     + " WHERE municipalidad_id = ? AND id = ?")) {
                 sentencia.setLong(1, municipalidad);

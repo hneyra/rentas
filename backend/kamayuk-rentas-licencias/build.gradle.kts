@@ -22,6 +22,7 @@ plugins {
 }
 
 dependencies {
+    testImplementation(testFixtures(project(":kamayuk-rentas-parametros")))
     // Las tres APIs publicas que la licencia consume. Nunca sus tablas: Spring
     // Modulith verifica que no se cruce el limite (ARQ-01 §4).
     //

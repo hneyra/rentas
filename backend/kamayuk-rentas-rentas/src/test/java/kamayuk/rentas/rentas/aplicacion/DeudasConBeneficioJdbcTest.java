@@ -539,7 +539,7 @@ class DeudasConBeneficioJdbcTest {
         try (Connection carga = base.conexion(BaseDeDatosDePrueba.CARGA_PARAMETROS);
                 PreparedStatement sentencia =
                         carga.prepareStatement(
-                                "INSERT INTO parametro_tributario (municipalidad_id, tipo, clave,"
+                                "INSERT INTO parametro_tributario_de_prueba (municipalidad_id, tipo, clave,"
                                         + " valor_numerico, valor_texto, vigencia_desde,"
                                         + " documento_fuente, sellado, usuario_carga)"
                                         + " VALUES (NULL, ?, ?, ?::numeric, ?, DATE '2026-01-01',"
@@ -576,7 +576,7 @@ class DeudasConBeneficioJdbcTest {
             for (long parametro : parametros) {
                 try (PreparedStatement sentencia =
                         app.prepareStatement(
-                                "INSERT INTO conjunto_parametro_detalle (municipalidad_id,"
+                                "INSERT INTO conjunto_parametro_detalle_de_prueba (municipalidad_id,"
                                         + " conjunto_id, parametro_id) VALUES (?, ?, ?)")) {
                     sentencia.setLong(1, municipalidadId);
                     sentencia.setLong(2, conjunto);
@@ -587,7 +587,7 @@ class DeudasConBeneficioJdbcTest {
             if (sellado && existente == null) {
                 try (PreparedStatement sentencia =
                         app.prepareStatement(
-                                "UPDATE conjunto_parametros SET estado = 'SELLADO',"
+                                "UPDATE conjunto_parametros_de_prueba SET estado = 'SELLADO',"
                                         + " fecha_sellado = now(), usuario_sellado = 'siembra'"
                                         + " WHERE municipalidad_id = ? AND id = ?")) {
                     sentencia.setLong(1, municipalidadId);
@@ -603,7 +603,7 @@ class DeudasConBeneficioJdbcTest {
             Connection app, long municipalidadId) throws SQLException {
         try (PreparedStatement sentencia =
                 app.prepareStatement(
-                        "SELECT id FROM conjunto_parametros WHERE municipalidad_id = ?"
+                        "SELECT id FROM conjunto_parametros_de_prueba WHERE municipalidad_id = ?"
                                 + " AND ejercicio = ? AND estado = 'SELLADO'")) {
             sentencia.setLong(1, municipalidadId);
             sentencia.setInt(2, EJERCICIO.valor());
@@ -616,7 +616,7 @@ class DeudasConBeneficioJdbcTest {
     private static long nuevoConjunto(Connection app, long municipalidadId) throws SQLException {
         try (PreparedStatement sentencia =
                 app.prepareStatement(
-                        "INSERT INTO conjunto_parametros (municipalidad_id, ejercicio, version)"
+                        "INSERT INTO conjunto_parametros_de_prueba (municipalidad_id, ejercicio, version)"
                                 + " VALUES (?, ?, ?) RETURNING id")) {
             sentencia.setLong(1, municipalidadId);
             sentencia.setInt(2, EJERCICIO.valor());

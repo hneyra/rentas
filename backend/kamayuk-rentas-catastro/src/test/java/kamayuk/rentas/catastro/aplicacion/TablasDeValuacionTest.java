@@ -1,8 +1,6 @@
 package kamayuk.rentas.catastro.aplicacion;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.assertj.core.api.Assertions.tuple;
 
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -20,7 +18,6 @@ import kamayuk.rentas.auditoria.Origen;
 import kamayuk.rentas.auditoria.OrigenContext;
 import kamayuk.rentas.catastro.dominio.Arancel;
 import kamayuk.rentas.catastro.dominio.Depreciacion;
-import kamayuk.rentas.catastro.dominio.Partida;
 import kamayuk.rentas.catastro.dominio.ValorUnitarioEdificacion;
 import kamayuk.rentas.catastro.infraestructura.ValuacionRepositoryJdbc;
 import kamayuk.rentas.compartido.TenantContext;
@@ -136,6 +133,28 @@ class TablasDeValuacionTest {
         OrigenContext.limpiar();
     }
 
+    // ------------------------------------------------------------------
+    // LO QUE SE FUE CON P5B, Y POR QUE NO SE SUSTITUYE AQUI
+    //
+    // Cuatro pruebas de esta clase median guardas de la BASE que se fueron con sus tablas a
+    // `normativa` en `V2`:
+    //
+    //   - «los cuadros nacionales salen de la edicion que el conjunto compuso»: el JOIN con
+    //     `conjunto_parametro_detalle`. Hoy lo hace `normativa` al componer el snapshot y lo mide
+    //     `ComponerSnapshotTest` alli; aqui la copia local YA ES lo que el conjunto compuso.
+    //   - «una edicion sellada no admite una fila mas»: el disparador de inmutabilidad de `V9`.
+    //   - «la aplicacion no puede escribir un cuadro nacional»: el REVOKE de `V55` a `sgtm_app`.
+    //     Las dos viven en `normativa`, con sus pruebas.
+    //   - «cargar contra un conjunto sellado falla»: el disparador `arancel_de_conjunto_sellado_
+    //     inmutable` de `V18`, que `V2` RETIRA porque consultaba una tabla que ya no esta. Esa
+    //     garantia QUEDA ABIERTA y hay que reconstruirla en `catastro`, donde `arancel` va a vivir
+    //     (P5C). Es un hueco declarado: `docs/00-gobierno/P5B-extraccion.md` §7.
+    //
+    // Lo que se queda es lo que sigue siendo de este sistema: que el ejercicio resuelva a un
+    // conjunto, que los cuadros se lean por conjunto y no por ejercicio, y que un conjunto sin su
+    // snapshot no vea ningun cuadro.
+    // ------------------------------------------------------------------
+
     @Test
     @DisplayName("el ejercicio resuelve al conjunto sellado de mayor version")
     void elEjercicioResuelveAlSelladoVigente() {
@@ -164,25 +183,6 @@ class TablasDeValuacionTest {
     }
 
     @Test
-    @DisplayName("cargar contra un conjunto sellado falla: no hay forma de editar en sitio")
-    void cargarContraUnConjuntoSelladoFalla() {
-        assertThatThrownBy(
-                        () ->
-                                tablas.cargarArancel(
-                                        Arancel.nuevo(
-                                                viaId,
-                                                null,
-                                                new ValorNormativo(VALOR_V1),
-                                                "otra resolucion"),
-                                        IdentificadorDeConjunto.de(conjuntoV1),
-                                        OBSERVACION))
-                .as(
-                        "el disparador de V18 lo impide aunque la aplicacion nunca comprobara el"
-                                + " estado del conjunto antes de escribir")
-                .hasMessageContaining("sellad");
-    }
-
-    @Test
     @DisplayName("cargar contra un conjunto abierto entra, con auditoria")
     void cargarContraUnConjuntoAbiertoEntra() {
         Arancel guardado =
@@ -208,43 +208,6 @@ class TablasDeValuacionTest {
     }
 
     @Test
-    @DisplayName("los cuadros nacionales salen de la edicion que el conjunto compuso (D-13)")
-    void valoresUnitariosYDepreciacionSalenDeLaEdicionCompuesta() throws SQLException {
-        long edicion = publicarEdicionNacional("VUE-DE-LA-PRUEBA");
-        componerEnElConjunto(conjuntoAbierto, edicion);
-
-        IdentificadorDeConjunto conjunto = IdentificadorDeConjunto.de(conjuntoAbierto);
-        List<ValorUnitarioEdificacion> valoresUnitarios =
-                transacciones.execute(estado -> repositorio.valoresUnitariosDe(conjunto));
-        assertThat(valoresUnitarios)
-                .singleElement()
-                .extracting(ValorUnitarioEdificacion::partida)
-                .isEqualTo(Partida.MUROS);
-
-        List<Depreciacion> depreciaciones =
-                transacciones.execute(estado -> repositorio.depreciacionesDe(conjunto));
-        // El uso viaja: sin el, las dos primeras filas —la misma combinacion en dos tablas del
-        // Anexo I con porcentajes distintos— serian indistinguibles al leerlas (H-15, V57).
-        assertThat(depreciaciones)
-                .extracting(
-                        Depreciacion::uso, Depreciacion::material, Depreciacion::antiguedadHasta)
-                .containsExactly(
-                        tuple("01", "CONCRETO", 10),
-                        tuple("01", "CONCRETO", null),
-                        tuple("03", "CONCRETO", 10));
-        assertThat(depreciaciones)
-                .filteredOn(Depreciacion::sinTope)
-                .singleElement()
-                .satisfies(
-                        fila ->
-                                assertThat(fila.antiguedadHasta())
-                                        .as(
-                                                "«mas de 50 anios» llega sin tope; leido con getInt"
-                                                        + " seria un tramo «hasta 0» que no cubre nada")
-                                        .isNull());
-    }
-
-    @Test
     @DisplayName("el conjunto que no compuso la edicion no ve el cuadro, aunque este publicado")
     void unConjuntoQueNoLaCompusoNoVeLaEdicion() throws SQLException {
         // La edicion existe, es nacional y esta publicada: cualquiera la puede leer si la nombra.
@@ -262,41 +225,6 @@ class TablasDeValuacionTest {
 
         assertThat(valoresUnitarios).isEmpty();
         assertThat(depreciaciones).isEmpty();
-    }
-
-    @Test
-    @DisplayName("una edicion sellada no admite una fila mas: corregir es publicar otra")
-    void unaEdicionSelladaNoAdmiteUnaFilaMas() throws SQLException {
-        long edicion = publicarEdicionNacional("VUE-QUE-SE-CIERRA");
-        sellarEdicion(edicion);
-
-        assertThatThrownBy(() -> agregarValorUnitario(edicion, 'D'))
-                .isInstanceOf(SQLException.class)
-                .hasMessageContaining("sellada");
-    }
-
-    @Test
-    @DisplayName("la aplicacion no puede escribir un cuadro nacional: solo lo lee")
-    void laAplicacionNoEscribeElCuadroNacional() throws SQLException {
-        long edicion = publicarEdicionNacional("VUE-QUE-LA-APP-INTENTA");
-
-        try (Connection app = base.conexion(BaseDeDatosDePrueba.APP)) {
-            ContextoDeTenant.fijar(app, municipalidad);
-            try (PreparedStatement sentencia =
-                    app.prepareStatement(
-                            "INSERT INTO valor_unitario_edificacion (publicacion_id, partida,"
-                                    + " categoria, anio_construccion_desde, valor_m2,"
-                                    + " documento_fuente)"
-                                    + " VALUES (?, 'TECHOS', 'A', 2000, 1.000000, 'de la app')")) {
-                sentencia.setLong(1, edicion);
-                // 42501 = insufficient_privilege. Se compara el SQLSTATE y no el texto porque el
-                // texto depende del idioma del servidor.
-                assertThatThrownBy(sentencia::executeUpdate)
-                        .isInstanceOfSatisfying(
-                                SQLException.class,
-                                error -> assertThat(error.getSQLState()).isEqualTo("42501"));
-            }
-        }
     }
 
     /**
@@ -329,7 +257,7 @@ class TablasDeValuacionTest {
             long edicion;
             try (PreparedStatement sentencia =
                     carga.prepareStatement(
-                            "INSERT INTO parametro_tributario (municipalidad_id, tipo, clave,"
+                            "INSERT INTO parametro_tributario_de_prueba (municipalidad_id, tipo, clave,"
                                     + " valor_texto, vigencia_desde, documento_fuente, usuario_carga,"
                                     + " usuario_aprueba)"
                                     + " VALUES (NULL, 'PRUEBA_EDICION', ?, 'edicion de prueba',"
@@ -352,7 +280,7 @@ class TablasDeValuacionTest {
         try (Connection carga = base.conexion(BaseDeDatosDePrueba.CARGA_PARAMETROS);
                 PreparedStatement sentencia =
                         carga.prepareStatement(
-                                "INSERT INTO valor_unitario_edificacion (publicacion_id, partida,"
+                                "INSERT INTO valor_unitario_de_prueba (publicacion_id, partida,"
                                         + " categoria, anio_construccion_desde, valor_m2,"
                                         + " documento_fuente)"
                                         + " VALUES (?, 'MUROS', ?, 2000, ?, 'tabla de la prueba, sin"
@@ -374,7 +302,7 @@ class TablasDeValuacionTest {
         try (Connection carga = base.conexion(BaseDeDatosDePrueba.CARGA_PARAMETROS);
                 PreparedStatement sentencia =
                         carga.prepareStatement(
-                                "INSERT INTO depreciacion (publicacion_id, uso, material,"
+                                "INSERT INTO depreciacion_de_prueba (publicacion_id, uso, material,"
                                         + " estado_conservacion, antiguedad_hasta, porcentaje,"
                                         + " documento_fuente)"
                                         + " VALUES (?, ?, 'CONCRETO', 'BUENO', ?, ?, 'tabla de la"
@@ -402,7 +330,7 @@ class TablasDeValuacionTest {
         try (Connection carga = base.conexion(BaseDeDatosDePrueba.CARGA_PARAMETROS);
                 PreparedStatement sentencia =
                         carga.prepareStatement(
-                                "UPDATE parametro_tributario SET sellado = true WHERE id = ?")) {
+                                "UPDATE parametro_tributario_de_prueba SET sellado = true WHERE id = ?")) {
             sentencia.setLong(1, edicion);
             sentencia.executeUpdate();
             carga.commit();
@@ -415,7 +343,7 @@ class TablasDeValuacionTest {
             ContextoDeTenant.fijar(app, municipalidad);
             try (PreparedStatement sentencia =
                     app.prepareStatement(
-                            "INSERT INTO conjunto_parametro_detalle (municipalidad_id, conjunto_id,"
+                            "INSERT INTO conjunto_parametro_detalle_de_prueba (municipalidad_id, conjunto_id,"
                                     + " parametro_id) VALUES (?, ?, ?)")) {
                 sentencia.setLong(1, municipalidad);
                 sentencia.setLong(2, conjunto);
@@ -473,7 +401,7 @@ class TablasDeValuacionTest {
             // cargarContraUnConjuntoSelladoFalla existe para demostrar.
             try (PreparedStatement sentencia =
                     app.prepareStatement(
-                            "INSERT INTO conjunto_parametros (municipalidad_id, ejercicio, version)"
+                            "INSERT INTO conjunto_parametros_de_prueba (municipalidad_id, ejercicio, version)"
                                     + " VALUES (?, ?, ?) RETURNING id")) {
                 sentencia.setLong(1, municipalidad);
                 sentencia.setInt(2, EJERCICIO.valor());
@@ -496,7 +424,7 @@ class TablasDeValuacionTest {
             }
             try (PreparedStatement sentencia =
                     app.prepareStatement(
-                            "UPDATE conjunto_parametros SET estado = 'SELLADO', fecha_sellado = now(),"
+                            "UPDATE conjunto_parametros_de_prueba SET estado = 'SELLADO', fecha_sellado = now(),"
                                     + " usuario_sellado = 'prueba' WHERE municipalidad_id = ? AND id = ?")) {
                 sentencia.setLong(1, municipalidad);
                 sentencia.setLong(2, conjunto);
@@ -512,7 +440,7 @@ class TablasDeValuacionTest {
             ContextoDeTenant.fijar(app, municipalidad);
             try (PreparedStatement sentencia =
                     app.prepareStatement(
-                            "INSERT INTO conjunto_parametros (municipalidad_id, ejercicio, version)"
+                            "INSERT INTO conjunto_parametros_de_prueba (municipalidad_id, ejercicio, version)"
                                     + " VALUES (?, ?, ?) RETURNING id")) {
                 sentencia.setLong(1, municipalidad);
                 sentencia.setInt(2, EJERCICIO.valor());

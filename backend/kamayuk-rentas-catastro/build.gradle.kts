@@ -12,6 +12,7 @@ plugins {
 }
 
 dependencies {
+    testImplementation(testFixtures(project(":kamayuk-rentas-parametros")))
     // Dos dependencias a otro contexto acotado, y las dos aqui para que se vean.
     //
     // La titularidad guarda un contribuyente_id y nada mas: el nombre, el codigo y el domicilio

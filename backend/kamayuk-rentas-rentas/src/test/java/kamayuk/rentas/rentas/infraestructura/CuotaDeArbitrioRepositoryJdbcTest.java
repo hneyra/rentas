@@ -279,7 +279,7 @@ class CuotaDeArbitrioRepositoryJdbcTest {
     private static long crearConjunto(long municipalidadId) {
         return ejecutarComoApp(
                 municipalidadId,
-                "INSERT INTO conjunto_parametros (municipalidad_id, ejercicio, version)"
+                "INSERT INTO conjunto_parametros_de_prueba (municipalidad_id, ejercicio, version)"
                         + " VALUES (?, 2026, ?) RETURNING id",
                 municipalidadId,
                 SIGUIENTE_VERSION.getAndIncrement());

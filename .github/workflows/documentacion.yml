@@ -1,56 +1,24 @@
 # Verificación de la documentación que se comprueba sola.
 #
-# Son cinco, y todas comprueban en las dos direcciones:
+# Desde P5B queda **una**, y conviene decir dónde están las otras: el corpus de valores
+# normativos y sus seis verificadores se fueron a `normativa` con el servicio (ADR-0025 §5,
+# «la doble verificación empieza en el documento y no en la fila»), y allí corren en el
+# flujo `Documentación` de aquel repositorio. Lo que se queda aquí es lo que es de este
+# sistema:
 #
-#   1. el **mapa normativo** de NEG-02 §2 — qué norma fija cada dato que falta,
-#      qué parte de D-02 lo bloquea y qué issues lo esperan— contra el etiquetado
-#      real del tablero;
-#   2. los **valores normativos transcritos** (E-3, #200) — que cada archivo lleve
-#      norma, artículo, fecha de publicación y **dos firmas distintas**, que cierre
-#      filas del mapa que existen y que nadie más cierra, y que ninguna cifra haya
-#      acabado cargada en una migración: cargar depende de D-13, no de E-3.
-#   3. el **derivado publicable** (#188, #247 §4) — que cada cifra de
-#      `valores-normativos/publicacion/` esté letra por letra en el archivo
-#      VERIFICADO del corpus que su fila nombra, y que las dos firmas que van a
-#      `usuario_carga` y `usuario_aprueba` sean las que ese archivo declara. Es lo
-#      único desde lo que `PublicarParametros` escribe en `parametro_tributario`;
-#      y como hoy está en verde, corre además contra sus doce muestras;
-#   4. los **cuadros normativos** (#188) — el hermano de la anterior para lo que no
-#      cabe en una fila. Un cuadro tiene miles de cifras y no se transcribe a mano,
-#      así que lo que se comprueba es la cadena que la sustituye: archivo del corpus
-#      VERIFICADO, dos firmas, documento fuente, y el **sha256** del archivo de filas
-#      recalculado y contrastado contra el que el corpus firmó. Junto a ella corre el
-#      generador del derivado de la depreciación, que lo reproduce desde su
-#      transcripción y exige que sea el mismo byte a byte. `verificar-cuadros.mjs`
-#      existía desde #380 y **no lo corría nadie**: una verificación escrita que
-#      nunca se ejecuta no protege nada;
-#   5. el **contrato de la API** (#312) — que `rentas-v1.yaml` sea todavía lo que su
-#      generador produce. Es el gemelo de «el catálogo generado cuadra con el
-#      prototipo» del flujo de frontend, y existe porque el contrato dejó de
-#      poder reproducirse sin que nada se pusiera rojo: seguía siendo válido, el
-#      backend lo cumplía y el frontend generaba sus tipos de él, y aun así
-#      regenerarlo borraba 519 líneas y dos operaciones enteras.
+#   · el **contrato de la API** (#312) — que `rentas-v1.yaml` sea todavía lo que su
+#     generador produce. Existe porque el contrato dejó de poder reproducirse sin que nada
+#     se pusiera rojo: seguía siendo válido, el backend lo cumplía y el frontend generaba
+#     sus tipos de él, y aun así regenerarlo borraba 519 líneas y dos operaciones enteras.
 #
-# La segunda pasa en verde con el directorio vacío, y debe hacerlo: la barrera
-# llega antes que la transcripción. Por eso corre además contra sus muestras, que
-# es lo que distingue «no hay nada que rechazar» de «no rechaza nada».
-#
-# Va en su propio flujo y no dentro del de frontend porque no necesita `yarn`
-# ni el espacio de trabajo: es Node pelado sobre archivos de `docs/`.
+# Va en su propio flujo y no dentro del del backend porque no necesita Gradle ni base de
+# datos: es Node pelado sobre archivos de `docs/`.
 name: Documentación
 
 on:
   pull_request:
     paths: &rutas
-      - 'docs/10-negocio/**'
       - '.github/workflows/documentacion.yml'
-      # La comprobación de valores normativos LEE las migraciones, para que una
-      # cifra cargada por SQL no se escape del filtro de rutas.
-      - 'backend/kamayuk-rentas-esquema/src/main/resources/db/migration/**'
-      # Y la del derivado LEE `UnidadDePlazo` (#192): las unidades de plazo no se
-      # copian en el verificador, se leen del enumerado, así que una unidad nueva
-      # sin esta ruta cambiaría sin que corriese quien la mira.
-      - 'backend/kamayuk-rentas-dominio-compartido/src/main/java/kamayuk/rentas/dominio/UnidadDePlazo.java'
       # El contrato y el prototipo del que se deriva: son las DOS entradas del
       # generador de OpenAPI, y tocar cualquiera de ellas sin la otra es
       # exactamente lo que la comprobación tiene que ver.
@@ -79,42 +47,6 @@ jobs:
         with:
           node-version: '22'
 
-      - name: El mapa normativo y el tablero dicen lo mismo
-        run: node docs/10-negocio/verificar-mapa-normativo.mjs
-
-      - name: Las prohibiciones de los valores normativos muerden
-        run: node docs/10-negocio/verificar-las-muestras-de-valores.mjs
-
-      - name: Los valores normativos transcritos están en regla
-        run: node docs/10-negocio/verificar-valores-normativos.mjs
-
-      # El derivado desde el que `PublicarParametros` publica: cada cifra suya
-      # tiene que estar letra por letra en el archivo VERIFICADO del corpus que la
-      # fila nombra, con las dos firmas de ADR-0007 que ese archivo declara.
-      - name: Las prohibiciones del derivado publicable muerden
-        run: node docs/10-negocio/verificar-las-muestras-de-publicacion.mjs
-
-      - name: Lo publicable es lo que el corpus dice
-        run: node docs/10-negocio/verificar-publicacion.mjs
-
-      # El hermano del anterior para lo que no cabe en una fila: un cuadro tiene
-      # miles de cifras y no se transcribe a mano, así que lo que se comprueba es
-      # la cadena que sustituye a esa lectura —archivo VERIFICADO, dos firmas,
-      # documento fuente, y el sha256 del archivo de filas recalculado—. Existía
-      # desde #380 y **no lo corría nadie**: una verificación escrita que nunca se
-      # ejecuta no protege nada. Puesto aquí en #188, al añadirse la segunda
-      # edición del manifiesto.
-      - name: Los cuadros normativos son los que el corpus firmó
-        run: node docs/10-negocio/verificar-cuadros.mjs
-
-      # No escribe el archivo: lo regenera desde `depreciacion.md` y exige que sea
-      # el mismo, byte a byte. Es lo que impide que el derivado y su transcripción
-      # firmada se separen — el derivado no se edita, se regenera.
-      - name: El derivado de la depreciación es el que su generador produce
-        run: >-
-          node docs/10-negocio/valores-normativos/fuentes/depreciacion-rnt-2016/derivar-depreciacion.mjs
-          --comprobar
-
       # No escribe el archivo: lo regenera en memoria y exige que sea el mismo.
       # Se comprobó que muerde, en las dos direcciones: retocando un `summary`
       # del YAML a mano, borrando de él la operación `permisos_de_la_sesion`
@@ -123,8 +55,13 @@ jobs:
       - name: El contrato de la API es el que su generador produce
         run: node docs/50-api/generar-openapi.mjs --comprobar
 
-      # NOTA DEL CORTE (P5A): aqui faltaba un sexto paso, la autoprueba de
-      # `scripts/catastro/importar_predios_gpkg.py`. `scripts/` NO viaja en esta etapa —el
-      # importador del plano es de `catastro`, y se va con el en P5C—. Se retira en vez de
-      # dejarse apuntando a un archivo que no existe: un paso que falla por no encontrar su
-      # guion es indistinguible de uno que falla porque el guion esta mal.
+      # NOTAS DEL CORTE
+      #
+      # P5A: faltaba la autoprueba de `scripts/catastro/importar_predios_gpkg.py`. `scripts/`
+      # no viajó —el importador del plano es de `catastro` y se va con él en P5C—. Se retiró
+      # en vez de dejarse apuntando a un archivo que no existe: un paso que falla por no
+      # encontrar su guion es indistinguible de uno que falla porque el guion está mal.
+      #
+      # P5B: se fueron los SEIS pasos del corpus normativo, con el corpus. Corren en el flujo
+      # `Documentación` de `normativa`, que es donde están los archivos que leen. Ninguno se
+      # perdió: se comprobó ejecutándolos allí, incluidas sus muestras rotas a propósito.

@@ -13,6 +13,7 @@ plugins {
 }
 
 dependencies {
+    testImplementation(testFixtures(project(":kamayuk-rentas-parametros")))
     testImplementation(testFixtures(project(":kamayuk-rentas-esquema")))
     testImplementation("org.springframework.boot:spring-boot-starter-jdbc")
     testImplementation("org.springframework:spring-aop")

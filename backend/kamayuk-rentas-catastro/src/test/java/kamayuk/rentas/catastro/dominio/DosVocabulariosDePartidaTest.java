@@ -1,7 +1,6 @@
 package kamayuk.rentas.catastro.dominio;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.io.IOException;
 import java.sql.Connection;
@@ -72,7 +71,7 @@ class DosVocabulariosDePartidaTest {
                 Statement sentencia = conexion.createStatement()) {
             try (var filas =
                     sentencia.executeQuery(
-                            "INSERT INTO parametro_tributario (tipo, clave, valor_texto,"
+                            "INSERT INTO parametro_tributario_de_prueba (tipo, clave, valor_texto,"
                                     + " vigencia_desde, documento_fuente, usuario_carga,"
                                     + " usuario_aprueba) VALUES ('FICTICIO_EDICION_V59', 'CUADRO',"
                                     + " 'cabecera de la prueba de V59', DATE '2026-01-01', 'prueba de"
@@ -126,34 +125,14 @@ class DosVocabulariosDePartidaTest {
                         CategoriasConstructivas.ninguna().getClass().getRecordComponents().length);
     }
 
-    @Test
-    @DisplayName("la base rechaza en el cuadro las cuatro partidas que la norma retiro")
-    void laBaseRechazaLasCuatro() throws SQLException {
-        for (String partida : RETIRADAS_DEL_CUADRO) {
-            try (Connection conexion = base.conexionAdmin();
-                    Statement sentencia = conexion.createStatement()) {
-                assertThatThrownBy(
-                                () ->
-                                        sentencia.executeUpdate(
-                                                "INSERT INTO valor_unitario_edificacion"
-                                                        + " (partida, categoria, valor_m2,"
-                                                        + " documento_fuente, publicacion_id,"
-                                                        + " anio_construccion_desde) VALUES ('"
-                                                        + partida
-                                                        + "', 'C', 100, 'prueba de V59', "
-                                                        + edicion
-                                                        + ", 1990)"))
-                        .as(
-                                "%s salio del cuadro con V59. Sin el CHECK, publicar la edicion de"
-                                        + " la norma dejaria esta partida sin ninguna fila, y una"
-                                        + " edicion incompleta no se distingue de una completa hasta"
-                                        + " que alguien valoriza un predio",
-                                partida)
-                        .isInstanceOf(SQLException.class)
-                        .hasMessageContaining("valor_unitario_edificacion_partida_check");
-            }
-        }
-    }
+    // La prueba que medía el `CHECK` de `valor_unitario_edificacion.partida` —«la base rechaza
+    // en el cuadro las cuatro partidas que la norma retiro»— se fue con la tabla en P5B: el cuadro
+    // vive en `normativa` desde `V2`, y con el su restriccion. Aqui se queda lo que sigue siendo de
+    // este sistema: que los DOS vocabularios existan, que no coincidan y que eso sea la decision.
+    //
+    // Lo que la prueba retirada garantizaba —que la base rechace una partida de la ficha en el
+    // cuadro— le toca ahora a `normativa`, donde esta el `CHECK`. Queda escrito como hueco en
+    // `docs/00-gobierno/P5B-extraccion.md` §7.
 
     @Test
     @DisplayName("y admite las tres, para que el rechazo de arriba no sea el de otra cosa")
@@ -166,7 +145,7 @@ class DosVocabulariosDePartidaTest {
                     Statement sentencia = conexion.createStatement()) {
                 int filas =
                         sentencia.executeUpdate(
-                                "INSERT INTO valor_unitario_edificacion (partida, categoria,"
+                                "INSERT INTO valor_unitario_de_prueba (partida, categoria,"
                                         + " valor_m2, documento_fuente, publicacion_id,"
                                         + " anio_construccion_desde) VALUES ('"
                                         + partida.name()

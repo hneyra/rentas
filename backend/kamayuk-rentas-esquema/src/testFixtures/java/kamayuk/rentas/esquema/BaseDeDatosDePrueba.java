@@ -100,6 +100,7 @@ public final class BaseDeDatosDePrueba implements AutoCloseable {
         try {
             base.crearRoles();
             base.migrar();
+            base.crearEscenarioDeNormativa();
             return base;
         } catch (RuntimeException | SQLException | IOException e) {
             base.close();
@@ -130,6 +131,22 @@ public final class BaseDeDatosDePrueba implements AutoCloseable {
         Connection conexion = abrir(motor.url(), rol, claves.get(rol));
         conexion.setAutoCommit(false);
         return conexion;
+    }
+
+    /**
+     * Las tablas con que las pruebas escriben el escenario de {@code normativa} (P5B).
+     *
+     * <p>Se crean SIEMPRE, y no solo donde hacen falta, por el mismo motivo por el que los roles se
+     * crean siempre: que una prueba tenga que acordarse de provisionar su escenario es que un dia
+     * se le olvide y falle por un motivo que no es el suyo. No son tablas de tenant —no llevan
+     * {@code municipalidad_id NOT NULL} y no llevan RLS—, y {@code AislamientoMultiTenantTest} las
+     * declara exentas nombrandolas una a una: ver el javadoc de {@link EscenarioDeNormativa}.
+     */
+    private void crearEscenarioDeNormativa() throws SQLException {
+        try (Connection admin = conexionAdmin()) {
+            admin.setAutoCommit(false);
+            EscenarioDeNormativa.crear(admin);
+        }
     }
 
     private void crearRoles() throws SQLException, IOException {

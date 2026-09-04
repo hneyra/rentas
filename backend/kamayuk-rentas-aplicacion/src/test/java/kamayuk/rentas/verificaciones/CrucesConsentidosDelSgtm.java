@@ -67,50 +67,22 @@ final class CrucesConsentidosDelSgtm {
                             "ConciliacionRepositoryJdbc", "predio", "PENDIENTE-CRUCE-01"),
 
                     // ---------------------------------------------------------------------------
-                    // GOB-05 §6.4 — `catastro` -> `normativa`.
+                    // GOB-05 §6.4 y §6.5 — CERRADOS EN P5B.
                     //
-                    // El valor unitario y la depreciacion, los dos con JOIN a
-                    // conjunto_parametro_detalle para no ver mas que lo que el conjunto sellado
-                    // contiene. ADR-0025 §1 lo resuelve SIN llamada por red en el camino caliente:
-                    // al abrir una corrida se resuelve el conjunto una vez, se descarga el
-                    // snapshot, se verifica su sha256 y se cachea en tabla local para siempre,
-                    // porque lo sellado no cambia (V9). Una corrida de 300 000 predios hace UNA
-                    // peticion, no 300 000.
+                    // `PENDIENTE-CRUCE-02` (valores unitarios y depreciacion, catastro ->
+                    // normativa)
+                    // y `PENDIENTE-CRUCE-03` (valores referenciales, rentas -> normativa) ya no
+                    // cruzan nada: las tres tablas se fueron a `normativa` con `V2` y lo que
+                    // `ValuacionRepositoryJdbc` y `ValorReferencialRepositoryJdbc` leen ahora es la
+                    // CACHE LOCAL —`normativa_valor_unitario`, `normativa_depreciacion`,
+                    // `normativa_valor_referencial` (`V3`)—, que es de este sistema.
                     //
-                    // El `arancel` NO esta aqui: ✅ D-N4 lo deja en `catastro` y ya no cruza nada.
-                    //
-                    // Le toca a: catastro (con normativa publicando el snapshot).
-                    new CruceConsentido(
-                            "ValuacionRepositoryJdbc",
-                            "valor_unitario_edificacion",
-                            "PENDIENTE-CRUCE-02"),
-                    new CruceConsentido(
-                            "ValuacionRepositoryJdbc", "depreciacion", "PENDIENTE-CRUCE-02"),
-                    new CruceConsentido(
-                            "ValuacionRepositoryJdbc",
-                            "conjunto_parametro_detalle",
-                            "PENDIENTE-CRUCE-02"),
-
+                    // Se retiran de la lista, y esa retirada no es un tramite:
+                    // `ningunCruceConsentido
+                    // Sobra` vuelve a escanear SIN la lista y exige que cada entrada siga eximiendo
+                    // un cruce de verdad, asi que dejarlas puestas habria puesto la prueba en rojo.
+                    // Es la lista de trabajo pendiente encogiendose por haberse hecho el trabajo.
                     // ---------------------------------------------------------------------------
-                    // GOB-05 §6.5 — `rentas` -> `normativa`.
-                    //
-                    // El valor referencial de un vehiculo, resuelto POR CONJUNTO y no por ejercicio
-                    // (el defecto que ARQ-09 §3 nombra). Mismo snapshot sellado que §6.4, y la
-                    // asimetria que ADR-0025 §Consecuencias anticipa: `catastro` solo necesita las
-                    // tablas de valuacion; `rentas` necesita ademas la UIT, los tramos, las
-                    // deducciones, los plazos y esta. La IDENTIDAD del conjunto es la misma para
-                    // los
-                    // dos, y eso es lo que la corrida compara.
-                    //
-                    // Le toca a: rentas.
-                    new CruceConsentido(
-                            "ValorReferencialRepositoryJdbc",
-                            "valor_referencial_vehiculo",
-                            "PENDIENTE-CRUCE-03"),
-                    new CruceConsentido(
-                            "ValorReferencialRepositoryJdbc",
-                            "conjunto_parametro_detalle",
-                            "PENDIENTE-CRUCE-03"),
 
                     // ---------------------------------------------------------------------------
                     // GOB-05 §6.6 — `rentas` -> `catastro`. El puerto YA EXISTE.

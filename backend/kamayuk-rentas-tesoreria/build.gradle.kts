@@ -14,6 +14,7 @@ plugins {
 }
 
 dependencies {
+    testImplementation(testFixtures(project(":kamayuk-rentas-parametros")))
     // Las dos APIs publicas que la caja consume: leer la deuda a la fecha de pago
     // (ConsultaDeDeudaPublica) y asentar su abono (RegistroDeAbonos). Nunca sus
     // tablas: Spring Modulith verifica que no se cruce el limite (ARQ-01 §4).

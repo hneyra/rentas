@@ -11,6 +11,7 @@ plugins {
 }
 
 dependencies {
+    testImplementation(testFixtures(project(":kamayuk-rentas-parametros")))
     // El acta predial referencia la version de ficha catastral vigente a la
     // fecha de la visita (RNF-075), igual que declaracion_jurada en rentas
     // (#28). Solo se importa el paquete raiz de catastro, que es su API

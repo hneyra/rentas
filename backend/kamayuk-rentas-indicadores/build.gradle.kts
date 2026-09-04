@@ -17,6 +17,7 @@ plugins {
 }
 
 dependencies {
+    testImplementation(testFixtures(project(":kamayuk-rentas-parametros")))
     // Lo recaudado, lo cargado y la cartera pendiente: RecaudacionDelLibro y
     // CarteraDelLibro, las dos del paquete raiz. Ninguna tabla (ARQ-01 §4 regla 1).
     implementation(project(":kamayuk-rentas-cuentacorriente"))

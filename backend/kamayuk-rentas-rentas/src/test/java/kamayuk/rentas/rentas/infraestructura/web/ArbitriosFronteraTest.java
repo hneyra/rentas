@@ -228,7 +228,7 @@ class ArbitriosFronteraTest {
 
     private static long crearConjunto() {
         return comoApp(
-                "INSERT INTO conjunto_parametros (municipalidad_id, ejercicio, version)"
+                "INSERT INTO conjunto_parametros_de_prueba (municipalidad_id, ejercicio, version)"
                         + " VALUES (?, 2026, 1) RETURNING id",
                 municipalidad);
     }

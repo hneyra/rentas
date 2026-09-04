@@ -205,27 +205,16 @@ class ImportarArancelTest {
         assertThat(informe.rechazadas().get(0).motivo()).contains("VA-NO-EXISTE");
     }
 
-    @Test
-    @DisplayName("cargar contra un conjunto sellado se rechaza fila a fila, sin tumbar el archivo")
-    void cargarContraUnConjuntoSelladoSeRechaza() {
-        String archivo =
-                """
-                viaCodigo,tramo,valorM2,documentoFuente
-                VA-1,,53,RM 514-2025-EF/15
-                VA-2,,80,RM 514-2025-EF/15
-                """;
-
-        InformeDeImportacion informe =
-                importarArancel.importar(
-                        new StringReader(archivo),
-                        IdentificadorDeConjunto.de(conjuntoSellado),
-                        Observacion.de("Intento de carga contra un conjunto sellado"));
-
-        assertThat(informe.nuevas()).isZero();
-        assertThat(informe.rechazadas()).hasSize(2);
-        assertThat(informe.rechazadas())
-                .allSatisfy(f -> assertThat(f.motivo()).containsIgnoringCase("sellad"));
-    }
+    // La prueba «cargar contra un conjunto sellado se rechaza fila a fila» se RETIRA en P5B, y no
+    // porque deje de importar: lo que la sostenia era el disparador `arancel_de_conjunto_sellado_
+    // inmutable` (`V18`), que consultaba `conjunto_parametros` —tabla que se fue a `normativa` con
+    // `V2`—. Una funcion que consulta una tabla inexistente no protege nada: revienta en el primer
+    // INSERT, asi que `V2` la retira.
+    //
+    // LA GARANTIA QUEDA ABIERTA: hoy nada impide cargar un arancel contra un conjunto ya sellado.
+    // Hay que reconstruirla en `catastro`, donde `arancel` va a vivir desde P5C y donde estara la
+    // copia local del conjunto sellado con la que comprobarlo. Hueco declarado en
+    // `docs/00-gobierno/P5B-extraccion.md` §7.
 
     @Test
     @DisplayName("una fila mal formada se rechaza con su motivo, y las validas entran igual")
@@ -326,7 +315,7 @@ class ImportarArancelTest {
             ContextoDeTenant.fijar(app, municipalidad);
             try (PreparedStatement sentencia =
                     app.prepareStatement(
-                            "INSERT INTO conjunto_parametros (municipalidad_id, ejercicio, version)"
+                            "INSERT INTO conjunto_parametros_de_prueba (municipalidad_id, ejercicio, version)"
                                     + " VALUES (?, ?, ?) RETURNING id")) {
                 sentencia.setLong(1, municipalidad);
                 sentencia.setInt(2, ejercicio);
@@ -360,7 +349,7 @@ class ImportarArancelTest {
             }
             try (PreparedStatement sentencia =
                     app.prepareStatement(
-                            "UPDATE conjunto_parametros SET estado = 'SELLADO', fecha_sellado = now(),"
+                            "UPDATE conjunto_parametros_de_prueba SET estado = 'SELLADO', fecha_sellado = now(),"
                                     + " usuario_sellado = 'prueba' WHERE municipalidad_id = ? AND id = ?")) {
                 sentencia.setLong(1, municipalidad);
                 sentencia.setLong(2, conjunto);

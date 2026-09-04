@@ -299,7 +299,7 @@ class DeterminacionPredialJdbcTest {
             ContextoDeTenant.fijar(app, municipalidad);
             try (PreparedStatement sentencia =
                     app.prepareStatement(
-                            "INSERT INTO conjunto_parametros (municipalidad_id, ejercicio, version,"
+                            "INSERT INTO conjunto_parametros_de_prueba (municipalidad_id, ejercicio, version,"
                                     + " estado, fecha_sellado, usuario_sellado)"
                                     + " VALUES (?, 2026, 1, 'SELLADO', now(), 'siembra')"
                                     + " RETURNING id")) {

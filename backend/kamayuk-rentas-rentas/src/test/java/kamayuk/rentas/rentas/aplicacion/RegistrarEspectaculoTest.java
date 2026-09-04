@@ -220,7 +220,7 @@ class RegistrarEspectaculoTest {
         try (Connection carga = base.conexion(BaseDeDatosDePrueba.CARGA_PARAMETROS);
                 PreparedStatement sentencia =
                         carga.prepareStatement(
-                                "INSERT INTO parametro_tributario (municipalidad_id, tipo, clave,"
+                                "INSERT INTO parametro_tributario_de_prueba (municipalidad_id, tipo, clave,"
                                         + " valor_numerico, vigencia_desde, documento_fuente,"
                                         + " usuario_carga, usuario_aprueba)"
                                         + " VALUES (NULL, ?, ?, ?, DATE '2026-01-01', 'ficticio de"

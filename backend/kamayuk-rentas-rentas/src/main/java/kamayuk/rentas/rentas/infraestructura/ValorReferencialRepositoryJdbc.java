@@ -21,11 +21,16 @@ import org.springframework.stereotype.Repository;
  * que alguien la escriba «para el caso simple» y acabe leyendo una version sellada distinta de la
  * que uso la determinacion.
  *
- * <p>Desde V55 la tabla es nacional (D-13, ADR-0017): la aprueba el MEF y se carga una vez para
- * todas las municipalidades. Por eso ya no tiene {@code conjunto_id} y las dos consultas llegan a
- * ella por {@code conjunto_parametro_detalle}, que es donde el conjunto sellado dejo escrito <b>que
- * edicion</b> de la tabla uso. La firma de los metodos no cambia, y eso es lo importante: quien lee
- * sigue teniendo que decir de que conjunto habla.
+ * <p>La tabla es nacional (D-13, ADR-0017): la aprueba el MEF y se carga una vez para todas las
+ * municipalidades. Desde P5B vive en {@code normativa}, y lo que estas dos consultas leen es {@code
+ * normativa_valor_referencial} —la copia local del conjunto SELLADO, descargada una vez y
+ * verificada por su sha256 (ADR-0025 §1)—. <b>La firma de los metodos no cambia</b>, y eso es lo
+ * importante: quien lee sigue teniendo que decir de que conjunto habla.
+ *
+ * <p>Desaparece el {@code JOIN} con {@code conjunto_parametro_detalle}, que servia para ver solo la
+ * edicion que el conjunto compuso: la copia local YA ES esa edicion. Y el aislamiento se mantiene
+ * por el mismo mecanismo de antes —la copia es tabla de tenant con su politica RLS—, de modo que
+ * preguntar por el conjunto de otra municipalidad sigue sin devolver nada.
  */
 @Repository
 public class ValorReferencialRepositoryJdbc extends RepositorioJdbc
@@ -65,10 +70,8 @@ public class ValorReferencialRepositoryJdbc extends RepositorioJdbc
                         """
                         SELECT v.ejercicio, v.marca, v.modelo, v.anio_fabricacion, v.valor,
                                v.documento_fuente
-                          FROM valor_referencial_vehiculo v
-                          JOIN conjunto_parametro_detalle d
-                            ON d.parametro_id = v.publicacion_id
-                         WHERE d.conjunto_id = :conjunto
+                          FROM normativa_valor_referencial v
+                         WHERE v.conjunto_id = :conjunto
                            AND v.marca = :marca
                            AND v.modelo = :modelo
                            AND v.anio_fabricacion = :anio
@@ -112,10 +115,8 @@ public class ValorReferencialRepositoryJdbc extends RepositorioJdbc
         return jdbc().sql(
                         """
                         SELECT DISTINCT v.marca, v.modelo
-                          FROM valor_referencial_vehiculo v
-                          JOIN conjunto_parametro_detalle d
-                            ON d.parametro_id = v.publicacion_id
-                         WHERE d.conjunto_id = :conjunto
+                          FROM normativa_valor_referencial v
+                         WHERE v.conjunto_id = :conjunto
                          ORDER BY v.marca, v.modelo
                         """)
                 .param("conjunto", conjunto.valor())

@@ -14,6 +14,7 @@ import kamayuk.rentas.carga.LectorDeFilasCsv;
 import kamayuk.rentas.carga.LectorDeFilasCsv.FilaCsv;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.ValorNormativo;
+import kamayuk.rentas.parametros.CorpusDeNormativa;
 import kamayuk.rentas.parametros.IdentificadorDeConjunto;
 import kamayuk.rentas.parametros.LectorDeParametros;
 import kamayuk.rentas.parametros.ParametrosSellados;
@@ -35,10 +36,7 @@ import kamayuk.rentas.parametros.ParametrosSellados;
 public final class DerivadoPublicado {
 
     /** El derivado que este repositorio versiona, tal como se despliega. */
-    public static final Path ARCHIVO =
-            Path.of("../../docs/10-negocio/valores-normativos/publicacion/parametros-2026.csv")
-                    .toAbsolutePath()
-                    .normalize();
+    public static final Path ARCHIVO = CorpusDeNormativa.derivadoPublicable();
 
     private DerivadoPublicado() {}
 
