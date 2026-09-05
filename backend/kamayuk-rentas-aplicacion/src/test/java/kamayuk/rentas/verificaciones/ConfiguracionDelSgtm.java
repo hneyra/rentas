@@ -185,6 +185,11 @@ public final class ConfiguracionDelSgtm implements ConfiguracionDeLasVerificacio
                     "colindante_rural",
                     "construccion",
                     "ficha_catastral",
+                    // V6: el frente del predio. Se nombra aunque este sistema no la tenga —y por
+                    // eso
+                    // mismo—: sin la entrada, el reparto la da por «replicada» y el escaner de la
+                    // regla 11 DEJA DE MIRAR un cruce contra ella, en verde (la leccion de R-N).
+                    "frente_predio",
                     "inquilino",
                     "manzana",
                     "otra_instalacion",
@@ -342,6 +347,31 @@ public final class ConfiguracionDelSgtm implements ConfiguracionDeLasVerificacio
                 // escribe SIN la unidad para que diga lo mismo que el resto (#607).
                 "RegistrarAnuncio",
                 "ActualizarFichaCatastral");
+    }
+
+    /**
+     * Las dos consultas de texto libre que hay hoy, con su motivo (ADR-0034 §3).
+     *
+     * <p>Las dos escriben {@code ILIKE :param} con el comodin antepuesto en Java, o sea un
+     * «contiene» sobre una tabla de tenant. <b>No tienen forma de rango</b>: un comodin por delante
+     * no llega a ningun indice b-tree, con RLS o sin ella, asi que recorren las filas del inquilino
+     * por construccion. Entran declaradas y no se arreglan aqui porque cerrarlas no es cambiar una
+     * consulta: es decidir que hace esa pantalla —hoy ofrece «el motivo contiene…» y «la
+     * descripcion contiene…»—, y eso es una decision del dueno de sanciones.
+     *
+     * <p><b>Y esta lista es la lista de trabajo pendiente</b>, no una puerta abierta: mientras
+     * tenga entradas, este sistema tiene dos consultas que no escalan con el padron.
+     */
+    @Override
+    public Set<String> busquedasDeTextoLibreConMotivo() {
+        return Set.of(
+                // «El motivo de la notificacion contiene…», en el listado de notificaciones
+                // administrativas. Sobre `notificacion.motivo`, que no tiene indice de texto.
+                "NotificacionAdministrativaRepositoryJdbc",
+                // «La descripcion de la infraccion contiene…», en el buscador del codigo de
+                // infracciones. El catalogo es pequeno y acotado por familia, que es lo unico que
+                // hoy lo hace tolerable — y lo que dejaria de serlo si el catalogo creciera.
+                "CodigoInfraccionRepositoryJdbc");
     }
 
     @Override
