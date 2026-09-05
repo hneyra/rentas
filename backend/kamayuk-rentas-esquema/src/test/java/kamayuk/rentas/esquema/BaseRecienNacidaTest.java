@@ -40,7 +40,7 @@ import org.junit.jupiter.api.Test;
  * ese camino</b>, que es CI. Se dice aqui para que nadie concluya de un verde local que la ha
  * comprobado.
  */
-@DisplayName("C-11 — La base de prueba la crea este motor, por los dos caminos")
+@DisplayName("C-21 — La base de prueba la crea este motor, por los dos caminos")
 class BaseRecienNacidaTest {
 
     @Test

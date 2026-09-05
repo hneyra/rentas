@@ -184,7 +184,7 @@ class AislamientoMultiTenantTest {
             // exige que toda tabla este en alguna lista; sin esta, una entrada que ya no exime
             // nada se queda dentro para siempre y la lista deja de decir lo que exime.
             //
-            // Y no es hipotetico: `spatial_ref_sys` la instala PostGIS, y hasta C-11 la base de
+            // Y no es hipotetico: `spatial_ref_sys` la instala PostGIS, y hasta C-21 la base de
             // prueba la heredaba de `template1` por el camino de Testcontainers. La salida comoda
             // ante ese rojo era anadirla aqui en los tres sistemas que NO crean PostGIS —lo que
             // habria dejado a local y a CI midiendo bases distintas—. Con esta guarda, esa salida
