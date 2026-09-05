@@ -185,11 +185,11 @@ Las convenciones viven en `buildSrc/` como plugins precompilados, **no** en un b
 
 | Plugin | Qué aporta |
 |---|---|
-| `sgtm.java-base` | Toolchain de Java 25, `-Xlint:all`, JUnit Platform |
-| `sgtm.calidad` | Spotless (formato), Checkstyle (nombres y trampas), NullAway (nulidad) |
-| `sgtm.pruebas` | JUnit y AssertJ. **No** trae Testcontainers, a propósito |
-| `sgtm.pruebas-postgres` | Reenvía las propiedades del motor externo al proceso de prueba |
-| `sgtm.modulo` | Convenciones de un contexto acotado: BOM de Spring y dominio compartido |
+| `kamayuk.java-base` | Toolchain de Java 25, `-Xlint:all`, JUnit Platform |
+| `kamayuk.calidad` | Spotless (formato), Checkstyle (nombres y trampas), NullAway (nulidad) |
+| `kamayuk.pruebas` | JUnit y AssertJ. **No** trae Testcontainers, a propósito |
+| `kamayuk.pruebas-postgres` | Reenvía las propiedades del motor externo al proceso de prueba |
+| `kamayuk.modulo` | Convenciones de un contexto acotado: BOM de Spring y dominio compartido |
 
 ## Base de datos
 

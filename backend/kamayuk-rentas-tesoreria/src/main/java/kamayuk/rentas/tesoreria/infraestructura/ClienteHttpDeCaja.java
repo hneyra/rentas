@@ -42,8 +42,8 @@ import tools.jackson.databind.json.JsonMapper;
  * convenio es <b>deuda reprogramada</b> —tiene interes, tiene quiebre y tiene consecuencias
  * coactivas— y si viajara a {@code caja}, {@code caja} adquiriria reglas tributarias y dejaria de
  * poder cobrar un puesto de mercado (ADR-0026 §5). Asi que el modulo hace hoy DOS cosas, y por eso
- * conserva {@code sgtm.pruebas-postgres}: lleva un contexto acotado con tablas de verdad, y ademas
- * es el adaptador cliente de {@code caja}.
+ * conserva {@code kamayuk.pruebas-postgres}: lleva un contexto acotado con tablas de verdad, y
+ * ademas es el adaptador cliente de {@code caja}.
  *
  * <h2>Nunca vacio y nunca cero</h2>
  *

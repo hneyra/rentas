@@ -5,8 +5,8 @@
 // por D-02, y lo que falta no es la estructura sino los valores normativos.
 
 plugins {
-    id("sgtm.modulo")
-    id("sgtm.pruebas-postgres")
+    id("kamayuk.modulo")
+    id("kamayuk.pruebas-postgres")
 }
 
 dependencies {

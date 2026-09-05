@@ -16,7 +16,7 @@
 //     `indicadores` no cambiaron ni una linea. Lo unico que cambio es quien los
 //     implementa.
 //
-// POR ESO CONSERVA `sgtm.pruebas-postgres`, al reves que `kamayuk-rentas-catastro` y
+// POR ESO CONSERVA `kamayuk.pruebas-postgres`, al reves que `kamayuk-rentas-catastro` y
 // `kamayuk-rentas-parametros`, que quedaron como clientes puros y se lo quitaron: aqui
 // `ConvenioRepositoryJdbc` y `MovimientoDeConvenioRepositoryJdbc` siguen escribiendo SQL
 // contra tablas de este sistema, y eso se prueba contra PostgreSQL de verdad o no se
@@ -26,8 +26,8 @@
 // se debe lo dice `cuentacorriente` releyendo su libro.
 
 plugins {
-    id("sgtm.modulo")
-    id("sgtm.pruebas-postgres")
+    id("kamayuk.modulo")
+    id("kamayuk.pruebas-postgres")
 }
 
 dependencies {

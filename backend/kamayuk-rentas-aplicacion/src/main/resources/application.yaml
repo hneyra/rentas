@@ -1,6 +1,6 @@
 spring:
   application:
-    name: sgtm
+    name: kamayuk
   threads:
     virtual:
       enabled: true

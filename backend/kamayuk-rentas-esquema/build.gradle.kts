@@ -11,8 +11,8 @@
 // copiado seria un segundo sitio donde olvidar que el rol no puede ser superusuario.
 
 plugins {
-    id("sgtm.java-base")
-    id("sgtm.pruebas-postgres")
+    id("kamayuk.java-base")
+    id("kamayuk.pruebas-postgres")
     `java-test-fixtures`
     application
 }

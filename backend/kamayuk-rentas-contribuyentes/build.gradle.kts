@@ -7,8 +7,8 @@
 // No depende de D-02: el padron identifica al sujeto, no calcula nada.
 
 plugins {
-    id("sgtm.modulo")
-    id("sgtm.pruebas-postgres")
+    id("kamayuk.modulo")
+    id("kamayuk.pruebas-postgres")
 }
 
 dependencies {

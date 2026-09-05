@@ -9,8 +9,8 @@
 import org.gradle.api.artifacts.VersionCatalogsExtension
 
 plugins {
-    id("sgtm.java-base")
-    id("sgtm.pruebas")
+    id("kamayuk.java-base")
+    id("kamayuk.pruebas")
 }
 
 val libs = extensions.getByType<VersionCatalogsExtension>().named("libs")

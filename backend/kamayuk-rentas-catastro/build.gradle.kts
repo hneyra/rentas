@@ -10,10 +10,10 @@
 // sin una sola consulta. Si este modulo volviera a tener un repositorio, `rentas` leeria tablas de
 // `catastro` y el escaner de frontera lo diria.
 //
-// NO lleva `sgtm.pruebas-postgres`: no tiene una sola consulta que probar.
+// NO lleva `kamayuk.pruebas-postgres`: no tiene una sola consulta que probar.
 
 plugins {
-    id("sgtm.modulo")
+    id("kamayuk.modulo")
     `java-test-fixtures`
 }
 

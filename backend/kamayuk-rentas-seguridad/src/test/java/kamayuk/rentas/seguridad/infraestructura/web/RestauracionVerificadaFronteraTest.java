@@ -206,7 +206,7 @@ class RestauracionVerificadaFronteraTest {
                 "2026-09-01T06:00:00Z",
                 "2026-09-01T06:07:00Z",
                 "EXITOSO",
-                "s3://sgtm-stg/base",
+                "s3://kamayuk-stg/base",
                 null,
                 null);
 
@@ -218,7 +218,7 @@ class RestauracionVerificadaFronteraTest {
                                 + " produccion la escribe el CronJob de infra/componentes/Respaldo.ts")
                 .contains("\"totalElementos\":1")
                 .contains("\"resultado\":\"EXITOSO\"")
-                .contains("\"destino\":\"s3://sgtm-stg/base\"");
+                .contains("\"destino\":\"s3://kamayuk-stg/base\"");
     }
 
     @Test
@@ -229,7 +229,7 @@ class RestauracionVerificadaFronteraTest {
                         "2026-09-01T06:00:00Z",
                         "2026-09-01T06:07:00Z",
                         "EXITOSO",
-                        "s3://sgtm-stg/base",
+                        "s3://kamayuk-stg/base",
                         null,
                         null);
 
@@ -275,7 +275,7 @@ class RestauracionVerificadaFronteraTest {
                 "2026-08-30T06:00:00Z",
                 "2026-08-30T06:07:00Z",
                 "EXITOSO",
-                "s3://sgtm-stg/base",
+                "s3://kamayuk-stg/base",
                 "2026-08-31T22:15:00Z",
                 QUIEN_VERIFICA);
 
@@ -296,7 +296,7 @@ class RestauracionVerificadaFronteraTest {
                 "2026-09-01T06:00:00Z",
                 "2026-09-01T06:07:00Z",
                 "EXITOSO",
-                "s3://sgtm-stg/base",
+                "s3://kamayuk-stg/base",
                 null,
                 null);
 
@@ -339,7 +339,7 @@ class RestauracionVerificadaFronteraTest {
                 "2026-09-01T06:00:00Z",
                 "2026-09-01T06:07:00Z",
                 "EXITOSO",
-                "s3://sgtm-stg/base",
+                "s3://kamayuk-stg/base",
                 null,
                 null);
 
@@ -368,7 +368,7 @@ class RestauracionVerificadaFronteraTest {
                 "2026-09-01T06:00:00Z",
                 "2026-09-01T06:07:00Z",
                 "EXITOSO",
-                "s3://sgtm-stg/base",
+                "s3://kamayuk-stg/base",
                 null,
                 null);
 
@@ -433,7 +433,7 @@ class RestauracionVerificadaFronteraTest {
                                         "2026-09-01T06:00:00Z",
                                         "2026-09-01T06:02:00Z",
                                         "FALLIDO",
-                                        "s3://sgtm-stg/base",
+                                        "s3://kamayuk-stg/base",
                                         "2026-09-01T22:00:00Z",
                                         QUIEN_VERIFICA))
                 .as(
@@ -452,7 +452,7 @@ class RestauracionVerificadaFronteraTest {
                                         "2026-09-01T06:00:00Z",
                                         null,
                                         "EN_CURSO",
-                                        "s3://sgtm-stg/base",
+                                        "s3://kamayuk-stg/base",
                                         "2026-09-01T22:00:00Z",
                                         QUIEN_VERIFICA))
                 .hasMessageContaining("respaldo_verificacion_exitosa_ck");
@@ -467,7 +467,7 @@ class RestauracionVerificadaFronteraTest {
                                         "2026-09-01T06:00:00Z",
                                         "2026-09-01T06:07:00Z",
                                         "EXITOSO",
-                                        "s3://sgtm-stg/base",
+                                        "s3://kamayuk-stg/base",
                                         "2026-08-20T22:00:00Z",
                                         QUIEN_VERIFICA))
                 .as("lo que se restauro el 20 de agosto no puede ser la copia del 1 de setiembre")
@@ -483,7 +483,7 @@ class RestauracionVerificadaFronteraTest {
                                         "2026-09-01T06:00:00Z",
                                         "2026-09-01T06:07:00Z",
                                         "EXITOSO",
-                                        "s3://sgtm-stg/base",
+                                        "s3://kamayuk-stg/base",
                                         "2026-09-01T22:00:00Z",
                                         null))
                 .as("un instante sin firmante no se puede auditar: no dice que se ejecuto")
@@ -495,7 +495,7 @@ class RestauracionVerificadaFronteraTest {
                                         "2026-09-01T06:00:00Z",
                                         "2026-09-01T06:07:00Z",
                                         "EXITOSO",
-                                        "s3://sgtm-stg/base",
+                                        "s3://kamayuk-stg/base",
                                         null,
                                         QUIEN_VERIFICA))
                 .as("y un firmante sin instante afirma la verificacion sin decir cuando")

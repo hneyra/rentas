@@ -7,7 +7,7 @@
 // propaga las propiedades de sistema del build.
 
 plugins {
-    id("sgtm.pruebas")
+    id("kamayuk.pruebas")
 }
 
 tasks.withType<Test>().configureEach {

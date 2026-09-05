@@ -3,5 +3,5 @@
 // probarse sin levantar el contexto (ARQ-04 §1).
 
 plugins {
-    id("sgtm.pruebas")
+    id("kamayuk.pruebas")
 }

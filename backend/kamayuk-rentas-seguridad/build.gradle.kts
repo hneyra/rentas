@@ -8,8 +8,8 @@
 // mantenimiento completo es de #9 y #12; el guardia que los comprueba, de #8.
 
 plugins {
-    id("sgtm.modulo")
-    id("sgtm.pruebas-postgres")
+    id("kamayuk.modulo")
+    id("kamayuk.pruebas-postgres")
 }
 
 dependencies {

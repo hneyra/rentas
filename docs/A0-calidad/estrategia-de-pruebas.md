@@ -54,7 +54,7 @@ persistencia sobre H2 pasaría en verde sin verificar lo único que aquí import
 
 Por omisión se levanta un contenedor con Testcontainers. Para entornos sin Docker existe una
 salida documentada —apuntar a un PostgreSQL ya existente con
-`-Dsgtm.pruebas.postgres.url`—, y **no** una salida que omita la prueba. Detalle en
+`-Dkamayuk.pruebas.postgres.url`—, y **no** una salida que omita la prueba. Detalle en
 [`backend/README.md`](../../backend/README.md).
 
 ### 3.3 Aislamiento multi-tenant — la prueba central

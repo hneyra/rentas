@@ -6,8 +6,8 @@
 // importes liquidados y las multas viven en #198, con `bloqueado:D-02a`—.
 
 plugins {
-    id("sgtm.modulo")
-    id("sgtm.pruebas-postgres")
+    id("kamayuk.modulo")
+    id("kamayuk.pruebas-postgres")
 }
 
 dependencies {
