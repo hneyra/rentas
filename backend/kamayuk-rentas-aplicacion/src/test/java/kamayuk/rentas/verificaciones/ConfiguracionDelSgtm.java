@@ -404,6 +404,29 @@ public final class ConfiguracionDelSgtm implements ConfiguracionDeLasVerificacio
                 // no lo fuera no se guardaria. Exigir una observacion aqui produciria la cadena
                 // fija que el javadoc de la regla advierte.
                 ".parametros.aplicacion.DescargaDeNormativa.asegurarDescargado("
-                        + "long, java.lang.String)");
+                        + "long, java.lang.String)",
+                // El ingestor de hechos de `catastro` (C-8, ADR-0027). Las dos escrituras son de
+                // la misma clase y por el mismo motivo que la de arriba, que es el caso mas
+                // parecido de esta lista: lo que escriben es una COPIA de un dato que este sistema
+                // NO PRODUJO —un predio, una ficha, una valuacion sellada—, ya decidido en el otro
+                // y verificado por la huella que el emisor calculo (`V9`).
+                //
+                // No hay ningun usuario que la pida: la dispara un proceso por lotes que un
+                // CronJob invoca. Y no hay ningun «por que» que dar — el porque de un predio
+                // cambiado esta en la observacion del acto que lo cambio, EN `catastro`, que es
+                // donde la regla 10 la exigio. Pedirla aqui produciria exactamente lo que el
+                // javadoc de la regla advierte: una cadena fija que satisface la comprobacion y
+                // vacia de sentido la auditoria.
+                //
+                // `matar` esta en la lista por lo mismo, con un matiz: lo que escribe no es un
+                // dato del padron sino la constancia de que un hecho NO se pudo aplicar, con su
+                // motivo dentro. Ese motivo es lo que una observacion seria, y lo pone el
+                // ingestor porque es el unico que sabe por que.
+                ".rentas.aplicacion.AplicarUnHecho.aplicar("
+                        + "kamayuk.rentas.rentas.dominio.proyeccion.HechoRecibido,"
+                        + " java.time.Instant)",
+                ".rentas.aplicacion.AplicarUnHecho.matar("
+                        + "kamayuk.rentas.rentas.dominio.proyeccion.HechoRecibido,"
+                        + " java.lang.String, java.time.Instant)");
     }
 }

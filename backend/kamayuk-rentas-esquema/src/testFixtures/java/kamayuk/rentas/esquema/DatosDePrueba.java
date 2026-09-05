@@ -623,6 +623,7 @@ public final class DatosDePrueba {
                         huellaDe(eventoDelPredio));
             }
             sembrarLaValuacion(ingestor, muni, predioId);
+            sembrarUnHechoSinAplicar(ingestor, muni);
             ingestor.commit();
         }
     }
@@ -671,6 +672,32 @@ public final class DatosDePrueba {
                         + "  WHERE v.ejercicio = 2026",
                 muni,
                 eventoDelCierre);
+    }
+
+    /**
+     * Un hecho apartado en la cola de muertos (`V12`, C-8), para que su aislamiento se pueda medir.
+     *
+     * <p>La prueba de aislamiento no comprueba solo que A no vea filas de B: comprueba
+     * <b>ademas</b> que A vea las suyas, y sin una fila sembrada las dos cosas darian cero y se
+     * leerian igual.
+     *
+     * <p>Su {@code evento_id} <b>no esta en el buzon a proposito</b>, y por eso esta tabla no tiene
+     * clave foranea hacia el: sus filas son exactamente los hechos que nunca llegaron a aplicarse.
+     */
+    private static void sembrarUnHechoSinAplicar(Connection ingestor, long muni)
+            throws SQLException {
+        String eventoQueNoSeAplico = UUID.randomUUID().toString();
+        ejecutar(
+                ingestor,
+                "INSERT INTO catastro_evento_muerto (municipalidad_id, evento_id, secuencia, tipo,"
+                        + " predio_id, ejercicio, cuerpo, huella, motivo, recibido_en)"
+                        + " VALUES (?, CAST(? AS uuid), 99, 'PREDIO_PROYECTADO', NULL, NULL,"
+                        + "         '{\"prueba\": \"aislamiento\"}', ?,"
+                        + "         'Sembrado por la prueba de aislamiento: no se aplico nunca',"
+                        + "         now())",
+                muni,
+                eventoQueNoSeAplico,
+                huellaDe(eventoQueNoSeAplico));
     }
 
     private static long sembrarRentas(

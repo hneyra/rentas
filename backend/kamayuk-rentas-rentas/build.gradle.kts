@@ -82,4 +82,15 @@ tasks.test {
     inputs
         .file(rootProject.file("../../normativa/docs/10-negocio/valores-normativos/publicacion/parametros-2026.csv"))
         .withPathSensitivity(PathSensitivity.RELATIVE)
+
+    // Y el lote de hechos que publica `catastro` (C-8): `IngestionDeCatastroJdbcTest` lo lee para
+    // medir el camino entero. Sin declararlo, cambiar la forma del evento —o el algoritmo de la
+    // huella agregada— deja `test` en UP-TO-DATE y la rotura pasa en VERDE RANCIO en local.
+    //
+    // No se supone: se midio. Cambiando el separador de la huella agregada en `catastro` y
+    // republicando el lote, esta tarea dijo BUILD SUCCESSFUL sin ejecutar una sola prueba. Es la
+    // leccion de #192 punto 2, tercera vez en este proyecto.
+    inputs
+        .file(rootProject.file("../../catastro/docs/50-api/eventos/lote-de-eventos.json"))
+        .withPathSensitivity(PathSensitivity.RELATIVE)
 }

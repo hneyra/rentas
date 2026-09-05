@@ -57,6 +57,17 @@ class ProcedenciaDeLasProyeccionesTest {
      */
     private static final String BUZON = "catastro_evento_aplicado";
 
+    /**
+     * La cola de muertos tampoco es una proyeccion, y no puede referenciar al buzon.
+     *
+     * <p>`V12` (C-8). Sus filas son los hechos que NO se pudieron aplicar, o sea exactamente los
+     * que no estan en {@link #BUZON}: una clave foranea ahi haria imposible escribir la unica fila
+     * que esta tabla existe para escribir. Lleva las tres columnas de procedencia igual —de que
+     * hecho venia, con que secuencia y con que huella— porque son lo que permite volver a aplicarlo
+     * a mano cuando la causa se arregle.
+     */
+    private static final String COLA_DE_MUERTOS = "catastro_evento_muerto";
+
     private static final String VIOLA_CLAVE_FORANEA = "23503";
     private static final String NO_ADMITE_NULO = "23502";
 
@@ -79,16 +90,32 @@ class ProcedenciaDeLasProyeccionesTest {
     }
 
     @Test
-    @DisplayName("las proyecciones se derivan del privilegio, y son las cinco de V4 y V5")
+    @DisplayName(
+            "lo que el ingestor escribe se deriva del privilegio: las cinco de V4/V5 y la cola de V12")
     void lasProyeccionesSeDerivanDelPrivilegio() throws SQLException {
         // Si el censo se quedara vacio, las dos pruebas de abajo pasarian sin revisar nada. Esta
         // fija cuantas hay hoy, para que anadir o quitar una sea una decision y no un descuido.
+        //
+        // `catastro_evento_muerto` entra con `V12` (C-8) y NO es una proyeccion: es lo contrario,
+        // el registro de los hechos que NO se pudieron proyectar. Aparece aqui porque el criterio
+        // es el PRIVILEGIO —`sgtm_app` lee y no escribe, el ingestor escribe— y ese criterio es
+        // justo lo que hace que una tabla nueva entre sola en el censo en vez de olvidarse.
+        //
+        // Lleva las tres columnas de procedencia igual, asi que la prueba de abajo la cubre; lo
+        // que NO puede llevar es la clave foranea al buzon, porque sus filas son exactamente los
+        // eventos que nunca entraron en el.
         assertThat(proyecciones())
                 .as(
                         "toda tabla que `sgtm_app` lee y no escribe, y que escribe un rol ingestor:"
-                                + " eso es una proyeccion alimentada por otro sistema")
+                                + " o es una proyeccion alimentada por otro sistema, o es el"
+                                + " registro de lo que de el no se pudo aplicar")
                 .containsExactlyInAnyOrder(
-                        BUZON, "predio_ref", "ficha_ref", "valuacion_predio", "valuacion_corrida");
+                        BUZON,
+                        COLA_DE_MUERTOS,
+                        "predio_ref",
+                        "ficha_ref",
+                        "valuacion_predio",
+                        "valuacion_corrida");
     }
 
     @Test
