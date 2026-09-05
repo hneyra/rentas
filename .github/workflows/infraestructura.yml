@@ -57,7 +57,7 @@ jobs:
           path: infrastructure
           # Los cinco repositorios del producto son PRIVADOS y el `GITHUB_TOKEN` solo
           # alcanza al suyo: sin esto, `Not Found` al pedir la rama por omision.
-          token: ${{ secrets.CLONES_TOKEN || github.token }}
+          token: ${{ secrets.GH_CLONE_KEY || github.token }}
 
       - uses: actions/setup-node@v4
         with:

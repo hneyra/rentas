@@ -53,7 +53,7 @@ jobs:
           path: infrastructure
           # Los cinco repositorios del producto son PRIVADOS y el `GITHUB_TOKEN` solo
           # alcanza al suyo: sin esto, `Not Found` al pedir la rama por omision.
-          token: ${{ secrets.CLONES_TOKEN || github.token }}
+          token: ${{ secrets.GH_CLONE_KEY || github.token }}
 
       # El contrato que «caja» publica de lo que le pide a este sistema (P6, ADR-0030 §4).
       # `ContratoConElConsumidorTestBase` lo lee del clon hermano y **se niega a saltarse**: una
@@ -68,7 +68,7 @@ jobs:
           path: caja
           # Los cinco repositorios del producto son PRIVADOS y el `GITHUB_TOKEN` solo
           # alcanza al suyo: sin esto, `Not Found` al pedir la rama por omision.
-          token: ${{ secrets.CLONES_TOKEN || github.token }}
+          token: ${{ secrets.GH_CLONE_KEY || github.token }}
           sparse-checkout: docs/50-api/contratos-que-consume
           sparse-checkout-cone-mode: false
 
