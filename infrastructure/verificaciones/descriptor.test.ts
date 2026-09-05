@@ -19,6 +19,9 @@ const ENTORNO: EntornoDelDescriptor = {
   imagenDe: (c) => `ghcr.io/hneyra/kamayuk-${c}:0eee58e43e04b1c2d3f4a5b6c7d8e9f0a1b2c3d4`,
   secretoDe: (c) => `kamayuk-rentas-stg-${c}`,
   prioridadDe: (clase) => `kamayuk-stg-prioridad-${clase}`,
+  // Del AMBIENTE, no de este sistema (C-7): quien recibe el aviso cuando algo
+  // se rompe aqui. `checkInvariants` de `infrastructure` rechaza el relleno.
+  operacion: { responsable: "Guardia de plataforma", canal: "#kamayuk-guardia" },
 };
 
 describe("el descriptor de rentas", () => {
