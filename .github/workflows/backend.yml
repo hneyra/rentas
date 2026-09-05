@@ -72,6 +72,43 @@ jobs:
           sparse-checkout: docs/50-api/contratos-que-consume
           sparse-checkout-cone-mode: false
 
+      # Y los otros dos hermanos de los que este repositorio declara ENTRADAS DE GRADLE.
+      # No es lo mismo que el contrato de arriba y por eso van aparte: aquello lo lee una prueba
+      # al correr, y esto lo pide Gradle al CONFIGURAR la tarea, asi que sin el archivo el fallo
+      # no es una asercion sino «Input file does not exist» y no llega a ejecutarse nada.
+      #
+      #   normativa/docs/.../publicacion/parametros-2026.csv   lo declaran `valores`, `coactiva`
+      #       y `nucleo` (#192, ADR-0025 §5): las pruebas del derivado publicable lo leen, y sin
+      #       declararlo `test` se queda UP-TO-DATE y una rotura pasa en verde rancio.
+      #   catastro/docs/50-api/eventos/lote-de-eventos.json    lo declara `nucleo`, y lo lee
+      #       `IngestionDeCatastroJdbcTest`.
+      #
+      # Y de `catastro` hace falta ademas `infra/carga-de-datos/ejemplos`, que no es una entrada
+      # de Gradle sino una ruta que `ArchivosDeEjemploDeRentasTest` resuelve a mano: la tercera
+      # forma de pedirle algo a un hermano, y la que ninguna de las otras dos guardas veria.
+      #
+      # Faltaban los dos, y no se veia porque el `Build completo` no llegaba a correr: el paso
+      # anterior, el de aislamiento, moria antes (C-21). Lo ata ahora `ClonesHermanosDelWorkflowTest`.
+      - name: Traer lo que este repositorio declara de «normativa»
+        uses: actions/checkout@v4
+        with:
+          repository: hneyra/normativa
+          path: normativa
+          token: ${{ secrets.GH_CLONE_KEY || github.token }}
+          sparse-checkout: docs/10-negocio/valores-normativos/publicacion
+          sparse-checkout-cone-mode: false
+
+      - name: Traer lo que este repositorio declara de «catastro»
+        uses: actions/checkout@v4
+        with:
+          repository: hneyra/catastro
+          path: catastro
+          token: ${{ secrets.GH_CLONE_KEY || github.token }}
+          sparse-checkout: |
+            docs/50-api/eventos
+            infra/carga-de-datos/ejemplos
+          sparse-checkout-cone-mode: false
+
       # ADR-0001 fija Java 25. Se comprueba en vez de suponerse: si alguien cambiara la propiedad,
       # CI verificaria en silencio una version de Java distinta de la que se despliega.
       - name: La version de Java declarada es la que instala CI
