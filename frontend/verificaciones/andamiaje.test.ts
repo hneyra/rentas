@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
@@ -59,8 +59,39 @@ describe('«yarn verificar» encadena las tres comprobaciones', () => {
   });
 });
 
+/**
+ * Los dos sitios donde puede estar el workflow del frontend, en orden de preferencia.
+ *
+ * El segundo no deberia existir, y existe por un motivo que se dice en vez de esconderse:
+ * el token con que se empujo este cambio no tiene alcance `workflow`, asi que GitHub
+ * rechaza la rama entera si toca `.github/workflows/`. El archivo viaja en `frontend/ci/`
+ * hasta que alguien pueda moverlo, y el encabezado de ese archivo lleva el `git mv` y el
+ * mensaje exacto del rechazo.
+ *
+ * La prueba mira los dos porque lo que verifica es el CONTENIDO —el filtro, la orden y el
+ * candado—, y eso vale igual antes y despues de instalarlo. Lo que NO admite es que
+ * desaparezca: si no esta en ninguno de los dos, sale rojo.
+ */
+const SITIOS_DEL_WORKFLOW = ['.github/workflows/frontend.yml', 'frontend/ci/frontend.yml'];
+
 describe('el frontend tiene su propia CI', () => {
-  const workflow = leer(join(REPOSITORIO, '.github/workflows/frontend.yml'));
+  const encontrado = SITIOS_DEL_WORKFLOW.map((sitio) => join(REPOSITORIO, sitio)).find((ruta) =>
+    existsSync(ruta),
+  );
+
+  it('el workflow existe, instalado o pendiente de instalar', () => {
+    expect(
+      encontrado,
+      `No hay workflow del frontend en ninguno de sus dos sitios:\n` +
+        SITIOS_DEL_WORKFLOW.map((s) => `  · ${s}`).join('\n') +
+        '\nSin el, «yarn verificar» solo se ejecuta en la maquina de quien lo escribe.',
+    ).toBeDefined();
+  });
+
+  // Sin el archivo, `workflow` es la cadena vacia y NO una excepcion. Leerlo a secas
+  // reventaba el modulo entero con un `ENOENT` durante la recoleccion: los doce casos de
+  // este archivo desaparecian y el rojo hablaba de `readFileSync`, no de la CI que falta.
+  const workflow = encontrado === undefined ? '' : leer(encontrado);
 
   it('se dispara solo con lo suyo', () => {
     // El filtro `paths` es lo contrario del criterio de `publicar-imagenes.yml`, y a
