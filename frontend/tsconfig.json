@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.base.json",
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "verificaciones/**/*.ts",
+    "eslint.prohibiciones.mjs",
+    "vitest.setup.ts",
+    "*.config.ts"
+  ],
+  // Las muestras violan las reglas A PROPOSITO y varias no compilan. Se lintan desde la
+  // prueba, con su texto y una ruta sintetica; el compilador no tiene nada que hacer aqui.
+  "exclude": ["verificaciones/muestras/**", "dist", "node_modules"],
+  "compilerOptions": {
+    "types": ["vite/client", "node", "@testing-library/jest-dom"]
+  }
+}

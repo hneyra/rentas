@@ -13,11 +13,11 @@ fiscalizacion, coactiva, sanciones y licencias. **Es quien decide cuanto se debe
 | Pieza | Estado |
 |---|---|
 | `infrastructure/` — el descriptor (ADR-0031 §2) | **Existe y verifica**: `yarn verificar` en verde, sin Pulumi, sin token y sin cluster |
-| `.github/workflows/` — su CI | **Existe**, con tres flujos: el descriptor, las **dos barreras bloqueantes** del backend y la guarda del registro |
+| `.github/workflows/` — su CI | **Existe**, con seis flujos: el descriptor, las **dos barreras bloqueantes** del backend, la documentacion, la guarda del registro, la publicacion de las dos imagenes y la verificacion del frontend |
 | `docs/30-arquitectura/adr/` | **Existe**, con 11 ADR propio(s) y su indice ⚠ ver la nota de abajo |
 | `backend/` — **17 modulos**, con el negocio dentro | **Existe entero desde P5A.** `./gradlew build` en verde: **3 756 pruebas**, 0 fallos, el mismo numero que `sgtm`. `verificarAislamiento` 223 y `verificarArquitectura` 130 |
 | `V1__baseline.sql` — su esquema | **Esta aqui**, en `backend/kamayuk-rentas-esquema/src/main/resources/db/migration/`. Una sola migracion, 132 tablas |
-| Su frontend (`rentas-web`, ADR-0030 §1) | **NO existe** |
+| Su frontend (`rentas-web`, ADR-0030 §1) | **Existe el andamiaje, y ninguna pantalla** (F-1). Vite 7 + React 19 + TypeScript 5.9 en `frontend/`, con el codigo en `frontend/src/`. `yarn verificar` en verde: **30 pruebas**, 0 fallos. Sus siete reglas son **ocho prohibiciones de ESLint con su muestra que las viola** |
 | La imagen `ghcr.io/hneyra/kamayuk-rentas` | **NO existe.** El `Deployment` del descriptor la nombra igual: es correcto, y en esta etapa no se despliega nada |
 
 ## Por donde entrar

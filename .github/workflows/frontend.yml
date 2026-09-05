@@ -1,0 +1,66 @@
+name: Frontend
+
+# La CI de `rentas-web`. Corre `yarn verificar` —lint, tipos y pruebas— y nada mas: aqui no
+# se construye imagen ni se despliega, porque F-1 levanta el andamiaje y ninguna pantalla.
+#
+# POR QUE SI LLEVA FILTRO `paths`, AL REVES QUE `publicar-imagenes.yml`
+# Alli el filtro seria un defecto: la guarda de `infrastructure` necesita que TODO commit de
+# `main` tenga sus dos imagenes, y con filtro un merge de solo documentacion dejaria un `sha`
+# de `main` sin imagenes, en silencio. Aqui no se publica nada que nadie vaya a pedir por su
+# etiqueta, asi que la equivalencia no hace falta y el filtro solo evita gastar una
+# instalacion de npm en cada cambio del backend.
+#
+# El workflow se incluye en su propio filtro: un cambio en este archivo tiene que verificarse
+# a si mismo. Sin eso, romper la CI del frontend es el unico cambio que la CI del frontend no
+# revisa.
+#
+# NO NECESITA EL CLON HERMANO. El backend si —`settings.gradle.kts` consume `infrastructure`
+# como *composite build*— y por eso `infraestructura.yml` mueve el anfitrion a `rentas/`. El
+# frontend todavia no depende de ningun paquete `@kamayuk/*` publicado, asi que se clona
+# donde toca y ya. El dia que dependa, este archivo se parecera a aquel.
+
+on:
+  push:
+    branches: [main]
+    paths: ["frontend/**", ".github/workflows/frontend.yml"]
+  pull_request:
+    paths: ["frontend/**", ".github/workflows/frontend.yml"]
+
+# Sin permisos de escritura: este trabajo lee y verifica, no publica nada.
+permissions:
+  contents: read
+
+jobs:
+  verificar:
+    name: La interfaz cumple sus reglas
+    runs-on: ubuntu-latest
+    # Un colgado no consume cuota sin limite: la leccion de `observabilidad-alertas`.
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: yarn
+          cache-dependency-path: frontend/yarn.lock
+
+      # `--frozen-lockfile` y no `yarn install` a secas: sin el, una version nueva de
+      # cualquier dependencia entra en la CI sin pasar por ningun PR, y el dia que rompa
+      # algo el diff no lo explica.
+      - name: Instalar
+        working-directory: frontend
+        run: yarn install --frozen-lockfile
+
+      # La MISMA orden que se ejecuta en local. Si aqui se escribieran los tres pasos por
+      # separado, «verde en CI» y «verde en mi maquina» dejarian de ser la misma afirmacion
+      # en cuanto una de las dos cambiara.
+      - name: Verificar
+        working-directory: frontend
+        run: yarn verificar
+
+      # El bundle no se publica todavia, pero se construye: un `tsc` en verde no demuestra
+      # que Vite sepa empaquetar esto, y descubrirlo el dia del despliegue es tarde.
+      - name: Construir el bundle
+        working-directory: frontend
+        run: yarn build

@@ -1,0 +1,182 @@
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { ESLint } from 'eslint';
+import { describe, expect, it } from 'vitest';
+
+import { CLIENTE_DE_API, PROHIBICIONES, REGLAS_EXIGIDAS } from '../eslint.prohibiciones.mjs';
+
+/**
+ * Las reglas de `eslint.config.js` muerden.
+ *
+ * Es el equivalente frontend de `ReglasDeArquitecturaMuerdenTest`: cada prohibicion tiene
+ * una muestra que la viola a proposito, y aqui se exige que ESLint la senale. **Una regla
+ * que no puede fallar no protege nada** — el mismo argumento por el que la prueba de
+ * aislamiento demuestra que el superusuario omite RLS en vez de afirmarlo.
+ *
+ * Tres cosas hacen que esto no sea una lista mas que alguien olvida actualizar:
+ *
+ *   1. La lista de prohibiciones **se importa del propio config**. No hay copia.
+ *   2. El nombre del archivo de la muestra **se compone** desde el `clave`. Anadir una
+ *      prohibicion sin su muestra es un archivo que no existe, y sale rojo aqui mismo.
+ *   3. El mensaje esperado **es el del config**. Si alguien reescribe el mensaje y deja la
+ *      regla apagada, no hay texto duplicado que lo tape.
+ *
+ * Lo que ninguna derivacion puede sujetar es que alguien BORRE una prohibicion: con ella
+ * se iria su prueba, en verde. Eso lo sujeta `REGLAS_EXIGIDAS`, que es la unica lista
+ * escrita a mano y la que nombra las siete reglas del issue.
+ *
+ * Las muestras estan en `ignores` de la configuracion para que `yarn lint` no las senale;
+ * aqui se lintan como TEXTO, con una ruta sintetica dentro de `src/`, que es donde la
+ * regla tiene que aplicar de verdad.
+ */
+
+const AQUI = dirname(fileURLToPath(import.meta.url));
+const RAIZ = join(AQUI, '..');
+const MUESTRAS = join(AQUI, 'muestras');
+
+const eslint = new ESLint({ cwd: RAIZ });
+
+/** Ruta sintetica: la muestra se juzga como si viviera en una pantalla de la aplicacion. */
+const enUnaPantalla = (nombre: string) => join(RAIZ, 'src/pantallas', nombre);
+
+/** El archivo de la muestra de esa clave, o `null` si no hay ninguno. */
+function archivoDeLaMuestra(clave: string): string | null {
+  for (const extension of ['.ts', '.tsx']) {
+    const candidato = join(MUESTRAS, `${clave}${extension}`);
+    if (existsSync(candidato)) {
+      return candidato;
+    }
+  }
+  return null;
+}
+
+async function mensajesDe(archivo: string, rutaJuzgada: string): Promise<string[]> {
+  const codigo = readFileSync(archivo, 'utf8');
+  const [resultado] = await eslint.lintText(codigo, { filePath: rutaJuzgada });
+  return (resultado?.messages ?? []).map((m) => m.message);
+}
+
+describe('cada prohibicion tiene su muestra, y ESLint la senala', () => {
+  it.each(PROHIBICIONES.map((p) => ({ ...p })))('$clave', async ({ clave, message }) => {
+    const archivo = archivoDeLaMuestra(clave);
+
+    expect(
+      archivo,
+      `La prohibicion «${clave}» no tiene muestra que la viole.\n` +
+        `Escribe verificaciones/muestras/${clave}.ts con codigo que la incumpla a\n` +
+        `proposito. Una regla sin muestra no se ha demostrado que pueda fallar, y una\n` +
+        `regla que no puede fallar no protege nada.`,
+    ).not.toBeNull();
+
+    const mensajes = await mensajesDe(archivo as string, enUnaPantalla(`${clave}.ts`));
+
+    expect(
+      mensajes,
+      `ESLint no senalo la muestra de «${clave}».\n` +
+        `Se esperaba el mensaje del config:\n  ${message}\n` +
+        `Se obtuvo:\n${mensajes.length === 0 ? '  (ninguno)' : mensajes.map((m) => `  · ${m}`).join('\n')}`,
+    ).toContain(message);
+  });
+});
+
+describe('la lista de prohibiciones y la de muestras no se separan', () => {
+  it('las siete reglas del producto tienen al menos una prohibicion que las sirve', () => {
+    const servidas = new Set(PROHIBICIONES.map((p) => p.regla));
+    const huerfanas = REGLAS_EXIGIDAS.filter((regla) => !servidas.has(regla));
+
+    expect(
+      huerfanas,
+      'Hay reglas del producto que ninguna prohibicion de ESLint expresa. Una regla que\n' +
+        'solo vive en un documento se incumple en seis meses.',
+    ).toEqual([]);
+  });
+
+  it('ninguna prohibicion sirve a una regla que nadie declaro', () => {
+    const noDeclaradas = PROHIBICIONES.filter((p) => !REGLAS_EXIGIDAS.includes(p.regla)).map(
+      (p) => `${p.clave} -> ${p.regla}`,
+    );
+
+    expect(
+      noDeclaradas,
+      'Una prohibicion nueva se declara tambien en REGLAS_EXIGIDAS: si no, borrarla se\n' +
+        'llevaria su prueba por delante y nadie lo notaria.',
+    ).toEqual([]);
+  });
+
+  it('no hay muestras sin prohibicion que las reclame', () => {
+    const claves = new Set(PROHIBICIONES.map((p) => p.clave));
+    const sobrantes = readdirSync(MUESTRAS)
+      .map((archivo) => archivo.replace(/\.tsx?$/, ''))
+      .filter((clave) => !claves.has(clave));
+
+    expect(
+      sobrantes,
+      'Sobra una muestra: viola una regla que ya no existe, asi que nadie la lee y nada\n' +
+        'la mantiene cierta.',
+    ).toEqual([]);
+  });
+});
+
+describe('la excepcion del cliente de API es exactamente una', () => {
+  const conExcepcion = PROHIBICIONES.filter((p) => p.salvo !== undefined);
+
+  it('solo el cliente de API esta exceptuado de algo', () => {
+    expect(new Set(conExcepcion.map((p) => p.salvo))).toEqual(new Set([CLIENTE_DE_API]));
+  });
+
+  it.each(conExcepcion.map((p) => ({ ...p })))(
+    '«$clave» no se senala dentro de $salvo',
+    async ({ clave, message, salvo }) => {
+      const archivo = archivoDeLaMuestra(clave);
+      const mensajes = await mensajesDe(archivo as string, join(RAIZ, salvo as string, 'x.ts'));
+
+      expect(mensajes).not.toContain(message);
+    },
+  );
+
+  it('pero fuera de el, si', async () => {
+    const mensajes = await mensajesDe(
+      archivoDeLaMuestra('fetch-fuera-del-cliente') as string,
+      enUnaPantalla('cualquiera.ts'),
+    );
+
+    expect(mensajes.join('\n')).toMatch(/Las peticiones pasan por «solicitar»/);
+  });
+
+  it('y el cliente de API no queda exento de TODO: solo de su excepcion', async () => {
+    // Que `src/api/` pueda llamar a `fetch` no lo pone fuera del idioma ni de la regla 2.
+    const mensajes = await mensajesDe(
+      archivoDeLaMuestra('municipalidad-en-el-cliente') as string,
+      join(RAIZ, CLIENTE_DE_API, 'x.ts'),
+    );
+
+    expect(mensajes.join('\n')).toMatch(/jamas envia municipalidadId/);
+  });
+});
+
+describe('las reglas no senalan codigo correcto', () => {
+  it('el codigo que las respeta pasa limpio', async () => {
+    const correcto = `
+      import { solicitar } from '../api/cliente.ts';
+
+      export interface CuentaCorriente {
+        readonly total: string;
+        readonly fechaCalculo: string;
+      }
+
+      export const alicuotaPredial = '0.006';
+
+      export function cuentaDe(contribuyente: string) {
+        // El total llega calculado del backend, con su fecha: aqui solo se pide.
+        return solicitar<CuentaCorriente>(\`/contribuyentes/\${contribuyente}/cuenta\`);
+      }
+    `;
+
+    const [resultado] = await eslint.lintText(correcto, {
+      filePath: enUnaPantalla('correcto.ts'),
+    });
+
+    expect(resultado?.messages ?? []).toEqual([]);
+  });
+});
