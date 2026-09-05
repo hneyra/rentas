@@ -39,6 +39,10 @@ const ENTORNO: EntornoDelDescriptor = {
   nombreConVersion: (base) => `${base}-0eee58e43e04`,
   plataforma: {
     namespace: "sgtm-stg",
+    // El anfitrion del motor, ya cruzando el namespace (C-17, punto 1). Los cuatro descriptores
+    // escribian `postgres:5432` a mano, que es el nombre del `compose.yaml` local: en Kubernetes
+    // no existe ningun `Service` que se llame asi.
+    motor: "sgtm-stg-postgres.sgtm-stg:5432",
     emisor: "https://stg.kamayuk.example/keycloak/realms/sgtm",
     jwks: "http://sgtm-stg-identidad.sgtm-stg:8080/keycloak/realms/sgtm/protocol/openid-connect/certs",
   },
@@ -115,18 +119,45 @@ describe("el descriptor de rentas", () => {
     expect(destinosDeEgreso()).toEqual(["caja", "catastro", "normativa"]);
   });
 
-  it("y sus DOS perfiles producen dos Deployments; el `batch` sin puerto", () => {
-    // `ADR-0003` sigue siendo cierto DENTRO de este sistema: un artefacto, dos perfiles.
+  /**
+   * **Un solo `Deployment`, y el perfil `batch` no es uno** (C-17, punto 5).
+   *
+   * Hasta aqui eran dos, y el segundo —`kamayuk-rentas-batch`— arrancaba, no encontraba nada que
+   * planificar, **salia con codigo 0** a los once segundos y Kubernetes lo volvia a crear:
+   * `CrashLoopBackOff` permanente con la aplicacion sana. `ADR-0003` sigue siendo cierto —un
+   * artefacto, dos perfiles—, y lo que cambia es la FORMA en que el segundo perfil se invoca: el
+   * `Job` de implantacion y el `CronJob` del ingestor, que crean su pod cuando hay trabajo. El
+   * propio codigo lo dice: `CorrerElIngestor` y `CorrerLaAntiEntropia` son `ApplicationRunner`,
+   * «y el perfil `batch` TERMINA el proceso con `web-application-type: none`».
+   *
+   * Un `Deployment` solo admite `restartPolicy: Always`, asi que la forma miente en las dos
+   * direcciones: afirma que algo corre siempre cuando no corre nada, y reporta como fallo una
+   * salida con exito.
+   */
+  it("produce UN Deployment, el del perfil web: `batch` no es un proceso que este siempre", () => {
     const deployments = rentas.despliegue(ENTORNO).filter((m) => m.kind === "Deployment");
-    expect(deployments.map((m) => m.metadata.name)).toEqual([
-      "kamayuk-rentas-web",
-      "kamayuk-rentas-batch",
+    expect(deployments.map((m) => m.metadata.name)).toEqual(["kamayuk-rentas-web"]);
+
+    const perfiles = deployments.map(
+      (m) =>
+        m.kind === "Deployment"
+          ? (m.spec.template.spec.containers[0]?.env ?? []).find(
+              (v) => v.name === "SPRING_PROFILES_ACTIVE",
+            )?.value
+          : undefined,
+    );
+    expect(perfiles, "un `Deployment` en perfil `batch` es un CrashLoopBackOff garantizado").toEqual([
+      "web",
     ]);
-    const batch = deployments[1];
-    if (batch?.kind !== "Deployment") throw new Error("falta el perfil batch");
-    // El perfil batch no atiende HTTP: un puerto ahi es una superficie que nadie pidio.
-    expect(batch.spec.template.spec.containers[0]?.ports).toBeUndefined();
-    expect(batch.spec.template.spec.containers[0]?.livenessProbe).toBeUndefined();
+  });
+
+  /** Y el perfil `batch` sigue existiendo donde le toca: en un Job y en un CronJob. */
+  it("el perfil `batch` corre donde hay trabajo: la implantacion y el ingestor", () => {
+    const enPerfilBatch = [...rentas.implantacion(ENTORNO), ...rentas.lotes(ENTORNO)];
+    const perfiles = contenedoresDe(enPerfilBatch).map(
+      (c) => (c.env ?? []).find((v) => v.name === "SPRING_PROFILES_ACTIVE")?.value,
+    );
+    expect(perfiles).toEqual(["batch", "batch"]);
   });
 });
 
@@ -253,5 +284,54 @@ describe("C-14 §3 — el ingestor de catastro, declarado entero y suspendido", 
     expect(valorDe(c, "KAMAYUK_CATASTRO_URL")).toBe(
       "http://kamayuk-catastro-web.kamayuk-catastro-stg",
     );
+  });
+});
+
+describe("C-17 — que el despliegue pase de verdad", () => {
+  /**
+   * El anfitrion del motor **se pide**, y este descriptor no escribe ninguno.
+   *
+   * Es la mutacion que este criterio existe para cazar: hasta C-17 la constante decia
+   * `jdbc:postgresql://postgres:5432/...`, y en Kubernetes no hay ningun `Service` llamado
+   * `postgres` —ese nombre viene del `compose.yaml` local—. Medido en el clúster:
+   * `UnknownHostException` en los ocho Jobs de los cuatro sistemas y en sus `Deployment`.
+   */
+  it("toda URL de base sale del anfitrion que entrega el entorno", () => {
+    const urls = contenedoresDe([
+      ...rentas.despliegue(ENTORNO),
+      ...rentas.migracion(ENTORNO),
+      ...rentas.implantacion(ENTORNO),
+      ...rentas.lotes(ENTORNO),
+    ]).flatMap((c) => (c.env ?? []).map((v) => v.value ?? ""))
+      .filter((v) => v.startsWith("jdbc:"));
+
+    expect(urls.length, "ninguna variable lleva una URL de base: ¿se dejo de leer?").toBeGreaterThan(0);
+    for (const url of urls) {
+      expect(url).toBe(`jdbc:postgresql://${ENTORNO.plataforma.motor}/rentas`);
+    }
+  });
+
+  /**
+   * DNS, sin el cual las demas reglas de egreso no sirven de nada.
+   *
+   * Una politica de egreso convierte a los pods que selecciona en «solo lo declarado», y todo lo
+   * que estas reglas nombran —el motor, la identidad, los sistemas hermanos— se alcanza por el
+   * nombre de un `Service`. Resolverlo es una consulta a CoreDNS, en `kube-system`. Con la regla
+   * anadida a mano sobre el clúster, las ocho tareas de los cuatro sistemas pasaron de `Failed` a
+   * `Complete` (C-17, punto 3).
+   */
+  it("abre DNS hacia kube-system, en UDP y en TCP", () => {
+    const reglas = rentas.egreso(ENTORNO).flatMap((p) => p.spec.egress ?? []);
+    const dns = reglas.filter((r) =>
+      (r.to ?? []).some(
+        (d) => d.namespaceSelector?.matchLabels?.["kubernetes.io/metadata.name"] === "kube-system",
+      ),
+    );
+
+    expect(dns, "sin DNS ninguna de las demas reglas de egreso puede resolver un nombre").toHaveLength(1);
+    expect(
+      (dns[0]?.ports ?? []).map((p) => `${p.protocol}/${p.port}`).sort(),
+      "TCP tambien: una respuesta que no cabe en un datagrama se reintenta por TCP",
+    ).toEqual(["TCP/53", "UDP/53"]);
   });
 });

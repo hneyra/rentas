@@ -256,6 +256,61 @@ class CadenaDeIdentidadTest {
                     .isEqualTo(200);
         }
 
+        /**
+         * Las DOS sondas que el orquestador pide de verdad, y que esta cadena negaba (C-17 §2).
+         *
+         * <p>Los cuatro descriptores declaran {@code /actuator/health/liveness} y {@code
+         * .../readiness} en sus sondas desde que existen. Medido dentro del clúster: {@code
+         * /actuator/health} devolvia 200 y {@code /actuator/health/liveness} <b>401</b>, de modo
+         * que los cuatro pods arrancaban, conectaban a la base y el kubelet los mataba a los ~45 s.
+         * {@code CrashLoopBackOff} para siempre, con la aplicacion sana.
+         *
+         * <p>Que los grupos EXISTAN no hace falta configurarlo: Spring Boot 4.1 los registra por
+         * omision. Lo que esta prueba anade es que la CADENA los deje pasar — quitar {@code
+         * SONDA_DE_VIDA} o {@code SONDA_DE_PREPARACION} de {@code requestMatchers} devuelve el 401
+         * y estas dos se ponen rojas.
+         */
+        @Test
+        @DisplayName("las dos sondas de Kubernetes se atienden sin identidad")
+        void lasSondasDeKubernetesSonPublicas() throws Exception {
+            for (String ruta :
+                    List.of(SeguridadWeb.SONDA_DE_VIDA, SeguridadWeb.SONDA_DE_PREPARACION)) {
+                HttpResponse<String> respuesta = pedirSinToken(ruta);
+
+                assertThat(respuesta.statusCode())
+                        .as(
+                                "«%s» la pide el kubelet sin credencial ninguna: un 401 aqui es un"
+                                        + " CrashLoopBackOff con la aplicacion sana",
+                                ruta)
+                        .isEqualTo(200);
+                assertThat(respuesta.body())
+                        .as("con `show-details: never` el grupo dice si y no que")
+                        .contains("\"status\":\"UP\"");
+            }
+        }
+
+        /**
+         * Y el comodin sigue cerrado: se abrieron DOS grupos, no {@code /actuator/health/**}.
+         *
+         * <p>Es el contraste que impide pasarse de listo. Un {@code requestMatchers} con comodin
+         * dejaria esta prueba y la anterior en verde y abriria de golpe cualquier grupo que alguien
+         * anada despues, que es exactamente lo que el docstring de {@link SeguridadWeb} dice que no
+         * se hace.
+         */
+        @Test
+        @DisplayName("y ningun otro grupo de salud se abrio de paso")
+        void elComodinSigueCerrado() throws Exception {
+            HttpResponse<String> respuesta = pedirSinToken(SeguridadWeb.SONDA_DE_SALUD + "/db");
+
+            assertThat(respuesta.statusCode())
+                    .as(
+                            "la cadena tiene que NEGARLA. Con un comodin la peticion llegaria al"
+                                    + " endpoint y volveria 404 —`show-details: never` no publica"
+                                    + " componentes—, que es un rojo distinto y por eso se compara"
+                                    + " contra el codigo exacto y no contra «no es 200»")
+                    .isEqualTo(401);
+        }
+
         @Test
         @DisplayName("las metricas de Prometheus se atienden sin identidad, y son las dos unicas")
         void lasMetricasSonPublicas() throws Exception {

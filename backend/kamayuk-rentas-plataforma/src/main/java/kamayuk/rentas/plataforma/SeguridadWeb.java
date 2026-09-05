@@ -35,10 +35,12 @@ import org.springframework.security.web.access.AccessDeniedHandler;
  * <h2>Las cuatro reglas</h2>
  *
  * <ul>
- *   <li>{@code /actuator/health} es publico. Es lo que permite que el orquestador sepa si el
- *       proceso esta vivo y con base de datos; sin un endpoint publico, {@code depends_on:
- *       service_healthy} no puede significar nada. No expone detalles: {@code show-details} va en
- *       {@code never}, asi que dice si y no que.
+ *   <li>{@code /actuator/health} es publico, y con el sus dos GRUPOS —{@code .../liveness} y {@code
+ *       .../readiness}—. Es lo que permite que el orquestador sepa si el proceso esta vivo y con
+ *       base de datos; sin un endpoint publico, {@code depends_on: service_healthy} no puede
+ *       significar nada. No expone detalles: {@code show-details} va en {@code never}, asi que dice
+ *       si y no que. Los tres se nombran <b>uno por uno</b>, sin comodin: el porque de que los
+ *       grupos no basten con el padre esta en {@link #SONDA_DE_VIDA}.
  *   <li>{@code /actuator/prometheus} tambien es publico —sin token—, y es una decision distinta a
  *       la de {@code health}: no protege datos de negocio, protege una superficie de ataque. Lo que
  *       lo mantiene fuera de alcance NO es esta cadena: es que ninguna {@code IngressRoute} enruta
@@ -88,6 +90,58 @@ public class SeguridadWeb {
 
     /** La sonda de vida del orquestador. Se atiende sin identidad. */
     public static final String SONDA_DE_SALUD = "/actuator/health";
+
+    /**
+     * La sonda de <b>vida</b> de Kubernetes: «¿este proceso sigue en pie?».
+     *
+     * <p>Es un GRUPO de {@link #SONDA_DE_SALUD}, no un endpoint nuevo. Spring Boot 4.1 lo registra
+     * por omision —{@code AvailabilityProbesAutoConfiguration} lleva
+     * {@code @ConditionalOnBooleanProperty(name = "management.endpoint.health.probes.enabled",
+     * matchIfMissing = true)}—, asi que aqui no hay ninguna propiedad que anadir: lo unico que
+     * faltaba era abrirlo.
+     *
+     * <h2>Por que se abre, habiendo un {@code /actuator/health} que ya es publico</h2>
+     *
+     * <p>Porque los dos <b>no dicen lo mismo</b>. {@code /actuator/health} incluye el indicador de
+     * la base de datos, y una sonda de VIDA que incluya la base le dice al orquestador «mata este
+     * proceso cuando la base no conteste». Matarlo no devuelve la base: lo que produce es los
+     * cuatro sistemas reiniciandose en bucle mientras el motor se recupera, tirando en cada vuelta
+     * el pool de conexiones y el monton caliente de la JVM — una caida del motor convertida en
+     * cinco. Este grupo contiene <b>solo</b> {@code livenessState}: contesta si el proceso esta
+     * vivo, que es la unica pregunta cuya respuesta «no» se arregla reiniciando.
+     *
+     * <h2>Lo que cuesta, medido y no supuesto</h2>
+     *
+     * <p>Lo que se anade a la superficie sin token son dos <b>subrecursos del endpoint que ya era
+     * publico</b>, y con {@code show-details: never} cada uno contesta exactamente {@code
+     * {"status":"UP"}}: dicen estrictamente MENOS que su padre, que ya enumeraba mas indicadores. Y
+     * se nombran <b>uno por uno</b>, sin comodin: {@code /actuator/health/**} abriria de golpe
+     * cualquier grupo que alguien anada despues, que es justo lo que el docstring de esta clase
+     * dice que no se hace.
+     *
+     * <h2>Como se llego a esto</h2>
+     *
+     * <p>Los cuatro descriptores declaraban estas dos rutas en sus sondas desde que existen, y esta
+     * cadena permitia <b>solo</b> {@code /actuator/health}. Medido dentro del clúster: {@code
+     * /actuator/health} → 200, {@code /actuator/health/liveness} → <b>401</b>. Los cuatro pods
+     * arrancaban, conectaban a la base y el kubelet los mataba a los ~45 s: {@code
+     * CrashLoopBackOff} para siempre, con la aplicacion sana. Nada comparaba la ruta de la sonda
+     * con lo que esta cadena permite; ahora lo hace `sondas-contra-la-cadena.test.ts` de
+     * `infrastructure`, que lee este archivo y los cuatro descriptores (C-17, punto 2).
+     */
+    public static final String SONDA_DE_VIDA = SONDA_DE_SALUD + "/liveness";
+
+    /**
+     * La sonda de <b>preparacion</b> de Kubernetes: «¿puede recibir trafico?».
+     *
+     * <p>El otro grupo, y con la misma decision detras. Contiene solo {@code readinessState}, asi
+     * que <b>no comprueba la base</b> — y eso es deliberado: quien la comprueba es la sonda de
+     * ARRANQUE, que sigue apuntando a {@link #SONDA_DE_SALUD} entero, de modo que un pod no se
+     * declara arrancado hasta que llega a su base. Despues del arranque, con una sola replica,
+     * sacar el pod de la rotacion no gana nada: el ingreso contestaria 503 —indistinguible de «el
+     * sistema entero esta caido»— en vez del error del catalogo, que dice que paso.
+     */
+    public static final String SONDA_DE_PREPARACION = SONDA_DE_SALUD + "/readiness";
 
     /**
      * Las metricas de Prometheus (issue #156). Se atienden sin identidad porque quien las protege
@@ -221,7 +275,11 @@ public class SeguridadWeb {
     SecurityFilterChain cadenaDeSeguridad(HttpSecurity http) throws Exception {
         return http.authorizeHttpRequests(
                         rutas ->
-                                rutas.requestMatchers(SONDA_DE_SALUD, METRICAS)
+                                rutas.requestMatchers(
+                                                SONDA_DE_SALUD,
+                                                SONDA_DE_VIDA,
+                                                SONDA_DE_PREPARACION,
+                                                METRICAS)
                                         .permitAll()
                                         .requestMatchers(RAIZ_DE_LA_API)
                                         .authenticated()

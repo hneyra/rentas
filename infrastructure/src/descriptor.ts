@@ -55,8 +55,23 @@ const SISTEMA = "rentas";
 /** La imagen del migrador: el otro objetivo del mismo `Dockerfile` (C-14, punto 1). */
 const MIGRADOR = `${SISTEMA}-migrador`;
 
-/** Su base, en el motor de la plataforma. Una por sistema (ADR-0029, ADR-0032). */
-const URL_DE_LA_BASE = `jdbc:postgresql://postgres:5432/${SISTEMA}`;
+/**
+ * Su base, en el motor de la plataforma. Una por sistema (ADR-0029, ADR-0032).
+ *
+ * **El anfitrion lo pide, no lo escribe** (C-17, punto 1). Hasta aqui esta linea decia
+ * `jdbc:postgresql://postgres:5432/...`, y en Kubernetes **no hay ningun `Service` llamado
+ * `postgres`**: ese nombre viene del `compose.yaml` local. El servicio real es
+ * `sgtm-<ambiente>-postgres` y vive en el namespace de la PLATAFORMA, asi que ni siquiera un
+ * nombre corto correcto resolveria desde aqui. Lo medido fue `UnknownHostException` en los ocho
+ * Jobs y en los `Deployment` de los cuatro: nada del producto podia arrancar.
+ *
+ * Componerlo aqui seria repetir dos convenciones que son de `infrastructure` —como se nombra un
+ * recurso del ambiente y como se llama su namespace—, y dos copias de una convencion se separan.
+ * Lo que si es de este sistema, y por eso se escribe aqui, es el nombre de su base.
+ */
+function urlDeLaBase(e: EntornoDelDescriptor): string {
+  return `jdbc:postgresql://${e.plataforma.motor}/${SISTEMA}`;
+}
 
 /**
  * Lo que piden los Jobs de un solo uso —migrar e implantar— y los procesos por lotes.
@@ -84,7 +99,7 @@ const RECURSOS_DE_ARRANQUE = {
 /** La conexion de la aplicacion: `sgtm_app` y solo `sgtm_app` (ARQ-03 §4). */
 function credencialesDeLaAplicacion(e: EntornoDelDescriptor): VariableDeEntorno[] {
   return [
-    { name: "SGTM_DB_URL", value: URL_DE_LA_BASE },
+    { name: "SGTM_DB_URL", value: urlDeLaBase(e) },
     { name: "SGTM_DB_USUARIO", value: "sgtm_app" },
     {
       name: "SGTM_DB_CLAVE",
@@ -108,7 +123,7 @@ function contenedorDelMigrador(e: EntornoDelDescriptor): Contenedor {
     name: "migrador",
     image: e.imagenDe(MIGRADOR),
     env: [
-      { name: "SGTM_DB_URL", value: URL_DE_LA_BASE },
+      { name: "SGTM_DB_URL", value: urlDeLaBase(e) },
       // Migrar es lo unico que corre como `sgtm_owner`: es el unico rol con DDL.
       { name: "SGTM_DB_OWNER_USUARIO", value: "sgtm_owner" },
       {
@@ -135,7 +150,7 @@ function variablesDeImplantacion(e: EntornoDelDescriptor): VariableDeEntorno[] {
     { name: "KAMAYUK_IMPLANTACION_ADMINISTRADOR", value: i.administrador },
     { name: "KAMAYUK_IMPLANTACION_NOMBREDELADMINISTRADOR", value: i.nombreDelAdministrador },
     { name: "KAMAYUK_IMPLANTACION_ESDEMOSTRACION", value: String(i.esDemostracion) },
-    { name: "KAMAYUK_IMPLANTACION_URL", value: URL_DE_LA_BASE },
+    { name: "KAMAYUK_IMPLANTACION_URL", value: urlDeLaBase(e) },
     // OWNERCLAVE sin guion bajo: en una variable de entorno el `_` se traduce a punto, asi que
     // `KAMAYUK_IMPLANTACION_OWNER_CLAVE` seria `kamayuk.implantacion.owner.clave` y no
     // `owner-clave`. Es la misma nota que lleva el Job del monolito, y por el mismo motivo.
@@ -210,7 +225,7 @@ function despliegueDelPerfil(e: EntornoDelDescriptor, perfil: string, atiendeHtt
                 image: e.imagenDe(SISTEMA),
                 env: [
                   { name: "SPRING_PROFILES_ACTIVE", value: perfil },
-                  { name: "SGTM_DB_URL", value: URL_DE_LA_BASE },
+                  { name: "SGTM_DB_URL", value: urlDeLaBase(e) },
                   { name: "SGTM_DB_USUARIO", value: "sgtm_app" },
                   {
                     name: "SGTM_DB_CLAVE",
@@ -283,8 +298,38 @@ export const rentas: DescriptorDeSistema = {
     };
   },
 
-  despliegue: (e) => [...despliegueDelPerfil(e, "web", true),
-    ...despliegueDelPerfil(e, "batch", false)],
+  /**
+   * **Un solo `Deployment`, el del perfil `web`** (C-17, punto 5).
+   *
+   * Hasta aqui habia dos, y el segundo era `kamayuk-rentas-batch`. Medido en el clúster: arranca,
+   * registra «No TaskScheduler/ScheduledExecutorService bean found for scheduled processing»,
+   * **sale con codigo 0** a los once segundos y Kubernetes lo vuelve a crear —`CrashLoopBackOff`
+   * con siete reinicios—. No es un fallo de arranque disfrazado: es que **no hay nada que
+   * sostenga vivo a ese proceso**, y el propio codigo lo dice. `CorrerElIngestor` y
+   * `CorrerLaAntiEntropia` son `ApplicationRunner` del perfil `batch`, y su javadoc explica por
+   * que no son `@Scheduled`: «en los cuatro backends no hay ni un `@EnableScheduling` […] y el
+   * perfil `batch` TERMINA el proceso con `web-application-type: none`».
+   *
+   * ## Por que se quita, y no se convierte en `CronJob` ni se le da algo que lo mantenga vivo
+   *
+   * Porque el trabajo del perfil `batch` **ya tiene su forma, y son dos**: `implantacion()` —un
+   * `Job`, que corre una vez— y `lotes()` —el `CronJob` del ingestor, que corre en su ventana—.
+   * Los dos crean su pod cuando hay trabajo y lo dejan morir al acabar. Un `Deployment` dice
+   * «esto tiene que estar corriendo siempre», y aqui no hay nada que lo este.
+   *
+   * Un `CronJob` mas tampoco: un `CronJob` necesita una ventana y algo que correr en ella, y este
+   * sistema ya tiene el suyo. Anadir un segundo con la misma imagen y ningun runner que invocar
+   * seria el mismo vacio con horario.
+   *
+   * ## Lo que costaba tenerlo, que es mas que un pod en rojo
+   *
+   * Un `Deployment` solo admite `restartPolicy: Always`, asi que Kubernetes **no puede
+   * distinguir «termino» de «se murio»**: la forma miente en las dos direcciones —afirma que algo
+   * corre siempre cuando no corre nada, y reporta como fallo una salida con exito—. Y un
+   * `CrashLoopBackOff` permanente en el tablero es ruido que acaba no mirandose, que es lo que
+   * hace que el dia que reviente algo de verdad tampoco se mire.
+   */
+  despliegue: (e) => despliegueDelPerfil(e, "web", true),
 
   /**
    * Su Job de migracion. Cada base tiene sus migraciones y su prueba de aislamiento.
@@ -518,6 +563,45 @@ export const rentas: DescriptorDeSistema = {
           podSelector: { matchLabels: { componente: SISTEMA } },
           policyTypes: ["Egress"],
           egress: [
+            // ── DNS, y va primero porque todo lo demas depende de el ──────────────────
+            //
+            // Sin esta regla las cuatro que siguen NO SIRVEN DE NADA. Una politica de egreso
+            // convierte a los pods que selecciona en «solo lo declarado», y `postgres`,
+            // `identidad` y los sistemas hermanos se nombran por su `Service`: resolver ese
+            // nombre es una consulta a CoreDNS, que vive en `kube-system`, y ninguna de las
+            // reglas de abajo la permite. El sintoma medido es `UnknownHostException`, y es
+            // **intermitente** —la resolucion se cachea, asi que a veces sale y a veces no—,
+            // que es peor que fallar siempre.
+            //
+            // Con esta regla anadida a mano sobre el clúster, las OCHO tareas de los cuatro
+            // sistemas pasaron de `Failed` a `Complete` (C-17, punto 3).
+            //
+            // Es la misma politica que `Red.ts` le da al namespace de la plataforma desde que
+            // existe (`permitir-dns`): lo que fallo aqui no fue la idea, fue que estas politicas
+            // se escribieron de cero y esa parte no se copio. Va **en el descriptor** y no en
+            // `infrastructure` porque quien decide que pods restringe esta politica es este
+            // archivo —`podSelector` es suyo—; lo que si es de `infrastructure` es la guarda que
+            // comprueba que ningun sistema se la deje.
+            //
+            // Sin `podSelector` en el destino, a proposito: lo que se abre es el PUERTO 53 hacia
+            // el namespace del sistema, no un pod concreto. Nombrar `k8s-app: kube-dns` ataria
+            // esta politica a como etiqueta sus pods una distribucion de Kubernetes.
+            {
+              to: [
+                {
+                  namespaceSelector: {
+                    matchLabels: { "kubernetes.io/metadata.name": "kube-system" },
+                  },
+                },
+              ],
+              ports: [
+                { protocol: "UDP", port: 53 },
+                // TCP tambien: una respuesta que no cabe en un datagrama se reintenta por TCP,
+                // y una politica que solo abriera UDP funcionaria hasta el dia que dejara de
+                // hacerlo, por el tamano de una respuesta.
+                { protocol: "TCP", port: 53 },
+              ],
+            },
             // Su motor. Los cuatro lo necesitan; cada uno a SU base.
             {
               to: [
@@ -612,17 +696,26 @@ export const rentas: DescriptorDeSistema = {
     json: { title: `Kamayuk · ${SISTEMA}`, panels: [] },
   }),
 
-  /** Su inventario de claves: metadatos, **nunca un valor** (INF-06, ADR-0011 §3). */
-  claves: (): ClaveDeclarada[] => [
+  /**
+   * Su inventario de claves: metadatos, **nunca un valor** (INF-06, ADR-0011 §3).
+   *
+   * **El nombre sale de `e.secretoDe(...)`, el mismo que usan los manifiestos** (C-17, punto 4).
+   * Hasta aqui esta lista decia `kamayuk-<sistema>-app` —sin el ambiente— mientras los
+   * `secretKeyRef` de arriba pedian `kamayuk-<sistema>-<ambiente>-app`: el inventario nombraba
+   * un `Secret` que nadie monta, y los que se montan no estaban en ningun inventario. La
+   * interseccion entre lo declarado y lo referenciado era **cero**, y el sintoma no es un error
+   * sino un pod en `Pending` esperando un `Secret` que nadie genera.
+   */
+  claves: (e): ClaveDeclarada[] => [
     {
-      nombre: `kamayuk-${SISTEMA}-app`,
+      nombre: e.secretoDe("app"),
       clave: "clave",
       rol: "sgtm_app",
       rotacion: "trimestral",
       proposito: `la conexion de ${SISTEMA} a su base`,
     },
     {
-      nombre: `kamayuk-${SISTEMA}-owner`,
+      nombre: e.secretoDe("owner"),
       clave: "clave",
       rol: "sgtm_owner",
       rotacion: "anual",
@@ -632,7 +725,7 @@ export const rentas: DescriptorDeSistema = {
       // El pool del ingestor (C-8): OTRO rol dentro del mismo proceso. `V4` y `V5` no le dan a
       // `sgtm_app` mas que `SELECT` sobre las cuatro proyecciones, asi que quien las escribe
       // tiene que ser otro — y ese otro no atiende peticiones.
-      nombre: `kamayuk-${SISTEMA}-ingestor`,
+      nombre: e.secretoDe("ingestor"),
       clave: "clave",
       rol: "rol_ingestor_catastro",
       rotacion: "trimestral",
@@ -646,7 +739,7 @@ export const rentas: DescriptorDeSistema = {
       // —ADR-0028 §2, RFC 8693— en ninguno de los cuatro repositorios (C-8, hueco 3). Un valor
       // generado por `bootstrap-secretos.sh` es una cadena aleatoria, no un token que Keycloak
       // haya emitido, asi que `catastro` la rechaza con 401. Por eso el CronJob nace suspendido.
-      nombre: `kamayuk-${SISTEMA}-catastro`,
+      nombre: e.secretoDe("catastro"),
       clave: "clave",
       rotacion: "trimestral",
       proposito: "pedir el buzon de hechos de catastro; sin identidad de servicio todavia",
