@@ -136,26 +136,49 @@ function contenedorDelMigrador(e: EntornoDelDescriptor): Contenedor {
   };
 }
 
-/** Las propiedades de `DatosDeImplantacion`, tal como Spring las lee del entorno. */
+/**
+ * Las propiedades de `DatosDeImplantacion`, tal como Spring las lee del entorno.
+ *
+ * **El prefijo es `SGTM_IMPLANTACION_` y no `KAMAYUK_IMPLANTACION_`, y esa es la correccion de
+ * C-18.** No es una preferencia: `DatosDeImplantacion` de ESTE sistema declara
+ * `@ConfigurationProperties("sgtm.implantacion")` —y `RegistroDeMunicipalidadesJdbc` lee
+ * `${sgtm.implantacion.url}` y `${sgtm.implantacion.owner-clave}`—, porque `rentas` es el
+ * monolito y conserva su prefijo; los otros tres estrenaron `kamayuk.implantacion` a proposito,
+ * para que un descuido no pueda apuntar la implantacion de uno con las variables de otro.
+ *
+ * Hasta C-18 este descriptor ponia el prefijo de los otros tres, y el sintoma **no se parece a
+ * su causa**: `ImplantarMunicipalidad` esta condicionado a `@ConditionalOnProperty(
+ * "sgtm.implantacion.ubigeo")`, asi que el runner NO SE REGISTRA, el proceso arranca, no hace
+ * nada y **sale con codigo 0**. El `Job` de Kubernetes queda `Complete` y la evidencia de C-17 lo
+ * recoge asi —«kamayuk-rentas-implantacion … Complete 1/1 25s»—: una tarea que dice que si porque
+ * no estaba mirando. Lo medido en el compose de C-18: `flyway_schema_history` con 13 filas y
+ * `municipalidad` **vacia**, o sea `rentas` migrado y sin ninguna municipalidad — sin fila no hay
+ * `municipalidad_id` que poner en ningun token, ni accesos sembrados, ni administrador, asi que a
+ * `rentas` no puede entrar nadie.
+ *
+ * Lo que impide que vuelva a pasar es una guarda de `infrastructure` que LEE el
+ * `@ConfigurationProperties` de cada sistema y lo compara con lo que su descriptor pone
+ * (`prefijo-de-la-implantacion.test.ts`): el prefijo deja de estar escrito en dos sitios.
+ */
 function variablesDeImplantacion(e: EntornoDelDescriptor): VariableDeEntorno[] {
   const i = e.implantacion;
   return [
     { name: "SPRING_PROFILES_ACTIVE", value: "batch" },
     ...credencialesDeLaAplicacion(e),
-    { name: "KAMAYUK_IMPLANTACION_UBIGEO", value: i.ubigeo },
-    { name: "KAMAYUK_IMPLANTACION_NOMBRE", value: i.nombre },
-    { name: "KAMAYUK_IMPLANTACION_TIPO", value: i.tipo },
+    { name: "SGTM_IMPLANTACION_UBIGEO", value: i.ubigeo },
+    { name: "SGTM_IMPLANTACION_NOMBRE", value: i.nombre },
+    { name: "SGTM_IMPLANTACION_TIPO", value: i.tipo },
     // No crea ninguna contrasena: la credencial vive en Keycloak, y esta cuenta tiene que ser
     // la misma que exista alli.
-    { name: "KAMAYUK_IMPLANTACION_ADMINISTRADOR", value: i.administrador },
-    { name: "KAMAYUK_IMPLANTACION_NOMBREDELADMINISTRADOR", value: i.nombreDelAdministrador },
-    { name: "KAMAYUK_IMPLANTACION_ESDEMOSTRACION", value: String(i.esDemostracion) },
-    { name: "KAMAYUK_IMPLANTACION_URL", value: urlDeLaBase(e) },
+    { name: "SGTM_IMPLANTACION_ADMINISTRADOR", value: i.administrador },
+    { name: "SGTM_IMPLANTACION_NOMBREDELADMINISTRADOR", value: i.nombreDelAdministrador },
+    { name: "SGTM_IMPLANTACION_ESDEMOSTRACION", value: String(i.esDemostracion) },
+    { name: "SGTM_IMPLANTACION_URL", value: urlDeLaBase(e) },
     // OWNERCLAVE sin guion bajo: en una variable de entorno el `_` se traduce a punto, asi que
-    // `KAMAYUK_IMPLANTACION_OWNER_CLAVE` seria `kamayuk.implantacion.owner.clave` y no
-    // `owner-clave`. Es la misma nota que lleva el Job del monolito, y por el mismo motivo.
+    // `SGTM_IMPLANTACION_OWNER_CLAVE` seria `sgtm.implantacion.owner.clave` y no `owner-clave`.
+    // Es la misma nota que lleva el Job del monolito, y por el mismo motivo.
     {
-      name: "KAMAYUK_IMPLANTACION_OWNERCLAVE",
+      name: "SGTM_IMPLANTACION_OWNERCLAVE",
       valueFrom: { secretKeyRef: { name: e.secretoDe("owner"), key: "clave" } },
     },
   ];

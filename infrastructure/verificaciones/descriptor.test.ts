@@ -216,8 +216,29 @@ describe("C-14 — que esto se pueda desplegar", () => {
     const c = pod.containers[0]!;
     expect(c.image).toBe(ENTORNO.imagenDe("rentas"));
     expect(valorDe(c, "SPRING_PROFILES_ACTIVE")).toBe("batch");
-    expect(valorDe(c, "KAMAYUK_IMPLANTACION_UBIGEO")).toBe("200105");
-    expect(valorDe(c, "KAMAYUK_IMPLANTACION_ESDEMOSTRACION")).toBe("true");
+    // EL PREFIJO DE `rentas` ES `SGTM_IMPLANTACION_`, y hasta C-18 esta linea decia el otro.
+    //
+    // `rentas` es el monolito y conserva `@ConfigurationProperties("sgtm.implantacion")`; sus dos
+    // `@Value` piden `${sgtm.implantacion.url}` y `${sgtm.implantacion.owner-clave}`. Los otros
+    // tres estrenaron `kamayuk.implantacion` **a proposito**, para que un descuido no pueda
+    // apuntar la implantacion de uno con las variables de otro — y el descriptor de `rentas`
+    // copio el de sus hermanos, con esta comprobacion exigiendo el nombre roto. Es el mismo modo
+    // de fallo que C-17 §1: una guarda que fosiliza el defecto que tenia que ver.
+    //
+    // El defecto es MUDO: `ImplantarMunicipalidad` esta condicionado a
+    // `@ConditionalOnProperty("sgtm.implantacion.ubigeo")`, asi que con el prefijo ajeno el runner
+    // **no se registra**, el proceso arranca, no hace nada y sale con codigo 0 — el Job queda
+    // `Complete`. Medido levantando el compose de C-18: 13 migraciones aplicadas y `municipalidad`
+    // VACIA, o sea `rentas` sin ninguna municipalidad y sin nadie que pueda entrar.
+    //
+    // Aqui va el literal y no una lectura del Java, y conviene decir por que: este paquete no
+    // tiene `@types/node`, asi que no puede leer un archivo sin estrenar una dependencia. Lo que
+    // ata este literal a su Java es `infrastructure/infra/verificaciones/prefijo-de-la-implantacion.test.ts`,
+    // que lee el `@ConfigurationProperties` de los cuatro y lo compara con lo que su descriptor
+    // pone — el mismo reparto que `checkout-en-el-espacio-de-trabajo`: la comparacion vive donde
+    // estan los dos clones.
+    expect(valorDe(c, "SGTM_IMPLANTACION_UBIGEO")).toBe("200105");
+    expect(valorDe(c, "SGTM_IMPLANTACION_ESDEMOSTRACION")).toBe("true");
   });
 
   /**
