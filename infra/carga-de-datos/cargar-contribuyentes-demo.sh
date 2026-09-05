@@ -21,7 +21,7 @@
 # `infrastructure/infra/carga-de-datos/siembra/pasos.tsv`, que es el unico sitio desde el
 # que se ven los tres sistemas a la vez (ADR-0031).
 #   uso: cargar-contribuyentes-demo.sh --ambiente stg|prod --municipalidad-id N \
-#        --archivo ejemplos/contribuyentes.csv [--namespace sgtm-stg] [--observacion "..."]
+#        --archivo ejemplos/contribuyentes.csv [--namespace kamayuk-stg] [--observacion "..."]
 #
 # Requiere: kubectl con el tunel al API del ambiente ya abierto (ver infra/README.md).
 set -euo pipefail
@@ -45,15 +45,15 @@ done
 [ -n "$MUNICIPALIDAD_ID" ] || { echo "Falta --municipalidad-id." >&2; exit 2; }
 [ -n "$ARCHIVO" ] || { echo "Falta --archivo (el CSV de contribuyentes ficticios; hay uno en ejemplos/contribuyentes.csv)." >&2; exit 2; }
 [ -f "$ARCHIVO" ] || { echo "No existe el archivo: $ARCHIVO" >&2; exit 2; }
-NAMESPACE=${NAMESPACE:-sgtm-$AMBIENTE}
+NAMESPACE=${NAMESPACE:-kamayuk-$AMBIENTE}
 
 SUFIJO=$(date +%s)
-RECURSO="sgtm-${AMBIENTE}-carga-demo-contribuyentes-${SUFIJO}"
+RECURSO="kamayuk-${AMBIENTE}-carga-demo-contribuyentes-${SUFIJO}"
 
-IMAGEN=$(kubectl -n "$NAMESPACE" get deployment "sgtm-${AMBIENTE}-aplicacion" \
+IMAGEN=$(kubectl -n "$NAMESPACE" get deployment "kamayuk-${AMBIENTE}-aplicacion" \
     -o jsonpath='{.spec.template.spec.containers[0].image}')
 [ -n "$IMAGEN" ] || {
-    echo "No se pudo leer la imagen de sgtm-${AMBIENTE}-aplicacion en $NAMESPACE" >&2
+    echo "No se pudo leer la imagen de kamayuk-${AMBIENTE}-aplicacion en $NAMESPACE" >&2
     exit 1
 }
 echo "Imagen desplegada: $IMAGEN"
@@ -92,7 +92,7 @@ spec:
         app: lote
     spec:
       restartPolicy: Never
-      priorityClassName: sgtm-${AMBIENTE}-prioridad-lote
+      priorityClassName: kamayuk-${AMBIENTE}-prioridad-lote
       containers:
         - name: carga-demo-contribuyentes
           image: $IMAGEN
@@ -100,13 +100,13 @@ spec:
             - name: SPRING_PROFILES_ACTIVE
               value: batch
             - name: KAMAYUK_DB_URL
-              value: jdbc:postgresql://sgtm-${AMBIENTE}-postgres:5432/sgtm
+              value: jdbc:postgresql://kamayuk-${AMBIENTE}-postgres:5432/sgtm
             - name: KAMAYUK_DB_USUARIO
               value: kamayuk_app
             - name: KAMAYUK_DB_CLAVE
               valueFrom:
                 secretKeyRef:
-                  name: sgtm-${AMBIENTE}-postgres-app
+                  name: kamayuk-${AMBIENTE}-postgres-app
                   key: clave-app
             - name: KAMAYUK_CARGACONTRIBUYENTESDEMO_MUNICIPALIDADID
               value: "$MUNICIPALIDAD_ID"

@@ -107,7 +107,7 @@ queda esto, que **no es un olvido**:
 | Nombres de clase: `SgtmAplicacion`, `ConfiguracionDelSgtm`, `TablasDelSgtm`, `CrucesConsentidosDelSgtm` | Son identificadores de Java |
 | `bootJar` → `sgtm.jar`, y el `Dockerfile` que lo copia por ese nombre | El artefacto y su imagen |
 | Claves de configuración de Spring: `sgtm.redondeo.*`, `sgtm.implantacion.*`, `sgtm.carga-*`, `sgtm.portal.oidc.*`, y las variables `SGTM_*` | Las lee el código; renombrarlas es cambiar el contrato del despliegue |
-| `sgtm-ciudadano` (realm), `s3://sgtm-stg` (bucket de una prueba) | No son módulos. La lista blanca del guion los deja fuera **a propósito** |
+| `sgtm-ciudadano` (realm), `s3://kamayuk-stg` (bucket de una prueba) | No son módulos. La lista blanca del guion los deja fuera **a propósito** |
 
 Son candidatos a una etapa de limpieza posterior, no a ésta.
 

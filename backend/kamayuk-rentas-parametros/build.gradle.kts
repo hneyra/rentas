@@ -9,8 +9,8 @@
 // verificacion y ocurre en `normativa`, con su propio rol y su propia base.
 
 plugins {
-    id("sgtm.modulo")
-    id("sgtm.pruebas-postgres")
+    id("kamayuk.modulo")
+    id("kamayuk.pruebas-postgres")
     `java-test-fixtures`
 }
 

@@ -7,7 +7,7 @@ import org.gradle.api.artifacts.VersionCatalogsExtension
 
 plugins {
     // La cadena es calidad -> java-base, asi que aplicar esta trae las dos.
-    id("sgtm.calidad")
+    id("kamayuk.calidad")
 }
 
 val libs = extensions.getByType<VersionCatalogsExtension>().named("libs")

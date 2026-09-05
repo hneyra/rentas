@@ -5,8 +5,8 @@
 // Modulith. Ningun otro modulo tiene en su classpath a todos los demas.
 
 plugins {
-    id("sgtm.java-base")
-    id("sgtm.pruebas-postgres")
+    id("kamayuk.java-base")
+    id("kamayuk.pruebas-postgres")
     alias(libs.plugins.spring.boot)
 }
 
@@ -132,7 +132,7 @@ tasks.test {
         .withPathSensitivity(PathSensitivity.NONE)
 
     // Gradle no propaga las propiedades de sistema del build al proceso de prueba
-    // (lo mismo que hace `sgtm.pruebas-postgres` con las suyas). Sin esto,
+    // (lo mismo que hace `kamayuk.pruebas-postgres` con las suyas). Sin esto,
     // `-Dkamayuk.formas.regenerar=true` no llega y el archivo no se puede regenerar.
     for (propiedad in listOf("kamayuk.formas.regenerar", "kamayuk.respuestas.regenerar", "kamayuk.contratos.regenerar")) {
         providers.systemProperty(propiedad).orNull?.let { systemProperty(propiedad, it) }

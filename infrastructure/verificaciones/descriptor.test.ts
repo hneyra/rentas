@@ -38,13 +38,13 @@ const ENTORNO: EntornoDelDescriptor = {
   // El nombre de un `Job` lleva la version: un `Job` de Kubernetes es INMUTABLE.
   nombreConVersion: (base) => `${base}-0eee58e43e04`,
   plataforma: {
-    namespace: "sgtm-stg",
+    namespace: "kamayuk-stg",
     // El anfitrion del motor, ya cruzando el namespace (C-17, punto 1). Los cuatro descriptores
     // escribian `postgres:5432` a mano, que es el nombre del `compose.yaml` local: en Kubernetes
     // no existe ningun `Service` que se llame asi.
-    motor: "sgtm-stg-postgres.sgtm-stg:5432",
+    motor: "kamayuk-stg-postgres.kamayuk-stg:5432",
     emisor: "https://stg.kamayuk.example/keycloak/realms/sgtm",
-    jwks: "http://sgtm-stg-identidad.sgtm-stg:8080/keycloak/realms/sgtm/protocol/openid-connect/certs",
+    jwks: "http://kamayuk-stg-identidad.kamayuk-stg:8080/keycloak/realms/sgtm/protocol/openid-connect/certs",
   },
 };
 

@@ -61,7 +61,7 @@ const MIGRADOR = `${SISTEMA}-migrador`;
  * **El anfitrion lo pide, no lo escribe** (C-17, punto 1). Hasta aqui esta linea decia
  * `jdbc:postgresql://postgres:5432/...`, y en Kubernetes **no hay ningun `Service` llamado
  * `postgres`**: ese nombre viene del `compose.yaml` local. El servicio real es
- * `sgtm-<ambiente>-postgres` y vive en el namespace de la PLATAFORMA, asi que ni siquiera un
+ * `kamayuk-<ambiente>-postgres` y vive en el namespace de la PLATAFORMA, asi que ni siquiera un
  * nombre corto correcto resolveria desde aqui. Lo medido fue `UnknownHostException` en los ocho
  * Jobs y en los `Deployment` de los cuatro: nada del producto podia arrancar.
  *

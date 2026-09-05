@@ -39,7 +39,7 @@ manda el archivo, no esta tabla.
 
 `sgtm-aplicacion` depende de todos —es quien ensambla— y es el **único** que declara
 `sgtm-seguridad` (ver §3.12). Todo contexto ve `sgtm-dominio-compartido` por el plugin de
-convenciones `sgtm.modulo`, y esa arista no se lista porque no distingue a nadie.
+convenciones `kamayuk.modulo`, y esa arista no se lista porque no distingue a nadie.
 
 ## 3. Los contextos
 

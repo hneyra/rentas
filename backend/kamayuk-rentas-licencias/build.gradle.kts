@@ -17,8 +17,8 @@
 // determina `rentas` con tablas de ordenanza bloqueadas por D-02b.
 
 plugins {
-    id("sgtm.modulo")
-    id("sgtm.pruebas-postgres")
+    id("kamayuk.modulo")
+    id("kamayuk.pruebas-postgres")
 }
 
 dependencies {

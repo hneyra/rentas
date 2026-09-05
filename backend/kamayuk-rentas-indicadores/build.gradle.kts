@@ -13,7 +13,7 @@
 // en el classpath.
 
 plugins {
-    id("sgtm.modulo")
+    id("kamayuk.modulo")
 }
 
 dependencies {

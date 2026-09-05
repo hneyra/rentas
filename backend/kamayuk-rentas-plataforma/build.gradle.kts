@@ -7,8 +7,8 @@
 // puede depender de Spring.
 
 plugins {
-    id("sgtm.java-base")
-    id("sgtm.pruebas-postgres")
+    id("kamayuk.java-base")
+    id("kamayuk.pruebas-postgres")
 }
 
 dependencies {

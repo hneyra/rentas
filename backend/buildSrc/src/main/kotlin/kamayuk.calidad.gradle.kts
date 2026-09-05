@@ -12,7 +12,7 @@
 import net.ltgt.gradle.errorprone.errorprone
 
 plugins {
-    id("sgtm.java-base")
+    id("kamayuk.java-base")
     id("com.diffplug.spotless")
     id("net.ltgt.errorprone")
     checkstyle
