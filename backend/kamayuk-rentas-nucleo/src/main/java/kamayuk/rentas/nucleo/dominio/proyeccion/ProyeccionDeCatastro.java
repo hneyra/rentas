@@ -7,8 +7,8 @@ import java.time.Instant;
  *
  * <h2>Lo implementa un adaptador que se conecta con OTRO ROL</h2>
  *
- * <p>{@code rol_ingestor_catastro} y no {@code sgtm_app}: `V4` y `V5` no le dan a la aplicacion mas
- * que {@code SELECT} sobre las cuatro proyecciones, y eso no es una precaucion — es lo que hace
+ * <p>{@code rol_ingestor_catastro} y no {@code kamayuk_app}: `V4` y `V5` no le dan a la aplicacion
+ * mas que {@code SELECT} sobre las cuatro proyecciones, y eso no es una precaucion — es lo que hace
  * cierto ADR-0027 §3 en vez de una promesa. Una proyeccion que la aplicacion pueda escribir deja de
  * ser una proyeccion el dia que alguien «arregle» una fila a mano.
  *

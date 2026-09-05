@@ -10,7 +10,7 @@ import java.util.Optional;
  * <p><b>No hay {@code actualizar} ni {@code eliminar}, y no es una omision.</b> {@link #registrar}
  * es el unico punto de escritura: la resolucion se notifica al contribuyente, que se lleva el
  * papel, y su cargo ya esta en el libro. Corregirla en el sitio dejaria al papel, al libro y a la
- * base diciendo tres cosas distintas. V49 no le concede {@code UPDATE} a {@code sgtm_app}, y el
+ * base diciendo tres cosas distintas. V49 no le concede {@code UPDATE} a {@code kamayuk_app}, y el
  * escaner del codigo fuente lo vigila ademas en {@code TABLAS_INMUTABLES}.
  */
 public interface ResolucionDeDeterminacionRepository {

@@ -78,11 +78,11 @@ import tools.jackson.databind.json.JsonMapper;
  * igual que el contenedor: envolverlo en un {@code TransactionTemplate} incondicional dejaria estas
  * pruebas pasando con la anotacion quitada, que es el modo de fallo que existen para impedir.
  *
- * <p>La conexion es la de {@code sgtm_app} y no la del dueño: con {@code FORCE ROW LEVEL SECURITY}
- * el dueño <b>tambien</b> queda sujeto a la politica, asi que una rotura escrita con {@code
- * sgtm_owner} pasaria en verde sin medir nada (#537, #545, #601). Lo unico que impide que un cambio
- * de fixture devuelva la conexion sin que nadie lo note es el centinela {@link
- * #seConectaComoSgtmApp}.
+ * <p>La conexion es la de {@code kamayuk_app} y no la del dueño: con {@code FORCE ROW LEVEL
+ * SECURITY} el dueño <b>tambien</b> queda sujeto a la politica, asi que una rotura escrita con
+ * {@code kamayuk_owner} pasaria en verde sin medir nada (#537, #545, #601). Lo unico que impide que
+ * un cambio de fixture devuelva la conexion sin que nadie lo note es el centinela {@link
+ * #seConectaComoKamayukApp}.
  */
 @DisplayName("RF-120 — Alta y ciclo de vida de usuarios y grupos, de HTTP a PostgreSQL (#572)")
 class AltaDeUsuariosYGruposFronteraTest {
@@ -172,14 +172,14 @@ class AltaDeUsuariosYGruposFronteraTest {
     // ---------------------------------------------------------------- el centinela
 
     @Test
-    @DisplayName("centinela — el pool que usa el controlador es el de sgtm_app, no otro rol")
-    void seConectaComoSgtmApp() {
+    @DisplayName("centinela — el pool que usa el controlador es el de kamayuk_app, no otro rol")
+    void seConectaComoKamayukApp() {
         // Mira EL POOL —el que el controlador usa— y no una conexion abierta aparte:
-        // preguntandoselo a `base.conexion(APP)` el centinela contestaria «sgtm_app»
+        // preguntandoselo a `base.conexion(APP)` el centinela contestaria «kamayuk_app»
         // siempre, incluso con el pool cambiado, y no guardaria nada (#639).
         assertThat(delPool.sql("SELECT current_user").query(String.class).single())
                 .as(
-                        "con `sgtm_owner` las roturas de aislamiento pasan en VERDE —FORCE ROW LEVEL"
+                        "con `kamayuk_owner` las roturas de aislamiento pasan en VERDE —FORCE ROW LEVEL"
                                 + " SECURITY sujeta tambien al dueño— y con el superusuario del"
                                 + " cluster no se mide RLS en absoluto")
                 .isEqualTo(BaseDeDatosDePrueba.APP);

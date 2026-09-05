@@ -64,7 +64,7 @@ import org.springframework.transaction.annotation.AnnotationTransactionAttribute
 import org.springframework.transaction.interceptor.TransactionInterceptor;
 
 /**
- * #57 — La situacion del ciudadano contra PostgreSQL de verdad, conectada como {@code sgtm_app}
+ * #57 — La situacion del ciudadano contra PostgreSQL de verdad, conectada como {@code kamayuk_app}
  * (RF-131, ADR-0020).
  *
  * <h2>Lo que esta clase defiende y ninguna prueba con dobles puede</h2>
@@ -516,7 +516,7 @@ class SituacionDelCiudadanoJdbcTest {
      * ROW LEVEL SECURITY} (DAT-01 §0, primer hallazgo).
      */
     @Test
-    @DisplayName("el pool de la prueba es sgtm_app, no el superusuario")
+    @DisplayName("el pool de la prueba es kamayuk_app, no el superusuario")
     void elPoolNoEsSuperusuario() {
         // Sin esto, todo lo de arriba pasaria en verde sin haber verificado ningun
         // aislamiento: es la leccion heredada del SRTM y la que hace que esta clase valga.

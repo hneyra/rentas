@@ -39,11 +39,11 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * La muestra de un programa contra PostgreSQL de verdad, conectada como {@code sgtm_app} (#481).
+ * La muestra de un programa contra PostgreSQL de verdad, conectada como {@code kamayuk_app} (#481).
  *
- * <p>Se conecta como {@code sgtm_app} y no con la conexión por omisión de la base de prueba porque
- * <b>un superusuario omite RLS incluso con {@code FORCE ROW LEVEL SECURITY}</b>: las dos pruebas de
- * aislamiento de aquí pasarían en verde sin verificar nada (DAT-01 §0, primer hallazgo).
+ * <p>Se conecta como {@code kamayuk_app} y no con la conexión por omisión de la base de prueba
+ * porque <b>un superusuario omite RLS incluso con {@code FORCE ROW LEVEL SECURITY}</b>: las dos
+ * pruebas de aislamiento de aquí pasarían en verde sin verificar nada (DAT-01 §0, primer hallazgo).
  */
 @DisplayName("#481 — La muestra del programa de fiscalizacion")
 class MuestraDelProgramaRepositoryJdbcTest {
@@ -358,7 +358,7 @@ class MuestraDelProgramaRepositoryJdbcTest {
         }
 
         @Test
-        @DisplayName("sgtm_app no puede editar ni borrar una fila de la muestra (regla 4)")
+        @DisplayName("kamayuk_app no puede editar ni borrar una fila de la muestra (regla 4)")
         void sgtmAppNoPuedeEditarNiBorrar() throws SQLException {
             try (Connection app = base.conexion(BaseDeDatosDePrueba.APP)) {
                 ContextoDeTenant.fijar(app, municipalidadA);
@@ -472,7 +472,8 @@ class MuestraDelProgramaRepositoryJdbcTest {
 
     private static void cerrarPrograma(long municipalidadId, long programaId) {
         try (Connection owner = base.conexion(BaseDeDatosDePrueba.OWNER)) {
-            // Lo cierra el owner: `sgtm_app` no tiene UPDATE sobre `programa_fiscalizacion`, que es
+            // Lo cierra el owner: `kamayuk_app` no tiene UPDATE sobre `programa_fiscalizacion`, que
+            // es
             // otra tabla que solo se agrega (V7). Aqui solo hace falta el estado sembrado.
             ContextoDeTenant.fijar(owner, municipalidadId);
             try (PreparedStatement sentencia =

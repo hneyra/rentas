@@ -79,7 +79,7 @@ desapareció.
 
 **Dos requisitos que la hacen valer:**
 
-- Se conecta como `sgtm_app`, creado en el arranque de la prueba. No con la conexión por omisión.
+- Se conecta como `kamayuk_app`, creado en el arranque de la prueba. No con la conexión por omisión.
 - Siembra **una fila en cada tabla de tenant, para las dos municipalidades**. Si una tabla
   estuviera vacía, «no se ve nada de B» sería cierto sin probar nada. Por eso la prueba exige
   además que A vea filas propias en cada tabla: **al agregar una tabla hay que sembrarla**.

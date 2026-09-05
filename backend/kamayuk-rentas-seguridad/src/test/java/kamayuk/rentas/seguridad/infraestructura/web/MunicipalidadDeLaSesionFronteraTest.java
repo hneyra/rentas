@@ -63,8 +63,8 @@ import tools.jackson.databind.json.JsonMapper;
  * un valor que comparar es el {@code SET LOCAL} de la transaccion. Por eso las dos roturas que
  * cuentan son quitar el filtro y quitar la {@code @Transactional}.
  *
- * <p>La conexion es la de {@code sgtm_app} de todas formas: es la que corre en produccion, y probar
- * con otra dejaria de medir lo que el rol de la aplicacion puede hacer de verdad.
+ * <p>La conexion es la de {@code kamayuk_app} de todas formas: es la que corre en produccion, y
+ * probar con otra dejaria de medir lo que el rol de la aplicacion puede hacer de verdad.
  *
  * <p>El proxy transaccional se construye con {@link AnnotationTransactionAttributeSource}, o sea
  * <b>obedeciendo a la anotacion</b> igual que el contenedor: envolverlo en un {@code

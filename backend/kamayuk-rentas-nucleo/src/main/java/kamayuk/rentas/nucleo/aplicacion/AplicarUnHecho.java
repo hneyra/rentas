@@ -27,8 +27,8 @@ import org.springframework.transaction.annotation.Transactional;
  * <h2>El gestor de transacciones se nombra, y no es un detalle</h2>
  *
  * <p>{@code transaccionesDelIngestor} es el que abre transacciones sobre el pool de {@code
- * rol_ingestor_catastro}. Sin nombrarlo, Spring tomaria el primario —el de {@code sgtm_app}— y el
- * {@code INSERT} moriria con {@code 42501}: `V4` y `V5` no le dan a la aplicacion mas que {@code
+ * rol_ingestor_catastro}. Sin nombrarlo, Spring tomaria el primario —el de {@code kamayuk_app}— y
+ * el {@code INSERT} moriria con {@code 42501}: `V4` y `V5` no le dan a la aplicacion mas que {@code
  * SELECT} sobre las cuatro proyecciones. Es la mitad de ADR-0027 §3 que no es una promesa.
  *
  * <h2>Y el {@code SET LOCAL} viene de ahi</h2>

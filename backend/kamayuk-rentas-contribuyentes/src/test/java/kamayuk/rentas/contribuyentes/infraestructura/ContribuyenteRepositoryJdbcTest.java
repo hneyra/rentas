@@ -37,7 +37,7 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * El padron contra PostgreSQL de verdad, conectado como {@code sgtm_app}.
+ * El padron contra PostgreSQL de verdad, conectado como {@code kamayuk_app}.
  *
  * <p>Los nombres sembrados son <b>inventados</b>. Se eligieron con la forma de los del padron real
  * —apellidos primero, con coma, con enie y con tilde— porque es justamente esa forma la que rompe
@@ -126,8 +126,8 @@ class ContribuyenteRepositoryJdbcTest {
     class Aislamiento {
 
         @Test
-        @DisplayName("la prueba se conecta como sgtm_app, no como superusuario")
-        void seConectaComoSgtmApp() {
+        @DisplayName("la prueba se conecta como kamayuk_app, no como superusuario")
+        void seConectaComoKamayukApp() {
             TenantContext.fijar(new MunicipalidadId(municipalidadA));
 
             String usuario =

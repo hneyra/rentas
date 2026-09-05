@@ -104,7 +104,7 @@ spec:
             - name: KAMAYUK_DB_URL
               value: jdbc:postgresql://sgtm-${AMBIENTE}-postgres:5432/sgtm
             - name: KAMAYUK_DB_USUARIO
-              value: sgtm_app
+              value: kamayuk_app
             - name: KAMAYUK_DB_CLAVE
               valueFrom:
                 secretKeyRef:

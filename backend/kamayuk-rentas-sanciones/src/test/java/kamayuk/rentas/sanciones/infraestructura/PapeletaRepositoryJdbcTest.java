@@ -36,7 +36,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Las papeletas —de las dos familias, #46 y #47— contra PostgreSQL de verdad, conectado como {@code
- * sgtm_app}.
+ * kamayuk_app}.
  *
  * <p>El AC "reimprimir una papeleta de hace tres años devuelve los mismos seis importes" se
  * verifica aquí releyendo la fila tal cual quedó guardada: nada en el camino de lectura recalcula

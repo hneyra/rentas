@@ -21,7 +21,7 @@ import org.jspecify.annotations.Nullable;
  * <h2>Nunca se edita</h2>
  *
  * <p>Es un documento que se entrega al administrado (regla 4, RNF-051). V47 le concede a {@code
- * sgtm_app} solo {@code SELECT} e {@code INSERT}, igual que V41 a la resolución de gerencia: una
+ * kamayuk_app} solo {@code SELECT} e {@code INSERT}, igual que V41 a la resolución de gerencia: una
  * constancia equivocada se deja sin efecto con otra, y las dos quedan.
  *
  * @param id nulo mientras no se ha guardado; lo asigna la base

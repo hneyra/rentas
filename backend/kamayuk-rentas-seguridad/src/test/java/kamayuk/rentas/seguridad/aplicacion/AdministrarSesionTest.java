@@ -423,7 +423,7 @@ class AdministrarSesionTest {
         void seConsultaPorLaTablaPadre() {
             // DAT-01 §0 hallazgo 2: una particion no hereda relrowsecurity, asi que
             // consultarla directamente devolveria filas de cualquier municipalidad.
-            // La barrera final es que sgtm_app no tiene privilegios sobre ellas (V7),
+            // La barrera final es que kamayuk_app no tiene privilegios sobre ellas (V7),
             // y aqui se comprueba justamente eso: la consulta buena funciona y la que
             // toca la particion no puede ni ejecutarse.
             assertThat(sesion.auditoria(ConsultaDeAuditoria.delEjercicio(EJERCICIO), PRIMERA))
@@ -537,7 +537,7 @@ class AdministrarSesionTest {
                                                                             + " VALUES (now(),"
                                                                             + " 'EN_CURSO', '/tmp')")
                                                             .update()))
-                    .as("un boton «respaldar ahora» exigiria privilegios que sgtm_app no tiene")
+                    .as("un boton «respaldar ahora» exigiria privilegios que kamayuk_app no tiene")
                     .hasMessageContaining("respaldo");
         }
     }

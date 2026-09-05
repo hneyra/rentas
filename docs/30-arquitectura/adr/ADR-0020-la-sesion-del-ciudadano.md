@@ -58,7 +58,7 @@ token del ciudadano (realm propio)
 La base de datos no aprende a cruzar municipalidades; sigue sin poder hacerlo. Cada rama abre su
 transacción, emite su `SET LOCAL` y queda sujeta a la misma política RLS que cualquier consulta de
 ventanilla. Lo único nuevo es que el proceso **recorre el registro de tenants**, que ya es legítimo
-y ya se hace: `municipalidad` es catálogo con `USING (true)`, `sgtm_app` tiene `SELECT` sobre ella
+y ya se hace: `municipalidad` es catálogo con `USING (true)`, `kamayuk_app` tiene `SELECT` sobre ella
 (V6, V7) y todo proceso masivo del perfil `batch` itera municipalidad por municipalidad.
 
 Tres reglas hacen que ese recorrido sea seguro, y las tres se verifican:

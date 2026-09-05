@@ -144,7 +144,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 /**
  * #42 — Las costas del procedimiento y el fraccionamiento coactivo contra PostgreSQL de verdad
- * (V35), conectado como {@code sgtm_app}.
+ * (V35), conectado como {@code kamayuk_app}.
  *
  * <p>Lo que esta clase defiende y ninguna prueba con dobles puede:
  *
@@ -171,8 +171,8 @@ import tools.jackson.databind.json.JsonMapper;
  *   <li><b>Que dos expedientes del mismo obligado no compartan obligacion de costas.</b> Es la
  *       clave primaria de {@code costa_obligacion} (V35 §3), y sin ella la columna «Costas S/»
  *       diria lo mismo en las dos filas de la grilla sin que nada fallara.
- *   <li><b>Que {@code sgtm_app} no pueda editar ni borrar una liquidacion.</b> Es el {@code REVOKE}
- *       de V35, y se comprueba intentandolo por SQL directo.
+ *   <li><b>Que {@code kamayuk_app} no pueda editar ni borrar una liquidacion.</b> Es el {@code
+ *       REVOKE} de V35, y se comprueba intentandolo por SQL directo.
  *   <li><b>Que RLS aisle la liquidacion</b>: desde otra municipalidad no existe.
  * </ul>
  */
@@ -950,7 +950,7 @@ class CostasYFraccionamientoJdbcTest {
 
         @Test
         @DisplayName(
-                "sgtm_app no puede editar ni borrar una liquidacion, su linea ni su obligacion")
+                "kamayuk_app no puede editar ni borrar una liquidacion, su linea ni su obligacion")
         void noSePuedeEditarUnaLiquidacion() {
             String expediente = expedienteConRec1("PRIV-1");
             LiquidacionDeCostas liquidacion = liquidarTodo(expediente);

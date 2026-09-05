@@ -17,7 +17,7 @@
 --       `ComponerSnapshot` lo rechaza), asi que aqui no puede haber nada que
 --       manana sea distinto. Es lo que hace legitimo cachear PARA SIEMPRE: no hay
 --       invalidacion que disenar, ni ventana de inconsistencia, ni TTL.
---    2. La copia NO SE PUEDE EDITAR. `sgtm_app` recibe `INSERT` y `SELECT`, y
+--    2. La copia NO SE PUEDE EDITAR. `kamayuk_app` recibe `INSERT` y `SELECT`, y
 --       nada mas: sin `UPDATE` y sin `DELETE`. Una cifra normativa que se pudiera
 --       corregir en la copia local seria un padron calculado con valores que
 --       ninguna ordenanza respalda, y ninguna consulta lo delataria.
@@ -69,7 +69,7 @@ CREATE TABLE normativa_conjunto (
 
 COMMENT ON TABLE normativa_conjunto IS
     'Copia local de un conjunto sellado de `normativa` (ADR-0025 §1). Inmutable: '
-    '`sgtm_app` solo puede insertarla y leerla';
+    '`kamayuk_app` solo puede insertarla y leerla';
 COMMENT ON COLUMN normativa_conjunto.ambito IS
     'VALUACION u OBLIGACION (ADR-0024). Forma parte de la clave porque el snapshot '
     'se pide por ambito y cada mitad tiene su propia huella; la IDENTIDAD -conjunto, '
@@ -223,14 +223,14 @@ CREATE POLICY normativa_valor_referencial_tenant ON normativa_valor_referencial 
 --  distingue (#435).
 -- ----------------------------------------------------------------------------
 
-GRANT INSERT, SELECT ON normativa_conjunto TO sgtm_app;
-GRANT INSERT, SELECT ON normativa_parametro TO sgtm_app;
-GRANT INSERT, SELECT ON normativa_valor_unitario TO sgtm_app;
-GRANT INSERT, SELECT ON normativa_depreciacion TO sgtm_app;
-GRANT INSERT, SELECT ON normativa_valor_referencial TO sgtm_app;
+GRANT INSERT, SELECT ON normativa_conjunto TO kamayuk_app;
+GRANT INSERT, SELECT ON normativa_parametro TO kamayuk_app;
+GRANT INSERT, SELECT ON normativa_valor_unitario TO kamayuk_app;
+GRANT INSERT, SELECT ON normativa_depreciacion TO kamayuk_app;
+GRANT INSERT, SELECT ON normativa_valor_referencial TO kamayuk_app;
 
-GRANT SELECT ON normativa_conjunto TO sgtm_readonly;
-GRANT SELECT ON normativa_parametro TO sgtm_readonly;
-GRANT SELECT ON normativa_valor_unitario TO sgtm_readonly;
-GRANT SELECT ON normativa_depreciacion TO sgtm_readonly;
-GRANT SELECT ON normativa_valor_referencial TO sgtm_readonly;
+GRANT SELECT ON normativa_conjunto TO kamayuk_readonly;
+GRANT SELECT ON normativa_parametro TO kamayuk_readonly;
+GRANT SELECT ON normativa_valor_unitario TO kamayuk_readonly;
+GRANT SELECT ON normativa_depreciacion TO kamayuk_readonly;
+GRANT SELECT ON normativa_valor_referencial TO kamayuk_readonly;

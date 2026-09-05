@@ -30,7 +30,7 @@ import org.springframework.stereotype.Repository;
  *
  * <p>DAT-01 §0 hallazgo 2: una particion no hereda {@code relrowsecurity} del padre, asi que
  * consultarla directamente <b>no aplica la politica</b> y devolveria filas de cualquier
- * municipalidad. La mitigacion que de verdad cierra el hueco es que {@code sgtm_app} no tiene
+ * municipalidad. La mitigacion que de verdad cierra el hueco es que {@code kamayuk_app} no tiene
  * ningun privilegio sobre las particiones (V7), pero eso no exime de escribir la consulta bien: si
  * algun dia se concediera por error, esta consulta seguiria siendo correcta.
  *

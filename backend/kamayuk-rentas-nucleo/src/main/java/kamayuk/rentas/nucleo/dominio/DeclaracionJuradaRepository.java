@@ -11,7 +11,7 @@ import kamayuk.rentas.dominio.Ejercicio;
  * <p><b>No hay {@code eliminar}.</b> {@link #insertar} es el unico punto de alta; {@link #marcar}
  * es el unico {@code UPDATE}, y toca solo {@code estado} —nunca el numero, la fecha ni el tipo—.
  * Una rectificatoria es otra fila, nunca una edicion (regla 4). Desde V54 eso no depende de que
- * esta clase se acuerde: {@code sgtm_app} tiene el privilegio de {@code UPDATE} sobre la columna
+ * esta clase se acuerde: {@code kamayuk_app} tiene el privilegio de {@code UPDATE} sobre la columna
  * {@code estado} y sobre ninguna otra.
  */
 public interface DeclaracionJuradaRepository {

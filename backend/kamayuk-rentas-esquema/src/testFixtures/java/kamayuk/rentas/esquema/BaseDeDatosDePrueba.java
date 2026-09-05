@@ -20,11 +20,11 @@ import java.util.Map;
  *
  * <ol>
  *   <li>con la conexion de superusuario, crea los cuatro roles de ARQ-03 §4 y les asigna su clave;
- *   <li>migra con Flyway conectado como {@code sgtm_owner}, que es el unico rol con DDL;
+ *   <li>migra con Flyway conectado como {@code kamayuk_owner}, que es el unico rol con DDL;
  *   <li>a partir de ahi entrega conexiones por rol.
  * </ol>
  *
- * <p>El orden importa: las politicas de V6 nombran a {@code sgtm_owner} y a {@code
+ * <p>El orden importa: las politicas de V6 nombran a {@code kamayuk_owner} y a {@code
  * rol_carga_parametros}, asi que los roles tienen que existir antes de la primera migracion.
  *
  * <p><b>Los roles son del CLUSTER, no de la base</b> (INF-01 §4.1), y eso decide como esta escrito
@@ -48,9 +48,9 @@ import java.util.Map;
  */
 public final class BaseDeDatosDePrueba implements AutoCloseable {
 
-    public static final String OWNER = "sgtm_owner";
-    public static final String APP = "sgtm_app";
-    public static final String READONLY = "sgtm_readonly";
+    public static final String OWNER = "kamayuk_owner";
+    public static final String APP = "kamayuk_app";
+    public static final String READONLY = "kamayuk_readonly";
     public static final String CARGA_PARAMETROS = "rol_carga_parametros";
 
     /**

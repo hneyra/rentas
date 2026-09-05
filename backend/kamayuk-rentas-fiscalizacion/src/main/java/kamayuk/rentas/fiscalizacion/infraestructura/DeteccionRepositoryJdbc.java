@@ -224,9 +224,9 @@ public class DeteccionRepositoryJdbc extends RepositorioJdbc implements Deteccio
      * <p>Lo que evita es el {@code LEFT JOIN LATERAL}: un descenso al índice de {@code
      * declaracion_jurada} <b>por cada predio del padrón</b>, con su {@code Sort} montado y
      * desmontado 14 422 veces. Medido sobre el padrón de Catacaos en dos municipalidades, como
-     * {@code sgtm_app} y con RLS activa: <b>31 738 de las 32 293 páginas</b> que el conteo tocaba
-     * eran eso, y sin ellos toca <b>555</b> (DAT-01 §7.2). Es el coste que no depende del tamaño de
-     * página, que es el síntoma que da nombre a #561.
+     * {@code kamayuk_app} y con RLS activa: <b>31 738 de las 32 293 páginas</b> que el conteo
+     * tocaba eran eso, y sin ellos toca <b>555</b> (DAT-01 §7.2). Es el coste que no depende del
+     * tamaño de página, que es el síntoma que da nombre a #561.
      */
     static final String CONTEO_SIN_CONDICION =
             "SELECT count(*)" + DESDE_EL_PADRON + FILTRO_DEL_PADRON;

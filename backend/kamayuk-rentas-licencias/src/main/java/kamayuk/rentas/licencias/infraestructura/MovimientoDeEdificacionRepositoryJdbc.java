@@ -23,7 +23,7 @@ import org.springframework.stereotype.Repository;
 /**
  * Los movimientos de un FUE y los tramos de vigencia que conceden, contra PostgreSQL (V43).
  *
- * <p><b>Solo inserta.</b> V43 le concede a {@code sgtm_app} unicamente {@code SELECT} e {@code
+ * <p><b>Solo inserta.</b> V43 le concede a {@code kamayuk_app} unicamente {@code SELECT} e {@code
  * INSERT} sobre las dos tablas, y el escaner de fuentes rechaza un {@code UPDATE
  * edificacion_movimiento SET} antes de que llegue a ejecutarse.
  *

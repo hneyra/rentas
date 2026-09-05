@@ -94,7 +94,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 /**
  * #48 — El Formulario Unico de Edificaciones contra PostgreSQL de verdad (V43), conectado como
- * {@code sgtm_app}.
+ * {@code kamayuk_app}.
  *
  * <p>Lo que esta clase defiende y ninguna prueba con dobles puede:
  *
@@ -107,8 +107,8 @@ import tools.jackson.databind.json.JsonMapper;
  *       sella; la valorizacion las lee por el puerto publico de {@code catastro}. Y con un
  *       ejercicio <b>sin</b> cuadro sellado, el papel imprime «—» y la ficha dice que falta: eso es
  *       lo que separa #48 de #197.
- *   <li><b>Que {@code sgtm_app} no pueda editar ni borrar un expediente ni sus secciones.</b> Es el
- *       {@code REVOKE} de V43, comprobado por SQL directo, que es como se salta cualquier
+ *   <li><b>Que {@code kamayuk_app} no pueda editar ni borrar un expediente ni sus secciones.</b> Es
+ *       el {@code REVOKE} de V43, comprobado por SQL directo, que es como se salta cualquier
  *       comprobacion escrita en Java.
  *   <li><b>Que la base impida una segunda emision bajo concurrencia real.</b> Un doble que consulta
  *       antes de insertar pasa la prueba y falla en produccion: diez peticiones simultaneas pasan
@@ -837,7 +837,7 @@ class LicenciaDeEdificacionJdbcTest {
     class LaBase {
 
         @Test
-        @DisplayName("sgtm_app no puede editar ni borrar un expediente ni sus secciones")
+        @DisplayName("kamayuk_app no puede editar ni borrar un expediente ni sus secciones")
         void sinUpdateNiDelete() {
             String expediente = expedienteCompleto(HOY);
             long id = identificadorDe(expediente);

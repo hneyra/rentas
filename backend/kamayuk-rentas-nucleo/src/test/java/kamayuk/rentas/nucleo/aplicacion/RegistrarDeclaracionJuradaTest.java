@@ -82,9 +82,9 @@ import org.springframework.transaction.support.TransactionTemplate;
  *   <li><b>La maquina de estados, entera</b>, y con las dos capas que la sostienen: el dominio, que
  *       produce el mensaje, y el disparador de V54, que es lo unico que ven dos peticiones
  *       simultaneas.
- *   <li><b>Lo que de una DJ presentada se puede cambiar.</b> Desde V54 {@code sgtm_app} solo tiene
- *       {@code UPDATE} sobre {@code estado}: se comprueba con SQL directo, que es la unica forma de
- *       comprobar un privilegio.
+ *   <li><b>Lo que de una DJ presentada se puede cambiar.</b> Desde V54 {@code kamayuk_app} solo
+ *       tiene {@code UPDATE} sobre {@code estado}: se comprueba con SQL directo, que es la unica
+ *       forma de comprobar un privilegio.
  * </ul>
  */
 @DisplayName("RF-023 — Presentar, rectificar, observar y anular declaraciones juradas")
@@ -776,7 +776,7 @@ class RegistrarDeclaracionJuradaTest {
     class LoQueImpideLaBase {
 
         @Test
-        @DisplayName("sgtm_app no puede cambiar el numero de una DJ presentada")
+        @DisplayName("kamayuk_app no puede cambiar el numero de una DJ presentada")
         void noSePuedeCambiarElNumero() throws SQLException {
             DeclaracionJurada original = presentar(LocalDate.of(2026, 3, 1));
 
@@ -883,7 +883,7 @@ class RegistrarDeclaracionJuradaTest {
         return total == null ? 0L : total;
     }
 
-    /** Una sentencia como {@code sgtm_app}, con el contexto de tenant fijado a mano. */
+    /** Una sentencia como {@code kamayuk_app}, con el contexto de tenant fijado a mano. */
     private static void porSql(String sql) throws SQLException {
         try (Connection app = base.conexion(BaseDeDatosDePrueba.APP)) {
             ContextoDeTenant.fijar(app, municipalidad);

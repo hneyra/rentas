@@ -8,7 +8,7 @@ import java.util.Optional;
  * y la aplica la política RLS.
  *
  * <p><b>No hay {@code actualizar} ni {@code borrar}.</b> {@link #insertar} es el único punto de
- * escritura: V41 le retira a {@code sgtm_app} el privilegio de {@code UPDATE} sobre {@code
+ * escritura: V41 le retira a {@code kamayuk_app} el privilegio de {@code UPDATE} sobre {@code
  * descargo}, y V7 nunca le dio {@code DELETE}. Lo que en otro dominio sería corregir el resultado
  * aquí es dictar una {@link ResolucionDeGerencia}.
  */

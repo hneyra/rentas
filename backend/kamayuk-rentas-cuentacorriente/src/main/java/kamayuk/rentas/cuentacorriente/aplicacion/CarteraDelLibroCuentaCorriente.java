@@ -34,7 +34,7 @@ import org.springframework.transaction.annotation.Transactional;
  * ejercicio en cada carga de la pantalla de inicio». Se midio antes de derogarlo, y la medida
  * completa —con su plan, sus paginas y sus mutaciones— vive en {@code CarteraEnElPlanJdbcTest}:
  * sobre <b>dos</b> padrones del tamano de Catacaos en la misma instalacion (210 210 asientos en la
- * particion de 2026), como {@code sgtm_app} y con RLS activa, la cartera sobre {@code
+ * particion de 2026), como {@code kamayuk_app} y con RLS activa, la cartera sobre {@code
  * saldo_proyectado} tardaba <b>76,4 ms</b> y tocaba <b>3 944</b> paginas; sobre el libro tarda
  * <b>178,1 ms</b> y toca <b>4 166</b>. Y {@link #cargadoPorTributo}, que el panel <b>ya</b> paga en
  * cada carga sobre esa misma particion, tarda 127,9 ms y toca <b>4 210</b>: la consulta nueva toca

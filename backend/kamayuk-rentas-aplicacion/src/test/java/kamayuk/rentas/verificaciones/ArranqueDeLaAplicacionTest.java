@@ -83,10 +83,11 @@ class ArranqueDeLaAplicacionTest {
      * Se provisiona en un bloque estatico y no en {@code @BeforeAll} porque {@link
      * DynamicPropertySource} corre antes: el contexto necesita la URL de la base ya resuelta.
      *
-     * <p>La base es real y la aplicacion se conecta como {@code sgtm_app}, igual que en produccion.
-     * No es por rigor de aislamiento —aqui no se lee ni una fila de negocio— sino porque un
-     * arranque contra una URL inventada no distingue «arranca» de «arranca y no llega a la base»:
-     * la sonda de salud consulta la base, y es lo que el orquestador mira para dar el pod por vivo.
+     * <p>La base es real y la aplicacion se conecta como {@code kamayuk_app}, igual que en
+     * produccion. No es por rigor de aislamiento —aqui no se lee ni una fila de negocio— sino
+     * porque un arranque contra una URL inventada no distingue «arranca» de «arranca y no llega a
+     * la base»: la sonda de salud consulta la base, y es lo que el orquestador mira para dar el pod
+     * por vivo.
      */
     static {
         try {

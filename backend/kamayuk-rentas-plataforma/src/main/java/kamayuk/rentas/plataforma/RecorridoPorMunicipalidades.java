@@ -32,7 +32,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * rama abre su transaccion, emite su {@code SET LOCAL app.municipalidad_id} y queda sujeta a la
  * misma politica RLS que cualquier consulta de ventanilla. Lo unico nuevo es que el proceso recorre
  * el registro de tenants, que ya es legitimo y ya se hace: {@code municipalidad} es catalogo con
- * {@code USING (true)}, {@code sgtm_app} tiene {@code SELECT} sobre ella (V6, V7) y todo proceso
+ * {@code USING (true)}, {@code kamayuk_app} tiene {@code SELECT} sobre ella (V6, V7) y todo proceso
  * masivo del perfil {@code batch} itera municipalidad por municipalidad.
  *
  * <h2>El unico del perfil {@code web} que mueve el contexto</h2>

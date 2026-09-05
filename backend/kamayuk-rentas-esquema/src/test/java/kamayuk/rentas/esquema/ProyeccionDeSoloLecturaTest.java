@@ -32,8 +32,8 @@ import org.junit.jupiter.api.Test;
  *
  * <p>Por lo que #435 midio y conviene no volver a descubrir: RLS y `GRANT` son dos guardas
  * independientes y las dos dan el mismo `42501`, asi que el sintoma no distingue cual actuo.
- * Devolverle el `GRANT` a `sgtm_app` puede dejar el intento fallando igual —lo pararia la politica—
- * y la unica que ve la diferencia es la consulta al catalogo.
+ * Devolverle el `GRANT` a `kamayuk_app` puede dejar el intento fallando igual —lo pararia la
+ * politica— y la unica que ve la diferencia es la consulta al catalogo.
  */
 @DisplayName("P5C — La proyeccion de catastro es de solo lectura para la aplicacion")
 class ProyeccionDeSoloLecturaTest {
@@ -77,7 +77,7 @@ class ProyeccionDeSoloLecturaTest {
     }
 
     @Test
-    @DisplayName("sgtm_app no tiene INSERT, UPDATE ni DELETE sobre ninguna de las tres")
+    @DisplayName("kamayuk_app no tiene INSERT, UPDATE ni DELETE sobre ninguna de las tres")
     void laAplicacionSoloLee() throws SQLException {
         SoftAssertions verificaciones = new SoftAssertions();
         for (String tabla : PROYECCION) {
@@ -162,7 +162,7 @@ class ProyeccionDeSoloLecturaTest {
     @Test
     @DisplayName("el ingestor no llega al padron: no lee `predio` ni escribe deuda")
     void elIngestorNoLlegaAlPadron() throws SQLException {
-        // Lo que hace del ingestor un rol y no un `sgtm_app` con otro nombre. Recibe los datos
+        // Lo que hace del ingestor un rol y no un `kamayuk_app` con otro nombre. Recibe los datos
         // DENTRO del evento; si pudiera leer las tablas de negocio, la tentacion seria componer
         // la proyeccion con un JOIN y volveriamos al cruce que P5C existe para deshacer.
         SoftAssertions verificaciones = new SoftAssertions();

@@ -12,9 +12,9 @@ package kamayuk.rentas.documentos;
  * <h2>Por que es un puerto de UNA pregunta</h2>
  *
  * <p>Porque lo unico que la capa de documentos necesita saber es si marca o no marca. No hay {@code
- * activar}, ni {@code desactivar}: quitar la marca es un {@code UPDATE} de {@code sgtm_owner} sobre
- * {@code municipalidad.es_demostracion}, la misma escritura que da de alta la municipalidad. Un
- * metodo aqui seria un camino desde una pantalla hasta un documento sin marcar.
+ * activar}, ni {@code desactivar}: quitar la marca es un {@code UPDATE} de {@code kamayuk_owner}
+ * sobre {@code municipalidad.es_demostracion}, la misma escritura que da de alta la municipalidad.
+ * Un metodo aqui seria un camino desde una pantalla hasta un documento sin marcar.
  *
  * <p>Y no recibe la municipalidad, como ningun metodo de dominio (regla 2): sale del contexto de
  * tenant, que es lo que impide que un llamador pregunte por la instalacion de otro.

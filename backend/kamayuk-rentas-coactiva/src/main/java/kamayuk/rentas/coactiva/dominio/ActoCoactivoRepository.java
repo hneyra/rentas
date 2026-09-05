@@ -9,8 +9,8 @@ import java.util.Optional;
  * <p>Ningun metodo recibe la municipalidad (regla 2): la filtra la politica RLS.
  *
  * <p><b>No hay {@code actualizar} ni {@code borrar}</b>, y no es un olvido: V34 le retira a {@code
- * sgtm_app} el privilegio de {@code UPDATE} sobre {@code acto_coactivo}, y V7 nunca le dio {@code
- * DELETE}. Un acto se deja sin efecto con otro acto.
+ * kamayuk_app} el privilegio de {@code UPDATE} sobre {@code acto_coactivo}, y V7 nunca le dio
+ * {@code DELETE}. Un acto se deja sin efecto con otro acto.
  */
 public interface ActoCoactivoRepository {
 

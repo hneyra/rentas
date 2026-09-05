@@ -67,9 +67,9 @@ import tools.jackson.databind.json.JsonMapper;
  * contenedor: quitarsela a {@code efectivosDeUsuario} o a {@code gruposDeUsuario} pone estas
  * pruebas en rojo con el 500 de produccion.
  *
- * <p>La conexion es la de {@code sgtm_app} y no la de superusuario: un superusuario omite RLS
+ * <p>La conexion es la de {@code kamayuk_app} y no la de superusuario: un superusuario omite RLS
  * incluso con {@code FORCE ROW LEVEL SECURITY}, y entonces el aislamiento no se estaria midiendo.
- * Lo sostiene {@link #seConectaComoSgtmApp()}, que mira el pool que usan los controladores.
+ * Lo sostiene {@link #seConectaComoKamayukApp()}, que mira el pool que usan los controladores.
  *
  * <h2>Y desde #585, tambien la ESCRITURA de esa excepcion</h2>
  *
@@ -343,7 +343,7 @@ class PermisosDeUnUsuarioFronteraTest {
                 .as(
                         "conectando el pool como SUPERUSUARIO del cluster —que omite RLS incluso"
                                 + " con FORCE ROW LEVEL SECURITY— esto seria 200 con los miembros"
-                                + " de A. Con sgtm_owner NO: al dueno la politica tambien lo"
+                                + " de A. Con kamayuk_owner NO: al dueno la politica tambien lo"
                                 + " somete, y la rotura pasaria en verde sin medir nada (#537,"
                                 + " #545)")
                 .isEqualTo(404);
@@ -820,7 +820,7 @@ class PermisosDeUnUsuarioFronteraTest {
                 .as(
                         "con un SUPERUSUARIO del cluster —que omite RLS incluso con FORCE ROW LEVEL"
                                 + " SECURITY— esto seria 200 y le escribiria un permiso al usuario"
-                                + " de A. Con sgtm_owner NO: al dueno la politica tambien lo somete"
+                                + " de A. Con kamayuk_owner NO: al dueno la politica tambien lo somete"
                                 + " (#537, #545)")
                 .isEqualTo(404);
 
@@ -831,11 +831,11 @@ class PermisosDeUnUsuarioFronteraTest {
     }
 
     @Test
-    @DisplayName("#585 — el pool que usan los controladores es el de sgtm_app")
-    void seConectaComoSgtmApp() {
+    @DisplayName("#585 — el pool que usan los controladores es el de kamayuk_app")
+    void seConectaComoKamayukApp() {
         // Mira el POOL que usa el controlador, y no una conexion aparte: es lo unico que impide
         // que un cambio de fixture devuelva la conexion sin que nadie lo note (#545). Con
-        // `sgtm_owner` la mutacion de aislamiento pasaria en verde —FORCE ROW LEVEL SECURITY
+        // `kamayuk_owner` la mutacion de aislamiento pasaria en verde —FORCE ROW LEVEL SECURITY
         // sujeta tambien al dueno (#537)— y con el superusuario del cluster la politica se omite
         // entera; esta linea caza los dos casos.
         assertThat(jdbc.sql("SELECT current_user").query(String.class).single())

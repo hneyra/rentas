@@ -153,7 +153,8 @@ final class TablasDelSgtm {
                     // No entra en INMUTABLES, y es deliberado: su `estado` SI cambia en el
                     // sitio —observar, anular y sustituir son eso, y no llevan mas contenido que
                     // quien, cuando y por que, que es una fila de auditoria—. Lo que impide tocar
-                    // las demas columnas no es este escaner sino V54, que le concede a sgtm_app el
+                    // las demas columnas no es este escaner sino V54, que le concede a kamayuk_app
+                    // el
                     // UPDATE sobre `estado` y sobre ninguna otra.
                     "declaracion_jurada",
                     "auditoria");

@@ -67,12 +67,12 @@ import tools.jackson.databind.json.JsonMapper;
  * envolverlo en un {@code TransactionTemplate} incondicional lo dejaria pasando con la anotacion
  * quitada, que es el modo de fallo que existe para impedir.
  *
- * <p>La conexion es la de {@code sgtm_app} y no la del dueno de las tablas: con {@code FORCE ROW
+ * <p>La conexion es la de {@code kamayuk_app} y no la del dueno de las tablas: con {@code FORCE ROW
  * LEVEL SECURITY} el dueno <b>tambien</b> queda sujeto a la politica, asi que una rotura de
- * aislamiento escrita con {@code sgtm_owner} pasaria en verde sin medir nada (#537, #545). Quien
+ * aislamiento escrita con {@code kamayuk_owner} pasaria en verde sin medir nada (#537, #545). Quien
  * omite RLS es el superusuario del cluster. Para que un cambio de fixture no devuelva la conexion
- * sin que nadie lo note, {@link #seConectaComoSgtmApp()} lo comprueba <b>por el mismo pool</b> que
- * usan los controladores.
+ * sin que nadie lo note, {@link #seConectaComoKamayukApp()} lo comprueba <b>por el mismo pool</b>
+ * que usan los controladores.
  */
 @DisplayName("RF-121 — Quien tiene un privilegio, y que conserva una cuenta deshabilitada (#583)")
 class QuienTieneElPrivilegioFronteraTest {
@@ -401,7 +401,7 @@ class QuienTieneElPrivilegioFronteraTest {
                         "las dos municipalidades tienen una cuenta «ana.grupo» y un acceso «caja»:"
                                 + " conectando el pool como SUPERUSUARIO del cluster —que omite RLS"
                                 + " incluso con FORCE ROW LEVEL SECURITY— saldrian las de las dos."
-                                + " Con sgtm_owner NO: al dueno la politica tambien lo somete"
+                                + " Con kamayuk_owner NO: al dueno la politica tambien lo somete"
                                 + " (#537, #545)")
                 .containsExactly("ana.grupo");
         assertThat(unaDe(deB, "ana.grupo").usuarioId())
@@ -428,15 +428,15 @@ class QuienTieneElPrivilegioFronteraTest {
     }
 
     @Test
-    @DisplayName("AC 4 — y la conexion es la de sgtm_app, no la del dueno de las tablas")
-    void seConectaComoSgtmApp() throws SQLException {
+    @DisplayName("AC 4 — y la conexion es la de kamayuk_app, no la del dueno de las tablas")
+    void seConectaComoKamayukApp() throws SQLException {
         try (Connection conexion = pool.getConnection();
                 PreparedStatement sentencia = conexion.prepareStatement("SELECT current_user");
                 ResultSet resultado = sentencia.executeQuery()) {
             resultado.next();
             assertThat(resultado.getString(1))
                     .as(
-                            "centinela de #545: con sgtm_owner las roturas de aislamiento de este"
+                            "centinela de #545: con kamayuk_owner las roturas de aislamiento de este"
                                     + " archivo pasarian en VERDE, porque FORCE ROW LEVEL SECURITY"
                                     + " somete tambien al dueno")
                     .isEqualTo(BaseDeDatosDePrueba.APP);
@@ -554,7 +554,7 @@ class QuienTieneElPrivilegioFronteraTest {
     }
 
     /**
-     * El pool de {@code sgtm_app}, apuntando las sentencias que llegan al motor.
+     * El pool de {@code kamayuk_app}, apuntando las sentencias que llegan al motor.
      *
      * <p>Existe para una sola comprobacion, la del AC 1: que la lectura conteste <b>sin recorrer el
      * padron</b>. Es la unica propiedad de este archivo que no se ve en la respuesta —componerla

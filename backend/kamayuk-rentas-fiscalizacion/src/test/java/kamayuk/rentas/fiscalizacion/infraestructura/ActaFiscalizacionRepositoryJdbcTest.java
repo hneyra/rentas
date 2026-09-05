@@ -32,7 +32,7 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * Las actas de fiscalización contra PostgreSQL de verdad, conectado como {@code sgtm_app} (#45).
+ * Las actas de fiscalización contra PostgreSQL de verdad, conectado como {@code kamayuk_app} (#45).
  *
  * <p>El AC "registrar un acta no modifica ninguna fila de catastro" se verifica aquí como el propio
  * AC lo pide: contando las filas de {@code predio} y {@code ficha_catastral} antes y después,

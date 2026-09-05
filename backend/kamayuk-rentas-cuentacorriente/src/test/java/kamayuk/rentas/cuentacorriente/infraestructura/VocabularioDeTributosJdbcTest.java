@@ -53,8 +53,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 /**
  * Las <b>dos</b> barreras del vocabulario de tributos del libro, medidas por separado (#553).
  *
- * <p>Se conecta como {@code sgtm_app}, nunca como {@code sgtm_owner}: con {@code FORCE ROW LEVEL
- * SECURITY} el dueno de la tabla tambien queda sujeto a la politica (#537, #545, #601).
+ * <p>Se conecta como {@code kamayuk_app}, nunca como {@code kamayuk_owner}: con {@code FORCE ROW
+ * LEVEL SECURITY} el dueno de la tabla tambien queda sujeto a la politica (#537, #545, #601).
  *
  * <h2>Por que dos barreras y por que medirlas aparte</h2>
  *
@@ -465,7 +465,7 @@ class VocabularioDeTributosJdbcTest {
 
     /**
      * Una fila anterior a {@code V74}: la escribe el <b>dueno</b> con la restriccion desactivada un
-     * instante, porque desde {@code sgtm_app} ya no se puede producir —que es exactamente lo que
+     * instante, porque desde {@code kamayuk_app} ya no se puede producir —que es exactamente lo que
      * este issue cierra— y hace falta poder sembrar el estado que las instalaciones ya tienen.
      */
     private static void insertarSaltandoElCheck(long titular, String tributo) throws SQLException {

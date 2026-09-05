@@ -89,7 +89,7 @@ import org.springframework.transaction.interceptor.TransactionInterceptor;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * #35 — El ciclo de vida del convenio contra PostgreSQL de verdad, como {@code sgtm_app}.
+ * #35 — El ciclo de vida del convenio contra PostgreSQL de verdad, como {@code kamayuk_app}.
  *
  * <p>Lo que esta clase defiende y ninguna prueba con dobles puede:
  *
@@ -108,7 +108,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  *   <li><b>Que reejecutar no duplica</b>, con <b>hilos de verdad</b>: la barrera son {@code
  *       convenio_cuota_uq}, {@code convenio_deuda_uq} y los dos indices unicos parciales de {@code
  *       convenio_movimiento}, no un {@code if}.
- *   <li><b>Que {@code sgtm_app} no pueda editar ni borrar</b> un convenio, su cronograma ni su
+ *   <li><b>Que {@code kamayuk_app} no pueda editar ni borrar</b> un convenio, su cronograma ni su
  *       acta. No es una convencion: son los privilegios que V31 concede, y se comprueba
  *       intentandolo.
  *   <li><b>El aislamiento</b>: con el contexto de B, el convenio de A no existe.
@@ -740,7 +740,7 @@ class ConvenioJdbcTest {
         }
 
         @Test
-        @DisplayName("sgtm_app no puede actualizar un convenio ni su cronograma (V31)")
+        @DisplayName("kamayuk_app no puede actualizar un convenio ni su cronograma (V31)")
         void noSePuedeActualizarUnConvenio() {
             long titular = contribuyenteConDeuda("PRIV-1");
             Convenio convenio = registrarPreconvenio(titular, 6, "20");

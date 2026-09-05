@@ -7,7 +7,7 @@ import java.util.Set;
 /**
  * Los movimientos de una licencia (V37, #44).
  *
- * <p><b>No hay {@code actualizar} ni {@code borrar}</b>: V37 le concede a {@code sgtm_app} solo
+ * <p><b>No hay {@code actualizar} ni {@code borrar}</b>: V37 le concede a {@code kamayuk_app} solo
  * {@code SELECT} e {@code INSERT}. Lo que le pasa a una licencia se agrega.
  */
 public interface MovimientoDeLicenciaRepository {

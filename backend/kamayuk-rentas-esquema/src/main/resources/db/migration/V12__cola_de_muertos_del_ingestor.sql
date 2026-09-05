@@ -102,7 +102,7 @@ CREATE POLICY catastro_evento_muerto_tenant ON catastro_evento_muerto FOR ALL TO
 -- ----------------------------------------------------------------------------
 --  Privilegios
 --
---  `sgtm_app` LEE y no escribe, igual que en las cuatro proyecciones de `V4` y `V5`:
+--  `kamayuk_app` LEE y no escribe, igual que en las cuatro proyecciones de `V4` y `V5`:
 --  quien escribe es el ingestor. Lee porque quien explique un muerto lo hara desde una
 --  pantalla, y porque una cifra de operacion tiene que poder contarlos.
 --
@@ -110,6 +110,6 @@ CREATE POLICY catastro_evento_muerto_tenant ON catastro_evento_muerto FOR ALL TO
 --  recibe DELETE, y no lo va a recibir (regla 4).
 -- ----------------------------------------------------------------------------
 
-GRANT SELECT ON catastro_evento_muerto TO sgtm_app;
+GRANT SELECT ON catastro_evento_muerto TO kamayuk_app;
 GRANT SELECT, INSERT, UPDATE ON catastro_evento_muerto TO rol_ingestor_catastro;
-GRANT SELECT ON catastro_evento_muerto TO sgtm_readonly;
+GRANT SELECT ON catastro_evento_muerto TO kamayuk_readonly;

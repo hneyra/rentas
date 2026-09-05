@@ -8,7 +8,7 @@ import java.util.Set;
 /**
  * Lo que le pasa a un FUE y los tramos de vigencia que sus actos conceden (#48, V43 §7 y §8).
  *
- * <p><b>Solo agrega.</b> V43 le concede a {@code sgtm_app} nada mas que {@code SELECT} e {@code
+ * <p><b>Solo agrega.</b> V43 le concede a {@code kamayuk_app} nada mas que {@code SELECT} e {@code
  * INSERT} sobre las dos tablas: corregir un movimiento seria corregir la historia de un acto
  * administrativo ya notificado, y corregir una vigencia seria mover el plazo de una obra que ya
  * esta en marcha.

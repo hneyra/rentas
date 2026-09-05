@@ -15,7 +15,7 @@ package kamayuk.rentas.autorizacion;
  *
  * <p>Nota: {@code ELIMINACION} existe como privilegio porque el manual lo tiene, y gobierna la
  * <b>baja</b> —desactivar—, no un {@code DELETE}: la aplicacion no borra nada (RNF-051) y el rol
- * {@code sgtm_app} no tiene el privilegio en la base.
+ * {@code kamayuk_app} no tiene el privilegio en la base.
  */
 public enum Privilegio {
     EJECUCION("ejecucion"),

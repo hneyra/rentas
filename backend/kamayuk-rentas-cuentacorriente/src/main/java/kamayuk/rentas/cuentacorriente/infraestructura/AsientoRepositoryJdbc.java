@@ -39,8 +39,8 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 
 /**
- * El libro contra PostgreSQL. Solo {@code SELECT} e {@code INSERT}: {@code sgtm_app} no tiene mas
- * privilegios sobre {@code cuenta_corriente_asiento} (V7), y el escaner de fuentes rechaza
+ * El libro contra PostgreSQL. Solo {@code SELECT} e {@code INSERT}: {@code kamayuk_app} no tiene
+ * mas privilegios sobre {@code cuenta_corriente_asiento} (V7), y el escaner de fuentes rechaza
  * cualquier {@code UPDATE} escrito aqui por error, ademas de la propia base.
  *
  * <p>{@link #buscar} cruza con {@code contribuyente} para resolver el codigo de la ruta a un

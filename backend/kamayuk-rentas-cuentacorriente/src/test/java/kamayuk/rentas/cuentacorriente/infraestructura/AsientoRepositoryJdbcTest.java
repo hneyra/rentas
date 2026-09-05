@@ -40,10 +40,10 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * El libro de asientos contra PostgreSQL de verdad, conectado como {@code sgtm_app} (RF-040,
+ * El libro de asientos contra PostgreSQL de verdad, conectado como {@code kamayuk_app} (RF-040,
  * ADR-0006).
  *
- * <p>Lo que <b>no</b> repite esta clase: que {@code sgtm_app} tenga solo {@code SELECT} e {@code
+ * <p>Lo que <b>no</b> repite esta clase: que {@code kamayuk_app} tenga solo {@code SELECT} e {@code
  * INSERT} sobre {@code cuenta_corriente_asiento}, que no admita {@code UPDATE}, y que el acceso
  * directo a una particion falle. Eso ya lo demuestra {@code AislamientoMultiTenantTest} en {@code
  * kamayuk-rentas-esquema}, contra esta misma tabla. Lo que defiende esta clase es el

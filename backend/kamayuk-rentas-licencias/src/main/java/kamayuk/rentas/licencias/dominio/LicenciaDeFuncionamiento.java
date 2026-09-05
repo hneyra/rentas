@@ -13,7 +13,7 @@ import org.jspecify.annotations.Nullable;
  *
  * <h2>No se edita</h2>
  *
- * <p>V37 le retira a {@code sgtm_app} el privilegio de {@code UPDATE}, y el escaner de fuentes
+ * <p>V37 le retira a {@code kamayuk_app} el privilegio de {@code UPDATE}, y el escaner de fuentes
  * rechaza cualquier {@code UPDATE licencia_funcionamiento SET} antes de que llegue a ejecutarse. No
  * es purismo: la licencia es un acto administrativo que el titular se lleva impreso y cuelga en el
  * establecimiento. Corregirla en la base deja al papel y al sistema diciendo cosas distintas, y

@@ -35,7 +35,7 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/** Beneficios y exoneraciones contra PostgreSQL de verdad, conectado como {@code sgtm_app}. */
+/** Beneficios y exoneraciones contra PostgreSQL de verdad, conectado como {@code kamayuk_app}. */
 @DisplayName("RF-029 — Beneficios y exoneraciones")
 class BeneficioRepositoryJdbcTest {
 

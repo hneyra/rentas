@@ -7,8 +7,8 @@ import java.util.Optional;
  * El historial de un expediente coactivo (V33, #40).
  *
  * <p>Ningun metodo recibe la municipalidad (regla 2). <b>No hay {@code actualizar} ni {@code
- * borrar}</b>: V33 le concede a {@code sgtm_app} solo {@code SELECT} e {@code INSERT}. Un cambio de
- * estado equivocado se corrige registrando otro, y los dos quedan.
+ * borrar}</b>: V33 le concede a {@code kamayuk_app} solo {@code SELECT} e {@code INSERT}. Un cambio
+ * de estado equivocado se corrige registrando otro, y los dos quedan.
  */
 public interface MovimientoDelExpedienteRepository {
 

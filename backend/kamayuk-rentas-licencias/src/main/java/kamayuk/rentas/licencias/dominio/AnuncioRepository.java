@@ -11,8 +11,8 @@ import kamayuk.rentas.dominio.Ejercicio;
  * filtra la politica RLS con el valor que {@code SET LOCAL} fijo al abrir la transaccion.
  *
  * <p><b>No hay {@code actualizar} ni {@code borrar}</b>, y no es un olvido: V45 le retira a {@code
- * sgtm_app} el privilegio de {@code UPDATE} y {@code DELETE} nunca lo tuvo (V7). Un anuncio se cesa
- * con un movimiento; no se corrige.
+ * kamayuk_app} el privilegio de {@code UPDATE} y {@code DELETE} nunca lo tuvo (V7). Un anuncio se
+ * cesa con un movimiento; no se corrige.
  */
 public interface AnuncioRepository {
 

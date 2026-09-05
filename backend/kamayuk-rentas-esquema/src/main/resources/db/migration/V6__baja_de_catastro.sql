@@ -150,7 +150,7 @@ DROP FUNCTION verificar_titularidad_no_excede();
 --  6. Lo que NO se hace aqui, y por que
 --
 --  No se revoca `CONNECT` a nadie: el `REVOKE CONNECT` es un privilegio SOBRE LA BASE
---  y solo lo puede retirar su dueno; `sgtm_owner` a proposito no lo es (#722,
+--  y solo lo puede retirar su dueno; `kamayuk_owner` a proposito no lo es (#722,
 --  «permission denied for database»), asi que la sentencia fallaria y dejaria la
 --  instalacion sin migrar.
 --

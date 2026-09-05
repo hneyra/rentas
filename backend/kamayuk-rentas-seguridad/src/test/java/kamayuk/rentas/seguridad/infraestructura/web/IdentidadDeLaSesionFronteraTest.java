@@ -82,9 +82,9 @@ import tools.jackson.databind.json.JsonMapper;
  * como <b>superusuario del cluster</b>, que omite RLS incluso con {@code FORCE ROW LEVEL SECURITY}—
  * si muerde, y las dos municipalidades tienen a proposito una cuenta con el <b>mismo nombre</b>: es
  * lo unico que distingue «se resolvio la fila de esta municipalidad» de «se resolvio la primera que
- * habia». La rotura que uno escribiria por costumbre —{@code sgtm_owner}— no sirve: con {@code
+ * habia». La rotura que uno escribiria por costumbre —{@code kamayuk_owner}— no sirve: con {@code
  * FORCE} el dueño tambien queda sujeto a la politica (#537, #545). Lo sujeta el centinela {@link
- * #seConectaComoSgtmApp()}.
+ * #seConectaComoKamayukApp()}.
  *
  * <p>El proxy transaccional se construye con {@link AnnotationTransactionAttributeSource}, o sea
  * <b>obedeciendo a la anotacion</b> igual que el contenedor: envolverlo en un {@code
@@ -364,11 +364,11 @@ class IdentidadDeLaSesionFronteraTest {
     }
 
     @Test
-    @DisplayName("el pool habla como sgtm_app, que es el rol que corre en produccion")
-    void seConectaComoSgtmApp() {
+    @DisplayName("el pool habla como kamayuk_app, que es el rol que corre en produccion")
+    void seConectaComoKamayukApp() {
         assertThat(pool.getUsername())
                 .as(
-                        "con sgtm_owner la prueba de aislamiento seguiria en VERDE —FORCE ROW LEVEL"
+                        "con kamayuk_owner la prueba de aislamiento seguiria en VERDE —FORCE ROW LEVEL"
                                 + " SECURITY sujeta tambien al dueño— y no demostraria nada"
                                 + " (#537, #545)")
                 .isEqualTo(BaseDeDatosDePrueba.APP);

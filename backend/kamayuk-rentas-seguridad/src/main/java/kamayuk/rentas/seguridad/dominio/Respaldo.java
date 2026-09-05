@@ -7,8 +7,8 @@ import org.jspecify.annotations.Nullable;
  * El estado de una copia de seguridad (RF-126).
  *
  * <p>La aplicacion <b>no hace copias y no debe poder hacerlas</b>: se conecta como {@code
- * sgtm_app}, que no tiene DDL ni es superusuario (ARQ-03 §4). Quien las hace es el proceso de
- * despliegue y quien escribe esta tabla es {@code sgtm_owner}. Aqui solo se lee.
+ * kamayuk_app}, que no tiene DDL ni es superusuario (ARQ-03 §4). Quien las hace es el proceso de
+ * despliegue y quien escribe esta tabla es {@code kamayuk_owner}. Aqui solo se lee.
  *
  * <p>{@code ultimaRestauracionVerificada} es la columna que la pantalla existe para enseñar (#558):
  * una copia sin restauracion probada no es una copia (RNF-079). <b>Nulo significa «nunca se

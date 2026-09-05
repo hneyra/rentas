@@ -12,7 +12,7 @@ import org.jspecify.annotations.Nullable;
  *
  * <h2>No se edita</h2>
  *
- * <p>V45 le retira a {@code sgtm_app} el privilegio de {@code UPDATE}, y el escaner de fuentes
+ * <p>V45 le retira a {@code kamayuk_app} el privilegio de {@code UPDATE}, y el escaner de fuentes
  * rechaza cualquier {@code UPDATE anuncio SET} antes de que llegue a ejecutarse. Los tres tramites
  * que la pantalla enumera —renovacion, cese, retiro— producen actos nuevos, no ediciones del
  * formulario.

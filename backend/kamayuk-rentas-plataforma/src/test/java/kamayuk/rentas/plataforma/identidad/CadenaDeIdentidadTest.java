@@ -53,8 +53,9 @@ import org.springframework.web.bind.annotation.RestController;
  *
  * <p>Eso ultimo es justamente la promesa de ADR-0005. Aqui el contexto de Spring es el de verdad
  * —{@link SeguridadWeb} y {@link ConfiguracionDeTenant} tal como los carga la aplicacion—, contra
- * PostgreSQL y conectado como {@code sgtm_app}: un superusuario omite RLS incluso con {@code FORCE
- * ROW LEVEL SECURITY}, y una prueba escrita sobre esa conexion pasaria en verde sin verificar nada.
+ * PostgreSQL y conectado como {@code kamayuk_app}: un superusuario omite RLS incluso con {@code
+ * FORCE ROW LEVEL SECURITY}, y una prueba escrita sobre esa conexion pasaria en verde sin verificar
+ * nada.
  *
  * <p>Y corre en {@code ./gradlew build}: no necesita Docker ni Keycloak, porque el emisor es {@link
  * EmisorDeMentira}. Que la verificacion mas completa dependiera de levantar una instalacion entera

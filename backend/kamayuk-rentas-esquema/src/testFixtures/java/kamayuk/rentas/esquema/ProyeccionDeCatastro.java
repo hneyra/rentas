@@ -20,7 +20,7 @@ import java.util.UUID;
  *
  * <h2>Por que escribe con OTRO rol</h2>
  *
- * <p>Porque `V4` no le da a `sgtm_app` mas que `SELECT` sobre las tres tablas, y eso no es una
+ * <p>Porque `V4` no le da a `kamayuk_app` mas que `SELECT` sobre las tres tablas, y eso no es una
  * precaucion: es lo que hace que ADR-0027 §3 sea cierto en vez de una promesa. Una prueba que
  * pudiera escribir la proyeccion con la conexion de la aplicacion estaria midiendo un sistema que
  * no es el que se despliega.
@@ -45,7 +45,7 @@ public final class ProyeccionDeCatastro {
      */
     public static void proyectar(BaseDeDatosDePrueba base, long municipalidadId)
             throws SQLException {
-        // Se LEE con `sgtm_app` y se ESCRIBE con el ingestor, en dos conexiones. El rodeo no es
+        // Se LEE con `kamayuk_app` y se ESCRIBE con el ingestor, en dos conexiones. El rodeo no es
         // un capricho: el ingestor NO tiene privilegio sobre las tablas de escenario, y el de
         // produccion recibe los datos DENTRO del evento; un `INSERT ... SELECT` en una sola
         // conexion no puede existir.

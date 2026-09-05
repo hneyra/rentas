@@ -27,8 +27,8 @@ puestas.
 - La aplicación no se conecta como propietario de las tablas.
 - **Una prueba de aislamiento escrita sobre la conexión por omisión de Testcontainers —que es de
   superusuario— pasa en verde sin verificar nada.** Por eso `AislamientoMultiTenantTest` crea el
-  rol `sgtm_app` en su arranque y lo usa para todo, y lo demuestra: con el mismo contexto fijado,
-  el superusuario ve las dos municipalidades y `sgtm_app` una.
+  rol `kamayuk_app` en su arranque y lo usa para todo, y lo demuestra: con el mismo contexto fijado,
+  el superusuario ve las dos municipalidades y `kamayuk_app` una.
 
 ### Hallazgo 2 — Una partición no hereda la política del padre
 
@@ -55,7 +55,7 @@ por un mensaje de error, filas de otra municipalidad. Así que el `LIKE` se qued
 después del recorrido, y el índice sobra.
 
 Medido contra PostgreSQL 16 con 30 000 filas, misma tabla, mismo índice, mismos datos y el rol
-`sgtm_app` sujeto a la política:
+`kamayuk_app` sujeto a la política:
 
 | Cómo se escribe el prefijo | Plan | Coste |
 |---|---|---|
@@ -82,7 +82,7 @@ que se evalúa como filtro de todos modos.
 
 `ALTER TABLE … ADD CONSTRAINT … FOREIGN KEY` lanza, para validar, **una consulta** sobre la tabla.
 Esa consulta queda sujeta a la política, la política lee `app.municipalidad_id`, y el migrador corre
-como `sgtm_owner` **sin contexto de tenant** —correctamente: migrar no es atender la petición de
+como `kamayuk_owner` **sin contexto de tenant** —correctamente: migrar no es atender la petición de
 ninguna municipalidad—. El resultado es que la migración entera se cae con
 
 ```
@@ -159,7 +159,7 @@ El motivo es el mismo: `geography_overlaps` **no es *leakproof*** — y tampoco 
 que PostgreSQL no lo evalúa antes de la política.
 
 **Y aquí el síntoma engaña más que en el `LIKE`, porque el plan dice «Index».** Medido contra
-PostgreSQL 16 con PostGIS 3.5, 60 000 lotes repartidos en dos municipalidades, como `sgtm_app`:
+PostgreSQL 16 con PostGIS 3.5, 60 000 lotes repartidos en dos municipalidades, como `kamayuk_app`:
 
 ```
 Bitmap Heap Scan on predio  (cost=329.74..3399.28 rows=404)
@@ -211,7 +211,7 @@ tampoco es la correcta —el marco medido contiene unas 440 filas—, así que q
 del mismo predicado y se retiró.
 
 La otra salida —`ALTER FUNCTION geography_overlaps(geography,geography) LEAKPROOF`— se descartó: es
-un acto de superusuario que no cabe en una migración (`sgtm_owner` a propósito no lo es), y sobre
+un acto de superusuario que no cabe en una migración (`kamayuk_owner` a propósito no lo es), y sobre
 todo es **afirmar** que ningún error de una función en C de un tercero puede revelar la fila de otra
 municipalidad. `float8le` es *leakproof* en el catálogo de PostgreSQL, que es una afirmación que ya
 está verificada.
@@ -240,7 +240,7 @@ está verificada.
 | `V18__tablas_de_valuacion_por_conjunto.sql` | `arancel`, `valor_unitario_edificacion` y `depreciacion` cuelgan de un conjunto de parámetros sellado (#17) |
 | `V19__declaracion_jurada_ficha_y_rectificatoria.sql` | La DJ enlaza la versión de ficha vigente a su presentación, y la rectificatoria es autorreferencia (#28) |
 | `V20__determinacion_detalle_por_predio.sql` | Detalle de la determinación por predio, y el predial nunca por un solo predio (NEG-05 §1, #30) |
-| `V21__lectura_de_flyway_schema_history.sql` | `sgtm_app` puede leer `flyway_schema_history`: el Job de implantación espera a la migración consultándola (#158) |
+| `V21__lectura_de_flyway_schema_history.sql` | `kamayuk_app` puede leer `flyway_schema_history`: el Job de implantación espera a la migración consultándola (#158) |
 | `V22__catalogo_de_infracciones_vigente.sql` | Una sola versión vigente por código de infracción (#43) |
 | `V23__determinacion_de_arbitrios.sql` | Determinación de arbitrios por predio, servicio y cuota, cada servicio con su propia tasa (#31) |
 | `V24__acta_de_fiscalizacion_ficha_y_vehiculo.sql` | El acta guarda de qué versión de ficha partió la visita, y la FK a `vehiculo` que faltaba (#45) |
@@ -304,7 +304,7 @@ clasificar:
 |---|---|---|
 | **De tenant** | Todas las de negocio (hoy, con `V57`: 113): llevan `municipalidad_id NOT NULL` | Política con `USING` y `WITH CHECK` |
 | **De catálogo** | Seis: `municipalidad`, `parametro_tributario`, `respaldo` (`V8`) y las tres de valuación nacionales de `V55` —`valor_unitario_edificacion`, `depreciacion`, `valor_referencial_vehiculo`—. La lista normativa es `TABLAS_DE_CATALOGO`, en el código de la prueba de aislamiento | Política propia, enumerada en el código de la prueba |
-| **Exenta** | `flyway_schema_history` | Sin RLS; desde `V21`, `sgtm_app` puede leerla |
+| **Exenta** | `flyway_schema_history` | Sin RLS; desde `V21`, `kamayuk_app` puede leerla |
 
 ## 4. Las piezas centrales
 
@@ -595,8 +595,8 @@ padrón real de Catacaos, con el coste **independiente del tamaño de página** 
 mismo que `tamano=200`). Lo que sigue es la medida, que es lo que el issue pide antes que ningún
 arreglo (precedente de #313).
 
-**Cómo se tomó.** PostgreSQL 16.10, conexión de **`sgtm_app`** con la política RLS activa —no la del
-superusuario, que la omite, ni la de `sgtm_owner`, que con `FORCE ROW LEVEL SECURITY` queda sujeto
+**Cómo se tomó.** PostgreSQL 16.10, conexión de **`kamayuk_app`** con la política RLS activa —no la del
+superusuario, que la omite, ni la de `kamayuk_owner`, que con `FORCE ROW LEVEL SECURITY` queda sujeto
 pero es dueño de las tablas—, `SET LOCAL app.municipalidad_id` dentro de una transacción, y el
 padrón de Catacaos —**14 422 predios**— sembrado en **dos** municipalidades (28 844 predios, 28 844
 fichas, 28 844 titularidades, 2 884 declaraciones juradas). Cada sentencia se midió en sus dos
@@ -652,7 +652,7 @@ describe: el plan **dice «Index»** y lee la titularidad entera del inquilino, 
 condición de índice es la de la propia política.
 
 ```
--- antes de V69, como sgtm_app y con RLS activa
+-- antes de V69, como kamayuk_app y con RLS activa
 Sort  (actual rows=20)
   ->  Bitmap Heap Scan on titularidad  (actual rows=20)
         Recheck Cond: (municipalidad_id = current_setting('app.municipalidad_id')::bigint)
@@ -709,7 +709,7 @@ página saldría vacía sin que nada lo explicara. El camino de escritura no las
 migrado sí puede traerlas, y **el conteo tiene que decir lo que la grilla enseña sea cual sea el
 dato**. Eso lo fija una prueba con esa siembra exacta, no este párrafo.
 
-**Medido.** Misma forma que §7.1 —PostgreSQL 16.10, conexión de **`sgtm_app`** con RLS activa,
+**Medido.** Misma forma que §7.1 —PostgreSQL 16.10, conexión de **`kamayuk_app`** con RLS activa,
 `SET LOCAL app.municipalidad_id` dentro de una transacción, el padrón de Catacaos (14 422 predios,
 14 422 fichas, 14 422 titularidades, 2 885 declaraciones) sembrado en **dos** municipalidades— y en
 otra máquina, más lenta y compartida: aquí el conteo que §7.1 midió en 83,5 ms cuesta entre 311 y
@@ -743,7 +743,7 @@ con `LIMIT` no le ofrece la prueba de unicidad que la eliminación exige, aunque
 escribió sea evidente. De ahí que esto haya que decirlo en el SQL.
 
 ```
--- antes, como sgtm_app y con RLS activa
+-- antes, como kamayuk_app y con RLS activa
 Aggregate  (Buffers: shared hit=32293)
   ->  Nested Loop Left Join (actual rows=14422)
         ->  Hash Right Join (actual rows=14422)          <- 555: el padron, una vez

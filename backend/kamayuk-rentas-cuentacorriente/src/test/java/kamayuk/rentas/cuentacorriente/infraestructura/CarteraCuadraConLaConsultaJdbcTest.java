@@ -98,8 +98,8 @@ import org.springframework.transaction.support.TransactionTemplate;
  * (D-02a), asi que comparar totales pasaria en verde <b>por un motivo que dejaria de ser cierto</b>
  * el dia que se cierre esa decision.
  *
- * <p>Se conecta como {@code sgtm_app}, no como el superusuario ni como {@code sgtm_owner}: con
- * {@code FORCE ROW LEVEL SECURITY} el dueno tambien queda sujeto a la politica, asi que esa
+ * <p>Se conecta como {@code kamayuk_app}, no como el superusuario ni como {@code kamayuk_owner}:
+ * con {@code FORCE ROW LEVEL SECURITY} el dueno tambien queda sujeto a la politica, asi que esa
  * mutacion pasaria en verde sin demostrar nada (#537, #545, #601).
  */
 @DisplayName("#639 — La cartera del panel cuadra con consulta_deuda")
@@ -484,7 +484,7 @@ class CarteraCuadraConLaConsultaJdbcTest {
         void elSuperusuarioVeLasDos() throws SQLException {
             // El centinela de #545: si un cambio de fixture devolviera la conexion al
             // superusuario del cluster —el unico que omite RLS con FORCE ROW LEVEL SECURITY,
-            // que `sgtm_owner` no omite—, cada cifra de esta clase saldria al doble y ninguna
+            // que `kamayuk_owner` no omite—, cada cifra de esta clase saldria al doble y ninguna
             // pareceria mal.
             try (Connection admin = base.conexionAdmin();
                     PreparedStatement sentencia =

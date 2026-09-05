@@ -50,7 +50,7 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * Los valores contra PostgreSQL de verdad, conectado como {@code sgtm_app} (V3, V26, #37).
+ * Los valores contra PostgreSQL de verdad, conectado como {@code kamayuk_app} (V3, V26, #37).
  *
  * <p>Lo que esta clase defiende y ninguna otra prueba puede: que diez emisiones concurrentes para
  * el mismo tipo y ejercicio saquen diez correlativos consecutivos sin huecos ni repetidos —una
@@ -343,7 +343,7 @@ class ValorRepositoryJdbcTest {
     class SinDelete {
 
         @Test
-        @DisplayName("sgtm_app no puede borrar un valor: el privilegio no existe")
+        @DisplayName("kamayuk_app no puede borrar un valor: el privilegio no existe")
         void sgtmAppNoPuedeBorrarValor() throws SQLException {
             TenantContext.fijar(new MunicipalidadId(municipalidadA));
             long contribuyente = crearContribuyente(municipalidadA, "V-0005", "50200005");

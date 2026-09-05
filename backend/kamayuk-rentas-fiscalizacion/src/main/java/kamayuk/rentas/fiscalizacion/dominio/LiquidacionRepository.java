@@ -13,7 +13,7 @@ import kamayuk.rentas.dominio.Ejercicio;
  * es el único punto de escritura: una liquidación se notifica al contribuyente, que se lleva el
  * papel, así que corregirla en el sitio dejaría al papel y al sistema diciendo cosas distintas. Se
  * reliquida —otra versión— o se anula con un movimiento. V39 no le concede {@code UPDATE} a {@code
- * sgtm_app}, y el escáner del código fuente lo vigila además en {@code TABLAS_INMUTABLES}: la
+ * kamayuk_app}, y el escáner del código fuente lo vigila además en {@code TABLAS_INMUTABLES}: la
  * barrera de la base falla en ejecución, la del escáner rompe el build, que es donde cuesta barato.
  */
 public interface LiquidacionRepository {

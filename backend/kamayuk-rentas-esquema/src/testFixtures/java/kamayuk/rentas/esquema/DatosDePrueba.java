@@ -69,8 +69,8 @@ public final class DatosDePrueba {
      * valores unitarios, la depreciacion y los valores referenciales del MEF—, que dejaron de ser
      * municipales. Se siembran <b>una sola vez para las dos municipalidades</b>, que es exactamente
      * lo que la decision afirma: una copia nacional no puede divergir de si misma. Y se siembran
-     * como {@code rol_carga_parametros}, porque {@code sgtm_app} ya no tiene {@code INSERT} sobre
-     * ellas.
+     * como {@code rol_carga_parametros}, porque {@code kamayuk_app} ya no tiene {@code INSERT}
+     * sobre ellas.
      *
      * @return el identificador del parametro de relleno que las tablas de tenant componen
      */
@@ -133,7 +133,7 @@ public final class DatosDePrueba {
     }
 
     /**
-     * Siembra todas las tablas de tenant como {@code sgtm_app} y con el contexto de la
+     * Siembra todas las tablas de tenant como {@code kamayuk_app} y con el contexto de la
      * municipalidad fijado. Sembrar con el rol de la aplicacion, y no con el owner, verifica de
      * paso que la clausula {@code WITH CHECK} deja pasar lo que debe dejar pasar.
      */
@@ -169,7 +169,7 @@ public final class DatosDePrueba {
             // Y AHORA la proyeccion, con OTRA conexion y OTRO rol.
             //
             // Las dos cosas son deliberadas y ninguna es comodidad de la prueba. El rol, porque
-            // `sgtm_app` no tiene INSERT sobre la proyeccion (V4) — intentarlo con esta misma
+            // `kamayuk_app` no tiene INSERT sobre la proyeccion (V4) — intentarlo con esta misma
             // conexion da «permission denied for table catastro_evento_aplicado», que es
             // exactamente lo que ADR-0027 §3 promete. Y despues del commit, porque el ingestor
             // es otro proceso: no puede ver lo que esta transaccion todavia no ha confirmado, y
@@ -525,8 +525,8 @@ public final class DatosDePrueba {
      * La proyeccion local de {@code catastro} (P5C, `V4`), sembrada como la escribiria el ingestor.
      *
      * <p>Se escribe con la conexion del INGESTOR, que es la unica que puede: `V4` le da a
-     * `sgtm_app` solo `SELECT`. Y se hace despues del commit del escenario, porque el ingestor es
-     * otro proceso y no ve lo que otra transaccion no ha confirmado.
+     * `kamayuk_app` solo `SELECT`. Y se hace despues del commit del escenario, porque el ingestor
+     * es otro proceso y no ve lo que otra transaccion no ha confirmado.
      */
     private static void sembrarLaProyeccionDeCatastro(
             BaseDeDatosDePrueba base, long muni, long predioId) throws SQLException {

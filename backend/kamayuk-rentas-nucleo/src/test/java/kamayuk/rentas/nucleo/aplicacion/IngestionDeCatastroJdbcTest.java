@@ -144,7 +144,8 @@ class IngestionDeCatastroJdbcTest {
         poolDelIngestor.setPassword(base.clave(BaseDeDatosDePrueba.INGESTOR_CATASTRO));
         gestorDelIngestor = new TenantTransactionManager(poolDelIngestor);
 
-        // Y el candado lee con `sgtm_app`, que es quien lo lee en produccion: `V4` y `V5` no le dan
+        // Y el candado lee con `kamayuk_app`, que es quien lo lee en produccion: `V4` y `V5` no le
+        // dan
         // mas que SELECT sobre las cuatro proyecciones, y una prueba que lo leyera con el rol del
         // ingestor estaria midiendo un sistema que no es el que se despliega.
         DriverManagerDataSource poolDeLaAplicacion = new DriverManagerDataSource();

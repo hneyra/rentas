@@ -22,8 +22,8 @@ import org.springframework.stereotype.Repository;
  * El historial de un expediente coactivo contra PostgreSQL (V33).
  *
  * <p><b>Solo inserta.</b> No hay aqui ni un {@code UPDATE expediente_movimiento} ni un {@code
- * DELETE}: V33 le concede a {@code sgtm_app} solo {@code SELECT} e {@code INSERT}, y el escaner de
- * fuentes rechaza esas dos cadenas antes de que lleguen a ejecutarse.
+ * DELETE}: V33 le concede a {@code kamayuk_app} solo {@code SELECT} e {@code INSERT}, y el escaner
+ * de fuentes rechaza esas dos cadenas antes de que lleguen a ejecutarse.
  *
  * <p><b>La apertura duplicada la rechaza el indice, no un {@code if}.</b> Se inserta y se traduce
  * el choque contra {@code expediente_movimiento_apertura_uq}.

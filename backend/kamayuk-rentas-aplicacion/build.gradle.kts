@@ -55,8 +55,8 @@ dependencies {
     implementation("io.micrometer:micrometer-registry-prometheus")
 
     // Las migraciones viven en kamayuk-rentas-esquema y las ejecuta el proceso de despliegue
-    // como sgtm_owner. La aplicacion NO migra al arrancar: se conecta como
-    // sgtm_app, que no tiene DDL (ARQ-03 §4).
+    // como kamayuk_owner. La aplicacion NO migra al arrancar: se conecta como
+    // kamayuk_app, que no tiene DDL (ARQ-03 §4).
     runtimeOnly(libs.postgresql)
 
     // Las barreras, compartidas con los otros cuatro repositorios (composite build; ver

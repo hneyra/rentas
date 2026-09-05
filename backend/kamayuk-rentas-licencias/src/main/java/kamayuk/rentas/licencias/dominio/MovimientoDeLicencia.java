@@ -9,10 +9,10 @@ import org.jspecify.annotations.Nullable;
 /**
  * Lo que le paso a una licencia, con la resolucion que lo sustenta (#44, V37 §5).
  *
- * <p><b>Solo se agrega.</b> V37 le concede a {@code sgtm_app} nada mas que {@code SELECT} e {@code
- * INSERT} sobre {@code licencia_movimiento}, y el escaner de fuentes rechaza un {@code UPDATE
- * licencia_movimiento SET} antes de que llegue a ejecutarse. Corregir un movimiento seria corregir
- * la historia de un acto administrativo ya notificado.
+ * <p><b>Solo se agrega.</b> V37 le concede a {@code kamayuk_app} nada mas que {@code SELECT} e
+ * {@code INSERT} sobre {@code licencia_movimiento}, y el escaner de fuentes rechaza un {@code
+ * UPDATE licencia_movimiento SET} antes de que llegue a ejecutarse. Corregir un movimiento seria
+ * corregir la historia de un acto administrativo ya notificado.
  *
  * <p>El documento va con las dos formas —su identificador y su numero impreso— escritas en el mismo
  * {@code INSERT} desde la misma emision. No pueden divergir, y tenerlas las dos es lo que permite

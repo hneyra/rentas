@@ -61,10 +61,11 @@ class MigradorTest {
         // base de datos. Vale ademas en las dos formas de correr las pruebas —contenedor
         // propio o PostgreSQL compartido—, porque los roles son del CLUSTER, no de la
         // base: una prueba que exigiera un cluster sin ellos solo pasaria en la primera.
-        assertThatThrownBy(() -> Migrador.exigirLosRoles(List.of("sgtm_app", "sgtm_readonly")))
+        assertThatThrownBy(
+                        () -> Migrador.exigirLosRoles(List.of("kamayuk_app", "kamayuk_readonly")))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("sgtm_app")
-                .hasMessageContaining("sgtm_readonly")
+                .hasMessageContaining("kamayuk_app")
+                .hasMessageContaining("kamayuk_readonly")
                 .hasMessageContaining("V6__rls.sql")
                 .hasMessageContaining("crear-roles.sql");
     }

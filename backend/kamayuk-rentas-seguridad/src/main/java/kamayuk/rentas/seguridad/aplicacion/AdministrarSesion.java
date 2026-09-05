@@ -92,8 +92,8 @@ public class AdministrarSesion {
      * Estado de las copias de seguridad (RF-126).
      *
      * <p>Consulta, no ejecucion. La aplicacion no hace copias y no debe poder hacerlas: se conecta
-     * como {@code sgtm_app}, que no tiene DDL ni es superusuario. Un boton «respaldar ahora» detras
-     * de un endpoint exigiria darle privilegios que se le quitaron a proposito.
+     * como {@code kamayuk_app}, que no tiene DDL ni es superusuario. Un boton «respaldar ahora»
+     * detras de un endpoint exigiria darle privilegios que se le quitaron a proposito.
      */
     @Transactional(readOnly = true)
     public Pagina<Respaldo> respaldos(Paginacion paginacion) {

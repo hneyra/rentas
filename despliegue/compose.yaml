@@ -39,7 +39,7 @@ services:
   #
   # La imagen del MIGRADOR, no la de la aplicacion (C-14, punto 1): son dos
   # objetivos del mismo `Dockerfile` y estan separados porque las credenciales de
-  # `sgtm_owner` —el unico rol con DDL— existen durante la migracion y desaparecen
+  # `kamayuk_owner` —el unico rol con DDL— existen durante la migracion y desaparecen
   # con ella. Meterlas en la imagen de la aplicacion le daria DDL sobre el padron
   # a un proceso de larga vida expuesto en HTTP (ARQ-03 §4).
   #
@@ -60,7 +60,7 @@ services:
       # descriptor pide `e.plataforma.motor` en vez de escribirlo. Lo que si es de
       # este sistema —y por eso coincide en los dos— es el nombre de SU base.
       KAMAYUK_DB_URL: jdbc:postgresql://base:5432/rentas
-      KAMAYUK_DB_OWNER_USUARIO: sgtm_owner
+      KAMAYUK_DB_OWNER_USUARIO: kamayuk_owner
       KAMAYUK_DB_OWNER_CLAVE: ${KAMAYUK_CLAVE_OWNER:?falta KAMAYUK_CLAVE_OWNER, sale del .env de la plataforma}
     # Corre y termina. Si se reinicia vuelve a comprobar el ambiente y no aplica
     # nada: el migrador es idempotente y tiene su prueba que lo demuestra.
@@ -87,9 +87,9 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: batch
       KAMAYUK_DB_URL: jdbc:postgresql://base:5432/rentas
-      # `sgtm_app` y solo `sgtm_app`: sin DDL, sin BYPASSRLS, sin DELETE y
+      # `kamayuk_app` y solo `kamayuk_app`: sin DDL, sin BYPASSRLS, sin DELETE y
       # propietario de nada.
-      KAMAYUK_DB_USUARIO: sgtm_app
+      KAMAYUK_DB_USUARIO: kamayuk_app
       KAMAYUK_DB_CLAVE: ${KAMAYUK_CLAVE_APP:?falta KAMAYUK_CLAVE_APP, sale del .env de la plataforma}
       # El prefijo es `kamayuk.implantacion`: `DatosDeImplantacion` declara
       # `@ConfigurationProperties("kamayuk.implantacion")` y `RegistroDeMunicipalidadesJdbc`
@@ -141,7 +141,7 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: web
       KAMAYUK_DB_URL: jdbc:postgresql://base:5432/rentas
-      KAMAYUK_DB_USUARIO: sgtm_app
+      KAMAYUK_DB_USUARIO: kamayuk_app
       KAMAYUK_DB_CLAVE: ${KAMAYUK_CLAVE_APP:?falta KAMAYUK_CLAVE_APP, sale del .env de la plataforma}
       # Sin el emisor la aplicacion se NIEGA a arrancar, y es deliberado: un
       # backend que atiende sin poder validar un token responde a la sonda, se

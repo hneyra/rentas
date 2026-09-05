@@ -31,9 +31,9 @@ import org.springframework.transaction.support.TransactionTemplate;
  * ADR-0008, contra PostgreSQL real: la auditoria se escribe, no se puede editar y —lo que da
  * sentido a todo lo demas— <b>sin observacion la operacion completa se deshace</b>.
  *
- * <p>Como todas las pruebas de persistencia, se conecta como {@code sgtm_app}: es la unica forma de
- * que los privilegios y la RLS signifiquen algo. Con la conexion de superusuario de Testcontainers,
- * los tres casos de privilegios de aqui pasarian en verde sin verificar nada.
+ * <p>Como todas las pruebas de persistencia, se conecta como {@code kamayuk_app}: es la unica forma
+ * de que los privilegios y la RLS signifiquen algo. Con la conexion de superusuario de
+ * Testcontainers, los tres casos de privilegios de aqui pasarian en verde sin verificar nada.
  */
 @DisplayName("ADR-0008 — Auditoria obligatoria")
 class AuditoriaJdbcTest {

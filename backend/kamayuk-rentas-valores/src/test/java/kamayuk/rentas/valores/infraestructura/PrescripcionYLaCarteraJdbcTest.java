@@ -76,9 +76,9 @@ import org.springframework.transaction.support.TransactionTemplate;
  * cuatro anios del art. 43 ya corrieron. La fecha de presentacion es un argumento del caso de uso,
  * no el reloj (regla 6), de modo que esto no es un truco de la prueba: es como se resuelve.
  *
- * <p>Conectada como {@code sgtm_app} —quien sufre la politica RLS—, nunca como {@code sgtm_owner}:
- * con {@code FORCE ROW LEVEL SECURITY} el dueno tambien queda sujeto a la politica, asi que esa
- * mutacion pasaria en verde sin demostrar nada (#537, #545).
+ * <p>Conectada como {@code kamayuk_app} —quien sufre la politica RLS—, nunca como {@code
+ * kamayuk_owner}: con {@code FORCE ROW LEVEL SECURITY} el dueno tambien queda sujeto a la politica,
+ * asi que esa mutacion pasaria en verde sin demostrar nada (#537, #545).
  */
 @DisplayName("#674 — La prescripcion declarada y las dos cifras del panel")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)

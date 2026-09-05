@@ -32,8 +32,8 @@ import org.springframework.stereotype.Repository;
  * Los expedientes coactivos contra PostgreSQL (V3, V33).
  *
  * <p><b>Solo inserta.</b> No hay aqui ni un {@code UPDATE expediente_coactivo} ni un {@code
- * DELETE}: V33 le retira a {@code sgtm_app} el {@code UPDATE} sobre {@code expediente_coactivo} y
- * {@code expediente_valor}, y el escaner de fuentes rechaza esas cadenas antes de que lleguen a
+ * DELETE}: V33 le retira a {@code kamayuk_app} el {@code UPDATE} sobre {@code expediente_coactivo}
+ * y {@code expediente_valor}, y el escaner de fuentes rechaza esas cadenas antes de que lleguen a
  * ejecutarse. El unico {@code UPDATE} de esta clase es el del contador de {@code
  * expediente_correlativo}, que es infraestructura de numeracion y no un acto del procedimiento
  * (mismo criterio que {@code valor_correlativo} en V26 y {@code convenio_correlativo} en V31).

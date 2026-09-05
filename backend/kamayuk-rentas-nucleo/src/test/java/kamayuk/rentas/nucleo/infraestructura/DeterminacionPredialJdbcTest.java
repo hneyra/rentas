@@ -41,14 +41,14 @@ import org.springframework.transaction.support.TransactionTemplate;
  *       redondeo que ADR-0018 evita. Las dos producen cifras plausibles.
  *   <li>Los dos {@code CHECK} de V56 rechazan la fila incoherente <b>aunque se escriba por SQL
  *       directo</b>, sin pasar por el dominio.
- *   <li>{@code sgtm_app} no puede modificar ni borrar el detalle: la unica forma de recalcular es
- *       insertar otra determinacion (ADR-0007).
+ *   <li>{@code kamayuk_app} no puede modificar ni borrar el detalle: la unica forma de recalcular
+ *       es insertar otra determinacion (ADR-0007).
  *   <li>Las dos lecturas nuevas devuelven <b>la ultima</b> de cada contribuyente, no una
  *       cualquiera, y <b>bajo RLS</b>: con el contexto de la municipalidad B, la determinacion de A
  *       no existe.
  * </ul>
  *
- * <p>La conexion es la de {@code sgtm_app}, nunca la de superusuario: un superusuario omite RLS
+ * <p>La conexion es la de {@code kamayuk_app}, nunca la de superusuario: un superusuario omite RLS
  * incluso con {@code FORCE ROW LEVEL SECURITY}, y una prueba escrita sobre esa conexion pasa en
  * verde sin verificar nada (DAT-01 §0).
  */
@@ -150,7 +150,7 @@ class DeterminacionPredialJdbcTest {
     }
 
     @Test
-    @DisplayName("sgtm_app no puede modificar ni borrar el detalle de una determinacion")
+    @DisplayName("kamayuk_app no puede modificar ni borrar el detalle de una determinacion")
     void elDetalleNoSeEdita() throws SQLException {
         enA();
         long titular = crearContribuyente(municipalidadA, "DET-3003", "80300303");

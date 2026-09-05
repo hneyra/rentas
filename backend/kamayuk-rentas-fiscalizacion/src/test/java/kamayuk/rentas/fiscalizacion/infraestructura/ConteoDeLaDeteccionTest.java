@@ -70,7 +70,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * paginas del plan, y —a traves del caso de uso entero, con un pool que anota lo que se ejecuta—
  * que la sentencia de conteo que la peticion manda de verdad no nombre {@code declaracion_jurada}.
  *
- * <h2>La conexion es la de {@code sgtm_app}</h2>
+ * <h2>La conexion es la de {@code kamayuk_app}</h2>
  *
  * <p>No la del superusuario, que omite RLS incluso con {@code FORCE ROW LEVEL SECURITY} (DAT-01 §0,
  * hallazgo 1). El plan que importa es el que obtiene la aplicacion, con la condicion de la politica
@@ -482,8 +482,8 @@ class ConteoDeLaDeteccionTest {
      *
      * <p>Se siembra con SQL directo: lo que aqui se mide es el plan, no el camino de escritura, y
      * meter 28 869 predios por sus casos de uso tardaria mas que la prueba entera. La conexion es
-     * la de {@code sgtm_app} con su contexto fijado, asi que las filas entran por donde entrarian
-     * de verdad, con la politica RLS comprobando cada una.
+     * la de {@code kamayuk_app} con su contexto fijado, asi que las filas entran por donde
+     * entrarian de verdad, con la politica RLS comprobando cada una.
      *
      * <p><b>Dos municipalidades pobladas y no una</b>, por lo mismo que en {@code
      * TitularesEnElIndiceTest}: con una sola, «lee el padron del inquilino» y «lee la tabla entera»

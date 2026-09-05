@@ -105,7 +105,7 @@ No es alivio: es un hallazgo. Las tres causas que ya se midieron:
 - **La rotura no llegaba al camino que la prueba recorre.** El caso clásico: anotar una clase que
   la prueba instancia con `new`, de modo que el proxy transaccional no se aplica y la anotación no
   cambia nada.
-- **La verificación no medía lo que parecía.** El ejemplo caro: conectar como `sgtm_owner` para
+- **La verificación no medía lo que parecía.** El ejemplo caro: conectar como `kamayuk_owner` para
   demostrar una fuga de aislamiento deja todo en verde, porque con `FORCE ROW LEVEL SECURITY` el
   dueño también queda sujeto a la política. Hay que usar el superusuario del clúster.
 

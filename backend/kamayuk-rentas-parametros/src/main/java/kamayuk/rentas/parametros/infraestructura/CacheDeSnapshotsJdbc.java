@@ -17,8 +17,8 @@ import org.springframework.stereotype.Repository;
  * La cache local de conjuntos sellados (`V3`).
  *
  * <p>Escribe una vez y lee siempre. No hay ningun {@code UPDATE} ni ningun {@code DELETE}, y
- * tampoco el privilegio para hacerlos: `V3` le concede a {@code sgtm_app} {@code INSERT} y {@code
- * SELECT} y nada mas, de modo que la guarda no depende de que este codigo se porte bien.
+ * tampoco el privilegio para hacerlos: `V3` le concede a {@code kamayuk_app} {@code INSERT} y
+ * {@code SELECT} y nada mas, de modo que la guarda no depende de que este codigo se porte bien.
  */
 @Repository
 public class CacheDeSnapshotsJdbc extends RepositorioJdbc implements CacheDeSnapshots {

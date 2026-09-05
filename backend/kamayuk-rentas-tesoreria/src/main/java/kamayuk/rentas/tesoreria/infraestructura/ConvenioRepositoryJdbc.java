@@ -38,8 +38,8 @@ import org.springframework.stereotype.Repository;
  * Los convenios contra PostgreSQL (V3, V31).
  *
  * <p><b>Solo inserta.</b> No hay aqui ni un {@code UPDATE convenio} ni un {@code DELETE}: V31 le
- * retira a {@code sgtm_app} el {@code UPDATE} sobre {@code convenio} y {@code convenio_cuota}, y el
- * escaner de fuentes rechaza esas cadenas antes de que lleguen a ejecutarse. El unico {@code
+ * retira a {@code kamayuk_app} el {@code UPDATE} sobre {@code convenio} y {@code convenio_cuota}, y
+ * el escaner de fuentes rechaza esas cadenas antes de que lleguen a ejecutarse. El unico {@code
  * UPDATE} de esta clase es el del contador de {@code convenio_correlativo}, que es infraestructura
  * de numeracion y no un acto administrativo (mismo criterio que {@code valor_correlativo} en V26).
  *

@@ -48,10 +48,10 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * La liquidación de fiscalización contra PostgreSQL de verdad, conectado como {@code sgtm_app}
+ * La liquidación de fiscalización contra PostgreSQL de verdad, conectado como {@code kamayuk_app}
  * (#49).
  *
- * <p>Conectado como {@code sgtm_app} y no como el superusuario que Testcontainers entrega por
+ * <p>Conectado como {@code kamayuk_app} y no como el superusuario que Testcontainers entrega por
  * omisión: un superusuario <b>omite RLS incluso con {@code FORCE ROW LEVEL SECURITY}</b>, y una
  * prueba escrita sobre esa conexión pasa en verde sin verificar nada (CAL-01 §3.2).
  */
@@ -198,7 +198,7 @@ class LiquidacionJdbcTest {
                                             + guardada.identificador()))
                     .as(
                             "cambiar los parametros de hoy no altera una liquidacion emitida: la"
-                                    + " columna esta COPIADA y sgtm_app no la puede mover (AC 1)")
+                                    + " columna esta COPIADA y kamayuk_app no la puede mover (AC 1)")
                     .contains("42501");
         }
 
@@ -252,7 +252,7 @@ class LiquidacionJdbcTest {
     class SoloSeAgrega {
 
         @Test
-        @DisplayName("sgtm_app no puede actualizar la cabecera, ni el detalle, ni el movimiento")
+        @DisplayName("kamayuk_app no puede actualizar la cabecera, ni el detalle, ni el movimiento")
         void sgtmAppNoPuedeActualizar() {
             TenantContext.fijar(new MunicipalidadId(municipalidadA));
             Escenario escenario = sembrar(municipalidadA);
@@ -620,7 +620,7 @@ class LiquidacionJdbcTest {
                 "CASA_HABITACION");
     }
 
-    /** El SQLSTATE del error, ejecutando como {@code sgtm_app} con contexto de tenant. */
+    /** El SQLSTATE del error, ejecutando como {@code kamayuk_app} con contexto de tenant. */
     private static String errorDe(String sql) {
         try (Connection app = base.conexion(BaseDeDatosDePrueba.APP)) {
             ContextoDeTenant.fijar(app, municipalidadA);

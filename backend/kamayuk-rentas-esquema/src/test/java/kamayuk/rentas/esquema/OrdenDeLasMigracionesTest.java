@@ -49,7 +49,7 @@ class OrdenDeLasMigracionesTest {
     @BeforeAll
     static void provisionar() throws SQLException, IOException {
         base = BaseDeDatosDePrueba.provisionar();
-        // El esquema lo crea el superusuario y no `sgtm_owner`, que a proposito no tiene CREATE
+        // El esquema lo crea el superusuario y no `kamayuk_owner`, que a proposito no tiene CREATE
         // sobre la base —«permission denied for database», que es lo que dijo la primera vez—.
         // Es la misma frontera que el resto del sistema respeta: quien migra tiene DDL sobre lo
         // suyo, no sobre el motor.

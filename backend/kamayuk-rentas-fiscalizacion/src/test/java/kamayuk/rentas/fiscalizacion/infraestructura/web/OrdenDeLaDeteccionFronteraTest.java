@@ -84,12 +84,12 @@ import tools.jackson.databind.json.JsonMapper;
  * sólo existen al otro lado de {@link ManejadorDeErrores}: es la misma frontera que el issue midió
  * con {@code curl} contra el backend local.
  *
- * <p>La conexión es la de {@code sgtm_app}: un superusuario omite RLS <b>incluso con {@code FORCE
- * ROW LEVEL SECURITY}</b> (DAT-01 §0, primer hallazgo), y con {@code sgtm_owner} no basta —FORCE lo
- * sujeta a la política igual (#537, #545)—. Por eso el padrón de la vecina lleva a propósito el
- * sector mayor y la diferencia mayor de las dos municipalidades: si la conexión omitiera RLS,
- * <b>encabezaría los dos órdenes descendentes</b> y la fuga saldría en la aserción del AC 1 y en la
- * del AC 2, no sólo en una prueba aparte.
+ * <p>La conexión es la de {@code kamayuk_app}: un superusuario omite RLS <b>incluso con {@code
+ * FORCE ROW LEVEL SECURITY}</b> (DAT-01 §0, primer hallazgo), y con {@code kamayuk_owner} no basta
+ * —FORCE lo sujeta a la política igual (#537, #545)—. Por eso el padrón de la vecina lleva a
+ * propósito el sector mayor y la diferencia mayor de las dos municipalidades: si la conexión
+ * omitiera RLS, <b>encabezaría los dos órdenes descendentes</b> y la fuga saldría en la aserción
+ * del AC 1 y en la del AC 2, no sólo en una prueba aparte.
  *
  * <p>El caso de uso se envuelve con {@link AnnotationTransactionAttributeSource}, o sea
  * <b>obedeciendo a la anotación</b> como el contenedor: un {@code TransactionTemplate}
@@ -411,13 +411,13 @@ class OrdenDeLaDeteccionFronteraTest {
     class ElAislamiento {
 
         @Test
-        @DisplayName("la prueba se conecta como sgtm_app, no como superusuario ni como el dueno")
-        void seConectaComoSgtmApp() {
+        @DisplayName("la prueba se conecta como kamayuk_app, no como superusuario ni como el dueno")
+        void seConectaComoKamayukApp() {
             assertThat(jdbc.sql("SELECT current_user").query(String.class).single())
                     .as(
                             "con superusuario RLS se omite —incluso con FORCE ROW LEVEL SECURITY— y"
                                     + " todo lo de este archivo pasaria sin verificar nada. Con"
-                                    + " sgtm_owner NO basta: FORCE lo sujeta a la politica igual,"
+                                    + " kamayuk_owner NO basta: FORCE lo sujeta a la politica igual,"
                                     + " asi que la rotura clasica escrita con el dueño sale VERDE"
                                     + " (#537, #545)")
                     .isEqualTo(BaseDeDatosDePrueba.APP);

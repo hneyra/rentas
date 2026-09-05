@@ -177,7 +177,7 @@ describe("C-14 — que esto se pueda desplegar", () => {
   /**
    * El Job de migracion corre la imagen del MIGRADOR, no la de la aplicacion.
    *
-   * Hasta C-14 corria la misma que el `Deployment` con `KAMAYUK_DB_USUARIO=sgtm_owner` y sin perfil:
+   * Hasta C-14 corria la misma que el `Deployment` con `KAMAYUK_DB_USUARIO=kamayuk_owner` y sin perfil:
    * arrancaba el proceso web con las credenciales del unico rol con DDL, y la aplicacion tiene
    * `spring.flyway.enabled: false` a proposito (ARQ-03 §4). O sea que ese Job **no migraba**.
    */
@@ -186,7 +186,7 @@ describe("C-14 — que esto se pueda desplegar", () => {
     expect(contenedores).toHaveLength(1);
     const c = contenedores[0]!;
     expect(c.image).toBe(ENTORNO.imagenDe(`${"rentas"}-migrador`));
-    expect(valorDe(c, "KAMAYUK_DB_OWNER_USUARIO")).toBe("sgtm_owner");
+    expect(valorDe(c, "KAMAYUK_DB_OWNER_USUARIO")).toBe("kamayuk_owner");
     expect(declara(c, "KAMAYUK_DB_OWNER_CLAVE")).toBe(true);
     // La de la APLICACION. El migrador no la lee, y ponerla es lo que hacia que este Job
     // pareciera correcto sin migrar nada.

@@ -21,7 +21,7 @@ import org.springframework.stereotype.Repository;
  * Las notificaciones de valores contra PostgreSQL (V3, V28).
  *
  * <p>No hay ningun {@code UPDATE} ni {@code DELETE} aqui, y tampoco existe el privilegio: V28 se lo
- * revoca a {@code sgtm_app}. Un intento no hallado se reintenta con otra fila, y la anterior se
+ * revoca a {@code kamayuk_app}. Un intento no hallado se reintenta con otra fila, y la anterior se
  * queda donde estaba (AC de #39).
  */
 @Repository

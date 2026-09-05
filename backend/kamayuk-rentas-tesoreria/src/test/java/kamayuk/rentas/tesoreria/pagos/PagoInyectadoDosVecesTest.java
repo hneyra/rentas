@@ -72,8 +72,8 @@ import org.springframework.transaction.support.TransactionTemplate;
  *       encargo pide: comprobarlo con el escaner y no leyendo el codigo.
  * </ul>
  *
- * <p>Contra PostgreSQL de verdad y como {@code sgtm_app}. Contra un doble no se puede demostrar ni
- * el indice unico, ni que diez hilos se serialicen en el motor, ni que la fila del buzon y el
+ * <p>Contra PostgreSQL de verdad y como {@code kamayuk_app}. Contra un doble no se puede demostrar
+ * ni el indice unico, ni que diez hilos se serialicen en el motor, ni que la fila del buzon y el
  * asiento caigan en la misma transaccion.
  */
 @DisplayName("P5D AC 3 y AC 4 — el buzon de pagos")

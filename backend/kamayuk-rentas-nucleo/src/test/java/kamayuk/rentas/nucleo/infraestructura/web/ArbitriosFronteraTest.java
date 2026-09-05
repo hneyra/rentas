@@ -52,7 +52,7 @@ import tools.jackson.databind.json.JsonMapper;
  * dos suyas. Los dos ejercicios son 2026 y 2027 porque son las <b>dos unicas particiones</b> que
  * V23 declara de {@code determinacion_arbitrio}.
  *
- * <p>Conectada como {@code sgtm_app} —quien sufre la politica RLS; un superusuario la omite y no
+ * <p>Conectada como {@code kamayuk_app} —quien sufre la politica RLS; un superusuario la omite y no
  * verificaria nada— y con el proxy transaccional construido a partir de la <b>anotacion</b>, como
  * el contenedor (#486).
  */

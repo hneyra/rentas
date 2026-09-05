@@ -25,7 +25,7 @@ import org.springframework.stereotype.Repository;
 /**
  * Los movimientos de una autorizacion de anuncio contra PostgreSQL (V45).
  *
- * <p><b>Solo inserta.</b> V45 le concede a {@code sgtm_app} unicamente {@code SELECT} e {@code
+ * <p><b>Solo inserta.</b> V45 le concede a {@code kamayuk_app} unicamente {@code SELECT} e {@code
  * INSERT} sobre {@code anuncio_movimiento}, y el escaner de fuentes rechaza un {@code UPDATE
  * anuncio_movimiento SET} antes de que llegue a ejecutarse.
  *

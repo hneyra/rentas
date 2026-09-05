@@ -148,7 +148,7 @@ Qué queda levantado, y cómo se comprueba que de verdad está:
 | Pieza | Dónde | Comprobación que se ejecutó |
 |---|---|---|
 | PostgreSQL | `localhost:5432` | `rentas`, `catastro`, `normativa` y `caja` existen, con `pg_trgm`, `unaccent`, `btree_gist` y `postgis` en cada una |
-| Roles | el clúster | `sgtm_owner`, `sgtm_app`, `sgtm_readonly`, `rol_carga_parametros`; **ninguno superusuario ni con `BYPASSRLS`** |
+| Roles | el clúster | `kamayuk_owner`, `kamayuk_app`, `kamayuk_readonly`, `rol_carga_parametros`; **ninguno superusuario ni con `BYPASSRLS`** |
 | Keycloak | <http://localhost:8180> | los dos realms, `sgtm` y `sgtm-ciudadano`, con el emisor que el backend va a comparar |
 | Buzón (Mailpit) | <http://localhost:8025> | ahí llega el enlace de primera clave |
 | Traefik | <http://localhost:8080> | **404 es lo correcto**: está vivo y no hay ningún sistema detrás todavía |
@@ -176,7 +176,7 @@ qué.
 
 No se versiona, y si alguna vez aparece en un diff, la clave que lleve deja de ser una clave: hay
 que **rotarla**, no borrarla del commit. Una clave **distinta por rol**: si el superusuario,
-`sgtm_owner` y `sgtm_app` comparten clave, la separación de privilegios entera es decorativa.
+`kamayuk_owner` y `kamayuk_app` comparten clave, la separación de privilegios entera es decorativa.
 
 ## 6. Editor
 

@@ -45,7 +45,7 @@ import org.springframework.transaction.interceptor.TransactionInterceptor;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * #366 — El titular del predio, resuelto contra PostgreSQL de verdad y como {@code sgtm_app}
+ * #366 — El titular del predio, resuelto contra PostgreSQL de verdad y como {@code kamayuk_app}
  * (ADR-0015 §2.4).
  *
  * <p>Lo que esta clase defiende, y ninguna prueba con dobles puede:
@@ -362,7 +362,7 @@ class TitularDelPredioJdbcTest {
 
             assertThat(consulta.resolver(predio, EN_MARZO).titulares())
                     .as(
-                            "la prueba corre como sgtm_app, que es a quien la politica RLS aplica:"
+                            "la prueba corre como kamayuk_app, que es a quien la politica RLS aplica:"
                                     + " desde B ese predio no existe, asi que no tiene titular")
                     .isEmpty();
         }

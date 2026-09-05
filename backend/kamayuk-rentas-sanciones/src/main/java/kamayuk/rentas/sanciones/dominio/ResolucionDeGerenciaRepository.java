@@ -6,10 +6,10 @@ import java.util.Optional;
 /**
  * Las resoluciones de gerencia contra PostgreSQL. Ningún método recibe la municipalidad (regla 2).
  *
- * <p><b>Solo inserta.</b> V41 no le concede a {@code sgtm_app} ni {@code UPDATE} ni {@code DELETE}
- * sobre {@code resolucion_gerencia}, por lo mismo que V34 se los negó a {@code acto_coactivo}: la
- * resolución se notifica al administrado, que se lleva el papel. Una equivocada se deja sin efecto
- * con otra, y las dos quedan.
+ * <p><b>Solo inserta.</b> V41 no le concede a {@code kamayuk_app} ni {@code UPDATE} ni {@code
+ * DELETE} sobre {@code resolucion_gerencia}, por lo mismo que V34 se los negó a {@code
+ * acto_coactivo}: la resolución se notifica al administrado, que se lleva el papel. Una equivocada
+ * se deja sin efecto con otra, y las dos quedan.
  */
 public interface ResolucionDeGerenciaRepository {
 

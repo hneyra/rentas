@@ -54,10 +54,10 @@ import org.springframework.transaction.support.TransactionTemplate;
 /**
  * El libro dice <b>por que</b> se dio de baja una deuda (#684, V77, RF-044 y RF-045).
  *
- * <p>Se conecta como {@code sgtm_app}, nunca como {@code sgtm_owner}: con {@code FORCE ROW LEVEL
- * SECURITY} el dueno de la tabla <b>tambien</b> queda sujeto a la politica, asi que una rotura de
- * aislamiento escrita con el dueno pasaria en verde sin demostrar nada (#537, #545, #601). Quien la
- * omite es el superusuario del cluster, y con el se mide.
+ * <p>Se conecta como {@code kamayuk_app}, nunca como {@code kamayuk_owner}: con {@code FORCE ROW
+ * LEVEL SECURITY} el dueno de la tabla <b>tambien</b> queda sujeto a la politica, asi que una
+ * rotura de aislamiento escrita con el dueno pasaria en verde sin demostrar nada (#537, #545,
+ * #601). Quien la omite es el superusuario del cluster, y con el se mide.
  *
  * <h2>Que defiende</h2>
  *
@@ -153,19 +153,19 @@ class CausalDeLaBajaJdbcTest {
     }
 
     // ------------------------------------------------------------------
-    //  El centinela: si esta prueba deja de correr como sgtm_app, no mide nada
+    //  El centinela: si esta prueba deja de correr como kamayuk_app, no mide nada
     // ------------------------------------------------------------------
 
     @Test
-    @DisplayName("la prueba se conecta como sgtm_app, no como el dueno ni como superusuario")
-    void seConectaComoSgtmApp() {
+    @DisplayName("la prueba se conecta como kamayuk_app, no como el dueno ni como superusuario")
+    void seConectaComoKamayukApp() {
         String usuario =
                 transaccion.execute(
                         estado -> jdbc.sql("SELECT current_user").query(String.class).single());
         assertThat(usuario)
                 .as(
                         "con FORCE ROW LEVEL SECURITY el dueno tambien queda sujeto a la politica,"
-                                + " asi que una prueba escrita con sgtm_owner pasaria en verde sin"
+                                + " asi que una prueba escrita con kamayuk_owner pasaria en verde sin"
                                 + " medir el aislamiento (#537, #545)")
                 .isEqualTo(BaseDeDatosDePrueba.APP);
     }
@@ -585,7 +585,7 @@ class CausalDeLaBajaJdbcTest {
                             asiento -> assertThat(asiento.monto()).isEqualTo(Dinero.de("10.00")));
 
             // La misma demostracion que exige AislamientoMultiTenantTest: con el mismo
-            // contexto fijado, el superusuario ve las dos municipalidades y sgtm_app una.
+            // contexto fijado, el superusuario ve las dos municipalidades y kamayuk_app una.
             try (Connection admin = base.conexionAdmin();
                     PreparedStatement sentencia =
                             admin.prepareStatement(

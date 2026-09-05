@@ -28,9 +28,9 @@ import java.sql.Statement;
  * AislamientoMultiTenantTest} les exigiria RLS sola —esa es exactamente su regla— y estariamos
  * manteniendo la politica de unas tablas que no son de nadie.
  *
- * <p>Y no llevan {@code DELETE}: la prueba de aislamiento exige que {@code sgtm_app} no lo tenga en
- * ninguna tabla de esta base (RNF-051, regla 4), y una tabla de escenario que se lo concediera la
- * pondria en rojo por un motivo que no es el suyo.
+ * <p>Y no llevan {@code DELETE}: la prueba de aislamiento exige que {@code kamayuk_app} no lo tenga
+ * en ninguna tabla de esta base (RNF-051, regla 4), y una tabla de escenario que se lo concediera
+ * la pondria en rojo por un motivo que no es el suyo.
  *
  * <h2>Lo que estas tablas NO prueban</h2>
  *

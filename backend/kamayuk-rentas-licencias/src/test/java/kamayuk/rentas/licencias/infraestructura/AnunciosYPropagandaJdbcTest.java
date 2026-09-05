@@ -80,7 +80,8 @@ import org.springframework.transaction.interceptor.TransactionInterceptor;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * #51 — Anuncios y propaganda contra PostgreSQL de verdad (V45), conectado como {@code sgtm_app}.
+ * #51 — Anuncios y propaganda contra PostgreSQL de verdad (V45), conectado como {@code
+ * kamayuk_app}.
  *
  * <p>Lo que esta clase defiende y ninguna prueba con dobles puede:
  *
@@ -805,7 +806,7 @@ class AnunciosYPropagandaJdbcTest {
     class Inmutabilidad {
 
         @Test
-        @DisplayName("sgtm_app no puede corregir un anuncio en el sitio")
+        @DisplayName("kamayuk_app no puede corregir un anuncio en el sitio")
         void noSePuedeEditarElAnuncio() {
             long titular = crearContribuyente();
             RegistrarAnuncio.Registro alta =

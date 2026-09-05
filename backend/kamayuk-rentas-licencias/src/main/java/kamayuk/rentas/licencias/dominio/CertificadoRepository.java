@@ -10,7 +10,7 @@ import kamayuk.rentas.dominio.Ejercicio;
  * filtra la politica RLS con el valor que {@code SET LOCAL} fijo al abrir la transaccion.
  *
  * <p><b>No hay {@code actualizar} ni {@code borrar}</b>, y no es un olvido: V51 crea {@code
- * certificado} sin conceder {@code UPDATE} ni {@code DELETE} a {@code sgtm_app}. Un certificado
+ * certificado} sin conceder {@code UPDATE} ni {@code DELETE} a {@code kamayuk_app}. Un certificado
  * equivocado se sustituye emitiendo otro; no se corrige.
  */
 public interface CertificadoRepository {

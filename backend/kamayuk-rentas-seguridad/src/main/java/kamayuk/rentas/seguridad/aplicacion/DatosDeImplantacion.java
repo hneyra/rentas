@@ -7,15 +7,15 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * Lo que hay que saber para implantar una municipalidad.
  *
  * <p>Son propiedades y no argumentos de linea de comandos por lo mismo que en el migrador: la clave
- * de {@code sgtm_owner} esta entre ellas, y un argumento queda en el historial del proceso y en los
- * registros del orquestador.
+ * de {@code kamayuk_owner} esta entre ellas, y un argumento queda en el historial del proceso y en
+ * los registros del orquestador.
  *
  * <h2>Por que no la registra un {@code @ConfigurationPropertiesScan}</h2>
  *
  * <p>Porque un escaneo la registra en <b>todos</b> los perfiles, y este record valida en su
  * constructor compacto: sin las propiedades puestas, el bean falla al construirse y el contexto no
  * arranca. Con el escaneo, el proceso <b>web</b> —que no implanta nada y no tiene por que conocer
- * la clave de {@code sgtm_owner}— moria al arrancar con «Falta kamayuk.implantacion.ubigeo». Lo
+ * la clave de {@code kamayuk_owner}— moria al arrancar con «Falta kamayuk.implantacion.ubigeo». Lo
  * encontro el primer arranque real del artefacto despues de escribir la implantacion.
  *
  * <p>Por eso la declara {@link ImplantarMunicipalidad} con {@code @EnableConfigurationProperties}:

@@ -10,8 +10,8 @@ import org.springframework.stereotype.Repository;
 /**
  * Lee lo que la proyeccion de valuacion tiene (P5C, `V5`).
  *
- * <p>Ni un `INSERT`: quien escribe estas dos tablas es `rol_ingestor_catastro`, y a `sgtm_app` `V5`
- * no le da mas que `SELECT`. Eso no es disciplina de esta clase — es un privilegio, y
+ * <p>Ni un `INSERT`: quien escribe estas dos tablas es `rol_ingestor_catastro`, y a `kamayuk_app`
+ * `V5` no le da mas que `SELECT`. Eso no es disciplina de esta clase — es un privilegio, y
  * `ProyeccionDeSoloLecturaTest` lo comprueba contra el catalogo.
  */
 @Repository

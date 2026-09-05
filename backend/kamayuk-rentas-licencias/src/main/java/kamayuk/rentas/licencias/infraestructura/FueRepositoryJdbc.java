@@ -46,8 +46,8 @@ import org.springframework.stereotype.Repository;
  * El expediente del FUE y sus cinco secciones contra PostgreSQL (V4, V43).
  *
  * <p><b>Solo inserta.</b> No hay aqui ni un {@code UPDATE licencia_edificacion} ni un {@code
- * DELETE}: V43 le retira a {@code sgtm_app} el privilegio de {@code UPDATE} sobre la cabecera y no
- * se lo concede a ninguna tabla de seccion; {@code DELETE} nunca lo tuvo (V7). El unico {@code
+ * DELETE}: V43 le retira a {@code kamayuk_app} el privilegio de {@code UPDATE} sobre la cabecera y
+ * no se lo concede a ninguna tabla de seccion; {@code DELETE} nunca lo tuvo (V7). El unico {@code
  * UPDATE} de esta clase es el del contador de {@code edificacion_correlativo}, que es
  * infraestructura de numeracion y no un acto administrativo.
  *

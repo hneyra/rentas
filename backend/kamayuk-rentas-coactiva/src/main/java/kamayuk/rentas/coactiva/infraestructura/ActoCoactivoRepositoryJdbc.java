@@ -21,8 +21,8 @@ import org.springframework.stereotype.Repository;
  * Los actos del procedimiento coactivo contra PostgreSQL (V34).
  *
  * <p><b>Solo inserta.</b> No hay aqui ni un {@code UPDATE acto_coactivo} ni un {@code DELETE}: V34
- * le retira a {@code sgtm_app} el privilegio de {@code UPDATE} y V7 nunca le dio {@code DELETE}; el
- * escaner de fuentes rechaza esas dos cadenas antes de que lleguen a ejecutarse.
+ * le retira a {@code kamayuk_app} el privilegio de {@code UPDATE} y V7 nunca le dio {@code DELETE};
+ * el escaner de fuentes rechaza esas dos cadenas antes de que lleguen a ejecutarse.
  *
  * <p><b>La REC-1 duplicada la rechaza el indice, no un {@code if}.</b> Se inserta y se traduce el
  * choque contra {@code acto_rec1_uq}: diez peticiones simultaneas pasan las diez por cualquier

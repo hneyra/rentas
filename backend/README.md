@@ -31,9 +31,9 @@ docker compose up --build --wait aplicacion
 ```
 
 Lo que hay que entender antes de tocarlo: **la aplicación no migra**. Arranca con
-`spring.flyway.enabled: false` y se conecta como `sgtm_app`, que no tiene DDL. Quien migra es
+`spring.flyway.enabled: false` y se conecta como `kamayuk_app`, que no tiene DDL. Quien migra es
 [`Migrador`](kamayuk-rentas-esquema/src/main/java/kamayuk/rentas/esquema/Migrador.java), en su propio
-contenedor, como `sgtm_owner`, y termina antes de que la aplicación arranque. Es el **mismo**
+contenedor, como `kamayuk_owner`, y termina antes de que la aplicación arranque. Es el **mismo**
 código que provisiona la base de cada prueba de persistencia: si el despliegue migrara por su
 cuenta, lo verificado en CI y lo desplegado en la municipalidad dejarían de ser lo mismo.
 
@@ -193,9 +193,9 @@ Las convenciones viven en `buildSrc/` como plugins precompilados, **no** en un b
 
 ## Base de datos
 
-La aplicación se conecta **siempre** como `sgtm_app`: sin DDL, sin `BYPASSRLS`, sin ser
+La aplicación se conecta **siempre** como `kamayuk_app`: sin DDL, sin `BYPASSRLS`, sin ser
 propietaria de las tablas y **sin `DELETE`**. Las migraciones las ejecuta el proceso de despliegue
-como `sgtm_owner`; la aplicación **no migra al arrancar** (`spring.flyway.enabled: false`).
+como `kamayuk_owner`; la aplicación **no migra al arrancar** (`spring.flyway.enabled: false`).
 
 Los roles se crean antes de la primera migración con
 [`db/roles/crear-roles.sql`](kamayuk-rentas-esquema/src/main/resources/db/roles/crear-roles.sql), que no es

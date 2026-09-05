@@ -23,9 +23,9 @@ import org.springframework.stereotype.Repository;
 /**
  * Las corridas masivas de valores por papeletas contra PostgreSQL (V47 §1 y §2, #53).
  *
- * <p>La cabecera <b>solo se inserta</b>: V47 no le concede {@code UPDATE} a {@code sgtm_app}, igual
- * que V27 a {@code valor_masivo}. Sus candidatos sí se actualizan, porque su estado es la marca de
- * progreso de un proceso interno y no un acto administrativo.
+ * <p>La cabecera <b>solo se inserta</b>: V47 no le concede {@code UPDATE} a {@code kamayuk_app},
+ * igual que V27 a {@code valor_masivo}. Sus candidatos sí se actualizan, porque su estado es la
+ * marca de progreso de un proceso interno y no un acto administrativo.
  *
  * <h2>La idempotencia la garantiza un índice, no un {@code if}</h2>
  *

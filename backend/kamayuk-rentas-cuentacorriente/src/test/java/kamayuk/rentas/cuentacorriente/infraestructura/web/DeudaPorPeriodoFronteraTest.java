@@ -92,10 +92,10 @@ import tools.jackson.databind.json.JsonMapper;
  * a.periodo = :periodo} devolveria «no debe nada» sobre una obligacion que si debe (el hueco que
  * #247 §2 documenta con {@code =} frente a {@code IS NOT DISTINCT FROM}).
  *
- * <p>La conexion es la de {@code sgtm_app}. Un superusuario omite RLS incluso con {@code FORCE ROW
- * LEVEL SECURITY} —y {@code sgtm_owner} <b>no</b> lo omite, asi que la rotura clasica escrita con
- * el dueno saldria en verde (#537, #545)—, y ademas sin transaccion no hay {@code SET LOCAL} y la
- * politica revienta (#486): el camino que se recorre aqui es el de produccion entero.
+ * <p>La conexion es la de {@code kamayuk_app}. Un superusuario omite RLS incluso con {@code FORCE
+ * ROW LEVEL SECURITY} —y {@code kamayuk_owner} <b>no</b> lo omite, asi que la rotura clasica
+ * escrita con el dueno saldria en verde (#537, #545)—, y ademas sin transaccion no hay {@code SET
+ * LOCAL} y la politica revienta (#486): el camino que se recorre aqui es el de produccion entero.
  */
 @DisplayName("RF-041 — consulta_deuda por cuota, y la baja que se compone con ella (#551)")
 class DeudaPorPeriodoFronteraTest {
@@ -439,13 +439,13 @@ class DeudaPorPeriodoFronteraTest {
     class ElAislamiento {
 
         @Test
-        @DisplayName("la prueba se conecta como sgtm_app, no como superusuario ni como el dueno")
-        void seConectaComoSgtmApp() {
+        @DisplayName("la prueba se conecta como kamayuk_app, no como superusuario ni como el dueno")
+        void seConectaComoKamayukApp() {
             assertThat(jdbc.sql("SELECT current_user").query(String.class).single())
                     .as(
                             "con superusuario RLS se omite —incluso con FORCE ROW LEVEL SECURITY— y"
                                     + " todo lo de este archivo pasaria sin verificar nada. Con"
-                                    + " sgtm_owner NO basta: FORCE lo sujeta a la politica igual,"
+                                    + " kamayuk_owner NO basta: FORCE lo sujeta a la politica igual,"
                                     + " asi que la rotura clasica escrita con el dueno sale VERDE"
                                     + " (#537, #545)")
                     .isEqualTo(BaseDeDatosDePrueba.APP);

@@ -10,7 +10,7 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * La muestra sorteada de un programa (#481). <b>Sólo se agrega</b>: no hay método que edite ni que
- * borre una fila, y {@code V60} tampoco le concede a {@code sgtm_app} el privilegio (regla 4).
+ * borre una fila, y {@code V60} tampoco le concede a {@code kamayuk_app} el privilegio (regla 4).
  */
 public interface MuestraDelProgramaRepository {
 

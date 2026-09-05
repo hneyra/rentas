@@ -40,9 +40,9 @@ import org.springframework.transaction.support.TransactionTemplate;
 /**
  * El rastro de la corrida de emision predial, contra PostgreSQL de verdad (#523).
  *
- * <p>Conectado como {@code sgtm_app}, que es lo unico que hace que estas pruebas verifiquen algo:
- * un superusuario <b>omite RLS incluso con FORCE ROW LEVEL SECURITY</b>, y la mitad de este archivo
- * pasaria en verde sin comprobar nada (DAT-01 §0).
+ * <p>Conectado como {@code kamayuk_app}, que es lo unico que hace que estas pruebas verifiquen
+ * algo: un superusuario <b>omite RLS incluso con FORCE ROW LEVEL SECURITY</b>, y la mitad de este
+ * archivo pasaria en verde sin comprobar nada (DAT-01 §0).
  *
  * <p>Lo que se mide aqui es lo que ninguna prueba de capa web puede decir: que las corridas de una
  * municipalidad no se ven desde otra, y que <b>no se pueden corregir</b> — una corrida es un hecho,
@@ -230,17 +230,18 @@ class CorridaDeEmisionJdbcTest {
                 transaccion.execute(estado -> repositorio.ultimaDe(new Ejercicio(2023)));
 
         assertThat(desdeB)
-                .as("la corrida de A no existe para B: RLS con FORCE, y conectados como sgtm_app")
+                .as(
+                        "la corrida de A no existe para B: RLS con FORCE, y conectados como kamayuk_app")
                 .isEmpty();
     }
 
     /**
      * <b>La inmutabilidad la sostiene el privilegio, no el codigo.</b> {@code V62} no le concede a
-     * {@code sgtm_app} ni {@code UPDATE} ni {@code DELETE}, asi que no hace falta confiar en que
+     * {@code kamayuk_app} ni {@code UPDATE} ni {@code DELETE}, asi que no hace falta confiar en que
      * nadie escriba el verbo: escribirlo falla.
      */
     @Test
-    @DisplayName("una corrida no se corrige ni se borra: sgtm_app no puede")
+    @DisplayName("una corrida no se corrige ni se borra: kamayuk_app no puede")
     void unaCorridaNoSeCorrigeNiSeBorra() {
         TenantContext.fijar(new MunicipalidadId(municipalidadA));
         CorridaDeEmision guardada =

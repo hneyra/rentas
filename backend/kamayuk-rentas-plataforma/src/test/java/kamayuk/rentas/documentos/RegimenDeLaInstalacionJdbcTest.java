@@ -26,7 +26,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 /**
  * De donde sale la marca: de la fila, no de un archivo de configuracion (#122, ADR-0007).
  *
- * <p>Contra PostgreSQL y como {@code sgtm_app}, porque las tres cosas que se verifican aqui solo
+ * <p>Contra PostgreSQL y como {@code kamayuk_app}, porque las tres cosas que se verifican aqui solo
  * existen ahi: que la consulta resuelva la municipalidad por el parametro de sesion que fija {@code
  * SET LOCAL} —y no por un identificador que viaje en Java—, que una instalacion que atiende a
  * varias municipalidades no confunda el regimen de una con el de otra, y que la pregunta se pueda

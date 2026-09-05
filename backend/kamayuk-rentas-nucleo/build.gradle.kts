@@ -59,7 +59,7 @@ dependencies {
     implementation(project(":kamayuk-rentas-valores"))
 
     // La prueba del repositorio corre contra PostgreSQL de verdad: provisiona la
-    // base como un ambiente real y se conecta como sgtm_app, no como el
+    // base como un ambiente real y se conecta como kamayuk_app, no como el
     // superusuario que entrega Testcontainers (CAL-01 §3.2).
     testImplementation(testFixtures(project(":kamayuk-rentas-esquema")))
     testImplementation("org.springframework.boot:spring-boot-starter-jdbc")

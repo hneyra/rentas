@@ -117,18 +117,18 @@ Consecuencias prácticas:
 - **La prueba de aislamiento no usa la conexión que Testcontainers entrega por omisión**, que es
   de superusuario. Una prueba escrita sobre ella pasa en verde sin verificar nada. La prueba lo
   demuestra: con el mismo contexto fijado, el superusuario ve las dos municipalidades y
-  `sgtm_app` una.
+  `kamayuk_app` una.
 
 ## 4. Roles de base de datos
 
 | Rol | Para qué | Privilegios |
 |---|---|---|
-| `sgtm_owner` | Migraciones. **Único que hace DDL** | Propietario de las tablas; `CREATE` en el esquema |
-| `sgtm_app` | La aplicación | `SELECT, INSERT, UPDATE` sobre tablas padre; **sin `DELETE`**; solo `SELECT, INSERT` en el libro de asientos y en auditoría |
-| `sgtm_readonly` | Reportes y réplica de lectura | `SELECT` sobre tablas padre |
+| `kamayuk_owner` | Migraciones. **Único que hace DDL** | Propietario de las tablas; `CREATE` en el esquema |
+| `kamayuk_app` | La aplicación | `SELECT, INSERT, UPDATE` sobre tablas padre; **sin `DELETE`**; solo `SELECT, INSERT` en el libro de asientos y en auditoría |
+| `kamayuk_readonly` | Reportes y réplica de lectura | `SELECT` sobre tablas padre |
 | `rol_carga_parametros` | Carga de catálogos normativos | Escritura sobre `parametro_tributario` y tablas de valuación |
-| `sgtm_respaldo` | El respaldo con wal-g (INF-08, #155) | `pg_read_all_settings` y `EXECUTE` sobre `pg_backup_start`/`pg_backup_stop`; sin `CONNECT` a la base del padrón |
-| `sgtm_monitor` | Métricas de `postgres_exporter` (#156) | El rol predefinido `pg_monitor`: vistas de estadísticas, ni una fila del padrón |
+| `kamayuk_respaldo` | El respaldo con wal-g (INF-08, #155) | `pg_read_all_settings` y `EXECUTE` sobre `pg_backup_start`/`pg_backup_stop`; sin `CONNECT` a la base del padrón |
+| `kamayuk_monitor` | Métricas de `postgres_exporter` (#156) | El rol predefinido `pg_monitor`: vistas de estadísticas, ni una fila del padrón |
 
 Los cuatro primeros los crea `db/roles/crear-roles.sql` antes de la primera migración; los dos
 últimos nacen solo en el clúster, en `infra/componentes/inicializacion/40-rol-de-respaldo.sh` y
@@ -143,7 +143,7 @@ separación.
 Solo dos, y ninguna desactiva RLS:
 
 1. **`municipalidad`** — el registro de tenants. Lectura para todos (un proceso masivo itera
-   municipalidad por municipalidad), escritura solo para `sgtm_owner`.
+   municipalidad por municipalidad), escritura solo para `kamayuk_owner`.
 2. **Catálogos con política propia** — `parametro_tributario` con `municipalidad_id IS NULL`, las
    tres tablas de valuación que V55 volvió nacionales por ADR-0017 (`valor_unitario_edificacion`,
    `depreciacion` y `valor_referencial_vehiculo`) y `respaldo`, que no lleva `municipalidad_id`

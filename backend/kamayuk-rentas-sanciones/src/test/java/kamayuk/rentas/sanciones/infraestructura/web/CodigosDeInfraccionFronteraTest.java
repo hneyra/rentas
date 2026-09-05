@@ -56,8 +56,8 @@ import tools.jackson.databind.json.JsonMapper;
  * de produccion exacto. Envolverlo en un {@code TransactionTemplate} incondicional habria hecho
  * pasar la prueba con la anotacion quitada.
  *
- * <p>La conexion es la de {@code sgtm_app}: un superusuario omite RLS incluso con {@code FORCE ROW
- * LEVEL SECURITY}.
+ * <p>La conexion es la de {@code kamayuk_app}: un superusuario omite RLS incluso con {@code FORCE
+ * ROW LEVEL SECURITY}.
  */
 @DisplayName("RF-060 — El catalogo de infracciones, de HTTP a PostgreSQL (#486)")
 class CodigosDeInfraccionFronteraTest {

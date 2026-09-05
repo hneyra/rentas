@@ -24,7 +24,7 @@ import org.springframework.stereotype.Repository;
  * <p>{@link #marcar} es el unico {@code UPDATE}, y toca solo {@code estado}: es lo que garantiza en
  * la base lo que {@link DeclaracionJurada#rectificadaPor} ya garantiza en el dominio —una
  * rectificatoria sustituye sin editar—. Desde V54 eso ya no depende de que esta clase se acuerde:
- * {@code sgtm_app} tiene {@code UPDATE} sobre la columna {@code estado} y sobre ninguna otra.
+ * {@code kamayuk_app} tiene {@code UPDATE} sobre la columna {@code estado} y sobre ninguna otra.
  */
 @Repository
 public class DeclaracionJuradaRepositoryJdbc extends RepositorioJdbc
@@ -225,10 +225,10 @@ public class DeclaracionJuradaRepositoryJdbc extends RepositorioJdbc
      * historico del ejercicio</b>, y no en 1.
      *
      * <p>Ese arranque no se pudo sembrar en la migracion, y el motivo vale anotarlo: {@code
-     * declaracion_jurada} tiene RLS con {@code FORCE} y el migrador corre como {@code sgtm_owner}
-     * <b>sin</b> contexto de tenant, asi que un {@code SELECT} sobre ella durante la migracion
-     * falla con «unrecognized configuration parameter» (DAT-01 §0, cuarto hallazgo). Aqui si hay
-     * contexto: la subconsulta ve las declaraciones de esta municipalidad y de ninguna otra.
+     * declaracion_jurada} tiene RLS con {@code FORCE} y el migrador corre como {@code
+     * kamayuk_owner} <b>sin</b> contexto de tenant, asi que un {@code SELECT} sobre ella durante la
+     * migracion falla con «unrecognized configuration parameter» (DAT-01 §0, cuarto hallazgo). Aqui
+     * si hay contexto: la subconsulta ve las declaraciones de esta municipalidad y de ninguna otra.
      *
      * <p>La subconsulta solo se evalua la <b>primera</b> vez de cada ejercicio: a partir de ahi
      * gana la rama del conflicto, que se limita a incrementar. Y si dos peticiones la evaluan a la

@@ -16,7 +16,7 @@ import org.springframework.stereotype.Repository;
 /**
  * Los duplicados de una licencia contra PostgreSQL (V4, V37).
  *
- * <p><b>Solo inserta.</b> V37 le retira a {@code sgtm_app} el {@code UPDATE} sobre {@code
+ * <p><b>Solo inserta.</b> V37 le retira a {@code kamayuk_app} el {@code UPDATE} sobre {@code
  * licencia_duplicado} y {@code DELETE} nunca lo tuvo (V7).
  *
  * <p><b>El ordinal repetido lo rechaza el indice, no la cuenta previa.</b> {@code cuantosDe} sirve

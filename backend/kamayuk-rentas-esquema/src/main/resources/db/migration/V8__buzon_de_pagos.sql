@@ -138,7 +138,7 @@ CREATE POLICY pago_recibido_tenant ON pago_recibido FOR ALL TO PUBLIC
 -- ----------------------------------------------------------------------------
 --  3. PRIVILEGIOS
 --
---  `sgtm_app` inserta y actualiza: el pago entra por HTTP —la aplicacion es quien
+--  `kamayuk_app` inserta y actualiza: el pago entra por HTTP —la aplicacion es quien
 --  atiende— y su estado cambia al imputarse. NO recibe DELETE, y no lo va a recibir:
 --  un pago rechazado se explica y se corrige, no se borra (regla 4, RNF-051).
 --
@@ -149,5 +149,5 @@ CREATE POLICY pago_recibido_tenant ON pago_recibido FOR ALL TO PUBLIC
 --  apuntando al padron para nada.
 -- ----------------------------------------------------------------------------
 
-GRANT INSERT, SELECT, UPDATE ON pago_recibido TO sgtm_app;
-GRANT SELECT                  ON pago_recibido TO sgtm_readonly;
+GRANT INSERT, SELECT, UPDATE ON pago_recibido TO kamayuk_app;
+GRANT SELECT                  ON pago_recibido TO kamayuk_readonly;

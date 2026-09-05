@@ -85,10 +85,10 @@ import tools.jackson.databind.json.JsonMapper;
  * #laFilaNoLlevaNingunDatoDeMunicipalidad()} lo comprueba contra el catalogo de PostgreSQL, y
  * {@link #lasDosMunicipalidadesVenLaMismaCopia()} fija que las dos leen la misma y por que.
  *
- * <p>La conexion es la de {@code sgtm_app} de todas formas —es la que corre en produccion—, con el
- * centinela {@link #seConectaComoSgtmApp()} delante: escrita con {@code sgtm_owner} una prueba de
- * aislamiento pasa en verde sin medir nada, porque {@code FORCE ROW LEVEL SECURITY} sujeta tambien
- * al dueno (#537, #545, #601).
+ * <p>La conexion es la de {@code kamayuk_app} de todas formas —es la que corre en produccion—, con
+ * el centinela {@link #seConectaComoKamayukApp()} delante: escrita con {@code kamayuk_owner} una
+ * prueba de aislamiento pasa en verde sin medir nada, porque {@code FORCE ROW LEVEL SECURITY}
+ * sujeta tambien al dueno (#537, #545, #601).
  *
  * <p>El proxy transaccional se construye con {@link AnnotationTransactionAttributeSource}, o sea
  * <b>obedeciendo a la anotacion</b> igual que el contenedor: envolverlo en un {@code
@@ -188,11 +188,11 @@ class RestauracionVerificadaFronteraTest {
     // ------------------------------------------------------------------
 
     @Test
-    @DisplayName("la prueba se conecta como sgtm_app, que es lo unico que hace medible el resto")
-    void seConectaComoSgtmApp() {
+    @DisplayName("la prueba se conecta como kamayuk_app, que es lo unico que hace medible el resto")
+    void seConectaComoKamayukApp() {
         assertThat(jdbc.sql("SELECT current_user").query(String.class).single())
                 .as(
-                        "con sgtm_owner las pruebas de aislamiento pasan en verde sin medir nada:"
+                        "con kamayuk_owner las pruebas de aislamiento pasan en verde sin medir nada:"
                                 + " FORCE ROW LEVEL SECURITY sujeta tambien al dueno (#537, #545)")
                 .isEqualTo(BaseDeDatosDePrueba.APP);
     }
@@ -317,7 +317,7 @@ class RestauracionVerificadaFronteraTest {
     // ------------------------------------------------------------------ AC 3
 
     @Test
-    @DisplayName("AC 3 — la aplicacion no escribe aqui: sgtm_app solo tiene SELECT (V8)")
+    @DisplayName("AC 3 — la aplicacion no escribe aqui: kamayuk_app solo tiene SELECT (V8)")
     void laAplicacionNoEscribeElRespaldo() {
         assertThatThrownBy(
                         () ->
@@ -327,7 +327,7 @@ class RestauracionVerificadaFronteraTest {
                                         .update())
                 .as(
                         "un boton «respaldar ahora» detras de un endpoint exigiria privilegios que"
-                                + " se le quitaron a proposito a sgtm_app (ARQ-03 §4)")
+                                + " se le quitaron a proposito a kamayuk_app (ARQ-03 §4)")
                 .rootCause()
                 .hasMessageContaining("permission denied");
     }
@@ -351,10 +351,10 @@ class RestauracionVerificadaFronteraTest {
                                         .update())
                 .as(
                         "quien puede afirmar que una copia se restauro es quien la restauro de"
-                                + " verdad: el simulacro, como sgtm_owner (INF-08 §5)")
+                                + " verdad: el simulacro, como kamayuk_owner (INF-08 §5)")
                 .rootCause()
                 .hasMessageContaining("permission denied");
-        // Medido: devolviendole el GRANT a sgtm_app, este UPDATE deja de lanzar y pasa a
+        // Medido: devolviendole el GRANT a kamayuk_app, este UPDATE deja de lanzar y pasa a
         // actualizar CERO filas sin decir nada —RLS no tiene ninguna politica de UPDATE
         // que le aplique, y un UPDATE que no ve filas no es un error—. O sea que el
         // sintoma de «no tengo permiso» y el de «no hay nada que marcar» se vuelven el
@@ -418,7 +418,7 @@ class RestauracionVerificadaFronteraTest {
     // ------------------------------------------------------------------
     // Los invariantes de la columna, contra PostgreSQL y por SQL directo
     //
-    // Se escriben como sgtm_owner —el rol que de verdad las escribe— y sin pasar
+    // Se escriben como kamayuk_owner —el rol que de verdad las escribe— y sin pasar
     // por ningun caso de uso, porque lo que se mide es la guarda de la BASE: un
     // `if` de Java no protege a un proceso de despliegue que habla en SQL (#188,
     // #435, #542).
@@ -566,7 +566,7 @@ class RestauracionVerificadaFronteraTest {
         return resultado.getResponse().getContentAsString();
     }
 
-    /** Siembra una copia como {@code sgtm_owner}, que es quien la escribe en produccion (V8). */
+    /** Siembra una copia como {@code kamayuk_owner}, que es quien la escribe en produccion (V8). */
     private static long registrarCopia(
             String inicio,
             String fin,

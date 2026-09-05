@@ -10,14 +10,14 @@ import java.util.List;
 import org.flywaydb.core.Flyway;
 
 /**
- * Aplica las migraciones del esquema conectado como {@code sgtm_owner} (ARQ-03 §4).
+ * Aplica las migraciones del esquema conectado como {@code kamayuk_owner} (ARQ-03 §4).
  *
  * <h2>Por que existe</h2>
  *
  * <p>La aplicacion arranca con {@code spring.flyway.enabled: false} y eso es correcto: se conecta
- * como {@code sgtm_app}, que no tiene DDL, no es propietaria de ninguna tabla y no es superusuario.
- * Lo que faltaba era <b>el otro lado</b> —el proceso que si migra— y sin el las quince migraciones
- * existian sin que nadie las aplicara nunca.
+ * como {@code kamayuk_app}, que no tiene DDL, no es propietaria de ninguna tabla y no es
+ * superusuario. Lo que faltaba era <b>el otro lado</b> —el proceso que si migra— y sin el las
+ * quince migraciones existian sin que nadie las aplicara nunca.
  *
  * <p>Es el mismo codigo que usa {@code BaseDeDatosDePrueba} para arrancar la base de cada prueba de
  * persistencia. Deliberado: si el despliegue migrara por su cuenta —con otra version de Flyway,
@@ -32,9 +32,9 @@ import org.flywaydb.core.Flyway;
  *       guion que los crea, {@code db/roles/crear-roles.sql}, no es una migracion: lo ejecuta el
  *       superusuario al provisionar el motor, porque un rol no puede crearse a si mismo.
  *   <li><b>Que quien migra no es superusuario ni tiene {@code BYPASSRLS}.</b> Todo lo que la prueba
- *       de aislamiento demuestra lo demuestra sobre objetos creados por un {@code sgtm_owner} sin
- *       privilegios de mas. Migrar con otro rol deja un esquema cuyo propietario no es el que esa
- *       verificacion supone, y entonces lo verificado y lo desplegado vuelven a ser cosas
+ *       de aislamiento demuestra lo demuestra sobre objetos creados por un {@code kamayuk_owner}
+ *       sin privilegios de mas. Migrar con otro rol deja un esquema cuyo propietario no es el que
+ *       esa verificacion supone, y entonces lo verificado y lo desplegado vuelven a ser cosas
  *       distintas.
  * </ol>
  *
@@ -43,10 +43,10 @@ import org.flywaydb.core.Flyway;
 public final class Migrador {
 
     /** Unico rol con DDL. Lo crea {@code crear-roles.sql}, no una migracion. */
-    public static final String ROL_QUE_MIGRA = "sgtm_owner";
+    public static final String ROL_QUE_MIGRA = "kamayuk_owner";
 
     private static final List<String> ROLES_EXIGIDOS =
-            List.of("sgtm_owner", "sgtm_app", "sgtm_readonly", "rol_carga_parametros");
+            List.of("kamayuk_owner", "kamayuk_app", "kamayuk_readonly", "rol_carga_parametros");
 
     private Migrador() {}
 
@@ -82,7 +82,7 @@ public final class Migrador {
      * nada y devuelve cero.
      *
      * @param url URL JDBC del motor
-     * @param usuario rol con DDL, normalmente {@code sgtm_owner}
+     * @param usuario rol con DDL, normalmente {@code kamayuk_owner}
      * @param clave su clave
      * @return cuantas migraciones se aplicaron en esta ejecucion
      */
@@ -203,7 +203,7 @@ public final class Migrador {
                                 + " tiene privilegios que el modelo de ARQ-03 §4 excluye"
                                 + (superusuario ? " [SUPERUSER]" : "")
                                 + (omiteRls ? " [BYPASSRLS]" : "")
-                                + ". El esquema tiene que crearlo un sgtm_owner sin ellos: es sobre"
+                                + ". El esquema tiene que crearlo un kamayuk_owner sin ellos: es sobre"
                                 + " esos objetos que la prueba de aislamiento demuestra lo que"
                                 + " demuestra");
             }

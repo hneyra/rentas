@@ -126,7 +126,8 @@ public final class EscenarioDeNormativa {
                         "valor_referencial_de_prueba"
                     }) {
                 // Sin DELETE, y no por prudencia: `AislamientoMultiTenantTest` exige que
-                // `sgtm_app` no lo tenga en NINGUNA tabla (RNF-051), y una tabla de escenario que
+                // `kamayuk_app` no lo tenga en NINGUNA tabla (RNF-051), y una tabla de escenario
+                // que
                 // se lo concediera pondria esa prueba en rojo por un motivo que no es el suyo.
                 sentencia.execute("GRANT SELECT, INSERT, UPDATE ON " + tabla + " TO PUBLIC");
             }

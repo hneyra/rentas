@@ -29,7 +29,7 @@
 --
 --  DE SOLO LECTURA, IGUAL QUE LA PROYECCION DE `V4`
 --  -----------------------------------------------
---  `sgtm_app` no escribe ninguna de las dos. Y hay un motivo mas fuerte que en `V4`:
+--  `kamayuk_app` no escribe ninguna de las dos. Y hay un motivo mas fuerte que en `V4`:
 --  `valuacion_predio` es un HECHO SELLADO. Corregir una valuacion es publicar otra
 --  (ADR-0027 §1), nunca un `UPDATE` — y por eso el ingestor tampoco recibe `UPDATE`
 --  sobre ella, a diferencia de lo que si tiene sobre `predio_ref`.
@@ -94,7 +94,7 @@ CREATE INDEX valuacion_predio_ejercicio_ix
     ON valuacion_predio (municipalidad_id, ejercicio);
 
 COMMENT ON TABLE valuacion_predio IS
-    'El hecho sellado de ADR-0027 §1, proyectado aqui. INMUTABLE: ni `sgtm_app` ni el '
+    'El hecho sellado de ADR-0027 §1, proyectado aqui. INMUTABLE: ni `kamayuk_app` ni el '
     'ingestor tienen UPDATE. Corregir una valuacion es publicar otra';
 COMMENT ON COLUMN valuacion_predio.motivo IS
     'Por que este predio no se pudo valorizar, cuando no se pudo. Hoy es el caso NORMAL: '
@@ -127,11 +127,11 @@ CREATE POLICY valuacion_predio_tenant ON valuacion_predio FOR ALL TO PUBLIC
 --  cierre de una corrida se sustituye; un hecho sellado, no.
 -- ----------------------------------------------------------------------------
 
-GRANT SELECT ON valuacion_corrida TO sgtm_app;
-GRANT SELECT ON valuacion_predio TO sgtm_app;
+GRANT SELECT ON valuacion_corrida TO kamayuk_app;
+GRANT SELECT ON valuacion_predio TO kamayuk_app;
 
 GRANT SELECT, INSERT, UPDATE ON valuacion_corrida TO rol_ingestor_catastro;
 GRANT SELECT, INSERT ON valuacion_predio TO rol_ingestor_catastro;
 
-GRANT SELECT ON valuacion_corrida TO sgtm_readonly;
-GRANT SELECT ON valuacion_predio TO sgtm_readonly;
+GRANT SELECT ON valuacion_corrida TO kamayuk_readonly;
+GRANT SELECT ON valuacion_predio TO kamayuk_readonly;

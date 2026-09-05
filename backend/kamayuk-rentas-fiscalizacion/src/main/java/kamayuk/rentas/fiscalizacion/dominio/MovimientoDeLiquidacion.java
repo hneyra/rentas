@@ -9,8 +9,8 @@ import org.jspecify.annotations.Nullable;
  * Una línea del historial de una liquidación: su apertura, o un cambio de estado (#49, RF-056).
  *
  * <p>Solo se agrega. Un movimiento equivocado se corrige con otro movimiento, nunca editando el
- * anterior: V39 no le concede {@code UPDATE} a {@code sgtm_app} y el escáner del código fuente lo
- * vigila además en {@code TABLAS_INMUTABLES}.
+ * anterior: V39 no le concede {@code UPDATE} a {@code kamayuk_app} y el escáner del código fuente
+ * lo vigila además en {@code TABLAS_INMUTABLES}.
  *
  * @param id nulo mientras no se ha guardado
  * @param liquidacionId a qué liquidación pertenece

@@ -98,7 +98,7 @@ import org.springframework.transaction.interceptor.TransactionInterceptor;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * #25 — La consulta unificada contra PostgreSQL de verdad, conectada como {@code sgtm_app}
+ * #25 — La consulta unificada contra PostgreSQL de verdad, conectada como {@code kamayuk_app}
  * (RF-046).
  *
  * <p>Lo que esta clase defiende y ninguna prueba con dobles puede:

@@ -32,7 +32,7 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * El catálogo de códigos de infracción (#43) contra PostgreSQL de verdad, como {@code sgtm_app}.
+ * El catálogo de códigos de infracción (#43) contra PostgreSQL de verdad, como {@code kamayuk_app}.
  */
 @DisplayName("#43 — Catálogo de códigos de infracción")
 class CodigoInfraccionRepositoryJdbcTest {

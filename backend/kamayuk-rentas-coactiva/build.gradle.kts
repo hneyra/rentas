@@ -52,7 +52,7 @@ dependencies {
     implementation(project(":kamayuk-rentas-nucleo"))
 
     // Las pruebas de repositorio y del ciclo completo corren contra PostgreSQL de
-    // verdad, conectadas como sgtm_app y no como el superusuario que entrega
+    // verdad, conectadas como kamayuk_app y no como el superusuario que entrega
     // Testcontainers (CAL-01 §3.2). Contra un doble no se puede demostrar ni el
     // REVOKE UPDATE del historial, ni que un valor no entre en dos expedientes.
     testImplementation(testFixtures(project(":kamayuk-rentas-esquema")))

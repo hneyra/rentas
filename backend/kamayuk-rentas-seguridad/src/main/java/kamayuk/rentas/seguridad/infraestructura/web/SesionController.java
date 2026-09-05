@@ -247,7 +247,7 @@ public class SesionController {
      *
      * <p>Es un {@code POST} porque asi lo declara el contrato, derivado de la pantalla del
      * prototipo; lo que hace es <b>consultar</b>. La aplicacion no ejecuta respaldos: quien los
-     * hace es el proceso de despliegue, y darle a {@code sgtm_app} lo que haria falta para
+     * hace es el proceso de despliegue, y darle a {@code kamayuk_app} lo que haria falta para
      * respaldar seria deshacer la separacion de privilegios de ARQ-03 §4.
      */
     @PostMapping(Api.RAIZ + "/seguridad/respaldos")

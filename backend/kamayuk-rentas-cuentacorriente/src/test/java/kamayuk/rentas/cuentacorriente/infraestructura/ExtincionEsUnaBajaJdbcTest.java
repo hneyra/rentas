@@ -68,9 +68,9 @@ import org.springframework.transaction.support.TransactionTemplate;
 /**
  * Extinguir deuda es darla de baja, y el libro lo dice (#662, RF-044, RF-045, RF-064, RF-130).
  *
- * <p>Se conecta como {@code sgtm_app}, nunca como {@code sgtm_owner}: con {@code FORCE ROW LEVEL
- * SECURITY} el dueno de la tabla <b>tambien</b> queda sujeto a la politica, asi que una rotura de
- * aislamiento escrita con el dueno pasaria en verde sin demostrar nada (#537, #545).
+ * <p>Se conecta como {@code kamayuk_app}, nunca como {@code kamayuk_owner}: con {@code FORCE ROW
+ * LEVEL SECURITY} el dueno de la tabla <b>tambien</b> queda sujeto a la politica, asi que una
+ * rotura de aislamiento escrita con el dueno pasaria en verde sin demostrar nada (#537, #545).
  *
  * <h2>La decision que esta clase defiende</h2>
  *
@@ -464,7 +464,7 @@ class ExtincionEsUnaBajaJdbcTest {
     class NoSeMezclaConB {
 
         @Test
-        @DisplayName("y el superusuario ve las dos municipalidades donde sgtm_app ve una")
+        @DisplayName("y el superusuario ve las dos municipalidades donde kamayuk_app ve una")
         void unaExtincionEnBNoDescuentaDeA() throws SQLException {
             long deA = nuevoTitular(municipalidadA, nuevoCodigo());
             long deB = nuevoTitular(municipalidadB, nuevoCodigo());
@@ -486,7 +486,7 @@ class ExtincionEsUnaBajaJdbcTest {
                     .isEqualTo(Dinero.CERO);
 
             // La misma demostracion que exige AislamientoMultiTenantTest: con el mismo
-            // contexto fijado, el superusuario ve las dos municipalidades y sgtm_app una.
+            // contexto fijado, el superusuario ve las dos municipalidades y kamayuk_app una.
             try (Connection admin = base.conexionAdmin();
                     PreparedStatement sentencia =
                             admin.prepareStatement(

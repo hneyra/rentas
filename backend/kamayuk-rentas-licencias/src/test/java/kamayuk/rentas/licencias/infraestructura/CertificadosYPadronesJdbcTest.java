@@ -97,7 +97,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 /**
  * #54 — Padrones, resumen anual y certificados contra PostgreSQL de verdad (V51), conectado como
- * {@code sgtm_app}.
+ * {@code kamayuk_app}.
  *
  * <p>Lo que esta clase defiende y ninguna prueba con dobles puede:
  *
@@ -939,7 +939,7 @@ class CertificadosYPadronesJdbcTest {
     class Inmutabilidad {
 
         @Test
-        @DisplayName("sgtm_app no puede corregir un certificado en el sitio")
+        @DisplayName("kamayuk_app no puede corregir un certificado en el sitio")
         void noSePuedeEditar() {
             EmitirCertificado.Emision emitido = emitirCertificadoDe(TipoDeCertificado.NUMERACION);
             long id = emitido.certificado().identificador();

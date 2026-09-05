@@ -37,7 +37,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * La fase del procedimiento sancionador, derivada contra PostgreSQL de verdad y conectada como
- * {@code sgtm_app} (#397).
+ * {@code kamayuk_app} (#397).
  *
  * <h2>Por qué esta prueba tiene que ser contra la base</h2>
  *
@@ -47,7 +47,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * sigue abierta o venció— viven en cuatro tablas, y comprobarlos con dobles sería comprobar los
  * dobles.
  *
- * <p>Y se conecta como {@code sgtm_app}, no como superusuario: un superusuario omite RLS incluso
+ * <p>Y se conecta como {@code kamayuk_app}, no como superusuario: un superusuario omite RLS incluso
  * con {@code FORCE ROW LEVEL SECURITY}, y esta consulta cruza {@code contribuyente}, {@code
  * codigo_infraccion}, {@code notificacion_administrativa} y {@code resolucion_gerencia} — cuatro
  * oportunidades de traerse filas de otra municipalidad si alguna política faltara.

@@ -357,7 +357,7 @@ class EmitirDocumentoTest {
             TenantContext.fijar(new MunicipalidadId(otraMunicipalidad));
 
             assertThat(emitir.buscar(TIPO, EJERCICIO, numero))
-                    .as("la prueba corre como sgtm_app, que es a quien la politica RLS aplica")
+                    .as("la prueba corre como kamayuk_app, que es a quien la politica RLS aplica")
                     .isEmpty();
         }
     }

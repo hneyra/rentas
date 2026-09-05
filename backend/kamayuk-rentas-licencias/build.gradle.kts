@@ -51,7 +51,7 @@ dependencies {
     implementation(project(":kamayuk-rentas-parametros"))
 
     // Las pruebas de repositorio y del ciclo completo corren contra PostgreSQL de
-    // verdad, conectadas como sgtm_app y no como el superusuario que entrega
+    // verdad, conectadas como kamayuk_app y no como el superusuario que entrega
     // Testcontainers (CAL-01 §3.2). Contra un doble no se puede demostrar ni el
     // REVOKE UPDATE de V37, ni que dos duplicados simultaneos no compartan
     // ordinal, ni que RLS aisle la licencia.

@@ -63,15 +63,15 @@ import org.springframework.transaction.support.TransactionTemplate;
  * lower()} y {@code regexp_replace()} las usa medio sistema — de modo que la marca no debilitaria
  * esta consulta sino toda consulta con RLS de esta base.
  *
- * <h2>Dos municipalidades sembradas, y la conexion es la de {@code sgtm_app}</h2>
+ * <h2>Dos municipalidades sembradas, y la conexion es la de {@code kamayuk_app}</h2>
  *
  * <p>Dos, porque con una sola dueña de toda la tabla la condicion de la politica selecciona el 100
  * % de las filas y no acota nada (#536). Y aqui <b>eso muerde</b>, que en #561 no pasaba: se midio
  * sembrando una sola, y {@link #laConsultaDeProduccionNoLlegaAlIndice} se pone roja porque el plan
  * pasa a {@code Seq Scan} y ya no hay ningun {@code Index Cond} que enseñar — con lo que se pierde
  * justamente la frase que esta prueba existe para fijar, «dice Index y lee la tabla entera». Y
- * {@code sgtm_app}, porque ahi esta el fondo del asunto: como superusuario el indice <b>si</b> se
- * usa. Escribir la prueba con {@code sgtm_owner} —la rotura que uno teclea por costumbre— la
+ * {@code kamayuk_app}, porque ahi esta el fondo del asunto: como superusuario el indice <b>si</b>
+ * se usa. Escribir la prueba con {@code kamayuk_owner} —la rotura que uno teclea por costumbre— la
  * dejaria pasando igual, porque con {@code FORCE ROW LEVEL SECURITY} el dueño tambien queda sujeto
  * a la politica (#537, #545); por eso hay centinela.
  */
@@ -172,15 +172,15 @@ class BusquedaDelPadronEnElPlanTest {
     }
 
     @Test
-    @DisplayName("el centinela: se mide con la conexion de sgtm_app y no con la del dueño")
-    void seConectaComoSgtmApp() {
+    @DisplayName("el centinela: se mide con la conexion de kamayuk_app y no con la del dueño")
+    void seConectaComoKamayukApp() {
         String quien =
                 transaccion.execute(
                         estado -> jdbc.sql("SELECT current_user").query(String.class).single());
         assertThat(quien)
                 .as(
                         "con FORCE ROW LEVEL SECURITY el dueño tambien queda sujeto a la politica"
-                                + " (#537, #545), asi que una medida hecha como sgtm_owner pasaria en"
+                                + " (#537, #545), asi que una medida hecha como kamayuk_owner pasaria en"
                                 + " verde sin demostrar nada. Y como superusuario mediria justo el"
                                 + " plan que la aplicacion nunca obtiene.")
                 .isEqualTo(BaseDeDatosDePrueba.APP);
@@ -440,7 +440,7 @@ class BusquedaDelPadronEnElPlanTest {
         return encontrados == null ? List.of() : encontrados;
     }
 
-    /** Como la aplicacion: {@code sgtm_app}, con RLS activa y el contexto de tenant fijado. */
+    /** Como la aplicacion: {@code kamayuk_app}, con RLS activa y el contexto de tenant fijado. */
     private String explicarComoLaAplicacion(String predicado) {
         String plan =
                 transaccion.execute(

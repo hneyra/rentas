@@ -96,8 +96,8 @@ import tools.jackson.databind.json.JsonMapper;
  *
  * <p>Porque el defecto vive justo en la frontera que las dos familias de pruebas se reparten sin
  * cruzar (#486): la lectura del filtro es de la capa web y su consecuencia —cuántas filas trae el
- * {@code WHERE}— es del motor. La conexión es la de {@code sgtm_app}: un superusuario omite RLS
- * incluso con {@code FORCE ROW LEVEL SECURITY}, y {@code sgtm_owner} tampoco sirve, porque con
+ * {@code WHERE}— es del motor. La conexión es la de {@code kamayuk_app}: un superusuario omite RLS
+ * incluso con {@code FORCE ROW LEVEL SECURITY}, y {@code kamayuk_owner} tampoco sirve, porque con
  * {@code FORCE} el dueño también queda sujeto a la política (#537, #545).
  *
  * <p>Los casos de uso van envueltos con {@link AnnotationTransactionAttributeSource}, o sea
@@ -338,12 +338,12 @@ class ProgramarDesdeLaDeteccionFronteraTest {
 
     @Test
     @Order(5)
-    @DisplayName("la prueba se conecta como sgtm_app, no como superusuario ni como el dueno")
-    void seConectaComoSgtmApp() {
+    @DisplayName("la prueba se conecta como kamayuk_app, no como superusuario ni como el dueno")
+    void seConectaComoKamayukApp() {
         assertThat(jdbc.sql("SELECT current_user").query(String.class).single())
                 .as(
                         "con superusuario RLS se omite —incluso con FORCE ROW LEVEL SECURITY— y"
-                                + " todo este archivo pasaria sin verificar nada. Con sgtm_owner NO"
+                                + " todo este archivo pasaria sin verificar nada. Con kamayuk_owner NO"
                                 + " basta: FORCE lo sujeta a la politica igual, asi que la rotura"
                                 + " clasica escrita con el dueno sale VERDE (#537, #545)")
                 .isEqualTo(BaseDeDatosDePrueba.APP);

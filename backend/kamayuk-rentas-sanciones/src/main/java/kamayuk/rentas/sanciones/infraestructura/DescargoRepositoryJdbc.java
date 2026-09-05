@@ -19,7 +19,7 @@ import org.springframework.stereotype.Repository;
  * Los descargos contra PostgreSQL (V4 + V41).
  *
  * <p><b>Solo inserta.</b> No hay aquí ni un {@code UPDATE descargo} ni un {@code DELETE}: V41 le
- * retira a {@code sgtm_app} el privilegio de {@code UPDATE} y V7 nunca le dio {@code DELETE}.
+ * retira a {@code kamayuk_app} el privilegio de {@code UPDATE} y V7 nunca le dio {@code DELETE}.
  * Ninguna consulta filtra por {@code municipalidad_id} —lo hace la política RLS—.
  */
 @Repository

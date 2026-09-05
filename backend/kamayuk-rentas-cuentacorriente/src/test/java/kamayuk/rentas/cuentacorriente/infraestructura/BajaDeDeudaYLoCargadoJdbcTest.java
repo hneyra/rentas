@@ -56,11 +56,11 @@ import org.springframework.transaction.support.TransactionTemplate;
 /**
  * Una deuda dada de baja deja de contar como emitida (#601, RF-043, RF-044, RF-130).
  *
- * <p>Se conecta como {@code sgtm_app}, nunca como {@code sgtm_owner}: con {@code FORCE ROW LEVEL
- * SECURITY} el dueno de la tabla <b>tambien</b> queda sujeto a la politica, asi que una rotura de
- * aislamiento escrita con el dueno pasaria en verde sin demostrar nada (#537, #545). Quien la omite
- * es el superusuario del cluster, y con el cada cifra del panel sale <b>al doble</b> sin que
- * ninguna parezca mal (#56).
+ * <p>Se conecta como {@code kamayuk_app}, nunca como {@code kamayuk_owner}: con {@code FORCE ROW
+ * LEVEL SECURITY} el dueno de la tabla <b>tambien</b> queda sujeto a la politica, asi que una
+ * rotura de aislamiento escrita con el dueno pasaria en verde sin demostrar nada (#537, #545).
+ * Quien la omite es el superusuario del cluster, y con el cada cifra del panel sale <b>al doble</b>
+ * sin que ninguna parezca mal (#56).
  *
  * <h2>Que defiende</h2>
  *
@@ -330,7 +330,7 @@ class BajaDeDeudaYLoCargadoJdbcTest {
                     .isEqualTo(Dinero.CERO);
 
             // La misma demostracion que exige AislamientoMultiTenantTest: con el mismo
-            // contexto fijado, el superusuario ve las dos municipalidades y sgtm_app una.
+            // contexto fijado, el superusuario ve las dos municipalidades y kamayuk_app una.
             // Sin esto, esta clase entera podria estar pasando en verde sin verificar
             // nada del aislamiento.
             try (Connection admin = base.conexionAdmin();

@@ -105,7 +105,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 /**
  * #41 — El procedimiento coactivo contra PostgreSQL de verdad (V34), conectado como {@code
- * sgtm_app}.
+ * kamayuk_app}.
  *
  * <p>Lo que esta clase defiende y ninguna prueba con dobles puede:
  *
@@ -121,8 +121,8 @@ import tools.jackson.databind.json.JsonMapper;
  *   <li><b>Que no haya dos REC-1 del mismo expediente bajo concurrencia real.</b> Un doble que
  *       consulta antes de insertar pasa la prueba y falla en produccion: diez peticiones
  *       simultaneas pasan las diez por el {@code if}. Aqui se lanzan diez hilos a la vez.
- *   <li><b>Que {@code sgtm_app} no pueda editar ni borrar un acto.</b> Es el {@code REVOKE} de V34,
- *       y se comprueba intentandolo.
+ *   <li><b>Que {@code kamayuk_app} no pueda editar ni borrar un acto.</b> Es el {@code REVOKE} de
+ *       V34, y se comprueba intentandolo.
  *   <li><b>Que reintentar una diligencia no pierda la anterior.</b> La garantia es {@code
  *       notificacion_intento_uq} (V28) sobre la <b>misma</b> tabla que #39 usa, en su rebanada
  *       {@code objeto = 'ACTO_COACTIVO'}.
@@ -897,7 +897,7 @@ class ActosCoactivosJdbcTest {
         }
 
         @Test
-        @DisplayName("sgtm_app no puede editar un acto: el privilegio no existe")
+        @DisplayName("kamayuk_app no puede editar un acto: el privilegio no existe")
         void noSePuedeEditarUnActo() {
             String expediente = expedienteConDeuda("B-0005");
             ActoCoactivo rec1 = dictarActo(expediente, TipoDeActoCoactivo.REC1, REC1, null).acto();

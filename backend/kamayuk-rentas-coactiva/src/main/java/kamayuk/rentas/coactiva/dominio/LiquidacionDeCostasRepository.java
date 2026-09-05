@@ -14,7 +14,7 @@ import kamayuk.rentas.dominio.Ejercicio;
  * <p>Ningun metodo recibe la municipalidad (regla 2): la filtra la politica RLS.
  *
  * <p><b>No hay {@code actualizar} ni {@code borrar}</b>, y no es un olvido: V35 le retira a {@code
- * sgtm_app} el {@code UPDATE} sobre {@code costa_procesal} y no le concede ninguno sobre {@code
+ * kamayuk_app} el {@code UPDATE} sobre {@code costa_procesal} y no le concede ninguno sobre {@code
  * liquidacion_costas} ni {@code costa_obligacion}. Una costa mal liquidada no se corrige en el
  * sitio —su cargo ya esta asentado en el libro—: se reversa el asiento y se liquida de nuevo.
  */

@@ -68,8 +68,8 @@ import tools.jackson.databind.json.JsonMapper;
  * construye con {@link AnnotationTransactionAttributeSource}, obedeciendo a la anotacion como el
  * contenedor: si un caso de uso deja de declarar {@code @Transactional}, aqui se cae.
  *
- * <p>La conexion es la de {@code sgtm_app}. Un superusuario omite RLS incluso con {@code FORCE ROW
- * LEVEL SECURITY}, asi que una prueba escrita sobre el no verificaria ningun aislamiento.
+ * <p>La conexion es la de {@code kamayuk_app}. Un superusuario omite RLS incluso con {@code FORCE
+ * ROW LEVEL SECURITY}, asi que una prueba escrita sobre el no verificaria ningun aislamiento.
  */
 @DisplayName("RF-013…016 — El padron se escribe: alta, mudanza, contactos y responsables (#488)")
 class EscrituraDelPadronControllerTest {

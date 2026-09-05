@@ -9,7 +9,7 @@ import java.util.Optional;
  * 2).
  *
  * <p>No hay {@code actualizar} ni {@code borrar}, y tampoco existe el privilegio: V28 le revoca el
- * {@code UPDATE} a {@code sgtm_app}. Un intento no hallado se reintenta con otra fila, y la
+ * {@code UPDATE} a {@code kamayuk_app}. Un intento no hallado se reintenta con otra fila, y la
  * anterior se queda donde estaba.
  */
 public interface NotificacionDeResolucionRepository {

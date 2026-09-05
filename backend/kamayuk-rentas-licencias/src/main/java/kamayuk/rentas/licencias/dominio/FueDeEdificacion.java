@@ -19,7 +19,7 @@ import org.jspecify.annotations.Nullable;
  *
  * <h2>No se edita</h2>
  *
- * <p>V43 le retira a {@code sgtm_app} el privilegio de {@code UPDATE}, y el escaner de fuentes
+ * <p>V43 le retira a {@code kamayuk_app} el privilegio de {@code UPDATE}, y el escaner de fuentes
  * rechaza cualquier {@code UPDATE licencia_edificacion SET} antes de que llegue a ejecutarse. Lo
  * que cambia mientras el expediente se tramita son sus <b>secciones</b>, que se versionan.
  *

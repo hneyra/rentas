@@ -40,11 +40,11 @@ import org.springframework.stereotype.Repository;
  * Las licencias de funcionamiento contra PostgreSQL (V4, V37).
  *
  * <p><b>Solo inserta.</b> No hay aqui ni un {@code UPDATE licencia_funcionamiento} ni un {@code
- * DELETE}: V37 le retira a {@code sgtm_app} el privilegio de {@code UPDATE} y {@code DELETE} nunca
- * lo tuvo (V7); el escaner de fuentes rechaza esas dos cadenas antes de que lleguen a ejecutarse.
- * El unico {@code UPDATE} de esta clase es el del contador de {@code licencia_correlativo}, que es
- * infraestructura de numeracion y no un acto administrativo (mismo criterio que {@code
- * valor_correlativo} en V26 y {@code expediente_correlativo} en V33).
+ * DELETE}: V37 le retira a {@code kamayuk_app} el privilegio de {@code UPDATE} y {@code DELETE}
+ * nunca lo tuvo (V7); el escaner de fuentes rechaza esas dos cadenas antes de que lleguen a
+ * ejecutarse. El unico {@code UPDATE} de esta clase es el del contador de {@code
+ * licencia_correlativo}, que es infraestructura de numeracion y no un acto administrativo (mismo
+ * criterio que {@code valor_correlativo} en V26 y {@code expediente_correlativo} en V33).
  *
  * <p><b>El numero repetido lo rechaza el indice, no un {@code if}.</b> Se inserta y se traduce el
  * choque contra {@code licencia_numero_uq}: diez peticiones simultaneas pasan las diez por

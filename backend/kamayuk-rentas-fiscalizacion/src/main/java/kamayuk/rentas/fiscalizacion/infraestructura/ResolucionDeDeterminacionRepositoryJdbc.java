@@ -20,7 +20,7 @@ import org.springframework.stereotype.Repository;
  * Las transferencias a rentas contra PostgreSQL.
  *
  * <p>Solo {@code INSERT} y {@code SELECT}: V49 no le concede {@code UPDATE} ni {@code DELETE} a
- * {@code sgtm_app}, y el escaner del codigo fuente vigila lo mismo desde arriba.
+ * {@code kamayuk_app}, y el escaner del codigo fuente vigila lo mismo desde arriba.
  *
  * <p>Ninguna consulta lleva {@code WHERE municipalidad_id = ?}: el filtrado lo hace la politica RLS
  * con el valor que {@code SET LOCAL} fijo al abrir la transaccion (regla 2).

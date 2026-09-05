@@ -29,9 +29,10 @@ import org.springframework.transaction.support.TransactionTemplate;
 /**
  * La anti-entropia encuentra la fila desincronizada y NOMBRA el sector (P6, punto 4, AC 2).
  *
- * <p>Contra PostgreSQL de verdad y conectado como {@code sgtm_app}, que es lo unico que hace fiel a
- * esta prueba: la proyeccion lleva RLS con {@code FORCE}, asi que una prueba escrita con el dueno
- * de las tablas pasaria en verde con el aislamiento roto (#537, #545, #601). El centinela lo fija.
+ * <p>Contra PostgreSQL de verdad y conectado como {@code kamayuk_app}, que es lo unico que hace
+ * fiel a esta prueba: la proyeccion lleva RLS con {@code FORCE}, asi que una prueba escrita con el
+ * dueno de las tablas pasaria en verde con el aislamiento roto (#537, #545, #601). El centinela lo
+ * fija.
  *
  * <h2>Que hace de «catastro» aqui, y por que eso es legitimo</h2>
  *
@@ -107,11 +108,11 @@ class AntiEntropiaJdbcTest {
      *
      * <p>Con {@code FORCE ROW LEVEL SECURITY}, el DUENO de las tablas tambien queda sujeto a la
      * politica, asi que la rotura de aislamiento que uno teclea por costumbre —cambiar el rol por
-     * {@code sgtm_owner}— dejaria estas pruebas en verde sin medir nada.
+     * {@code kamayuk_owner}— dejaria estas pruebas en verde sin medir nada.
      */
     @Test
-    @DisplayName("se conecta como sgtm_app, no como el dueno")
-    void seConectaComoSgtmApp() {
+    @DisplayName("se conecta como kamayuk_app, no como el dueno")
+    void seConectaComoKamayukApp() {
         assertThat(comoApp(() -> jdbc.sql("SELECT current_user").query(String.class).single()))
                 .isEqualTo(BaseDeDatosDePrueba.APP);
     }
@@ -247,9 +248,9 @@ class AntiEntropiaJdbcTest {
     /**
      * Siembra la proyeccion con el rol del ingestor.
      *
-     * <p>`V4` solo le da `SELECT` a `sgtm_app` sobre `predio_ref`, y eso no es una precaucion: es
-     * lo que hace cierto ADR-0027 §3 en vez de una promesa. Una prueba que sembrara con la conexion
-     * de la aplicacion estaria midiendo un sistema que no es el que se despliega.
+     * <p>`V4` solo le da `SELECT` a `kamayuk_app` sobre `predio_ref`, y eso no es una precaucion:
+     * es lo que hace cierto ADR-0027 §3 en vez de una promesa. Una prueba que sembrara con la
+     * conexion de la aplicacion estaria midiendo un sistema que no es el que se despliega.
      */
     private static void proyectar(List<Lote> lotes) throws SQLException {
         UUID evento = UUID.randomUUID();

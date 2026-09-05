@@ -9,9 +9,9 @@ import org.jspecify.annotations.Nullable;
 /**
  * Lo que le paso a un FUE, con la resolucion que lo sustenta (#48, V43 §7).
  *
- * <p><b>Solo se agrega.</b> V43 le concede a {@code sgtm_app} nada mas que {@code SELECT} e {@code
- * INSERT} sobre {@code edificacion_movimiento}, y el escaner de fuentes rechaza un {@code UPDATE
- * edificacion_movimiento SET} antes de que llegue a ejecutarse.
+ * <p><b>Solo se agrega.</b> V43 le concede a {@code kamayuk_app} nada mas que {@code SELECT} e
+ * {@code INSERT} sobre {@code edificacion_movimiento}, y el escaner de fuentes rechaza un {@code
+ * UPDATE edificacion_movimiento SET} antes de que llegue a ejecutarse.
  *
  * <p>El <b>numero de la licencia</b> vive aqui y no en la cabecera, y es la decision de diseno de
  * este issue: un FUE existe antes de que haya licencia —se presenta, se completa por partes y

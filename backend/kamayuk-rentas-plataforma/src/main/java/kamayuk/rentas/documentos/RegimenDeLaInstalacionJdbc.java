@@ -53,7 +53,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * del padron llevaria su propia consulta.
  *
  * <p>Se puede porque el valor no cambia en caliente: quitarle la marca a una instalacion es un
- * {@code UPDATE} de {@code sgtm_owner}, una operacion de implantacion, y las de implantacion
+ * {@code UPDATE} de {@code kamayuk_owner}, una operacion de implantacion, y las de implantacion
  * reinician el proceso. No hay ninguna pantalla que lo cambie, y ese es justamente el punto de que
  * el hecho viva en la base y no en configuracion.
  *

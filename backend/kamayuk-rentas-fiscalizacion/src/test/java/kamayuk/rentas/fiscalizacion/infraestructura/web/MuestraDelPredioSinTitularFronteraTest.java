@@ -82,9 +82,9 @@ import tools.jackson.databind.json.JsonMapper;
  * titular «entraría» sin que nadie hubiera comprobado que la base la acepta. Y porque lo que el
  * issue exige que se vea —el recuento— sale por la respuesta del {@code POST}, no del caso de uso.
  *
- * <p>La conexión es la de {@code sgtm_app}: un superusuario omite RLS incluso con {@code FORCE ROW
- * LEVEL SECURITY} (DAT-01 §0, primer hallazgo), y {@code sgtm_owner} tampoco sirve —con {@code
- * FORCE} el dueño también queda sujeto a la política, que es lo que #537 y #545 midieron—.
+ * <p>La conexión es la de {@code kamayuk_app}: un superusuario omite RLS incluso con {@code FORCE
+ * ROW LEVEL SECURITY} (DAT-01 §0, primer hallazgo), y {@code kamayuk_owner} tampoco sirve —con
+ * {@code FORCE} el dueño también queda sujeto a la política, que es lo que #537 y #545 midieron—.
  *
  * <p>Los casos de uso se envuelven con {@link AnnotationTransactionAttributeSource}, o sea
  * <b>obedeciendo a la anotación</b> como el contenedor: un {@code TransactionTemplate}

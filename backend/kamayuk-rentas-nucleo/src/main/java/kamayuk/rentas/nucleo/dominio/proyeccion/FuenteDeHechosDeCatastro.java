@@ -12,11 +12,11 @@ import java.util.UUID;
  * diferencia no es de gusto:
  *
  * <ul>
- *   <li>El receptor de un pago escribe {@code pago_recibido}, y `V8` le da a {@code sgtm_app}
+ *   <li>El receptor de un pago escribe {@code pago_recibido}, y `V8` le da a {@code kamayuk_app}
  *       {@code INSERT, SELECT, UPDATE} sobre ella: el proceso que atiende HTTP <b>puede</b>
  *       recibir.
  *   <li>El receptor de estos hechos escribe {@code predio_ref}, {@code ficha_ref}, {@code
- *       valuacion_predio} y {@code valuacion_corrida}, y `V4` y `V5` le dan a {@code sgtm_app}
+ *       valuacion_predio} y {@code valuacion_corrida}, y `V4` y `V5` le dan a {@code kamayuk_app}
  *       <b>solo {@code SELECT}</b>. Quien las escribe es {@code rol_ingestor_catastro}, que no
  *       atiende peticiones. Un endpoint que recibiera empujones tendria que llevar esa credencial
  *       dentro del proceso web, y entonces «la proyeccion es de solo lectura para la aplicacion»

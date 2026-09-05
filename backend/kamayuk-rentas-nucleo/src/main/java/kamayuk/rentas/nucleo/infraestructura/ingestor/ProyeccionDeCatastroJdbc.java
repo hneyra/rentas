@@ -12,7 +12,7 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 /**
  * Escribe la proyeccion local de {@code catastro} (C-8, `V4`, `V5`, `V9`, `V12`).
  *
- * <h2>Se conecta con {@code rol_ingestor_catastro}, no con {@code sgtm_app}</h2>
+ * <h2>Se conecta con {@code rol_ingestor_catastro}, no con {@code kamayuk_app}</h2>
  *
  * <p>El {@code JdbcClient} que recibe sale del pool que {@link ConfiguracionDelIngestor} construye,
  * y esa es la mitad de ADR-0027 §3 que no es una promesa: `V4` y `V5` no le dan a la aplicacion mas

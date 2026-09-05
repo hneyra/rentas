@@ -13,10 +13,10 @@ import org.jspecify.annotations.Nullable;
  * <h2>No se edita, y por eso no tiene estado</h2>
  *
  * <p>V51 crea {@code certificado} <b>sin</b> conceder {@code UPDATE} ni {@code DELETE} a {@code
- * sgtm_app}, y el escaner de fuentes rechaza cualquier {@code UPDATE certificado SET} antes de que
- * llegue a ejecutarse. Un certificado equivocado se sustituye emitiendo <b>otro</b> —con su numero,
- * su derecho de tramite y su papel—, y los dos quedan. Es el mismo criterio que V39 aplico desde el
- * principio a la liquidacion de fiscalizacion.
+ * kamayuk_app}, y el escaner de fuentes rechaza cualquier {@code UPDATE certificado SET} antes de
+ * que llegue a ejecutarse. Un certificado equivocado se sustituye emitiendo <b>otro</b> —con su
+ * numero, su derecho de tramite y su papel—, y los dos quedan. Es el mismo criterio que V39 aplico
+ * desde el principio a la liquidacion de fiscalizacion.
  *
  * <p>Por eso tampoco hay columna {@code estado}: lo unico que le pasa a un certificado con el
  * tiempo es <b>caducar</b>, y eso no es un hecho suyo sino una relacion entre {@link

@@ -7,9 +7,9 @@ import java.util.Optional;
  * Las corridas masivas de valores por papeletas contra PostgreSQL. Ningún método recibe la
  * municipalidad (regla 2).
  *
- * <p>La corrida <b>solo se inserta</b> —V47 no le concede {@code UPDATE} a {@code sgtm_app}, igual
- * que V27 a {@code valor_masivo}—; sus candidatos sí se actualizan, porque su estado es la marca de
- * progreso de un proceso interno y no un acto administrativo.
+ * <p>La corrida <b>solo se inserta</b> —V47 no le concede {@code UPDATE} a {@code kamayuk_app},
+ * igual que V27 a {@code valor_masivo}—; sus candidatos sí se actualizan, porque su estado es la
+ * marca de progreso de un proceso interno y no un acto administrativo.
  */
 public interface CorridaDeValoresRepository {
 

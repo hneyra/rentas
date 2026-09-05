@@ -20,8 +20,8 @@ import org.springframework.stereotype.Repository;
  * El historial de las liquidaciones contra PostgreSQL.
  *
  * <p>Solo {@code INSERT} y {@code SELECT}: V39 no le concede {@code UPDATE} ni {@code DELETE} a
- * {@code sgtm_app}, y el escáner del código fuente vigila lo mismo desde arriba. De aquí se deriva
- * el estado, y una corrección es otro movimiento.
+ * {@code kamayuk_app}, y el escáner del código fuente vigila lo mismo desde arriba. De aquí se
+ * deriva el estado, y una corrección es otro movimiento.
  */
 @Repository
 public class MovimientoDeLiquidacionRepositoryJdbc extends RepositorioJdbc

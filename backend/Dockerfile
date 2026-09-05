@@ -4,12 +4,12 @@
 # archivo:
 #
 #   `aplicacion`  el artefacto unico de ADR-0003, desplegado en los perfiles web y
-#                 batch. Se conecta como sgtm_app: sin DDL, sin BYPASSRLS, sin ser
+#                 batch. Se conecta como kamayuk_app: sin DDL, sin BYPASSRLS, sin ser
 #                 propietaria de ninguna tabla y sin DELETE (ARQ-03 §4).
-#   `migrador`    el proceso que aplica el esquema como sgtm_owner y termina.
+#   `migrador`    el proceso que aplica el esquema como kamayuk_owner y termina.
 #
 # Estan separadas porque las credenciales son distintas y no deben convivir en el
-# mismo contenedor: las de sgtm_owner existen durante la migracion y desaparecen
+# mismo contenedor: las de kamayuk_owner existen durante la migracion y desaparecen
 # con ella. Meterlas en la imagen de la aplicacion —aunque solo fuera «para el
 # arranque»— le daria a un proceso de larga vida, expuesto en HTTP, la capacidad
 # de hacer DDL sobre el padron de todas las municipalidades.

@@ -35,8 +35,8 @@ import org.springframework.stereotype.Repository;
  * Las autorizaciones de anuncio contra PostgreSQL (V4, V45).
  *
  * <p><b>Solo inserta.</b> No hay aqui ni un {@code UPDATE anuncio} ni un {@code DELETE}: V45 le
- * retira a {@code sgtm_app} el privilegio de {@code UPDATE} y {@code DELETE} nunca lo tuvo (V7); el
- * escaner de fuentes rechaza esas dos cadenas antes de que lleguen a ejecutarse. El unico {@code
+ * retira a {@code kamayuk_app} el privilegio de {@code UPDATE} y {@code DELETE} nunca lo tuvo (V7);
+ * el escaner de fuentes rechaza esas dos cadenas antes de que lleguen a ejecutarse. El unico {@code
  * UPDATE} de esta clase es el del contador de {@code anuncio_correlativo}, que es infraestructura
  * de numeracion y no un acto administrativo (mismo criterio que {@code licencia_correlativo} en
  * V37).

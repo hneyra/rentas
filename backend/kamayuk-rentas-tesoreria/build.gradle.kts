@@ -54,7 +54,7 @@ dependencies {
     implementation("tools.jackson.core:jackson-databind")
 
     // Las pruebas del convenio corren contra PostgreSQL de verdad: provisionan la base
-    // como un ambiente real y se conectan como sgtm_app, no como el superusuario que
+    // como un ambiente real y se conectan como kamayuk_app, no como el superusuario que
     // entrega Testcontainers (CAL-01 §3.2). Contra un doble no se puede demostrar ni el
     // aislamiento, ni el REVOKE UPDATE, ni que una transaccion deje cero filas al fallar
     // a mitad.

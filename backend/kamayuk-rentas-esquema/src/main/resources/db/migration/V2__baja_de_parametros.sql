@@ -114,7 +114,7 @@ DROP FUNCTION IF EXISTS valuacion_de_publicacion_sellada_es_inmutable();
 --
 --  PERO EL `REVOKE CONNECT` NO SE HACE AQUI, Y HAY QUE DECIR POR QUE: es un
 --  privilegio sobre la BASE, no sobre una tabla, y solo lo puede retirar quien la
---  posee. `sgtm_owner` -que es quien corre esta migracion- a proposito NO es
+--  posee. `kamayuk_owner` -que es quien corre esta migracion- a proposito NO es
 --  dueno de la base (lo midio #722 al intentar crear un esquema: «permission
 --  denied for database»), asi que la sentencia fallaria y dejaria la instalacion
 --  sin migrar. Le toca a `crear-roles.sql`, que corre como superusuario y es

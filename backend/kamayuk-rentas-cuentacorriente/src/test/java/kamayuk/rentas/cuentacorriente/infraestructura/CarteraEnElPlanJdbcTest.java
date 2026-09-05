@@ -44,7 +44,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  *
  * <p>Sobre dos padrones del tamano real de Catacaos en la <b>misma instalacion</b> —14 422 predios
  * y 10 603 contribuyentes cada uno, 210 210 asientos en la particion de 2026, 84 824 en la de 2027
- * y 285 024 filas proyectadas—, como {@code sgtm_app} y con RLS activa, con {@code EXPLAIN
+ * y 285 024 filas proyectadas—, como {@code kamayuk_app} y con RLS activa, con {@code EXPLAIN
  * (ANALYZE, BUFFERS)} y mediana de tres repeticiones:
  *
  * <table border="1">
@@ -227,11 +227,11 @@ class CarteraEnElPlanJdbcTest {
 
     @Test
     @DisplayName("y todo esto se mide con el rol de la aplicacion, no con el dueno de las tablas")
-    void seConectaComoSgtmApp() {
+    void seConectaComoKamayukApp() {
         TenantContext.fijar(new MunicipalidadId(municipalidadA));
 
         // El centinela de #545, y aqui hace mas falta que en ninguna otra: escrita con
-        // `sgtm_owner` —la rotura que uno teclea por costumbre— la prueba de «no lee las
+        // `kamayuk_owner` —la rotura que uno teclea por costumbre— la prueba de «no lee las
         // filas de la vecina» pasa en VERDE, porque con FORCE ROW LEVEL SECURITY el dueno
         // tambien queda sujeto a la politica. Quien la omite es el superusuario del
         // cluster, y con el la misma prueba lee 72 000 filas de las 96 000 de la particion.
@@ -282,7 +282,7 @@ class CarteraEnElPlanJdbcTest {
 
     // ------------------------------------------------------------------
 
-    /** El plan de la consulta real, medido como {@code sgtm_app} y con el contexto fijado. */
+    /** El plan de la consulta real, medido como {@code kamayuk_app} y con el contexto fijado. */
     private static String plan() {
         TenantContext.fijar(new MunicipalidadId(municipalidadA));
         List<String> lineas =

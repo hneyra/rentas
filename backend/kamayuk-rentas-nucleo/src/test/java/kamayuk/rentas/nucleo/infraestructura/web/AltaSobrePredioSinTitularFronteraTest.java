@@ -95,11 +95,11 @@ import tools.jackson.databind.json.JsonMapper;
  * declaracion existe para pasar por encima de <i>evidencia contraria</i> —«esta unidad es de
  * fulano»— y aqui no hay ninguna.
  *
- * <h2>Por que hasta la base, y como sgtm_app</h2>
+ * <h2>Por que hasta la base, y como kamayuk_app</h2>
  *
  * <p>Porque la distincion la resuelve una consulta mas al padron de predios, y un doble puede
- * prometer cualquier cosa. La conexion es la de {@code sgtm_app} con el centinela de #545: un
- * superusuario omite RLS incluso con {@code FORCE ROW LEVEL SECURITY}, y {@code sgtm_owner}
+ * prometer cualquier cosa. La conexion es la de {@code kamayuk_app} con el centinela de #545: un
+ * superusuario omite RLS incluso con {@code FORCE ROW LEVEL SECURITY}, y {@code kamayuk_owner}
  * <b>no</b> lo omite —asi que la rotura de aislamiento escrita con el dueño saldria en verde—. El
  * proxy transaccional se construye con {@link AnnotationTransactionAttributeSource}, o sea
  * obedeciendo a la anotacion como el contenedor (#486).
@@ -240,13 +240,13 @@ class AltaSobrePredioSinTitularFronteraTest {
     // ------------------------------------------------------------------
 
     @Test
-    @DisplayName("la prueba se conecta como sgtm_app, no como superusuario ni como el dueno")
-    void seConectaComoSgtmApp() {
+    @DisplayName("la prueba se conecta como kamayuk_app, no como superusuario ni como el dueno")
+    void seConectaComoKamayukApp() {
         assertThat(jdbc.sql("SELECT current_user").query(String.class).single())
                 .as(
                         "con superusuario RLS se omite —incluso con FORCE ROW LEVEL SECURITY— y"
                                 + " todo lo de este archivo pasaria sin verificar nada. Con"
-                                + " sgtm_owner NO basta: FORCE lo sujeta a la politica igual, asi"
+                                + " kamayuk_owner NO basta: FORCE lo sujeta a la politica igual, asi"
                                 + " que la rotura clasica escrita con el dueno sale VERDE (#537,"
                                 + " #545)")
                 .isEqualTo(BaseDeDatosDePrueba.APP);

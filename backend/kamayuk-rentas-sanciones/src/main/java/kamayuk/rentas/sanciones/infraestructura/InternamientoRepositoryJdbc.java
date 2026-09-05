@@ -31,8 +31,8 @@ import org.springframework.stereotype.Repository;
  * El depósito municipal contra PostgreSQL (V4 + V41).
  *
  * <p><b>Solo inserta.</b> No hay aquí ni un {@code UPDATE internamiento} ni un {@code DELETE}: V41
- * le retira a {@code sgtm_app} el privilegio de {@code UPDATE} sobre el ingreso y no se lo da a sus
- * movimientos. Ninguna consulta filtra por {@code municipalidad_id} —lo hace la política RLS—.
+ * le retira a {@code kamayuk_app} el privilegio de {@code UPDATE} sobre el ingreso y no se lo da a
+ * sus movimientos. Ninguna consulta filtra por {@code municipalidad_id} —lo hace la política RLS—.
  *
  * <h2>El estado se calcula en SQL, y con la misma regla que en Java</h2>
  *

@@ -35,7 +35,7 @@ import org.springframework.stereotype.Repository;
  * Las liquidaciones de costas contra PostgreSQL (V35, #42).
  *
  * <p><b>Solo inserta.</b> No hay aqui ni un {@code UPDATE liquidacion_costas} ni un {@code UPDATE
- * costa_procesal} ni un {@code DELETE}: V35 le retira a {@code sgtm_app} el {@code UPDATE} sobre
+ * costa_procesal} ni un {@code DELETE}: V35 le retira a {@code kamayuk_app} el {@code UPDATE} sobre
  * {@code costa_procesal} y no le concede ninguno sobre las dos tablas nuevas, y el escaner de
  * fuentes rechaza esas cadenas antes de que lleguen a ejecutarse. El unico {@code UPDATE} de esta
  * clase es el del contador de {@code liquidacion_costas_correlativo}, que es infraestructura de

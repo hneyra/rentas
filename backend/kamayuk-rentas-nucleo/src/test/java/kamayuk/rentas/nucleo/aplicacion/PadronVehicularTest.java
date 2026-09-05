@@ -51,7 +51,7 @@ import org.springframework.transaction.annotation.AnnotationTransactionAttribute
 import org.springframework.transaction.interceptor.TransactionInterceptor;
 
 /**
- * El padron vehicular contra PostgreSQL real, como {@code sgtm_app} (RF-024, #26).
+ * El padron vehicular contra PostgreSQL real, como {@code kamayuk_app} (RF-024, #26).
  *
  * <p>Tres propiedades se verifican aqui, y las tres tienen una implementacion equivocada que parece
  * mas natural que la correcta:

@@ -5,7 +5,7 @@ import java.util.List;
 /**
  * Los duplicados autorizados de una licencia (V37, #44).
  *
- * <p><b>Solo se agregan</b>: V37 le retira a {@code sgtm_app} el {@code UPDATE} sobre {@code
+ * <p><b>Solo se agregan</b>: V37 le retira a {@code kamayuk_app} el {@code UPDATE} sobre {@code
  * licencia_duplicado}, y {@code DELETE} nunca lo tuvo (V7).
  */
 public interface DuplicadoDeLicenciaRepository {

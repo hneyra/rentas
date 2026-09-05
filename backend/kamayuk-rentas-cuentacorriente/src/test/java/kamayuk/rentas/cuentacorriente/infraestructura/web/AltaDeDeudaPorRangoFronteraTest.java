@@ -77,9 +77,9 @@ import tools.jackson.databind.json.JsonMapper;
  * periodo} guardado, fila a fila, contra el que se pidio: contar cuantos asientos hay no basta, y
  * esa es la razon de ser del issue.
  *
- * <p>La conexion es la de {@code sgtm_app}. Un superusuario omite RLS incluso con {@code FORCE ROW
- * LEVEL SECURITY}, y ademas sin transaccion no hay {@code SET LOCAL} y la politica revienta (#486):
- * el camino que se recorre aqui es el de produccion entero.
+ * <p>La conexion es la de {@code kamayuk_app}. Un superusuario omite RLS incluso con {@code FORCE
+ * ROW LEVEL SECURITY}, y ademas sin transaccion no hay {@code SET LOCAL} y la politica revienta
+ * (#486): el camino que se recorre aqui es el de produccion entero.
  */
 @DisplayName("RF-043 — Alta de deuda por rango de cuotas, de HTTP a PostgreSQL (#538)")
 class AltaDeDeudaPorRangoFronteraTest {
@@ -541,7 +541,7 @@ class AltaDeDeudaPorRangoFronteraTest {
         return JdbcClient.create(pool);
     }
 
-    /** Como lo haria una migracion. La escribe {@code sgtm_owner}: la aplicacion no hace DDL. */
+    /** Como lo haria una migracion. La escribe {@code kamayuk_owner}: la aplicacion no hace DDL. */
     private static void declararParticion(int ejercicio) throws SQLException {
         ejecutarComoOwner(
                 "CREATE TABLE cuenta_corriente_asiento_"

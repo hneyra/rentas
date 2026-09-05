@@ -54,10 +54,10 @@ import org.springframework.transaction.support.TransactionTemplate;
  * La relacion de altas y bajas son los <b>actos</b> sobre la deuda, no todo el libro (#640,
  * RF-045).
  *
- * <p>Se conecta como {@code sgtm_app}, nunca como {@code sgtm_owner}: con {@code FORCE ROW LEVEL
- * SECURITY} el dueno de la tabla <b>tambien</b> queda sujeto a la politica, asi que una rotura de
- * aislamiento escrita con el dueno pasaria en verde sin demostrar nada (#537, #545, y #601 lo
- * volvio a medir). Quien la omite es el superusuario del cluster.
+ * <p>Se conecta como {@code kamayuk_app}, nunca como {@code kamayuk_owner}: con {@code FORCE ROW
+ * LEVEL SECURITY} el dueno de la tabla <b>tambien</b> queda sujeto a la politica, asi que una
+ * rotura de aislamiento escrita con el dueno pasaria en verde sin demostrar nada (#537, #545, y
+ * #601 lo volvio a medir). Quien la omite es el superusuario del cluster.
  *
  * <h2>Que defiende</h2>
  *
@@ -70,9 +70,9 @@ import org.springframework.transaction.support.TransactionTemplate;
  *       y se exige <b>una</b> fila.
  *   <li><b>AC 2 — los asientos sin acto.</b> Los anteriores a {@code V68} tienen {@code acto} nulo
  *       y <b>no se pueden reparar</b> (V68 §3: RLS con {@code FORCE} y migrador sin contexto de
- *       tenant, DAT-01 §0; y {@code sgtm_app} sin {@code UPDATE} desde V7). No salen, y eso se dice
- *       —en el javadoc del repositorio, en el del controlador y en la descripcion que el contrato
- *       publica—, en vez de callarse.
+ *       tenant, DAT-01 §0; y {@code kamayuk_app} sin {@code UPDATE} desde V7). No salen, y eso se
+ *       dice —en el javadoc del repositorio, en el del controlador y en la descripcion que el
+ *       contrato publica—, en vez de callarse.
  *   <li><b>AC 3 — el contraste.</b> Una baja de verdad sigue apareciendo, con su documento y su
  *       motivo; y tambien el alta, y tambien la <b>reversion</b> de una baja, que copia el acto
  *       (Asiento#reversionDe) y es lo que devuelve la deuda al padron. Un arreglo que filtrara de
@@ -249,7 +249,7 @@ class AltasBajasSonActosJdbcTest {
             // SQL directo porque desde Java ya no se puede producir —`enAsientos` estampa
             // el acto siempre— y porque V68 §3 dejo medido que esas filas NO se pueden
             // reparar: RLS con FORCE mas un migrador sin contexto de tenant (DAT-01 §0) y
-            // `sgtm_app` sin UPDATE sobre el libro (V7).
+            // `kamayuk_app` sin UPDATE sobre el libro (V7).
             insertarSinActo(titular, "JUEGOS", TipoAsiento.ABONO, "RES-BAJA-VIEJA");
             darDeBaja(titular, "JUEGOS", "45.00");
 
@@ -360,7 +360,7 @@ class AltasBajasSonActosJdbcTest {
                             asiento -> assertThat(asiento.monto()).isEqualTo(Dinero.de("10.00")));
 
             // La misma demostracion que exige AislamientoMultiTenantTest: con el mismo
-            // contexto fijado, el superusuario ve las dos municipalidades y sgtm_app una.
+            // contexto fijado, el superusuario ve las dos municipalidades y kamayuk_app una.
             try (Connection admin = base.conexionAdmin();
                     PreparedStatement sentencia =
                             admin.prepareStatement(

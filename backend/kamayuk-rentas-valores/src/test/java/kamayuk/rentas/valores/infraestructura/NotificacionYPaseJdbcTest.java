@@ -63,7 +63,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * #39 — Notificacion, pase a coactiva y prescripcion contra PostgreSQL de verdad (V28), conectado
- * como {@code sgtm_app}.
+ * como {@code kamayuk_app}.
  *
  * <p>Lo que esta clase defiende y ninguna prueba con dobles puede:
  *
@@ -71,7 +71,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  *   <li>Que el pase a coactiva sea idempotente <b>bajo concurrencia real</b>. Un doble que consulta
  *       antes de insertar pasa la prueba y falla en produccion: dos peticiones simultaneas pasan
  *       las dos por el {@code if}. Aqui se lanzan diez hilos a la vez.
- *   <li>Que {@code sgtm_app} <b>no tenga</b> el privilegio de actualizar una notificacion ni un
+ *   <li>Que {@code kamayuk_app} <b>no tenga</b> el privilegio de actualizar una notificacion ni un
  *       movimiento. No es una convencion: es un {@code REVOKE} de V28, y se comprueba intentandolo.
  *   <li>Que la restriccion de exigibilidad de la base rechace una diligencia no hallada con fecha
  *       de exigibilidad, aunque alguien la escriba por SQL directo.
@@ -218,7 +218,7 @@ class NotificacionYPaseJdbcTest {
         }
 
         @Test
-        @DisplayName("sgtm_app no puede actualizar una notificacion: el privilegio no existe")
+        @DisplayName("kamayuk_app no puede actualizar una notificacion: el privilegio no existe")
         void noSePuedeActualizarUnaNotificacion() {
             Valor valor = emitir("N-0005", "OP-2026-N00005");
             Notificacion guardada =
@@ -338,7 +338,7 @@ class NotificacionYPaseJdbcTest {
         }
 
         @Test
-        @DisplayName("sgtm_app no puede borrar un movimiento: el privilegio no existe")
+        @DisplayName("kamayuk_app no puede borrar un movimiento: el privilegio no existe")
         void noSePuedeBorrarUnMovimiento() {
             Valor valor = emitir("P-0004", "OP-2026-P00004");
             Notificacion notificacion =
@@ -455,7 +455,7 @@ class NotificacionYPaseJdbcTest {
         }
 
         @Test
-        @DisplayName("sgtm_app no puede borrar una prescripcion: el privilegio no existe")
+        @DisplayName("kamayuk_app no puede borrar una prescripcion: el privilegio no existe")
         void noSePuedeBorrarUnaPrescripcion() {
             assertThat(estadoSqlDelFallo(() -> ejecutarComoApp("DELETE FROM prescripcion")))
                     .isEqualTo("42501");

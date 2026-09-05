@@ -62,8 +62,8 @@ import tools.jackson.databind.json.JsonMapper;
  * /rentas/transferencias/predio} contestaba 201 y dejaba una fila con {@code tipo_transferencia =
  * 'XXXX'}. Una prueba de capa web contra un doble del repositorio comprueba el codigo de estado y
  * no puede decir nada de la fila; y una prueba de repositorio no pasa por el borde, que es donde
- * vive el 422. Esta cruza las dos, con la conexion de {@code sgtm_app} —un superusuario omite RLS
- * incluso con {@code FORCE ROW LEVEL SECURITY}— y el proxy transaccional construido con {@link
+ * vive el 422. Esta cruza las dos, con la conexion de {@code kamayuk_app} —un superusuario omite
+ * RLS incluso con {@code FORCE ROW LEVEL SECURITY}— y el proxy transaccional construido con {@link
  * AnnotationTransactionAttributeSource}, o sea obedeciendo a la anotacion como el contenedor
  * (#486).
  *

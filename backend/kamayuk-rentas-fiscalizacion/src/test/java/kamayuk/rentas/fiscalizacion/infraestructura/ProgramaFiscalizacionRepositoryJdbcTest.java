@@ -40,7 +40,7 @@ import org.springframework.transaction.interceptor.TransactionInterceptor;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * Los programas de fiscalización contra PostgreSQL de verdad, conectado como {@code sgtm_app} —
+ * Los programas de fiscalización contra PostgreSQL de verdad, conectado como {@code kamayuk_app} —
  * nunca como superusuario, que omite RLS incluso con {@code FORCE ROW LEVEL SECURITY} y dejaría la
  * prueba en verde sin verificar nada.
  */

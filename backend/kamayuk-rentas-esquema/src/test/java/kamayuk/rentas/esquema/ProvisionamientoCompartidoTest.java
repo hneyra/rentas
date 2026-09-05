@@ -145,18 +145,18 @@ class ProvisionamientoCompartidoTest {
     @Test
     @DisplayName("la clave sale del cluster y del rol, no de un sorteo")
     void laClaveSeDerivaYNoSeSortea() {
-        String unaVez = BaseDeDatosDePrueba.claveDeRol(7_654_321L, "admin", "sgtm_app");
+        String unaVez = BaseDeDatosDePrueba.claveDeRol(7_654_321L, "admin", "kamayuk_app");
 
-        assertThat(BaseDeDatosDePrueba.claveDeRol(7_654_321L, "admin", "sgtm_app"))
+        assertThat(BaseDeDatosDePrueba.claveDeRol(7_654_321L, "admin", "kamayuk_app"))
                 .as("dos tareas de la misma corrida tienen que derivar lo mismo")
                 .isEqualTo(unaVez);
-        assertThat(BaseDeDatosDePrueba.claveDeRol(7_654_322L, "admin", "sgtm_app"))
+        assertThat(BaseDeDatosDePrueba.claveDeRol(7_654_322L, "admin", "kamayuk_app"))
                 .as("otro cluster —otro contenedor— no comparte clave con este")
                 .isNotEqualTo(unaVez);
-        assertThat(BaseDeDatosDePrueba.claveDeRol(7_654_321L, "otra", "sgtm_app"))
+        assertThat(BaseDeDatosDePrueba.claveDeRol(7_654_321L, "otra", "kamayuk_app"))
                 .as("quien no tiene la credencial de administrador no puede derivarla")
                 .isNotEqualTo(unaVez);
-        assertThat(BaseDeDatosDePrueba.claveDeRol(7_654_321L, "admin", "sgtm_owner"))
+        assertThat(BaseDeDatosDePrueba.claveDeRol(7_654_321L, "admin", "kamayuk_owner"))
                 .as("cuatro roles, cuatro claves: una sola las haria intercambiables")
                 .isNotEqualTo(unaVez);
         assertThat(unaVez).hasSize(64).matches("[0-9a-f]+");

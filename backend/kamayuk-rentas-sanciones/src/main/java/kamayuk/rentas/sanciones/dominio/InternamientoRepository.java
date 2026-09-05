@@ -15,7 +15,7 @@ import kamayuk.rentas.compartido.Paginacion;
  * internamiento— y separarlo obligaría a que cada caso de uso compusiera dos repositorios para
  * responder una pregunta que es una.
  *
- * <p><b>Solo inserta.</b> V41 le retira a {@code sgtm_app} el {@code UPDATE} sobre {@code
+ * <p><b>Solo inserta.</b> V41 le retira a {@code kamayuk_app} el {@code UPDATE} sobre {@code
  * internamiento} y no se lo da a sus movimientos.
  */
 public interface InternamientoRepository {

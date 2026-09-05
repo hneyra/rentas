@@ -11,7 +11,7 @@ import kamayuk.rentas.dominio.Ejercicio;
  * <p><b>No hay ningun metodo que borre ni que actualice</b>, y no es una omision: lo que se guarda
  * aqui es un conjunto ya sellado, que por construccion no cambia —el disparador de {@code V9} de
  * {@code normativa} lo vuelve inmutable a el y a su contenido—. Una cache de contenido inmutable no
- * tiene invalidacion que disenar. {@code sgtm_app} tampoco tiene el privilegio: {@code V3} le
+ * tiene invalidacion que disenar. {@code kamayuk_app} tampoco tiene el privilegio: {@code V3} le
  * concede {@code INSERT} y {@code SELECT} y nada mas.
  */
 public interface CacheDeSnapshots {

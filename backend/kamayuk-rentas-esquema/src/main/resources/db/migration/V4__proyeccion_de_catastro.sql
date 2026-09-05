@@ -50,7 +50,7 @@
 --
 --  DE SOLO LECTURA, Y LO SOSTIENE EL MOTOR
 --  ---------------------------------------
---  `sgtm_app` recibe SELECT y nada mas. Quien escribe es `rol_ingestor_catastro`, que
+--  `kamayuk_app` recibe SELECT y nada mas. Quien escribe es `rol_ingestor_catastro`, que
 --  no atiende ninguna peticion. No es disciplina del repositorio: es un privilegio, la
 --  misma mecanica con que `V54` protege el estado de la declaracion jurada y con la que
 --  `V3` protege la copia de normativa. Una proyeccion que la aplicacion pueda escribir
@@ -113,7 +113,7 @@ CREATE INDEX predio_ref_codigo_prefijo_ix
 CREATE INDEX predio_ref_sector_ix ON predio_ref (municipalidad_id, sector_codigo);
 
 COMMENT ON TABLE predio_ref IS
-    'Proyeccion local del predio de `catastro` (P5C). De solo lectura para `sgtm_app`: '
+    'Proyeccion local del predio de `catastro` (P5C). De solo lectura para `kamayuk_app`: '
     'quien la escribe es `rol_ingestor_catastro`';
 COMMENT ON COLUMN predio_ref.sector_codigo IS
     'El CODIGO del sector, no su identificador: lo que los filtros de `rentas` teclean es '
@@ -180,7 +180,7 @@ CREATE POLICY ficha_ref_tenant ON ficha_ref FOR ALL TO PUBLIC
 -- ----------------------------------------------------------------------------
 --  5. Privilegios
 --
---  `sgtm_app` LEE Y NO ESCRIBE, y esa es la mitad de ADR-0027 §3 que no es una
+--  `kamayuk_app` LEE Y NO ESCRIBE, y esa es la mitad de ADR-0027 §3 que no es una
 --  promesa. `rol_ingestor_catastro` existe para escribirla y no atiende peticiones:
 --  el proceso que consume la cola corre en el perfil `batch`.
 --
@@ -202,14 +202,14 @@ BEGIN
 END
 $privilegios$;
 
-GRANT SELECT ON catastro_evento_aplicado TO sgtm_app;
-GRANT SELECT ON predio_ref TO sgtm_app;
-GRANT SELECT ON ficha_ref TO sgtm_app;
+GRANT SELECT ON catastro_evento_aplicado TO kamayuk_app;
+GRANT SELECT ON predio_ref TO kamayuk_app;
+GRANT SELECT ON ficha_ref TO kamayuk_app;
 
 GRANT SELECT, INSERT, UPDATE ON catastro_evento_aplicado TO rol_ingestor_catastro;
 GRANT SELECT, INSERT, UPDATE ON predio_ref TO rol_ingestor_catastro;
 GRANT SELECT, INSERT, UPDATE ON ficha_ref TO rol_ingestor_catastro;
 
-GRANT SELECT ON catastro_evento_aplicado TO sgtm_readonly;
-GRANT SELECT ON predio_ref TO sgtm_readonly;
-GRANT SELECT ON ficha_ref TO sgtm_readonly;
+GRANT SELECT ON catastro_evento_aplicado TO kamayuk_readonly;
+GRANT SELECT ON predio_ref TO kamayuk_readonly;
+GRANT SELECT ON ficha_ref TO kamayuk_readonly;

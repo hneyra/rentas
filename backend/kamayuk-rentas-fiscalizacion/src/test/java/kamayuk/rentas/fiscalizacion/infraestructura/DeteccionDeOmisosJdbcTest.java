@@ -43,7 +43,8 @@ import org.springframework.transaction.annotation.AnnotationTransactionAttribute
 import org.springframework.transaction.interceptor.TransactionInterceptor;
 
 /**
- * Omisos y subvaluadores contra PostgreSQL de verdad, conectado como {@code sgtm_app} (#49, #545).
+ * Omisos y subvaluadores contra PostgreSQL de verdad, conectado como {@code kamayuk_app} (#49,
+ * #545).
  *
  * <p>Antes de #545 esta detección se probaba con dobles en memoria, y por eso no podía ver su
  * defecto principal: el filtro de condición se aplicaba <b>después</b> de paginar, así que {@code
@@ -51,9 +52,9 @@ import org.springframework.transaction.interceptor.TransactionInterceptor;
  * lo miraba —{@code elFiltroDeCondicionNoAlteraElTotal}— lo daba por bueno. La consulta vive ahora
  * en el motor, y aquí se mide contra él.
  *
- * <p>Se conecta como {@code sgtm_app} y no con la conexión por omisión de la base de prueba porque
- * <b>un superusuario omite RLS incluso con {@code FORCE ROW LEVEL SECURITY}</b>: la prueba de
- * aislamiento pasaría en verde sin verificar nada (DAT-01 §0, primer hallazgo).
+ * <p>Se conecta como {@code kamayuk_app} y no con la conexión por omisión de la base de prueba
+ * porque <b>un superusuario omite RLS incluso con {@code FORCE ROW LEVEL SECURITY}</b>: la prueba
+ * de aislamiento pasaría en verde sin verificar nada (DAT-01 §0, primer hallazgo).
  *
  * <p>El caso de uso se envuelve en un proxy transaccional construido con {@link
  * AnnotationTransactionAttributeSource} —obedeciendo a la anotación, como el contenedor—:
@@ -809,13 +810,13 @@ class DeteccionDeOmisosJdbcTest {
         }
 
         @Test
-        @DisplayName("la prueba se conecta como sgtm_app, no como superusuario")
-        void seConectaComoSgtmApp() {
+        @DisplayName("la prueba se conecta como kamayuk_app, no como superusuario")
+        void seConectaComoKamayukApp() {
             assertThat(usuarioDelPool())
                     .as(
                             "con superusuario RLS se omite —incluso con FORCE ROW LEVEL SECURITY— y"
                                     + " todo lo de este archivo pasaria sin verificar nada (DAT-01 §0)."
-                                    + " Con sgtm_owner NO basta: FORCE lo sujeta a la politica igual,"
+                                    + " Con kamayuk_owner NO basta: FORCE lo sujeta a la politica igual,"
                                     + " asi que la rotura clasica escrita con el dueño sale VERDE")
                     .isEqualTo(BaseDeDatosDePrueba.APP);
         }
@@ -878,7 +879,7 @@ class DeteccionDeOmisosJdbcTest {
         return envolver(deteccion).detectar(E2024, sector, condicion, HOY, paginacion);
     }
 
-    /** Con que rol habla el pool que la deteccion usa. Ver {@code seConectaComoSgtmApp}. */
+    /** Con que rol habla el pool que la deteccion usa. Ver {@code seConectaComoKamayukApp}. */
     private static String usuarioDelPool() {
         return jdbc.sql("SELECT current_user").query(String.class).single();
     }
@@ -1179,8 +1180,8 @@ class DeteccionDeOmisosJdbcTest {
     }
 
     /**
-     * Lo escribe el owner: {@code sgtm_app} no tiene {@code UPDATE} sobre estas tablas —cerrar una
-     * ficha o una titularidad es un acto del dominio, no de la siembra de una prueba—.
+     * Lo escribe el owner: {@code kamayuk_app} no tiene {@code UPDATE} sobre estas tablas —cerrar
+     * una ficha o una titularidad es un acto del dominio, no de la siembra de una prueba—.
      */
     private static void conElOwner(long municipalidadId, String sql, Object... valores) {
         try (Connection owner = base.conexion(BaseDeDatosDePrueba.OWNER)) {

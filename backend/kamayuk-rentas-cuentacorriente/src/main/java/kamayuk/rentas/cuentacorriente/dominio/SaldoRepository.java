@@ -8,7 +8,7 @@ import java.util.Optional;
  *
  * <p><b>Es la unica tabla de este contexto que admite {@code UPDATE}</b>, y es legitimo
  * precisamente porque no es la verdad: el libro no se toca nunca, y esto es un cache que se
- * recalcula. V7 le concede {@code SELECT, INSERT, UPDATE} a {@code sgtm_app} por eso, y solo por
+ * recalcula. V7 le concede {@code SELECT, INSERT, UPDATE} a {@code kamayuk_app} por eso, y solo por
  * eso.
  */
 public interface SaldoRepository {

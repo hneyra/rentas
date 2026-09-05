@@ -1,12 +1,12 @@
 package kamayuk.rentas.seguridad.dominio;
 
 /**
- * El registro de tenants: la unica escritura del sistema que no la hace {@code sgtm_app}.
+ * El registro de tenants: la unica escritura del sistema que no la hace {@code kamayuk_app}.
  *
- * <p>{@code V6__rls.sql} le pone a {@code municipalidad} una politica {@code FOR ALL TO sgtm_owner}
- * y lo explica sin rodeos: «dar de alta una municipalidad es una operacion de implantacion». Este
- * puerto existe para que esa excepcion tenga un sitio con nombre en lugar de aparecer como un
- * {@code DriverManager} suelto en medio de un caso de uso.
+ * <p>{@code V6__rls.sql} le pone a {@code municipalidad} una politica {@code FOR ALL TO
+ * kamayuk_owner} y lo explica sin rodeos: «dar de alta una municipalidad es una operacion de
+ * implantacion». Este puerto existe para que esa excepcion tenga un sitio con nombre en lugar de
+ * aparecer como un {@code DriverManager} suelto en medio de un caso de uso.
  *
  * <p>Es deliberadamente diminuto. No hay {@code renombrar}, ni {@code desactivar}, ni consulta: lo
  * que no se necesita para implantar no se pone, porque cada metodo aqui es una capacidad que el
@@ -25,7 +25,7 @@ public interface RegistroDeMunicipalidades {
      * <p>Que tampoco toque {@code esDemostracion} es lo que hace que la marca sea dificil de
      * quitar, que es su proposito (#122): una instalacion no deja de ser de demostracion porque
      * alguien relance el despliegue con una variable distinta. Se quita con un {@code UPDATE}
-     * deliberado de {@code sgtm_owner}, y eso deja rastro de quien lo hizo.
+     * deliberado de {@code kamayuk_owner}, y eso deja rastro de quien lo hizo.
      */
     long darDeAltaSiFalta(String ubigeo, String nombre, String tipo, boolean esDemostracion);
 }

@@ -13,7 +13,7 @@ import org.jspecify.annotations.Nullable;
  * politica RLS con el valor que {@code SET LOCAL} fijo al abrir la transaccion.
  *
  * <p><b>No hay {@code actualizar} ni {@code borrar}</b>, y no es un olvido: V37 le retira a {@code
- * sgtm_app} el privilegio de {@code UPDATE} y {@code DELETE} nunca lo tuvo (V7). Una licencia se
+ * kamayuk_app} el privilegio de {@code UPDATE} y {@code DELETE} nunca lo tuvo (V7). Una licencia se
  * cancela con un movimiento; no se corrige.
  */
 public interface LicenciaRepository {

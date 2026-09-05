@@ -21,8 +21,8 @@ import org.springframework.stereotype.Repository;
  * Los movimientos de un convenio contra PostgreSQL (V31).
  *
  * <p><b>Solo inserta.</b> No hay aqui ni un {@code UPDATE convenio_movimiento} ni un {@code
- * DELETE}: V31 le concede a {@code sgtm_app} solo {@code SELECT} e {@code INSERT}, y el escaner de
- * fuentes rechaza esas dos cadenas antes de que lleguen a ejecutarse.
+ * DELETE}: V31 le concede a {@code kamayuk_app} solo {@code SELECT} e {@code INSERT}, y el escaner
+ * de fuentes rechaza esas dos cadenas antes de que lleguen a ejecutarse.
  *
  * <p><b>La doble formalizacion y el doble cierre los rechaza el indice, no un {@code if}.</b> Se
  * inserta y se traduce el choque contra {@code convenio_movimiento_formalizacion_uq} o {@code

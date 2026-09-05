@@ -5,15 +5,15 @@ spring:
     virtual:
       enabled: true
   datasource:
-    # La aplicacion se conecta SIEMPRE como sgtm_app: sin DDL, sin BYPASSRLS,
+    # La aplicacion se conecta SIEMPRE como kamayuk_app: sin DDL, sin BYPASSRLS,
     # sin ser propietaria de las tablas y sin DELETE (ARQ-03 §4). Las
-    # credenciales de sgtm_owner solo existen en el proceso de migracion.
+    # credenciales de kamayuk_owner solo existen en el proceso de migracion.
     url: ${KAMAYUK_DB_URL}
-    username: ${KAMAYUK_DB_USUARIO:sgtm_app}
+    username: ${KAMAYUK_DB_USUARIO:kamayuk_app}
     password: ${KAMAYUK_DB_CLAVE}
   flyway:
     # La aplicacion NO migra al arrancar. Las migraciones viven en kamayuk-rentas-esquema y
-    # las aplica el migrador del despliegue, como sgtm_owner, antes de que este
+    # las aplica el migrador del despliegue, como kamayuk_owner, antes de que este
     # proceso arranque (kamayuk.rentas.esquema.Migrador).
     enabled: false
 

@@ -17,7 +17,7 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * Los convenios, en memoria. <b>Solo agrega</b>: no hay forma de editar uno, igual que en la base
- * —V31 le revoca el {@code UPDATE} a {@code sgtm_app}—.
+ * —V31 le revoca el {@code UPDATE} a {@code kamayuk_app}—.
  *
  * <p>El correlativo se comporta como el de la base: incrementa por ejercicio y no se reinicia. Que
  * dos registros consecutivos no repitan numero se prueba aqui; que no lo repitan <b>bajo

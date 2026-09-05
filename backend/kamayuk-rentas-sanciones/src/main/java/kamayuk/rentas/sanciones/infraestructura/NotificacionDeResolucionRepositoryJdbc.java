@@ -24,7 +24,7 @@ import org.springframework.stereotype.Repository;
  * aquí puede ver la diligencia de un valor ni al revés.
  *
  * <p>No hay ningún {@code UPDATE} ni {@code DELETE}, y tampoco existe el privilegio: V28 se lo
- * revoca a {@code sgtm_app}. Un intento no hallado se reintenta con otra fila.
+ * revoca a {@code kamayuk_app}. Un intento no hallado se reintenta con otra fila.
  */
 @Repository
 public class NotificacionDeResolucionRepositoryJdbc extends RepositorioJdbc

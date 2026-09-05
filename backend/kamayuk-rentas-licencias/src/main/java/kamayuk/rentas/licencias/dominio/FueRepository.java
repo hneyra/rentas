@@ -14,8 +14,8 @@ import kamayuk.rentas.dominio.Ejercicio;
  * transaccion.
  *
  * <p><b>No hay {@code actualizar} ni {@code borrar}</b>, y no es un olvido: V43 le retira a {@code
- * sgtm_app} el privilegio de {@code UPDATE} sobre {@code licencia_edificacion} y no se lo concede a
- * ninguna tabla de seccion; {@code DELETE} nunca lo tuvo (V7). Una seccion se corrige
+ * kamayuk_app} el privilegio de {@code UPDATE} sobre {@code licencia_edificacion} y no se lo
+ * concede a ninguna tabla de seccion; {@code DELETE} nunca lo tuvo (V7). Una seccion se corrige
  * <b>completando la siguiente version</b>, y el expediente se anula con un movimiento.
  */
 public interface FueRepository {

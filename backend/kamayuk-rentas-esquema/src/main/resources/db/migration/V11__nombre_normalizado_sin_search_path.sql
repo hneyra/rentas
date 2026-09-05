@@ -64,7 +64,7 @@
 --     acepta, y el indice queda `indisvalid = t, indisready = t`. Comprobado.
 --  3. **El plan.** `EXPLAIN (ANALYZE, BUFFERS)` de la consulta real de
 --     `ContribuyenteRepositoryJdbc` —60 000 contribuyentes en dos municipalidades,
---     como `sgtm_app` y con RLS activa— sale IDENTICO antes y despues: los mismos
+--     como `kamayuk_app` y con RLS activa— sale IDENTICO antes y despues: los mismos
 --     nodos, el mismo `Index Cond` y `shared hit=1133` en los dos.
 --
 --  LO QUE SIGUE MAL Y ESTA MIGRACION NO ARREGLA, DICHO AQUI

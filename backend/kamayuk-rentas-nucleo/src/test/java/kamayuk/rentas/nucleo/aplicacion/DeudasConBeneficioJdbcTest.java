@@ -61,7 +61,8 @@ import org.springframework.transaction.interceptor.TransactionInterceptor;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * #72 — La simulacion del acogimiento contra PostgreSQL de verdad, conectada como {@code sgtm_app}.
+ * #72 — La simulacion del acogimiento contra PostgreSQL de verdad, conectada como {@code
+ * kamayuk_app}.
  *
  * <p>Lo que esta clase defiende y ninguna prueba con dobles puede:
  *

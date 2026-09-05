@@ -37,7 +37,7 @@ exenta— vive en el código de la prueba (`TABLAS_DE_CATALOGO`, `TABLAS_EXENTAS
 ./gradlew :kamayuk-rentas-esquema:test
 ```
 
-> **La prueba se conecta como el rol `sgtm_app`, creado en su arranque. No cambies eso.**
+> **La prueba se conecta como el rol `kamayuk_app`, creado en su arranque. No cambies eso.**
 >
 > La conexión que Testcontainers entrega por omisión es de **superusuario**, y un superusuario
 > **omite Row Level Security incluso con `FORCE ROW LEVEL SECURITY`**. Una prueba escrita sobre
@@ -45,10 +45,10 @@ exenta— vive en el código de la prueba (`TABLAS_DE_CATALOGO`, `TABLAS_EXENTAS
 >
 > Eso no se afirma: se demuestra. `Trampa#superusuarioOmiteRlsPorEsoLaPruebaNoUsaEsaConexion`
 > verifica que, con el mismo contexto fijado, el superusuario ve las dos municipalidades y
-> `sgtm_app` una.
+> `kamayuk_app` una.
 
 Los fixtures provisionan la base como se provisiona un ambiente real: crean los cuatro roles con
-su clave, migran conectados como `sgtm_owner` —el único con DDL— y a partir de ahí entregan
+su clave, migran conectados como `kamayuk_owner` —el único con DDL— y a partir de ahí entregan
 conexiones por rol.
 
 Esa clave **no se sortea**, y desde #698 es deliberado: `ALTER ROLE` es del clúster y no de la base,
@@ -84,6 +84,6 @@ No basta con que esté escrita. Las dos mutaciones más baratas, verificadas:
 | Mutación | Qué se pone en rojo |
 |---|---|
 | Quitar `WITH CHECK` de la política de tenant en `V6` | «toda tabla de tenant tiene politica con USING y WITH CHECK», en todas las tablas de tenant (113 hoy, con V56) |
-| Agregar `GRANT SELECT ON determinacion_2026 TO sgtm_app` en `V7` | «sgtm_app no tiene ningun privilegio sobre ninguna particion» y «el acceso directo a una particion falla» |
+| Agregar `GRANT SELECT ON determinacion_2026 TO kamayuk_app` en `V7` | «kamayuk_app no tiene ningun privilegio sobre ninguna particion» y «el acceso directo a una particion falla» |
 
 Conviene repetirlas cada vez que se toque el DDL de RLS o de privilegios.

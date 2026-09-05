@@ -22,7 +22,7 @@ import org.junit.jupiter.api.Test;
  * Prueba de aislamiento multi-tenant — ARQ-03, CAL-01 §3. <b>Bloqueante.</b>
  *
  * <p><b>El requisito que la hace valida:</b> todas las verificaciones de aislamiento se hacen
- * conectadas como {@code sgtm_app}, un rol creado en el arranque de la prueba. La conexion que
+ * conectadas como {@code kamayuk_app}, un rol creado en el arranque de la prueba. La conexion que
  * Testcontainers entrega por omision es de superusuario, y un superusuario omite RLS incluso con
  * {@code FORCE ROW LEVEL SECURITY} (DAT-01 §0, hallazgo 1). Una prueba escrita sobre esa conexion
  * pasa en verde sin proteger nada.
@@ -37,7 +37,7 @@ class AislamientoMultiTenantTest {
     /**
      * Tablas que legitimamente no llevan RLS. Es deliberadamente corta: agregar una entrada aqui
      * tiene que doler y verse en el diff. {@code flyway_schema_history} la crea y la usa solo
-     * {@code sgtm_owner}; la aplicacion no tiene ningun privilegio sobre ella.
+     * {@code kamayuk_owner}; la aplicacion no tiene ningun privilegio sobre ella.
      *
      * <p><b>{@code spatial_ref_sys} salio de esta lista en P5E</b>, y conviene decir por que en vez
      * de dejar la entrada: la instalaba la extension PostGIS, y {@code rentas} ya no la crea
@@ -502,21 +502,21 @@ class AislamientoMultiTenantTest {
         }
 
         @Test
-        @DisplayName("sgtm_app no es propietario de ninguna tabla")
+        @DisplayName("kamayuk_app no es propietario de ninguna tabla")
         void sgtmAppNoEsPropietarioDeNingunaTabla() throws SQLException {
             List<String> propias =
                     consultarTextos(
                             "SELECT c.relname FROM pg_class c"
                                     + "  JOIN pg_roles r ON r.oid = c.relowner"
                                     + "  JOIN pg_namespace n ON n.oid = c.relnamespace"
-                                    + " WHERE n.nspname = 'public' AND r.rolname = 'sgtm_app'");
+                                    + " WHERE n.nspname = 'public' AND r.rolname = 'kamayuk_app'");
             assertThat(propias)
                     .as("la aplicacion nunca se conecta como propietario (ARQ-03 §4)")
                     .isEmpty();
         }
 
         @Test
-        @DisplayName("sgtm_app no tiene DELETE en ninguna tabla")
+        @DisplayName("kamayuk_app no tiene DELETE en ninguna tabla")
         void sgtmAppNoTieneDeleteEnNingunaTabla() throws SQLException {
             List<String> conDelete = tablasConPrivilegio(BaseDeDatosDePrueba.APP, "DELETE");
             assertThat(conDelete)
@@ -559,7 +559,7 @@ class AislamientoMultiTenantTest {
     class Particiones {
 
         @Test
-        @DisplayName("sgtm_app no tiene ningun privilegio sobre ninguna particion")
+        @DisplayName("kamayuk_app no tiene ningun privilegio sobre ninguna particion")
         void sgtmAppNoTieneNingunPrivilegioSobreParticiones() throws SQLException {
             SoftAssertions verificaciones = new SoftAssertions();
             for (String particion : particiones) {
@@ -659,7 +659,7 @@ class AislamientoMultiTenantTest {
                                     + " dejo de ser superusuario, no porque la trampa desaparecio")
                     .isEqualTo(2);
             assertThat(vistasPorLaAplicacion)
-                    .as("sgtm_app ve solo la suya. Esta es la unica conexion que prueba algo")
+                    .as("kamayuk_app ve solo la suya. Esta es la unica conexion que prueba algo")
                     .isEqualTo(1);
         }
     }

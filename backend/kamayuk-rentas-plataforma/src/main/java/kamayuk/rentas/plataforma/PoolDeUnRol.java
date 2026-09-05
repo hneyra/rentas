@@ -11,10 +11,10 @@ import org.springframework.transaction.PlatformTransactionManager;
  *
  * <h2>Para que existe</h2>
  *
- * <p>Casi todo este backend habla con la base como {@code sgtm_app}, y {@code
+ * <p>Casi todo este backend habla con la base como {@code kamayuk_app}, y {@code
  * ConfiguracionDeTenant} cablea ese unico pool. Pero hay trabajo que <b>no puede</b> correr con esa
  * credencial: la proyeccion local de {@code catastro} la escribe {@code rol_ingestor_catastro} y
- * `V4` y `V5` no le dan a {@code sgtm_app} mas que {@code SELECT} sobre ella (ADR-0027 §3). Un
+ * `V4` y `V5` no le dan a {@code kamayuk_app} mas que {@code SELECT} sobre ella (ADR-0027 §3). Un
  * proceso que la escriba necesita su propio pool.
  *
  * <p>Lo que este objeto evita es que ese proceso se lo monte por su cuenta: si lo hiciera, se

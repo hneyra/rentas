@@ -96,7 +96,7 @@ import tools.jackson.databind.json.JsonMapper;
  * respuesta</b>: son 201 los dos, con el mismo importe y el mismo papel. Solo se ve leyendo la
  * clave de la obligacion que quedo escrita, que es lo que esta prueba hace.
  *
- * <p>La conexion es la de {@code sgtm_app} y el proxy transaccional se construye con {@link
+ * <p>La conexion es la de {@code kamayuk_app} y el proxy transaccional se construye con {@link
  * AnnotationTransactionAttributeSource}, o sea obedeciendo a la anotacion como el contenedor
  * (#486).
  */

@@ -42,7 +42,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 /**
  * Los agregados que alimentan el panel de recaudacion, contra PostgreSQL de verdad (#56, RF-130).
  *
- * <p>Se conecta como {@code sgtm_app}, no como el superusuario que entrega Testcontainers: un
+ * <p>Se conecta como {@code kamayuk_app}, no como el superusuario que entrega Testcontainers: un
  * superusuario omite Row Level Security incluso con {@code FORCE ROW LEVEL SECURITY}, y la prueba
  * de aislamiento pasaria en verde sin verificar nada.
  *
@@ -57,7 +57,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  *       porque la politica RLS no le deja ver las filas.
  * </ul>
  *
- * <p>Lo que <b>no</b> repite: que {@code sgtm_app} no pueda hacer {@code UPDATE} sobre el libro,
+ * <p>Lo que <b>no</b> repite: que {@code kamayuk_app} no pueda hacer {@code UPDATE} sobre el libro,
  * que el acceso directo a una particion falle, ni el patron de repositorio. Eso ya lo demuestran
  * {@code AislamientoMultiTenantTest} y {@code AsientoRepositoryJdbcTest} sobre estas mismas tablas.
  */
@@ -380,7 +380,7 @@ class CarteraDelLibroJdbcTest {
         @DisplayName("y el aislamiento lo pone la politica, no el superusuario que lo omite")
         void elSuperusuarioVeLasDos() throws SQLException {
             // La misma demostracion que exige AislamientoMultiTenantTest: con el mismo
-            // contexto fijado, el superusuario ve las dos municipalidades y sgtm_app una.
+            // contexto fijado, el superusuario ve las dos municipalidades y kamayuk_app una.
             // Sin esto, esta clase entera podria estar pasando en verde sin verificar
             // nada del aislamiento.
             try (Connection admin = base.conexionAdmin();

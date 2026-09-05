@@ -215,7 +215,7 @@ ciclo que `verificarArquitectura` rechaza.
      expediente, la licencia y el certificado. Un número de mesa de partes, si el trámite lo
      tiene, es una referencia del expediente y no la identidad de la declaración;
    - **el `estado` es lo único que un acto mueve**, y eso lo sostiene el motor y no la disciplina
-     del repositorio: V54 le retira a `sgtm_app` el `UPDATE` sobre la tabla y le concede el de esa
+     del repositorio: V54 le retira a `kamayuk_app` el `UPDATE` sobre la tabla y le concede el de esa
      columna y solo esa, y un disparador rechaza cualquier acto sobre un estado terminal.
      `declaracion_jurada` entra por eso en `TABLAS_PROTEGIDAS` —borrarla sacaría al predio del
      padrón afecto sin acto que lo explique, o sea un omiso fabricado— y **no** en

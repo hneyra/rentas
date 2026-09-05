@@ -41,17 +41,17 @@ import org.springframework.transaction.support.TransactionTemplate;
  * <h2>Por que un proceso y no un endpoint</h2>
  *
  * <p>Dar de alta una municipalidad es escribir en {@code municipalidad}, y esa tabla la escribe
- * <b>solo {@code sgtm_owner}</b> —{@code V6__rls.sql} lo dice con una politica {@code FOR ALL TO
- * sgtm_owner}, y el esquema lo explica: «dar de alta una municipalidad es una operacion de
- * implantacion»—. Un endpoint que lo hiciera le exigiria a {@code sgtm_app} un privilegio que se le
- * quito a proposito, y seria el camino mas corto de una pantalla de alta a una escalada entre
+ * <b>solo {@code kamayuk_owner}</b> —{@code V6__rls.sql} lo dice con una politica {@code FOR ALL TO
+ * kamayuk_owner}, y el esquema lo explica: «dar de alta una municipalidad es una operacion de
+ * implantacion»—. Un endpoint que lo hiciera le exigiria a {@code kamayuk_app} un privilegio que se
+ * le quito a proposito, y seria el camino mas corto de una pantalla de alta a una escalada entre
  * municipalidades.
  *
  * <p>Corre en el perfil {@code batch}: sin servidor web, sin puerto expuesto y con vida corta. Las
- * credenciales de {@code sgtm_owner} entran <b>solo</b> aqui, para <b>un</b> {@code INSERT}, en una
- * conexion que se abre y se cierra en el paso 1. Todo lo demas —accesos, grupo, usuario, permisos—
- * va por el camino normal de la aplicacion, como {@code sgtm_app} y con su auditoria, porque son
- * escrituras de negocio y tienen que dejar el mismo rastro que dejarian hechas a mano.
+ * credenciales de {@code kamayuk_owner} entran <b>solo</b> aqui, para <b>un</b> {@code INSERT}, en
+ * una conexion que se abre y se cierra en el paso 1. Todo lo demas —accesos, grupo, usuario,
+ * permisos— va por el camino normal de la aplicacion, como {@code kamayuk_app} y con su auditoria,
+ * porque son escrituras de negocio y tienen que dejar el mismo rastro que dejarian hechas a mano.
  *
  * <h2>Los dos grupos que deja</h2>
  *

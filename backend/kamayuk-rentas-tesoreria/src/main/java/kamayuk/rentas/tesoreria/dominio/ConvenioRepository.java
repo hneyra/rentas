@@ -10,9 +10,9 @@ import org.jspecify.annotations.Nullable;
  * Los convenios. Ningun metodo recibe la municipalidad (regla 2): la filtra la politica RLS.
  *
  * <p><b>Solo se agregan.</b> No hay {@code actualizar} ni {@code borrar}, y no es un olvido: V31 le
- * retira a {@code sgtm_app} el privilegio de {@code UPDATE} sobre {@code convenio} y sobre {@code
- * convenio_cuota}, y {@code DELETE} nunca lo tuvo (V7). Lo que le pasa a un convenio se agrega a
- * {@code convenio_movimiento}.
+ * retira a {@code kamayuk_app} el privilegio de {@code UPDATE} sobre {@code convenio} y sobre
+ * {@code convenio_cuota}, y {@code DELETE} nunca lo tuvo (V7). Lo que le pasa a un convenio se
+ * agrega a {@code convenio_movimiento}.
  */
 public interface ConvenioRepository {
 

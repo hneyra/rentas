@@ -51,7 +51,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * mirando tablas sueltas.
  *
  * <p>Se usa el {@link RegistroDeMunicipalidadesJdbc} de verdad, con las credenciales de {@code
- * sgtm_owner} de la base de prueba: el paso que necesita ese rol es justamente el que no tiene
+ * kamayuk_owner} de la base de prueba: el paso que necesita ese rol es justamente el que no tiene
  * sentido simular.
  */
 @DisplayName("Implantacion de una municipalidad")
@@ -356,7 +356,7 @@ class ImplantarMunicipalidadTest {
         @DisplayName("relanzar el despliegue no le quita la marca a una instalacion")
         void relanzarNoLeQuitaLaMarca() {
             // Quitar la marca tiene que ser deliberado y dejar rastro: un UPDATE de
-            // sgtm_owner. Si un despliegue con la variable en false la quitara, bastaria
+            // kamayuk_owner. Si un despliegue con la variable en false la quitara, bastaria
             // un descuido en un archivo de entorno para que la marcha blanca empezara a
             // emitir papeles indistinguibles de los de verdad.
             implantacion("200503", "admin.marchablanca", true).run(null);

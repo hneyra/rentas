@@ -14,7 +14,7 @@ import org.jspecify.annotations.Nullable;
  *
  * <h2>No se edita, y su estado no es una columna</h2>
  *
- * <p>V31 le retira a {@code sgtm_app} el privilegio de {@code UPDATE} sobre {@code convenio} y
+ * <p>V31 le retira a {@code kamayuk_app} el privilegio de {@code UPDATE} sobre {@code convenio} y
  * sobre {@code convenio_cuota}, y el escaner de fuentes rechaza cualquier {@code UPDATE convenio
  * SET} antes de que llegue a ejecutarse. Es la misma decision que V29 y V30 tomaron para el recibo,
  * por el mismo motivo: un convenio es un acto administrativo con numeracion propia que el

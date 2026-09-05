@@ -30,10 +30,10 @@ import org.springframework.stereotype.Repository;
  * Los certificados contra PostgreSQL (V51).
  *
  * <p><b>Solo inserta.</b> No hay aqui ni un {@code UPDATE certificado} ni un {@code DELETE}: V51
- * crea la tabla sin conceder ninguno de los dos a {@code sgtm_app}, y el escaner de fuentes rechaza
- * esas dos cadenas antes de que lleguen a ejecutarse. El unico {@code UPDATE} de esta clase es el
- * del contador de {@code certificado_correlativo}, que es infraestructura de numeracion y no un
- * documento entregable (mismo criterio que {@code licencia_correlativo} en V37).
+ * crea la tabla sin conceder ninguno de los dos a {@code kamayuk_app}, y el escaner de fuentes
+ * rechaza esas dos cadenas antes de que lleguen a ejecutarse. El unico {@code UPDATE} de esta clase
+ * es el del contador de {@code certificado_correlativo}, que es infraestructura de numeracion y no
+ * un documento entregable (mismo criterio que {@code licencia_correlativo} en V37).
  *
  * <p><b>El numero repetido y la clave repetida los rechaza el indice, no un {@code if}.</b> Se
  * inserta y se traducen los dos choques —{@code certificado_numero_uq} y {@code

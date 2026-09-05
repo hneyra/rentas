@@ -98,7 +98,7 @@ class ProcedenciaDeLasProyeccionesTest {
         //
         // `catastro_evento_muerto` entra con `V12` (C-8) y NO es una proyeccion: es lo contrario,
         // el registro de los hechos que NO se pudieron proyectar. Aparece aqui porque el criterio
-        // es el PRIVILEGIO —`sgtm_app` lee y no escribe, el ingestor escribe— y ese criterio es
+        // es el PRIVILEGIO —`kamayuk_app` lee y no escribe, el ingestor escribe— y ese criterio es
         // justo lo que hace que una tabla nueva entre sola en el censo en vez de olvidarse.
         //
         // Lleva las tres columnas de procedencia igual, asi que la prueba de abajo la cubre; lo
@@ -106,7 +106,7 @@ class ProcedenciaDeLasProyeccionesTest {
         // eventos que nunca entraron en el.
         assertThat(proyecciones())
                 .as(
-                        "toda tabla que `sgtm_app` lee y no escribe, y que escribe un rol ingestor:"
+                        "toda tabla que `kamayuk_app` lee y no escribe, y que escribe un rol ingestor:"
                                 + " o es una proyeccion alimentada por otro sistema, o es el"
                                 + " registro de lo que de el no se pudo aplicar")
                 .containsExactlyInAnyOrder(
@@ -226,8 +226,8 @@ class ProcedenciaDeLasProyeccionesTest {
                                   JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
                                  WHERE n.nspname = 'public'
                                    AND c.relkind = 'r'
-                                   AND     has_table_privilege('sgtm_app', c.oid, 'SELECT')
-                                   AND NOT has_table_privilege('sgtm_app', c.oid, 'INSERT')
+                                   AND     has_table_privilege('kamayuk_app', c.oid, 'SELECT')
+                                   AND NOT has_table_privilege('kamayuk_app', c.oid, 'INSERT')
                                    AND EXISTS (
                                          SELECT 1
                                            FROM pg_catalog.pg_roles r

@@ -23,8 +23,8 @@ import tools.jackson.databind.json.JsonMapper;
  * <h2>Un SEGUNDO pool, con otro rol, y por eso todo esto esta aqui y no en anotaciones</h2>
  *
  * <p>El ingestor escribe {@code predio_ref}, {@code ficha_ref}, {@code valuacion_predio} y {@code
- * valuacion_corrida}, y `V4` y `V5` no le dan a {@code sgtm_app} mas que {@code SELECT} sobre las
- * cuatro. Quien las escribe es {@code rol_ingestor_catastro}. Asi que esto construye:
+ * valuacion_corrida}, y `V4` y `V5` no le dan a {@code kamayuk_app} mas que {@code SELECT} sobre
+ * las cuatro. Quien las escribe es {@code rol_ingestor_catastro}. Asi que esto construye:
  *
  * <ol>
  *   <li>un pool propio con ESA credencial, con {@link PoolDeUnRol}: lleva el mismo guardia que el

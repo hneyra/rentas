@@ -64,10 +64,10 @@ import tools.jackson.databind.json.JsonMapper;
  * incondicional dejaria pasar la mutacion de quitarle el {@code @Transactional}, que es el modo de
  * fallo que #486 existe para impedir.
  *
- * <p>La conexion es la de {@code sgtm_app}: un superusuario omite RLS <b>incluso con {@code FORCE
- * ROW LEVEL SECURITY}</b>, y con {@code sgtm_owner} no basta —FORCE lo sujeta a la politica igual
- * (#537, #545, #601)—. Por eso la municipalidad vecina siembra a proposito su propia acta: si la
- * conexion omitiera RLS, saldria en la lista y en el total.
+ * <p>La conexion es la de {@code kamayuk_app}: un superusuario omite RLS <b>incluso con {@code
+ * FORCE ROW LEVEL SECURITY}</b>, y con {@code kamayuk_owner} no basta —FORCE lo sujeta a la
+ * politica igual (#537, #545, #601)—. Por eso la municipalidad vecina siembra a proposito su propia
+ * acta: si la conexion omitiera RLS, saldria en la lista y en el total.
  */
 @DisplayName("#599 — El listado de actas, de HTTP a PostgreSQL")
 class ListadoDeActasFronteraTest {
@@ -239,13 +239,13 @@ class ListadoDeActasFronteraTest {
     class Aislamiento {
 
         @Test
-        @DisplayName("la conexion es la de sgtm_app, no la del dueno ni la del superusuario")
-        void seConectaComoSgtmApp() {
+        @DisplayName("la conexion es la de kamayuk_app, no la del dueno ni la del superusuario")
+        void seConectaComoKamayukApp() {
             assertThat(jdbc.sql("SELECT current_user").query(String.class).single())
                     .as(
                             "con superusuario RLS se omite —incluso con FORCE ROW LEVEL SECURITY—"
                                     + " y todo lo de este archivo pasaria sin verificar nada. Con"
-                                    + " sgtm_owner NO basta: FORCE lo sujeta a la politica igual,"
+                                    + " kamayuk_owner NO basta: FORCE lo sujeta a la politica igual,"
                                     + " asi que la rotura clasica escrita con el dueno sale VERDE"
                                     + " (#537, #545, #601)")
                     .isEqualTo(BaseDeDatosDePrueba.APP);

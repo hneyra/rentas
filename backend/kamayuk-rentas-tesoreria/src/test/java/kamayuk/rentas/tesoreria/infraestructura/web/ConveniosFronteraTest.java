@@ -88,7 +88,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 /**
  * #547 — Lo que le falta publicar al fraccionamiento se dice con un 422 que lo nombra, de HTTP a
- * PostgreSQL y como {@code sgtm_app}.
+ * PostgreSQL y como {@code kamayuk_app}.
  *
  * <h2>Por que va hasta la base</h2>
  *
@@ -112,9 +112,9 @@ import tools.jackson.databind.json.JsonMapper;
  * CondicionesParametrizadas.aLaFechaDe} usa para resolver el conjunto. La deuda, en cambio, es
  * siempre del ejercicio 2026: el libro solo tiene declaradas las particiones de 2026 y 2027.
  *
- * <p>La conexion es la de {@code sgtm_app}. Un superusuario omite RLS incluso con {@code FORCE ROW
- * LEVEL SECURITY}, asi que una prueba escrita sobre el no leeria las politicas que aqui deciden que
- * conjunto se ve.
+ * <p>La conexion es la de {@code kamayuk_app}. Un superusuario omite RLS incluso con {@code FORCE
+ * ROW LEVEL SECURITY}, asi que una prueba escrita sobre el no leeria las politicas que aqui deciden
+ * que conjunto se ve.
  */
 /*
  * #633 — Y el TERCER estado, el que se escapo de #540 y de #547.
@@ -847,7 +847,7 @@ class ConveniosFronteraTest {
         return cuerpo.substring(desde, cuerpo.indexOf('"', desde));
     }
 
-    /** Cuantas filas de `convenio` llevan esa clave. Se lee como `sgtm_app`, con su RLS. */
+    /** Cuantas filas de `convenio` llevan esa clave. Se lee como `kamayuk_app`, con su RLS. */
     private static long conveniosConLaClave(String clave) {
         return enTransaccion(
                 () ->

@@ -11,8 +11,8 @@ import org.jspecify.annotations.Nullable;
 /**
  * Lo que le paso a una autorizacion de anuncio (#51, V45 §2).
  *
- * <p><b>Solo se agrega.</b> V45 le concede a {@code sgtm_app} nada mas que {@code SELECT} e {@code
- * INSERT} sobre {@code anuncio_movimiento}, y el escaner de fuentes rechaza un {@code UPDATE
+ * <p><b>Solo se agrega.</b> V45 le concede a {@code kamayuk_app} nada mas que {@code SELECT} e
+ * {@code INSERT} sobre {@code anuncio_movimiento}, y el escaner de fuentes rechaza un {@code UPDATE
  * anuncio_movimiento SET} antes de que llegue a ejecutarse.
  *
  * <h2>El movimiento es donde vive la garantia de «un cargo, una vez»</h2>

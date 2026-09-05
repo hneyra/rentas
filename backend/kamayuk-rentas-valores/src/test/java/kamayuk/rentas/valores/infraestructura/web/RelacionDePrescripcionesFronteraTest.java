@@ -64,10 +64,10 @@ import tools.jackson.databind.json.JsonMapper;
  * comprobacion que muerde es la que <b>compara las filas devueltas contra el conjunto sembrado</b>
  * (#425, #541).
  *
- * <p>Conectada como {@code sgtm_app} —quien sufre la politica RLS—, nunca como {@code sgtm_owner}:
- * con {@code FORCE ROW LEVEL SECURITY} el dueno tambien queda sujeto a la politica, de modo que esa
- * mutacion pasaria en verde sin demostrar nada (#537, #545, #601, #639). Quien la omite es el
- * superusuario del cluster.
+ * <p>Conectada como {@code kamayuk_app} —quien sufre la politica RLS—, nunca como {@code
+ * kamayuk_owner}: con {@code FORCE ROW LEVEL SECURITY} el dueno tambien queda sujeto a la politica,
+ * de modo que esa mutacion pasaria en verde sin demostrar nada (#537, #545, #601, #639). Quien la
+ * omite es el superusuario del cluster.
  */
 @DisplayName("#674 — GET /coactiva/prescripcion, de HTTP a PostgreSQL")
 class RelacionDePrescripcionesFronteraTest {
@@ -312,11 +312,11 @@ class RelacionDePrescripcionesFronteraTest {
     }
 
     @Test
-    @DisplayName("se conecta como sgtm_app, que es quien sufre la politica RLS")
-    void seConectaComoSgtmApp() {
+    @DisplayName("se conecta como kamayuk_app, que es quien sufre la politica RLS")
+    void seConectaComoKamayukApp() {
         // Mira el POOL que usa el controlador, y no una conexion aparte: es lo unico que impide
         // que un cambio de fixture devuelva la conexion sin que nadie lo note (#545). Con
-        // `sgtm_owner` la mutacion de aislamiento pasaria en verde —FORCE ROW LEVEL SECURITY
+        // `kamayuk_owner` la mutacion de aislamiento pasaria en verde —FORCE ROW LEVEL SECURITY
         // sujeta tambien al dueno (#537)— y con el superusuario del cluster la politica se omite
         // entera; esta linea caza los dos casos.
         assertThat(jdbc.sql("SELECT current_user").query(String.class).single())

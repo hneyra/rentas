@@ -93,7 +93,8 @@ import org.springframework.transaction.interceptor.TransactionInterceptor;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * #40 — El expediente coactivo contra PostgreSQL de verdad (V33), conectado como {@code sgtm_app}.
+ * #40 — El expediente coactivo contra PostgreSQL de verdad (V33), conectado como {@code
+ * kamayuk_app}.
  *
  * <p>Lo que esta clase defiende y ninguna prueba con dobles puede:
  *
@@ -105,8 +106,8 @@ import org.springframework.transaction.support.TransactionTemplate;
  *   <li><b>Que un valor no pueda estar en dos expedientes, bajo concurrencia real.</b> Un doble que
  *       consulta antes de insertar pasa la prueba y falla en produccion: diez peticiones
  *       simultaneas pasan las diez por el {@code if}. Aqui se lanzan diez hilos a la vez.
- *   <li><b>Que {@code sgtm_app} no tenga el privilegio de actualizar el expediente, sus valores ni
- *       su historial.</b> No es una convencion: es un {@code REVOKE} de V33, y se comprueba
+ *   <li><b>Que {@code kamayuk_app} no tenga el privilegio de actualizar el expediente, sus valores
+ *       ni su historial.</b> No es una convencion: es un {@code REVOKE} de V33, y se comprueba
  *       intentandolo por SQL directo.
  *   <li><b>Que el estado derivado en SQL y el derivado en Java digan lo mismo.</b> Son dos
  *       escrituras de la misma regla —{@code ESTADO_DERIVADO} en el repositorio y {@code
@@ -736,7 +737,7 @@ class ExpedienteCoactivoJdbcTest {
     class Privilegios {
 
         @Test
-        @DisplayName("sgtm_app no puede actualizar el historial: el privilegio no existe")
+        @DisplayName("kamayuk_app no puede actualizar el historial: el privilegio no existe")
         void noSePuedeActualizarElHistorial() {
             long contribuyente = contribuyenteConDeuda("P-0001");
             Valor valor = emitir(contribuyente, "OP-2026-P00001");

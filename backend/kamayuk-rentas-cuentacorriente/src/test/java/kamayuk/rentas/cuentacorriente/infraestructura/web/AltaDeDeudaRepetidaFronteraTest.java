@@ -90,7 +90,7 @@ import tools.jackson.databind.json.JsonMapper;
  * <h2>Por que va hasta la base, y como se mide la carrera</h2>
  *
  * <p>Porque la garantia es {@code asiento_alta_unica_uq} (V75) y no un {@code if} de Java: entre
- * leer y escribir cabe otra peticion. Y porque la conexion es la de {@code sgtm_app} —sin
+ * leer y escribir cabe otra peticion. Y porque la conexion es la de {@code kamayuk_app} —sin
  * transaccion no hay {@code SET LOCAL} y la politica RLS revienta (#486)—, de modo que el camino
  * que se recorre aqui es el de produccion entero.
  *
@@ -532,8 +532,8 @@ class AltaDeDeudaRepetidaFronteraTest {
      * dijera.
      */
     @Test
-    @DisplayName("la prueba se conecta como sgtm_app, no como el dueno ni como el superusuario")
-    void seConectaComoSgtmApp() {
+    @DisplayName("la prueba se conecta como kamayuk_app, no como el dueno ni como el superusuario")
+    void seConectaComoKamayukApp() {
         String usuario =
                 transaccion.execute(
                         estado -> jdbc.sql("SELECT current_user").query(String.class).single());

@@ -84,7 +84,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 /**
  * #44 — La licencia de funcionamiento contra PostgreSQL de verdad (V37), conectada como {@code
- * sgtm_app}.
+ * kamayuk_app}.
  *
  * <p>Lo que esta clase defiende y ninguna prueba con dobles puede:
  *
@@ -98,7 +98,7 @@ import tools.jackson.databind.json.JsonMapper;
  *       RecibosDeTramite}. Que un recibo anulado no sirva se comprueba anulandolo de verdad en
  *       {@code recibo_movimiento}, que es donde la anulacion vive desde #34; un doble tendria que
  *       fingir eso mismo y solo probaria que finge bien.
- *   <li><b>Que {@code sgtm_app} no pueda editar ni borrar una licencia</b> (AC 2). Es el {@code
+ *   <li><b>Que {@code kamayuk_app} no pueda editar ni borrar una licencia</b> (AC 2). Es el {@code
  *       REVOKE} de V37, y se comprueba intentandolo por SQL directo, que es como se salta cualquier
  *       comprobacion escrita en Java.
  *   <li><b>Que la base impida una segunda cancelacion bajo concurrencia real</b>. Un doble que
@@ -540,7 +540,7 @@ class LicenciaDeFuncionamientoJdbcTest {
     class LaBase {
 
         @Test
-        @DisplayName("sgtm_app no puede editar ni borrar una licencia (REVOKE de V37)")
+        @DisplayName("kamayuk_app no puede editar ni borrar una licencia (REVOKE de V37)")
         void laLicenciaNoSeEdita() {
             giroDelCatalogo("47411", "COMPUTADORAS");
             long titular = crearContribuyente();

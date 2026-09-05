@@ -80,9 +80,9 @@ import tools.jackson.databind.json.JsonMapper;
  * <h2>Por qué hasta la base</h2>
  *
  * <p>Porque la diferencia entre «no existe» y «existe y está vacío» la decide una consulta, y con
- * un doble la escribiría la propia prueba. La conexión es la de {@code sgtm_app}: un superusuario
- * omite RLS incluso con {@code FORCE ROW LEVEL SECURITY} (DAT-01 §0, primer hallazgo), así que el
- * programa de la municipalidad vecina «existiría» y el 404 no se podría demostrar.
+ * un doble la escribiría la propia prueba. La conexión es la de {@code kamayuk_app}: un
+ * superusuario omite RLS incluso con {@code FORCE ROW LEVEL SECURITY} (DAT-01 §0, primer hallazgo),
+ * así que el programa de la municipalidad vecina «existiría» y el 404 no se podría demostrar.
  *
  * <p>Los casos de uso se envuelven con {@link AnnotationTransactionAttributeSource}, o sea
  * <b>obedeciendo a la anotación</b> como haría el contenedor: un {@code TransactionTemplate}

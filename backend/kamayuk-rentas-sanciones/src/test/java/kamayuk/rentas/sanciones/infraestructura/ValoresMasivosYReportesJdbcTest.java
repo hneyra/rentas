@@ -141,7 +141,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 /**
  * #53 — Valores masivos de papeletas, constancias, padrones y resúmenes contra PostgreSQL de verdad
- * (V47), conectado como {@code sgtm_app}.
+ * (V47), conectado como {@code kamayuk_app}.
  *
  * <p>Lo que esta clase defiende y ninguna prueba con dobles puede:
  *
@@ -164,7 +164,7 @@ import tools.jackson.databind.json.JsonMapper;
  *       sobre la misma papeleta: una emite y nueve se deshacen enteras. La garantía es {@code
  *       papeleta_valor_unico_uq}, no un {@code if}.
  *   <li><b>AC 7 — RLS.</b> Desde la municipalidad vecina la corrida y la constancia no existen; y
- *       {@code sgtm_app} no puede editar ninguna de las dos.
+ *       {@code kamayuk_app} no puede editar ninguna de las dos.
  * </ul>
  */
 @DisplayName("#53 — Valores masivos, constancias, padrones y resumenes contra PostgreSQL")
@@ -1150,7 +1150,7 @@ class ValoresMasivosYReportesJdbcTest {
         }
 
         @Test
-        @DisplayName("sgtm_app no puede editar el criterio de una corrida ni una constancia")
+        @DisplayName("kamayuk_app no puede editar el criterio de una corrida ni una constancia")
         void noSePuedeEditar() {
             Papeleta papeleta = papeletaExigible("rls2");
             CorridaDeValores corrida = corridaDe(papeleta);

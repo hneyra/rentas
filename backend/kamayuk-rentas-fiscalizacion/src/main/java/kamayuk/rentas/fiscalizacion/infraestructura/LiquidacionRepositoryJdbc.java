@@ -29,7 +29,7 @@ import org.springframework.stereotype.Repository;
  * Las liquidaciones de fiscalización contra PostgreSQL.
  *
  * <p>Ninguna consulta filtra por {@code municipalidad_id} —lo hace la política RLS— y <b>no hay ni
- * un {@code UPDATE} ni un {@code DELETE}</b>: V39 no le concede a {@code sgtm_app} el privilegio
+ * un {@code UPDATE} ni un {@code DELETE}</b>: V39 no le concede a {@code kamayuk_app} el privilegio
  * sobre las tres tablas de la liquidación, y el escáner del código fuente las incluye en {@code
  * TABLAS_PROTEGIDAS} y {@code TABLAS_INMUTABLES}. La única excepción es {@code
  * liquidacion_correlativo}, que es infraestructura de numeración y no un acto del procedimiento.

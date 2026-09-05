@@ -38,7 +38,7 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * Las cuotas de arbitrio contra PostgreSQL de verdad, conectado como {@code sgtm_app} (#31).
+ * Las cuotas de arbitrio contra PostgreSQL de verdad, conectado como {@code kamayuk_app} (#31).
  *
  * <p>La garantia de idempotencia que exige el AC de #31 —"reejecutar el proceso no duplica cargos"—
  * es el {@code UNIQUE} de V23, no la comprobacion en Java: la prueba de {@code

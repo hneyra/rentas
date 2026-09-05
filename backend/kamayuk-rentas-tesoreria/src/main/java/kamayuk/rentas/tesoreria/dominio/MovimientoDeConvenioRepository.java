@@ -9,7 +9,7 @@ import org.jspecify.annotations.Nullable;
  * filtra la politica RLS.
  *
  * <p><b>No hay {@code actualizar} ni {@code borrar}</b>, y no es un olvido: V31 le concede a {@code
- * sgtm_app} solo {@code SELECT} e {@code INSERT}. Lo que le pasa a un convenio se agrega.
+ * kamayuk_app} solo {@code SELECT} e {@code INSERT}. Lo que le pasa a un convenio se agrega.
  */
 public interface MovimientoDeConvenioRepository {
 

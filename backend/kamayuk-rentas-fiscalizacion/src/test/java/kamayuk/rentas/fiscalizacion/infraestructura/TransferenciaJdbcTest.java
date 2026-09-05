@@ -79,9 +79,9 @@ import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * La transferencia a rentas contra PostgreSQL de verdad, conectado como {@code sgtm_app} (#52).
+ * La transferencia a rentas contra PostgreSQL de verdad, conectado como {@code kamayuk_app} (#52).
  *
- * <p>Conectado como {@code sgtm_app} y no como el superusuario que Testcontainers entrega por
+ * <p>Conectado como {@code kamayuk_app} y no como el superusuario que Testcontainers entrega por
  * omision: un superusuario <b>omite RLS incluso con {@code FORCE ROW LEVEL SECURITY}</b>, y una
  * prueba escrita sobre esa conexion pasa en verde sin verificar nada (CAL-01 §3.2).
  *
@@ -574,7 +574,7 @@ class TransferenciaJdbcTest {
     class DeLaInmutabilidadYElAislamiento {
 
         @Test
-        @DisplayName("sgtm_app no puede actualizar ni borrar una resolucion de determinacion")
+        @DisplayName("kamayuk_app no puede actualizar ni borrar una resolucion de determinacion")
         void nadieLaEdita() {
             Escenario escenario = sembrar(municipalidadA, Dinero.de("450.00"));
             TransferirARentas.Transferencia hecha = transferir(escenario);
@@ -728,7 +728,7 @@ class TransferenciaJdbcTest {
                                 .single());
     }
 
-    /** El SQLSTATE del error, ejecutando como {@code sgtm_app} con contexto de tenant. */
+    /** El SQLSTATE del error, ejecutando como {@code kamayuk_app} con contexto de tenant. */
     private static String errorDe(String sql) {
         try (Connection app = base.conexion(BaseDeDatosDePrueba.APP)) {
             ContextoDeTenant.fijar(app, municipalidadA);

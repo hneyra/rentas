@@ -15,7 +15,7 @@ import kamayuk.rentas.dominio.Ejercicio;
  * <p>Ningun metodo recibe la municipalidad (regla 2): la filtra la politica RLS.
  *
  * <p><b>No hay {@code actualizar} ni {@code borrar}</b>, y no es un olvido: V33 le retira a {@code
- * sgtm_app} el privilegio de {@code UPDATE} sobre {@code expediente_coactivo} y sobre {@code
+ * kamayuk_app} el privilegio de {@code UPDATE} sobre {@code expediente_coactivo} y sobre {@code
  * expediente_valor}, y V7 nunca le dio {@code DELETE}. Lo que le pasa a un expediente se agrega, en
  * {@code expediente_movimiento}.
  */

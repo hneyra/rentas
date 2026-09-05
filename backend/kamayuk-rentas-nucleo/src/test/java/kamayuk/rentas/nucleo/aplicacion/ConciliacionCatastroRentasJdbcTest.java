@@ -56,7 +56,7 @@ import org.springframework.transaction.interceptor.TransactionInterceptor;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * #344 — La conciliacion catastro-rentas contra PostgreSQL de verdad, como {@code sgtm_app}
+ * #344 — La conciliacion catastro-rentas contra PostgreSQL de verdad, como {@code kamayuk_app}
  * (ADR-0015).
  *
  * <p>Lo que esta clase defiende, y ninguna prueba con dobles puede:
@@ -472,7 +472,7 @@ class ConciliacionCatastroRentasJdbcTest {
             TenantContext.fijar(new MunicipalidadId(municipalidadB));
 
             assertThat(consulta.todas(porCodigo(tramo), E2026, HOY, unaPagina()).contenido())
-                    .as("la prueba corre como sgtm_app, que es a quien la politica RLS aplica")
+                    .as("la prueba corre como kamayuk_app, que es a quien la politica RLS aplica")
                     .isEmpty();
             assertThat(
                             consulta.noConciliadas(porCodigo(tramo), E2026, HOY, unaPagina())

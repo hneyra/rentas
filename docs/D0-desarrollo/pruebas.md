@@ -39,7 +39,7 @@ prueba escrita sobre la conexión que Testcontainers entrega por omisión pasa e
 verificar nada**. Aquí se demuestra en vez de afirmarse: con el mismo contexto fijado, el
 superusuario ve las dos municipalidades y el rol de la aplicación, una.
 
-Y hay una segunda trampa, medida y que conviene tener escrita: **conectar como `sgtm_owner` no
+Y hay una segunda trampa, medida y que conviene tener escrita: **conectar como `kamayuk_owner` no
 sirve para demostrar la fuga.** Con `FORCE ROW LEVEL SECURITY` el dueño de la tabla también queda
 sujeto a la política, así que esa rotura pasa en **verde** y no demuestra nada. La que hay que
 escribir es la del superusuario del clúster.

@@ -14,12 +14,12 @@
 --  inalcanzable**. `C-12` fue a arreglarlo y lo que midio es que no se puede
 --  arreglar sin pagar un precio que no vale la pena. La medida, contra
 --  PostgreSQL 16.15, con 30 000 contribuyentes en cada una de dos
---  municipalidades, conectado como `sgtm_app` y con RLS activa:
+--  municipalidades, conectado como `kamayuk_app` y con RLS activa:
 --
 --                         | similarity(...) >= 0.30  |  el operador %
 --                         | (lo que la app pregunta) | (lo que el indice sabe)
 --    ---------------------+--------------------------+------------------------
---     sgtm_app, RLS activa| Bitmap Index Scan sobre  | Bitmap Index Scan sobre
+--     kamayuk_app, RLS activa| Bitmap Index Scan sobre  | Bitmap Index Scan sobre
 --                         | contribuyente_pk         | contribuyente_pk
 --                         | 1 109 paginas, 95,9 ms   | 1 109 paginas, 94,9 ms
 --                         | 29 243 filas al Filter   | 29 243 filas al Filter
@@ -49,7 +49,7 @@
 --  ------------------------------------------------------------------
 --  * **La de #565 / `V66` —una columna generada—: NO SIRVE aqui.** Se midio:
 --    con `nombre_busqueda` generada y un GIN sobre la COLUMNA, la consulta como
---    `sgtm_app` sale en `Seq Scan`. Alli lo que no era *leakproof* era la
+--    `kamayuk_app` sale en `Seq Scan`. Alli lo que no era *leakproof* era la
 --    FUNCION —y la columna generada la saca de la expresion—; aqui lo que no lo
 --    es es el OPERADOR, y ese se queda.
 --  * **La de #536 —sustituir el operador por desigualdades—: no existe.** Del

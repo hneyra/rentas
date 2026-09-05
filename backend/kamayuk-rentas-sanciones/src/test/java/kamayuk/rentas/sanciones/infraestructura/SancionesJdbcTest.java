@@ -109,7 +109,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 /**
  * #50 — Descargos, internamiento vehicular y resoluciones de gerencia contra PostgreSQL de verdad
- * (V41), conectado como {@code sgtm_app}.
+ * (V41), conectado como {@code kamayuk_app}.
  *
  * <p>Lo que esta clase defiende y ninguna prueba con dobles puede:
  *
@@ -132,7 +132,7 @@ import tools.jackson.databind.json.JsonMapper;
  *   <li><b>Que dos peticiones simultáneas no dicten dos ordinarias.</b> Un doble que consulta antes
  *       de insertar pasa la prueba y falla en producción: diez peticiones a la vez pasan las diez
  *       por el {@code if}. Aquí se lanzan diez hilos.
- *   <li><b>Que {@code sgtm_app} no pueda editar una resolución ni un internamiento.</b> Es el
+ *   <li><b>Que {@code kamayuk_app} no pueda editar una resolución ni un internamiento.</b> Es el
  *       {@code REVOKE} de V41, y se comprueba intentándolo.
  *   <li><b>Que RLS aísle</b>: desde otra municipalidad, la resolución no existe.
  * </ul>
@@ -1017,7 +1017,7 @@ class SancionesJdbcTest {
     class PrivilegiosYAislamiento {
 
         @Test
-        @DisplayName("sgtm_app no puede editar ni borrar una resolucion de gerencia")
+        @DisplayName("kamayuk_app no puede editar ni borrar una resolucion de gerencia")
         void laResolucionNoSeEdita() {
             Papeleta papeleta = papeletaDeTransito("E01");
             ResolucionDeGerencia ordinaria =
@@ -1051,7 +1051,7 @@ class SancionesJdbcTest {
         }
 
         @Test
-        @DisplayName("sgtm_app no puede rellenar la salida encima del ingreso")
+        @DisplayName("kamayuk_app no puede rellenar la salida encima del ingreso")
         void elInternamientoNoSeEdita() {
             Papeleta papeleta = papeletaDeTransito("E02");
             RegistrarInternamiento.Internado internado = internarVehiculo(papeleta, "T2G-601");
