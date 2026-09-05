@@ -50,7 +50,12 @@ class ModulosTest {
                         "licencias",
                         "seguridad",
                         "cuentacorriente",
-                        "rentas",
+                        // El contexto acotado `rentas`, que se llama `nucleo` desde R-N:
+                        // «kamayuk-rentas-rentas» repetia el nombre del sistema y la direccion
+                        // pidio quitarlo. El identificador que Modulith detecta es el ULTIMO
+                        // segmento del paquete, asi que renombrar el paquete lo renombra aqui — y
+                        // esta lista es lo que lo puso en rojo al hacerlo.
+                        "nucleo",
                         "sanciones",
                         // #56: el panel de recaudacion. No es un contexto acotado —ARQ-01 §3
                         // fija doce— pero si es un modulo para Modulith, y eso es lo que

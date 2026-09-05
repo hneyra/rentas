@@ -28,7 +28,7 @@ const CASOS = [
   {
     nombre: 'cierra un issue, toca backend y NO deja fila',
     cuerpo: 'Cierra #711.\n\nLo de siempre.',
-    archivos: ['backend/kamayuk-rentas-rentas/src/main/java/kamayuk/rentas/rentas/Algo.java'],
+    archivos: ['backend/kamayuk-rentas-nucleo/src/main/java/kamayuk/rentas/nucleo/Algo.java'],
     anadido: '',
     esperado: 'rojo',
     dice: '#711',
@@ -52,7 +52,7 @@ const CASOS = [
   {
     nombre: 'cierra un issue, toca backend y SI deja su fila',
     cuerpo: 'Cierra #711.',
-    archivos: ['backend/kamayuk-rentas-rentas/src/main/java/kamayuk/rentas/rentas/Algo.java'],
+    archivos: ['backend/kamayuk-rentas-nucleo/src/main/java/kamayuk/rentas/nucleo/Algo.java'],
     anadido: `+${FILA}`,
     esperado: 'verde',
   },
@@ -61,7 +61,7 @@ const CASOS = [
     cuerpo: 'Cierra #711.',
     archivos: [
       'docs/00-gobierno/algo.md',
-      'backend/kamayuk-rentas-rentas/src/test/java/kamayuk/rentas/rentas/AlgoTest.java',
+      'backend/kamayuk-rentas-nucleo/src/test/java/kamayuk/rentas/nucleo/AlgoTest.java',
     ],
     anadido: '',
     esperado: 'verde',
@@ -69,7 +69,7 @@ const CASOS = [
   {
     nombre: 'toca backend y no declara que cierre nada',
     cuerpo: 'Un arreglo suelto, sin issue.',
-    archivos: ['backend/kamayuk-rentas-rentas/src/main/java/kamayuk/rentas/rentas/Algo.java'],
+    archivos: ['backend/kamayuk-rentas-nucleo/src/main/java/kamayuk/rentas/nucleo/Algo.java'],
     anadido: '',
     esperado: 'verde',
   },

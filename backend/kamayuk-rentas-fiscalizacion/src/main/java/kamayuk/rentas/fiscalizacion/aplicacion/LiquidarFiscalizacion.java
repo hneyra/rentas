@@ -28,9 +28,9 @@ import kamayuk.rentas.fiscalizacion.dominio.MovimientoDeLiquidacion;
 import kamayuk.rentas.fiscalizacion.dominio.MovimientoDeLiquidacionRepository;
 import kamayuk.rentas.fiscalizacion.dominio.PlantillaDeNumeroDeLiquidacion;
 import kamayuk.rentas.fiscalizacion.dominio.TipoDeFiscalizacion;
+import kamayuk.rentas.nucleo.DeclaracionDelEjercicio;
+import kamayuk.rentas.nucleo.DeclaracionesDelEjercicio;
 import kamayuk.rentas.parametros.LectorDeParametros;
-import kamayuk.rentas.rentas.DeclaracionDelEjercicio;
-import kamayuk.rentas.rentas.DeclaracionesDelEjercicio;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 

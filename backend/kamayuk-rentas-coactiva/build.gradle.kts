@@ -49,7 +49,7 @@ dependencies {
     //    obligado, para la consulta de deudas en beneficio (RF-107). Solo el
     //    registro: el efecto sobre el importe es D-02b (#191) y no se calcula.
     implementation(project(":kamayuk-rentas-tesoreria"))
-    implementation(project(":kamayuk-rentas-rentas"))
+    implementation(project(":kamayuk-rentas-nucleo"))
 
     // Las pruebas de repositorio y del ciclo completo corren contra PostgreSQL de
     // verdad, conectadas como sgtm_app y no como el superusuario que entrega

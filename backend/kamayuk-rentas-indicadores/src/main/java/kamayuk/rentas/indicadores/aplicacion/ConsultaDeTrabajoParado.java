@@ -11,7 +11,7 @@ import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.indicadores.dominio.FrenteDeTrabajo;
 import kamayuk.rentas.indicadores.dominio.FrenteParado;
 import kamayuk.rentas.indicadores.dominio.TrabajoParado;
-import kamayuk.rentas.rentas.PrediosSinConciliar;
+import kamayuk.rentas.nucleo.PrediosSinConciliar;
 import kamayuk.rentas.sanciones.PapeletasSinNotificar;
 import kamayuk.rentas.valores.ValoresSinNotificar;
 import org.springframework.stereotype.Service;

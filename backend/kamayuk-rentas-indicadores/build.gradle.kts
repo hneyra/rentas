@@ -50,7 +50,7 @@ dependencies {
     // #564, el mismo que publica GET /catastro/fichas/conciliacion/resumen. El
     // frente es de Catastro y la dependencia es de `rentas` porque el derivado
     // sale de `declaracion_jurada`, que es de rentas (ADR-0015).
-    implementation(project(":kamayuk-rentas-rentas"))
+    implementation(project(":kamayuk-rentas-nucleo"))
 
     // MockMvc para el endpoint: transporte sin base de datos. El panel no persiste
     // nada, asi que no hay una sola prueba contra PostgreSQL en este modulo; las que

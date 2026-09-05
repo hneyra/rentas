@@ -23,8 +23,8 @@ import kamayuk.rentas.fiscalizacion.dominio.Hallazgo;
 import kamayuk.rentas.fiscalizacion.dominio.LineaDeLiquidacion;
 import kamayuk.rentas.fiscalizacion.dominio.Liquidacion;
 import kamayuk.rentas.fiscalizacion.dominio.TipoDeFiscalizacion;
+import kamayuk.rentas.nucleo.DeclaracionDelEjercicio;
 import kamayuk.rentas.parametros.LectorDeParametros;
-import kamayuk.rentas.rentas.DeclaracionDelEjercicio;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -257,7 +257,7 @@ class LiquidarYReliquidarTest {
                     .containsExactlyInAnyOrder("fichaVigenteEn", "areaDeLaVersion");
             assertThat(metodosDe(kamayuk.rentas.catastro.LectorDeCaracteristicas.class))
                     .containsExactly("de");
-            assertThat(metodosDe(kamayuk.rentas.rentas.DeclaracionesDelEjercicio.class))
+            assertThat(metodosDe(kamayuk.rentas.nucleo.DeclaracionesDelEjercicio.class))
                     .containsExactly("dePredios");
 
             // Con #52 la afirmacion se afina, y esta linea es la que la afina: `catastro` publica

@@ -52,6 +52,14 @@ rebautizar el contexto `rentas` a `determinacion` para que el módulo suene mejo
 exactamente eso. Se escribe el nombre repetido y se anota aquí para que nadie lo lea como un
 error de copiar y pegar.
 
+> **R-N (2026-09-05) los renombró: los tres son hoy `kamayuk-<sistema>-nucleo`.** Lo que aquí se
+> decidió —«no renombrar nada de Java ni de Gradle durante el corte»— valía **durante** el corte, y
+> el corte terminó en P5E; la dirección pidió después quitar la repetición. El patrón D-N1 sigue
+> intacto, porque lo que cambió no es el patrón sino el nombre del contexto: `nucleo`, y no `core`,
+> porque el nombre de un contexto acotado es dominio y el dominio va en español. Lo de arriba se
+> deja como se escribió. El porqué, lo que costó y las dos guardas fosilizadas que destapó están en
+> `infrastructure/docs/00-gobierno/R-N-los-tres-modulos-repetidos.md`.
+
 **Kamayuk es el nombre del producto, no el del repositorio**, y `SGTM` deja de nombrar un
 repositorio para nombrar lo que la municipalidad compra (ADR-0029). Ese cambio de vocabulario
 **no está aplicado en ninguna parte del árbol de hoy** y no se aplica aquí.
@@ -1390,7 +1398,7 @@ a lo largo del documento. **No queda ninguna abierta de las que este inventario 
 
 | # | Decisión | Consecuencia mecánica que la decisión no cubre, y hay que escribir al ejecutarla |
 |---|---|---|
-| **✅ D-N1** | El patrón de módulo Gradle es `kamayuk-<sistema>-<contexto>` | Tres módulos donde sistema y contexto coinciden dan nombre repetido —`kamayuk-catastro-catastro`, `kamayuk-rentas-rentas`, `kamayuk-caja-caja`— y **no se renombra ninguno** (§1.1) |
+| **✅ D-N1** | El patrón de módulo Gradle es `kamayuk-<sistema>-<contexto>` | Tres módulos donde sistema y contexto coinciden dan nombre repetido —`kamayuk-catastro-catastro`, `kamayuk-rentas-rentas`, `kamayuk-caja-caja`— y **no se renombra ninguno** (§1.1). **R-N (2026-09-05) revirtió esta consecuencia**: los tres se llaman `kamayuk-<sistema>-nucleo`, y el patrón `kamayuk-<sistema>-<contexto>` sigue intacto porque el contexto pasó a llamarse `nucleo` |
 | **✅ D-N2** | La capa de documentos y la de auditoría son **un artefacto aparte** de `comun-plataforma` | Los dos paquetes van **juntos** en él, porque emitir audita y `RegimenDeLaInstalacionJdbc` decide si el papel sale marcado. Cómo se llame y quién lo publique sigue siendo **D-23** (§1.1) |
 | **✅ D-N3** | Confirmado: `indicadores` ve **seis** contextos, no dos. ARQ-01 §2 y §3.13 hay que corregirlos | Lo que hay que arreglar no es el número: la garantía era la revisión y no el build. Y con `AvanceDeCaja` en `caja`, el invariante «ninguna cifra del panel se calcula en el panel» se vuelve más difícil, no menos (§1.1) |
 | **✅ D-N4** | Las **tres** tablas de valuación **nacionales** van a `normativa`; **`arancel` se queda en `catastro`**, porque su fuente es cartográfica. Cada sistema guarda copia local de lo nacional por el snapshot sellado de ADR-0025 §1 | La FK `arancel → via` **deja de cruzar**, y `normativa` pasa a no tener ninguna que salga. En su lugar cruza `arancel → conjunto_parametros` (§1.2, §2.8) |

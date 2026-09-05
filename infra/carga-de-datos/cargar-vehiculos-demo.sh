@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Siembra un padron vehicular FICTICIO en una instalacion de demostracion, corriendo el
-# proceso batch CargarVehiculosDeDemostracion (kamayuk-rentas-rentas) como un Job de un solo uso.
+# proceso batch CargarVehiculosDeDemostracion (kamayuk-rentas-nucleo) como un Job de un solo uso.
 #
 # Misma guarda que cargar-fichas-demo.sh: el proceso pregunta por municipalidad.es_demostracion
 # antes de leer una sola fila, y si la municipalidad no esta marcada NO ESCRIBE NADA.

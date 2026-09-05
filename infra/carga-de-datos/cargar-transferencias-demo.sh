@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Siembra transferencias FICTICIAS de predios y vehiculos en una instalacion de demostracion,
-# corriendo el proceso batch CargarTransferenciasDeDemostracion (kamayuk-rentas-rentas) como un
+# corriendo el proceso batch CargarTransferenciasDeDemostracion (kamayuk-rentas-nucleo) como un
 # Job de un solo uso.
 #
 # Misma guarda que cargar-fichas-demo.sh: el proceso pregunta por municipalidad.es_demostracion

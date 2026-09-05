@@ -4,8 +4,8 @@ import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import kamayuk.rentas.dominio.Ejercicio;
-import kamayuk.rentas.rentas.DeclaracionDelEjercicio;
-import kamayuk.rentas.rentas.DeclaracionesDelEjercicio;
+import kamayuk.rentas.nucleo.DeclaracionDelEjercicio;
+import kamayuk.rentas.nucleo.DeclaracionesDelEjercicio;
 
 /**
  * Las declaraciones juradas de mentira, por predio y ejercicio.

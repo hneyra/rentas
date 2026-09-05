@@ -31,7 +31,7 @@ import kamayuk.rentas.fiscalizacion.dobles.ParametrosDeMentira;
 import kamayuk.rentas.fiscalizacion.dobles.TitularesDeMentira;
 import kamayuk.rentas.fiscalizacion.dominio.ActaFiscalizacion;
 import kamayuk.rentas.fiscalizacion.dominio.Hallazgo;
-import kamayuk.rentas.rentas.DeclaracionDelEjercicio;
+import kamayuk.rentas.nucleo.DeclaracionDelEjercicio;
 import kamayuk.rentas.web.ConfiguracionDeJson;
 import kamayuk.rentas.web.ManejadorDeErrores;
 import org.junit.jupiter.api.BeforeEach;

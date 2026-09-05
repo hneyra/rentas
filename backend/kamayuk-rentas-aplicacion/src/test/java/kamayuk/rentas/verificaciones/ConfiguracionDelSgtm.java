@@ -42,7 +42,7 @@ public final class ConfiguracionDelSgtm implements ConfiguracionDeLasVerificacio
             Map.ofEntries(
                     Map.entry("kamayuk-rentas-contribuyentes", "rentas"),
                     Map.entry("kamayuk-rentas-catastro", "catastro"),
-                    Map.entry("kamayuk-rentas-rentas", "rentas"),
+                    Map.entry("kamayuk-rentas-nucleo", "rentas"),
                     Map.entry("kamayuk-rentas-parametros", "normativa"),
                     Map.entry("kamayuk-rentas-fiscalizacion", "rentas"),
                     Map.entry("kamayuk-rentas-sanciones", "rentas"),
@@ -298,6 +298,11 @@ public final class ConfiguracionDelSgtm implements ConfiguracionDeLasVerificacio
     }
 
     @Override
+    public Set<String> modulosDelReparto() {
+        return SISTEMA_DEL_MODULO.keySet();
+    }
+
+    @Override
     public Map<String, String> sistemaDeCadaTabla() {
         Map<String, String> reparto = new HashMap<>();
         DE_RENTAS.forEach(t -> reparto.put(t, "rentas"));
@@ -344,7 +349,11 @@ public final class ConfiguracionDelSgtm implements ConfiguracionDeLasVerificacio
         return Set.of(
                 "kamayuk.rentas.compartido",
                 "kamayuk.rentas.plataforma.tenant",
-                "kamayuk.rentas.dominio");
+                "kamayuk.rentas.dominio",
+                // El contexto acotado principal, anadido en R-N: sin el, renombrar el paquete del
+                // modulo mas grande del sistema no ponia roja esta guarda —se conformaba con que
+                // estuvieran los tres de infraestructura—. `caja` ya lo declaraba desde P5D.
+                "kamayuk.rentas.nucleo.dominio");
     }
 
     @Override
@@ -367,8 +376,8 @@ public final class ConfiguracionDelSgtm implements ConfiguracionDeLasVerificacio
                 // 422 «el predio no tiene ficha vigente».
                 ".catastro.TransferenciaDeFiscalizacion$SinFichaQueVersionar",
                 // Si un predio declaro en un ejercicio, por lote (RF-055).
-                ".rentas.DeclaracionesDelEjercicio",
-                ".rentas.DeclaracionDelEjercicio",
+                ".nucleo.DeclaracionesDelEjercicio",
+                ".nucleo.DeclaracionDelEjercicio",
                 // Cuanto se debe a una fecha, para el estado de cuenta de fiscalizacion (RF-056).
                 // Arista al reves de las otras: la excepcion de ARQ-01 §4 regla 2.
                 ".cuentacorriente.ConsultaDeDeudaPublica",
@@ -388,14 +397,14 @@ public final class ConfiguracionDelSgtm implements ConfiguracionDeLasVerificacio
                 // CONSULTA.
                 // Lo unico que escribe es su propia fila de ACCESO, y esa observacion no la puede
                 // dar el usuario porque nadie escribe un motivo para mirar una grilla.
-                ".rentas.aplicacion.ConsultaDeConciliacion.noConciliadas("
+                ".nucleo.aplicacion.ConsultaDeConciliacion.noConciliadas("
                         + "kamayuk.rentas.catastro.BusquedaDeFichas, kamayuk.rentas.dominio.Ejercicio,"
                         + " java.time.LocalDate, kamayuk.rentas.compartido.Paginacion)",
                 // El titular de un predio, resuelto al clic (ADR-0015 §2.4, #366). Misma forma.
-                ".rentas.aplicacion.ConsultaDeTitulares.resolver(long, java.time.LocalDate)",
+                ".nucleo.aplicacion.ConsultaDeTitulares.resolver(long, java.time.LocalDate)",
                 // La rama del portal del contribuyente (ADR-0020, #57). Misma forma y un motivo
                 // mas fuerte: aqui el usuario ni siquiera es un funcionario.
-                ".rentas.aplicacion.RamaDelCiudadano.leer(java.time.LocalDate)",
+                ".nucleo.aplicacion.RamaDelCiudadano.leer(java.time.LocalDate)",
                 // La descarga del conjunto sellado de `normativa` (P5B, ADR-0025 §1). Es el caso
                 // mas claro de la lista: lo que escribe es una COPIA de un dato que este sistema no
                 // produjo, ya sellado en el otro y verificado por su sha256. No hay ningun usuario
@@ -422,11 +431,11 @@ public final class ConfiguracionDelSgtm implements ConfiguracionDeLasVerificacio
                 // dato del padron sino la constancia de que un hecho NO se pudo aplicar, con su
                 // motivo dentro. Ese motivo es lo que una observacion seria, y lo pone el
                 // ingestor porque es el unico que sabe por que.
-                ".rentas.aplicacion.AplicarUnHecho.aplicar("
-                        + "kamayuk.rentas.rentas.dominio.proyeccion.HechoRecibido,"
+                ".nucleo.aplicacion.AplicarUnHecho.aplicar("
+                        + "kamayuk.rentas.nucleo.dominio.proyeccion.HechoRecibido,"
                         + " java.time.Instant)",
-                ".rentas.aplicacion.AplicarUnHecho.matar("
-                        + "kamayuk.rentas.rentas.dominio.proyeccion.HechoRecibido,"
+                ".nucleo.aplicacion.AplicarUnHecho.matar("
+                        + "kamayuk.rentas.nucleo.dominio.proyeccion.HechoRecibido,"
                         + " java.lang.String, java.time.Instant)");
     }
 }

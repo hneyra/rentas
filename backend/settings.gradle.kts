@@ -69,7 +69,11 @@ include("kamayuk-rentas-indicadores")
 // codigo de negocio; el estado por contexto esta en ARQ-01 §5.
 include("kamayuk-rentas-contribuyentes")
 include("kamayuk-rentas-catastro")
-include("kamayuk-rentas-rentas")
+// El contexto acotado `rentas`. Se llama `nucleo` desde R-N (2026-09-05): el patron
+// `kamayuk-<sistema>-<contexto>` producia `kamayuk-rentas-rentas` alli donde el contexto
+// principal se llama igual que su sistema, y la direccion pidio quitar la repeticion. El
+// patron queda intacto; lo que cambia es el nombre del contexto.
+include("kamayuk-rentas-nucleo")
 include("kamayuk-rentas-parametros")
 include("kamayuk-rentas-fiscalizacion")
 include("kamayuk-rentas-sanciones")

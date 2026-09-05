@@ -141,6 +141,8 @@ feo y es la consecuencia mecánica de la convención; se prefiere la fealdad a u
 una excepción en la regla de nombres es lo que hace que la siguiente extracción tenga que
 acordarse de ella.
 
+> **R-N (2026-09-05) renombró los tres.** `kamayuk-rentas-rentas`, `kamayuk-catastro-catastro` y `kamayuk-caja-caja` son hoy `kamayuk-<sistema>-nucleo`, con su paquete `kamayuk.<sistema>.nucleo`. Lo de arriba se deja como se escribió —es lo que se decidió entonces— y el porqué del cambio está en `infrastructure/docs/00-gobierno/R-N-los-tres-modulos-repetidos.md`.
+
 **`rootProject.name` se queda en `kamayuk-rentas-backend`**, que es lo que P3 puso. El enunciado
 de la etapa pide `rentas-backend`; el bloque de reglas manda, P3 ya había elegido, y cambiarlo
 sólo por seguir la letra del enunciado habría sido pisar trabajo hecho para quedar peor alineado

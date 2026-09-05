@@ -6,7 +6,7 @@ import java.util.List;
 import kamayuk.rentas.coactiva.ExpedientesSinRec;
 import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.dominio.Ejercicio;
-import kamayuk.rentas.rentas.PrediosSinConciliar;
+import kamayuk.rentas.nucleo.PrediosSinConciliar;
 import kamayuk.rentas.sanciones.PapeletasSinNotificar;
 import kamayuk.rentas.valores.ValoresSinNotificar;
 

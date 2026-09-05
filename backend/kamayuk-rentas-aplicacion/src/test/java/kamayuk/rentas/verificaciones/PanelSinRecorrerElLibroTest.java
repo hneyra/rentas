@@ -12,7 +12,7 @@ import kamayuk.rentas.cuentacorriente.CarteraDelLibro;
 import kamayuk.rentas.cuentacorriente.RecaudacionDelLibro;
 import kamayuk.rentas.indicadores.aplicacion.ConsultaDeTrabajoParado;
 import kamayuk.rentas.indicadores.aplicacion.PanelDeRecaudacion;
-import kamayuk.rentas.rentas.PrediosSinConciliar;
+import kamayuk.rentas.nucleo.PrediosSinConciliar;
 import kamayuk.rentas.sanciones.PapeletasSinNotificar;
 import kamayuk.rentas.tesoreria.AvanceDeCaja;
 import kamayuk.rentas.valores.ValoresSinNotificar;

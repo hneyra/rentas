@@ -5,7 +5,7 @@ import java.util.ArrayList;
 import java.util.List;
 import kamayuk.rentas.coactiva.aplicacion.ConsultaDeDeudasCoactivas;
 import kamayuk.rentas.coactiva.dominio.ActoCoactivo;
-import kamayuk.rentas.rentas.BeneficioRegistrado;
+import kamayuk.rentas.nucleo.BeneficioRegistrado;
 import org.jspecify.annotations.Nullable;
 
 /**

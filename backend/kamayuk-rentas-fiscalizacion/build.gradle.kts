@@ -30,7 +30,7 @@ dependencies {
     // tiene que acotar el conjunto antes de paginar, y la condicion se DERIVA
     // del cruce, asi que la consulta es una y vive en `DeteccionRepositoryJdbc`
     // —con su porque escrito en `DeteccionRepository`—.
-    implementation(project(":kamayuk-rentas-rentas"))
+    implementation(project(":kamayuk-rentas-nucleo"))
 
     // La liquidacion fija el conjunto SELLADO del ejercicio de cada linea
     // (AC 1 de #49) y lo recupera por identificador, nunca por ejercicio.

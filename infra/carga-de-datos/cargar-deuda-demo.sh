@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Siembra el SALDO INICIAL FICTICIO del libro de cuenta corriente en una instalacion de
-# demostracion, corriendo el proceso batch CargarDeudaDeDemostracion (kamayuk-rentas-rentas)
+# demostracion, corriendo el proceso batch CargarDeudaDeDemostracion (kamayuk-rentas-nucleo)
 # como un Job de un solo uso.
 #
 # Misma guarda que cargar-fichas-demo.sh: el proceso pregunta por municipalidad.es_demostracion

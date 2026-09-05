@@ -28,7 +28,7 @@ dependencies {
     // Los doce contextos acotados de ARQ-01 §3.
     implementation(project(":kamayuk-rentas-contribuyentes"))
     implementation(project(":kamayuk-rentas-catastro"))
-    implementation(project(":kamayuk-rentas-rentas"))
+    implementation(project(":kamayuk-rentas-nucleo"))
     implementation(project(":kamayuk-rentas-parametros"))
     implementation(project(":kamayuk-rentas-fiscalizacion"))
     implementation(project(":kamayuk-rentas-sanciones"))
