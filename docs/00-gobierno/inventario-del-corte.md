@@ -715,7 +715,7 @@ El criterio es [ADR-0031](../30-arquitectura/adr/ADR-0031-infraestructura-comun-
 un sistema cambia cuando cambia ese sistema y no puede vivir en un repositorio ajeno.**
 
 En la columna «Destino», `infrastructure` = el repositorio nuevo; `descriptor` = la carpeta
-`infrastructure/` de cada repositorio de sistema, publicada como `@sgtm/infra-<sistema>`
+`infrastructure/` de cada repositorio de sistema, publicada como `@kamayuk/infra-<sistema>`
 (ADR-0031 §2). `ambos` = la mecánica es común y lo que declara cada sistema es suyo.
 
 ## 3.1 Raíz de `infra/`
@@ -898,7 +898,7 @@ una migración de esquema que rompe un sistema que nadie tocó.
 | ADR | Estado | Por qué no viaja |
 |---|---|---|
 | `ADR-0003` Monolito modular con Spring Modulith | **Reemplazado por ADR-0029** | Su argumento —«el equipo que mantendrá esto en una municipalidad no opera doce despliegues»— sigue siendo el que hay que contestar (**D-22**). Se enlaza desde ADR-0029, no se copia |
-| `ADR-0009` React con Vite, «una sola aplicación por ahora» | **Reemplazado en esa cláusula por ADR-0030** | El resto —React, Vite, TypeScript— pasa a `@sgtm/ui` y a las convenciones de `infrastructure` ⚠ |
+| `ADR-0009` React con Vite, «una sola aplicación por ahora» | **Reemplazado en esa cláusula por ADR-0030** | El resto —React, Vite, TypeScript— pasa a `@kamayuk/ui` y a las convenciones de `infrastructure` ⚠ |
 | `ADR-0010` Catálogo portado y proxy de datos | **Describe algo que ya no existe** | `CLAUDE.md` lo dice con todas las letras: «ninguno de los dos existe hoy». Se cita en varios sitios como precedente («el proxy no filtra»), y esas citas hay que resolverlas al mover cada documento |
 
 ⚠ **`ADR-0005` (OIDC para autenticar; el modelo de permisos del manual para autorizar) se parte

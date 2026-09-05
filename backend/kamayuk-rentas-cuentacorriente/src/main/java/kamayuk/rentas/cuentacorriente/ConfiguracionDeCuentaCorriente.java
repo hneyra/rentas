@@ -39,8 +39,8 @@ public class ConfiguracionDeCuentaCorriente {
      */
     @Bean
     PoliticaDeRedondeo redondeoDeDeuda(
-            @Value("${sgtm.redondeo.escala}") int escala,
-            @Value("${sgtm.redondeo.modo}") String modo) {
+            @Value("${kamayuk.redondeo.escala}") int escala,
+            @Value("${kamayuk.redondeo.modo}") String modo) {
         return new PoliticaDeRedondeo(
                 escala, RoundingMode.valueOf(modo.strip().toUpperCase(Locale.ROOT)));
     }

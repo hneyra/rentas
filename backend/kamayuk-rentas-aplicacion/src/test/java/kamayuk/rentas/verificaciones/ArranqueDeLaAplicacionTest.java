@@ -72,7 +72,7 @@ import org.springframework.test.context.DynamicPropertySource;
             // decodificador PEREZOSO —solo va a la red al validar el primer token— y aqui no se
             // valida ninguno. Lo que se comprueba es que la cadena se monta, que es lo que falta
             // cuando la variable no esta puesta.
-            "SGTM_OIDC_EMISOR=https://identidad.invalido/realms/sgtm",
+            "KAMAYUK_OIDC_EMISOR=https://identidad.invalido/realms/sgtm",
         })
 @DisplayName("C-7 — rentas arranca, en los dos perfiles")
 class ArranqueDeLaAplicacionTest {
@@ -98,17 +98,17 @@ class ArranqueDeLaAplicacionTest {
     }
 
     /**
-     * Se llenan las <b>variables que pone el descriptor</b> —{@code SGTM_DB_URL} y las suyas—, no
-     * las propiedades de Spring que hay debajo. Es la diferencia entre comprobar que la aplicacion
-     * arranca y comprobar que arranca <b>con la configuracion que el despliegue le entrega</b>: un
-     * {@code application.yaml} que dejara de leer una de estas variables pasaria inadvertido si la
-     * prueba escribiera {@code spring.datasource.url} directamente.
+     * Se llenan las <b>variables que pone el descriptor</b> —{@code KAMAYUK_DB_URL} y las suyas—,
+     * no las propiedades de Spring que hay debajo. Es la diferencia entre comprobar que la
+     * aplicacion arranca y comprobar que arranca <b>con la configuracion que el despliegue le
+     * entrega</b>: un {@code application.yaml} que dejara de leer una de estas variables pasaria
+     * inadvertido si la prueba escribiera {@code spring.datasource.url} directamente.
      */
     @DynamicPropertySource
     static void configurar(DynamicPropertyRegistry propiedades) {
-        propiedades.add("SGTM_DB_URL", base::url);
-        propiedades.add("SGTM_DB_USUARIO", () -> BaseDeDatosDePrueba.APP);
-        propiedades.add("SGTM_DB_CLAVE", () -> base.clave(BaseDeDatosDePrueba.APP));
+        propiedades.add("KAMAYUK_DB_URL", base::url);
+        propiedades.add("KAMAYUK_DB_USUARIO", () -> BaseDeDatosDePrueba.APP);
+        propiedades.add("KAMAYUK_DB_CLAVE", () -> base.clave(BaseDeDatosDePrueba.APP));
     }
 
     @AfterAll
@@ -193,9 +193,9 @@ class ArranqueDeLaAplicacionTest {
                         .profiles("batch")
                         .web(org.springframework.boot.WebApplicationType.NONE)
                         .properties(
-                                "SGTM_DB_URL=" + base.url(),
-                                "SGTM_DB_USUARIO=" + BaseDeDatosDePrueba.APP,
-                                "SGTM_DB_CLAVE=" + base.clave(BaseDeDatosDePrueba.APP))
+                                "KAMAYUK_DB_URL=" + base.url(),
+                                "KAMAYUK_DB_USUARIO=" + BaseDeDatosDePrueba.APP,
+                                "KAMAYUK_DB_CLAVE=" + base.clave(BaseDeDatosDePrueba.APP))
                         .run()) {
             assertThat(contexto.isActive()).isTrue();
         }

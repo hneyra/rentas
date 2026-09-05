@@ -51,7 +51,7 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @Profile("batch")
-@ConditionalOnProperty("sgtm.anti-entropia.municipalidad")
+@ConditionalOnProperty("kamayuk.anti-entropia.municipalidad")
 public class CorrerLaAntiEntropia implements ApplicationRunner {
 
     private static final Logger log = LoggerFactory.getLogger(CorrerLaAntiEntropia.class);
@@ -63,7 +63,7 @@ public class CorrerLaAntiEntropia implements ApplicationRunner {
     public CorrerLaAntiEntropia(
             ConciliarConElPadron conciliar,
             Clock reloj,
-            @Value("${sgtm.anti-entropia.municipalidad}") long municipalidadId) {
+            @Value("${kamayuk.anti-entropia.municipalidad}") long municipalidadId) {
         this.conciliar = conciliar;
         this.reloj = reloj;
         this.municipalidadId = municipalidadId;

@@ -214,8 +214,8 @@ public class SeguridadWeb {
     @Order(1)
     SecurityFilterChain cadenaDelPortal(
             HttpSecurity http,
-            @Value("${sgtm.portal.oidc.emisor:}") String emisor,
-            @Value("${sgtm.portal.oidc.jwks:}") String jwks)
+            @Value("${kamayuk.portal.oidc.emisor:}") String emisor,
+            @Value("${kamayuk.portal.oidc.jwks:}") String jwks)
             throws Exception {
 
         http.securityMatcher(RUTAS_DEL_PORTAL)

@@ -62,7 +62,7 @@ PY
     SALTADAS=6
 fi
 
-export SGTM_BASELINE_URL="$URL" SGTM_BASELINE_USUARIO="$USUARIO" SGTM_BASELINE_CLAVE="$CLAVE"
+export KAMAYUK_BASELINE_URL="$URL" KAMAYUK_BASELINE_USUARIO="$USUARIO" KAMAYUK_BASELINE_CLAVE="$CLAVE"
 ejecutar() { (cd "$AQUI" && "$RAIZ/backend/gradlew" -q -p "$AQUI" run -Dclase="$1" --args="$2" --console=plain); }
 
 echo "── 1. La referencia: V1..V78 sobre una base vacia"

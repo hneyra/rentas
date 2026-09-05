@@ -15,7 +15,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * <p>Porque un escaneo la registra en <b>todos</b> los perfiles, y este record valida en su
  * constructor compacto: sin las propiedades puestas, el bean falla al construirse y el contexto no
  * arranca. Con el escaneo, el proceso <b>web</b> —que no implanta nada y no tiene por que conocer
- * la clave de {@code sgtm_owner}— moria al arrancar con «Falta sgtm.implantacion.ubigeo». Lo
+ * la clave de {@code sgtm_owner}— moria al arrancar con «Falta kamayuk.implantacion.ubigeo». Lo
  * encontro el primer arranque real del artefacto despues de escribir la implantacion.
  *
  * <p>Por eso la declara {@link ImplantarMunicipalidad} con {@code @EnableConfigurationProperties}:
@@ -39,7 +39,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  *     persona y no debe parecerlo: quien lea la auditoria tiene que distinguir lo que hizo la
  *     implantacion de lo que hizo alguien
  */
-@ConfigurationProperties("sgtm.implantacion")
+@ConfigurationProperties("kamayuk.implantacion")
 public record DatosDeImplantacion(
         String ubigeo,
         String nombre,
@@ -52,20 +52,20 @@ public record DatosDeImplantacion(
     private static final Set<String> TIPOS = Set.of("DISTRITAL", "PROVINCIAL");
 
     public DatosDeImplantacion {
-        ubigeo = exigir(ubigeo, "sgtm.implantacion.ubigeo");
+        ubigeo = exigir(ubigeo, "kamayuk.implantacion.ubigeo");
         if (!ubigeo.matches("\\d{6}")) {
             throw new IllegalArgumentException(
                     "El ubigeo son seis digitos, y llego '" + ubigeo + "'");
         }
-        nombre = exigir(nombre, "sgtm.implantacion.nombre");
-        tipo = exigir(tipo, "sgtm.implantacion.tipo").toUpperCase(java.util.Locale.ROOT);
+        nombre = exigir(nombre, "kamayuk.implantacion.nombre");
+        tipo = exigir(tipo, "kamayuk.implantacion.tipo").toUpperCase(java.util.Locale.ROOT);
         if (!TIPOS.contains(tipo)) {
             throw new IllegalArgumentException(
                     "El tipo de municipalidad es DISTRITAL o PROVINCIAL, y llego '" + tipo + "'");
         }
-        administrador = exigir(administrador, "sgtm.implantacion.administrador");
+        administrador = exigir(administrador, "kamayuk.implantacion.administrador");
         nombreDelAdministrador =
-                exigir(nombreDelAdministrador, "sgtm.implantacion.nombre-del-administrador");
+                exigir(nombreDelAdministrador, "kamayuk.implantacion.nombre-del-administrador");
         usuarioDelProceso =
                 usuarioDelProceso == null || usuarioDelProceso.isBlank()
                         ? "implantacion"

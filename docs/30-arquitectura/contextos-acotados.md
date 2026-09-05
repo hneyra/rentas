@@ -176,7 +176,7 @@ sido abrir el límite sin usarlo; se declaró el día que se usó.
 Módulos, accesos y políticas, grupos, usuarios, miembros, permisos, sesiones y **auditoría**.
 Él no depende de ningún contexto, y **ningún contexto depende de él**: solo `sgtm-aplicacion` lo
 declara, para ensamblarlo. La transversalidad del control de acceso no la da este módulo sino
-`sgtm-plataforma` —el guardia de `pe.gob.sgtm.autorizacion` (`@RequiereAcceso`), que todo
+`sgtm-plataforma` —el guardia de `kamayuk.rentas.autorizacion` (`@RequiereAcceso`), que todo
 controlador usa sin conocer a `seguridad`—; este contexto es quien administra los datos que ese
 guardia consulta.
 *Módulo Gradle:* `sgtm-seguridad`.
@@ -216,7 +216,7 @@ día, y no habría forma de saber cuál está mal.
    existe) ni moviendo el acto a `rentas` (el libro es quien asienta). Se resuelve con un **puerto
    de salida** escrito en el vocabulario del libro —`TitularesDeLaUnidad`: dos `long` y una fecha,
    sin un solo tipo ajeno— que **implementa `rentas`**, el único contexto que ve predio, vehículo
-   y padrón de personas a la vez. Es la misma forma que `pe.gob.sgtm.autorizacion.ComprobadorDeAcceso`
+   y padrón de personas a la vez. Es la misma forma que `kamayuk.rentas.autorizacion.ComprobadorDeAcceso`
    —declarado en `plataforma`, implementado en `seguridad`—, y **no crea ninguna arista nueva** en
    el mapa de §2: `rentas ──► cuentacorriente` ya existía.
 

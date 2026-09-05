@@ -1,5 +1,5 @@
 {
-  "_": "ARCHIVO GENERADO — no editar a mano. Lo produce FormasDeLaApiTest del tipo de retorno de cada controlador; se regenera con -Dsgtm.formas.regenerar=true. Es la forma del JSON que devuelve cada operacion —nombres de campo y anidamiento, con los tipos reducidos a hojas—, y la lee el frontend para comprobar que su proxy de datos publica la forma que el backend publica (#400, ADR-0010).",
+  "_": "ARCHIVO GENERADO — no editar a mano. Lo produce FormasDeLaApiTest del tipo de retorno de cada controlador; se regenera con -Dkamayuk.formas.regenerar=true. Es la forma del JSON que devuelve cada operacion —nombres de campo y anidamiento, con los tipos reducidos a hojas—, y la lee el frontend para comprobar que su proxy de datos publica la forma que el backend publica (#400, ADR-0010).",
   "GET /autorizaciones/anuncios": {
     "contenido": [
       {

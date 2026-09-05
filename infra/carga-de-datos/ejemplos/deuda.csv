@@ -19,7 +19,7 @@
 # produce cifras indistinguibles de las de una determinacion real.
 #
 # EL TRIBUTO ES UN VOCABULARIO CERRADO (#553). Los doce de
-# `pe.gob.sgtm.cuentacorriente.TributoDelLibro`, que son los del CHECK de V74: PREDIAL,
+# `kamayuk.rentas.cuentacorriente.TributoDelLibro`, que son los del CHECK de V74: PREDIAL,
 # ARBITRIO —en SINGULAR—, VEHICULAR, ALCABALA, ESPECTACULOS, ANUNCIOS, JUEGOS,
 # MULTA_TRIBUTARIA, MULTA_TRANSITO, MULTA_ADMINISTRATIVA, CONVENIO y «COSTAS PROCESALES».
 # Este archivo sembraba ARBITRIOS en plural, y como la clave de una obligacion compara ese

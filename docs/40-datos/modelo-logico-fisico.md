@@ -414,7 +414,7 @@ fraccionamiento— y `fase` —ordinaria, valor, coactiva, convenio—.
   obligaciones distintas**: `DeterminarArbitrios` asienta `ARBITRIO` y
   `ejemplos/deuda.csv` sembraba `ARBITRIOS`, así que el filtro «Arbitrios» de la consulta
   unificada no encontraba la deuda sembrada. El vocabulario vive en un solo sitio,
-  `pe.gob.sgtm.cuentacorriente.TributoDelLibro`, y es API pública del módulo porque los siete
+  `kamayuk.rentas.cuentacorriente.TributoDelLibro`, y es API pública del módulo porque los siete
   contextos que asientan lo necesitan.
 - **`saldo_proyectado.tributo` no lleva `CHECK`, y es deliberado**: es caché derivada del libro
   —su tributo sólo puede venir de un asiento—, así que acotarla no añade protección y sí

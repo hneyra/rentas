@@ -89,7 +89,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  */
 @Component
 @Profile("batch")
-@ConditionalOnProperty("sgtm.implantacion.ubigeo")
+@ConditionalOnProperty("kamayuk.implantacion.ubigeo")
 @EnableConfigurationProperties(DatosDeImplantacion.class)
 public class ImplantarMunicipalidad implements ApplicationRunner {
 

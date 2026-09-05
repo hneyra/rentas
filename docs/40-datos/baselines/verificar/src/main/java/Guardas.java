@@ -124,20 +124,20 @@ public final class Guardas {
     }
     /** La URL del motor, del entorno: el arnes no fija ningun puerto (INF-01 §4.1). */
     static String base() {
-        String u = System.getenv("SGTM_BASELINE_URL");
+        String u = System.getenv("KAMAYUK_BASELINE_URL");
         if (u == null || u.isBlank()) {
             throw new IllegalStateException(
-                    "Falta SGTM_BASELINE_URL, p.ej. jdbc:postgresql://localhost:5432/postgres");
+                    "Falta KAMAYUK_BASELINE_URL, p.ej. jdbc:postgresql://localhost:5432/postgres");
         }
         return u;
     }
 
     static String usuario() {
-        return System.getenv().getOrDefault("SGTM_BASELINE_USUARIO", "postgres");
+        return System.getenv().getOrDefault("KAMAYUK_BASELINE_USUARIO", "postgres");
     }
 
     static String clave() {
-        return System.getenv().getOrDefault("SGTM_BASELINE_CLAVE", "postgres");
+        return System.getenv().getOrDefault("KAMAYUK_BASELINE_CLAVE", "postgres");
     }
 
     static String admin() { return base(); }

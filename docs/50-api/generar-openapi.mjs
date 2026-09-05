@@ -3692,7 +3692,7 @@ function clavesRepetidas(fuente, tabla) {
  *
  * Lo produce `RespuestasDeLaApiTest` leyendo cada controlador —la unica forma de
  * contestar 404 es `ProblemaDeNegocio` con `CodigoDeError.NO_ENCONTRADO`— y se
- * regenera con `-Dsgtm.respuestas.regenerar=true`. **No se escribe a mano**: medio
+ * regenera con `-Dkamayuk.respuestas.regenerar=true`. **No se escribe a mano**: medio
  * centenar de entradas manuales envejecen solas, que es el defecto que #312 midio.
  *
  * La clave es «VERBO /ruta», la misma que usa `formas-de-la-api.json`.

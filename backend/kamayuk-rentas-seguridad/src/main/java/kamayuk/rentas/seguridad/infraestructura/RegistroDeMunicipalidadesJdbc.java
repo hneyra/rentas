@@ -37,7 +37,7 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @Profile("batch")
-@ConditionalOnProperty("sgtm.implantacion.ubigeo")
+@ConditionalOnProperty("kamayuk.implantacion.ubigeo")
 public class RegistroDeMunicipalidadesJdbc implements RegistroDeMunicipalidades {
 
     private final String url;
@@ -45,9 +45,9 @@ public class RegistroDeMunicipalidadesJdbc implements RegistroDeMunicipalidades 
     private final String clave;
 
     public RegistroDeMunicipalidadesJdbc(
-            @Value("${sgtm.implantacion.url}") String url,
-            @Value("${sgtm.implantacion.owner-usuario:sgtm_owner}") String usuario,
-            @Value("${sgtm.implantacion.owner-clave}") String clave) {
+            @Value("${kamayuk.implantacion.url}") String url,
+            @Value("${kamayuk.implantacion.owner-usuario:sgtm_owner}") String usuario,
+            @Value("${kamayuk.implantacion.owner-clave}") String clave) {
         this.url = url;
         this.usuario = usuario;
         this.clave = clave;

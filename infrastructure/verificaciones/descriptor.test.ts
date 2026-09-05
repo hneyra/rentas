@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Contenedor, EntornoDelDescriptor, Manifiesto } from "@sgtm/infra-contrato";
+import type { Contenedor, EntornoDelDescriptor, Manifiesto } from "@kamayuk/infra-contrato";
 import { rentas } from "../src/descriptor";
 
 /**
@@ -177,7 +177,7 @@ describe("C-14 — que esto se pueda desplegar", () => {
   /**
    * El Job de migracion corre la imagen del MIGRADOR, no la de la aplicacion.
    *
-   * Hasta C-14 corria la misma que el `Deployment` con `SGTM_DB_USUARIO=sgtm_owner` y sin perfil:
+   * Hasta C-14 corria la misma que el `Deployment` con `KAMAYUK_DB_USUARIO=sgtm_owner` y sin perfil:
    * arrancaba el proceso web con las credenciales del unico rol con DDL, y la aplicacion tiene
    * `spring.flyway.enabled: false` a proposito (ARQ-03 §4). O sea que ese Job **no migraba**.
    */
@@ -186,11 +186,11 @@ describe("C-14 — que esto se pueda desplegar", () => {
     expect(contenedores).toHaveLength(1);
     const c = contenedores[0]!;
     expect(c.image).toBe(ENTORNO.imagenDe(`${"rentas"}-migrador`));
-    expect(valorDe(c, "SGTM_DB_OWNER_USUARIO")).toBe("sgtm_owner");
-    expect(declara(c, "SGTM_DB_OWNER_CLAVE")).toBe(true);
+    expect(valorDe(c, "KAMAYUK_DB_OWNER_USUARIO")).toBe("sgtm_owner");
+    expect(declara(c, "KAMAYUK_DB_OWNER_CLAVE")).toBe(true);
     // La de la APLICACION. El migrador no la lee, y ponerla es lo que hacia que este Job
     // pareciera correcto sin migrar nada.
-    expect(declara(c, "SGTM_DB_USUARIO")).toBe(false);
+    expect(declara(c, "KAMAYUK_DB_USUARIO")).toBe(false);
   });
 
   it("y las dos imagenes son los dos objetivos del Dockerfile", () => {
@@ -216,17 +216,16 @@ describe("C-14 — que esto se pueda desplegar", () => {
     const c = pod.containers[0]!;
     expect(c.image).toBe(ENTORNO.imagenDe("rentas"));
     expect(valorDe(c, "SPRING_PROFILES_ACTIVE")).toBe("batch");
-    // EL PREFIJO DE `rentas` ES `SGTM_IMPLANTACION_`, y hasta C-18 esta linea decia el otro.
+    // EL PREFIJO DE `rentas` ES `KAMAYUK_IMPLANTACION_`, y esta linea ya dijo dos nombres.
     //
-    // `rentas` es el monolito y conserva `@ConfigurationProperties("sgtm.implantacion")`; sus dos
-    // `@Value` piden `${sgtm.implantacion.url}` y `${sgtm.implantacion.owner-clave}`. Los otros
-    // tres estrenaron `kamayuk.implantacion` **a proposito**, para que un descuido no pueda
-    // apuntar la implantacion de uno con las variables de otro — y el descriptor de `rentas`
-    // copio el de sus hermanos, con esta comprobacion exigiendo el nombre roto. Es el mismo modo
-    // de fallo que C-17 §1: una guarda que fosiliza el defecto que tenia que ver.
+    // Hasta C-18 decia `KAMAYUK_IMPLANTACION_` mientras el Java leia `sgtm.implantacion`, o sea
+    // que la comprobacion exigia el nombre roto —el mismo modo de fallo que C-17 §1—. C-18 lo
+    // arreglo poniendo aqui `SGTM_IMPLANTACION_`, y R-A/B lo deshizo por el otro lado:
+    // `DatosDeImplantacion` pasa a declarar `@ConfigurationProperties("kamayuk.implantacion")` y
+    // sus dos `@Value` piden `${kamayuk.implantacion.*}`, como los de sus tres hermanos.
     //
     // El defecto es MUDO: `ImplantarMunicipalidad` esta condicionado a
-    // `@ConditionalOnProperty("sgtm.implantacion.ubigeo")`, asi que con el prefijo ajeno el runner
+    // `@ConditionalOnProperty("kamayuk.implantacion.ubigeo")`, asi que con el prefijo ajeno el runner
     // **no se registra**, el proceso arranca, no hace nada y sale con codigo 0 — el Job queda
     // `Complete`. Medido levantando el compose de C-18: 13 migraciones aplicadas y `municipalidad`
     // VACIA, o sea `rentas` sin ninguna municipalidad y sin nadie que pueda entrar.
@@ -237,8 +236,8 @@ describe("C-14 — que esto se pueda desplegar", () => {
     // que lee el `@ConfigurationProperties` de los cuatro y lo compara con lo que su descriptor
     // pone — el mismo reparto que `checkout-en-el-espacio-de-trabajo`: la comparacion vive donde
     // estan los dos clones.
-    expect(valorDe(c, "SGTM_IMPLANTACION_UBIGEO")).toBe("200105");
-    expect(valorDe(c, "SGTM_IMPLANTACION_ESDEMOSTRACION")).toBe("true");
+    expect(valorDe(c, "KAMAYUK_IMPLANTACION_UBIGEO")).toBe("200105");
+    expect(valorDe(c, "KAMAYUK_IMPLANTACION_ESDEMOSTRACION")).toBe("true");
   });
 
   /**

@@ -68,7 +68,7 @@ FROM eclipse-temurin:25-jre AS aplicacion
 
 # Usuario sin privilegios y sin shell. Un proceso que solo tiene que escuchar en
 # un puerto no necesita ser root dentro del contenedor.
-RUN useradd --system --uid 10001 --shell /usr/sbin/nologin sgtm
+RUN useradd --system --uid 10001 --shell /usr/sbin/nologin kamayuk
 
 # curl entra por una sola razon: la sonda de vida del orquestador se ejecuta
 # DENTRO del contenedor, y la imagen base no trae ningun cliente HTTP. La
@@ -79,14 +79,14 @@ RUN apt-get update \
     && apt-get install --yes --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=construccion /origen/backend/kamayuk-rentas-aplicacion/build/libs/sgtm.jar /opt/sgtm/sgtm.jar
+COPY --from=construccion /origen/backend/kamayuk-rentas-aplicacion/build/libs/rentas.jar /opt/kamayuk/rentas.jar
 USER 10001
 EXPOSE 8080
 
 # Sin CMD con argumentos: la configuracion entra por variables de entorno
-# (SGTM_DB_URL, SGTM_DB_USUARIO, SGTM_DB_CLAVE) y por SPRING_PROFILES_ACTIVE,
+# (KAMAYUK_DB_URL, KAMAYUK_DB_USUARIO, KAMAYUK_DB_CLAVE) y por SPRING_PROFILES_ACTIVE,
 # que es lo unico que distingue el perfil web del batch.
-ENTRYPOINT ["java", "-jar", "/opt/sgtm/sgtm.jar"]
+ENTRYPOINT ["java", "-jar", "/opt/kamayuk/rentas.jar"]
 
 # ---------------------------------------------------------------------------
 FROM eclipse-temurin:25-jre AS migrador

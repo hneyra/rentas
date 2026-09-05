@@ -27,7 +27,7 @@ jobs:
     steps:
       # ESTE repositorio, y **no** en la raiz del espacio de trabajo (C-9a).
       #
-      # `infrastructure/package.json` declara `@sgtm/infra-contrato` como
+      # `infrastructure/package.json` declara `@kamayuk/infra-contrato` como
       # `link:../../infrastructure/infra/contrato`: un hermano. Eso lo resuelve yarn al
       # instalar, contra el disco, y **ninguna variable de entorno lo redirige** — asi que
       # aqui la disposicion de hermanos no es una preferencia, esta escrita en el

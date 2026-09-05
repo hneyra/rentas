@@ -38,7 +38,7 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @Profile("batch")
-@ConditionalOnProperty("sgtm.carga-deuda-demo.archivo")
+@ConditionalOnProperty("kamayuk.carga-deuda-demo.archivo")
 @EnableConfigurationProperties(DatosDeCargaDeudaDemo.class)
 public class CargarDeudaDeDemostracion implements ApplicationRunner {
 

@@ -133,8 +133,8 @@ tasks.test {
 
     // Gradle no propaga las propiedades de sistema del build al proceso de prueba
     // (lo mismo que hace `sgtm.pruebas-postgres` con las suyas). Sin esto,
-    // `-Dsgtm.formas.regenerar=true` no llega y el archivo no se puede regenerar.
-    for (propiedad in listOf("sgtm.formas.regenerar", "sgtm.respuestas.regenerar", "kamayuk.contratos.regenerar")) {
+    // `-Dkamayuk.formas.regenerar=true` no llega y el archivo no se puede regenerar.
+    for (propiedad in listOf("kamayuk.formas.regenerar", "kamayuk.respuestas.regenerar", "kamayuk.contratos.regenerar")) {
         providers.systemProperty(propiedad).orNull?.let { systemProperty(propiedad, it) }
     }
 }
@@ -144,7 +144,7 @@ tasks.test {
 // java-library, y cual de los dos acaba en el contenedor dependeria del orden
 // alfabetico.
 tasks.named<org.springframework.boot.gradle.tasks.bundling.BootJar>("bootJar") {
-    archiveFileName.set("sgtm.jar")
+    archiveFileName.set("rentas.jar")
 }
 
 // La prueba de arranque va en su PROPIA tarea, y no es una manía de organización.

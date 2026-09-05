@@ -12,7 +12,7 @@ import org.testcontainers.utility.DockerImageName;
  * en memoria no tiene RLS y daria falsos verdes.
  *
  * <p>Admite apuntar a un PostgreSQL ya existente mediante {@code kamayuk.pruebas.postgres.url} (o
- * la variable de entorno {@code SGTM_PRUEBAS_POSTGRES_URL}) para los entornos donde no se puede
+ * la variable de entorno {@code KAMAYUK_PRUEBAS_POSTGRES_URL}) para los entornos donde no se puede
  * descargar la imagen. Lo que NO admite es saltarse la prueba: sin motor, falla. Una prueba
  * bloqueante que se omite sola es peor que no tenerla, porque el build queda verde.
  *

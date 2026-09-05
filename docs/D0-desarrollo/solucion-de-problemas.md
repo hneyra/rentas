@@ -79,9 +79,9 @@ do sleep 5; done
 
 Los puertos por omisión —5432, 8080, 8180, 8025— son de los más ocupados que hay, y en un demonio
 compartido puede haber otra instalación corriendo. **Se mueven en el `.env`**, sin tocar el
-compose: `SGTM_PUERTO_BASE`, `SGTM_PUERTO_INGRESO`, `SGTM_PUERTO_IDENTIDAD`, `SGTM_PUERTO_CORREO`.
+compose: `KAMAYUK_PUERTO_BASE`, `KAMAYUK_PUERTO_INGRESO`, `KAMAYUK_PUERTO_IDENTIDAD`, `KAMAYUK_PUERTO_CORREO`.
 
-Y **si mueves el de Keycloak, mueve `SGTM_OIDC_EMISOR` con él**. Es lo que Keycloak escribe en el
+Y **si mueves el de Keycloak, mueve `KAMAYUK_OIDC_EMISOR` con él**. Es lo que Keycloak escribe en el
 `iss` de cada token y lo que el backend compara: con dos nombres distintos la firma valida, el
 emisor no cuadra, y el 401 no dice por qué.
 

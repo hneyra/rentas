@@ -62,13 +62,13 @@ public final class Migrador {
     public static void main(String[] args) throws SQLException {
         if (args.length > 0) {
             throw new IllegalArgumentException(
-                    "El migrador no admite argumentos: la conexion sale de SGTM_DB_URL,"
-                            + " SGTM_DB_OWNER_USUARIO y SGTM_DB_OWNER_CLAVE. Una clave en la linea"
+                    "El migrador no admite argumentos: la conexion sale de KAMAYUK_DB_URL,"
+                            + " KAMAYUK_DB_OWNER_USUARIO y KAMAYUK_DB_OWNER_CLAVE. Una clave en la linea"
                             + " de comandos queda en el historial del proceso");
         }
-        String url = variableObligatoria("SGTM_DB_URL");
-        String usuario = System.getenv().getOrDefault("SGTM_DB_OWNER_USUARIO", ROL_QUE_MIGRA);
-        String clave = variableObligatoria("SGTM_DB_OWNER_CLAVE");
+        String url = variableObligatoria("KAMAYUK_DB_URL");
+        String usuario = System.getenv().getOrDefault("KAMAYUK_DB_OWNER_USUARIO", ROL_QUE_MIGRA);
+        String clave = variableObligatoria("KAMAYUK_DB_OWNER_CLAVE");
 
         int aplicadas = migrar(url, usuario, clave);
         System.out.println(

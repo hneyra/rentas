@@ -166,9 +166,9 @@ porque no hay imagen que construir; la forma que tendrá el día que la haya est
 | 8180 | Keycloak | Compose |
 | 8025 | Mailpit, el buzón | Compose |
 
-**Los cuatro se pueden mover**, y a veces hay que hacerlo: `SGTM_PUERTO_BASE`, `SGTM_PUERTO_INGRESO`,
-`SGTM_PUERTO_IDENTIDAD` y `SGTM_PUERTO_CORREO` en el `.env`. Si mueves el de Keycloak, **mueve con
-él `SGTM_OIDC_EMISOR`**: es lo que Keycloak pone en el `iss` de cada token y lo que el backend
+**Los cuatro se pueden mover**, y a veces hay que hacerlo: `KAMAYUK_PUERTO_BASE`, `KAMAYUK_PUERTO_INGRESO`,
+`KAMAYUK_PUERTO_IDENTIDAD` y `KAMAYUK_PUERTO_CORREO` en el `.env`. Si mueves el de Keycloak, **mueve con
+él `KAMAYUK_OIDC_EMISOR`**: es lo que Keycloak pone en el `iss` de cada token y lo que el backend
 compara, y con dos nombres distintos la firma valida y el emisor no cuadra — y el 401 no dice por
 qué.
 

@@ -43,12 +43,12 @@ import org.junit.jupiter.api.Test;
 class RespuestasDeLaApiTest {
 
     /** Con esto puesto, la prueba reescribe el archivo en vez de compararlo. */
-    private static final String REGENERAR = "sgtm.respuestas.regenerar";
+    private static final String REGENERAR = "kamayuk.respuestas.regenerar";
 
     private static final String PROCEDENCIA =
             "ARCHIVO GENERADO — no editar a mano. Lo produce RespuestasDeLaApiTest leyendo el"
                     + " codigo de cada controlador; se regenera con"
-                    + " -Dsgtm.respuestas.regenerar=true. Dice que operaciones pueden contestar 404"
+                    + " -Dkamayuk.respuestas.regenerar=true. Dice que operaciones pueden contestar 404"
                     + " —la unica forma de hacerlo es ProblemaDeNegocio con"
                     + " CodigoDeError.NO_ENCONTRADO— y lo lee generar-openapi.mjs para declararlo"
                     + " en el contrato (#732).";

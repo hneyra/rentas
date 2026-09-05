@@ -39,14 +39,14 @@ import org.junit.jupiter.api.Test;
  * regenerar es rojo aqui, no un desajuste que aparece en integracion.
  *
  * <pre>
- * ./gradlew :kamayuk-rentas-aplicacion:test --tests '*FormasDeLaApiTest*' -Dsgtm.formas.regenerar=true
+ * ./gradlew :kamayuk-rentas-aplicacion:test --tests '*FormasDeLaApiTest*' -Dkamayuk.formas.regenerar=true
  * </pre>
  */
 @DisplayName("Formas de la API (docs/50-api)")
 class FormasDeLaApiTest {
 
     /** Con esto puesto, la prueba reescribe el archivo en vez de compararlo. */
-    private static final String REGENERAR = "sgtm.formas.regenerar";
+    private static final String REGENERAR = "kamayuk.formas.regenerar";
 
     /**
      * La primera clave del archivo dice de donde sale.
@@ -57,7 +57,7 @@ class FormasDeLaApiTest {
      */
     private static final String PROCEDENCIA =
             "ARCHIVO GENERADO — no editar a mano. Lo produce FormasDeLaApiTest del tipo de retorno"
-                    + " de cada controlador; se regenera con -Dsgtm.formas.regenerar=true. Es la"
+                    + " de cada controlador; se regenera con -Dkamayuk.formas.regenerar=true. Es la"
                     + " forma del JSON que devuelve cada operacion —nombres de campo y anidamiento,"
                     + " con los tipos reducidos a hojas—, y la lee el frontend para comprobar que su"
                     + " proxy de datos publica la forma que el backend publica (#400, ADR-0010).";

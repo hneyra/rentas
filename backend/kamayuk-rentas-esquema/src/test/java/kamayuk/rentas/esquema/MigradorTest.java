@@ -106,7 +106,7 @@ class MigradorTest {
     void noAdmiteArgumentos() {
         assertThatThrownBy(() -> Migrador.main(new String[] {"jdbc:postgresql://x/y"}))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("SGTM_DB_URL");
+                .hasMessageContaining("KAMAYUK_DB_URL");
     }
 
     // ------------------------------------------------------------------

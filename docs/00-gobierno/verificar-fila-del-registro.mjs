@@ -29,7 +29,7 @@
 
      node docs/00-gobierno/verificar-fila-del-registro.mjs [--base origin/main]
 
-   El cuerpo del PR sale de `SGTM_CUERPO_DEL_PR`; sin esa variable no hay nada que
+   El cuerpo del PR sale de `KAMAYUK_CUERPO_DEL_PR`; sin esa variable no hay nada que
    comprobar y la comprobacion pasa, porque fuera de un PR no existe el dato.
 
    Las tres entradas se pueden dar por archivo —`--cuerpo`, `--archivos`, `--anadido`—,
@@ -55,7 +55,7 @@ const opciones = leerOpciones(process.argv.slice(2));
 
 const cuerpo = opciones.cuerpo
   ? readFileSync(opciones.cuerpo, 'utf8')
-  : (process.env.SGTM_CUERPO_DEL_PR ?? '');
+  : (process.env.KAMAYUK_CUERPO_DEL_PR ?? '');
 
 const issues = [...cuerpo.matchAll(CIERRA)].map((coincidencia) => coincidencia[1]);
 if (issues.length === 0) {

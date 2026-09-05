@@ -83,7 +83,7 @@ la prueba:
 
 El usuario debe ser superusuario: la prueba crea los cuatro roles, les asigna su clave y crea una
 base nueva por corrida. También sirven las variables de entorno equivalentes
-(`SGTM_PRUEBAS_POSTGRES_URL`, …) y `-Dkamayuk.pruebas.postgres.imagen` para cambiar la imagen.
+(`KAMAYUK_PRUEBAS_POSTGRES_URL`, …) y `-Dkamayuk.pruebas.postgres.imagen` para cambiar la imagen.
 
 **Qué garantiza este camino, y qué no.** Cada tarea `test` crea su propia base, y eso aísla las
 migraciones y los datos sembrados. Lo que **no** es de la base son los **roles**: `ALTER ROLE` vale

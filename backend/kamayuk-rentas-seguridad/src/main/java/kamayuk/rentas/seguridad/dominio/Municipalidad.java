@@ -15,7 +15,7 @@ package kamayuk.rentas.seguridad.dominio;
  *
  * <p>La columna {@code municipalidad.nombre} guarda el nombre <b>como sale en los documentos</b>,
  * con su tipo delante —«Municipalidad Distrital de Catacaos»—; es lo que declara {@code
- * sgtm.implantacion.nombre} y lo que escribe la implantacion. {@link #tipo()} es el mismo dato
+ * kamayuk.implantacion.nombre} y lo que escribe la implantacion. {@link #tipo()} es el mismo dato
  * clasificado —{@code DISTRITAL} o {@code PROVINCIAL}, lo que admite el {@code CHECK} de {@code
  * V1}—, y esta para quien necesite distinguir las dos, <b>no</b> para anteponerlo: componer
  * «Municipalidad » + tipo + « de » + nombre produce «Municipalidad Distrital de Municipalidad

@@ -8,9 +8,9 @@ spring:
     # La aplicacion se conecta SIEMPRE como sgtm_app: sin DDL, sin BYPASSRLS,
     # sin ser propietaria de las tablas y sin DELETE (ARQ-03 §4). Las
     # credenciales de sgtm_owner solo existen en el proceso de migracion.
-    url: ${SGTM_DB_URL}
-    username: ${SGTM_DB_USUARIO:sgtm_app}
-    password: ${SGTM_DB_CLAVE}
+    url: ${KAMAYUK_DB_URL}
+    username: ${KAMAYUK_DB_USUARIO:sgtm_app}
+    password: ${KAMAYUK_DB_CLAVE}
   flyway:
     # La aplicacion NO migra al arrancar. Las migraciones viven en kamayuk-rentas-esquema y
     # las aplica el migrador del despliegue, como sgtm_owner, antes de que este
@@ -27,10 +27,10 @@ spring:
 # eso no hay ninguna regla de calculo que los use todavia. Lo que D-03 tiene que
 # cerrar no es solo la escala y el modo, sino los PUNTOS del calculo donde se
 # redondea (D-03c), que es ingenieria inversa contra el SRTM del MEF.
-sgtm:
+kamayuk:
   redondeo:
-    escala: ${SGTM_REDONDEO_ESCALA:2}
-    modo: ${SGTM_REDONDEO_MODO:HALF_UP}
+    escala: ${KAMAYUK_REDONDEO_ESCALA:2}
+    modo: ${KAMAYUK_REDONDEO_MODO:HALF_UP}
 
 # La sonda de vida y las metricas, y sin detalles en la primera. `health` responde
 # si el proceso esta arriba y llega a la base, y con `show-details: never` no dice
@@ -68,7 +68,7 @@ spring:
           # Va en el perfil web y no arriba porque el perfil batch no atiende HTTP: no
           # hay peticion que autenticar, y exigirle el emisor obligaria a que la maquina
           # que corre una determinacion masiva de madrugada pudiera ver Keycloak.
-          issuer-uri: ${SGTM_OIDC_EMISOR}
+          issuer-uri: ${KAMAYUK_OIDC_EMISOR}
           # El emisor es una identidad, no una direccion de red, y en un despliegue
           # con contenedores las dos no coinciden: el navegador va a Keycloak por el
           # nombre publico y el backend lo alcanza por el nombre interno. Si se usara
@@ -79,7 +79,7 @@ spring:
           # `issuer-uri` sigue siendo el publico —es lo que se compara con el `iss`
           # del token, y es lo que hace que un token de otro realm no valga—; lo que
           # cambia es de donde se traen las claves.
-          jwk-set-uri: ${SGTM_OIDC_JWKS:${SGTM_OIDC_EMISOR}/protocol/openid-connect/certs}
+          jwk-set-uri: ${KAMAYUK_OIDC_JWKS:${KAMAYUK_OIDC_EMISOR}/protocol/openid-connect/certs}
 
 # El realm del CIUDADANO (ADR-0020). Emisor distinto del de funcionarios, y por eso
 # no cuelga de `spring.security.oauth2.resourceserver`: esa rama es la que monta la
@@ -91,14 +91,14 @@ spring:
 # portal cuando esto esta vacio es NEGARLO TODO —no dejar de registrarse—, porque si
 # no se registrara, `/api/v1/portal/**` caeria en la cadena general y quedaria servido
 # contra el emisor de funcionarios: la mezcla exacta que las dos cadenas impiden.
-sgtm:
+kamayuk:
   portal:
     oidc:
-      emisor: ${SGTM_PORTAL_OIDC_EMISOR:}
+      emisor: ${KAMAYUK_PORTAL_OIDC_EMISOR:}
       # Mismo reparto que arriba: el emisor es una identidad y se compara con el `iss`
       # del token; el JWKS es una direccion de red, y dentro del cluster no coincide
       # con el nombre publico.
-      jwks: ${SGTM_PORTAL_OIDC_JWKS:}
+      jwks: ${KAMAYUK_PORTAL_OIDC_JWKS:}
 
 ---
 spring:

@@ -1,5 +1,5 @@
 {
-  "_procedencia": "ARCHIVO GENERADO — no editar a mano. Lo produce RespuestasDeLaApiTest leyendo el codigo de cada controlador; se regenera con -Dsgtm.respuestas.regenerar=true. Dice que operaciones pueden contestar 404 —la unica forma de hacerlo es ProblemaDeNegocio con CodigoDeError.NO_ENCONTRADO— y lo lee generar-openapi.mjs para declararlo en el contrato (#732).",
+  "_procedencia": "ARCHIVO GENERADO — no editar a mano. Lo produce RespuestasDeLaApiTest leyendo el codigo de cada controlador; se regenera con -Dkamayuk.respuestas.regenerar=true. Dice que operaciones pueden contestar 404 —la unica forma de hacerlo es ProblemaDeNegocio con CodigoDeError.NO_ENCONTRADO— y lo lee generar-openapi.mjs para declararlo en el contrato (#732).",
   "GET /autorizaciones/anuncios": [],
   "GET /catastro/fichas/conciliacion": [],
   "GET /catastro/fichas/conciliacion/resumen": [],

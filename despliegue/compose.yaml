@@ -43,7 +43,7 @@ services:
   # con ella. Meterlas en la imagen de la aplicacion le daria DDL sobre el padron
   # a un proceso de larga vida expuesto en HTTP (ARQ-03 §4).
   #
-  # Lee `SGTM_DB_OWNER_USUARIO` y `SGTM_DB_OWNER_CLAVE`, y NO `SGTM_DB_USUARIO`:
+  # Lee `KAMAYUK_DB_OWNER_USUARIO` y `KAMAYUK_DB_OWNER_CLAVE`, y NO `KAMAYUK_DB_USUARIO`:
   # lo dice el `main` de `kamayuk.rentas.esquema.Migrador`, que rechaza
   # argumentos a proposito para que una clave no quede en el historial del proceso.
   rentas-migraciones:
@@ -59,9 +59,9 @@ services:
       # cluster es otro nombre y lo entrega el entorno (C-17, punto 1): el
       # descriptor pide `e.plataforma.motor` en vez de escribirlo. Lo que si es de
       # este sistema —y por eso coincide en los dos— es el nombre de SU base.
-      SGTM_DB_URL: jdbc:postgresql://base:5432/rentas
-      SGTM_DB_OWNER_USUARIO: sgtm_owner
-      SGTM_DB_OWNER_CLAVE: ${SGTM_CLAVE_OWNER:?falta SGTM_CLAVE_OWNER, sale del .env de la plataforma}
+      KAMAYUK_DB_URL: jdbc:postgresql://base:5432/rentas
+      KAMAYUK_DB_OWNER_USUARIO: sgtm_owner
+      KAMAYUK_DB_OWNER_CLAVE: ${KAMAYUK_CLAVE_OWNER:?falta KAMAYUK_CLAVE_OWNER, sale del .env de la plataforma}
     # Corre y termina. Si se reinicia vuelve a comprobar el ambiente y no aplica
     # nada: el migrador es idempotente y tiene su prueba que lo demuestra.
     restart: "no"
@@ -86,39 +86,39 @@ services:
         condition: service_completed_successfully
     environment:
       SPRING_PROFILES_ACTIVE: batch
-      SGTM_DB_URL: jdbc:postgresql://base:5432/rentas
+      KAMAYUK_DB_URL: jdbc:postgresql://base:5432/rentas
       # `sgtm_app` y solo `sgtm_app`: sin DDL, sin BYPASSRLS, sin DELETE y
       # propietario de nada.
-      SGTM_DB_USUARIO: sgtm_app
-      SGTM_DB_CLAVE: ${SGTM_CLAVE_APP:?falta SGTM_CLAVE_APP, sale del .env de la plataforma}
-      # EL PREFIJO DE `rentas` ES `sgtm.implantacion`, y no `kamayuk.implantacion`.
-      # `rentas` es el monolito y conserva el suyo: `DatosDeImplantacion` declara
-      # `@ConfigurationProperties("sgtm.implantacion")` y
-      # `RegistroDeMunicipalidadesJdbc` lee `${sgtm.implantacion.url}` y
-      # `${sgtm.implantacion.owner-clave}`. Los otros tres estrenaron
-      # `kamayuk.implantacion` a proposito, para que un descuido no pueda apuntar la
-      # implantacion de uno con las variables de otro.
+      KAMAYUK_DB_USUARIO: sgtm_app
+      KAMAYUK_DB_CLAVE: ${KAMAYUK_CLAVE_APP:?falta KAMAYUK_CLAVE_APP, sale del .env de la plataforma}
+      # El prefijo es `kamayuk.implantacion`: `DatosDeImplantacion` declara
+      # `@ConfigurationProperties("kamayuk.implantacion")` y `RegistroDeMunicipalidadesJdbc`
+      # lee `${kamayuk.implantacion.url}` y `${kamayuk.implantacion.owner-clave}`.
+      #
+      # Hasta R-A/B `rentas` leia `sgtm.implantacion` —era el monolito— mientras sus tres
+      # hermanos ya usaban el del producto, y C-18 arreglo esa asimetria por el lado del
+      # descriptor. R-A/B la deshace por el otro: renombra la propiedad en el Java.
       #
       # Con el prefijo equivocado esto NO FALLA: `ImplantarMunicipalidad` esta
-      # condicionado a `@ConditionalOnProperty("sgtm.implantacion.ubigeo")`, asi que
+      # condicionado a `@ConditionalOnProperty("kamayuk.implantacion.ubigeo")`, asi que
       # el runner no se registra, el proceso arranca, no hace nada y sale con codigo
       # 0. Lo medido en C-18: 13 migraciones aplicadas y `municipalidad` VACIA.
-      SGTM_IMPLANTACION_UBIGEO: ${SGTM_UBIGEO:?falta SGTM_UBIGEO en el .env de la plataforma}
-      SGTM_IMPLANTACION_NOMBRE: ${SGTM_MUNICIPALIDAD:?falta SGTM_MUNICIPALIDAD en el .env de la plataforma}
-      SGTM_IMPLANTACION_TIPO: ${SGTM_TIPO_DE_MUNICIPALIDAD:-DISTRITAL}
+      KAMAYUK_IMPLANTACION_UBIGEO: ${KAMAYUK_UBIGEO:?falta KAMAYUK_UBIGEO en el .env de la plataforma}
+      KAMAYUK_IMPLANTACION_NOMBRE: ${KAMAYUK_MUNICIPALIDAD:?falta KAMAYUK_MUNICIPALIDAD en el .env de la plataforma}
+      KAMAYUK_IMPLANTACION_TIPO: ${KAMAYUK_TIPO_DE_MUNICIPALIDAD:-DISTRITAL}
       # La cuenta TIENE que ser la misma que el usuario de Keycloak: es lo unico
       # que une la fila de `usuario` con la identidad del token (ADR-0005).
-      SGTM_IMPLANTACION_ADMINISTRADOR: ${SGTM_ADMINISTRADOR:?falta SGTM_ADMINISTRADOR (ver identidad/datos-de-implantacion.sh)}
-      SGTM_IMPLANTACION_NOMBREDELADMINISTRADOR: ${SGTM_NOMBRE_DEL_ADMINISTRADOR:-Administrador del sistema}
+      KAMAYUK_IMPLANTACION_ADMINISTRADOR: ${KAMAYUK_ADMINISTRADOR:?falta KAMAYUK_ADMINISTRADOR (ver identidad/datos-de-implantacion.sh)}
+      KAMAYUK_IMPLANTACION_NOMBREDELADMINISTRADOR: ${KAMAYUK_NOMBRE_DEL_ADMINISTRADOR:-Administrador del sistema}
       # Por omision `true`, al reves que en el codigo: aqui se levanta una marcha
       # blanca, y mientras D-02a siga abierta toda cifra sale de parametros que
       # nadie ha firmado. Solo se aplica al ALTA.
-      SGTM_IMPLANTACION_ESDEMOSTRACION: ${SGTM_ES_DEMOSTRACION:-true}
-      SGTM_IMPLANTACION_URL: jdbc:postgresql://base:5432/rentas
+      KAMAYUK_IMPLANTACION_ESDEMOSTRACION: ${KAMAYUK_ES_DEMOSTRACION:-true}
+      KAMAYUK_IMPLANTACION_URL: jdbc:postgresql://base:5432/rentas
       # OWNERCLAVE sin guion bajo: en una variable de entorno el `_` se traduce a
-      # punto, asi que `SGTM_IMPLANTACION_OWNER_CLAVE` seria
+      # punto, asi que `KAMAYUK_IMPLANTACION_OWNER_CLAVE` seria
       # `kamayuk.implantacion.owner.clave` y no `owner-clave`.
-      SGTM_IMPLANTACION_OWNERCLAVE: ${SGTM_CLAVE_OWNER:?falta SGTM_CLAVE_OWNER, sale del .env de la plataforma}
+      KAMAYUK_IMPLANTACION_OWNERCLAVE: ${KAMAYUK_CLAVE_OWNER:?falta KAMAYUK_CLAVE_OWNER, sale del .env de la plataforma}
     restart: "no"
 
   # ── El backend ──────────────────────────────────────────────────────────────
@@ -140,22 +140,22 @@ services:
         condition: service_completed_successfully
     environment:
       SPRING_PROFILES_ACTIVE: web
-      SGTM_DB_URL: jdbc:postgresql://base:5432/rentas
-      SGTM_DB_USUARIO: sgtm_app
-      SGTM_DB_CLAVE: ${SGTM_CLAVE_APP:?falta SGTM_CLAVE_APP, sale del .env de la plataforma}
+      KAMAYUK_DB_URL: jdbc:postgresql://base:5432/rentas
+      KAMAYUK_DB_USUARIO: sgtm_app
+      KAMAYUK_DB_CLAVE: ${KAMAYUK_CLAVE_APP:?falta KAMAYUK_CLAVE_APP, sale del .env de la plataforma}
       # Sin el emisor la aplicacion se NIEGA a arrancar, y es deliberado: un
       # backend que atiende sin poder validar un token responde a la sonda, se
       # declara sano y no atiende a nadie (ADR-0005).
       #
       # Es el MISMO realm que los otros tres: un login para los cuatro
       # (ADR-0030 §3).
-      SGTM_OIDC_EMISOR: ${SGTM_OIDC_EMISOR:-http://localhost:8180}/realms/sgtm
+      KAMAYUK_OIDC_EMISOR: ${KAMAYUK_OIDC_EMISOR:-http://localhost:8180}/realms/sgtm
       # El emisor es una identidad, no una direccion de red. El navegador llega a
       # Keycloak por su nombre publico y este contenedor por el interno de la red
       # del compose; usar el publico para las dos cosas haria que el backend
       # buscara el JWKS en si mismo y todo token seria invalido por un motivo que
       # no se parece a su causa.
-      SGTM_OIDC_JWKS: http://identidad:8080/realms/sgtm/protocol/openid-connect/certs
+      KAMAYUK_OIDC_JWKS: http://identidad:8080/realms/sgtm/protocol/openid-connect/certs
     labels:
       # Su prefijo, y SOLO el suyo. Reclamar el de otro no falla: se lo queda, y
       # las peticiones dejan de llegar a su dueno. Es la misma prohibicion (a) que

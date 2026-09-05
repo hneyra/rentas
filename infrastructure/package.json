@@ -1,5 +1,5 @@
 {
-  "name": "@sgtm/infra-rentas",
+  "name": "@kamayuk/infra-rentas",
   "version": "0.1.0",
   "private": true,
   "description": "El descriptor de infraestructura de rentas (ADR-0031 §2). Funciones puras que devuelven manifiestos; `infrastructure` las compone y las audita.",
@@ -14,7 +14,7 @@
     "verificar": "yarn lint && yarn typecheck && yarn test"
   },
   "dependencies": {
-    "@sgtm/infra-contrato": "link:../../infrastructure/infra/contrato"
+    "@kamayuk/infra-contrato": "link:../../infrastructure/infra/contrato"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",

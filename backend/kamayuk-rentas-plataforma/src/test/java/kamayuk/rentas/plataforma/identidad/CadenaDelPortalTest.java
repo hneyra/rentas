@@ -90,7 +90,7 @@ class CadenaDelPortalTest {
     static void configurar(DynamicPropertyRegistry propiedades) {
         propiedades.add(
                 "spring.security.oauth2.resourceserver.jwt.issuer-uri", deFuncionarios::emisor);
-        propiedades.add("sgtm.portal.oidc.emisor", delCiudadano::emisor);
+        propiedades.add("kamayuk.portal.oidc.emisor", delCiudadano::emisor);
     }
 
     @AfterAll
