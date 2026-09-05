@@ -1,0 +1,169 @@
+# Quien publica las dos imagenes de `rentas`, y por que su etiqueta es un `sha` DE ESTE
+# REPOSITORIO.
+#
+# ## El hueco que cierra, medido
+#
+# Hasta hoy **ninguno de los cinco repositorios publicaba una sola imagen**. El
+# `publicar-imagenes.yml` del monolito se quedo en `sgtm` —el archivo historico— y nunca se
+# traslado; lo que los cinco tienen se llama `registro.yml` y es otra cosa (la guarda de #711
+# sobre la tabla de `CLAUDE.md`). Comprobado contra el registro el 2026-09-05, con un token
+# emitido por `ghcr.io/token`:
+#
+#     GET /v2/hneyra/kamayuk-rentas/manifests/<sha>          -> 404 MANIFEST_UNKNOWN
+#     GET /v2/hneyra/kamayuk-rentas-migrador/manifests/<sha>  -> 404 MANIFEST_UNKNOWN
+#
+# Y los manifiestos que `infrastructure` emite piden esas dos etiquetas. Sin ellas, un
+# `pulumi up` deja los pods en `ImagePullBackOff` **y nada lo predice**: el manifiesto es
+# valido, el planificador ubica el pod, y el fallo aparece cuando ya se desplego.
+#
+# ## La etiqueta es el `sha` de ESTE repositorio, y esa es la decision
+#
+# `infrastructure` etiquetaba **las ocho** imagenes de los cuatro sistemas con
+# `applicationBootstrapVersion`, que es un `sha` de `sgtm`: una revision que no describe este
+# codigo y que ni siquiera existe en este clon. Una etiqueta que no se puede resolver contra
+# ningun `git log` no identifica nada, y entonces «que esta corriendo en la municipalidad» deja
+# de tener respuesta.
+#
+# Desde aqui: `ghcr.io/<owner>/kamayuk-rentas:${{ github.sha }}`. Nunca `latest` —una etiqueta
+# movil convierte cualquier reinicio del nodo en una actualizacion no planificada—, y la version
+# que cada ambiente despliega la declara `infrastructure` en su stack
+# (`kamayuk:versionesDeLosSistemas`), no este archivo: la etiqueta la pone quien construye la
+# imagen, **cual se despliega** lo pone quien compone el manifiesto (ADR-0011 §5).
+#
+# ## Sin filtro `paths`, a proposito
+#
+# El flujo del monolito filtraba por `backend/**` para no reconstruir ante un cambio de
+# documentacion. Aqui no, y el motivo es una equivalencia que la guarda de `infrastructure`
+# necesita: **todo commit de `main` tiene sus dos imagenes**. Con un filtro, un merge de solo
+# documentacion deja un `sha` de `main` SIN imagenes, y entonces «esta en la historia de main»
+# —lo unico que se puede comprobar sin hablar con el registro— deja de implicar «se puede
+# desplegar», en silencio.
+#
+# Lo que costaria eso es justo el caso que el filtro venia a abaratar, y ahi la cache de capas
+# lo cubre: un commit que no toca `backend/` reconstruye desde capas identicas.
+#
+# ## El segundo trabajo no sobra
+#
+# Un `build-push-action` en verde dice que el `push` no devolvio error. Lo que hace falta afirmar
+# es otra cosa —**que la etiqueta se puede pedir**— y eso solo lo contesta el registro. Se
+# pregunta desde aqui porque es donde hay un token con `packages: read`; un PAT de escritorio
+# normal no lo tiene y recibe `403 DENIED`, que no se distingue de «no existe» si uno no lo mira.
+name: Publicar imágenes
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Sin `cancel-in-progress`: cancelar una publicacion a medias deja `main` con una imagen de las
+# dos, que es peor que esperar.
+concurrency:
+  group: publicar-imagenes-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publicar:
+    name: ${{ matrix.imagen }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      # Sin `fail-fast`: si una de las dos cae, interesa saber si la otra tambien.
+      fail-fast: false
+      matrix:
+        # `destino` es la etapa de `backend/Dockerfile`; `imagen`, el nombre publicado. Los dos
+        # difieren porque el Dockerfile los llama como se leen en ARQ-03 §4 y el registro los
+        # necesita con el prefijo del producto, que es lo unico que impide que `caja` y
+        # `catastro` de dos proyectos distintos colisionen en `ghcr.io/<owner>/`.
+        include:
+          - destino: aplicacion
+            imagen: kamayuk-rentas
+          - destino: migrador
+            imagen: kamayuk-rentas-migrador
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: El nombre del propietario, en minusculas
+        id: registro
+        run: |
+          # GHCR exige minusculas. `github.repository_owner` ya lo esta para este repositorio,
+          # pero un propietario con mayusculas rompe el `push` sin decir por que.
+          echo "propietario=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" \
+            >> "$GITHUB_OUTPUT"
+
+      # El contexto es la RAIZ del repositorio, no `backend/`, y el propio Dockerfile explica por
+      # que: hay `COPY` que salen de `backend/`. Con el contexto en `backend/` esos archivos
+      # sencillamente no existen dentro de la imagen y la tarea que los copia se salta con
+      # NO-SOURCE — compilando en verde.
+      #
+      # No hace falta el clon hermano de `infrastructure`: el Dockerfile construye con
+      # `-Pkamayuk.sinLibreriasComunes`, que desactiva el composite build de `comun-verificaciones`
+      # y, con el, TODA tarea de prueba. Aqui no corre ni una: las bloqueantes ya corrieron en
+      # `backend.yml`, contra un motor de verdad.
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: backend/Dockerfile
+          target: ${{ matrix.destino }}
+          push: true
+          tags: ghcr.io/${{ steps.registro.outputs.propietario }}/${{ matrix.imagen }}:${{ github.sha }}
+          cache-from: type=gha,scope=${{ matrix.imagen }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.imagen }}
+
+  comprobar:
+    name: Las dos etiquetas se pueden pedir al registro
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: publicar
+    permissions:
+      contents: read
+      packages: read
+
+    steps:
+      # Contra el REGISTRO, no contra el log del build. Un `build-push-action` en verde dice que
+      # el `push` no devolvio error; que la etiqueta se pueda PEDIR es otra afirmacion, y es la
+      # que decide si el pod arranca.
+      #
+      # Los tres desenlaces se distinguen a proposito, y el tercero es el que engaña:
+      #
+      #   200  la etiqueta existe.
+      #   404  MANIFEST_UNKNOWN: no existe. Es el estado en que estaban las ocho.
+      #   403  DENIED: el token no puede leer ese paquete. NO se puede concluir nada, ni que
+      #        falta ni que esta — asi que se falla diciendolo, en vez de dar por bueno un
+      #        codigo que no es 404.
+      - name: Preguntar a ghcr.io por cada etiqueta
+        env:
+          GHCR_USUARIO: ${{ github.actor }}
+          GHCR_CLAVE: ${{ secrets.GITHUB_TOKEN }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -u
+          propietario=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')
+          fallo=0
+          for imagen in kamayuk-rentas kamayuk-rentas-migrador; do
+            token=$(curl -sS -u "$GHCR_USUARIO:$GHCR_CLAVE" \
+              "https://ghcr.io/token?service=ghcr.io&scope=repository:$propietario/$imagen:pull" \
+              | python3 -c 'import sys, json; print(json.load(sys.stdin).get("token", ""))')
+            codigo=$(curl -sS -o /dev/null -w '%{http_code}' \
+              -H "Authorization: Bearer $token" \
+              -H 'Accept: application/vnd.oci.image.index.v1+json, application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.docker.distribution.manifest.v2+json' \
+              "https://ghcr.io/v2/$propietario/$imagen/manifests/$SHA")
+            case "$codigo" in
+              200) echo "OK   ghcr.io/$propietario/$imagen:$SHA" ;;
+              404) echo "::error::ghcr.io/$propietario/$imagen:$SHA NO existe en el registro (404). Un despliegue que la pida deja el pod en ImagePullBackOff."; fallo=1 ;;
+              *)   echo "::error::No se pudo saber si ghcr.io/$propietario/$imagen:$SHA existe: el registro contesto $codigo. No se da por buena una respuesta que no sea 200."; fallo=1 ;;
+            esac
+          done
+          exit "$fallo"
