@@ -25,7 +25,27 @@ jobs:
     # Un colgado no consume cuota sin limite: la leccion de `observabilidad-alertas`.
     timeout-minutes: 10
     steps:
+      # ESTE repositorio, y **no** en la raiz del espacio de trabajo (C-9a).
+      #
+      # `infrastructure/package.json` declara `@sgtm/infra-contrato` como
+      # `link:../../infrastructure/infra/contrato`: un hermano. Eso lo resuelve yarn al
+      # instalar, contra el disco, y **ninguna variable de entorno lo redirige** — asi que
+      # aqui la disposicion de hermanos no es una preferencia, esta escrita en el
+      # `package.json`.
+      #
+      # En CI no se puede reproducir clonando hacia arriba: `actions/checkout` se NIEGA a
+      # escribir fuera de `GITHUB_WORKSPACE` —«Repository path
+      # '/home/runner/work/infrastructure/sgtm' is not under
+      # '/home/runner/work/infrastructure/infrastructure'», que es como se descubrio—. Asi
+      # que lo que se mueve es el ANFITRION: este repositorio se clona en
+      # `<espacio>/rentas`, el hermano en `<espacio>/infrastructure`, y el `link:`
+      # resuelve exactamente igual que en la maquina de quien lo escribe.
+      #
+      # `path: infrastructure` a secas **no vale**: chocaria con el directorio
+      # `infrastructure/` que este repositorio ya tiene dentro.
       - uses: actions/checkout@v4
+        with:
+          path: rentas
 
       # El contrato vive en `infrastructure`, y la dependencia es `link:` a un repositorio
       # hermano. En CI ese hermano no esta, asi que se clona al lado — con la MISMA estructura
@@ -34,16 +54,16 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: hneyra/infrastructure
-          path: ../infrastructure
+          path: infrastructure
 
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
 
       - name: Instalar
-        working-directory: infrastructure
+        working-directory: rentas/infrastructure
         run: yarn install --frozen-lockfile
 
       - name: Verificar el descriptor
-        working-directory: infrastructure
+        working-directory: rentas/infrastructure
         run: yarn verificar
