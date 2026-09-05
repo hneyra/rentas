@@ -227,11 +227,51 @@ public final class MotorPostgres implements AutoCloseable {
                         nombreDeImagen(
                                 imagen == null || imagen.isBlank() ? IMAGEN_POR_OMISION : imagen));
         contenedor.start();
-        return new MotorPostgres(
-                contenedor,
-                contenedor.getJdbcUrl(),
-                contenedor.getUsername(),
-                contenedor.getPassword());
+        return conContenedor(contenedor);
+    }
+
+    /**
+     * El motor de un contenedor recien levantado, sobre una base creada por nosotros.
+     *
+     * <p><b>Aqui estaba la divergencia entre local y CI, y por eso este metodo existe.</b> Los dos
+     * caminos parecian equivalentes —«Testcontainers entrega un motor limpio»— y no lo eran: el
+     * externo creaba su base con {@link #sentenciaDeCreacion}, o sea desde {@code template0}, y
+     * este se quedaba con la base por omision del contenedor, que la crea {@code initdb} desde
+     * {@code template1}. La imagen es {@code postgis/postgis}, que instala PostGIS <b>en {@code
+     * template1}</b>, asi que toda base heredada de ahi nace con {@code postgis}, {@code
+     * postgis_topology}, {@code postgis_tiger_geocoder} y {@code fuzzystrmatch} dentro — y con
+     * ellas la tabla {@code spatial_ref_sys}, que no es de este esquema.
+     *
+     * <p>Medido en CI el 2026-09-05: {@code AislamientoMultiTenantTest} caia en {@code rentas},
+     * {@code normativa} y {@code caja} con «spatial_ref_sys tiene ENABLE ROW LEVEL SECURITY:
+     * Expecting value to be true but was false», o sea que <b>la prueba bloqueante mas importante
+     * del sistema no llegaba a ejecutarse en el unico sitio donde corre siempre</b>. En local no
+     * aparecia nunca, porque en local se usa el camino externo.
+     *
+     * <p>Y la salida comoda —eximir {@code spatial_ref_sys} en los tres— era la mala: dejaria a
+     * local probando una base sin extensiones y a CI una con ellas, y una prueba que mide cosas
+     * distintas segun donde corra no dice lo que parece decir. {@code rentas} ademas ya habia
+     * <b>sacado</b> esa exencion en P5E por escrito, precisamente porque su {@code crear-roles.sql}
+     * no crea PostGIS: volver a ponerla habria sido deshacer una decision tomada.
+     *
+     * <p>Con esto, la base de cada corrida trae exactamente las extensiones que el {@code
+     * crear-roles.sql} de su sistema declara —dos en {@code rentas}, tres en {@code catastro},
+     * ninguna en {@code normativa} y en {@code caja}—, se llegue por donde se llegue.
+     */
+    private static MotorPostgres conContenedor(PostgreSQLContainer<?> contenedor) {
+        String urlDeArranque = contenedor.getJdbcUrl();
+        String usuario = contenedor.getUsername();
+        String clave = contenedor.getPassword();
+        String nombre = nombreDeBaseNueva();
+        crearBase(urlDeArranque, nombre, usuario, clave);
+        MotorPostgres motor =
+                new MotorPostgres(
+                        contenedor, reemplazarBaseDeDatos(urlDeArranque, nombre), usuario, clave);
+        // La base muere con el contenedor, asi que `close()` no la borra; se guarda para que
+        // `urlDeCoordinacion()` y los mensajes de error digan la misma base en los dos caminos.
+        motor.urlDeMantenimiento = urlDeArranque;
+        motor.nombreDeLaBase = nombre;
+        return motor;
     }
 
     /**
@@ -308,13 +348,27 @@ public final class MotorPostgres implements AutoCloseable {
      * claves unicas en lugar de como lo que es.
      */
     private static MotorPostgres conMotorExterno(String urlBase, String usuario, String clave) {
-        String nombre = "sgtm_prueba_" + UUID.randomUUID().toString().substring(0, 8);
+        String nombre = nombreDeBaseNueva();
         crearBase(urlBase, nombre, usuario, clave);
         MotorPostgres motor =
                 new MotorPostgres(null, reemplazarBaseDeDatos(urlBase, nombre), usuario, clave);
         motor.urlDeMantenimiento = urlBase;
         motor.nombreDeLaBase = nombre;
         return motor;
+    }
+
+    /**
+     * El prefijo de toda base de prueba, y la unica forma de saber que la creamos nosotros.
+     *
+     * <p>Lo lee {@code BaseRecienNacidaTest}: una base que no se llame asi es la que venia hecha
+     * —la del contenedor, o la que alguien nombro en la URL—, y esa no paso por {@link
+     * #sentenciaDeCreacion}.
+     */
+    static final String PREFIJO_DE_LA_BASE = "sgtm_prueba_";
+
+    /** Un nombre nuevo para la base de esta corrida. */
+    private static String nombreDeBaseNueva() {
+        return PREFIJO_DE_LA_BASE + UUID.randomUUID().toString().substring(0, 8);
     }
 
     /** Cambia el nombre de la base en una URL JDBC, conservando host, puerto y parametros. */

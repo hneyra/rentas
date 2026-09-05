@@ -178,6 +178,35 @@ class AislamientoMultiTenantTest {
         }
 
         @Test
+        @DisplayName("EL REVERSO: ninguna entrada de TABLAS_EXENTAS sobra")
+        void ningunaExencionSobra() throws SQLException {
+            // La lista tiene dos direcciones y solo una la medía nadie. `todaTablaEstaClasificada`
+            // exige que toda tabla este en alguna lista; sin esta, una entrada que ya no exime
+            // nada se queda dentro para siempre y la lista deja de decir lo que exime.
+            //
+            // Y no es hipotetico: `spatial_ref_sys` la instala PostGIS, y hasta C-11 la base de
+            // prueba la heredaba de `template1` por el camino de Testcontainers. La salida comoda
+            // ante ese rojo era anadirla aqui en los tres sistemas que NO crean PostGIS —lo que
+            // habria dejado a local y a CI midiendo bases distintas—. Con esta guarda, esa salida
+            // ya no esta: en un sistema que no crea la extension, la tabla no existe y la entrada
+            // se rechaza nombrandola.
+            List<String> existentes =
+                    consultarTextos(
+                            "SELECT c.relname FROM pg_class c"
+                                    + " JOIN pg_namespace n ON n.oid = c.relnamespace"
+                                    + " WHERE n.nspname = 'public' AND c.relkind IN ('r','p')"
+                                    + " ORDER BY 1");
+
+            assertThat(TABLAS_EXENTAS)
+                    .as(
+                            "una exencion que ya no exime nada es peor que ninguna: dice que hay"
+                                    + " una tabla sin RLS donde no hay ninguna tabla. Si la tabla se"
+                                    + " fue, la entrada se va con ella; si nunca estuvo, la entrada"
+                                    + " esta tapando un rojo que hay que arreglar en otro sitio")
+                    .allSatisfy(exenta -> assertThat(existentes).contains(exenta));
+        }
+
+        @Test
         @DisplayName("toda tabla no exenta tiene RLS activa y forzada")
         void todaTablaTieneRlsActivaYForzada() throws SQLException {
             SoftAssertions verificaciones = new SoftAssertions();
