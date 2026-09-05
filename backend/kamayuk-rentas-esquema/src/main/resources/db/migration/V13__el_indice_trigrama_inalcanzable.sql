@@ -1,0 +1,134 @@
+-- ============================================================================
+--  V13 — se retira `contribuyente_nombre_trgm_ix`, que nadie puede usar (C-12)
+--
+--  QUE SE RETIRA, Y QUE NO
+--  -----------------------
+--  Se va EL INDICE. No se va `pg_trgm`, no se va `nombre_normalizado(text)` y no
+--  cambia ni una linea de la consulta: la busqueda por aproximacion de RF-014
+--  sigue siendo `similarity(...) >= 0.30` y sigue encontrando exactamente lo
+--  mismo, comprobado fila a fila con el indice puesto y sin el.
+--
+--  EL DEFECTO, MEDIDO Y NO SUPUESTO
+--  --------------------------------
+--  `C-4` §5 lo destapo midiendo otra cosa: bajo RLS este indice **es
+--  inalcanzable**. `C-12` fue a arreglarlo y lo que midio es que no se puede
+--  arreglar sin pagar un precio que no vale la pena. La medida, contra
+--  PostgreSQL 16.15, con 30 000 contribuyentes en cada una de dos
+--  municipalidades, conectado como `sgtm_app` y con RLS activa:
+--
+--                         | similarity(...) >= 0.30  |  el operador %
+--                         | (lo que la app pregunta) | (lo que el indice sabe)
+--    ---------------------+--------------------------+------------------------
+--     sgtm_app, RLS activa| Bitmap Index Scan sobre  | Bitmap Index Scan sobre
+--                         | contribuyente_pk         | contribuyente_pk
+--                         | 1 109 paginas, 95,9 ms   | 1 109 paginas, 94,9 ms
+--                         | 29 243 filas al Filter   | 29 243 filas al Filter
+--    ---------------------+--------------------------+------------------------
+--     superusuario        | Seq Scan                 | Bitmap Index Scan sobre
+--     (omite RLS)         | 992 paginas, 162,4 ms    | ESTE INDICE
+--                         |                          | 781 paginas, 32,2 ms
+--
+--  Hacen falta LAS DOS COSAS para que el indice sirva —preguntar con `%` y no
+--  tener RLS delante—, y esta aplicacion no tiene ninguna de las dos.
+--
+--  1. **El operador no llega al indice bajo RLS.** `similarity_op` tiene
+--     `proleakproof = f` —leido de `pg_proc`—, asi que PostgreSQL no lo puede
+--     evaluar antes de la politica de seguridad y no lo admite como condicion de
+--     ningun indice. Es el QUINTO hallazgo de DAT-01 §0 por SEXTA vez, tras
+--     `textlike` con el `LIKE` (#565), `geography_overlaps` con el marco (#536),
+--     `construccion.ficha_id` (#313), la titularidad a una fecha (#561) y la
+--     cartera (#639). Y con el mismo sintoma engañoso: **el plan sigue diciendo
+--     «Index»**, porque usa `contribuyente_pk` por la condicion de la propia
+--     politica y lee el padron entero del inquilino.
+--  2. **Y la consulta ni siquiera pregunta con `%`.** Pregunta con
+--     `similarity(...) >= 0.30`, que `gin_trgm_ops` no sabe responder ni sin RLS
+--     — la fila de arriba a la derecha lo enseña: como superusuario, ese
+--     predicado sale en `Seq Scan`.
+--
+--  LAS TRES SALIDAS CONOCIDAS DE ESTE PROYECTO, MEDIDAS Y DESCARTADAS
+--  ------------------------------------------------------------------
+--  * **La de #565 / `V66` —una columna generada—: NO SIRVE aqui.** Se midio:
+--    con `nombre_busqueda` generada y un GIN sobre la COLUMNA, la consulta como
+--    `sgtm_app` sale en `Seq Scan`. Alli lo que no era *leakproof* era la
+--    FUNCION —y la columna generada la saca de la expresion—; aqui lo que no lo
+--    es es el OPERADOR, y ese se queda.
+--  * **La de #536 —sustituir el operador por desigualdades—: no existe.** Del
+--    censo de `pg_proc`: NINGUN operador de `pg_trgm` es *leakproof* (`%`,
+--    `<%`, `<<%`, `<->`), y tampoco lo son los de arreglos (`&&`, `@>`), que
+--    cerrarian la variante «guardar los trigramas y cruzarlos». Lo unico
+--    *leakproof* que sirve sobre texto es la igualdad y las comparaciones de
+--    patron, y ninguna de las dos expresa «se parece».
+--  * **Un indice compuesto con `btree_gin`: es la leccion de #313 literal.** Se
+--    midio: `Bitmap Index Scan on <el indice compuesto>` —el plan dice «Index»—
+--    con `Index Cond` de SOLO `municipalidad_id` y el trigrama en el `Filter`,
+--    descartando las mismas 29 243 filas.
+--
+--  Y LA QUE SI FUNCIONA, QUE ES LA QUE NO SE HACE
+--  ----------------------------------------------
+--  Marcar la cadena entera `LEAKPROOF`. Medido tambien, y en dos pasos, porque
+--  el primero enseña algo que no se veia venir:
+--
+--    * marcar SOLO `similarity_op` **no cambia el plan**. El operando es
+--      `nombre_normalizado(...)`, que PostgreSQL inserta en linea, de modo que
+--      dentro del predicado quedan ademas `lower`, `regexp_replace` y
+--      `unaccent`, y ninguna de las cuatro es *leakproof*: basta una para que la
+--      clausula entera no se pueda promover.
+--    * marcando las CINCO, el indice SI se usa bajo RLS —781 paginas, 32,5 ms—
+--      y la condicion de la politica **baja al `Filter`**, que es exactamente el
+--      precio: el indice se consulta antes que la politica de aislamiento.
+--
+--  No se hace, por lo mismo que #536 lo descarto para `geography_overlaps` y por
+--  dos motivos mas propios de aqui: es un acto de SUPERUSUARIO que no cabe en
+--  una migracion; es AFIRMAR que ninguna de cuatro funciones en C —tres del
+--  nucleo y una de una extension— puede revelar por un error la fila de otra
+--  municipalidad; y `lower()` y `regexp_replace()` las usa medio sistema, asi
+--  que la marca no debilitaria esta consulta sino TODA consulta con RLS de esta
+--  base.
+--
+--  LO QUE EL INDICE CUESTA MIENTRAS TANTO
+--  --------------------------------------
+--  * **2 496 kB** sobre 30 000 filas, un 31 % del monton de la tabla (7 936 kB).
+--  * y casi DOBLA lo que cuesta escribir en el padron: 5 000 altas tardan
+--    **75,0 ms** con el indice y **38,9 ms** sin el (mediana de tres).
+--
+--  Un indice que nadie puede usar no es neutro: se paga en cada alta y en cada
+--  correccion de un contribuyente. Y ademas MIENTE, porque su nombre promete una
+--  busqueda por trigramas que no ocurre — que es lo que hizo falta medir dos
+--  veces para descubrir.
+--
+--  LO QUE LA BUSQUEDA CUESTA SIN EL, QUE ES LO MISMO QUE COSTABA CON EL
+--  --------------------------------------------------------------------
+--  Nada cambia, porque el indice no se usaba. Sobre el padron REAL de Catacaos
+--  —10 603 contribuyentes— en una instalacion de tres municipalidades: **398
+--  paginas y 19,2 ms**. El dia que eso no baste, lo que hace falta no es este
+--  indice: es un indice invertido propio —una tabla de trigramas por
+--  contribuyente, cruzada con `=`, que SI es *leakproof*—, con su disparador y
+--  con la similitud reimplementada. Es otro trabajo, con su medida y su
+--  decision, y esta escrito aqui para que quien llegue no vuelva a empezar por
+--  volver a crear este indice.
+--
+--  ESTO NO SE PUEDE HACER EN EL MONOLITO
+--  -------------------------------------
+--  `sgtm` tiene el mismo indice en su `V11__busqueda_por_aproximacion.sql`, que
+--  es una migracion APLICADA del archivo historico: no se edita —cambiaria su
+--  suma de Flyway— y ese repositorio no admite migraciones nuevas. Alli el
+--  indice se queda, inalcanzable, y lo unico que se puede hacer es decirlo.
+--
+--  POR QUE ESTO NO ES DESTRUCTIVO
+--  ------------------------------
+--  Un indice no es un dato (regla 4, RNF-051): retirarlo no borra ni una fila y
+--  volver a crearlo es una migracion de una linea. Se retira con `DROP INDEX` a
+--  secas —sin `CONCURRENTLY`— porque Flyway migra en transaccion y `CONCURRENTLY`
+--  no cabe en una; el bloqueo dura lo que dura borrar el nodo del catalogo.
+-- ============================================================================
+
+DROP INDEX IF EXISTS contribuyente_nombre_trgm_ix;
+
+COMMENT ON FUNCTION public.nombre_normalizado(text) IS
+    'Minusculas, sin tildes y sin espacios repetidos. IMMUTABLE para poder indexarla. '
+    'La funcion y el diccionario van CUALIFICADOS con su esquema desde C-4: los dos se '
+    'resuelven por search_path, y pg_dump lo vacia. Desde C-12 ya NO la indexa nadie '
+    '—contribuyente_nombre_trgm_ix era inalcanzable bajo RLS y se retiro—, asi que en '
+    'este esquema solo se llama en tiempo de consulta; la cualificacion se queda porque '
+    'sigue siendo correcta y porque el mismo cuerpo se vuelca en catastro, donde SI lo '
+    'inserta en linea una columna generada';
