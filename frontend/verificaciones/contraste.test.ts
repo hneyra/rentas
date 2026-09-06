@@ -386,29 +386,29 @@ describe('que par quedo mas cerca del limite', () => {
     const conMargen = evaluables
       .map((par) => ({
         par,
-        margen: dosDecimales(ratio(color(tema, par.frente), color(tema, par.fondo))) - MINIMO[par.criterio],
+        ratio: dosDecimales(ratio(color(tema, par.frente), color(tema, par.fondo))),
       }))
+      .map((medida) => ({ ...medida, margen: medida.ratio - MINIMO[medida.par.criterio] }))
       .sort((uno, otro) => uno.margen - otro.margen);
 
-    const primero = conMargen[0];
-    expect(primero).toBeDefined();
-
-    const esperado = MAS_AJUSTADO[tema];
-    const medido = dosDecimales(
-      ratio(color(tema, (primero as { par: Par }).par.frente), color(tema, (primero as { par: Par }).par.fondo)),
-    );
+    const [masAjustado] = conMargen;
+    if (masAjustado === undefined) {
+      // No es una asercion: si no hay pares que evaluar, esta prueba no mide nada y
+      // decirlo asi es mas util que un `expect` que pasa sobre una lista vacia.
+      throw new Error(`No hay ningun par evaluable en el tema ${tema}.`);
+    }
 
     expect(
       {
-        frente: (primero as { par: Par }).par.frente,
-        fondo: (primero as { par: Par }).par.fondo,
-        criterio: (primero as { par: Par }).par.criterio,
-        ratio: medido,
+        frente: masAjustado.par.frente,
+        fondo: masAjustado.par.fondo,
+        criterio: masAjustado.par.criterio,
+        ratio: masAjustado.ratio,
       },
       `El par mas ajustado del tema ${tema} cambio. Si el cambio es deliberado, se anota aqui\n` +
         'el nuevo: esta constante es lo que hace que «pasa de sobra» y «pasa por poco» sean\n' +
         'afirmaciones distintas.',
-    ).toEqual(esperado);
+    ).toEqual(MAS_AJUSTADO[tema]);
   });
 });
 
