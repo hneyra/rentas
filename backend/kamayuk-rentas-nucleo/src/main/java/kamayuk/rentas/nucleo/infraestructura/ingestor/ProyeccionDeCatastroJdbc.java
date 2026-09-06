@@ -285,7 +285,7 @@ public class ProyeccionDeCatastroJdbc implements ProyeccionDeCatastro {
                         .param("construccion", importe(valuacion.valorConstruccion()))
                         .param("obras", importe(valuacion.valorObras()))
                         .param("total", importe(valuacion.valorDelPredio()))
-                        .param("motivo", valuacion.motivo())
+                        .param("motivo", recortarMotivoDeValuacion(valuacion.motivo()))
                         .param("llave", valuacion.llaveQueFalta())
                         .param("ficha", valuacion.fichaCatastralId())
                         .param("conjunto", valuacion.conjuntoId())
@@ -376,5 +376,44 @@ public class ProyeccionDeCatastroJdbc implements ProyeccionDeCatastro {
     /** El largo de {@code catastro_evento_muerto.motivo}. */
     private static String recortar(String motivo) {
         return motivo.length() <= 400 ? motivo : motivo.substring(0, 400);
+    }
+
+    /** El largo de {@code valuacion_predio.motivo} (`V5__valuacion_recibida.sql`). */
+    private static final int LARGO_DEL_MOTIVO_DE_VALUACION = 300;
+
+    /**
+     * El motivo de una valuacion, recortado a lo que su columna admite.
+     *
+     * <h2>Por que existe, medido y no supuesto</h2>
+     *
+     * <p>Este metodo faltaba, y la asimetria con {@link #recortar} —que si recorta el de {@code
+     * catastro_evento_muerto}, cuya columna es MAS ANCHA— no era deliberada. Se vio al crecer un
+     * motivo de {@code catastro} a 388 caracteres: la ingestion entera murio con «ERROR: value too
+     * long for type character varying(300)».
+     *
+     * <p><b>Y lo caro no es el error: es lo que viene detras.</b> Los hechos llegan por el buzon de
+     * salida, que entrega y REINTENTA. Un motivo que no cabe no se pierde con un aviso — se queda
+     * reintentando para siempre, y lo unico visible de este lado es que las valuaciones de ese
+     * predio no llegan. Recortar deja el hecho DENTRO, que es lo que se necesita: la cifra, la
+     * llave que falta y el predio son lo que decide, y el motivo es el texto que lo explica.
+     *
+     * <h2>Lo que cuesta, dicho</h2>
+     *
+     * <p>Un diagnostico cortado en silencio, que este proyecto normalmente evita. Se acepta porque
+     * la alternativa medida es peor —el hecho no llega nunca— y porque {@code llave_que_falta}
+     * viaja aparte y NO se recorta: la parte del motivo que una maquina lee esta a salvo, y lo que
+     * se puede perder es la cola de una frase.
+     *
+     * <p><b>Y no es la unica mitad del arreglo</b>: {@code catastro} tiene desde el mismo dia una
+     * guarda que impide que sus diez motivos crezcan (su {@code
+     * NingunMotivoDesbordaAlConsumidorTest}). Esta es la de este lado, y hace falta igual: aquella
+     * vigila los motivos que hoy existen, y esta protege de los que lleguen manana por cualquier
+     * otra via.
+     */
+    private static @Nullable String recortarMotivoDeValuacion(@Nullable String motivo) {
+        if (motivo == null || motivo.length() <= LARGO_DEL_MOTIVO_DE_VALUACION) {
+            return motivo;
+        }
+        return motivo.substring(0, LARGO_DEL_MOTIVO_DE_VALUACION);
     }
 }
