@@ -1,5 +1,5 @@
 /**
- * Los tipos que el sistema de disenio necesita del dominio.
+ * Los tipos que el sistema de diseno necesita del dominio.
  *
  * Son tres, y ninguno es una clase: lo que llega del backend es JSON, y envolverlo
  * aqui obligaria a desenvolverlo antes de cada `fetch`. Lo que si hacen es

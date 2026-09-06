@@ -2,7 +2,7 @@
  * El marcador de carga.
  *
  * **El artboard no lo dibuja.** Lo que declara es `hint-placeholder-count` en
- * cada `sc-for`, que le dice al editor cuantas filas fingir mientras se disenia;
+ * cada `sc-for`, que le dice al editor cuantas filas fingir mientras se disena;
  * no es un estado de la aplicacion. Asi que este componente es nuestro, y hace
  * lo minimo: ocupar el sitio que ocupara el dato, con el barrido que
  * `prefers-reduced-motion` apaga desde `base.css`.

@@ -27,7 +27,7 @@ const TRAZOS = {
   expediente: ['M6.5 3.5h7.5l4 4v13h-11.5z', 'M14 3.5v4h4', 'M9.5 12.5h5'],
   /** El triangulo de «Infracciones administrativas», con su admiracion. */
   alerta: ['M12 4.2 20.8 19.6H3.2z', 'M12 7.6V13M12 16.4h.02'],
-  /** El candado del artboard (la contrasenia). Es el icono de «sin permiso». */
+  /** El candado del artboard (la contrasena). Es el icono de «sin permiso». */
   candado: ['M7 11V8a5 5 0 0 1 10 0v3', 'M5.5 11h13v9.5h-13z'],
   visto: ['M5 12.5l4.5 4.5L19 7'],
   mas: ['M12 5v14M5 12h14'],

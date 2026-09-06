@@ -4,7 +4,7 @@
    **Ni un hexadecimal, ni un pixel suelto: todo sale de `tokens/`.** Es lo que
    hace que el tema oscuro exista sin tocar un solo componente, y lo que hace que
    la prueba de contraste signifique algo — si un componente pintara un color a
-   mano, la prueba mediria unos tokens y la pantalla enseniaria otros.
+   mano, la prueba mediria unos tokens y la pantalla ensenaria otros.
 
    El prefijo es `kr-` (kamayuk rentas). No hay modulos de CSS ni `styled`: el
    nombre de clase es plano y estable, para que se pueda leer en el inspector y

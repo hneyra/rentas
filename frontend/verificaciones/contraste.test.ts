@@ -214,7 +214,7 @@ const POR_DEBAJO_DEL_MINIMO: ReadonlyArray<{
     ratio: 1.58,
     porque:
       'El filo de un control en reposo. #C3CFD9 es `const BORDE_CAMPO` del artboard, y AC2 ' +
-      'lo ata: cambiarlo aqui seria repintar el disenio desde una prueba. El estado de FOCO ' +
+      'lo ata: cambiarlo aqui seria repintar el diseno desde una prueba. El estado de FOCO ' +
       'si cumple —el filo pasa a `--azul` (8.27:1) mas un halo de 3 px—, asi que lo que ' +
       'queda por debajo es solo el reposo. Cerrarlo es un cambio del artboard, no de F-2. ' +
       'En el tema oscuro, donde nada obliga, el mismo token si cumple (3.56:1).',

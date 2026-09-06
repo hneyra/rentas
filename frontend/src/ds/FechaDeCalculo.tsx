@@ -6,7 +6,7 @@ import type { Fecha } from '../dominio/valores.ts';
  *
  * **Es de la respuesta, no de un bloque de totales**, y ahi estaba el defecto
  * que este componente corrige: cuando la fecha vive dentro de la banda de
- * totales, las pantallas que ensenian cifras en una tabla y no tienen banda se
+ * totales, las pantallas que ensenan cifras en una tabla y no tienen banda se
  * quedan mostrando importes sin decir de cuando son.
  *
  * `fecha` es obligatoria por el mismo motivo que en `Importe`: no hay respuesta

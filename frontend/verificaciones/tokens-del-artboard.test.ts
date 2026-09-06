@@ -18,7 +18,7 @@ import {
 /**
  * Los tokens dicen lo que dice el artboard.
  *
- * **Es la barrera contra el modo de fallo mas caro de un sistema de disenio: que
+ * **Es la barrera contra el modo de fallo mas caro de un sistema de diseno: que
  * alguien reescriba un valor a ojo.** Un `#005286` en vez de `#005284` no lo ve
  * nadie en una revision, no rompe ninguna prueba de componente, y a los tres
  * meses hay dos azules en la pantalla y ya no se sabe cual era el bueno.
@@ -201,7 +201,7 @@ describe('los componentes no pintan: solo usan tokens', () => {
       colores,
       `«${hoja}» tiene un color escrito a mano. Todo color sale de \`tokens/colors.css\`:\n` +
         'es lo que hace que el tema oscuro exista sin tocar un componente, y lo que hace\n' +
-        'que la prueba de contraste mida lo que la pantalla ensenia y no otra cosa.',
+        'que la prueba de contraste mida lo que la pantalla ensena y no otra cosa.',
     ).toEqual([]);
   });
 });
@@ -257,7 +257,7 @@ describe('la escala tipografica y el espaciado son los del artboard', () => {
       comoLoEscribeElArtboard.includes(valor as string),
       `«${token}» vale ${valor} y el artboard escribe «${comoLoEscribeElArtboard}».\n` +
         'Los medios pixeles de V6 son deliberados: una tabla de 13.5 px cabe donde una de\n' +
-        '14 no. Redondearlos es reescribir el disenio a ojo.',
+        '14 no. Redondearlos es reescribir el diseno a ojo.',
     ).toBe(true);
 
     expect(

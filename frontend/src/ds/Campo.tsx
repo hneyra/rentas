@@ -63,7 +63,7 @@ export interface CampoProps {
   readonly onCambio?: (valor: string) => void;
 }
 
-/** Lo que ensenia un campo de solo lectura que todavia no tiene valor. */
+/** Lo que ensena un campo de solo lectura que todavia no tiene valor. */
 const SIN_VALOR = '—';
 
 export function Campo({
@@ -132,7 +132,7 @@ export function Campo({
       // **Lo que sirvio la API manda sobre la lista del catalogo.** Las dos
       // vienen de sitios distintos y no tienen por que coincidir; un `select`
       // con un valor que no esta en su lista se dibuja mostrando la PRIMERA
-      // opcion, y entonces la pantalla ensenia una eleccion que nadie hizo.
+      // opcion, y entonces la pantalla ensena una eleccion que nadie hizo.
       const declaradas = opciones ?? [];
       const todas =
         valor === '' || declaradas.includes(valor) ? declaradas : [valor, ...declaradas];

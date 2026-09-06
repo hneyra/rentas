@@ -67,10 +67,10 @@ describe('el error del backend', () => {
 });
 
 describe('el desplegable', () => {
-  it('un valor que la API sirvio y el catalogo no tiene se ensenia igual', () => {
+  it('un valor que la API sirvio y el catalogo no tiene se ensena igual', () => {
     // Las dos listas vienen de sitios distintos y no tienen por que coincidir. Un
     // `<select>` con un valor que no esta en sus opciones se dibuja mostrando la
-    // PRIMERA, y entonces la pantalla ensenia una eleccion que nadie hizo.
+    // PRIMERA, y entonces la pantalla ensena una eleccion que nadie hizo.
     render(
       <Campo
         etiqueta="Tipo de via"
@@ -116,7 +116,7 @@ describe('bloqueado y solo lectura no son lo mismo', () => {
     expect(control).toHaveFocus();
   });
 
-  it('un «ro» es un valor calculado, y ensenia una raya cuando no lo hay', () => {
+  it('un «ro» es un valor calculado, y ensena una raya cuando no lo hay', () => {
     render(<Campo etiqueta="Departamento" tipo="ro" />);
 
     expect(screen.getByLabelText('Departamento')).toHaveTextContent('—');
