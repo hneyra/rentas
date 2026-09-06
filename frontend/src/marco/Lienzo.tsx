@@ -1,22 +1,27 @@
 import { Aviso, Boton, Campo, Icono } from '../ds/index.ts';
+import { Contribuyentes } from '../secciones/Contribuyentes.tsx';
+import { Panel } from '../secciones/Panel.tsx';
+import type { EstadoDelPadron } from '../secciones/estadoDelPadron.ts';
 import { HOJAS, esPropia } from './arbol.ts';
 import { Trazos } from './Trazos.tsx';
 
 /**
  * El lienzo: lo que hay debajo de las pestanas.
  *
- * Tiene **tres estados y ninguno mas**, porque el contenido de las cuatro
- * secciones de Rentas esta fuera del alcance de este issue:
+ * Tiene **cinco estados**:
  *
  *   1. **sin pestanas** — no hay nada abierto, y se dice;
- *   2. **una hoja ajena** — la ficha del AC9, que explica en que archivo se
- *      disena esa pantalla y deja la pestana abierta para volver a ella;
- *   3. **una seccion propia** — el hueco declarado, con **un** campo.
+ *   2. **una hoja ajena** — la ficha del AC9 de F-3, que explica en que archivo
+ *      se disena esa pantalla y deja la pestana abierta para volver a ella;
+ *   3. **`panel`** — el panel del modulo (F-5, AC1);
+ *   4. **`predios`** — el padron y el expediente (F-5, AC2 a AC9);
+ *   5. **`territorio` y `valores`** — el hueco declarado, con **un** campo,
+ *      hasta que #8 las construya.
  *
  * <h2>Por que el hueco lleva un campo, y por que es «Observación»</h2>
  *
- * El AC5 pide que **editar un campo** marque la pestana. Un lienzo del todo
- * vacio no tiene ninguno, asi que la mecanica del estado sucio no se podria
+ * El AC5 de F-3 pide que **editar un campo** marque la pestana. Un lienzo del
+ * todo vacio no tiene ninguno, asi que la mecanica del estado sucio no se podria
  * demostrar ni usar: habria que creersela hasta que llegara la primera pantalla.
  *
  * Y es la observacion y no un campo cualquiera porque es el unico que toda
@@ -30,9 +35,26 @@ export interface LienzoProps {
   readonly observacion: string;
   readonly alEscribirObservacion: (observacion: string) => void;
   readonly alCerrar: (destino: string) => void;
+  /** Abre otra seccion: «Ver todo el padrón» del panel, y cada frente de la cola. */
+  readonly alAbrir: (destino: string) => void;
+  /** Marca la pestana activa como sucia: es lo que pone el asterisco (AC9). */
+  readonly alEnsuciar: () => void;
+  readonly alAvisar: (texto: string) => void;
+  readonly padron: EstadoDelPadron;
+  readonly alCambiarPadron: (cambio: Partial<EstadoDelPadron>) => void;
 }
 
-export function Lienzo({ activa, observacion, alEscribirObservacion, alCerrar }: LienzoProps) {
+export function Lienzo({
+  activa,
+  observacion,
+  alEscribirObservacion,
+  alCerrar,
+  alAbrir,
+  alEnsuciar,
+  alAvisar,
+  padron,
+  alCambiarPadron,
+}: LienzoProps) {
   if (activa === null) {
     return (
       <main className="kr-marco__lienzo kr-marco__lienzo--vacio">
@@ -101,6 +123,32 @@ export function Lienzo({ activa, observacion, alEscribirObservacion, alCerrar }:
     );
   }
 
+  if (activa === 'panel') {
+    return (
+      <Panel
+        alIrAlPadron={(chip) => {
+          alCambiarPadron({ elegido: null, chip: chip ?? padron.chip });
+          alAbrir('predios');
+        }}
+        alAbrirContribuyente={(codigo) => {
+          alCambiarPadron({ elegido: codigo, paso: 0, vals: {}, intento: false });
+          alAbrir('predios');
+        }}
+      />
+    );
+  }
+
+  if (activa === 'predios') {
+    return (
+      <Contribuyentes
+        estado={padron}
+        alCambiar={alCambiarPadron}
+        alEnsuciar={alEnsuciar}
+        alAvisar={alAvisar}
+      />
+    );
+  }
+
   return (
     <main className="kr-marco__lienzo">
       <div className="kr-marco__hueco">
@@ -108,9 +156,8 @@ export function Lienzo({ activa, observacion, alEscribirObservacion, alCerrar }:
           tipo="vacio"
           titulo={`La pantalla de «${hoja.rotulo}» todavía no está construida`}
           detalle={
-            'Este issue entrega el marco: el árbol, las pestañas, el enrutado por hash y el ' +
-            'estado sin guardar. El contenido de las cuatro secciones de Rentas llega en su ' +
-            'propio issue.'
+            'El marco, el panel y el padrón ya están: esta sección es una de las dos que faltan ' +
+            '—Determinación y Valores— y llega en su propio issue.'
           }
         />
         <div className="kr-marco__observacion">

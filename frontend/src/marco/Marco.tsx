@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useReducer, useState } from 'react';
 
 import { Icono } from '../ds/index.ts';
+import {
+  NUEVO,
+  PADRON_AL_EMPEZAR,
+  type EstadoDelPadron,
+} from '../secciones/estadoDelPadron.ts';
 import { BarraGlobal } from './BarraGlobal.tsx';
 import { Confirmacion } from './Confirmacion.tsx';
 import { Lienzo } from './Lienzo.tsx';
@@ -15,9 +20,10 @@ import { estadoInicial, reducir } from './pestanas.ts';
  * El marco V6: **se construye una vez y lo usan todos los modulos** (F-3).
  *
  * Es la barra global, el arbol de la izquierda, las pestanas, el enrutado por
- * hash y el estado sin guardar. **No es ninguna pantalla**: el contenido de las
- * cuatro secciones de Rentas y los datos son de otros issues, y hasta que
- * lleguen el lienzo dice que esta vacio en vez de aparentar que no lo esta.
+ * hash y el estado sin guardar. **No es ninguna pantalla**: las secciones viven
+ * en `src/secciones/` y el marco solo decide cual se ensena. Desde F-5 hay dos
+ * —el panel y el padron—; para las otras dos el lienzo sigue diciendo que estan
+ * vacias en vez de aparentar que no lo estan.
  *
  * <h2>Solo la variante A</h2>
  *
@@ -75,7 +81,7 @@ function tituloDe(activa: string | null, ejercicio: string): string {
   return hoja.rotulo;
 }
 
-function subtituloDe(activa: string | null, ejercicio: string): string {
+function subtituloDe(activa: string | null, ejercicio: string, padron: EstadoDelPadron): string {
   if (activa === null) {
     return '';
   }
@@ -86,7 +92,20 @@ function subtituloDe(activa: string | null, ejercicio: string): string {
   if (!esPropia(activa)) {
     return hoja.modulo;
   }
-  return activa === 'panel' ? `Ejercicio ${ejercicio}` : (SUBTITULOS[activa] ?? '');
+  if (activa === 'panel') {
+    return `Ejercicio ${ejercicio}`;
+  }
+  // El del padron dice **a quien se esta mirando**, como el artboard: el codigo cuando hay un
+  // expediente abierto, y que se esta creando cuando se esta creando. La cifra de «62,418
+  // contribuyentes en el padrón» sigue sin escribirse aqui: es un dato, y el dato lo tiene la
+  // seccion, que es quien lo pidio.
+  if (activa === 'predios') {
+    if (padron.elegido === NUEVO) {
+      return 'Creando un contribuyente';
+    }
+    return padron.elegido ?? (SUBTITULOS[activa] ?? '');
+  }
+  return SUBTITULOS[activa] ?? '';
 }
 
 export function Marco() {
@@ -103,6 +122,10 @@ export function Marco() {
   const [ejercicio, fijarEjercicio] = useState('2026');
   const [toast, fijarToast] = useState('');
   const [observaciones, fijarObservaciones] = useState<Readonly<Record<string, string>>>({});
+  // El estado del padron vive aqui y no dentro de la seccion: el marco la desmonta al cambiar
+  // de pestana, y con el estado dentro, escribir media alta e ir al panel dejaria el formulario
+  // en blanco **con el asterisco puesto**. Ver `secciones/estadoDelPadron.ts`.
+  const [padron, fijarPadron] = useState<EstadoDelPadron>(PADRON_AL_EMPEZAR);
 
   const abrir = useCallback((destino: string) => {
     despachar({ tipo: 'abrir', destino });
@@ -298,7 +321,7 @@ export function Marco() {
             <div className="kr-marco__cabecera">
               <h1 className="kr-marco__titulo">{tituloDe(pestanas.activa, ejercicio)}</h1>
               <span className="kr-marco__subtitulo">
-                {subtituloDe(pestanas.activa, ejercicio)}
+                {subtituloDe(pestanas.activa, ejercicio, padron)}
               </span>
             </div>
           )}
@@ -355,6 +378,15 @@ export function Marco() {
             }}
             alCerrar={(destino) => {
               despachar({ tipo: 'pedir-cierre', destino });
+            }}
+            alAbrir={abrir}
+            alEnsuciar={() => {
+              despachar({ tipo: 'ensuciar' });
+            }}
+            alAvisar={fijarToast}
+            padron={padron}
+            alCambiarPadron={(cambio) => {
+              fijarPadron((actual) => ({ ...actual, ...cambio }));
             }}
           />
         </div>

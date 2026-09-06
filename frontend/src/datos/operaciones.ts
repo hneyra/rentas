@@ -52,11 +52,17 @@
  */
 
 import {
+  ACTIVIDAD,
+  BANDEJA,
+  CIFRAS,
+  COBERTURA,
   DETERMINACIONES,
   EJERCICIO_DE_CAPTURA,
   EXPEDIENTE,
   FECHA_DE_CAPTURA,
+  FECHA_DE_CORTE_DEL_PANEL,
   NODOS,
+  NOTA_DE_COBERTURA,
   PASOS,
   PREDIOS,
   VAL,
@@ -622,15 +628,150 @@ function arbitriosDelEjercicio() {
     }));
 }
 
+// ── El panel del modulo ─────────────────────────────────────────────────────────────────────
+
+/**
+ * Las cuatro tarjetas de cabecera, como KPI del indicador de recaudacion.
+ *
+ * **Ninguna lleva importe**, y no es un olvido: el artboard escribe «S/ 9.42 M» y «41.2 %»,
+ * cifras redondeadas para un ojo. El contrato publica al lado el importe exacto con su fecha, y
+ * de 9.42 millones no se puede sacar un centimo sin inventarlo.
+ *
+ * Y **el `delta` del artboard no viaja**: la tarjeta «Recaudado» dibuja una pastilla con «+3.1»
+ * y el contrato no publica ninguna variacion. Servirla exigiria un campo que el backend no
+ * tiene; calcularla en la pantalla, una cifra sin fecha —«+3.1» respecto de que dia—.
+ */
+function kpisDeRecaudacion() {
+  return CIFRAS.map((cifra) => ({
+    label: cifra.etiqueta,
+    value: cifra.valor,
+    note: cifra.nota,
+    importe: null,
+  }));
+}
+
+/**
+ * «Recaudado sobre emitido, por tributo», como el unico panel del indicador.
+ *
+ * `pct` lo publica el contrato como ENTERO y el artboard guarda 89.4: dibuja el rotulo con
+ * `toFixed(0)` y el ancho de la barra con `toFixed(1)`. Aqui las dos cosas salen del mismo
+ * entero, que es lo que el backend va a mandar; la decima que se pierde es medio pixel de barra
+ * y la alternativa —publicar un decimal que el contrato no admite— es un desajuste de forma.
+ */
+function panelesDeRecaudacion() {
+  return [
+    {
+      title: 'Recaudado sobre emitido, por tributo',
+      note: NOTA_DE_COBERTURA,
+      rows: COBERTURA.map((fila) => ({
+        label: fila.tributo,
+        sub: fila.detalle,
+        value: `${fila.avance.toFixed(0)} %`,
+        pct: Number(fila.avance.toFixed(0)),
+        avanceConocido: true,
+        // El artboard dibuja el avance y el importe redondeado a millones, no el cargado ni el
+        // pendiente exactos. Los tres importes del contrato quedan sin dato.
+        importe: null,
+        cargado: null,
+        pendiente: null,
+      })),
+    },
+  ];
+}
+
+/** Los tres frentes de «Cola de trabajo», que es el trabajo parado del modulo. */
+function frentesParados() {
+  return BANDEJA.map((frente) => ({
+    frente: frente.etiqueta,
+    modulo: simulado<string>('moduloDelFrente'),
+    queEstaParado: frente.titulo,
+    porQueCuestaDinero: frente.detalle,
+    cuantos: frente.cuantos,
+    // El artboard cuenta expedientes parados —534, 208, 392— y no cuanto dinero representan.
+    importe: null,
+  }));
+}
+
+/**
+ * «Actividad reciente», que es la bitacora.
+ *
+ * El artboard escribe una DISTANCIA en el tiempo —«hace 2 h»— y la bitacora guarda un INSTANTE.
+ * Viaja el instante, que es el dato; convertirlo en distancia contra el reloj del puesto haria
+ * que la misma fila dijera «hace 2 h» a las nueve y «ayer» a medianoche.
+ */
+function bitacoraReciente() {
+  const ids = simulado<readonly number[]>('auditoriaId');
+  const tablas = simulado<readonly string[]>('tablaDeLaBitacora');
+  const instantes = simulado<readonly string[]>('instanteDeLaBitacora');
+  return ACTIVIDAD.map((acto, i) => ({
+    id: elemento(ids, i, 'auditoriaId'),
+    ejercicio: EJERCICIO_DE_CAPTURA,
+    tabla: elemento(tablas, i, 'tablaDeLaBitacora'),
+    clave: acto.codigo,
+    operacion: acto.tipo,
+    usuario: simulado<string>('usuarioDeLaBitacora'),
+    // Ni el equipo ni la IP salen en el artboard, y tampoco el antes y el despues de cada
+    // cambio: la bitacora del panel es un resumen de cuatro lineas, no el registro completo.
+    origenEquipo: null,
+    origenIp: null,
+    fecha: elemento(instantes, i, 'instanteDeLaBitacora'),
+    observacion: acto.detalle,
+    datosAnteriores: null,
+    datosNuevos: null,
+  }));
+}
+
+// ── El unico expediente coactivo del padron ─────────────────────────────────────────────────
+
+/**
+ * Los contribuyentes del padron que estan en cobranza coactiva.
+ *
+ * Es **uno** de los cinco, y el artboard dice cual y con que expediente: «expediente coactivo
+ * 2026-0418 con medida cautelar». Se sirve porque es la unica manera honesta de que la lista
+ * del padron sepa quien esta en coactiva: `GET /rentas/contribuyentes` publica identidad
+ * —codigo, documento, tipo de persona, nombre, condicion especial y si esta activo— y **ni el
+ * estado de cobranza ni la deuda**, que son las dos cosas sobre las que el artboard construye
+ * la fila. Medido campo a campo contra `docs/50-api/formas-de-la-api.json`.
+ */
+function deudasEnCoactiva() {
+  return PREDIOS.filter((contribuyente) => contribuyente.estado === 'En coactiva').map(
+    (contribuyente) => {
+      const expediente = /expediente coactivo (\S+)/.exec(contribuyente.contexto);
+      if (expediente === null) {
+        throw new Error(
+          `«${contribuyente.titulo}» esta en coactiva y su contexto no nombra el expediente.`,
+        );
+      }
+      const numero = celda(expediente, 1);
+      return {
+        expediente: numero,
+        ano: cuantos(celda(numero.split('-'), 0)),
+        codContribuyente: contribuyente.cod,
+        contribuyente: contribuyente.titulo,
+        // El artboard no dice de que tributos es la deuda coactiva, ni numera la medida
+        // cautelar que menciona, ni le pone fecha. Y no hay beneficio: el contexto no lo dice.
+        tributos: [],
+        deudaS: decimal(contribuyente.autovaluo),
+        costasS: simulado<string>('costasDelExpedienteCoactivo'),
+        totalS: decimal(contribuyente.autovaluo),
+        aLaFecha: FECHA_DE_CAPTURA,
+        estado: contribuyente.estado,
+        ultimaActuacion: null,
+        beneficios: [],
+      };
+    },
+  );
+}
+
 // ── La tabla ────────────────────────────────────────────────────────────────────────────────
 
 /**
- * Las trece operaciones que el proxy contesta.
+ * Las diecisiete operaciones que el proxy contesta.
  *
- * Trece de las 181 que el backend publica, y son las que el artboard `RentasV6` alimenta: no se
- * sirve nada de lo que no haya datos capturados. Una operacion mas es una entrada aqui y su
- * constructor; una operacion que no este se contesta con 404 en `problem+json`, que es lo que
- * el backend contesta cuando la ruta no existe.
+ * Diecisiete de las 181 que el backend publica, y son las que los artboards de `RentasV6`
+ * alimentan: no se sirve nada de lo que no haya datos capturados. Una operacion mas es una
+ * entrada aqui y su constructor; una operacion que no este se contesta con 404 en
+ * `problem+json`, que es lo que el backend contesta cuando la ruta no existe.
  */
 export const OPERACIONES: readonly Operacion[] = [
   {
@@ -723,4 +864,39 @@ export const OPERACIONES: readonly Operacion[] = [
   { metodo: 'POST', ruta: '/rentas/vehicular/calculo', cuerpo: calculoVehicular },
   { metodo: 'POST', ruta: '/rentas/alcabala', cuerpo: calculoDeAlcabala },
   { metodo: 'POST', ruta: '/rentas/espectaculos', cuerpo: calculoDeEspectaculos },
+
+  // ── Las cuatro que alimentan el panel y el estado del padron (F-5) ────────────────────────
+  {
+    metodo: 'GET',
+    ruta: '/indicadores/recaudacion',
+    cuerpo: () => ({
+      ejercicio: EJERCICIO_DE_CAPTURA,
+      fechaCalculo: FECHA_DE_CORTE_DEL_PANEL,
+      calculadoEn: simulado<string>('calculadoEnDelPanel'),
+      // Lo cargado del ejercicio, exacto. El artboard lo escribe redondeado a millones.
+      cargado: null,
+      kpis: kpisDeRecaudacion(),
+      paneles: panelesDeRecaudacion(),
+    }),
+  },
+  {
+    metodo: 'GET',
+    ruta: '/indicadores/trabajo-parado',
+    cuerpo: () => ({
+      ejercicio: EJERCICIO_DE_CAPTURA,
+      fechaCalculo: FECHA_DE_CORTE_DEL_PANEL,
+      calculadoEn: simulado<string>('calculadoEnDelPanel'),
+      frentes: frentesParados(),
+    }),
+  },
+  {
+    metodo: 'GET',
+    ruta: '/seguridad/auditoria',
+    cuerpo: () => todoEnUnaPagina(bitacoraReciente()),
+  },
+  {
+    metodo: 'GET',
+    ruta: '/coactiva/deudas',
+    cuerpo: () => todoEnUnaPagina(deudasEnCoactiva()),
+  },
 ];

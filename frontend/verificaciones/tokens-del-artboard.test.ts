@@ -197,7 +197,10 @@ describe('los componentes no pintan: solo usan tokens', () => {
   // dos: es la hoja mas grande del proyecto y la unica que dibuja una superficie
   // OSCURA —la barra global— en tema claro. Un `#fff` escrito ahi a mano seria
   // invisible en la revision y, en tema oscuro, texto blanco sobre papel blanco.
-  it.each(['componentes.css', 'marco.css', 'tokens/base.css'])(
+  // Y `secciones.css` desde F-5: es la hoja de las dos pantallas que existen, y
+  // la unica que pinta INSIGNIAS, barras de avance y realces de error — o sea,
+  // los sitios donde un color a mano se lee como informacion y no como adorno.
+  it.each(['componentes.css', 'marco.css', 'secciones.css', 'tokens/base.css'])(
     '«%s» no escribe ni un color a mano',
     (hoja) => {
       const css = sinComentarios(leer(join(RAIZ, 'src/estilos', hoja)));

@@ -85,3 +85,99 @@ export function formatearFecha(fecha: Fecha): string {
   const [, anio, mes, dia] = partes;
   return `${dia}/${mes}/${anio}`;
 }
+
+/**
+ * Ordena dos importes **sin convertirlos a numero**.
+ *
+ * Ordenar una lista por deuda es lo que pide el artboard, y la manera obvia —`Number(a) -
+ * Number(b)`— es la prohibida (regla 1, y la prohibicion `importe-convertido-a-number` de
+ * ESLint): en coma flotante dos importes que se diferencian en un centimo a partir de
+ * diecisiete digitos comparan iguales, y ordenar por una comparacion que a veces dice «iguales»
+ * cuando no lo son cambia el orden de la lista segun por donde se empiece.
+ *
+ * Se compara como texto y sale exacto: primero el signo, luego la parte entera **por longitud**
+ * —«100» pesa mas que «99» aunque «1» < «9»— y a igual longitud lexicograficamente, que para
+ * digitos es el orden numerico; despues los decimales, completados a dos.
+ *
+ * Devuelve el negativo/cero/positivo que espera `Array.prototype.sort`.
+ */
+export function compararImportes(a: Importe, b: Importe): number {
+  const parteDe = (valor: Importe) => {
+    const limpio = valor.trim();
+    if (!IMPORTE_SERVIDO.test(limpio)) {
+      throw new Error(
+        `Importe con una forma que el backend no sirve: «${valor}». No se puede ordenar por el.`,
+      );
+    }
+    const negativo = limpio.startsWith('-');
+    const sinSigno = negativo ? limpio.slice(1) : limpio;
+    const [entera, decimales] = sinSigno.split(DECIMAL);
+    return {
+      signo: negativo ? -1 : 1,
+      entera: (entera ?? '').replace(/^0+(?=\d)/, ''),
+      decimales: `${decimales ?? ''}00`.slice(0, 2),
+    };
+  };
+
+  const uno = parteDe(a);
+  const otro = parteDe(b);
+
+  if (uno.signo !== otro.signo) {
+    return uno.signo - otro.signo;
+  }
+  if (uno.entera.length !== otro.entera.length) {
+    return uno.signo * (uno.entera.length - otro.entera.length);
+  }
+  if (uno.entera !== otro.entera) {
+    return uno.signo * (uno.entera < otro.entera ? -1 : 1);
+  }
+  if (uno.decimales === otro.decimales) {
+    return 0;
+  }
+  return uno.signo * (uno.decimales < otro.decimales ? -1 : 1);
+}
+
+/** Los doce meses, en minuscula, como los escribe el artboard: «al 31 de agosto». */
+const MESES = [
+  'enero',
+  'febrero',
+  'marzo',
+  'abril',
+  'mayo',
+  'junio',
+  'julio',
+  'agosto',
+  'septiembre',
+  'octubre',
+  'noviembre',
+  'diciembre',
+];
+
+/**
+ * `"2026-08-31"` -> `"31 de agosto"`.
+ *
+ * **Sin el ano, y a proposito**: es la fecha de corte de un panel que ya dice de que ejercicio
+ * es, y asi la escribe el artboard. Donde haga falta la fecha completa esta `formatearFecha`.
+ *
+ * Sin `Date` y sin `Intl`, por lo mismo que el resto de este archivo: `Intl.DateTimeFormat`
+ * necesita construir un `Date`, y `new Date("2026-08-31")` se interpreta en UTC y se imprime en
+ * local — en Lima sale el 30 de agosto—. Una tabla de doce nombres no tiene ese problema.
+ */
+export function formatearFechaEnPalabras(fecha: Fecha): string {
+  const partes = FECHA_SERVIDA.exec(fecha.trim());
+
+  if (partes === null) {
+    throw new Error(
+      `Fecha con una forma que el backend no sirve: «${fecha}». Se espera ISO 8601 sin hora, «2026-09-06».`,
+    );
+  }
+
+  const [, , mes, dia] = partes;
+  const nombre = MESES[Number(mes) - 1];
+  if (nombre === undefined) {
+    throw new Error(`Fecha con un mes que no existe: «${fecha}».`);
+  }
+
+  // Sin el cero de la izquierda: «1 de enero», no «01 de enero».
+  return `${String(Number(dia))} de ${nombre}`;
+}
