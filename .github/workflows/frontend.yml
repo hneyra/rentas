@@ -1,29 +1,3 @@
-# ============================================================================
-#  ESTE ARCHIVO TIENE QUE VIVIR EN `.github/workflows/frontend.yml`, Y NO AQUI.
-#
-#  Esta en `frontend/ci/` porque la sesion que lo escribio NO PUDO EMPUJARLO a su
-#  sitio. El token de `gh` de esa maquina tiene los alcances `gist`, `read:org` y
-#  `repo`, y le falta `workflow`; GitHub rechaza el `push` entero —no el archivo:
-#  la rama— con este mensaje, medido siete veces en quince minutos:
-#
-#      ! [remote rejected] f-1-andamiaje-del-frontend -> f-1-andamiaje-del-frontend
-#        (refusing to allow an OAuth App to create or update workflow
-#         `.github/workflows/frontend.yml` without `workflow` scope)
-#
-#  Se deja AQUI, y no fuera del PR, porque un archivo que no viaja es un archivo
-#  que nadie escribe dos veces: asi el contenido se revisa con el resto del
-#  cambio y la instalacion es una linea. Con el alcance `workflow` concedido:
-#
-#      git mv frontend/ci/frontend.yml .github/workflows/frontend.yml
-#
-#  MIENTRAS TANTO, EL FRONTEND NO TIENE CI, y hay que saberlo: `yarn verificar`
-#  pasa en la maquina de quien lo escribe y NADA lo comprueba en el PR. Lo unico
-#  que corre hoy sobre esta rama es `registro.yml`, que mira la fila de CLAUDE.md.
-#  `frontend/verificaciones/andamiaje.test.ts` verifica el CONTENIDO de este
-#  archivo —el filtro, la orden y el candado— vive donde viva, y exige que exista
-#  en uno de los dos sitios: si alguien lo borra en vez de instalarlo, sale rojo.
-# ============================================================================
-
 name: Frontend
 
 # La CI de `rentas-web`. Corre `yarn verificar` —lint, tipos y pruebas— y nada mas: aqui no

@@ -1,0 +1,73 @@
+/* ============================================================================
+   Espaciado, radios y sombras de V6.
+   ----------------------------------------------------------------------------
+   **V6 no esta en una rejilla de 4 px, y no se le impone una.** Sus rellenos
+   reales son `9px 10px` en un campo, `9px 15px` en un boton secundario,
+   `10px 18px` en el primario, `2px 8px` en una insignia y `11px 16px` en una
+   celda: 9, 11 y 15 no caben en ninguna escala de cuatros. Redondearlos seria
+   reescribir el diseno a ojo, que es lo que la doctrina de la portada prohibe.
+
+   Asi que aqui no hay `--space-1 … --space-9`. Hay los espaciados que el
+   artboard usa, con el nombre del sitio donde los usa. Un componente nuevo que
+   no encaje en ninguno escribe el suyo literal, como en el artboard, y solo se
+   asciende a token cuando tres sitios lo repiten.
+   ============================================================================ */
+
+:root {
+  /* —— Rellenos, tal como el artboard los escribe —— */
+
+  /* `const IN`: el relleno de todo control que se escribe. */
+  --relleno-campo: 9px 10px;
+
+  /* Boton secundario. El primario lleva un pixel mas de alto y tres de ancho:
+     no es un descuido del artboard, es que el rotulo va en 600 y pesa mas. */
+  --relleno-boton: 9px 15px;
+  --relleno-boton-primario: 10px 18px;
+
+  /* El boton menudo —el «Copiar» de una traza, el de una fila— NO sale del
+     artboard: V6 no dibuja ninguno. Se deriva del campo, que si: mismo relleno
+     horizontal (10 px) para que alineen, y el vertical justo para que la caja no
+     domine al texto. Se dice que es derivado en vez de aparentar que se copio. */
+  --relleno-boton-menudo: 5px 10px;
+
+  /* `const INS`: la insignia. */
+  --relleno-insignia: 2px 8px;
+
+  /* `const TD` y `const TH`: la celda y su cabecera. */
+  --relleno-celda: 11px 16px;
+  --relleno-cabecera: 9px 16px;
+
+  /* El estado vacio dentro de un panel, y el de una pagina entera. */
+  --relleno-vacio: 32px 20px;
+
+  /* —— Huecos ——
+     Los cinco `gap` que el artboard repite. */
+  --hueco-1: 5px;
+  --hueco-2: 7px;
+  --hueco-3: 9px;
+  --hueco-4: 12px;
+  --hueco-5: 16px;
+
+  /* —— Radios ——
+     Tres, y ni uno mas: la insignia, el control, y la caja flotante. */
+  --radio-menudo: 4px;
+  --radio: 6px;
+  --radio-grande: 7px;
+
+  /* —— Foco ——
+     El halo de un control enfocado: `box-shadow: 0 0 0 3px #D3EBFA`. El color es
+     `--foco`, de `colors.css`, asi que este anillo cambia solo con el tema. */
+  --anillo: 0 0 0 3px var(--foco);
+
+  /* El grosor y la separacion del indicador de foco de lo que no es un campo.
+     El artboard: `outline: 2px solid …; outline-offset: 2px`. */
+  --grosor-foco: 2px;
+  --separacion-foco: 2px;
+
+  /* —— Sombra ——
+     Una sola, la del aviso flotante: `0 10px 30px rgba(0,54,90,.28)`. El color es
+     `--azul-oscuro` en rgba, escrito literal porque `color-mix()` sobre una
+     custom property no lo resuelven todos los navegadores de una caja de
+     ventanilla. */
+  --sombra-flotante: 0 10px 30px rgba(0, 54, 90, 0.28);
+}

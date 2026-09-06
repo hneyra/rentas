@@ -107,6 +107,17 @@ export const PROHIBICIONES = [
       'Aritmetica con un importe. El total lo calcula el backend y lo sostiene con su fecha: pidelo, no lo sumes (regla 1, regla 9).',
   },
   {
+    clave: 'importe-sin-fecha',
+    regla: 'un importe se muestra con su fecha de calculo',
+    // `:not(:has(...))`: el elemento de apertura que NO tiene entre sus atributos
+    // uno llamado `fechaCalculo`. Un `<Importe {...props} />` tambien cae, y esta
+    // bien que caiga: desde el JSX no hay forma de saber si ese objeto la trae.
+    selector:
+      "JSXOpeningElement[name.name='Importe']:not(:has(JSXAttribute[name.name='fechaCalculo']))",
+    message:
+      'Un importe se muestra con la fecha a la que esta calculado: no existe «la deuda», existe la deuda a una fecha (regla 9, RNF-075).',
+  },
+  {
     clave: 'municipalidad-en-el-cliente',
     regla: 'municipalidadId no se manda nunca',
     selector: "Identifier[name='municipalidadId']",
@@ -145,6 +156,7 @@ export const REGLAS_EXIGIDAS = [
   'sin tildes ni enie en identificadores',
   'fetch prohibido fuera del cliente de API',
   'un importe es string, nunca number',
+  'un importe se muestra con su fecha de calculo',
   'sin aritmetica sobre importes',
   'municipalidadId no se manda nunca',
   'el token no toca localStorage ni sessionStorage',

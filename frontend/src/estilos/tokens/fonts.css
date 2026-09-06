@@ -1,0 +1,43 @@
+/* ============================================================================
+   Las familias tipograficas de V6.
+   ----------------------------------------------------------------------------
+   **Una sola familia: `Source Sans 3`.** No hay serif de titulares ni monoespaciada
+   de codigos, que es lo que traia la etapa anterior (Source Serif 4 + Inter +
+   JetBrains Mono, en `ds/tokens/fonts.css` del proyecto de diseno). Los doce
+   artboards V6 declaran exactamente esto y nada mas:
+
+       font-family: 'Source Sans 3', system-ui, sans-serif
+
+   Las cifras NO cambian de familia: se alinean con `font-variant-numeric:
+   tabular-nums`, que es lo que el artboard usa en cada columna de importes
+   (`const TDN`). Una monoespaciada para los numeros seria una familia mas que
+   descargar para resolver algo que una propiedad ya resuelve.
+
+   LOS `woff2` NO ESTAN VENDORIZADOS TODAVIA, y hay que saberlo: hoy la pagina se
+   ve con `system-ui` en una maquina que no tenga Source Sans 3 instalada. El
+   artboard los pide al CDN de Google con un `<link>`, y aqui NO se hace: una
+   municipalidad con red mala no deberia depender de un tercero para que su
+   sistema se lea, y una peticion menos a un dominio ajeno es una cosa menos que
+   explicar. Servirlos desde el propio bundle es trabajo de la pantalla que los
+   necesite —hay que traer los archivos, elegir los pesos y medir el peso del
+   bundle—, y F-2 trae el vocabulario, no el empaquetado. La pila de reserva es
+   parte del contrato mientras tanto, y por eso esta escrita y no implicita.
+   ============================================================================ */
+
+:root {
+  /* La familia de todo. `system-ui` primero en la reserva porque es la que ya
+     esta cargada: la reserva tiene que ser rapida, no parecida. */
+  --fuente: 'Source Sans 3', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+  /* Los tres pesos que el artboard pide en su `<link>` de Google Fonts:
+     `wght@400;600;700`. Ni uno mas: un peso que nadie declara es un `woff2` que
+     alguien descarga sin usarlo. */
+  --peso-normal: 400;
+  --peso-fuerte: 600;
+  --peso-titulo: 700;
+
+  /* Cifras que se pueden comparar en columna. Va sobre CUALQUIER cifra que se
+     lea junto a otra —un importe, un codigo, un porcentaje—, no solo sobre las
+     de una tabla. */
+  --cifras: tabular-nums;
+}

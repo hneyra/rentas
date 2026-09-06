@@ -1,0 +1,33 @@
+/* ============================================================================
+   El unico punto de entrada de los estilos de `rentas-web`.
+   ----------------------------------------------------------------------------
+   Lo importa `src/main.tsx`, y nadie mas importa una hoja suelta: si cada
+   componente trajera la suya, el orden de la cascada lo decidiria el orden en
+   que Vite resuelve los modulos, que cambia con un `import` movido de sitio.
+
+   EL ORDEN IMPORTA, y no por las custom properties. Para `var()` el orden es
+   indiferente —se resuelven al usarlas, no al declararlas—; importa porque
+   `base.css` y `componentes.css` escriben REGLAS de verdad, y una regla que
+   llega despues gana a igualdad de especificidad. Asi que:
+
+     1..4  los cuatro que solo DECLARAN: colores, familias, escala y espaciado.
+     5     `base.css`, que APLICA: el reinicio, el fondo del documento, el foco.
+     6     `componentes.css`, que va despues del reinicio a proposito — un
+           componente tiene que poder ganarle al reinicio sin subir a `!important`.
+
+   `verificaciones/tokens-del-artboard.test.ts` comprueba que los cinco archivos
+   de tokens estan y que se importan **en este orden**: un `@import` movido de
+   sitio no rompe nada visible el dia que se mueve, y el dia que si lo rompe ya
+   no se parece a este cambio.
+
+   Nada de Tailwind y nada de CSS-in-JS. El diseno llega como CSS con custom
+   properties y se queda como CSS con custom properties: cada capa de traduccion
+   es un sitio donde el valor del artboard se puede reescribir a ojo.
+   ============================================================================ */
+
+@import './tokens/colors.css';
+@import './tokens/fonts.css';
+@import './tokens/typography.css';
+@import './tokens/spacing.css';
+@import './tokens/base.css';
+@import './componentes.css';

@@ -4,6 +4,10 @@
     "src/**/*.ts",
     "src/**/*.tsx",
     "verificaciones/**/*.ts",
+    // `.tsx` tambien: `verificaciones/tipos/barreras-de-tipos.tsx` es una prueba DEL
+    // COMPILADOR —`@ts-expect-error` falla cuando no hay error— y sin esta linea `tsc` ni
+    // lo abriria, asi que las barreras de tipo dejarian de comprobarse en silencio.
+    "verificaciones/**/*.tsx",
     "eslint.prohibiciones.mjs",
     "vitest.setup.ts",
     "*.config.ts"

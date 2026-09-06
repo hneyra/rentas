@@ -3,6 +3,11 @@ import { createRoot } from 'react-dom/client';
 
 import { Aplicacion } from './aplicacion.tsx';
 import { arrancar } from './arranque.ts';
+// El UNICO sitio donde se importa una hoja de estilos. `estilos.css` encadena los cinco
+// archivos de tokens y las clases de los componentes, en ese orden; si cada componente
+// trajera la suya, el orden de la cascada lo decidiria el orden en que Vite resuelve los
+// modulos — que cambia con un `import` movido de sitio.
+import './estilos/estilos.css';
 
 const raiz = document.getElementById('raiz');
 if (raiz === null) {

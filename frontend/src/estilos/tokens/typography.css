@@ -1,0 +1,78 @@
+/* ============================================================================
+   La escala tipografica de V6.
+   ----------------------------------------------------------------------------
+   Los valores son los del artboard, **sin redondear**. V6 no esta en una escala
+   modular: usa 15, 14.5, 14, 13.5, 13, 12.5, 12, 11.5 y 11 px, y esos medios
+   pixeles son deliberados —una tabla de 13.5 px cabe donde una de 14 no—. La
+   doctrina de la portada es explicita: los estilos en linea se copian tal cual,
+   sin redondear, y antes lo literal que lo abstracto.
+
+   Por eso los nombres son de USO y no de tamano: `--texto-celda` dice donde va,
+   `--texto-4` no diria nada y el dia que la celda cambie de 13.5 a 13 habria que
+   renombrar la variable o mentir con ella.
+
+   Cada linea lleva de donde sale, con el selector del artboard donde se ve.
+   ============================================================================ */
+
+:root {
+  /* —— Tamanos —— */
+
+  /* `html, body { font-size: 15px }`. Es la base del documento. */
+  --texto-base: 15px;
+
+  /* El titulo de un estado vacio a pagina entera: «Elija un contribuyente de la
+     lista». */
+  --texto-titulo: 16px;
+
+  /* El titulo de un estado vacio dentro de un panel: «Ningun contribuyente
+     coincide». */
+  --texto-subtitulo: 14.5px;
+
+  /* Lo que se escribe: `const IN`, y el `textarea`. */
+  --texto-control: 14px;
+
+  /* La talla de trabajo: celda de tabla (`const TD`), rotulo de boton, nota de
+     seccion, valor de solo lectura. Es la mas frecuente del artboard. */
+  --texto-celda: 13.5px;
+
+  /* El detalle de un estado vacio y el texto de ayuda. */
+  --texto-menudo: 13px;
+
+  /* La etiqueta de un campo, y el titular de una fila de lista. */
+  --texto-etiqueta: 12.5px;
+
+  /* El codigo bajo una fila de lista. */
+  --texto-dato: 12px;
+
+  /* La insignia (`const INS`) y la palabra «opcional» junto a una etiqueta. */
+  --texto-insignia: 11.5px;
+
+  /* La cabecera de tabla (`const TH`), en mayusculas. */
+  --texto-cabecera: 11px;
+
+  /* —— Interlineados ——
+     El artboard los escribe donde el texto es prosa y los deja por omision donde
+     es una linea suelta. Aqui se nombran los tres que aparecen. */
+
+  /* Prosa de una nota o de un detalle: `line-height:1.55`. */
+  --linea-prosa: 1.55;
+
+  /* La nota que encabeza una seccion del expediente: `line-height:1.6`. */
+  --linea-nota: 1.6;
+
+  /* Texto apretado dentro de una caja: la etiqueta de una casilla. */
+  --linea-apretada: 1.4;
+
+  /* —— Otros —— */
+
+  /* La cabecera de tabla abre las mayusculas: `letter-spacing:.07em`. */
+  --espaciado-cabecera: 0.07em;
+
+  /* El ancho de lectura comodo de una nota: `max-width:74ch` en el artboard.
+     Va aqui y no en `spacing.css` porque `ch` es una medida tipografica: cambia
+     con la familia y con el tamano, no con la rejilla. */
+  --ancho-prosa: 74ch;
+
+  /* El de un estado vacio, que es mas estrecho a proposito: `max-width:38ch`. */
+  --ancho-prosa-corta: 38ch;
+}

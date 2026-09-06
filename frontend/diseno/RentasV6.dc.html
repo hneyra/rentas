@@ -1,0 +1,2036 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&amp;display=swap" />
+<style>
+  @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
+  @keyframes pop { from { opacity: 0; transform: translateY(-6px) scale(.985) } to { opacity: 1; transform: none } }
+  @keyframes subir { from { opacity: 0; transform: translateY(8px) } to { opacity: 1; transform: none } }
+  html, body { margin: 0; height: 100%; background: #F2F6F9; color: #16232C; font-family: 'Source Sans 3', system-ui, sans-serif; font-size: 15px; -webkit-font-smoothing: antialiased }
+  * { box-sizing: border-box }
+  a { color: #005284; text-decoration: none }
+  a:hover { text-decoration: underline; text-underline-offset: 3px }
+  input, select, textarea, button { font: inherit; color: inherit }
+  :focus-visible { outline: 2px solid #52BDEF; outline-offset: 2px }
+  input:focus, select:focus, textarea:focus { border-color: #005284; box-shadow: 0 0 0 3px #D3EBFA; outline: none }
+  ::placeholder { color: #93A3AF }
+  ::-webkit-scrollbar { width: 10px; height: 10px }
+  ::-webkit-scrollbar-thumb { background: #C3CFD9; border-radius: 8px }
+  ::-webkit-scrollbar-thumb:hover { background: #A7B7C4 }
+  [data-ancho="1"] { grid-column: 1 / -1 }
+  [data-tramo]::placeholder { color: #C3CFD9; letter-spacing: .2em }
+  [data-sticky] th { position: sticky; top: 0; z-index: 2 }
+  @media (max-width: 1240px) { [data-lista] { flex: 0 0 320px !important; width: 320px !important } }
+  @media (max-width: 1040px) {
+  }
+  @media (max-width: 900px) {
+    [data-split] { flex-direction: column !important }
+    [data-lista] { flex: 0 0 auto !important; width: 100% !important; max-height: 300px; border-right: 0 !important; border-bottom: 1px solid #D6DEE4 !important }
+  }
+  @media (max-width: 760px) { [data-sm-hide] { display: none !important } }
+  /* El selector de marco es un control del prototipo: se retira antes que
+     cualquier elemento de la aplicación cuando la barra se estrecha. */
+  @media (max-width: 1180px) { [data-marco-hide] { display: none !important } }
+  @media (prefers-reduced-motion: reduce) { * { animation-duration: .01ms !important } }
+</style>
+</helmet>
+
+<div style="display:flex; flex-direction:column; height:100vh; overflow:hidden; background:#F2F6F9">
+
+  <!-- ══════════ LANZADOR DE MÓDULOS ══════════ -->
+  <sc-if value="{{ lanzador }}">
+    <div onClick="{{ cerrarLanzador }}" style="position:fixed; inset:0; z-index:80"></div>
+    <div role="dialog" aria-label="Módulos del sistema" style="position:fixed; z-index:81; top:56px; right:10px; width:min(560px,calc(100vw - 20px)); background:#fff; border:1px solid #D6DEE4; border-radius:10px; box-shadow:0 18px 48px rgba(0,54,90,.2); overflow:hidden; animation:pop .14s ease">
+      <div style="display:flex; align-items:baseline; gap:10px; padding:14px 16px 12px; border-bottom:1px solid #E3E9EE">
+        <p style="margin:0; flex:1; font-size:15px; font-weight:700">Módulos</p>
+        <p style="margin:0; font-size:12.5px; color:#5A6B78">Los doce comparten este marco</p>
+      </div>
+      <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(168px,1fr)); gap:0; padding:6px">
+        <sc-for list="{{ modulos }}" as="m" hint-placeholder-count="12">
+          <button onClick="{{ m.ir }}" aria-current="{{ m.actual }}" style="{{ m.style }}" style-hover="background:#EFF7FC">
+            <span style="{{ m.iconStyle }}">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                <sc-for list="{{ m.icon }}" as="p" hint-placeholder-count="3">
+                  <path d="{{ p.d }}"></path>
+                </sc-for>
+              </svg>
+            </span>
+            <span style="flex:1; min-width:0; text-align:left; font-size:13.5px; line-height:1.3; text-wrap:pretty">{{ m.label }}</span>
+          </button>
+        </sc-for>
+      </div>
+      <p style="margin:0; padding:11px 16px; border-top:1px solid #E3E9EE; background:#F7FBFE; font-size:12.5px; color:#5A6B78">El ejercicio de trabajo es global a la sesión: al cambiarlo, cambia para los doce módulos.</p>
+    </div>
+  </sc-if>
+
+  <!-- ══════════ PALETA DE COMANDOS ══════════ -->
+  <sc-if value="{{ pal }}">
+    <div onClick="{{ cerrarPal }}" style="position:fixed; inset:0; z-index:82; background:rgba(22,35,44,.38)"></div>
+    <div role="dialog" aria-label="Buscar" style="position:fixed; z-index:83; top:12vh; left:50%; transform:translateX(-50%); width:min(620px,92vw); background:#fff; border:1px solid #D6DEE4; border-radius:10px; box-shadow:0 22px 56px rgba(0,54,90,.26); overflow:hidden; animation:pop .14s ease">
+      <div style="display:flex; align-items:center; gap:11px; padding:14px 16px; border-bottom:1px solid #E3E9EE">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#5A6B78" stroke-width="1.8" stroke-linecap="round" style="flex:0 0 auto"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-4.3-4.3"></path></svg>
+        <input value="{{ pq }}" onChange="{{ onPq }}" autofocus="{{ true }}" placeholder="Un contribuyente, un DNI, un RUC, una acción…" style="flex:1; border:0; background:transparent; padding:2px 0; font-size:16px; outline:none" />
+        <kbd style="font-size:11px; color:#93A3AF; border:1px solid #D6DEE4; border-radius:4px; padding:2px 6px">Esc</kbd>
+      </div>
+      <div style="max-height:54vh; overflow:auto">
+        <sc-for list="{{ palRes }}" as="r" hint-placeholder-count="6">
+          <button onClick="{{ r.ir }}" style="display:flex; align-items:center; gap:12px; width:100%; text-align:left; border:0; border-bottom:1px solid #E3E9EE; background:transparent; padding:11px 16px; cursor:pointer" style-hover="background:#EFF7FC">
+            <span style="{{ r.tipoStyle }}">{{ r.tipo }}</span>
+            <span style="flex:1; min-width:0; font-size:14.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{{ r.label }}</span>
+            <span data-sm-hide="1" style="font-size:12.5px; color:#5A6B78; flex:0 0 auto">{{ r.nota }}</span>
+          </button>
+        </sc-for>
+      </div>
+      <div style="display:flex; justify-content:space-between; gap:10px; padding:9px 16px; background:#F7FBFE; font-size:12px; color:#5A6B78">
+        <span>{{ palPie }}</span>
+        <span>Ctrl K</span>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- ══════════ BARRA GLOBAL ══════════
+       Del mismo azul que tenía el riel de módulos. A la izquierda el
+       lanzador de nueve puntos y la entidad; a la derecha, y en este orden
+       desde el borde, el usuario, el buscador y el ejercicio. -->
+  <header style="flex:0 0 auto; display:flex; align-items:center; gap:12px; height:52px; padding:0 12px 0 8px; background:#00365A; z-index:50">
+    <!-- La pila de tres barras muestra u oculta el árbol de módulos de la
+         izquierda, que empuja el contenido en lugar de taparlo. -->
+    <button onClick="{{ abrirSecciones }}" aria-label="Mostrar u ocultar las secciones de Rentas" aria-expanded="{{ secAria }}" title="{{ seccionesTitulo }}" style="{{ seccionesStyle }}">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"></path></svg>
+    </button>
+
+    <sc-if value="{{ logoEnBarra }}">
+      <span style="display:flex; align-items:center; gap:10px; flex:1 1 auto; min-width:0">
+        <img src="escudo-catacaos.png" alt="Escudo de la municipalidad" width="30" height="36" style="display:block; width:auto; height:36px; flex:0 0 auto" />
+        <span style="flex:1 1 auto; min-width:0; line-height:1.15">
+          <span style="display:block; font-size:14.5px; font-weight:700; color:#fff; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{{ entidad }}</span>
+          <span data-sm-hide="1" style="display:block; font-size:10.5px; color:#9FC6DF">Sistema de gestión tributaria municipal</span>
+        </span>
+      </span>
+    </sc-if>
+    <sc-if value="{{ soloNombre }}">
+      <span style="min-width:0; line-height:1.15; flex:1 1 auto">
+        <span style="display:block; font-size:14.5px; font-weight:700; color:#fff; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{{ entidad }}</span>
+        <span data-sm-hide="1" style="display:block; font-size:10.5px; color:#9FC6DF">Sistema de gestión tributaria municipal</span>
+      </span>
+    </sc-if>
+
+
+    <!-- El aviso de servicio vive en la barra global: así lo alcanzan los tres
+         marcos. En el marco B no hay fila blanca donde ponerlo. -->
+    <sc-if value="{{ aviso }}">
+      <button onClick="{{ verAviso }}" aria-label="{{ avisoAria }}" title="{{ avisoAria }}" style="position:relative; display:grid; place-items:center; width:32px; height:32px; border:1px solid rgba(255,255,255,.2); border-radius:6px; background:rgba(255,255,255,.09); color:#fff; cursor:pointer; flex:0 0 auto" style-hover="background:rgba(255,255,255,.18)">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M18 15.6V10.5a6 6 0 0 0-12 0v5.1L4.4 18h15.2z"></path>
+          <path d="M9.8 18a2.2 2.2 0 0 0 4.4 0"></path>
+        </svg>
+        <span style="position:absolute; top:-5px; right:-5px; min-width:17px; height:17px; padding:0 4px; border-radius:999px; display:grid; place-items:center; font-size:10.5px; font-weight:700; background:#C0492F; color:#fff; border:1.5px solid #00365A">{{ avisosN }}</span>
+      </button>
+    </sc-if>
+
+    <div style="display:flex; align-items:center; gap:7px; border:1px solid rgba(255,255,255,.2); border-radius:6px; padding:3px 4px 3px 10px; background:rgba(255,255,255,.09); flex:0 0 auto">
+      <span data-sm-hide="1" style="font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.08em; color:#9FC6DF">Ejercicio</span>
+      <select value="{{ ejercicio }}" onChange="{{ onEjercicio }}" aria-label="Ejercicio de trabajo" style="border:0; background:#E4F4FD; color:#004670; border-radius:4px; padding:3px 7px; font-size:13px; font-weight:600; cursor:pointer">
+        <sc-for list="{{ anios }}" as="a" hint-placeholder-count="4">
+          <option value="{{ a }}">{{ a }}</option>
+        </sc-for>
+      </select>
+    </div>
+
+    <button onClick="{{ abrirPal }}" aria-label="Buscar" title="Buscar — Ctrl K" style="display:grid; place-items:center; width:32px; height:32px; border:1px solid rgba(255,255,255,.2); border-radius:6px; background:rgba(255,255,255,.09); color:#fff; cursor:pointer; flex:0 0 auto" style-hover="background:rgba(255,255,255,.18)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-4.3-4.3"></path></svg>
+    </button>
+
+    <!-- El lanzador de los doce módulos, entre el buscador y el usuario:
+         cambiar de módulo es menos frecuente que buscar dentro del propio. -->
+    <button onClick="{{ abrirLanzador }}" aria-label="Ver todos los módulos" aria-expanded="{{ lanzador }}" title="Todos los módulos" style="{{ lanzadorStyle }}">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="currentColor">
+        <sc-for list="{{ puntos }}" as="p" hint-placeholder-count="9">
+          <circle cx="{{ p.x }}" cy="{{ p.y }}" r="1.9"></circle>
+        </sc-for>
+      </svg>
+    </button>
+
+    <div style="position:relative; border-left:1px solid rgba(255,255,255,.18); padding-left:12px; flex:0 0 auto">
+      <button onClick="{{ abrirSesion }}" aria-expanded="{{ sesionAria }}" aria-label="Sesión de J. Cárdenas Vega" style="{{ sesionStyle }}" style-hover="background:rgba(255,255,255,.14)">
+        <span style="width:27px; height:27px; border-radius:50%; background:#E4F4FD; color:#004670; display:grid; place-items:center; font-size:11.5px; font-weight:700; flex:0 0 auto">JC</span>
+        <span data-sm-hide="1" style="line-height:1.2; text-align:left">
+          <span style="display:block; font-size:12.5px; font-weight:600; color:#fff">J. Cárdenas Vega</span>
+          <span style="display:block; font-size:10.5px; color:#9FC6DF">Rentas · ventanilla</span>
+        </span>
+        <span style="{{ sesionCaret }}">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9.5l6 6 6-6"></path></svg>
+        </span>
+      </button>
+
+      <sc-if value="{{ sesionAbierta }}">
+        <div onClick="{{ cerrarSesion }}" style="position:fixed; inset:0; z-index:84"></div>
+        <div role="menu" aria-label="Sesión" style="position:absolute; z-index:85; top:44px; right:0; width:min(258px,calc(100vw - 24px)); background:#fff; border:1px solid #D6DEE4; border-radius:9px; box-shadow:0 16px 42px rgba(0,54,90,.22); overflow:hidden; animation:pop .13s ease">
+          <div style="display:flex; align-items:center; gap:10px; padding:13px 14px; border-bottom:1px solid #E3E9EE">
+            <span style="width:34px; height:34px; border-radius:50%; background:#E4F4FD; color:#004670; display:grid; place-items:center; font-size:13px; font-weight:700; flex:0 0 auto">JC</span>
+            <span style="flex:1; min-width:0; line-height:1.25">
+              <span style="display:block; font-size:13.5px; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">J. Cárdenas Vega</span>
+              <span style="display:block; font-size:11.5px; color:#5A6B78">jcardenas · Rentas · ventanilla</span>
+            </span>
+          </div>
+          <div style="padding:5px">
+            <sc-for list="{{ sesionOpciones }}" as="o" hint-placeholder-count="3">
+              <button onClick="{{ o.ir }}" role="menuitem" style="{{ o.style }}" style-hover="background:#EFF7FC">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="flex:0 0 auto">
+                  <sc-for list="{{ o.icon }}" as="p" hint-placeholder-count="2">
+                    <path d="{{ p.d }}"></path>
+                  </sc-for>
+                </svg>
+                <span style="flex:1; min-width:0; text-align:left; font-size:13.5px">{{ o.label }}</span>
+              </button>
+            </sc-for>
+          </div>
+          <sc-if value="{{ haySucias }}">
+            <p style="margin:0; padding:10px 14px; border-top:1px solid #E3E9EE; background:#FFF4D9; font-size:12px; line-height:1.5; color:#7A5200; text-wrap:pretty">{{ avisoSucias }}</p>
+          </sc-if>
+        </div>
+      </sc-if>
+    </div>
+  </header>
+
+  <div style="flex:1; display:flex; min-height:0; overflow:hidden">
+
+  <sc-if value="{{ secOpen }}">
+      <aside aria-label="Módulos y submódulos" style="{{ panel.asideStyle }}">
+
+        <div style="flex:0 0 auto; padding:10px 11px; border-bottom:1px solid #E3E9EE">
+          <div style="display:flex; align-items:center; gap:7px; border:1px solid #D6DEE4; border-radius:6px; padding:6px 9px; background:#F7FBFE">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#5A6B78" stroke-width="1.8" stroke-linecap="round" style="flex:0 0 auto"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-4.3-4.3"></path></svg>
+            <input value="{{ filtro }}" onChange="{{ onFiltro }}" placeholder="Filtrar módulos y submódulos" aria-label="Filtrar módulos y submódulos" style="flex:1; min-width:0; border:0; background:transparent; font-size:12.5px; outline:none" />
+            <sc-if value="{{ hayFiltro }}">
+              <button onClick="{{ limpiarFiltro }}" aria-label="Quitar el filtro" style="border:0; background:transparent; padding:0; cursor:pointer; color:#93A3AF; flex:0 0 auto">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+              </button>
+            </sc-if>
+          </div>
+          <sc-if value="{{ hayFiltro }}">
+            <p style="margin:7px 2px 0; font-size:11px; color:#5A6B78">{{ filtroConteo }}</p>
+          </sc-if>
+        </div>
+
+        <!-- ══ A · Acordeón con chevrón ══
+             El desplegable clásico, pero con el chevrón hacia abajo, que es
+             el gesto convencional de «esto se abre». El «>» giraba y leía
+             como «entrar», no como «desplegar». -->
+        <sc-if value="{{ panel.esA }}">
+          <div style="flex:1; min-width:0; display:flex; flex-direction:column; overflow:auto">
+            <div style="padding:7px 7px 10px; display:flex; flex-direction:column; gap:1px">
+              <sc-for list="{{ arbolModulos }}" as="m" hint-placeholder-count="9">
+                <div>
+                  <button onClick="{{ m.toggle }}" aria-expanded="{{ m.abiertoAria }}" style="{{ m.style }}" style-hover="background:#EFF7FC">
+                    <span style="{{ m.iconStyle }}">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <sc-for list="{{ m.icon }}" as="p" hint-placeholder-count="3">
+                          <path d="{{ p.d }}"></path>
+                        </sc-for>
+                      </svg>
+                    </span>
+                    <span style="flex:1; min-width:0; text-align:left; font-size:13.5px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{{ m.label }}</span>
+                    <sc-if value="{{ m.conteo }}">
+                      <span style="{{ m.conteoStyle }}">{{ m.conteo }}</span>
+                    </sc-if>
+                    <span style="{{ m.chevronStyle }}">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9.5l6 6 6-6"></path></svg>
+                    </span>
+                  </button>
+                  <sc-if value="{{ m.abierto }}">
+                    <div style="display:flex; flex-direction:column; gap:1px; padding:2px 0 7px 15px; margin-left:16px; border-left:1px solid #E3E9EE">
+                      <sc-for list="{{ m.hojas }}" as="h" hint-placeholder-count="4">
+                        <button onClick="{{ h.ir }}" aria-current="{{ h.actual }}" style="{{ h.style }}" style-hover="background:#EFF7FC">
+                          <span style="flex:1; min-width:0; text-align:left; font-size:13px">{{ h.label }}</span>
+                          <sc-if value="{{ h.marca }}">
+                            <span style="{{ h.marcaStyle }}">{{ h.marca }}</span>
+                          </sc-if>
+                        </button>
+                      </sc-for>
+                    </div>
+                  </sc-if>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </sc-if>
+
+        <!-- ══ B · Sin control de despliegue ══
+             No hay nada que pulsar para abrir: el módulo activo enseña sus
+             submódulos y los demás son una línea. El estado se lee por el
+             realce y la sangría, no por un icono. -->
+        <sc-if value="{{ panel.esB }}">
+          <div style="flex:1; min-width:0; display:flex; flex-direction:column; overflow:auto">
+            <div style="padding:7px 7px 10px; display:flex; flex-direction:column; gap:1px">
+              <sc-for list="{{ arbolModulos }}" as="m" hint-placeholder-count="9">
+                <div>
+                  <button onClick="{{ m.toggle }}" aria-expanded="{{ m.abiertoAria }}" style="{{ m.styleB }}" style-hover="background:#EFF7FC">
+                    <span style="{{ m.iconStyleB }}">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <sc-for list="{{ m.icon }}" as="p" hint-placeholder-count="3">
+                          <path d="{{ p.d }}"></path>
+                        </sc-for>
+                      </svg>
+                    </span>
+                    <span style="flex:1; min-width:0; text-align:left; font-size:13.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{{ m.label }}</span>
+                    <sc-if value="{{ m.conteo }}">
+                      <span style="{{ m.conteoStyle }}">{{ m.conteo }}</span>
+                    </sc-if>
+                  </button>
+                  <sc-if value="{{ m.abierto }}">
+                    <div style="display:flex; flex-direction:column; gap:1px; padding:3px 0 8px 16px">
+                      <sc-for list="{{ m.hojas }}" as="h" hint-placeholder-count="4">
+                        <button onClick="{{ h.ir }}" aria-current="{{ h.actual }}" style="{{ h.styleB }}" style-hover="background:#EFF7FC">
+                          <span style="{{ h.barraStyle }}"></span>
+                          <span style="flex:1; min-width:0; text-align:left; font-size:13px">{{ h.label }}</span>
+                          <sc-if value="{{ h.marca }}">
+                            <span style="{{ h.marcaStyle }}">{{ h.marca }}</span>
+                          </sc-if>
+                        </button>
+                      </sc-for>
+                    </div>
+                  </sc-if>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ sinCoincidencias }}">
+          <div style="flex:1; display:grid; place-items:center; padding:24px 18px">
+            <p style="margin:0; font-size:13px; line-height:1.55; color:#5A6B78; text-align:center; text-wrap:pretty">Ningún módulo ni submódulo se llama así. Pruebe con «papeleta», «acta», «recibo» o «expediente».</p>
+          </div>
+        </sc-if>
+
+        <!-- ══ C · Riel de módulos y lista de submódulos ══
+             Dos columnas: los doce módulos como iconos y, al lado, los
+             submódulos del elegido. No hay árbol que plegar ni desplazar:
+             es lo que escala mejor a doce módulos. -->
+        <sc-if value="{{ panel.esC }}">
+          <div style="flex:1; min-width:0; display:flex; overflow:hidden">
+            <nav aria-label="Módulos" style="flex:0 0 56px; width:56px; background:#F7FBFE; border-right:1px solid #E3E9EE; display:flex; flex-direction:column; align-items:center; gap:2px; padding:8px 0; overflow-y:auto">
+              <sc-for list="{{ arbolModulos }}" as="m" hint-placeholder-count="9">
+                <button onClick="{{ m.toggle }}" aria-current="{{ m.abiertoAria }}" title="{{ m.label }}" aria-label="{{ m.label }}" style="{{ m.rielStyle }}">
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <sc-for list="{{ m.icon }}" as="p" hint-placeholder-count="3">
+                      <path d="{{ p.d }}"></path>
+                    </sc-for>
+                  </svg>
+                  <sc-if value="{{ m.conteo }}">
+                    <span style="{{ m.rielPastilla }}">{{ m.conteo }}</span>
+                  </sc-if>
+                </button>
+              </sc-for>
+            </nav>
+            <div style="flex:1; min-width:0; display:flex; flex-direction:column; overflow:auto">
+              <div style="padding:12px 14px 11px; border-bottom:1px solid #E3E9EE">
+                <p style="margin:0; font-size:14px; font-weight:700; line-height:1.2; text-wrap:pretty">{{ panel.modLabel }}</p>
+                <p style="margin:3px 0 0; font-size:11px; color:#5A6B78">{{ panel.modNota }}</p>
+              </div>
+              <div style="padding:7px; display:flex; flex-direction:column; gap:1px">
+                <sc-for list="{{ panel.hojas }}" as="h" hint-placeholder-count="4">
+                  <button onClick="{{ h.ir }}" aria-current="{{ h.actual }}" style="{{ h.styleB }}" style-hover="background:#EFF7FC">
+                    <span style="{{ h.barraStyle }}"></span>
+                    <span style="flex:1; min-width:0; text-align:left; font-size:13px">{{ h.label }}</span>
+                    <sc-if value="{{ h.marca }}">
+                      <span style="{{ h.marcaStyle }}">{{ h.marca }}</span>
+                    </sc-if>
+                  </button>
+                </sc-for>
+              </div>
+            </div>
+          </div>
+        </sc-if>
+
+        <!-- Conmutador del experimento: no es parte del producto. -->
+        <div style="flex:0 0 auto; display:flex; align-items:center; gap:7px; padding:9px 11px; border-top:1px solid #E3E9EE; background:#F7FBFE">
+          <span style="font-size:9.5px; font-weight:700; text-transform:uppercase; letter-spacing:.09em; color:#5A6B78; flex:0 0 auto">Panel</span>
+          <sc-for list="{{ panelOpciones }}" as="o" hint-placeholder-count="3">
+            <button onClick="{{ o.ir }}" aria-pressed="{{ o.on }}" title="{{ o.titulo }}" style="{{ o.style }}">{{ o.label }}</button>
+          </sc-for>
+        </div>
+
+        <sc-if value="{{ panel.hayCola }}">
+        <div style="flex:0 0 auto; padding:11px; border-top:1px solid #E3E9EE">
+          <p style="margin:0 0 7px; font-size:10.5px; font-weight:600; text-transform:uppercase; letter-spacing:.1em; color:#5A6B78">Cola de trabajo</p>
+          <sc-for list="{{ cola }}" as="c" hint-placeholder-count="3">
+            <button onClick="{{ c.ir }}" style="display:flex; align-items:center; gap:9px; width:100%; text-align:left; border:0; border-radius:5px; padding:6px 7px; background:transparent; cursor:pointer" style-hover="background:#EFF7FC">
+              <span style="{{ c.puntoStyle }}"></span>
+              <span style="flex:1; min-width:0; font-size:12.5px; color:#3A4A55">{{ c.label }}</span>
+              <span style="font-size:12.5px; font-weight:600; color:#16232C">{{ c.n }}</span>
+            </button>
+          </sc-for>
+        </div>
+        </sc-if>
+      </aside>
+  </sc-if>
+
+
+    <div style="flex:1; min-width:0; display:flex; flex-direction:column; overflow:hidden">
+
+      <!-- Cada submódulo abierto es una pestaña con su botón de cerrar: el
+           usuario navega entre lo que tiene abierto sin volver al menú. -->
+      <div style="flex:0 0 auto; display:flex; align-items:stretch; gap:0; padding:0 12px 0 0; min-height:44px; background:#F2F6F9; border-bottom:1px solid #D6DEE4; z-index:40; overflow-x:auto">
+        <sc-for list="{{ pestanas }}" as="t" hint-placeholder-count="2">
+          <span style="{{ t.marcoStyle }}">
+            <button onClick="{{ t.ir }}" aria-current="{{ t.actual }}" style="{{ t.style }}">
+              <span style="{{ t.iconStyle }}">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <sc-for list="{{ t.icon }}" as="p" hint-placeholder-count="3">
+                    <path d="{{ p.d }}"></path>
+                  </sc-for>
+                </svg>
+              </span>
+              <span style="white-space:nowrap">{{ t.label }}</span>
+            </button>
+            <button onClick="{{ t.cerrar }}" aria-label="{{ t.cerrarAria }}" title="{{ t.cerrarAria }}" style="{{ t.cerrarStyle }}" style-hover="background:#E3E9EE; color:#16232C">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+            </button>
+          </span>
+        </sc-for>
+        <span style="flex:1; min-width:8px"></span>
+      </div>
+
+      <sc-if value="{{ hayPestanas }}">
+        <div style="flex:0 0 auto; display:flex; align-items:center; gap:14px; flex-wrap:wrap; padding:0 16px; min-height:52px; background:#fff; border-bottom:1px solid #D6DEE4">
+          <span style="flex:1; min-width:0; display:flex; align-items:baseline; gap:9px">
+            <h1 style="margin:0; font-size:16.5px; font-weight:700; letter-spacing:-.01em; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{{ titulo }}</h1>
+            <span data-sm-hide="1" style="font-size:13px; color:#5A6B78; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{{ subtitulo }}</span>
+          </span>
+          <sc-if value="{{ hayAccion }}">
+            <button onClick="{{ nuevaFicha }}" style="display:flex; align-items:center; gap:7px; border:0; border-radius:6px; padding:9px 15px; background:#005284; color:#fff; font-size:13.5px; font-weight:600; cursor:pointer; flex:0 0 auto" style-hover="background:#00365A">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+              {{ accionLabel }}
+            </button>
+          </sc-if>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ sinPestanas }}">
+        <div style="flex:1; display:grid; place-items:center; padding:32px">
+          <div style="max-width:40ch; text-align:center">
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#93A3AF" stroke-width="1.5" stroke-linejoin="round"><path d="M6.5 3.5h7.5l4 4v13h-11.5z"></path><path d="M14 3.5v4h4"></path><path d="M9.5 12.5h5"></path></svg>
+            <p style="margin:12px 0 0; font-size:16px; font-weight:700">No hay ningún submódulo abierto</p>
+            <p style="margin:7px 0 0; font-size:13.5px; line-height:1.55; color:#5A6B78; text-wrap:pretty">Elija uno en el menú de la izquierda y se abrirá como pestaña. Puede tener varios abiertos y moverse entre ellos.</p>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ avisoAbierto }}">
+        <div role="status" style="flex:0 0 auto; display:flex; align-items:flex-start; gap:12px; padding:11px 16px; background:#FFF4D9; border-bottom:1px solid #E8C86A">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8A5B00" stroke-width="2" stroke-linecap="round" style="flex:0 0 auto; margin-top:1px"><circle cx="12" cy="12" r="9"></circle><path d="M12 7.6V13M12 16.4h.02"></path></svg>
+          <p style="margin:0; flex:1; font-size:13.5px; line-height:1.5; color:#4A3200; text-wrap:pretty">La emisión masiva del predial 2026 dejó 534 contribuyentes observados sin cuponera. Hasta que se corrija la inconsistencia no se les puede cobrar el ejercicio.</p>
+          <button onClick="{{ cerrarAviso }}" aria-label="Descartar el aviso" style="border:0; background:transparent; padding:2px; cursor:pointer; color:#8A5B00; flex:0 0 auto">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+          </button>
+        </div>
+      </sc-if>
+
+      <!-- Un submódulo de otro módulo: la pestaña existe y se puede
+           navegar, y dice de dónde viene. Su pantalla vive en el archivo de
+           ese módulo. -->
+      <sc-if value="{{ esAjena }}">
+        <div style="flex:1; overflow:auto; padding:18px">
+          <div style="max-width:640px; background:#fff; border:1px solid #D6DEE4; border-radius:8px; overflow:hidden">
+            <div style="display:flex; align-items:center; gap:11px; padding:14px 16px; border-bottom:1px solid #E3E9EE">
+              <span style="display:grid; place-items:center; width:30px; height:30px; border-radius:7px; flex:0 0 auto; background:#E4F4FD; color:#004670">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <sc-for list="{{ ajena.icon }}" as="p" hint-placeholder-count="3">
+                    <path d="{{ p.d }}"></path>
+                  </sc-for>
+                </svg>
+              </span>
+              <span style="flex:1; min-width:0; line-height:1.25">
+                <span style="display:block; font-size:15px; font-weight:700">{{ ajena.label }}</span>
+                <span style="display:block; font-size:12.5px; color:#5A6B78">{{ ajena.mod }} · {{ ajena.nota }}</span>
+              </span>
+            </div>
+            <p style="margin:0; padding:15px 16px; font-size:13.5px; line-height:1.6; color:#3A4A55; text-wrap:pretty">{{ ajena.texto }}</p>
+            <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:12px 16px; border-top:1px solid #E3E9EE; background:#F7FBFE">
+              <p style="margin:0; flex:1; min-width:180px; font-size:12.5px; color:#5A6B78; text-wrap:pretty">Puede dejarla abierta y volver a ella desde la barra de pestañas.</p>
+              <button onClick="{{ ajena.cerrar }}" style="border:1px solid #D6DEE4; border-radius:6px; padding:8px 15px; background:#fff; font-size:13px; cursor:pointer" style-hover="border-color:#7E96A8">Cerrar la pestaña</button>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- ══════════ PANEL ══════════ -->
+      <sc-if value="{{ esPanel }}">
+        <div style="flex:1; overflow:auto; padding:18px; animation:fadeIn .22s ease">
+          <div style="max-width:1180px; display:flex; flex-direction:column; gap:14px">
+            <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(212px,1fr)); gap:12px">
+              <sc-for list="{{ cifras }}" as="c" hint-placeholder-count="4">
+                <div style="background:#fff; border:1px solid #D6DEE4; border-radius:8px; padding:14px 15px">
+                  <div style="display:flex; align-items:center; gap:8px">
+                    <p style="margin:0; flex:1; font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.09em; color:#5A6B78">{{ c.etiqueta }}</p>
+                    <sc-if value="{{ c.delta }}">
+                      <span style="{{ c.deltaStyle }}">{{ c.delta }}</span>
+                    </sc-if>
+                  </div>
+                  <p style="margin:9px 0 0; font-size:29px; font-weight:700; letter-spacing:-.025em; line-height:1; color:#16232C">{{ c.valor }}</p>
+                  <p style="margin:8px 0 0; font-size:12.5px; line-height:1.45; color:#5A6B78; text-wrap:pretty">{{ c.nota }}</p>
+                </div>
+              </sc-for>
+            </div>
+
+            <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(340px,1fr)); gap:14px">
+              <section style="background:#fff; border:1px solid #D6DEE4; border-radius:8px; overflow:hidden">
+                <div style="display:flex; align-items:center; gap:10px; padding:12px 15px; border-bottom:1px solid #E3E9EE">
+                  <h2 style="margin:0; flex:1; font-size:14.5px; font-weight:700">Cola de trabajo</h2>
+                  <span style="font-size:12px; color:#5A6B78">{{ colaTotal }}</span>
+                </div>
+                <sc-for list="{{ bandeja }}" as="b" hint-placeholder-count="3">
+                  <button onClick="{{ b.ir }}" style="display:flex; align-items:center; gap:12px; width:100%; text-align:left; border:0; border-bottom:1px solid #E3E9EE; background:transparent; padding:12px 15px; cursor:pointer" style-hover="background:#F7FBFE">
+                    <span style="{{ b.insignia }}">{{ b.etiqueta }}</span>
+                    <span style="flex:1; min-width:0">
+                      <span style="display:block; font-size:14px; font-weight:600">{{ b.titulo }}</span>
+                      <span style="display:block; font-size:12.5px; line-height:1.45; color:#5A6B78; margin-top:2px; text-wrap:pretty">{{ b.detalle }}</span>
+                    </span>
+                    <span style="font-size:17px; font-weight:700; flex:0 0 auto">{{ b.n }}</span>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#93A3AF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:0 0 auto"><path d="M10 6l6 6-6 6"></path></svg>
+                  </button>
+                </sc-for>
+              </section>
+
+              <section style="background:#fff; border:1px solid #D6DEE4; border-radius:8px; overflow:hidden">
+                <div style="display:flex; align-items:center; gap:10px; padding:12px 15px; border-bottom:1px solid #E3E9EE">
+                  <h2 style="margin:0; flex:1; font-size:14.5px; font-weight:700">Recaudado sobre emitido, por tributo</h2>
+                  <span style="font-size:12px; color:#5A6B78">al 31 de agosto</span>
+                </div>
+                <sc-for list="{{ cobertura }}" as="c" hint-placeholder-count="5">
+                  <button onClick="{{ c.ir }}" style="display:flex; align-items:center; gap:12px; width:100%; text-align:left; border:0; border-bottom:1px solid #E3E9EE; background:transparent; padding:11px 15px; cursor:pointer" style-hover="background:#F7FBFE">
+                    <span style="flex:0 0 130px; min-width:0; font-size:13.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{{ c.label }}</span>
+                    <span style="flex:1; min-width:40px; height:8px; border-radius:999px; background:#E4F4FD; overflow:hidden; position:relative">
+                      <span style="{{ c.barra }}"></span>
+                    </span>
+                    <span style="flex:0 0 46px; text-align:right; font-size:13px; font-weight:600; color:{{ c.color }}">{{ c.pct }}</span>
+                    <span data-sm-hide="1" style="flex:0 0 74px; text-align:right; font-size:12.5px; color:#5A6B78">{{ c.detalle }}</span>
+                  </button>
+                </sc-for>
+                <p style="margin:0; padding:11px 15px; background:#F7FBFE; font-size:12.5px; line-height:1.5; color:#5A6B78; text-wrap:pretty">Multas y papeletas al 38 % no es un problema de caja: es lo que Tránsito no llegó a notificar. Cada barra lleva a su determinación.</p>
+              </section>
+            </div>
+
+            <section style="background:#fff; border:1px solid #D6DEE4; border-radius:8px; overflow:hidden">
+              <div style="display:flex; align-items:center; gap:10px; padding:12px 15px; border-bottom:1px solid #E3E9EE">
+                <h2 style="margin:0; flex:1; font-size:14.5px; font-weight:700">Actividad reciente</h2>
+                <button onClick="{{ irPredios }}" style="border:1px solid #D6DEE4; border-radius:5px; padding:5px 11px; background:#fff; font-size:12.5px; cursor:pointer" style-hover="border-color:#7E96A8">Ver todo el padrón</button>
+              </div>
+              <sc-for list="{{ actividad }}" as="a" hint-placeholder-count="4">
+                <button onClick="{{ a.ir }}" style="display:flex; align-items:center; gap:12px; width:100%; text-align:left; border:0; border-bottom:1px solid #E3E9EE; background:transparent; padding:10px 15px; cursor:pointer" style-hover="background:#F7FBFE">
+                  <span style="{{ a.insignia }}">{{ a.tipo }}</span>
+                  <span style="flex:0 0 auto; font-size:13px; font-weight:600; color:#005284">{{ a.codigo }}</span>
+                  <span style="flex:1; min-width:0; font-size:13px; color:#3A4A55; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{{ a.detalle }}</span>
+                  <span style="flex:0 0 auto; font-size:12px; color:#5A6B78">{{ a.cuando }}</span>
+                </button>
+              </sc-for>
+            </section>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- ══════════ PREDIOS ══════════ -->
+      <sc-if value="{{ esPredios }}">
+        <div data-split="1" style="flex:1; display:flex; min-height:0; overflow:hidden">
+
+          <div data-lista="1" style="flex:0 0 376px; width:376px; display:flex; flex-direction:column; min-height:0; background:#fff; border-right:1px solid #D6DEE4">
+            <div style="flex:0 0 auto; padding:11px 12px 10px; border-bottom:1px solid #E3E9EE">
+              <div style="display:flex; align-items:center; gap:8px; border:1px solid #D6DEE4; border-radius:6px; padding:7px 10px; background:#F7FBFE">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5A6B78" stroke-width="1.8" stroke-linecap="round" style="flex:0 0 auto"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-4.3-4.3"></path></svg>
+                <input value="{{ q }}" onChange="{{ onQ }}" placeholder="Nombre, DNI, RUC o código" style="flex:1; min-width:0; border:0; background:transparent; font-size:14px; outline:none" />
+                <sc-if value="{{ hayQ }}">
+                  <button onClick="{{ limpiarQ }}" aria-label="Limpiar la búsqueda" style="border:0; background:transparent; padding:0; cursor:pointer; color:#93A3AF; flex:0 0 auto">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+                  </button>
+                </sc-if>
+              </div>
+              <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-top:9px">
+                <sc-for list="{{ chips }}" as="c" hint-placeholder-count="4">
+                  <button onClick="{{ c.ir }}" aria-pressed="{{ c.on }}" style="{{ c.style }}">{{ c.label }}</button>
+                </sc-for>
+              </div>
+            </div>
+
+            <div style="flex:0 0 auto; display:flex; align-items:center; gap:9px; padding:8px 12px; border-bottom:1px solid #E3E9EE; background:#F7FBFE">
+              <span style="flex:1; font-size:12px; font-weight:600; color:#5A6B78">{{ conteo }}</span>
+              <select value="{{ orden }}" onChange="{{ onOrden }}" aria-label="Ordenar la lista" style="border:1px solid #D6DEE4; border-radius:5px; padding:3px 7px; background:#fff; font-size:12px; cursor:pointer">
+                <sc-for list="{{ ordenes }}" as="o" hint-placeholder-count="3">
+                  <option value="{{ o }}">{{ o }}</option>
+                </sc-for>
+              </select>
+            </div>
+
+            <div style="flex:1; overflow:auto; min-height:0">
+              <sc-if value="{{ listaVacia }}">
+                <div style="padding:32px 20px; text-align:center">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#93A3AF" stroke-width="1.7" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-4.3-4.3"></path></svg>
+                  <p style="margin:10px 0 0; font-size:14.5px; font-weight:600">Ningún contribuyente coincide</p>
+                  <p style="margin:6px 0 0; font-size:13px; line-height:1.5; color:#5A6B78; text-wrap:pretty">Puede estar con el código antiguo o con otro documento. Si viene a declarar por primera vez, créelo aquí mismo.</p>
+                  <button onClick="{{ nuevaFicha }}" style="margin-top:14px; border:0; border-radius:6px; padding:9px 16px; background:#005284; color:#fff; font-size:13.5px; font-weight:600; cursor:pointer">Nuevo contribuyente</button>
+                </div>
+              </sc-if>
+              <sc-for list="{{ filas }}" as="r" hint-placeholder-count="5">
+                <button onClick="{{ r.ir }}" aria-current="{{ r.actual }}" style="{{ r.style }}" style-hover="background:#F7FBFE">
+                  <span style="display:flex; align-items:center; gap:8px">
+                    <span style="flex:1; min-width:0; font-size:14px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{{ r.titulo }}</span>
+                    <span style="{{ r.insignia }}">{{ r.estado }}</span>
+                  </span>
+                  <span style="display:block; font-size:12.5px; color:#5A6B78; margin-top:3px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{{ r.titular }}</span>
+                  <span style="display:flex; align-items:baseline; gap:9px; margin-top:6px">
+                    <span style="font-size:12px; color:#5A6B78; font-variant-numeric:tabular-nums">{{ r.codigo }}</span>
+                    <span style="flex:1"></span>
+                    <span style="font-size:13px; font-weight:600; font-variant-numeric:tabular-nums">{{ r.autovaluo }}</span>
+                  </span>
+                </button>
+              </sc-for>
+            </div>
+          </div>
+
+          <div style="flex:1; min-width:0; display:flex; flex-direction:column; min-height:0; overflow:hidden">
+            <sc-if value="{{ sinSeleccion }}">
+              <div style="flex:1; display:grid; place-items:center; padding:32px">
+                <div style="max-width:38ch; text-align:center">
+                  <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#93A3AF" stroke-width="1.5" stroke-linejoin="round"><path d="M6.5 3.5h7.5l4 4v13h-11.5z"></path><path d="M14 3.5v4h4"></path><path d="M9.5 12.5h5"></path></svg>
+                  <p style="margin:12px 0 0; font-size:16px; font-weight:700">Elija un contribuyente de la lista</p>
+                  <p style="margin:7px 0 0; font-size:13.5px; line-height:1.55; color:#5A6B78; text-wrap:pretty">El expediente se abre aquí al lado, sin salir de la lista. También puede crear un contribuyente nuevo.</p>
+                </div>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ hayFicha }}">
+              <div style="flex:0 0 auto; padding:12px 18px; background:#fff; border-bottom:1px solid #D6DEE4">
+                <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap">
+                  <span style="font-size:14px; font-weight:700; color:#005284; font-variant-numeric:tabular-nums">{{ ficha.codigo }}</span>
+                  <span style="{{ ficha.insignia }}">{{ ficha.estado }}</span>
+                  <span style="flex:1; min-width:20px"></span>
+                  <sc-for list="{{ ficha.acciones }}" as="a" hint-placeholder-count="3">
+                    <button onClick="{{ a.ir }}" style="{{ a.style }}">{{ a.label }}</button>
+                  </sc-for>
+                </div>
+                <p style="margin:8px 0 0; font-size:17px; font-weight:700; letter-spacing:-.015em; text-wrap:pretty">{{ ficha.titulo }}</p>
+                <p style="margin:4px 0 0; font-size:13.5px; line-height:1.5; color:#5A6B78; text-wrap:pretty">{{ ficha.contexto }}</p>
+              </div>
+
+              <sc-if value="{{ esNuevo }}">
+                <div style="flex:0 0 auto; padding:12px 18px; background:#F7FBFE; border-bottom:1px solid #D6DEE4">
+                  <div style="display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; margin-bottom:9px">
+                    <p style="margin:0; font-size:12.5px; font-weight:700">Documento de identidad</p>
+                    <p style="margin:0; flex:1; min-width:180px; font-size:12.5px; color:#5A6B78; text-wrap:pretty">El código de contribuyente lo asigna el sistema. Lo que tiene que ser único es el documento.</p>
+                    <span style="{{ codigo.insignia }}">{{ codigo.estado }}</span>
+                  </div>
+                  <div style="display:flex; align-items:flex-end; gap:9px; flex-wrap:wrap">
+                    <label style="display:block">
+                      <span style="display:block; font-size:10.5px; font-weight:600; text-transform:uppercase; letter-spacing:.06em; color:#5A6B78; margin-bottom:4px">Tipo</span>
+                      <select value="{{ codigo.tipo }}" onChange="{{ codigo.onTipo }}" aria-label="Tipo de documento" style="border:1px solid #C3CFD9; border-radius:5px; padding:8px 9px; background:#fff; font-size:14px; cursor:pointer">
+                        <sc-for list="{{ codigo.tipos }}" as="o" hint-placeholder-count="3">
+                          <option value="{{ o }}">{{ o }}</option>
+                        </sc-for>
+                      </select>
+                    </label>
+                    <label style="display:block">
+                      <span style="display:block; font-size:10.5px; font-weight:600; text-transform:uppercase; letter-spacing:.06em; color:#5A6B78; margin-bottom:4px">Número</span>
+                      <input data-tramo="1" value="{{ codigo.numero }}" onChange="{{ codigo.onNumero }}" placeholder="{{ codigo.ph }}" maxlength="{{ codigo.largo }}" aria-label="Número de documento" style="{{ codigo.numStyle }}" />
+                    </label>
+                    <span style="display:flex; align-items:center; gap:8px; margin-left:4px; padding-bottom:2px">
+                      <span style="font-size:12px; color:#5A6B78">Código que se asignará</span>
+                      <code style="font-size:14.5px; font-weight:700; letter-spacing:.04em; color:#004670; background:#E4F4FD; border-radius:5px; padding:7px 11px; font-variant-numeric:tabular-nums">{{ codigo.completo }}</code>
+                    </span>
+                  </div>
+                  <sc-if value="{{ codigo.problema }}">
+                    <p style="margin:9px 0 0; padding:9px 11px; border-left:3px solid {{ codigo.borde }}; border-radius:0 5px 5px 0; background:{{ codigo.fondo }}; font-size:13px; line-height:1.5; color:{{ codigo.color }}; text-wrap:pretty">{{ codigo.aviso }}</p>
+                  </sc-if>
+                </div>
+              </sc-if>
+
+              <div style="flex:0 0 auto; display:flex; align-items:stretch; gap:2px; padding:0 14px; background:#fff; border-bottom:1px solid #D6DEE4; overflow-x:auto">
+                <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="6">
+                  <button onClick="{{ t.ir }}" aria-current="{{ t.actual }}" style="{{ t.style }}">
+                    <span>{{ t.label }}</span>
+                    <sc-if value="{{ t.pendientes }}">
+                      <span style="{{ t.pendStyle }}">{{ t.pendientes }}</span>
+                    </sc-if>
+                  </button>
+                </sc-for>
+              </div>
+
+              <div style="flex:1; overflow:auto; min-height:0; padding:16px 18px 24px; animation:fadeIn .18s ease">
+                <div style="max-width:920px">
+                  <p style="margin:0 0 14px; font-size:13.5px; line-height:1.6; color:#3A4A55; max-width:74ch; text-wrap:pretty">{{ paso.nota }}</p>
+
+                  <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(212px,1fr)); gap:14px 16px">
+                    <sc-for list="{{ paso.campos }}" as="f" hint-placeholder-count="8">
+                      <label data-ancho="{{ f.ancho }}" style="display:block; min-width:0">
+                        <span style="display:flex; align-items:baseline; gap:7px; margin-bottom:5px">
+                          <span style="font-size:12.5px; font-weight:600; color:#3A4A55">{{ f.label }}</span>
+                          <sc-if value="{{ f.opcional }}">
+                            <span style="font-size:11.5px; color:#93A3AF">opcional</span>
+                          </sc-if>
+                        </span>
+                        <sc-if value="{{ f.esTexto }}">
+                          <input value="{{ f.valor }}" onChange="{{ f.on }}" placeholder="{{ f.ph }}" style="{{ f.style }}" />
+                        </sc-if>
+                        <sc-if value="{{ f.esFecha }}">
+                          <input type="date" value="{{ f.valor }}" onChange="{{ f.on }}" style="{{ f.style }}" />
+                        </sc-if>
+                        <sc-if value="{{ f.esSel }}">
+                          <select value="{{ f.valor }}" onChange="{{ f.on }}" style="{{ f.style }}">
+                            <sc-for list="{{ f.opts }}" as="o" hint-placeholder-count="4">
+                              <option value="{{ o }}">{{ o }}</option>
+                            </sc-for>
+                          </select>
+                        </sc-if>
+                        <sc-if value="{{ f.esArea }}">
+                          <textarea value="{{ f.valor }}" onChange="{{ f.on }}" rows="3" placeholder="{{ f.ph }}" style="width:100%; box-sizing:border-box; border:1px solid #C3CFD9; border-radius:6px; padding:9px 10px; background:#fff; font-family:'Source Sans 3',sans-serif; font-size:14px; resize:vertical"></textarea>
+                        </sc-if>
+                        <sc-if value="{{ f.esChk }}">
+                          <span style="display:flex; align-items:flex-start; gap:9px; border:1px solid #C3CFD9; border-radius:6px; padding:9px 10px; background:#fff">
+                            <input type="checkbox" checked="{{ f.marcado }}" onChange="{{ f.on }}" style="accent-color:#005284; width:17px; height:17px; flex:0 0 auto; margin-top:1px" />
+                            <span style="font-size:13.5px; line-height:1.4; color:#3A4A55">{{ f.ph }}</span>
+                          </span>
+                        </sc-if>
+                        <sc-if value="{{ f.esRo }}">
+                          <span style="display:block; border:1px dashed #C3CFD9; border-radius:6px; padding:9px 10px; background:#F7FBFE; font-size:13.5px; color:#3A4A55; font-variant-numeric:tabular-nums">{{ f.valor }}</span>
+                        </sc-if>
+                        <sc-if value="{{ f.ayuda }}">
+                          <span style="display:block; font-size:12px; line-height:1.45; color:#5A6B78; margin-top:5px; text-wrap:pretty">{{ f.ayuda }}</span>
+                        </sc-if>
+                      </label>
+                    </sc-for>
+                  </div>
+
+                  <sc-if value="{{ paso.hayTabla }}">
+                    <section style="margin-top:18px; background:#fff; border:1px solid #D6DEE4; border-radius:8px; overflow:hidden">
+                      <div style="display:flex; align-items:center; gap:10px; padding:11px 14px; border-bottom:1px solid #E3E9EE">
+                        <h3 style="margin:0; flex:1; font-size:13.5px; font-weight:700">{{ paso.tabla.titulo }}</h3>
+                        <button style="border:1px solid #D6DEE4; border-radius:5px; padding:5px 11px; background:#fff; font-size:12.5px; cursor:pointer" style-hover="border-color:#7E96A8">{{ paso.tabla.accion }}</button>
+                      </div>
+                      <div style="overflow-x:auto">
+                        <table style="width:100%; border-collapse:collapse; min-width:{{ paso.tabla.min }}">
+                          <thead>
+                            <tr>
+                              <sc-for list="{{ paso.tabla.cols }}" as="c" hint-placeholder-count="6">
+                                <th style="{{ c.style }}">{{ c.label }}</th>
+                              </sc-for>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <sc-for list="{{ paso.tabla.filas }}" as="r" hint-placeholder-count="3">
+                              <tr style="border-top:1px solid #E3E9EE" style-hover="background:#F7FBFE">
+                                <sc-for list="{{ r.celdas }}" as="cl" hint-placeholder-count="6">
+                                  <td style="{{ cl.style }}">{{ cl.texto }}</td>
+                                </sc-for>
+                              </tr>
+                            </sc-for>
+                          </tbody>
+                        </table>
+                      </div>
+                      <sc-if value="{{ paso.tabla.vacia }}">
+                        <p style="margin:0; padding:22px 14px; text-align:center; font-size:13px; color:#5A6B78; text-wrap:pretty">{{ paso.tabla.vacioTexto }}</p>
+                      </sc-if>
+                      <p style="margin:0; padding:10px 14px; border-top:1px solid #E3E9EE; background:#F7FBFE; font-size:12.5px; line-height:1.5; color:#5A6B78; text-wrap:pretty">{{ paso.tabla.nota }}</p>
+                    </section>
+                  </sc-if>
+
+                  <sc-if value="{{ cierre.hay }}">
+                    <section style="margin-top:18px; background:#fff; border:1px solid #D6DEE4; border-radius:8px; overflow:hidden">
+                      <div style="padding:13px 15px; border-bottom:1px solid #E3E9EE">
+                        <h3 style="margin:0; font-size:14.5px; font-weight:700">Lo que se va a registrar</h3>
+                        <p style="margin:5px 0 0; font-size:13px; line-height:1.55; color:#5A6B78; max-width:72ch; text-wrap:pretty">Una ficha registrada entra en el padrón y desde ese momento el predio genera obligación predial.</p>
+                      </div>
+                      <sc-for list="{{ cierre.lineas }}" as="l" hint-placeholder-count="4">
+                        <div style="display:flex; align-items:flex-start; gap:12px; padding:12px 15px; border-bottom:1px solid #E3E9EE">
+                          <span style="{{ l.iconoStyle }}">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="{{ l.icono }}"></path></svg>
+                          </span>
+                          <span style="flex:1; min-width:0">
+                            <span style="display:block; font-size:13.5px">{{ l.titulo }}</span>
+                            <span style="display:block; font-size:12.5px; line-height:1.45; color:#5A6B78; margin-top:2px; text-wrap:pretty">{{ l.detalle }}</span>
+                          </span>
+                          <span style="font-size:13px; font-weight:600; color:#3A4A55; flex:0 0 auto; white-space:nowrap">{{ l.valor }}</span>
+                        </div>
+                      </sc-for>
+                      <p style="margin:0; padding:12px 15px; border-left:4px solid {{ cierre.borde }}; background:{{ cierre.fondo }}; font-size:13px; line-height:1.55; color:{{ cierre.color }}; text-wrap:pretty">{{ cierre.aviso }}</p>
+                    </section>
+                  </sc-if>
+                </div>
+              </div>
+
+              <div style="flex:0 0 auto; display:flex; align-items:center; gap:11px; flex-wrap:wrap; padding:11px 18px; background:#fff; border-top:1px solid #D6DEE4">
+                <button onClick="{{ atras }}" aria-disabled="{{ primerPaso }}" style="{{ atrasStyle }}">Anterior</button>
+                <p style="margin:0; flex:1; min-width:170px; font-size:12.5px; line-height:1.45; color:#5A6B78; text-wrap:pretty">{{ pasoNota }}</p>
+                <button onClick="{{ adelante }}" aria-disabled="{{ bloqueado }}" title="{{ motivo }}" style="{{ adelanteStyle }}" style-hover="background:#00365A">{{ botonLabel }}</button>
+              </div>
+            </sc-if>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- ══════════ TERRITORIO ══════════ -->
+      <sc-if value="{{ esTerritorio }}">
+        <div data-split="1" style="flex:1; display:flex; min-height:0; overflow:hidden">
+          <div data-lista="1" style="flex:0 0 300px; width:300px; display:flex; flex-direction:column; min-height:0; background:#fff; border-right:1px solid #D6DEE4">
+            <p style="margin:0; flex:0 0 auto; padding:11px 14px; border-bottom:1px solid #E3E9EE; font-size:12.5px; font-weight:700">Tipos de determinación</p>
+            <div style="flex:1; overflow:auto; min-height:0">
+              <sc-for list="{{ arbol }}" as="n" hint-placeholder-count="7">
+                <button onClick="{{ n.ir }}" aria-current="{{ n.actual }}" style="{{ n.style }}" style-hover="background:#F7FBFE">
+                  <span style="flex:1; min-width:0; text-align:left; font-size:13.5px">{{ n.label }}</span>
+                  <span style="font-size:12px; color:#5A6B78; flex:0 0 auto">{{ n.conteo }}</span>
+                </button>
+              </sc-for>
+            </div>
+          </div>
+          <div style="flex:1; min-width:0; display:flex; flex-direction:column; min-height:0; overflow:hidden">
+            <div style="flex:0 0 auto; padding:13px 18px; background:#fff; border-bottom:1px solid #D6DEE4">
+              <h2 style="margin:0; font-size:16px; font-weight:700">{{ terr.titulo }}</h2>
+              <p style="margin:5px 0 0; font-size:13.5px; line-height:1.55; color:#5A6B78; max-width:78ch; text-wrap:pretty">{{ terr.nota }}</p>
+            </div>
+            <div style="flex:1; overflow:auto; min-height:0">
+              <table data-sticky="1" style="width:100%; border-collapse:collapse; min-width:620px">
+                <thead>
+                  <tr>
+                    <sc-for list="{{ terr.cols }}" as="c" hint-placeholder-count="5">
+                      <th style="{{ c.style }}">{{ c.label }}</th>
+                    </sc-for>
+                  </tr>
+                </thead>
+                <tbody>
+                  <sc-for list="{{ terr.filas }}" as="r" hint-placeholder-count="6">
+                    <tr style="border-top:1px solid #E3E9EE; background:#fff" style-hover="background:#F7FBFE">
+                      <sc-for list="{{ r.celdas }}" as="cl" hint-placeholder-count="5">
+                        <td style="{{ cl.style }}">{{ cl.texto }}</td>
+                      </sc-for>
+                    </tr>
+                  </sc-for>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- ══════════ VALORES ══════════ -->
+      <sc-if value="{{ esValores }}">
+        <div style="flex:1; display:flex; flex-direction:column; min-height:0; overflow:hidden">
+          <div style="flex:0 0 auto; display:flex; align-items:stretch; gap:2px; padding:0 16px; background:#fff; border-bottom:1px solid #D6DEE4; overflow-x:auto">
+            <sc-for list="{{ valTabs }}" as="t" hint-placeholder-count="3">
+              <button onClick="{{ t.ir }}" aria-current="{{ t.actual }}" style="{{ t.style }}">{{ t.label }}</button>
+            </sc-for>
+          </div>
+          <div style="flex:0 0 auto; display:flex; align-items:center; gap:12px; flex-wrap:wrap; padding:12px 18px; background:#fff; border-bottom:1px solid #D6DEE4">
+            <p style="margin:0; flex:1; min-width:220px; font-size:13.5px; line-height:1.55; color:#3A4A55; max-width:80ch; text-wrap:pretty">{{ val.nota }}</p>
+            <span style="display:flex; align-items:center; gap:7px; border:1px solid #D6DEE4; border-radius:999px; padding:4px 12px; background:#F7FBFE; font-size:12.5px; color:#5A6B78; flex:0 0 auto">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 11V8a5 5 0 0 1 10 0v3"></path><path d="M5.5 11h13v9.5h-13z"></path></svg>
+              Solo lectura
+            </span>
+          </div>
+          <div style="flex:1; overflow:auto; min-height:0">
+            <table data-sticky="1" style="width:100%; border-collapse:collapse; min-width:660px">
+              <thead>
+                <tr>
+                  <sc-for list="{{ val.cols }}" as="c" hint-placeholder-count="6">
+                    <th style="{{ c.style }}">{{ c.label }}</th>
+                  </sc-for>
+                </tr>
+              </thead>
+              <tbody>
+                <sc-for list="{{ val.filas }}" as="r" hint-placeholder-count="7">
+                  <tr style="border-top:1px solid #E3E9EE; background:#fff" style-hover="background:#F7FBFE">
+                    <sc-for list="{{ r.celdas }}" as="cl" hint-placeholder-count="6">
+                      <td style="{{ cl.style }}">{{ cl.texto }}</td>
+                    </sc-for>
+                  </tr>
+                </sc-for>
+              </tbody>
+            </table>
+            <p style="margin:0; padding:13px 18px; font-size:12.5px; line-height:1.55; color:#5A6B78; text-wrap:pretty">{{ val.pie }}</p>
+          </div>
+        </div>
+      </sc-if>
+
+    </div>
+  </div>
+
+  <!-- Cerrar una pestaña con cambios los descarta: se pregunta antes, y la
+       salida por defecto es guardar, no perder. -->
+  <sc-if value="{{ porCerrar }}">
+    <div onClick="{{ confirmar.cancelar }}" style="position:fixed; inset:0; z-index:88; background:rgba(0,54,90,.4)"></div>
+    <div role="dialog" aria-modal="true" aria-label="Cerrar con cambios sin guardar" style="position:fixed; z-index:89; top:50%; left:50%; transform:translate(-50%,-50%); width:min(556px,calc(100vw - 32px)); background:#fff; border-radius:10px; box-shadow:0 22px 56px rgba(0,54,90,.28); overflow:hidden; animation:pop .14s ease">
+      <div style="display:flex; align-items:flex-start; gap:12px; padding:18px 20px 14px">
+        <span style="display:grid; place-items:center; width:32px; height:32px; border-radius:50%; flex:0 0 auto; background:#FFF4D9; color:#7A5200">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7.6V13M12 16.4h.02"></path></svg>
+        </span>
+        <span style="flex:1; min-width:0">
+          <p style="margin:0; font-size:16px; font-weight:700; text-wrap:pretty">{{ confirmar.label }} tiene cambios sin guardar</p>
+          <p style="margin:7px 0 0; font-size:13.5px; line-height:1.55; color:#3A4A55; text-wrap:pretty">Si cierra la pestaña se pierden. Guárdelos primero o ciérrela descartándolos: eso no se puede deshacer.</p>
+        </span>
+      </div>
+      <div style="display:flex; align-items:center; gap:9px; flex-wrap:wrap; padding:13px 20px; border-top:1px solid #E3E9EE; background:#F7FBFE">
+        <button onClick="{{ confirmar.cerrar }}" style="border:1px solid #D6DEE4; border-radius:6px; padding:9px 15px; background:#fff; font-size:13.5px; color:#8F2A17; cursor:pointer; white-space:nowrap" style-hover="border-color:#A8321E">Descartar y cerrar</button>
+        <span style="flex:1; min-width:0"></span>
+        <button onClick="{{ confirmar.cancelar }}" style="border:1px solid #D6DEE4; border-radius:6px; padding:9px 15px; background:#fff; font-size:13.5px; cursor:pointer; white-space:nowrap" style-hover="border-color:#7E96A8">Seguir editando</button>
+        <button onClick="{{ confirmar.guardar }}" style="border:0; border-radius:6px; padding:10px 18px; background:#005284; color:#fff; font-size:13.5px; font-weight:600; cursor:pointer; white-space:nowrap" style-hover="background:#00365A">Guardar y cerrar</button>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ toast }}">
+    <div role="status" style="position:fixed; z-index:90; bottom:20px; left:50%; transform:translateX(-50%); display:flex; align-items:center; gap:10px; padding:12px 20px; border-radius:7px; background:#16232C; color:#fff; font-size:14px; box-shadow:0 10px 30px rgba(0,54,90,.28); animation:subir .18s ease; max-width:calc(100vw - 40px)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#52BDEF" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" style="flex:0 0 auto"><path d="M5 12.5l4.5 4.5L19 7"></path></svg>
+      {{ toast }}
+    </div>
+  </sc-if>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:900},&quot;entidad&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;Municipalidad Distrital de Catacaos&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Institución&quot;}}">
+/* ── V4: se va el riel de módulos y aparece una barra global ────
+   Mismos colores y tipografía que V2 y V3: Orient #005284 para acción,
+   Picton Blue #52BDEF de acento, Source Sans 3.
+   La barra superior toma el azul que tenía el riel (#00365A). A la
+   izquierda, el lanzador de nueve puntos y la entidad; a la derecha, y en
+   este orden desde el borde, el usuario, el buscador y el ejercicio.
+
+   Tres marcos sobre el mismo espacio de trabajo, conmutables abajo a la
+   izquierda:
+     A — literal: barra global, panel lateral con el logo de la entidad y
+         el nombre del módulo, y una fila blanca con el título de pantalla.
+     B — sin la fila blanca: el título baja al lienzo y la pantalla gana
+         50 px de alto útil. Dos barras de cromo en lugar de tres.
+     C — sin panel lateral: el logo y el módulo pasan a una fila blanca con
+         las secciones como pestañas y la acción primaria a la derecha. La
+         lista y la ficha ocupan todo el ancho.
+
+   El escudo es un marcador de posición: si me envían el archivo del logo,
+   lo cambio por la imagen real. */
+const AZUL = '#005284';
+const AZUL_OSC = '#00365A';
+const AZUL_SUAVE = '#E4F4FD';
+const ACENTO = '#52BDEF';
+const LINEA = '#D6DEE4';
+const LINEA_2 = '#E3E9EE';
+const BORDE_CAMPO = '#C3CFD9';
+const TINTA = '#16232C';
+const TINTA_2 = '#3A4A55';
+const TINTA_3 = '#5A6B78';
+const SUP = '#F7FBFE';
+
+const IN = "width:100%; box-sizing:border-box; border:1px solid " + BORDE_CAMPO + "; border-radius:6px; padding:9px 10px; background:#fff; font-size:14px";
+const IN_MAL = "width:100%; box-sizing:border-box; border:1px solid #A8321E; border-radius:6px; padding:9px 10px; background:#FFF9F8; font-size:14px";
+
+const TH = 'padding:9px 16px; text-align:left; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:' + TINTA_3 + '; white-space:nowrap; background:' + SUP + '; border-bottom:1px solid ' + LINEA;
+const THN = TH + '; text-align:right';
+const TD = 'padding:11px 16px; font-size:13.5px; color:' + TINTA_2;
+const TDN = 'padding:11px 16px; font-size:13.5px; color:' + TINTA + '; text-align:right; white-space:nowrap; font-variant-numeric:tabular-nums';
+const TD1 = 'padding:11px 16px; font-size:13.5px; font-weight:600; color:' + TINTA + '; white-space:nowrap';
+
+const INS = {
+  ok: 'display:inline-block; font-size:11.5px; font-weight:600; border-radius:4px; padding:2px 8px; background:#DCEFE3; color:#1F5B39; white-space:nowrap; flex:0 0 auto',
+  warn: 'display:inline-block; font-size:11.5px; font-weight:600; border-radius:4px; padding:2px 8px; background:#FFF4D9; color:#7A5200; white-space:nowrap; flex:0 0 auto',
+  bad: 'display:inline-block; font-size:11.5px; font-weight:600; border-radius:4px; padding:2px 8px; background:#FBE4E0; color:#8F2A17; white-space:nowrap; flex:0 0 auto',
+  info: 'display:inline-block; font-size:11.5px; font-weight:600; border-radius:4px; padding:2px 8px; background:' + AZUL_SUAVE + '; color:#004670; white-space:nowrap; flex:0 0 auto'
+};
+
+const MODULOS = [
+  ['Inicio', ['M3 10.6 12 3.5l9 7.1', 'M5.6 9.6V20.5h12.8V9.6', 'M10 20.5v-5.4h4v5.4']],
+  ['Catastro', ['M3.5 6.6 9 4.2l6 2.4 5.5-2.4v13.2L15 19.8l-6-2.4-5.5 2.4z', 'M9 4.2v13.2', 'M15 6.6v13.2']],
+  ['Rentas · Registro', ['M6.5 3.5h7.5l4 4v13h-11.5z', 'M14 3.5v4h4', 'M9.5 12.5h5', 'M9.5 16.5h3.5']],
+  ['Fiscalización', ['M9.5 4.5H8A1.5 1.5 0 0 0 6.5 6v13A1.5 1.5 0 0 0 8 20.5h8a1.5 1.5 0 0 0 1.5-1.5V6A1.5 1.5 0 0 0 16 4.5h-1.5', 'M9.5 3.2h5v2.8h-5z', 'M9.6 13.2l2 2 3.4-4']],
+  ['Tránsito', ['M5 15.8v-3.2l1.9-4.4h10.2l1.9 4.4v3.2', 'M3.6 15.8h16.8', 'M8.4 18.4a1.6 1.6 0 1 1-3.2 0 1.6 1.6 0 0 1 3.2 0', 'M18.8 18.4a1.6 1.6 0 1 1-3.2 0 1.6 1.6 0 0 1 3.2 0']],
+  ['Infracciones administrativas', ['M12 4.2 20.8 19.6H3.2z', 'M12 9.8v4.4', 'M12 17.1h.02']],
+  ['Tesorería', ['M3.2 7.4h17.6v9.2H3.2z', 'M13.6 12a1.6 1.6 0 1 1-3.2 0 1.6 1.6 0 0 1 3.2 0', 'M6.6 10.6v2.8', 'M17.4 10.6v2.8']],
+  ['Consultas', ['M17.4 11a6.4 6.4 0 1 1-12.8 0 6.4 6.4 0 0 1 12.8 0', 'M15.8 15.8 20.6 20.6']],
+  ['Valores', ['M6.5 3.5h7.5l4 4v13h-11.5z', 'M14 3.5v4h4', 'M9.5 11.5h5', 'M15.6 16.4a2.3 2.3 0 1 1-4.6 0 2.3 2.3 0 0 1 4.6 0']],
+  ['Coactiva', ['M12 4.4v3.2', 'M5 8.6h14', 'M5 8.6 2.8 14.4h4.4z', 'M19 8.6 16.8 14.4h4.4z', 'M8.4 20h7.2']],
+  ['Autorizaciones y licencias', ['M4.4 9.6V20h15.2V9.6', 'M3.2 9.6 5.2 4.6h13.6l2 5z', 'M9.6 20v-5.4h4.8V20']],
+  ['Seguridad', ['M12 3.4 19 5.9v5.6c0 4.1-3 7.2-7 9.1-4-1.9-7-5-7-9.1V5.9z', 'M9.4 12.1l1.9 1.9 3.5-3.6']]
+];
+
+const ICO_SEC = {
+  panel: ['M4 19.5h16', 'M6.5 19.5V9', 'M11 19.5V5.5', 'M15.5 19.5v-7', 'M20 19.5v-11'],
+  predios: ['M3.5 6.6 9 4.2l6 2.4 5.5-2.4v13.2L15 19.8l-6-2.4-5.5 2.4z', 'M9 4.2v13.2'],
+  territorio: ['M4.5 4.5h6v6h-6z', 'M13.5 4.5h6v6h-6z', 'M4.5 13.5h6v6h-6z', 'M13.5 13.5h6v6h-6z'],
+  valores: ['M6.5 3.5h7.5l4 4v13h-11.5z', 'M14 3.5v4h4', 'M9.5 12.5h5']
+};
+
+/* El código de contribuyente lo asigna el sistema; lo que tiene que ser
+   único es el documento. Por eso la compuerta del alta comprueba el
+   documento, no un código compuesto como en Catastro. */
+const DOCS = { DNI: 8, RUC: 11, 'Carnet de extranjería': 12 };
+const DOC_EN_USO = '44218937';
+
+/* Las seis secciones del expediente. Conservan las etiquetas del manual:
+   lo que se va son las nueve pestañas, que eran navegación, no contenido. */
+const PASOS = [
+  { id: 'ident', label: 'Identificación',
+    nota: 'Quién es y cómo está calificado. La calificación decide el trato de cobranza, no el impuesto: un principal contribuyente paga lo mismo, se le persigue antes.',
+    campos: [
+      { k: 'tipoPersona', l: 'Tipo de persona', t: 'sel', o: ['', 'Natural', 'Jurídica', 'Sucesión indivisa', 'Sociedad conyugal'] },
+      { k: 'apPaterno', l: 'Apellido paterno' },
+      { k: 'apMaterno', l: 'Apellido materno' },
+      { k: 'nombres', l: 'Nombres' },
+      { k: 'razonSocial', l: 'Razón social', ancho: 1, opcional: true, ph: 'Solo si es persona jurídica' },
+      { k: 'nacimiento', l: 'Fecha de nacimiento', t: 'date' },
+      { k: 'sexo', l: 'Sexo', t: 'sel', o: ['', 'Masculino', 'Femenino'] },
+      { k: 'estadoCivil', l: 'Estado civil', t: 'sel', o: ['', 'Soltero(a)', 'Casado(a)', 'Viudo(a)', 'Divorciado(a)', 'Conviviente'] },
+      { k: 'conyuge', l: 'Cónyuge', opcional: true },
+      { k: 'calificacion', l: 'Calificación', t: 'sel', o: ['', '001 — Principal contribuyente', '002 — Mediano contribuyente', '003 — Pequeño contribuyente'], ayuda: 'Decide el trato de cobranza' },
+      { k: 'estadoContrib', l: 'Estado', t: 'sel', o: ['', 'Activo', 'Inactivo', 'Baja', 'Fallecido', 'No habido'] }
+    ] },
+  { id: 'domicilio', label: 'Domicilio fiscal',
+    nota: 'A dónde se notifica. La vía sale del catálogo vial de Catastro: si el domicilio está mal, la notificación no llega y la cobranza no avanza.',
+    campos: [
+      { k: 'tipoVia', l: 'Tipo de vía', t: 'sel', o: ['', 'AV — Avenida', 'CA — Calle', 'JR — Jirón', 'PS — Pasaje', 'CR — Carretera'] },
+      { k: 'via', l: 'Nombre de la vía', ancho: 1 },
+      { k: 'numero', l: 'Número' },
+      { k: 'numAd', l: 'Número adicional', opcional: true },
+      { k: 'habUrbana', l: 'Habilitación urbana', ancho: 1 },
+      { k: 'dep', l: 'Departamento', t: 'ro' },
+      { k: 'prov', l: 'Provincia', t: 'ro' },
+      { k: 'dist', l: 'Distrito', t: 'ro' },
+      { k: 'mz', l: 'Manzana', opcional: true },
+      { k: 'lt', l: 'Lote', opcional: true },
+      { k: 'telefonos', l: 'Teléfonos' },
+      { k: 'email', l: 'Correo electrónico' },
+      { k: 'notifElec', l: 'Notificación electrónica', t: 'chk', ph: 'Autoriza notificar al correo declarado' }
+    ] },
+  { id: 'unidades', label: 'Predios y vehículos',
+    nota: 'Las unidades afectas de las que sale el impuesto. El código predial es el mismo de Catastro: no hay dos padrones de predios.',
+    campos: [
+      { k: 'nPredios', l: 'Predios en el distrito', t: 'ro' },
+      { k: 'autovaluo', l: 'Autovalúo acumulado (S/)', t: 'ro', ayuda: 'Base imponible del predial: se determina por contribuyente, no por predio' },
+      { k: 'nVehiculos', l: 'Vehículos afectos', t: 'ro' },
+      { k: 'baseVeh', l: 'Base imponible vehicular (S/)', t: 'ro' }
+    ],
+    tabla: { titulo: 'Predios del contribuyente', min: '760px', accion: 'Añadir predio',
+      vacioTexto: 'Todavía no hay predios declarados. Sin unidad afecta no hay impuesto que determinar.',
+      cols: [['Código predial', 0], ['Ubicación', 0], ['Uso', 0], ['Terreno m²', 1], ['% prop.', 1], ['Autovalúo S/', 1]],
+      filas: [
+        ['02-014-D-14-01', 'Calle Santa Rosa 116', 'Casa habitación', '210.00', '100.00', '132,196.75'],
+        ['04-021-B-07-00', 'Mz. B Lt. 7 — Bellavista', 'Terreno sin construir', '184.00', '50.00', '38,420.00']
+      ],
+      nota: 'El autovalúo del conjunto es la base imponible del predial: la escala progresiva se aplica a la suma, no a cada predio.' } },
+  { id: 'beneficios', label: 'Beneficios',
+    nota: 'La deducción de 50 UIT para pensionistas y adultos mayores exige predio único destinado a vivienda. Es la que más se solicita y la que más se deniega.',
+    campos: [
+      { k: 'tipoBen', l: 'Tipo de beneficio', t: 'sel', o: ['', 'Pensionista — deducción 50 UIT', 'Adulto mayor no pensionista', 'Persona con discapacidad', 'Inafectación', 'Amnistía tributaria'] },
+      { k: 'benPredio', l: 'Código predial' },
+      { k: 'benExp', l: 'Nº de expediente' },
+      { k: 'benFecha', l: 'Fecha de solicitud', t: 'date' },
+      { k: 'benRes', l: 'Nº de resolución', opcional: true, ph: 'Se emite al aprobar' },
+      { k: 'benEstado', l: 'Estado', t: 'sel', o: ['', 'Vigente', 'En trámite', 'Denegado', 'Vencido'] }
+    ],
+    tabla: { titulo: 'Beneficios del contribuyente', min: '700px', accion: 'Solicitar beneficio',
+      vacioTexto: 'Sin beneficios registrados. Compruebe si cumple los requisitos de la deducción de 50 UIT.',
+      cols: [['Expediente', 0], ['Tipo', 0], ['Resolución', 0], ['Vigencia', 0], ['Deducción', 0], ['Estado', 0]],
+      filas: [
+        ['2026-0281', 'Pensionista', 'RES-0412-2026-MPS', '2026 — indefinida', '50 UIT', 'Vigente'],
+        ['2025-1102', 'Amnistía 2025', 'ORD-018-2025-MPS', '2025', '100 % interés', 'Vencido']
+      ],
+      nota: 'Un beneficio vigente reduce la base imponible del ejercicio en curso; no borra la deuda de ejercicios anteriores.' } },
+  { id: 'cuenta', label: 'Cuenta corriente',
+    nota: 'Lo que debe hoy, con reajuste e interés al día. La cifra cambia cada día: no se guarda, se calcula.',
+    campos: [
+      { k: 'deudaTotal', l: 'Deuda al día de hoy (S/)', t: 'ro' },
+      { k: 'insoluto', l: 'Insoluto (S/)', t: 'ro' },
+      { k: 'interes', l: 'Interés y reajuste (S/)', t: 'ro' },
+      { k: 'gastos', l: 'Gastos y costas (S/)', t: 'ro' }
+    ],
+    tabla: { titulo: 'Deuda por concepto', min: '760px', accion: 'Emitir estado de cuenta',
+      vacioTexto: 'Sin deuda pendiente. Se le puede emitir constancia de no adeudo.',
+      cols: [['Año', 0], ['Concepto', 0], ['Cuotas', 0], ['Insoluto S/', 1], ['Interés S/', 1], ['Total S/', 1], ['Situación', 0]],
+      filas: [
+        ['2026', 'Impuesto predial', '3 y 4', '293.72', '0.00', '293.72', 'Por vencer'],
+        ['2026', 'Arbitrios municipales', '1 a 8', '291.60', '18.44', '310.04', 'Vencida'],
+        ['2024', 'Impuesto predial', '1 a 4', '1,842.60', '212.44', '2,055.04', 'Vencida'],
+        ['2024', 'Patrimonio vehicular', '1', '614.00', '182.44', '796.44', 'En coactiva']
+      ],
+      nota: 'Lo que está en cobranza coactiva se paga igual, pero además acumula costas del procedimiento.' } },
+  { id: 'obs', label: 'Observaciones',
+    nota: 'Lo que hay que saber antes de atenderlo, y quién tocó qué. La bitácora no se edita: es lo que se presenta cuando alguien pregunta por una baja.',
+    campos: [
+      { k: 'obs', l: 'Observación', t: 'area', ancho: 1, opcional: true, ph: 'Lo que hay que saber antes de atenderlo' },
+      { k: 'registrado', l: 'Registrado por', t: 'ro' },
+      { k: 'modificado', l: 'Última modificación', t: 'ro' }
+    ] }
+];
+
+/* Los contribuyentes del padrón. La deuda es a la fecha de hoy. */
+const PREDIOS = [
+  { cod: '00000025673', titulo: 'Suc. Rufina Medina Medina', titular: 'DNI 03593174 · sucesión indivisa', uso: 'Sin conciliar',
+    autovaluo: 'S/ 1,842.60', estado: 'Con deuda', tono: 'warn', valor: 1842.60,
+    contexto: '2 predios y 1 vehículo · autovalúo acumulado S/ 170,616.75 · pequeño contribuyente · beneficio de pensionista vigente' },
+  { cod: '00000003541', titulo: 'Castillo Pascuala, María Elena', titular: 'DNI 44218937 · persona natural', uso: 'Al día',
+    autovaluo: 'S/ 591.94', estado: 'Al día', tono: 'ok', valor: 591.94,
+    contexto: '2 predios y 2 vehículos · autovalúo acumulado S/ 151,406.75 · pequeño contribuyente · sin beneficios' },
+  { cod: '00000006550', titulo: 'Díaz Madrid, Julio César', titular: 'DNI 02718844 · persona natural', uso: 'En coactiva',
+    autovaluo: 'S/ 9,412.15', estado: 'En coactiva', tono: 'bad', valor: 9412.15,
+    contexto: '3 predios · autovalúo acumulado S/ 412,880.00 · mediano contribuyente · expediente coactivo 2026-0418 con medida cautelar' },
+  { cod: '00000006551', titulo: 'Noblecilla Arismendiz S.A.C.', titular: 'RUC 20525118447 · persona jurídica', uso: 'Observado',
+    autovaluo: 'S/ 412.00', estado: 'Observado', tono: 'bad', valor: 412.00,
+    contexto: '1 predio sin arancel de vía · sin emisión 2026: la inconsistencia impide determinar el impuesto' },
+  { cod: '00000152614', titulo: 'Valdez Ríos, Oliver Fabián', titular: 'DNI 41182844 · sociedad conyugal', uso: 'Al día',
+    autovaluo: 'S/ 0.00', estado: 'Al día', tono: 'ok', valor: 0,
+    contexto: '1 predio con licencia de obra · autovalúo acumulado S/ 24,483.20 · sin deuda pendiente' }
+];
+
+/* Las seis determinaciones. Comparten anatomía: sujeto, memoria del
+   cálculo y acto. Lo que cambia es la cuenta, no la pantalla. */
+const NODOS = [
+  ['Predial — individual', '1 contribuyente'], ['Predial — masivo', '62,418 cuentas'],
+  ['Arbitrios municipales', '4 servicios'], ['Patrimonio vehicular', '3 ejercicios'],
+  ['Alcabala', '1 transferencia'], ['Espectáculos públicos', '84 eventos']
+];
+
+const DETERMINACIONES = [
+  { titulo: 'Predial — individual',
+    nota: 'Escala progresiva acumulativa sobre el autovalúo de todos los predios del contribuyente en el distrito, con el mínimo imponible de 0.6 % de la UIT.',
+    cols: [['', 0], ['Concepto', 0], ['Detalle', 0], ['S/', 1]],
+    filas: [
+      ['', 'Valuo total del conjunto', '2 predios, al 100 % y al 50 %', '170,616.75'],
+      ['−', 'Valuo exonerado', 'Sin beneficio aplicado este ejercicio', '0.00'],
+      ['=', 'Valuo afecto', 'Base imponible del predial', '151,406.75'],
+      ['×', 'Tramo 1 — hasta 15 UIT · 0.2 %', 'S/ 80,250.00 del afecto', '160.50'],
+      ['×', 'Tramo 2 — de 15 a 60 UIT · 0.6 %', 'S/ 71,156.75 del afecto', '426.94'],
+      ['×', 'Tramo 3 — más de 60 UIT · 1.0 %', 'S/ 0.00 del afecto', '0.00'],
+      ['=', 'Impuesto insoluto anual', 'Suma de los tres tramos', '587.44'],
+      ['+', 'Derecho de emisión', 'Tasa del TUPA por cuponera', '4.50'],
+      ['=', 'Total a pagar', 'En 4 cuotas trimestrales de S/ 147.98', '591.94']
+    ] },
+  { titulo: 'Predial — masivo',
+    nota: 'Proceso de emisión anual. Recalcula el padrón completo y deja constancia de los contribuyentes observados que quedan fuera de la emisión.',
+    cols: [['Etapa', 0], ['Registros', 1], ['Monto S/', 1], ['Observados', 1], ['Estado', 0]],
+    filas: [
+      ['Lectura del padrón', '62,418', '—', '0', 'Completa'],
+      ['Valuación de predios', '78,204', '1,842,116,420.00', '412', 'Completa'],
+      ['Determinación del impuesto', '61,884', '9,418,204.60', '534', 'Completa'],
+      ['Determinación de arbitrios', '61,884', '5,884,110.20', '188', 'Completa'],
+      ['Generación de cuponeras', '61,350', '—', '534', 'Con observados']
+    ] },
+  { titulo: 'Arbitrios municipales',
+    nota: 'Limpieza pública, parques y serenazgo. La tasa depende del uso del predio, la zona y los metros de frontis declarados en la ficha catastral.',
+    cols: [['Servicio', 0], ['Criterio de distribución', 0], ['Frecuencia', 0], ['Mensual S/', 1], ['Anual S/', 1]],
+    filas: [
+      ['Limpieza pública — barrido', 'Metros lineales de frontis', 'Diaria', '8.40', '100.80'],
+      ['Limpieza pública — recolección', 'Área construida y uso', 'Interdiaria', '14.20', '170.40'],
+      ['Parques y jardines', 'Ubicación del predio', 'Permanente', '6.10', '73.20'],
+      ['Serenazgo', 'Uso y peligrosidad de zona', 'Permanente', '11.80', '141.60'],
+      ['Total del ejercicio', 'Con descuento de pronto pago', '12 cuotas', '36.45', '437.40']
+    ] },
+  { titulo: 'Patrimonio vehicular',
+    nota: 'El 1 % sobre la base imponible, con un mínimo del 1.5 % de la UIT, por los tres ejercicios en que el vehículo permanece afecto.',
+    cols: [['', 0], ['Concepto', 0], ['Detalle', 0], ['S/', 1]],
+    filas: [
+      ['', 'Valor de adquisición', 'Declarado por el titular', '112,400.00'],
+      ['', 'Tabla referencial MEF', 'Publicada para el año de fabricación', '112,800.00'],
+      ['=', 'Base imponible', 'El mayor de los dos', '112,800.00'],
+      ['×', 'Tasa', '1.0 %', '1,128.00'],
+      ['=', 'Impuesto anual', 'En 4 cuotas de S/ 282.00', '1,128.00'],
+      ['', 'Mínimo imponible — 1.5 % UIT', 'Comprobación: el impuesto lo supera', '80.25']
+    ] },
+  { titulo: 'Alcabala',
+    nota: 'El 3 % sobre el exceso de las primeras 10 UIT, tomando como base el mayor valor entre el de transferencia y el autovalúo ajustado por el IPM.',
+    cols: [['', 0], ['Concepto', 0], ['Detalle', 0], ['S/', 1]],
+    filas: [
+      ['', 'Valor de transferencia', 'Según minuta EP-2218-2026', '95,000.00'],
+      ['', 'Autovalúo ajustado por IPM', 'Índice 1.0206 sobre S/ 76,840.00', '78,420.00'],
+      ['=', 'Base de cálculo', 'El mayor de los dos', '95,000.00'],
+      ['−', 'Tramo inafecto — 10 UIT', 'S/ 5,350.00 × 10', '53,500.00'],
+      ['=', 'Base imponible', '', '41,500.00'],
+      ['×', 'Tasa', '3.0 %', '1,245.00'],
+      ['=', 'Alcabala a pagar', 'Vence el 31/08/2026', '1,245.00']
+    ] },
+  { titulo: 'Espectáculos públicos',
+    nota: 'Grava el monto que se abona por presenciar el espectáculo. El organizador actúa como agente perceptor: retiene y entrega.',
+    cols: [['Expediente', 0], ['Organizador', 0], ['Espectáculo', 0], ['Aforo', 1], ['Recaudación S/', 1], ['Tasa', 0], ['Impuesto S/', 1]],
+    filas: [
+      ['2026-0884', 'Producciones del Norte E.I.R.L.', 'Concierto de cumbia', '2,400', '84,000.00', '10 %', '8,400.00'],
+      ['2026-0912', 'Asoc. Taurina Sullana', 'Corrida de toros', '1,800', '126,000.00', '10 %', '12,600.00'],
+      ['2026-0918', 'Cine Plaza S.A.C.', 'Función de cine', '320', '4,800.00', '0 %', '0.00']
+    ] }
+];
+
+const VAL = [
+  { label: 'UIT y escala progresiva',
+    nota: 'La UIT del ejercicio y los tres tramos de la escala del predial. Cambiar la UIT recalcula mínimos, tramos y multas en todo el sistema.',
+    cols: [['Concepto', 0], ['Base', 0], ['Tasa o valor', 0], ['Equivalente S/', 1]],
+    filas: [['UIT 2026', 'Aprobada por el MEF', 'S/ 5,350.00', '5,350.00'],
+      ['Tramo 1 del predial', 'Hasta 15 UIT', '0.2 %', '80,250.00'],
+      ['Tramo 2 del predial', 'De 15 a 60 UIT', '0.6 %', '321,000.00'],
+      ['Tramo 3 del predial', 'Más de 60 UIT', '1.0 %', 'sin tope'],
+      ['Mínimo imponible predial', '0.6 % de la UIT', '—', '32.10'],
+      ['Mínimo imponible vehicular', '1.5 % de la UIT', '—', '80.25'],
+      ['Deducción de pensionista', '50 UIT', '—', '267,500.00'],
+      ['Derecho de emisión', 'Tasa del TUPA', '—', '4.50']],
+    pie: 'La escala es acumulativa: cada tramo se aplica solo a la porción del autovalúo que le corresponde, no al total.' },
+  { label: 'Arbitrios por servicio',
+    nota: 'Tasa mensual por metro de frontis o metro construido, según el servicio, la zona y el uso del predio.',
+    cols: [['Servicio', 0], ['Zona 1', 1], ['Zona 2', 1], ['Zona 3', 1], ['Zona 4', 1], ['Criterio', 0]],
+    filas: [['Barrido de calles', '11.20', '8.40', '6.10', '4.20', 'Metro de frontis'],
+      ['Recolección de residuos', '18.60', '14.20', '10.40', '7.20', 'Metro construido'],
+      ['Parques y jardines', '8.40', '6.10', '4.20', '2.80', 'Ubicación'],
+      ['Serenazgo', '16.20', '11.80', '8.40', '5.60', 'Uso y peligrosidad']],
+    pie: 'Los arbitrios se determinan por predio, no por contribuyente: cada uno tiene su frontis y su zona.' },
+  { label: 'Intereses y reajustes',
+    nota: 'Interés moratorio, reajuste por índice de precios y las tasas del fraccionamiento. Se aplican día a día sobre el insoluto vencido.',
+    cols: [['Concepto', 0], ['Vigencia', 0], ['Tasa mensual', 1], ['Tasa diaria', 1]],
+    filas: [['Interés moratorio (TIM)', 'Desde 01/2026', '0.90 %', '0.0300 %'],
+      ['Interés de fraccionamiento', 'Desde 01/2026', '0.80 %', '0.0267 %'],
+      ['Reajuste por IPM', 'Trimestral', '—', '—'],
+      ['Costas del procedimiento coactivo', 'Arancel vigente', '—', '—']],
+    pie: 'El interés corre desde el día siguiente al vencimiento de la cuota. Una amnistía puede condonarlo, nunca el insoluto.' }
+];
+
+/* Los iconos del árbol, por módulo. */
+const ICO_MOD = {};
+
+/* El árbol de la izquierda: cada módulo con sus submódulos, con el mismo
+   reparto de secciones que su propio rediseño. Catastro, Tesorería y
+   Valores quedan fuera de este experimento.
+   Los submódulos de Rentas abren la pantalla real; los de los demás abren
+   su pestaña con la ficha del submódulo, que es lo que este marco
+   demuestra: navegar entre varias cosas abiertas a la vez. */
+const ARBOL = [
+  ['Inicio', 'Panel de recaudación', 'inicio',
+    [['ini-panel', 'Panel'], ['ini-flujo', 'Recaudación'], ['ini-parado', 'Trabajo parado'], ['ini-cierre', 'Cierre del día']]],
+  ['Rentas · Registro', 'Predial y contribuyentes', 'rentas',
+    [['panel', 'Panel'], ['predios', 'Contribuyentes'], ['territorio', 'Determinación'], ['valores', 'Valores']]],
+  ['Fiscalización', 'Detección y actas', 'fisc',
+    [['fis-panel', 'Panel'], ['fis-actas', 'Actas'], ['fis-prog', 'Programas y cruces'], ['fis-res', 'Resultados']]],
+  ['Tránsito', 'Papeletas y vehículos', 'transito',
+    [['tra-panel', 'Panel'], ['tra-pap', 'Papeletas'], ['tra-veh', 'Vehículos y depósito'], ['tra-cua', 'Cuadros y plazos']]],
+  ['Infracciones administrativas', 'Sanciones administrativas', 'infra',
+    [['inf-panel', 'Panel'], ['inf-exp', 'Expedientes'], ['inf-cuis', 'CUIS y reincidencia'], ['inf-esc', 'Escalas y plazos']]],
+  ['Consultas', 'Ventanilla y constancias', 'consultas',
+    [['con-panel', 'Panel'], ['con-contrib', 'Contribuyentes'], ['con-obj', 'Consultas por objeto'], ['con-doc', 'Documentos y beneficios']]],
+  ['Coactiva', 'Expedientes y medidas', 'coactiva',
+    [['coa-panel', 'Panel'], ['coa-exp', 'Expedientes'], ['coa-cart', 'Cartera y medidas'], ['coa-cost', 'Costas y plazos']]],
+  ['Autorizaciones y licencias', 'Licencias y anuncios', 'autoriz',
+    [['aut-panel', 'Panel'], ['aut-sol', 'Solicitudes'], ['aut-cat', 'Catálogos y padrones'], ['aut-tram', 'Trámites y plazos']]],
+  ['Seguridad', 'Usuarios y permisos', 'seguridad',
+    [['seg-panel', 'Panel'], ['seg-acc', 'Accesos'], ['seg-aud', 'Auditoría'], ['seg-sis', 'Sistema']]],
+  ['Catastro', 'Predios y valuación', 'catastro',
+    [['cat-panel', 'Panel'], ['cat-pred', 'Predios'], ['cat-terr', 'Territorio'], ['cat-val', 'Valores del ejercicio']]],
+  ['Tesorería', 'Caja y recaudación', 'tesoreria',
+    [['tes-panel', 'Panel'], ['tes-rec', 'Recibos'], ['tes-caj', 'Cajas y arqueo'], ['tes-tar', 'Tarifario y cierre']]],
+  ['Valores', 'Emisión y notificación', 'valores-mod',
+    [['val-panel', 'Panel'], ['val-val', 'Valores'], ['val-cart', 'Cartera y lotes'], ['val-tip', 'Tipos y prescripción']]]
+];
+
+ARBOL.forEach((m) => {
+  const fila = MODULOS.find((x) => x[0] === m[0]);
+  ICO_MOD[m[0]] = fila ? fila[1] : [];
+});
+
+/* Índice plano: de la clave del submódulo a su módulo y su rótulo. */
+const HOJAS = {};
+ARBOL.forEach((m) => m[3].forEach((h) => { HOJAS[h[0]] = { mod: m[0], nota: m[1], label: h[1] }; }));
+
+/* Las cuatro secciones del módulo, con el slug que va al hash. Vive fuera
+   de la clase porque la usan tanto el render como el enrutado. */
+const SECS = [
+  ['panel', 'Panel', '', 'panel'],
+  ['predios', 'Contribuyentes', '62,418', 'contribuyentes'],
+  ['territorio', 'Determinación', '6', 'determinacion'],
+  ['valores', 'Valores', '', 'valores']
+];
+
+class Component extends DCLogic {
+  state = {
+    secOpen: true, abiertas: ['panel'], desplegado: 'Rentas · Registro',
+    sucias: {}, porCerrar: null, panelVar: 'a', filtro: '', sesion: false,
+    dest: 'panel', predio: null, paso: 0, vals: {}, intento: false,
+    q: '', chip: 'Todos', orden: 'Código',
+    nodo: 0, valTab: 0, ejercicio: '2026',
+    lanzador: false, pal: false, pq: '',
+    aviso: true, avisoAbierto: false, toast: ''
+  };
+
+  componentDidMount() {
+    this.aplicar();
+    const inicial = this.destDeHash();
+    if (inicial) this.setState({ dest: inicial });
+    else this.marcarHash(this.state.dest);
+    this._hash = () => {
+      const d = this.destDeHash();
+      if (d && d !== this.state.dest) this.setState({ dest: d, predio: null });
+    };
+    window.addEventListener('hashchange', this._hash);
+    this._tecla = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        this.setState((s) => ({ pal: !s.pal, pq: '', lanzador: false }));
+      } else if (e.key === 'Escape') {
+        this.setState({ pal: false, lanzador: false, porCerrar: null, sesion: false });
+      }
+    };
+    window.addEventListener('keydown', this._tecla);
+  }
+  componentDidUpdate() { this.aplicar(); }
+  componentWillUnmount() {
+    window.removeEventListener('keydown', this._tecla);
+    window.removeEventListener('hashchange', this._hash);
+    if (this._reloj) clearTimeout(this._reloj);
+  }
+
+  aplicar() {
+    if (this.state.toast && this.state.toast !== this._ultimo) {
+      this._ultimo = this.state.toast;
+      if (this._reloj) clearTimeout(this._reloj);
+      this._reloj = setTimeout(() => { this._ultimo = ''; this.setState({ toast: '' }); }, 3400);
+    }
+  }
+
+  /* El hash lleva la sección abierta, así que la URL es enlazable y
+     sobrevive a una recarga. Se escribe con replaceState para no llenar el
+     historial ni provocar un salto de desplazamiento. */
+  marcarHash(dest) {
+    const slug = (SECS.find((x) => x[0] === dest) || [])[3] || (HOJAS[dest] ? dest : null);
+    if (!slug) return;
+    try {
+      if (window.location.hash.slice(1) !== slug) {
+        window.history.replaceState(null, '', '#' + slug);
+      }
+    } catch (e) { /* sin permiso de historial: el hash es un extra */ }
+  }
+
+  destDeHash() {
+    const slug = (window.location.hash || '').slice(1);
+    const fila = SECS.find((x) => x[3] === slug);
+    if (fila) return fila[0];
+    return HOJAS[slug] ? slug : null;
+  }
+
+  ir(dest, extra) {
+    this.marcarHash(dest);
+    /* Abrir un submódulo lo añade a las pestañas si no estaba; si ya estaba,
+       solo lo activa. El panel lateral no se cierra: es persistente. */
+    this.setState((s) => Object.assign({
+      dest: dest, lanzador: false, pal: false,
+      abiertas: s.abiertas.indexOf(dest) >= 0 ? s.abiertas : s.abiertas.concat([dest])
+    }, extra || {}));
+  }
+
+  /* Cerrar una pestaña activa la vecina: la de la izquierda si hay, y si no
+     la de la derecha. Cerrar la última deja el espacio vacío, que es honesto:
+     no hay nada abierto. */
+  /* Con cambios sin guardar no se cierra a la primera: se pregunta, porque
+     cerrar los descarta y eso no se puede deshacer. */
+  pedirCierre(dest) {
+    if (this.state.sucias[dest]) { this.setState({ porCerrar: dest }); return; }
+    this.cerrarPestana(dest);
+  }
+
+  cerrarPestana(dest) {
+    this.setState((s) => {
+      const i = s.abiertas.indexOf(dest);
+      if (i < 0) return {};
+      const quedan = s.abiertas.filter((x) => x !== dest);
+      let activa = s.dest;
+      if (s.dest === dest) {
+        activa = quedan.length === 0 ? null : quedan[Math.max(i - 1, 0)];
+        if (activa) this.marcarHash(activa);
+      }
+      const sucias = Object.assign({}, s.sucias);
+      delete sucias[dest];
+      return { abiertas: quedan, dest: activa, predio: null, sucias: sucias, porCerrar: null };
+    });
+  }
+  /* Editar un campo marca sucia la pestaña activa: es lo que después pone
+     el asterisco y lo que obliga a confirmar antes de cerrarla. */
+  set(k, v) {
+    this.setState((s) => ({
+      vals: Object.assign({}, s.vals, { [k]: v }),
+      sucias: s.dest === null ? s.sucias : Object.assign({}, s.sucias, { [s.dest]: true })
+    }));
+  }
+  val(k, d) { const v = this.state.vals[k]; return v === undefined ? d : v; }
+  esNuevo() { return this.state.predio === 'nuevo'; }
+  cols(defs) { return defs.map((x) => ({ label: x[0], style: x[1] ? THN : TH })); }
+  filas(rows, defs) {
+    return rows.map((r) => ({
+      celdas: r.map((c, j) => ({ texto: c, style: j === 0 ? TD1 : (defs[j] && defs[j][1] ? TDN : TD) }))
+    }));
+  }
+
+  datos() {
+    if (this.esNuevo()) {
+      return {
+        dep: 'Piura', prov: 'Sullana', dist: 'Sullana',
+        nPredios: '0', autovaluo: '—', nVehiculos: '0', baseVeh: '—',
+        deudaTotal: '—', insoluto: '—', interes: '—', gastos: '—',
+        registrado: 'Se anota al guardar', modificado: '—'
+      };
+    }
+    return {
+      tipoPersona: 'Sucesión indivisa', apPaterno: 'Medina', apMaterno: 'Medina', nombres: 'Rufina',
+      razonSocial: '', nacimiento: '1948-08-30', sexo: 'Femenino', estadoCivil: 'Viudo(a)', conyuge: '',
+      calificacion: '003 — Pequeño contribuyente', estadoContrib: 'Activo',
+      tipoVia: 'CA — Calle', via: 'Santa Rosa', numero: '116', numAd: '',
+      habUrbana: 'Urb. Santa Rosa — El Alto', dep: 'Piura', prov: 'Sullana', dist: 'Sullana',
+      mz: '015', lt: '001', telefonos: '969032194', email: 'fruiz159@gmail.com', notifElec: true,
+      nPredios: '2', autovaluo: '170,616.75', nVehiculos: '1', baseVeh: '61,400.00',
+      tipoBen: 'Pensionista — deducción 50 UIT', benPredio: '02-014-D-14-01', benExp: '2026-0281',
+      benFecha: '2026-03-04', benRes: 'RES-0412-2026-MPS', benEstado: 'Vigente',
+      deudaTotal: '3,455.24', insoluto: '3,041.92', interes: '413.32', gastos: '96.00',
+      obs: '', registrado: 'MRIOS — 12/08/2026 09:14', modificado: 'MRIOS — 03/07/2026 16:02'
+    };
+  }
+
+  campo(f, d) {
+    const valor = this.val(f.k, d[f.k]);
+    const vacio = valor === undefined || valor === '';
+    const obligatorio = !f.opcional && f.t !== 'ro' && f.t !== 'chk';
+    return {
+      label: f.l, ph: f.ph || '', ayuda: f.ayuda || '',
+      opcional: f.opcional === true, ancho: f.ancho ? '1' : '0',
+      valor: valor === undefined ? '' : valor,
+      opts: f.o || [], marcado: valor === true,
+      style: (obligatorio && vacio && this.state.intento) ? IN_MAL : IN,
+      esTexto: f.t === undefined || f.t === 'text', esSel: f.t === 'sel', esFecha: f.t === 'date',
+      esArea: f.t === 'area', esChk: f.t === 'chk', esRo: f.t === 'ro',
+      on: f.t === 'chk' ? (e) => this.set(f.k, e.target.checked) : (e) => this.set(f.k, e.target.value)
+    };
+  }
+
+  faltan(p, d) {
+    return p.campos.filter((f) => {
+      if (f.opcional || f.t === 'ro' || f.t === 'chk') return false;
+      const v = this.val(f.k, d[f.k]);
+      return v === undefined || v === '';
+    }).length;
+  }
+
+  renderVals() {
+    const s = this.state;
+    const d = this.datos();
+    const nuevo = this.esNuevo();
+    const paso = Math.min(s.paso, PASOS.length - 1);
+    const pasoDef = PASOS[paso];
+
+    const sel = nuevo ? null : PREDIOS.find((p) => p.cod === s.predio);
+
+    /* El alta se abre con el documento: el código de contribuyente lo asigna
+       el sistema, así que la comprobación que importa es que el documento no
+       esté ya en el padrón. */
+    const docTipo = this.val('docTipo', 'DNI');
+    const docLargo = DOCS[docTipo] || 8;
+    const docNumero = String(this.val('docNumero', nuevo ? '' : '03593174') || '');
+    const codigoListo = docNumero.length === docLargo;
+    const duplicado = codigoListo && docNumero === DOC_EN_USO;
+    const codigoCompleto = nuevo
+      ? (codigoListo ? '000001526' + String(15 + docNumero.length % 9).slice(0, 2) : '—')
+      : (sel ? sel.cod : '');
+
+    const pendPorPaso = PASOS.map((p) => this.faltan(p, d));
+    const pendientes = pendPorPaso.reduce((a, n) => a + n, 0);
+    const puede = codigoListo && !duplicado && pendientes === 0;
+    const motivo = duplicado
+      ? 'Ese documento ya está registrado a nombre de otro contribuyente.'
+      : (!codigoListo
+        ? 'Falta el número de documento completo.'
+        : (pendientes > 0 ? 'Quedan ' + pendientes + ' datos obligatorios sin llenar.' : ''));
+
+    const q = s.q.trim().toLowerCase();
+    let lista = PREDIOS.filter((p) => {
+      const coincide = q === '' || p.cod.toLowerCase().indexOf(q) >= 0
+        || p.titulo.toLowerCase().indexOf(q) >= 0 || p.titular.toLowerCase().indexOf(q) >= 0;
+      const filtro = s.chip === 'Todos' || p.estado === s.chip || p.uso === s.chip;
+      return coincide && filtro;
+    });
+    if (s.orden === 'Deuda') lista = lista.slice().sort((a, b) => b.valor - a.valor);
+    else if (s.orden === 'Nombre') lista = lista.slice().sort((a, b) => a.titulo.localeCompare(b.titulo, 'es'));
+
+    const det = DETERMINACIONES[Math.min(s.nodo, DETERMINACIONES.length - 1)];
+    const colsTerr = det.cols;
+    const filasTerr = det.filas;
+
+    const val = VAL[Math.min(s.valTab, VAL.length - 1)];
+
+    const acciones = [
+      ['Nuevo contribuyente', 'Acción', () => this.nuevo()],
+      ['Ver el panel del módulo', 'Ir a', () => this.ir('panel')],
+      ['Ver todo el padrón', 'Ir a', () => this.ir('predios', { predio: null })],
+      ['Determinar el predial', 'Ir a', () => this.ir('territorio', { nodo: 0 })],
+      ['Emisión masiva del predial', 'Ir a', () => this.ir('territorio', { nodo: 1 })],
+      ['Arbitrios municipales', 'Ir a', () => this.ir('territorio', { nodo: 2 })],
+      ['Patrimonio vehicular', 'Ir a', () => this.ir('territorio', { nodo: 3 })],
+      ['Alcabala', 'Ir a', () => this.ir('territorio', { nodo: 4 })],
+      ['UIT y escala progresiva', 'Ir a', () => this.ir('valores', { valTab: 0 })],
+      ['Intereses y reajustes', 'Ir a', () => this.ir('valores', { valTab: 2 })],
+      ['Contribuyentes en coactiva', 'Filtro', () => this.ir('predios', { predio: null, chip: 'En coactiva' })]
+    ];
+    const pq = s.pq.trim().toLowerCase();
+    const resPredios = PREDIOS.filter((p) => pq !== '' && (p.cod.toLowerCase().indexOf(pq) >= 0
+      || p.titulo.toLowerCase().indexOf(pq) >= 0 || p.titular.toLowerCase().indexOf(pq) >= 0))
+      .map((p) => ({ label: p.titulo + ' — ' + p.titular, tipo: 'Contribuyente', nota: p.cod, ir: () => this.abrir(p.cod) }));
+    const resAcciones = acciones.filter((a) => pq === '' || a[0].toLowerCase().indexOf(pq) >= 0)
+      .map((a) => ({ label: a[0], tipo: a[1], nota: 'Rentas', ir: a[2] }));
+    const palRes = resPredios.concat(resAcciones).slice(0, 9);
+    const tipoStyle = 'font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:' + TINTA_3 + '; background:' + SUP + '; border:1px solid ' + LINEA + '; border-radius:4px; padding:2px 7px; flex:0 0 auto';
+
+    const ajenaHoja = (s.dest !== null && !SECS.some((x) => x[0] === s.dest)) ? HOJAS[s.dest] : null;
+    const subtitulo = ajenaHoja
+      ? ajenaHoja.mod
+      : (s.dest === 'predios'
+        ? (nuevo ? 'Creando un contribuyente' : (sel ? sel.cod : '62,418 contribuyentes en el padrón'))
+        : (s.dest === 'panel' ? 'Ejercicio ' + s.ejercicio
+          : (s.dest === 'territorio' ? 'Seis tipos de cálculo' : 'UIT, arbitrios e intereses')));
+
+    return {
+      entidad: this.props.entidad || 'Municipalidad Distrital de Catacaos',
+      ejercicio: s.ejercicio, anios: ['2026', '2025', '2024', '2023'],
+      onEjercicio: (e) => this.setState({ ejercicio: e.target.value, toast: 'Ejercicio ' + e.target.value + ': se recargaron la UIT, la escala y las tablas de arbitrios.' }),
+
+      /* ── marcos ─────────────────────────────────────────────── */
+      /* V5 es un solo marco: sin panel lateral fijo y con las secciones en
+         un cajón. El escudo va una sola vez, en la barra: el cajón se
+         superpone a ella, así que ahí se verían los dos a la vez. */
+      hayFilaModulo: true,
+      logoEnBarra: true,
+      soloNombre: false,
+
+      secOpen: s.secOpen,
+      secAria: s.secOpen ? 'true' : 'false',
+      seccionesTitulo: s.secOpen ? 'Ocultar las secciones' : 'Mostrar las secciones',
+      abrirSecciones: () => this.setState((x) => ({ secOpen: !x.secOpen, lanzador: false, pal: false })),
+      seccionesStyle: 'display:grid; place-items:center; width:40px; height:38px; border:0; border-radius:8px; cursor:pointer; color:#fff; flex:0 0 auto; background:' +
+        (s.secOpen ? 'rgba(255,255,255,.2)' : 'transparent'),
+
+      puntos: [0, 1, 2].reduce((a, r) => a.concat([0, 1, 2].map((c) => ({ x: 6 + c * 6, y: 6 + r * 6 }))), []),
+      lanzador: s.lanzador,
+      lanzadorStyle: 'display:grid; place-items:center; width:40px; height:38px; border:0; border-radius:8px; cursor:pointer; color:#fff; flex:0 0 auto; background:' +
+        (s.lanzador ? 'rgba(255,255,255,.2)' : 'transparent'),
+      abrirLanzador: () => this.setState((x) => ({ lanzador: !x.lanzador, pal: false, secOpen: false })),
+      cerrarLanzador: () => this.setState({ lanzador: false }),
+      modulos: MODULOS.map((m) => {
+        const actual = m[0] === 'Rentas · Registro';
+        return {
+          label: m[0], actual: actual ? 'true' : 'false',
+          icon: m[1].map((p) => ({ d: p })),
+          ir: () => this.setState({ lanzador: false, toast: actual ? 'Ya está en Rentas.' : 'Abriría el módulo ' + m[0] + '.' }),
+          iconStyle: 'display:grid; place-items:center; width:32px; height:32px; border-radius:8px; flex:0 0 auto; background:' +
+            (actual ? AZUL : AZUL_SUAVE) + '; color:' + (actual ? '#fff' : '#004670'),
+          style: 'display:flex; align-items:center; gap:10px; width:100%; border:0; border-radius:8px; padding:10px; cursor:pointer; background:' +
+            (actual ? AZUL_SUAVE : 'transparent') + '; color:' + TINTA + '; font-weight:' + (actual ? '700' : '400')
+        };
+      }),
+
+      pal: s.pal, pq: s.pq,
+      palRes: palRes.map((r) => Object.assign({}, r, { tipoStyle: tipoStyle })),
+      palPie: palRes.length + (palRes.length === 1 ? ' resultado' : ' resultados'),
+      onPq: (e) => this.setState({ pq: e.target.value }),
+      abrirPal: () => this.setState({ pal: true, pq: '', lanzador: false, secOpen: false }),
+      cerrarPal: () => this.setState({ pal: false }),
+
+      /* El árbol: un módulo desplegado a la vez, para que la lista quepa
+         sin desplazar. Elegir una hoja abre su pestaña. */
+      filtro: s.filtro, hayFiltro: s.filtro.trim() !== '',
+      onFiltro: (e) => this.setState({ filtro: e.target.value }),
+      limpiarFiltro: () => this.setState({ filtro: '' }),
+      filtroConteo: (() => {
+        const q = s.filtro.trim().toLowerCase();
+        if (q === '') return '';
+        let mods = 0, hojas = 0;
+        ARBOL.forEach((m) => {
+          const casaMod = m[0].toLowerCase().indexOf(q) >= 0;
+          const casan = m[3].filter((h) => h[1].toLowerCase().indexOf(q) >= 0).length;
+          if (casaMod || casan > 0) mods++;
+          hojas += casaMod ? m[3].length : casan;
+        });
+        if (mods === 0) return 'Sin coincidencias';
+        return mods + (mods === 1 ? ' módulo' : ' módulos') + ' · ' + hojas + (hojas === 1 ? ' submódulo' : ' submódulos');
+      })(),
+      sinCoincidencias: (() => {
+        const q = s.filtro.trim().toLowerCase();
+        if (q === '' || s.panelVar === 'c') return false;
+        return !ARBOL.some((m) => m[0].toLowerCase().indexOf(q) >= 0
+          || m[3].some((h) => h[1].toLowerCase().indexOf(q) >= 0));
+      })(),
+
+      panelOpciones: [
+        ['a', 'A', 'Acordeón con chevrón hacia abajo'],
+        ['b', 'B', 'Sin control de despliegue: manda el realce'],
+        ['c', 'C', 'Riel de módulos y lista de submódulos']
+      ].map((o) => {
+        const on = s.panelVar === o[0];
+        return {
+          label: o[1], on: on ? 'true' : 'false', titulo: o[2],
+          ir: () => this.setState({ panelVar: o[0] }),
+          style: 'flex:1; border:1px solid ' + (on ? AZUL : LINEA) + '; border-radius:5px; padding:3px 0; cursor:pointer; font-size:11.5px; font-weight:700; background:' +
+            (on ? AZUL : '#fff') + '; color:' + (on ? '#fff' : TINTA_3)
+        };
+      }),
+      panel: (() => {
+        const v = s.panelVar;
+        const q = s.filtro.trim().toLowerCase();
+        const visibles = ARBOL.filter((x) => q === '' || x[0].toLowerCase().indexOf(q) >= 0
+          || x[3].some((h) => h[1].toLowerCase().indexOf(q) >= 0));
+        const m = visibles.find((x) => x[0] === s.desplegado) || visibles[0] || ARBOL[0];
+        return {
+          esA: v === 'a', esB: v === 'b', esC: v === 'c',
+          hayCola: v !== 'c',
+          modLabel: m[0], modNota: m[1],
+          asideStyle: 'flex:0 0 ' + (v === 'c' ? '292px' : '252px') + '; width:' + (v === 'c' ? '292px' : '252px') +
+            '; background:#fff; border-right:1px solid ' + LINEA + '; display:flex; flex-direction:column; overflow:hidden',
+          hojas: ((q === '' || m[0].toLowerCase().indexOf(q) >= 0) ? m[3]
+            : m[3].filter((h) => h[1].toLowerCase().indexOf(q) >= 0)).map((h) => {
+            const on = s.dest === h[0];
+            const ya = s.abiertas.indexOf(h[0]) >= 0;
+            return {
+              label: h[1] + (s.sucias[h[0]] ? ' *' : ''), actual: on ? 'true' : 'false',
+              marca: (ya && !on) ? 'abierta' : '',
+              marcaStyle: 'font-size:9.5px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:' + TINTA_3 + '; flex:0 0 auto',
+              barraStyle: 'width:3px; height:16px; border-radius:2px; flex:0 0 auto; background:' + (on ? AZUL : 'transparent'),
+              styleB: 'display:flex; align-items:center; gap:9px; width:100%; border:0; border-radius:6px; padding:7px 9px 7px 6px; cursor:pointer; background:' +
+                (on ? AZUL_SUAVE : 'transparent') + '; color:' + (on ? '#004670' : TINTA_2) + '; font-weight:' + (on ? '700' : '400'),
+              ir: () => this.ir(h[0])
+            };
+          })
+        };
+      })(),
+
+      arbolModulos: (() => {
+        const q = s.filtro.trim().toLowerCase();
+        /* Con filtro, un módulo entra si casa su nombre —y entonces enseña
+           todos sus submódulos— o si casa alguno de ellos, y entonces solo
+           enseña los que casan. Y se despliega solo: buscar y tener que
+           abrir después sería pedir dos gestos para uno. */
+        return ARBOL.filter((m) => q === '' || m[0].toLowerCase().indexOf(q) >= 0
+          || m[3].some((h) => h[1].toLowerCase().indexOf(q) >= 0)).map((m) => {
+        const casaMod = q !== '' && m[0].toLowerCase().indexOf(q) >= 0;
+        const hojasVisibles = (q === '' || casaMod) ? m[3]
+          : m[3].filter((h) => h[1].toLowerCase().indexOf(q) >= 0);
+        const abierto = q !== '' ? true : s.desplegado === m[0];
+        const nAbiertas = m[3].filter((h) => s.abiertas.indexOf(h[0]) >= 0).length;
+        return {
+          label: m[0], nota: m[1],
+          abierto: abierto, abiertoAria: abierto ? 'true' : 'false',
+          abiertoTexto: abierto ? m[1] : '',
+          conteo: nAbiertas > 0 ? String(nAbiertas) : '',
+          icon: (ICO_MOD[m[0]] || []).map((p) => ({ d: p })),
+          toggle: () => this.setState((x) => ({
+            desplegado: (x.panelVar !== 'c' && x.desplegado === m[0]) ? null : m[0]
+          })),
+          /* A: el chevrón apunta abajo cuando está cerrado y arriba cuando
+             está abierto, que es el gesto convencional del desplegable. */
+          chevronStyle: 'display:grid; place-items:center; width:16px; height:16px; flex:0 0 auto; color:#93A3AF; transform:rotate(' +
+            (abierto ? '180' : '0') + 'deg); transition:transform .16s ease',
+          conteoStyle: 'font-size:9.5px; font-weight:700; border-radius:999px; padding:1px 6px; flex:0 0 auto; background:' +
+            (abierto ? '#fff' : AZUL_SUAVE) + '; color:#004670',
+          /* B: sin control. El módulo activo se distingue por el fondo y la
+             sangría de sus hijos, no por un icono que haya que interpretar. */
+          styleB: 'display:flex; align-items:center; gap:9px; width:100%; border:0; border-radius:7px; padding:8px 9px; cursor:pointer; background:' +
+            (abierto ? AZUL_SUAVE : 'transparent') + '; color:' + (abierto ? '#004670' : TINTA) +
+            '; font-weight:' + (abierto ? '700' : '400'),
+          iconStyleB: 'display:grid; place-items:center; width:24px; height:24px; border-radius:6px; flex:0 0 auto; background:' +
+            (abierto ? '#fff' : '#F2F6F9') + '; color:' + (abierto ? AZUL : TINTA_3),
+          /* C: riel de iconos. El módulo elegido se marca con el fondo y una
+             pastilla si tiene pestañas abiertas. */
+          rielStyle: 'position:relative; display:grid; place-items:center; width:40px; height:38px; border:0; border-radius:8px; cursor:pointer; flex:0 0 auto; background:' +
+            (abierto ? AZUL : 'transparent') + '; color:' + (abierto ? '#fff' : TINTA_3),
+          rielPastilla: 'position:absolute; top:2px; right:2px; min-width:15px; height:15px; border-radius:999px; display:grid; place-items:center; font-size:9px; font-weight:700; background:#C0492F; color:#fff',
+          iconStyle: 'display:grid; place-items:center; width:24px; height:24px; border-radius:6px; flex:0 0 auto; background:' +
+            (abierto ? AZUL : '#F2F6F9') + '; color:' + (abierto ? '#fff' : TINTA_3),
+          style: 'display:flex; align-items:center; gap:8px; width:100%; border:0; border-radius:7px; padding:7px 8px; cursor:pointer; background:' +
+            (abierto ? '#E4F4FD' : 'transparent') + '; color:' + (abierto ? '#004670' : TINTA),
+          hojas: hojasVisibles.map((h) => {
+            const on = s.dest === h[0];
+            const yaAbierta = s.abiertas.indexOf(h[0]) >= 0;
+            return {
+              label: h[1] + (s.sucias[h[0]] ? ' *' : ''), actual: on ? 'true' : 'false',
+              marca: (yaAbierta && !on) ? 'abierta' : '',
+              marcaStyle: 'font-size:9.5px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:' + TINTA_3 + '; flex:0 0 auto',
+              barraStyle: 'width:3px; height:16px; border-radius:2px; flex:0 0 auto; background:' + (on ? AZUL : 'transparent'),
+              style: 'display:flex; align-items:center; gap:8px; width:100%; border:0; border-radius:6px; padding:7px 9px; cursor:pointer; background:' +
+                (on ? AZUL_SUAVE : 'transparent') + '; color:' + (on ? '#004670' : TINTA_2) + '; font-weight:' + (on ? '700' : '400'),
+              styleB: 'display:flex; align-items:center; gap:9px; width:100%; border:0; border-radius:6px; padding:7px 9px 7px 6px; cursor:pointer; background:' +
+                (on ? AZUL_SUAVE : 'transparent') + '; color:' + (on ? '#004670' : TINTA_2) + '; font-weight:' + (on ? '700' : '400'),
+              ir: () => this.ir(h[0])
+            };
+          })
+        };
+        });
+      })(),
+
+      cola: [
+        ['Observados', '534', 'bad'], ['Sin conciliar', '208', 'warn'], ['Beneficios en trámite', '392', 'warn']
+      ].map((c) => ({
+        label: c[0], n: c[1],
+        ir: () => this.ir('predios', { predio: null, chip: c[0] === 'Observados' ? 'Observado' : 'Todos' }),
+        puntoStyle: 'width:7px; height:7px; border-radius:50%; flex:0 0 auto; background:' +
+          (c[2] === 'bad' ? '#C0492F' : '#C08A00')
+      })),
+
+      titulo: s.dest === null ? 'Sin pestañas abiertas'
+        : (ajenaHoja ? ajenaHoja.label
+          : (s.dest === 'valores' ? 'Valores del ejercicio ' + s.ejercicio
+            : (s.dest === 'panel' ? 'Panel de Rentas'
+              : (SECS.find((x) => x[0] === s.dest) || ['', 'Rentas'])[1]))),
+      subtitulo: subtitulo,
+
+      aviso: s.aviso && !s.avisoAbierto,
+      avisosN: '1',
+      sesionAbierta: s.sesion,
+      sesionAria: s.sesion ? 'true' : 'false',
+      abrirSesion: () => this.setState((x) => ({ sesion: !x.sesion, lanzador: false, pal: false })),
+      cerrarSesion: () => this.setState({ sesion: false }),
+      sesionStyle: 'display:flex; align-items:center; gap:8px; border:0; border-radius:7px; padding:3px 6px 3px 3px; cursor:pointer; background:' +
+        (s.sesion ? 'rgba(255,255,255,.16)' : 'transparent'),
+      sesionCaret: 'display:grid; place-items:center; width:15px; height:15px; flex:0 0 auto; color:#9FC6DF; transform:rotate(' +
+        (s.sesion ? '180' : '0') + 'deg); transition:transform .15s ease',
+      /* Cerrar sesión con pestañas sucias pierde lo escrito: se advierte
+         aquí, donde se decide, y no después de haberlo perdido. */
+      haySucias: Object.keys(s.sucias).length > 0,
+      avisoSucias: 'Hay ' + Object.keys(s.sucias).length +
+        (Object.keys(s.sucias).length === 1 ? ' pestaña con cambios sin guardar. Al cerrar sesión se pierden.'
+          : ' pestañas con cambios sin guardar. Al cerrar sesión se pierden.'),
+      sesionOpciones: [
+        ['Mi perfil', ['M12 7.4a3 3 0 1 1-6 0 3 3 0 0 1 6 0', 'M3.6 20c0-3 2.4-4.6 5.4-4.6s5.4 1.6 5.4 4.6'], 0],
+        ['Cambiar contraseña', ['M7 11V8a5 5 0 0 1 10 0v3', 'M5.5 11h13v9.5h-13z'], 0],
+        ['Cerrar sesión', ['M9.5 20H6A1.5 1.5 0 0 1 4.5 18.5v-13A1.5 1.5 0 0 1 6 4h3.5', 'M14 8l4 4-4 4', 'M18 12H9'], 1]
+      ].map((o) => ({
+        label: o[0], icon: o[1].map((d) => ({ d: d })),
+        ir: () => this.setState({
+          sesion: false,
+          toast: o[2] ? 'Cerraría la sesión de jcardenas.' : 'Abriría ' + o[0].toLowerCase() + '.'
+        }),
+        style: 'display:flex; align-items:center; gap:10px; width:100%; border:0; border-radius:6px; padding:9px 9px; cursor:pointer; background:transparent; color:' +
+          (o[2] ? '#8F2A17' : TINTA_2) + '; font-weight:' + (o[2] ? '600' : '400')
+      })),
+      avisoAria: '1 aviso del sistema',
+      avisoAbierto: s.aviso && s.avisoAbierto,
+      verAviso: () => this.setState({ avisoAbierto: true }),
+      cerrarAviso: () => this.setState({ aviso: false, avisoAbierto: false }),
+
+      esPanel: s.dest === 'panel',
+      cifras: [
+        { etiqueta: 'Emitido del ejercicio', valor: 'S/ 9.42 M', delta: '', nota: 'Predial de 61,884 cuentas. Los 534 observados no están dentro.' },
+        { etiqueta: 'Recaudado', valor: '41.2 %', delta: '+3.1', nota: 'Al 31 de agosto, con dos cuotas vencidas de cuatro.' },
+        { etiqueta: 'Contribuyentes', valor: '62,418', delta: '', nota: 'Activos. Los de baja siguen en determinaciones ya emitidas.' },
+        { etiqueta: 'Observados sin emisión', valor: '534', delta: '', nota: 'Cada uno tiene una causa concreta y arreglable.' }
+      ].map((c) => ({
+        etiqueta: c.etiqueta, valor: c.valor, nota: c.nota, delta: c.delta,
+        deltaStyle: 'font-size:11.5px; font-weight:700; border-radius:4px; padding:1px 6px; background:#DCEFE3; color:#1F5B39'
+      })),
+
+      porCerrar: s.porCerrar !== null,
+      confirmar: (() => {
+        const k = s.porCerrar;
+        const h = k ? (HOJAS[k] || { label: k, mod: 'Rentas · Registro' }) : { label: '', mod: '' };
+        return {
+          label: h.label, mod: h.mod,
+          cerrar: () => this.cerrarPestana(k),
+          cancelar: () => this.setState({ porCerrar: null }),
+          guardar: () => {
+            this.setState({ toast: 'Cambios guardados en ' + h.label + '.' });
+            this.cerrarPestana(k);
+          }
+        };
+      })(),
+
+      esAjena: s.dest !== null && !SECS.some((x) => x[0] === s.dest),
+      ajena: (() => {
+        const h = HOJAS[s.dest] || { mod: '—', nota: '', label: '—' };
+        return {
+          label: h.label, mod: h.mod, nota: h.nota,
+          icon: (ICO_MOD[h.mod] || []).map((p) => ({ d: p })),
+          texto: 'Este marco abre cada submódulo como pestaña, de cualquier módulo. La pantalla de «' +
+            h.label + '» está diseñada en el archivo de ' + h.mod +
+            ': lo que se prueba aquí es la navegación entre varias cosas abiertas a la vez.',
+          cerrar: () => this.cerrarPestana(s.dest)
+        };
+      })(),
+
+      pestanas: s.abiertas.map((k) => {
+        const hoja = HOJAS[k] || { mod: 'Rentas · Registro', label: k };
+        const propio = SECS.some((x) => x[0] === k);
+        const on = s.dest === k;
+        return {
+          label: hoja.label + (s.sucias[k] ? ' *' : ''), actual: on ? 'true' : 'false',
+          icon: (propio ? ICO_SEC[k] : (ICO_MOD[hoja.mod] || [])).map((p) => ({ d: p })),
+          cerrarAria: s.sucias[k]
+            ? 'Cerrar ' + hoja.label + ' — tiene cambios sin guardar'
+            : 'Cerrar ' + hoja.label,
+          ir: () => this.ir(k),
+          cerrar: () => this.pedirCierre(k),
+          marcoStyle: 'display:flex; align-items:center; gap:2px; flex:0 0 auto; padding:0 6px 0 0; border-right:1px solid ' + LINEA_2 +
+            '; background:' + (on ? '#fff' : 'transparent') +
+            '; border-top:2px solid ' + (on ? AZUL : 'transparent'),
+          iconStyle: 'display:grid; place-items:center; flex:0 0 auto; color:' + (on ? AZUL : TINTA_3),
+          style: 'display:flex; align-items:center; gap:8px; border:0; background:transparent; padding:11px 8px 11px 13px; cursor:pointer; font-size:13.5px; color:' +
+            (on ? TINTA : TINTA_3) + '; font-weight:' + (on ? '700' : '400'),
+          cerrarStyle: 'display:grid; place-items:center; width:22px; height:22px; border:0; border-radius:5px; background:transparent; cursor:pointer; color:' +
+            (on ? TINTA_3 : '#93A3AF') + '; flex:0 0 auto'
+        };
+      }),
+      /* El rótulo es el de este módulo, y solo se ofrece cuando la pestaña
+         activa es suya: en una ajena no hay nada que crear aquí. */
+      accionLabel: 'Nuevo contribuyente',
+      hayAccion: s.dest !== null && SECS.some((x) => x[0] === s.dest),
+      hayPestanas: s.abiertas.length > 0 && s.dest !== null,
+      sinPestanas: s.abiertas.length === 0 || s.dest === null,
+      colaTotal: '1,134 pendientes',
+      cola: [
+        ['Observados', 534, 'bad'], ['Sin conciliar', 208, 'warn'], ['Beneficios en trámite', 392, 'warn']
+      ].map((c) => ({
+        label: c[0], n: String(c[1]),
+        ir: () => this.ir('predios', { predio: null, chip: c[0] === 'Observados' ? 'Observado' : 'Todos' }),
+        puntoStyle: 'width:7px; height:7px; border-radius:50%; flex:0 0 auto; background:' +
+          (c[2] === 'bad' ? '#C0492F' : '#C08A00')
+      })),
+      bandeja: [
+        ['Observado', 'bad', 'Contribuyentes sin emisión', 'Predio sin arancel, ficha no conciliada o titularidad incompleta. Sin corregirlo no se les puede cobrar el ejercicio.', 534],
+        ['Sin conciliar', 'warn', 'Predios que no generan deuda', 'Tienen ficha catastral y no están en la cuenta corriente. Es la única cifra que se traduce en dinero que no entra.', 208],
+        ['En trámite', 'warn', 'Beneficios por resolver', 'Deducciones de 50 UIT pendientes. Mientras no se resuelvan, el contribuyente paga sin el beneficio.', 392]
+      ].map((b) => ({
+        etiqueta: b[0], insignia: INS[b[1]], titulo: b[2], detalle: b[3], n: String(b[4]),
+        ir: () => this.ir('predios', { predio: null, chip: b[0] === 'Observado' ? 'Observado' : 'Todos' })
+      })),
+      cobertura: [
+        ['Impuesto predial', 89.4, 'S/ 9.42 M'], ['Arbitrios municipales', 86.9, 'S/ 5.88 M'],
+        ['Patrimonio vehicular', 65.3, 'S/ 2.88 M'], ['Alcabala', 100, 'S/ 1.42 M'],
+        ['Multas y papeletas', 38.6, 'S/ 4.12 M']
+      ].map((c) => ({
+        label: c[0], pct: c[1].toFixed(0) + ' %', detalle: c[2],
+        color: c[1] < 60 ? '#8F2A17' : (c[1] < 90 ? '#7A5200' : '#1F5B39'),
+        ir: () => this.ir('territorio', { nodo: c[0] === 'Arbitrios municipales' ? 2 : (c[0] === 'Patrimonio vehicular' ? 3 : (c[0] === 'Alcabala' ? 4 : 0)) }),
+        barra: 'position:absolute; inset:0 auto 0 0; width:' + c[1].toFixed(1) + '%; border-radius:999px; background:' +
+          (c[1] < 60 ? '#C0492F' : (c[1] < 90 ? '#C08A00' : AZUL))
+      })),
+      actividad: [
+        ['Determinado', 'ok', '00000003541', 'Predial 2026 determinado en S/ 591.94 · 4 cuotas', 'hace 2 h'],
+        ['Alta', 'info', '00000152614', 'Contribuyente creado desde declaración jurada', 'ayer'],
+        ['Baja', 'warn', '00000025673', 'Prescripción declarada de 2014 a 2016 · S/ 1,613.96', 'ayer'],
+        ['Observado', 'bad', '00000006551', 'Sin emisión 2026: el predio no tiene arancel de vía', 'hace 3 días']
+      ].map((a) => ({
+        tipo: a[0], insignia: INS[a[1]], codigo: a[2], detalle: a[3], cuando: a[4],
+        ir: () => this.abrir(a[2])
+      })),
+      irPredios: () => this.ir('predios', { predio: null }),
+
+      esPredios: s.dest === 'predios',
+      q: s.q, hayQ: s.q !== '',
+      onQ: (e) => this.setState({ q: e.target.value }),
+      limpiarQ: () => this.setState({ q: '' }),
+      chips: ['Todos', 'Con deuda', 'En coactiva', 'Observado'].map((c) => {
+        const on = s.chip === c;
+        return {
+          label: c, on: on ? 'true' : 'false',
+          ir: () => this.setState({ chip: c }),
+          style: 'border:1px solid ' + (on ? AZUL : LINEA) + '; border-radius:999px; padding:3px 10px; cursor:pointer; font-size:12px; background:' +
+            (on ? AZUL_SUAVE : '#fff') + '; color:' + (on ? '#004670' : TINTA_3) + '; font-weight:' + (on ? '600' : '400')
+        };
+      }),
+      orden: s.orden, ordenes: ['Código', 'Deuda', 'Nombre'],
+      onOrden: (e) => this.setState({ orden: e.target.value }),
+      conteo: lista.length + ' de 62,418',
+      listaVacia: lista.length === 0,
+      filas: lista.map((p) => {
+        const on = s.predio === p.cod;
+        return {
+          titulo: p.titulo, titular: p.titular, codigo: p.cod, autovaluo: p.autovaluo,
+          estado: p.estado, insignia: INS[p.tono], actual: on ? 'true' : 'false',
+          ir: () => this.abrir(p.cod),
+          style: 'display:block; width:100%; text-align:left; border:0; border-bottom:1px solid ' + LINEA_2 +
+            '; border-left:3px solid ' + (on ? AZUL : 'transparent') + '; background:' + (on ? AZUL_SUAVE : 'transparent') +
+            '; padding:11px 13px; cursor:pointer'
+        };
+      }),
+      sinSeleccion: !nuevo && sel === undefined,
+      hayFicha: nuevo || sel !== undefined,
+      esNuevo: nuevo,
+      ficha: {
+        codigo: nuevo ? (codigoCompleto === '' ? 'Sin código' : codigoCompleto) : (sel ? sel.cod : ''),
+        titulo: nuevo
+          ? (this.val('apPaterno', '') === '' && this.val('razonSocial', '') === ''
+            ? 'Contribuyente nuevo'
+            : (this.val('razonSocial', '') !== '' ? this.val('razonSocial', '')
+              : this.val('apPaterno', '') + ' ' + this.val('apMaterno', '') + ', ' + this.val('nombres', '')))
+          : (sel ? sel.titulo : ''),
+        contexto: nuevo
+          ? (codigoListo
+            ? docTipo + ' ' + docNumero + ' · borrador, nada se registra hasta la última sección'
+            : 'Sin documento · borrador, nada se registra hasta la última sección')
+          : (sel ? sel.titular + ' · ' + sel.contexto : ''),
+        estado: nuevo ? 'Borrador' : (sel ? sel.estado : ''),
+        insignia: nuevo ? INS.warn : (sel ? INS[sel.tono] : INS.info),
+        acciones: (nuevo
+          ? [['Descartar', 0], ['Guardar borrador', 0]]
+          : [['Estado de cuenta', 0], ['Declaración jurada', 0], ['Determinar el predial', 1]]
+        ).map((a) => ({
+          label: a[0],
+          ir: () => {
+            if (a[0] === 'Descartar') { this.setState({ predio: null, vals: {}, intento: false, toast: 'Borrador descartado.' }); return; }
+            if (a[0] === 'Determinar el predial') { this.ir('territorio', { nodo: 0 }); return; }
+            this.setState({ toast: a[0] + ': emitido para ' + (sel ? sel.titulo : 'el contribuyente') + '.' });
+          },
+          style: a[1]
+            ? 'border:0; border-radius:6px; padding:8px 16px; background:' + AZUL + '; color:#fff; font-size:13px; font-weight:600; cursor:pointer'
+            : 'border:1px solid ' + LINEA + '; border-radius:6px; padding:7px 13px; background:#fff; font-size:13px; cursor:pointer'
+        }))
+      },
+      codigo: {
+        tipos: Object.keys(DOCS), tipo: docTipo,
+        onTipo: (e) => this.setState((x) => ({ vals: Object.assign({}, x.vals, { docTipo: e.target.value, docNumero: '' }) })),
+        numero: docNumero, largo: docLargo, ph: '·'.repeat(docLargo),
+        onNumero: (e) => this.set('docNumero', e.target.value.replace(/[^0-9]/g, '').slice(0, docLargo)),
+        numStyle: 'width:' + (docLargo * 13 + 26) + "px; box-sizing:border-box; border:1px solid " +
+          (codigoListo && !duplicado ? BORDE_CAMPO : (duplicado ? '#A8321E' : '#C08A00')) +
+          "; border-radius:5px; padding:8px 9px; background:#fff; font-size:14.5px; text-align:center; letter-spacing:.06em; font-variant-numeric:tabular-nums",
+        completo: codigoCompleto === '' ? '—' : codigoCompleto,
+        estado: duplicado ? 'Documento ya registrado' : (codigoListo ? 'Documento válido' : docNumero.length + ' de ' + docLargo + ' dígitos'),
+        insignia: duplicado ? INS.bad : (codigoListo ? INS.ok : INS.warn),
+        problema: duplicado || !codigoListo,
+        aviso: duplicado
+          ? 'Ese documento ya está en el padrón, a nombre de Castillo Pascuala, María Elena (00000003541). Dos códigos para la misma persona parten su deuda en dos cuentas que nadie cruza: abra el contribuyente que ya existe.'
+          : 'El ' + docTipo + ' tiene ' + docLargo + ' dígitos. Se comprueba contra el padrón antes de crear el código.',
+        fondo: duplicado ? '#FBE4E0' : SUP,
+        borde: duplicado ? '#A8321E' : ACENTO,
+        color: duplicado ? '#8F2A17' : TINTA_2
+      },
+      tabs: PASOS.map((p, i) => {
+        const on = paso === i;
+        const f = pendPorPaso[i];
+        return {
+          label: p.label, actual: on ? 'true' : 'false',
+          pendientes: (nuevo && f > 0) ? String(f) : '',
+          pendStyle: 'font-size:10.5px; font-weight:700; border-radius:999px; padding:1px 6px; background:#FFF4D9; color:#7A5200',
+          ir: () => this.setState({ paso: i }),
+          style: 'display:flex; align-items:center; gap:7px; border:0; border-bottom:2px solid ' + (on ? AZUL : 'transparent') +
+            '; background:transparent; padding:11px 12px 9px; cursor:pointer; font-size:13.5px; white-space:nowrap; color:' +
+            (on ? TINTA : TINTA_3) + '; font-weight:' + (on ? '700' : '400')
+        };
+      }),
+      paso: {
+        nota: pasoDef.nota,
+        campos: pasoDef.campos.map((f) => this.campo(f, d)),
+        hayTabla: pasoDef.tabla !== undefined,
+        tabla: pasoDef.tabla ? {
+          titulo: pasoDef.tabla.titulo, min: pasoDef.tabla.min, nota: pasoDef.tabla.nota,
+          cols: this.cols(pasoDef.tabla.cols),
+          filas: this.filas(nuevo ? [] : pasoDef.tabla.filas, pasoDef.tabla.cols),
+          vacia: nuevo,
+          accion: pasoDef.tabla.accion,
+          vacioTexto: pasoDef.tabla.vacioTexto
+        } : null
+      },
+      cierre: (() => {
+        const enUltimo = nuevo && paso >= PASOS.length - 1;
+        const V = 'M5 12.5l4.5 4.5L19 7';
+        const X = 'M12 7.5V13M12 16.5h.02';
+        const ok = 'display:grid; place-items:center; width:24px; height:24px; border-radius:50%; flex:0 0 auto; background:#DCEFE3; color:#1F5B39';
+        const pend = 'display:grid; place-items:center; width:24px; height:24px; border-radius:50%; flex:0 0 auto; background:#FFF4D9; color:#7A5200';
+        return {
+          hay: enUltimo,
+          lineas: [
+            { titulo: 'Se crea el contribuyente ' + (codigoListo ? codigoCompleto : 'sin código'),
+              detalle: codigoListo ? 'El código lo asigna el sistema y ya no cambia: enlaza predios, vehículos, licencias y papeletas.' : 'Falta el documento para poder asignarlo.',
+              valor: codigoListo ? codigoCompleto : '—', icono: codigoListo ? V : X, iconoStyle: codigoListo ? ok : pend },
+            { titulo: 'Queda en el padrón sin unidades afectas',
+              detalle: 'Un contribuyente sin predio ni vehículo existe y no debe nada. La obligación nace cuando se le vincula una unidad.',
+              valor: 'Sin deuda', icono: V, iconoStyle: ok },
+            { titulo: 'No se le determina nada todavía',
+              detalle: 'La determinación del predial se hace después, sobre el autovalúo de los predios que se le vinculen.',
+              valor: 'Después', icono: X, iconoStyle: pend },
+            { titulo: 'El alta queda en la bitácora',
+              detalle: 'Con tu usuario y la hora. Crear un contribuyente duplicado es el error que más cuesta deshacer.',
+              valor: 'Auditoría', icono: V, iconoStyle: ok }
+          ],
+          aviso: puede
+            ? 'Todo listo. Al crear el contribuyente entra en el padrón y se le puede vincular un predio.'
+            : 'No se puede crear todavía. ' + motivo,
+          fondo: puede ? '#DCEFE3' : '#FBE4E0',
+          borde: puede ? '#1F5B39' : '#A8321E',
+          color: puede ? '#1F5B39' : '#8F2A17'
+        };
+      })(),
+      primerPaso: paso === 0 ? 'true' : 'false',
+      atrasStyle: 'border:1px solid ' + (paso === 0 ? LINEA : AZUL) + '; border-radius:6px; padding:9px 18px; background:#fff; font-size:13.5px; font-weight:600; cursor:pointer; color:' +
+        (paso === 0 ? '#93A3AF' : AZUL),
+      atras: () => this.setState({ paso: Math.max(paso - 1, 0) }),
+      botonLabel: paso >= PASOS.length - 1 ? (nuevo ? 'Crear el contribuyente' : 'Guardar los cambios') : 'Continuar',
+      bloqueado: (nuevo && paso >= PASOS.length - 1 && !puede) ? 'true' : 'false',
+      motivo: (nuevo && paso >= PASOS.length - 1 && !puede) ? motivo : '',
+      adelanteStyle: 'border:0; border-radius:6px; padding:10px 22px; background:' + AZUL + '; color:#fff; font-size:13.5px; font-weight:600; cursor:pointer; opacity:' +
+        ((nuevo && paso >= PASOS.length - 1 && !puede) ? '.55' : '1'),
+      adelante: () => {
+        const ultimo = paso >= PASOS.length - 1;
+        if (ultimo && nuevo) {
+          if (!puede) { this.setState({ intento: true, toast: motivo }); return; }
+          this.setState({ predio: codigoCompleto, paso: 0, intento: false, toast: 'Contribuyente ' + codigoCompleto + ' creado. Ya se le puede vincular un predio.' });
+          return;
+        }
+        if (ultimo) { this.setState({ toast: 'Cambios guardados en el expediente.' }); return; }
+        this.setState({ paso: paso + 1, toast: nuevo ? 'Guardado en el borrador.' : 'Cambios guardados.' });
+      },
+      pasoNota: paso >= PASOS.length - 1
+        ? (nuevo ? (puede ? 'Al crear el contribuyente se le puede vincular un predio.' : motivo)
+          : 'Los datos del contribuyente afectan la determinación del ejercicio en curso.')
+        : (nuevo ? 'El borrador se guarda al avanzar.' : 'Los cambios se guardan al avanzar de sección.'),
+
+      esTerritorio: s.dest === 'territorio',
+      arbol: NODOS.map((n, i) => {
+        const on = s.nodo === i;
+        return {
+          label: n[0], conteo: n[1], actual: on ? 'true' : 'false',
+          ir: () => this.setState({ nodo: i }),
+          style: 'display:flex; align-items:center; gap:10px; width:100%; border:0; border-bottom:1px solid ' + LINEA_2 +
+            '; border-left:3px solid ' + (on ? AZUL : 'transparent') + '; background:' + (on ? AZUL_SUAVE : 'transparent') +
+            '; padding:10px 13px; cursor:pointer; color:' + TINTA + '; font-weight:' + (on ? '700' : '400')
+        };
+      }),
+      terr: {
+        titulo: det.titulo,
+        nota: det.nota,
+        cols: this.cols(colsTerr),
+        filas: this.filas(filasTerr, colsTerr)
+      },
+
+      esValores: s.dest === 'valores',
+      valTabs: VAL.map((v, i) => {
+        const on = s.valTab === i;
+        return {
+          label: v.label, actual: on ? 'true' : 'false',
+          ir: () => this.setState({ valTab: i }),
+          style: 'border:0; border-bottom:2px solid ' + (on ? AZUL : 'transparent') +
+            '; background:transparent; padding:12px 14px 10px; cursor:pointer; font-size:14px; white-space:nowrap; color:' +
+            (on ? TINTA : TINTA_3) + '; font-weight:' + (on ? '700' : '400')
+        };
+      }),
+      val: {
+        nota: val.nota, pie: val.pie,
+        cols: this.cols(val.cols),
+        filas: this.filas(val.filas, val.cols)
+      },
+
+      nuevaFicha: () => this.nuevo(),
+      toast: s.toast
+    };
+  }
+
+  nuevo() {
+    this.setState({
+      dest: 'predios', predio: 'nuevo', paso: 0, vals: {}, intento: false,
+      lanzador: false, pal: false,
+      toast: 'Contribuyente nuevo: empiece por el documento de identidad.'
+    });
+  }
+  abrir(cod) {
+    this.setState({ dest: 'predios', predio: cod, paso: 0, vals: {}, intento: false, pal: false, lanzador: false });
+  }
+}
+
+</script>
+</body>
+</html>
