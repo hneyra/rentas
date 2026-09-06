@@ -4,7 +4,7 @@
 
 | Tarea | Qué mide | Necesita | Hoy |
 |---|---|---|---|
-| `./gradlew verificarArquitectura` | 18 reglas de ArchUnit, tres escáneres de fuentes y la frontera de sistema —contra sus muestras **y contra el código de negocio**—, más el contrato de la API, las formas y respuestas publicadas y los límites de Modulith | nada | **130 pruebas** |
+| `./gradlew verificarArquitectura` | 20 reglas de ArchUnit, cinco escáneres de fuentes, el revisor de esquema y la frontera de sistema —contra sus muestras **y contra el código de negocio**—, más el contrato de la API, las formas y respuestas publicadas y los límites de Modulith | nada | **176 pruebas** |
 | `./gradlew verificarAislamiento` | Los cuatro roles, `FORCE ROW LEVEL SECURITY`, el `WITH CHECK`, que sin contexto la consulta **reviente en vez de devolver vacío**, la trampa del superusuario, y RLS sobre las **132 tablas** del baseline | PostgreSQL 16 | **223 pruebas** (46 del esquema + 177 del pool) |
 | `./gradlew build` | Lo anterior más Spotless, Checkstyle y NullAway, sobre los 17 módulos | PostgreSQL 16 | **3 756 pruebas** |
 | `yarn verificar` (en `infrastructure/`) | El descriptor de despliegue: lint, tipos y pruebas | nada | |

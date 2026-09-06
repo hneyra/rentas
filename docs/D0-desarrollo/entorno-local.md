@@ -72,8 +72,8 @@ cd backend
 ./gradlew verificarArquitectura
 ```
 
-Sin Docker, sin base y sin red. Corre **130 pruebas**: las 18 reglas de ArchUnit —aplicadas a las
-muestras de `comun-verificaciones` **y al código de negocio**—, los tres escáneres de fuentes, la
+Sin Docker, sin base y sin red. Corre **176 pruebas**: las 20 reglas de ArchUnit —aplicadas a las
+muestras de `comun-verificaciones` **y al código de negocio**—, los cinco escáneres de fuentes y el revisor de esquema, la
 frontera de sistema, el contrato de la API contra las rutas publicadas, las formas y respuestas
 que los controladores emiten, y los límites de módulo de Spring Modulith.
 
