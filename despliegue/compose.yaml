@@ -26,10 +26,15 @@
 #  motivo mas: el perfil `batch` TERMINA el proceso, asi que un servicio mas seria
 #  un contenedor que sale con codigo 0 y al que Compose reiniciaria en bucle —el
 #  defecto 5 de C-17—. Queda como hueco declarado de C-18.
-#  AQUI NO HAY FRONTEND, y no es un olvido. Este repositorio no tiene todavia
-#  `frontend/`: ADR-0030 §1 decide que habra uno por sistema y hoy no existe
-#  ninguno de los cuatro. El `README.md` de `infrastructure/despliegue/` decia
-#  que este compose traia «su backend y su frontend»; se corrigio a lo que hay.
+#  AQUI NO HAY FRONTEND, y no es un olvido. Desde F-1 este repositorio SI tiene
+#  `frontend/` —Vite 7 + React 19, con sus reglas y su CI—, pero es andamiaje sin
+#  ninguna pantalla: no hay imagen `kamayuk-rentas-web`, no hay nginx que sirva el
+#  bundle y no hay nada que ver. Un servicio aqui seria un contenedor que sirve
+#  una pagina con un `<h1>` y poco mas, y —peor— una segunda forma de levantar el
+#  sistema que el descriptor no conoce, que es la trampa que ADR-0011 anoto.
+#  Entra cuando haya pantallas. El `README.md` de `infrastructure/despliegue/`
+#  decia que este compose traia «su backend y su frontend»; se corrigio a lo que
+#  hay, y lo que hay sigue siendo el backend.
 # ============================================================================
 
 name: kamayuk-rentas
