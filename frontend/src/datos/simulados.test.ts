@@ -77,9 +77,11 @@ describe('lo capturado no se mezcla con lo inventado', () => {
 });
 
 describe('la lista de rutas que ya sirve el backend', () => {
-  it('esta vacia, y por eso el proxy contesta las trece', () => {
+  it('esta vacia, y por eso el proxy contesta las diecisiete', () => {
     expect(YA_SERVIDAS).toEqual([]);
-    expect(OPERACIONES).toHaveLength(13);
+    // Trece las trajo F-4; las cuatro de F-5 son las que alimentan el panel del modulo y el
+    // estado de cobranza del padron.
+    expect(OPERACIONES).toHaveLength(17);
   });
 
   it('el porque de que este vacia esta escrito, y no es «todavia no lo hemos hecho»', () => {

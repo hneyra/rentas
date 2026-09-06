@@ -680,3 +680,184 @@ export const FECHA_DE_CAPTURA = '2026-08-12';
 
 /** El ejercicio del artboard. `VAL[0]` publica la UIT como «UIT 2026». */
 export const EJERCICIO_DE_CAPTURA = 2026;
+
+// ── El panel del modulo ─────────────────────────────────────────────────────────────────────
+//
+// Estas constantes NO son declaraciones con nombre del artboard: viven dentro de
+// `renderVals()`, que es donde el prototipo compone lo que dibuja. Se capturan igual —y con la
+// misma disciplina: cada cifra se puede buscar en `RentasV6.dc.html` y encontrarla igual—
+// porque son datos de muestra y no plantilla, y la regla 3 de PORTAR.md manda copiarlos
+// enteros. Que el artboard las siga declarando lo comprueba
+// `verificaciones/secciones-del-artboard.test.ts`, que las lee del `.dc.html`.
+
+/** Una tarjeta de cifra del panel. */
+export interface CifraDelPanel {
+  readonly etiqueta: string;
+  readonly valor: string;
+  /**
+   * La variacion, en la pastilla verde de la tarjeta.
+   *
+   * **Se captura y no se sirve**, y es el unico campo de este archivo del que eso se puede
+   * decir: `GET /indicadores/recaudacion` publica `label`, `value`, `note` y un importe con su
+   * fecha, y no una variacion. Calcularla en la pantalla seria publicar una cifra que ningun
+   * backend sostiene, y ademas una cifra sin fecha (regla 9): «+3.1» respecto de que dia.
+   */
+  readonly delta: string;
+  readonly nota: string;
+}
+
+/** Las cuatro tarjetas de cabecera del panel. `renderVals().cifras`. */
+export const CIFRAS: readonly CifraDelPanel[] = [
+  {
+    etiqueta: 'Emitido del ejercicio',
+    valor: 'S/ 9.42 M',
+    delta: '',
+    nota: 'Predial de 61,884 cuentas. Los 534 observados no están dentro.',
+  },
+  {
+    etiqueta: 'Recaudado',
+    valor: '41.2 %',
+    delta: '+3.1',
+    nota: 'Al 31 de agosto, con dos cuotas vencidas de cuatro.',
+  },
+  {
+    etiqueta: 'Contribuyentes',
+    valor: '62,418',
+    delta: '',
+    nota: 'Activos. Los de baja siguen en determinaciones ya emitidas.',
+  },
+  {
+    etiqueta: 'Observados sin emisión',
+    valor: '534',
+    delta: '',
+    nota: 'Cada uno tiene una causa concreta y arreglable.',
+  },
+];
+
+/** Un frente parado de la cola de trabajo. `renderVals().bandeja`. */
+export interface FrenteDelPanel {
+  readonly etiqueta: string;
+  /** El tono de la insignia en el artboard: `ok`, `warn`, `bad`, `info`. */
+  readonly tono: string;
+  readonly titulo: string;
+  readonly detalle: string;
+  readonly cuantos: number;
+}
+
+/** Los tres frentes de «Cola de trabajo». */
+export const BANDEJA: readonly FrenteDelPanel[] = [
+  {
+    etiqueta: 'Observado',
+    tono: 'bad',
+    titulo: 'Contribuyentes sin emisión',
+    detalle:
+      'Predio sin arancel, ficha no conciliada o titularidad incompleta. Sin corregirlo no se les puede cobrar el ejercicio.',
+    cuantos: 534,
+  },
+  {
+    etiqueta: 'Sin conciliar',
+    tono: 'warn',
+    titulo: 'Predios que no generan deuda',
+    detalle:
+      'Tienen ficha catastral y no están en la cuenta corriente. Es la única cifra que se traduce en dinero que no entra.',
+    cuantos: 208,
+  },
+  {
+    etiqueta: 'En trámite',
+    tono: 'warn',
+    titulo: 'Beneficios por resolver',
+    detalle:
+      'Deducciones de 50 UIT pendientes. Mientras no se resuelvan, el contribuyente paga sin el beneficio.',
+    cuantos: 392,
+  },
+];
+
+/** Lo que la cabecera de la cola de trabajo dice a la derecha. `renderVals().colaTotal`. */
+export const COLA_TOTAL = '1,134 pendientes';
+
+/** Una fila de «Recaudado sobre emitido, por tributo». `renderVals().cobertura`. */
+export interface CoberturaDelPanel {
+  readonly tributo: string;
+  /**
+   * El avance, con su decimal.
+   *
+   * El artboard guarda 89.4 y dibuja DOS cosas con el: el rotulo con `toFixed(0)` —«89 %»— y
+   * el ancho de la barra con `toFixed(1)`. Es un porcentaje de avance, no dinero.
+   */
+  readonly avance: number;
+  readonly detalle: string;
+}
+
+/** Las cinco barras de cobertura. */
+export const COBERTURA: readonly CoberturaDelPanel[] = [
+  { tributo: 'Impuesto predial', avance: 89.4, detalle: 'S/ 9.42 M' },
+  { tributo: 'Arbitrios municipales', avance: 86.9, detalle: 'S/ 5.88 M' },
+  { tributo: 'Patrimonio vehicular', avance: 65.3, detalle: 'S/ 2.88 M' },
+  { tributo: 'Alcabala', avance: 100, detalle: 'S/ 1.42 M' },
+  { tributo: 'Multas y papeletas', avance: 38.6, detalle: 'S/ 4.12 M' },
+];
+
+/** El pie de la tabla de cobertura, tal cual. */
+export const NOTA_DE_COBERTURA =
+  'Multas y papeletas al 38 % no es un problema de caja: es lo que Tránsito no llegó a ' +
+  'notificar. Cada barra lleva a su determinación.';
+
+/** Un movimiento de «Actividad reciente». `renderVals().actividad`. */
+export interface ActividadDelPanel {
+  readonly tipo: string;
+  readonly tono: string;
+  readonly codigo: string;
+  readonly detalle: string;
+  /**
+   * Cuando paso, como lo escribe el artboard: «hace 2 h», «ayer», «hace 3 días».
+   *
+   * **Se captura y no se sirve.** `GET /seguridad/auditoria` publica un INSTANTE, que es lo
+   * que la bitacora guarda; una distancia calculada en el navegador contra el reloj del puesto
+   * haria que la misma fila dijera «hace 2 h» a las nueve y «ayer» a medianoche, sin que
+   * ningun dato hubiera cambiado.
+   */
+  readonly cuando: string;
+}
+
+/** Los cuatro movimientos de la bitacora que el panel ensena. */
+export const ACTIVIDAD: readonly ActividadDelPanel[] = [
+  {
+    tipo: 'Determinado',
+    tono: 'ok',
+    codigo: '00000003541',
+    detalle: 'Predial 2026 determinado en S/ 591.94 · 4 cuotas',
+    cuando: 'hace 2 h',
+  },
+  {
+    tipo: 'Alta',
+    tono: 'info',
+    codigo: '00000152614',
+    detalle: 'Contribuyente creado desde declaración jurada',
+    cuando: 'ayer',
+  },
+  {
+    tipo: 'Baja',
+    tono: 'warn',
+    codigo: '00000025673',
+    detalle: 'Prescripción declarada de 2014 a 2016 · S/ 1,613.96',
+    cuando: 'ayer',
+  },
+  {
+    tipo: 'Observado',
+    tono: 'bad',
+    codigo: '00000006551',
+    detalle: 'Sin emisión 2026: el predio no tiene arancel de vía',
+    cuando: 'hace 3 días',
+  },
+];
+
+/**
+ * La fecha de corte del panel: **«al 31 de agosto»**, del ejercicio capturado.
+ *
+ * No es `FECHA_DE_CAPTURA`. El artboard lo escribe dos veces —en la cabecera de «Recaudado
+ * sobre emitido, por tributo» y en la nota de la tarjeta «Recaudado»— y son las cifras del
+ * panel las que estan a esa fecha, no las del expediente. Un panel que dijera estar al 12 de
+ * agosto ensenaria el avance de agosto con la fecha equivocada, que es exactamente lo que la
+ * regla 9 existe para impedir.
+ */
+export const FECHA_DE_CORTE_DEL_PANEL = '2026-08-31';

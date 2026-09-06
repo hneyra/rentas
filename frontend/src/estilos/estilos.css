@@ -14,9 +14,11 @@
      5     `base.css`, que APLICA: el reinicio, el fondo del documento, el foco.
      6     `componentes.css`, que va despues del reinicio a proposito — un
            componente tiene que poder ganarle al reinicio sin subir a `!important`.
-     7     `marco.css`, el ultimo, porque COMPONE con los ocho componentes base: el
+     7     `marco.css`, porque COMPONE con los ocho componentes base: el
            `Boton` del dialogo, el `Campo` del hueco y el `Aviso` de la seccion sin
            construir se colocan desde ahi, y colocarlos exige llegar despues.
+     8     `secciones.css`, el ultimo, porque compone con el LIENZO que dibuja
+           `marco.css`: una seccion es lo que hay debajo de las pestanas.
 
    `verificaciones/tokens-del-artboard.test.ts` comprueba que los cinco archivos
    de tokens estan y que se importan **en este orden**: un `@import` movido de
@@ -35,3 +37,4 @@
 @import './tokens/base.css';
 @import './componentes.css';
 @import './marco.css';
+@import './secciones.css';

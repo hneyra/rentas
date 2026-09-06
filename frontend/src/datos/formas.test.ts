@@ -221,6 +221,61 @@ const HUECOS_ACEPTADOS: readonly string[] = [
   'POST /rentas/alcabala.predioId',
   'POST /rentas/alcabala.contribuyenteId',
   'POST /rentas/espectaculos.organizadorId',
+
+  // ── El panel (F-5) ──────────────────────────────────────────────────────────────────────
+  // Todos son de la MISMA familia, y por eso van juntos: el panel del artboard escribe cifras
+  // redondeadas para un ojo —«S/ 9.42 M», «41.2 %», «534 pendientes»— y el contrato publica al
+  // lado el importe exacto con su fecha. De 9.42 millones no sale un centimo sin inventarlo.
+  'GET /indicadores/recaudacion.cargado',
+  'GET /indicadores/recaudacion.kpis[0].importe',
+  'GET /indicadores/recaudacion.kpis[1].importe',
+  'GET /indicadores/recaudacion.kpis[2].importe',
+  'GET /indicadores/recaudacion.kpis[3].importe',
+  'GET /indicadores/recaudacion.paneles[0].rows[0].importe',
+  'GET /indicadores/recaudacion.paneles[0].rows[0].cargado',
+  'GET /indicadores/recaudacion.paneles[0].rows[0].pendiente',
+  'GET /indicadores/recaudacion.paneles[0].rows[1].importe',
+  'GET /indicadores/recaudacion.paneles[0].rows[1].cargado',
+  'GET /indicadores/recaudacion.paneles[0].rows[1].pendiente',
+  'GET /indicadores/recaudacion.paneles[0].rows[2].importe',
+  'GET /indicadores/recaudacion.paneles[0].rows[2].cargado',
+  'GET /indicadores/recaudacion.paneles[0].rows[2].pendiente',
+  'GET /indicadores/recaudacion.paneles[0].rows[3].importe',
+  'GET /indicadores/recaudacion.paneles[0].rows[3].cargado',
+  'GET /indicadores/recaudacion.paneles[0].rows[3].pendiente',
+  'GET /indicadores/recaudacion.paneles[0].rows[4].importe',
+  'GET /indicadores/recaudacion.paneles[0].rows[4].cargado',
+  'GET /indicadores/recaudacion.paneles[0].rows[4].pendiente',
+  'GET /indicadores/trabajo-parado.frentes[0].importe',
+  'GET /indicadores/trabajo-parado.frentes[1].importe',
+  'GET /indicadores/trabajo-parado.frentes[2].importe',
+
+  // ── La bitacora del panel (F-5) ─────────────────────────────────────────────────────────
+  // Cuatro lineas de resumen, no el registro completo: el artboard no dice desde que equipo ni
+  // desde que IP se hizo cada cosa, ni el antes y el despues de cada cambio.
+  'GET /seguridad/auditoria.contenido[0].origenEquipo',
+  'GET /seguridad/auditoria.contenido[0].origenIp',
+  'GET /seguridad/auditoria.contenido[0].datosAnteriores',
+  'GET /seguridad/auditoria.contenido[0].datosNuevos',
+  'GET /seguridad/auditoria.contenido[1].origenEquipo',
+  'GET /seguridad/auditoria.contenido[1].origenIp',
+  'GET /seguridad/auditoria.contenido[1].datosAnteriores',
+  'GET /seguridad/auditoria.contenido[1].datosNuevos',
+  'GET /seguridad/auditoria.contenido[2].origenEquipo',
+  'GET /seguridad/auditoria.contenido[2].origenIp',
+  'GET /seguridad/auditoria.contenido[2].datosAnteriores',
+  'GET /seguridad/auditoria.contenido[2].datosNuevos',
+  'GET /seguridad/auditoria.contenido[3].origenEquipo',
+  'GET /seguridad/auditoria.contenido[3].origenIp',
+  'GET /seguridad/auditoria.contenido[3].datosAnteriores',
+  'GET /seguridad/auditoria.contenido[3].datosNuevos',
+
+  // ── El expediente coactivo del padron (F-5) ─────────────────────────────────────────────
+  // El artboard dice «expediente coactivo 2026-0418 con medida cautelar» y nada mas: ni de que
+  // tributos es la deuda, ni el numero y la fecha de esa medida, ni beneficio alguno.
+  'GET /coactiva/deudas.contenido[0].tributos',
+  'GET /coactiva/deudas.contenido[0].ultimaActuacion',
+  'GET /coactiva/deudas.contenido[0].beneficios',
 ];
 
 beforeAll(() => {

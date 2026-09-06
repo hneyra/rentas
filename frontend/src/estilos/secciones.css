@@ -1,0 +1,922 @@
+/* ============================================================================
+   Las dos secciones de Rentas que existen: el panel y el padrón (F-5).
+   ----------------------------------------------------------------------------
+   Va DESPUES de `marco.css` porque compone con el lienzo que el marco dibuja:
+   una seccion es lo que hay debajo de las pestanas, y colocarla exige llegar
+   despues.
+
+   **Ni un hexadecimal, ni un `rgba()`: todo color sale de `tokens/colors.css`**,
+   igual que en `componentes.css` y `marco.css`, y lo comprueba la misma prueba
+   —el `it.each` de `tokens-del-artboard.test.ts` incluye este archivo desde
+   F-5—. Es lo que hace que el tema oscuro exista sin tocar una linea de aqui.
+
+   Los PIXELES si son literales, y a proposito: son los del artboard, con sus
+   medios pixeles (13.5, 12.5, 10.5) y sus rellenos impares (11px 13px).
+   ============================================================================ */
+
+.kr-seccion {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  overflow: hidden;
+}
+
+/* ── El panel del modulo ───────────────────────────────────────────────────
+   Una columna de 1180 px de ancho maximo sobre el lienzo, con scroll propio. */
+
+.kr-panel {
+  flex: 1;
+  overflow: auto;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 1180px;
+}
+
+.kr-panel__cifras {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(212px, 1fr));
+  gap: var(--hueco-4);
+}
+
+.kr-panel__cifra {
+  background: var(--superficie);
+  border: 1px solid var(--linea);
+  border-radius: 8px;
+  padding: 14px 15px;
+}
+
+.kr-panel__cifra-etiqueta {
+  margin: 0;
+  font-size: var(--texto-cabecera);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--tinta-3);
+}
+
+.kr-panel__cifra-valor {
+  margin: var(--hueco-3) 0 0;
+  font-size: 29px;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1;
+  color: var(--tinta);
+}
+
+.kr-panel__cifra-nota {
+  margin: 8px 0 0;
+  font-size: var(--texto-etiqueta);
+  line-height: 1.45;
+  color: var(--tinta-3);
+  text-wrap: pretty;
+}
+
+.kr-panel__dos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 14px;
+}
+
+/* ── La tarjeta: cabecera, filas y pie ─────────────────────────────────────
+   La usan los tres bloques del panel y las tres tablas del expediente. */
+
+.kr-tarjeta {
+  background: var(--superficie);
+  border: 1px solid var(--linea);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.kr-tarjeta--tabla {
+  margin-top: 18px;
+}
+
+.kr-tarjeta__cabecera {
+  display: flex;
+  align-items: center;
+  gap: var(--hueco-4);
+  padding: 12px 15px;
+  border-bottom: 1px solid var(--linea-2);
+}
+
+.kr-tarjeta__titulo {
+  margin: 0;
+  flex: 1;
+  font-size: var(--texto-subtitulo);
+  font-weight: 700;
+  color: var(--tinta);
+}
+
+.kr-tarjeta__apunte {
+  font-size: var(--texto-dato);
+  color: var(--tinta-3);
+}
+
+.kr-tarjeta__pie {
+  margin: 0;
+  padding: 11px 15px;
+  background: var(--sup);
+  border-top: 1px solid var(--linea-2);
+  font-size: var(--texto-etiqueta);
+  line-height: 1.5;
+  color: var(--tinta-3);
+  text-wrap: pretty;
+}
+
+/* ── Una fila que es un boton: la cola de trabajo y la actividad ───────────── */
+
+.kr-fila-boton {
+  display: flex;
+  align-items: center;
+  gap: var(--hueco-4);
+  width: 100%;
+  text-align: left;
+  border: 0;
+  border-bottom: 1px solid var(--linea-2);
+  background: transparent;
+  padding: 12px 15px;
+  cursor: pointer;
+  color: var(--tinta);
+  font: inherit;
+}
+
+.kr-fila-boton--menuda {
+  padding: 10px 15px;
+}
+
+.kr-fila-boton:hover {
+  background: var(--sup);
+}
+
+.kr-fila-boton__cuerpo {
+  flex: 1;
+  min-width: 0;
+}
+
+.kr-fila-boton__titulo {
+  display: block;
+  font-size: var(--texto-control);
+  font-weight: 600;
+}
+
+.kr-fila-boton__detalle {
+  display: block;
+  font-size: var(--texto-etiqueta);
+  line-height: 1.45;
+  color: var(--tinta-3);
+  margin-top: 2px;
+  text-wrap: pretty;
+}
+
+.kr-fila-boton__cuenta {
+  font-size: 17px;
+  font-weight: 700;
+  flex: 0 0 auto;
+}
+
+.kr-actividad__codigo {
+  flex: 0 0 auto;
+  font-size: var(--texto-menudo);
+  font-weight: 600;
+  color: var(--azul);
+  font-variant-numeric: tabular-nums;
+}
+
+.kr-actividad__detalle {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--texto-menudo);
+  color: var(--tinta-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kr-actividad__cuando {
+  flex: 0 0 auto;
+  font-size: var(--texto-dato);
+  color: var(--tinta-3);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── El avance por tributo ─────────────────────────────────────────────────── */
+
+.kr-avance {
+  display: flex;
+  align-items: center;
+  gap: var(--hueco-4);
+  padding: 11px 15px;
+  border-bottom: 1px solid var(--linea-2);
+}
+
+.kr-avance__tributo {
+  flex: 0 0 130px;
+  min-width: 0;
+  font-size: var(--texto-celda);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kr-avance__carril {
+  flex: 1;
+  min-width: 40px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--azul-suave);
+  overflow: hidden;
+  position: relative;
+}
+
+.kr-avance__barra {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 999px;
+}
+
+.kr-avance__barra--alto {
+  background: var(--azul);
+}
+
+.kr-avance__barra--medio {
+  background: var(--atencion-tinta);
+}
+
+.kr-avance__barra--bajo {
+  background: var(--mal-borde);
+}
+
+.kr-avance__pct {
+  flex: 0 0 46px;
+  text-align: right;
+  font-size: var(--texto-menudo);
+  font-weight: 600;
+}
+
+.kr-avance__pct--alto {
+  color: var(--ok-tinta);
+}
+
+.kr-avance__pct--medio {
+  color: var(--atencion-tinta);
+}
+
+.kr-avance__pct--bajo {
+  color: var(--mal-tinta);
+}
+
+.kr-avance__detalle {
+  flex: 0 0 74px;
+  text-align: right;
+  font-size: var(--texto-etiqueta);
+  color: var(--tinta-3);
+}
+
+/* ── El padron: la lista a la izquierda y el expediente al lado ────────────── */
+
+.kr-padron {
+  display: flex;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.kr-padron__lista {
+  flex: 0 0 376px;
+  width: 376px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--superficie);
+  border-right: 1px solid var(--linea);
+}
+
+.kr-padron__buscador {
+  flex: 0 0 auto;
+  padding: 11px 12px 10px;
+  border-bottom: 1px solid var(--linea-2);
+}
+
+.kr-busqueda {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--linea);
+  border-radius: var(--radio);
+  padding: 7px 10px;
+  background: var(--sup);
+  color: var(--tinta-3);
+}
+
+.kr-busqueda__campo {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: var(--texto-control);
+  color: var(--tinta);
+  outline: none;
+}
+
+.kr-busqueda__limpiar {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  color: var(--tinta-4);
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+}
+
+.kr-padron__chips {
+  display: flex;
+  align-items: center;
+  gap: var(--hueco-2);
+  flex-wrap: wrap;
+  margin-top: var(--hueco-3);
+}
+
+.kr-chip {
+  border: 1px solid var(--linea);
+  border-radius: 999px;
+  padding: 3px 10px;
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--texto-dato);
+  background: var(--superficie);
+  color: var(--tinta-3);
+}
+
+.kr-chip--on {
+  border-color: var(--azul);
+  background: var(--azul-suave);
+  color: var(--info-tinta);
+  font-weight: 600;
+}
+
+.kr-padron__conteo {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--hueco-3);
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--linea-2);
+  background: var(--sup);
+}
+
+.kr-padron__cuantos {
+  flex: 1;
+  font-size: var(--texto-dato);
+  font-weight: 600;
+  color: var(--tinta-3);
+}
+
+.kr-padron__orden {
+  display: flex;
+  align-items: center;
+  gap: var(--hueco-1);
+}
+
+.kr-padron__orden-rotulo {
+  font-size: var(--texto-dato);
+  color: var(--tinta-3);
+}
+
+.kr-padron__orden select {
+  border: 1px solid var(--linea);
+  border-radius: var(--radio-menudo);
+  padding: 3px 7px;
+  background: var(--superficie);
+  color: var(--tinta);
+  font: inherit;
+  font-size: var(--texto-dato);
+  cursor: pointer;
+}
+
+.kr-padron__filas {
+  flex: 1;
+  overflow: auto;
+  min-height: 0;
+}
+
+.kr-padron__fila {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  border-bottom: 1px solid var(--linea-2);
+  border-left: 3px solid transparent;
+  background: transparent;
+  padding: 11px 13px;
+  cursor: pointer;
+  color: var(--tinta);
+  font: inherit;
+}
+
+.kr-padron__fila:hover {
+  background: var(--sup);
+}
+
+.kr-padron__fila--actual {
+  border-left-color: var(--azul);
+  background: var(--azul-suave);
+}
+
+.kr-padron__fila--esqueleto {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hueco-2);
+  cursor: default;
+}
+
+.kr-padron__linea {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.kr-padron__nombre {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--texto-control);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kr-padron__titular {
+  display: block;
+  font-size: var(--texto-etiqueta);
+  color: var(--tinta-3);
+  margin-top: 3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kr-padron__pie {
+  display: flex;
+  align-items: baseline;
+  gap: var(--hueco-3);
+  margin-top: var(--hueco-2);
+}
+
+.kr-padron__codigo {
+  font-size: var(--texto-dato);
+  color: var(--tinta-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.kr-padron__separacion {
+  flex: 1;
+}
+
+.kr-padron__importe {
+  font-size: var(--texto-menudo);
+  font-weight: 600;
+}
+
+.kr-padron__vacio {
+  padding: var(--relleno-vacio);
+}
+
+.kr-padron__hueco-del-contrato {
+  margin: var(--hueco-4) 0 0;
+  padding: var(--hueco-3) 11px;
+  border-left: 3px solid var(--atencion-tinta);
+  border-radius: 0 var(--radio-menudo) var(--radio-menudo) 0;
+  background: var(--atencion-fondo);
+  font-size: var(--texto-menudo);
+  line-height: 1.5;
+  color: var(--atencion-tinta);
+  text-wrap: pretty;
+}
+
+.kr-padron__expediente {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.kr-padron__sin-eleccion {
+  flex: 1;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: var(--hueco-2);
+  padding: 32px;
+  text-align: center;
+  max-width: var(--ancho-prosa-corta);
+  margin: 0 auto;
+  color: var(--tinta-4);
+}
+
+.kr-padron__sin-eleccion-titulo {
+  margin: var(--hueco-4) 0 0;
+  font-size: var(--texto-titulo);
+  font-weight: 700;
+  color: var(--tinta);
+}
+
+.kr-padron__sin-eleccion-detalle {
+  margin: 0;
+  font-size: var(--texto-celda);
+  line-height: var(--linea-prosa);
+  color: var(--tinta-3);
+  text-wrap: pretty;
+}
+
+/* ── El expediente ─────────────────────────────────────────────────────────── */
+
+.kr-ficha {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.kr-ficha__cabecera {
+  flex: 0 0 auto;
+  padding: 12px 18px;
+  background: var(--superficie);
+  border-bottom: 1px solid var(--linea);
+}
+
+.kr-ficha__identidad {
+  display: flex;
+  align-items: center;
+  gap: var(--hueco-4);
+  flex-wrap: wrap;
+}
+
+.kr-ficha__codigo {
+  font-size: var(--texto-control);
+  font-weight: 700;
+  color: var(--azul);
+  font-variant-numeric: tabular-nums;
+}
+
+.kr-ficha__hueco {
+  flex: 1;
+  min-width: 20px;
+}
+
+.kr-ficha__titulo {
+  margin: 8px 0 0;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  color: var(--tinta);
+  text-wrap: pretty;
+}
+
+.kr-ficha__contexto {
+  margin: 4px 0 0;
+  font-size: var(--texto-celda);
+  line-height: 1.5;
+  color: var(--tinta-3);
+  text-wrap: pretty;
+}
+
+.kr-ficha__pestanas {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  padding: 0 14px;
+  background: var(--superficie);
+  border-bottom: 1px solid var(--linea);
+  overflow-x: auto;
+}
+
+.kr-ficha__pestana {
+  display: flex;
+  align-items: center;
+  gap: var(--hueco-2);
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  padding: 11px 12px 9px;
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--texto-celda);
+  white-space: nowrap;
+  color: var(--tinta-3);
+}
+
+.kr-ficha__pestana--actual {
+  border-bottom-color: var(--azul);
+  color: var(--tinta);
+  font-weight: 700;
+}
+
+.kr-ficha__pendientes {
+  font-size: 10.5px;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 1px 6px;
+  background: var(--atencion-fondo);
+  color: var(--atencion-tinta);
+}
+
+.kr-ficha__cuerpo {
+  flex: 1;
+  overflow: auto;
+  min-height: 0;
+  padding: 16px 18px 24px;
+}
+
+.kr-ficha__ancho {
+  max-width: 920px;
+}
+
+.kr-ficha__nota {
+  margin: 0 0 14px;
+  font-size: var(--texto-celda);
+  line-height: var(--linea-nota);
+  color: var(--tinta-2);
+  max-width: var(--ancho-prosa);
+  text-wrap: pretty;
+}
+
+.kr-rejilla {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(212px, 1fr));
+  gap: 14px 16px;
+}
+
+.kr-rejilla .kr-campo--ancho {
+  grid-column: 1 / -1;
+}
+
+.kr-ficha__pie {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  flex-wrap: wrap;
+  padding: 11px 18px;
+  background: var(--superficie);
+  border-top: 1px solid var(--linea);
+}
+
+.kr-ficha__pie-nota {
+  margin: 0;
+  flex: 1;
+  min-width: 170px;
+  font-size: var(--texto-etiqueta);
+  line-height: 1.45;
+  color: var(--tinta-3);
+  text-wrap: pretty;
+}
+
+/* ── La compuerta del documento, en el alta ────────────────────────────────── */
+
+.kr-compuerta {
+  flex: 0 0 auto;
+  padding: 12px 18px;
+  background: var(--sup);
+  border-bottom: 1px solid var(--linea);
+}
+
+.kr-compuerta__cabecera {
+  display: flex;
+  align-items: baseline;
+  gap: var(--hueco-4);
+  flex-wrap: wrap;
+  margin-bottom: var(--hueco-3);
+}
+
+.kr-compuerta__rotulo {
+  margin: 0;
+  font-size: var(--texto-etiqueta);
+  font-weight: 700;
+  color: var(--tinta);
+}
+
+.kr-compuerta__regla {
+  margin: 0;
+  flex: 1;
+  min-width: 180px;
+  font-size: var(--texto-etiqueta);
+  color: var(--tinta-3);
+  text-wrap: pretty;
+}
+
+.kr-compuerta__controles {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--hueco-3);
+  flex-wrap: wrap;
+}
+
+.kr-compuerta__asignado {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 2px 4px;
+}
+
+.kr-compuerta__asignado-rotulo {
+  font-size: var(--texto-dato);
+  color: var(--tinta-3);
+}
+
+.kr-compuerta__asignado-valor {
+  font-size: 14.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--info-tinta);
+  background: var(--azul-suave);
+  border-radius: var(--radio-menudo);
+  padding: 7px 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.kr-compuerta__aviso {
+  margin: var(--hueco-3) 0 0;
+  padding: var(--hueco-3) 11px;
+  border-left: 3px solid var(--acento);
+  border-radius: 0 var(--radio-menudo) var(--radio-menudo) 0;
+  background: var(--sup);
+  font-size: var(--texto-menudo);
+  line-height: 1.5;
+  color: var(--tinta-2);
+  text-wrap: pretty;
+}
+
+.kr-compuerta__aviso--mal {
+  border-left-color: var(--mal-borde);
+  background: var(--mal-fondo);
+  color: var(--mal-tinta);
+}
+
+/* ── Las tablas del expediente ─────────────────────────────────────────────── */
+
+.kr-tabla__marco {
+  overflow-x: auto;
+}
+
+.kr-tabla {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.kr-tabla--unidades,
+.kr-tabla--cuenta {
+  min-width: 760px;
+}
+
+.kr-tabla--beneficios {
+  min-width: 700px;
+}
+
+.kr-tabla th {
+  padding: var(--relleno-cabecera);
+  text-align: left;
+  font-size: var(--texto-cabecera);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: var(--espaciado-cabecera);
+  color: var(--tinta-3);
+  white-space: nowrap;
+  background: var(--sup);
+  border-bottom: 1px solid var(--linea);
+}
+
+.kr-tabla td {
+  padding: var(--relleno-celda);
+  font-size: var(--texto-celda);
+  color: var(--tinta-2);
+  border-top: 1px solid var(--linea-2);
+}
+
+.kr-tabla__th--cifra,
+.kr-tabla__td--cifra {
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.kr-tabla__td--cifra {
+  color: var(--tinta);
+}
+
+.kr-tabla__td--clave {
+  font-weight: 600;
+  color: var(--tinta);
+  white-space: nowrap;
+}
+
+.kr-tabla__vacio {
+  margin: 0;
+  padding: 22px 14px;
+  text-align: center;
+  font-size: var(--texto-menudo);
+  color: var(--tinta-3);
+  text-wrap: pretty;
+}
+
+/* ── «Lo que se va a registrar» ────────────────────────────────────────────── */
+
+.kr-cierre {
+  margin-top: 18px;
+}
+
+.kr-cierre__cabecera {
+  padding: 13px 15px;
+  border-bottom: 1px solid var(--linea-2);
+}
+
+.kr-cierre__nota {
+  margin: var(--hueco-1) 0 0;
+  font-size: var(--texto-menudo);
+  line-height: var(--linea-prosa);
+  color: var(--tinta-3);
+  max-width: 72ch;
+  text-wrap: pretty;
+}
+
+.kr-cierre__linea {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--hueco-4);
+  padding: 12px 15px;
+  border-bottom: 1px solid var(--linea-2);
+}
+
+.kr-cierre__marca {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+
+.kr-cierre__marca--ok {
+  background: var(--ok-fondo);
+  color: var(--ok-tinta);
+}
+
+.kr-cierre__marca--pendiente {
+  background: var(--atencion-fondo);
+  color: var(--atencion-tinta);
+}
+
+.kr-cierre__texto {
+  flex: 1;
+  min-width: 0;
+}
+
+.kr-cierre__titulo {
+  display: block;
+  font-size: var(--texto-celda);
+  color: var(--tinta);
+}
+
+.kr-cierre__detalle {
+  display: block;
+  font-size: var(--texto-etiqueta);
+  line-height: 1.45;
+  color: var(--tinta-3);
+  margin-top: 2px;
+  text-wrap: pretty;
+}
+
+.kr-cierre__valor {
+  font-size: var(--texto-menudo);
+  font-weight: 600;
+  color: var(--tinta-2);
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.kr-cierre__veredicto {
+  margin: 0;
+  padding: 12px 15px;
+  border-left: 4px solid transparent;
+  font-size: var(--texto-menudo);
+  line-height: var(--linea-prosa);
+  text-wrap: pretty;
+}
+
+.kr-cierre__veredicto--ok {
+  border-left-color: var(--ok-tinta);
+  background: var(--ok-fondo);
+  color: var(--ok-tinta);
+}
+
+.kr-cierre__veredicto--mal {
+  border-left-color: var(--mal-borde);
+  background: var(--mal-fondo);
+  color: var(--mal-tinta);
+}

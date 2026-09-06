@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatearFecha, formatearImporte } from './formato.ts';
+import {
+  compararImportes,
+  formatearFecha,
+  formatearFechaEnPalabras,
+  formatearImporte,
+} from './formato.ts';
 
 describe('un importe se escribe como el artboard lo escribe', () => {
   it.each([
@@ -64,4 +69,69 @@ describe('una fecha se escribe como el artboard la escribe', () => {
       expect(() => formatearFecha(servida)).toThrow(/no sirve/);
     },
   );
+});
+
+describe('ordenar por importe se hace con texto, no con numeros (F-5)', () => {
+  it.each([
+    ['1842.60', '591.94'],
+    ['9412.15', '1842.60'],
+    ['100.00', '99.99'],
+    ['0.10', '0.09'],
+    ['1.00', '-1.00'],
+    ['-1.00', '-2.00'],
+  ])('«%s» pesa mas que «%s»', (mayor, menor) => {
+    expect(compararImportes(mayor, menor)).toBeGreaterThan(0);
+    expect(compararImportes(menor, mayor)).toBeLessThan(0);
+  });
+
+  it.each([
+    ['412.00', '412.00'],
+    ['412', '412.00'],
+    ['0007.50', '7.5'],
+  ])('«%s» y «%s» pesan igual', (uno, otro) => {
+    expect(compararImportes(uno, otro)).toBe(0);
+  });
+
+  it('distingue un centimo donde la coma flotante ya no llega', () => {
+    // Es el motivo de que exista: `Number('9007199254740993.00')` y
+    // `Number('9007199254740992.00')` son el MISMO numero, asi que una comparacion
+    // por resta diria «iguales» y el orden de la lista dependeria de por donde se
+    // empezara a ordenar (regla 1, RNF-055).
+    expect(Number('9007199254740993.00') - Number('9007199254740992.00')).toBe(0);
+    expect(compararImportes('9007199254740993.00', '9007199254740992.00')).toBeGreaterThan(0);
+  });
+
+  it('ordena una lista entera, de mas a menos', () => {
+    const importes = ['591.94', '9412.15', '0.00', '1842.60', '412.00'];
+    expect([...importes].sort((a, b) => compararImportes(b, a))).toEqual([
+      '9412.15',
+      '1842.60',
+      '591.94',
+      '412.00',
+      '0.00',
+    ]);
+  });
+
+  it('se niega a ordenar por algo que no es un importe servido', () => {
+    expect(() => compararImportes('S/ 1,842.60', '412.00')).toThrow(/no se puede ordenar/i);
+  });
+});
+
+describe('la fecha en palabras, como el artboard escribe la de corte', () => {
+  it.each([
+    ['2026-08-31', '31 de agosto'],
+    ['2026-01-01', '1 de enero'],
+    ['2026-12-25', '25 de diciembre'],
+    ['2026-09-06', '6 de septiembre'],
+  ])('«%s» -> «%s»', (servida, mostrada) => {
+    expect(formatearFechaEnPalabras(servida)).toBe(mostrada);
+  });
+
+  it('no pasa por un Date ni por Intl, asi que no se corre un dia', () => {
+    expect(formatearFechaEnPalabras('2026-01-01')).toBe('1 de enero');
+  });
+
+  it.each(['2026-13-01', '31/08/2026', ''])('se niega con «%s»', (servida) => {
+    expect(() => formatearFechaEnPalabras(servida)).toThrow();
+  });
 });

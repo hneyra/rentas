@@ -224,6 +224,65 @@ export const SIMULADOS: readonly Simulado[] = [
     porQue:
       'El expediente del artboard ensena departamento, provincia y distrito por su nombre —Piura, Sullana, Sullana—; el codigo de ubigeo con que el backend los publica no sale.',
   },
+
+  // ── El panel del modulo (F-5) ───────────────────────────────────────────────────────────
+  {
+    clave: 'calculadoEnDelPanel',
+    valor: '2026-08-31T23:59:00',
+    operacion: 'GET /indicadores/recaudacion',
+    porQue:
+      'El panel del artboard dice a que FECHA estan sus cifras —«al 31 de agosto»— y no a que hora se calcularon. El backend publica las dos: la fecha de corte y el instante de la corrida.',
+  },
+  {
+    clave: 'moduloDelFrente',
+    valor: 'Rentas · Registro',
+    operacion: 'GET /indicadores/trabajo-parado',
+    porQue:
+      'El contrato dice de que modulo es cada frente parado. El artboard no lo escribe: dibuja los tres dentro del panel de Rentas y los tres enlazan al padron.',
+  },
+
+  // ── La bitacora que el panel ensena como «Actividad reciente» ───────────────────────────
+  {
+    clave: 'auditoriaId',
+    valor: [50401, 50402, 50403, 50404],
+    operacion: 'GET /seguridad/auditoria',
+    porQue: 'La actividad del artboard se identifica por el contribuyente que toco, no por id.',
+  },
+  {
+    clave: 'tablaDeLaBitacora',
+    valor: ['determinacion', 'contribuyente', 'deuda', 'corrida_predial'],
+    operacion: 'GET /seguridad/auditoria',
+    porQue:
+      'La bitacora del backend guarda que TABLA se toco. El artboard escribe el tipo de acto —«Determinado», «Alta», «Baja», «Observado»—, que es otra cosa: uno es donde paso y el otro que paso.',
+  },
+  {
+    clave: 'usuarioDeLaBitacora',
+    valor: 'MRIOS',
+    operacion: 'GET /seguridad/auditoria',
+    porQue:
+      'Las cuatro filas de actividad del artboard no dicen quien las hizo. El usuario sale del unico que el artboard nombra, en «Registrado por» del expediente.',
+  },
+  {
+    clave: 'instanteDeLaBitacora',
+    valor: [
+      '2026-08-31T21:59:00',
+      '2026-08-30T16:20:00',
+      '2026-08-30T11:05:00',
+      '2026-08-28T09:40:00',
+    ],
+    operacion: 'GET /seguridad/auditoria',
+    porQue:
+      'El artboard escribe una DISTANCIA —«hace 2 h», «ayer», «hace 3 días»— y la bitacora guarda un instante. Los cuatro se colocan a esa distancia de la fecha de corte del panel, que es la unica referencia que el artboard da.',
+  },
+
+  // ── El unico expediente coactivo del padron ─────────────────────────────────────────────
+  {
+    clave: 'costasDelExpedienteCoactivo',
+    valor: '0.00',
+    operacion: 'GET /coactiva/deudas',
+    porQue:
+      'El artboard da UN importe para el contribuyente en coactiva (S/ 9,412.15) y el contrato lo publica repartido en deuda y costas. Las costas van a cero y la deuda se lleva el total: repartirlo seria inventar el reparto, y sumarle costas descuadraria la cifra capturada.',
+  },
 ];
 
 /** Indice por clave, para que `simulado()` no recorra la lista en cada llamada. */
