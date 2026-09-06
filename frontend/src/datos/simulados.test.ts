@@ -77,19 +77,36 @@ describe('lo capturado no se mezcla con lo inventado', () => {
 });
 
 describe('la lista de rutas que ya sirve el backend', () => {
-  it('esta vacia, y por eso el proxy contesta las dieciocho', () => {
-    expect(YA_SERVIDAS).toEqual([]);
+  /**
+   * **Ya no esta vacia: I-1 encendio las dos primeras.**
+   *
+   * Hasta entonces esta prueba afirmaba `toEqual([])` y el javadoc de `servidas.ts` daba los dos
+   * motivos, los dos comprobables: sin token el backend contesta 401, y sin `server.proxy` la
+   * peticion la atiende el servidor de Vite y devuelve el `index.html` con un 200. Los dos
+   * estan cerrados, asi que lo que se afirma ahora es **cuales** son y que no son mas: encender
+   * una ruta es una decision, y una lista que crece sin que nada lo diga vuelve a convertir la
+   * integracion en el salto que este mecanismo existe para evitar.
+   */
+  it('son las dos lecturas de sesion, y el proxy sigue contestando las dieciocho', () => {
+    expect(YA_SERVIDAS.map((o) => `${o.metodo} ${o.ruta}`)).toEqual([
+      'GET /seguridad/sesion',
+      'GET /seguridad/sesion/municipalidad',
+    ]);
     // Trece las trajo F-4; las cuatro de F-5 son las que alimentan el panel del modulo y el
     // estado de cobranza del padron; la de F-6 es la procedencia del conjunto sellado, que es
-    // lo unico que el contrato dice de la tabla de valores del ejercicio.
+    // lo unico que el contrato dice de la tabla de valores del ejercicio. **Ninguna de las
+    // dieciocho se apaga con esto**: las dos de sesion no estaban entre ellas, asi que el
+    // proxy sigue simulando exactamente lo mismo que antes de I-1 (AC9).
     expect(OPERACIONES).toHaveLength(18);
+    const simuladas = new Set(OPERACIONES.map((o) => `${o.metodo} ${o.ruta}`));
+    expect(YA_SERVIDAS.filter((o) => simuladas.has(`${o.metodo} ${o.ruta}`))).toEqual([]);
   });
 
-  it('el porque de que este vacia esta escrito, y no es «todavia no lo hemos hecho»', () => {
+  it('y por que son ESAS dos esta escrito, con lo que hizo falta antes', () => {
     const fuente = readFileSync(join(AQUI, 'servidas.ts'), 'utf8');
 
-    // Los dos motivos son comprobables hoy: sin token el backend contesta 401, y sin
-    // `server.proxy` la peticion la atiende el servidor de Vite y devuelve el index.html.
+    // Los dos motivos que la mantenian vacia eran comprobables, y siguen escritos porque son la
+    // razon del orden: primero el token, despues el camino, y entonces una entrada aqui.
     expect(fuente).toContain('401');
     expect(fuente).toContain('server.proxy');
   });

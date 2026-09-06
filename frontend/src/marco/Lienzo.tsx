@@ -44,8 +44,14 @@ export interface LienzoProps {
   readonly alAvisar: (texto: string) => void;
   readonly padron: EstadoDelPadron;
   readonly alCambiarPadron: (cambio: Partial<EstadoDelPadron>) => void;
-  /** El ejercicio de la barra global: decide de que conjunto sellado se piden las senas. */
-  readonly ejercicio: string;
+  /**
+   * El ejercicio de la barra global: decide de que conjunto sellado se piden las senas.
+   *
+   * `null` cuando el backend no ha fijado ninguno, que es lo que contesta hoy la instalacion.
+   * No se sustituye por el ano en curso: pedir las senas del conjunto de 2026 porque hoy es
+   * 2026 seria decidir aqui el ejercicio de trabajo de la sesion.
+   */
+  readonly ejercicio: string | null;
 }
 
 export function Lienzo({

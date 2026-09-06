@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-import { ErrorDeLaApi } from '../api/cliente.ts';
+import { peldanoDe } from '../api/escalera.ts';
 import { pedirCalculo, pedirLista, pedirUno } from './lecturas.ts';
 
 /**
@@ -26,16 +26,30 @@ export interface Recurso<T> {
   readonly dato: T | null;
   readonly cargando: boolean;
   readonly error: string | null;
+  /**
+   * Lo que lanzo la peticion, sin interpretar. `null` si no fallo.
+   *
+   * `error` es una frase para ensenar; esto es el fallo entero, con su `codigo`. Los dos hacen
+   * falta y no son el mismo dato: una seccion pinta la frase en un `Aviso`, pero quien tiene
+   * que DECIDIR —el casco, que ante un 401 vuelve a la puerta de identidad y ante un 403
+   * `SIN_PRIVILEGIO` no, porque volver a entrar con la misma cuenta daria el mismo 403— no
+   * puede decidir sobre una frase en castellano sin volver a parsearla.
+   */
+  readonly fallo: unknown;
 }
 
-/** Lo que se le dice al usuario cuando la peticion no salio. */
+/**
+ * Lo que se le dice al usuario cuando la peticion no salio.
+ *
+ * Desde I-1 lo redacta `peldanoDe`, que es la misma funcion con la que el casco decide que
+ * hacer. Antes esto componia su propia frase —«El sistema no pudo contestar (403): …»— y el
+ * casco componia otra, asi que un 403 `SIN_PRIVILEGIO` se explicaba de dos maneras distintas
+ * segun donde saltara: en la pantalla como una averia, y en la puerta como lo que es. Una sola
+ * fuente para las dos.
+ */
 function mensajeDe(fallo: unknown): string {
-  if (fallo instanceof ErrorDeLaApi) {
-    // El codigo de estado va dentro a proposito: «no tienes permiso» y «el sistema no
-    // contesta» se arreglan de maneras distintas, y quien atiende tiene que poder decir cual.
-    return `El sistema no pudo contestar (${String(fallo.estado)}): ${fallo.message}.`;
-  }
-  return 'El sistema no pudo contestar. Reintente en unos segundos.';
+  const peldano = peldanoDe(fallo);
+  return `${peldano.detalle} ${peldano.remedio}`;
 }
 
 /**
@@ -45,7 +59,7 @@ function mensajeDe(fallo: unknown): string {
  * `false` la pantalla parpadearia su estado vacio en el primer fotograma.
  */
 function alEmpezar<T>(hayRuta: boolean): Recurso<T> {
-  return { dato: null, cargando: hayRuta, error: null };
+  return { dato: null, cargando: hayRuta, error: null, fallo: null };
 }
 
 /**
@@ -62,24 +76,24 @@ function usePeticion<T>(ruta: string | null, pedir: (ruta: string, senal: AbortS
 
   useEffect(() => {
     if (ruta === null) {
-      fijar({ dato: null, cargando: false, error: null });
+      fijar({ dato: null, cargando: false, error: null, fallo: null });
       return;
     }
 
     const control = new AbortController();
     let vivo = true;
-    fijar({ dato: null, cargando: true, error: null });
+    fijar({ dato: null, cargando: true, error: null, fallo: null });
 
     pedir(ruta, control.signal).then(
       (dato) => {
         if (vivo) {
-          fijar({ dato, cargando: false, error: null });
+          fijar({ dato, cargando: false, error: null, fallo: null });
         }
       },
       (fallo: unknown) => {
         // Abortar no es fallar: es que la pantalla ya no quiere esa respuesta.
         if (vivo && !control.signal.aborted) {
-          fijar({ dato: null, cargando: false, error: mensajeDe(fallo) });
+          fijar({ dato: null, cargando: false, error: mensajeDe(fallo), fallo });
         }
       },
     );

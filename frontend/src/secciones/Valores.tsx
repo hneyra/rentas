@@ -43,14 +43,23 @@ import {
  * esta sellado, la pastilla lo diria — que es la unica manera de que signifique algo.
  */
 export interface ValoresProps {
-  /** El ejercicio de la barra global. Decide de que conjunto se piden las senas. */
-  readonly ejercicio: string;
+  /**
+   * El ejercicio de la barra global. Decide de que conjunto se piden las senas.
+   *
+   * `null` si la sesion no tiene ejercicio de trabajo fijado (AC8 de I-1). Entonces no se pide
+   * nada y la pantalla lo dice: las senas que sostienen la pastilla «Solo lectura» son las de
+   * UN ejercicio, y pedir las de un ano elegido aqui pondria una procedencia inventada encima
+   * de una tabla de valores.
+   */
+  readonly ejercicio: string | null;
 }
 
 export function Valores({ ejercicio }: ValoresProps) {
   const [pestana, fijarPestana] = useState(0);
 
-  const conjunto = useUno<ConjuntoDelEjercicio>(RUTAS.conjuntoSellado(ejercicio));
+  const conjunto = useUno<ConjuntoDelEjercicio>(
+    ejercicio === null ? null : RUTAS.conjuntoSellado(ejercicio),
+  );
   const predial = useCalculo<DeterminacionIndividual>(RUTAS.calculoIndividual);
   const vehicular = useCalculo<DeterminacionVehicular>(RUTAS.calculoVehicular);
   const arbitrios = useLista<ArbitrioServido>(RUTAS.arbitrios);
@@ -119,6 +128,19 @@ export function Valores({ ejercicio }: ValoresProps) {
             tipo="error"
             titulo="No se pudieron leer los valores del ejercicio"
             detalle={errores[0]}
+          />
+        )}
+
+        {ejercicio === null && (
+          <Aviso
+            tipo="vacio"
+            titulo="La sesión no tiene ejercicio de trabajo fijado"
+            detalle={
+              'La UIT, la escala y las tablas de arbitrios son las de UN ejercicio, y el backend ' +
+              'no ha dicho cuál: «GET /seguridad/sesion» contesta «ejercicioDeTrabajo: null». ' +
+              'Elegir uno aquí pondría una procedencia inventada encima de una tabla de valores. ' +
+              'Fijarlo es «PUT /seguridad/sesion/ejercicio», y llega con «Cambiar de ejercicio».'
+            }
           />
         )}
 

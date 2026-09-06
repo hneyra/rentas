@@ -232,20 +232,65 @@ describe('la lista de operaciones ya servidas por el backend', () => {
     expect(await respuesta.json()).toEqual({ delBackend: true });
   });
 
-  it('y si el backend dice que no la conoce, suena en vez de caer al proxy en silencio', async () => {
+  it('y si el backend dice que no la implementa, suena en vez de caer al proxy en silencio', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn<typeof fetch>(() => Promise.resolve(new Response('', { status: 404 }))),
+      vi.fn<typeof fetch>(() => Promise.resolve(new Response('', { status: 501 }))),
     );
     instalarProxyDeDatos({ yaServidas: [{ metodo: 'GET', ruta: '/rentas/contribuyentes' }] });
 
     const respuesta = await fetch(`${RAIZ}/rentas/contribuyentes`);
 
     // 502 y no los datos del proxy: que la ruta de la lista y la del backend no cuadren es
-    // exactamente lo que se quiere ver, y repleglarse en silencio lo esconderia.
+    // exactamente lo que se quiere ver, y replegarse en silencio lo esconderia.
     expect(respuesta.status).toBe(502);
     expect((await respuesta.json()) as Record<string, unknown>).toMatchObject({
       detail: expect.stringContaining('src/datos/servidas.ts'),
+    });
+  });
+
+  /**
+   * **El 404 NO se convierte, y hasta I-1 si se convertia.** Es el hallazgo de este issue por el
+   * lado del proxy: la conversion daba por hecho que un 404 de una ruta declarada significaba
+   * «esa ruta no esta publicada», y no lo significa. El cuarto peldano de la escalera de
+   * identidad —«El token identifica a 'X', que no es un usuario de esta municipalidad»— es un
+   * 404 legitimo de `GET /seguridad/sesion`, que si existe.
+   *
+   * Con la conversion puesta, ese peldano no llegaba nunca a la pantalla: se convertia en un 502
+   * que acusa a `servidas.ts` de un desajuste que no hay, y mandaba a mirar el archivo
+   * equivocado. Y los dos 404 son indistinguibles en el cable, medido con `curl`: los dos traen
+   * `codigo: "NO_ENCONTRADO"`.
+   *
+   * Lo que la conversion protegia lo protege ahora `verificaciones/camino-a-la-api.test.ts`, que
+   * exige que cada ruta de `YA_SERVIDAS` sea una clave del contrato. Es estatico y no necesita
+   * que nadie levante un backend para decirlo.
+   */
+  it('un 404 del backend pasa TAL CUAL: es una respuesta, no un desajuste de la lista', async () => {
+    const cuerpo = {
+      status: 404,
+      title: 'No se encontro lo solicitado',
+      codigo: 'NO_ENCONTRADO',
+      mensaje: "El token identifica a 'administrador', que no es un usuario de esta municipalidad",
+    };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<typeof fetch>(() =>
+        Promise.resolve(
+          new Response(JSON.stringify(cuerpo), {
+            status: 404,
+            headers: { 'content-type': 'application/problem+json' },
+          }),
+        ),
+      ),
+    );
+    instalarProxyDeDatos({ yaServidas: [{ metodo: 'GET', ruta: '/seguridad/sesion' }] });
+
+    const respuesta = await fetch(`${RAIZ}/seguridad/sesion`);
+
+    expect(respuesta.status).toBe(404);
+    expect((await respuesta.json()) as Record<string, unknown>).toMatchObject({
+      codigo: 'NO_ENCONTRADO',
+      mensaje: expect.stringContaining('no es un usuario de esta municipalidad'),
     });
   });
 

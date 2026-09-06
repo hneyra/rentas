@@ -388,6 +388,43 @@ export interface MovimientoDeLaBitacora {
   readonly observacion: string;
 }
 
+// ── La sesion ──────────────────────────────────────────────────────────────────────
+
+/**
+ * Quien esta trabajando, tal como `GET /seguridad/sesion` lo publica.
+ *
+ * **Son cuatro campos y `ejercicioDeTrabajo` puede ser nulo.** No es una posibilidad teorica:
+ * medido contra la instalacion, la cuenta `administrador` contesta hoy
+ * `{"usuarioId":2,"cuenta":"administrador","nombre":"Administrador del Sistema","ejercicioDeTrabajo":null}`.
+ * El contrato lo declara `entero` porque declara el TIPO del campo, no si viene; quien lee tiene
+ * que admitir que no venga, y la barra tiene que decirlo en vez de inventarse un ano (AC8).
+ * Fijarlo es `PUT /seguridad/sesion/ejercicio`, y eso es de otro issue.
+ */
+export interface SesionDeLaVentanilla {
+  readonly usuarioId: number;
+  readonly cuenta: string;
+  readonly nombre: string;
+  readonly ejercicioDeTrabajo: number | null;
+}
+
+/**
+ * De que municipalidad es la sesion, tal como `GET /seguridad/sesion/municipalidad` lo publica.
+ *
+ * Es la lectura que hace honesta la cabecera. Hasta I-1 el nombre de la entidad era una
+ * constante del marco —«Municipalidad Distrital de Catacaos»— sin ninguna interfaz que la
+ * cambiara: con el token de otra municipalidad, esa cabecera afirmaba de quien son unas cifras
+ * que no son suyas, y lo afirmaba en todas las pantallas a la vez. `../sgtm` no pudo cerrarlo
+ * —su `rotuloDeLaEntidad()` acaba diciendo «Municipalidad n.º 9», porque ninguna lectura suya
+ * publicaba el nombre—; aqui si, y por eso esta es una de las dos primeras rutas que salen a la
+ * red de verdad.
+ */
+export interface MunicipalidadDeLaSesion {
+  readonly id: number;
+  readonly ubigeo: string;
+  readonly nombre: string;
+  readonly tipo: string;
+}
+
 // ── Las rutas, escritas una vez ─────────────────────────────────────────────────────────────
 
 /**
@@ -398,6 +435,8 @@ export interface MovimientoDeLaBitacora {
  * pantalla. Las que llevan parametro son funciones, para que el parametro no se olvide.
  */
 export const RUTAS = {
+  sesion: '/seguridad/sesion',
+  municipalidadDeLaSesion: '/seguridad/sesion/municipalidad',
   padron: '/rentas/contribuyentes',
   ficha: (id: number) => `/rentas/contribuyentes/${String(id)}/ficha`,
   predios: '/rentas/predios',
