@@ -4,6 +4,25 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 
 import { desinstalarProxyDeDatos, instalarProxyDeDatos } from '../api/proxy.ts';
 import { Marco } from './Marco.tsx';
+import { MUNICIPALIDAD_MEDIDA, conEjercicio } from './sesionMedida.ts';
+
+/**
+ * **Quien esta en sesion se dice, y desde I-1 no se puede no decirlo.**
+ *
+ * `MarcoProps` exige `sesion` y `municipalidad` sin respaldo: el respaldo era «J. Cárdenas Vega»
+ * y «Municipalidad Distrital de Catacaos», dos constantes del artboard que la cabecera de todas
+ * las pantallas afirmaba sin habérselo preguntado a nadie. Estas cuarenta y cuatro pruebas son
+ * del MARCO y no de la identidad, asi que pasan la sesion medida de la instalacion **con un
+ * ejercicio puesto**: lo que miden —pestanas, hash, filtro, paleta— no cambia con el ejercicio,
+ * pero el titulo de «Valores» y el subtitulo del panel si, y esas dos afirmaciones ya existian.
+ * El caso de `ejercicioDeTrabajo: null` tiene su propio grupo, que es el AC8.
+ */
+const salida = vi.fn();
+const IDENTIDAD = {
+  sesion: conEjercicio(2026),
+  municipalidad: MUNICIPALIDAD_MEDIDA,
+  alSalir: salida,
+};
 
 /**
  * El marco, montado. AC2 a AC9.
@@ -113,7 +132,7 @@ const titulo = () => screen.getByRole('heading', { level: 1 }).textContent;
 
 describe('AC2 — la variante A, y solo esa', () => {
   it('el panel esta, y no hay ningun conmutador A/B/C', () => {
-    render(<Marco />);
+    render(<Marco {...IDENTIDAD} />);
 
     expect(arbol()).toBeInTheDocument();
     expect(within(arbol()).queryByRole('button', { name: /^A$/ })).toBeNull();
@@ -128,7 +147,7 @@ describe('AC2 — la variante A, y solo esa', () => {
   });
 
   it('la cola de trabajo se muestra, y con sus tres filas', () => {
-    render(<Marco />);
+    render(<Marco {...IDENTIDAD} />);
 
     expect(within(arbol()).getByText('Cola de trabajo')).toBeInTheDocument();
     expect(within(arbol()).getByRole('button', { name: /^Observados/ })).toBeInTheDocument();
@@ -139,7 +158,7 @@ describe('AC2 — la variante A, y solo esa', () => {
   });
 
   it('los diez modulos estan, y Catastro y Tesorería no', () => {
-    render(<Marco />);
+    render(<Marco {...IDENTIDAD} />);
 
     expect(within(arbol()).getAllByRole('button', { expanded: false })).toHaveLength(9);
     expect(within(arbol()).queryByRole('button', { name: /^Catastro/ })).toBeNull();
@@ -151,7 +170,7 @@ describe('AC2 — la variante A, y solo esa', () => {
 describe('AC3 — abrir un submodulo', () => {
   it('lo anade a las pestanas, y no cierra el panel', async () => {
     const usuario = userEvent.setup();
-    render(<Marco />);
+    render(<Marco {...IDENTIDAD} />);
 
     await usuario.click(modulo('Coactiva'));
     await usuario.click(submodulo('Expedientes'));
@@ -163,7 +182,7 @@ describe('AC3 — abrir un submodulo', () => {
 
   it('si ya estaba abierto, solo lo activa', async () => {
     const usuario = userEvent.setup();
-    render(<Marco />);
+    render(<Marco {...IDENTIDAD} />);
 
     await usuario.click(modulo('Coactiva'));
     await usuario.click(submodulo('Expedientes'));
@@ -179,7 +198,7 @@ describe('AC4 — el enrutado por hash', () => {
   it('abrir una seccion escribe su slug con replaceState, nunca con pushState', async () => {
     const apilar = vi.spyOn(window.history, 'pushState');
     const usuario = userEvent.setup();
-    render(<Marco />);
+    render(<Marco {...IDENTIDAD} />);
 
     expect(window.location.hash, 'al montar, el hash ya dice donde se esta').toBe('#panel');
 
@@ -196,7 +215,7 @@ describe('AC4 — el enrutado por hash', () => {
   it('recargar sobre «#determinacion» reabre esa seccion, CON su pestana', () => {
     window.history.replaceState(null, '', '#determinacion');
 
-    render(<Marco />);
+    render(<Marco {...IDENTIDAD} />);
 
     expect(titulo()).toBe('Determinación');
     expect(pestanas()).toEqual(['Panel', 'Determinación']);
@@ -206,14 +225,14 @@ describe('AC4 — el enrutado por hash', () => {
   it('un hash de una hoja ajena tambien la reabre', () => {
     window.history.replaceState(null, '', '#coa-exp');
 
-    render(<Marco />);
+    render(<Marco {...IDENTIDAD} />);
 
     expect(titulo()).toBe('Expedientes');
     expect(activa()).toBe('Expedientes');
   });
 
   it('«hashchange» navega', () => {
-    render(<Marco />);
+    render(<Marco {...IDENTIDAD} />);
 
     act(() => {
       window.history.replaceState(null, '', '#contribuyentes');
@@ -225,7 +244,7 @@ describe('AC4 — el enrutado por hash', () => {
   });
 
   it('un hash que no abre nada no cambia nada', () => {
-    render(<Marco />);
+    render(<Marco {...IDENTIDAD} />);
 
     act(() => {
       window.history.replaceState(null, '', '#lo-que-sea');
@@ -239,7 +258,7 @@ describe('AC4 — el enrutado por hash', () => {
 describe('AC5 — el estado sin guardar', () => {
   it('editar un campo marca la pestana activa con un asterisco', async () => {
     const usuario = userEvent.setup();
-    render(<Marco />);
+    render(<Marco {...IDENTIDAD} />);
 
     expect(pestanas()).toEqual(['Panel']);
     await ensuciar(usuario);
@@ -249,7 +268,7 @@ describe('AC5 — el estado sin guardar', () => {
 
   it('cerrarla pregunta, y ofrece las TRES salidas', async () => {
     const usuario = userEvent.setup();
-    render(<Marco />);
+    render(<Marco {...IDENTIDAD} />);
     await ensuciar(usuario);
 
     await usuario.click(
@@ -265,7 +284,7 @@ describe('AC5 — el estado sin guardar', () => {
 
   it('«Seguir editando» deja la pestana, y sigue sucia', async () => {
     const usuario = userEvent.setup();
-    render(<Marco />);
+    render(<Marco {...IDENTIDAD} />);
     await ensuciar(usuario);
     await usuario.click(
       screen.getByRole('button', { name: 'Cerrar Contribuyentes — tiene cambios sin guardar' }),
@@ -279,7 +298,7 @@ describe('AC5 — el estado sin guardar', () => {
 
   it('«Descartar y cerrar» cierra, y no dice que guardo nada', async () => {
     const usuario = userEvent.setup();
-    render(<Marco />);
+    render(<Marco {...IDENTIDAD} />);
     await ensuciar(usuario);
     await usuario.click(modulo('Coactiva'));
     await usuario.click(submodulo('Costas y plazos'));
@@ -295,7 +314,7 @@ describe('AC5 — el estado sin guardar', () => {
 
   it('«Guardar y cerrar» cierra y lo dice', async () => {
     const usuario = userEvent.setup();
-    render(<Marco />);
+    render(<Marco {...IDENTIDAD} />);
     await ensuciar(usuario);
     await usuario.click(modulo('Coactiva'));
     await usuario.click(submodulo('Costas y plazos'));
@@ -313,7 +332,7 @@ describe('AC5 — el estado sin guardar', () => {
 
   it('cerrar una pestana LIMPIA no pregunta', async () => {
     const usuario = userEvent.setup();
-    render(<Marco />);
+    render(<Marco {...IDENTIDAD} />);
     await usuario.click(modulo('Coactiva'));
     await usuario.click(submodulo('Costas y plazos'));
 
@@ -325,7 +344,7 @@ describe('AC5 — el estado sin guardar', () => {
 
   it('el asterisco tambien sale en el arbol, donde se elige la seccion', async () => {
     const usuario = userEvent.setup();
-    render(<Marco />);
+    render(<Marco {...IDENTIDAD} />);
 
     await ensuciar(usuario);
 
@@ -342,7 +361,7 @@ describe('AC6 — cerrar la activa activa la vecina', () => {
 
   it('la de la izquierda cuando la hay', async () => {
     const usuario = userEvent.setup();
-    render(<Marco />);
+    render(<Marco {...IDENTIDAD} />);
     await abrirTres(usuario);
 
     await usuario.click(screen.getByRole('button', { name: 'Cerrar Costas y plazos' }));
@@ -353,7 +372,7 @@ describe('AC6 — cerrar la activa activa la vecina', () => {
 
   it('la de la derecha cuando se cierra la primera', async () => {
     const usuario = userEvent.setup();
-    render(<Marco />);
+    render(<Marco {...IDENTIDAD} />);
     await abrirTres(usuario);
     await usuario.click(within(barraDePestanas()).getByRole('button', { name: 'Panel' }));
 
@@ -365,7 +384,7 @@ describe('AC6 — cerrar la activa activa la vecina', () => {
 
   it('cerrar la ultima deja el espacio vacio, y lo dice', async () => {
     const usuario = userEvent.setup();
-    render(<Marco />);
+    render(<Marco {...IDENTIDAD} />);
 
     await usuario.click(screen.getByRole('button', { name: 'Cerrar Panel' }));
 
@@ -382,7 +401,7 @@ describe('AC7 — el filtro del arbol', () => {
 
   it('filtra modulos y submodulos, y el conteo dice cuantos casan', async () => {
     const usuario = userEvent.setup();
-    render(<Marco />);
+    render(<Marco {...IDENTIDAD} />);
 
     await filtrar(usuario, 'papeleta');
 
@@ -393,7 +412,7 @@ describe('AC7 — el filtro del arbol', () => {
 
   it('un modulo que casa por su nombre ensena sus cuatro submodulos', async () => {
     const usuario = userEvent.setup();
-    render(<Marco />);
+    render(<Marco {...IDENTIDAD} />);
 
     await filtrar(usuario, 'coactiva');
 
@@ -403,7 +422,7 @@ describe('AC7 — el filtro del arbol', () => {
 
   it('sin coincidencias sale su mensaje', async () => {
     const usuario = userEvent.setup();
-    render(<Marco />);
+    render(<Marco {...IDENTIDAD} />);
 
     await filtrar(usuario, 'zzz');
 
@@ -413,7 +432,7 @@ describe('AC7 — el filtro del arbol', () => {
 
   it('quitar el filtro devuelve el arbol entero', async () => {
     const usuario = userEvent.setup();
-    render(<Marco />);
+    render(<Marco {...IDENTIDAD} />);
     await filtrar(usuario, 'zzz');
 
     await usuario.click(screen.getByRole('button', { name: 'Quitar el filtro' }));
@@ -426,7 +445,7 @@ describe('AC7 — el filtro del arbol', () => {
 describe('AC8 — el teclado', () => {
   it('Ctrl+K abre la paleta y Ctrl+K la cierra', async () => {
     const usuario = userEvent.setup();
-    render(<Marco />);
+    render(<Marco {...IDENTIDAD} />);
 
     await usuario.keyboard('{Control>}k{/Control}');
     expect(screen.getByRole('dialog', { name: 'Buscar' })).toBeInTheDocument();
@@ -437,7 +456,7 @@ describe('AC8 — el teclado', () => {
 
   it('Cmd+K hace lo mismo, que es el atajo del mismo gesto en otro teclado', async () => {
     const usuario = userEvent.setup();
-    render(<Marco />);
+    render(<Marco {...IDENTIDAD} />);
 
     await usuario.keyboard('{Meta>}k{/Meta}');
 
@@ -446,7 +465,7 @@ describe('AC8 — el teclado', () => {
 
   it('se opera con flechas y Enter', async () => {
     const usuario = userEvent.setup();
-    render(<Marco />);
+    render(<Marco {...IDENTIDAD} />);
     await usuario.keyboard('{Control>}k{/Control}');
 
     await usuario.type(screen.getByLabelText('Buscar un destino'), 'cartera');
@@ -469,7 +488,7 @@ describe('AC8 — el teclado', () => {
   // Autorizaciones, en ese orden, que es el del arbol.
   it('la flecha arriba retrocede, y no vuelve al primero', async () => {
     const usuario = userEvent.setup();
-    render(<Marco />);
+    render(<Marco {...IDENTIDAD} />);
     await usuario.keyboard('{Control>}k{/Control}');
     await usuario.type(screen.getByLabelText('Buscar un destino'), 'plazos');
     expect(within(screen.getByRole('dialog', { name: 'Buscar' })).getByText('4 resultados'));
@@ -482,7 +501,7 @@ describe('AC8 — el teclado', () => {
 
   it('el indice se acota: ni por arriba ni por abajo se sale de la lista', async () => {
     const usuario = userEvent.setup();
-    render(<Marco />);
+    render(<Marco {...IDENTIDAD} />);
     await usuario.keyboard('{Control>}k{/Control}');
     await usuario.type(screen.getByLabelText('Buscar un destino'), 'plazos');
 
@@ -502,7 +521,7 @@ describe('AC8 — el teclado', () => {
 
   it('Escape cierra la paleta', async () => {
     const usuario = userEvent.setup();
-    render(<Marco />);
+    render(<Marco {...IDENTIDAD} />);
     await usuario.keyboard('{Control>}k{/Control}');
 
     await usuario.keyboard('{Escape}');
@@ -512,7 +531,7 @@ describe('AC8 — el teclado', () => {
 
   it('Escape cierra el lanzador de modulos', async () => {
     const usuario = userEvent.setup();
-    render(<Marco />);
+    render(<Marco {...IDENTIDAD} />);
     await usuario.click(screen.getByRole('button', { name: 'Ver todos los módulos' }));
     expect(screen.getByRole('dialog', { name: 'Módulos del sistema' })).toBeInTheDocument();
 
@@ -523,8 +542,8 @@ describe('AC8 — el teclado', () => {
 
   it('Escape cierra el menu de sesion', async () => {
     const usuario = userEvent.setup();
-    render(<Marco />);
-    await usuario.click(screen.getByRole('button', { name: 'Sesión de J. Cárdenas Vega' }));
+    render(<Marco {...IDENTIDAD} />);
+    await usuario.click(screen.getByRole('button', { name: 'Sesión de Administrador del Sistema' }));
     expect(screen.getByRole('menu', { name: 'Sesión' })).toBeInTheDocument();
 
     await usuario.keyboard('{Escape}');
@@ -534,7 +553,7 @@ describe('AC8 — el teclado', () => {
 
   it('Escape cierra el dialogo de confirmacion, y no cierra la pestana', async () => {
     const usuario = userEvent.setup();
-    render(<Marco />);
+    render(<Marco {...IDENTIDAD} />);
     await ensuciar(usuario);
     await usuario.click(
       screen.getByRole('button', { name: 'Cerrar Contribuyentes — tiene cambios sin guardar' }),
@@ -553,7 +572,7 @@ describe('AC8 — el teclado', () => {
 describe('AC9 — la pestana ajena', () => {
   it('un submodulo de otro modulo abre su ficha, y dice donde se disena', async () => {
     const usuario = userEvent.setup();
-    render(<Marco />);
+    render(<Marco {...IDENTIDAD} />);
 
     await usuario.click(modulo('Valores'));
     await usuario.click(submodulo('Cartera y lotes'));
@@ -568,7 +587,7 @@ describe('AC9 — la pestana ajena', () => {
 
   it('se puede tener abierta a la vez que una propia, y volver a ella', async () => {
     const usuario = userEvent.setup();
-    render(<Marco />);
+    render(<Marco {...IDENTIDAD} />);
     await usuario.click(modulo('Valores'));
     await usuario.click(submodulo('Cartera y lotes'));
 
@@ -583,7 +602,7 @@ describe('AC9 — la pestana ajena', () => {
 
   it('una ficha ajena no ofrece el campo de observacion: aqui no se edita nada', async () => {
     const usuario = userEvent.setup();
-    render(<Marco />);
+    render(<Marco {...IDENTIDAD} />);
 
     await usuario.click(modulo('Valores'));
     await usuario.click(submodulo('Cartera y lotes'));
@@ -593,7 +612,7 @@ describe('AC9 — la pestana ajena', () => {
 
   it('«Cerrar la pestaña» de la ficha la cierra', async () => {
     const usuario = userEvent.setup();
-    render(<Marco />);
+    render(<Marco {...IDENTIDAD} />);
     await usuario.click(modulo('Valores'));
     await usuario.click(submodulo('Cartera y lotes'));
 
@@ -606,7 +625,7 @@ describe('AC9 — la pestana ajena', () => {
 describe('el resto del marco que se porta', () => {
   it('el lanzador lista los diez modulos y abre el panel del que se elige', async () => {
     const usuario = userEvent.setup();
-    render(<Marco />);
+    render(<Marco {...IDENTIDAD} />);
 
     await usuario.click(screen.getByRole('button', { name: 'Ver todos los módulos' }));
     const lanzador = screen.getByRole('dialog', { name: 'Módulos del sistema' });
@@ -621,7 +640,7 @@ describe('el resto del marco que se porta', () => {
 
   it('cambiar de ejercicio lo dice, y el titulo de Valores lo lleva dentro', async () => {
     const usuario = userEvent.setup();
-    render(<Marco />);
+    render(<Marco {...IDENTIDAD} />);
     await usuario.click(submodulo('Valores'));
     expect(titulo()).toBe('Valores del ejercicio 2026');
 
@@ -633,10 +652,10 @@ describe('el resto del marco que se porta', () => {
 
   it('el menu de sesion avisa de las pestanas con cambios sin guardar', async () => {
     const usuario = userEvent.setup();
-    render(<Marco />);
+    render(<Marco {...IDENTIDAD} />);
     await ensuciar(usuario);
 
-    await usuario.click(screen.getByRole('button', { name: 'Sesión de J. Cárdenas Vega' }));
+    await usuario.click(screen.getByRole('button', { name: 'Sesión de Administrador del Sistema' }));
 
     expect(
       within(screen.getByRole('menu', { name: 'Sesión' })).getByText(
@@ -647,7 +666,7 @@ describe('el resto del marco que se porta', () => {
 
   it('el panel se puede ocultar y volver a mostrar', async () => {
     const usuario = userEvent.setup();
-    render(<Marco />);
+    render(<Marco {...IDENTIDAD} />);
     const alternar = screen.getByRole('button', {
       name: 'Mostrar u ocultar las secciones de Rentas',
     });

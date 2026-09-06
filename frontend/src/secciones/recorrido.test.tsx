@@ -1,9 +1,17 @@
 import { render, screen } from '@testing-library/react';
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { desinstalarProxyDeDatos, instalarProxyDeDatos } from '../api/proxy.ts';
 import { Marco } from '../marco/Marco.tsx';
 import { SECCIONES } from '../marco/arbol.ts';
+import { MUNICIPALIDAD_MEDIDA, conEjercicio } from '../marco/sesionMedida.ts';
+
+/** Ver `marco/sesionMedida.ts`: el marco no se monta sin decir quien esta dentro (I-1). */
+const IDENTIDAD = {
+  sesion: conEjercicio(2026),
+  municipalidad: MUNICIPALIDAD_MEDIDA,
+  alSalir: vi.fn(),
+};
 
 /**
  * **El modulo entero recorre** (AC9 de #8): las cuatro secciones de Rentas se abren por su slug
@@ -69,7 +77,7 @@ const RECORRIDO = [
 /** Abre la aplicacion directamente sobre ese slug, como haria una recarga. */
 function abrirEn(slug: string) {
   window.history.replaceState(null, '', `#${slug}`);
-  render(<Marco />);
+  render(<Marco {...IDENTIDAD} />);
 }
 
 describe('AC9 — las cuatro secciones se abren por su slug y dibujan sus datos', () => {

@@ -5,6 +5,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 
 import { desinstalarProxyDeDatos, instalarProxyDeDatos } from '../api/proxy.ts';
 import { Marco } from '../marco/Marco.tsx';
+import { MUNICIPALIDAD_MEDIDA, conEjercicio } from '../marco/sesionMedida.ts';
 import { Contribuyentes } from './Contribuyentes.tsx';
 import { PADRON_AL_EMPEZAR, type EstadoDelPadron } from './estadoDelPadron.ts';
 
@@ -31,6 +32,13 @@ afterAll(() => {
 afterEach(() => {
   window.history.replaceState(null, '', '/');
 });
+
+/** Ver `marco/sesionMedida.ts`: el marco no se monta sin decir quien esta dentro (I-1). */
+const IDENTIDAD = {
+  sesion: conEjercicio(2026),
+  municipalidad: MUNICIPALIDAD_MEDIDA,
+  alSalir: vi.fn(),
+};
 
 const ensuciada = vi.fn();
 const avisada = vi.fn();
@@ -535,7 +543,7 @@ describe('AC9 — escribir en el alta marca sucia la pestana, y cerrar pregunta'
 
   it('montado en el marco, pone el asterisco y cerrar pregunta', async () => {
     const usuario = userEvent.setup();
-    render(<Marco />);
+    render(<Marco {...IDENTIDAD} />);
     await usuario.click(
       within(screen.getByRole('complementary', { name: 'Módulos y submódulos' })).getByRole(
         'button',
@@ -564,7 +572,7 @@ describe('AC9 — escribir en el alta marca sucia la pestana, y cerrar pregunta'
     // encontraria el formulario en blanco **con el asterisco puesto**, y el dialogo preguntaria
     // por unos cambios que ya no existen.
     const usuario = userEvent.setup();
-    render(<Marco />);
+    render(<Marco {...IDENTIDAD} />);
     const arbol = screen.getByRole('complementary', { name: 'Módulos y submódulos' });
     await usuario.click(within(arbol).getByRole('button', { name: /^Contribuyentes/ }));
     await screen.findByText('Suc. Rufina Medina Medina');

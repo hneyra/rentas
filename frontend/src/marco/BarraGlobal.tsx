@@ -1,3 +1,4 @@
+import type { SesionDeLaVentanilla } from '../datos/lecturas.ts';
 import { Icono } from '../ds/index.ts';
 import { ARBOL, MODULO_PROPIO } from './arbol.ts';
 import { Trazos } from './Trazos.tsx';
@@ -19,6 +20,28 @@ import { Trazos } from './Trazos.tsx';
  * artboard contestaba con «Abriria el modulo X» porque en el prototipo cada
  * modulo era otro archivo; aqui los diez estan en el arbol, sus destinos existen
  * y abrirlos es lo que el gesto promete.
+ *
+ * <h2>Desde I-1, quien aparece aqui lo dice el backend (AC7)</h2>
+ *
+ * La entidad y el usuario eran dos constantes del artboard —«Municipalidad
+ * Distrital de Catacaos» y «J. Cárdenas Vega»—, o sea que la cabecera de TODAS
+ * las pantallas afirmaba de quien son unas cifras sin haberselo preguntado a
+ * nadie: con el token de otra municipalidad decia lo mismo. Ahora llegan de
+ * `GET /seguridad/sesion` y `GET /seguridad/sesion/municipalidad`, y llegan como
+ * **props obligatorias**: no hay forma de montar esta barra sin decir quien esta
+ * dentro, que es mas fuerte que acordarse de pasarlas.
+ *
+ * <h2>El papel del usuario NO se dibuja, y no es un olvido</h2>
+ *
+ * El artboard escribe «Rentas · ventanilla» debajo del nombre. **Ninguna de las
+ * 181 operaciones del contrato publica un papel, un perfil ni un rol para la
+ * sesion** —medido sobre `docs/50-api/formas-de-la-api.json`, cero coincidencias
+ * de «rol», «roles» o «perfil» en las 181—: `GET /seguridad/sesion` publica
+ * `usuarioId`, `cuenta`, `nombre` y `ejercicioDeTrabajo`, y nada mas. Escribir
+ * «ventanilla» aqui seria afirmar en pantalla un permiso que nadie ha
+ * concedido, que en un sistema de recaudacion es la peor clase de invencion. En
+ * su sitio va **la cuenta**, que si llega y es lo que hay que dictar por
+ * telefono cuando algo no se puede hacer.
  */
 
 /** Las opciones del menu de sesion, con sus trazos tal como el artboard los escribe. */
@@ -52,9 +75,33 @@ const PUNTOS = [0, 1, 2].flatMap((fila) =>
 /** Los ejercicios que la sesion puede tomar. */
 export const EJERCICIOS = ['2026', '2025', '2024', '2023'] as const;
 
+/**
+ * Las iniciales del avatar, sacadas del nombre que contesta el backend.
+ *
+ * Dos letras como en el artboard, y de las dos PRIMERAS palabras: «Administrador del Sistema»
+ * da «AS» y no «AD». Sin nombre no se inventa nada — se ensena un guion, porque un avatar con
+ * dos letras al azar es peor que un avatar vacio.
+ */
+export function inicialesDe(nombre: string): string {
+  const palabras = nombre.trim().split(/\s+/).filter((p) => p.length > 0);
+  if (palabras.length === 0) {
+    return '—';
+  }
+  const primera = palabras[0] ?? '';
+  const segunda = palabras.length > 1 ? (palabras[palabras.length - 1] ?? '') : '';
+  return (primera.charAt(0) + segunda.charAt(0)).toUpperCase();
+}
+
 export interface BarraGlobalProps {
   readonly entidad: string;
-  readonly ejercicio: string;
+  /** Quien esta trabajando, tal como lo contesta `GET /seguridad/sesion`. */
+  readonly usuario: SesionDeLaVentanilla;
+  /**
+   * El ejercicio de trabajo, o `null` si el backend no ha fijado ninguno.
+   *
+   * `null` no es un caso raro: es lo que contesta hoy la instalacion. Ver el `<select>`.
+   */
+  readonly ejercicio: string | null;
   readonly alCambiarEjercicio: (ejercicio: string) => void;
   readonly panelAbierto: boolean;
   readonly alAlternarPanel: () => void;
@@ -64,6 +111,8 @@ export interface BarraGlobalProps {
   readonly sesionAbierta: boolean;
   readonly alAlternarSesion: () => void;
   readonly alCerrarSesion: () => void;
+  /** Cierra la sesion de verdad: aqui y en el emisor de identidad. */
+  readonly alSalir: () => void;
   readonly hayAviso: boolean;
   readonly alVerAviso: () => void;
   readonly cuantasSucias: number;
@@ -73,6 +122,7 @@ export interface BarraGlobalProps {
 
 export function BarraGlobal({
   entidad,
+  usuario,
   ejercicio,
   alCambiarEjercicio,
   panelAbierto,
@@ -83,6 +133,7 @@ export function BarraGlobal({
   sesionAbierta,
   alAlternarSesion,
   alCerrarSesion,
+  alSalir,
   hayAviso,
   alVerAviso,
   cuantasSucias,
@@ -138,11 +189,23 @@ export function BarraGlobal({
       <div className="kr-marco__ejercicio">
         <span className="kr-marco__ejercicio-rotulo">Ejercicio</span>
         <select
-          value={ejercicio}
+          value={ejercicio ?? ''}
           onChange={(evento) => alCambiarEjercicio(evento.target.value)}
           aria-label="Ejercicio de trabajo"
+          title={
+            ejercicio === null
+              ? 'El backend no ha fijado el ejercicio de trabajo de esta sesión.'
+              : `Ejercicio de trabajo: ${ejercicio}`
+          }
           className="kr-marco__ejercicio-selector"
         >
+          {/* La opcion vacia existe SOLO mientras el backend no haya fijado ninguno (AC8). El
+              artboard pone «2026» fijo; si el backend contesta `ejercicioDeTrabajo: null` —que
+              es lo que contesta hoy— ensenar un ano cualquiera afirmaria sobre que ejercicio se
+              esta trabajando, y todas las cifras de la pantalla se leerian como suyas. En
+              cuanto hay uno, la opcion desaparece: desde aqui no se puede DESfijar, porque
+              fijarlo y desfijarlo es `PUT /seguridad/sesion/ejercicio` y eso es de otro issue. */}
+          {ejercicio === null && <option value="">Sin fijar</option>}
           {EJERCICIOS.map((anio) => (
             <option key={anio} value={anio}>
               {anio}
@@ -241,15 +304,16 @@ export function BarraGlobal({
           type="button"
           onClick={alAlternarSesion}
           aria-expanded={sesionAbierta}
-          aria-label="Sesión de J. Cárdenas Vega"
+          aria-label={`Sesión de ${usuario.nombre}`}
           className={`kr-marco__sesion-boton${
             sesionAbierta ? ' kr-marco__sesion-boton--activo' : ''
           }`}
         >
-          <span className="kr-marco__avatar">JC</span>
+          <span className="kr-marco__avatar">{inicialesDe(usuario.nombre)}</span>
           <span className="kr-marco__sesion-quien">
-            <span className="kr-marco__sesion-nombre">J. Cárdenas Vega</span>
-            <span className="kr-marco__sesion-papel">Rentas · ventanilla</span>
+            <span className="kr-marco__sesion-nombre">{usuario.nombre}</span>
+            {/* La CUENTA, no un papel: el contrato no publica ninguno. Ver la cabecera. */}
+            <span className="kr-marco__sesion-papel">{usuario.cuenta}</span>
           </span>
           <span
             className={`kr-marco__caret${sesionAbierta ? ' kr-marco__caret--arriba' : ''}`}
@@ -268,10 +332,12 @@ export function BarraGlobal({
             />
           <div role="menu" aria-label="Sesión" className="kr-marco__menu">
             <div className="kr-marco__menu-cabecera">
-              <span className="kr-marco__avatar kr-marco__avatar--grande">JC</span>
+              <span className="kr-marco__avatar kr-marco__avatar--grande">
+                {inicialesDe(usuario.nombre)}
+              </span>
               <span className="kr-marco__menu-quien">
-                <span className="kr-marco__menu-nombre">J. Cárdenas Vega</span>
-                <span className="kr-marco__menu-papel">jcardenas · Rentas · ventanilla</span>
+                <span className="kr-marco__menu-nombre">{usuario.nombre}</span>
+                <span className="kr-marco__menu-papel">{usuario.cuenta}</span>
               </span>
             </div>
             <div className="kr-marco__menu-opciones">
@@ -282,11 +348,16 @@ export function BarraGlobal({
                   role="menuitem"
                   onClick={() => {
                     alCerrarSesion();
-                    alAvisar(
-                      opcion.salida
-                        ? 'Cerraría la sesión de jcardenas.'
-                        : `Abriría ${opcion.rotulo.toLowerCase()}.`,
-                    );
+                    // «Cerrar sesión» sale de verdad desde I-1: hay un token que soltar y una
+                    // sesion del emisor que cerrar. Un aviso flotante que dijera «cerraría la
+                    // sesión» dejaria el token vivo en la pestana, que es justo lo que la PC
+                    // compartida de ventanilla no puede permitirse. Las otras dos opciones
+                    // siguen siendo del artboard: abren pantallas que aqui no existen.
+                    if (opcion.salida) {
+                      alSalir();
+                      return;
+                    }
+                    alAvisar(`Abriría ${opcion.rotulo.toLowerCase()}.`);
                   }}
                   className={`kr-marco__menu-opcion${
                     opcion.salida ? ' kr-marco__menu-opcion--salida' : ''

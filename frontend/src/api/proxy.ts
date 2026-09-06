@@ -26,9 +26,9 @@
  * <h2>Y se apaga tambien operacion por operacion</h2>
  *
  * `datos/servidas.ts` lista las rutas que el backend ya sirve, y esas el proxy las deja pasar
- * al `fetch` de verdad. Hoy la lista esta vacia y ahi se explica por que; el mecanismo existe
- * porque la integracion va a ser ruta a ruta y un mecanismo escrito el dia que hace falta se
- * escribe mal ese dia.
+ * al `fetch` de verdad. Desde I-1 hay **dos** —las dos lecturas de sesion—, y ahi se explica por
+ * que son esas; el mecanismo existia antes de tener a quien aplicarselo, porque un mecanismo
+ * escrito el dia que hace falta se escribe mal ese dia.
  *
  * <h2>Lo que deliberadamente NO simula</h2>
  *
@@ -153,12 +153,30 @@ function verboNoAdmitido(metodo: string, rutaRelativa: string, verbos: readonly 
   return new Response(respuesta.body, { status: 405, headers: cabeceras });
 }
 
-/** La ruta esta declarada como servida y el backend dice que no la conoce. */
+/**
+ * La ruta esta declarada como servida y el backend dice que no la implementa.
+ *
+ * **Solo el 501, y el 404 ya no. Lo cambio I-1 con su medida.** Hasta entonces esto se
+ * disparaba tambien con un 404, dando por hecho que un 404 de una ruta declarada significaba
+ * «esa ruta no esta publicada». **No lo significa**: el cuarto peldano de la escalera de
+ * identidad —«El token identifica a 'X', que no es un usuario de esta municipalidad»— es un
+ * 404 legitimo de `GET /seguridad/sesion`, que si existe. Con la conversion puesta, ese
+ * peldano no llegaba nunca a la pantalla: se convertia en un 502 que acusa a la lista de
+ * `servidas.ts` de un desajuste que no hay, y mandaba a mirar el archivo equivocado.
+ *
+ * Y los dos 404 son **indistinguibles en el cable**, medido con `curl`: el de la ruta que no
+ * existe y el del usuario que no es de esta municipalidad traen los dos `codigo:
+ * "NO_ENCONTRADO"`. Asi que no era cuestion de afinar la condicion — la premisa era falsa.
+ *
+ * Lo que protegia sigue protegido, y mejor: `verificaciones/camino-a-la-api.test.ts` exige que
+ * cada ruta de `YA_SERVIDAS` sea una clave del contrato. Es estatico, se pone rojo en `yarn
+ * verificar` y no necesita que nadie levante un backend para decirlo.
+ */
 function declaradaYNoServida(metodo: string, rutaRelativa: string, estado: number): Response {
   return problema(
     'ERROR_INTERNO',
     502,
-    'La operacion esta declarada como servida y el backend no la sirve',
+    'La operacion esta declarada como servida y el backend no la implementa',
     `«${metodo} ${rutaRelativa}» esta en la lista de operaciones que el backend ya sirve, y el ` +
       `backend respondio ${estado}. Quita la ruta de src/datos/servidas.ts o implementa la ` +
       'operacion: caer al proxy en silencio esconderia justo el desajuste que se quiere ver.',
@@ -222,7 +240,10 @@ export function instalarProxyDeDatos({
     // lista y la del backend no cuadran—.
     if (laSirveElBackend(yaServidas, metodo, rutaRelativa)) {
       const respuesta = await anterior(entrada, opciones);
-      return respuesta.status === 404 || respuesta.status === 501
+      // El 404 NO se convierte: es una respuesta legitima de una ruta que existe —el cuarto
+      // peldano de la escalera de identidad—, y tragarselo era esconder el unico mensaje que
+      // dice que cuenta esta entrando. Ver `declaradaYNoServida`.
+      return respuesta.status === 501
         ? declaradaYNoServida(metodo, rutaRelativa, respuesta.status)
         : respuesta;
     }

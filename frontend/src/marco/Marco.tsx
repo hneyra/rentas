@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useReducer, useState } from 'react';
 
+import type { MunicipalidadDeLaSesion, SesionDeLaVentanilla } from '../datos/lecturas.ts';
 import { Icono } from '../ds/index.ts';
 import {
   NUEVO,
@@ -42,8 +43,16 @@ import { estadoInicial, reducir } from './pestanas.ts';
  * sale como un aviso suelto varias pruebas mas tarde.
  */
 
-/** La municipalidad piloto. La pone el marco, no cada pantalla. */
-const ENTIDAD = 'Municipalidad Distrital de Catacaos';
+/**
+ * De donde sale ahora el nombre de la entidad: **de `municipalidad.nombre`, y de ningun otro
+ * sitio**.
+ *
+ * Aqui habia una constante —«Municipalidad Distrital de Catacaos»— sin ninguna interfaz que la
+ * cambiara. Con el token de otra municipalidad, esa cabecera afirmaba de quien son unas cifras
+ * que no son suyas, y lo afirmaba en las cuatro secciones a la vez. Lo cierra I-1 con
+ * `GET /seguridad/sesion/municipalidad`, que es una de las dos primeras rutas que salen a la red
+ * de verdad (`datos/servidas.ts`).
+ */
 
 /** Cuanto vive un aviso flotante, en milisegundos. Del artboard. */
 const VIDA_DEL_TOAST = 3400;
@@ -61,7 +70,7 @@ const SUBTITULOS: Readonly<Record<string, string>> = {
   valores: 'UIT, arbitrios e intereses',
 };
 
-function tituloDe(activa: string | null, ejercicio: string): string {
+function tituloDe(activa: string | null, ejercicio: string | null): string {
   if (activa === null) {
     return 'Sin pestañas abiertas';
   }
@@ -76,12 +85,19 @@ function tituloDe(activa: string | null, ejercicio: string): string {
     return 'Panel de Rentas';
   }
   if (activa === 'valores') {
-    return `Valores del ejercicio ${ejercicio}`;
+    // Sin ejercicio fijado, el titulo no nombra ninguno. «Valores del ejercicio 2026» con la
+    // sesion sin ejercicio seria la misma mentira que la entidad constante, en el sitio donde
+    // mas cara sale: lo que esta pantalla ensena son la UIT y las alicuotas de UN ano.
+    return ejercicio === null ? 'Valores' : `Valores del ejercicio ${ejercicio}`;
   }
   return hoja.rotulo;
 }
 
-function subtituloDe(activa: string | null, ejercicio: string, padron: EstadoDelPadron): string {
+function subtituloDe(
+  activa: string | null,
+  ejercicio: string | null,
+  padron: EstadoDelPadron,
+): string {
   if (activa === null) {
     return '';
   }
@@ -93,7 +109,7 @@ function subtituloDe(activa: string | null, ejercicio: string, padron: EstadoDel
     return hoja.modulo;
   }
   if (activa === 'panel') {
-    return `Ejercicio ${ejercicio}`;
+    return ejercicio === null ? 'Sin ejercicio de trabajo fijado' : `Ejercicio ${ejercicio}`;
   }
   // El del padron dice **a quien se esta mirando**, como el artboard: el codigo cuando hay un
   // expediente abierto, y que se esta creando cuando se esta creando. La cifra de «62,418
@@ -108,7 +124,22 @@ function subtituloDe(activa: string | null, ejercicio: string, padron: EstadoDel
   return SUBTITULOS[activa] ?? '';
 }
 
-export function Marco() {
+/**
+ * Lo que el marco necesita saber de quien esta dentro.
+ *
+ * **Obligatorio, y a proposito.** Podrian ser opcionales con un respaldo, y ese respaldo seria
+ * otra vez «J. Cárdenas Vega»: un valor por omision aqui es exactamente el defecto que I-1
+ * cierra, con la diferencia de que nadie lo veria hasta que alguien montara el marco sin
+ * pasarlas. Sin respaldo, no se puede.
+ */
+export interface MarcoProps {
+  readonly sesion: SesionDeLaVentanilla;
+  readonly municipalidad: MunicipalidadDeLaSesion;
+  /** Cierra la sesion aqui y en el emisor. Lo enchufa el casco a `api/identidad.salir`. */
+  readonly alSalir: () => void;
+}
+
+export function Marco({ sesion: quien, municipalidad, alSalir }: MarcoProps) {
   const [pestanas, despachar] = useReducer(reducir, destinoDelHash(), estadoInicial);
 
   const [panelAbierto, fijarPanelAbierto] = useState(true);
@@ -119,7 +150,13 @@ export function Marco() {
   const [sesion, fijarSesion] = useState(false);
   const [avisoDescartado, fijarAvisoDescartado] = useState(false);
   const [avisoAbierto, fijarAvisoAbierto] = useState(false);
-  const [ejercicio, fijarEjercicio] = useState('2026');
+  // El ejercicio arranca en el que dice el backend, y en `null` si no dice ninguno (AC8). Lo
+  // que el artboard ponia aqui era un `'2026'` fijo. Cambiarlo desde el selector sigue siendo
+  // local a esta pestana —fijarlo de verdad es `PUT /seguridad/sesion/ejercicio`, y eso es de
+  // otro issue—, pero de donde ARRANCA ya no es una invencion.
+  const [ejercicio, fijarEjercicio] = useState<string | null>(
+    quien.ejercicioDeTrabajo === null ? null : String(quien.ejercicioDeTrabajo),
+  );
   const [toast, fijarToast] = useState('');
   // El estado del padron vive aqui y no dentro de la seccion: el marco la desmonta al cambiar
   // de pestana, y con el estado dentro, escribir media alta e ir al panel dejaria el formulario
@@ -204,7 +241,8 @@ export function Marco() {
       )}
 
       <BarraGlobal
-        entidad={ENTIDAD}
+        entidad={municipalidad.nombre}
+        usuario={quien}
         ejercicio={ejercicio}
         alCambiarEjercicio={(elegido) => {
           fijarEjercicio(elegido);
@@ -238,6 +276,7 @@ export function Marco() {
         alCerrarSesion={() => {
           fijarSesion(false);
         }}
+        alSalir={alSalir}
         hayAviso={!avisoDescartado && !avisoAbierto}
         alVerAviso={() => {
           fijarAvisoAbierto(true);

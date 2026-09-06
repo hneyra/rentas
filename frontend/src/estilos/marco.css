@@ -1184,3 +1184,57 @@
 .kr-marco__toast svg {
   color: var(--acento);
 }
+
+/* ============================================================================
+   La puerta: lo que se ve cuando la sesion no se pudo leer (I-1).
+   ----------------------------------------------------------------------------
+   Ocupa la pantalla entera a proposito. Sin sesion no hay token, sin token no
+   hay inquilino y sin inquilino ninguna seccion puede pedir nada: dibujar el
+   marco alrededor enseñaria un padron vacio, una recaudacion vacia y una cola
+   de trabajo vacia, que se ven exactamente igual que «no hay contribuyentes»,
+   «no se recaudo nada» y «no hay nada parado». Ver `marco/Puerta.tsx`.
+
+   Ni un color escrito a mano: los cuatro que usa son tokens, como el resto de
+   esta hoja, y lo comprueba `verificaciones/tokens-del-artboard.test.ts`.
+   ============================================================================ */
+
+.kr-puerta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: var(--hueco-5);
+  background: var(--fondo);
+}
+
+.kr-puerta__caja {
+  width: 100%;
+  max-width: 30rem;
+  padding: var(--hueco-5);
+  border: 1px solid var(--linea);
+  border-radius: var(--radio-grande);
+  background: var(--superficie);
+}
+
+.kr-puerta__marca {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hueco-1);
+  margin: 0 0 var(--hueco-5);
+  color: var(--azul);
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.kr-puerta__marca-nota {
+  color: var(--tinta-3);
+  font-size: 0.78rem;
+  font-weight: 400;
+}
+
+.kr-puerta__remedio {
+  margin: 0 0 var(--hueco-4);
+  color: var(--tinta-2);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
