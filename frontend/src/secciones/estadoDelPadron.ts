@@ -11,10 +11,25 @@
 export interface EstadoDelPadron {
   /** Lo tecleado en el buscador. */
   readonly q: string;
+  /**
+   * Con que criterio se busca lo tecleado: «Nombre», «Código», «DNI» o «RUC».
+   *
+   * Existe desde I-4 porque la busqueda la resuelve el backend, y el backend admite **cuatro
+   * parametros que se combinan con Y**: una sola caja sin criterio no tiene a donde mandar lo
+   * tecleado. El razonamiento entero, con lo que se descarto, esta en `padron.ts`.
+   */
+  readonly criterio: string;
   /** El chip activo: «Todos», «Con deuda», «En coactiva» u «Observado». */
   readonly chip: string;
-  /** El orden: «Código», «Deuda» o «Nombre». */
+  /** El orden: «Código» o «Nombre». */
   readonly orden: string;
+  /**
+   * La pagina del padron que se esta mirando, contada desde 0 como la cuenta el backend.
+   *
+   * Vive aqui y no dentro de la seccion por el mismo motivo que lo demas: irse al panel desde la
+   * pagina 27 y volver a la 1 sin haber pedido nada es perder el sitio sin avisar.
+   */
+  readonly pagina: number;
   /** El codigo del contribuyente abierto, `NUEVO` para el alta, o `null`. */
   readonly elegido: string | null;
   /** La seccion del expediente que se ve, de las seis. */
@@ -28,17 +43,22 @@ export interface EstadoDelPadron {
 /** El valor de `elegido` que abre el alta en vez de un expediente. */
 export const NUEVO = 'nuevo';
 
-/** Los tres ordenes del artboard. */
-export const ORDENES: readonly string[] = ['Código', 'Deuda', 'Nombre'];
-
 /** Los cuatro chips del artboard, en su orden. */
 export const CHIPS: readonly string[] = ['Todos', 'Con deuda', 'En coactiva', 'Observado'];
 
-/** Como empieza la seccion: sin filtro, con «Todos» y sin nadie abierto. */
+/**
+ * Como empieza la seccion: sin filtro, buscando por nombre, con «Todos» y sin nadie abierto.
+ *
+ * El criterio por omision es **«Nombre»** y no «Código», que es el orden por omision: quien
+ * atiende en ventanilla llega con un nombre mal deletreado mucho mas a menudo que con un codigo
+ * de once digitos, y ese es justo el criterio que el backend resuelve por aproximacion.
+ */
 export const PADRON_AL_EMPEZAR: EstadoDelPadron = {
   q: '',
+  criterio: 'Nombre',
   chip: 'Todos',
   orden: 'Código',
+  pagina: 0,
   elegido: null,
   paso: 0,
   vals: {},

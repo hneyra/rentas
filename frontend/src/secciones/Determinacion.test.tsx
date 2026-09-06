@@ -1,8 +1,10 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { fijarToken } from '../api/identidad.ts';
 import { desinstalarProxyDeDatos, instalarProxyDeDatos } from '../api/proxy.ts';
+import { CORRIDA_MEDIDA, contestaLaInstalacion } from '../datos/backendMedido.ts';
 import { sumarImportes } from '../dominio/aritmetica.ts';
 import { Determinacion } from './Determinacion.tsx';
 
@@ -14,14 +16,40 @@ import { Determinacion } from './Determinacion.tsx';
  * de verdad y la pantalla lo lee. Si el proxy dejara de enrutar
  * `POST /rentas/predial/calculo-individual`, esto se pondria rojo igual — que es lo que
  * distingue una prueba de pantalla de una prueba de una constante importada (AC8).
+ *
+ * <h2>Y desde I-4 una de las suyas la contesta el backend, no el proxy</h2>
+ *
+ * `GET /rentas/predial/corridas/ultima` entro en `YA_SERVIDAS`, y esta seccion la pide: encender
+ * una ruta la enciende **para todas las pantallas que la usen**, no solo para la del issue que
+ * la encendio. Asi que el «Predial — masivo» de aqui pasa a ensenar la corrida de la
+ * instalacion, y las cifras del artboard —«62,418 cuentas», las cinco etapas, los 534
+ * observados— dejan de ser lo que se ve. Lo que se ve esta abajo, y es lo que contesta la
+ * municipalidad 9: **dos etapas, cero registros y `simulacion: true`**.
  */
 
-beforeAll(() => {
+/** El doble: contesta lo medido a lo que sale por `YA_SERVIDAS`, y 404 a lo demas. */
+function backendMedido() {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn<typeof fetch>((entrada) => {
+      const cuerpo = contestaLaInstalacion(String(entrada));
+      return Promise.resolve(
+        cuerpo === null ? new Response('{}', { status: 404 }) : Response.json(cuerpo),
+      );
+    }),
+  );
   instalarProxyDeDatos();
+}
+
+beforeEach(() => {
+  fijarToken('un-token-de-prueba');
+  backendMedido();
 });
 
-afterAll(() => {
+afterEach(() => {
   desinstalarProxyDeDatos();
+  vi.unstubAllGlobals();
+  fijarToken(null);
 });
 
 /** Monta la seccion y espera a la primera cifra de la memoria del predial. */
@@ -69,9 +97,12 @@ describe('AC1 — los seis tipos, con su conteo', () => {
     await montar();
 
     expect(tipo('Predial — individual').textContent).toContain('1 contribuyente');
-    // De `etapas[0].registros` de la corrida: el artboard escribe «62,418 cuentas» y aqui se
-    // compone de la cifra servida.
-    expect(await screen.findByText('62,418 cuentas')).toBeInTheDocument();
+    // De `etapas[0].registros` de la corrida. El artboard escribe «62,418 cuentas»; la
+    // instalacion contesta **0**, porque su ultima corrida leyo cero registros. La cifra que se
+    // ensena es la servida, y por eso cambio al encender la ruta.
+    expect(CORRIDA_MEDIDA.etapas[0]?.registros).toBe(0);
+    expect(await screen.findByText('0 cuentas')).toBeInTheDocument();
+    expect(screen.queryByText('62,418 cuentas')).toBeNull();
     expect(await screen.findByText('4 servicios')).toBeInTheDocument();
   });
 
@@ -217,32 +248,36 @@ describe('AC4 — el total cuadra con lo que se esta mostrando', () => {
   });
 });
 
-describe('AC5 — el predial masivo ensena sus cinco etapas', () => {
-  it('las cinco, incluida la ultima «Con observados»', async () => {
+describe('AC5 — el predial masivo ensena las etapas que la corrida trae', () => {
+  it('las que contesto la instalacion, y no las cinco del artboard', async () => {
     const usuario = await montar();
     await usuario.click(tipo('Predial — masivo'));
 
     const etapas = await screen.findByRole('table', { name: 'Memoria de Predial — masivo' });
-    // Cinco filas de datos mas la de cabecera.
-    expect(within(etapas).getAllByRole('row')).toHaveLength(6);
-    expect(within(etapas).getByText('Con observados')).toBeInTheDocument();
+    // Dos filas de datos mas la de cabecera. El artboard dibujaba cinco.
+    expect(within(etapas).getAllByRole('row')).toHaveLength(CORRIDA_MEDIDA.etapas.length + 1);
+    expect(within(etapas).getByText('Padrón leído')).toBeInTheDocument();
+    expect(within(etapas).getByText('Simulados')).toBeInTheDocument();
+    expect(within(etapas).queryByText('Generación de cuponeras')).toBeNull();
   });
 
-  it('los observados no se esconden: los 534 de la ultima etapa se ven', async () => {
+  it('una corrida SIMULADA lo dice: no emitio, asi que nadie debe nada por ella', async () => {
+    // El contrato publica `simulacion` y hasta I-4 nadie lo leia. Un ensayo y una emision se
+    // dibujaban igual, y la diferencia entre los dos es si esos contribuyentes tienen deuda.
     const usuario = await montar();
     await usuario.click(tipo('Predial — masivo'));
 
-    const ultima = fila('Generación de cuponeras');
-    expect(within(ultima).getByText('61,350')).toBeInTheDocument();
-    expect(within(ultima).getByText('534')).toBeInTheDocument();
-    expect(within(ultima).getByText('Con observados')).toBeInTheDocument();
+    expect(CORRIDA_MEDIDA.simulacion).toBe(true);
+    expect(await screen.findByText('La última corrida fue una simulación')).toBeInTheDocument();
   });
 
-  it('la etapa que no emite dinero deja el guion del artboard, y no un cero', async () => {
+  it('la etapa que no emite dinero deja el guion, y no un cero', async () => {
     const usuario = await montar();
     await usuario.click(tipo('Predial — masivo'));
 
-    const lectura = fila('Lectura del padrón');
+    // «Padrón leído» publica `monto: ""`: cadena vacia y no «0.00». Leer un predio no mueve
+    // dinero, y un cero diria que emitio cero soles.
+    const lectura = fila('Padrón leído');
     expect(within(lectura).getByText('—')).toBeInTheDocument();
     expect(within(lectura).queryByText('S/ 0.00')).toBeNull();
   });

@@ -53,7 +53,10 @@ describe('la instalacion y su desinstalador', () => {
 
 describe('la frontera: que intercepta y que no', () => {
   it('atiende lo que cuelga de la raiz del sistema', async () => {
-    instalarProxyDeDatos();
+    // `yaServidas: []` y no la lista de verdad: lo que se mide aqui es que el PROXY conteste, y
+    // desde I-4 `/rentas/contribuyentes` esta en `YA_SERVIDAS`, asi que con la lista real esta
+    // peticion saldria a la red. El mecanismo de la lista se mide abajo, con su propia lista.
+    instalarProxyDeDatos({ yaServidas: [] });
 
     const respuesta = await fetch(`${RAIZ}/rentas/contribuyentes`);
 
@@ -66,7 +69,7 @@ describe('la frontera: que intercepta y que no', () => {
   });
 
   it('el cliente de la aplicacion habla con el proxy sin saberlo', async () => {
-    instalarProxyDeDatos();
+    instalarProxyDeDatos({ yaServidas: [] });
 
     // `solicitar()` compone la URL con SU prefijo. Que esto conteste demuestra que los dos
     // prefijos coinciden: si `cliente.ts` dijera `/api/v1`, la peticion se iria al fetch real.
@@ -151,7 +154,7 @@ describe('el proxy no finge semantica (AC8)', () => {
   });
 
   it('no pagina: publica el envoltorio del backend con el conjunto entero', async () => {
-    instalarProxyDeDatos();
+    instalarProxyDeDatos({ yaServidas: [] });
 
     const pagina = (await (await fetch(`${RAIZ}/rentas/contribuyentes?pagina=2`)).json()) as {
       contenido: unknown[];
@@ -170,7 +173,7 @@ describe('el proxy no finge semantica (AC8)', () => {
   });
 
   it('no persiste: dos escrituras iguales devuelven lo mismo, y no dejan rastro', async () => {
-    instalarProxyDeDatos();
+    instalarProxyDeDatos({ yaServidas: [] });
 
     const antes = await (await fetch(`${RAIZ}/rentas/contribuyentes`)).text();
     const primera = await (
@@ -192,7 +195,7 @@ describe('el proxy no finge semantica (AC8)', () => {
   });
 
   it('una escritura contesta 201 y una lectura 200', async () => {
-    instalarProxyDeDatos();
+    instalarProxyDeDatos({ yaServidas: [] });
 
     const lectura = await fetch(`${RAIZ}/rentas/contribuyentes`);
     const escritura = await fetch(`${RAIZ}/rentas/alcabala`, { method: 'POST' });
@@ -211,10 +214,13 @@ describe('el proxy no finge semantica (AC8)', () => {
 });
 
 describe('la lista de operaciones ya servidas por el backend', () => {
-  it('con la lista vacia —la de hoy— nada sale a la red', async () => {
+  it('con la lista vacia, nada sale a la red', async () => {
+    // Ya no es «la de hoy»: I-1 puso dos rutas y I-4 seis mas. Lo que esta prueba mide sigue
+    // siendo el mecanismo —una lista que no nombra la ruta la deja en el proxy—, y por eso pasa
+    // la lista explicitamente en vez de fiarse de que la de verdad este vacia.
     const real = vi.fn<typeof fetch>(() => Promise.resolve(new Response('{}')));
     vi.stubGlobal('fetch', real);
-    instalarProxyDeDatos();
+    instalarProxyDeDatos({ yaServidas: [] });
 
     await fetch(`${RAIZ}/rentas/contribuyentes`);
 

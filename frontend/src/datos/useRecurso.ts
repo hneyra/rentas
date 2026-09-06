@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 
 import { peldanoDe } from '../api/escalera.ts';
-import { pedirCalculo, pedirLista, pedirUno } from './lecturas.ts';
+import { pedirCalculo, pedirLista, pedirPagina, pedirUno } from './lecturas.ts';
+import type { Paginado } from './lecturas.ts';
 
 /**
  * **Los tres nombres empiezan por `use` y no por `usar`, y es la excepcion que confirma la
@@ -118,6 +119,24 @@ export function useUno<T>(ruta: string | null): Recurso<T> {
 /** Pide una operacion paginada y devuelve su contenido. */
 export function useLista<T>(ruta: string | null): Recurso<readonly T[]> {
   return usePeticion<readonly T[]>(ruta, (donde, senal) => pedirLista<T>(donde, senal));
+}
+
+/**
+ * Pide una operacion paginada y devuelve **el envoltorio entero**, no solo su contenido.
+ *
+ * <h2>Por que hace falta, y por que `useLista` no basta (I-4)</h2>
+ *
+ * Porque `useLista` tira `pagina`, `tamano`, `totalElementos`, `totalPaginas` y `hayMas`, y con
+ * seis filas eso no se notaba: el padron del artboard cabia entero en una respuesta, asi que
+ * `contenido.length` ERA la cuenta del padron. Con **10 603** contribuyentes medidos —y
+ * `totalPaginas: 5302` con `tamano=2`— deja de serlo: el contenido es una ventana y la cuenta
+ * la sabe el backend. Recalcularla aqui daria «20 de 20» sobre un padron de diez mil.
+ *
+ * Quien pagina necesita ademas `hayMas` para saber si «Siguiente» lleva a alguna parte, y
+ * `totalPaginas` para decir «pagina 3 de 5 302». Ninguno de los dos se deduce del contenido.
+ */
+export function usePagina<T>(ruta: string | null): Recurso<Paginado<T>> {
+  return usePeticion<Paginado<T>>(ruta, (donde, senal) => pedirPagina<T>(donde, senal));
 }
 
 /**

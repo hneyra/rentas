@@ -1,8 +1,10 @@
 import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { fijarToken } from '../api/identidad.ts';
 import { desinstalarProxyDeDatos, instalarProxyDeDatos } from '../api/proxy.ts';
+import { contestaLaInstalacion } from '../datos/backendMedido.ts';
 import { Marco } from './Marco.tsx';
 import { MUNICIPALIDAD_MEDIDA, conEjercicio } from './sesionMedida.ts';
 import {
@@ -55,14 +57,25 @@ const IDENTIDAD = {
  * verdad contra el servidor de pruebas, fallaria, y estas pruebas —que son del MARCO— medirian
  * el marco con todas sus secciones en estado de error. Con el proxy instalado se dibujan como
  * se dibujan en desarrollo, que es lo que estas pruebas dan por hecho al escribir en el alta.
+ *
+ * **Y desde I-4 el proxy no basta.** Seis de las rutas que las secciones piden estan en
+ * `YA_SERVIDAS`, asi que el proxy las deja salir a la red; sin doble, «Contribuyentes» se
+ * dibujaba en estado de error justo donde estas pruebas escriben en el alta — y dos del AC5
+ * empezaron a caer con «Test timed out in 5000ms» bajo carga, medido. Con el doble puesto, el
+ * marco vuelve a montar sus cuatro secciones con datos.
  */
-beforeAll(() => {
+function transporte() {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn<typeof fetch>((entrada) => {
+      const cuerpo = contestaLaInstalacion(String(entrada));
+      return Promise.resolve(
+        cuerpo === null ? new Response('{}', { status: 404 }) : Response.json(cuerpo),
+      );
+    }),
+  );
   instalarProxyDeDatos();
-});
-
-afterAll(() => {
-  desinstalarProxyDeDatos();
-});
+}
 
 /**
  * Ensucia una pestana escribiendo en un campo, que es lo que el AC5 de F-3 pide demostrar.
@@ -89,9 +102,16 @@ const limpiarElHash = () => {
   window.history.replaceState(null, '', '/');
 };
 
-beforeEach(limpiarElHash);
+beforeEach(() => {
+  limpiarElHash();
+  fijarToken('un-token-de-prueba');
+  transporte();
+});
 afterEach(() => {
+  desinstalarProxyDeDatos();
+  vi.unstubAllGlobals();
   vi.restoreAllMocks();
+  fijarToken(null);
   limpiarElHash();
 });
 

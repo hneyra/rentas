@@ -314,8 +314,11 @@ export function valoresDelExpediente(leido: LoLeidoDelExpediente): Readonly<Reco
 
   return {
     tipoPersona: ficha.contribuyente.tipoPersona,
-    nacimiento: ficha.datosPersonales.fechaNacimiento,
-    estadoCivil: ficha.datosPersonales.estadoCivil,
+    // Nulos si la ficha no los trae, que es lo que contesta la instalacion: la tabla los tiene
+    // vacios en el origen. Vacio es lo correcto — «null» escrito en un campo de fecha seria peor
+    // que el hueco, porque parece un dato.
+    nacimiento: ficha.datosPersonales.fechaNacimiento ?? '',
+    estadoCivil: ficha.datosPersonales.estadoCivil ?? '',
     calificacion: ficha.contribuyente.condicionEspecial ?? '',
     estadoContrib: ficha.contribuyente.activo ? 'Activo' : 'Baja',
     telefonos: contacto(ficha.contactos, 'TELEFONO'),

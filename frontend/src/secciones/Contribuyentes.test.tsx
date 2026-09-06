@@ -1,9 +1,21 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { fijarToken } from '../api/identidad.ts';
 import { desinstalarProxyDeDatos, instalarProxyDeDatos } from '../api/proxy.ts';
+import {
+  BUSQUEDA_APROXIMADA,
+  ORDENADO_POR_NOMBRE_FILAS,
+  PAGINA_0_FILAS,
+  PAGINA_1_FILAS,
+  POR_NOMBRE_APROXIMADO_FILAS,
+  TOTAL_DEL_PADRON,
+  TOTAL_DE_LA_BUSQUEDA,
+  contestaLaInstalacion,
+  envolver,
+} from '../datos/backendMedido.ts';
 import { Marco } from '../marco/Marco.tsx';
 import { MUNICIPALIDAD_MEDIDA, conEjercicio } from '../marco/sesionMedida.ts';
 import {
@@ -13,33 +25,34 @@ import {
 } from '../marco/seguridadMedida.ts';
 import { componerArbol } from '../marco/composicion.ts';
 import { Contribuyentes } from './Contribuyentes.tsx';
-import { PADRON_AL_EMPEZAR, type EstadoDelPadron } from './estadoDelPadron.ts';
+import { NUEVO, PADRON_AL_EMPEZAR, type EstadoDelPadron } from './estadoDelPadron.ts';
+import { SECCIONES_DEL_EXPEDIENTE } from './expediente.ts';
 
 /**
- * El padron y el expediente, montados y **pidiendo los datos por HTTP** (AC2 a AC9).
+ * El padron y el expediente, **contra las respuestas de la instalacion** (I-4).
  *
- * El proxy de #4 esta instalado: la lista que se ve aqui llego por `GET /rentas/contribuyentes`,
- * el estado de coactiva por `GET /coactiva/deudas` y los observados por la ultima corrida. Si el
- * proxy dejara de enrutar cualquiera de las tres, esto se pondria rojo — que es lo que separa
- * esta prueba de una que leyera `PREDIOS` de un `import`.
+ * <h2>Como se monta, y por que en ese orden</h2>
  *
- * El estado de la seccion vive **fuera** de ella (lo guarda el marco, para que sobreviva a
- * cambiar de pestana), asi que aqui se monta con un contenedor minimo que hace lo mismo.
+ * El `fetch` se sustituye **antes** de instalar el proxy, como en `aplicacion.test.tsx`: el proxy
+ * guarda el `fetch` que encuentra al instalarse y es a ese al que delega lo que esta en
+ * `YA_SERVIDAS`. Con el orden al reves, el proxy delegaria al `fetch` de jsdom y estas pruebas
+ * medirian una peticion de verdad contra un servidor que no existe.
+ *
+ * Puesto asi, lo que se ejercita es el mecanismo entero: **las seis rutas de I-4 salen por
+ * `YA_SERVIDAS` hasta el doble** —con su cadena de consulta, que es lo que se comprueba— y las
+ * dos del expediente que este issue no enciende las sigue contestando el proxy. Si alguien
+ * quitara una de las seis de `servidas.ts`, el doble no recibiria su peticion y varias de estas
+ * pruebas lo dirian por su nombre.
+ *
+ * <h2>Y lo que contesta el doble esta medido, no inventado</h2>
+ *
+ * Sale de `datos/backendMedido.ts`, que es `curl` contra la instalacion del 2026-09-07. El caso
+ * que decide la mitad de este archivo es la busqueda: `?nombreRazonSocial=sulon vilchez` devuelve
+ * **74** elementos cuyos tres primeros nombres **no contienen la cadena tecleada**. Un filtro del
+ * cliente devolveria cero; el servidor devuelve esos tres. No hace falta espiar nada para
+ * distinguirlos — basta mirar la pantalla.
  */
 
-beforeAll(() => {
-  instalarProxyDeDatos();
-});
-
-afterAll(() => {
-  desinstalarProxyDeDatos();
-});
-
-afterEach(() => {
-  window.history.replaceState(null, '', '/');
-});
-
-/** Ver `marco/sesionMedida.ts`: el marco no se monta sin decir quien esta dentro (I-1). */
 const IDENTIDAD = {
   sesion: conEjercicio(2026),
   municipalidad: MUNICIPALIDAD_MEDIDA,
@@ -53,6 +66,51 @@ const IDENTIDAD = {
 
 const ensuciada = vi.fn();
 const avisada = vi.fn();
+
+/** Un problema en `problem+json`, con la forma que publica `ManejadorDeErrores`. */
+function problema(estado: number, codigo: string, mensaje: string): Response {
+  return new Response(JSON.stringify({ status: estado, title: mensaje, codigo, mensaje }), {
+    status: estado,
+    headers: { 'content-type': 'application/problem+json' },
+  });
+}
+
+/**
+ * El doble: contesta lo que contesta la instalacion, y deja anular una ruta.
+ *
+ * `anular` sirve para los dos casos que no se pueden medir con el backend sano —porque hoy
+ * contesta bien— y que son justo los que hay que distinguir de «no hay»: que una lectura falle,
+ * y que una lista llegue recortada.
+ */
+function backendMedido(anular?: (url: string) => Response | null) {
+  const espia = vi.fn<typeof fetch>((entrada) => {
+    const url = typeof entrada === 'string' ? entrada : String(entrada);
+    const propia = anular?.(url) ?? null;
+    if (propia !== null) {
+      return Promise.resolve(propia);
+    }
+    const cuerpo = contestaLaInstalacion(url);
+    return Promise.resolve(
+      cuerpo === null
+        ? problema(404, 'NO_ENCONTRADO', `El doble no mide «${url}».`)
+        : Response.json(cuerpo),
+    );
+  });
+  vi.stubGlobal('fetch', espia);
+  instalarProxyDeDatos();
+  return espia;
+}
+
+beforeEach(() => {
+  fijarToken('un-token-de-prueba');
+});
+
+afterEach(() => {
+  desinstalarProxyDeDatos();
+  vi.unstubAllGlobals();
+  fijarToken(null);
+  window.history.replaceState(null, '', '/');
+});
 
 /** El contenedor que hace lo que hace el marco: guardar el estado de la seccion. */
 function Contenedor({ inicial }: { readonly inicial?: Partial<EstadoDelPadron> }) {
@@ -69,11 +127,11 @@ function Contenedor({ inicial }: { readonly inicial?: Partial<EstadoDelPadron> }
   );
 }
 
-/** Monta el padron y espera a que la lista este servida. */
+/** Monta el padron y espera a que la primera pagina este servida. */
 async function montar(inicial?: Partial<EstadoDelPadron>) {
   const usuario = userEvent.setup();
   render(<Contenedor inicial={inicial} />);
-  await screen.findByText('Suc. Rufina Medina Medina');
+  await screen.findByText('SULLON VILCHEZ-JOSE RAUL');
   return usuario;
 }
 
@@ -85,350 +143,573 @@ function listados(): string[] {
     .map((boton) => boton.querySelector('.kr-padron__nombre')?.textContent ?? '');
 }
 
+/**
+ * Un alta con **todos los obligatorios llenos menos el documento**.
+ *
+ * Existe porque sin ella la compuerta no se puede medir: mientras quede un obligatorio vacio,
+ * `puedeCrear` es falso por ESO, y una prueba que teclee solo el documento y compruebe que no
+ * se puede crear pasa igual aunque la compuerta no mire nada. Se compone de la propia definicion
+ * del formulario, para que anadir un campo obligatorio no la deje coja en silencio.
+ */
+function conTodoLlenoMenosElDocumento(docTipo: string, docNumero: string) {
+  const vals: Record<string, string> = {};
+  for (const seccion of SECCIONES_DEL_EXPEDIENTE) {
+    for (const campo of seccion.campos) {
+      if (campo.opcional !== true && campo.tipo !== 'ro' && campo.tipo !== 'chk') {
+        vals[campo.clave] = 'x';
+      }
+    }
+  }
+  return { elegido: NUEVO, paso: SECCIONES_DEL_EXPEDIENTE.length - 1, vals: { ...vals, docTipo, docNumero } };
+}
+
 const buscador = () => screen.getByRole('textbox', { name: 'Buscar en el padrón' });
+const criterio = () => screen.getByRole('combobox', { name: 'Buscar por' });
 const chip = (rotulo: string) => screen.getByRole('button', { name: rotulo, pressed: false });
+const pedidas = (espia: ReturnType<typeof backendMedido>) =>
+  espia.mock.calls.map((llamada) => String(llamada[0]));
 
-describe('AC2 — el padron llega del proxy y responde al buscador', () => {
-  it('los CINCO contribuyentes del artboard, y su conteo', async () => {
+describe('AC1 — el padron se llena del envoltorio paginado, leido tal cual', () => {
+  it('las filas son las que contesto `GET /rentas/contribuyentes`', async () => {
+    backendMedido();
+
     await montar();
 
-    expect(listados()).toEqual([
-      'Suc. Rufina Medina Medina',
-      'Castillo Pascuala, María Elena',
-      'Díaz Madrid, Julio César',
-      'Noblecilla Arismendiz S.A.C.',
-      'Valdez Ríos, Oliver Fabián',
-    ]);
-    expect(screen.getByText('5 de 5')).toBeInTheDocument();
+    expect(listados()).toEqual(PAGINA_0_FILAS.map((quien) => quien.nombreRazonSocial));
   });
 
-  it('cada fila lleva su documento y su tipo de persona, como el artboard', async () => {
+  it('cada fila lleva su documento y su tipo de persona', async () => {
+    backendMedido();
     await montar();
 
-    expect(screen.getByText('DNI 03593174 · Sucesión indivisa')).toBeInTheDocument();
-    expect(screen.getByText('RUC 20525118447 · Persona jurídica')).toBeInTheDocument();
+    expect(screen.getByText('DNI 29614026 · NATURAL')).toBeInTheDocument();
+    expect(screen.getByText('00000000008')).toBeInTheDocument();
   });
 
-  it('escribir en el buscador recorta la lista', async () => {
-    const usuario = await montar();
+  it('la cuenta es `totalElementos`, y NO el largo de lo que llego', async () => {
+    // **Es el AC1 y el AC2 a la vez.** `contenido` trae cinco filas y el padron tiene 10 603:
+    // una pantalla que contara sus filas diria «5» y estaria diciendo que el padron de Catacaos
+    // tiene cinco contribuyentes.
+    backendMedido();
+    await montar();
 
-    await usuario.type(buscador(), 'díaz');
-
-    expect(listados()).toEqual(['Díaz Madrid, Julio César']);
-    expect(screen.getByText('1 de 5')).toBeInTheDocument();
+    expect(screen.getByText('10,603 contribuyentes')).toBeInTheDocument();
+    expect(screen.queryByText(/^5 /)).toBeNull();
   });
 
-  it('tambien busca por documento y por codigo', async () => {
-    const usuario = await montar();
+  it('la peticion sale con `pagina` y `tamano`, que es lo que hace que sea una ventana', async () => {
+    const espia = backendMedido();
 
-    await usuario.type(buscador(), '20525118447');
-    expect(listados()).toEqual(['Noblecilla Arismendiz S.A.C.']);
+    await montar();
 
-    await usuario.clear(buscador());
-    await usuario.type(buscador(), '152614');
-    expect(listados()).toEqual(['Valdez Ríos, Oliver Fabián']);
-  });
-
-  it('el aspa limpia la busqueda y devuelve la lista entera', async () => {
-    const usuario = await montar();
-    await usuario.type(buscador(), 'díaz');
-
-    await usuario.click(screen.getByRole('button', { name: 'Limpiar la búsqueda' }));
-
-    expect(listados()).toHaveLength(5);
+    expect(pedidas(espia)).toContain('/rentas/api/v1/rentas/contribuyentes?pagina=0&tamano=20&ordenarPor=codigoContribuyente');
   });
 });
 
-describe('AC2 — los chips filtran por lo que el contrato SI publica', () => {
-  it('«En coactiva» sale de `GET /coactiva/deudas`, con su importe y su fecha', async () => {
+describe('AC2 — la paginacion funciona sobre 10 603 filas', () => {
+  it('dice en que pagina se esta y cuantas hay, con las cifras del backend', async () => {
+    backendMedido();
+    await montar();
+
+    // 531 paginas de veinte. Sale de `totalPaginas`, que llega en el envoltorio.
+    expect(screen.getByText('Página 1 de 531')).toBeInTheDocument();
+  });
+
+  it('«Siguiente» pide la pagina 1 y ensena OTRAS filas', async () => {
+    const espia = backendMedido();
+    const usuario = await montar();
+
+    await usuario.click(screen.getByRole('button', { name: 'Página siguiente' }));
+
+    expect(await screen.findByText('CORTEZ DE IPANAQUE-MARIA ANTONIETA')).toBeInTheDocument();
+    expect(pedidas(espia).some((url) => url.includes('pagina=1'))).toBe(true);
+    // Ninguna de la pagina 0 sigue ahi: es una ventana, no un «cargar mas».
+    expect(listados()).toEqual(PAGINA_1_FILAS.map((quien) => quien.nombreRazonSocial));
+    expect(screen.getByText('Página 2 de 531')).toBeInTheDocument();
+  });
+
+  it('«Página anterior» vuelve, y en la primera no lleva a ninguna parte', async () => {
+    backendMedido();
+    const usuario = await montar();
+
+    expect(screen.getByRole('button', { name: 'Página anterior' })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
+
+    await usuario.click(screen.getByRole('button', { name: 'Página siguiente' }));
+    await screen.findByText('CORTEZ DE IPANAQUE-MARIA ANTONIETA');
+    await usuario.click(screen.getByRole('button', { name: 'Página anterior' }));
+
+    expect(await screen.findByText('SULLON VILCHEZ-JOSE RAUL')).toBeInTheDocument();
+    expect(screen.getByText('Página 1 de 531')).toBeInTheDocument();
+  });
+
+  it('la cuenta NO se recalcula al pasar de pagina: la dice el backend', async () => {
+    backendMedido();
+    const usuario = await montar();
+
+    await usuario.click(screen.getByRole('button', { name: 'Página siguiente' }));
+    await screen.findByText('CORTEZ DE IPANAQUE-MARIA ANTONIETA');
+
+    expect(screen.getByText('10,603 contribuyentes')).toBeInTheDocument();
+  });
+});
+
+describe('AC3 — la busqueda la resuelve el backend, no un filtro sobre la pagina', () => {
+  it('lo tecleado viaja como `?nombreRazonSocial=`', async () => {
+    const espia = backendMedido();
+    const usuario = await montar();
+
+    await usuario.type(buscador(), BUSQUEDA_APROXIMADA);
+    await screen.findByText('VILCHEZ SULLON-LUIS');
+
+    expect(
+      pedidas(espia).some((url) => url.includes('nombreRazonSocial=sulon%20vilchez')),
+    ).toBe(true);
+  });
+
+  it('y salen nombres que NO contienen lo tecleado, que es lo que un filtro no puede hacer', async () => {
+    // **Es la prueba del AC3.** «sulon vilchez» no esta dentro de «VILCHEZ SULLON-LUIS»: un
+    // `includes()` sobre las filas cargadas devolveria CERO. Lo que se ve es lo que contesto el
+    // servidor, que busca por parecido de trigramas.
+    backendMedido();
+    const usuario = await montar();
+
+    await usuario.type(buscador(), BUSQUEDA_APROXIMADA);
+
+    expect(await screen.findByText('VILCHEZ SULLON-LUIS')).toBeInTheDocument();
+    expect(listados()).toEqual(POR_NOMBRE_APROXIMADO_FILAS.map((q) => q.nombreRazonSocial));
+    listados().forEach((nombre) => {
+      expect(nombre.toLowerCase()).not.toContain(BUSQUEDA_APROXIMADA);
+    });
+  });
+
+  it('la cuenta de la busqueda tambien es la del backend', async () => {
+    backendMedido();
+    const usuario = await montar();
+
+    await usuario.type(buscador(), BUSQUEDA_APROXIMADA);
+    await screen.findByText('VILCHEZ SULLON-LUIS');
+
+    // 74, no 5: de lo que casa, llegaron cinco.
+    expect(screen.getByText(`${String(TOTAL_DE_LA_BUSQUEDA)} contribuyentes`)).toBeInTheDocument();
+    expect(TOTAL_DE_LA_BUSQUEDA).toBeLessThan(TOTAL_DEL_PADRON);
+  });
+
+  it('cambiar de criterio cambia el parametro, y vuelve a la primera pagina', async () => {
+    const espia = backendMedido();
+    const usuario = await montar();
+    await usuario.click(screen.getByRole('button', { name: 'Página siguiente' }));
+    await screen.findByText('CORTEZ DE IPANAQUE-MARIA ANTONIETA');
+
+    await usuario.selectOptions(criterio(), 'DNI');
+    await usuario.type(buscador(), '29614026');
+    // Se espera a la CUENTA y no al nombre: ese nombre esta tambien en la pagina 0, que llega
+    // antes por el cambio de criterio, asi que esperarlo resolveria antes de la busqueda.
+    await screen.findByText('1 contribuyente');
+
+    const suyas = pedidas(espia).filter((url) => url.includes('dNI=29614026'));
+    expect(suyas).not.toEqual([]);
+    // Y con `pagina=0`: quedarse en la 27 de una busqueda nueva ensena un vacio que no lo es.
+    expect(suyas.every((url) => url.includes('pagina=0'))).toBe(true);
+  });
+
+  it('no se pregunta una vez por tecla: se espera a que la mano pare', async () => {
+    // Con la busqueda del cliente esto no costaba nada porque no habia peticion. Con la del
+    // servidor, cada tecla es una consulta por trigramas sobre 10 603 filas — «MEDINA» serian
+    // seis, y las cinco primeras se descartan al llegar. Se mide en peticiones y no en
+    // milisegundos: lo que importa no es cuanto se espera, es cuantas veces se pregunta.
+    const espia = backendMedido();
+    const usuario = await montar();
+    const antes = pedidas(espia).filter((url) => url.includes('nombreRazonSocial')).length;
+
+    await usuario.type(buscador(), BUSQUEDA_APROXIMADA);
+    await screen.findByText('VILCHEZ SULLON-LUIS');
+
+    const consultas = pedidas(espia).filter((url) => url.includes('nombreRazonSocial')).length;
+    // **El limite es DOS y no «menos que las teclas», y la diferencia importa**: medido, sin
+    // espera las trece teclas dan **12** consultas, y «12 < 13» pasaba — la prueba estaba en
+    // verde con el defecto puesto. Con espera son **1**. Un margen de dos deja sitio a que la
+    // ultima tecla y el asentado se solapen, y sigue estando a diez de distancia del defecto.
+    expect(consultas - antes).toBeLessThanOrEqual(2);
+    expect(consultas - antes).toBeGreaterThan(0);
+  });
+
+  it('el aspa limpia la busqueda y vuelve el padron entero', async () => {
+    backendMedido();
+    const usuario = await montar();
+    await usuario.type(buscador(), BUSQUEDA_APROXIMADA);
+    await screen.findByText('VILCHEZ SULLON-LUIS');
+
+    await usuario.click(screen.getByRole('button', { name: 'Limpiar la búsqueda' }));
+
+    expect(await screen.findByText('10,603 contribuyentes')).toBeInTheDocument();
+  });
+});
+
+describe('AC3 — los criterios que la operacion no admite NO se ofrecen, y se dice cual', () => {
+  it('el selector ofrece exactamente los cuatro que el backend publica', async () => {
+    backendMedido();
+    await montar();
+
+    expect(
+      within(criterio())
+        .getAllByRole('option')
+        .map((una) => una.textContent),
+    ).toEqual(['Nombre', 'Código', 'DNI', 'RUC']);
+  });
+
+  it('«Código» avisa de que se compara por igualdad, porque asi es el SQL', async () => {
+    backendMedido();
+    const usuario = await montar();
+
+    await usuario.selectOptions(criterio(), 'Código');
+
+    // Medido: `?codigo=000000000` devuelve 0 sobre un padron de codigos que empiezan por ceros.
+    // Sin este aviso, quien teclee medio codigo concluye que ese contribuyente no existe.
+    expect(
+      screen.getByText('«Código» se busca completo: el backend compara por igualdad.'),
+    ).toBeInTheDocument();
+  });
+
+  it('y «Nombre» no lo avisa, porque ahi si vale un trozo', async () => {
+    backendMedido();
+    await montar();
+
+    expect(screen.queryByText(/se busca completo/)).toBeNull();
+  });
+
+  it('el orden ofrece DOS, y «Deuda» no es uno de ellos', async () => {
+    // El backend contesta 422 `ORDEN_NO_ADMITIDO` a `?ordenarPor=deuda`, porque esta operacion
+    // no publica la deuda. Ofrecerlo y ordenar aqui pondria delante «al que mas debe» de la
+    // pagina que se este mirando, que sobre 531 paginas no quiere decir nada.
+    backendMedido();
+    await montar();
+
+    const orden = screen.getByRole('combobox', { name: 'Ordenar la lista' });
+    expect(
+      within(orden)
+        .getAllByRole('option')
+        .map((una) => una.textContent),
+    ).toEqual(['Código', 'Nombre']);
+  });
+
+  it('elegir «Nombre» manda `?ordenarPor=nombreRazonSocial` y ensena lo que devuelve', async () => {
+    const espia = backendMedido();
+    const usuario = await montar();
+
+    await usuario.selectOptions(screen.getByRole('combobox', { name: 'Ordenar la lista' }), 'Nombre');
+
+    expect(await screen.findByText('3D PHARMACEUTICAL SAC')).toBeInTheDocument();
+    expect(listados()).toEqual(ORDENADO_POR_NOMBRE_FILAS.map((q) => q.nombreRazonSocial));
+    expect(pedidas(espia).some((url) => url.includes('ordenarPor=nombreRazonSocial'))).toBe(true);
+  });
+});
+
+describe('AC5 — los chips son listas, y su vacio es un dato y no una averia', () => {
+  it('«En coactiva» sale vacio CON EL BACKEND SANO, y lo dice como tal', async () => {
+    // `GET /coactiva/deudas` contesta 200 con lista vacia en las dos municipalidades, medido.
+    // No hay nadie en coactiva; eso no es que no se haya podido leer.
+    backendMedido();
     const usuario = await montar();
 
     await usuario.click(chip('En coactiva'));
 
-    expect(listados()).toEqual(['Díaz Madrid, Julio César']);
-    // Es el unico importe de la lista, y viaja con su fecha (regla 9): el contrato lo publica
-    // con `aLaFecha`, no suelto.
-    expect(screen.getByText('S/ 9,412.15')).toBeInTheDocument();
+    expect(await screen.findByText('Ningún expediente coactivo abierto')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'La consulta de cobranza coactiva respondió, y no hay ninguno en esta municipalidad.',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/No se pudo leer/)).toBeNull();
+    expect(screen.getByText('0 contribuyentes')).toBeInTheDocument();
   });
 
-  it('«Observado» sale de los observados de la ultima corrida', async () => {
+  it('y cuando SI falla dice otra cosa, que es lo que separa las dos', async () => {
+    backendMedido((url) =>
+      url.includes('/coactiva/deudas')
+        ? problema(503, 'ERROR_INTERNO', 'El servicio de coactiva no responde')
+        : null,
+    );
+    const usuario = await montar();
+
+    await usuario.click(chip('En coactiva'));
+
+    expect(await screen.findByText('No se pudo leer la lista')).toBeInTheDocument();
+    expect(screen.queryByText('Ningún expediente coactivo abierto')).toBeNull();
+  });
+
+  it('«Observado» sale vacio igual, y con su propia frase', async () => {
+    backendMedido();
     const usuario = await montar();
 
     await usuario.click(chip('Observado'));
 
-    expect(listados()).toEqual(['Noblecilla Arismendiz S.A.C.']);
+    expect(await screen.findByText('Ningún contribuyente observado')).toBeInTheDocument();
+    expect(
+      screen.getByText('La última corrida de emisión respondió, y no dejó a nadie fuera.'),
+    ).toBeInTheDocument();
   });
 
-  it('«Con deuda» sale VACIO, y la pantalla dice por que', async () => {
-    // **Es el hallazgo de este trabajo.** `GET /rentas/contribuyentes` publica identidad y nada
-    // mas: ni el estado de cobranza ni la deuda, que son las dos cosas sobre las que el artboard
-    // construye la fila. Recorridas las 181 operaciones, ninguna las publica por contribuyente
-    // en una lista. El chip existe, filtra, y sale vacio DICIENDOLO — un chip que devolviera
-    // resultados a ojo diria a la ventanilla quien debe sin que ningun sistema lo sostenga.
+  it('«Con deuda» sale vacio porque NADIE lo publica, y esa es una tercera frase', async () => {
+    // El hallazgo de F-5, ahora comprobado contra el backend: `GET /rentas/contribuyentes`
+    // publica identidad y nada mas. El chip no filtra ni pide: dice que no tiene fuente.
+    backendMedido();
     const usuario = await montar();
 
     await usuario.click(chip('Con deuda'));
 
-    expect(listados()).toEqual([]);
-    expect(screen.getByText('Ningún contribuyente coincide')).toBeInTheDocument();
+    expect(await screen.findByText('Nadie puede salir por «Con deuda»')).toBeInTheDocument();
     expect(
-      screen.getByText(/ninguna operación de este backend publica la deuda del padrón/),
+      screen.getByText(/Ninguna operación de este backend publica la deuda del padrón/),
     ).toBeInTheDocument();
   });
 
-  it('las filas que nadie clasifica se ensenan con lo que el padron publica de ellas', async () => {
+  it('con una lista de estado RECORTADA, la insignia deja de afirmarse', async () => {
+    // No aparecer en la primera pagina de coactiva no es no estar en coactiva. Sin esto, una
+    // fila con expediente abierto se dibujaria «Activo» sin que nada lo dijera.
+    backendMedido((url) =>
+      url.includes('/coactiva/deudas')
+        ? Response.json(
+            envolver(
+              [
+                {
+                  expediente: '2026-0418',
+                  ano: 2026,
+                  codContribuyente: 'no-es-de-esta-pagina',
+                  contribuyente: 'Alguien',
+                  deudaS: '10.00',
+                  costasS: '0.00',
+                  totalS: '10.00',
+                  aLaFecha: '2026-08-12',
+                  estado: 'En coactiva',
+                },
+              ],
+              0,
+              400,
+            ),
+          )
+        : null,
+    );
+
     await montar();
-    // El estado de coactiva y el de los observados llegan en otras dos peticiones —y la de los
-    // observados, encadenada a la de la ultima corrida—: hasta que las tres estan, la lista es
-    // correcta pero incompleta. Se espera a la ultima en llegar, **y por su insignia**: un
-    // `findByText('Observado')` a secas casa tambien con el CHIP, que esta desde el primer
-    // fotograma, asi que unas veces resolveria antes de tiempo y otras se quejaria de que hay
-    // dos. Esta prueba fallo asi una vez antes de acotarla.
-    await screen.findByText('Observado', { selector: '.kr-insignia' });
 
-    // «Activo» sale de `activo`, que es lo unico que la operacion del padron publica del estado
-    // de un contribuyente. **No es «Al día»**: nadie ha dicho que lo esten, y el artboard SI lo
-    // decia de tres de los cinco. Son los tres que no estan ni en coactiva ni observados.
-    const insignias = screen
-      .getAllByText(/./, { selector: '.kr-insignia' })
-      .map((marca) => marca.textContent);
-    expect(insignias.filter((estado) => estado === 'Activo')).toHaveLength(3);
-    // Los dos estados de cobranza que el artboard SI dibujaba no aparecen en ninguna insignia:
-    // «Con deuda» sigue estando como CHIP, que es otra cosa.
-    expect(insignias).not.toContain('Al día');
-    expect(insignias).not.toContain('Con deuda');
+    expect(
+      await screen.findByText('El estado de cobranza se calculó sobre una parte'),
+    ).toBeInTheDocument();
   });
 });
 
-describe('AC2 — el orden', () => {
-  const selector = () => screen.getByRole('combobox', { name: 'Ordenar la lista' });
-
-  it('«Nombre» ordena en castellano', async () => {
+describe('AC9 — la busqueda sin resultados es un estado, no un error', () => {
+  it('dice el texto del artboard y ofrece crear', async () => {
+    backendMedido((url) =>
+      url.includes('codigo=99999999999') ? Response.json(envolver([], 0, 0)) : null,
+    );
     const usuario = await montar();
 
-    await usuario.selectOptions(selector(), 'Nombre');
+    await usuario.selectOptions(criterio(), 'Código');
+    await usuario.type(buscador(), '99999999999');
 
-    expect(listados()[0]).toBe('Castillo Pascuala, María Elena');
-    expect(listados()[4]).toBe('Valdez Ríos, Oliver Fabián');
-  });
-
-  it('«Deuda» pone delante al unico del que se publica una', async () => {
-    const usuario = await montar();
-
-    await usuario.selectOptions(selector(), 'Deuda');
-
-    expect(listados()[0]).toBe('Díaz Madrid, Julio César');
-  });
-
-  it('«Código» devuelve el orden en que llego el padron', async () => {
-    const usuario = await montar();
-    await usuario.selectOptions(selector(), 'Nombre');
-
-    await usuario.selectOptions(selector(), 'Código');
-
-    expect(listados()[0]).toBe('Suc. Rufina Medina Medina');
-  });
-});
-
-describe('AC3 — sin coincidencias sale su vacio, y no es mudo', () => {
-  it('el texto del artboard, entero', async () => {
-    const usuario = await montar();
-
-    await usuario.type(buscador(), 'Zzzz');
-
-    expect(screen.getByText('Ningún contribuyente coincide')).toBeInTheDocument();
+    expect(await screen.findByText('Ningún contribuyente coincide')).toBeInTheDocument();
     expect(
       screen.getByText(
         'Puede estar con el código antiguo o con otro documento. Si viene a declarar por primera vez, créelo aquí mismo.',
       ),
     ).toBeInTheDocument();
-  });
-
-  it('y con el boton que resuelve el caso que lo provoca', async () => {
-    const usuario = await montar();
-    await usuario.type(buscador(), 'Zzzz');
-
-    // Hay dos botones con ese rotulo —el del vacio de la lista y el del vacio de la derecha—, y
-    // los dos hacen lo mismo. El de este AC es el que sale DENTRO del vacio de la busqueda.
-    const vacio = screen.getByText('Ningún contribuyente coincide').closest('.kr-aviso');
-    await usuario.click(within(vacio as HTMLElement).getByRole('button', { name: 'Nuevo contribuyente' }));
-
-    expect(screen.getByText('Contribuyente nuevo')).toBeInTheDocument();
+    expect(screen.queryByText('No se pudo leer la lista')).toBeNull();
   });
 });
 
-describe('AC5 — el estado vacio de la derecha', () => {
-  it('sin nadie elegido, dice que elija y explica que el expediente se abre al lado', async () => {
-    await montar();
+describe('AC6 — el expediente abre sobre un contribuyente de verdad', () => {
+  it('elegirlo pide su ficha POR SU IDENTIFICADOR', async () => {
+    const espia = backendMedido();
+    const usuario = await montar();
 
-    expect(screen.getByText('Elija un contribuyente de la lista')).toBeInTheDocument();
+    await usuario.click(screen.getByRole('button', { name: /SULLON VILCHEZ-JOSE RAUL/ }));
+
+    // El 17 es el `id` que trajo la fila, no un numero de esta prueba.
+    expect(pedidas(espia)).toContain('/rentas/api/v1/rentas/contribuyentes/17/ficha');
     expect(
-      screen.getByText(
-        'El expediente se abre aquí al lado, sin salir de la lista. También puede crear un contribuyente nuevo.',
-      ),
+      await screen.findByText('00000000008', { selector: '.kr-ficha__codigo' }),
     ).toBeInTheDocument();
-  });
-});
-
-describe('AC4 — el expediente se abre al lado, sin salir de la lista', () => {
-  it('elegir un contribuyente abre su expediente con las SEIS secciones', async () => {
-    const usuario = await montar();
-
-    await usuario.click(screen.getByRole('button', { name: /Suc. Rufina Medina Medina/ }));
-
-    expect(
-      screen.getAllByRole('tab').map((pestana) => pestana.textContent),
-    ).toEqual([
-      'Identificación',
-      'Domicilio fiscal',
-      'Predios y vehículos',
-      'Beneficios',
-      'Cuenta corriente',
-      'Observaciones',
-    ]);
     // Y la lista sigue ahi: no se navego a ninguna parte.
     expect(listados()).toHaveLength(5);
   });
 
-  it('lo que la ficha publica llega lleno, y lo que publica compuesto queda vacio', async () => {
+  it('lo que la ficha NO publica queda vacio, y no dice «null»', async () => {
+    // Medido: `datosPersonales` llega con sus tres campos nulos y `domicilioFiscal` tambien,
+    // porque la tabla `domicilio` esta vacia en el origen.
+    backendMedido();
     const usuario = await montar();
 
-    await usuario.click(screen.getByRole('button', { name: /Suc. Rufina Medina Medina/ }));
-    await screen.findByDisplayValue('Sucesión indivisa');
+    await usuario.click(screen.getByRole('button', { name: /SULLON VILCHEZ-JOSE RAUL/ }));
+    await screen.findByDisplayValue('NATURAL');
 
-    // Publicado: tipo de persona, fecha de nacimiento, estado civil y calificacion.
-    expect(screen.getByLabelText('Fecha de nacimiento')).toHaveValue('1948-08-30');
-    expect(screen.getByLabelText('Estado civil')).toHaveValue('Viudo(a)');
-    // Compuesto y no partible: `nombreRazonSocial` es «Suc. Rufina Medina Medina», y de ahi no
-    // sale cual de las dos «Medina» es el apellido paterno. Adivinarlo escribiria en el
-    // expediente un apellido que nadie declaro.
-    expect(screen.getByLabelText('Apellido paterno')).toHaveValue('');
+    expect(screen.getByLabelText('Fecha de nacimiento')).toHaveValue('');
+    expect(screen.getByLabelText('Estado civil')).toHaveValue('');
   });
 
-  it('elegir OTRO contribuyente cambia el expediente sin navegar fuera', async () => {
+  it('elegir a OTRO cambia la ficha, y la pide con su id', async () => {
+    const espia = backendMedido();
     const usuario = await montar();
-    await usuario.click(screen.getByRole('button', { name: /Suc. Rufina Medina Medina/ }));
-    await screen.findByText('00000025673', { selector: '.kr-ficha__codigo' });
+    await usuario.click(screen.getByRole('button', { name: /SULLON VILCHEZ-JOSE RAUL/ }));
+    await screen.findByText('00000000008', { selector: '.kr-ficha__codigo' });
 
-    await usuario.click(screen.getByRole('button', { name: /Noblecilla Arismendiz/ }));
+    await usuario.click(screen.getByRole('button', { name: /ROMAN GARCIA-PABLO/ }));
 
-    // La cabecera del expediente cambia entera: codigo, nombre, documento y estado.
     expect(
-      await screen.findByText('00000006551', { selector: '.kr-ficha__codigo' }),
+      await screen.findByText('00000000050', { selector: '.kr-ficha__codigo' }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByText('RUC 20525118447 · Persona jurídica', {
-        selector: '.kr-ficha__contexto',
-      }),
-    ).toBeInTheDocument();
-    // Y la lista sigue ahi, con los cinco: no se navego a ninguna parte.
-    expect(listados()).toHaveLength(5);
-    // **Lo que NO cambia son los campos**, y es del proxy y no de la pantalla: el proxy de #4
-    // no filtra por el parametro de la ruta a proposito (su AC8), asi que la ficha que contesta
-    // es siempre la del expediente capturado. El dia que el backend conteste de verdad, esta
-    // pantalla ya pide `/rentas/contribuyentes/{id}/ficha` con el id de la fila elegida.
-    expect(screen.getByLabelText('Tipo de persona')).toHaveValue('Sucesión indivisa');
+    expect(pedidas(espia)).toContain('/rentas/api/v1/rentas/contribuyentes/20/ficha');
   });
 
-  it('«Cuenta corriente» trae la deuda por concepto, y cada cifra con su fecha', async () => {
+  it('los beneficios se piden acotados a ESE contribuyente, y su vacio se dice (AC9)', async () => {
+    const espia = backendMedido();
     const usuario = await montar();
-    await usuario.click(screen.getByRole('button', { name: /Suc. Rufina Medina Medina/ }));
-    await screen.findByDisplayValue('Sucesión indivisa');
+    await usuario.click(screen.getByRole('button', { name: /SULLON VILCHEZ-JOSE RAUL/ }));
+    await screen.findByDisplayValue('NATURAL');
+
+    await usuario.click(screen.getByRole('tab', { name: 'Beneficios' }));
+
+    expect(pedidas(espia)).toContain(
+      '/rentas/api/v1/rentas/beneficios?contribuyente=00000000008',
+    );
+    expect(
+      await screen.findByText('Este contribuyente no tiene ningún beneficio registrado.'),
+    ).toBeInTheDocument();
+  });
+
+  it('las dos operaciones que este issue NO enciende las sigue contestando el proxy', async () => {
+    // `GET /rentas/predios` y `GET /consultas/deuda` exigen `?codContribuyente=`, que el
+    // contrato no publica (#26). Siguen en el proxy, y la pantalla sigue abriendo.
+    const espia = backendMedido();
+    const usuario = await montar();
+    await usuario.click(screen.getByRole('button', { name: /SULLON VILCHEZ-JOSE RAUL/ }));
+    await screen.findByDisplayValue('NATURAL');
 
     await usuario.click(screen.getByRole('tab', { name: 'Cuenta corriente' }));
 
     const tabla = await screen.findByRole('table');
-    // Dos filas de predial: la de 2026 y la de 2024, como el artboard.
-    expect(within(tabla).getAllByText('Impuesto predial')).toHaveLength(2);
-    expect(within(tabla).getByText('S/ 2,055.04')).toBeInTheDocument();
-    // «3 y 4» y «1 a 8» se derivan de `periodoDesde`/`periodoHasta`, como el artboard.
-    expect(within(tabla).getByText('3 y 4')).toBeInTheDocument();
-    expect(within(tabla).getByText('1 a 8')).toBeInTheDocument();
-  });
-
-  it('«Predios y vehículos» trae los predios, y el autovaluo NO lo publica catastro', async () => {
-    const usuario = await montar();
-    await usuario.click(screen.getByRole('button', { name: /Suc. Rufina Medina Medina/ }));
-    await screen.findByDisplayValue('Sucesión indivisa');
-
-    await usuario.click(screen.getByRole('tab', { name: 'Predios y vehículos' }));
-
-    const tabla = await screen.findByRole('table');
-    expect(within(tabla).getByText('02-014-D-14-01')).toBeInTheDocument();
-    expect(within(tabla).getByText('Calle Santa Rosa 116')).toBeInTheDocument();
-    // El autovaluo del predio lo calcula catastro y llega sellado (ADR-0024): `GET
-    // /rentas/predios` no lo publica, y la celda lo dice con un guion en vez de suponerlo.
-    expect(within(tabla).getAllByText('—')).toHaveLength(2);
+    expect(within(tabla).getAllByText('Impuesto predial').length).toBeGreaterThan(0);
+    // No salieron a la red: el doble no las vio.
+    expect(pedidas(espia).some((url) => url.includes('/consultas/deuda'))).toBe(false);
   });
 });
 
-describe('AC6 — el alta guiada y sus secciones', () => {
-  it('empieza en la primera, y «Anterior» esta deshabilitado', async () => {
+describe('AC7 — todo importe que se ensena lleva su fecha', () => {
+  it('el unico de la lista sale de coactiva, con su `aLaFecha`', async () => {
+    backendMedido((url) =>
+      url.includes('/coactiva/deudas')
+        ? Response.json(
+            envolver(
+              [
+                {
+                  expediente: '2026-0418',
+                  ano: 2026,
+                  codContribuyente: PAGINA_0_FILAS[0]?.codigo ?? '',
+                  contribuyente: 'SULLON VILCHEZ-JOSE RAUL',
+                  deudaS: '9412.15',
+                  costasS: '0.00',
+                  totalS: '9412.15',
+                  aLaFecha: '2026-08-12',
+                  estado: 'En coactiva',
+                },
+              ],
+              0,
+              1,
+            ),
+          )
+        : null,
+    );
+
+    await montar();
+
+    // El importe es texto y se formatea, nunca se convierte ni se suma (reglas 1 y 9).
+    expect(await screen.findByText('S/ 9,412.15')).toBeInTheDocument();
+    expect(await screen.findByText('En coactiva', { selector: '.kr-insignia' })).toBeInTheDocument();
+  });
+});
+
+describe('AC8 — la compuerta del alta le pregunta al PADRON, no a la pagina cargada', () => {
+  const numero = () => screen.getByRole('textbox', { name: 'Número' });
+
+  it('un DNI ya registrado se consulta por `?dNI=` y el aviso dice de quien es', async () => {
+    const espia = backendMedido();
     const usuario = await montar();
     await usuario.click(screen.getByRole('button', { name: 'Nuevo contribuyente' }));
 
-    // El nombre accesible lleva la cuenta de obligatorios pendientes al lado del rotulo.
-    expect(screen.getByRole('tab', { name: /^Identificación/ })).toHaveAttribute(
-      'aria-selected',
-      'true',
+    await usuario.type(numero(), '29614026');
+
+    expect(await screen.findByText('Documento ya registrado')).toBeInTheDocument();
+    expect(
+      screen.getByText(/a nombre de SULLON VILCHEZ-JOSE RAUL \(00000000008\)/),
+    ).toBeInTheDocument();
+    expect(pedidas(espia).some((url) => url.includes('dNI=29614026'))).toBe(true);
+  });
+
+  it('un DNI libre no bloquea, y la respuesta vacia es la que lo dice', async () => {
+    backendMedido();
+    const usuario = await montar();
+    await usuario.click(screen.getByRole('button', { name: 'Nuevo contribuyente' }));
+
+    await usuario.type(numero(), '99999999');
+
+    expect(await screen.findByText('Documento válido')).toBeInTheDocument();
+  });
+
+  it('con todo lleno y el documento LIBRE, se puede crear', async () => {
+    // Es la mitad que hace falta para que la de abajo diga algo: sin ella, «no se puede crear»
+    // se cumpliria tambien con la compuerta rota, porque hay obligatorios vacios.
+    backendMedido();
+    await montar(conTodoLlenoMenosElDocumento('DNI', '99999999'));
+    await screen.findByText('Documento válido');
+
+    expect(screen.getByRole('button', { name: 'Crear el contribuyente' })).toHaveAttribute(
+      'aria-disabled',
+      'false',
     );
-    // `aria-disabled` y no `disabled`: sigue en el recorrido del tabulador, y pulsarlo no
-    // retrocede de la primera.
-    expect(screen.getByRole('button', { name: 'Anterior' })).toHaveAttribute(
+  });
+
+  it('si la consulta FALLA no se crea: no saber no es saber que esta libre', async () => {
+    backendMedido((url) =>
+      url.includes('dNI=99999999')
+        ? problema(503, 'ERROR_INTERNO', 'El padrón no responde')
+        : null,
+    );
+    await montar(conTodoLlenoMenosElDocumento('DNI', '99999999'));
+
+    expect(await screen.findByText('No se pudo comprobar')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Crear el contribuyente' })).toHaveAttribute(
       'aria-disabled',
       'true',
     );
   });
 
-  it('«Continuar» avanza y «Anterior» retrocede', async () => {
+  it('un carne de extranjeria NO se puede comprobar, y la pantalla lo dice en vez de fingir', async () => {
+    // `ContribuyenteController.buscar` publica `dNI` y `rUC` y nada para los demas tipos.
+    const espia = backendMedido();
     const usuario = await montar();
     await usuario.click(screen.getByRole('button', { name: 'Nuevo contribuyente' }));
 
-    await usuario.click(screen.getByRole('button', { name: 'Continuar' }));
-    expect(screen.getByRole('tab', { name: /^Domicilio fiscal/ })).toHaveAttribute(
-      'aria-selected',
-      'true',
+    await usuario.selectOptions(
+      screen.getByRole('combobox', { name: 'Tipo' }),
+      'Carnet de extranjería',
     );
+    await usuario.type(numero(), '001234567890');
 
-    await usuario.click(screen.getByRole('button', { name: 'Anterior' }));
-    expect(screen.getByRole('tab', { name: /^Identificación/ })).toHaveAttribute(
-      'aria-selected',
-      'true',
-    );
-
-    // Y pulsarlo otra vez en la primera no retrocede a ninguna parte.
-    await usuario.click(screen.getByRole('button', { name: 'Anterior' }));
-    expect(screen.getByRole('tab', { name: /^Identificación/ })).toHaveAttribute(
-      'aria-selected',
-      'true',
-    );
-  });
-
-  it('la ULTIMA seccion es «Lo que se va a registrar», ANTES de confirmar', async () => {
-    const usuario = await montar();
-    await usuario.click(screen.getByRole('button', { name: 'Nuevo contribuyente' }));
-
-    // Antes de la ultima no esta: el resumen es lo que se lee justo antes de crear.
-    expect(screen.queryByText('Lo que se va a registrar')).toBeNull();
-
-    await usuario.click(screen.getByRole('tab', { name: /^Observaciones/ }));
-
-    expect(screen.getByText('Lo que se va a registrar')).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        'Una ficha registrada entra en el padrón y desde ese momento el predio genera obligación predial.',
-      ),
-    ).toBeInTheDocument();
-    expect(screen.getByText('El alta queda en la bitácora')).toBeInTheDocument();
-    // Y el boton de confirmar esta DESPUES del resumen, no antes.
-    expect(screen.getByRole('button', { name: 'Crear el contribuyente' })).toBeInTheDocument();
+    expect(await screen.findByText('Sin comprobar en el padrón')).toBeInTheDocument();
+    expect(screen.getByText(/sólo se puede consultar por DNI y por RUC/)).toBeInTheDocument();
+    // Y no se pregunta nada: una consulta sin filtro devolveria el padron entero.
+    expect(pedidas(espia).some((url) => url.includes('001234567890'))).toBe(false);
   });
 });
 
-describe('AC7 — la longitud del documento decide, y bloquea el avance', () => {
+describe('AC7 de F-5 — la longitud del documento sigue decidiendo', () => {
   const numero = () => screen.getByRole('textbox', { name: 'Número' });
 
   it('un DNI incompleto se cuenta en pantalla y no deja crear', async () => {
+    backendMedido();
     const usuario = await montar();
     await usuario.click(screen.getByRole('button', { name: 'Nuevo contribuyente' }));
 
@@ -436,33 +717,10 @@ describe('AC7 — la longitud del documento decide, y bloquea el avance', () => 
 
     expect(screen.getByText('7 de 8 dígitos')).toBeInTheDocument();
     expect(screen.getByText(/El DNI tiene 8 dígitos/)).toBeInTheDocument();
-
-    await usuario.click(screen.getByRole('tab', { name: /^Observaciones/ }));
-    expect(screen.getByRole('button', { name: 'Crear el contribuyente' })).toHaveAttribute(
-      'aria-disabled',
-      'true',
-    );
-    expect(screen.getByText(/No se puede crear todavía/)).toBeInTheDocument();
-  });
-
-  it('el DNI completo vale, y el mismo numero como RUC no', async () => {
-    const usuario = await montar();
-    await usuario.click(screen.getByRole('button', { name: 'Nuevo contribuyente' }));
-
-    // Un documento que no esta en el padron: «03593174» es el de Rufina y saldria por duplicado.
-    await usuario.type(numero(), '99999999');
-    expect(screen.getByText('Documento válido')).toBeInTheDocument();
-
-    await usuario.selectOptions(screen.getByRole('combobox', { name: 'Tipo' }), 'RUC');
-    // Cambiar de tipo vacia el numero: ocho digitos tecleados como DNI no son los ocho
-    // primeros de un RUC, son otro documento a medio escribir.
-    expect(screen.getByText('0 de 11 dígitos')).toBeInTheDocument();
-
-    await usuario.type(numero(), '20525118440');
-    expect(screen.getByText('Documento válido')).toBeInTheDocument();
   });
 
   it('el carnet de extranjeria son DOCE, y once no bastan', async () => {
+    backendMedido();
     const usuario = await montar();
     await usuario.click(screen.getByRole('button', { name: 'Nuevo contribuyente' }));
 
@@ -476,6 +734,7 @@ describe('AC7 — la longitud del documento decide, y bloquea el avance', () => 
   });
 
   it('las letras no entran, y el numero no pasa de su longitud', async () => {
+    backendMedido();
     const usuario = await montar();
     await usuario.click(screen.getByRole('button', { name: 'Nuevo contribuyente' }));
 
@@ -485,65 +744,49 @@ describe('AC7 — la longitud del documento decide, y bloquea el avance', () => 
   });
 });
 
-describe('AC8 — el documento repetido se rechaza, y dice de quien es', () => {
-  it('el aviso nombra al contribuyente que ya lo tiene, con su codigo', async () => {
+describe('AC6 de F-5 — el alta guiada y sus seis secciones', () => {
+  it('empieza en la primera, y «Anterior» esta deshabilitado', async () => {
+    backendMedido();
     const usuario = await montar();
     await usuario.click(screen.getByRole('button', { name: 'Nuevo contribuyente' }));
 
-    await usuario.type(screen.getByRole('textbox', { name: 'Número' }), '44218937');
-
-    expect(screen.getByText('Documento ya registrado')).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        'Ese documento ya está en el padrón, a nombre de Castillo Pascuala, María Elena (00000003541). Dos códigos para la misma persona parten su deuda en dos cuentas que nadie cruza: abra el contribuyente que ya existe.',
-      ),
-    ).toBeInTheDocument();
-  });
-
-  it('el nombre sale del PADRON servido, no de una constante', async () => {
-    // Es la diferencia que importa: la comprobacion no es contra `DOC_EN_USO`, es contra el
-    // padron que el proxy contesto. El dia que ese documento sea de otra persona, el aviso dice
-    // la otra — sin tocar esta pantalla.
-    const usuario = await montar();
-    await usuario.click(screen.getByRole('button', { name: 'Nuevo contribuyente' }));
-
-    await usuario.type(screen.getByRole('textbox', { name: 'Número' }), '02718844');
-
-    expect(screen.getByText(/a nombre de Díaz Madrid, Julio César \(00000006550\)/)).toBeInTheDocument();
-  });
-
-  it('un documento repetido bloquea el alta, aunque este completo', async () => {
-    const usuario = await montar();
-    await usuario.click(screen.getByRole('button', { name: 'Nuevo contribuyente' }));
-    await usuario.type(screen.getByRole('textbox', { name: 'Número' }), '44218937');
-
-    await usuario.click(screen.getByRole('tab', { name: /^Observaciones/ }));
-
-    expect(screen.getByRole('button', { name: 'Crear el contribuyente' })).toHaveAttribute(
+    expect(screen.getByRole('tab', { name: /^Identificación/ })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    expect(screen.getByRole('button', { name: 'Anterior' })).toHaveAttribute(
       'aria-disabled',
       'true',
     );
-    // El motivo sale dos veces, y las dos hacen falta: en el veredicto del resumen y en la nota
-    // del pie, que es la que se lee sin desplazarse hasta el resumen.
-    expect(
-      screen.getAllByText(/Ese documento ya está registrado a nombre de otro contribuyente\./),
-    ).toHaveLength(2);
   });
 
-  it('un documento libre NO bloquea por duplicado', async () => {
+  it('la ULTIMA seccion es «Lo que se va a registrar», ANTES de confirmar', async () => {
+    backendMedido();
     const usuario = await montar();
     await usuario.click(screen.getByRole('button', { name: 'Nuevo contribuyente' }));
 
-    await usuario.type(screen.getByRole('textbox', { name: 'Número' }), '99999999');
+    expect(screen.queryByText('Lo que se va a registrar')).toBeNull();
 
-    expect(screen.queryByText('Documento ya registrado')).toBeNull();
-    expect(screen.getByText('Documento válido')).toBeInTheDocument();
+    await usuario.click(screen.getByRole('tab', { name: /^Observaciones/ }));
+
+    expect(screen.getByText('Lo que se va a registrar')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Crear el contribuyente' })).toBeInTheDocument();
   });
 });
 
-describe('AC9 — escribir en el alta marca sucia la pestana, y cerrar pregunta', () => {
+describe('AC5 de F-5 — el estado vacio de la derecha', () => {
+  it('sin nadie elegido, dice que elija y explica que el expediente se abre al lado', async () => {
+    backendMedido();
+    await montar();
+
+    expect(screen.getByText('Elija un contribuyente de la lista')).toBeInTheDocument();
+  });
+});
+
+describe('AC9 de F-5 — escribir en el alta marca sucia la pestana', () => {
   it('teclear un campo del alta avisa al marco', async () => {
     ensuciada.mockClear();
+    backendMedido();
     const usuario = await montar();
     await usuario.click(screen.getByRole('button', { name: 'Nuevo contribuyente' }));
 
@@ -553,6 +796,7 @@ describe('AC9 — escribir en el alta marca sucia la pestana, y cerrar pregunta'
   });
 
   it('montado en el marco, pone el asterisco y cerrar pregunta', async () => {
+    backendMedido();
     const usuario = userEvent.setup();
     render(<Marco {...IDENTIDAD} />);
     await usuario.click(
@@ -561,7 +805,7 @@ describe('AC9 — escribir en el alta marca sucia la pestana, y cerrar pregunta'
         { name: /^Contribuyentes/ },
       ),
     );
-    await screen.findByText('Suc. Rufina Medina Medina');
+    await screen.findByText('SULLON VILCHEZ-JOSE RAUL');
 
     await usuario.click(screen.getByRole('button', { name: 'Nuevo contribuyente' }));
     await usuario.type(screen.getByLabelText('Nombres'), 'Rosa');
@@ -579,14 +823,12 @@ describe('AC9 — escribir en el alta marca sucia la pestana, y cerrar pregunta'
   });
 
   it('lo tecleado sobrevive a irse al panel y volver', async () => {
-    // El estado de la seccion lo guarda el marco a proposito: si viviera dentro, volver
-    // encontraria el formulario en blanco **con el asterisco puesto**, y el dialogo preguntaria
-    // por unos cambios que ya no existen.
+    backendMedido();
     const usuario = userEvent.setup();
     render(<Marco {...IDENTIDAD} />);
     const arbol = screen.getByRole('complementary', { name: 'Módulos y submódulos' });
     await usuario.click(within(arbol).getByRole('button', { name: /^Contribuyentes/ }));
-    await screen.findByText('Suc. Rufina Medina Medina');
+    await screen.findByText('SULLON VILCHEZ-JOSE RAUL');
     await usuario.click(screen.getByRole('button', { name: 'Nuevo contribuyente' }));
     await usuario.type(screen.getByLabelText('Nombres'), 'Rosa');
 

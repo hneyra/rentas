@@ -332,6 +332,39 @@
   place-items: center;
 }
 
+/* El selector del criterio: sin el, una sola caja no tiene a donde mandar lo tecleado, porque
+   los cuatro parametros del backend se combinan con Y (I-4, `secciones/padron.ts`). */
+.kr-busqueda__criterio {
+  display: flex;
+  align-items: center;
+  gap: var(--hueco-1);
+  flex: 0 0 auto;
+  border-right: 1px solid var(--linea);
+  padding-right: 8px;
+}
+
+.kr-busqueda__criterio-rotulo {
+  font-size: var(--texto-dato);
+  color: var(--tinta-3);
+}
+
+.kr-busqueda__criterio select {
+  border: 0;
+  background: transparent;
+  color: var(--tinta);
+  font: inherit;
+  font-size: var(--texto-dato);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.kr-padron__nota-del-criterio {
+  margin: var(--hueco-2) 0 0;
+  font-size: var(--texto-menudo);
+  color: var(--tinta-3);
+  text-wrap: pretty;
+}
+
 .kr-padron__chips {
   display: flex;
   align-items: center;
@@ -824,6 +857,37 @@
   font-size: var(--texto-menudo);
   color: var(--tinta-3);
   text-wrap: pretty;
+}
+
+/* «No se pudo leer» no se pinta igual que «no hay»: son dos frases que llevan a dos sitios. */
+.kr-tabla__vacio--mal {
+  color: var(--mal-tinta);
+}
+
+/* ── La paginacion del padron (I-4) ────────────────────────────────────────── */
+
+.kr-padron__paginacion {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--hueco-2);
+  padding: 8px 12px;
+  border-top: 1px solid var(--linea-2);
+  background: var(--sup);
+}
+
+.kr-padron__pagina {
+  font-size: var(--texto-dato);
+  color: var(--tinta-3);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Las filas de coactiva y de observados publican el codigo y no el identificador, asi que no
+   abren el expediente: llevan al padron a buscarlo por codigo. Se dice en la propia fila. */
+.kr-padron__abrir {
+  font-size: var(--texto-menudo);
+  color: var(--info-tinta);
 }
 
 /* ── «Lo que se va a registrar» ────────────────────────────────────────────── */

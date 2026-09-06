@@ -100,9 +100,12 @@ describe('AC4 — la raiz de la API es UNA, escrita en tres sitios que tienen qu
 });
 
 describe('AC7 — lo que se declara servido tiene que publicarlo el backend', () => {
-  it('las seis de seguridad estan declaradas: las dos de I-1 y las cuatro de I-3', () => {
+  it('las doce declaradas: dos de I-1, cuatro de I-3 y seis de I-4', () => {
     // La lista escrita a mano es a proposito. Derivarla de `YA_SERVIDAS` la haria pasar diga lo
-    // que diga: encender una ruta es una decision, y una decision se revisa leyendo su diff.
+    // que diga: encender una ruta es una decision, y una decision se revisa leyendo su diff. La
+    // lista crece de una en una porque encenderlas todas a la vez seria cambiar 181 respuestas
+    // en una tarde sin poder decir cual rompio la pantalla; que cada una exista en el contrato
+    // lo comprueba el caso de mas abajo.
     expect(YA_SERVIDAS.map((o) => `${o.metodo} ${o.ruta}`)).toEqual([
       'GET /seguridad/sesion',
       'GET /seguridad/sesion/municipalidad',
@@ -110,15 +113,33 @@ describe('AC7 — lo que se declara servido tiene que publicarlo el backend', ()
       'GET /seguridad/accesos',
       'GET /seguridad/sesion/permisos',
       'PUT /seguridad/sesion/ejercicio',
+      'GET /rentas/contribuyentes',
+      'GET /rentas/contribuyentes/{id}/ficha',
+      'GET /coactiva/deudas',
+      'GET /rentas/predial/corridas/ultima',
+      'GET /rentas/predial/corridas/{corridaId}/observados',
+      'GET /rentas/beneficios',
     ]);
   });
 
-  it('y la escritura es UNA, que es la primera de esta interfaz', () => {
+  it('y la escritura sigue siendo UNA: las seis de I-4 son todas lecturas', () => {
     // Las escrituras cambian datos y quedan auditadas, asi que encender una no es como
-    // encender una lectura: si algun dia son cinco, esta cifra lo dice en la revision.
+    // encender una lectura: si algun dia son cinco, esta cifra lo dice en la revision. I-4
+    // enciende seis rutas y ninguna escribe — el expediente todavia no guarda nada.
     expect(YA_SERVIDAS.filter((o) => o.metodo !== 'GET').map((o) => o.ruta)).toEqual([
       '/seguridad/sesion/ejercicio',
     ]);
+  });
+
+  it('las DOS del expediente que exigen un parametro sin declarar siguen fuera (#26)', () => {
+    // Medido: sin `?codContribuyente=` las dos contestan **422**, y ese parametro no aparece en
+    // el contrato — que declara la forma de la RESPUESTA y no la de la peticion. Encenderlas
+    // seria escribir en el frontend un nombre que nada de este repositorio puede comprobar.
+    // Esta prueba es la lista de trabajo pendiente: el dia que se enciendan, se borra de aqui.
+    const fuera = YA_SERVIDAS.map((o) => `${o.metodo} ${o.ruta}`);
+
+    expect(fuera).not.toContain('GET /rentas/predios');
+    expect(fuera).not.toContain('GET /consultas/deuda');
   });
 
   it.each(YA_SERVIDAS.map((o) => `${o.metodo} ${o.ruta}`))(
@@ -274,13 +295,20 @@ describe('AC1 — el token no toca el almacenamiento del navegador', () => {
 /**
  * Las capturas de la instalacion, y la guarda que impide que se conviertan en respaldos.
  *
- * Son dos desde I-3: la sesion (quien esta dentro) y la seguridad (que modulos hay y que puede
- * abrir esta cuenta). Las dos son lo mismo —bytes de un `curl`, para que las pruebas del marco
- * no repitan cuarenta y cuatro literales— y las dos tienen el mismo riesgo: que alguien escriba
- * `arbol ?? ARBOL_MEDIDO` y devuelva la navegacion constante que I-3 vino a quitar, esta vez
- * con una constante que ademas parece medida.
+ * Son TRES desde I-4: la sesion (quien esta dentro), la seguridad (que modulos hay y que puede
+ * abrir esta cuenta) y el padron (que contesta `GET /rentas/contribuyentes` a diez mil filas).
+ * Las tres son lo mismo —bytes de un `curl`, para que las pruebas no repitan literales— y las
+ * tres tienen el mismo riesgo, que es el peor que hay en `src/` porque **parecen datos
+ * legitimos**: un respaldo hecho con ellas no se ve como una invencion, se ve como un dato
+ * medido. Un `arbol ?? ARBOL_MEDIDO` devolveria la navegacion constante que I-3 vino a quitar,
+ * y un `padron.dato ?? PAGINA_0_FILAS` ensenaria contribuyentes de Catacaos con el token de
+ * cualquier otra municipalidad.
  */
-const CAPTURAS = ['src/marco/sesionMedida.ts', 'src/marco/seguridadMedida.ts'];
+const CAPTURAS = [
+  'src/marco/sesionMedida.ts',
+  'src/marco/seguridadMedida.ts',
+  'src/datos/backendMedido.ts',
+];
 
 describe('las capturas de la instalacion son de las pruebas, y no respaldos de produccion', () => {
   it.each(CAPTURAS)('«%s» solo la importan archivos de prueba', (captura) => {
@@ -295,8 +323,9 @@ describe('las capturas de la instalacion son de las pruebas, y no respaldos de p
       (ruta) => ruta !== captura && importa.test(readFileSync(join(FRONTEND, ruta), 'utf8')),
     );
 
-    expect(culpables).toEqual([]);
-  });
+      expect(culpables).toEqual([]);
+    },
+  );
 
   it('y lo que declara es lo que contesta la instalacion: sin ejercicio de trabajo', async () => {
     const { SESION_MEDIDA } = await import('../src/marco/sesionMedida.ts');
