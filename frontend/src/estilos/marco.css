@@ -1,0 +1,1186 @@
+/* ============================================================================
+   El marco V6: la barra global, el arbol, las pestanas y el lienzo.
+   ----------------------------------------------------------------------------
+   Se construye UNA vez y lo usan todos los modulos. Va despues de
+   `componentes.css` porque compone con los ocho componentes base —el `Boton` del
+   dialogo, el `Campo` del hueco, el `Aviso` de la seccion sin construir— y a
+   igualdad de especificidad tiene que poder colocarlos.
+
+   **Ni un hexadecimal, ni un `rgba()`: todo color sale de `tokens/colors.css`**,
+   igual que en `componentes.css`, y lo comprueba la misma prueba —el `it.each`
+   de `tokens-del-artboard.test.ts` incluye este archivo—. Es lo que hace que el
+   tema oscuro exista sin tocar una linea de aqui.
+
+   Los PIXELES si son literales, y a proposito: son los del artboard, con sus
+   medios pixeles (13.5, 12.5, 10.5) y sus rellenos impares (7px 9px). V6 no esta
+   en una rejilla de cuatros y redondearlo seria reescribir el diseno a ojo.
+
+   **252 px de panel, y no 292.** Los 292 eran de la variante `c`, el riel de
+   iconos con la lista al lado, que no se porta. Lo comprueba
+   `verificaciones/marco-sin-selector.test.ts` leyendo este archivo: una medida
+   que se queda de una variante que no existe no la ve nadie en una revision.
+   ============================================================================ */
+
+.kr-marco {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--fondo);
+}
+
+/* ── La barra global ───────────────────────────────────────────────────────
+   Del mismo azul que tenia el riel de modulos en V3. */
+
+.kr-marco__barra {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--hueco-4);
+  height: 52px;
+  padding: 0 12px 0 8px;
+  background: var(--azul-oscuro);
+  color: var(--sobre-barra);
+  z-index: 50;
+}
+
+.kr-marco__control {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 38px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--sobre-barra);
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+
+.kr-marco__control--activo {
+  background: var(--barra-realce);
+}
+
+/* El aviso y el buscador: caja mas pequena, con filo, como en el artboard. */
+.kr-marco__control--filo {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--barra-realce);
+  border-radius: var(--radio);
+  background: var(--barra-control);
+}
+
+.kr-marco__control:hover {
+  background: var(--barra-hover);
+}
+
+.kr-marco__globo {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border: 1.5px solid var(--azul-oscuro);
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  font-size: 10.5px;
+  font-weight: var(--peso-titulo);
+  background: var(--mal-tinta);
+  color: var(--superficie);
+}
+
+.kr-marco__entidad {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 0;
+  line-height: 1.15;
+}
+
+.kr-marco__entidad-nombre {
+  font-size: 14.5px;
+  font-weight: var(--peso-titulo);
+  color: var(--sobre-barra);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kr-marco__entidad-nota {
+  font-size: 10.5px;
+  color: var(--sobre-barra-2);
+}
+
+.kr-marco__ejercicio {
+  display: flex;
+  align-items: center;
+  gap: var(--hueco-2);
+  border: 1px solid var(--barra-realce);
+  border-radius: var(--radio);
+  padding: 3px 4px 3px 10px;
+  background: var(--barra-control);
+  flex: 0 0 auto;
+}
+
+.kr-marco__ejercicio-rotulo {
+  font-size: 11px;
+  font-weight: var(--peso-fuerte);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--sobre-barra-2);
+}
+
+.kr-marco__ejercicio-selector {
+  border: 0;
+  border-radius: var(--radio-menudo);
+  padding: 3px 7px;
+  background: var(--azul-suave);
+  color: var(--info-tinta);
+  font-size: 13px;
+  font-weight: var(--peso-fuerte);
+  cursor: pointer;
+}
+
+.kr-marco__relativo {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+/* ── El lanzador de modulos ───────────────────────────────────────────────── */
+
+.kr-marco__velo {
+  position: fixed;
+  inset: 0;
+  z-index: 82;
+  border: 0;
+  padding: 0;
+  background: var(--velo);
+  cursor: default;
+}
+
+.kr-marco__velo--paleta {
+  background: var(--velo-paleta);
+}
+
+/* El velo de un menu no oscurece nada: solo recoge el clic de fuera. */
+.kr-marco__velo--claro {
+  z-index: 80;
+  background: transparent;
+}
+
+.kr-marco__lanzador {
+  position: absolute;
+  z-index: 81;
+  top: 44px;
+  right: 0;
+  width: min(560px, calc(100vw - 20px));
+  background: var(--superficie);
+  border: 1px solid var(--linea);
+  border-radius: 10px;
+  box-shadow: var(--sombra-menu);
+  overflow: hidden;
+}
+
+.kr-marco__lanzador-cabecera {
+  display: flex;
+  align-items: baseline;
+  gap: var(--hueco-4);
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid var(--linea-2);
+}
+
+.kr-marco__lanzador-titulo {
+  margin: 0;
+  flex: 1;
+  font-size: 15px;
+  font-weight: var(--peso-titulo);
+}
+
+.kr-marco__lanzador-nota {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--tinta-3);
+}
+
+.kr-marco__lanzador-rejilla {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+  padding: var(--hueco-1);
+}
+
+.kr-marco__lanzador-modulo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  border: 0;
+  border-radius: 8px;
+  padding: 10px;
+  background: transparent;
+  color: var(--tinta);
+  cursor: pointer;
+  text-align: left;
+}
+
+.kr-marco__lanzador-modulo:hover {
+  background: var(--sup);
+}
+
+.kr-marco__lanzador-modulo--actual {
+  background: var(--azul-suave);
+  font-weight: var(--peso-titulo);
+}
+
+.kr-marco__lanzador-icono {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  flex: 0 0 auto;
+  background: var(--azul-suave);
+  color: var(--info-tinta);
+}
+
+.kr-marco__lanzador-icono--actual {
+  background: var(--azul);
+  color: var(--sobre-azul);
+}
+
+.kr-marco__lanzador-rotulo {
+  flex: 1;
+  min-width: 0;
+  font-size: 13.5px;
+  line-height: 1.3;
+}
+
+.kr-marco__lanzador-pie {
+  margin: 0;
+  padding: 11px 16px;
+  border-top: 1px solid var(--linea-2);
+  background: var(--sup);
+  font-size: 12.5px;
+  color: var(--tinta-3);
+}
+
+/* ── La sesion ────────────────────────────────────────────────────────────── */
+
+.kr-marco__sesion {
+  position: relative;
+  border-left: 1px solid var(--barra-realce);
+  padding-left: var(--hueco-4);
+  flex: 0 0 auto;
+}
+
+.kr-marco__sesion-boton {
+  display: flex;
+  align-items: center;
+  gap: var(--hueco-3);
+  border: 0;
+  border-radius: var(--radio-grande);
+  padding: 3px 6px 3px 3px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.kr-marco__sesion-boton:hover,
+.kr-marco__sesion-boton--activo {
+  background: var(--barra-hover);
+}
+
+.kr-marco__avatar {
+  width: 27px;
+  height: 27px;
+  border-radius: 50%;
+  background: var(--azul-suave);
+  color: var(--info-tinta);
+  display: grid;
+  place-items: center;
+  font-size: 11.5px;
+  font-weight: var(--peso-titulo);
+  flex: 0 0 auto;
+}
+
+.kr-marco__avatar--grande {
+  width: 34px;
+  height: 34px;
+  font-size: 13px;
+}
+
+.kr-marco__sesion-quien {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+  text-align: left;
+}
+
+.kr-marco__sesion-nombre {
+  font-size: 12.5px;
+  font-weight: var(--peso-fuerte);
+  color: var(--sobre-barra);
+}
+
+.kr-marco__sesion-papel {
+  font-size: 10.5px;
+  color: var(--sobre-barra-2);
+}
+
+.kr-marco__caret {
+  display: grid;
+  place-items: center;
+  width: 15px;
+  height: 15px;
+  flex: 0 0 auto;
+  color: var(--sobre-barra-2);
+  transition: transform 0.15s ease;
+}
+
+.kr-marco__caret--arriba {
+  transform: rotate(180deg);
+}
+
+.kr-marco__menu {
+  position: absolute;
+  z-index: 85;
+  top: 44px;
+  right: 0;
+  width: min(258px, calc(100vw - 24px));
+  background: var(--superficie);
+  border: 1px solid var(--linea);
+  border-radius: var(--radio-grande);
+  box-shadow: var(--sombra-menu);
+  overflow: hidden;
+  color: var(--tinta);
+}
+
+.kr-marco__menu-cabecera {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 14px;
+  border-bottom: 1px solid var(--linea-2);
+}
+
+.kr-marco__menu-quien {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  line-height: 1.25;
+}
+
+.kr-marco__menu-nombre {
+  font-size: 13.5px;
+  font-weight: var(--peso-titulo);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kr-marco__menu-papel {
+  font-size: 11.5px;
+  color: var(--tinta-3);
+}
+
+.kr-marco__menu-opciones {
+  padding: var(--hueco-1);
+}
+
+.kr-marco__menu-opcion {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  border: 0;
+  border-radius: var(--radio);
+  padding: var(--hueco-3);
+  background: transparent;
+  color: var(--tinta-2);
+  cursor: pointer;
+  text-align: left;
+}
+
+.kr-marco__menu-opcion:hover {
+  background: var(--sup);
+}
+
+.kr-marco__menu-opcion--salida {
+  color: var(--mal-tinta);
+  font-weight: var(--peso-fuerte);
+}
+
+.kr-marco__menu-rotulo {
+  flex: 1;
+  min-width: 0;
+  font-size: 13.5px;
+}
+
+.kr-marco__menu-aviso {
+  margin: 0;
+  padding: 10px 14px;
+  border-top: 1px solid var(--linea-2);
+  background: var(--atencion-fondo);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--atencion-tinta);
+}
+
+/* ── La paleta de comandos ────────────────────────────────────────────────── */
+
+.kr-marco__paleta {
+  position: fixed;
+  z-index: 83;
+  top: 12vh;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(620px, 92vw);
+  background: var(--superficie);
+  border: 1px solid var(--linea);
+  border-radius: 10px;
+  box-shadow: var(--sombra-dialogo);
+  overflow: hidden;
+  color: var(--tinta);
+}
+
+.kr-marco__paleta-cabecera {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--linea-2);
+  color: var(--tinta-3);
+}
+
+.kr-marco__paleta-entrada {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  padding: 2px 0;
+  font-size: 16px;
+  color: var(--tinta);
+  outline: none;
+}
+
+.kr-marco__tecla {
+  font-size: 11px;
+  color: var(--tinta-3);
+  border: 1px solid var(--linea);
+  border-radius: var(--radio-menudo);
+  padding: 2px 6px;
+}
+
+.kr-marco__paleta-lista {
+  max-height: 54vh;
+  overflow: auto;
+}
+
+.kr-marco__resultado {
+  display: flex;
+  align-items: center;
+  gap: var(--hueco-4);
+  width: 100%;
+  text-align: left;
+  border: 0;
+  border-bottom: 1px solid var(--linea-2);
+  background: transparent;
+  padding: 11px 16px;
+  cursor: pointer;
+  color: var(--tinta);
+}
+
+.kr-marco__resultado--marcado {
+  background: var(--sup);
+}
+
+.kr-marco__tipo {
+  font-size: 10.5px;
+  font-weight: var(--peso-titulo);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--tinta-3);
+  background: var(--sup);
+  border: 1px solid var(--linea);
+  border-radius: var(--radio-menudo);
+  padding: 2px 7px;
+  flex: 0 0 auto;
+}
+
+.kr-marco__resultado-rotulo {
+  flex: 1;
+  min-width: 0;
+  font-size: 14.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kr-marco__resultado-nota {
+  font-size: 12.5px;
+  color: var(--tinta-3);
+  flex: 0 0 auto;
+}
+
+.kr-marco__paleta-pie {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: var(--hueco-3) 16px;
+  background: var(--sup);
+  font-size: 12px;
+  color: var(--tinta-3);
+}
+
+/* ── El cuerpo: panel + area de trabajo ───────────────────────────────────── */
+
+.kr-marco__cuerpo {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* 252 px: la medida de la variante A. Los 292 eran de la `c`. */
+.kr-marco__panel {
+  flex: 0 0 252px;
+  width: 252px;
+  background: var(--superficie);
+  border-right: 1px solid var(--linea);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.kr-marco__filtro {
+  flex: 0 0 auto;
+  padding: 10px 11px;
+  border-bottom: 1px solid var(--linea-2);
+}
+
+.kr-marco__buscador {
+  display: flex;
+  align-items: center;
+  gap: var(--hueco-2);
+  border: 1px solid var(--linea);
+  border-radius: var(--radio);
+  padding: 6px 9px;
+  background: var(--sup);
+  color: var(--tinta-3);
+}
+
+.kr-marco__entrada {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  font-size: 12.5px;
+  color: var(--tinta);
+  outline: none;
+}
+
+.kr-marco__quitar {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  color: var(--tinta-3);
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+}
+
+.kr-marco__conteo {
+  margin: var(--hueco-2) 2px 0;
+  font-size: 11px;
+  color: var(--tinta-3);
+}
+
+.kr-marco__arbol {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  overflow: auto;
+  padding: 7px 7px 10px;
+}
+
+.kr-marco__modulo {
+  display: flex;
+  align-items: center;
+  gap: var(--hueco-2);
+  width: 100%;
+  border: 0;
+  border-radius: var(--radio-grande);
+  padding: 7px 8px;
+  background: transparent;
+  color: var(--tinta);
+  cursor: pointer;
+}
+
+.kr-marco__modulo:hover {
+  background: var(--sup);
+}
+
+.kr-marco__modulo--abierto {
+  background: var(--azul-suave);
+  color: var(--info-tinta);
+}
+
+.kr-marco__icono-modulo {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radio);
+  flex: 0 0 auto;
+  background: var(--fondo);
+  color: var(--tinta-3);
+}
+
+.kr-marco__modulo--abierto .kr-marco__icono-modulo {
+  background: var(--azul);
+  color: var(--sobre-azul);
+}
+
+.kr-marco__rotulo-modulo {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  font-size: 13.5px;
+  font-weight: var(--peso-fuerte);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kr-marco__pastilla {
+  font-size: 9.5px;
+  font-weight: var(--peso-titulo);
+  border-radius: 999px;
+  padding: 1px 6px;
+  flex: 0 0 auto;
+  background: var(--azul-suave);
+  color: var(--info-tinta);
+}
+
+.kr-marco__modulo--abierto .kr-marco__pastilla {
+  background: var(--superficie);
+}
+
+.kr-marco__chevron {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  color: var(--tinta-4);
+  transition: transform 0.16s ease;
+}
+
+.kr-marco__chevron--arriba {
+  transform: rotate(180deg);
+}
+
+.kr-marco__hojas {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 2px 0 7px 15px;
+  margin-left: 16px;
+  border-left: 1px solid var(--linea-2);
+}
+
+.kr-marco__hoja {
+  display: flex;
+  align-items: center;
+  gap: var(--hueco-3);
+  width: 100%;
+  border: 0;
+  border-radius: var(--radio);
+  padding: 7px 9px;
+  background: transparent;
+  color: var(--tinta-2);
+  cursor: pointer;
+}
+
+.kr-marco__hoja:hover {
+  background: var(--sup);
+}
+
+.kr-marco__hoja--actual {
+  background: var(--azul-suave);
+  color: var(--info-tinta);
+  font-weight: var(--peso-titulo);
+}
+
+.kr-marco__rotulo-hoja {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  font-size: 13px;
+}
+
+.kr-marco__marca {
+  font-size: 9.5px;
+  font-weight: var(--peso-titulo);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--tinta-3);
+  flex: 0 0 auto;
+}
+
+.kr-marco__sin-coincidencias {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  padding: 24px 18px;
+}
+
+.kr-marco__sin-coincidencias p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--tinta-3);
+  text-align: center;
+}
+
+/* La cola de trabajo: siempre, sin condicion (era `hayCola = v !== 'c'`). */
+.kr-marco__cola {
+  flex: 0 0 auto;
+  padding: 11px;
+  border-top: 1px solid var(--linea-2);
+}
+
+.kr-marco__cola-titulo {
+  margin: 0 0 var(--hueco-2);
+  font-size: 10.5px;
+  font-weight: var(--peso-fuerte);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--tinta-3);
+}
+
+.kr-marco__cola-fila {
+  display: flex;
+  align-items: center;
+  gap: var(--hueco-3);
+  width: 100%;
+  text-align: left;
+  border: 0;
+  border-radius: var(--radio-menudo);
+  padding: 6px 7px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.kr-marco__cola-fila:hover {
+  background: var(--sup);
+}
+
+.kr-marco__punto {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+
+.kr-marco__punto--mal {
+  background: var(--mal-tinta);
+}
+
+.kr-marco__punto--atencion {
+  background: var(--atencion-tinta);
+}
+
+.kr-marco__cola-rotulo {
+  flex: 1;
+  min-width: 0;
+  font-size: 12.5px;
+  color: var(--tinta-2);
+}
+
+.kr-marco__cola-n {
+  font-size: 12.5px;
+  font-weight: var(--peso-fuerte);
+  color: var(--tinta);
+}
+
+/* ── El area de trabajo ───────────────────────────────────────────────────── */
+
+.kr-marco__area {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.kr-marco__pestanas {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: stretch;
+  padding: 0 12px 0 0;
+  min-height: 44px;
+  background: var(--fondo);
+  border-bottom: 1px solid var(--linea);
+  z-index: 40;
+  overflow-x: auto;
+}
+
+.kr-marco__pestana {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: 0 0 auto;
+  padding: 0 6px 0 0;
+  border-right: 1px solid var(--linea-2);
+  border-top: 2px solid transparent;
+}
+
+.kr-marco__pestana--actual {
+  background: var(--superficie);
+  border-top-color: var(--azul);
+}
+
+.kr-marco__pestana-boton {
+  display: flex;
+  align-items: center;
+  gap: var(--hueco-3);
+  border: 0;
+  background: transparent;
+  padding: 11px 8px 11px 13px;
+  cursor: pointer;
+  font-size: 13.5px;
+  color: var(--tinta-3);
+}
+
+.kr-marco__pestana--actual .kr-marco__pestana-boton {
+  color: var(--tinta);
+  font-weight: var(--peso-titulo);
+}
+
+.kr-marco__pestana-icono {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  color: var(--tinta-3);
+}
+
+.kr-marco__pestana--actual .kr-marco__pestana-icono {
+  color: var(--azul);
+}
+
+.kr-marco__pestana-rotulo {
+  white-space: nowrap;
+}
+
+.kr-marco__pestana-cerrar {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: var(--radio-menudo);
+  background: transparent;
+  cursor: pointer;
+  color: var(--tinta-4);
+  flex: 0 0 auto;
+}
+
+.kr-marco__pestana-cerrar:hover {
+  background: var(--linea-2);
+  color: var(--tinta);
+}
+
+.kr-marco__pestanas-resto {
+  flex: 1;
+  min-width: 8px;
+}
+
+.kr-marco__cabecera {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: baseline;
+  gap: var(--hueco-3);
+  flex-wrap: wrap;
+  padding: 0 16px;
+  min-height: 52px;
+  background: var(--superficie);
+  border-bottom: 1px solid var(--linea);
+}
+
+.kr-marco__titulo {
+  margin: 0;
+  font-size: 16.5px;
+  font-weight: var(--peso-titulo);
+  letter-spacing: -0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kr-marco__subtitulo {
+  font-size: 13px;
+  color: var(--tinta-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kr-marco__aviso {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--hueco-4);
+  padding: 11px 16px;
+  background: var(--atencion-fondo);
+  border-bottom: 1px solid var(--atencion-tinta);
+  color: var(--atencion-tinta);
+}
+
+.kr-marco__aviso-icono {
+  flex: 0 0 auto;
+  margin-top: 1px;
+  display: grid;
+  place-items: center;
+}
+
+.kr-marco__aviso-texto {
+  margin: 0;
+  flex: 1;
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.kr-marco__aviso-cerrar {
+  border: 0;
+  background: transparent;
+  padding: 2px;
+  cursor: pointer;
+  color: var(--atencion-tinta);
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+}
+
+/* ── El lienzo ────────────────────────────────────────────────────────────── */
+
+.kr-marco__lienzo {
+  flex: 1;
+  overflow: auto;
+  padding: 18px;
+}
+
+.kr-marco__lienzo--vacio {
+  display: grid;
+  place-items: center;
+  padding: 32px;
+}
+
+.kr-marco__sin-pestanas {
+  max-width: 40ch;
+  text-align: center;
+  color: var(--tinta-4);
+}
+
+.kr-marco__sin-pestanas-titulo {
+  margin: var(--hueco-4) 0 0;
+  font-size: 16px;
+  font-weight: var(--peso-titulo);
+  color: var(--tinta);
+}
+
+.kr-marco__sin-pestanas-detalle {
+  margin: var(--hueco-2) 0 0;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--tinta-3);
+}
+
+/* La ficha de una hoja ajena (AC9). */
+.kr-marco__ficha {
+  max-width: 640px;
+  background: var(--superficie);
+  border: 1px solid var(--linea);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.kr-marco__ficha-cabecera {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--linea-2);
+}
+
+.kr-marco__ficha-icono {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radio-grande);
+  flex: 0 0 auto;
+  background: var(--azul-suave);
+  color: var(--info-tinta);
+}
+
+.kr-marco__ficha-quien {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  line-height: 1.25;
+}
+
+.kr-marco__ficha-rotulo {
+  font-size: 15px;
+  font-weight: var(--peso-titulo);
+}
+
+.kr-marco__ficha-modulo {
+  font-size: 12.5px;
+  color: var(--tinta-3);
+}
+
+.kr-marco__ficha-texto {
+  margin: 0;
+  padding: 15px 16px;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--tinta-2);
+}
+
+.kr-marco__ficha-pie {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: var(--hueco-4) 16px;
+  border-top: 1px solid var(--linea-2);
+  background: var(--sup);
+}
+
+.kr-marco__ficha-nota {
+  margin: 0;
+  flex: 1;
+  min-width: 180px;
+  font-size: 12.5px;
+  color: var(--tinta-3);
+}
+
+/* El hueco de una seccion propia todavia sin construir. */
+.kr-marco__hueco {
+  max-width: 640px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--hueco-5);
+}
+
+.kr-marco__observacion {
+  background: var(--superficie);
+  border: 1px solid var(--linea);
+  border-radius: 8px;
+  padding: 15px 16px;
+}
+
+/* ── El dialogo de cierre con cambios sin guardar ─────────────────────────── */
+
+.kr-marco__dialogo {
+  position: fixed;
+  z-index: 89;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(556px, calc(100vw - 32px));
+  background: var(--superficie);
+  border-radius: 10px;
+  box-shadow: var(--sombra-dialogo);
+  overflow: hidden;
+  color: var(--tinta);
+}
+
+.kr-marco__dialogo-cuerpo {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--hueco-4);
+  padding: 18px 20px 14px;
+}
+
+.kr-marco__dialogo-icono {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  background: var(--atencion-fondo);
+  color: var(--atencion-tinta);
+}
+
+.kr-marco__dialogo-texto {
+  flex: 1;
+  min-width: 0;
+}
+
+.kr-marco__dialogo-titulo {
+  margin: 0;
+  font-size: 16px;
+  font-weight: var(--peso-titulo);
+}
+
+.kr-marco__dialogo-detalle {
+  margin: var(--hueco-2) 0 0;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--tinta-2);
+}
+
+.kr-marco__dialogo-acciones {
+  display: flex;
+  align-items: center;
+  gap: var(--hueco-3);
+  flex-wrap: wrap;
+  padding: 13px 20px;
+  border-top: 1px solid var(--linea-2);
+  background: var(--sup);
+}
+
+/* Descartar es la salida destructiva: se dice con el color, no solo con el
+   texto, y va separada de las otras dos por el hueco flexible. */
+.kr-marco__descartar {
+  color: var(--mal-tinta);
+}
+
+.kr-marco__separador {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ── El aviso flotante ────────────────────────────────────────────────────── */
+
+.kr-marco__toast {
+  position: fixed;
+  z-index: 90;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: var(--hueco-4) 20px;
+  border-radius: var(--radio-grande);
+  background: var(--tinta);
+  color: var(--superficie);
+  font-size: var(--texto-control);
+  box-shadow: var(--sombra-flotante);
+  max-width: calc(100vw - 40px);
+}
+
+.kr-marco__toast svg {
+  color: var(--acento);
+}

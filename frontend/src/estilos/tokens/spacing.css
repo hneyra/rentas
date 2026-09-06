@@ -64,10 +64,17 @@
   --grosor-foco: 2px;
   --separacion-foco: 2px;
 
-  /* —— Sombra ——
-     Una sola, la del aviso flotante: `0 10px 30px rgba(0,54,90,.28)`. El color es
-     `--azul-oscuro` en rgba, escrito literal porque `color-mix()` sobre una
-     custom property no lo resuelven todos los navegadores de una caja de
-     ventanilla. */
+  /* —— Sombras ——
+     Las de lo que flota por encima de la pagina. El color es `--azul-oscuro` en
+     rgba, escrito literal porque `color-mix()` sobre una custom property no lo
+     resuelven todos los navegadores de una caja de ventanilla — y por eso viven
+     aqui y no en `colors.css`: son una sombra, no un color que el tema invierta.
+
+     El artboard escribe CUATRO, y se conservan TRES: `0 18px 48px ….2` del
+     lanzador y `0 16px 42px ….22` del menu de sesion son la misma decision —una
+     caja colgada de la barra— y se unifican en `--sombra-menu`. Las otras dos si
+     son distintas: un aviso flotante roza la pagina y un dialogo modal la tapa. */
   --sombra-flotante: 0 10px 30px rgba(0, 54, 90, 0.28);
+  --sombra-menu: 0 16px 42px rgba(0, 54, 90, 0.22);
+  --sombra-dialogo: 0 22px 56px rgba(0, 54, 90, 0.28);
 }

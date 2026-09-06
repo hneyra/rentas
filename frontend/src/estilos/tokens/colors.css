@@ -119,6 +119,35 @@
      a un paso de distancia y el barrido no se veria. */
   --esqueleto: #e3e9ee;
   --esqueleto-brillo: #f7fbfe;
+
+  /* —— La barra global (F-3) ——
+     La barra se pinta con `--azul-oscuro`, y lo que se lee ENCIMA no puede ser
+     `--sobre-azul`: en tema oscuro `--sobre-azul` es tinta oscura, porque alli la
+     accion es el celeste, y sobre la barra —que sigue siendo oscura en los dos
+     temas— no se leeria nada. Por eso son tokens propios y no un reuso.
+
+     `--sobre-barra` es el `color:#fff` de la entidad y de los controles;
+     `--sobre-barra-2` el `#9FC6DF` de la segunda linea. Los dos salen del
+     artboard.
+
+     Los tres realces son las capas de blanco translucido que el artboard le pone
+     a un control de la barra: `.09` en reposo, `.2` pulsado o de filo, `.18` bajo
+     el puntero. El artboard escribe ademas `.14` y `.16` en dos sitios; se
+     consolidan en `--barra-hover`, porque tres capas que se distinguen en un dos
+     por ciento no son tres decisiones. */
+  --sobre-barra: #ffffff;
+  --sobre-barra-2: #9fc6df;
+  --barra-control: rgba(255, 255, 255, 0.09);
+  --barra-realce: rgba(255, 255, 255, 0.2);
+  --barra-hover: rgba(255, 255, 255, 0.18);
+
+  /* —— Los dos velos ——
+     El de un dialogo (`rgba(0,54,90,.4)`) y el de la paleta de comandos
+     (`rgba(22,35,44,.38)`). Son dos y no uno porque el artboard los escribe
+     distintos: el dialogo tapa con el azul de la marca y la paleta con la tinta.
+     Ninguno de los dos lleva texto encima, asi que no tienen par de contraste. */
+  --velo: rgba(0, 54, 90, 0.4);
+  --velo-paleta: rgba(22, 35, 44, 0.38);
 }
 
 /* ============================================================================
@@ -194,6 +223,15 @@
 
     --esqueleto: #1f303b;
     --esqueleto-brillo: #2c414f;
+
+    --sobre-barra: #eaf1f6;
+    --sobre-barra-2: #97a9b6;
+    --barra-control: rgba(255, 255, 255, 0.06);
+    --barra-realce: rgba(255, 255, 255, 0.16);
+    --barra-hover: rgba(255, 255, 255, 0.12);
+
+    --velo: rgba(0, 0, 0, 0.62);
+    --velo-paleta: rgba(0, 0, 0, 0.62);
   }
 }
 
@@ -238,4 +276,13 @@
 
   --esqueleto: #1f303b;
   --esqueleto-brillo: #2c414f;
+
+  --sobre-barra: #eaf1f6;
+  --sobre-barra-2: #97a9b6;
+  --barra-control: rgba(255, 255, 255, 0.06);
+  --barra-realce: rgba(255, 255, 255, 0.16);
+  --barra-hover: rgba(255, 255, 255, 0.12);
+
+  --velo: rgba(0, 0, 0, 0.62);
+  --velo-paleta: rgba(0, 0, 0, 0.62);
 }
