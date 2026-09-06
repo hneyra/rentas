@@ -98,7 +98,7 @@ Registro completo en [GOB-02](https://github.com/hneyra/sgtm/blob/migracion-a-mi
 | # | Decisión | Bloquea |
 |---|---|---|
 | D-02b | Valores de **ordenanza local** con su ratificación provincial | Arbitrios, sanciones, fraccionamiento |
-| D-11 | El **`% actualización`**: sigue sin fuente. Su valor neutro es **cero**, no uno | `RT-002`, `RT-005`, `RT-011` |
+| D-11 | El **`% actualización`**: **cerrada para 2026 y sólo para 2026** (2026-09-06). Su fila está publicada y sellada en `normativa`, y lo que la sella no es un valor por omisión sino un **hecho**: el supuesto del art. 12 del TUO LTM no se cumple ese ejercicio porque se publicaron los aranceles y los precios unitarios, de modo que no hay actualización que aplicar. **Para cualquier otro ejercicio sigue sin fuente**, y su valor neutro es **cero**, no uno — §1.6 del archivo del corpus lee el supuesto contra 2026 y ninguno más, y **no se hereda** | `RT-002`, `RT-005`, `RT-011` en los ejercicios distintos de 2026 |
 | D-14 | Regla de imputación de un pago parcial | El camino del dinero |
 | D-18 | La clave foránea que se pierde al separar `catastro` (`declaracion_jurada.predio_id` y las suyas) | El baseline |
 | D-21 | Dónde se aplica el **`% de propiedad`** | La frontera de ADR-0024 |
