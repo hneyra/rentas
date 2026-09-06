@@ -121,7 +121,6 @@ export function Marco() {
   const [avisoAbierto, fijarAvisoAbierto] = useState(false);
   const [ejercicio, fijarEjercicio] = useState('2026');
   const [toast, fijarToast] = useState('');
-  const [observaciones, fijarObservaciones] = useState<Readonly<Record<string, string>>>({});
   // El estado del padron vive aqui y no dentro de la seccion: el marco la desmonta al cambiar
   // de pestana, y con el estado dentro, escribir media alta e ir al panel dejaria el formulario
   // en blanco **con el asterisco puesto**. Ver `secciones/estadoDelPadron.ts`.
@@ -365,17 +364,6 @@ export function Marco() {
 
           <Lienzo
             activa={pestanas.activa}
-            observacion={
-              pestanas.activa === null ? '' : (observaciones[pestanas.activa] ?? '')
-            }
-            alEscribirObservacion={(texto) => {
-              const donde = pestanas.activa;
-              if (donde === null) {
-                return;
-              }
-              fijarObservaciones((actuales) => ({ ...actuales, [donde]: texto }));
-              despachar({ tipo: 'ensuciar' });
-            }}
             alCerrar={(destino) => {
               despachar({ tipo: 'pedir-cierre', destino });
             }}
@@ -388,6 +376,7 @@ export function Marco() {
             alCambiarPadron={(cambio) => {
               fijarPadron((actual) => ({ ...actual, ...cambio }));
             }}
+            ejercicio={ejercicio}
           />
         </div>
       </div>

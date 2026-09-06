@@ -14,7 +14,7 @@ import {
 import { TIPOS_DE_DOCUMENTO, longitudDe } from '../src/dominio/documento.ts';
 import { SECCIONES_DEL_EXPEDIENTE } from '../src/secciones/expediente.ts';
 import { ESTADOS_CON_TONO, tonoDelEstado } from '../src/secciones/tonos.ts';
-import { ARTBOARD, RAIZ, leer } from './tokens.ts';
+import { ARTBOARD, RAIZ, comoDato, leer, literalTras as literalDe, textoTras as textoDe } from './tokens.ts';
 
 /**
  * Las dos secciones de F-5 dicen lo que dice el artboard, y **el artboard se lee**.
@@ -45,58 +45,15 @@ const FORMAS = join(RAIZ, '../docs/50-api/formas-de-la-api.json');
 const formas = JSON.parse(readFileSync(FORMAS, 'utf8')) as Record<string, unknown>;
 
 /**
- * El literal que sigue a `<clave>` en el artboard, con los corchetes contados.
+ * Los tres analizadores del artboard viven en `tokens.ts` desde F-6.
  *
- * Sirve igual para `const PASOS = [` que para `cifras: [`, que es lo que hace falta aqui: la
- * mitad de los datos del panel no son declaraciones con nombre — viven dentro de `renderVals()`,
- * que es donde el prototipo compone lo que dibuja.
+ * Estaban aqui, y subieron cuando `determinacion-y-valores-del-artboard.test.ts` necesito leer
+ * el mismo archivo: dos copias del mismo analizador pueden divergir, y la que divergiera
+ * compararia contra otra cosa sin decirlo. Se envuelven con el `html` ya leido para no repetirlo
+ * en las veinte llamadas de abajo.
  */
-function literalTras(marca: string): string {
-  const inicio = html.indexOf(marca);
-  if (inicio === -1) {
-    throw new Error(`El artboard ya no declara «${marca}»: la referencia cambio.`);
-  }
-  const desde = inicio + marca.length;
-  const abre = html[desde];
-  if (abre !== '[' && abre !== '{') {
-    throw new Error(`«${marca}» ya no abre un literal: abre con «${String(abre)}».`);
-  }
-  const cierra = abre === '[' ? ']' : '}';
-
-  let profundidad = 0;
-  for (let i = desde; i < html.length; i += 1) {
-    if (html[i] === abre) {
-      profundidad += 1;
-    } else if (html[i] === cierra) {
-      profundidad -= 1;
-      if (profundidad === 0) {
-        return html.slice(desde, i + 1);
-      }
-    }
-  }
-  throw new Error(`El literal «${marca}» no se cierra.`);
-}
-
-/** El literal de JavaScript del artboard, leido como dato. Igual que en `arbol-del-artboard`. */
-function comoDato(literal: string): unknown {
-  return JSON.parse(
-    literal.replace(/'/g, '"').replace(/([{,]\s*)([A-Za-z_][A-Za-z0-9_]*)\s*:/g, '$1"$2":'),
-  );
-}
-
-/** El texto entre comillas simples que sigue a la marca: `colaTotal: '1,134 pendientes'`. */
-function textoTras(marca: string): string {
-  const inicio = html.indexOf(marca);
-  if (inicio === -1) {
-    throw new Error(`El artboard ya no declara «${marca}».`);
-  }
-  const resto = html.slice(inicio + marca.length);
-  const comillas = /^\s*'([^']*)'/.exec(resto);
-  if (comillas === null) {
-    throw new Error(`«${marca}» ya no va seguido de un texto entre comillas simples.`);
-  }
-  return comillas[1] ?? '';
-}
+const literalTras = (marca: string) => literalDe(html, marca);
+const textoTras = (marca: string) => textoDe(html, marca);
 
 interface CifraDelArtboard {
   etiqueta: string;

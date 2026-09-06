@@ -40,7 +40,7 @@
  * decimal que el backend publica—. Y toda cifra de deuda viaja envuelta en
  * `{ importe, actualizadoA }` (regla 9), con `FECHA_DE_CAPTURA` y no con la de hoy.
  *
- * <h2>Las cuentas del artboard se copian, no se cuadran</h2>
+ * <h2>Las cuentas del artboard se copian, no se cuadran — salvo las que se DERIVAN</h2>
  *
  * Hay dos sitios donde el prototipo no cierra consigo mismo, y se dejan como estan porque
  * corregirlos seria inventar la correccion:
@@ -49,8 +49,15 @@
  *     `PREDIOS[0]`— y un total a pagar de 591.94, que es el de `PREDIOS[1]`.
  *   · El expediente declara una base vehicular de 61,400.00 y la memoria vehicular calcula
  *     sobre 112,800.00.
+ *
+ * La excepcion son los **dos totales de la memoria del predial** (#8, AC4): el insoluto sale de
+ * sumar los tres tramos y el total, de sumarle el derecho de emision. Ver `totalesDelPredial`.
+ * Dan exactamente lo que el artboard escribe —587.44 y 591.94—, y esa coincidencia es la
+ * comprobacion, no la fuente: copiarlos habria servido la misma respuesta y habria dejado de
+ * moverse el dia que un tramo cambiara.
  */
 
+import { sumarImportes } from '../dominio/aritmetica.ts';
 import {
   ACTIVIDAD,
   BANDEJA,
@@ -493,11 +500,45 @@ function prediosDeLaBase() {
   }));
 }
 
+/**
+ * Los dos totales de la memoria del predial, **derivados de sus sumandos** y no copiados.
+ *
+ * El insoluto es la suma de los tres tramos y el total es el insoluto mas el derecho de
+ * emision. El artboard escribe los dos —587.44 y 591.94— y los dos cuadran hoy; copiarlos
+ * daria una respuesta que se ve identica a esta y **esta muerta**: cambiar el aporte de un
+ * tramo dejaria el insoluto donde estaba, y la pantalla ensenaria un total que no cuadra con
+ * las filas que ella misma dibuja, sin que nada se pusiera rojo.
+ *
+ * Vive AQUI y no en la pantalla porque aqui es donde esta el backend: el proxy hace de el, y
+ * el total lo calcula el backend (regla 1, regla 9). La pantalla lo pide y ademas comprueba
+ * que cuadre — ver `secciones/determinacion.ts`.
+ *
+ * Se exporta para poder probarla **con otros sumandos**: con los del artboard tiene que dar lo
+ * que el artboard dice, y con un tramo distinto tiene que dar otra cosa. Una implementacion
+ * que copiara pasaria la primera prueba y fallaria la segunda, que es de lo que se trata.
+ */
+export function totalesDelPredial(
+  aportesDeLosTramos: readonly string[],
+  derechoDeEmision: string,
+): { readonly impuestoInsoluto: string; readonly totalAPagar: string } {
+  const insoluto = sumarImportes(aportesDeLosTramos);
+  return {
+    impuestoInsoluto: insoluto,
+    totalAPagar: sumarImportes([insoluto, derechoDeEmision]),
+  };
+}
+
 function determinacionIndividual() {
   const uit = decimal(celda(valorNormativo(0, 'UIT 2026'), 3));
   const vencimientos = simulado<readonly string[]>('vencimientosDeLasCuotas');
   const total = memoria('Predial — individual', 'Total a pagar');
   const importeDeLaCuota = /S\/\s*([\d.,]+)/.exec(celda(total, 2));
+  const tramos = tramosAplicados();
+  const derechoDeEmision = decimal(celda(memoria('Predial — individual', 'Derecho de emisión'), 3));
+  const totales = totalesDelPredial(
+    tramos.map((tramo) => tramo.aporte),
+    derechoDeEmision,
+  );
   const contribuyente = contribuyentesDelPadron().find((c) => c.codigo === '00000003541');
   if (contribuyente === undefined) {
     throw new Error('El padron del artboard no trae el contribuyente de la memoria individual.');
@@ -518,11 +559,11 @@ function determinacionIndividual() {
     valuoAfecto: decimal(celda(memoria('Predial — individual', 'Valuo afecto'), 3)),
     baseImponible: decimal(celda(memoria('Predial — individual', 'Valuo afecto'), 3)),
     uit,
-    tramos: tramosAplicados(),
+    tramos,
     minimoImponible: decimal(celda(valorNormativo(0, 'Mínimo imponible predial'), 3)),
-    impuestoInsoluto: decimal(celda(memoria('Predial — individual', 'Impuesto insoluto anual'), 3)),
-    derechoDeEmision: decimal(celda(memoria('Predial — individual', 'Derecho de emisión'), 3)),
-    totalAPagar: decimal(celda(total, 3)),
+    impuestoInsoluto: totales.impuestoInsoluto,
+    derechoDeEmision,
+    totalAPagar: totales.totalAPagar,
     modalidad: simulado<string>('modalidad'),
     cuotas: vencimientos.map((vencimiento, i) => ({
       numero: i + 1,
@@ -766,9 +807,9 @@ function deudasEnCoactiva() {
 // ── La tabla ────────────────────────────────────────────────────────────────────────────────
 
 /**
- * Las diecisiete operaciones que el proxy contesta.
+ * Las dieciocho operaciones que el proxy contesta.
  *
- * Diecisiete de las 181 que el backend publica, y son las que los artboards de `RentasV6`
+ * Dieciocho de las 181 que el backend publica, y son las que los artboards de `RentasV6`
  * alimentan: no se sirve nada de lo que no haya datos capturados. Una operacion mas es una
  * entrada aqui y su constructor; una operacion que no este se contesta con 404 en
  * `problem+json`, que es lo que el backend contesta cuando la ruta no existe.
@@ -898,5 +939,23 @@ export const OPERACIONES: readonly Operacion[] = [
     metodo: 'GET',
     ruta: '/coactiva/deudas',
     cuerpo: () => todoEnUnaPagina(deudasEnCoactiva()),
+  },
+
+  // ── La procedencia de los valores del ejercicio (F-6) ─────────────────────────────────────
+  //
+  // Es la UNICA de las 181 operaciones que dice algo de la tabla de valores del ejercicio, y lo
+  // que dice no son los valores: son sus SEÑAS —de que ejercicio, de que conjunto, que version
+  // y si esta sellado—. Los valores en si son de `normativa`, que los sella, y llegan a este
+  // sistema por su copia local (ADR-0025); ninguna operacion de ESTE backend los publica. Ver
+  // el javadoc de `secciones/valores.ts`, donde esta medido.
+  {
+    metodo: 'GET',
+    ruta: '/seguridad/parametros/ejercicios/{ejercicio}',
+    cuerpo: () => ({
+      ejercicio: EJERCICIO_DE_CAPTURA,
+      sellado: simulado<boolean>('conjuntoSellado'),
+      conjuntoId: simulado<number>('conjuntoId'),
+      version: simulado<number>('versionDelConjunto'),
+    }),
   },
 ];

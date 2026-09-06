@@ -1,5 +1,6 @@
 /* ============================================================================
-   Las dos secciones de Rentas que existen: el panel y el padrón (F-5).
+   Las cuatro secciones de Rentas: el panel y el padrón (F-5), la determinación
+   y los valores del ejercicio (F-6).
    ----------------------------------------------------------------------------
    Va DESPUES de `marco.css` porque compone con el lienzo que el marco dibuja:
    una seccion es lo que hay debajo de las pestanas, y colocarla exige llegar
@@ -919,4 +920,241 @@
   border-left-color: var(--mal-borde);
   background: var(--mal-fondo);
   color: var(--mal-tinta);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Las dos secciones de F-6: «Determinación» y «Valores».
+   --------------------------------------------------------------------------
+   Los pixeles son los del artboard, tomados de sus estilos en linea sin
+   redondear: la lista de tipos mide 300 px (`flex:0 0 300px`), su fila lleva
+   `padding:10px 13px` con un filo izquierdo de 3 px, la cabecera del cuadro
+   `13px 18px`, y la nota se corta a 78ch en «Determinación» y a 80ch en
+   «Valores» — dos anchos distintos porque el artboard los escribe distintos.
+
+   Los COLORES, como en todo este archivo, salen de `tokens/colors.css`.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Determinación ───────────────────────────────────────────────────────── */
+
+.kr-determinacion {
+  display: flex;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.kr-determinacion__lista {
+  flex: 0 0 300px;
+  width: 300px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--superficie);
+  border-right: 1px solid var(--linea);
+}
+
+.kr-determinacion__rotulo {
+  margin: 0;
+  flex: 0 0 auto;
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--linea-2);
+  font-size: var(--texto-etiqueta);
+  font-weight: 700;
+  color: var(--tinta);
+}
+
+.kr-determinacion__tipos {
+  flex: 1;
+  overflow: auto;
+  min-height: 0;
+}
+
+.kr-determinacion__tipo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid var(--linea-2);
+  border-left: 3px solid transparent;
+  background: transparent;
+  padding: 10px 13px;
+  cursor: pointer;
+  color: var(--tinta);
+  font: inherit;
+  font-weight: 400;
+  text-align: left;
+}
+
+.kr-determinacion__tipo:hover {
+  background: var(--sup);
+}
+
+.kr-determinacion__tipo--actual {
+  border-left-color: var(--azul);
+  background: var(--azul-suave);
+  font-weight: 700;
+}
+
+.kr-determinacion__tipo-rotulo {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  font-size: var(--texto-celda);
+}
+
+.kr-determinacion__conteo {
+  font-size: var(--texto-dato);
+  color: var(--tinta-3);
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.kr-determinacion__cuadro {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.kr-determinacion__cabecera {
+  flex: 0 0 auto;
+  padding: 13px 18px;
+  background: var(--superficie);
+  border-bottom: 1px solid var(--linea);
+}
+
+.kr-determinacion__titulo {
+  margin: 0;
+  font-size: var(--texto-titulo);
+  font-weight: 700;
+  color: var(--tinta);
+}
+
+.kr-determinacion__nota {
+  margin: 5px 0 0;
+  font-size: var(--texto-celda);
+  line-height: var(--linea-prosa);
+  color: var(--tinta-3);
+  max-width: 78ch;
+  text-wrap: pretty;
+}
+
+.kr-determinacion__cuerpo {
+  flex: 1;
+  overflow: auto;
+  min-height: 0;
+}
+
+/* ── Valores ─────────────────────────────────────────────────────────────── */
+
+.kr-valores {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.kr-valores__pestanas {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  padding: 0 16px;
+  background: var(--superficie);
+  border-bottom: 1px solid var(--linea);
+  overflow-x: auto;
+}
+
+.kr-valores__pestana {
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  padding: 12px 14px 10px;
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--texto-control);
+  white-space: nowrap;
+  color: var(--tinta-3);
+  font-weight: 400;
+}
+
+.kr-valores__pestana--actual {
+  border-bottom-color: var(--azul);
+  color: var(--tinta);
+  font-weight: 700;
+}
+
+.kr-valores__cabecera {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--hueco-4);
+  flex-wrap: wrap;
+  padding: 12px 18px;
+  background: var(--superficie);
+  border-bottom: 1px solid var(--linea);
+}
+
+.kr-valores__nota {
+  margin: 0;
+  flex: 1;
+  min-width: 220px;
+  font-size: var(--texto-celda);
+  line-height: var(--linea-prosa);
+  color: var(--tinta-2);
+  max-width: 80ch;
+  text-wrap: pretty;
+}
+
+.kr-valores__sello {
+  display: flex;
+  align-items: center;
+  gap: var(--hueco-2);
+  border: 1px solid var(--linea);
+  border-radius: 999px;
+  padding: 4px 12px;
+  background: var(--sup);
+  font-size: var(--texto-etiqueta);
+  color: var(--tinta-3);
+  flex: 0 0 auto;
+}
+
+.kr-valores__cuerpo {
+  flex: 1;
+  overflow: auto;
+  min-height: 0;
+}
+
+.kr-valores__pie {
+  margin: 0;
+  padding: 13px 18px;
+  font-size: var(--texto-etiqueta);
+  line-height: var(--linea-prosa);
+  color: var(--tinta-3);
+  text-wrap: pretty;
+}
+
+/* ── El cuadro que comparten las dos ─────────────────────────────────────── */
+
+.kr-cuadro--predial-individual,
+.kr-cuadro--predial-masivo,
+.kr-cuadro--arbitrios,
+.kr-cuadro--vehicular,
+.kr-cuadro--alcabala {
+  min-width: 620px;
+}
+
+.kr-cuadro--espectaculos,
+.kr-cuadro--escala,
+.kr-cuadro--intereses {
+  min-width: 660px;
+}
+
+/* El guion de lo que ninguna operacion publica. Es tinta desvaida a proposito:
+   no es un dato en cero, es la ausencia de dato — y el `title` lo dice para
+   quien pase el puntero. */
+.kr-cuadro__sin-dato {
+  color: var(--tinta-3);
 }
