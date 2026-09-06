@@ -1,4 +1,5 @@
 import { Icono } from '../ds/index.ts';
+import type { Modulo } from './arbol.ts';
 import { Trazos } from './Trazos.tsx';
 import { conteoDelFiltro, modulosQueCasan } from './filtro.ts';
 
@@ -27,11 +28,19 @@ import { conteoDelFiltro, modulosQueCasan } from './filtro.ts';
  * anteriores giraba y leia como «entrar», no como «desplegar».
  */
 export interface PanelDeModulosProps {
+  /**
+   * Los modulos que se ofrecen, ya compuestos (I-3).
+   *
+   * **No es `ARBOL`, y esa es la diferencia entera de este issue**: lo que se dibuja aqui es lo
+   * que `GET /seguridad/modulos` publica, menos lo que es de otro sistema y menos lo que esta
+   * cuenta no puede abrir. Antes eran diez constantes, siempre las mismas y para todos.
+   */
+  readonly arbol: readonly Modulo[];
   readonly filtro: string;
   readonly alFiltrar: (filtro: string) => void;
-  /** El modulo desplegado. Uno a la vez, para que la lista quepa sin desplazar. */
+  /** El modulo desplegado, por su CLAVE. Uno a la vez, para que la lista quepa sin desplazar. */
   readonly desplegado: string | null;
-  readonly alDesplegar: (modulo: string) => void;
+  readonly alDesplegar: (clave: string) => void;
   readonly activa: string | null;
   readonly abiertas: readonly string[];
   readonly sucias: Readonly<Record<string, true>>;
@@ -53,6 +62,7 @@ const COLA = [
 ] as const;
 
 export function PanelDeModulos({
+  arbol,
   filtro,
   alFiltrar,
   desplegado,
@@ -63,7 +73,7 @@ export function PanelDeModulos({
   alAbrir,
 }: PanelDeModulosProps) {
   const hayFiltro = filtro.trim() !== '';
-  const visibles = modulosQueCasan(filtro);
+  const visibles = modulosQueCasan(arbol, filtro);
 
   return (
     <aside aria-label="Módulos y submódulos" className="kr-marco__panel">
@@ -89,14 +99,14 @@ export function PanelDeModulos({
             </button>
           )}
         </div>
-        {hayFiltro && <p className="kr-marco__conteo">{conteoDelFiltro(filtro)}</p>}
+        {hayFiltro && <p className="kr-marco__conteo">{conteoDelFiltro(arbol, filtro)}</p>}
       </div>
 
       <div className="kr-marco__arbol">
         {visibles.map(({ modulo, submodulos }) => {
           // Con filtro se despliega solo el que casa; sin filtro manda la
           // eleccion de quien pulso.
-          const abierto = hayFiltro || desplegado === modulo.rotulo;
+          const abierto = hayFiltro || desplegado === modulo.clave;
           const cuantasAbiertas = modulo.submodulos.filter((submodulo) =>
             abiertas.includes(submodulo.clave),
           ).length;
@@ -105,7 +115,7 @@ export function PanelDeModulos({
             <div key={modulo.clave}>
               <button
                 type="button"
-                onClick={() => alDesplegar(modulo.rotulo)}
+                onClick={() => alDesplegar(modulo.clave)}
                 aria-expanded={abierto}
                 className={`kr-marco__modulo${abierto ? ' kr-marco__modulo--abierto' : ''}`}
               >

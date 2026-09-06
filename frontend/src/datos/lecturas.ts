@@ -425,6 +425,75 @@ export interface MunicipalidadDeLaSesion {
   readonly tipo: string;
 }
 
+/**
+ * Un modulo del sistema, tal como `GET /seguridad/modulos` lo publica.
+ *
+ * **Cinco campos, y ninguno es un icono ni un submodulo.** No es un recorte de este archivo:
+ * `ModuloResource` declara exactamente `(long id, String codigo, String nombre, int orden,
+ * boolean activo)`, el esquema no tiene `padre_id` ni tabla de submodulos —cero coincidencias
+ * de `submodulo|modulo_padre|padre_id` en todo `db/migration/`— y ninguna de las 181
+ * operaciones publica una jerarquia. Por eso el arbol es un **empalme** y no una copia: los
+ * modulos son de aqui y los cuarenta destinos son del artboard (`marco/arbol.ts`).
+ *
+ * `activo` viaja como campo porque la consulta no lo filtra —`SELECT id, codigo, nombre,
+ * orden, activo FROM modulo_sistema`, sin `WHERE`—, asi que la lista incluye los inactivos y
+ * decidir que hacer con ellos es de quien compone el arbol.
+ */
+export interface ModuloDelSistema {
+  readonly id: number;
+  readonly codigo: string;
+  readonly nombre: string;
+  readonly orden: number;
+  readonly activo: boolean;
+}
+
+/**
+ * Una opcion del catalogo de accesos, de `GET /seguridad/accesos`.
+ *
+ * **`moduloId` es la unica razon por la que esta lectura hace falta.** La matriz de permisos es
+ * un objeto plano de codigo a privilegios, y desde ella no hay forma de saber a que modulo
+ * pertenece `internamiento`, `certificados` o `papeletas`. Este campo es la clave foranea
+ * `acceso_modulo_fk` publicada como escalar, y es lo que ata un permiso a una rama del arbol.
+ */
+export interface AccesoDelSistema {
+  readonly id: number;
+  readonly moduloId: number;
+  readonly tipo: string;
+  readonly codigo: string;
+  readonly nombre: string;
+  readonly activo: boolean;
+}
+
+/**
+ * La matriz de permisos efectivos, de `GET /seguridad/sesion/permisos` (ADR-0013).
+ *
+ * Es `{ "<opcion>": ["lectura", "registro", …] }` con **solo las opciones sobre las que la
+ * cuenta tiene algun privilegio**; una cuenta sin ninguno recibe `{}` y no un 403.
+ *
+ * **El contrato no declara su forma campo a campo, y hay que saberlo**: en
+ * `docs/50-api/formas-de-la-api.json` esta operacion vale literalmente `"objeto"`, porque el
+ * generador describe el tipo de retorno de cada controlador y este devuelve un
+ * `Map<String, List<String>>`. O sea que la comparacion campo a campo del AC5 de #4 **no puede
+ * aplicarse aqui**: lo unico que el contrato promete es que es un objeto. Lo que sostiene la
+ * lectura son las 134 llaves medidas en `marco/seguridadMedida.ts`.
+ */
+export type PermisosDeLaSesion = Readonly<Record<string, readonly string[]>>;
+
+/**
+ * La sesion tras fijar el ejercicio, de `PUT /seguridad/sesion/ejercicio`.
+ *
+ * **No es la misma forma que `GET /seguridad/sesion`**, y confundirlas costaria la cabecera:
+ * esta publica `id`, `usuarioId`, `inicio` y `ejercicioDeTrabajo`, y **no publica ni `cuenta`
+ * ni `nombre`**. Lo unico que se le toma es el ejercicio; quien esta trabajando lo sigue
+ * diciendo la lectura que ya se hizo.
+ */
+export interface SesionTrasElCambio {
+  readonly id: number;
+  readonly usuarioId: number;
+  readonly inicio: string;
+  readonly ejercicioDeTrabajo: number | null;
+}
+
 // ── Las rutas, escritas una vez ─────────────────────────────────────────────────────────────
 
 /**
@@ -437,6 +506,18 @@ export interface MunicipalidadDeLaSesion {
 export const RUTAS = {
   sesion: '/seguridad/sesion',
   municipalidadDeLaSesion: '/seguridad/sesion/municipalidad',
+  modulos: '/seguridad/modulos',
+  // `tamano` a 200 porque el catalogo tiene 134 accesos y el tamano por omision es 20.
+  //
+  // **Medido contra la instalacion, no supuesto**: sin el, `GET /seguridad/accesos` contesta
+  // `{"tamano":20,"totalElementos":134,"totalPaginas":7,"hayMas":true}` y llegan los veinte
+  // primeros por codigo alfabetico. Con esos veinte, solo SIETE de los doce modulos tienen
+  // algun acceso conocido, y de los diez que este sistema sirve **se caerian cinco**: Inicio,
+  // Fiscalización, Tránsito, Consultas y Valores. El sintoma no seria un error — seria un
+  // panel con cinco modulos y ninguna pista de que faltan los otros.
+  accesos: '/seguridad/accesos?tamano=200',
+  permisosDeLaSesion: '/seguridad/sesion/permisos',
+  ejercicioDeLaSesion: '/seguridad/sesion/ejercicio',
   padron: '/rentas/contribuyentes',
   ficha: (id: number) => `/rentas/contribuyentes/${String(id)}/ficha`,
   predios: '/rentas/predios',
@@ -482,5 +563,45 @@ export async function pedirCalculo<T>(ruta: string, senal?: AbortSignal): Promis
   return solicitar<T>(ruta, {
     metodo: 'POST',
     ...(senal === undefined ? {} : { senal }),
+  });
+}
+
+/**
+ * Fija el ejercicio de trabajo de la sesion. **Es la primera escritura de esta interfaz.**
+ *
+ * <h2>La observacion es del cuerpo, y no es un adorno</h2>
+ *
+ * Regla 10 y RNF-052: toda modificacion de datos exige observacion del usuario. Aqui no es una
+ * convencion que alguien pueda saltarse desde la pantalla, porque **es un parametro obligatorio
+ * de esta funcion**: no existe la forma de llamarla sin decir por que. Del lado del backend la
+ * sostiene el tipo `Observacion`, que valida en su constructor —minimo 5 caracteres tras
+ * `strip()`, maximo 500—.
+ *
+ * <h2>Lo que NO se comprueba aqui, y por que</h2>
+ *
+ * Ni la longitud de la observacion ni el rango del ejercicio. Las dos son reglas del backend y
+ * las dos las contesta el, medidas contra la instalacion:
+ *
+ * <pre>
+ * {"ejercicio":2025,"observacion":"abc"} -> 422 VALIDACION
+ *   «La observacion debe explicar el cambio: al menos 5 caracteres, y no espacios en blanco (ADR-0008)»
+ * {"ejercicio":1800,"observacion":"…"}   -> 422 VALIDACION
+ *   «Ejercicio fuera de rango: 1800. Se admite de 1990 a 2100»
+ * </pre>
+ *
+ * Copiar aqui el 5, el 1990 o el 2100 seria escribir en la interfaz tres numeros cuya fuente es
+ * el dominio del backend, y el dia que cambiaran habria dos verdades y ninguna que lo dijera.
+ * La pantalla manda lo que le den y **ensena lo que el backend conteste, con sus palabras**.
+ *
+ * @param ejercicio el ano de trabajo que se quiere fijar
+ * @param observacion por que se cambia. Sin ella la operacion no se puede ni escribir
+ */
+export async function cambiarElEjercicio(
+  ejercicio: number,
+  observacion: string,
+): Promise<SesionTrasElCambio> {
+  return solicitar<SesionTrasElCambio>(RUTAS.ejercicioDeLaSesion, {
+    metodo: 'PUT',
+    cuerpo: { ejercicio, observacion },
   });
 }

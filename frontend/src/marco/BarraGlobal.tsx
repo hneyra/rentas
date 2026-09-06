@@ -1,6 +1,7 @@
 import type { SesionDeLaVentanilla } from '../datos/lecturas.ts';
 import { Icono } from '../ds/index.ts';
-import { ARBOL, MODULO_PROPIO } from './arbol.ts';
+import { CODIGO_PROPIO, type Modulo } from './arbol.ts';
+import { Ejercicio } from './Ejercicio.tsx';
 import { Trazos } from './Trazos.tsx';
 
 /**
@@ -72,9 +73,6 @@ const PUNTOS = [0, 1, 2].flatMap((fila) =>
   [0, 1, 2].map((columna) => ({ x: 6 + columna * 6, y: 6 + fila * 6 })),
 );
 
-/** Los ejercicios que la sesion puede tomar. */
-export const EJERCICIOS = ['2026', '2025', '2024', '2023'] as const;
-
 /**
  * Las iniciales del avatar, sacadas del nombre que contesta el backend.
  *
@@ -97,12 +95,24 @@ export interface BarraGlobalProps {
   /** Quien esta trabajando, tal como lo contesta `GET /seguridad/sesion`. */
   readonly usuario: SesionDeLaVentanilla;
   /**
+   * Los modulos que el lanzador ofrece: **los que compuso `composicion.ts`**, no el catalogo.
+   *
+   * Hasta I-3 esta rejilla recorria `ARBOL`, la constante del artboard, y por tanto ofrecia
+   * diez modulos dijera lo que dijera el backend y pudiera lo que pudiera la cuenta. Ahora
+   * ofrece exactamente lo que el panel de la izquierda: si un modulo no esta en el arbol, no
+   * esta en ningun sitio. Dejarlo aqui habria sido la puerta trasera del AC2.
+   */
+  readonly arbol: readonly Modulo[];
+  /**
    * El ejercicio de trabajo, o `null` si el backend no ha fijado ninguno.
    *
-   * `null` no es un caso raro: es lo que contesta hoy la instalacion. Ver el `<select>`.
+   * `null` no es un caso raro: es lo que contesta hoy la instalacion. Ver `Ejercicio.tsx`.
    */
-  readonly ejercicio: string | null;
-  readonly alCambiarEjercicio: (ejercicio: string) => void;
+  readonly ejercicio: number | null;
+  /** Si la cuenta tiene `especial` sobre `cambiar_anio` (AC5). */
+  readonly puedeCambiarEjercicio: boolean;
+  /** Manda el `PUT`. Lanza si el backend no lo acepta. */
+  readonly alCambiarEjercicio: (ejercicio: number, observacion: string) => Promise<void>;
   readonly panelAbierto: boolean;
   readonly alAlternarPanel: () => void;
   readonly lanzadorAbierto: boolean;
@@ -123,7 +133,9 @@ export interface BarraGlobalProps {
 export function BarraGlobal({
   entidad,
   usuario,
+  arbol,
   ejercicio,
+  puedeCambiarEjercicio,
   alCambiarEjercicio,
   panelAbierto,
   alAlternarPanel,
@@ -186,33 +198,13 @@ export function BarraGlobal({
         </button>
       )}
 
-      <div className="kr-marco__ejercicio">
-        <span className="kr-marco__ejercicio-rotulo">Ejercicio</span>
-        <select
-          value={ejercicio ?? ''}
-          onChange={(evento) => alCambiarEjercicio(evento.target.value)}
-          aria-label="Ejercicio de trabajo"
-          title={
-            ejercicio === null
-              ? 'El backend no ha fijado el ejercicio de trabajo de esta sesión.'
-              : `Ejercicio de trabajo: ${ejercicio}`
-          }
-          className="kr-marco__ejercicio-selector"
-        >
-          {/* La opcion vacia existe SOLO mientras el backend no haya fijado ninguno (AC8). El
-              artboard pone «2026» fijo; si el backend contesta `ejercicioDeTrabajo: null` —que
-              es lo que contesta hoy— ensenar un ano cualquiera afirmaria sobre que ejercicio se
-              esta trabajando, y todas las cifras de la pantalla se leerian como suyas. En
-              cuanto hay uno, la opcion desaparece: desde aqui no se puede DESfijar, porque
-              fijarlo y desfijarlo es `PUT /seguridad/sesion/ejercicio` y eso es de otro issue. */}
-          {ejercicio === null && <option value="">Sin fijar</option>}
-          {EJERCICIOS.map((anio) => (
-            <option key={anio} value={anio}>
-              {anio}
-            </option>
-          ))}
-        </select>
-      </div>
+      {/* Era un `<select>` con cuatro anos inventados que cambiaba una variable local. Desde
+          I-3 es el acto de verdad, con su observacion y su privilegio. Ver `Ejercicio.tsx`. */}
+      <Ejercicio
+        ejercicio={ejercicio}
+        puedeCambiar={puedeCambiarEjercicio}
+        alCambiar={alCambiarEjercicio}
+      />
 
       <button
         type="button"
@@ -258,11 +250,21 @@ export function BarraGlobal({
           <div role="dialog" aria-label="Módulos del sistema" className="kr-marco__lanzador">
             <div className="kr-marco__lanzador-cabecera">
               <p className="kr-marco__lanzador-titulo">Módulos</p>
-              <p className="kr-marco__lanzador-nota">Los diez comparten este marco</p>
+              {/* «Los diez» era una cifra escrita: el artboard tenia diez y siempre diez. Ahora
+                  el arbol lo compone el backend y la cuenta, asi que la nota cuenta lo que hay
+                  — que es tambien la unica manera de que se vea cuando faltan. */}
+              <p className="kr-marco__lanzador-nota">
+                {arbol.length === 1
+                  ? 'Un módulo comparte este marco'
+                  : `Los ${String(arbol.length)} comparten este marco`}
+              </p>
             </div>
             <div className="kr-marco__lanzador-rejilla">
-              {ARBOL.map((modulo) => {
-                const propio = modulo.rotulo === MODULO_PROPIO;
+              {arbol.map((modulo) => {
+                // Por CODIGO y no por rotulo: el rotulo ya es el que dice el backend, y una
+                // municipalidad que renombrara su modulo de rentas dejaria de reconocer el
+                // suyo — la rejilla marcaria «el actual» en ninguno.
+                const propio = modulo.codigo === CODIGO_PROPIO;
                 const primero = modulo.submodulos[0];
                 return (
                   <button
@@ -291,8 +293,8 @@ export function BarraGlobal({
               })}
             </div>
             <p className="kr-marco__lanzador-pie">
-              El ejercicio de trabajo es global a la sesión: al cambiarlo, cambia para los diez
-              módulos.
+              El ejercicio de trabajo es de la sesión, no de esta pestaña: al cambiarlo, cambia
+              para todos los módulos.
             </p>
           </div>
           </>

@@ -6,6 +6,12 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 import { desinstalarProxyDeDatos, instalarProxyDeDatos } from '../api/proxy.ts';
 import { Marco } from '../marco/Marco.tsx';
 import { MUNICIPALIDAD_MEDIDA, conEjercicio } from '../marco/sesionMedida.ts';
+import {
+  ACCESOS_MEDIDOS,
+  MODULOS_MEDIDOS,
+  PERMISOS_MEDIDOS,
+} from '../marco/seguridadMedida.ts';
+import { componerArbol } from '../marco/composicion.ts';
 import { Contribuyentes } from './Contribuyentes.tsx';
 import { PADRON_AL_EMPEZAR, type EstadoDelPadron } from './estadoDelPadron.ts';
 
@@ -37,6 +43,11 @@ afterEach(() => {
 const IDENTIDAD = {
   sesion: conEjercicio(2026),
   municipalidad: MUNICIPALIDAD_MEDIDA,
+  // El arbol compuesto de la captura de la instalacion: diez modulos, los mismos que estas
+  // pruebas daban por hecho cuando `ARBOL` era la navegacion entera (I-3).
+  arbol: componerArbol(MODULOS_MEDIDOS, ACCESOS_MEDIDOS, PERMISOS_MEDIDOS).modulos,
+  permisos: PERMISOS_MEDIDOS,
+  alCambiarEjercicio: () => Promise.resolve(2026),
   alSalir: vi.fn(),
 };
 

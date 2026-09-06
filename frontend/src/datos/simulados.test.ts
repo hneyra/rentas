@@ -87,16 +87,21 @@ describe('la lista de rutas que ya sirve el backend', () => {
    * una ruta es una decision, y una lista que crece sin que nada lo diga vuelve a convertir la
    * integracion en el salto que este mecanismo existe para evitar.
    */
-  it('son las dos lecturas de sesion, y el proxy sigue contestando las dieciocho', () => {
+  it('son las seis de seguridad, y el proxy sigue contestando las dieciocho', () => {
     expect(YA_SERVIDAS.map((o) => `${o.metodo} ${o.ruta}`)).toEqual([
       'GET /seguridad/sesion',
       'GET /seguridad/sesion/municipalidad',
+      'GET /seguridad/modulos',
+      'GET /seguridad/accesos',
+      'GET /seguridad/sesion/permisos',
+      'PUT /seguridad/sesion/ejercicio',
     ]);
     // Trece las trajo F-4; las cuatro de F-5 son las que alimentan el panel del modulo y el
     // estado de cobranza del padron; la de F-6 es la procedencia del conjunto sellado, que es
     // lo unico que el contrato dice de la tabla de valores del ejercicio. **Ninguna de las
-    // dieciocho se apaga con esto**: las dos de sesion no estaban entre ellas, asi que el
-    // proxy sigue simulando exactamente lo mismo que antes de I-1 (AC9).
+    // dieciocho se apaga con esto**: ninguna de las seis de seguridad estaba entre ellas, asi
+    // que el proxy sigue simulando exactamente lo mismo que antes de I-1 (AC9). La asercion de
+    // abajo es la que lo sostiene, y lo sostiene por interseccion y no por confianza.
     expect(OPERACIONES).toHaveLength(18);
     const simuladas = new Set(OPERACIONES.map((o) => `${o.metodo} ${o.ruta}`));
     expect(YA_SERVIDAS.filter((o) => simuladas.has(`${o.metodo} ${o.ruta}`))).toEqual([]);

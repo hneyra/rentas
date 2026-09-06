@@ -109,6 +109,92 @@ describe('AC2 — el panel mide 252 px, que es la medida de la variante A', () =
   });
 });
 
+/**
+ * I-3 — el marco no escribe ningun ejercicio, y por el mismo motivo que no escribe `panelVar`.
+ *
+ * El artboard ofrecia `EJERCICIOS = ['2026','2025','2024','2023']`, y esa lista **es una
+ * invencion**: ninguna de las 181 operaciones publica los ejercicios que la municipalidad
+ * admite. Lo que si esta medido es el rango que el backend acepta —1990 a 2100— y lo contesta
+ * el, en un 422 con su frase dentro.
+ *
+ * Esto se vigila leyendo el fuente y no por comportamiento **porque una lista de anos no falla
+ * nunca**: un `<select>` con cuatro opciones se dibuja, se pulsa y manda un `PUT` que el backend
+ * acepta. Lo que estaria mal no es que no funcione — es que la pantalla afirmaria que esos
+ * cuatro son los ejercicios de esta municipalidad, sin que nadie se lo haya dicho.
+ */
+describe('I-3 — el ejercicio se teclea: el marco no lleva ninguna lista de anos', () => {
+  /**
+   * El unico ano escrito que queda en el marco, con su motivo y su dueno.
+   *
+   * **No se esconde acotando la guarda: se enumera.** `Marco.tsx` dibuja el aviso de servicio
+   * del artboard —«La emisión masiva del predial 2026 dejó 534 contribuyentes observados sin
+   * cuponera»—, que F-3 porto entero y declaro como lo que es: **texto del artboard y no una
+   * lectura**, igual que las tres cifras de la cola de trabajo (534, 208, 392). Cerrarlo no es
+   * de I-3: es darle una operacion que publique los avisos del sistema, y ninguna de las 181 lo
+   * hace. Mientras tanto la excepcion esta aqui, con su nombre, para que se vea al leerla.
+   */
+  const CON_ANO_DEL_ARTBOARD: ReadonlyArray<readonly [string, string]> = [
+    ['Marco.tsx', 'el aviso de servicio del artboard, portado entero en F-3 y sin operacion que lo sirva'],
+  ];
+  const exentos = new Set(CON_ANO_DEL_ARTBOARD.map(([nombre]) => nombre));
+
+  it.each(['2023', '2024', '2025', '2026'])('no queda escrito el ano «%s»', (anio) => {
+    const donde = archivosDelMarco.filter((nombre) => {
+      // Las capturas quedan fuera a proposito: son los bytes que devuelve la instalacion, y
+      // `MODULOS_MEDIDOS` o `SESION_MEDIDA` pueden llevar un ano dentro porque el backend lo
+      // dijo. Lo que se vigila es que no lo escriba el CODIGO que se dibuja.
+      if (nombre.endsWith('Medida.ts') || exentos.has(nombre)) return false;
+      return new RegExp(`\\b${anio}\\b`).test(sinNingunComentario(leer(join(MARCO, nombre))));
+    });
+
+    expect(
+      donde,
+      `El marco escribe el ano «${anio}». Ninguna operacion del contrato publica los\n` +
+        'ejercicios que la municipalidad admite, asi que una lista escrita aqui afirma algo\n' +
+        'que nadie ha dicho. El rango lo sabe el backend (1990-2100) y lo contesta en su 422.',
+    ).toEqual([]);
+  });
+
+  it.each(CON_ANO_DEL_ARTBOARD)('la excepcion «%s» sigue siendo cierta (%s)', (nombre) => {
+    // La lista se comprueba en las DOS direcciones, como `POR_DEBAJO_DEL_MINIMO` en el
+    // contraste: un exento que ya no escriba ningun ano tiene que salir de la lista, o la
+    // excepcion se queda tapando un archivo limpio y la siguiente no se ve.
+    const fuente = sinNingunComentario(leer(join(MARCO, nombre)));
+
+    expect(/\b20\d\d\b/.test(fuente), `«${nombre}» ya no escribe ningun ano: sobra en la lista`).toBe(
+      true,
+    );
+  });
+
+  it('y la excepcion de `Marco.tsx` es SOLO el aviso del artboard, no un permiso general', () => {
+    const fuente = sinNingunComentario(leer(join(MARCO, 'Marco.tsx')));
+    const anos = fuente.match(/\b20\d\d\b/g) ?? [];
+
+    // Uno, y el que es. Si manana alguien escribe otro ano ahi dentro, esta cifra lo dice.
+    expect(anos).toEqual(['2026']);
+    expect(fuente).toContain('La emisión masiva del predial 2026');
+  });
+
+  it('y no queda la constante que los tenia', () => {
+    const donde = archivosDelMarco.filter((nombre) =>
+      /\bEJERCICIOS\b/.test(sinNingunComentario(leer(join(MARCO, nombre)))),
+    );
+
+    expect(donde).toEqual([]);
+  });
+
+  it('el mando del ejercicio no es un `<select>`: es el acto', () => {
+    const barra = sinNingunComentario(leer(join(MARCO, 'BarraGlobal.tsx')));
+    const acto = sinNingunComentario(leer(join(MARCO, 'Ejercicio.tsx')));
+
+    // Un `<select>` cambia al pasar por encima, y lo que hay detras es una escritura auditada
+    // con privilegio propio. La forma del control tiene que decir eso antes que el texto.
+    expect(barra).not.toContain('<select');
+    expect(acto).not.toContain('<select');
+    expect(acto).toContain('Observación');
+  });
+});
+
 describe('AC2 — la cola de trabajo se muestra siempre', () => {
   it('no cuelga de ninguna condicion en el panel', () => {
     const panel = sinNingunComentario(leer(join(MARCO, 'PanelDeModulos.tsx')));

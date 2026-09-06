@@ -14,21 +14,21 @@ import { conteoDelFiltro, modulosQueCasan } from './filtro.ts';
 
 describe('sin filtro, estan los diez modulos enteros', () => {
   it('los diez, con sus cuatro submodulos cada uno', () => {
-    const visibles = modulosQueCasan('');
+    const visibles = modulosQueCasan(ARBOL, '');
 
     expect(visibles).toHaveLength(10);
     expect(visibles.flatMap((fila) => fila.submodulos)).toHaveLength(40);
   });
 
   it('y el conteo no dice nada: no hay nada que contar', () => {
-    expect(conteoDelFiltro('')).toBe('');
-    expect(conteoDelFiltro('   ')).toBe('');
+    expect(conteoDelFiltro(ARBOL, '')).toBe('');
+    expect(conteoDelFiltro(ARBOL, '   ')).toBe('');
   });
 });
 
 describe('AC7 — un modulo entra por su nombre, y entonces entero', () => {
   it('«coactiva» ensena los CUATRO submodulos de Coactiva, no solo los que casan', () => {
-    const visibles = modulosQueCasan('coactiva');
+    const visibles = modulosQueCasan(ARBOL, 'coactiva');
 
     expect(visibles).toHaveLength(1);
     expect(visibles[0]?.modulo.rotulo).toBe('Coactiva');
@@ -40,13 +40,13 @@ describe('AC7 — un modulo entra por su nombre, y entonces entero', () => {
   });
 
   it('y el conteo lo dice en singular: «1 módulo · 4 submódulos»', () => {
-    expect(conteoDelFiltro('coactiva')).toBe('1 módulo · 4 submódulos');
+    expect(conteoDelFiltro(ARBOL, 'coactiva')).toBe('1 módulo · 4 submódulos');
   });
 });
 
 describe('AC7 — un modulo entra por un submodulo, y entonces solo ese', () => {
   it('«papeletas» deja Tránsito con un solo submodulo visible', () => {
-    const visibles = modulosQueCasan('papeletas');
+    const visibles = modulosQueCasan(ARBOL, 'papeletas');
 
     expect(visibles).toHaveLength(1);
     expect(visibles[0]?.modulo.rotulo).toBe('Tránsito');
@@ -54,28 +54,28 @@ describe('AC7 — un modulo entra por un submodulo, y entonces solo ese', () => 
   });
 
   it('y el conteo lo dice en singular por los dos lados', () => {
-    expect(conteoDelFiltro('papeletas')).toBe('1 módulo · 1 submódulo');
+    expect(conteoDelFiltro(ARBOL, 'papeletas')).toBe('1 módulo · 1 submódulo');
   });
 
   it('«panel» casa en los diez, uno por modulo', () => {
-    expect(conteoDelFiltro('panel')).toBe('10 módulos · 10 submódulos');
+    expect(conteoDelFiltro(ARBOL, 'panel')).toBe('10 módulos · 10 submódulos');
   });
 });
 
 describe('AC7 — sin coincidencias', () => {
   it('el conteo lo dice, y no ensena un cero', () => {
-    expect(conteoDelFiltro('zzz')).toBe('Sin coincidencias');
-    expect(modulosQueCasan('zzz')).toEqual([]);
+    expect(conteoDelFiltro(ARBOL, 'zzz')).toBe('Sin coincidencias');
+    expect(modulosQueCasan(ARBOL, 'zzz')).toEqual([]);
   });
 });
 
 describe('el filtro no distingue mayusculas, y el orden del arbol se conserva', () => {
   it('«COACTIVA» y «coactiva» dan lo mismo', () => {
-    expect(conteoDelFiltro('COACTIVA')).toBe(conteoDelFiltro('coactiva'));
+    expect(conteoDelFiltro(ARBOL, 'COACTIVA')).toBe(conteoDelFiltro(ARBOL, 'coactiva'));
   });
 
   it('los visibles salen en el orden del arbol, no en el de coincidencia', () => {
-    const visibles = modulosQueCasan('panel').map((fila) => fila.modulo.rotulo);
+    const visibles = modulosQueCasan(ARBOL, 'panel').map((fila) => fila.modulo.rotulo);
 
     expect(visibles).toEqual(ARBOL.map((modulo) => modulo.rotulo));
   });
