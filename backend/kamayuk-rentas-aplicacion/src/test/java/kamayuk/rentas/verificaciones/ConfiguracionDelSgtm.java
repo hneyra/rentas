@@ -198,7 +198,34 @@ public final class ConfiguracionDelSgtm implements ConfiguracionDeLasVerificacio
                     "sector",
                     "tierra_rural",
                     "titularidad",
-                    "via");
+                    "via",
+                    // Las CATORCE que `catastro` ha creado desde T-0 y que aqui faltaban. Se
+                    // nombran
+                    // aunque este sistema no las tenga —y por eso mismo—: el reparto se consulta
+                    // con `getOrDefault(tabla, SISTEMA_REPLICADO)` y «replicado» significa «no esta
+                    // a ningun lado de la frontera», asi que una tabla que FALTA no da un cruce:
+                    // DEJA DE REVISARSE, en verde (la leccion de R-N, y lo que el censo de
+                    // `catastro#7` midio). Nombrar de mas no cuesta nada —ningun archivo de este
+                    // repositorio las menciona— y es lo que hace que el cruce, si llega, se vea.
+                    //
+                    // V5 el buzon de salida; V7 (#4) la zonificacion; V8 (#5) la gestion del
+                    // riesgo; V9 (#6, ADR-0035) el hallazgo catastral; V10 (#7) la derivacion de
+                    // frentes. `acta` es la de CATASTRO —el acta del hallazgo—: la tributaria de
+                    // `rentas` se llama `acta_fiscalizacion` y sigue siendo suya.
+                    "acta",
+                    "campania",
+                    "candidato",
+                    "catastro_evento",
+                    "evidencia",
+                    "faja_marginal",
+                    "frente_derivacion",
+                    "habilitacion_urbana",
+                    "hallazgo",
+                    "itse",
+                    "parametro_urbanistico",
+                    "seccion_via",
+                    "zona_riesgo",
+                    "zonificacion");
 
     private static final Set<String> DE_NORMATIVA =
             Set.of(
