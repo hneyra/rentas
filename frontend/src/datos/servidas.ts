@@ -1,7 +1,7 @@
 /**
  * Las operaciones que el backend YA sirve en el entorno donde corre la aplicacion.
  *
- * <h2>Dos, y son las dos primeras (I-1)</h2>
+ * <h2>Seis: las dos primeras de I-1 y las cuatro de I-3</h2>
  *
  * La integracion no es un salto. El backend publica 181 operaciones y el proxy simula
  * dieciocho: encenderlas todas a la vez seria cambiar 181 respuestas en una sola tarde sin poder
@@ -59,14 +59,53 @@ export interface OperacionServida {
 }
 
 /**
- * Las dos lecturas de sesion. Todo lo demas lo sigue contestando el proxy.
+ * Las seis de seguridad. Todo lo demas lo sigue contestando el proxy.
  *
  * El tipo es `readonly OperacionServida[]` y no una tupla: lo que cambia el dia que se encienda
- * la tercera es esta lista, y nada mas.
+ * la septima es esta lista, y nada mas.
+ *
+ * <h2>Las cuatro que enciende I-3, en el orden en que se encendieron</h2>
+ *
+ * <ol>
+ *   <li><b>`GET /seguridad/modulos`.</b> Al encenderla llegan <b>12</b> modulos en el
+ *       envoltorio paginado —`totalElementos: 12`, `tamano: 20`, una pagina—, y sus nombres
+ *       resultaron ser <b>los rotulos del artboard byte a byte</b> para los diez que este
+ *       sistema sirve. Eso no se sabia antes de pedirla: era la premisa que hacia posible
+ *       empalmar el catalogo con el catalogo del backend sin traducir nada.</li>
+ *   <li><b>`GET /seguridad/accesos`.</b> Llegan <b>134</b> con su `moduloId`, y **es la unica
+ *       razon por la que esta lectura esta en la lista**: sin ella, la matriz de permisos es
+ *       una bolsa de 134 codigos planos sin ninguna forma de saber a que rama pertenece
+ *       ninguno. Se pide con `?tamano=200` porque el tamano por omision es 20 (ver `RUTAS`).</li>
+ *   <li><b>`GET /seguridad/sesion/permisos`.</b> Llegan <b>134</b> llaves, una por acceso, cada
+ *       una con sus siete privilegios. Y al pedirla con las <b>dos</b> cuentas de la
+ *       instalacion salieron <b>identicas</b>, llave a llave: ninguna de las dos ejercita el
+ *       filtro. Eso cambio como se prueba el AC2 — ver `marco/seguridadMedida.ts`.</li>
+ *   <li><b>`PUT /seguridad/sesion/ejercicio`.</b> La primera <b>escritura</b> de esta interfaz.
+ *       Con observacion contesta 200 y la sesion con su ejercicio dentro; sin ella contesta
+ *       <b>500</b>, que es el defecto #30 y no se arregla aqui — se rodea no mandando nunca una
+ *       vacia—. Con una observacion corta o un ejercicio fuera de 1990-2100 contesta
+ *       <b>422 `VALIDACION`</b> con su frase, y esa frase es la que la pantalla ensena.</li>
+ * </ol>
+ *
+ * <h2>Dos de las cuatro piden un permiso de ADMINISTRACION, y hay que decirlo</h2>
+ *
+ * `GET /seguridad/modulos` declara `@RequiereAcceso(acceso = "modulos", …)` y
+ * `GET /seguridad/accesos` declara `acceso = "accesos"` — o sea «Modulos del sistema» y
+ * «Accesos y politicas», las dos opciones con las que se administra el catalogo. **Asi que la
+ * navegacion de esta aplicacion se compone hoy de dos operaciones que una cuenta de ventanilla
+ * no tiene por que poder llamar**, y a la que no las tenga le contestaran 403 `SIN_PRIVILEGIO`:
+ * no se quedaria sin un modulo, se quedaria sin arbol. Es exactamente el caso del AC7, y por
+ * eso la pantalla lo explica y ofrece reintentar en vez de dibujar un marco vacio. Cerrarlo de
+ * verdad no es de este lado: es publicar el menu de la sesion —el catalogo filtrado por quien
+ * pregunta— y eso es del dueno de `seguridad`.
  */
 export const YA_SERVIDAS: readonly OperacionServida[] = [
   { metodo: 'GET', ruta: '/seguridad/sesion' },
   { metodo: 'GET', ruta: '/seguridad/sesion/municipalidad' },
+  { metodo: 'GET', ruta: '/seguridad/modulos' },
+  { metodo: 'GET', ruta: '/seguridad/accesos' },
+  { metodo: 'GET', ruta: '/seguridad/sesion/permisos' },
+  { metodo: 'PUT', ruta: '/seguridad/sesion/ejercicio' },
 ];
 
 /** `/rentas/vehiculos/{placa}` → `^/rentas/vehiculos/[^/]+$`. */

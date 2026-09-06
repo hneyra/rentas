@@ -1,6 +1,10 @@
-import { useCallback, useEffect, useReducer, useState } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useState } from 'react';
 
-import type { MunicipalidadDeLaSesion, SesionDeLaVentanilla } from '../datos/lecturas.ts';
+import type {
+  MunicipalidadDeLaSesion,
+  PermisosDeLaSesion,
+  SesionDeLaVentanilla,
+} from '../datos/lecturas.ts';
 import { Icono } from '../ds/index.ts';
 import {
   NUEVO,
@@ -13,7 +17,8 @@ import { Lienzo } from './Lienzo.tsx';
 import { PaletaDeComandos } from './PaletaDeComandos.tsx';
 import { PanelDeModulos } from './PanelDeModulos.tsx';
 import { Trazos } from './Trazos.tsx';
-import { HOJAS, MODULO_PROPIO, esPropia } from './arbol.ts';
+import { CODIGO_PROPIO, HOJAS, esPropia, type Modulo } from './arbol.ts';
+import { destinosOfrecidos, puedeCambiarElEjercicio } from './composicion.ts';
 import { destinoDelHash, marcarHash } from './hash.ts';
 import { estadoInicial, reducir } from './pestanas.ts';
 
@@ -135,39 +140,88 @@ function subtituloDe(
 export interface MarcoProps {
   readonly sesion: SesionDeLaVentanilla;
   readonly municipalidad: MunicipalidadDeLaSesion;
+  /**
+   * Los modulos que se ofrecen, ya compuestos por `composicion.ts` (I-3).
+   *
+   * **Obligatorio y sin respaldo, por el mismo motivo que `sesion`.** Un valor por omision aqui
+   * seria `ARBOL`, o sea la navegacion constante de diez modulos para todos que este issue
+   * viene a quitar — y nadie lo veria hasta que alguien montara el marco sin pasarla.
+   */
+  readonly arbol: readonly Modulo[];
+  /** La matriz de `GET /seguridad/sesion/permisos`. Decide si se ofrece el acto del AC3. */
+  readonly permisos: PermisosDeLaSesion;
+  /** Manda `PUT /seguridad/sesion/ejercicio`. Lanza si el backend no lo acepta. */
+  readonly alCambiarEjercicio: (ejercicio: number, observacion: string) => Promise<number | null>;
   /** Cierra la sesion aqui y en el emisor. Lo enchufa el casco a `api/identidad.salir`. */
   readonly alSalir: () => void;
 }
 
-export function Marco({ sesion: quien, municipalidad, alSalir }: MarcoProps) {
-  const [pestanas, despachar] = useReducer(reducir, destinoDelHash(), estadoInicial);
+export function Marco({
+  sesion: quien,
+  municipalidad,
+  arbol,
+  permisos,
+  alCambiarEjercicio,
+  alSalir,
+}: MarcoProps) {
+  const [pestanas, despachar] = useReducer(reducir, arbol, (modulos) => {
+    // El hash tambien se valida contra lo ofrecido, y hay que hacerlo AQUI: al arrancar, la
+    // pestana no se abre llamando a `abrir` sino inicializando el reducer, asi que la guarda de
+    // `abrir` no la ve pasar. Un enlace guardado a `#coa-exp` habria abierto la pestana igual.
+    const ofrece = destinosOfrecidos(modulos);
+    const pedido = destinoDelHash();
+    // Y el arranque por omision es el primer destino que se ofrece, que casi siempre es el
+    // `panel` de rentas y no lo es cuando esta cuenta no puede abrir ese modulo.
+    const primero = modulos[0]?.submodulos[0]?.clave ?? 'panel';
+    const propio = ofrece.has('panel') ? 'panel' : primero;
+    return estadoInicial(pedido !== null && ofrece.has(pedido) ? pedido : null, propio);
+  });
 
   const [panelAbierto, fijarPanelAbierto] = useState(true);
   const [filtro, fijarFiltro] = useState('');
-  const [desplegado, fijarDesplegado] = useState<string | null>(MODULO_PROPIO);
+  const [desplegado, fijarDesplegado] = useState<string | null>(
+    // Por CLAVE y no por rotulo: el rotulo ya lo dice el backend. Ver `CODIGO_PROPIO`.
+    arbol.find((modulo) => modulo.codigo === CODIGO_PROPIO)?.clave ?? null,
+  );
   const [lanzador, fijarLanzador] = useState(false);
   const [paleta, fijarPaleta] = useState(false);
   const [sesion, fijarSesion] = useState(false);
   const [avisoDescartado, fijarAvisoDescartado] = useState(false);
   const [avisoAbierto, fijarAvisoAbierto] = useState(false);
-  // El ejercicio arranca en el que dice el backend, y en `null` si no dice ninguno (AC8). Lo
-  // que el artboard ponia aqui era un `'2026'` fijo. Cambiarlo desde el selector sigue siendo
-  // local a esta pestana —fijarlo de verdad es `PUT /seguridad/sesion/ejercicio`, y eso es de
-  // otro issue—, pero de donde ARRANCA ya no es una invencion.
-  const [ejercicio, fijarEjercicio] = useState<string | null>(
-    quien.ejercicioDeTrabajo === null ? null : String(quien.ejercicioDeTrabajo),
-  );
+  // El ejercicio arranca en el que dice el backend, y en `null` si no dice ninguno (AC4). Lo
+  // que el artboard ponia aqui era un `'2026'` fijo. **Y desde I-3 tampoco cambia solo**: lo
+  // fija `PUT /seguridad/sesion/ejercicio`, y lo que se guarda aqui es el que CONTESTO el
+  // backend, no el que se le pidio. No es lo mismo: si el backend aceptara 2026 y devolviera
+  // otro —o ninguno—, la barra diria el que el backend cree y no el que alguien tecleo.
+  const [ejercicio, fijarEjercicio] = useState<number | null>(quien.ejercicioDeTrabajo);
   const [toast, fijarToast] = useState('');
   // El estado del padron vive aqui y no dentro de la seccion: el marco la desmonta al cambiar
   // de pestana, y con el estado dentro, escribir media alta e ir al panel dejaria el formulario
   // en blanco **con el asterisco puesto**. Ver `secciones/estadoDelPadron.ts`.
   const [padron, fijarPadron] = useState<EstadoDelPadron>(PADRON_AL_EMPEZAR);
 
-  const abrir = useCallback((destino: string) => {
-    despachar({ tipo: 'abrir', destino });
-    fijarPaleta(false);
-    fijarLanzador(false);
-  }, []);
+  /**
+   * Los destinos que esta cuenta puede abrir. La ultima puerta del AC2.
+   *
+   * El panel, el lanzador y la paleta ya ofrecen solo lo compuesto, pero **el hash no pasa por
+   * ninguno de los tres**: `#coa-exp` escrito en la barra de direcciones —o un enlace guardado
+   * de cuando la cuenta si podia— abriria la pestana igual. Que la pantalla de dentro fuera a
+   * recibir un 403 no lo arregla: la pestana existiria, con su rotulo y su icono, y la persona
+   * tendria que descubrir por el error que no era para ella.
+   */
+  const ofrecidos = useMemo(() => destinosOfrecidos(arbol), [arbol]);
+
+  const abrir = useCallback(
+    (destino: string) => {
+      if (!ofrecidos.has(destino)) {
+        return;
+      }
+      despachar({ tipo: 'abrir', destino });
+      fijarPaleta(false);
+      fijarLanzador(false);
+    },
+    [ofrecidos],
+  );
 
   // El hash sigue a la pestana activa, con `replaceState`: abrir una seccion no
   // es navegar, y con `pushState` el «atras» del navegador haria falta cuarenta
@@ -182,14 +236,16 @@ export function Marco({ sesion: quien, municipalidad, alSalir }: MarcoProps) {
     const alCambiarElHash = () => {
       const destino = destinoDelHash();
       if (destino !== null) {
-        despachar({ tipo: 'abrir', destino });
+        // Por `abrir` y no por `despachar`, para que pase por la guarda del AC2: cambiar el
+        // hash a mano es la via mas directa que hay a un destino que el arbol no ofrece.
+        abrir(destino);
       }
     };
     window.addEventListener('hashchange', alCambiarElHash);
     return () => {
       window.removeEventListener('hashchange', alCambiarElHash);
     };
-  }, []);
+  }, [abrir]);
 
   useEffect(() => {
     const alPulsar = (evento: KeyboardEvent) => {
@@ -225,6 +281,10 @@ export function Marco({ sesion: quien, municipalidad, alSalir }: MarcoProps) {
     };
   }, [toast]);
 
+  // El ejercicio es un numero —es lo que el backend publica y lo que el `PUT` recibe— y las
+  // pantallas lo usan para componer una ruta y un titulo. La conversion se hace una vez, aqui,
+  // en la frontera entre lo que se guarda y lo que se dibuja.
+  const ejercicioTexto = ejercicio === null ? null : String(ejercicio);
   const cuantasSucias = Object.keys(pestanas.sucias).length;
   const porCerrar = pestanas.porCerrar;
   const hojaPorCerrar = porCerrar === null ? undefined : HOJAS.get(porCerrar);
@@ -233,6 +293,7 @@ export function Marco({ sesion: quien, municipalidad, alSalir }: MarcoProps) {
     <div className="kr-marco">
       {paleta && (
         <PaletaDeComandos
+          arbol={arbol}
           alAbrir={abrir}
           alCerrar={() => {
             fijarPaleta(false);
@@ -243,11 +304,19 @@ export function Marco({ sesion: quien, municipalidad, alSalir }: MarcoProps) {
       <BarraGlobal
         entidad={municipalidad.nombre}
         usuario={quien}
+        arbol={arbol}
         ejercicio={ejercicio}
-        alCambiarEjercicio={(elegido) => {
-          fijarEjercicio(elegido);
+        puedeCambiarEjercicio={puedeCambiarElEjercicio(permisos)}
+        alCambiarEjercicio={async (elegido, observacion) => {
+          // Lo que se guarda es lo que CONTESTA el backend. El aviso flotante decia antes «se
+          // recargaron la UIT, la escala y las tablas de arbitrios» y no se recargaba nada:
+          // ahora dice lo unico que se sabe cierto —que quedo fijado, y que quedo registrado—.
+          const fijado = await alCambiarEjercicio(elegido, observacion);
+          fijarEjercicio(fijado);
           fijarToast(
-            `Ejercicio ${elegido}: se recargaron la UIT, la escala y las tablas de arbitrios.`,
+            fijado === null
+              ? 'La sesión quedó sin ejercicio de trabajo.'
+              : `Ejercicio de trabajo: ${String(fijado)}. El cambio quedó registrado.`,
           );
         }}
         panelAbierto={panelAbierto}
@@ -289,11 +358,12 @@ export function Marco({ sesion: quien, municipalidad, alSalir }: MarcoProps) {
       <div className="kr-marco__cuerpo">
         {panelAbierto && (
           <PanelDeModulos
+            arbol={arbol}
             filtro={filtro}
             alFiltrar={fijarFiltro}
             desplegado={desplegado}
-            alDesplegar={(modulo) => {
-              fijarDesplegado((actual) => (actual === modulo ? null : modulo));
+            alDesplegar={(clave) => {
+              fijarDesplegado((actual) => (actual === clave ? null : clave));
             }}
             activa={pestanas.activa}
             abiertas={pestanas.abiertas}
@@ -357,9 +427,9 @@ export function Marco({ sesion: quien, municipalidad, alSalir }: MarcoProps) {
 
           {pestanas.activa !== null && (
             <div className="kr-marco__cabecera">
-              <h1 className="kr-marco__titulo">{tituloDe(pestanas.activa, ejercicio)}</h1>
+              <h1 className="kr-marco__titulo">{tituloDe(pestanas.activa, ejercicioTexto)}</h1>
               <span className="kr-marco__subtitulo">
-                {subtituloDe(pestanas.activa, ejercicio, padron)}
+                {subtituloDe(pestanas.activa, ejercicioTexto, padron)}
               </span>
             </div>
           )}
@@ -415,7 +485,7 @@ export function Marco({ sesion: quien, municipalidad, alSalir }: MarcoProps) {
             alCambiarPadron={(cambio) => {
               fijarPadron((actual) => ({ ...actual, ...cambio }));
             }}
-            ejercicio={ejercicio}
+            ejercicio={ejercicioTexto}
           />
         </div>
       </div>

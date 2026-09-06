@@ -5,6 +5,12 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { desinstalarProxyDeDatos, instalarProxyDeDatos } from '../api/proxy.ts';
 import { Marco } from './Marco.tsx';
 import { MUNICIPALIDAD_MEDIDA, conEjercicio } from './sesionMedida.ts';
+import {
+  ACCESOS_MEDIDOS,
+  MODULOS_MEDIDOS,
+  PERMISOS_MEDIDOS,
+} from './seguridadMedida.ts';
+import { componerArbol } from './composicion.ts';
 
 /**
  * **Quien esta en sesion se dice, y desde I-1 no se puede no decirlo.**
@@ -21,6 +27,11 @@ const salida = vi.fn();
 const IDENTIDAD = {
   sesion: conEjercicio(2026),
   municipalidad: MUNICIPALIDAD_MEDIDA,
+  // El arbol compuesto de la captura de la instalacion: diez modulos, los mismos que estas
+  // pruebas daban por hecho cuando `ARBOL` era la navegacion entera (I-3).
+  arbol: componerArbol(MODULOS_MEDIDOS, ACCESOS_MEDIDOS, PERMISOS_MEDIDOS).modulos,
+  permisos: PERMISOS_MEDIDOS,
+  alCambiarEjercicio: () => Promise.resolve(2026),
   alSalir: salida,
 };
 
@@ -472,13 +483,19 @@ describe('AC8 — el teclado', () => {
     const paleta = screen.getByRole('dialog', { name: 'Buscar' });
     expect(within(paleta).getByText('2 resultados')).toBeInTheDocument();
 
-    // El primero es «Cartera y medidas», de Coactiva; el segundo, «Cartera y
-    // lotes», de Valores. Una flecha abajo elige el segundo.
+    // El primero es «Cartera y lotes», de Valores; el segundo, «Cartera y
+    // medidas», de Coactiva. Una flecha abajo elige el segundo.
+    //
+    // **El orden se invirtio en I-3, y no es un ajuste de la prueba: es el AC1.** El artboard
+    // ponia Valores el ultimo de los diez y Coactiva el septimo; el orden ahora lo da
+    // `GET /seguridad/modulos`, que publica VALORES (id 95) antes que COACTIVA (id 101). O sea
+    // que quien decide en que orden se lee el arbol es el backend, y esta linea es donde se
+    // nota.
     await usuario.keyboard('{ArrowDown}');
     await usuario.keyboard('{Enter}');
 
     expect(screen.queryByRole('dialog', { name: 'Buscar' })).toBeNull();
-    expect(activa()).toBe('Cartera y lotes');
+    expect(activa()).toBe('Cartera y medidas');
   });
 
   // Sobre CUATRO resultados y acabando en el tercero, no en el primero. Con dos
@@ -640,14 +657,22 @@ describe('el resto del marco que se porta', () => {
 
   it('cambiar de ejercicio lo dice, y el titulo de Valores lo lleva dentro', async () => {
     const usuario = userEvent.setup();
-    render(<Marco {...IDENTIDAD} />);
+    // El backend contesta 2024, y es ESA cifra la que la barra tiene que pasar a decir. Antes
+    // de I-3 esto era `selectOptions(…, '2024')` sobre un `<select>` y no salia ninguna
+    // peticion: el ejercicio cambiaba en una variable de esta pestana y el aviso flotante
+    // afirmaba que «se recargaron la UIT, la escala y las tablas de arbitrios».
+    render(<Marco {...IDENTIDAD} alCambiarEjercicio={() => Promise.resolve(2024)} />);
     await usuario.click(submodulo('Valores'));
     expect(titulo()).toBe('Valores del ejercicio 2026');
 
-    await usuario.selectOptions(screen.getByLabelText('Ejercicio de trabajo'), '2024');
+    await usuario.click(screen.getByRole('button', { name: '2026' }));
+    await usuario.clear(screen.getByLabelText('Ejercicio'));
+    await usuario.type(screen.getByLabelText('Ejercicio'), '2024');
+    await usuario.type(screen.getByLabelText('Observación'), 'Cierre del ejercicio anterior');
+    await usuario.click(screen.getByRole('button', { name: 'Cambiar el ejercicio' }));
 
     expect(titulo()).toBe('Valores del ejercicio 2024');
-    expect(screen.getByRole('status').textContent).toContain('Ejercicio 2024');
+    expect(screen.getByRole('status').textContent).toContain('Ejercicio de trabajo: 2024');
   });
 
   it('el menu de sesion avisa de las pestanas con cambios sin guardar', async () => {

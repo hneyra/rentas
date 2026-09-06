@@ -1,7 +1,7 @@
 import { useEffect, useId, useMemo, useState } from 'react';
 
 import { Icono } from '../ds/index.ts';
-import { ARBOL } from './arbol.ts';
+import type { Modulo } from './arbol.ts';
 
 /**
  * La paleta de comandos: `Ctrl/Cmd+K` (AC8).
@@ -34,37 +34,49 @@ interface Entrada {
   readonly modulo: string;
 }
 
-/** Los cuarenta destinos, aplanados una sola vez. */
-const ENTRADAS: readonly Entrada[] = ARBOL.flatMap((modulo) =>
-  modulo.submodulos.map((submodulo) => ({
-    destino: submodulo.clave,
-    rotulo: submodulo.rotulo,
-    modulo: modulo.rotulo,
-  })),
-);
-
 /** Cuantos resultados caben sin que la lista tape la pantalla. El artboard: 9. */
 const CUANTOS = 9;
 
 export interface PaletaDeComandosProps {
+  /**
+   * Los modulos que se ofrecen, ya compuestos (I-3).
+   *
+   * **La paleta es la puerta trasera del AC2 mas facil de olvidar.** Aplanaba `ARBOL` en una
+   * constante de modulo —los cuarenta destinos, calculados una vez al cargar el archivo—, asi
+   * que aunque el panel escondiera Coactiva, teclear «expediente» en `Ctrl+K` la seguia
+   * ofreciendo y `Enter` la abria. Ahora se aplana lo que se ofrece, y nada mas.
+   */
+  readonly arbol: readonly Modulo[];
   readonly alAbrir: (destino: string) => void;
   readonly alCerrar: () => void;
 }
 
-export function PaletaDeComandos({ alAbrir, alCerrar }: PaletaDeComandosProps) {
+export function PaletaDeComandos({ arbol, alAbrir, alCerrar }: PaletaDeComandosProps) {
   const [consulta, fijarConsulta] = useState('');
   const [indice, fijarIndice] = useState(0);
   const idDeLaLista = useId();
 
+  const entradas: readonly Entrada[] = useMemo(
+    () =>
+      arbol.flatMap((modulo) =>
+        modulo.submodulos.map((submodulo) => ({
+          destino: submodulo.clave,
+          rotulo: submodulo.rotulo,
+          modulo: modulo.rotulo,
+        })),
+      ),
+    [arbol],
+  );
+
   const resultados = useMemo(() => {
     const busqueda = consulta.trim().toLowerCase();
-    return ENTRADAS.filter(
+    return entradas.filter(
       (entrada) =>
         busqueda === '' ||
         entrada.rotulo.toLowerCase().includes(busqueda) ||
         entrada.modulo.toLowerCase().includes(busqueda),
     ).slice(0, CUANTOS);
-  }, [consulta]);
+  }, [consulta, entradas]);
 
   // Al cambiar la consulta, la seleccion vuelve arriba. Sin esto, escribir una
   // letra mas dejaria marcado el cuarto resultado de una lista que ya es otra, y

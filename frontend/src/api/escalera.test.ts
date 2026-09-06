@@ -81,6 +81,48 @@ describe('AC6 — cada peldano de la escalera es un remedio distinto', () => {
   });
 });
 
+/**
+ * El quinto peldano, que llego con la primera escritura de esta interfaz (I-3).
+ *
+ * Hasta #31 esta interfaz solo leia y un 422 no podia llegar. Con
+ * `PUT /seguridad/sesion/ejercicio` llega, y es **la respuesta mas probable del acto**.
+ */
+describe('422 VALIDACION — el backend entendio la peticion y la rechazo por una regla suya', () => {
+  it('NO es una averia: escribir «ok» no manda a llamar a soporte', () => {
+    const dijo =
+      'La observacion debe explicar el cambio: al menos 5 caracteres, y no espacios en blanco (ADR-0008)';
+    const peldano = peldanoDe(fallo(422, 'VALIDACION', dijo));
+
+    expect(peldano.clave).toBe('no-valido');
+    // Sin este peldano caia en `averia`, con «Reintente en unos segundos. Si sigue igual, avise
+    // a soporte» — para una observacion corta.
+    expect(peldano.esAveria).toBe(false);
+    expect(peldano.pideIdentidad).toBe(false);
+  });
+
+  it('y el mensaje del backend se conserva TAL CUAL, porque lleva la regla y su cifra', () => {
+    const peldano = peldanoDe(
+      fallo(422, 'VALIDACION', 'Ejercicio fuera de rango: 1800. Se admite de 1990 a 2100'),
+    );
+
+    // Es lo unico con lo que quien esta delante corrige lo que escribio. Resumirlo a «revise
+    // los datos» borraria justo eso; copiar la regla aqui para adelantarla seria peor, porque
+    // dejaria dos verdades sobre el rango y ninguna que lo dijera.
+    expect(peldano.detalle).toBe('Ejercicio fuera de rango: 1800. Se admite de 1990 a 2100');
+    expect(peldano.detalle).not.toContain('422');
+  });
+
+  it('un 500 sigue siendo una averia, que es lo que el 422 NO es', () => {
+    // El contraste importa: los dos son fallos del servidor por el codigo, y sin separarlos el
+    // 500 de #30 —el cuerpo sin observacion— y el 422 de una observacion corta se explicarian
+    // igual, cuando uno se arregla escribiendo mas y el otro no se arregla desde aqui.
+    expect(peldanoDe(fallo(500, 'ERROR_INTERNO', 'No se pudo completar la operacion')).esAveria).toBe(
+      true,
+    );
+    expect(peldanoDe(fallo(422, 'VALIDACION', 'x')).esAveria).toBe(false);
+  });
+});
+
 describe('AC6 — lo que SI es una averia', () => {
   it('un corte de red: no llega ningun ErrorDeLaApi, y hay que decir algo igual', () => {
     const peldano = peldanoDe(new TypeError('Failed to fetch'));

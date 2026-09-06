@@ -11,7 +11,17 @@
  *   <tr><td>token sin el claim `municipalidad_id`</td><td><b>403</b> `SIN_MUNICIPALIDAD`</td></tr>
  *   <tr><td>token sin el permiso que la operacion pide</td><td><b>403</b> `SIN_PRIVILEGIO`</td></tr>
  *   <tr><td>la cuenta no es usuario de esa municipalidad</td><td><b>404</b> `NO_ENCONTRADO`</td></tr>
+ *   <tr><td>el cuerpo incumple una regla del dominio</td><td><b>422</b> `VALIDACION`</td></tr>
  * </table>
+ *
+ * <h2>El quinto peldano lo trajo la primera escritura (I-3)</h2>
+ *
+ * Hasta #31 esta interfaz solo leia, y un 422 no podia llegar. Con
+ * `PUT /seguridad/sesion/ejercicio` llega, y es **la respuesta mas probable del acto**: medido
+ * contra la instalacion, una observacion de tres letras contesta «La observacion debe explicar
+ * el cambio: al menos 5 caracteres…» y un ejercicio de 1800, «Ejercicio fuera de rango: 1800.
+ * Se admite de 1990 a 2100». Sin este peldano las dos caian en `averia`, o sea que escribir
+ * «ok» en un campo mandaba a **avisar a soporte** — y con el tono de que algo se rompio.
  *
  * Y se arreglan de cuatro maneras que no se parecen: volver a identificarse; que el
  * administrador asigne la municipalidad a la cuenta; pedir el permiso que falta; y revisar con
@@ -43,6 +53,7 @@ export interface Peldano {
     | 'sin-privilegio'
     | 'no-encontrado'
     | 'no-permitido'
+    | 'no-valido'
     | 'averia';
   readonly titulo: string;
   /** Lo que paso, en una frase. Cuando el backend lo dice, es lo que el backend dijo. */
@@ -149,6 +160,24 @@ export function peldanoDe(fallo: unknown): Peldano {
         'Revise con que cuenta esta entrando: puede ser valida en el emisor de identidad y no ' +
         'estar dada de alta en esta municipalidad.',
       pideIdentidad: false,
+      esAveria: false,
+    };
+  }
+
+  if (fallo.estado === 422) {
+    return {
+      clave: 'no-valido',
+      titulo: 'Lo que se mandó no cumple una regla',
+      // Tal cual, y esta es la unica respuesta de la escalera donde el texto del backend NO es
+      // un respaldo sino el dato: es la regla concreta que se incumplio, con su cifra dentro
+      // —«al menos 5 caracteres», «Se admite de 1990 a 2100»—, y es lo unico con lo que quien
+      // esta delante puede corregir lo que escribio. Resumirla a «revise los datos» borraria
+      // justo eso. Copiar la regla aqui para adelantarla seria peor: seria tener dos verdades.
+      detalle: loQueDijo(fallo, 'El backend rechazo el contenido de la peticion.'),
+      remedio: 'Corrija lo que dice el mensaje y vuelva a intentarlo.',
+      pideIdentidad: false,
+      // No es una averia: el backend leyo la peticion, la entendio y la rechazo por una regla
+      // suya. Mandar a soporte por esto es mandar a soporte porque alguien escribio «ok».
       esAveria: false,
     };
   }

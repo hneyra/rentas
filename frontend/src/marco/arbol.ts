@@ -1,5 +1,18 @@
 /**
- * El arbol de modulos y submodulos del marco V6, y las cuatro secciones propias.
+ * El **catalogo del artboard**: los iconos, las notas y los cuarenta destinos.
+ *
+ * <h2>Desde I-3 esto ya NO es el arbol que se dibuja</h2>
+ *
+ * Hasta #31, `ARBOL` era la navegacion entera: los diez modulos que salian en el panel, en el
+ * lanzador y en la paleta eran exactamente estas diez constantes. Ahora **el arbol que se
+ * dibuja lo compone `composicion.ts`** a partir de `GET /seguridad/modulos`, y este archivo
+ * aporta la mitad que el backend no publica —el icono, la nota y los cuatro submodulos— mas la
+ * llave para empalmarlas, que es `codigo`.
+ *
+ * Que la distincion importe se ve en una frase: **este archivo ya no decide que modulos hay**.
+ * Si el backend deja de publicar «Coactiva», Coactiva desaparece del panel aunque siga escrita
+ * aqui; y si publicara un modulo que este catalogo no conoce, no se dibuja —no hay icono ni
+ * destinos que dibujarle— y `composicion.ts` lo nombra en vez de tragarselo.
  *
  * <h2>De donde sale, literalmente</h2>
  *
@@ -48,6 +61,24 @@ export interface Modulo {
    * `valores-mod` existe justamente porque `valores` ya es una seccion propia.
    */
   readonly clave: string;
+  /**
+   * El codigo con que `GET /seguridad/modulos` publica este mismo modulo.
+   *
+   * **Es la llave del empalme, y es lo unico que este archivo aporta a la union.** El backend
+   * publica `id`, `codigo`, `nombre`, `orden` y `activo`, y **ningun icono y ningun submodulo**
+   * —medido: el esquema no tiene `padre_id` ni tabla de submodulos, y ninguna de las 181
+   * operaciones publica una jerarquia—; el artboard aporta el icono, la nota y los cuatro
+   * destinos, y no tiene codigo. Empalmar por el NOMBRE seria mas barato —los diez coinciden
+   * hoy byte a byte, medido— y estaria mal: el dia que alguien corrija «Tránsito» a «Tránsito y
+   * transporte» el modulo **desapareceria del arbol en silencio**, que es justo el modo de
+   * fallo que este proyecto persigue. Con el codigo, un cambio de nombre se ve como lo que es:
+   * un modulo que ahora se llama distinto.
+   *
+   * Que cada uno de estos diez codigos sea uno de los que la instalacion publica —y que su
+   * nombre sea el rotulo que el artboard dibuja— lo comprueba `composicion.test.ts` contra
+   * `seguridadMedida.ts`, que es una captura de `curl` y no una lista escrita a mano.
+   */
+  readonly codigo: string;
   /** Los `<path>` de su icono, tal como `const MODULOS` los escribe. */
   readonly trazos: readonly string[];
   readonly submodulos: readonly Submodulo[];
@@ -62,11 +93,23 @@ export interface Modulo {
  */
 export const MODULO_PROPIO = 'Rentas · Registro';
 
+/**
+ * El codigo con que el backend publica el modulo propio.
+ *
+ * **Es lo que hay que mirar desde I-3, y no `MODULO_PROPIO`.** El rotulo que se dibuja ya es el
+ * que contesta `GET /seguridad/modulos`, asi que una municipalidad que renombrara su modulo de
+ * rentas dejaria de reconocer el suyo si se comparara por texto: el lanzador no marcaria
+ * ninguno como el actual y el panel no desplegaria ninguno al arrancar. El codigo no cambia
+ * cuando cambia el nombre, que es justo la propiedad que hace falta aqui.
+ */
+export const CODIGO_PROPIO = 'RENTAS_REGISTRO';
+
 export const ARBOL: readonly Modulo[] = [
   {
     rotulo: 'Inicio',
     nota: 'Panel de recaudación',
     clave: 'inicio',
+    codigo: 'INICIO',
     trazos: ['M3 10.6 12 3.5l9 7.1', 'M5.6 9.6V20.5h12.8V9.6', 'M10 20.5v-5.4h4v5.4'],
     submodulos: [
       { clave: 'ini-panel', rotulo: 'Panel' },
@@ -79,6 +122,7 @@ export const ARBOL: readonly Modulo[] = [
     rotulo: MODULO_PROPIO,
     nota: 'Predial y contribuyentes',
     clave: 'rentas',
+    codigo: 'RENTAS_REGISTRO',
     trazos: ['M6.5 3.5h7.5l4 4v13h-11.5z', 'M14 3.5v4h4', 'M9.5 12.5h5', 'M9.5 16.5h3.5'],
     submodulos: [
       { clave: 'panel', rotulo: 'Panel' },
@@ -91,6 +135,7 @@ export const ARBOL: readonly Modulo[] = [
     rotulo: 'Fiscalización',
     nota: 'Detección y actas',
     clave: 'fisc',
+    codigo: 'FISCALIZACION',
     trazos: [
       'M9.5 4.5H8A1.5 1.5 0 0 0 6.5 6v13A1.5 1.5 0 0 0 8 20.5h8a1.5 1.5 0 0 0 1.5-1.5V6A1.5 1.5 0 0 0 16 4.5h-1.5',
       'M9.5 3.2h5v2.8h-5z',
@@ -107,6 +152,7 @@ export const ARBOL: readonly Modulo[] = [
     rotulo: 'Tránsito',
     nota: 'Papeletas y vehículos',
     clave: 'transito',
+    codigo: 'TRANSITO',
     trazos: [
       'M5 15.8v-3.2l1.9-4.4h10.2l1.9 4.4v3.2',
       'M3.6 15.8h16.8',
@@ -124,6 +170,7 @@ export const ARBOL: readonly Modulo[] = [
     rotulo: 'Infracciones administrativas',
     nota: 'Sanciones administrativas',
     clave: 'infra',
+    codigo: 'INFRACCIONES_ADMINISTRATIVAS',
     trazos: ['M12 4.2 20.8 19.6H3.2z', 'M12 9.8v4.4', 'M12 17.1h.02'],
     submodulos: [
       { clave: 'inf-panel', rotulo: 'Panel' },
@@ -136,6 +183,7 @@ export const ARBOL: readonly Modulo[] = [
     rotulo: 'Consultas',
     nota: 'Ventanilla y constancias',
     clave: 'consultas',
+    codigo: 'CONSULTAS',
     trazos: ['M17.4 11a6.4 6.4 0 1 1-12.8 0 6.4 6.4 0 0 1 12.8 0', 'M15.8 15.8 20.6 20.6'],
     submodulos: [
       { clave: 'con-panel', rotulo: 'Panel' },
@@ -148,6 +196,7 @@ export const ARBOL: readonly Modulo[] = [
     rotulo: 'Coactiva',
     nota: 'Expedientes y medidas',
     clave: 'coactiva',
+    codigo: 'COACTIVA',
     trazos: [
       'M12 4.4v3.2',
       'M5 8.6h14',
@@ -166,6 +215,7 @@ export const ARBOL: readonly Modulo[] = [
     rotulo: 'Autorizaciones y licencias',
     nota: 'Licencias y anuncios',
     clave: 'autoriz',
+    codigo: 'AUTORIZACIONES_Y_LICENCIAS',
     trazos: ['M4.4 9.6V20h15.2V9.6', 'M3.2 9.6 5.2 4.6h13.6l2 5z', 'M9.6 20v-5.4h4.8V20'],
     submodulos: [
       { clave: 'aut-panel', rotulo: 'Panel' },
@@ -178,6 +228,7 @@ export const ARBOL: readonly Modulo[] = [
     rotulo: 'Seguridad',
     nota: 'Usuarios y permisos',
     clave: 'seguridad',
+    codigo: 'SEGURIDAD',
     trazos: [
       'M12 3.4 19 5.9v5.6c0 4.1-3 7.2-7 9.1-4-1.9-7-5-7-9.1V5.9z',
       'M9.4 12.1l1.9 1.9 3.5-3.6',
@@ -193,6 +244,7 @@ export const ARBOL: readonly Modulo[] = [
     rotulo: 'Valores',
     nota: 'Emisión y notificación',
     clave: 'valores-mod',
+    codigo: 'VALORES',
     trazos: [
       'M6.5 3.5h7.5l4 4v13h-11.5z',
       'M14 3.5v4h4',
@@ -207,6 +259,17 @@ export const ARBOL: readonly Modulo[] = [
     ],
   },
 ];
+
+/**
+ * El catalogo indexado por el codigo con que el backend publica cada modulo.
+ *
+ * Es por donde `composicion.ts` empalma. Se construye del propio `ARBOL` y no de una segunda
+ * lista: dos listas que hay que mantener a la par divergen, y la que divergiera dejaria un
+ * modulo del backend sin icono sin que nada se pusiera rojo.
+ */
+export const CATALOGO_POR_CODIGO: ReadonlyMap<string, Modulo> = new Map(
+  ARBOL.map((modulo) => [modulo.codigo, modulo]),
+);
 
 /** Una seccion del modulo propio, con el slug que va al hash. */
 export interface Seccion {

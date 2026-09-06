@@ -100,10 +100,24 @@ describe('AC4 — la raiz de la API es UNA, escrita en tres sitios que tienen qu
 });
 
 describe('AC7 — lo que se declara servido tiene que publicarlo el backend', () => {
-  it('las dos rutas de sesion estan declaradas, y son las dos primeras', () => {
+  it('las seis de seguridad estan declaradas: las dos de I-1 y las cuatro de I-3', () => {
+    // La lista escrita a mano es a proposito. Derivarla de `YA_SERVIDAS` la haria pasar diga lo
+    // que diga: encender una ruta es una decision, y una decision se revisa leyendo su diff.
     expect(YA_SERVIDAS.map((o) => `${o.metodo} ${o.ruta}`)).toEqual([
       'GET /seguridad/sesion',
       'GET /seguridad/sesion/municipalidad',
+      'GET /seguridad/modulos',
+      'GET /seguridad/accesos',
+      'GET /seguridad/sesion/permisos',
+      'PUT /seguridad/sesion/ejercicio',
+    ]);
+  });
+
+  it('y la escritura es UNA, que es la primera de esta interfaz', () => {
+    // Las escrituras cambian datos y quedan auditadas, asi que encender una no es como
+    // encender una lectura: si algun dia son cinco, esta cifra lo dice en la revision.
+    expect(YA_SERVIDAS.filter((o) => o.metodo !== 'GET').map((o) => o.ruta)).toEqual([
+      '/seguridad/sesion/ejercicio',
     ]);
   });
 
@@ -142,6 +156,88 @@ describe('AC7 — lo que se declara servido tiene que publicarlo el backend', ()
   });
 });
 
+/**
+ * AC8 — las formas de las cuatro operaciones nuevas, contra el contrato y contra la captura.
+ *
+ * <h2>Se comparan TRES cosas y no dos, y la tercera es la que vale</h2>
+ *
+ * Lo que declara `docs/50-api/formas-de-la-api.json`, lo que devuelve la instalacion
+ * (`seguridadMedida.ts`) y lo que esta interfaz lee. Comparar solo las dos primeras diria que el
+ * generador y el servidor coinciden —que es cierto y no es el riesgo—; el riesgo es que la
+ * pantalla lea `zonaCodigo` donde el contrato dice `codigo`, que es el sintoma **mudo** de C-1:
+ * un campo que falta no da error, da `undefined`.
+ */
+describe('AC8 — el contrato, la instalacion y lo que se lee dicen lo mismo', () => {
+  const formas = JSON.parse(readFileSync(FORMAS, 'utf8')) as Record<string, Record<string, unknown>>;
+
+  it.each([
+    ['GET /seguridad/modulos', ['activo', 'codigo', 'id', 'nombre', 'orden']],
+    ['GET /seguridad/accesos', ['activo', 'codigo', 'id', 'moduloId', 'nombre', 'tipo']],
+  ])('«%s» publica una pagina, y su fila tiene estos campos', (clave, campos) => {
+    const forma = formas[clave] ?? {};
+    const fila = (forma['contenido'] as unknown[])[0] as object;
+
+    expect(Object.keys(fila).sort()).toEqual(campos);
+    // El envoltorio de paginacion, con la advertencia que el propio AC8 hace: `totalElementos`
+    // y `totalPaginas` son CUENTAS de cosas y no importes, asi que llegan como `entero` y la
+    // prohibicion del importe como `number` no les aplica (el lookahead de F-4).
+    expect(Object.keys(forma).sort()).toEqual([
+      'contenido',
+      'hayMas',
+      'pagina',
+      'tamano',
+      'totalElementos',
+      'totalPaginas',
+    ]);
+    expect(forma['totalElementos']).toBe('entero');
+    expect(forma['totalPaginas']).toBe('entero');
+  });
+
+  it('y la instalacion devuelve EXACTAMENTE esos campos, ni uno mas ni uno menos', async () => {
+    const { MODULOS_MEDIDOS, ACCESOS_MEDIDOS } = await import('../src/marco/seguridadMedida.ts');
+
+    for (const [clave, medido] of [
+      ['GET /seguridad/modulos', MODULOS_MEDIDOS[0]],
+      ['GET /seguridad/accesos', ACCESOS_MEDIDOS[0]],
+    ] as const) {
+      const fila = ((formas[clave] ?? {})['contenido'] as unknown[])[0] as object;
+
+      expect(Object.keys(medido ?? {}).sort(), clave).toEqual(Object.keys(fila).sort());
+    }
+  });
+
+  it('`PUT /seguridad/sesion/ejercicio` NO publica la cuenta ni el nombre: solo la sesion', () => {
+    // Es la razon por la que de esta respuesta se toma **solo** `ejercicioDeTrabajo`. Leer de
+    // aqui quien esta trabajando dejaria la cabecera en blanco despues de cada cambio.
+    expect(Object.keys(formas['PUT /seguridad/sesion/ejercicio'] ?? {}).sort()).toEqual([
+      'ejercicioDeTrabajo',
+      'id',
+      'inicio',
+      'usuarioId',
+    ]);
+  });
+
+  it('la matriz de permisos NO tiene forma declarada: el contrato dice «objeto» y ya', () => {
+    // Y hay que saberlo: la comparacion campo a campo del AC5 de #4 **no puede aplicarse aqui**.
+    // El generador describe el tipo de retorno de cada controlador y este devuelve un
+    // `Map<String, List<String>>`, que no tiene campos que describir. Lo unico que sostiene la
+    // lectura son las 134 llaves medidas — y por eso `composicion.ts` no da por hecho que el
+    // valor sea una lista. Esta prueba caduca sola el dia que el contrato lo declare.
+    expect(formas['GET /seguridad/sesion/permisos']).toBe('objeto');
+  });
+
+  it('ninguna operacion publica un menu de la sesion: por eso el arbol se compone aqui', () => {
+    // Si `seguridad` publicara el catalogo YA filtrado por quien pregunta, componerlo en la
+    // interfaz —con dos operaciones de administracion, ver `SinArbol.tsx`— sobraria. Hoy no lo
+    // publica: cero operaciones cuyo nombre hable de un menu, un arbol o una navegacion.
+    const candidatas = Object.keys(formas).filter((clave) =>
+      /menu|arbol|navegacion|submodulo/i.test(clave),
+    );
+
+    expect(candidatas).toEqual([]);
+  });
+});
+
 describe('AC1 — el token no toca el almacenamiento del navegador', () => {
   it('la prohibicion sigue en la lista, con su clave', () => {
     expect(PROHIBICIONES.map((p) => p.clave)).toContain('token-en-almacenamiento');
@@ -175,15 +271,28 @@ describe('AC1 — el token no toca el almacenamiento del navegador', () => {
   });
 });
 
-describe('la sesion medida es de las pruebas, y no un respaldo de produccion', () => {
-  it('solo la importan archivos de prueba', () => {
-    // Sin esta guarda, `sesionMedida.ts` acabaria siendo el respaldo que `MarcoProps` existe
-    // para prohibir: un `sesion ?? SESION_MEDIDA` en cualquier sitio devolveria la cabecera
-    // constante que I-1 vino a quitar, y esta vez con una constante que ademas parece medida.
+/**
+ * Las capturas de la instalacion, y la guarda que impide que se conviertan en respaldos.
+ *
+ * Son dos desde I-3: la sesion (quien esta dentro) y la seguridad (que modulos hay y que puede
+ * abrir esta cuenta). Las dos son lo mismo —bytes de un `curl`, para que las pruebas del marco
+ * no repitan cuarenta y cuatro literales— y las dos tienen el mismo riesgo: que alguien escriba
+ * `arbol ?? ARBOL_MEDIDO` y devuelva la navegacion constante que I-3 vino a quitar, esta vez
+ * con una constante que ademas parece medida.
+ */
+const CAPTURAS = ['src/marco/sesionMedida.ts', 'src/marco/seguridadMedida.ts'];
+
+describe('las capturas de la instalacion son de las pruebas, y no respaldos de produccion', () => {
+  it.each(CAPTURAS)('«%s» solo la importan archivos de prueba', (captura) => {
+    const archivo = captura.slice(captura.lastIndexOf('/') + 1);
+    // Se busca un `import ... from '…/<archivo>'` y **no una mencion cualquiera**, y esa
+    // correccion la trajo I-3 con su rojo: `seguridadMedida.ts` nombra a `sesionMedida.ts` en
+    // su javadoc —dice que es su hermano y por que— y el patron anterior, que buscaba el
+    // nombre a secas, lo dio por culpable. Una guarda que no distingue «lo importa» de «lo
+    // menciona» acaba desactivandose para poder escribir un comentario, y entonces no vigila.
+    const importa = new RegExp(`from\\s+'[^']*${archivo.replace('.', '\\.')}'`);
     const culpables = deProduccion.filter(
-      (ruta) =>
-        ruta !== 'src/marco/sesionMedida.ts' &&
-        /sesionMedida\.ts/.test(readFileSync(join(FRONTEND, ruta), 'utf8')),
+      (ruta) => ruta !== captura && importa.test(readFileSync(join(FRONTEND, ruta), 'utf8')),
     );
 
     expect(culpables).toEqual([]);

@@ -38,11 +38,20 @@ export type AccionSobrePestanas =
  * seccion activa y sin pestana en la barra —activa una cosa que no se ve, y que
  * no se puede cerrar—. Aqui la pestana existe, que es lo que el AC4 y el AC6
  * necesitan que sea cierto a la vez.
+ *
+ * `porOmision` es con que se arranca cuando el hash no pide nada, y desde I-3 no
+ * puede darse por hecho que sea `panel`: el arbol lo compone el backend, y una
+ * cuenta que no pueda abrir el modulo de rentas no tiene ningun `panel` que
+ * abrir. Arrancar ahi de todos modos dejaria una pestana de un destino que el
+ * arbol no ofrece — la puerta que el AC2 cierra, abierta por el arranque.
  */
-export function estadoInicial(destino: string | null): EstadoDePestanas {
-  const arranque = destino ?? 'panel';
+export function estadoInicial(
+  destino: string | null,
+  porOmision = 'panel',
+): EstadoDePestanas {
+  const arranque = destino ?? porOmision;
   return {
-    abiertas: arranque === 'panel' ? ['panel'] : ['panel', arranque],
+    abiertas: arranque === porOmision ? [porOmision] : [porOmision, arranque],
     activa: arranque,
     sucias: {},
     porCerrar: null,
