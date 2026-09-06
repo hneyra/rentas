@@ -140,7 +140,7 @@ export function Campo({
         <select
           {...comunes}
           value={valor}
-          disabled={cargando || bloqueado}
+          disabled={bloqueado}
           onChange={(evento) => onCambio?.(evento.target.value)}
         >
           {todas.map((opcion) => (
