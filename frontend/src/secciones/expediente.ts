@@ -281,6 +281,15 @@ export interface LoLeidoDelExpediente {
   readonly ficha: FichaDelContribuyente | null;
   readonly predios: readonly PredioServido[] | null;
   readonly beneficios: readonly BeneficioServido[] | null;
+  /**
+   * La deuda por concepto. **Se recibe y no se usa para ningun campo**, a proposito.
+   *
+   * Los cuatro valores de solo lectura de «Cuenta corriente» —deuda al dia de hoy, insoluto,
+   * interes y gastos— son SUMAS de esta tabla, y sumar importes en la pantalla esta prohibido
+   * (regla 1, RNF-055): el total lo calcula el backend y lo sostiene con su fecha. Los publica
+   * `GET /consultas/unificada` en `resumenDeSaldos`, que esta pantalla no pide todavia. Hasta
+   * entonces los cuatro quedan vacios, y la tabla —que si llega entera— dice lo que se sabe.
+   */
   readonly deuda: readonly DeudaPorConcepto[] | null;
 }
 
