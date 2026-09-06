@@ -168,6 +168,45 @@ describe('la excepcion del cliente de API es exactamente una', () => {
 });
 
 describe('las reglas no senalan codigo correcto', () => {
+  it('los dos contadores del envoltorio de paginacion se declaran «number», y pasan', async () => {
+    // `totalElementos` y `totalPaginas` son cuentas de cosas, no de dinero: el backend los
+    // publica como `entero` en las mas de sesenta operaciones paginadas. Si la prohibicion los
+    // senalara, toda pantalla con una tabla arrancaria con dos `eslint-disable` — y una regla
+    // que se desactiva por costumbre deja de proteger a la tercera vez.
+    const envoltorio = `
+      export interface Pagina<T> {
+        readonly contenido: readonly T[];
+        readonly pagina: number;
+        readonly tamano: number;
+        readonly totalElementos: number;
+        readonly totalPaginas: number;
+        readonly hayMas: boolean;
+      }
+    `;
+
+    const [resultado] = await eslint.lintText(envoltorio, {
+      filePath: enUnaPantalla('paginacion.ts'),
+    });
+
+    expect(resultado?.messages ?? []).toEqual([]);
+  });
+
+  it('pero el resto de «total…» sigue prohibido: la excepcion no se derrama', async () => {
+    const conDinero = `
+      export interface Liquidacion {
+        readonly totalAPagar: number;
+      }
+    `;
+
+    const [resultado] = await eslint.lintText(conDinero, {
+      filePath: enUnaPantalla('liquidacion.ts'),
+    });
+
+    expect((resultado?.messages ?? []).map((m) => m.message).join('\n')).toMatch(
+      /Un importe se declara «string»/,
+    );
+  });
+
   it('el codigo que las respeta pasa limpio', async () => {
     const correcto = `
       import { solicitar } from '../api/cliente.ts';
