@@ -193,17 +193,24 @@ describe('AC2 — los valores coinciden con el artboard', () => {
 });
 
 describe('los componentes no pintan: solo usan tokens', () => {
-  it.each(['componentes.css', 'tokens/base.css'])('«%s» no escribe ni un color a mano', (hoja) => {
-    const css = sinComentarios(leer(join(RAIZ, 'src/estilos', hoja)));
-    const colores = css.match(/#[0-9a-f]{3,8}\b|\brgba?\(|\bhsla?\(/gi) ?? [];
+  // `marco.css` entra en la lista desde F-3, y por el mismo motivo que los otros
+  // dos: es la hoja mas grande del proyecto y la unica que dibuja una superficie
+  // OSCURA —la barra global— en tema claro. Un `#fff` escrito ahi a mano seria
+  // invisible en la revision y, en tema oscuro, texto blanco sobre papel blanco.
+  it.each(['componentes.css', 'marco.css', 'tokens/base.css'])(
+    '«%s» no escribe ni un color a mano',
+    (hoja) => {
+      const css = sinComentarios(leer(join(RAIZ, 'src/estilos', hoja)));
+      const colores = css.match(/#[0-9a-f]{3,8}\b|\brgba?\(|\bhsla?\(/gi) ?? [];
 
-    expect(
-      colores,
-      `«${hoja}» tiene un color escrito a mano. Todo color sale de \`tokens/colors.css\`:\n` +
-        'es lo que hace que el tema oscuro exista sin tocar un componente, y lo que hace\n' +
-        'que la prueba de contraste mida lo que la pantalla ensena y no otra cosa.',
-    ).toEqual([]);
-  });
+      expect(
+        colores,
+        `«${hoja}» tiene un color escrito a mano. Todo color sale de \`tokens/colors.css\`:\n` +
+          'es lo que hace que el tema oscuro exista sin tocar un componente, y lo que hace\n' +
+          'que la prueba de contraste mida lo que la pantalla ensena y no otra cosa.',
+      ).toEqual([]);
+    },
+  );
 });
 
 describe('el tema oscuro se declara dos veces y dice lo mismo', () => {
