@@ -475,8 +475,12 @@ export function Expediente({
       </div>
 
       <div className="kr-ficha__pie">
+        {/* `aria-disabled` y no `disabled`, como el artboard y por el mismo motivo que el
+            `Campo` bloqueado de F-2: un control deshabilitado sale del recorrido del tabulador,
+            y en ventanilla se trabaja con teclado. Pulsarlo en la primera seccion no hace nada,
+            que es lo que el rotulo ya anuncia. */}
         <Boton
-          disabled={estado.paso === 0}
+          aria-disabled={estado.paso === 0}
           onClick={() => {
             alCambiar({ paso: Math.max(estado.paso - 1, 0) });
           }}

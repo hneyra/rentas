@@ -353,7 +353,12 @@ describe('AC6 — el alta guiada y sus secciones', () => {
       'aria-selected',
       'true',
     );
-    expect(screen.getByRole('button', { name: 'Anterior' })).toBeDisabled();
+    // `aria-disabled` y no `disabled`: sigue en el recorrido del tabulador, y pulsarlo no
+    // retrocede de la primera.
+    expect(screen.getByRole('button', { name: 'Anterior' })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
   });
 
   it('«Continuar» avanza y «Anterior» retrocede', async () => {
@@ -366,6 +371,13 @@ describe('AC6 — el alta guiada y sus secciones', () => {
       'true',
     );
 
+    await usuario.click(screen.getByRole('button', { name: 'Anterior' }));
+    expect(screen.getByRole('tab', { name: /^Identificación/ })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+
+    // Y pulsarlo otra vez en la primera no retrocede a ninguna parte.
     await usuario.click(screen.getByRole('button', { name: 'Anterior' }));
     expect(screen.getByRole('tab', { name: /^Identificación/ })).toHaveAttribute(
       'aria-selected',
