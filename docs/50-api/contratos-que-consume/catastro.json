@@ -72,6 +72,29 @@
       },
       "cuerpo" : { }
     },
+    "GET /catastro/predios/{predioId}/frentes" : {
+      "parametros" : [ ],
+      "respuesta" : {
+        "predioId" : "entero",
+        "frentes" : [ {
+          "id" : "entero",
+          "viaId" : "entero",
+          "viaCodigo" : "texto",
+          "viaNombre" : "texto",
+          "longitud" : "texto",
+          "longitudEstado" : "texto",
+          "esPrincipal" : "booleano",
+          "numeracion" : "texto",
+          "retiro" : "texto",
+          "confirmadoPor" : "texto",
+          "confirmadoEn" : "texto"
+        } ],
+        "derivadoEn" : "texto",
+        "frentesDerivados" : "entero",
+        "motivoDeLaDerivacion" : "texto"
+      },
+      "cuerpo" : { }
+    },
     "GET /catastro/tablas/valores-unitarios" : {
       "parametros" : [ "ejercicio" ],
       "respuesta" : [ {
@@ -122,6 +145,91 @@
           "direccion" : "texto",
           "porcentajeTitularidad" : "texto",
           "porcentajeRegistradoDelPredio" : "texto"
+        } ]
+      },
+      "cuerpo" : { }
+    },
+    "GET /fiscalizacion/campanias/{campaniaId}/hallazgos" : {
+      "parametros" : [ "pagina", "tamano" ],
+      "respuesta" : {
+        "contenido" : [ {
+          "id" : "entero",
+          "candidatoId" : "entero",
+          "clase" : "texto",
+          "predioId" : "entero",
+          "fichaId" : "entero",
+          "areaDeLaFicha" : "texto",
+          "areaVerificada" : "texto",
+          "excesoVerificado" : "texto",
+          "inspector" : "texto",
+          "verificadoEn" : "fecha",
+          "estado" : "texto"
+        } ],
+        "totalElementos" : "entero"
+      },
+      "cuerpo" : { }
+    },
+    "GET /grd/itse" : {
+      "parametros" : [ "aLaFecha", "predioId" ],
+      "respuesta" : {
+        "predioId" : "entero",
+        "aLaFecha" : "fecha",
+        "vigentes" : [ {
+          "id" : "entero",
+          "numero" : "texto",
+          "nivelRiesgo" : "texto",
+          "modalidad" : "texto",
+          "vigenciaDesde" : "fecha",
+          "vigenciaHasta" : "fecha",
+          "fechaAnulacion" : "fecha"
+        } ]
+      },
+      "cuerpo" : { }
+    },
+    "GET /grd/riesgo" : {
+      "parametros" : [ "predioId" ],
+      "respuesta" : {
+        "predioId" : "entero",
+        "aLaFecha" : "fecha",
+        "hayRiesgoNoMitigable" : "booleano",
+        "zonas" : [ {
+          "id" : "entero",
+          "codigo" : "texto",
+          "fenomeno" : "texto",
+          "nivel" : "texto",
+          "mitigable" : "booleano",
+          "fuente" : "texto",
+          "documentoOrigen" : "texto",
+          "vigenciaDesde" : "fecha",
+          "vigenciaHasta" : "fecha"
+        } ],
+        "fajasMarginales" : [ {
+          "id" : "entero",
+          "codigo" : "texto",
+          "cuerpoDeAgua" : "texto",
+          "anchoM" : "texto",
+          "fuente" : "texto",
+          "documentoOrigen" : "texto",
+          "vigenciaDesde" : "fecha",
+          "vigenciaHasta" : "fecha"
+        } ]
+      },
+      "cuerpo" : { }
+    },
+    "GET /urbano/zonificacion" : {
+      "parametros" : [ "aLaFecha", "predioId" ],
+      "respuesta" : {
+        "aLaFecha" : "fecha",
+        "codigo" : "texto",
+        "nombre" : "texto",
+        "plan" : "texto",
+        "ordenanza" : "texto",
+        "vigenciaDesde" : "fecha",
+        "vigenciaHasta" : "fecha",
+        "parametros" : [ {
+          "clave" : "texto",
+          "valor" : "texto",
+          "unidad" : "texto"
         } ]
       },
       "cuerpo" : { }
