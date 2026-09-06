@@ -24,17 +24,18 @@ import tools.jackson.databind.JsonNode;
  * adaptador: es lo que {@code catastro} publica, y declarar una sola dejaria a la otra sin nadie
  * que comprobara su forma en el CI del proveedor.
  *
- * <h2>El riesgo no lleva fecha en la URL, y no es un olvido</h2>
+ * <h2>Las DOS llevan la fecha, y la de riesgo desde `catastro`#18</h2>
  *
- * <p>{@code /grd/riesgo} declara <b>un solo parametro</b>, {@code predioId}: {@code catastro}
- * resuelve con su reloj y devuelve la fecha que uso. Mandarle un {@code aLaFecha} que no lee seria
- * exactamente el defecto de C-1 —viaja en la URL, se descarta en silencio y la respuesta parece
- * contestar a lo que se pregunto—, asi que no se manda. Lo que se pierde queda dicho en el puerto:
- * desde aqui <b>no se puede preguntar por el riesgo de un dia pasado</b>.
+ * <p>Hasta entonces {@code /grd/riesgo} declaraba un solo parametro —{@code predioId}— y resolvia
+ * con el reloj del otro lado, asi que mandarle un {@code aLaFecha} habria sido el defecto de C-1:
+ * viajar en la URL y descartarse en silencio, con la respuesta pareciendo contestar a lo que se
+ * pregunto. Ahora lo lee, y por eso se manda: sin el, desde aqui no se puede preguntar que decia la
+ * carta de peligro el dia que se denego una licencia.
  *
- * <p>{@code /grd/itse} si la lee, asi que ahi la fecha se manda y ademas se COMPARA con la que
- * vuelve, por lo mismo que en {@link CaracteristicasDelPredioHttp}: un certificado vencido que
- * saliera como vigente es una licencia emitida contra un papel caducado.
+ * <p>Y en las dos la fecha que vuelve se <b>COMPARA</b> con la que se pidio, por lo mismo que en
+ * {@link CaracteristicasDelPredioHttp}: una zona sustituida leida como vigente —o un certificado
+ * vencido— es una licencia decidida contra lo que regia otro dia. La comparacion es lo unico que
+ * caza desde este lado que el parametro se haya vuelto a descartar.
  */
 @Component
 public class RiesgoYItseDelPredioHttp implements RiesgoYItseDelPredio {
@@ -46,9 +47,13 @@ public class RiesgoYItseDelPredioHttp implements RiesgoYItseDelPredio {
     }
 
     @Override
-    public RiesgoDelPredio riesgoDe(long predioId) {
-        String que = "leer el riesgo del predio " + predioId;
-        JsonNode cuerpo = catastro.pedirHechoDelTerritorio("/grd/riesgo?predioId=" + predioId, que);
+    public RiesgoDelPredio riesgoDe(long predioId, LocalDate aLaFecha) {
+        String que = "leer el riesgo del predio " + predioId + " al " + aLaFecha;
+        JsonNode cuerpo =
+                catastro.pedirHechoDelTerritorio(
+                        "/grd/riesgo?predioId=" + predioId + "&aLaFecha=" + aLaFecha, que);
+        ClienteHttpDeCatastro.exigirQueContesteALaFecha(
+                cuerpo, aLaFecha, "el riesgo del predio " + predioId);
 
         List<ZonaDeRiesgo> zonas = new ArrayList<>();
         for (JsonNode zona : cuerpo.path("zonas")) {

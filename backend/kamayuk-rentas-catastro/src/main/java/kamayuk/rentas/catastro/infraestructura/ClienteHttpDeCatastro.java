@@ -101,6 +101,12 @@ public class ClienteHttpDeCatastro {
      * <p>No es «no hay dato» y no es «catastro esta caido»: es que la operacion no existe. Se
      * distingue de las otras dos a proposito, porque se arregla de otra manera —publicandola— y
      * decir cualquiera de las otras dos mandaria a mirar una cola o un despliegue.
+     *
+     * <p><b>Hoy no la lanza ningun adaptador, y eso se dice para que nadie lo suponga al reves</b>:
+     * el ultimo hueco de ruta que quedaba —los hallazgos de un predio— lo cerro `catastro`#17. Se
+     * conserva porque la distincion que nombra es la que {@link EscrituraSinTransaccionCompartida}
+     * usa de contraste, y porque el proximo puerto que se escriba antes que su ruta la necesita: lo
+     * que no se conserva es la idea de que algun puerto siga sin poder preguntar.
      */
     public static final class SinRutaEnCatastro extends RuntimeException {
         @java.io.Serial private static final long serialVersionUID = 1L;

@@ -445,7 +445,8 @@ class LecturaDeCatastroTest {
         assertThat(fabricada.keySet())
                 .isEqualTo(ContratoQueConsumeDeCatastro.RIESGO_DEL_PREDIO.keySet());
 
-        RiesgoDelPredio riesgo = new RiesgoYItseDelPredioHttp(doble(fabricada)).riesgoDe(11L);
+        RiesgoDelPredio riesgo =
+                new RiesgoYItseDelPredioHttp(doble(fabricada)).riesgoDe(11L, AL_30_DE_JUNIO);
 
         assertThat(riesgo.predioId()).isEqualTo(11L);
         assertThat(riesgo.aLaFecha()).isEqualTo(AL_30_DE_JUNIO);
@@ -463,6 +464,30 @@ class LecturaDeCatastroTest {
         assertThat(riesgo.fajasMarginales().get(0).ancho().unidad())
                 .as("la unidad viaja en el NOMBRE del campo, y este lado la mete dentro del dato")
                 .isEqualTo("ML");
+    }
+
+    @Test
+    @DisplayName("`catastro`#18 — y un riesgo resuelto con OTRA fecha falla en voz alta")
+    void unRiesgoDeOtraFechaFallaEnVozAlta() {
+        // El contraste de mandar la fecha, y hace falta las dos veces: que el adaptador la PONGA
+        // en la URL lo mide `PeticionesACatastroTest`; que sirva de algo lo mide esto. Si el otro
+        // lado dejara de leerla —el defecto de C-1— seguiria contestando 200, con la carta de
+        // peligro de hoy y su `hayRiesgoNoMitigable` de hoy, y quien revisa una licencia de 2024
+        // leeria una respuesta plausible y equivocada. La unica senal es la fecha que vuelve.
+        Map<String, Object> deOtroDia = new LinkedHashMap<>();
+        deOtroDia.put("predioId", 11);
+        deOtroDia.put("aLaFecha", "2026-08-30");
+        deOtroDia.put("hayRiesgoNoMitigable", false);
+        deOtroDia.put("zonas", List.of());
+        deOtroDia.put("fajasMarginales", List.of());
+
+        assertThatThrownBy(
+                        () ->
+                                new RiesgoYItseDelPredioHttp(doble(deOtroDia))
+                                        .riesgoDe(11L, AL_30_DE_JUNIO))
+                .isInstanceOf(ClienteHttpDeCatastro.CatastroInalcanzable.class)
+                .hasMessageContaining("se pidio al " + AL_30_DE_JUNIO)
+                .hasMessageContaining("2026-08-30");
     }
 
     @Test
@@ -656,6 +681,79 @@ class LecturaDeCatastroTest {
                 .as("cero significaria que lo inscrito y lo verificado coinciden")
                 .isNull();
         assertThat(leido.areaVerificada().valor()).isEqualByComparingTo("240.00");
+    }
+
+    @Test
+    @DisplayName("`catastro`#17 — los hallazgos de UN predio se leen del sobre que dice de cual es")
+    void losHallazgosDeUnPredioSeLeenDelSobreDeclarado() {
+        Map<String, Object> hallazgo = new LinkedHashMap<>();
+        hallazgo.put("id", 31);
+        hallazgo.put("candidatoId", 77);
+        hallazgo.put("clase", "SUBVALUADOR");
+        hallazgo.put("predioId", 11);
+        hallazgo.put("fichaId", 7);
+        hallazgo.put("areaDeLaFicha", "120.00");
+        hallazgo.put("areaVerificada", "180.50");
+        hallazgo.put("excesoVerificado", "60.50");
+        hallazgo.put("inspector", "mlopez");
+        hallazgo.put("verificadoEn", "2026-05-12");
+        hallazgo.put("estado", "FIRME");
+
+        assertThat(hallazgo.keySet())
+                .as("la fila es la MISMA que la de la pagina de una campania, y se lee igual")
+                .isEqualTo(ContratoQueConsumeDeCatastro.FILA_DE_HALLAZGO.keySet());
+
+        JsonMapper json = new JsonMapper();
+        ObjectNode cuerpo = json.createObjectNode();
+        cuerpo.put("predioId", 11);
+        cuerpo.set("hallazgos", json.createArrayNode().add(json.valueToTree(hallazgo)));
+
+        List<HallazgoCatastral> hallados =
+                new HallazgosDelPredioHttp(new CatastroQueNoContesta(ruta -> cuerpo)).de(11L);
+
+        assertThat(hallados).hasSize(1);
+        assertThat(hallados.get(0).id()).isEqualTo(31L);
+        assertThat(hallados.get(0).predioId()).isEqualTo(11L);
+        assertThat(hallados.get(0).fichaId())
+                .as("sin la version contra la que se comparo, el exceso no significa nada")
+                .isEqualTo(7L);
+        assertThat(hallados.get(0).areaVerificada().valor()).isEqualByComparingTo("180.50");
+        assertThat(hallados.get(0).excesoVerificado().valor()).isEqualByComparingTo("60.50");
+    }
+
+    @Test
+    @DisplayName("`catastro`#17 — y una lista que dice ser de OTRO predio no se lee")
+    void unaListaDeOtroPredioNoSeLee() {
+        JsonMapper json = new JsonMapper();
+        ObjectNode cuerpo = json.createObjectNode();
+        // El sobre contesta por el 12 y se pregunto por el 11. Sin esta comprobacion, lo hallado
+        // en un predio se leeria como hallado en otro — y sobre un exceso de area se abre una
+        // fiscalizacion tributaria (el guardia de #298, aqui).
+        cuerpo.put("predioId", 12);
+        cuerpo.set("hallazgos", json.createArrayNode());
+
+        assertThatThrownBy(
+                        () ->
+                                new HallazgosDelPredioHttp(
+                                                new CatastroQueNoContesta(ruta -> cuerpo))
+                                        .de(11L))
+                .isInstanceOf(ClienteHttpDeCatastro.CatastroInalcanzable.class)
+                .hasMessageContaining("dice ser del predio 12");
+    }
+
+    @Test
+    @DisplayName("`catastro`#17 — un predio sin hallazgos devuelve la lista VACIA, y no lanza")
+    void unPredioSinHallazgosDevuelveLaListaVacia() {
+        JsonMapper json = new JsonMapper();
+        ObjectNode cuerpo = json.createObjectNode();
+        cuerpo.put("predioId", 11);
+        cuerpo.set("hallazgos", json.createArrayNode());
+
+        assertThat(new HallazgosDelPredioHttp(new CatastroQueNoContesta(ruta -> cuerpo)).de(11L))
+                .as(
+                        "«esta en el padron y no tiene nada hallado» es un dato, y llega con 200."
+                                + " Que el predio no este llega con 404 y es NoConstaEnCatastro")
+                .isEmpty();
     }
 
     /** Un catastro que contesta siempre ese objeto, sea cual sea la ruta. */

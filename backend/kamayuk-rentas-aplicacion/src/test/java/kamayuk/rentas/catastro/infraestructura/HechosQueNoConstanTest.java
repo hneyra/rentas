@@ -50,7 +50,7 @@ class HechosQueNoConstanTest {
                                 "VALIDACION",
                                 "El predio 11 esta en el padron y no tiene poligono levantado"));
 
-        assertThatThrownBy(() -> new RiesgoYItseDelPredioHttp(doble).riesgoDe(11L))
+        assertThatThrownBy(() -> new RiesgoYItseDelPredioHttp(doble).riesgoDe(11L, AL_30_DE_JUNIO))
                 .as(
                         "«cero zonas» se leeria como «no cae en ninguna» y acabaria autorizando lo"
                                 + " que no debe")
@@ -94,21 +94,28 @@ class HechosQueNoConstanTest {
     }
 
     @Test
-    @DisplayName("los hallazgos de UN predio no se inventan: se dice que ruta los serviria")
-    void losHallazgosDeUnPredioNoSeInventan() {
-        CatastroQueNoContesta doble = new CatastroQueNoContesta(ruta -> null);
+    @DisplayName("`catastro`#17 — el predio que no esta en el padron NO devuelve cero hallazgos")
+    void elPredioQueNoEstaNoDevuelveCeroHallazgos() {
+        // Hasta `catastro`#17 esta lectura lanzaba `SinRutaEnCatastro` porque la ruta no existia.
+        // Ahora existe, y lo que hay que distinguir es otra cosa: el 404 dice que ese predio no
+        // esta en el padron de esa municipalidad, y la lista vacia —con 200— dice que esta y no
+        // tiene nada hallado. Contestarlas igual haria que un identificador mal tecleado se leyera
+        // como un predio limpio, que es con lo que se cierra una revision.
+        CatastroQueNoContesta doble =
+                CatastroQueNoContesta.queContesta(
+                        404,
+                        problema(
+                                "NO_ENCONTRADO",
+                                "El predio 11 no esta en el padron de esta municipalidad"));
 
-        assertThatThrownBy(() -> new HallazgosDelPredioHttp(doble).de(11L))
-                .as(
-                        "devolver vacio diria que ese predio no tiene hallazgos; recorrer la"
-                                + " campania y filtrar aqui devolveria los que cupieron en la"
-                                + " primera pagina")
-                .isInstanceOf(ClienteHttpDeCatastro.SinRutaEnCatastro.class)
-                .hasMessageContaining("/fiscalizacion/predios/{predioId}/hallazgos");
+        Throwable lanzada = catchThrowable(() -> new HallazgosDelPredioHttp(doble).de(11L));
 
+        assertThat(lanzada).isInstanceOf(ClienteHttpDeCatastro.NoConstaEnCatastro.class);
+        assertThat(((ClienteHttpDeCatastro.NoConstaEnCatastro) lanzada).codigo())
+                .isEqualTo("NO_ENCONTRADO");
         assertThat(doble.rutas)
-                .as("y no se manda ninguna peticion: la operacion no existe")
-                .isEmpty();
+                .as("y se pide por la ruta que `catastro`#17 publico, no recorriendo campanias")
+                .containsExactly("/fiscalizacion/predios/11/hallazgos");
     }
 
     @Test

@@ -12,13 +12,19 @@ import org.junit.jupiter.api.DisplayName;
 /**
  * Lo que {@code rentas} le pide a {@code catastro}, publicado para que su CI lo comprueba.
  *
- * <p>Son las <b>catorce</b> operaciones que los adaptadores de {@code kamayuk-rentas-catastro}
- * piden hoy. Tres venian de antes —la grilla de fichas, el cuadro de valores unitarios y las
- * huellas del padron—, <b>cinco las estreno C-5</b>, que publico las rutas que le faltaban a esta
- * frontera —si el predio esta, lo que tiene inscrito a una fecha, el area de una version de ficha,
- * de quien son unos predios y que predios son de alguien—, y <b>cinco mas las estrena #9</b>: la
- * zona urbanistica, el riesgo del suelo, el ITSE, los frentes y los hallazgos de la fiscalizacion
- * catastral.
+ * <p>Son las <b>quince</b> operaciones que los adaptadores de {@code kamayuk-rentas-catastro} piden
+ * hoy. Tres venian de antes —la grilla de fichas, el cuadro de valores unitarios y las huellas del
+ * padron—, <b>cinco las estreno C-5</b>, que publico las rutas que le faltaban a esta frontera —si
+ * el predio esta, lo que tiene inscrito a una fecha, el area de una version de ficha, de quien son
+ * unos predios y que predios son de alguien—, <b>cinco mas las estreno #9</b> —la zona urbanistica,
+ * el riesgo del suelo, el ITSE, los frentes y los hallazgos de una campania— y <b>la decimoquinta
+ * la estrena `catastro`#17</b>: los hallazgos de UN predio, que era el ultimo puerto de este modulo
+ * que lanzaba por no tener ruta.
+ *
+ * <p><b>Y `catastro`#18 no anade ninguna: cambia una.</b> {@code GET /grd/riesgo} pasa a leer
+ * {@code aLaFecha}, asi que el adaptador se lo manda y este contrato lo declara. Mientras no lo
+ * leia, mandarlo habria sido el defecto de C-1 —viajar en la URL y descartarse en silencio—; ahora
+ * no mandarlo seria contestar siempre con lo vigente hoy a quien pregunta por 2024.
  *
  * <p><b>Cinco operaciones para cuatro puertos, y no es un descuadre</b>: {@code
  * RiesgoYItseDelPredio} pide por dos rutas porque {@code catastro} publica dos —{@code /grd/riesgo}
@@ -228,8 +234,9 @@ public class ContratoQueConsumeDeCatastro extends ContratoQueSePublicaTestBase {
     public static final Map<String, Object> RIESGO_DEL_PREDIO =
             ordenados(
                     Map.entry("predioId", "entero"),
-                    // Sale aunque esta operacion NO admita fecha: catastro resuelve con su reloj y
-                    // dice cual uso. Sin ella la respuesta es una que dentro de un mes es otra.
+                    // La fecha con la que catastro resolvio, que desde `catastro`#18 es la que se
+                    // pidio. El adaptador las compara: sin ella la respuesta es una que dentro de
+                    // un mes es otra, y sin compararlas nadie notaria que dejo de leerse.
                     Map.entry("aLaFecha", "fecha"),
                     // Derivado y arriba: es el dato que decide, y recalcularlo aqui recorriendo
                     // las zonas seria repetir la unica linea que importa.
@@ -453,15 +460,16 @@ public class ContratoQueConsumeDeCatastro extends ContratoQueSePublicaTestBase {
                 ContratoDelConsumidor.OperacionEsperada.lectura(
                         Set.of("predioId", "aLaFecha"), ZONA_DEL_PREDIO));
 
-        // El riesgo del suelo. UN solo parametro, y es una decision medida: esta operacion no
-        // admite fecha —catastro resuelve con su reloj y devuelve la que uso—, asi que mandarle
-        // un `aLaFecha` seria el defecto de C-1 al reves: viajaria en la URL y se descartaria en
-        // silencio. Lo que se pierde queda dicho en el puerto: desde aqui no se puede preguntar
-        // por el riesgo de un dia pasado.
+        // El riesgo del suelo, A UNA FECHA (`catastro`#18). Hasta ese issue esta operacion no
+        // admitia fecha —catastro resolvia con su reloj— y mandarle un `aLaFecha` habria sido el
+        // defecto de C-1 al reves: viajaria en la URL y se descartaria en silencio. Ahora la lee,
+        // y la respuesta sigue diciendo con cual resolvio: el adaptador las COMPARA antes de leer
+        // una zona, que es lo unico que caza desde este lado que el parametro se vuelva a
+        // descartar.
         operaciones.put(
                 "GET /grd/riesgo",
                 ContratoDelConsumidor.OperacionEsperada.lectura(
-                        Set.of("predioId"), RIESGO_DEL_PREDIO));
+                        Set.of("predioId", "aLaFecha"), RIESGO_DEL_PREDIO));
 
         // El ITSE vigente a una fecha. Esta SI la lee, asi que se manda y ademas se compara con
         // la que vuelve: un certificado vencido leido como vigente es una licencia emitida
@@ -493,6 +501,26 @@ public class ContratoQueConsumeDeCatastro extends ContratoQueSePublicaTestBase {
                         ordenados(
                                 Map.entry("contenido", List.of(FILA_DE_HALLAZGO)),
                                 Map.entry("totalElementos", "entero"))));
+
+        // Los hallazgos de UN predio (`catastro`#17). Sin parametros: el predio va en la ruta y
+        // no hay fecha que resolver —un hallazgo lleva dentro la version de ficha contra la que
+        // se contrasto y el dia en que se verifico—. Sin paginar tampoco, y es del proveedor:
+        // un candidato produce como mucho un hallazgo y un predio entra una vez por campania.
+        //
+        // El sobre trae el `predioId` por el que se contesto, y el adaptador lo COMPARA con el
+        // que pidio antes de leer una fila: una lista de otro predio se leeria como los
+        // hallazgos de este, y sobre un exceso de area se abre una fiscalizacion tributaria.
+        //
+        // Se declaran los ONCE campos de la fila y no la campania ni el acta, que esa respuesta
+        // tambien publica: se declara lo que se usa, porque un campo declarado es un campo que
+        // el proveedor no puede retirar sin poner rojo su build (la disciplina de los frentes).
+        operaciones.put(
+                "GET /fiscalizacion/predios/{predioId}/hallazgos",
+                ContratoDelConsumidor.OperacionEsperada.lectura(
+                        Set.of(),
+                        ordenados(
+                                Map.entry("predioId", "entero"),
+                                Map.entry("hallazgos", List.of(FILA_DE_HALLAZGO)))));
 
         return new ContratoDelConsumidor("rentas", "catastro", "/catastro/api/v1", operaciones);
     }
