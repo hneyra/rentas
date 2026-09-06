@@ -146,10 +146,19 @@ class ClonesHermanosDelWorkflowTest {
                 .isNotEmpty();
     }
 
-    /** El directorio del clon de este repositorio: el primer ancestro con un `.git`. */
+    /**
+     * El directorio del clon de este repositorio: el primer ancestro con un `.git`.
+     *
+     * <p><b>{@code exists} y no {@code isDirectory}</b>, y no es un detalle: en un {@code git
+     * worktree} el {@code .git} de la raiz es un <b>archivo</b> con una linea {@code gitdir:}
+     * dentro, asi que con {@code isDirectory} el recorrido sube hasta la raiz del sistema de
+     * archivos y muere con «No se encontro la raiz». Eso no es un rojo que hable de lo que esta
+     * guarda vigila: es que la guarda no se puede correr, que es peor. {@code catastro} y {@code
+     * normativa} cerraron el mismo defecto en sus dos ayudantes; aqui quedaba este.
+     */
     private static Path raizDelClon() {
         Path actual = Path.of("").toAbsolutePath();
-        while (actual != null && !Files.isDirectory(actual.resolve(".git"))) {
+        while (actual != null && !Files.exists(actual.resolve(".git"))) {
             actual = actual.getParent();
         }
         if (actual == null) {

@@ -29,6 +29,16 @@ final class TablasDelSgtm {
             Set.of(
                     "cuenta_corriente_asiento",
                     "determinacion",
+                    // Con #9, y era un hueco medido: `determinacion` estaba desde el monolito y su
+                    // hermana de arbitrios NO, ni aqui ni en INMUTABLES —aunque su GRANT del
+                    // baseline ya sea `INSERT, SELECT`, sin UPDATE ni DELETE, o sea que la base ya
+                    // habia decidido lo que el escaner no vigilaba—. Es una determinacion: dice
+                    // cuanto se determino de limpieza publica, parques o serenazgo por un predio y
+                    // un periodo, y de esa cifra sale un valor que se notifica. Borrarla dejaria
+                    // el cargo en el libro sin la determinacion que lo justifica, y corregirla en
+                    // el sitio dejaria al papel notificado y a la base diciendo cosas distintas.
+                    // Se reversa determinando otra vez, y las dos quedan (regla 4).
+                    "determinacion_arbitrio",
                     "saldo_proyectado",
                     "parametro_tributario",
                     "recibo",
@@ -167,6 +177,12 @@ final class TablasDelSgtm {
             Set.of(
                     "cuenta_corriente_asiento",
                     "auditoria",
+                    // Con #9. Entra en las DOS listas, al reves que `declaracion_jurada`, que solo
+                    // esta en PROTEGIDAS: aquella tiene un `estado` que SI cambia en el sitio
+                    // —observar, anular y sustituir son eso—, y esta no tiene ninguna columna de
+                    // estado que mover. Lo unico que se podria editar de ella es el monto, que es
+                    // la cifra determinada, y esa no se corrige: se determina otra vez.
+                    "determinacion_arbitrio",
                     "papeleta_cambio_numero",
                     // Una diligencia de notificacion y un pase a coactiva son actos, no estados de
                     // un proceso: no se corrigen en el sitio. Un intento no hallado se reintenta
