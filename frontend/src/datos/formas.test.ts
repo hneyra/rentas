@@ -279,7 +279,12 @@ const HUECOS_ACEPTADOS: readonly string[] = [
 ];
 
 beforeAll(() => {
-  instalarProxyDeDatos();
+  // `yaServidas: []` y no la lista de verdad: **lo que este archivo mide es la forma que sirve
+  // el PROXY**, y desde I-4 seis de las dieciocho operaciones que simula estan tambien en
+  // `YA_SERVIDAS`. Con la lista real, esas seis saldrian a la red —a un servidor que en las
+  // pruebas no existe— y la comparacion de formas dejaria de hacerse justo sobre las que mas
+  // se usan. Que la lista real deje pasar lo suyo lo mide `api/proxy.test.ts`.
+  instalarProxyDeDatos({ yaServidas: [] });
 });
 
 afterAll(() => {

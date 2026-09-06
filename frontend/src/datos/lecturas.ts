@@ -96,11 +96,26 @@ export interface EtapaDeLaCorrida {
   readonly estado: string;
 }
 
-/** La ultima corrida de emision del predial. */
+/**
+ * La ultima corrida de emision del predial.
+ *
+ * **Ocho campos desde I-4, y no cinco.** `sector`, `simulacion` y `conjunto` los declara el
+ * contrato y los contesta la instalacion —medido: `{"id":20,"ejercicio":"2026",
+ * "alcance":"TODOS","sector":null,"simulacion":true,"conjunto":"",…}`—, y hasta I-4 este tipo no
+ * los nombraba. Un campo que no se declara es un campo que el proveedor puede retirar sin que
+ * nada se ponga rojo, y `simulacion` no es un adorno: dice si esa corrida emitio de verdad o fue
+ * un ensayo, que es la diferencia entre una deuda que existe y una que no.
+ */
 export interface CorridaDelPredial {
   readonly id: number;
   readonly ejercicio: string;
   readonly alcance: string;
+  /** El sector al que se acoto, o `null` si el alcance fue el padron entero. */
+  readonly sector: string | null;
+  /** Si fue un ensayo. Una corrida simulada NO emite. */
+  readonly simulacion: boolean;
+  /** El conjunto sellado de `normativa` con que se calculo. Vacio si no consta. */
+  readonly conjunto: string;
   readonly fechaCalculo: string;
   readonly observados: number;
   readonly etapas: readonly EtapaDeLaCorrida[];
@@ -265,12 +280,20 @@ export interface ContactoServido {
   readonly vigente: boolean;
 }
 
-/** La ficha del contribuyente, de `GET /rentas/contribuyentes/{id}/ficha`. */
+/**
+ * La ficha del contribuyente, de `GET /rentas/contribuyentes/{id}/ficha`.
+ *
+ * **Los dos datos personales pueden faltar, y desde I-4 el tipo lo dice.** Medido contra la
+ * instalacion: `"datosPersonales":{"fechaNacimiento":null,"estadoCivil":null,"conyugeId":null}`.
+ * El contrato los declara `fecha` y `texto` porque declara **el tipo del campo, no si viene** —
+ * es el mismo caso que `ejercicioDeTrabajo` en la sesion (I-1)—, y una fecha que se lee como
+ * `string` cuando llega `null` acaba en la pantalla como «null» o revienta al formatearse.
+ */
 export interface FichaDelContribuyente {
   readonly contribuyente: ContribuyenteDelPadron;
   readonly datosPersonales: {
-    readonly fechaNacimiento: string;
-    readonly estadoCivil: string;
+    readonly fechaNacimiento: string | null;
+    readonly estadoCivil: string | null;
     readonly conyugeId: number | null;
   };
   readonly aLaFecha: string;
@@ -521,7 +544,15 @@ export const RUTAS = {
   padron: '/rentas/contribuyentes',
   ficha: (id: number) => `/rentas/contribuyentes/${String(id)}/ficha`,
   predios: '/rentas/predios',
-  beneficios: '/rentas/beneficios',
+  /**
+   * Los beneficios de UN contribuyente, por su codigo.
+   *
+   * `?contribuyente=` es un parametro que la operacion **si** publica —el repositorio cruza con
+   * `contribuyente` y compara `c.codigo_contribuyente = :codigo`—, al contrario que el
+   * `?codContribuyente=` que exigen `/rentas/predios` y `/consultas/deuda` (#26). Por eso esta
+   * es la unica de las tres del expediente que I-4 pudo encender.
+   */
+  beneficiosDe: (codigo: string) => `/rentas/beneficios?contribuyente=${encodeURIComponent(codigo)}`,
   deuda: '/consultas/deuda',
   coactiva: '/coactiva/deudas',
   ultimaCorrida: '/rentas/predial/corridas/ultima',
@@ -542,6 +573,18 @@ export const RUTAS = {
 export async function pedirLista<T>(ruta: string, senal?: AbortSignal): Promise<readonly T[]> {
   const pagina = await solicitar<Paginado<T>>(ruta, senal === undefined ? {} : { senal });
   return pagina.contenido;
+}
+
+/**
+ * Pide una operacion paginada y devuelve **el envoltorio entero**.
+ *
+ * Los cinco campos que `pedirLista` tira son los que hacen falta en cuanto la lista no cabe en
+ * una respuesta: `totalElementos` es la cuenta del backend —y no se recalcula—, `totalPaginas` y
+ * `hayMas` dicen si «Siguiente» lleva a alguna parte, y `pagina` y `tamano` son el eco de lo que
+ * se pidio, que es lo unico que permite comprobar que la ventana servida es la pedida.
+ */
+export async function pedirPagina<T>(ruta: string, senal?: AbortSignal): Promise<Paginado<T>> {
+  return solicitar<Paginado<T>>(ruta, senal === undefined ? {} : { senal });
 }
 
 /** Pide una operacion que contesta un objeto. */

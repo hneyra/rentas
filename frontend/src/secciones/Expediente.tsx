@@ -14,11 +14,11 @@ import {
   type FichaDelContribuyente,
   type PredioServido,
 } from '../datos/lecturas.ts';
-import { useLista, useUno } from '../datos/useRecurso.ts';
+import { useLista, usePagina, useUno } from '../datos/useRecurso.ts';
 import { NUEVO, type EstadoDelPadron } from './estadoDelPadron.ts';
 import { SECCIONES_DEL_EXPEDIENTE, valoresDelExpediente } from './expediente.ts';
 import { tonoDelEstado } from './tonos.ts';
-import type { FilaDelPadron } from './padron.ts';
+import { rutaDelDocumento, type FilaDelPadron } from './padron.ts';
 
 /**
  * El expediente del contribuyente, y el alta guiada, que son la misma pantalla (AC4, AC6-AC9).
@@ -35,9 +35,28 @@ import type { FilaDelPadron } from './padron.ts';
  *
  *   1. **La longitud exacta del tipo** —DNI 8, RUC 11, carnet de extranjeria 12—, que vive en
  *      `dominio/documento.ts` porque es una regla y no un dato de esta pantalla.
- *   2. **Que no este ya en el padron**, y eso NO se comprueba contra una constante: se comprueba
- *      contra el padron que el proxy sirvio, y el aviso nombra al contribuyente que ya lo tiene
- *      con su codigo. Si manana ese documento fuera de otra persona, el aviso diria la otra.
+ *   2. **Que no este ya en el padron**, y desde I-4 eso **se le pregunta al backend**:
+ *      `GET /rentas/contribuyentes?dNI=…`, que es un criterio que la operacion publica. El aviso
+ *      nombra al contribuyente que ya lo tiene con su codigo, y si manana ese documento fuera de
+ *      otra persona, el aviso diria la otra.
+ *
+ * <h2>Por que la comprobacion tuvo que salir de la pantalla (I-4)</h2>
+ *
+ * Hasta I-4 se comprobaba contra `padron`, la lista que la seccion habia cargado. Con las cinco
+ * filas del artboard eso era el padron entero; contra la instalacion son **veinte de 10 603**, y
+ * un documento que esta en la pagina 400 se habria declarado **libre**. El alta habria creado el
+ * segundo codigo de la misma persona, que es exactamente el dano que esta compuerta existe para
+ * impedir —«dos codigos para la misma persona parten su deuda en dos cuentas que nadie cruza»—,
+ * y lo habria hecho **diciendo «Documento válido»**. No es una mejora de precision: es que la
+ * comprobacion anterior, sobre datos de verdad, respondia que si a casi todo.
+ *
+ * <h2>Y hay un tipo que NO se puede comprobar, y se dice</h2>
+ *
+ * `ContribuyenteController.buscar` publica `dNI` y `rUC` y ningun parametro para los demas
+ * tipos, asi que el **carne de extranjeria** no se puede consultar por aqui. La compuerta no
+ * finge: dice que no puede comprobarlo y que quien decide es el `POST`, que contesta **409** si
+ * el documento se repite. Fingir un «Documento válido» seria la version silenciosa del defecto
+ * que este issue vino a cerrar.
  *
  * <h2>Lo que el contrato no publica queda vacio, y esta razonado</h2>
  *
@@ -51,8 +70,6 @@ export interface ExpedienteProps {
   readonly alCambiar: (cambio: Partial<EstadoDelPadron>) => void;
   readonly alEnsuciar: () => void;
   readonly alAvisar: (texto: string) => void;
-  /** El padron servido, para comprobar que el documento no este ya en uso. */
-  readonly padron: readonly ContribuyenteDelPadron[];
 }
 
 /** `'2026-01-01'` + `null` → `'2026 — indefinida'`, como lo escribe el artboard. */
@@ -78,14 +95,15 @@ export function Expediente({
   alCambiar,
   alEnsuciar,
   alAvisar,
-  padron,
 }: ExpedienteProps) {
   const nuevo = estado.elegido === NUEVO;
   const id = fila?.contribuyente.id ?? null;
 
   const ficha = useUno<FichaDelContribuyente>(id === null ? null : RUTAS.ficha(id));
   const predios = useLista<PredioServido>(id === null ? null : RUTAS.predios);
-  const beneficios = useLista<BeneficioServido>(id === null ? null : RUTAS.beneficios);
+  const beneficios = useLista<BeneficioServido>(
+    fila === null ? null : RUTAS.beneficiosDe(fila.contribuyente.codigo),
+  );
   const deuda = useLista<DeudaPorConcepto>(id === null ? null : RUTAS.deuda);
 
   const servidos = valoresDelExpediente({
@@ -106,10 +124,15 @@ export function Expediente({
   const largoDoc = longitudDe(tipoDoc);
   const numeroDoc = valor('docNumero');
   const listo = documentoCompleto(numeroDoc, tipoDoc);
-  const duenoDelDocumento = listo
-    ? (padron.find((uno) => uno.numeroDocumento === numeroDoc) ?? null)
-    : null;
+  // `null` en dos casos que no son el mismo: el documento aun no esta completo, o su tipo no es
+  // uno de los dos que la operacion admite. El segundo se distingue abajo y se dice.
+  const consulta = listo ? rutaDelDocumento(RUTAS.padron, tipoDoc, numeroDoc) : null;
+  const yaEnElPadron = usePagina<ContribuyenteDelPadron>(nuevo ? consulta : null);
+  const seSabeSiEstaLibre = !nuevo || !listo || consulta !== null;
+  const duenoDelDocumento = yaEnElPadron.dato?.contenido[0] ?? null;
   const duplicado = duenoDelDocumento !== null;
+  const comprobando = yaEnElPadron.cargando;
+  const noSePudoComprobar = yaEnElPadron.error !== null;
 
   // El codigo lo asigna el sistema. Mientras no hay backend que lo asigne, se compone como lo
   // compone el artboard: es un marcador de posicion, y por eso se ensena y no se manda.
@@ -135,14 +158,22 @@ export function Expediente({
 
   const pendientesPorSeccion = SECCIONES_DEL_EXPEDIENTE.map(faltanEn);
   const pendientes = pendientesPorSeccion.reduce((suma, cuantos) => suma + cuantos, 0);
-  const puedeCrear = listo && !duplicado && pendientes === 0;
+  // Mientras la pregunta esta en el aire no se crea: un alta lanzada sobre «todavia no se sabe»
+  // se resuelve en el peor caso posible, que es el duplicado que la compuerta existe para
+  // impedir. Y si la pregunta FALLO tampoco: no saber no es lo mismo que saber que esta libre.
+  const puedeCrear =
+    listo && !duplicado && !comprobando && !noSePudoComprobar && pendientes === 0;
   const motivo = duplicado
     ? 'Ese documento ya está registrado a nombre de otro contribuyente.'
     : !listo
       ? 'Falta el número de documento completo.'
-      : pendientes > 0
-        ? `Quedan ${String(pendientes)} datos obligatorios sin llenar.`
-        : '';
+      : comprobando
+        ? 'Se está comprobando si ese documento ya está en el padrón.'
+        : noSePudoComprobar
+          ? 'No se pudo comprobar en el padrón si ese documento ya existe.'
+          : pendientes > 0
+            ? `Quedan ${String(pendientes)} datos obligatorios sin llenar.`
+            : '';
 
   const bloqueado = nuevo && ultima && !puedeCrear;
 
@@ -214,12 +245,26 @@ export function Expediente({
               El código de contribuyente lo asigna el sistema. Lo que tiene que ser único es el
               documento.
             </p>
-            <Insignia tono={duplicado ? 'mal' : listo ? 'ok' : 'atencion'}>
+            <Insignia
+              tono={
+                duplicado || noSePudoComprobar
+                  ? 'mal'
+                  : listo && !comprobando && seSabeSiEstaLibre
+                    ? 'ok'
+                    : 'atencion'
+              }
+            >
               {duplicado
                 ? 'Documento ya registrado'
-                : listo
-                  ? 'Documento válido'
-                  : `${String(numeroDoc.length)} de ${String(largoDoc)} dígitos`}
+                : noSePudoComprobar
+                  ? 'No se pudo comprobar'
+                  : !listo
+                    ? `${String(numeroDoc.length)} de ${String(largoDoc)} dígitos`
+                    : comprobando
+                      ? 'Comprobando en el padrón…'
+                      : seSabeSiEstaLibre
+                        ? 'Documento válido'
+                        : 'Sin comprobar en el padrón'}
             </Insignia>
           </div>
           <div className="kr-compuerta__controles">
@@ -250,11 +295,17 @@ export function Expediente({
               <code className="kr-compuerta__asignado-valor">{codigoAsignado}</code>
             </p>
           </div>
-          {(duplicado || !listo) && (
-            <p className={`kr-compuerta__aviso${duplicado ? ' kr-compuerta__aviso--mal' : ''}`}>
+          {(duplicado || !listo || noSePudoComprobar || !seSabeSiEstaLibre) && (
+            <p
+              className={`kr-compuerta__aviso${duplicado || noSePudoComprobar ? ' kr-compuerta__aviso--mal' : ''}`}
+            >
               {duplicado && duenoDelDocumento !== null
                 ? `Ese documento ya está en el padrón, a nombre de ${duenoDelDocumento.nombreRazonSocial} (${duenoDelDocumento.codigo}). Dos códigos para la misma persona parten su deuda en dos cuentas que nadie cruza: abra el contribuyente que ya existe.`
-                : `El ${tipoDoc} tiene ${String(largoDoc)} dígitos. Se comprueba contra el padrón antes de crear el código.`}
+                : noSePudoComprobar
+                  ? `No se pudo preguntar al padrón si ese documento ya existe: ${yaEnElPadron.error ?? ''} Hasta que se pueda, el alta queda bloqueada: crear un contribuyente duplicado es el error que más cuesta deshacer.`
+                  : !listo
+                    ? `El ${tipoDoc} tiene ${String(largoDoc)} dígitos. Se comprueba contra el padrón antes de crear el código.`
+                    : `El padrón sólo se puede consultar por DNI y por RUC, así que desde aquí no se puede comprobar si ese ${tipoDoc.toLowerCase()} ya está registrado. Si lo estuviera, el alta se rechazará al guardarla.`}
             </p>
           )}
         </div>
@@ -405,6 +456,19 @@ export function Expediente({
                 </table>
               </div>
               {nuevo && <p className="kr-tabla__vacio">{seccion.tabla.vacioTexto}</p>}
+              {/* Un 200 con lista vacia es un ESTADO, no una averia (AC9): la operacion
+                  contesto, y lo que contesto es que este contribuyente no tiene ninguno. Se
+                  distingue de «no se pudo leer», que es lo de la linea siguiente. */}
+              {!nuevo && seccion.id === 'beneficios' && beneficios.dato?.length === 0 && (
+                <p className="kr-tabla__vacio">
+                  Este contribuyente no tiene ningún beneficio registrado.
+                </p>
+              )}
+              {!nuevo && seccion.id === 'beneficios' && beneficios.error !== null && (
+                <p className="kr-tabla__vacio kr-tabla__vacio--mal">
+                  No se pudieron leer los beneficios: {beneficios.error}
+                </p>
+              )}
               <p className="kr-tarjeta__pie">{seccion.tabla.nota}</p>
             </section>
           )}

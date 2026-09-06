@@ -1,7 +1,9 @@
 import { render, screen } from '@testing-library/react';
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { fijarToken } from '../api/identidad.ts';
 import { desinstalarProxyDeDatos, instalarProxyDeDatos } from '../api/proxy.ts';
+import { PAGINA_0_FILAS, contestaLaInstalacion } from '../datos/backendMedido.ts';
 import { Marco } from '../marco/Marco.tsx';
 import { SECCIONES } from '../marco/arbol.ts';
 import { MUNICIPALIDAD_MEDIDA, conEjercicio } from '../marco/sesionMedida.ts';
@@ -42,15 +44,36 @@ const IDENTIDAD = {
  * una seccion fuera del catalogo y no del dato, ese grupo lo dice.
  */
 
-beforeAll(() => {
+/**
+ * El transporte del recorrido: **las ocho de `YA_SERVIDAS` contra lo medido, y el resto al
+ * proxy**.
+ *
+ * Desde I-4 el modulo no se sirve de una sola fuente, y este archivo tiene que reflejarlo o
+ * dejaria de recorrer lo que la aplicacion recorre: «Contribuyentes» habla con el backend y
+ * «Valores» con el proxy, en la misma sesion y por el mismo `solicitar()`.
+ */
+function transporte() {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn<typeof fetch>((entrada) => {
+      const cuerpo = contestaLaInstalacion(String(entrada));
+      return Promise.resolve(
+        cuerpo === null ? new Response('{}', { status: 404 }) : Response.json(cuerpo),
+      );
+    }),
+  );
   instalarProxyDeDatos();
-});
+}
 
-afterAll(() => {
-  desinstalarProxyDeDatos();
+beforeEach(() => {
+  fijarToken('un-token-de-prueba');
+  transporte();
 });
 
 afterEach(() => {
+  desinstalarProxyDeDatos();
+  vi.unstubAllGlobals();
+  fijarToken(null);
   window.history.replaceState(null, '', '/');
 });
 
@@ -68,8 +91,9 @@ const RECORRIDO = [
   {
     slug: 'contribuyentes',
     titulo: 'Contribuyentes',
-    // Un contribuyente del padron que sirve `GET /rentas/contribuyentes`.
-    conDatos: 'Suc. Rufina Medina Medina',
+    // Un contribuyente del padron de VERDAD: desde I-4 esta ruta la sirve el backend, y el
+    // nombre es el de la primera fila que contesta la municipalidad 9.
+    conDatos: PAGINA_0_FILAS[0]?.nombreRazonSocial ?? '',
   },
   {
     slug: 'determinacion',
@@ -115,7 +139,13 @@ describe('la marca de cada seccion es del DATO y no del catalogo', () => {
   it.each(RECORRIDO.map((paso) => [paso.slug, paso] as const))(
     'sin proxy, «#%s» conserva su titulo y pierde su marca',
     async (_slug, paso) => {
+      // Sin proxy Y sin backend: se quitan los dos, porque desde I-4 las secciones ya no se
+      // sirven todas del mismo sitio y apagar solo uno dejaria a la mitad con sus datos.
       desinstalarProxyDeDatos();
+      vi.stubGlobal(
+        'fetch',
+        vi.fn<typeof fetch>(() => Promise.resolve(new Response('{}', { status: 503 }))),
+      );
       try {
         abrirEn(paso.slug);
 
@@ -125,7 +155,7 @@ describe('la marca de cada seccion es del DATO y no del catalogo', () => {
         await screen.findAllByRole('alert');
         expect(screen.queryByText(paso.conDatos)).toBeNull();
       } finally {
-        instalarProxyDeDatos();
+        transporte();
       }
     },
   );

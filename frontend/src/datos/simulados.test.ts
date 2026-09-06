@@ -87,24 +87,63 @@ describe('la lista de rutas que ya sirve el backend', () => {
    * una ruta es una decision, y una lista que crece sin que nada lo diga vuelve a convertir la
    * integracion en el salto que este mecanismo existe para evitar.
    */
-  it('son las seis de seguridad, y el proxy sigue contestando las dieciocho', () => {
+  it('son las doce, en el orden en que se encendieron, y el proxy sigue simulando las dieciocho', () => {
+    // Se enumeran y no se cuentan: encender una ruta es una decision, y `toHaveLength(12)` la
+    // daria por buena sin mirar cual. Las tres tandas se distinguen a simple vista.
     expect(YA_SERVIDAS.map((o) => `${o.metodo} ${o.ruta}`)).toEqual([
+      // I-1: el camino
       'GET /seguridad/sesion',
       'GET /seguridad/sesion/municipalidad',
+      // I-3: la navegacion
       'GET /seguridad/modulos',
       'GET /seguridad/accesos',
       'GET /seguridad/sesion/permisos',
       'PUT /seguridad/sesion/ejercicio',
+      // I-4: el padron
+      'GET /rentas/contribuyentes',
+      'GET /rentas/contribuyentes/{id}/ficha',
+      'GET /coactiva/deudas',
+      'GET /rentas/predial/corridas/ultima',
+      'GET /rentas/predial/corridas/{corridaId}/observados',
+      'GET /rentas/beneficios',
     ]);
     // Trece las trajo F-4; las cuatro de F-5 son las que alimentan el panel del modulo y el
     // estado de cobranza del padron; la de F-6 es la procedencia del conjunto sellado, que es
-    // lo unico que el contrato dice de la tabla de valores del ejercicio. **Ninguna de las
-    // dieciocho se apaga con esto**: ninguna de las seis de seguridad estaba entre ellas, asi
-    // que el proxy sigue simulando exactamente lo mismo que antes de I-1 (AC9). La asercion de
-    // abajo es la que lo sostiene, y lo sostiene por interseccion y no por confianza.
+    // lo unico que el contrato dice de la tabla de valores del ejercicio. **El proxy no pierde
+    // ninguna al encenderse una ruta**, y no es un descuido: son dos listas con dos trabajos
+    // distintos, y el de abajo dice cual es el de cada una.
     expect(OPERACIONES).toHaveLength(18);
+  });
+
+  it('las que el backend sirve SIGUEN simuladas, y por eso su forma se sigue comparando', () => {
+    // Hasta I-3 la interseccion estaba vacia y esta prueba lo afirmaba —ni las dos de sesion ni
+    // las cuatro de seguridad alimentan ninguna pantalla del artboard—. **Con I-4 deja de
+    // estarlo: seis de las doce estan tambien en `OPERACIONES`, y eso es lo que se quiere**, por
+    // dos motivos que ninguna otra prueba dice:
+    //
+    //   · `formas.test.ts` compara campo a campo lo que sirve el PROXY contra el contrato. Una
+    //     operacion que saliera del proxy al encenderse dejaria de compararse justo cuando
+    //     empieza a usarse de verdad, que es al reves de lo que hace falta.
+    //   · el proxy consulta `laSirveElBackend` ANTES de mirar su tabla, asi que tener las dos no
+    //     es ambiguo: manda la lista, y lo simulado queda como lo que se sirve si se apaga.
     const simuladas = new Set(OPERACIONES.map((o) => `${o.metodo} ${o.ruta}`));
-    expect(YA_SERVIDAS.filter((o) => simuladas.has(`${o.metodo} ${o.ruta}`))).toEqual([]);
+    const enLasDos = YA_SERVIDAS.map((o) => `${o.metodo} ${o.ruta}`).filter((c) =>
+      simuladas.has(c),
+    );
+
+    expect(enLasDos).toEqual([
+      'GET /rentas/contribuyentes',
+      'GET /rentas/contribuyentes/{id}/ficha',
+      'GET /coactiva/deudas',
+      'GET /rentas/predial/corridas/ultima',
+      'GET /rentas/predial/corridas/{corridaId}/observados',
+      'GET /rentas/beneficios',
+    ]);
+    // Y las seis de seguridad siguen sin estarlo: ninguna alimenta una pantalla del artboard,
+    // asi que encenderlas no le quito nada al proxy.
+    expect(simuladas.has('GET /seguridad/sesion')).toBe(false);
+    expect(simuladas.has('GET /seguridad/modulos')).toBe(false);
+    expect(simuladas.has('PUT /seguridad/sesion/ejercicio')).toBe(false);
   });
 
   it('y por que son ESAS dos esta escrito, con lo que hizo falta antes', () => {
@@ -116,8 +155,14 @@ describe('la lista de rutas que ya sirve el backend', () => {
     expect(fuente).toContain('server.proxy');
   });
 
-  it('el mecanismo funciona aunque la lista este vacia', () => {
-    expect(laSirveElBackend(YA_SERVIDAS, 'GET', '/rentas/contribuyentes')).toBe(false);
+  it('el mecanismo no depende de lo que haya en la lista', () => {
+    // Con una lista que no la nombra, la ruta se queda en el proxy — que es lo que permite
+    // encenderlas de una en una.
+    expect(laSirveElBackend([], 'GET', '/rentas/contribuyentes')).toBe(false);
+    expect(laSirveElBackend(YA_SERVIDAS, 'GET', '/rentas/contribuyentes')).toBe(true);
+    // Y una que sigue fuera lo sigue estando: `/rentas/predios` exige `?codContribuyente=`, que
+    // el contrato no publica (#26).
+    expect(laSirveElBackend(YA_SERVIDAS, 'GET', '/rentas/predios')).toBe(false);
     expect(
       laSirveElBackend(
         [{ metodo: 'get', ruta: '/rentas/contribuyentes/{id}/ficha' }],

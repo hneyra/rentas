@@ -1,7 +1,7 @@
 /**
  * Las operaciones que el backend YA sirve en el entorno donde corre la aplicacion.
  *
- * <h2>Seis: las dos primeras de I-1 y las cuatro de I-3</h2>
+ * <h2>Doce: dos de sesion (I-1), cuatro de seguridad (I-3) y seis del padron (I-4)</h2>
  *
  * La integracion no es un salto. El backend publica 181 operaciones y el proxy simula
  * dieciocho: encenderlas todas a la vez seria cambiar 181 respuestas en una sola tarde sin poder
@@ -59,10 +59,15 @@ export interface OperacionServida {
 }
 
 /**
- * Las seis de seguridad. Todo lo demas lo sigue contestando el proxy.
+ * Lo que el backend ya sirve. Todo lo demas lo sigue contestando el proxy.
  *
  * El tipo es `readonly OperacionServida[]` y no una tupla: lo que cambia el dia que se encienda
- * la septima es esta lista, y nada mas.
+ * la siguiente es esta lista, y nada mas.
+ *
+ * <b>Son doce, y llegaron en tres tandas</b>: las dos de sesion que abrieron el camino (I-1),
+ * las cuatro con que se compone la navegacion (I-3) y las seis del padron de contribuyentes
+ * (I-4). Cada tanda dejo escrito lo que vio al encender lo suyo, y las tres notas siguen aqui
+ * porque lo que se vio es lo que justifica que la ruta este en la lista.
  *
  * <h2>Las cuatro que enciende I-3, en el orden en que se encendieron</h2>
  *
@@ -98,6 +103,56 @@ export interface OperacionServida {
  * eso la pantalla lo explica y ofrece reintentar en vez de dibujar un marco vacio. Cerrarlo de
  * verdad no es de este lado: es publicar el menu de la sesion —el catalogo filtrado por quien
  * pregunta— y eso es del dueno de `seguridad`.
+ *
+ * <h2>Las seis de I-4, con lo que se vio al encender cada una</h2>
+ *
+ * Medido contra la instalacion el 2026-09-07, con `administrador` (municipalidad 9) para la
+ * escala y `jperez` (municipalidad 1) para el movimiento:
+ *
+ * <ol>
+ *   <li><b>`GET /rentas/contribuyentes`</b> — 200. **10 603 contribuyentes** y `totalPaginas:
+ *       5302` con `tamano=2`; 16 con `jperez`. Lo que se vio al encenderla es que la lista deja
+ *       de ser una lista y pasa a ser una <b>ventana</b>: el conteo «5 de 5» que dibujaba F-5
+ *       decia «20 de 20» sobre un padron de diez mil, y el buscador del cliente contestaba
+ *       «ningun contribuyente coincide» para gente que si estaba. De ahi salen AC1, AC2 y
+ *       AC3.</li>
+ *   <li><b>`GET /coactiva/deudas`</b> — 200 con <b>lista vacia</b> en las dos municipalidades.
+ *       No es una averia: es el dato. Con el backend sano, el chip que depende de esta operacion
+ *       sale vacio, y la pantalla tiene que decir «ninguno» y no «no se pudo leer» (AC5).</li>
+ *   <li><b>`GET /rentas/predial/corridas/ultima`</b> — 200. `{"id":20,"ejercicio":"2026",
+ *       "alcance":"TODOS","simulacion":true,…}` con `administrador` y `id: 18` con `jperez`.
+ *       Trae tres campos que el port no leia y el contrato si declara —`sector`, `simulacion` y
+ *       `conjunto`—, asi que se anadieron al tipo: un campo declarado es un campo que el
+ *       proveedor no puede retirar sin poner rojo su build.</li>
+ *   <li><b>`GET /rentas/predial/corridas/{corridaId}/observados`</b> — 200 con lista vacia. Se
+ *       enciende junto a la anterior porque no se puede pedir sin ella: su `corridaId` sale de
+ *       la respuesta de la ultima corrida.</li>
+ *   <li><b>`GET /rentas/contribuyentes/{id}/ficha`</b> — 200. Y lo que se vio al encenderla es
+ *       lo que obligo a cambiar el tipo: `datosPersonales.fechaNacimiento` y `estadoCivil`
+ *       llegan <b>nulos</b>, y la tabla `domicilio` esta vacia en el origen, asi que
+ *       `domicilioFiscal` tambien. Un 404 legitimo —`{"codigo":"NO_ENCONTRADO"}`— es la
+ *       respuesta a un identificador que no es de esta municipalidad.</li>
+ *   <li><b>`GET /rentas/beneficios?contribuyente={codigo}`</b> — 200 con <b>lista vacia</b>, y
+ *       la tabla `beneficio` esta vacia tambien en el origen del volcado. Se enciende porque es
+ *       la unica de las tres del expediente que <b>si</b> puede acotarse a un contribuyente con
+ *       un parametro que la operacion publica (`?contribuyente=`, comparado contra
+ *       `c.codigo_contribuyente`). El estado vacio se dibuja como estado y no como averia
+ *       (AC9).</li>
+ * </ol>
+ *
+ * <h2>Y las dos del expediente que NO se encienden, con su medida</h2>
+ *
+ * <b>`GET /rentas/predios`</b> y <b>`GET /consultas/deuda`</b> exigen `?codContribuyente=` —sin
+ * el, <b>422</b>— y el contrato <b>no publica ese parametro</b> (#26). Mandarlo desde aqui seria
+ * construir sobre un nombre que nada comprueba: el dia que el proveedor lo renombrara, esta
+ * pantalla pediria sin filtro, el backend contestaria 422 y ninguna prueba de este lado lo
+ * habria dicho antes. Se quedan en el proxy hasta que el contrato lo declare — y mientras tanto
+ * el expediente dice de donde sale cada una de sus tres tablas, porque un contribuyente de
+ * verdad con los predios del artboard debajo seria peor que una tabla vacia.
+ *
+ * <b>`GET /rentas/arbitrios`</b> tambien contesta 200 con lista vacia, medido, y tampoco se
+ * enciende: es de la seccion «Valores» (F-6) y no del padron. Encenderla en este PR cambiaria
+ * una pantalla que este issue no toca.
  */
 export const YA_SERVIDAS: readonly OperacionServida[] = [
   { metodo: 'GET', ruta: '/seguridad/sesion' },
@@ -106,6 +161,12 @@ export const YA_SERVIDAS: readonly OperacionServida[] = [
   { metodo: 'GET', ruta: '/seguridad/accesos' },
   { metodo: 'GET', ruta: '/seguridad/sesion/permisos' },
   { metodo: 'PUT', ruta: '/seguridad/sesion/ejercicio' },
+  { metodo: 'GET', ruta: '/rentas/contribuyentes' },
+  { metodo: 'GET', ruta: '/rentas/contribuyentes/{id}/ficha' },
+  { metodo: 'GET', ruta: '/coactiva/deudas' },
+  { metodo: 'GET', ruta: '/rentas/predial/corridas/ultima' },
+  { metodo: 'GET', ruta: '/rentas/predial/corridas/{corridaId}/observados' },
+  { metodo: 'GET', ruta: '/rentas/beneficios' },
 ];
 
 /** `/rentas/vehiculos/{placa}` → `^/rentas/vehiculos/[^/]+$`. */

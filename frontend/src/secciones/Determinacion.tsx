@@ -226,6 +226,21 @@ export function Determinacion() {
             />
           )}
 
+          {/* Una corrida SIMULADA no emite: no deja ninguna deuda en la cuenta corriente. El
+              contrato publica `simulacion` y hasta I-4 nadie lo leia, asi que un ensayo y una
+              emision de verdad se dibujaban iguales — y la diferencia entre las dos es si esos
+              contribuyentes deben algo. Es lo primero que hay que saber al mirar este cuadro. */}
+          {tipo.clave === 'predial-masivo' && corrida.dato?.simulacion === true && (
+            <Aviso
+              tipo="vacio"
+              titulo="La última corrida fue una simulación"
+              detalle={
+                'Se calculó para ver qué saldría, y no emitió: ninguna de estas cuentas tiene ' +
+                'deuda por esta corrida. Lo dice la propia respuesta, en «simulacion».'
+              }
+            />
+          )}
+
           {cuadre !== null &&
             tipo.clave === 'predial-individual' &&
             (!cuadre.insolutoCuadra || !cuadre.totalCuadra) && (

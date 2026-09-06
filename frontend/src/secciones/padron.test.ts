@@ -4,16 +4,24 @@ import type {
   ContribuyenteDelPadron,
   DeudaEnCoactiva,
   ObservadoDeLaCorrida,
+  Paginado,
 } from '../datos/lecturas.ts';
-import { componerPadron, filtrar, ordenar } from './padron.ts';
+import {
+  CRITERIOS,
+  ORDENES_DEL_PADRON,
+  componerPadron,
+  criterioDe,
+  rutaDelDocumento,
+  rutaDelPadron,
+} from './padron.ts';
 
 /**
- * La aritmetica del padron, sin montar nada.
+ * La aritmetica del padron y **la consulta que se le manda al backend**, sin montar nada.
  *
- * Componer, filtrar y ordenar son funciones puras y se prueban como tales: montar la seccion
- * para comprobar que «Nombre» ordena por nombre diria menos —la lista de la pantalla depende
+ * Componer y componer la ruta son funciones puras y se prueban como tales: montar la seccion
+ * para comprobar que el criterio viaja en la URL diria menos —la lista de la pantalla depende
  * ademas de tres peticiones— y costaria un `render`. Lo que si se prueba montado, en
- * `Contribuyentes.test.tsx`, es que la pantalla las use.
+ * `Contribuyentes.test.tsx`, es que la pantalla las use y que lo que salio por el cable sea esto.
  */
 
 const uno = (
@@ -25,7 +33,7 @@ const uno = (
   codigo,
   tipoDocumento: 'DNI',
   numeroDocumento: '03593174',
-  tipoPersona: 'Persona natural',
+  tipoPersona: 'NATURAL',
   nombreRazonSocial: nombre,
   condicionEspecial: null,
   activo: true,
@@ -39,7 +47,7 @@ const PADRON: readonly ContribuyenteDelPadron[] = [
   uno('00000006551', 'Noblecilla Arismendiz S.A.C.', {
     tipoDocumento: 'RUC',
     numeroDocumento: '20525118447',
-    tipoPersona: 'Persona jurídica',
+    tipoPersona: 'JURIDICA',
   }),
   uno('00000152614', 'Valdez Ríos, Oliver Fabián', {
     numeroDocumento: '41182844',
@@ -47,29 +55,38 @@ const PADRON: readonly ContribuyenteDelPadron[] = [
   }),
 ];
 
-const COACTIVA: readonly DeudaEnCoactiva[] = [
-  {
-    expediente: '2026-0418',
-    ano: 2026,
-    codContribuyente: '00000006550',
-    contribuyente: 'Díaz Madrid, Julio César',
-    deudaS: '9412.15',
-    costasS: '0.00',
-    totalS: '9412.15',
-    aLaFecha: '2026-08-12',
-    estado: 'En coactiva',
-  },
-];
+/** Envuelve una lista como la envuelve el backend. `total` por omision: la lista entera. */
+function ventana<T>(contenido: readonly T[], total = contenido.length): Paginado<T> {
+  return {
+    contenido,
+    pagina: 0,
+    tamano: 20,
+    totalElementos: total,
+    totalPaginas: Math.ceil(total / 20),
+    hayMas: contenido.length < total,
+  };
+}
 
-const OBSERVADOS: readonly ObservadoDeLaCorrida[] = [
-  {
-    codContribuyente: '00000006551',
-    nombre: 'Noblecilla Arismendiz S.A.C.',
-    motivo: 'El predio no tiene arancel de vía',
-  },
-];
+const EN_COACTIVA: DeudaEnCoactiva = {
+  expediente: '2026-0418',
+  ano: 2026,
+  codContribuyente: '00000006550',
+  contribuyente: 'Díaz Madrid, Julio César',
+  deudaS: '9412.15',
+  costasS: '0.00',
+  totalS: '9412.15',
+  aLaFecha: '2026-08-12',
+  estado: 'En coactiva',
+};
 
-const filas = componerPadron(PADRON, COACTIVA, OBSERVADOS);
+const OBSERVADO: ObservadoDeLaCorrida = {
+  codContribuyente: '00000006551',
+  nombre: 'Noblecilla Arismendiz S.A.C.',
+  motivo: 'El predio no tiene arancel de vía',
+};
+
+const compuesto = componerPadron(PADRON, ventana([EN_COACTIVA]), ventana([OBSERVADO]));
+const filas = compuesto.filas;
 
 describe('componer la fila del padron de las tres respuestas', () => {
   it('quien tiene expediente coactivo se ensena «En coactiva», con su importe y su fecha', () => {
@@ -78,7 +95,7 @@ describe('componer la fila del padron de las tres respuestas', () => {
     expect(diaz?.estado).toBe('En coactiva');
     expect(diaz?.expediente).toBe('2026-0418');
     // El importe NO viaja solo: es la regla 9, y aqui es lo unico que permite ensenar una cifra
-    // en la lista sin inventarla.
+    // en la lista sin inventarle una fecha.
     expect(diaz?.importe).toEqual({ importe: '9412.15', actualizadoA: '2026-08-12' });
   });
 
@@ -87,146 +104,187 @@ describe('componer la fila del padron de las tres respuestas', () => {
 
     expect(noblecilla?.estado).toBe('Observado');
     expect(noblecilla?.motivo).toBe('El predio no tiene arancel de vía');
-    // Y sin importe: la corrida dice quien quedo fuera, no cuanto debe.
+    // Nadie publica cuanto debe: la fila no lleva importe, y no lleva un cero.
     expect(noblecilla?.importe).toBeNull();
   });
 
-  it('quien no esta en ninguna de las dos se ensena con lo que SI publica el padron', () => {
-    // «Activo» y «De baja» salen de `activo`, que es el unico estado que la operacion del
-    // padron publica. No es «Al día»: nadie ha dicho que este al dia.
-    expect(filas.map((fila) => fila.estado)).toEqual([
-      'Activo',
-      'Activo',
-      'En coactiva',
-      'Observado',
-      'De baja',
-    ]);
+  it('a quien nadie clasifica se le ensena lo que el padron publica de el, y nada mas', () => {
+    const rufina = filas.find((fila) => fila.contribuyente.codigo === '00000025673');
+    const oliver = filas.find((fila) => fila.contribuyente.codigo === '00000152614');
+
+    // «Activo» y «De baja» salen de `activo`. **No es «Al día»**: nadie ha dicho que lo esten.
+    expect(rufina?.estado).toBe('Activo');
+    expect(oliver?.estado).toBe('De baja');
+    expect(filas.map((fila) => fila.estado)).not.toContain('Al día');
   });
 
-  it('ninguna fila se inventa un importe', () => {
-    expect(filas.filter((fila) => fila.importe !== null)).toHaveLength(1);
-  });
-
-  it('conserva el orden en que llego el padron', () => {
+  it('el orden es el que llego, y no se reordena', () => {
     expect(filas.map((fila) => fila.contribuyente.codigo)).toEqual(
       PADRON.map((quien) => quien.codigo),
     );
   });
 });
 
-describe('el buscador mira lo que la caja promete: «Nombre, DNI, RUC o código»', () => {
-  it('por nombre, sin distinguir mayusculas', () => {
-    expect(filtrar(filas, 'castillo', 'Todos').map((fila) => fila.contribuyente.codigo)).toEqual([
-      '00000003541',
+describe('AC5 — la insignia solo se afirma si la lista que la sostiene llego ENTERA', () => {
+  it('con las dos listas completas, el estado se da por bueno', () => {
+    expect(compuesto.estadoCompleto).toBe(true);
+  });
+
+  it('con las DOS vacias y completas tambien: vacio no es incompleto', () => {
+    // Es el caso medido contra la instalacion: las dos contestan 200 con lista vacia. «No hay
+    // nadie en coactiva» es un dato, y un dato completo.
+    const sinNadie = componerPadron(PADRON, ventana([]), ventana([]));
+
+    expect(sinNadie.estadoCompleto).toBe(true);
+    expect(sinNadie.filas.map((fila) => fila.estado)).toEqual([
+      'Activo',
+      'Activo',
+      'Activo',
+      'Activo',
+      'De baja',
     ]);
   });
 
-  it('por numero de documento', () => {
-    expect(filtrar(filas, '20525118447', 'Todos').map((fila) => fila.contribuyente.codigo)).toEqual(
-      ['00000006551'],
+  it('con una RECORTADA, no: no aparecer en una pagina no es no estar en la lista', () => {
+    // 1 de 400. Quien esta en coactiva y cae en la pagina 7 se dibujaria «Activo», que es una
+    // afirmacion sobre una persona hecha por omision.
+    const recortada = componerPadron(PADRON, ventana([EN_COACTIVA], 400), ventana([OBSERVADO]));
+
+    expect(recortada.estadoCompleto).toBe(false);
+    // Y lo que SI aparece en la ventana se sigue marcando: lo que no se puede afirmar es la
+    // ausencia, no la presencia.
+    expect(recortada.filas.find((fila) => fila.contribuyente.codigo === '00000006550')?.estado).toBe(
+      'En coactiva',
     );
   });
 
-  it('por codigo, aunque se teclee un trozo', () => {
-    expect(filtrar(filas, '152614', 'Todos').map((fila) => fila.contribuyente.codigo)).toEqual([
-      '00000152614',
-    ]);
-  });
-
-  it('por tipo de documento: «RUC» saca a la persona juridica', () => {
-    expect(filtrar(filas, 'RUC', 'Todos').map((fila) => fila.contribuyente.codigo)).toEqual([
-      '00000006551',
-    ]);
-  });
-
-  it('lo que no casa con nadie devuelve la lista vacia, que es lo que dispara el AC3', () => {
-    expect(filtrar(filas, 'Zzz', 'Todos')).toEqual([]);
-  });
-
-  it('los espacios de los lados no cuentan', () => {
-    expect(filtrar(filas, '   castillo  ', 'Todos')).toHaveLength(1);
+  it('sin ninguna de las dos —todavia no llegaron— tampoco se afirma nada', () => {
+    expect(componerPadron(PADRON, null, null).estadoCompleto).toBe(false);
   });
 });
 
-describe('los cuatro chips del artboard', () => {
-  it('«Todos» no filtra', () => {
-    expect(filtrar(filas, '', 'Todos')).toHaveLength(5);
-  });
-
-  it('«En coactiva» saca al que tiene expediente', () => {
-    expect(filtrar(filas, '', 'En coactiva').map((fila) => fila.contribuyente.codigo)).toEqual([
-      '00000006550',
+describe('AC3 — el criterio viaja en la URL, con el nombre que el backend lee', () => {
+  it('los cuatro que la operacion admite, y ninguno mas', () => {
+    // `dNI` y `rUC` con la mayuscula corrida: es como los declara `ContribuyenteController`, y
+    // escribirlos «bien» haria que el filtro no filtrara y volviera el padron entero.
+    expect(CRITERIOS.map((uno) => [uno.rotulo, uno.parametro])).toEqual([
+      ['Nombre', 'nombreRazonSocial'],
+      ['Código', 'codigo'],
+      ['DNI', 'dNI'],
+      ['RUC', 'rUC'],
     ]);
   });
 
-  it('«Observado» saca al que quedo sin emision', () => {
-    expect(filtrar(filas, '', 'Observado').map((fila) => fila.contribuyente.codigo)).toEqual([
-      '00000006551',
-    ]);
-  });
+  it('buscar por nombre manda `nombreRazonSocial`, y NO manda orden', () => {
+    const ruta = rutaDelPadron('/rentas/contribuyentes', {
+      criterio: 'Nombre',
+      texto: 'sulon vilchez',
+      orden: 'Código',
+      pagina: 0,
+    });
 
-  it('«Con deuda» no saca a nadie, porque nadie publica quien debe', () => {
-    // **Es el hallazgo, y esta escrito como prueba a proposito.** Ninguna de las 181 operaciones
-    // publica, por contribuyente y en una lista, el estado de cobranza con su deuda; el chip
-    // existe porque el artboard lo dibuja, filtra, y sale vacio con su motivo escrito en la
-    // pantalla. El dia que el padron publique el saldo, esta prueba es la que hay que cambiar.
-    expect(filtrar(filas, '', 'Con deuda')).toEqual([]);
-  });
-
-  it('el chip y la busqueda se aplican los DOS, no uno u otro', () => {
-    expect(filtrar(filas, 'Noblecilla', 'En coactiva')).toEqual([]);
-    expect(filtrar(filas, 'Noblecilla', 'Observado')).toHaveLength(1);
-  });
-});
-
-describe('los tres ordenes', () => {
-  it('«Código» deja el orden en que llego el padron', () => {
-    expect(ordenar(filas, 'Código')).toEqual(filas);
-  });
-
-  it('«Nombre» ordena en castellano: la «Í» de Díaz va antes que la «N» de Noblecilla', () => {
-    expect(ordenar(filas, 'Nombre').map((fila) => fila.contribuyente.nombreRazonSocial)).toEqual([
-      'Castillo Pascuala, María Elena',
-      'Díaz Madrid, Julio César',
-      'Noblecilla Arismendiz S.A.C.',
-      'Suc. Rufina Medina Medina',
-      'Valdez Ríos, Oliver Fabián',
-    ]);
-  });
-
-  it('«Deuda» pone delante al que mas debe, y al que nadie publica lo deja al final', () => {
-    const dos = componerPadron(
-      PADRON,
-      [
-        ...COACTIVA,
-        {
-          ...COACTIVA[0]!,
-          expediente: '2026-0002',
-          codContribuyente: '00000025673',
-          contribuyente: 'Suc. Rufina Medina Medina',
-          deudaS: '1842.60',
-          totalS: '1842.60',
-        },
-      ],
-      OBSERVADOS,
+    expect(ruta).toBe(
+      '/rentas/contribuyentes?nombreRazonSocial=sulon%20vilchez&pagina=0&tamano=20',
     );
+    // Sin `ordenarPor`: con nombre el backend ordena por parecido, y pedirle otro orden dejaria
+    // el mejor parecido fuera de la primera pagina.
+    expect(ruta).not.toContain('ordenarPor');
+  });
 
-    expect(ordenar(dos, 'Deuda').map((fila) => fila.contribuyente.codigo).slice(0, 2)).toEqual([
-      '00000006550',
-      '00000025673',
-    ]);
-    // Los tres sin importe van detras, y en su orden: no es que deban cero, es que nadie
-    // publica cuanto deben — colocarlos entre los ceros diria que estan al dia.
+  it('los tres exactos mandan el suyo, y el orden si viaja', () => {
+    const porCodigo = rutaDelPadron('/rentas/contribuyentes', {
+      criterio: 'Código',
+      texto: '00000000008',
+      orden: 'Nombre',
+      pagina: 0,
+    });
+
+    expect(porCodigo).toContain('codigo=00000000008');
+    expect(porCodigo).toContain('ordenarPor=nombreRazonSocial');
     expect(
-      ordenar(dos, 'Deuda')
-        .slice(2)
-        .every((fila) => fila.importe === null),
-    ).toBe(true);
+      rutaDelPadron('/rentas/contribuyentes', {
+        criterio: 'DNI',
+        texto: '29614026',
+        orden: 'Código',
+        pagina: 0,
+      }),
+    ).toContain('dNI=29614026');
+    expect(
+      rutaDelPadron('/rentas/contribuyentes', {
+        criterio: 'RUC',
+        texto: '20602546391',
+        orden: 'Código',
+        pagina: 0,
+      }),
+    ).toContain('rUC=20602546391');
   });
 
-  it('ordenar no muta la lista que recibe', () => {
-    const antes = filas.map((fila) => fila.contribuyente.codigo);
-    ordenar(filas, 'Nombre');
-    expect(filas.map((fila) => fila.contribuyente.codigo)).toEqual(antes);
+  it('sin texto no se manda criterio ninguno: el padron entero, paginado', () => {
+    expect(
+      rutaDelPadron('/rentas/contribuyentes', {
+        criterio: 'Nombre',
+        texto: '   ',
+        orden: 'Código',
+        pagina: 3,
+      }),
+    ).toBe('/rentas/contribuyentes?pagina=3&tamano=20&ordenarPor=codigoContribuyente');
+  });
+
+  it('«Código» y «DNI» y «RUC» se declaran EXACTOS, que es lo que hace el SQL', () => {
+    // Medido: `?codigo=000000000` sobre codigos que todos empiezan por ceros devuelve 0, porque
+    // la condicion es `codigo_contribuyente = :codigo`. La pantalla lo dice antes de que alguien
+    // teclee medio codigo y concluya que no existe.
+    expect(CRITERIOS.filter((uno) => uno.exacto).map((uno) => uno.rotulo)).toEqual([
+      'Código',
+      'DNI',
+      'RUC',
+    ]);
+    expect(criterioDe('Nombre').exacto).toBe(false);
+  });
+});
+
+describe('AC3 — los ordenes son los que el backend admite, y «Deuda» no esta', () => {
+  it('dos, con el campo que los pide', () => {
+    // Medido: `?ordenarPor=deuda` contesta 422 `ORDEN_NO_ADMITIDO`, «Campo pedido: deuda». No
+    // esta en la lista blanca porque esta operacion no publica la deuda.
+    expect(ORDENES_DEL_PADRON.map((uno) => [uno.rotulo, uno.campo])).toEqual([
+      ['Código', 'codigoContribuyente'],
+      ['Nombre', 'nombreRazonSocial'],
+    ]);
+    expect(ORDENES_DEL_PADRON.map((uno) => uno.rotulo)).not.toContain('Deuda');
+  });
+});
+
+describe('AC2 — la pagina viaja, y el tamano tambien', () => {
+  it('la pagina se cuenta desde 0, como la cuenta el backend', () => {
+    expect(
+      rutaDelPadron('/rentas/contribuyentes', {
+        criterio: 'Nombre',
+        texto: '',
+        orden: 'Código',
+        pagina: 530,
+      }),
+    ).toContain('pagina=530');
+  });
+});
+
+describe('la compuerta del documento pregunta por lo que se puede preguntar', () => {
+  it('un DNI y un RUC se preguntan, con su parametro', () => {
+    expect(rutaDelDocumento('/rentas/contribuyentes', 'DNI', '29614026')).toBe(
+      '/rentas/contribuyentes?dNI=29614026',
+    );
+    expect(rutaDelDocumento('/rentas/contribuyentes', 'RUC', '20602546391')).toBe(
+      '/rentas/contribuyentes?rUC=20602546391',
+    );
+  });
+
+  it('un carne de extranjeria NO, y por eso devuelve `null` en vez de una ruta', () => {
+    // El controlador publica `dNI` y `rUC` y ningun parametro para los demas tipos. Devolver
+    // una ruta sin filtro traeria el padron entero y su primera fila se leeria como «ya existe».
+    expect(rutaDelDocumento('/rentas/contribuyentes', 'Carnet de extranjería', '001234567890')).toBeNull();
+  });
+
+  it('y sin numero tampoco se pregunta', () => {
+    expect(rutaDelDocumento('/rentas/contribuyentes', 'DNI', '')).toBeNull();
   });
 });
