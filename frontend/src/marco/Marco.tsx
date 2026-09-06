@@ -7,7 +7,7 @@ import { Lienzo } from './Lienzo.tsx';
 import { PaletaDeComandos } from './PaletaDeComandos.tsx';
 import { PanelDeModulos } from './PanelDeModulos.tsx';
 import { Trazos } from './Trazos.tsx';
-import { HOJAS, MODULO_PROPIO, SECCIONES, esPropia } from './arbol.ts';
+import { HOJAS, MODULO_PROPIO, esPropia } from './arbol.ts';
 import { destinoDelHash, marcarHash } from './hash.ts';
 import { estadoInicial, reducir } from './pestanas.ts';
 
@@ -244,12 +244,13 @@ export function Marco() {
         <div className="kr-marco__area">
           <div className="kr-marco__pestanas" aria-label="Pestañas abiertas" role="group">
             {pestanas.abiertas.map((clave) => {
+              // `abiertas` solo lleva claves del arbol —el hash se valida contra
+              // el antes de aceptarse—, asi que `hoja` esta siempre. Se cae del
+              // lado de ensenar la clave y ningun icono en vez de reventar: una
+              // pestana es cromo, y el cromo no tumba la pantalla que envuelve.
               const hoja = HOJAS.get(clave);
-              const rotulo = hoja === undefined ? clave : hoja.rotulo;
-              const trazos =
-                hoja === undefined
-                  ? (SECCIONES[0]?.trazos ?? [])
-                  : hoja.trazos;
+              const rotulo = hoja?.rotulo ?? clave;
+              const trazos = hoja?.trazos ?? [];
               const esLaActiva = pestanas.activa === clave;
               const sucia = pestanas.sucias[clave] === true;
 
