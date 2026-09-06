@@ -13,11 +13,11 @@ fiscalizacion, coactiva, sanciones y licencias. **Es quien decide cuanto se debe
 | Pieza | Estado |
 |---|---|
 | `infrastructure/` — el descriptor (ADR-0031 §2) | **Existe y verifica**: `yarn verificar` en verde, sin Pulumi, sin token y sin cluster |
-| `.github/workflows/` — su CI | **Existe**, con cinco flujos: el descriptor, las **dos barreras bloqueantes** del backend, la documentacion, la guarda del registro y la publicacion de las dos imagenes. El **sexto, el del frontend, esta escrito y NO instalado**: vive en `frontend/ci/frontend.yml` porque el token que lo empujo no tenia alcance `workflow`, y su encabezado lleva el `git mv` que lo pone en su sitio |
+| `.github/workflows/` — su CI | **Existe**, con seis flujos: el descriptor, las **dos barreras bloqueantes** del backend, la documentacion, la guarda del registro, la publicacion de las dos imagenes y el del **frontend**, que corre `yarn verificar` y `yarn build` sobre cada cambio de `frontend/**` |
 | `docs/30-arquitectura/adr/` | **Existe**, con 11 ADR propio(s) y su indice ⚠ ver la nota de abajo |
 | `backend/` — **17 modulos**, con el negocio dentro | **Existe entero desde P5A.** `./gradlew build` en verde: **3 756 pruebas**, 0 fallos, el mismo numero que `sgtm`. `verificarAislamiento` 223 y `verificarArquitectura` 130 |
 | `V1__baseline.sql` — su esquema | **Esta aqui**, en `backend/kamayuk-rentas-esquema/src/main/resources/db/migration/`. Una sola migracion, 132 tablas |
-| Su frontend (`rentas-web`, ADR-0030 §1) | **Existe el andamiaje, y ninguna pantalla** (F-1). Vite 7 + React 19 + TypeScript 5.9 en `frontend/`, con el codigo en `frontend/src/`. `yarn verificar` en verde: **31 pruebas**, 0 fallos. Sus siete reglas son **ocho prohibiciones de ESLint con su muestra que las viola** |
+| Su frontend (`rentas-web`, ADR-0030 §1) | **Existe el andamiaje y el vocabulario visual; ninguna pantalla todavia** (F-1, F-2). Vite 7 + React 19 + TypeScript 5.9 en `frontend/`, con el codigo en `frontend/src/`. `yarn verificar` en verde: **222 pruebas**, 0 fallos. Sus ocho reglas son **nueve prohibiciones de ESLint con su muestra que las viola**, y sus tokens salen del artboard V6: una prueba compara sus hex contra `frontend/diseno/RentasV6.dc.html` |
 | La imagen `ghcr.io/hneyra/kamayuk-rentas` | **NO existe.** El `Deployment` del descriptor la nombra igual: es correcto, y en esta etapa no se despliega nada |
 
 ## Por donde entrar
