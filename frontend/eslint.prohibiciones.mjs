@@ -33,9 +33,19 @@
 /**
  * Nombres de campo que llevan dinero. Sobre ellos no se hace aritmetica ni se declara un
  * `number`.
+ *
+ * **`total` lleva una excepcion, y es de verdad la unica.** `totalElementos` y `totalPaginas`
+ * son los dos contadores del envoltorio de paginacion del backend —`{ contenido, pagina,
+ * tamano, totalElementos, totalPaginas, hayMas }`, que publican mas de sesenta de las 181
+ * operaciones—, y son cuentas de cosas, no de dinero: llegan como `entero` en
+ * `docs/50-api/formas-de-la-api.json` y tienen que declararse `number`. Sin la excepcion, toda
+ * pantalla con una tabla paginada arrancaria con dos `eslint-disable`, y una regla que se
+ * desactiva por costumbre deja de proteger a la tercera vez. Lo descubrio F-4 al tipar el
+ * envoltorio; el resto de `total…` —`totalAPagar`, `totalDeLaDeuda`— sigue prohibido, y la
+ * prueba de reglas lo comprueba por los dos lados.
  */
 const CAMPOS_DE_DINERO =
-  'monto|importe|saldo|deuda|total|insoluto|interes|autovaluo|arbitrio|recargo|vuelto|recibido|pagado|abonado';
+  'monto|importe|saldo|deuda|total(?!Elementos|Paginas)|insoluto|interes|autovaluo|arbitrio|recargo|vuelto|recibido|pagado|abonado';
 
 /**
  * Tildes y enie: prohibidas en identificadores (idioma del repositorio).
