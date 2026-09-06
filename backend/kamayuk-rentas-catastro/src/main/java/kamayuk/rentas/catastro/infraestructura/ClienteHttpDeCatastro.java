@@ -43,7 +43,13 @@ import tools.jackson.databind.json.JsonMapper;
  * /catastro/predios/&#123;id&#125;}, {@code &#8230;/caracteristicas}, {@code
  * /catastro/fichas/&#123;id&#125;/area}, {@code /catastro/titularidad} y sus dos hermanas— y las
  * conecto. Con las tres que ya salian —la grilla de fichas, el cuadro de valores unitarios y las
- * huellas del padron—, este cliente pide hoy <b>nueve operaciones</b>.
+ * huellas del padron—, este cliente pedia <b>nueve operaciones</b>.
+ *
+ * <p><b>Desde #9 son catorce</b>, y los puertos trece: la etapa 1 anadio las cuatro lecturas nuevas
+ * que {@code catastro} publico en sus #4, #5, #6 y #7 —la zona urbanistica, el riesgo del suelo con
+ * el ITSE, los frentes y los hallazgos de la fiscalizacion catastral—. Son cuatro puertos y cinco
+ * operaciones porque el riesgo y el ITSE son dos rutas de ese sistema; el motivo esta en {@link
+ * kamayuk.rentas.catastro.RiesgoYItseDelPredio}.
  *
  * <p>Lo que queda son las <b>dos escrituras</b>, y ya no lanzan {@link SinRutaEnCatastro}: eso
  * seria mentir, porque publicar la ruta no las arregla. Lanzan {@link
@@ -95,6 +101,12 @@ public class ClienteHttpDeCatastro {
      * <p>No es «no hay dato» y no es «catastro esta caido»: es que la operacion no existe. Se
      * distingue de las otras dos a proposito, porque se arregla de otra manera —publicandola— y
      * decir cualquiera de las otras dos mandaria a mirar una cola o un despliegue.
+     *
+     * <p><b>Hoy no la lanza ningun adaptador, y eso se dice para que nadie lo suponga al reves</b>:
+     * el ultimo hueco de ruta que quedaba —los hallazgos de un predio— lo cerro `catastro`#17. Se
+     * conserva porque la distincion que nombra es la que {@link EscrituraSinTransaccionCompartida}
+     * usa de contraste, y porque el proximo puerto que se escriba antes que su ruta la necesita: lo
+     * que no se conserva es la idea de que algun puerto siga sin poder preguntar.
      */
     public static final class SinRutaEnCatastro extends RuntimeException {
         @java.io.Serial private static final long serialVersionUID = 1L;
@@ -151,6 +163,51 @@ public class ClienteHttpDeCatastro {
     }
 
     /**
+     * `catastro` contesto, y lo que contesta es que ese hecho del territorio <b>no consta</b>.
+     *
+     * <p>No es {@link CatastroInalcanzable} y esa distincion es todo el motivo de que sea otra
+     * clase: se pregunto, se contesto, y la respuesta es un hecho. Las cuatro lecturas de C-5 no la
+     * necesitan —ahi la ausencia viaja como campo, {@code enElPadron: false}—, pero las de
+     * `catastro`#4 y #5 si: ese sistema contesta <b>422</b> cuando el predio esta y no tiene
+     * poligono y <b>404</b> cuando ningun plan vigente lo cubre, y lo hace a proposito, porque un
+     * 200 con la zona nula seria indistinguible de «este predio esta en zona nula» —que no admite
+     * ningun giro—.
+     *
+     * <p>Colapsarlas en «catastro no responde» borraria de este lado justo la distincion que el
+     * proveedor construyo, y mandaria a mirar un despliegue cuando lo que falta es cargar un plano
+     * o aprobar una ordenanza.
+     *
+     * <p>El {@link #codigo()} es el del catalogo estable de {@code catastro} —{@code VALIDACION},
+     * {@code NO_ENCONTRADO}—, y viaja como dato y no dentro de la frase por lo mismo que alli: un
+     * texto en castellano se reescribe en cuanto alguien lo lee en voz alta.
+     */
+    public static final class NoConstaEnCatastro extends RuntimeException {
+        @java.io.Serial private static final long serialVersionUID = 1L;
+
+        private final String codigo;
+
+        public NoConstaEnCatastro(String que, String codigo, String detalle) {
+            super(
+                    "No se puede "
+                            + que
+                            + ": `catastro` contesto «"
+                            + codigo
+                            + "» — "
+                            + detalle
+                            + ". No es que no se pudiera preguntar: se pregunto, contesto, y lo que"
+                            + " contesta es que ese hecho del territorio no consta. Devolver vacio"
+                            + " aqui diria que el predio no tiene lo que se pregunta, que es otra"
+                            + " cosa");
+            this.codigo = codigo;
+        }
+
+        /** El codigo del catalogo de `catastro`, para decidir sin analizar el mensaje. */
+        public String codigo() {
+            return codigo;
+        }
+    }
+
+    /**
      * Que la respuesta este resuelta con la fecha que se pidio, y no con otra.
      *
      * <p>Las lecturas de esta frontera devuelven {@code aLaFecha}: la fecha con la que {@code
@@ -202,12 +259,55 @@ public class ClienteHttpDeCatastro {
                 texto(fila, "titular"));
     }
 
-    private static @Nullable String texto(JsonNode fila, String campo) {
+    static @Nullable String texto(JsonNode fila, String campo) {
         JsonNode nodo = fila.path(campo);
         return nodo.isNull() || nodo.isMissingNode() ? null : nodo.asString();
     }
 
-    JsonNode pedir(String ruta, String que) {
+    /** Una fecha que puede no venir. Vacia y ausente son lo mismo aqui: no la hay. */
+    static @Nullable LocalDate fecha(JsonNode fila, String campo) {
+        String valor = texto(fila, campo);
+        return valor == null || valor.isBlank() ? null : LocalDate.parse(valor);
+    }
+
+    /**
+     * Una fecha que la respuesta TIENE que traer.
+     *
+     * <p>Falta la fecha ⇒ falla nombrandola, en vez de tomar una por omision: lo que llega sin su
+     * fecha es una cifra que dentro de un mes es otra y nadie puede decir cual se dio (regla 9).
+     */
+    static LocalDate fechaObligatoria(JsonNode fila, String campo, String que) {
+        String valor = texto(fila, campo);
+        if (valor == null || valor.isBlank()) {
+            throw new CatastroInalcanzable(
+                    que
+                            + ": la respuesta no trae «"
+                            + campo
+                            + "», y sin esa fecha lo que llega no se sabe de que dia es (regla 9)",
+                    null);
+        }
+        try {
+            return LocalDate.parse(valor);
+        } catch (java.time.format.DateTimeParseException malFormada) {
+            throw new CatastroInalcanzable(
+                    que + ": «" + campo + "» llego como «" + valor + "», que no es una fecha",
+                    null);
+        }
+    }
+
+    /**
+     * Lo que `catastro` contesto, antes de interpretarlo: su estado y su cuerpo.
+     *
+     * <p>Existe para que la interpretacion —que un 200 se lee, que un 4xx con codigo es un hecho y
+     * que uno sin codigo es una averia— sea <b>codigo de produccion bajo prueba</b>: el doble de
+     * las pruebas sustituye {@link #enviar}, que es lo unico que habla por la red, y no {@link
+     * #pedir}. Con el doble puesto un escalon mas arriba, cada rama de esa interpretacion se
+     * saltaba entera y ninguna prueba podia verla.
+     */
+    record RespuestaDeCatastro(int estado, String cuerpo) {}
+
+    /** Manda la peticion y devuelve lo que llego. Es lo unico que toca la red. */
+    RespuestaDeCatastro enviar(String ruta, String que) {
         if (raiz.isBlank()) {
             throw new CatastroInalcanzable(
                     que + ": kamayuk.catastro.url no esta configurada", null);
@@ -221,22 +321,68 @@ public class ClienteHttpDeCatastro {
         try {
             HttpResponse<String> respuesta =
                     cliente.send(peticion.build(), HttpResponse.BodyHandlers.ofString());
-            if (respuesta.statusCode() != 200) {
-                throw new CatastroInalcanzable(
-                        que + " (contesto " + respuesta.statusCode() + ")", null);
-            }
-            return json.readTree(respuesta.body());
+            return new RespuestaDeCatastro(respuesta.statusCode(), respuesta.body());
         } catch (IOException noContesta) {
             throw new CatastroInalcanzable(que, noContesta);
+        } catch (InterruptedException interrumpido) {
+            Thread.currentThread().interrupt();
+            throw new CatastroInalcanzable(que, interrumpido);
+        }
+    }
+
+    /**
+     * Una lectura en la que todo lo que no sea 200 es una averia.
+     *
+     * <p>Es lo que corresponde a las nueve operaciones de P5C y C-5: se disenaron para que la
+     * ausencia viajara <b>como campo</b>, asi que ahi un 404 no es «no hay», es que algo esta mal.
+     */
+    JsonNode pedir(String ruta, String que) {
+        RespuestaDeCatastro respuesta = enviar(ruta, que);
+        if (respuesta.estado() != 200) {
+            throw new CatastroInalcanzable(que + " (contesto " + respuesta.estado() + ")", null);
+        }
+        return leer(respuesta.cuerpo(), que);
+    }
+
+    /**
+     * Una lectura en la que un 4xx <b>con codigo</b> es un hecho del territorio y no una averia.
+     *
+     * <p>La usan las lecturas de `catastro`#4, #5 y #7, que contestan con el catalogo de errores de
+     * ese sistema: ver {@link NoConstaEnCatastro}. Un 4xx <b>sin</b> codigo —el HTML de un proxy,
+     * una ruta que no existe— sigue siendo una averia, y ese contraste es lo que impide que «no
+     * consta» se trague tambien los fallos de verdad.
+     */
+    JsonNode pedirHechoDelTerritorio(String ruta, String que) {
+        RespuestaDeCatastro respuesta = enviar(ruta, que);
+        if (respuesta.estado() == 200) {
+            return leer(respuesta.cuerpo(), que);
+        }
+        String codigo = leerSiSePuede(respuesta.cuerpo()).path("codigo").asString("");
+        if (codigo.isBlank()) {
+            throw new CatastroInalcanzable(que + " (contesto " + respuesta.estado() + ")", null);
+        }
+        throw new NoConstaEnCatastro(
+                que, codigo, leerSiSePuede(respuesta.cuerpo()).path("detail").asString(""));
+    }
+
+    private JsonNode leer(String cuerpo, String que) {
+        try {
+            return json.readTree(cuerpo);
         } catch (JacksonException ilegible) {
             // Jackson 3 no lanza `IOException` sino `JacksonException`, que es NO COMPROBADA
             // (C-7). Sin este `catch` un cuerpo que no es JSON —el HTML de un proxy, por
             // ejemplo— saldria como una excepcion cruda de una libreria en vez de como «catastro
             // no contesta lo que dice contestar», que es lo que quien opera necesita leer.
             throw new CatastroInalcanzable(que, ilegible);
-        } catch (InterruptedException interrumpido) {
-            Thread.currentThread().interrupt();
-            throw new CatastroInalcanzable(que, interrumpido);
+        }
+    }
+
+    /** El cuerpo de un error, cuando se puede leer. Si no es JSON, no hay codigo que sacar. */
+    private JsonNode leerSiSePuede(String cuerpo) {
+        try {
+            return json.readTree(cuerpo);
+        } catch (JacksonException noEsJson) {
+            return json.createObjectNode();
         }
     }
 

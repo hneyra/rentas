@@ -184,6 +184,87 @@ class PeticionesACatastroTest {
     }
 
     // ------------------------------------------------------------------
+    // #9 — las cinco operaciones de la etapa 1.
+
+    @Test
+    @DisplayName("la zona: `predioId` y `aLaFecha`, que es como ESTA operacion nombra la fecha")
+    void laZonaMandaLoDeclarado() {
+        CatastroQueNoContesta espia = respuestaDe();
+        new ZonificacionDelPredioHttp(espia).zonaDe(11L, A_LA_FECHA);
+
+        assertThat(mandados(espia))
+                .as(
+                        "las siete rutas de C-1 leen «fecha» y esta lee «aLaFecha»: el adaptador"
+                                + " manda lo que el otro lado lee, no como lo llama el puerto")
+                .isEqualTo(declaradosPara("GET /urbano/zonificacion"));
+    }
+
+    @Test
+    @DisplayName("el riesgo: `predioId` y `aLaFecha`, que `catastro`#18 estreno en esta ruta")
+    void elRiesgoMandaLaFecha() {
+        CatastroQueNoContesta espia = respuestaDe();
+        new RiesgoYItseDelPredioHttp(espia).riesgoDe(11L, A_LA_FECHA);
+
+        assertThat(espia.rutas).containsExactly("/grd/riesgo?predioId=11&aLaFecha=" + A_LA_FECHA);
+        assertThat(mandados(espia))
+                .as(
+                        "hasta #18 esta operacion no leia la fecha y mandarla habria sido el"
+                                + " defecto de C-1 al reves —viajar en la URL y descartarse en"
+                                + " silencio—; ahora la lee, y NO mandarla seria contestar con lo"
+                                + " vigente hoy a quien pregunta por 2024")
+                .isEqualTo(declaradosPara("GET /grd/riesgo"));
+    }
+
+    @Test
+    @DisplayName("el ITSE: `predioId` y `aLaFecha`, porque un certificado vence")
+    void elItseMandaLoDeclarado() {
+        CatastroQueNoContesta espia = respuestaDe();
+        new RiesgoYItseDelPredioHttp(espia).itseVigenteEn(11L, A_LA_FECHA);
+
+        assertThat(mandados(espia)).isEqualTo(declaradosPara("GET /grd/itse"));
+    }
+
+    @Test
+    @DisplayName("los frentes: ningun parametro, y el predio va en la ruta")
+    void losFrentesNoLlevanParametros() {
+        CatastroQueNoContesta espia = respuestaDe();
+        new FrentesDelPredioHttp(espia).delPredio(11L);
+
+        assertThat(espia.rutas).containsExactly("/catastro/predios/11/frentes");
+        assertThat(mandados(espia))
+                .isEqualTo(declaradosPara("GET /catastro/predios/{predioId}/frentes"));
+    }
+
+    @Test
+    @DisplayName("los hallazgos: `pagina` y `tamano`, y NO el orden, que es lista blanca ajena")
+    void losHallazgosMandanLoDeclarado() {
+        CatastroQueNoContesta espia = respuestaDe();
+        new HallazgosDelPredioHttp(espia).deLaCampania(3L, Paginacion.de(2, 50, "verificadoEn"));
+
+        assertThat(espia.rutas)
+                .containsExactly("/fiscalizacion/campanias/3/hallazgos?pagina=2&tamano=50");
+        assertThat(mandados(espia))
+                .as(
+                        "cual campo admite ordenar depende de la tabla, y la tabla es de catastro:"
+                                + " pedir uno que no admita seria un 422 sobre una consulta buena")
+                .isEqualTo(declaradosPara("GET /fiscalizacion/campanias/{campaniaId}/hallazgos"));
+    }
+
+    @Test
+    @DisplayName("los hallazgos de UN predio: ningun parametro, y el predio va en la ruta")
+    void losHallazgosDelPredioNoLlevanParametros() {
+        CatastroQueNoContesta espia = respuestaDe();
+        new HallazgosDelPredioHttp(espia).de(11L);
+
+        assertThat(espia.rutas).containsExactly("/fiscalizacion/predios/11/hallazgos");
+        assertThat(mandados(espia))
+                .as(
+                        "no hay fecha que resolver: el hallazgo lleva dentro la version de ficha"
+                                + " contra la que se contrasto y el dia en que se verifico")
+                .isEqualTo(declaradosPara("GET /fiscalizacion/predios/{predioId}/hallazgos"));
+    }
+
+    // ------------------------------------------------------------------
 
     /**
      * Un catastro de mentira que contesta lo minimo que cada adaptador sabe leer sin caerse.
@@ -205,8 +286,29 @@ class PeticionesACatastroTest {
                     // con la que se resolvio y el sujeto por el que se pregunto. Se devuelve lo
                     // que se pidio, porque aqui se mide la peticion y no la respuesta — de eso se
                     // ocupa `LecturaDeCatastroTest`.
+                    //
+                    // Y una fecha por omision: hay operaciones cuya respuesta la trae siempre
+                    // aunque la peticion no la mande, asi que sin esto el adaptador fallaria por
+                    // falta de un campo obligatorio antes de que esta prueba llegara a mirar la
+                    // URL. Desde `catastro`#18 `GET /grd/riesgo` SI la manda, y entonces manda el
+                    // eco de abajo, que es lo que su adaptador compara.
+                    cuerpo.put("aLaFecha", A_LA_FECHA.toString());
                     eco(ruta, "fecha").ifPresent(fecha -> cuerpo.put("aLaFecha", fecha));
+                    eco(ruta, "aLaFecha").ifPresent(fecha -> cuerpo.put("aLaFecha", fecha));
+                    // Y la vigencia de la zona (#9), por lo mismo: es obligatoria en la respuesta
+                    // de `GET /urbano/zonificacion`, y lo que aqui se mide es la peticion.
+                    cuerpo.put("vigenciaDesde", A_LA_FECHA.toString());
                     eco(ruta, "predio").ifPresent(p -> numero(cuerpo, "predioId", p));
+                    // Y el predio que va en la RUTA y no en un parametro, para la lectura de
+                    // hallazgos por predio (`catastro`#17): su adaptador comprueba el sobre antes
+                    // de leer una fila, asi que sin este eco fallaria por la respuesta antes de
+                    // que esta prueba llegara a mirar la URL.
+                    java.util.regex.Matcher enLaRuta =
+                            java.util.regex.Pattern.compile("/predios/(\\d+)/hallazgos")
+                                    .matcher(ruta);
+                    if (enLaRuta.find()) {
+                        cuerpo.put("predioId", Long.parseLong(enLaRuta.group(1)));
+                    }
                     eco(ruta, "contribuyente").ifPresent(c -> numero(cuerpo, "contribuyenteId", c));
                     cuerpo.put("enElPadron", false);
                     cuerpo.put("existe", false);
