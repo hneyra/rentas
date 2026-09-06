@@ -1,0 +1,328 @@
+/* ============================================================================
+   Los ocho componentes base, vestidos con los tokens y con nada mas.
+   ----------------------------------------------------------------------------
+   **Ni un hexadecimal, ni un pixel suelto: todo sale de `tokens/`.** Es lo que
+   hace que el tema oscuro exista sin tocar un solo componente, y lo que hace que
+   la prueba de contraste signifique algo — si un componente pintara un color a
+   mano, la prueba mediria unos tokens y la pantalla enseniaria otros.
+
+   El prefijo es `kr-` (kamayuk rentas). No hay modulos de CSS ni `styled`: el
+   nombre de clase es plano y estable, para que se pueda leer en el inspector y
+   buscar con `grep`.
+   ============================================================================ */
+
+/* ── Boton ─────────────────────────────────────────────────────────────────
+   Tres variantes y dos tallas, ni una mas. En una barra de acciones la ULTIMA
+   es la primaria y las demas secundarias; eso lo decide quien compone la barra,
+   no este componente. */
+
+.kr-boton {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--hueco-2);
+  border-radius: var(--radio);
+  padding: var(--relleno-boton);
+  font-size: var(--texto-celda);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.kr-boton:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.kr-boton--primario {
+  border: 0;
+  padding: var(--relleno-boton-primario);
+  background: var(--azul);
+  color: var(--sobre-azul);
+  font-weight: var(--peso-fuerte);
+}
+
+.kr-boton--primario:hover:not(:disabled) {
+  background: var(--azul-hover);
+}
+
+.kr-boton--secundario {
+  border: 1px solid var(--borde-boton);
+  background: var(--superficie);
+  color: var(--tinta);
+}
+
+.kr-boton--secundario:hover:not(:disabled) {
+  border-color: var(--borde-hover);
+}
+
+.kr-boton--fantasma {
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--azul);
+}
+
+.kr-boton--fantasma:hover:not(:disabled) {
+  background: var(--azul-suave);
+}
+
+.kr-boton--menudo {
+  padding: var(--relleno-boton-menudo);
+  font-size: var(--texto-dato);
+}
+
+/* ── Insignia ──────────────────────────────────────────────────────────────
+   `const INS` del artboard. El texto va SIEMPRE dentro: el color es el segundo
+   canal, nunca el unico. */
+
+.kr-insignia {
+  display: inline-block;
+  flex: 0 0 auto;
+  border-radius: var(--radio-menudo);
+  padding: var(--relleno-insignia);
+  font-size: var(--texto-insignia);
+  font-weight: var(--peso-fuerte);
+  white-space: nowrap;
+}
+
+.kr-insignia--ok {
+  background: var(--ok-fondo);
+  color: var(--ok-tinta);
+}
+
+.kr-insignia--atencion {
+  background: var(--atencion-fondo);
+  color: var(--atencion-tinta);
+}
+
+.kr-insignia--mal {
+  background: var(--mal-fondo);
+  color: var(--mal-tinta);
+}
+
+.kr-insignia--info {
+  background: var(--info-fondo);
+  color: var(--info-tinta);
+}
+
+/* ── Importe ───────────────────────────────────────────────────────────────
+   `const TDN` del artboard: alineado a la derecha y con cifras tabulares, para
+   que una columna de importes se pueda comparar de un vistazo. */
+
+.kr-importe {
+  font-variant-numeric: var(--cifras);
+  white-space: nowrap;
+}
+
+.kr-importe__valor {
+  font-weight: var(--peso-fuerte);
+  color: var(--tinta);
+}
+
+.kr-importe__fecha {
+  margin-left: var(--hueco-1);
+  font-size: var(--texto-dato);
+  font-weight: var(--peso-normal);
+  color: var(--tinta-3);
+}
+
+/* ── FechaDeCalculo ────────────────────────────────────────────────────────
+   La linea que dice a que fecha estan las cifras de una pantalla entera. */
+
+.kr-fecha-de-calculo {
+  margin: 0;
+  font-size: var(--texto-menudo);
+  color: var(--tinta-3);
+}
+
+.kr-fecha-de-calculo strong {
+  font-weight: var(--peso-fuerte);
+  font-variant-numeric: var(--cifras);
+  color: var(--tinta-2);
+}
+
+/* ── Esqueleto ─────────────────────────────────────────────────────────────
+   El artboard no dibuja la carga: declara `hint-placeholder-count` y deja el
+   problema al port. Un barrido lento, que `prefers-reduced-motion` apaga desde
+   `base.css`. */
+
+.kr-esqueleto {
+  display: block;
+  border-radius: var(--radio-menudo);
+  background: var(--esqueleto);
+  background-image: linear-gradient(
+    90deg,
+    var(--esqueleto) 0%,
+    var(--esqueleto-brillo) 50%,
+    var(--esqueleto) 100%
+  );
+  background-size: 200% 100%;
+  animation: kr-barrido 1.4s ease-in-out infinite;
+}
+
+@keyframes kr-barrido {
+  from {
+    background-position: 200% 0;
+  }
+
+  to {
+    background-position: -200% 0;
+  }
+}
+
+/* ── Campo ─────────────────────────────────────────────────────────────────
+   `const IN` y `const IN_MAL` del artboard, mas la etiqueta, la ayuda y el
+   error. Todo control lleva su etiqueta asociada por `id`: la caja de ventanilla
+   se opera con teclado, y un control sin etiqueta no se puede anunciar. */
+
+.kr-campo {
+  display: block;
+  min-width: 0;
+}
+
+.kr-campo--ancho {
+  grid-column: 1 / -1;
+}
+
+.kr-campo__etiqueta {
+  display: flex;
+  align-items: baseline;
+  gap: var(--hueco-2);
+  margin-bottom: var(--hueco-1);
+  font-size: var(--texto-etiqueta);
+  font-weight: var(--peso-fuerte);
+  color: var(--tinta-2);
+}
+
+.kr-campo__opcional {
+  font-size: var(--texto-insignia);
+  font-weight: var(--peso-normal);
+  color: var(--tinta-3);
+}
+
+.kr-campo__control {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--borde-campo);
+  border-radius: var(--radio);
+  padding: var(--relleno-campo);
+  background: var(--superficie);
+  color: var(--tinta);
+  font-size: var(--texto-control);
+}
+
+textarea.kr-campo__control {
+  resize: vertical;
+}
+
+.kr-campo--con-error .kr-campo__control {
+  border-color: var(--mal-borde);
+  background: var(--mal-campo);
+}
+
+/* El valor que el sistema calcula y nadie teclea: borde discontinuo, superficie
+   sutil y cifras tabulares. No es lo mismo que un control bloqueado. */
+.kr-campo__control--lectura {
+  display: block;
+  border-style: dashed;
+  background: var(--sup);
+  color: var(--tinta-2);
+  font-size: var(--texto-celda);
+  font-variant-numeric: var(--cifras);
+}
+
+.kr-campo__casilla {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--hueco-3);
+  border: 1px solid var(--borde-campo);
+  border-radius: var(--radio);
+  padding: var(--relleno-campo);
+  background: var(--superficie);
+  font-size: var(--texto-celda);
+  line-height: var(--linea-apretada);
+  color: var(--tinta-2);
+}
+
+.kr-campo__casilla input {
+  flex: 0 0 auto;
+  margin-top: 1px;
+  width: 17px;
+  height: 17px;
+  accent-color: var(--azul);
+}
+
+.kr-campo__error {
+  margin: var(--hueco-1) 0 0;
+  font-size: var(--texto-etiqueta);
+  font-weight: var(--peso-fuerte);
+  color: var(--mal-tinta);
+}
+
+.kr-campo__ayuda {
+  margin: var(--hueco-1) 0 0;
+  font-size: var(--texto-etiqueta);
+  line-height: var(--linea-prosa);
+  color: var(--tinta-3);
+}
+
+/* ── Aviso ─────────────────────────────────────────────────────────────────
+   El estado vacio del artboard —icono desvaido, titulo, detalle— servido
+   tambien para el error y para la falta de permiso. */
+
+.kr-aviso {
+  padding: var(--relleno-vacio);
+  text-align: center;
+}
+
+.kr-aviso__icono {
+  color: var(--tinta-4);
+}
+
+.kr-aviso--error .kr-aviso__icono {
+  color: var(--mal-tinta);
+}
+
+.kr-aviso--sin-permiso .kr-aviso__icono {
+  color: var(--atencion-tinta);
+}
+
+.kr-aviso__titulo {
+  margin: var(--hueco-4) auto 0;
+  max-width: var(--ancho-prosa-corta);
+  font-size: var(--texto-titulo);
+  font-weight: var(--peso-titulo);
+  color: var(--tinta);
+  text-wrap: pretty;
+}
+
+.kr-aviso__detalle {
+  margin: var(--hueco-2) auto 0;
+  max-width: var(--ancho-prosa-corta);
+  font-size: var(--texto-menudo);
+  line-height: var(--linea-prosa);
+  color: var(--tinta-3);
+  text-wrap: pretty;
+}
+
+.kr-aviso__traza {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--hueco-3);
+  margin: var(--hueco-4) 0 0;
+  font-size: var(--texto-etiqueta);
+  font-variant-numeric: var(--cifras);
+  color: var(--tinta-3);
+}
+
+.kr-aviso__copiada {
+  color: var(--ok-tinta);
+  font-weight: var(--peso-fuerte);
+}
+
+.kr-aviso__acciones {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--hueco-3);
+  margin-top: var(--hueco-5);
+}

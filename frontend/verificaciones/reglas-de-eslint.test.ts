@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ESLint } from 'eslint';
 import { describe, expect, it } from 'vitest';
@@ -24,7 +24,7 @@ import { CLIENTE_DE_API, PROHIBICIONES, REGLAS_EXIGIDAS } from '../eslint.prohib
  *
  * Lo que ninguna derivacion puede sujetar es que alguien BORRE una prohibicion: con ella
  * se iria su prueba, en verde. Eso lo sujeta `REGLAS_EXIGIDAS`, que es la unica lista
- * escrita a mano y la que nombra las siete reglas del issue.
+ * escrita a mano y la que nombra las reglas del producto.
  *
  * Las muestras estan en `ignores` de la configuracion para que `yarn lint` no las senale;
  * aqui se lintan como TEXTO, con una ruta sintetica dentro de `src/`, que es donde la
@@ -37,7 +37,14 @@ const MUESTRAS = join(AQUI, 'muestras');
 
 const eslint = new ESLint({ cwd: RAIZ });
 
-/** Ruta sintetica: la muestra se juzga como si viviera en una pantalla de la aplicacion. */
+/**
+ * Ruta sintetica: la muestra se juzga como si viviera en una pantalla de la aplicacion.
+ *
+ * **Conserva la extension del archivo de la muestra**, y no es un detalle: una muestra con
+ * JSX tiene que juzgarse como `.tsx`. Juzgada como `.ts`, el analizador de TypeScript no
+ * admite JSX y el rojo habla de un error de sintaxis en vez de la regla que se venia a
+ * comprobar — o peor, la prohibicion no llega a evaluarse y la muestra pasa en verde.
+ */
 const enUnaPantalla = (nombre: string) => join(RAIZ, 'src/pantallas', nombre);
 
 /** El archivo de la muestra de esa clave, o `null` si no hay ninguno. */
@@ -69,7 +76,7 @@ describe('cada prohibicion tiene su muestra, y ESLint la senala', () => {
         `regla que no puede fallar no protege nada.`,
     ).not.toBeNull();
 
-    const mensajes = await mensajesDe(archivo as string, enUnaPantalla(`${clave}.ts`));
+    const mensajes = await mensajesDe(archivo as string, enUnaPantalla(basename(archivo as string)));
 
     expect(
       mensajes,
@@ -77,11 +84,16 @@ describe('cada prohibicion tiene su muestra, y ESLint la senala', () => {
         `Se esperaba el mensaje del config:\n  ${message}\n` +
         `Se obtuvo:\n${mensajes.length === 0 ? '  (ninguno)' : mensajes.map((m) => `  · ${m}`).join('\n')}`,
     ).toContain(message);
-  });
+    // 30 s y no los 5 de Vitest: el PRIMER caso paga el arranque en frio de ESLint y del
+    // analizador de TypeScript —2.4 s con el arbol de F-1, mas de 5 con este—, y ese coste
+    // crece con los archivos del proyecto, no con lo que la prueba comprueba. Un tiempo
+    // agotado ahi no dice «la regla no muerde»: dice «la maquina iba cargada», y es el
+    // rojo mas caro que hay, porque no se reproduce.
+  }, 30_000);
 });
 
 describe('la lista de prohibiciones y la de muestras no se separan', () => {
-  it('las siete reglas del producto tienen al menos una prohibicion que las sirve', () => {
+  it('cada regla del producto tiene al menos una prohibicion que la sirve', () => {
     const servidas = new Set(PROHIBICIONES.map((p) => p.regla));
     const huerfanas = REGLAS_EXIGIDAS.filter((regla) => !servidas.has(regla));
 
@@ -178,5 +190,32 @@ describe('las reglas no senalan codigo correcto', () => {
     });
 
     expect(resultado?.messages ?? []).toEqual([]);
+  });
+
+  it('un «Importe» CON su fecha de calculo pasa limpio', async () => {
+    // **Esta es la mitad que faltaba, y hacia falta.** La muestra de
+    // `importe-sin-fecha` escribe `<Importe valor="…" />` SIN un solo atributo, asi que
+    // un selector que buscara cualquier otro nombre —`fechaDeCalculo` en vez de
+    // `fechaCalculo`— la seguiria senalando igual y la prohibicion pasaria en VERDE
+    // habiendo dejado de proteger nada. Se comprobo: renombrar el atributo dentro del
+    // selector dejaba las 17 pruebas en verde. Lo que lo caza es el caso positivo.
+    const correcto = `
+      import { Importe } from '../ds/index.ts';
+
+      export function FilaDeCuentaCorriente() {
+        return <Importe valor="1842.60" fechaCalculo="2026-09-06" />;
+      }
+    `;
+
+    const [resultado] = await eslint.lintText(correcto, {
+      filePath: enUnaPantalla('correcto.tsx'),
+    });
+
+    expect(
+      (resultado?.messages ?? []).map((m) => m.message),
+      'Un `<Importe>` que SI declara su fecha no puede estar senalado: si lo esta, el\n' +
+        'selector ya no busca el atributo que dice buscar, y entonces la prohibicion\n' +
+        'senala a todo el mundo — que es indistinguible de no senalar a nadie.',
+    ).toEqual([]);
   });
 });

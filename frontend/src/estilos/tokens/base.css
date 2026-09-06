@@ -1,0 +1,103 @@
+/* ============================================================================
+   El reinicio de V6.
+   ----------------------------------------------------------------------------
+   Es el bloque `<style>` de la cabecera de los doce artboards, portado. Es el
+   UNICO de los cinco archivos que escribe reglas de verdad: los otros cuatro
+   solo declaran custom properties. Por eso va el ultimo de los cinco en
+   `estilos.css` — lee lo que los otros declaran — y por eso `componentes.css`
+   va despues de el.
+
+   Dos cosas del artboard NO se copian, y las dos por lo mismo, que esta medido:
+
+     1. `::placeholder { color: #93A3AF }` pasa a `--tinta-3`. #93A3AF sobre papel
+        blanco da **2.59:1**; un `placeholder` es texto y WCAG 1.4.3 pide 4.5:1.
+        `--tinta-3` da 5.51:1 y es un color del artboard, asi que no se inventa
+        ninguno: lo que cambia es cual de los suyos se usa. `--tinta-4` se queda
+        con el valor del artboard para lo que si es decorativo, que es donde el
+        artboard mas lo usa: los trazos de los iconos de un estado vacio, que
+        siempre llevan al lado el texto que dice lo mismo.
+
+     2. `:focus-visible { outline: 2px solid #52BDEF }` pasa a `--azul`. #52BDEF
+        sobre papel blanco da **2.12:1**, y WCAG 1.4.11 pide 3:1 para lo que
+        identifica un ESTADO. `--azul` da 8.27:1, y tampoco es un color nuevo: es
+        el que el propio artboard le pone al borde de un campo enfocado.
+
+   Los dos numeros los recalcula `verificaciones/contraste.test.ts` en cada
+   corrida: no son una nota de un dia, son una asercion.
+   ============================================================================ */
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: var(--fondo);
+  color: var(--tinta);
+  font-family: var(--fuente);
+  font-size: var(--texto-base);
+  /* stylelint-disable-next-line property-no-vendor-prefix -- lo pide el artboard */
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+a {
+  color: var(--azul);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+input,
+select,
+textarea,
+button {
+  font: inherit;
+  color: inherit;
+}
+
+/* El indicador de foco. `--azul` y no `--acento`: ver la cabecera. */
+:focus-visible {
+  outline: var(--grosor-foco) solid var(--azul);
+  outline-offset: var(--separacion-foco);
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--azul);
+  box-shadow: var(--anillo);
+  outline: none;
+}
+
+/* `--tinta-3` y no `--tinta-4`: ver la cabecera. */
+::placeholder {
+  color: var(--tinta-3);
+  opacity: 1;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--borde-campo);
+  border-radius: 8px;
+}
+
+/* Quien pidio menos movimiento no recibe animaciones. Va en el reinicio y no en
+   cada componente: una animacion nueva no se acuerda de preguntar. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

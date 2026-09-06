@@ -60,31 +60,27 @@ describe('«yarn verificar» encadena las tres comprobaciones', () => {
 });
 
 /**
- * Los dos sitios donde puede estar el workflow del frontend, en orden de preferencia.
+ * Donde vive el workflow del frontend.
  *
- * El segundo no deberia existir, y existe por un motivo que se dice en vez de esconderse:
- * el token con que se empujo este cambio no tiene alcance `workflow`, asi que GitHub
- * rechaza la rama entera si toca `.github/workflows/`. El archivo viaja en `frontend/ci/`
- * hasta que alguien pueda moverlo, y el encabezado de ese archivo lleva el `git mv` y el
- * mensaje exacto del rechazo.
+ * Hasta F-1 vivia en `frontend/ci/frontend.yml` y no aqui, porque el token de aquella sesion
+ * no tenia el alcance `workflow` y GitHub rechazaba la rama entera. Eso se cerro: el
+ * `git mv` esta hecho y el archivo esta instalado, asi que la prueba mira UN sitio y no dos.
  *
- * La prueba mira los dos porque lo que verifica es el CONTENIDO —el filtro, la orden y el
- * candado—, y eso vale igual antes y despues de instalarlo. Lo que NO admite es que
- * desaparezca: si no esta en ninguno de los dos, sale rojo.
+ * Lo que verifica sigue siendo el CONTENIDO —el filtro, la orden y el candado—, y que el
+ * archivo EXISTA: si alguien lo borra, sale rojo aqui antes de que nadie note que los PR
+ * del frontend dejaron de verificarse.
  */
-const SITIOS_DEL_WORKFLOW = ['.github/workflows/frontend.yml', 'frontend/ci/frontend.yml'];
+const SITIO_DEL_WORKFLOW = '.github/workflows/frontend.yml';
 
 describe('el frontend tiene su propia CI', () => {
-  const encontrado = SITIOS_DEL_WORKFLOW.map((sitio) => join(REPOSITORIO, sitio)).find((ruta) =>
-    existsSync(ruta),
-  );
+  const ruta = join(REPOSITORIO, SITIO_DEL_WORKFLOW);
+  const encontrado = existsSync(ruta) ? ruta : undefined;
 
-  it('el workflow existe, instalado o pendiente de instalar', () => {
+  it('el workflow esta instalado', () => {
     expect(
       encontrado,
-      `No hay workflow del frontend en ninguno de sus dos sitios:\n` +
-        SITIOS_DEL_WORKFLOW.map((s) => `  · ${s}`).join('\n') +
-        '\nSin el, «yarn verificar» solo se ejecuta en la maquina de quien lo escribe.',
+      `No hay workflow del frontend en «${SITIO_DEL_WORKFLOW}».\n` +
+        'Sin el, «yarn verificar» solo se ejecuta en la maquina de quien lo escribe.',
     ).toBeDefined();
   });
 

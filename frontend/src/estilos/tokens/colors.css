@@ -1,0 +1,241 @@
+/* ============================================================================
+   La paleta de V6.
+   ----------------------------------------------------------------------------
+   NO es la paleta «Juris PE» de `ds/tokens/colors.css` del proyecto de diseno.
+   Aquellos cinco archivos son de la etapa ANTERIOR —crema #f6f4ef, navy #1F3A5F,
+   Source Serif 4— y V6 no usa **nada** de eso: medido, cero apariciones de los
+   colores de V6 en aquel arbol. La paleta de V6 va en linea dentro de cada
+   `*V6.dc.html`, declarada como constantes de JavaScript.
+
+   De donde sale cada valor, y por que importa la distincion:
+
+     · Las ONCE que el artboard declara con nombre —`const AZUL = '#005284'`, y
+       sus diez hermanas— son las que `verificaciones/tokens-del-artboard.test.ts`
+       compara una a una contra `frontend/diseno/RentasV6.dc.html`. Cambiar una
+       aqui pone la prueba roja. Son identicas en los DOCE artboards V6: se
+       comprobo antes de escribirlas.
+     · Las que el artboard usa como literal en linea —el fondo de pagina, el
+       anillo de foco, la tinta del `::placeholder` y los cuatro pares de la
+       insignia— no tienen nombre alli, pero SI salen del artboard y la misma
+       prueba las exige, buscandolas por su hexadecimal.
+
+   Nada de esto se escribio a ojo. Lo que si es nuestro, porque el artboard no lo
+   trae, es el tema oscuro: V6 solo dibuja el claro. Ver mas abajo.
+   ============================================================================ */
+
+:root {
+  /* El tema del documento, para que el navegador pinte lo que no pintamos
+     nosotros: casillas, desplegables y barras de desplazamiento nativas. Sin
+     esto, en tema oscuro salen con el cromo claro del sistema. */
+  color-scheme: light;
+
+  /* —— Superficies ——
+     `--fondo` es el lienzo (`html, body { background: #F2F6F9 }` del artboard);
+     `--superficie` el papel de una tarjeta, una fila o un control; `--sup` la
+     superficie sutil del artboard (`const SUP`), la de la cabecera de tabla y
+     el valor de solo lectura. */
+  --fondo: #f2f6f9;
+  --superficie: #ffffff;
+  --sup: #f7fbfe;
+
+  /* —— Tinta ——
+     Cuatro pasos, de la primaria a la desvaida. `--tinta-4` es la unica que NO
+     se usa como texto: sobre papel blanco da 2.59:1 y WCAG 1.4.3 pide 4.5:1. Es
+     el trazo de un icono decorativo, y nada mas — el `::placeholder`, que el
+     artboard pintaba con ella, usa `--tinta-3` (ver `base.css`). */
+  --tinta: #16232c;
+  --tinta-2: #3a4a55;
+  --tinta-3: #5a6b78;
+  --tinta-4: #93a3af;
+
+  /* —— Accion ——
+     `--azul` es el color de lo que se puede pulsar; `--azul-oscuro` el de la
+     barra global; `--azul-suave` el relleno detras de un texto en azul; `--acento` el celeste
+     de la marca. `--sobre-azul` es lo que se lee ENCIMA de `--azul`, y existe
+     para que el rotulo del boton primario no sea un `#fff` escrito a mano en
+     cinco sitios: eso ataria `--azul` a ser oscuro para siempre. */
+  --azul: #005284;
+  --azul-oscuro: #00365a;
+  /* El primario bajo el puntero. En claro se OSCURECE (`style-hover` del
+     artboard: `background:#00365A`); en oscuro tiene que ACLARARSE, porque alli
+     la accion ya es el celeste. Por eso es un token propio y no `--azul-oscuro`
+     usado de dos formas. */
+  --azul-hover: #00365a;
+  --azul-suave: #e4f4fd;
+  --acento: #52bdef;
+  --sobre-azul: #ffffff;
+
+  /* —— Filos ——
+     `--linea` es el filo por omision; `--linea-2` el mas tenue, entre filas;
+     `--borde-campo` el de un control que se puede escribir. */
+  --linea: #d6dee4;
+  --linea-2: #e3e9ee;
+  --borde-campo: #c3cfd9;
+  /* El filo de un BOTON secundario. En claro vale lo mismo que `--linea`, que es
+     lo que el artboard le pone (`border:1px solid #D6DEE4`), pero es un token
+     aparte a proposito: un filo de boton IDENTIFICA un control y WCAG 1.4.11 le
+     pide 3:1, y una linea que separa dos filas no identifica nada. Con un solo
+     token, subir uno subiria el otro. En oscuro, donde no hay artboard que copiar,
+     este si cumple (4.26:1) y `--linea` se queda de filo tenue. */
+  --borde-boton: #d6dee4;
+  /* El filo de un secundario bajo el puntero: `style-hover="border-color:#7E96A8"`. */
+  --borde-hover: #7e96a8;
+
+  /* —— Foco ——
+     `--foco` es el halo de 3 px detras de un campo enfocado
+     (`box-shadow: 0 0 0 3px #D3EBFA` en el artboard).
+
+     El INDICADOR de foco de lo demas —botones, enlaces, filas— es `--azul` y no
+     `--acento`, que es lo que el artboard pone en su `:focus-visible`. El motivo
+     esta medido: `--acento` sobre `--superficie` da **2.12:1**, y WCAG 1.4.11
+     pide 3:1 para la informacion visual que identifica un ESTADO. `--azul` da
+     8.27:1 y no es un color nuevo — es el mismo que el artboard le pone al borde
+     de un campo enfocado, asi que el foco queda del mismo color en todas partes.
+     `--acento` se queda para lo decorativo, que es donde el artboard lo usa mas. */
+  --foco: #d3ebfa;
+
+  /* —— Los cuatro tonos de la insignia ——
+     Los cuatro pares salen de `const INS` del artboard, tal cual. Los nombres
+     son los del dominio y no los del artboard (`warn`, `bad`), que estaban en
+     ingles. */
+  --ok-fondo: #dcefe3;
+  --ok-tinta: #1f5b39;
+  --atencion-fondo: #fff4d9;
+  --atencion-tinta: #7a5200;
+  --mal-fondo: #fbe4e0;
+  --mal-tinta: #8f2a17;
+  --info-fondo: #e4f4fd;
+  --info-tinta: #004670;
+
+  /* —— Un campo con error ——
+     `IN_MAL` del artboard: borde `#A8321E` sobre relleno `#FFF9F8`. */
+  --mal-borde: #a8321e;
+  --mal-campo: #fff9f8;
+
+  /* —— Carga ——
+     El artboard no dibuja estados de carga: declara `hint-placeholder-count` y
+     deja el problema al port. Estos dos son nuestros, y por eso el brillo se
+     nombra aparte en vez de reusar `--sup`: en oscuro `--sup` y `--linea-2` estan
+     a un paso de distancia y el barrido no se veria. */
+  --esqueleto: #e3e9ee;
+  --esqueleto-brillo: #f7fbfe;
+}
+
+/* ============================================================================
+   Tema oscuro.
+   ----------------------------------------------------------------------------
+   **El artboard no lo trae**: V6 dibuja doce pantallas y las doce en claro. Asi
+   que estos valores NO estan atados a `RentasV6.dc.html` y la prueba del
+   artboard no los mira. Lo unico que los sujeta es lo que si se puede medir:
+   `verificaciones/contraste.test.ts` calcula el ratio WCAG de los mismos pares
+   en los dos temas y falla por debajo de AA en cualquiera de ellos.
+
+   Como se derivo, para que se pueda repetir:
+     · La rampa se invierte, no se reasigna: `--tinta` sigue siendo lo que mas
+       contrasta con su superficie, `--tinta-3` lo terciario.
+     · Los matices se conservan. `--superficie` en oscuro es #16232C, que es la
+       `--tinta` del claro: el papel oscuro es la tinta clara, y asi no entra
+       ningun matiz que el artboard no tenga.
+     · La accion pasa de `--azul` a `--acento`: #005284 sobre un papel oscuro da
+       1.9:1 y no se puede leer. El celeste de la marca sobre #16232C da 7.54:1.
+       Por eso `--sobre-azul` tambien cambia: en oscuro lo que se lee encima de
+       la accion es tinta, no blanco.
+     · `--borde-campo` NO copia el defecto del claro. En claro esta atado al
+       artboard (#C3CFD9, 1.59:1, por debajo del 3:1 de WCAG 1.4.11) y no se
+       puede tocar sin romper la comparacion; aqui nada obliga, asi que se elige
+       un valor que si cumple (3.56:1). Un defecto que no estoy obligado a
+       copiar, no lo copio.
+
+   Se aplica de dos formas y las dos hacen falta: `@media` para quien no ha
+   elegido —el navegador decide— y `[data-tema]` para quien si. La regla del
+   `@media` se guarda con `:not([data-tema='claro'])` para que la eleccion
+   explicita de tema claro gane sobre la preferencia del sistema.
+   ============================================================================ */
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-tema='claro']) {
+    color-scheme: dark;
+
+    --fondo: #0b141b;
+    --superficie: #16232c;
+    --sup: #1c2b36;
+
+    --tinta: #eaf1f6;
+    --tinta-2: #c3d0da;
+    --tinta-3: #97a9b6;
+    --tinta-4: #6e808d;
+
+    --azul: #52bdef;
+    --azul-oscuro: #08121a;
+    --azul-hover: #8fd7f6;
+    --azul-suave: #12303f;
+    --acento: #8fd7f6;
+    --sobre-azul: #04202d;
+
+    --linea: #283a47;
+    --linea-2: #1f303b;
+    --borde-campo: #687986;
+    --borde-boton: #748694;
+    --borde-hover: #8fa3b0;
+
+    --foco: #1b4a63;
+
+    --ok-fondo: #12301f;
+    --ok-tinta: #8bd6a8;
+    --atencion-fondo: #32260a;
+    --atencion-tinta: #efc96a;
+    --mal-fondo: #3a1811;
+    --mal-tinta: #f5a48d;
+    --info-fondo: #0f2c3d;
+    --info-tinta: #9ad6f5;
+
+    --mal-borde: #f5a48d;
+    --mal-campo: #2a1109;
+
+    --esqueleto: #1f303b;
+    --esqueleto-brillo: #2c414f;
+  }
+}
+
+:root[data-tema='oscuro'] {
+  color-scheme: dark;
+
+  --fondo: #0b141b;
+  --superficie: #16232c;
+  --sup: #1c2b36;
+
+  --tinta: #eaf1f6;
+  --tinta-2: #c3d0da;
+  --tinta-3: #97a9b6;
+  --tinta-4: #6e808d;
+
+  --azul: #52bdef;
+  --azul-oscuro: #08121a;
+  --azul-hover: #8fd7f6;
+  --azul-suave: #12303f;
+  --acento: #8fd7f6;
+  --sobre-azul: #04202d;
+
+  --linea: #283a47;
+  --linea-2: #1f303b;
+  --borde-campo: #687986;
+  --borde-boton: #748694;
+  --borde-hover: #8fa3b0;
+
+  --foco: #1b4a63;
+
+  --ok-fondo: #12301f;
+  --ok-tinta: #8bd6a8;
+  --atencion-fondo: #32260a;
+  --atencion-tinta: #efc96a;
+  --mal-fondo: #3a1811;
+  --mal-tinta: #f5a48d;
+  --info-fondo: #0f2c3d;
+  --info-tinta: #9ad6f5;
+
+  --mal-borde: #f5a48d;
+  --mal-campo: #2a1109;
+
+  --esqueleto: #1f303b;
+  --esqueleto-brillo: #2c414f;
+}
