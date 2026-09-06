@@ -51,6 +51,7 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.transaction.annotation.AnnotationTransactionAttributeSource;
 import org.springframework.transaction.interceptor.TransactionInterceptor;
 import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 /**
  * EL CAMINO ENTERO de C-8, medido: del buzon de {@code catastro} a la proyeccion de este sistema.
@@ -208,6 +209,85 @@ class IngestionDeCatastroJdbcTest {
     }
 
     // ------------------------------------------------------------------
+
+    @Test
+    @DisplayName("un motivo mas largo que su columna ENTRA recortado, y no para la ingestion")
+    void elMotivoQueNoCabeEntraRecortado() throws SQLException {
+        // EL DEFECTO QUE ESTO IMPIDE, MEDIDO Y NO SUPUESTO. Al crecer un motivo de `catastro` a
+        // 388 caracteres, la ingestion entera murio con «ERROR: value too long for type character
+        // varying(300)». Y lo caro no es el error: los hechos llegan por el buzon de salida, que
+        // entrega y REINTENTA, asi que un motivo que no cabe no se pierde con un aviso — se queda
+        // reintentando para siempre, y lo unico visible de este lado es que las valuaciones de ese
+        // predio no llegan.
+        //
+        // Se comprueba con un motivo LARGO DE VERDAD y no de 301: si la columna se ensanchara sin
+        // tocar el codigo, esta prueba tiene que seguir midiendo el recorte y no el borde.
+        APORTAR.addAll(deTipo("PREDIO_PROYECTADO"));
+        ingestor.ingerir();
+
+        String motivoLargo = "A".repeat(700);
+        APORTAR.add(conMotivo(deTipo("VALUACION_PUBLICADA").get(0), motivoLargo));
+
+        IngestarHechosDeCatastro.Vuelta vuelta = ingestor.ingerir();
+
+        assertThat(vuelta.aplicados())
+                .as("el hecho ENTRA: recortar es lo que impide el reintento infinito")
+                .isEqualTo(1);
+        assertThat(contar("valuacion_predio")).isEqualTo(1);
+        assertThat(elMotivoGuardado())
+                .as("recortado a lo que la columna admite, y no una letra menos")
+                .hasSize(300)
+                .isEqualTo("A".repeat(300));
+    }
+
+    @Test
+    @DisplayName("EL CONTRASTE: un motivo que SI cabe no se toca")
+    void elMotivoQueCabeNoSeToca() throws SQLException {
+        // Sin este contraste, un recorte que cortara SIEMPRE —o que devolviera la cadena vacia—
+        // pasaria la prueba de arriba y nadie lo notaria.
+        APORTAR.addAll(deTipo("PREDIO_PROYECTADO"));
+        ingestor.ingerir();
+
+        String motivoCorto = "B".repeat(120);
+        APORTAR.add(conMotivo(deTipo("VALUACION_PUBLICADA").get(0), motivoCorto));
+        ingestor.ingerir();
+
+        assertThat(elMotivoGuardado()).isEqualTo(motivoCorto);
+    }
+
+    /**
+     * El mismo hecho con otro motivo.
+     *
+     * <p>Se rehace con Jackson y no con un {@code replace} de texto porque {@code cuerpo} es una
+     * CADENA que contiene JSON: sus comillas viajan escapadas dentro del evento, y un patron
+     * escrito sobre la forma sin escapar no encuentra nada — pasa en verde midiendo el motivo
+     * original, que fue lo primero que salio al escribir esto.
+     *
+     * <p>La huella NO se recalcula, y da igual: la ingestion no la comprueba contra el cuerpo, la
+     * guarda para deduplicar y para ver a un emisor que reescribe un hecho sellado. Es la misma
+     * licencia que se toma {@code unHechoImposibleSeApartaYAvisa} con su huella inventada.
+     */
+    private static String conMotivo(String hecho, String motivo) {
+        ObjectNode evento = (ObjectNode) json.readTree(hecho);
+        ObjectNode cuerpo = (ObjectNode) json.readTree(evento.path("cuerpo").asString());
+        cuerpo.put("motivo", motivo);
+        evento.put("cuerpo", json.writeValueAsString(cuerpo));
+        return json.writeValueAsString(evento);
+    }
+
+    /** El motivo de la unica valuacion de esta municipalidad, leido como hace {@code contar}. */
+    private static String elMotivoGuardado() throws SQLException {
+        try (Connection admin = base.conexionAdmin();
+                PreparedStatement sentencia =
+                        admin.prepareStatement(
+                                "SELECT motivo FROM valuacion_predio WHERE municipalidad_id = ?")) {
+            sentencia.setLong(1, municipalidad);
+            try (ResultSet filas = sentencia.executeQuery()) {
+                filas.next();
+                return filas.getString(1);
+            }
+        }
+    }
 
     @Test
     @DisplayName(

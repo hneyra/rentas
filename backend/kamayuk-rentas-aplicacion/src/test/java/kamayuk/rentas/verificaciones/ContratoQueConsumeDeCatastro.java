@@ -12,11 +12,25 @@ import org.junit.jupiter.api.DisplayName;
 /**
  * Lo que {@code rentas} le pide a {@code catastro}, publicado para que su CI lo comprueba.
  *
- * <p>Son las <b>nueve</b> operaciones que los adaptadores de {@code kamayuk-rentas-catastro} piden
+ * <p>Son las <b>quince</b> operaciones que los adaptadores de {@code kamayuk-rentas-catastro} piden
  * hoy. Tres venian de antes —la grilla de fichas, el cuadro de valores unitarios y las huellas del
- * padron— y <b>cinco las estreno C-5</b>, que publico las rutas que le faltaban a esta frontera: si
+ * padron—, <b>cinco las estreno C-5</b>, que publico las rutas que le faltaban a esta frontera —si
  * el predio esta, lo que tiene inscrito a una fecha, el area de una version de ficha, de quien son
- * unos predios y que predios son de alguien.
+ * unos predios y que predios son de alguien—, <b>cinco mas las estreno #9</b> —la zona urbanistica,
+ * el riesgo del suelo, el ITSE, los frentes y los hallazgos de una campania— y <b>la decimoquinta
+ * la estrena `catastro`#17</b>: los hallazgos de UN predio, que era el ultimo puerto de este modulo
+ * que lanzaba por no tener ruta.
+ *
+ * <p><b>Y `catastro`#18 no anade ninguna: cambia una.</b> {@code GET /grd/riesgo} pasa a leer
+ * {@code aLaFecha}, asi que el adaptador se lo manda y este contrato lo declara. Mientras no lo
+ * leia, mandarlo habria sido el defecto de C-1 —viajar en la URL y descartarse en silencio—; ahora
+ * no mandarlo seria contestar siempre con lo vigente hoy a quien pregunta por 2024.
+ *
+ * <p><b>Cinco operaciones para cuatro puertos, y no es un descuadre</b>: {@code
+ * RiesgoYItseDelPredio} pide por dos rutas porque {@code catastro} publica dos —{@code /grd/riesgo}
+ * y {@code /grd/itse}—, con dos transacciones y dos respuestas del otro lado. Declarar una sola
+ * dejaria a la otra sin nadie que comprobara su forma en el CI del proveedor, que es exactamente lo
+ * que este archivo existe para conseguir.
  *
  * <p>Lo que sigue sin declararse son las <b>dos escrituras</b>, y no porque falte la ruta: {@code
  * GestorDeTitularidad.transferir} y {@code TransferenciaDeFiscalizacion.inscribirLoHallado} ocurren
@@ -155,6 +169,158 @@ public class ContratoQueConsumeDeCatastro extends ContratoQueSePublicaTestBase {
                     Map.entry("porcentajeTitularidad", "texto"),
                     Map.entry("porcentajeRegistradoDelPredio", "texto"));
 
+    // ------------------------------------------------------------------
+    // #9 — las CINCO operaciones de los cuatro puertos nuevos (`catastro`#4, #5, #6 y #7).
+    //
+    // Cuatro puertos y cinco operaciones, y no es un descuadre: `RiesgoYItseDelPredio` pregunta
+    // por dos rutas —`/grd/riesgo` y `/grd/itse`— porque `catastro` publica dos, con dos
+    // transacciones y dos respuestas. Declarar una sola dejaria a la otra sin nadie que
+    // comprobara su forma en el CI del proveedor, que es justo lo que este archivo existe para
+    // conseguir.
+
+    /** Un parametro urbanistico de la zona, tal como lo lee {@code ZonificacionDelPredioHttp}. */
+    public static final Map<String, Object> PARAMETRO_URBANISTICO =
+            ordenados(
+                    Map.entry("clave", "texto"),
+                    Map.entry("valor", "texto"),
+                    Map.entry("unidad", "texto"));
+
+    /** La zona de un predio a una fecha (`catastro`#4). */
+    public static final Map<String, Object> ZONA_DEL_PREDIO =
+            ordenados(
+                    // La fecha con la que catastro resolvio, no la que se pidio. El adaptador las
+                    // compara, por lo mismo que en las caracteristicas del predio (C-1).
+                    Map.entry("aLaFecha", "fecha"),
+                    Map.entry("codigo", "texto"),
+                    Map.entry("nombre", "texto"),
+                    Map.entry("plan", "texto"),
+                    // La norma que la aprobo: sin ella, quien niegue un giro por la zona no puede
+                    // citar lo que lo sustenta, y una denegacion sin norma no se notifica.
+                    Map.entry("ordenanza", "texto"),
+                    Map.entry("vigenciaDesde", "fecha"),
+                    Map.entry("vigenciaHasta", "fecha"),
+                    Map.entry("parametros", List.of(PARAMETRO_URBANISTICO)));
+
+    /** Una zona de riesgo que cruza el lote (`catastro`#5). */
+    public static final Map<String, Object> ZONA_DE_RIESGO =
+            ordenados(
+                    Map.entry("id", "entero"),
+                    Map.entry("codigo", "texto"),
+                    Map.entry("fenomeno", "texto"),
+                    Map.entry("nivel", "texto"),
+                    // Al lado del nivel y no en su lugar: es el que decide. Una zona MUY_ALTO
+                    // mitigable se construye con su obra de mitigacion.
+                    Map.entry("mitigable", "booleano"),
+                    Map.entry("fuente", "texto"),
+                    Map.entry("documentoOrigen", "texto"),
+                    Map.entry("vigenciaDesde", "fecha"),
+                    Map.entry("vigenciaHasta", "fecha"));
+
+    /** Una faja marginal que cruza el lote (`catastro`#5). */
+    public static final Map<String, Object> FAJA_MARGINAL =
+            ordenados(
+                    Map.entry("id", "entero"),
+                    Map.entry("codigo", "texto"),
+                    Map.entry("cuerpoDeAgua", "texto"),
+                    // Cadena y con la unidad en el NOMBRE: es la magnitud que fija la resolucion
+                    // de la ANA, y un decimal de mas o de menos mueve un lindero (ADR-0021).
+                    Map.entry("anchoM", "texto"),
+                    Map.entry("fuente", "texto"),
+                    Map.entry("documentoOrigen", "texto"),
+                    Map.entry("vigenciaDesde", "fecha"),
+                    Map.entry("vigenciaHasta", "fecha"));
+
+    /** El riesgo del suelo de un predio (`catastro`#5). */
+    public static final Map<String, Object> RIESGO_DEL_PREDIO =
+            ordenados(
+                    Map.entry("predioId", "entero"),
+                    // La fecha con la que catastro resolvio, que desde `catastro`#18 es la que se
+                    // pidio. El adaptador las compara: sin ella la respuesta es una que dentro de
+                    // un mes es otra, y sin compararlas nadie notaria que dejo de leerse.
+                    Map.entry("aLaFecha", "fecha"),
+                    // Derivado y arriba: es el dato que decide, y recalcularlo aqui recorriendo
+                    // las zonas seria repetir la unica linea que importa.
+                    Map.entry("hayRiesgoNoMitigable", "booleano"),
+                    Map.entry("zonas", List.of(ZONA_DE_RIESGO)),
+                    Map.entry("fajasMarginales", List.of(FAJA_MARGINAL)));
+
+    /** Un certificado ITSE (`catastro`#5). */
+    public static final Map<String, Object> CERTIFICADO_ITSE =
+            ordenados(
+                    Map.entry("id", "entero"),
+                    Map.entry("numero", "texto"),
+                    // El que el certificado ACREDITA. El que un giro exige es de este sistema
+                    // (`ciiu.riesgo_itse`), y se escribe con el mismo vocabulario.
+                    Map.entry("nivelRiesgo", "texto"),
+                    Map.entry("modalidad", "texto"),
+                    Map.entry("vigenciaDesde", "fecha"),
+                    Map.entry("vigenciaHasta", "fecha"),
+                    Map.entry("fechaAnulacion", "fecha"));
+
+    /** El ITSE de un predio a una fecha (`catastro`#5). */
+    public static final Map<String, Object> ITSE_DEL_PREDIO =
+            ordenados(
+                    Map.entry("predioId", "entero"),
+                    Map.entry("aLaFecha", "fecha"),
+                    Map.entry("vigentes", List.of(CERTIFICADO_ITSE)));
+
+    /**
+     * Un frente del predio (`catastro`#7).
+     *
+     * <p><b>Sin {@code geometria}</b>, que el recurso si publica: {@code rentas} no tiene visor de
+     * plano, y un campo declarado aqui es un campo que el proveedor no puede retirar sin poner rojo
+     * su build. Se declara lo que se usa.
+     */
+    public static final Map<String, Object> FRENTE_DEL_PREDIO =
+            ordenados(
+                    Map.entry("id", "entero"),
+                    Map.entry("viaId", "entero"),
+                    Map.entry("viaCodigo", "texto"),
+                    Map.entry("viaNombre", "texto"),
+                    // «18.50 ML»: la unidad va DENTRO del dato. El barrido se determina sobre
+                    // metros lineales y el recojo sobre metros cuadrados, y leer unos por otros
+                    // no falla: cobra otra cosa.
+                    Map.entry("longitud", "texto"),
+                    // PROPUESTA la corto una maquina; CONFIRMADA la firmo una persona (ADR-0021).
+                    // Sin este campo las dos llegan iguales.
+                    Map.entry("longitudEstado", "texto"),
+                    Map.entry("esPrincipal", "booleano"),
+                    Map.entry("numeracion", "texto"),
+                    Map.entry("retiro", "texto"),
+                    Map.entry("confirmadoPor", "texto"),
+                    Map.entry("confirmadoEn", "texto"));
+
+    /** Los frentes de un predio, con la constancia de cuando se derivaron (`catastro`#7). */
+    public static final Map<String, Object> FRENTES_DEL_PREDIO =
+            ordenados(
+                    Map.entry("predioId", "entero"),
+                    Map.entry("frentes", List.of(FRENTE_DEL_PREDIO)),
+                    // Los tres que impiden confundir «no da a ninguna calle» con «nadie lo ha
+                    // derivado»: hoy no hay ni un poligono cargado, asi que la respuesta va a ser
+                    // siempre la segunda, y determinar sobre cero metros cobraria de menos.
+                    Map.entry("derivadoEn", "texto"),
+                    Map.entry("frentesDerivados", "entero"),
+                    Map.entry("motivoDeLaDerivacion", "texto"));
+
+    /** Un hallazgo de la fiscalizacion catastral (`catastro`#6, ADR-0035). */
+    public static final Map<String, Object> FILA_DE_HALLAZGO =
+            ordenados(
+                    Map.entry("id", "entero"),
+                    Map.entry("candidatoId", "entero"),
+                    Map.entry("clase", "texto"),
+                    Map.entry("predioId", "entero"),
+                    // Contra que version se comparo, y cuando: una diferencia sin su version es
+                    // una diferencia que manana es otra (regla 9).
+                    Map.entry("fichaId", "entero"),
+                    // Las tres areas viajan como cadena: `ConfiguracionDeJson` las serializa con
+                    // `writeString` (RNF-055), igual que en la grilla de fichas.
+                    Map.entry("areaDeLaFicha", "texto"),
+                    Map.entry("areaVerificada", "texto"),
+                    Map.entry("excesoVerificado", "texto"),
+                    Map.entry("inspector", "texto"),
+                    Map.entry("verificadoEn", "fecha"),
+                    Map.entry("estado", "texto"));
+
     /**
      * Publico y no protegido: lo lee {@code PeticionesACatastroTest}, que vive en el paquete del
      * adaptador y compara los parametros declarados aqui con los que la URL construida manda de
@@ -281,6 +447,80 @@ public class ContratoQueConsumeDeCatastro extends ContratoQueSePublicaTestBase {
                                 Map.entry("contribuyenteId", "entero"),
                                 Map.entry("aLaFecha", "fecha"),
                                 Map.entry("predios", List.of(PREDIO_DEL_TITULAR)))));
+
+        // ------------------------------------------------------------------
+        // #9 — las cinco de la etapa 1. Cierran por el lado del consumidor lo que `catastro`
+        // publico en sus #4, #5, #6 y #7.
+
+        // La zona a la que cae un predio. La fecha viaja como `aLaFecha` —y no como `fecha`,
+        // que es lo que leen las siete rutas de C-1—: es como ESTA operacion la nombra, y lo que
+        // el adaptador manda es lo que el otro lado lee, no lo que el puerto llama.
+        operaciones.put(
+                "GET /urbano/zonificacion",
+                ContratoDelConsumidor.OperacionEsperada.lectura(
+                        Set.of("predioId", "aLaFecha"), ZONA_DEL_PREDIO));
+
+        // El riesgo del suelo, A UNA FECHA (`catastro`#18). Hasta ese issue esta operacion no
+        // admitia fecha —catastro resolvia con su reloj— y mandarle un `aLaFecha` habria sido el
+        // defecto de C-1 al reves: viajaria en la URL y se descartaria en silencio. Ahora la lee,
+        // y la respuesta sigue diciendo con cual resolvio: el adaptador las COMPARA antes de leer
+        // una zona, que es lo unico que caza desde este lado que el parametro se vuelva a
+        // descartar.
+        operaciones.put(
+                "GET /grd/riesgo",
+                ContratoDelConsumidor.OperacionEsperada.lectura(
+                        Set.of("predioId", "aLaFecha"), RIESGO_DEL_PREDIO));
+
+        // El ITSE vigente a una fecha. Esta SI la lee, asi que se manda y ademas se compara con
+        // la que vuelve: un certificado vencido leido como vigente es una licencia emitida
+        // contra un papel caducado.
+        operaciones.put(
+                "GET /grd/itse",
+                ContratoDelConsumidor.OperacionEsperada.lectura(
+                        Set.of("predioId", "aLaFecha"), ITSE_DEL_PREDIO));
+
+        // Los frentes de un predio: el insumo de los arbitrios de barrido. Sin parametros —un
+        // frente no se resuelve a una fecha; lo que tiene fecha es su confirmacion, y viaja
+        // dentro de cada frente—.
+        operaciones.put(
+                "GET /catastro/predios/{predioId}/frentes",
+                ContratoDelConsumidor.OperacionEsperada.lectura(Set.of(), FRENTES_DEL_PREDIO));
+
+        // Los hallazgos de una campania. Es la UNICA lectura de hallazgos que catastro publica;
+        // sus otras seis operaciones abren la campania, detectan, verifican, adjuntan evidencia
+        // y levantan acta, y ninguna es cosa de `rentas`.
+        //
+        // No se manda `ordenarPor`: su lista blanca es de catastro —cual campo es admisible
+        // depende de la tabla— y pedir uno que no admita seria un 422. Sin el ordena por
+        // `verificadoEn`, que es su valor por omision; lo que hace falta es que HAYA un orden,
+        // porque sin `ORDER BY` dos paginas consecutivas repiten una fila y omiten otra.
+        operaciones.put(
+                "GET /fiscalizacion/campanias/{campaniaId}/hallazgos",
+                ContratoDelConsumidor.OperacionEsperada.lectura(
+                        Set.of("pagina", "tamano"),
+                        ordenados(
+                                Map.entry("contenido", List.of(FILA_DE_HALLAZGO)),
+                                Map.entry("totalElementos", "entero"))));
+
+        // Los hallazgos de UN predio (`catastro`#17). Sin parametros: el predio va en la ruta y
+        // no hay fecha que resolver —un hallazgo lleva dentro la version de ficha contra la que
+        // se contrasto y el dia en que se verifico—. Sin paginar tampoco, y es del proveedor:
+        // un candidato produce como mucho un hallazgo y un predio entra una vez por campania.
+        //
+        // El sobre trae el `predioId` por el que se contesto, y el adaptador lo COMPARA con el
+        // que pidio antes de leer una fila: una lista de otro predio se leeria como los
+        // hallazgos de este, y sobre un exceso de area se abre una fiscalizacion tributaria.
+        //
+        // Se declaran los ONCE campos de la fila y no la campania ni el acta, que esa respuesta
+        // tambien publica: se declara lo que se usa, porque un campo declarado es un campo que
+        // el proveedor no puede retirar sin poner rojo su build (la disciplina de los frentes).
+        operaciones.put(
+                "GET /fiscalizacion/predios/{predioId}/hallazgos",
+                ContratoDelConsumidor.OperacionEsperada.lectura(
+                        Set.of(),
+                        ordenados(
+                                Map.entry("predioId", "entero"),
+                                Map.entry("hallazgos", List.of(FILA_DE_HALLAZGO)))));
 
         return new ContratoDelConsumidor("rentas", "catastro", "/catastro/api/v1", operaciones);
     }
