@@ -136,6 +136,64 @@ export function constantesDelArtboard(): Map<string, string> {
   return declaradas;
 }
 
+/**
+ * El literal que sigue a `<marca>` en el artboard, con los corchetes contados.
+ *
+ * Sirve igual para `const PASOS = [` que para `cifras: [`, que es lo que hace falta: la mitad de
+ * los datos del panel no son declaraciones con nombre — viven dentro de `renderVals()`, que es
+ * donde el prototipo compone lo que dibuja.
+ *
+ * **Vivia dentro de `secciones-del-artboard.test.ts`** y subio aqui en F-6, cuando una segunda
+ * prueba necesito leer el mismo artboard: dos analizadores del mismo archivo pueden divergir, y
+ * el que divergiera compararia contra otra cosa sin decirlo.
+ */
+export function literalTras(html: string, marca: string): string {
+  const inicio = html.indexOf(marca);
+  if (inicio === -1) {
+    throw new Error(`El artboard ya no declara «${marca}»: la referencia cambio.`);
+  }
+  const desde = inicio + marca.length;
+  const abre = html[desde];
+  if (abre !== '[' && abre !== '{') {
+    throw new Error(`«${marca}» ya no abre un literal: abre con «${String(abre)}».`);
+  }
+  const cierra = abre === '[' ? ']' : '}';
+
+  let profundidad = 0;
+  for (let i = desde; i < html.length; i += 1) {
+    if (html[i] === abre) {
+      profundidad += 1;
+    } else if (html[i] === cierra) {
+      profundidad -= 1;
+      if (profundidad === 0) {
+        return html.slice(desde, i + 1);
+      }
+    }
+  }
+  throw new Error(`El literal «${marca}» no se cierra.`);
+}
+
+/** El literal de JavaScript del artboard, leido como dato. */
+export function comoDato(literal: string): unknown {
+  return JSON.parse(
+    literal.replace(/'/g, '"').replace(/([{,]\s*)([A-Za-z_][A-Za-z0-9_]*)\s*:/g, '$1"$2":'),
+  );
+}
+
+/** El texto entre comillas simples que sigue a la marca: `colaTotal: '1,134 pendientes'`. */
+export function textoTras(html: string, marca: string): string {
+  const inicio = html.indexOf(marca);
+  if (inicio === -1) {
+    throw new Error(`El artboard ya no declara «${marca}».`);
+  }
+  const resto = html.slice(inicio + marca.length);
+  const comillas = /^\s*'([^']*)'/.exec(resto);
+  if (comillas === null) {
+    throw new Error(`«${marca}» ya no va seguido de un texto entre comillas simples.`);
+  }
+  return comillas[1] ?? '';
+}
+
 /** Todos los colores hexadecimales que aparecen en el artboard, normalizados. */
 export function coloresDelArtboard(): Set<string> {
   const html = leer(ARTBOARD);

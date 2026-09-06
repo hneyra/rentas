@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 
 import { ErrorDeLaApi } from '../api/cliente.ts';
-import { pedirLista, pedirUno } from './lecturas.ts';
+import { pedirCalculo, pedirLista, pedirUno } from './lecturas.ts';
 
 /**
  * **Los tres nombres empiezan por `use` y no por `usar`, y es la excepcion que confirma la
@@ -104,4 +104,16 @@ export function useUno<T>(ruta: string | null): Recurso<T> {
 /** Pide una operacion paginada y devuelve su contenido. */
 export function useLista<T>(ruta: string | null): Recurso<readonly T[]> {
   return usePeticion<readonly T[]>(ruta, (donde, senal) => pedirLista<T>(donde, senal));
+}
+
+/**
+ * Pide un calculo, que el contrato publica como `POST`. Ver `pedirCalculo`.
+ *
+ * Con `ruta` nula no pide nada, que es como la seccion «Determinación» se ahorra las cinco
+ * memorias que no se estan mirando: elegir un tipo cambia la ruta, y el efecto **aborta la
+ * anterior**. Sin eso, pasar por los seis tipos dejaria seis peticiones vivas y el cuadro lo
+ * pintaria la que contestara ultima.
+ */
+export function useCalculo<T>(ruta: string | null): Recurso<T> {
+  return usePeticion<T>(ruta, (donde, senal) => pedirCalculo<T>(donde, senal));
 }

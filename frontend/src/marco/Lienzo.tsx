@@ -1,6 +1,8 @@
-import { Aviso, Boton, Campo, Icono } from '../ds/index.ts';
+import { Aviso, Boton, Icono } from '../ds/index.ts';
 import { Contribuyentes } from '../secciones/Contribuyentes.tsx';
+import { Determinacion } from '../secciones/Determinacion.tsx';
 import { Panel } from '../secciones/Panel.tsx';
+import { Valores } from '../secciones/Valores.tsx';
 import type { EstadoDelPadron } from '../secciones/estadoDelPadron.ts';
 import { HOJAS, esPropia } from './arbol.ts';
 import { Trazos } from './Trazos.tsx';
@@ -8,32 +10,32 @@ import { Trazos } from './Trazos.tsx';
 /**
  * El lienzo: lo que hay debajo de las pestanas.
  *
- * Tiene **cinco estados**:
+ * Tiene **cuatro estados**:
  *
  *   1. **sin pestanas** — no hay nada abierto, y se dice;
  *   2. **una hoja ajena** — la ficha del AC9 de F-3, que explica en que archivo
  *      se disena esa pantalla y deja la pestana abierta para volver a ella;
  *   3. **`panel`** — el panel del modulo (F-5, AC1);
- *   4. **`predios`** — el padron y el expediente (F-5, AC2 a AC9);
- *   5. **`territorio` y `valores`** — el hueco declarado, con **un** campo,
- *      hasta que #8 las construya.
+ *   4. **`predios`, `territorio` y `valores`** — el padron con su expediente
+ *      (F-5) y las dos secciones de F-6.
  *
- * <h2>Por que el hueco lleva un campo, y por que es «Observación»</h2>
+ * <h2>El hueco con su campo «Observación» ya no esta, y por que</h2>
  *
- * El AC5 de F-3 pide que **editar un campo** marque la pestana. Un lienzo del
- * todo vacio no tiene ninguno, asi que la mecanica del estado sucio no se podria
- * demostrar ni usar: habria que creersela hasta que llegara la primera pantalla.
+ * Hasta F-6 quedaban dos secciones sin construir, y el lienzo las dibujaba con
+ * un aviso y **un** campo de observacion: el AC5 de F-3 pide que *editar un
+ * campo* marque la pestana, y un lienzo del todo vacio no tenia ninguno con el
+ * que demostrarlo.
  *
- * Y es la observacion y no un campo cualquiera porque es el unico que toda
- * pantalla de este sistema va a llevar: **regla 10 — toda modificacion de datos
- * exige observacion del usuario, y sin observacion no se guarda** (manual
- * §Auditoria, RNF-052). Cuando la seccion se construya, este campo no sobra:
- * baja con ella.
+ * Con #8 las cuatro secciones existen, y **ninguna de las dos nuevas modifica
+ * datos**: «Determinación» ensena la memoria de un calculo y «Valores», un
+ * conjunto sellado que el propio artboard rotula «Solo lectura». La regla 10
+ * —toda modificacion de datos exige observacion del usuario— no pide un campo
+ * donde no se modifica nada, asi que el campo baja con el hueco. Donde si se
+ * escribe es en el alta del padron, y ahi esta la mecanica del estado sucio, con
+ * sus pruebas (`Contribuyentes.test.tsx`, AC9 de F-5, y `Marco.test.tsx`).
  */
 export interface LienzoProps {
   readonly activa: string | null;
-  readonly observacion: string;
-  readonly alEscribirObservacion: (observacion: string) => void;
   readonly alCerrar: (destino: string) => void;
   /** Abre otra seccion: «Ver todo el padrón» del panel, y cada frente de la cola. */
   readonly alAbrir: (destino: string) => void;
@@ -42,18 +44,19 @@ export interface LienzoProps {
   readonly alAvisar: (texto: string) => void;
   readonly padron: EstadoDelPadron;
   readonly alCambiarPadron: (cambio: Partial<EstadoDelPadron>) => void;
+  /** El ejercicio de la barra global: decide de que conjunto sellado se piden las senas. */
+  readonly ejercicio: string;
 }
 
 export function Lienzo({
   activa,
-  observacion,
-  alEscribirObservacion,
   alCerrar,
   alAbrir,
   alEnsuciar,
   alAvisar,
   padron,
   alCambiarPadron,
+  ejercicio,
 }: LienzoProps) {
   if (activa === null) {
     return (
@@ -149,29 +152,23 @@ export function Lienzo({
     );
   }
 
+  if (activa === 'territorio') {
+    return <Determinacion />;
+  }
+
+  if (activa === 'valores') {
+    return <Valores ejercicio={ejercicio} />;
+  }
+
+  // No puede pasar: `esPropia` deja pasar exactamente las cuatro claves de `SECCIONES`, y las
+  // cuatro estan arriba. Se contesta igual, en vez de devolver `undefined` a React.
   return (
     <main className="kr-marco__lienzo">
-      <div className="kr-marco__hueco">
-        <Aviso
-          tipo="vacio"
-          titulo={`La pantalla de «${hoja.rotulo}» todavía no está construida`}
-          detalle={
-            'El marco, el panel y el padrón ya están: esta sección es una de las dos que faltan ' +
-            '—Determinación y Valores— y llega en su propio issue.'
-          }
-        />
-        <div className="kr-marco__observacion">
-          <Campo
-            etiqueta="Observación"
-            tipo="area"
-            valor={observacion}
-            onCambio={alEscribirObservacion}
-            ancho
-            ph="Por qué se modifica"
-            ayuda="Toda modificación de datos exige observación del usuario: sin ella no se guarda (regla 10)."
-          />
-        </div>
-      </div>
+      <Aviso
+        tipo="error"
+        titulo="Esa sección no tiene pantalla"
+        detalle={`«${activa}» es una sección de este módulo y el lienzo no sabe dibujarla.`}
+      />
     </main>
   );
 }

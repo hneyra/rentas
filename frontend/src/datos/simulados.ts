@@ -129,6 +129,20 @@ export const SIMULADOS: readonly Simulado[] = [
     operacion: 'GET /seguridad/parametros/ejercicios/{ejercicio}',
     porQue: 'Gemelo del anterior: el nombre legible del conjunto tampoco aparece en el artboard.',
   },
+  {
+    clave: 'conjuntoSellado',
+    valor: true,
+    operacion: 'GET /seguridad/parametros/ejercicios/{ejercicio}',
+    porQue:
+      'La seccion «Valores» del artboard lleva la pastilla «Solo lectura» y no dice por que lo es. El motivo es el sello: un conjunto sellado no se edita, se sustituye por otro (ADR-0025).',
+  },
+  {
+    clave: 'versionDelConjunto',
+    valor: 1,
+    operacion: 'GET /seguridad/parametros/ejercicios/{ejercicio}',
+    porQue:
+      'La version del conjunto es lo que hace reproducible un recalculo diez anos despues, y el artboard ensena las cifras sin decir de que version salen.',
+  },
 
   // ── Cronograma y modalidad ──────────────────────────────────────────────────────────────
   {

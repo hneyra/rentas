@@ -82,6 +82,20 @@ export interface ObservadoDeLaCorrida {
   readonly motivo: string;
 }
 
+/** Una etapa de la emision masiva, con lo que dejo fuera. */
+export interface EtapaDeLaCorrida {
+  readonly etapa: string;
+  readonly registros: number;
+  /**
+   * Lo emitido en esa etapa. **Cadena vacia donde la etapa no mueve dinero**, y no un cero:
+   * «no se emitio nada» y «esta etapa no emite» no son lo mismo, y el artboard escribe ahi un
+   * guion. La pantalla lo dibuja como guion; sumarlo como cero seria decir otra cosa.
+   */
+  readonly monto: string;
+  readonly observados: number;
+  readonly estado: string;
+}
+
 /** La ultima corrida de emision del predial. */
 export interface CorridaDelPredial {
   readonly id: number;
@@ -89,6 +103,148 @@ export interface CorridaDelPredial {
   readonly alcance: string;
   readonly fechaCalculo: string;
   readonly observados: number;
+  readonly etapas: readonly EtapaDeLaCorrida[];
+}
+
+// ── Las determinaciones ─────────────────────────────────────────────────────────────────────
+
+/**
+ * Un tramo de la escala progresiva **ya aplicado**, de `POST /rentas/predial/calculo-individual`.
+ *
+ * La alicuota y el limite superior salen del conjunto sellado de `normativa` (ADR-0025) y la
+ * porcion gravada y el aporte, del calculo. Ninguno de los cuatro se recompone aqui: la escala
+ * es una regla tributaria y las reglas tributarias son del backend (regla 6).
+ *
+ * `limiteSuperior` es nulo en el ultimo tramo, que no tiene tope.
+ */
+export interface TramoAplicado {
+  readonly orden: number;
+  readonly limiteSuperior: string | null;
+  readonly alicuota: string;
+  readonly porcionGravada: string;
+  readonly aporte: string;
+}
+
+/** Un predio que entra en la base del predial. */
+export interface PredioDeLaBase {
+  readonly predioId: number;
+  readonly codigoPredial: string;
+  readonly ubicacion: string;
+  readonly uso: string;
+  readonly porcentajePropiedad: string;
+  readonly autovaluo: string;
+}
+
+/** Una cuota del cronograma. */
+export interface CuotaDeterminada {
+  readonly numero: number;
+  readonly vencimiento: string;
+  readonly importe: string;
+}
+
+/**
+ * La memoria del predial de un contribuyente, de `POST /rentas/predial/calculo-individual`.
+ *
+ * **Los tres totales viajan juntos y los tres se dibujan** —insoluto, derecho de emision y
+ * total—, pero la pantalla no los suma: los pide. Que cuadren con los tramos que ella misma
+ * ensena lo comprueba `secciones/determinacion.ts`, y por que se comprueba en vez de calcular
+ * esta escrito ahi.
+ */
+export interface DeterminacionIndividual {
+  readonly ejercicio: string;
+  readonly codContribuyente: string;
+  readonly sujeto: string;
+  readonly conjunto: string;
+  readonly fechaCalculo: string;
+  readonly predios: readonly PredioDeLaBase[];
+  readonly valuoTotal: string;
+  readonly valuoExonerado: string;
+  readonly valuoAfecto: string;
+  readonly uit: string;
+  readonly tramos: readonly TramoAplicado[];
+  readonly minimoImponible: string;
+  readonly impuestoInsoluto: string;
+  readonly derechoDeEmision: string;
+  readonly totalAPagar: string;
+  readonly modalidad: string;
+  readonly cuotas: readonly CuotaDeterminada[];
+  /** La nota de la memoria y el rotulo de cada tramo, tal como el backend los publica. */
+  readonly reglasAplicadas: readonly string[];
+}
+
+/** La emision masiva del predial, de `POST /rentas/predial/calculo-masivo`. */
+export interface CorridaMasiva {
+  readonly ejercicio: string;
+  readonly alcance: string;
+  readonly conjunto: string;
+  readonly fechaCalculo: string;
+  readonly etapas: readonly EtapaDeLaCorrida[];
+  readonly observados: readonly ObservadoDeLaCorrida[];
+}
+
+/** Un ejercicio afecto del vehiculo. */
+export interface EjercicioVehicular {
+  readonly ejercicio: string;
+  readonly placa: string;
+  readonly baseImponible: string;
+  readonly montoDeterminado: string;
+}
+
+/** La memoria vehicular, de `POST /rentas/vehicular/calculo`. */
+export interface DeterminacionVehicular {
+  readonly fechaCalculo: string;
+  readonly conjunto: string;
+  readonly alicuota: string;
+  readonly minimoImponible: string;
+  readonly determinaciones: readonly EjercicioVehicular[];
+}
+
+/**
+ * La alcabala de una transferencia, de `POST /rentas/alcabala`.
+ *
+ * **Cuatro campos, y ninguno es una fecha.** No es un olvido de este archivo: es lo que
+ * declara `docs/50-api/formas-de-la-api.json`, y es lo que impide dibujar sus dos importes
+ * (regla 9). Medido y razonado en `secciones/determinacion.ts`.
+ */
+export interface DeterminacionDeAlcabala {
+  readonly id: number;
+  readonly ejercicio: string;
+  readonly baseImponible: string;
+  readonly montoDeterminado: string;
+}
+
+/** El impuesto a un espectaculo, de `POST /rentas/espectaculos`. Tampoco lleva fecha. */
+export interface DeterminacionDeEspectaculo {
+  readonly id: number;
+  readonly ejercicio: string;
+  readonly ingresoDeclarado: string;
+  readonly montoDeterminado: string;
+}
+
+/** Un arbitrio determinado, de `GET /rentas/arbitrios`. */
+export interface ArbitrioServido {
+  readonly id: number;
+  readonly ejercicio: string;
+  readonly servicio: string;
+  readonly periodo: number;
+  readonly monto: string;
+  readonly fechaCalculo: string;
+}
+
+/**
+ * Las senas del conjunto sellado del ejercicio, de
+ * `GET /seguridad/parametros/ejercicios/{ejercicio}`.
+ *
+ * **Es lo unico que las 181 operaciones dicen de la tabla de valores del ejercicio**, y no son
+ * los valores: son de que ejercicio, de que conjunto, que version y si esta sellado. Los
+ * valores los sella `normativa` (ADR-0025) y este sistema los consume de su copia local, sin
+ * publicarlos por HTTP.
+ */
+export interface ConjuntoDelEjercicio {
+  readonly ejercicio: number;
+  readonly sellado: boolean;
+  readonly conjuntoId: number;
+  readonly version: number;
 }
 
 // ── El expediente del contribuyente ─────────────────────────────────────────────────────────
@@ -253,6 +409,13 @@ export const RUTAS = {
   recaudacion: '/indicadores/recaudacion',
   trabajoParado: '/indicadores/trabajo-parado',
   bitacora: '/seguridad/auditoria',
+  arbitrios: '/rentas/arbitrios',
+  calculoIndividual: '/rentas/predial/calculo-individual',
+  calculoMasivo: '/rentas/predial/calculo-masivo',
+  calculoVehicular: '/rentas/vehicular/calculo',
+  alcabala: '/rentas/alcabala',
+  espectaculos: '/rentas/espectaculos',
+  conjuntoSellado: (ejercicio: string) => `/seguridad/parametros/ejercicios/${ejercicio}`,
 } as const;
 
 /** Pide una operacion paginada y devuelve solo su contenido. */
@@ -264,4 +427,21 @@ export async function pedirLista<T>(ruta: string, senal?: AbortSignal): Promise<
 /** Pide una operacion que contesta un objeto. */
 export async function pedirUno<T>(ruta: string, senal?: AbortSignal): Promise<T> {
   return solicitar<T>(ruta, senal === undefined ? {} : { senal });
+}
+
+/**
+ * Pide un calculo, que en el contrato es un `POST`.
+ *
+ * **No es un capricho del verbo**: determinar produce un acto —una determinacion con su
+ * identificador, su conjunto sellado y su fecha—, y por eso las cuatro memorias del modulo se
+ * piden con `POST` y no con `GET`. La peticion **no lleva cuerpo** mientras la pantalla sea de
+ * lectura: el proxy lo ignora a proposito (AC8 de #4) y el dia que este backend conteste, el
+ * cuerpo sera lo que decida cual contribuyente, cual vehiculo o cual transferencia se
+ * determina. Hasta entonces, mandar uno inventado seria escribir aqui esa decision.
+ */
+export async function pedirCalculo<T>(ruta: string, senal?: AbortSignal): Promise<T> {
+  return solicitar<T>(ruta, {
+    metodo: 'POST',
+    ...(senal === undefined ? {} : { senal }),
+  });
 }

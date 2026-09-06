@@ -1,7 +1,8 @@
 import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { desinstalarProxyDeDatos, instalarProxyDeDatos } from '../api/proxy.ts';
 import { Marco } from './Marco.tsx';
 
 /**
@@ -15,6 +16,44 @@ import { Marco } from './Marco.tsx';
  * marco para comprobar que cerrar la primera de tres activa la segunda diria
  * menos y costaria un `render`.
  */
+
+/**
+ * **El proxy se instala aqui desde F-6, y antes no hacia falta.**
+ *
+ * Hasta #8 el marco montaba dos secciones con datos —el panel y el padron— y dos huecos. Ahora
+ * monta cuatro, y las cuatro piden por HTTP: sin el proxy, cada una intentaria una peticion de
+ * verdad contra el servidor de pruebas, fallaria, y estas pruebas —que son del MARCO— medirian
+ * el marco con todas sus secciones en estado de error. Con el proxy instalado se dibujan como
+ * se dibujan en desarrollo, que es lo que estas pruebas dan por hecho al escribir en el alta.
+ */
+beforeAll(() => {
+  instalarProxyDeDatos();
+});
+
+afterAll(() => {
+  desinstalarProxyDeDatos();
+});
+
+/**
+ * Ensucia una pestana escribiendo en un campo, que es lo que el AC5 de F-3 pide demostrar.
+ *
+ * **Se ensucia «Contribuyentes» y no «Determinación», y desde F-6 no hay otra manera.** Hasta
+ * #8, las dos secciones que faltaban se dibujaban como un hueco con un campo «Observación», y
+ * era ahi donde esta mecanica se demostraba sin depender del contenido de ninguna pantalla. Con
+ * las cuatro secciones construidas ese hueco ya no existe, y **ninguna de las dos nuevas
+ * modifica datos**: «Determinación» ensena la memoria de un calculo y «Valores» un conjunto
+ * sellado que el propio artboard rotula «Solo lectura». La regla 10 pide observacion donde se
+ * modifica algo, y ahi no se modifica nada.
+ *
+ * Donde si se escribe es en el alta del padron, asi que la mecanica se demuestra sobre un campo
+ * de verdad — que es mas fuerte que sobre el campo de un hueco: si el alta dejara de avisar al
+ * marco, estas siete pruebas lo dirian.
+ */
+const ensuciar = async (usuario: ReturnType<typeof userEvent.setup>) => {
+  await usuario.click(submodulo('Contribuyentes'));
+  await usuario.click(await screen.findByRole('button', { name: 'Nuevo contribuyente' }));
+  await usuario.type(screen.getByLabelText('Nombres'), 'Rosa');
+};
 
 const limpiarElHash = () => {
   window.history.replaceState(null, '', '/');
@@ -198,19 +237,6 @@ describe('AC4 — el enrutado por hash', () => {
 });
 
 describe('AC5 — el estado sin guardar', () => {
-  /**
-   * Se ensucia «Determinación» y no «Panel» porque desde F-5 el Panel ya no es un
-   * hueco: tiene su pantalla, y su pantalla no lleva campo de observacion. El
-   * hueco con su `Observación` sobrevive en las DOS secciones que faltan
-   * —«Determinación» y «Valores»—, que es donde esta mecanica se sigue pudiendo
-   * demostrar sin depender del contenido de ninguna pantalla. Que el alta del
-   * padron tambien ensucia lo prueba `Contribuyentes.test.tsx` (AC9 de F-5).
-   */
-  const ensuciar = async (usuario: ReturnType<typeof userEvent.setup>) => {
-    await usuario.click(submodulo('Determinación'));
-    await usuario.type(screen.getByLabelText('Observación'), 'Se corrige el domicilio fiscal');
-  };
-
   it('editar un campo marca la pestana activa con un asterisco', async () => {
     const usuario = userEvent.setup();
     render(<Marco />);
@@ -218,7 +244,7 @@ describe('AC5 — el estado sin guardar', () => {
     expect(pestanas()).toEqual(['Panel']);
     await ensuciar(usuario);
 
-    expect(pestanas()).toEqual(['Panel', 'Determinación *']);
+    expect(pestanas()).toEqual(['Panel', 'Contribuyentes *']);
   });
 
   it('cerrarla pregunta, y ofrece las TRES salidas', async () => {
@@ -227,14 +253,14 @@ describe('AC5 — el estado sin guardar', () => {
     await ensuciar(usuario);
 
     await usuario.click(
-      screen.getByRole('button', { name: 'Cerrar Determinación — tiene cambios sin guardar' }),
+      screen.getByRole('button', { name: 'Cerrar Contribuyentes — tiene cambios sin guardar' }),
     );
 
     const dialogo = screen.getByRole('dialog', { name: 'Cerrar con cambios sin guardar' });
     expect(within(dialogo).getByRole('button', { name: 'Guardar y cerrar' })).toBeInTheDocument();
     expect(within(dialogo).getByRole('button', { name: 'Descartar y cerrar' })).toBeInTheDocument();
     expect(within(dialogo).getByRole('button', { name: 'Seguir editando' })).toBeInTheDocument();
-    expect(pestanas(), 'preguntar no cierra').toEqual(['Panel', 'Determinación *']);
+    expect(pestanas(), 'preguntar no cierra').toEqual(['Panel', 'Contribuyentes *']);
   });
 
   it('«Seguir editando» deja la pestana, y sigue sucia', async () => {
@@ -242,13 +268,13 @@ describe('AC5 — el estado sin guardar', () => {
     render(<Marco />);
     await ensuciar(usuario);
     await usuario.click(
-      screen.getByRole('button', { name: 'Cerrar Determinación — tiene cambios sin guardar' }),
+      screen.getByRole('button', { name: 'Cerrar Contribuyentes — tiene cambios sin guardar' }),
     );
 
     await usuario.click(screen.getByRole('button', { name: 'Seguir editando' }));
 
     expect(screen.queryByRole('dialog', { name: 'Cerrar con cambios sin guardar' })).toBeNull();
-    expect(pestanas()).toEqual(['Panel', 'Determinación *']);
+    expect(pestanas()).toEqual(['Panel', 'Contribuyentes *']);
   });
 
   it('«Descartar y cerrar» cierra, y no dice que guardo nada', async () => {
@@ -258,7 +284,7 @@ describe('AC5 — el estado sin guardar', () => {
     await usuario.click(modulo('Coactiva'));
     await usuario.click(submodulo('Costas y plazos'));
     await usuario.click(
-      screen.getByRole('button', { name: 'Cerrar Determinación — tiene cambios sin guardar' }),
+      screen.getByRole('button', { name: 'Cerrar Contribuyentes — tiene cambios sin guardar' }),
     );
 
     await usuario.click(screen.getByRole('button', { name: 'Descartar y cerrar' }));
@@ -274,14 +300,14 @@ describe('AC5 — el estado sin guardar', () => {
     await usuario.click(modulo('Coactiva'));
     await usuario.click(submodulo('Costas y plazos'));
     await usuario.click(
-      screen.getByRole('button', { name: 'Cerrar Determinación — tiene cambios sin guardar' }),
+      screen.getByRole('button', { name: 'Cerrar Contribuyentes — tiene cambios sin guardar' }),
     );
 
     await usuario.click(screen.getByRole('button', { name: 'Guardar y cerrar' }));
 
     expect(pestanas()).toEqual(['Panel', 'Costas y plazos']);
     expect(screen.getByRole('status').textContent).toContain(
-      'Cambios guardados en Determinación.',
+      'Cambios guardados en Contribuyentes.',
     );
   });
 
@@ -303,7 +329,7 @@ describe('AC5 — el estado sin guardar', () => {
 
     await ensuciar(usuario);
 
-    expect(submodulo('Determinación').textContent).toContain('*');
+    expect(submodulo('Contribuyentes').textContent).toContain('*');
   });
 });
 
@@ -509,10 +535,9 @@ describe('AC8 — el teclado', () => {
   it('Escape cierra el dialogo de confirmacion, y no cierra la pestana', async () => {
     const usuario = userEvent.setup();
     render(<Marco />);
-    await usuario.click(submodulo('Determinación'));
-    await usuario.type(screen.getByLabelText('Observación'), 'Se corrige');
+    await ensuciar(usuario);
     await usuario.click(
-      screen.getByRole('button', { name: 'Cerrar Determinación — tiene cambios sin guardar' }),
+      screen.getByRole('button', { name: 'Cerrar Contribuyentes — tiene cambios sin guardar' }),
     );
 
     await usuario.keyboard('{Escape}');
@@ -520,7 +545,7 @@ describe('AC8 — el teclado', () => {
     expect(screen.queryByRole('dialog', { name: 'Cerrar con cambios sin guardar' })).toBeNull();
     expect(pestanas(), 'Escape es «seguir editando», no «descartar»').toEqual([
       'Panel',
-      'Determinación *',
+      'Contribuyentes *',
     ]);
   });
 });
@@ -609,8 +634,7 @@ describe('el resto del marco que se porta', () => {
   it('el menu de sesion avisa de las pestanas con cambios sin guardar', async () => {
     const usuario = userEvent.setup();
     render(<Marco />);
-    await usuario.click(submodulo('Determinación'));
-    await usuario.type(screen.getByLabelText('Observación'), 'Se corrige');
+    await ensuciar(usuario);
 
     await usuario.click(screen.getByRole('button', { name: 'Sesión de J. Cárdenas Vega' }));
 
