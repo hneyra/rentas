@@ -14,20 +14,19 @@ import kamayuk.rentas.compartido.Paginacion;
  * rentas} (ADR-0024), y corregir el area es versionar la ficha con su observacion, que es un acto
  * de una persona en {@code catastro} (ADR-0035 punto 4).
  *
- * <h2>Lo que este puerto NO puede pedir, medido y no supuesto</h2>
+ * <h2>Las dos lecturas, y por que son dos y no una</h2>
  *
- * <p><b>{@code catastro} no publica una lectura de hallazgos POR PREDIO.</b> Lo unico que publica
- * es la pagina de una campania —{@code GET
- * /catastro/api/v1/fiscalizacion/campanias/&#123;id&#125;/hallazgos}—, y cada fila dice de que
- * predio es. Se leyeron sus siete operaciones antes de escribir esto: las otras seis abren una
- * campania, detectan, verifican en gabinete o en campo, adjuntan evidencia y levantan acta, y
- * ninguna de esas es cosa de {@code rentas}.
+ * <p>{@link #deLaCampania} recorre lo hallado en una campania, pagina a pagina; {@link #de(long)}
+ * contesta por UN predio. Hasta `catastro`#17 la segunda <b>lanzaba nombrando la ruta que la
+ * serviria</b>, porque el otro lado no la publicaba: devolver vacio habria dicho que ese predio
+ * esta limpio, y recorrer la campania filtrando de este lado habria devuelto <b>lo que cupo en la
+ * primera pagina</b> —sobre cuatro mil candidatos, una respuesta plausible, incompleta y muda—.
  *
- * <p>Por eso {@link #de(long)} existe y <b>lanza</b> en vez de faltar. Sin el, quien necesitara los
- * hallazgos de un predio recorreria {@link #deLaCampania} y filtraria de este lado: sobre una
- * campania de cuatro mil candidatos eso devuelve <b>lo que cupo en la primera pagina</b>, que es
- * una respuesta plausible, incompleta y silenciosa. Es el mismo criterio con que los dos puertos de
- * escritura de este modulo lanzan en vez de devolver vacio.
+ * <p>Ahora la sirve {@code GET
+ * /catastro/api/v1/fiscalizacion/predios/&#123;predioId&#125;/hallazgos}, que filtra por {@code
+ * hallazgo.predio_id} en la base del dueno del dato. Las otras seis operaciones de aquel
+ * controlador abren una campania, detectan, verifican en gabinete o en campo, adjuntan evidencia y
+ * levantan acta: ninguna es cosa de {@code rentas}, y consumirlas seria mover la frontera.
  */
 public interface HallazgosDelPredio {
 
@@ -41,10 +40,19 @@ public interface HallazgosDelPredio {
     Pagina<HallazgoCatastral> deLaCampania(long campaniaId, Paginacion paginacion);
 
     /**
-     * Los hallazgos de UN predio.
+     * Los hallazgos de UN predio (`catastro`#17).
      *
-     * @throws kamayuk.rentas.catastro.infraestructura.ClienteHttpDeCatastro.SinRutaEnCatastro
-     *     siempre, hoy: {@code catastro} no publica la operacion que lo serviria
+     * <p><b>Nunca trae un omiso catastral</b>, y no porque este lado lo filtre: un {@code
+     * OMISO_CATASTRAL} tiene {@code predioId} nulo por construccion —no es de ningun predio—, asi
+     * que una lectura por predio no puede alcanzarlo. Los omisos de una campania se leen con {@link
+     * #deLaCampania}, y quien lea «los hallazgos del predio» tiene que saberlo.
+     *
+     * <p>La lista <b>vacia es un dato</b>: ese predio esta en el padron y no tiene nada hallado.
+     * Que el predio no este es otra cosa y llega como {@code NoConstaEnCatastro}, porque se
+     * atienden distinto —una cierra una revision, la otra se arregla revisando el identificador—.
+     *
+     * @throws kamayuk.rentas.catastro.infraestructura.ClienteHttpDeCatastro.NoConstaEnCatastro si
+     *     el predio no esta en el padron de esa municipalidad
      */
     java.util.List<HallazgoCatastral> de(long predioId);
 }

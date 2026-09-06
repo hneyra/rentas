@@ -28,21 +28,26 @@ import java.time.LocalDate;
 public interface RiesgoYItseDelPredio {
 
     /**
-     * Las zonas de riesgo y las fajas marginales que cruzan el lote.
+     * Las zonas de riesgo y las fajas marginales que cruzaban el lote <b>a una fecha</b>.
      *
-     * <p><b>No recibe fecha, y hay que decir por que</b>: {@code catastro} no la admite en esta
-     * operacion —resuelve con su propio reloj— y la respuesta trae dentro la que uso. De modo que
-     * este puerto <b>no puede preguntar por el riesgo de un dia pasado</b>, y eso esta declarado y
-     * no cerrado: cerrarlo es publicar el parametro, y eso es del dueno de {@code grd}. Lo que si
-     * se conserva es la regla 9, porque {@link RiesgoDelPredio#aLaFecha()} dice con que dia se
-     * contesto.
+     * <p><b>Recibe la fecha desde `catastro`#18</b>, y el hueco que #9 dejo declarado se cierra
+     * aqui: hasta entonces {@code GET /grd/riesgo} no la admitia —resolvia con el reloj del otro
+     * lado—, asi que desde este sistema no se podia preguntar por el riesgo de un dia pasado. Quien
+     * revisa hoy una licencia denegada en 2024 necesita saber que decia la carta de peligro
+     * <b>entonces</b>: una carta se sustituye por otra, y con ella cambia {@link
+     * RiesgoDelPredio#hayRiesgoNoMitigable()}, que es el dato del que cuelga la decision.
+     *
+     * <p>La fecha viaja como {@code aLaFecha} —el nombre que {@code catastro} lee en esta ruta, en
+     * la del ITSE y en la de la zonificacion— y la respuesta trae dentro la que se uso, que el
+     * adaptador <b>compara</b> con la pedida antes de leer una sola zona: contestar con lo vigente
+     * en otra fecha es exactamente lo que la regla 9 existe para impedir.
      *
      * @throws kamayuk.rentas.catastro.infraestructura.ClienteHttpDeCatastro.NoConstaEnCatastro si
      *     el predio no esta en el padron, o esta y no tiene poligono. Sin poligono la respuesta
      *     correcta no existe: «cero zonas» se leeria como «no cae en ninguna» y acabaria
      *     autorizando lo que no debe
      */
-    RiesgoDelPredio riesgoDe(long predioId);
+    RiesgoDelPredio riesgoDe(long predioId, LocalDate aLaFecha);
 
     /**
      * Los certificados ITSE vigentes a una fecha. Ninguno vencido sale.

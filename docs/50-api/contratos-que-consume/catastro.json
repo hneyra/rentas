@@ -169,6 +169,26 @@
       },
       "cuerpo" : { }
     },
+    "GET /fiscalizacion/predios/{predioId}/hallazgos" : {
+      "parametros" : [ ],
+      "respuesta" : {
+        "predioId" : "entero",
+        "hallazgos" : [ {
+          "id" : "entero",
+          "candidatoId" : "entero",
+          "clase" : "texto",
+          "predioId" : "entero",
+          "fichaId" : "entero",
+          "areaDeLaFicha" : "texto",
+          "areaVerificada" : "texto",
+          "excesoVerificado" : "texto",
+          "inspector" : "texto",
+          "verificadoEn" : "fecha",
+          "estado" : "texto"
+        } ]
+      },
+      "cuerpo" : { }
+    },
     "GET /grd/itse" : {
       "parametros" : [ "aLaFecha", "predioId" ],
       "respuesta" : {
@@ -187,7 +207,7 @@
       "cuerpo" : { }
     },
     "GET /grd/riesgo" : {
-      "parametros" : [ "predioId" ],
+      "parametros" : [ "aLaFecha", "predioId" ],
       "respuesta" : {
         "predioId" : "entero",
         "aLaFecha" : "fecha",
