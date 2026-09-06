@@ -143,6 +143,20 @@ export function Contribuyentes({
             <Aviso tipo="error" titulo="No se pudo leer el padrón" detalle={padron.error} />
           )}
 
+          {/* El estado de cobranza llega de otras dos operaciones. Si una falla, la lista se
+              dibuja igual —los cinco estan— pero **con el estado incompleto**: quien esta en
+              coactiva se veria como «Activo». Callarlo seria peor que no tener el dato. */}
+          {padron.error === null && (coactiva.error !== null || observados.error !== null) && (
+            <Aviso
+              tipo="error"
+              titulo="El estado de cobranza no está completo"
+              detalle={
+                'La lista está, pero no se pudo leer quién está en coactiva o quién quedó ' +
+                'observado. Los chips de esos dos estados no encontrarán a nadie.'
+              }
+            />
+          )}
+
           {padron.cargando &&
             [0, 1, 2, 3, 4].map((hueco) => (
               <div className="kr-padron__fila kr-padron__fila--esqueleto" key={hueco}>
