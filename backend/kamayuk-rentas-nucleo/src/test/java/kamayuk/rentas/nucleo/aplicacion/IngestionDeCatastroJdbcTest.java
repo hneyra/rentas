@@ -378,7 +378,7 @@ class IngestionDeCatastroJdbcTest {
     @DisplayName(
             "AC 2: el mismo hecho aplicado por diez hilos deja UNA fila, y lo sostiene el indice unico")
     void elMismoHechoDosVecesProduceUnaFila() throws Exception {
-        HechoRecibido hecho = leer(hechosDeCatastro.get(0));
+        HechoRecibido hecho = leer(deTipo("PREDIO_PROYECTADO").get(0));
         int hilos = 10;
         CountDownLatch salida = new CountDownLatch(1);
         CountDownLatch llegada = new CountDownLatch(hilos);
@@ -430,7 +430,7 @@ class IngestionDeCatastroJdbcTest {
     @Test
     @DisplayName("AC 3: un hecho fuera de secuencia se descarta, y se dice")
     void unHechoViejoSeDescartaYSeDice() throws SQLException {
-        HechoRecibido nuevo = leer(hechosDeCatastro.get(0));
+        HechoRecibido nuevo = leer(deTipo("PREDIO_PROYECTADO").get(0));
         assertThat(aplicador.aplicar(nuevo, AHORA))
                 .isEqualTo(ProyeccionDeCatastro.Aplicacion.APLICADO);
         String direccionNueva = direccionProyectada();
@@ -495,7 +495,7 @@ class IngestionDeCatastroJdbcTest {
     @DisplayName(
             "y el emisor que reescribe un hecho sellado se ve, en vez de descartarse en silencio")
     void reescribirUnHechoSelladoSeVe() {
-        HechoRecibido original = leer(hechosDeCatastro.get(1));
+        HechoRecibido original = leer(deTipo("PREDIO_PROYECTADO").get(1));
         assertThat(aplicador.aplicar(original, AHORA))
                 .isEqualTo(ProyeccionDeCatastro.Aplicacion.APLICADO);
 
@@ -518,6 +518,40 @@ class IngestionDeCatastroJdbcTest {
                 .hasMessageContaining("reescribiendo un hecho sellado");
     }
 
+    /**
+     * Lo que le pasa a la ingestion con lo que {@code catastro} publica de verdad (#54).
+     *
+     * <h2>Esta prueba se PUSO ROJA, que es lo que se le pedia, y esta es su otra mitad</h2>
+     *
+     * <p><b>Las cuatro cifras que afirmaba son las mismas, y las cuatro estan invertidas.</b> La
+     * version que #51 dejo escrita fijaba el defecto para que el dia que #54 se cerrase saliera
+     * roja y se leyera; ese dia es este, y su enunciado —«un tipo que este sistema no sabe aplicar
+     * PARA la ingestion entera, sin avisar»— describe lo que este PR retira. No se borra en
+     * silencio: se conserva aqui lo que media, cifra a cifra, con lo que hoy afirma cada una.
+     *
+     * <ul>
+     *   <li>{@code aplicados = 0} —se perdia la pagina entera, con los hechos del padron que iban
+     *       DELANTE dentro— es hoy <b>{@code aplicados = 2}</b>, y se mide sobre las FILAS ({@code
+     *       predio_ref} y {@code ficha_ref}) y no sobre el codigo de salida.
+     *   <li>{@code acusados = 0} —la vuelta siguiente traia lo mismo y volvia a morir— es hoy
+     *       <b>los dos predios y solo ellos</b>: el hecho que no se sabe aplicar <b>sigue sin
+     *       acusarse</b>, y eso deja de ser el defecto para ser la decision — el emisor lo conserva
+     *       para el dia que exista quien lo aplique.
+     *   <li>{@code muertos = 0} sigue siendo cero, y ha cambiado de significado: ya no es «se queda
+     *       bloqueando la cola sin apartarse» sino «no se aparta PORQUE no procede». La cola de
+     *       {@code unHechoImposibleSeApartaYAvisa} es para lo que no se podra aplicar <i>nunca</i>;
+     *       aqui el hecho esta bien y lo que falta es la capacidad.
+     *   <li>{@code avisos = 0} sigue siendo cero por el canal de {@code AlertaDeHechosSinAplicar}
+     *       —ese avisa de hechos APARTADOS, y «la proyeccion del padron esta incompleta» es falso
+     *       de un hecho del territorio— y pasa a haber un <b>{@code WARN} por hecho que lo
+     *       nombra</b>. Es lo unico que separa «se ignora» de «se pierde sin que nadie se entere»,
+     *       y sin el todo lo demas de esta prueba sigue en verde: medido en la rotura R2.
+     * </ul>
+     *
+     * <p>La decision —ignorar con aviso, de las tres salidas del issue— es de la direccion, y su
+     * porque esta en el javadoc de {@link IngestarHechosDeCatastro} y en el de {@link
+     * kamayuk.rentas.nucleo.dominio.proyeccion.TipoDeHechoDeCatastro}.
+     */
     @Test
     @DisplayName(
             "#54: un tipo que no se sabe aplicar se IGNORA con su aviso, y el padron de la MISMA"
@@ -874,9 +908,13 @@ class IngestionDeCatastroJdbcTest {
 
     /** Los hechos del lote de ese tipo, en el orden en que `catastro` los emitio. */
     private static List<String> deTipo(String tipo) {
+        return deTipoEn(hechosDeCatastro, tipo);
+    }
+
+    private static List<String> deTipoEn(List<String> donde, String tipo) {
         List<String> suyos = new ArrayList<>();
-        for (String hecho : hechosDeCatastro) {
-            if (tipo.equals(json.readTree(hecho).path("tipo").asString())) {
+        for (String hecho : donde) {
+            if (tipo.equals(json.readTree(hecho).path("tipo").asString(""))) {
                 suyos.add(hecho);
             }
         }

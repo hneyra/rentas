@@ -8,7 +8,10 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.Optional;
+import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.dominio.MotivoDeInalcanzable;
 import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Value;
@@ -182,6 +185,152 @@ public class ClienteHttpDeCaja {
     }
 
     /**
+     * Lo que llego por el cable, sin interpretar.
+     *
+     * <p>Existe para que {@link #enviar} sea la <b>unica</b> costura que un doble de prueba
+     * sustituye. Es la leccion de #9 con {@code catastro}: mientras el doble sustituia {@code
+     * pedir}, lo que {@code pedir} DECIDE —que un 200 se lee, que un 404 es una respuesta y que un
+     * cuerpo ilegible es «la caja no contesta lo que dice contestar»— no lo ejercia ninguna prueba.
+     */
+    record RespuestaDeCaja(int estado, String cuerpo) {}
+
+    /** Manda la peticion y devuelve lo que llego. Es lo unico que toca la red. */
+    RespuestaDeCaja enviar(String ruta, String que) {
+        exigirRaiz(que);
+        HttpRequest.Builder peticion =
+                HttpRequest.newBuilder(URI.create(raiz + ruta))
+                        .timeout(ESPERA_DE_LECTURA)
+                        .header("Accept", "application/json")
+                        .GET();
+        return mandar(peticion, que);
+    }
+
+    /** Lo mismo para la unica escritura, por lo mismo: que se pueda espiar el cuerpo que sale. */
+    RespuestaDeCaja enviarCuerpo(String ruta, String cuerpo, String que) {
+        exigirRaiz(que);
+        HttpRequest.Builder peticion =
+                HttpRequest.newBuilder(URI.create(raiz + ruta))
+                        .timeout(ESPERA_DE_LECTURA)
+                        .header("Content-Type", "application/json")
+                        .header("Accept", "application/json")
+                        .POST(HttpRequest.BodyPublishers.ofString(cuerpo));
+        return mandar(peticion, que);
+    }
+
+    private void exigirRaiz(String que) {
+        if (raiz.isBlank()) {
+            throw new CajaInalcanzable(
+                    MotivoDeInalcanzable.SIN_CONFIGURAR,
+                    que + ": kamayuk.caja.url no esta configurada",
+                    null);
+        }
+    }
+
+    private RespuestaDeCaja mandar(HttpRequest.Builder peticion, String que) {
+        token().ifPresent(t -> peticion.header("Authorization", t));
+        try {
+            HttpResponse<String> respuesta =
+                    cliente.send(peticion.build(), HttpResponse.BodyHandlers.ofString());
+            return new RespuestaDeCaja(respuesta.statusCode(), respuesta.body());
+        } catch (IOException noContesta) {
+            throw new CajaInalcanzable(que, noContesta);
+        } catch (InterruptedException interrumpido) {
+            Thread.currentThread().interrupt();
+            throw new CajaInalcanzable(que, interrumpido);
+        }
+    }
+
+    // ------------------------------------------------------------------
+    //  Leer un campo de la respuesta: o esta, o la lectura falla nombrandolo
+    // ------------------------------------------------------------------
+
+    /**
+     * Un campo de texto que TIENE que estar, leido por su camino dentro del cuerpo.
+     *
+     * <p><b>Aqui no hay valor por omision, y ese es todo el punto</b> (#41 AC-2). {@code
+     * path("cobrado").asString("0")} sobre un nodo que no es escalar —un objeto {@code {importe,
+     * actualizadoA}}, por ejemplo— <b>no da error</b>: devuelve el «0». Y un cero publicado ahi
+     * pone el panel de recaudacion en «0,00 cobrado hoy» con la ventanilla cobrando, al lado de
+     * tres cifras del libro que si estan bien: es la cifra plausible y falsa de #48, y el sintoma
+     * es que no hay sintoma.
+     *
+     * <p>El camino se escribe con puntos —{@code «cobrado.importe»}— y el mensaje lo nombra entero,
+     * porque quien lee el registro necesita saber <b>que campo</b> falta y no que «algo» no cuadro.
+     */
+    static String exigirTexto(JsonNode cuerpo, String camino, String que) {
+        JsonNode nodo = cuerpo;
+        for (String paso : camino.split("\\.")) {
+            nodo = nodo.path(paso);
+        }
+        if (nodo.isMissingNode() || nodo.isNull() || !nodo.isValueNode()) {
+            throw new CajaInalcanzable(
+                    que
+                            + ": `caja` no publica «"
+                            + camino
+                            + "» como un valor de texto (llego "
+                            + descripcion(nodo)
+                            + "). No se lee con un valor por omision: un importe o una fecha que se"
+                            + " degradaran a «0» o a hoy no se distinguirian de los buenos",
+                    null);
+        }
+        return nodo.asString();
+    }
+
+    /** Que llego de verdad en ese camino, para que el rojo diga algo. */
+    private static String descripcion(JsonNode nodo) {
+        if (nodo.isMissingNode()) {
+            return "nada: el campo no esta";
+        }
+        if (nodo.isNull()) {
+            return "null";
+        }
+        String comoTexto = nodo.toString();
+        return (comoTexto.length() > 120 ? comoTexto.substring(0, 120) + "…" : comoTexto);
+    }
+
+    /** Un importe de esta frontera. Viaja como cadena (RNF-055, regla 1). */
+    static Dinero exigirDinero(JsonNode cuerpo, String camino, String que) {
+        String texto = exigirTexto(cuerpo, camino, que);
+        try {
+            return Dinero.de(texto);
+        } catch (NumberFormatException noEsUnImporte) {
+            // `NumberFormatException` y no `RuntimeException`: es la que lanza el
+            // `BigDecimal` de `Dinero.de`, y Checkstyle prohibe la ancha con razon —taparia
+            // ademas cualquier defecto de este metodo—. Sale como «la caja no contesta lo que
+            // dice contestar» y no como una excepcion cruda de un objeto de valor: quien lee el
+            // registro necesita el campo y el valor, y quien la caza —`PanelDeRecaudacion`—
+            // solo conoce el tipo del puerto.
+            throw new CajaInalcanzable(
+                    que
+                            + ": `caja` publica «"
+                            + camino
+                            + "» = '"
+                            + texto
+                            + "', que no es un"
+                            + " importe",
+                    noEsUnImporte);
+        }
+    }
+
+    /** Una fecha de esta frontera, en ISO. Toda cifra indica su fecha (regla 9, RNF-075). */
+    static LocalDate exigirFecha(JsonNode cuerpo, String camino, String que) {
+        String texto = exigirTexto(cuerpo, camino, que);
+        try {
+            return LocalDate.parse(texto);
+        } catch (DateTimeParseException malEscrita) {
+            throw new CajaInalcanzable(
+                    que
+                            + ": `caja` publica «"
+                            + camino
+                            + "» = '"
+                            + texto
+                            + "', que no es una fecha"
+                            + " ISO",
+                    malEscrita);
+        }
+    }
+
+    /**
      * Pide, y devuelve el cuerpo.
      *
      * @throws CajaInalcanzable si no contesta, o si contesta cualquier cosa que no sea 200
@@ -198,40 +347,21 @@ public class ClienteHttpDeCaja {
      * de la clase: en las demas, un vacio se leeria como un dato.
      */
     Optional<JsonNode> pedirSiExiste(String ruta, String que) {
-        if (raiz.isBlank()) {
-            throw new CajaInalcanzable(
-                    MotivoDeInalcanzable.SIN_CONFIGURAR,
-                    que + ": kamayuk.caja.url no esta configurada",
-                    null);
+        RespuestaDeCaja respuesta = enviar(ruta, que);
+        if (respuesta.estado() == 404) {
+            return Optional.empty();
         }
-        HttpRequest.Builder peticion =
-                HttpRequest.newBuilder(URI.create(raiz + ruta))
-                        .timeout(ESPERA_DE_LECTURA)
-                        .header("Accept", "application/json")
-                        .GET();
-        token().ifPresent(t -> peticion.header("Authorization", t));
+        if (respuesta.estado() != 200) {
+            throw new CajaInalcanzable(que + " (contesto " + respuesta.estado() + ")", null);
+        }
         try {
-            HttpResponse<String> respuesta =
-                    cliente.send(peticion.build(), HttpResponse.BodyHandlers.ofString());
-            if (respuesta.statusCode() == 404) {
-                return Optional.empty();
-            }
-            if (respuesta.statusCode() != 200) {
-                throw new CajaInalcanzable(
-                        que + " (contesto " + respuesta.statusCode() + ")", null);
-            }
-            return Optional.of(json.readTree(respuesta.body()));
-        } catch (IOException noContesta) {
-            throw new CajaInalcanzable(que, noContesta);
+            return Optional.of(json.readTree(respuesta.cuerpo()));
         } catch (JacksonException ilegible) {
             // Jackson 3 no lanza `IOException` sino `JacksonException`, que es NO COMPROBADA
             // (C-7). Sin este `catch` un cuerpo que no es JSON —el HTML de un proxy, por
             // ejemplo— saldria como una excepcion cruda de una libreria en vez de como «caja
             // no contesta lo que dice contestar», que es lo que quien opera necesita leer.
             throw new CajaInalcanzable(que, ilegible);
-        } catch (InterruptedException interrumpido) {
-            Thread.currentThread().interrupt();
-            throw new CajaInalcanzable(que, interrumpido);
         }
     }
 
@@ -245,38 +375,15 @@ public class ClienteHttpDeCaja {
      * inventado dejaria al contribuyente delante de una ventanilla que no encuentra su deuda.
      */
     JsonNode publicar(String ruta, String cuerpo, String que) {
-        if (raiz.isBlank()) {
-            throw new CajaInalcanzable(
-                    MotivoDeInalcanzable.SIN_CONFIGURAR,
-                    que + ": kamayuk.caja.url no esta configurada",
-                    null);
+        RespuestaDeCaja respuesta = enviarCuerpo(ruta, cuerpo, que);
+        int estado = respuesta.estado();
+        if (estado != 200 && estado != 201) {
+            throw new CajaInalcanzable(que + " (contesto " + estado + ")", null);
         }
-        HttpRequest.Builder peticion =
-                HttpRequest.newBuilder(URI.create(raiz + ruta))
-                        .timeout(ESPERA_DE_LECTURA)
-                        .header("Content-Type", "application/json")
-                        .header("Accept", "application/json")
-                        .POST(HttpRequest.BodyPublishers.ofString(cuerpo));
-        token().ifPresent(t -> peticion.header("Authorization", t));
         try {
-            HttpResponse<String> respuesta =
-                    cliente.send(peticion.build(), HttpResponse.BodyHandlers.ofString());
-            int estado = respuesta.statusCode();
-            if (estado != 200 && estado != 201) {
-                throw new CajaInalcanzable(que + " (contesto " + estado + ")", null);
-            }
-            return json.readTree(respuesta.body());
-        } catch (IOException noContesta) {
-            throw new CajaInalcanzable(que, noContesta);
+            return json.readTree(respuesta.cuerpo());
         } catch (JacksonException ilegible) {
-            // Jackson 3 no lanza `IOException` sino `JacksonException`, que es NO COMPROBADA
-            // (C-7). Sin este `catch` un cuerpo que no es JSON —el HTML de un proxy, por
-            // ejemplo— saldria como una excepcion cruda de una libreria en vez de como «caja
-            // no contesta lo que dice contestar», que es lo que quien opera necesita leer.
             throw new CajaInalcanzable(que, ilegible);
-        } catch (InterruptedException interrumpido) {
-            Thread.currentThread().interrupt();
-            throw new CajaInalcanzable(que, interrumpido);
         }
     }
 

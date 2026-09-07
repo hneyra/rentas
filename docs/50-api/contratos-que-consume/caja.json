@@ -1,0 +1,83 @@
+{
+  "PROCEDENCIA" : "ARCHIVO GENERADO — no editar a mano. Lo publica el CONSUMIDOR con lo que su adaptador pide y lee de verdad; lo comprueba el PROVEEDOR en su propio CI (ADR-0030 §4). Un campo que el proveedor deje de publicar, o un parametro que deje de leer, pone rojo el build del proveedor y no el del consumidor: es lo que sustituye a lo que hacia el compilador cuando los contextos compartian repositorio.",
+  "consumidor" : "rentas",
+  "proveedor" : "caja",
+  "raiz" : "/caja/api/v1",
+  "operaciones" : {
+    "GET /recaudacion/avance" : {
+      "parametros" : [ "desde", "hasta" ],
+      "respuesta" : {
+        "desde" : "texto",
+        "hasta" : "texto",
+        "aLaFecha" : "texto",
+        "cobrado" : {
+          "importe" : "texto",
+          "actualizadoA" : "fecha"
+        },
+        "anulado" : {
+          "importe" : "texto",
+          "actualizadoA" : "fecha"
+        }
+      },
+      "cuerpo" : { }
+    },
+    "GET /recibos/{numero}" : {
+      "parametros" : [ ],
+      "respuesta" : {
+        "reciboId" : "entero",
+        "numero" : "texto",
+        "fechaDePago" : "texto",
+        "contribuyenteId" : "entero",
+        "esDeTasas" : "booleano",
+        "anulado" : "booleano",
+        "conceptos" : [ "texto" ],
+        "total" : "texto",
+        "actualizadoA" : "texto"
+      },
+      "cuerpo" : { }
+    },
+    "GET /tasas/{codigo}/cobros/{numero}" : {
+      "parametros" : [ ],
+      "respuesta" : {
+        "numeroDeRecibo" : "texto",
+        "codigoDeTasa" : "texto",
+        "cantidad" : "entero",
+        "importe" : "texto",
+        "fecha" : "texto"
+      },
+      "cuerpo" : { }
+    },
+    "GET /tasas/{codigo}/recaudacion" : {
+      "parametros" : [ "desde", "hasta" ],
+      "respuesta" : {
+        "codigoDeTasa" : "texto",
+        "cobrado" : "texto",
+        "anulado" : "texto",
+        "desde" : "texto",
+        "hasta" : "texto"
+      },
+      "cuerpo" : { }
+    },
+    "POST /ordenes-de-cobro" : {
+      "parametros" : [ ],
+      "respuesta" : {
+        "ordenId" : "entero",
+        "estado" : "texto",
+        "nueva" : "booleano"
+      },
+      "cuerpo" : {
+        "sistemaOrigen" : "texto",
+        "referenciaExterna" : "texto",
+        "concepto" : "texto",
+        "detalle" : "texto",
+        "importe" : "texto",
+        "fechaExigibilidad" : "texto",
+        "actualizadoA" : "texto",
+        "pagadorDocumento" : "texto",
+        "pagadorNombre" : "texto",
+        "pagadorIdExterno" : "entero",
+        "observacion" : "texto"
+      }
+    }
+  }
+}

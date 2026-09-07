@@ -42,6 +42,15 @@ export interface PanelProps {
   readonly alIrAlPadron: (chip?: string) => void;
   /** Una linea de actividad abre el expediente del contribuyente que toco. */
   readonly alAbrirContribuyente: (codigo: string) => void;
+  /**
+   * El ejercicio de la barra global. **La bitacora no se puede pedir sin el** (#26): `GET
+   * /seguridad/auditoria` lo declara `@RequestParam("ejercicio") int` y sin el contesta 422
+   * «Falta el parametro obligatorio 'ejercicio'», medido contra la instalacion.
+   *
+   * Nulo mientras la sesion no ha contestado todavia: entonces la bitacora no se pide, que es
+   * lo mismo que hace el resto de la interfaz con lo que aun no sabe.
+   */
+  readonly ejercicio: string | null;
 }
 
 /**
@@ -68,10 +77,12 @@ function momento(instante: string): string {
   return `${dia}/${mes}/${anio} ${hora}:${minuto}`;
 }
 
-export function Panel({ alIrAlPadron, alAbrirContribuyente }: PanelProps) {
+export function Panel({ alIrAlPadron, alAbrirContribuyente, ejercicio }: PanelProps) {
   const recaudacion = useUno<IndicadorDeRecaudacion>(RUTAS.recaudacion);
   const parado = useUno<TrabajoParado>(RUTAS.trabajoParado);
-  const bitacora = useLista<MovimientoDeLaBitacora>(RUTAS.bitacora);
+  const bitacora = useLista<MovimientoDeLaBitacora>(
+    ejercicio === null ? null : RUTAS.bitacoraDe(ejercicio),
+  );
 
   const indicador = recaudacion.dato;
   const avance = indicador?.paneles[0];
