@@ -26,15 +26,21 @@
 #  motivo mas: el perfil `batch` TERMINA el proceso, asi que un servicio mas seria
 #  un contenedor que sale con codigo 0 y al que Compose reiniciaria en bucle —el
 #  defecto 5 de C-17—. Queda como hueco declarado de C-18.
-#  AQUI NO HAY FRONTEND, y no es un olvido. Desde F-1 este repositorio SI tiene
-#  `frontend/` —Vite 7 + React 19, con sus reglas y su CI—, pero es andamiaje sin
-#  ninguna pantalla: no hay imagen `kamayuk-rentas-web`, no hay nginx que sirva el
-#  bundle y no hay nada que ver. Un servicio aqui seria un contenedor que sirve
-#  una pagina con un `<h1>` y poco mas, y —peor— una segunda forma de levantar el
-#  sistema que el descriptor no conoce, que es la trampa que ADR-0011 anoto.
-#  Entra cuando haya pantallas. El `README.md` de `infrastructure/despliegue/`
-#  decia que este compose traia «su backend y su frontend»; se corrigio a lo que
-#  hay, y lo que hay sigue siendo el backend.
+#  Y DESDE #44 SI HAY FRONTEND. Hasta aqui este bloque decia «AQUI NO HAY
+#  FRONTEND, y no es un olvido», y daba su motivo: que `frontend/` era andamiaje
+#  sin ninguna pantalla, de modo que un servicio aqui habria sido «un contenedor
+#  que sirve una pagina con un `<h1>` y poco mas».
+#
+#  ESE MOTIVO CADUCO, y por eso el comentario se reescribe en vez de borrarse.
+#  `rentas-web` tiene sus cuatro secciones (Panel, Contribuyentes, Determinacion
+#  y Valores), entra por Keycloak con PKCE, lee doce rutas del backend y escribe
+#  una. Lo que quedaba pendiente era justo lo contrario de lo que aquel parrafo
+#  decia: no faltaban pantallas, faltaba la imagen. Con #44 existe, asi que entra.
+#
+#  LO QUE ESTE SERVICIO NO HACE, que es la mitad importante: no reenvia nada al
+#  backend, y por eso NO tiene `depends_on`. Quien pone la interfaz y la API en el
+#  mismo origen es Traefik, partiendo `/rentas` en dos. El motivo largo esta en el
+#  propio servicio.
 # ============================================================================
 
 name: kamayuk-rentas
@@ -186,8 +192,29 @@ services:
       # Su prefijo, y SOLO el suyo. Reclamar el de otro no falla: se lo queda, y
       # las peticiones dejan de llegar a su dueno. Es la misma prohibicion (a) que
       # `descriptor/auditoria.ts` aplica en el cluster.
+      #
+      # DESDE #44 LA REGLA ES `/rentas/api/v1` Y NO `/rentas`, porque ahora hay
+      # dos cosas bajo ese prefijo: esta API y la interfaz. El reparto es el mismo
+      # que `ingreso()` declara para el cluster, y tiene que serlo (ADR-0011).
+      #
+      # Se estrecha SIN PERDER NADA, y esta medido: lo unico que este proceso
+      # sirve bajo `/rentas` es `Api.RAIZ`, que es `/rentas/api/v1` entera
+      # (`kamayuk/rentas/web/Api.java:13`). El actuator vive en `/actuator/...`,
+      # o sea que `PathPrefix(/rentas)` nunca lo enrutaba — la sonda de aqui
+      # abajo lo pide por `localhost:8080` y no por Traefik, a proposito.
+      #
+      # Y NO se le quita el prefijo: `Api.RAIZ` es la ruta entera, asi que un
+      # `stripprefix` aqui dejaria a Spring buscando `/api/v1/...` y contestando
+      # 404 a todo. El `stripprefix` es de la interfaz, y solo de ella.
+      #
+      # La PRIORIDAD va escrita. Traefik v3 ordena por longitud de la regla
+      # cuando nadie la declara, y `/rentas/api/v1` es mas larga que `/rentas`,
+      # asi que hoy saldria bien POR ACCIDENTE. El fallo al reves no grita: la
+      # API la contestaria el nginx, cuyo `try_files` devuelve el `index.html`
+      # con un **200**, y la pantalla recibiria HTML donde espera JSON.
       - traefik.enable=true
-      - traefik.http.routers.rentas.rule=PathPrefix(`/rentas`)
+      - traefik.http.routers.rentas.rule=PathPrefix(`/rentas/api/v1`)
+      - traefik.http.routers.rentas.priority=20
       - traefik.http.services.rentas.loadbalancer.server.port=8080
     healthcheck:
       # `/actuator/health` y no `/actuator/health/liveness`: aqui esta sonda
@@ -206,6 +233,89 @@ services:
       timeout: 3s
       retries: 40
       start_period: 30s
+
+  # ── La interfaz (#44) ───────────────────────────────────────────────────────
+  #
+  # `rentas-web` compilado y servido por nginx. La imagen es
+  # `kamayuk-rentas-interfaz` y NUNCA `kamayuk-rentas-web`: ese nombre ya es el
+  # del BACKEND con el perfil `web` de Spring en el descriptor, y darselo aqui
+  # dejaria dos artefactos del producto llamados igual.
+  #
+  # POR QUE SE LLAMA `rentas-interfaz` Y NO `interfaz`
+  #
+  # Por lo mismo que el backend se llama `rentas` y no `aplicacion`, escrito unas
+  # lineas mas arriba: los cuatro composes comparten la red `kamayuk-plataforma` y
+  # Compose le da a cada servicio un alias de red con su nombre. ADR-0030 §1 dice
+  # que habra CUATRO interfaces, y el dia de la segunda un alias `interfaz`
+  # resolveria a una cualquiera de las dos. El sintoma de eso no es un error: es
+  # una peticion que a veces llega a quien no era.
+  #
+  # SIN `depends_on`, Y ESO ES UNA AFIRMACION (AC-8 de #44)
+  #
+  # Esta interfaz no necesita el backend para dibujarse, y tampoco para hablar con
+  # el: `frontend/nginx.conf` NO reenvia a ningun sitio. Quien pone la pantalla y
+  # la API en el mismo origen —que es lo unico que hace falta, porque el backend
+  # no publica ni una cabecera CORS— es Traefik, con las dos reglas de aqui.
+  #
+  # Declarar una dependencia que no existe costaria dos cosas: haria que el
+  # compose MINTIERA sobre el grafo —que es justo lo que la guarda de
+  # `infrastructure` compara contra el descriptor— y obligaria a
+  # `up -d rentas-interfaz` a levantar antes la base, el migrador y la
+  # implantacion para servir unos archivos que no los usan.
+  #
+  # Lo unico que SI necesita de fuera es la red `kamayuk-plataforma`, porque este
+  # archivo entero la declara `external: true`.
+  rentas-interfaz:
+    build:
+      # El contexto es `frontend/` y no la raiz, al reves que los tres de arriba:
+      # este `Dockerfile` no tiene ni un `COPY` que salga de ahi, y el
+      # `.dockerignore` que acota el contexto —`frontend/.dockerignore`— solo se
+      # aplica desde la raiz del contexto. El de la raiz excluye `frontend/`
+      # entero, asi que no dice nada de esta imagen.
+      context: ../frontend
+      target: interfaz
+    image: kamayuk-rentas-interfaz:compose
+    # EL PUERTO LLEVA EL SUFIJO DEL SISTEMA, y no es capricho (AC-8 de #44).
+    #
+    # `KAMAYUK_PUERTO_INTERFAZ` a secas YA LO USA la interfaz del monolito
+    # —`infrastructure/despliegue/compose.yaml` publica
+    # `${KAMAYUK_PUERTO_INTERFAZ:-8081}:8080`— y el `.env` es EL MISMO para todo
+    # esto. Reusar el nombre tendria dos efectos, los dos malos: con ese `.env`
+    # delante el valor por omision de aqui NO SE APLICARIA NUNCA, asi que
+    # documentar `:8083` seria documentar algo falso; y las dos interfaces
+    # pedirian el mismo puerto del anfitrion y se pelearian por el. Es lo que
+    # `caja`#39 midio.
+    #
+    # 8083 porque 8080 es el ingreso del monolito, 8081 su interfaz y 8082 lo
+    # toma por omision la de `caja` —y en esta instalacion, el propio Traefik—.
+    # Comprobado libre antes de escribirlo.
+    #
+    # PARA QUE SIRVE, existiendo Traefik: para mirar el nginx SIN el ingreso
+    # delante. Por aqui las rutas llegan con el prefijo puesto, o sea que
+    # `/rentas/...` cae en el bloque que contesta 404 diciendo que falta el
+    # `stripprefix` — que es exactamente lo que se quiere poder distinguir
+    # cuando algo no llega.
+    ports:
+      - "${KAMAYUK_PUERTO_INTERFAZ_RENTAS:-8083}:8080"
+    labels:
+      # La otra mitad del reparto. Prioridad MENOR que la de la API, escrita y no
+      # heredada de la longitud de la regla: ver la nota del servicio `rentas`.
+      #
+      # Y aqui SI se quita el prefijo, porque este nginx sirve en la raiz de su
+      # contenedor. Que el paquete lo pida con el prefijo puesto lo garantiza
+      # `vite.config.ts` con `base: '/rentas/'` (ADR-0030 §2).
+      - traefik.enable=true
+      - traefik.http.routers.rentas-interfaz.rule=PathPrefix(`/rentas`)
+      - traefik.http.routers.rentas-interfaz.priority=10
+      - traefik.http.routers.rentas-interfaz.middlewares=rentas-quitar-prefijo
+      - traefik.http.middlewares.rentas-quitar-prefijo.stripprefix.prefixes=/rentas
+      - traefik.http.services.rentas-interfaz.loadbalancer.server.port=8080
+    # SIN `healthcheck` aqui, y tampoco es un olvido: `frontend/Dockerfile` ya
+    # declara el suyo —`wget --spider -q http://127.0.0.1:8080/index.html`, por
+    # 127.0.0.1 y no `localhost` porque este nginx escucha solo en IPv4— y Docker
+    # aplica el `HEALTHCHECK` de la imagen al contenedor, que es de donde
+    # `up --wait` lee la salud. Copiarlo aqui seria un segundo sitio con la misma
+    # verdad, y el que envejece sin ponerse rojo.
 
 # La red de la plataforma, QUE YA EXISTE. `external: true` es lo que impide que
 # este compose cree una segunda con el mismo nombre y deje a los servicios sin
