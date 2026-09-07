@@ -100,11 +100,17 @@ export function Expediente({
   const id = fila?.contribuyente.id ?? null;
 
   const ficha = useUno<FichaDelContribuyente>(id === null ? null : RUTAS.ficha(id));
-  const predios = useLista<PredioServido>(id === null ? null : RUTAS.predios);
+  // Las tres se piden POR CONTRIBUYENTE, y las tres lo llevan en la URL: `codContribuyente`
+  // en las dos primeras (#26) y `contribuyente` en los beneficios, que es el nombre que ESA
+  // operacion publica. Hasta #26 las dos primeras se pedian peladas y el backend habria
+  // contestado 422: `codigo` sale de la misma fila que ya alimentaba los beneficios, asi que no
+  // hace falta ninguna lectura nueva.
+  const codigo = fila?.contribuyente.codigo ?? null;
+  const predios = useLista<PredioServido>(codigo === null ? null : RUTAS.prediosDe(codigo));
   const beneficios = useLista<BeneficioServido>(
-    fila === null ? null : RUTAS.beneficiosDe(fila.contribuyente.codigo),
+    codigo === null ? null : RUTAS.beneficiosDe(codigo),
   );
-  const deuda = useLista<DeudaPorConcepto>(id === null ? null : RUTAS.deuda);
+  const deuda = useLista<DeudaPorConcepto>(codigo === null ? null : RUTAS.deudaDe(codigo));
 
   const servidos = valoresDelExpediente({
     ficha: ficha.dato,

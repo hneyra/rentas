@@ -1,0 +1,1270 @@
+{
+  "_": "ARCHIVO GENERADO — no editar a mano. Lo produce ParametrosDeLaApiTest de la FIRMA de cada controlador; se regenera con -Dkamayuk.formas.regenerar=true. Dice que hace falta para PEDIR cada operacion: «obligatorios» sale de @RequestParam required=true sin defaultValue; «algunoDeEstos» son grupos de los que hay que mandar al menos uno, que el controlador exige en su cuerpo porque admite varios nombres; «condicionales» son los que solo hacen falta segun el cuerpo de la peticion; «opcionales» es el resto, y «enElCuerpo» son los que el controlador exige y NO viajan en la URL sino en el cuerpo JSON. Lo lee el frontend para comprobar que su proxy no sirve una operacion sin lo que el backend exige (#26).",
+  "GET /autorizaciones/anuncios": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["contribuyente", "direccion", "nExpediente", "nroAutorizacion", "ordenarPor", "pagina", "tamano"],
+    "enElCuerpo": []
+  },
+  "GET /catastro/fichas/conciliacion": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["codRefCatastral", "conciliadaConRentas", "contribuyente", "direccion", "ejercicio", "fecha", "lote", "manzana", "ordenarPor", "pagina", "tamano", "tipo"],
+    "enElCuerpo": []
+  },
+  "GET /catastro/fichas/conciliacion/resumen": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["ejercicio", "fecha"],
+    "enElCuerpo": []
+  },
+  "GET /catastro/predios/{predioId}/titulares": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["vigenteA"],
+    "enElCuerpo": []
+  },
+  "GET /coactiva/deudas": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["contribuyente", "direccion", "estado", "nExpediente", "ordenarPor", "pagina", "tamano", "tipoDeDeuda"],
+    "enElCuerpo": []
+  },
+  "GET /coactiva/deudas-en-beneficio": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["benefAplicable", "contribuyente", "direccion", "fechaDeCalculo", "ordenarPor", "pagina", "tamano", "tipoDeDeuda"],
+    "enElCuerpo": []
+  },
+  "GET /coactiva/expedientes": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["codContribuyente", "direccion", "ejecutor", "estado", "nroDeExpediente", "ordenarPor", "pagina", "tamano"],
+    "enElCuerpo": []
+  },
+  "GET /coactiva/expedientes/{numero}/deuda": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["fechaDeCalculo"],
+    "enElCuerpo": []
+  },
+  "GET /coactiva/expedientes/{numero}/proceso": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["proyectarInteresAl"],
+    "enElCuerpo": []
+  },
+  "GET /coactiva/liquidaciones-costas": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["contribuyente", "direccion", "estado", "nroExpedCoact", "nroLiquidacion", "ordenarPor", "pagina", "tamano"],
+    "enElCuerpo": []
+  },
+  "GET /coactiva/prescripcion": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["codContribuyente", "direccion", "ejercicio", "ordenarPor", "pagina", "resultado", "tamano", "tributo"],
+    "enElCuerpo": []
+  },
+  "GET /consultas/altas-bajas": {
+    "obligatorios": [],
+    "algunoDeEstos": [["codContribuyente", "codigoCont"]],
+    "condicionales": [],
+    "opcionales": ["altaBaja", "ano", "causal", "direccion", "ordenarPor", "pagina", "tamano", "tributo"],
+    "enElCuerpo": []
+  },
+  "GET /consultas/constancias/no-adeudo": {
+    "obligatorios": ["codContribuyente"],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["fecha"],
+    "enElCuerpo": []
+  },
+  "GET /consultas/cuenta-corriente/{codigo}": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["direccion", "ejercicio", "ordenarPor", "pagina", "tamano", "tributo"],
+    "enElCuerpo": []
+  },
+  "GET /consultas/deuda": {
+    "obligatorios": [],
+    "algunoDeEstos": [["codContribuyente"]],
+    "condicionales": [],
+    "opcionales": ["direccion", "fase", "fechaDeCorte", "incluyeConvenios", "ordenarPor", "pagina", "porPeriodo", "tamano"],
+    "enElCuerpo": []
+  },
+  "GET /consultas/deudas-con-beneficio": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["benefAplicable", "contribuyente", "direccion", "formaDePago", "ordenarPor", "pagina", "tamano", "tipoDePapeleta"],
+    "enElCuerpo": []
+  },
+  "GET /consultas/pagos": {
+    "obligatorios": [],
+    "algunoDeEstos": [["codContribuyente"]],
+    "condicionales": [],
+    "opcionales": ["desde", "direccion", "hasta", "ordenarPor", "pagina", "tamano"],
+    "enElCuerpo": []
+  },
+  "GET /consultas/predios": {
+    "obligatorios": [],
+    "algunoDeEstos": [["codContribuyente", "contribuyente"]],
+    "condicionales": [],
+    "opcionales": ["calle", "codigoPredial", "direccion", "fecha", "lote", "manzana", "ordenarPor", "pagina", "tamano"],
+    "enElCuerpo": []
+  },
+  "GET /consultas/unificada": {
+    "obligatorios": ["contribuyente"],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["direccion", "impresion", "ordenarPor", "pagina", "tamano"],
+    "enElCuerpo": []
+  },
+  "GET /consultas/valores": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["codContribuyente", "direccion", "estado", "nroDeValor", "ordenarPor", "pagina", "tamano", "tipo"],
+    "enElCuerpo": []
+  },
+  "GET /consultas/vehiculos": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["codContribuyente", "contribuyente", "direccion", "estado", "fecha", "nroMotor", "ordenarPor", "pagina", "placa", "tamano"],
+    "enElCuerpo": []
+  },
+  "GET /fiscalizacion/actas": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["direccion", "ordenarPor", "pagina", "programa", "tamano"],
+    "enElCuerpo": []
+  },
+  "GET /fiscalizacion/estado-cuenta": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["contribuyente", "fechaDeConsulta"],
+    "enElCuerpo": []
+  },
+  "GET /fiscalizacion/omisos": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["condicion", "direccion", "ejercicio", "ordenarPor", "pagina", "sector", "tamano"],
+    "enElCuerpo": []
+  },
+  "GET /fiscalizacion/predial/historico": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["codCont", "contribuyente", "direccion", "nLiquidacion", "nNotificacion", "ordenarPor", "pagina", "tamano"],
+    "enElCuerpo": []
+  },
+  "GET /fiscalizacion/programas": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["direccion", "ejercicio", "nDePrograma", "ordenarPor", "pagina", "tamano"],
+    "enElCuerpo": []
+  },
+  "GET /fiscalizacion/programas/{id}/muestra": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["direccion", "ordenarPor", "pagina", "predio", "tamano"],
+    "enElCuerpo": []
+  },
+  "GET /fiscalizacion/resoluciones/{numero}": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "GET /fiscalizacion/resultados": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["direccion", "estado", "hallazgo", "ordenarPor", "pagina", "programa", "tamano"],
+    "enElCuerpo": []
+  },
+  "GET /indicadores/recaudacion": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["ejercicio"],
+    "enElCuerpo": []
+  },
+  "GET /indicadores/trabajo-parado": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["ejercicio"],
+    "enElCuerpo": []
+  },
+  "GET /infracciones/actas": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["administrado", "codigoCuis", "direccion", "estado", "nroDeActa", "ordenarPor", "pagina", "tamano"],
+    "enElCuerpo": []
+  },
+  "GET /infracciones/administrativas/codigos/reporte": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["codigo", "descripcionContiene", "direccion", "fecha", "ordenarPor", "pagina", "tamano"],
+    "enElCuerpo": []
+  },
+  "GET /infracciones/administrativas/estado-cuenta": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["codContribuyente", "direccion", "ordenarPor", "pagina", "papeleta", "tamano"],
+    "enElCuerpo": []
+  },
+  "GET /infracciones/administrativas/reportes/padron-notificaciones": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["desde", "direccion", "estado", "hasta", "ordenarPor", "pagina", "tamano"],
+    "enElCuerpo": []
+  },
+  "GET /infracciones/administrativas/reportes/por-contribuyente": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["ano", "codContribuyente", "direccion", "estadoDeDeuda", "ordenarPor", "pagina", "tamano"],
+    "enElCuerpo": []
+  },
+  "GET /infracciones/administrativas/reportes/resumen-recaudacion": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["ano"],
+    "enElCuerpo": []
+  },
+  "GET /infracciones/administrativas/reportes/vencidas": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["conPapeleta", "direccion", "fiscalizador", "infraccion", "ordenarPor", "pagina", "tamano", "vencidasAl"],
+    "enElCuerpo": []
+  },
+  "GET /infracciones/cuis": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["codigo", "direccion", "fecha", "materia", "ordenarPor", "pagina", "tamano"],
+    "enElCuerpo": []
+  },
+  "GET /licencias/certificados": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["direccion", "nDeCertificado", "ordenarPor", "pagina", "predio", "solicitante", "tamano", "tipo"],
+    "enElCuerpo": []
+  },
+  "GET /licencias/ciiu": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["codigoCiiu", "descripcion", "direccion", "ordenarPor", "pagina", "seccion", "tamano"],
+    "enElCuerpo": []
+  },
+  "GET /licencias/edificacion": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["direccion", "lugarLt", "lugarMz", "nombreContribuyente", "nroExpediente", "nroLicencia", "ordenarPor", "pagina", "tamano", "tipoTramite"],
+    "enElCuerpo": []
+  },
+  "GET /licencias/edificacion/reportes/general": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["desde", "direccion", "estado", "hasta", "modalidad", "ordenarPor", "pagina", "tamano"],
+    "enElCuerpo": []
+  },
+  "GET /licencias/funcionamiento": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["denominacionComercial", "direccion", "nExpediente", "nombreDelContribuyente", "nroLicencia", "ordenarPor", "pagina", "tamano"],
+    "enElCuerpo": []
+  },
+  "GET /licencias/funcionamiento/reportes/resumen-anual": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["aLaFecha", "desdeElAno", "hastaElAno", "tipoDeLicencia"],
+    "enElCuerpo": []
+  },
+  "GET /pagos/conciliacion": {
+    "obligatorios": ["fecha"],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "GET /portal/situacion": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "GET /rentas/arbitrios": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["anio", "codigoPredial", "direccion", "ejercicio", "ordenarPor", "pagina", "tamano", "uso", "zona"],
+    "enElCuerpo": []
+  },
+  "GET /rentas/beneficios": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["contribuyente", "direccion", "estado", "ordenarPor", "pagina", "tamano", "tipo"],
+    "enElCuerpo": []
+  },
+  "GET /rentas/contribuyentes": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["codigo", "dNI", "direccion", "nombreRazonSocial", "ordenarPor", "pagina", "rUC", "tamano"],
+    "enElCuerpo": []
+  },
+  "GET /rentas/contribuyentes/{id}/ficha": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["fecha"],
+    "enElCuerpo": []
+  },
+  "GET /rentas/declaraciones/{djNro}": {
+    "obligatorios": ["ano"],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "GET /rentas/declaraciones/{djNro}/hoja": {
+    "obligatorios": ["ano"],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["fecha"],
+    "enElCuerpo": []
+  },
+  "GET /rentas/predial/corridas/ultima": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["ejercicio"],
+    "enElCuerpo": []
+  },
+  "GET /rentas/predial/corridas/{corridaId}/observados": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["direccion", "ordenarPor", "pagina", "tamano"],
+    "enElCuerpo": []
+  },
+  "GET /rentas/predios": {
+    "obligatorios": [],
+    "algunoDeEstos": [["codContribuyente", "contribuyente"]],
+    "condicionales": [],
+    "opcionales": ["codigoPredial", "condicion", "direccion", "ordenarPor", "pagina", "sector", "tamano"],
+    "enElCuerpo": []
+  },
+  "GET /rentas/vehiculos": {
+    "obligatorios": [],
+    "algunoDeEstos": [["codContribuyente", "contribuyente"]],
+    "condicionales": [],
+    "opcionales": ["direccion", "fecha", "ordenarPor", "pagina", "tamano"],
+    "enElCuerpo": []
+  },
+  "GET /rentas/vehiculos/{placa}": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "GET /seguridad/accesos": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["direccion", "ordenarPor", "pagina", "tamano"],
+    "enElCuerpo": []
+  },
+  "GET /seguridad/accesos/{codigo}/usuarios": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["direccion", "ordenarPor", "pagina", "privilegio", "tamano"],
+    "enElCuerpo": []
+  },
+  "GET /seguridad/auditoria": {
+    "obligatorios": ["ejercicio"],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["desde", "direccion", "hasta", "operacion", "ordenarPor", "pagina", "tabla", "tamano", "usuario"],
+    "enElCuerpo": []
+  },
+  "GET /seguridad/grupos": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["direccion", "ordenarPor", "pagina", "tamano"],
+    "enElCuerpo": []
+  },
+  "GET /seguridad/grupos/{grupo}/miembros": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["direccion", "ordenarPor", "pagina", "tamano"],
+    "enElCuerpo": []
+  },
+  "GET /seguridad/grupos/{id}/permisos": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "GET /seguridad/modulos": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["direccion", "ordenarPor", "pagina", "tamano"],
+    "enElCuerpo": []
+  },
+  "GET /seguridad/parametros/ejercicios/{ejercicio}": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "GET /seguridad/sesion": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "GET /seguridad/sesion/municipalidad": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "GET /seguridad/sesion/permisos": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "GET /seguridad/usuarios": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["direccion", "ordenarPor", "pagina", "tamano"],
+    "enElCuerpo": []
+  },
+  "GET /seguridad/usuarios/{id}/grupos": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["direccion", "ordenarPor", "pagina", "tamano"],
+    "enElCuerpo": []
+  },
+  "GET /seguridad/usuarios/{id}/permisos": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "GET /seguridad/usuarios/{id}/permisos/configurados": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "GET /tesoreria/convenios": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["codContribuyente", "desde", "direccion", "estado", "hasta", "nroDeConvenio", "ordenarPor", "pagina", "tamano"],
+    "enElCuerpo": []
+  },
+  "GET /transito/codigos": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["codigo", "direccion", "fecha", "ordenarPor", "pagina", "tamano", "textoDeLaInfraccion"],
+    "enElCuerpo": []
+  },
+  "GET /transito/estado-cuenta": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["conductor", "direccion", "ordenarPor", "pagina", "placa", "tamano"],
+    "enElCuerpo": []
+  },
+  "GET /transito/internamientos": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["aLaFecha", "deposito", "direccion", "estado", "ordenarPor", "pagina", "placa", "tamano"],
+    "enElCuerpo": []
+  },
+  "GET /transito/papeletas": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["desde", "direccion", "documentoDelInfractor", "estado", "hasta", "nroPapeleta", "ordenarPor", "pagina", "placa", "tamano"],
+    "enElCuerpo": []
+  },
+  "GET /transito/papeletas/busqueda": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["direccion", "estadoDeDeuda", "ingresadoPor", "nPlaca", "ordenarPor", "pagina", "papeleta", "tamano"],
+    "enElCuerpo": []
+  },
+  "GET /transito/papeletas/{numero}/actos": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["familia"],
+    "enElCuerpo": []
+  },
+  "GET /transito/papeletas/{numero}/hoja-informativa": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "GET /transito/reportes/padron": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["desde", "direccion", "estado", "hasta", "ordenarPor", "pagina", "tamano"],
+    "enElCuerpo": []
+  },
+  "GET /transito/reportes/padron-coactiva": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["desde", "direccion", "ejecutor", "estadoDelExpediente", "hasta", "ordenarPor", "pagina", "tamano"],
+    "enElCuerpo": []
+  },
+  "GET /transito/reportes/padron-constancias": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["desde", "direccion", "hasta", "nDeConstancia", "ordenarPor", "pagina", "tamano", "usuarioQueEmitio"],
+    "enElCuerpo": []
+  },
+  "GET /transito/reportes/record-conductor": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["direccion", "documento", "licencia", "ordenarPor", "pagina", "tamano"],
+    "enElCuerpo": []
+  },
+  "GET /transito/reportes/record-vehicular": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["direccion", "ordenarPor", "pagina", "placa", "tamano"],
+    "enElCuerpo": []
+  },
+  "GET /transito/reportes/resumen-papeletas": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["agrupadoPor", "desde", "hasta"],
+    "enElCuerpo": []
+  },
+  "GET /transito/reportes/resumen-por-codigo": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["codigoDeInfraccion", "desde", "estado", "hasta"],
+    "enElCuerpo": []
+  },
+  "GET /transito/reportes/resumen-por-placa": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["desde", "estado", "hasta", "iniciales2Letras"],
+    "enElCuerpo": []
+  },
+  "GET /transito/reportes/resumen-recaudacion": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["ano", "caja"],
+    "enElCuerpo": []
+  },
+  "GET /valores": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["codContribuyente", "direccion", "ejercicio", "nroDeValor", "ordenarPor", "pagina", "tamano", "tipo"],
+    "enElCuerpo": []
+  },
+  "PATCH /coactiva/expedientes/{numero}/direccion-referencial": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "PATCH /coactiva/expedientes/{numero}/estados": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "PATCH /fiscalizacion/liquidaciones/{numero}/estados": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "PATCH /transito/papeletas/{numero}/codigo": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "POST /autorizaciones/anuncios": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "POST /autorizaciones/anuncios/reportes": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "POST /autorizaciones/anuncios/{id}/cese": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "POST /autorizaciones/anuncios/{id}/renovacion": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "POST /autorizaciones/anuncios/{id}/retiro": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "POST /coactiva/convenios": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "POST /coactiva/expedientes/importacion": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "POST /coactiva/expedientes/{numero}/actos": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "POST /coactiva/liquidaciones-costas": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["nroExpedCoact"],
+    "enElCuerpo": []
+  },
+  "POST /coactiva/notificaciones": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "POST /coactiva/prescripcion": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "POST /coactiva/rec/impresion": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["proyectarInteresAl"],
+    "enElCuerpo": []
+  },
+  "POST /fiscalizacion/liquidaciones": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "POST /fiscalizacion/liquidaciones/{numero}/reliquidaciones": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "POST /fiscalizacion/predial/actas": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "POST /fiscalizacion/programas": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["ejercicio", "tipo"],
+    "enElCuerpo": []
+  },
+  "POST /fiscalizacion/programas/{id}/muestra": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "POST /fiscalizacion/transferencias": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "POST /fiscalizacion/vehicular": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["hallazgo"],
+    "enElCuerpo": []
+  },
+  "POST /infracciones/administrativas/notificaciones": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["numero"],
+    "enElCuerpo": []
+  },
+  "POST /infracciones/administrativas/reportes": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "POST /infracciones/administrativas/resoluciones": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "POST /infracciones/administrativas/resoluciones/{id}/notificacion": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "POST /infracciones/administrativas/valores/generacion-masiva": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "POST /licencias/certificados": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "POST /licencias/certificados/{numero}/impresion": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "POST /licencias/ciiu": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "POST /licencias/edificacion": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "POST /licencias/edificacion/{expediente}/licencia": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "POST /licencias/edificacion/{expediente}/revalidacion": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "POST /licencias/edificacion/{expediente}/secciones": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "POST /licencias/funcionamiento": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "POST /licencias/funcionamiento/reportes/padron": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "POST /licencias/funcionamiento/{id}/cancelacion": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "POST /licencias/funcionamiento/{id}/duplicado": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "POST /ordenes-de-cobro": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "POST /pagos": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "POST /rentas/alcabala": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "POST /rentas/contribuyentes": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "POST /rentas/contribuyentes/{id}/contactos": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "POST /rentas/contribuyentes/{id}/domicilios": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "POST /rentas/contribuyentes/{id}/responsables": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "POST /rentas/declaraciones": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "POST /rentas/declaraciones/{djNro}/anulacion": {
+    "obligatorios": ["ano"],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "POST /rentas/declaraciones/{djNro}/observacion": {
+    "obligatorios": ["ano"],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "POST /rentas/declaraciones/{djNro}/rectificacion": {
+    "obligatorios": ["ano"],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "POST /rentas/deuda/altas": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "POST /rentas/deuda/bajas": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["ano", "codContribuyente", "tributo"],
+    "enElCuerpo": []
+  },
+  "POST /rentas/espectaculos": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "POST /rentas/predial/calculo-individual": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": ["codContribuyente", "ejercicio"],
+    "opcionales": ["ano"],
+    "enElCuerpo": ["predioId"]
+  },
+  "POST /rentas/predial/calculo-masivo": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": ["ejercicio"],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "POST /rentas/transferencias/predio": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "POST /rentas/transferencias/vehiculo": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "POST /rentas/vehicular/calculo": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": ["ejercicio"],
+    "opcionales": ["codContribuyente", "placa"],
+    "enElCuerpo": []
+  },
+  "POST /seguridad/grupos": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "POST /seguridad/grupos/{grupo}/miembros": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "POST /seguridad/grupos/{id}/baja": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "POST /seguridad/grupos/{id}/reactivacion": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "POST /seguridad/respaldos": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["direccion", "ordenarPor", "pagina", "tamano"],
+    "enElCuerpo": []
+  },
+  "POST /seguridad/usuarios": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "POST /seguridad/usuarios/{id}/baja": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "POST /seguridad/usuarios/{id}/reactivacion": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "POST /tesoreria/convenios/{numero}/anulacion": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "POST /tesoreria/fraccionamientos": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "POST /transito/constancias-libres": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "POST /transito/descargos": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["nDeExpediente", "papeleta"],
+    "enElCuerpo": []
+  },
+  "POST /transito/internamientos": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "POST /transito/internamientos/{placa}/liberacion": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "POST /transito/reportes": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "POST /transito/resoluciones/ordinaria": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "POST /transito/resoluciones/sancionadora": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "POST /transito/resoluciones/{numero}/notificacion": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "POST /transito/valores/generacion-masiva": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "POST /valores": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "POST /valores/masivo": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "POST /valores/{nro}/notificacion": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["notificador", "resultado"],
+    "enElCuerpo": []
+  },
+  "POST /valores/{numero}/movimientos": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "PUT /rentas/contribuyentes/{id}": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "PUT /rentas/contribuyentes/{id}/contactos/{contactoId}": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "PUT /rentas/contribuyentes/{id}/responsables/{responsableId}": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "PUT /seguridad/grupos/{id}/permisos": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "PUT /seguridad/grupos/{id}/vigencia": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "PUT /seguridad/sesion/ejercicio": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "PUT /seguridad/usuarios/{id}/clave": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "PUT /seguridad/usuarios/{id}/permisos": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
+  "PUT /seguridad/usuarios/{id}/vigencia": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  }
+}

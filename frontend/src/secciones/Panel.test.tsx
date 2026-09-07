@@ -6,6 +6,13 @@ import { desinstalarProxyDeDatos, instalarProxyDeDatos } from '../api/proxy.ts';
 import { Panel } from './Panel.tsx';
 
 /**
+ * El ejercicio de la barra global. **La bitacora no se puede pedir sin el** (#26): sin
+ * `?ejercicio=`, `GET /seguridad/auditoria` contesta 422 en el backend y —desde #26— tambien en
+ * el proxy, que se niega a servir lo que el backend no serviria.
+ */
+const EJERCICIO = '2026';
+
+/**
  * El panel del modulo, montado y **pidiendo los datos por HTTP** (AC1).
  *
  * El proxy de #4 esta instalado, asi que lo que se dibuja aqui llego por el mismo camino que va
@@ -27,7 +34,13 @@ afterAll(() => {
 async function montar() {
   const alIrAlPadron = vi.fn();
   const alAbrirContribuyente = vi.fn();
-  render(<Panel alIrAlPadron={alIrAlPadron} alAbrirContribuyente={alAbrirContribuyente} />);
+  render(
+    <Panel
+      alIrAlPadron={alIrAlPadron}
+      alAbrirContribuyente={alAbrirContribuyente}
+      ejercicio={EJERCICIO}
+    />,
+  );
   await screen.findByText('Emitido del ejercicio');
   return { alIrAlPadron, alAbrirContribuyente };
 }
@@ -213,7 +226,9 @@ describe('cuando el backend no contesta, el panel lo dice', () => {
   it('un fallo de la operacion sale como aviso, y no como un panel vacio', async () => {
     desinstalarProxyDeDatos();
     const alIrAlPadron = vi.fn();
-    render(<Panel alIrAlPadron={alIrAlPadron} alAbrirContribuyente={vi.fn()} />);
+    render(
+      <Panel alIrAlPadron={alIrAlPadron} alAbrirContribuyente={vi.fn()} ejercicio={EJERCICIO} />,
+    );
 
     expect(
       await screen.findByText('No se pudo leer el indicador de recaudación'),
