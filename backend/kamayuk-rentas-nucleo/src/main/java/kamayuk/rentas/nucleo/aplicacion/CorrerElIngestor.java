@@ -61,7 +61,10 @@ public class CorrerElIngestor implements ApplicationRunner {
             for (int vuelta = 1; vuelta <= VUELTAS_MAXIMAS; vuelta++) {
                 IngestarHechosDeCatastro.Vuelta resultado = ingestor.ingerir();
                 log.info("Vuelta {}: {}", vuelta, resultado);
-                if (resultado.vacia()) {
+                if (resultado.sinProgreso()) {
+                    // SIN PROGRESO, no «vacia». Un hecho ignorado se lee y no se acusa (#54), asi
+                    // que el emisor lo vuelve a servir: dar vueltas hasta que el lote llegue vacio
+                    // seria dar las cincuenta sobre los mismos hechos.
                     return;
                 }
             }
