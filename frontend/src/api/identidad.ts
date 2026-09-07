@@ -35,17 +35,35 @@
  * que este issue viene a abrir sin recorrer ni una vez.
  */
 
-/** El realm. Se configura por ambiente: el emisor no es el mismo en el cluster que aqui. */
-const REALM = import.meta.env.VITE_KAMAYUK_OIDC_REALM ?? 'http://localhost:8181/realms/sgtm';
+import { configuracion } from './configuracion.ts';
+
+/**
+ * El realm. Se configura por ambiente: el emisor no es el mismo en el cluster que aqui.
+ *
+ * <h2>Por que esto es una FUNCION y no una constante de modulo (#44)</h2>
+ *
+ * Hasta #44 estas tres eran `const` que leian `import.meta.env`, y eso hacia lo unico que no se
+ * podia hacer: **hornear la URL del emisor dentro de la imagen**. Vite sustituye
+ * `import.meta.env.VITE_*` al construir, asi que una imagen etiquetada con el `sha` del
+ * repositorio solo habria servido para el ambiente en que se construyo.
+ *
+ * Ahora salen de `configuracion()`, que las resuelve **al llamar** con los tres escalones que
+ * `configuracion.ts` documenta. Y son funciones —no constantes evaluadas al importar— porque una
+ * constante de modulo se fija en el orden de carga de los modulos: si este archivo se importara
+ * antes de que `configuracion.js` hubiera corrido, la constante congelaria el valor por omision
+ * y el ambiente no entraria nunca. El orden se sujeta en `index.html`, pero atarlo ademas al
+ * orden de importacion seria una segunda condicion que nadie comprueba.
+ */
+const realm = () => configuracion('oidcRealm');
 
 /** El cliente publico de la SPA. Sin secreto: un secreto en un bundle no es un secreto. */
-const CLIENTE = import.meta.env.VITE_KAMAYUK_OIDC_CLIENTE ?? 'sgtm-backoffice';
+const cliente = () => configuracion('oidcCliente');
 
-const ALCANCE = import.meta.env.VITE_KAMAYUK_OIDC_ALCANCE ?? 'openid profile';
+const alcance = () => configuracion('oidcAlcance');
 
-const AUTORIZACION = `${REALM}/protocol/openid-connect/auth`;
-const CANJE = `${REALM}/protocol/openid-connect/token`;
-const FIN = `${REALM}/protocol/openid-connect/logout`;
+const autorizacion = () => `${realm()}/protocol/openid-connect/auth`;
+const canje = () => `${realm()}/protocol/openid-connect/token`;
+const fin = () => `${realm()}/protocol/openid-connect/logout`;
 
 /**
  * Las cuatro claves del rebote.
@@ -136,14 +154,14 @@ export async function entrar(): Promise<void> {
 
   const parametros = new URLSearchParams({
     response_type: 'code',
-    client_id: CLIENTE,
+    client_id: cliente(),
     redirect_uri: retorno(),
-    scope: ALCANCE,
+    scope: alcance(),
     state: estado,
     code_challenge: await reto(verificador),
     code_challenge_method: 'S256',
   });
-  window.location.assign(`${AUTORIZACION}?${parametros.toString()}`);
+  window.location.assign(`${autorizacion()}?${parametros.toString()}`);
 }
 
 /** Lo que paso al volver de Keycloak. */
@@ -207,12 +225,12 @@ export async function canjearSiVuelve(): Promise<Vuelta> {
   try {
     // Con tope. Sin el, un emisor que no contesta deja la aplicacion SIN DIBUJAR NADA para
     // siempre —ni un error ni un esqueleto—, porque el arranque espera aqui antes de montar.
-    respuesta = await fetch(CANJE, {
+    respuesta = await fetch(canje(), {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
         grant_type: 'authorization_code',
-        client_id: CLIENTE,
+        client_id: cliente(),
         code: codigo,
         redirect_uri: retorno(),
         code_verifier: verificador,
@@ -276,7 +294,7 @@ export function salir(): void {
   }
   const parametros = new URLSearchParams({ post_logout_redirect_uri: retorno() });
   if (identidad !== null) parametros.set('id_token_hint', identidad);
-  window.location.assign(`${FIN}?${parametros.toString()}`);
+  window.location.assign(`${fin()}?${parametros.toString()}`);
 }
 
 function motivoDelEmisor(error: string): string {

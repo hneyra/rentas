@@ -7,6 +7,18 @@
   </head>
   <body>
     <div id="raiz"></div>
+    <!--
+      Las senias del ambiente, ANTES del paquete. Ver `src/api/configuracion.ts`.
+
+      Guion clasico y no `type="module"`, y el orden de estas dos lineas es lo unico que hace que
+      funcione: un modulo se difiere hasta despues del analisis del documento, asi que este se
+      ejecuta primero aunque este escrito arriba o abajo. Al reves —los dos como modulos— la
+      puerta de identidad leeria las senias antes de que nadie las hubiera puesto.
+
+      La ruta es absoluta desde la raiz del sitio; Vite le antepone `base` (`/rentas/`) al
+      construir, que es lo mismo que hace con los activos del paquete.
+    -->
+    <script src="/configuracion.js"></script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

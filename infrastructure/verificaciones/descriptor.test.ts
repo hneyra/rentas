@@ -134,21 +134,50 @@ describe("el descriptor de rentas", () => {
    * direcciones: afirma que algo corre siempre cuando no corre nada, y reporta como fallo una
    * salida con exito.
    */
-  it("produce UN Deployment, el del perfil web: `batch` no es un proceso que este siempre", () => {
+  /**
+   * Los DOS `Deployment`, y **ninguno de ellos en perfil `batch`**.
+   *
+   * Desde #44 son dos y no uno: el backend en perfil `web` y la interfaz, que es un nginx y no
+   * tiene perfil de Spring ninguno. Lo que esta prueba vigila no ha cambiado —que no exista un
+   * `kamayuk-rentas-batch`, que arranca, sale con codigo 0 a los once segundos y Kubernetes lo
+   * vuelve a crear en `CrashLoopBackOff`— y se comprueba sobre el unico contenedor que declara
+   * `SPRING_PROFILES_ACTIVE`: si alguien anadiera el `Deployment` de `batch`, esa lista tendria
+   * dos entradas y esto saldria rojo igual que antes.
+   */
+  it("produce DOS Deployment —el backend y la interfaz— y ninguno en perfil `batch`", () => {
     const deployments = rentas.despliegue(ENTORNO).filter((m) => m.kind === "Deployment");
-    expect(deployments.map((m) => m.metadata.name)).toEqual(["kamayuk-rentas-web"]);
+    expect(deployments.map((m) => m.metadata.name).sort()).toEqual([
+      "kamayuk-rentas-interfaz",
+      "kamayuk-rentas-web",
+    ]);
 
-    const perfiles = deployments.map(
-      (m) =>
-        m.kind === "Deployment"
-          ? (m.spec.template.spec.containers[0]?.env ?? []).find(
-              (v) => v.name === "SPRING_PROFILES_ACTIVE",
-            )?.value
-          : undefined,
-    );
+    const perfiles = deployments
+      .flatMap((m) => (m.kind === "Deployment" ? m.spec.template.spec.containers : []))
+      .flatMap((c) => c.env ?? [])
+      .filter((v) => v.name === "SPRING_PROFILES_ACTIVE")
+      .map((v) => v.value);
     expect(perfiles, "un `Deployment` en perfil `batch` es un CrashLoopBackOff garantizado").toEqual([
       "web",
     ]);
+  });
+
+  /**
+   * La interfaz no hereda NADA de la configuracion del backend (AC-6 de #44).
+   *
+   * Es la mitad que no se ve mirando lo que si declara: un nginx que sirve archivos no necesita
+   * la URL de la base, ni el rol con que conectarse, ni la clave de `kamayuk_app`. Copiar el
+   * bloque de variables del backend «por si acaso» pondria una credencial dentro de un pod que
+   * no la usa, y ahi se quedaria hasta que alguien la leyera.
+   */
+  it("la interfaz no declara ni una variable de entorno ni un solo secreto", () => {
+    const interfaz = rentas
+      .despliegue(ENTORNO)
+      .filter((m) => m.kind === "Deployment")
+      .filter((m) => m.metadata.name === "kamayuk-rentas-interfaz")
+      .flatMap((m) => (m.kind === "Deployment" ? m.spec.template.spec.containers : []));
+    expect(interfaz).toHaveLength(1);
+    expect(interfaz[0]?.env ?? []).toEqual([]);
+    expect(JSON.stringify(interfaz[0])).not.toContain("secretKeyRef");
   });
 
   /** Y el perfil `batch` sigue existiendo donde le toca: en un Job y en un CronJob. */
@@ -193,8 +222,22 @@ describe("C-14 — que esto se pueda desplegar", () => {
     expect(declara(c, "KAMAYUK_DB_USUARIO")).toBe(false);
   });
 
-  it("y las dos imagenes son los dos objetivos del Dockerfile", () => {
-    expect(rentas.imagenes).toEqual(["rentas", `${"rentas"}-migrador`]);
+  /**
+   * TRES imagenes y DOS `Dockerfile` (#44).
+   *
+   * `rentas` y `rentas-migrador` son dos objetivos del mismo `backend/Dockerfile`, con el contexto
+   * en la raiz del repositorio. `rentas-interfaz` sale de `frontend/Dockerfile`, con el contexto
+   * en `frontend/` — y esas dos parejas son las que `publicar-imagenes.yml` tiene que declarar en
+   * su matriz, porque un `.dockerignore` solo cuenta desde la raiz de SU contexto.
+   *
+   * **Y no se llama `rentas-web`**: ese nombre es el del `Deployment` y el `Service` del backend
+   * en perfil `web`, que este mismo archivo produce.
+   */
+  it("y las tres imagenes son los objetivos de los dos Dockerfile", () => {
+    expect(rentas.imagenes).toEqual(["rentas", "rentas-migrador", "rentas-interfaz"]);
+    expect(rentas.imagenes, "«rentas-web» ya es el Deployment del backend").not.toContain(
+      "rentas-web",
+    );
   });
 
   /**
@@ -350,18 +393,197 @@ describe("C-17 — que el despliegue pase de verdad", () => {
    * anadida a mano sobre el clúster, las ocho tareas de los cuatro sistemas pasaron de `Failed` a
    * `Complete` (C-17, punto 3).
    */
-  it("abre DNS hacia kube-system, en UDP y en TCP", () => {
-    const reglas = rentas.egreso(ENTORNO).flatMap((p) => p.spec.egress ?? []);
-    const dns = reglas.filter((r) =>
-      (r.to ?? []).some(
-        (d) => d.namespaceSelector?.matchLabels?.["kubernetes.io/metadata.name"] === "kube-system",
-      ),
-    );
+  it("TODA politica de egreso abre DNS hacia kube-system, en UDP y en TCP", () => {
+    // Desde #44 hay DOS politicas de egreso —la del backend y la de la interfaz— y las dos
+    // necesitan la regla: la propiedad se comprueba **por politica** y no sobre el total, o
+    // anadir una tercera sin DNS pasaria en verde escondida detras de las otras dos.
+    const conEgreso = rentas.egreso(ENTORNO).filter((p) => (p.spec.egress ?? []).length > 0);
+    expect(conEgreso.length).toBeGreaterThanOrEqual(2);
 
-    expect(dns, "sin DNS ninguna de las demas reglas de egreso puede resolver un nombre").toHaveLength(1);
+    for (const politica of conEgreso) {
+      const dns = (politica.spec.egress ?? []).filter((r) =>
+        (r.to ?? []).some(
+          (d) => d.namespaceSelector?.matchLabels?.["kubernetes.io/metadata.name"] === "kube-system",
+        ),
+      );
+      expect(
+        dns,
+        `«${politica.metadata.name}» no abre DNS: ninguna de sus demas reglas puede resolver un nombre`,
+      ).toHaveLength(1);
+      expect(
+        (dns[0]?.ports ?? []).map((p) => `${p.protocol}/${p.port}`).sort(),
+        "TCP tambien: una respuesta que no cabe en un datagrama se reintenta por TCP",
+      ).toEqual(["TCP/53", "UDP/53"]);
+    }
+  });
+});
+
+/**
+ * #44 — que `rentas-web` se pueda desplegar, y que llegue a alguien.
+ *
+ * Lo que estas pruebas vigilan no es que los manifiestos existan —eso se ve leyendolos— sino las
+ * decisiones cuyo fallo NO GRITA: la precedencia del ingreso, el prefijo, el puerto de la
+ * politica de red, de donde sale el emisor OIDC y sobre que archivo cae el montaje.
+ */
+describe("#44 — la interfaz desplegada", () => {
+  const manifiestos = rentas.ingreso(ENTORNO);
+  const rutas = manifiestos.flatMap((m) => (m.kind === "IngressRoute" ? m.spec.routes : []));
+  const deLaApi = rutas.find((r) => r.match.includes("/rentas/api/v1"));
+  const deLaInterfaz = rutas.find((r) => !r.match.includes("/rentas/api/v1"));
+
+  const interfazDe = (m: Manifiesto[]) =>
+    m
+      .filter((x) => x.kind === "Deployment" && x.metadata.name === "kamayuk-rentas-interfaz")
+      .flatMap((x) => (x.kind === "Deployment" ? x.spec.template.spec.containers : []));
+
+  /**
+   * AC-6. **La prioridad se escribe, no se hereda de la longitud de la regla.**
+   *
+   * Traefik v3 ordena por longitud del `match` cuando nadie declara `priority`, y
+   * `PathPrefix(/rentas/api/v1)` es mas larga que `PathPrefix(/rentas)` — o sea que hoy saldria
+   * bien **por accidente**. Un `undefined` aqui no es «el valor por omision»: es que la
+   * precedencia la decide una propiedad del texto de la regla, y el dia que alguien reescriba la
+   * de la interfaz para que sea mas larga, la API se la queda el nginx y contesta 200 con HTML.
+   */
+  it("las dos rutas declaran su prioridad, y la de la API es la mayor", () => {
+    expect(rutas, "la ruta va partida en dos: la API y la interfaz").toHaveLength(2);
     expect(
-      (dns[0]?.ports ?? []).map((p) => `${p.protocol}/${p.port}`).sort(),
-      "TCP tambien: una respuesta que no cabe en un datagrama se reintenta por TCP",
-    ).toEqual(["TCP/53", "UDP/53"]);
+      deLaApi?.priority,
+      "sin prioridad explicita la precedencia sale bien por accidente",
+    ).toBeTypeOf("number");
+    expect(deLaInterfaz?.priority).toBeTypeOf("number");
+    expect(deLaApi!.priority!).toBeGreaterThan(deLaInterfaz!.priority!);
+  });
+
+  /**
+   * AC-6, y es la mitad que produce un **200** cuando se hace al reves.
+   *
+   * `Api.RAIZ` del backend es `/rentas/api/v1` entera: quitarle el prefijo deja a Spring buscando
+   * `/api/v1/...` y contestando 404 a todo. Y a la interfaz hay que quitarselo porque su nginx
+   * sirve en la raiz del contenedor.
+   */
+  it("el prefijo se quita SOLO en la ruta de la interfaz", () => {
+    expect(deLaApi?.middlewares ?? [], "el backend espera la ruta entera").toEqual([]);
+    expect((deLaInterfaz?.middlewares ?? []).map((m) => m.name)).toEqual([
+      "kamayuk-rentas-quitar-prefijo",
+    ]);
+
+    const middleware = manifiestos.find((m) => m.kind === "Middleware");
+    expect(middleware?.metadata.name).toBe("kamayuk-rentas-quitar-prefijo");
+    expect(middleware?.kind === "Middleware" ? middleware.spec : {}).toEqual({
+      stripPrefix: { prefixes: ["/rentas"] },
+    });
+  });
+
+  /** Cada ruta a SU servicio, y el de la interfaz no es el del backend. */
+  it("la API va al backend y la interfaz a la interfaz", () => {
+    expect(deLaApi?.services.map((s) => s.name)).toEqual(["kamayuk-rentas-web"]);
+    expect(deLaInterfaz?.services.map((s) => s.name)).toEqual(["kamayuk-rentas-interfaz"]);
+  });
+
+  /**
+   * AC-7. La interfaz **no hereda** las aristas del backend, y el vehiculo es la etiqueta.
+   *
+   * Si su `componente` fuera `rentas`, el `podSelector` de la politica del backend la
+   * seleccionaria y un nginx de archivos estaticos tendria salida a PostgreSQL.
+   */
+  it("la interfaz no sale a PostgreSQL ni a ningun otro sistema: solo DNS", () => {
+    const suyas = rentas
+      .egreso(ENTORNO)
+      .filter((p) => p.spec.podSelector.matchLabels?.["componente"] === "rentas-interfaz");
+    expect(suyas.map((p) => p.metadata.name).sort()).toEqual([
+      "kamayuk-rentas-interfaz-egreso",
+      "kamayuk-rentas-interfaz-ingreso",
+    ]);
+
+    const salidas = suyas.flatMap((p) => p.spec.egress ?? []);
+    expect(salidas, "solo DNS, y nada mas").toHaveLength(1);
+    expect(
+      salidas.flatMap((r) => (r.ports ?? []).map((p) => p.port)),
+      "un 5432 aqui seria salida a la base desde un servidor de archivos",
+    ).toEqual([53, 53]);
+  });
+
+  /**
+   * AC-7, la trampa del puerto. Una `NetworkPolicy` filtra sobre el puerto del **contenedor**; el
+   * mapeo 80 -> 8080 lo deshace el `Service` antes de que la politica mire nada. Con 80 escrito
+   * aqui la politica no admite absolutamente nada, y el sintoma es el navegador esperando con la
+   * ruta creada y el pod sano.
+   */
+  it("la entrada se abre al puerto del CONTENEDOR y no al del Service", () => {
+    const entrada = rentas
+      .egreso(ENTORNO)
+      .find((p) => p.metadata.name === "kamayuk-rentas-interfaz-ingreso");
+    const puertos = (entrada?.spec.ingress ?? []).flatMap((r) =>
+      (r.ports ?? []).map((p) => p.port),
+    );
+    expect(puertos).toEqual([8080]);
+
+    const servicio = rentas
+      .despliegue(ENTORNO)
+      .find((m) => m.kind === "Service" && m.metadata.name === "kamayuk-rentas-interfaz");
+    expect(servicio?.kind === "Service" ? servicio.spec.ports : []).toEqual([
+      { name: "http", port: 80, targetPort: 8080 },
+    ]);
+  });
+
+  /**
+   * El emisor sale del ambiente, y es el PUBLICO.
+   *
+   * `plataforma.jwks` es la otra direccion del mismo Keycloak y NO vale aqui: es un nombre de la
+   * red interna del cluster, que el navegador no puede alcanzar. Confundirlas daria una interfaz
+   * que no deja entrar a nadie, con un error que habla de un anfitrion desconocido.
+   */
+  it("el ConfigMap sirve el emisor publico, y no el JWKS interno", () => {
+    const mapa = rentas
+      .despliegue(ENTORNO)
+      .find((m) => m.kind === "ConfigMap" && m.metadata.name.includes("interfaz"));
+    const guion = mapa?.kind === "ConfigMap" ? (mapa.data["configuracion.js"] ?? "") : "";
+
+    expect(guion).toContain("window.__KAMAYUK_RENTAS__");
+    expect(guion).toContain(ENTORNO.plataforma.emisor);
+    expect(guion, "el JWKS es una direccion interna: el navegador no la alcanza").not.toContain(
+      ENTORNO.plataforma.jwks,
+    );
+    // Y no queda horneado ningun `localhost`, que es el valor por omision del paquete.
+    expect(guion, "el valor por omision del paquete no puede llegar al cluster").not.toContain(
+      "localhost",
+    );
+  });
+
+  /**
+   * El montaje tiene que caer sobre el archivo que `nginx` sirve, y con `subPath`.
+   *
+   * Sin `subPath` el montaje tapa el directorio entero: la imagen serviria un `html/` con un solo
+   * archivo dentro, sin `index.html` y sin `assets/`. Y la ruta tiene que ser exactamente la del
+   * archivo que viaja vacio en `frontend/public/`; si no, el `ConfigMap` no reemplaza nada y la
+   * interfaz entra por el emisor por omision —`localhost`— desde la municipalidad.
+   */
+  it("el guion se monta con subPath sobre el que la imagen ya trae", () => {
+    const contenedor = interfazDe(rentas.despliegue(ENTORNO))[0];
+    expect(contenedor?.volumeMounts).toEqual([
+      {
+        name: "configuracion",
+        mountPath: "/usr/share/nginx/html/configuracion.js",
+        subPath: "configuracion.js",
+        readOnly: true,
+      },
+    ]);
+  });
+
+  /**
+   * AC-2, la mitad que este paquete SI puede afirmar.
+   *
+   * `SEGURIDAD` fija `runAsNonRoot: true` y **no** fija `runAsUser`, y eso solo es correcto
+   * porque la imagen declara su uid en numero. La otra mitad —que `frontend/Dockerfile` diga
+   * `USER 101` y no `USER nginx`— la comprueba `frontend/verificaciones/imagen-y-despliegue.test.ts`,
+   * que es donde se puede leer un archivo: **este paquete no declara `@types/node` a proposito**,
+   * porque un descriptor es una funcion pura que no lee ni el disco ni el entorno (ADR-0031 §2) y
+   * la forma mas barata de que siga siendolo es que ni siquiera pueda.
+   */
+  it("no fija runAsUser, porque quien declara el uid es la imagen", () => {
+    const contenedor = interfazDe(rentas.despliegue(ENTORNO))[0];
+    expect(contenedor?.securityContext?.runAsNonRoot).toBe(true);
+    expect(JSON.stringify(contenedor?.securityContext)).not.toContain("runAsUser");
   });
 });
