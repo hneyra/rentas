@@ -72,12 +72,22 @@ public class ManejadorDeErrores {
         return ResponseEntity.status(problema.codigo().estado()).body(cuerpo);
     }
 
+    /**
+     * El campo de ordenacion no esta en la lista blanca.
+     *
+     * <p><b>El cuerpo dice ademas por cuales SI se puede ordenar</b> (#35). Sin esa segunda linea,
+     * la misma operacion contestaba con dos calidades distintas a la misma clase de error: un
+     * parametro desconocido traia «Se admiten: …» con la lista entera y un orden no admitido solo
+     * repetia el campo pedido, de modo que quien integra tenia que adivinarlo probando nombres.
+     */
     @ExceptionHandler(OrdenSeguro.OrdenNoAdmitido.class)
     public ResponseEntity<ProblemDetail> ordenNoAdmitido(OrdenSeguro.OrdenNoAdmitido error) {
         return respuesta(
                 CodigoDeError.ORDEN_NO_ADMITIDO,
                 CodigoDeError.ORDEN_NO_ADMITIDO.mensaje(),
-                List.of("Campo pedido: " + error.campo()));
+                List.of(
+                        "Campo pedido: " + error.campo(),
+                        "Se admiten: " + String.join(", ", error.admitidos())));
     }
 
     /**

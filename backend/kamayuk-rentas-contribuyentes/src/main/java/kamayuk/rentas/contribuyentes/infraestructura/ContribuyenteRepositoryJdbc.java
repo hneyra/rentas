@@ -21,6 +21,7 @@ import kamayuk.rentas.dominio.CodigoContribuyente;
 import kamayuk.rentas.dominio.DocumentoIdentidad;
 import kamayuk.rentas.dominio.TipoDocumento;
 import kamayuk.rentas.persistencia.OrdenSeguro;
+import kamayuk.rentas.persistencia.RangoDePrefijo;
 import kamayuk.rentas.persistencia.RepositorioJdbc;
 import org.jspecify.annotations.Nullable;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -115,14 +116,45 @@ public class ContribuyenteRepositoryJdbc extends RepositorioJdbc
                 .optional();
     }
 
+    /**
+     * El padron acotado por el criterio, paginado.
+     *
+     * <h2>El codigo va por PREFIJO, y por rango (#35)</h2>
+     *
+     * <p>Hasta #35 era {@code codigo_contribuyente = :codigo}, y sobre un padron cuyos codigos
+     * empiezan todos por ceros eso solo sirve a quien ya sabe el codigo entero: medido contra
+     * Catacaos, {@code ?codigo=000000000} devolvia <b>0</b> de 10 603 filas <b>y sin error</b>, que
+     * se lee como «ese contribuyente no existe».
+     *
+     * <p>El prefijo lo escribe {@link RangoDePrefijo} y no un {@code LIKE}, por el tercer hallazgo
+     * de RLS (DAT-01 §0): {@code textlike} no es <i>leakproof</i>, asi que bajo la politica se
+     * queda en el {@code Filter} y el recorrido lee el padron entero del inquilino. Medido como el
+     * rol de la aplicacion sobre 30 000 contribuyentes en cada una de dos municipalidades, con
+     * {@code ANALYZE} hecho y {@code EXPLAIN (ANALYZE, BUFFERS)}, para un prefijo que selecciona 99
+     * filas: el rango sobre {@code contribuyente_codigo_prefijo_ix} ({@code V17}) da <b>5 bloques y
+     * 0 filas descartadas</b>, con la politica y los dos extremos juntos en el {@code Index Cond};
+     * el mismo rango <b>sin</b> ese indice, <b>567 y 29 901</b>; y el {@code LIKE}, <b>902 y 59
+     * 901</b> — las 60 000 filas de las dos municipalidades leidas para devolver 99. Lo fija {@code
+     * CodigoDelPadronPorPrefijoEnElPlanTest}, que cuenta bloques y descartes y no la palabra
+     * «Index».
+     */
     @Override
     public Pagina<Contribuyente> buscar(CriterioDeBusqueda criterio, Paginacion paginacion) {
+        StringBuilder condicionDelCodigo = new StringBuilder();
         List<String> condiciones = new ArrayList<>();
         Map<String, Object> parametros = new HashMap<>();
 
-        if (criterio.codigo() != null) {
-            condiciones.add("codigo_contribuyente = :codigo");
-            parametros.put("codigo", criterio.codigo().toUpperCase(java.util.Locale.ROOT));
+        if (criterio.codigoQueEmpiezaPor() != null) {
+            RangoDePrefijo.condicion(
+                    condicionDelCodigo,
+                    parametros,
+                    "codigo_contribuyente",
+                    criterio.codigoQueEmpiezaPor().toUpperCase(java.util.Locale.ROOT),
+                    "codigo");
+            // `RangoDePrefijo` compone « AND <condicion>» porque escribe sobre un WHERE ya
+            // empezado; aqui las condiciones se unen despues, asi que se le quita el AND de
+            // delante en vez de darle un `WHERE 1 = 1` que el planificador tenga que descartar.
+            condiciones.add(condicionDelCodigo.substring(" AND ".length()));
         }
         if (criterio.numeroDocumento() != null) {
             condiciones.add("numero_documento = :numeroDocumento");

@@ -73,22 +73,32 @@ const PANTALLAS = ventana.SGTM_SCREENS;
    errata —la mayuscula esta donde nadie la escribe—, y #539 nacio de esa
    errata: `?dni=` devolvia el padron entero de Catacaos con 200.
 
-   **Se conservan, y no es por comodidad.** Tres motivos, en este orden:
+   **Se conservan, MENOS los dos de `GET /rentas/contribuyentes`** (#35). El
+   motivo de conservarlos sigue siendo el mismo y sigue valiendo: el contrato
+   esta DERIVADO del prototipo (#312) y el nombre lo produce el rotulo del
+   manual, asi que una tabla de excepciones —«dNI se publica como dni»—
+   convertiria el nombre en un dato que alguien mantiene a mano, que es lo que
+   este generador existe para no tener. Y desde #539 la errata ya no es cara:
+   contesta «Parametro desconocido: 'dni'» en vez de devolver el padron.
 
-   1. El contrato esta DERIVADO del prototipo (#312) y el nombre lo produce el
-      rotulo del manual. Meterle una tabla de excepciones —«dNI se publica como
-      dni»— convierte el nombre en un dato que alguien mantiene a mano, que es
-      lo que este generador existe para no tener.
-   2. Renombrar solo aqui deja al controlador leyendo el nombre viejo y a la
-      pantalla mandando el nuevo: un filtro que deja de filtrar, o sea ESTE
-      MISMO issue otra vez. Hay que moverlo en los tres sitios a la vez —el
-      generador, el controlador y `frontend/src/api`—, y el frontend nuevo NO
-      genera sus tipos del contrato, asi que nada rompería la compilación: el
-      unico sintoma seria el listado entero en pantalla.
-   3. Y sobre todo: lo que hacia peligroso el nombre ya no lo es. Desde #539 la
-      errata contesta «Parametro desconocido: 'dni'» en vez de devolver el
-      padron. Renombrar pasa de arreglo a mejora de estilo, y como tal se hace
-      cuando se pueda mover el frontend en el mismo PR. */
+   Lo que #35 hace en el padron **no es renombrar**: es que esos dos filtros no
+   podian existir tal como estaban. Con `dNI` y `rUC` solo se podian comprobar
+   DOS de los seis tipos de documento —no habia forma de preguntar si un
+   extranjero ya estaba en el padron antes de darlo de alta otra vez—, asi que
+   se sustituyen por `tipoDocumento` + `numeroDocumento`, que es ademas el
+   vocabulario que el mismo controlador ya usa para ESCRIBIR (#488). No entran
+   como excepcion de nombre sino por las dos tablas de siempre: los viejos por
+   SUPRIMIDOS y los nuevos por DEL_BACKEND, cada uno con su motivo.
+
+   Y esto se podia hacer ahora y no antes por una razon concreta: hasta que la
+   interfaz vivio en este repositorio, mover un nombre dejaba al controlador
+   leyendo el viejo y a la pantalla mandando el nuevo —un filtro que deja de
+   filtrar, o sea ESTE MISMO defecto otra vez—. Los tres sitios se mueven en el
+   mismo PR: este generador, `ContribuyenteController` y `frontend/src/secciones`.
+
+   Y **el censo no baja de once**, medido sobre el YAML regenerado: `dNI` y
+   `rUC` viven tambien en `GET /autorizaciones/anuncios`, que ningun controlador
+   sirve. Lo que baja son los PARAMETROS, de 18 a 16. */
 
 const sinTildes = (texto) =>
   texto
@@ -212,6 +222,21 @@ const SUPRIMIDOS = {
   // que se va es su parametro. Quien pregunta por su propia situacion usa
   // `portal_mi_situacion`, que no tiene ninguno.
   portal: ['doc'],
+  // `GET /rentas/contribuyentes?dNI=…&rUC=…` (#35). Los dos se van, y no por
+  // como se escriben —eso solo—: es que **dos filtros no pueden cubrir seis
+  // tipos de documento**. `TipoDocumento` declara DNI, RUC, CE, PASAPORTE,
+  // PARTIDA y OTRO, y el borde publicaba dos, de modo que el alta **no podia
+  // preguntar si un extranjero ya estaba en el padron** antes de darlo de alta
+  // por segunda vez. La unica manera de «comprobarlo» era traerse el padron y
+  // mirar la primera pagina: sobre 10 603 filas, decir «libre» casi siempre.
+  //
+  // Suben a DEL_BACKEND como `tipoDocumento` + `numeroDocumento`, que ademas es
+  // el vocabulario con el que este mismo controlador ESCRIBE desde #488: con
+  // `dni`/`ruc` la misma operacion tendria dos nombres para el mismo dato segun
+  // el verbo. Y dos filtros excluyentes sobre una sola columna son dos nombres
+  // de la misma cosa, que es el defecto que `OrdenSeguro.publicandoComo` cerro
+  // para el orden (#546).
+  contribuyentes: ['dNI', 'rUC'],
   // `GET /seguridad/auditoria?accion=ALTA` se teclea y **no filtra**: medido
   // sobre las 1 441 filas de la municipalidad 1, deja el total en 1 441 (#544).
   //
@@ -358,6 +383,50 @@ const DEL_BACKEND = {
         Cualquier otra palabra es 422: un «si» tecleado que se leyera como «no filtres»
         devolveria a la lista las vias que se dieron de baja, que es lo que este filtro existe
         para impedir.
+      `),
+    },
+  ],
+  // Los dos filtros del documento que #35 unifica, en el sitio de los que
+  // SUPRIMIDOS retira, y el codigo con lo que su rotulo no puede decir. El
+  // codigo va SIN `tras` porque los que no lo llevan se escriben DELANTE del
+  // filtro homonimo del prototipo, y `reunir` se queda con el primero: asi se le
+  // cambia la descripcion sin pasar por SUPRIMIDOS —que lo quitaria del todo,
+  // medido: suprimir y volver a anadir el mismo nombre lo deja fuera—.
+  contribuyentes: [
+    {
+      nombre: 'codigo',
+      ejemplo: '00000025673',
+      descripcion: bloque(`
+        Filtro «Código» de la pantalla. La comparacion es POR PREFIJO y no por igualdad (#35):
+        los codigos de un padron empiezan todos por la misma retahila de ceros, asi que una
+        igualdad solo sirve a quien ya sabe el codigo entero — medido contra Catacaos,
+        «?codigo=000000000» devolvia 0 de 10 603 filas y sin error ninguno. El codigo completo
+        sigue devolviendo una sola fila: es el prefijo mas largo que hay.
+      `),
+    },
+    {
+      nombre: 'tipoDocumento',
+      ejemplo: 'CE',
+      tras: 'nombreRazonSocial',
+      esquema: '{ type: string, enum: [DNI, RUC, CE, PASAPORTE, PARTIDA, OTRO] }',
+      descripcion: bloque(`
+        Que clase de documento es, para acotar la busqueda. El vocabulario es el del enumerado
+        «TipoDocumento» y el del CHECK de «contribuyente.tipo_documento» (V1), letra por letra;
+        cualquier otra palabra se rechaza con 422 nombrando los seis, en vez de devolver una
+        pagina vacia. Es OPCIONAL: quien atiende teclea el numero que trae el carne y no se
+        detiene a clasificarlo. Sin «numeroDocumento» es 422, porque acotar solo por tipo
+        devolveria el padron entero de ese tipo.
+      `),
+    },
+    {
+      nombre: 'numeroDocumento',
+      ejemplo: '03593174',
+      tras: 'tipoDocumento',
+      descripcion: bloque(`
+        El numero del documento, tal como viene en el carne. Sustituye a «dNI» y «rUC» (#35): con
+        aquellos dos solo se podian comprobar dos de los seis tipos, de modo que un carne de
+        extranjeria no se podia buscar y el alta no tenia como saber si esa persona ya estaba en
+        el padron.
       `),
     },
   ],

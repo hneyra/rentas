@@ -13,17 +13,28 @@ import org.jspecify.annotations.Nullable;
  * contribuyente por segunda vez, que es como se duplican los padrones (RF-014).
  *
  * <p>El documento se puede buscar <b>sin el tipo</b>: quien atiende teclea el numero que trae el
- * carne, no se detiene a clasificarlo.
+ * carne, no se detiene a clasificarlo. Y con el tipo <b>puesto</b> se puede buscar cualquiera de
+ * los seis de {@link TipoDocumento}, no solo el DNI y el RUC: hasta #35 el borde HTTP solo
+ * publicaba esos dos, de modo que <b>no habia forma de saber si un extranjero ya estaba en el
+ * padron</b> antes de darlo de alta por segunda vez. La restriccion nunca fue de este record.
+ *
+ * <p><b>El codigo es un PREFIJO y no una igualdad</b> (#35). Los codigos de un padron empiezan
+ * todos por la misma retahila de ceros —{@code 00000000008}, {@code 00000000023}—, asi que buscar
+ * por igualdad solo sirve a quien ya sabe el codigo entero, que es justo lo que quien busca no
+ * tiene: medido contra Catacaos, {@code ?codigo=000000000} devolvia <b>0</b> de 10 603 y sin error
+ * ninguno, o sea «ese contribuyente no existe». Se llama {@code codigoQueEmpiezaPor} y no {@code
+ * codigo} para que el nombre diga lo que la consulta hace; quien lo lea en el repositorio no tiene
+ * que ir a buscar el {@code WHERE} para saberlo.
  */
 public record CriterioDeBusqueda(
-        @Nullable String codigo,
+        @Nullable String codigoQueEmpiezaPor,
         @Nullable String nombreAproximado,
         @Nullable TipoDocumento tipoDocumento,
         @Nullable String numeroDocumento,
         boolean soloActivos) {
 
     public CriterioDeBusqueda {
-        codigo = limpiar(codigo);
+        codigoQueEmpiezaPor = limpiar(codigoQueEmpiezaPor);
         nombreAproximado = limpiar(nombreAproximado);
         numeroDocumento = limpiar(numeroDocumento);
         if (tipoDocumento != null && numeroDocumento == null) {
@@ -42,7 +53,8 @@ public record CriterioDeBusqueda(
         return new CriterioDeBusqueda(null, aproximado, null, null, false);
     }
 
-    public static CriterioDeBusqueda porCodigo(String codigo) {
+    /** El codigo entero o sus primeras cifras: la comparacion es «empieza por» (#35). */
+    public static CriterioDeBusqueda porCodigoQueEmpiezaPor(String codigo) {
         return new CriterioDeBusqueda(codigo, null, null, null, false);
     }
 
@@ -57,7 +69,7 @@ public record CriterioDeBusqueda(
 
     public CriterioDeBusqueda y(CriterioDeBusqueda otro) {
         return new CriterioDeBusqueda(
-                otro.codigo != null ? otro.codigo : codigo,
+                otro.codigoQueEmpiezaPor != null ? otro.codigoQueEmpiezaPor : codigoQueEmpiezaPor,
                 otro.nombreAproximado != null ? otro.nombreAproximado : nombreAproximado,
                 otro.tipoDocumento != null ? otro.tipoDocumento : tipoDocumento,
                 otro.numeroDocumento != null ? otro.numeroDocumento : numeroDocumento,
@@ -66,7 +78,7 @@ public record CriterioDeBusqueda(
 
     public CriterioDeBusqueda soloLosActivos() {
         return new CriterioDeBusqueda(
-                codigo, nombreAproximado, tipoDocumento, numeroDocumento, true);
+                codigoQueEmpiezaPor, nombreAproximado, tipoDocumento, numeroDocumento, true);
     }
 
     public Optional<String> nombre() {
@@ -79,7 +91,7 @@ public record CriterioDeBusqueda(
     }
 
     public boolean estaVacio() {
-        return codigo == null
+        return codigoQueEmpiezaPor == null
                 && nombreAproximado == null
                 && numeroDocumento == null
                 && !soloActivos;
@@ -98,7 +110,7 @@ public record CriterioDeBusqueda(
         // Sin el numero de documento ni el nombre: esto acaba en un log, y ahi no van
         // datos identificatorios de una persona.
         return "CriterioDeBusqueda[codigo="
-                + (codigo != null)
+                + (codigoQueEmpiezaPor != null)
                 + ", nombre="
                 + (nombreAproximado != null)
                 + ", documento="

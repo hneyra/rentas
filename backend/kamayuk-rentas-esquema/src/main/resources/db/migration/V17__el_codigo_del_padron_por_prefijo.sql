@@ -1,0 +1,100 @@
+-- ============================================================================
+--  V17 — el codigo del contribuyente, buscable por PREFIJO (#35)
+--
+--  QUE ANADE
+--  ---------
+--  Un solo indice: `contribuyente_codigo_prefijo_ix`, sobre
+--  `(municipalidad_id, codigo_contribuyente text_pattern_ops)`. Ninguna
+--  columna, ninguna tabla, ningun dato.
+--
+--  EL DEFECTO QUE CIERRA
+--  ---------------------
+--  Hasta #35 `GET /rentas/contribuyentes?codigo=` era igualdad exacta, sobre un
+--  padron cuyos codigos empiezan todos por la misma retahila de ceros:
+--  `?codigo=000000000` devolvia **cero** filas sobre los 10 603 contribuyentes
+--  de Catacaos, y **sin error** —lo que quien busca lee como «ese contribuyente
+--  no existe»—. Desde #35 la condicion es un prefijo.
+--
+--  Y un prefijo de este esquema se escribe como RANGO y no como `LIKE`
+--  (DAT-01 §0 hallazgo 3, `RangoDePrefijo`): `textlike` no es leakproof, asi
+--  que bajo RLS PostgreSQL no lo puede evaluar por encima de la politica y la
+--  condicion se queda en el `Filter`.
+--
+--  LO MEDIDO, Y QUE COMPRA CADA COSA
+--  ---------------------------------
+--  PostgreSQL 16.13, como el rol de la aplicacion —no el dueno ni un
+--  superusuario—, sobre la MISMA tabla de este esquema con 30 000
+--  contribuyentes en cada una de dos municipalidades, los dos padrones con los
+--  mismos codigos (que es como son de verdad: el codigo no lleva el ubigeo
+--  dentro), `ANALYZE` hecho, y `EXPLAIN (ANALYZE, BUFFERS)` sobre el prefijo
+--  `000000000`, que selecciona 99 filas de las 30 000 del inquilino:
+--
+--    forma de preguntar                     plan                    bloques  descartadas
+--    -------------------------------------  ----------------------  -------  -----------
+--    LIKE 'prefijo%'                         Seq Scan                    902       59 901
+--    rango ~>=~ / ~<~  SIN este indice       Bitmap Heap Scan            567       29 901
+--                                            (solo la politica en el
+--                                             Index Cond; el rango
+--                                             baja al Filter)
+--    rango ~>=~ / ~<~  CON este indice       Index Only Scan               5            0
+--                                            (politica + los DOS
+--                                             extremos en el Index Cond)
+--
+--  El `LIKE` es el quinto hallazgo de RLS en su forma mas cara: lee las 60 000
+--  filas de las dos municipalidades y descarta 59 901 a mano. La fila de en
+--  medio es la que hace falta para que ESTE indice signifique algo:
+--  `contribuyente_codigo_uq` indexa la misma columna, pero con la clase de
+--  operadores POR OMISION, que no sabe responder a `~>=~`.
+--
+--  POR QUE NO SE APROVECHA `contribuyente_codigo_uq` CON `>=` / `<`
+--  ---------------------------------------------------------------
+--  Se midio, y **cuesta lo mismo**: `Index Only Scan using
+--  contribuyente_codigo_uq`, 5 bloques, con la politica y los dos extremos
+--  juntos en el `Index Cond`. O sea que este indice NO compra velocidad. Lo que
+--  compra es otra cosa, y conviene decirlo asi de claro:
+--
+--    1. **Una sola manera de buscar por prefijo en este esquema.** Ya hay siete
+--       indices `text_pattern_ops` —`predio`, `via`, `papeleta`, `anuncio`,
+--       `certificado`, `ciiu`, `licencia_funcionamiento`— y una pieza
+--       compartida que escribe la condicion, `RangoDePrefijo`, cuyo javadoc
+--       dice por que existe: «repetirla una cuarta vez es como se acaba colando
+--       un LIKE en la quinta». Escribir aqui `>=` / `<` a mano seria la cuarta
+--       copia y el segundo dialecto.
+--    2. **El rango queda definido byte a byte y no por la colacion.** `>=` / `<`
+--       comparan con la colacion de la base, y esta base no declara ninguna:
+--       `CREATE DATABASE rentas` la hereda del cluster (C-14, 05-crear-bases.sh).
+--       El limite superior lo calcula `RangoDePrefijo.siguienteA` incrementando
+--       el ultimo caracter, que es el sucesor en BYTES; los operadores de
+--       `text_pattern_ops` comparan en bytes pase lo que pase, que es
+--       literalmente para lo que esa clase de operadores existe.
+--
+--  LO QUE CUESTA, MEDIDO
+--  ---------------------
+--  **2 400 kB** sobre 60 000 filas (la tabla, 7 216 kB), y una entrada mas por
+--  cada alta del padron. No es gratis y por eso se mide: C-12 retiro
+--  `contribuyente_nombre_trgm_ix` de esta misma tabla —2 496 kB— porque nadie
+--  podia usarlo. Este si se usa: es el unico que responde al rango, y sin el
+--  la busqueda del padron por codigo lee 567 bloques en vez de 5.
+--
+--  Y NO COMPITE con la unica, que era la otra objecion posible —la que le costo
+--  el puesto a `zonificacion_vigencia_ix` en `catastro`—: la lectura por codigo
+--  entero (`findByCodigo`) cuesta **4 bloques con este indice y 4 sin el**, y el
+--  plan es el mismo `Index Only Scan` cambiando solo de indice.
+--
+--  NO SE RETIRA NINGUNO
+--  --------------------
+--  `contribuyente_codigo_uq` es una RESTRICCION de unicidad, no un indice de
+--  busqueda: retirarla dejaria al padron admitiendo dos veces el mismo codigo en
+--  la misma municipalidad. Y este no la duplica —sirve una clase de operadores
+--  que ella no sabe responder—, que es lo que distingue este caso del
+--  `frente_predio_ix` que `catastro` retiro en su `V13`.
+-- ============================================================================
+
+CREATE INDEX contribuyente_codigo_prefijo_ix
+    ON contribuyente (municipalidad_id, codigo_contribuyente text_pattern_ops);
+
+COMMENT ON INDEX contribuyente_codigo_prefijo_ix IS
+    'Busqueda del padron por prefijo de codigo (#35). Sirve el rango ~>=~ / ~<~ que escribe '
+    'RangoDePrefijo; contribuyente_codigo_uq no lo sirve, porque declara la clase de operadores '
+    'por omision. Medido bajo RLS con 30 000 filas por municipalidad: con el, 5 bloques y 0 filas '
+    'descartadas; sin el, 567 y 29 901';
