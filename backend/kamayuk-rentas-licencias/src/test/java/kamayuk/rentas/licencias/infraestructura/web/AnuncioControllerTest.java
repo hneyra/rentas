@@ -170,7 +170,9 @@ class AnuncioControllerTest {
                         Instant.parse("2026-03-16T10:00:00Z"),
                         "prueba",
                         Observacion.de("Siembra de la prueba"),
-                        List.of(new GiroDeLaLicencia(1L, "47111", "COMERCIO", true, true))));
+                        List.of(new GiroDeLaLicencia(1L, "47111", "COMERCIO", true, true)),
+                        kamayuk.rentas.licencias.dominio.TerritorioDeLaLicencia.sinComprobar(
+                                "Siembra de la prueba: aqui no se mide el territorio")));
     }
 
     @AfterEach

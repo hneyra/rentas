@@ -34,6 +34,18 @@ import org.springframework.transaction.annotation.Transactional;
  *       porque lo que hay aqui describe un padron que catastro no emitio.
  * </ul>
  *
+ * <h2>Y desde #38 protege un dato que SI se usa</h2>
+ *
+ * <p>Hasta ese issue este candado se cumplia y a continuacion la corrida determinaba con cifras que
+ * <b>no venian de esas valuaciones</b>: se bloqueaba la emision hasta que llegara un dato y, cuando
+ * llegaba, no se leia. Una valuacion incompleta y una completa producian exactamente el mismo
+ * recibo, asi que este candado era una puerta cerrada delante de una pared.
+ *
+ * <p>Ya no: {@link DeterminarPredial} lee la valuacion sellada de cada predio y manda sobre la
+ * declarada cuando trae cifra (ADR-0024). Las dos mitades tienen que seguir siendo ciertas a la
+ * vez, y si alguna deja de serlo —el candado deja de exigirlas, o la corrida deja de leerlas— lo
+ * que queda es otra vez una puerta que no protege nada.
+ *
  * <h2>Y por que el conteo y la huella vienen CON el cierre</h2>
  *
  * <p>Porque si `rentas` los derivara de lo que recibio, estaria comprobando que lo que tiene es

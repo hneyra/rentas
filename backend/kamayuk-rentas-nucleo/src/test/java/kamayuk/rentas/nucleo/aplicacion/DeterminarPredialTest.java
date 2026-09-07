@@ -69,8 +69,12 @@ class DeterminarPredialTest {
     private PrediosDePrueba predios;
     private AuditoriaDePrueba auditoria;
 
+    /** Lo que `catastro` sello. Nace VACIO: sin valuacion, manda el autovaluo declarado (#38). */
+    private kamayuk.rentas.nucleo.dobles.ValuacionesSelladasEnMemoria valuaciones;
+
     @BeforeEach
     void preparar() {
+        valuaciones = new kamayuk.rentas.nucleo.dobles.ValuacionesSelladasEnMemoria();
         determinaciones = new DeterminacionesEnMemoria();
         predios = new PrediosDePrueba();
         auditoria = new AuditoriaDePrueba();
@@ -421,6 +425,7 @@ class DeterminarPredialTest {
                 new SinCaracteristicas(),
                 new DirectorioDePrueba(),
                 new CuadroPredialParametrizado(lector),
+                valuaciones,
                 new RegistrarDeterminacionPredial(determinaciones, lector, auditoria, RELOJ),
                 RELOJ);
     }

@@ -2,6 +2,7 @@ package kamayuk.rentas.catastro.infraestructura;
 
 import java.util.ArrayList;
 import java.util.List;
+import kamayuk.rentas.catastro.EstadoDeLaLongitud;
 import kamayuk.rentas.catastro.FrenteInscrito;
 import kamayuk.rentas.catastro.FrentesDelPredio;
 import kamayuk.rentas.catastro.FrentesInscritos;
@@ -27,6 +28,14 @@ import tools.jackson.databind.JsonNode;
  * ML}: suponerla es escribir la confusion que este tipo existe para impedir, y la suposicion no
  * dejaria ni un rastro en la fila que despues se cobra.
  *
+ * <h2>Y {@code longitudEstado} tampoco se le supone</h2>
+ *
+ * <p>Llegaba con {@code asString("")}, o sea que un proveedor viejo o un despliegue a medias
+ * producia una cadena vacia. Un consumidor escrito como {@code !"PROPUESTA".equals(estado)} daria
+ * esa longitud por buena y la cobraria, sin un solo error por el camino. Ahora se exige uno de los
+ * dos valores que {@link EstadoDeLaLongitud} admite y cualquier otra cosa —incluida la ausencia— se
+ * rechaza en voz alta, igual que la unidad de la medida y por el mismo motivo (#15).
+ *
  * <h2>Y no se lee la geometria</h2>
  *
  * <p>El recurso trae el tramo en WKT para poder dibujarlo. Este lado no lo pide: {@code rentas} no
@@ -48,32 +57,65 @@ public class FrentesDelPredioHttp implements FrentesDelPredio {
         JsonNode cuerpo =
                 catastro.pedirHechoDelTerritorio("/catastro/predios/" + predioId + "/frentes", que);
 
-        List<FrenteInscrito> frentes = new ArrayList<>();
+        // Se reparten al leer y no despues: el tipo no admite una lista que mezcle los dos
+        // estados, asi que no hay ningun instante en que exista una lista con las dos cosas
+        // dentro —que es el instante en que alguien la sumaria— (#15).
+        List<FrenteInscrito> confirmados = new ArrayList<>();
+        List<FrenteInscrito> propuestos = new ArrayList<>();
         for (JsonNode frente : cuerpo.path("frentes")) {
-            frentes.add(
+            FrenteInscrito leido =
                     new FrenteInscrito(
                             frente.path("id").asLong(),
                             frente.path("viaId").asLong(),
                             frente.path("viaCodigo").asString(""),
                             frente.path("viaNombre").asString(""),
                             medida(frente, "longitud", que),
-                            frente.path("longitudEstado").asString(""),
+                            estado(frente, que),
                             frente.path("esPrincipal").asBoolean(),
                             ClienteHttpDeCatastro.texto(frente, "numeracion"),
                             medidaOpcional(frente, "retiro", que),
                             ClienteHttpDeCatastro.texto(frente, "confirmadoPor"),
-                            ClienteHttpDeCatastro.texto(frente, "confirmadoEn")));
+                            ClienteHttpDeCatastro.texto(frente, "confirmadoEn"));
+            (leido.confirmada() ? confirmados : propuestos).add(leido);
         }
 
         return new FrentesInscritos(
                 cuerpo.path("predioId").asLong(),
-                List.copyOf(frentes),
+                List.copyOf(confirmados),
+                List.copyOf(propuestos),
                 ClienteHttpDeCatastro.texto(cuerpo, "derivadoEn"),
                 entero(cuerpo, "frentesDerivados"),
                 ClienteHttpDeCatastro.texto(cuerpo, "motivoDeLaDerivacion"));
     }
 
     // ------------------------------------------------------------------
+
+    /**
+     * Quien afirmo la longitud, y sin valor por omision.
+     *
+     * <p>La cadena vacia NO es un estado. Si el campo no llega, o llega con un valor que este lado
+     * no reconoce, la lectura se niega: dar por buena una longitud cuyo autor no consta es
+     * exactamente lo que la compuerta PROPUESTA/CONFIRMADA existe para impedir, y `catastro` la
+     * construyo porque la decision de cobrar es de aqui (ADR-0024, ADR-0021).
+     */
+    private static EstadoDeLaLongitud estado(JsonNode frente, String que) {
+        String texto = ClienteHttpDeCatastro.texto(frente, "longitudEstado");
+        return EstadoDeLaLongitud.reconocer(texto)
+                .orElseThrow(
+                        () ->
+                                new ClienteHttpDeCatastro.CatastroInalcanzable(
+                                        que
+                                                + ": un frente llego con «longitudEstado» = «"
+                                                + texto
+                                                + "», y este lado solo reconoce PROPUESTA y"
+                                                + " CONFIRMADA. Una PROPUESTA la corto una maquina"
+                                                + " contra el eje de la via y una CONFIRMADA la"
+                                                + " firmo una persona (ADR-0021): sin ese campo las"
+                                                + " dos llegan iguales, y quien determine un"
+                                                + " arbitrio sobre metros que nadie confirmo no"
+                                                + " tiene como saberlo",
+                                        null));
+    }
 
     /** Una medida que tiene que estar, con su unidad dentro. */
     private static Medida medida(JsonNode fila, String campo, String que) {

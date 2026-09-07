@@ -1,9 +1,16 @@
 package kamayuk.rentas.nucleo.infraestructura;
 
+import java.math.BigDecimal;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.nucleo.dominio.predial.ValuacionRecibida;
+import kamayuk.rentas.nucleo.dominio.predial.ValuacionSellada;
 import kamayuk.rentas.persistencia.RepositorioJdbc;
+import org.jspecify.annotations.Nullable;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 
@@ -41,6 +48,71 @@ public class ValuacionRecibidaJdbc extends RepositorioJdbc implements ValuacionR
                                         fila.getInt("conteo"),
                                         fila.getString("huella")))
                 .optional();
+    }
+
+    /** Las columnas de una valuacion sellada, escritas una sola vez para las dos lecturas. */
+    private static final String COLUMNAS_DE_LA_VALUACION =
+            """
+            SELECT predio_id, fecha_de_corte, valor_terreno, valor_construccion,
+                   valor_obras, valor_del_predio, motivo, llave_que_falta,
+                   conjunto_id, reglas_version, huella
+              FROM valuacion_predio
+             WHERE ejercicio = :ejercicio
+            """;
+
+    @Override
+    public Optional<ValuacionSellada> delPredio(Ejercicio ejercicio, long predioId) {
+        return jdbc().sql(COLUMNAS_DE_LA_VALUACION + "   AND predio_id = :predio")
+                .param("ejercicio", ejercicio.valor())
+                .param("predio", predioId)
+                .query((fila, numeroDeFila) -> leer(fila))
+                .optional();
+    }
+
+    @Override
+    public Map<Long, ValuacionSellada> deLosPredios(Ejercicio ejercicio, List<Long> predioIds) {
+        Map<Long, ValuacionSellada> porPredio = new LinkedHashMap<>();
+        if (predioIds.isEmpty()) {
+            // `IN ()` no es SQL valido, y preguntar por el ejercicio entero para filtrar despues
+            // leeria el padron completo para no devolver nada.
+            return porPredio;
+        }
+        for (ValuacionSellada valuacion :
+                jdbc().sql(COLUMNAS_DE_LA_VALUACION + "   AND predio_id IN (:predios)")
+                        .param("ejercicio", ejercicio.valor())
+                        .param("predios", predioIds)
+                        .query((fila, numeroDeFila) -> leer(fila))
+                        .list()) {
+            porPredio.put(valuacion.predioId(), valuacion);
+        }
+        return porPredio;
+    }
+
+    /**
+     * Una fila de {@code valuacion_predio}.
+     *
+     * <p>Las cuatro cifras se leen con {@link #dineroOnulo}, que devuelve {@code null} y NO {@link
+     * Dinero#CERO} cuando la columna es nula: {@code getBigDecimal} ya devuelve {@code null}, pero
+     * envolverlo sin mirar produciria un cero, y un cero aqui es indistinguible de un predio que no
+     * vale nada (#48). Es el mismo motivo por el que la tabla tiene su `CHECK`.
+     */
+    private static ValuacionSellada leer(java.sql.ResultSet fila) throws java.sql.SQLException {
+        return new ValuacionSellada(
+                fila.getLong("predio_id"),
+                fila.getDate("fecha_de_corte").toLocalDate(),
+                dineroOnulo(fila.getBigDecimal("valor_terreno")),
+                dineroOnulo(fila.getBigDecimal("valor_construccion")),
+                dineroOnulo(fila.getBigDecimal("valor_obras")),
+                dineroOnulo(fila.getBigDecimal("valor_del_predio")),
+                fila.getString("motivo"),
+                fila.getString("llave_que_falta"),
+                fila.getLong("conjunto_id"),
+                fila.getString("reglas_version"),
+                fila.getString("huella"));
+    }
+
+    private static @Nullable Dinero dineroOnulo(@Nullable BigDecimal valor) {
+        return valor == null ? null : new Dinero(valor);
     }
 
     @Override

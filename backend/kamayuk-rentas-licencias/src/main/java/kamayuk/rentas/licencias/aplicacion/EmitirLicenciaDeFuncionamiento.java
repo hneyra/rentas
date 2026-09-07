@@ -21,12 +21,16 @@ import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.licencias.dominio.Ciiu;
 import kamayuk.rentas.licencias.dominio.CiiuRepository;
+import kamayuk.rentas.licencias.dominio.CompatibilidadConLaZona;
+import kamayuk.rentas.licencias.dominio.ComprobacionDelTerritorio;
 import kamayuk.rentas.licencias.dominio.GiroDeLaLicencia;
 import kamayuk.rentas.licencias.dominio.LicenciaDeFuncionamiento;
 import kamayuk.rentas.licencias.dominio.LicenciaRepository;
 import kamayuk.rentas.licencias.dominio.MovimientoDeLicencia;
 import kamayuk.rentas.licencias.dominio.MovimientoDeLicenciaRepository;
 import kamayuk.rentas.licencias.dominio.PlantillaDeNumeroDeLicencia;
+import kamayuk.rentas.licencias.dominio.RespuestaDelTerritorio;
+import kamayuk.rentas.licencias.dominio.TerritorioDeLaLicencia;
 import kamayuk.rentas.licencias.dominio.TipoDeLicencia;
 import kamayuk.rentas.tesoreria.ReciboDeTramite;
 import kamayuk.rentas.tesoreria.RecibosDeTramite;
@@ -61,6 +65,41 @@ import org.springframework.transaction.annotation.Transactional;
  * licencia sin documento no se puede entregar; un documento sin licencia no tiene acto que lo
  * explique.
  *
+ * <h2>El territorio se pregunta ANTES de autorizar, y la ausencia no autoriza (#43)</h2>
+ *
+ * <p>Hasta este issue la licencia se emitia contra una zona <b>tecleada</b> en la solicitud, que no
+ * se comparaba con nada, y sin mirar el riesgo del suelo ni el ITSE. {@code catastro} publicaba las
+ * tres cosas —{@code /urbano/zonificacion}, {@code /grd/riesgo} y {@code /grd/itse}— y no las
+ * llamaba nadie. Ahora las llama {@link ComprobarElTerritorio}, con la fecha de emision, y lo que
+ * conteste decide:
+ *
+ * <ul>
+ *   <li><b>Riesgo no mitigable comprobado ⇒ NO SE EMITE</b>, y no hay autorizacion que lo salve. Es
+ *       el unico desenlace sin salida, y es porque el hecho esta <b>medido</b> y el dano no se
+ *       corrige con una resolucion posterior: un local abierto sobre un suelo que se mueve ya esta
+ *       abierto.
+ *   <li><b>El giro no cabe en la zona ⇒ hace falta una autorizacion explicita</b>, con su
+ *       observacion. No se rechaza en seco porque {@code ciiu.zonificacion_compatible} es <b>texto
+ *       libre</b> —el indice de usos es ordenanza local, D-02b— y el vocabulario de los dos lados
+ *       no esta normalizado: negar sobre una comparacion de cadenas denegaria licencias que la
+ *       ordenanza permite. Lo que no puede seguir es no preguntar.
+ *   <li><b>Alguna consulta no contesto ⇒ hace falta la misma autorizacion explicita.</b> «No se
+ *       pudo preguntar» NO es «no hay riesgo» (AC-4). Y no se rechaza en seco por una razon medida:
+ *       hoy <b>no hay ni un poligono cargado en ninguna instalacion</b>, asi que rechazar dejaria
+ *       el modulo de licencias sin poder emitir una sola — y un sistema que no se puede usar se
+ *       acaba desactivando, que es como se pierden las guardas.
+ *   <li><b>Todo comprobado y favorable ⇒ se emite</b> sin pedirle nada mas a nadie.
+ * </ul>
+ *
+ * <p>Las tres razones por las que puede hacer falta la autorizacion <b>se distinguen en el
+ * mensaje</b> y llegan a quien opera como tres cosas distintas (AC-5): no consta el predio, no se
+ * pudo preguntar, o el giro no cabe. Se arreglan de tres maneras —dar de alta el predio o cargar el
+ * plano, levantar el despliegue, y revisar el indice de usos— y decir la equivocada manda a quien
+ * atiende a buscar donde no es.
+ *
+ * <p>Y <b>las dos zonas se guardan</b>: la declarada en {@code zonificacion} y la del territorio en
+ * {@code zona_del_territorio}, con {@code zona_origen} diciendo cual sostiene el acto (V14).
+ *
  * <h2>Ningun cargo en la cuenta corriente, y es una decision</h2>
  *
  * <p>Emitir una licencia <b>no</b> genera deuda. El derecho de tramite ya se pago en caja de tasas
@@ -84,6 +123,7 @@ public class EmitirLicenciaDeFuncionamiento {
     private final RecibosDeTramite recibos;
     private final DirectorioDeContribuyentes contribuyentes;
     private final LectorDeFichasEconomicas fichas;
+    private final ComprobarElTerritorio territorio;
     private final DerechosDeTramiteParametrizados derechos;
     private final EmitirDocumento documentos;
     private final PlantillaDeNumeroDeLicencia plantilla;
@@ -97,6 +137,7 @@ public class EmitirLicenciaDeFuncionamiento {
             RecibosDeTramite recibos,
             DirectorioDeContribuyentes contribuyentes,
             LectorDeFichasEconomicas fichas,
+            ComprobarElTerritorio territorio,
             DerechosDeTramiteParametrizados derechos,
             EmitirDocumento documentos,
             PlantillaDeNumeroDeLicencia plantilla,
@@ -108,6 +149,7 @@ public class EmitirLicenciaDeFuncionamiento {
         this.recibos = recibos;
         this.contribuyentes = contribuyentes;
         this.fichas = fichas;
+        this.territorio = territorio;
         this.derechos = derechos;
         this.documentos = documentos;
         this.plantilla = plantilla;
@@ -127,6 +169,9 @@ public class EmitirLicenciaDeFuncionamiento {
      * @throws ComprobacionDelDerecho.DerechoNoPagado si el recibo no respalda el derecho (RF-110)
      * @throws DerechosDeTramiteParametrizados.DerechoSinParametrizar si el conjunto sellado no dice
      *     que concepto del TUPA cobra el derecho
+     * @throws RiesgoNoMitigable si el lote cruza una zona de riesgo no mitigable comprobada (#43)
+     * @throws TerritorioSinAutorizar si algo del territorio no se pudo comprobar —o el giro no cabe
+     *     en la zona— y la solicitud no trae la autorizacion explicita que lo asume
      */
     @Transactional
     public LicenciaEmitida emitir(
@@ -151,6 +196,22 @@ public class EmitirLicenciaDeFuncionamiento {
                         "registro de licencia de funcionamiento");
 
         List<GiroDeLaLicencia> giros = resolverGiros(solicitud);
+
+        // EL TERRITORIO SE PREGUNTA AQUI, antes de numerar y antes de dibujar el papel. Despues
+        // seria descubrirlo con el documento ya emitido y su huella ya calculada, y una licencia
+        // no se edita (V37): corregirla es otro acto.
+        //
+        // La zona compatible que decide es la del giro PRINCIPAL, y no la union de los giros: lo
+        // dice `LicenciaDeFuncionamiento` con todas las letras —«la actividad principal es la que
+        // decide el riesgo de la ITSE y la compatibilidad con la zonificacion»— y tomar la union
+        // dejaria que un giro secundario compatible autorizara al principal que no lo es.
+        Ciiu principal = catalogo.porCodigo(solicitud.giroPrincipal()).orElseThrow();
+        ComprobacionDelTerritorio comprobacion =
+                territorio.de(
+                        solicitud.predioId(),
+                        solicitud.fechaEmision(),
+                        principal.zonificacionCompatible());
+        exigirQueElTerritorioLoPermita(solicitud, comprobacion, principal);
 
         Ejercicio ejercicio = Ejercicio.de(solicitud.fechaEmision());
         String numero = plantilla.componer(ejercicio, licencias.siguienteCorrelativo(ejercicio));
@@ -190,7 +251,8 @@ public class EmitirLicenciaDeFuncionamiento {
                         ahora,
                         null,
                         observacion,
-                        giros);
+                        giros,
+                        TerritorioDeLaLicencia.de(comprobacion));
 
         EmitirDocumento.Emision emision =
                 documentos.emitir(
@@ -294,7 +356,73 @@ public class EmitirLicenciaDeFuncionamiento {
                 licencia.registradoEn(),
                 licencia.usuarioRegistro(),
                 licencia.observacion(),
-                licencia.giros());
+                licencia.giros(),
+                licencia.territorio());
+    }
+
+    /**
+     * Se niega, exige que alguien lo asuma por escrito, o deja pasar (#43, AC-2, AC-4 y AC-5).
+     *
+     * <p>El orden importa y es este: <b>primero lo que no tiene salida</b>. Si el riesgo no
+     * mitigable se comprobo, no se llega a mirar si hay autorizacion — porque no hay autorizacion
+     * que valga, y decir «falta autorizar» mandaria a quien atiende a pedir una firma que nadie
+     * puede dar.
+     */
+    private static void exigirQueElTerritorioLoPermita(
+            Solicitud solicitud, ComprobacionDelTerritorio comprobacion, Ciiu principal) {
+
+        if (comprobacion.riesgoNoMitigableComprobado()) {
+            throw new RiesgoNoMitigable(solicitud.predioId(), comprobacion.aLaFecha());
+        }
+
+        if (comprobacion.todoComprobadoYFavorable()
+                || comprobacion.zona() == RespuestaDelTerritorio.NO_SE_PREGUNTO) {
+            return;
+        }
+
+        if (solicitud.autorizacionDelTerritorio() != null) {
+            return;
+        }
+
+        throw new TerritorioSinAutorizar(
+                solicitud.predioId(),
+                principal.codigo(),
+                comprobacion,
+                queHayQueHacer(comprobacion));
+    }
+
+    /**
+     * Que tiene que hacer quien atiende, segun cual de las tres cosas paso.
+     *
+     * <p>Las tres se arreglan de maneras distintas —dar de alta el predio o cargar el plano,
+     * levantar el despliegue, revisar el indice de usos— y colapsarlas en «no se pudo comprobar el
+     * territorio» manda a mirar donde no es. Es la distincion que {@code catastro} construyo a
+     * proposito y que #9 transporto hasta aqui; borrarla en la ultima capa la desperdicia entera.
+     */
+    private static String queHayQueHacer(ComprobacionDelTerritorio comprobacion) {
+        if (comprobacion.zona() == RespuestaDelTerritorio.NO_SE_PUDO_PREGUNTAR
+                || comprobacion.riesgo() == RespuestaDelTerritorio.NO_SE_PUDO_PREGUNTAR
+                || comprobacion.itse() == RespuestaDelTerritorio.NO_SE_PUDO_PREGUNTAR) {
+            return "No se pudo preguntar a `catastro`. Esto NO es «no hay riesgo»: es que no se"
+                    + " sabe. Se arregla levantando el despliegue de `catastro`, y hasta entonces"
+                    + " emitir exige que una persona lo asuma por escrito";
+        }
+        if (comprobacion.zona() == RespuestaDelTerritorio.NO_CONSTA
+                || comprobacion.riesgo() == RespuestaDelTerritorio.NO_CONSTA) {
+            return "El predio no consta en el territorio: no esta en el padron de `catastro`, no"
+                    + " tiene poligono levantado, o ningun plan de zonificacion vigente lo cubre."
+                    + " Hoy es el caso normal, porque no hay cartografia cargada. Se arregla dando"
+                    + " de alta el predio, cargando el plano o aprobando la zonificacion";
+        }
+        if (comprobacion.compatibilidad() == CompatibilidadConLaZona.INCOMPATIBLE) {
+            return "El giro principal no cabe en la zona "
+                    + comprobacion.zonaDelTerritorio()
+                    + " segun el indice de usos del catalogo CIIU. Se revisa el catalogo, o se"
+                    + " autoriza por excepcion diciendo por que";
+        }
+        return "El giro principal no declara en que zonas cabe (`ciiu.zonificacion_compatible` esta"
+                + " vacio, D-02b), asi que no hay con que decidir la compatibilidad. Se rellena el"
+                + " catalogo, o se autoriza diciendo por que";
     }
 
     /** Sin datos personales: esto acaba en la columna JSON de la auditoria. */
@@ -335,6 +463,10 @@ public class EmitirLicenciaDeFuncionamiento {
      * @param giroPrincipal cual de ellos es la actividad principal
      * @param expediente el numero del expediente del tramite
      * @param fechaExpediente su fecha
+     * @param autorizacionDelTerritorio por que se emite aunque el territorio no lo respalde; {@code
+     *     null} cuando no hace falta. NO salva un riesgo no mitigable comprobado: eso no se
+     *     autoriza. Es una {@link Observacion} y no una bandera a proposito — «lo autorizo» sin
+     *     decir por que no es una autorizacion, es un permiso silencioso (regla 10)
      */
     public record Solicitud(
             String codigoContribuyente,
@@ -351,7 +483,8 @@ public class EmitirLicenciaDeFuncionamiento {
             List<String> girosCiiu,
             String giroPrincipal,
             @Nullable String expediente,
-            @Nullable LocalDate fechaExpediente) {
+            @Nullable LocalDate fechaExpediente,
+            @Nullable Observacion autorizacionDelTerritorio) {
 
         public Solicitud {
             Objects.requireNonNull(codigoContribuyente, "La licencia es de un titular");
@@ -397,6 +530,75 @@ public class EmitirLicenciaDeFuncionamiento {
                             + codigo
                             + "' en esta municipalidad: una licencia se emite a un titular del"
                             + " padron");
+        }
+    }
+
+    /**
+     * El lote cruza una zona de riesgo NO MITIGABLE, comprobada. No se emite, y no hay excepcion.
+     *
+     * <p>Es el unico desenlace de #43 sin salida, y el motivo es que el hecho esta <b>medido</b>:
+     * {@code catastro} publica {@code hayRiesgoNoMitigable} derivado y arriba (`catastro`#5), no
+     * recalculado aqui. Autorizar un local sobre un suelo asi es un dano que no se corrige con una
+     * resolucion posterior — el local ya esta abierto—, asi que no se ofrece la autorizacion por
+     * escrito que si se ofrece cuando algo <b>no se pudo comprobar</b>.
+     */
+    public static final class RiesgoNoMitigable extends RuntimeException {
+
+        @java.io.Serial private static final long serialVersionUID = 1L;
+
+        RiesgoNoMitigable(@Nullable Long predioId, LocalDate aLaFecha) {
+            super(
+                    "No se emite la licencia: el predio "
+                            + predioId
+                            + " cruzaba el "
+                            + aLaFecha
+                            + " una zona de riesgo NO MITIGABLE, segun la carta de peligro que"
+                            + " `catastro` publica. No hay autorizacion que lo salve: un local"
+                            + " abierto sobre ese suelo no se cierra con una resolucion posterior");
+        }
+    }
+
+    /**
+     * El territorio no respalda la emision y nadie la ha asumido por escrito.
+     *
+     * <p>Tres cosas distintas llegan aqui —no consta el predio, no se pudo preguntar, o el giro no
+     * cabe en la zona— y el mensaje <b>dice cual</b> y que hacer con ella. Colapsarlas borraria la
+     * distincion que {@code catastro} construyo a proposito (AC-5).
+     */
+    public static final class TerritorioSinAutorizar extends RuntimeException {
+
+        @java.io.Serial private static final long serialVersionUID = 1L;
+
+        private final transient ComprobacionDelTerritorio comprobacion;
+
+        TerritorioSinAutorizar(
+                @Nullable Long predioId,
+                String giroPrincipal,
+                ComprobacionDelTerritorio comprobacion,
+                String queHacer) {
+            super(
+                    "No se emite la licencia del predio "
+                            + predioId
+                            + " con el giro principal "
+                            + giroPrincipal
+                            + " sin autorizacion expresa: "
+                            + queHacer
+                            + ". Lo que el territorio contesto al "
+                            + comprobacion.aLaFecha()
+                            + ": zona "
+                            + comprobacion.zona()
+                            + ", riesgo "
+                            + comprobacion.riesgo()
+                            + ", ITSE "
+                            + comprobacion.itse()
+                            + ", compatibilidad "
+                            + comprobacion.compatibilidad());
+            this.comprobacion = comprobacion;
+        }
+
+        /** Lo que se pudo comprobar, para que el borde lo publique sin analizar el mensaje. */
+        public ComprobacionDelTerritorio comprobacion() {
+            return comprobacion;
         }
     }
 
