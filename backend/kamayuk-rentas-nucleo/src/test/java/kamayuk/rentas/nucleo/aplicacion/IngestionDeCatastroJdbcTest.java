@@ -358,7 +358,7 @@ class IngestionDeCatastroJdbcTest {
     @DisplayName(
             "AC 2: el mismo hecho aplicado por diez hilos deja UNA fila, y lo sostiene el indice unico")
     void elMismoHechoDosVecesProduceUnaFila() throws Exception {
-        HechoRecibido hecho = leer(hechosDeCatastro.get(0));
+        HechoRecibido hecho = leer(deTipo("PREDIO_PROYECTADO").get(0));
         int hilos = 10;
         CountDownLatch salida = new CountDownLatch(1);
         CountDownLatch llegada = new CountDownLatch(hilos);
@@ -410,7 +410,7 @@ class IngestionDeCatastroJdbcTest {
     @Test
     @DisplayName("AC 3: un hecho fuera de secuencia se descarta, y se dice")
     void unHechoViejoSeDescartaYSeDice() throws SQLException {
-        HechoRecibido nuevo = leer(hechosDeCatastro.get(0));
+        HechoRecibido nuevo = leer(deTipo("PREDIO_PROYECTADO").get(0));
         assertThat(aplicador.aplicar(nuevo, AHORA))
                 .isEqualTo(ProyeccionDeCatastro.Aplicacion.APLICADO);
         String direccionNueva = direccionProyectada();
@@ -475,7 +475,7 @@ class IngestionDeCatastroJdbcTest {
     @DisplayName(
             "y el emisor que reescribe un hecho sellado se ve, en vez de descartarse en silencio")
     void reescribirUnHechoSelladoSeVe() {
-        HechoRecibido original = leer(hechosDeCatastro.get(1));
+        HechoRecibido original = leer(deTipo("PREDIO_PROYECTADO").get(1));
         assertThat(aplicador.aplicar(original, AHORA))
                 .isEqualTo(ProyeccionDeCatastro.Aplicacion.APLICADO);
 
@@ -498,9 +498,38 @@ class IngestionDeCatastroJdbcTest {
                 .hasMessageContaining("reescribiendo un hecho sellado");
     }
 
+    /**
+     * Lo que hoy le pasa a la ingestion con lo que `catastro` publica de verdad (#54).
+     *
+     * <p><b>No bendice el estado: lo fija.</b> Rechazar un tipo que este sistema no sabe aplicar es
+     * correcto y esta decidido —lo dice el javadoc de {@code TipoDeHechoDeCatastro}—. Lo que esta
+     * prueba mide es <b>donde</b> ocurre el rechazo y lo que cuesta: {@code leer(...)} lanza dentro
+     * de {@code pendientes()}, o sea mientras se arma el lote y antes de que ningun hecho llegue al
+     * aplicador, y {@code POR_VUELTA} es 200, asi que el buzon entero viene en una pagina.
+     *
+     * <p>Las cuatro cifras que se afirman son el defecto, y la ultima es la peor:
+     *
+     * <ul>
+     *   <li>{@code aplicados = 0} — no se para EN el hecho desconocido: se pierde la pagina entera,
+     *       incluidos los hechos del padron que iban DELANTE.
+     *   <li>{@code acusados = 0} — la vuelta siguiente trae lo mismo y vuelve a morir. La ingestion
+     *       del padron queda parada, y no se destranca sola.
+     *   <li>{@code muertos = 0} — el hecho no se aparta. Es justo lo que {@code
+     *       unHechoImposibleSeApartaYAvisa} existe para impedir: el cuerpo ilegible pasa por esa
+     *       puerta y el tipo desconocido entra por otra, que no la tiene.
+     *   <li>{@code avisos = 0} — {@code AlertaDeHechosSinAplicar} avisa de hechos APARTADOS, y aqui
+     *       no se aparta ninguno: al responsable de catastro no le llega nada.
+     * </ul>
+     *
+     * <p>Las dos primeras cifras las trajo `rentas`#52 con esta misma prueba; las otras dos son de
+     * #54, y no son contabilidad: son las que separan «se para, que esta bien» de «se para, se
+     * pierde lo que iba delante y nadie se entera». El dia que #54 se cierre —por cualquiera de sus
+     * tres salidas— esta prueba se pone roja y lee esto. Es lo que se pide de ella.
+     */
     @Test
-    @DisplayName("un tipo que este sistema no sabe aplicar se rechaza, y NO se acusa")
-    void unTipoDesconocidoNoSeAcusa() {
+    @DisplayName(
+            "#54: un tipo que este sistema no sabe aplicar PARA la ingestion entera, sin avisar")
+    void unTipoDesconocidoNoSeAcusa() throws SQLException {
         // NO ES HIPOTETICO, y por eso esta prueba existe desde el mismo dia que se midio: desde
         // `catastro`#7 y #28 aquel sistema publica SIETE tipos y este declara TRES. El lote de
         // ejemplo trae hoy MANZANA_PUBLICADA, FRENTE_PUBLICADO, HALLAZGO_FIRME y
@@ -518,15 +547,29 @@ class IngestionDeCatastroJdbcTest {
                                 + " ella, no la guarda")
                 .isNotEmpty();
 
+        // Los hechos del padron van DELANTE, como en el buzon de verdad: es lo que mide que se
+        // pierda la pagina entera y no solo el hecho desconocido. Sin esto, «aplicados = 0» seria
+        // cierto por no haber aportado nada que aplicar.
+        APORTAR.addAll(deTipo("PREDIO_PROYECTADO"));
         APORTAR.add(ajeno.get(0));
 
         assertThatThrownBy(() -> ingestor.ingerir())
                 .as("no se aplica a medias, y se dice cual es el tipo y que hay que hacer")
                 .hasMessageContaining("que este sistema no sabe aplicar");
+
+        assertThat(contar("catastro_evento_aplicado"))
+                .as("los DOS predios que iban delante en la misma pagina tampoco entraron")
+                .isZero();
         assertThat(ACUSADOS)
                 .as(
                         "acusarlo sin aplicarlo lo perderia: el buzon de salida no lo vuelve a"
                                 + " servir")
+                .isEmpty();
+        assertThat(contar("catastro_evento_muerto"))
+                .as("y no se aparta, que es lo que en el AC 6 impide que bloquee la cola")
+                .isZero();
+        assertThat(AVISOS)
+                .as("al responsable de catastro no le llega NADA: el aviso es de lo apartado")
                 .isEmpty();
     }
 
@@ -691,9 +734,13 @@ class IngestionDeCatastroJdbcTest {
 
     /** Los hechos del lote de ese tipo, en el orden en que `catastro` los emitio. */
     private static List<String> deTipo(String tipo) {
+        return deTipoEn(hechosDeCatastro, tipo);
+    }
+
+    private static List<String> deTipoEn(List<String> donde, String tipo) {
         List<String> suyos = new ArrayList<>();
-        for (String hecho : hechosDeCatastro) {
-            if (tipo.equals(json.readTree(hecho).path("tipo").asString())) {
+        for (String hecho : donde) {
+            if (tipo.equals(json.readTree(hecho).path("tipo").asString(""))) {
                 suyos.add(hecho);
             }
         }

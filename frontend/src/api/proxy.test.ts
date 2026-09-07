@@ -143,10 +143,22 @@ describe('el proxy no finge semantica (AC8)', () => {
   it('no filtra ni ordena: la cadena de consulta no cambia una coma de la respuesta', async () => {
     instalarProxyDeDatos();
 
-    const sinFiltro = await (await fetch(`${RAIZ}/rentas/predios`)).text();
-    const conFiltro = await (
-      await fetch(`${RAIZ}/rentas/predios?uso=Comercio&orden=direccion&pagina=3&tamano=1`)
+    // Los dos llevan `codContribuyente`, que esta operacion EXIGE desde #26: sin el, el proxy
+    // contesta 422 —como el backend— y las dos respuestas saldrian identicas por ser el mismo
+    // rechazo, o sea que esta prueba pasaria sin medir lo que dice medir. Lo que cambia entre
+    // las dos peticiones son los parametros que el proxy NO mira.
+    const sinFiltro = await (
+      await fetch(`${RAIZ}/rentas/predios?codContribuyente=C-0001`)
     ).text();
+    const conFiltro = await (
+      await fetch(
+        `${RAIZ}/rentas/predios?codContribuyente=C-0001&uso=Comercio&orden=direccion&pagina=3&tamano=1`,
+      )
+    ).text();
+
+    // Y que las dos sean 200: si las dos fueran el mismo 422, la igualdad de abajo no diria
+    // nada. Es el contraste que hace que la comparacion valga.
+    expect(JSON.parse(sinFiltro)).not.toMatchObject({ codigo: 'VALIDACION' });
 
     // Identicas al byte. Fingir el filtro seria inventar una decision que el backend no ha
     // tomado, y la interfaz se acabaria construyendo contra esa invencion.
