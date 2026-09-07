@@ -64,6 +64,21 @@ async function montar() {
 const tipo = (titulo: string) =>
   screen.getByRole('button', { name: new RegExp(`^${titulo.replace(/[—.]/g, '.')}`) });
 
+/**
+ * La fila de un dato que llega en OTRA respuesta, esperada antes de leerla.
+ *
+ * `fila()` es sincrona, y sirve mientras lo que se busca venga de la misma respuesta que
+ * `montar()` ya espero —la memoria del predial individual—. Para las etapas de la corrida
+ * masiva y para los arbitrios NO sirve: son `useUno`/`useLista` distintos, disparados por el
+ * click en el tipo, y `Cuadro` dibuja su `<table aria-label=…>` **siempre**, tambien mientras
+ * carga. Asi que un `getByText` sincrono ahi es una carrera contra el reloj: la gana en una
+ * maquina descargada y la pierde en la de quien tiene un build al lado (#36).
+ */
+async function filaServida(texto: string): Promise<HTMLElement> {
+  await screen.findByText(texto);
+  return fila(texto);
+}
+
 /** La fila cuya celda de texto dice eso. */
 function fila(texto: string): HTMLElement {
   const celda = screen.getByText(texto);
@@ -254,9 +269,12 @@ describe('AC5 — el predial masivo ensena las etapas que la corrida trae', () =
     await usuario.click(tipo('Predial — masivo'));
 
     const etapas = await screen.findByRole('table', { name: 'Memoria de Predial — masivo' });
+    // Se espera A LA ETAPA y no a la tabla: `Cuadro` dibuja la tabla en cuanto se elige el
+    // tipo, y con cuatro esqueletos dentro mientras la corrida no ha llegado. Contando filas
+    // ahi, «3» se comparaba contra «5» — o contra «1» (#36).
+    expect(await within(etapas).findByText('Padrón leído')).toBeInTheDocument();
     // Dos filas de datos mas la de cabecera. El artboard dibujaba cinco.
     expect(within(etapas).getAllByRole('row')).toHaveLength(CORRIDA_MEDIDA.etapas.length + 1);
-    expect(within(etapas).getByText('Padrón leído')).toBeInTheDocument();
     expect(within(etapas).getByText('Simulados')).toBeInTheDocument();
     expect(within(etapas).queryByText('Generación de cuponeras')).toBeNull();
   });
@@ -277,7 +295,7 @@ describe('AC5 — el predial masivo ensena las etapas que la corrida trae', () =
 
     // «Padrón leído» publica `monto: ""`: cadena vacia y no «0.00». Leer un predio no mueve
     // dinero, y un cero diria que emitio cero soles.
-    const lectura = fila('Padrón leído');
+    const lectura = await filaServida('Padrón leído');
     expect(within(lectura).getByText('—')).toBeInTheDocument();
     expect(within(lectura).queryByText('S/ 0.00')).toBeNull();
   });
@@ -323,8 +341,12 @@ describe('las dos determinaciones que llegan sin fecha no dibujan sus importes',
     await usuario.click(tipo('Alcabala'));
 
     const cuadro = await screen.findByRole('table', { name: 'Memoria de Alcabala' });
+    // **El orden importa, y al reves era un falso verde**: `toHaveLength(0)` se cumple sola
+    // mientras el cuadro esta cargando, porque entonces no hay NINGUN importe pintado. Se
+    // espera primero a que la respuesta este puesta, y solo entonces se afirma que ninguno
+    // de sus dos importes se dibujo (#36).
+    expect(await within(cuadro).findByText('Base imponible')).toBeInTheDocument();
     expect(cuadro.querySelectorAll('.kr-importe__valor')).toHaveLength(0);
-    expect(within(cuadro).getByText('Base imponible')).toBeInTheDocument();
     // Y no es que el cuadro este vacio: sus siete conceptos estan.
     expect(within(cuadro).getAllByRole('row')).toHaveLength(8);
   });
@@ -347,7 +369,7 @@ describe('lo que el contrato no publica sale como guion, y no en blanco', () => 
     const usuario = await montar();
     await usuario.click(tipo('Arbitrios municipales'));
 
-    const barrido = fila('Limpieza pública — barrido');
+    const barrido = await filaServida('Limpieza pública — barrido');
     expect(within(barrido).getByText('S/ 8.40')).toBeInTheDocument();
     expect(within(barrido).getAllByText('—')).toHaveLength(3);
   });

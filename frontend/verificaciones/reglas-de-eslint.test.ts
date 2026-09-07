@@ -2,7 +2,7 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ESLint } from 'eslint';
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 
 import { CLIENTE_DE_API, PROHIBICIONES, REGLAS_EXIGIDAS } from '../eslint.prohibiciones.mjs';
 
@@ -36,6 +36,30 @@ const RAIZ = join(AQUI, '..');
 const MUESTRAS = join(AQUI, 'muestras');
 
 const eslint = new ESLint({ cwd: RAIZ });
+
+/**
+ * ESLint se arranca AQUI, y no dentro del primer caso.
+ *
+ * **Medido (#36): el arranque en frio costaba 3,64 s y sus diecinueve hermanas, de 0,02 a
+ * 0,51.** O sea que el primer caso —`'identificador-con-tilde'`, por orden y no por nada que
+ * tenga de especial— pagaba el `import` de `eslint`, de `typescript-eslint` y de `typescript`
+ * entero para todos los demas, dentro de SU presupuesto de tiempo. Por eso llevaba un
+ * `30_000` escrito a mano, y aun asi **reventaba**: en una de las doce corridas de la tanda
+ * tardo **49,80 s** y salio en rojo diciendo «Test timed out in 30000ms», que es un rojo que
+ * habla de la maquina y no de la regla que se venia a comprobar — exactamente el rojo mas
+ * caro, porque no se reproduce.
+ *
+ * Con el arranque aqui, ese caso pasa a costar lo que cuestan sus hermanas y el `30_000`
+ * sobra: los veinte corren con los 5 s de Vitest y de sobra. El coste no desaparece —hay que
+ * cargar TypeScript— pero deja de estar dentro del presupuesto de una prueba que no lo mide,
+ * y si algun dia el arranque se atasca, el rojo sale de este gancho y dice que fue el
+ * arranque.
+ */
+beforeAll(async () => {
+  await eslint.lintText('export const listo = 1;\n', {
+    filePath: join(RAIZ, 'src/pantallas/calentamiento.ts'),
+  });
+}, 60_000);
 
 /**
  * Ruta sintetica: la muestra se juzga como si viviera en una pantalla de la aplicacion.
@@ -84,12 +108,9 @@ describe('cada prohibicion tiene su muestra, y ESLint la senala', () => {
         `Se esperaba el mensaje del config:\n  ${message}\n` +
         `Se obtuvo:\n${mensajes.length === 0 ? '  (ninguno)' : mensajes.map((m) => `  · ${m}`).join('\n')}`,
     ).toContain(message);
-    // 30 s y no los 5 de Vitest: el PRIMER caso paga el arranque en frio de ESLint y del
-    // analizador de TypeScript —2.4 s con el arbol de F-1, mas de 5 con este—, y ese coste
-    // crece con los archivos del proyecto, no con lo que la prueba comprueba. Un tiempo
-    // agotado ahi no dice «la regla no muerde»: dice «la maquina iba cargada», y es el
-    // rojo mas caro que hay, porque no se reproduce.
-  }, 30_000);
+    // Sin tiempo propio: el arranque en frio lo paga `beforeAll`, asi que los veinte casos
+    // caben en los 5 s de Vitest con dos ordenes de magnitud de margen (#36).
+  });
 });
 
 describe('la lista de prohibiciones y la de muestras no se separan', () => {

@@ -32,7 +32,15 @@ async function montar() {
   return { alIrAlPadron, alAbrirContribuyente };
 }
 
-/** La tarjeta que lleva ese titulo. */
+/**
+ * La tarjeta que lleva ese titulo.
+ *
+ * **Encontrarla NO significa que sus datos hayan llegado** (#36). Cada `<section>` del panel
+ * se dibuja siempre, con su `<h2>` dentro, y `montar()` solo espera a `GET /indicadores/
+ * recaudacion`. La cola sale de `/indicadores/trabajo-parado` y la actividad de
+ * `/seguridad/auditoria`: dos peticiones mas, que no tienen por que aterrizar antes. Por eso
+ * lo que se afirma DENTRO de estas dos tarjetas se espera con `findBy*` y no con `getBy*`.
+ */
 const tarjeta = (titulo: string) => screen.getByRole('region', { name: titulo });
 
 describe('AC1 — las cuatro cifras de cabecera', () => {
@@ -98,7 +106,7 @@ describe('AC1 — la cola de trabajo', () => {
     await montar();
     const cola = tarjeta('Cola de trabajo');
 
-    expect(within(cola).getByText('Contribuyentes sin emisión')).toBeInTheDocument();
+    expect(await within(cola).findByText('Contribuyentes sin emisión')).toBeInTheDocument();
     expect(within(cola).getByText('Predios que no generan deuda')).toBeInTheDocument();
     expect(within(cola).getByText('Beneficios por resolver')).toBeInTheDocument();
     expect(
@@ -111,7 +119,9 @@ describe('AC1 — la cola de trabajo', () => {
   it('el total se DERIVA de los tres frentes y da los 1,134 del artboard', async () => {
     await montar();
 
-    expect(within(tarjeta('Cola de trabajo')).getByText('1,134 pendientes')).toBeInTheDocument();
+    expect(
+      await within(tarjeta('Cola de trabajo')).findByText('1,134 pendientes'),
+    ).toBeInTheDocument();
   });
 
   it('cada frente lleva al padron, y el de «Observado» con su chip puesto', async () => {
@@ -119,7 +129,9 @@ describe('AC1 — la cola de trabajo', () => {
     const { alIrAlPadron } = await montar();
 
     await usuario.click(
-      within(tarjeta('Cola de trabajo')).getByRole('button', { name: /Contribuyentes sin emisión/ }),
+      await within(tarjeta('Cola de trabajo')).findByRole('button', {
+        name: /Contribuyentes sin emisión/,
+      }),
     );
 
     expect(alIrAlPadron).toHaveBeenCalledWith('Observado');
@@ -157,7 +169,7 @@ describe('AC1 — la actividad reciente y «Ver todo el padrón»', () => {
     await montar();
     const actividad = tarjeta('Actividad reciente');
 
-    expect(within(actividad).getByText('00000003541')).toBeInTheDocument();
+    expect(await within(actividad).findByText('00000003541')).toBeInTheDocument();
     expect(
       within(actividad).getByText('Predial 2026 determinado en S/ 591.94 · 4 cuotas'),
     ).toBeInTheDocument();
@@ -172,7 +184,7 @@ describe('AC1 — la actividad reciente y «Ver todo el padrón»', () => {
     await montar();
     const actividad = tarjeta('Actividad reciente');
 
-    expect(within(actividad).getByText('31/08/2026 21:59')).toBeInTheDocument();
+    expect(await within(actividad).findByText('31/08/2026 21:59')).toBeInTheDocument();
     expect(within(actividad).queryByText('hace 2 h')).toBeNull();
   });
 
@@ -181,7 +193,7 @@ describe('AC1 — la actividad reciente y «Ver todo el padrón»', () => {
     const { alAbrirContribuyente } = await montar();
 
     await usuario.click(
-      within(tarjeta('Actividad reciente')).getByRole('button', { name: /00000152614/ }),
+      await within(tarjeta('Actividad reciente')).findByRole('button', { name: /00000152614/ }),
     );
 
     expect(alAbrirContribuyente).toHaveBeenCalledWith('00000152614');
