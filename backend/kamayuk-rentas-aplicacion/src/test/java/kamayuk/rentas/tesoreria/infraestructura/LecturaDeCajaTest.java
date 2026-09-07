@@ -2,11 +2,13 @@ package kamayuk.rentas.tesoreria.infraestructura;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowable;
 
 import java.time.LocalDate;
 import java.util.Map;
 import kamayuk.comun.verificaciones.contrato.ContratoDelConsumidor;
 import kamayuk.rentas.dominio.Dinero;
+import kamayuk.rentas.tesoreria.AnulacionesDeRecibo;
 import kamayuk.rentas.tesoreria.AvanceDeCaja;
 import kamayuk.rentas.tesoreria.RecaudadoEnCaja;
 import kamayuk.rentas.verificaciones.ContratoQueConsumeDeCaja;
@@ -298,17 +300,108 @@ class LecturaDeCajaTest {
         return new java.util.TreeSet<>(cuerpo.propertyNames());
     }
 
-    /** El contrato tiene que declarar las cinco operaciones que estos adaptadores piden. */
+    // ------------------------------------------------------------------
+    //  El estado de un recibo por su IDENTIFICADOR (#40)
+    // ------------------------------------------------------------------
+
     @Test
-    @DisplayName("y el contrato declara las cinco operaciones de esta frontera")
-    void elContratoDeclaraLasCinco() {
+    @DisplayName("un recibo anulado se lee como anulado, y uno vigente como vigente")
+    void elEstadoDelReciboSeLee() {
+        assertThat(new AnulacionesDeReciboHttp(cajaConElRecibo(true)).estaAnulado(77)).isTrue();
+        assertThat(new AnulacionesDeReciboHttp(cajaConElRecibo(false)).estaAnulado(77)).isFalse();
+    }
+
+    @Test
+    @DisplayName("y un «anulado» que no esta NO se lee como false: falla nombrandolo (AC-2)")
+    void elAnuladoAusenteNoSeLeeComoFalse() {
+        // Es el sintoma mudo de C-1 en su forma mas cara: `asBoolean(false)` sobre un campo que
+        // no esta no da error, da `false` — y `false` significa «ese recibo sigue vigente», que
+        // es la respuesta que IMPIDE anular el convenio. Un campo renombrado del otro lado se
+        // veria como una regla de negocio que empieza a rechazar siempre.
+        ObjectNode cuerpo = JSON.createObjectNode().put("reciboId", 77L);
+        cuerpo.put("estaAnulado", true);
+
+        Throwable error =
+                catchThrowable(
+                        () ->
+                                new AnulacionesDeReciboHttp(new CajaQueNoContesta(ruta -> cuerpo))
+                                        .estaAnulado(77));
+
+        assertThat(error)
+                .as(
+                        "leido con `asBoolean(false)` esto NO lanza: devuelve false, o sea «ese"
+                                + " recibo sigue vigente». Un campo renombrado al otro lado de la"
+                                + " frontera no se veria como un fallo sino como una regla de negocio"
+                                + " que empieza a rechazar SIEMPRE, indistinguible de la de verdad")
+                .isInstanceOf(ClienteHttpDeCaja.CajaInalcanzable.class)
+                .hasMessageContaining("«anulado»")
+                .hasMessageContaining("nada: el campo no esta");
+    }
+
+    @Test
+    @DisplayName("un 404 NO es «no esta anulado»: es que ese recibo no consta (AC-2)")
+    void elCuatrocientosCuatroNoEsFalse() {
+        // Con `catchThrowable` y no con `assertThatThrownBy`: cuando NO se lanza nada, el
+        // segundo revienta antes de aplicar el `.as(...)` y el rojo se queda en «Expecting code
+        // to raise a throwable», que no dice que se rompio ni lo que cuesta. Medido con la
+        // rotura puesta.
+        Throwable error =
+                catchThrowable(
+                        () ->
+                                new AnulacionesDeReciboHttp(
+                                                CajaQueNoContesta.queContesta(404, "{}"))
+                                        .estaAnulado(77));
+
+        assertThat(error)
+                .as(
+                        "si esto devuelve «false» —que es lo que hace un Optional.empty() leido"
+                                + " como dato—, «ese recibo sigue vigente» pasa a significar «caja no"
+                                + " lo tiene», y CerrarConvenio anula el convenio con su cuota inicial"
+                                + " cobrada y VIVA: dinero recibido por un acto que ya no existe. Es"
+                                + " el hecho que esa guarda existe para impedir, producido por la"
+                                + " guarda misma, y `caja` lo avisa por escrito en el javadoc de esa"
+                                + " ruta")
+                .isInstanceOf(AnulacionesDeRecibo.ReciboQueNoConsta.class)
+                .hasMessageContaining("recibo 77")
+                .hasMessageContaining("`caja` no tiene ningun recibo con ese identificador");
+    }
+
+    @Test
+    @DisplayName("y una caja que no contesta sale por el PUERTO, no como el recibo que no consta")
+    void laCajaCaidaSeDistingueDelReciboQueNoConsta() {
+        assertThatThrownBy(
+                        () ->
+                                new AnulacionesDeReciboHttp(
+                                                CajaQueNoContesta.queContesta(503, "{}"))
+                                        .estaAnulado(77))
+                .isInstanceOf(AnulacionesDeRecibo.CajaInalcanzable.class)
+                .isNotInstanceOf(AnulacionesDeRecibo.ReciboQueNoConsta.class);
+    }
+
+    /** El contrato tiene que declarar las seis operaciones que estos adaptadores piden. */
+    @Test
+    @DisplayName("y el contrato declara las seis operaciones de esta frontera")
+    void elContratoDeclaraLasSeis() {
         ContratoDelConsumidor contrato = new ContratoQueConsumeDeCaja().contrato();
         assertThat(contrato.operaciones().keySet())
                 .containsExactlyInAnyOrder(
                         "GET /recaudacion/avance",
                         "GET /recibos/{numero}",
+                        "GET /recibos/por-id/{reciboId}",
                         "GET /tasas/{codigo}/cobros/{numero}",
                         "GET /tasas/{codigo}/recaudacion",
                         "POST /ordenes-de-cobro");
+    }
+
+    /** El estado del recibo, compuesto de la forma que el contrato declara. */
+    private static CajaQueNoContesta cajaConElRecibo(boolean anulado) {
+        ObjectNode cuerpo = desdeElContrato(ContratoQueConsumeDeCaja.ESTADO_DEL_RECIBO);
+        cuerpo.put("reciboId", 77L);
+        cuerpo.put("anulado", anulado);
+        // Las claves salen del contrato y no de una copia escrita al lado: si el contrato
+        // dejara de declarar «anulado», esto se pondria rojo.
+        assertThat(nombresDe(cuerpo))
+                .containsAll(ContratoQueConsumeDeCaja.ESTADO_DEL_RECIBO.keySet());
+        return new CajaQueNoContesta(ruta -> cuerpo);
     }
 }

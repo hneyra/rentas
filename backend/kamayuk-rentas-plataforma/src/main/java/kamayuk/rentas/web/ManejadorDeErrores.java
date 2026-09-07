@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import kamayuk.rentas.dominio.OperacionTodaviaNoCompletable;
 import kamayuk.rentas.persistencia.OrdenSeguro;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -288,6 +289,38 @@ public class ManejadorDeErrores {
         return pedido
                 + ". Admitidos: "
                 + admitidos.stream().map(HttpMethod::name).collect(Collectors.joining(", "));
+    }
+
+    /**
+     * Una operacion publicada que todavia no puede terminar (#40).
+     *
+     * <p><b>Hasta #40 estas tres eran un 500 con numero de incidencia</b>, porque ninguna tenia
+     * manejador y caian en el {@code @ExceptionHandler(Exception.class)} de mas abajo. Tres cosas a
+     * la vez, y la tercera es la que duele:
+     *
+     * <ul>
+     *   <li>el estado miente: un {@code 500} dice «el servidor se rompio» ante una limitacion de
+     *       diseno conocida, escrita y argumentada;
+     *   <li>el mensaje se pierde. La excepcion <b>nombra la operacion que lo serviria</b> o el
+     *       protocolo que falta, y {@code ERROR_INTERNO} lo sustituye por «No se pudo completar la
+     *       operacion» a proposito, porque su detalle no puede salir;
+     *   <li>y manda a llamar a soporte por algo que soporte no puede arreglar — publicar una ruta
+     *       en otro repositorio o construir el protocolo de ADR-0027 no son incidencias.
+     * </ul>
+     *
+     * <p>El mensaje de la excepcion SI se devuelve, por lo mismo que el de {@link
+     * #validacion(IllegalArgumentException)}: lo escribimos nosotros, habla de la frontera y no
+     * nombra ni una tabla ni una columna. Y {@code loQueFalta} viaja en {@code detalles} como dato:
+     * un cliente que quiera distinguir «falta publicar la ruta» de «falta el protocolo» no tiene
+     * que analizar castellano para hacerlo.
+     */
+    @ExceptionHandler(OperacionTodaviaNoCompletable.class)
+    public ResponseEntity<ProblemDetail> todaviaNoSePuedeCompletar(
+            OperacionTodaviaNoCompletable error) {
+        return respuesta(
+                CodigoDeError.OPERACION_NO_DISPONIBLE,
+                mensajeDe(error, CodigoDeError.OPERACION_NO_DISPONIBLE),
+                List.of("Lo que falta: " + error.loQueFalta().name()));
     }
 
     @ExceptionHandler(Exception.class)

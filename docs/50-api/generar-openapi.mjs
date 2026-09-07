@@ -3833,6 +3833,36 @@ const DESCRIPCION_DEL_404_POR_OMISION =
   ' servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo:' +
   ' NO_ENCONTRADO` y dice que se buscaba.';
 
+/**
+ * Las escrituras publicadas que HOY NO PUEDEN TERMINAR, derivado del codigo (#40).
+ *
+ * Lo escribe `EscriturasQueNoPuedenTerminarTest` desde su lista declarada, que esa
+ * misma prueba contrasta en los dos sentidos contra el bytecode de produccion —quien
+ * construye una `OperacionTodaviaNoCompletable` no puede quedar sin declarar, y una
+ * entrada no puede hablar de una clase que ya no la construye—, y se regenera con
+ * `-Dkamayuk.escrituras.regenerar=true`. **No se escribe a mano**, por lo mismo que
+ * `respuestas-de-la-api.json`: una lista manual envejece sola y el contrato acaba
+ * prometiendo lo contrario de lo que el codigo hace (#312).
+ *
+ * Lo que compra: un contrato que publica estas dos rutas **igual que a las demas**
+ * promete algo que ninguna pantalla puede conseguir. Con el 501 declarado, quien
+ * escribe contra el contrato sabe que existe y que reintentar no la desbloquea.
+ */
+const NO_COMPLETABLES = JSON.parse(
+  readFileSync(new URL('./escrituras-no-completables.json', import.meta.url), 'utf8'),
+);
+
+/** Que significa cada valor de `falta`, para quien lee el contrato y no el codigo. */
+const QUE_FALTA = {
+  LA_RUTA_DEL_VECINO:
+    'El sistema vecino no publica todavia la operacion que la serviria. Se arregla' +
+    ' publicandola alli (ADR-0030 §4), no reintentando.',
+  LA_TRANSACCION_COMPARTIDA:
+    'La escritura del sistema vecino y las que la rodean aqui tendrian que confirmar o' +
+    ' deshacerse juntas, y dos bases y dos procesos no comparten transaccion. Falta el' +
+    ' protocolo de ADR-0027; publicar una ruta NO lo arregla.',
+};
+
 const RESPUESTAS = {
   // El 403 del ciudadano no es el de siempre: su token no lleva municipalidad —no
   // pertenece a ninguna— y lo que puede faltarle es el documento acreditado. Y no
@@ -4263,6 +4293,24 @@ for (const [ruta, ops] of porRuta) {
         lineas,
         10,
         DESCRIPCION_DEL_404[op.operationId] ?? DESCRIPCION_DEL_404_POR_OMISION,
+      );
+      lineas.push('          content:');
+      lineas.push('            application/problem+json:');
+      lineas.push('              schema: { $ref: "#/components/schemas/Error" }');
+    }
+    // El 501 de las escrituras que hoy no pueden terminar, derivado del codigo (#40).
+    const bloqueada = NO_COMPLETABLES[`${op.metodo.toUpperCase()} ${rutaRelativa}`];
+    if (bloqueada) {
+      lineas.push('        "501":');
+      escribirDescripcion(
+        lineas,
+        10,
+        '**Esta operacion todavia no se puede completar.** No es un fallo del servidor y no' +
+          ' hay nada que corregir en la peticion: reintentar no la desbloquea. ' +
+          QUE_FALTA[bloqueada.falta] +
+          ' Motivo: ' +
+          bloqueada.motivo +
+          '. El cuerpo es `problem+json` con `codigo: OPERACION_NO_DISPONIBLE`.',
       );
       lineas.push('          content:');
       lineas.push('            application/problem+json:');

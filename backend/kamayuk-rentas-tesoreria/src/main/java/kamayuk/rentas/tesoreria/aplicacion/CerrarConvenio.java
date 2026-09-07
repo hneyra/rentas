@@ -272,10 +272,15 @@ public class CerrarConvenio {
      * SELECT} sobre {@code recibo_movimiento}, que estaba en esta base; ahora es {@link
      * AnulacionesDeRecibo}, un puerto a {@code caja}. Lo que NO cambia es que la respuesta decide:
      * el puerto no devuelve {@code false} cuando no se puede preguntar —eso significaria «el recibo
-     * sigue vigente» sin haberlo mirado— sino que lanza, y hoy lanza siempre porque {@code caja}
-     * publica sus recibos por el numero impreso y aqui lo que hay es el identificador interno. Ver
-     * {@code AnulacionesDeReciboSinRuta}, que dice exactamente que se rompe mientras eso dure y que
-     * no se rompe.
+     * sigue vigente» sin haberlo mirado— sino que lanza.
+     *
+     * <p><b>Y desde #40 se pregunta de verdad</b>: {@code AnulacionesDeReciboHttp} pide {@code GET
+     * /recibos/por-id/&#123;reciboId&#125;}, que {@code caja} publica desde el propio P5D. Hasta
+     * entonces lo servia un muñon que lanzaba siempre, asi que <b>anular un convenio ya formalizado
+     * contestaba 500</b> — y las otras cinco operaciones del convenio no pasaban por aqui. Las tres
+     * respuestas que ahora se distinguen se arreglan de tres maneras: el recibo vigente, anulandolo
+     * en ventanilla; el que no consta, conciliando los dos padrones; y la caja caida, levantando el
+     * despliegue.
      */
     private void exigirQueElReciboDeLaInicialEsteAnulado(Convenio convenio, long convenioId) {
         Optional<MovimientoDeConvenio> formalizacion = movimientos.formalizacionDe(convenioId);

@@ -94,6 +94,31 @@ public enum CodigoDeError {
             HttpStatus.SERVICE_UNAVAILABLE, "Un sistema del que este depende no contesta"),
 
     /**
+     * La operacion esta publicada y todavia no se puede completar (#40).
+     *
+     * <p>Es un codigo propio, y las tres alternativas se descartaron con su motivo:
+     *
+     * <ul>
+     *   <li>No es {@link #VALIDACION}: <b>no hay nada que corregir en la peticion</b>. Decirlo
+     *       manda a quien opera a repasar un formulario que esta bien.
+     *   <li>No es {@link #ERROR_INTERNO}: <b>no es un fallo</b>. Ese codigo manda a llamar a
+     *       soporte con un numero de incidencia, y soporte no puede arreglar ni una ruta que otro
+     *       repositorio no ha publicado ni un protocolo que no existe. Ademas la interfaz ofrece
+     *       «Reintentar» sobre el, y reintentar esto no puede funcionar nunca.
+     *   <li>No es {@link #SERVICIO_NO_DISPONIBLE}: ese dice «el vecino no contesta, vuelve a
+     *       intentarlo», y aqui el vecino puede estar perfectamente levantado. La distincion es la
+     *       misma que {@code MotivoDeInalcanzable} hace entre «falta la variable» y «se cayo».
+     * </ul>
+     *
+     * <p>El estado es {@code 501}: «el servidor no soporta la funcionalidad que la peticion
+     * necesita» (RFC 9110 §15.6.2). Y el mensaje <b>nombra que falta</b> —la ruta que lo serviria,
+     * o el protocolo que haria confirmar juntas a las dos bases—, con {@code detalles} diciendo
+     * cual de las dos cosas es, como dato y no dentro de la frase.
+     */
+    OPERACION_NO_DISPONIBLE(
+            HttpStatus.NOT_IMPLEMENTED, "Esta operacion todavia no se puede completar"),
+
+    /**
      * Cualquier otra cosa.
      *
      * <p>Su mensaje es deliberadamente inutil para quien lo recibe y util para quien lo investiga:
