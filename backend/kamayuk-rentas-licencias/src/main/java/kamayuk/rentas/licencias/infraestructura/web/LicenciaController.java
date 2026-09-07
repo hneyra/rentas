@@ -226,7 +226,14 @@ public class LicenciaController {
                         peticion.giros() == null ? List.of() : peticion.giros(),
                         exigido(peticion.giroPrincipal(), "giroPrincipal"),
                         vacioAnulo(peticion.nExpediente()),
-                        fechaOpcional(peticion.fechaDeExpediente(), "fechaDeExpediente"));
+                        fechaOpcional(peticion.fechaDeExpediente(), "fechaDeExpediente"),
+                        // La autorizacion por escrito de #43: NO es una bandera. Sin el motivo, «lo
+                        // autorizo» es un permiso silencioso, y esto es lo que quedara escrito en
+                        // la licencia el dia que alguien pregunte por que se emitio sin comprobar.
+                        peticion.autorizacionDelTerritorio() == null
+                                        || peticion.autorizacionDelTerritorio().isBlank()
+                                ? null
+                                : Observacion.de(peticion.autorizacionDelTerritorio()));
 
         EmitirLicenciaDeFuncionamiento.LicenciaEmitida emitida;
         try {
@@ -235,6 +242,16 @@ public class LicenciaController {
             throw new ProblemaDeNegocio(CodigoDeError.NO_ENCONTRADO, mensajeDe(noEsta));
         } catch (EmitirLicenciaDeFuncionamiento.GiroDesconocido noEstaElGiro) {
             throw new ProblemaDeNegocio(CodigoDeError.VALIDACION, mensajeDe(noEstaElGiro));
+        } catch (EmitirLicenciaDeFuncionamiento.RiesgoNoMitigable enRiesgo) {
+            // 422 y no 403: la peticion esta bien formada y quien la manda tiene el permiso. Lo
+            // que pasa es que el hecho del territorio la impide, y el mensaje lo dice entero para
+            // que quien atiende no lo lea como una averia (#43).
+            throw new ProblemaDeNegocio(CodigoDeError.VALIDACION, mensajeDe(enRiesgo));
+        } catch (EmitirLicenciaDeFuncionamiento.TerritorioSinAutorizar sinAutorizar) {
+            // Tambien 422, y el mensaje distingue las TRES: no consta el predio, no se pudo
+            // preguntar, o el giro no cabe en la zona. Se arreglan de tres maneras distintas y
+            // colapsarlas manda a quien atiende a mirar donde no es (AC-5).
+            throw new ProblemaDeNegocio(CodigoDeError.VALIDACION, mensajeDe(sinAutorizar));
         } catch (ComprobacionDelDerecho.DerechoNoPagado sinPagar) {
             throw new ProblemaDeNegocio(CodigoDeError.VALIDACION, mensajeDe(sinPagar));
         } catch (DerechosDeTramiteParametrizados.DerechoSinParametrizar

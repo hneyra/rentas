@@ -26,7 +26,9 @@ import kamayuk.rentas.licencias.dominio.EstadoDeLicencia;
 import kamayuk.rentas.licencias.dominio.GiroDeLaLicencia;
 import kamayuk.rentas.licencias.dominio.LicenciaDeFuncionamiento;
 import kamayuk.rentas.licencias.dominio.LicenciaRepository;
+import kamayuk.rentas.licencias.dominio.OrigenDeLaZona;
 import kamayuk.rentas.licencias.dominio.ResumenDelPadronDeLicencias;
+import kamayuk.rentas.licencias.dominio.TerritorioDeLaLicencia;
 import kamayuk.rentas.licencias.dominio.TipoDeLicencia;
 import kamayuk.rentas.persistencia.OrdenSeguro;
 import kamayuk.rentas.persistencia.RangoDePrefijo;
@@ -66,7 +68,9 @@ public class LicenciaRepositoryJdbc extends RepositorioJdbc implements LicenciaR
             "id, numero, contribuyente_id, predio_id, ficha_id, nombre_comercial, direccion,"
                     + " area_solicitada, tipo_licencia, zonificacion, aforo, fecha_emision,"
                     + " vigencia_hasta, recibo_id, documento_id, expediente, fecha_expediente,"
-                    + " usuario_registro, fecha_registro, observacion";
+                    + " usuario_registro, fecha_registro, observacion,"
+                    + " zona_del_territorio, ordenanza_de_la_zona, zona_origen,"
+                    + " comprobacion_territorio";
 
     /** Las mismas columnas con el alias {@code l}, que la consulta del padron necesita. */
     private static final String COLUMNAS_CALIFICADAS = "l." + COLUMNAS.replace(", ", ", l.");
@@ -138,7 +142,9 @@ public class LicenciaRepositoryJdbc extends RepositorioJdbc implements LicenciaR
                                             + "  area_solicitada, tipo_licencia, zonificacion, aforo,"
                                             + "  fecha_emision, vigencia_hasta, recibo_id,"
                                             + "  documento_id, expediente, fecha_expediente,"
-                                            + "  usuario_registro, fecha_registro, observacion)"
+                                            + "  usuario_registro, fecha_registro, observacion,"
+                                            + "  zona_del_territorio, ordenanza_de_la_zona,"
+                                            + "  zona_origen, comprobacion_territorio)"
                                             + " VALUES ("
                                             + MUNICIPALIDAD_ACTUAL
                                             + ", :numero, :contribuyente, :predio, :ficha,"
@@ -146,7 +152,8 @@ public class LicenciaRepositoryJdbc extends RepositorioJdbc implements LicenciaR
                                             + "  :zonificacion, :aforo, :emision, :vigencia,"
                                             + "  :recibo, :documento, :expediente,"
                                             + "  :fechaExpediente, :usuario, :registrado,"
-                                            + "  :observacion)"
+                                            + "  :observacion, :zonaTerritorio, :ordenanzaZona,"
+                                            + "  :zonaOrigen, :comprobacionTerritorio)"
                                             + " RETURNING id")
                             .param("numero", licencia.numero())
                             .param("contribuyente", licencia.contribuyenteId())
@@ -167,6 +174,10 @@ public class LicenciaRepositoryJdbc extends RepositorioJdbc implements LicenciaR
                             .param("usuario", UsuarioDeLaSesion.actual())
                             .param("registrado", Timestamp.from(licencia.registradoEn()))
                             .param("observacion", licencia.observacion().texto())
+                            .param("zonaTerritorio", licencia.territorio().zonaDelTerritorio())
+                            .param("ordenanzaZona", licencia.territorio().ordenanzaDeLaZona())
+                            .param("zonaOrigen", licencia.territorio().origen().name())
+                            .param("comprobacionTerritorio", licencia.territorio().comprobacion())
                             .query(Long.class)
                             .single();
         } catch (DuplicateKeyException yaEstaba) {
@@ -550,7 +561,12 @@ public class LicenciaRepositoryJdbc extends RepositorioJdbc implements LicenciaR
                 fechaExpediente == null ? null : fechaExpediente.toLocalDate(),
                 fila.getTimestamp("fecha_registro").toInstant(),
                 fila.getString("usuario_registro"),
-                Observacion.de(fila.getString("observacion")));
+                Observacion.de(fila.getString("observacion")),
+                new TerritorioDeLaLicencia(
+                        fila.getString("zona_del_territorio"),
+                        fila.getString("ordenanza_de_la_zona"),
+                        OrigenDeLaZona.valueOf(fila.getString("zona_origen")),
+                        fila.getString("comprobacion_territorio")));
     }
 
     /**
@@ -580,7 +596,8 @@ public class LicenciaRepositoryJdbc extends RepositorioJdbc implements LicenciaR
             @Nullable LocalDate fechaExpediente,
             Instant registradoEn,
             @Nullable String usuarioRegistro,
-            Observacion observacion) {
+            Observacion observacion,
+            TerritorioDeLaLicencia territorio) {
 
         LicenciaDeFuncionamiento con(List<GiroDeLaLicencia> giros) {
             return new LicenciaDeFuncionamiento(
@@ -604,7 +621,8 @@ public class LicenciaRepositoryJdbc extends RepositorioJdbc implements LicenciaR
                     registradoEn,
                     usuarioRegistro,
                     observacion,
-                    giros);
+                    giros,
+                    territorio);
         }
     }
 }

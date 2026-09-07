@@ -29,7 +29,6 @@ import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.MunicipalidadId;
 import kamayuk.rentas.esquema.BaseDeDatosDePrueba;
 import kamayuk.rentas.esquema.DatosDePrueba;
-import kamayuk.rentas.nucleo.dominio.proyeccion.FuenteDeHechosDeCatastro;
 import kamayuk.rentas.nucleo.dominio.proyeccion.HechoRecibido;
 import kamayuk.rentas.nucleo.dominio.proyeccion.ProyeccionDeCatastro;
 import kamayuk.rentas.nucleo.dominio.proyeccion.TipoDeHechoDeCatastro;
@@ -106,14 +105,6 @@ class IngestionDeCatastroJdbcTest {
 
     /** Lo que el buzon de mentira sirve en la vuelta siguiente. */
     private static final List<String> APORTAR = new CopyOnWriteArrayList<>();
-
-    /**
-     * Los hechos que `catastro` publica en el MISMO buzon y este sistema NO sabe aplicar (#54).
-     *
-     * <p>Se llenan al leer el lote y los consume {@code
-     * laIngestionSeParaEnteraEnUnTipoDesconocido}.
-     */
-    private static final List<String> DEL_TERRITORIO = new CopyOnWriteArrayList<>();
 
     /** Lo que el consumidor acuso. */
     private static final Set<String> ACUSADOS = Collections.synchronizedSet(new HashSet<>());
@@ -480,70 +471,6 @@ class IngestionDeCatastroJdbcTest {
                 .contains("LA PROYECCION DEL PADRON ESTA INCOMPLETA");
     }
 
-    /**
-     * Lo que hoy le pasa a la ingestion con lo que `catastro` publica de verdad (#54).
-     *
-     * <p><b>No bendice el estado: lo fija.</b> Rechazar un tipo que este sistema no sabe aplicar es
-     * correcto y esta decidido —lo dice el javadoc de {@code TipoDeHechoDeCatastro}—. Lo que esta
-     * prueba mide es <b>donde</b> ocurre el rechazo y lo que cuesta: {@code leer(...)} lanza dentro
-     * de {@code pendientes()}, o sea mientras se arma el lote y antes de que ningun hecho llegue al
-     * aplicador, y {@code POR_VUELTA} es 200, asi que el buzon entero viene en una pagina.
-     *
-     * <p>Las cuatro cifras de abajo son el defecto, y la ultima es la peor:
-     *
-     * <ul>
-     *   <li>{@code aplicados = 0} — no se para EN el hecho desconocido: se pierde la pagina entera,
-     *       incluidos los hechos del padron que iban DELANTE.
-     *   <li>{@code acusados = 0} — la vuelta siguiente trae lo mismo y vuelve a morir. La ingestion
-     *       del padron queda parada, y no se destranca sola.
-     *   <li>{@code muertos = 0} — el hecho no se aparta. Es justo lo que {@code
-     *       unHechoImposibleSeApartaYAvisa} existe para impedir: el cuerpo ilegible pasa por esa
-     *       puerta y el tipo desconocido entra por otra, que no la tiene.
-     *   <li>{@code avisos = 0} — {@code AlertaDeHechosSinAplicar} avisa de hechos APARTADOS, y aqui
-     *       no se aparta ninguno: al responsable de catastro no le llega nada.
-     * </ul>
-     *
-     * <p>El dia que #54 se cierre —por cualquiera de sus tres salidas— esta prueba se pone roja y
-     * lee esto. Es lo que se pide de ella.
-     */
-    @Test
-    @DisplayName("#54: un tipo que este sistema no conoce PARA la ingestion entera, sin avisar")
-    void laIngestionSeParaEnteraEnUnTipoDesconocido() throws SQLException {
-        // Del archivo y no fabricado: si `catastro` renombra un tipo, esto lo sigue. Y si algun
-        // dia no publicara ninguno del territorio, la lista vacia dejaria esta prueba midiendo
-        // sobre nada — por eso se exige antes.
-        assertThat(DEL_TERRITORIO)
-                .as(
-                        "`catastro` tiene que estar publicando algun tipo que este sistema no"
-                                + " conoce: sin eso, lo de abajo se cumpliria sobre el vacio")
-                .isNotEmpty();
-        String delTerritorio = DEL_TERRITORIO.get(0);
-        String tipo = json.readTree(delTerritorio).path("tipo").asString();
-
-        // Los dos predios van DELANTE, como en el buzon de verdad: es lo que mide que se pierda
-        // la pagina entera y no solo el hecho desconocido.
-        APORTAR.addAll(deTipo("PREDIO_PROYECTADO"));
-        APORTAR.add(delTerritorio);
-
-        assertThatThrownBy(() -> ingestor.ingerir())
-                .isInstanceOf(FuenteDeHechosDeCatastro.CatastroNoContesta.class)
-                .hasMessageContaining(tipo)
-                .hasMessageContaining("que este sistema no sabe aplicar");
-
-        assertThat(contar("catastro_evento_aplicado"))
-                .as("los DOS predios que iban delante en la misma pagina tampoco entraron")
-                .isZero();
-        assertThat(ACUSADOS)
-                .as("nada se acusa: la vuelta siguiente trae lo mismo y vuelve a morir")
-                .isEmpty();
-        assertThat(contar("catastro_evento_muerto"))
-                .as("y no se aparta, que es lo que en el AC 6 impide que bloquee la cola")
-                .isZero();
-        assertThat(AVISOS)
-                .as("al responsable de catastro no le llega NADA: el aviso es de lo apartado")
-                .isEmpty();
-    }
-
     @Test
     @DisplayName(
             "y el emisor que reescribe un hecho sellado se ve, en vez de descartarse en silencio")
@@ -571,19 +498,111 @@ class IngestionDeCatastroJdbcTest {
                 .hasMessageContaining("reescribiendo un hecho sellado");
     }
 
+    /**
+     * Lo que hoy le pasa a la ingestion con lo que `catastro` publica de verdad (#54).
+     *
+     * <p><b>No bendice el estado: lo fija.</b> Rechazar un tipo que este sistema no sabe aplicar es
+     * correcto y esta decidido —lo dice el javadoc de {@code TipoDeHechoDeCatastro}—. Lo que esta
+     * prueba mide es <b>donde</b> ocurre el rechazo y lo que cuesta: {@code leer(...)} lanza dentro
+     * de {@code pendientes()}, o sea mientras se arma el lote y antes de que ningun hecho llegue al
+     * aplicador, y {@code POR_VUELTA} es 200, asi que el buzon entero viene en una pagina.
+     *
+     * <p>Las cuatro cifras que se afirman son el defecto, y la ultima es la peor:
+     *
+     * <ul>
+     *   <li>{@code aplicados = 0} — no se para EN el hecho desconocido: se pierde la pagina entera,
+     *       incluidos los hechos del padron que iban DELANTE.
+     *   <li>{@code acusados = 0} — la vuelta siguiente trae lo mismo y vuelve a morir. La ingestion
+     *       del padron queda parada, y no se destranca sola.
+     *   <li>{@code muertos = 0} — el hecho no se aparta. Es justo lo que {@code
+     *       unHechoImposibleSeApartaYAvisa} existe para impedir: el cuerpo ilegible pasa por esa
+     *       puerta y el tipo desconocido entra por otra, que no la tiene.
+     *   <li>{@code avisos = 0} — {@code AlertaDeHechosSinAplicar} avisa de hechos APARTADOS, y aqui
+     *       no se aparta ninguno: al responsable de catastro no le llega nada.
+     * </ul>
+     *
+     * <p>Las dos primeras cifras las trajo `rentas`#52 con esta misma prueba; las otras dos son de
+     * #54, y no son contabilidad: son las que separan «se para, que esta bien» de «se para, se
+     * pierde lo que iba delante y nadie se entera». El dia que #54 se cierre —por cualquiera de sus
+     * tres salidas— esta prueba se pone roja y lee esto. Es lo que se pide de ella.
+     */
+    @Test
+    @DisplayName(
+            "#54: un tipo que este sistema no sabe aplicar PARA la ingestion entera, sin avisar")
+    void unTipoDesconocidoNoSeAcusa() throws SQLException {
+        // NO ES HIPOTETICO, y por eso esta prueba existe desde el mismo dia que se midio: desde
+        // `catastro`#7 y #28 aquel sistema publica SIETE tipos y este declara TRES. El lote de
+        // ejemplo trae hoy MANZANA_PUBLICADA, FRENTE_PUBLICADO, HALLAZGO_FIRME y
+        // HALLAZGO_DEJADO_SIN_EFECTO, o sea que el ingestor de una instalacion real se para en el
+        // primero de ellos.
+        //
+        // Pararse es LO CORRECTO —aplicar a medias dejaria la proyeccion diciendo algo que nadie
+        // escribio— y lo que no puede pasar es lo otro: que se acuse. Un hecho acusado y no
+        // aplicado esta perdido, y `catastro` no lo vuelve a servir.
+        List<String> ajeno = tiposQueCatastroPublicaYAquiNoSeAplican();
+        assertThat(ajeno)
+                .as(
+                        "si `catastro` dejara de publicar tipos ajenos, esta prueba se quedaria sin"
+                                + " sujeto y pasaria en verde sin medir nada: entonces lo que sobra es"
+                                + " ella, no la guarda")
+                .isNotEmpty();
+
+        // Los hechos del padron van DELANTE, como en el buzon de verdad: es lo que mide que se
+        // pierda la pagina entera y no solo el hecho desconocido. Sin esto, «aplicados = 0» seria
+        // cierto por no haber aportado nada que aplicar.
+        APORTAR.addAll(deTipo("PREDIO_PROYECTADO"));
+        APORTAR.add(ajeno.get(0));
+
+        assertThatThrownBy(() -> ingestor.ingerir())
+                .as("no se aplica a medias, y se dice cual es el tipo y que hay que hacer")
+                .hasMessageContaining("que este sistema no sabe aplicar");
+
+        assertThat(contar("catastro_evento_aplicado"))
+                .as("los DOS predios que iban delante en la misma pagina tampoco entraron")
+                .isZero();
+        assertThat(ACUSADOS)
+                .as(
+                        "acusarlo sin aplicarlo lo perderia: el buzon de salida no lo vuelve a"
+                                + " servir")
+                .isEmpty();
+        assertThat(contar("catastro_evento_muerto"))
+                .as("y no se aparta, que es lo que en el AC 6 impide que bloquee la cola")
+                .isZero();
+        assertThat(AVISOS)
+                .as("al responsable de catastro no le llega NADA: el aviso es de lo apartado")
+                .isEmpty();
+    }
+
     // ------------------------------------------------------------------
 
-    /**
-     * Los hechos del PADRON que `catastro` publico, cada uno como el JSON de un evento del feed.
-     *
-     * <p><b>Se filtra por tipo, y el total del archivo NO se cuenta.</b> `catastro` publica en el
-     * MISMO buzon los hechos del TERRITORIO —`MANZANA_PUBLICADA`, `FRENTE_PUBLICADO`,
-     * `HALLAZGO_FIRME`, `HALLAZGO_DEJADO_SIN_EFECTO`—, que este sistema todavia no sabe aplicar
-     * (#54). Este centinela exigia que el archivo tuviera <b>exactamente cinco</b> hechos, y por
-     * eso `rentas@main` se puso rojo el dia que el emisor publico los suyos: ataba estas pruebas al
-     * numero de tipos que `catastro` decida emitir, que es una cifra de la que este sistema no
-     * decide nada. Lo que si es suyo son las tres cuentas de abajo.
-     */
+    /** Los hechos del lote cuyo tipo `catastro` publica y esta proyeccion todavia no aplica. */
+    private static List<String> tiposQueCatastroPublicaYAquiNoSeAplican() {
+        List<String> ajenos = new ArrayList<>();
+        try {
+            for (var evento :
+                    json.readTree(
+                                    Files.readString(
+                                            raizDeLosRepositorios()
+                                                    .resolve(
+                                                            Path.of(
+                                                                    "catastro",
+                                                                    "docs",
+                                                                    "50-api",
+                                                                    "eventos",
+                                                                    "lote-de-eventos.json")),
+                                            StandardCharsets.UTF_8))
+                            .path("eventos")) {
+                if (!conocidos().contains(evento.path("tipo").asString(""))) {
+                    ajenos.add(evento.toString());
+                }
+            }
+        } catch (IOException noSePudoLeer) {
+            throw new IllegalStateException("No se pudo leer el lote de `catastro`", noSePudoLeer);
+        }
+        return ajenos;
+    }
+
+    /** Los tres hechos que `catastro` publico, cada uno como el JSON de un evento del feed. */
     private static List<String> hechosPublicadosPorCatastro() throws IOException {
         Path archivo =
                 raizDeLosRepositorios()
@@ -603,58 +622,70 @@ class IngestionDeCatastroJdbcTest {
                             + " regeneraria el archivo y el rojo se volveria un diff que alguien"
                             + " acepta");
         }
-        List<String> delPadron = new ArrayList<>();
+        List<String> hechos = new ArrayList<>();
+        List<String> ajenos = new ArrayList<>();
+        java.util.Map<String, Integer> porTipo = new java.util.LinkedHashMap<>();
         for (var evento :
                 json.readTree(Files.readString(archivo, StandardCharsets.UTF_8)).path("eventos")) {
-            String hecho = evento.toString();
-            if (esDelPadron(evento.path("tipo").asString(""))) {
-                delPadron.add(hecho);
+            String tipo = evento.path("tipo").asString("");
+            porTipo.merge(tipo, 1, Integer::sum);
+            // Los tipos que ESTE sistema sabe aplicar, y solo esos. `catastro` publica hoy siete
+            // (`catastro`#7 y #28) y aqui `TipoDeHechoDeCatastro` declara tres, a proposito: la
+            // copia del enumerado existe para que un tipo nuevo se RECHACE en voz alta en vez de
+            // aplicarse a medias. Lo que esta prueba mide es la proyeccion de los tres, asi que
+            // aporta los tres; lo que hace el ingestor con los otros cuatro lo mide
+            // `unTipoDesconocidoNoSeAcusa`.
+            if (conocidos().contains(tipo)) {
+                hechos.add(evento.toString());
             } else {
-                DEL_TERRITORIO.add(hecho);
+                ajenos.add(tipo);
             }
         }
 
-        // DOS predios y no uno, y eso importa: la huella agregada de una corrida es un
-        // `String.join(separador, huellas)`, y con UNA sola huella el separador NO APARECE. Un
-        // lote de un predio no puede distinguir la huella que `catastro` calcula en Java de la
+        // La expectativa NO es un total, y esa es la correccion. Estaba escrita como
+        // «el lote tiene 5 hechos», y `catastro`#28 lo llevo a 10 sin cambiar nada de lo que esta
+        // prueba mide: el rojo salio como `initializationError` —que se lleva por delante la clase
+        // entera y aborta el build— hablando de un numero, no de la propiedad que hace falta.
+        //
+        // La propiedad es esta: DOS predios y no uno. La huella agregada de una corrida es un
+        // `String.join(separador, huellas)`, y con UNA sola huella el separador NO APARECE, asi que
+        // un lote de un predio no puede distinguir la huella que `catastro` calcula en Java de la
         // que este sistema calcula en SQL — se midio: con el lote de un predio, cambiar el
         // separador de coma a punto y coma dejo estas cinco pruebas en VERDE.
-        //
-        // Las tres cuentas se escriben aqui y NO se derivan del archivo, que es lo que las hace un
-        // centinela: son lo que las pruebas de abajo consumen —`deTipo(...).get(1)` de las
-        // valuaciones, el cierre que las cuadra—, asi que el dia que el emisor deje de publicar
-        // una, esto lo dice en vez de dejar una prueba midiendo sobre una lista mas corta.
-        exigir(delPadron, TipoDeHechoDeCatastro.PREDIO_PROYECTADO, 2);
-        exigir(delPadron, TipoDeHechoDeCatastro.VALUACION_PUBLICADA, 2);
-        exigir(delPadron, TipoDeHechoDeCatastro.CORRIDA_CERRADA, 1);
-        return List.copyOf(delPadron);
-    }
-
-    /**
-     * Si este sistema sabe aplicar ese tipo: o sea si esta en su copia del enumerado del emisor.
-     */
-    private static boolean esDelPadron(String tipo) {
-        for (TipoDeHechoDeCatastro conocido : TipoDeHechoDeCatastro.values()) {
-            if (conocido.name().equals(tipo)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private static void exigir(List<String> hechos, TipoDeHechoDeCatastro tipo, int cuantos) {
-        long hay = deTipoEn(hechos, tipo.name()).size();
-        if (hay != cuantos) {
+        int predios = porTipo.getOrDefault("PREDIO_PROYECTADO", 0);
+        int valuaciones = porTipo.getOrDefault("VALUACION_PUBLICADA", 0);
+        int cierres = porTipo.getOrDefault("CORRIDA_CERRADA", 0);
+        if (predios < 2 || valuaciones < 2 || cierres != 1) {
             throw new IllegalStateException(
                     "El lote publicado trae "
-                            + hay
-                            + " hecho(s) de tipo "
-                            + tipo
-                            + " y estas pruebas consumen "
-                            + cuantos
-                            + ": dos predios, sus dos valuaciones y el cierre. Con un solo predio"
-                            + " el separador de la huella agregada no se puede comparar");
+                            + predios
+                            + " predio(s), "
+                            + valuaciones
+                            + " valuacion(es) y "
+                            + cierres
+                            + " cierre(s), y esta prueba necesita al menos dos predios con sus dos"
+                            + " valuaciones y exactamente un cierre. Con un solo predio el"
+                            + " separador de la huella agregada no se puede comparar. Tipos del"
+                            + " lote: "
+                            + porTipo);
         }
+        if (!ajenos.isEmpty()) {
+            // No es un fallo: es el censo de lo que `catastro` publica y esta proyeccion todavia
+            // no aplica. Se imprime para que quien anada un tipo a `TipoDeHechoDeCatastro` vea
+            // aqui cuales quedan, en vez de descubrirlo cuando el ingestor se pare en produccion.
+            System.out.println(
+                    "Tipos que `catastro` publica y esta proyeccion NO aplica todavia: " + ajenos);
+        }
+        return List.copyOf(hechos);
+    }
+
+    /** Los tipos que {@code TipoDeHechoDeCatastro} declara, leidos del enumerado y no copiados. */
+    private static java.util.Set<String> conocidos() {
+        java.util.Set<String> nombres = new java.util.LinkedHashSet<>();
+        for (TipoDeHechoDeCatastro tipo : TipoDeHechoDeCatastro.values()) {
+            nombres.add(tipo.name());
+        }
+        return nombres;
     }
 
     /** El directorio que contiene los repositorios hermanos. */

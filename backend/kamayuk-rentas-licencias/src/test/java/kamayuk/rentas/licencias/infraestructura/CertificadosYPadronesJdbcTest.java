@@ -126,6 +126,10 @@ import tools.jackson.databind.json.JsonMapper;
 @DisplayName("#54 — Certificados y padrones contra PostgreSQL")
 class CertificadosYPadronesJdbcTest {
 
+    /** El territorio comprobado y en regla: estas pruebas miden otra cosa (#43). */
+    private static final kamayuk.rentas.licencias.aplicacion.ComprobarElTerritorio
+            TERRITORIO_EN_REGLA = kamayuk.rentas.licencias.dobles.TerritorioDePrueba.enRegla("CZ");
+
     private static final LocalDate HOY = LocalDate.of(2026, 3, 16);
     private static final LocalDate MEDIADOS_DE_2026 = LocalDate.of(2026, 7, 15);
     private static final LocalDate FIN_DE_2026 = LocalDate.of(2026, 12, 31);
@@ -313,6 +317,7 @@ class CertificadosYPadronesJdbcTest {
                                 recibos,
                                 padron,
                                 (predioId, fecha) -> Optional.empty(),
+                                TERRITORIO_EN_REGLA,
                                 derechos,
                                 documentos,
                                 PlantillaDeNumeroDeLicencia.POR_OMISION,
@@ -1156,7 +1161,8 @@ class CertificadosYPadronesJdbcTest {
                                                 List.of(giro),
                                                 giro,
                                                 "EXP-54-" + CONTADOR.incrementAndGet(),
-                                                HOY),
+                                                HOY,
+                                                null),
                                         FormatoDeDocumento.PDF,
                                         PORQUE))
                 .licencia()

@@ -114,6 +114,10 @@ import tools.jackson.databind.json.JsonMapper;
 @DisplayName("#44 — La licencia de funcionamiento contra PostgreSQL")
 class LicenciaDeFuncionamientoJdbcTest {
 
+    /** El territorio comprobado y en regla: estas pruebas miden otra cosa (#43). */
+    private static final kamayuk.rentas.licencias.aplicacion.ComprobarElTerritorio
+            TERRITORIO_EN_REGLA = kamayuk.rentas.licencias.dobles.TerritorioDePrueba.enRegla("CZ");
+
     private static final LocalDate HOY = LocalDate.of(2026, 3, 16);
     private static final Clock RELOJ =
             Clock.fixed(HOY.atStartOfDay(ZoneOffset.UTC).toInstant(), ZoneOffset.UTC);
@@ -231,6 +235,7 @@ class LicenciaDeFuncionamientoJdbcTest {
                                 recibos,
                                 padron,
                                 fichas,
+                                TERRITORIO_EN_REGLA,
                                 derechos,
                                 documentos,
                                 PlantillaDeNumeroDeLicencia.POR_OMISION,
@@ -247,6 +252,7 @@ class LicenciaDeFuncionamientoJdbcTest {
                                 recibos,
                                 padron,
                                 fichas,
+                                TERRITORIO_EN_REGLA,
                                 new DerechosDeTramiteParametrizados(new SinDerechosSellados()),
                                 documentos,
                                 PlantillaDeNumeroDeLicencia.POR_OMISION,
@@ -835,7 +841,10 @@ class LicenciaDeFuncionamientoJdbcTest {
                 List.of(giro),
                 giro,
                 "EXP-2026-" + CONTADOR.incrementAndGet(),
-                HOY);
+                HOY,
+                // Sin autorizacion expresa: el territorio de estas pruebas esta en regla, asi que
+                // no hace falta ninguna (#43).
+                null);
     }
 
     private static long giroDelCatalogo(String codigo, String descripcion) {

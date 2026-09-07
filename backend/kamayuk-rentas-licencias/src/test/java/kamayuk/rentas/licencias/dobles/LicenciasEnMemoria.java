@@ -85,7 +85,8 @@ public final class LicenciasEnMemoria implements LicenciaRepository {
                         licencia.registradoEn(),
                         "prueba",
                         licencia.observacion(),
-                        licencia.giros());
+                        licencia.giros(),
+                        licencia.territorio());
         licencias.add(conId);
         return conId;
     }

@@ -27,9 +27,13 @@ import kamayuk.rentas.nucleo.dominio.predial.CuotaDelPredial;
 import kamayuk.rentas.nucleo.dominio.predial.DetalleDeterminacionPredio;
 import kamayuk.rentas.nucleo.dominio.predial.Determinacion;
 import kamayuk.rentas.nucleo.dominio.predial.DeterminacionPredialCalculada;
+import kamayuk.rentas.nucleo.dominio.predial.OrigenDelAutovaluo;
 import kamayuk.rentas.nucleo.dominio.predial.PredioEnLaBase;
 import kamayuk.rentas.nucleo.dominio.predial.Tramo;
 import kamayuk.rentas.nucleo.dominio.predial.TramosProgresivosAcumulativos;
+import kamayuk.rentas.nucleo.dominio.predial.ValuacionRecibida;
+import kamayuk.rentas.nucleo.dominio.predial.ValuacionSellada;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 
 /**
@@ -54,18 +58,43 @@ import org.springframework.stereotype.Service;
  * unico que impide que la base se pueda inflar o desinflar desde el cuerpo de la peticion, y por
  * eso {@link PredioDeclarado} no tiene campo para el.
  *
- * <h2>El autovaluo, en cambio, se declara</h2>
+ * <h2>El autovaluo: de donde sale, y que manda cuando hay dos (#38, AC-2)</h2>
  *
- * <p>Y no es un descuido: <b>el sistema no sabe valorizar un predio todavia</b>. Llegar al
- * autovaluo exige el cuadro de valores unitarios y la tabla de depreciacion —a las dos les falta
- * una dimension que la norma si tiene (GOB-03, H-14 y H-15)—, los aranceles de la ordenanza (D-02b)
- * y el {@code % actualizacion}, que sigue <b>sin fuente identificada</b> (D-11). Por eso {@code
- * determinacion_predio_detalle} (V20) guarda el autovaluo en vez de derivarlo, y por eso {@link
- * RegistrarDeterminacionPredial} lo recibe ya declarado.
+ * <p><b>Manda la valuacion que {@code catastro} sello</b> cuando existe y trae cifra; si no, manda
+ * la declarada. Y las dos quedan escritas: {@code determinacion_predio_detalle} guarda desde V14 de
+ * cual de las dos salio cada predio, y —cuando salio de una valuacion— con que {@code conjuntoId} y
+ * con que huella se calculo.
  *
- * <p>La consecuencia practica es que un predio sin autovaluo declarado <b>no se determina</b>: se
- * responde nombrandolo. Tomar el autovaluo del ejercicio anterior seria aplicar en silencio un
- * {@code % actualizacion} de cero, que es exactamente lo que D-11 advierte que no es neutro.
+ * <p><b>Las tres opciones se enumeraron con su coste antes de elegir</b>, que es lo que AC-2 pide:
+ *
+ * <ol>
+ *   <li><b>Manda siempre la declarada.</b> Es el estado anterior a #38, y su coste esta medido: la
+ *       valuacion sellada llegaba, se guardaba, se contaba, y <b>ninguna consulta leia una
+ *       cifra</b> — de modo que el candado de emision se negaba a emitir hasta que llegaran todas y
+ *       despues la corrida determinaba con otros numeros. Una valuacion completa y una incompleta
+ *       producian exactamente el mismo recibo.
+ *   <li><b>Manda siempre la sellada, y sin la declarada no se determina.</b> Dejaria hoy sin emitir
+ *       a casi todo el padron: {@code catastro} valoriza 4 de los 23 predios de la demostracion, y
+ *       los otros 19 traen el motivo de RT-004.
+ *   <li><b>Manda la sellada cuando la hay, y la declarada cuando no.</b> Es la elegida.
+ * </ol>
+ *
+ * <p>El argumento de la tercera es ADR-0024 leido literalmente: «aqui llega un valor ya calculado y
+ * sellado, y sobre el se aplican tramos, deducciones y alicuotas». La valuacion sale de la ficha
+ * catastral y la firma un sistema con su conjunto y su huella; la declaracion la firma el
+ * contribuyente y es la que la fiscalizacion contrasta. Cuando el sistema sabe valorizar, esa es la
+ * cifra — y que la declarada quede guardada al lado es lo que permite ver la discrepancia en vez de
+ * enterarse de ella en ventanilla.
+ *
+ * <p><b>Lo que esto NO hace es valorizar.</b> Este sistema sigue sin saber, y sigue siendo correcto
+ * que no sepa: llegar al autovaluo exige el cuadro de valores unitarios y la tabla de depreciacion
+ * (GOB-03, H-14 y H-15), los aranceles de la ordenanza (D-02b) y el {@code % actualizacion} (D-11).
+ * Lo que cambia es que, cuando <b>otro</b> sistema ya lo hizo y lo sello, aqui se lee.
+ *
+ * <p>La consecuencia practica sigue en pie: un predio sin ninguno de los dos <b>no se
+ * determina</b>, y se responde nombrandolo con lo que {@code catastro} dijo que le falta. Tomar el
+ * autovaluo del ejercicio anterior seria aplicar en silencio un {@code % actualizacion} de cero,
+ * que es exactamente lo que D-11 advierte que no es neutro.
  *
  * <h2>Simular no asienta</h2>
  *
@@ -86,6 +115,7 @@ public class DeterminarPredial {
     private final LectorDeCaracteristicas caracteristicas;
     private final DirectorioDeContribuyentes directorio;
     private final CuadroPredialParametrizado cuadro;
+    private final ValuacionRecibida valuaciones;
     private final RegistrarDeterminacionPredial registro;
     private final Clock reloj;
 
@@ -95,6 +125,7 @@ public class DeterminarPredial {
             LectorDeCaracteristicas caracteristicas,
             DirectorioDeContribuyentes directorio,
             CuadroPredialParametrizado cuadro,
+            ValuacionRecibida valuaciones,
             RegistrarDeterminacionPredial registro,
             Clock reloj) {
         this.yaDeclarados = yaDeclarados;
@@ -102,6 +133,7 @@ public class DeterminarPredial {
         this.caracteristicas = caracteristicas;
         this.directorio = directorio;
         this.cuadro = cuadro;
+        this.valuaciones = valuaciones;
         this.registro = registro;
         this.reloj = reloj;
     }
@@ -205,16 +237,50 @@ public class DeterminarPredial {
             porPredio.put(declarado.predioId(), declarado);
         }
 
+        // Las valuaciones selladas de TODOS sus predios, de una vez. Preguntar dentro del bucle
+        // seria una consulta por predio, y la corrida masiva recorre el padron entero.
+        Map<Long, ValuacionSellada> selladas =
+                valuaciones.deLosPredios(
+                        peticion.ejercicio(),
+                        suyos.stream().map(PredioDelContribuyente::predioId).toList());
+
         List<PredioEnLaBase> base = new ArrayList<>();
         for (PredioDelContribuyente predio : suyos) {
             PredioDeclarado declarado = porPredio.get(predio.predioId());
-            if (declarado == null) {
-                throw new PredioSinAutovaluo(predio);
+            ValuacionSellada sellada = selladas.get(predio.predioId());
+            // LA PRECEDENCIA DE #38, en una linea: manda la sellada cuando trae cifra.
+            boolean mandaLaSellada = sellada != null && sellada.tieneCifra();
+            if (declarado == null && !mandaLaSellada) {
+                throw new PredioSinAutovaluo(predio, sellada);
             }
             Optional<CaracteristicasDelPredio> rasgos = caracteristicas.de(predio.predioId(), hoy);
             Dinero exonerado =
-                    declarado.valuoExonerado() == null ? Dinero.CERO : declarado.valuoExonerado();
-            Dinero afecto = declarado.autovaluo().menos(exonerado);
+                    declarado == null || declarado.valuoExonerado() == null
+                            ? Dinero.CERO
+                            : declarado.valuoExonerado();
+            // La parte exonerada sigue siendo un dato DECLARADO aunque el autovaluo venga sellado:
+            // `catastro` valoriza el predio y no sabe que parte esta inafecta —eso es una
+            // deduccion, y las deducciones son de este lado (ADR-0024)—.
+            Dinero autovaluo;
+            OrigenDelAutovaluo origen;
+            Long conjuntoDeLaValuacion = null;
+            String huellaDeLaValuacion = null;
+            Dinero autovaluoDeclarado = null;
+            if (mandaLaSellada) {
+                ValuacionSellada laSellada = Objects.requireNonNull(sellada);
+                autovaluo = laSellada.autovaluo().orElseThrow();
+                origen = OrigenDelAutovaluo.SELLADO;
+                conjuntoDeLaValuacion = laSellada.conjuntoId();
+                huellaDeLaValuacion = laSellada.huella();
+                // La declarada NO desaparece cuando manda la sellada: se guarda al lado para que
+                // la discrepancia se pueda ver, en vez de descubrirse en ventanilla con el papel
+                // ya notificado (#38, AC-3).
+                autovaluoDeclarado = declarado == null ? null : declarado.autovaluo();
+            } else {
+                autovaluo = Objects.requireNonNull(declarado).autovaluo();
+                origen = OrigenDelAutovaluo.DECLARADO;
+            }
+            Dinero afecto = autovaluo.menos(exonerado);
             Porcentaje cuota = predio.porcentajeTitularidad();
             Dinero ponderado =
                     afecto.por(cuota.valor().movePointLeft(2))
@@ -226,13 +292,17 @@ public class DeterminarPredial {
                             predio.direccion(),
                             rasgos.map(CaracteristicasDelPredio::uso).orElse(null),
                             cuota,
-                            declarado.autovaluo(),
+                            autovaluo,
                             exonerado,
                             ponderado,
                             // Lo que suma la titularidad ENTERA del predio, no solo esta cuota
                             // (#690): si es menor que 100, la base sale ponderada por un predio
                             // que no tiene dueño completo, y eso hay que poder decirlo.
-                            predio.porcentajeRegistradoDelPredio()));
+                            predio.porcentajeRegistradoDelPredio(),
+                            origen,
+                            conjuntoDeLaValuacion,
+                            huellaDeLaValuacion,
+                            autovaluoDeclarado));
         }
         return List.copyOf(base);
     }
@@ -364,19 +434,42 @@ public class DeterminarPredial {
 
         private final long predioId;
 
-        PredioSinAutovaluo(PredioDelContribuyente predio) {
+        PredioSinAutovaluo(PredioDelContribuyente predio, @Nullable ValuacionSellada sellada) {
             super(
                     "El predio "
                             + predio.codigoReferenciaCatastral()
                             + " (id "
                             + predio.predioId()
-                            + ") entra en la base y no trae autovaluo declarado. El sistema no lo"
-                            + " puede derivar todavia —faltan el cuadro de valores unitarios y la"
-                            + " tabla de depreciacion (GOB-03), los aranceles de la ordenanza"
-                            + " (D-02b) y el % actualizacion, que sigue sin fuente (D-11)—, y"
-                            + " determinar sin el deja la base del contribuyente por debajo de lo"
+                            + ") entra en la base y no trae autovaluo: ni declarado, ni sellado por"
+                            + " `catastro`. "
+                            + porQueNoHayValuacion(sellada)
+                            + " Determinar sin el deja la base del contribuyente por debajo de lo"
                             + " que es");
             this.predioId = predio.predioId();
+        }
+
+        /**
+         * Lo que `catastro` dijo, cuando dijo algo.
+         *
+         * <p>Antes de #38 este mensaje explicaba «el sistema no lo puede derivar todavia» y
+         * nombraba GOB-03, D-02b y D-11 — que era cierto de ESTE sistema y no de la frontera. Ahora
+         * quien valoriza es `catastro`, asi que lo que hace falta decir es <b>que contesto</b> y
+         * con que llave se paro, en vez de repetir de memoria una lista de bloqueos que ya no es la
+         * suya. Las tres respuestas se arreglan de maneras distintas: publicar la valuacion, sellar
+         * la llave que falta, o teclear la declaracion jurada.
+         */
+        private static String porQueNoHayValuacion(@Nullable ValuacionSellada sellada) {
+            if (sellada == null) {
+                return "`catastro` no ha publicado ninguna valuacion de este predio para este"
+                        + " ejercicio.";
+            }
+            return "`catastro` publico su valuacion y NO pudo calcularla: «"
+                    + sellada.motivo()
+                    + "»"
+                    + (sellada.llaveQueFalta() == null
+                            ? ""
+                            : " (falta la llave " + sellada.llaveQueFalta() + ")")
+                    + ".";
         }
 
         public long predioId() {

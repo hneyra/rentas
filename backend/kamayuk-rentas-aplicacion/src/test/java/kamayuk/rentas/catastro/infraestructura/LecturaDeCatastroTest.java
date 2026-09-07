@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import kamayuk.rentas.catastro.CaracteristicasDelPredio;
 import kamayuk.rentas.catastro.CuotaDeTitularidad;
+import kamayuk.rentas.catastro.EstadoDeLaLongitud;
 import kamayuk.rentas.catastro.FichaDelPadron;
 import kamayuk.rentas.catastro.FrentesInscritos;
 import kamayuk.rentas.catastro.HallazgoCatastral;
@@ -560,15 +561,106 @@ class LecturaDeCatastroTest {
                 .as("«no da a ninguna calle» y «nadie lo ha derivado» son la misma lista vacia")
                 .isEqualTo("2026-02-01T08:00:00Z");
         assertThat(frentes.frentesDerivados()).isEqualTo(1);
-        assertThat(frentes.frentes()).hasSize(1);
-        assertThat(frentes.frentes().get(0).viaNombre()).isEqualTo("AV. CAYETANO HEREDIA");
-        assertThat(frentes.frentes().get(0).longitud().magnitud()).isEqualByComparingTo("18.50");
-        assertThat(frentes.frentes().get(0).longitud().unidad())
+        assertThat(frentes.confirmados()).hasSize(1);
+        assertThat(frentes.propuestos())
+                .as("el adaptador reparte al leer: no existe un instante con las dos juntas (#15)")
+                .isEmpty();
+        assertThat(frentes.confirmados().get(0).viaNombre()).isEqualTo("AV. CAYETANO HEREDIA");
+        assertThat(frentes.confirmados().get(0).longitud().magnitud())
+                .isEqualByComparingTo("18.50");
+        assertThat(frentes.confirmados().get(0).longitud().unidad())
                 .as("el barrido va sobre metros LINEALES y el recojo sobre cuadrados")
                 .isEqualTo("ML");
-        assertThat(frentes.frentes().get(0).longitudEstado()).isEqualTo("CONFIRMADA");
-        assertThat(frentes.frentes().get(0).confirmadoPor()).isEqualTo("jperez");
-        assertThat(frentes.frentes().get(0).retiro()).isNotNull();
+        assertThat(frentes.confirmados().get(0).longitudEstado())
+                .isEqualTo(EstadoDeLaLongitud.CONFIRMADA);
+        assertThat(frentes.confirmados().get(0).confirmadoPor()).isEqualTo("jperez");
+        assertThat(frentes.confirmados().get(0).retiro()).isNotNull();
+        assertThat(frentes.metrosLinealesConfirmados())
+                .as("el unico total que este lado ofrece, y dice en su nombre que son confirmados")
+                .contains(kamayuk.rentas.dominio.Medida.enMetrosLineales("18.50"));
+    }
+
+    @Test
+    @DisplayName("una PROPUESTA se lee, se separa y NO entra en el total (#15)")
+    void unaPropuestaSeLeeYNoEntraEnElTotal() {
+        Map<String, Object> propuesta = frenteDeMuestra("PROPUESTA");
+        propuesta.put("confirmadoPor", null);
+        propuesta.put("confirmadoEn", null);
+        Map<String, Object> confirmada = frenteDeMuestra("CONFIRMADA");
+        confirmada.put("id", 5);
+        confirmada.put("longitud", "10.00 ML");
+
+        Map<String, Object> fabricada = new LinkedHashMap<>();
+        fabricada.put("predioId", 11);
+        fabricada.put("frentes", List.of(propuesta, confirmada));
+        fabricada.put("derivadoEn", "2026-02-01T08:00:00Z");
+        fabricada.put("frentesDerivados", 2);
+        fabricada.put("motivoDeLaDerivacion", null);
+
+        FrentesInscritos frentes = new FrentesDelPredioHttp(doble(fabricada)).delPredio(11L);
+
+        assertThat(frentes.propuestos()).hasSize(1);
+        assertThat(frentes.confirmados()).hasSize(1);
+        assertThat(frentes.metrosLinealesConfirmados())
+                .as(
+                        "los 18,50 ML propuestos los corto una maquina contra el eje de la via"
+                                + " (ADR-0021)")
+                .contains(kamayuk.rentas.dominio.Medida.enMetrosLineales("10.00"));
+    }
+
+    @Test
+    @DisplayName("y un frente sin `longitudEstado` se rechaza: la cadena vacia no es un estado")
+    void unFrenteSinEstadoSeRechaza() {
+        Map<String, Object> frente = frenteDeMuestra("CONFIRMADA");
+        frente.put("longitudEstado", null);
+
+        Map<String, Object> fabricada = new LinkedHashMap<>();
+        fabricada.put("predioId", 11);
+        fabricada.put("frentes", List.of(frente));
+        fabricada.put("derivadoEn", null);
+        fabricada.put("frentesDerivados", null);
+        fabricada.put("motivoDeLaDerivacion", null);
+
+        assertThatThrownBy(() -> new FrentesDelPredioHttp(doble(fabricada)).delPredio(11L))
+                .as(
+                        "con `asString(\"\")` llegaba la cadena vacia y un consumidor escrito como"
+                                + " !\"PROPUESTA\".equals(estado) la habria cobrado (#15)")
+                .isInstanceOf(ClienteHttpDeCatastro.CatastroInalcanzable.class)
+                .hasMessageContaining("solo reconoce PROPUESTA y CONFIRMADA");
+    }
+
+    @Test
+    @DisplayName("y uno con un estado que este lado no conoce, tampoco")
+    void unEstadoDesconocidoSeRechaza() {
+        Map<String, Object> frente = frenteDeMuestra("FIRMADA");
+
+        Map<String, Object> fabricada = new LinkedHashMap<>();
+        fabricada.put("predioId", 11);
+        fabricada.put("frentes", List.of(frente));
+        fabricada.put("derivadoEn", null);
+        fabricada.put("frentesDerivados", null);
+        fabricada.put("motivoDeLaDerivacion", null);
+
+        assertThatThrownBy(() -> new FrentesDelPredioHttp(doble(fabricada)).delPredio(11L))
+                .isInstanceOf(ClienteHttpDeCatastro.CatastroInalcanzable.class)
+                .hasMessageContaining("«FIRMADA»");
+    }
+
+    /** Un frente con la forma exacta del contrato, para no repetir once claves cuatro veces. */
+    private static Map<String, Object> frenteDeMuestra(String estado) {
+        Map<String, Object> frente = new LinkedHashMap<>();
+        frente.put("id", 4);
+        frente.put("viaId", 21);
+        frente.put("viaCodigo", "AV-0007");
+        frente.put("viaNombre", "AV. CAYETANO HEREDIA");
+        frente.put("longitud", "18.50 ML");
+        frente.put("longitudEstado", estado);
+        frente.put("esPrincipal", true);
+        frente.put("numeracion", "100");
+        frente.put("retiro", "3.00 ML");
+        frente.put("confirmadoPor", "jperez");
+        frente.put("confirmadoEn", "2026-02-03T10:15:30Z");
+        return frente;
     }
 
     @Test

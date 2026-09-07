@@ -22,6 +22,13 @@ import org.jspecify.annotations.Nullable;
  *
  * <p><b>Ni un importe.</b> Ni tarifa, ni factor, ni el nombre de un servicio.
  *
+ * <h2>Y {@code longitud()} no es la longitud que se cobra</h2>
+ *
+ * <p>Este registro publica la longitud <b>tal como llego</b>, para poder ensenarla y para poder
+ * decir cuanto falta por confirmar. La que puede llegar a una base imponible se pide por su nombre
+ * a {@link FrentesInscritos#metrosLinealesConfirmados()}, que es el unico total que este lado
+ * ofrece. Ver {@link EstadoDeLaLongitud}.
+ *
  * @param retiro el retiro municipal, cuando lo tiene; {@code null} si el frente no lo declara
  * @param confirmadoEn el instante en que se confirmo, como texto; {@code null} si nadie la
  *     confirmo. Texto y no instante porque es constancia y no una cifra que este sistema opere
@@ -32,9 +39,15 @@ public record FrenteInscrito(
         String viaCodigo,
         String viaNombre,
         Medida longitud,
-        String longitudEstado,
+        EstadoDeLaLongitud longitudEstado,
         boolean esPrincipal,
         @Nullable String numeracion,
         @Nullable Medida retiro,
         @Nullable String confirmadoPor,
-        @Nullable String confirmadoEn) {}
+        @Nullable String confirmadoEn) {
+
+    /** Si esta longitud la firmo una persona (ADR-0021), o la corto una maquina. */
+    public boolean confirmada() {
+        return longitudEstado.confirmada();
+    }
+}

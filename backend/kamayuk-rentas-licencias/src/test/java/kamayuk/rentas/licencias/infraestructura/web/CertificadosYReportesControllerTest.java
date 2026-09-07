@@ -74,6 +74,10 @@ import tools.jackson.databind.json.JsonMapper;
 @DisplayName("Capa web — certificados y reportes de licencias")
 class CertificadosYReportesControllerTest {
 
+    /** El territorio comprobado y en regla: estas pruebas miden otra cosa (#43). */
+    private static final kamayuk.rentas.licencias.aplicacion.ComprobarElTerritorio
+            TERRITORIO_EN_REGLA = kamayuk.rentas.licencias.dobles.TerritorioDePrueba.enRegla("CZ");
+
     private static final LocalDate HOY = LocalDate.of(2026, 3, 16);
     private static final Clock RELOJ =
             Clock.fixed(HOY.atStartOfDay(ZoneOffset.UTC).toInstant(), ZoneOffset.UTC);
@@ -209,6 +213,7 @@ class CertificadosYReportesControllerTest {
                                         caja,
                                         padron,
                                         (predioId, fecha) -> java.util.Optional.empty(),
+                                        TERRITORIO_EN_REGLA,
                                         derechos,
                                         documentos,
                                         PlantillaDeNumeroDeLicencia.POR_OMISION,
