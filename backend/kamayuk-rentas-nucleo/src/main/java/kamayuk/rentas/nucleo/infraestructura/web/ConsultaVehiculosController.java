@@ -29,12 +29,25 @@ import org.springframework.web.bind.annotation.RestController;
  * {@link kamayuk.rentas.cuentacorriente.ConsultaDeDeudaPublica}, la API publica del otro (ARQ-01
  * §4).
  *
- * <p>{@code estado} filtra por el estado del vehiculo en el padron ({@code ACTIVO}, {@code
- * TRANSFERIDO}, {@code BAJA}, {@code ROBADO}): el prototipo dibuja
- * «AFECTO/INAFECTO/EXONERADO/BAJA», que no son valores de esta columna sino de la afectacion
- * calculada de cada fila. Solo {@code BAJA} coincide entre los dos vocabularios; el resto se ignora
- * como filtro —igual que {@code ConsultaDeudaController} ignora una «Fase» que no traduce—, y queda
- * para cuando la pantalla se conecte.
+ * <h2>{@code estado}: los cuatro del padron acotan, y lo demas es 422 (#42)</h2>
+ *
+ * <p>{@code estado} filtra por el estado del vehiculo en el padron, y sus valores son los cuatro
+ * del enumerado {@link EstadoVehiculo} —{@code ACTIVO}, {@code TRANSFERIDO}, {@code BAJA}, {@code
+ * ROBADO}—, que son los del {@code CHECK} de la tabla. Los cuatro acotan: {@code
+ * VehiculoRepositoryJdbc} los lleva a {@code v.estado = :estado}.
+ *
+ * <p><b>Hasta #42 solo {@code BAJA} se traducia y los otros tres devolvian {@code null}</b>, que en
+ * {@link CriterioDeVehiculo} significa <i>sin filtro</i>: quien pedia {@code estado=ACTIVO} recibia
+ * el padron vehicular entero ordenado por placa, con aspecto de resultado acotado. Y el prototipo
+ * empeora el caso, porque dibuja «AFECTO/INAFECTO/EXONERADO/BAJA», que <b>no</b> son valores de
+ * esta columna sino de la afectacion calculada de cada fila: tres de las cuatro opciones del
+ * desplegable no filtraban nada.
+ *
+ * <p>Ahora las tres se contestan con <b>422 nombrando el parametro</b> y diciendo que vocabulario
+ * se admite, igual que {@code ArbitriosController} con «zona» y «uso» (#541). Un filtro que dice
+ * que no es otra cosa que uno que se traga la pregunta; y devolver la lista vacia tampoco valdria,
+ * porque «ningun vehiculo exonerado» se lee como un hecho del padron y no como «esa palabra no es
+ * de esta columna».
  */
 @RestController
 @RequestMapping(Api.RAIZ + "/consultas/vehiculos")
@@ -81,12 +94,43 @@ public class ConsultaVehiculosController {
                 VehiculoEncontradoResource::de);
     }
 
-    /** Solo {@code BAJA} tiene equivalente en el padron; el resto no filtra (ver el javadoc). */
+    /**
+     * El estado pedido, o 422 nombrando el parametro si no es del padron (#42).
+     *
+     * <p>Ausente es «sin filtro» y es lo unico que puede serlo: cualquier palabra que llegue tiene
+     * que acotar o rechazarse, porque la tercera salida —leerla y no aplicarla— devuelve el padron
+     * entero con aspecto de respuesta.
+     */
     private static @Nullable EstadoVehiculo estadoDe(@Nullable String texto) {
-        if (texto == null || !"BAJA".equalsIgnoreCase(texto.strip())) {
+        if (texto == null || texto.isBlank()) {
             return null;
         }
-        return EstadoVehiculo.BAJA;
+        String pedido = texto.strip().toUpperCase(Locale.ROOT);
+        for (EstadoVehiculo estado : EstadoVehiculo.values()) {
+            if (estado.name().equals(pedido)) {
+                return estado;
+            }
+        }
+        throw new ProblemaDeNegocio(
+                CodigoDeError.VALIDACION,
+                "El filtro «estado» admite los estados del padron vehicular —"
+                        + vocabularioDelPadron()
+                        + "—, y llego '"
+                        + texto
+                        + "'. «AFECTO», «INAFECTO» y «EXONERADO» son afectacion calculada de cada"
+                        + " ejercicio y no una columna del padron, asi que no hay contra que"
+                        + " compararlas: acotar por ellas devolveria el padron entero");
+    }
+
+    private static String vocabularioDelPadron() {
+        StringBuilder nombres = new StringBuilder();
+        for (EstadoVehiculo estado : EstadoVehiculo.values()) {
+            if (nombres.length() > 0) {
+                nombres.append(", ");
+            }
+            nombres.append(estado.name());
+        }
+        return nombres.toString();
     }
 
     private LocalDate fechaDe(@Nullable String texto) {

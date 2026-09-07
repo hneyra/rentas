@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.tngtech.archunit.core.domain.JavaClass;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.lang.reflect.RecordComponent;
@@ -678,6 +679,412 @@ class ParametrosDeLaConsultaTest {
                 || jakarta.servlet.http.HttpServletRequest.class.isAssignableFrom(
                         parametro.getType());
     }
+
+    /**
+     * Los filtros que un handler <b>declara</b> y su cuerpo no lee, con su motivo (#42).
+     *
+     * <p>Es la lista de trabajo pendiente y no una excepcion permanente, como {@code
+     * busquedasDeTextoLibreConMotivo()} de T-0: se acorta, y quitarle una entrada sin arreglar el
+     * filtro pone {@link #ningunFiltroDeclaradoSeQuedaSinAcotar} en rojo nombrando la operacion.
+     * Tambien se comprueba al reves —una entrada que ya no corresponde a ningun filtro roto sale
+     * roja—, porque una exencion que no exime nada no protege nada y sigue eximiendo a lo que
+     * herede ese nombre.
+     *
+     * <p><b>Nace vacia, y esa es la cifra.</b> Cuando #42 se escribio habia cinco: {@code
+     * codigoPredial}, {@code calle}, {@code manzana} y {@code lote} de {@code GET
+     * /consultas/predios} y {@code incluyeConvenios} de {@code GET /consultas/deuda}. Los cinco se
+     * cierran en ese PR —uno implementandolo y cuatro rechazandolos con 422— asi que la lista nace
+     * en 0 y solo puede crecer si alguien publica un filtro nuevo que no acote.
+     *
+     * <p><b>Lo que esta comprobacion NO puede ver, dicho aqui y no descubierto mas tarde.</b> Mide
+     * que el identificador del parametro <b>aparezca</b> en el cuerpo, asi que un filtro que se lee
+     * y se <b>neutraliza</b> —{@code estadoDe(estado)} devolviendo {@code null} para tres de los
+     * cuatro valores que la pantalla ofrece, que era el sexto caso de #42— le pasa por delante en
+     * verde: el identificador esta ahi. Eso no se puede leer del fuente sin interpretar lo que el
+     * metodo hace con el, y por eso ese caso lo miden pruebas de comportamiento —{@code
+     * FiltrosQueNoAcotabanTest}— y no esta guarda.
+     */
+    private static final Map<String, String> FILTROS_DECLARADOS_QUE_NO_ACOTAN = Map.of();
+
+    /**
+     * El hueco exacto entre {@link #elCensoDeFiltrosQueNoFiltranNoCrece} y {@link
+     * #loQueElBordeRechazaSoloBaja} (#42).
+     *
+     * <p>Las dos de arriba miden el <b>desajuste</b> entre el contrato y la firma: filtros que el
+     * contrato declara y ningun handler declara —{@code GuardiaDeParametros} los contesta con 422—,
+     * y filtros que un handler declara y el contrato no publica. Entre las dos queda un caso que
+     * <b>ninguna</b> ve: un parametro que el handler <b>si</b> declara —asi que Spring lo enlaza,
+     * la guarda lo admite y {@code removeAll} lo quita de {@code sinLeer}— y que el cuerpo del
+     * metodo no usa. Declarar el parametro y no usarlo es la unica forma de que un filtro roto pase
+     * las tres comprobaciones a la vez.
+     *
+     * <p>Y es el peor de los tres desenlaces posibles: no hay error, no hay 422, la lista vuelve
+     * <b>entera</b> y quien filtro cree estar mirando una parte. Es el mismo hallazgo que R-N midio
+     * por el eje de las tablas —una tabla que falta en el reparto no da un cruce, deja de
+     * revisarse— repetido por el eje de los parametros.
+     *
+     * <h2>Como se mide, y por que asi</h2>
+     *
+     * <p>Se lee el <b>fuente</b> del metodo con los comentarios y los literales quitados, y se
+     * busca el identificador del parametro como palabra entera dentro de su cuerpo. Las tres
+     * decisiones tienen su motivo:
+     *
+     * <ul>
+     *   <li><b>El fuente y no el bytecode</b>, porque el bytecode de un parametro que solo se pasa
+     *       a otro metodo y el de uno que se descarta se distinguen, pero el de uno que se lee para
+     *       componer un mensaje y el de uno que decide no: lo que hace falta aqui es «lo nombra o
+     *       no lo nombra», que es una propiedad del texto.
+     *   <li><b>Sin comentarios ni literales</b>, y esa es la mitad que importa: los javadoc de
+     *       estos controladores <b>hablan</b> del parametro que ignoran —«{@code incluyeConvenios}
+     *       esta en el contrato de la pantalla pero se ignora»— y los mensajes de un 422 lo nombran
+     *       entre comillas. Con el texto en crudo, los cinco casos de #42 salian en verde por su
+     *       propia documentacion.
+     *   <li><b>El cuerpo y no el metodo entero</b>, porque la declaracion del parametro nombra al
+     *       parametro por construccion.
+     * </ul>
+     *
+     * <p>La medida es conservadora <b>en la direccion buena</b>: puede dar por leido un parametro
+     * cuyo identificador aparezca en el cuerpo por otro motivo —un campo homonimo escrito sin
+     * {@code this.}—, y no puede acusar a uno que si se lee. Una guarda que grite en lo correcto se
+     * acaba apagando (#437).
+     */
+    @Test
+    @DisplayName("y ningun @RequestParam que un handler declara se queda sin leer en su cuerpo")
+    void ningunFiltroDeclaradoSeQuedaSinAcotar() {
+        Set<String> medidos = new TreeSet<>();
+        int mirados = 0;
+        int conCuerpo = 0;
+        for (Map.Entry<String, Method> handler : handlersConSuOperacion()) {
+            String cuerpo = cuerpoDelHandler(handler.getValue());
+            conCuerpo++;
+            for (Parameter parametro : handler.getValue().getParameters()) {
+                RequestParam anotacion = parametro.getAnnotation(RequestParam.class);
+                if (anotacion == null || Map.class.isAssignableFrom(parametro.getType())) {
+                    // Un @RequestParam Map recoge la consulta entera y no declara ni un nombre:
+                    // no hay identificador que buscar.
+                    continue;
+                }
+                mirados++;
+                if (!seNombraEn(cuerpo, parametro.getName())) {
+                    medidos.add(handler.getKey() + " · " + nombreDeclarado(anotacion, parametro));
+                }
+            }
+        }
+
+        assertThat(conCuerpo)
+                .as(
+                        "no se leyo el cuerpo de ningun handler: el recorrido dejo de encontrar"
+                                + " fuentes y esta comprobacion se estaria cumpliendo sola. Falla en"
+                                + " vez de saltarsela")
+                .isGreaterThan(150);
+        assertThat(mirados)
+                .as(
+                        "no se miro ni un @RequestParam de los 300 y pico que este backend declara:"
+                                + " el conjunto vacio cumple lo de abajo sin medir nada")
+                .isGreaterThan(200);
+
+        Set<String> nuevos = new TreeSet<>(medidos);
+        nuevos.removeAll(FILTROS_DECLARADOS_QUE_NO_ACOTAN.keySet());
+        assertThat(nuevos)
+                .as(
+                        "estos filtros los declara su handler —asi que Spring los enlaza y"
+                                + " GuardiaDeParametros los admite— y el cuerpo del metodo no los"
+                                + " lee: se teclean, viajan en la URL y la lista vuelve ENTERA, sin"
+                                + " error y sin 422. Cada uno tiene tres salidas y ninguna mas:"
+                                + " implementarlo, rechazarlo con 422 nombrandolo (el patron de"
+                                + " ArbitriosController con «zona» y «uso»), o retirarlo del"
+                                + " contrato en docs/50-api/generar-openapi.mjs (SUPRIMIDOS). Lo que"
+                                + " no puede es aceptarlo y devolver todo (#42)")
+                .isEmpty();
+
+        Set<String> muertos = new TreeSet<>(FILTROS_DECLARADOS_QUE_NO_ACOTAN.keySet());
+        muertos.removeAll(medidos);
+        assertThat(muertos)
+                .as(
+                        "estas entradas del censo ya no corresponden a ningun filtro que se quede"
+                                + " sin leer: o se arreglo y hay que quitarlas, o la operacion se"
+                                + " renombro y la entrada esta eximiendo a un nombre que no existe."
+                                + " Una exencion que no exime nada no protege nada, y sigue ahi para"
+                                + " el filtro que herede ese nombre")
+                .isEmpty();
+    }
+
+    @Test
+    @DisplayName("y esa medida distingue nombrar un parametro de hablar de el en un comentario")
+    void laMedidaDistingueElCodigoDeLaProsa() {
+        String fuente =
+                """
+                class Muestra {
+                    /** Aqui se habla de calle, que es el filtro que se ignora. */
+                    void unMetodo(String calle, String lote, String manzana, String codigoPredial) {
+                        // calle no se usa: este comentario lo nombra y no cuenta
+                        String mensaje = "El filtro «lote» no se puede servir";
+                        usar(manzana);
+                        char inicial = 'c';
+                        System.out.println(mensaje + inicial + codigoPredial);
+                    }
+                }
+                """;
+        String limpio = sinComentariosNiLiterales(fuente);
+        List<String> cuerpos =
+                cuerposDe(limpio, "unMetodo", List.of("calle", "lote", "manzana", "codigoPredial"));
+
+        assertThat(cuerpos)
+                .as("una sola declaracion, asi que hay exactamente un cuerpo que mirar")
+                .hasSize(1);
+        String cuerpo = cuerpos.getFirst();
+
+        assertThat(seNombraEn(cuerpo, "manzana"))
+                .as("se pasa a otro metodo: eso es leerlo")
+                .isTrue();
+        assertThat(seNombraEn(cuerpo, "codigoPredial")).isTrue();
+        assertThat(seNombraEn(cuerpo, "calle"))
+                .as(
+                        "solo aparece en un javadoc, en un comentario de linea y en su propia"
+                                + " declaracion. Sin quitar los comentarios, los cinco filtros de"
+                                + " #42 salian en verde por su propia documentacion: los javadoc de"
+                                + " ConsultaPrediosController y ConsultaDeudaController decian con"
+                                + " todas las letras que no filtraban")
+                .isFalse();
+        assertThat(seNombraEn(limpio, "calle"))
+                .as(
+                        "y por eso se mira el CUERPO y no el metodo entero: en el fuente limpio"
+                                + " sigue estando, porque la declaracion del parametro lo nombra por"
+                                + " construccion")
+                .isTrue();
+        assertThat(seNombraEn(cuerpo, "lote"))
+                .as(
+                        "solo aparece dentro de un literal, que es donde un 422 nombra el parametro"
+                                + " que rechaza")
+                .isFalse();
+        assertThat(limpio.lines().count())
+                .as("las lineas no se mueven: se sustituye por espacios, no se borra")
+                .isEqualTo(fuente.lines().count());
+    }
+
+    /** Cada handler publicado con la operacion por la que se le llama. */
+    private static List<Map.Entry<String, Method>> handlersConSuOperacion() {
+        List<Map.Entry<String, Method>> handlers = new ArrayList<>();
+        for (JavaClass clase : ReglasDeArquitectura.clasesDeProduccion()) {
+            Class<?> tipo = clase.reflect();
+            if (!AnnotatedElementUtils.hasAnnotation(tipo, RestController.class)) {
+                continue;
+            }
+            RequestMapping deLaClase =
+                    AnnotatedElementUtils.findMergedAnnotation(tipo, RequestMapping.class);
+            String base = deLaClase == null ? "" : primero(deLaClase.path());
+            for (Method metodo : tipo.getDeclaredMethods()) {
+                RequestMapping mapeo =
+                        AnnotatedElementUtils.findMergedAnnotation(metodo, RequestMapping.class);
+                if (mapeo == null) {
+                    continue;
+                }
+                String ruta = sinRaiz(base + primero(mapeo.path()));
+                for (RequestMethod verbo : verbos(mapeo)) {
+                    handlers.add(Map.entry(verbo.name() + " " + ruta, metodo));
+                }
+            }
+        }
+        return handlers;
+    }
+
+    private static String nombreDeclarado(RequestParam anotacion, Parameter parametro) {
+        String declarado = anotacion.name().isEmpty() ? anotacion.value() : anotacion.name();
+        return declarado.isEmpty() ? parametro.getName() : declarado;
+    }
+
+    /** El identificador, como palabra entera y no como trozo de otra. */
+    private static boolean seNombraEn(String texto, String identificador) {
+        return Pattern.compile(
+                        "(?<![A-Za-z0-9_$])" + Pattern.quote(identificador) + "(?![A-Za-z0-9_$])")
+                .matcher(texto)
+                .find();
+    }
+
+    /** El cuerpo del handler, del fuente, con los comentarios y los literales ya quitados. */
+    private static String cuerpoDelHandler(Method metodo) {
+        Class<?> raiz = metodo.getDeclaringClass();
+        while (raiz.getEnclosingClass() != null) {
+            raiz = raiz.getEnclosingClass();
+        }
+        Path fuente = fuentesDeProduccion().get(raiz.getName());
+        assertThat(fuente)
+                .as(
+                        "no se encontro el fuente de %s bajo backend/*/src/main/java: sin el, este"
+                                + " handler se daria por revisado sin mirarlo",
+                        raiz.getName())
+                .isNotNull();
+        String limpio = LIMPIOS.computeIfAbsent(fuente, ParametrosDeLaConsultaTest::leerLimpio);
+
+        List<String> nombres = new ArrayList<>();
+        for (Parameter parametro : metodo.getParameters()) {
+            nombres.add(parametro.getName());
+        }
+        List<String> cuerpos = cuerposDe(limpio, metodo.getName(), nombres);
+
+        assertThat(cuerpos)
+                .as(
+                        "no se pudo localizar sin ambiguedad el cuerpo de %s#%s en %s: se"
+                                + " encontraron %d candidatos. Falla en vez de elegir uno, porque"
+                                + " revisar el cuerpo equivocado es peor que no revisar",
+                        raiz.getSimpleName(),
+                        metodo.getName(),
+                        fuente.getFileName(),
+                        cuerpos.size())
+                .hasSize(1);
+        return cuerpos.getFirst();
+    }
+
+    /**
+     * Los cuerpos de las declaraciones de {@code nombre} que declaran <b>todos</b> esos parametros.
+     *
+     * <p>Se buscan candidatos y se filtran en vez de tomar el primero: una llamada al mismo metodo
+     * se descarta porque tras su parentesis de cierre viene un punto y coma y no la llave que abre
+     * un cuerpo, y una sobrecarga porque su firma no nombra todos los parametros. Si quedan dos,
+     * quien llama <b>falla</b>: leer el cuerpo equivocado es peor que no leer ninguno.
+     */
+    private static List<String> cuerposDe(
+            String limpio, String nombre, List<String> nombresDeParametros) {
+        List<String> cuerpos = new ArrayList<>();
+        Matcher declaracion =
+                Pattern.compile("(?<![A-Za-z0-9_$.])" + Pattern.quote(nombre) + "\\s*\\(")
+                        .matcher(limpio);
+        while (declaracion.find()) {
+            int abre = declaracion.end() - 1;
+            int cierra = pareja(limpio, abre, '(', ')');
+            if (cierra < 0) {
+                continue;
+            }
+            int llave = cierra + 1;
+            while (llave < limpio.length()
+                    && limpio.charAt(llave) != '{'
+                    && limpio.charAt(llave) != ';') {
+                llave++;
+            }
+            if (llave >= limpio.length() || limpio.charAt(llave) != '{') {
+                // Una llamada, no una declaracion con cuerpo.
+                continue;
+            }
+            String firma = limpio.substring(abre + 1, cierra);
+            boolean losDeclaraTodos = true;
+            for (String parametro : nombresDeParametros) {
+                if (!seNombraEn(firma, parametro)) {
+                    losDeclaraTodos = false;
+                    break;
+                }
+            }
+            if (!losDeclaraTodos) {
+                continue;
+            }
+            int fin = pareja(limpio, llave, '{', '}');
+            if (fin > 0) {
+                cuerpos.add(limpio.substring(llave + 1, fin));
+            }
+        }
+        return cuerpos;
+    }
+
+    private static final Map<Path, String> LIMPIOS = new LinkedHashMap<>();
+
+    private static String leerLimpio(Path fuente) {
+        try {
+            return sinComentariosNiLiterales(Files.readString(fuente, StandardCharsets.UTF_8));
+        } catch (IOException excepcion) {
+            throw new UncheckedIOException(excepcion);
+        }
+    }
+
+    /** La posicion del cierre que hace pareja con la apertura de {@code desde}. */
+    private static int pareja(String texto, int desde, char abre, char cierra) {
+        int profundidad = 0;
+        for (int i = desde; i < texto.length(); i++) {
+            char actual = texto.charAt(i);
+            if (actual == abre) {
+                profundidad++;
+            } else if (actual == cierra) {
+                profundidad--;
+                if (profundidad == 0) {
+                    return i;
+                }
+            }
+        }
+        return -1;
+    }
+
+    /**
+     * El mismo fuente con los comentarios y los literales sustituidos por espacios.
+     *
+     * <p>Por espacios y no borrados: las posiciones no se mueven, asi que el emparejado de llaves
+     * sigue valiendo sobre el texto limpio.
+     */
+    private static String sinComentariosNiLiterales(String fuente) {
+        char[] salida = fuente.toCharArray();
+        int i = 0;
+        int n = fuente.length();
+        while (i < n) {
+            char actual = fuente.charAt(i);
+            if (actual == '/' && i + 1 < n && fuente.charAt(i + 1) == '/') {
+                int fin = fuente.indexOf('\n', i);
+                fin = fin < 0 ? n : fin;
+                i = borrar(salida, i, fin);
+            } else if (actual == '/' && i + 1 < n && fuente.charAt(i + 1) == '*') {
+                int fin = fuente.indexOf("*/", i + 2);
+                fin = fin < 0 ? n : fin + 2;
+                i = borrar(salida, i, fin);
+            } else if (actual == '"' && fuente.startsWith("\"\"\"", i)) {
+                int fin = fuente.indexOf("\"\"\"", i + 3);
+                fin = fin < 0 ? n : fin + 3;
+                i = borrar(salida, i, fin);
+            } else if (actual == '"' || actual == '\'') {
+                int fin = i + 1;
+                while (fin < n && fuente.charAt(fin) != actual) {
+                    fin += fuente.charAt(fin) == '\\' ? 2 : 1;
+                }
+                i = borrar(salida, i, Math.min(fin + 1, n));
+            } else {
+                i++;
+            }
+        }
+        return new String(salida);
+    }
+
+    private static int borrar(char[] salida, int desde, int hasta) {
+        for (int i = desde; i < hasta && i < salida.length; i++) {
+            if (salida[i] != '\n') {
+                salida[i] = ' ';
+            }
+        }
+        return hasta;
+    }
+
+    /** Todo {@code .java} de produccion del backend, por su nombre cualificado. */
+    private static Map<String, Path> fuentesDeProduccion() {
+        if (FUENTES.isEmpty()) {
+            Path backend = raizDelRepositorio().resolve("backend");
+            try (java.util.stream.Stream<Path> arbol = Files.walk(backend)) {
+                arbol.filter(ruta -> ruta.toString().endsWith(".java"))
+                        .filter(ruta -> ruta.toString().contains("/src/main/java/"))
+                        .forEach(
+                                ruta -> {
+                                    String texto = ruta.toString();
+                                    String relativa =
+                                            texto.substring(
+                                                    texto.indexOf("/src/main/java/")
+                                                            + "/src/main/java/".length());
+                                    FUENTES.put(
+                                            relativa.substring(
+                                                            0, relativa.length() - ".java".length())
+                                                    .replace('/', '.'),
+                                            ruta);
+                                });
+            } catch (IOException excepcion) {
+                throw new UncheckedIOException(excepcion);
+            }
+        }
+        return FUENTES;
+    }
+
+    private static final Map<String, Path> FUENTES = new LinkedHashMap<>();
 
     private static int cuantosParametros(Map<String, Set<String>> porOperacion) {
         return porOperacion.values().stream().mapToInt(Set::size).sum();

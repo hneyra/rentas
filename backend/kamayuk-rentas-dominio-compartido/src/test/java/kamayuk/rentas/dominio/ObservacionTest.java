@@ -46,9 +46,39 @@ class ObservacionTest {
                 .hasMessageContaining("500");
     }
 
+    /**
+     * #30. Hasta este issue esto era un {@code NullPointerException}, y esa eleccion decidia el
+     * estado HTTP sin que nadie lo hubiera decidido: el borde no lo caza y sale <b>500 con un
+     * identificador de incidencia</b>, donde un obligatorio ausente contesta 422 en el resto del
+     * sistema.
+     *
+     * <p>Se afirma <b>el tipo y el mensaje</b>, y las dos cosas hacen falta: el tipo es lo que
+     * decide el estado —el manejador traduce {@link IllegalArgumentException} a 422— y el mensaje
+     * es lo unico que le dice al cliente que campo le falta. Con solo el tipo, un mensaje que no
+     * nombrara el campo pasaria en verde, que es la mitad del defecto.
+     */
     @Test
-    @DisplayName("no admite un texto nulo")
-    void noAdmiteUnTextoNulo() {
-        assertThatThrownBy(() -> new Observacion(null)).isInstanceOf(NullPointerException.class);
+    @DisplayName("un texto nulo se rechaza como lo que es: un campo que falta (#30)")
+    void unTextoNuloSeRechazaComoUnCampoQueFalta() {
+        assertThatThrownBy(() -> new Observacion(null))
+                .as("un NullPointerException aqui sale del borde como 500 con incidencia")
+                .isInstanceOf(IllegalArgumentException.class)
+                .isNotInstanceOf(NullPointerException.class)
+                .hasMessageContaining("'observacion'")
+                .hasMessageContaining("regla 10");
+    }
+
+    /**
+     * El contraste: que falte no es lo mismo que no valga, y los dos mensajes son distintos. Sin
+     * esto, un arreglo que contestara «falta el campo» a todo pasaria en verde y le diria a quien
+     * escribio cuatro caracteres que no escribio ninguno.
+     */
+    @Test
+    @DisplayName("y una demasiado corta sigue diciendo que es corta, no que falta")
+    void unaDemasiadoCortaSigueDiciendoQueEsCorta() {
+        assertThatThrownBy(() -> Observacion.de("ab"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("al menos 5 caracteres");
+        assertThatThrownBy(() -> Observacion.de("ab")).hasMessageNotContaining("Falta el campo");
     }
 }

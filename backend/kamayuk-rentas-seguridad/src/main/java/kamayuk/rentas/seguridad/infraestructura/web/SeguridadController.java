@@ -154,6 +154,11 @@ public class SeguridadController {
      *
      * <p>La observacion viaja en el cuerpo y se convierte en el tipo antes de llegar al caso de
      * uso: si viene vacia, el constructor de {@link Observacion} la rechaza y la peticion es 422.
+     *
+     * <p><b>Y si NO viene, tambien —desde #30 y no antes</b>. Esta frase estaba escrita como si
+     * cubriera los dos casos y solo cubria uno: un {@code ""} era 422 y un campo ausente era {@code
+     * Objects.requireNonNull} y por tanto <b>500 con identificador de incidencia</b>, que es la
+     * mitad que nadie habia medido.
      */
     @PostMapping("/grupos/{grupo}/miembros")
     @RequiereAcceso(acceso = "miembros", privilegio = Privilegio.REGISTRO)
