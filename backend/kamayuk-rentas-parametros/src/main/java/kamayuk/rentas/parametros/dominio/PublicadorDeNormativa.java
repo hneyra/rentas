@@ -1,6 +1,7 @@
 package kamayuk.rentas.parametros.dominio;
 
 import kamayuk.rentas.dominio.Ejercicio;
+import kamayuk.rentas.dominio.MotivoDeInalcanzable;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -47,7 +48,16 @@ public interface PublicadorDeNormativa {
     final class NormativaInalcanzable extends RuntimeException {
         @java.io.Serial private static final long serialVersionUID = 1L;
 
+        // El aviso [serial] no aplica: es un enum, que se serializa por su nombre.
+        @SuppressWarnings("serial")
+        private final MotivoDeInalcanzable motivo;
+
         public NormativaInalcanzable(String que, @Nullable Throwable causa) {
+            this(MotivoDeInalcanzable.NO_CONTESTA, que, causa);
+        }
+
+        public NormativaInalcanzable(
+                MotivoDeInalcanzable motivo, String que, @Nullable Throwable causa) {
             super(
                     "No se pudo hablar con `normativa` para "
                             + que
@@ -55,6 +65,17 @@ public interface PublicadorDeNormativa {
                             + " Un conjunto ya descargado se sigue pudiendo usar (ADR-0025"
                             + " §Consecuencias); lo que no se puede es resolver uno nuevo",
                     causa);
+            this.motivo = motivo;
+        }
+
+        /**
+         * Si falto la variable de entorno o si el vecino no contesto (#25, AC-4).
+         *
+         * <p>Viaja como dato y no dentro de la frase: quien decide mirando el texto deja de decidir
+         * bien en cuanto alguien reescribe el mensaje, y nada se pone rojo.
+         */
+        public MotivoDeInalcanzable motivo() {
+            return motivo;
         }
     }
 

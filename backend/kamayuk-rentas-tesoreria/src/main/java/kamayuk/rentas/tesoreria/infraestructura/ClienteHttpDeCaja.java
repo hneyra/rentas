@@ -9,6 +9,7 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Optional;
+import kamayuk.rentas.dominio.MotivoDeInalcanzable;
 import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -135,8 +136,28 @@ public class ClienteHttpDeCaja {
     public static final class CajaInalcanzable extends RuntimeException {
         @java.io.Serial private static final long serialVersionUID = 1L;
 
+        // El aviso [serial] no aplica: es un enum, que se serializa por su nombre.
+        @SuppressWarnings("serial")
+        private final MotivoDeInalcanzable motivo;
+
         public CajaInalcanzable(String que, @Nullable Throwable causa) {
+            this(MotivoDeInalcanzable.NO_CONTESTA, que, causa);
+        }
+
+        public CajaInalcanzable(
+                MotivoDeInalcanzable motivo, String que, @Nullable Throwable causa) {
             super("No se pudo " + que + ". El sistema del dinero vive en `caja`", causa);
+            this.motivo = motivo;
+        }
+
+        /**
+         * Si falto la variable de entorno o si el vecino no contesto (#25, AC-4).
+         *
+         * <p>Viaja como dato y no dentro de la frase: quien decide mirando el texto deja de decidir
+         * bien en cuanto alguien reescribe el mensaje, y nada se pone rojo.
+         */
+        public MotivoDeInalcanzable motivo() {
+            return motivo;
         }
     }
 
@@ -178,7 +199,10 @@ public class ClienteHttpDeCaja {
      */
     Optional<JsonNode> pedirSiExiste(String ruta, String que) {
         if (raiz.isBlank()) {
-            throw new CajaInalcanzable(que + ": kamayuk.caja.url no esta configurada", null);
+            throw new CajaInalcanzable(
+                    MotivoDeInalcanzable.SIN_CONFIGURAR,
+                    que + ": kamayuk.caja.url no esta configurada",
+                    null);
         }
         HttpRequest.Builder peticion =
                 HttpRequest.newBuilder(URI.create(raiz + ruta))
@@ -222,7 +246,10 @@ public class ClienteHttpDeCaja {
      */
     JsonNode publicar(String ruta, String cuerpo, String que) {
         if (raiz.isBlank()) {
-            throw new CajaInalcanzable(que + ": kamayuk.caja.url no esta configurada", null);
+            throw new CajaInalcanzable(
+                    MotivoDeInalcanzable.SIN_CONFIGURAR,
+                    que + ": kamayuk.caja.url no esta configurada",
+                    null);
         }
         HttpRequest.Builder peticion =
                 HttpRequest.newBuilder(URI.create(raiz + ruta))

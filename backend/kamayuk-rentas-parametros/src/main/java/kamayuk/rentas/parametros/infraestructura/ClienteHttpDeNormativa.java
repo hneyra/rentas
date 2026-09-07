@@ -12,12 +12,17 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Optional;
 import kamayuk.rentas.dominio.Ejercicio;
+import kamayuk.rentas.dominio.MotivoDeInalcanzable;
 import kamayuk.rentas.parametros.dominio.PublicadorDeNormativa;
 import kamayuk.rentas.parametros.dominio.SnapshotDeNormativa;
 import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+import org.springframework.web.context.request.RequestAttributes;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
@@ -52,6 +57,15 @@ import tools.jackson.databind.json.JsonMapper;
  * <p>Ningun metodo que pregunte por un parametro suelto. Es lo que impide reinventar la API de
  * consulta que ADR-0025 descarta, y no lo sostiene ninguna prueba: lo sostiene que la clase no
  * tenga como.
+ *
+ * <h2>El contexto de municipalidad no viaja en ningun parametro</h2>
+ *
+ * <p>Ni en el cuerpo, ni en la ruta, ni en una cabecera propia (ADR-0028): se reenvia el {@code
+ * Authorization} de la peticion que se atiende, y {@code normativa} valida ESE token. Es lo mismo
+ * que hacen {@code ClienteHttpDeCaja} y {@code ClienteHttpDeCatastro}, y hasta #25 <b>este cliente
+ * era el unico de los tres que no lo hacia</b> — pedia sin credencial y recibia 401 siempre, lo que
+ * se leyo durante un tiempo como el hueco de identidad de servicio (ADR-0028 §2) cuando en realidad
+ * era una cabecera que faltaba. Ver {@link #token()}.
  */
 @Component
 public class ClienteHttpDeNormativa implements PublicadorDeNormativa {
@@ -137,17 +151,19 @@ public class ClienteHttpDeNormativa implements PublicadorDeNormativa {
     private HttpResponse<String> pedir(String url, String que) {
         if (raiz.isBlank()) {
             throw new PublicadorDeNormativa.NormativaInalcanzable(
-                    que + ": `kamayuk.normativa.url` no esta configurada", null);
+                    MotivoDeInalcanzable.SIN_CONFIGURAR,
+                    que + ": `kamayuk.normativa.url` no esta configurada",
+                    null);
         }
         try {
-            HttpRequest peticion =
+            HttpRequest.Builder peticion =
                     HttpRequest.newBuilder(URI.create(url))
                             .timeout(ESPERA_DE_LECTURA)
                             .header("Accept", "application/json")
-                            .GET()
-                            .build();
+                            .GET();
+            token().ifPresent(t -> peticion.header("Authorization", t));
             return cliente.send(
-                    peticion, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+                    peticion.build(), HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
         } catch (IOException noContesta) {
             throw new PublicadorDeNormativa.NormativaInalcanzable(que, noContesta);
         } catch (InterruptedException interrumpido) {
@@ -268,5 +284,30 @@ public class ClienteHttpDeNormativa implements PublicadorDeNormativa {
     private static @Nullable Integer entero(JsonNode fila, String campo) {
         JsonNode valor = fila.get(campo);
         return valor == null || valor.isNull() ? null : valor.asInt();
+    }
+
+    /**
+     * El {@code Authorization} de la peticion que se esta atendiendo, si la hay (#25).
+     *
+     * <p>Es <b>la misma linea</b> que {@code ClienteHttpDeCaja} y {@code ClienteHttpDeCatastro}
+     * llevan desde P5C y P5D, y este cliente era el unico de los tres que no la tenia: pedia sin
+     * ninguna credencial, y {@code normativa} —que tiene la misma cadena de identidad que los otros
+     * tres (ADR-0005, ADR-0030 §3)— contestaba <b>401</b> a todo. Medido contra la instalacion: sin
+     * cabecera, {@code {"codigo":"NO_AUTENTICADO"}}; con ella, la ruta contesta y el 404 que
+     * devuelve es un hecho del dominio —«ese ejercicio no esta sellado»— que {@link
+     * #conjuntoVigenteEn} ya sabia traducir.
+     *
+     * <p><b>Vacio no es un fallo, y por eso devuelve {@link Optional} y no lanza</b>: en el perfil
+     * {@code batch} —el ingestor, el migrador— no hay peticion de la que tomar el token, y ahi lo
+     * correcto es mandar la peticion sin cabecera y dejar que {@code normativa} conteste 401. Ese
+     * caso <b>si</b> es el hueco de identidad de servicio de ADR-0028 §2 (RFC 8693), y no se cierra
+     * aqui: lo que se cierra es el camino de una peticion HTTP, que siempre trae token.
+     */
+    private static Optional<String> token() {
+        RequestAttributes atributos = RequestContextHolder.getRequestAttributes();
+        if (!(atributos instanceof ServletRequestAttributes servlet)) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(servlet.getRequest().getHeader("Authorization"));
     }
 }

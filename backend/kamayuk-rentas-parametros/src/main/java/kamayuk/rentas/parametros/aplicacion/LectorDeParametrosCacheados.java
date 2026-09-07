@@ -119,6 +119,30 @@ public class LectorDeParametrosCacheados implements LectorDeParametros {
     }
 
     /**
+     * Lo que ya esta descargado para el ejercicio, sin tocar la red (#25, AC-3).
+     *
+     * <p>Dos {@code SELECT} sobre {@code normativa_conjunto} y ninguna llamada: el primero da el
+     * conjunto de mayor version que esta en la copia local, el segundo su ejercicio y su version.
+     * <b>No pasa por {@link #asegurarDescargado(long)}</b>, y esa es toda la diferencia: quien
+     * pregunta por las senias no necesita el snapshot, asi que exigirle que este completo
+     * convertiria una lectura que se puede contestar en una que va a la red y falla.
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<ConjuntoYaDescargado> loQueYaEstaDescargado(Ejercicio ejercicio) {
+        return cache.conjuntoCacheadoDe(ejercicio)
+                .flatMap(
+                        conjunto ->
+                                cache.identidadDe(conjunto)
+                                        .map(
+                                                identidad ->
+                                                        new ConjuntoYaDescargado(
+                                                                conjunto,
+                                                                identidad.ejercicio(),
+                                                                identidad.version())));
+    }
+
+    /**
      * Deja el conjunto en la cache si no estaba.
      *
      * <p>Se delega, y no se hace aqui, porque descargar ESCRIBE y esto casi siempre corre dentro de

@@ -9,6 +9,7 @@ import java.util.Objects;
 import java.util.OptionalInt;
 import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.dominio.Ejercicio;
+import kamayuk.rentas.dominio.MotivoDeInalcanzable;
 import kamayuk.rentas.indicadores.dobles.CajaDeMentira;
 import kamayuk.rentas.indicadores.dobles.LibroDeMentira;
 import kamayuk.rentas.indicadores.dominio.AvanceDeRecaudacion;
@@ -390,6 +391,85 @@ class PanelDeRecaudacionTest {
     }
 
     // ------------------------------------------------------------------
+
+    /**
+     * #25 AC-2 — con {@code caja} apagada el panel sale igual, menos su cifra.
+     *
+     * <p>Tres de las cuatro cifras del panel son del <b>libro de este sistema</b> y estan bien
+     * leidas cuando la caja falla. Hasta #25 la excepcion subia sin capturar y se las llevaba por
+     * delante: la pantalla de entrada del modulo no se podia dibujar porque un vecino no
+     * contestaba.
+     *
+     * <p>Se prueban <b>los dos motivos</b> y no uno, porque son las dos causas que el AC-4 separa y
+     * las dos tienen que dar el mismo repliegue: quien mira el panel no distingue un despliegue mal
+     * armado de una caida, y no tiene por que — quien los distingue es el registro.
+     */
+    @Nested
+    @DisplayName("AC-2 — con `caja` apagada")
+    class SinCaja {
+
+        private AvanceDeRecaudacion sinCaja(MotivoDeInalcanzable motivo) {
+            return new PanelDeRecaudacion(libro, libro, new CajaDeMentira().apagar(motivo))
+                    .del(EJERCICIO, HOY, AHORA);
+        }
+
+        @Test
+        @DisplayName("no revienta: el panel se compone igual, con sus cuatro indicadores")
+        void noRevienta() {
+            AvanceDeRecaudacion avance = sinCaja(MotivoDeInalcanzable.NO_CONTESTA);
+
+            assertThat(avance.indicadores()).hasSize(4);
+            assertThat(avance.carteras()).hasSize(2);
+        }
+
+        @Test
+        @DisplayName("las TRES cifras del libro salen, y son las mismas que con la caja sana")
+        void lasTresDelLibroSalen() {
+            AvanceDeRecaudacion sano = panel();
+            AvanceDeRecaudacion caido = sinCaja(MotivoDeInalcanzable.NO_CONTESTA);
+
+            for (String concepto :
+                    List.of("Recaudado " + EJERCICIO, "Avance de cobranza", "Cartera pendiente")) {
+                assertThat(indicador(caido, concepto).cifra())
+                        .as("«%s» sale del libro de este sistema, no de `caja`", concepto)
+                        .isEqualTo(indicador(sano, concepto).cifra());
+            }
+            // Y lo emitido del ejercicio, que es campo y no indicador (#549).
+            assertThat(caido.cargado()).isEqualTo(sano.cargado());
+        }
+
+        @Test
+        @DisplayName("y la cuarta se declara ausente: sin cifra, sin importe y diciendo por que")
+        void laCuartaSeDeclaraAusente() {
+            Indicador hoy =
+                    indicador(sinCaja(MotivoDeInalcanzable.NO_CONTESTA), "Recaudado hoy en caja");
+
+            assertThat(hoy.cifra()).isEqualTo(FormatoDeCifra.SIN_CIFRA);
+            assertThat(hoy.nota()).contains("no se pudo leer");
+            // El importe NULO es lo que impide que la pantalla lo sume: un cero seria una cifra.
+            assertThat(hoy.importe()).isNull();
+        }
+
+        @Test
+        @DisplayName("EL CONTRASTE: con la caja sana esa misma cifra SI sale, y no es un guion")
+        void conLaCajaSanaLaCifraSale() {
+            Indicador hoy = indicador("Recaudado hoy en caja");
+
+            assertThat(hoy.cifra()).isNotEqualTo(FormatoDeCifra.SIN_CIFRA);
+            assertThat(hoy.importe()).isEqualTo(Dinero.de("300.00"));
+        }
+
+        @Test
+        @DisplayName("una URL sin configurar se repliega igual que un vecino caido")
+        void sinConfigurarSeRepliegaIgual() {
+            Indicador hoy =
+                    indicador(
+                            sinCaja(MotivoDeInalcanzable.SIN_CONFIGURAR), "Recaudado hoy en caja");
+
+            assertThat(hoy.cifra()).isEqualTo(FormatoDeCifra.SIN_CIFRA);
+            assertThat(hoy.importe()).isNull();
+        }
+    }
 
     private Cartera porTributo() {
         return panel().carteras().get(0);

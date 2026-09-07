@@ -216,6 +216,29 @@ function sondas() {
   };
 }
 
+/**
+ * Los tres sistemas vecinos que este backend consume, con el prefijo bajo el que cada uno sirve.
+ *
+ * <p>Escrito una sola vez y no tres, y el prefijo va aqui porque es parte de la direccion: los tres
+ * clientes de Java componen `raiz + ruta` y una raiz sin prefijo daria un 404 en cada llamada.
+ */
+const VECINOS = ["caja", "catastro", "normativa"] as const;
+
+/**
+ * `KAMAYUK_<VECINO>_URL` para cada uno, apuntando a su `Service` en su namespace.
+ *
+ * Esto y el bloque equivalente de `despliegue/compose.yaml` **tienen que decir lo mismo**, y lo
+ * sujeta `infra/verificaciones/compose-de-los-sistemas.test.ts`, que compara los NOMBRES de las
+ * variables de los dos lados en las dos direcciones. Anadirlas solo en el compose pone en rojo la
+ * guarda del repositorio hermano con «declara «KAMAYUK_CAJA_URL» y el descriptor no se la da».
+ */
+function urlesDeLosVecinos(e: EntornoDelDescriptor) {
+  return VECINOS.map((vecino) => ({
+    name: `KAMAYUK_${vecino.toUpperCase()}_URL`,
+    value: `http://kamayuk-${vecino}-web.${e.namespaceDe(vecino)}/${vecino}/api/v1`,
+  }));
+}
+
 /** El endurecimiento que no admite excepcion (issue #157). */
 const SEGURIDAD = {
   runAsNonRoot: true,
@@ -264,6 +287,20 @@ function despliegueDelPerfil(e: EntornoDelDescriptor, perfil: string, atiendeHtt
                   // declarada —que nombra el pod de identidad, no internet— no habria salido en
                   // absoluto. Todo token invalido, por un motivo que no se parece a su causa.
                   { name: "KAMAYUK_OIDC_JWKS", value: e.plataforma.jwks },
+                  // Los tres vecinos (#25). Sin ellas `rentas` levanta, la sonda dice UP y tres de
+                  // sus operaciones contestan 500 —el panel de recaudacion, los predios de un
+                  // contribuyente y las senias del conjunto sellado—, porque las tres se declaran
+                  // `@Value("${kamayuk.<sistema>.url:}")`, con cadena vacia por omision.
+                  //
+                  // La politica de egreso de `red()` ya nombraba los tres namespaces: lo que
+                  // faltaba no era el permiso de red, era la direccion. Se compone con
+                  // `namespaceDe` y no a mano, por lo mismo que el ingestor: dos copias de la
+                  // convencion se separan.
+                  //
+                  // El `Service` de cada sistema escucha en el puerto 80 y su backend sirve bajo su
+                  // propio prefijo, asi que la raiz lleva el prefijo dentro: los tres clientes
+                  // componen `raiz + ruta`.
+                  ...urlesDeLosVecinos(e),
                 ],
                 ...(atiendeHttp ? { ports: [{ name: "http", containerPort: 8080 }] } : {}),
                 resources: RECURSOS,
