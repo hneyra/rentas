@@ -543,7 +543,20 @@ export const RUTAS = {
   ejercicioDeLaSesion: '/seguridad/sesion/ejercicio',
   padron: '/rentas/contribuyentes',
   ficha: (id: number) => `/rentas/contribuyentes/${String(id)}/ficha`,
-  predios: '/rentas/predios',
+  /**
+   * Los predios de UN contribuyente, por su codigo (#26).
+   *
+   * **`?codContribuyente=` no es opcional**: sin el, `GET /rentas/predios` contesta 422 —«Hay
+   * que decir de quien son los predios: falta «codContribuyente» (o su otro nombre,
+   * «contribuyente»)»—, medido contra la instalacion. Hasta #26 el contrato no publicaba ese
+   * parametro, asi que esta ruta se pedia pelada y el proxy la contestaba igual; hoy lo declara
+   * `docs/50-api/parametros-de-la-api.json` y el proxy la rechaza como la rechazaria el backend.
+   *
+   * Se manda el nombre canonico y no `contribuyente`: los dos valen, y elegir el que el
+   * contrato declara primero deja una sola forma en la interfaz.
+   */
+  prediosDe: (codigo: string) =>
+    `/rentas/predios?codContribuyente=${encodeURIComponent(codigo)}`,
   /**
    * Los beneficios de UN contribuyente, por su codigo.
    *
@@ -553,13 +566,27 @@ export const RUTAS = {
    * es la unica de las tres del expediente que I-4 pudo encender.
    */
   beneficiosDe: (codigo: string) => `/rentas/beneficios?contribuyente=${encodeURIComponent(codigo)}`,
-  deuda: '/consultas/deuda',
+  /**
+   * La deuda de UN contribuyente (#26). Aqui `codContribuyente` no tiene segundo nombre: es el
+   * unico que `GET /consultas/deuda` admite, y sin el contesta 422.
+   */
+  deudaDe: (codigo: string) =>
+    `/consultas/deuda?codContribuyente=${encodeURIComponent(codigo)}`,
   coactiva: '/coactiva/deudas',
   ultimaCorrida: '/rentas/predial/corridas/ultima',
   observados: (corridaId: number) => `/rentas/predial/corridas/${String(corridaId)}/observados`,
   recaudacion: '/indicadores/recaudacion',
   trabajoParado: '/indicadores/trabajo-parado',
-  bitacora: '/seguridad/auditoria',
+  /**
+   * La bitacora de UN ejercicio (#26).
+   *
+   * Es la unica de las tres que lo declara en la firma —`@RequestParam("ejercicio") int`—, asi
+   * que sin el la peticion no llega al metodo: Spring contesta 422 «Falta el parametro
+   * obligatorio 'ejercicio'». El ejercicio es el de la barra global, que es el mismo con el que
+   * se piden las señas del conjunto sellado.
+   */
+  bitacoraDe: (ejercicio: string) =>
+    `/seguridad/auditoria?ejercicio=${encodeURIComponent(ejercicio)}`,
   arbitrios: '/rentas/arbitrios',
   calculoIndividual: '/rentas/predial/calculo-individual',
   calculoMasivo: '/rentas/predial/calculo-masivo',

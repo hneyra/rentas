@@ -143,12 +143,19 @@ export interface OperacionServida {
  * <h2>Y las dos del expediente que NO se encienden, con su medida</h2>
  *
  * <b>`GET /rentas/predios`</b> y <b>`GET /consultas/deuda`</b> exigen `?codContribuyente=` —sin
- * el, <b>422</b>— y el contrato <b>no publica ese parametro</b> (#26). Mandarlo desde aqui seria
- * construir sobre un nombre que nada comprueba: el dia que el proveedor lo renombrara, esta
- * pantalla pediria sin filtro, el backend contestaria 422 y ninguna prueba de este lado lo
- * habria dicho antes. Se quedan en el proxy hasta que el contrato lo declare — y mientras tanto
- * el expediente dice de donde sale cada una de sus tres tablas, porque un contribuyente de
- * verdad con los predios del artboard debajo seria peor que una tabla vacia.
+ * el, <b>422</b>—, y hasta #26 el contrato <b>no publicaba ese parametro</b>: mandarlo era
+ * construir sobre un nombre que nada comprobaba. <b>Desde #26 lo publica</b>
+ * —`docs/50-api/parametros-de-la-api.json`, generado de la firma del controlador—, el expediente
+ * lo manda y el proxy contesta 422 sin el, igual que el backend. O sea que el motivo por el que
+ * estas dos no se encendian <b>ya no existe</b>.
+ *
+ * Encenderlas es lo siguiente y <b>no se hace aqui</b>, por una razon medible y no por prudencia:
+ * las once de arriba se encendieron <b>midiendo cada una contra la instalacion</b> —el 200, su
+ * cuerpo, y los campos nulos que obligaron a cambiar el tipo—, y esa medida es la que dice si la
+ * pantalla dibuja un estado vacio o una averia. Sin ella, anadirlas a esta lista seria afirmar
+ * algo que nadie comprobo. Mientras tanto el expediente dice de donde sale cada una de sus tres
+ * tablas, porque un contribuyente de verdad con los predios del artboard debajo seria peor que
+ * una tabla vacia.
  *
  * <b>`GET /rentas/arbitrios`</b> tambien contesta 200 con lista vacia, medido, y tampoco se
  * enciende: es de la seccion «Valores» (F-6) y no del padron. Encenderla en este PR cambiaria

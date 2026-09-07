@@ -154,6 +154,40 @@ function verboNoAdmitido(metodo: string, rutaRelativa: string, verbos: readonly 
 }
 
 /**
+ * Falta un parametro que el backend EXIGE: 422, con el mensaje que el backend da (#26).
+ *
+ * Es la unica cosa de la peticion que este proxy mira, y no contradice a AC8: no filtra, no
+ * ordena y no pagina —sigue sin leer el VALOR—; lo que hace es **negarse a contestar lo que el
+ * backend se niega a contestar**. Servirlo igual es lo que dejaba escribir una pantalla contra
+ * una respuesta que el dia de la integracion es un 422, y nada lo anunciaba: medido contra la
+ * instalacion, tres de las trece lecturas de esta interfaz.
+ */
+function faltaUnParametro(rutaRelativa: string, grupos: readonly (readonly string[])[]): Response {
+  const faltan = grupos
+    .filter((grupo) => grupo.length > 0)
+    .map((grupo) => grupo.map((nombre) => `«${nombre}»`).join(' o '))
+    .join(', ');
+  return problema(
+    'VALIDACION',
+    422,
+    'La peticion no es valida',
+    `«${rutaRelativa}» no se puede pedir sin ${faltan}. El backend lo exige y contesta 422; ` +
+      'el proxy no sirve lo que el backend no serviria. Lo declara ' +
+      'docs/50-api/parametros-de-la-api.json, generado de la firma del controlador.',
+  );
+}
+
+/** Los grupos que la peticion NO satisface: ninguno de sus nombres viaja con valor. */
+function gruposSinSatisfacer(
+  operacion: Operacion,
+  parametros: URLSearchParams,
+): readonly (readonly string[])[] {
+  return (operacion.exige ?? []).filter(
+    (grupo) => !grupo.some((nombre) => (parametros.get(nombre) ?? '').trim() !== ''),
+  );
+}
+
+/**
  * La ruta esta declarada como servida y el backend dice que no la implementa.
  *
  * **Solo el 501, y el 404 ya no. Lo cambio I-1 con su medida.** Hasta entonces esto se
@@ -260,8 +294,16 @@ export function instalarProxyDeDatos({
         : verboNoAdmitido(metodo, rutaRelativa, verbos);
     }
 
-    // Ni la cadena de consulta ni el cuerpo llegan al constructor: no se le pasan. Una
-    // escritura responde 201 con la forma que el backend publica y no guarda nada.
+    // Lo unico que se mira de la cadena de consulta: que traiga lo que el backend EXIGE.
+    // El VALOR sigue sin llegar al constructor, asi que `?codContribuyente=X` y
+    // `?codContribuyente=Y` devuelven lo mismo — el proxy no filtra (#26, AC8 de #4).
+    const sinSatisfacer = gruposSinSatisfacer(operacion, url.searchParams);
+    if (sinSatisfacer.length > 0) {
+      return faltaUnParametro(rutaRelativa, sinSatisfacer);
+    }
+
+    // Ni el resto de la cadena de consulta ni el cuerpo llegan al constructor: no se le pasan.
+    // Una escritura responde 201 con la forma que el backend publica y no guarda nada.
     return new Response(JSON.stringify(operacion.cuerpo()), {
       status: metodo === 'GET' ? 200 : 201,
       headers: { 'content-type': 'application/json' },
