@@ -13,6 +13,12 @@ import org.jspecify.annotations.Nullable;
  * correlativo. La pantalla lo muestra como campo de solo lectura, y si viniera del cliente, dos
  * peticiones podrian pedir el mismo.
  *
+ * @param zonificacion la zona DECLARADA. No sustituye a la que contesta `catastro`: las dos se
+ *     guardan y la licencia dice cual sostiene el acto (#43, V14)
+ * @param autorizacionDelTerritorio por que se emite aunque el territorio no lo respalde. Hace falta
+ *     cuando el predio no consta, cuando no se pudo preguntar a `catastro`, o cuando el giro
+ *     principal no cabe en la zona. <b>NO salva un riesgo no mitigable comprobado</b>: eso no se
+ *     autoriza con nada
  * @param observacion por que se emite (regla 10, RNF-052)
  */
 public record PeticionDeLicencia(
@@ -23,6 +29,7 @@ public record PeticionDeLicencia(
         @Nullable String areaDelEstablecimiento,
         @Nullable String tipoDeLicencia,
         @Nullable String zonificacion,
+        @Nullable String autorizacionDelTerritorio,
         @Nullable Integer aforo,
         @Nullable String fechaDeEmision,
         @Nullable String fechaDeVencimiento,

@@ -125,7 +125,8 @@ public class ClienteHttpDeCatastro {
     }
 
     /** `catastro` no contesta. No es «eso no existe»: es que no se pudo preguntar. */
-    public static final class CatastroInalcanzable extends RuntimeException {
+    public static final class CatastroInalcanzable
+            extends kamayuk.rentas.catastro.TerritorioInalcanzable {
         @java.io.Serial private static final long serialVersionUID = 1L;
 
         // El aviso [serial] no aplica: es un enum, que se serializa por su nombre.
@@ -202,7 +203,8 @@ public class ClienteHttpDeCatastro {
      * {@code NO_ENCONTRADO}—, y viaja como dato y no dentro de la frase por lo mismo que alli: un
      * texto en castellano se reescribe en cuanto alguien lo lee en voz alta.
      */
-    public static final class NoConstaEnCatastro extends RuntimeException {
+    public static final class NoConstaEnCatastro
+            extends kamayuk.rentas.catastro.HechoDelTerritorioQueNoConsta {
         @java.io.Serial private static final long serialVersionUID = 1L;
 
         private final String codigo;
@@ -223,6 +225,7 @@ public class ClienteHttpDeCatastro {
         }
 
         /** El codigo del catalogo de `catastro`, para decidir sin analizar el mensaje. */
+        @Override
         public String codigo() {
             return codigo;
         }

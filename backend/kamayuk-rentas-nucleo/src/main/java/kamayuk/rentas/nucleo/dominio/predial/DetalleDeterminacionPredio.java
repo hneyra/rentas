@@ -26,6 +26,11 @@ import org.jspecify.annotations.Nullable;
  * @param porcentajePropiedad el % de propiedad del contribuyente sobre este predio a la fecha de
  *     calculo
  * @param baseImponiblePredio el aporte de este predio a la base del contribuyente, ya ponderado
+ * @param origen de donde salio el autovaluo: declarado, o sellado por {@code catastro} (#38)
+ * @param valuacionConjuntoId el conjunto de parametros que fijo la corrida de valuacion; {@code
+ *     null} cuando el autovaluo es declarado
+ * @param valuacionHuella la huella con que {@code catastro} sello esa valuacion; {@code null}
+ *     cuando el autovaluo es declarado
  */
 public record DetalleDeterminacionPredio(
         @Nullable Long id,
@@ -33,7 +38,10 @@ public record DetalleDeterminacionPredio(
         Dinero autovaluo,
         Dinero valuoExonerado,
         Porcentaje porcentajePropiedad,
-        Dinero baseImponiblePredio) {
+        Dinero baseImponiblePredio,
+        OrigenDelAutovaluo origen,
+        @Nullable Long valuacionConjuntoId,
+        @Nullable String valuacionHuella) {
 
     public DetalleDeterminacionPredio {
         if (predioId <= 0) {
@@ -60,6 +68,21 @@ public record DetalleDeterminacionPredio(
         Objects.requireNonNull(
                 porcentajePropiedad, "El detalle necesita el % de propiedad del contribuyente");
         Objects.requireNonNull(baseImponiblePredio, "El detalle necesita la base que aporta");
+        Objects.requireNonNull(origen, "El detalle dice de donde salio su autovaluo (#38)");
+        // La misma guarda que `determinacion_detalle_procedencia_ck` en la base. Un autovaluo que
+        // dice venir de una valuacion sellada y no trae con cual no deja decir de cual vino, que
+        // es exactamente el rastro que hace falta dentro de un ano.
+        boolean traeProcedencia = valuacionConjuntoId != null && valuacionHuella != null;
+        if ((origen == OrigenDelAutovaluo.SELLADO) != traeProcedencia) {
+            throw new IllegalArgumentException(
+                    "El autovaluo del predio "
+                            + predioId
+                            + " dice ser "
+                            + origen
+                            + " y "
+                            + (traeProcedencia ? "trae" : "no trae")
+                            + " el conjunto y la huella con que se sello (ADR-0027)");
+        }
         if (baseImponiblePredio.esNegativo()) {
             throw new IllegalArgumentException(
                     "La base imponible del predio no puede ser negativa");
@@ -88,7 +111,37 @@ public record DetalleDeterminacionPredio(
                 autovaluo,
                 valuoExonerado,
                 porcentajePropiedad,
-                baseImponiblePredio);
+                baseImponiblePredio,
+                OrigenDelAutovaluo.DECLARADO,
+                null,
+                null);
+    }
+
+    /**
+     * Un detalle nuevo cuyo autovaluo salio de la valuacion que {@code catastro} sello.
+     *
+     * <p>Exige el conjunto y la huella en la firma, no los admite despues: si se pudieran anadir a
+     * posteriori, existiria un instante en que un detalle SELLADO no dice de donde salio, y ese es
+     * el instante en que alguien lo guarda.
+     */
+    public static DetalleDeterminacionPredio sellado(
+            long predioId,
+            Dinero autovaluo,
+            Dinero valuoExonerado,
+            Porcentaje porcentajePropiedad,
+            Dinero baseImponiblePredio,
+            long valuacionConjuntoId,
+            String valuacionHuella) {
+        return new DetalleDeterminacionPredio(
+                null,
+                predioId,
+                autovaluo,
+                valuoExonerado,
+                porcentajePropiedad,
+                baseImponiblePredio,
+                OrigenDelAutovaluo.SELLADO,
+                valuacionConjuntoId,
+                valuacionHuella);
     }
 
     /** La parte del autovaluo que si esta afecta, antes de ponderar por el % de propiedad. */

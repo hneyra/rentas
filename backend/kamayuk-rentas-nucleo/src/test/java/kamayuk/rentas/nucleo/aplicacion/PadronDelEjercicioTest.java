@@ -255,6 +255,7 @@ class PadronDelEjercicioTest {
                 new SinCaracteristicas(),
                 new DirectorioDelPadron(caso),
                 new CuadroPredialParametrizado(lector),
+                new kamayuk.rentas.nucleo.dobles.ValuacionesSelladasEnMemoria(),
                 new RegistrarDeterminacionPredial(determinaciones, lector, registro -> {}, RELOJ),
                 RELOJ);
     }

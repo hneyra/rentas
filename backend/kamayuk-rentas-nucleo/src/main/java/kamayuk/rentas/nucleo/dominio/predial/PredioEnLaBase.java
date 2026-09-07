@@ -33,6 +33,13 @@ import org.jspecify.annotations.Nullable;
  *     de 0,349 %. La determinacion se hace igual —es correcta para lo registrado, y no determinar
  *     dejaria sin emitir a un tercio del padron—, pero sale <b>dicho</b>: una cifra ponderada por
  *     una titularidad incompleta no se distingue de una correcta si nada la acompaña
+ * @param origenDelAutovaluo de donde salio la cifra con que se determino este predio (#38)
+ * @param valuacionConjuntoId el conjunto con que `catastro` la calculo; {@code null} si es
+ *     declarada
+ * @param valuacionHuella la huella con que `catastro` la sello; {@code null} si es declarada
+ * @param autovaluoDeclarado <b>el otro</b> autovaluo, cuando manda la valuacion sellada y ademas
+ *     habia declaracion. Se guarda para que la discrepancia se pueda ver en vez de descubrirse en
+ *     ventanilla; {@code null} cuando no hay dos cifras que comparar
  */
 public record PredioEnLaBase(
         long predioId,
@@ -43,7 +50,11 @@ public record PredioEnLaBase(
         Dinero autovaluo,
         Dinero valuoExonerado,
         Dinero baseImponiblePredio,
-        Porcentaje porcentajeRegistradoDelPredio) {
+        Porcentaje porcentajeRegistradoDelPredio,
+        OrigenDelAutovaluo origenDelAutovaluo,
+        @Nullable Long valuacionConjuntoId,
+        @Nullable String valuacionHuella,
+        @Nullable Dinero autovaluoDeclarado) {
 
     /** La forma anterior a #690, que da el predio por completo. */
     public PredioEnLaBase(
@@ -65,6 +76,40 @@ public record PredioEnLaBase(
                 valuoExonerado,
                 baseImponiblePredio,
                 new Porcentaje(java.math.BigDecimal.valueOf(100)));
+    }
+
+    /**
+     * La forma anterior a #38, cuyo autovaluo es declarado.
+     *
+     * <p>Existe para las pruebas y los llamadores que no hablan de la valuacion sellada. El valor
+     * por omision es DECLARADO y no SELLADO a proposito: si fuera al reves, un llamador que no
+     * supiera de #38 estaria afirmando que su cifra la sello `catastro`, con un conjunto y una
+     * huella que no tiene.
+     */
+    public PredioEnLaBase(
+            long predioId,
+            String codigoReferenciaCatastral,
+            String direccion,
+            @Nullable String uso,
+            Porcentaje porcentajePropiedad,
+            Dinero autovaluo,
+            Dinero valuoExonerado,
+            Dinero baseImponiblePredio,
+            Porcentaje porcentajeRegistradoDelPredio) {
+        this(
+                predioId,
+                codigoReferenciaCatastral,
+                direccion,
+                uso,
+                porcentajePropiedad,
+                autovaluo,
+                valuoExonerado,
+                baseImponiblePredio,
+                porcentajeRegistradoDelPredio,
+                OrigenDelAutovaluo.DECLARADO,
+                null,
+                null,
+                null);
     }
 
     /** Las cuotas del predio cubren el predio entero a la fecha de calculo. */
@@ -107,9 +152,24 @@ public record PredioEnLaBase(
         return autovaluo.menos(valuoExonerado);
     }
 
-    /** El detalle que se guarda de este predio. */
+    /** El detalle que se guarda de este predio, con de donde salio su autovaluo (#38). */
     public DetalleDeterminacionPredio comoDetalle() {
+        if (origenDelAutovaluo == OrigenDelAutovaluo.SELLADO) {
+            return DetalleDeterminacionPredio.sellado(
+                    predioId,
+                    autovaluo,
+                    valuoExonerado,
+                    porcentajePropiedad,
+                    baseImponiblePredio,
+                    java.util.Objects.requireNonNull(valuacionConjuntoId),
+                    java.util.Objects.requireNonNull(valuacionHuella));
+        }
         return DetalleDeterminacionPredio.nuevo(
                 predioId, autovaluo, valuoExonerado, porcentajePropiedad, baseImponiblePredio);
+    }
+
+    /** Si el autovaluo salio de la valuacion que `catastro` sello (ADR-0027). */
+    public boolean autovaluoSellado() {
+        return origenDelAutovaluo == OrigenDelAutovaluo.SELLADO;
     }
 }

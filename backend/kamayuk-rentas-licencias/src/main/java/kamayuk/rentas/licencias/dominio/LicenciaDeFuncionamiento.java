@@ -47,6 +47,8 @@ import org.jspecify.annotations.Nullable;
  * @param usuarioRegistro quien la registro; sale del origen de la sesion
  * @param observacion por que se emite (regla 10, RNF-052)
  * @param giros los giros CIIU autorizados; al menos uno, exactamente uno principal
+ * @param territorio lo que el territorio contesto sobre el predio, y cual de las dos zonas sostiene
+ *     el acto (#43, V14). Nunca nulo: «no se comprobo» es un valor y no una ausencia
  */
 public record LicenciaDeFuncionamiento(
         @Nullable Long id,
@@ -69,7 +71,8 @@ public record LicenciaDeFuncionamiento(
         Instant registradoEn,
         @Nullable String usuarioRegistro,
         Observacion observacion,
-        List<GiroDeLaLicencia> giros) {
+        List<GiroDeLaLicencia> giros,
+        TerritorioDeLaLicencia territorio) {
 
     public LicenciaDeFuncionamiento {
         Objects.requireNonNull(numero, "Una licencia sin numero no es una licencia");
@@ -81,6 +84,10 @@ public record LicenciaDeFuncionamiento(
         Objects.requireNonNull(registradoEn, "La licencia dice cuando se registro");
         Objects.requireNonNull(observacion, "Sin observacion no se guarda (regla 10, RNF-052)");
         Objects.requireNonNull(giros, "La lista de giros es vacia, no nula");
+        Objects.requireNonNull(
+                territorio,
+                "«No se comprobo el territorio» es un valor y no un nulo: si fuera nulo, una"
+                        + " licencia sin comprobar y una comprobada serian indistinguibles (#43)");
 
         numero = numero.strip();
         nombreComercial = nombreComercial.strip();

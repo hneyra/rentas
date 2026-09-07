@@ -195,7 +195,8 @@ class EstadoYNumeracionTest {
                                             AHORA,
                                             null,
                                             PORQUE,
-                                            List.of(giro(1L, true))))
+                                            List.of(giro(1L, true)),
+                                            TerritorioDeLaLicencia.sinComprobar(null)))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("temporal");
         }
@@ -226,7 +227,8 @@ class EstadoYNumeracionTest {
                                             AHORA,
                                             null,
                                             PORQUE,
-                                            List.of(giro(1L, true))))
+                                            List.of(giro(1L, true)),
+                                            TerritorioDeLaLicencia.sinComprobar(null)))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("antes de empezar");
         }
@@ -312,6 +314,7 @@ class EstadoYNumeracionTest {
                 AHORA,
                 null,
                 PORQUE,
-                giros);
+                giros,
+                TerritorioDeLaLicencia.sinComprobar(null));
     }
 }
