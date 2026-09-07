@@ -128,15 +128,16 @@ dos direcciones:
 - El comentario rancio de `consultas/index.ts` ya quedó corregido, y
   `consulta_unificada`, `consulta_resumen_predial` y `consulta_valores` conectadas (#72):
   la ficha 360° las encuentra servidas.
-- Backend pendiente, cada uno con su issue: búsqueda de licencias por código o documento;
-  **`numeroDocumento` como filtro de `GET /rentas/contribuyentes`** — el contrato solo publica
-  `codigo`, `nombreRazonSocial`, `dNI` y `rUC`, así que un carné de extranjería, un pasaporte o
-  una partida no se pueden buscar por su número aunque `TipoDocumento` los admita y
-  `CriterioDeBusqueda.porNumeroDeDocumento` exista en el dominio; mientras tanto el inicio no
-  inventa la forma de esos documentos y a esas personas se las busca por nombre —; realm y
+- Backend pendiente, cada uno con su issue: búsqueda de licencias por código o documento; realm y
   lecturas del ciudadano para el portal público; y, si la operación diaria lo pide, el
   endpoint unificado de búsqueda del padrón como optimización — nunca como sustituto de la
   semántica por permiso.
+- **`numeroDocumento` como filtro de `GET /rentas/contribuyentes` ya no está pendiente**: lo cierra
+  #35. Este punto decía que el contrato sólo publicaba `codigo`, `nombreRazonSocial`, `dNI` y `rUC`,
+  de modo que un carné de extranjería, un pasaporte o una partida no se podían buscar por su número
+  aunque `TipoDocumento` los admitiera y `CriterioDeBusqueda.porNumeroDeDocumento` existiera en el
+  dominio. Desde #35 los dos filtros del documento son `tipoDocumento` + `numeroDocumento`, el tipo
+  es opcional y los seis del enumerado se pueden preguntar.
 - El inicio gana su entrada en el lanzador de ADR-0014 §2, la primera y sin permiso que
   comprobar: no es una opción del catálogo, es la puerta del shell, y hasta ahora la única
   vuelta era la marca de la barra lateral —que en móvil se pliega en cajón—.

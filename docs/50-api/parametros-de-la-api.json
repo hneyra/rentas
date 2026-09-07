@@ -347,7 +347,7 @@
     "obligatorios": [],
     "algunoDeEstos": [],
     "condicionales": [],
-    "opcionales": ["codigo", "dNI", "direccion", "nombreRazonSocial", "ordenarPor", "pagina", "rUC", "tamano"],
+    "opcionales": ["codigo", "direccion", "nombreRazonSocial", "numeroDocumento", "ordenarPor", "pagina", "tamano", "tipoDocumento"],
     "enElCuerpo": []
   },
   "GET /rentas/contribuyentes/{id}/ficha": {

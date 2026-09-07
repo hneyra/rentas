@@ -303,13 +303,13 @@ describe('AC3 — la busqueda la resuelve el backend, no un filtro sobre la pagi
     await usuario.click(screen.getByRole('button', { name: 'Página siguiente' }));
     await screen.findByText('CORTEZ DE IPANAQUE-MARIA ANTONIETA');
 
-    await usuario.selectOptions(criterio(), 'DNI');
+    await usuario.selectOptions(criterio(), 'Documento');
     await usuario.type(buscador(), '29614026');
     // Se espera a la CUENTA y no al nombre: ese nombre esta tambien en la pagina 0, que llega
     // antes por el cambio de criterio, asi que esperarlo resolveria antes de la busqueda.
     await screen.findByText('1 contribuyente');
 
-    const suyas = pedidas(espia).filter((url) => url.includes('dNI=29614026'));
+    const suyas = pedidas(espia).filter((url) => url.includes('numeroDocumento=29614026'));
     expect(suyas).not.toEqual([]);
     // Y con `pagina=0`: quedarse en la 27 de una busqueda nueva ensena un vacio que no lo es.
     expect(suyas.every((url) => url.includes('pagina=0'))).toBe(true);
@@ -349,7 +349,7 @@ describe('AC3 — la busqueda la resuelve el backend, no un filtro sobre la pagi
 });
 
 describe('AC3 — los criterios que la operacion no admite NO se ofrecen, y se dice cual', () => {
-  it('el selector ofrece exactamente los cuatro que el backend publica', async () => {
+  it('el selector ofrece exactamente los tres que el backend publica (#35)', async () => {
     backendMedido();
     await montar();
 
@@ -357,20 +357,47 @@ describe('AC3 — los criterios que la operacion no admite NO se ofrecen, y se d
       within(criterio())
         .getAllByRole('option')
         .map((una) => una.textContent),
-    ).toEqual(['Nombre', 'Código', 'DNI', 'RUC']);
+    ).toEqual(['Nombre', 'Código', 'Documento']);
   });
 
-  it('«Código» avisa de que se compara por igualdad, porque asi es el SQL', async () => {
+  it('#35 — «Código» avisa de que admite las primeras cifras, porque asi es el SQL', async () => {
     backendMedido();
     const usuario = await montar();
 
     await usuario.selectOptions(criterio(), 'Código');
 
-    // Medido: `?codigo=000000000` devuelve 0 sobre un padron de codigos que empiezan por ceros.
-    // Sin este aviso, quien teclee medio codigo concluye que ese contribuyente no existe.
+    // Antes de #35 el aviso decia lo contrario —«se busca completo»— y era cierto: la condicion
+    // era `codigo_contribuyente = :codigo` y `?codigo=000000000` devolvia 0 de 10 603. Un aviso
+    // que se quedara viejo mandaria a teclear el codigo entero a quien ya no hace falta.
     expect(
-      screen.getByText('«Código» se busca completo: el backend compara por igualdad.'),
+      screen.getByText('«Código» admite las primeras cifras: el backend busca por prefijo.'),
     ).toBeInTheDocument();
+    expect(screen.queryByText(/«Código» se busca completo/)).toBeNull();
+  });
+
+  it('y «Documento» si avisa de que se compara entero: ahi el SQL sigue siendo una igualdad', async () => {
+    backendMedido();
+    const usuario = await montar();
+
+    await usuario.selectOptions(criterio(), 'Documento');
+
+    expect(
+      screen.getByText('«Documento» se busca completo: el backend compara por igualdad.'),
+    ).toBeInTheDocument();
+  });
+
+  it('#35 — buscar medio codigo trae MAS DE UNA fila, y antes no traia ninguna', async () => {
+    backendMedido();
+    const usuario = await montar();
+
+    await usuario.selectOptions(criterio(), 'Código');
+    await usuario.type(buscador(), '000000000');
+
+    // Es el defecto entero visto desde la pantalla: con la igualdad de antes esto era «0
+    // contribuyentes» sobre un padron que tiene diez mil cuyo codigo empieza asi. Los 5 son los
+    // que el doble medido tiene sembrados con ese prefijo.
+    expect(await screen.findByText('5 contribuyentes')).toBeInTheDocument();
+    expect(screen.queryByText('0 contribuyentes')).toBeNull();
   });
 
   it('y «Nombre» no lo avisa, porque ahi si vale un trozo', async () => {
@@ -639,7 +666,7 @@ describe('AC7 — todo importe que se ensena lleva su fecha', () => {
 describe('AC8 — la compuerta del alta le pregunta al PADRON, no a la pagina cargada', () => {
   const numero = () => screen.getByRole('textbox', { name: 'Número' });
 
-  it('un DNI ya registrado se consulta por `?dNI=` y el aviso dice de quien es', async () => {
+  it('un DNI ya registrado se consulta por su tipo y su numero, y el aviso dice de quien es', async () => {
     const espia = backendMedido();
     const usuario = await montar();
     await usuario.click(screen.getByRole('button', { name: 'Nuevo contribuyente' }));
@@ -650,7 +677,11 @@ describe('AC8 — la compuerta del alta le pregunta al PADRON, no a la pagina ca
     expect(
       screen.getByText(/a nombre de SULLON VILCHEZ-JOSE RAUL \(00000000008\)/),
     ).toBeInTheDocument();
-    expect(pedidas(espia).some((url) => url.includes('dNI=29614026'))).toBe(true);
+    expect(
+      pedidas(espia).some(
+        (url) => url.includes('tipoDocumento=DNI') && url.includes('numeroDocumento=29614026'),
+      ),
+    ).toBe(true);
   });
 
   it('un DNI libre no bloquea, y la respuesta vacia es la que lo dice', async () => {
@@ -678,7 +709,7 @@ describe('AC8 — la compuerta del alta le pregunta al PADRON, no a la pagina ca
 
   it('si la consulta FALLA no se crea: no saber no es saber que esta libre', async () => {
     backendMedido((url) =>
-      url.includes('dNI=99999999')
+      url.includes('numeroDocumento=99999999')
         ? problema(503, 'ERROR_INTERNO', 'El padrón no responde')
         : null,
     );
@@ -691,8 +722,11 @@ describe('AC8 — la compuerta del alta le pregunta al PADRON, no a la pagina ca
     );
   });
 
-  it('un carne de extranjeria NO se puede comprobar, y la pantalla lo dice en vez de fingir', async () => {
-    // `ContribuyenteController.buscar` publica `dNI` y `rUC` y nada para los demas tipos.
+  it('#35 — un carne de extranjeria YA se comprueba, y antes la pantalla decia que no podia', async () => {
+    // Hasta #35 `ContribuyenteController.buscar` publicaba `dNI` y `rUC` y nada para los demas
+    // tipos: esta misma prueba afirmaba lo contrario —«Sin comprobar en el padrón», y ninguna
+    // peticion— porque era lo unico que se podia hacer sin fingir. Lo que cambia no es la
+    // pantalla: es que la operacion admite el tipo.
     const espia = backendMedido();
     const usuario = await montar();
     await usuario.click(screen.getByRole('button', { name: 'Nuevo contribuyente' }));
@@ -703,10 +737,15 @@ describe('AC8 — la compuerta del alta le pregunta al PADRON, no a la pagina ca
     );
     await usuario.type(numero(), '001234567890');
 
-    expect(await screen.findByText('Sin comprobar en el padrón')).toBeInTheDocument();
-    expect(screen.getByText(/sólo se puede consultar por DNI y por RUC/)).toBeInTheDocument();
-    // Y no se pregunta nada: una consulta sin filtro devolveria el padron entero.
-    expect(pedidas(espia).some((url) => url.includes('001234567890'))).toBe(false);
+    expect(await screen.findByText('Documento válido')).toBeInTheDocument();
+    expect(screen.queryByText('Sin comprobar en el padrón')).toBeNull();
+    // Y se pregunta de verdad, con su tipo: sin el, el numero de un carne podria chocar con el
+    // DNI de otra persona y el aviso acusaria a quien no es.
+    expect(
+      pedidas(espia).some(
+        (url) => url.includes('tipoDocumento=CE') && url.includes('numeroDocumento=001234567890'),
+      ),
+    ).toBe(true);
   });
 });
 

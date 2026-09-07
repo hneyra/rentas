@@ -195,20 +195,68 @@ class ContribuyenteRepositoryJdbcTest {
     class Busqueda {
 
         @Test
-        @DisplayName("por codigo exacto")
-        void porCodigo() {
+        @DisplayName("por el codigo entero: sigue trayendo una sola fila")
+        void porCodigoEntero() {
             TenantContext.fijar(new MunicipalidadId(municipalidadA));
 
             Pagina<Contribuyente> pagina =
                     transaccion.execute(
                             estado ->
                                     repositorio.buscar(
-                                            CriterioDeBusqueda.porCodigo("00002"),
+                                            CriterioDeBusqueda.porCodigoQueEmpiezaPor("00002"),
                                             Paginacion.de(0, 20, "codigo_contribuyente")));
 
             assertThat(pagina).isNotNull();
-            assertThat(pagina.totalElementos()).isEqualTo(1);
+            assertThat(pagina.totalElementos())
+                    .as(
+                            "#35 convierte el codigo en un prefijo, y el prefijo mas largo que hay"
+                                    + " es el codigo entero: quien ya lo sabe sigue recibiendo una fila"
+                                    + " y no una lista")
+                    .isEqualTo(1);
             assertThat(pagina.contenido().get(0).nombreRazonSocial()).startsWith("QUISPE");
+        }
+
+        @Test
+        @DisplayName("#35 — por las primeras cifras: el prefijo encuentra MAS DE UNA")
+        void porElPrefijoDelCodigo() {
+            TenantContext.fijar(new MunicipalidadId(municipalidadA));
+
+            Pagina<Contribuyente> pagina =
+                    transaccion.execute(
+                            estado ->
+                                    repositorio.buscar(
+                                            CriterioDeBusqueda.porCodigoQueEmpiezaPor("0000"),
+                                            Paginacion.de(0, 20, "codigo_contribuyente")));
+
+            assertThat(pagina).isNotNull();
+            assertThat(pagina.contenido().stream().map(c -> c.codigo().valor()).toList())
+                    .as(
+                            "con la igualdad de antes de #35 esto devolvia CERO filas y sin error"
+                                    + " —medido contra Catacaos, «?codigo=000000000» sobre 10 603—, que"
+                                    + " es lo que quien busca lee como «ese contribuyente no existe»")
+                    .containsExactly("00001", "00002", "00003", "00004");
+        }
+
+        @Test
+        @DisplayName("y el prefijo no salta a la municipalidad vecina, que tiene el mismo codigo")
+        void elPrefijoNoCruzaElAislamiento() {
+            TenantContext.fijar(new MunicipalidadId(municipalidadB));
+
+            Pagina<Contribuyente> pagina =
+                    transaccion.execute(
+                            estado ->
+                                    repositorio.buscar(
+                                            CriterioDeBusqueda.porCodigoQueEmpiezaPor("0000"),
+                                            Paginacion.de(0, 20, "codigo_contribuyente")));
+
+            assertThat(pagina).isNotNull();
+            assertThat(pagina.contenido())
+                    .as(
+                            "un filtro mas ancho es mas filas, y quien las acota sigue siendo la"
+                                    + " politica: B tiene un solo contribuyente y el codigo 00001 esta"
+                                    + " en las dos")
+                    .singleElement()
+                    .satisfies(c -> assertThat(c.nombreRazonSocial()).startsWith("OTRO PADRON"));
         }
 
         @Test

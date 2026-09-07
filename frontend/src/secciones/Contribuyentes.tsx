@@ -33,7 +33,7 @@ import { tonoDelEstado } from './tonos.ts';
  * aqui, y las tres por el mismo motivo:
  *
  *   · **Buscar.** Filtrar las veinte filas cargadas devuelve «ningun contribuyente coincide»
- *     para alguien que si esta en el padron. Lo resuelve el backend, con los cuatro criterios
+ *     para alguien que si esta en el padron. Lo resuelve el backend, con los criterios
  *     que publica y con el selector que hace falta para elegir entre ellos (`padron.ts`).
  *   · **Ordenar.** Reordenar la pagina cargada pone delante «el primero» de veinte, no del
  *     padron. Va como `?ordenarPor=`, y por eso «Deuda» desaparece: el backend contesta **422
@@ -234,11 +234,14 @@ export function Contribuyentes({
               </button>
             )}
           </div>
-          {/* Un «=» y no un «contiene»: el SQL es `codigo_contribuyente = :codigo`, medido —un
-              codigo a medias devuelve cero—. Decirlo aqui es mas barato que descubrirlo. */}
-          {criterio.exacto && (
+          {/* Que compara el backend, dicho antes de que alguien teclee medio dato y concluya
+              que no existe. Desde #35 son dos frases y no una: el codigo admite prefijo —el SQL
+              es un rango `~>=~` / `~<~`— y el documento sigue siendo igualdad. */}
+          {criterio.comparacion !== 'aproximacion' && (
             <p className="kr-padron__nota-del-criterio">
-              «{criterio.rotulo}» se busca completo: el backend compara por igualdad.
+              {criterio.comparacion === 'prefijo'
+                ? `«${criterio.rotulo}» admite las primeras cifras: el backend busca por prefijo.`
+                : `«${criterio.rotulo}» se busca completo: el backend compara por igualdad.`}
             </p>
           )}
           <div className="kr-padron__chips">
@@ -270,7 +273,7 @@ export function Contribuyentes({
               <span className="kr-padron__orden-rotulo">Ordenar la lista</span>
               <select
                 value={estado.orden}
-                disabled={buscado.trim() !== '' && !criterio.exacto}
+                disabled={buscado.trim() !== '' && criterio.comparacion === 'aproximacion'}
                 onChange={(evento) => {
                   rehacerLaConsulta({ orden: evento.target.value });
                 }}

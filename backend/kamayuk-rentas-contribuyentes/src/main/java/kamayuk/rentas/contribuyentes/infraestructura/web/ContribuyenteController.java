@@ -3,6 +3,8 @@ package kamayuk.rentas.contribuyentes.infraestructura.web;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Locale;
 import kamayuk.rentas.autorizacion.ComprobadorDeAcceso;
 import kamayuk.rentas.autorizacion.Privilegio;
@@ -39,10 +41,39 @@ import org.springframework.web.bind.annotation.RestController;
  * Padron de contribuyentes: {@code GET/POST /api/v1/rentas/contribuyentes} y {@code PUT
  * /api/v1/rentas/contribuyentes/{id}}.
  *
- * <p>Los cuatro filtros de la lectura son los que declara el contrato, con los nombres que trae de
- * la pantalla del manual: {@code codigo}, {@code nombreRazonSocial}, {@code dNI} y {@code rUC}. Que
- * los dos ultimos vengan asi —con la mayuscula corrida— no es un descuido: el contrato se derivo
- * del prototipo, y cambiarlo aqui rompe la pantalla. Se corrige en el contrato o no se corrige.
+ * <h2>Los cuatro filtros de la lectura, y por que dos cambiaron de nombre en #35</h2>
+ *
+ * <p>Son {@code codigo}, {@code nombreRazonSocial}, {@code tipoDocumento} y {@code
+ * numeroDocumento}. Los dos ultimos se llamaban <b>{@code dNI} y {@code rUC}</b>, con la minuscula
+ * suelta y el resto en mayusculas, y ese nombre no lo escribio nadie: sale de pasar a camelCase el
+ * rotulo «D.N.I.» de la pantalla del manual, que es de donde el contrato se deriva (#312). No es
+ * camelCase de nada —la guia de la casa dice «campos de la API JSON en español camelCase»— y ademas
+ * invita a la errata, que es de donde nacio #539.
+ *
+ * <p><b>Se unifican en un tipo y un numero, y no se renombran a {@code dni} y {@code ruc}</b>. Tres
+ * motivos, en este orden:
+ *
+ * <ol>
+ *   <li><b>Con dos filtros solo se podian comprobar dos de los seis tipos.</b> {@link
+ *       TipoDocumento} tiene {@code DNI}, {@code RUC}, {@code CE}, {@code PASAPORTE}, {@code
+ *       PARTIDA} y {@code OTRO}, y el borde publicaba dos: <b>no habia forma de preguntar si un
+ *       extranjero ya estaba en el padron</b> antes de darlo de alta otra vez, que es el dano que
+ *       la compuerta del alta existe para impedir. Renombrar a {@code dni}/{@code ruc} habria
+ *       arreglado la ortografia y dejado ese hueco intacto.
+ *   <li><b>Un tipo y un numero es lo que este mismo controlador ya escribe.</b> {@link
+ *       PeticionDeContribuyente} declara {@code tipoDocumento} y {@code numeroDocumento} desde
+ *       #488: con {@code dni}/{@code ruc} en la lectura, la misma operacion tendria dos
+ *       vocabularios para el mismo dato segun el verbo.
+ *   <li>Y dos filtros excluyentes para una sola columna son <b>dos nombres de la misma cosa</b>,
+ *       que es el defecto que {@code OrdenSeguro.publicandoComo} cerro para el orden (#546).
+ * </ol>
+ *
+ * <p>El tipo es <b>opcional</b>: quien atiende teclea el numero que trae el carne y no se detiene a
+ * clasificarlo. Un tipo que el enumerado no reconozca es <b>422 nombrando los seis</b> —rechazar
+ * tambien es leer—, y un tipo sin numero tambien, porque acotar solo por tipo devolveria el padron
+ * entero de ese tipo.
+ *
+ * <p><b>Y {@code codigo} paso a ser un PREFIJO</b> (#35): ver {@link CriterioDeBusqueda}.
  *
  * <p><b>Hasta #488 esto era solo lectura</b>, y el javadoc lo decia sin rodeos: el alta vivia en
  * {@code RegistrarContribuyente} y no se publicaba. La consecuencia era que una municipalidad
@@ -107,21 +138,41 @@ public class ContribuyenteController {
     public RespuestaPaginada<ContribuyenteResource> buscar(
             @RequestParam(required = false) @Nullable String codigo,
             @RequestParam(required = false) @Nullable String nombreRazonSocial,
-            @RequestParam(name = "dNI", required = false) @Nullable String dni,
-            @RequestParam(name = "rUC", required = false) @Nullable String ruc,
+            @RequestParam(required = false) @Nullable String tipoDocumento,
+            @RequestParam(required = false) @Nullable String numeroDocumento,
             ParametrosDePaginacion paginacion) {
 
         CriterioDeBusqueda criterio =
-                new CriterioDeBusqueda(
-                        codigo,
-                        nombreRazonSocial,
-                        tipoDe(dni, ruc),
-                        dni != null && !dni.isBlank() ? dni : ruc,
-                        false);
+                criterioDe(codigo, nombreRazonSocial, tipoDocumento, numeroDocumento);
 
         return RespuestaPaginada.de(
                 consulta.buscar(criterio, paginacion.aPaginacion(ORDEN_POR_OMISION)),
                 ContribuyenteResource::de);
+    }
+
+    /**
+     * Los cuatro filtros, convertidos en el criterio del dominio.
+     *
+     * <p>Lo unico que puede fallar aqui es el vocabulario: el tipo que no existe y el tipo sin
+     * numero. Los dos son <b>422 y no 500</b>, porque los manda el cliente, y los dos dicen que
+     * arreglar — el segundo con el mensaje que el propio {@link CriterioDeBusqueda} escribe, que ya
+     * explica por que acotar solo por tipo no es una busqueda.
+     */
+    private static CriterioDeBusqueda criterioDe(
+            @Nullable String codigo,
+            @Nullable String nombreRazonSocial,
+            @Nullable String tipoDocumento,
+            @Nullable String numeroDocumento) {
+        try {
+            return new CriterioDeBusqueda(
+                    codigo,
+                    nombreRazonSocial,
+                    tipoDeBusquedaDe(tipoDocumento),
+                    numeroDocumento,
+                    false);
+        } catch (IllegalArgumentException sinNumero) {
+            throw new ProblemaDeNegocio(CodigoDeError.VALIDACION, mensajeDe(sinNumero));
+        }
     }
 
     /**
@@ -302,19 +353,36 @@ public class ContribuyenteController {
         return limpio.isEmpty() ? null : limpio;
     }
 
+    /** El tipo que acota la busqueda, o {@code null} si no se pidio ninguno (#35). */
+    private static @Nullable TipoDocumento tipoDeBusquedaDe(@Nullable String texto) {
+        if (texto == null || texto.isBlank()) {
+            return null;
+        }
+        return tipoDeDocumentoDe(texto);
+    }
+
     /**
-     * El contrato trae el DNI y el RUC como dos filtros distintos, no como un tipo y un numero. Si
-     * llegan los dos, gana el DNI: son criterios excluyentes —nadie tiene los dos en la misma fila—
-     * y combinarlos con Y devolveria siempre vacio, que es la respuesta mas confusa posible.
+     * El tipo del enumerado, o 422 <b>con los seis dentro</b>.
+     *
+     * <p>Nombrarlos es la diferencia entre un rechazo que se arregla y uno que manda a adivinar: lo
+     * mismo que hace {@code GuardiaDeParametros} con «Se admiten: …» cuando el parametro no existe,
+     * y lo que #35 le pide al {@code ORDEN_NO_ADMITIDO}. La misma clase de error, la misma calidad
+     * de respuesta.
      */
-    private static @Nullable TipoDocumento tipoDe(@Nullable String dni, @Nullable String ruc) {
-        if (dni != null && !dni.isBlank()) {
-            return TipoDocumento.DNI;
+    private static TipoDocumento tipoDeDocumentoDe(String texto) {
+        try {
+            return TipoDocumento.valueOf(normalizar(texto));
+        } catch (IllegalArgumentException desconocido) {
+            throw new ProblemaDeNegocio(
+                    CodigoDeError.VALIDACION,
+                    "Tipo de documento desconocido: '" + texto + "'",
+                    List.of("Se admiten: " + String.join(", ", nombresDeLosTiposDeDocumento())));
         }
-        if (ruc != null && !ruc.isBlank()) {
-            return TipoDocumento.RUC;
-        }
-        return null;
+    }
+
+    /** Los seis, en el orden en que el enumerado los declara. */
+    private static List<String> nombresDeLosTiposDeDocumento() {
+        return Arrays.stream(TipoDocumento.values()).map(Enum::name).toList();
     }
 
     static Observacion observacionDe(@Nullable String texto) {
@@ -339,14 +407,7 @@ public class ContribuyenteController {
     }
 
     private static DocumentoIdentidad documentoDe(@Nullable String tipo, @Nullable String numero) {
-        String nombreDelTipo = normalizar(exigir(tipo, "tipoDocumento"));
-        TipoDocumento tipoDocumento;
-        try {
-            tipoDocumento = TipoDocumento.valueOf(nombreDelTipo);
-        } catch (IllegalArgumentException desconocido) {
-            throw new ProblemaDeNegocio(
-                    CodigoDeError.VALIDACION, "Tipo de documento desconocido: '" + tipo + "'");
-        }
+        TipoDocumento tipoDocumento = tipoDeDocumentoDe(exigir(tipo, "tipoDocumento"));
         try {
             return new DocumentoIdentidad(tipoDocumento, exigir(numero, "numeroDocumento"));
         } catch (IllegalArgumentException invalido) {

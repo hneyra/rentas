@@ -184,13 +184,19 @@ export function contestaLaInstalacion(url: string): unknown | null {
   }
   const codigo = q.get('codigo');
   if (codigo !== null) {
-    const suyo = [...PAGINA_0_FILAS, ...PAGINA_1_FILAS].filter((uno) => uno.codigo === codigo);
+    // Por PREFIJO desde #35, que es lo que el backend hace: con `===` este doble seguiria
+    // contestando lo que contestaba antes y la pantalla no podria distinguir las dos.
+    const suyo = [...PAGINA_0_FILAS, ...PAGINA_1_FILAS].filter((uno) =>
+      uno.codigo.startsWith(codigo),
+    );
     return envolver(suyo, 0, suyo.length);
   }
-  const documento = q.get('dNI') ?? q.get('rUC');
+  const documento = q.get('numeroDocumento');
   if (documento !== null) {
+    const tipo = q.get('tipoDocumento');
     const suyo = [...PAGINA_0_FILAS, ...PAGINA_1_FILAS].filter(
-      (uno) => uno.numeroDocumento === documento,
+      (uno) =>
+        uno.numeroDocumento === documento && (tipo === null || uno.tipoDocumento === tipo),
     );
     return envolver(suyo, 0, suyo.length);
   }
