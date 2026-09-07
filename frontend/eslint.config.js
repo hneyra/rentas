@@ -88,6 +88,22 @@ export default tseslint.config(
   ...bloquesDeExcepcion,
 
   {
+    // `public/` es codigo de NAVEGADOR que Vite copia tal cual, sin transformar ni empaquetar:
+    // no es un modulo, no pasa por TypeScript y por eso no lo alcanza el bloque de arriba, que
+    // solo mira `.ts`/`.tsx`. Sin esta linea `window` sale como `no-undef`.
+    //
+    // Se le dan globales de navegador y NO se mete en `ignores`, a proposito: `configuracion.js`
+    // es lo primero que ejecuta la pagina —antes que el paquete— y un error de sintaxis ahi deja
+    // la aplicacion entera en blanco. Es justo el archivo que mas conviene que alguien revise.
+    files: ['public/**/*.js'],
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: 'script',
+      globals: { ...globals.browser },
+    },
+  },
+
+  {
     // Las pruebas y los arneses corren en Node y hablan DE las prohibiciones: una prueba
     // que no puede escribir `municipalidadId` no puede comprobar que esta prohibido.
     //

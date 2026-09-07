@@ -1,0 +1,63 @@
+# Lo que NO viaja al contexto de `frontend/Dockerfile`.
+#
+# Este archivo hace falta APARTE del `.dockerignore` de la raiz, y no es duplicacion: un
+# `.dockerignore` solo se aplica desde la raiz del contexto, y el contexto de esta imagen es
+# `frontend/`. El de la raiz, ademas, **excluye `frontend/` entero** —sirve a la imagen del
+# backend, cuyo contexto si es la raiz—, asi que no dice absolutamente nada de esta.
+
+# ── Lo que se reconstruye dentro ─────────────────────────────────────────────────────────
+#
+# `node_modules` se reinstala desde `package.json` + `yarn.lock` con `--frozen-lockfile`.
+# Copiarlo de fuera meteria en la imagen los binarios compilados para la maquina de quien
+# construye, que no tienen por que ser los de la imagen base. Y no es solo tamano: cada archivo
+# del contexto entra en la huella de la capa, asi que un `yarn install` local —que reescribe
+# marcas de tiempo— invalidaria la cache y reconstruiria la imagen entera sin que ninguna fuente
+# hubiera cambiado.
+node_modules
+
+# Se reconstruye dentro con `yarn build`. Copiarlo de fuera es lo que haria que la imagen
+# publicara el `dist/` de otro commit sin que nada lo dijera: `COPY . .` lo traeria y `vite build`
+# lo sobrescribiria... salvo que el `build` fallara antes, que es justo cuando importa.
+dist
+
+# ── LOS ARCHIVOS DE ENTORNO. Todos, y este es el bloque que mas importa ──────────────────
+#
+# Vite carga `.env`, `.env.local`, `.env.<modo>` y `.env.<modo>.local`, y **hornea** cada
+# `VITE_*` que encuentre dentro del paquete. O sea que un archivo de entorno que entre en el
+# contexto no queda «disponible por si acaso»: acaba **dentro del JavaScript que se publica**.
+#
+# No basta con confiar en `.gitignore`, y esta medido en este repositorio: el de la raiz ignora
+# `.env` y `*.local.*`, y con eso **`.env.local` y `.env.production` se quedan fuera de las dos
+# reglas** —`*.local.*` exige algo detras del `.local`, asi que no casa con `.env.local`—. Los dos
+# son nombres que Vite lee. Es el hallazgo de `caja`#47: un `.env.<modo>` no ignorado por git
+# hornea lo que lleve dentro, en claro, en el paquete.
+#
+# Y hay uno que **si** esta versionado y tampoco puede entrar: `.env.development` enciende
+# `VITE_KAMAYUK_PROXY_DE_DATOS`, o sea las cifras del artboard. `vite build` no lo lee —solo se
+# carga en modo desarrollo—, pero excluirlo hace que eso deje de depender de una propiedad de
+# Vite que alguien podria cambiar sin querer. Es la segunda de las dos vallas del AC-3 de #44; la
+# primera es el `ENV` explicito del `Dockerfile`.
+.env
+.env.*
+
+# ── El arnes de extremo a extremo ────────────────────────────────────────────────────────
+#
+# `e2e/.estado/` guarda **cookies de sesion de Keycloak**, o sea credenciales vivas de la
+# instalacion de quien corrio `yarn e2e`. Esta en `.gitignore`, pero eso no lo mantiene fuera del
+# contexto: en la maquina de quien construye existe de verdad. Una credencial dentro de una imagen
+# que se publica en un registro es la peor forma de este defecto.
+#
+# El resto de `e2e/` tampoco lo necesita ninguna etapa: `yarn build` es `vite build` a secas, que
+# solo sigue lo que `index.html` importa. Los caminos son `.spec.ts` y los corre Playwright.
+e2e
+playwright-report
+test-results
+
+# ── Residuos locales y lo que no empaqueta nadie ─────────────────────────────────────────
+#
+# La historia del repositorio no la necesita ninguna etapa. En este arbol `frontend/.git` no
+# existe —el `.git` esta en la raiz—, pero un `git worktree` o un clon parcial de `frontend/` si
+# lo pondrian aqui, y entonces entraria entero.
+.git
+*.tsbuildinfo
+.capturas

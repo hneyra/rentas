@@ -56,6 +56,48 @@ const SISTEMA = "rentas";
 const MIGRADOR = `${SISTEMA}-migrador`;
 
 /**
+ * La imagen de la interfaz (#44): `frontend/Dockerfile`, un nginx sirviendo el `dist/` de
+ * `rentas-web`.
+ *
+ * **Nunca `rentas-web`.** Ese nombre YA ES otra cosa en este mismo archivo: el `Deployment` y el
+ * `Service` del BACKEND con el perfil `web` de Spring, que produce
+ * `despliegueDelPerfil(e, "web", true)` como `kamayuk-${SISTEMA}-web`. Reutilizarlo dejaria dos
+ * artefactos del producto llamados igual —uno sirve la API y el otro archivos estaticos— y
+ * cualquier frase del tipo «despliega `kamayuk-rentas-web`» pasaria a tener dos respuestas.
+ */
+const INTERFAZ = `${SISTEMA}-interfaz`;
+
+/** El nombre de sus tres recursos. Sale una vez y se usa en seis sitios. */
+const NOMBRE_DE_LA_INTERFAZ = `kamayuk-${SISTEMA}-interfaz`;
+
+/**
+ * Su etiqueta `componente`, **distinta de la del backend**, y no es cosmetica.
+ *
+ * `egreso()` selecciona por `componente: rentas` los pods que pueden hablar con el motor, con la
+ * identidad y con los tres sistemas vecinos. Si la interfaz llevara esa misma etiqueta heredaria
+ * las cinco aristas, y un nginx de archivos estaticos con salida a PostgreSQL es superficie que
+ * nadie pidio (AC-7 de #44). Con etiqueta propia sus dos politicas se escriben aparte y dicen lo
+ * que de verdad necesita, que es mucho menos.
+ */
+const COMPONENTE_DE_LA_INTERFAZ = INTERFAZ;
+
+/**
+ * El cliente publico de Keycloak con el que la interfaz entra.
+ *
+ * **Se escribe aqui porque `EntornoDelDescriptor` no lo publica**, y eso es lo que hay hoy: el
+ * realm lo describe `infrastructure` y este contrato entrega el emisor (`plataforma.emisor`) pero
+ * no el cliente. Mientras siga asi, cambiar de cliente es cambiar esta linea.
+ *
+ * **Y hay un hueco declarado que este repositorio NO puede cerrar (AC-9 de #44)**: `sgtm-backoffice`
+ * admite `http://localhost:5173/*` y nada mas, medido. `identidad.ts` compone el `redirect_uri`
+ * como `origin + '/'`, o sea `https://<dominio>/` una vez desplegado, que ese cliente **no
+ * admite** — el rebote acaba en «Invalid parameter: redirect_uri» y no entra nadie. Ampliar
+ * `redirectUris` es del dueno del realm, que es `infrastructure`. Se nombra aqui para que quien
+ * despliegue lo lea antes y no el dia del despliegue.
+ */
+const CLIENTE_OIDC_DE_LA_INTERFAZ = "sgtm-backoffice";
+
+/**
  * Su base, en el motor de la plataforma. Una por sistema (ADR-0029, ADR-0032).
  *
  * **El anfitrion lo pide, no lo escribe** (C-17, punto 1). Hasta aqui esta linea decia
@@ -239,6 +281,21 @@ function urlesDeLosVecinos(e: EntornoDelDescriptor) {
   }));
 }
 
+/**
+ * Lo que pide la interfaz, y es **mucho menos que el backend**: un nginx sirviendo archivos
+ * estaticos no necesita 1 CPU ni 1 Gi.
+ *
+ * No son cifras inventadas: son las mismas que `convenciones.recursos.interfaz` de
+ * `infrastructure` le da al nginx del monolito, que hace exactamente esto. Se copian y no se
+ * importan porque un descriptor no puede depender de `infrastructure` —seria la dependencia al
+ * reves de ADR-0031 §2—, y con un solo nodo lo que se reparte es el `request`: 50m frente a los
+ * 100m del backend es la diferencia entre que este pod quepa al lado de todo lo demas o no.
+ */
+const RECURSOS_DE_LA_INTERFAZ = {
+  requests: { cpu: "50m", memory: "64Mi" },
+  limits: { cpu: "200m", memory: "128Mi" },
+};
+
 /** El endurecimiento que no admite excepcion (issue #157). */
 const SEGURIDAD = {
   runAsNonRoot: true,
@@ -328,12 +385,322 @@ function despliegueDelPerfil(e: EntornoDelDescriptor, perfil: string, atiendeHtt
   return manifiestos;
 }
 
+/**
+ * Las senias del ambiente que la interfaz lee **al arrancar**, servidas como un guion.
+ *
+ * <h2>El problema que resuelve, que es el unico de #44 que no es de despliegue</h2>
+ *
+ * Vite sustituye `import.meta.env.VITE_*` **al construir**, asi que todo lo que la interfaz
+ * supiera por esa via quedaria horneado dentro de la imagen. Y una de esas cosas es la **URL del
+ * emisor OIDC**, que no es la misma en el puesto de quien desarrolla que en la municipalidad.
+ *
+ * <h2>Por que NO se hace una imagen por ambiente, que es lo que hizo el monolito</h2>
+ *
+ * `infrastructure/infra/componentes/Aplicacion.ts` etiqueta la del monolito
+ * `sgtm-interfaz:${environment}-${version}` justamente por esto, y lo dice en su comentario. Aqui
+ * no cabe, y por dos motivos que se pierden a la vez:
+ *
+ *   1. **La etiqueta es el `sha` de este repositorio** (AC-1 de #44, y lo que `publicar-imagenes.yml`
+ *      ya hace con las otras dos). Meter el nombre del ambiente dentro deja una etiqueta que no
+ *      resuelve contra ningun `git log`, y entonces «que corre en la municipalidad» vuelve a no
+ *      tener respuesta — que es exactamente el defecto que aquel workflow vino a cerrar.
+ *   2. **Lo verificado dejaria de ser lo desplegado.** Con una imagen por ambiente no se promueve
+ *      un artefacto de la marcha blanca a produccion: se vuelve a construir, y lo que sale no es
+ *      lo que se probo.
+ *
+ * <h2>Y por que un `ConfigMap` con esto y NO con el `nginx.conf`</h2>
+ *
+ * `caja` mete su `nginx.conf` en un `ConfigMap` y lo monta encima del que la imagen trae, para
+ * poder cambiarlo sin republicar. Aqui **no se hace**, y es una decision: ese archivo no tiene ni
+ * una linea que dependa del ambiente —el reparto entre la API y la interfaz lo hace el ingreso,
+ * no el nginx, asi que aqui no hay ningun destino que reescribir— de modo que la copia seria un
+ * segundo original con cero beneficio y una forma segura de divergir del que de verdad se sirve.
+ *
+ * Lo que si depende del ambiente es esto, y por eso es esto lo que viaja en el `ConfigMap`.
+ *
+ * <h2>El nombre del archivo y su forma</h2>
+ *
+ * `configuracion.js`, el mismo que `frontend/public/configuracion.js` —que viaja **vacio** dentro
+ * de la imagen— y sobre el que este se monta. Se compone con `JSON.stringify` y no concatenando
+ * comillas: un valor con una comilla dentro se saldria del literal y dejaria un guion que no
+ * analiza, o sea la aplicacion entera en blanco.
+ */
+function senasDelAmbiente(e: EntornoDelDescriptor): Record<string, string> {
+  return {
+    // El emisor PUBLICO, que es el que el navegador tiene que alcanzar. Es la misma cadena que el
+    // backend recibe en `KAMAYUK_OIDC_EMISOR` —el contrato la describe como «el emisor OIDC,
+    // publico. Es lo que se compara con el `iss`»— y por eso no se compone aqui: componerla seria
+    // repetir una convencion de `infrastructure`, y dos copias de una convencion se separan.
+    //
+    // Ojo con la otra: `plataforma.jwks` NO vale aqui. Es una direccion de la red interna del
+    // cluster, y el navegador no la puede alcanzar.
+    oidcRealm: e.plataforma.emisor,
+    oidcCliente: CLIENTE_OIDC_DE_LA_INTERFAZ,
+    // Sin `offline_access` ni nada que pida un `refresh_token`: el token de esta interfaz vive en
+    // una variable de modulo y muere con la pestana (ADR-0030 §3), asi que una credencial de vida
+    // larga seria justo lo que ese diseno evita.
+    oidcAlcance: "openid profile",
+  };
+}
+
+/**
+ * La interfaz: su `ConfigMap`, su `Deployment` y su `Service` (AC-6 de #44).
+ *
+ * <h2>Que corre aqui, y que NO</h2>
+ *
+ * Un `nginx` sirviendo el `dist/` de `rentas-web`. **Sin una sola variable de entorno y sin un
+ * solo `secretKeyRef`**: lo unico que este proceso necesita saber del ambiente son las senias del
+ * emisor, que no son secretas —el cliente es publico y su URL la ve cualquiera que abra el
+ * navegador— y viajan en el `ConfigMap`. Un `Secret` montado aqui seria una credencial regalada a
+ * un proceso que no la usa.
+ *
+ * <h2>`runAsNonRoot` sin `runAsUser`</h2>
+ *
+ * `SEGURIDAD` fija `runAsNonRoot: true`. El monolito tiene que anadirle ademas `runAsUser: 101`
+ * porque su `Dockerfile` dice `USER nginx` —un NOMBRE— y el kubelet no puede comprobar que un
+ * nombre no sea root: se niega a arrancar el contenedor con un `CreateContainerConfigError` que
+ * solo aparece al desplegar. El de #44 dice **`USER 101`**, en numero y por este motivo, asi que
+ * aqui no hace falta repetirlo. Y si alguien lo devolviera a un nombre, este `Deployment` dejaria
+ * de arrancar sin que este archivo tuviera por que enterarse: por eso `descriptor.test.ts` lee el
+ * `Dockerfile` y lo comprueba.
+ *
+ * <h2>Las sondas piden `/index.html` y no `/`</h2>
+ *
+ * Por lo mismo que el `HEALTHCHECK` de la imagen: con el `try_files` de `nginx.conf`, `/` devuelve
+ * la pantalla **caiga lo que caiga**, asi que pedirlo no distingue «nginx levantado» de «nginx
+ * levantado sobre el `dist/` que se copio». Pedir el archivo por su nombre si.
+ *
+ * <h2>Sin `startupProbe`, al reves que el backend</h2>
+ *
+ * El backend arranca una JVM con Spring y necesita hasta 150 s (`failureThreshold: 30`). Un nginx
+ * escucha en menos de un segundo. Una sonda de arranque aqui solo retrasaria la primera lectura.
+ */
+function despliegueDeLaInterfaz(e: EntornoDelDescriptor): Manifiesto[] {
+  const etiquetas = { ...e.etiquetas, componente: COMPONENTE_DE_LA_INTERFAZ };
+  const configuracion = `${NOMBRE_DE_LA_INTERFAZ}-configuracion`;
+  return [
+    {
+      apiVersion: "v1",
+      kind: "ConfigMap",
+      metadata: { name: configuracion, namespace: e.namespace, labels: etiquetas },
+      data: {
+        "configuracion.js": `window.__KAMAYUK_RENTAS__ = ${JSON.stringify(senasDelAmbiente(e), null, 2)};\n`,
+      },
+    },
+    {
+      apiVersion: "apps/v1",
+      kind: "Deployment",
+      metadata: { name: NOMBRE_DE_LA_INTERFAZ, namespace: e.namespace, labels: etiquetas },
+      spec: {
+        replicas: 1,
+        // El mismo `maxSurge: 0` que el backend, y por el mismo motivo: en un nodo sin holgura un
+        // pod extra durante el despliegue no agenda y el rollout se cuelga.
+        strategy: { type: "RollingUpdate", rollingUpdate: { maxSurge: 0, maxUnavailable: 1 } },
+        selector: { matchLabels: { app: NOMBRE_DE_LA_INTERFAZ } },
+        template: {
+          metadata: { labels: { ...etiquetas, app: NOMBRE_DE_LA_INTERFAZ } },
+          spec: {
+            priorityClassName: e.prioridadDe("servicio"),
+            containers: [
+              {
+                name: "interfaz",
+                // La etiqueta la pone `infrastructure`. Ver la cabecera.
+                image: e.imagenDe(INTERFAZ),
+                ports: [{ name: "http", containerPort: 8080 }],
+                resources: RECURSOS_DE_LA_INTERFAZ,
+                readinessProbe: {
+                  timeoutSeconds: 3,
+                  httpGet: { path: "/index.html", port: 8080 },
+                  periodSeconds: 10,
+                },
+                livenessProbe: {
+                  timeoutSeconds: 3,
+                  httpGet: { path: "/index.html", port: 8080 },
+                  periodSeconds: 20,
+                },
+                volumeMounts: [
+                  {
+                    name: "configuracion",
+                    mountPath: "/usr/share/nginx/html/configuracion.js",
+                    // `subPath`, o el montaje taparia el directorio entero y se llevaria por
+                    // delante el `index.html` y todo `assets/`: la imagen serviria un directorio
+                    // con un solo archivo dentro.
+                    //
+                    // El precio del `subPath` es que **no se actualiza solo**: cambiar el
+                    // `ConfigMap` exige reiniciar el pod. Es el precio correcto aqui — cambiar de
+                    // emisor a mitad de sesion dejaria a unas pestanas hablando con un realm y a
+                    // otras con otro.
+                    subPath: "configuracion.js",
+                    readOnly: true,
+                  },
+                ],
+                securityContext: SEGURIDAD,
+              },
+            ],
+            volumes: [{ name: "configuracion", configMap: { name: configuracion } }],
+          },
+        },
+      },
+    },
+    {
+      apiVersion: "v1",
+      kind: "Service",
+      metadata: { name: NOMBRE_DE_LA_INTERFAZ, namespace: e.namespace, labels: etiquetas },
+      spec: {
+        type: "ClusterIP",
+        selector: { app: NOMBRE_DE_LA_INTERFAZ },
+        // 80 hacia fuera y 8080 dentro, como el `Service` del backend de este mismo archivo: el
+        // contenedor no corre como root y no puede abrir un puerto privilegiado.
+        ports: [{ name: "http", port: 80, targetPort: 8080 }],
+      },
+    },
+  ];
+}
+
+/**
+ * Las dos prioridades del ingreso, **explicitas y no heredadas de la longitud de la regla**
+ * (AC-6 de #44).
+ *
+ * Traefik v3 ordena las rutas por la longitud de su `match` cuando nadie declara `priority`, y
+ * `PathPrefix(/rentas/api/v1)` es mas larga que `PathPrefix(/rentas)`, asi que hoy saldria bien
+ * **por accidente**. No se deja implicito, y el motivo es que el fallo no grita: con la
+ * precedencia al reves, `/rentas/api/v1/contribuyentes` lo atenderia el nginx de la interfaz,
+ * cuyo `try_files $uri /index.html` devuelve el `index.html` con un **200**. La pantalla pide
+ * JSON y recibe HTML con codigo de exito: no un error, una pagina. Es el mismo modo de fallo que
+ * `frontend/vite.config.ts` documenta para el desarrollo desde I-1, medido alli con Vite de
+ * verdad: `200`, `content-type: text/html`, 584 bytes.
+ */
+const PRIORIDAD_DE_LA_API = 20;
+const PRIORIDAD_DE_LA_INTERFAZ = 10;
+
+/**
+ * DNS, y va primero en toda politica de egreso porque todo lo demas depende de el.
+ *
+ * Sin esta regla las demas NO SIRVEN DE NADA. Una politica de egreso convierte a los pods que
+ * selecciona en «solo lo declarado», y `postgres`, `identidad` y los sistemas hermanos se nombran
+ * por su `Service`: resolver ese nombre es una consulta a CoreDNS, que vive en `kube-system`, y
+ * ninguna de las otras reglas la permite. El sintoma medido es `UnknownHostException`, y es
+ * **intermitente** —la resolucion se cachea, asi que a veces sale y a veces no—, que es peor que
+ * fallar siempre.
+ *
+ * Con esta regla anadida a mano sobre el clúster, las OCHO tareas de los cuatro sistemas pasaron
+ * de `Failed` a `Complete` (C-17, punto 3).
+ *
+ * Es la misma politica que `Red.ts` le da al namespace de la plataforma desde que existe
+ * (`permitir-dns`): lo que fallo aqui no fue la idea, fue que estas politicas se escribieron de
+ * cero y esa parte no se copio. Va **en el descriptor** y no en `infrastructure` porque quien
+ * decide que pods restringe esta politica es este archivo —`podSelector` es suyo—; lo que si es
+ * de `infrastructure` es la guarda que comprueba que ningun sistema se la deje.
+ *
+ * Sin `podSelector` en el destino, a proposito: lo que se abre es el PUERTO 53 hacia el namespace
+ * del sistema, no un pod concreto. Nombrar `k8s-app: kube-dns` ataria esta politica a como
+ * etiqueta sus pods una distribucion de Kubernetes.
+ *
+ * **Escrita una vez y usada dos** (#44): la del backend y la de la interfaz. Hasta aqui vivia en
+ * linea dentro de `egreso()`, y con una segunda politica en el archivo eso habrian sido dos
+ * copias de la misma decision envejeciendo aparte.
+ */
+function reglaDeDns() {
+  return {
+    to: [
+      {
+        namespaceSelector: {
+          matchLabels: { "kubernetes.io/metadata.name": "kube-system" },
+        },
+      },
+    ],
+    ports: [
+      { protocol: "UDP" as const, port: 53 },
+      // TCP tambien: una respuesta que no cabe en un datagrama se reintenta por TCP, y una
+      // politica que solo abriera UDP funcionaria hasta el dia que dejara de hacerlo, por el
+      // tamano de una respuesta.
+      { protocol: "TCP" as const, port: 53 },
+    ],
+  };
+}
+
+/**
+ * Las dos politicas de red de la interfaz, y son las dos puntas de un solo flujo (AC-7 de #44).
+ *
+ * <h2>Entrada: Traefik y nadie mas</h2>
+ *
+ * `infrastructure` deniega por omision en el namespace, asi que sin esta regla el ingreso enruta
+ * y el paquete no llega — la ruta existe, el pod esta sano y el navegador se queda esperando.
+ *
+ * El puerto es el **8080 del contenedor**, no el 80 del `Service`: una `NetworkPolicy` filtra
+ * sobre el puerto del pod, y el mapeo 80 -> 8080 lo deshace el `Service` antes de que la politica
+ * mire nada. Escribir 80 aqui seria una politica que no admite absolutamente nada, y el sintoma
+ * volveria a ser el navegador esperando.
+ *
+ * <h2>Salida: DNS y NADA MAS, y sobre todo NO el backend</h2>
+ *
+ * Esta interfaz no habla con nadie. No es una promesa: `frontend/nginx.conf` no tiene un solo
+ * reenvio, y no lo tiene porque **el mismo origen se consigue un piso mas arriba** — el ingreso
+ * parte `/rentas` en dos y manda `/rentas/api/v1` al backend directamente. El navegador ve un
+ * unico origen, que es lo que hacia falta para que no hubiera CORS, y este pod no participa.
+ *
+ * De ahi que **no exista una regla hacia el backend**, y eso es la mitad importante de este
+ * bloque: no es un olvido, es que anadirla abriria una salida que ningun proceso usa. Y el dia
+ * que alguien escriba un `proxy_pass` aqui, no funcionara en el cluster aunque funcione en el
+ * compose — y ese es el sitio correcto para enterarse: el PR que lo escriba.
+ *
+ * Y **no sale a PostgreSQL**, que es lo que el AC-7 pide comprobar: no hereda ninguna de las
+ * cinco aristas del backend porque su `componente` es `rentas-interfaz` y no `rentas`, asi que
+ * ningun `podSelector` de `egreso()` la alcanza.
+ */
+function politicasDeLaInterfaz(e: EntornoDelDescriptor): NetworkPolicy[] {
+  const seleccion = { matchLabels: { componente: COMPONENTE_DE_LA_INTERFAZ } };
+  return [
+    {
+      apiVersion: "networking.k8s.io/v1",
+      kind: "NetworkPolicy",
+      metadata: {
+        name: `${NOMBRE_DE_LA_INTERFAZ}-ingreso`,
+        namespace: e.namespace,
+        labels: e.etiquetas,
+      },
+      spec: {
+        podSelector: seleccion,
+        policyTypes: ["Ingress"],
+        ingress: [
+          {
+            from: [
+              {
+                namespaceSelector: {
+                  matchLabels: { "kubernetes.io/metadata.name": "kube-system" },
+                },
+              },
+            ],
+            ports: [{ protocol: "TCP", port: 8080 }],
+          },
+        ],
+      },
+    },
+    {
+      apiVersion: "networking.k8s.io/v1",
+      kind: "NetworkPolicy",
+      metadata: {
+        name: `${NOMBRE_DE_LA_INTERFAZ}-egreso`,
+        namespace: e.namespace,
+        labels: e.etiquetas,
+      },
+      spec: {
+        podSelector: seleccion,
+        policyTypes: ["Egress"],
+        egress: [reglaDeDns()],
+      },
+    },
+  ];
+}
+
 export const rentas: DescriptorDeSistema = {
   sistema: SISTEMA,
   prefijo: SISTEMA,
-  // DOS imagenes, y son dos objetivos del mismo `Dockerfile` (C-14, punto 1): las
-  // credenciales de `kamayuk_owner` existen durante la migracion y desaparecen con ella.
-  imagenes: [SISTEMA, MIGRADOR],
+  // TRES imagenes. Las dos primeras son dos objetivos del MISMO `Dockerfile` (C-14, punto 1): las
+  // credenciales de `kamayuk_owner` existen durante la migracion y desaparecen con ella. La
+  // tercera es de OTRO —`frontend/Dockerfile`, con contexto `frontend/` (#44)— y no comparte una
+  // sola capa con ellas: no lleva JVM, ni Node, ni codigo fuente; solo `dist/` y nginx.
+  imagenes: [SISTEMA, MIGRADOR, INTERFAZ],
 
   /**
    * Su base y sus roles. **Solo la suya**: pedir privilegios sobre la de otro sistema es una
@@ -389,7 +756,7 @@ export const rentas: DescriptorDeSistema = {
    * `CrashLoopBackOff` permanente en el tablero es ruido que acaba no mirandose, que es lo que
    * hace que el dia que reviente algo de verdad tampoco se mire.
    */
-  despliegue: (e) => despliegueDelPerfil(e, "web", true),
+  despliegue: (e) => [...despliegueDelPerfil(e, "web", true), ...despliegueDeLaInterfaz(e)],
 
   /**
    * Su Job de migracion. Cada base tiene sus migraciones y su prueba de aislamiento.
@@ -577,9 +944,42 @@ export const rentas: DescriptorDeSistema = {
     return [ingestor];
   },
 
-  /** Sus rutas, **bajo su prefijo**. Reclamar el de otro no falla: se lo queda. */
+  /**
+   * Sus rutas, **bajo su prefijo**. Reclamar el de otro no falla: se lo queda.
+   *
+   * <h2>La ruta va PARTIDA EN DOS, y ese reparto es lo que quita el CORS (AC-6 de #44)</h2>
+   *
+   * `/rentas/api/v1` al backend y `/rentas` a la interfaz, dentro del **mismo `Host`**. Desde el
+   * navegador todo cuelga de un solo origen, asi que no hay peticion entre origenes que
+   * autorizar — y hace falta que no la haya, porque esta medido que el backend **no publica ni
+   * una cabecera `Access-Control-Allow-Origin`**: cero `CorsConfiguration` y cero `@CrossOrigin`
+   * en todo `backend/`. Una peticion desde otro origen la bloquea el navegador antes de que
+   * nadie la lea.
+   *
+   * Es el mismo resultado que el monolito consigue con un `proxy_pass` dentro de su nginx, y se
+   * prefiere este por tres cosas: no hay dos caminos a la API que puedan divergir, el destino no
+   * cambia entre el compose y el cluster —asi que no hay que reescribir ninguna linea del
+   * `nginx.conf` al meterlo en un `ConfigMap`, ni hay `ConfigMap` de `nginx.conf` que mantener— y
+   * la interfaz no necesita salida de red hacia el backend (ver `politicasDeLaInterfaz`).
+   *
+   * <h2>El prefijo se quita SOLO en la de la interfaz</h2>
+   *
+   * `Api.RAIZ` del backend **es** `/rentas/api/v1` entera, asi que quitarle el prefijo dejaria a
+   * Spring buscando `/api/v1/...` y contestando 404 a todo. La interfaz al reves: su `nginx.conf`
+   * sirve en la raiz del contenedor, y el paquete pide con el prefijo puesto porque
+   * `vite.config.ts` declara `base: '/rentas/'` (ADR-0030 §2).
+   */
   ingreso(e): Manifiesto[] {
+    const quitarElPrefijo = `kamayuk-${SISTEMA}-quitar-prefijo`;
     return [
+      {
+        apiVersion: "traefik.io/v1alpha1",
+        kind: "Middleware",
+        metadata: { name: quitarElPrefijo, namespace: e.namespace, labels: e.etiquetas },
+        // Traefik reenvia lo que queda y anade `X-Forwarded-Prefix`, asi que quien quiera
+        // reconstruir la URL publica puede; nginx no lo necesita para servir un archivo.
+        spec: { stripPrefix: { prefixes: [`/${SISTEMA}`] } },
+      },
       {
         apiVersion: "traefik.io/v1alpha1",
         kind: "IngressRoute",
@@ -590,9 +990,18 @@ export const rentas: DescriptorDeSistema = {
           entryPoints: ["websecure"],
           routes: [
             {
+              match: `Host(\`${e.dominio}\`) && PathPrefix(\`/${SISTEMA}/api/v1\`)`,
+              kind: "Rule",
+              priority: PRIORIDAD_DE_LA_API,
+              // SIN `middlewares`: el backend espera la ruta entera. Ver la cabecera.
+              services: [{ name: `kamayuk-${SISTEMA}-web`, port: 80 }],
+            },
+            {
               match: `Host(\`${e.dominio}\`) && PathPrefix(\`/${SISTEMA}\`)`,
               kind: "Rule",
-              services: [{ name: `kamayuk-${SISTEMA}-web`, port: 80 }],
+              priority: PRIORIDAD_DE_LA_INTERFAZ,
+              services: [{ name: NOMBRE_DE_LA_INTERFAZ, port: 80 }],
+              middlewares: [{ name: quitarElPrefijo }],
             },
           ],
           tls: { certResolver: "letsencrypt" },
@@ -623,45 +1032,8 @@ export const rentas: DescriptorDeSistema = {
           podSelector: { matchLabels: { componente: SISTEMA } },
           policyTypes: ["Egress"],
           egress: [
-            // ── DNS, y va primero porque todo lo demas depende de el ──────────────────
-            //
-            // Sin esta regla las cuatro que siguen NO SIRVEN DE NADA. Una politica de egreso
-            // convierte a los pods que selecciona en «solo lo declarado», y `postgres`,
-            // `identidad` y los sistemas hermanos se nombran por su `Service`: resolver ese
-            // nombre es una consulta a CoreDNS, que vive en `kube-system`, y ninguna de las
-            // reglas de abajo la permite. El sintoma medido es `UnknownHostException`, y es
-            // **intermitente** —la resolucion se cachea, asi que a veces sale y a veces no—,
-            // que es peor que fallar siempre.
-            //
-            // Con esta regla anadida a mano sobre el clúster, las OCHO tareas de los cuatro
-            // sistemas pasaron de `Failed` a `Complete` (C-17, punto 3).
-            //
-            // Es la misma politica que `Red.ts` le da al namespace de la plataforma desde que
-            // existe (`permitir-dns`): lo que fallo aqui no fue la idea, fue que estas politicas
-            // se escribieron de cero y esa parte no se copio. Va **en el descriptor** y no en
-            // `infrastructure` porque quien decide que pods restringe esta politica es este
-            // archivo —`podSelector` es suyo—; lo que si es de `infrastructure` es la guarda que
-            // comprueba que ningun sistema se la deje.
-            //
-            // Sin `podSelector` en el destino, a proposito: lo que se abre es el PUERTO 53 hacia
-            // el namespace del sistema, no un pod concreto. Nombrar `k8s-app: kube-dns` ataria
-            // esta politica a como etiqueta sus pods una distribucion de Kubernetes.
-            {
-              to: [
-                {
-                  namespaceSelector: {
-                    matchLabels: { "kubernetes.io/metadata.name": "kube-system" },
-                  },
-                },
-              ],
-              ports: [
-                { protocol: "UDP", port: 53 },
-                // TCP tambien: una respuesta que no cabe en un datagrama se reintenta por TCP,
-                // y una politica que solo abriera UDP funcionaria hasta el dia que dejara de
-                // hacerlo, por el tamano de una respuesta.
-                { protocol: "TCP", port: 53 },
-              ],
-            },
+            // DNS, y va primero porque todo lo demas depende de el. Ver `reglaDeDns`.
+            reglaDeDns(),
             // Su motor. Los cuatro lo necesitan; cada uno a SU base.
             {
               to: [
@@ -733,6 +1105,11 @@ export const rentas: DescriptorDeSistema = {
           ],
         },
       },
+      // La interfaz, que **no comparte ninguna** de las cinco aristas de arriba: su `componente`
+      // es «rentas-interfaz» y no «rentas», asi que ningun `podSelector` de esta politica la
+      // selecciona. Es lo que hace que un nginx de archivos estaticos no tenga salida a
+      // PostgreSQL (AC-7 de #44). Ver `politicasDeLaInterfaz`.
+      ...politicasDeLaInterfaz(e),
     ];
   },
 

@@ -1,4 +1,4 @@
-# Quien publica las dos imagenes de `rentas`, y por que su etiqueta es un `sha` DE ESTE
+# Quien publica las tres imagenes de `rentas`, y por que su etiqueta es un `sha` DE ESTE
 # REPOSITORIO.
 #
 # ## El hueco que cierra, medido
@@ -15,6 +15,12 @@
 # Y los manifiestos que `infrastructure` emite piden esas dos etiquetas. Sin ellas, un
 # `pulumi up` deja los pods en `ImagePullBackOff` **y nada lo predice**: el manifiesto es
 # valido, el planificador ubica el pod, y el fallo aparece cuando ya se desplego.
+#
+# Desde #44 son TRES: se anade `kamayuk-rentas-interfaz`, la interfaz servida por nginx. Sale de
+# OTRO Dockerfile y con OTRO contexto, y por eso `archivo` y `contexto` pasan a la matriz en vez
+# de quedarse fijos en el paso: un `.dockerignore` solo cuenta desde la raiz de SU contexto, asi
+# que construir `frontend/Dockerfile` con el contexto en la raiz se llevaria dentro
+# `node_modules`, los `.env` y las cookies de Keycloak que el arnes deja en `e2e/.estado/`.
 #
 # ## La etiqueta es el `sha` de ESTE repositorio, y esa es la decision
 #
@@ -34,7 +40,7 @@
 #
 # El flujo del monolito filtraba por `backend/**` para no reconstruir ante un cambio de
 # documentacion. Aqui no, y el motivo es una equivalencia que la guarda de `infrastructure`
-# necesita: **todo commit de `main` tiene sus dos imagenes**. Con un filtro, un merge de solo
+# necesita: **todo commit de `main` tiene sus tres imagenes**. Con un filtro, un merge de solo
 # documentacion deja un `sha` de `main` SIN imagenes, y entonces «esta en la historia de main»
 # —lo unico que se puede comprobar sin hablar con el registro— deja de implicar «se puede
 # desplegar», en silencio.
@@ -55,8 +61,8 @@ on:
     branches: [main]
   workflow_dispatch:
 
-# Sin `cancel-in-progress`: cancelar una publicacion a medias deja `main` con una imagen de las
-# dos, que es peor que esperar.
+# Sin `cancel-in-progress`: cancelar una publicacion a medias deja `main` con unas imagenes si y
+# otras no, que es peor que esperar.
 concurrency:
   group: publicar-imagenes-${{ github.ref }}
   cancel-in-progress: false
@@ -71,18 +77,37 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     strategy:
-      # Sin `fail-fast`: si una de las dos cae, interesa saber si la otra tambien.
+      # Sin `fail-fast`: si una cae, interesa saber si las otras tambien.
       fail-fast: false
       matrix:
         # `destino` es la etapa de `backend/Dockerfile`; `imagen`, el nombre publicado. Los dos
         # difieren porque el Dockerfile los llama como se leen en ARQ-03 §4 y el registro los
         # necesita con el prefijo del producto, que es lo unico que impide que `caja` y
         # `catastro` de dos proyectos distintos colisionen en `ghcr.io/<owner>/`.
+        #
+        # `archivo` y `contexto` estan AQUI y no fijos en el paso, y eso dejo de ser cosmetico en
+        # cuanto entro la tercera: las dos del backend salen del mismo `backend/Dockerfile` con el
+        # contexto en la raiz —tiene `COPY` que salen de `backend/`— y la interfaz sale de
+        # `frontend/Dockerfile` con el contexto en `frontend/`, que es lo unico que hace que su
+        # `.dockerignore` se aplique.
+        #
+        # La interfaz NO se llama `kamayuk-rentas-web`: ese nombre ya es el del `Deployment` y el
+        # `Service` del backend con el perfil `web` de Spring (`infrastructure/src/descriptor.ts`,
+        # `despliegueDelPerfil(e, "web", true)`). Se llama `kamayuk-rentas-interfaz`, que es ademas
+        # como `infrastructure` nombra la del monolito (`sgtm-interfaz`).
         include:
           - destino: aplicacion
             imagen: kamayuk-rentas
+            archivo: backend/Dockerfile
+            contexto: .
           - destino: migrador
             imagen: kamayuk-rentas-migrador
+            archivo: backend/Dockerfile
+            contexto: .
+          - destino: interfaz
+            imagen: kamayuk-rentas-interfaz
+            archivo: frontend/Dockerfile
+            contexto: frontend
 
     steps:
       - uses: actions/checkout@v4
@@ -103,19 +128,27 @@ jobs:
           echo "propietario=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" \
             >> "$GITHUB_OUTPUT"
 
-      # El contexto es la RAIZ del repositorio, no `backend/`, y el propio Dockerfile explica por
-      # que: hay `COPY` que salen de `backend/`. Con el contexto en `backend/` esos archivos
-      # sencillamente no existen dentro de la imagen y la tarea que los copia se salta con
-      # NO-SOURCE — compilando en verde.
+      # El archivo y el contexto los pone la matriz, y el motivo de cada pareja esta escrito alli.
       #
-      # No hace falta el clon hermano de `infrastructure`: el Dockerfile construye con
+      # Para las DOS DEL BACKEND el contexto es la RAIZ del repositorio, no `backend/`, y el propio
+      # Dockerfile explica por que: hay `COPY` que salen de `backend/`. Con el contexto en
+      # `backend/` esos archivos sencillamente no existen dentro de la imagen y la tarea que los
+      # copia se salta con NO-SOURCE — compilando en verde.
+      #
+      # Tampoco hace falta el clon hermano de `infrastructure`: aquel Dockerfile construye con
       # `-Pkamayuk.sinLibreriasComunes`, que desactiva el composite build de `comun-verificaciones`
       # y, con el, TODA tarea de prueba. Aqui no corre ni una: las bloqueantes ya corrieron en
       # `backend.yml`, contra un motor de verdad.
+      #
+      # Para LA INTERFAZ tampoco corre ninguna verificacion: `frontend/Dockerfile` hace
+      # `yarn build`, no `yarn verificar`. Las 1 071 pruebas y el arnes de navegador ya corrieron
+      # en `frontend.yml`. Lo que si comprueba esa imagen al construirse es lo que solo se puede
+      # comprobar sobre el `dist/` que va a servir: que no lleva codigo fuente dentro y que no
+      # lleva ni una cifra del artboard (AC-2 y AC-3 de #44).
       - uses: docker/build-push-action@v6
         with:
-          context: .
-          file: backend/Dockerfile
+          context: ${{ matrix.contexto }}
+          file: ${{ matrix.archivo }}
           target: ${{ matrix.destino }}
           push: true
           tags: ghcr.io/${{ steps.registro.outputs.propietario }}/${{ matrix.imagen }}:${{ github.sha }}
@@ -123,7 +156,7 @@ jobs:
           cache-to: type=gha,mode=max,scope=${{ matrix.imagen }}
 
   comprobar:
-    name: Las dos etiquetas se pueden pedir al registro
+    name: Las tres etiquetas se pueden pedir al registro
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs: publicar
@@ -152,7 +185,10 @@ jobs:
           set -u
           propietario=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')
           fallo=0
-          for imagen in kamayuk-rentas kamayuk-rentas-migrador; do
+          # Las tres, y en el mismo orden que la matriz de `publicar`. Son dos listas que
+          # tienen que decir lo mismo: una imagen que se publique y no se pregunte aqui queda
+          # sin la unica afirmacion que decide si el pod arranca.
+          for imagen in kamayuk-rentas kamayuk-rentas-migrador kamayuk-rentas-interfaz; do
             token=$(curl -sS -u "$GHCR_USUARIO:$GHCR_CLAVE" \
               "https://ghcr.io/token?service=ghcr.io&scope=repository:$propietario/$imagen:pull" \
               | python3 -c 'import sys, json; print(json.load(sys.stdin).get("token", ""))')
