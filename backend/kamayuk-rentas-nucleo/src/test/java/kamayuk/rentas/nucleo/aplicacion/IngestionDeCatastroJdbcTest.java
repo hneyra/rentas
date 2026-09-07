@@ -645,6 +645,38 @@ class IngestionDeCatastroJdbcTest {
     }
 
     @Test
+    @DisplayName(
+            "#54: y lo que va DETRAS del ignorado tambien ENTRA — se ignora UN hecho, no el resto"
+                    + " de la pagina")
+    void loQueVaDetrasDelIgnoradoTambienEntra() throws SQLException {
+        // LA OTRA DIRECCION, y sin ella un `break` donde hay un `continue` pasa en VERDE: las
+        // otras dos pruebas de #54 ponen los tipos que no se saben aplicar AL FINAL de la pagina
+        // —que es como llegan hoy en el lote del emisor—, asi que ahi «se ignora y la vuelta
+        // sigue» y «se ignora y se corta la vuelta» dan exactamente el mismo resultado. Aqui el
+        // ignorado va PRIMERO y lo que se mide es lo que hay detras de el.
+        List<String> ajenos = tiposQueCatastroPublicaYAquiNoSeAplican();
+        assertThat(ajenos)
+                .as(
+                        "sin un tipo que este sistema no sepa aplicar esta prueba no tiene sujeto y"
+                                + " pasaria en verde sin medir nada")
+                .isNotEmpty();
+
+        APORTAR.add(ajenos.get(0));
+        APORTAR.addAll(deTipo("PREDIO_PROYECTADO"));
+
+        IngestarHechosDeCatastro.Vuelta vuelta = ingestor.ingerir();
+
+        assertThat(vuelta.ignorados()).isEqualTo(1);
+        assertThat(vuelta.aplicados())
+                .as("los dos predios van DETRAS del ignorado, y entran igual")
+                .isEqualTo(2);
+        assertThat(contar("predio_ref")).as("y estan ESCRITOS, no contados").isEqualTo(2);
+        assertThat(ACUSADOS)
+                .as("los de detras se acusan; el ignorado no")
+                .containsExactlyInAnyOrderElementsOf(identidadesDe(deTipo("PREDIO_PROYECTADO")));
+    }
+
+    @Test
     @DisplayName("EL CONTRASTE: sin ningun tipo ajeno no sale NI UN aviso")
     void sinTiposAjenosNoSaleNiUnAviso() throws SQLException {
         // Sin esto, un ingestor que avisara SIEMPRE pasaria la prueba de arriba — y una guarda que
