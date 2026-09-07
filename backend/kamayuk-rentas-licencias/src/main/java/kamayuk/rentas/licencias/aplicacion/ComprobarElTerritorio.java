@@ -1,12 +1,13 @@
 package kamayuk.rentas.licencias.aplicacion;
 
 import java.time.LocalDate;
+import kamayuk.rentas.catastro.HechoDelTerritorioQueNoConsta;
 import kamayuk.rentas.catastro.ItseDelPredio;
 import kamayuk.rentas.catastro.RiesgoDelPredio;
 import kamayuk.rentas.catastro.RiesgoYItseDelPredio;
+import kamayuk.rentas.catastro.TerritorioInalcanzable;
 import kamayuk.rentas.catastro.ZonaDelPredio;
 import kamayuk.rentas.catastro.ZonificacionDelPredio;
-import kamayuk.rentas.catastro.infraestructura.ClienteHttpDeCatastro;
 import kamayuk.rentas.licencias.dominio.CompatibilidadConLaZona;
 import kamayuk.rentas.licencias.dominio.ComprobacionDelTerritorio;
 import kamayuk.rentas.licencias.dominio.RespuestaDelTerritorio;
@@ -30,6 +31,14 @@ import org.springframework.stereotype.Service;
  * compatible». {@link ComprobacionDelTerritorio} lo sostiene por construccion: no deja afirmar un
  * hecho que no vino. Quien decide es {@link EmitirLicenciaDeFuncionamiento}, y decide con las
  * cuatro respuestas delante.
+ *
+ * <h2>Y las tres excepciones se atrapan por su tipo PUBLICO</h2>
+ *
+ * <p>{@link HechoDelTerritorioQueNoConsta} y {@link TerritorioInalcanzable} viven en el paquete del
+ * puerto y no en el del transporte, y eso lo destapo este consumidor: hasta que existio, Spring
+ * Modulith no tenia a quien ponerle rojo. Los modos de fallo de un puerto son parte de su API —de
+ * ellos cuelga si se abre un local—, asi que un consumidor no puede depender de una clase de {@code
+ * infraestructura} para distinguirlos.
  *
  * <p><b>No abre transaccion y no escribe nada.</b> Son tres lecturas HTTP a otro sistema; meterlas
  * dentro de la transaccion que despues escribe la licencia dejaria una conexion de la base abierta
@@ -74,10 +83,10 @@ public class ComprobarElTerritorio {
             queDijoLaZona = RespuestaDelTerritorio.RESPONDIO;
             codigoDeZona = zona.codigo();
             ordenanza = zona.ordenanza();
-        } catch (ClienteHttpDeCatastro.NoConstaEnCatastro noConsta) {
+        } catch (HechoDelTerritorioQueNoConsta noConsta) {
             queDijoLaZona = RespuestaDelTerritorio.NO_CONSTA;
             anotar(motivo, "zona: no consta (" + noConsta.codigo() + ")");
-        } catch (ClienteHttpDeCatastro.CatastroInalcanzable noSePudo) {
+        } catch (TerritorioInalcanzable noSePudo) {
             queDijoLaZona = RespuestaDelTerritorio.NO_SE_PUDO_PREGUNTAR;
             anotar(motivo, "zona: no se pudo preguntar a `catastro`");
         }
@@ -88,10 +97,10 @@ public class ComprobarElTerritorio {
             RiesgoDelPredio riesgo = riesgoYItse.riesgoDe(predioId, aLaFecha);
             queDijoElRiesgo = RespuestaDelTerritorio.RESPONDIO;
             noMitigable = riesgo.hayRiesgoNoMitigable();
-        } catch (ClienteHttpDeCatastro.NoConstaEnCatastro noConsta) {
+        } catch (HechoDelTerritorioQueNoConsta noConsta) {
             queDijoElRiesgo = RespuestaDelTerritorio.NO_CONSTA;
             anotar(motivo, "riesgo: no consta (" + noConsta.codigo() + ")");
-        } catch (ClienteHttpDeCatastro.CatastroInalcanzable noSePudo) {
+        } catch (TerritorioInalcanzable noSePudo) {
             queDijoElRiesgo = RespuestaDelTerritorio.NO_SE_PUDO_PREGUNTAR;
             anotar(motivo, "riesgo: no se pudo preguntar a `catastro`");
         }
@@ -102,10 +111,10 @@ public class ComprobarElTerritorio {
             ItseDelPredio itse = riesgoYItse.itseVigenteEn(predioId, aLaFecha);
             queDijoElItse = RespuestaDelTerritorio.RESPONDIO;
             vigentes = itse.vigentes().size();
-        } catch (ClienteHttpDeCatastro.NoConstaEnCatastro noConsta) {
+        } catch (HechoDelTerritorioQueNoConsta noConsta) {
             queDijoElItse = RespuestaDelTerritorio.NO_CONSTA;
             anotar(motivo, "ITSE: no consta (" + noConsta.codigo() + ")");
-        } catch (ClienteHttpDeCatastro.CatastroInalcanzable noSePudo) {
+        } catch (TerritorioInalcanzable noSePudo) {
             queDijoElItse = RespuestaDelTerritorio.NO_SE_PUDO_PREGUNTAR;
             anotar(motivo, "ITSE: no se pudo preguntar a `catastro`");
         }

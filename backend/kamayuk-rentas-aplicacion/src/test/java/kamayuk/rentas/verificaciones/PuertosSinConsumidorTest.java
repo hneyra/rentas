@@ -109,6 +109,12 @@ class PuertosSinConsumidorTest {
                                 + " un puerto, «todos tienen consumidor» es cierto sobre el conjunto"
                                 + " vacio")
                 .isNotEmpty();
+        assertThat(fuentesDeProduccion())
+                .as(
+                        "ni un archivo de `build/`: son copias del fuente, y el modulo que se"
+                                + " deduce de su ruta no es el suyo — un puerto quedaria «consumido»"
+                                + " por su propio adaptador con otro nombre de modulo")
+                .noneMatch(ruta -> ruta.toString().contains("/build/"));
 
         List<String> sinConsumidor = new ArrayList<>();
         for (Map.Entry<String, List<String>> puerto : encontrados.entrySet()) {
@@ -207,6 +213,19 @@ class PuertosSinConsumidorTest {
             }
         }
 
+        // LOS PUNTOS DE EXTENSION NO SON PUERTOS CLIENTE, y hay que separarlos o el censo miente.
+        // `ReglaDeAgregacion` es una interfaz de `parametros` que `nucleo` IMPLEMENTA
+        // (`RT011BaseImponibleDelContribuyente`): la llamada va del proveedor al implementador y no
+        // al reves, asi que «nadie la llama desde fuera» es su forma normal y no un hueco. Lo
+        // encontro esta guarda al ponerse estricta, y acusarla habria sido gritar en lo correcto
+        // —que es como una comprobacion se acaba apagando (#437)—.
+        puertos.keySet()
+                .removeIf(
+                        tipo ->
+                                fuentesDeProduccion().stream()
+                                        .filter(f -> !puertos.get(tipo).equals(moduloDe(f)))
+                                        .anyMatch(f -> leer(f).contains("implements " + tipo)));
+
         Map<String, List<String>> consumidores = new LinkedHashMap<>();
         for (Map.Entry<String, String> puerto : puertos.entrySet()) {
             consumidores.put(puerto.getKey(), new ArrayList<>());
@@ -218,7 +237,7 @@ class PuertosSinConsumidorTest {
                 if (puerto.getValue().equals(modulo)) {
                     continue;
                 }
-                if (mencionaElTipo(texto, puerto.getKey())) {
+                if (loConsume(texto, puerto.getKey())) {
                     consumidores.get(puerto.getKey()).add(fuente.getFileName().toString());
                 }
             }
@@ -229,6 +248,58 @@ class PuertosSinConsumidorTest {
     private static boolean esUnPuerto(Path archivo, String nombre) {
         String texto = leer(archivo);
         return texto.contains("public interface " + nombre);
+    }
+
+    /**
+     * Consume el puerto quien lo nombra <b>y ademas llama a alguno de sus metodos</b>.
+     *
+     * <h2>Por que no basta con nombrarlo, medido</h2>
+     *
+     * <p>La primera version de esta guarda contaba menciones, y paso en VERDE sobre el defecto
+     * exacto que existe para atrapar: se le quito a {@code ComprobarElTerritorio} la consulta del
+     * riesgo y del ITSE dejando el puerto <b>en el constructor y sin usar</b>, y el censo siguio
+     * dandolo por consumido — porque el nombre del tipo seguia ahi, en la firma.
+     *
+     * <p>Es la forma de C-1 por este eje: el colaborador viaja, se inyecta y se descarta en
+     * silencio. Un puerto que se recibe y no se llama esta exactamente igual de muerto que uno que
+     * nadie declara, y desde fuera se ve mejor — parece cableado.
+     *
+     * <p>Los nombres de los metodos se leen del <b>propio tipo por reflexion</b> y no de una lista:
+     * una lista copiada aqui se quedaria vieja el dia que el puerto gane una operacion, y entonces
+     * un consumidor que solo llamara a la nueva contaria como ninguno.
+     */
+    private static boolean loConsume(String texto, String tipo) {
+        if (!mencionaElTipo(texto, tipo)) {
+            return false;
+        }
+        for (String metodo : metodosDe(tipo)) {
+            if (texto.contains("." + metodo + "(")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Los metodos que el puerto declara, leidos del tipo compilado. */
+    private static Set<String> metodosDe(String tipo) {
+        Set<String> nombres = new LinkedHashSet<>();
+        for (Map.Entry<String, String> modulo : MODULOS_CLIENTE.entrySet()) {
+            String paquete = modulo.getValue().replace('/', '.');
+            try {
+                for (java.lang.reflect.Method metodo :
+                        Class.forName(paquete + "." + tipo).getDeclaredMethods()) {
+                    nombres.add(metodo.getName());
+                }
+                return nombres;
+            } catch (ClassNotFoundException enOtroPaquete) {
+                // El puerto es del otro modulo cliente; se prueba con el siguiente paquete.
+            }
+        }
+        throw new IllegalStateException(
+                "No se pudo cargar el puerto «"
+                        + tipo
+                        + "»: sin sus metodos, este censo no puede distinguir «lo llama» de «lo"
+                        + " nombra», y pasaria en verde con un puerto inyectado y sin usar");
     }
 
     /**
@@ -252,6 +323,13 @@ class PuertosSinConsumidorTest {
             recorrido
                     .filter(ruta -> ruta.toString().endsWith(".java"))
                     .filter(ruta -> ruta.toString().contains("/src/main/java/"))
+                    // Y NO lo que Gradle deja en `build/`. Sin esta linea el recorrido entra en
+                    // `build/spotless-clean/spotlessJava/src/main/java/...`, que es una COPIA del
+                    // fuente: el modulo que se deduce de esa ruta es «spotlessJava», asi que todo
+                    // puerto quedaba «consumido» por su propio adaptador copiado con otro nombre de
+                    // modulo. Medido: con el recorrido entero, `FrentesDelPredio` salia consumido y
+                    // su exencion «sobraba».
+                    .filter(ruta -> !ruta.toString().contains("/build/"))
                     .forEach(fuentes::add);
         } catch (IOException fallo) {
             throw new UncheckedIOException(fallo);
