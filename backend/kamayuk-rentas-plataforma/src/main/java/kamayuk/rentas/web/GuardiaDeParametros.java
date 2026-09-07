@@ -25,11 +25,19 @@ import org.springframework.web.servlet.HandlerInterceptor;
  *
  * <h2>El defecto que cierra</h2>
  *
- * <p>{@code GET /rentas/contribuyentes} acota por {@code dNI} —asi lo declara el contrato, derivado
- * del rotulo «D.N.I.» del prototipo (#312)—. Escribirlo {@code dni} no fallaba: Spring ignora el
- * parametro que ningun argumento reclama, la consulta sale <b>sin acotar</b> y el endpoint devuelve
- * el padron entero con {@code 200}. Medido contra Catacaos: {@code ?dNI=29614026} devuelve 1 fila y
- * {@code ?dni=29614026} devuelve <b>10 603</b>.
+ * <p>{@code GET /rentas/contribuyentes} acotaba por {@code dNI} —asi lo declaraba el contrato,
+ * derivado del rotulo «D.N.I.» del prototipo (#312)—. Escribirlo {@code dni} no fallaba: Spring
+ * ignora el parametro que ningun argumento reclama, la consulta sale <b>sin acotar</b> y el
+ * endpoint devuelve el padron entero con {@code 200}. Medido contra Catacaos: {@code ?dNI=29614026}
+ * devolvia 1 fila y {@code ?dni=29614026} devolvia <b>10 603</b>.
+ *
+ * <p><b>Esa operacion ya no se llama asi</b> (#35): sus dos filtros del documento son {@code
+ * tipoDocumento} y {@code numeroDocumento}, porque con {@code dNI} y {@code rUC} solo se podian
+ * comprobar dos de los seis tipos de documento. El ejemplo se conserva porque es el defecto que dio
+ * origen a esta guarda, y porque el nombre <b>no desaparecio del contrato</b>: medido, los
+ * <b>once</b> nombres con esa forma siguen siendo once —{@code dNI} y {@code rUC} viven tambien en
+ * {@code GET /autorizaciones/anuncios}, que ningun controlador sirve— y lo que baja es el numero de
+ * parametros, de <b>18 a 16</b>.
  *
  * <p>El sintoma no se parece a la causa —quien busca un DNI y recibe diez mil filas piensa que el
  * padron esta mal, no que el parametro se llama de otra forma— y es un filtro que <b>abre

@@ -36,9 +36,9 @@ import { rutaDelDocumento, type FilaDelPadron } from './padron.ts';
  *   1. **La longitud exacta del tipo** —DNI 8, RUC 11, carnet de extranjeria 12—, que vive en
  *      `dominio/documento.ts` porque es una regla y no un dato de esta pantalla.
  *   2. **Que no este ya en el padron**, y desde I-4 eso **se le pregunta al backend**:
- *      `GET /rentas/contribuyentes?dNI=…`, que es un criterio que la operacion publica. El aviso
- *      nombra al contribuyente que ya lo tiene con su codigo, y si manana ese documento fuera de
- *      otra persona, el aviso diria la otra.
+ *      `GET /rentas/contribuyentes?tipoDocumento=…&numeroDocumento=…`, que son los dos criterios
+ *      que la operacion publica desde #35. El aviso nombra al contribuyente que ya lo tiene con su
+ *      codigo, y si manana ese documento fuera de otra persona, el aviso diria la otra.
  *
  * <h2>Por que la comprobacion tuvo que salir de la pantalla (I-4)</h2>
  *
@@ -50,13 +50,20 @@ import { rutaDelDocumento, type FilaDelPadron } from './padron.ts';
  * y lo habria hecho **diciendo «Documento válido»**. No es una mejora de precision: es que la
  * comprobacion anterior, sobre datos de verdad, respondia que si a casi todo.
  *
- * <h2>Y hay un tipo que NO se puede comprobar, y se dice</h2>
+ * <h2>Y el tipo que no se podia comprobar YA SE COMPRUEBA (#35)</h2>
  *
- * `ContribuyenteController.buscar` publica `dNI` y `rUC` y ningun parametro para los demas
- * tipos, asi que el **carne de extranjeria** no se puede consultar por aqui. La compuerta no
- * finge: dice que no puede comprobarlo y que quien decide es el `POST`, que contesta **409** si
- * el documento se repite. Fingir un «Documento válido» seria la version silenciosa del defecto
- * que este issue vino a cerrar.
+ * Hasta #35 `ContribuyenteController.buscar` publicaba `dNI` y `rUC` y ningun parametro para los
+ * demas, asi que el **carne de extranjeria** no se podia consultar: la compuerta decia «Sin
+ * comprobar en el padrón» y dejaba la decision al `POST`, que contesta 409 si el documento se
+ * repite. Con `tipoDocumento` + `numeroDocumento` los **tres** tipos que esta compuerta ofrece se
+ * preguntan, que es justo lo que el alta necesita para no crear el segundo codigo de la misma
+ * persona.
+ *
+ * <p>La rama de «no se puede comprobar» **se queda**, y no es codigo muerto disfrazado: es lo que
+ * separa «no lo se» de «esta libre» el dia que el artboard anada un cuarto tipo que el enumerado
+ * del backend no tenga. `rutaDelDocumento` devuelve `null` en ese caso y la compuerta lo dice, en
+ * vez de fingir un «Documento válido» — que seria la version silenciosa del defecto que esta
+ * compuerta existe para impedir.
  *
  * <h2>Lo que el contrato no publica queda vacio, y esta razonado</h2>
  *
@@ -311,7 +318,7 @@ export function Expediente({
                   ? `No se pudo preguntar al padrón si ese documento ya existe: ${yaEnElPadron.error ?? ''} Hasta que se pueda, el alta queda bloqueada: crear un contribuyente duplicado es el error que más cuesta deshacer.`
                   : !listo
                     ? `El ${tipoDoc} tiene ${String(largoDoc)} dígitos. Se comprueba contra el padrón antes de crear el código.`
-                    : `El padrón sólo se puede consultar por DNI y por RUC, así que desde aquí no se puede comprobar si ese ${tipoDoc.toLowerCase()} ya está registrado. Si lo estuviera, el alta se rechazará al guardarla.`}
+                    : `El padrón no admite consultar el tipo «${tipoDoc}», así que desde aquí no se puede comprobar si ese documento ya está registrado. Si lo estuviera, el alta se rechazará al guardarla.`}
             </p>
           )}
         </div>

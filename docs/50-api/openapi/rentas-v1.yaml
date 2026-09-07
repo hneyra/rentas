@@ -1738,23 +1738,41 @@ paths:
         - name: codigo
           in: query
           required: false
-          description: "Filtro «Código» de la pantalla"
+          description: >-
+            Filtro «Código» de la pantalla. La comparacion es POR PREFIJO y no por igualdad (#35):
+            los codigos de un padron empiezan todos por la misma retahila de ceros, asi que una
+            igualdad solo sirve a quien ya sabe el codigo entero — medido contra Catacaos,
+            «?codigo=000000000» devolvia 0 de 10 603 filas y sin error ninguno. El codigo completo
+            sigue devolviendo una sola fila: es el prefijo mas largo que hay.
           schema: { type: string }
+          example: "00000025673"
         - name: nombreRazonSocial
           in: query
           required: false
           description: "Filtro «Nombre / razón social» de la pantalla"
           schema: { type: string }
-        - name: dNI
+        - name: tipoDocumento
           in: query
           required: false
-          description: "Filtro «D.N.I.» de la pantalla"
-          schema: { type: string }
-        - name: rUC
+          description: >-
+            Que clase de documento es, para acotar la busqueda. El vocabulario es el del enumerado
+            «TipoDocumento» y el del CHECK de «contribuyente.tipo_documento» (V1), letra por letra;
+            cualquier otra palabra se rechaza con 422 nombrando los seis, en vez de devolver una
+            pagina vacia. Es OPCIONAL: quien atiende teclea el numero que trae el carne y no se
+            detiene a clasificarlo. Sin «numeroDocumento» es 422, porque acotar solo por tipo
+            devolveria el padron entero de ese tipo.
+          schema: { type: string, enum: [DNI, RUC, CE, PASAPORTE, PARTIDA, OTRO] }
+          example: "CE"
+        - name: numeroDocumento
           in: query
           required: false
-          description: "Filtro «R.U.C.» de la pantalla"
+          description: >-
+            El numero del documento, tal como viene en el carne. Sustituye a «dNI» y «rUC» (#35): con
+            aquellos dos solo se podian comprobar dos de los seis tipos, de modo que un carne de
+            extranjeria no se podia buscar y el alta no tenia como saber si esa persona ya estaba en
+            el padron.
           schema: { type: string }
+          example: "03593174"
         - name: pagina
           in: query
           required: false

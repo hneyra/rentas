@@ -14,6 +14,7 @@ import {
   rutaDelDocumento,
   rutaDelPadron,
 } from './padron.ts';
+import { TIPOS_DE_DOCUMENTO } from '../dominio/documento.ts';
 
 /**
  * La aritmetica del padron y **la consulta que se le manda al backend**, sin montar nada.
@@ -164,15 +165,17 @@ describe('AC5 — la insignia solo se afirma si la lista que la sostiene llego E
 });
 
 describe('AC3 — el criterio viaja en la URL, con el nombre que el backend lee', () => {
-  it('los cuatro que la operacion admite, y ninguno mas', () => {
-    // `dNI` y `rUC` con la mayuscula corrida: es como los declara `ContribuyenteController`, y
-    // escribirlos «bien» haria que el filtro no filtrara y volviera el padron entero.
+  it('los tres que la operacion admite, y ninguno mas (#35)', () => {
+    // `dNI` y `rUC` se fueron con #35: no eran camelCase de nada y, sobre todo, con dos filtros
+    // solo se podian comprobar dos de los seis tipos de documento. Ahora es un numero, y el
+    // tipo lo manda quien sabe cual es —la compuerta del alta—.
     expect(CRITERIOS.map((uno) => [uno.rotulo, uno.parametro])).toEqual([
       ['Nombre', 'nombreRazonSocial'],
       ['Código', 'codigo'],
-      ['DNI', 'dNI'],
-      ['RUC', 'rUC'],
+      ['Documento', 'numeroDocumento'],
     ]);
+    expect(CRITERIOS.map((uno) => uno.parametro)).not.toContain('dNI');
+    expect(CRITERIOS.map((uno) => uno.parametro)).not.toContain('rUC');
   });
 
   it('buscar por nombre manda `nombreRazonSocial`, y NO manda orden', () => {
@@ -191,7 +194,7 @@ describe('AC3 — el criterio viaja en la URL, con el nombre que el backend lee'
     expect(ruta).not.toContain('ordenarPor');
   });
 
-  it('los tres exactos mandan el suyo, y el orden si viaja', () => {
+  it('los dos que no son aproximacion mandan el suyo, y el orden si viaja', () => {
     const porCodigo = rutaDelPadron('/rentas/contribuyentes', {
       criterio: 'Código',
       texto: '00000000008',
@@ -203,20 +206,26 @@ describe('AC3 — el criterio viaja en la URL, con el nombre que el backend lee'
     expect(porCodigo).toContain('ordenarPor=nombreRazonSocial');
     expect(
       rutaDelPadron('/rentas/contribuyentes', {
-        criterio: 'DNI',
+        criterio: 'Documento',
         texto: '29614026',
         orden: 'Código',
         pagina: 0,
       }),
-    ).toContain('dNI=29614026');
+    ).toContain('numeroDocumento=29614026');
+  });
+
+  it('#35 — media cifra del codigo tambien se manda: el backend busca por prefijo', () => {
+    // Antes de #35 esto era una busqueda que no encontraba nada: `codigo_contribuyente =
+    // :codigo` sobre un padron cuyos codigos empiezan todos por ceros. Medido contra Catacaos,
+    // `?codigo=000000000` devolvia 0 de 10 603 filas y sin error.
     expect(
       rutaDelPadron('/rentas/contribuyentes', {
-        criterio: 'RUC',
-        texto: '20602546391',
+        criterio: 'Código',
+        texto: '000000000',
         orden: 'Código',
         pagina: 0,
       }),
-    ).toContain('rUC=20602546391');
+    ).toContain('codigo=000000000');
   });
 
   it('sin texto no se manda criterio ninguno: el padron entero, paginado', () => {
@@ -230,16 +239,37 @@ describe('AC3 — el criterio viaja en la URL, con el nombre que el backend lee'
     ).toBe('/rentas/contribuyentes?pagina=3&tamano=20&ordenarPor=codigoContribuyente');
   });
 
-  it('«Código» y «DNI» y «RUC» se declaran EXACTOS, que es lo que hace el SQL', () => {
-    // Medido: `?codigo=000000000` sobre codigos que todos empiezan por ceros devuelve 0, porque
-    // la condicion es `codigo_contribuyente = :codigo`. La pantalla lo dice antes de que alguien
-    // teclee medio codigo y concluya que no existe.
-    expect(CRITERIOS.filter((uno) => uno.exacto).map((uno) => uno.rotulo)).toEqual([
-      'Código',
-      'DNI',
-      'RUC',
+  it('cada criterio declara COMO compara el backend, y son tres cosas distintas (#35)', () => {
+    // La pantalla lo dice antes de que alguien teclee medio dato y concluya que no existe. Y son
+    // tres y no dos: el codigo dejo de ser una igualdad y pasa a ser un rango `~>=~` / `~<~`,
+    // mientras que el documento sigue comparandose entero.
+    expect(CRITERIOS.map((uno) => [uno.rotulo, uno.comparacion])).toEqual([
+      ['Nombre', 'aproximacion'],
+      ['Código', 'prefijo'],
+      ['Documento', 'igualdad'],
     ]);
-    expect(criterioDe('Nombre').exacto).toBe(false);
+    expect(criterioDe('Nombre').comparacion).toBe('aproximacion');
+  });
+
+  it('y solo la aproximacion sustituye al orden: el prefijo no ordena por nada', () => {
+    // Con nombre el backend ordena por parecido, asi que pedirle otro orden dejaria el mejor
+    // parecido fuera de la primera pagina. Con un prefijo no hay parecido que respetar, y sin
+    // esta distincion buscar por codigo dejaria de poder ordenarse.
+    const porNombre = rutaDelPadron('/rentas/contribuyentes', {
+      criterio: 'Nombre',
+      texto: 'sulon',
+      orden: 'Nombre',
+      pagina: 0,
+    });
+    const porPrefijo = rutaDelPadron('/rentas/contribuyentes', {
+      criterio: 'Código',
+      texto: '0000',
+      orden: 'Nombre',
+      pagina: 0,
+    });
+
+    expect(porNombre).not.toContain('ordenarPor');
+    expect(porPrefijo).toContain('ordenarPor=nombreRazonSocial');
   });
 });
 
@@ -268,20 +298,40 @@ describe('AC2 — la pagina viaja, y el tamano tambien', () => {
   });
 });
 
-describe('la compuerta del documento pregunta por lo que se puede preguntar', () => {
-  it('un DNI y un RUC se preguntan, con su parametro', () => {
+describe('#35 — la compuerta del documento pregunta por LOS TRES tipos, no por dos', () => {
+  it('un DNI y un RUC se preguntan, con su tipo y su numero', () => {
     expect(rutaDelDocumento('/rentas/contribuyentes', 'DNI', '29614026')).toBe(
-      '/rentas/contribuyentes?dNI=29614026',
+      '/rentas/contribuyentes?tipoDocumento=DNI&numeroDocumento=29614026',
     );
     expect(rutaDelDocumento('/rentas/contribuyentes', 'RUC', '20602546391')).toBe(
-      '/rentas/contribuyentes?rUC=20602546391',
+      '/rentas/contribuyentes?tipoDocumento=RUC&numeroDocumento=20602546391',
     );
   });
 
-  it('un carne de extranjeria NO, y por eso devuelve `null` en vez de una ruta', () => {
-    // El controlador publica `dNI` y `rUC` y ningun parametro para los demas tipos. Devolver
-    // una ruta sin filtro traeria el padron entero y su primera fila se leeria como «ya existe».
-    expect(rutaDelDocumento('/rentas/contribuyentes', 'Carnet de extranjería', '001234567890')).toBeNull();
+  it('y el carne de extranjeria TAMBIEN, que es lo que #35 desbloquea', () => {
+    // Hasta #35 esto devolvia `null` y la compuerta decia «Sin comprobar en el padrón»: el
+    // controlador publicaba `dNI` y `rUC` y ningun parametro para los demas tipos, asi que el
+    // alta no tenia como saber si ese extranjero ya estaba — y dar de alta dos veces a la misma
+    // persona parte su deuda en dos cuentas que nadie cruza.
+    expect(rutaDelDocumento('/rentas/contribuyentes', 'Carnet de extranjería', '001234567890')).toBe(
+      '/rentas/contribuyentes?tipoDocumento=CE&numeroDocumento=001234567890',
+    );
+  });
+
+  it('los TRES tipos que la compuerta ofrece se pueden preguntar: 3 de 3, antes 2 de 3', () => {
+    // Contado sobre la lista del artboard y no sobre tres literales: el dia que se anada un
+    // cuarto tipo, esto dice si se puede preguntar o si hay que traducirlo primero.
+    const preguntables = TIPOS_DE_DOCUMENTO.filter(
+      (tipo) => rutaDelDocumento('/rentas/contribuyentes', tipo, '12345678') !== null,
+    );
+
+    expect(preguntables).toEqual([...TIPOS_DE_DOCUMENTO]);
+  });
+
+  it('y el tipo que el backend no conoce NO se manda: seria un 422 en la compuerta', () => {
+    // El vocabulario de `?tipoDocumento=` es el del enumerado `TipoDocumento`, y «Carnet de
+    // extranjería» no es una de sus seis palabras: por eso la traduccion se escribe.
+    expect(rutaDelDocumento('/rentas/contribuyentes', 'Partida de nacimiento', '12345678')).toBeNull();
   });
 
   it('y sin numero tampoco se pregunta', () => {

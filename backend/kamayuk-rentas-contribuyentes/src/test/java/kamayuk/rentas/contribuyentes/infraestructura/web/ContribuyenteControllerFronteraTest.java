@@ -30,6 +30,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.aop.framework.ProxyFactory;
 import org.springframework.http.converter.json.JacksonJsonHttpMessageConverter;
@@ -93,9 +94,12 @@ class ContribuyenteControllerFronteraTest {
         municipalidadA = crearMunicipalidad("220101", "Municipalidad de la frontera A");
         municipalidadB = crearMunicipalidad("220102", "Municipalidad de la frontera B");
 
-        sembrar(municipalidadA, "00001", "40123456", "PEÑA GARCIA, MARIA DEL CARMEN");
-        sembrar(municipalidadA, "00002", "40123457", "QUISPE MAMANI, JOSE LUIS");
-        sembrar(municipalidadB, "00001", "40999999", "OTRO PADRON, PERSONA DISTINTA");
+        sembrar(municipalidadA, "00001", "DNI", "40123456", "PEÑA GARCIA, MARIA DEL CARMEN");
+        sembrar(municipalidadA, "00002", "DNI", "40123457", "QUISPE MAMANI, JOSE LUIS");
+        // Un extranjero, que es el caso que #35 existe para poder preguntar: hasta entonces el
+        // borde publicaba `dNI` y `rUC` y ninguno mas, asi que un carne no se podia comprobar.
+        sembrar(municipalidadA, "00003", "CE", "001234567890", "MARQUEZ SOLIS, DIEGO ARMANDO");
+        sembrar(municipalidadB, "00001", "DNI", "40999999", "OTRO PADRON, PERSONA DISTINTA");
 
         DriverManagerDataSource pool = new DriverManagerDataSource();
         pool.setUrl(base.url());
@@ -184,7 +188,9 @@ class ContribuyenteControllerFronteraTest {
     @DisplayName("el filtro por documento tambien cruza entera")
     void elFiltroViajaYFiltra() throws Exception {
         MvcResult resultado =
-                mvc.perform(get("/rentas/api/v1/rentas/contribuyentes").param("dNI", "40123457"))
+                mvc.perform(
+                                get("/rentas/api/v1/rentas/contribuyentes")
+                                        .param("numeroDocumento", "40123457"))
                         .andReturn();
 
         assertThat(resultado.getResponse().getStatus()).isEqualTo(200);
@@ -197,11 +203,13 @@ class ContribuyenteControllerFronteraTest {
     @DisplayName("el mismo filtro bien escrito trae UNA fila del padron sembrado")
     void elFiltroBienEscritoTraeUnaFila() throws Exception {
         MvcResult respuesta =
-                mvc.perform(get("/rentas/api/v1/rentas/contribuyentes").param("dNI", "40123457"))
+                mvc.perform(
+                                get("/rentas/api/v1/rentas/contribuyentes")
+                                        .param("numeroDocumento", "40123457"))
                         .andReturn();
 
         assertThat(filasDevueltas(respuesta))
-                .as("hay dos contribuyentes sembrados en esta municipalidad, y se pidio uno")
+                .as("hay tres contribuyentes sembrados en esta municipalidad, y se pidio uno")
                 .isEqualTo(1);
     }
 
@@ -222,6 +230,196 @@ class ContribuyenteControllerFronteraTest {
         assertThat(respuesta.getResponse().getContentAsString())
                 .as("y nombrarlo es lo unico que separa arreglarlo de creer que el padron esta mal")
                 .contains("Parametro desconocido: 'dni'");
+    }
+
+    @Nested
+    @DisplayName("#35 AC-1 — los parametros se llaman como manda la guia")
+    class LosNombresDeLosParametros {
+
+        @Test
+        @DisplayName("«dNI» y «rUC» ya no existen: 422 que los nombra, no un filtro que se ignora")
+        void losNombresViejosYaNoSeAdmiten() throws Exception {
+            for (String viejo : java.util.List.of("dNI", "rUC")) {
+                MvcResult respuesta =
+                        mvc.perform(
+                                        get("/rentas/api/v1/rentas/contribuyentes")
+                                                .param(viejo, "40123457"))
+                                .andReturn();
+
+                assertThat(respuesta.getResponse().getStatus())
+                        .as(
+                                "un parametro retirado que se ignorara devolveria el padron entero"
+                                        + " con 200, que es exactamente el defecto de #539 por el otro"
+                                        + " extremo. Lo para GuardiaDeParametros: «%s»",
+                                viejo)
+                        .isEqualTo(422);
+                assertThat(respuesta.getResponse().getContentAsString())
+                        .contains("Parametro desconocido: '" + viejo + "'")
+                        .as("y dice como se llaman ahora")
+                        .contains("Se admiten: ")
+                        .contains("numeroDocumento")
+                        .contains("tipoDocumento");
+            }
+        }
+    }
+
+    @Nested
+    @DisplayName("#35 AC-2 — buscar por codigo admite prefijo")
+    class ElCodigoPorPrefijo {
+
+        @Test
+        @DisplayName("las primeras cifras encuentran MAS DE UNA fila, y antes devolvian cero")
+        void elPrefijoEncuentraMasDeUna() throws Exception {
+            MvcResult respuesta =
+                    mvc.perform(get("/rentas/api/v1/rentas/contribuyentes").param("codigo", "0000"))
+                            .andReturn();
+
+            assertThat(filasDevueltas(respuesta))
+                    .as(
+                            "con la igualdad de antes de #35, medido contra Catacaos:"
+                                    + " «?codigo=000000000» sobre 10 603 contribuyentes cuyos codigos"
+                                    + " empiezan todos por ceros devolvia 0, y sin error — que se lee"
+                                    + " como «ese contribuyente no existe»")
+                    .isEqualTo(3);
+            assertThat(respuesta.getResponse().getContentAsString())
+                    .contains("PEÑA GARCIA")
+                    .contains("QUISPE MAMANI")
+                    .contains("MARQUEZ SOLIS");
+        }
+
+        @Test
+        @DisplayName("y el codigo entero sigue trayendo una sola")
+        void elCodigoEnteroSigueTrayendoUna() throws Exception {
+            MvcResult respuesta =
+                    mvc.perform(
+                                    get("/rentas/api/v1/rentas/contribuyentes")
+                                            .param("codigo", "00002"))
+                            .andReturn();
+
+            assertThat(filasDevueltas(respuesta))
+                    .as(
+                            "el prefijo mas largo que hay es el codigo entero: quien ya lo sabe no"
+                                    + " recibe una lista")
+                    .isEqualTo(1);
+            assertThat(respuesta.getResponse().getContentAsString()).contains("QUISPE MAMANI");
+        }
+
+        @Test
+        @DisplayName("y no cruza el aislamiento: la vecina tiene el mismo 00001 y no sale")
+        void elPrefijoNoCruzaElAislamiento() throws Exception {
+            MvcResult respuesta =
+                    mvc.perform(get("/rentas/api/v1/rentas/contribuyentes").param("codigo", "0000"))
+                            .andReturn();
+
+            assertThat(respuesta.getResponse().getContentAsString())
+                    .as("un filtro mas ancho es mas filas, y quien las acota sigue siendo RLS")
+                    .doesNotContain("OTRO PADRON");
+        }
+    }
+
+    @Nested
+    @DisplayName("#35 AC-3 — se puede comprobar cualquier tipo de documento")
+    class CualquierTipoDeDocumento {
+
+        @Test
+        @DisplayName("un carne de extranjeria se encuentra, y antes no habia como preguntarlo")
+        void elCarneDeExtranjeriaSeEncuentra() throws Exception {
+            MvcResult respuesta =
+                    mvc.perform(
+                                    get("/rentas/api/v1/rentas/contribuyentes")
+                                            .param("tipoDocumento", "CE")
+                                            .param("numeroDocumento", "001234567890"))
+                            .andReturn();
+
+            assertThat(filasDevueltas(respuesta))
+                    .as(
+                            "esto es lo que el alta necesita para no dar de alta dos veces al mismo"
+                                    + " extranjero: con «dNI» y «rUC» como unicos filtros, la unica"
+                                    + " manera de «comprobarlo» era traerse el padron y mirar la"
+                                    + " primera pagina")
+                    .isEqualTo(1);
+            assertThat(respuesta.getResponse().getContentAsString()).contains("MARQUEZ SOLIS");
+        }
+
+        @Test
+        @DisplayName("el tipo es opcional: el numero solo tambien encuentra al extranjero")
+        void elTipoEsOpcional() throws Exception {
+            MvcResult respuesta =
+                    mvc.perform(
+                                    get("/rentas/api/v1/rentas/contribuyentes")
+                                            .param("numeroDocumento", "001234567890"))
+                            .andReturn();
+
+            assertThat(filasDevueltas(respuesta))
+                    .as("quien atiende teclea el numero que trae el carne, no lo clasifica")
+                    .isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("y el tipo que no existe es 422 NOMBRANDO los seis, no una pagina vacia")
+        void elTipoDesconocidoEs422ConSuVocabulario() throws Exception {
+            MvcResult respuesta =
+                    mvc.perform(
+                                    get("/rentas/api/v1/rentas/contribuyentes")
+                                            .param("tipoDocumento", "CARNE")
+                                            .param("numeroDocumento", "001234567890"))
+                            .andReturn();
+
+            assertThat(respuesta.getResponse().getStatus()).isEqualTo(422);
+            assertThat(respuesta.getResponse().getContentAsString())
+                    .contains("Tipo de documento desconocido: 'CARNE'")
+                    .as(
+                            "rechazar tambien es leer, y decir con que vocabulario es lo que lo"
+                                    + " convierte en un rechazo que se arregla")
+                    .contains("Se admiten: DNI, RUC, CE, PASAPORTE, PARTIDA, OTRO");
+        }
+
+        @Test
+        @DisplayName("y el tipo SIN numero es 422: acotar solo por tipo es pedir medio padron")
+        void elTipoSinNumeroEs422() throws Exception {
+            MvcResult respuesta =
+                    mvc.perform(
+                                    get("/rentas/api/v1/rentas/contribuyentes")
+                                            .param("tipoDocumento", "DNI"))
+                            .andReturn();
+
+            assertThat(respuesta.getResponse().getStatus()).isEqualTo(422);
+            assertThat(respuesta.getResponse().getContentAsString())
+                    .contains("Buscar por tipo de documento sin numero");
+        }
+    }
+
+    @Nested
+    @DisplayName("#35 AC-4 — ORDEN_NO_ADMITIDO dice por que campos SI se puede ordenar")
+    class ElOrdenQueNoSeAdmite {
+
+        @Test
+        @DisplayName("«deuda» sigue siendo 422, y ahora el cuerpo trae la lista")
+        void ordenarPorDeudaDiceLaLista() throws Exception {
+            MvcResult respuesta =
+                    mvc.perform(
+                                    get("/rentas/api/v1/rentas/contribuyentes")
+                                            .param("ordenarPor", "deuda"))
+                            .andReturn();
+
+            assertThat(respuesta.getResponse().getStatus()).isEqualTo(422);
+            String cuerpo = respuesta.getResponse().getContentAsString();
+            assertThat(cuerpo)
+                    .contains("\"codigo\":\"ORDEN_NO_ADMITIDO\"")
+                    .contains("Campo pedido: deuda");
+            assertThat(cuerpo)
+                    .as(
+                            "la misma operacion contesta «Se admiten: …» cuando el PARAMETRO no"
+                                    + " existe; sin esta linea, la misma clase de error tenia dos"
+                                    + " calidades de respuesta y quien integra tenia que adivinar")
+                    .contains("Se admiten: ")
+                    .contains("codigoContribuyente")
+                    .contains("nombreRazonSocial")
+                    .contains("numeroDocumento");
+            assertThat(cuerpo)
+                    .as("y no ofrece lo que esta operacion no publica")
+                    .doesNotContain("deuda,");
+        }
     }
 
     /**
@@ -277,7 +475,7 @@ class ContribuyenteControllerFronteraTest {
     }
 
     private static void sembrar(
-            long municipalidadId, String codigo, String documento, String nombre)
+            long municipalidadId, String codigo, String tipo, String documento, String nombre)
             throws SQLException {
         try (Connection app = base.conexion(BaseDeDatosDePrueba.APP)) {
             ContextoDeTenant.fijar(app, municipalidadId);
@@ -286,11 +484,12 @@ class ContribuyenteControllerFronteraTest {
                             "INSERT INTO contribuyente (municipalidad_id, codigo_contribuyente,"
                                     + " tipo_documento, numero_documento, tipo_persona,"
                                     + " nombre_razon_social, usuario_registro)"
-                                    + " VALUES (?, ?, 'DNI', ?, 'NATURAL', ?, 'siembra')")) {
+                                    + " VALUES (?, ?, ?, ?, 'NATURAL', ?, 'siembra')")) {
                 sentencia.setLong(1, municipalidadId);
                 sentencia.setString(2, codigo);
-                sentencia.setString(3, documento);
-                sentencia.setString(4, nombre);
+                sentencia.setString(3, tipo);
+                sentencia.setString(4, documento);
+                sentencia.setString(5, nombre);
                 sentencia.executeUpdate();
             }
             app.commit();

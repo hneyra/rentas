@@ -126,11 +126,12 @@ export function componerPadron(
 /**
  * Un criterio que `GET /rentas/contribuyentes` **admite**, con el parametro que lo lleva.
  *
- * Los cuatro son los que declara `ContribuyenteController.buscar`: `codigo`,
- * `nombreRazonSocial`, `dNI` y `rUC`. Los dos ultimos van con la mayuscula corrida, y no es un
- * descuido de este archivo: es el nombre que el backend lee, y escribirlo «bien» aqui haria que
- * la busqueda por documento no filtrara nada y devolviera el padron entero — diez mil filas
- * presentadas como el resultado de buscar un DNI.
+ * Los que declara `ContribuyenteController.buscar` son `codigo`, `nombreRazonSocial`,
+ * `tipoDocumento` y `numeroDocumento`. **Los dos ultimos se llamaban `dNI` y `rUC`** —con la
+ * minuscula suelta y el resto en mayusculas, que es lo que sale de pasar a camelCase el rotulo
+ * «D.N.I.» del prototipo— y #35 los sustituye por un tipo y un numero: con dos filtros solo se
+ * podian comprobar dos de los seis tipos de documento, asi que **un carne de extranjeria no se
+ * podia buscar**.
  */
 export interface CriterioDelPadron {
   /** Lo que se lee en el selector. */
@@ -140,13 +141,21 @@ export interface CriterioDelPadron {
   /** Lo que se lee dentro de la caja mientras esta vacia. */
   readonly ayuda: string;
   /**
-   * Si el backend compara por igualdad. `false` es aproximacion por trigramas.
+   * Como compara el backend. Son tres cosas distintas y la pantalla dice cual:
    *
-   * Medido: `?codigo=000000000` sobre un padron cuyos codigos empiezan todos por ceros devuelve
-   * **0**, porque el SQL es `codigo_contribuyente = :codigo`. Y `?nombreRazonSocial=sulon
-   * vilchez` —con una ele de menos— devuelve **74**, porque es `similarity(...) >= umbral`.
+   * - `igualdad`: el SQL es `= :parametro`. Medio numero de documento no encuentra nada.
+   * - `prefijo`: desde #35, el SQL es un rango `~>=~` / `~<~` sobre `codigo_contribuyente`, o
+   *   sea «empieza por». Antes era igualdad, y medido contra Catacaos `?codigo=000000000`
+   *   devolvia **0** de 10 603 filas y sin error — que es lo que quien busca lee como «no
+   *   existe».
+   * - `aproximacion`: `similarity(...) >= umbral`. `?nombreRazonSocial=sulon vilchez` —con una
+   *   ele de menos— devuelve **74**.
+   *
+   * Y decide ademas si el orden viaja: **solo la aproximacion lo sustituye**, porque el backend
+   * ordena por parecido en ese caso y pedirle otro orden dejaria el mejor parecido fuera de la
+   * primera pagina. Un prefijo no ordena por nada, asi que el orden si se manda.
    */
-  readonly exacto: boolean;
+  readonly comparacion: 'igualdad' | 'prefijo' | 'aproximacion';
 }
 
 /**
@@ -154,7 +163,7 @@ export interface CriterioDelPadron {
  *
  * <h2>Por que hay un selector y no una sola caja</h2>
  *
- * Porque los cuatro parametros **se combinan con Y** (`CriterioDeBusqueda`, en el dominio del
+ * Porque los parametros **se combinan con Y** (`CriterioDeBusqueda`, en el dominio del
  * backend): mandar lo tecleado a los cuatro a la vez pediria un contribuyente cuyo codigo, cuyo
  * nombre, cuyo DNI y cuyo RUC fueran todos la misma cadena, y eso no existe. Y adivinar cual es
  * por la pinta de lo tecleado **tampoco se puede**: un codigo de contribuyente tiene once
@@ -165,21 +174,35 @@ export interface CriterioDelPadron {
  * <h2>Lo que la caja del artboard promete y la operacion NO admite</h2>
  *
  * El artboard rotula «Nombre, DNI, RUC o código», y el port de F-5 buscaba ademas por **tipo de
- * persona** y por **tipo de documento** sobre las filas cargadas. Ninguno de los dos es un
- * criterio de esta operacion, asi que **no se ofrecen**. Y el **carne de extranjeria** tampoco:
- * el controlador solo publica `dNI` y `rUC`, de modo que un carne no se puede buscar por aqui —
- * es el mismo hueco que la compuerta del alta declara en `Expediente.tsx`.
+ * persona** sobre las filas cargadas. Ese no es un criterio de esta operacion, asi que **no se
+ * ofrece**.
+ *
+ * <h2>Y por que el DNI y el RUC son ahora UN criterio y no dos (#35)</h2>
+ *
+ * Porque el backend dejo de publicar dos filtros excluyentes —`dNI` y `rUC`— y publica un tipo
+ * y un numero. Con dos, **solo se podian comprobar dos de los seis tipos**; con el numero solo
+ * se busca cualquiera, que es lo que quien atiende hace de verdad: teclea lo que trae el carne
+ * sin clasificarlo. El tipo se manda en la compuerta del alta, donde SI se sabe cual es.
  */
 export const CRITERIOS: readonly CriterioDelPadron[] = [
   {
     rotulo: 'Nombre',
     parametro: 'nombreRazonSocial',
     ayuda: 'Apellidos y nombres, o razón social',
-    exacto: false,
+    comparacion: 'aproximacion',
   },
-  { rotulo: 'Código', parametro: 'codigo', ayuda: 'Código completo, con sus ceros', exacto: true },
-  { rotulo: 'DNI', parametro: 'dNI', ayuda: 'Los 8 dígitos del DNI', exacto: true },
-  { rotulo: 'RUC', parametro: 'rUC', ayuda: 'Los 11 dígitos del RUC', exacto: true },
+  {
+    rotulo: 'Código',
+    parametro: 'codigo',
+    ayuda: 'El código o sus primeras cifras',
+    comparacion: 'prefijo',
+  },
+  {
+    rotulo: 'Documento',
+    parametro: 'numeroDocumento',
+    ayuda: 'El número del documento, del tipo que sea',
+    comparacion: 'igualdad',
+  },
 ];
 
 /**
@@ -243,7 +266,7 @@ export function rutaDelPadron(base: string, consulta: ConsultaDelPadron): string
   const criterio = criterioDe(consulta.criterio);
   const texto = consulta.texto.trim();
   const orden = ORDENES_DEL_PADRON.find((uno) => uno.rotulo === consulta.orden);
-  const porParecido = texto !== '' && !criterio.exacto;
+  const porParecido = texto !== '' && criterio.comparacion === 'aproximacion';
 
   const partes = [
     ...parametro(criterio.parametro, texto),
@@ -255,15 +278,39 @@ export function rutaDelPadron(base: string, consulta: ConsultaDelPadron): string
 }
 
 /**
+ * Como se llama en el backend cada tipo de documento que la compuerta ofrece.
+ *
+ * Los rotulos son los del artboard (`dominio/documento.ts`) y los valores son los del enumerado
+ * `TipoDocumento` del backend, que es el vocabulario que `?tipoDocumento=` admite —y que rechaza
+ * con 422 nombrando los seis si llega otro—. Se escribe la traduccion en vez de mandar el rotulo
+ * porque «Carnet de extranjería» no es `CE`, y mandarlo tal cual seria un 422 en la compuerta.
+ */
+const TIPO_EN_EL_BACKEND: Readonly<Record<string, string>> = {
+  DNI: 'DNI',
+  RUC: 'RUC',
+  'Carnet de extranjería': 'CE',
+};
+
+/**
  * La ruta que pregunta si ese documento ya esta en el padron, o `null` si no se puede preguntar.
  *
- * Devuelve `null` para el carne de extranjeria **a proposito**: la operacion publica `dNI` y
- * `rUC` y ningun parametro para los demas tipos, asi que la unica manera de «comprobarlo» seria
- * traerse el padron y mirar — sobre 10 603 filas, mirar la primera pagina y decir «libre».
+ * **Desde #35 los tres tipos se pueden preguntar.** Hasta entonces la operacion publicaba `dNI` y
+ * `rUC` y ningun parametro para los demas, asi que el carne de extranjeria devolvia `null` y la
+ * compuerta decia «Sin comprobar en el padrón»: la unica manera de comprobarlo habria sido
+ * traerse el padron y mirar la primera pagina —sobre 10 603 filas, decir «libre» casi siempre—.
+ *
+ * Sigue devolviendo `null` sin numero, y **tambien con un tipo que el backend no conoce**: esa
+ * rama no la alcanza ninguno de los tres de hoy, y se queda porque es lo que impide que anadir un
+ * cuarto rotulo al artboard mande al backend una palabra que contesta 422.
  */
 export function rutaDelDocumento(base: string, tipo: string, numero: string): string | null {
-  const criterio = CRITERIOS.find((uno) => uno.rotulo === tipo);
-  return criterio === undefined || numero === ''
-    ? null
-    : `${base}?${parametro(criterio.parametro, numero).join('&')}`;
+  const tipoDelBackend = TIPO_EN_EL_BACKEND[tipo];
+  if (tipoDelBackend === undefined || numero === '') {
+    return null;
+  }
+  const partes = [
+    ...parametro('tipoDocumento', tipoDelBackend),
+    ...parametro('numeroDocumento', numero),
+  ];
+  return `${base}?${partes.join('&')}`;
 }

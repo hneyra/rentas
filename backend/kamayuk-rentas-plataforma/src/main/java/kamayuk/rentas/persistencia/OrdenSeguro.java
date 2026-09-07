@@ -1,5 +1,6 @@
 package kamayuk.rentas.persistencia;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
@@ -218,12 +219,23 @@ public final class OrdenSeguro {
         return resultado.toString();
     }
 
-    /** El campo pedido no esta en la lista blanca. Es 422, no 500: lo mando mal el cliente. */
+    /**
+     * El campo pedido no esta en la lista blanca. Es 422, no 500: lo mando mal el cliente.
+     *
+     * <p><b>Lleva la lista, y no solo el campo pedido</b> (#35). Hasta entonces el cuerpo del 422
+     * decia «Campo pedido: deuda» y nada mas, mientras que el 422 del <i>parametro</i> desconocido
+     * —{@code GuardiaDeParametros}— contesta «Se admiten: …» con la lista entera: la misma clase de
+     * error con dos calidades de respuesta, y en la misma operacion. Quien integra tenia que
+     * adivinar por que campos si se puede ordenar, y adivinar sobre un {@code ORDER BY} significa
+     * probar nombres contra produccion.
+     */
     public static final class OrdenNoAdmitido extends RuntimeException {
 
         @java.io.Serial private static final long serialVersionUID = 1L;
 
         private final String campo;
+
+        private final List<String> admitidos;
 
         OrdenNoAdmitido(String campo, Set<String> admitidos) {
             super(
@@ -234,10 +246,21 @@ public final class OrdenSeguro {
                             + ". El nombre de columna no se puede parametrizar en un ORDER BY, asi"
                             + " que solo se admite lo declarado");
             this.campo = campo;
+            this.admitidos = admitidos.stream().sorted().toList();
         }
 
         public String campo() {
             return campo;
+        }
+
+        /**
+         * Por que campos SI se puede ordenar, ordenados alfabeticamente.
+         *
+         * <p>Son los mismos que el mensaje ya nombraba, sacados a un accesor para que el borde
+         * pueda publicarlos como un detalle mas y no tenga que analizar el texto de una excepcion.
+         */
+        public List<String> admitidos() {
+            return admitidos;
         }
     }
 
