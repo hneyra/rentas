@@ -553,9 +553,18 @@ public class LicenciaController {
 
     // ------------------------------------------------------------------
 
+    /**
+     * La observacion del cuerpo, o 422 (regla 10, RNF-052).
+     *
+     * <p><b>El nulo se le pasa al constructor y no se convierte en {@code ""} (#30).</b> Hasta ese
+     * issue esto decia {@code texto == null ? "" : texto}, y con ello un campo que <i>falta</i>
+     * salia contestado como uno <i>demasiado corto</i>: 422, si, pero diciendo «al menos 5
+     * caracteres» a quien no habia escrito ninguno y sin nombrar el campo. Son dos errores
+     * distintos y el cliente los arregla distinto.
+     */
     private static Observacion observacionDe(@Nullable String texto) {
         try {
-            return Observacion.de(texto == null ? "" : texto);
+            return Observacion.de(texto);
         } catch (IllegalArgumentException sinObservacion) {
             throw new ProblemaDeNegocio(
                     CodigoDeError.VALIDACION,

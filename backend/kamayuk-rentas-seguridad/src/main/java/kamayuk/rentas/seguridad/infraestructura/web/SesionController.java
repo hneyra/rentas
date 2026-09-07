@@ -311,11 +311,31 @@ public class SesionController {
         }
     }
 
-    /** Cuerpo del cambio de ejercicio. Sin municipalidad: no la acepta y no la necesita. */
-    public record CambioDeEjercicio(int ejercicio, String observacion) {}
+    /**
+     * Cuerpo del cambio de ejercicio. Sin municipalidad: no la acepta y no la necesita.
+     *
+     * <p><b>{@code observacion} va {@link Nullable} porque es lo que Jackson puede producir</b>
+     * (#30): la clave que el cliente no manda llega nula, la anotacion no la obliga a nada, y
+     * declararla no-nula solo consigue que NullAway se lo crea. Eso es lo que dejaba pasar un
+     * {@code Observacion.de(...)} con un nulo dentro, y con el un {@code NullPointerException} que
+     * el borde no caza: <b>500 con identificador de incidencia</b> donde tocaba un 422. Declarado,
+     * quien lo lea tiene que decidir que hace con el nulo — y el constructor de {@link Observacion}
+     * ya contesta lo suyo.
+     */
+    public record CambioDeEjercicio(int ejercicio, @Nullable String observacion) {}
 
-    /** Cuerpo del cambio de clave. <b>Sin ningun campo de contrasena</b>, a proposito. */
-    public record SolicitudDeCambioDeClave(String observacion) {}
+    /**
+     * Cuerpo del cambio de clave. <b>Sin ningun campo de contrasena</b>, a proposito.
+     *
+     * <p><b>{@code observacion} va {@link Nullable} porque es lo que Jackson puede producir</b>
+     * (#30): la clave que el cliente no manda llega nula, la anotacion no la obliga a nada, y
+     * declararla no-nula solo consigue que NullAway se lo crea. Eso es lo que dejaba pasar un
+     * {@code Observacion.de(...)} con un nulo dentro, y con el un {@code NullPointerException} que
+     * el borde no caza: <b>500 con identificador de incidencia</b> donde tocaba un 422. Declarado,
+     * quien lo lea tiene que decidir que hace con el nulo — y el constructor de {@link Observacion}
+     * ya contesta lo suyo.
+     */
+    public record SolicitudDeCambioDeClave(@Nullable String observacion) {}
 
     public record CambioDeClaveIniciado(String gestionadaPor, String destino) {}
 

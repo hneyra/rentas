@@ -40,10 +40,47 @@
 
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
+import { pathToFileURL } from 'node:url';
 
-/** Lo que hace de un cambio «codigo» a efectos de esta guarda. */
-const RUTAS_DE_CODIGO = [
+/** Lo que hace de un cambio «codigo» a efectos de esta guarda.
+
+    ESTA LISTA ES PROPIA DE ESTE REPOSITORIO Y NO SE COPIA. El guion vive replicado en
+    los cinco y lo comun es el MECANISMO —los casos de la autoprueba, `CIERRA`, «exige
+    que la fila exista y no lo que diga»—; la lista la decide cada dueno con lo que su
+    arbol tiene. Copiarla a ciegas es exactamente lo que produjo el hueco de #45.
+
+    `infrastructure/src/` (#45). El descriptor de despliegue decide que corre en la
+    municipalidad: los limites, los `securityContext`, las `NetworkPolicy`, las variables
+    de entorno del pod y sus rutas de ingreso. C-17 midio CINCO defectos que vivian ahi y
+    que solo se ven al desplegar. Estaba fuera y en los otros tres repositorios dentro:
+    este es el unico de los cuatro que tiene los dos directorios a la vez —`infra/` con la
+    carga de datos, `infrastructure/` con el descriptor—, que es de donde salio la
+    confusion al copiar. Se acota a `src/` a proposito: `infrastructure/verificaciones/`
+    son sus pruebas, y una prueba no es codigo de produccion.
+
+    `infra/` SE QUEDA, y no por inercia (#45 AC-2). Son cuatro guiones de carga y cuatro
+    CSV, y C-6 midio lo que cuesta uno mal apuntado: un guion lanzado contra la imagen
+    equivocada arranca la aplicacion, NO CARGA NI UNA FILA y sale con codigo 0 —cero
+    lineas de carga, ni un aviso—, que es la clase de defecto que solo el registro
+    impide volver a descubrir. LO QUE CUESTA, contado: de los diez archivos de `infra/`,
+    dos son `README.md`, asi que un PR que solo los toque y ademas cierre un issue
+    tendra que dejar fila. Se acepta y no se talla una excepcion para dos archivos: esos
+    README documentan con que variable se invoca cada cargador —lo que el censo de
+    `infrastructure` cruza contra su `@ConditionalOnProperty`— y la guarda solo dispara
+    cuando el PR ADEMAS cierra un issue, asi que el exceso esta acotado.
+
+    LO QUE SIGUE FUERA, medido y no supuesto: `despliegue/compose.yaml`, que este
+    repositorio tiene desde #44. Es el mismo defecto que `caja`#39 cerro alli con
+    `/^despliegue\//`, y aqui NO se cierra porque no es de #45 — queda dicho para que el
+    siguiente no tenga que volver a medirlo.
+
+    SE EXPORTA para que su autoprueba pueda exigir que cada patron tenga su muestra. Es
+    la mitad que faltaba: quitar una muestra dejaba la autoprueba en «las 7 se comportan
+    como deben», en verde. Y se exporta en vez de copiarse alli porque una copia se queda
+    vieja sola y entonces la autoprueba certifica una lista que ya no es esta. */
+export const RUTAS_DE_CODIGO = [
   /^backend\/[^/]+\/src\/main\//,
+  /^infrastructure\/src\//,
   /^frontend\/src\//,
   /^infra\//,
 ];
@@ -51,60 +88,68 @@ const RUTAS_DE_CODIGO = [
 /** Como se declara que un PR cierra un issue. GitHub admite estas y alguna mas. */
 const CIERRA = /\b(?:cierra|closes?|close|fixes?|fix|resuelve|resolves?)\s+#(\d+)/gi;
 
-const opciones = leerOpciones(process.argv.slice(2));
-
-const cuerpo = opciones.cuerpo
-  ? readFileSync(opciones.cuerpo, 'utf8')
-  : (process.env.KAMAYUK_CUERPO_DEL_PR ?? '');
-
-const issues = [...cuerpo.matchAll(CIERRA)].map((coincidencia) => coincidencia[1]);
-if (issues.length === 0) {
-  console.log('El PR no declara que cierre ningun issue: no hay fila que exigir.');
-  process.exit(0);
+// Se ejecuta SOLO cuando se invoca como guion. Importarlo no hace nada, que es lo que
+// permite a su autoprueba leer `RUTAS_DE_CODIGO` de aqui en vez de copiarla (#45).
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  principal();
 }
 
-const archivos = opciones.archivos
-  ? lineas(readFileSync(opciones.archivos, 'utf8'))
-  : lineas(git(['diff', '--name-only', `${opciones.base}...HEAD`]));
+function principal() {
+  const opciones = leerOpciones(process.argv.slice(2));
 
-const deCodigo = archivos.filter((ruta) => RUTAS_DE_CODIGO.some((patron) => patron.test(ruta)));
-if (deCodigo.length === 0) {
-  console.log(
-    `Cierra #${issues.join(', #')} y no toca codigo de produccion: la fila no se exige.`,
-  );
-  process.exit(0);
-}
+  const cuerpo = opciones.cuerpo
+    ? readFileSync(opciones.cuerpo, 'utf8')
+    : (process.env.KAMAYUK_CUERPO_DEL_PR ?? '');
 
-const anadido = opciones.anadido
-  ? readFileSync(opciones.anadido, 'utf8')
-  : git(['diff', `${opciones.base}...HEAD`, '--', 'CLAUDE.md'])
-      .split('\n')
-      .filter((linea) => linea.startsWith('+') && !linea.startsWith('+++'))
-      .join('\n');
-
-const sinFila = issues.filter((numero) => !nombra(anadido, numero));
-if (sinFila.length > 0) {
-  console.error('');
-  console.error('FALLO: falta la fila de «Verificar antes de afirmar» en CLAUDE.md.');
-  console.error('');
-  for (const numero of sinFila) {
-    console.error(`  · Este PR cierra #${numero} y CLAUDE.md no gana ninguna linea que lo nombre.`);
+  const issues = [...cuerpo.matchAll(CIERRA)].map((coincidencia) => coincidencia[1]);
+  if (issues.length === 0) {
+    console.log('El PR no declara que cierre ningun issue: no hay fila que exigir.');
+    process.exit(0);
   }
-  console.error('');
-  console.error('  Esa tabla es la memoria del proyecto: cada issue deja ahi que se');
-  console.error('  implemento y COMO SE DEMOSTRO QUE LA VERIFICACION PUEDE FALLAR. Una fila');
-  console.error('  que no se escribe es una leccion que el siguiente vuelve a descubrir');
-  console.error('  ejecutando.');
-  console.error('');
-  console.error('  Lo que se comprueba aqui es solo que la fila EXISTA. Que diga la verdad');
-  console.error('  —que la mutacion sea real y las cifras cuadren— lo lee la revision.');
-  console.error('');
-  console.error(`  Archivos de codigo en este cambio: ${deCodigo.length}`);
-  console.error(`    ${deCodigo.slice(0, 5).join('\n    ')}`);
-  process.exit(1);
-}
 
-console.log(`Cada issue que este PR cierra tiene su fila: #${issues.join(', #')}.`);
+  const archivos = opciones.archivos
+    ? lineas(readFileSync(opciones.archivos, 'utf8'))
+    : lineas(git(['diff', '--name-only', `${opciones.base}...HEAD`]));
+
+  const deCodigo = archivos.filter((ruta) => RUTAS_DE_CODIGO.some((patron) => patron.test(ruta)));
+  if (deCodigo.length === 0) {
+    console.log(
+      `Cierra #${issues.join(', #')} y no toca codigo de produccion: la fila no se exige.`,
+    );
+    process.exit(0);
+  }
+
+  const anadido = opciones.anadido
+    ? readFileSync(opciones.anadido, 'utf8')
+    : git(['diff', `${opciones.base}...HEAD`, '--', 'CLAUDE.md'])
+        .split('\n')
+        .filter((linea) => linea.startsWith('+') && !linea.startsWith('+++'))
+        .join('\n');
+
+  const sinFila = issues.filter((numero) => !nombra(anadido, numero));
+  if (sinFila.length > 0) {
+    console.error('');
+    console.error('FALLO: falta la fila de «Verificar antes de afirmar» en CLAUDE.md.');
+    console.error('');
+    for (const numero of sinFila) {
+      console.error(`  · Este PR cierra #${numero} y CLAUDE.md no gana ninguna linea que lo nombre.`);
+    }
+    console.error('');
+    console.error('  Esa tabla es la memoria del proyecto: cada issue deja ahi que se');
+    console.error('  implemento y COMO SE DEMOSTRO QUE LA VERIFICACION PUEDE FALLAR. Una fila');
+    console.error('  que no se escribe es una leccion que el siguiente vuelve a descubrir');
+    console.error('  ejecutando.');
+    console.error('');
+    console.error('  Lo que se comprueba aqui es solo que la fila EXISTA. Que diga la verdad');
+    console.error('  —que la mutacion sea real y las cifras cuadren— lo lee la revision.');
+    console.error('');
+    console.error(`  Archivos de codigo en este cambio: ${deCodigo.length}`);
+    console.error(`    ${deCodigo.slice(0, 5).join('\n    ')}`);
+    process.exit(1);
+  }
+
+  console.log(`Cada issue que este PR cierra tiene su fila: #${issues.join(', #')}.`);
+}
 
 // ---------------------------------------------------------------------------
 
