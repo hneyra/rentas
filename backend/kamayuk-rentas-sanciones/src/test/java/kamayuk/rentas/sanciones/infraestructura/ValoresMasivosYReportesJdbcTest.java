@@ -39,6 +39,7 @@ import kamayuk.rentas.cuentacorriente.ConsultaDeDeudaPublica;
 import kamayuk.rentas.cuentacorriente.ExtincionDeDeuda;
 import kamayuk.rentas.cuentacorriente.GeneradorDeCargos;
 import kamayuk.rentas.cuentacorriente.MovimientoDeFase;
+import kamayuk.rentas.cuentacorriente.ObligacionPublica;
 import kamayuk.rentas.cuentacorriente.RecaudacionDelLibro;
 import kamayuk.rentas.cuentacorriente.RecaudadoEnElLibro;
 import kamayuk.rentas.cuentacorriente.RegistroDeAbonos;
@@ -245,6 +246,14 @@ class ValoresMasivosYReportesJdbcTest {
     private static HojaDePapeletaController hojaDePapeleta;
     private static ResumenesDeTransitoController resumenesDeTransito;
     private static RegistroDeAbonos abonos;
+
+    /**
+     * Desde #39 hace falta tambien aqui: {@code abonarPagoIntegro} recibe lo que la caja cobro y lo
+     * compara con lo que el libro dice. Esta prueba cobra integro, asi que lee la cifra del libro
+     * —igual que {@code EmitirOrdenDeCobro} al valorar la orden— en vez de escribirla a mano.
+     */
+    private static ConsultaDeDeudaPublica deudas;
+
     private static RegistrarValor registrarValor;
     private static GeneradorDeDocumentos generadorDeDocumentos;
 
@@ -283,7 +292,7 @@ class ValoresMasivosYReportesJdbcTest {
         PoliticaDeRedondeo redondeo = new PoliticaDeRedondeo(2, RoundingMode.HALF_UP);
 
         GeneradorDeCargos cargos = envolver(new GeneradorDeCargosCuentaCorriente(registrarAsiento));
-        ConsultaDeDeudaPublica deudas =
+        deudas =
                 envolver(
                         new ConsultaDeDeudaCuentaCorriente(
                                 envolver(
@@ -1625,20 +1634,43 @@ class ValoresMasivosYReportesJdbcTest {
     }
 
     private static void cobrarIntegro(Papeleta papeleta, String documento) {
+        SeleccionDeObligacion obligacion =
+                new SeleccionDeObligacion(
+                        "MULTA_TRANSITO",
+                        Ejercicio.de(papeleta.fechaInfraccion()),
+                        null,
+                        papeleta.vehiculoId());
+        Dinero cobrado = loQueDebeAlDia(papeleta.obligadoId(), obligacion);
         enTransaccion(
                 () ->
                         abonos.abonarPagoIntegro(
                                 papeleta.obligadoId(),
-                                List.of(
-                                        new SeleccionDeObligacion(
-                                                "MULTA_TRANSITO",
-                                                Ejercicio.de(papeleta.fechaInfraccion()),
-                                                null,
-                                                papeleta.vehiculoId())),
+                                List.of(obligacion),
+                                cobrado,
                                 EXIGIBLE_DESDE,
                                 documento,
                                 PORQUE),
                 "cajero");
+    }
+
+    /**
+     * Lo que el libro dice que esa obligacion debe a {@code EXIGIBLE_DESDE}, que es lo que una
+     * orden de cobro emitida ese dia habria congelado. Se pregunta al puerto, no se escribe a mano:
+     * una cifra escrita a mano dejaria la comprobacion de #39 comparandose contra si misma.
+     */
+    private static Dinero loQueDebeAlDia(long contribuyenteId, SeleccionDeObligacion obligacion) {
+        return enTransaccion(
+                        () -> deudas.deTodoElContribuyente(contribuyenteId, EXIGIBLE_DESDE),
+                        "cajero")
+                .stream()
+                .filter(
+                        publica ->
+                                publica.tributo().equals(obligacion.tributo())
+                                        && publica.ejercicio().equals(obligacion.ejercicio())
+                                        && java.util.Objects.equals(
+                                                publica.vehiculoId(), obligacion.vehiculoId()))
+                .map(ObligacionPublica::total)
+                .reduce(Dinero.CERO, Dinero::mas);
     }
 
     private static CorridaDeValores corridaDe(Papeleta papeleta) {
