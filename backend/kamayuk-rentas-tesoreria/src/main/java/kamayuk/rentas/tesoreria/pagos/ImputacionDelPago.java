@@ -53,6 +53,8 @@ public class ImputacionDelPago {
     /**
      * @throws RegistroDeAbonos.SinDeudaQueAbonar si no hay contra que imputar
      * @throws RegistroDeAbonos.SinAbonosQueReversar si la anulacion no encuentra que deshacer
+     * @throws RegistroDeAbonos.ImporteCobradoNoCuadra si el libro extinguiria una cifra distinta de
+     *     la que la caja cobro (#39)
      */
     @Transactional
     public RecibirPago.Recibido recibirEImputar(PagoRecibido pago) {
@@ -137,6 +139,11 @@ public class ImputacionDelPago {
                 abonos.abonarPagoIntegro(
                         contribuyenteId,
                         obligaciones,
+                        // Lo que la caja cobro DE VERDAD (#39). Hasta este issue no viajaba —
+                        // `grep -n "total" ImputacionDelPago.java` no devolvia ni una linea— y el
+                        // libro extinguia lo que el mismo recalculaba a `fechaDePago`, que con un
+                        // pago hecho dias despues de emitirse su orden no es la misma cifra.
+                        pago.total(),
                         pago.fechaDePago(),
                         pago.documentoDeOrigen(),
                         porElPago(pago));

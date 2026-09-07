@@ -36,6 +36,14 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
  * ese importe lo decide aqui</b> —interes antes que insoluto, deuda mas antigua primero—, porque
  * esa regla es el art. 31 del Codigo Tributario y escrita dos veces la que decide de verdad acaba
  * siendo la que nadie recuerda que existe (ADR-0026 §2).
+ *
+ * <h2>Y si el importe no alcanza a extinguir lo que se debe, no se reparte: se rechaza</h2>
+ *
+ * <p>Desde #39, {@code RegistroDeAbonos} compara lo cobrado contra lo que el libro dice a la fecha
+ * de pago y lanza {@link RegistroDeAbonos.ImporteCobradoNoCuadra} cuando no coinciden al centimo.
+ * Cae por esta misma via —el pago queda {@code RECHAZADO} con el motivo dentro— y el motivo por el
+ * que se rechaza en vez de imputarse a medias esta escrito en esa excepcion: repartir un pago
+ * parcial es D-14, que sigue abierta.
  */
 @Service
 public class RecibirPago {
@@ -69,6 +77,7 @@ public class RecibirPago {
             return imputacion.recibirEImputar(pago);
         } catch (RegistroDeAbonos.SinDeudaQueAbonar
                 | RegistroDeAbonos.SinAbonosQueReversar
+                | RegistroDeAbonos.ImporteCobradoNoCuadra
                 | ReferenciaDeObligacion.ReferenciaIlegible noSePudo) {
             return new Recibido(rechazo.rechazar(pago, motivoDe(noSePudo)), true);
         }

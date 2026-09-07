@@ -48,6 +48,19 @@ import org.springframework.transaction.annotation.Transactional;
  * con la misma fecha valor que el abono y con el mismo documento de origen: el recibo explica las
  * dos filas.
  *
+ * <h2>Primero se planifica, despues se compara, y solo entonces se escribe (#39)</h2>
+ *
+ * <p>El recorrido esta partido en dos a proposito. {@link #planificarUna} <b>lee</b> el libro y
+ * compone los asientos que harian falta sin escribir ninguno; {@link #abonarPagoIntegro} suma lo
+ * que esos asientos extinguirian y lo compara con lo que la caja cobro de verdad. Si no coinciden
+ * al centimo lanza {@code ImporteCobradoNoCuadra} y <b>no se escribe una sola fila</b>.
+ *
+ * <p>Antes de #39 el recorrido asentaba a medida que leia, asi que no existia ningun momento en el
+ * que estuviera decidido cuanto se iba a extinguir y todavia no se hubiera extinguido — y ese
+ * momento es el unico sitio donde la comprobacion cabe. Dejar que la excepcion deshiciera la
+ * transaccion daria el mismo resultado visible, pero escribiria en el libro para borrarlo despues,
+ * que es lo contrario de lo que ADR-0006 pide de este camino.
+ *
  * <h2>Por cuota, no por obligacion</h2>
  *
  * <p>El cajero marca «predial 2026 del predio 7». El libro cuenta por cuota, y cada cuota puede
@@ -87,10 +100,13 @@ public class RegistroDeAbonosCuentaCorriente implements RegistroDeAbonos {
     public List<AbonoAsentado> abonarPagoIntegro(
             long contribuyenteId,
             List<SeleccionDeObligacion> obligaciones,
+            Dinero cobrado,
             LocalDate fechaDePago,
             String documentoOrigen,
             Observacion observacion) {
 
+        java.util.Objects.requireNonNull(
+                cobrado, "El abono se comprueba contra lo que la caja cobro (#39)");
         if (obligaciones.isEmpty()) {
             throw new IllegalArgumentException("No se puede abonar sin marcar ninguna obligacion");
         }
@@ -113,28 +129,45 @@ public class RegistroDeAbonosCuentaCorriente implements RegistroDeAbonos {
             saldos.bloquear(clave);
         }
 
-        // 2. Ya con los candados puestos, releer el libro y asentar.
-        List<AbonoAsentado> abonados = new ArrayList<>();
+        // 2. Ya con los candados puestos, releer el libro y PLANIFICAR. Todavia no se escribe
+        //    nada, y el orden importa: el AC-2 de #39 pide comparar ANTES de asentar. Podria
+        //    dejarse que la excepcion deshiciera la transaccion —el rechazo se escribe en una
+        //    nueva, que es justo para lo que existe `RechazoDelPago`— pero escribir en el libro
+        //    para deshacerlo despues es lo contrario de lo que ADR-0006 pide de este camino.
+        List<PlanDeAbono> planes = new ArrayList<>();
+        Dinero segunElLibro = Dinero.CERO;
         for (SeleccionDeObligacion seleccion : sinRepetir) {
-            AbonoAsentado abono =
-                    abonarUna(
-                            claveDe(contribuyenteId, seleccion),
-                            seleccion,
-                            fechaDePago,
-                            documentoOrigen,
-                            observacion);
-            if (abono != null) {
-                abonados.add(abono);
+            PlanDeAbono plan =
+                    planificarUna(claveDe(contribuyenteId, seleccion), seleccion, fechaDePago);
+            if (plan != null) {
+                planes.add(plan);
+                segunElLibro = segunElLibro.mas(plan.resumen().total());
             }
         }
 
-        if (abonados.isEmpty()) {
+        if (planes.isEmpty()) {
             throw new SinDeudaQueAbonar(
                     "Ninguna de las "
                             + sinRepetir.size()
                             + " obligaciones marcadas tenia deuda al "
                             + fechaDePago
                             + ": o ya se pagaron, o nunca se determinaron");
+        }
+
+        // 3. La comprobacion de #39. Se hace contra `cobrado` y no contra lo releido: una
+        //    comparacion de `deudaActualizadaA(fechaDePago)` consigo misma se cumple siempre y no
+        //    protege de nada.
+        if (!segunElLibro.equals(cobrado)) {
+            throw ImporteCobradoNoCuadra.de(cobrado, segunElLibro, fechaDePago);
+        }
+
+        // 4. Y ahora si: se escribe el plan, en el mismo orden en que se leyo.
+        List<AbonoAsentado> abonados = new ArrayList<>(planes.size());
+        for (PlanDeAbono plan : planes) {
+            for (AsientoPlaneado planeado : plan.asientos()) {
+                asentar(planeado, fechaDePago, documentoOrigen, observacion);
+            }
+            abonados.add(plan.resumen());
         }
         return List.copyOf(abonados);
     }
@@ -194,17 +227,31 @@ public class RegistroDeAbonosCuentaCorriente implements RegistroDeAbonos {
     // ------------------------------------------------------------------
 
     /**
+     * Un asiento que <b>todavia no se ha escrito</b>: lo que la planificacion decidio y lo que la
+     * escritura replica. Existe para que entre lo uno y lo otro quepa la comprobacion de #39.
+     */
+    private record AsientoPlaneado(
+            ClaveDeSaldo cuota, Fase fase, Concepto concepto, TipoAsiento tipo, Dinero monto) {}
+
+    /**
+     * Lo que una obligacion va a dejar en el libro: sus asientos, en orden, y el resumen que se
+     * devuelve a quien cobra. {@code resumen} nunca es nulo aqui — un plan sin deuda no se crea.
+     */
+    private record PlanDeAbono(List<AsientoPlaneado> asientos, AbonoAsentado resumen) {}
+
+    /**
      * Una obligacion completa: todas sus cuotas con deuda. Devuelve {@code null} si no tenia
      * ninguna —eso no es un error por si solo: el error es que <b>ninguna</b> de las marcadas la
      * tuviera, y eso lo decide quien llama—.
+     *
+     * <p><b>Lee y no escribe</b> (#39). Antes de #39 este metodo asentaba a medida que recorria, y
+     * por eso no habia ningun momento en el que estuviera decidido cuanto se iba a extinguir y
+     * todavia no se hubiera extinguido. Ese momento es donde vive la comprobacion.
      */
-    private @org.jspecify.annotations.Nullable AbonoAsentado abonarUna(
-            ClaveDeObligacion obligacion,
-            SeleccionDeObligacion seleccion,
-            LocalDate fechaDePago,
-            String documentoOrigen,
-            Observacion observacion) {
+    private @org.jspecify.annotations.Nullable PlanDeAbono planificarUna(
+            ClaveDeObligacion obligacion, SeleccionDeObligacion seleccion, LocalDate fechaDePago) {
 
+        List<AsientoPlaneado> planeados = new ArrayList<>();
         Dinero insoluto = Dinero.CERO;
         Dinero reajuste = Dinero.CERO;
         Dinero interes = Dinero.CERO;
@@ -228,25 +275,16 @@ public class RegistroDeAbonosCuentaCorriente implements RegistroDeAbonos {
                 }
                 Dinero devengadoSinAsentar = aCobrar.menos(parteDe(yaAsentado, parte));
                 if (devengadoSinAsentar.esPositivo()) {
-                    asentar(
-                            cuota,
-                            fila.fase(),
-                            parte,
-                            TipoAsiento.CARGO,
-                            devengadoSinAsentar,
-                            fechaDePago,
-                            documentoOrigen,
-                            observacion);
+                    planeados.add(
+                            new AsientoPlaneado(
+                                    cuota,
+                                    fila.fase(),
+                                    parte,
+                                    TipoAsiento.CARGO,
+                                    devengadoSinAsentar));
                 }
-                asentar(
-                        cuota,
-                        fila.fase(),
-                        parte,
-                        TipoAsiento.ABONO,
-                        aCobrar,
-                        fechaDePago,
-                        documentoOrigen,
-                        observacion);
+                planeados.add(
+                        new AsientoPlaneado(cuota, fila.fase(), parte, TipoAsiento.ABONO, aCobrar));
             }
 
             insoluto = insoluto.mas(cobrable.insoluto());
@@ -257,34 +295,34 @@ public class RegistroDeAbonosCuentaCorriente implements RegistroDeAbonos {
 
         Dinero total = insoluto.mas(reajuste).mas(interes).mas(gasto);
         return total.esPositivo()
-                ? new AbonoAsentado(seleccion, fechaDePago, insoluto, reajuste, interes, gasto)
+                ? new PlanDeAbono(
+                        List.copyOf(planeados),
+                        new AbonoAsentado(
+                                seleccion, fechaDePago, insoluto, reajuste, interes, gasto))
                 : null;
     }
 
     private void asentar(
-            ClaveDeSaldo cuota,
-            Fase fase,
-            Concepto concepto,
-            TipoAsiento tipo,
-            Dinero monto,
+            AsientoPlaneado planeado,
             LocalDate fechaDePago,
             String documentoOrigen,
             Observacion observacion) {
+        ClaveDeSaldo cuota = planeado.cuota();
         registrar.asentar(
                 Asiento.nuevo(
                         cuota.ejercicio(),
                         cuota.contribuyenteId(),
                         cuota.tributo(),
-                        concepto,
-                        tipo,
-                        fase,
+                        planeado.concepto(),
+                        planeado.tipo(),
+                        planeado.fase(),
                         // 0 en la proyeccion significa «anual», y en el asiento eso es nulo:
                         // es la traduccion inversa de ClaveDeSaldo.de(Asiento).
                         cuota.periodo() == 0 ? null : cuota.periodo(),
                         cuota.predioId(),
                         cuota.vehiculoId(),
                         null,
-                        monto,
+                        planeado.monto(),
                         fechaDePago,
                         documentoOrigen),
                 observacion);
