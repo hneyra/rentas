@@ -1022,6 +1022,38 @@ const DESCRIPCIONES_DE_FILTRO = {
       ' ficha_catastral.uso, tambien texto libre —«Casa habitacion», «Tienda de artesania»—, y' +
       ' ninguno de los cinco usos en mayusculas del desplegable casa con el (#541).',
   },
+  // Los cuatro filtros de ubicacion de la consulta de predios (#42). Uno se
+  // sirve y tres se rechazan: hasta #42 los cuatro se declaraban y ninguno
+  // acotaba, asi que la lista volvia entera bajo un control tecleado.
+  consulta_predios: {
+    codigoPredial:
+      'Filtro «Código predial» de la pantalla. SE SIRVE, por igualdad exacta del codigo de' +
+      ' referencia catastral entre los predios del contribuyente consultado —«contribuyente» o' +
+      ' «codContribuyente» es obligatorio, asi que el universo ya es el de una persona—. No por' +
+      ' prefijo: un codigo se teclea entero (#42).',
+    calle:
+      'Filtro «Calle» de la pantalla. NO SE SIRVE: se rechaza con 422 con cualquier valor. Lo que' +
+      ' «catastro» publica de cada predio es su direccion como UN SOLO texto (PredioDelContribuyente),' +
+      ' no la calle como dato propio; filtrar contra la direccion libre devolveria la lista vacia,' +
+      ' que se lee como «no tiene predios». Servirlo exige una busqueda por ubicacion en «catastro»' +
+      ' que no existe (#42).',
+    manzana:
+      'Filtro «Manzana» de la pantalla. NO SE SIRVE, y por lo mismo que «calle»: la manzana no viaja' +
+      ' como dato propio y deducirla partiendo el codigo de referencia catastral seria inventarla,' +
+      ' porque cada municipalidad lo compone a su manera (#42).',
+    lote:
+      'Filtro «Lote» de la pantalla. NO SE SIRVE, y por lo mismo que «manzana» (#42).',
+  },
+  // «incluyeConvenios» se rechaza: el contexto de convenios no existe y ninguna
+  // fila del libro dice si su cuota nace de uno (#42).
+  consulta_deuda: {
+    incluyeConvenios:
+      'Filtro «Incluye convenios» de la pantalla. NO SE SIRVE: se rechaza con 422 con cualquier' +
+      ' valor. El contexto de convenios de fraccionamiento todavia no existe y ninguna fila del' +
+      ' libro dice si su cuota nace de uno, asi que no hay contra que comparar; hasta #42 se' +
+      ' aceptaba y la lista volvia igual, marcada la casilla y sin marcar. Sin el parametro, esta' +
+      ' lectura publica la deuda del libro entera.',
+  },
   // Los cuatro filtros que el prototipo dibuja para el catalogo vial. Tres se
   // sirven desde #565 y uno se rechaza: `via` (V1) no tiene columna de sector.
   calles: {
@@ -1053,8 +1085,12 @@ const DESCRIPCIONES_DE_FILTRO = {
   },
   consulta_vehiculos: {
     estado:
-      'Filtro «Estado» de la pantalla. Solo «BAJA» filtra contra el padron; el resto —AFECTO,' +
-      ' INAFECTO, EXONERADO— es afectacion calculada y no se traduce todavia',
+      'Filtro «Estado» de la pantalla. Admite los CUATRO estados del padron vehicular —ACTIVO,' +
+      ' TRANSFERIDO, BAJA, ROBADO, que son los del CHECK de la tabla— y los cuatro acotan.' +
+      ' «AFECTO», «INAFECTO» y «EXONERADO», que es lo que el prototipo dibuja, son afectacion' +
+      ' calculada de cada ejercicio y no una columna del padron: se rechazan con 422 nombrando el' +
+      ' parametro. Hasta #42 solo «BAJA» se traducia y los otros tres devolvian el padron entero' +
+      ' ordenado por placa, con aspecto de resultado acotado.',
   },
   costas_procesales_listado: {
     estado: 'Filtro «Estado» de la pantalla. Se derivan del libro: ACTIVA o CANCELADA',
