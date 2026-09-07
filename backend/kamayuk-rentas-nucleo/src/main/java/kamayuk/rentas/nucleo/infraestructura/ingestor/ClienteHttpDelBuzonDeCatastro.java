@@ -12,7 +12,6 @@ import java.util.List;
 import java.util.UUID;
 import kamayuk.rentas.nucleo.dominio.proyeccion.FuenteDeHechosDeCatastro;
 import kamayuk.rentas.nucleo.dominio.proyeccion.HechoRecibido;
-import kamayuk.rentas.nucleo.dominio.proyeccion.TipoDeHechoDeCatastro;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
@@ -36,11 +35,24 @@ import tools.jackson.databind.json.JsonMapper;
  * <b>no</b> puede pasar es que un fallo de transporte mate un hecho: eso lo mataria por un motivo
  * que iba a arreglarse solo.
  *
- * <h2>Un tipo de hecho desconocido NO se lee, y se dice</h2>
+ * <h2>Un tipo de hecho que este sistema no sabe aplicar SI se lee, y se decide despues</h2>
  *
- * <p>Si {@code catastro} publica un cuarto tipo, este lado lo rechaza nombrandolo en vez de
- * ignorarlo. Ignorarlo lo dejaria en el buzon del emisor para siempre —nunca se acusaria— o, peor,
- * lo acusaria sin aplicarlo. Es el motivo por el que el enumerado esta copiado en los dos lados.
+ * <p><b>Hasta #54 se rechazaba aqui, y ese era el defecto.</b> {@code valueOf} lanzaba {@link
+ * FuenteDeHechosDeCatastro.CatastroNoContesta} <b>mientras se armaba el lote</b>, o sea antes de
+ * que ningun hecho llegara al aplicador; y como el buzon entero viene en una pagina, un solo hecho
+ * del territorio se llevaba por delante la vuelta ENTERA —cero aplicados, con los predios que iban
+ * delante dentro— y la siguiente traia lo mismo. Encima el tipo de la excepcion enganaba por su
+ * cuenta: quien atendiera leia «catastro no contesta» —falso, contesta perfectamente— y miraba el
+ * despliegue.
+ *
+ * <p>Ahora el hecho se lee con su nombre de tipo <b>tal como el emisor lo escribio</b> y quien
+ * decide es {@link kamayuk.rentas.nucleo.aplicacion.IngestarHechosDeCatastro}, hecho a hecho: lo
+ * que no se sabe aplicar se ignora con un aviso {@code WARN} que lo nombra, sin acusarlo, y la
+ * vuelta sigue.
+ *
+ * <p>Lo que sigue siendo un fallo de transporte es un hecho <b>sin tipo</b>: eso no es una
+ * capacidad que falte sino una respuesta que no tiene la forma de un hecho, y se arregla mirando el
+ * despliegue.
  */
 public class ClienteHttpDelBuzonDeCatastro implements FuenteDeHechosDeCatastro {
 
@@ -102,24 +114,11 @@ public class ClienteHttpDelBuzonDeCatastro implements FuenteDeHechosDeCatastro {
     // ------------------------------------------------------------------
 
     private HechoRecibido leer(JsonNode evento) {
-        String tipo = evento.path("tipo").asString("");
-        TipoDeHechoDeCatastro conocido;
-        try {
-            conocido = TipoDeHechoDeCatastro.valueOf(tipo);
-        } catch (IllegalArgumentException desconocido) {
-            throw new CatastroNoContesta(
-                    "`catastro` publica un hecho de tipo «"
-                            + tipo
-                            + "», que este sistema no sabe aplicar. No se acusa: aplicarlo a"
-                            + " medias dejaria la proyeccion diciendo algo que nadie escribio, y"
-                            + " acusarlo sin aplicarlo lo perderia. Hay que anadir el tipo a"
-                            + " TipoDeHechoDeCatastro y decidir que hace con el la proyeccion");
-        }
         try {
             return new HechoRecibido(
                     UUID.fromString(evento.path("eventoId").asString()),
                     evento.path("secuencia").asLong(),
-                    conocido,
+                    evento.path("tipo").asString(""),
                     evento.path("predioId").isNull() || evento.path("predioId").isMissingNode()
                             ? null
                             : evento.path("predioId").asLong(),

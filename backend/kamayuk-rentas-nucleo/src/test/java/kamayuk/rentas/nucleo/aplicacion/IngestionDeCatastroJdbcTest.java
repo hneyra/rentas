@@ -29,6 +29,7 @@ import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.MunicipalidadId;
 import kamayuk.rentas.esquema.BaseDeDatosDePrueba;
 import kamayuk.rentas.esquema.DatosDePrueba;
+import kamayuk.rentas.nucleo.dominio.proyeccion.FuenteDeHechosDeCatastro;
 import kamayuk.rentas.nucleo.dominio.proyeccion.HechoRecibido;
 import kamayuk.rentas.nucleo.dominio.proyeccion.ProyeccionDeCatastro;
 import kamayuk.rentas.nucleo.dominio.proyeccion.TipoDeHechoDeCatastro;
@@ -103,6 +104,17 @@ class IngestionDeCatastroJdbcTest {
     /** Los avisos que el canal del responsable recibio de verdad. */
     private static final List<String> AVISOS = new CopyOnWriteArrayList<>();
 
+    /**
+     * Lo que el ingestor escribio en el registro.
+     *
+     * <p>Se mira el registro DE VERDAD y no una lista que la prueba se pase a si misma: lo que #54
+     * decidio es que un tipo que este sistema no sabe aplicar <b>se ignore con un aviso</b>, y
+     * «ignorar» y «perder en silencio» solo se distinguen si alguien lee ese aviso.
+     */
+    private static final ch.qos.logback.core.read.ListAppender<
+                    ch.qos.logback.classic.spi.ILoggingEvent>
+            ANOTADOS = new ch.qos.logback.core.read.ListAppender<>();
+
     /** Lo que el buzon de mentira sirve en la vuelta siguiente. */
     private static final List<String> APORTAR = new CopyOnWriteArrayList<>();
 
@@ -119,6 +131,10 @@ class IngestionDeCatastroJdbcTest {
 
     @BeforeAll
     static void provisionar() throws Exception {
+        ANOTADOS.start();
+        ((ch.qos.logback.classic.Logger)
+                        org.slf4j.LoggerFactory.getLogger(IngestarHechosDeCatastro.class))
+                .addAppender(ANOTADOS);
         base = BaseDeDatosDePrueba.provisionar();
         municipalidad = DatosDePrueba.crearMunicipalidad(base, "203301", "Municipalidad del corte");
         // El mismo mapa que registra la aplicacion: importes y areas como cadena (RNF-055).
@@ -179,6 +195,9 @@ class IngestionDeCatastroJdbcTest {
 
     @AfterAll
     static void cerrar() throws IOException {
+        ((ch.qos.logback.classic.Logger)
+                        org.slf4j.LoggerFactory.getLogger(IngestarHechosDeCatastro.class))
+                .detachAppender(ANOTADOS);
         if (buzonDeCatastro != null) {
             buzonDeCatastro.close();
         }
@@ -195,6 +214,7 @@ class IngestionDeCatastroJdbcTest {
         APORTAR.clear();
         ACUSADOS.clear();
         AVISOS.clear();
+        ANOTADOS.list.clear();
         municipalidad =
                 DatosDePrueba.crearMunicipalidad(
                         base,
@@ -422,7 +442,7 @@ class IngestionDeCatastroJdbcTest {
                 new HechoRecibido(
                         UUID.randomUUID(),
                         nuevo.secuencia() - 1,
-                        TipoDeHechoDeCatastro.PREDIO_PROYECTADO,
+                        TipoDeHechoDeCatastro.PREDIO_PROYECTADO.name(),
                         nuevo.predioId(),
                         null,
                         nuevo.cuerpo().replace("Jr. Union", "DIRECCION VIEJA"),
@@ -486,7 +506,7 @@ class IngestionDeCatastroJdbcTest {
                 new HechoRecibido(
                         original.eventoId(),
                         original.secuencia(),
-                        original.tipo(),
+                        original.tipoPublicado(),
                         original.predioId(),
                         original.ejercicio(),
                         original.cuerpo(),
@@ -499,35 +519,198 @@ class IngestionDeCatastroJdbcTest {
     }
 
     @Test
-    @DisplayName("un tipo que este sistema no sabe aplicar se rechaza, y NO se acusa")
-    void unTipoDesconocidoNoSeAcusa() {
-        // NO ES HIPOTETICO, y por eso esta prueba existe desde el mismo dia que se midio: desde
-        // `catastro`#7 y #28 aquel sistema publica SIETE tipos y este declara TRES. El lote de
-        // ejemplo trae hoy MANZANA_PUBLICADA, FRENTE_PUBLICADO, HALLAZGO_FIRME y
-        // HALLAZGO_DEJADO_SIN_EFECTO, o sea que el ingestor de una instalacion real se para en el
-        // primero de ellos.
+    @DisplayName(
+            "#54: un tipo que no se sabe aplicar se IGNORA con su aviso, y el padron de la MISMA"
+                    + " pagina ENTRA")
+    void loQueNoSeSabeAplicarSeIgnoraYElPadronDeLaMismaPaginaEntra() throws SQLException {
+        // ESTA ES LA MEDIDA DEL ISSUE, INVERTIDA. Antes de #54 el rechazo ocurria al ARMAR el lote
+        // —dentro de `pendientes()`— y con `POR_VUELTA = 200` el buzon entero viene en una pagina,
+        // asi que un solo hecho del territorio mataba la vuelta ENTERA: aplicados 0, acusados 0,
+        // muertos 0 y avisos 0, con los DOS predios que iban delante dentro.
         //
-        // Pararse es LO CORRECTO —aplicar a medias dejaria la proyeccion diciendo algo que nadie
-        // escribio— y lo que no puede pasar es lo otro: que se acuse. Un hecho acusado y no
-        // aplicado esta perdido, y `catastro` no lo vuelve a servir.
-        List<String> ajeno = tiposQueCatastroPublicaYAquiNoSeAplican();
-        assertThat(ajeno)
+        // Y LO QUE SE MIDE SON LAS FILAS, no el codigo de salida: «la ingestion no revienta» pasa
+        // en verde con la cola entera descartada en silencio.
+        List<String> ajenos = tiposQueCatastroPublicaYAquiNoSeAplican();
+        assertThat(ajenos)
                 .as(
-                        "si `catastro` dejara de publicar tipos ajenos, esta prueba se quedaria sin"
-                                + " sujeto y pasaria en verde sin medir nada: entonces lo que sobra es"
-                                + " ella, no la guarda")
+                        "si `catastro` dejara de publicar tipos que este sistema no sabe aplicar,"
+                                + " esta prueba se quedaria sin sujeto y pasaria en verde sin medir"
+                                + " nada: entonces lo que sobra es ella, no la guarda")
                 .isNotEmpty();
 
-        APORTAR.add(ajeno.get(0));
+        // El orden importa: los del padron DELANTE, que es lo que el issue midio perdiendose.
+        APORTAR.addAll(deTipo("PREDIO_PROYECTADO"));
+        APORTAR.addAll(ajenos);
+
+        IngestarHechosDeCatastro.Vuelta vuelta = ingestor.ingerir();
+
+        assertThat(vuelta.leidos()).isEqualTo(2 + ajenos.size());
+        assertThat(vuelta.ignorados())
+                .as(
+                        "se IGNORAN: ni se aplican, ni se apartan a la cola de muertos, ni paran la"
+                                + " vuelta. La cola de muertos es para lo que no se podra aplicar"
+                                + " NUNCA; aqui el hecho esta bien y falta la capacidad")
+                .isEqualTo(ajenos.size());
+        assertThat(vuelta.aplicados())
+                .as("los dos predios que iban en la misma pagina, que antes se iban con ella")
+                .isEqualTo(2);
+        assertThat(contar("predio_ref")).as("y estan ESCRITOS, no contados").isEqualTo(2);
+        assertThat(contar("ficha_ref")).isEqualTo(5);
+
+        // NI SE APLICAN NI SE APARTAN. La cola de muertos es para lo que no se podra aplicar
+        // NUNCA; aqui el hecho esta bien y lo que falta es la capacidad.
+        assertThat(vuelta.muertos()).isZero();
+        assertThat(contar("catastro_evento_muerto")).isZero();
+        assertThat(contar("catastro_evento_aplicado"))
+                .as("solo los dos predios: un hecho ignorado no se anota como aplicado")
+                .isEqualTo(2);
+        assertThat(AVISOS).as("no se avisa al responsable: no hay nada roto que atender").isEmpty();
+
+        // Y NO SE ACUSA, que es lo que deja el hecho pendiente en el buzon del emisor para el dia
+        // que exista quien lo aplique.
+        assertThat(ACUSADOS)
+                .as("solo los dos predios")
+                .containsExactlyInAnyOrderElementsOf(identidadesDe(deTipo("PREDIO_PROYECTADO")));
+
+        // LA OTRA MITAD, sin la cual «se ignora» y «se pierde sin que nadie se entere» son
+        // indistinguibles: cada uno deja su WARN, y el WARN lo NOMBRA.
+        List<String> ignorados = avisosDeIgnorados();
+        assertThat(ignorados)
+                .as(
+                        "sin el aviso, «se ignora» y «se pierde sin que nadie se entere» son"
+                                + " indistinguibles: todo lo de arriba —las filas que entran, lo que no"
+                                + " se acusa, lo que no se aparta— sigue siendo cierto con la cola"
+                                + " descartada en silencio")
+                .hasSize(ajenos.size());
+        for (String tipo : tiposDeLosHechos(ajenos)) {
+            assertThat(ignorados)
+                    .as("el aviso nombra el tipo concreto, o no sirve para implementarlo despues")
+                    .anyMatch(aviso -> aviso.contains("«" + tipo + "»"));
+        }
+        for (String aviso : ignorados) {
+            assertThat(aviso)
+                    .contains("IGNORADO")
+                    .contains("no sabe aplicarlo")
+                    .contains("NO es un fallo")
+                    .as("dice donde esta escrito el contrato de tipos")
+                    .contains("TipoDeHechoDeCatastro");
+        }
+
+        // Y LA VUELTA SIGUIENTE NO PROGRESA, que es lo que impide que el runner de las cincuenta
+        // vueltas sobre los mismos hechos: se vuelven a leer —no se acusaron— y no se resuelve
+        // ninguno.
+        IngestarHechosDeCatastro.Vuelta otra = ingestor.ingerir();
+        assertThat(otra.leidos()).isEqualTo(ajenos.size());
+        assertThat(otra.aplicados()).isZero();
+        assertThat(otra.sinProgreso())
+                .as(
+                        "sin esto el runner daria sus 50 vueltas sobre los mismos hechos, avisando"
+                                + " 50 veces de lo mismo: «el lote vino vacio» NO se cumple nunca"
+                                + " cuando lo que queda no se acusa")
+                .isTrue();
+    }
+
+    @Test
+    @DisplayName("EL CONTRASTE: sin ningun tipo ajeno no sale NI UN aviso")
+    void sinTiposAjenosNoSaleNiUnAviso() throws SQLException {
+        // Sin esto, un ingestor que avisara SIEMPRE pasaria la prueba de arriba — y una guarda que
+        // grita en lo correcto se acaba silenciando, y con ella el aviso que si dice algo.
+        APORTAR.addAll(deTipo("PREDIO_PROYECTADO"));
+        APORTAR.addAll(deTipo("VALUACION_PUBLICADA"));
+
+        IngestarHechosDeCatastro.Vuelta vuelta = ingestor.ingerir();
+
+        assertThat(vuelta.aplicados())
+                .as(
+                        "LAS FILAS, y no el codigo de salida: un ingestor que ignorara la cola"
+                                + " ENTERA en silencio no reventaria, y aqui entrarian cero")
+                .isEqualTo(4);
+        assertThat(vuelta.ignorados()).isZero();
+        assertThat(contar("predio_ref")).isEqualTo(2);
+        assertThat(ANOTADOS.list)
+                .as("ni un aviso de ninguna clase cuando todo lo que llega se sabe aplicar")
+                .isEmpty();
+        assertThat(vuelta.sinProgreso()).isFalse();
+    }
+
+    @Test
+    @DisplayName("#54: y el tipo que `catastro` invente MANANA se ignora igual, con su nombre")
+    void unTipoQueCatastroInventeManianaSeIgnoraIgual() throws SQLException {
+        // La propiedad, y no la lista de cuatro: lo que decide no es que tipos hay hoy en el lote
+        // sino que este sistema no sabe aplicarlos. El octavo tampoco puede parar la ingestion.
+        String inventado = "UN_TIPO_QUE_CATASTRO_INVENTARA";
+        APORTAR.addAll(deTipo("PREDIO_PROYECTADO"));
+        APORTAR.add(conTipo(deTipo("VALUACION_PUBLICADA").get(0), inventado));
+
+        IngestarHechosDeCatastro.Vuelta vuelta = ingestor.ingerir();
+
+        assertThat(vuelta.aplicados()).isEqualTo(2);
+        assertThat(vuelta.ignorados()).isEqualTo(1);
+        assertThat(contar("predio_ref")).isEqualTo(2);
+        assertThat(avisosDeIgnorados())
+                .as("ignorarlo en silencio no se distingue de perderlo")
+                .singleElement(org.assertj.core.api.InstanceOfAssertFactories.STRING)
+                .as("con su nombre TAL COMO LLEGO: es lo unico con lo que se puede implementar")
+                .contains("«" + inventado + "»")
+                .contains("IGNORADO");
+    }
+
+    @Test
+    @DisplayName("y un hecho SIN TIPO sigue siendo un fallo de TRANSPORTE, que es otra cosa")
+    void unHechoSinTipoSigueSiendoUnFalloDeTransporte() {
+        // Las dos se arreglan distinto y por eso se distinguen: un tipo que no se sabe aplicar es
+        // una capacidad que falta —se ignora y la vuelta sigue— y una respuesta sin tipo es un
+        // despliegue que contesta algo que no tiene la forma de un hecho.
+        APORTAR.add(
+                """
+                {"eventoId": "%s", "secuencia": 4243, "tipo": "",
+                 "predioId": 7, "ejercicio": null, "cuerpo": "{}",
+                 "huella": "%s", "emitidoEn": "2026-03-01T10:00:00Z"}
+                """
+                        .formatted(UUID.randomUUID(), "e".repeat(64)));
 
         assertThatThrownBy(() -> ingestor.ingerir())
-                .as("no se aplica a medias, y se dice cual es el tipo y que hay que hacer")
-                .hasMessageContaining("que este sistema no sabe aplicar");
-        assertThat(ACUSADOS)
-                .as(
-                        "acusarlo sin aplicarlo lo perderia: el buzon de salida no lo vuelve a"
-                                + " servir")
-                .isEmpty();
+                .isInstanceOf(FuenteDeHechosDeCatastro.CatastroNoContesta.class)
+                .hasMessageContaining("no tiene la forma de un hecho");
+        assertThat(ACUSADOS).as("no se acusa nada: la vuelta siguiente lo reintenta").isEmpty();
+    }
+
+    /** Los avisos de tipo ignorado que el ingestor escribio, ya interpolados. */
+    private static List<String> avisosDeIgnorados() {
+        List<String> avisos = new ArrayList<>();
+        for (var anotado : ANOTADOS.list) {
+            if (anotado.getLevel() == ch.qos.logback.classic.Level.WARN
+                    && anotado.getFormattedMessage().contains("IGNORADO")) {
+                avisos.add(anotado.getFormattedMessage());
+            }
+        }
+        return avisos;
+    }
+
+    /** El mismo hecho con OTRO tipo, para poder ejercer uno que este sistema no sabe aplicar. */
+    private static String conTipo(String hecho, String tipo) {
+        ObjectNode evento = (ObjectNode) json.readTree(hecho);
+        evento.put("tipo", tipo);
+        evento.put("eventoId", UUID.randomUUID().toString());
+        return json.writeValueAsString(evento);
+    }
+
+    /** Los tipos, tal como el emisor los publico, de estos hechos. */
+    private static Set<String> tiposDeLosHechos(List<String> hechos) {
+        Set<String> tipos = new java.util.LinkedHashSet<>();
+        for (String hecho : hechos) {
+            tipos.add(json.readTree(hecho).path("tipo").asString());
+        }
+        return tipos;
+    }
+
+    /** Los identificadores de estos hechos, para compararlos con lo que se acuso. */
+    private static Set<String> identidadesDe(List<String> hechos) {
+        Set<String> identidades = new java.util.LinkedHashSet<>();
+        for (String hecho : hechos) {
+            identidades.add(json.readTree(hecho).path("eventoId").asString());
+        }
+        return identidades;
     }
 
     // ------------------------------------------------------------------
@@ -681,7 +864,7 @@ class IngestionDeCatastroJdbcTest {
         return new HechoRecibido(
                 UUID.fromString(nodo.path("eventoId").asString()),
                 nodo.path("secuencia").asLong(),
-                TipoDeHechoDeCatastro.valueOf(nodo.path("tipo").asString()),
+                nodo.path("tipo").asString(),
                 nodo.path("predioId").isNull() ? null : nodo.path("predioId").asLong(),
                 nodo.path("ejercicio").isNull() ? null : nodo.path("ejercicio").asInt(),
                 nodo.path("cuerpo").asString(),

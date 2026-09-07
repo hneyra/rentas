@@ -58,7 +58,7 @@ public class AlertaAlCanalDelResponsable implements AlertaDeHechosSinAplicar {
                 "LA PROYECCION DEL PADRON ESTA INCOMPLETA: el hecho "
                         + hecho.eventoId()
                         + " ("
-                        + hecho.tipo()
+                        + hecho.tipoPublicado()
                         + ", predio "
                         + hecho.predioId()
                         + ", ejercicio "
