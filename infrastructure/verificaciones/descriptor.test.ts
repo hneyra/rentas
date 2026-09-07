@@ -277,19 +277,29 @@ function declara(c: Contenedor, nombre: string): boolean {
   return (c.env ?? []).some((e) => e.name === nombre);
 }
 
-describe("C-14 §3 — el ingestor de catastro, declarado entero y suspendido", () => {
+describe("C-14 §3 — el ingestor de catastro, declarado entero y CORRIENDO (#21)", () => {
   /**
    * C-8 lo construyo y lo midio, y su hueco 2 decia: «mientras el descriptor no tenga campo, el
-   * ingestor no se puede desplegar». Ahora lo tiene, y nace SUSPENDIDO porque el feed de
-   * `catastro` esta detras de `@RequiereAcceso` y no hay identidad de servicio (ADR-0028 §2):
-   * sin credencial la llamada sale sin `Authorization` y `catastro` la rechaza con 401, asi que
-   * un CronJob activo fallaria cada noche y su alerta seria ruido.
+   * ingestor no se puede desplegar». Ahora lo tiene.
+   *
+   * **Nacio SUSPENDIDO y esta prueba exigia que lo siguiera estando** —`toBe(true)`—, que es la
+   * forma en que una guarda fosiliza el defecto que vigila: mientras nadie la tocara, arreglar la
+   * identidad de servicio ponia el descriptor en ROJO. Es el mismo patron que C-17 §1, C-18 §5 y
+   * R-AB encontraron tres veces.
+   *
+   * Desde #21 el `suspend` se va y lo que sostiene la seguridad es otra cosa, y mas fuerte: la
+   * credencial declara `emisor: "keycloak"`, y la guarda `identidad-de-servicio` de
+   * `infrastructure` **no deja pasar el build** si alguna municipalidad no declara su cliente de
+   * servicio. Un CronJob activo contra un emisor que no emitio nada ya no se puede desplegar,
+   * porque el build se para antes.
    */
-  it("declara su configuracion entera, y no corre todavia", () => {
+  it("declara su configuracion entera, y CORRE", () => {
     const crones = rentas.lotes(ENTORNO).filter((m) => m.kind === "CronJob");
     expect(crones).toHaveLength(1);
     const cron = crones[0]!;
-    expect(cron.spec.suspend).toBe(true);
+    // `undefined` es lo que Kubernetes lee como «no suspendido». Se afirma que NO es `true` y no
+    // que sea `false`: declarar `suspend: false` seria ruido en el manifiesto.
+    expect(cron.spec.suspend, "el ingestor volvio a nacer suspendido (#21 AC-4)").not.toBe(true);
     const c = cron.spec.jobTemplate.spec.template.spec.containers[0]!;
     // `@ConditionalOnProperty("kamayuk.rentas.ingestor.usuario")`: sin ella el cableado del
     // ingestor no existe y el proceso arranca sin ingestar nada.
