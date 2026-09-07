@@ -1,6 +1,8 @@
 package kamayuk.rentas.nucleo.dominio.predial;
 
 import java.time.LocalDate;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import kamayuk.rentas.dominio.Ejercicio;
 
@@ -16,6 +18,32 @@ public interface ValuacionRecibida {
 
     /** El cierre de la corrida del ejercicio, si llego. */
     Optional<CierreDeCorrida> cierreDe(Ejercicio ejercicio);
+
+    /**
+     * La valuacion que {@code catastro} sello para ese predio en ese ejercicio (#38, AC-1).
+     *
+     * <p>Hasta este issue no habia forma de pedirla. La tabla se escribia, se contaba y se le
+     * calculaba una huella agregada, y <b>ni una consulta leia una cifra</b>: el candado de emision
+     * exigia que llegaran todas y la determinacion calculaba con el autovaluo declarado, de modo
+     * que una valuacion completa y una incompleta producian exactamente el mismo recibo.
+     *
+     * <p>Vacio significa que ese predio no tiene valuacion de ese ejercicio. <b>No</b> significa
+     * que valga cero, y por eso {@link ValuacionSellada} obliga a traer la cifra o el motivo.
+     */
+    Optional<ValuacionSellada> delPredio(Ejercicio ejercicio, long predioId);
+
+    /**
+     * Las valuaciones selladas de varios predios de una vez, por su identificador.
+     *
+     * <p>Existe para que la determinacion no pregunte una vez por predio dentro de un bucle: un
+     * contribuyente con tres predios son tres viajes, y la corrida masiva recorre el padron entero.
+     * Es la misma razon por la que {@code PublicadorDeNormativa} no sabe contestar por partida
+     * (P5B).
+     *
+     * <p>Los predios que no tengan valuacion sencillamente no salen en el mapa. Una entrada con
+     * cifras nulas seria un cero disfrazado.
+     */
+    Map<Long, ValuacionSellada> deLosPredios(Ejercicio ejercicio, List<Long> predioIds);
 
     /** Cuantas valuaciones de ese ejercicio hay proyectadas en esta base. */
     long valuacionesRecibidasDe(Ejercicio ejercicio);

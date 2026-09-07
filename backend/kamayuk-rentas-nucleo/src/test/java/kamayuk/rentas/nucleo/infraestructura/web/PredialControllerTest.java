@@ -998,6 +998,21 @@ class PredialControllerTest {
         public String huellaDeLoRecibido(kamayuk.rentas.dominio.Ejercicio ejercicio) {
             return "";
         }
+
+        @Override
+        public java.util.Optional<kamayuk.rentas.nucleo.dominio.predial.ValuacionSellada> delPredio(
+                kamayuk.rentas.dominio.Ejercicio ejercicio, long predioId) {
+            return java.util.Optional.empty();
+        }
+
+        @Override
+        public java.util.Map<Long, kamayuk.rentas.nucleo.dominio.predial.ValuacionSellada>
+                deLosPredios(
+                        kamayuk.rentas.dominio.Ejercicio ejercicio, java.util.List<Long> predios) {
+            // Ninguna valuacion sellada: la determinacion cae a los autovaluos DECLARADOS, que es
+            // lo que estas pruebas miden. Que la sellada mande cuando la hay lo mide #38 aparte.
+            return java.util.Map.of();
+        }
     }
 
     private MockMvc montar(ParametrosSellados sellados) {
@@ -1014,6 +1029,7 @@ class PredialControllerTest {
                         new SinCaracteristicas(),
                         new DirectorioDePrueba(),
                         cuadro,
+                        new kamayuk.rentas.nucleo.dobles.ValuacionesSelladasEnMemoria(),
                         new RegistrarDeterminacionPredial(
                                 determinaciones, lector, auditoria, RELOJ),
                         RELOJ);
@@ -1467,6 +1483,21 @@ class PredialControllerTest {
         @Override
         public String huellaDeLoRecibido(kamayuk.rentas.dominio.Ejercicio ejercicio) {
             return HUELLA;
+        }
+
+        @Override
+        public java.util.Optional<kamayuk.rentas.nucleo.dominio.predial.ValuacionSellada> delPredio(
+                kamayuk.rentas.dominio.Ejercicio ejercicio, long predioId) {
+            return java.util.Optional.empty();
+        }
+
+        @Override
+        public java.util.Map<Long, kamayuk.rentas.nucleo.dominio.predial.ValuacionSellada>
+                deLosPredios(
+                        kamayuk.rentas.dominio.Ejercicio ejercicio, java.util.List<Long> predios) {
+            // Ninguna valuacion sellada: la determinacion cae a los autovaluos DECLARADOS, que es
+            // lo que estas pruebas miden. Que la sellada mande cuando la hay lo mide #38 aparte.
+            return java.util.Map.of();
         }
     }
 }

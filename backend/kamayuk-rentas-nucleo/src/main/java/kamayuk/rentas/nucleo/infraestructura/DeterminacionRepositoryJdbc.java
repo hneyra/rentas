@@ -15,6 +15,7 @@ import kamayuk.rentas.nucleo.dominio.OrigenDeDeterminacion;
 import kamayuk.rentas.nucleo.dominio.predial.DetalleDeterminacionPredio;
 import kamayuk.rentas.nucleo.dominio.predial.Determinacion;
 import kamayuk.rentas.nucleo.dominio.predial.DeterminacionRepository;
+import kamayuk.rentas.nucleo.dominio.predial.OrigenDelAutovaluo;
 import kamayuk.rentas.persistencia.RepositorioJdbc;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
@@ -43,7 +44,8 @@ public class DeterminacionRepositoryJdbc extends RepositorioJdbc
 
     private static final String COLUMNAS_DETALLE =
             "t.id, t.predio_id, t.autovaluo, t.valuo_exonerado, t.porcentaje_propiedad,"
-                    + " t.base_imponible_predio";
+                    + " t.base_imponible_predio, t.autovaluo_origen, t.valuacion_conjunto_id,"
+                    + " t.valuacion_huella";
 
     public DeterminacionRepositoryJdbc(JdbcClient jdbc) {
         super(jdbc);
@@ -118,11 +120,13 @@ public class DeterminacionRepositoryJdbc extends RepositorioJdbc
                             "INSERT INTO determinacion_predio_detalle"
                                     + " (municipalidad_id, ejercicio, determinacion_id, predio_id,"
                                     + "  autovaluo, valuo_exonerado, porcentaje_propiedad,"
-                                    + "  base_imponible_predio)"
+                                    + "  base_imponible_predio, autovaluo_origen,"
+                                    + "  valuacion_conjunto_id, valuacion_huella)"
                                     + " VALUES ("
                                     + MUNICIPALIDAD_ACTUAL
                                     + ", :ejercicio, :determinacionId, :predioId, :autovaluo,"
-                                    + "  :exonerado, :porcentaje, :baseImponiblePredio)")
+                                    + "  :exonerado, :porcentaje, :baseImponiblePredio,"
+                                    + "  :origen, :conjuntoDeLaValuacion, :huellaDeLaValuacion)")
                     .param("ejercicio", determinacion.ejercicio().valor())
                     .param("determinacionId", id)
                     .param("predioId", fila.predioId())
@@ -130,6 +134,9 @@ public class DeterminacionRepositoryJdbc extends RepositorioJdbc
                     .param("exonerado", fila.valuoExonerado().valor())
                     .param("porcentaje", fila.porcentajePropiedad().valor())
                     .param("baseImponiblePredio", fila.baseImponiblePredio().valor())
+                    .param("origen", fila.origen().name())
+                    .param("conjuntoDeLaValuacion", fila.valuacionConjuntoId())
+                    .param("huellaDeLaValuacion", fila.valuacionHuella())
                     .update();
         }
 
@@ -235,6 +242,9 @@ public class DeterminacionRepositoryJdbc extends RepositorioJdbc
                 new Dinero(fila.getBigDecimal("autovaluo")),
                 new Dinero(fila.getBigDecimal("valuo_exonerado")),
                 new Porcentaje(fila.getBigDecimal("porcentaje_propiedad")),
-                new Dinero(fila.getBigDecimal("base_imponible_predio")));
+                new Dinero(fila.getBigDecimal("base_imponible_predio")),
+                OrigenDelAutovaluo.valueOf(fila.getString("autovaluo_origen")),
+                fila.getObject("valuacion_conjunto_id", Long.class),
+                fila.getString("valuacion_huella"));
     }
 }

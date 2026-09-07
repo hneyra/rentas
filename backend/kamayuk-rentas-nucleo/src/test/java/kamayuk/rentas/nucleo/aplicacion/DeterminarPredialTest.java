@@ -69,8 +69,12 @@ class DeterminarPredialTest {
     private PrediosDePrueba predios;
     private AuditoriaDePrueba auditoria;
 
+    /** Lo que `catastro` sello. Nace VACIO: sin valuacion, manda el autovaluo declarado (#38). */
+    private kamayuk.rentas.nucleo.dobles.ValuacionesSelladasEnMemoria valuaciones;
+
     @BeforeEach
     void preparar() {
+        valuaciones = new kamayuk.rentas.nucleo.dobles.ValuacionesSelladasEnMemoria();
         determinaciones = new DeterminacionesEnMemoria();
         predios = new PrediosDePrueba();
         auditoria = new AuditoriaDePrueba();
@@ -212,7 +216,13 @@ class DeterminarPredialTest {
         assertThatThrownBy(() -> determinar(declarado(11L, "100000.00"), null))
                 .isInstanceOf(DeterminarPredial.PredioSinAutovaluo.class)
                 .hasMessageContaining("10002")
-                .hasMessageContaining("D-11");
+                // Hasta #38 esta asercion exigia «D-11». Ya no, y no es que se haya relajado: el
+                // mensaje decia «el sistema no lo puede derivar todavia» y recitaba GOB-03, D-02b y
+                // D-11, que son bloqueos de ESTE sistema. Quien valoriza es `catastro`, asi que lo
+                // que hay que decir es que contesto EL —y aqui no contesto nada—. Las dos formas
+                // del motivo las mide `LaValuacionSellada`.
+                .hasMessageContaining("ni declarado, ni sellado por `catastro`")
+                .hasMessageContaining("no ha publicado ninguna valuacion");
     }
 
     @Test
@@ -391,6 +401,168 @@ class DeterminarPredialTest {
 
     // ---------------------------------------------------------------- utilidades
 
+    @org.junit.jupiter.api.Nested
+    @DisplayName("#38 — la valuacion que `catastro` sello, y que manda cuando hay dos")
+    class LaValuacionSellada {
+
+        @Test
+        @DisplayName("con valuacion sellada MANDA la sellada, y la declarada se guarda al lado")
+        void mandaLaSellada() {
+            predios.con(11L, "10001", "AV. GRAU 100", Porcentaje.total());
+            valuaciones.conCifra(EJERCICIO, 11L, "180000.00", 42L);
+
+            DeterminacionPredialCalculada calculada = determinar(declarado(11L, "100000.00"), null);
+
+            PredioEnLaBase enLaBase = calculada.predios().get(0);
+            assertThat(enLaBase.autovaluo())
+                    .as(
+                            "ADR-0024: «aqui llega un valor ya calculado y sellado, y sobre el se"
+                                    + " aplican tramos, deducciones y alicuotas»")
+                    .isEqualTo(Dinero.de("180000.00"));
+            assertThat(enLaBase.autovaluoSellado()).isTrue();
+            assertThat(enLaBase.valuacionConjuntoId())
+                    .as("el conjunto lo fijo LA CORRIDA, no lo resuelve este sistema (ADR-0027 §2)")
+                    .isEqualTo(42L);
+            assertThat(enLaBase.valuacionHuella()).isNotNull();
+            assertThat(enLaBase.autovaluoDeclarado())
+                    .as(
+                            "la declarada NO desaparece: si desapareciera, la discrepancia se"
+                                    + " descubriria en ventanilla con el papel ya notificado")
+                    .isEqualTo(Dinero.de("100000.00"));
+            assertThat(calculada.cabecera().baseImponible()).isEqualTo(Dinero.de("180000.00"));
+        }
+
+        @Test
+        @DisplayName(
+                "sin valuacion sellada manda la declarada, que es el estado de casi todo el padron")
+        void sinSelladaMandaLaDeclarada() {
+            predios.con(11L, "10001", "AV. GRAU 100", Porcentaje.total());
+
+            PredioEnLaBase enLaBase =
+                    determinar(declarado(11L, "100000.00"), null).predios().get(0);
+
+            assertThat(enLaBase.autovaluo()).isEqualTo(Dinero.de("100000.00"));
+            assertThat(enLaBase.autovaluoSellado()).isFalse();
+            assertThat(enLaBase.valuacionConjuntoId()).isNull();
+            assertThat(enLaBase.autovaluoDeclarado())
+                    .as("no hay dos cifras que comparar, asi que no se guarda ninguna «otra»")
+                    .isNull();
+        }
+
+        @Test
+        @DisplayName("una valuacion CON MOTIVO y sin cifras no vale como cero: manda la declarada")
+        void unaValuacionConMotivoNoEsCero() {
+            predios.con(11L, "10001", "AV. GRAU 100", Porcentaje.total());
+            valuaciones.sinCifra(
+                    EJERCICIO,
+                    11L,
+                    "No hay tabla de depreciacion para el uso de la ficha (RT-004)",
+                    "TABLA_DE_DEPRECIACION");
+
+            PredioEnLaBase enLaBase =
+                    determinar(declarado(11L, "100000.00"), null).predios().get(0);
+
+            assertThat(enLaBase.autovaluo())
+                    .as(
+                            "leerla como cero dejaria la base del contribuyente en cero y el recibo"
+                                    + " saldria plausible (#48). Hoy es el caso de 19 de los 23 predios"
+                                    + " de la demostracion")
+                    .isEqualTo(Dinero.de("100000.00"));
+            assertThat(enLaBase.autovaluoSellado()).isFalse();
+        }
+
+        @Test
+        @DisplayName("AC-4 — un predio con valuacion sellada y SIN declaracion se determina")
+        void conSelladaYSinDeclaracionSeDetermina() {
+            predios.con(11L, "10001", "AV. GRAU 100", Porcentaje.total());
+            valuaciones.conCifra(EJERCICIO, 11L, "150000.00", 42L);
+
+            // Ni un `PredioDeclarado`: antes de #38 esto lanzaba `PredioSinAutovaluo` aunque
+            // `valuacion_predio` trajera sus cuatro cifras.
+            DeterminacionPredialCalculada calculada =
+                    servicio()
+                            .determinar(
+                                    new DeterminarPredial.Peticion(
+                                            EJERCICIO, "C-001", List.of(), "TRIMESTRAL", false),
+                                    PORQUE);
+
+            assertThat(calculada.cabecera().baseImponible()).isEqualTo(Dinero.de("150000.00"));
+            assertThat(calculada.predios().get(0).autovaluoSellado()).isTrue();
+        }
+
+        @Test
+        @DisplayName("y sin ninguna de las dos, el motivo dice lo que `catastro` contesto")
+        void sinNingunaDeLasDosSeDiceQueContestoCatastro() {
+            predios.con(11L, "10001", "AV. GRAU 100", Porcentaje.total());
+            valuaciones.sinCifra(
+                    EJERCICIO,
+                    11L,
+                    "Falta el % de actualizacion del ejercicio",
+                    "PORCENTAJE_DE_ACTUALIZACION");
+
+            assertThatThrownBy(
+                            () ->
+                                    servicio()
+                                            .determinar(
+                                                    new DeterminarPredial.Peticion(
+                                                            EJERCICIO,
+                                                            "C-001",
+                                                            List.of(),
+                                                            "TRIMESTRAL",
+                                                            false),
+                                                    PORQUE))
+                    .as(
+                            "antes de #38 este mensaje recitaba GOB-03, D-02b y D-11, que son"
+                                    + " bloqueos de ESTE sistema. Quien valoriza es `catastro`, asi que"
+                                    + " lo que hay que decir es que contesto")
+                    .isInstanceOf(DeterminarPredial.PredioSinAutovaluo.class)
+                    .hasMessageContaining("NO pudo calcularla")
+                    .hasMessageContaining("PORCENTAJE_DE_ACTUALIZACION");
+        }
+
+        @Test
+        @DisplayName("y si `catastro` no publico nada, lo dice de OTRA manera")
+        void sinValuacionNiDeclaracionSeDistingueDeLaQueNoPudo() {
+            predios.con(11L, "10001", "AV. GRAU 100", Porcentaje.total());
+
+            assertThatThrownBy(
+                            () ->
+                                    servicio()
+                                            .determinar(
+                                                    new DeterminarPredial.Peticion(
+                                                            EJERCICIO,
+                                                            "C-001",
+                                                            List.of(),
+                                                            "TRIMESTRAL",
+                                                            false),
+                                                    PORQUE))
+                    .as(
+                            "«no ha publicado ninguna» y «publico y no pudo» se arreglan de"
+                                    + " maneras distintas: correr la valuacion, o sellar la llave")
+                    .isInstanceOf(DeterminarPredial.PredioSinAutovaluo.class)
+                    .hasMessageContaining("no ha publicado ninguna valuacion");
+        }
+
+        @Test
+        @DisplayName("y la corrida LEE las valuaciones: no coincide por casualidad")
+        void laCorridaLeeLasValuaciones() {
+            predios.con(11L, "10001", "AV. GRAU 100", Porcentaje.total());
+            // La sellada y la declarada valen LO MISMO: el resultado no distingue nada, y por eso
+            // lo que se afirma es la LECTURA. Es la mitad que #38 AC-5 pide y que ninguna cifra
+            // podria sostener.
+            valuaciones.conCifra(EJERCICIO, 11L, "100000.00", 42L);
+
+            determinar(declarado(11L, "100000.00"), null);
+
+            assertThat(valuaciones.loQuePreguntaron())
+                    .as(
+                            "el candado exigia que llegaran todas y la corrida determinaba con"
+                                    + " otras cifras: una valuacion completa y una incompleta producian"
+                                    + " el mismo recibo")
+                    .contains(EJERCICIO.valor() + ":11");
+        }
+    }
+
     private DeterminacionPredialCalculada determinar(
             DeterminarPredial.PredioDeclarado uno, DeterminarPredial.PredioDeclarado otro) {
         List<DeterminarPredial.PredioDeclarado> declarados = new ArrayList<>();
@@ -421,6 +593,7 @@ class DeterminarPredialTest {
                 new SinCaracteristicas(),
                 new DirectorioDePrueba(),
                 new CuadroPredialParametrizado(lector),
+                valuaciones,
                 new RegistrarDeterminacionPredial(determinaciones, lector, auditoria, RELOJ),
                 RELOJ);
     }

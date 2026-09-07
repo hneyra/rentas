@@ -498,7 +498,66 @@ class IngestionDeCatastroJdbcTest {
                 .hasMessageContaining("reescribiendo un hecho sellado");
     }
 
+    @Test
+    @DisplayName("un tipo que este sistema no sabe aplicar se rechaza, y NO se acusa")
+    void unTipoDesconocidoNoSeAcusa() {
+        // NO ES HIPOTETICO, y por eso esta prueba existe desde el mismo dia que se midio: desde
+        // `catastro`#7 y #28 aquel sistema publica SIETE tipos y este declara TRES. El lote de
+        // ejemplo trae hoy MANZANA_PUBLICADA, FRENTE_PUBLICADO, HALLAZGO_FIRME y
+        // HALLAZGO_DEJADO_SIN_EFECTO, o sea que el ingestor de una instalacion real se para en el
+        // primero de ellos.
+        //
+        // Pararse es LO CORRECTO —aplicar a medias dejaria la proyeccion diciendo algo que nadie
+        // escribio— y lo que no puede pasar es lo otro: que se acuse. Un hecho acusado y no
+        // aplicado esta perdido, y `catastro` no lo vuelve a servir.
+        List<String> ajeno = tiposQueCatastroPublicaYAquiNoSeAplican();
+        assertThat(ajeno)
+                .as(
+                        "si `catastro` dejara de publicar tipos ajenos, esta prueba se quedaria sin"
+                                + " sujeto y pasaria en verde sin medir nada: entonces lo que sobra es"
+                                + " ella, no la guarda")
+                .isNotEmpty();
+
+        APORTAR.add(ajeno.get(0));
+
+        assertThatThrownBy(() -> ingestor.ingerir())
+                .as("no se aplica a medias, y se dice cual es el tipo y que hay que hacer")
+                .hasMessageContaining("que este sistema no sabe aplicar");
+        assertThat(ACUSADOS)
+                .as(
+                        "acusarlo sin aplicarlo lo perderia: el buzon de salida no lo vuelve a"
+                                + " servir")
+                .isEmpty();
+    }
+
     // ------------------------------------------------------------------
+
+    /** Los hechos del lote cuyo tipo `catastro` publica y esta proyeccion todavia no aplica. */
+    private static List<String> tiposQueCatastroPublicaYAquiNoSeAplican() {
+        List<String> ajenos = new ArrayList<>();
+        try {
+            for (var evento :
+                    json.readTree(
+                                    Files.readString(
+                                            raizDeLosRepositorios()
+                                                    .resolve(
+                                                            Path.of(
+                                                                    "catastro",
+                                                                    "docs",
+                                                                    "50-api",
+                                                                    "eventos",
+                                                                    "lote-de-eventos.json")),
+                                            StandardCharsets.UTF_8))
+                            .path("eventos")) {
+                if (!conocidos().contains(evento.path("tipo").asString(""))) {
+                    ajenos.add(evento.toString());
+                }
+            }
+        } catch (IOException noSePudoLeer) {
+            throw new IllegalStateException("No se pudo leer el lote de `catastro`", noSePudoLeer);
+        }
+        return ajenos;
+    }
 
     /** Los tres hechos que `catastro` publico, cada uno como el JSON de un evento del feed. */
     private static List<String> hechosPublicadosPorCatastro() throws IOException {
@@ -521,24 +580,69 @@ class IngestionDeCatastroJdbcTest {
                             + " acepta");
         }
         List<String> hechos = new ArrayList<>();
+        List<String> ajenos = new ArrayList<>();
+        java.util.Map<String, Integer> porTipo = new java.util.LinkedHashMap<>();
         for (var evento :
                 json.readTree(Files.readString(archivo, StandardCharsets.UTF_8)).path("eventos")) {
-            hechos.add(evento.toString());
+            String tipo = evento.path("tipo").asString("");
+            porTipo.merge(tipo, 1, Integer::sum);
+            // Los tipos que ESTE sistema sabe aplicar, y solo esos. `catastro` publica hoy siete
+            // (`catastro`#7 y #28) y aqui `TipoDeHechoDeCatastro` declara tres, a proposito: la
+            // copia del enumerado existe para que un tipo nuevo se RECHACE en voz alta en vez de
+            // aplicarse a medias. Lo que esta prueba mide es la proyeccion de los tres, asi que
+            // aporta los tres; lo que hace el ingestor con los otros cuatro lo mide
+            // `unTipoDesconocidoNoSeAcusa`.
+            if (conocidos().contains(tipo)) {
+                hechos.add(evento.toString());
+            } else {
+                ajenos.add(tipo);
+            }
         }
-        // DOS predios y no uno, y eso importa: la huella agregada de una corrida es un
-        // `String.join(separador, huellas)`, y con UNA sola huella el separador NO APARECE. Un
-        // lote de un predio no puede distinguir la huella que `catastro` calcula en Java de la
+
+        // La expectativa NO es un total, y esa es la correccion. Estaba escrita como
+        // «el lote tiene 5 hechos», y `catastro`#28 lo llevo a 10 sin cambiar nada de lo que esta
+        // prueba mide: el rojo salio como `initializationError` —que se lleva por delante la clase
+        // entera y aborta el build— hablando de un numero, no de la propiedad que hace falta.
+        //
+        // La propiedad es esta: DOS predios y no uno. La huella agregada de una corrida es un
+        // `String.join(separador, huellas)`, y con UNA sola huella el separador NO APARECE, asi que
+        // un lote de un predio no puede distinguir la huella que `catastro` calcula en Java de la
         // que este sistema calcula en SQL — se midio: con el lote de un predio, cambiar el
         // separador de coma a punto y coma dejo estas cinco pruebas en VERDE.
-        if (hechos.size() != 5) {
+        int predios = porTipo.getOrDefault("PREDIO_PROYECTADO", 0);
+        int valuaciones = porTipo.getOrDefault("VALUACION_PUBLICADA", 0);
+        int cierres = porTipo.getOrDefault("CORRIDA_CERRADA", 0);
+        if (predios < 2 || valuaciones < 2 || cierres != 1) {
             throw new IllegalStateException(
-                    "El lote publicado tiene "
-                            + hechos.size()
-                            + " hechos y esta prueba espera 5: dos predios, sus dos valuaciones y"
-                            + " el cierre. Con un solo predio el separador de la huella agregada no"
-                            + " se puede comparar");
+                    "El lote publicado trae "
+                            + predios
+                            + " predio(s), "
+                            + valuaciones
+                            + " valuacion(es) y "
+                            + cierres
+                            + " cierre(s), y esta prueba necesita al menos dos predios con sus dos"
+                            + " valuaciones y exactamente un cierre. Con un solo predio el"
+                            + " separador de la huella agregada no se puede comparar. Tipos del"
+                            + " lote: "
+                            + porTipo);
+        }
+        if (!ajenos.isEmpty()) {
+            // No es un fallo: es el censo de lo que `catastro` publica y esta proyeccion todavia
+            // no aplica. Se imprime para que quien anada un tipo a `TipoDeHechoDeCatastro` vea
+            // aqui cuales quedan, en vez de descubrirlo cuando el ingestor se pare en produccion.
+            System.out.println(
+                    "Tipos que `catastro` publica y esta proyeccion NO aplica todavia: " + ajenos);
         }
         return List.copyOf(hechos);
+    }
+
+    /** Los tipos que {@code TipoDeHechoDeCatastro} declara, leidos del enumerado y no copiados. */
+    private static java.util.Set<String> conocidos() {
+        java.util.Set<String> nombres = new java.util.LinkedHashSet<>();
+        for (TipoDeHechoDeCatastro tipo : TipoDeHechoDeCatastro.values()) {
+            nombres.add(tipo.name());
+        }
+        return nombres;
     }
 
     /** El directorio que contiene los repositorios hermanos. */
