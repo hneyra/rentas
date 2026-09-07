@@ -181,8 +181,18 @@ public final class Recursos {
         }
     }
 
-    /** Cuerpo de {@code POST /seguridad/grupos/{grupo}/miembros}. */
-    public record CambioDeMiembro(long usuarioId, boolean activo, String observacion) {}
+    /**
+     * Cuerpo de {@code POST /seguridad/grupos/&#123;grupo&#125;/miembros}.
+     *
+     * <p><b>{@code observacion} va {@link Nullable} porque es lo que Jackson puede producir</b>
+     * (#30): la clave que el cliente no manda llega nula, la anotacion no la obliga a nada, y
+     * declararla no-nula solo consigue que NullAway se lo crea. Eso es lo que dejaba pasar un
+     * {@code Observacion.de(...)} con un nulo dentro, y con el un {@code NullPointerException} que
+     * el borde no caza: <b>500 con identificador de incidencia</b> donde tocaba un 422. Declarado,
+     * quien lo lea tiene que decidir que hace con el nulo — y el constructor de {@link Observacion}
+     * ya contesta lo suyo.
+     */
+    public record CambioDeMiembro(long usuarioId, boolean activo, @Nullable String observacion) {}
 
     /**
      * El cuerpo del alta de un grupo (#572).

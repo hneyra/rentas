@@ -95,6 +95,23 @@ tasks.test {
         .file(rootProject.file("../docs/50-api/formas-de-la-api.json"))
         .withPathSensitivity(PathSensitivity.RELATIVE)
 
+    // Y para el censo de parametros de la peticion (#26), por lo mismo: lo compara
+    // `ParametrosDeLaApiTest` contra lo que las FIRMAS de los controladores exigen, y sin
+    // declararlo aqui una edicion a mano dejaria la tarea UP-TO-DATE y pasaria en verde.
+    inputs
+        .file(rootProject.file("../docs/50-api/parametros-de-la-api.json"))
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+
+    // Y LOS CONTRATOS QUE ESTE BACKEND PUBLICA COMO CONSUMIDOR, que hasta #27 no estaban
+    // declarados: `ContratoQueConsumeDeCatastro`, `...DeNormativa` y —desde #27— `...DeCaja`
+    // comparan lo que producen contra `docs/50-api/contratos-que-consume/*.json`, y editar uno
+    // de esos archivos a mano dejaba `test` UP-TO-DATE. Es la misma leccion de #192 punto 2 que
+    // el contrato de la API y las formas ya tenian cerrada, en el ultimo archivo de `docs/` que
+    // una prueba lee y nadie habia declarado.
+    inputs
+        .dir(rootProject.file("../docs/50-api/contratos-que-consume"))
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+
     // Y para el censo de respuestas (#732), por lo mismo: lo compara
     // `RespuestasDeLaApiTest` contra lo que los controladores pueden contestar, y sin
     // declararlo aqui una edicion a mano dejaria la tarea UP-TO-DATE y pasaria en verde.

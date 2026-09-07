@@ -1,10 +1,8 @@
 package kamayuk.rentas.tesoreria.infraestructura;
 
-import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.tesoreria.ReciboDeTramite;
 import kamayuk.rentas.tesoreria.RecibosDeTramite;
 import org.springframework.stereotype.Component;
@@ -57,19 +55,20 @@ public class RecibosDeTramiteHttp implements RecibosDeTramite {
     }
 
     private static ReciboDeTramite recibo(JsonNode cuerpo) {
+        String que = "leer un recibo de tramite";
         List<String> conceptos = new ArrayList<>();
         for (JsonNode concepto : cuerpo.path("conceptos")) {
             conceptos.add(concepto.asString());
         }
         return new ReciboDeTramite(
                 cuerpo.path("reciboId").asLong(),
-                cuerpo.path("numero").asString(""),
-                LocalDate.parse(cuerpo.path("fechaDePago").asString()),
+                ClienteHttpDeCaja.exigirTexto(cuerpo, "numero", que),
+                ClienteHttpDeCaja.exigirFecha(cuerpo, "fechaDePago", que),
                 cuerpo.path("contribuyenteId").asLong(),
                 cuerpo.path("esDeTasas").asBoolean(),
                 cuerpo.path("anulado").asBoolean(),
                 List.copyOf(conceptos),
-                Dinero.de(cuerpo.path("total").asString("0")),
-                LocalDate.parse(cuerpo.path("actualizadoA").asString()));
+                ClienteHttpDeCaja.exigirDinero(cuerpo, "total", que),
+                ClienteHttpDeCaja.exigirFecha(cuerpo, "actualizadoA", que));
     }
 }

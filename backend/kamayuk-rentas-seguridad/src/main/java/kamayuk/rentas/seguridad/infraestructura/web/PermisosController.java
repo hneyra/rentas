@@ -81,12 +81,17 @@ public class PermisosController {
     /**
      * La observacion del cuerpo, o 422 nombrandola (regla 10, RNF-052).
      *
-     * <p>{@link Observacion#de} rechaza el nulo con {@code Objects.requireNonNull}, y una {@code
-     * NullPointerException} no la caza ningun manejador: cae en el
-     * {@code @ExceptionHandler(Exception.class)} y sale <b>500 con identificador de incidencia</b>.
-     * O sea que un cuerpo sin observacion decia «el servidor se rompio» y ensuciaba el registro de
-     * errores, cuando lo que pasa es que la peticion esta mal. Se lee aqui, una vez, y las dos
-     * matrices —la del grupo y la de la cuenta (#585)— usan la misma lectura: dos copias acabarian
+     * <p><b>Desde #30 el nulo ya no depende de esta guarda para no ser un 500</b>: {@link
+     * Observacion} lo rechaza con {@link IllegalArgumentException}, que el borde traduce a 422
+     * nombrando el campo. Antes lo rechazaba con {@code Objects.requireNonNull} y una {@code
+     * NullPointerException} no la caza ningun manejador: caia en el
+     * {@code @ExceptionHandler(Exception.class)} y salia <b>500 con identificador de
+     * incidencia</b>, o sea diciendo «el servidor se rompio» y ensuciando el registro de errores
+     * cuando lo que pasaba es que la peticion estaba mal.
+     *
+     * <p>Esta lectura se queda igualmente, y por lo que aporta encima: contesta con la redaccion de
+     * esta operacion y rechaza tambien el texto en blanco. Se lee aqui, una vez, y las dos matrices
+     * —la del grupo y la de la cuenta (#585)— usan la misma lectura: dos copias acabarian
      * contestando cosas distintas al mismo cuerpo.
      */
     static Observacion observacionDe(@Nullable String texto) {
@@ -168,8 +173,9 @@ public class PermisosController {
      * Cuerpo de la peticion: los niveles a fijar y por que.
      *
      * <p>Los dos campos van {@code @Nullable} porque es lo que Jackson puede producir: la clave que
-     * el cliente no manda llega nula, y declararla no nula solo consigue que el fallo salga como
-     * {@code NullPointerException} —o sea, 500— en vez de como el 422 que le corresponde.
+     * el cliente no manda llega nula, y declararla no nula solo consigue esconder de quien lee el
+     * {@code record} que ese nulo existe. Que llegue a ser 422 y no 500 lo sostiene desde #30 el
+     * constructor de {@link Observacion}, no la declaracion.
      */
     public record CambioDePermisos(
             @Nullable List<NivelDeAcceso> niveles, @Nullable String observacion) {}

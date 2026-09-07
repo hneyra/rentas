@@ -581,8 +581,10 @@ describe('AC6 — el expediente abre sobre un contribuyente de verdad', () => {
   });
 
   it('las dos operaciones que este issue NO enciende las sigue contestando el proxy', async () => {
-    // `GET /rentas/predios` y `GET /consultas/deuda` exigen `?codContribuyente=`, que el
-    // contrato no publica (#26). Siguen en el proxy, y la pantalla sigue abriendo.
+    // `GET /rentas/predios` y `GET /consultas/deuda` exigen `?codContribuyente=`. Desde #26 el
+    // contrato lo publica y el expediente lo manda —el codigo sale de la fila del padron—, asi
+    // que el proxy las contesta con 200 en vez de con el 422 que da sin el; encenderlas contra
+    // el backend es otra decision y otra medida (ver `servidas.ts`).
     const espia = backendMedido();
     const usuario = await montar();
     await usuario.click(screen.getByRole('button', { name: /SULLON VILCHEZ-JOSE RAUL/ }));
