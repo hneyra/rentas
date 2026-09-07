@@ -21,3 +21,10 @@ backend/.gradle/
 # Secretos: nunca, y `.gitleaks.toml` vigila que no se cuelen
 *.local.*
 .env
+
+# El arnes de extremo a extremo (I-2). Nada de esto se versiona:
+# `.estado/` son cookies de sesion de Keycloak —credenciales vivas— y los otros dos son
+# salida de una corrida, que cambia en cada una y no dice nada de lo que el arnes verifica.
+frontend/e2e/.estado/
+frontend/playwright-report/
+frontend/test-results/

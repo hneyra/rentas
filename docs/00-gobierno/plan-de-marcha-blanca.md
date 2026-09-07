@@ -168,9 +168,19 @@ Conviene que esté escrito antes, y no descubrirlo el día de la demostración:
       —la escalera de identidad la comprueba CI, los permisos los aprende la interfaz del backend
       (ADR-0013), y la determinación se pide y se lee desde #395—, pero **el recorrido completo no
       está medido de una pieza**.
-- [ ] **Ese recorrido está como prueba de extremo a extremo, no como acta de una demostración.** Hay
-      seis caminos en Chromium (`frontend/e2e/`), y uno de ellos es la determinación simulada con el
-      teclado; corren contra el proxy de datos, no contra la instalación levantada.
+- [ ] **Ese recorrido está como prueba de extremo a extremo, no como acta de una demostración.** A
+      medias, y la mitad que falta es la de arriba. Desde I-2 (#28) `frontend/e2e/` **existe**: son
+      **18 caminos en Chromium** más tres accesos, corren con `yarn e2e` y **contra la instalación
+      levantada, no contra el proxy de datos** —el arnés arranca su propio Vite con
+      `VITE_KAMAYUK_PROXY_DE_DATOS=false` y ninguna sección enseña una cifra del artboard, medido—.
+      El acceso es el de verdad, por el formulario de Keycloak, con PKCE y canje. Lo que **no**
+      está es el recorrido de la casilla anterior: los caminos son de lectura, porque la única
+      escritura que esta interfaz publica hoy es `PUT /seguridad/sesion/ejercicio` —y de ella se
+      ejerce el 422—; registrar un contribuyente y registrar un predio con su ficha no se pueden
+      recorrer todavía porque esas pantallas no escriben (F-5) y el predio es de `catastro`. Y **no
+      corre en CI**: el job está declarado en `frontend.yml` con las cuatro cosas que le faltan
+      escritas dentro, y la tercera no se arregla con trabajo —los datos que los caminos afirman
+      salen del volcado de la marcha blanca, que no se versiona en ningún repositorio—.
 - [x] **Todo documento que salga lleva la marca de demostración**, y hay pruebas que se ponen rojas
       si se le quita: 19 en el backend, y el peldaño 9 de `despliegue.yml` —«la marcha blanca se
       levanta MARCADA»— contra la instalación real.
