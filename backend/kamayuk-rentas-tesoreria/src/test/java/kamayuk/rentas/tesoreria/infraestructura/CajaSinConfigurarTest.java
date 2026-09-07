@@ -2,6 +2,7 @@ package kamayuk.rentas.tesoreria.infraestructura;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowable;
 
 import java.io.IOException;
 import java.net.ServerSocket;
@@ -66,31 +67,25 @@ class CajaSinConfigurarTest {
         // panel habria tenido que cazar `ClienteHttpDeCaja.CajaInalcanzable`.
         String muerto = "http://127.0.0.1:" + unPuertoQueNadieEscucha() + "/caja/api/v1";
 
-        assertThat(errorDe(() -> avanceCon("").delDia(DIA, DIA)))
-                .isNotInstanceOf(ClienteHttpDeCaja.CajaInalcanzable.class)
-                .isInstanceOf(AvanceDeCaja.CajaInalcanzable.class);
-        assertThat(errorDe(() -> avanceCon(muerto).delDia(DIA, DIA)))
-                .isNotInstanceOf(ClienteHttpDeCaja.CajaInalcanzable.class)
-                .isInstanceOf(AvanceDeCaja.CajaInalcanzable.class);
+        assertThat(catchThrowable(() -> avanceCon("").delDia(DIA, DIA)))
+                .isInstanceOf(AvanceDeCaja.CajaInalcanzable.class)
+                .isNotInstanceOf(ClienteHttpDeCaja.CajaInalcanzable.class);
+        assertThat(catchThrowable(() -> avanceCon(muerto).delDia(DIA, DIA)))
+                .isInstanceOf(AvanceDeCaja.CajaInalcanzable.class)
+                .isNotInstanceOf(ClienteHttpDeCaja.CajaInalcanzable.class);
     }
 
     /** La causa original se conserva: el registro sigue pudiendo decir que paso de verdad. */
     @Test
     @DisplayName("la excepcion del transporte viaja como causa, no se pierde")
     void laCausaSeConserva() {
-        Throwable fallo = errorDe(() -> avanceCon("").delDia(DIA, DIA));
+        Throwable fallo = catchThrowable(() -> avanceCon("").delDia(DIA, DIA));
 
-        assertThat(fallo.getCause()).isInstanceOf(ClienteHttpDeCaja.CajaInalcanzable.class);
-        assertThat(fallo).hasMessageContaining("kamayuk.caja.url no esta configurada");
-    }
-
-    private static Throwable errorDe(Runnable accion) {
-        try {
-            accion.run();
-        } catch (RuntimeException fallo) {
-            return fallo;
-        }
-        throw new AssertionError("Se esperaba un fallo y no lo hubo");
+        assertThat(fallo)
+                .isInstanceOf(AvanceDeCaja.CajaInalcanzable.class)
+                .hasMessageContaining("kamayuk.caja.url no esta configurada")
+                .cause()
+                .isInstanceOf(ClienteHttpDeCaja.CajaInalcanzable.class);
     }
 
     private static int unPuertoQueNadieEscucha() throws IOException {
