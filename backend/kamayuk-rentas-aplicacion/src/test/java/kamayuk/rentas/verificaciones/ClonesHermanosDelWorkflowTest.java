@@ -156,6 +156,35 @@ class ClonesHermanosDelWorkflowTest {
      * guarda vigila: es que la guarda no se puede correr, que es peor. {@code catastro} y {@code
      * normativa} cerraron el mismo defecto en sus dos ayudantes; aqui quedaba este.
      */
+    /**
+     * Como se llama ESTE repositorio, para poder descartarse a si mismo de la lista de hermanos.
+     *
+     * <p><b>No es el nombre del directorio</b>, y ese era el segundo defecto de {@code worktree} de
+     * este mismo archivo —el primero fue {@code isDirectory} por {@code exists}, ver {@link
+     * #raizDelClon()}—. En un {@code git worktree} el directorio se llama como el worktree y no
+     * como el repositorio, asi que {@code getFileName()} devolvia algo como {@code w1} y {@code
+     * «rentas»} dejaba de reconocerse como propio: la guarda exigia entonces que el workflow
+     * hiciera {@code checkout} de {@code rentas} DESDE {@code rentas}, un rojo que no habla de lo
+     * que vigila.
+     *
+     * <p>El nombre de verdad sale del {@code .git}: en un clon normal es el del directorio, y en un
+     * worktree ese {@code .git} es un <b>archivo</b> con {@code gitdir: <clon>/.git/worktrees/<x>}
+     * dentro, de donde se recupera el nombre del clon principal.
+     */
+    private static String nombreDelRepositorio(Path raiz) throws IOException {
+        Path git = raiz.resolve(".git");
+        if (Files.isRegularFile(git)) {
+            String gitdir = Files.readString(git, StandardCharsets.UTF_8).strip();
+            int corte = gitdir.indexOf("/.git/worktrees/");
+            if (corte > 0) {
+                return Path.of(gitdir.substring("gitdir:".length(), corte).strip())
+                        .getFileName()
+                        .toString();
+            }
+        }
+        return raiz.getFileName().toString();
+    }
+
     private static Path raizDelClon() {
         Path actual = Path.of("").toAbsolutePath();
         while (actual != null && !Files.exists(actual.resolve(".git"))) {
@@ -231,7 +260,7 @@ class ClonesHermanosDelWorkflowTest {
 
     /** Rutas de hermano escritas como literal en el codigo de prueba. */
     private static List<String[]> rutasEscritasAMano(Path raiz) throws IOException {
-        String propio = raiz.getFileName().toString();
+        String propio = nombreDelRepositorio(raiz);
         List<String[]> escritas = new ArrayList<>();
         for (Path archivo : fuentes(raiz, ".java")) {
             Matcher coincidencia =
@@ -257,7 +286,7 @@ class ClonesHermanosDelWorkflowTest {
      * tendria sentido.
      */
     private static List<String[]> loQueLasPruebasResuelven(Path raiz) throws Exception {
-        String propio = raiz.getFileName().toString();
+        String propio = nombreDelRepositorio(raiz);
         List<String[]> resueltas = new ArrayList<>();
         for (Path archivo : fuentes(raiz, "Test.java")) {
             String texto = Files.readString(archivo, StandardCharsets.UTF_8);

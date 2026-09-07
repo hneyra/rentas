@@ -39,10 +39,20 @@ public class AvanceDeCajaHttp implements AvanceDeCaja {
 
     @Override
     public RecaudadoEnCaja delDia(LocalDate dia, LocalDate aLaFecha) {
-        JsonNode cuerpo =
-                caja.pedir(
-                        "/recaudacion/avance?dia=" + dia + "&aLaFecha=" + aLaFecha,
-                        "leer el avance de caja del " + dia);
+        JsonNode cuerpo;
+        try {
+            cuerpo =
+                    caja.pedir(
+                            "/recaudacion/avance?dia=" + dia + "&aLaFecha=" + aLaFecha,
+                            "leer el avance de caja del " + dia);
+        } catch (ClienteHttpDeCaja.CajaInalcanzable noContesta) {
+            // Se traduce al tipo del PUERTO, no al del transporte: es lo mismo que
+            // `OrdenesDeCobroHttp` hace desde P5D, y lo que permite que `indicadores` la cace sin
+            // conocer este subpaquete. El MOTIVO viaja intacto, porque quien lo lee en el registro
+            // necesita separar «falta una variable de entorno» de «la caja se cayo» (#25, AC-4).
+            throw new AvanceDeCaja.CajaInalcanzable(
+                    noContesta.motivo(), noContesta.getMessage(), noContesta);
+        }
         return new RecaudadoEnCaja(
                 Dinero.de(cuerpo.path("cobrado").asString("0")),
                 Dinero.de(cuerpo.path("anulado").asString("0")),

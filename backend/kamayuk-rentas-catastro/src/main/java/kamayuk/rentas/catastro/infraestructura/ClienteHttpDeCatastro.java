@@ -12,6 +12,7 @@ import java.time.LocalDate;
 import java.util.Optional;
 import kamayuk.rentas.catastro.FichaDelPadron;
 import kamayuk.rentas.dominio.AreaM2;
+import kamayuk.rentas.dominio.MotivoDeInalcanzable;
 import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -127,8 +128,28 @@ public class ClienteHttpDeCatastro {
     public static final class CatastroInalcanzable extends RuntimeException {
         @java.io.Serial private static final long serialVersionUID = 1L;
 
+        // El aviso [serial] no aplica: es un enum, que se serializa por su nombre.
+        @SuppressWarnings("serial")
+        private final MotivoDeInalcanzable motivo;
+
         public CatastroInalcanzable(String que, @Nullable Throwable causa) {
+            this(MotivoDeInalcanzable.NO_CONTESTA, que, causa);
+        }
+
+        public CatastroInalcanzable(
+                MotivoDeInalcanzable motivo, String que, @Nullable Throwable causa) {
             super("No se pudo " + que + ". El sistema del predio vive en `catastro`", causa);
+            this.motivo = motivo;
+        }
+
+        /**
+         * Si falto la variable de entorno o si el vecino no contesto (#25, AC-4).
+         *
+         * <p>Viaja como dato y no dentro de la frase: quien decide mirando el texto deja de decidir
+         * bien en cuanto alguien reescribe el mensaje, y nada se pone rojo.
+         */
+        public MotivoDeInalcanzable motivo() {
+            return motivo;
         }
     }
 
@@ -310,7 +331,9 @@ public class ClienteHttpDeCatastro {
     RespuestaDeCatastro enviar(String ruta, String que) {
         if (raiz.isBlank()) {
             throw new CatastroInalcanzable(
-                    que + ": kamayuk.catastro.url no esta configurada", null);
+                    MotivoDeInalcanzable.SIN_CONFIGURAR,
+                    que + ": kamayuk.catastro.url no esta configurada",
+                    null);
         }
         HttpRequest.Builder peticion =
                 HttpRequest.newBuilder(URI.create(raiz + ruta))

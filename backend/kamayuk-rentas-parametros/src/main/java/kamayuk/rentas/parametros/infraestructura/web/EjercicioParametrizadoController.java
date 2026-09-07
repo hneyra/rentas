@@ -1,12 +1,16 @@
 package kamayuk.rentas.parametros.infraestructura.web;
 
+import java.util.Optional;
 import kamayuk.rentas.autorizacion.Privilegio;
 import kamayuk.rentas.autorizacion.RequiereAcceso;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.parametros.IdentificadorDeConjunto;
 import kamayuk.rentas.parametros.LectorDeParametros;
+import kamayuk.rentas.parametros.dominio.PublicadorDeNormativa;
 import kamayuk.rentas.web.Api;
 import org.jspecify.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -46,6 +50,9 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping(Api.RAIZ + "/seguridad/parametros")
 public class EjercicioParametrizadoController {
 
+    private static final Logger REGISTRO =
+            LoggerFactory.getLogger(EjercicioParametrizadoController.class);
+
     private final LectorDeParametros lector;
 
     public EjercicioParametrizadoController(LectorDeParametros lector) {
@@ -68,10 +75,13 @@ public class EjercicioParametrizadoController {
      *
      * <p><b>Y `normativa` caido NO se contesta con un 200 que diga «no esta sellado»</b>: eso es
      * una frase falsa que quien atiende no puede distinguir de la verdadera, y le haria buscar una
-     * ordenanza cuando lo que falta es un despliegue. {@link
-     * kamayuk.rentas.parametros.dominio.PublicadorDeNormativa.NormativaInalcanzable} sale del
-     * controlador sin capturar y el borde la traduce; el repliegue a la cache lo decide el lector,
-     * que es quien sabe si hay algo cacheado.
+     * ordenanza cuando lo que falta es un despliegue.
+     *
+     * <p>Lo que si se contesta con un 200, desde #25, son <b>las senias del conjunto que ya esta
+     * descargado aqui</b> (AC-3): eso no es inventarse una respuesta, es la que ADR-0025
+     * §Consecuencias promete. Y si no hay nada descargado, {@link
+     * kamayuk.rentas.parametros.dominio.PublicadorDeNormativa.NormativaInalcanzable} sigue saliendo
+     * del controlador y el borde la traduce. Ver {@link #conLoQueYaEstaDescargado}.
      */
     @GetMapping("/ejercicios/{ejercicio}")
     @RequiereAcceso(acceso = RequiereAcceso.SESION_PROPIA, privilegio = Privilegio.LECTURA)
@@ -83,7 +93,48 @@ public class EjercicioParametrizadoController {
                     ejercicio, true, conjunto.valor(), lector.porConjunto(conjunto).version());
         } catch (LectorDeParametros.EjercicioSinSellar sinSellar) {
             return new EjercicioParametrizadoResource(ejercicio, false, null, null);
+        } catch (PublicadorDeNormativa.NormativaInalcanzable inalcanzable) {
+            return conLoQueYaEstaDescargado(ejercicio, elPedido, inalcanzable);
         }
+    }
+
+    /**
+     * `normativa` no contesta: se sirven las senias del conjunto que ya esta aqui (#25, AC-3).
+     *
+     * <p>Es lo que ADR-0025 §Consecuencias promete —«{@code normativa} puede caerse sin detener
+     * nada que ya haya resuelto su conjunto; solo bloquea abrir una corrida nueva»— y lo que el
+     * propio mensaje de {@link PublicadorDeNormativa.NormativaInalcanzable} lleva escrito desde
+     * P5B: «un conjunto ya descargado se sigue pudiendo usar; lo que no se puede es resolver uno
+     * nuevo».
+     *
+     * <p><b>Si no hay nada descargado se vuelve a lanzar la original, y no se contesta 200.</b> Un
+     * {@code sellado: false} aqui seria una frase falsa —«esta municipalidad no ha parametrizado el
+     * ejercicio»— que quien atiende no puede distinguir de la verdadera, y le haria buscar una
+     * ordenanza cuando lo que falta es un despliegue. Se conserva la excepcion de origen, con su
+     * causa y su motivo, para que el registro siga diciendo cual de las dos cosas paso (AC-4).
+     */
+    private EjercicioParametrizadoResource conLoQueYaEstaDescargado(
+            int ejercicio,
+            Ejercicio elPedido,
+            PublicadorDeNormativa.NormativaInalcanzable inalcanzable) {
+
+        Optional<LectorDeParametros.ConjuntoYaDescargado> local =
+                lector.loQueYaEstaDescargado(elPedido);
+        if (local.isEmpty()) {
+            throw inalcanzable;
+        }
+        LectorDeParametros.ConjuntoYaDescargado descargado = local.get();
+        REGISTRO.warn(
+                "`normativa` no contesta ({}), asi que las senias del ejercicio {} se contestan con"
+                        + " el conjunto {} version {} que ya estaba descargado aqui (ADR-0025"
+                        + " §Consecuencias). Resolver uno NUEVO sigue sin poder hacerse",
+                inalcanzable.motivo(),
+                ejercicio,
+                descargado.conjuntoId(),
+                descargado.version(),
+                inalcanzable);
+        return new EjercicioParametrizadoResource(
+                ejercicio, true, descargado.conjuntoId(), descargado.version());
     }
 
     /**

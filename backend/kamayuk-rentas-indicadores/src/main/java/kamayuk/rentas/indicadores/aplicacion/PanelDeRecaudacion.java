@@ -18,6 +18,7 @@ import kamayuk.rentas.cuentacorriente.RecaudacionDelLibro;
 import kamayuk.rentas.cuentacorriente.RecaudadoEnElLibro;
 import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.dominio.Ejercicio;
+import kamayuk.rentas.dominio.MotivoDeInalcanzable;
 import kamayuk.rentas.indicadores.dominio.AvanceDeCobranza;
 import kamayuk.rentas.indicadores.dominio.AvanceDeRecaudacion;
 import kamayuk.rentas.indicadores.dominio.Cartera;
@@ -26,6 +27,9 @@ import kamayuk.rentas.indicadores.dominio.Indicador;
 import kamayuk.rentas.indicadores.dominio.LineaDeCartera;
 import kamayuk.rentas.tesoreria.AvanceDeCaja;
 import kamayuk.rentas.tesoreria.RecaudadoEnCaja;
+import org.jspecify.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -71,6 +75,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class PanelDeRecaudacion {
 
+    private static final Logger REGISTRO = LoggerFactory.getLogger(PanelDeRecaudacion.class);
+
     /** El texto que acompaña a una cifra que no se puede dar. */
     private static final String SIN_BASE = "sin cargos asentados en el ejercicio";
 
@@ -105,7 +111,7 @@ public class PanelDeRecaudacion {
         RecaudadoEnElLibro recaudado = recaudacion.recaudadoDeTodos(primerDia, ultimoDia, aLaFecha);
         CargadoEnElLibro cargado = cartera.cargadoPorTributo(ejercicio, aLaFecha);
         CarteraPendiente pendiente = cartera.pendientePorTributo(ejercicio, aLaFecha);
-        RecaudadoEnCaja hoy = caja.delDia(aLaFecha, aLaFecha);
+        RecaudadoEnCaja hoy = avanceDelDiaSiSePuede(aLaFecha);
 
         return new AvanceDeRecaudacion(
                 ejercicio,
@@ -124,6 +130,48 @@ public class PanelDeRecaudacion {
                         porMes(ejercicio, recaudado, cargado, aLaFecha)));
     }
 
+    /**
+     * El avance del dia, o {@code null} si {@code caja} no lo pudo dar (#25, AC-2).
+     *
+     * <p><b>Tres de las cuatro cifras de este panel son de este sistema</b> —salen del libro, ya
+     * leidas y correctas cuando esto se ejecuta— y la cuarta es la unica ajena. Hasta #25 la
+     * excepcion subia sin capturar, asi que un vecino ausente <b>se llevaba por delante las otras
+     * tres</b> y la pantalla de entrada del modulo no se podia dibujar. Los cuatro sistemas tienen
+     * ciclo de vida propio (ADR-0029): que uno se reinicie no puede apagar pantallas del otro.
+     *
+     * <p><b>Y el hueco no se rellena con un cero.</b> Devolver {@code Dinero.CERO} diria que la
+     * ventanilla no ha cobrado nada hoy —plausible, falsa, y al lado de tres cifras que si estan
+     * bien—, que es lo que {@link AvanceDeCaja} lleva prohibiendo desde #48. Se devuelve la
+     * ausencia y el indicador la declara, igual que «Avance de cobranza» hace cuando no hay base
+     * contra la que medir.
+     *
+     * <p><b>El registro separa las dos causas</b> (AC-4): que falte {@code KAMAYUK_CAJA_URL} es un
+     * despliegue mal armado —se arregla poniendo la variable, y no se cura solo— y que la caja no
+     * conteste es una caida —se arregla levantandola, y se cura sola—. Colapsarlas en una linea
+     * manda a mirar un contenedor sano cuando lo que falta es configuracion.
+     */
+    private @Nullable RecaudadoEnCaja avanceDelDiaSiSePuede(LocalDate aLaFecha) {
+        try {
+            return caja.delDia(aLaFecha, aLaFecha);
+        } catch (AvanceDeCaja.CajaInalcanzable noSePudo) {
+            if (noSePudo.motivo() == MotivoDeInalcanzable.SIN_CONFIGURAR) {
+                REGISTRO.error(
+                        "El panel sale sin el avance del dia porque `caja` NO ESTA CONFIGURADA:"
+                                + " falta `kamayuk.caja.url` (KAMAYUK_CAJA_URL) en este despliegue."
+                                + " No es una caida y no se arregla sola; las otras tres cifras son"
+                                + " del libro de este sistema y salen igual",
+                        noSePudo);
+            } else {
+                REGISTRO.warn(
+                        "El panel sale sin el avance del dia porque `caja` no contesta. La URL esta"
+                                + " configurada, asi que es el vecino y no el despliegue; las otras"
+                                + " tres cifras son del libro de este sistema y salen igual",
+                        noSePudo);
+            }
+            return null;
+        }
+    }
+
     // ------------------------------------------------------------------
     //  Las cifras grandes
     // ------------------------------------------------------------------
@@ -133,7 +181,7 @@ public class PanelDeRecaudacion {
             RecaudadoEnElLibro recaudado,
             CargadoEnElLibro cargado,
             CarteraPendiente pendiente,
-            RecaudadoEnCaja hoy,
+            @Nullable RecaudadoEnCaja hoy,
             LocalDate aLaFecha) {
 
         Dinero delEjercicio = recaudadoDelPropioEjercicio(ejercicio, recaudado);
@@ -173,16 +221,26 @@ public class PanelDeRecaudacion {
                         pendiente.total(),
                         aLaFecha));
 
+        // El unico indicador que NO sale del libro de este sistema, y por tanto el unico que puede
+        // faltar. Se declara ausente en vez de valer cero: la forma es la misma que «Avance de
+        // cobranza» usa cuando no hay base contra la que medir (#25, AC-2).
         indicadores.add(
-                new Indicador(
-                        "Recaudado hoy en caja",
-                        FormatoDeCifra.importe(hoy.neto()),
-                        "cobrado "
-                                + FormatoDeCifra.importe(hoy.cobrado())
-                                + " · anulado "
-                                + FormatoDeCifra.importe(hoy.anulado()),
-                        hoy.neto(),
-                        hoy.aLaFecha()));
+                hoy == null
+                        ? new Indicador(
+                                "Recaudado hoy en caja",
+                                FormatoDeCifra.SIN_CIFRA,
+                                "no se pudo leer el avance del dia: `caja` no contesta",
+                                null,
+                                aLaFecha)
+                        : new Indicador(
+                                "Recaudado hoy en caja",
+                                FormatoDeCifra.importe(hoy.neto()),
+                                "cobrado "
+                                        + FormatoDeCifra.importe(hoy.cobrado())
+                                        + " · anulado "
+                                        + FormatoDeCifra.importe(hoy.anulado()),
+                                hoy.neto(),
+                                hoy.aLaFecha()));
 
         return List.copyOf(indicadores);
     }

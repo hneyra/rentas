@@ -70,6 +70,43 @@ public interface LectorDeParametros {
     IdentificadorDeConjunto conjuntoVigenteEn(Ejercicio ejercicio);
 
     /**
+     * Las senias del conjunto que este sistema <b>ya tiene descargado</b> para el ejercicio, si hay
+     * alguno. Sin red (#25, AC-3).
+     *
+     * <p>Es la lectura que sostiene lo que ADR-0025 §Consecuencias promete: «{@code normativa}
+     * puede caerse sin detener nada que ya haya resuelto su conjunto». Contesta las cuatro senias
+     * —el ejercicio, si esta sellado, que conjunto y que version— <b>sin llamar por red y sin
+     * cargar los parametros</b>, que es lo que la distingue de {@link
+     * #porConjunto(IdentificadorDeConjunto)}: esa arma el juego entero y, si el snapshot no
+     * estuviera en la copia local, iria a buscarlo.
+     *
+     * <p><b>Vacio significa «aqui no hay nada descargado», y NUNCA «ese ejercicio no esta
+     * sellado».</b> Las dos se ven igual desde fuera y no lo son: la segunda es una respuesta de
+     * {@code normativa} y la primera es no haber podido preguntar. Quien la use tiene que conservar
+     * esa diferencia —el controlador vuelve a lanzar la {@code NormativaInalcanzable} original—,
+     * porque contestar «no esta parametrizado» mandaria a buscar una ordenanza cuando lo que falta
+     * es un despliegue.
+     *
+     * <p><b>Por que es {@code default} y no abstracto</b>: este puerto lo implementan veintiseis
+     * clases, y veinticinco son dobles de prueba de otros modulos a los que la copia local no les
+     * dice nada. Obligarlas a escribir un metodo que no usan seria ruido en veinticinco archivos
+     * para una sola implementacion de produccion. El vacio es ademas la respuesta correcta para un
+     * doble: no tiene cache.
+     */
+    default Optional<ConjuntoYaDescargado> loQueYaEstaDescargado(Ejercicio ejercicio) {
+        return Optional.empty();
+    }
+
+    /**
+     * Las senias de un conjunto que esta en la copia local: cual es, de que ejercicio y que
+     * version.
+     *
+     * <p>No lleva ninguna cifra normativa dentro, y es a proposito: esto identifica el conjunto, no
+     * lo abre.
+     */
+    record ConjuntoYaDescargado(long conjuntoId, Ejercicio ejercicio, int version) {}
+
+    /**
      * Ningun conjunto sellado rige el ejercicio. No hay valor por omision (ARQ-09 §2.5).
      *
      * <p>Publica su ejercicio y <b>ninguna llave</b> ({@link ParametroSinPublicar}): lo que falta

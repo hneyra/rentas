@@ -1,6 +1,8 @@
 package kamayuk.rentas.tesoreria;
 
 import java.time.LocalDate;
+import kamayuk.rentas.dominio.MotivoDeInalcanzable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Cuanto lleva cobrado la caja en un dia (#56, reutilizando #36 / RF-088).
@@ -42,4 +44,39 @@ public interface AvanceDeCaja {
      * @param aLaFecha la fecha con la que se responde; viaja con la cifra (regla 9, RNF-075)
      */
     RecaudadoEnCaja delDia(LocalDate dia, LocalDate aLaFecha);
+
+    /**
+     * No se pudo leer el avance del dia (#25).
+     *
+     * <p><b>Es del PUERTO y no del transporte</b>, igual que {@code
+     * OrdenesDeCobro.CajaInalcanzable} y por el mismo motivo: quien mira un panel no tiene por que
+     * conocer las excepciones de un cliente HTTP, y el dia que la caja se llame por otro camino el
+     * llamador no cambia. Sin esto, {@code indicadores} tendria que cazar una clase de {@code
+     * tesoreria.infraestructura} —un subpaquete interno de otro modulo—, que es justo lo que la
+     * frontera de Modulith impide.
+     *
+     * <p><b>Sigue sin haber cero ni vacio.</b> Lo que cambia con #25 no es que esto se pueda tapar
+     * con un {@code Dinero.CERO} —eso diria que la ventanilla no ha cobrado nada hoy, que es la
+     * cifra plausible y falsa que este puerto lleva prohibiendo desde #48—, sino <b>quien</b> lo
+     * caza: hasta #25 subia sin capturar y se llevaba por delante las otras tres cifras del panel,
+     * que son locales y estaban bien leidas.
+     */
+    final class CajaInalcanzable extends RuntimeException {
+        @java.io.Serial private static final long serialVersionUID = 1L;
+
+        // El aviso [serial] no aplica: es un enum, que se serializa por su nombre.
+        @SuppressWarnings("serial")
+        private final MotivoDeInalcanzable motivo;
+
+        public CajaInalcanzable(
+                MotivoDeInalcanzable motivo, @Nullable String mensaje, @Nullable Throwable causa) {
+            super(mensaje, causa);
+            this.motivo = motivo;
+        }
+
+        /** Si falto la variable de entorno o si la caja no contesto (#25, AC-4). */
+        public MotivoDeInalcanzable motivo() {
+            return motivo;
+        }
+    }
 }

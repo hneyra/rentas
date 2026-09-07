@@ -161,6 +161,27 @@ services:
       # buscara el JWKS en si mismo y todo token seria invalido por un motivo que
       # no se parece a su causa.
       KAMAYUK_OIDC_JWKS: http://identidad:8080/realms/sgtm/protocol/openid-connect/certs
+      # ── Los tres vecinos (#25) ────────────────────────────────────────────
+      #
+      # Sin estas tres, `rentas` levanta, la sonda dice UP y TRES de sus
+      # operaciones contestan 500: las tres se declaran
+      # `@Value("${kamayuk.<sistema>.url:}")`, o sea CON CADENA VACIA POR
+      # OMISION, asi que el defecto no aparece hasta la primera llamada y el
+      # navegador solo ve un ERROR_INTERNO con un identificador de incidencia.
+      # Habia que entrar al contenedor a leer el registro para descubrir que lo
+      # que faltaba era una variable de entorno.
+      #
+      # Apuntan al ALIAS DE RED de cada sistema en `kamayuk-plataforma`, que es
+      # el nombre de su servicio en su propio compose —`caja`, `catastro` y
+      # `normativa`—. Por eso el servicio de cada sistema se llama como el
+      # sistema y no `aplicacion`: ver la nota de arriba.
+      #
+      # El puerto es el 8080 (el del contenedor) y no el publicado, porque esto
+      # va por la red interna y no por Traefik. Y la raiz incluye el prefijo de
+      # la API del vecino: los tres clientes componen `raiz + ruta`.
+      KAMAYUK_CAJA_URL: http://caja:8080/caja/api/v1
+      KAMAYUK_CATASTRO_URL: http://catastro:8080/catastro/api/v1
+      KAMAYUK_NORMATIVA_URL: http://normativa:8080/normativa/api/v1
     labels:
       # Su prefijo, y SOLO el suyo. Reclamar el de otro no falla: se lo queda, y
       # las peticiones dejan de llegar a su dueno. Es la misma prohibicion (a) que
