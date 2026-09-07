@@ -115,8 +115,38 @@ afterEach(() => {
   limpiarElHash();
 });
 
+/**
+ * Los dos marcos de referencia del arbol de React, buscados UNA vez por montaje.
+ *
+ * **Es una correccion de coste, no de estilo, y esta medida** (#36). Una consulta por papel
+ * sobre el documento entero cuesta **76 ms** en esta pantalla —`dom-accessibility-api` calcula
+ * el nombre accesible de los 39 botones cada vez—, mientras que la misma consulta acotada a un
+ * contenedor pequeno cuesta **6 ms**, y un `getByText` o un `getByLabelText`, 6 y 7. O sea que
+ * `getByRole` sobre el documento es el unico gesto caro que hacen estas pruebas, y `modulo()` y
+ * `submodulo()` lo repetian en cada llamada solo para volver a encontrar el mismo `<aside>`.
+ *
+ * Con las siete del AC5 costando de 2 a 3 s en limpio y el tiempo de Vitest en 5, ese margen se
+ * agotaba en cuanto la maquina iba al doble de lento: **seis de las siete** salieron en rojo
+ * bajo carga, la peor en 4 de 5 corridas.
+ *
+ * La memoria se invalida sola: `isConnected` es falso en cuanto `cleanup()` desmonta —o en
+ * cuanto React reemplaza el nodo—, y entonces se vuelve a buscar. No hay que acordarse de
+ * limpiarla entre pruebas, que es justo la clase de estado compartido que las estropea.
+ */
+function recordado(buscar: () => HTMLElement): () => HTMLElement {
+  let recuerdo: HTMLElement | null = null;
+  return () => {
+    if (recuerdo === null || !recuerdo.isConnected) {
+      recuerdo = buscar();
+    }
+    return recuerdo;
+  };
+}
+
 /** El panel de la izquierda. */
-const arbol = () => screen.getByRole('complementary', { name: 'Módulos y submódulos' });
+const arbol = recordado(() =>
+  screen.getByRole('complementary', { name: 'Módulos y submódulos' }),
+);
 
 /** La cabecera de un modulo del arbol: es la unica con `aria-expanded`. */
 const modulo = (rotulo: string, abierto = false) =>
@@ -141,7 +171,23 @@ function submodulo(rotulo: string): HTMLElement {
   return primera;
 }
 
-const barraDePestanas = () => screen.getByRole('group', { name: 'Pestañas abiertas' });
+const barraDePestanas = recordado(() =>
+  screen.getByRole('group', { name: 'Pestañas abiertas' }),
+);
+
+/**
+ * El dialogo de cerrar con cambios sin guardar, y el boton que se busca DENTRO de el.
+ *
+ * Sus tres salidas —«Seguir editando», «Descartar y cerrar», «Guardar y cerrar»— se buscaban
+ * sobre el documento entero, a 76 ms cada una. Acotadas al dialogo cuestan 6, y ademas dicen
+ * algo mas fuerte: que el boton esta **en el dialogo**, que es donde el AC5 lo pide.
+ */
+const dialogoDeCierre = () =>
+  screen.getByRole('dialog', { name: 'Cerrar con cambios sin guardar' });
+
+/** El aspa de una pestana, buscada en la barra y no en toda la pantalla. */
+const cerrar = (rotulo: string) =>
+  within(barraDePestanas()).getByRole('button', { name: rotulo });
 
 /** Los rotulos de las pestanas abiertas, en su orden, con su asterisco. */
 function pestanas(): string[] {
@@ -303,7 +349,7 @@ describe('AC5 — el estado sin guardar', () => {
     await ensuciar(usuario);
 
     await usuario.click(
-      screen.getByRole('button', { name: 'Cerrar Contribuyentes — tiene cambios sin guardar' }),
+      cerrar('Cerrar Contribuyentes — tiene cambios sin guardar'),
     );
 
     const dialogo = screen.getByRole('dialog', { name: 'Cerrar con cambios sin guardar' });
@@ -318,10 +364,10 @@ describe('AC5 — el estado sin guardar', () => {
     render(<Marco {...IDENTIDAD} />);
     await ensuciar(usuario);
     await usuario.click(
-      screen.getByRole('button', { name: 'Cerrar Contribuyentes — tiene cambios sin guardar' }),
+      cerrar('Cerrar Contribuyentes — tiene cambios sin guardar'),
     );
 
-    await usuario.click(screen.getByRole('button', { name: 'Seguir editando' }));
+    await usuario.click(within(dialogoDeCierre()).getByRole('button', { name: 'Seguir editando' }));
 
     expect(screen.queryByRole('dialog', { name: 'Cerrar con cambios sin guardar' })).toBeNull();
     expect(pestanas()).toEqual(['Panel', 'Contribuyentes *']);
@@ -334,10 +380,10 @@ describe('AC5 — el estado sin guardar', () => {
     await usuario.click(modulo('Coactiva'));
     await usuario.click(submodulo('Costas y plazos'));
     await usuario.click(
-      screen.getByRole('button', { name: 'Cerrar Contribuyentes — tiene cambios sin guardar' }),
+      cerrar('Cerrar Contribuyentes — tiene cambios sin guardar'),
     );
 
-    await usuario.click(screen.getByRole('button', { name: 'Descartar y cerrar' }));
+    await usuario.click(within(dialogoDeCierre()).getByRole('button', { name: 'Descartar y cerrar' }));
 
     expect(pestanas()).toEqual(['Panel', 'Costas y plazos']);
     expect(screen.queryByText(/Cambios guardados/)).toBeNull();
@@ -350,10 +396,10 @@ describe('AC5 — el estado sin guardar', () => {
     await usuario.click(modulo('Coactiva'));
     await usuario.click(submodulo('Costas y plazos'));
     await usuario.click(
-      screen.getByRole('button', { name: 'Cerrar Contribuyentes — tiene cambios sin guardar' }),
+      cerrar('Cerrar Contribuyentes — tiene cambios sin guardar'),
     );
 
-    await usuario.click(screen.getByRole('button', { name: 'Guardar y cerrar' }));
+    await usuario.click(within(dialogoDeCierre()).getByRole('button', { name: 'Guardar y cerrar' }));
 
     expect(pestanas()).toEqual(['Panel', 'Costas y plazos']);
     expect(screen.getByRole('status').textContent).toContain(
@@ -367,7 +413,7 @@ describe('AC5 — el estado sin guardar', () => {
     await usuario.click(modulo('Coactiva'));
     await usuario.click(submodulo('Costas y plazos'));
 
-    await usuario.click(screen.getByRole('button', { name: 'Cerrar Costas y plazos' }));
+    await usuario.click(cerrar('Cerrar Costas y plazos'));
 
     expect(screen.queryByRole('dialog', { name: 'Cerrar con cambios sin guardar' })).toBeNull();
     expect(pestanas()).toEqual(['Panel']);
@@ -395,7 +441,7 @@ describe('AC6 — cerrar la activa activa la vecina', () => {
     render(<Marco {...IDENTIDAD} />);
     await abrirTres(usuario);
 
-    await usuario.click(screen.getByRole('button', { name: 'Cerrar Costas y plazos' }));
+    await usuario.click(cerrar('Cerrar Costas y plazos'));
 
     expect(pestanas()).toEqual(['Panel', 'Expedientes']);
     expect(activa()).toBe('Expedientes');
@@ -407,7 +453,7 @@ describe('AC6 — cerrar la activa activa la vecina', () => {
     await abrirTres(usuario);
     await usuario.click(within(barraDePestanas()).getByRole('button', { name: 'Panel' }));
 
-    await usuario.click(screen.getByRole('button', { name: 'Cerrar Panel' }));
+    await usuario.click(cerrar('Cerrar Panel'));
 
     expect(pestanas()).toEqual(['Expedientes', 'Costas y plazos']);
     expect(activa()).toBe('Expedientes');
@@ -417,7 +463,7 @@ describe('AC6 — cerrar la activa activa la vecina', () => {
     const usuario = userEvent.setup();
     render(<Marco {...IDENTIDAD} />);
 
-    await usuario.click(screen.getByRole('button', { name: 'Cerrar Panel' }));
+    await usuario.click(cerrar('Cerrar Panel'));
 
     expect(pestanas()).toEqual([]);
     expect(screen.queryByRole('heading', { level: 1 })).toBeNull();
@@ -593,7 +639,7 @@ describe('AC8 — el teclado', () => {
     render(<Marco {...IDENTIDAD} />);
     await ensuciar(usuario);
     await usuario.click(
-      screen.getByRole('button', { name: 'Cerrar Contribuyentes — tiene cambios sin guardar' }),
+      cerrar('Cerrar Contribuyentes — tiene cambios sin guardar'),
     );
 
     await usuario.keyboard('{Escape}');

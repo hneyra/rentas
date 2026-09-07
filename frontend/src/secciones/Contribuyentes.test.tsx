@@ -591,7 +591,10 @@ describe('AC6 — el expediente abre sobre un contribuyente de verdad', () => {
     await usuario.click(screen.getByRole('tab', { name: 'Cuenta corriente' }));
 
     const tabla = await screen.findByRole('table');
-    expect(within(tabla).getAllByText('Impuesto predial').length).toBeGreaterThan(0);
+    // Se espera A LAS FILAS y no a la tabla: `Expediente` dibuja el `<table>` siempre, y sus
+    // filas salen de `GET /consultas/deuda`, que es otra peticion —y por otro transporte, el
+    // proxy— que la ficha que se acaba de esperar (#36).
+    expect((await within(tabla).findAllByText('Impuesto predial')).length).toBeGreaterThan(0);
     // No salieron a la red: el doble no las vio.
     expect(pedidas(espia).some((url) => url.includes('/consultas/deuda'))).toBe(false);
   });
