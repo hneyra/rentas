@@ -850,18 +850,23 @@ export const rentas: DescriptorDeSistema = {
    * `V5` no le dan a `kamayuk_app` mas que `SELECT` sobre las cuatro proyecciones— y viene a buscar
    * los hechos al buzon de `catastro` por HTTP, con acuse.
    *
-   * ## Nace SUSPENDIDO, y hay que decir por que
+   * ## Ya NO nace suspendido, y hay que decir por que dejo de estarlo
    *
-   * El feed de `catastro` esta detras de `@RequiereAcceso("consulta_fichas")`, y **no hay identidad
-   * de servicio**: ADR-0028 §2 —el intercambio de token de RFC 8693— no esta implementado en
-   * ninguno de los cuatro repositorios (C-8, hueco 3). Sin credencial, la llamada sale sin
-   * `Authorization` y `catastro` la rechaza con 401, que es el comportamiento correcto. Un
-   * `CronJob` activo en ese estado fallaria cada noche y su alerta seria ruido.
+   * Nacio `suspend: true` porque el feed de `catastro` esta detras de
+   * `@RequiereAcceso("consulta_fichas")` y **no habia identidad de servicio**: sin credencial la
+   * llamada salia sin `Authorization`, `catastro` la rechazaba con 401 —el comportamiento
+   * correcto— y un `CronJob` activo en ese estado fallaria cada noche con una alerta que es ruido.
+   * Su propio comentario decia «quitar el `suspend` es una linea el dia que exista la identidad de
+   * servicio».
    *
-   * Lo que se declara aqui es **la ventana, los limites y la configuracion entera**, que es lo que
-   * C-8 §huecos 2 decia que faltaba: «mientras el descriptor no tenga campo, el ingestor no se
-   * puede desplegar». Quitar el `suspend` es una linea el dia que exista la identidad de servicio.
-   * Es el mismo trato que `Aplicacion.ts` le da al `CronJob` de `lote` del monolito.
+   * **Ese dia es #21.** `KAMAYUK_CATASTRO_CREDENCIAL` declara `emisor: "keycloak"` en el
+   * inventario, y con eso la guarda `identidad-de-servicio` de `infrastructure` **no deja pasar el
+   * build** mientras alguna municipalidad no declare su cliente de servicio. O sea que el CronJob
+   * ya no puede quedarse activo contra un emisor que no ha emitido nada: lo que antes sostenia el
+   * `suspend` lo sostiene ahora una guarda que se pone roja.
+   *
+   * Lo que se declara aqui sigue siendo **la ventana, los limites y la configuracion entera**, que
+   * es lo que C-8 §huecos 2 decia que faltaba.
    */
   lotes(e): Manifiesto[] {
     const nombre = `kamayuk-${SISTEMA}-ingestor`;
@@ -872,8 +877,6 @@ export const rentas: DescriptorDeSistema = {
       metadata: { name: nombre, namespace: e.namespace, labels: etiquetas },
       spec: {
         schedule: VENTANA_DE_LOTE,
-        // Ver la cabecera: no hay identidad de servicio todavia (ADR-0028 §2).
-        suspend: true,
         concurrencyPolicy: "Forbid",
         successfulJobsHistoryLimit: 3,
         failedJobsHistoryLimit: 3,
@@ -922,8 +925,8 @@ export const rentas: DescriptorDeSistema = {
                         name: "KAMAYUK_CATASTRO_URL",
                         value: `http://kamayuk-catastro-web.${e.namespaceDe("catastro")}`,
                       },
-                      // La credencial con que se pide el feed. HOY NO SIRVE: no hay identidad de
-                      // servicio (ADR-0028 §2), y por eso el CronJob nace suspendido.
+                      // La credencial con que se pide el feed: la clave del cliente confidencial
+                      // con la que el ingestor pide su token (#21). No es el token.
                       {
                         name: "KAMAYUK_CATASTRO_CREDENCIAL",
                         valueFrom: {
@@ -1171,15 +1174,20 @@ export const rentas: DescriptorDeSistema = {
     {
       // La credencial con que el ingestor pide el feed de `catastro`.
       //
-      // **Se declara y HOY NO SIRVE**, y hay que decirlo aqui y no solo en el CronJob: el feed
-      // esta detras de `@RequiereAcceso("consulta_fichas")` y no hay identidad de servicio
-      // —ADR-0028 §2, RFC 8693— en ninguno de los cuatro repositorios (C-8, hueco 3). Un valor
-      // generado por `bootstrap-secretos.sh` es una cadena aleatoria, no un token que Keycloak
-      // haya emitido, asi que `catastro` la rechaza con 401. Por eso el CronJob nace suspendido.
+      // **`emisor: "keycloak"` es lo que la separa de una clave de PostgreSQL** (#21). Su valor no
+      // vale por si mismo: es la clave del cliente confidencial `kamayuk-rentas-servicio-<ubigeo>`
+      // con la que se pide un token, y ese cliente lo crea `reconciliar-identidades.sh servicios`
+      // desde `despliegue/identidad/municipalidades/<ubigeo>.json`.
+      //
+      // Hasta #21 esto se declaraba sin decirlo, `bootstrap-secretos.sh` generaba una cadena
+      // aleatoria, y `catastro` la rechazaba con 401 — un secreto que existe y no autentica a
+      // nadie es indistinguible de uno bueno hasta que se despliega. Ahora `identidad-de-servicio`
+      // exige que la cuenta exista en TODAS las municipalidades antes de dejar pasar el build.
       nombre: e.secretoDe("catastro"),
       clave: "clave",
+      emisor: "keycloak",
       rotacion: "trimestral",
-      proposito: "pedir el buzon de hechos de catastro; sin identidad de servicio todavia",
+      proposito: "pedir el buzon de hechos de catastro con el token del cliente de servicio",
     },
   ],
 };
