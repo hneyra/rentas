@@ -2,7 +2,6 @@ package kamayuk.rentas.tesoreria.infraestructura;
 
 import java.time.LocalDate;
 import java.util.Optional;
-import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.tesoreria.CobrosDeTasas;
 import kamayuk.rentas.tesoreria.RecaudacionDeTasa;
 import kamayuk.rentas.tesoreria.TasaCobrada;
@@ -80,20 +79,22 @@ public class CobrosDeTasasHttp implements CobrosDeTasas {
                                 + desde
                                 + " y "
                                 + hasta);
+        String que = "leer lo recaudado por " + codigoDeTasa + " entre " + desde + " y " + hasta;
         return new RecaudacionDeTasa(
-                cuerpo.path("codigoDeTasa").asString(codigoDeTasa),
-                Dinero.de(cuerpo.path("cobrado").asString("0")),
-                Dinero.de(cuerpo.path("anulado").asString("0")),
-                LocalDate.parse(cuerpo.path("desde").asString()),
-                LocalDate.parse(cuerpo.path("hasta").asString()));
+                ClienteHttpDeCaja.exigirTexto(cuerpo, "codigoDeTasa", que),
+                ClienteHttpDeCaja.exigirDinero(cuerpo, "cobrado", que),
+                ClienteHttpDeCaja.exigirDinero(cuerpo, "anulado", que),
+                ClienteHttpDeCaja.exigirFecha(cuerpo, "desde", que),
+                ClienteHttpDeCaja.exigirFecha(cuerpo, "hasta", que));
     }
 
     private static TasaCobrada cobrada(JsonNode cuerpo) {
+        String que = "acreditar el cobro de una tasa";
         return new TasaCobrada(
-                cuerpo.path("numeroDeRecibo").asString(""),
-                cuerpo.path("codigoDeTasa").asString(""),
+                ClienteHttpDeCaja.exigirTexto(cuerpo, "numeroDeRecibo", que),
+                ClienteHttpDeCaja.exigirTexto(cuerpo, "codigoDeTasa", que),
                 cuerpo.path("cantidad").asInt(),
-                Dinero.de(cuerpo.path("importe").asString("0")),
-                LocalDate.parse(cuerpo.path("fecha").asString()));
+                ClienteHttpDeCaja.exigirDinero(cuerpo, "importe", que),
+                ClienteHttpDeCaja.exigirFecha(cuerpo, "fecha", que));
     }
 }

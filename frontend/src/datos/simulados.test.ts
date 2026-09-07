@@ -160,8 +160,9 @@ describe('la lista de rutas que ya sirve el backend', () => {
     // encenderlas de una en una.
     expect(laSirveElBackend([], 'GET', '/rentas/contribuyentes')).toBe(false);
     expect(laSirveElBackend(YA_SERVIDAS, 'GET', '/rentas/contribuyentes')).toBe(true);
-    // Y una que sigue fuera lo sigue estando: `/rentas/predios` exige `?codContribuyente=`, que
-    // el contrato no publica (#26).
+    // Y una que sigue fuera lo sigue estando: `/rentas/predios` no se ha encendido todavia.
+    // Ya no es porque falte el parametro —#26 lo publica y el expediente lo manda—: es que
+    // encender una ruta se hace midiendo su respuesta contra la instalacion, y eso es otro PR.
     expect(laSirveElBackend(YA_SERVIDAS, 'GET', '/rentas/predios')).toBe(false);
     expect(
       laSirveElBackend(

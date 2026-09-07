@@ -95,6 +95,22 @@ export interface Operacion {
    * haga.
    */
   readonly cuerpo: () => unknown;
+  /**
+   * Lo que el backend EXIGE para contestar esta operacion (#26).
+   *
+   * Cada grupo es un «al menos uno de estos»: `[['codContribuyente', 'contribuyente']]` dice
+   * que hay que mandar uno de los dos nombres, y `[['ejercicio']]` que ese hace falta si o si.
+   * Sale de `docs/50-api/parametros-de-la-api.json`, que genera `ParametrosDeLaApiTest` de la
+   * firma del controlador; **que esta lista sea la de ese archivo lo comprueba `formas.test.ts`**,
+   * y no se escribe a ojo.
+   *
+   * Y el proxy los **exige de verdad**: sin ellos contesta 422, igual que el backend. No es
+   * filtrar —el proxy sigue sin mirar el valor—: es negarse a contestar lo que el backend se
+   * niega a contestar. Servirlo sin ellos es lo que dejaba construir una pantalla contra una
+   * respuesta que el dia de la integracion es un 422 —medido: tres de las trece lecturas de
+   * esta interfaz—.
+   */
+  readonly exige?: readonly (readonly string[])[];
 }
 
 /** La clave con que la operacion aparece en `formas-de-la-api.json`. */
@@ -846,6 +862,9 @@ export const OPERACIONES: readonly Operacion[] = [
   {
     metodo: 'GET',
     ruta: '/rentas/predios',
+    // 422 medido contra la instalacion: «Hay que decir de quien son los predios: falta
+    // «codContribuyente» (o su otro nombre, «contribuyente»)».
+    exige: [['codContribuyente', 'contribuyente']],
     cuerpo: () => todoEnUnaPagina(prediosDelExpediente()),
   },
   {
@@ -861,6 +880,9 @@ export const OPERACIONES: readonly Operacion[] = [
   {
     metodo: 'GET',
     ruta: '/consultas/deuda',
+    // 422 medido: «Hay que decir de quien es la consulta: falta «codContribuyente»». Aqui no
+    // hay segundo nombre: esta operacion solo admite el canonico.
+    exige: [['codContribuyente']],
     cuerpo: () => todoEnUnaPagina(deudaPorConcepto()),
   },
   {
@@ -933,6 +955,9 @@ export const OPERACIONES: readonly Operacion[] = [
   {
     metodo: 'GET',
     ruta: '/seguridad/auditoria',
+    // La unica de las tres que lo declara en la FIRMA: `@RequestParam("ejercicio") int`. 422
+    // medido: «Falta el parametro obligatorio 'ejercicio'».
+    exige: [['ejercicio']],
     cuerpo: () => todoEnUnaPagina(bitacoraReciente()),
   },
   {

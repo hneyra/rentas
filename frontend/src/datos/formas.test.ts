@@ -48,9 +48,52 @@ import { OPERACIONES, claveDe, type Operacion } from './operaciones.ts';
 const AQUI = dirname(fileURLToPath(import.meta.url));
 const FORMAS = join(AQUI, '../../../docs/50-api/formas-de-la-api.json');
 
+/**
+ * El archivo hermano de las formas: que hace falta para PEDIR cada operacion (#26).
+ *
+ * Va aparte porque `formas-de-la-api.json` trata cada clave como una operacion y su valor como
+ * la forma de la respuesta —esta prueba misma cuenta sus claves—, asi que meter los parametros
+ * dentro rompe a su unico consumidor. Lo genera `ParametrosDeLaApiTest` de la FIRMA de cada
+ * controlador.
+ */
+const PARAMETROS = join(AQUI, '../../../docs/50-api/parametros-de-la-api.json');
+
 type Formas = Record<string, unknown>;
 
+interface ParametrosDeUnaOperacion {
+  readonly obligatorios: readonly string[];
+  readonly algunoDeEstos: readonly (readonly string[])[];
+  readonly condicionales: readonly string[];
+  readonly opcionales: readonly string[];
+}
+
 const declaradas = JSON.parse(readFileSync(FORMAS, 'utf8')) as Formas;
+const exigidos = JSON.parse(readFileSync(PARAMETROS, 'utf8')) as Record<
+  string,
+  ParametrosDeUnaOperacion
+>;
+
+/**
+ * Los grupos que el backend exige para esa operacion, en la forma de `Operacion.exige`.
+ *
+ * Un obligatorio de la firma es un grupo de un nombre: dos formas de decir lo mismo dejarian a
+ * la comparacion de abajo teniendo que normalizar, y una normalizacion es donde se cuela la
+ * diferencia que nadie ve. Los `condicionales` NO entran: son los que el backend admite en el
+ * cuerpo o solo exige segun el, y exigirlos aqui pondria rojo un uso legitimo.
+ */
+function gruposExigidos(clave: string): readonly (readonly string[])[] {
+  const declarado = exigidos[clave];
+  if (declarado === undefined) return [];
+  return [...declarado.obligatorios.map((nombre) => [nombre]), ...declarado.algunoDeEstos];
+}
+
+/** Una cadena de consulta que satisface lo que la operacion exige. Vacia si no exige nada. */
+function consultaMinima(clave: string): string {
+  const pares = gruposExigidos(clave).map(
+    (grupo) => `${grupo[0]}=${encodeURIComponent('valor-de-la-prueba')}`,
+  );
+  return pares.length === 0 ? '' : `?${pares.join('&')}`;
+}
 
 /** La clave de metadatos del archivo generado, que no es una operacion. */
 const METADATOS = '_';
@@ -154,9 +197,17 @@ function comparar(
   }
 }
 
-/** Una ruta con sus `{parametros}` rellenos, para poder pedirla de verdad. */
+/**
+ * Una ruta con sus `{parametros}` rellenos y su cadena de consulta minima, para poder pedirla
+ * de verdad.
+ *
+ * **Hasta #26 no llevaba cadena de consulta**, y por eso esta prueba salia verde sobre tres
+ * operaciones que contra la instalacion contestan 422: el proxy servia la respuesta sin exigir
+ * nada, y la comparacion de formas se hacia sobre un cuerpo que el backend nunca habria
+ * mandado.
+ */
 function urlDe(operacion: Operacion): string {
-  return RAIZ + operacion.ruta.replace(/\{\w+\}/g, '1');
+  return RAIZ + operacion.ruta.replace(/\{\w+\}/g, '1') + consultaMinima(claveDe(operacion));
 }
 
 async function servido(operacion: Operacion): Promise<unknown> {
@@ -304,6 +355,65 @@ describe('el proxy solo sirve operaciones que el backend publica', () => {
   it('el archivo de formas trae las 181 operaciones del backend, y su cabecera', () => {
     expect(Object.keys(declaradas)).toContain(METADATOS);
     expect(Object.keys(declaradas).filter((k) => k !== METADATOS)).toHaveLength(181);
+  });
+});
+
+describe('el proxy exige lo que el backend exige para poder contestar (#26)', () => {
+  it.each(OPERACIONES.map((o) => [claveDe(o), o] as const))(
+    '«%s» declara los mismos grupos que parametros-de-la-api.json',
+    (clave, operacion) => {
+      // Los dos lados salen de sitios distintos: `exige` lo escribe este repositorio y los
+      // grupos los genera `ParametrosDeLaApiTest` de la FIRMA del controlador. Que cuadren es
+      // lo unico que impide que el proxy sirva una operacion sin lo que el backend exige — y
+      // que este fuera de sincronia se ve aqui y no el dia de la integracion.
+      expect(
+        (operacion.exige ?? []).map((grupo) => [...grupo]),
+        `«${clave}»: lo que el proxy exige y lo que el backend exige no cuadran.\n` +
+          'Lo declara docs/50-api/parametros-de-la-api.json, generado de la firma del\n' +
+          'controlador: si el parametro cambio ahi, actualiza `exige` en operaciones.ts.\n' +
+          'Servirla sin el es construir una pantalla contra una respuesta que el dia de la\n' +
+          'integracion es un 422, y nada lo anuncia.',
+      ).toEqual(gruposExigidos(clave).map((grupo) => [...grupo]));
+    },
+  );
+
+  it('ninguna operacion con parametros obligatorios se sirve sin ellos', async () => {
+    const conExigencia = OPERACIONES.filter((o) => gruposExigidos(claveDe(o)).length > 0);
+
+    // El contraste, y no sobra: con la lista vacia este `for` no mira nada y la prueba pasaria
+    // en verde el dia que alguien borrara `exige` de las tres. Hoy son exactamente esas tres,
+    // las mismas que contra la instalacion contestan 422.
+    expect(
+      conExigencia.map((o) => claveDe(o)).sort(),
+      'ninguna operacion del proxy declara parametros obligatorios: esta prueba no mide nada',
+    ).toEqual([
+      'GET /consultas/deuda',
+      'GET /rentas/predios',
+      'GET /seguridad/auditoria',
+    ]);
+
+    for (const operacion of conExigencia) {
+      const pelada = RAIZ + operacion.ruta.replace(/\{\w+\}/g, '1');
+      const respuesta = await fetch(pelada, { method: operacion.metodo });
+      expect(
+        respuesta.status,
+        `El proxy sirvio «${claveDe(operacion)}» sin sus parametros obligatorios. El backend ` +
+          'contesta 422 ahi, medido contra la instalacion.',
+      ).toBe(422);
+      const cuerpo = (await respuesta.json()) as { codigo?: string; mensaje?: string };
+      expect(cuerpo.codigo).toBe('VALIDACION');
+      for (const grupo of gruposExigidos(claveDe(operacion))) {
+        expect(cuerpo.mensaje).toContain(grupo[0]);
+      }
+    }
+  });
+
+  it('y con ellos si la sirve, con su 200', async () => {
+    // La otra mitad: una guarda que rechazara SIEMPRE tambien pasaria la de arriba.
+    for (const operacion of OPERACIONES.filter((o) => gruposExigidos(claveDe(o)).length > 0)) {
+      const respuesta = await fetch(urlDe(operacion), { method: operacion.metodo });
+      expect(respuesta.status, `«${claveDe(operacion)}» con sus parametros`).toBe(200);
+    }
   });
 });
 

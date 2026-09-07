@@ -135,6 +135,7 @@ export function Lienzo({
   if (activa === 'panel') {
     return (
       <Panel
+        ejercicio={ejercicio}
         alIrAlPadron={(chip) => {
           alCambiarPadron({ elegido: null, chip: chip ?? padron.chip });
           alAbrir('predios');

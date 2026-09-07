@@ -74,9 +74,16 @@ public class OrdenesDeCobroHttp implements OrdenesDeCobro {
             // `SinDeudaQueFraccionar`.
             throw new CajaInalcanzable(noContesta.getMessage(), noContesta);
         }
+        // `estado` se EXIGE y no se lee con «PENDIENTE» por omision: un estado inventado aqui
+        // diria que la orden esta viva cuando la caja quiza contesto otra cosa, y esa es la
+        // misma forma de defecto que #41 midio en el avance del dia (`asString(default)` sobre
+        // un nodo que no esta no falla: degrada). `ordenId` y `nueva` se quedan como estaban y
+        // se dice por que: son de tipos que no admiten «exigir» sin inventar un tercer ayudante,
+        // y su cero y su falso no se leen como una cifra de dinero.
         return new Emitida(
                 respuesta.path("ordenId").asLong(),
-                respuesta.path("estado").asString("PENDIENTE"),
+                ClienteHttpDeCaja.exigirTexto(
+                        respuesta, "estado", "emitir la orden " + peticion.referencia().texto()),
                 respuesta.path("nueva").asBoolean(false));
     }
 
