@@ -28,10 +28,18 @@ import org.springframework.web.bind.annotation.RestController;
  * a una fecha de corte, en una fila por obligacion. Sin {@code fechaDeCorte}, se calcula a hoy, con
  * el reloj inyectado de {@link ConsultarDeuda#hoy()} y no con {@code LocalDate.now()} (regla 6).
  *
- * <p>{@code incluyeConvenios} esta en el contrato de la pantalla pero se ignora: el contexto de
- * convenios de fraccionamiento todavia no existe (#25 depende de el solo para esa parte). Se acepta
- * el parametro para no romper la pantalla, no se aplica —el mismo patron que {@code situacion} en
- * {@code CuentaCorrienteController}—.
+ * <h2>{@code incluyeConvenios} se rechaza con 422 en vez de ignorarse (#42)</h2>
+ *
+ * <p>Estaba declarado y <b>no se aplicaba</b>: se marcaba la casilla en la pantalla, viajaba en la
+ * URL y la lista volvia igual. Es la peor de las respuestas posibles —quien lo marco cree estar
+ * viendo tambien las cuotas de un convenio, y quien lo desmarco cree estar viendola sin ellas—, y
+ * en las dos direcciones la respuesta es plausible.
+ *
+ * <p>No se puede servir todavia porque <b>el dato no existe</b>: el contexto de convenios de
+ * fraccionamiento no esta construido (#25 depende de el solo para esa parte) y ninguna fila del
+ * libro dice si la cuota nace de uno. Se contesta 422 nombrando el parametro, que es el patron de
+ * {@code ArbitriosController} con «zona» y «uso» (#541): rechazar tambien es leer, y es lo que
+ * separa un filtro que dice que no de uno que se traga la pregunta.
  *
  * <h2>{@code porPeriodo}: la fila que se puede dar de baja (#551)</h2>
  *
@@ -110,6 +118,8 @@ public class ConsultaDeudaController {
             @RequestParam(required = false) @Nullable String porPeriodo,
             ParametrosDePaginacion parametros) {
 
+        rechazarLoQueNoSeSirve(incluyeConvenios);
+
         String codigo = exigirContribuyente(codContribuyente);
         if (consulta.contribuyentePorCodigo(codigo).isEmpty()) {
             throw noEstaEnElPadron(codigo);
@@ -122,6 +132,26 @@ public class ConsultaDeudaController {
         return RespuestaPaginada.de(
                 consulta.porContribuyente(criterio, paginacionDe(parametros)),
                 ObligacionConDeudaResource::de);
+    }
+
+    /**
+     * El filtro de convenios, dicho en vez de ignorado (#42).
+     *
+     * <p>Se lee —{@code @RequestParam}— para poder rechazarlo, y va lo <b>primero</b>: el parametro
+     * no se puede servir con ningun valor ni para ningun contribuyente, asi que contestarlo antes
+     * de mirar nada mas es lo que hace que el 422 hable de el y no de otra cosa.
+     */
+    private static void rechazarLoQueNoSeSirve(@Nullable String incluyeConvenios) {
+        if (incluyeConvenios == null || incluyeConvenios.isBlank()) {
+            return;
+        }
+        throw new ProblemaDeNegocio(
+                CodigoDeError.VALIDACION,
+                "El filtro «incluyeConvenios» no se puede servir: el contexto de convenios de"
+                        + " fraccionamiento todavia no existe y ninguna fila del libro dice si su"
+                        + " cuota nace de uno, asi que no hay contra que comparar. La deuda que"
+                        + " esta lectura publica es la del libro entera; quitar el parametro"
+                        + " devuelve exactamente eso");
     }
 
     /**
