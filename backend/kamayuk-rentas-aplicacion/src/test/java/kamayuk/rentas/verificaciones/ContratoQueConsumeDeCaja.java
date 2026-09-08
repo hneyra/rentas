@@ -24,17 +24,19 @@ import org.junit.jupiter.api.DisplayName;
  * contra un endpoint que admite {@code desde} y {@code hasta}, con {@code GET
  * /rentas/api/v1/indicadores/recaudacion} en 500 y las dos aplicaciones sanas.
  *
- * <h2>Cinco operaciones para cuatro puertos</h2>
+ * <h2>Seis operaciones para cinco puertos</h2>
  *
  * <p>{@code CobrosDeTasas} pide por dos rutas porque {@code caja} publica dos —acreditar un cobro
  * en un recibo y sumar lo recaudado por un concepto en un rango—, con dos respuestas distintas.
  * Declarar una sola dejaria a la otra sin nadie que comprobara su forma en el CI del proveedor, que
  * es lo unico que este archivo existe para conseguir.
  *
- * <p><b>La anulacion de un recibo NO entra</b>, y esa ausencia es deliberada: {@code
- * AnulacionesDeReciboSinRuta} lanza {@code SinRutaEnCaja} porque {@code caja} todavia no publica
- * esa operacion. Declararla aqui pondria rojo el CI del proveedor por una ruta que este backend no
- * llama, que es la disciplina que {@code ContratoQueConsumeDeCatastro} ya escribio.
+ * <p><b>Y desde #40 entra la sexta: el estado de un recibo por su IDENTIFICADOR.</b> Hasta entonces
+ * esa ausencia era deliberada —el puerto lo servia un muñon que lanzaba {@code SinRutaEnCaja}, y
+ * declarar aqui una ruta que este backend no llama pondria rojo el CI del proveedor por nada—. Ya
+ * no: {@code AnulacionesDeReciboHttp} la pide de verdad, asi que declararla es exactamente lo que
+ * este archivo existe para hacer. La ruta la publica {@code caja} desde el propio P5D ({@code
+ * e54c443}), o sea el mismo commit que creo el muñon.
  *
  * <h2>Lo que se declara es lo que se LEE, no lo que el proveedor publica</h2>
  *
@@ -82,6 +84,18 @@ public class ContratoQueConsumeDeCaja extends ContratoQueSePublicaTestBase {
                     Map.entry("aLaFecha", "texto"),
                     Map.entry("cobrado", IMPORTE_ACTUALIZADO),
                     Map.entry("anulado", IMPORTE_ACTUALIZADO));
+
+    /**
+     * El estado de un recibo por su identificador, tal como lo lee {@code AnulacionesDeReciboHttp}.
+     *
+     * <p>Dos campos y ninguna cifra, que es lo que {@code caja} publica: quien pregunta esto no
+     * quiere el recibo, quiere saber si sigue en pie. {@code anulado} se declara <b>booleano</b> y
+     * se lee exigiendolo: {@code asBoolean(false)} sobre un campo ausente no da error, da {@code
+     * false} — y ese {@code false} significa «ese recibo sigue vigente», que es la respuesta que
+     * impide anular el convenio.
+     */
+    public static final Map<String, Object> ESTADO_DEL_RECIBO =
+            ordenados(Map.entry("reciboId", "entero"), Map.entry("anulado", "booleano"));
 
     /** Un recibo de tramite, tal como lo lee {@code RecibosDeTramiteHttp}. */
     public static final Map<String, Object> RECIBO_DE_TRAMITE =
@@ -164,6 +178,13 @@ public class ContratoQueConsumeDeCaja extends ContratoQueSePublicaTestBase {
         operaciones.put(
                 "GET /recibos/{numero}",
                 ContratoDelConsumidor.OperacionEsperada.lectura(Set.of(), RECIBO_DE_TRAMITE));
+
+        // Si un recibo esta anulado, por su IDENTIFICADOR interno y no por su numero impreso:
+        // `convenio_movimiento.recibo_id` guarda el id, no el numero del papel. Sin parametros,
+        // el identificador va en la ruta.
+        operaciones.put(
+                "GET /recibos/por-id/{reciboId}",
+                ContratoDelConsumidor.OperacionEsperada.lectura(Set.of(), ESTADO_DEL_RECIBO));
 
         // Si un recibo cobro un concepto del TUPA, y por cuanto. Los dos van en la ruta.
         operaciones.put(

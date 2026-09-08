@@ -17,10 +17,12 @@ import kamayuk.rentas.contribuyentes.ResumenDeContribuyente;
 import kamayuk.rentas.cuentacorriente.SeleccionDeObligacion;
 import kamayuk.rentas.dominio.Alicuota;
 import kamayuk.rentas.dominio.Ejercicio;
+import kamayuk.rentas.dominio.MotivoDeInalcanzable;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.parametros.FaltaPublicar;
 import kamayuk.rentas.parametros.LectorDeParametros;
 import kamayuk.rentas.parametros.PoliticasDeRedondeoSelladas;
+import kamayuk.rentas.tesoreria.AnulacionesDeRecibo;
 import kamayuk.rentas.tesoreria.aplicacion.CerrarConvenio;
 import kamayuk.rentas.tesoreria.aplicacion.CondicionesParametrizadas;
 import kamayuk.rentas.tesoreria.aplicacion.ConsultaDeConvenios;
@@ -383,10 +385,30 @@ public class ConvenioController {
         } catch (MovimientoDeConvenioRepository.ConvenioYaCerrado
                 | MovimientoDeConvenioRepository.ConvenioYaFormalizado
                 | CerrarConvenio.ReciboDeLaInicialVigente
+                | AnulacionesDeRecibo.ReciboQueNoConsta
                 | ConvenioRepository.CronogramaDuplicado enConflicto) {
             // 409: la peticion esta bien formada; lo que no admite la operacion es el
             // estado actual del convenio.
+            //
+            // `ReciboQueNoConsta` entra aqui desde #40 y no en `NO_ENCONTRADO`: lo que no se
+            // encuentra no es lo que la peticion identifica —el convenio existe y se leyo—, es
+            // una fila de OTRA base a la que este convenio apunta sin clave foranea desde `V7`.
+            // Un 404 le diria a quien opera que se equivoco de numero de convenio.
             throw new ProblemaDeNegocio(CodigoDeError.CONFLICTO, mensajeDe(enConflicto));
+        } catch (AnulacionesDeRecibo.CajaInalcanzable noSePudo) {
+            // 503 y no 500, igual que en /ordenes-de-cobro: no es un defecto de este servidor, es
+            // que el otro no esta — y reintentar SI puede cambiar el resultado. Hasta #40 esto ni
+            // siquiera se podia alcanzar: el puerto lanzaba antes de tocar la red.
+            //
+            // Y el remedio lo decide el MOTIVO y no el texto (#25, AC-4): «a este despliegue le
+            // falta `kamayuk.caja.url`» no se cura solo y «la caja se cayo» si, asi que decir
+            // siempre «la caja no contesta» mandaria a mirar un despliegue que puede estar
+            // perfectamente levantado.
+            throw new ProblemaDeNegocio(
+                    CodigoDeError.SERVICIO_NO_DISPONIBLE,
+                    remedioDe(noSePudo.motivo())
+                            + ", asi que no se pudo comprobar el recibo de la cuota inicial: "
+                            + mensajeDe(noSePudo));
         } catch (CondicionesParametrizadas.CondicionSinParametrizar
                 | LectorDeParametros.EjercicioSinSellar
                 | PoliticasDeRedondeoSelladas.SinPuntosObservados
@@ -655,5 +677,19 @@ public class ConvenioController {
     private static String mensajeDe(RuntimeException excepcion) {
         String mensaje = excepcion.getMessage();
         return mensaje == null ? "El valor recibido no es valido" : mensaje;
+    }
+
+    /**
+     * Que hay que hacer, decidido por el MOTIVO y no por el texto (#40, #25 AC-4).
+     *
+     * <p>Las dos salen {@code 503} —las dos son «no se pudo preguntar» y las dos admiten
+     * reintento—, y no se arreglan igual: una la arregla quien despliega poniendo una variable de
+     * entorno y <b>no se cura sola</b>; la otra la arregla levantar la caja y se cura sola. Con una
+     * sola frase, quien opera va a mirar un despliegue que puede estar perfectamente en pie.
+     */
+    private static String remedioDe(MotivoDeInalcanzable motivo) {
+        return motivo == MotivoDeInalcanzable.SIN_CONFIGURAR
+                ? "A este despliegue le falta la direccion de `caja` (kamayuk.caja.url)"
+                : "La caja no contesta";
     }
 }

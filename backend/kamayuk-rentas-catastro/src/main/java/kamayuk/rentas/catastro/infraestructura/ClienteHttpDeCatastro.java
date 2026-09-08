@@ -13,6 +13,7 @@ import java.util.Optional;
 import kamayuk.rentas.catastro.FichaDelPadron;
 import kamayuk.rentas.dominio.AreaM2;
 import kamayuk.rentas.dominio.MotivoDeInalcanzable;
+import kamayuk.rentas.dominio.OperacionTodaviaNoCompletable;
 import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -109,11 +110,12 @@ public class ClienteHttpDeCatastro {
      * usa de contraste, y porque el proximo puerto que se escriba antes que su ruta la necesita: lo
      * que no se conserva es la idea de que algun puerto siga sin poder preguntar.
      */
-    public static final class SinRutaEnCatastro extends RuntimeException {
+    public static final class SinRutaEnCatastro extends OperacionTodaviaNoCompletable {
         @java.io.Serial private static final long serialVersionUID = 1L;
 
         public SinRutaEnCatastro(String que, String operacionQueLoServiria) {
             super(
+                    LoQueFalta.LA_RUTA_DEL_VECINO,
                     "No se puede pedir "
                             + que
                             + ": `catastro` todavia no publica la operacion que lo serviria ("
@@ -168,11 +170,13 @@ public class ClienteHttpDeCatastro {
      * donde debe haber 11</b>, o sea el padron cambiado sin resolucion que lo justifique y sin
      * cargo que cobrar.
      */
-    public static final class EscrituraSinTransaccionCompartida extends RuntimeException {
+    public static final class EscrituraSinTransaccionCompartida
+            extends OperacionTodaviaNoCompletable {
         @java.io.Serial private static final long serialVersionUID = 1L;
 
         public EscrituraSinTransaccionCompartida(String que, String conQuePasoTendriaQueConfirmar) {
             super(
+                    LoQueFalta.LA_TRANSACCION_COMPARTIDA,
                     "No se puede "
                             + que
                             + " por HTTP: `catastro` confirmaria su escritura por su cuenta y "

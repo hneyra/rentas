@@ -24,6 +24,7 @@ import kamayuk.rentas.cuentacorriente.MovimientoAsentado;
 import kamayuk.rentas.cuentacorriente.SeleccionDeObligacion;
 import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.dominio.Ejercicio;
+import kamayuk.rentas.dominio.MotivoDeInalcanzable;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.dominio.PuntoDeRedondeo;
 import kamayuk.rentas.dominio.ValorNormativo;
@@ -31,6 +32,7 @@ import kamayuk.rentas.parametros.IdentificadorDeConjunto;
 import kamayuk.rentas.parametros.LectorDeParametros;
 import kamayuk.rentas.parametros.ParametrosSellados;
 import kamayuk.rentas.parametros.PoliticasDeRedondeoSelladas;
+import kamayuk.rentas.tesoreria.AnulacionesDeRecibo;
 import kamayuk.rentas.tesoreria.aplicacion.CerrarConvenio;
 import kamayuk.rentas.tesoreria.aplicacion.CondicionesParametrizadas;
 import kamayuk.rentas.tesoreria.aplicacion.ConsultaDeConvenios;
@@ -42,6 +44,7 @@ import kamayuk.rentas.tesoreria.dobles.ContribuyentesDeMentira;
 import kamayuk.rentas.tesoreria.dobles.ConveniosEnMemoria;
 import kamayuk.rentas.tesoreria.dobles.MovimientosDeConvenioEnMemoria;
 import kamayuk.rentas.tesoreria.dominio.Convenio;
+import kamayuk.rentas.tesoreria.infraestructura.ClienteHttpDeCaja;
 import kamayuk.rentas.web.ConfiguracionDeJson;
 import kamayuk.rentas.web.ManejadorDeErrores;
 import org.jspecify.annotations.Nullable;
@@ -127,6 +130,18 @@ class ConvenioControllerTest {
     private static final SeleccionDeObligacion PREDIAL =
             new SeleccionDeObligacion("PREDIAL", SELLADO, null, null);
 
+    /**
+     * Que recibos de {@code caja} estan anulados. Se cambia por prueba desde #40.
+     *
+     * <p>Era un {@code new AnulacionesDeReciboDeMentira()} escrito dentro del {@code
+     * CerrarConvenio} del {@code MockMvc}, o sea inalcanzable: ninguna prueba de capa web podia
+     * decir que contesta este endpoint segun lo que {@code caja} responda. Y eso importa desde #40,
+     * porque las cuatro respuestas posibles —anulado, vigente, no consta y caja caida— se arreglan
+     * de cuatro maneras distintas y hasta ahora <b>ninguna llegaba</b>: el puerto lo servia un
+     * muñon que lanzaba siempre y la ruta contestaba 500.
+     */
+    private AnulacionesDeRecibo anulaciones = new AnulacionesDeReciboDeMentira();
+
     private final ConveniosEnMemoria convenios = new ConveniosEnMemoria();
     private final MovimientosDeConvenioEnMemoria movimientos = new MovimientosDeConvenioEnMemoria();
     private final AcogimientoDeMentira libro =
@@ -156,7 +171,9 @@ class ConvenioControllerTest {
                                     new CerrarConvenio(
                                             convenios,
                                             movimientos,
-                                            new AnulacionesDeReciboDeMentira(),
+                                            // Por delegacion y no por valor: el campo se cambia
+                                            // en cada prueba y el `MockMvc` ya esta construido.
+                                            (long reciboId) -> anulaciones.estaAnulado(reciboId),
                                             acogimiento,
                                             preconvenios,
                                             (RegistroDeAuditoria registro) -> {},
@@ -436,7 +453,153 @@ class ConvenioControllerTest {
         assertThat(cierres(numero)).isEqualTo(1);
     }
 
+    // ------------------------------------------------------------------
+    //  #40 — anular un convenio formalizado, y las cuatro respuestas que ahora se distinguen
+    // ------------------------------------------------------------------
+
+    @Test
+    @DisplayName("#40 — con el recibo de la inicial ANULADO en caja, la anulacion termina")
+    void laAnulacionTerminaConElReciboAnulado() throws Exception {
+        String numero = convenioVigente();
+        anulaciones = new AnulacionesDeReciboDeMentira().anular(999L);
+
+        MvcResult respuesta = anular(numero);
+
+        assertThat(respuesta.getResponse().getStatus())
+                .as(
+                        "hasta #40 esto era 500: el puerto lo servia un muñon que lanzaba"
+                                + " SinRutaEnCaja nombrando la ruta que lo serviria — y esa ruta la"
+                                + " publicaba `caja` desde el mismo commit que creo el muñon")
+                .isEqualTo(201);
+        assertThat(cierres(numero)).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("#40 — y con el recibo VIGENTE contesta 409, que es lo que CerrarConvenio sabe")
+    void elReciboVigenteContestaConflicto() throws Exception {
+        String numero = convenioVigente();
+        anulaciones = new AnulacionesDeReciboDeMentira();
+
+        MvcResult respuesta = anular(numero);
+
+        assertThat(respuesta.getResponse().getStatus()).isEqualTo(409);
+        assertThat(respuesta.getResponse().getContentAsString())
+                .contains("\"codigo\":\"CONFLICTO\"")
+                .contains("Anulese primero el recibo");
+        assertThat(cierres(numero)).as("y nada se cerro").isZero();
+    }
+
+    @Test
+    @DisplayName("#40 — un recibo que caja NO TIENE no es «no esta anulado»: 409 con su motivo")
+    void elReciboQueNoConstaSeDistingueDelVigente() throws Exception {
+        String numero = convenioVigente();
+        anulaciones =
+                (long reciboId) -> {
+                    throw new AnulacionesDeRecibo.ReciboQueNoConsta(reciboId);
+                };
+
+        MvcResult respuesta = anular(numero);
+
+        assertThat(respuesta.getResponse().getStatus()).isEqualTo(409);
+        assertThat(respuesta.getResponse().getContentAsString())
+                .as(
+                        "se arreglan de maneras distintas —anular el recibo en ventanilla, o"
+                                + " conciliar los dos padrones—, asi que no pueden salir con el mismo"
+                                + " texto")
+                .contains("`caja` no tiene ningun recibo con ese identificador")
+                .doesNotContain("Anulese primero el recibo");
+        assertThat(cierres(numero)).isZero();
+    }
+
+    @Test
+    @DisplayName("#40 — y una caja que no contesta es 503, no 500 y no 409")
+    void laCajaCaidaContestaServicioNoDisponible() throws Exception {
+        String numero = convenioVigente();
+        anulaciones = cajaInalcanzable(MotivoDeInalcanzable.NO_CONTESTA);
+
+        MvcResult respuesta = anular(numero);
+
+        assertThat(respuesta.getResponse().getStatus())
+                .as(
+                        "503 y no 500: no es un defecto de este servidor, y reintentar SI puede"
+                                + " cambiar el resultado")
+                .isEqualTo(503);
+        assertThat(respuesta.getResponse().getContentAsString())
+                .contains("\"codigo\":\"SERVICIO_NO_DISPONIBLE\"");
+    }
+
+    @Test
+    @DisplayName("#40 — y los dos motivos del 503 NO salen iguales: se arreglan distinto (#25)")
+    void losDosMotivosDelQuinientosTresSeDistinguen() throws Exception {
+        // El MISMO convenio las dos veces —un 503 no cierra nada, asi que se puede volver a
+        // pedir—: con dos convenios distintos, dos cuerpos distintos no dirian nada.
+        String numero = convenioVigente();
+        anulaciones = cajaInalcanzable(MotivoDeInalcanzable.NO_CONTESTA);
+        String caida = anular(numero).getResponse().getContentAsString();
+        anulaciones = cajaInalcanzable(MotivoDeInalcanzable.SIN_CONFIGURAR);
+        String sinConfigurar = anular(numero).getResponse().getContentAsString();
+
+        assertThat(caida)
+                .as(
+                        "los dos son «no se pudo preguntar» y los dos admiten reintento, pero uno"
+                                + " lo arregla levantar la caja —y se cura solo— y el otro poner una"
+                                + " variable de entorno en el despliegue, que NO se cura solo. Con la"
+                                + " misma frase, quien opera va a mirar un despliegue que puede estar"
+                                + " perfectamente en pie (#25, AC-4)")
+                .isNotEqualTo(sinConfigurar);
+        assertThat(sinConfigurar).contains("kamayuk.caja.url");
+        assertThat(caida).doesNotContain("kamayuk.caja.url");
+    }
+
+    /** Una caja que no se pudo preguntar, con el motivo que se le diga. */
+    private static AnulacionesDeRecibo cajaInalcanzable(MotivoDeInalcanzable motivo) {
+        return (long reciboId) -> {
+            throw new AnulacionesDeRecibo.CajaInalcanzable(
+                    motivo,
+                    "No se pudo preguntar si el recibo " + reciboId + " esta anulado",
+                    new java.io.IOException("connection refused"));
+        };
+    }
+
+    @Test
+    @DisplayName("#40 AC-4 — y el muñon que quedara sale 501, no 500 con incidencia")
+    void unPuertoSinRutaSaleComoOperacionNoDisponible() throws Exception {
+        // Es el estado exacto anterior a #40 puesto a mano: un puerto que lanza `SinRutaEnCaja`.
+        // No queda ninguno en `src/main` —lo comprueba `EscriturasQueNoPuedenTerminarTest`— y esto
+        // mide lo otro: que el dia que alguien escriba un puerto antes que su ruta, quien opera
+        // reciba «esta operacion todavia no se puede completar» con la ruta que falta dentro, y no
+        // «avise a soporte» con un numero de incidencia que soporte no puede usar para nada.
+        String numero = convenioVigente();
+        anulaciones =
+                (long reciboId) -> {
+                    throw new ClienteHttpDeCaja.SinRutaEnCaja(
+                            "si el recibo " + reciboId + " esta anulado",
+                            "GET caja/api/v1/recibos/por-id/{reciboId}");
+                };
+
+        MvcResult respuesta = anular(numero);
+
+        assertThat(respuesta.getResponse().getStatus()).isEqualTo(501);
+        assertThat(respuesta.getResponse().getContentAsString())
+                .contains("\"codigo\":\"OPERACION_NO_DISPONIBLE\"")
+                .contains("GET caja/api/v1/recibos/por-id/{reciboId}")
+                .doesNotContain("\"incidencia\"");
+    }
+
     // ---------------------------------------------------------------- utilidades
+
+    private MvcResult anular(String numero) throws Exception {
+        return mvc.perform(
+                        post("/rentas/api/v1/tesoreria/convenios/" + numero + "/anulacion")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
+                                        {"accion":"ANULACION","fechaAnul":"2026-03-16",
+                                         "motivo":"NO DEBIO EXISTIR",
+                                         "observacion":"Anulacion pedida en ventanilla"}
+                                        """))
+                .andReturn();
+    }
 
     /** Cuantos cierres tiene ese convenio, contados sobre el doble de los movimientos. */
     private long cierres(String numero) {

@@ -2790,6 +2790,11 @@ paths:
           content:
             application/problem+json:
               schema: { $ref: "#/components/schemas/Error" }
+        "501":
+          description: "**Esta operacion todavia no se puede completar.** No es un fallo del servidor y no hay nada que corregir en la peticion: reintentar no la desbloquea. La escritura del sistema vecino y las que la rodean aqui tendrian que confirmar o deshacerse juntas, y dos bases y dos procesos no comparten transaccion. Falta el protocolo de ADR-0027; publicar una ruta NO lo arregla. Motivo: ADR-0027: falta el protocolo que hace confirmar juntas a las dos bases. La lectura de la titularidad de este mismo adaptador SI funciona; lo que no se puede es escribir. El cuerpo es `problem+json` con `codigo: OPERACION_NO_DISPONIBLE`."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
         "403":
           $ref: "#/components/responses/SinMunicipalidad"
         "422":
@@ -3659,6 +3664,11 @@ paths:
               schema: { type: object }
         "404":
           description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "501":
+          description: "**Esta operacion todavia no se puede completar.** No es un fallo del servidor y no hay nada que corregir en la peticion: reintentar no la desbloquea. La escritura del sistema vecino y las que la rodean aqui tendrian que confirmar o deshacerse juntas, y dos bases y dos procesos no comparten transaccion. Falta el protocolo de ADR-0027; publicar una ruta NO lo arregla. Motivo: ADR-0027: falta el protocolo que hace confirmar juntas a las dos bases. Publicar la ruta NO la arregla, y ademas la implementacion de `catastro` declara Propagation.MANDATORY para que esto no se pueda escribir suelto. El cuerpo es `problem+json` con `codigo: OPERACION_NO_DISPONIBLE`."
           content:
             application/problem+json:
               schema: { $ref: "#/components/schemas/Error" }

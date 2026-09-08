@@ -13,6 +13,7 @@ import java.time.format.DateTimeParseException;
 import java.util.Optional;
 import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.dominio.MotivoDeInalcanzable;
+import kamayuk.rentas.dominio.OperacionTodaviaNoCompletable;
 import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -72,13 +73,21 @@ import tools.jackson.databind.json.JsonMapper;
  *       perder el dia al reves.
  * </ul>
  *
- * <h2>El 404 es la UNICA respuesta que puede volver vacia, y solo en dos sitios</h2>
+ * <h2>El 404 es una RESPUESTA, y lo que significa lo decide cada lectura</h2>
  *
  * <p>{@code GET /recibos/{numero}} y {@code GET /tasas/{codigo}/cobros/{numero}} contestan 404
  * cuando ese recibo no existe o no cobro ese concepto, y ahi el {@code Optional.empty()} <b>es la
  * respuesta</b> y no una falta de dato: es lo que los dos puertos ya prometian —«vacio si el numero
  * no existe o no tiene la forma de un numero de recibo»—. La diferencia con lo de arriba es que ahi
  * <b>se pregunto y contestaron</b>. Cualquier otro codigo sale como {@link CajaInalcanzable}.
+ *
+ * <p><b>Y desde #40 hay una tercera que lo pide vacio y NO lo devuelve vacio.</b> {@code GET
+ * /recibos/por-id/{reciboId}} contesta 404 cuando ese identificador no existe, y ahi el vacio no
+ * puede llegar al puerto: {@code AnulacionesDeRecibo.estaAnulado} devuelve un booleano, y un {@code
+ * false} significa «ese recibo sigue vigente». {@code AnulacionesDeReciboHttp} lo traduce a {@code
+ * AnulacionesDeRecibo.ReciboQueNoConsta}, que es una tercera respuesta con su propio remedio. Lo
+ * que este cliente decide es el TRANSPORTE —que un 404 es una respuesta y no un fallo—; que
+ * significa lo decide quien pregunta.
  *
  * <h2>Los importes llegan como CADENA</h2>
  *
@@ -119,12 +128,21 @@ public class ClienteHttpDeCaja {
      * <p>No es «no hay dato» y no es «caja esta caida»: es que la operacion no existe. Se distingue
      * de las otras dos a proposito, porque se arregla de otra manera —publicandola— y decir
      * cualquiera de las otras dos mandaria a mirar una cola o un despliegue.
+     *
+     * <p><b>Hoy no la lanza ningun adaptador, y eso se dice para que nadie lo suponga al reves</b>:
+     * el unico hueco de ruta que quedaba —si un recibo esta anulado, por su identificador interno—
+     * lo cerro #40, y el muñon que lo lanzaba se borro con el. Se conserva por lo mismo que su
+     * gemela {@code SinRutaEnCatastro}: el proximo puerto que se escriba antes que su ruta la
+     * necesita, y desde #40 sale como {@code 501 OPERACION_NO_DISPONIBLE} en vez de como un 500 con
+     * numero de incidencia. Lo que no se conserva es la idea de que algun puerto de esta frontera
+     * siga sin poder preguntar.
      */
-    public static final class SinRutaEnCaja extends RuntimeException {
+    public static final class SinRutaEnCaja extends OperacionTodaviaNoCompletable {
         @java.io.Serial private static final long serialVersionUID = 1L;
 
         public SinRutaEnCaja(String que, String operacionQueLoServiria) {
             super(
+                    LoQueFalta.LA_RUTA_DEL_VECINO,
                     "No se puede pedir "
                             + que
                             + ": `caja` todavia no publica la operacion que lo serviria ("
@@ -288,6 +306,40 @@ public class ClienteHttpDeCaja {
         return (comoTexto.length() > 120 ? comoTexto.substring(0, 120) + "…" : comoTexto);
     }
 
+    /**
+     * Un booleano que TIENE que estar, leido por su camino dentro del cuerpo.
+     *
+     * <p><b>Es el sintoma mudo de C-1 en su forma mas cara</b> (#40 AC-2): {@code
+     * path("anulado").asBoolean(false)} sobre un nodo que no esta <b>no da error</b> — devuelve
+     * {@code false}. Y ahi {@code false} no es «no se sabe»: significa «ese recibo sigue vigente»,
+     * que es la respuesta que <b>impide</b> anular el convenio. Un campo renombrado del otro lado
+     * de la frontera no se veria como un fallo sino como una regla de negocio que empieza a
+     * rechazar siempre, y quien la sufre no tiene forma de distinguirla de la de verdad.
+     *
+     * <p>Y por el otro lado es peor: si algun dia el valor por omision fuera {@code true}, un campo
+     * ausente dejaria anular un convenio con su cuota inicial cobrada y viva. Por eso no hay valor
+     * por omision en ninguna direccion.
+     */
+    static boolean exigirBooleano(JsonNode cuerpo, String camino, String que) {
+        JsonNode nodo = cuerpo;
+        for (String paso : camino.split("\\.")) {
+            nodo = nodo.path(paso);
+        }
+        if (!nodo.isBoolean()) {
+            throw new CajaInalcanzable(
+                    que
+                            + ": `caja` no publica «"
+                            + camino
+                            + "» como un booleano (llego "
+                            + descripcion(nodo)
+                            + "). No se lee con un valor por omision: un «false» inventado dice"
+                            + " «ese recibo sigue vigente», que es una respuesta y no una falta de"
+                            + " dato",
+                    null);
+        }
+        return nodo.asBoolean();
+    }
+
     /** Un importe de esta frontera. Viaja como cadena (RNF-055, regla 1). */
     static Dinero exigirDinero(JsonNode cuerpo, String camino, String que) {
         String texto = exigirTexto(cuerpo, camino, que);
@@ -343,8 +395,11 @@ public class ClienteHttpDeCaja {
     /**
      * Pide, y trata el 404 como una respuesta y no como un fallo.
      *
-     * <p>Solo lo usan las dos lecturas cuyo puerto promete vacio cuando no existe. Ver el javadoc
-     * de la clase: en las demas, un vacio se leeria como un dato.
+     * <p>Lo usan las dos lecturas cuyo puerto promete vacio cuando no existe, y —desde #40— la del
+     * estado de un recibo por su identificador, que <b>no</b> lo propaga como vacio sino que lo
+     * traduce a su propia respuesta. Ver el javadoc de la clase: lo que este metodo decide es que
+     * un 404 no es un fallo; que significa lo decide quien pregunta, y en las demas lecturas un
+     * vacio se leeria como un dato.
      */
     Optional<JsonNode> pedirSiExiste(String ruta, String que) {
         RespuestaDeCaja respuesta = enviar(ruta, que);

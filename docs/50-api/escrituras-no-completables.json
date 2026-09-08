@@ -1,0 +1,11 @@
+{
+  "_procedencia": "ARCHIVO GENERADO — no editar a mano. Lo escribe EscriturasQueNoPuedenTerminarTest desde su lista NO_PUEDEN_TERMINAR, que la misma prueba contrasta EN LOS DOS SENTIDOS contra el bytecode de produccion: ninguna clase que construya una OperacionTodaviaNoCompletable puede quedar sin declarar, y ninguna entrada puede hablar de una clase que ya no la construye. Se regenera con -Dkamayuk.escrituras.regenerar=true. Dice que operaciones publicadas NO pueden terminar todavia y que falta para que puedan, y lo lee generar-openapi.mjs para declarar su 501 en el contrato (#40).",
+  "POST /fiscalizacion/transferencias": {
+    "falta": "LA_TRANSACCION_COMPARTIDA",
+    "motivo": "ADR-0027: falta el protocolo que hace confirmar juntas a las dos bases. Publicar la ruta NO la arregla, y ademas la implementacion de `catastro` declara Propagation.MANDATORY para que esto no se pueda escribir suelto"
+  },
+  "POST /rentas/transferencias/predio": {
+    "falta": "LA_TRANSACCION_COMPARTIDA",
+    "motivo": "ADR-0027: falta el protocolo que hace confirmar juntas a las dos bases. La lectura de la titularidad de este mismo adaptador SI funciona; lo que no se puede es escribir"
+  }
+}

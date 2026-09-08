@@ -21,6 +21,14 @@
       },
       "cuerpo" : { }
     },
+    "GET /recibos/por-id/{reciboId}" : {
+      "parametros" : [ ],
+      "respuesta" : {
+        "reciboId" : "entero",
+        "anulado" : "booleano"
+      },
+      "cuerpo" : { }
+    },
     "GET /recibos/{numero}" : {
       "parametros" : [ ],
       "respuesta" : {

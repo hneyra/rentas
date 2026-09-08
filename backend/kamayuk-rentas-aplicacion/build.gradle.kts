@@ -119,6 +119,15 @@ tasks.test {
         .file(rootProject.file("../docs/50-api/respuestas-de-la-api.json"))
         .withPathSensitivity(PathSensitivity.RELATIVE)
 
+    // Y para el censo de escrituras que no pueden terminar (#40), por lo mismo: lo compara
+    // `EscriturasQueNoPuedenTerminarTest` contra las clases que construyen una
+    // `OperacionTodaviaNoCompletable`, y sin declararlo aqui una edicion a mano dejaria la tarea
+    // UP-TO-DATE y pasaria en verde — con el contrato publicando un 501 sobre una ruta que ya se
+    // conecto, o callandolo sobre una que no puede terminar.
+    inputs
+        .file(rootProject.file("../docs/50-api/escrituras-no-completables.json"))
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+
     // Y lo mismo para las pruebas de TODOS los modulos, que `AsercionesQueNoPuedenFallarTest`
     // lee del disco (#724). Es el unico escaner que recorre `src/test`, y esas fuentes no estan
     // en el classpath de este modulo —solo lo estan las de `src/main`, por las dependencias—,
@@ -151,7 +160,7 @@ tasks.test {
     // Gradle no propaga las propiedades de sistema del build al proceso de prueba
     // (lo mismo que hace `kamayuk.pruebas-postgres` con las suyas). Sin esto,
     // `-Dkamayuk.formas.regenerar=true` no llega y el archivo no se puede regenerar.
-    for (propiedad in listOf("kamayuk.formas.regenerar", "kamayuk.respuestas.regenerar", "kamayuk.contratos.regenerar")) {
+    for (propiedad in listOf("kamayuk.formas.regenerar", "kamayuk.respuestas.regenerar", "kamayuk.contratos.regenerar", "kamayuk.escrituras.regenerar")) {
         providers.systemProperty(propiedad).orNull?.let { systemProperty(propiedad, it) }
     }
 }
