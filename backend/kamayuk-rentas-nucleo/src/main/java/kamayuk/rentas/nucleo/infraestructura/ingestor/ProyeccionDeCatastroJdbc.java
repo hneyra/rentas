@@ -6,6 +6,7 @@ import java.time.Instant;
 import java.util.Optional;
 import kamayuk.rentas.nucleo.dominio.proyeccion.HechoRecibido;
 import kamayuk.rentas.nucleo.dominio.proyeccion.ProyeccionDeCatastro;
+import kamayuk.rentas.nucleo.dominio.proyeccion.TipoDeHechoDeCatastro;
 import org.jspecify.annotations.Nullable;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
@@ -61,21 +62,35 @@ public class ProyeccionDeCatastroJdbc implements ProyeccionDeCatastro {
 
     @Override
     public Aplicacion aplicar(HechoRecibido hecho, Instant cuando) {
+        TipoDeHechoDeCatastro tipo = hecho.tipo();
+        if (tipo == null) {
+            // ESTE CAMINO NO LO ALCANZA EL INGESTOR, y aun asi no puede ser un `switch` sobre
+            // null. Quien filtra los tipos que este sistema no sabe aplicar es
+            // `IngestarHechosDeCatastro`, que los IGNORA con un aviso y sin acusarlos (#54); lo
+            // que llega aqui con un tipo desconocido es una llamada directa al aplicador, y el
+            // unico desenlace honesto es decirlo en vez de reventar con un NullPointerException.
+            throw new NoSePuedeAplicar(
+                    "El hecho es de tipo «"
+                            + hecho.tipoPublicado()
+                            + "», que este sistema no sabe aplicar. La ingestion lo ignora antes"
+                            + " de llegar aqui (ver IngestarHechosDeCatastro y el javadoc de"
+                            + " TipoDeHechoDeCatastro)");
+        }
         if (!anotarEnElBuzon(hecho, cuando)) {
             return Aplicacion.YA_APLICADO;
         }
         // El `default` esta por Checkstyle y no sobra: el enumerado es una COPIA del de
-        // `catastro` (ver `TipoDeHechoDeCatastro`), y el dia que alguien le anada un cuarto valor
-        // sin decidir que hace la proyeccion con el, esto tiene que fallar en vez de no escribir
-        // nada y devolver «aplicado».
-        return switch (hecho.tipo()) {
+        // `catastro` (ver `TipoDeHechoDeCatastro`), y el dia que alguien le anada un valor sin
+        // escribir su rama aqui, esto tiene que fallar en vez de no escribir nada y devolver
+        // «aplicado».
+        return switch (tipo) {
             case PREDIO_PROYECTADO -> aplicarPredio(hecho, cuando);
             case VALUACION_PUBLICADA -> aplicarValuacion(hecho, cuando);
             case CORRIDA_CERRADA -> aplicarCorrida(hecho, cuando);
             default ->
                     throw new NoSePuedeAplicar(
                             "El hecho es de tipo «"
-                                    + hecho.tipo()
+                                    + tipo
                                     + "» y esta proyeccion no sabe que escribir con el");
         };
     }
@@ -94,7 +109,7 @@ public class ProyeccionDeCatastroJdbc implements ProyeccionDeCatastro {
                                 .formatted(MUNICIPALIDAD_ACTUAL))
                 .param("evento", hecho.eventoId())
                 .param("secuencia", hecho.secuencia())
-                .param("tipo", hecho.tipo().name())
+                .param("tipo", hecho.tipoPublicado())
                 .param("predio", hecho.predioId())
                 .param("ejercicio", hecho.ejercicio())
                 .param("cuerpo", hecho.cuerpo())
@@ -141,7 +156,7 @@ public class ProyeccionDeCatastroJdbc implements ProyeccionDeCatastro {
                                         .formatted(MUNICIPALIDAD_ACTUAL))
                         .param("evento", hecho.eventoId())
                         .param("secuencia", hecho.secuencia())
-                        .param("tipo", hecho.tipo().name())
+                        .param("tipo", hecho.tipoPublicado())
                         .param("predio", hecho.predioId())
                         .param("cuando", Timestamp.from(cuando))
                         .param("huella", hecho.huella())
