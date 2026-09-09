@@ -925,6 +925,25 @@ export const rentas: DescriptorDeSistema = {
                         name: "KAMAYUK_CATASTRO_URL",
                         value: `http://kamayuk-catastro-web.${e.namespaceDe("catastro")}`,
                       },
+                      // A donde se pide el token, por la red INTERNA (#21 AC-2). Es una
+                      // direccion y no una identidad: el emisor publico es lo que se compara con
+                      // el `iss` del token que se RECIBE; esto es a donde se va a buscarlo.
+                      // Pedirlo al publico haria salir al ingreso para volver a entrar, y la
+                      // politica de egreso —que nombra el pod de identidad, no internet— no lo
+                      // permite.
+                      {
+                        name: "KAMAYUK_RENTAS_INGESTOR_IDENTIDAD_TOKEN",
+                        value: e.plataforma.token,
+                      },
+                      // Y con QUE cliente: uno por municipalidad, porque la cuenta de servicio de
+                      // ese cliente es la que lleva `municipalidad_id` y ADR-0028 §2 dice que «no
+                      // hay un proceso con permiso sobre todas». El nombre lo fija
+                      // `clienteDeServicio()` de `infrastructure`, y su guarda
+                      // `identidad-de-servicio` compara esta cadena con la suya.
+                      {
+                        name: "KAMAYUK_RENTAS_INGESTOR_IDENTIDAD_CLIENTE",
+                        value: `kamayuk-${SISTEMA}-servicio-${e.implantacion.ubigeo}`,
+                      },
                       // La credencial con que se pide el feed: la clave del cliente confidencial
                       // con la que el ingestor pide su token (#21). No es el token.
                       {

@@ -96,11 +96,28 @@ public class ConfiguracionDelIngestor {
         return new AlertaAlCanalDelResponsable(json, responsable);
     }
 
+    /**
+     * De donde sale el {@code Authorization} del ingestor (#21 AC-2).
+     *
+     * <p>Es un {@code @Bean} de esta configuracion y no un {@code @Component}: el ingestor solo
+     * existe en el perfil de lotes, y un componente descubierto por barrido se construiria tambien
+     * en el proceso web, que no llama a nadie y no tiene por que tener una credencial de servicio.
+     */
+    @Bean
+    CredencialDeServicio credencialDeServicio(
+            JsonMapper json,
+            java.time.Clock reloj,
+            @Value("${kamayuk.rentas.ingestor.identidad.token:}") String punto,
+            @Value("${kamayuk.rentas.ingestor.identidad.cliente:}") String cliente,
+            @Value("${kamayuk.catastro.credencial:}") String clave) {
+        return new TokenDeServicioDeKeycloak(json, reloj, punto, cliente, clave);
+    }
+
     @Bean
     FuenteDeHechosDeCatastro fuenteDeHechosDeCatastro(
             JsonMapper json,
             @Value("${kamayuk.catastro.url:}") String raiz,
-            @Value("${kamayuk.catastro.credencial:}") String credencial) {
+            CredencialDeServicio credencial) {
         return new ClienteHttpDelBuzonDeCatastro(json, raiz, credencial);
     }
 
