@@ -45,6 +45,7 @@ const ENTORNO: EntornoDelDescriptor = {
     motor: "kamayuk-stg-postgres.kamayuk-stg:5432",
     emisor: "https://stg.kamayuk.example/keycloak/realms/sgtm",
     jwks: "http://kamayuk-stg-identidad.kamayuk-stg:8080/keycloak/realms/sgtm/protocol/openid-connect/certs",
+    token: "http://kamayuk-stg-identidad.kamayuk-stg:8080/keycloak/realms/sgtm/protocol/openid-connect/token",
   },
 };
 

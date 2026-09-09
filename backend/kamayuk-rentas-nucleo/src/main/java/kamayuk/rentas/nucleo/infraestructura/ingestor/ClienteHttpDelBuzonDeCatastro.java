@@ -22,10 +22,15 @@ import tools.jackson.databind.json.JsonMapper;
  * <h2>Corre SIN USUARIO DELANTE, y eso decide como se autentica</h2>
  *
  * <p>Lo llama un proceso por lotes: no hay ninguna peticion en curso de la que sacar un {@code
- * Authorization}, asi que se manda una credencial de servicio configurada. <b>Si no la hay, la
- * llamada sale sin credencial y el destino la rechaza</b>, que es deliberado. El intercambio por un
- * token delegado (RFC 8693, ADR-0028 §2) no esta construido en ninguno de los cuatro repositorios y
- * queda declarado como hueco.
+ * Authorization}. Desde #21 AC-2 <b>pide el suyo</b> con {@code client_credentials} y la clave de
+ * su cliente confidencial —uno por sistema y municipalidad, ADR-0028 §2—, en vez de mandar una
+ * cadena configurada que ningun emisor firmo. Quien lo pide y lo guarda es {@link
+ * TokenDeServicioDeKeycloak}; este cliente solo sabe que hay una {@link CredencialDeServicio} y que
+ * puede tardar, porque un token se renueva.
+ *
+ * <p>Sin identidad configurada la llamada sale sin credencial y el destino la rechaza, que sigue
+ * siendo lo correcto: es lo que hace que el compose sin Keycloak no se pase la vida pidiendo tokens
+ * que nadie va a dar.
  *
  * <h2>Todo fallo de aqui es TRANSITORIO</h2>
  *
@@ -65,9 +70,10 @@ public class ClienteHttpDelBuzonDeCatastro implements FuenteDeHechosDeCatastro {
     private final HttpClient cliente;
     private final JsonMapper json;
     private final String raiz;
-    private final String credencial;
+    private final CredencialDeServicio credencial;
 
-    public ClienteHttpDelBuzonDeCatastro(JsonMapper json, String raiz, String credencial) {
+    public ClienteHttpDelBuzonDeCatastro(
+            JsonMapper json, String raiz, CredencialDeServicio credencial) {
         this.json = json;
         this.raiz = raiz.endsWith("/") ? raiz.substring(0, raiz.length() - 1) : raiz;
         this.credencial = credencial;
@@ -158,9 +164,16 @@ public class ClienteHttpDelBuzonDeCatastro implements FuenteDeHechosDeCatastro {
         }
     }
 
+    /**
+     * Pone la cabecera si la hay.
+     *
+     * <p>Se pide AQUI y no en el constructor: un token caduca, y uno pedido al construir el bean
+     * estaria muerto en la vuelta de la noche siguiente.
+     */
     private void conCredencial(HttpRequest.Builder peticion) {
-        if (!credencial.isBlank()) {
-            peticion.header("Authorization", credencial);
+        String cabecera = credencial.cabecera();
+        if (!cabecera.isBlank()) {
+            peticion.header("Authorization", cabecera);
         }
     }
 

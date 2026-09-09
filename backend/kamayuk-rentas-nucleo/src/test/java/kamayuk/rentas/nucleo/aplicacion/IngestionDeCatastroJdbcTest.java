@@ -36,6 +36,7 @@ import kamayuk.rentas.nucleo.dominio.proyeccion.TipoDeHechoDeCatastro;
 import kamayuk.rentas.nucleo.infraestructura.ValuacionRecibidaJdbc;
 import kamayuk.rentas.nucleo.infraestructura.ingestor.AlertaAlCanalDelResponsable;
 import kamayuk.rentas.nucleo.infraestructura.ingestor.ClienteHttpDelBuzonDeCatastro;
+import kamayuk.rentas.nucleo.infraestructura.ingestor.CredencialDeServicio;
 import kamayuk.rentas.nucleo.infraestructura.ingestor.CuerpoDelHecho;
 import kamayuk.rentas.nucleo.infraestructura.ingestor.ProyeccionDeCatastroJdbc;
 import kamayuk.rentas.nucleo.infraestructura.ingestor.ResponsableDeLaProyeccion;
@@ -183,7 +184,8 @@ class IngestionDeCatastroJdbcTest {
 
         ingestor =
                 new IngestarHechosDeCatastro(
-                        new ClienteHttpDelBuzonDeCatastro(json, buzonDeCatastro.raiz(), ""),
+                        new ClienteHttpDelBuzonDeCatastro(
+                                json, buzonDeCatastro.raiz(), CredencialDeServicio.fija("")),
                         aplicador,
                         new AlertaAlCanalDelResponsable(
                                 json,
