@@ -22,6 +22,7 @@ import kamayuk.rentas.seguridad.dominio.Usuario;
 import org.jspecify.annotations.Nullable;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * La lectura de la copia local de la autorizacion (etapa 4 de ADR-0039).
@@ -29,6 +30,27 @@ import org.springframework.stereotype.Repository;
  * <p>Es lo que quedo de {@code AdministracionRepositoryJdbc} y {@code PermisoRepositoryJdbc} al
  * retirar la administracion: ni un {@code INSERT} ni un {@code UPDATE}. Sin {@code WHERE
  * municipalidad_id}: lo pone RLS con el {@code SET LOCAL} de la transaccion (ADR-0002).
+ *
+ * <h2>Los cinco metodos llevan {@code @Transactional}, y no es decorativo</h2>
+ *
+ * <p>Es la misma doctrina que {@code ComprobadorDeAccesoJdbc} de al lado tiene escrita desde que la
+ * pago: estas consultas leen {@code modulo_sistema}, {@code acceso}, {@code usuario}, {@code
+ * grupo}, {@code miembro} y {@code permiso}, que son tablas de tenant con RLS, y sus politicas leen
+ * {@code app.municipalidad_id} —el parametro que {@code TenantTransactionManager} fija con {@code
+ * SET LOCAL} <b>al abrir la transaccion</b>—. Sin transaccion no hay parametro, y PostgreSQL no
+ * devuelve cero filas: falla.
+ *
+ * <p><b>Y esto se pago de verdad, medido contra la instalacion levantada</b> (AC-5/AC-6 de
+ * `identidad`#4): hasta la etapa 4 quien llamaba a este SQL era {@code AdministrarSeguridad}, un
+ * caso de uso {@code @Transactional(readOnly = true)}, y el retiro de la administracion dejo a
+ * {@code SeguridadController} llamando al repositorio <b>directamente</b>. Con eso, {@code GET
+ * /rentas/api/v1/seguridad/modulos} y {@code /accesos} —las dos rutas de las que {@code rentas-web}
+ * compone su arbol— contestaban <b>500</b>: {@code DataIntegrityViolationException … SELECT
+ * count(*) FROM modulo_sistema; ERROR: invalid input syntax for type bigint: ""}. Ninguna prueba lo
+ * veia porque todas abren su propia transaccion (un {@code TransactionTemplate} o un caso de uso
+ * anotado), que es exactamente lo que aquel javadoc ya advertia; lo caza {@code
+ * LecturasDeLaCopiaLocalDePuntaAPuntaTest}, que entra por HTTP con el tenant puesto SOLO por el
+ * filtro.
  *
  * <p>La matriz efectiva conserva <b>la misma precedencia</b> que usa {@code
  * ComprobadorDeAccesoJdbc} —una excepcion de usuario, aunque niegue, sustituye al grupo entero para
@@ -48,6 +70,7 @@ public class LecturaDeLaCopiaLocalJdbc extends RepositorioJdbc implements Lectur
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Pagina<Modulo> modulos(Paginacion paginacion) {
         return paginar(
                 "SELECT id, codigo, nombre, orden, activo FROM modulo_sistema",
@@ -59,6 +82,7 @@ public class LecturaDeLaCopiaLocalJdbc extends RepositorioJdbc implements Lectur
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Pagina<Acceso> accesos(Paginacion paginacion) {
         return paginar(
                 "SELECT id, modulo_id, tipo, codigo, nombre, activo FROM acceso",
@@ -70,11 +94,13 @@ public class LecturaDeLaCopiaLocalJdbc extends RepositorioJdbc implements Lectur
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Optional<Usuario> usuario(long id) {
         return unUsuario("id = :clave", id);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Optional<Usuario> usuarioPorCuenta(String cuenta) {
         return unUsuario("cuenta = :clave", cuenta);
     }
@@ -94,6 +120,7 @@ public class LecturaDeLaCopiaLocalJdbc extends RepositorioJdbc implements Lectur
      * del usuario si existe, y si no la union de sus grupos vigentes.
      */
     @Override
+    @Transactional(readOnly = true)
     public Map<String, Set<Privilegio>> permisosEfectivosDe(String cuenta, LocalDate fecha) {
         String sql =
                 "SELECT a.codigo,"

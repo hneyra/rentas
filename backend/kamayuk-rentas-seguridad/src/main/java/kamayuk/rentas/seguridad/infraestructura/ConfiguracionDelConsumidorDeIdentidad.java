@@ -45,12 +45,21 @@ public class ConfiguracionDelConsumidorDeIdentidad {
         return new ClienteHttpDelBuzonDeIdentidad(json, raiz, credencial);
     }
 
+    /**
+     * Quien recibe el aviso. Las dos propiedades son obligatorias y el canal NO tiene que ser
+     * http(s): el motivo, medido, esta en {@link ResponsableDelConsumidor}.
+     */
     @Bean
-    AlertaDeEventosSinAplicar alertaDeEventosSinAplicar(
-            JsonMapper json,
+    ResponsableDelConsumidor responsableDelConsumidorDeIdentidad(
             @Value("${kamayuk.identidad.responsable:}") String responsable,
             @Value("${kamayuk.identidad.canal:}") String canal) {
-        return new AlertaAlResponsableDeLaCopiaLocal(json, responsable, canal);
+        return new ResponsableDelConsumidor(responsable, canal);
+    }
+
+    @Bean
+    AlertaDeEventosSinAplicar alertaDeEventosSinAplicar(
+            JsonMapper json, ResponsableDelConsumidor responsable) {
+        return new AlertaAlResponsableDeLaCopiaLocal(json, responsable);
     }
 
     @Bean

@@ -183,16 +183,25 @@ class ClienteHttpDelBuzonDeIdentidadTest {
                 .hasMessageContaining("no tiene la forma de un evento");
     }
 
+    /**
+     * El puerto 1: fuera del rango efimero, asi que ningun otro servidor de mentira de este modulo
+     * puede quedarselo.
+     *
+     * <p>Antes esta prueba cerraba el buzon y reusaba SU puerto, y eso se volvio intermitente en
+     * cuanto el modulo tuvo un segundo servidor de mentira ({@code ElAvisoAlResponsableTest}): el
+     * puerto recien liberado se lo lleva el siguiente {@code ServerSocket(0)} de la misma JVM, y
+     * entonces «nadie escucha» es falso y la prueba pasa en verde sin medir nada. Medido en la
+     * corrida completa, donde salio en rojo con «Expecting code to raise a throwable».
+     */
+    private static final int PUERTO_QUE_NADIE_ESCUCHA = 1;
+
     @Test
     @DisplayName("un puerto que nadie escucha es «no contesta», y no un rechazo")
-    void nadieEscucha() throws IOException {
-        int puerto = buzon.puerto();
-        buzon.close();
-
+    void nadieEscucha() {
         ClienteHttpDelBuzonDeIdentidad apagado =
                 new ClienteHttpDelBuzonDeIdentidad(
                         JsonMapper.builder().build(),
-                        "http://127.0.0.1:" + puerto + "/identidad/api/v1",
+                        "http://127.0.0.1:" + PUERTO_QUE_NADIE_ESCUCHA + "/identidad/api/v1",
                         CredencialDeServicio.fija("Bearer x"));
 
         assertThatThrownBy(() -> apagado.pendientes(10))

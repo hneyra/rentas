@@ -160,6 +160,21 @@ class ConsumirEventosDeIdentidadJdbcTest {
         assertThat(vuelta.ajenos()).isEqualTo(1);
         assertThat(vuelta.apartados()).isEqualTo(1);
         assertThat(vuelta.pendientes()).isEqualTo(1);
+        assertThat(vuelta.pospuestos())
+                .as("y el pospuesto se guarda entero, con su motivo: de ahi sale el aviso (H7)")
+                .singleElement()
+                .satisfies(
+                        pospuesto -> {
+                            assertThat(pospuesto.evento().eventoId())
+                                    .isEqualTo(huerfana.eventoId());
+                            assertThat(pospuesto.motivo()).contains("Grupo que no llego");
+                        });
+        assertThat(vuelta.quedan())
+                .as(
+                        "[«quedan» se cuenta DESPUES del acuse, y por eso sale de la respuesta del"
+                                + " acuse: con `lote.quedan()` la linea decia «174 acusados; quedan"
+                                + " 174», que es lo contrario de lo que promete (H6)]")
+                .isEqualTo(buzon.quedanTrasElAcuse);
         assertThat(vuelta.sinProgreso()).isFalse();
 
         assertThat(buzon.acusados)
@@ -310,6 +325,45 @@ class ConsumirEventosDeIdentidadJdbcTest {
     }
 
     @Test
+    @DisplayName(
+            "tres permisos de otros sistemas dejan UNA linea de resumen, no una por evento (H6)")
+    void losAjenosSeResumenEnUnaLinea() {
+        buzon.sirve(
+                evento(60, "PERMISO_FIJADO", permiso("catastro")),
+                evento(61, "PERMISO_FIJADO", permiso("normativa")),
+                evento(62, "PERMISO_FIJADO", permiso("caja")));
+        ch.qos.logback.classic.Logger registro =
+                (ch.qos.logback.classic.Logger)
+                        org.slf4j.LoggerFactory.getLogger(ConsumirEventosDeIdentidad.class);
+        ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent> anotadas =
+                new ch.qos.logback.core.read.ListAppender<>();
+        anotadas.start();
+        registro.addAppender(anotadas);
+
+        ConsumirEventosDeIdentidad.Vuelta vuelta;
+        try {
+            vuelta = consumidor.consumir();
+        } finally {
+            registro.detachAppender(anotadas);
+        }
+
+        assertThat(vuelta.ajenos()).isEqualTo(3);
+        assertThat(
+                        anotadas.list.stream()
+                                .filter(l -> l.getFormattedMessage().contains("OTROS sistemas"))
+                                .map(ch.qos.logback.classic.spi.ILoggingEvent::getFormattedMessage)
+                                .toList())
+                .as(
+                        "[una linea por evento era ruido medido: una implantacion entera son 494"
+                                + " lineas entre los cuatro consumidores (28 en rentas, 161 en"
+                                + " normativa), y un registro que grita en lo normal es el que nadie"
+                                + " lee el dia que dice algo]")
+                .singleElement()
+                .asString()
+                .contains("3 permiso(s) de OTROS sistemas ignorados y acusados");
+    }
+
+    @Test
     @DisplayName("y con el buzon vacio no se acusa nada y no hay progreso")
     void conElBuzonVacio() {
         ConsumirEventosDeIdentidad.Vuelta vuelta = consumidor.consumir();
@@ -397,11 +451,18 @@ class ConsumirEventosDeIdentidadJdbcTest {
             pendientes.addAll(List.of(eventos));
         }
 
+        /** Lo que el ACUSE contesta, a proposito distinto de lo que trae el lote. */
+        private static final long QUEDAN_TRAS_EL_ACUSE = 3;
+
+        private final long quedanTrasElAcuse = QUEDAN_TRAS_EL_ACUSE;
+
         @Override
         public Lote pendientes(int limite) {
             List<EventoDeIdentidadRecibido> pagina = List.copyOf(pendientes);
             pendientes.clear();
-            return new Lote(pagina, pagina.size());
+            // El lote dice lo que habia ANTES del acuse; el acuse, lo que queda despues. Que sean
+            // distintos es lo que hace que la prueba pueda distinguir de cual sale la cifra.
+            return new Lote(pagina, pagina.size() + 100);
         }
 
         @Override
@@ -417,7 +478,7 @@ class ConsumirEventosDeIdentidadJdbcTest {
                 throw new AcuseRechazado(422, "{\"codigo\":\"VALIDACION\"}");
             }
             acusados.addAll(eventoIds);
-            return new Acuse(eventoIds.size(), eventoIds.size(), 0);
+            return new Acuse(eventoIds.size(), eventoIds.size(), QUEDAN_TRAS_EL_ACUSE);
         }
     }
 
@@ -428,6 +489,14 @@ class ConsumirEventosDeIdentidadJdbcTest {
         public void hayUnEventoSinAplicar(
                 EventoDeIdentidadRecibido evento, String motivo, long apartados) {
             avisos.add(evento.tipoPublicado() + ": " + motivo + " apartados=" + apartados);
+        }
+
+        @Override
+        public void hayPospuestosQueNoAvanzan(
+                List<kamayuk.rentas.seguridad.dominio.EventoPospuesto> pospuestos,
+                java.time.Instant ahora,
+                java.time.Duration umbral) {
+            avisos.add("POSPUESTOS: " + pospuestos.size());
         }
     }
 }

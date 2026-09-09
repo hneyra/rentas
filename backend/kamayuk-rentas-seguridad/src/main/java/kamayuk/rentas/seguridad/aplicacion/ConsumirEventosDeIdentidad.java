@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.UUID;
 import kamayuk.rentas.seguridad.dominio.AlertaDeEventosSinAplicar;
 import kamayuk.rentas.seguridad.dominio.EventoDeIdentidadRecibido;
+import kamayuk.rentas.seguridad.dominio.EventoPospuesto;
 import kamayuk.rentas.seguridad.dominio.FuenteDeEventosDeIdentidad;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,7 +49,7 @@ public class ConsumirEventosDeIdentidad {
         int yaEstaban = 0;
         int ajenos = 0;
         int apartados = 0;
-        int pendientes = 0;
+        List<EventoPospuesto> pospuestos = new ArrayList<>();
 
         for (EventoDeIdentidadRecibido evento : lote.eventos()) {
             try {
@@ -56,19 +57,12 @@ public class ConsumirEventosDeIdentidad {
                 switch (resultado) {
                     case APLICADO -> aplicados++;
                     case YA_APLICADO -> yaEstaban++;
-                    case IGNORADO_AJENO -> {
-                        ajenos++;
-                        // WARN y no en silencio: un permiso que se ignora sin rastro es
-                        // indistinguible de uno que se perdio.
-                        log.warn(
-                                "Evento {} ({}, secuencia {}) es un permiso de OTRO sistema y no"
-                                        + " rige en esta copia: se acusa y no se aplica. No es un"
-                                        + " fallo: `identidad` publica los cinco catalogos por un"
-                                        + " solo buzon, y a `rentas` solo le tocan los suyos",
-                                evento.eventoId(),
-                                evento.tipoPublicado(),
-                                evento.secuencia());
-                    }
+                    // Se cuentan y se resumen al final de la vuelta, en UNA linea. Uno por
+                    // evento era ruido medido: una implantacion entera son 161 permisos y 28 de
+                    // ellos son de otros sistemas en `rentas` (494 lineas entre los cuatro
+                    // consumidores), y un registro que grita en lo normal es un registro que
+                    // nadie lee el dia que dice algo.
+                    case IGNORADO_AJENO -> ajenos++;
                     // Checkstyle exige el `default` aunque el enumerado este cubierto: si algun
                     // dia gana un cuarto resultado, mejor que se note aqui que en el acuse.
                     default ->
@@ -86,9 +80,11 @@ public class ConsumirEventosDeIdentidad {
                 resueltos.add(evento.eventoId());
                 alerta.hayUnEventoSinAplicar(evento, motivo, aplicador.apartados());
             } catch (AplicarUnEventoDeIdentidad.TodaviaNo todaviaNo) {
-                pendientes++;
                 // NO se acusa y NO se aparta: su dependencia esta en camino. Un fallo que se
-                // arregla solo no puede matar un evento (AC-7 #3).
+                // arregla solo no puede matar un evento (AC-7 #3). Se guardan enteros —no solo
+                // contados— porque quien decide si esto ya no es «esta en camino» es la corrida,
+                // mirando cuanto llevan esperando.
+                pospuestos.add(new EventoPospuesto(evento, motivoDe(todaviaNo)));
                 log.warn(
                         "Evento {} ({}, secuencia {}) TODAVIA no se puede aplicar y se deja"
                                 + " pendiente en el buzon de `identidad`: {}",
@@ -99,10 +95,25 @@ public class ConsumirEventosDeIdentidad {
             }
         }
 
+        if (ajenos > 0) {
+            // UNA linea por vuelta, no una por evento: lo que hay que poder leer es cuantos
+            // permisos de otros sistemas trajo este lote, no cual fue cada uno.
+            log.warn(
+                    "{} permiso(s) de OTROS sistemas ignorados y acusados en esta vuelta: no rigen"
+                            + " en esta copia. No es un fallo: `identidad` publica los cinco"
+                            + " catalogos por un solo buzon, y a `rentas` solo le tocan los suyos",
+                    ajenos);
+        }
+
+        // Lo que queda en el buzon se cuenta DESPUES del acuse, y por eso sale de la respuesta
+        // del acuse y no del lote: `lote.quedan()` es lo que habia cuando se sirvio, o sea ANTES
+        // de que estos se acusaran — decia «174 acusados; quedan 174», que es exactamente lo
+        // contrario de lo que la linea promete.
+        long quedan = lote.quedan();
         boolean acuseRechazado = false;
         if (!resueltos.isEmpty()) {
             try {
-                fuente.acusar(List.copyOf(resueltos));
+                quedan = fuente.acusar(List.copyOf(resueltos)).quedan();
             } catch (FuenteDeEventosDeIdentidad.AcuseRechazado rechazo) {
                 acuseRechazado = true;
                 // Un 4xx de negocio al acusar: se registra y la corrida termina. Los eventos SI
@@ -124,8 +135,8 @@ public class ConsumirEventosDeIdentidad {
                 yaEstaban,
                 ajenos,
                 apartados,
-                pendientes,
-                lote.quedan(),
+                List.copyOf(pospuestos),
+                quedan,
                 acuseRechazado);
     }
 
@@ -141,9 +152,14 @@ public class ConsumirEventosDeIdentidad {
             int yaEstaban,
             int ajenos,
             int apartados,
-            int pendientes,
+            List<EventoPospuesto> pospuestos,
             long quedan,
             boolean acuseRechazado) {
+
+        /** Cuantos se dejaron para la vuelta siguiente. */
+        public int pendientes() {
+            return pospuestos.size();
+        }
 
         /**
          * Sin progreso, no «vacia»: un evento pendiente por su dependencia no se acusa, asi que el
@@ -151,7 +167,7 @@ public class ConsumirEventosDeIdentidad {
          * todas sobre los mismos eventos (la leccion de #54).
          */
         public boolean sinProgreso() {
-            return leidos == 0 || leidos == pendientes || acuseRechazado;
+            return leidos == 0 || leidos == pendientes() || acuseRechazado;
         }
 
         @Override
@@ -166,10 +182,10 @@ public class ConsumirEventosDeIdentidad {
                     + " de otro sistema, "
                     + apartados
                     + " apartados sin poder aplicarse, "
-                    + pendientes
+                    + pendientes()
                     + " pendientes por su dependencia; quedan "
                     + quedan
-                    + " en el buzon de `identidad`"
+                    + " en el buzon de `identidad` DESPUES de acusar"
                     + (acuseRechazado ? "; y el acuse fue RECHAZADO" : "");
         }
     }
