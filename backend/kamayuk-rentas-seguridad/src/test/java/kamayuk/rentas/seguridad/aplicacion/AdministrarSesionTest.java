@@ -31,8 +31,7 @@ import kamayuk.rentas.plataforma.tenant.TenantTransactionManager;
 import kamayuk.rentas.seguridad.dominio.ConsultaDeAuditoria;
 import kamayuk.rentas.seguridad.dominio.RegistroAuditado;
 import kamayuk.rentas.seguridad.dominio.Sesion;
-import kamayuk.rentas.seguridad.dominio.Usuario;
-import kamayuk.rentas.seguridad.infraestructura.AdministracionRepositoryJdbc;
+import kamayuk.rentas.seguridad.infraestructura.LecturaDeLaCopiaLocalJdbc;
 import kamayuk.rentas.seguridad.infraestructura.SesionRepositoryJdbc;
 import kamayuk.rentas.seguridad.infraestructura.web.SesionController;
 import kamayuk.rentas.web.ProblemaDeNegocio;
@@ -77,7 +76,6 @@ class AdministrarSesionTest {
     private static TenantTransactionManager gestorDeTransacciones;
     private static TransactionTemplate transaccion;
     private static AdministrarSesion sesion;
-    private static AdministrarSeguridad administrar;
 
     @BeforeAll
     static void provisionar() throws SQLException, IOException {
@@ -96,13 +94,12 @@ class AdministrarSesionTest {
         transaccion = new TransactionTemplate(gestor);
 
         AuditoriaJdbc auditoria = new AuditoriaJdbc(jdbc, RELOJ);
-        AdministracionRepositoryJdbc administracion = new AdministracionRepositoryJdbc(jdbc);
+        LecturaDeLaCopiaLocalJdbc administracion = new LecturaDeLaCopiaLocalJdbc(jdbc);
         sesion =
                 envolver(
                         new AdministrarSesion(
                                 new SesionRepositoryJdbc(jdbc), administracion, auditoria, RELOJ),
                         gestor);
-        administrar = envolver(new AdministrarSeguridad(administracion, auditoria, RELOJ), gestor);
 
         crearUsuarioEn(municipalidadA, "operador.a");
         crearUsuarioEn(municipalidadB, "operador.b");
@@ -120,9 +117,18 @@ class AdministrarSesionTest {
     private static void crearUsuarioEn(long municipalidad, String cuenta) {
         TenantContext.fijar(new MunicipalidadId(municipalidad));
         OrigenContext.fijar(new Origen(cuenta, "PC-01", "10.0.0.1"));
-        administrar.registrarUsuario(
-                Usuario.nuevo(cuenta, "Operador " + cuenta, null),
-                Observacion.de("Alta del operador para la prueba de sesion"));
+        // Con SQL directo, como llegaria por el buzon de `identidad`: la administracion ya no
+        // vive aqui (ADR-0039, etapa 4) y esta prueba solo necesita la fila.
+        transaccion.execute(
+                estado ->
+                        jdbc.sql(
+                                        "INSERT INTO usuario (municipalidad_id, cuenta, nombre)"
+                                                + " VALUES"
+                                                + " (current_setting('app.municipalidad_id')::bigint,"
+                                                + " :cuenta, :nombre)")
+                                .param("cuenta", cuenta)
+                                .param("nombre", "Operador " + cuenta)
+                                .update());
         TenantContext.limpiar();
         OrigenContext.limpiar();
     }

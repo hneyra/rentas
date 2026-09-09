@@ -263,7 +263,14 @@ public final class ConfiguracionDelSgtm implements ConfiguracionDeLasVerificacio
                     "recibo_movimiento",
                     "tasa");
 
-    /** Transversales (§2.5) y las siete de seguridad (§2.6): se replican en los cuatro. */
+    /**
+     * Transversales (§2.5) y las siete de seguridad (§2.6): se replican en los cinco.
+     *
+     * <p>Las dos de `identidad_evento_*` (V18, ADR-0039 etapa 4) van aqui y no en `DE_IDENTIDAD`
+     * por lo mismo que `identidad_evento` no esta en ningun reparto: son la constancia LOCAL de que
+     * un evento del buzon se aplico o se aparto en ESTA copia, y las escribe y lee solo este
+     * sistema — igual que cada satelite tiene las suyas con su nombre.
+     */
     private static final Set<String> REPLICADAS =
             Set.of(
                     "acceso",
@@ -272,6 +279,8 @@ public final class ConfiguracionDelSgtm implements ConfiguracionDeLasVerificacio
                     "auditoria_2027",
                     "documento_emitido",
                     "grupo",
+                    "identidad_evento_aplicado",
+                    "identidad_evento_muerto",
                     "miembro",
                     "modulo_sistema",
                     "municipalidad",
@@ -493,6 +502,43 @@ public final class ConfiguracionDelSgtm implements ConfiguracionDeLasVerificacio
                         + " java.time.Instant)",
                 ".nucleo.aplicacion.AplicarUnHecho.matar("
                         + "kamayuk.rentas.nucleo.dominio.proyeccion.HechoRecibido,"
-                        + " java.lang.String, java.time.Instant)");
+                        + " java.lang.String, java.time.Instant)",
+                // El consumidor del buzon de `identidad` (ADR-0039 etapa 4). La misma forma que
+                // el ingestor de arriba y el mismo motivo: lo que escribe es una COPIA de la
+                // autorizacion, ya decidida en `identidad` con la observacion que la regla 10
+                // exigio ALLI —quien concedio, cuando y por que— y verificada por la huella del
+                // emisor. Nadie la pide aqui: la dispara un CronJob. `apartar` es la constancia
+                // de que un evento no se pudo aplicar, con el motivo dentro.
+                ".seguridad.aplicacion.AplicarUnEventoDeIdentidad.aplicar("
+                        + "kamayuk.rentas.seguridad.dominio.EventoDeIdentidadRecibido)",
+                ".seguridad.aplicacion.AplicarUnEventoDeIdentidad.apartar("
+                        + "kamayuk.rentas.seguridad.dominio.EventoDeIdentidadRecibido,"
+                        + " java.lang.String)");
+    }
+
+    /**
+     * Regla 12 (ADR-0039): ningun sistema que no sea `identidad` ESCRIBE `usuario`, `grupo`,
+     * `miembro` ni `permiso`. Hasta la etapa 4 esta lista NO estaba declarada —la libreria la deja
+     * en {@code null}, o sea «no se ha mirado»— y `rentas` escribia esas cuatro tablas desde sus
+     * dos repositorios de administracion, que hoy ya no existen.
+     *
+     * <p>Los dos escritores que quedan, con su motivo y su fecha de fin:
+     *
+     * <ul>
+     *   <li>{@code SembradorDeLaCopiaLocal} — el arranque en frio de una municipalidad recien
+     *       implantada: el grupo de administracion, el primer administrador, su afiliacion y sus
+     *       permisos. <b>Hasta la etapa 5</b>, en la que la siembra desaparece y todo llega por el
+     *       buzon.
+     *   <li>{@code AplicarUnEventoDeIdentidad} — el aplicador del buzon: escribe lo que `identidad`
+     *       decidio, y es la unica forma en que la copia local se actualiza. <b>Sin fecha de
+     *       fin</b>: es la etapa 4 funcionando.
+     * </ul>
+     *
+     * <p>Cualquier otra escritura sobre esas cuatro tablas en {@code src/main} es un rojo con
+     * archivo y linea: se pide por el API de `identidad`, o se declara aqui.
+     */
+    @Override
+    public Set<String> escritoresDeLaAutorizacionConMotivo() {
+        return Set.of("SembradorDeLaCopiaLocal", "AplicarUnEventoDeIdentidad");
     }
 }

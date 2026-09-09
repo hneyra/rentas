@@ -2031,6 +2031,42 @@ public final class DatosDePrueba {
                 muni,
                 EJERCICIO,
                 "10.0.0.1");
+        sembrarLoQueDejaElConsumidorDeIdentidad(app, muni);
+    }
+
+    /**
+     * Las dos tablas que deja el consumidor del buzon de `identidad` (`V18`, etapa 4 de ADR-0039):
+     * un evento aplicado y uno apartado, uno por municipalidad.
+     *
+     * <p>La prueba de aislamiento no comprueba solo que A no vea filas de B: comprueba
+     * <b>ademas</b> que A vea las suyas, y sin una fila sembrada las dos cosas darian cero y se
+     * leerian igual. Se siembran con la conexion de la aplicacion porque es quien las escribe en
+     * operacion: al reves que la proyeccion de `catastro`, aqui no hay un rol ingestor aparte —la
+     * copia local de la autorizacion la escribe `kamayuk_app` desde el baseline—.
+     */
+    private static void sembrarLoQueDejaElConsumidorDeIdentidad(Connection app, long muni)
+            throws SQLException {
+        String aplicado = UUID.randomUUID().toString();
+        ejecutar(
+                app,
+                "INSERT INTO identidad_evento_aplicado (municipalidad_id, evento_id, secuencia,"
+                        + " tipo, sujeto_id, huella, aplicado_en)"
+                        + " VALUES (?, CAST(? AS uuid), 1, 'USUARIO_DADO_DE_ALTA', 1, ?, now())",
+                muni,
+                aplicado,
+                huellaDe(aplicado));
+        String apartado = UUID.randomUUID().toString();
+        ejecutar(
+                app,
+                "INSERT INTO identidad_evento_muerto (municipalidad_id, evento_id, secuencia,"
+                        + " tipo, sujeto_id, cuerpo, huella, motivo, apartado_en)"
+                        + " VALUES (?, CAST(? AS uuid), 2, 'UN_TIPO_QUE_NO_EXISTE', 1,"
+                        + "         'esto no es JSON', ?,"
+                        + "         'Sembrado por la prueba de aislamiento: no se aplico nunca',"
+                        + "         now())",
+                muni,
+                apartado,
+                huellaDe(apartado));
     }
 
     /** Identificador del contribuyente titular sembrado en una municipalidad. */

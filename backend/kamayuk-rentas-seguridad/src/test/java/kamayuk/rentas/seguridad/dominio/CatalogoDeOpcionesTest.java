@@ -10,17 +10,17 @@ import org.junit.jupiter.api.Test;
 class CatalogoDeOpcionesTest {
 
     @Test
-    @DisplayName("lee el catalogo real, con sus 134 opciones")
+    @DisplayName("lee el catalogo real, con sus 130 opciones")
     void leeElCatalogoReal() {
         List<CatalogoDeOpciones.Opcion> opciones = CatalogoDeOpciones.leer();
 
         // Si el analisis devolviera vacio o a medias, la siembra crearia menos
         // accesos de la cuenta y nadie lo notaria hasta que alguien no pudiera dar
         // permiso sobre una pantalla concreta.
-        assertThat(opciones).as("las 134 opciones de los 12 modulos (NEG-03)").hasSize(134);
+        assertThat(opciones).as("las 130 opciones de los 12 modulos (NEG-03)").hasSize(130);
         assertThat(opciones.stream().map(CatalogoDeOpciones.Opcion::codigo).distinct().toList())
                 .as("el id de cada opcion es unico: es la clave de acceso.codigo")
-                .hasSize(134);
+                .hasSize(130);
         assertThat(
                         opciones.stream()
                                 .map(CatalogoDeOpciones.Opcion::moduloCodigo)

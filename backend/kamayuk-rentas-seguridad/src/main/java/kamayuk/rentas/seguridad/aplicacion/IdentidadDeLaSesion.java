@@ -3,8 +3,8 @@ package kamayuk.rentas.seguridad.aplicacion;
 import java.util.Objects;
 import kamayuk.rentas.auditoria.OrigenContext;
 import kamayuk.rentas.dominio.Ejercicio;
-import kamayuk.rentas.seguridad.dominio.AdministracionRepository;
 import kamayuk.rentas.seguridad.dominio.Identidad;
+import kamayuk.rentas.seguridad.dominio.LecturaDeLaCopiaLocal;
 import kamayuk.rentas.seguridad.dominio.Sesion;
 import kamayuk.rentas.seguridad.dominio.SesionRepository;
 import kamayuk.rentas.seguridad.dominio.Usuario;
@@ -43,10 +43,10 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class IdentidadDeLaSesion {
 
-    private final AdministracionRepository administracion;
+    private final LecturaDeLaCopiaLocal administracion;
     private final SesionRepository sesiones;
 
-    public IdentidadDeLaSesion(AdministracionRepository administracion, SesionRepository sesiones) {
+    public IdentidadDeLaSesion(LecturaDeLaCopiaLocal administracion, SesionRepository sesiones) {
         this.administracion = administracion;
         this.sesiones = sesiones;
     }

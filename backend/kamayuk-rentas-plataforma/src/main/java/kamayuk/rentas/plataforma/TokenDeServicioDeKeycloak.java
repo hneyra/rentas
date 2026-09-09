@@ -1,4 +1,4 @@
-package kamayuk.rentas.nucleo.infraestructura.ingestor;
+package kamayuk.rentas.plataforma;
 
 import java.io.IOException;
 import java.net.URI;
@@ -10,17 +10,19 @@ import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import kamayuk.rentas.nucleo.dominio.proyeccion.FuenteDeHechosDeCatastro.CatastroNoContesta;
+import kamayuk.rentas.plataforma.CredencialDeServicio.NoSePudoObtener;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * El token con el que el ingestor le pide el buzon a {@code catastro} (#21 AC-2, ADR-0028 §2).
+ * El token con el que un proceso de lotes de este sistema le pide su buzon a otro —el ingestor a
+ * {@code catastro} (#21 AC-2), el consumidor de la autorizacion a {@code identidad} (etapa 4 de
+ * ADR-0039)— (ADR-0028 §2).
  *
  * <h2>Por que `client_credentials` y no el token de nadie</h2>
  *
- * <p>El ingestor lo despierta un {@code CronJob}, no una peticion: no hay ningun {@code
+ * <p>A los dos los despierta un {@code CronJob}, no una peticion: no hay ningun {@code
  * Authorization} del que tirar. Lo que hay es un cliente confidencial suyo —{@code
  * kamayuk-rentas-servicio-<ubigeo>}, uno por municipalidad— cuya cuenta de servicio lleva el
  * atributo {@code municipalidad_id}, y de ahi sale el claim que acota la corrida.
@@ -37,9 +39,10 @@ import tools.jackson.databind.json.JsonMapper;
  *
  * <h2>Lo que hace cuando no puede</h2>
  *
- * <p>Lanza {@link CatastroNoContesta}, como todo lo de este camino: no poder pedir el token —el
- * emisor caido, la clave equivocada, el cliente sin crear— se arregla mirando el despliegue. Lo que
- * <b>no</b> puede pasar es que un fallo de transporte mate un hecho.
+ * <p>Lanza {@link NoSePudoObtener}: no poder pedir el token —el emisor caido, la clave equivocada,
+ * el cliente sin crear— se arregla mirando el despliegue, y cada cliente HTTP lo traduce a la
+ * excepcion transitoria de su buzon. Lo que <b>no</b> puede pasar es que un fallo de transporte
+ * mate un hecho.
  */
 public class TokenDeServicioDeKeycloak implements CredencialDeServicio {
 
@@ -101,7 +104,7 @@ public class TokenDeServicioDeKeycloak implements CredencialDeServicio {
             JsonNode respuesta = pedir();
             String token = respuesta.path("access_token").asString("");
             if (token.isBlank()) {
-                throw new CatastroNoContesta(
+                throw new NoSePudoObtener(
                         "El emisor contesto 200 al pedir el token de «"
                                 + clienteDeServicio
                                 + "» y su respuesta no trae `access_token`. Es un emisor que no"
@@ -133,29 +136,28 @@ public class TokenDeServicioDeKeycloak implements CredencialDeServicio {
         try {
             respuesta = cliente.send(peticion, HttpResponse.BodyHandlers.ofString());
         } catch (IOException noContesta) {
-            throw new CatastroNoContesta(
+            throw new NoSePudoObtener(
                     "No se pudo pedir el token de servicio a «" + punto + "»", noContesta);
         } catch (InterruptedException interrumpido) {
             Thread.currentThread().interrupt();
-            throw new CatastroNoContesta(
-                    "Se interrumpio al pedir el token de servicio", interrumpido);
+            throw new NoSePudoObtener("Se interrumpio al pedir el token de servicio", interrumpido);
         }
         if (respuesta.statusCode() != 200) {
             // El cuerpo NO se copia al mensaje: lo escribe el emisor y en un error de cliente
             // trae `error_description`, que puede repetir lo que se le mando — incluida la clave.
-            throw new CatastroNoContesta(
+            throw new NoSePudoObtener(
                     "El emisor contesto "
                             + respuesta.statusCode()
                             + " al pedir el token de «"
                             + clienteDeServicio
                             + "». Ese cliente tiene que existir en el realm con esa clave"
-                            + " (`reconciliar-identidades.sh servicios`, #21). No es `catastro`:"
-                            + " es quien llama, y se arregla en el despliegue");
+                            + " (`reconciliar-identidades.sh servicios`, #21). No es el sistema al"
+                            + " que se llama: es quien llama, y se arregla en el despliegue");
         }
         try {
             return json.readTree(respuesta.body());
         } catch (JacksonException ilegible) {
-            throw new CatastroNoContesta(
+            throw new NoSePudoObtener(
                     "El emisor contesto algo que no es JSON al pedir el token", ilegible);
         }
     }

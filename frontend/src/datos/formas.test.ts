@@ -352,9 +352,9 @@ describe('el proxy solo sirve operaciones que el backend publica', () => {
     ).toContain(clave);
   });
 
-  it('el archivo de formas trae las 181 operaciones del backend, y su cabecera', () => {
+  it('el archivo de formas trae las 162 operaciones del backend, y su cabecera', () => {
     expect(Object.keys(declaradas)).toContain(METADATOS);
-    expect(Object.keys(declaradas).filter((k) => k !== METADATOS)).toHaveLength(181);
+    expect(Object.keys(declaradas).filter((k) => k !== METADATOS)).toHaveLength(162);
   });
 });
 

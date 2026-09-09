@@ -164,51 +164,11 @@ class ContratoDeApiTest {
                     "POST /rentas/deuda/bajas",
                     "GET /seguridad/modulos",
                     "GET /seguridad/accesos",
-                    "GET /seguridad/grupos",
-                    "GET /seguridad/usuarios",
-                    // #543 — la matriz de permisos efectivos de un usuario no se podia
-                    // reconstruir: no habia lectura de pertenencia a grupo (la ruta de
-                    // miembros era solo POST) ni de la excepcion de usuario, y sin `origen`
-                    // el cliente tendria que reimplementar la precedencia.
-                    "GET /seguridad/usuarios/{id}/grupos",
-                    "GET /seguridad/usuarios/{id}/permisos",
-                    // #585 — y la ESCRITURA de esa excepcion, que #543 dejo sin poder tocar:
-                    // `AdministrarPermisos.fijarParaUsuario` existia —transaccional, con su
-                    // Observacion y con la guarda del ultimo administrador— y no la llamaba
-                    // nadie, asi que negarle un privilegio a una persona sin sacarla de su
-                    // grupo solo se podia por SQL directo, sin fila de auditoria y sin pasar
-                    // por esa guarda.
-                    "PUT /seguridad/usuarios/{id}/permisos",
-                    // #583 — las dos preguntas que la matriz efectiva no puede contestar.
-                    // La primera es lo CONFIGURADO de una cuenta: la efectiva aplica la
-                    // regla del guardia, asi que a una cuenta deshabilitada le contesta la
-                    // lista vacia tanto si conserva permisos como si nunca los tuvo, y las
-                    // dos respuestas eran el mismo JSON. La segunda es la inversa —que
-                    // cuentas tienen un privilegio sobre un acceso—, que costaba una
-                    // peticion por usuario del padron y no se puede componer acotando por
-                    // grupo, porque la excepcion propia SUSTITUYE a lo que el grupo da.
-                    "GET /seguridad/usuarios/{id}/permisos/configurados",
-                    "GET /seguridad/accesos/{codigo}/usuarios",
-                    "POST /seguridad/grupos/{grupo}/miembros",
-                    // #582 — la pregunta inversa: quien esta EN un grupo. De esta misma
-                    // ruta solo habia el POST que afilia, asi que derivarla costaba una
-                    // peticion por usuario del padron de cuentas.
-                    "GET /seguridad/grupos/{grupo}/miembros",
-                    "PUT /seguridad/grupos/{id}/permisos",
-                    "GET /seguridad/grupos/{id}/permisos",
-                    // #572 — las ocho escrituras que #543 dejo censadas sin ruta. Las de
-                    // grupo solo esperaban su controlador; las de usuario esperaban la
-                    // decision de ADR-0012 §5 sobre como se coordinan las dos mitades de
-                    // una persona: esta pantalla escribe la fila del padron y el archivo
-                    // declarativo de `despliegue/identidad/` crea la cuenta del proveedor.
-                    "POST /seguridad/grupos",
-                    "POST /seguridad/grupos/{id}/baja",
-                    "POST /seguridad/grupos/{id}/reactivacion",
-                    "PUT /seguridad/grupos/{id}/vigencia",
-                    "POST /seguridad/usuarios",
-                    "POST /seguridad/usuarios/{id}/baja",
-                    "POST /seguridad/usuarios/{id}/reactivacion",
-                    "PUT /seguridad/usuarios/{id}/vigencia",
+                    // ADR-0039 etapa 4 — las diecinueve rutas de administracion (grupos,
+                    // usuarios, miembros y las dos matrices de permisos: #543, #585, #583,
+                    // #582, #572) se fueron a `identidad`, que es el dueño de la autorizacion.
+                    // Aqui queda la copia local, que se lee por las dos de arriba y se llena
+                    // por el buzon.
                     "GET /seguridad/sesion/permisos",
                     // #555 — a quien pertenecen las cifras de la pantalla. Ninguna
                     // operacion publicaba el nombre de la municipalidad de la sesion, asi

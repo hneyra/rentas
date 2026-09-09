@@ -25,7 +25,7 @@ import kamayuk.rentas.esquema.BaseDeDatosDePrueba;
 import kamayuk.rentas.esquema.ContextoDeTenant;
 import kamayuk.rentas.plataforma.tenant.TenantTransactionManager;
 import kamayuk.rentas.seguridad.infraestructura.ComprobadorDeAccesoJdbc;
-import kamayuk.rentas.seguridad.infraestructura.PermisoRepositoryJdbc;
+import kamayuk.rentas.seguridad.infraestructura.LecturaDeLaCopiaLocalJdbc;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -54,14 +54,17 @@ class AutorizacionTest {
     private static final Clock RELOJ =
             Clock.fixed(Instant.parse("2026-08-18T10:00:00Z"), ZoneId.of("America/Lima"));
 
+    /** La cuenta del primer administrador que la siembra deja; ninguna prueba la usa de sujeto. */
+    private static final String ADMINISTRADOR = "admin.de.la.siembra";
+
     private static BaseDeDatosDePrueba base;
     private static long municipalidad;
 
     private static JdbcClient jdbc;
     private static TransactionTemplate transaccion;
-    private static SembradorDeAccesos sembrador;
+    private static SembradorDeLaCopiaLocal sembrador;
     private static ComprobadorDeAcceso comprobador;
-    private static PermisoRepositoryJdbc permisos;
+    private static LecturaDeLaCopiaLocalJdbc permisos;
 
     @BeforeAll
     static void provisionar() throws SQLException, IOException {
@@ -77,15 +80,15 @@ class AutorizacionTest {
         TenantTransactionManager gestor = new TenantTransactionManager(pool);
         transaccion = new TransactionTemplate(gestor);
         comprobador = new ComprobadorDeAccesoJdbc(jdbc);
-        permisos = new PermisoRepositoryJdbc(jdbc);
+        permisos = new LecturaDeLaCopiaLocalJdbc(jdbc);
 
-        SembradorDeAccesos objetivo =
-                new SembradorDeAccesos(jdbc, new AuditoriaJdbc(jdbc, RELOJ), RELOJ);
+        SembradorDeLaCopiaLocal objetivo =
+                new SembradorDeLaCopiaLocal(jdbc, new AuditoriaJdbc(jdbc, RELOJ), RELOJ);
         ProxyFactory fabrica = new ProxyFactory(objetivo);
         fabrica.setProxyTargetClass(true);
         fabrica.addAdvice(
                 new TransactionInterceptor(gestor, new AnnotationTransactionAttributeSource()));
-        sembrador = (SembradorDeAccesos) fabrica.getProxy();
+        sembrador = (SembradorDeLaCopiaLocal) fabrica.getProxy();
     }
 
     @AfterAll
@@ -112,30 +115,37 @@ class AutorizacionTest {
     class Siembra {
 
         @Test
-        @DisplayName("siembra las 134 opciones, es idempotente y deja una sola fila de auditoria")
+        @DisplayName("siembra las 130 opciones, es idempotente y deja una sola fila de auditoria")
         void siembraEsIdempotenteYSeAudita() throws SQLException {
             // Las aserciones no dependen de que esta prueba corra la primera: JUnit no
             // garantiza el orden entre clases anidadas, y una prueba que solo pasa si
             // va primero es una prueba que se rompera al agregar otra.
-            sembrador.sembrar(Observacion.de("Siembra inicial de accesos, RF-122"));
+            sembrador.sembrar(
+                    ADMINISTRADOR,
+                    "Administrador",
+                    Observacion.de("Siembra inicial de accesos, RF-122"));
 
-            assertThat(contar("SELECT count(*) FROM acceso")).isEqualTo(134);
+            assertThat(contar("SELECT count(*) FROM acceso")).isEqualTo(130);
             assertThat(contar("SELECT count(*) FROM modulo_sistema")).isEqualTo(12);
 
-            int repetida = sembrador.sembrar(Observacion.de("Segundo despliegue, sin cambios"));
+            int repetida =
+                    sembrador.sembrar(
+                            ADMINISTRADOR,
+                            "Administrador",
+                            Observacion.de("Segundo despliegue, sin cambios"));
             assertThat(repetida)
                     .as("se ejecuta en cada despliegue: lo que ya existe se queda como esta")
                     .isZero();
-            assertThat(contar("SELECT count(*) FROM acceso")).isEqualTo(134);
+            assertThat(contar("SELECT count(*) FROM acceso")).isEqualTo(130);
 
             assertThat(contar("SELECT count(*) FROM auditoria WHERE tabla = 'acceso'"))
-                    .as("una fila por corrida que crea algo, no 134 filas identicas")
+                    .as("una fila por corrida que crea algo, no 130 filas identicas")
                     .isEqualTo(1);
             assertThat(
                             textoUnico(
                                     "SELECT datos_nuevos::text FROM auditoria WHERE tabla = 'acceso'"))
                     .as("y esa fila dice cuantos accesos creo la corrida que si creo algo")
-                    .contains("\"accesosCreados\": 134");
+                    .contains("\"accesosCreados\": 130");
         }
     }
 
@@ -309,7 +319,7 @@ class AutorizacionTest {
             Map<String, Set<Privilegio>> matriz = efectivosDe("con.calles");
 
             assertThat(matriz)
-                    .as("de las 134 opciones sembradas, solo aparece sobre la que tiene permiso")
+                    .as("de las 130 opciones sembradas, solo aparece sobre la que tiene permiso")
                     .containsOnlyKeys("calles");
             assertThat(matriz.get("calles"))
                     .containsExactlyInAnyOrder(Privilegio.LECTURA, Privilegio.IMPRESION);
@@ -380,7 +390,7 @@ class AutorizacionTest {
 
     private static Map<String, Set<Privilegio>> efectivosDe(String cuenta) {
         Map<String, Set<Privilegio>> resultado =
-                transaccion.execute(estado -> permisos.efectivosDe(cuenta, HOY));
+                transaccion.execute(estado -> permisos.permisosEfectivosDe(cuenta, HOY));
         if (resultado == null) {
             throw new IllegalStateException("efectivosDe no devolvio matriz");
         }
@@ -394,7 +404,10 @@ class AutorizacionTest {
     }
 
     private static void sembrar() {
-        sembrador.sembrar(Observacion.de("Siembra de accesos para la prueba de autorizacion"));
+        sembrador.sembrar(
+                ADMINISTRADOR,
+                "Administrador",
+                Observacion.de("Siembra de accesos para la prueba de autorizacion"));
     }
 
     private static long crearUsuario(String cuenta, LocalDate desde, LocalDate hasta) {

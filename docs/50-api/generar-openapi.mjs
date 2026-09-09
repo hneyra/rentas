@@ -3956,6 +3956,55 @@ function sangrado(texto) {
 
 /* ── Recoger las operaciones ──────────────────────────────────────────── */
 
+/* ── Lo que se fue a `identidad` (ADR-0039, etapa 4; `identidad`#4) ─────────
+   Cuatro pantallas del prototipo —usuarios, grupos, miembros y permisos— son
+   la ADMINISTRACION de la autorizacion, y la autorizacion es un sistema propio
+   desde ADR-0039: se administra en `identidad` y llega aqui por su buzon. Este
+   backend ya no publica ninguna de sus diecinueve operaciones —la de cada
+   pantalla y las adicionales de #543, #582, #583, #585 y #572—, y un contrato
+   que las siguiera declarando prometeria pantallas que contestan 404.
+
+   El prototipo NO se toca: es el manual, y sigue teniendo esas cuatro pantallas.
+   Lo que se retira es cada operacion de ESTE contrato, POR SU `operationId` y no
+   por pantalla: de esas mismas pantallas cuelgan tres adicionales que se quedan
+   —`permisos_de_la_sesion`, `identidad_de_la_sesion` y `municipalidad_de_la_sesion`,
+   que son de la SESION y no de la administracion— y retirar la pantalla entera se
+   las llevaba por delante (medido: 22 operaciones fuera donde tenian que ser 19).
+   `titulares_del_privilegio` cuelga de `accesos`, que se queda, y se va con las
+   otras: «quien tiene este privilegio» es administracion.
+
+   `ContratoDeApiTest` lo sostiene por los dos lados: toda ruta publicada esta en
+   el contrato, y toda ruta del contrato que este en IMPLEMENTADAS existe. */
+const PANTALLAS_RETIRADAS = new Set(['usuarios', 'grupos', 'miembros', 'permisos']);
+const OPERACIONES_RETIRADAS = new Set([
+  // Las cuatro pantallas: su `operationId` es su `id`.
+  ...PANTALLAS_RETIRADAS,
+  // Y las quince adicionales de administracion que colgaban de ellas o de `accesos`.
+  'registrar_usuario',
+  'grupos_del_usuario',
+  'inhabilitar_usuario',
+  'habilitar_usuario',
+  'fijar_vigencia_de_usuario',
+  'registrar_grupo',
+  'inhabilitar_grupo',
+  'habilitar_grupo',
+  'fijar_vigencia_de_grupo',
+  'titulares_del_privilegio',
+  'miembros_del_grupo',
+  'permisos_de_grupo',
+  'permisos_efectivos_de_usuario',
+  'fijar_permisos_de_usuario',
+  'permisos_configurados_de_usuario',
+]);
+for (const id of PANTALLAS_RETIRADAS) {
+  if (!PANTALLAS[id]) {
+    throw new Error(
+      `PANTALLAS_RETIRADAS nombra «${id}», que no es ninguna pantalla del prototipo: una` +
+        ' retirada que no retira nada se queda ahi para la pantalla que herede ese nombre.',
+    );
+  }
+}
+
 /**
  * Las adicionales que no se escriben junto a su pantalla, sino tras otra.
  *
@@ -4183,8 +4232,22 @@ function escribirDescripcion(lineas, sangria, valor) {
   for (const linea of valor.lineas) lineas.push(linea === '' ? '' : `${margen}  ${linea}`);
 }
 
+// Las retiradas se quitan al final y por `operationId`, y se exige que TODAS existan:
+// una entrada que no retira nada es una que se quedo para la operacion que herede
+// ese nombre.
+const idsGenerados = new Set(operaciones.map((op) => op.operationId));
+for (const retirada of OPERACIONES_RETIRADAS) {
+  if (!idsGenerados.has(retirada)) {
+    throw new Error(
+      `OPERACIONES_RETIRADAS nombra «${retirada}» y el generador no produce ninguna operacion` +
+        ' con ese operationId: la entrada no retira nada.',
+    );
+  }
+}
+const vigentes = operaciones.filter((op) => !OPERACIONES_RETIRADAS.has(op.operationId));
+
 const porRuta = new Map();
-for (const op of operaciones) {
+for (const op of vigentes) {
   if (!porRuta.has(op.ruta)) porRuta.set(op.ruta, []);
   porRuta.get(op.ruta).push(op);
 }
@@ -4194,9 +4257,14 @@ lineas.push('# ARCHIVO GENERADO — no editar a mano.');
 lineas.push('# Origen: los `endpoint` de design/sgtm-data-{1..5}.js.');
 lineas.push('# Regenerar con: node docs/50-api/generar-openapi.mjs');
 lineas.push('#');
-lineas.push('# Es el contrato PROPUESTO: define verbo, ruta y parametros de las 134');
+const opcionesVigentes = NAV.reduce(
+  (n, g) => n + g.items.filter(([id]) => !PANTALLAS_RETIRADAS.has(id)).length,
+  0,
+);
+lineas.push(`# Es el contrato PROPUESTO: define verbo, ruta y parametros de las ${opcionesVigentes}`);
 lineas.push('# operaciones que la interfaz espera. Los esquemas de cuerpo y respuesta se');
-lineas.push('# escriben cuando se implementa cada operacion.');
+lineas.push('# escriben cuando se implementa cada operacion. Las cuatro pantallas de');
+lineas.push('# administracion de la autorizacion se fueron a identidad (ADR-0039, etapa 4).');
 lineas.push('openapi: 3.1.0');
 lineas.push('info:');
 lineas.push('  title: SGTM — Sistema de Gestion Tributaria Municipal');
@@ -4219,8 +4287,16 @@ lineas.push('security:');
 lineas.push('  - tokenDeAcceso: []');
 lineas.push('tags:');
 for (const grupo of NAV) {
+  const vigentes = grupo.items.filter(([id]) => !PANTALLAS_RETIRADAS.has(id)).length;
   lineas.push(`  - name: ${comillas(grupo.label)}`);
-  lineas.push(`    description: ${comillas(`${grupo.items.length} opciones del manual`)}`);
+  lineas.push(
+    `    description: ${comillas(
+      vigentes === grupo.items.length
+        ? `${grupo.items.length} opciones del manual`
+        : `${vigentes} opciones del manual; las otras ${grupo.items.length - vigentes} se` +
+            ' administran en identidad (ADR-0039)',
+    )}`,
+  );
 }
 lineas.push('paths:');
 
@@ -4467,9 +4543,9 @@ if (process.argv.includes('--comprobar')) {
     process.exit(1);
   }
   console.log(
-    `El contrato y el generador cuadran: ${operaciones.length} operaciones en ${porRuta.size} rutas`,
+    `El contrato y el generador cuadran: ${vigentes.length} operaciones en ${porRuta.size} rutas`,
   );
 } else {
   writeFileSync(archivo, salida, 'utf8');
-  console.log(`OpenAPI generado: ${operaciones.length} operaciones en ${porRuta.size} rutas`);
+  console.log(`OpenAPI generado: ${vigentes.length} operaciones en ${porRuta.size} rutas`);
 }

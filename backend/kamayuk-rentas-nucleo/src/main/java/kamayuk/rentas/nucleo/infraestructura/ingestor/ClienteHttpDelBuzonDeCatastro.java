@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.UUID;
 import kamayuk.rentas.nucleo.dominio.proyeccion.FuenteDeHechosDeCatastro;
 import kamayuk.rentas.nucleo.dominio.proyeccion.HechoRecibido;
+import kamayuk.rentas.plataforma.CredencialDeServicio;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
@@ -171,7 +172,15 @@ public class ClienteHttpDelBuzonDeCatastro implements FuenteDeHechosDeCatastro {
      * estaria muerto en la vuelta de la noche siguiente.
      */
     private void conCredencial(HttpRequest.Builder peticion) {
-        String cabecera = credencial.cabecera();
+        String cabecera;
+        try {
+            cabecera = credencial.cabecera();
+        } catch (CredencialDeServicio.NoSePudoObtener sinToken) {
+            // La credencial vive en `plataforma` y no sabe de que buzon es: aqui se vuelve
+            // «catastro no contesta», que es la excepcion transitoria de ESTE camino y la que la
+            // vuelta reintenta. El mensaje del emisor viaja entero: es el que dice que falta.
+            throw new CatastroNoContesta(String.valueOf(sinToken.getMessage()), sinToken);
+        }
         if (!cabecera.isBlank()) {
             peticion.header("Authorization", cabecera);
         }

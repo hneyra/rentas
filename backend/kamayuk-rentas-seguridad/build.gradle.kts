@@ -54,7 +54,7 @@ val exigirCatalogo = tasks.register("exigirCatalogoDeOpciones") {
     doLast {
         if (!ruta.exists()) {
             throw GradleException(
-                "No esta $donde, y sin el el jar sale sin las 134 opciones: nadie" +
+                "No esta $donde, y sin el el jar sale sin las 130 opciones: nadie" +
                     " puede dar permiso a ninguna pantalla, y la implantacion de una" +
                     " municipalidad no tiene accesos que sembrar. Si esto ocurre dentro" +
                     " de una imagen de Docker, el contexto de compilacion no incluye docs/.",

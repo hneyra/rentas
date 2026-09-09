@@ -39,6 +39,13 @@ final class TablasDelSgtm {
                     // el sitio dejaria al papel notificado y a la base diciendo cosas distintas.
                     // Se reversa determinando otra vez, y las dos quedan (regla 4).
                     "determinacion_arbitrio",
+                    // ADR-0039 etapa 4 (V18): la constancia local de que un evento del buzon de
+                    // `identidad` se aplico o se aparto. Borrar una fila de la primera haria que
+                    // el buzon —que sirve al menos una vez— volviera a aplicar lo mismo; borrar
+                    // una de la segunda perderia el unico sitio donde esta el cuerpo entero de lo
+                    // que no se pudo aplicar. El baseline concede INSERT y SELECT, y nada mas.
+                    "identidad_evento_aplicado",
+                    "identidad_evento_muerto",
                     "saldo_proyectado",
                     "parametro_tributario",
                     "recibo",

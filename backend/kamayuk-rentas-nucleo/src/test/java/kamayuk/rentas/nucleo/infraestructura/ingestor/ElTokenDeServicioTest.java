@@ -19,6 +19,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import kamayuk.rentas.nucleo.dominio.proyeccion.FuenteDeHechosDeCatastro.CatastroNoContesta;
+import kamayuk.rentas.plataforma.CredencialDeServicio;
+import kamayuk.rentas.plataforma.TokenDeServicioDeKeycloak;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -191,17 +193,39 @@ class ElTokenDeServicioTest {
     }
 
     @Test
-    @DisplayName("un emisor que rechaza la clave es CatastroNoContesta: se reintenta la vuelta")
+    @DisplayName("un emisor que rechaza la clave es transitorio: se reintenta la vuelta")
     void unEmisorQueRechazaSeReintenta() {
         emisor.responde(401, "{\"error\":\"invalid_client\"}");
 
+        // El proveedor vive en `plataforma` desde la etapa 4 de ADR-0039 y no sabe de que buzon
+        // es: lanza su propia excepcion, que es transitoria por definicion.
         assertThatThrownBy(() -> proveedor().cabecera())
-                .isInstanceOf(CatastroNoContesta.class)
+                .isInstanceOf(CredencialDeServicio.NoSePudoObtener.class)
                 // El mensaje nombra al cliente y dice donde se arregla. Acaba en
                 // el aviso de la vuelta: «el emisor contesto 401» manda al despliegue,
                 // «catastro no contesta» manda a mirar un sistema que esta perfectamente.
                 .hasMessageContaining(CLIENTE)
-                .hasMessageContaining("No es `catastro`");
+                .hasMessageContaining("es quien llama");
+    }
+
+    @Test
+    @DisplayName("y visto desde el buzon de `catastro` es CatastroNoContesta, con el mismo mensaje")
+    void desdeElBuzonDeCatastroEsCatastroNoContesta() throws IOException {
+        emisor.responde(401, "{\"error\":\"invalid_client\"}");
+        try (EmisorDeMentira catastro = EmisorDeMentira.arranca()) {
+            ClienteHttpDelBuzonDeCatastro cliente =
+                    new ClienteHttpDelBuzonDeCatastro(
+                            JsonMapper.builder().build(),
+                            "http://127.0.0.1:" + catastro.puerto(),
+                            proveedor());
+
+            // Es lo que la vuelta reintenta: sin esta traduccion, `IngestarHechosDeCatastro`
+            // veria una excepcion que no conoce y la vuelta moriria sin su aviso.
+            assertThatThrownBy(() -> cliente.pendientes(10))
+                    .isInstanceOf(CatastroNoContesta.class)
+                    .hasMessageContaining(CLIENTE);
+            assertThat(catastro.peticiones()).isZero();
+        }
     }
 
     @Test
@@ -210,7 +234,7 @@ class ElTokenDeServicioTest {
         emisor.responde(200, "{\"scope\":\"kamayuk-servicio\"}");
 
         assertThatThrownBy(() -> proveedor().cabecera())
-                .isInstanceOf(CatastroNoContesta.class)
+                .isInstanceOf(CredencialDeServicio.NoSePudoObtener.class)
                 .hasMessageContaining("no esta emitiendo");
     }
 

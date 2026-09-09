@@ -27,14 +27,11 @@ import kamayuk.rentas.autorizacion.GuardiaDeAcceso;
 import kamayuk.rentas.autorizacion.Privilegio;
 import kamayuk.rentas.compartido.TenantContext;
 import kamayuk.rentas.dominio.MunicipalidadId;
-import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.esquema.BaseDeDatosDePrueba;
 import kamayuk.rentas.plataforma.tenant.TenantTransactionManager;
-import kamayuk.rentas.seguridad.aplicacion.AdministrarSeguridad;
 import kamayuk.rentas.seguridad.aplicacion.AdministrarSesion;
 import kamayuk.rentas.seguridad.aplicacion.IdentidadDeLaSesion;
-import kamayuk.rentas.seguridad.dominio.Usuario;
-import kamayuk.rentas.seguridad.infraestructura.AdministracionRepositoryJdbc;
+import kamayuk.rentas.seguridad.infraestructura.LecturaDeLaCopiaLocalJdbc;
 import kamayuk.rentas.seguridad.infraestructura.SesionRepositoryJdbc;
 import kamayuk.rentas.web.ConfiguracionDeJson;
 import kamayuk.rentas.web.GuardiaDeParametros;
@@ -56,6 +53,7 @@ import org.springframework.test.web.servlet.RequestBuilder;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.annotation.AnnotationTransactionAttributeSource;
 import org.springframework.transaction.interceptor.TransactionInterceptor;
+import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
@@ -143,12 +141,10 @@ class IdentidadDeLaSesionFronteraTest {
         TenantTransactionManager gestor = new TenantTransactionManager(pool);
 
         AuditoriaJdbc auditoria = new AuditoriaJdbc(jdbc, RELOJ);
-        AdministracionRepositoryJdbc administracion = new AdministracionRepositoryJdbc(jdbc);
+        LecturaDeLaCopiaLocalJdbc administracion = new LecturaDeLaCopiaLocalJdbc(jdbc);
         SesionRepositoryJdbc sesiones = new SesionRepositoryJdbc(jdbc);
 
-        AdministrarSeguridad seguridad =
-                conLaTransaccionQueDiceLaAnotacion(
-                        new AdministrarSeguridad(administracion, auditoria, RELOJ), gestor);
+        TransactionTemplate transaccion = new TransactionTemplate(gestor);
         AdministrarSesion administrar =
                 conLaTransaccionQueDiceLaAnotacion(
                         new AdministrarSesion(sesiones, administracion, auditoria, RELOJ), gestor);
@@ -160,9 +156,9 @@ class IdentidadDeLaSesionFronteraTest {
         // ajeno de A queda en el numero siguiente al propio. Es lo que permite que la
         // mutacion del AC 4 —«devuelve el usuarioId de otro»— apunte a un usuario que
         // existe y llegue a `exigirQueSeaElPropio` en vez de morir en el 404.
-        usuarioDeA = crear(seguridad, municipalidadA, CUENTA, NOMBRE_DE_A);
-        usuarioAjenoDeA = crear(seguridad, municipalidadA, CUENTA_AJENA, "Operador ajeno");
-        usuarioDeB = crear(seguridad, municipalidadB, CUENTA, NOMBRE_DE_B);
+        usuarioDeA = crear(jdbc, transaccion, municipalidadA, CUENTA, NOMBRE_DE_A);
+        usuarioAjenoDeA = crear(jdbc, transaccion, municipalidadA, CUENTA_AJENA, "Operador ajeno");
+        usuarioDeB = crear(jdbc, transaccion, municipalidadB, CUENTA, NOMBRE_DE_B);
 
         comprobador = new ComprobadorDeMentira();
         mvc =
@@ -433,16 +429,32 @@ class IdentidadDeLaSesionFronteraTest {
         return (T) fabrica.getProxy();
     }
 
+    /**
+     * La fila del usuario, con SQL directo: la administracion ya no vive aqui (ADR-0039, etapa 4) y
+     * lo que esta prueba necesita es la fila tal como la dejaria el consumidor del buzon.
+     */
     private static long crear(
-            AdministrarSeguridad seguridad, long municipalidad, String cuenta, String nombre) {
+            JdbcClient jdbc,
+            TransactionTemplate transaccion,
+            long municipalidad,
+            String cuenta,
+            String nombre) {
         TenantContext.fijar(new MunicipalidadId(municipalidad));
         OrigenContext.fijar(new Origen("implantacion", null, null));
         try {
-            Usuario guardado =
-                    seguridad.registrarUsuario(
-                            Usuario.nuevo(cuenta, nombre, null),
-                            Observacion.de("Alta del usuario para la prueba de la sesion"));
-            return java.util.Objects.requireNonNull(guardado.id());
+            Long id =
+                    transaccion.execute(
+                            estado ->
+                                    jdbc.sql(
+                                                    "INSERT INTO usuario (municipalidad_id,"
+                                                            + " cuenta, nombre) VALUES"
+                                                            + " (current_setting('app.municipalidad_id')::bigint,"
+                                                            + " :cuenta, :nombre) RETURNING id")
+                                            .param("cuenta", cuenta)
+                                            .param("nombre", nombre)
+                                            .query(Long.class)
+                                            .single());
+            return java.util.Objects.requireNonNull(id);
         } finally {
             TenantContext.limpiar();
             OrigenContext.limpiar();
