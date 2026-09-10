@@ -17,6 +17,7 @@ import kamayuk.rentas.auditoria.AuditoriaJdbc;
 import kamayuk.rentas.auditoria.Origen;
 import kamayuk.rentas.auditoria.OrigenContext;
 import kamayuk.rentas.autorizacion.GuardiaDeAcceso;
+import kamayuk.rentas.autorizacion.Privilegio;
 import kamayuk.rentas.compartido.TenantContext;
 import kamayuk.rentas.dominio.MunicipalidadId;
 import kamayuk.rentas.dominio.Observacion;
@@ -24,7 +25,7 @@ import kamayuk.rentas.esquema.BaseDeDatosDePrueba;
 import kamayuk.rentas.plataforma.tenant.OrigenContextFilter;
 import kamayuk.rentas.plataforma.tenant.TenantContextFilter;
 import kamayuk.rentas.plataforma.tenant.TenantTransactionManager;
-import kamayuk.rentas.seguridad.aplicacion.SembradorDeLaCopiaLocal;
+import kamayuk.rentas.seguridad.aplicacion.SembradorDelCatalogo;
 import kamayuk.rentas.seguridad.dominio.CatalogoDeOpciones;
 import kamayuk.rentas.seguridad.dominio.LecturaDeLaCopiaLocal;
 import kamayuk.rentas.seguridad.infraestructura.ComprobadorDeAccesoJdbc;
@@ -50,6 +51,7 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.annotation.AnnotationTransactionAttributeSource;
 import org.springframework.transaction.interceptor.TransactionInterceptor;
+import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
@@ -101,6 +103,9 @@ class LecturasDeLaCopiaLocalDePuntaAPuntaTest {
 
     private static final String ADMINISTRADOR = "admin.punta.a.punta";
 
+    /** El grupo del que cuelgan sus permisos; en produccion lo crea `identidad`. */
+    private static final String GRUPO = "Administracion del sistema";
+
     private static BaseDeDatosDePrueba base;
     private static MockMvc mvc;
     private static long municipalidadA;
@@ -123,12 +128,18 @@ class LecturasDeLaCopiaLocalDePuntaAPuntaTest {
         // Las dos municipalidades se siembran como lo hace la implantacion: por el sembrador, con
         // su transaccion y su contexto. Es lo unico de esta clase que fija el inquilino a mano, y
         // se limpia enseguida — lo que se mide es la PETICION, que no lo tiene puesto.
-        SembradorDeLaCopiaLocal sembrador =
+        SembradorDelCatalogo sembrador =
                 proxificado(
-                        new SembradorDeLaCopiaLocal(jdbc, new AuditoriaJdbc(jdbc, RELOJ), RELOJ),
+                        new SembradorDelCatalogo(jdbc, new AuditoriaJdbc(jdbc, RELOJ), RELOJ),
                         gestor);
         sembrar(sembrador, municipalidadA);
         sembrar(sembrador, municipalidadB);
+
+        // Y lo que desde la etapa 5 NO siembra este sistema: el administrador y sus permisos,
+        // que en produccion llegan por el buzon de `identidad`.
+        TransactionTemplate transaccion = new TransactionTemplate(gestor);
+        administradorConSusPermisos(transaccion, jdbc, municipalidadA);
+        administradorConSusPermisos(transaccion, jdbc, municipalidadB);
 
         // Proxificados los dos, como Spring hace en produccion: lo que decide si hay transaccion
         // es la anotacion de cada metodo, no esta prueba.
@@ -257,16 +268,74 @@ class LecturasDeLaCopiaLocalDePuntaAPuntaTest {
                                 List.of()));
     }
 
-    private static void sembrar(SembradorDeLaCopiaLocal sembrador, long municipalidad) {
+    private static void sembrar(SembradorDelCatalogo sembrador, long municipalidad) {
         TenantContext.fijar(new MunicipalidadId(municipalidad));
         OrigenContext.fijar(Origen.deProceso("implantacion"));
         try {
             sembrador.sembrar(
-                    ADMINISTRADOR,
-                    "Administrador de la prueba",
-                    Observacion.de("Siembra de la copia local para la prueba de punta a punta"));
+                    Observacion.de("Siembra del catalogo para la prueba de punta a punta"));
         } finally {
             OrigenContext.limpiar();
+            TenantContext.limpiar();
+        }
+    }
+
+    /**
+     * El administrador con sus permisos, que desde la etapa 5 <b>no lo escribe este sistema</b>.
+     *
+     * <p>En produccion estas cuatro filas llegan por el buzon de `identidad` y las escribe {@code
+     * AplicarUnEventoDeIdentidad}. Aqui se escriben con SQL directo a proposito: lo que esta clase
+     * mide es la <b>lectura</b> —que las dos rutas del arbol contesten 200 y no el 500 de una
+     * consulta sin {@code SET LOCAL}—, y montar el buzon entero para poblar cuatro filas mediria
+     * otra cosa. Quien mide que esas filas llegan de verdad por el buzon es {@code
+     * ImplantarMunicipalidadTest}.
+     */
+    private static void administradorConSusPermisos(
+            TransactionTemplate transaccion, JdbcClient jdbc, long municipalidad) {
+        TenantContext.fijar(new MunicipalidadId(municipalidad));
+        try {
+            transaccion.executeWithoutResult(
+                    estado -> {
+                        jdbc.sql(
+                                        "INSERT INTO grupo (municipalidad_id, nombre, descripcion)"
+                                                + " VALUES (current_setting('app.municipalidad_id')::bigint,"
+                                                + " :nombre, 'Llegado por el buzon de identidad')")
+                                .param("nombre", GRUPO)
+                                .update();
+                        jdbc.sql(
+                                        "INSERT INTO usuario (municipalidad_id, cuenta, nombre)"
+                                                + " VALUES (current_setting('app.municipalidad_id')::bigint,"
+                                                + " :cuenta, 'Administrador de la prueba')")
+                                .param("cuenta", ADMINISTRADOR)
+                                .update();
+                        jdbc.sql(
+                                        "INSERT INTO miembro (municipalidad_id, grupo_id,"
+                                                + " usuario_id, usuario_alta) SELECT"
+                                                + " current_setting('app.municipalidad_id')::bigint,"
+                                                + " g.id, u.id, 'identidad' FROM grupo g, usuario u"
+                                                + " WHERE g.nombre = :nombre AND u.cuenta = :cuenta")
+                                .param("nombre", GRUPO)
+                                .param("cuenta", ADMINISTRADOR)
+                                .update();
+                        StringBuilder columnas = new StringBuilder();
+                        StringBuilder valores = new StringBuilder();
+                        for (Privilegio privilegio : Privilegio.values()) {
+                            columnas.append(", ").append(privilegio.columna());
+                            valores.append(", true");
+                        }
+                        jdbc.sql(
+                                        "INSERT INTO permiso (municipalidad_id, acceso_id, grupo_id,"
+                                                + " usuario_registro"
+                                                + columnas
+                                                + ") SELECT"
+                                                + " current_setting('app.municipalidad_id')::bigint,"
+                                                + " a.id, g.id, 'identidad'"
+                                                + valores
+                                                + " FROM acceso a, grupo g WHERE g.nombre = :nombre")
+                                .param("nombre", GRUPO)
+                                .update();
+                    });
+        } finally {
             TenantContext.limpiar();
         }
     }

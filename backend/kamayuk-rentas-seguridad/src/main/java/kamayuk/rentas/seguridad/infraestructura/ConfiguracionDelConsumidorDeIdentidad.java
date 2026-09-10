@@ -5,6 +5,7 @@ import kamayuk.rentas.plataforma.CredencialDeServicio;
 import kamayuk.rentas.plataforma.TokenDeServicioDeKeycloak;
 import kamayuk.rentas.seguridad.aplicacion.AplicarUnEventoDeIdentidad;
 import kamayuk.rentas.seguridad.aplicacion.ConsumirEventosDeIdentidad;
+import kamayuk.rentas.seguridad.aplicacion.PasadaDelConsumidorDeIdentidad;
 import kamayuk.rentas.seguridad.dominio.AlertaDeEventosSinAplicar;
 import kamayuk.rentas.seguridad.dominio.FuenteDeEventosDeIdentidad;
 import org.springframework.beans.factory.annotation.Value;
@@ -60,6 +61,21 @@ public class ConfiguracionDelConsumidorDeIdentidad {
     AlertaDeEventosSinAplicar alertaDeEventosSinAplicar(
             JsonMapper json, ResponsableDelConsumidor responsable) {
         return new AlertaAlResponsableDeLaCopiaLocal(json, responsable);
+    }
+
+    /**
+     * La pasada entera —vueltas y aviso de pospuestos— como bean propio (ADR-0039, etapa 5).
+     *
+     * <p>La piden DOS: el {@code CronJob} por {@code CorrerElConsumidorDeIdentidad}, y la
+     * implantacion, que la llama en linea porque desde la etapa 5 es la unica fuente del
+     * administrador. Que este condicionada a {@code kamayuk.identidad.url} es lo que le permite a
+     * la implantacion <b>ver que falta</b> y decirlo, en vez de terminar en verde con la copia
+     * vacia.
+     */
+    @Bean
+    PasadaDelConsumidorDeIdentidad pasadaDelConsumidorDeIdentidad(
+            ConsumirEventosDeIdentidad consumidor, AlertaDeEventosSinAplicar alerta, Clock reloj) {
+        return new PasadaDelConsumidorDeIdentidad(consumidor, alerta, reloj);
     }
 
     @Bean

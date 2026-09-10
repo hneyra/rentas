@@ -25,7 +25,14 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 
-@DisplayName("Etapa 4 — el runner del consumidor de identidad")
+/**
+ * El runner del {@code CronJob}: de que municipalidad es el buzon, y quien corre la pasada.
+ *
+ * <p>El bucle de la pasada NO se mide aqui desde la etapa 5: vive en {@link
+ * PasadaDelConsumidorDeIdentidad} y lo mide su propia clase, porque la implantacion lo llama
+ * tambien.
+ */
+@DisplayName("Etapa 5 — el runner del consumidor de identidad")
 class CorrerElConsumidorDeIdentidadTest {
 
     private static final long CATACAOS = 7L;
@@ -85,24 +92,25 @@ class CorrerElConsumidorDeIdentidadTest {
         assertThat(consumidor.value())
                 .as(
                         "[si el consumidor corriera antes, el buzon se leeria contra una"
-                                + " municipalidad que todavia no esta en `municipalidad`, y el"
-                                + " runner se negaria: la implantacion TERMINA cediendole el paso]")
+                                + " municipalidad que todavia no esta en `municipalidad`]")
                 .isGreaterThan(implantacion.value());
     }
 
     @Test
-    @DisplayName(
-            "da vueltas hasta que una no progresa, con el contexto puesto, y lo limpia al salir")
-    void daVueltasHastaQueNoProgresa() {
+    @DisplayName("la pasada corre con el contexto de la municipalidad puesto, y se limpia al salir")
+    void laPasadaCorreConElContextoPuesto() {
         BuzonDeMentira buzon = new BuzonDeMentira(3);
         AplicadorQueCuenta aplicador = new AplicadorQueCuenta();
         CorrerElConsumidorDeIdentidad runner =
                 new CorrerElConsumidorDeIdentidad(
-                        new ConsumirEventosDeIdentidad(buzon, aplicador, new AlertaQueAnota()),
+                        new PasadaDelConsumidorDeIdentidad(
+                                new ConsumirEventosDeIdentidad(
+                                        buzon, aplicador, new AlertaQueAnota()),
+                                new AlertaQueAnota(),
+                                RELOJ),
                         registroCon("200105", CATACAOS),
-                        new AlertaQueAnota(),
-                        RELOJ,
-                        "kamayuk-rentas-servicio-200105");
+                        "kamayuk-rentas-servicio-200105",
+                        "");
 
         runner.run(new DefaultApplicationArguments());
 
@@ -118,101 +126,47 @@ class CorrerElConsumidorDeIdentidadTest {
     }
 
     @Test
-    @DisplayName("y un buzon que no contesta sube tal cual, dejando el contexto limpio")
-    void unBuzonQueNoContestaSube() {
-        FuenteDeEventosDeIdentidad caido =
-                new FuenteDeEventosDeIdentidad() {
-                    @Override
-                    public Lote pendientes(int limite) {
-                        throw new IdentidadNoContesta("`identidad` contesto 403 al leer el buzon");
-                    }
-
-                    @Override
-                    public Acuse acusar(List<UUID> eventoIds) {
-                        return new Acuse(0, 0, 0);
-                    }
-                };
+    @DisplayName(
+            "y en el Job de implantacion NO corre: la pasada la hizo la implantacion en linea"
+                    + " (etapa 5)")
+    void enElJobDeImplantacionNoCorre() {
+        PasadaQueCuenta pasada = new PasadaQueCuenta();
         CorrerElConsumidorDeIdentidad runner =
                 new CorrerElConsumidorDeIdentidad(
-                        new ConsumirEventosDeIdentidad(
-                                caido, new AplicadorQueCuenta(), new AlertaQueAnota()),
+                        pasada,
                         registroCon("200105", CATACAOS),
-                        new AlertaQueAnota(),
-                        RELOJ,
-                        "kamayuk-rentas-servicio-200105");
-
-        assertThatThrownBy(() -> runner.run(new DefaultApplicationArguments()))
-                .as("transitorio: la corrida acaba en rojo y la copia se queda como estaba")
-                .isInstanceOf(FuenteDeEventosDeIdentidad.IdentidadNoContesta.class)
-                .hasMessageContaining("403");
-        assertThat(TenantContext.actualSiHay()).isEmpty();
-    }
-
-    @Test
-    @DisplayName(
-            "un pospuesto que lleva mas de quince minutos esperando SE AVISA, y la corrida termina"
-                    + " bien")
-    void unPospuestoViejoSeAvisa() {
-        AlertaQueAnota alerta = new AlertaQueAnota();
-        BuzonQuePospone buzon = new BuzonQuePospone(AHORA.minus(Duration.ofMinutes(20)));
-        CorrerElConsumidorDeIdentidad runner = runnerCon(buzon, alerta);
+                        "kamayuk-rentas-servicio-200105",
+                        "200105");
 
         runner.run(new DefaultApplicationArguments());
 
-        assertThat(alerta.pospuestos)
+        assertThat(pasada.veces)
                 .as(
-                        "[medido con las cinco aplicaciones levantadas: cuatro permisos quedaron"
-                                + " pospuestos corrida tras corrida, con su WARN por vuelta y CERO"
-                                + " avisos al responsable. Un pospuesto no es un fallo mientras su"
-                                + " dependencia este en camino; pasado ese tiempo ya no lo esta, y sin"
-                                + " este aviso no se entera nadie]")
-                .singleElement()
-                .satisfies(
-                        aviso -> {
-                            assertThat(aviso.pospuestos())
-                                    .singleElement()
-                                    .satisfies(
-                                            p ->
-                                                    assertThat(p.evento().tipoPublicado())
-                                                            .isEqualTo("MIEMBRO_AFILIADO"));
-                            assertThat(aviso.umbral())
-                                    .isEqualTo(
-                                            CorrerElConsumidorDeIdentidad.ANTIGUEDAD_QUE_SE_AVISA);
-                            assertThat(aviso.ahora()).isEqualTo(AHORA);
-                        });
-        assertThat(alerta.apartados)
-                .as("y NO se aparta: el pospuesto sigue en el buzon, que es lo correcto")
-                .isEmpty();
-        assertThat(TenantContext.actualSiHay()).isEmpty();
+                        "[el Job de implantacion lleva las mismas KAMAYUK_IDENTIDAD_*, asi que este"
+                                + " runner existiria alli tambien: correr seria una segunda pasada"
+                                + " sobre un buzon ya vaciado y dos respuestas a «quien trae la"
+                                + " autorizacion en una implantacion»]")
+                .isZero();
     }
 
     @Test
-    @DisplayName("y uno de dos minutos NO: su dependencia todavia puede estar en camino")
-    void unPospuestoRecienteNoSeAvisa() {
-        AlertaQueAnota alerta = new AlertaQueAnota();
-        BuzonQuePospone buzon = new BuzonQuePospone(AHORA.minus(Duration.ofMinutes(2)));
+    @DisplayName("y el contraste: sin implantacion configurada SI corre")
+    void sinImplantacionConfiguradaSiCorre() {
+        PasadaQueCuenta pasada = new PasadaQueCuenta();
 
-        runnerCon(buzon, alerta).run(new DefaultApplicationArguments());
+        new CorrerElConsumidorDeIdentidad(
+                        pasada,
+                        registroCon("200105", CATACAOS),
+                        "kamayuk-rentas-servicio-200105",
+                        "")
+                .run(new DefaultApplicationArguments());
 
-        assertThat(alerta.pospuestos)
-                .as(
-                        "[el contraste: avisar del pospuesto normal —la afiliacion que llega junto"
-                                + " a su grupo— seria un aviso por corrida que nadie leeria, y con el"
-                                + " se perderia el que importa]")
-                .isEmpty();
+        assertThat(pasada.veces)
+                .as("[sin esto, «no corre en la implantacion» se cumpliria no corriendo nunca]")
+                .isEqualTo(1);
     }
 
     // ------------------------------------------------------------------
-
-    private static CorrerElConsumidorDeIdentidad runnerCon(
-            FuenteDeEventosDeIdentidad buzon, AlertaQueAnota alerta) {
-        return new CorrerElConsumidorDeIdentidad(
-                new ConsumirEventosDeIdentidad(buzon, new AplicadorQuePospone(), alerta),
-                registroCon("200105", CATACAOS),
-                alerta,
-                RELOJ,
-                "kamayuk-rentas-servicio-200105");
-    }
 
     private static RecorridoPorMunicipalidades registroCon(String ubigeo, long id) {
         DriverManagerDataSource sinBase = new DriverManagerDataSource();
@@ -223,6 +177,25 @@ class CorrerElConsumidorDeIdentidadTest {
                 return List.of(new Municipalidad(id, ubigeo, "Municipalidad de la prueba"));
             }
         };
+    }
+
+    /** Una pasada que solo cuenta cuantas veces la llamaron. */
+    private static final class PasadaQueCuenta extends PasadaDelConsumidorDeIdentidad {
+        private int veces;
+
+        PasadaQueCuenta() {
+            super(
+                    new ConsumirEventosDeIdentidad(
+                            new BuzonDeMentira(0), new AplicadorQueCuenta(), new AlertaQueAnota()),
+                    new AlertaQueAnota(),
+                    RELOJ);
+        }
+
+        @Override
+        public int hastaAgotar() {
+            veces++;
+            return 0;
+        }
     }
 
     private static final class BuzonDeMentira implements FuenteDeEventosDeIdentidad {
@@ -249,7 +222,7 @@ class CorrerElConsumidorDeIdentidadTest {
                                     1L,
                                     "{}",
                                     "a".repeat(64),
-                                    java.time.Instant.EPOCH)),
+                                    Instant.EPOCH)),
                     paginas);
         }
 
@@ -259,56 +232,9 @@ class CorrerElConsumidorDeIdentidadTest {
         }
     }
 
-    /** Un buzon que sirve siempre el mismo evento: el que nadie puede aplicar todavia. */
-    private static final class BuzonQuePospone implements FuenteDeEventosDeIdentidad {
-        private final Instant creadoEn;
-
-        BuzonQuePospone(Instant creadoEn) {
-            this.creadoEn = creadoEn;
-        }
-
-        @Override
-        public Lote pendientes(int limite) {
-            return new Lote(
-                    List.of(
-                            new EventoDeIdentidadRecibido(
-                                    UUID.fromString("11111111-1111-4111-8111-111111111111"),
-                                    42,
-                                    "MIEMBRO_AFILIADO",
-                                    9,
-                                    "{}",
-                                    "b".repeat(64),
-                                    creadoEn)),
-                    1);
-        }
-
-        @Override
-        public Acuse acusar(List<UUID> eventoIds) {
-            throw new IllegalStateException("un pospuesto no se acusa: no habria que llamar aqui");
-        }
-    }
-
-    /** El aplicador que siempre dice «todavia no»: la dependencia no esta en esta copia. */
-    private static final class AplicadorQuePospone extends AplicarUnEventoDeIdentidad {
-        AplicadorQuePospone() {
-            super(
-                    JdbcClient.create(new DriverManagerDataSource()),
-                    tools.jackson.databind.json.JsonMapper.builder().build(),
-                    RELOJ);
-        }
-
-        @Override
-        public Aplicacion aplicar(EventoDeIdentidadRecibido evento) {
-            throw new TodaviaNo(
-                    "El evento de `miembro` nombra el grupo «Mesa de Partes» y la cuenta"
-                            + " «jperez», y esta copia no conoce a los dos todavia");
-        }
-    }
-
     /** Anota los dos avisos por separado: son dos hechos distintos. */
     private static final class AlertaQueAnota implements AlertaDeEventosSinAplicar {
         private final List<String> apartados = new ArrayList<>();
-        private final List<AvisoDePospuestos> pospuestos = new ArrayList<>();
 
         @Override
         public void hayUnEventoSinAplicar(
@@ -319,12 +245,9 @@ class CorrerElConsumidorDeIdentidadTest {
         @Override
         public void hayPospuestosQueNoAvanzan(
                 List<EventoPospuesto> lista, Instant ahora, Duration umbral) {
-            pospuestos.add(new AvisoDePospuestos(lista, ahora, umbral));
+            // Lo mide PasadaDelConsumidorDeIdentidadTest; aqui no es el sujeto.
         }
     }
-
-    private record AvisoDePospuestos(
-            List<EventoPospuesto> pospuestos, Instant ahora, Duration umbral) {}
 
     private static final class AplicadorQueCuenta extends AplicarUnEventoDeIdentidad {
         private final List<Long> contextos = new ArrayList<>();
@@ -333,7 +256,7 @@ class CorrerElConsumidorDeIdentidadTest {
             super(
                     JdbcClient.create(new DriverManagerDataSource()),
                     tools.jackson.databind.json.JsonMapper.builder().build(),
-                    java.time.Clock.systemUTC());
+                    Clock.systemUTC());
         }
 
         @Override

@@ -1,20 +1,10 @@
 package kamayuk.rentas.seguridad.aplicacion;
 
-import java.time.Clock;
-import java.time.Duration;
-import java.time.Instant;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import kamayuk.rentas.compartido.TenantContext;
 import kamayuk.rentas.dominio.MunicipalidadId;
 import kamayuk.rentas.plataforma.RecorridoPorMunicipalidades;
-import kamayuk.rentas.seguridad.dominio.AlertaDeEventosSinAplicar;
-import kamayuk.rentas.seguridad.dominio.EventoPospuesto;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -27,8 +17,14 @@ import org.springframework.stereotype.Component;
 
 /**
  * El proceso de vida corta que trae de {@code identidad} lo que esta copia no tiene (ADR-0039,
- * etapa 4). Lo lanza el {@code CronJob} del descriptor cada cinco minutos, y lo lanza tambien la
- * implantacion al terminar, <b>despues</b> de sembrar.
+ * etapa 4). Lo lanza el {@code CronJob} del descriptor cada cinco minutos.
+ *
+ * <h2>Lo que hace, y lo que ya no</h2>
+ *
+ * <p>Resuelve <b>de que municipalidad</b> es el buzon, fija el contexto de tenant y delega la
+ * pasada en {@link PasadaDelConsumidorDeIdentidad}. El bucle vivia aqui hasta la etapa 5 y se saco
+ * para que {@link ImplantarMunicipalidad} pueda llamarlo <b>en linea</b>: el motivo esta escrito en
+ * aquella clase.
  *
  * <h2>Perfil {@code batch}, y fuera del camino caliente</h2>
  *
@@ -49,22 +45,14 @@ import org.springframework.stereotype.Component;
  * buzon. No hay una variable aparte con la municipalidad: seria una segunda fuente de la misma
  * verdad, y la que se quedaria vieja es la que nadie compara con el token.
  *
- * <h2>Un pospuesto que no avanza SI se avisa (AC-5/AC-6 de `identidad`#4)</h2>
+ * <h2>En el {@code Job} de implantacion NO corre, y es una decision (etapa 5)</h2>
  *
- * <p>Un evento que todavia no se puede aplicar no se acusa, asi que el buzon lo vuelve a servir y
- * la corrida siguiente lo intenta otra vez. Mientras su dependencia este en camino eso es lo
- * correcto y no es un fallo. Medido con las cinco aplicaciones levantadas, lo que pasa cuando NO
- * esta en camino es que no le llega a nadie: cuatro permisos quedaron pospuestos corrida tras
- * corrida, con su WARN por vuelta y <b>cero avisos al responsable</b>. Asi que al terminar la
- * corrida, los que llevan mas de {@value #MINUTOS_QUE_SE_TOLERAN} minutos esperando —{@link
- * #ANTIGUEDAD_QUE_SE_AVISA}— se juntan en <b>un</b> aviso, y la corrida <b>termina bien</b>: un
- * pospuesto no es un fallo de la corrida, y salir con codigo 1 cada cinco minutos convertiria el
- * {@code CronJob} en un `Job` que falla siempre y al que nadie mira.
- *
- * <h2>Acotado</h2>
- *
- * <p>Como mucho {@value #VUELTAS_MAXIMAS} paginas por corrida, y se para antes en cuanto una vuelta
- * no progresa. Un proceso que no acaba no es un consumidor: es un pod que nadie mira.
+ * <p>Ese {@code Job} lleva las mismas cinco variables {@code KAMAYUK_IDENTIDAD_*} que el {@code
+ * CronJob}, asi que este runner existiria tambien alli — y desde la etapa 5 la pasada la hace
+ * {@link ImplantarMunicipalidad} <b>en linea</b>, porque tiene que comprobar el resultado antes de
+ * dar el {@code Job} por bueno. Correr aqui otra vez seria una segunda pasada sobre un buzon ya
+ * vaciado y, peor, dejaria dos respuestas a «quien trae la autorizacion en una implantacion». Por
+ * eso se aparta cuando hay implantacion configurada, y lo dice.
  */
 @Component
 @Profile("batch")
@@ -72,96 +60,53 @@ import org.springframework.stereotype.Component;
 @Order(CorrerElConsumidorDeIdentidad.DESPUES_DE_IMPLANTAR)
 public class CorrerElConsumidorDeIdentidad implements ApplicationRunner {
 
-    /** Detras de {@link ImplantarMunicipalidad}: primero se siembra, despues se trae. */
+    /**
+     * Detras de {@link ImplantarMunicipalidad}, aunque hoy no lleguen a coincidir.
+     *
+     * <p>Se conserva porque cuesta una linea y cubre el dia que alguien retire el apartado de
+     * arriba: si los dos runners corrieran, el orden sigue siendo el unico que tiene sentido —el
+     * buzon se lee contra una municipalidad que tiene que estar ya en {@code municipalidad}—.
+     */
     public static final int DESPUES_DE_IMPLANTAR = ImplantarMunicipalidad.ORDEN + 1;
 
     private static final Logger log = LoggerFactory.getLogger(CorrerElConsumidorDeIdentidad.class);
-
-    private static final int VUELTAS_MAXIMAS = 50;
-
-    /**
-     * Tres ticks del {@code CronJob}, que corre cada cinco minutos.
-     *
-     * <p>Un pospuesto normal —la afiliacion que llega en el mismo lote que su grupo, o en el
-     * siguiente— se resuelve en la corrida siguiente: medido, en cuanto la dependencia llega los
-     * cuatro consumidores se ponen al dia en UNA corrida. Tres ticks deja pasar el caso normal y un
-     * reintento con `backoffLimit: 1`, y no deja pasar el caso que hay que atender: el que se
-     * repite igual corrida tras corrida.
-     */
-    static final int MINUTOS_QUE_SE_TOLERAN = 15;
-
-    static final Duration ANTIGUEDAD_QUE_SE_AVISA = Duration.ofMinutes(MINUTOS_QUE_SE_TOLERAN);
 
     /** La forma del cliente de servicio, la misma que `identidad` lee del `azp` del token. */
     private static final Pattern CLIENTE_DE_SERVICIO =
             Pattern.compile("^kamayuk-rentas-servicio-([0-9]{6})$");
 
-    private final ConsumirEventosDeIdentidad consumidor;
+    private final PasadaDelConsumidorDeIdentidad pasada;
     private final RecorridoPorMunicipalidades registro;
-    private final AlertaDeEventosSinAplicar alerta;
-    private final Clock reloj;
     private final String clienteDeServicio;
+    private final String ubigeoDeLaImplantacion;
 
     public CorrerElConsumidorDeIdentidad(
-            ConsumirEventosDeIdentidad consumidor,
+            PasadaDelConsumidorDeIdentidad pasada,
             RecorridoPorMunicipalidades registro,
-            AlertaDeEventosSinAplicar alerta,
-            Clock reloj,
-            @Value("${kamayuk.identidad.cliente:}") String clienteDeServicio) {
-        this.consumidor = consumidor;
+            @Value("${kamayuk.identidad.cliente:}") String clienteDeServicio,
+            @Value("${kamayuk.implantacion.ubigeo:}") String ubigeoDeLaImplantacion) {
+        this.pasada = pasada;
         this.registro = registro;
-        this.alerta = alerta;
-        this.reloj = reloj;
         this.clienteDeServicio = clienteDeServicio;
+        this.ubigeoDeLaImplantacion = ubigeoDeLaImplantacion;
     }
 
     @Override
     public void run(ApplicationArguments argumentos) {
+        if (!ubigeoDeLaImplantacion.isBlank()) {
+            log.info(
+                    "Este proceso implanta la municipalidad {}, asi que la pasada del consumidor"
+                            + " de `identidad` ya la hizo la implantacion en linea (ADR-0039,"
+                            + " etapa 5). No se repite",
+                    ubigeoDeLaImplantacion);
+            return;
+        }
         long municipalidadId = municipalidadDe(clienteDeServicio, registro);
         TenantContext.fijar(new MunicipalidadId(municipalidadId));
-        // Por `eventoId` y no una lista: el buzon vuelve a servir el mismo evento en cada vuelta
-        // mientras no se acuse, y avisar del mismo tres veces seria contar tres problemas donde
-        // hay uno. Se queda el ultimo motivo, que es el de la vuelta mas reciente.
-        Map<UUID, EventoPospuesto> pospuestos = new LinkedHashMap<>();
         try {
-            for (int vuelta = 1; vuelta <= VUELTAS_MAXIMAS; vuelta++) {
-                ConsumirEventosDeIdentidad.Vuelta resultado = consumidor.consumir();
-                for (EventoPospuesto pospuesto : resultado.pospuestos()) {
-                    pospuestos.put(pospuesto.evento().eventoId(), pospuesto);
-                }
-                log.info("Vuelta {} del consumidor de identidad: {}", vuelta, resultado);
-                if (resultado.sinProgreso()) {
-                    return;
-                }
-            }
-            log.warn(
-                    "Se agotaron las {} vueltas y el buzon de `identidad` sigue teniendo eventos."
-                            + " No es un fallo: la corrida acaba a proposito en vez de no acabar,"
-                            + " y la siguiente sigue por donde esta se quedo",
-                    VUELTAS_MAXIMAS);
+            pasada.hastaAgotar();
         } finally {
-            avisarSiNoAvanzan(pospuestos.values());
             TenantContext.limpiar();
-        }
-    }
-
-    /**
-     * Avisa UNA vez, y solo de los que llevan esperando mas de {@link #ANTIGUEDAD_QUE_SE_AVISA}.
-     *
-     * <p>Va en el {@code finally} a proposito: un buzon que deja de contestar a mitad de corrida es
-     * transitorio y sube —la corrida acaba en rojo—, pero lo que ya se sabia de los pospuestos se
-     * sabe igual, y callarlo por eso seria perder el aviso justo el dia que hay dos cosas mal.
-     */
-    private void avisarSiNoAvanzan(Iterable<EventoPospuesto> pospuestos) {
-        Instant ahora = reloj.instant();
-        List<EventoPospuesto> viejos = new ArrayList<>();
-        for (EventoPospuesto pospuesto : pospuestos) {
-            if (pospuesto.edad(ahora).compareTo(ANTIGUEDAD_QUE_SE_AVISA) > 0) {
-                viejos.add(pospuesto);
-            }
-        }
-        if (!viejos.isEmpty()) {
-            alerta.hayPospuestosQueNoAvanzan(List.copyOf(viejos), ahora, ANTIGUEDAD_QUE_SE_AVISA);
         }
     }
 

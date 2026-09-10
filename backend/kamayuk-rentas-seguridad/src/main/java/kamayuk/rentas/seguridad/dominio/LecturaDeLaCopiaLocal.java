@@ -30,6 +30,16 @@ public interface LecturaDeLaCopiaLocal {
     Optional<Usuario> usuarioPorCuenta(String cuenta);
 
     /**
+     * Cuantas cuentas tiene la copia local de esta municipalidad.
+     *
+     * <p>Existe para UNA pregunta, y la hace la implantacion (ADR-0039, etapa 5): despues de la
+     * pasada del buzon, <b>cero</b> significa que nadie puede entrar. Se cuenta y no se busca una
+     * cuenta concreta a proposito: desde la etapa 5 quien existe lo decide {@code identidad}, y
+     * este sistema no tiene ninguna opinion sobre como se llama la primera cuenta.
+     */
+    long usuariosEnLaCopia();
+
+    /**
      * La matriz efectiva de una cuenta a una fecha: por acceso, la union de sus grupos, y la
      * excepcion del usuario sustituyendo al grupo donde la haya (ADR-0013).
      */

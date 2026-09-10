@@ -54,15 +54,12 @@ class AutorizacionTest {
     private static final Clock RELOJ =
             Clock.fixed(Instant.parse("2026-08-18T10:00:00Z"), ZoneId.of("America/Lima"));
 
-    /** La cuenta del primer administrador que la siembra deja; ninguna prueba la usa de sujeto. */
-    private static final String ADMINISTRADOR = "admin.de.la.siembra";
-
     private static BaseDeDatosDePrueba base;
     private static long municipalidad;
 
     private static JdbcClient jdbc;
     private static TransactionTemplate transaccion;
-    private static SembradorDeLaCopiaLocal sembrador;
+    private static SembradorDelCatalogo sembrador;
     private static ComprobadorDeAcceso comprobador;
     private static LecturaDeLaCopiaLocalJdbc permisos;
 
@@ -82,13 +79,13 @@ class AutorizacionTest {
         comprobador = new ComprobadorDeAccesoJdbc(jdbc);
         permisos = new LecturaDeLaCopiaLocalJdbc(jdbc);
 
-        SembradorDeLaCopiaLocal objetivo =
-                new SembradorDeLaCopiaLocal(jdbc, new AuditoriaJdbc(jdbc, RELOJ), RELOJ);
+        SembradorDelCatalogo objetivo =
+                new SembradorDelCatalogo(jdbc, new AuditoriaJdbc(jdbc, RELOJ), RELOJ);
         ProxyFactory fabrica = new ProxyFactory(objetivo);
         fabrica.setProxyTargetClass(true);
         fabrica.addAdvice(
                 new TransactionInterceptor(gestor, new AnnotationTransactionAttributeSource()));
-        sembrador = (SembradorDeLaCopiaLocal) fabrica.getProxy();
+        sembrador = (SembradorDelCatalogo) fabrica.getProxy();
     }
 
     @AfterAll
@@ -120,19 +117,12 @@ class AutorizacionTest {
             // Las aserciones no dependen de que esta prueba corra la primera: JUnit no
             // garantiza el orden entre clases anidadas, y una prueba que solo pasa si
             // va primero es una prueba que se rompera al agregar otra.
-            sembrador.sembrar(
-                    ADMINISTRADOR,
-                    "Administrador",
-                    Observacion.de("Siembra inicial de accesos, RF-122"));
+            sembrador.sembrar(Observacion.de("Siembra inicial de accesos, RF-122"));
 
             assertThat(contar("SELECT count(*) FROM acceso")).isEqualTo(130);
             assertThat(contar("SELECT count(*) FROM modulo_sistema")).isEqualTo(12);
 
-            int repetida =
-                    sembrador.sembrar(
-                            ADMINISTRADOR,
-                            "Administrador",
-                            Observacion.de("Segundo despliegue, sin cambios"));
+            int repetida = sembrador.sembrar(Observacion.de("Segundo despliegue, sin cambios"));
             assertThat(repetida)
                     .as("se ejecuta en cada despliegue: lo que ya existe se queda como esta")
                     .isZero();
@@ -404,10 +394,7 @@ class AutorizacionTest {
     }
 
     private static void sembrar() {
-        sembrador.sembrar(
-                ADMINISTRADOR,
-                "Administrador",
-                Observacion.de("Siembra de accesos para la prueba de autorizacion"));
+        sembrador.sembrar(Observacion.de("Siembra de accesos para la prueba de autorizacion"));
     }
 
     private static long crearUsuario(String cuenta, LocalDate desde, LocalDate hasta) {
