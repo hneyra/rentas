@@ -174,6 +174,43 @@ repository.findById(id);                           // infraestructura: inglés
 
 Tablas y columnas en español `snake_case`. Campos de la API JSON en español `camelCase`.
 Comentarios, pruebas y mensajes de commit en español.
+## El monolito se llamaba `sgtm`, y en la prosa se sigue llamando asi
+
+El producto es **Kamayuk**. El sistema del que sale —el monolito retirado— se llamaba `sgtm`, y
+ese nombre **ya no esta en el codigo**: ni en un realm, ni en una imagen, ni en un identificador, ni
+en un dato de configuracion.
+
+**Pero sigue en los comentarios, en `docs/` y en el registro de «Verificar antes de afirmar», y eso
+es deliberado.** No es limpieza pendiente:
+
+- una fila del registro que dice «copiado de `sgtm@33f329a2`» **es la medicion que se hizo**;
+  reescribirla la falsifica, y borrarla pierde con que rotura se demostro;
+- un comentario que dice «hasta `E` la sonda apuntaba a `sgtm`» **es el motivo por el que el codigo
+  de al lado es como es**; quitar el nombre lo deja sin sujeto y hay que volver a descubrirlo;
+- y varias guardas explican en su docblock **de que defecto vienen**, que es lo que impide que
+  alguien las «simplifique».
+
+**Asi que NO se hace una pasada de limpieza sobre la prosa.** Si estas aqui por un `grep sgtm` que
+devuelve cientos de lineas: casi todas son de este tipo y se quedan.
+
+**Lo que si esta prohibido es que la cadena vuelva al codigo**, y lo vigila **una sola guarda para
+los seis**: `sin-el-nombre-del-monolito.test.ts` de `infrastructure`, que barre este arbol y los
+cinco clones hermanos. Barre **solo codigo de produccion** —ni `docs/`, ni `*.md`, ni pruebas— y
+**omite comentarios**, por lo de arriba.
+
+Esta en un sitio y no en `comun-verificaciones` porque, medido, **del lado Java no hay nada que
+vigilar**: `backend/*/src/main` de los cinco solo nombra el monolito en comentarios y en dos
+`COMMENT ON COLUMN`. Anadir una prohibicion a la libreria compartida exigiria su clase de muestra y
+tocaria los seis builds para vigilar el conjunto vacio.
+
+**Dos excepciones declaradas, y las dos con su motivo dentro de la guarda.** (1) Los buckets
+`sgtm-{stg,prod}-respaldos` (`infra/Pulumi.{stg,prod}.yaml`): **son el nombre de cosas que
+existen**, y renombrarlos en el codigo sin renombrar el bucket manda los respaldos a un sitio que no
+existe — y eso no da error hasta el dia que hay que restaurar. (2) Dos `COMMENT ON COLUMN` dentro de
+un `V1__baseline.sql` **ya aplicado**: Flyway valida la suma de comprobacion de cada migracion, asi
+que editar una que ya corrio hace fallar el arranque de **toda base existente**. No es que no se
+quiera cambiar: **no se puede** — se corregiria con una migracion nueva, si alguna vez importa.
+
 ## Comandos
 
 ```bash

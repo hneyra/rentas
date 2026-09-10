@@ -8,7 +8,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.sql.SQLException;
-import kamayuk.rentas.SgtmAplicacion;
+import kamayuk.rentas.KamayukAplicacion;
 import kamayuk.rentas.autorizacion.ComprobadorDeAcceso;
 import kamayuk.rentas.catastro.infraestructura.ClienteHttpDeCatastro;
 import kamayuk.rentas.esquema.BaseDeDatosDePrueba;
@@ -45,7 +45,7 @@ import org.springframework.test.context.DynamicPropertySource;
  *
  * <h2>Por que el contexto ENTERO y no un {@code ApplicationContextRunner}</h2>
  *
- * <p>Porque lo que falla es el ensamblaje del artefacto que se despliega: {@code SgtmAplicacion}
+ * <p>Porque lo que falla es el ensamblaje del artefacto que se despliega: {@code KamayukAplicacion}
  * con sus {@code @Import}, su {@code @SpringBootApplication} y el {@code application.yaml} que
  * viaja en el jar. Un contexto armado a mano con las clases que uno recuerda es exactamente el
  * lugar donde un bean que falta no se nota.
@@ -64,7 +64,7 @@ import org.springframework.test.context.DynamicPropertySource;
  * <p>Las dos dejan el contexto sin levantar, asi que caen <b>todos</b> los casos de esta clase.
  */
 @SpringBootTest(
-        classes = SgtmAplicacion.class,
+        classes = KamayukAplicacion.class,
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = {
             "spring.profiles.active=web",
@@ -190,7 +190,7 @@ class ArranqueDeLaAplicacionTest {
     @DisplayName("y el perfil batch levanta tambien, sin servidor web")
     void elPerfilBatchLevanta() {
         try (ConfigurableApplicationContext contexto =
-                new SpringApplicationBuilder(SgtmAplicacion.class)
+                new SpringApplicationBuilder(KamayukAplicacion.class)
                         .profiles("batch")
                         .web(org.springframework.boot.WebApplicationType.NONE)
                         .properties(

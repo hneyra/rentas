@@ -23,8 +23,8 @@ import org.springframework.stereotype.Component;
  * hay <b>ni un</b> {@code @EnableScheduling} —Spring Boot no lo activa por autoconfiguracion, asi
  * que el unico {@code @Scheduled} del sistema, el publicador del buzon de {@code caja}, tampoco se
  * registra—, y el perfil {@code batch} <b>termina el proceso</b> tras los runners ({@code
- * SgtmAplicacion} llama a {@code System.exit}) con {@code web-application-type: none}: un proceso
- * que sale no puede sostener un temporizador.
+ * KamayukAplicacion} llama a {@code System.exit}) con {@code web-application-type: none}: un
+ * proceso que sale no puede sostener un temporizador.
  *
  * <p>Asi que se hace como todo lo demas que corre por lotes en este sistema —la implantacion, la
  * publicacion de parametros, la carga del catalogo vial—: un {@code ApplicationRunner} del perfil

@@ -104,7 +104,7 @@ queda esto, que **no es un olvido**:
 |---|---|
 | Roles de base de datos: `sgtm_owner`, `sgtm_app`, `sgtm_readonly` | Son del **clúster**, que los cuatro sistemas comparten. Ya lo dice `CLAUDE.md` de `rentas` |
 | Ids de los plugins de convención: `sgtm.calidad`, `sgtm.modulo`, `sgtm.pruebas`, `sgtm.java-base`, `sgtm.pruebas-postgres` | Son identificadores de Gradle |
-| Nombres de clase: `SgtmAplicacion`, `ConfiguracionDeRentas`, `TablasDeRentas`, `CrucesConsentidosDelSgtm` | Son identificadores de Java |
+| Nombres de clase: `KamayukAplicacion`, `ConfiguracionDeRentas`, `TablasDeRentas`, `CrucesConsentidosDelSgtm` | Son identificadores de Java |
 | `bootJar` → `sgtm.jar`, y el `Dockerfile` que lo copia por ese nombre | El artefacto y su imagen |
 | Claves de configuración de Spring: `sgtm.redondeo.*`, `sgtm.implantacion.*`, `sgtm.carga-*`, `sgtm.portal.oidc.*`, y las variables `SGTM_*` | Las lee el código; renombrarlas es cambiar el contrato del despliegue |
 | `sgtm-ciudadano` (realm), `s3://kamayuk-stg` (bucket de una prueba) | No son módulos. La lista blanca del guion los deja fuera **a propósito** |

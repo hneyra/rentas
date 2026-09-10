@@ -43,7 +43,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class ConstanciasLibresController {
 
     /** Donde viaja el número de la constancia recién emitida. */
-    static final String CABECERA_DEL_NUMERO = "X-Sgtm-Numero";
+    static final String CABECERA_DEL_NUMERO = "X-Kamayuk-Numero";
 
     private final EmitirConstanciaLibre emitir;
     private final Clock reloj;
