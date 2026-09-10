@@ -170,7 +170,7 @@ describe('AC5 — ErrorDeLaApi conserva codigo y mensaje del problem+json', () =
     fetchQueContesta(
       new Response(
         JSON.stringify({
-          type: 'https://sgtm.gob.pe/errores/no_encontrado',
+          type: 'https://kamayuk.gob.pe/errores/no_encontrado',
           title: 'No se encontro lo solicitado',
           status: 404,
           detail: 'No se encontro lo solicitado',

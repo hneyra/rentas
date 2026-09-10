@@ -24,7 +24,7 @@ import org.junit.jupiter.api.Test;
 @DisplayName("#706 — La base de prueba declara su codificacion")
 class CodificacionDeLaBaseDePruebaTest {
 
-    private final String sentencia = MotorPostgres.sentenciaDeCreacion("sgtm_prueba_abcd1234");
+    private final String sentencia = MotorPostgres.sentenciaDeCreacion("kamayuk_prueba_abcd1234");
 
     @Test
     @DisplayName(

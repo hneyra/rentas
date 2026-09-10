@@ -223,10 +223,10 @@ public class ContribuyenteRepositoryJdbc extends RepositorioJdbc
                                         // parecido pueden salir en distinto orden en cada pagina
                                         // y una fila aparecer dos veces o ninguna.
                                         + " codigo_contribuyente ASC"
-                                        + " LIMIT :sgtmLimite OFFSET :sgtmDesplazamiento")
+                                        + " LIMIT :kamayukLimite OFFSET :kamayukDesplazamiento")
                         .params(parametros)
-                        .param("sgtmLimite", paginacion.tamano())
-                        .param("sgtmDesplazamiento", paginacion.desplazamiento())
+                        .param("kamayukLimite", paginacion.tamano())
+                        .param("kamayukDesplazamiento", paginacion.desplazamiento())
                         .query(ContribuyenteRepositoryJdbc::mapear)
                         .list();
 

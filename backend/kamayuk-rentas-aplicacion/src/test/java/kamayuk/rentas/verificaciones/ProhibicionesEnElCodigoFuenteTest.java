@@ -44,7 +44,7 @@ class ProhibicionesEnElCodigoFuenteTest extends ProhibicionesEnElCodigoFuenteTes
         assertThat(RevisorDeCodigoFuente.revisarAreas("ModeloDelFue.java", fuente))
                 .as("el papel no tiene serializador y la unidad va en el rotulo de la fila")
                 .isEmpty();
-        assertThat(new ConfiguracionDelSgtm().componenElAreaAManoConMotivo())
+        assertThat(new ConfiguracionDeRentas().componenElAreaAManoConMotivo())
                 .as(
                         "las seis de hoy: cuatro modelos de documento y las DOS descripciones de"
                                 + " auditoria. La columna JSON de la bitacora SI sale por HTTP"
@@ -88,7 +88,7 @@ class ProhibicionesEnElCodigoFuenteTest extends ProhibicionesEnElCodigoFuenteTes
                 .contains("texto(vieja.areaDeclarada())");
         assertThat(RevisorDeCodigoFuente.revisarAreas(celda.getFileName().toString(), fuente))
                 .isEmpty();
-        assertThat(new ConfiguracionDelSgtm().componenElAreaAManoConMotivo())
+        assertThat(new ConfiguracionDeRentas().componenElAreaAManoConMotivo())
                 .doesNotContain("DiferenciaEntreLiquidaciones");
     }
 }

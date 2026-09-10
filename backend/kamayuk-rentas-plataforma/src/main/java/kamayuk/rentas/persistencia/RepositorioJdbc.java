@@ -90,13 +90,13 @@ public abstract class RepositorioJdbc {
                 seleccion
                         + " "
                         + orden.clausula(paginacion)
-                        + " LIMIT :sgtmLimite OFFSET :sgtmDesplazamiento";
+                        + " LIMIT :kamayukLimite OFFSET :kamayukDesplazamiento";
 
         List<T> contenido =
                 jdbc.sql(sql)
                         .params(parametros)
-                        .param("sgtmLimite", paginacion.tamano())
-                        .param("sgtmDesplazamiento", paginacion.desplazamiento())
+                        .param("kamayukLimite", paginacion.tamano())
+                        .param("kamayukDesplazamiento", paginacion.desplazamiento())
                         .query(mapeo)
                         .list();
 
