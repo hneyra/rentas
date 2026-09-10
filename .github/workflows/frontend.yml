@@ -79,7 +79,7 @@ jobs:
   #
   #   1. `despliegue/plataforma.compose.yaml` vive en `infrastructure`, otro repositorio.
   #      Levantarlo desde aqui pide clonarlo y mantener las dos versiones en paso.
-  #   2. El realm `sgtm` con el cliente `sgtm-backoffice` —PKCE S256, redirect
+  #   2. El realm `sgtm` con el cliente `kamayuk-backoffice` —PKCE S256, redirect
   #      `http://localhost:5173/*`— y las tres cuentas lo describe tambien `infrastructure`.
   #   3. **Los datos no estan en ningun repositorio.** Los caminos afirman cosas como
   #      «SULLON VILCHEZ-JOSE RAUL» y las etapas «Padrón leído»/«Simulados», que salen del
@@ -108,7 +108,7 @@ jobs:
           echo "El arnes de extremo a extremo (frontend/e2e) NO corre en esta CI todavia."
           echo "Le faltan cuatro cosas, y ninguna esta en este repositorio:"
           echo "  1. despliegue/plataforma.compose.yaml, que vive en «infrastructure»"
-          echo "  2. el realm «sgtm» con el cliente «sgtm-backoffice» y sus tres cuentas"
+          echo "  2. el realm «sgtm» con el cliente «kamayuk-backoffice» y sus tres cuentas"
           echo "  3. el volcado de datos de la marcha blanca, que no se versiona en ningun sitio"
           echo "  4. el secreto KAMAYUK_E2E_CLAVE"
           echo ""

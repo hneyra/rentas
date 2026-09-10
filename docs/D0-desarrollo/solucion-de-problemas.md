@@ -71,7 +71,7 @@ sonda en ese compose, así que `--wait` sólo comprueba que el contenedor corre.
 Espera por lo que de verdad necesitas, no por el `up`:
 
 ```bash
-until curl -sf http://localhost:8180/realms/sgtm/.well-known/openid-configuration > /dev/null
+until curl -sf http://localhost:8180/realms/kamayuk/.well-known/openid-configuration > /dev/null
 do sleep 5; done
 ```
 

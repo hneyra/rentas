@@ -29,7 +29,7 @@ import {
  * prohibicion mira la clave.
  */
 
-const REALM = 'http://localhost:8181/realms/sgtm';
+const REALM = 'http://localhost:8181/realms/kamayuk';
 
 /** Sustituye `location`, que en jsdom no se puede espiar de otra manera. */
 function ubicacion(href = 'http://localhost:5173/') {
@@ -69,7 +69,7 @@ afterEach(() => {
 });
 
 describe('AC1 — la ida a la puerta es codigo de autorizacion con PKCE S256', () => {
-  it('manda al realm sgtm, al cliente sgtm-backoffice, con code y S256', async () => {
+  it('manda al realm sgtm, al cliente kamayuk-backoffice, con code y S256', async () => {
     const asignar = ubicacion();
 
     await entrar();
@@ -77,7 +77,7 @@ describe('AC1 — la ida a la puerta es codigo de autorizacion con PKCE S256', (
     const destino = new URL(String(asignar.mock.calls[0]?.[0]));
     expect(destino.origin + destino.pathname).toBe(`${REALM}/protocol/openid-connect/auth`);
     expect(destino.searchParams.get('response_type')).toBe('code');
-    expect(destino.searchParams.get('client_id')).toBe('sgtm-backoffice');
+    expect(destino.searchParams.get('client_id')).toBe('kamayuk-backoffice');
     expect(destino.searchParams.get('code_challenge_method')).toBe('S256');
     // La URI de retorno es la raiz del origen, y una sola: declarar una por pantalla seria una
     // lista que ampliar cada vez que nace una seccion, y el sintoma de olvidarse es «Invalid
@@ -153,7 +153,7 @@ describe('AC1 — el canje deja el token EN MEMORIA y en ningun almacenamiento',
     expect(String(espia.mock.calls[0]?.[0])).toBe(`${REALM}/protocol/openid-connect/token`);
     const enviado = new URLSearchParams(String(espia.mock.calls[0]?.[1]?.body));
     expect(enviado.get('grant_type')).toBe('authorization_code');
-    expect(enviado.get('client_id')).toBe('sgtm-backoffice');
+    expect(enviado.get('client_id')).toBe('kamayuk-backoffice');
     expect(enviado.get('code_verifier')).toBe('el-verificador');
     // Sin secreto: el cliente es publico, y un secreto dentro de un bundle no es un secreto.
     expect(enviado.get('client_secret')).toBeNull();

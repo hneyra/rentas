@@ -43,9 +43,9 @@ const ENTORNO: EntornoDelDescriptor = {
     // escribian `postgres:5432` a mano, que es el nombre del `compose.yaml` local: en Kubernetes
     // no existe ningun `Service` que se llame asi.
     motor: "kamayuk-stg-postgres.kamayuk-stg:5432",
-    emisor: "https://stg.kamayuk.example/keycloak/realms/sgtm",
-    jwks: "http://kamayuk-stg-identidad.kamayuk-stg:8080/keycloak/realms/sgtm/protocol/openid-connect/certs",
-    token: "http://kamayuk-stg-identidad.kamayuk-stg:8080/keycloak/realms/sgtm/protocol/openid-connect/token",
+    emisor: "https://stg.kamayuk.example/keycloak/realms/kamayuk",
+    jwks: "http://kamayuk-stg-identidad.kamayuk-stg:8080/keycloak/realms/kamayuk/protocol/openid-connect/certs",
+    token: "http://kamayuk-stg-identidad.kamayuk-stg:8080/keycloak/realms/kamayuk/protocol/openid-connect/token",
   },
 };
 

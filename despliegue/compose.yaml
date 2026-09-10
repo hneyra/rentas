@@ -148,7 +148,7 @@ services:
       # `identidad` es KEYCLOAK (es a quien se le pide el token, dos lineas mas
       # abajo). La URL va ENTERA, con su prefijo `/identidad/api/v1`.
       KAMAYUK_IDENTIDAD_URL: http://identidad-sistema:8080/identidad/api/v1
-      KAMAYUK_IDENTIDAD_TOKEN: http://identidad:8080/realms/sgtm/protocol/openid-connect/token
+      KAMAYUK_IDENTIDAD_TOKEN: http://identidad:8080/realms/kamayuk/protocol/openid-connect/token
       # El mismo cliente de servicio que el ingestor: uno por (sistema, municipalidad).
       # De su ubigeo sale de que municipalidad es el buzon que se lee.
       KAMAYUK_IDENTIDAD_CLIENTE: kamayuk-rentas-servicio-${KAMAYUK_UBIGEO:?falta KAMAYUK_UBIGEO en el .env de la plataforma}
@@ -190,13 +190,13 @@ services:
       #
       # Es el MISMO realm que los otros tres: un login para los cuatro
       # (ADR-0030 §3).
-      KAMAYUK_OIDC_EMISOR: ${KAMAYUK_OIDC_EMISOR:-http://localhost:8180}/realms/sgtm
+      KAMAYUK_OIDC_EMISOR: ${KAMAYUK_OIDC_EMISOR:-http://localhost:8180}/realms/kamayuk
       # El emisor es una identidad, no una direccion de red. El navegador llega a
       # Keycloak por su nombre publico y este contenedor por el interno de la red
       # del compose; usar el publico para las dos cosas haria que el backend
       # buscara el JWKS en si mismo y todo token seria invalido por un motivo que
       # no se parece a su causa.
-      KAMAYUK_OIDC_JWKS: http://identidad:8080/realms/sgtm/protocol/openid-connect/certs
+      KAMAYUK_OIDC_JWKS: http://identidad:8080/realms/kamayuk/protocol/openid-connect/certs
       # ── Los tres vecinos (#25) ────────────────────────────────────────────
       #
       # Sin estas tres, `rentas` levanta, la sonda dice UP y TRES de sus

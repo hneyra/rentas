@@ -134,12 +134,12 @@ mounts* los resuelve el demonio, y si las rutas no existen allí el motor arranc
 de inicialización y **sin ningún error**. Ver [DEV-03 §2 bis](solucion-de-problemas.md).
 
 **`--wait` vuelve antes de que Keycloak sirva sus realms.** Medido: la base, el buzón y Traefik
-quedan `healthy` en segundos, y `/realms/sgtm/.well-known/openid-configuration` sigue sin
+quedan `healthy` en segundos, y `/realms/kamayuk/.well-known/openid-configuration` sigue sin
 contestar unos **treinta segundos más**. No es un fallo; es que Keycloak no declara sonda en este
 compose. Lo que hay que esperar es esto:
 
 ```bash
-until curl -sf http://localhost:8180/realms/sgtm/.well-known/openid-configuration > /dev/null
+until curl -sf http://localhost:8180/realms/kamayuk/.well-known/openid-configuration > /dev/null
 do sleep 5; done
 ```
 

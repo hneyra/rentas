@@ -29,7 +29,7 @@
  *
  * `sesion.ts:66` se salta la puerta en `localhost` porque el puerto de su vista previa no estaba
  * entre las URI de retorno del cliente y el rebote acababa en «Invalid parameter: redirect_uri».
- * Aqui esta medido que si esta: `sgtm-backoffice` declara `http://localhost:5173/*`, que es donde
+ * Aqui esta medido que si esta: `kamayuk-backoffice` declara `http://localhost:5173/*`, que es donde
  * sirve `yarn dev`. Y `crypto.subtle` existe: `http://localhost` es un origen seguro para el
  * navegador, asi que S256 se puede calcular. Saltarse la puerta aqui seria dejar el unico camino
  * que este issue viene a abrir sin recorrer ni una vez.
@@ -109,7 +109,7 @@ export function token(): string | null {
 /**
  * Fija el token a mano.
  *
- * Existe para las pruebas y para pegar un token de `sgtm-verificacion` en desarrollo sin montar
+ * Existe para las pruebas y para pegar un token de `kamayuk-verificacion` en desarrollo sin montar
  * el rebote entero. No lo persiste: eso es justo lo que este archivo no hace.
  */
 export function fijarToken(nuevo: string | null, identidad: string | null = null): void {
