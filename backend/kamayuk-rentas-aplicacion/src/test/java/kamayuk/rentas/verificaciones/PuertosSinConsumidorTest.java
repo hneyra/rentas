@@ -55,8 +55,8 @@ class PuertosSinConsumidorTest {
     /**
      * Los modulos que son adaptadores CLIENTE de otro sistema (P5E §6).
      *
-     * <p>Son los dos que {@code ConfiguracionDelSgtm} reparte fuera de {@code rentas}: sus tipos de
-     * la raiz del paquete son la API que este sistema declara consumir del vecino. Los demas
+     * <p>Son los dos que {@code ConfiguracionDeRentas} reparte fuera de {@code rentas}: sus tipos
+     * de la raiz del paquete son la API que este sistema declara consumir del vecino. Los demas
      * modulos publican puertos <b>internos</b>, entre contextos de este mismo sistema, y esos ya
      * los vigila Spring Modulith.
      */

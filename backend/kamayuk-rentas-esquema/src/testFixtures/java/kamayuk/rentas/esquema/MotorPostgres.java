@@ -364,7 +364,7 @@ public final class MotorPostgres implements AutoCloseable {
      * —la del contenedor, o la que alguien nombro en la URL—, y esa no paso por {@link
      * #sentenciaDeCreacion}.
      */
-    static final String PREFIJO_DE_LA_BASE = "sgtm_prueba_";
+    static final String PREFIJO_DE_LA_BASE = "kamayuk_prueba_";
 
     /** Un nombre nuevo para la base de esta corrida. */
     private static String nombreDeBaseNueva() {

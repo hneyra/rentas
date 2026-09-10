@@ -15,9 +15,9 @@ import java.util.Set;
  * <p>Aqui estan las 132 juntas porque {@code sgtm} es el monolito. Al separarse, cada sistema se
  * lleva las suyas segun GOB-05 §2.
  */
-final class TablasDelSgtm {
+final class TablasDeRentas {
 
-    private TablasDelSgtm() {}
+    private TablasDeRentas() {}
 
     /**
      * RNF-051: no se borra deuda, pagos, recibos, valores, papeletas, asientos ni auditoria.

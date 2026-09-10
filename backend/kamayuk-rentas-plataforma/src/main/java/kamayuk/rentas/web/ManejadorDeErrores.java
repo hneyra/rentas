@@ -355,7 +355,7 @@ public class ManejadorDeErrores {
 
     private static ProblemDetail cuerpoDe(CodigoDeError codigo, String mensaje) {
         ProblemDetail cuerpo = ProblemDetail.forStatus(codigo.estado());
-        cuerpo.setType(URI.create("https://sgtm.gob.pe/errores/" + codigo.name().toLowerCase()));
+        cuerpo.setType(URI.create("https://kamayuk.gob.pe/errores/" + codigo.name().toLowerCase()));
         cuerpo.setTitle(codigo.mensaje());
         cuerpo.setDetail(mensaje);
         // `codigo` y `mensaje` como extensiones: son los dos campos que el contrato

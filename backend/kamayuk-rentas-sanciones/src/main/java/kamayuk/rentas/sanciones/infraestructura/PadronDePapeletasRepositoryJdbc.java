@@ -154,12 +154,12 @@ public class PadronDePapeletasRepositoryJdbc extends RepositorioJdbc
                                 + COLUMNAS
                                 + DESDE
                                 + donde
-                                + " AND p.id > :sgtmCursor"
+                                + " AND p.id > :kamayukCursor"
                                 + " ORDER BY p.id"
-                                + " LIMIT :sgtmLimite")
+                                + " LIMIT :kamayukLimite")
                 .params(parametros)
-                .param("sgtmCursor", despuesDe)
-                .param("sgtmLimite", cuantos)
+                .param("kamayukCursor", despuesDe)
+                .param("kamayukLimite", cuantos)
                 .query(PadronDePapeletasRepositoryJdbc::mapear)
                 .list();
     }

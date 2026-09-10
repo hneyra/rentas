@@ -36,7 +36,7 @@ public class ConfiguracionDeJson {
 
     @Bean
     public SimpleModule moduloDeObjetosDeValor() {
-        SimpleModule modulo = new SimpleModule("sgtm-objetos-de-valor");
+        SimpleModule modulo = new SimpleModule("kamayuk-objetos-de-valor");
 
         registrar(modulo, Dinero.class, d -> d.valor().toPlainString(), Dinero::de);
         registrar(modulo, Alicuota.class, a -> a.valor().toPlainString(), Alicuota::de);

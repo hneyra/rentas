@@ -108,7 +108,7 @@ const esperar = (ms: number) => new Promise((listo) => setTimeout(listo, ms));
 function problema(codigo: string, estado: number, titulo: string, detalle: string): Response {
   return new Response(
     JSON.stringify({
-      type: `https://sgtm.gob.pe/errores/${codigo.toLowerCase()}`,
+      type: `https://kamayuk.gob.pe/errores/${codigo.toLowerCase()}`,
       title: titulo,
       status: estado,
       detail: detalle,

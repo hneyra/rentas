@@ -26,7 +26,7 @@ import kamayuk.comun.verificaciones.ConfiguracionDeLasVerificaciones;
  * corte: encuentra los cruces de GOB-05 §6 hoy, con todo junto y funcionando, que es la unica
  * ventana en la que arreglarlos cuesta barato.
  */
-public final class ConfiguracionDelSgtm implements ConfiguracionDeLasVerificaciones {
+public final class ConfiguracionDeRentas implements ConfiguracionDeLasVerificaciones {
 
     /**
      * El reparto por modulo Gradle (GOB-05 §1).
@@ -361,12 +361,12 @@ public final class ConfiguracionDelSgtm implements ConfiguracionDeLasVerificacio
 
     @Override
     public Set<String> tablasProtegidas() {
-        return TablasDelSgtm.PROTEGIDAS;
+        return TablasDeRentas.PROTEGIDAS;
     }
 
     @Override
     public Set<String> tablasInmutables() {
-        return TablasDelSgtm.INMUTABLES;
+        return TablasDeRentas.INMUTABLES;
     }
 
     @Override

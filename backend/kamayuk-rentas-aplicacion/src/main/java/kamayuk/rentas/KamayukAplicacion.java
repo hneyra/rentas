@@ -23,7 +23,7 @@ import org.springframework.modulith.Modulithic;
  * o extienda {@code RepositorioJdbc} contaria como una dependencia que explicar.
  */
 @Modulithic(
-        systemName = "SGTM",
+        systemName = "Kamayuk",
         sharedModules = {
             "dominio",
             "compartido",
@@ -36,7 +36,7 @@ import org.springframework.modulith.Modulithic;
         })
 @SpringBootApplication
 @Import({ConfiguracionDeTenant.class, SeguridadWeb.class})
-public class SgtmAplicacion {
+public class KamayukAplicacion {
 
     /** El perfil de los procesos que corren y terminan (ADR-0003). */
     private static final String PERFIL_BATCH = "batch";
@@ -60,7 +60,8 @@ public class SgtmAplicacion {
      * distinto de cero.
      */
     public static void main(String[] args) {
-        ConfigurableApplicationContext contexto = SpringApplication.run(SgtmAplicacion.class, args);
+        ConfigurableApplicationContext contexto =
+                SpringApplication.run(KamayukAplicacion.class, args);
         if (contexto.getEnvironment().matchesProfiles(PERFIL_BATCH)) {
             System.exit(SpringApplication.exit(contexto));
         }
