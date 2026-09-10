@@ -1,7 +1,6 @@
 package kamayuk.rentas.seguridad.aplicacion;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.io.IOException;
 import java.sql.SQLException;
@@ -11,26 +10,21 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.EnumSet;
 import java.util.Optional;
-import java.util.Set;
 import kamayuk.rentas.auditoria.AuditoriaJdbc;
 import kamayuk.rentas.autorizacion.ComprobadorDeAcceso;
 import kamayuk.rentas.autorizacion.Privilegio;
-import kamayuk.rentas.compartido.Pagina;
-import kamayuk.rentas.compartido.Paginacion;
 import kamayuk.rentas.compartido.TenantContext;
 import kamayuk.rentas.dominio.MunicipalidadId;
-import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.esquema.BaseDeDatosDePrueba;
 import kamayuk.rentas.plataforma.tenant.TenantTransactionManager;
 import kamayuk.rentas.seguridad.dominio.CatalogoDeOpciones;
-import kamayuk.rentas.seguridad.dominio.Grupo;
 import kamayuk.rentas.seguridad.dominio.RegistroDeMunicipalidades;
 import kamayuk.rentas.seguridad.dominio.Usuario;
-import kamayuk.rentas.seguridad.infraestructura.AdministracionRepositoryJdbc;
 import kamayuk.rentas.seguridad.infraestructura.ComprobadorDeAccesoJdbc;
-import kamayuk.rentas.seguridad.infraestructura.PermisoRepositoryJdbc;
+import kamayuk.rentas.seguridad.infraestructura.LecturaDeLaCopiaLocalJdbc;
 import kamayuk.rentas.seguridad.infraestructura.RegistroDeMunicipalidadesJdbc;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -43,16 +37,15 @@ import org.springframework.transaction.interceptor.TransactionInterceptor;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * La implantacion, contra PostgreSQL real y de punta a punta.
+ * La implantacion contra PostgreSQL de verdad, en la forma que tiene desde la etapa 4 de ADR-0039:
+ * la de catastro, normativa y caja —el registro, la siembra de la copia local y nada mas—. Lo que
+ * se mide es lo que el guardia de acceso contesta despues, que es lo unico que decide si la
+ * municipalidad se puede usar.
  *
- * <p>Lo que se verifica no es que las filas queden escritas —eso lo verifica cada caso de uso por
- * su cuenta— sino <b>que despues de correr esto haya alguien que pueda administrar el sistema</b>.
- * Es la unica pregunta que importa el dia de la implantacion, y la unica que no se puede responder
- * mirando tablas sueltas.
- *
- * <p>Se usa el {@link RegistroDeMunicipalidadesJdbc} de verdad, con las credenciales de {@code
- * kamayuk_owner} de la base de prueba: el paso que necesita ese rol es justamente el que no tiene
- * sentido simular.
+ * <p>El paso final de la implantacion —cederle el paso al consumidor del buzon— no se mide aqui: el
+ * orden entre los dos runners lo mide {@code CorrerElConsumidorDeIdentidadTest}, y que el
+ * consumidor sin {@code KAMAYUK_IDENTIDAD_URL} no exista lo decide Spring con
+ * {@code @ConditionalOnProperty}, que una prueba unitaria no ejerce.
  */
 @DisplayName("Implantacion de una municipalidad")
 class ImplantarMunicipalidadTest {
@@ -60,18 +53,13 @@ class ImplantarMunicipalidadTest {
     private static final Clock RELOJ =
             Clock.fixed(Instant.parse("2026-08-20T10:00:00Z"), ZoneId.of("America/Lima"));
     private static final LocalDate HOY = LocalDate.of(2026, 8, 20);
-    private static final Paginacion TODO = Paginacion.de(0, 500, "id");
 
     private static BaseDeDatosDePrueba base;
     private static JdbcClient jdbc;
     private static ComprobadorDeAcceso comprobador;
     private static TransactionTemplate transaccion;
-    private static TenantTransactionManager gestor;
-    private static AdministrarSeguridad administrar;
-    private static AdministrarPermisos permisos;
-    private static AdministracionRepositoryJdbc administracion;
     private static RegistroDeMunicipalidades registro;
-    private static SembradorDeAccesos sembrador;
+    private static SembradorDeLaCopiaLocal sembrador;
 
     @BeforeAll
     static void provisionar() throws SQLException, IOException {
@@ -83,24 +71,13 @@ class ImplantarMunicipalidadTest {
         pool.setPassword(base.clave(BaseDeDatosDePrueba.APP));
 
         jdbc = JdbcClient.create(pool);
-        gestor = new TenantTransactionManager(pool);
+        TenantTransactionManager gestor = new TenantTransactionManager(pool);
         transaccion = new TransactionTemplate(gestor);
-        // El comprobador es @Transactional y hay que envolverlo: consulta tablas con
-        // RLS, y sus politicas leen app.municipalidad_id, que solo existe dentro de una
-        // transaccion. Sin envolver, PostgreSQL responde «unrecognized configuration
-        // parameter» —el aislamiento funcionando— y la prueba se cae por el motivo
-        // equivocado. Es el mismo descuido que tenia el guardia de acceso en produccion.
         comprobador = envolver(new ComprobadorDeAccesoJdbc(jdbc), gestor);
-        administracion = new AdministracionRepositoryJdbc(jdbc);
-
-        AuditoriaJdbc auditoria = new AuditoriaJdbc(jdbc, RELOJ);
-        administrar = envolver(new AdministrarSeguridad(administracion, auditoria, RELOJ), gestor);
-        permisos =
+        sembrador =
                 envolver(
-                        new AdministrarPermisos(
-                                new PermisoRepositoryJdbc(jdbc), administracion, auditoria, RELOJ),
+                        new SembradorDeLaCopiaLocal(jdbc, new AuditoriaJdbc(jdbc, RELOJ), RELOJ),
                         gestor);
-        sembrador = envolver(new SembradorDeAccesos(jdbc, auditoria, RELOJ), gestor);
 
         registro =
                 new RegistroDeMunicipalidadesJdbc(
@@ -114,6 +91,11 @@ class ImplantarMunicipalidadTest {
         if (base != null) {
             base.close();
         }
+    }
+
+    @AfterEach
+    void limpiarContexto() {
+        TenantContext.limpiar();
     }
 
     @SuppressWarnings("unchecked")
@@ -132,12 +114,8 @@ class ImplantarMunicipalidadTest {
     private static ImplantarMunicipalidad implantacion(
             String ubigeo, String administradorCuenta, boolean esDemostracion) {
         return new ImplantarMunicipalidad(
-                sembrador,
-                administrar,
-                permisos,
-                administracion,
                 registro,
-                gestor,
+                sembrador,
                 new DatosDeImplantacion(
                         ubigeo,
                         "Municipalidad de prueba " + ubigeo,
@@ -145,25 +123,21 @@ class ImplantarMunicipalidadTest {
                         administradorCuenta,
                         "Administrador de la implantacion",
                         esDemostracion,
-                        "implantacion"));
+                        "implantacion"),
+                "");
     }
 
-    /** Ejecuta la implantacion y devuelve el identificador de la municipalidad. */
     private static long implantar(String ubigeo, String administradorCuenta) {
         implantacion(ubigeo, administradorCuenta).run(null);
         return idDe(ubigeo);
     }
 
-    /**
-     * Cuenta los accesos de la municipalidad del contexto, dentro de una transaccion.
-     *
-     * <p>`acceso` es tabla de tenant: su politica lee app.municipalidad_id, y ese parametro lo fija
-     * TenantTransactionManager al abrir la transaccion. Una lectura suelta no falla en vacio, falla
-     * y punto, que es el comportamiento correcto (DAT-01 §0).
-     */
-    private static long accesosSembrados() {
-        return transaccion.execute(
-                estado -> jdbc.sql("SELECT count(*) FROM acceso").query(Long.class).single());
+    private static long contar(String sql) {
+        Long cuenta = transaccion.execute(estado -> jdbc.sql(sql).query(Long.class).single());
+        if (cuenta == null) {
+            throw new IllegalStateException("sin cuenta para: " + sql);
+        }
+        return cuenta;
     }
 
     private static boolean esDemostracion(String ubigeo) {
@@ -182,61 +156,33 @@ class ImplantarMunicipalidadTest {
     }
 
     @Nested
-    @DisplayName("Deja el sistema administrable")
-    class DejaElSistemaAdministrable {
+    @DisplayName("Deja el sistema usable")
+    class DejaElSistemaUsable {
 
         @Test
-        @DisplayName("el administrador puede administrar permisos, que es de lo que depende todo")
-        void elAdministradorPuedeAdministrar() {
-            long municipalidad = implantar("250201", "admin.implantacion");
-            TenantContext.fijar(new MunicipalidadId(municipalidad));
-
-            assertThat(
-                            comprobador.autoriza(
-                                    "admin.implantacion", "permisos", Privilegio.MODIFICACION, HOY))
-                    .as(
-                            "sin esto, el primer administrador no puede darle permisos a nadie —ni a"
-                                    + " si mismo—, y de ahi solo se sale entrando por la base de datos")
-                    .isTrue();
-
-            TenantContext.limpiar();
-        }
-
-        @Test
-        @DisplayName("quedan sembrados todos los accesos del catalogo, no solo los de seguridad")
+        @DisplayName("quedan sembrados todos los accesos del catalogo")
         void quedanSembradosTodosLosAccesos() {
             long municipalidad = implantar("250202", "admin.250202");
             TenantContext.fijar(new MunicipalidadId(municipalidad));
 
-            long enLaBase = accesosSembrados();
-
-            assertThat(enLaBase)
+            assertThat(contar("SELECT count(*) FROM acceso"))
                     .as(
                             "una opcion sin acceso sembrado es una opcion a la que nadie puede dar"
                                     + " permiso, y no se nota hasta que alguien la busca")
                     .isEqualTo(CatalogoDeOpciones.leer().size());
-
-            TenantContext.limpiar();
         }
 
         @Test
-        @DisplayName("el administrador recibe el catalogo entero, no solo el modulo de seguridad")
+        @DisplayName("el administrador recibe el catalogo entero con los siete privilegios")
         void elAdministradorRecibeTodoElCatalogo() {
             long municipalidad = implantar("250203", "admin.250203");
             TenantContext.fijar(new MunicipalidadId(municipalidad));
 
-            // Administra la seguridad...
-            assertThat(comprobador.autoriza("admin.250203", "usuarios", Privilegio.REGISTRO, HOY))
-                    .isTrue();
-            // ...y tambien el padron, la caja y todo lo demas: administra la municipalidad
-            // entera, no solo su seguridad (REQ-03 §3).
             assertThat(
                             comprobador.autoriza(
                                     "admin.250203", "contribuyentes", Privilegio.REGISTRO, HOY))
                     .as("el administrador inicial administra toda la municipalidad")
                     .isTrue();
-
-            // Cada opcion del catalogo, con cada uno de los siete privilegios.
             for (CatalogoDeOpciones.Opcion opcion : CatalogoDeOpciones.leer()) {
                 for (Privilegio privilegio : EnumSet.allOf(Privilegio.class)) {
                     assertThat(
@@ -246,83 +192,71 @@ class ImplantarMunicipalidadTest {
                             .isTrue();
                 }
             }
+        }
 
-            TenantContext.limpiar();
+        @Test
+        @DisplayName("y NO recibe las cuatro opciones que se fueron a identidad: aqui no existen")
+        void lasCuatroDeAdministracionNoExisten() {
+            long municipalidad = implantar("250205", "admin.250205");
+            TenantContext.fijar(new MunicipalidadId(municipalidad));
+
+            for (String retirada : new String[] {"usuarios", "grupos", "miembros", "permisos"}) {
+                assertThat(contar("SELECT count(*) FROM acceso WHERE codigo = '" + retirada + "'"))
+                        .as(
+                                "«%s» se administra en `identidad` (ADR-0039, etapa 4): sembrarla"
+                                        + " aqui seria una fila de `acceso` sobre la que se pueden"
+                                        + " otorgar permisos que no habilitan nada",
+                                retirada)
+                        .isZero();
+                assertThat(comprobador.autoriza("admin.250205", retirada, Privilegio.LECTURA, HOY))
+                        .isFalse();
+            }
+        }
+
+        @Test
+        @DisplayName("deja UN grupo, y el grupo «Seguridad» de antes de la etapa 4 ya no")
+        void dejaUnSoloGrupo() {
+            long municipalidad = implantar("250206", "admin.250206");
+            TenantContext.fijar(new MunicipalidadId(municipalidad));
+
+            assertThat(contar("SELECT count(*) FROM grupo")).isEqualTo(1);
+            assertThat(
+                            contar(
+                                    "SELECT count(*) FROM grupo WHERE nombre = '"
+                                            + SembradorDeLaCopiaLocal.GRUPO_DE_ADMINISTRACION
+                                            + "'"))
+                    .isEqualTo(1);
+            assertThat(contar("SELECT count(*) FROM grupo WHERE nombre = 'Seguridad'"))
+                    .as(
+                            "un grupo plantilla sobre cuatro opciones que este sistema ya no sirve"
+                                    + " seria una promesa vacia")
+                    .isZero();
         }
     }
 
     @Nested
-    @DisplayName("El grupo Seguridad delegado")
-    class GrupoDeSeguridad {
+    @DisplayName("Aislamiento entre municipalidades implantadas")
+    class Aislamiento {
 
         @Test
-        @DisplayName("un miembro administra el acceso de los usuarios, y nada mas")
-        void unMiembroSoloAdministraElAccesoDeLosUsuarios() {
-            long municipalidad = implantar("250209", "admin.250209");
-            TenantContext.fijar(new MunicipalidadId(municipalidad));
-            kamayuk.rentas.auditoria.OrigenContext.fijar(
-                    kamayuk.rentas.auditoria.Origen.deProceso("admin.250209"));
+        @DisplayName("desde B, el administrador de A no existe")
+        void desdeBElAdministradorDeANoExiste() {
+            long a = implantar("250211", "admin.de.a");
+            long b = implantar("250212", "admin.de.b");
+            TenantContext.fijar(new MunicipalidadId(b));
 
-            long grupoSeguridad =
-                    transaccion.execute(
-                            estado ->
-                                    administracion
-                                            .grupoPorNombre(
-                                                    ImplantarMunicipalidad.GRUPO_DE_SEGURIDAD)
-                                            .orElseThrow()
-                                            .id());
-
-            Usuario operador =
-                    administrar.registrarUsuario(
-                            Usuario.nuevo("operador.accesos", "Operadora de accesos", null),
-                            Observacion.de("prueba: miembro del grupo Seguridad"));
-            administrar.afiliar(
-                    grupoSeguridad,
-                    operador.id(),
-                    Observacion.de("prueba: miembro del grupo Seguridad"));
-
-            // Administra el acceso: grupos, usuarios, permisos, miembros.
+            LecturaDeLaCopiaLocalJdbc copia = new LecturaDeLaCopiaLocalJdbc(jdbc);
+            Optional<Usuario> deA =
+                    transaccion.execute(estado -> copia.usuarioPorCuenta("admin.de.a"));
+            assertThat(deA)
+                    .as("dos municipalidades implantadas en la misma base no se ven entre si")
+                    .isEmpty();
             assertThat(
                             comprobador.autoriza(
-                                    "operador.accesos", "usuarios", Privilegio.MODIFICACION, HOY))
-                    .isTrue();
-            assertThat(
-                            comprobador.autoriza(
-                                    "operador.accesos", "permisos", Privilegio.MODIFICACION, HOY))
-                    .isTrue();
-            // Y nada mas: es el alcance que tuvo el administrador antes de recibir el catalogo.
-            assertThat(
-                            comprobador.autoriza(
-                                    "operador.accesos", "contribuyentes", Privilegio.LECTURA, HOY))
-                    .as("el grupo Seguridad solo administra el acceso de los usuarios")
+                                    "admin.de.a", "contribuyentes", Privilegio.MODIFICACION, HOY))
+                    .as("y el administrador de una no autoriza en la otra")
                     .isFalse();
-
-            kamayuk.rentas.auditoria.OrigenContext.limpiar();
-            TenantContext.limpiar();
-        }
-
-        @Test
-        @DisplayName("se crea sin miembros: es una plantilla")
-        void seCreaSinMiembros() {
-            long municipalidad = implantar("250210", "admin.250210");
-            TenantContext.fijar(new MunicipalidadId(municipalidad));
-
-            long miembros =
-                    transaccion.execute(
-                            estado ->
-                                    jdbc.sql(
-                                                    "SELECT count(*) FROM miembro m"
-                                                            + " JOIN grupo g ON g.id = m.grupo_id"
-                                                            + " WHERE g.nombre = :n")
-                                            .param("n", ImplantarMunicipalidad.GRUPO_DE_SEGURIDAD)
-                                            .query(Long.class)
-                                            .single());
-
-            assertThat(miembros)
-                    .as("la implantacion no mete a nadie en el grupo Seguridad")
-                    .isZero();
-
-            TenantContext.limpiar();
+            assertThat(a).isNotEqualTo(b);
         }
     }
 
@@ -343,10 +277,6 @@ class ImplantarMunicipalidadTest {
         @Test
         @DisplayName("por omision NO es de demostracion")
         void porOmisionNoEsDeDemostracion() {
-            // De los dos errores posibles, el valor por omision tiene que ser el que no se
-            // pueda cometer callando: una instalacion real que se declarara de demostracion
-            // emite papeles marcados de mas —molesto—; una de demostracion que se olvidara
-            // de declararse emite papeles sin marca, que es lo que #122 impide.
             implantacion("200502", "admin.real").run(null);
 
             assertThat(esDemostracion("200502")).isFalse();
@@ -355,10 +285,6 @@ class ImplantarMunicipalidadTest {
         @Test
         @DisplayName("relanzar el despliegue no le quita la marca a una instalacion")
         void relanzarNoLeQuitaLaMarca() {
-            // Quitar la marca tiene que ser deliberado y dejar rastro: un UPDATE de
-            // kamayuk_owner. Si un despliegue con la variable en false la quitara, bastaria
-            // un descuido en un archivo de entorno para que la marcha blanca empezara a
-            // emitir papeles indistinguibles de los de verdad.
             implantacion("200503", "admin.marchablanca", true).run(null);
             implantacion("200503", "admin.marchablanca", false).run(null);
 
@@ -379,129 +305,44 @@ class ImplantarMunicipalidadTest {
             long segunda = implantar("250204", "admin.250204");
 
             assertThat(segunda).as("la municipalidad es la misma fila").isEqualTo(primera);
-
             TenantContext.fijar(new MunicipalidadId(primera));
 
-            Pagina<Grupo> grupos = administrar.grupos(TODO);
-            assertThat(
-                            grupos.contenido().stream()
-                                    .filter(
-                                            g ->
-                                                    ImplantarMunicipalidad.GRUPO_DE_ADMINISTRACION
-                                                            .equals(g.nombre()))
-                                    .count())
+            assertThat(contar("SELECT count(*) FROM grupo"))
                     .as(
                             "un grupo de administracion duplicado deja permisos repartidos en dos sitios")
                     .isEqualTo(1);
-            assertThat(
-                            grupos.contenido().stream()
-                                    .filter(
-                                            g ->
-                                                    ImplantarMunicipalidad.GRUPO_DE_SEGURIDAD
-                                                            .equals(g.nombre()))
-                                    .count())
-                    .as("y el grupo Seguridad tampoco se duplica al relanzar")
+            assertThat(contar("SELECT count(*) FROM usuario WHERE cuenta = 'admin.250204'"))
                     .isEqualTo(1);
-
-            Pagina<Usuario> usuarios = administrar.usuarios(TODO);
-            assertThat(
-                            usuarios.contenido().stream()
-                                    .filter(u -> "admin.250204".equals(u.cuenta()))
-                                    .count())
-                    .isEqualTo(1);
-
-            assertThat(accesosSembrados()).isEqualTo(CatalogoDeOpciones.leer().size());
-
-            TenantContext.limpiar();
+            assertThat(contar("SELECT count(*) FROM miembro")).isEqualTo(1);
+            assertThat(contar("SELECT count(*) FROM permiso"))
+                    .as("un permiso por opcion del catalogo, y ni uno mas")
+                    .isEqualTo(CatalogoDeOpciones.leer().size());
         }
-    }
-
-    @Nested
-    @DisplayName("Aislamiento entre municipalidades implantadas")
-    class Aislamiento {
 
         @Test
-        @DisplayName("desde B, el administrador de A no existe")
-        void desdeBElAdministradorDeANoExiste() {
-            long a = implantar("250205", "admin.de.a");
-            long b = implantar("250206", "admin.de.b");
-
-            TenantContext.fijar(new MunicipalidadId(b));
-
-            Optional<Usuario> deA =
-                    transaccion.execute(estado -> administracion.usuarioPorCuenta("admin.de.a"));
-            assertThat(deA)
-                    .as("dos municipalidades implantadas en la misma base no se ven entre si")
-                    .isEmpty();
-            assertThat(comprobador.autoriza("admin.de.a", "permisos", Privilegio.MODIFICACION, HOY))
-                    .as("y el administrador de una no autoriza en la otra")
-                    .isFalse();
-
-            assertThat(a).isNotEqualTo(b);
-            TenantContext.limpiar();
-        }
-    }
-
-    @Nested
-    @DisplayName("Lo que la implantacion deja protegido")
-    class LoQueDejaProtegido {
-
-        @Test
-        @DisplayName("no se le puede quitar al grupo el permiso que sostiene la administracion")
-        void noSeLePuedeQuitarElPermisoQueSostieneLaAdministracion() {
+        @DisplayName("y no le quita al administrador lo que alguien le haya recortado despues")
+        void noReponeLoRecortado() {
             long municipalidad = implantar("250207", "admin.250207");
             TenantContext.fijar(new MunicipalidadId(municipalidad));
-            kamayuk.rentas.auditoria.OrigenContext.fijar(
-                    kamayuk.rentas.auditoria.Origen.deProceso("admin.250207"));
+            transaccion.executeWithoutResult(
+                    estado ->
+                            jdbc.sql(
+                                            "UPDATE permiso SET registro = false WHERE acceso_id ="
+                                                    + " (SELECT id FROM acceso WHERE codigo ="
+                                                    + " 'contribuyentes')")
+                                    .update());
+            TenantContext.limpiar();
 
-            long grupoId =
-                    transaccion.execute(
-                            estado ->
-                                    administracion
-                                            .grupoPorNombre(
-                                                    ImplantarMunicipalidad.GRUPO_DE_ADMINISTRACION)
-                                            .orElseThrow()
-                                            .id());
-
-            // Es la comprobacion que da valor a todo lo anterior: si el unico grupo que
-            // puede administrar permisos se quedara sin ellos, la municipalidad tendria
-            // que arreglarse entrando por la base de datos.
-            assertThatThrownBy(
-                            () ->
-                                    permisos.fijarParaGrupo(
-                                            grupoId,
-                                            "permisos",
-                                            Set.of(),
-                                            Observacion.de(
-                                                    "Intento de dejar la municipalidad sin quien"
-                                                            + " administre")))
-                    .as(
-                            "la implantacion deja UN grupo administrador: quitarle esto lo deja en cero")
-                    .isInstanceOf(RuntimeException.class);
+            implantar("250207", "admin.250207");
+            TenantContext.fijar(new MunicipalidadId(municipalidad));
 
             assertThat(
                             comprobador.autoriza(
-                                    "admin.250207", "permisos", Privilegio.MODIFICACION, HOY))
-                    .as("y despues del intento fallido sigue pudiendo administrar")
-                    .isTrue();
-
-            kamayuk.rentas.auditoria.OrigenContext.limpiar();
-            TenantContext.limpiar();
-        }
-
-        @Test
-        @DisplayName("los siete privilegios quedan puestos, no solo la lectura")
-        void losSietePrivilegiosQuedanPuestos() {
-            long municipalidad = implantar("250208", "admin.250208");
-            TenantContext.fijar(new MunicipalidadId(municipalidad));
-
-            for (Privilegio privilegio : EnumSet.allOf(Privilegio.class)) {
-                assertThat(comprobador.autoriza("admin.250208", "grupos", privilegio, HOY))
-                        .as("privilegio %s sobre la pantalla de grupos", privilegio)
-                        .isTrue();
-            }
-
-            TenantContext.limpiar();
+                                    "admin.250207", "contribuyentes", Privilegio.REGISTRO, HOY))
+                    .as(
+                            "lo que ya existe se queda como esta: relanzar el despliegue no vuelve"
+                                    + " a abrir lo que alguien cerro")
+                    .isFalse();
         }
     }
 }

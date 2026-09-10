@@ -413,39 +413,11 @@
     "opcionales": ["direccion", "ordenarPor", "pagina", "tamano"],
     "enElCuerpo": []
   },
-  "GET /seguridad/accesos/{codigo}/usuarios": {
-    "obligatorios": [],
-    "algunoDeEstos": [],
-    "condicionales": [],
-    "opcionales": ["direccion", "ordenarPor", "pagina", "privilegio", "tamano"],
-    "enElCuerpo": []
-  },
   "GET /seguridad/auditoria": {
     "obligatorios": ["ejercicio"],
     "algunoDeEstos": [],
     "condicionales": [],
     "opcionales": ["desde", "direccion", "hasta", "operacion", "ordenarPor", "pagina", "tabla", "tamano", "usuario"],
-    "enElCuerpo": []
-  },
-  "GET /seguridad/grupos": {
-    "obligatorios": [],
-    "algunoDeEstos": [],
-    "condicionales": [],
-    "opcionales": ["direccion", "ordenarPor", "pagina", "tamano"],
-    "enElCuerpo": []
-  },
-  "GET /seguridad/grupos/{grupo}/miembros": {
-    "obligatorios": [],
-    "algunoDeEstos": [],
-    "condicionales": [],
-    "opcionales": ["direccion", "ordenarPor", "pagina", "tamano"],
-    "enElCuerpo": []
-  },
-  "GET /seguridad/grupos/{id}/permisos": {
-    "obligatorios": [],
-    "algunoDeEstos": [],
-    "condicionales": [],
-    "opcionales": [],
     "enElCuerpo": []
   },
   "GET /seguridad/modulos": {
@@ -477,34 +449,6 @@
     "enElCuerpo": []
   },
   "GET /seguridad/sesion/permisos": {
-    "obligatorios": [],
-    "algunoDeEstos": [],
-    "condicionales": [],
-    "opcionales": [],
-    "enElCuerpo": []
-  },
-  "GET /seguridad/usuarios": {
-    "obligatorios": [],
-    "algunoDeEstos": [],
-    "condicionales": [],
-    "opcionales": ["direccion", "ordenarPor", "pagina", "tamano"],
-    "enElCuerpo": []
-  },
-  "GET /seguridad/usuarios/{id}/grupos": {
-    "obligatorios": [],
-    "algunoDeEstos": [],
-    "condicionales": [],
-    "opcionales": ["direccion", "ordenarPor", "pagina", "tamano"],
-    "enElCuerpo": []
-  },
-  "GET /seguridad/usuarios/{id}/permisos": {
-    "obligatorios": [],
-    "algunoDeEstos": [],
-    "condicionales": [],
-    "opcionales": [],
-    "enElCuerpo": []
-  },
-  "GET /seguridad/usuarios/{id}/permisos/configurados": {
     "obligatorios": [],
     "algunoDeEstos": [],
     "condicionales": [],
@@ -1043,60 +987,11 @@
     "opcionales": ["codContribuyente", "placa"],
     "enElCuerpo": []
   },
-  "POST /seguridad/grupos": {
-    "obligatorios": [],
-    "algunoDeEstos": [],
-    "condicionales": [],
-    "opcionales": [],
-    "enElCuerpo": []
-  },
-  "POST /seguridad/grupos/{grupo}/miembros": {
-    "obligatorios": [],
-    "algunoDeEstos": [],
-    "condicionales": [],
-    "opcionales": [],
-    "enElCuerpo": []
-  },
-  "POST /seguridad/grupos/{id}/baja": {
-    "obligatorios": [],
-    "algunoDeEstos": [],
-    "condicionales": [],
-    "opcionales": [],
-    "enElCuerpo": []
-  },
-  "POST /seguridad/grupos/{id}/reactivacion": {
-    "obligatorios": [],
-    "algunoDeEstos": [],
-    "condicionales": [],
-    "opcionales": [],
-    "enElCuerpo": []
-  },
   "POST /seguridad/respaldos": {
     "obligatorios": [],
     "algunoDeEstos": [],
     "condicionales": [],
     "opcionales": ["direccion", "ordenarPor", "pagina", "tamano"],
-    "enElCuerpo": []
-  },
-  "POST /seguridad/usuarios": {
-    "obligatorios": [],
-    "algunoDeEstos": [],
-    "condicionales": [],
-    "opcionales": [],
-    "enElCuerpo": []
-  },
-  "POST /seguridad/usuarios/{id}/baja": {
-    "obligatorios": [],
-    "algunoDeEstos": [],
-    "condicionales": [],
-    "opcionales": [],
-    "enElCuerpo": []
-  },
-  "POST /seguridad/usuarios/{id}/reactivacion": {
-    "obligatorios": [],
-    "algunoDeEstos": [],
-    "condicionales": [],
-    "opcionales": [],
     "enElCuerpo": []
   },
   "POST /tesoreria/convenios/{numero}/anulacion": {
@@ -1225,20 +1120,6 @@
     "opcionales": [],
     "enElCuerpo": []
   },
-  "PUT /seguridad/grupos/{id}/permisos": {
-    "obligatorios": [],
-    "algunoDeEstos": [],
-    "condicionales": [],
-    "opcionales": [],
-    "enElCuerpo": []
-  },
-  "PUT /seguridad/grupos/{id}/vigencia": {
-    "obligatorios": [],
-    "algunoDeEstos": [],
-    "condicionales": [],
-    "opcionales": [],
-    "enElCuerpo": []
-  },
   "PUT /seguridad/sesion/ejercicio": {
     "obligatorios": [],
     "algunoDeEstos": [],
@@ -1247,20 +1128,6 @@
     "enElCuerpo": []
   },
   "PUT /seguridad/usuarios/{id}/clave": {
-    "obligatorios": [],
-    "algunoDeEstos": [],
-    "condicionales": [],
-    "opcionales": [],
-    "enElCuerpo": []
-  },
-  "PUT /seguridad/usuarios/{id}/permisos": {
-    "obligatorios": [],
-    "algunoDeEstos": [],
-    "condicionales": [],
-    "opcionales": [],
-    "enElCuerpo": []
-  },
-  "PUT /seguridad/usuarios/{id}/vigencia": {
     "obligatorios": [],
     "algunoDeEstos": [],
     "condicionales": [],

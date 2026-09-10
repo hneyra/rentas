@@ -133,6 +133,12 @@ function urlDeLaBase(e: EntornoDelDescriptor): string {
  */
 const VENTANA_DE_LOTE = "0 7 * * *";
 
+/**
+ * Cada cinco minutos: la ventana de inconsistencia de la copia local de la autorizacion
+ * (ADR-0039, etapa 4). Ver el comentario del CronJob en `lotes()`.
+ */
+const VENTANA_DEL_CONSUMIDOR_DE_IDENTIDAD = "*/5 * * * *";
+
 const RECURSOS_DE_ARRANQUE = {
   requests: { cpu: "50m", memory: "256Mi" },
   limits: { cpu: "1", memory: "1Gi" },
@@ -223,6 +229,48 @@ function variablesDeImplantacion(e: EntornoDelDescriptor): VariableDeEntorno[] {
       name: "KAMAYUK_IMPLANTACION_OWNERCLAVE",
       valueFrom: { secretKeyRef: { name: e.secretoDe("owner"), key: "clave" } },
     },
+  ];
+}
+
+/**
+ * Con que lee `rentas` el buzon de `identidad` (ADR-0039, etapa 4): las seis de
+ * `kamayuk.identidad.*`, que `ConfiguracionDelConsumidorDeIdentidad` y
+ * `CorrerElConsumidorDeIdentidad` leen. Sin `KAMAYUK_IDENTIDAD_URL` el consumidor NO existe
+ * —`@ConditionalOnProperty("kamayuk.identidad.url")`— y la implantacion lo dice al terminar:
+ * la copia local se queda con lo que sembro `SembradorDeLaCopiaLocal` y nadie la actualiza.
+ *
+ * La URL se compone con `namespaceDe` y no a mano, y el `Service` se llama
+ * `kamayuk-identidad-web` —es lo que el descriptor de `identidad` publica— y **no**
+ * `kamayuk-<amb>-identidad`, que es Keycloak. Va ENTERA, con su prefijo: `Api.RAIZ` de
+ * `identidad` es `/identidad/api/v1` y de ahi cuelga `/eventos/pendientes`.
+ *
+ * El cliente de servicio es EL MISMO que usa el ingestor hacia `catastro`
+ * —`kamayuk-rentas-servicio-<ubigeo>`, uno por municipalidad (ADR-0028 §2)— y la clave es
+ * OTRA: `e.secretoDe("identidad")`, el espejo de la que el Job de identidad le fija a Keycloak
+ * para el par (rentas, identidad). De ese cliente sale ademas la municipalidad del buzon: el
+ * runner lee el ubigeo del nombre y lo resuelve contra `municipalidad`, que es lo mismo que
+ * `identidad` lee del `azp` del token; no hay una variable aparte que pueda discrepar.
+ *
+ * El responsable y su canal son los mismos que el ingestor del padron: la municipalidad tiene
+ * UNA persona que responde por lo que este despliegue no consigue hacer solo (ADR-0026 §4).
+ */
+function variablesDelConsumidorDeIdentidad(e: EntornoDelDescriptor): VariableDeEntorno[] {
+  return [
+    {
+      name: "KAMAYUK_IDENTIDAD_URL",
+      value: `http://kamayuk-identidad-web.${e.namespaceDe("identidad")}/identidad/api/v1`,
+    },
+    { name: "KAMAYUK_IDENTIDAD_TOKEN", value: e.plataforma.token },
+    {
+      name: "KAMAYUK_IDENTIDAD_CLIENTE",
+      value: `kamayuk-${SISTEMA}-servicio-${e.implantacion.ubigeo}`,
+    },
+    {
+      name: "KAMAYUK_IDENTIDAD_CREDENCIAL",
+      valueFrom: { secretKeyRef: { name: e.secretoDe("identidad"), key: "clave" } },
+    },
+    { name: "KAMAYUK_IDENTIDAD_RESPONSABLE", value: e.operacion.responsable },
+    { name: "KAMAYUK_IDENTIDAD_CANAL", value: e.operacion.canal },
   ];
 }
 
@@ -830,7 +878,12 @@ export const rentas: DescriptorDeSistema = {
                   // La MISMA imagen que la aplicacion, con el perfil `batch` (ADR-0003: un
                   // artefacto, dos perfiles). No abre puerto ninguno.
                   image: e.imagenDe(SISTEMA),
-                  env: variablesDeImplantacion(e),
+                  // Y las del consumidor de `identidad` (ADR-0039 etapa 4): la implantacion
+                  // TERMINA con una pasada suya —`CorrerElConsumidorDeIdentidad` corre detras
+                  // de `ImplantarMunicipalidad` en el mismo proceso— y trae lo que `identidad`
+                  // ya diga de esta municipalidad. Sin ellas la implantacion no falla: siembra
+                  // y avisa de que nadie va a actualizar la copia.
+                  env: [...variablesDeImplantacion(e), ...variablesDelConsumidorDeIdentidad(e)],
                   resources: RECURSOS_DE_ARRANQUE,
                   securityContext: SEGURIDAD,
                 },
@@ -963,7 +1016,52 @@ export const rentas: DescriptorDeSistema = {
         },
       },
     };
-    return [ingestor];
+    // El consumidor del buzon de `identidad` (ADR-0039, etapa 4; `identidad`#4). Cada cinco
+    // minutos y no una vez al dia como el ingestor: lo que trae es QUIEN PUEDE HACER QUE, y la
+    // ventana de inconsistencia de la copia local —el tiempo entre que `identidad` retira un
+    // permiso y esta copia deja de concederlo— es exactamente su periodo. ADR-0039 §«Lo que
+    // cuesta» exige que esa ventana este medida y escrita; hoy es «cinco minutos mas lo que
+    // tarde una vuelta», y se dice aqui en vez de suponerse. `Forbid` y `backoffLimit: 1`, como
+    // el ingestor: dos consumidores a la vez se pisarian el acuse, y un fallo transitorio lo
+    // reintenta la corrida siguiente, no la misma.
+    const consumidorDeIdentidad = `kamayuk-${SISTEMA}-consumidor-de-identidad`;
+    const consumidor: CronJob = {
+      apiVersion: "batch/v1",
+      kind: "CronJob",
+      metadata: { name: consumidorDeIdentidad, namespace: e.namespace, labels: etiquetas },
+      spec: {
+        schedule: VENTANA_DEL_CONSUMIDOR_DE_IDENTIDAD,
+        concurrencyPolicy: "Forbid",
+        successfulJobsHistoryLimit: 3,
+        failedJobsHistoryLimit: 3,
+        jobTemplate: {
+          spec: {
+            backoffLimit: 1,
+            template: {
+              metadata: { labels: { ...etiquetas, app: consumidorDeIdentidad } },
+              spec: {
+                restartPolicy: "Never",
+                priorityClassName: e.prioridadDe("lote"),
+                containers: [
+                  {
+                    name: "consumidor-de-identidad",
+                    image: e.imagenDe(SISTEMA),
+                    env: [
+                      { name: "SPRING_PROFILES_ACTIVE", value: "batch" },
+                      ...credencialesDeLaAplicacion(e),
+                      ...variablesDelConsumidorDeIdentidad(e),
+                    ],
+                    resources: RECURSOS_DE_ARRANQUE,
+                    securityContext: SEGURIDAD,
+                  },
+                ],
+              },
+            },
+          },
+        },
+      },
+    };
+    return [ingestor, consumidor];
   },
 
   /**
@@ -1088,6 +1186,22 @@ export const rentas: DescriptorDeSistema = {
               ],
               ports: [{ protocol: "TCP", port: 8080 }],
             },
+            // identidad EL SISTEMA (ADR-0039, etapa 4): el buzon del que este consumidor trae la
+            // autorizacion. `componente: identidad-sistema` y no `identidad`, que en la
+            // plataforma es Keycloak —la regla de arriba—; el namespace es el suyo. Solo lo usan
+            // el CronJob del consumidor y el Job de implantacion, y es una arista de LECTURA: el
+            // camino caliente de la autorizacion sigue siendo la copia local.
+            {
+              to: [
+                {
+                  namespaceSelector: {
+                    matchLabels: { "kubernetes.io/metadata.name": e.namespaceDe("identidad") },
+                  },
+                  podSelector: { matchLabels: { componente: "identidad-sistema" } },
+                },
+              ],
+              ports: [{ protocol: "TCP", port: 8080 }],
+            },
             // catastro: la valuacion sellada del ejercicio y las fichas que la sustentan (ADR-0027)
             {
               to: [
@@ -1207,6 +1321,15 @@ export const rentas: DescriptorDeSistema = {
       emisor: "keycloak",
       rotacion: "trimestral",
       proposito: "pedir el buzon de hechos de catastro con el token del cliente de servicio",
+    },
+    {
+      nombre: e.secretoDe("identidad"),
+      clave: "clave",
+      emisor: "keycloak",
+      rotacion: "trimestral",
+      proposito:
+        "leer y acusar el buzon de identidad —la autorizacion— con el token del cliente de" +
+        " servicio (ADR-0039, etapa 4)",
     },
   ],
 };

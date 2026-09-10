@@ -25,7 +25,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import kamayuk.comun.verificaciones.ReglasDeArquitectura;
 import kamayuk.rentas.auditoria.Operacion;
-import kamayuk.rentas.autorizacion.Privilegio;
 import kamayuk.rentas.fiscalizacion.dominio.ActaFiscalizacion;
 import kamayuk.rentas.fiscalizacion.dominio.CondicionFiscalizada;
 import kamayuk.rentas.fiscalizacion.dominio.EstadoDeLiquidacion;
@@ -241,17 +240,11 @@ class ParametrosDeLaConsultaTest {
                     // contrato declara, y comprometerlos cuando la operacion nace no cuesta
                     // nada. `resultado` se RECHAZA con 422 si no es uno de los tres, que
                     // tambien es leerlo.
-                    "GET /coactiva/prescripcion",
-                    // #583 — quien tiene un privilegio sobre un acceso. Estrena
-                    // controlador, y comprometer las dos direcciones cuando la operacion
-                    // nace no cuesta nada: su unico filtro propio es `privilegio`, que el
-                    // controlador lee y RECHAZA con 422 si no es uno de los siete —y
-                    // rechazar tambien es leer—. La otra lectura de ese issue, la de lo
-                    // configurado, no declara ningun parametro de consulta y su promesa es
-                    // que siga sin declararlo: un filtro nuevo ahi tendria que leerlo
-                    // alguien.
-                    "GET /seguridad/accesos/{codigo}/usuarios",
-                    "GET /seguridad/usuarios/{id}/permisos/configurados");
+                    // #583 estaba aqui con sus dos lecturas —«quien tiene un privilegio» y lo
+                    // configurado de una cuenta— y salen con la etapa 4 de ADR-0039: la
+                    // administracion de la autorizacion es de `identidad`, y las dos rutas ya
+                    // no estan ni en el contrato ni en ningun controlador de este backend.
+                    "GET /coactiva/prescripcion");
 
     // `GET /tesoreria/cajas` (#618) estaba aqui y sale con P5D: el catalogo de ventanillas es de
     // `caja` desde `V7`. Su promesa era la mas estrecha que hay —ningun parametro propio, solo el
@@ -1134,21 +1127,9 @@ class ParametrosDeLaConsultaTest {
                 .containsExactly(nombresDe(Hallazgo.values()));
     }
 
-    @Test
-    @DisplayName("y el de «quien tiene un privilegio» son los siete de Privilegio (#583)")
-    void elVocabularioDelPrivilegioEsElDeSuEnumerado() throws IOException {
-        // El mismo eslabon, y aqui el parametro es ADEMAS obligatorio: una palabra
-        // que no sea una de las siete no da una pagina vacia sino 422 enumerandolas.
-        // Sin esta prueba el contrato seria una segunda copia de la lista que nadie
-        // compara con la primera, y un privilegio anadido al enumerado se quedaria
-        // fuera del desplegable sin que nada lo dijera (#192).
-        assertThat(vocabularioDelContrato("/seguridad/accesos/{codigo}/usuarios", "privilegio"))
-                .as(
-                        "los SIETE privilegios del manual (cap. 4, RF-121), letra por letra. Se"
-                                + " declara en docs/50-api/generar-openapi.mjs (VOCABULARIOS), nunca"
-                                + " a mano")
-                .containsExactly(nombresDe(Privilegio.values()));
-    }
+    // El vocabulario de `privilegio` de `GET /seguridad/accesos/{codigo}/usuarios` (#583) se
+    // comprobaba aqui contra el enumerado; esa operacion se fue a `identidad` con la etapa 4 de
+    // ADR-0039 y ya no esta en el contrato, asi que no hay vocabulario que comparar.
 
     @Test
     @DisplayName("y los dos vocabularios de fiscalizacion siguen siendo DOS, aunque digan lo mismo")

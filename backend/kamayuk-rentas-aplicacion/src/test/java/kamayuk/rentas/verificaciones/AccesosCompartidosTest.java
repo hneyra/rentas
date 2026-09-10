@@ -34,7 +34,7 @@ import org.springframework.core.annotation.AnnotatedElementUtils;
  *
  * <p>Lo que la prueba <b>no</b> mira es el privilegio: no hace falta, porque el guardia exige el
  * mismo sobre la alternativa que sobre la opcion propia y {@code GuardiaDeAccesoTest} lo mide. Lo
- * que si comprueba es que la opcion alternativa <b>exista en el catalogo de las 134</b>: un acceso
+ * que si comprueba es que la opcion alternativa <b>exista en el catalogo de las 130</b>: un acceso
  * inventado no lo tiene nadie, asi que la alternativa no autorizaria a nadie y el endpoint
  * pareceria compartido sin estarlo —la trampa que #366 documento al nombrar
  * «consulta_contribuyentes», una opcion que no existe—.
@@ -89,7 +89,7 @@ class AccesosCompartidosTest {
     }
 
     @Test
-    @DisplayName("y la opcion alternativa existe en el catalogo de las 134")
+    @DisplayName("y la opcion alternativa existe en el catalogo de las 130")
     void laOpcionAlternativaExisteEnElCatalogo() {
         Set<String> delCatalogo = new TreeSet<>();
         for (CatalogoDeOpciones.Opcion opcion : CatalogoDeOpciones.leer()) {
@@ -105,7 +105,7 @@ class AccesosCompartidosTest {
             }
         }
 
-        assertThat(delCatalogo).as("el catalogo se lee y trae las opciones").hasSize(134);
+        assertThat(delCatalogo).as("el catalogo se lee y trae las opciones").hasSize(130);
         assertThat(inventadas)
                 .as(
                         "un acceso que no esta en el catalogo no lo tiene nadie: la alternativa no"

@@ -15,7 +15,11 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const raiz = new URL('../../', import.meta.url);
-const origen = new URL('design/', raiz);
+// `docs/50-api/prototipo/` y no `design/`: en este repositorio no hay `design/` —el
+// prototipo vendorizado vive junto al generador del contrato— y con `design/` este
+// guion moria con ENOENT. Medido en la etapa 4 de ADR-0039; los dos generadores leen
+// los MISMOS cinco archivos.
+const origen = new URL('docs/50-api/prototipo/', raiz);
 const destino = new URL('docs/10-negocio/catalogo-de-opciones.md', raiz);
 
 const ventana = {};
@@ -24,8 +28,26 @@ for (let i = 1; i <= 5; i++) {
   runInContext(readFileSync(fileURLToPath(new URL(`sgtm-data-${i}.js`, origen)), 'utf8'), contexto);
 }
 
-const NAV = ventana.SGTM_NAV;
+/* Las cuatro opciones que se fueron a `identidad` (ADR-0039, etapa 4; `identidad`#4).
+   Son la ADMINISTRACION de la autorizacion —usuarios, grupos, miembros, permisos— y
+   la autorizacion es un sistema propio: se administra alli y llega aqui por su
+   buzon. El prototipo NO se toca —es el manual, y sigue teniendo esas pantallas—;
+   lo que se retira es su fila de ESTE catalogo, porque una opcion sembrada en
+   `acceso` sin pantalla que la sirva es un permiso que no habilita nada. Las
+   sirve `identidad` con su propio catalogo, y `identidad` deriva el de `rentas`
+   de este archivo: por eso su copia sale roja hasta que la regenere. */
+const RETIRADAS = new Set(['usuarios', 'grupos', 'miembros', 'permisos']);
+const NAV = ventana.SGTM_NAV.map((grupo) => ({
+  ...grupo,
+  items: grupo.items.filter(([id]) => !RETIRADAS.has(id)),
+}));
 const PANTALLAS = ventana.SGTM_SCREENS;
+for (const id of RETIRADAS) {
+  if (!PANTALLAS[id]) {
+    throw new Error(`RETIRADAS nombra «${id}», que no es ninguna pantalla del prototipo`);
+  }
+}
+const TOTAL = NAV.reduce((n, g) => n + g.items.length, 0);
 
 /** Clasificacion del manual, por titulo de pantalla (FRO-03 §4). */
 function clasificar(pantalla, etiqueta) {
@@ -105,11 +127,13 @@ const CAPITULO = {
 const lineas = [];
 lineas.push('# NEG-03 — Catálogo de opciones');
 lineas.push('');
-lineas.push('Las **134 opciones** de los **12 módulos** del sistema, con el `endpoint` que cada una');
+lineas.push(`Las **${TOTAL} opciones** de los **${NAV.length} módulos** del sistema, con el \`endpoint\` que cada una`);
 lineas.push('declara en el prototipo de interfaz y el contexto acotado que la sirve.');
 lineas.push('');
 lineas.push('**Este archivo se genera.** Regenerarlo con `node docs/10-negocio/generar-catalogo.mjs`');
-lineas.push('cuando cambie el catálogo del prototipo; no editarlo a mano.');
+lineas.push('cuando cambie el catálogo del prototipo; no editarlo a mano. Las cuatro opciones de');
+lineas.push('administración de la autorización —usuarios, grupos, miembros, permisos— **no están**:');
+lineas.push('se fueron a `identidad` ([ADR-0039](https://github.com/hneyra/infrastructure/blob/main/docs/30-arquitectura/adr/ADR-0039-la-identidad-es-un-sistema.md), etapa 4).');
 lineas.push('');
 lineas.push('Leyenda de bloque: `Registro` = registro y mantenimiento · `Procesos` · `Consultas` ·');
 lineas.push('`Documentos` = documentos y reportes. Es la **taxonomía del manual**, y la calcula el');

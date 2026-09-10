@@ -1,10 +1,12 @@
 # NEG-03 — Catálogo de opciones
 
-Las **134 opciones** de los **12 módulos** del sistema, con el `endpoint` que cada una
+Las **130 opciones** de los **12 módulos** del sistema, con el `endpoint` que cada una
 declara en el prototipo de interfaz y el contexto acotado que la sirve.
 
 **Este archivo se genera.** Regenerarlo con `node docs/10-negocio/generar-catalogo.mjs`
-cuando cambie el catálogo del prototipo; no editarlo a mano.
+cuando cambie el catálogo del prototipo; no editarlo a mano. Las cuatro opciones de
+administración de la autorización —usuarios, grupos, miembros, permisos— **no están**:
+se fueron a `identidad` ([ADR-0039](https://github.com/hneyra/infrastructure/blob/main/docs/30-arquitectura/adr/ADR-0039-la-identidad-es-un-sistema.md), etapa 4).
 
 Leyenda de bloque: `Registro` = registro y mantenimiento · `Procesos` · `Consultas` ·
 `Documentos` = documentos y reportes. Es la **taxonomía del manual**, y la calcula el
@@ -37,8 +39,8 @@ aparta de eso, el módulo lleva una **nota** bajo su título.
 | Valores | cap. 3 §Valores | `valores` | 6 |
 | Coactiva | cap. 3 §Coactivas | `coactiva` | 12 |
 | Autorizaciones y licencias | cap. 3 §Autorizaciones y §Licencias | `licencias` | 11 |
-| Seguridad | cap. 4 | `seguridad` | 11 |
-| **Total** | | | **134** |
+| Seguridad | cap. 4 | `seguridad` | 7 |
+| **Total** | | | **130** |
 
 ## Inicio
 
@@ -262,11 +264,7 @@ Manual: cap. 4 · contexto acotado: `seguridad`
 | id | Opción | Bloque | Endpoint |
 |---|---|---|---|
 | `modulos` | Módulos del sistema | Registro | `GET /api/v1/seguridad/modulos` |
-| `usuarios` | Usuarios del sistema | Registro | `GET /api/v1/seguridad/usuarios` |
-| `grupos` | Grupos de usuarios | Registro | `GET /api/v1/seguridad/grupos` |
 | `accesos` | Accesos y políticas | Registro | `GET /api/v1/seguridad/accesos` |
-| `miembros` | Gestión de miembros | Registro | `POST /api/v1/seguridad/grupos/{grupo}/miembros` |
-| `permisos` | Permisos y niveles de accesibilidad | Registro | `PUT /api/v1/seguridad/grupos/{id}/permisos` |
 | `cambiar_anio` | Cambiar el año de trabajo | Procesos | `PUT /api/v1/seguridad/sesion/ejercicio` |
 | `cambiar_clave` | Cambiar contraseña | Procesos | `PUT /api/v1/seguridad/usuarios/{id}/clave` |
 | `auditoria` | Auditoría del sistema | Consultas | `GET /api/v1/seguridad/auditoria` |

@@ -1,0 +1,35 @@
+{
+  "PROCEDENCIA" : "ARCHIVO GENERADO — no editar a mano. Lo publica el CONSUMIDOR con lo que su adaptador pide y lee de verdad; lo comprueba el PROVEEDOR en su propio CI (ADR-0030 §4). Un campo que el proveedor deje de publicar, o un parametro que deje de leer, pone rojo el build del proveedor y no el del consumidor: es lo que sustituye a lo que hacia el compilador cuando los contextos compartian repositorio.",
+  "consumidor" : "rentas",
+  "proveedor" : "identidad",
+  "raiz" : "/identidad/api/v1",
+  "operaciones" : {
+    "GET /eventos/pendientes" : {
+      "parametros" : [ "limite" ],
+      "respuesta" : {
+        "eventos" : [ {
+          "eventoId" : "texto",
+          "secuencia" : "entero",
+          "tipo" : "texto",
+          "sujetoId" : "entero",
+          "cuerpo" : "texto",
+          "huella" : "texto",
+          "creadoEn" : "texto"
+        } ],
+        "quedan" : "entero"
+      },
+      "cuerpo" : { }
+    },
+    "POST /eventos/acuses" : {
+      "parametros" : [ ],
+      "respuesta" : {
+        "recibidos" : "entero",
+        "escritos" : "entero",
+        "quedan" : "entero"
+      },
+      "cuerpo" : {
+        "eventos" : [ "texto" ]
+      }
+    }
+  }
+}

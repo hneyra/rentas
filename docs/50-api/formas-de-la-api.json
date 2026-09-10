@@ -2099,22 +2099,6 @@
     "totalPaginas": "entero",
     "hayMas": "booleano"
   },
-  "GET /seguridad/accesos/{codigo}/usuarios": {
-    "contenido": [
-      {
-        "usuarioId": "entero",
-        "cuenta": "texto",
-        "nombre": "texto",
-        "origen": "texto",
-        "grupoId": "entero"
-      }
-    ],
-    "pagina": "entero",
-    "tamano": "entero",
-    "totalElementos": "entero",
-    "totalPaginas": "entero",
-    "hayMas": "booleano"
-  },
   "GET /seguridad/auditoria": {
     "contenido": [
       {
@@ -2138,52 +2122,6 @@
     "totalPaginas": "entero",
     "hayMas": "booleano"
   },
-  "GET /seguridad/grupos": {
-    "contenido": [
-      {
-        "id": "entero",
-        "nombre": "texto",
-        "descripcion": "texto",
-        "habilitado": "booleano",
-        "vigenciaDesde": "fecha",
-        "vigenciaHasta": "fecha"
-      }
-    ],
-    "pagina": "entero",
-    "tamano": "entero",
-    "totalElementos": "entero",
-    "totalPaginas": "entero",
-    "hayMas": "booleano"
-  },
-  "GET /seguridad/grupos/{grupo}/miembros": {
-    "contenido": [
-      {
-        "id": "entero",
-        "cuenta": "texto",
-        "nombre": "texto",
-        "correo": "texto",
-        "habilitado": "booleano",
-        "vigenciaDesde": "fecha",
-        "vigenciaHasta": "fecha"
-      }
-    ],
-    "pagina": "entero",
-    "tamano": "entero",
-    "totalElementos": "entero",
-    "totalPaginas": "entero",
-    "hayMas": "booleano"
-  },
-  "GET /seguridad/grupos/{id}/permisos": [
-    {
-      "id": "entero",
-      "acceso": "texto",
-      "grupoId": "entero",
-      "usuarioId": "entero",
-      "privilegios": [
-        "texto"
-      ]
-    }
-  ],
   "GET /seguridad/modulos": {
     "contenido": [
       {
@@ -2219,66 +2157,6 @@
     "tipo": "texto"
   },
   "GET /seguridad/sesion/permisos": "objeto",
-  "GET /seguridad/usuarios": {
-    "contenido": [
-      {
-        "id": "entero",
-        "cuenta": "texto",
-        "nombre": "texto",
-        "correo": "texto",
-        "habilitado": "booleano",
-        "vigenciaDesde": "fecha",
-        "vigenciaHasta": "fecha"
-      }
-    ],
-    "pagina": "entero",
-    "tamano": "entero",
-    "totalElementos": "entero",
-    "totalPaginas": "entero",
-    "hayMas": "booleano"
-  },
-  "GET /seguridad/usuarios/{id}/grupos": {
-    "contenido": [
-      {
-        "id": "entero",
-        "nombre": "texto",
-        "descripcion": "texto",
-        "habilitado": "booleano",
-        "vigenciaDesde": "fecha",
-        "vigenciaHasta": "fecha"
-      }
-    ],
-    "pagina": "entero",
-    "tamano": "entero",
-    "totalElementos": "entero",
-    "totalPaginas": "entero",
-    "hayMas": "booleano"
-  },
-  "GET /seguridad/usuarios/{id}/permisos": [
-    {
-      "acceso": "texto",
-      "privilegios": [
-        "texto"
-      ],
-      "origen": "texto",
-      "grupoId": "entero"
-    }
-  ],
-  "GET /seguridad/usuarios/{id}/permisos/configurados": {
-    "usuarioId": "entero",
-    "cuenta": "texto",
-    "surtenEfectoHoy": "booleano",
-    "permisos": [
-      {
-        "acceso": "texto",
-        "privilegios": [
-          "texto"
-        ],
-        "origen": "texto",
-        "grupoId": "entero"
-      }
-    ]
-  },
   "GET /tesoreria/convenios": {
     "contenido": [
       {
@@ -4276,35 +4154,6 @@
       }
     ]
   },
-  "POST /seguridad/grupos": {
-    "id": "entero",
-    "nombre": "texto",
-    "descripcion": "texto",
-    "habilitado": "booleano",
-    "vigenciaDesde": "fecha",
-    "vigenciaHasta": "fecha"
-  },
-  "POST /seguridad/grupos/{grupo}/miembros": {
-    "grupoId": "entero",
-    "usuarioId": "entero",
-    "activo": "booleano"
-  },
-  "POST /seguridad/grupos/{id}/baja": {
-    "id": "entero",
-    "nombre": "texto",
-    "descripcion": "texto",
-    "habilitado": "booleano",
-    "vigenciaDesde": "fecha",
-    "vigenciaHasta": "fecha"
-  },
-  "POST /seguridad/grupos/{id}/reactivacion": {
-    "id": "entero",
-    "nombre": "texto",
-    "descripcion": "texto",
-    "habilitado": "booleano",
-    "vigenciaDesde": "fecha",
-    "vigenciaHasta": "fecha"
-  },
   "POST /seguridad/respaldos": {
     "contenido": [
       {
@@ -4324,33 +4173,6 @@
     "totalElementos": "entero",
     "totalPaginas": "entero",
     "hayMas": "booleano"
-  },
-  "POST /seguridad/usuarios": {
-    "id": "entero",
-    "cuenta": "texto",
-    "nombre": "texto",
-    "correo": "texto",
-    "habilitado": "booleano",
-    "vigenciaDesde": "fecha",
-    "vigenciaHasta": "fecha"
-  },
-  "POST /seguridad/usuarios/{id}/baja": {
-    "id": "entero",
-    "cuenta": "texto",
-    "nombre": "texto",
-    "correo": "texto",
-    "habilitado": "booleano",
-    "vigenciaDesde": "fecha",
-    "vigenciaHasta": "fecha"
-  },
-  "POST /seguridad/usuarios/{id}/reactivacion": {
-    "id": "entero",
-    "cuenta": "texto",
-    "nombre": "texto",
-    "correo": "texto",
-    "habilitado": "booleano",
-    "vigenciaDesde": "fecha",
-    "vigenciaHasta": "fecha"
   },
   "POST /tesoreria/convenios/{numero}/anulacion": {
     "numero": "texto",
@@ -4607,25 +4429,6 @@
     "vigenciaHasta": "fecha",
     "documentoOrigen": "texto"
   },
-  "PUT /seguridad/grupos/{id}/permisos": [
-    {
-      "id": "entero",
-      "acceso": "texto",
-      "grupoId": "entero",
-      "usuarioId": "entero",
-      "privilegios": [
-        "texto"
-      ]
-    }
-  ],
-  "PUT /seguridad/grupos/{id}/vigencia": {
-    "id": "entero",
-    "nombre": "texto",
-    "descripcion": "texto",
-    "habilitado": "booleano",
-    "vigenciaDesde": "fecha",
-    "vigenciaHasta": "fecha"
-  },
   "PUT /seguridad/sesion/ejercicio": {
     "id": "entero",
     "usuarioId": "entero",
@@ -4635,25 +4438,5 @@
   "PUT /seguridad/usuarios/{id}/clave": {
     "gestionadaPor": "texto",
     "destino": "texto"
-  },
-  "PUT /seguridad/usuarios/{id}/permisos": [
-    {
-      "id": "entero",
-      "acceso": "texto",
-      "grupoId": "entero",
-      "usuarioId": "entero",
-      "privilegios": [
-        "texto"
-      ]
-    }
-  ],
-  "PUT /seguridad/usuarios/{id}/vigencia": {
-    "id": "entero",
-    "cuenta": "texto",
-    "nombre": "texto",
-    "correo": "texto",
-    "habilitado": "booleano",
-    "vigenciaDesde": "fecha",
-    "vigenciaHasta": "fecha"
   }
 }

@@ -130,6 +130,27 @@ services:
       # punto, asi que `KAMAYUK_IMPLANTACION_OWNER_CLAVE` seria
       # `kamayuk.implantacion.owner.clave` y no `owner-clave`.
       KAMAYUK_IMPLANTACION_OWNERCLAVE: ${KAMAYUK_CLAVE_OWNER:?falta KAMAYUK_CLAVE_OWNER, sale del .env de la plataforma}
+      # ── El consumidor del buzon de `identidad` (ADR-0039, etapa 4) ──
+      # La implantacion TERMINA con una pasada del consumidor, que trae lo que
+      # `identidad` ya diga de esta municipalidad. Son las mismas seis variables que
+      # el CronJob del descriptor le da al proceso en el cluster.
+      #
+      # `identidad-sistema` y no `identidad`: en la red `kamayuk-plataforma` el alias
+      # `identidad` es KEYCLOAK (es a quien se le pide el token, dos lineas mas
+      # abajo). La URL va ENTERA, con su prefijo `/identidad/api/v1`.
+      KAMAYUK_IDENTIDAD_URL: http://identidad-sistema:8080/identidad/api/v1
+      KAMAYUK_IDENTIDAD_TOKEN: http://identidad:8080/realms/sgtm/protocol/openid-connect/token
+      # El mismo cliente de servicio que el ingestor: uno por (sistema, municipalidad).
+      # De su ubigeo sale de que municipalidad es el buzon que se lee.
+      KAMAYUK_IDENTIDAD_CLIENTE: kamayuk-rentas-servicio-${KAMAYUK_UBIGEO:?falta KAMAYUK_UBIGEO en el .env de la plataforma}
+      # La clave que `reconciliar-identidades.sh` le fijo a ese cliente para el par
+      # (rentas, identidad). Vacia por omision: sin ella la peticion sale sin
+      # cabecera e `identidad` contesta 401, que es transitorio y se ve en el registro.
+      KAMAYUK_IDENTIDAD_CREDENCIAL: ${KAMAYUK_RENTAS_CREDENCIAL_DE_IDENTIDAD:-}
+      # A quien se avisa cuando un evento no se puede aplicar (ADR-0026 §4). La misma
+      # persona y el mismo canal que el ingestor del padron.
+      KAMAYUK_IDENTIDAD_RESPONSABLE: ${KAMAYUK_RESPONSABLE_DE_OPERACION:?falta KAMAYUK_RESPONSABLE_DE_OPERACION en el .env de la plataforma}
+      KAMAYUK_IDENTIDAD_CANAL: ${KAMAYUK_CANAL_DE_OPERACION:?falta KAMAYUK_CANAL_DE_OPERACION en el .env de la plataforma}
     restart: "no"
 
   # ── El backend ──────────────────────────────────────────────────────────────

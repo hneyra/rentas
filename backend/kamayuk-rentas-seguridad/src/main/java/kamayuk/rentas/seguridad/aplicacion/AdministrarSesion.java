@@ -10,8 +10,8 @@ import kamayuk.rentas.compartido.Pagina;
 import kamayuk.rentas.compartido.Paginacion;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.Observacion;
-import kamayuk.rentas.seguridad.dominio.AdministracionRepository;
 import kamayuk.rentas.seguridad.dominio.ConsultaDeAuditoria;
+import kamayuk.rentas.seguridad.dominio.LecturaDeLaCopiaLocal;
 import kamayuk.rentas.seguridad.dominio.RegistroAuditado;
 import kamayuk.rentas.seguridad.dominio.Respaldo;
 import kamayuk.rentas.seguridad.dominio.Sesion;
@@ -30,13 +30,13 @@ import org.springframework.transaction.annotation.Transactional;
 public class AdministrarSesion {
 
     private final SesionRepository sesiones;
-    private final AdministracionRepository administracion;
+    private final LecturaDeLaCopiaLocal administracion;
     private final Auditoria auditoria;
     private final Clock reloj;
 
     public AdministrarSesion(
             SesionRepository sesiones,
-            AdministracionRepository administracion,
+            LecturaDeLaCopiaLocal administracion,
             Auditoria auditoria,
             Clock reloj) {
         this.sesiones = sesiones;

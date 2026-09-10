@@ -6,7 +6,7 @@ import java.util.Map;
 import java.util.Set;
 import kamayuk.rentas.auditoria.OrigenContext;
 import kamayuk.rentas.autorizacion.Privilegio;
-import kamayuk.rentas.seguridad.dominio.PermisoRepository;
+import kamayuk.rentas.seguridad.dominio.LecturaDeLaCopiaLocal;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,16 +26,16 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class PermisosDeLaSesion {
 
-    private final PermisoRepository permisos;
+    private final LecturaDeLaCopiaLocal permisos;
     private final Clock reloj;
 
-    public PermisosDeLaSesion(PermisoRepository permisos, Clock reloj) {
+    public PermisosDeLaSesion(LecturaDeLaCopiaLocal permisos, Clock reloj) {
         this.permisos = permisos;
         this.reloj = reloj;
     }
 
     @Transactional(readOnly = true)
     public Map<String, Set<Privilegio>> efectivos() {
-        return permisos.efectivosDe(OrigenContext.actual().usuario(), LocalDate.now(reloj));
+        return permisos.permisosEfectivosDe(OrigenContext.actual().usuario(), LocalDate.now(reloj));
     }
 }

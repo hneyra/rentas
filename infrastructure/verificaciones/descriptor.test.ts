@@ -116,8 +116,11 @@ describe("el descriptor de rentas", () => {
     }
   });
 
-  it("su egreso es catastro, normativa y caja: el grafo de ADR-0029", () => {
-    expect(destinosDeEgreso()).toEqual(["caja", "catastro", "normativa"]);
+  it("su egreso es catastro, normativa, caja e identidad: el grafo de ADR-0029 y ADR-0039", () => {
+    // `identidad-sistema` y no `identidad`: en la plataforma `componente: identidad` es
+    // Keycloak, que `destinosDeEgreso` descarta como infraestructura. La arista nueva es la
+    // del consumidor del buzon (etapa 4), y es de lectura.
+    expect(destinosDeEgreso()).toEqual(["caja", "catastro", "identidad-sistema", "normativa"]);
   });
 
   /**
@@ -182,12 +185,12 @@ describe("el descriptor de rentas", () => {
   });
 
   /** Y el perfil `batch` sigue existiendo donde le toca: en un Job y en un CronJob. */
-  it("el perfil `batch` corre donde hay trabajo: la implantacion y el ingestor", () => {
+  it("el perfil `batch` corre donde hay trabajo: la implantacion, el ingestor y el consumidor", () => {
     const enPerfilBatch = [...rentas.implantacion(ENTORNO), ...rentas.lotes(ENTORNO)];
     const perfiles = contenedoresDe(enPerfilBatch).map(
       (c) => (c.env ?? []).find((v) => v.name === "SPRING_PROFILES_ACTIVE")?.value,
     );
-    expect(perfiles).toEqual(["batch", "batch"]);
+    expect(perfiles).toEqual(["batch", "batch", "batch"]);
   });
 });
 
@@ -339,8 +342,11 @@ describe("C-14 §3 — el ingestor de catastro, declarado entero y CORRIENDO (#2
    */
   it("declara su configuracion entera, y CORRE", () => {
     const crones = rentas.lotes(ENTORNO).filter((m) => m.kind === "CronJob");
-    expect(crones).toHaveLength(1);
-    const cron = crones[0]!;
+    expect(crones.map((m) => m.metadata.name)).toEqual([
+      "kamayuk-rentas-ingestor",
+      "kamayuk-rentas-consumidor-de-identidad",
+    ]);
+    const cron = crones.find((m) => m.metadata.name === "kamayuk-rentas-ingestor")!;
     // `undefined` es lo que Kubernetes lee como «no suspendido». Se afirma que NO es `true` y no
     // que sea `false`: declarar `suspend: false` seria ruido en el manifiesto.
     expect(cron.spec.suspend, "el ingestor volvio a nacer suspendido (#21 AC-4)").not.toBe(true);
@@ -586,5 +592,92 @@ describe("#44 — la interfaz desplegada", () => {
     const contenedor = interfazDe(rentas.despliegue(ENTORNO))[0];
     expect(contenedor?.securityContext?.runAsNonRoot).toBe(true);
     expect(JSON.stringify(contenedor?.securityContext)).not.toContain("runAsUser");
+  });
+});
+
+describe("ADR-0039 etapa 4 — el consumidor del buzon de identidad, declarado entero y CORRIENDO", () => {
+  const cronDelConsumidor = () =>
+    rentas
+      .lotes(ENTORNO)
+      .filter((m) => m.kind === "CronJob")
+      .find((m) => m.metadata.name === "kamayuk-rentas-consumidor-de-identidad")!;
+
+  /**
+   * Nace SIN `suspend`, y es lo que AC-7 #5 pide medir: un CronJob suspendido se lee igual que
+   * «esto todavia no toca», y lo que sostiene que pueda correr no es un interruptor sino la
+   * guarda `identidad-de-servicio` de `infrastructure`, que exige que la credencial con
+   * `emisor: "keycloak"` tenga su cuenta de servicio en cada municipalidad.
+   */
+  it("cada cinco minutos, sin solaparse, y NO nace suspendido (AC-7 #5)", () => {
+    const cron = cronDelConsumidor();
+    expect(cron).toBeDefined();
+    expect(cron.spec.schedule).toBe("*/5 * * * *");
+    expect(cron.spec.concurrencyPolicy).toBe("Forbid");
+    expect(cron.spec.jobTemplate.spec.backoffLimit).toBe(1);
+    expect(
+      cron.spec.suspend,
+      "el consumidor de identidad nacio suspendido: la copia local no se actualiza nunca y nada lo dice",
+    ).not.toBe(true);
+  });
+
+  it("declara las seis variables que el consumidor lee, con la URL del Service de identidad", () => {
+    const c = cronDelConsumidor().spec.jobTemplate.spec.template.spec.containers[0]!;
+    expect(valorDe(c, "SPRING_PROFILES_ACTIVE")).toBe("batch");
+    // `kamayuk-identidad-web` en el namespace de `identidad`, con el prefijo entero: NO
+    // `kamayuk-stg-identidad`, que es Keycloak.
+    expect(valorDe(c, "KAMAYUK_IDENTIDAD_URL")).toBe(
+      "http://kamayuk-identidad-web.kamayuk-identidad-stg/identidad/api/v1",
+    );
+    expect(valorDe(c, "KAMAYUK_IDENTIDAD_TOKEN")).toBe(ENTORNO.plataforma.token);
+    // El MISMO cliente que el ingestor: de su ubigeo sale la municipalidad del buzon.
+    expect(valorDe(c, "KAMAYUK_IDENTIDAD_CLIENTE")).toBe("kamayuk-rentas-servicio-200105");
+    expect(declara(c, "KAMAYUK_IDENTIDAD_CREDENCIAL")).toBe(true);
+    expect(valorDe(c, "KAMAYUK_IDENTIDAD_RESPONSABLE")).toBe("Guardia de plataforma");
+    expect(valorDe(c, "KAMAYUK_IDENTIDAD_CANAL")).toBe("guardia@example.pe");
+    // Y la credencial de la base, porque el aplicador escribe la copia local.
+    expect(valorDe(c, "KAMAYUK_DB_USUARIO")).toBe("kamayuk_app");
+  });
+
+  it("la implantacion recibe las mismas seis: TERMINA con una pasada del consumidor", () => {
+    const implantacion = contenedoresDe(rentas.implantacion(ENTORNO)).find(
+      (c) => c.name === "implantacion",
+    )!;
+    const consumidor = cronDelConsumidor().spec.jobTemplate.spec.template.spec.containers[0]!;
+    const deIdentidad = (c: Contenedor) =>
+      (c.env ?? []).filter((v) => v.name.startsWith("KAMAYUK_IDENTIDAD_"));
+    expect(deIdentidad(implantacion).map((v) => v.name)).toEqual([
+      "KAMAYUK_IDENTIDAD_URL",
+      "KAMAYUK_IDENTIDAD_TOKEN",
+      "KAMAYUK_IDENTIDAD_CLIENTE",
+      "KAMAYUK_IDENTIDAD_CREDENCIAL",
+      "KAMAYUK_IDENTIDAD_RESPONSABLE",
+      "KAMAYUK_IDENTIDAD_CANAL",
+    ]);
+    expect(deIdentidad(implantacion)).toEqual(deIdentidad(consumidor));
+  });
+
+  it("su credencial esta en el inventario con `emisor: keycloak`, y es la del secreto que monta", () => {
+    const clave = rentas.claves(ENTORNO).find((c) => c.nombre === ENTORNO.secretoDe("identidad"));
+    expect(clave, "sin la clave en el inventario nadie la genera ni la rota").toBeDefined();
+    expect(clave!.emisor).toBe("keycloak");
+    const c = cronDelConsumidor().spec.jobTemplate.spec.template.spec.containers[0]!;
+    const ref = (c.env ?? []).find((v) => v.name === "KAMAYUK_IDENTIDAD_CREDENCIAL")?.valueFrom
+      ?.secretKeyRef;
+    expect(ref?.name).toBe(ENTORNO.secretoDe("identidad"));
+  });
+
+  it("y la arista hacia identidad-sistema va a SU namespace, al 8080, y no a Keycloak", () => {
+    const reglas = rentas
+      .egreso(ENTORNO)
+      .flatMap((p) => p.spec.egress ?? [])
+      .filter((r) =>
+        (r.to ?? []).some((d) => d.podSelector?.matchLabels?.["componente"] === "identidad-sistema"),
+      );
+    expect(reglas).toHaveLength(1);
+    const destino = reglas[0]!.to![0]!;
+    expect(destino.namespaceSelector?.matchLabels?.["kubernetes.io/metadata.name"]).toBe(
+      "kamayuk-identidad-stg",
+    );
+    expect(reglas[0]!.ports).toEqual([{ protocol: "TCP", port: 8080 }]);
   });
 });

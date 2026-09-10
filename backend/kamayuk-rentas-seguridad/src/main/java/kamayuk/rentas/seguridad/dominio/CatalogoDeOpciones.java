@@ -12,7 +12,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Las 134 opciones del menu, leidas del catalogo (NEG-03).
+ * Las 130 opciones del menu, leidas del catalogo (NEG-03): las 134 del manual menos las cuatro de
+ * administracion de la autorizacion, que se fueron a `identidad` (ADR-0039, etapa 4).
  *
  * <h2>Por que se lee un documento</h2>
  *
