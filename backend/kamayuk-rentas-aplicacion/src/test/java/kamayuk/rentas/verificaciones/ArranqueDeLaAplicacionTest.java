@@ -72,7 +72,7 @@ import org.springframework.test.context.DynamicPropertySource;
             // decodificador PEREZOSO —solo va a la red al validar el primer token— y aqui no se
             // valida ninguno. Lo que se comprueba es que la cadena se monta, que es lo que falta
             // cuando la variable no esta puesta.
-            "KAMAYUK_OIDC_EMISOR=https://identidad.invalido/realms/sgtm",
+            "KAMAYUK_OIDC_EMISOR=https://identidad.invalido/realms/kamayuk",
         })
 @DisplayName("C-7 — rentas arranca, en los dos perfiles")
 class ArranqueDeLaAplicacionTest {

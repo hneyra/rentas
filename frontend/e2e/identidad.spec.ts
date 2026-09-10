@@ -152,7 +152,7 @@ test.describe('el peldano sin-identidad: el 401 de verdad, despues de cerrar ses
     }
 
     await page.goto(ENTRADA);
-    await page.waitForURL(/\/realms\/sgtm\/protocol\/openid-connect\/auth/, { timeout: 40_000 });
+    await page.waitForURL(/\/realms\/kamayuk\/protocol\/openid-connect\/auth/, { timeout: 40_000 });
     await page.locator('#username').fill(cuenta.usuario);
     await page.locator('#password').fill(clave);
     await page.locator('#kc-login').click();

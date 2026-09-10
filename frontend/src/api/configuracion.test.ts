@@ -21,14 +21,14 @@ afterEach(() => {
 
 describe('lo que sirve el contenedor gana a lo que Vite horneo', () => {
   it('toma la senia servida', () => {
-    window.__KAMAYUK_RENTAS__ = { oidcRealm: 'https://muni.example/keycloak/realms/sgtm' };
-    expect(configuracion('oidcRealm')).toBe('https://muni.example/keycloak/realms/sgtm');
+    window.__KAMAYUK_RENTAS__ = { oidcRealm: 'https://muni.example/keycloak/realms/kamayuk' };
+    expect(configuracion('oidcRealm')).toBe('https://muni.example/keycloak/realms/kamayuk');
     expect(procedencia('oidcRealm')).toBe('servida');
   });
 
   it('sin nada servido cae al valor por omision, que es el de la instalacion local', () => {
-    expect(configuracion('oidcRealm')).toBe('http://localhost:8181/realms/sgtm');
-    expect(configuracion('oidcCliente')).toBe('sgtm-backoffice');
+    expect(configuracion('oidcRealm')).toBe('http://localhost:8181/realms/kamayuk');
+    expect(configuracion('oidcCliente')).toBe('kamayuk-backoffice');
     expect(configuracion('oidcAlcance')).toBe('openid profile');
     expect(procedencia('oidcRealm')).toBe('omision');
   });
@@ -53,13 +53,13 @@ describe('lo que sirve el contenedor gana a lo que Vite horneo', () => {
 describe('una cadena en blanco cuenta como ausencia', () => {
   it.each(['', '   ', '\n'])('«%s» no se toma como valor', (vacia) => {
     window.__KAMAYUK_RENTAS__ = { oidcRealm: vacia };
-    expect(configuracion('oidcRealm')).toBe('http://localhost:8181/realms/sgtm');
+    expect(configuracion('oidcRealm')).toBe('http://localhost:8181/realms/kamayuk');
     expect(procedencia('oidcRealm')).toBe('omision');
   });
 
   it('y una senia con espacios alrededor se limpia en vez de rechazarse', () => {
-    window.__KAMAYUK_RENTAS__ = { oidcRealm: '  https://muni.example/realms/sgtm \n' };
-    expect(configuracion('oidcRealm')).toBe('https://muni.example/realms/sgtm');
+    window.__KAMAYUK_RENTAS__ = { oidcRealm: '  https://muni.example/realms/kamayuk \n' };
+    expect(configuracion('oidcRealm')).toBe('https://muni.example/realms/kamayuk');
   });
 });
 
@@ -71,19 +71,19 @@ describe('una cadena en blanco cuenta como ausencia', () => {
  */
 describe('el escalon horneado sigue existiendo, y queda por debajo del servido', () => {
   it('se usa cuando no hay nada servido', async () => {
-    vi.stubEnv('VITE_KAMAYUK_OIDC_REALM', 'https://horneado.example/realms/sgtm');
+    vi.stubEnv('VITE_KAMAYUK_OIDC_REALM', 'https://horneado.example/realms/kamayuk');
     vi.resetModules();
     const modulo = await import('./configuracion.ts');
-    expect(modulo.configuracion('oidcRealm')).toBe('https://horneado.example/realms/sgtm');
+    expect(modulo.configuracion('oidcRealm')).toBe('https://horneado.example/realms/kamayuk');
     expect(modulo.procedencia('oidcRealm')).toBe('construccion');
   });
 
   it('pero lo servido lo gana, que es lo que hace que una imagen sirva para varias municipalidades', async () => {
-    vi.stubEnv('VITE_KAMAYUK_OIDC_REALM', 'https://horneado.example/realms/sgtm');
+    vi.stubEnv('VITE_KAMAYUK_OIDC_REALM', 'https://horneado.example/realms/kamayuk');
     vi.resetModules();
     const modulo = await import('./configuracion.ts');
-    window.__KAMAYUK_RENTAS__ = { oidcRealm: 'https://servido.example/realms/sgtm' };
-    expect(modulo.configuracion('oidcRealm')).toBe('https://servido.example/realms/sgtm');
+    window.__KAMAYUK_RENTAS__ = { oidcRealm: 'https://servido.example/realms/kamayuk' };
+    expect(modulo.configuracion('oidcRealm')).toBe('https://servido.example/realms/kamayuk');
     expect(modulo.procedencia('oidcRealm')).toBe('servida');
   });
 });

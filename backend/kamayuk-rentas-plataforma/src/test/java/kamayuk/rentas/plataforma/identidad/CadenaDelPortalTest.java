@@ -80,7 +80,7 @@ class CadenaDelPortalTest {
     static {
         try {
             deFuncionarios = EmisorDeMentira.arrancar("sgtm");
-            delCiudadano = EmisorDeMentira.arrancar("sgtm-ciudadano");
+            delCiudadano = EmisorDeMentira.arrancar("kamayuk-ciudadano");
         } catch (IOException | JOSEException e) {
             throw new IllegalStateException("No se pudieron arrancar los dos emisores", e);
         }

@@ -70,7 +70,7 @@ async function entrarPorElFormulario(page: Page, cuenta: CuentaDeLaInstalacion):
   // La ida a la puerta la hace la aplicacion sola: `arrancar()` ve que no hay token y llama a
   // `entrar()` antes de montar nada. Si esto no llegara, el defecto seria de PKCE o del
   // `redirect_uri`, y el mensaje de Keycloak lo diria en esta misma pagina.
-  await page.waitForURL(/\/realms\/sgtm\/protocol\/openid-connect\/auth/, { timeout: 40_000 });
+  await page.waitForURL(/\/realms\/kamayuk\/protocol\/openid-connect\/auth/, { timeout: 40_000 });
 
   await page.locator('#username').fill(cuenta.usuario);
   await page.locator('#password').fill(clave);

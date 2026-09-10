@@ -65,7 +65,7 @@ describe('AC1 — el arnes existe, sobre Chromium, y levanta su propio servidor'
 describe('AC1 — el puerto es el 5173, y no es una preferencia', () => {
   it('la entrada se sirve en 5173, que es el unico origen que el realm admite', () => {
     // `src/api/identidad.ts` compone `redirect_uri` como `window.location.origin + '/'`, asi
-    // que el puerto de Vite ES el redirect. El cliente `sgtm-backoffice` admite
+    // que el puerto de Vite ES el redirect. El cliente `kamayuk-backoffice` admite
     // `http://localhost:5173/*` y nada mas: en cualquier otro puerto Keycloak contesta
     // `invalid_redirect_uri` y no hay canje que medir.
     expect(INSTALACION).toContain('export const PUERTO = 5173');

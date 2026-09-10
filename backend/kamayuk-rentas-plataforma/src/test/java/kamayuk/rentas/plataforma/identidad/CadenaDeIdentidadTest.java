@@ -200,7 +200,8 @@ class CadenaDeIdentidadTest {
                     pedirCon(
                             emisor.token(
                                     claves ->
-                                            claves.issuer("https://identidad.de.otro/realms/sgtm")
+                                            claves.issuer(
+                                                            "https://identidad.de.otro/realms/kamayuk")
                                                     .claim("municipalidad_id", municipalidadA)));
 
             assertThat(respuesta.statusCode())

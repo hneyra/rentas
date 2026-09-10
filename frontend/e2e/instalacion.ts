@@ -16,7 +16,7 @@ import type { APIRequestContext } from '@playwright/test';
  *
  * `src/api/identidad.ts` compone la URI de retorno como `window.location.origin + '/'`, o sea
  * que el ORIGEN DE LA PAGINA es lo que viaja como `redirect_uri` en la ida a Keycloak y otra
- * vez en el canje. El cliente `sgtm-backoffice` del realm admite exactamente
+ * vez en el canje. El cliente `kamayuk-backoffice` del realm admite exactamente
  * `http://localhost:5173/*`, asi que servir la aplicacion en cualquier otro puerto no hace que
  * la prueba sea menos comoda: hace que Keycloak conteste `invalid_redirect_uri` y que no haya
  * canje que medir.
@@ -46,7 +46,7 @@ export const ENTRADA = `${ORIGEN}/rentas/`;
 export const BACKEND = process.env.KAMAYUK_BACKEND ?? 'http://localhost:8082';
 
 /** El emisor de identidad. La misma variable que lee `src/api/identidad.ts`. */
-export const EMISOR = process.env.KAMAYUK_OIDC_REALM ?? 'http://localhost:8181/realms/sgtm';
+export const EMISOR = process.env.KAMAYUK_OIDC_REALM ?? 'http://localhost:8181/realms/kamayuk';
 
 /**
  * La sonda del backend, y **por que es una ruta protegida y no una de salud**.

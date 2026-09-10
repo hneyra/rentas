@@ -88,14 +88,14 @@ const COMPONENTE_DE_LA_INTERFAZ = INTERFAZ;
  * realm lo describe `infrastructure` y este contrato entrega el emisor (`plataforma.emisor`) pero
  * no el cliente. Mientras siga asi, cambiar de cliente es cambiar esta linea.
  *
- * **Y hay un hueco declarado que este repositorio NO puede cerrar (AC-9 de #44)**: `sgtm-backoffice`
+ * **Y hay un hueco declarado que este repositorio NO puede cerrar (AC-9 de #44)**: `kamayuk-backoffice`
  * admite `http://localhost:5173/*` y nada mas, medido. `identidad.ts` compone el `redirect_uri`
  * como `origin + '/'`, o sea `https://<dominio>/` una vez desplegado, que ese cliente **no
  * admite** — el rebote acaba en «Invalid parameter: redirect_uri» y no entra nadie. Ampliar
  * `redirectUris` es del dueno del realm, que es `infrastructure`. Se nombra aqui para que quien
  * despliegue lo lea antes y no el dia del despliegue.
  */
-const CLIENTE_OIDC_DE_LA_INTERFAZ = "sgtm-backoffice";
+const CLIENTE_OIDC_DE_LA_INTERFAZ = "kamayuk-backoffice";
 
 /**
  * Su base, en el motor de la plataforma. Una por sistema (ADR-0029, ADR-0032).

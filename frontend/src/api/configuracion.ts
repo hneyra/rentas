@@ -57,13 +57,13 @@ declare global {
 /**
  * El tercer escalon: la instalacion local.
  *
- * `sgtm-backoffice` y `localhost:8181` son los que hacen que `yarn dev` entre por la puerta sin
+ * `kamayuk-backoffice` y `localhost:8181` son los que hacen que `yarn dev` entre por la puerta sin
  * configurar nada, y los mismos que `identidad.ts` traia escritos antes de que existiera este
  * archivo.
  */
 const POR_OMISION: Record<ClaveDeConfiguracion, string> = {
-  oidcRealm: 'http://localhost:8181/realms/sgtm',
-  oidcCliente: 'sgtm-backoffice',
+  oidcRealm: 'http://localhost:8181/realms/kamayuk',
+  oidcCliente: 'kamayuk-backoffice',
   oidcAlcance: 'openid profile',
 };
 
