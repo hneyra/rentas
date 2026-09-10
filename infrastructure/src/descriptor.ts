@@ -233,11 +233,17 @@ function variablesDeImplantacion(e: EntornoDelDescriptor): VariableDeEntorno[] {
 }
 
 /**
- * Con que lee `rentas` el buzon de `identidad` (ADR-0039, etapa 4): las seis de
- * `kamayuk.identidad.*`, que `ConfiguracionDelConsumidorDeIdentidad` y
- * `CorrerElConsumidorDeIdentidad` leen. Sin `KAMAYUK_IDENTIDAD_URL` el consumidor NO existe
- * —`@ConditionalOnProperty("kamayuk.identidad.url")`— y la implantacion lo dice al terminar:
- * la copia local se queda con lo que sembro `SembradorDeLaCopiaLocal` y nadie la actualiza.
+ * Con que lee `rentas` el buzon de `identidad` (ADR-0039): las seis de `kamayuk.identidad.*`, que
+ * `ConfiguracionDelConsumidorDeIdentidad` y `CorrerElConsumidorDeIdentidad` leen.
+ *
+ * **Desde la etapa 5 no son opcionales en el Job de implantacion, y por eso van en los dos
+ * procesos.** Sin `KAMAYUK_IDENTIDAD_URL` el consumidor NO existe
+ * —`@ConditionalOnProperty("kamayuk.identidad.url")`— y hasta la etapa 4 eso dejaba una copia que
+ * nadie actualizaba pero con administrador, porque el sembrador lo escribia. Retirado el
+ * sembrador, la unica cuenta que puede entrar llega por el buzon: `ImplantarMunicipalidad` corre
+ * la pasada EN LINEA y **falla** si no hay buzon, si no contesta, o si contesta y no trae ni una
+ * cuenta. Un Job que saliera con codigo 0 ahi se leeria en Kubernetes como `Complete` con la
+ * municipalidad implantada y sin que nadie pueda entrar, que es el Job roto de C-18 con otra cara.
  *
  * La URL se compone con `namespaceDe` y no a mano, y el `Service` se llama
  * `kamayuk-identidad-web` —es lo que el descriptor de `identidad` publica— y **no**

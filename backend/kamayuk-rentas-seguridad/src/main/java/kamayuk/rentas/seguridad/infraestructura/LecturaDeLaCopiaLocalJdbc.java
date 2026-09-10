@@ -31,7 +31,7 @@ import org.springframework.transaction.annotation.Transactional;
  * retirar la administracion: ni un {@code INSERT} ni un {@code UPDATE}. Sin {@code WHERE
  * municipalidad_id}: lo pone RLS con el {@code SET LOCAL} de la transaccion (ADR-0002).
  *
- * <h2>Los cinco metodos llevan {@code @Transactional}, y no es decorativo</h2>
+ * <h2>Los seis metodos llevan {@code @Transactional}, y no es decorativo</h2>
  *
  * <p>Es la misma doctrina que {@code ComprobadorDeAccesoJdbc} de al lado tiene escrita desde que la
  * pago: estas consultas leen {@code modulo_sistema}, {@code acceso}, {@code usuario}, {@code
@@ -119,6 +119,13 @@ public class LecturaDeLaCopiaLocalJdbc extends RepositorioJdbc implements Lectur
      * La matriz efectiva, en <b>una</b> consulta: por cada acceso activo, la fila de la excepcion
      * del usuario si existe, y si no la union de sus grupos vigentes.
      */
+    @Override
+    @Transactional(readOnly = true)
+    public long usuariosEnLaCopia() {
+        Long cuantas = jdbc().sql("SELECT count(*) FROM usuario").query(Long.class).single();
+        return cuantas == null ? 0L : cuantas;
+    }
+
     @Override
     @Transactional(readOnly = true)
     public Map<String, Set<Privilegio>> permisosEfectivosDe(String cuenta, LocalDate fecha) {

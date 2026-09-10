@@ -130,10 +130,19 @@ services:
       # punto, asi que `KAMAYUK_IMPLANTACION_OWNER_CLAVE` seria
       # `kamayuk.implantacion.owner.clave` y no `owner-clave`.
       KAMAYUK_IMPLANTACION_OWNERCLAVE: ${KAMAYUK_CLAVE_OWNER:?falta KAMAYUK_CLAVE_OWNER, sale del .env de la plataforma}
-      # ── El consumidor del buzon de `identidad` (ADR-0039, etapa 4) ──
+      # ── El consumidor del buzon de `identidad` (ADR-0039, etapa 5) ──
       # La implantacion TERMINA con una pasada del consumidor, que trae lo que
-      # `identidad` ya diga de esta municipalidad. Son las mismas seis variables que
+      # `identidad` diga de esta municipalidad. Son las mismas seis variables que
       # el CronJob del descriptor le da al proceso en el cluster.
+      #
+      # DESDE LA ETAPA 5 NO SON OPCIONALES, y el orden de los despliegues tampoco:
+      # `identidad` PRIMERO. El sembrador de este sistema ya no escribe usuarios,
+      # grupos ni permisos —solo el catalogo—, asi que la unica cuenta que puede
+      # entrar llega por el buzon. Sin buzon, sin respuesta, o con respuesta vacia
+      # porque `identidad` todavia no implanto esta municipalidad, la implantacion
+      # FALLA nombrando lo que falta en vez de salir con codigo 0: un contenedor
+      # que sale bien se lee como `Complete`, y eso es lo que C-18 encontro haciendo
+      # el Job de `rentas` durante meses.
       #
       # `identidad-sistema` y no `identidad`: en la red `kamayuk-plataforma` el alias
       # `identidad` es KEYCLOAK (es a quien se le pide el token, dos lineas mas

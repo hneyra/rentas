@@ -520,25 +520,27 @@ public final class ConfiguracionDelSgtm implements ConfiguracionDeLasVerificacio
      * Regla 12 (ADR-0039): ningun sistema que no sea `identidad` ESCRIBE `usuario`, `grupo`,
      * `miembro` ni `permiso`. Hasta la etapa 4 esta lista NO estaba declarada —la libreria la deja
      * en {@code null}, o sea «no se ha mirado»— y `rentas` escribia esas cuatro tablas desde sus
-     * dos repositorios de administracion, que hoy ya no existen.
+     * dos repositorios de administracion, que ya no existen.
      *
-     * <p>Los dos escritores que quedan, con su motivo y su fecha de fin:
+     * <p><b>Desde la etapa 5 queda UN escritor, y sin fecha de fin</b>: {@code
+     * AplicarUnEventoDeIdentidad}, el aplicador del buzon. Escribe lo que `identidad` decidio —con
+     * la observacion que la regla 10 exigio ALLI— y es la unica forma en que esta copia se
+     * actualiza. No es una excepcion pendiente de retirar: es ADR-0039 funcionando, y el dia que se
+     * retirara esta copia dejaria de poder autorizar.
      *
-     * <ul>
-     *   <li>{@code SembradorDeLaCopiaLocal} — el arranque en frio de una municipalidad recien
-     *       implantada: el grupo de administracion, el primer administrador, su afiliacion y sus
-     *       permisos. <b>Hasta la etapa 5</b>, en la que la siembra desaparece y todo llega por el
-     *       buzon.
-     *   <li>{@code AplicarUnEventoDeIdentidad} — el aplicador del buzon: escribe lo que `identidad`
-     *       decidio, y es la unica forma en que la copia local se actualiza. <b>Sin fecha de
-     *       fin</b>: es la etapa 4 funcionando.
-     * </ul>
+     * <p>El otro escritor era {@code SembradorDeLaCopiaLocal}, el arranque en frio: el grupo de
+     * administracion, el primer administrador, su afiliacion y sus permisos, con SQL directo. <b>Se
+     * retiro en la etapa 5</b> y con el se retira su entrada — mientras existiera habia dos
+     * origenes para las mismas cuatro tablas y el de aqui solo agregaba, que es lo que hace que una
+     * revocacion decidida en `identidad` no se note. Lo que queda de aquella clase es {@code
+     * SembradorDelCatalogo}, que siembra {@code modulo_sistema} y {@code acceso} —el catalogo, o
+     * sea que pantallas existen— y ninguna de las cuatro.
      *
      * <p>Cualquier otra escritura sobre esas cuatro tablas en {@code src/main} es un rojo con
      * archivo y linea: se pide por el API de `identidad`, o se declara aqui.
      */
     @Override
     public Set<String> escritoresDeLaAutorizacionConMotivo() {
-        return Set.of("SembradorDeLaCopiaLocal", "AplicarUnEventoDeIdentidad");
+        return Set.of("AplicarUnEventoDeIdentidad");
     }
 }
