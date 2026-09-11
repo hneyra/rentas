@@ -870,7 +870,23 @@ export const rentas: DescriptorDeSistema = {
         kind: "Job",
         metadata: { name: nombre, namespace: e.namespace, labels: etiquetas },
         spec: {
-          backoffLimit: 3,
+          // `6` y no `3`, y es `infrastructure`#65. Son los reintentos que este `Job` aguanta
+          // esperando a que `identidad` implante su municipalidad, y de eso depende que su copia
+          // local nazca poblada en vez de vacia.
+          //
+          // Medido en `infrastructure/infra/verificaciones/orden-de-implantacion.ts`: con el
+          // retroceso exponencial de Kubernetes —10 s, 20 s, 40 s…, con tope de 360 s por intento—
+          // `3` da **70 s** y `6` da **630 s**, contra el `MARGEN_MINIMO_SEGUNDOS = 600` que ese
+          // archivo declara. Las dos cifras estan congeladas en su prueba, asi que no son una
+          // estimacion. En un ambiente de cero 70 s no alcanzan: `identidad` tiene que esperar al
+          // motor (hasta 120 s de `espera-al-motor`), migrar su esquema e implantar su municipalidad
+          // antes de que su buzon publique nada.
+          //
+          // Y NO se arregla solo: un `Job` que agota su limite no reintenta nunca, y su nombre lleva
+          // el `sha`, asi que `pulumi up` tampoco lo recrea — el ambiente se queda atascado hasta
+          // que alguien lo borra a mano. Es el atasco de #44, y su cuarta repeticion fue
+          // `infrastructure`#69.
+          backoffLimit: 6,
           ttlSecondsAfterFinished: 86400,
           template: {
             metadata: { labels: { ...etiquetas, app: nombre } },
