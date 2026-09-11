@@ -153,9 +153,30 @@ Qué queda levantado, y cómo se comprueba que de verdad está:
 | Buzón (Mailpit) | <http://localhost:8025> | ahí llega el enlace de primera clave |
 | Traefik | <http://localhost:8080> | **404 es lo correcto**: está vivo y no hay ningún sistema detrás todavía |
 
-**Este repositorio todavía no levanta nada contra ella.** No hay `despliegue/compose.yaml` propio
-porque no hay imagen que construir; la forma que tendrá el día que la haya está escrita en
-[`infrastructure/despliegue/README.md`](https://github.com/hneyra/infrastructure/blob/main/despliegue/README.md).
+### Este repositorio, contra ella
+
+```bash
+docker compose -f despliegue/compose.yaml \
+  --env-file ../infrastructure/despliegue/.env up --build --wait
+```
+
+**El `--env-file` es imprescindible, y no estaba escrito en ningún sitio.** Este compose interpola
+variables del `.env` de la plataforma —las claves de `kamayuk_owner` y `kamayuk_app` son del motor
+que ella levanta—, no declara `env_file:` y no tiene `.env` propio. Sin él, el `up` muere en el
+primer `${...:?}` y el remedio no se parece al error. Es
+[`infrastructure`#74](https://github.com/hneyra/infrastructure/issues/74).
+
+O todo de una vez, desde `infrastructure`:
+
+```bash
+cd ../infrastructure/despliegue && ./levantar-todo.sh rentas
+```
+
+> **Este párrafo decía lo contrario, y era falso.** Afirmaba «este repositorio todavía no levanta
+> nada contra ella; no hay `despliegue/compose.yaml` propio porque no hay imagen que construir».
+> Medido: el archivo existe y la imagen se construye. Una guía que describe un estado anterior no
+> se lee como desactualizada — se lee como instrucciones, y manda a `infrastructure` a buscar una
+> forma que ya está aquí.
 
 ## 4. Puertos
 
