@@ -1,0 +1,1599 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="stylesheet" href="rentas-tokens.css" />
+<style>
+  html, body { margin: 0; background: var(--fondo); color: var(--tinta); font-family: Arial, Helvetica, sans-serif; font-size: 14px; line-height: 1.45 }
+  * { box-sizing: border-box }
+  a { color: var(--azul) }
+  a:hover { color: var(--azul-hover) }
+  input, select, button, textarea { font-family: inherit; font-size: 14px; color: var(--tinta) }
+  :focus-visible { outline: 2px solid var(--azul); outline-offset: 1px }
+  input:focus, select:focus { border-color: var(--azul); box-shadow: 0 0 0 3px var(--foco); outline: none }
+  ::placeholder { color: var(--tinta-3) }
+  table { border-collapse: collapse; width: 100% }
+  @media (max-width: 1040px) { [data-side][data-open="0"] { display: none !important } }
+  @media (max-width: 880px) { [data-sm-hide] { display: none !important } }
+</style>
+</helmet>
+
+<div style="height:100vh; overflow:hidden; display:flex; flex-direction:column; background:var(--fondo)">
+
+  <sc-if value="{{ velo }}">
+    <div onClick="{{ cerrarTodo }}" style="position:fixed; inset:0; z-index:78"></div>
+  </sc-if>
+
+  <!-- data-shadcn marca la pieza que le toca a cada región al portar -->
+  <div data-shadcn="header + SidebarTrigger" style="flex:0 0 auto; position:relative; z-index:79; display:flex; align-items:stretch; flex-wrap:wrap; background:var(--azul-oscuro); color:var(--sobre-barra)">
+    <span style="display:flex; align-items:center; gap:12px; padding:9px 16px; flex:1 1 auto; min-width:0">
+      <button onClick="{{ alternarSide }}" aria-label="Mostrar u ocultar el menú" style="display:grid; place-items:center; width:32px; height:32px; border:0; border-radius:var(--radio-sm); background:var(--barra-control); color:var(--sobre-barra); cursor:pointer; flex:0 0 auto" style-hover="background:var(--barra-hover)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"></path></svg>
+      </button>
+      <img src="escudo-catacaos.png" alt="" width="28" height="34" style="display:block; width:auto; height:34px; flex:0 0 auto" />
+      <span style="line-height:1.2; min-width:0">
+        <span style="display:block; font-size:16px; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">Sistema de Rentas y Tributos</span>
+        <span style="display:block; font-size:11.5px; color:var(--sobre-barra-2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{{ entidad }}</span>
+      </span>
+    </span>
+
+    <button onClick="{{ abrirPaleta }}" data-sm-hide="1" style="display:flex; align-items:center; gap:9px; margin:9px 0; padding:0 14px; border:0; border-radius:var(--radio-sm); background:var(--barra-control); color:var(--sobre-barra-2); cursor:pointer; flex:0 0 auto" style-hover="background:var(--barra-hover)">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-4.3-4.3"></path></svg>
+      <span style="font-size:13px">Buscar</span>
+      <kbd style="font-family:inherit; font-size:10.5px; border:1px solid var(--barra-realce); border-radius:3px; padding:1px 5px">Ctrl K</kbd>
+    </button>
+
+    <button onClick="{{ alternarEntrega }}" aria-pressed="{{ entregaAria }}" title="Anota cada región con la pieza de shadcn que le corresponde" style="{{ entregaStyle }}">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16.5 3.5h4v4"></path><path d="M20.5 3.5 13 11"></path><path d="M19 14v5.5H4.5V5H10"></path></svg>
+      <span data-sm-hide="1" style="font-size:13px">Entrega</span>
+    </button>
+
+    <button onClick="{{ verAvisos }}" aria-label="{{ avisosAria }}" title="{{ avisosAria }}" style="position:relative; display:grid; place-items:center; width:44px; border:0; border-left:1px solid var(--barra-realce); background:transparent; color:var(--sobre-barra); cursor:pointer; flex:0 0 auto" style-hover="background:var(--barra-hover)">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 9a6 6 0 1 0-12 0c0 5-2 6.5-2 6.5h16S18 14 18 9"></path><path d="M13.7 19.5a2 2 0 0 1-3.4 0"></path></svg>
+      <span style="position:absolute; top:9px; right:8px; min-width:17px; height:17px; padding:0 4px; border-radius:9px; background:var(--mal-borde); color:#fff; font-size:11px; font-weight:700; display:grid; place-items:center; border:1.5px solid var(--azul-oscuro)">{{ avisos }}</span>
+    </button>
+
+    <span style="position:relative; display:flex; align-items:stretch; flex:0 0 auto">
+      <button onClick="{{ abrirSesion }}" aria-expanded="{{ sesionAria }}" aria-label="Opciones de la sesión" style="{{ sesionStyle }}" style-hover="background:var(--barra-hover)">
+        <span style="display:grid; place-items:center; width:27px; height:27px; border-radius:50%; background:var(--barra-realce); font-size:11px; font-weight:700; flex:0 0 auto">JC</span>
+        <span data-sm-hide="1" style="line-height:1.2; text-align:left">
+          <span style="display:block; font-size:12.5px; font-weight:700; white-space:nowrap">J. Cárdenas Vega</span>
+          <span style="display:block; font-size:11px; color:var(--sobre-barra-2)">Rentas · ventanilla</span>
+        </span>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" style="flex:0 0 auto"><path d="M6 9l6 6 6-6"></path></svg>
+      </button>
+      <sc-if value="{{ sesion }}">
+        <div role="menu" data-shadcn="DropdownMenu" style="position:absolute; z-index:79; top:100%; right:0; width:min(262px,calc(100vw - 24px)); background:var(--superficie); border:1px solid var(--linea); border-radius:0 0 var(--radio) var(--radio); box-shadow:var(--sombra-2); overflow:hidden; text-align:left">
+          <sc-for list="{{ opcionesSesion }}" as="o" hint-placeholder-count="4">
+            <button onClick="{{ o.ir }}" style="{{ o.style }}" style-hover="background:var(--sup)">{{ o.label }}</button>
+          </sc-for>
+        </div>
+      </sc-if>
+    </span>
+  </div>
+
+  <!-- Paleta de comandos -->
+  <sc-if value="{{ paleta }}">
+    <div onClick="{{ cerrarTodo }}" style="position:fixed; inset:0; z-index:84; background:var(--velo-paleta)"></div>
+    <div data-shadcn="Command (cmdk)" style="position:fixed; z-index:85; top:11vh; left:50%; transform:translateX(-50%); width:min(620px,92vw); background:var(--superficie); border:1px solid var(--linea); border-radius:var(--radio); box-shadow:var(--sombra-2); overflow:hidden">
+      <div style="display:flex; align-items:center; gap:10px; padding:13px 15px; border-bottom:1px solid var(--linea)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--tinta-3)" stroke-width="1.8" stroke-linecap="round" style="flex:0 0 auto"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-4.3-4.3"></path></svg>
+        <input value="{{ pq }}" onChange="{{ onPq }}" autofocus="{{ true }}" placeholder="Un módulo, un submódulo, un endpoint…" style="flex:1; border:0; background:transparent; font-size:15px; outline:none" />
+        <kbd style="font-family:inherit; font-size:10.5px; color:var(--tinta-3); border:1px solid var(--linea); border-radius:3px; padding:2px 5px">Esc</kbd>
+      </div>
+      <div style="max-height:54vh; overflow:auto">
+        <sc-for list="{{ palRes }}" as="r" hint-placeholder-count="7">
+          <button onClick="{{ r.ir }}" style="display:flex; align-items:baseline; gap:11px; width:100%; text-align:left; border:0; border-bottom:1px solid var(--linea-2); background:transparent; padding:10px 15px; cursor:pointer" style-hover="background:var(--sup)">
+            <span style="flex:1; min-width:0; font-size:13.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{{ r.label }}</span>
+            <span style="font-size:11.5px; color:var(--tinta-3); flex:0 0 auto">{{ r.modulo }}</span>
+          </button>
+        </sc-for>
+      </div>
+      <p style="margin:0; padding:9px 15px; background:var(--sup); font-size:11.5px; color:var(--tinta-3)">{{ palPie }}</p>
+    </div>
+  </sc-if>
+
+  <!-- Confirmación de cierre con cambios -->
+  <sc-if value="{{ porCerrar }}">
+    <div onClick="{{ confirmar.cancelar }}" style="position:fixed; inset:0; z-index:88; background:var(--velo)"></div>
+    <div role="dialog" aria-modal="true" data-shadcn="AlertDialog" style="position:fixed; z-index:89; top:50%; left:50%; transform:translate(-50%,-50%); width:min(460px,calc(100vw - 32px)); background:var(--superficie); border-radius:var(--radio); box-shadow:var(--sombra-2); overflow:hidden">
+      <div style="padding:18px 20px 14px">
+        <p style="margin:0; font-size:16px; font-weight:700; text-wrap:pretty">{{ confirmar.label }} tiene cambios sin guardar</p>
+        <p style="margin:7px 0 0; font-size:13.5px; line-height:1.55; color:var(--tinta-2); text-wrap:pretty">Si cierra la pantalla se pierden. Guárdelos primero o ciérrela descartándolos: eso no se puede deshacer.</p>
+      </div>
+      <div style="display:flex; align-items:center; gap:9px; flex-wrap:wrap; padding:13px 20px; border-top:1px solid var(--linea-2); background:var(--sup)">
+        <button onClick="{{ confirmar.cerrar }}" style="border:1px solid var(--borde-boton); border-radius:var(--radio-sm); padding:9px 15px; background:var(--superficie); font-size:13.5px; color:var(--mal-tinta); cursor:pointer">Salir y perder los cambios</button>
+        <span style="flex:1; min-width:8px"></span>
+        <button onClick="{{ confirmar.cancelar }}" style="border:1px solid var(--borde-boton); border-radius:var(--radio-sm); padding:9px 15px; background:var(--superficie); font-size:13.5px; cursor:pointer">Seguir editando</button>
+        <button onClick="{{ confirmar.guardar }}" style="border:0; border-radius:var(--radio-sm); padding:10px 18px; background:var(--azul); color:var(--sobre-azul); font-size:13.5px; font-weight:700; cursor:pointer">Guardar y cerrar</button>
+      </div>
+    </div>
+  </sc-if>
+
+  <div style="flex:1 1 0; display:flex; align-items:stretch; min-height:0; overflow:hidden">
+
+    <!-- ══════════ ÁRBOL: 10 módulos × 4 submódulos ══════════ -->
+    <aside data-side="1" data-open="{{ sideOpen }}" data-shadcn="Sidebar + Collapsible" style="{{ sideStyle }}">
+      <div style="flex:0 0 auto; padding:10px 10px 9px; border-bottom:1px solid var(--linea-2)">
+        <input value="{{ filtro }}" onChange="{{ onFiltro }}" placeholder="Filtrar módulos y submódulos" aria-label="Filtrar módulos y submódulos" style="width:100%; box-sizing:border-box; border:1px solid var(--borde-campo); border-radius:var(--radio-sm); padding:7px 10px; background:var(--superficie); font-size:13px" />
+      </div>
+      <div style="flex:1; overflow:auto; padding:6px 7px 12px">
+        <sc-for list="{{ arbol }}" as="m" hint-placeholder-count="10">
+          <div>
+            <button onClick="{{ m.toggle }}" aria-expanded="{{ m.abiertoAria }}" style="{{ m.style }}" style-hover="background:var(--sup)">
+              <span style="{{ m.caretStyle }}">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"></path></svg>
+              </span>
+              <span style="{{ m.iconStyle }}">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <sc-for list="{{ m.icon }}" as="p" hint-placeholder-count="4">
+                    <path d="{{ p.d }}"></path>
+                  </sc-for>
+                </svg>
+              </span>
+              <span style="flex:1; min-width:0; text-align:left; line-height:1.2">
+                <span style="display:block; font-size:13px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{{ m.label }}</span>
+                <sc-if value="{{ m.notaVisible }}">
+                  <span style="display:block; font-size:10.5px; color:var(--tinta-3); overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{{ m.nota }}</span>
+                </sc-if>
+              </span>
+            </button>
+            <sc-if value="{{ m.abierto }}">
+              <div style="display:flex; flex-direction:column; gap:1px; margin:2px 0 7px 43px; padding-left:0; border-left:1px solid var(--linea)">
+                <sc-for list="{{ m.hojas }}" as="h" hint-placeholder-count="4">
+                  <button onClick="{{ h.ir }}" aria-current="{{ h.actual }}" style="{{ h.style }}" style-hover="background:var(--sup)">
+                    <span style="{{ h.guiaStyle }}"></span>
+                    <span style="flex:1; min-width:0; text-align:left; font-size:12.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{{ h.label }}</span>
+                    <sc-if value="{{ h.marca }}">
+                      <span style="font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--tinta-3); flex:0 0 auto">{{ h.marca }}</span>
+                    </sc-if>
+                  </button>
+                </sc-for>
+              </div>
+            </sc-if>
+          </div>
+        </sc-for>
+        <sc-if value="{{ sinResultados }}">
+          <p style="margin:16px 10px; font-size:12.5px; line-height:1.5; color:var(--tinta-3); text-wrap:pretty">Ningún módulo ni submódulo coincide con «{{ filtro }}».</p>
+        </sc-if>
+      </div>
+      <p style="flex:0 0 auto; margin:0; padding:10px 12px; border-top:1px solid var(--linea-2); font-size:11px; line-height:1.5; color:var(--tinta-3); text-wrap:pretty">{{ pieArbol }}</p>
+    </aside>
+
+    <div style="flex:1; min-width:0; display:flex; flex-direction:column; overflow:hidden">
+
+      <sc-if value="{{ sinPestanas }}">
+        <div style="flex:1; display:grid; place-items:center; padding:30px">
+          <p style="margin:0; max-width:44ch; text-align:center; font-size:14px; line-height:1.6; color:var(--tinta-3); text-wrap:pretty">No hay ningún submódulo abierto. Elija uno en el árbol de la izquierda.</p>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ hayPestanas }}">
+        <div style="flex:1; overflow:auto">
+          <!-- Cabecera del submódulo, al modo de V7: ruta, título grande y
+               el juego de acciones debajo -->
+          <div style="padding:16px 18px 4px">
+            <nav data-shadcn="Breadcrumb" aria-label="Ruta" style="display:flex; align-items:center; gap:7px; font-size:12.5px; color:var(--tinta-3); margin-bottom:7px">
+              <sc-for list="{{ miga }}" as="b" hint-placeholder-count="3">
+                <span style="{{ b.style }}">{{ b.label }}</span>
+              </sc-for>
+            </nav>
+            <h1 style="margin:0; font-size:27px; font-weight:400; letter-spacing:-.01em; color:var(--tinta); text-wrap:pretty">{{ vista.titulo }}</h1>
+            <p style="margin:7px 0 0; font-size:13.5px; line-height:1.55; color:var(--tinta-2); max-width:82ch; text-wrap:pretty">{{ vista.nota }}</p>
+
+          </div>
+
+          <!-- Barra de instrucción, al modo de V7 -->
+          <div style="background:var(--sup); border-top:1px solid var(--linea); border-bottom:1px solid var(--linea)">
+            <p style="margin:0; padding:10px 18px; font-size:13.5px; line-height:1.55; color:var(--tinta-2); max-width:96ch; text-wrap:pretty"><strong>{{ vista.modulo }}:</strong> {{ vista.instruccion }}</p>
+          </div>
+          <div style="padding:16px 18px 24px; display:flex; flex-direction:column; gap:14px; max-width:1180px">
+
+            <!-- El formulario del submódulo -->
+            <sc-for list="{{ vista.bloques }}" as="b" hint-placeholder-count="2">
+              <section data-shadcn="Card + Form" style="background:var(--superficie); border:1px solid var(--azul); border-radius:var(--radio); overflow:hidden">
+                <div style="padding:11px 15px; background:var(--azul); color:var(--sobre-azul)">
+                  <h2 style="margin:0; font-size:14.5px; font-weight:700">{{ b.titulo }}</h2>
+                </div>
+                <sc-if value="{{ b.nota }}">
+                  <p style="margin:0; padding:11px 15px; border-bottom:1px solid var(--linea-2); font-size:13px; line-height:1.55; color:var(--tinta-2); max-width:80ch; text-wrap:pretty">{{ b.nota }}</p>
+                </sc-if>
+                <sc-if value="{{ b.hayCampos }}">
+                  <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(216px,1fr)); gap:14px 16px; padding:15px 15px 18px">
+                    <sc-for list="{{ b.campos }}" as="c" hint-placeholder-count="8">
+                      <label data-ancho="{{ c.ancho }}" style="display:block; min-width:0">
+                        <span style="display:flex; align-items:baseline; gap:7px; margin-bottom:5px">
+                          <span style="font-size:12.5px; font-weight:700; color:var(--tinta-2)">{{ c.label }}</span>
+                          <sc-if value="{{ c.opcional }}">
+                            <span style="font-size:11.5px; color:var(--tinta-3)">(opcional)</span>
+                          </sc-if>
+                        </span>
+                        <sc-if value="{{ c.esSel }}">
+                          <select value="{{ c.valor }}" onChange="{{ c.on }}" style="{{ c.control }}">
+                            <sc-for list="{{ c.opts }}" as="o" hint-placeholder-count="4">
+                              <option value="{{ o }}">{{ o }}</option>
+                            </sc-for>
+                          </select>
+                        </sc-if>
+                        <sc-if value="{{ c.esFecha }}">
+                          <input type="date" value="{{ c.valor }}" onChange="{{ c.on }}" style="{{ c.control }}" />
+                        </sc-if>
+                        <sc-if value="{{ c.esTexto }}">
+                          <input value="{{ c.valor }}" onChange="{{ c.on }}" placeholder="{{ c.ph }}" style="{{ c.control }}" />
+                        </sc-if>
+                        <sc-if value="{{ c.esArea }}">
+                          <textarea value="{{ c.valor }}" onChange="{{ c.on }}" rows="3" placeholder="{{ c.ph }}" style="{{ c.control }}"></textarea>
+                        </sc-if>
+                        <sc-if value="{{ c.esChk }}">
+                          <span style="display:flex; align-items:center; gap:9px; border:1px solid var(--borde-campo); border-radius:var(--radio-sm); padding:8px 10px; background:var(--superficie)">
+                            <input type="checkbox" checked="{{ c.marcado }}" onChange="{{ c.on }}" style="accent-color:var(--azul); width:16px; height:16px; flex:0 0 auto" />
+                            <span style="font-size:13px; color:var(--tinta-2)">{{ c.ph }}</span>
+                          </span>
+                        </sc-if>
+                        <sc-if value="{{ c.esRo }}">
+                          <span style="display:block; min-height:36px; line-height:19px; border:1px dashed var(--borde-campo); border-radius:var(--radio-sm); padding:8px 10px; background:var(--sup); font-size:13.5px; color:var(--tinta-2)">{{ c.valor }}</span>
+                        </sc-if>
+                        <sc-if value="{{ c.ayuda }}">
+                          <span style="display:block; font-size:11.5px; line-height:1.45; color:var(--tinta-3); margin-top:5px; text-wrap:pretty">{{ c.ayuda }}</span>
+                        </sc-if>
+                      </label>
+                    </sc-for>
+                  </div>
+                </sc-if>
+                <sc-if value="{{ b.hayTabla }}">
+                  <div>
+                    <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:11px 15px; border-top:1px solid var(--linea-2)">
+                      <p style="margin:0; flex:1; min-width:140px; font-size:13px; font-weight:700">{{ b.tabla.titulo }}</p>
+                      <span style="font-size:11.5px; color:var(--tinta-3)">{{ b.tabla.conteo }}</span>
+                      <sc-if value="{{ b.tabla.accion }}">
+                        <button onClick="{{ b.tabla.anadir }}" style="border:1px solid var(--borde-boton); border-radius:var(--radio-sm); padding:6px 12px; background:var(--superficie); font-size:12.5px; cursor:pointer" style-hover="border-color:var(--borde-hover)">{{ b.tabla.accion }}</button>
+                      </sc-if>
+                    </div>
+                    <div style="overflow-x:auto; border-top:1px solid var(--linea-2)">
+                      <table style="min-width:{{ b.tabla.min }}">
+                        <thead>
+                          <tr>
+                            <sc-for list="{{ b.tabla.cols }}" as="c" hint-placeholder-count="6">
+                              <th style="{{ c.style }}">{{ c.label }}</th>
+                            </sc-for>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <sc-for list="{{ b.tabla.filas }}" as="r" hint-placeholder-count="4">
+                            <tr style="{{ r.filaStyle }}">
+                              <sc-for list="{{ r.celdas }}" as="cl" hint-placeholder-count="6">
+                                <td style="{{ cl.style }}">
+                                  <sc-if value="{{ cl.insignia }}"><span style="{{ cl.insignia }}">{{ cl.texto }}</span></sc-if>
+                                  <sc-if value="{{ cl.plano }}">{{ cl.texto }}</sc-if>
+                                </td>
+                              </sc-for>
+                            </tr>
+                          </sc-for>
+                        </tbody>
+                      </table>
+                    </div>
+                    <sc-if value="{{ b.tabla.nota }}">
+                      <p style="margin:0; padding:10px 15px; background:var(--sup); font-size:12px; line-height:1.5; color:var(--tinta-3); text-wrap:pretty">{{ b.tabla.nota }}</p>
+                    </sc-if>
+                  </div>
+                </sc-if>
+              </section>
+            </sc-for>
+
+            <!-- Las acciones, al pie: el orden de la pantalla es llenar y
+                 luego confirmar, no al contrario -->
+            <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:2px 0 0">
+              <button onClick="{{ volver }}" style="border:1px solid var(--borde-boton); border-radius:var(--radio-sm); padding:9px 18px; background:var(--superficie); font-size:13.5px; cursor:pointer; flex:0 0 auto" style-hover="border-color:var(--borde-hover)">Volver</button>
+              <p style="margin:0; flex:1; min-width:180px; font-size:12.5px; line-height:1.5; color:var(--tinta-3); text-wrap:pretty">{{ pie.aviso }}</p>
+              <sc-for list="{{ pie.acciones }}" as="a" hint-placeholder-count="2">
+                <button onClick="{{ a.ir }}" style="{{ a.style }}">{{ a.label }}</button>
+              </sc-for>
+            </div>
+
+            <!-- Entrega: sólo cuando el modo está activo -->
+            <sc-if value="{{ entrega }}">
+              <div style="display:flex; flex-direction:column; gap:14px">
+                <section style="background:var(--superficie); border:1px solid var(--acento); border-radius:var(--radio); overflow:hidden">
+                  <div style="display:flex; align-items:center; gap:10px; padding:11px 15px; background:var(--azul-suave); border-bottom:1px solid var(--acento)">
+                    <h2 style="margin:0; flex:1; font-size:14px; font-weight:700; color:var(--info-tinta)">Operaciones que respaldan esta pantalla</h2>
+                    <span style="font-size:11.5px; color:var(--info-tinta)">{{ vista.conteoOps }}</span>
+                  </div>
+                  <sc-for list="{{ vista.operaciones }}" as="o" hint-placeholder-count="4">
+                    <div style="display:flex; align-items:center; gap:11px; flex-wrap:wrap; padding:9px 15px; border-bottom:1px solid var(--linea-2)">
+                      <span style="{{ o.verboStyle }}">{{ o.verbo }}</span>
+                      <code style="flex:1; min-width:170px; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:12px; color:var(--tinta); overflow-wrap:anywhere">{{ o.ruta }}</code>
+                      <span data-sm-hide="1" style="font-size:11.5px; color:var(--tinta-3); flex:0 1 auto">{{ o.nota }}</span>
+                    </div>
+                  </sc-for>
+                  <p style="margin:0; padding:10px 15px; background:var(--sup); font-size:12px; line-height:1.5; color:var(--tinta-3); text-wrap:pretty">{{ vista.notaOps }}</p>
+                </section>
+
+                <section style="background:var(--superficie); border:1px solid var(--acento); border-radius:var(--radio); overflow:hidden">
+                  <div style="padding:11px 15px; background:var(--azul-suave); border-bottom:1px solid var(--acento)">
+                    <h2 style="margin:0; font-size:14px; font-weight:700; color:var(--info-tinta)">Composición en shadcn/ui — {{ vista.titulo }}</h2>
+                  </div>
+                  <sc-for list="{{ vista.piezas }}" as="p" hint-placeholder-count="4">
+                    <div style="display:flex; align-items:flex-start; gap:12px; padding:10px 15px; border-bottom:1px solid var(--linea-2)">
+                      <code style="flex:0 0 auto; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:12.5px; font-weight:700; color:var(--info-tinta); background:var(--azul-suave); border-radius:var(--radio-sm); padding:2px 8px">{{ p.pieza }}</code>
+                      <span style="flex:1; min-width:0; font-size:12.5px; line-height:1.5; color:var(--tinta-2); text-wrap:pretty">{{ p.uso }}</span>
+                    </div>
+                  </sc-for>
+                  <p style="margin:0; padding:10px 15px; background:var(--sup); font-size:12px; line-height:1.5; color:var(--tinta-3); text-wrap:pretty">Esta lista no está escrita a mano: se deriva de los bloques y los campos que la pantalla rinde, más las piezas que el formulario no delata. Las regiones del cromo llevan su propio atributo <code style="font-family:ui-monospace,Menlo,Consolas,monospace">data-shadcn</code> en el marcado.</p>
+                </section>
+
+                <section style="background:var(--superficie); border:1px solid var(--linea); border-radius:var(--radio); overflow:hidden">
+                  <div style="padding:11px 15px; border-bottom:1px solid var(--linea-2)">
+                    <h2 style="margin:0; font-size:14px; font-weight:700">Tokens a Tailwind</h2>
+                    <p style="margin:4px 0 0; font-size:12.5px; line-height:1.5; color:var(--tinta-3); text-wrap:pretty">Salen de <code style="font-family:ui-monospace,Menlo,Consolas,monospace">frontend/src/estilos/tokens/colors.css</code>. En Tailwind v4 entran en un bloque <code style="font-family:ui-monospace,Menlo,Consolas,monospace">@theme</code>; la clase de la derecha es la que usa el componente.</p>
+                  </div>
+                  <div style="overflow-x:auto">
+                    <table style="min-width:660px">
+                      <thead>
+                        <tr>
+                          <sc-for list="{{ tokens.cols }}" as="c" hint-placeholder-count="4">
+                            <th style="{{ c.style }}">{{ c.label }}</th>
+                          </sc-for>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <sc-for list="{{ tokens.filas }}" as="r" hint-placeholder-count="8">
+                          <tr style="{{ r.filaStyle }}">
+                            <td style="padding:9px 14px; border-bottom:1px solid var(--linea-2)">
+                              <span style="display:flex; align-items:center; gap:9px">
+                                <span style="{{ r.muestra }}"></span>
+                                <code style="font-family:ui-monospace,Menlo,Consolas,monospace; font-size:12.5px">{{ r.token }}</code>
+                              </span>
+                            </td>
+                            <sc-for list="{{ r.celdas }}" as="cl" hint-placeholder-count="3">
+                              <td style="{{ cl.style }}">{{ cl.texto }}</td>
+                            </sc-for>
+                          </tr>
+                        </sc-for>
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+
+                <section style="background:var(--superficie); border:1px solid var(--linea); border-radius:var(--radio); overflow:hidden">
+                  <div style="padding:11px 15px; border-bottom:1px solid var(--linea-2)">
+                    <h2 style="margin:0; font-size:14px; font-weight:700">Cómo cae en el repositorio</h2>
+                  </div>
+                  <sc-for list="{{ reparto }}" as="r" hint-placeholder-count="5">
+                    <div style="display:flex; align-items:flex-start; gap:12px; padding:10px 15px; border-bottom:1px solid var(--linea-2)">
+                      <code style="flex:0 0 auto; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:12.5px; color:var(--tinta)">{{ r.ruta }}</code>
+                      <span style="flex:1; min-width:0; font-size:12.5px; line-height:1.5; color:var(--tinta-2); text-wrap:pretty">{{ r.que }}</span>
+                    </div>
+                  </sc-for>
+                  <p style="margin:0; padding:10px 15px; background:var(--sup); font-size:12px; line-height:1.5; color:var(--tinta-3); text-wrap:pretty">El árbol de este artboard no está escrito a mano: son los mismos diez módulos y cuarenta submódulos de <code style="font-family:ui-monospace,Menlo,Consolas,monospace">frontend/src/marco/arbol.ts</code>, que a su vez se empalma con <code style="font-family:ui-monospace,Menlo,Consolas,monospace">GET /seguridad/modulos</code> por el campo <code style="font-family:ui-monospace,Menlo,Consolas,monospace">codigo</code>.</p>
+                </section>
+              </div>
+            </sc-if>
+          </div>
+        </div>
+      </sc-if>
+    </div>
+  </div>
+
+  <sc-if value="{{ toast }}">
+    <div role="status" style="position:fixed; z-index:90; bottom:20px; left:50%; transform:translateX(-50%); padding:11px 20px; border-radius:var(--radio-sm); background:var(--tinta); color:var(--superficie); font-size:13.5px; box-shadow:var(--sombra-2); max-width:calc(100vw - 40px)">{{ toast }}</div>
+  </sc-if>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:900},&quot;entidad&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;Municipalidad Distrital de Catacaos&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Institución&quot;}}">
+/* ════════════════════════════════════════════════════════════════════════
+   RentasV8 — el marco de V6/V7 sobre el árbol REAL del backend.
+
+   Los diez módulos, sus cuarenta submódulos, sus rótulos, sus claves y los
+   trazos de sus iconos son copia literal de
+       hneyra/rentas · frontend/src/marco/arbol.ts
+   que a su vez se empalma con `GET /seguridad/modulos` por el campo `codigo`.
+   Catastro y Tesorería NO están: por ADR-0029 son de `../catastro` y `../caja`.
+   Valores sí, con clave `valores-mod` para no chocar con la sección `valores`.
+
+   Las operaciones que se listan bajo cada submódulo son los `@RequestMapping`
+   reales de los diecisiete módulos del backend, no rutas inventadas.
+
+   Para portarlo: los colores salen de `rentas-tokens.css`, que es copia de
+   `frontend/src/estilos/tokens/colors.css`; cada región lleva `data-shadcn` con
+   la pieza que le toca; y el modo «Entrega» de la barra despliega el mapa de
+   tokens y el reparto de archivos.
+   ════════════════════════════════════════════════════════════════════════ */
+
+const PROPIO = 'Rentas · Registro';
+
+/* El prefijo de todas las rutas. Es el valor de Api.RAIZ tal como lo fijan las
+   verificaciones del backend (EndpointsPublicados.RAIZ y ParametrosDeLaConsulta
+   .RAIZ, los dos con "/rentas/api/v1"). */
+const RAIZ = '/rentas/api/v1';
+
+/* [rótulo, nota, clave, código, trazos, submódulos]
+   submódulo: [clave, rótulo, operaciones[[verbo, ruta, nota]], piezas[[pieza, uso]]]
+
+   El verbo BASE marca una ruta de la que solo se leyó el @RequestMapping de la
+   clase: el controlador cuelga de ahí, pero sus métodos no se han verificado y
+   no se inventan. Los demás verbos salen de un @GetMapping, @PostMapping,
+   @PutMapping o @PatchMapping leído. */
+const ARBOL = [
+  ['Inicio', 'Panel de recaudación', 'inicio', 'INICIO',
+    ['M3 10.6 12 3.5l9 7.1', 'M5.6 9.6V20.5h12.8V9.6', 'M10 20.5v-5.4h4v5.4'],
+    [
+      ['ini-panel', 'Panel', [
+        ['GET', '/indicadores/recaudacion', 'IndicadoresController'],
+        ['BASE', '/portal/situacion', 'PortalController']],
+        [['Progress', 'La barra de avance por tributo']]],
+      ['ini-flujo', 'Recaudación', [['GET', '/indicadores/recaudacion', 'IndicadoresController']],
+        [['Chart', 'Barras horizontales; recharts, que shadcn envuelve']]],
+      ['ini-parado', 'Trabajo parado', [['GET', '/indicadores/trabajo-parado', 'IndicadoresController']],
+        []],
+      ['ini-cierre', 'Cierre del día', [['BASE', '/consultas/pagos', 'ConsultaPagosController']],
+        []]
+    ]],
+
+  [PROPIO, 'Predial y contribuyentes', 'rentas', 'RENTAS_REGISTRO',
+    ['M6.5 3.5h7.5l4 4v13h-11.5z', 'M14 3.5v4h4', 'M9.5 12.5h5', 'M9.5 16.5h3.5'],
+    [
+      ['panel', 'Panel', [
+        ['GET', '/rentas/predial/corridas/ultima', 'PredialController'],
+        ['GET', '/rentas/predial/corridas/{corridaId}/observados', 'Los que quedan sin emisión']],
+        [['Alert', 'Los observados sin emisión, que es lo que hay que corregir']]],
+      ['predios', 'Contribuyentes', [
+        ['BASE', '/rentas/contribuyentes', 'ContribuyenteController.RUTA'],
+        ['PUT', '/rentas/contribuyentes/{id}', 'Actualiza el contribuyente'],
+        ['GET', '/rentas/contribuyentes/{id}/ficha', 'FichaDelContribuyenteController'],
+        ['POST', '/rentas/contribuyentes/{id}/domicilios', 'Añade un domicilio'],
+        ['POST', '/rentas/contribuyentes/{id}/contactos', 'Añade un contacto']],
+        [['DataTable', 'El padrón pide orden y filtro por columna; TanStack Table, que shadcn envuelve']]],
+      ['territorio', 'Determinación', [
+        ['POST', '/rentas/predial/calculo-individual', 'Determina un contribuyente'],
+        ['POST', '/rentas/predial/calculo-masivo', 'Emisión anual del padrón'],
+        ['POST', '/rentas/deuda/altas', 'MovimientosDeDeudaController'],
+        ['POST', '/rentas/deuda/bajas', 'Extingue deuda, con resolución'],
+        ['BASE', '/rentas/vehicular/calculo', 'VehicularController'],
+        ['BASE', '/rentas/alcabala', 'AlcabalaController'],
+        ['BASE', '/rentas/espectaculos', 'EspectaculoController']],
+        [['AlertDialog', 'Confirmar antes de asentar: la determinación entra en la cuenta corriente']]],
+      ['valores', 'Valores', [
+        ['GET', '/seguridad/parametros/ejercicios/{ejercicio}', 'EjercicioParametrizadoController'],
+        ['BASE', '/rentas/arbitrios', 'ArbitriosController'],
+        ['BASE', '/rentas/beneficios', 'BeneficioController']],
+        []]
+    ]],
+
+  ['Fiscalización', 'Detección y actas', 'fisc', 'FISCALIZACION',
+    ['M9.5 4.5H8A1.5 1.5 0 0 0 6.5 6v13A1.5 1.5 0 0 0 8 20.5h8a1.5 1.5 0 0 0 1.5-1.5V6A1.5 1.5 0 0 0 16 4.5h-1.5',
+     'M9.5 3.2h5v2.8h-5z', 'M9.6 13.2l2 2 3.4-4'],
+    [
+      ['fis-panel', 'Panel', [['GET', '/fiscalizacion/estado-cuenta', 'OmisosController']],
+        [['Progress', 'El avance del programa por etapa']]],
+      ['fis-actas', 'Actas', [
+        ['BASE', '/fiscalizacion/actas', 'ActasController'],
+        ['BASE', '/fiscalizacion/predial/actas', 'ActaPredialController'],
+        ['BASE', '/fiscalizacion/vehicular', 'ActaVehicularController']],
+        [['DataTable', 'Actas por estado, con filtro por programa']]],
+      ['fis-prog', 'Programas y cruces', [
+        ['GET', '/fiscalizacion/programas/{id}/muestra', 'MuestraController'],
+        ['POST', '/fiscalizacion/programas/{id}/muestra', 'Genera la muestra'],
+        ['GET', '/fiscalizacion/omisos', 'OmisosController']],
+        []],
+      ['fis-res', 'Resultados', [
+        ['GET', '/fiscalizacion/resultados', 'LiquidacionController'],
+        ['POST', '/fiscalizacion/liquidaciones', 'Liquida la diferencia'],
+        ['PATCH', '/fiscalizacion/liquidaciones/{numero}/estados', 'Cambia el estado'],
+        ['GET', '/fiscalizacion/resoluciones/{numero}', 'ResolucionController']],
+        [['AlertDialog', 'Emitir la resolución: es lo que vuelve la diferencia deuda exigible']]]
+    ]],
+
+  ['Tránsito', 'Papeletas y vehículos', 'transito', 'TRANSITO',
+    ['M5 15.8v-3.2l1.9-4.4h10.2l1.9 4.4v3.2', 'M3.6 15.8h16.8',
+     'M8.4 18.4a1.6 1.6 0 1 1-3.2 0 1.6 1.6 0 0 1 3.2 0', 'M18.8 18.4a1.6 1.6 0 1 1-3.2 0 1.6 1.6 0 0 1 3.2 0'],
+    [
+      ['tra-panel', 'Panel', [['BASE', '/transito/estado-cuenta', 'EstadoDeCuentaTransitoController']],
+        [['Alert', 'Las caducadas sin notificar, que ya no se pueden cobrar']]],
+      ['tra-pap', 'Papeletas', [
+        ['BASE', '/transito/papeletas', 'PapeletasController'],
+        ['BASE', '/transito/papeletas/busqueda', 'BusquedaDePapeletasController'],
+        ['BASE', '/transito/papeletas/{numero}/actos', 'ActosDeLaPapeletaController'],
+        ['BASE', '/transito/descargos', 'DescargosController']],
+        [['Command', 'La búsqueda por placa o número, que es como se entra a esta pantalla']]],
+      ['tra-veh', 'Vehículos y depósito', [
+        ['BASE', '/transito/internamientos', 'InternamientosController'],
+        ['BASE', '/transito/constancias-libres', 'ConstanciasLibresController'],
+        ['GET', '/rentas/vehiculos/{placa}', 'VehiculoController']],
+        [['DataTable', 'Internamientos con sus días de custodia']]],
+      ['tra-cua', 'Cuadros y plazos', [['BASE', '/transito/codigos', 'CodigosTransitoController']],
+        [['HoverCard', 'La norma que respalda cada código']]]
+    ]],
+
+  ['Infracciones administrativas', 'Sanciones administrativas', 'infra', 'INFRACCIONES_ADMINISTRATIVAS',
+    ['M12 4.2 20.8 19.6H3.2z', 'M12 9.8v4.4', 'M12 17.1h.02'],
+    [
+      ['inf-panel', 'Panel', [['BASE', '/infracciones/administrativas/estado-cuenta', 'EstadoDeCuentaAdministrativoController']],
+        [['Progress', 'Los que vencen esta semana']]],
+      ['inf-exp', 'Expedientes', [
+        ['BASE', '/infracciones/actas', 'InfraccionesAdministrativasController'],
+        ['BASE', '/infracciones/administrativas/notificaciones', 'NotificacionAdministrativaController']],
+        [['Stepper', 'Acta, resolución y notificación, en orden legal; composición de Card']]],
+      ['inf-cuis', 'CUIS y reincidencia', [['BASE', '/infracciones/cuis', 'CodigosCuisController']],
+        []],
+      ['inf-esc', 'Escalas y plazos', [
+        ['BASE', '/infracciones/administrativas/codigos/reporte', 'ReporteCodigosAdministrativosController'],
+        ['BASE', '/infracciones/administrativas/reportes/vencidas', 'NotificacionesVencidasController'],
+        ['BASE', '/infracciones/administrativas/reportes/por-contribuyente', 'NotificacionesPorContribuyenteController']],
+        [['Alert', 'Lo vencido, que ya no se puede cobrar']]]
+    ]],
+
+  ['Consultas', 'Ventanilla y constancias', 'consultas', 'CONSULTAS',
+    ['M17.4 11a6.4 6.4 0 1 1-12.8 0 6.4 6.4 0 0 1 12.8 0', 'M15.8 15.8 20.6 20.6'],
+    [
+      ['con-panel', 'Panel', [['GET', '/consultas/cuenta-corriente/{codigo}', 'CuentaCorrienteController']],
+        []],
+      ['con-contrib', 'Contribuyentes', [
+        ['BASE', '/consultas/deuda', 'ConsultaDeudaController'],
+        ['BASE', '/consultas/pagos', 'ConsultaPagosController'],
+        ['BASE', '/consultas/unificada', 'ConsultaUnificadaController']],
+        [['Command', 'Un solo campo que reconoce DNI, RUC, placa, código o nombre']]],
+      ['con-obj', 'Consultas por objeto', [
+        ['BASE', '/consultas/predios', 'ConsultaPrediosController'],
+        ['BASE', '/consultas/vehiculos', 'ConsultaVehiculosController'],
+        ['BASE', '/consultas/valores', 'ConsultaValoresController'],
+        ['BASE', '/consultas/altas-bajas', 'AltasBajasController']],
+        []],
+      ['con-doc', 'Documentos y beneficios', [
+        ['GET', '/consultas/constancias/no-adeudo?formato', 'ConstanciaController'],
+        ['BASE', '/consultas/deudas-con-beneficio', 'DeudasConBeneficioController']],
+        [['Alert', 'Con deuda pendiente sale constancia de deuda, no de no adeudo']]]
+    ]],
+
+  ['Coactiva', 'Expedientes y medidas', 'coactiva', 'COACTIVA',
+    ['M12 4.4v3.2', 'M5 8.6h14', 'M5 8.6 2.8 14.4h4.4z', 'M19 8.6 16.8 14.4h4.4z', 'M8.4 20h7.2'],
+    [
+      ['coa-panel', 'Panel', [
+        ['GET', '/coactiva/deudas', 'DeudaCoactivaController'],
+        ['GET', '/coactiva/deudas-en-beneficio', 'La que está en convenio']],
+        [['Alert', 'Los expedientes sin REC: están abiertos y el procedimiento no ha empezado']]],
+      ['coa-exp', 'Expedientes', [
+        ['GET', '/coactiva/expedientes', 'ExpedienteController'],
+        ['GET', '/coactiva/expedientes/{numero}/proceso', 'La línea de vida del expediente'],
+        ['POST', '/coactiva/expedientes/{numero}/actos', 'Dicta un acto coactivo'],
+        ['PATCH', '/coactiva/expedientes/{numero}/estados', 'Cambia el estado'],
+        ['POST', '/coactiva/rec/impresion', 'Imprime la REC']],
+        [['Stepper', 'REC, notificación, medida y ejecución'], ['AlertDialog', 'El coste tasado del acto, antes de dictarlo']]],
+      ['coa-cart', 'Cartera y medidas', [
+        ['POST', '/coactiva/convenios', 'ConvenioCoactivoController'],
+        ['POST', '/coactiva/expedientes/importacion', 'Importa cartera'],
+        ['GET', '/coactiva/expedientes/{numero}/deuda', 'La deuda del expediente'],
+        ['POST', '/coactiva/notificaciones', 'Notifica el acto']],
+        []],
+      ['coa-cost', 'Costas y plazos', [
+        ['GET', '/coactiva/liquidaciones-costas', 'CostasController'],
+        ['POST', '/coactiva/liquidaciones-costas', 'Liquida las costas'],
+        ['GET', '/coactiva/prescripcion', 'PrescripcionController, en el módulo de valores']],
+        [['Progress', 'Lo que queda para que prescriba']]]
+    ]],
+
+  ['Autorizaciones y licencias', 'Licencias y anuncios', 'autoriz', 'AUTORIZACIONES_Y_LICENCIAS',
+    ['M4.4 9.6V20h15.2V9.6', 'M3.2 9.6 5.2 4.6h13.6l2 5z', 'M9.6 20v-5.4h4.8V20'],
+    [
+      ['aut-panel', 'Panel', [['GET', '/licencias/funcionamiento', 'LicenciaController']],
+        [['Alert', 'Las de plazo agotado, que ya se entienden otorgadas']]],
+      ['aut-sol', 'Solicitudes', [
+        ['POST', '/licencias/funcionamiento', 'Licencia de funcionamiento'],
+        ['POST', '/licencias/funcionamiento/{id}/cancelacion', 'Cese de actividades'],
+        ['POST', '/licencias/edificacion/{expediente}/licencia', 'EdificacionController'],
+        ['POST', '/autorizaciones/anuncios/{id}/renovacion', 'AnuncioController']],
+        [['Progress', 'El plazo del TUPA, que al agotarse otorga por silencio positivo']]],
+      ['aut-cat', 'Catálogos y padrones', [
+        ['GET', '/licencias/ciiu', 'CiiuController'],
+        ['POST', '/licencias/ciiu', 'Alta de giro'],
+        ['POST', '/licencias/certificados/{numero}/impresion', 'CertificadoController']],
+        [['Combobox', 'El giro CIIU: son 1,842 y no caben en un Select']]],
+      ['aut-tram', 'Trámites y plazos', [
+        ['POST', '/licencias/funcionamiento/reportes/padron', 'Padrón de licencias'],
+        ['GET', '/licencias/funcionamiento/reportes/resumen-anual', 'Resumen por ejercicio'],
+        ['GET', '/licencias/edificacion/reportes/general', 'Reporte de edificación']],
+        []]
+    ]],
+
+  ['Seguridad', 'Usuarios y permisos', 'seguridad', 'SEGURIDAD',
+    ['M12 3.4 19 5.9v5.6c0 4.1-3 7.2-7 9.1-4-1.9-7-5-7-9.1V5.9z', 'M9.4 12.1l1.9 1.9 3.5-3.6'],
+    [
+      ['seg-panel', 'Panel', [
+        ['GET', '/seguridad/modulos', 'Con lo que se compone este mismo árbol'],
+        ['GET', '/seguridad/sesion', 'SesionController'],
+        ['GET', '/seguridad/sesion/municipalidad', 'La entidad de la barra']],
+        []],
+      ['seg-acc', 'Accesos', [
+        ['GET', '/seguridad/accesos', 'SeguridadController'],
+        ['GET', '/seguridad/sesion/permisos', 'Permisos efectivos de la sesión'],
+        ['PUT', '/seguridad/usuarios/{id}/clave', 'Cambia la contraseña']],
+        [['Tooltip', 'De qué grupo viene un permiso heredado']]],
+      ['seg-aud', 'Auditoría', [['GET', '/seguridad/auditoria', 'Quién hizo qué y cuándo']],
+        [['DataTable', 'Bitácora con filtro por usuario, módulo y riesgo']]],
+      ['seg-sis', 'Sistema', [
+        ['PUT', '/seguridad/sesion/ejercicio', 'Cambia el ejercicio de trabajo'],
+        ['GET', '/seguridad/parametros/ejercicios/{ejercicio}', 'EjercicioParametrizadoController'],
+        ['POST', '/seguridad/respaldos', 'Copias de seguridad']],
+        [['AlertDialog', 'Cambiar el ejercicio con una caja abierta pide confirmación']]]
+    ]],
+
+  ['Valores', 'Emisión y notificación', 'valores-mod', 'VALORES',
+    ['M6.5 3.5h7.5l4 4v13h-11.5z', 'M14 3.5v4h4', 'M9.5 11.5h5', 'M15.6 16.4a2.3 2.3 0 1 1-4.6 0 2.3 2.3 0 0 1 4.6 0'],
+    [
+      ['val-panel', 'Panel', [['BASE', '/valores', 'ValoresController']],
+        [['Alert', 'Emitidos y sin notificar: no cobran y el plazo les corre igual']]],
+      ['val-val', 'Valores', [
+        ['POST', '/valores/{nro}/notificacion', 'Notifica el valor'],
+        ['POST', '/valores/{numero}/movimientos', 'Movimientos del valor'],
+        ['BASE', '/consultas/valores', 'ConsultaValoresController']],
+        [['Sheet', 'El valor y su hoja, sin salir de la lista']]],
+      ['val-cart', 'Cartera y lotes', [['POST', '/valores/masivo', 'Emisión por lote']],
+        [['Progress', 'La corrida, con sus observados']]],
+      ['val-tip', 'Tipos y prescripción', [
+        ['GET', '/coactiva/prescripcion', 'PrescripcionController'],
+        ['POST', '/coactiva/prescripcion', 'Declara la prescripción']],
+        [['Progress', 'Cuánto queda para que prescriba']]]
+    ]]
+];
+
+
+/* ── Las cuarenta pantallas ────────────────────────────────────
+   Cada submódulo trae su formulario: los grupos de campos y las tablas que
+   la pantalla pide. El inventario de campos sigue el de Rentas.dc.html y el
+   de los doce artboards V4, que salieron del manual del sistema.
+
+   Formato de un campo: [etiqueta, tipo, opciones o ayuda]
+     tipo ''  texto      s  desplegable   d  fecha
+          r  sólo lectura c  casilla      a  área
+     un 1 al final del tipo hace el campo de ancho completo. */
+const PANTALLAS = {
+  /* ═══ Inicio ═══ */
+  'ini-panel': [['Ejercicio en curso', '', [
+    ['Ejercicio', 's', ['2026', '2025', '2024']], ['Emitido del ejercicio', 'r', 'S/ 23,725,394.80'], ['Recaudado', 'r', 'S/ 18,424,251.20'],
+    ['Avance', 'r', '77.7 %'], ['Contribuyentes activos', 'r', '62,418'], ['Observados sin emisión', 'r', '534']]]],
+  'ini-flujo': [['Emitido contra recaudado', 'Por tributo, al día de hoy.', [
+    ['Ejercicio', 's', ['2026', '2025', '2024']], ['Desde', 'd'], ['Hasta', 'd'],
+    ['Tributo', 's', ['Todos', 'Impuesto predial', 'Arbitrios municipales', 'Patrimonio vehicular', 'Alcabala', 'Multas']]],
+    { t: 'Cuadre por tributo', c: [['Tributo', 0], ['Emitido S/', 1], ['Recaudado S/', 1], ['Saldo S/', 1], ['Avance', 1]], f: [
+      ['Impuesto predial', '9,418,204.60', '8,420,118.40', '998,086.20', '89.4 %'],
+      ['Arbitrios municipales', '5,884,110.20', '5,112,440.80', '771,669.40', '86.9 %'],
+      ['Patrimonio vehicular', '2,884,000.00', '1,882,400.00', '1,001,600.00', '65.3 %'],
+      ['Alcabala', '1,420,880.00', '1,420,880.00', '0.00', '100.0 %'],
+      ['Multas y papeletas', '4,118,200.00', '1,588,412.00', '2,529,788.00', '38.6 %']],
+      n: 'El saldo por cobrar no es deuda perdida: es lo que sigue vivo mientras no prescriba.' }]],
+  'ini-parado': [['Trabajo parado', 'Dinero que no entra por un acto que se puede hacer hoy.', [
+    ['Módulo', 's', ['Todos', 'Tránsito', 'Valores', 'Coactiva', 'Fiscalización', 'Autorizaciones']],
+    ['Antigüedad mínima', 's', ['Cualquiera', 'Más de 30 días', 'Más de 90 días']]],
+    { t: 'Frentes abiertos', c: [['Módulo', 0], ['Qué falta', 0], ['Registros', 1], ['Importe S/', 1], ['Situación', 0]], f: [
+      ['Tránsito', 'Papeletas caducadas sin notificar', '1,842', '788,976.00', 'Vencida'],
+      ['Valores', 'Emitidos y sin notificar', '412', '184,412.00', 'Vencida'],
+      ['Coactiva', 'Expedientes importados sin REC', '388', '162,844.00', 'Vencida'],
+      ['Fiscalización', 'Actas con diferencia sin emitir', '61', '214,882.40', 'Por vencer'],
+      ['Autorizaciones', 'Solicitudes con el plazo agotado', '42', '0.00', 'Por vencer']], i: 4 }]],
+  'ini-cierre': [['Cierre del día', 'Lo cobrado en el turno, contra lo contado en caja.', [
+    ['Caja', 's', ['C-1', 'C-2', 'C-3']], ['Turno', 's', ['Mañana', 'Tarde']], ['Fecha', 'd'],
+    ['Cajero', 'r', 'J. Cárdenas Vega'], ['Recaudado del turno', 'r', 'S/ 9,418.60'], ['Diferencia de arqueo', 'r', 'S/ 0.00']],
+    { t: 'Lo cobrado por concepto', c: [['Concepto', 0], ['Recibos', 1], ['Efectivo S/', 1], ['Tarjeta S/', 1], ['Total S/', 1]], f: [
+      ['Impuesto predial', '31', '4,182.40', '1,204.00', '5,386.40'],
+      ['Arbitrios municipales', '14', '1,884.20', '412.00', '2,296.20'],
+      ['Patrimonio vehicular', '4', '882.00', '564.00', '1,446.00'],
+      ['Tasas del TUPA', '3', '290.00', '0.00', '290.00']],
+      n: 'El arqueo se cuadra contra lo contado en caja, no contra lo registrado: la diferencia es lo que hay que explicar.' }]],
+
+  /* ═══ Rentas · Registro ═══ */
+  panel: [['Estado de la emisión', 'La última corrida del padrón y lo que dejó fuera.', [
+    ['Ejercicio', 's', ['2026', '2025', '2024']], ['Última corrida', 'r', '28/01/2026 02:14'], ['Cuentas emitidas', 'r', '61,350'],
+    ['Observados', 'r', '534'], ['Monto determinado', 'r', 'S/ 9,418,204.60'], ['Derecho de emisión', 'r', 'S/ 4.50']],
+    { t: 'Etapas de la corrida', c: [['Etapa', 0], ['Registros', 1], ['Monto S/', 1], ['Observados', 1], ['Estado', 0]], f: [
+      ['Lectura del padrón', '62,418', '—', '0', 'Conforme'],
+      ['Valuación de predios', '78,204', '1,842,116,420.00', '412', 'Conforme'],
+      ['Determinación del impuesto', '61,884', '9,418,204.60', '534', 'Conforme'],
+      ['Determinación de arbitrios', '61,884', '5,884,110.20', '188', 'Conforme'],
+      ['Generación de cuponeras', '61,350', '—', '534', 'Observado']], i: 4,
+      n: 'Los observados quedan sin emisión hasta que se corrija la inconsistencia: predio sin arancel, ficha no conciliada o titularidad incompleta.' }]],
+  predios: [
+    ['Identificación del contribuyente', 'El código lo asigna el sistema; lo que tiene que ser único es el documento.', [
+      ['Código', 'r', '00000025673'], ['Tipo de persona', 's', ['Natural', 'Jurídica', 'Sucesión indivisa', 'Sociedad conyugal']],
+      ['Tipo de documento', 's', ['DNI', 'RUC', 'Carnet de extranjería']], ['Número de documento', ''],
+      ['Apellido paterno', ''], ['Apellido materno', ''], ['Nombres', ''],
+      ['Razón social', '1', 'Sólo si es persona jurídica'],
+      ['Fecha de nacimiento', 'd'], ['Sexo', 's', ['Masculino', 'Femenino']],
+      ['Estado civil', 's', ['Soltero(a)', 'Casado(a)', 'Viudo(a)', 'Divorciado(a)', 'Conviviente']],
+      ['Calificación', 's', ['001 — Principal contribuyente', '002 — Mediano contribuyente', '003 — Pequeño contribuyente']],
+      ['Estado', 's', ['Activo', 'Inactivo', 'Baja', 'Fallecido', 'No habido']]]],
+    ['Domicilio fiscal', 'A dónde se notifica. La vía sale del catálogo vial de Catastro.', [
+      ['Tipo de vía', 's', ['AV — Avenida', 'CA — Calle', 'JR — Jirón', 'PS — Pasaje', 'CR — Carretera']],
+      ['Nombre de la vía', '1'], ['Número', ''], ['Número adicional', ''],
+      ['Habilitación urbana', '1'], ['Departamento', 'r', 'Piura'], ['Provincia', 'r', 'Sullana'], ['Distrito', 'r', 'Sullana'],
+      ['Manzana', ''], ['Lote', ''], ['Teléfonos', ''], ['Correo electrónico', ''],
+      ['Notificación electrónica', 'c', 'Autoriza notificar al correo declarado']]],
+    ['Unidades afectas', 'Las unidades de las que sale el impuesto.', [],
+      { t: 'Predios del contribuyente', a: 'Añadir predio', cn: '2 predios · autovalúo S/ 170,616.75',
+        c: [['Código predial', 0], ['Ubicación', 0], ['Uso', 0], ['Terreno m²', 1], ['% prop.', 1], ['Autovalúo S/', 1]], f: [
+        ['02-014-D-14-01', 'Calle Santa Rosa 116', 'Casa habitación', '210.00', '100.00', '132,196.75'],
+        ['04-021-B-07-00', 'Mz. B Lt. 7 — Bellavista', 'Terreno sin construir', '184.00', '50.00', '38,420.00']],
+        n: 'El autovalúo del conjunto es la base imponible del predial: la escala se aplica a la suma, no a cada predio.' }]],
+  territorio: [
+    ['Sujeto y ejercicio', 'Sobre quién y sobre qué año se determina.', [
+      ['Contribuyente', '1'], ['Ejercicio', 's', ['2026', '2025', '2024']],
+      ['Declaración jurada Nº', ''], ['Tipo de declaración', 's', ['Inscripción', 'Descargo', 'Rectificatoria', 'Anual mecanizada']],
+      ['Fecha de declaración', 'd'], ['Modalidad de pago', 's', ['Al contado', 'Fraccionado en 4 cuotas']]]],
+    ['Beneficios aplicados', 'Una deducción reduce la base imponible del ejercicio en curso.', [
+      ['Deducción', 's', ['No aplica', 'Pensionista — 50 UIT', 'Adulto mayor no pensionista — 50 UIT']],
+      ['Nº de resolución', '', 'Se exige si hay deducción'],
+      ['Inafectación', 's', ['Ninguna', 'Gobierno central', 'Entidad religiosa', 'Cuerpo de bomberos', 'Beneficencia']],
+      ['Monto deducido', 'r', 'S/ 0.00']]],
+    ['Cuotas del ejercicio', '', [],
+      { t: 'Cronograma', cn: '4 cuotas trimestrales',
+        c: [['Cuota', 0], ['Vencimiento', 0], ['Importe S/', 1], ['Situación', 0]], f: [
+        ['1 de 4', '28/02/2026', '151.36', 'Cancelada'],
+        ['2 de 4', '31/05/2026', '146.86', 'Cancelada'],
+        ['3 de 4', '31/08/2026', '146.86', 'Vencida'],
+        ['4 de 4', '30/11/2026', '146.86', 'Por vencer']], i: 3,
+        n: 'El derecho de emisión se cobra entero en la primera cuponera, no prorrateado: por eso la cuota 1 es mayor.' }]],
+  valores: [['Parámetros del ejercicio', 'Se aprueban una vez al año; aquí sólo se consultan.', [
+    ['Ejercicio', 's', ['2026', '2025', '2024']], ['UIT', 'r', 'S/ 5,350.00'], ['Interés moratorio mensual', 'r', '0.90 %'],
+    ['Interés de fraccionamiento', 'r', '0.80 %'], ['Derecho de emisión', 'r', 'S/ 4.50'], ['IPM para alcabala', 'r', '1.0206']],
+    { t: 'UIT y escala progresiva', cn: 'Ejercicio 2026',
+      c: [['Concepto', 0], ['Base', 0], ['Tasa o valor', 0], ['Equivalente S/', 1]], f: [
+      ['UIT 2026', 'Aprobada por el MEF', 'S/ 5,350.00', '5,350.00'],
+      ['Tramo 1 del predial', 'Hasta 15 UIT', '0.2 %', '80,250.00'],
+      ['Tramo 2 del predial', 'De 15 a 60 UIT', '0.6 %', '321,000.00'],
+      ['Tramo 3 del predial', 'Más de 60 UIT', '1.0 %', 'sin tope'],
+      ['Mínimo imponible predial', '0.6 % de la UIT', '—', '32.10'],
+      ['Deducción de pensionista', '50 UIT', '—', '267,500.00']],
+      n: 'La escala es acumulativa: cada tramo se aplica sólo a la porción del autovalúo que le corresponde.' }]],
+
+  /* ═══ Fiscalización ═══ */
+  'fis-panel': [['Estado de la fiscalización', 'Lo detectado, lo inspeccionado y lo que sostiene una determinación.', [
+    ['Ejercicio', 's', ['2026', '2025']], ['Programa', 's', ['Todos', 'PF-2026-014', 'PF-2026-008']],
+    ['Detectados por cruce', 'r', '3,418'], ['Programados', 'r', '96'], ['Con acta cerrada', 'r', '84'], ['Con diferencia', 'r', '61']]]],
+  'fis-actas': [['Acta de inspección', 'Lo que el verificador midió frente a lo que el titular declaró.', [
+    ['Nº de acta', ''], ['Programa', 's', ['PF-2026-014', 'PF-2026-008']],
+    ['Tipo de acta', 's', ['Predial', 'Vehicular']], ['Código predial', ''],
+    ['Contribuyente', '1'], ['Verificador', 's', ['Reto Santos, Víctor', 'Peña Sandoval, Luis']],
+    ['Fecha de inspección', 'd'], ['Con presencia del titular', 'c', 'El titular firmó el acta'],
+    ['Observaciones', 'a1', 'Lo que hay que saber antes de volver al predio']],
+    { t: 'Declarado contra verificado', c: [['Concepto', 0], ['Declarado', 1], ['Verificado', 1], ['Diferencia', 1], ['Situación', 0]], f: [
+      ['Área de terreno (m²)', '210.00', '210.00', '0.00', 'Conforme'],
+      ['Área construida (m²)', '164.50', '198.00', '+33.50', 'Con diferencia'],
+      ['Número de pisos', '2', '2', '0', 'Conforme'],
+      ['Uso del predio', 'Casa habitación', 'Comercio', '—', 'Con diferencia']], i: 4,
+      n: 'La diferencia es lo que sostiene la determinación. Sin acta cerrada no se puede liquidar.' }]],
+  'fis-prog': [['Programa de fiscalización', 'La muestra sale de un cruce: catastro contra rentas.', [
+    ['Nº de programa', ''], ['Denominación', '1'], ['Ejercicio', 's', ['2026', '2025']],
+    ['Criterio del cruce', 's', ['Predio sin declarar', 'Área subvaluada', 'Uso distinto al declarado', 'Omiso a la declaración']],
+    ['Sector', 's', ['Todos', '01', '02', '03', '04', '05']], ['Tamaño de la muestra', ''],
+    ['Fecha de inicio', 'd'], ['Fecha de cierre', 'd']],
+    { t: 'Muestra del programa', cn: '96 de 3,418 detectados', a: 'Regenerar muestra',
+      c: [['Código predial', 0], ['Contribuyente', 0], ['Causa del cruce', 0], ['Diferencia estimada S/', 1], ['Estado', 0]], f: [
+      ['02-014-D-14-01', 'Suc. Rufina Medina Medina', 'Área subvaluada', '1,842.60', 'Inspeccionado'],
+      ['04-021-B-07-00', 'Castillo Pascuala, María E.', 'Predio sin declarar', '3,412.00', 'Programado'],
+      ['02-016-A-09-00', 'Inversiones del Norte S.A.C.', 'Uso distinto al declarado', '8,844.20', 'Con diferencia']], i: 4 }]],
+  'fis-res': [['Liquidación de la diferencia', 'La deuda omitida se determina aquí y entra en la cuenta corriente al emitir.', [
+    ['Nº de acta', 'r', 'ACT-2026-00418'], ['Contribuyente', 'r', 'Suc. Rufina Medina Medina'], ['Ejercicios alcanzados', 's', ['2024 — 2026', '2022 — 2026', 'Sólo 2026']],
+    ['Insoluto omitido', 'r', 'S/ 603.00'], ['Interés', 'r', 'S/ 79.80'], ['Multa tributaria', 'r', 'S/ 267.50'],
+    ['Artículo del Código Tributario', 's', ['176º — No presentar declaración', '178º — Declarar cifras falsas', 'No aplica']],
+    ['Total liquidado', 'r', 'S/ 950.30']],
+    { t: 'Detalle por ejercicio', c: [['Ejercicio', 0], ['Base omitida S/', 1], ['Insoluto S/', 1], ['Interés S/', 1], ['Total S/', 1]], f: [
+      ['2024', '33,500.00', '201.00', '48.24', '249.24'],
+      ['2025', '33,500.00', '201.00', '26.13', '227.13'],
+      ['2026', '33,500.00', '201.00', '5.43', '206.43']],
+      n: 'Emitir la resolución de determinación es lo que convierte esto en deuda exigible.' }]],
+
+  /* ═══ Tránsito ═══ */
+  'tra-panel': [['Papeletas del ejercicio', 'Por situación, con lo que se puede y no se puede cobrar.', [
+    ['Ejercicio', 's', ['2026', '2025']], ['Levantadas', 'r', '8,412'], ['Notificadas', 'r', '5,884'],
+    ['Canceladas', 'r', '2,118'], ['Caducadas sin notificar', 'r', '1,842'], ['En coactiva', 'r', '388']]]],
+  'tra-pap': [['Papeleta de tránsito', 'La fecha de notificación decide si la papeleta se puede cobrar.', [
+    ['Nº de papeleta', ''], ['Placa', ''], ['Fecha de la infracción', 'd'], ['Hora', ''],
+    ['Código de infracción', 's', ['M-01 — Conducir sin licencia', 'M-08 — Exceso de velocidad', 'G-58 — Estacionar en zona rígida', 'L-05 — No portar SOAT']],
+    ['Lugar', '1'], ['Inspector', 's', ['Vílchez Rojas, Andrés', 'Peña Sandoval, Luis']],
+    ['Infractor', '1'], ['Documento del infractor', ''], ['Licencia de conducir', ''],
+    ['Vehículo internado', 'c', 'El vehículo quedó en el depósito municipal'],
+    ['Observaciones', 'a1']],
+    { t: 'Actos de la papeleta', cn: '4 actos', c: [['Nº', 0], ['Acto', 0], ['Fecha', 0], ['Documento', 0], ['Estado', 0]], f: [
+      ['1', 'Levantamiento', '18/07/2026', 'Papeleta 0041182', 'Conforme'],
+      ['2', 'Notificación', '24/07/2026', 'Cédula 2026-0884', 'Conforme'],
+      ['3', 'Descargo del infractor', '02/08/2026', 'Expediente 2026-0918', 'Por vencer'],
+      ['4', 'Resolución de sanción', '—', '—', 'Pendiente']], i: 4,
+      n: 'Una papeleta no notificada dentro del plazo caduca: existe, y ya no se puede cobrar.' }]],
+  'tra-veh': [['Internamiento en depósito', 'La custodia se tasa por día y la paga el titular al retirar.', [
+    ['Placa', ''], ['Nº de papeleta', ''], ['Fecha de internamiento', 'd'],
+    ['Depósito', 's', ['Depósito municipal 1', 'Depósito municipal 2']],
+    ['Clase de vehículo', 's', ['Automóvil', 'Camioneta', 'Motocicleta', 'Camión', 'Trimóvil']],
+    ['Marca y modelo', ''], ['Días de custodia', 'r', '54'], ['Tasa diaria', 'r', 'S/ 18.00'], ['Total de custodia', 'r', 'S/ 972.00'],
+    ['Grúa', 'c', 'Se usó grúa para el traslado']],
+    { t: 'Vehículos internados', cn: '3 de 188', c: [['Placa', 0], ['Clase', 0], ['Ingreso', 0], ['Días', 1], ['Custodia S/', 1], ['Situación', 0]], f: [
+      ['T2G-418', 'Automóvil', '18/07/2026', '54', '972.00', 'En depósito'],
+      ['V1H-882', 'Camioneta', '02/08/2026', '39', '702.00', 'En depósito'],
+      ['M4J-118', 'Motocicleta', '28/08/2026', '13', '156.00', 'Por vencer']], i: 5,
+      n: 'Sin la papeleta cancelada y la custodia pagada no se emite la orden de retiro.' }]],
+  'tra-cua': [['Cuadro de infracciones', 'La escala la fija el Reglamento Nacional de Tránsito.', [
+    ['Ejercicio', 's', ['2026', '2025']], ['Tipo', 's', ['Todas', 'Muy grave (M)', 'Grave (G)', 'Leve (L)']],
+    ['UIT vigente', 'r', 'S/ 5,350.00'], ['Buscar código', '1']],
+    { t: 'Códigos y escala', cn: '4 de 312', c: [['Código', 0], ['Infracción', 0], ['Tipo', 0], ['% UIT', 1], ['Multa S/', 1], ['Medida', 0]], f: [
+      ['M-01', 'Conducir sin licencia', 'Muy grave', '50 %', '2,675.00', 'Retención'],
+      ['M-08', 'Exceso de velocidad', 'Muy grave', '50 %', '2,675.00', 'Retención'],
+      ['G-58', 'Estacionar en zona rígida', 'Grave', '8 %', '428.00', 'Ninguna'],
+      ['L-05', 'No portar SOAT', 'Leve', '4 %', '214.00', 'Ninguna']],
+      n: 'La multa se recalcula cada año con la UIT: la tabla guarda el porcentaje, no el importe.' }]],
+
+  /* ═══ Infracciones administrativas ═══ */
+  'inf-panel': [['Expedientes administrativos', 'Por etapa, con los que vencen esta semana.', [
+    ['Ejercicio', 's', ['2026', '2025']], ['Actas levantadas', 'r', '694'], ['Resoluciones dictadas', 'r', '412'],
+    ['Notificadas', 'r', '318'], ['Vencen esta semana', 'r', '46'], ['En coactiva', 'r', '88']]]],
+  'inf-exp': [['Acta de constatación', 'El acta constata el hecho; la resolución lo sanciona; la notificación lo hace exigible.', [
+    ['Nº de expediente', ''], ['Nº de acta', ''], ['Fecha de constatación', 'd'],
+    ['Código CUIS', 's', ['A-042 — Anuncio sin autorización', 'B-118 — Local sin licencia', 'C-101 — Funcionar con giro distinto', 'D-204 — Residuos en vía pública']],
+    ['Infractor', '1'], ['Documento', ''], ['Dirección del hecho', '1'],
+    ['Inspector', 's', ['Peña Sandoval, Luis', 'Vílchez Rojas, Andrés']],
+    ['Reincidencia', 's', ['Primera vez', 'Segunda vez', 'Tercera o más']],
+    ['Medida complementaria', 's', ['Ninguna', 'Clausura temporal', 'Clausura definitiva', 'Retiro', 'Decomiso']],
+    ['Descripción del hecho', 'a1']],
+    { t: 'Actos del expediente', cn: '3 actos', c: [['Nº', 0], ['Acto', 0], ['Fecha', 0], ['Documento', 0], ['Estado', 0]], f: [
+      ['1', 'Acta de constatación', '18/07/2026', 'Acta 2026-0418', 'Conforme'],
+      ['2', 'Resolución de sanción', '04/08/2026', 'RS-2026-0244', 'Conforme'],
+      ['3', 'Notificación', '—', '—', 'Pendiente']], i: 4,
+      n: 'El orden es legal, no una preferencia: sin acta no hay resolución, y sin notificación la sanción no es exigible.' }]],
+  'inf-cuis': [['Cuadro único de infracciones y sanciones', 'La reincidencia multiplica la multa.', [
+    ['Ejercicio', 's', ['2026', '2025']],
+    ['Materia', 's', ['Todas', 'Comercialización', 'Anuncios', 'Salubridad', 'Construcción']],
+    ['UIT vigente', 'r', 'S/ 5,350.00'], ['Buscar código', '1']],
+    { t: 'Códigos CUIS', cn: '4 de 418', c: [['Código', 0], ['Infracción', 0], ['% UIT', 1], ['Multa S/', 1], ['2ª vez', 1], ['Medida', 0]], f: [
+      ['A-042', 'Anuncio sin autorización', '10 %', '535.00', '1,070.00', 'Retiro'],
+      ['B-118', 'Local sin licencia', '50 %', '2,675.00', '5,350.00', 'Clausura temporal'],
+      ['C-101', 'Funcionar con giro distinto', '25 %', '1,337.50', '2,675.00', 'Clausura temporal'],
+      ['D-204', 'Residuos en vía pública', '5 %', '267.50', '535.00', 'Ninguna']] }]],
+  'inf-esc': [['Escalas y plazos', 'Lo vencido no se puede cobrar: el plazo de notificación es el que manda.', [
+    ['Ejercicio', 's', ['2026', '2025']], ['Desde', 'd'], ['Hasta', 'd'],
+    ['Estado', 's', ['Todos', 'Por notificar', 'Notificadas', 'Vencidas']]],
+    { t: 'Notificaciones por estado', c: [['Estado', 0], ['Expedientes', 1], ['Importe S/', 1], ['Plazo', 0], ['Situación', 0]], f: [
+      ['Por notificar', '188', '84,412.00', 'Vence en 12 días', 'Por vencer'],
+      ['Notificadas en plazo', '412', '218,844.00', '—', 'Conforme'],
+      ['Vencidas sin notificar', '94', '48,116.00', 'Agotado', 'Vencida']], i: 4 }]],
+
+  /* ═══ Consultas ═══ */
+  'con-panel': [['Cuenta corriente del contribuyente', 'La deuda es a la fecha de hoy: no se guarda, se calcula.', [
+    ['Contribuyente', '1'], ['Documento', 'r', 'DNI 03593174'], ['Fecha de cálculo', 'r', '12/09/2026'],
+    ['Insoluto', 'r', 'S/ 3,041.92'], ['Interés y reajuste', 'r', 'S/ 413.32'], ['Gastos y costas', 'r', 'S/ 108.00'], ['Total', 'r', 'S/ 3,563.24'],
+    ['Beneficio vigente', 'r', 'Pensionista — 50 UIT']]]],
+  'con-contrib': [['Buscar contribuyente', 'Un solo campo: el sistema reconoce DNI, RUC, placa, código o nombre.', [
+    ['Nombre, documento, placa o código', '1'], ['Ejercicio', 's', ['2026', '2025', '2024']],
+    ['Con deuda vencida', 'c', 'Sólo los que deben algo vencido'],
+    ['En cobranza coactiva', 'c', 'Sólo los que están en coactiva']],
+    { t: 'Resultados', cn: '4 de 62,418', c: [['Código', 0], ['Nombre o razón social', 0], ['Documento', 0], ['Unidades', 0], ['Deuda hoy S/', 1], ['Estado', 0]], f: [
+      ['00000025673', 'Suc. Rufina Medina Medina', 'DNI 03593174', '2 predios · 1 vehículo', '3,563.24', 'Con deuda'],
+      ['00000003541', 'Castillo Pascuala, María Elena', 'DNI 44218937', '2 predios · 2 vehículos', '591.94', 'Al día'],
+      ['00000006550', 'Díaz Madrid, Julio César', 'DNI 02718844', '3 predios', '9,412.15', 'En coactiva'],
+      ['00000006551', 'Noblecilla Arismendiz S.A.C.', 'RUC 20525118447', '1 predio', '412.00', 'Observado']], i: 5 }]],
+  'con-obj': [['Consulta por objeto', 'Cuando no se sabe el contribuyente pero sí el predio, la placa o el valor.', [
+    ['Objeto', 's', ['Predio', 'Vehículo', 'Valor notificado', 'Expediente coactivo']],
+    ['Identificador del objeto', '1', 'Código predial, placa o número de valor'],
+    ['Ejercicio', 's', ['Todos', '2026', '2025', '2024']]],
+    { t: 'Predios encontrados', cn: '2 predios', c: [['Código predial', 0], ['Ubicación', 0], ['Titular', 0], ['Autovalúo S/', 1], ['Deuda S/', 1], ['Conciliado', 0]], f: [
+      ['02-014-D-14-01', 'Calle Santa Rosa 116', 'Suc. Rufina Medina Medina', '132,196.75', '2,360.76', 'Conforme'],
+      ['04-021-B-07-00', 'Mz. B Lt. 7 — Bellavista', 'Castillo Pascuala, María E.', '38,420.00', '0.00', 'Observado']], i: 5,
+      n: 'Un predio sin conciliar tiene ficha catastral y no genera deuda predial.' }]],
+  'con-doc': [['Constancia de no adeudo', 'Se emite sólo si no debe nada. Con deuda sale constancia de deuda.', [
+    ['Contribuyente', '1'], ['Objeto de la constancia', 's', ['Todos sus tributos', 'Un predio', 'Un vehículo']],
+    ['Identificador del objeto', ''], ['Motivo', 's', ['Trámite notarial', 'Transferencia', 'Licencia', 'Otro']],
+    ['Nº de expediente', ''], ['Resultado', 'r', 'Con deuda: saldría constancia de deuda'],
+    ['Incluye deuda en coactiva', 'c', 'Suma también lo que está en cobranza coactiva']],
+    { t: 'Deuda que impide la constancia', cn: '2 conceptos', c: [['Año', 0], ['Concepto', 0], ['Cuotas', 0], ['Total S/', 1], ['Situación', 0]], f: [
+      ['2024', 'Impuesto predial', '1 a 4', '2,067.04', 'Vencida'],
+      ['2024', 'Patrimonio vehicular', '1', '892.44', 'En coactiva']], i: 4 }]],
+
+  /* ═══ Coactiva ═══ */
+  'coa-panel': [['Cartera coactiva', 'Por etapa, con lo que está parado y por qué.', [
+    ['Ejercicio', 's', ['2026', '2025']], ['Expedientes abiertos', 'r', '1,184'], ['Con REC notificada', 'r', '796'],
+    ['Con medida cautelar', 'r', '412'], ['Sin REC', 'r', '388'], ['Deuda en cartera', 'r', 'S/ 4,118,240.00']]]],
+  'coa-exp': [['Expediente coactivo', 'Cada acto tiene su coste tasado, y lo paga el deudor.', [
+    ['Nº de expediente', ''], ['Contribuyente', '1'], ['Documento', 'r', 'DNI 02718844'],
+    ['Fecha de apertura', 'd'], ['Ejecutor coactivo', 's', ['Ayca Gonzales, Alberto', 'Quispe Peña, Jorge']],
+    ['Auxiliar coactivo', 's', ['Ríos Mendoza, María', 'Cárdenas Vega, José']],
+    ['Deuda en el expediente', 'r', 'S/ 9,412.15'], ['Costas acumuladas', 'r', 'S/ 96.00'],
+    ['Etapa', 's', ['Importado', 'REC notificada', 'Medida cautelar', 'Ejecución forzada', 'Concluido']],
+    ['Dirección referencial', 'a1', 'Donde se notifica si el domicilio fiscal falla']],
+    { t: 'Actos del expediente', cn: '4 actos · costas S/ 96.00', a: 'Dictar acto',
+      c: [['Nº', 0], ['Acto', 0], ['Fecha', 0], ['Costa S/', 1], ['Estado', 0]], f: [
+      ['1', 'Resolución de ejecución coactiva (REC)', '04/08/2026', '18.00', 'Conforme'],
+      ['2', 'Notificación de la REC', '11/08/2026', '12.00', 'Conforme'],
+      ['3', 'Embargo en forma de retención', '28/08/2026', '48.00', 'Conforme'],
+      ['4', 'Tasación y remate', '—', '18.00', 'Pendiente']], i: 4,
+      n: 'El coste de cada acto se ve antes de dictarlo: es deuda que se añade a la del contribuyente.' }]],
+  'coa-cart': [['Convenio de fraccionamiento', 'Dos cuotas impagas quiebran el convenio y reactivan la ejecución.', [
+    ['Nº de expediente', 'r', '2026-0418'], ['Deuda a fraccionar', 'r', 'S/ 9,412.15'],
+    ['Inicial (%)', '', 'No menos del 20 %'], ['Monto de la inicial', 'r', 'S/ 1,882.43'],
+    ['Número de cuotas', 's', ['12', '6', '18', '24']], ['Interés de fraccionamiento', 'r', '0.80 % mensual'],
+    ['Fecha de la primera cuota', 'd'], ['Garantía', 's', ['Ninguna', 'Carta fianza', 'Hipoteca', 'Prenda']],
+    ['Cuota mensual resultante', 'r', 'S/ 682.44']],
+    { t: 'Medidas cautelares vigentes', cn: '2 medidas', c: [['Tipo', 0], ['Sobre', 0], ['Dictada', 0], ['Importe S/', 1], ['Estado', 0]], f: [
+      ['Retención bancaria', 'Cuenta 0011-0418-...', '28/08/2026', '2,400.00', 'Conforme'],
+      ['Inscripción de embargo', 'Predio 02-014-D-14-01', '04/09/2026', '9,412.15', 'Por vencer']], i: 4,
+      n: 'Suscribir el convenio suspende la ejecución; no levanta las medidas ya inscritas.' }]],
+  'coa-cost': [['Costas del procedimiento', 'Se tasan por arancel, no se estiman.', [
+    ['Nº de expediente', 'r', '2026-0418'], ['Actos dictados', 'r', '4'], ['Costas tasadas', 'r', 'S/ 96.00'],
+    ['Gastos de notificación', 'r', 'S/ 12.00'], ['Total de costas', 'r', 'S/ 108.00'],
+    ['Reloj de prescripción', 'r', 'Prescribe el 31/12/2028'], ['Suspendido por', 's', ['Nada', 'Convenio vigente', 'Reclamación', 'Proceso judicial']]],
+    { t: 'Costas por acto', c: [['Acto', 0], ['Arancel', 0], ['Cantidad', 1], ['Costa S/', 1]], f: [
+      ['Resolución de ejecución coactiva', '0.35 % UIT', '1', '18.00'],
+      ['Notificación', '0.22 % UIT', '1', '12.00'],
+      ['Embargo en forma de retención', '0.90 % UIT', '1', '48.00'],
+      ['Tasación', '0.35 % UIT', '1', '18.00']],
+      n: 'La deuda prescribe a los cuatro años; un acto de cobranza interrumpe el plazo y lo reinicia.' }]],
+
+  /* ═══ Autorizaciones y licencias ═══ */
+  'aut-panel': [['Solicitudes en trámite', 'Agotado el plazo del TUPA, la autorización se entiende otorgada.', [
+    ['Ejercicio', 's', ['2026', '2025']], ['En evaluación', 'r', '188'], ['Con requisitos incompletos', 'r', '88'],
+    ['Con plazo agotado', 'r', '42'], ['Otorgadas', 'r', '474'], ['Denegadas', 'r', '26']]]],
+  'aut-sol': [
+    ['Datos de la solicitud', 'El giro decide la modalidad y el plazo.', [
+      ['Nº de expediente', ''], ['Trámite', 's', ['Licencia de funcionamiento', 'Licencia de edificación (FUE)', 'Anuncio y propaganda']],
+      ['Fecha de presentación', 'd'], ['Plazo del TUPA', 'r', '15 días hábiles'], ['Días transcurridos', 'r', '7'],
+      ['Modalidad', 'r', 'Aprobación automática'], ['Solicitante', '1'], ['Documento', ''],
+      ['Denominación comercial', '1'], ['Giro (CIIU)', 's', ['D-1549-19 — Restaurante-pollería', 'G-5211-01 — Venta al por menor', 'H-5520-02 — Restaurantes a domicilio', 'I-6023-01 — Transporte de carga']],
+      ['Código catastral del local', ''], ['Área del establecimiento (m²)', ''], ['Aforo', ''],
+      ['Horario autorizado', 's', ['De 06:00 a 23:00 horas', 'De 08:00 a 20:00 horas', 'Las 24 horas']]]],
+    ['Requisitos del TUPA', 'Un expediente incompleto se admite y el plazo corre igual: para detenerlo hay que observarlo.', [
+      ['Solicitud-declaración jurada', 'c', 'Presentada'], ['Copia del RUC y del documento', 'c', 'Presentada'],
+      ['Declaración de condiciones de seguridad', 'c', 'Presentada'], ['Pago del derecho de trámite', 'c', 'Presentado'],
+      ['Compatibilidad de uso y zonificación', 'c', 'Verificada por Catastro'],
+      ['Inspección técnica de seguridad', 'c', 'Sólo si el riesgo es alto']],
+      { t: 'Actos del expediente', cn: '3 actos', c: [['Nº', 0], ['Acto', 0], ['Fecha', 0], ['Documento', 0], ['Estado', 0]], f: [
+      ['1', 'Presentación del expediente', '04/08/2026', 'Expediente 2026-0280', 'Conforme'],
+      ['2', 'Pago del derecho de trámite', '04/08/2026', 'Recibo 0003-0041183', 'Conforme'],
+      ['3', 'Verificación de requisitos', '05/08/2026', 'Informe de admisibilidad', 'Por vencer']], i: 4 }]],
+  'aut-cat': [['Catálogo de giros y certificados', 'El riesgo del giro decide la modalidad de la licencia.', [
+    ['Buscar giro o actividad', '1'], ['Materia', 's', ['Todas', 'Comercialización', 'Alimentos', 'Transporte', 'Industria']],
+    ['Nivel de riesgo', 's', ['Todos', 'Bajo', 'Medio', 'Alto', 'Muy alto']]],
+    { t: 'Giros CIIU', cn: '4 de 1,842', a: 'Añadir giro',
+      c: [['Código CIIU', 0], ['Actividad', 0], ['Materia', 0], ['Riesgo', 0]], f: [
+      ['G-5211-01', 'Venta al por menor en almacenes no especializados', 'Comercialización', 'Bajo'],
+      ['D-1549-19', 'Restaurante-pollería', 'Alimentos', 'Medio'],
+      ['H-5520-02', 'Servicio de restaurantes a domicilio', 'Alimentos', 'Bajo'],
+      ['I-6023-01', 'Transporte de carga por carretera', 'Transporte', 'Alto']], i: 3,
+      n: 'Bajo y medio van por aprobación automática con declaración jurada; alto y muy alto exigen inspección previa.' }]],
+  'aut-tram': [['Padrón y reportes', 'El padrón es la base del cruce con fiscalización.', [
+    ['Ejercicio', 's', ['2026', '2025', '2024']],
+    ['Tipo de licencia', 's', ['Todas', 'Definitiva', 'Temporal', 'Cesionaria']],
+    ['Estado', 's', ['Todos', 'Activa', 'Pendiente', 'Vencida', 'Cesada']],
+    ['Agrupado por', 's', ['Giro comercial', 'Año', 'Dirección', 'Titular']],
+    ['Desde', 'd'], ['Hasta', 'd']],
+    { t: 'Padrón de licencias', cn: '3 de 6,418', c: [['Nº licencia', 0], ['Titular', 0], ['Denominación', 0], ['Giro', 0], ['Estado', 0]], f: [
+      ['2026-006549', 'Eleodoro Quiroga Ramos', 'Bodega El Sol', 'G-5211-01', 'Activa'],
+      ['2026-006550', 'Díaz Madrid, Julio César', 'Bodega Los Ángeles', 'G-5211-01', 'Activa'],
+      ['2026-000000', 'Castillo Pascuala, María E.', 'Restaurant Sabor y Sazón', 'D-1549-19', 'Pendiente']], i: 4,
+      n: 'Un establecimiento en funcionamiento que no figura aquí es la infracción B-118 del cuadro CUIS.' }]],
+
+  /* ═══ Seguridad ═══ */
+  'seg-panel': [['Lo que hay que revisar', 'Hallazgos de seguridad, cada uno con su causa.', [
+    ['Usuarios registrados', 'r', '7'], ['Activos', 'r', '6'], ['Con permiso total', 'r', '3'],
+    ['Cuentas inactivas con permisos', 'r', '1'], ['Contraseñas caducadas', 'r', '2'],
+    ['Última restauración verificada', 'r', 'Hace 94 días']]]],
+  'seg-acc': [['Permisos del usuario o grupo', 'Un permiso heredado del grupo no se quita aquí: se quita en el grupo.', [
+    ['Usuario o grupo', '1'], ['Tipo', 's', ['Usuario', 'Grupo']],
+    ['Estado de la cuenta', 's', ['Activa', 'Inactiva', 'Bloqueada']],
+    ['Grupos a los que pertenece', 'r', 'CAJA, RENTAS'], ['Permisos propios', 'r', '2'], ['Heredados', 'r', '6'],
+    ['Con nivel total', 'r', '0'], ['Antigüedad de la contraseña', 'r', '44 días']],
+    { t: 'Permisos efectivos', cn: '9 accesos', c: [['Acceso', 0], ['Módulo', 0], ['Niveles', 0], ['Origen', 0], ['Sensible', 0]], f: [
+      ['Caja tributaria', 'Tesorería', 'Ejecuta · Consulta · Ingresa · Imprime', 'Heredado de CAJA', 'Mueve dinero'],
+      ['Anulación de recibo', 'Tesorería', 'Ejecuta · Consulta', 'Propio', 'Mueve dinero'],
+      ['Baja de deuda', 'Rentas', 'Consulta', 'Heredado de RENTAS', 'Mueve dinero'],
+      ['Ficha urbana individual', 'Catastro', 'Consulta', 'Heredado de CATASTRO', 'No']],
+      n: 'Los siete niveles son Total, Ejecuta, Consulta, Ingresa, Modifica, Anula e Imprime. Total implica los otros seis.' }]],
+  'seg-aud': [['Bitácora de auditoría', 'No se edita ni se borra: es lo que se presenta cuando alguien pregunta por una baja.', [
+    ['Usuario', 's', ['Todos', 'jquispe', 'jcardenas', 'mrios', 'lpena', 'vreto']],
+    ['Módulo', 's', ['Todos', 'Rentas', 'Tesorería', 'Catastro', 'Coactiva', 'Seguridad']],
+    ['Desde', 'd'], ['Hasta', 'd'],
+    ['Riesgo', 's', ['Todos', 'Alto', 'Medio', 'Bajo']], ['Buscar en el detalle', '1']],
+    { t: 'Movimientos', cn: '4 de 84,182', c: [['Fecha y hora', 0], ['Usuario', 0], ['Acto', 0], ['Detalle', 0], ['Riesgo', 0]], f: [
+      ['13/08/2026 09:41', 'jcardenas', 'Anulación de recibo', 'Recibo 0003-0041184 · S/ 1,245.00', 'Alto'],
+      ['13/08/2026 08:12', 'jquispe', 'Cambio de permisos', 'aayca: Anulación → Total', 'Alto'],
+      ['12/08/2026 17:04', 'mrios', 'Baja de deuda', '2 cuotas · S/ 1,613.96 · prescripción', 'Alto'],
+      ['12/08/2026 11:20', 'vreto', 'Modificación de ficha', '01-1042-0004 · área 136 → 198', 'Medio']], i: 4 }]],
+  'seg-sis': [['Parámetros del sistema', 'El ejercicio es global a la sesión: decide sobre qué año escriben todos los módulos.', [
+    ['Ejercicio de trabajo', 's', ['2026', '2025', '2024']], ['UIT del ejercicio', ''],
+    ['Interés moratorio mensual', ''], ['Interés de fraccionamiento', ''],
+    ['Tasa diaria de custodia', ''], ['Derecho de emisión', ''],
+    ['Caducidad de contraseña (días)', ''], ['Intentos antes de bloquear', ''],
+    ['Motivo del cambio', 'a1', 'Queda en la auditoría con su usuario y la hora']],
+    { t: 'Copias de seguridad', cn: '4 copias', c: [['Fecha', 0], ['Tipo', 0], ['Tamaño', 0], ['Destino', 0], ['Restauración probada', 0]], f: [
+      ['13/08/2026 02:00', 'Completa', '18.4 GB', 'Nube — Lima', 'Pendiente'],
+      ['12/08/2026 02:00', 'Completa', '18.4 GB', 'Nube — Lima', 'Pendiente'],
+      ['11/08/2026 02:00', 'Completa', '18.3 GB', 'Nube — Lima', 'Pendiente'],
+      ['11/05/2026 02:00', 'Completa', '17.1 GB', 'Nube — Lima', 'Conforme']], i: 4,
+      n: 'Una copia que nadie ha probado a restaurar no protege nada: la columna que importa es la última restauración verificada.' }]],
+
+  /* ═══ Valores ═══ */
+  'val-panel': [['Valores del ejercicio', 'Un valor emitido y sin notificar no cobra, y le corre el plazo igual.', [
+    ['Ejercicio', 's', ['2026', '2025']], ['Emitidos', 'r', '8,224'], ['Notificados', 'r', '4,118'],
+    ['Sin notificar', 'r', '4,106'], ['Reclamados', 'r', '188'], ['Por prescribir este año', 'r', '412']]]],
+  'val-val': [['Valor', 'La notificación es lo que hace exigible la deuda.', [
+    ['Nº de valor', ''], ['Tipo de valor', 's', ['Orden de pago', 'Resolución de determinación', 'Resolución de multa', 'Resolución de pérdida de fraccionamiento']],
+    ['Contribuyente', '1'], ['Ejercicio', 's', ['2026', '2025', '2024']],
+    ['Concepto', 's', ['Impuesto predial', 'Arbitrios municipales', 'Patrimonio vehicular', 'Multa tributaria']],
+    ['Insoluto', ''], ['Interés', 'r', 'S/ 224.44'], ['Total del valor', 'r', 'S/ 2,067.04'],
+    ['Fecha de emisión', 'd'], ['Fecha de notificación', 'd', 'Sin ella el valor no es exigible'],
+    ['Forma de notificación', 's', ['Personal en domicilio fiscal', 'Con certificación de negativa', 'Cedulón', 'Publicación', 'Electrónica']],
+    ['Estado', 's', ['Emitido', 'Notificado', 'Reclamado', 'Firme', 'Anulado']]],
+    { t: 'Movimientos del valor', cn: '3 movimientos', c: [['Fecha', 0], ['Movimiento', 0], ['Documento', 0], ['Importe S/', 1], ['Estado', 0]], f: [
+      ['04/08/2026', 'Emisión', 'OP-2026-004182', '2,067.04', 'Conforme'],
+      ['11/08/2026', 'Notificación personal', 'Cédula 2026-1184', '—', 'Conforme'],
+      ['28/08/2026', 'Reclamación', 'Expediente 2026-0918', '—', 'Por vencer']], i: 4 }]],
+  'val-cart': [['Emisión por lote', 'Una corrida toca miles de cuentas: se simula antes de emitir.', [
+    ['Ejercicio', 's', ['2026', '2025']],
+    ['Tipo de valor', 's', ['Orden de pago', 'Resolución de determinación', 'Resolución de multa']],
+    ['Concepto', 's', ['Impuesto predial', 'Arbitrios municipales', 'Patrimonio vehicular']],
+    ['Alcance', 's', ['Todo el padrón', 'Por sector', 'Por rango de deuda', 'Sólo observados']],
+    ['Sector', 's', ['Todos', '01', '02', '03', '04', '05']],
+    ['Deuda mínima', ''], ['Antigüedad mínima', 's', ['Cualquiera', 'Más de 90 días', 'Más de un año']],
+    ['Genera cuponera PDF', 'c', 'Produce el archivo para imprenta']],
+    { t: 'Última corrida', cn: 'Ejecutada el 28/08/2026', c: [['Etapa', 0], ['Registros', 1], ['Monto S/', 1], ['Observados', 1], ['Estado', 0]], f: [
+      ['Selección de la cartera', '8,412', '3,884,116.00', '0', 'Conforme'],
+      ['Emisión de valores', '8,224', '3,812,440.00', '188', 'Conforme'],
+      ['Generación de cedulones', '8,224', '—', '0', 'Conforme'],
+      ['Notificación', '4,118', '—', '4,106', 'Observado']], i: 4,
+      n: 'La notificación es el cuello de botella: lo emitido y no notificado no cobra.' }]],
+  'val-tip': [['Tipos de valor y prescripción', 'La deuda prescribe a los cuatro años; un acto de cobranza reinicia el plazo.', [
+    ['Tipo de valor', 's', ['Todos', 'Orden de pago', 'Resolución de determinación', 'Resolución de multa']],
+    ['Ejercicio', 's', ['Todos', '2026', '2025', '2024', '2023', '2022']],
+    ['Estado', 's', ['Todos', 'Vigente', 'Por prescribir', 'Prescrito']],
+    ['Prescriben este año', 'r', '412 valores · S/ 184,412.00']],
+    { t: 'Reloj de prescripción', cn: '4 tramos', c: [['Ejercicio', 0], ['Valores', 1], ['Importe S/', 1], ['Prescribe el', 0], ['Situación', 0]], f: [
+      ['2022', '412', '184,412.00', '31/12/2026', 'Por vencer'],
+      ['2023', '588', '244,116.00', '31/12/2027', 'Conforme'],
+      ['2024', '844', '388,240.00', '31/12/2028', 'Conforme'],
+      ['2021 y anteriores', '188', '84,116.00', 'Vencido', 'Vencida']], i: 4,
+      n: 'Declarar la prescripción es un acto: se hace de oficio o a pedido, y queda en la bitácora.' }]]
+};
+
+/* Los cuatro submódulos propios llevan icono propio (ICO_SEC del artboard). */
+const ICO_SEC = {
+  panel: ['M4 19.5h16', 'M6.5 19.5V9', 'M11 19.5V5.5', 'M15.5 19.5v-7', 'M20 19.5v-11'],
+  predios: ['M3.5 6.6 9 4.2l6 2.4 5.5-2.4v13.2L15 19.8l-6-2.4-5.5 2.4z', 'M9 4.2v13.2'],
+  territorio: ['M4.5 4.5h6v6h-6z', 'M13.5 4.5h6v6h-6z', 'M4.5 13.5h6v6h-6z', 'M13.5 13.5h6v6h-6z'],
+  valores: ['M6.5 3.5h7.5l4 4v13h-11.5z', 'M14 3.5v4h4', 'M9.5 12.5h5']
+};
+
+/* El slug del hash para las cuatro secciones propias. */
+const SLUGS = { panel: 'panel', predios: 'contribuyentes', territorio: 'determinacion', valores: 'valores' };
+
+/* Qué hay que hacer en cada pantalla. Es la línea de la barra de
+   instrucción: distinta de la nota del título, que dice qué es la pantalla. */
+const INSTRUCCIONES = {
+  'ini-panel': 'revise el avance del ejercicio. Si algo no cuadra, la sección «Trabajo parado» dice qué acto falta.',
+  'ini-flujo': 'elija el tributo y el periodo. El saldo por cobrar es lo que sigue vivo mientras no prescriba.',
+  'ini-parado': 'elija un frente y resuélvalo: cada fila es dinero que no entra por un acto que se puede hacer hoy.',
+  'ini-cierre': 'cuadre lo contado en caja contra lo registrado. La diferencia es lo que hay que explicar.',
+  panel: 'revise los observados antes de emitir: sin corregir la inconsistencia no se les puede cobrar el ejercicio.',
+  predios: 'complete la identificación y el domicilio. El documento tiene que ser único en el padrón.',
+  territorio: 'fije el sujeto y el ejercicio, y compruebe la memoria del cálculo antes de asentar la determinación.',
+  valores: 'consulte los parámetros del ejercicio. Se aprueban por ordenanza: aquí no se cambian.',
+  'fis-panel': 'elija un programa y siga su embudo, de lo detectado a lo que sostiene una determinación.',
+  'fis-actas': 'registre lo que midió en campo. La diferencia contra lo declarado es lo que sostiene la liquidación.',
+  'fis-prog': 'defina el criterio del cruce y el tamaño de la muestra. De ahí salen las inspecciones del programa.',
+  'fis-res': 'compruebe la liquidación por ejercicio. Emitir la resolución es lo que la vuelve deuda exigible.',
+  'tra-panel': 'atienda primero las caducadas sin notificar: existen y ya no se pueden cobrar.',
+  'tra-pap': 'registre la papeleta y su notificación. Sin notificar dentro del plazo, la papeleta caduca.',
+  'tra-veh': 'registre el internamiento. Sin la papeleta cancelada y la custodia pagada no se emite la orden de retiro.',
+  'tra-cua': 'consulte el código y su escala. La multa se recalcula cada año con la UIT.',
+  'inf-panel': 'atienda las que vencen esta semana: pasado el plazo, la sanción ya no es exigible.',
+  'inf-exp': 'levante el acta, dicte la resolución y notifíquela. El orden es legal, no una preferencia.',
+  'inf-cuis': 'consulte el código y su escala. La reincidencia multiplica la multa.',
+  'inf-esc': 'revise lo que está por notificar. Lo vencido sin notificar ya no se puede cobrar.',
+  'con-panel': 'la deuda está calculada a hoy: cambia cada día, no se guarda.',
+  'con-contrib': 'escriba lo que tenga: el sistema reconoce DNI, RUC, placa, código o nombre.',
+  'con-obj': 'cuando no sepa el contribuyente pero sí el predio, la placa o el valor, búsquelo por el objeto.',
+  'con-doc': 'compruebe la deuda antes de emitir: con deuda pendiente sale constancia de deuda, no de no adeudo.',
+  'coa-panel': 'los expedientes sin REC están abiertos y el procedimiento no ha empezado.',
+  'coa-exp': 'dicte el acto que corresponda. El coste de cada uno se ve antes: es deuda que se añade a la del contribuyente.',
+  'coa-cart': 'fije la inicial y las cuotas. Dos cuotas impagas quiebran el convenio y reactivan la ejecución.',
+  'coa-cost': 'las costas se tasan por arancel. Un acto de cobranza interrumpe el plazo de prescripción y lo reinicia.',
+  'aut-panel': 'atienda las de plazo agotado: en aprobación automática, la autorización ya se entiende otorgada.',
+  'aut-sol': 'compruebe los requisitos del TUPA. Un expediente incompleto se admite y el plazo corre igual.',
+  'aut-cat': 'consulte el giro: su nivel de riesgo decide la modalidad de la licencia y su plazo.',
+  'aut-tram': 'un establecimiento en funcionamiento que no figure en el padrón es la infracción B-118 del CUIS.',
+  'seg-panel': 'revise cada hallazgo: un permiso total sobre un módulo tributario es la llave de la caja.',
+  'seg-acc': 'un permiso heredado del grupo no se quita aquí: se quita en el grupo.',
+  'seg-aud': 'filtre por usuario, módulo o riesgo. La bitácora no se edita ni se borra.',
+  'seg-sis': 'el ejercicio es global a la sesión: decide sobre qué año escriben todos los módulos.',
+  'val-panel': 'un valor emitido y sin notificar no cobra, y le corre el plazo de prescripción igual.',
+  'val-val': 'registre la notificación: es lo que hace exigible la deuda del valor.',
+  'val-cart': 'simule antes de emitir: una corrida toca miles de cuentas y la notificación es el cuello de botella.',
+  'val-tip': 'declarar la prescripción es un acto: se hace de oficio o a pedido, y queda en la bitácora.'
+};
+
+const TOKENS = [
+  ['--azul', '#005284', 'bg-azul / text-azul', 'Lo que se puede pulsar'],
+  ['--azul-oscuro', '#00365a', 'bg-azul-oscuro', 'La barra global'],
+  ['--azul-suave', '#e4f4fd', 'bg-azul-suave', 'Relleno detrás de un texto en azul'],
+  ['--acento', '#52bdef', 'border-acento', 'El celeste de la marca; decorativo'],
+  ['--fondo', '#f2f6f9', 'bg-fondo', 'El lienzo'],
+  ['--superficie', '#ffffff', 'bg-superficie', 'El papel de una tarjeta'],
+  ['--tinta', '#16232c', 'text-tinta', 'Texto primario'],
+  ['--tinta-3', '#5a6b78', 'text-tinta-3', 'Texto terciario y placeholder'],
+  ['--linea', '#d6dee4', 'border-linea', 'El filo por omisión'],
+  ['--ok-fondo', '#dcefe3', 'bg-ok-fondo', 'Insignia conforme'],
+  ['--atencion-fondo', '#fff4d9', 'bg-atencion-fondo', 'Insignia de atención'],
+  ['--mal-fondo', '#fbe4e0', 'bg-mal-fondo', 'Insignia de error']
+];
+
+const REPARTO = [
+  ['src/marco/arbol.ts', 'Ya existe: los diez módulos y los cuarenta submódulos que dibuja este artboard.'],
+  ['src/marco/Marco.tsx', 'La barra global, el árbol y la ruta. Sidebar + Collapsible + Breadcrumb de shadcn.'],
+  ['src/secciones/*.tsx', 'Una por submódulo propio: Panel, Contribuyentes, Determinacion, Valores.'],
+  ['src/ds/', 'Ya existe: Aviso, Boton, Campo, Insignia. Se sustituyen por los de shadcn o se envuelven.'],
+  ['src/estilos/tokens/colors.css', 'Ya existe: entra tal cual en @theme de Tailwind v4.'],
+  ['src/api/proxy.ts', 'Ya existe: contesta trece operaciones del contrato. Las demás van contra el backend.'],
+  ['src/api/cliente.ts', 'Ya existe: el prefijo ' + RAIZ + ' y el manejo de errores.']
+];
+
+class Component extends DCLogic {
+  state = {
+    dest: 'panel', abiertas: ['panel'], desplegado: PROPIO,
+    vals: {}, sucias: {}, porCerrar: null,
+    sideOpen: true, filtro: '', entrega: false,
+    paleta: false, pq: '', sesion: false, toast: ''
+  };
+
+  componentDidMount() {
+    this.aplicar();
+    const inicial = this.destDeHash();
+    if (inicial && inicial !== this.state.dest) {
+      this.setState((s) => ({
+        dest: inicial,
+        abiertas: s.abiertas.indexOf(inicial) >= 0 ? s.abiertas : s.abiertas.concat([inicial]),
+        desplegado: (this.hoja(inicial) || {}).modulo || s.desplegado
+      }));
+    }
+    this._hash = () => {
+      const d = this.destDeHash();
+      if (!d) return;
+      const h = this.hoja(d);
+      this.setState((s) => ({
+        dest: d,
+        desplegado: h ? h.modulo : s.desplegado,
+        abiertas: s.abiertas.indexOf(d) >= 0 ? s.abiertas : s.abiertas.concat([d])
+      }));
+    };
+    window.addEventListener('hashchange', this._hash);
+    this._tecla = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        this.setState((s) => ({ paleta: !s.paleta, pq: '', sesion: false }));
+      } else if (e.key === 'Escape') {
+        this.setState({ paleta: false, sesion: false, porCerrar: null });
+      }
+    };
+    window.addEventListener('keydown', this._tecla);
+  }
+  componentDidUpdate() { this.aplicar(); }
+  componentWillUnmount() {
+    window.removeEventListener('keydown', this._tecla);
+    window.removeEventListener('hashchange', this._hash);
+    if (this._reloj) clearTimeout(this._reloj);
+  }
+
+  aplicar() {
+    if (this.state.toast && this.state.toast !== this._ultimo) {
+      this._ultimo = this.state.toast;
+      if (this._reloj) clearTimeout(this._reloj);
+      this._reloj = setTimeout(() => { this._ultimo = ''; this.setState({ toast: '' }); }, 3400);
+    }
+  }
+
+  di(m) { this.setState({ toast: m }); }
+
+  /* Índice plano clave → { módulo, nota, rótulo, trazos, ops, piezas } */
+  hoja(clave) {
+    for (const m of ARBOL) {
+      for (const h of m[5]) {
+        if (h[0] === clave) {
+          return {
+            modulo: m[0], nota: m[1], rotulo: h[1],
+            propio: m[0] === PROPIO,
+            trazos: ICO_SEC[clave] || m[4],
+            ops: h[2], piezas: h[3]
+          };
+        }
+      }
+    }
+    return null;
+  }
+
+  /* El hash lleva la sección abierta; las propias con su slug, las demás con
+     su clave. `replaceState` para no llenar el historial. */
+  marcarHash(dest) {
+    const slug = SLUGS[dest] || dest;
+    if (typeof window === 'undefined') return;
+    const url = window.location.pathname + window.location.search + '#' + slug;
+    window.history.replaceState(null, '', url);
+  }
+  destDeHash() {
+    const slug = (window.location.hash || '').slice(1);
+    if (!slug) return null;
+    const propia = Object.keys(SLUGS).find((k) => SLUGS[k] === slug);
+    if (propia) return propia;
+    return this.hoja(slug) ? slug : null;
+  }
+
+  ir(dest) {
+    this.marcarHash(dest);
+    const h = this.hoja(dest);
+    /* El árbol es la única guía que queda: tiene que desplegar el módulo del
+       destino, no el que el usuario abrió la última vez. */
+    this.setState((s) => ({
+      dest: dest, paleta: false, sesion: false,
+      desplegado: h ? h.modulo : s.desplegado,
+      abiertas: s.abiertas.indexOf(dest) >= 0 ? s.abiertas : s.abiertas.concat([dest])
+    }));
+  }
+
+  pedirCierre(dest) {
+    if (this.state.sucias[dest]) { this.setState({ porCerrar: dest }); return; }
+    this.cerrarPestana(dest);
+  }
+  cerrarPestana(dest) {
+    this.setState((s) => {
+      const i = s.abiertas.indexOf(dest);
+      if (i < 0) return {};
+      const quedan = s.abiertas.filter((x) => x !== dest);
+      let activa = s.dest;
+      let desplegado = s.desplegado;
+      if (s.dest === dest) {
+        activa = quedan.length === 0 ? null : quedan[Math.max(i - 1, 0)];
+        if (activa) {
+          this.marcarHash(activa);
+          const h = this.hoja(activa);
+          if (h) desplegado = h.modulo;
+        }
+      }
+      const sucias = Object.assign({}, s.sucias);
+      delete sucias[dest];
+      return { abiertas: quedan, dest: activa, desplegado: desplegado, sucias: sucias, porCerrar: null };
+    });
+  }
+
+  tono(t) {
+    const s = String(t).toLowerCase();
+    if (/coactiva|observado|vencida|denegado/.test(s)) return 'mal';
+    if (/con deuda|por vencer|en trámite/.test(s)) return 'atencion';
+    return 'ok';
+  }
+  insignia(tono) {
+    return 'display:inline-block; font-size:11.5px; font-weight:700; border-radius:999px; padding:3px 9px; white-space:nowrap; background:var(--' +
+      tono + '-fondo); color:var(--' + tono + '-tinta)';
+  }
+
+  /* De PANTALLAS a lo que la plantilla pinta. Un bloque es
+     [título, nota, campos[], tabla?]; un campo, [etiqueta, tipo, opciones|ayuda]. */
+  bloques(clave) {
+    const def = PANTALLAS[clave];
+    if (!def) return [];
+    const CTRL = 'width:100%; box-sizing:border-box; border:1px solid var(--borde-campo); border-radius:var(--radio-sm); padding:8px 10px; background:var(--superficie); font-size:13.5px';
+    return def.map((b, bi) => {
+      const campos = (b[2] || []).map((c, ci) => {
+        const t = String(c[1] || '');
+        const ancho = t.indexOf('1') >= 0;
+        const base = t.replace('1', '');
+        const k = clave + '|' + bi + '|' + ci;
+        const opts = Array.isArray(c[2]) ? c[2] : [];
+        const ayuda = (!Array.isArray(c[2]) && c[2]) ? c[2] : '';
+        const guardado = this.state.vals[k];
+        const valor = guardado !== undefined ? guardado
+          : (base === 's' ? (opts[0] || '')
+            : (base === 'r' ? (ayuda || '—')
+              : (base === 'c' ? false : '')));
+        return {
+          label: c[0], ancho: ancho ? '1' : '0', control: CTRL,
+          valor: valor === false ? '' : valor, marcado: valor === true,
+          opts: opts, ayuda: (base === 'c' || base === 'r') ? '' : ayuda, ph: base === 'c' ? ayuda : (ayuda || ''),
+          opcional: base === 'c' ? false : /opcional/i.test(ayuda),
+          esSel: base === 's', esFecha: base === 'd', esRo: base === 'r',
+          esChk: base === 'c', esArea: base === 'a',
+          esTexto: base === '' || base === 't',
+          on: base === 'c'
+            ? (e) => this.setState((x) => ({ vals: Object.assign({}, x.vals, { [k]: e.target.checked }), sucias: Object.assign({}, x.sucias, { [clave]: true }) }))
+            : (e) => this.setState((x) => ({ vals: Object.assign({}, x.vals, { [k]: e.target.value }), sucias: Object.assign({}, x.sucias, { [clave]: true }) }))
+        };
+      });
+      const t = b[3];
+      return {
+        titulo: b[0], nota: b[1] || '',
+        hayCampos: campos.length > 0, campos: campos,
+        hayTabla: t !== undefined,
+        tabla: t === undefined ? null : Object.assign(
+          this.tabla({ titulo: t.t, conteo: t.cn || (t.f.length + (t.f.length === 1 ? ' registro' : ' registros')), min: (t.c.length * 130) + 'px', nota: t.n || '', cols: t.c, filas: t.f, insignia: t.i }),
+          { accion: t.a || '', anadir: () => this.di('Abriría el alta de una fila de esta lista.') })
+      };
+    });
+  }
+
+  /* De los bloques de una pantalla a su composición en shadcn. Las piezas
+     derivadas salen de lo que el formulario tiene; las declaradas, del árbol,
+     y sólo las que el formulario no puede delatar. */
+  /* Concordancia de número: la frase de una pieza derivada lleva su cuenta
+     dentro, y la mayoría de las pantallas tiene exactamente un campo de
+     fecha o una marca. `n(1, 'un desplegable', 'desplegables')` da «Un
+     desplegable» y «3 desplegables», no «1 desplegables». */
+  n(c, uno, muchos) {
+    if (c !== 1) return c + ' ' + muchos;
+    return uno.charAt(0).toUpperCase() + uno.slice(1);
+  }
+
+  piezas(clave, hoja) {
+    const bl = this.bloques(clave);
+    const campos = bl.reduce((a, b) => a.concat(b.campos), []);
+    const tablas = bl.filter((b) => b.hayTabla).map((b) => b.tabla);
+    const out = [];
+    const add = (p, u) => { if (!out.some((x) => x.pieza === p)) out.push({ pieza: p, uso: u }); };
+
+    if (bl.length > 1) {
+      add('Card', 'Una por grupo de campos: ' + bl.map((b) => '«' + b.titulo + '»').join(', ') + '.');
+    } else if (bl.length === 1) {
+      add('Card', 'La pantalla es un solo grupo: «' + bl[0].titulo + '».');
+    }
+    const cuenta = (p) => campos.filter(p).length;
+    const nEsc = cuenta((c) => !c.esRo);
+    if (nEsc > 0) add('Form + zod', nEsc === 1
+      ? 'El único campo que se escribe, con su validación.'
+      : 'Los ' + nEsc + ' campos que se escriben, con su validación.');
+    const nSel = cuenta((c) => c.esSel);
+    if (nSel > 0) add('Select', this.n(nSel, 'un desplegable', 'desplegables') + ' de lista cerrada.');
+    const nFec = cuenta((c) => c.esFecha);
+    if (nFec > 0) add('Calendar + Popover', this.n(nFec, 'un campo', 'campos') + ' de fecha.');
+    const nChk = cuenta((c) => c.esChk);
+    if (nChk > 0) add('Checkbox', this.n(nChk, 'una marca', 'marcas') + ' de sí o no.');
+    if (campos.some((c) => c.esArea)) add('Textarea', 'El campo libre de observaciones.');
+    if (campos.some((c) => c.esRo)) add('Separator', 'Separa lo que se consulta de lo que se escribe.');
+    if (tablas.length > 0) {
+      add('Table', tablas.length === 1 ? 'La lista «' + tablas[0].titulo + '».' : 'Las ' + tablas.length + ' listas de la pantalla.');
+      if (tablas.some((t) => t.filas.some((r) => r.celdas.some((c) => c.insignia)))) {
+        add('Badge', 'La columna de situación, con los cuatro tonos de la insignia.');
+      }
+      if (tablas.some((t) => t.accion)) add('Button', 'La acción de la lista: ' + tablas.filter((t) => t.accion).map((t) => '«' + t.accion + '»').join(', ') + '.');
+    }
+    (hoja.piezas || []).forEach((p) => add(p[0], /[.?!»]$/.test(p[1]) ? p[1] : p[1] + '.'));
+    return out;
+  }
+
+  tabla(def) {
+    const TH = 'padding:9px 14px; text-align:left; font-size:11.5px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--tinta-3); background:var(--sup); border-bottom:1px solid var(--linea); white-space:nowrap';
+    const TD = 'padding:10px 14px; font-size:13.5px; color:var(--tinta-2); border-bottom:1px solid var(--linea-2)';
+    return {
+      titulo: def.titulo, conteo: def.conteo, min: def.min, nota: def.nota,
+      cols: def.cols.map((c) => ({ label: c[0], style: c[1] ? TH + '; text-align:right' : TH })),
+      filas: def.filas.map((f, i) => ({
+        filaStyle: 'background:' + (i % 2 ? 'var(--sup)' : 'var(--superficie)'),
+        celdas: f.map((c, j) => {
+          if (def.insignia !== undefined && j === def.insignia) {
+            return { texto: c, insignia: this.insignia(this.tono(c)) + '; margin:-2px 0', plano: false, style: 'padding:10px 14px; border-bottom:1px solid var(--linea-2)' };
+          }
+          return {
+            texto: c, insignia: '', plano: true,
+            style: def.cols[j] && def.cols[j][1]
+              ? TD + '; text-align:right; font-variant-numeric:tabular-nums; color:var(--tinta)'
+              : (j === 0 ? TD + '; font-weight:600; color:var(--tinta); white-space:nowrap' : TD)
+          };
+        })
+      }))
+    };
+  }
+
+  renderVals() {
+    const s = this.state;
+    const f = s.filtro.trim().toLowerCase();
+    const coincide = (t) => f === '' || String(t).toLowerCase().indexOf(f) >= 0;
+
+    /* El árbol, filtrado: un módulo entra si coincide él o alguna de sus hojas. */
+    const arbolFiltrado = ARBOL.map((m) => {
+      const hojasVisibles = m[5].filter((h) => coincide(m[0]) || coincide(h[1]));
+      return { m: m, hojas: hojasVisibles };
+    }).filter((x) => x.hojas.length > 0);
+
+    const hojaActual = s.dest ? this.hoja(s.dest) : null;
+
+    /* Paleta: los cuarenta destinos y sus operaciones. */
+    const pq = s.pq.trim().toLowerCase();
+    const palRes = [];
+    ARBOL.forEach((m) => m[5].forEach((h) => {
+      if (pq === '' || h[1].toLowerCase().indexOf(pq) >= 0 || m[0].toLowerCase().indexOf(pq) >= 0
+        || h[2].some((o) => o[1].toLowerCase().indexOf(pq) >= 0)) {
+        palRes.push({ label: h[1], modulo: m[0], ir: () => this.ir(h[0]) });
+      }
+    }));
+
+    const TH2 = 'padding:9px 14px; text-align:left; font-size:11.5px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--tinta-3); background:var(--sup); border-bottom:1px solid var(--linea); white-space:nowrap';
+    const TD2 = 'padding:9px 14px; font-size:12.5px; color:var(--tinta-2); border-bottom:1px solid var(--linea-2)';
+
+    return {
+      entidad: this.props.entidad || 'Municipalidad Distrital de Catacaos',
+      avisos: '3', avisosAria: '3 avisos sin leer',
+      verAvisos: () => this.di('3 avisos: emisión observada, cuota vencida y amnistía por terminar.'),
+      velo: s.sesion,
+      cerrarTodo: () => this.setState({ sesion: false, paleta: false }),
+
+      sesion: s.sesion, sesionAria: s.sesion ? 'true' : 'false',
+      abrirSesion: () => this.setState((x) => ({ sesion: !x.sesion, paleta: false })),
+      sesionStyle: 'display:flex; align-items:center; gap:10px; border:0; border-left:1px solid var(--barra-realce); padding:8px 15px; cursor:pointer; color:var(--sobre-barra); flex:0 0 auto; background:' +
+        (s.sesion ? 'var(--barra-hover)' : 'transparent'),
+      opcionesSesion: [['Mi perfil', false], ['Cambiar la contraseña', false], ['Preferencias', false], ['Cerrar sesión', true]].map((o) => ({
+        label: o[0],
+        ir: () => this.setState({ sesion: false, toast: o[1] ? 'Cerraría la sesión.' : 'Abriría ' + o[0].toLowerCase() + '.' }),
+        style: 'display:block; width:100%; text-align:left; border:0; border-bottom:1px solid var(--linea-2); background:transparent; padding:11px 15px; cursor:pointer; font-size:13.5px; color:' +
+          (o[1] ? 'var(--mal-tinta)' : 'var(--azul)')
+      })),
+
+      paleta: s.paleta, pq: s.pq,
+      abrirPaleta: () => this.setState({ paleta: true, pq: '', sesion: false }),
+      onPq: (e) => this.setState({ pq: e.target.value }),
+      palRes: palRes.slice(0, 12),
+      palPie: palRes.length + ' de 40 destinos',
+
+      entrega: s.entrega, entregaAria: s.entrega ? 'true' : 'false',
+      alternarEntrega: () => this.setState((x) => ({
+        entrega: !x.entrega,
+        toast: x.entrega ? '' : 'Modo entrega: cada pantalla muestra su composición en shadcn y el mapa de tokens.'
+      })),
+      entregaStyle: 'display:flex; align-items:center; gap:8px; border:0; border-left:1px solid var(--barra-realce); padding:0 15px; cursor:pointer; flex:0 0 auto; color:' +
+        (s.entrega ? 'var(--azul-oscuro)' : 'var(--sobre-barra)') + '; background:' +
+        (s.entrega ? 'var(--acento)' : 'transparent'),
+
+      sideOpen: s.sideOpen ? '1' : '0',
+      alternarSide: () => this.setState((x) => ({ sideOpen: !x.sideOpen })),
+      sideStyle: 'flex:0 0 262px; width:262px; background:var(--fondo); border-right:1px solid var(--linea); display:' +
+        (s.sideOpen ? 'flex' : 'none') + '; flex-direction:column; min-height:0',
+      filtro: s.filtro,
+      onFiltro: (e) => this.setState({ filtro: e.target.value }),
+      sinResultados: arbolFiltrado.length === 0,
+      pieArbol: 'Diez módulos y cuarenta submódulos, de arbol.ts. Catastro y Tesorería son de otros sistemas.',
+
+      arbol: arbolFiltrado.map((x) => {
+        const m = x.m;
+        const abierto = s.desplegado === m[0] || f !== '';
+        return {
+          label: m[0], nota: m[1],
+          abierto: abierto, abiertoAria: abierto ? 'true' : 'false',
+          notaVisible: abierto,
+          icon: m[4].map((d) => ({ d: d })),
+          toggle: () => this.setState((y) => ({ desplegado: y.desplegado === m[0] ? null : m[0] })),
+          caretStyle: 'display:grid; place-items:center; width:15px; height:15px; flex:0 0 auto; color:var(--tinta-4); transform:rotate(' +
+            (abierto ? '90' : '0') + 'deg); transition:transform .13s ease',
+          iconStyle: 'display:grid; place-items:center; width:24px; height:24px; border-radius:var(--radio-sm); flex:0 0 auto; background:' +
+            (abierto ? 'var(--azul)' : 'var(--fondo)') + '; color:' + (abierto ? 'var(--sobre-azul)' : 'var(--tinta-3)'),
+          style: 'display:flex; align-items:center; gap:8px; width:100%; border:0; border-radius:var(--radio-sm); padding:7px 8px; cursor:pointer; background:' +
+            (abierto ? 'var(--azul-suave)' : 'transparent') + '; color:' + (abierto ? 'var(--info-tinta)' : 'var(--tinta)'),
+          hojas: x.hojas.map((h) => {
+            const on = s.dest === h[0];
+            const ya = s.abiertas.indexOf(h[0]) >= 0;
+            return {
+              label: h[1], actual: on ? 'page' : 'false',
+              marca: s.sucias[h[0]] ? 'sin guardar' : '',
+              guiaStyle: 'width:12px; height:' + (on ? '2px' : '1px') + '; flex:0 0 auto; margin-left:-1px; background:' +
+                (on ? 'var(--azul)' : 'var(--linea)'),
+              ir: () => this.ir(h[0]),
+              style: 'display:flex; align-items:center; gap:8px; width:100%; border:0; border-radius:0 var(--radio-sm) var(--radio-sm) 0; padding:7px 8px 7px 0; cursor:pointer; background:' +
+                (on ? 'var(--azul-suave)' : 'transparent') + '; color:' + (on ? 'var(--info-tinta)' : 'var(--tinta-2)') +
+                '; font-weight:' + (on ? '700' : '400')
+            };
+          })
+        };
+      }),
+
+      hayPestanas: s.abiertas.length > 0 && s.dest !== null,
+      sinPestanas: s.abiertas.length === 0 || s.dest === null,
+
+      porCerrar: s.porCerrar !== null,
+      confirmar: (() => {
+        const k = s.porCerrar;
+        const h = k ? (this.hoja(k) || { rotulo: k }) : { rotulo: '' };
+        return {
+          label: h.rotulo,
+          cerrar: () => this.cerrarPestana(k),
+          cancelar: () => this.setState({ porCerrar: null }),
+          guardar: () => { this.di('Cambios guardados en ' + h.rotulo + '.'); this.cerrarPestana(k); }
+        };
+      })(),
+      volver: () => (s.dest ? this.pedirCierre(s.dest) : null),
+      /* Una pantalla de sólo lectura no se guarda: ofrece imprimir y exportar.
+         Una con campos, sí, y avisa de lo que el acto implica. */
+      pie: (() => {
+        const editable = hojaActual ? this.bloques(s.dest).some((b) => b.campos.some((c) => !c.esRo)) : false;
+        const acciones = editable
+          ? [['Limpiar', 0], ['Guardar', 1]]
+          : [['Exportar', 0], ['Imprimir', 1]];
+        return {
+          aviso: editable
+            ? 'Nada se escribe hasta que pulse Guardar.'
+            : 'Los datos son los que figuran en el padrón a la fecha de hoy.',
+          acciones: acciones.map((a) => ({
+            label: a[0],
+            ir: () => {
+              if (a[0] === 'Imprimir') { window.print(); return; }
+              if (a[0] === 'Limpiar') { this.di('Vaciaría el formulario. No se puede deshacer.'); return; }
+              if (a[0] === 'Guardar') {
+                this.setState((x) => {
+                  const sucias = Object.assign({}, x.sucias);
+                  delete sucias[x.dest];
+                  return { sucias: sucias, toast: 'Guardado.' };
+                });
+                return;
+              }
+              this.di('Exportaría esta pantalla a Excel.');
+            },
+            style: a[1]
+              ? 'border:0; border-radius:var(--radio-sm); padding:10px 22px; background:var(--azul); color:var(--sobre-azul); font-size:13.5px; font-weight:700; cursor:pointer; flex:0 0 auto'
+              : 'border:1px solid var(--borde-boton); border-radius:var(--radio-sm); padding:9px 16px; background:var(--superficie); font-size:13.5px; cursor:pointer; flex:0 0 auto'
+          }))
+        };
+      })(),
+
+      miga: hojaActual
+        ? [hojaActual.modulo, hojaActual.rotulo].map((b, i, arr) => ({
+            label: i === arr.length - 1 ? b : b + '  /',
+            style: 'white-space:nowrap; color:var(--tinta-3); font-weight:' + (i === arr.length - 1 ? '700' : '400')
+          }))
+        : [],
+
+      vista: hojaActual ? {
+        titulo: hojaActual.rotulo,
+        propio: hojaActual.propio,
+        nota: hojaActual.propio
+          ? hojaActual.nota + '. Submódulo de este sistema: su pantalla vive en src/secciones.'
+          : hojaActual.nota + '. Submódulo de ' + hojaActual.modulo + ': su pantalla vive en el archivo de ese módulo.',
+        conteoOps: hojaActual.ops.length + (hojaActual.ops.length === 1 ? ' operación' : ' operaciones'),
+        operaciones: hojaActual.ops.map((o) => {
+          /* BASE = solo se leyó el @RequestMapping de la clase; los métodos no
+             se han verificado, así que no se les pone verbo. */
+          const base = o[0] === 'BASE';
+          const escritura = o[0] === 'POST' || o[0] === 'PUT' || o[0] === 'PATCH';
+          return {
+            verbo: o[0], ruta: RAIZ + o[1], nota: o[2],
+            verboStyle: 'display:inline-block; min-width:48px; text-align:center; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:11px; font-weight:700; border-radius:var(--radio-sm); padding:3px 7px; flex:0 0 auto; background:' +
+              (base ? 'var(--fondo)' : (escritura ? 'var(--ok-fondo)' : 'var(--info-fondo)')) + '; color:' +
+              (base ? 'var(--tinta-3)' : (escritura ? 'var(--ok-tinta)' : 'var(--info-tinta)')) +
+              (base ? '; border:1px solid var(--linea)' : '')
+          };
+        }),
+        notaOps: 'Rutas leídas del backend. Las que llevan verbo salen de un @GetMapping, @PostMapping, @PutMapping o @PatchMapping; las marcadas BASE son el @RequestMapping de la clase, cuyos métodos no se han verificado. El prefijo es el valor de Api.RAIZ medido en las verificaciones del backend.',
+        piezas: this.piezas(s.dest, hojaActual),
+        modulo: hojaActual.modulo,
+        /* Una instrucción por pantalla: lo que hay que hacer aquí, no lo que
+           la pantalla es. Eso ya lo dice la nota del título. */
+        instruccion: INSTRUCCIONES[s.dest] || (hojaActual.propio
+          ? 'complete o revise los datos de esta pantalla. Nada se guarda hasta que lo confirme.'
+          : 'consulte los datos; para operar sobre ellos, abra ' + hojaActual.modulo + '.'),
+        bloques: this.bloques(s.dest)
+      } : { titulo: '', nota: '', modulo: '', instruccion: '', operaciones: [], piezas: [], bloques: [] },
+
+      tokens: {
+        cols: [['Token', 0], ['Valor', 0], ['Clase Tailwind', 0], ['Para qué', 0]].map((c) => ({ label: c[0], style: TH2 })),
+        filas: TOKENS.map((t, i) => ({
+          token: t[0],
+          filaStyle: 'background:' + (i % 2 ? 'var(--sup)' : 'var(--superficie)'),
+          muestra: 'display:block; width:15px; height:15px; border-radius:3px; flex:0 0 auto; border:1px solid var(--linea); background:' + t[1],
+          celdas: [
+            { texto: t[1], style: TD2 + '; font-family:ui-monospace,Menlo,Consolas,monospace' },
+            { texto: t[2], style: TD2 + '; font-family:ui-monospace,Menlo,Consolas,monospace; color:var(--info-tinta)' },
+            { texto: t[3], style: TD2 }
+          ]
+        }))
+      },
+      reparto: REPARTO.map((r) => ({ ruta: r[0], que: r[1] })),
+
+      toast: s.toast
+    };
+  }
+}
+
+</script>
+</body>
+</html>

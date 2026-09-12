@@ -130,8 +130,16 @@ describe('AC2 — los valores coinciden con el artboard', () => {
   const delArtboard = constantesDelArtboard();
   const coloresQueUsa = coloresDelArtboard();
 
-  it('el artboard vendorizado esta y declara sus once constantes con nombre', () => {
-    expect(existsSync(ARTBOARD), `Falta el artboard en ${ARTBOARD}.`).toBe(true);
+  it('el artboard vendorizado declara sus once constantes con nombre', () => {
+    // AQUI HABIA UN `expect(existsSync(ARTBOARD), 'Falta el artboard en …')`, Y ERA INALCANZABLE.
+    //
+    // `constantesDelArtboard()` se llama en el cuerpo del `describe`, catorce lineas mas arriba,
+    // y lee el archivo con `readFileSync`. Si el artboard no esta, ESA llamada lanza `ENOENT`
+    // durante la recoleccion y este `it` no llega a existir — asi que la comprobacion defensiva
+    // no podia ejecutarse nunca. Peor que no tenerla: parecia cobertura (#78).
+    //
+    // Quien lo comprueba ahora es `los-artboards-estan.test.ts`, que no importa NADA que pueda
+    // faltar y por eso puede hablar cuando algo falta.
 
     // Sin esta comprobacion, un cambio en el formato del artboard —o un archivo
     // que no se descargo entero— dejaria el mapa VACIO, y entonces los once casos
