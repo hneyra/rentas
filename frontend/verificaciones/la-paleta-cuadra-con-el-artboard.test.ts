@@ -26,12 +26,24 @@ import { ARTBOARDS, rutaDe } from './artboards.ts';
  * colores literales —los de su tabla «Tokens a Tailwind»— y no los 42 que define. Sin vendorizar
  * la hoja no se podia comprobar contra el artboard mas de un cuarto de la paleta.
  *
- * <h2>Como se traducen los nombres</h2>
+ * <h2>Como se traducen los nombres, y por que el radio NO es uno a uno</h2>
  *
  * El artboard escribe `--azul`; el `@theme` de Tailwind v4 escribe `--color-azul`, y ese prefijo
- * es lo que hace que se generen `bg-azul` y `text-azul`. Los radios van a `--radius-*` y las
- * sombras a `--shadow-*`. La traduccion se hace aqui, en un sitio, y la comparacion es token a
- * token.
+ * es lo que hace que se generen `bg-azul` y `text-azul`. Las sombras van a `--shadow-*`. Los
+ * colores y las sombras se comparan **token a token**.
+ *
+ * **El radio no.** El artboard declara dos —`--radio` y `--radio-sm`, los dos de 3 px— y la
+ * libreria publica cuatro: `--radius`, que es el knob que shadcn lee, y los tres tamanos de los
+ * que shadcn deriva. No hay una correspondencia uno a uno que escribir, asi que lo que se
+ * comprueba es la REGLA: **todo radio que la libreria publica vale lo que el artboard dice**.
+ * Escribir un mapa a mano aqui obligaria a tocarlo cada vez que shadcn cambie de tamanos.
+ *
+ * <h2>De donde viene esta forma (kamayuk-lib#8)</h2>
+ *
+ * De un rojo real. El `@theme` emitia `--radius-radio` y shadcn lee `var(--radius)`, asi que el
+ * token existia y no se llamaba como shadcn lo busca. Al renombrarlo, esta guarda salio roja con
+ * `expected 44 to be 42` — **y nada en la CI de `kamayuk-lib` lo dijo**: se cazo corriendo la
+ * suite del consumidor a mano. El acoplamiento entre los dos repositorios no lo vigila nadie.
  */
 
 const requerir = createRequire(import.meta.url);
@@ -71,19 +83,22 @@ function declaraciones(css: string): Map<string, string> {
   return salida;
 }
 
-/** El nombre que el `@theme` le da a un token del artboard. */
+/** El nombre que el `@theme` le da a un token del artboard. Solo colores y sombras: ver el radio. */
 function comoLoLlamaTailwind(nombre: string): string {
   const pelado = nombre.slice(2);
-  if (pelado.startsWith('radio')) return `--radius-${pelado}`;
   if (pelado.startsWith('sombra')) return `--shadow-${pelado}`;
   return `--color-${pelado}`;
 }
+
+const esRadio = (nombre: string): boolean => nombre.startsWith('--radio');
 
 const delArtboard = declaraciones(readFileSync(HOJA_DEL_ARTBOARD, 'utf8'));
 const deLaLibreria = declaraciones(readFileSync(PALETA_DE_LA_LIBRERIA, 'utf8'));
 
 /** `color-scheme` no es un token: es una declaracion de la pagina. */
 const TOKENS_DEL_ARTBOARD = [...delArtboard].filter(([n]) => n.startsWith('--'));
+/** Los que se comparan uno a uno: todos menos los radios. */
+const UNO_A_UNO = TOKENS_DEL_ARTBOARD.filter(([n]) => !esRadio(n));
 
 describe('la paleta de @kamayuk/ui es la del artboard', () => {
   it('EL CENTINELA: las dos lecturas traen tokens', () => {
@@ -91,12 +106,14 @@ describe('la paleta de @kamayuk/ui es la del artboard', () => {
     // la comparacion de abajo pasaria en verde comparando nada — que es como una guarda se queda
     // sin sujeto sin que nadie la borre.
     expect(TOKENS_DEL_ARTBOARD.length, 'el artboard no declaro ni un token').toBe(42);
-    expect(deLaLibreria.size, 'la libreria no publico ni un token').toBe(42);
+    // La libreria publica MAS: los 38 colores y las 2 sombras uno a uno, mas CUATRO radios
+    // —`--radius` y los tres tamanos de shadcn— donde el artboard declara dos. Ver el javadoc.
+    expect(deLaLibreria.size, 'la libreria no publico ni un token').toBe(44);
   });
 
-  it('y son exactamente los mismos cuarenta y dos, con el mismo valor', () => {
+  it('los colores y las sombras son los mismos, uno a uno', () => {
     const discrepancias: string[] = [];
-    for (const [nombre, valor] of TOKENS_DEL_ARTBOARD) {
+    for (const [nombre, valor] of UNO_A_UNO) {
       const enTailwind = comoLoLlamaTailwind(nombre);
       const publicado = deLaLibreria.get(enTailwind);
       if (publicado === undefined) {
@@ -119,8 +136,10 @@ describe('la paleta de @kamayuk/ui es la del artboard', () => {
     // La otra direccion, que es la que nadie mira: un token inventado en la libreria se usa en una
     // pantalla, se ve bien, y no esta en ningun artboard — asi es como una paleta empieza a tener
     // colores que nadie decidio.
-    const esperados = new Set(TOKENS_DEL_ARTBOARD.map(([n]) => comoLoLlamaTailwind(n)));
-    const sobrantes = [...deLaLibreria.keys()].filter((n) => !esperados.has(n));
+    const esperados = new Set(UNO_A_UNO.map(([n]) => comoLoLlamaTailwind(n)));
+    const sobrantes = [...deLaLibreria.keys()].filter(
+      (n) => !esperados.has(n) && !n.startsWith('--radius'),
+    );
 
     expect(
       sobrantes,
@@ -135,5 +154,29 @@ describe('la paleta de @kamayuk/ui es la del artboard', () => {
     // para que nadie lo «arregle» subiendolo sin enterarse de que es un trazo decorativo.
     expect(delArtboard.get('--tinta-4')).toBe('#93a3af');
     expect(deLaLibreria.get('--color-tinta-4')).toBe('#93a3af');
+  });
+  it('TODO radio que la libreria publica vale lo que el artboard dice', () => {
+    // La regla, y no un mapa de nombres: el artboard declara `--radio` y `--radio-sm`, los dos de
+    // 3 px, y la libreria publica `--radius` mas los tres tamanos de shadcn. Lo que importa no es
+    // como se llaman sino que ninguno se aparte del valor del artboard — que es lo que haria que
+    // los componentes de shadcn cayeran en su `0.625rem`.
+    const delArtboardRadios = [...new Set(
+      TOKENS_DEL_ARTBOARD.filter(([n]) => esRadio(n)).map(([, v]) => v),
+    )];
+    expect(delArtboardRadios, 'el artboard declara mas de un radio distinto').toHaveLength(1);
+    const esperado = delArtboardRadios[0];
+
+    const publicados = [...deLaLibreria].filter(([n]) => n.startsWith('--radius'));
+    expect(publicados.length, 'la libreria no publica ningun radio').toBeGreaterThanOrEqual(4);
+    // `--radius` a secas tiene que estar: es el que shadcn lee.
+    expect(deLaLibreria.has('--radius'), 'falta `--radius`, que es el knob de shadcn').toBe(true);
+
+    const distintos = publicados
+      .filter(([, v]) => v !== esperado)
+      .map(([n, v]) => `  ${n}: «${v}», y el artboard dice «${esperado ?? ''}»`);
+    expect(
+      distintos,
+      `Un radio publicado se aparto del que dibuja el artboard:\n${distintos.join('\n')}`,
+    ).toEqual([]);
   });
 });
