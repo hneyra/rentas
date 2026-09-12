@@ -484,6 +484,10 @@
   version "0.0.0"
   uid ""
 
+"@kamayuk/ui@link:../../kamayuk-lib/paquetes/ui":
+  version "0.0.0"
+  uid ""
+
 "@napi-rs/lzma-linux-x64-gnu@1.5.1":
   version "1.5.1"
   resolved "https://registry.yarnpkg.com/@napi-rs/lzma-linux-x64-gnu/-/lzma-linux-x64-gnu-1.5.1.tgz#e57d4306966078662038094fb38eb9146dc3aea9"

@@ -1,0 +1,85 @@
+/* ============================================================================
+   Tokens de rentas-web — copia del bloque claro de
+   hneyra/rentas · frontend/src/estilos/tokens/colors.css (rama main)
+
+   El archivo del repo trae además un tema oscuro (@media prefers-color-scheme
+   y [data-tema='oscuro']) que este artboard no usa y por eso no copia.
+
+   Se copian aquí para que el artboard pinte con los mismos valores que el
+   frontend real. Al portar a Tailwind v4, este archivo entra tal cual en un
+   bloque `@theme` renombrando cada token a `--color-*`; con Tailwind v3, va en
+   `theme.extend.colors` leyendo las mismas variables. El mapa está en la
+   pestaña «Entrega» del artboard.
+   ============================================================================ */
+
+:root {
+  color-scheme: light;
+
+  /* Superficies */
+  --fondo: #f2f6f9;
+  --superficie: #ffffff;
+  --sup: #f7fbfe;
+
+  /* Tinta. --tinta-4 es la única que NO se usa como texto: sobre papel blanco
+     da 2.59:1 y WCAG 1.4.3 pide 4.5:1. Es el trazo de un icono decorativo, y
+     nada más. */
+  --tinta: #16232c;
+  --tinta-2: #3a4a55;
+  --tinta-3: #5a6b78;
+  --tinta-4: #93a3af;
+
+  /* Acción */
+  --azul: #005284;
+  --azul-oscuro: #00365a;
+  --azul-hover: #00365a;
+  --azul-suave: #e4f4fd;
+  --acento: #52bdef;
+  --sobre-azul: #ffffff;
+
+  /* Filos */
+  --linea: #d6dee4;
+  --linea-2: #e3e9ee;
+  --borde-campo: #c3cfd9;
+  --borde-boton: #d6dee4;
+  --borde-hover: #7e96a8;
+
+  /* Foco */
+  --foco: #d3ebfa;
+
+  /* Los cuatro tonos de la insignia */
+  --ok-fondo: #dcefe3;
+  --ok-tinta: #1f5b39;
+  --atencion-fondo: #fff4d9;
+  --atencion-tinta: #7a5200;
+  --mal-fondo: #fbe4e0;
+  --mal-tinta: #8f2a17;
+  --info-fondo: #e4f4fd;
+  --info-tinta: #004670;
+
+  /* Campo con error */
+  --mal-borde: #a8321e;
+  --mal-campo: #fff9f8;
+
+  /* Carga */
+  --esqueleto: #e3e9ee;
+  --esqueleto-brillo: #f7fbfe;
+
+  /* La barra global */
+  --sobre-barra: #ffffff;
+  --sobre-barra-2: #9fc6df;
+  --barra-control: rgba(255, 255, 255, 0.09);
+  --barra-realce: rgba(255, 255, 255, 0.2);
+  --barra-hover: rgba(255, 255, 255, 0.18);
+
+  /* Los dos velos */
+  --velo: rgba(0, 54, 90, 0.4);
+  --velo-paleta: rgba(22, 35, 44, 0.38);
+
+  /* Radio y sombra: no están en el archivo del repo. El artboard V6 usa 5–6 px
+     y shadcn parte de 0.5rem; se fija aquí para que el port tenga un solo sitio
+     que tocar. */
+  --radio: 3px;
+  --radio-sm: 3px;
+  --sombra-1: 0 1px 2px rgba(22, 35, 44, 0.06);
+  --sombra-2: 0 6px 22px rgba(0, 54, 90, 0.18);
+}

@@ -64,10 +64,14 @@ describe('el enlace con el clon hermano esta bien puesto', () => {
     // Sin esto, lo de abajo pasaria sobre la lista vacia el dia que alguien quite los `link:`
     // — que es como una guarda se queda sin sujeto y sigue en verde.
     const enlaces = enlacesDeclarados(readFileSync(join(FRONTEND, 'package.json'), 'utf8'));
+    // La lista se escribe entera, no se cuenta: anadir un paquete exige decir cual, y este
+    // rojo —que es el que salio al enlazar `@kamayuk/ui`— es la unica senal de que la
+    // superficie de dependencia del frontend acaba de crecer.
     expect(enlaces.map((e) => e.paquete).sort()).toEqual([
       '@kamayuk/api',
       '@kamayuk/formato',
       '@kamayuk/sesion',
+      '@kamayuk/ui',
     ]);
     // Y todos apuntan al mismo clon hermano: tres rutas a tres sitios distintos serian tres
     // dependencias que mantener, no una.
