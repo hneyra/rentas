@@ -59,6 +59,13 @@ name: Publicar imágenes
 on:
   push:
     branches: [main]
+  # Y EN LOS PR, PERO SIN PUBLICAR (#75). Hasta aqui la imagen solo se construia al integrar en
+  # `main`, asi que un `Dockerfile` roto se descubria DESPUES del merge — y en un flujo sin
+  # filtro `paths`, dejando sin su tercera imagen a todos los commits siguientes. Con esto, el
+  # `docker build` de verdad corre en el PR; lo unico que no corre es el `push`.
+  #
+  # Sin filtro `paths`, por lo mismo que el `push`: ver la cabecera.
+  pull_request:
   workflow_dispatch:
 
 # Sin `cancel-in-progress`: cancelar una publicacion a medias deja `main` con unas imagenes si y
@@ -98,19 +105,42 @@ jobs:
         include:
           - destino: aplicacion
             imagen: kamayuk-rentas
-            archivo: backend/Dockerfile
-            contexto: .
+            archivo: rentas/backend/Dockerfile
+            contexto: rentas
           - destino: migrador
             imagen: kamayuk-rentas-migrador
-            archivo: backend/Dockerfile
-            contexto: .
+            archivo: rentas/backend/Dockerfile
+            contexto: rentas
           - destino: interfaz
             imagen: kamayuk-rentas-interfaz
-            archivo: frontend/Dockerfile
-            contexto: frontend
+            archivo: rentas/frontend/Dockerfile
+            contexto: rentas/frontend
+            # VA DESPUES DE `contexto:`, y no es estilo: la prueba que fija esta matriz casa las
+            # cuatro claves CONSECUTIVAS y en ese orden, asi que una clave nueva en medio deja la
+            # entrada sin casar y el rojo dice «2 items» en vez de nombrar lo que paso.
+            contextos: kamayuk-lib=kamayuk-lib
 
     steps:
-      - uses: actions/checkout@v4
+      # El anfitrion BAJA UN NIVEL para que el clon hermano quepa a su lado, igual que en
+      # `frontend.yml`. `actions/checkout` se niega a escribir fuera de `GITHUB_WORKSPACE`, asi
+      # que no se puede clonar hacia arriba: lo que se mueve es este repositorio.
+      #
+      # Y con el bajan las rutas de la matriz: `contexto: rentas` es la raiz de ESTE repositorio,
+      # exactamente lo que era `.` antes, asi que el `.dockerignore` que aplica a las dos
+      # imagenes del backend sigue siendo el mismo.
+      - name: Este repositorio
+        uses: actions/checkout@v4
+        with:
+          path: rentas
+
+      # De aqui salen los tres paquetes que `frontend/package.json` declara como `link:`. La
+      # imagen de la interfaz no se construye sin el.
+      - name: Las librerias comunes
+        uses: actions/checkout@v4
+        with:
+          repository: hneyra/kamayuk-lib
+          path: kamayuk-lib
+          token: ${{ secrets.GH_CLONE_KEY || github.token }}
 
       - uses: docker/setup-buildx-action@v3
 
@@ -150,7 +180,13 @@ jobs:
           context: ${{ matrix.contexto }}
           file: ${{ matrix.archivo }}
           target: ${{ matrix.destino }}
-          push: true
+          # El clon hermano, para la interfaz. Vacio en las dos del backend, que no lo necesitan.
+          build-contexts: ${{ matrix.contextos }}
+          # SE CONSTRUYE SIEMPRE, SE PUBLICA SOLO AL INTEGRAR (#75). Con `false` el build corre
+          # entero —todas las etapas, incluidas las dos comprobaciones sobre el `dist` que va a
+          # servir— y lo unico que no ocurre es la subida al registro. Es lo que convierte este
+          # flujo en una verificacion del PR y no solo en un publicador.
+          push: ${{ github.event_name == 'push' }}
           tags: ghcr.io/${{ steps.registro.outputs.propietario }}/${{ matrix.imagen }}:${{ github.sha }}
           cache-from: type=gha,scope=${{ matrix.imagen }}
           cache-to: type=gha,mode=max,scope=${{ matrix.imagen }}
@@ -160,6 +196,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs: publicar
+    # SOLO AL INTEGRAR. En un PR el trabajo de arriba construye pero no publica (#75), asi que
+    # preguntar aqui por las tres etiquetas daria `MANIFEST_UNKNOWN` — un rojo que no habla de
+    # nada roto. La afirmacion que esta comprobacion sostiene —«todo commit de `main` tiene sus
+    # tres imagenes»— es sobre `main`, no sobre una rama.
+    if: github.event_name != 'pull_request'
     permissions:
       contents: read
       packages: read

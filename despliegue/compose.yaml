@@ -298,11 +298,25 @@ services:
   rentas-interfaz:
     build:
       # El contexto es `frontend/` y no la raiz, al reves que los tres de arriba:
-      # este `Dockerfile` no tiene ni un `COPY` que salga de ahi, y el
-      # `.dockerignore` que acota el contexto —`frontend/.dockerignore`— solo se
-      # aplica desde la raiz del contexto. El de la raiz excluye `frontend/`
-      # entero, asi que no dice nada de esta imagen.
+      # el `.dockerignore` que lo acota —`frontend/.dockerignore`— solo se aplica
+      # desde la raiz del contexto, y el de la raiz excluye `frontend/` entero,
+      # asi que no diria nada de esta imagen.
       context: ../frontend
+      # Y desde #75, el clon hermano por un CONTEXTO CON NOMBRE. Decia aqui que
+      # este `Dockerfile` «no tiene ni un COPY que salga de ahi» y ya no es
+      # cierto: `frontend/package.json` declara tres `link:` a `kamayuk-lib`.
+      #
+      # Sin esta clave, `COPY --from=kamayuk-lib` no es ni una etapa ni un
+      # contexto declarado, y BuildKit lo resuelve como NOMBRE DE IMAGEN — o sea
+      # que se va a buscar `docker.io/library/kamayuk-lib:latest`. El rojo
+      # aparece al teclear `up --build`, no en CI, que es donde nadie mira.
+      #
+      # La ruta esta medida y no depende de contra que base la resuelva compose:
+      # `despliegue/../../kamayuk-lib` y `frontend/../../kamayuk-lib` dan el
+      # mismo directorio, y coincide letra por letra con el `link:` del
+      # `package.json`. Pide `docker compose` >= v2.17.0.
+      additional_contexts:
+        kamayuk-lib: ../../kamayuk-lib
       target: interfaz
     image: kamayuk-rentas-interfaz:compose
     # EL PUERTO LLEVA EL SUFIJO DEL SISTEMA, y no es capricho (AC-8 de #44).

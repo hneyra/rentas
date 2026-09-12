@@ -21,11 +21,11 @@ import { formatearImporte, sumarImportes } from '@kamayuk/formato';
  * la leccion que costo una vuelta: cuando los dos vivian juntos, el archivo moria entero y la
  * guarda se callaba justo cuando tenia que hablar.
  *
- * <h2>Lo que NO se hace, y es deliberado</h2>
+ * <h2>Y desde #75, `src/` tambien puede</h2>
  *
- * No se importa `@kamayuk/*` desde `src/`. El destino del `link:` queda fuera del contexto de
- * Docker de `publicar-imagenes.yml`, asi que un import de produccion romperia la imagen **en
- * `main`, con este flujo en verde**. Eso es #75.
+ * Este archivo nacio importando desde `verificaciones/` y no desde `src/` porque el destino del
+ * `link:` quedaba fuera del contexto de Docker. #75 lo cerro con un contexto con nombre de
+ * BuildKit, asi que esa abstencion ya no hace falta.
  */
 
 describe('y el enlace RESUELVE: los tres paquetes se importan y se ejecutan', () => {

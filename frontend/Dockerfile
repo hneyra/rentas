@@ -24,8 +24,12 @@
 # ## Por que NO se reutiliza `backend/Dockerfile`
 #
 # Aquel compila con Gradle y su contexto es la RAIZ del repositorio, porque tiene `COPY` que salen
-# de `backend/`. Este no necesita nada de fuera de `frontend/`, asi que su contexto es `frontend/`
-# y su `.dockerignore` es `frontend/.dockerignore`. Las dos decisiones van juntas: un
+# de `backend/`. Este tiene su contexto en `frontend/` y su `.dockerignore` es
+# `frontend/.dockerignore`.
+#
+# Decia «este no necesita nada de fuera de `frontend/`», y desde #75 ya no es cierto: necesita los
+# tres paquetes de `kamayuk-lib`, que entran por un CONTEXTO CON NOMBRE y no por el principal
+# —ver la etapa `construccion`—. Las dos decisiones van juntas: un
 # `.dockerignore` solo se aplica desde la raiz del contexto, de modo que el de la raiz —que ademas
 # excluye `frontend/` entero— no dice nada de esta imagen.
 #
@@ -42,13 +46,51 @@
 # ---------------------------------------------------------------------------
 FROM node:22-alpine AS construccion
 
-WORKDIR /origen
+# EL `WORKDIR` REPRODUCE LA DISPOSICION DE CLONES HERMANOS, Y NO ES COSMETICO (#75).
+#
+# `frontend/package.json` declara `@kamayuk/{api,formato,sesion}` como
+# `link:../../kamayuk-lib/paquetes/*`, y yarn resuelve eso contra el DISCO. Para que la misma
+# ruta relativa valga aqui dentro, el arbol de la imagen tiene que tener la misma forma que el
+# de quien compila:
+#
+#     /obra/rentas/frontend     <- aqui, o sea `../../` = /obra
+#     /obra/kamayuk-lib         <- ahi cae el contexto con nombre
+#
+# Acortarlo a `/obra/frontend` —que es lo que apetece— hace que `../../kamayuk-lib` resuelva a
+# `/kamayuk-lib` y el `yarn install` falle. **Y no fallaria hoy**: mientras nada de `src/`
+# importe `@kamayuk/*`, la imagen se construye igual y el defecto espera. Por eso la profundidad
+# no se deja a la vista de nadie: la deriva `imagen-y-despliegue.test.ts` del `link:` declarado.
+WORKDIR /obra/rentas/frontend
+
+# EL CLON HERMANO, POR UN CONTEXTO CON NOMBRE DE BUILDKIT (#75).
+#
+# El contexto principal de esta imagen es `frontend/` y el hermano vive DOS niveles por encima,
+# o sea fuera de lo que Docker puede copiar. Subir el contexto a la raiz del repositorio no vale
+# por dos motivos medidos: el `.dockerignore` de la raiz excluye `frontend/` entero, y aun asi
+# `kamayuk-lib` es OTRO repositorio y seguiria fuera. Y el arreglo del backend tampoco
+# transfiere: `-Pkamayuk.sinLibreriasComunes` se pudo escribir porque su libreria es
+# `testImplementation` y la imagen no corre pruebas; estas tres son dependencias de EJECUCION
+# del bundle, asi que no existe un «construir el artefacto sin la libreria».
+#
+# Quien lo pasa: `--build-context kamayuk-lib=…` (buildx), `build-contexts:` en
+# `publicar-imagenes.yml` y `additional_contexts:` en `despliegue/compose.yaml`. Los tres tienen
+# que decir el mismo nombre, y eso lo ata una prueba.
+#
+# SE COPIA `paquetes/` Y NADA MAS, a proposito: un contexto con nombre entra por su propia raiz
+# y **ningun `.dockerignore` lo acota** —el de `frontend/` solo filtra el contexto principal—.
+# Medido el 2026-09-12: `kamayuk-lib` no trae `.dockerignore` y su `node_modules` pesa 160 MB;
+# un `COPY --from=kamayuk-lib .` se lo llevaria dentro, con el `.git` y cualquier `.env`.
+COPY --from=kamayuk-lib paquetes/ /obra/kamayuk-lib/paquetes/
 
 # Primero el manifiesto y el candado, y nada mas: asi la capa de dependencias se reutiliza
 # mientras esos dos archivos no cambien, que es lo que hace barato reconstruir tras tocar una
 # pantalla. `--frozen-lockfile` es lo mismo que exige `frontend.yml`: si `package.json` y
 # `yarn.lock` no cuadran, esto falla aqui en vez de instalar en silencio una version distinta de
 # la que se verifico.
+#
+# Y ojo con lo que NO garantiza: un `link:` a un directorio que no existe se instala con codigo
+# 0 y sin avisar (medido). Lo que lo detecta es `verificaciones/enlace-con-kamayuk-lib.test.ts`,
+# que corre en `yarn verificar`, no aqui.
 COPY package.json yarn.lock ./
 RUN yarn install --frozen-lockfile
 
@@ -99,7 +141,7 @@ FROM nginx:1.31.5-alpine AS interfaz
 # ajenos que hay que aprenderse para saber que sobran.
 RUN rm -rf /usr/share/nginx/html/*
 
-COPY --from=construccion /origen/dist/ /usr/share/nginx/html/
+COPY --from=construccion /obra/rentas/frontend/dist/ /usr/share/nginx/html/
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 # LO QUE SE SIRVE NO LLEVA CODIGO FUENTE NI UNA CIFRA DEL ARTBOARD (AC-2 y AC-3 de #44).
@@ -107,7 +149,7 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 # ## Por que la comprobacion esta AQUI y no en la etapa de construccion
 #
 # La primera version miraba `dist/` **dentro de `construccion`**, y medirla enseno que eso deja
-# el agujero abierto: un `COPY --from=construccion /origen/src/ /usr/share/nginx/html/src/` en
+# el agujero abierto: un `COPY --from=construccion /obra/rentas/frontend/src/ /usr/share/nginx/html/src/` en
 # ESTA etapa **no lo ve nadie**, porque la comprobacion ya habia corrido en otra imagen. Medido:
 # con ese `COPY` puesto el `docker build` sale en VERDE y la imagen sirve
 # `/src/api/identidad.ts` con **200 y 13 712 bytes** — el codigo fuente de la puerta de identidad,

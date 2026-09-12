@@ -120,6 +120,23 @@ const CASOS = [
     esperado: 'verde',
   },
   {
+    // #75. El `Dockerfile` decide que se publica, y el compose como se levanta la instalacion.
+    nombre: 'cierra un issue, toca el Dockerfile de la interfaz y NO deja fila',
+    cuerpo: 'Cierra #75.\n\nLa imagen alcanza al clon hermano.',
+    archivos: ['frontend/Dockerfile'],
+    anadido: '',
+    esperado: 'rojo',
+    dice: '#75',
+  },
+  {
+    nombre: 'cierra un issue, toca el compose y NO deja fila',
+    cuerpo: 'Cierra #75.',
+    archivos: ['despliegue/compose.yaml'],
+    anadido: '',
+    esperado: 'rojo',
+    dice: '#75',
+  },
+  {
     nombre: 'cierra un issue, toca backend y SI deja su fila',
     cuerpo: 'Cierra #711.',
     archivos: ['backend/kamayuk-rentas-nucleo/src/main/java/kamayuk/rentas/nucleo/Algo.java'],
