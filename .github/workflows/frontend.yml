@@ -106,114 +106,18 @@ jobs:
         run: yarn build
 
   # ---------------------------------------------------------------------------------------
-  # AC7 de I-2 (#28). EL ARNES DE EXTREMO A EXTREMO, DECLARADO Y **NO FINGIDO**.
+  # EL ARNES DE EXTREMO A EXTREMO SALIO EN #90, CON LAS PANTALLAS CONTRA LAS QUE CORRIA
   #
-  # Este trabajo NO corre hoy, y el criterio de aceptacion lo permite con una condicion: que
-  # diga lo que le falta en vez de pasar en verde sin mirar. Asi que el paso «Lo que falta»
-  # corre SIEMPRE y lo deja escrito en el registro de cada PR; los pasos que de verdad
-  # verifican algo solo corren cuando la instalacion existe, y entonces corren con
-  # `KAMAYUK_E2E_EXIGIR=1`, que convierte «no hay instalacion» en un fallo en vez de un salto.
+  # Los 21 caminos de I-2 (#28) entraban por el formulario de Keycloak de verdad —eso se conserva
+  # y vale— y despues abrian las cuatro secciones de la V6, que ya no existen: el cambio de
+  # guardia las sustituyo por cuarenta pantallas dibujadas por un interprete.
   #
-  # POR QUE NO SE PUEDE LEVANTAR LA INSTALACION AQUI, medido y no supuesto. Son cuatro cosas
-  # y ninguna se arregla en este repositorio:
+  # Este trabajo se retira ENTERO en vez de dejarse apuntando a un directorio vacio, porque un
+  # trabajo que no puede correr y sale en verde es exactamente lo que su propio nombre —«declarado;
+  # sin instalacion en CI todavia»— existia para no ser.
   #
-  #   1. `despliegue/plataforma.compose.yaml` vive en `infrastructure`, otro repositorio.
-  #      Levantarlo desde aqui pide clonarlo y mantener las dos versiones en paso.
-  #   2. El realm `sgtm` con el cliente `kamayuk-backoffice` —PKCE S256, redirect
-  #      `http://localhost:5173/*`— y las tres cuentas lo describe tambien `infrastructure`.
-  #   3. **Los datos no estan en ningun repositorio.** Los caminos afirman cosas como
-  #      «SULLON VILCHEZ-JOSE RAUL» y las etapas «Padrón leído»/«Simulados», que salen del
-  #      volcado de la marcha blanca del contenedor `sgtm-base-1` —42 tablas con filas— y ese
-  #      volcado no se versiona. Un CI que levantara la plataforma vacia tendria backend,
-  #      Keycloak y base, y **aun asi** todos los caminos en rojo por falta de padron.
-  #   4. `KAMAYUK_E2E_CLAVE` tendria que existir como secreto del repositorio. Hoy no existe.
-  #
-  # Lo que SI se verifica en cada PR sin instalacion son las propiedades del arnes que son del
-  # arbol de archivos —donde vive, que no entra en `yarn verificar`, que no lleva ninguna clave
-  # escrita, que levanta Vite con el proxy de datos apagado—: eso lo hace
-  # `verificaciones/arnes-e2e.test.ts`, dentro del trabajo de arriba, que si es bloqueante.
+  # Vuelve con el arnes nuevo, y con el vuelven las cuatro cosas que le faltaban y que NO estan en
+  # este repositorio: el compose de la plataforma (`infrastructure`), el realm «sgtm» con sus tres
+  # cuentas, el volcado de la marcha blanca —que no se versiona en ningun sitio— y el secreto
+  # `KAMAYUK_E2E_CLAVE`. Quedan escritas aqui para no volver a descubrirlas.
   # ---------------------------------------------------------------------------------------
-  arnes:
-    name: El arnes de extremo a extremo (declarado; sin instalacion en CI todavia)
-    runs-on: ubuntu-latest
-    needs: verificar
-    timeout-minutes: 20
-    steps:
-      - name: Este repositorio
-        uses: actions/checkout@v4
-        with:
-          path: rentas
-
-      - name: Las librerias comunes
-        uses: actions/checkout@v4
-        with:
-          repository: hneyra/kamayuk-lib
-          path: kamayuk-lib
-          token: ${{ secrets.GH_CLONE_KEY || github.token }}
-
-      # Corre SIEMPRE. Es lo que impide que este trabajo sea un verde que no mira nada: el
-      # registro de cada PR dice, con nombre y apellido, que le falta para poder verificar.
-      - name: Lo que le falta a este trabajo para poder correr
-        run: |
-          echo "El arnes de extremo a extremo (frontend/e2e) NO corre en esta CI todavia."
-          echo "Le faltan cuatro cosas, y ninguna esta en este repositorio:"
-          echo "  1. despliegue/plataforma.compose.yaml, que vive en «infrastructure» — y desde"
-          echo "     #74 clonar un hermano YA se hace aqui, asi que lo que falta no es poder"
-          echo "     clonarlo, sino mantener las dos versiones en paso"
-          echo "  2. el realm «sgtm» con el cliente «kamayuk-backoffice» y sus tres cuentas"
-          echo "  3. el volcado de datos de la marcha blanca, que no se versiona en ningun sitio"
-          echo "  4. el secreto KAMAYUK_E2E_CLAVE"
-          echo ""
-          echo "Con las cuatro puestas, este trabajo corre solo y con KAMAYUK_E2E_EXIGIR=1,"
-          echo "que hace que la ausencia de instalacion FALLE en vez de saltarse."
-          echo ""
-          echo "En local: cd frontend && yarn e2e"
-
-      - name: Hay instalacion?
-        id: hay
-        env:
-          CLAVE: ${{ secrets.KAMAYUK_E2E_CLAVE }}
-        run: |
-          if [ -n "$CLAVE" ]; then
-            echo "instalacion=si" >> "$GITHUB_OUTPUT"
-          else
-            echo "instalacion=no" >> "$GITHUB_OUTPUT"
-          fi
-
-      - uses: actions/setup-node@v4
-        if: steps.hay.outputs.instalacion == 'si'
-        with:
-          node-version: "22"
-          cache: yarn
-          cache-dependency-path: rentas/frontend/yarn.lock
-
-      - name: Instalar
-        if: steps.hay.outputs.instalacion == 'si'
-        working-directory: rentas/frontend
-        run: yarn install --frozen-lockfile
-
-      # El navegador se descarga aparte y no viene con la dependencia: `@playwright/test` trae
-      # el arnes, no Chromium.
-      - name: Instalar Chromium
-        if: steps.hay.outputs.instalacion == 'si'
-        working-directory: rentas/frontend
-        run: yarn e2e:navegador
-
-      - name: Correr el arnes
-        if: steps.hay.outputs.instalacion == 'si'
-        working-directory: rentas/frontend
-        env:
-          KAMAYUK_E2E_CLAVE: ${{ secrets.KAMAYUK_E2E_CLAVE }}
-          # Sin esto, un CI sin instalacion se saltaria los caminos y saldria VERDE. Aqui la
-          # instalacion tenia que estar, asi que su ausencia es un fallo.
-          KAMAYUK_E2E_EXIGIR: "1"
-        run: yarn e2e
-
-      - uses: actions/upload-artifact@v4
-        if: always() && steps.hay.outputs.instalacion == 'si'
-        with:
-          name: informe-del-arnes
-          # Tambien sigue al anfitrion, y si se olvida NO falla: `upload-artifact` solo avisa
-          # cuando el glob no casa, el paso sale verde y el informe no se sube.
-          path: rentas/frontend/playwright-report/
-          retention-days: 7

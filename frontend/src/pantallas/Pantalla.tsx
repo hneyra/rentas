@@ -1,9 +1,6 @@
-import { seEscribe, tipoDe } from '@kamayuk/ui';
 import { useState } from 'react';
 
-import { AccionesAlPie, type Avisos } from './piezas/AccionesAlPie.tsx';
 import { BloqueDeLaPantalla } from './piezas/BloqueDeLaPantalla.tsx';
-import { CabeceraDePantalla } from './piezas/CabeceraDePantalla.tsx';
 import type { Pantalla as Definicion } from './tipos.ts';
 
 /**
@@ -25,30 +22,23 @@ import type { Pantalla as Definicion } from './tipos.ts';
  * conocen con un solo consumidor**: mover un archivo el dia que llegue el segundo cuesta una
  * tarde, y deshacer una abstraccion disenada contra un solo caso cuesta el doble.
  *
- * <h2>Que la pantalla se guarde o no lo decide el DATO</h2>
+ * <h2>Que dibuja, y que NO (#90)</h2>
  *
- * Si algun campo se escribe, la pantalla ofrece limpiar y guardar; si no, exportar e imprimir. No
- * es un parametro: un parametro deja la puerta abierta a una pantalla de solo lectura con un
- * boton de guardar que no guarda nada.
+ * Dibuja **el cuerpo**: los bloques. La cabecera —miga, titulo e instruccion— y las acciones del
+ * pie las pone `@kamayuk/shell`, que es quien sabe donde esta uno y a donde puede volver. Aqui
+ * hubo una copia de las dos hasta que el armazon llego (#89): se retiran, porque dos cabeceras
+ * que se dibujan igual acaban divirgiendo y la que se queda vieja es la que alguien esta mirando.
+ *
+ * La INSTRUCCION sigue viniendo de la definicion y se le pasa al armazon desde el catalogo: es
+ * dato de este sistema, no del marco.
  *
  * <h2>Lo que todavia NO hace</h2>
  *
- * No llama a la API —dibuja lo que la definicion dice, que son las cifras del artboard— y no esta
- * dentro del armazon. Las dos cosas van en sus propios issues, y hasta entonces la interfaz que
- * se sirve sigue siendo la V6.
+ * No llama a la API: dibuja lo que la definicion dice, que son las cifras del artboard.
  */
 
 export interface PantallaProps {
   readonly definicion: Definicion;
-  /** El modulo al que pertenece: va en la miga y delante de la instruccion. */
-  readonly modulo: string;
-  /** El rotulo de la hoja, que es el titulo de la pantalla. */
-  readonly titulo: string;
-  /** Que ES la pantalla. Lo dice el arbol, no la definicion. */
-  readonly nota?: string;
-  readonly alVolver?: () => void;
-  /** Lo que se lee junto a las acciones del pie. Por omision, sin vocabulario de ningun sistema. */
-  readonly avisos?: Avisos;
   /** Se avisa la primera vez que se toca un campo: es lo que marca la hoja como sucia. */
   readonly alEnsuciar?: () => void;
 }
@@ -56,22 +46,9 @@ export interface PantallaProps {
 /** `bloque|campo` -> lo tecleado. Plano a proposito: una pantalla no anida mas. */
 type Tecleado = Record<string, string | boolean>;
 
-export function Pantalla({
-  definicion,
-  modulo,
-  titulo,
-  nota = '',
-  alVolver = () => {},
-  alEnsuciar = () => {},
-  avisos,
-}: PantallaProps) {
+export function Pantalla({ definicion, alEnsuciar = () => {} }: PantallaProps) {
   const [tecleado, setTecleado] = useState<Tecleado>({});
 
-  // Del dato, y no de una bandera: si algun campo de algun bloque no es de solo lectura, esta
-  // pantalla se guarda.
-  const guardable = definicion.bloques.some((b) =>
-    b.campos.some((c) => seEscribe(tipoDe(c.tipo))),
-  );
 
   const cambiar = (bloque: number, campo: number, valor: string | boolean) => {
     setTecleado((antes) => {
@@ -92,34 +69,17 @@ export function Pantalla({
   };
 
   return (
-    <div className="flex-1 overflow-auto">
-      <CabeceraDePantalla
-        modulo={modulo}
-        titulo={titulo}
-        nota={nota}
-        instruccion={definicion.instruccion}
-      />
-      <div className="px-[18px] pt-4 pb-6 flex flex-col gap-[14px] max-w-[1180px]">
-        {definicion.bloques.map((bloque, i) => (
-          <BloqueDeLaPantalla
-            // El titulo del bloque: es unico dentro de cada pantalla en las cuarenta, y con el
-            // indice, reordenar los bloques dejaria a React reusando el estado del anterior.
-            key={bloque.titulo}
-            bloque={bloque}
-            valores={valoresDe(i)}
-            alCambiar={(campo, valor) => cambiar(i, campo, valor)}
-          />
-        ))}
-        <AccionesAlPie
-          seEscribe={guardable}
-          avisos={avisos}
-          alVolver={alVolver}
-          alActuar={(accion) => {
-            if (accion === 'Imprimir') window.print();
-            if (accion === 'Limpiar') setTecleado({});
-          }}
+    <div className="flex flex-col gap-[14px]">
+      {definicion.bloques.map((bloque, i) => (
+        <BloqueDeLaPantalla
+          // El titulo del bloque: es unico dentro de cada pantalla en las cuarenta, y con el
+          // indice, reordenar los bloques dejaria a React reusando el estado del anterior.
+          key={bloque.titulo}
+          bloque={bloque}
+          valores={valoresDe(i)}
+          alCambiar={(campo, valor) => cambiar(i, campo, valor)}
         />
-      </div>
+      ))}
     </div>
   );
 }

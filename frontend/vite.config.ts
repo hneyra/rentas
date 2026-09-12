@@ -1,5 +1,6 @@
 import process from 'node:process';
 
+import tailwind from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 
@@ -31,7 +32,16 @@ const RAIZ_DE_LA_API = '/rentas/api/v1';
 
 export default defineConfig({
   base: '/rentas/',
-  plugins: [react()],
+  /**
+   * Tailwind v4, **desde #90**.
+   *
+   * No estaba antes y no podia estar: su *preflight* normaliza margenes, tipografia y filos de
+   * todo el documento, y la V6 —3 446 lineas de CSS escritas a mano— se apoyaba en los valores
+   * por omision del navegador. Encenderlo con las dos interfaces vivas le habria cambiado la cara
+   * a la que se estaba sirviendo. Por eso la guarda de #91 compila la hoja DENTRO de la prueba: se
+   * podia medir que los tokens llegan al CSS sin aplicarselo a nadie.
+   */
+  plugins: [tailwind(), react()],
   /**
    * **UNA sola copia de lo que los paquetes enlazados dan por puesto.**
    *

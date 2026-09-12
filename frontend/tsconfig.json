@@ -8,10 +8,8 @@
     // COMPILADOR —`@ts-expect-error` falla cuando no hay error— y sin esta linea `tsc` ni
     // lo abriria, asi que las barreras de tipo dejarian de comprobarse en silencio.
     "verificaciones/**/*.tsx",
-    // El arnes de extremo a extremo (I-2). Se compila aunque `vitest` no lo recoja: sin esta
-    // linea `yarn typecheck` no lo abriria, y un camino con un tipo mal escrito solo se
-    // descubriria al correr `yarn e2e` contra una instalacion levantada — o sea, tarde.
-    "e2e/**/*.ts",
+    // El arnes de extremo a extremo salio en #90 con las pantallas de V6 contra las que corria.
+    // Vuelve con la V8 en su propio issue, y esta linea vuelve con el.
     "eslint.prohibiciones.mjs",
     "vitest.setup.ts",
     "*.config.ts"

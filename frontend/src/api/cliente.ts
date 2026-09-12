@@ -25,7 +25,15 @@
 import { token } from './identidad.ts';
 
 /** Todo lo de este sistema cuelga de `rentas/` (ADR-0030 §2): la ruta dice quien responde. */
-const PREFIJO = '/rentas/api/v1';
+/**
+ * La raiz de la API de este sistema.
+ *
+ * **Exportada**, y no privada: `vite.config.ts` la necesita para su `server.proxy` y
+ * `verificaciones/camino-a-la-api.test.ts` para comprobar que las dos dicen lo mismo. Vivia en
+ * `api/proxy.ts`, que salio con la V6 (#90); aqui es donde pertenece, porque es quien la usa para
+ * pedir.
+ */
+export const PREFIJO = '/rentas/api/v1';
 
 /**
  * Los miembros del `problem+json` que el backend publica, tal como los publica.

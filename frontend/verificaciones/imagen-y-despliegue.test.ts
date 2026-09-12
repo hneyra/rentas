@@ -186,10 +186,23 @@ describe('AC-3 — el proxy de datos NO viaja en la imagen', () => {
    * Medirlo fuera tambien vale, y esta en el PR; tenerlo aqui es lo que hace que una imagen con
    * cifras del artboard **no se pueda publicar**: el `docker build` sale en rojo.
    */
-  it('la imagen se niega a construirse si el dist lleva una cifra del artboard', () => {
-    for (const cadena of ['Rufina Medina Medina', '170,616.75', '62,418', 'Cárdenas', 'SULLON VILCHEZ']) {
+  it('la imagen se niega a construirse si el dist lleva rastro del prototipo V6', () => {
+    // Eran cinco cadenas y quedan TRES, y la diferencia esta contada entera en el Dockerfile:
+    // «62,418» y «Cárdenas» salen porque desde #90 estan en las definiciones de V8 —son el
+    // contenido de las pantallas, no datos de un proxy— y la comprobacion las encontraria
+    // siempre. Lo que queda comprueba que el prototipo de V6 no vuelve.
+    //
+    // La garantia grande de #44 —«ni una cifra del artboard en lo servido»— esta ABIERTA, y no se
+    // finge que no: #97 la recupera cuando las pantallas lean de la API.
+    for (const cadena of ['Rufina Medina Medina', '170,616.75', 'SULLON VILCHEZ']) {
       expect(DOCKERFILE, `la comprobacion del dist no busca «${cadena}»`).toContain(cadena);
     }
+  });
+
+  it('y el Dockerfile DICE que la garantia de las cifras esta abierta, con su numero', () => {
+    // Sin esto, la comprobacion recortada se leeria como que la propiedad se sigue cumpliendo. Un
+    // recorte silencioso de una guarda es peor que quitarla: nadie sabe que dejo de cubrir.
+    expect(DOCKERFILE, 'el Dockerfile no dice que la garantia esta abierta').toContain('#97');
   });
 
   /**

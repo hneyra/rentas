@@ -1,5 +1,9 @@
 import { formatearImporte } from '../../src/dominio/formato.ts';
-import { Importe, Insignia } from '../../src/ds/index.ts';
+// `Importe` e `Insignia` ya no son de este repositorio: son de `@kamayuk/ui` desde
+// `kamayuk-lib`#6. Las barreras que ponen —que un importe sin fecha no compile, que un tono
+// inventado no compile— siguen siendo las mismas, y siguen comprobandose desde aqui: quien las
+// tiene que poder romper es el consumidor.
+import { Importe, Insignia } from '@kamayuk/ui';
 import type { ClaveDeHoja } from '../../src/pantallas/arbol.ts';
 import type { Campo, Operacion, Pantalla } from '../../src/pantallas/tipos.ts';
 

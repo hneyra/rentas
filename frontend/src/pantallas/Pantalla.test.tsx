@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 
 import { Pantalla } from './Pantalla.tsx';
-import type { Bloque, Campo, Pantalla as Definicion } from './tipos.ts';
+import type { Campo, Pantalla as Definicion } from './tipos.ts';
 
 /**
  * **El interprete dibuja lo que la definicion dice** (#88).
@@ -12,7 +12,14 @@ import type { Bloque, Campo, Pantalla as Definicion } from './tipos.ts';
  * Las pruebas son sobre definiciones INVENTADAS y no sobre las cuarenta de verdad, a proposito:
  * aqui se comprueba el interprete, y una prueba que dependiera de que «ini-panel» tiene seis
  * campos se rompe el dia que el artboard cambie sin que el interprete tenga nada que ver. Que las
- * cuarenta se dibujen es otra prueba, y esta en `las-cuarenta-se-dibujan.test.tsx`.
+ * cuarenta se dibujen es otra prueba, y desde #90 corre **contra la aplicacion montada**, en
+ * `verificaciones/los-cuarenta-destinos-se-recorren.test.tsx`.
+ *
+ * <h2>La cabecera y el pie NO se prueban aqui, porque ya no se dibujan aqui</h2>
+ *
+ * Los pone `@kamayuk/shell`, que tiene sus propias pruebas de las dos. Este archivo tenia una
+ * copia de esas comprobaciones hasta #90 y se retiran con el codigo que las justificaba: una
+ * prueba que sobrevive a lo que probaba se convierte en una que pasa por otro motivo.
  */
 
 const campo = (c: Campo): Definicion => ({
@@ -21,7 +28,7 @@ const campo = (c: Campo): Definicion => ({
 });
 
 const monta = (definicion: Definicion, extra: Partial<Parameters<typeof Pantalla>[0]> = {}) =>
-  render(<Pantalla definicion={definicion} modulo="Un modulo" titulo="Una pantalla" {...extra} />);
+  render(<Pantalla definicion={definicion} {...extra} />);
 
 describe('los siete tipos de campo, cada uno con su pieza', () => {
   it('EL CENTINELA: la tabla de piezas de `@kamayuk/ui` sigue teniendo los siete', () => {
@@ -97,88 +104,6 @@ describe('lo que se escribe, se escribe', () => {
   });
 });
 
-const soloLectura: Bloque = {
-  titulo: 'Consulta',
-  nota: '',
-  campos: [{ etiqueta: 'Recaudado', tipo: 'r', valor: 'S/ 1.00' }],
-};
-const conEscritura: Bloque = {
-  titulo: 'Alta',
-  nota: '',
-  campos: [{ etiqueta: 'Nombre', tipo: '' }],
-};
-
-describe('las acciones al pie las decide el DATO', () => {
-  it('sin ningun campo que se escriba: exportar e imprimir', () => {
-    monta({ instruccion: 'consulte.', bloques: [soloLectura] });
-    expect(screen.getByRole('button', { name: 'Exportar' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Imprimir' })).toBeTruthy();
-    // Un boton de guardar aqui seria un boton que miente: no hay nada que guardar.
-    expect(screen.queryByRole('button', { name: 'Guardar' })).toBeNull();
-    // El aviso por omision NO dice «padron»: ese vocabulario es del sistema, y lo pasa el.
-    expect(screen.getByText('Los datos son los que figuran a la fecha de hoy.')).toBeTruthy();
-  });
-
-  it('con UN solo campo que se escriba, aunque haya diez de consulta: limpiar y guardar', () => {
-    monta({ instruccion: 'complete.', bloques: [soloLectura, conEscritura] });
-    expect(screen.getByRole('button', { name: 'Guardar' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Limpiar' })).toBeTruthy();
-    expect(screen.queryByRole('button', { name: 'Imprimir' })).toBeNull();
-    expect(screen.getByText(/Nada se escribe hasta que pulse Guardar/)).toBeTruthy();
-  });
-
-  it('la que confirma es la UNICA primaria', () => {
-    monta({ instruccion: 'complete.', bloques: [conEscritura] });
-    expect(screen.getByRole('button', { name: 'Guardar' }).className).toContain('bg-azul');
-    expect(screen.getByRole('button', { name: 'Limpiar' }).className).not.toContain('bg-azul');
-  });
-
-  it('el aviso lo puede poner quien monta la pantalla, con SUS palabras', () => {
-    // Es lo que deja a `rentas` usar el texto de V8 —que dice «padron»— sin que esa palabra entre
-    // en un archivo destinado a `@kamayuk/ui`.
-    monta(
-      { instruccion: 'consulte.', bloques: [soloLectura] },
-      { avisos: { consulta: 'Lo que figura en el padron de ESTE sistema.', escritura: 'x' } },
-    );
-    expect(screen.getByText('Lo que figura en el padron de ESTE sistema.')).toBeTruthy();
-  });
-
-  it('«Limpiar» vacia lo tecleado', async () => {
-    const usuario = userEvent.setup({ delay: null });
-    monta({ instruccion: 'complete.', bloques: [conEscritura] });
-    await usuario.type(screen.getByLabelText('Nombre'), 'Rufina');
-    await usuario.click(screen.getByRole('button', { name: 'Limpiar' }));
-    expect((screen.getByLabelText('Nombre') as HTMLInputElement).value).toBe('');
-  });
-});
-
-describe('la cabecera', () => {
-  it('el titulo va en peso 400 y es el UNICO `h1`', () => {
-    monta({ instruccion: 'haga.', bloques: [conEscritura] });
-    const h1 = screen.getByRole('heading', { level: 1, name: 'Una pantalla' });
-    // 27 px en negrita pesa mas que la barra global y la pantalla se lee al reves. El tamano ya
-    // jerarquiza; el peso encima lo hace gritar.
-    expect(h1.className).toContain('font-normal');
-    expect(h1.className).toContain('text-[27px]');
-  });
-
-  it('la miga lleva el modulo y la hoja, y la hoja es la actual', () => {
-    monta({ instruccion: 'haga.', bloques: [conEscritura] });
-    const miga = screen.getByRole('navigation', { name: 'Ruta' });
-    expect(within(miga).getByText('Un modulo')).toBeTruthy();
-    expect(within(miga).getByText('Una pantalla').className).toContain('font-bold');
-  });
-
-  it('la instruccion dice QUE HACER, y va aparte de la nota que dice QUE ES', () => {
-    monta({
-      instruccion: 'elija el ejercicio y revise lo emitido.',
-      bloques: [conEscritura],
-    }, { nota: 'El estado de la emision del padron.' });
-    expect(screen.getByText(/elija el ejercicio y revise lo emitido/)).toBeTruthy();
-    expect(screen.getByText('El estado de la emision del padron.')).toBeTruthy();
-  });
-});
-
 describe('la tabla de un bloque', () => {
   const conTabla: Definicion = {
     instruccion: 'consulte.',
@@ -227,9 +152,4 @@ describe('la tabla de un bloque', () => {
     expect(screen.getByText('2 registros')).toBeTruthy();
   });
 
-  it('una tabla sola, sin campos, NO ofrece guardar', () => {
-    monta(conTabla);
-    expect(screen.getByRole('button', { name: 'Exportar' })).toBeTruthy();
-    expect(screen.queryByRole('button', { name: 'Guardar' })).toBeNull();
-  });
 });
