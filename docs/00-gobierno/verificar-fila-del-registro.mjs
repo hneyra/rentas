@@ -1,6 +1,6 @@
 /* Comprueba que un PR que cierra un issue deja su fila en «Verificar antes de afirmar».
 
-   `CLAUDE.md` §«Verificar antes de afirmar» es la memoria del proyecto: cada issue
+   El registro de «Verificar antes de afirmar» es la memoria del proyecto: cada issue
    deja ahi que se implemento y **como se demostro que la verificacion puede fallar**.
    Es lo que impide volver a descubrir el mismo hallazgo de RLS por tercera vez.
 
@@ -85,6 +85,19 @@ export const RUTAS_DE_CODIGO = [
   /^infra\//,
 ];
 
+/**
+ * Donde puede estar la fila. **Son dos a proposito, y es una ventana de compatibilidad**
+ * (`infrastructure`#114): el registro se muda de `CLAUDE.md` a `docs/agent/HISTORY.md` —eran
+ * el 91 % de un archivo que cada sesion carga entero— y los seis repositorios no migran a la
+ * vez.
+ *
+ * Mientras las dos esten aqui, una fila escrita en cualquiera de los dos cuenta. El dia que
+ * los seis hayan migrado se retira `CLAUDE.md` **en un cambio propio**, y entonces una fila
+ * en el sitio viejo deja de contar. Estrechar antes deja rojos cruzados en los que aun no
+ * han migrado.
+ */
+const DONDE_VIVE_LA_FILA = ['docs/agent/HISTORY.md', 'CLAUDE.md'];
+
 /** Como se declara que un PR cierra un issue. GitHub admite estas y alguna mas. */
 const CIERRA = /\b(?:cierra|closes?|close|fixes?|fix|resuelve|resolves?)\s+#(\d+)/gi;
 
@@ -121,7 +134,7 @@ function principal() {
 
   const anadido = opciones.anadido
     ? readFileSync(opciones.anadido, 'utf8')
-    : git(['diff', `${opciones.base}...HEAD`, '--', 'CLAUDE.md'])
+    : git(['diff', `${opciones.base}...HEAD`, '--', ...DONDE_VIVE_LA_FILA])
         .split('\n')
         .filter((linea) => linea.startsWith('+') && !linea.startsWith('+++'))
         .join('\n');
@@ -129,10 +142,15 @@ function principal() {
   const sinFila = issues.filter((numero) => !nombra(anadido, numero));
   if (sinFila.length > 0) {
     console.error('');
-    console.error('FALLO: falta la fila de «Verificar antes de afirmar» en CLAUDE.md.');
+    console.error(
+      `FALLO: falta la fila de «Verificar antes de afirmar» en ${DONDE_VIVE_LA_FILA[0]}.`,
+    );
     console.error('');
     for (const numero of sinFila) {
-      console.error(`  · Este PR cierra #${numero} y CLAUDE.md no gana ninguna linea que lo nombre.`);
+      console.error(
+        `  · Este PR cierra #${numero} y no lo nombra ninguna linea nueva de ` +
+          `${DONDE_VIVE_LA_FILA.join(' ni de ')}.`,
+      );
     }
     console.error('');
     console.error('  Esa tabla es la memoria del proyecto: cada issue deja ahi que se');
