@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "version": "0.1.0",
-  "description": "rentas — interfaz web. F-1: el andamiaje, sus reglas y su CI; ninguna pantalla todavia.",
+  "description": "rentas \u2014 interfaz web. F-1: el andamiaje, sus reglas y su CI; ninguna pantalla todavia.",
   "engines": {
     "node": ">=22"
   },
@@ -20,6 +20,9 @@
     "verificar": "yarn lint && yarn typecheck && yarn test"
   },
   "dependencies": {
+    "@kamayuk/api": "link:../../kamayuk-lib/paquetes/api",
+    "@kamayuk/formato": "link:../../kamayuk-lib/paquetes/formato",
+    "@kamayuk/sesion": "link:../../kamayuk-lib/paquetes/sesion",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },
