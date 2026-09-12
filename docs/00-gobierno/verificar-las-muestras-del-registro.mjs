@@ -4,9 +4,14 @@
    esquivada, que en una convencion de proceso es peor todavia — el peaje se aprende a
    rodear y la tabla se queda igual de vacia.
 
-   Asi que se corre la comprobacion contra ocho situaciones fabricadas, cuatro que tiene
+   Asi que se corre la comprobacion contra nueve situaciones fabricadas, cinco que tiene
    que rechazar y cuatro que tiene que dejar pasar, y se exige que el rechazo **nombre el
    issue**: rechazar por el motivo equivocado seria pasar por casualidad.
+
+   La ultima en llegar es del tercer tiempo de `infrastructure`#114 y fija lo que la mudanza
+   del registro destapo en tres repositorios a la vez: **una cabecera o un parrafo que citen
+   el issue no valen como fila**. Hasta entonces valian, y con eso un PR podia salir en verde
+   con la tabla intacta.
 
    Las dos ultimas en llegar son de #45 y van EN PAREJA: una toca `infrastructure/src/`
    —el descriptor de despliegue— cerrando un issue sin dejar fila y tiene que salir roja;
@@ -56,6 +61,19 @@ const CASOS = [
     anadido: '+| Una fila cualquiera (#711) | … | … |',
     esperado: 'rojo',
     dice: '#71',
+  },
+  {
+    // `infrastructure`#114, tercer tiempo. Hasta el 2026-09-12 `nombra()` buscaba `#N` en
+    // CUALQUIER linea anadida, y eso lo satisface una cabecera o un parrafo. Lo destaparon tres
+    // carriles a la vez al mudar el registro: la cabecera del archivo nuevo citaba el issue de
+    // la mudanza y la rotura de control —quitar la fila— salia VERDE. Con `nombra()` devuelta a
+    // su forma de antes, esta muestra pasa a verde: ese es el rojo que demuestra el arreglo.
+    nombre: 'una cabecera o un parrafo que citen el issue NO valen como fila',
+    cuerpo: 'Cierra #711.',
+    archivos: ['backend/kamayuk-rentas-nucleo/src/main/java/kamayuk/rentas/nucleo/Algo.java'],
+    anadido: '+# Registro\n+\n+Se mudo aqui por #711, y esto no es una fila.',
+    esperado: 'rojo',
+    dice: '#711',
   },
   {
     // #45. El descriptor de despliegue decide que corre en la municipalidad, y hasta #45

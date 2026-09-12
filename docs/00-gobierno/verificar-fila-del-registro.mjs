@@ -86,17 +86,21 @@ export const RUTAS_DE_CODIGO = [
 ];
 
 /**
- * Donde puede estar la fila. **Son dos a proposito, y es una ventana de compatibilidad**
- * (`infrastructure`#114): el registro se muda de `CLAUDE.md` a `docs/agent/HISTORY.md` —eran
- * el 91 % de un archivo que cada sesion carga entero— y los seis repositorios no migran a la
- * vez.
+ * Donde vive la fila. **Es UNA, y ya no es una ventana de compatibilidad** (`infrastructure`#114):
+ * el registro se mudo de `CLAUDE.md` a `docs/agent/HISTORY.md` —eran el 91 % de un archivo que
+ * cada sesion carga entero— y **los seis repositorios migraron el 2026-09-12**, asi que el
+ * estrechado llega en su cambio propio, que es como el primer tiempo dijo que se haria.
  *
- * Mientras las dos esten aqui, una fila escrita en cualquiera de los dos cuenta. El dia que
- * los seis hayan migrado se retira `CLAUDE.md` **en un cambio propio**, y entonces una fila
- * en el sitio viejo deja de contar. Estrechar antes deja rojos cruzados en los que aun no
- * han migrado.
+ * Lo que cambia con esto: **una fila escrita en `CLAUDE.md` deja de contar**. Mientras los dos
+ * sitios estuvieran aqui, un PR podia dejar su fila en el archivo viejo y salir en verde, y la
+ * memoria del proyecto se partia en dos sin que nada lo dijera — que es justo lo que la mudanza
+ * viene a cerrar.
+ *
+ * Sigue siendo una lista y no una cadena a proposito: es lo que se le pasa a `git diff -- …`, y
+ * el dia que el registro se vuelva a partir —por tamano, por ejemplo— el segundo archivo entra
+ * aqui y no hay nada mas que tocar.
  */
-const DONDE_VIVE_LA_FILA = ['docs/agent/HISTORY.md', 'CLAUDE.md'];
+const DONDE_VIVE_LA_FILA = ['docs/agent/HISTORY.md'];
 
 /** Como se declara que un PR cierra un issue. GitHub admite estas y alguna mas. */
 const CIERRA = /\b(?:cierra|closes?|close|fixes?|fix|resuelve|resolves?)\s+#(\d+)/gi;
@@ -148,7 +152,7 @@ function principal() {
     console.error('');
     for (const numero of sinFila) {
       console.error(
-        `  · Este PR cierra #${numero} y no lo nombra ninguna linea nueva de ` +
+        `  · Este PR cierra #${numero} y no lo nombra ninguna FILA nueva de ` +
           `${DONDE_VIVE_LA_FILA.join(' ni de ')}.`,
       );
     }
@@ -161,6 +165,10 @@ function principal() {
     console.error('  Lo que se comprueba aqui es solo que la fila EXISTA. Que diga la verdad');
     console.error('  —que la mutacion sea real y las cifras cuadren— lo lee la revision.');
     console.error('');
+    console.error('  Y tiene que ser una FILA de la tabla —una linea que empiece por «|»—: una');
+    console.error('  cabecera o un parrafo que citen el issue no cuentan. Esa era la forma de');
+    console.error('  salir en verde sin una sola fila escrita.');
+    console.error('');
     console.error(`  Archivos de codigo en este cambio: ${deCodigo.length}`);
     console.error(`    ${deCodigo.slice(0, 5).join('\n    ')}`);
     process.exit(1);
@@ -171,9 +179,31 @@ function principal() {
 
 // ---------------------------------------------------------------------------
 
-/** Si ese texto nombra al issue como tal y no como parte de otro numero. */
+/**
+ * Si ese texto trae una FILA que nombre al issue —como tal y no como parte de otro numero—.
+ *
+ * **Que sea una fila es la mitad que faltaba, y hasta el 2026-09-12 no estaba.** Bastaba con que
+ * `#N` apareciera en cualquier linea anadida, y eso **lo satisface una cabecera o un parrafo**.
+ *
+ * Lo destaparon TRES carriles a la vez al mudar el registro a `docs/agent/HISTORY.md`
+ * (`infrastructure`#114), y este repositorio fue uno de los tres: la cabecera del archivo nuevo
+ * citaba el issue que traia la mudanza, asi que la rotura de control —quitar la fila y enmendar
+ * el commit— salio **VERDE**, contestando «Cada issue que este PR cierra tiene su fila» con cero
+ * filas dentro. Los tres lo rodearon igual: escribiendo una cabecera que no cita su propio issue
+ * y anotandolo. Eso es una costumbre, y una costumbre no es una guarda — el dia que alguien
+ * escriba en la cabecera «esto se mudo por #N», la guarda vuelve a dar por buena una tabla sin
+ * tocar.
+ *
+ * Asi que la exigencia se escribe donde se puede sostener: **una fila de una tabla de Markdown
+ * empieza por `|`**. El `+` del diff se quita antes de mirar, porque lo que llega aqui son las
+ * lineas anadidas del cambio.
+ */
 function nombra(texto, numero) {
-  return new RegExp(`#${numero}(?![0-9])`).test(texto);
+  const cita = new RegExp(`#${numero}(?![0-9])`);
+  return texto
+    .split('\n')
+    .map((linea) => linea.replace(/^\+/, '').trim())
+    .some((linea) => linea.startsWith('|') && cita.test(linea));
 }
 
 function lineas(texto) {
