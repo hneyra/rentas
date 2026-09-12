@@ -229,10 +229,17 @@ describe("C-14 — que esto se pueda desplegar", () => {
   /**
    * TRES imagenes y DOS `Dockerfile` (#44).
    *
-   * `rentas` y `rentas-migrador` son dos objetivos del mismo `backend/Dockerfile`, con el contexto
-   * en la raiz del repositorio. `rentas-interfaz` sale de `frontend/Dockerfile`, con el contexto
-   * en `frontend/` — y esas dos parejas son las que `publicar-imagenes.yml` tiene que declarar en
-   * su matriz, porque un `.dockerignore` solo cuenta desde la raiz de SU contexto.
+   * `rentas` y `rentas-migrador` son dos objetivos del mismo `Dockerfile` del backend, con el
+   * contexto en la raiz de ese repositorio. `rentas-interfaz` sale del `Dockerfile` del frontend,
+   * con el contexto en su propio directorio — y esas dos parejas son las que
+   * `publicar-imagenes.yml` tiene que declarar en su matriz, porque un `.dockerignore` solo
+   * cuenta desde la raiz de SU contexto.
+   *
+   * Desde `rentas`#75 las rutas de esa matriz llevan `rentas/` delante: el anfitrion baja a un
+   * `path:` para que `kamayuk-lib` quepa a su lado, y la interfaz alcanza sus tres paquetes por
+   * un contexto con nombre de BuildKit. La afirmacion de abajo no cambia —compara NOMBRES de
+   * imagen, que son los mismos—, pero el detalle de arriba se queda sin numero a proposito: quien
+   * lo fija es `frontend/verificaciones/imagen-y-despliegue.test.ts`, en aquel repositorio.
    *
    * **Y no se llama `rentas-web`**: ese nombre es el del `Deployment` y el `Service` del backend
    * en perfil `web`, que este mismo archivo produce.

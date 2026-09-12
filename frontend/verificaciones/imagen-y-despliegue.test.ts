@@ -67,10 +67,13 @@ describe('AC-1 — la imagen existe, y quien la publica sabe de donde sale', () 
     const entradas = [...PUBLICAR.matchAll(/- destino: (\S+)\n\s+imagen: (\S+)\n\s+archivo: (\S+)\n\s+contexto: (\S+)/g)]
       .map((m) => ({ destino: m[1], imagen: m[2], archivo: m[3], contexto: m[4] }));
 
+    // Las rutas llevan `rentas/` delante desde #75: el anfitrion baja a `path: rentas` para que
+    // el clon hermano quepa a su lado. `contexto: rentas` es la raiz de ESTE repositorio —
+    // exactamente lo que era `.`—, asi que el `.dockerignore` que aplica a cada imagen no cambia.
     expect(entradas).toEqual([
-      { destino: 'aplicacion', imagen: 'kamayuk-rentas', archivo: 'backend/Dockerfile', contexto: '.' },
-      { destino: 'migrador', imagen: 'kamayuk-rentas-migrador', archivo: 'backend/Dockerfile', contexto: '.' },
-      { destino: 'interfaz', imagen: 'kamayuk-rentas-interfaz', archivo: 'frontend/Dockerfile', contexto: 'frontend' },
+      { destino: 'aplicacion', imagen: 'kamayuk-rentas', archivo: 'rentas/backend/Dockerfile', contexto: 'rentas' },
+      { destino: 'migrador', imagen: 'kamayuk-rentas-migrador', archivo: 'rentas/backend/Dockerfile', contexto: 'rentas' },
+      { destino: 'interfaz', imagen: 'kamayuk-rentas-interfaz', archivo: 'rentas/frontend/Dockerfile', contexto: 'rentas/frontend' },
     ]);
 
     // Y el paso las TOMA de la matriz. Con `context: .` fijo, la matriz seria decorativa.
@@ -479,5 +482,117 @@ describe('las senias del ambiente: lo que Vite no puede hornear', () => {
     expect(DESCRIPTOR).toContain('redirect_uri');
     expect(DESCRIPTOR).toContain('localhost:5173');
     expect(DESCRIPTOR, 'hay que decir de quien es el realm').toContain('infrastructure');
+  });
+});
+
+/**
+ * **#75 — el `Dockerfile` alcanza al clon hermano, y los cuatro sitios dicen lo mismo.**
+ *
+ * `frontend/package.json` declara `@kamayuk/{api,formato,sesion}` como
+ * `link:../../kamayuk-lib/paquetes/*`, y el contexto de esta imagen es `frontend/`: el destino
+ * queda DOS niveles por encima, fuera de lo que Docker puede copiar. Lo resuelve un contexto con
+ * nombre de BuildKit, y eso reparte una sola verdad en cuatro archivos —el `package.json`, el
+ * `Dockerfile`, el workflow y el compose— que tienen que decir lo mismo.
+ *
+ * <h2>Por que estas tres guardas, y no ninguna</h2>
+ *
+ * Porque medido el 2026-09-12 **no existia ni una** asercion en todo el repositorio sobre el
+ * `WORKDIR`, sobre un `COPY --from=`, sobre el orden o el nombre de las etapas, ni sobre
+ * `build-contexts`/`additional_contexts`. O sea que el arreglo de #75 entraba sin que nada lo
+ * sujetara, y su modo de fallo es el mismo que viene a cerrar:
+ *
+ * > `WORKDIR /obra/rentas/frontend` se «simplifica» a `/obra/frontend` seis meses despues
+ * > —queda mas corto—, la imagen sigue construyendose mientras nadie importe `@kamayuk/*`, y el
+ * > dia que el import llegue, `../../kamayuk-lib` resuelve a `/kamayuk-lib`, el `yarn install`
+ * > falla **en `main`** y toda la CI estaba en verde.
+ */
+describe('#75 — el contexto con nombre, y la profundidad que lo sostiene', () => {
+  /** Las etapas que el propio Dockerfile declara: `FROM … AS <nombre>`. */
+  const etapas = [...DOCKERFILE.matchAll(/^FROM\s+\S+\s+AS\s+(\S+)/gm)].map((m) => m[1]);
+  /** De donde copia: una etapa suya, o un contexto que alguien tiene que darle. */
+  const copiaDe = [...DOCKERFILE.matchAll(/^COPY\s+--from=(\S+)/gm)].map((m) => m[1]);
+  const contextosQuePide = [...new Set(copiaDe.filter((n) => !etapas.includes(n)))];
+
+  it('EL CENTINELA: el Dockerfile declara etapas y copia de sitios', () => {
+    // Sin esto, todo lo de abajo pasaria sobre listas vacias si las dos expresiones dejaran de
+    // casar — que es como una guarda se queda sin sujeto y sigue en verde.
+    expect(etapas).toContain('interfaz');
+    expect(copiaDe.length).toBeGreaterThan(0);
+  });
+
+  it('todo `COPY --from=` que no es una etapa lo declaran el workflow Y el compose', () => {
+    // Son dos sitios que tienen que decir el mismo nombre, y ninguno de los dos falla solo:
+    // BuildKit resuelve un `--from=` desconocido como NOMBRE DE IMAGEN, o sea que se va a
+    // buscar `docker.io/library/kamayuk-lib:latest` — y el rojo que sale habla de una imagen
+    // que no existe, no de un contexto que falta.
+    expect(contextosQuePide).toEqual(['kamayuk-lib']);
+
+    for (const nombre of contextosQuePide) {
+      expect(PUBLICAR, `«${nombre}» no lo declara publicar-imagenes.yml`).toContain(
+        `contextos: ${nombre}=`,
+      );
+      expect(PUBLICAR).toContain('build-contexts: ${{ matrix.contextos }}');
+      expect(sinComentarios(COMPOSE), `«${nombre}» no lo declara el compose`).toMatch(
+        new RegExp(`additional_contexts:\\s*\\n\\s*${nombre}:`),
+      );
+    }
+  });
+
+  it('y el workflow clona ese hermano, porque un contexto con nombre no se inventa', () => {
+    expect(PUBLICAR).toContain('repository: hneyra/kamayuk-lib');
+    expect(PUBLICAR).toContain('path: kamayuk-lib');
+    // El anfitrion tiene que bajar, o el hermano no cabe al lado.
+    expect(PUBLICAR).toContain('path: rentas');
+  });
+
+  it('LA PROFUNDIDAD: el `WORKDIR` deja `../../` donde el `COPY` pone al hermano', () => {
+    // ESTA es la que sujeta el arreglo, y se DERIVA de los tres archivos en vez de escribirse:
+    // una constante repetida a mano se queda vieja el dia que alguien mueva uno de los tres.
+    const paquete = /"@kamayuk\/[a-z]+":\s*"link:([^"]+)"/.exec(
+      leer(join(FRONTEND, 'package.json')),
+    )?.[1];
+    const trabajo = /^WORKDIR\s+(\S+)/m.exec(DOCKERFILE)?.[1];
+    const destinoDelCopy = /^COPY --from=kamayuk-lib\s+\S+\s+(\S+)/m.exec(DOCKERFILE)?.[1];
+
+    expect(paquete, 'no hay ningun `link:` en el package.json').toBeDefined();
+    expect(trabajo, 'el Dockerfile no declara WORKDIR').toBeDefined();
+    expect(destinoDelCopy, 'el COPY del hermano no dice donde lo deja').toBeDefined();
+
+    // Donde cae el paquete si se sigue el `link:` desde el `WORKDIR`, resuelto como lo haria
+    // el sistema de archivos de la imagen.
+    const resuelto = join(trabajo as string, paquete as string);
+    // Y donde el COPY lo dejo de verdad. `paquetes/formato` cuelga de ahi.
+    const puesto = join(destinoDelCopy as string, '..');
+
+    expect(
+      resuelto.startsWith(puesto),
+      `El «link:» lleva a «${resuelto}» y el COPY deja al hermano en «${puesto}».\n` +
+        'El `WORKDIR` tiene que reproducir la disposicion de clones hermanos —' +
+        '`/obra/rentas/frontend` con el hermano en `/obra/kamayuk-lib`— o `yarn install` no lo\n' +
+        'encuentra. Y no fallaria hoy: mientras nada de `src/` importe `@kamayuk/*`, la imagen\n' +
+        'se construye igual y el defecto espera a `main`.',
+    ).toBe(true);
+  });
+
+  it('del hermano se copia SOLO `paquetes/`: un contexto con nombre no lo acota ningun `.dockerignore`', () => {
+    // Medido el 2026-09-12: `kamayuk-lib` no trae `.dockerignore` y su `node_modules` pesa
+    // 160 MB. Un `COPY --from=kamayuk-lib .` se lo llevaria dentro, con el `.git` y cualquier
+    // `.env`. Y `frontend/.dockerignore` no ayuda: solo filtra el contexto PRINCIPAL.
+    expect(DOCKERFILE).toMatch(/^COPY --from=kamayuk-lib paquetes\/ /m);
+    expect(DOCKERFILE).not.toMatch(/^COPY --from=kamayuk-lib \.\s/m);
+  });
+
+  it('la imagen se CONSTRUYE en los PR y se PUBLICA solo al integrar', () => {
+    // Hasta #75 solo se construia al integrar en `main`, asi que un `Dockerfile` roto se
+    // descubria despues del merge — y en un flujo sin filtro `paths`, dejando sin su tercera
+    // imagen a todos los commits siguientes.
+    expect(PUBLICAR).toMatch(/^\s{2}pull_request:$/m);
+    expect(PUBLICAR).toContain("push: ${{ github.event_name == 'push' }}");
+    // Y nadie publica desde una rama. Sin esta linea, cambiar la expresion por `true` no
+    // rompería nada y las imagenes de un PR acabarian en el registro.
+    expect(PUBLICAR).not.toContain('push: true');
+    // El trabajo que pregunta al registro no corre en un PR: alli no hay nada publicado, y su
+    // rojo —`MANIFEST_UNKNOWN`— no hablaria de nada roto.
+    expect(PUBLICAR).toContain("if: github.event_name != 'pull_request'");
   });
 });

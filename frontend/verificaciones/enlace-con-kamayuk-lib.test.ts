@@ -28,13 +28,15 @@ import { enlacesDeclarados, problemasDelEnlace } from './enlace.ts';
  * 2. **Que resuelva de verdad**, importando de los tres paquetes y ejecutandolos. Un `link:` que
  *    nadie importa no demuestra que el enlace funcione: demuestra que yarn escribio un symlink.
  *
- * <h2>Lo que NO se hace aqui, y es deliberado</h2>
+ * <h2>Lo que NO se hacia aqui, y ya se puede</h2>
  *
- * **No se importa `@kamayuk/*` desde `src/`.** Medido: `publicar-imagenes.yml` construye
- * `frontend/Dockerfile` con `context: frontend` y sin filtro `paths`, asi que el destino del
- * `link:` queda fuera del contexto de Docker y la imagen dejaria de construirse **en `main`, con
- * este flujo en verde**. Eso es #75, y se cierra antes de la reimplantacion sobre RentasV8, que
- * es cuando el import de produccion llega de verdad.
+ * Este archivo nacio con `@kamayuk/*` prohibido en `src/`: el destino del `link:` quedaba fuera
+ * del contexto de Docker, asi que un import de produccion habria roto la imagen **en `main`, con
+ * este flujo en verde**. **#75 lo cerro**: el `Dockerfile` alcanza al clon hermano por un
+ * contexto con nombre de BuildKit, la imagen se construye ademas en cada PR, y tres guardas
+ * nuevas de `imagen-y-despliegue.test.ts` atan los cuatro sitios que tienen que decir lo mismo.
+ *
+ * O sea que la reimplantacion sobre RentasV8 ya puede importar desde `src/`.
  */
 
 const AQUI = dirname(fileURLToPath(import.meta.url));

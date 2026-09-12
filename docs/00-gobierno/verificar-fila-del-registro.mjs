@@ -91,6 +91,13 @@ export const RUTAS_DE_CODIGO = [
   // Y se acota al archivo, no al directorio: `frontend/` entero incluye pruebas, `diseno/` y
   // configuracion, y una guarda que grita en cada PR se acaba apagando (#437).
   /^frontend\/package\.json$/,
+  // Y por lo mismo, los dos archivos que deciden QUE IMAGEN SE PUBLICA y COMO SE LEVANTA la
+  // instalacion. #75 los toco los dos —el `Dockerfile` gana un contexto con nombre, el compose
+  // el suyo— y sin estas dos lineas ese PR habria salido verde sin fila, igual que #74 sin la
+  // de arriba. El comentario de mas abajo ya anotaba el hueco del compose «para que el siguiente
+  // no tenga que volver a medirlo»: este es el siguiente.
+  /^frontend\/Dockerfile$/,
+  /^despliegue\/compose\.yaml$/,
   /^infra\//,
 ];
 
