@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "version": "0.1.0",
-  "description": "rentas \u2014 interfaz web. F-1: el andamiaje, sus reglas y su CI; ninguna pantalla todavia.",
+  "description": "rentas — interfaz web. F-1: el andamiaje, sus reglas y su CI; ninguna pantalla todavia.",
   "engines": {
     "node": ">=22"
   },
@@ -20,12 +20,20 @@
     "verificar": "yarn lint && yarn typecheck && yarn test"
   },
   "dependencies": {
+    "@hookform/resolvers": "^5.2.0",
     "@kamayuk/api": "link:../../kamayuk-lib/paquetes/api",
     "@kamayuk/formato": "link:../../kamayuk-lib/paquetes/formato",
     "@kamayuk/sesion": "link:../../kamayuk-lib/paquetes/sesion",
     "@kamayuk/ui": "link:../../kamayuk-lib/paquetes/ui",
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "radix-ui": "^1.6.7",
+    "react": "19.3.0",
+    "react-day-picker": "^10.0.1",
+    "react-dom": "19.3.0",
+    "react-hook-form": "^7.88.0",
+    "tailwind-merge": "^3.6.0",
+    "zod": "^4.6.2"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.0",
@@ -43,6 +51,7 @@
     "eslint-plugin-react-hooks": "^5.2.0",
     "globals": "^16.0.0",
     "jsdom": "^26.1.0",
+    "tailwindcss": "^4.3.3",
     "typescript": "~5.9.0",
     "typescript-eslint": "^8.46.0",
     "vite": "^7.1.0",
