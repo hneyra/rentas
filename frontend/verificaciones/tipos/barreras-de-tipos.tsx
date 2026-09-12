@@ -1,5 +1,7 @@
 import { formatearImporte } from '../../src/dominio/formato.ts';
 import { Importe, Insignia } from '../../src/ds/index.ts';
+import type { ClaveDeHoja } from '../../src/pantallas/arbol.ts';
+import type { Campo, Operacion, Pantalla } from '../../src/pantallas/tipos.ts';
 
 /**
  * Las barreras que pone el COMPILADOR, y la prueba de que muerden.
@@ -71,3 +73,72 @@ export const insigniaConTonoInventado = (
   // @ts-expect-error — «verde» no es un `Tono`.
   <Insignia tono="verde">Vigente</Insignia>
 );
+
+/* ── UI-5 (#85), AC1: los tipos de las cuarenta pantallas son ESTRECHOS ─────────────────── */
+
+/**
+ * AC1: el tipo de un campo es la union de los siete —con y sin ancho completo—, no `string`.
+ *
+ * Sin la union, `['Ejercicio', 'select', […]]` compilaria y el interprete lo dibujaria como una
+ * caja de texto vacia: no sabe hacer nada con un octavo tipo, y no se queja. Se descubriria
+ * mirando la pantalla, que es justo lo que una definicion tipada existe para evitar.
+ */
+export const campoConTipoInventado: Campo = {
+  etiqueta: 'Ejercicio',
+  // @ts-expect-error — «select» no es uno de los siete tipos del artboard.
+  tipo: 'select',
+  opciones: ['2026'],
+};
+
+/** Y la marca de ancho completo es un `1`, no cualquier sufijo. */
+export const campoConAnchoInventado: Campo = {
+  etiqueta: 'Observaciones',
+  // @ts-expect-error — «a2» no existe: el ancho completo se marca con un `1`.
+  tipo: 'a2',
+};
+
+/**
+ * AC1, la parte que no es la union: el **tercer elemento** significa una cosa distinta segun el
+ * tipo, y cada rama lo exige por su nombre.
+ *
+ * Un desplegable sin opciones no es un desplegable: se dibuja vacio y no se puede elegir nada.
+ */
+// @ts-expect-error — falta `opciones`, que es lo unico que un desplegable dibuja.
+export const desplegableSinOpciones: Campo = {
+  etiqueta: 'Tipo de persona',
+  tipo: 's',
+};
+
+/** Y al reves: un campo de texto no tiene opciones que ofrecer. */
+export const textoConOpciones: Campo = {
+  etiqueta: 'Número de documento',
+  tipo: '',
+  // @ts-expect-error — «opciones» es de los desplegables; un texto no las tiene.
+  opciones: ['DNI', 'RUC'],
+};
+
+/** Un campo de solo lectura siempre muestra algo: sin `valor` no hay nada que leer. */
+// @ts-expect-error — falta `valor`: es lo que el campo muestra.
+export const soloLecturaSinValor: Campo = {
+  etiqueta: 'Total',
+  tipo: 'r',
+};
+
+/**
+ * AC2: una pantalla cuya clave no sea una hoja del arbol no compila.
+ *
+ * Es la mitad que la guarda anti-deriva no tiene que comprobar con un `expect`: «cero pantallas
+ * sin hoja» lo sostiene `Record<ClaveDeHoja, Pantalla>`, y `ClaveDeHoja` sale del propio `ARBOL`.
+ */
+export const pantallaHuerfana: Partial<Record<ClaveDeHoja, Pantalla>> = {
+  // @ts-expect-error — «ini-panelito» no es ninguna de las cuarenta hojas del arbol.
+  'ini-panelito': { instruccion: 'no lleva a ninguna parte', bloques: [] },
+};
+
+/** Y un verbo de operacion es uno de los cinco del arbol, `BASE` incluido. */
+export const operacionConVerboInventado: Operacion = {
+  // @ts-expect-error — «DELETE» no es un verbo del arbol; y no lo es por la regla 4: no se borra.
+  verbo: 'DELETE',
+  ruta: '/rentas/contribuyentes/{id}',
+  nota: 'ContribuyenteController',
+};
