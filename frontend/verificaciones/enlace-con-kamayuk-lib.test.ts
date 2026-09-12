@@ -71,6 +71,7 @@ describe('el enlace con el clon hermano esta bien puesto', () => {
       '@kamayuk/api',
       '@kamayuk/formato',
       '@kamayuk/sesion',
+      '@kamayuk/shell',
       '@kamayuk/ui',
     ]);
     // Y todos apuntan al mismo clon hermano: tres rutas a tres sitios distintos serian tres

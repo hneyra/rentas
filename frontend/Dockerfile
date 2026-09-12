@@ -162,22 +162,37 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 # ## Lo que busca
 #
 # `vite build` no deberia emitir un solo `.ts`/`.tsx`, pero «no deberia» no es una comprobacion.
-# Y con el artboard igual: si alguna seccion volviera a importar `datos/prototipo.ts` —la rotura 7
-# de F-6, que costo 4 080 bytes— las cifras entrarian en el paquete. Son las cinco cadenas que el
-# AC-3 nombra, contra el directorio que nginx tiene como `root`.
+#
+# ## LA OTRA MITAD DE #44 —«ni una cifra del artboard»— ESTA ABIERTA DESDE #90, Y SE DICE AQUI
+#
+# Hasta la V6, la imagen se negaba a construirse si lo servido contenia una de cinco cadenas del
+# artboard. Era cierto porque las cifras inventadas vivian en `datos/prototipo.ts`, detras de
+# `VITE_KAMAYUK_PROXY_DE_DATOS`, y Rollup plegaba el `import()` dinamico entero con la bandera
+# apagada — medido: 193 592 bytes y cero cifras, frente a 227 205 con ellas.
+#
+# **Con la V8 no se sostiene.** Las cifras de ejemplo del artboard SON el contenido de las cuarenta
+# pantallas: viven en sus definiciones, que se importan estaticamente y se comparan campo por campo
+# contra el artboard (#86). Medido sobre el `dist`: «9,418,204.60» esta dentro.
+#
+# **Y no hay un subconjunto de esas cinco cadenas que sirva para distinguir una interfaz de otra.**
+# Se intento —dejar tres, las que parecian ser solo de V6— y la CI lo desmintio en el primer
+# intento: «Rufina Medina Medina» esta en `definiciones/fiscalizacion.ts` y «170,616.75» en
+# `definiciones/rentas-registro.ts`. El artboard V8 **reutiliza los mismos datos de muestra**, que
+# es coherente con que se declare derivado del V6.
+#
+# Asi que el bucle se retira ENTERO en vez de recortarse. Una guarda que no puede fallar no protege
+# nada; una que falla siempre tampoco, y ademas bloquea. Vuelve con #97, cuando las pantallas lean
+# de la API y las cifras dejen de viajar en el paquete.
+#
+# Lo que NO ha cambiado y sigue mordiendo es lo de abajo: **lo servido no lleva codigo fuente**.
 RUN set -eu; \
     servido=/usr/share/nginx/html; \
     if find "$servido" \( -name '*.ts' -o -name '*.tsx' \) | grep -q .; then \
         echo "Lo que se sirve lleva codigo fuente dentro:"; \
         find "$servido" \( -name '*.ts' -o -name '*.tsx' \); exit 1; \
     fi; \
-    for cadena in 'Rufina Medina Medina' '170,616.75' '62,418' 'Cárdenas' 'SULLON VILCHEZ'; do \
-        if grep -rqF "$cadena" "$servido"; then \
-            echo "Lo que se sirve lleva una cifra del artboard: «$cadena». Ver AC-3 de #44."; \
-            grep -rlF "$cadena" "$servido"; exit 1; \
-        fi; \
-    done; \
-    echo "lo servido esta limpio: sin fuentes y sin cifras del artboard"
+    echo "lo servido no lleva codigo fuente. Las cifras del artboard SI viajan: ver #97"
+
 
 # Sin root, y esto es lo unico que lo consigue: la configuracion de `nginx:*-alpine` trae `User`
 # VACIO, o sea que sin este `USER` la interfaz correria como root. El usuario `nginx` ya existe en

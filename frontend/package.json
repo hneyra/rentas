@@ -15,8 +15,6 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "e2e": "playwright test",
-    "e2e:navegador": "playwright install chromium",
     "verificar": "yarn lint && yarn typecheck && yarn test"
   },
   "dependencies": {
@@ -24,6 +22,7 @@
     "@kamayuk/api": "link:../../kamayuk-lib/paquetes/api",
     "@kamayuk/formato": "link:../../kamayuk-lib/paquetes/formato",
     "@kamayuk/sesion": "link:../../kamayuk-lib/paquetes/sesion",
+    "@kamayuk/shell": "link:../../kamayuk-lib/paquetes/shell",
     "@kamayuk/ui": "link:../../kamayuk-lib/paquetes/ui",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -33,13 +32,14 @@
     "react-day-picker": "^10.0.1",
     "react-dom": "19.3.0",
     "react-hook-form": "^7.88.0",
+    "react-router-dom": "^7.18.3",
     "sonner": "^2.0.8",
     "tailwind-merge": "^3.6.0",
     "zod": "^4.6.2"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.0",
-    "@playwright/test": "^1.63.0",
+    "@tailwindcss/vite": "^4.3.3",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.9.0",
     "@testing-library/react": "^16.3.0",

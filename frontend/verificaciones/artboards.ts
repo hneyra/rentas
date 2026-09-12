@@ -1,6 +1,15 @@
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-import { RAIZ } from './tokens.ts';
+/**
+ * La raiz de `frontend/`, deducida de este archivo.
+ *
+ * Vivia en `verificaciones/tokens.ts`, que salio con la V6 (#90) porque su oficio era leer el
+ * artboard V6. Se trae aqui entera en vez de dejar aquel archivo como cascara: un modulo que solo
+ * existe para exportar una constante es un archivo mas que mantener y una indireccion mas que
+ * seguir.
+ */
+export const RAIZ = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 /**
  * Los artboards que este repositorio vendoriza, con su procedencia.
@@ -23,15 +32,16 @@ export interface Artboard {
   readonly deDonde: string;
 }
 
-/** El proyecto de Claude Design del que salen los dos. */
+/**
+ * El proyecto de Claude Design del que salen.
+ *
+ * **`RentasV6.dc.html` salio de esta lista y del arbol en #90**, con la interfaz que dibujaba.
+ * No es que se haya perdido: sigue en el proyecto, y esta linea dice de donde se vuelve a sacar
+ * si alguna vez hace falta comparar contra lo que habia.
+ */
 const PROYECTO = 'SGTM Redesign (c562dcb9-e2d5-4c46-b77d-7897b0f95989)';
 
 export const ARTBOARDS: readonly Artboard[] = [
-  {
-    archivo: 'diseno/RentasV6.dc.html',
-    que: 'El marco V6 y las cuatro secciones que la interfaz tiene hoy. Contra el se comparan los tokens, el arbol y las cifras de las secciones.',
-    deDonde: `${PROYECTO}, archivo «RentasV6.dc.html»`,
-  },
   {
     archivo: 'diseno/RentasV8.dc.html',
     que: 'El artboard NUEVO: diez modulos, cuarenta submodulos y cuarenta pantallas, con la cabecera al modo de V7 y el modo «Entrega». Es contra el que se reimplanta la interfaz.',

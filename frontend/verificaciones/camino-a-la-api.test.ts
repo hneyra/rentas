@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import { PROHIBICIONES } from '../eslint.prohibiciones.mjs';
-import { RAIZ } from '../src/api/proxy.ts';
+import { PREFIJO as RAIZ } from '../src/api/cliente.ts';
 import { YA_SERVIDAS } from '../src/datos/servidas.ts';
 import configuracion from '../vite.config.ts';
 
@@ -215,7 +215,7 @@ describe('AC8 — el contrato, la instalacion y lo que se lee dicen lo mismo', (
   });
 
   it('y la instalacion devuelve EXACTAMENTE esos campos, ni uno mas ni uno menos', async () => {
-    const { MODULOS_MEDIDOS, ACCESOS_MEDIDOS } = await import('../src/marco/seguridadMedida.ts');
+    const { MODULOS_MEDIDOS, ACCESOS_MEDIDOS } = await import('../src/datos/seguridadMedida.ts');
 
     for (const [clave, medido] of [
       ['GET /seguridad/modulos', MODULOS_MEDIDOS[0]],
@@ -328,7 +328,7 @@ describe('las capturas de la instalacion son de las pruebas, y no respaldos de p
   );
 
   it('y lo que declara es lo que contesta la instalacion: sin ejercicio de trabajo', async () => {
-    const { SESION_MEDIDA } = await import('../src/marco/sesionMedida.ts');
+    const { SESION_MEDIDA } = await import('../src/datos/sesionMedida.ts');
 
     // `null` no es una eleccion del archivo: es lo que contesta el backend, y es el caso que el
     // AC8 obliga a no mentir. Una muestra con un `2026` dentro lo dejaria sin ejercitar.

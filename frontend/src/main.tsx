@@ -3,11 +3,12 @@ import { createRoot } from 'react-dom/client';
 
 import { Aplicacion } from './aplicacion.tsx';
 import { arrancar } from './arranque.ts';
-// El UNICO sitio donde se importa una hoja de estilos. `estilos.css` encadena los cinco
-// archivos de tokens y las clases de los componentes, en ese orden; si cada componente
-// trajera la suya, el orden de la cascada lo decidiria el orden en que Vite resuelve los
-// modulos — que cambia con un `import` movido de sitio.
-import './estilos/estilos.css';
+// El UNICO sitio donde se importa una hoja de estilos, y desde #90 la hoja es la de la libreria:
+// `@kamayuk/ui` publica el `@theme` con los 42 tokens del artboard V8 y los seis temas. Aqui no
+// queda CSS propio — lo que la V6 tenia en `src/estilos/` eran 3 446 lineas escritas a mano, y
+// tenerlas al lado de la paleta de la libreria seria tener dos fuentes de verdad para el mismo
+// color.
+import '@kamayuk/ui/estilos.css';
 
 const raiz = document.getElementById('raiz');
 if (raiz === null) {
@@ -16,8 +17,8 @@ if (raiz === null) {
   throw new Error('Falta el elemento #raiz en index.html: la aplicacion no tiene donde montarse.');
 }
 
-// El montaje va DENTRO de `arrancar`, no despues: con el proxy de datos encendido, una
-// pantalla no debe poder pedir datos antes de que haya quien conteste. Ver `arranque.ts`.
+// El montaje va DENTRO de `arrancar`, no despues: el canje del codigo de autorizacion tiene que
+// ocurrir antes de que la primera pantalla pida nada. Ver `arranque.ts`.
 void arrancar(() => {
   createRoot(raiz).render(
     <StrictMode>
