@@ -25,11 +25,56 @@ const REPOSITORIO = join(RAIZ, '..');
 
 const leer = (ruta: string) => readFileSync(ruta, 'utf8');
 
+/**
+ * Un `tsconfig` es **JSONC**, no JSON: admite comentarios, y los dos de este frontend los usan.
+ *
+ * `JSON.parse` a secas revienta con `Expected double-quoted property name in JSON at position
+ * 183` —medido—, que es un mensaje sobre comillas para un archivo que no tiene ningun problema de
+ * comillas. Y revienta **en la recoleccion**, o sea que se lleva por delante las pruebas de este
+ * archivo entero en vez de fallar una.
+ *
+ * Se recorre caracter a caracter y no con expresiones regulares, porque hay que saber si se esta
+ * DENTRO de una cadena: una ruta con `https://` dentro se comeria el resto de la linea.
+ */
+function comoJsonc(texto: string): unknown {
+  let salida = '';
+  let enCadena = false;
+  let escapado = false;
+  for (let i = 0; i < texto.length; i += 1) {
+    const c = texto[i] ?? '';
+    if (enCadena) {
+      salida += c;
+      if (escapado) escapado = false;
+      else if (c === '\\') escapado = true;
+      else if (c === '"') enCadena = false;
+      continue;
+    }
+    if (c === '"') {
+      enCadena = true;
+      salida += c;
+      continue;
+    }
+    if (c === '/' && texto[i + 1] === '/') {
+      while (i < texto.length && texto[i] !== '\n') i += 1;
+      salida += '\n';
+      continue;
+    }
+    if (c === '/' && texto[i + 1] === '*') {
+      i += 2;
+      while (i < texto.length && !(texto[i] === '*' && texto[i + 1] === '/')) i += 1;
+      i += 1;
+      salida += ' ';
+      continue;
+    }
+    salida += c;
+  }
+  return JSON.parse(salida);
+}
+
 describe('el compilador es tan estricto como el issue pide', () => {
-  const opciones = JSON.parse(leer(join(RAIZ, 'tsconfig.base.json'))).compilerOptions as Record<
-    string,
-    unknown
-  >;
+  const opciones = (comoJsonc(leer(join(RAIZ, 'tsconfig.base.json'))) as {
+    compilerOptions: Record<string, unknown>;
+  }).compilerOptions;
 
   it.each([
     ['strict', 'sin el, el resto de banderas no significan nada'],
@@ -38,6 +83,14 @@ describe('el compilador es tan estricto como el issue pide', () => {
       'sin el, `cuotas[0].total` compila y revienta con la lista vacia',
     ],
     ['verbatimModuleSyntax', 'sin el, un `import type` se cuela en el bundle y arrastra el modulo'],
+    [
+      'preserveSymlinks',
+      // Su ausencia NO se nota en local, donde el clon hermano si tiene su `node_modules`: se
+      // nota en CI y en la imagen, donde el hermano se clona y no se instala, y el rojo habla de
+      // `Cannot find module 'react'` sobre archivos de la libreria. Su motivo entero esta en
+      // `tsconfig.base.json`, junto a la bandera.
+      'sin el, la libreria enlazada resuelve sus dependencias desde el clon hermano, que en CI no las tiene',
+    ],
   ])('%s esta encendido — %s', (bandera) => {
     expect(opciones[bandera]).toBe(true);
   });

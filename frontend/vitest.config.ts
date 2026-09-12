@@ -1,6 +1,8 @@
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vitest/config';
 
+import { LO_QUE_PONE_EL_CONSUMIDOR } from './resolucion.ts';
+
 export default defineConfig({
   /**
    * La MISMA base que `vite.config.ts`, y no por simetria: de aqui sale
@@ -13,6 +15,16 @@ export default defineConfig({
    */
   base: '/rentas/',
   plugins: [react()],
+  /**
+   * **UNA sola copia de lo que los paquetes enlazados dan por puesto.**
+   *
+   * La lista NO se escribe: se deriva de las `peerDependencies` de cada `@kamayuk/*` enlazado.
+   * El porque entero —con los dos rojos que costo, `Cannot read properties of null (reading
+   * 'useId')` en local y `Cannot find module 'react'` en CI— esta en `resolucion.ts`.
+   */
+  resolve: {
+    dedupe: [...LO_QUE_PONE_EL_CONSUMIDOR],
+  },
   test: {
     environment: 'jsdom',
     // Sin globales: un `describe` que aparece de la nada no dice de donde sale, y el

@@ -3,6 +3,8 @@ import process from 'node:process';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 
+import { LO_QUE_PONE_EL_CONSUMIDOR } from './resolucion.ts';
+
 /**
  * El empaquetado de `rentas-web`.
  *
@@ -30,6 +32,16 @@ const RAIZ_DE_LA_API = '/rentas/api/v1';
 export default defineConfig({
   base: '/rentas/',
   plugins: [react()],
+  /**
+   * **UNA sola copia de lo que los paquetes enlazados dan por puesto.**
+   *
+   * La lista NO se escribe: se deriva de las `peerDependencies` de cada `@kamayuk/*` enlazado.
+   * El porque entero —con los dos rojos que costo, `Cannot read properties of null (reading
+   * 'useId')` en local y `Cannot find module 'react'` en CI— esta en `resolucion.ts`.
+   */
+  resolve: {
+    dedupe: [...LO_QUE_PONE_EL_CONSUMIDOR],
+  },
   /**
    * El camino a la API en desarrollo, y **por que hace falta uno** (I-1, AC4).
    *

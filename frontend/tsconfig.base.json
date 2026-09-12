@@ -6,6 +6,29 @@
     "moduleResolution": "bundler",
     "jsx": "react-jsx",
 
+    // `preserveSymlinks`: LA LIBRERIA COMUN RESUELVE DESDE AQUI, NO DESDE SU CLON
+    //
+    // `@kamayuk/ui` y sus hermanos viajan como FUENTE —`main: index.ts`, sin compilar— y llegan
+    // por un enlace simbolico al clon hermano. Sin esta bandera, `tsc` sigue el enlace hasta
+    // `/…/kamayuk-lib/paquetes/ui/` y resuelve los `import 'react'` de dentro subiendo por EL
+    // ARBOL DEL HERMANO — que en CI y en la imagen **no tiene dependencias instaladas**, porque
+    // alli el hermano se clona y no se instala.
+    //
+    // El rojo que da no habla de enlaces ni de clones (medido en la CI de #88):
+    //
+    //     ../../kamayuk-lib/paquetes/ui/shadcn/tarjeta.tsx(1,48): error TS2307:
+    //       Cannot find module 'react' or its corresponding type declarations.
+    //
+    // ...seguido de veintitantos errores derivados —`Property 'children' does not exist on type
+    // 'BotonProps'`— que parecen defectos de la libreria y no lo son: son `ButtonHTMLAttributes`
+    // sin resolver. En local no pasa, porque alli el hermano SI tiene su `node_modules`.
+    //
+    // Con la bandera, los archivos de la libreria se leen por `node_modules/@kamayuk/ui/…` y sus
+    // dependencias resuelven contra ESTE frontend, que es justo lo que `peerDependencies`
+    // significa. El equivalente para Vite es `resolve.dedupe`, en `resolucion.ts`, porque ahi
+    // `preserveSymlinks` rompe la transformacion — probado.
+    "preserveSymlinks": true,
+
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "noImplicitOverride": true,
