@@ -73,7 +73,8 @@ frontend/               Vite 7, React 19, TypeScript 5.9, con yarn. `rentas-web`
   src/secciones/                  las cuatro pantallas: Panel, Contribuyentes (F-5), Determinación y Valores (F-6)
   src/dominio/                    los tipos del dominio y el formato de importes y fechas
   src/datos/                      la captura del artboard, la invención apartada y las 18 operaciones
-  diseno/RentasV6.dc.html         el artboard vendorizado contra el que se comparan los tokens
+  diseno/RentasV6.dc.html         el artboard de la interfaz de HOY: tokens, arbol y cifras
+  diseno/RentasV8.dc.html         el artboard NUEVO, contra el que se reimplanta (#78)
   eslint.prohibiciones.mjs        las prohibiciones como dato: las leen el config y la prueba
   verificaciones/                 las barreras, sus `muestras/` que las violan y `tipos/`
 infrastructure/         el descriptor de despliegue en TypeScript, con yarn
