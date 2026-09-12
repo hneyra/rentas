@@ -14,10 +14,22 @@ name: Frontend
 # a si mismo. Sin eso, romper la CI del frontend es el unico cambio que la CI del frontend no
 # revisa.
 #
-# NO NECESITA EL CLON HERMANO. El backend si —`settings.gradle.kts` consume `infrastructure`
-# como *composite build*— y por eso `infraestructura.yml` mueve el anfitrion a `rentas/`. El
-# frontend todavia no depende de ningun paquete `@kamayuk/*` publicado, asi que se clona
-# donde toca y ya. El dia que dependa, este archivo se parecera a aquel.
+# SI NECESITA UN CLON HERMANO, DESDE #74. Este comentario decia lo contrario —«el frontend
+# todavia no depende de ningun paquete `@kamayuk/*` publicado […] el dia que dependa, este
+# archivo se parecera a aquel»— y ese dia llego: `frontend/package.json` declara
+# `@kamayuk/{api,formato,sesion}` como `link:../../kamayuk-lib/paquetes/*`, que yarn resuelve
+# contra el DISCO y ninguna variable de entorno redirige. Asi que la disposicion de clones
+# hermanos no es una preferencia: esta escrita en el `package.json`.
+#
+# Por eso el anfitrion baja a `path: rentas` y `kamayuk-lib` se clona a su lado. Es el mismo
+# patron que `infraestructura.yml` usa para `@kamayuk/infra-contrato`, con una diferencia: alli
+# `path: infrastructure` a secas no valia porque chocaba con el directorio `infrastructure/`
+# que este repositorio ya tiene dentro. `kamayuk-lib` no tiene esa colision.
+#
+# LO QUE EL FILTRO `paths` NO PUEDE VER, y hay que saberlo: un cambio en `kamayuk-lib` no
+# dispara ninguna corrida aqui. La CI de `rentas` se pondra roja en el siguiente PR que toque
+# `frontend/**` por algo que no cambio en `rentas`, y el `git log` de este repositorio no lo
+# explicara. Es el coste que ADR-0038 §3 conto: «+1 clon, que hoy no tienen ninguno».
 
 on:
   push:
@@ -37,32 +49,60 @@ jobs:
     # Un colgado no consume cuota sin limite: la leccion de `observabilidad-alertas`.
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      # El anfitrion BAJA UN NIVEL para que el hermano quepa a su lado. `actions/checkout` se
+      # niega a escribir fuera de `GITHUB_WORKSPACE`, asi que no se puede clonar hacia arriba:
+      # lo que se mueve es este repositorio, y el espacio de trabajo pasa a hacer de padre.
+      - name: Este repositorio
+        uses: actions/checkout@v4
+        with:
+          path: rentas
+
+      # El clon hermano del que cuelgan los tres `link:` de `frontend/package.json`.
+      #
+      # El repliegue `|| github.token` es el que llevan los catorce workflows de los seis clones
+      # que ya clonan un hermano, y aqui hay una razon added: `GH_CLONE_KEY` puede ser un PAT de
+      # alcance fino que enumera los repositorios del producto, y `kamayuk-lib` no existia
+      # cuando se emitio. Si el checkout muere con «Repository not found», es eso.
+      - name: Las librerias comunes
+        uses: actions/checkout@v4
+        with:
+          repository: hneyra/kamayuk-lib
+          path: kamayuk-lib
+          token: ${{ secrets.GH_CLONE_KEY || github.token }}
 
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
           cache: yarn
-          cache-dependency-path: frontend/yarn.lock
+          # La ruta sigue al anfitrion. Si se olvida, `setup-node` NO se salta la cache: FALLA
+          # el paso, antes de instalar nada y con un mensaje que habla de cache y no de rutas
+          # —«Some specified paths were not resolved, unable to cache dependencies»—. En local
+          # el concepto no existe.
+          cache-dependency-path: rentas/frontend/yarn.lock
 
       # `--frozen-lockfile` y no `yarn install` a secas: sin el, una version nueva de
       # cualquier dependencia entra en la CI sin pasar por ningun PR, y el dia que rompa
       # algo el diff no lo explica.
+      #
+      # Y ojo con lo que este paso NO garantiza: con el clon hermano ausente, `yarn install
+      # --frozen-lockfile` sale con **codigo 0** y no enlaza nada —medido; `--check-files`
+      # tampoco lo caza—. Quien lo detecta es `verificaciones/enlace-con-kamayuk-lib.test.ts`,
+      # dentro de `yarn verificar`, y lo dice nombrando el `git clone`.
       - name: Instalar
-        working-directory: frontend
+        working-directory: rentas/frontend
         run: yarn install --frozen-lockfile
 
       # La MISMA orden que se ejecuta en local. Si aqui se escribieran los tres pasos por
       # separado, «verde en CI» y «verde en mi maquina» dejarian de ser la misma afirmacion
       # en cuanto una de las dos cambiara.
       - name: Verificar
-        working-directory: frontend
+        working-directory: rentas/frontend
         run: yarn verificar
 
       # El bundle no se publica todavia, pero se construye: un `tsc` en verde no demuestra
       # que Vite sepa empaquetar esto, y descubrirlo el dia del despliegue es tarde.
       - name: Construir el bundle
-        working-directory: frontend
+        working-directory: rentas/frontend
         run: yarn build
 
   # ---------------------------------------------------------------------------------------
@@ -99,7 +139,17 @@ jobs:
     needs: verificar
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - name: Este repositorio
+        uses: actions/checkout@v4
+        with:
+          path: rentas
+
+      - name: Las librerias comunes
+        uses: actions/checkout@v4
+        with:
+          repository: hneyra/kamayuk-lib
+          path: kamayuk-lib
+          token: ${{ secrets.GH_CLONE_KEY || github.token }}
 
       # Corre SIEMPRE. Es lo que impide que este trabajo sea un verde que no mira nada: el
       # registro de cada PR dice, con nombre y apellido, que le falta para poder verificar.
@@ -107,7 +157,9 @@ jobs:
         run: |
           echo "El arnes de extremo a extremo (frontend/e2e) NO corre en esta CI todavia."
           echo "Le faltan cuatro cosas, y ninguna esta en este repositorio:"
-          echo "  1. despliegue/plataforma.compose.yaml, que vive en «infrastructure»"
+          echo "  1. despliegue/plataforma.compose.yaml, que vive en «infrastructure» — y desde"
+          echo "     #74 clonar un hermano YA se hace aqui, asi que lo que falta no es poder"
+          echo "     clonarlo, sino mantener las dos versiones en paso"
           echo "  2. el realm «sgtm» con el cliente «kamayuk-backoffice» y sus tres cuentas"
           echo "  3. el volcado de datos de la marcha blanca, que no se versiona en ningun sitio"
           echo "  4. el secreto KAMAYUK_E2E_CLAVE"
@@ -133,23 +185,23 @@ jobs:
         with:
           node-version: "22"
           cache: yarn
-          cache-dependency-path: frontend/yarn.lock
+          cache-dependency-path: rentas/frontend/yarn.lock
 
       - name: Instalar
         if: steps.hay.outputs.instalacion == 'si'
-        working-directory: frontend
+        working-directory: rentas/frontend
         run: yarn install --frozen-lockfile
 
       # El navegador se descarga aparte y no viene con la dependencia: `@playwright/test` trae
       # el arnes, no Chromium.
       - name: Instalar Chromium
         if: steps.hay.outputs.instalacion == 'si'
-        working-directory: frontend
+        working-directory: rentas/frontend
         run: yarn e2e:navegador
 
       - name: Correr el arnes
         if: steps.hay.outputs.instalacion == 'si'
-        working-directory: frontend
+        working-directory: rentas/frontend
         env:
           KAMAYUK_E2E_CLAVE: ${{ secrets.KAMAYUK_E2E_CLAVE }}
           # Sin esto, un CI sin instalacion se saltaria los caminos y saldria VERDE. Aqui la
@@ -161,5 +213,7 @@ jobs:
         if: always() && steps.hay.outputs.instalacion == 'si'
         with:
           name: informe-del-arnes
-          path: frontend/playwright-report/
+          # Tambien sigue al anfitrion, y si se olvida NO falla: `upload-artifact` solo avisa
+          # cuando el glob no casa, el paso sale verde y el informe no se sube.
+          path: rentas/frontend/playwright-report/
           retention-days: 7

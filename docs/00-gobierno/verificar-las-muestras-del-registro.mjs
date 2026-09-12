@@ -99,6 +99,27 @@ const CASOS = [
     esperado: 'verde',
   },
   {
+    // #74. El manifiesto del frontend decide que viaja al bundle, y hasta entonces no estaba
+    // en `RUTAS_DE_CODIGO`: el PR que enchufo los tres `link:` al clon hermano habria salido
+    // verde sin fila. Con la ruta devuelta a la lista de antes, esta muestra pasa a VERDE — y
+    // ese es el rojo que demuestra que el arreglo sirve.
+    nombre: 'cierra un issue, toca el manifiesto del frontend y NO deja fila',
+    cuerpo: 'Cierra #74.\n\nEl primer clon hermano.',
+    archivos: ['frontend/package.json'],
+    anadido: '',
+    esperado: 'rojo',
+    dice: '#74',
+  },
+  {
+    // El contraste, y es el que impide que la correccion se satisfaga declarando que todo
+    // `frontend/` cuenta: el candado y las barreras no son codigo de produccion.
+    nombre: 'toca el candado del frontend y sus barreras, y no exige fila',
+    cuerpo: 'Cierra #74.',
+    archivos: ['frontend/yarn.lock', 'frontend/verificaciones/enlace.ts'],
+    anadido: '',
+    esperado: 'verde',
+  },
+  {
     nombre: 'cierra un issue, toca backend y SI deja su fila',
     cuerpo: 'Cierra #711.',
     archivos: ['backend/kamayuk-rentas-nucleo/src/main/java/kamayuk/rentas/nucleo/Algo.java'],

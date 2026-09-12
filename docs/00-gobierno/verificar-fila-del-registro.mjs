@@ -82,6 +82,15 @@ export const RUTAS_DE_CODIGO = [
   /^backend\/[^/]+\/src\/main\//,
   /^infrastructure\/src\//,
   /^frontend\/src\//,
+  // El manifiesto del frontend es codigo de produccion aunque no sea `src/`: decide QUE VIAJA
+  // AL BUNDLE. Desde #74 declara tres `link:` a un clon hermano, y sin esta linea el PR que los
+  // enchufo —el cambio de infraestructura mas delicado de la etapa— habria pasado en VERDE sin
+  // dejar su fila, porque no tocaba `frontend/src/`. Verde silencioso: la fila que falta no se
+  // distingue de la que nadie tenia que escribir.
+  //
+  // Y se acota al archivo, no al directorio: `frontend/` entero incluye pruebas, `diseno/` y
+  // configuracion, y una guarda que grita en cada PR se acaba apagando (#437).
+  /^frontend\/package\.json$/,
   /^infra\//,
 ];
 
