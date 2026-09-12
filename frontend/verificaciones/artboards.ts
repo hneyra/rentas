@@ -38,6 +38,11 @@ export const ARTBOARDS: readonly Artboard[] = [
     deDonde: `${PROYECTO}, archivo «RentasV8.dc.html»`,
   },
   {
+    archivo: 'diseno/rentas-tokens.css',
+    que: 'Los 42 tokens que el artboard V8 usa —38 colores, 2 radios, 2 sombras—. El `.dc.html` los ENLAZA y no los lleva dentro: por si solo trae 12 colores literales, los de su tabla «Tokens a Tailwind». Sin esta hoja no se puede comprobar contra el artboard mas de un cuarto de la paleta.',
+    deDonde: `${PROYECTO}, archivo «rentas-tokens.css»`,
+  },
+  {
     archivo: 'diseno/escudo-catacaos.png',
     que: 'El escudo que la barra global de V8 dibuja. Comprobado byte a byte identico al que sirve `caja` en su `public/`.',
     deDonde: `${PROYECTO}, archivo «escudo-catacaos.png»`,

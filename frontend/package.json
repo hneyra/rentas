@@ -23,6 +23,7 @@
     "@kamayuk/api": "link:../../kamayuk-lib/paquetes/api",
     "@kamayuk/formato": "link:../../kamayuk-lib/paquetes/formato",
     "@kamayuk/sesion": "link:../../kamayuk-lib/paquetes/sesion",
+    "@kamayuk/ui": "link:../../kamayuk-lib/paquetes/ui",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },
