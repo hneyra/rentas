@@ -186,23 +186,40 @@ describe('AC-3 — el proxy de datos NO viaja en la imagen', () => {
    * Medirlo fuera tambien vale, y esta en el PR; tenerlo aqui es lo que hace que una imagen con
    * cifras del artboard **no se pueda publicar**: el `docker build` sale en rojo.
    */
-  it('la imagen se niega a construirse si el dist lleva rastro del prototipo V6', () => {
-    // Eran cinco cadenas y quedan TRES, y la diferencia esta contada entera en el Dockerfile:
-    // «62,418» y «Cárdenas» salen porque desde #90 estan en las definiciones de V8 —son el
-    // contenido de las pantallas, no datos de un proxy— y la comprobacion las encontraria
-    // siempre. Lo que queda comprueba que el prototipo de V6 no vuelve.
-    //
-    // La garantia grande de #44 —«ni una cifra del artboard en lo servido»— esta ABIERTA, y no se
-    // finge que no: #97 la recupera cuando las pantallas lean de la API.
-    for (const cadena of ['Rufina Medina Medina', '170,616.75', 'SULLON VILCHEZ']) {
-      expect(DOCKERFILE, `la comprobacion del dist no busca «${cadena}»`).toContain(cadena);
-    }
+  it('la imagen se niega a construirse si lo servido lleva codigo fuente', () => {
+    // La mitad de #44 que SIGUE VIVA, y es la que mas vale: un `.ts` servido es el codigo de la
+    // puerta de identidad publicado. Medido en su dia: con un `COPY` de `src/` puesto en la ultima
+    // etapa, la imagen servia `/src/api/identidad.ts` con 200 y 13 712 bytes.
+    expect(DOCKERFILE).toMatch(/-name '\*\.ts' -o -name '\*\.tsx'/);
+    expect(DOCKERFILE).toContain('Lo que se sirve lleva codigo fuente dentro');
   });
 
-  it('y el Dockerfile DICE que la garantia de las cifras esta abierta, con su numero', () => {
-    // Sin esto, la comprobacion recortada se leeria como que la propiedad se sigue cumpliendo. Un
-    // recorte silencioso de una guarda es peor que quitarla: nadie sabe que dejo de cubrir.
+  /**
+   * **La otra mitad de #44 esta abierta, y el Dockerfile tiene que DECIRLO.**
+   *
+   * «Ni una cifra del artboard en lo servido» era cierto mientras las cifras vivian tras una
+   * bandera que Rollup plegaba. En V8 **son el contenido de las cuarenta pantallas**, asi que
+   * viajan siempre.
+   *
+   * Y no hay un subconjunto de las cinco cadenas que sirva para distinguir V6 de V8: se intento
+   * dejar tres y **la CI lo desmintio en el primer intento** —«Rufina Medina Medina» esta en
+   * `definiciones/fiscalizacion.ts` y «170,616.75» en `definiciones/rentas-registro.ts»—. El
+   * artboard V8 reutiliza los datos de muestra del V6, que es coherente con que se declare
+   * derivado suyo.
+   *
+   * Asi que el bucle se retiro entero. Esta prueba existe para que ese hueco **no se olvide**: un
+   * recorte silencioso de una guarda es peor que quitarla, porque nadie sabe que dejo de cubrir.
+   */
+  it('y DICE que la garantia de las cifras esta abierta, con su numero', () => {
     expect(DOCKERFILE, 'el Dockerfile no dice que la garantia esta abierta').toContain('#97');
+    // Se mira el MECANISMO —el bucle que recorre cadenas— y no la palabra: la prosa de arriba
+    // tiene que poder nombrar «Rufina Medina Medina» para explicar por que el bucle se fue.
+    // Prohibir la palabra obligaria a escribir el motivo en acertijos.
+    expect(
+      DOCKERFILE,
+      'el Dockerfile volvio a buscar cadenas del artboard: con las cifras en las definiciones,\n' +
+        'eso bloquea la construccion SIEMPRE. Si vuelve, que sea con #97 resuelto.',
+    ).not.toMatch(/for cadena in/);
   });
 
   /**

@@ -172,27 +172,27 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 #
 # **Con la V8 no se sostiene.** Las cifras de ejemplo del artboard SON el contenido de las cuarenta
 # pantallas: viven en sus definiciones, que se importan estaticamente y se comparan campo por campo
-# contra el artboard (#86). Medido sobre el `dist` de hoy: «9,418,204.60» esta dentro.
+# contra el artboard (#86). Medido sobre el `dist`: «9,418,204.60» esta dentro.
 #
-# Las cinco cadenas de V6 se retiran en vez de dejarse puestas, y el motivo es que **ya no pueden
-# aparecer**: el prototipo se borro en #90. Una guarda que no puede fallar no protege nada, y
-# dejarla habria hecho creer que la propiedad se cumple.
+# **Y no hay un subconjunto de esas cinco cadenas que sirva para distinguir una interfaz de otra.**
+# Se intento —dejar tres, las que parecian ser solo de V6— y la CI lo desmintio en el primer
+# intento: «Rufina Medina Medina» esta en `definiciones/fiscalizacion.ts` y «170,616.75» en
+# `definiciones/rentas-registro.ts`. El artboard V8 **reutiliza los mismos datos de muestra**, que
+# es coherente con que se declare derivado del V6.
 #
-# Vuelve con #97, cuando las pantallas lean de la API. Lo que NO ha cambiado y sigue mordiendo es
-# lo de abajo: **lo servido no lleva codigo fuente**.
+# Asi que el bucle se retira ENTERO en vez de recortarse. Una guarda que no puede fallar no protege
+# nada; una que falla siempre tampoco, y ademas bloquea. Vuelve con #97, cuando las pantallas lean
+# de la API y las cifras dejen de viajar en el paquete.
+#
+# Lo que NO ha cambiado y sigue mordiendo es lo de abajo: **lo servido no lleva codigo fuente**.
 RUN set -eu; \
     servido=/usr/share/nginx/html; \
     if find "$servido" \( -name '*.ts' -o -name '*.tsx' \) | grep -q .; then \
         echo "Lo que se sirve lleva codigo fuente dentro:"; \
         find "$servido" \( -name '*.ts' -o -name '*.tsx' \); exit 1; \
     fi; \
-    for cadena in 'Rufina Medina Medina' '170,616.75' 'SULLON VILCHEZ'; do \
-        if grep -rqF "$cadena" "$servido"; then \
-            echo "Lo que se sirve lleva una cifra del prototipo V6, que se borro en #90: «$cadena»."; \
-            grep -rlF "$cadena" "$servido"; exit 1; \
-        fi; \
-    done; \
-    echo "lo servido esta limpio: sin fuentes y sin rastro del prototipo V6 (ver #97 para las de V8)"
+    echo "lo servido no lleva codigo fuente. Las cifras del artboard SI viajan: ver #97"
+
 
 # Sin root, y esto es lo unico que lo consigue: la configuracion de `nginx:*-alpine` trae `User`
 # VACIO, o sea que sin este `USER` la interfaz correria como root. El usuario `nginx` ya existe en
