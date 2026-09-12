@@ -1,6 +1,8 @@
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vitest/config';
 
+import { LO_QUE_PONE_EL_CONSUMIDOR } from './resolucion.ts';
+
 export default defineConfig({
   /**
    * La MISMA base que `vite.config.ts`, y no por simetria: de aqui sale
@@ -14,31 +16,14 @@ export default defineConfig({
   base: '/rentas/',
   plugins: [react()],
   /**
-   * **UNA sola copia de React, aunque `@kamayuk/ui` venga por `link:`** (#88).
+   * **UNA sola copia de lo que los paquetes enlazados dan por puesto.**
    *
-   * El `link:` es un enlace simbolico al clon hermano, asi que un `import 'react'` desde dentro de
-   * `@kamayuk/ui` —o desde `radix-ui`, que vive en el `node_modules` de aquel— se resuelve contra
-   * **su** arbol y no contra el de este frontend. Resultado: dos React en la misma pagina, y el
-   * segundo no tiene despachador de ganchos.
-   *
-   * El rojo que da no dice nada de esto:
-   *
-   *     Cannot read properties of null (reading 'useId')
-   *
-   * ...y sale en la primera pieza que use un gancho —`Etiqueta`, por su `useId()`—, o sea muy
-   * lejos de la causa. Medido al estrenar las piezas de `kamayuk-lib`#11: catorce de dieciseis
-   * pruebas del interprete en rojo con ese mensaje.
-   *
-   * **Y la lista tiene que incluir a `radix-ui`, no solo a React.** Con `['react', 'react-dom']` a
-   * secas el rojo cambia de `useId` a `useCallback` y sigue ahi: lo que faltaba por deduplicar era
-   * la libreria de primitivas, que arrastra su propio React desde el arbol del hermano. El cambio
-   * de gancho en el mensaje es la unica pista de que se avanzo, y es facil leerla como «lo mismo».
-   *
-   * Va en los dos archivos —empaquetado y pruebas— porque cada uno resuelve por su cuenta, y
-   * arreglar solo uno deja el otro roto de una forma que nadie mira hasta que le toca.
+   * La lista NO se escribe: se deriva de las `peerDependencies` de cada `@kamayuk/*` enlazado.
+   * El porque entero —con los dos rojos que costo, `Cannot read properties of null (reading
+   * 'useId')` en local y `Cannot find module 'react'` en CI— esta en `resolucion.ts`.
    */
   resolve: {
-    dedupe: ['react', 'react-dom', 'radix-ui', 'react-hook-form', 'react-day-picker'],
+    dedupe: [...LO_QUE_PONE_EL_CONSUMIDOR],
   },
   test: {
     environment: 'jsdom',
