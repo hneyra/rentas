@@ -79,10 +79,16 @@ describe('AC1 — la ida a la puerta es codigo de autorizacion con PKCE S256', (
     expect(destino.searchParams.get('response_type')).toBe('code');
     expect(destino.searchParams.get('client_id')).toBe('kamayuk-backoffice');
     expect(destino.searchParams.get('code_challenge_method')).toBe('S256');
-    // La URI de retorno es la raiz del origen, y una sola: declarar una por pantalla seria una
-    // lista que ampliar cada vez que nace una seccion, y el sintoma de olvidarse es «Invalid
-    // parameter: redirect_uri».
-    expect(destino.searchParams.get('redirect_uri')).toBe('http://localhost:5173/');
+    // La URI de retorno es la raiz DE LA APLICACION —`/rentas/`, la misma `base` de la que
+    // salen los activos—, y una sola: declarar una por pantalla seria una lista que ampliar
+    // cada vez que nace una seccion, y el sintoma de olvidarse es «Invalid parameter:
+    // redirect_uri».
+    //
+    // Que aqui ponga `/rentas/` y no `/` es lo que este archivo NO PODIA afirmar antes:
+    // `vitest.config.ts` no compartia la `base` con `vite.config.ts`, asi que en pruebas
+    // `BASE_URL` valia `/` y esta linea daba por buena la raiz del SITIO. En `prod` eso
+    // devolvia al usuario a `https://<dominio>/` y un 404, con el `code` correcto.
+    expect(destino.searchParams.get('redirect_uri')).toBe('http://localhost:5173/rentas/');
   });
 
   it('y el reto ES el SHA-256 del verificador guardado, no una cadena que lo diga', async () => {

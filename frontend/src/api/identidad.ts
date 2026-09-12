@@ -315,14 +315,24 @@ function motivoDelEmisor(error: string): string {
 }
 
 /**
- * Siempre la raiz, aunque se entrara por una ruta profunda.
+ * Siempre la raiz DE LA APLICACION, aunque se entrara por una ruta profunda.
  *
  * Es una sola URI de retorno que declarar en el cliente, y el destino viaja aparte en
  * `sessionStorage`. Declarar una por pantalla seria una lista que hay que ampliar cada vez que
  * nace una seccion, y el sintoma de olvidarse es «Invalid parameter: redirect_uri».
+ *
+ * **La raiz de la aplicacion no es la del sitio, y confundirlas costo el acceso a `prod`.**
+ * Esto devolvia `origin + '/'`, que es correcto para una aplicacion servida en la raiz; esta
+ * se sirve bajo `/rentas/` (`vite.config.ts`, `base`), porque ADR-0030 §2 pone el sistema
+ * delante de la ruta y el mismo Traefik sirve las cuatro interfaces. Medido el 2026-09-12:
+ * quien se autenticaba volvia a `https://<dominio>/` y recibia un **404**, con el `code` y el
+ * `iss` correctos — o sea que la autenticacion funcionaba y el retorno no.
+ *
+ * `BASE_URL` es de donde ya salen los activos del paquete, asi que no hay un segundo sitio
+ * que mantener: si la base cambia, esto la sigue.
  */
 function retorno(): string {
-  return window.location.origin + '/';
+  return window.location.origin + import.meta.env.BASE_URL;
 }
 
 function aleatorio(largo: number): string {

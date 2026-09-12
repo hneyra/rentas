@@ -64,12 +64,17 @@ describe('AC1 — el arnes existe, sobre Chromium, y levanta su propio servidor'
 
 describe('AC1 — el puerto es el 5173, y no es una preferencia', () => {
   it('la entrada se sirve en 5173, que es el unico origen que el realm admite', () => {
-    // `src/api/identidad.ts` compone `redirect_uri` como `window.location.origin + '/'`, asi
-    // que el puerto de Vite ES el redirect. El cliente `kamayuk-backoffice` admite
+    // `src/api/identidad.ts` compone `redirect_uri` como `origin + import.meta.env.BASE_URL`,
+    // asi que el puerto de Vite ES el redirect. El cliente `kamayuk-backoffice` admite
     // `http://localhost:5173/*` y nada mas: en cualquier otro puerto Keycloak contesta
     // `invalid_redirect_uri` y no hay canje que medir.
+    //
+    // El literal se remidio con #71: era `origin + '/'` —la raiz del SITIO— y devolvia al
+    // usuario a un 404 en `prod`, donde la aplicacion cuelga de `/rentas/`. El comodin del
+    // cliente cubre las dos, asi que esta guarda no lo habria visto: lo que fija es el
+    // PUERTO, y por eso el literal va con ella y no suelto.
     expect(INSTALACION).toContain('export const PUERTO = 5173');
-    expect(leer('src/api/identidad.ts')).toContain("window.location.origin + '/'");
+    expect(leer('src/api/identidad.ts')).toContain('window.location.origin + import.meta.env.BASE_URL');
   });
 
   it('y la entrada cuelga de «/rentas/», que es la `base` que declara Vite', () => {
