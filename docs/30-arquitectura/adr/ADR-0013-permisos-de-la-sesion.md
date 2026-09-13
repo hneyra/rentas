@@ -69,6 +69,13 @@ endpoint con la forma del backend; en modo prototipo devuelve las 134 opciones c
 privilegios, porque no hay una sesión real de la que sacarlos y la demostración tiene que llegar a
 todas las pantallas.
 
+> **Nota del 2026-09-13 — el parrafo de arriba se deja tal cual, y describe algo que ya no existe.**
+> El proxy de datos salio en #90 con las pantallas de V6 contra las que contestaba, y con el el modo
+> prototipo. No se reescribe porque **es el contexto con que se decidio**: un ADR fechado dice lo que
+> se sabia ese dia, y este repositorio marca lo que cambia en la cabecera `Estado`, no editando el
+> cuerpo. **Lo decidido aqui sigue en pie** y es lo que hace hoy la interfaz: pide su matriz al
+> backend y filtra con ella su catalogo (`frontend/src/permisos.ts`, #105).
+
 ## Consecuencias
 
 **Positivas**
