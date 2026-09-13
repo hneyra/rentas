@@ -4,11 +4,11 @@
 
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import { enlacesDeclarados } from './enlace.ts';
+import { enlacesDeclarados, loQuePideElEnlace } from './enlace.ts';
 
 /**
  * **Lo que `@kamayuk/*` pide por `peerDependencies`, este frontend lo TIENE** (#88).
@@ -38,6 +38,7 @@ import { enlacesDeclarados } from './enlace.ts';
  */
 
 const requerir = createRequire(import.meta.url);
+const RAIZ = fileURLToPath(new URL('..', import.meta.url));
 
 const CRUDO = readFileSync('package.json', 'utf8');
 const ENLACES = enlacesDeclarados(CRUDO);
@@ -54,16 +55,16 @@ interface Peticion {
   readonly rango: string;
 }
 
-const PETICIONES: readonly Peticion[] = ENLACES.flatMap((enlace) => {
-  const suyo = JSON.parse(
-    readFileSync(join(dirname(requerir.resolve(enlace.paquete)), 'package.json'), 'utf8'),
-  ) as { peerDependencies?: Record<string, string> };
-  return Object.entries(suyo.peerDependencies ?? {}).map(([pide, rango]) => ({
+// El `resolve` va envuelto —`loQuePideElEnlace`— y no suelto: sin el clon hermano, esto corre en
+// la RECOLECCION, o sea que el rojo que salga aqui se lleva por delante el archivo entero. Que
+// diga el `git clone` en vez de «Cannot find module» cuesta lo mismo (#113).
+const PETICIONES: readonly Peticion[] = ENLACES.flatMap((enlace) =>
+  Object.entries(loQuePideElEnlace(requerir, enlace, RAIZ)).map(([pide, rango]) => ({
     paquete: enlace.paquete,
     pide,
     rango,
-  }));
-});
+  })),
+);
 
 /** `^1.6.7` / `>=19` -> el numero que hay que alcanzar. Basta para comparar mayores. */
 const mayorDe = (version: string): number => Number(/(\d+)/.exec(version)?.[1] ?? '0');

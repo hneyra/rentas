@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { isAbsolute, join, resolve } from 'node:path';
+import { dirname, isAbsolute, join, resolve } from 'node:path';
 
 /**
  * La comprobacion del enlace con el clon hermano, como funcion pura sobre una raiz.
@@ -38,14 +38,118 @@ export function enlacesDeclarados(contenido: string): Enlace[] {
 }
 
 /**
- * De un `link:` al `git clone` que lo haria existir.
+ * De un `link:` a la raiz del clon hermano que da por puesta.
  *
- * `../../kamayuk-lib/paquetes/formato` -> `kamayuk-lib`. Se deriva de la ruta en vez de
+ * `../../kamayuk-lib/paquetes/formato` -> `../../kamayuk-lib`. Se deriva de la ruta en vez de
  * escribirse: un mensaje escrito a mano nombra el repositorio de ayer.
  */
+function raizDelClon(declarada: string): string | null {
+  const partes = declarada.split('/');
+  const hasta = partes.findIndex((parte) => parte !== '..' && parte !== '.');
+  return hasta === -1 ? null : partes.slice(0, hasta + 1).join('/');
+}
+
+/** Y de ahi, el nombre del repositorio: `../../kamayuk-lib` -> `kamayuk-lib`. */
 function clonDe(declarada: string): string | null {
-  const partes = declarada.split('/').filter((parte) => parte !== '..' && parte !== '.');
-  return partes[0] ?? null;
+  const raiz = raizDelClon(declarada);
+  return raiz === null ? null : (raiz.split('/').at(-1) ?? null);
+}
+
+/** Donde tiene que estar en el disco lo que un `link:` declara, ya resuelto. */
+export function destinoDelEnlace(declarada: string, raizDelFrontend: string): string {
+  return isAbsolute(declarada) ? declarada : resolve(raizDelFrontend, declarada);
+}
+
+/**
+ * Que hacer cuando un `link:` no esta puesto, nombrando el `git clone` que lo haria existir.
+ *
+ * Se separo de `problemasDelEnlace` porque hace falta en dos sitios y el segundo no mira el
+ * disco: `resolucion.ts` lo necesita cuando `require.resolve` revienta, que es DOS pasos antes
+ * de que nadie llegue a preguntar por este directorio (#113).
+ */
+export function remedioDelEnlace(paquete: string, declarada: string): string {
+  const clon = clonDe(declarada);
+  return clon === null
+    ? `Revisa la ruta declarada para «${paquete}».`
+    : `Este frontend NO funciona sin «${clon}» clonado al lado de «rentas»:\n` +
+        `    git clone https://github.com/hneyra/${clon} ${raizDelClon(declarada) ?? ''}\n` +
+        '  Y no basta con que yarn haya salido en verde: un `link:` a un directorio que no ' +
+        'existe se instala con codigo 0 y sin avisar.';
+}
+
+/** Lo poco que hace falta de `require` para resolver un enlace. Un objeto, y por tanto fingible. */
+export interface Requeridor {
+  resolve(peticion: string): string;
+}
+
+/**
+ * **Lo que un paquete enlazado pide por `peerDependencies`, o un rojo que dice donde mirar** (#113).
+ *
+ * <h2>El defecto que esto cierra</h2>
+ *
+ * `resolucion.ts` termina con un `throw` que nombra el `git clone` exacto... y **no llegaba a
+ * salir**. Con el clon hermano ausente, `require.resolve('@kamayuk/api')` revienta doce lineas
+ * antes, en la primera vuelta del bucle, y lo que se lee es:
+ *
+ *     failed to load config from …/frontend/vite.config.ts
+ *     Error: Cannot find module '@kamayuk/api'
+ *     Require stack:
+ *     - …/frontend/resolucion.ts
+ *
+ * Un mensaje sobre un modulo, dentro de un archivo de configuracion de Vite, para quien acaba de
+ * clonar el repositorio y no sabe que hay un hermano. **Y es el caso mas comun**, porque
+ * `yarn install` con el hermano ausente sale con codigo 0 y no enlaza nada: el primer sintoma
+ * aparece dos pasos despues y no se parece a su causa.
+ *
+ * `enlace-con-kamayuk-lib.test.ts` si lo dice — pero vive en `yarn verificar`, que es el paso
+ * SIGUIENTE. Quien clona y arranca `yarn dev` no pasa por el.
+ *
+ * <h2>Por que el paquete se nombra, y no «uno de ellos»</h2>
+ *
+ * Son cinco enlaces. Un rojo que dijera «algun `@kamayuk/*` no resolvio» obliga a probarlos a
+ * mano, y los dos remedios son distintos: si el destino no esta, falta el `git clone`; si esta,
+ * lo que falta es el `yarn install` que escribe el symlink.
+ */
+export function loQuePideElEnlace(
+  requerir: Requeridor,
+  enlace: Enlace,
+  raizDelFrontend: string,
+): Record<string, string> {
+  let entrada: string;
+  try {
+    entrada = requerir.resolve(enlace.paquete);
+  } catch (causa) {
+    throw new Error(porQueNoResuelve(enlace, raizDelFrontend), { cause: causa });
+  }
+  const manifiesto = JSON.parse(readFileSync(join(dirname(entrada), 'package.json'), 'utf8')) as {
+    peerDependencies?: Record<string, string>;
+  };
+  return manifiesto.peerDependencies ?? {};
+}
+
+/** El rojo de arriba, entero: que paquete, donde se le espera y que comando lo pone ahi. */
+function porQueNoResuelve(enlace: Enlace, raizDelFrontend: string): string {
+  const { paquete, declarada } = enlace;
+  const destino = destinoDelEnlace(declarada, raizDelFrontend);
+  const raiz = raizDelClon(declarada);
+  const donde =
+    raiz === null
+      ? `  Se espera en:\n    ${destino}\n`
+      : `  Se espera el clon hermano en:\n    ${destinoDelEnlace(raiz, raizDelFrontend)}\n` +
+        `  y «${paquete}» dentro de el, en:\n    ${destino}\n`;
+  // Si el destino ESTA, el `git clone` seria un consejo falso: lo que falta es el enlace.
+  const remedio = existsSync(destino)
+    ? 'El destino existe, o sea que el clon hermano esta y lo que falta es el enlace:\n' +
+      '    yarn install\n' +
+      '  (en `frontend/`; `node_modules/' +
+      paquete +
+      '` no esta puesto).'
+    : remedioDelEnlace(paquete, declarada);
+  return (
+    `No se pudo resolver «${paquete}», declarado «link:${declarada}» en el package.json de este frontend.\n` +
+    donde +
+    `  ${remedio}`
+  );
 }
 
 /**
@@ -84,15 +188,8 @@ export function problemasDelEnlace(raizDelFrontend: string): Problema[] {
 
   const salida: Problema[] = [];
   for (const { paquete, declarada } of enlacesDeclarados(readFileSync(manifiesto, 'utf8'))) {
-    const destino = isAbsolute(declarada) ? declarada : resolve(raizDelFrontend, declarada);
-    const clon = clonDe(declarada);
-    const remedio =
-      clon === null
-        ? `Revisa la ruta declarada para «${paquete}».`
-        : `Este frontend NO funciona sin «${clon}» clonado al lado de «rentas»:\n` +
-          `    git clone https://github.com/hneyra/${clon} ../../${clon}\n` +
-          '  Y no basta con que yarn haya salido en verde: un `link:` a un directorio que no ' +
-          'existe se instala con codigo 0 y sin avisar.';
+    const destino = destinoDelEnlace(declarada, raizDelFrontend);
+    const remedio = remedioDelEnlace(paquete, declarada);
 
     if (!existsSync(destino)) {
       salida.push({ paquete, que: `«${declarada}» no existe (${destino}).`, remedio });
