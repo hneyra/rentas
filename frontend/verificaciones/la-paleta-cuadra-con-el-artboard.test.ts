@@ -44,21 +44,45 @@ import { ARTBOARDS, rutaDe } from './artboards.ts';
  * token existia y no se llamaba como shadcn lo busca. Al renombrarlo, esta guarda salio roja con
  * `expected 44 to be 42` — **y nada en la CI de `kamayuk-lib` lo dijo**: se cazo corriendo la
  * suite del consumidor a mano. El acoplamiento entre los dos repositorios no lo vigila nadie.
+ *
+ * <h2>Por que el centinela NO cuenta (#118)</h2>
+ *
+ * Aquel `expected 44 to be 42` era un rojo correcto con un mensaje inutil: no nombraba el token que
+ * se habia ido. Y el mismo `44` tenia el filo contrario — el dia que la libreria publicase un token
+ * mas, rojo **sin que nada estuviera mal**.
+ *
+ * Asi que el centinela ya no fija ninguna cifra: contrasta contra **una tercera fuente**, los
+ * `var(--…)` que el propio `.dc.html` pinta, y **nombra** lo que falta. Que sea una tercera fuente
+ * es lo que lo mantiene en pie: se lee de otro archivo y de otra manera —USOS, no DECLARACIONES—,
+ * asi que un cambio de formato que vaciara cualquiera de los dos mapas de declaraciones no la
+ * vacia a ella, y el centinela conserva contra que contrastar. Sobre el conjunto vacio no pasa: lo
+ * que sale es la lista entera de tokens que dejaron de estar.
+ *
+ * El dia que `temas.css` salga del paquete (kamayuk-lib#23) y se mueva el numero de tokens
+ * visibles, esta prueba dira **cuales** faltan o **cuales** sobran, que es lo unico accionable.
+ * Por lo mismo no queda ni una cuenta en el resto del archivo: los radios que shadcn lee se exigen
+ * por nombre.
  */
 
 const requerir = createRequire(import.meta.url);
 
-/** La hoja del artboard, por la lista de artboards declarados. */
-const HOJA_DEL_ARTBOARD = (() => {
-  const declarada = ARTBOARDS.find((a) => a.archivo.endsWith('rentas-tokens.css'));
-  if (declarada === undefined) {
+/** Un artboard declarado en `artboards.ts`, por el final de su nombre de archivo. */
+function artboardDeclarado(sufijo: string): string {
+  const declarado = ARTBOARDS.find((a) => a.archivo.endsWith(sufijo));
+  if (declarado === undefined) {
     throw new Error(
-      'La hoja de tokens del artboard no esta declarada en `artboards.ts`. Sin ella, esta guarda ' +
-        'no sabe contra que comparar.',
+      `«${sufijo}» no esta declarado en \`artboards.ts\`. Sin el, esta guarda no sabe contra que ` +
+        'comparar.',
     );
   }
-  return rutaDe(declarada);
-})();
+  return rutaDe(declarado);
+}
+
+/** La hoja del artboard: quien DECLARA los tokens. */
+const HOJA_DEL_ARTBOARD = artboardDeclarado('rentas-tokens.css');
+
+/** El artboard en si: quien los USA. Es la tercera fuente del centinela — ver el javadoc. */
+const DIBUJO_DEL_ARTBOARD = artboardDeclarado('RentasV8.dc.html');
 
 /**
  * El `@theme` de `@kamayuk/ui`, alcanzado POR EL ENLACE y no por una ruta al clon hermano.
@@ -72,6 +96,11 @@ const PALETA_DE_LA_LIBRERIA = join(
   'estilos',
   'estilos.css',
 );
+
+/** `var(--azul)` -> `'--azul'`. Se leen USOS, y no declaraciones: es la otra mitad del centinela. */
+function usados(texto: string): readonly string[] {
+  return [...new Set([...texto.matchAll(/var\(\s*(--[a-z0-9-]+)/gi)].map(([, n]) => n ?? ''))].sort();
+}
 
 /** `--azul: #005284;` -> `['--azul', '#005284']`, sin comentarios de por medio. */
 function declaraciones(css: string): Map<string, string> {
@@ -95,20 +124,57 @@ const esRadio = (nombre: string): boolean => nombre.startsWith('--radio');
 const delArtboard = declaraciones(readFileSync(HOJA_DEL_ARTBOARD, 'utf8'));
 const deLaLibreria = declaraciones(readFileSync(PALETA_DE_LA_LIBRERIA, 'utf8'));
 
+/**
+ * Los tokens que el artboard PINTA, leidos de sus `var(--…)`.
+ *
+ * De aqui sale que el centinela no tenga que fijar un numero: lo que exige es que cada token que
+ * el dibujo usa este declarado en la hoja y publicado por la libreria. Es un **suelo**, no una
+ * cuenta — la libreria puede publicar mas sin que esto se mueva, y si publica de mas lo dice la
+ * guarda de sobrantes, por nombre.
+ */
+const PINTADOS_POR_EL_ARTBOARD = usados(readFileSync(DIBUJO_DEL_ARTBOARD, 'utf8'));
+
 /** `color-scheme` no es un token: es una declaracion de la pagina. */
 const TOKENS_DEL_ARTBOARD = [...delArtboard].filter(([n]) => n.startsWith('--'));
 /** Los que se comparan uno a uno: todos menos los radios. */
 const UNO_A_UNO = TOKENS_DEL_ARTBOARD.filter(([n]) => !esRadio(n));
 
 describe('la paleta de @kamayuk/ui es la del artboard', () => {
-  it('EL CENTINELA: las dos lecturas traen tokens', () => {
+  it('EL CENTINELA: las dos lecturas traen los tokens que el artboard pinta', () => {
     // Sin esto, un cambio de formato en cualquiera de los dos archivos dejaria su mapa VACIO, y
     // la comparacion de abajo pasaria en verde comparando nada — que es como una guarda se queda
     // sin sujeto sin que nadie la borre.
-    expect(TOKENS_DEL_ARTBOARD.length, 'el artboard no declaro ni un token').toBe(42);
-    // La libreria publica MAS: los 38 colores y las 2 sombras uno a uno, mas CUATRO radios
-    // —`--radius` y los tres tamanos de shadcn— donde el artboard declara dos. Ver el javadoc.
-    expect(deLaLibreria.size, 'la libreria no publico ni un token').toBe(44);
+    //
+    // Lo que exige NO es una cifra, sino un suelo tomado de una tercera fuente: los `var(--…)` que
+    // el `.dc.html` pinta. Asi el rojo NOMBRA lo que falta, y publicar un token de mas no lo mueve.
+    expect(
+      PINTADOS_POR_EL_ARTBOARD.length,
+      'el `.dc.html` no pinta ni un `var(--…)`: el centinela se quedo sin contra que contrastar, ' +
+        'y sin el las comparaciones de abajo pasarian sobre el conjunto vacio',
+    ).toBeGreaterThan(0);
+
+    const sinDeclarar = PINTADOS_POR_EL_ARTBOARD.filter((n) => !delArtboard.has(n));
+    expect(
+      sinDeclarar,
+      'El artboard pinta tokens que su hoja no declara:\n' +
+        `${sinDeclarar.map((n) => `  ${n}`).join('\n')}\n\n` +
+        '  O `rentas-tokens.css` se vendorizo a medias, o dejo de leerse — y entonces lo que se\n' +
+        '  compara contra la libreria es menos paleta de la que el artboard dibuja.',
+    ).toEqual([]);
+
+    const sinPublicar = [
+      // El knob que shadcn lee: si no esta, no hay radio que comprobar.
+      '--radius',
+      ...PINTADOS_POR_EL_ARTBOARD.filter((n) => !esRadio(n)).map(comoLoLlamaTailwind),
+    ].filter((n) => !deLaLibreria.has(n));
+    expect(
+      sinPublicar,
+      'La libreria dejo de publicar tokens que el artboard pinta:\n' +
+        `${sinPublicar.map((n) => `  ${n}`).join('\n')}\n\n` +
+        '  Si el `@theme` de `@kamayuk/ui` se leyo vacio, aqui sale la paleta entera. Si solo son\n' +
+        '  algunos, o se renombraron sin avisar al consumidor (kamayuk-lib#8) o se fueron con la\n' +
+        '  hoja que los traia (kamayuk-lib#23) — y en ese caso el artboard los sigue pintando.',
+    ).toEqual([]);
   });
 
   it('los colores y las sombras son los mismos, uno a uno', () => {
@@ -143,8 +209,12 @@ describe('la paleta de @kamayuk/ui es la del artboard', () => {
 
     expect(
       sobrantes,
-      'La libreria publica tokens que el artboard no declara. Un color que nadie dibujo es un\n' +
-        'color que nadie decidio.',
+      'La libreria publica tokens que el artboard no declara:\n' +
+        `${sobrantes.map((n) => `  ${n}`).join('\n')}\n\n` +
+        '  Un color que nadie dibujo es un color que nadie decidio. Este es el rojo que sale\n' +
+        '  cuando la libreria publica uno de mas, y por eso el centinela ya no cuenta: contar\n' +
+        '  decia «expected 45 to be 44» sin nombrar cual (#118).\n' +
+        '  Si el token es deliberado, entra primero en el artboard y de ahi se deriva el `@theme`.',
     ).toEqual([]);
   });
 
@@ -167,9 +237,18 @@ describe('la paleta de @kamayuk/ui es la del artboard', () => {
     const esperado = delArtboardRadios[0];
 
     const publicados = [...deLaLibreria].filter(([n]) => n.startsWith('--radius'));
-    expect(publicados.length, 'la libreria no publica ningun radio').toBeGreaterThanOrEqual(4);
-    // `--radius` a secas tiene que estar: es el que shadcn lee.
-    expect(deLaLibreria.has('--radius'), 'falta `--radius`, que es el knob de shadcn').toBe(true);
+    // Los cuatro que shadcn lee, POR NOMBRE y no por cuenta: `toBeGreaterThanOrEqual(4)` se cumplia
+    // con cuatro nombres cualesquiera, y saldria rojo —sin que nada estuviera mal— el dia que
+    // shadcn anadiera un tamano. Nombrarlos dice CUAL falto, que es lo unico accionable (#118).
+    const QUE_SHADCN_LEE = ['--radius', '--radius-sm', '--radius-md', '--radius-lg'];
+    const faltan = QUE_SHADCN_LEE.filter((n) => !deLaLibreria.has(n));
+    expect(
+      faltan,
+      'La libreria dejo de publicar radios que shadcn lee:\n' +
+        `${faltan.map((n) => `  ${n}`).join('\n')}\n\n` +
+        '  Sin `--radius` los componentes de shadcn caen en su `0.625rem` por omision, que no es\n' +
+        '  el radio del artboard.',
+    ).toEqual([]);
 
     const distintos = publicados
       .filter(([, v]) => v !== esperado)
