@@ -13,7 +13,7 @@ import type { ClaveDeHoja } from './pantallas/arbol.ts';
 import { pantallaDe } from './pantallas/definiciones/index.ts';
 import { useDatosDeLaHoja } from './datos/useDatosDeLaHoja.ts';
 import type { FallaDeLaPuerta } from './api/identidad.ts';
-import { salir } from './api/identidad.ts';
+import { abrirLaCuenta, salir } from './api/identidad.ts';
 import { fallaDeLaPuerta } from './arranque.ts';
 
 /**
@@ -42,6 +42,23 @@ import { fallaDeLaPuerta } from './arranque.ts';
  *   de que no escriben todavia. Un boton que no dice nada al pulsarlo se lee como una pantalla
  *   rota; uno que dice lo que hace —y lo que no— se lee como una pantalla a medio conectar, que
  *   es lo que es.
+ *
+ * <h2>El menu de sesion: las cuatro opciones hacen algo, y dos de ellas se van de aqui</h2>
+ *
+ * Es el mismo criterio de la linea de arriba, aplicado al otro sitio donde habia botones mudos
+ * (#115). Hasta este issue tres de las cuatro eran `al: () => {}`; hoy no queda ninguna, y lo
+ * vigila `verificaciones/ninguna-opcion-del-menu-se-queda-muda.test.ts`.
+ *
+ *     Mi perfil               -> la consola de cuenta del EMISOR, en otra pestana
+ *     Cambiar la contrasena   -> la misma consola, en su pagina de credenciales
+ *     Preferencias            -> el cajon de los temas (#111)
+ *     Cerrar sesion           -> `salir()`
+ *
+ * Las dos primeras **no se resuelven aqui a proposito**, y no por falta de backend: la
+ * autorizacion es de `identidad` desde ADR-0039 y la contrasena la guarda Keycloak, que ya publica
+ * su propia pagina de cuenta. Dibujar aqui esos dos formularios seria prometer una escritura que
+ * ningun backend de este repositorio puede atender — y por eso el issue lo deja fuera por escrito.
+ * A donde llevan, y con que se midio, esta en `api/identidad.ts`.
  */
 
 const ENTIDAD = 'Municipalidad Distrital de Catacaos';
@@ -161,8 +178,18 @@ function ArmazonDelSistema() {
         catalogo={catalogo}
         cuenta={{ nombre: 'J. Cardenas Vega', iniciales: 'JC', nota: t(ENTIDAD) }}
         opcionesDeSesion={[
-          { rotulo: t('Mi perfil'), al: () => {} },
-          { rotulo: t('Cambiar la contrasena'), al: () => {} },
+          {
+            rotulo: t('Mi perfil'),
+            al: () => {
+              abrirLaCuenta('perfil');
+            },
+          },
+          {
+            rotulo: t('Cambiar la contrasena'),
+            al: () => {
+              abrirLaCuenta('contrasena');
+            },
+          },
           {
             rotulo: t('Preferencias'),
             al: () => {

@@ -391,6 +391,95 @@ export function salir(): void {
   window.location.assign(`${fin()}?${parametros.toString()}`);
 }
 
+/**
+ * **Las dos paginas de la cuenta, que NO son de este sistema** (#115).
+ *
+ * <h2>Por que salen de aqui y no de una pantalla de Rentas</h2>
+ *
+ * Porque ni el perfil ni la contrasena son de `rentas`. La autorizacion es de `identidad` desde
+ * ADR-0039 —aqui no se da de alta un usuario, no se afilia a nadie y no se fija un permiso— y la
+ * contrasena **nunca llega a este sistema**: la guarda Keycloak, que es quien la pide en su
+ * formulario. Dibujar aqui un formulario de perfil o de clave seria prometer una escritura que
+ * ningun backend de este repositorio puede atender.
+ *
+ * <h2>La URL se DERIVA del emisor, no se escribe</h2>
+ *
+ * Sale de `realm()`, o sea de `configuracion('oidcRealm')`, que es exactamente de donde salen
+ * `autorizacion()`, `canje()` y `fin()`. Y eso trae la garantia que hace honesto mandar ahi: **si
+ * ese origen no fuera alcanzable desde el navegador, nadie habria entrado a Rentas**, porque el
+ * formulario de identificacion se sirve del mismo sitio. No es una URL mas que pueda estar mal
+ * puesta: es la misma que ya funciono.
+ *
+ * <h2>Las dos rutas, medidas contra el Keycloak que la plataforma fija</h2>
+ *
+ * `despliegue/plataforma.compose.yaml` fija `quay.io/keycloak/keycloak:26.0`. Contra el codigo de
+ * esa version:
+ *
+ *   · `RealmsResource.java:191` — `@Path("{realm}/account")`: la consola de cuenta cuelga del
+ *     realm, asi que basta con anadir un segmento al emisor que ya se lee;
+ *   · `AccountConsole.java:119` — el `baseUrl` que el servidor le pasa a la consola es esa misma
+ *     ruta **con barra final**, y `AccountConsole.getMainPage()` esta en `@Path("{any:.*}")`: la
+ *     consola se sirve para cualquier sub-ruta, o sea que un enlace profundo entra;
+ *   · `js/apps/account-ui/src/routes.tsx` — `PersonalInfoRoute` es la ruta **indice** (de ahi la
+ *     barra final para «Mi perfil») y `SigningInRoute` es `account-security/signing-in`, que es
+ *     donde se cambia la clave. Y `main.tsx` monta un `createBrowserRouter`: las rutas son de
+ *     camino y no de `#`, asi que el enlace profundo es el que se escribe abajo.
+ *   · `RealmManager.java:558` — `if (!hasAccountManagementClient(rep)) setupAccountManagement(realm)`
+ *     al importar: `realm-kamayuk.json` declara dos clientes —`kamayuk-backoffice` y
+ *     `kamayuk-verificacion`— y **ninguno** es `account`, asi que Keycloak los crea al sembrar el
+ *     realm. La consola no se queda sin su cliente por no estar en el volcado.
+ *
+ * **Lo que NO se pudo medir, y se dice**: que una instalacion levantada las sirva. Este puesto no
+ * tiene motor de contenedores, asi que la plataforma no se pudo levantar y ninguna de las dos URL
+ * se pidio de verdad. Lo comprobado es el codigo de la version que el compose fija, no un 200.
+ */
+export type PaginaDeLaCuenta = 'perfil' | 'contrasena';
+
+/** Lo que se le anade al emisor para llegar a cada una. Ver el javadoc de arriba. */
+const RUTA_DE_LA_CUENTA: Readonly<Record<PaginaDeLaCuenta, string>> = {
+  // Con barra final: es la ruta indice de la consola, y la misma que el servidor le pasa como
+  // `baseUrl`. Sin ella el camino que el enrutador compara no es el que le dijeron que era.
+  perfil: 'account/',
+  contrasena: 'account/account-security/signing-in',
+};
+
+/** A donde lleva cada opcion del menu de sesion. Se exporta para poder comprobarla. */
+export function urlDeLaCuenta(pagina: PaginaDeLaCuenta): string {
+  return `${realm()}/${RUTA_DE_LA_CUENTA[pagina]}`;
+}
+
+/**
+ * Abre la pagina de la cuenta **en otra pestana**, y si no se puede, va en esta.
+ *
+ * <h2>Por que otra pestana</h2>
+ *
+ * Porque el token vive EN MEMORIA —es la decision de la cabecera de este archivo— y se muere con
+ * el documento. Irse a Keycloak en esta misma pestana tiraria la sesion de trabajo: al volver,
+ * el arranque tendria que rebotar otra vez por la puerta. Con una pestana nueva, quien mira el
+ * perfil vuelve a Rentas y sigue donde estaba.
+ *
+ * <h2>Por que se mira lo que devuelve, y por que NO lleva «noopener» en las opciones</h2>
+ *
+ * Porque el sintoma que este issue viene a quitar es **que no pase nada**. Un bloqueador de
+ * ventanas emergentes puede negar la pestana, y entonces `window.open` devuelve `null`: sin mirarlo,
+ * el boton volveria a ser el `al: () => {}` de antes, esta vez sin que se vea en el codigo. Con el
+ * `null` mirado, el peor caso es irse en esta pestana, que es feo y es visible.
+ *
+ * Y por eso mismo `noopener` **no** puede ir en la cadena de opciones: HTML manda devolver `null`
+ * cuando se pide, asi que la comprobacion de arriba daria siempre positivo y la pestana nueva no
+ * se usaria nunca. Se consigue lo mismo soltando el `opener` despues.
+ */
+export function abrirLaCuenta(pagina: PaginaDeLaCuenta): void {
+  const url = urlDeLaCuenta(pagina);
+  const otra = window.open(url, '_blank');
+  if (otra === null) {
+    window.location.assign(url);
+    return;
+  }
+  // La pestana nueva no necesita poder tocar esta. Ver el javadoc: aqui y no en las opciones.
+  otra.opener = null;
+}
+
 function motivoDelEmisor(error: string): string {
   switch (error) {
     case 'access_denied':
