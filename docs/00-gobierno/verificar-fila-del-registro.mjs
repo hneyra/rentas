@@ -1,4 +1,5 @@
-/* Comprueba que un PR que cierra un issue deja su fila en «Verificar antes de afirmar».
+/* Comprueba que un PR que cierra un issue deja su fila en «Verificar antes de afirmar»,
+   y —desde #130— que el cierre que declara lo entienda tambien GitHub.
 
    El registro de «Verificar antes de afirmar» es la memoria del proyecto: cada issue
    deja ahi que se implemento y **como se demostro que la verificacion puede fallar**.
@@ -24,6 +25,28 @@
    Un PR de solo documentacion, de solo pruebas o sin issue asociado pasa en verde. Sin
    ese contraste la guarda seria un peaje que todo el mundo aprende a esquivar — y una
    guarda esquivada no protege nada, que es de donde venimos.
+
+   ## Y desde #130, una segunda cosa: que el cierre declarado CIERRE
+
+   Esta guarda reconoce `Cierra #N`, en castellano, que es el idioma de la casa. **GitHub
+   no.** Su auto-cierre solo entiende close/closes/closed, fix/fixes/fixed y
+   resolve/resolves/resolved. El PR #129 dijo «Cierra #111», se mezclo con todo en verde
+   —esta guarda incluida, porque la fila estaba— y **el issue se quedo abierto** sin que
+   nada lo dijera; los otros cinco de la tanda decian «Closes» y cerraron solos.
+
+   Asi que si el cuerpo declara un cierre con una palabra que GitHub ignora, esto sale
+   **rojo**, nombra el issue que va a quedarse abierto y escribe la linea que hay que
+   poner. **No cambia el idioma de nada** —AC «Lo que NO entra» de #130—: `Cierra #N` se
+   sigue reconociendo, y lo que se pide es una linea que GitHub sepa leer.
+
+   **Por que rojo y no una advertencia en la salida.** Porque el defecto que viene a cerrar
+   es exactamente «verde que nadie mira»: un aviso impreso en un check que sale en verde
+   tiene la misma forma que el fallo —CI contenta, log sin leer— y lo habria reproducido en
+   vez de cerrarlo. El coste esta acotado y medido: de los seis PR de la tanda, cinco
+   seguirian verdes y solo el roto se pondria rojo; el remedio es **una linea del cuerpo**,
+   lo escribe quien lo escribio mal, y `registro.yml` escucha `edited` desde #57 —para esto
+   mismo—, asi que editar el cuerpo relanza la comprobacion sin empujar un commit. Y el que
+   de verdad no quiera auto-cierre tiene salida limpia: no declararlo («Ref #N»).
 
    ## Uso
 
@@ -118,8 +141,44 @@ export const RUTAS_DE_CODIGO = [
  */
 const DONDE_VIVE_LA_FILA = ['docs/agent/HISTORY.md'];
 
-/** Como se declara que un PR cierra un issue. GitHub admite estas y alguna mas. */
-const CIERRA = /\b(?:cierra|closes?|close|fixes?|fix|resuelve|resolves?)\s+#(\d+)/gi;
+/** Como se declara que un PR cierra un issue: en el idioma de la casa, y en el de GitHub.
+
+    **Son DOS listas y no una, y esa diferencia es el defecto de #130.** CLAUDE.md manda
+    «comentarios, pruebas y mensajes de commit en espanol», asi que esta guarda reconoce
+    `Cierra #N` y `Resuelve #N` y las va a seguir reconociendo: el idioma no se cambia por una
+    limitacion de GitHub. **Pero GitHub solo auto-cierra con las inglesas** —close/closes/closed,
+    fix/fixes/fixed, resolve/resolves/resolved— y con ninguna mas.
+
+    Medido en la tanda del 2026-09-12, PR a PR: #121, #122, #123, #124 y #128 decian `Closes #N`
+    y **cerraron su issue al mezclar**; #129 decia `Cierra #111` y **no cerro nada**. El PR se
+    mezclo, la CI quedo verde, esta misma guarda dijo que la fila estaba, y el issue siguio
+    abierto hasta que alguien lo cerro a mano al auditar. El modo de fallo **se parece al exito**,
+    que es el peor que hay — y la trampa estaba montada por construccion: esta guarda PREMIA
+    escribir en castellano y esa misma palabra es la que GitHub ignora.
+
+    Las inglesas van en las dos listas a proposito, y hasta #130 `CIERRA` no conocia `closed`,
+    `fixed` ni `resolved`. Eran dos huecos: un cuerpo que dijera «Fixed #N» cerraba el issue en
+    GitHub y aqui **no exigia fila**, y uno que dijera «Cierra #N» y «Fixed #N» a la vez se leeria
+    como que #N se queda sin auto-cierre, cuando si lo tiene. */
+const PALABRAS_DE_LA_CASA = ['cierra', 'resuelve'];
+const PALABRAS_DE_GITHUB = [
+  'closes',
+  'closed',
+  'close',
+  'fixes',
+  'fixed',
+  'fix',
+  'resolves',
+  'resolved',
+  'resolve',
+];
+
+const CIERRA = declaracionDeCierre([...PALABRAS_DE_LA_CASA, ...PALABRAS_DE_GITHUB]);
+const CIERRA_EN_GITHUB = declaracionDeCierre(PALABRAS_DE_GITHUB);
+
+function declaracionDeCierre(palabras) {
+  return new RegExp(String.raw`\b(?:${palabras.join('|')})\s+#(\d+)`, 'gi');
+}
 
 // Se ejecuta SOLO cuando se invoca como guion. Importarlo no hace nada, que es lo que
 // permite a su autoprueba leer `RUTAS_DE_CODIGO` de aqui en vez de copiarla (#45).
@@ -134,10 +193,63 @@ function principal() {
     ? readFileSync(opciones.cuerpo, 'utf8')
     : (process.env.KAMAYUK_CUERPO_DEL_PR ?? '');
 
-  const issues = [...cuerpo.matchAll(CIERRA)].map((coincidencia) => coincidencia[1]);
+  /* Sin duplicados: un cuerpo que explica lo que hace nombra el mismo issue varias veces, y los
+     tres mensajes de aqui abajo lo listan. Medido en el CI de este mismo PR antes de arreglarlo:
+     «Cierra #130, #130, #130, #130 y no toca codigo de produccion». No cambia lo que se decide
+     —filtrar y comprobar sobre repetidos da lo mismo—, solo lo que se lee. */
+  const issues = [...new Set([...cuerpo.matchAll(CIERRA)].map((coincidencia) => coincidencia[1]))];
   if (issues.length === 0) {
     console.log('El PR no declara que cierre ningun issue: no hay fila que exigir.');
     process.exit(0);
+  }
+
+  /* Lo SEGUNDO que comprueba esta guarda (#130), y mira el CUERPO y no el diff: que la palabra
+     con que el PR declara cada cierre sea de las que GitHub entiende.
+
+     Se hace por ISSUE y no por cuerpo, porque un cuerpo puede declarar dos y acertar con uno:
+     «Cierra #711 … Closes #712» cierra #712 al mezclar y deja #711 abierto. Un aviso que dijera
+     «el cuerpo trae alguna palabra buena» daria ese caso por bueno.
+
+     Y va ANTES del filtro de `RUTAS_DE_CODIGO` a proposito: quedarse sin auto-cierre no depende
+     de que archivos toque el PR. Heredar aqui la condicion que la FILA si necesita dejaria el
+     agujero abierto de par en par para los PR de solo documentacion —mismo defecto, otra ropa—,
+     y seria una guarda con un punto ciego que nada justifica. */
+  const enGitHub = new Set([...cuerpo.matchAll(CIERRA_EN_GITHUB)].map((c) => c[1]));
+  const sinAutocierre = issues.filter((numero) => !enGitHub.has(numero));
+  if (sinAutocierre.length > 0) {
+    console.error('');
+    console.error('FALLO: este PR declara un cierre con una palabra que GitHub no entiende.');
+    console.error('');
+    for (const numero of sinAutocierre) {
+      console.error(`  · Al mezclar este PR, #${numero} NO se va a cerrar solo.`);
+    }
+    console.error('');
+    console.error('  GitHub auto-cierra con estas palabras, y con ninguna mas:');
+    console.error(`    ${PALABRAS_DE_GITHUB.join(', ')}`);
+    console.error('');
+    console.error('  Medido en la tanda del 2026-09-12: los cinco PR que decian «Closes #N»');
+    console.error('  cerraron su issue al mezclar y el que decia «Cierra #N» no, y nadie se');
+    console.error('  entero hasta la auditoria — PR mezclado, CI verde, fila escrita, issue');
+    console.error('  abierto. El modo de fallo se parece al exito, y por eso esto es rojo y no');
+    console.error('  una linea mas en un registro que solo se lee cuando algo ya esta rojo.');
+    console.error('');
+    console.error('  ARREGLO: escribe en el cuerpo del PR');
+    for (const numero of sinAutocierre) {
+      console.error(`    Closes #${numero}`);
+    }
+    console.error('');
+    console.error('  Y SI NO QUIERES QUE SE CIERRE SOLO, entonces no lo declares: «Ref #N» o');
+    console.error('  «Parte de #N» no disparan nada, ni aqui ni en GitHub. Lo unico que esto');
+    console.error('  impide es el tercer caso —declarar el cierre y no cerrar—, que es el que');
+    console.error('  miente. Que el PR se quede sin auto-cierre pasa a ser una decision.');
+    console.error('');
+    console.error('  EL IDIOMA NO CAMBIA: «Cierra #N» se sigue reconociendo aqui, y la fila, el');
+    console.error('  commit y el resto del cuerpo siguen en castellano (CLAUDE.md §Idioma). Lo');
+    console.error('  que hace falta es UNA linea que GitHub sepa leer, no un cuerpo en ingles.');
+    console.error('');
+    console.error('  Editar el cuerpo del PR relanza esta comprobacion sin empujar un commit:');
+    console.error('  `registro.yml` escucha `edited` desde #57, justo para los rojos de cuerpo.');
+    process.exit(1);
   }
 
   const archivos = opciones.archivos

@@ -4,11 +4,21 @@
    esquivada, que en una convencion de proceso es peor todavia — el peaje se aprende a
    rodear y la tabla se queda igual de vacia.
 
-   Asi que se corre la comprobacion contra nueve situaciones fabricadas, cinco que tiene
-   que rechazar y cuatro que tiene que dejar pasar, y se exige que el rechazo **nombre el
-   issue**: rechazar por el motivo equivocado seria pasar por casualidad.
+   Asi que se corre la comprobacion contra una lista de situaciones fabricadas, unas que
+   tiene que rechazar y otras que tiene que dejar pasar, y se exige que el rechazo
+   **nombre el issue y su motivo**: rechazar por el motivo equivocado seria pasar por
+   casualidad. **El recuento no se escribe aqui**, lo imprime el final del guion: esta
+   frase decia «nueve, cinco y cuatro» y llevaba cuatro muestras siendo falsa.
 
-   La ultima en llegar es del tercer tiempo de `infrastructure`#114 y fija lo que la mudanza
+   Las tres ultimas en llegar son de #130 y miden la SEGUNDA regla del guion: la guarda
+   reconoce `Cierra #N` —el idioma de la casa— y GitHub solo auto-cierra con las inglesas,
+   de modo que el PR se mezcla en verde y el issue se queda abierto sin que nada lo diga.
+   Van en trio: la que avisa, el contraste con `Closes #N` que no debe avisar, y la del
+   cuerpo mixto, que exige que el aviso se haga issue a issue. **Y obligaron a que `dice`
+   sea una lista**: con dos reglas en el mismo guion, `dice: '#711'` lo satisface
+   cualquiera de las dos y una muestra podia ponerse roja por la regla que no era.
+
+   La del tercer tiempo de `infrastructure`#114 fija lo que la mudanza
    del registro destapo en tres repositorios a la vez: **una cabecera o un parrafo que citen
    el issue no valen como fila**. Hasta entonces valian, y con eso un PR podia salir en verde
    con la tabla intacta.
@@ -40,11 +50,11 @@ const FILA = '| Lo que se verifico (#711, 3 pruebas) | La rotura | El rojo |';
 const CASOS = [
   {
     nombre: 'cierra un issue, toca backend y NO deja fila',
-    cuerpo: 'Cierra #711.\n\nLo de siempre.',
+    cuerpo: 'Closes #711.\n\nLo de siempre.',
     archivos: ['backend/kamayuk-rentas-nucleo/src/main/java/kamayuk/rentas/nucleo/Algo.java'],
     anadido: '',
     esperado: 'rojo',
-    dice: '#711',
+    dice: ['#711', 'falta la fila'],
   },
   {
     nombre: 'la fila que anade nombra a OTRO issue',
@@ -52,15 +62,15 @@ const CASOS = [
     archivos: ['frontend/src/modulos/rentas/Rentas.tsx'],
     anadido: '+| Otra cosa (#712) | … | … |',
     esperado: 'rojo',
-    dice: '#711',
+    dice: ['#711', 'falta la fila'],
   },
   {
     nombre: 'un numero que solo CONTIENE al del issue no cuenta como su fila',
-    cuerpo: 'Cierra #71',
+    cuerpo: 'Closes #71',
     archivos: ['infra/src/componentes/index.ts'],
     anadido: '+| Una fila cualquiera (#711) | … | … |',
     esperado: 'rojo',
-    dice: '#71',
+    dice: ['#71', 'falta la fila'],
   },
   {
     // `infrastructure`#114, tercer tiempo. Hasta el 2026-09-12 `nombra()` buscaba `#N` en
@@ -69,11 +79,11 @@ const CASOS = [
     // la mudanza y la rotura de control —quitar la fila— salia VERDE. Con `nombra()` devuelta a
     // su forma de antes, esta muestra pasa a verde: ese es el rojo que demuestra el arreglo.
     nombre: 'una cabecera o un parrafo que citen el issue NO valen como fila',
-    cuerpo: 'Cierra #711.',
+    cuerpo: 'Closes #711.',
     archivos: ['backend/kamayuk-rentas-nucleo/src/main/java/kamayuk/rentas/nucleo/Algo.java'],
     anadido: '+# Registro\n+\n+Se mudo aqui por #711, y esto no es una fila.',
     esperado: 'rojo',
-    dice: '#711',
+    dice: ['#711', 'falta la fila'],
   },
   {
     // #45. El descriptor de despliegue decide que corre en la municipalidad, y hasta #45
@@ -81,11 +91,11 @@ const CASOS = [
     // otros tres repositorios. Con `RUTAS_DE_CODIGO` devuelta a la lista de antes, esta
     // muestra pasa a VERDE — y ese es el rojo que demuestra que el arreglo sirve.
     nombre: 'cierra un issue, toca el descriptor de despliegue y NO deja fila',
-    cuerpo: 'Cierra #44.\n\nEl despliegue de `rentas-web`.',
+    cuerpo: 'Closes #44.\n\nEl despliegue de `rentas-web`.',
     archivos: ['infrastructure/src/descriptor.ts'],
     anadido: '',
     esperado: 'rojo',
-    dice: '#44',
+    dice: ['#44', 'falta la fila'],
   },
   {
     // El contraste de la de arriba (#45 AC-4), y no es el mismo que el de `docs/`: estos
@@ -93,7 +103,7 @@ const CASOS = [
     // de «todo `infrastructure/` es codigo». Sin el, la correccion se podria satisfacer
     // declarando que todo cuenta, y entonces la guarda grita en cada PR y se apaga (#437).
     nombre: 'toca infrastructure/ FUERA de src/ —su prueba y su README— y no exige fila',
-    cuerpo: 'Cierra #44.',
+    cuerpo: 'Closes #44.',
     archivos: ['infrastructure/verificaciones/descriptor.test.ts', 'infrastructure/README.md'],
     anadido: '',
     esperado: 'verde',
@@ -104,17 +114,17 @@ const CASOS = [
     // verde sin fila. Con la ruta devuelta a la lista de antes, esta muestra pasa a VERDE — y
     // ese es el rojo que demuestra que el arreglo sirve.
     nombre: 'cierra un issue, toca el manifiesto del frontend y NO deja fila',
-    cuerpo: 'Cierra #74.\n\nEl primer clon hermano.',
+    cuerpo: 'Closes #74.\n\nEl primer clon hermano.',
     archivos: ['frontend/package.json'],
     anadido: '',
     esperado: 'rojo',
-    dice: '#74',
+    dice: ['#74', 'falta la fila'],
   },
   {
     // El contraste, y es el que impide que la correccion se satisfaga declarando que todo
     // `frontend/` cuenta: el candado y las barreras no son codigo de produccion.
     nombre: 'toca el candado del frontend y sus barreras, y no exige fila',
-    cuerpo: 'Cierra #74.',
+    cuerpo: 'Closes #74.',
     archivos: ['frontend/yarn.lock', 'frontend/verificaciones/enlace.ts'],
     anadido: '',
     esperado: 'verde',
@@ -122,30 +132,30 @@ const CASOS = [
   {
     // #75. El `Dockerfile` decide que se publica, y el compose como se levanta la instalacion.
     nombre: 'cierra un issue, toca el Dockerfile de la interfaz y NO deja fila',
-    cuerpo: 'Cierra #75.\n\nLa imagen alcanza al clon hermano.',
+    cuerpo: 'Closes #75.\n\nLa imagen alcanza al clon hermano.',
     archivos: ['frontend/Dockerfile'],
     anadido: '',
     esperado: 'rojo',
-    dice: '#75',
+    dice: ['#75', 'falta la fila'],
   },
   {
     nombre: 'cierra un issue, toca el compose y NO deja fila',
-    cuerpo: 'Cierra #75.',
+    cuerpo: 'Closes #75.',
     archivos: ['despliegue/compose.yaml'],
     anadido: '',
     esperado: 'rojo',
-    dice: '#75',
+    dice: ['#75', 'falta la fila'],
   },
   {
     nombre: 'cierra un issue, toca backend y SI deja su fila',
-    cuerpo: 'Cierra #711.',
+    cuerpo: 'Closes #711.',
     archivos: ['backend/kamayuk-rentas-nucleo/src/main/java/kamayuk/rentas/nucleo/Algo.java'],
     anadido: `+${FILA}`,
     esperado: 'verde',
   },
   {
     nombre: 'cierra un issue y NO toca codigo de produccion',
-    cuerpo: 'Cierra #711.',
+    cuerpo: 'Closes #711.',
     archivos: [
       'docs/00-gobierno/algo.md',
       'backend/kamayuk-rentas-nucleo/src/test/java/kamayuk/rentas/nucleo/AlgoTest.java',
@@ -159,6 +169,48 @@ const CASOS = [
     archivos: ['backend/kamayuk-rentas-nucleo/src/main/java/kamayuk/rentas/nucleo/Algo.java'],
     anadido: '',
     esperado: 'verde',
+  },
+
+  {
+    /* #130. Las tres de aqui abajo son del segundo defecto que este guion mide: la guarda
+       reconoce `Cierra #N` —el idioma de la casa— y GitHub solo auto-cierra con las inglesas,
+       asi que el PR se mezcla en verde y el issue se queda abierto sin que nada lo diga. Paso
+       de verdad en #129 el 2026-09-12 y hubo que cerrar #111 a mano al auditar.
+
+       **Esta muestra lleva su fila puesta a proposito**: si no, se pondria roja por la regla
+       de la fila y no mediria nada de #130. Y mide dos cosas de una: que el aviso salga, y que
+       `cierra` SIGA reconociendose —con la palabra fuera de `CIERRA`, este cuerpo saldria
+       verde diciendo «El PR no declara que cierre ningun issue», que es el AC de que el idioma
+       no se toca—. */
+    nombre: 'declara el cierre solo en castellano: avisa de que GitHub no lo entiende',
+    cuerpo: 'Cierra #711.\n\nLo de siempre.',
+    archivos: ['backend/kamayuk-rentas-nucleo/src/main/java/kamayuk/rentas/nucleo/Algo.java'],
+    anadido: `+${FILA}`,
+    esperado: 'rojo',
+    dice: ['#711', 'GitHub no entiende', 'Closes #711'],
+  },
+  {
+    // El contraste de la de arriba, y es la mitad que AC-3 de #130 pide medir: la palabra que
+    // GitHub SI entiende no dispara nada. Sin el, el arreglo se podria satisfacer gritando
+    // siempre que un PR cierra un issue, y una guarda que grita en cada PR se acaba apagando.
+    nombre: 'declara el cierre con la palabra que GitHub entiende: no avisa de nada',
+    cuerpo: 'Closes #711.\n\nLo de siempre.',
+    archivos: ['backend/kamayuk-rentas-nucleo/src/main/java/kamayuk/rentas/nucleo/Algo.java'],
+    anadido: `+${FILA}`,
+    esperado: 'verde',
+  },
+  {
+    // Y la precision que el aviso tiene que tener: se mira ISSUE A ISSUE y no «el cuerpo trae
+    // alguna palabra buena». Este cuerpo cierra #712 al mezclar y deja #711 abierto, asi que el
+    // aviso tiene que nombrar #711 y NO #712 — con la comprobacion hecha por cuerpo, esta
+    // muestra sale verde y el issue se queda abierto igual que en #129.
+    nombre: 'dos issues, uno en cada idioma: solo avisa del que GitHub no entiende',
+    cuerpo: 'Cierra #711.\n\nCloses #712.',
+    archivos: ['backend/kamayuk-rentas-nucleo/src/main/java/kamayuk/rentas/nucleo/Algo.java'],
+    anadido: `+${FILA}\n+| Y la del otro (#712) | La rotura | El rojo |`,
+    esperado: 'rojo',
+    dice: ['#711', 'GitHub no entiende'],
+    noDice: '#712',
   },
 ];
 
@@ -230,8 +282,23 @@ for (const caso of CASOS) {
     fallos++;
     continue;
   }
-  if (esperabaRojo && !salida.includes(caso.dice)) {
-    console.error(`MAL: «${caso.nombre}» se puso rojo sin nombrar ${caso.dice}.`);
+  /* `dice` es una LISTA desde #130, y no por comodidad: con dos reglas distintas en el mismo
+     guion —falta la fila, y el cierre que GitHub no entiende— un `dice: '#711'` lo satisface
+     cualquiera de las dos, asi que una muestra podia ponerse roja por el motivo equivocado y
+     pasar. Cada roja nombra ahora su numero **y su motivo**. */
+  const dice = [caso.dice ?? []].flat();
+  const faltan = dice.filter((texto) => !salida.includes(texto));
+  if (esperabaRojo && faltan.length > 0) {
+    console.error(`MAL: «${caso.nombre}» se puso rojo sin decir ${faltan.join(' ni ')}.`);
+    console.error(salida.trim());
+    fallos++;
+    continue;
+  }
+  /* Y la direccion contraria, que hace falta para el aviso de #130: se mira issue a issue, asi
+     que la muestra del cuerpo mixto tiene que nombrar al que se queda abierto y NO al otro. */
+  const sobran = [caso.noDice ?? []].flat().filter((texto) => salida.includes(texto));
+  if (sobran.length > 0) {
+    console.error(`MAL: «${caso.nombre}» nombro ${sobran.join(' y ')}, y no debia.`);
     console.error(salida.trim());
     fallos++;
     continue;

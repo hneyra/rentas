@@ -15,6 +15,14 @@
 # En `sgtm` la guarda existe desde #711 y NO CORRE EN CI, porque engancharla exige tocar
 # `.github/workflows/` y el token de aquella sesion no tenia alcance `workflow`. Aqui se engancha.
 #
+# Y DESDE #130 COMPRUEBA UNA SEGUNDA COSA: QUE EL CIERRE DECLARADO CIERRE
+# La guarda reconoce «Cierra #N», en castellano, que es el idioma de la casa. GitHub no: solo
+# auto-cierra con close/closes/closed, fix/fixes/fixed y resolve/resolves/resolved. El PR #129
+# decia «Cierra #111», se mezclo con todo en verde —esta guarda incluida, porque la fila estaba— y
+# el issue se quedo ABIERTO sin que nada lo dijera; los otros cinco de la tanda decian «Closes» y
+# cerraron solos. Ese modo de fallo se parece al exito, asi que sale rojo y no como una linea en un
+# log verde que nadie lee. El remedio es una linea del cuerpo, y el `edited` de abajo lo relanza.
+#
 # QUE EXIGE Y QUE NO
 # Exige que la fila EXISTA. Que diga la verdad —que la mutacion sea real y las cifras cuadren— no
 # lo puede leer una maquina: eso lo lee la revision. Y un PR de solo documentacion, de solo
@@ -66,7 +74,7 @@ jobs:
       - name: La autoprueba de la guarda, antes de usarla
         run: node docs/00-gobierno/verificar-las-muestras-del-registro.mjs
 
-      - name: La fila del registro
+      - name: La fila del registro, y que el cierre declarado cierre
         env:
           KAMAYUK_CUERPO_DEL_PR: ${{ github.event.pull_request.body }}
         run: node docs/00-gobierno/verificar-fila-del-registro.mjs --base origin/${{ github.event.pull_request.base.ref }}

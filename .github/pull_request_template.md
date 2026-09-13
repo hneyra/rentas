@@ -1,0 +1,42 @@
+<!-- ────────────────────────────────────────────────────────────────────────────────────────
+     LA LINEA QUE CIERRA DE VERDAD
+
+     Escribe `Closes #<numero>`, en ingles, y **en el cuerpo** del PR: no en el titulo, que
+     GitHub no lee para esto.
+
+     GitHub solo auto-cierra con close/closes/closed, fix/fixes/fixed y
+     resolve/resolves/resolved. **La palabra castellana NO cierra nada**, aunque sea el
+     idioma de la casa y aunque la guarda del registro la acepte —y la acepta a proposito:
+     el idioma no se cambia por una limitacion de GitHub—.
+
+     Medido en la tanda del 2026-09-12: cinco PR escribieron la palabra inglesa y cerraron
+     su issue al mezclar; uno escribio la castellana y no cerro nada. Ese PR se mezclo, la
+     CI quedo verde, la guarda dijo que la fila estaba, y el issue siguio abierto hasta que
+     alguien lo cerro a mano al auditar (ver 130).
+
+     Desde entonces eso sale ROJO en el flujo `Registro`, con el issue nombrado. Y si de
+     verdad NO quieres que se cierre solo, no lo declares: «Ref» o «Parte de» seguidos del
+     numero no disparan nada, ni aqui ni en GitHub.
+
+     OJO: este comentario viaja en el cuerpo si no lo borras, y la guarda lee el cuerpo
+     ENTERO, comentarios incluidos. Por eso aqui no hay ni una palabra de cierre seguida de
+     un numero: le haria exigir la fila de un issue que este PR no cierra (paso en #55).
+
+     El resto del cuerpo va en castellano, como el commit y como la fila del registro.
+     ──────────────────────────────────────────────────────────────────────────────────── -->
+
+Closes #
+
+## Que hace
+
+<!-- Que cambia y por que. En castellano. -->
+
+## Como se demostro que la verificacion puede fallar
+
+<!-- CLAUDE.md §«Verificar antes de afirmar»: con que rotura se midio y que rojo exacto
+     salio. Si este PR cierra un issue y toca codigo de produccion, ademas tiene que dejar
+     su fila en `docs/agent/HISTORY.md`, y eso lo comprueba el flujo `Registro`. -->
+
+## Lo que NO cierra
+
+<!-- Lo que queda fuera, con su motivo. -->

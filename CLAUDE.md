@@ -296,6 +296,16 @@ Que la fila **exista** lo comprueba `docs/00-gobierno/verificar-fila-del-registr
 que cierre un issue y toque código de producción. Lo que la fila **diga** —que la mutación sea
 real y las cifras cuadren— no lo puede leer una máquina: eso lo lee la revisión.
 
+**Y el cuerpo del PR cierra su issue con `Closes #N`, en inglés y en el cuerpo —nunca en el
+título—.** No es una excepción al idioma de la casa: es que **GitHub sólo auto-cierra con
+`close(s|d)`, `fix(es|ed)` y `resolve(s|d)`**, y «Cierra #N» —que la guarda acepta, y va a seguir
+aceptando— **no cierra nada**. Medido en la tanda del 2026-09-12: cinco PR con la palabra inglesa
+cerraron su issue al mezclar y el que llevaba la castellana no, y nadie se enteró hasta la
+auditoría —PR mezclado, CI verde, fila escrita, issue abierto—. Desde #130 eso sale **rojo** en
+`Registro` nombrando el issue que se quedaría abierto, y la plantilla de PR
+(`.github/pull_request_template.md`) lo dice arriba del todo. Si de verdad no quieres auto-cierre,
+no lo declares: «Ref» o «Parte de» no disparan nada.
+
 | Verificación | Cómo se demostró que puede fallar | Resultado |
 |---|---|---|
 
