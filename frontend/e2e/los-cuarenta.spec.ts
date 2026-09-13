@@ -1,8 +1,8 @@
 import { expect, test } from '@playwright/test';
 
-import { CATALOGO } from '../src/catalogo.ts';
-import { pantallaDe } from '../src/pantallas/definiciones/index.ts';
+import { ARBOL } from '../src/pantallas/arbol.ts';
 import type { ClaveDeHoja } from '../src/pantallas/arbol.ts';
+import { pantallaDe } from '../src/pantallas/definiciones/index.ts';
 import { abrir, conLaSeguridadContestada } from './instalacion.ts';
 
 /**
@@ -17,14 +17,27 @@ import { abrir, conLaSeguridadContestada } from './instalacion.ts';
  * Y una cosa mas que jsdom no puede: que **se vea algo**. Una pantalla puede tener su DOM perfecto
  * y estar pintada en blanco sobre blanco, o con altura cero. Aqui se exige que el titulo sea
  * visible de verdad, que en Playwright significa que tiene caja y no esta tapado.
+ *
+ * <h2>Por que se lee `ARBOL` y no `CATALOGO`, que seria lo natural</h2>
+ *
+ * Porque `catalogo.ts` importa `@kamayuk/shell`, y **el cargador de Playwright no es el de Vite**:
+ * no honra `preserveSymlinks` ni el `dedupe` de `resolucion.ts`, asi que resuelve las dependencias
+ * de la libreria contra el arbol del clon hermano — que en CI se clona y **no se instala**. El rojo
+ * fue `Cannot find package 'class-variance-authority' imported from …/paquetes/ui/shadcn/boton.tsx`,
+ * y no decia ni una palabra de Playwright ni de symlinks.
+ *
+ * Podria arreglarse con `--preserve-symlinks` en el arranque del runner. No se hace: **un arnes de
+ * extremo a extremo no deberia importar la libreria de componentes para nada** — prueba el
+ * artefacto construido, no sus piezas. `ARBOL` y las definiciones son dato de este repositorio y
+ * no tiran de nadie.
  */
 
 test.beforeEach(async ({ page }) => {
   await conLaSeguridadContestada(page);
 });
 
-const DESTINOS = CATALOGO.flatMap((modulo) =>
-  modulo.destinos.map((destino) => ({ modulo: modulo.rotulo, destino })),
+const DESTINOS = ARBOL.flatMap((modulo) =>
+  modulo.hojas.map((hoja) => ({ modulo: modulo.rotulo, destino: hoja })),
 );
 
 test('EL CENTINELA: hay cuarenta destinos que recorrer', () => {
