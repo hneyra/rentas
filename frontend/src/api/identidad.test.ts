@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  abrirLaCuenta,
   canjearSiVuelve,
   entrar,
   fijarToken,
@@ -9,6 +10,7 @@ import {
   puedeIrALaPuerta,
   salir,
   token,
+  urlDeLaCuenta,
   vieneDeSalir,
 } from './identidad.ts';
 
@@ -412,5 +414,72 @@ describe('#112 — antes de mandar el navegador, se pregunta si el emisor esta',
     await entrar();
 
     expect(String(espia.mock.calls[0]?.[0])).not.toContain('/protocol/openid-connect/auth');
+  });
+});
+
+/**
+ * **La cuenta la lleva el emisor, y a ella se llega derivando** (#115, AC2).
+ *
+ * Lo que se mide aqui es lo unico que este puesto puede medir sin la plataforma levantada: que las
+ * dos URL **salgan del emisor configurado** y no de una cadena escrita a mano, y que pulsar haga
+ * algo siempre. Que un Keycloak vivo conteste 200 en esas dos rutas NO se pudo comprobar —no hay
+ * motor de contenedores aqui—; lo que sostiene la ruta es el codigo de `keycloak:26.0`, que es la
+ * version que el compose de la plataforma fija, y esta citado archivo y linea en `identidad.ts`.
+ */
+describe('#115 — «Mi perfil» y «Cambiar la contrasena» llevan a la consola del emisor', () => {
+  it('las dos URL cuelgan del REALM configurado', () => {
+    // El mismo prefijo del que salen `auth`, `token` y `logout`. Y eso es lo que las hace
+    // honestas: si ese origen no fuera alcanzable, nadie habria entrado a Rentas.
+    expect(urlDeLaCuenta('perfil')).toBe(`${REALM}/account/`);
+    expect(urlDeLaCuenta('contrasena')).toBe(`${REALM}/account/account-security/signing-in`);
+  });
+
+  it('y SIGUEN al emisor cuando el ambiente lo cambia: no estan escritas a mano', () => {
+    // Esta es la mitad que la comprobacion de arriba no puede hacer: un literal copiado del
+    // `POR_OMISION` la pasa entera. Aqui se sirve otro emisor —el primer escalon de
+    // `configuracion.ts`, que es lo que hace el `ConfigMap` del cluster— y las dos URL tienen que
+    // moverse con el. Si no, la imagen seria la imagen de un ambiente, que es justo lo que #44
+    // saco del paquete.
+    vi.stubGlobal('window', {
+      ...window,
+      __KAMAYUK_RENTAS__: { oidcRealm: 'https://identidad.catacaos.gob.pe/realms/kamayuk' },
+    });
+
+    expect(urlDeLaCuenta('perfil')).toBe('https://identidad.catacaos.gob.pe/realms/kamayuk/account/');
+    expect(urlDeLaCuenta('contrasena')).toBe(
+      'https://identidad.catacaos.gob.pe/realms/kamayuk/account/account-security/signing-in',
+    );
+  });
+
+  it('«Mi perfil» lleva a la ruta INDICE, con su barra: es la que el servidor da como base', () => {
+    // Sin la barra final, el camino que el navegador lleva no es el `baseUrl` que Keycloak le
+    // pasa a su consola (`AccountConsole.java:119`), y el enrutador compara contra ese.
+    expect(urlDeLaCuenta('perfil').endsWith('/account/')).toBe(true);
+  });
+
+  it('abre en OTRA pestana: el token vive en memoria y se muere con el documento', () => {
+    const asignar = ubicacion();
+    const otra = { opener: {} } as unknown as Window;
+    const abrir = vi.fn(() => otra);
+    vi.stubGlobal('open', abrir);
+
+    abrirLaCuenta('contrasena');
+
+    expect(abrir).toHaveBeenCalledWith(urlDeLaCuenta('contrasena'), '_blank');
+    // Y esta pestana no se mueve: la sesion de trabajo sigue donde estaba.
+    expect(asignar).not.toHaveBeenCalled();
+    // Sin `noopener` en las opciones —eso haria devolver `null` siempre— pero soltando el opener.
+    expect(otra.opener).toBeNull();
+  });
+
+  it('y si el navegador NIEGA la pestana, va en esta en vez de no hacer nada', () => {
+    // Es el AC3 visto desde el otro lado: un bloqueador de emergentes devuelve `null`, y sin
+    // mirarlo el boton volveria a ser el `al: () => {}` de antes — esta vez sin verse en el codigo.
+    const asignar = ubicacion();
+    vi.stubGlobal('open', vi.fn(() => null));
+
+    abrirLaCuenta('perfil');
+
+    expect(asignar).toHaveBeenCalledWith(urlDeLaCuenta('perfil'));
   });
 });
