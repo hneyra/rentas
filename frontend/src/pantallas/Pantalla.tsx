@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import type { DatosDeLaPantalla } from './datos.ts';
 import { coordenada } from './datos.ts';
@@ -60,6 +61,7 @@ export interface PantallaProps {
 type Tecleado = Record<string, string | boolean>;
 
 export function Pantalla({ definicion, datos, alEnsuciar = () => {} }: PantallaProps) {
+  const { t } = useTranslation();
   const [tecleado, setTecleado] = useState<Tecleado>({});
 
 
@@ -90,7 +92,7 @@ export function Pantalla({ definicion, datos, alEnsuciar = () => {} }: PantallaP
   return (
     <div className="flex flex-col gap-[14px]">
       {/* Una vez, arriba: ver el javadoc. */}
-      <Alerta tono={datos.ausencia.tono}>{datos.ausencia.explicacion}</Alerta>
+      <Alerta tono={datos.ausencia.tono}>{t(datos.ausencia.explicacion)}</Alerta>
       {definicion.bloques.map((bloque, i) => (
         <BloqueDeLaPantalla
           // El titulo del bloque: es unico dentro de cada pantalla en las cuarenta, y con el

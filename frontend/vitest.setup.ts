@@ -10,3 +10,18 @@ import { afterEach } from 'vitest';
  * de lo que se estaba probando.
  */
 afterEach(cleanup);
+
+/**
+ * **La instancia de i18next, para TODAS las pruebas** (#103).
+ *
+ * `react-i18next` sin proveedor usa la instancia global de `i18next`, que solo existe si alguien
+ * la inicializo. En la aplicacion lo hace `main.tsx`; en las pruebas no lo hacia nadie, y el
+ * sintoma era pequeno y confuso: `t('{{count}} registro', { count: 2 })` devolvia **«2 registro»**
+ * —la clave, interpolada, sin elegir forma plural— porque el recurso que trae `_one` y `_other` no
+ * estaba cargado.
+ *
+ * Importarlo aqui es lo que hace que una prueba de componente vea **lo mismo que la pantalla**.
+ * Ponerlo en cada archivo que lo necesite seria lo contrario: la que se olvidara pasaria en verde
+ * comprobando texto sin traducir.
+ */
+import './src/i18n/i18n.ts';

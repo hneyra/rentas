@@ -1,8 +1,10 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
+import { I18nextProvider } from 'react-i18next';
 
 import { Aplicacion } from './aplicacion.tsx';
 import { arrancar } from './arranque.ts';
+import i18n from './i18n/i18n.ts';
 // El UNICO sitio donde se importa una hoja de estilos, y desde #90 la hoja es la de la libreria:
 // `@kamayuk/ui` publica el `@theme` con los 42 tokens del artboard V8 y los seis temas. Aqui no
 // queda CSS propio — lo que la V6 tenia en `src/estilos/` eran 3 446 lineas escritas a mano, y
@@ -22,7 +24,9 @@ if (raiz === null) {
 void arrancar(() => {
   createRoot(raiz).render(
     <StrictMode>
-      <Aplicacion />
+      <I18nextProvider i18n={i18n}>
+        <Aplicacion />
+      </I18nextProvider>
     </StrictMode>,
   );
 });

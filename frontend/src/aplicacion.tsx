@@ -1,8 +1,9 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { Armazon, type AccionesDelSistema } from '@kamayuk/shell';
 
 import escudo from '../diseno/escudo-catacaos.png';
-import { CATALOGO } from './catalogo.ts';
+import { useCatalogo } from './catalogo.ts';
 import { Pantalla } from './pantallas/Pantalla.tsx';
 import type { ClaveDeHoja } from './pantallas/arbol.ts';
 import { pantallaDe } from './pantallas/definiciones/index.ts';
@@ -74,22 +75,24 @@ function CuerpoDeLaPantalla({ clave }: { readonly clave: ClaveDeHoja }) {
 }
 
 export function Aplicacion() {
+  const { t } = useTranslation();
+  const catalogo = useCatalogo();
   return (
     <QueryClientProvider client={CONSULTAS}>
     <Armazon
-      titulo="Rentas"
-      entidad={ENTIDAD}
+      titulo={t('Rentas')}
+      entidad={t(ENTIDAD)}
       escudo={<img src={escudo} alt="" width={28} height={28} />}
-      catalogo={CATALOGO}
-      cuenta={{ nombre: 'J. Cardenas Vega', iniciales: 'JC', nota: ENTIDAD }}
+      catalogo={catalogo}
+      cuenta={{ nombre: 'J. Cardenas Vega', iniciales: 'JC', nota: t(ENTIDAD) }}
       opcionesDeSesion={[
-        { rotulo: 'Mi perfil', al: () => {} },
-        { rotulo: 'Cambiar la contrasena', al: () => {} },
-        { rotulo: 'Preferencias', al: () => {} },
-        { rotulo: 'Cerrar sesion', peligrosa: true, al: () => void salir() },
+        { rotulo: t('Mi perfil'), al: () => {} },
+        { rotulo: t('Cambiar la contrasena'), al: () => {} },
+        { rotulo: t('Preferencias'), al: () => {} },
+        { rotulo: t('Cerrar sesion'), peligrosa: true, al: () => void salir() },
       ]}
       acciones={ACCIONES}
-      pieDelCarril="Diez modulos y cuarenta submodulos. Catastro y Tesoreria son de otros sistemas."
+      pieDelCarril={t('Diez modulos y cuarenta submodulos. Catastro y Tesoreria son de otros sistemas.')}
       pantalla={(hoja) => <CuerpoDeLaPantalla clave={hoja.destino.clave as ClaveDeHoja} />}
     />
     </QueryClientProvider>
