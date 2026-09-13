@@ -4,6 +4,7 @@ import { dirname, join } from 'node:path';
 
 import { expect, test, type Page } from '@playwright/test';
 
+import { UMBRAL_DE_TEXTO, conDosDecimales, contraste } from '../verificaciones/contraste.ts';
 import { abrir, conLaSeguridadContestada } from './instalacion.ts';
 
 /**
@@ -294,6 +295,104 @@ for (const paleta of SEIS) {
     ).toBe(comoLoDevuelveElNavegador(paleta.superficie));
   });
 }
+
+/** Lo que el navegador computo sobre una de las dos frases del cajon. */
+interface Medida {
+  readonly frase: string;
+  /** El color del texto, tal como `getComputedStyle` lo devuelve. */
+  readonly tinta: string;
+  /** El papel de verdad: el primer ancestro con fondo que no sea transparente. */
+  readonly papel: string;
+}
+
+/**
+ * Las dos frases que explican los ejes, medidas **con el cajon abierto**.
+ *
+ * El papel NO se da por sabido: un `<p>` no tiene fondo propio, asi que se sube por los ancestros
+ * hasta el primero que pinte uno. Escribir «el panel del cajon es `bg-fondo`» seria copiar aqui un
+ * dato de la libreria, y el dia que el panel cambie de papel esto mediria el contraste de ayer.
+ */
+async function medidaDeLasNotas(pagina: Page): Promise<readonly Medida[]> {
+  const notas = pagina.locator('[data-slot="mando-de-tema"] [data-slot="nota-del-eje"]');
+  await expect(notas).toHaveCount(2);
+  return notas.evaluateAll((elementos) =>
+    elementos.map((elemento) => {
+      let papel = '';
+      for (let nodo: Element | null = elemento; nodo !== null; nodo = nodo.parentElement) {
+        const fondo = getComputedStyle(nodo).backgroundColor;
+        if (fondo !== '' && fondo !== 'transparent' && fondo !== 'rgba(0, 0, 0, 0)') {
+          papel = fondo;
+          break;
+        }
+      }
+      return {
+        frase: (elemento.textContent ?? '').trim(),
+        tinta: getComputedStyle(elemento).color,
+        papel,
+      };
+    }),
+  );
+}
+
+/**
+ * **Las dos frases del cajon se LEEN, y en las seis combinaciones** (#140, AC1).
+ *
+ * <h2>Por que en el navegador y no sobre la hoja</h2>
+ *
+ * Porque el contraste que importa no es el de dos tokens escritos: es el del color que el elemento
+ * acaba teniendo sobre el papel que acaba teniendo debajo. Entre una cosa y la otra hay una
+ * cascada, seis paletas, un `@media` y un panel que pinta su propio fondo — y son exactamente las
+ * piezas que ya fallaron una vez en silencio (#111). Leer `text-tinta-3` en el `className` no dice
+ * nada de ninguna de ellas.
+ *
+ * <h2>Y en las SEIS, porque las seis derivan distinto</h2>
+ *
+ * El oscuro se deriva en OKLCH y el sepia parte de otro papel: `--tinta-3` sobre `--fondo` va de
+ * 4,88:1 en `sepia/claro` a 16,71:1 en `alto-contraste/claro`, medido sobre la hoja. La de por
+ * omision —`institucional/claro`, 5,07:1— es de las holgadas, asi que comprobar solo esa es
+ * exactamente comprobar la que no aprieta.
+ *
+ * <h2>Una prueba y no seis</h2>
+ *
+ * El arnes corre con un solo trabajador y sin paralelo: seis caminos serian seis arranques de la
+ * aplicacion para medir doce frases. Aqui se arranca una vez y se recorren las seis combinaciones
+ * por el mando, que es ademas como las recorre una persona.
+ */
+test('las dos frases del cajon se LEEN: WCAG 1.4.3 en las seis combinaciones', async ({ page }) => {
+  await abrir(page, 'ini-panel');
+
+  const medido: string[] = [];
+  const flojas: string[] = [];
+  for (const paleta of SEIS) {
+    await elegir(page, paleta.identidad, paleta.modo);
+    await abrirElMando(page);
+
+    for (const nota of await medidaDeLasNotas(page)) {
+      const razon = contraste(nota.tinta, nota.papel);
+      const linea =
+        `  ${paleta.identidad}/${paleta.modo} · «${nota.frase}»: ${nota.tinta} sobre ` +
+        `${nota.papel} = ${conDosDecimales(razon)}:1`;
+      medido.push(linea);
+      if (razon < UMBRAL_DE_TEXTO) flojas.push(linea);
+    }
+
+    await page.keyboard.press('Escape');
+    await expect(page.locator('[data-slot="mando-de-tema"]')).toBeHidden();
+  }
+
+  // EL CENTINELA. Sin esto, un `data-slot` renombrado o un cajon que no abriera dejarian la lista
+  // vacia, y una lista vacia de frases flojas es exactamente lo que esta prueba da por bueno.
+  expect(medido.length, 'no se midieron las doce frases: dos por cada una de las seis').toBe(12);
+
+  expect(
+    flojas,
+    'Hay texto del cajon de Preferencias por debajo del umbral de WCAG 1.4.3 ' +
+      `(${UMBRAL_DE_TEXTO}:1 para texto normal, y estas frases van a 12 px):\n` +
+      `${flojas.join('\n')}\n\n` +
+      '  Es el cajon donde vive el mando de accesibilidad visual, y la segunda frase es la unica\n' +
+      '  que dice que hace la opcion «El del sistema».',
+  ).toEqual([]);
+});
 
 test('la eleccion SOBREVIVE a recargar', async ({ page }) => {
   await abrir(page, 'ini-panel');

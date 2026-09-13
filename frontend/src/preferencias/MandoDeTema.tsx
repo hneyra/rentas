@@ -136,7 +136,20 @@ function Eje<T>({
           );
         })}
       </div>
-      <p className="mt-[7px] mb-0 text-[12px] leading-[1.5] text-tinta-4">{t(nota)}</p>
+      {/* `text-tinta-3` y NO `text-tinta-4` (#140). El artboard y la libreria lo declaran los dos
+          en su hoja: `--tinta-4` **no es color de texto** —2,39:1 sobre el lienzo, y WCAG 1.4.3
+          pide 4,5:1—; es el trazo de un icono decorativo, y por eso los tres usos de la libreria
+          llevan `aria-hidden`. Esta frase se lee: es la unica que dice que hace «El del sistema».
+          `tinta-3` pasa el umbral en las SEIS combinaciones —de 4,88:1 en sepia/claro a 16,71:1 en
+          alto-contraste/claro— y es el mismo token con que la libreria pinta `NotaDelCajon`, que
+          es la frase de encima y va al mismo tamano. Lo vigila
+          `verificaciones/tinta-4-no-es-color-de-texto.test.ts`. */}
+      <p
+        data-slot="nota-del-eje"
+        className="mt-[7px] mb-0 text-[12px] leading-[1.5] text-tinta-3"
+      >
+        {t(nota)}
+      </p>
     </fieldset>
   );
 }
