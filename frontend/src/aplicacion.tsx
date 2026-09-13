@@ -5,6 +5,8 @@ import { CATALOGO } from './catalogo.ts';
 import { Pantalla } from './pantallas/Pantalla.tsx';
 import type { ClaveDeHoja } from './pantallas/arbol.ts';
 import { pantallaDe } from './pantallas/definiciones/index.ts';
+import { hojaDe } from './pantallas/arbol.ts';
+import { porQueNoHayDato } from './porQueNoHayDato.ts';
 import { salir } from './api/identidad.ts';
 
 /**
@@ -63,7 +65,17 @@ export function Aplicacion() {
       ]}
       acciones={ACCIONES}
       pieDelCarril="Diez modulos y cuarenta submodulos. Catastro y Tesoreria son de otros sistemas."
-      pantalla={(hoja) => <Pantalla definicion={pantallaDe(hoja.destino.clave as ClaveDeHoja)} />}
+      pantalla={(hoja) => {
+        const clave = hoja.destino.clave as ClaveDeHoja;
+        return (
+          <Pantalla
+            definicion={pantallaDe(clave)}
+            // Quien sabe por que no hay dato es este sistema, no el interprete. Ver
+            // `porQueNoHayDato.ts`: son cuatro casos, no uno.
+            datos={{ ausencia: porQueNoHayDato(hojaDe(clave)) }}
+          />
+        );
+      }}
     />
   );
 }

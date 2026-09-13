@@ -65,12 +65,25 @@ export interface CampoDeLista {
   readonly opciones: readonly string[];
 }
 
-/** Un campo que solo se muestra: lo calcula el backend y la ventanilla no lo escribe. */
+/**
+ * Un campo que solo se muestra: lo calcula el backend y la ventanilla no lo escribe.
+ *
+ * <h2>NO lleva su valor, y ese es el punto (#97)</h2>
+ *
+ * Hasta aqui llevaba `valor: string` con la cifra de ejemplo del artboard —«S/ 23,725,394.80»—, y
+ * eso ponia **las cifras inventadas dentro del paquete que se sirve**. En un sistema de
+ * recaudacion una cifra asi **se lee como real**: es peor que un hueco.
+ *
+ * Las cifras no se pierden. Siguen donde siempre estuvieron: en `diseno/RentasV8.dc.html`, que
+ * viaja vendorizado, **no esta bajo `src/`** y no lo importa una sola linea de produccion. La
+ * guarda anti-deriva las sigue leyendo de alli.
+ *
+ * Lo que se va con ellas es la DUPLICACION: antes la misma cifra estaba en dos sitios y una guarda
+ * comprobaba que no divergieran. Ahora esta en uno.
+ */
 export interface CampoDeSoloLectura {
   readonly etiqueta: string;
   readonly tipo: ConAnchoCompleto<'r'>;
-  /** Lo que se muestra. En el artboard es una cifra de ejemplo; en la aplicacion, la de verdad. */
-  readonly valor: string;
 }
 
 /** Una casilla. Su texto no es ayuda: es lo que se lee AL LADO de la marca. */
@@ -110,12 +123,17 @@ export interface Columna {
   readonly alineadoDerecha: boolean;
 }
 
-/** La tabla que acompana a un bloque. Treinta y uno de los 45 bloques la llevan. */
+/**
+ * La tabla que acompana a un bloque. Treinta y uno de los 45 bloques la llevan.
+ *
+ * **Sin filas y sin conteo**, por lo mismo que un campo de solo lectura no lleva su valor (#97):
+ * eran 113 filas de cifras de ejemplo viajando en el paquete servido. Lo que se conserva es la
+ * FORMA —que columnas hay, cual va a la derecha, cual es la insignia—, que es lo que el interprete
+ * necesita para dibujar la tabla con dato o sin el.
+ */
 export interface Tabla {
   readonly titulo: string;
   readonly columnas: readonly Columna[];
-  /** Las filas, cada una con tantas celdas como columnas. */
-  readonly filas: readonly (readonly string[])[];
   /** La linea de debajo: lo que hay que saber para leer la tabla sin equivocarse. */
   readonly nota?: string;
   /**
@@ -127,8 +145,6 @@ export interface Tabla {
   readonly columnaDeInsignia?: number;
   /** El rotulo del boton de alta, si la lista admite anadir una fila. */
   readonly accion?: string;
-  /** El conteo del encabezado: «4 de 62,418». Sin el, el interprete cuenta las filas. */
-  readonly conteo?: string;
 }
 
 /* ── El bloque y la pantalla ───────────────────────────────────────────────────────────── */

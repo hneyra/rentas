@@ -14,6 +14,7 @@ import {
   tipoDe,
 } from '@kamayuk/ui';
 
+import type { Ausencia } from '../datos.ts';
 import type { Campo as Definicion } from '../tipos.ts';
 
 /**
@@ -36,16 +37,26 @@ import type { Campo as Definicion } from '../tipos.ts';
  * Es un `Dato`: filo discontinuo y `<output>`. No es un campo que «ahora no se puede escribir»,
  * es un valor que esta pantalla no decide — lo calcula el backend—, y esa diferencia es la que
  * evita que alguien intente corregir aqui una cifra que se corrige en otro sitio.
+ *
+ * <h2>Y cuando no hay dato, lo DICE (#97)</h2>
+ *
+ * Hasta #97 pintaba la cifra de ejemplo del artboard —«S/ 23,725,394.80»— que viajaba dentro de la
+ * definicion. En un sistema de recaudacion **eso se lee como real**. Ahora el valor entra por
+ * parametro y, cuando no esta, se dibuja la palabra que quien monta la pantalla haya elegido para
+ * decir por que — nunca una cifra, y nunca un cero: **un cero es una afirmacion**, y no saber no
+ * lo es.
  */
 
 export interface CampoDelBloqueProps {
   readonly campo: Definicion;
-  /** El valor actual. `undefined` = el que la definicion trae. */
+  /** Lo tecleado, o —en un campo de solo lectura— lo que se sepa de la API. */
   readonly valor?: string | boolean;
+  /** Que decir en el hueco de un campo de solo lectura cuando no hay valor. */
+  readonly ausencia: Ausencia;
   readonly alCambiar: (valor: string | boolean) => void;
 }
 
-export function CampoDelBloque({ campo, valor, alCambiar }: CampoDelBloqueProps) {
+export function CampoDelBloque({ campo, valor, ausencia, alCambiar }: CampoDelBloqueProps) {
   const tipo = tipoDe(campo.tipo);
   const ancho = anchoCompleto(campo.tipo);
   // «(opcional)» sale de la propia ayuda, como en el artboard: `/opcional/i.test(ayuda)`. No hay
@@ -73,12 +84,21 @@ export function CampoDelBloque({ campo, valor, alCambiar }: CampoDelBloqueProps)
         </Etiqueta>
       );
     }
-    case 'r':
+    case 'r': {
+      const hayDato = typeof valor === 'string' && valor !== '';
       return (
         <Etiqueta {...comun} ayuda={undefined}>
-          <Dato>{'valor' in campo ? campo.valor : ''}</Dato>
+          <Dato
+            // `data-sin-dato` no es decoracion: es lo que permite a una guarda contar los huecos
+            // de una pantalla sin leer el texto, que cambia con quien la monta.
+            data-sin-dato={hayDato ? undefined : ''}
+            className={hayDato ? undefined : 'text-tinta-3 italic'}
+          >
+            {hayDato ? valor : ausencia.enElCampo}
+          </Dato>
         </Etiqueta>
       );
+    }
     case 'c':
       return (
         <Etiqueta {...comun} ayuda={undefined}>

@@ -1,5 +1,6 @@
 import { Tarjeta, TarjetaCabecera, TarjetaCampos, TarjetaNota } from '@kamayuk/ui';
 
+import type { Ausencia } from '../datos.ts';
 import type { Bloque } from '../tipos.ts';
 import { CampoDelBloque } from './CampoDelBloque.tsx';
 import { TablaDelBloque } from './TablaDelBloque.tsx';
@@ -13,12 +14,23 @@ import { TablaDelBloque } from './TablaDelBloque.tsx';
 
 export interface BloqueDeLaPantallaProps {
   readonly bloque: Bloque;
-  /** Los valores tecleados, por indice de campo. Lo que no esta aqui vale lo que dice la definicion. */
+  /** Lo tecleado y lo sabido, por indice de campo. Lo que no esta aqui no se sabe. */
   readonly valores: Readonly<Record<number, string | boolean>>;
+  /** Las filas de su tabla, si se saben. */
+  readonly filas?: readonly (readonly string[])[];
+  readonly conteo?: string;
+  readonly ausencia: Ausencia;
   readonly alCambiar: (indiceDelCampo: number, valor: string | boolean) => void;
 }
 
-export function BloqueDeLaPantalla({ bloque, valores, alCambiar }: BloqueDeLaPantallaProps) {
+export function BloqueDeLaPantalla({
+  bloque,
+  valores,
+  filas,
+  conteo,
+  ausencia,
+  alCambiar,
+}: BloqueDeLaPantallaProps) {
   return (
     <Tarjeta>
       <TarjetaCabecera>{bloque.titulo}</TarjetaCabecera>
@@ -33,12 +45,15 @@ export function BloqueDeLaPantalla({ bloque, valores, alCambiar }: BloqueDeLaPan
               key={`${campo.etiqueta}|${campo.tipo}`}
               campo={campo}
               valor={valores[i]}
+              ausencia={ausencia}
               alCambiar={(v) => alCambiar(i, v)}
             />
           ))}
         </TarjetaCampos>
       )}
-      {bloque.tabla === undefined ? null : <TablaDelBloque tabla={bloque.tabla} />}
+      {bloque.tabla === undefined ? null : (
+        <TablaDelBloque tabla={bloque.tabla} filas={filas} conteo={conteo} ausencia={ausencia} />
+      )}
     </Tarjeta>
   );
 }

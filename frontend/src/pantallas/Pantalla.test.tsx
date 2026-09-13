@@ -3,6 +3,8 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 
+import type { Ausencia } from './datos.ts';
+import { coordenada } from './datos.ts';
 import { Pantalla } from './Pantalla.tsx';
 import type { Campo, Pantalla as Definicion } from './tipos.ts';
 
@@ -27,8 +29,15 @@ const campo = (c: Campo): Definicion => ({
   bloques: [{ titulo: 'Un bloque', nota: '', campos: [c] }],
 });
 
+/** Una ausencia inventada. La de verdad la redacta `porQueNoHayDato.ts`, que es de este sistema. */
+const SIN_DATO: Ausencia = {
+  enElCampo: 'sin conectar',
+  explicacion: 'Esta pantalla de prueba no esta conectada a nada.',
+  tono: 'info',
+};
+
 const monta = (definicion: Definicion, extra: Partial<Parameters<typeof Pantalla>[0]> = {}) =>
-  render(<Pantalla definicion={definicion} {...extra} />);
+  render(<Pantalla definicion={definicion} datos={{ ausencia: SIN_DATO }} {...extra} />);
 
 describe('los siete tipos de campo, cada uno con su pieza', () => {
   it('EL CENTINELA: la tabla de piezas de `@kamayuk/ui` sigue teniendo los siete', () => {
@@ -45,7 +54,12 @@ describe('los siete tipos de campo, cada uno con su pieza', () => {
   });
 
   it('«r» es un dato de solo lectura, y NO un campo desactivado', () => {
-    monta(campo({ etiqueta: 'Recaudado', tipo: 'r', valor: 'S/ 18,424,251.20' }));
+    monta(campo({ etiqueta: 'Recaudado', tipo: 'r' }), {
+      datos: {
+        ausencia: SIN_DATO,
+        valores: new Map([[coordenada(0, 0), 'S/ 18,424,251.20']]),
+      },
+    });
     const dato = document.querySelector('[data-slot="dato"]');
     expect(dato?.textContent).toBe('S/ 18,424,251.20');
     // `<output>`: se lee, sigue en el recorrido del tabulador, y no viaja con el formulario.
@@ -119,10 +133,6 @@ describe('la tabla de un bloque', () => {
             { rotulo: 'Emitido S/', alineadoDerecha: true },
             { rotulo: 'Situacion', alineadoDerecha: false },
           ],
-          filas: [
-            ['Predial', '9,418,204.60', 'Conforme'],
-            ['Arbitrios', '5,884,110.20', 'Vencida'],
-          ],
           columnaDeInsignia: 2,
           nota: 'El saldo no es deuda perdida.',
           accion: 'Anadir',
@@ -131,14 +141,28 @@ describe('la tabla de un bloque', () => {
     ],
   };
 
+  /** Las filas ya no viven en la definicion (#97): las pone quien las pide. */
+  const CON_FILAS = {
+    ausencia: SIN_DATO,
+    filas: new Map([
+      [
+        0,
+        [
+          ['Predial', '9,418,204.60', 'Conforme'],
+          ['Arbitrios', '5,884,110.20', 'Vencida'],
+        ],
+      ],
+    ]),
+  };
+
   it('la columna de cifras va a la derecha, y la primera identifica la fila', () => {
-    monta(conTabla);
+    monta(conTabla, { datos: CON_FILAS });
     expect(screen.getByRole('cell', { name: '9,418,204.60' }).className).toContain('tabular-nums');
     expect(screen.getByRole('cell', { name: 'Predial' }).className).toContain('whitespace-nowrap');
   });
 
   it('la columna de situacion se pinta como insignia, con el tono que el TEXTO pide', () => {
-    monta(conTabla);
+    monta(conTabla, { datos: CON_FILAS });
     // «Vencida» pide accion hoy; «Conforme» no. El tono sale del texto y no de un campo aparte,
     // que en 113 filas seria un dato a mano que el dia que se equivoque miente en verde.
     expect(screen.getByText('Vencida').className).toContain('bg-mal-fondo');
@@ -146,7 +170,7 @@ describe('la tabla de un bloque', () => {
   });
 
   it('la nota va FUERA de la tabla, y el conteo se cuenta solo', () => {
-    monta(conTabla);
+    monta(conTabla, { datos: CON_FILAS });
     // Dentro seria una fila mas y el lector la contaria como dato.
     expect(within(screen.getByRole('table')).queryByText(/deuda perdida/)).toBeNull();
     expect(screen.getByText('2 registros')).toBeTruthy();

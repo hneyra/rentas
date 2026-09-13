@@ -1,5 +1,8 @@
 import { useState } from 'react';
 
+import type { DatosDeLaPantalla } from './datos.ts';
+import { coordenada } from './datos.ts';
+import { Alerta } from '@kamayuk/ui';
 import { BloqueDeLaPantalla } from './piezas/BloqueDeLaPantalla.tsx';
 import type { Pantalla as Definicion } from './tipos.ts';
 
@@ -32,13 +35,23 @@ import type { Pantalla as Definicion } from './tipos.ts';
  * La INSTRUCCION sigue viniendo de la definicion y se le pasa al armazon desde el catalogo: es
  * dato de este sistema, no del marco.
  *
- * <h2>Lo que todavia NO hace</h2>
+ * <h2>Los DATOS entran por parametro, y su ausencia se EXPLICA (#97)</h2>
  *
- * No llama a la API: dibuja lo que la definicion dice, que son las cifras del artboard.
+ * El interprete no pide datos y no puede: saber que operaciones sirve este sistema es cosa de este
+ * sistema, y este archivo esta destinado a `@kamayuk/ui`. Recibe lo que se sepa —y, cuando no se
+ * sabe, por que—, y lo dibuja.
+ *
+ * **La explicacion va UNA vez arriba, y no en cada hueco.** Medido: 33 de las 40 pantallas no
+ * tienen ninguna operacion servida, asi que el hueco es el caso normal. Repetir la frase entera en
+ * cuarenta campos la convierte en ruido; ponerla solo en los huecos deja la peor pantalla posible
+ * —`seg-panel`, la unica con 3 de 3 operaciones servidas, saldria con seis guiones y ni una
+ * palabra—. Arriba se lee una vez y explica las cuarenta.
  */
 
 export interface PantallaProps {
   readonly definicion: Definicion;
+  /** Lo que se sabe de los datos, y que decir donde no se sabe. */
+  readonly datos: DatosDeLaPantalla;
   /** Se avisa la primera vez que se toca un campo: es lo que marca la hoja como sucia. */
   readonly alEnsuciar?: () => void;
 }
@@ -46,7 +59,7 @@ export interface PantallaProps {
 /** `bloque|campo` -> lo tecleado. Plano a proposito: una pantalla no anida mas. */
 type Tecleado = Record<string, string | boolean>;
 
-export function Pantalla({ definicion, alEnsuciar = () => {} }: PantallaProps) {
+export function Pantalla({ definicion, datos, alEnsuciar = () => {} }: PantallaProps) {
   const [tecleado, setTecleado] = useState<Tecleado>({});
 
 
@@ -59,8 +72,14 @@ export function Pantalla({ definicion, alEnsuciar = () => {} }: PantallaProps) {
     });
   };
 
-  const valoresDe = (bloque: number): Record<number, string | boolean> => {
+  const valoresDe = (bloque: number, campos: number): Record<number, string | boolean> => {
     const salida: Record<number, string | boolean> = {};
+    // Primero lo que se sepa de la API; lo tecleado va DESPUES y gana, porque un campo que alguien
+    // esta escribiendo no puede saltar hacia atras cuando llegue una respuesta.
+    for (let campo = 0; campo < campos; campo += 1) {
+      const sabido = datos.valores?.get(coordenada(bloque, campo));
+      if (sabido !== undefined) salida[campo] = sabido;
+    }
     for (const [clave, valor] of Object.entries(tecleado)) {
       const [b, c] = clave.split('|');
       if (b === String(bloque) && c !== undefined) salida[Number(c)] = valor;
@@ -70,13 +89,18 @@ export function Pantalla({ definicion, alEnsuciar = () => {} }: PantallaProps) {
 
   return (
     <div className="flex flex-col gap-[14px]">
+      {/* Una vez, arriba: ver el javadoc. */}
+      <Alerta tono={datos.ausencia.tono}>{datos.ausencia.explicacion}</Alerta>
       {definicion.bloques.map((bloque, i) => (
         <BloqueDeLaPantalla
           // El titulo del bloque: es unico dentro de cada pantalla en las cuarenta, y con el
           // indice, reordenar los bloques dejaria a React reusando el estado del anterior.
           key={bloque.titulo}
           bloque={bloque}
-          valores={valoresDe(i)}
+          valores={valoresDe(i, bloque.campos.length)}
+          filas={datos.filas?.get(i)}
+          conteo={datos.conteos?.get(i)}
+          ausencia={datos.ausencia}
           alCambiar={(campo, valor) => cambiar(i, campo, valor)}
         />
       ))}
