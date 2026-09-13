@@ -54,6 +54,15 @@ export interface DatosDeLaPantalla {
   readonly conteos?: ReadonlyMap<number, string>;
   /** Que decir donde no hay. Obligatorio: un hueco sin motivo es peor que el hueco. */
   readonly ausencia: Ausencia;
+  /**
+   * La palabra del hueco para campos CONCRETOS, cuando su motivo no es el de la pantalla.
+   *
+   * El caso que lo justifica: una pantalla que SI pidio sus datos y los recibio, y de la que la
+   * operacion **no publica** tres de sus cinco campos. Decir ahi «sin conectar» —el motivo de la
+   * pantalla— seria falso: si esta conectada. Lo que falta es el dato, y eso es informacion util
+   * para quien mantiene el backend.
+   */
+  readonly ausenciaPorCampo?: ReadonlyMap<Coordenada, string>;
 }
 
 /** La coordenada de un campo. */

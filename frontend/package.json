@@ -24,6 +24,7 @@
     "@kamayuk/sesion": "link:../../kamayuk-lib/paquetes/sesion",
     "@kamayuk/shell": "link:../../kamayuk-lib/paquetes/shell",
     "@kamayuk/ui": "link:../../kamayuk-lib/paquetes/ui",
+    "@tanstack/react-query": "^5.102.8",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",

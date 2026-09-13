@@ -1,6 +1,7 @@
 import { Tarjeta, TarjetaCabecera, TarjetaCampos, TarjetaNota } from '@kamayuk/ui';
 
-import type { Ausencia } from '../datos.ts';
+import type { Ausencia, Coordenada } from '../datos.ts';
+import { coordenada } from '../datos.ts';
 import type { Bloque } from '../tipos.ts';
 import { CampoDelBloque } from './CampoDelBloque.tsx';
 import { TablaDelBloque } from './TablaDelBloque.tsx';
@@ -20,6 +21,10 @@ export interface BloqueDeLaPantallaProps {
   readonly filas?: readonly (readonly string[])[];
   readonly conteo?: string;
   readonly ausencia: Ausencia;
+  /** La palabra del hueco para campos concretos. Ver `datos.ts`. */
+  readonly ausenciaPorCampo?: ReadonlyMap<Coordenada, string>;
+  /** El indice de este bloque, para componer la coordenada de sus campos. */
+  readonly indice: number;
   readonly alCambiar: (indiceDelCampo: number, valor: string | boolean) => void;
 }
 
@@ -29,6 +34,8 @@ export function BloqueDeLaPantalla({
   filas,
   conteo,
   ausencia,
+  ausenciaPorCampo,
+  indice,
   alCambiar,
 }: BloqueDeLaPantallaProps) {
   return (
@@ -46,6 +53,7 @@ export function BloqueDeLaPantalla({
               campo={campo}
               valor={valores[i]}
               ausencia={ausencia}
+              enElCampo={ausenciaPorCampo?.get(coordenada(indice, i))}
               alCambiar={(v) => alCambiar(i, v)}
             />
           ))}

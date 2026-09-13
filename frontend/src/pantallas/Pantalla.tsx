@@ -101,6 +101,8 @@ export function Pantalla({ definicion, datos, alEnsuciar = () => {} }: PantallaP
           filas={datos.filas?.get(i)}
           conteo={datos.conteos?.get(i)}
           ausencia={datos.ausencia}
+          ausenciaPorCampo={datos.ausenciaPorCampo}
+          indice={i}
           alCambiar={(campo, valor) => cambiar(i, campo, valor)}
         />
       ))}
