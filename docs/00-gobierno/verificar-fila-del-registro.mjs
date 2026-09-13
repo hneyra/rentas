@@ -1,12 +1,12 @@
 /* Comprueba que un PR que cierra un issue deja su fila en «Verificar antes de afirmar»,
-   y —desde #130— que el cierre que declara lo entienda tambien GitHub.
+   y —desde `rentas`#130— que el cierre que declara lo entienda tambien GitHub.
 
    El registro de «Verificar antes de afirmar» es la memoria del proyecto: cada issue
    deja ahi que se implemento y **como se demostro que la verificacion puede fallar**.
    Es lo que impide volver a descubrir el mismo hallazgo de RLS por tercera vez.
 
-   Y no la comprobaba nadie. Al integrar #585 y #618 la fila no se escribio y los dos
-   PR pasaron todos sus checks en verde; el hueco se descubrio a mano, leyendo la
+   Y no la comprobaba nadie. Al integrar `sgtm`#585 y `sgtm`#618 la fila no se escribio y
+   los dos PR pasaron todos sus checks en verde; el hueco se descubrio a mano, leyendo la
    tabla. El modo de fallo es silencioso: la fila que falta no se distingue de la que
    nadie tenia que escribir.
 
@@ -18,35 +18,61 @@
 
    Y solo lo exige cuando las dos cosas son ciertas:
 
-     1. el cuerpo del PR declara que cierra un issue (`Cierra #N`, `Closes #N`,
-        `Fixes #N`, `Resuelve #N`), y
-     2. el cambio toca el codigo de produccion del backend, del frontend o de infra.
+     1. el cuerpo del PR declara que cierra un issue (`Closes #N`, `Fixes #N`,
+        `Resolves #N`, o en el idioma de la casa `Cierra #N` y `Resuelve #N`), y
+     2. el cambio toca lo que ESTE repositorio declara codigo de produccion en
+        `RUTAS_DE_CODIGO`.
 
    Un PR de solo documentacion, de solo pruebas o sin issue asociado pasa en verde. Sin
    ese contraste la guarda seria un peaje que todo el mundo aprende a esquivar — y una
    guarda esquivada no protege nada, que es de donde venimos.
 
-   ## Y desde #130, una segunda cosa: que el cierre declarado CIERRE
+   ## Y una segunda cosa: que el cierre declarado CIERRE
 
    Esta guarda reconoce `Cierra #N`, en castellano, que es el idioma de la casa. **GitHub
    no.** Su auto-cierre solo entiende close/closes/closed, fix/fixes/fixed y
-   resolve/resolves/resolved. El PR #129 dijo «Cierra #111», se mezclo con todo en verde
-   —esta guarda incluida, porque la fila estaba— y **el issue se quedo abierto** sin que
-   nada lo dijera; los otros cinco de la tanda decian «Closes» y cerraron solos.
+   resolve/resolves/resolved. El PR `rentas`#129 dijo «Cierra #111», se mezclo con todo en
+   verde —esta guarda incluida, porque la fila estaba— y **el issue se quedo abierto** sin
+   que nada lo dijera; los otros cinco de aquella tanda decian «Closes» y cerraron solos.
 
    Asi que si el cuerpo declara un cierre con una palabra que GitHub ignora, esto sale
    **rojo**, nombra el issue que va a quedarse abierto y escribe la linea que hay que
-   poner. **No cambia el idioma de nada** —AC «Lo que NO entra» de #130—: `Cierra #N` se
-   sigue reconociendo, y lo que se pide es una linea que GitHub sepa leer.
+   poner. **No cambia el idioma de nada** —«Lo que NO entra» de `rentas`#130 y de
+   `infrastructure`#165—: `Cierra #N` se sigue reconociendo, y lo que se pide es una linea
+   que GitHub sepa leer.
 
    **Por que rojo y no una advertencia en la salida.** Porque el defecto que viene a cerrar
    es exactamente «verde que nadie mira»: un aviso impreso en un check que sale en verde
    tiene la misma forma que el fallo —CI contenta, log sin leer— y lo habria reproducido en
-   vez de cerrarlo. El coste esta acotado y medido: de los seis PR de la tanda, cinco
-   seguirian verdes y solo el roto se pondria rojo; el remedio es **una linea del cuerpo**,
-   lo escribe quien lo escribio mal, y `registro.yml` escucha `edited` desde #57 —para esto
-   mismo—, asi que editar el cuerpo relanza la comprobacion sin empujar un commit. Y el que
-   de verdad no quiera auto-cierre tiene salida limpia: no declararlo («Ref #N»).
+   vez de cerrarlo. El coste esta acotado y medido en `rentas`: de los seis PR de aquella
+   tanda, cinco seguirian verdes y solo el roto se pondria rojo. El remedio es **una linea
+   del cuerpo**, lo escribe quien lo escribio mal, y `registro.yml` escucha `edited` en los
+   seis repositorios desde `infrastructure`#57 —para esto mismo—, asi que editar el cuerpo
+   relanza la comprobacion sin empujar un commit. Y el que de verdad no quiera auto-cierre
+   tiene salida limpia: no declararlo («Ref #N»).
+
+   ## Seis copias, y lo unico que puede cambiar entre ellas (`infrastructure`#165)
+
+   Este guion vive COPIADO en los seis repositorios —`infrastructure`, `rentas`, `catastro`,
+   `normativa`, `caja` e `identidad`— y eso ya costo una vez: `rentas`#130 arreglo su copia y
+   las otras cinco se quedaron con el mismo defecto, en verde, porque nada las ataba. No es
+   una libreria porque hoy no hay donde publicar un guion de Node que los seis consuman
+   —`kamayuk-lib` no tiene sitio para eso—, asi que las copias se quedan y SE ATAN:
+   `infra/verificaciones/las-seis-copias-de-la-guarda-del-registro.test.ts`, en
+   `infrastructure`, lee las seis y exige que sean **identicas byte a byte salvo en un
+   bloque**, el de `RUTAS_DE_CODIGO`: su comentario de documentacion y la lista. Es lo unico
+   que decide cada dueno con lo que su arbol tiene, y dentro de la lista solo caben patrones
+   y comentarios.
+
+   Dos consecuencias, y las dos son a proposito:
+
+     - **un cambio a este archivo fuera de ese bloque es un cambio en los seis
+       repositorios**, y `infrastructure` se mezcla el ULTIMO: su guarda lee la rama
+       principal de los otros cinco, asi que mezclarlo antes la deja roja hasta que lleguen;
+     - **aqui no se escribe nada que sea de un solo repositorio**, ni un `#N` sin decir de
+       quien es: la misma linea esta en seis sitios, y un numero sin dueno nombraria un issue
+       distinto en cada uno. Lo propio de cada repositorio va en el bloque de
+       `RUTAS_DE_CODIGO`, en su autoprueba o en su `docs/agent/HISTORY.md`.
 
    ## Uso
 
@@ -57,8 +83,8 @@
 
    Las tres entradas se pueden dar por archivo —`--cuerpo`, `--archivos`, `--anadido`—,
    y es lo que usa su autoprueba: sin poder alimentarlas, demostrar que muerde exigiria
-   fabricar un repositorio, y una comprobacion que no se puede probar es la que este
-   issue viene a impedir.
+   fabricar un repositorio, y una comprobacion que no se puede probar es la que esta
+   guarda viene a impedir.
 */
 
 import { execFileSync } from 'node:child_process';
@@ -126,14 +152,14 @@ export const RUTAS_DE_CODIGO = [
 
 /**
  * Donde vive la fila. **Es UNA, y ya no es una ventana de compatibilidad** (`infrastructure`#114):
- * el registro se mudo de `CLAUDE.md` a `docs/agent/HISTORY.md` —eran el 91 % de un archivo que
- * cada sesion carga entero— y **los seis repositorios migraron el 2026-09-12**, asi que el
- * estrechado llega en su cambio propio, que es como el primer tiempo dijo que se haria.
+ * el registro se mudo de `CLAUDE.md` a `docs/agent/HISTORY.md` —era la mayor parte de un archivo
+ * que cada sesion carga entero— y **los seis repositorios migraron el 2026-09-12**, asi que el
+ * estrechado llego en su cambio propio, que es como el primer tiempo dijo que se haria.
  *
- * Lo que cambia con esto: **una fila escrita en `CLAUDE.md` deja de contar**. Mientras los dos
- * sitios estuvieran aqui, un PR podia dejar su fila en el archivo viejo y salir en verde, y la
- * memoria del proyecto se partia en dos sin que nada lo dijera — que es justo lo que la mudanza
- * viene a cerrar.
+ * Lo que cambia con esto: **una fila escrita en `CLAUDE.md` no cuenta**. Ese archivo conserva la
+ * doctrina y la cabecera de la tabla vacia, asi que escribir la fila ahi sale plausible; con los
+ * dos sitios aqui, un PR podia dejarla en el archivo viejo y salir en verde, y la memoria del
+ * proyecto se partia en dos sin que nada lo dijera — que es justo lo que la mudanza cerro.
  *
  * Sigue siendo una lista y no una cadena a proposito: es lo que se le pasa a `git diff -- …`, y
  * el dia que el registro se vuelva a partir —por tamano, por ejemplo— el segundo archivo entra
@@ -143,23 +169,25 @@ const DONDE_VIVE_LA_FILA = ['docs/agent/HISTORY.md'];
 
 /** Como se declara que un PR cierra un issue: en el idioma de la casa, y en el de GitHub.
 
-    **Son DOS listas y no una, y esa diferencia es el defecto de #130.** CLAUDE.md manda
-    «comentarios, pruebas y mensajes de commit en espanol», asi que esta guarda reconoce
-    `Cierra #N` y `Resuelve #N` y las va a seguir reconociendo: el idioma no se cambia por una
-    limitacion de GitHub. **Pero GitHub solo auto-cierra con las inglesas** —close/closes/closed,
-    fix/fixes/fixed, resolve/resolves/resolved— y con ninguna mas.
+    **Son DOS listas y no una, y esa diferencia es el defecto de `rentas`#130.** Los seis
+    CLAUDE.md mandan comentarios, pruebas y mensajes de commit en espanol, asi que esta guarda
+    reconoce `Cierra #N` y `Resuelve #N` y las va a seguir reconociendo: el idioma no se cambia
+    por una limitacion de GitHub. **Pero GitHub solo auto-cierra con las inglesas**
+    —close/closes/closed, fix/fixes/fixed, resolve/resolves/resolved— y con ninguna mas.
 
-    Medido en la tanda del 2026-09-12, PR a PR: #121, #122, #123, #124 y #128 decian `Closes #N`
-    y **cerraron su issue al mezclar**; #129 decia `Cierra #111` y **no cerro nada**. El PR se
-    mezclo, la CI quedo verde, esta misma guarda dijo que la fila estaba, y el issue siguio
-    abierto hasta que alguien lo cerro a mano al auditar. El modo de fallo **se parece al exito**,
-    que es el peor que hay — y la trampa estaba montada por construccion: esta guarda PREMIA
-    escribir en castellano y esa misma palabra es la que GitHub ignora.
+    Medido en `rentas` en la tanda del 2026-09-12, PR a PR: `rentas`#121, #122, #123, #124 y
+    #128 decian `Closes #N` y **cerraron su issue al mezclar**; `rentas`#129 decia
+    `Cierra #111` y **no cerro nada**. El PR se mezclo, la CI quedo verde, esta misma guarda
+    dijo que la fila estaba, y el issue siguio abierto hasta que alguien lo cerro a mano al
+    auditar. El modo de fallo **se parece al exito**, que es el peor que hay — y la trampa
+    estaba montada por construccion: esta guarda PREMIA escribir en castellano y esa misma
+    palabra es la que GitHub ignora.
 
-    Las inglesas van en las dos listas a proposito, y hasta #130 `CIERRA` no conocia `closed`,
-    `fixed` ni `resolved`. Eran dos huecos: un cuerpo que dijera «Fixed #N» cerraba el issue en
-    GitHub y aqui **no exigia fila**, y uno que dijera «Cierra #N» y «Fixed #N» a la vez se leeria
-    como que #N se queda sin auto-cierre, cuando si lo tiene. */
+    Las inglesas van en las dos listas a proposito, y hasta `rentas`#130 —y hasta
+    `infrastructure`#165 en las otras cinco copias— `CIERRA` no conocia `closed`, `fixed` ni
+    `resolved`. Eran dos huecos: un cuerpo que dijera «Fixed #N» cerraba el issue en GitHub y
+    aqui **no exigia fila**, y uno que dijera «Cierra #N» y «Fixed #N» a la vez se leeria como
+    que #N se queda sin auto-cierre, cuando si lo tiene. */
 const PALABRAS_DE_LA_CASA = ['cierra', 'resuelve'];
 const PALABRAS_DE_GITHUB = [
   'closes',
@@ -181,7 +209,7 @@ function declaracionDeCierre(palabras) {
 }
 
 // Se ejecuta SOLO cuando se invoca como guion. Importarlo no hace nada, que es lo que
-// permite a su autoprueba leer `RUTAS_DE_CODIGO` de aqui en vez de copiarla (#45).
+// permite a su autoprueba leer `RUTAS_DE_CODIGO` de aqui en vez de copiarla (`rentas`#45).
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   principal();
 }
@@ -194,7 +222,7 @@ function principal() {
     : (process.env.KAMAYUK_CUERPO_DEL_PR ?? '');
 
   /* Sin duplicados: un cuerpo que explica lo que hace nombra el mismo issue varias veces, y los
-     tres mensajes de aqui abajo lo listan. Medido en el CI de este mismo PR antes de arreglarlo:
+     tres mensajes de aqui abajo lo listan. Medido en el CI de `rentas`#132 antes de arreglarlo:
      «Cierra #130, #130, #130, #130 y no toca codigo de produccion». No cambia lo que se decide
      —filtrar y comprobar sobre repetidos da lo mismo—, solo lo que se lee. */
   const issues = [...new Set([...cuerpo.matchAll(CIERRA)].map((coincidencia) => coincidencia[1]))];
@@ -203,8 +231,8 @@ function principal() {
     process.exit(0);
   }
 
-  /* Lo SEGUNDO que comprueba esta guarda (#130), y mira el CUERPO y no el diff: que la palabra
-     con que el PR declara cada cierre sea de las que GitHub entiende.
+  /* Lo SEGUNDO que comprueba esta guarda (`rentas`#130), y mira el CUERPO y no el diff: que la
+     palabra con que el PR declara cada cierre sea de las que GitHub entiende.
 
      Se hace por ISSUE y no por cuerpo, porque un cuerpo puede declarar dos y acertar con uno:
      «Cierra #711 … Closes #712» cierra #712 al mezclar y deja #711 abierto. Un aviso que dijera
@@ -227,11 +255,11 @@ function principal() {
     console.error('  GitHub auto-cierra con estas palabras, y con ninguna mas:');
     console.error(`    ${PALABRAS_DE_GITHUB.join(', ')}`);
     console.error('');
-    console.error('  Medido en la tanda del 2026-09-12: los cinco PR que decian «Closes #N»');
-    console.error('  cerraron su issue al mezclar y el que decia «Cierra #N» no, y nadie se');
-    console.error('  entero hasta la auditoria — PR mezclado, CI verde, fila escrita, issue');
-    console.error('  abierto. El modo de fallo se parece al exito, y por eso esto es rojo y no');
-    console.error('  una linea mas en un registro que solo se lee cuando algo ya esta rojo.');
+    console.error('  Medido en `rentas` el 2026-09-12: de seis PR de una misma tanda, los cinco');
+    console.error('  que decian «Closes #N» cerraron su issue al mezclar y el que decia');
+    console.error('  «Cierra #N» no, y nadie se entero hasta la auditoria — PR mezclado, CI');
+    console.error('  verde, fila escrita, issue abierto. El modo de fallo se parece al exito, y');
+    console.error('  por eso esto es rojo y no una linea mas en un registro que nadie lee.');
     console.error('');
     console.error('  ARREGLO: escribe en el cuerpo del PR');
     for (const numero of sinAutocierre) {
@@ -248,7 +276,7 @@ function principal() {
     console.error('  que hace falta es UNA linea que GitHub sepa leer, no un cuerpo en ingles.');
     console.error('');
     console.error('  Editar el cuerpo del PR relanza esta comprobacion sin empujar un commit:');
-    console.error('  `registro.yml` escucha `edited` desde #57, justo para los rojos de cuerpo.');
+    console.error('  `registro.yml` escucha `edited`, justo para los rojos de cuerpo.');
     process.exit(1);
   }
 
@@ -310,21 +338,19 @@ function principal() {
 /**
  * Si ese texto trae una FILA que nombre al issue —como tal y no como parte de otro numero—.
  *
- * **Que sea una fila es la mitad que faltaba, y hasta el 2026-09-12 no estaba.** Bastaba con que
- * `#N` apareciera en cualquier linea anadida, y eso **lo satisface una cabecera o un parrafo**.
+ * Son dos exigencias y las dos hacen falta. La primera, que el numero aparezca como tal: `#711`
+ * no es la fila de `#71`. La segunda, que la linea que lo nombra **sea una fila de la tabla**
+ * —que empiece por `|`— y no una cabecera, un parrafo o una nota.
  *
- * Lo destaparon TRES carriles a la vez al mudar el registro a `docs/agent/HISTORY.md`
- * (`infrastructure`#114), y este repositorio fue uno de los tres: la cabecera del archivo nuevo
- * citaba el issue que traia la mudanza, asi que la rotura de control —quitar la fila y enmendar
- * el commit— salio **VERDE**, contestando «Cada issue que este PR cierra tiene su fila» con cero
- * filas dentro. Los tres lo rodearon igual: escribiendo una cabecera que no cita su propio issue
- * y anotandolo. Eso es una costumbre, y una costumbre no es una guarda — el dia que alguien
- * escriba en la cabecera «esto se mudo por #N», la guarda vuelve a dar por buena una tabla sin
- * tocar.
+ * **La segunda llego despues, y la destaparon TRES carriles a la vez** al mudar el registro a
+ * `docs/agent/HISTORY.md` (`infrastructure`#114): la cabecera del archivo nuevo citaba el issue
+ * de la propia mudanza, asi que la rotura de control —quitar la fila y exigir rojo— salia
+ * **VERDE**, contestando «Cada issue que este PR cierra tiene su fila» con cero filas dentro. Una
+ * guarda que un parrafo satisface no exige una fila: exige que alguien escriba el numero.
  *
- * Asi que la exigencia se escribe donde se puede sostener: **una fila de una tabla de Markdown
- * empieza por `|`**. El `+` del diff se quita antes de mirar, porque lo que llega aqui son las
- * lineas anadidas del cambio.
+ * El texto llega tal cual sale del `git diff`, asi que cada linea trae su `+` delante: se le quita
+ * antes de mirar. No se comprueba que la fila tenga tres columnas ni que diga la verdad, porque
+ * eso es justo lo que lee la revision y no una maquina.
  */
 function nombra(texto, numero) {
   const cita = new RegExp(`#${numero}(?![0-9])`);

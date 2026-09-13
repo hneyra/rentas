@@ -306,6 +306,13 @@ auditoría —PR mezclado, CI verde, fila escrita, issue abierto—. Desde #130 
 (`.github/pull_request_template.md`) lo dice arriba del todo. Si de verdad no quieres auto-cierre,
 no lo declares: «Ref» o «Parte de» no disparan nada.
 
+**Y ese guion no es sólo de este repositorio**: es el mismo archivo en los seis, byte a byte salvo
+el bloque de `RUTAS_DE_CODIGO` —su comentario y la lista—, y lo vigila
+`infra/verificaciones/las-seis-copias-de-la-guarda-del-registro.test.ts` en `infrastructure`
+([#165](https://github.com/hneyra/infrastructure/issues/165)). Cambiarlo fuera de ese bloque es
+cambiarlo en los seis, y `infrastructure` se mezcla el último. Lo que sí es de aquí es la
+autoprueba, que ejerce la lista de este árbol.
+
 | Verificación | Cómo se demostró que puede fallar | Resultado |
 |---|---|---|
 
