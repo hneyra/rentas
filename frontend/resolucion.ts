@@ -1,8 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-import { enlacesDeclarados } from './verificaciones/enlace.ts';
+import { enlacesDeclarados, loQuePideElEnlace } from './verificaciones/enlace.ts';
 
 /**
  * **Lo que los paquetes enlazados dan por puesto, y que por tanto resuelve ESTE frontend.**
@@ -37,16 +37,23 @@ import { enlacesDeclarados } from './verificaciones/enlace.ts';
  * `preserveSymlinks` seria mas directo —hace que la libreria resuelva como si estuviera dentro de
  * este frontend— y es lo que se usa para **TypeScript**, en `tsconfig.base.json`. Pero en Vite
  * rompe la transformacion: probado, `loadAndTransform` revienta y no se recoge ni un archivo.
+ *
+ * <h2>Y por que el `resolve` de cada enlace va envuelto</h2>
+ *
+ * Porque **este archivo es el primero que toca el clon hermano**, antes que `tsc`, que `vitest` y
+ * que ninguna guarda: lo carga `vite.config.ts`, o sea `yarn dev` y `yarn build`. Sin envolver,
+ * el hermano ausente salia como `Cannot find module '@kamayuk/api'` desde `require.resolve`, doce
+ * lineas antes del `throw` de aqui abajo —que nombra el `git clone` y **no llegaba a ejecutarse
+ * nunca** en el unico caso para el que se escribio (#113)—. El mensaje entero, con el paquete que
+ * no resolvio y la ruta donde se le espera, lo compone `loQuePideElEnlace`.
  */
 export const LO_QUE_PONE_EL_CONSUMIDOR: readonly string[] = (() => {
   const requerir = createRequire(import.meta.url);
+  const raiz = fileURLToPath(new URL('.', import.meta.url));
   const enlaces = enlacesDeclarados(readFileSync(new URL('./package.json', import.meta.url), 'utf8'));
   const nombres = new Set<string>();
   for (const enlace of enlaces) {
-    const manifiesto = JSON.parse(
-      readFileSync(join(dirname(requerir.resolve(enlace.paquete)), 'package.json'), 'utf8'),
-    ) as { peerDependencies?: Record<string, string> };
-    for (const nombre of Object.keys(manifiesto.peerDependencies ?? {})) nombres.add(nombre);
+    for (const nombre of Object.keys(loQuePideElEnlace(requerir, enlace, raiz))) nombres.add(nombre);
   }
   if (nombres.size === 0) {
     // Sin esto, un enlace roto dejaria la lista vacia y el sintoma seria el de arriba: dos React,
