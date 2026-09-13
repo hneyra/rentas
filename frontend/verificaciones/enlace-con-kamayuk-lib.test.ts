@@ -73,6 +73,9 @@ describe('el enlace con el clon hermano esta bien puesto', () => {
       '@kamayuk/sesion',
       '@kamayuk/shell',
       '@kamayuk/ui',
+      // El sexto, y el unico que NO entra en el paquete: trae las nueve prohibiciones de ESLint,
+      // que aqui estaban forkeadas (#137). Por eso va en `devDependencies` y los otros cinco no.
+      '@kamayuk/verificaciones',
     ]);
     // Y todos apuntan al mismo clon hermano: tres rutas a tres sitios distintos serian tres
     // dependencias que mantener, no una.

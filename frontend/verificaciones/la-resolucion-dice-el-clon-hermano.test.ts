@@ -89,7 +89,7 @@ describe('LA MUESTRA: sin el clon hermano, el rojo dice donde mirar', () => {
     expect(rojo).toContain('git clone https://github.com/hneyra/kamayuk-lib ../../kamayuk-lib');
   });
 
-  it('cada uno de los cinco enlaces declarados se nombra a si mismo', () => {
+  it('cada uno de los seis enlaces declarados se nombra a si mismo', () => {
     const enlaces = enlacesDeclarados(readFileSync(join(FRONTEND, 'package.json'), 'utf8'));
     expect(enlaces.length).toBeGreaterThanOrEqual(5);
     for (const { paquete, declarada } of enlaces) {
@@ -131,7 +131,7 @@ describe('LA GUARDA DE LA GUARDA: el `resolve` de `resolucion.ts` sigue envuelto
 });
 
 describe('con el hermano en su sitio, resuelve', () => {
-  it('los cinco enlaces piden algo, y lo piden de verdad', () => {
+  it('los seis enlaces se resuelven, y los que piden algo lo piden de verdad', () => {
     // Si esto sale rojo, el hermano falta — y el rojo que se lea aqui ES el mensaje de arriba,
     // que es el asunto entero de este archivo.
     const requerir = createRequire(import.meta.url);

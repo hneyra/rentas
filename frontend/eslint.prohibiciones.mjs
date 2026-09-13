@@ -1,61 +1,87 @@
 /**
- * Las prohibiciones del frontend de `rentas`, como DATO.
+ * Las prohibiciones de ESTE frontend: **las del producto, con las rutas de ESTE arbol**.
  *
- * No estan escritas dentro de `eslint.config.js` a proposito. Este archivo lo leen dos
- * consumidores y tienen que leer lo mismo:
+ * <h2>Aqui habia una copia, y ya habia divergido (#137)</h2>
+ *
+ * Las nueve nacieron en este archivo y las mudo `kamayuk-lib`#4 a
+ * `paquetes/verificaciones/prohibiciones.mjs`, cuya cabecera dice desde entonces que «las consumen
+ * el `eslint.config.js` de este repositorio **y el de cada sistema**». No era cierto: aqui quedo la
+ * copia, sin enlace y sin nadie que las comparara. **Medido antes de tocar nada**, importando los
+ * dos modulos y comparandolos campo a campo:
+ *
+ *   · nueve claves a los dos lados, en el mismo orden;
+ *   · **ocho de nueve identicas** en `clave`, `regla`, `selector` y `message`;
+ *   · `REGLAS_EXIGIDAS`, identica;
+ *   · y **una sola** diferencia, en `fetch-fuera-del-cliente`: el `salvo` y el `message` que lo
+ *     nombra. Alli `['paquetes/api/', 'paquetes/sesion/']`; aqui `'src/api/'`, y ademas **como
+ *     cadena y no como lista**, que es la diferencia semantica: las dos listas ya no se podian
+ *     intercambiar.
+ *
+ * O sea que lo comun eran 1 755 bytes de selector y 1 070 de mensaje, y lo propio **una ruta**.
+ * Con ese reparto, mantener dos copias sincronizadas cuesta mas que enlazar la buena: este archivo
+ * pasa a **derivar** la lista de `@kamayuk/verificaciones` —sexto `link:` del frontend— y a poner
+ * lo unico que es suyo.
+ *
+ * <h2>Por que la ruta es un parametro, y por que es una LISTA</h2>
+ *
+ * Porque la misma regla del producto necesita **una** ruta aqui y **dos** alla, y las dos veces con
+ * razon. Medido en este arbol: los tres `fetch` viven en `src/api/cliente.ts` y
+ * `src/api/identidad.ts`, o sea el cliente HTTP y la puerta PKCE en el MISMO directorio. En la
+ * libreria esas dos piezas son dos paquetes —`paquetes/api/` y `paquetes/sesion/`—, asi que alli
+ * hacen falta dos prefijos. Unificar las rutas seria falsificar uno de los dos arboles; lo que se
+ * comparte es la lista de reglas, no donde cae cada una.
+ *
+ * <h2>Que sigue siendo verdad de este archivo</h2>
+ *
+ * Que no esta escrito dentro de `eslint.config.js` a proposito. Lo leen dos consumidores y tienen
+ * que leer lo mismo:
  *
  *   1. `eslint.config.js`, que las convierte en opciones de `no-restricted-syntax`, y
  *   2. `verificaciones/reglas-de-eslint.test.ts`, que exige de cada una su muestra.
  *
- * Si la prueba tuviera su propia lista, seria una copia: se anade una regla al config, la
- * lista de la prueba no se toca, y la regla nueva queda sin muestra **en verde**. Que es
- * exactamente el modo de fallo que la prueba existe para impedir. Derivadas de aqui las
- * dos, una prohibicion sin muestra sale roja sola.
+ * Si la prueba tuviera su propia lista, seria una copia: se anade una regla al config, la lista de
+ * la prueba no se toca, y la regla nueva queda sin muestra **en verde**. Derivadas de aqui las dos,
+ * una prohibicion sin muestra sale roja sola.
  *
- * El `clave` no es decorativo: **es el nombre de su muestra**. La prueba no tiene un mapa
- * de «regla -> archivo» que alguien pueda dejar desactualizado; compone la ruta.
- */
-
-/**
- * @typedef {object} Prohibicion
- * @property {string} clave     Identificador estable. Tambien el nombre del archivo de su
- *                              muestra en `verificaciones/muestras/`, sin extension.
- * @property {string} regla     La fila de la tabla de reglas del producto a la que sirve.
- *                              Varias prohibiciones pueden servir a la misma regla.
- * @property {string} selector  Selector ESQuery que la detecta. Admite varios separados
- *                              por coma, que es como una regla se hace de varias formas.
- * @property {string} message   Lo que se le dice a quien la incumple. La prueba compara
- *                              contra ESTE texto, no contra una copia suya.
- * @property {string} [salvo]   Prefijo de ruta donde la prohibicion NO aplica. Una sola,
- *                              porque una excepcion que se puede repetir deja de serlo.
- */
-
-/**
- * Nombres de campo que llevan dinero. Sobre ellos no se hace aritmetica ni se declara un
- * `number`.
+ * El `clave` no es decorativo: **es el nombre de su muestra**. La prueba no tiene un mapa de
+ * «regla -> archivo» que alguien pueda dejar desactualizado; compone la ruta.
  *
- * **`total` lleva una excepcion, y es de verdad la unica.** `totalElementos` y `totalPaginas`
- * son los dos contadores del envoltorio de paginacion del backend —`{ contenido, pagina,
- * tamano, totalElementos, totalPaginas, hayMas }`, que publican mas de sesenta de las 181
- * operaciones—, y son cuentas de cosas, no de dinero: llegan como `entero` en
- * `docs/50-api/formas-de-la-api.json` y tienen que declararse `number`. Sin la excepcion, toda
- * pantalla con una tabla paginada arrancaria con dos `eslint-disable`, y una regla que se
- * desactiva por costumbre deja de proteger a la tercera vez. Lo descubrio F-4 al tipar el
- * envoltorio; el resto de `total…` —`totalAPagar`, `totalDeLaDeuda`— sigue prohibido, y la
- * prueba de reglas lo comprueba por los dos lados.
+ * Y que esta derivacion siga siendo una derivacion —y no vuelva a ser un fork— lo vigila
+ * `verificaciones/las-prohibiciones-son-las-de-la-libreria.test.ts`.
  */
-const CAMPOS_DE_DINERO =
-  'monto|importe|saldo|deuda|total(?!Elementos|Paginas)|insoluto|interes|autovaluo|arbitrio|recargo|vuelto|recibido|pagado|abonado';
+
+import { remedioDelEnlace } from './verificaciones/remedio.mjs';
 
 /**
- * Tildes y enie: prohibidas en identificadores (idioma del repositorio).
- * Copiada de `infrastructure/infra/eslint.config.mjs`, donde ya estaba escrita: la misma
- * regla en dos sitios distintos es dos reglas que divergen.
+ * La lista del producto, o un rojo que nombra el `git clone`.
+ *
+ * **El `import` va dinamico y envuelto, y es el hallazgo de #113 otra vez.** Este archivo lo carga
+ * `eslint.config.js`, o sea el PRIMER paso de `yarn verificar`, antes que `tsc` y antes que
+ * `enlace-con-kamayuk-lib.test.ts` —que es la guarda que sabe explicar que falta el clon hermano y
+ * que vive dos pasos mas tarde—. Con un `import` estatico, lo que se lee al clonar `rentas` a secas
+ * es
+ *
+ *     Error: Cannot find package '@kamayuk/verificaciones' imported from …/eslint.prohibiciones.mjs
+ *
+ * que habla de un modulo y no de un repositorio que falta. Envuelto, dice el `git clone`.
  */
-const LETRAS_ACENTUADAS = 'áéíóúÁÉÍÓÚñÑüÜ';
+async function delProducto() {
+  const declarada = '../../kamayuk-lib/paquetes/verificaciones';
+  try {
+    return await import('@kamayuk/verificaciones/prohibiciones');
+  } catch (causa) {
+    throw new Error(
+      'No se pudo cargar «@kamayuk/verificaciones/prohibiciones», de donde salen las nueve\n' +
+        `prohibiciones de ESLint de todo el producto (kamayuk-lib#4, rentas#137).\n  ${remedioDelEnlace('@kamayuk/verificaciones', declarada)}`,
+      { cause: causa },
+    );
+  }
+}
+
+const { PROHIBICIONES: DEL_PRODUCTO, REGLAS_EXIGIDAS: EXIGIDAS } = await delProducto();
 
 /**
- * El unico directorio que puede llamar a `fetch`.
+ * El unico directorio de ESTE arbol que puede llamar a `fetch`.
  *
  * Es la excepcion que da sentido a la regla: mientras toda peticion pase por `solicitar()`,
  * enchufar el token, la clave de idempotencia y el formato de error se hace en un sitio.
@@ -63,102 +89,85 @@ const LETRAS_ACENTUADAS = 'áéíóúÁÉÍÓÚñÑüÜ';
  */
 export const CLIENTE_DE_API = 'src/api/';
 
-/** @type {readonly Prohibicion[]} */
-export const PROHIBICIONES = [
-  {
-    clave: 'identificador-con-tilde',
-    regla: 'sin tildes ni enie en identificadores',
-    selector: `Identifier[name=/[${LETRAS_ACENTUADAS}]/]`,
-    message: 'Sin tildes ni enie en identificadores. El texto con tildes va en las cadenas.',
-  },
-  {
-    clave: 'fetch-fuera-del-cliente',
-    regla: 'fetch prohibido fuera del cliente de API',
-    selector: "CallExpression[callee.name='fetch']",
-    message:
-      'Las peticiones pasan por «solicitar» de src/api: ahi viven el token, la clave de idempotencia y el formato de error (ADR-0030 §3).',
-    salvo: CLIENTE_DE_API,
-  },
-  {
-    clave: 'importe-declarado-number',
-    regla: 'un importe es string, nunca number',
-    selector:
-      `TSPropertySignature[key.name=/^(${CAMPOS_DE_DINERO})/i] > TSTypeAnnotation > TSNumberKeyword, ` +
-      `Identifier[name=/^(${CAMPOS_DE_DINERO})/i] > TSTypeAnnotation > TSNumberKeyword`,
-    message:
-      'Un importe se declara «string», nunca «number»: en coma flotante 0.1 + 0.2 no es 0.30 y el centimo se pierde antes de mostrarse (regla 1, RNF-055).',
-  },
-  {
-    clave: 'importe-convertido-a-number',
-    regla: 'un importe es string, nunca number',
-    selector:
-      `CallExpression[callee.name=/^(Number|parseFloat|parseInt)$/] > MemberExpression[property.name=/^(${CAMPOS_DE_DINERO})/i], ` +
-      `CallExpression[callee.name=/^(Number|parseFloat|parseInt)$/] > Identifier[name=/^(${CAMPOS_DE_DINERO})/i]`,
-    message:
-      'Un importe es texto y pierde centimos como number. No lo conviertas: formatealo (regla 1, RNF-055).',
-  },
-  {
-    clave: 'aritmetica-con-importes',
-    regla: 'sin aritmetica sobre importes',
-    selector:
-      `BinaryExpression[operator=/^[-+*/%]$/] > MemberExpression[property.name=/^(${CAMPOS_DE_DINERO})/i], ` +
-      `CallExpression[callee.property.name='reduce'][callee.object.property.name=/^(${CAMPOS_DE_DINERO}|cuotas|conceptos|valores|papeletas)/i]`,
-    message:
-      'Aritmetica con un importe. El total lo calcula el backend y lo sostiene con su fecha: pidelo, no lo sumes (regla 1, regla 9).',
-  },
-  {
-    clave: 'importe-sin-fecha',
-    regla: 'un importe se muestra con su fecha de calculo',
-    // `:not(:has(...))`: el elemento de apertura que NO tiene entre sus atributos
-    // uno llamado `fechaCalculo`. Un `<Importe {...props} />` tambien cae, y esta
-    // bien que caiga: desde el JSX no hay forma de saber si ese objeto la trae.
-    selector:
-      "JSXOpeningElement[name.name='Importe']:not(:has(JSXAttribute[name.name='fechaCalculo']))",
-    message:
-      'Un importe se muestra con la fecha a la que esta calculado: no existe «la deuda», existe la deuda a una fecha (regla 9, RNF-075).',
-  },
-  {
-    clave: 'municipalidad-en-el-cliente',
-    regla: 'municipalidadId no se manda nunca',
-    selector: "Identifier[name='municipalidadId']",
-    message:
-      'El frontend jamas envia municipalidadId: el backend lo toma del token (regla 2, ADR-0028 §2).',
-  },
-  {
-    clave: 'token-en-almacenamiento',
-    regla: 'el token no toca localStorage ni sessionStorage',
-    // La prohibicion es guardar CREDENCIALES en el navegador, no usar el almacenamiento:
-    // una preferencia de la ventanilla ahi esta en su sitio. Por eso mira la clave.
-    selector:
-      'CallExpression[callee.object.name=/^(localStorage|sessionStorage)$/][callee.property.name=/^(setItem|getItem|removeItem)$/][arguments.0.value=/token|jwt|bearer|credencial|contrasena|acceso|sesion/i]',
-    message:
-      'El token vive en memoria, nunca en localStorage ni sessionStorage: en una PC de ventanilla compartida entre turnos, un token persistido sobrevive al cierre del navegador (ADR-0030 §3).',
-  },
-  {
-    clave: 'tasa-en-vez-de-alicuota',
-    regla: 'alicuota, nunca tasa',
-    selector: 'Identifier[name=/^tasa(De)?(Interes|Descuento|Porcentaje|Depreciacion|Moratori)/i]',
-    message: 'Un porcentaje se llama «alicuota» (regla 8). «tasa» es un tipo de tributo del manual.',
-  },
-];
+/**
+ * Donde `fetch` es legitimo AQUI, y en ningun otro sitio.
+ *
+ * **Es uno, y en la libreria son dos.** Alli el canje PKCE vive en `paquetes/sesion/`, separado del
+ * cliente HTTP; aqui las dos piezas estan en `src/api/` —`cliente.ts` y `identidad.ts`—, asi que un
+ * solo prefijo las cubre. Es una lista igualmente: el dia que este arbol separe la puerta de
+ * identidad, lo que cambia es este dato y no la prohibicion.
+ */
+export const DONDE_SE_LLAMA_A_FETCH = [CLIENTE_DE_API];
 
 /**
- * Las reglas del producto que el frontend expresa como verificacion, tal como las nombra
- * el issue F-1. La prueba exige que cada una tenga al menos una prohibicion que la sirva.
+ * Lo UNICO que este arbol pone de su parte: donde cae cada excepcion.
  *
- * ES LA LISTA ESCRITA A MANO, y es deliberado que sea la unica. `PROHIBICIONES` se deriva
- * hacia la prueba, asi que **borrar una prohibicion borraria tambien su prueba**, en
- * silencio. Esta lista es lo que se pone rojo cuando eso pasa.
+ * Va por **clave de prohibicion** y no por ruta de la libreria. Traducir `paquetes/api/` a
+ * `src/api/` seria un mapa de directorios de otro repositorio, que se queda viejo el dia que alla
+ * muevan uno; la clave, en cambio, es el identificador estable de la regla y es lo que la libreria
+ * promete no cambiar.
+ *
+ * Una prohibicion con `salvo` que no este aqui **para el proceso**: dejarla pasar tendria dos
+ * salidas y las dos malas —aplicarle la ruta de otra, o quitarle la excepcion y llenar de falsos
+ * positivos un directorio entero—.
+ *
+ * @type {Readonly<Record<string, readonly string[]>>}
+ */
+export const SALVO_EN_ESTE_ARBOL = {
+  'fetch-fuera-del-cliente': DONDE_SE_LLAMA_A_FETCH,
+};
+
+const sinTraducir = DEL_PRODUCTO.filter(
+  (p) => p.salvo !== undefined && SALVO_EN_ESTE_ARBOL[p.clave] === undefined,
+).map((p) => `  · ${p.clave}, exceptuada en la libreria de: ${[...(p.salvo ?? [])].join(', ')}`);
+
+if (sinTraducir.length > 0) {
+  throw new Error(
+    '`@kamayuk/verificaciones` trae prohibiciones con excepcion que este arbol no ha situado:\n' +
+      `${sinTraducir.join('\n')}\n` +
+      'Anade su entrada a SALVO_EN_ESTE_ARBOL en `frontend/eslint.prohibiciones.mjs`, diciendo\n' +
+      'que directorio de ESTE arbol hace lo que alli hace el suyo — o la lista vacia, si aqui no\n' +
+      'hay ninguno.',
+  );
+}
+
+const huerfanas = Object.keys(SALVO_EN_ESTE_ARBOL).filter(
+  (clave) => !DEL_PRODUCTO.some((p) => p.clave === clave && p.salvo !== undefined),
+);
+
+if (huerfanas.length > 0) {
+  throw new Error(
+    `SALVO_EN_ESTE_ARBOL situa excepciones que ya nadie pide: ${huerfanas.join(', ')}.\n` +
+      'O la prohibicion dejo de exceptuar nada, o cambio de clave. Una excepcion que no cuelga de\n' +
+      'ninguna regla no exceptua: solo se queda ahi pareciendo que si.',
+  );
+}
+
+/**
+ * Las nueve del producto, cada una con la ruta que le toca en este arbol.
+ *
+ * @type {readonly {
+ *   clave: string;
+ *   regla: string;
+ *   selector: string;
+ *   message: string;
+ *   salvo?: readonly string[];
+ * }[]}
+ */
+export const PROHIBICIONES = DEL_PRODUCTO.map((prohibicion) =>
+  prohibicion.salvo === undefined
+    ? prohibicion
+    : { ...prohibicion, salvo: SALVO_EN_ESTE_ARBOL[prohibicion.clave] },
+);
+
+/**
+ * Las reglas del producto que el frontend expresa como verificacion. **Tal cual**: son las del
+ * producto, no las de este sistema, y por eso se reexportan sin tocarlas.
+ *
+ * ES LA LISTA ESCRITA A MANO —alla—, y es deliberado que sea la unica. `PROHIBICIONES` se deriva
+ * hacia la prueba, asi que **borrar una prohibicion borraria tambien su prueba**, en silencio.
+ * Esta lista es lo que se pone rojo cuando eso pasa.
  *
  * @type {readonly string[]}
  */
-export const REGLAS_EXIGIDAS = [
-  'sin tildes ni enie en identificadores',
-  'fetch prohibido fuera del cliente de API',
-  'un importe es string, nunca number',
-  'un importe se muestra con su fecha de calculo',
-  'sin aritmetica sobre importes',
-  'municipalidadId no se manda nunca',
-  'el token no toca localStorage ni sessionStorage',
-  'alicuota, nunca tasa',
-];
+export const REGLAS_EXIGIDAS = EXIGIDAS;

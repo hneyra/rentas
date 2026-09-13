@@ -17,6 +17,10 @@ import { PROHIBICIONES } from './eslint.prohibiciones.mjs';
  * Las prohibiciones NO estan aqui: estan en `eslint.prohibiciones.mjs`, porque las lee
  * tambien `verificaciones/reglas-de-eslint.test.ts`, que exige de cada una su muestra que
  * la viola. **Una regla que no puede fallar no protege nada.**
+ *
+ * Y desde #137 ese archivo **tampoco las escribe**: las deriva de `@kamayuk/verificaciones`, que
+ * es donde viven las nueve del producto desde `kamayuk-lib`#4, y les pone las rutas de este
+ * arbol. Aqui habia una copia y ya habia divergido; la medida y el porque, en su cabecera.
  */
 
 /** Las prohibiciones que valen en todo el arbol. */
@@ -27,8 +31,13 @@ const EN_TODAS_PARTES = PROHIBICIONES.map(({ selector, message }) => ({ selector
  *
  * Se derivan de los `salvo` en vez de escribirse: una excepcion escrita a mano se olvida
  * de la prohibicion que se anadio ayer, y la deja apagada en un directorio entero.
+ *
+ * **Cada `salvo` es una LISTA de prefijos desde #137**, que es como lo publica
+ * `@kamayuk/verificaciones`: la misma regla exceptua un directorio en este arbol y dos en el de
+ * la libreria, porque alli el canje PKCE vive en un paquete aparte. Cuales son los de aqui lo
+ * dice `SALVO_EN_ESTE_ARBOL`, en `eslint.prohibiciones.mjs`.
  */
-const EXCEPCIONES = [...new Set(PROHIBICIONES.map((p) => p.salvo).filter((s) => s !== undefined))];
+const EXCEPCIONES = [...new Set(PROHIBICIONES.flatMap((p) => p.salvo ?? []))];
 
 /** @type {import('eslint').Linter.Config[]} */
 const bloquesDeExcepcion = EXCEPCIONES.map((directorio) => ({
@@ -36,10 +45,9 @@ const bloquesDeExcepcion = EXCEPCIONES.map((directorio) => ({
   rules: {
     'no-restricted-syntax': [
       'error',
-      ...PROHIBICIONES.filter((p) => p.salvo !== directorio).map(({ selector, message }) => ({
-        selector,
-        message,
-      })),
+      ...PROHIBICIONES.filter((p) => !(p.salvo ?? []).includes(directorio)).map(
+        ({ selector, message }) => ({ selector, message }),
+      ),
     ],
   },
 }));

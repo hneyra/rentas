@@ -267,7 +267,7 @@ describe('AC1 — el token no toca el almacenamiento del navegador', () => {
   it('y NO se le anadio ninguna excepcion: vale en todo el arbol', () => {
     const suya = PROHIBICIONES.find((p) => p.clave === 'token-en-almacenamiento');
 
-    // Un `salvo: 'src/api/'` la apagaria justo en el unico directorio donde hay un token.
+    // Un `salvo: ['src/api/']` la apagaria justo en el unico directorio donde hay un token.
     expect(suya?.salvo).toBeUndefined();
   });
 
@@ -287,7 +287,10 @@ describe('AC1 — el token no toca el almacenamiento del navegador', () => {
 
     // AC2: el token entra por `solicitar()`, y para eso `solicitar()` tiene que seguir siendo
     // el unico camino. Una excepcion mas y deja de serlo.
-    expect(delFetch?.salvo).toBe('src/api/');
+    //
+    // El `salvo` es una LISTA desde #137, que es como lo publica `@kamayuk/verificaciones`; lo
+    // que este arbol comprueba es que la lista siga teniendo un solo sitio dentro.
+    expect([...(delFetch?.salvo ?? [])]).toEqual(['src/api/']);
     expect(PROHIBICIONES.filter((p) => p.salvo !== undefined)).toHaveLength(1);
   });
 });
