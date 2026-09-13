@@ -1,0 +1,9 @@
+/* El fondo del pozo: solo se alcanza si el `base` de cada hoja importada es SU directorio. */
+
+@theme {
+  --color-muestra-honda: #b26a00;
+}
+
+.marca-honda {
+  color: #b26a00;
+}

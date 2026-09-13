@@ -17,19 +17,44 @@ const requerir = createRequire(import.meta.url);
 export const RAIZ_DE_UI = dirname(requerir.resolve('@kamayuk/ui'));
 
 /**
+ * **La hoja que el navegador recibe**, con su ruta y no solo con su contenido (#125).
+ *
+ * La ruta es el dato que faltaba: vive en `estilos/` y no en la raiz del paquete, y de su
+ * DIRECTORIO —no del de `package.json`— cuelga todo lo que la hoja importe.
+ */
+export const HOJA_DE_UI = join(RAIZ_DE_UI, 'estilos', 'estilos.css');
+
+/**
  * El CSS que Tailwind emite para la lista de clases que se le den.
  *
  * `loadStylesheet` hace falta porque la hoja empieza con `@import "tailwindcss"`, y el compilador
  * no sabe resolver ese nombre por si solo: aqui se le dice que es el `index.css` del paquete.
+ *
+ * <h2>El `base` sale de LA HOJA, y no del paquete (#125)</h2>
+ *
+ * Un `@import "./temas.css"` escrito dentro de `estilos/estilos.css` es `estilos/temas.css`:
+ * **el empaquetador lo resuelve relativo al archivo que lo escribe**, y eso es lo que el
+ * navegador recibe. Con `base` en la raiz del paquete se buscaba en `<raiz>/temas.css` — o sea
+ * que el arnes compilaba una hoja que no es la que se sirve, y lo hacia en silencio: mientras el
+ * unico `@import` fuera `"tailwindcss"`, que se intercepta por nombre, no habia nada que
+ * resolver mal.
+ *
+ * La `hoja` es un parametro por eso mismo: la guarda que lo vigila
+ * —`tailwind-resuelve-los-import.test.ts`— necesita compilar una hoja PROPIA con un `@import`
+ * relativo de verdad, sin esperar a que la libreria tenga uno.
  */
-export async function compilar(clases: readonly string[]): Promise<string> {
-  const hoja = readFileSync(join(RAIZ_DE_UI, 'estilos', 'estilos.css'), 'utf8');
-  const compilado = await compile(hoja, {
-    base: RAIZ_DE_UI,
+export async function compilar(
+  clases: readonly string[],
+  hoja: string = HOJA_DE_UI,
+): Promise<string> {
+  const compilado = await compile(readFileSync(hoja, 'utf8'), {
+    base: dirname(hoja),
     loadStylesheet: (id: string, desde: string) => {
       const ruta = id === 'tailwindcss' ? requerir.resolve('tailwindcss/index.css') : join(desde, id);
       return Promise.resolve({
         path: ruta,
+        // El `base` de la importada es SU directorio, que es lo que hace que un `@import`
+        // escrito dentro de ella cuelgue de donde ella esta y no de donde esta la primera.
         base: dirname(ruta),
         content: readFileSync(ruta, 'utf8'),
       });
