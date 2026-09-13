@@ -24,12 +24,15 @@ import { pantallaDe } from './pantallas/definiciones/index.ts';
  * <h2>Lo que este archivo NO hace</h2>
  *
  * **Traducir sus rotulos.** El catalogo es DATO y se construye una vez, fuera de React: no puede
- * llamar a `useTranslation`. Quien lo traduce es `useCatalogo()`, abajo, que si es un gancho — y
- * de paso vuelve a construirlo cuando el idioma cambie, que es lo que un `const` no haria.
+ * llamar a `useTranslation`. Quien lo traduce es `traducirCatalogo()`, abajo — era `useCatalogo()`,
+ * un gancho, hasta que #105 dejo de traducir `CATALOGO` entero para traducir el que la sesion
+ * permite; el javadoc de la funcion cuenta por que dejo de serlo (nombre corregido en #136).
  *
  * **Filtrar por permisos.** El armazon recibe el catalogo YA filtrado —lo dice su javadoc— y quien
- * lo filtra es quien sabe que puede abrir la cuenta. Eso llega cuando la sesion se conecte; hasta
- * entonces se ofrece el catalogo entero, que es lo mismo que hacia la V6 antes de I-3.
+ * lo filtra es quien sabe que puede abrir la cuenta. Decia aqui que eso llegaria cuando la sesion
+ * se conectase, y que hasta entonces se ofrecia el catalogo entero como hacia la V6 antes de I-3:
+ * **llego en #105**, y lo hace `permisos.ts` con lo que contestan las tres de seguridad, a
+ * peticion de `datos/useCatalogoPermitido.ts`.
  *
  * <h2>El icono se DEDUCE del trazo, y no se escribe</h2>
  *

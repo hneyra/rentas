@@ -32,10 +32,6 @@ import { useTextosDelMarco } from './i18n/textosDelMarco.ts';
  *
  * <h2>Lo que todavia NO hace, dicho aqui y no descubierto luego</h2>
  *
- * · **Filtrar el catalogo por permisos.** El armazon lo recibe YA filtrado y hoy se le pasa
- *   entero. La V6 lo filtraba desde I-3 con `GET /seguridad/accesos`, y eso vuelve cuando la
- *   sesion se conecte a las pantallas nuevas — no antes, porque filtrar contra una lista de
- *   permisos sin pantallas que abrir no se puede comprobar.
  * · **Pedir datos en las 38 pantallas que no tienen backend.** Dos de las cuarenta piden de verdad
  *   —`panel` y `coa-panel`—; el resto dice por que no. Ver `datos/conectores.ts`, que cuenta campo
  *   a campo por que «servida» no es «puede pintarse».
@@ -43,6 +39,14 @@ import { useTextosDelMarco } from './i18n/textosDelMarco.ts';
  *   de que no escriben todavia. Un boton que no dice nada al pulsarlo se lee como una pantalla
  *   rota; uno que dice lo que hace —y lo que no— se lee como una pantalla a medio conectar, que
  *   es lo que es.
+ *
+ * Y **una entrada se fue de esta lista**, que es lo que hay que anotar en vez de borrarla (#136):
+ * *filtrar el catalogo por permisos*. Decia que el armazon lo recibe ya filtrado pero que aqui se
+ * le pasaba entero, que la V6 lo filtraba desde I-3 con `GET /seguridad/accesos` y que aquello
+ * volveria cuando la sesion se conectase a las pantallas nuevas. **Volvio, en #105**: hoy lo
+ * compone `datos/useCatalogoPermitido.ts` con las tres de seguridad, y lo que la cuenta no puede
+ * abrir no se ofrece ni se abre por su hash — medido en
+ * `verificaciones/los-cuarenta-destinos-se-recorren.test.tsx`.
  *
  * <h2>El menu de sesion: las cuatro opciones hacen algo, y dos de ellas se van de aqui</h2>
  *
@@ -154,15 +158,31 @@ function ArmazonDelSistema() {
   const [preferencias, setPreferencias] = useState(false);
 
   /*
-   * **No se monta el armazon hasta saber que puede abrir la cuenta**, y hay dos motivos.
+   * **No se monta el armazon hasta saber que puede abrir la cuenta.** Se queda, y por lo que se
+   * midio al revisarlo (#136) — no por lo que decia antes.
    *
-   * El bueno: ofrecer el catalogo entero «mientras llega» ensenaria durante un segundo justo lo que
-   * #105 existe para esconder, y un segundo basta para pulsar.
+   * **El defecto ajeno ya no lo sostiene.** Hasta #136 aqui ponia que `@kamayuk/shell` revienta si
+   * su catalogo cambia despues de montar —`useHoja() fuera de una pantalla del <Armazon>`— y que
+   * por eso esto «hoy ademas es necesario». `kamayuk-lib`#20 esta **cerrado**: lo arreglan
+   * `6e7aa0b` y `e13c5aa`, con sus pruebas en `paquetes/shell/armazon.test.tsx`. Y esta medido
+   * desde aqui: con este rodeo retirado y el catalogo llegando tarde, el armazon **no revienta** y
+   * la pantalla del enlace profundo abre.
    *
-   * El otro es un rodeo declarado: `@kamayuk/shell` **revienta si su catalogo cambia despues de
-   * montar** —`useHoja() fuera de una pantalla del <Armazon>`, reproducido en cinco lineas—, y eso
-   * es exactamente lo que pasa cuando el catalogo sale de la red. Esta en `kamayuk-lib`#20. Cuando
-   * se arregle, esto sigue siendo lo correcto por el primer motivo; hoy ademas es necesario.
+   * **Y el primer motivo, tal como estaba escrito, tampoco lo sostiene ya.** Decia que ofrecer «el
+   * catalogo entero mientras llega» ensenaria un segundo lo que #105 esconde. Eso no puede pasar,
+   * y no es este rodeo quien lo impide: quien lo impide es `useCatalogoPermitido`, que mientras
+   * pide devuelve el catalogo **vacio** — retirado el rodeo, el arbol no nombra ni un modulo.
+   *
+   * **Lo que si lo sostiene es la mentira contraria, y esa esta medida.** Montar el armazon con el
+   * catalogo vacio hace que un enlace profundo —`#/tra-pap`, con las tres de seguridad todavia en
+   * vuelo— dibuje «Esa direccion no corresponde a ningun destino disponible para esta cuenta». Se
+   * lo dice a una cuenta que SI puede abrirla, y una negativa de permisos no se lee como una
+   * espera: se lee como un no. Con el rodeo, lo que se lee es «Averiguando que puede abrir esta
+   * cuenta», que es exactamente lo que esta pasando.
+   *
+   * Y no hay que fiarse de esta nota: retirar el rodeo pone en rojo **45 pruebas** de
+   * `los-cuarenta-destinos-se-recorren` y `la-siembra-abre-los-destinos`, y el volcado del rojo es
+   * literalmente ese `data-slot="destino-no-ofrecido"`.
    */
   if (sesion.estado !== 'compuesto') {
     return (
@@ -207,6 +227,11 @@ function ArmazonDelSistema() {
         acciones={ACCIONES}
         // Cuando no hay arbol, el pie del carril dice POR QUE: sin eso, «pidiendo», «fallo» y «esta
         // cuenta no puede abrir nada» son la misma pantalla en blanco, y son tres cosas distintas.
+        //
+        // Con el rodeo de arriba puesto, la rama de `porQue` **no se alcanza**: aqui el estado es
+        // siempre `compuesto` y `porQue` siempre vacio. Se deja escrita porque es la que recoge
+        // los tres casos el dia que el rodeo se retire, y borrarla haria que retirarlo saliera en
+        // blanco en vez de explicado.
         pieDelCarril={
           sesion.porQue === ''
             ? t('Diez modulos y cuarenta submodulos. Catastro y Tesoreria son de otros sistemas.')
