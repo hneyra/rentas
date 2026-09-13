@@ -10,15 +10,15 @@ import { comprobarQueElBundleServidoEsElMio } from '../puerto-del-arnes.mjs';
  * «ya esta usado» se da UNA vez, antes de lanzar el comando; luego se carrera la muerte del
  * proceso contra la disponibilidad de la URL. Si un intruso ocupa el puerto en ese hueco, el
  * `vite preview` de esta rama muere por `--strictPort` **y la URL contesta igual**, porque la
- * contesta el intruso. Los 69 caminos corren, y miden lo que ese intruso sirva.
+ * contesta el intruso. Los caminos corren igual, y miden lo que ese intruso sirva.
  *
  * Eso es lo que #148 llama «lo que de verdad asusta»: no el rojo ajeno, sino el **verde**
  * ajeno.
  *
  * <h2>Por que aqui y no en un camino mas</h2>
  *
- * Un `globalSetup` que falla detiene la corrida entera; un camino que falla es uno de 70 y
- * deja correr los otros 69 contra un servidor que no es este. Y ademas corre DESPUES de que
+ * Un `globalSetup` que falla detiene la corrida entera; un camino que falla es uno solo y
+ * deja correr los demas contra un servidor que no es este. Y ademas corre DESPUES de que
  * el `webServer` este arriba —el orden esta en `createGlobalSetupTasks`, que pone los
  * complementos delante—, que es justo cuando se puede preguntar.
  */

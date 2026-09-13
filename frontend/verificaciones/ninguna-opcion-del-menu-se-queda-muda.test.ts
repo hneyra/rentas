@@ -31,7 +31,7 @@ import { RAIZ } from './artboards.ts';
  *
  * <h2>Por que una guarda y no «ya esta arreglado»</h2>
  *
- * Porque `al: () => {}` **compila, pasa el lint y pasa las 557 pruebas**. Es la forma mas comoda
+ * Porque `al: () => {}` **compila, pasa el lint y pasa las pruebas**. Es la forma mas comoda
  * de satisfacer al compilador cuando se anade una opcion nueva al menu, y nada de lo que ya existe
  * en este arbol la ve. La reincidencia no cuesta trabajo: cuesta una linea.
  *

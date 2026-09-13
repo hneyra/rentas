@@ -5,7 +5,7 @@ import { PUERTO, URL_DEL_ARNES } from './puerto-del-arnes.mjs';
 /**
  * **El arnes que mide lo que jsdom no puede: que la interfaz se VEA** (#107).
  *
- * <h2>Por que este arnes existe, si ya hay 507 pruebas</h2>
+ * <h2>Por que este arnes existe, si ya hay pruebas de `vitest`</h2>
  *
  * Porque todas comparan `className` **como texto**. Ninguna dice que Tailwind emita ese CSS, que
  * el navegador lo aplique, que la rejilla se reacomode, que la cabecera azul sea azul, ni que un
