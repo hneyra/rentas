@@ -55,6 +55,11 @@ const LITERALES = [
   'La sesion no vale para saber que puede abrir esta cuenta. Vuelva a entrar.',
   'No se pudo saber que modulos puede abrir esta cuenta, asi que no se ofrece ninguno. Ofrecerlos todos ante un fallo convertiria un problema de red en un agujero de autorizacion.',
   'Esta cuenta no puede abrir ningun modulo de este sistema. No es un fallo: es una cuenta sin permisos, o afiliada a un grupo que no los tiene.',
+  // Las tres de la puerta que no contesta (#112). La segunda lleva interpolacion: el emisor, la
+  // URL y lo que dijo el navegador son dato, y por eso van entre llaves y no escritos.
+  'No se pudo llegar al emisor de identidad, asi que no se mando a nadie a identificarse.',
+  'El emisor es {{emisor}}, y la peticion a {{url}} no llego a completarse: {{motivo}}.',
+  'Si esto es un puesto de desarrollo, levante la plataforma; si no, avise a quien la administra. Despues vuelva a cargar la pagina.',
 ] as const;
 
 /** Lo que el plural tiene que decir, que es lo unico que no puede ser su clave. */

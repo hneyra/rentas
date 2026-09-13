@@ -55,10 +55,27 @@ async function retoEsperado(verificador: string): Promise<string> {
   return btoa(texto).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
+/**
+ * **El emisor contesta la sonda**, que es lo que `entrar()` pregunta antes de navegar (#112).
+ *
+ * Va en el `beforeEach` porque es el estado normal: con el emisor levantado, `entrar()` hace lo
+ * de siempre. Sin este doble, cada `entrar()` de este archivo saldria a `localhost:8181` de
+ * verdad, no encontraria nada, y la sonda diria —con razon— que no hay emisor.
+ *
+ * Devuelve una respuesta opaca porque la sonda va con `mode: 'no-cors'` y **no la lee**: lo unico
+ * que le importa es que el `fetch` no reviente.
+ */
+function elEmisorContesta() {
+  const espia = vi.fn<typeof fetch>(() => Promise.resolve(new Response(null, { status: 200 })));
+  vi.stubGlobal('fetch', espia);
+  return espia;
+}
+
 beforeEach(() => {
   sessionStorage.clear();
   localStorage.clear();
   fijarToken(null);
+  elEmisorContesta();
 });
 
 afterEach(() => {
@@ -313,5 +330,87 @@ describe('AC1 — los dos frenos del rebote', () => {
     // que paso antes de cerrar sesion.
     expect(puedeIrALaPuerta()).toBe(true);
     expect(vieneDeSalir()).toBe(true);
+  });
+});
+
+/**
+ * **La sonda: si el emisor no esta, `entrar()` no navega y lo dice** (#112).
+ *
+ * El defecto que cierra no da ningun sintoma: la navegacion se rechaza, no hay documento nuevo ni
+ * aplicacion, y queda la pagina de antes en blanco con la consola limpia.
+ */
+describe('#112 — antes de mandar el navegador, se pregunta si el emisor esta', () => {
+  it('con el emisor caido NO navega, y devuelve quien no contesto y en que URL', async () => {
+    const asignar = ubicacion();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<typeof fetch>(() => Promise.reject(new TypeError('Failed to fetch'))),
+    );
+
+    const falla = await entrar();
+
+    expect(asignar, 'navego hacia un emisor que no contesta').not.toHaveBeenCalled();
+    expect(falla?.emisor).toBe(REALM);
+    expect(falla?.url).toBe(`${REALM}/.well-known/openid-configuration`);
+    expect(falla?.motivo).toBe('Failed to fetch');
+  });
+
+  it('y una espera agotada se cuenta igual, con su motivo en vez del del navegador', async () => {
+    const asignar = ubicacion();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<typeof fetch>(() => {
+        const agotada = new Error('the operation was aborted');
+        agotada.name = 'TimeoutError';
+        return Promise.reject(agotada);
+      }),
+    );
+
+    const falla = await entrar();
+
+    expect(asignar).not.toHaveBeenCalled();
+    expect(falla?.motivo).toContain('no contesto en');
+  });
+
+  it('una ida que no ocurrio NO gasta una del tope: el emisor no la recibio', async () => {
+    ubicacion();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<typeof fetch>(() => Promise.reject(new TypeError('Failed to fetch'))),
+    );
+
+    await entrar();
+    await entrar();
+    await entrar();
+
+    // Si contara, tres recargas con la plataforma apagada dejarian la puerta cerrada por un tope
+    // que existe para frenar un rebote — y aqui no hubo ni un rebote.
+    expect(puedeIrALaPuerta()).toBe(true);
+    expect(sessionStorage.getItem('kamayuk.pkce.idas')).toBeNull();
+  });
+
+  it('con el emisor vivo la sonda pide el descubrimiento, sin leerlo y sin cache', async () => {
+    ubicacion();
+    const espia = elEmisorContesta();
+
+    const falla = await entrar();
+
+    expect(falla).toBeNull();
+    const [url, opciones] = espia.mock.calls[0] ?? [];
+    expect(String(url)).toBe(`${REALM}/.well-known/openid-configuration`);
+    // `no-cors` porque la respuesta no se lee: la pregunta es si el navegador LLEGA, que es lo
+    // mismo que decide si `assign` aterriza. Leyendola exigiria CORS del emisor, y un
+    // intermediario que no lo publique convertiria un emisor vivo en una pantalla de error.
+    expect(opciones?.mode).toBe('no-cors');
+    expect(opciones?.cache).toBe('no-store');
+  });
+
+  it('y la sonda NO es el propio punto de autorizacion: no se abre una sesion para tirarla', async () => {
+    ubicacion();
+    const espia = elEmisorContesta();
+
+    await entrar();
+
+    expect(String(espia.mock.calls[0]?.[0])).not.toContain('/protocol/openid-connect/auth');
   });
 });

@@ -9,7 +9,9 @@ import { Pantalla } from './pantallas/Pantalla.tsx';
 import type { ClaveDeHoja } from './pantallas/arbol.ts';
 import { pantallaDe } from './pantallas/definiciones/index.ts';
 import { useDatosDeLaHoja } from './datos/useDatosDeLaHoja.ts';
+import type { FallaDeLaPuerta } from './api/identidad.ts';
 import { salir } from './api/identidad.ts';
+import { fallaDeLaPuerta } from './arranque.ts';
 
 /**
  * **`rentas-web`, sobre el artboard V8** (#90).
@@ -143,7 +145,55 @@ function ArmazonDelSistema() {
   );
 }
 
+/**
+ * **Cuando no se pudo ni llegar al emisor de identidad** (#112).
+ *
+ * <h2>Por que esto se dibuja ANTES que nada, y no como un estado mas del catalogo</h2>
+ *
+ * Porque con el emisor caido el backend suele estar caido tambien, y entonces
+ * `useCatalogoPermitido` contesta su «No se pudo saber que modulos puede abrir esta cuenta». Es
+ * cierto y es inutil: manda a mirar los permisos cuando lo que pasa es que la plataforma no esta.
+ * La falla de la puerta es mas honda que la del catalogo, asi que gana.
+ *
+ * <h2>Y por que nombra la URL</h2>
+ *
+ * Porque las tres causas de que no se pueda llegar —la plataforma sin levantar, un `ConfigMap` con
+ * la URL equivocada y un cortafuegos— se distinguen leyendo **que URL** se pidio. Sin ella las
+ * tres son «no conecta», y las tres se arreglan en sitios distintos.
+ */
+function LaPuertaNoContesto({ falla }: { readonly falla: FallaDeLaPuerta }) {
+  const { t } = useTranslation();
+
+  return (
+    <div className="grid min-h-screen place-items-center p-[30px] bg-fondo">
+      <div className="max-w-[64ch] border border-mal-borde bg-mal-fondo p-[20px] text-[14px] leading-[1.6]">
+        <p className="m-0 font-bold text-mal-tinta">
+          {t('No se pudo llegar al emisor de identidad, asi que no se mando a nadie a identificarse.')}
+        </p>
+        <p className="mt-[10px] mb-0 break-all text-tinta-2">
+          {t('El emisor es {{emisor}}, y la peticion a {{url}} no llego a completarse: {{motivo}}.', {
+            emisor: falla.emisor,
+            url: falla.url,
+            motivo: falla.motivo,
+          })}
+        </p>
+        <p className="mt-[10px] mb-0 text-tinta-2 text-pretty">
+          {t(
+            'Si esto es un puesto de desarrollo, levante la plataforma; si no, avise a quien la ' +
+              'administra. Despues vuelva a cargar la pagina.',
+          )}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export function Aplicacion() {
+  // Se lee aqui y no en `main.tsx` porque el montaje no lleva argumentos a proposito: ver
+  // `arranque.ts`. Al llegar aqui la pasada de arranque ya termino, asi que el valor esta fijo.
+  const falla = fallaDeLaPuerta();
+  if (falla !== null) return <LaPuertaNoContesto falla={falla} />;
+
   return (
     <QueryClientProvider client={CONSULTAS}>
       <ArmazonDelSistema />

@@ -34,6 +34,18 @@
  * `Puerta` lo explica con su boton. Que es mejor que una pagina en blanco con un motivo escrito
  * solo en la consola.
  *
+ * <h2>Y hay un TERCER caso en que se monta: cuando la ida no llega a ocurrir (#112)</h2>
+ *
+ * No montar es correcto **cuando la puerta contesta**. Cuando no —el emisor apagado, un DNS que
+ * no resuelve, una espera agotada— la navegacion se rechaza y no queda ni documento nuevo ni
+ * aplicacion: la pagina de antes, vacia. Medido con `yarn dev` y nada mas levantado,
+ * `body.innerText` vacio y la consola con dos lineas de Vite y ni un error. O sea el mismo modo
+ * de fallo que el parrafo de arriba dice evitar, y ni siquiera con el motivo en la consola.
+ *
+ * Asi que `entrar()` pregunta primero si el emisor esta, y devuelve la falla cuando no. Con ella
+ * se monta y se explica **quien** no contesto y **en que URL** — que es lo que hace falta para
+ * arreglarlo. El camino bueno no cambia: si el emisor contesta, sigue sin montarse nada.
+ *
  * <h2>El PROXY DE DATOS se retiro con la V6 (#90), y aqui queda dicho por que</h2>
  *
  * Hasta el cambio de guardia, este arranque instalaba —detras de `VITE_KAMAYUK_PROXY_DE_DATOS`—
@@ -53,6 +65,7 @@
  */
 
 
+import type { FallaDeLaPuerta } from './api/identidad.ts';
 import {
   canjearSiVuelve,
   entrar,
@@ -63,17 +76,44 @@ import {
 } from './api/identidad.ts';
 
 /**
+ * La falla de la ultima pasada de `arrancar()`, o `null` si no la hubo.
+ *
+ * **Variable de modulo y no un argumento de `montar`** porque el montaje es una funcion sin
+ * argumentos a proposito —ver la cabecera: lo que importa es que sea LO ULTIMO que pasa— y porque
+ * quien tiene que leerla no es `main.tsx` sino la aplicacion, tres capas mas abajo.
+ *
+ * Cada pasada la vuelve a fijar, asi que no hay estado viejo que arrastrar de una a otra.
+ */
+let laFalla: FallaDeLaPuerta | null = null;
+
+/**
+ * Por que no se mando a nadie a identificarse, si es que no se pudo.
+ *
+ * `null` en todo lo demas, **incluido el caso normal de ir a la puerta** — ese no monta nada, asi
+ * que nadie llega a preguntar.
+ */
+export function fallaDeLaPuerta(): FallaDeLaPuerta | null {
+  return laFalla;
+}
+
+/**
  * Canjea si volvemos del emisor, y solo entonces monta.
  *
  * Devuelve sin montar cuando manda a la puerta: `entrar()` navega fuera de la pagina, asi que
  * dibujar algo despues seria dibujar sobre un documento que el navegador esta a punto de tirar.
+ *
+ * **Y monta cuando la ida no llega a ocurrir** (#112): ahi no hay documento que se vaya, asi que
+ * no montar deja la pagina en blanco y sin una linea que leer.
  */
 export async function arrancar(montar: () => void): Promise<void> {
+  laFalla = null;
   await canjearSiVuelve();
 
   if (token() === null && hayPuerta() && puedeIrALaPuerta() && !vieneDeSalir()) {
-    await entrar();
-    return;
+    laFalla = await entrar();
+    // Solo se deja de montar cuando la navegacion SI ocurrio. La condicion se lee al reves de lo
+    // que parece: `null` es que todo fue bien y la pagina se va.
+    if (laFalla === null) return;
   }
 
   montar();
