@@ -49,6 +49,12 @@ const LITERALES = [
   'Diez modulos y cuarenta submodulos. Catastro y Tesoreria son de otros sistemas.',
   'dd/mm/aaaa',
   'no publicado',
+  // Las cuatro del catalogo filtrado por permisos (#105). Las cazo `i18next-cli status` en cuanto
+  // se escribieron, que es exactamente para lo que esta encadenado en `yarn verificar`.
+  'Averiguando que puede abrir esta cuenta.',
+  'La sesion no vale para saber que puede abrir esta cuenta. Vuelva a entrar.',
+  'No se pudo saber que modulos puede abrir esta cuenta, asi que no se ofrece ninguno. Ofrecerlos todos ante un fallo convertiria un problema de red en un agujero de autorizacion.',
+  'Esta cuenta no puede abrir ningun modulo de este sistema. No es un fallo: es una cuenta sin permisos, o afiliada a un grupo que no los tiene.',
 ] as const;
 
 /** Lo que el plural tiene que decir, que es lo unico que no puede ser su clave. */
