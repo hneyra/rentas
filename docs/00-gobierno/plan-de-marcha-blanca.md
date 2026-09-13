@@ -195,15 +195,30 @@ Conviene que esté escrito antes, y no descubrirlo el día de la demostración:
       Sigue sin estar, y lo que describía esta casilla **ya no existe**: el arnés de I-2 (#28)
       —18 caminos en Chromium más tres accesos, contra la instalación levantada, con
       `VITE_KAMAYUK_PROXY_DE_DATOS=false`— **salió en #90** con las pantallas de V6 contra las que
-      corría, y con él la bandera, que tampoco existe. Vuelto a medir el 2026-09-13 con `yarn e2e`,
-      lo que hay es **otro arnés**: **47 caminos en Chromium, 0 fallos, 54,4 s** —`e2e/los-cuarenta.spec.ts`,
-      los 40 destinos más su centinela, y `e2e/se-ve.spec.ts`, seis— contra **el bundle construido**
+      corría, y con él la bandera, que tampoco existe. Lo que hay es **otro arnés**, y ya no son los
+      dos archivos que esta línea enumeraba sino **seis**: `e2e/los-cuarenta.spec.ts` —los 40
+      destinos más su centinela—, `e2e/se-ve.spec.ts`, `e2e/los-temas-llegan-al-navegador.spec.ts`,
+      `e2e/la-cuenta-la-lleva-el-emisor.spec.ts`, `e2e/la-puerta-caida.spec.ts` y
+      `e2e/la-siembra-no-viaja-al-bundle.spec.ts`. Corre contra **el bundle construido**
       (`vite build` + `vite preview --strictPort`) y **sin backend**: la seguridad se contesta con
       respuestas medidas con `curl` (`src/datos/seguridadMedida.ts`) y lo demás devuelve **404 a
       propósito**, para que las dos hojas que sí piden se vean **en su estado de error**. Mide lo
-      que las 508 pruebas de `vitest` no pueden —que Tailwind emita el CSS, que el navegador lo
-      aplique, que la rejilla se reacomode, que ninguna tabla desplace la página—, y **desde #107 sí
-      corre en CI**: `frontend.yml`, trabajo `arnes`.
+      que `vitest` no puede —que Tailwind emita el CSS, que el navegador lo aplique, que la rejilla
+      se reacomode, que ninguna tabla desplace la página, que las seis paletas lleguen al `<html>`
+      y que la siembra de desarrollo no viaje al `dist/`—, y **desde #107 sí corre en CI**:
+      `frontend.yml`, trabajo `arnes`.
+      **Leído el 2026-09-13, y es la lectura de ese día: aquí NO se renueva al mezclar.** `yarn e2e`
+      recorrió **69 caminos en Chromium, 0 fallos, 3,5 min**, y `cd frontend && yarn test` dio
+      **576 pruebas en 39 archivos**. Cada cifra va con **el comando que la lee delante**, y no con
+      la forma que #135 dejó en el `README` —«caduca en el siguiente PR que toque `frontend/`, y la
+      renueva la misma pasada que renueva los contadores de `CLAUDE.md` al mezclar»—: eso vale para
+      una portada, que se repasa en cada mezcla, y **esto es un acta**, que nadie repasa hasta que
+      se vuelve a recorrer entera (#119). Prometer aquí un renovador que no existe es el defecto que
+      abrió #143, no su arreglo. Y **la fecha sola no basta como detector**: las dos cifras que esta
+      lectura sustituye también decían 2026-09-13 y ya eran falsas **el mismo día** —47→69 caminos,
+      508→576 pruebas, sin que cambiara la fecha—, así que lo que permite volver a leerlas es el
+      comando, en una línea. La casilla, de todos modos, **no se apoya en el número**: se apoya en
+      lo que viene ahora.
       Lo que **no** mide, y por eso la casilla sigue vacía, son las dos mitades de siempre: (1) **el
       acceso de verdad**, por el formulario de Keycloak con PKCE y canje —le faltan el compose de la
       plataforma, el realm con sus tres cuentas, el volcado de la marcha blanca, que no se versiona
