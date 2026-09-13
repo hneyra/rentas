@@ -35,6 +35,17 @@ import { expect, test } from '@playwright/test';
  * levantada, que es justo el estado en que todo va bien.
  */
 
+/**
+ * **La paleta contra la que se mide el aviso es `institucional/claro`** (#111).
+ *
+ * Desde `kamayuk-lib`#23 el CSS servido trae las seis combinaciones, y desde #111 el proveedor de
+ * tema envuelve tambien esta pantalla —a proposito: quien eligio sepia u oscuro no debe encontrarse
+ * el aviso de averia con la paleta de otro—. Los dos colores que este archivo clava son los del
+ * artboard, o sea la combinacion clara, asi que el eje se declara en vez de heredarse. El motivo
+ * largo, con la medicion que lo sostiene, en `se-ve.spec.ts`.
+ */
+test.use({ colorScheme: 'light' });
+
 /** Lo que la sonda pide para saber si el emisor esta. */
 const DESCUBRIMIENTO = '**/realms/*/.well-known/openid-configuration';
 

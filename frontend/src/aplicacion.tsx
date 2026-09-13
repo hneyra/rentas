@@ -1,8 +1,11 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Armazon, type AccionesDelSistema } from '@kamayuk/shell';
+import { ProveedorDeTema, type ConfiguracionDeTema } from '@kamayuk/ui';
 
 import escudo from '../diseno/escudo-catacaos.png';
+import { MandoDeTema } from './preferencias/MandoDeTema.tsx';
 import { useCatalogoPermitido } from './datos/useCatalogoPermitido.ts';
 import { traducirCatalogo } from './catalogo.ts';
 import { Pantalla } from './pantallas/Pantalla.tsx';
@@ -42,6 +45,32 @@ import { fallaDeLaPuerta } from './arranque.ts';
  */
 
 const ENTIDAD = 'Municipalidad Distrital de Catacaos';
+
+/**
+ * **El tema de este servicio** (#111).
+ *
+ * Dos decisiones y ninguna mas; las seis paletas son de `@kamayuk/ui` y valen para los cuatro
+ * sistemas.
+ *
+ * · `identidadPorOmision`: con que se ve Rentas para quien no ha elegido nada. `institucional` es
+ *   la del artboard V8, o sea exactamente lo que se servia antes de este issue.
+ * · `prefijoDeClaves`: lo mismo que pide `@kamayuk/sesion`, y por lo mismo. Las cuatro interfaces
+ *   del producto se sirven **del mismo origen** —`/rentas/`, `/caja/`, `/catastro/`,
+ *   `/normativa/`—, asi que comparten el almacenamiento del navegador: sin prefijo propio, cambiar
+ *   el tema aqui se lo cambiaria a las otras tres.
+ *
+ * **Quien guarda es la libreria, no este archivo**, y eso es lo que hace que siga siendo cierto que
+ * un solo archivo de produccion de este repositorio toca el almacenamiento del navegador: la
+ * puerta. Lo comprueba `verificaciones/camino-a-la-api.test.ts`.
+ *
+ * **Y el modo no se declara**, que es la tercera decision y va por omision: ausente significa «el
+ * del equipo». Traer aqui un `claro` de fabrica congelaria en claro a quien tenga la maquina en
+ * oscuro, que es lo contrario de lo que pide quien la puso asi.
+ */
+const TEMA: ConfiguracionDeTema = {
+  identidadPorOmision: 'institucional',
+  prefijoDeClaves: 'kamayuk.rentas',
+};
 
 /**
  * Que hace cada accion del pie.
@@ -97,6 +126,10 @@ function ArmazonDelSistema() {
   const { t } = useTranslation();
   const sesion = useCatalogoPermitido();
   const catalogo = traducirCatalogo(sesion.catalogo, t);
+  // El cajon de preferencias: lo abre la opcion del menu de sesion y nada mas. Vive aqui —y no
+  // dentro del `<Armazon>`— porque el armazon no sabe que existe un tema: lo suyo es ofrecer la
+  // opcion y avisar de que se pulso.
+  const [preferencias, setPreferencias] = useState(false);
 
   /*
    * **No se monta el armazon hasta saber que puede abrir la cuenta**, y hay dos motivos.
@@ -120,28 +153,41 @@ function ArmazonDelSistema() {
   }
 
   return (
-    <Armazon
-      titulo={t('Rentas')}
-      entidad={t(ENTIDAD)}
-      escudo={<img src={escudo} alt="" width={28} height={28} />}
-      catalogo={catalogo}
-      cuenta={{ nombre: 'J. Cardenas Vega', iniciales: 'JC', nota: t(ENTIDAD) }}
-      opcionesDeSesion={[
-        { rotulo: t('Mi perfil'), al: () => {} },
-        { rotulo: t('Cambiar la contrasena'), al: () => {} },
-        { rotulo: t('Preferencias'), al: () => {} },
-        { rotulo: t('Cerrar sesion'), peligrosa: true, al: () => void salir() },
-      ]}
-      acciones={ACCIONES}
-      // Cuando no hay arbol, el pie del carril dice POR QUE: sin eso, «pidiendo», «fallo» y «esta
-      // cuenta no puede abrir nada» son la misma pantalla en blanco, y son tres cosas distintas.
-      pieDelCarril={
-        sesion.porQue === ''
-          ? t('Diez modulos y cuarenta submodulos. Catastro y Tesoreria son de otros sistemas.')
-          : sesion.porQue
-      }
-      pantalla={(hoja) => <CuerpoDeLaPantalla clave={hoja.destino.clave as ClaveDeHoja} />}
-    />
+    <>
+      <Armazon
+        titulo={t('Rentas')}
+        entidad={t(ENTIDAD)}
+        escudo={<img src={escudo} alt="" width={28} height={28} />}
+        catalogo={catalogo}
+        cuenta={{ nombre: 'J. Cardenas Vega', iniciales: 'JC', nota: t(ENTIDAD) }}
+        opcionesDeSesion={[
+          { rotulo: t('Mi perfil'), al: () => {} },
+          { rotulo: t('Cambiar la contrasena'), al: () => {} },
+          {
+            rotulo: t('Preferencias'),
+            al: () => {
+              setPreferencias(true);
+            },
+          },
+          { rotulo: t('Cerrar sesion'), peligrosa: true, al: () => void salir() },
+        ]}
+        acciones={ACCIONES}
+        // Cuando no hay arbol, el pie del carril dice POR QUE: sin eso, «pidiendo», «fallo» y «esta
+        // cuenta no puede abrir nada» son la misma pantalla en blanco, y son tres cosas distintas.
+        pieDelCarril={
+          sesion.porQue === ''
+            ? t('Diez modulos y cuarenta submodulos. Catastro y Tesoreria son de otros sistemas.')
+            : sesion.porQue
+        }
+        pantalla={(hoja) => <CuerpoDeLaPantalla clave={hoja.destino.clave as ClaveDeHoja} />}
+      />
+      <MandoDeTema
+        abierto={preferencias}
+        alCerrar={() => {
+          setPreferencias(false);
+        }}
+      />
+    </>
   );
 }
 
@@ -188,15 +234,31 @@ function LaPuertaNoContesto({ falla }: { readonly falla: FallaDeLaPuerta }) {
   );
 }
 
+/**
+ * **El proveedor del tema envuelve TODO, incluida la pantalla de la puerta caida** (#111).
+ *
+ * Podria envolver solo al armazon y seria mas corto. Seria tambien un fallo visible: quien eligio
+ * sepia u oscuro y se encuentra el emisor caido leeria ese aviso —el unico momento en que la
+ * interfaz de verdad no esta— con la paleta de otro. La pantalla que explica una averia es
+ * exactamente la que no debe parecer de otro programa.
+ *
+ * Y va por fuera del `QueryClientProvider` porque no depende de el: el tema se resuelve del
+ * navegador, no de la red, y no tiene que esperar a nada.
+ */
 export function Aplicacion() {
   // Se lee aqui y no en `main.tsx` porque el montaje no lleva argumentos a proposito: ver
   // `arranque.ts`. Al llegar aqui la pasada de arranque ya termino, asi que el valor esta fijo.
   const falla = fallaDeLaPuerta();
-  if (falla !== null) return <LaPuertaNoContesto falla={falla} />;
 
   return (
-    <QueryClientProvider client={CONSULTAS}>
-      <ArmazonDelSistema />
-    </QueryClientProvider>
+    <ProveedorDeTema configuracion={TEMA}>
+      {falla !== null ? (
+        <LaPuertaNoContesto falla={falla} />
+      ) : (
+        <QueryClientProvider client={CONSULTAS}>
+          <ArmazonDelSistema />
+        </QueryClientProvider>
+      )}
+    </ProveedorDeTema>
   );
 }
