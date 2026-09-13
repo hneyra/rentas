@@ -244,3 +244,56 @@ jobs:
             esac
           done
           exit "$fallo"
+
+  # --- Y que `infrastructure` lo despliegue -----------------------------------------
+  #
+  # Hasta aqui la cadena terminaba en «la imagen existe en el registro», y ahi se paraba:
+  # nadie avisaba a `infrastructure`, y la version que el cluster despliega se clava A MANO
+  # en `infra/Pulumi.<ambiente>.yaml`. Medido el 2026-09-13: `prod` iba 61 commits por detras
+  # de los cinco `main` sumados.
+  #
+  # Es deuda declarada, no una idea nueva. `infrastructure/.github/workflows/infra.yml:92-94`
+  # lo dice: «Una migracion de `rentas` no puede disparar este flujo. Es un hueco declarado
+  # desde P6 y sigue abierto: se cierra con un disparo entre repositorios
+  # (`repository_dispatch`), que no esta hecho.»
+  #
+  # VA DESPUES DE `comprobar` Y NO DE `publicar`, y la diferencia importa: `publicar` en verde
+  # dice que el `push` no devolvio error; `comprobar` dice que la etiqueta **se puede pedir al
+  # registro**. Avisar de una version cuya imagen no se puede bajar deja el pod en
+  # `ImagePullBackOff` con el `up` en verde.
+  avisar:
+    name: Pedirle a `infrastructure` que despliegue esta version
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: comprobar
+    # Solo al integrar en `main`. En un PR la imagen ni siquiera se publica.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions: {}
+    steps:
+      - name: repository_dispatch a hneyra/infrastructure
+        env:
+          # Un `GITHUB_TOKEN` NO puede disparar eventos en otro repositorio: hace falta un PAT
+          # de grano fino con `contents: write` **solo** sobre `hneyra/infrastructure`.
+          GH_TOKEN: ${{ secrets.DISPATCH_A_INFRAESTRUCTURA }}
+        run: |
+          set -euo pipefail
+          # Sin el secreto se avisa y se sale en VERDE, igual que `aplicar-stg` cuando le faltan
+          # las credenciales del cluster. Fallar aqui haria que crear un PAT fuera requisito para
+          # poder mezclar en los cinco repositorios; y para que no sea un silencio, queda escrito
+          # en el resumen del trabajo, que es donde alguien lo ve sin abrir el registro.
+          if [ -z "${GH_TOKEN:-}" ]; then
+            {
+              echo "### Sin avisar a \`infrastructure\`"
+              echo
+              echo "Falta el secreto \`DISPATCH_A_INFRAESTRUCTURA\`, asi que **esta version no se"
+              echo "desplegara sola**: hay que subir \`kamayuk:versionDeRentas\` a mano en"
+              echo "\`infra/Pulumi.stg.yaml\` de \`infrastructure\`."
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "::warning::Sin DISPATCH_A_INFRAESTRUCTURA: esta version no se desplegara sola."
+            exit 0
+          fi
+          gh api repos/hneyra/infrastructure/dispatches \
+            -f event_type=version-publicada \
+            -f client_payload[sistema]=rentas \
+            -f client_payload[sha]="$GITHUB_SHA"
+          echo "Pedido el despliegue de rentas@$GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
