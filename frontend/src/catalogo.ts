@@ -1,6 +1,3 @@
-import { useMemo } from 'react';
-import { useTranslation } from 'react-i18next';
-
 import type { Catalogo, ModuloDelCatalogo } from '@kamayuk/shell';
 import { ICONOS, seEscribe, tipoDe, type NombreDeIcono } from '@kamayuk/ui';
 
@@ -70,6 +67,18 @@ function laHojaSeEscribe(clave: Parameters<typeof pantallaDe>[0]): boolean {
   );
 }
 
+/**
+ * El **codigo de modulo** de cada entrada del catalogo, por su clave.
+ *
+ * El catalogo generico lleva `clave` —el slug, que es lo que viaja al hash— y el backend habla de
+ * `codigo` —`RENTAS_REGISTRO`—. Son dos identificadores del mismo modulo y ninguno de los dos
+ * sobra: el slug es para la barra de direcciones y el codigo es el que el catalogo de seguridad
+ * del clúster usa. La traduccion vive aqui porque es de este sistema.
+ */
+export const CODIGO_POR_CLAVE: ReadonlyMap<string, string> = new Map(
+  ARBOL.map((modulo) => [modulo.slug, modulo.codigo]),
+);
+
 export const CATALOGO: Catalogo = ARBOL.map(
   (modulo): ModuloDelCatalogo => ({
     clave: modulo.slug,
@@ -90,32 +99,26 @@ export const CATALOGO: Catalogo = ARBOL.map(
 
 
 /**
- * El catalogo **con sus rotulos traducidos** (#103).
+ * Un catalogo **con sus rotulos traducidos** (#103).
  *
- * Va aparte de `CATALOGO` y no lo sustituye: el de arriba es el dato —lo que este sistema tiene— y
- * este es como se ensena. Separarlos importa porque las guardas comparan el DATO contra el
- * artboard, y hacerlo contra una version traducida seria comparar la traduccion.
+ * Es una funcion pura y no un gancho, y eso cambio en #105: lo que se traduce ya no es `CATALOGO`
+ * entero sino **el que la sesion permite**, que se compone pidiendo tres operaciones. Con un
+ * gancho habria que decidir aqui de donde sale el catalogo, y este archivo no lo sabe.
  *
- * El `useMemo` depende de `t`, y de nada mas: `react-i18next` **cambia la identidad de `t` cuando
- * cambia el idioma**, asi que anadir `i18n.language` al lado no anade nada — el lint lo dice, y
- * tiene razon. Lo que si haria falta si `t` fuera estable es justo eso, y por eso queda escrito:
- * sin la dependencia correcta, cambiar de idioma dejaria el arbol en el anterior hasta que algo
- * mas provocara una pintada, que es un defecto que solo se ve con dos idiomas puestos.
+ * **El rotulo del modulo NO se traduce cuando viene del backend**, y esa es la parte sutil: desde
+ * #105 lo pisa `GET /seguridad/modulos`, porque el dia que la municipalidad renombre un modulo el
+ * arbol tiene que decir el nombre nuevo. Traducirlo lo devolveria al del artboard si coincidieran,
+ * y lo dejaria sin traducir si no — las dos cosas malas a la vez. Se traduce lo que es NUESTRO:
+ * la nota del modulo y los rotulos e instrucciones de sus destinos.
  */
-export function useCatalogo(): Catalogo {
-  const { t } = useTranslation();
-  return useMemo(
-    () =>
-      CATALOGO.map((modulo) => ({
-        ...modulo,
-        rotulo: t(modulo.rotulo),
-        nota: t(modulo.nota),
-        destinos: modulo.destinos.map((destino) => ({
-          ...destino,
-          rotulo: t(destino.rotulo),
-          instruccion: destino.instruccion === undefined ? undefined : t(destino.instruccion),
-        })),
-      })),
-    [t],
-  );
+export function traducirCatalogo(catalogo: Catalogo, t: (clave: string) => string): Catalogo {
+  return catalogo.map((modulo) => ({
+    ...modulo,
+    nota: t(modulo.nota),
+    destinos: modulo.destinos.map((destino) => ({
+      ...destino,
+      rotulo: t(destino.rotulo),
+      instruccion: destino.instruccion === undefined ? undefined : t(destino.instruccion),
+    })),
+  }));
 }

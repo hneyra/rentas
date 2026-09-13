@@ -3,7 +3,8 @@ import { useTranslation } from 'react-i18next';
 import { Armazon, type AccionesDelSistema } from '@kamayuk/shell';
 
 import escudo from '../diseno/escudo-catacaos.png';
-import { useCatalogo } from './catalogo.ts';
+import { useCatalogoPermitido } from './datos/useCatalogoPermitido.ts';
+import { traducirCatalogo } from './catalogo.ts';
 import { Pantalla } from './pantallas/Pantalla.tsx';
 import type { ClaveDeHoja } from './pantallas/arbol.ts';
 import { pantallaDe } from './pantallas/definiciones/index.ts';
@@ -55,8 +56,15 @@ const ENTIDAD = 'Municipalidad Distrital de Catacaos';
  *
  * `retry` en falso tambien aqui, ademas de en el gancho: un 401 reintentado tres veces son tres
  * idas a un backend que ya dijo que no, y el usuario espera el triple para leer lo mismo.
+ *
+ * **Se exporta por las pruebas, y eso dice algo de el.** Al ser de modulo, su cache **sobrevive a
+ * cada `render`**: en la aplicacion es justo lo que se quiere —volver a una pantalla ya vista la
+ * ensena mientras refresca—, y en una suite significa que una prueba hereda lo que cacheo la
+ * anterior. Medido: una prueba que cambiaba los permisos leia los de la prueba de antes y salia
+ * verde sobre el catalogo equivocado. Quien monta la aplicacion en una prueba tiene que llamar a
+ * `CONSULTAS.clear()`.
  */
-const CONSULTAS = new QueryClient({
+export const CONSULTAS = new QueryClient({
   defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } },
 });
 
@@ -74,11 +82,42 @@ function CuerpoDeLaPantalla({ clave }: { readonly clave: ClaveDeHoja }) {
   return <Pantalla definicion={pantallaDe(clave)} datos={useDatosDeLaHoja(clave)} />;
 }
 
-export function Aplicacion() {
+/**
+ * El armazon y lo que lo alimenta.
+ *
+ * Va **dentro** del proveedor y no fuera, y no es un detalle de orden: `useCatalogoPermitido` es un
+ * gancho de consulta, y un gancho corre **antes** que el JSX del componente que lo llama. Con las
+ * dos cosas en la misma funcion, el gancho se ejecutaba antes de que el proveedor existiera y
+ * reventaba con «No QueryClient set, use QueryClientProvider to set one» — en las cuarenta pruebas
+ * del recorrido a la vez.
+ */
+function ArmazonDelSistema() {
   const { t } = useTranslation();
-  const catalogo = useCatalogo();
+  const sesion = useCatalogoPermitido();
+  const catalogo = traducirCatalogo(sesion.catalogo, t);
+
+  /*
+   * **No se monta el armazon hasta saber que puede abrir la cuenta**, y hay dos motivos.
+   *
+   * El bueno: ofrecer el catalogo entero «mientras llega» ensenaria durante un segundo justo lo que
+   * #105 existe para esconder, y un segundo basta para pulsar.
+   *
+   * El otro es un rodeo declarado: `@kamayuk/shell` **revienta si su catalogo cambia despues de
+   * montar** —`useHoja() fuera de una pantalla del <Armazon>`, reproducido en cinco lineas—, y eso
+   * es exactamente lo que pasa cuando el catalogo sale de la red. Esta en `kamayuk-lib`#20. Cuando
+   * se arregle, esto sigue siendo lo correcto por el primer motivo; hoy ademas es necesario.
+   */
+  if (sesion.estado !== 'compuesto') {
+    return (
+      <div className="grid min-h-screen place-items-center p-[30px] bg-fondo">
+        <p className="m-0 max-w-[52ch] text-center text-[14px] leading-[1.6] text-tinta-2 text-pretty">
+          {sesion.porQue}
+        </p>
+      </div>
+    );
+  }
+
   return (
-    <QueryClientProvider client={CONSULTAS}>
     <Armazon
       titulo={t('Rentas')}
       entidad={t(ENTIDAD)}
@@ -92,9 +131,22 @@ export function Aplicacion() {
         { rotulo: t('Cerrar sesion'), peligrosa: true, al: () => void salir() },
       ]}
       acciones={ACCIONES}
-      pieDelCarril={t('Diez modulos y cuarenta submodulos. Catastro y Tesoreria son de otros sistemas.')}
+      // Cuando no hay arbol, el pie del carril dice POR QUE: sin eso, «pidiendo», «fallo» y «esta
+      // cuenta no puede abrir nada» son la misma pantalla en blanco, y son tres cosas distintas.
+      pieDelCarril={
+        sesion.porQue === ''
+          ? t('Diez modulos y cuarenta submodulos. Catastro y Tesoreria son de otros sistemas.')
+          : sesion.porQue
+      }
       pantalla={(hoja) => <CuerpoDeLaPantalla clave={hoja.destino.clave as ClaveDeHoja} />}
     />
+  );
+}
+
+export function Aplicacion() {
+  return (
+    <QueryClientProvider client={CONSULTAS}>
+      <ArmazonDelSistema />
     </QueryClientProvider>
   );
 }
