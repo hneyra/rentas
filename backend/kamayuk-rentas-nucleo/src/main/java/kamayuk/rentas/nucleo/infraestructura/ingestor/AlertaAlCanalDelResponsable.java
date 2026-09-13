@@ -73,13 +73,15 @@ public class AlertaAlCanalDelResponsable implements AlertaDeHechosSinAplicar {
                         + " padron algo que `catastro` ya no dice, y ninguna cifra lo delata"
                         + " (ADR-0026 §4).";
         REGISTRO.error("{} Responsable: {}", texto, responsable);
-        entregar(
-                new Aviso(
-                        responsable.nombre(),
-                        hecho.eventoId().toString(),
-                        motivo,
-                        muertosSinExplicar,
-                        texto));
+        if (responsable.seLeEntrega()) {
+            entregar(
+                    new Aviso(
+                            responsable.nombre(),
+                            hecho.eventoId().toString(),
+                            motivo,
+                            muertosSinExplicar,
+                            texto));
+        }
     }
 
     /**

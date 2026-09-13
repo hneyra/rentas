@@ -11,11 +11,12 @@ import org.junit.jupiter.api.Test;
  *
  * <h2>Por que hace falta esta clase de prueba, medido</h2>
  *
- * <p>La bateria de ingestion mide que el aviso <b>llegue</b>, y con eso no basta: quitar la
- * exigencia de que el canal sea una direccion a la que se pueda entregar <b>no pone nada en rojo
- * alli</b> —esa prueba configura una direccion http de verdad, asi que la guarda no llega a
- * dispararse—. Lo que la exigencia impide es la instalacion que configura «jefe.rentas@municipio» y
- * cree que ha configurado una alerta.
+ * <p>La bateria de ingestion mide que el aviso <b>llegue</b> a una direccion http de verdad. Lo que
+ * no puede ver es la otra mitad: <b>con que canal arranca el ingestor</b>. Hasta rentas#70 esta
+ * clase exigia http(s) y la prueba de aqui lo fijaba — y ese era el defecto: los dos stacks
+ * declaran un correo, {@code operaciones@example.pe}, y el {@code CronJob} no arrancaba en ningun
+ * ambiente. Ahora fija lo contrario, con los otros tres consumidores: cualquier canal arranca, y
+ * solo uno http(s) se entrega.
  */
 class ResponsableDeLaProyeccionTest {
 
@@ -31,18 +32,23 @@ class ResponsableDeLaProyeccionTest {
     }
 
     @Test
-    @DisplayName("y el canal tiene que ser una direccion a la que se pueda ENTREGAR")
-    void elCanalTieneQuePoderRecibir() {
-        // Es la diferencia deliberada con `ResponsableDeLaConciliacion` de `caja`, cuyo canal es
-        // texto libre — y por eso P5D dejo su alerta declarada como «construida y no medida».
-        assertThatThrownBy(
-                        () ->
-                                new ResponsableDeLaProyeccion(
-                                        "Responsable de Catastro",
-                                        "jefe.catastro@municipio.gob.pe"))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("http(s)")
-                .hasMessageContaining("construida y no medida");
+    @DisplayName("un correo arranca y no se entrega; una direccion http(s) arranca y se entrega")
+    void unCorreoArrancaYSoloUnaDireccionSeEntrega() {
+        // El valor que los dos stacks declaran de verdad (`kamayuk:canalDeOperacion`). Con la regla
+        // vieja esto lanzaba, y el `CronJob` del ingestor no arrancaba en ningun ambiente (#70).
+        ResponsableDeLaProyeccion conCorreo =
+                new ResponsableDeLaProyeccion("Equipo de operacion", "operaciones@example.pe");
+        assertThat(conCorreo.seLeEntrega())
+                .as("un correo no se puede entregar con un POST: solo se nombra en el ERROR")
+                .isFalse();
+
+        assertThat(
+                        new ResponsableDeLaProyeccion("Equipo", "https://avisos.municipio/gob")
+                                .seLeEntrega())
+                .as("una direccion https SI se entrega, que es lo que C-8 mide ejecutandolo")
+                .isTrue();
+        assertThat(new ResponsableDeLaProyeccion("Equipo", "http://avisos.local/x").seLeEntrega())
+                .isTrue();
     }
 
     @Test
