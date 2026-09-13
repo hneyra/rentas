@@ -19,7 +19,7 @@
     "verificar": "yarn lint && yarn typecheck && yarn i18n && yarn test",
     "i18n": "i18next-cli status",
     "i18n:regenerar": "KAMAYUK_REGENERAR=1 vitest run verificaciones/el-locale-esta-completo.test.ts",
-    "e2e": "playwright test",
+    "e2e": "node puerto-del-arnes.mjs && playwright test",
     "e2e:navegador": "playwright install chromium"
   },
   "dependencies": {
