@@ -15,6 +15,7 @@ import { useDatosDeLaHoja } from './datos/useDatosDeLaHoja.ts';
 import type { FallaDeLaPuerta } from './api/identidad.ts';
 import { abrirLaCuenta, salir } from './api/identidad.ts';
 import { fallaDeLaPuerta } from './arranque.ts';
+import { useTextosDelMarco } from './i18n/textosDelMarco.ts';
 
 /**
  * **`rentas-web`, sobre el artboard V8** (#90).
@@ -141,6 +142,10 @@ function CuerpoDeLaPantalla({ clave }: { readonly clave: ClaveDeHoja }) {
  */
 function ArmazonDelSistema() {
   const { t } = useTranslation();
+  // Las treinta y dos palabras que el marco dice por su cuenta, en el idioma de la sesion (#133).
+  // Sin esto el armazon usa las suyas por omision y la pantalla sale a medias: el cuerpo
+  // traducido y el marco en castellano. Ver `i18n/textosDelMarco.ts`.
+  const textos = useTextosDelMarco();
   const sesion = useCatalogoPermitido();
   const catalogo = traducirCatalogo(sesion.catalogo, t);
   // El cajon de preferencias: lo abre la opcion del menu de sesion y nada mas. Vive aqui —y no
@@ -172,6 +177,7 @@ function ArmazonDelSistema() {
   return (
     <>
       <Armazon
+        textos={textos}
         titulo={t('Rentas')}
         entidad={t(ENTIDAD)}
         escudo={<img src={escudo} alt="" width={28} height={28} />}

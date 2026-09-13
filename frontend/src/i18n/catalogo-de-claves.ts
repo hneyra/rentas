@@ -2,6 +2,7 @@ import { ARBOL } from '../pantallas/arbol.ts';
 import { PANTALLAS } from '../pantallas/definiciones/index.ts';
 import type { Modulo, Pantalla } from '../pantallas/tipos.ts';
 import { NADA_SERVIDO, SERVIDO_Y_SIN_PEDIR, SOLO_BASE } from '../porQueNoHayDato.ts';
+import { clavesDelMarco } from './textosDelMarco.ts';
 
 /**
  * **Todas las cadenas traducibles del sistema, sacadas de donde estan** (#103).
@@ -23,6 +24,13 @@ import { NADA_SERVIDO, SERVIDO_Y_SIN_PEDIR, SOLO_BASE } from '../porQueNoHayDato
  *
  * Asi que el catalogo se DERIVA del dato en vez de extraerse del codigo. La ventaja es que no
  * puede quedarse corto: una pantalla nueva trae sus cadenas sin que nadie se acuerde de nada.
+ *
+ * <h2>Y desde #133 tambien lo que dice el MARCO</h2>
+ *
+ * Las treinta y dos palabras de `@kamayuk/shell` y la marca de opcional de `@kamayuk/ui` entran
+ * por `textosDelMarco.ts`, y entran **derivadas** por el mismo motivo que las 747: escritas dentro
+ * de cada `t()` habria que acordarse de listarlas a mano en el inventario del locale, y un olvido
+ * ahi no produce ningun rojo — nadie echa de menos lo que nadie listo.
  *
  * <h2>Lo que NO entra</h2>
  *
@@ -76,6 +84,11 @@ function deLasAusencias(): readonly string[] {
 
 /** El catalogo entero, sin repetidos y en orden. */
 export function catalogoDeClaves(): readonly string[] {
-  const todas = new Set([...deLasPantallas(), ...delArbol(), ...deLasAusencias()]);
+  const todas = new Set([
+    ...deLasPantallas(),
+    ...delArbol(),
+    ...deLasAusencias(),
+    ...clavesDelMarco(),
+  ]);
   return [...todas].filter((c) => c.trim() !== '').sort((a, b) => a.localeCompare(b, 'es'));
 }
