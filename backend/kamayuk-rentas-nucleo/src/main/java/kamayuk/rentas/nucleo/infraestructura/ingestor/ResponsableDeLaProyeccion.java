@@ -12,17 +12,27 @@ import java.util.Objects;
  * registro: es que la proyeccion del padron sigue diciendo lo que el padron ya no dice, y
  * <b>ninguna cifra lo delata</b>.
  *
- * <h2>Y el canal tiene que ser una direccion a la que se pueda ENTREGAR</h2>
+ * <h2>Y el canal NO tiene que ser una direccion http(s) — medido, y alineado con los otros tres
+ * </h2>
  *
- * <p>Esta es la diferencia con {@code ResponsableDeLaConciliacion} de `caja`, y esta puesta a
- * proposito. Alli el canal es texto libre —«un correo, un canal de mensajeria, un telefono»— y la
- * alerta se queda en el registro; P5D lo declaro como hueco con todas las letras: «esta construido
- * y no esta medido». Aqui se exige {@code http://} o {@code https://} para que la entrega se pueda
- * <b>comprobar ejecutandola</b>, que es lo que C-8 pide.
+ * <p>Esta clase exigio {@code http://} o {@code https://} para que la entrega se pudiera
+ * <b>comprobar ejecutandola</b> (C-8), y eso dejo el {@code CronJob} del ingestor <b>sin arrancar
+ * en ningun ambiente</b> (rentas#70): los dos stacks declaran {@code kamayuk:canalDeOperacion:
+ * operaciones@example.pe}, un correo, y es lo que el descriptor le pone en {@code
+ * KAMAYUK_RENTAS_INGESTOR_CANAL}. Medido el 2026-09-13 levantando el perfil {@code batch} con esa
+ * configuracion: «kamayuk.rentas.ingestor.canal tiene que ser una direccion http(s) […] y llego
+ * «operaciones@example.pe»».
  *
- * <p>Lo que esta exigencia cuesta hay que decirlo: un municipio que solo tenga un correo tiene que
- * poner delante algo que reciba un {@code POST} y lo reenvie. A cambio, «avisa a una persona con
- * nombre» deja de ser una frase del javadoc.
+ * <p>Los otros tres consumidores ya lo habian medido y decidido igual —{@code
+ * ResponsableDeLaCopiaLocal} de {@code normativa}, {@code ResponsableDelConsumidor} de {@code
+ * catastro} y el aviso del consumidor de {@code identidad} de este mismo repositorio ({@code
+ * ElAvisoAlResponsableTest})—, y {@code normativa} dejo escrito que este era «un defecto latente de
+ * {@code rentas}».
+ *
+ * <p>Asi que el aviso <b>siempre</b> se escribe en el registro con nivel ERROR, con el responsable
+ * y su canal dentro, y <b>ademas</b> se entrega con un {@code POST} cuando el canal es http(s). Lo
+ * que cuesta queda dicho: con un correo la unica constancia es esa linea, y lo que la convierte en
+ * aviso es que la observabilidad alerte sobre ERROR.
  */
 public class ResponsableDeLaProyeccion {
 
@@ -41,25 +51,23 @@ public class ResponsableDeLaProyeccion {
                             + " cifra lo delata: el ingestor no arranca hasta que alguien diga quien"
                             + " lo recibe");
         }
-        if (!this.canal.startsWith("http://") && !this.canal.startsWith("https://")) {
-            throw new IllegalStateException(
-                    "kamayuk.rentas.ingestor.canal tiene que ser una direccion http(s) a la que se"
-                            + " pueda entregar el aviso, y llego «"
-                            + this.canal
-                            + "». No es una preferencia de formato: P5D dejo la alerta de `caja`"
-                            + " declarada como «construida y no medida» precisamente porque su"
-                            + " canal es texto libre y lo unico que se podia comprobar era que la"
-                            + " linea existiera. Aqui la entrega se comprueba ejecutandola");
-        }
     }
 
     public String nombre() {
         return nombre;
     }
 
-    /** Donde se entrega el aviso. Una direccion http(s). */
+    /**
+     * Donde se avisa. Una direccion http(s) recibe ademas un POST; cualquier otra —un correo, un
+     * telefono— solo se nombra en la linea de ERROR.
+     */
     public String canal() {
         return canal;
+    }
+
+    /** Si al canal se le puede ENTREGAR el aviso, y no solo nombrarlo. */
+    public boolean seLeEntrega() {
+        return canal.startsWith("http://") || canal.startsWith("https://");
     }
 
     @Override

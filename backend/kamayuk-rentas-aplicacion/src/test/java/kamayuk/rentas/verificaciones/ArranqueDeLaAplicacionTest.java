@@ -202,6 +202,136 @@ class ArranqueDeLaAplicacionTest {
         }
     }
 
+    /**
+     * El perfil {@code batch} <b>como lo arranca el {@code CronJob} del ingestor</b>, con su
+     * credencial (rentas#70).
+     *
+     * <h2>El defecto, medido en {@code prod} el 2026-09-12</h2>
+     *
+     * <p>{@code kamayuk-rentas-ingestor} no termino bien ni una vez: «Parameter 1 of constructor in
+     * RegimenDeLaInstalacionJdbc required a single bean, but 2 were found:
+     * transaccionesDelIngestor, transactionManager». La prueba de arriba no lo veia porque arranca
+     * {@code batch} <b>sin</b> {@code kamayuk.rentas.ingestor.usuario}, y sin esa propiedad {@code
+     * ConfiguracionDelIngestor} no existe.
+     *
+     * <h2>Y la mitad que no da error, que es la peligrosa</h2>
+     *
+     * <p>{@code ConfiguracionDelIngestor} declara un {@code @Bean} de tipo {@code DataSource}, y
+     * {@code ConfiguracionDeTenant} avisa de lo que eso provoca: la autoconfiguracion del pool de
+     * Boot se retira. Si pasa, el unico pool del contexto es el de {@code rol_ingestor_catastro}, y
+     * el gestor de la plataforma —el que todo lo demas usa— se conecta con ese rol. Resolver la
+     * ambiguedad con un {@code @Qualifier} dejaria arrancar el contexto <b>con el rol
+     * equivocado</b>. Por eso esto no mira solo que levante: pregunta a PostgreSQL con que rol
+     * conecta cada gestor.
+     *
+     * <p>Se inspecciona en {@code ApplicationStartedEvent}, que se publica con el contexto ya
+     * ensamblado y <b>antes</b> de los {@code ApplicationRunner}: {@code CorrerElIngestor} es uno,
+     * y aqui no hay {@code catastro} al que llamar. Lo que falle despues de ese evento es red, no
+     * ensamblaje.
+     */
+    @Test
+    @DisplayName("y el perfil batch levanta con el ingestor, y cada gestor conecta con SU rol")
+    // La captura amplia es la medida: cualquier fallo de arranque se recoge para decir si fue de
+    // ENSAMBLAJE —antes de `ApplicationStartedEvent`— o de red, despues. Una captura estrecha
+    // dejaria escapar justo el tipo que no se previo.
+    @SuppressWarnings("checkstyle:IllegalCatch")
+    void elPerfilBatchDelIngestorLevantaConSusRoles() {
+        java.util.Map<String, String> roles = new java.util.concurrent.ConcurrentHashMap<>();
+        java.util.concurrent.atomic.AtomicReference<Throwable> ensamblaje =
+                new java.util.concurrent.atomic.AtomicReference<>();
+        org.springframework.context.ApplicationListener<
+                        org.springframework.boot.context.event.ApplicationStartedEvent>
+                inspeccion =
+                        evento -> {
+                            var contexto = evento.getApplicationContext();
+                            roles.put("transactionManager", rolDe(contexto, "transactionManager"));
+                            roles.put(
+                                    "transaccionesDelIngestor",
+                                    rolDe(contexto, "transaccionesDelIngestor"));
+                        };
+        try (ConfigurableApplicationContext contexto =
+                new SpringApplicationBuilder(KamayukAplicacion.class)
+                        .profiles("batch")
+                        .web(org.springframework.boot.WebApplicationType.NONE)
+                        .listeners(inspeccion)
+                        .properties(
+                                "KAMAYUK_DB_URL=" + base.url(),
+                                "KAMAYUK_DB_USUARIO=" + BaseDeDatosDePrueba.APP,
+                                "KAMAYUK_DB_CLAVE=" + base.clave(BaseDeDatosDePrueba.APP),
+                                // Lo que el `CronJob` pone como VARIABLES DE ENTORNO
+                                // (`infrastructure/src/descriptor.ts`), con el nombre de propiedad
+                                // al que Spring las traduce. No se pueden escribir aqui en
+                                // mayusculas:
+                                // esa traduccion solo la hace el origen de variables de entorno, y
+                                // pasadas como propiedad `ConfiguracionDelIngestor` no se activa
+                                // —la
+                                // primera version de esta prueba salio roja por eso, y no por el
+                                // defecto—. Las `KAMAYUK_DB_*` de arriba si valen:
+                                // `application.yaml`
+                                // las usa como marcadores.
+                                "kamayuk.rentas.ingestor.usuario="
+                                        + BaseDeDatosDePrueba.INGESTOR_CATASTRO,
+                                "kamayuk.rentas.ingestor.clave="
+                                        + base.clave(BaseDeDatosDePrueba.INGESTOR_CATASTRO),
+                                "kamayuk.rentas.ingestor.municipalidad=1",
+                                "kamayuk.rentas.ingestor.responsable=Operacion de prueba",
+                                // El valor que los dos stacks declaran de verdad: un correo.
+                                "kamayuk.rentas.ingestor.canal=operaciones@example.pe",
+                                // Un puerto que nadie escucha: el runner fallara DESPUES del
+                                // evento.
+                                "kamayuk.catastro.url=http://127.0.0.1:1",
+                                "kamayuk.rentas.ingestor.identidad.token=http://127.0.0.1:1/token",
+                                "kamayuk.rentas.ingestor.identidad.cliente=kamayuk-rentas-servicio",
+                                "kamayuk.catastro.credencial=no-se-usa")
+                        .run()) {
+            assertThat(contexto.isActive()).isTrue();
+        } catch (RuntimeException fallo) {
+            ensamblaje.set(fallo);
+        }
+
+        assertThat(roles)
+                .as(
+                        "el contexto del ingestor no llego a ensamblarse (no se publico"
+                                + " ApplicationStartedEvent). Causa: %s",
+                        ensamblaje.get() == null ? "-" : causaRaiz(ensamblaje.get()))
+                .containsKeys("transactionManager", "transaccionesDelIngestor");
+        assertThat(roles.get("transactionManager"))
+                .as(
+                        "el gestor de la PLATAFORMA conecta como «%s». Todo lo que no es el ingestor"
+                                + " —el regimen de la instalacion, el recorrido por municipalidades—"
+                                + " correria con la credencial del ingestor",
+                        roles.get("transactionManager"))
+                .isEqualTo(BaseDeDatosDePrueba.APP);
+        assertThat(roles.get("transaccionesDelIngestor"))
+                .as("el gestor del ingestor no conecta con su propio rol")
+                .isEqualTo(BaseDeDatosDePrueba.INGESTOR_CATASTRO);
+    }
+
+    private static String rolDe(
+            org.springframework.context.ApplicationContext contexto, String gestor) {
+        var jdbc =
+                (org.springframework.jdbc.support.JdbcTransactionManager)
+                        contexto.getBean(
+                                gestor,
+                                org.springframework.transaction.PlatformTransactionManager.class);
+        try (var conexion = jdbc.getDataSource().getConnection();
+                var consulta = conexion.createStatement();
+                var fila = consulta.executeQuery("select current_user")) {
+            fila.next();
+            return fila.getString(1);
+        } catch (SQLException e) {
+            throw new IllegalStateException("no se pudo preguntar el rol de " + gestor, e);
+        }
+    }
+
+    private static String causaRaiz(Throwable fallo) {
+        Throwable t = fallo;
+        while (t.getCause() != null && t.getCause() != t) {
+            t = t.getCause();
+        }
+        return t.getClass().getSimpleName() + ": " + t.getMessage();
+    }
+
     private HttpResponse<String> pedir(String ruta) throws Exception {
         return cliente.send(
                 HttpRequest.newBuilder(URI.create("http://localhost:" + puerto + ruta)).build(),

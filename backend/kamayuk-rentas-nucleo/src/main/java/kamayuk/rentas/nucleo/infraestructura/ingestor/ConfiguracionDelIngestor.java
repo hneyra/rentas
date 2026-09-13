@@ -10,6 +10,7 @@ import kamayuk.rentas.nucleo.dominio.proyeccion.ProyeccionDeCatastro;
 import kamayuk.rentas.plataforma.CredencialDeServicio;
 import kamayuk.rentas.plataforma.PoolDeUnRol;
 import kamayuk.rentas.plataforma.TokenDeServicioDeKeycloak;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
@@ -54,6 +55,9 @@ public class ConfiguracionDelIngestor {
     /** El nombre del gestor de transacciones que {@link AplicarUnHecho} nombra. */
     public static final String TRANSACCIONES = AplicarUnHecho.TRANSACCIONES;
 
+    /** El nombre del pool del ingestor. Quien lo necesite lo pide por este nombre, y solo asi. */
+    static final String FUENTE = "fuenteDelIngestor";
+
     /**
      * El pool del ingestor.
      *
@@ -61,7 +65,23 @@ public class ConfiguracionDelIngestor {
      * pool grande aqui no aceleraria nada y competiria por las conexiones del motor con el proceso
      * que atiende la ventanilla.
      */
-    @Bean
+    /*
+     * `defaultCandidate = false` en el pool Y en su gestor, y es lo que arregla rentas#70.
+     *
+     * Sin eso, estos dos beans compiten por TIPO con los de la plataforma, y el defecto tiene dos
+     * mitades. La que da error: «required a single bean, but 2 were found: transaccionesDelIngestor,
+     * transactionManager», y el `CronJob` no arrancaba. La que NO da error, medida el 2026-09-13:
+     * un `@Bean` de tipo `DataSource` hace que la autoconfiguracion del pool de Boot se retire (lo
+     * avisa `ConfiguracionDeTenant`), asi que el UNICO pool del contexto era este, y el gestor de la
+     * plataforma conectaba como `rol_ingestor_catastro`. Arreglar la primera mitad con un `@Qualifier`
+     * en quien pide el gestor dejaba el contexto arrancando con ese rol en todo lo que no es el
+     * ingestor — `ArranqueDeLaAplicacionTest` lo mide preguntando `current_user` a cada gestor.
+     *
+     * Con `defaultCandidate = false` no cuentan para la inyeccion por tipo ni para las condiciones de
+     * la autoconfiguracion: solo los recibe quien los nombra —`AplicarUnHecho` por su
+     * `@Transactional(transactionManager = TRANSACCIONES)`, y los dos beans de abajo por `@Qualifier`—.
+     */
+    @Bean(name = FUENTE, defaultCandidate = false)
     DataSource fuenteDelIngestor(
             @Value("${spring.datasource.url}") String url,
             @Value("${kamayuk.rentas.ingestor.usuario}") String usuario,
@@ -69,13 +89,15 @@ public class ConfiguracionDelIngestor {
         return PoolDeUnRol.con(url, usuario, clave, 2, "ingestor-catastro");
     }
 
-    @Bean(TRANSACCIONES)
-    PlatformTransactionManager transaccionesDelIngestor(DataSource fuenteDelIngestor) {
+    @Bean(name = TRANSACCIONES, defaultCandidate = false)
+    PlatformTransactionManager transaccionesDelIngestor(
+            @Qualifier(FUENTE) DataSource fuenteDelIngestor) {
         return PoolDeUnRol.transaccionesDe(fuenteDelIngestor);
     }
 
     @Bean
-    ProyeccionDeCatastro proyeccionDeCatastro(DataSource fuenteDelIngestor, JsonMapper json) {
+    ProyeccionDeCatastro proyeccionDeCatastro(
+            @Qualifier(FUENTE) DataSource fuenteDelIngestor, JsonMapper json) {
         return new ProyeccionDeCatastroJdbc(
                 JdbcClient.create(fuenteDelIngestor), new CuerpoDelHecho(json));
     }
