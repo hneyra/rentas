@@ -1,0 +1,15 @@
+/* La vecina que la hoja arrastra: lo que hay aqui TIENE QUE SALIR en el CSS emitido.
+
+   Trae las dos cosas que `temas.css` traera —un bloque `@theme`, del que Tailwind deriva sus
+   utilidades, y CSS llano, que pasa tal cual— porque son dos caminos distintos: una hoja
+   concatenada sin procesar dejaria pasar el segundo y no el primero. */
+
+@import "./temas/oscuro.css";
+
+@theme {
+  --color-muestra-vecina: #0a5c3e;
+}
+
+.marca-de-la-vecina {
+  color: #0a5c3e;
+}

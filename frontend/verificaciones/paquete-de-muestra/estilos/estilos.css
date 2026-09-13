@@ -1,0 +1,18 @@
+/* ============================================================================
+   UNA HOJA DE MENTIRA CON LA FORMA DE LA DE `@kamayuk/ui` (#125).
+
+   No la sirve nadie: existe para que `tailwind-resuelve-los-import.test.ts`
+   pueda comprobar DONDE busca el arnes lo que una hoja importa.
+
+   La forma es la que importa, y es la de la libreria: la hoja vive en
+   `estilos/` de un paquete, y arrastra a su vecina con una ruta relativa
+   —que es lo que `kamayuk-lib`#23 hace con `temas.css` y las seis paletas—.
+
+   Por eso `paleta.css` esta en `estilos/` y NO en la raiz de este paquete de
+   mentira: si estuviera arriba, la guarda pasaria en verde tanto si el arnes
+   resuelve como el empaquetador como si resuelve contra la raiz, y no
+   distinguiria nada. Lo comprueba la propia prueba antes de compilar.
+   ============================================================================ */
+
+@import "tailwindcss";
+@import "./paleta.css";

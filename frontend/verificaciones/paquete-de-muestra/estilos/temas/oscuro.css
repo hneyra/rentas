@@ -1,0 +1,14 @@
+/* Un nivel mas abajo, y en OTRO directorio: el `@import` de una hoja importada se resuelve contra
+   el directorio de ESA hoja, no contra el de la primera. Es el mismo defecto una vuelta mas
+   adentro, y sin este archivo `loadStylesheet` podria devolver cualquier `base` y nadie lo
+   notaria. Por eso lo que este arrastra —`./claro.css`— es vecino SUYO y no de `estilos.css`. */
+
+@import "./claro.css";
+
+@theme {
+  --color-muestra-anidada: #7b1fa2;
+}
+
+.marca-anidada {
+  color: #7b1fa2;
+}
