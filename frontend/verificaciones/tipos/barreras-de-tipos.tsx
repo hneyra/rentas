@@ -5,7 +5,7 @@ import { formatearImporte } from '../../src/dominio/formato.ts';
 // tiene que poder romper es el consumidor.
 import { Importe, Insignia } from '@kamayuk/ui';
 import type { ClaveDeHoja } from '../../src/pantallas/arbol.ts';
-import type { Campo, Operacion, Pantalla } from '../../src/pantallas/tipos.ts';
+import type { Campo, Operacion, Pantalla, Tabla } from '../../src/pantallas/tipos.ts';
 
 /**
  * Las barreras que pone el COMPILADOR, y la prueba de que muerden.
@@ -121,11 +121,31 @@ export const textoConOpciones: Campo = {
   opciones: ['DNI', 'RUC'],
 };
 
-/** Un campo de solo lectura siempre muestra algo: sin `valor` no hay nada que leer. */
-// @ts-expect-error — falta `valor`: es lo que el campo muestra.
-export const soloLecturaSinValor: Campo = {
+/**
+ * Un campo de solo lectura **NO puede traer su valor** (#97), y esta barrera es la que impide que
+ * las cifras vuelvan.
+ *
+ * Hasta #97 esta barrera afirmaba lo CONTRARIO —que sin `valor` no compilaba—, y era correcto
+ * entonces: el valor era la cifra de ejemplo del artboard. Lo que cambio es que esa cifra
+ * **viajaba en el paquete servido**, y en un sistema de recaudacion se lee como real.
+ *
+ * Se invierte en vez de borrarse, y eso importa: borrarla dejaria la puerta abierta a que alguien
+ * devolviera el campo «para que se vea algo mientras no hay backend», que es exactamente como
+ * volverian. Con la barrera invertida, no compila.
+ */
+export const soloLecturaConValor: Campo = {
   etiqueta: 'Total',
   tipo: 'r',
+  // @ts-expect-error — un campo de solo lectura no lleva su valor: lo pone quien tiene los datos.
+  valor: 'S/ 1.00',
+};
+
+/** Y una tabla tampoco trae sus filas, por lo mismo. */
+export const tablaConFilas: Tabla = {
+  titulo: 'Cuadre',
+  columnas: [{ rotulo: 'Tributo', alineadoDerecha: false }],
+  // @ts-expect-error — las filas las pone quien las pide, no la definicion.
+  filas: [['Predial']],
 };
 
 /**

@@ -195,31 +195,28 @@ describe('AC-3 — el proxy de datos NO viaja en la imagen', () => {
   });
 
   /**
-   * **La otra mitad de #44 esta abierta, y el Dockerfile tiene que DECIRLO.**
+   * **Y la otra mitad de #44 vuelve a cumplirse** (#97).
    *
-   * «Ni una cifra del artboard en lo servido» era cierto mientras las cifras vivian tras una
-   * bandera que Rollup plegaba. En V8 **son el contenido de las cuarenta pantallas**, asi que
-   * viajan siempre.
+   * Esta prueba afirmaba lo contrario desde #90, y era correcto entonces: las cuarenta pantallas
+   * de V8 llevaban las cifras de ejemplo DENTRO de su definicion, asi que la garantia —«ni una
+   * cifra del artboard en lo servido»— no se podia cumplir. El bucle se retiro entero, porque
+   * recortarlo no servia: **V8 reutiliza los datos de muestra de V6**, asi que ninguna de las
+   * cinco cadenas de entonces distinguia una interfaz de otra.
    *
-   * Y no hay un subconjunto de las cinco cadenas que sirva para distinguir V6 de V8: se intento
-   * dejar tres y **la CI lo desmintio en el primer intento** —«Rufina Medina Medina» esta en
-   * `definiciones/fiscalizacion.ts` y «170,616.75» en `definiciones/rentas-registro.ts»—. El
-   * artboard V8 reutiliza los datos de muestra del V6, que es coherente con que se declare
-   * derivado suyo.
+   * #97 lo arregla por donde habia que arreglarlo: las definiciones conservan la FORMA y las
+   * cifras se quedan solo en el artboard, que no viaja. Medido sobre el `dist`: cero apariciones.
    *
-   * Asi que el bucle se retiro entero. Esta prueba existe para que ese hueco **no se olvide**: un
-   * recorte silencioso de una guarda es peor que quitarla, porque nadie sabe que dejo de cubrir.
+   * Asi que la prueba se **invierte** en vez de borrarse. Borrarla dejaria la puerta abierta a que
+   * el bucle se fuera otra vez sin que nadie lo notara — y lo que se perderia no es una linea de
+   * shell: es lo unico que impide **publicar** una imagen con cifras inventadas dentro.
    */
-  it('y DICE que la garantia de las cifras esta abierta, con su numero', () => {
-    expect(DOCKERFILE, 'el Dockerfile no dice que la garantia esta abierta').toContain('#97');
-    // Se mira el MECANISMO —el bucle que recorre cadenas— y no la palabra: la prosa de arriba
-    // tiene que poder nombrar «Rufina Medina Medina» para explicar por que el bucle se fue.
-    // Prohibir la palabra obligaria a escribir el motivo en acertijos.
-    expect(
-      DOCKERFILE,
-      'el Dockerfile volvio a buscar cadenas del artboard: con las cifras en las definiciones,\n' +
-        'eso bloquea la construccion SIEMPRE. Si vuelve, que sea con #97 resuelto.',
-    ).not.toMatch(/for cadena in/);
+  it('y vuelve a buscar cifras del artboard en lo servido', () => {
+    expect(DOCKERFILE, 'el Dockerfile dejo de buscar cifras del artboard').toMatch(/for cadena in/);
+    // Que las que busca EXISTAN en el artboard lo comprueba `sin-cifras-inventadas.test.ts`: una
+    // lista escrita en un Dockerfile se queda vieja sin que nada lo diga, y entonces busca cadenas
+    // que no existen — que es una guarda que no puede fallar. Ya paso con «SULLON VILCHEZ».
+    expect(DOCKERFILE).toContain('9,418,204.60');
+    expect(DOCKERFILE, 'el Dockerfile no dice de donde viene esto').toContain('#97');
   });
 
   /**

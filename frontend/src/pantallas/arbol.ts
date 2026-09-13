@@ -1,4 +1,4 @@
-import type { Modulo } from './tipos.ts';
+import type { Hoja, Modulo } from './tipos.ts';
 
 /**
  * **El arbol de V8: diez modulos y cuarenta hojas** (UI-5, #85, AC3).
@@ -767,3 +767,23 @@ export type SlugDeModulo = (typeof ARBOL)[number]['slug'];
 export const CLAVES_DE_HOJA: readonly ClaveDeHoja[] = ARBOL.flatMap((modulo) =>
   modulo.hojas.map((hoja) => hoja.clave),
 );
+
+/** Las cuarenta hojas, por su clave. Se construye una vez: son 40 y se consultan en cada pintada. */
+const POR_CLAVE: ReadonlyMap<string, Hoja> = new Map(
+  ARBOL.flatMap((modulo) => modulo.hojas.map((hoja) => [hoja.clave, hoja] as const)),
+);
+
+/**
+ * La hoja de una clave.
+ *
+ * Revienta con una clave que no existe en vez de devolver `undefined`: el tipo `ClaveDeHoja` ya
+ * impide escribir una mal, asi que llegar aqui sin hoja significa que el arbol y las claves se
+ * han desincronizado — y eso no se arregla dibujando una pantalla vacia.
+ */
+export function hojaDe(clave: ClaveDeHoja): Hoja {
+  const hoja = POR_CLAVE.get(clave);
+  if (hoja === undefined) {
+    throw new Error(`«${clave}» no esta en el arbol. El arbol y las claves se desincronizaron.`);
+  }
+  return hoja;
+}

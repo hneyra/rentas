@@ -62,7 +62,11 @@ import {
 /** Un campo nuestro, en la forma `[etiqueta, tipo, opciones | ayuda]` del artboard. */
 function campoComoElArtboard(campo: Campo): CampoDelArtboard {
   if (esCampoDeLista(campo)) return [campo.etiqueta, campo.tipo, campo.opciones];
-  if (esCampoDeSoloLectura(campo)) return [campo.etiqueta, campo.tipo, campo.valor];
+  // Un campo de solo lectura ya NO trae su valor (#97): las cifras viven solo en el artboard. Se
+  // devuelven dos elementos, y el descriptor de abajo omite el tercero **en los dos lados** — si
+  // solo lo omitiera aqui, la comparacion diria que falta y estaria diciendo la verdad sobre algo
+  // que ya no es un defecto.
+  if (esCampoDeSoloLectura(campo)) return [campo.etiqueta, campo.tipo];
   if (esCampoDeCasilla(campo)) return [campo.etiqueta, campo.tipo, campo.casilla];
   if (campo.ayuda === undefined) return [campo.etiqueta, campo.tipo];
   return [campo.etiqueta, campo.tipo, campo.ayuda];
@@ -73,12 +77,13 @@ function tablaComoElArtboard(tabla: Tabla): TablaDelArtboard {
   // Las claves opcionales se OMITEN cuando no estan, en vez de ponerlas a `undefined`: lo que
   // compara abajo es `toStrictEqual`, que distingue las dos cosas. Es deliberado — con
   // `toEqual`, una nota perdida en la transcripcion pasaria por «no habia nota».
+  // Sin `f` ni `cn` (#97): las filas y el conteo del artboard son cifras de ejemplo y ya no
+  // viajan en la definicion. El descriptor los omite en los DOS lados.
   return {
     t: tabla.titulo,
-    ...(tabla.conteo === undefined ? {} : { cn: tabla.conteo }),
     ...(tabla.accion === undefined ? {} : { a: tabla.accion }),
     c: tabla.columnas.map((columna) => [columna.rotulo, columna.alineadoDerecha ? 1 : 0] as const),
-    f: tabla.filas,
+    f: [],
     ...(tabla.columnaDeInsignia === undefined ? {} : { i: tabla.columnaDeInsignia }),
     ...(tabla.nota === undefined ? {} : { n: tabla.nota }),
   };
@@ -94,6 +99,31 @@ function bloqueComoElArtboard(bloque: Bloque): BloqueDelArtboard {
 /** Una pantalla nuestra, en la forma del artboard. */
 function pantallaComoElArtboard(pantalla: Pantalla): readonly BloqueDelArtboard[] {
   return pantalla.bloques.map(bloqueComoElArtboard);
+}
+
+/**
+ * **La FORMA de una pantalla del artboard, sin sus cifras de ejemplo** (#97).
+ *
+ * Desde #97 las definiciones no llevan ni el valor de un campo de solo lectura ni las filas de una
+ * tabla: eran cifras inventadas que viajaban en el paquete servido, y en un sistema de recaudacion
+ * se leen como reales. Siguen en el artboard, que es donde siempre estuvieron y que **no viaja**.
+ *
+ * Asi que la comparacion baja a la forma. Y baja **en los dos lados**: recortar solo el nuestro
+ * diria que falta algo, y estaria diciendo la verdad sobre lo que ya no es un defecto.
+ *
+ * Lo que sigue comparandose, campo por campo: etiqueta, tipo, opciones de un desplegable, texto de
+ * una casilla, ayuda, titulo y nota de cada bloque, y de cada tabla su titulo, sus columnas con su
+ * alineacion, su nota, su accion y cual es la columna de insignia.
+ */
+function soloLaForma(bloques: readonly BloqueDelArtboard[]): readonly BloqueDelArtboard[] {
+  return bloques.map((bloque) => {
+    const campos = bloque[2].map((campo) =>
+      campo[1] === 'r' || campo[1] === 'r1' ? ([campo[0], campo[1]] as const) : campo,
+    ) as BloqueDelArtboard[2];
+    if (bloque[3] === undefined) return [bloque[0], bloque[1], campos] as BloqueDelArtboard;
+    const { f: _filas, cn: _conteo, ...resto } = bloque[3];
+    return [bloque[0], bloque[1], campos, { ...resto, f: [] }] as BloqueDelArtboard;
+  });
 }
 
 /** Un modulo nuestro, en la forma `[rotulo, nota, clave, codigo, trazos, hojas]`. */
@@ -117,7 +147,7 @@ function moduloComoElArtboard(modulo: Modulo): ModuloDelArtboard {
 
 /** Un campo, en una linea con su coordenada. */
 function describirCampo(campo: CampoDelArtboard, bloque: number, indice: number): string {
-  const tercero =
+  const tercero = campo[1] === 'r' || campo[1] === 'r1' ? '' :
     campo.length === 2
       ? ''
       : Array.isArray(campo[2])
@@ -130,7 +160,6 @@ function describirCampo(campo: CampoDelArtboard, bloque: number, indice: number)
 function describirTabla(tabla: TablaDelArtboard, bloque: number): readonly string[] {
   return [
     `bloque ${bloque} · tabla titulo: «${tabla.t}»`,
-    `bloque ${bloque} · tabla conteo: «${tabla.cn ?? '—'}»`,
     `bloque ${bloque} · tabla accion: «${tabla.a ?? '—'}»`,
     `bloque ${bloque} · tabla insignia en columna: ${tabla.i ?? '—'}`,
     `bloque ${bloque} · tabla nota: «${tabla.n ?? '—'}»`,
@@ -138,7 +167,6 @@ function describirTabla(tabla: TablaDelArtboard, bloque: number): readonly strin
       (columna, i) =>
         `bloque ${bloque} · tabla columna ${i}: «${columna[0]}» ${columna[1] === 1 ? 'derecha' : 'izquierda'}`,
     ),
-    ...tabla.f.map((fila, i) => `bloque ${bloque} · tabla fila ${i}: ${fila.join(' | ')}`),
   ];
 }
 
@@ -218,6 +246,41 @@ describe('AC3 — el arbol es el del artboard, modulo a modulo', () => {
 
 /* ── Las cuarenta pantallas ────────────────────────────────────────────────────────────── */
 
+/**
+ * **El artboard SIGUE trayendo las cifras, y esta guarda lo exige** (#97).
+ *
+ * Desde #97 la comparacion baja a la forma: las cifras de ejemplo salieron de las definiciones y
+ * viven **solo** en el artboard. Eso tiene un precio que hay que pagar aqui: si alguien vaciara el
+ * artboard de valores, la comparacion de forma **seguiria pasando** —la forma no cambia— y se
+ * habria perdido, sin un solo rojo, lo unico que dice como se ve una pantalla con datos puestos.
+ *
+ * Asi que se cuentan. No se comparan contra nada —no hay con que— pero tienen que estar.
+ */
+describe('el artboard conserva las cifras que las definiciones ya no llevan', () => {
+  const pantallas = artboardV8().pantallas;
+  const bloques = Object.values(pantallas).flat() as readonly BloqueDelArtboard[];
+
+  it('cada campo de solo lectura trae su valor', () => {
+    const soloLectura = bloques.flatMap((b) => b[2]).filter((c) => c[1] === 'r' || c[1] === 'r1');
+    // 102, medido. Se afirma el numero y no «mas de cero»: perder la mitad seria igual de grave
+    // que perderlas todas, y «mas de cero» no lo veria.
+    expect(soloLectura.length, 'el artboard perdio campos de solo lectura').toBe(102);
+    const sinValor = soloLectura.filter((c) => c[2] === undefined || c[2] === '');
+    expect(
+      sinValor.map((c) => `  «${String(c[0])}»`),
+      'Hay campos de solo lectura en el artboard SIN valor. Desde #97 el artboard es el unico\n' +
+        'sitio donde esas cifras existen: sin ellas no queda como se ve una pantalla con datos.',
+    ).toEqual([]);
+  });
+
+  it('y cada tabla trae sus filas', () => {
+    const tablas = bloques.map((b) => b[3]).filter((t) => t !== undefined);
+    expect(tablas.length, 'el artboard perdio tablas').toBe(31);
+    const vacias = tablas.filter((t) => t.f.length === 0).map((t) => `  «${t.t}»`);
+    expect(vacias, `Hay tablas del artboard sin filas:\n${vacias.join('\n')}`).toEqual([]);
+  });
+});
+
 describe('AC4 — cada pantalla cuadra con el artboard, campo por campo', () => {
   it.each(CLAVES_DE_HOJA.map((clave) => [clave] as const))('«%s»', (clave) => {
     const delArtboard = artboardV8().pantallas[clave];
@@ -229,18 +292,19 @@ describe('AC4 — cada pantalla cuadra con el artboard, campo por campo', () => 
     ).toBeDefined();
 
     const nuestra = pantallaComoElArtboard(PANTALLAS[clave]);
+    const suya = soloLaForma(delArtboard as readonly BloqueDelArtboard[]);
 
     // Primero las lineas, que es lo que da un rojo que se lee: dice la coordenada exacta
     // —bloque, campo— y las dos versiones del texto.
     expect(
       describirPantalla(nuestra),
       `«${clave}» dejo de decir lo que el artboard dice. El artboard manda.`,
-    ).toEqual(describirPantalla(delArtboard as readonly BloqueDelArtboard[]));
+    ).toEqual(describirPantalla(suya));
 
     // Y luego la comparacion exhaustiva, que no depende de que el descriptor sepa mirar. Es
     // `toStrictEqual` y no `toEqual` a proposito: una clave opcional puesta a `undefined` no es
     // lo mismo que una clave que no esta.
-    expect(nuestra).toStrictEqual(delArtboard);
+    expect(nuestra).toStrictEqual(suya);
   });
 
   it.each(CLAVES_DE_HOJA.map((clave) => [clave] as const))(
