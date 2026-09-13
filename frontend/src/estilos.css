@@ -1,0 +1,42 @@
+/*
+ * La hoja de estilos de `rentas-web`. **No define ni un color.**
+ *
+ * ────────────────────────────────────────────────────────────────────────────────────────────
+ * POR QUE ESTE ARCHIVO EXISTE, SI LA PALETA ES DE `@kamayuk/ui`
+ * ────────────────────────────────────────────────────────────────────────────────────────────
+ *
+ * Por `@source`, y por nada mas.
+ *
+ * Tailwind v4 descubre las clases leyendo los archivos del proyecto, y **omite `node_modules` por
+ * completo**. `@kamayuk/ui` y `@kamayuk/shell` llegan por `link:`, o sea que viven ahi dentro: sus
+ * clases no las veia nadie.
+ *
+ * Y no fallaba del todo, que es lo que lo hizo invisible. El CSS salia con **157 reglas** —las de
+ * las piezas que este repositorio escribe— y las de la libreria faltaban. La pantalla se dibujaba,
+ * con su estructura correcta y la mitad de su aspecto: una tarjeta sin relleno, un campo sin filo,
+ * y **la rejilla de campos en una sola columna** porque
+ * `grid-cols-[repeat(auto-fit,minmax(216px,1fr))]` no generaba regla.
+ *
+ * Lo cazo el arnes de #107 midiendo en un navegador de verdad que los campos se reparten en
+ * columnas a 1400 px. Ninguna de las 507 pruebas de `vitest` podia verlo: comparan `className`
+ * como texto, y el texto estaba bien.
+ *
+ * ────────────────────────────────────────────────────────────────────────────────────────────
+ * LO QUE ESTE ARCHIVO NO PUEDE HACER
+ * ────────────────────────────────────────────────────────────────────────────────────────────
+ *
+ * Declarar un color, un radio o una sombra. La paleta es del artboard y la publica `@kamayuk/ui`;
+ * un valor escrito aqui seria una segunda fuente de verdad, y la que gana depende del orden en que
+ * el empaquetador resuelva los modulos. Lo vigila `verificaciones/la-v6-no-esta.test.ts`.
+ */
+
+@import '@kamayuk/ui/estilos.css';
+
+/*
+ * Donde mirar, ademas de en `src/`.
+ *
+ * Las rutas son relativas a ESTE archivo y apuntan al clon hermano, que es donde `link:` resuelve.
+ * `verificaciones/tailwind-esta-conectado.test.ts` comprueba que sigan apuntando a algo.
+ */
+@source "../../../kamayuk-lib/paquetes/ui";
+@source "../../../kamayuk-lib/paquetes/shell";

@@ -17,7 +17,9 @@
     "test:watch": "vitest",
     "verificar": "yarn lint && yarn typecheck && yarn i18n && yarn test",
     "i18n": "i18next-cli status",
-    "i18n:regenerar": "KAMAYUK_REGENERAR=1 vitest run verificaciones/el-locale-esta-completo.test.ts"
+    "i18n:regenerar": "KAMAYUK_REGENERAR=1 vitest run verificaciones/el-locale-esta-completo.test.ts",
+    "e2e": "playwright test",
+    "e2e:navegador": "playwright install chromium"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.0",
@@ -44,6 +46,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.0",
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/vite": "^4.3.3",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.9.0",

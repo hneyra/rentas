@@ -5,12 +5,11 @@ import { I18nextProvider } from 'react-i18next';
 import { Aplicacion } from './aplicacion.tsx';
 import { arrancar } from './arranque.ts';
 import i18n from './i18n/i18n.ts';
-// El UNICO sitio donde se importa una hoja de estilos, y desde #90 la hoja es la de la libreria:
-// `@kamayuk/ui` publica el `@theme` con los 42 tokens del artboard V8 y los seis temas. Aqui no
-// queda CSS propio — lo que la V6 tenia en `src/estilos/` eran 3 446 lineas escritas a mano, y
-// tenerlas al lado de la paleta de la libreria seria tener dos fuentes de verdad para el mismo
-// color.
-import '@kamayuk/ui/estilos.css';
+// El UNICO sitio donde se importa una hoja de estilos. `src/estilos.css` no define ni un color:
+// importa la de `@kamayuk/ui` —que publica el `@theme` del artboard— y le dice a Tailwind donde
+// mirar, porque por omision omite `node_modules` y la libreria vive ahi por el `link:`. El motivo
+// entero, con lo que costo descubrirlo, esta dentro de ese archivo.
+import './estilos.css';
 
 const raiz = document.getElementById('raiz');
 if (raiz === null) {

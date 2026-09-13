@@ -1,0 +1,5 @@
+
+# El arnes de #107. Ni el informe ni las trazas se versionan: son de una corrida, pesan, y en CI
+# viajan como artefacto del trabajo — que es donde se miran.
+playwright-report/
+test-results/
