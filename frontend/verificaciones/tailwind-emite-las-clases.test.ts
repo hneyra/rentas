@@ -58,6 +58,14 @@ import {
  * `.bg-<nombre>`: que exista con ese selector exacto, y que lo que declara, resuelto contra la
  * paleta **del `@theme`**, sea el valor del artboard.
  *
+ * <h2>Y que NO mide, que desde #145 tiene guarda propia</h2>
+ *
+ * Lo que el navegador acaba pintando. Lo acotado al `@layer theme` es el `@theme`, o sea el origen
+ * de las utilidades; el bloque sin capa de `temas.css` le gana en la cascada y decide el color que
+ * se ve. Eso lo compara contra el artboard `la-paleta-que-gana-la-cascada.test.ts`. El acotado de
+ * #139 **no se deshace**: sin el, una mutacion del `@theme` se la tapa ese mismo bloque, que
+ * repite los valores — que es el defecto que #139 vino a cerrar.
+ *
  * <h2>Por que esto se puede hacer sin conectar Tailwind a la aplicacion</h2>
  *
  * Porque no hace falta: la hoja se compila **dentro de la prueba**, con la API de `tailwindcss`.
