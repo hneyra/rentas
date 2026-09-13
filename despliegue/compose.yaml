@@ -6,7 +6,20 @@
 #  que vive en el clon hermano `infrastructure`:
 #
 #      docker compose -f ../infrastructure/despliegue/plataforma.compose.yaml up -d --wait
-#      docker compose -f despliegue/compose.yaml up --build --wait
+#      docker compose -f despliegue/compose.yaml \
+#          --env-file ../infrastructure/despliegue/.env up --build --wait
+#
+#  EL `--env-file` NO SOBRA, y `env_file:` NO lo sustituye (#74). Este compose interpola
+#  cinco `${KAMAYUK_CLAVE_*:?}` que salen del `.env` de la PLATAFORMA, y Compose busca
+#  `.env` en el directorio del proyecto —el de este archivo—, donde no hay ninguno.
+#  Medido el 2026-09-13: sin `--env-file`, `docker compose config` sale **1** con
+#  «required variable KAMAYUK_CLAVE_APP is missing a value»; con el, **0**.
+#
+#  Y `env_file:` se probo y NO vale: alimenta el entorno del CONTENEDOR, no la
+#  interpolacion, asi que el mismo `config` vuelve a salir 1 con el error identico.
+#  Un enlace `.env` junto a este archivo si funcionaria —medido, exit 0—, pero `.env`
+#  esta en `.gitignore` en los seis repositorios y des-ignorarlo para versionar un
+#  enlace es como se acaban subiendo credenciales.
 #
 #  ESTE ARCHIVO Y EL DESCRIPTOR TIENEN QUE DECIR LO MISMO. Es la trampa que
 #  ADR-0011 anoto —«dos formas de levantar el sistema, que se separen, que una
