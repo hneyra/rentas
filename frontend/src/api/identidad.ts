@@ -142,8 +142,101 @@ export function olvidarLaParada(): void {
   sessionStorage.removeItem(SALIDA);
 }
 
-/** Manda al formulario de Keycloak, guardando a donde habia que volver. */
-export async function entrar(): Promise<void> {
+/**
+ * Por que no se pudo ni mandar a la puerta: quien no contesto, a que URL, y con que palabras.
+ *
+ * Es lo que se ensena en pantalla, asi que lleva las tres cosas que hacen falta para arreglarlo
+ * y ninguna mas. El `motivo` va **en palabras del navegador** —«Failed to fetch»,
+ * «TimeoutError»— porque son las que se pueden buscar y las que aparecen en su consola.
+ */
+export interface FallaDeLaPuerta {
+  /** El emisor, tal como lo resuelve `configuracion()`. Lo primero que hay que mirar. */
+  readonly emisor: string;
+  /** La URL exacta que se pidio para saber si estaba. */
+  readonly url: string;
+  /** Lo que dijo el navegador, o que se agoto la espera. */
+  readonly motivo: string;
+}
+
+/**
+ * Lo que se espera al emisor antes de darlo por caido.
+ *
+ * Ocho segundos y no tres: una municipalidad con la plataforma al otro lado de un enlace lento
+ * tarda, y dar por caido lo que solo iba despacio manda a la pantalla de error a quien si podia
+ * entrar. Y no treinta: mas alla de unos segundos, quien mira ya cree que la pagina esta rota.
+ */
+const ESPERA_DE_LA_SONDA = 8_000;
+
+/**
+ * **Si el emisor esta, ANTES de mandarle el navegador entero** (#112).
+ *
+ * <h2>El defecto que esto cierra</h2>
+ *
+ * `entrar()` termina en `location.assign(...)`, y quien la llama no monta nada despues **a
+ * proposito**: la pagina se va. Pero cuando la navegacion se RECHAZA —el emisor apagado, un DNS
+ * que no resuelve, un cortafuegos que traga— no hay documento nuevo *ni* aplicacion. Medido con
+ * `yarn dev` y nada mas levantado: `body.innerText` vacio, `body.innerHTML` vacio y la consola
+ * con dos lineas de Vite, ni un error. Nada que leer en ninguna parte.
+ *
+ * <h2>Por que una sonda y no un tiempo de espera despues de navegar</h2>
+ *
+ * Porque despues de `assign` ya es tarde: Chromium **cambia de documento** —se midio el marco
+ * principal navegando a `chrome-error://chromewebdata/`—, asi que un `setTimeout` que montara la
+ * aplicacion correria sobre un documento que el navegador acaba de tirar. Y en el camino bueno
+ * haria lo contrario de lo que se quiere: pintar la pantalla justo antes de que la navegacion
+ * buena se la lleve, o sea un parpadeo.
+ *
+ * Preguntando ANTES, el camino bueno no cambia en nada: `assign` sigue siendo lo ultimo que pasa.
+ *
+ * <h2>Se pregunta al documento de descubrimiento, y NO se lee</h2>
+ *
+ * `/.well-known/openid-configuration` es publico, barato y no abre ninguna sesion; pedir el
+ * `authorization_endpoint` como sonda seria abrir una peticion de autorizacion de verdad —con su
+ * rastro en el emisor— para tirarla.
+ *
+ * Y va con `mode: 'no-cors'` **a proposito**: la respuesta no se lee. La pregunta no es «que
+ * contesta el emisor» sino «llega el navegador hasta el», que es exactamente lo que decide si
+ * `assign` va a aterrizar. Leyendo el cuerpo haria falta que el emisor publicara CORS, y un
+ * intermediario que no lo publique convertiria un emisor VIVO en esta pantalla de error.
+ */
+async function laPuertaContesta(): Promise<FallaDeLaPuerta | null> {
+  const url = `${realm()}/.well-known/openid-configuration`;
+  try {
+    await fetch(url, {
+      mode: 'no-cors',
+      // Sin cache: una respuesta guardada diria que el emisor esta cuando ya no.
+      cache: 'no-store',
+      signal: AbortSignal.timeout(ESPERA_DE_LA_SONDA),
+    });
+    return null;
+  } catch (falla) {
+    return { emisor: realm(), url, motivo: enPalabrasDelNavegador(falla) };
+  }
+}
+
+/** Lo que paso, dicho como el navegador lo dice. Ver `FallaDeLaPuerta.motivo`. */
+function enPalabrasDelNavegador(falla: unknown): string {
+  if (!(falla instanceof Error)) return 'la peticion no llego a completarse';
+  if (falla.name === 'TimeoutError') {
+    return `no contesto en ${String(ESPERA_DE_LA_SONDA / 1000)} s`;
+  }
+  return falla.message === '' ? falla.name : falla.message;
+}
+
+/**
+ * Manda al formulario de Keycloak, guardando a donde habia que volver.
+ *
+ * Devuelve `null` cuando el navegador se va —que es el caso de siempre— y **la falla cuando no se
+ * pudo ni llegar al emisor**, para que quien llama monte y la explique en vez de dejar la pagina
+ * en blanco. Ver `laPuertaContesta()`.
+ *
+ * La sonda va antes de tocar `sessionStorage`: una ida que no llego a ocurrir no es una ida, y
+ * contarla en el tope gastaria los tres intentos contra un emisor que nunca los recibio.
+ */
+export async function entrar(): Promise<FallaDeLaPuerta | null> {
+  const falla = await laPuertaContesta();
+  if (falla !== null) return falla;
+
   const verificador = aleatorio(64);
   const estado = aleatorio(24);
   sessionStorage.setItem(VERIFICADOR, verificador);
@@ -162,6 +255,7 @@ export async function entrar(): Promise<void> {
     code_challenge_method: 'S256',
   });
   window.location.assign(`${autorizacion()}?${parametros.toString()}`);
+  return null;
 }
 
 /** Lo que paso al volver de Keycloak. */
