@@ -35,7 +35,6 @@ const SE_FUE: readonly { readonly ruta: string; readonly que: string }[] = [
   { ruta: 'src/datos/operaciones.ts', que: 'las 18 operaciones del proxy' },
   { ruta: 'src/api/proxy.ts', que: 'el proxy de datos; se quedo sin nada que contestar' },
   { ruta: 'diseno/RentasV6.dc.html', que: 'el artboard de la interfaz anterior' },
-  { ruta: 'e2e', que: 'el arnes, atado a las pantallas de V6; se rehace aparte' },
 ];
 
 /** Lo que sustituyo a cada cosa, y que tiene que estar. La otra direccion de la misma guarda. */
@@ -46,13 +45,22 @@ const ESTA: readonly string[] = [
   'src/pantallas/arbol.ts',
   'src/pantallas/definiciones/index.ts',
   'diseno/RentasV8.dc.html',
+  // El arnes VOLVIO con #107, y es otro: corre contra el bundle construido en Chromium y mide lo
+  // que jsdom no puede —que la interfaz se vea—. El de la instalacion, que entraba por Keycloak
+  // de verdad, sigue sin poder correr y sigue declarado en `frontend.yml`.
+  'e2e/se-ve.spec.ts',
+  'e2e/los-cuarenta.spec.ts',
+  'playwright.config.ts',
+  'src/estilos.css',
 ];
 
 describe('la V6 no esta, y la V8 si', () => {
   it('EL CENTINELA: la lista dice algo y el arbol se puede leer', () => {
     // Sin esto, una `RAIZ` mal calculada haria que `existsSync` diera false para todo y la guarda
     // pasara en verde afirmando que no esta nada — incluida la V8.
-    expect(SE_FUE.length).toBeGreaterThanOrEqual(9);
+    // Ocho desde #107: `e2e/` volvio, y es otro arnes — corre contra el bundle en Chromium y mide
+    // que la interfaz se VEA, que es lo que jsdom no puede.
+    expect(SE_FUE.length).toBeGreaterThanOrEqual(8);
     expect(readdirSync(join(RAIZ, 'src')).length, 'no se pudo leer `src/`').toBeGreaterThan(3);
   });
 
@@ -74,15 +82,46 @@ describe('la V6 no esta, y la V8 si', () => {
     expect(ausentes, `Falta lo que sustituyo a la V6:\n  ${ausentes.join('\n  ')}`).toEqual([]);
   });
 
-  it('nadie importa ya una hoja de estilos propia: la paleta es la de la libreria', () => {
-    // La V6 encadenaba cinco archivos de tokens desde `src/estilos/estilos.css`. Si alguien
-    // anadiera una hoja propia al lado de la de `@kamayuk/ui`, habria dos fuentes de verdad para
-    // el mismo color — y la que gana depende del orden en que Vite resuelva los modulos.
+  it('la hoja propia NO define colores: solo importa la de la libreria y dice donde mirar', () => {
+    // La V6 encadenaba cinco archivos de tokens desde `src/estilos/estilos.css`, 3 446 lineas.
+    //
+    // Desde #107 vuelve a haber UNA hoja propia, y su motivo es otro: Tailwind **omite
+    // `node_modules`** al buscar clases, y `@kamayuk/{ui,shell}` viven ahi por el `link:`. Sin un
+    // `@source` que lo diga, mas de la mitad de las clases de la libreria no generaban regla — el
+    // CSS salia con 157 en vez de 419, y la rejilla de campos se dibujaba **en una sola columna**.
+    //
+    // Asi que lo que se prohibe no es el archivo: es que DECLARE valores. La paleta es del
+    // artboard y la publica `@kamayuk/ui`; un color escrito aqui seria una segunda fuente de
+    // verdad, y la que gana depende del orden en que el empaquetador resuelva los modulos.
     const main = readFileSync(join(RAIZ, 'src/main.tsx'), 'utf8');
-    expect(main).toContain("import '@kamayuk/ui/estilos.css'");
-    const propias = [...main.matchAll(/import '([^']*\.css)'/g)]
-      .map(([, ruta]) => ruta ?? '')
-      .filter((ruta) => !ruta.startsWith('@kamayuk/'));
-    expect(propias, `Hay hojas de estilo propias: ${propias.join(', ')}`).toEqual([]);
+    const hojas = [...main.matchAll(/import '([^']*\.css)'/g)].map(([, ruta]) => ruta ?? '');
+    expect(hojas, 'main.tsx importa mas de una hoja, o ninguna').toHaveLength(1);
+
+    const propia = readFileSync(join(RAIZ, 'src/estilos.css'), 'utf8');
+    expect(propia, 'la hoja propia no importa la de la libreria').toContain('@kamayuk/ui/estilos.css');
+    // Sin comentarios: la prosa de arriba explica el `--color-*` que la libreria publica.
+    const sinComentarios = propia.replace(/\/\*[\s\S]*?\*\//g, ' ');
+    const declaraciones = [...sinComentarios.matchAll(/(--[a-z0-9-]+)\s*:/gi)].map(([, n]) => n ?? '');
+    expect(
+      declaraciones,
+      'La hoja propia declara tokens. La paleta es del artboard y la publica `@kamayuk/ui`:\n' +
+        'dos sitios para el mismo color es uno de mas, y el que gana depende del empaquetador.',
+    ).toEqual([]);
+  });
+
+  it('y le dice a Tailwind donde esta la libreria, que es todo lo que hace', () => {
+    // Es el modo de fallo mas silencioso que este repositorio ha encontrado: **la pantalla se
+    // dibuja**, con su estructura correcta y la mitad de su aspecto. Ninguna de las 507 pruebas de
+    // `vitest` podia verlo — comparan `className` como texto, y el texto estaba bien. Lo cazo el
+    // arnes de #107 midiendo en un navegador que los campos se reparten en columnas.
+    const propia = readFileSync(join(RAIZ, 'src/estilos.css'), 'utf8');
+    const fuentes = [...propia.matchAll(/@source\s+"([^"]+)"/g)].map(([, r]) => r ?? '');
+    expect(fuentes.length, 'la hoja no declara ni un `@source`').toBeGreaterThanOrEqual(2);
+    for (const fuente of fuentes) {
+      expect(
+        existsSync(join(RAIZ, 'src', fuente)),
+        `«@source ${fuente}» apunta a un sitio que no existe: Tailwind no mirara ahi y nadie lo dira`,
+      ).toBe(true);
+    }
   });
 });
