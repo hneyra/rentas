@@ -10,6 +10,29 @@ import { abrir, conLaSeguridadContestada } from './instalacion.ts';
  * se reacomode y que un `overflow` no corte una tabla.
  */
 
+/**
+ * **Este archivo mide la paleta CLARA de `institucional`, y desde #111 lo dice** (`kamayuk-lib`#23).
+ *
+ * Con las seis paletas ya en el CSS servido, `--color-fondo` deja de tener un valor: tiene seis, y
+ * cual sale depende de dos atributos del `<html>` y —cuando el segundo falta— de
+ * `prefers-color-scheme`. Lo de aqui se compara contra `diseno/RentasV8.dc.html`, que es la
+ * combinacion `institucional/claro` y ninguna otra.
+ *
+ * <h2>Por que se declara, si Playwright ya va en claro</h2>
+ *
+ * Porque «ya va en claro» es un valor por omision de otra herramienta, medido y no supuesto:
+ * `contextOptions.colorScheme ?? "light"` en `playwright-core`, o sea que emula claro **aunque el
+ * equipo este en oscuro**, y solo `colorScheme: null` —que es `no-override`— hereda el del sistema.
+ * Comprobado en este arbol: con `'dark'`, el lienzo mide `#111213` y esta comparacion sale
+ * «Expected: "#f2f6f9" / Received: "#111213"».
+ *
+ * O sea: el rojo que este archivo daria si el eje se moviera **no hablaria del eje**, hablaria de
+ * un color. Declararlo cuesta una linea y convierte «funciona porque Playwright hace esto» en «se
+ * mide esta combinacion a proposito». El otro eje —que la pagina cambie de color de verdad al
+ * elegir otra— se mide entero en `los-temas-llegan-al-navegador.spec.ts`.
+ */
+test.use({ colorScheme: 'light' });
+
 test.beforeEach(async ({ page }) => {
   await conLaSeguridadContestada(page);
 });

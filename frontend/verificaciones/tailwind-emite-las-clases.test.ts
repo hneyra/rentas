@@ -35,8 +35,14 @@ import { RAIZ_DE_UI, clasesDe, compilar, fuentesDe } from './tailwind.ts';
  * sirviendose hasta #90.
  */
 
-/** Las piezas que dibujan: las de la libreria y las del interprete. */
-const FUENTES = [...fuentesDe(RAIZ_DE_UI), ...fuentesDe('src/pantallas')];
+/**
+ * Las piezas que dibujan: las de la libreria, las del interprete y las de la costura.
+ *
+ * `src/preferencias` entra con #111. Es la unica pieza que este repositorio dibuja fuera del
+ * interprete, y llego escribiendo clases que ninguna otra usa —`accent-azul` entre ellas—: dejarla
+ * fuera de esta lista seria dejar sin vigilar justo la unica que estrena utilidades.
+ */
+const FUENTES = [...fuentesDe(RAIZ_DE_UI), ...fuentesDe('src/pantallas'), ...fuentesDe('src/preferencias')];
 const CLASES = [...new Set(FUENTES.flatMap((f) => clasesDe(readFileSync(f, 'utf8'))))].sort();
 
 const HOJA_DEL_ARTBOARD = (() => {

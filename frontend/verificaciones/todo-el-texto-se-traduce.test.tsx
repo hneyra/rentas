@@ -1,6 +1,8 @@
+import { ProveedorDeTema } from '@kamayuk/ui';
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 
+import { MandoDeTema } from '../src/preferencias/MandoDeTema.tsx';
 import { CATALOGO } from '../src/catalogo.ts';
 import i18n, { ABRE, CIERRA, IDIOMA_MARCADO, IDIOMA_POR_OMISION } from '../src/i18n/i18n.ts';
 import { pantallaDe } from '../src/pantallas/definiciones/index.ts';
@@ -93,6 +95,31 @@ describe('ninguna cadena llega al DOM sin pasar por `t()`', () => {
       ).toEqual([]);
     },
   );
+
+  /**
+   * **El mando de preferencias tambien** (#111).
+   *
+   * Es la unica pieza que este repositorio dibuja fuera del interprete, asi que es la unica que el
+   * recorrido de las cuarenta **no** puede ver: no es una pantalla y no esta en el catalogo. Sus
+   * once cadenas —los rotulos de los dos ejes, las tres identidades, los tres modos y las tres
+   * notas— llegarian al DOM sin que nadie mirase.
+   *
+   * Se lee de `document.body` y no del contenedor porque el cajon sale en un portal: lo que se
+   * dibuja no cuelga de lo que `render` devuelve.
+   */
+  it('y el mando de preferencias, que no es una pantalla y por eso se le olvida a todo el mundo', () => {
+    render(
+      <ProveedorDeTema configuracion={{ identidadPorOmision: 'institucional', prefijoDeClaves: 'kamayuk.prueba' }}>
+        <MandoDeTema abierto alCerrar={() => {}} />
+      </ProveedorDeTema>,
+    );
+    const escapadas = sinTraducir(document.body);
+    expect(
+      escapadas,
+      'El mando de preferencias dibuja texto que no paso por «t()»:\n' +
+        `${escapadas.map((e) => `  «${e}»`).join('\n')}`,
+    ).toEqual([]);
+  });
 
   it('y el CENTINELA de la otra direccion: con el idioma normal NO hay marcas', async () => {
     // Sin esta mitad, la de arriba pasaria igual con un locale que envolviera SIEMPRE — incluso en
