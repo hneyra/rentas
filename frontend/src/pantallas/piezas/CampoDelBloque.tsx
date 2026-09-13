@@ -53,10 +53,18 @@ export interface CampoDelBloqueProps {
   readonly valor?: string | boolean;
   /** Que decir en el hueco de un campo de solo lectura cuando no hay valor. */
   readonly ausencia: Ausencia;
+  /** Y si ESTE campo tiene su propio motivo, el suyo. Ver `datos.ts`. */
+  readonly enElCampo?: string;
   readonly alCambiar: (valor: string | boolean) => void;
 }
 
-export function CampoDelBloque({ campo, valor, ausencia, alCambiar }: CampoDelBloqueProps) {
+export function CampoDelBloque({
+  campo,
+  valor,
+  ausencia,
+  enElCampo,
+  alCambiar,
+}: CampoDelBloqueProps) {
   const tipo = tipoDe(campo.tipo);
   const ancho = anchoCompleto(campo.tipo);
   // «(opcional)» sale de la propia ayuda, como en el artboard: `/opcional/i.test(ayuda)`. No hay
@@ -94,7 +102,7 @@ export function CampoDelBloque({ campo, valor, ausencia, alCambiar }: CampoDelBl
             data-sin-dato={hayDato ? undefined : ''}
             className={hayDato ? undefined : 'text-tinta-3 italic'}
           >
-            {hayDato ? valor : ausencia.enElCampo}
+            {hayDato ? valor : (enElCampo ?? ausencia.enElCampo)}
           </Dato>
         </Etiqueta>
       );

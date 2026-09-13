@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Armazon, type AccionesDelSistema } from '@kamayuk/shell';
 
 import escudo from '../diseno/escudo-catacaos.png';
@@ -5,8 +6,7 @@ import { CATALOGO } from './catalogo.ts';
 import { Pantalla } from './pantallas/Pantalla.tsx';
 import type { ClaveDeHoja } from './pantallas/arbol.ts';
 import { pantallaDe } from './pantallas/definiciones/index.ts';
-import { hojaDe } from './pantallas/arbol.ts';
-import { porQueNoHayDato } from './porQueNoHayDato.ts';
+import { useDatosDeLaHoja } from './datos/useDatosDeLaHoja.ts';
 import { salir } from './api/identidad.ts';
 
 /**
@@ -28,7 +28,9 @@ import { salir } from './api/identidad.ts';
  *   entero. La V6 lo filtraba desde I-3 con `GET /seguridad/accesos`, y eso vuelve cuando la
  *   sesion se conecte a las pantallas nuevas — no antes, porque filtrar contra una lista de
  *   permisos sin pantallas que abrir no se puede comprobar.
- * · **Pedir datos.** Cada pantalla dibuja las cifras de su definicion, que son las del artboard.
+ * · **Pedir datos en las 38 pantallas que no tienen backend.** Dos de las cuarenta piden de verdad
+ *   —`panel` y `coa-panel`—; el resto dice por que no. Ver `datos/conectores.ts`, que cuenta campo
+ *   a campo por que «servida» no es «puede pintarse».
  * · **Las acciones del pie hacen lo minimo honesto**: imprimir imprime, y las otras tres avisan
  *   de que no escriben todavia. Un boton que no dice nada al pulsarlo se lee como una pantalla
  *   rota; uno que dice lo que hace —y lo que no— se lee como una pantalla a medio conectar, que
@@ -43,14 +45,37 @@ const ENTIDAD = 'Municipalidad Distrital de Catacaos';
  * `imprimir` es la unica que puede hacer su trabajo entero sin backend, asi que lo hace. Las
  * otras tres dicen que les falta: ver `avisos.ts` para el texto que acompana a los botones.
  */
+/**
+ * El cliente de consultas, **creado una vez y fuera del componente**.
+ *
+ * Dentro se crearia uno nuevo en cada pintada, y con el se tiraria la cache entera: cada vuelta al
+ * mismo destino volveria a pedir. Fuera, volver a una pantalla ya vista la ensena mientras
+ * refresca.
+ *
+ * `retry` en falso tambien aqui, ademas de en el gancho: un 401 reintentado tres veces son tres
+ * idas a un backend que ya dijo que no, y el usuario espera el triple para leer lo mismo.
+ */
+const CONSULTAS = new QueryClient({
+  defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } },
+});
+
 const ACCIONES: AccionesDelSistema = {
   imprimir: () => {
     window.print();
   },
 };
 
+/** El cuerpo de una pantalla: su definicion, y lo que se sepa de sus datos. */
+function CuerpoDeLaPantalla({ clave }: { readonly clave: ClaveDeHoja }) {
+  // Un componente y no una funcion suelta: `useDatosDeLaHoja` es un gancho, y un gancho solo puede
+  // llamarse desde un componente. Ademas esto es lo que hace que **solo se vuelva a pintar la
+  // pantalla** cuando llega su respuesta, y no el armazon entero.
+  return <Pantalla definicion={pantallaDe(clave)} datos={useDatosDeLaHoja(clave)} />;
+}
+
 export function Aplicacion() {
   return (
+    <QueryClientProvider client={CONSULTAS}>
     <Armazon
       titulo="Rentas"
       entidad={ENTIDAD}
@@ -65,17 +90,8 @@ export function Aplicacion() {
       ]}
       acciones={ACCIONES}
       pieDelCarril="Diez modulos y cuarenta submodulos. Catastro y Tesoreria son de otros sistemas."
-      pantalla={(hoja) => {
-        const clave = hoja.destino.clave as ClaveDeHoja;
-        return (
-          <Pantalla
-            definicion={pantallaDe(clave)}
-            // Quien sabe por que no hay dato es este sistema, no el interprete. Ver
-            // `porQueNoHayDato.ts`: son cuatro casos, no uno.
-            datos={{ ausencia: porQueNoHayDato(hojaDe(clave)) }}
-          />
-        );
-      }}
+      pantalla={(hoja) => <CuerpoDeLaPantalla clave={hoja.destino.clave as ClaveDeHoja} />}
     />
+    </QueryClientProvider>
   );
 }
