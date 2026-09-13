@@ -1,5 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
+import { PUERTO, URL_DEL_ARNES } from './puerto-del-arnes.mjs';
+
 /**
  * **El arnes que mide lo que jsdom no puede: que la interfaz se VEA** (#107).
  *
@@ -24,6 +26,15 @@ import { defineConfig, devices } from '@playwright/test';
  * `vite preview` sirve lo que `vite build` produjo — el mismo artefacto que la imagen lleva. Con
  * el servidor de desarrollo se mediria un arbol de modulos sin empaquetar, con su CSS inyectado
  * por otra via: verde aqui y roto en produccion es exactamente lo que un arnes tiene que impedir.
+ *
+ * <h2>Y por que el puerto ya NO esta escrito aqui</h2>
+ *
+ * Porque estaba escrito TRES veces —`baseURL`, `webServer.url` y el `--port`— y siempre era el
+ * 4173. Con varios worktrees a la vez, el arnes de una rama media el bundle de otra: paso al
+ * cerrar #140 y dio `Received: 0`, un rojo que no nombra el puerto. Ahora sale de
+ * `puerto-del-arnes.mjs`, que lo deriva del ARBOL —el mismo siempre para la misma copia de
+ * trabajo, distinto para cada una— y en CI, donde solo hay un arbol, sigue siendo el 4173.
+ * El porque de cada decision, con lo que se midio, esta en ese archivo.
  */
 export default defineConfig({
   testDir: './e2e',
@@ -33,15 +44,29 @@ export default defineConfig({
   workers: 1,
   reporter: process.env.CI === undefined ? [['list']] : [['list'], ['html', { open: 'never' }]],
   use: {
-    baseURL: 'http://localhost:4173/rentas/',
+    baseURL: URL_DEL_ARNES,
     trace: 'retain-on-failure',
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  /**
+   * La segunda mitad de #148: que lo servido sea el `dist/` de este arbol y no el de otro.
+   * Corre DESPUES del `webServer` —los complementos van delante de los `globalSetup`— y
+   * detiene la corrida entera, que es lo que un camino suelto no puede hacer.
+   */
+  globalSetup: './e2e/el-bundle-servido-es-el-mio.ts',
   webServer: {
-    // `--strictPort`: si 4173 esta ocupado, que falle en vez de servir otro puerto y medir otra
-    // cosa. Y `build` delante, porque `preview` sin `dist` sirve un 404 con codigo 200.
-    command: 'yarn build && yarn preview --port 4173 --strictPort',
-    url: 'http://localhost:4173/rentas/',
+    // `build` delante, porque `preview` sin `dist` sirve un 404 con codigo 200. Y
+    // `--strictPort` SE QUEDA: sin el, Vite se mueve de puerto en silencio y el `baseURL` se
+    // queda donde estaba, que es medir el servidor de otro.
+    //
+    // La comprobacion de que el puerto esta libre NO esta aqui, y no es por gusto: esta en el
+    // script `e2e` de `package.json`, DELANTE de `playwright test`. Medido —#148, con un
+    // intruso en el puerto derivado—: si esta en este comando, Playwright ya ha hablado antes
+    // con su propio aviso, que dice «http://localhost:5074/rentas/ is already used» y nada
+    // mas; quien tiene el puerto, desde que directorio y como matarlo lo dice el nuestro, y
+    // para decirlo tiene que ir primero.
+    command: `yarn build && yarn preview --port ${PUERTO} --strictPort`,
+    url: URL_DEL_ARNES,
     reuseExistingServer: false,
     timeout: 120_000,
   },
