@@ -3,7 +3,10 @@ import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { type Requeridor, enlacesDeclarados, remedioDelEnlace } from './enlace.ts';
+import { type Requeridor, enlacesDeclarados } from './enlace.ts';
+// `remedioDelEnlace` se mudo a `remedio.mjs` en #137: lo necesita `eslint.config.js`, que
+// lo carga Node a secas y revienta con un import de `.ts` (`ERR_UNKNOWN_FILE_EXTENSION`).
+import { remedioDelEnlace } from './remedio.mjs';
 
 /**
  * **Alcanzar lo de `@kamayuk/*` POR SU ESPECIFICADOR, y no por su sitio en el disco** (#138).
