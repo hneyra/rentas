@@ -7,7 +7,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { abrir, conLaSeguridadContestada } from './instalacion.ts';
 
 /**
- * **Los temas llegan al NAVEGADOR, y no solo al archivo** (#111, AC3 y AC4).
+ * **Los temas llegan al NAVEGADOR, y no solo al archivo** (#111, AC3 y AC4; #134).
  *
  * <h2>Por que esta guarda existe, dicho sin rodeos</h2>
  *
@@ -21,7 +21,7 @@ import { abrir, conLaSeguridadContestada } from './instalacion.ts';
  * perfectamente inalcanzable las pasa todas. Asi que esta mide el otro extremo del camino: lo que
  * el servidor entrega y lo que el navegador computa.
  *
- * <h2>Las tres cosas que mide, y por que hacen falta las tres</h2>
+ * <h2>Las cuatro cosas que mide, y por que hacen falta las cuatro</h2>
  *
  *   1. **Lo que se sirve.** La hoja se pide POR SU URL al servidor que sirve el `dist`, no se lee
  *      del disco: es el mismo byte que recibe una ventanilla.
@@ -30,6 +30,11 @@ import { abrir, conLaSeguridadContestada } from './instalacion.ts';
  *   3. **Lo que el navegador PINTA.** Es lo unico que prueba que el selector es el correcto, que
  *      la cascada lo alcanza y que no quedo enterrado en un `@layer` que pierde. Un atributo que
  *      cambia de valor no dice nada de esto; el color computado, si.
+ *   4. **Lo que pinta el navegador POR SU CUENTA** (#134): `color-scheme` y, en pixeles, el canal
+ *      de la barra de desplazamiento. Las tres de arriba se repartieron el trabajo por paleta y
+ *      dejaron fuera una tercera capa que no es ni un token ni un pixel de la hoja — y por eso
+ *      `kamayuk-lib`#33, que era exactamente eso, entro, vivio y se arreglo sin mover un rojo aqui.
+ *      Ver el docblock del ultimo camino para por que se mide la barra y no una casilla.
  *
  * <h2>Los valores esperados salen de la libreria, no de una tabla de aqui</h2>
  *
@@ -114,6 +119,11 @@ async function tokenComputado(pagina: Page, nombre: string): Promise<string> {
   );
 }
 
+/** La senal que el `<html>` le da al navegador: `light` o `dark`. */
+async function elEsquemaDelDocumento(pagina: Page): Promise<string> {
+  return pagina.evaluate(() => getComputedStyle(document.documentElement).colorScheme);
+}
+
 async function abrirElMando(pagina: Page): Promise<void> {
   await pagina.locator('[data-slot="abrir-la-sesion"]').click();
   await pagina.getByRole('menuitem', { name: 'Preferencias' }).click();
@@ -131,6 +141,11 @@ async function elegir(
   await pagina.getByRole('radio', { name: ROTULO[modo], exact: true }).check();
   await pagina.keyboard.press('Escape');
   await expect(pagina.locator('[data-slot="mando-de-tema"]')).toBeHidden();
+  // Y el velo del cajon, DESAPARECIDO. No es celo: mientras siga montado intercepta el puntero, y
+  // la segunda llamada seguida a `elegir()` se queda esperando al boton de la sesion hasta agotar
+  // el tiempo. Medido al escribir la comprobacion de #134, que cambia de tema seis veces sin
+  // recargar: «<div data-slot="velo-del-cajon"> intercepts pointer events», 30 s.
+  await expect(pagina.locator('[data-slot="velo-del-cajon"]')).toHaveCount(0);
 }
 
 /** Todo el CSS que la pagina carga, pedido POR SU URL al servidor que sirve el `dist`. */
@@ -146,6 +161,22 @@ async function elCssQueSeSirve(pagina: Page): Promise<string> {
   );
   return [...pedidas, ...enLinea].join('\n');
 }
+
+/**
+ * **Con las barras de desplazamiento VISIBLES, y hace falta decirlo** (#134).
+ *
+ * Playwright arranca Chromium sin cabeza con `--hide-scrollbars`, y con esa bandera el canal no
+ * ocupa sitio ni se pinta: medido en este arbol, `offsetWidth - clientWidth` daba **0** en los dos
+ * contenedores que desbordan, y la franja de la derecha devolvia el fondo de la pagina y nada mas.
+ * O sea que la comprobacion de mas abajo no habria medido la barra: habria medido el lienzo, que es
+ * lo que la hoja pinta, y habria pasado en verde con el defecto puesto.
+ *
+ * Va a nivel de archivo porque `launchOptions` es una opcion del *worker*: dentro de un `describe`
+ * Playwright la rechaza. No molesta a lo demas de aqui —el resto mide colores computados y
+ * atributos— y no alcanza a `se-ve.spec.ts`, que corre en otro archivo y sigue midiendo que ninguna
+ * tabla desplace la pagina con el navegador que siempre tuvo.
+ */
+test.use({ launchOptions: { ignoreDefaultArgs: ['--hide-scrollbars'] } });
 
 test.beforeEach(async ({ page }) => {
   await conLaSeguridadContestada(page);
@@ -238,6 +269,15 @@ for (const paleta of SEIS) {
     expect(await tokenComputado(page, 'fondo'), 'el lienzo').toBe(paleta.fondo);
     expect(await tokenComputado(page, 'tinta'), 'la tinta').toBe(paleta.tinta);
 
+    // Y LA SENAL AL NAVEGADOR (#134). No es un token mas: los `--color-*` pintan lo que pinta la
+    // hoja, y `color-scheme` pinta lo que dibuja el navegador por su cuenta —controles nativos,
+    // barra de desplazamiento, lienzo—. Sin ella la pantalla se oscurece entera menos eso, que es
+    // exactamente el defecto de `kamayuk-lib`#33: entro, vivio y se arreglo sin mover un rojo aqui.
+    expect(
+      await elEsquemaDelDocumento(page),
+      'el `<html>` no le dice al navegador en que modo dibujar LO SUYO',
+    ).toBe(paleta.modo === 'oscuro' ? 'dark' : 'light');
+
     // Y en pixeles de verdad, no en tokens: la cabecera azul de la tarjeta y su papel. Es lo que
     // `se-ve.spec.ts` mide para la paleta clara, aqui para las seis.
     const cabecera = page.locator('[data-slot="tarjeta-cabecera"]').first();
@@ -287,11 +327,171 @@ test.describe('con el equipo puesto en oscuro', () => {
       await tokenComputado(page, 'fondo'),
       'con el equipo en oscuro y sin modo elegido, la interfaz no se puso oscura',
     ).toBe(oscuro?.fondo);
+    // La senal al navegador va por el OTRO bloque de la hoja —el del `@media`—, que es una regla
+    // distinta de la del atributo y puede quedarse sin ella por su cuenta (#134).
+    expect(
+      await elEsquemaDelDocumento(page),
+      'con el equipo en oscuro, el `<html>` no le dijo al navegador que dibujara en oscuro',
+    ).toBe('dark');
 
     await elegir(page, 'institucional', 'claro');
     expect(
       await tokenComputado(page, 'fondo'),
       'pedir claro en un equipo puesto en oscuro no saco de oscuro',
     ).toBe(FONDO_DEL_ARTBOARD);
+    expect(
+      await elEsquemaDelDocumento(page),
+      'pedir claro dejo al navegador dibujando lo suyo en oscuro',
+    ).toBe('light');
   });
+});
+
+/* ── Lo que pinta el NAVEGADOR, y no la hoja ───────────────────────────────────────────── */
+
+/**
+ * El canal de la barra de desplazamiento, leido EN PIXELES.
+ *
+ * Se busca subiendo desde la primera tarjeta hasta el primer antepasado que desplace de verdad
+ * —`overflow-y` resuelto y contenido mas alto que el hueco—, que es el contenedor del cuerpo de la
+ * pantalla. Por su clase no se puede buscar: no lleva `data-slot`, y la clase es de `@kamayuk/shell`.
+ *
+ * Se lleva el desplazamiento ARRIBA y se recorta el tramo inferior: con el pulgar en lo alto, lo de
+ * abajo es canal y solo canal. Que el recorte salga de un solo color es parte de la comprobacion —si
+ * saliera de varios, se estaria midiendo contenido y no la barra—.
+ */
+async function elCanalDeLaBarra(
+  pagina: Page,
+): Promise<{ readonly ancho: number; readonly colores: readonly string[] }> {
+  const donde = await pagina.evaluate(() => {
+    let caja: HTMLElement | null = document.querySelector('[data-slot="tarjeta"]');
+    while (caja !== null) {
+      const estilo = getComputedStyle(caja);
+      const desplaza = estilo.overflowY === 'auto' || estilo.overflowY === 'scroll';
+      if (desplaza && caja.scrollHeight > caja.clientHeight) break;
+      caja = caja.parentElement;
+    }
+    if (caja === null) return null;
+    caja.scrollTop = 0;
+    const ancho = caja.offsetWidth - caja.clientWidth;
+    const marco = caja.getBoundingClientRect();
+    return {
+      ancho,
+      x: marco.right - ancho,
+      y: marco.top + marco.height * 0.8,
+      alto: Math.round(marco.height * 0.15),
+    };
+  });
+  expect(donde, 'ninguna pantalla desbordo: no hay barra que medir').not.toBeNull();
+  if (donde === null) return { ancho: 0, colores: [] };
+  // El centinela de la bandera: con `--hide-scrollbars` puesta el canal no ocupa sitio, y recortar
+  // cero pixeles de ancho ni siquiera es una captura valida.
+  expect(
+    donde.ancho,
+    'el canal no ocupa sitio: la barra esta oculta y aqui no se estaria midiendo nada',
+  ).toBeGreaterThan(0);
+
+  const captura = await pagina.screenshot({
+    clip: { x: donde.x, y: donde.y, width: donde.ancho, height: donde.alto },
+  });
+  // El PNG lo descifra el propio navegador sobre un `<canvas>`: ya esta abierto, y traerse un
+  // descodificador de imagenes para leer quince pixeles de ancho seria una dependencia nueva.
+  const colores = await pagina.evaluate(async (base64) => {
+    const imagen = new Image();
+    imagen.src = `data:image/png;base64,${base64}`;
+    await imagen.decode();
+    const lienzo = document.createElement('canvas');
+    lienzo.width = imagen.width;
+    lienzo.height = imagen.height;
+    const pincel = lienzo.getContext('2d');
+    if (pincel === null) return [];
+    pincel.drawImage(imagen, 0, 0);
+    const datos = pincel.getImageData(0, 0, lienzo.width, lienzo.height).data;
+    const vistos = new Set<string>();
+    for (let i = 0; i < datos.length; i += 4) {
+      vistos.add(`${datos[i]},${datos[i + 1]},${datos[i + 2]}`);
+    }
+    return [...vistos];
+  }, captura.toString('base64'));
+  return { ancho: donde.ancho, colores };
+}
+
+/** La luminancia de un `r,g,b`, para poder decir «claro» y «oscuro» sin nombrar un color. */
+function luminancia(rgb: string): number {
+  const [r = 0, v = 0, a = 0] = rgb.split(',').map(Number);
+  return 0.2126 * r + 0.7152 * v + 0.0722 * a;
+}
+
+/**
+ * **Un control que pinta EL NAVEGADOR, en claro y en oscuro** (#134, AC2).
+ *
+ * <h2>Por que la barra de desplazamiento y no una casilla o un campo</h2>
+ *
+ * Porque estaba medido, y es el modo de fallo que este issue vino a cerrar: **un control al que la
+ * hoja ya le pinta todo mide la hoja otra vez**. Se volcaron las propiedades computadas del
+ * `<input>` de verdad de una pantalla en las seis combinaciones, y la unica que cambia con el modo
+ * sin cambiar con la identidad es `color-scheme`: el fondo, la tinta, el filo y el cursor los pone
+ * `CONTROL` de `@kamayuk/ui`. La casilla ni siquiera es nativa —Radix dibuja la marca en un `<svg>`
+ * nuestro— y el tirador del `<textarea>` salio identico con la hoja rota y con la hoja sana, porque
+ * el navegador lo deriva del fondo del propio control y no de `color-scheme`.
+ *
+ * El canal de la barra, en cambio, no lo toca ni una regla de este producto: no hay un solo
+ * `scrollbar-color` ni un `::-webkit-scrollbar` en el CSS servido.
+ *
+ * <h2>Las dos mitades, y por que van en la misma prueba</h2>
+ *
+ *   1. **Cambia con el modo**: el canal es casi blanco en las tres claras y gris oscuro en las tres
+ *      oscuras. Eso es la capa del navegador moviendose.
+ *   2. **NO cambia con la identidad**: las tres claras dan el MISMO pixel, y las tres oscuras otro.
+ *      Si cambiara con la identidad seria un token, o sea la hoja, y no probaria nada nuevo.
+ *
+ * Separadas, la primera sola no distingue «mide el navegador» de «mide la hoja». Juntas, si.
+ */
+test('la BARRA DE DESPLAZAMIENTO —que pinta el navegador— cambia con el modo y no con la identidad', async ({
+  page,
+}) => {
+  // Hueco corto a proposito: el cuerpo de `fis-actas` tiene que desbordar para que haya barra. Y es
+  // la pantalla con los cinco controles del interprete —texto, desplegable, fecha, casilla y area—,
+  // que son los que se midieron para descartarlos.
+  await page.setViewportSize({ width: 1280, height: 500 });
+  await abrir(page, 'fis-actas');
+
+  const medido = new Map<string, string>();
+  for (const paleta of SEIS) {
+    await elegir(page, paleta.identidad, paleta.modo);
+    const { colores } = await elCanalDeLaBarra(page);
+    expect(
+      colores,
+      `${paleta.identidad}/${paleta.modo}: el recorte no salio de un solo color, o sea que no es el canal`,
+    ).toHaveLength(1);
+
+    const color = colores[0] ?? '';
+    const claridad = luminancia(color);
+    if (paleta.modo === 'oscuro') {
+      expect(
+        claridad,
+        `${paleta.identidad}/${paleta.modo}: la pagina se oscurecio y el navegador siguio dibujando ` +
+          `la barra en claro (${color}). Es lo que pasa cuando la paleta oscura no declara ` +
+          '`color-scheme: dark`: la pantalla se oscurece entera menos lo que pinta el navegador.',
+      ).toBeLessThan(100);
+    } else {
+      expect(
+        claridad,
+        `${paleta.identidad}/${paleta.modo}: la barra no se pinto en claro (${color})`,
+      ).toBeGreaterThan(200);
+    }
+    medido.set(`${paleta.identidad}/${paleta.modo}`, color);
+  }
+
+  // La otra mitad: mismo modo, otra identidad, MISMO pixel. Es lo que separa «mide el navegador»
+  // de «mide la hoja»: un token cambia entre las tres identidades, y esto no.
+  for (const modo of ['claro', 'oscuro'] as const) {
+    const suyos = SEIS.filter((p) => p.modo === modo).map(
+      (p) => medido.get(`${p.identidad}/${modo}`) ?? '',
+    );
+    expect(
+      new Set(suyos).size,
+      `las tres identidades en ${modo} dieron barras distintas (${suyos.join(' | ')}): ` +
+        'eso es un token, o sea la hoja, y no la capa que esta prueba existe para medir',
+    ).toBe(1);
+  }
 });
