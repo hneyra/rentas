@@ -47,6 +47,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.0",
+    "@kamayuk/verificaciones": "link:../../kamayuk-lib/paquetes/verificaciones",
     "@playwright/test": "^1.63.0",
     "@tailwindcss/vite": "^4.3.3",
     "@testing-library/dom": "^10.4.0",

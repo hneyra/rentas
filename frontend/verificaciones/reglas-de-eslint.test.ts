@@ -4,7 +4,12 @@ import { fileURLToPath } from 'node:url';
 import { ESLint } from 'eslint';
 import { beforeAll, describe, expect, it } from 'vitest';
 
-import { CLIENTE_DE_API, PROHIBICIONES, REGLAS_EXIGIDAS } from '../eslint.prohibiciones.mjs';
+import {
+  CLIENTE_DE_API,
+  DONDE_SE_LLAMA_A_FETCH,
+  PROHIBICIONES,
+  REGLAS_EXIGIDAS,
+} from '../eslint.prohibiciones.mjs';
 
 /**
  * Las reglas de `eslint.config.js` muerden.
@@ -16,7 +21,10 @@ import { CLIENTE_DE_API, PROHIBICIONES, REGLAS_EXIGIDAS } from '../eslint.prohib
  *
  * Tres cosas hacen que esto no sea una lista mas que alguien olvida actualizar:
  *
- *   1. La lista de prohibiciones **se importa del propio config**. No hay copia.
+ *   1. La lista de prohibiciones **se importa del propio config**. No hay copia — y desde #137
+ *      tampoco la hay frente a la libreria: `eslint.prohibiciones.mjs` DERIVA las nueve de
+ *      `@kamayuk/verificaciones` y solo les pone las rutas de este arbol. Que siga siendo una
+ *      derivacion lo vigila `las-prohibiciones-son-las-de-la-libreria.test.ts`.
  *   2. El nombre del archivo de la muestra **se compone** desde el `clave`. Anadir una
  *      prohibicion sin su muestra es un archivo que no existe, y sale rojo aqui mismo.
  *   3. El mensaje esperado **es el del config**. Si alguien reescribe el mensaje y deja la
@@ -151,22 +159,38 @@ describe('la lista de prohibiciones y la de muestras no se separan', () => {
   });
 });
 
-describe('la excepcion del cliente de API es exactamente una', () => {
+describe('la excepcion del cliente de API es exactamente una, y en ESTE arbol', () => {
   const conExcepcion = PROHIBICIONES.filter((p) => p.salvo !== undefined);
 
-  it('solo el cliente de API esta exceptuado de algo', () => {
-    expect(new Set(conExcepcion.map((p) => p.salvo))).toEqual(new Set([CLIENTE_DE_API]));
+  it('solo `fetch` esta exceptuado, y solo en el sitio declarado', () => {
+    // Se comprueba la LISTA ENTERA, no su tamano: anadir un prefijo exige decir cual.
+    //
+    // **Aqui es UNO y en la libreria son DOS, y las dos cifras son correctas** (#137). Alla el
+    // canje PKCE vive en `paquetes/sesion/`, separado del cliente HTTP de `paquetes/api/`; en
+    // este arbol las dos piezas estan en `src/api/` —`cliente.ts` y `identidad.ts`, los tres
+    // `fetch` que hay—, asi que un prefijo las cubre. Por eso lo que se comparte con
+    // `@kamayuk/verificaciones` es la lista de reglas y NO sus rutas.
+    expect(conExcepcion.map((p) => p.clave)).toEqual(['fetch-fuera-del-cliente']);
+    expect(new Set(conExcepcion.flatMap((p) => p.salvo ?? []))).toEqual(
+      new Set(DONDE_SE_LLAMA_A_FETCH),
+    );
+    expect(DONDE_SE_LLAMA_A_FETCH).toEqual([CLIENTE_DE_API]);
   });
 
-  it.each(conExcepcion.map((p) => ({ ...p })))(
-    '«$clave» no se senala dentro de $salvo',
-    async ({ clave, message, salvo }) => {
-      const archivo = archivoDeLaMuestra(clave);
-      const mensajes = await mensajesDe(archivo as string, join(RAIZ, salvo as string, 'x.ts'));
+  it.each(
+    conExcepcion.flatMap((p) =>
+      [...(p.salvo ?? [])].map((directorio: string) => ({
+        clave: p.clave,
+        message: p.message,
+        directorio,
+      })),
+    ),
+  )('«$clave» no se senala dentro de $directorio', async ({ clave, message, directorio }) => {
+    const archivo = archivoDeLaMuestra(clave);
+    const mensajes = await mensajesDe(archivo as string, join(RAIZ, directorio, 'x.ts'));
 
-      expect(mensajes).not.toContain(message);
-    },
-  );
+    expect(mensajes).not.toContain(message);
+  });
 
   it('pero fuera de el, si', async () => {
     const mensajes = await mensajesDe(
