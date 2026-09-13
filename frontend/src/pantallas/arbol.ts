@@ -14,14 +14,19 @@ import type { Hoja, Modulo } from './tipos.ts';
  * aqui es un objeto. Es la unica libertad que se toma la transcripcion: las **cadenas** van
  * literales (AC9), y la guarda las compara una a una.
  *
- * <h2>Esto NO es `src/marco/arbol.ts`, y los dos tienen que existir</h2>
+ * <h2>Hubo un segundo arbol —`src/marco/arbol.ts`— y ya no esta</h2>
  *
- * `src/marco/arbol.ts` es el catalogo de **V6**: es lo que la interfaz que hoy se sirve compone
- * con `GET /seguridad/modulos`. Este es el de **V8**, el artboard contra el que se reimplanta.
- * Sustituir aquel por este ahora dejaria el repositorio sin interfaz durante varios issues, que
- * es justo lo que el issue deja fuera. Coinciden en los diez modulos y en las cuarenta claves
- * —por eso la reimplantacion es posible—, y difieren en lo que V8 anade: el codigo de modulo en
- * el propio arbol, las operaciones que cada hoja declara y sus piezas.
+ * Mientras se reimplantaba, este convivia con `src/marco/arbol.ts`, que era el catalogo de **V6**
+ * —lo que entonces se servia— compuesto con `GET /seguridad/modulos`. Sustituir aquel por este de
+ * golpe habria dejado el repositorio sin interfaz durante varios issues, asi que convivieron:
+ * coincidian en los diez modulos y en las cuarenta claves —por eso la reimplantacion era
+ * posible— y diferian en lo que V8 anade: el codigo de modulo en el propio arbol, las operaciones
+ * que cada hoja declara y sus piezas.
+ *
+ * **El cambio de guardia fue #90** (anotado en #136): la V6 salio del arbol y
+ * `verificaciones/la-v6-no-esta.test.ts` impide que vuelva. Este es el unico catalogo que queda, y
+ * quien lo cruza con `GET /seguridad/{modulos,accesos}` y `/sesion/permisos` es `src/permisos.ts`
+ * (#105).
  *
  * <h2>Por que `as const`</h2>
  *

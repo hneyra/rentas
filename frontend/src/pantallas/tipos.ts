@@ -25,10 +25,14 @@
  * artboard —90 desplegables con opciones y ninguno sin ellas, 102 campos de solo lectura con su
  * valor, 14 casillas con su etiqueta—.
  *
- * <h2>Esto no dibuja nada todavia</h2>
+ * <h2>Esto no dibuja nada, y cuando se escribio no habia quien lo dibujara</h2>
  *
- * AC8 del issue: aqui hay dato y guarda. El interprete y las piezas de shadcn llegan aparte
- * (`kamayuk-lib`#11), y hasta entonces la interfaz que se sirve sigue siendo la V6, intacta.
+ * AC8 del issue: aqui hay dato y guarda. El interprete y las piezas de shadcn llegaban aparte
+ * —`kamayuk-lib`#11— y hasta entonces se seguia sirviendo la V6, intacta.
+ *
+ * **Las dos cosas ya pasaron** (#136): `kamayuk-lib`#11 esta cerrado, y la V6 salio del arbol en
+ * #90 con `verificaciones/la-v6-no-esta.test.ts` vigilando que no vuelva. Lo que se sirve es la
+ * V8, y quien dibuja este dato es `pantallas/Pantalla.tsx` con las piezas de `@kamayuk/ui`.
  */
 
 /* ── El campo ──────────────────────────────────────────────────────────────────────────── */

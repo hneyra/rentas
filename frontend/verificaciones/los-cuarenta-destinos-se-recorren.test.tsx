@@ -180,10 +180,14 @@ describe('los cuarenta destinos se recorren, en la aplicacion montada', () => {
     expect(screen.queryByRole('button', { name: /Tránsito/ })).toBeNull();
     // ...y el armazon LO DICE, en vez de dejar la pantalla en blanco.
     //
-    // Se mira el `data-slot` y no el TEXTO, a proposito: las frases son de `@kamayuk/shell` y las
-    // esta haciendo traducibles `kamayuk-lib`#19. Una prueba de este repositorio atada a las
-    // palabras de otro se rompe cada vez que aquel las toque, y el rojo hablaria de una cadena en
-    // vez de de la propiedad — que es «no se queda mudo».
+    // Se mira el `data-slot` y no el TEXTO, a proposito: las frases son de `@kamayuk/shell`. Una
+    // prueba de este repositorio atada a las palabras de otro se rompe cada vez que aquel las
+    // toque, y el rojo hablaria de una cadena en vez de de la propiedad — que es «no se queda
+    // mudo».
+    //
+    // Cuando esto se escribio, `kamayuk-lib`#19 las estaba sacando a `textos`. **Ya cerro**, y
+    // desde #133 las pasa `i18n/textosDelMarco.ts` (#136): el texto depende ahora ademas del
+    // idioma de la sesion, o sea que mirar el `data-slot` vale por dos motivos en vez de uno.
     expect(elArmazonLoDice()).toBe(true);
   });
 
