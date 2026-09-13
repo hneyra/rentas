@@ -3,12 +3,11 @@
 // Lee dos archivos del disco y compara texto. No es un DOM lo que necesita.
 
 import { readFileSync } from 'node:fs';
-import { createRequire } from 'node:module';
-import { dirname, join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
 import { ARTBOARDS, rutaDe } from './artboards.ts';
+import { hojaDeUi } from './especificadores.ts';
 
 /**
  * **La paleta que `@kamayuk/ui` publica es la que el artboard dibuja** (#80).
@@ -64,8 +63,6 @@ import { ARTBOARDS, rutaDe } from './artboards.ts';
  * por nombre.
  */
 
-const requerir = createRequire(import.meta.url);
-
 /** Un artboard declarado en `artboards.ts`, por el final de su nombre de archivo. */
 function artboardDeclarado(sufijo: string): string {
   const declarado = ARTBOARDS.find((a) => a.archivo.endsWith(sufijo));
@@ -85,17 +82,17 @@ const HOJA_DEL_ARTBOARD = artboardDeclarado('rentas-tokens.css');
 const DIBUJO_DEL_ARTBOARD = artboardDeclarado('RentasV8.dc.html');
 
 /**
- * El `@theme` de `@kamayuk/ui`, alcanzado POR EL ENLACE y no por una ruta al clon hermano.
+ * El `@theme` de `@kamayuk/ui`, alcanzado POR EL ESPECIFICADOR que el codigo escribe.
  *
- * Que se resuelva por `node_modules/@kamayuk/ui` y no por `../../kamayuk-lib/...` no es un detalle
+ * Que se resuelva por `@kamayuk/ui/estilos.css` y no por `../../kamayuk-lib/...` no es un detalle
  * de estilo: es lo que hace que esta guarda comprobe la paleta **que este frontend usa de verdad**.
  * Una ruta al hermano leeria el archivo aunque el `link:` estuviera roto.
+ *
+ * Y desde #138 tampoco es `join(raiz, 'estilos', 'estilos.css')`: eso leia el archivo aunque el
+ * `exports` del paquete ya no lo publicara —o sea, aunque el bundle no pudiera importarlo—, que es
+ * el modo de fallo que `especificadores.ts` cuenta entero.
  */
-const PALETA_DE_LA_LIBRERIA = join(
-  dirname(requerir.resolve('@kamayuk/ui')),
-  'estilos',
-  'estilos.css',
-);
+const PALETA_DE_LA_LIBRERIA = hojaDeUi();
 
 /** `var(--azul)` -> `'--azul'`. Se leen USOS, y no declaraciones: es la otra mitad del centinela. */
 function usados(texto: string): readonly string[] {

@@ -8,7 +8,8 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import { HOJA_DE_UI, RAIZ_DE_UI, compilar } from './tailwind.ts';
+import { importesDe } from './especificadores.ts';
+import { HOJA_DE_UI, compilar } from './tailwind.ts';
 
 /**
  * **El arnes resuelve un `@import` relativo como el empaquetador: contra el ARCHIVO que lo
@@ -96,12 +97,25 @@ describe('el arnes resuelve los `@import` donde el empaquetador los resuelve', (
   });
 
   it('la hoja que se compila por omision es la que el navegador recibe', () => {
-    // La otra mitad: que el camino correcto se aplique a la hoja DE VERDAD. Se comprueba por
-    // ruta porque el contenido ya lo miden las otras pruebas; lo que aqui importa es que la hoja
-    // siga viviendo en `estilos/` —o sea, que su directorio NO sea la raiz del paquete—, que es
-    // exactamente lo que el defecto confundia.
+    // La otra mitad: que el camino correcto se aplique a la hoja DE VERDAD.
+    //
+    // **Ya no se comprueba DONDE vive** (#138). Decia `dirname(HOJA_DE_UI) === join(RAIZ_DE_UI,
+    // 'estilos')`, que es la disposicion interna del paquete — lo unico que un paquete NO promete:
+    // mover sus carpetas sin tocar el `exports` es legitimo y ponia esto rojo sin que nada
+    // estuviera mal. Lo que se exige es la propiedad que el defecto rompia: que lo que la hoja
+    // importa cuelgue del directorio de LA HOJA, este donde este.
     expect(existsSync(HOJA_DE_UI), `no esta la hoja de @kamayuk/ui en ${HOJA_DE_UI}`).toBe(true);
-    expect(dirname(HOJA_DE_UI)).toBe(join(RAIZ_DE_UI, 'estilos'));
-    expect(dirname(HOJA_DE_UI)).not.toBe(RAIZ_DE_UI);
+
+    const relativos = importesDe(readFileSync(HOJA_DE_UI, 'utf8')).filter((i) => i.startsWith('.'));
+    // Hoy es `./temas.css`, las seis paletas (`kamayuk-lib`#23). Si algun dia no hubiera ninguno,
+    // esta mitad se quedaria sin sujeto — el mecanismo lo sigue midiendo el paquete de muestra de
+    // arriba, que tiene un `@import` relativo propio y no depende de lo que la libreria escriba.
+    for (const vecina of relativos) {
+      expect(
+        existsSync(join(dirname(HOJA_DE_UI), vecina)),
+        `la hoja importa «${vecina}» y no esta junto a ella: lo que el navegador recibe se ` +
+          'resuelve contra el directorio de la hoja, no contra la raiz del paquete (#125).',
+      ).toBe(true);
+    }
   });
 });

@@ -4,6 +4,8 @@ import { dirname, join } from 'node:path';
 
 import { compile } from 'tailwindcss';
 
+import { hojaDeUi } from './especificadores.ts';
+
 /**
  * Compilar la hoja de `@kamayuk/ui` **con Tailwind de verdad**, y leer lo que sale.
  *
@@ -13,16 +15,28 @@ import { compile } from 'tailwindcss';
 
 const requerir = createRequire(import.meta.url);
 
-/** La raiz de `@kamayuk/ui`, alcanzada POR EL ENLACE y no por una ruta al clon hermano. */
+/**
+ * La raiz de `@kamayuk/ui`, alcanzada POR EL ENLACE y no por una ruta al clon hermano.
+ *
+ * Sigue siendo una raiz —y no un especificador— porque lo que cuelga de ella es una BUSQUEDA: los
+ * `.tsx` de la libreria, que `tailwind-emite-las-clases` recorre para saber que clases escribe. Un
+ * paquete no publica «todos sus componentes» por su `exports`, asi que no hay especificador que
+ * pedir. Lo que si lo tiene es la hoja, y por eso la hoja ya no sale de aqui (#138).
+ */
 export const RAIZ_DE_UI = dirname(requerir.resolve('@kamayuk/ui'));
 
 /**
  * **La hoja que el navegador recibe**, con su ruta y no solo con su contenido (#125).
  *
- * La ruta es el dato que faltaba: vive en `estilos/` y no en la raiz del paquete, y de su
- * DIRECTORIO —no del de `package.json`— cuelga todo lo que la hoja importe.
+ * Se alcanza **por el especificador** —el mismo que escribe `src/estilos.css`— y no por
+ * `join(RAIZ_DE_UI, 'estilos', 'estilos.css')` (#138): de la disposicion interna del paquete no
+ * hay nada prometido, y una ruta al disco lee el archivo aunque el `exports` ya no lo publique. El
+ * porque entero, con la medicion, esta en `especificadores.ts`.
+ *
+ * Lo de #125 no se pierde: de su DIRECTORIO —no del de `package.json`— cuelga todo lo que la hoja
+ * importe, y eso lo da `dirname` de lo que el especificador resuelva.
  */
-export const HOJA_DE_UI = join(RAIZ_DE_UI, 'estilos', 'estilos.css');
+export const HOJA_DE_UI = hojaDeUi();
 
 /**
  * El CSS que Tailwind emite para la lista de clases que se le den.

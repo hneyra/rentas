@@ -1,10 +1,9 @@
 import { readFileSync } from 'node:fs';
-import { createRequire } from 'node:module';
-import { dirname, join } from 'node:path';
 
 import { expect, test, type Page } from '@playwright/test';
 
 import { UMBRAL_DE_TEXTO, conDosDecimales, contraste } from '../verificaciones/contraste.ts';
+import { hermanaDe, hojaDeUi } from '../verificaciones/especificadores.ts';
 import { abrir, conLaSeguridadContestada } from './instalacion.ts';
 
 /**
@@ -40,16 +39,30 @@ import { abrir, conLaSeguridadContestada } from './instalacion.ts';
  * <h2>Los valores esperados salen de la libreria, no de una tabla de aqui</h2>
  *
  * Las seis paletas son **generadas** —el oscuro se deriva en OKLCH— y copiarlas aqui seria una
- * segunda fuente que se queda vieja sola. Se leen de `@kamayuk/ui/estilos/temas.css`, alcanzado
- * **por el enlace** y no por una ruta al clon hermano.
+ * segunda fuente que se queda vieja sola. Se leen del `temas.css` de la libreria, alcanzado **por
+ * el especificador de la hoja que lo arrastra** y no por una ruta al clon hermano (#138: ver
+ * `HOJA_DE_LOS_TEMAS`, mas abajo).
  *
  * Y para que la comparacion no sea circular —el archivo contra si mismo— hay un ancla: la paleta
  * clara de `institucional` tiene que ser la del artboard, `#f2f6f9`, que es la que `se-ve.spec.ts`
  * clava por su cuenta. Si la libreria regenerara otra cosa, esto sale rojo.
  */
 
-const RAIZ_DE_UI = dirname(createRequire(import.meta.url).resolve('@kamayuk/ui'));
-const HOJA_DE_LOS_TEMAS = join(RAIZ_DE_UI, 'estilos', 'temas.css');
+/**
+ * **`temas.css`, alcanzado COMO LO ALCANZA EL NAVEGADOR** (#138).
+ *
+ * No tiene entrada propia en el `exports` de `@kamayuk/ui`, y es deliberado (`kamayuk-lib`#23): se
+ * ARRASTRA desde la hoja publicada, porque con una entrada propia el consumidor tendria que
+ * escribir dos `import` y quien se olvidara del segundo se quedaria sin paletas y sin que nada se
+ * lo dijera.
+ *
+ * Asi que el camino aqui es el mismo que el del navegador: resolver `@kamayuk/ui/estilos.css` por
+ * su especificador —que SI pasa por el `exports`— y de ahi seguir el `@import` relativo que esa
+ * hoja escribe. Con `join(raiz, 'estilos', 'temas.css')` se leia el archivo aunque el paquete
+ * hubiera dejado de publicar la hoja que lo arrastra, o sea aunque el navegador no recibiera ni
+ * una de las seis paletas.
+ */
+const HOJA_DE_LOS_TEMAS = hermanaDe(hojaDeUi(), './temas.css');
 
 /** El fondo que el artboard V8 dibuja. El ancla contra la que se mide la libreria. */
 const FONDO_DEL_ARTBOARD = '#f2f6f9';
