@@ -5,7 +5,7 @@ acaba de clonar el repositorio y quiere ver algo funcionando **hoy**.
 
 | Documento | Para qué |
 |---|---|
-| [DEV-01 — Entorno local](entorno-local.md) | Qué instalar, el clon hermano que **no es opcional**, y las tres formas de trabajar |
+| [DEV-01 — Entorno local](entorno-local.md) | Qué instalar, el clon hermano que **no es opcional**, y las cuatro formas de trabajar |
 | [DEV-02 — Pruebas](pruebas.md) | Qué verifica qué, cómo correr una sola, y cómo probar sin Docker |
 | [DEV-03 — Cuando algo no arranca](solucion-de-problemas.md) | Los errores que ya costaron una tarde, con su causa |
 
@@ -42,11 +42,23 @@ cd backend && ./gradlew verificarArquitectura
 cd ../infrastructure && yarn install && yarn verificar
 ```
 
-Con eso ya corre todo lo que hoy hay que correr en este repositorio. **Lo que todavía no hay es
-una aplicación que arrancar**: no existe ni una clase de negocio, así que no hay `bootRun`, ni
-API, ni pantalla. Levantar la plataforma sirve para tener la base y la identidad esperando —y
-para descubrir hoy lo que si no se descubre el día que haya código—, y está en
-[DEV-01 §3](entorno-local.md).
+Con eso corren las barreras. **Y la interfaz se mira sin nada más levantado**, que es la cuarta
+forma de trabajar y la más barata de todas:
+
+```bash
+# 4 · Las 40 pantallas, sin PostgreSQL, sin Keycloak, sin Traefik y sin backend
+cd ../frontend && yarn install && yarn dev       # http://localhost:5173/rentas/
+```
+
+El árbol de módulos va **sembrado** con la captura de la instalación y la puerta de identidad se
+esquiva: lo enciende `VITE_KAMAYUK_SIN_PLATAFORMA`, que `.env.development` trae puesto y que
+`yarn build` no puede leer. Contra la plataforma de verdad es `yarn dev:con-plataforma`. Los dos
+niveles, con lo que se ve en cada uno, están en [DEV-01 §3D](entorno-local.md).
+
+> Este párrafo decía «lo que todavía no hay es una aplicación que arrancar: no existe ni una clase
+> de negocio, así que no hay `bootRun`, ni API, ni pantalla». Era cierto en F-1 y dejó de serlo en
+> P5A: hoy hay 3 080 pruebas de negocio y 40 pantallas. Una guía que describe un estado anterior
+> no se lee como desactualizada — se lee como instrucciones.
 
 ## Qué comando para qué tarea
 
@@ -57,6 +69,9 @@ para descubrir hoy lo que si no se descubre el día que haya código—, y está
 | Todo, más el formato | `./gradlew build` | `backend/` |
 | Arreglar el formato | `./gradlew spotlessApply` | `backend/` |
 | Verificar el descriptor | `yarn verificar` | `infrastructure/` |
+| Verificar la interfaz | `yarn verificar` | `frontend/` |
+| Mirar las 40 pantallas sin plataforma | `yarn dev` | `frontend/` |
+| Mirar la interfaz contra la plataforma | `yarn dev:con-plataforma` | `frontend/` |
 | Levantar la plataforma | `docker compose -f despliegue/plataforma.compose.yaml up -d --wait` | `../infrastructure/` |
 | Lo que hay que pasar antes de un PR | `./gradlew build verificarAislamiento verificarArquitectura` · `yarn verificar` | ambos |
 

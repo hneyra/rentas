@@ -96,19 +96,24 @@ RUN yarn install --frozen-lockfile
 
 COPY . .
 
-# EL PROXY DE DATOS, APAGADO Y DICHO (AC-3 de #44).
+# LA SIEMBRA DEL CATALOGO, APAGADA Y DICHA (AC-3 de #44, y AC2 de #114).
 #
 # Vite sustituye `import.meta.env.VITE_*` **al construir**, asi que con esta variable en `false`
-# la condicion de `src/arranque.ts` se pliega y el `import()` dinamico del proxy —con las
-# dieciocho operaciones y todas las cifras del artboard— se cae del paquete. Medido en F-4: la
-# diferencia entre las dos construcciones son 33 535 bytes y un trozo `proxy-*.js` entero.
+# la condicion de `src/arranque.ts` se pliega y el `import()` dinamico de
+# `desarrollo/sembrarElCatalogo.ts` —con los doce modulos, los 134 accesos y la matriz de
+# permisos capturados de la instalacion— se cae del paquete. Es el mismo mecanismo que llevaba el
+# proxy de datos de la V6 detras de `VITE_KAMAYUK_PROXY_DE_DATOS`, y esta medido por los dos
+# lados: con la bandera leida al CONSTRUIR el modulo no viaja; leida en tiempo de EJECUCION,
+# viaja entero.
 #
-# Es la PRIMERA de dos vallas, y ninguna sobra. `vite build` no lee `.env.development` —solo se
+# Es la PRIMERA de TRES vallas, y ninguna sobra. `vite build` no lee `.env.development` —solo se
 # carga en modo desarrollo—, o sea que en teoria bastaria con no hacer nada; pero «el paquete sale
 # limpio porque nadie se acordo de encenderlo» es una propiedad que se pierde el dia que alguien
 # cree un `.env.production`. Escribirlo aqui lo hace una decision y no una casualidad. La segunda
-# valla es `.dockerignore`, que deja fuera del contexto **todos** los `.env*`.
-ENV VITE_KAMAYUK_PROXY_DE_DATOS=false
+# valla es `.dockerignore`, que deja fuera del contexto **todos** los `.env*`. Y la tercera, que
+# #114 anadio delante de la bandera, es `import.meta.env.DEV`: en una construccion no hay modo
+# desarrollo que valga, diga lo que diga el entorno.
+ENV VITE_KAMAYUK_SIN_PLATAFORMA=false
 
 RUN yarn build
 
@@ -196,7 +201,13 @@ RUN set -eu; \
             grep -rlF "$cadena" "$servido"; exit 1; \
         fi; \
     done; \
-    echo "lo servido esta limpio: sin fuentes y sin una cifra del artboard"
+    for cadena in 'Ficha catastral rural' 'transito_rg_sancionadora'; do \
+        if grep -rqF "$cadena" "$servido"; then \
+            echo "Lo que se sirve lleva la captura de seguridad: «$cadena». Ver AC2 de #114."; \
+            grep -rlF "$cadena" "$servido"; exit 1; \
+        fi; \
+    done; \
+    echo "lo servido esta limpio: sin fuentes, sin una cifra del artboard y sin la captura sembrada"
 
 
 # Sin root, y esto es lo unico que lo consigue: la configuracion de `nginx:*-alpine` trae `User`

@@ -5,6 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { arrancar, fallaDeLaPuerta } from './arranque.ts';
 import { fijarToken, token, vieneDeSalir } from './api/identidad.ts';
+import { CONSULTAS } from './aplicacion.tsx';
+import { LLAVES } from './datos/useCatalogoPermitido.ts';
 
 /**
  * **Lo que tiene que pasar ANTES de que React monte.**
@@ -245,5 +247,93 @@ describe('#112 — la puerta que no contesta monta y se explica; la que si, no',
     await arrancar(() => {});
 
     expect(fallaDeLaPuerta()).toBeNull();
+  });
+});
+
+/**
+ * **La bandera de desarrollo: se siembra el catalogo y NO se va a la puerta** (#114).
+ *
+ * <h2>Las dos mitades, y ninguna vale sola</h2>
+ *
+ * · **Sembrar** sin esquivar la puerta deja `yarn dev` igual que antes: sin token se navega a
+ *   Keycloak, no se monta nada, y el catalogo sembrado no lo ve nadie.
+ * · **Esquivar** sin sembrar monta una aplicacion que pide las tres de seguridad, no recibe
+ *   ninguna y ensena «No se pudo saber que modulos puede abrir esta cuenta» — o sea el estado
+ *   que este issue vino a quitar.
+ *
+ * <h2>Y la tercera prueba es la que impide que la bandera se escape a produccion</h2>
+ *
+ * Sin ella, una condicion invertida —o leida de otra variable— pasaria en verde: las dos de
+ * arriba solo miran el camino encendido. Que el apagado siga siendo el de siempre es la mitad
+ * que cuesta mas descubrir, porque su sintoma aparece en el despliegue.
+ */
+describe('#114 — con la bandera, la interfaz arranca sin backend y sin Keycloak', () => {
+  it('sin token y con el emisor VIVO: no va a la puerta, monta, y el catalogo esta puesto', async () => {
+    fijarToken(null);
+    const asignar = ubicacion();
+    // El emisor contesta a proposito: asi se mide que la bandera esquiva la puerta **por
+    // decision** y no porque la sonda de #112 fallara. Con el emisor caido las dos cosas se
+    // confunden, y la prueba pasaria con la bandera desconectada.
+    elEmisorContesta();
+    CONSULTAS.clear();
+    vi.stubEnv('VITE_KAMAYUK_SIN_PLATAFORMA', 'true');
+    let monto = false;
+
+    await arrancar(() => {
+      monto = true;
+    });
+
+    expect(asignar, 'se fue a Keycloak teniendo la bandera puesta').not.toHaveBeenCalled();
+    expect(monto, 'no monto nada: la bandera no sirve de nada si no se dibuja').toBe(true);
+    // Y el catalogo esta donde las tres consultas lo buscan. Con doce modulos, que son los que
+    // publica la instalacion: ver `datos/seguridadMedida.ts`.
+    expect(CONSULTAS.getQueryData(LLAVES.modulos)).toHaveLength(12);
+    expect(CONSULTAS.getQueryData(LLAVES.permisos)).not.toBeUndefined();
+  });
+
+  it('y la puerta sigue viva por si acaso: con la bandera, el tope de idas no se toca', async () => {
+    // La bandera no gasta ninguna ida. Si la contara, tres `yarn dev` seguidos dejarian la
+    // aplicacion en «se paro de intentarlo» la primera vez que alguien apagara la bandera.
+    fijarToken(null);
+    ubicacion();
+    elEmisorContesta();
+    vi.stubEnv('VITE_KAMAYUK_SIN_PLATAFORMA', 'true');
+
+    await arrancar(() => {});
+
+    expect(sessionStorage.getItem('kamayuk.pkce.idas')).toBeNull();
+  });
+
+  it('SIN la bandera, el camino de siempre: sin token se va a la puerta y no monta', async () => {
+    fijarToken(null);
+    const asignar = ubicacion();
+    elEmisorContesta();
+    CONSULTAS.clear();
+    // Sin `stubEnv`: en modo `test` no se carga `.env.development`, asi que la bandera no existe.
+    let monto = false;
+
+    await arrancar(() => {
+      monto = true;
+    });
+
+    expect(monto).toBe(false);
+    expect(String(asignar.mock.calls[0]?.[0])).toContain('/protocol/openid-connect/auth');
+    expect(CONSULTAS.getQueryData(LLAVES.modulos)).toBeUndefined();
+  });
+
+  it('y con la bandera en cualquier otro valor tampoco siembra: se compara con «true»', async () => {
+    // `VITE_*` llega SIEMPRE como cadena. Un `if (import.meta.env.VITE_…)` a secas daria por
+    // encendida la bandera puesta a `false`, que es justo el valor que el `Dockerfile` escribe
+    // para apagarla.
+    fijarToken(null);
+    const asignar = ubicacion();
+    elEmisorContesta();
+    CONSULTAS.clear();
+    vi.stubEnv('VITE_KAMAYUK_SIN_PLATAFORMA', 'false');
+
+    await arrancar(() => {});
+
+    expect(asignar).toHaveBeenCalled();
+    expect(CONSULTAS.getQueryData(LLAVES.modulos)).toBeUndefined();
   });
 });

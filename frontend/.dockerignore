@@ -33,10 +33,11 @@ dist
 # hornea lo que lleve dentro, en claro, en el paquete.
 #
 # Y hay uno que **si** esta versionado y tampoco puede entrar: `.env.development` enciende
-# `VITE_KAMAYUK_PROXY_DE_DATOS`, o sea las cifras del artboard. `vite build` no lo lee —solo se
-# carga en modo desarrollo—, pero excluirlo hace que eso deje de depender de una propiedad de
-# Vite que alguien podria cambiar sin querer. Es la segunda de las dos vallas del AC-3 de #44; la
-# primera es el `ENV` explicito del `Dockerfile`.
+# `VITE_KAMAYUK_SIN_PLATAFORMA`, o sea la captura de las tres lecturas de seguridad. `vite build`
+# no lo lee —solo se carga en modo desarrollo—, pero excluirlo hace que eso deje de depender de
+# una propiedad de Vite que alguien podria cambiar sin querer. Es la segunda de las tres vallas
+# del AC-3 de #44 y del AC2 de #114; la primera es el `ENV` explicito del `Dockerfile` y la
+# tercera el `import.meta.env.DEV` que `src/arranque.ts` lleva delante de la bandera.
 .env
 .env.*
 

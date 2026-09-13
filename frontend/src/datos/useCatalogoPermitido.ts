@@ -31,6 +31,26 @@ import { RUTAS, pedirLista, pedirPagina, pedirUno } from './lecturas.ts';
  * del arranque —tres idas seguidas— para no ganar nada.
  */
 
+/** La rama de la cache donde viven las tres. Una sola palabra, escrita una sola vez. */
+const RAMA = 'seguridad';
+
+/**
+ * Las llaves con que las tres viven en la cache de consultas.
+ *
+ * **Se exportan**, y eso dice algo de ellas: la siembra de desarrollo (#114) tiene que poner el
+ * dato **en estas mismas llaves** para que estas tres consultas lo encuentren ya contestado. Con
+ * los literales repetidos alli, renombrar una llave aqui dejaria la siembra apuntando a una
+ * llave que nadie lee — y el sintoma no seria un error sino el catalogo vacio, o sea el mismo
+ * que se ve cuando no hay backend. Un desajuste mudo entre dos sitios que tienen que decir lo
+ * mismo es el defecto que este archivo lleva evitando desde I-3.
+ */
+export const LLAVES = {
+  rama: [RAMA],
+  modulos: [RAMA, 'modulos'],
+  accesos: [RAMA, 'accesos'],
+  permisos: [RAMA, 'permisos'],
+} as const;
+
 /** Que se sabe del catalogo, ademas del catalogo. */
 export interface CatalogoDeLaSesion extends CatalogoCompuesto {
   /** `null` mientras se pide. Distinto de «ninguno», que es una lista vacia. */
@@ -50,17 +70,17 @@ export function useCatalogoPermitido(): CatalogoDeLaSesion {
   const { t } = useTranslation();
 
   const modulos = useQuery({
-    queryKey: ['seguridad', 'modulos'],
+    queryKey: LLAVES.modulos,
     queryFn: ({ signal }) => pedirLista<ModuloDelSistema>(RUTAS.modulos, signal),
     retry: false,
   });
   const accesos = useQuery({
-    queryKey: ['seguridad', 'accesos'],
+    queryKey: LLAVES.accesos,
     queryFn: ({ signal }) => pedirPagina<AccesoDelSistema>(RUTAS.accesos, signal),
     retry: false,
   });
   const permisos = useQuery({
-    queryKey: ['seguridad', 'permisos'],
+    queryKey: LLAVES.permisos,
     queryFn: ({ signal }) => pedirUno<PermisosDeLaSesion>(RUTAS.permisosDeLaSesion, signal),
     retry: false,
   });
