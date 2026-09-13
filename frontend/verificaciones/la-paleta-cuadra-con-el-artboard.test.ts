@@ -19,6 +19,23 @@ import { hojaDeUi } from './especificadores.ts';
  * sistema— seria `@kamayuk/ui` dependiendo de `rentas`, que es exactamente lo que ADR-0030 §4
  * prohibe y lo que `sin-suponer-un-sistema` vigila del otro lado.
  *
+ * <h2>QUE VIGILA ESTA, ahora que son dos (#145)</h2>
+ *
+ * **Esta vigila el `@theme` de `estilos.css`, que es DE DONDE SALEN LAS UTILIDADES** — y no lo que
+ * el navegador pinta. Desde `kamayuk-lib`#23 la hoja arrastra `estilos/temas.css`, cuyo primer
+ * bloque entra **fuera de toda capa** y por eso le gana al `@theme`, que Tailwind emite dentro de
+ * `@layer theme`. Ese bloque lo compara con el artboard `la-paleta-que-gana-la-cascada.test.ts`,
+ * y hasta #145 no lo comparaba nadie.
+ *
+ * Las dos hacen falta y ninguna cubre a la otra. Tailwind v4 saca `bg-*`, `text-*` y `border-*`
+ * **solo** de los `--color-*` del `@theme`: con el `@theme` torcido la utilidad ni se genera —o se
+ * genera apuntando a un token que no existe— por muy bien que este el bloque que pinta. Y al
+ * reves, un `@theme` impecable con ese bloque torcido pinta la pantalla de un color que nadie
+ * decidio. **El `@theme` decide que utilidades EXISTEN; el bloque sin capa, de que color SE VEN.**
+ *
+ * Lo que SOLO vigila esta: los radios y las sombras. El bloque sin capa no los declara — vienen
+ * del `@theme`, y `--radius` del `:root` de `estilos.css`.
+ *
  * <h2>Por que hace falta la hoja aparte</h2>
  *
  * El `.dc.html` **enlaza** `rentas-tokens.css` y no lo lleva dentro: por si solo trae **12**
