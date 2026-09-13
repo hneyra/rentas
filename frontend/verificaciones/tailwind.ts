@@ -116,3 +116,195 @@ export function fuentesDe(raiz: string): string[] {
     return [ruta];
   });
 }
+
+/**
+ * **Leer el CSS EMITIDO por reglas, y no por `includes` sobre todo el texto** (#139).
+ *
+ * <h2>De que rojo viene</h2>
+ *
+ * De uno que no salio. `tailwind-emite-las-clases` preguntaba `plano.includes(c.valor)` —«¿esta
+ * este hexadecimal en alguna parte del CSS?»— para comprobar que la utilidad lleva el valor del
+ * artboard. Mientras la hoja solo traia el `@theme`, esa pregunta y la buena daban lo mismo. Desde
+ * `kamayuk-lib`#23 la hoja arrastra `temas.css`, que reproduce los 38 valores en su bloque
+ * `institucional/claro`, y la respuesta paso a ser **siempre** «si». Medido con
+ * `--color-tinta-2: #ff00ff` puesto en el `@theme`: cuatro pruebas en verde con el defecto dentro.
+ *
+ * Y la otra mitad —`plano.includes('.bg-' + nombre)`— tenia su propio filo romo: `includes` es
+ * subcadena, asi que `.bg-superficie` responde que si a `.bg-sup`, y `.bg-tinta-2` a `.bg-tinta`.
+ * **Siete de los 38 colores del artboard son prefijo de otro** —`sup`, `tinta`, `azul`, `linea`,
+ * `esqueleto`, `sobre-barra` y `velo`—, o sea que siete utilidades podian dejar de emitirse sin
+ * que nadie lo dijera.
+ *
+ * <h2>Que se hace en su lugar</h2>
+ *
+ * Se parte el CSS en reglas —selectores, declaraciones y las at-rules que las envuelven— y se
+ * pregunta a la regla. Es la unica forma de que «lleva su valor» tenga por sujeto la utilidad y no
+ * el archivo entero.
+ */
+export interface Regla {
+  /** Los selectores TAL CUAL se emitieron, con sus escapes: `.hover\:bg-azul:hover`. */
+  readonly selectores: readonly string[];
+  /** `background-color` -> `var(--color-azul)`. */
+  readonly declaraciones: ReadonlyMap<string, string>;
+  /** Los preludios de las at-rules que la envuelven: `['@layer utilities']`. */
+  readonly dentroDe: readonly string[];
+}
+
+/** Un preludio es de bloque anidado —`@media`, `@layer`, `@supports`— y no de regla. */
+const esAtRule = (preludio: string): boolean => preludio.startsWith('@');
+
+/**
+ * Parte el CSS emitido en reglas.
+ *
+ * Es un lector y no un analizador de CSS: le basta con llaves, comas y dos puntos porque lo que
+ * lee lo escribio Tailwind y no una persona. Los comentarios se quitan antes —el emitido empieza
+ * por su banner— para que un `/* … {` no abra un bloque de mentira.
+ */
+export function reglasDe(css: string): Regla[] {
+  const sinComentarios = css.replace(/\/\*[\s\S]*?\*\//g, ' ');
+  const salida: Regla[] = [];
+  const pila: { preludio: string; declaraciones: Map<string, string> }[] = [];
+  let acumulado = '';
+
+  const anotar = (texto: string): void => {
+    const bloque = pila[pila.length - 1];
+    const corte = texto.indexOf(':');
+    if (bloque === undefined || corte < 0) return;
+    bloque.declaraciones.set(texto.slice(0, corte).trim(), texto.slice(corte + 1).trim());
+  };
+
+  for (const caracter of sinComentarios) {
+    if (caracter === '{') {
+      pila.push({ preludio: acumulado.trim(), declaraciones: new Map() });
+      acumulado = '';
+    } else if (caracter === '}') {
+      anotar(acumulado);
+      const bloque = pila.pop();
+      if (bloque !== undefined && !esAtRule(bloque.preludio)) {
+        salida.push({
+          selectores: partirEnSelectores(bloque.preludio),
+          declaraciones: bloque.declaraciones,
+          dentroDe: pila.map((b) => b.preludio),
+        });
+      }
+      acumulado = '';
+    } else if (caracter === ';') {
+      anotar(acumulado);
+      acumulado = '';
+    } else {
+      acumulado += caracter;
+    }
+  }
+  return salida;
+}
+
+/**
+ * `button, input:where([type="a"], [type="b"])` -> dos selectores, y no tres.
+ *
+ * La coma de dentro de un `:where(…)` no separa nada, y Tailwind emite unos cuantos.
+ */
+function partirEnSelectores(preludio: string): string[] {
+  const salida: string[] = [];
+  let nivel = 0;
+  let actual = '';
+  for (const caracter of preludio) {
+    if (caracter === '(' || caracter === '[') nivel += 1;
+    else if (caracter === ')' || caracter === ']') nivel -= 1;
+    if (caracter === ',' && nivel === 0) {
+      salida.push(actual.trim());
+      actual = '';
+    } else {
+      actual += caracter;
+    }
+  }
+  if (actual.trim() !== '') salida.push(actual.trim());
+  return salida;
+}
+
+/**
+ * Las clases que un selector emitido NOMBRA, con sus escapes ya resueltos.
+ *
+ * Tailwind escapa lo que una clase lleva y un selector no admite: `data-[state=checked]:bg-azul`
+ * sale como `.data-\[state\=checked\]\:bg-azul`. Se lee caracter a caracter porque es la unica
+ * manera de saber donde ACABA la clase: en `.hover\:bg-azul:hover` el primer `:` es parte del
+ * nombre y el segundo no, y quitar las barras antes de leer pierde justo esa diferencia.
+ */
+export function clasesDelSelector(selector: string): string[] {
+  const salida: string[] = [];
+  for (let i = 0; i < selector.length; i += 1) {
+    if (selector[i] !== '.' || selector[i - 1] === '\\') continue;
+    let nombre = '';
+    let j = i + 1;
+    while (j < selector.length) {
+      const caracter = selector[j] ?? '';
+      if (caracter === '\\') {
+        nombre += selector[j + 1] ?? '';
+        j += 2;
+      } else if (/[A-Za-z0-9_-]/.test(caracter)) {
+        nombre += caracter;
+        j += 1;
+      } else break;
+    }
+    if (nombre !== '') salida.push(nombre);
+  }
+  return salida;
+}
+
+/** Todas las clases que el CSS emitido llega a nombrar, exactas y no por subcadena. */
+export function clasesEmitidas(reglas: readonly Regla[]): Set<string> {
+  return new Set(reglas.flatMap((r) => r.selectores.flatMap((s) => clasesDelSelector(s))));
+}
+
+/**
+ * La regla de la utilidad **desnuda**: la que tiene por selector exactamente `.<clase>`.
+ *
+ * Desnuda a proposito: `.hover\:bg-azul:hover` tambien nombra una clase, pero lo que se quiere
+ * medir es el camino `--color-x` -> `bg-x`, y ese lo dibuja la utilidad sin variante.
+ */
+export function utilidadDesnuda(reglas: readonly Regla[], clase: string): Regla | undefined {
+  return reglas.find(
+    (r) => r.selectores.length === 1 && r.selectores[0]?.replace(/\\/g, '') === `.${clase}`,
+  );
+}
+
+/**
+ * **La paleta que Tailwind deriva del `@theme`**, y no cualquier `--color-*` del CSS emitido.
+ *
+ * El `@theme` sale como `@layer theme { :root, :host { … } }`. Las seis paletas de `temas.css`
+ * salen FUERA de toda capa y en otros selectores —`:root, [data-tema='institucional']`,
+ * `:root[data-modo='oscuro']`, …—, que es lo que les deja ganar la cascada. Acotar la lectura a la
+ * capa es lo que hace que una mutacion del `@theme` no se la tape la paleta de al lado: es el
+ * defecto de #139 exactamente.
+ */
+export function paletaDelTema(reglas: readonly Regla[]): Map<string, string> {
+  const salida = new Map<string, string>();
+  for (const regla of reglas) {
+    if (!regla.dentroDe.some((a) => /^@layer\s+theme$/.test(a))) continue;
+    if (!regla.selectores.includes(':root')) continue;
+    for (const [propiedad, valor] of regla.declaraciones) {
+      if (propiedad.startsWith('--')) salida.set(propiedad, valor);
+    }
+  }
+  return salida;
+}
+
+/**
+ * El valor de una declaracion con sus `var(--…)` sustituidos por lo que la paleta dice.
+ *
+ * Una utilidad de color no lleva el hexadecimal: lleva `var(--color-azul)`. Sin resolverlo, «la
+ * regla trae su valor» no se puede preguntar. Lo que la paleta no conozca se deja tal cual, para
+ * que el rojo diga `var(--color-x)` —o sea, «el token no llego»— en vez de un vacio.
+ */
+export function resolver(valor: string, paleta: ReadonlyMap<string, string>): string {
+  let salida = valor;
+  // Cuatro pasadas: un token que apunte a otro token es legitimo, una cadena mas larga que eso
+  // en una paleta no lo es, y el tope impide dar vueltas si alguna vez se cierra un ciclo.
+  for (let vuelta = 0; vuelta < 4; vuelta += 1) {
+    const siguiente = salida.replace(/var\(\s*(--[a-z0-9-]+)\s*\)/gi, (todo, token: string) =>
+      paleta.get(token) ?? todo,
+    );
+    if (siguiente === salida) break;
+    salida = siguiente;
+  }
+  return salida.replace(/\s+/g, ' ').trim().toLowerCase();
+}
