@@ -64,10 +64,13 @@ el token, y la vuelve a pedir en cada renovación —así un cambio de permisos 
 usuario cierre sesión—. **Si la petición falla, `NINGUNO`**: negación por omisión, no un menú
 completo que falla en cada pulsación. `DatosDelToken` deja de tener un campo `permisos`.
 
-El proxy de datos ([`ADR-0010`](https://github.com/hneyra/sgtm/blob/migracion-a-microservicios/docs/30-arquitectura/adr/ADR-0010-catalogo-portado-y-proxy-de-datos.md)) publica el
-endpoint con la forma del backend; en modo prototipo devuelve las 134 opciones con los siete
-privilegios, porque no hay una sesión real de la que sacarlos y la demostración tiene que llegar a
-todas las pantallas.
+El proxy de datos ([`ADR-0010`](https://github.com/hneyra/sgtm/blob/migracion-a-microservicios/docs/30-arquitectura/adr/ADR-0010-catalogo-portado-y-proxy-de-datos.md)) publicaba el
+endpoint con la forma del backend; en modo prototipo devolvía las 134 opciones con los siete
+privilegios, porque no había una sesión real de la que sacarlos y la demostración tenía que llegar
+a todas las pantallas. **Ese proxy ya no existe**: salió en #90 con las pantallas de V6 contra las
+que contestaba, y con él el modo prototipo. Este párrafo queda en pasado porque describía la
+muleta, no la decisión: lo decidido aquí sigue en pie y es lo que hace hoy la interfaz de `rentas`
+—pide su matriz al backend y filtra con ella su catálogo (`frontend/src/permisos.ts`)—.
 
 ## Consecuencias
 
@@ -107,7 +110,7 @@ todas las pantallas.
 ## Enlaces
 
 - [`ADR-0005`](https://github.com/hneyra/infrastructure/blob/main/docs/30-arquitectura/adr/ADR-0005-identidad-y-acceso.md) — OIDC autentica, la base autoriza ·
-  [`ADR-0010`](https://github.com/hneyra/sgtm/blob/migracion-a-microservicios/docs/30-arquitectura/adr/ADR-0010-catalogo-portado-y-proxy-de-datos.md) — el proxy publica el endpoint ·
+  [`ADR-0010`](https://github.com/hneyra/sgtm/blob/migracion-a-microservicios/docs/30-arquitectura/adr/ADR-0010-catalogo-portado-y-proxy-de-datos.md) — el proxy publicaba el endpoint (retirado en #90) ·
   [`ADR-0012`](https://github.com/hneyra/infrastructure/blob/main/docs/30-arquitectura/adr/ADR-0012-usuarios-y-grupos-declarativos.md) — los permisos del primer administrador
 - REQ-03 §5 ([`docs/20-requisitos/actores-y-permisos.md`](https://github.com/hneyra/sgtm/blob/migracion-a-microservicios/docs/20-requisitos/actores-y-permisos.md))
 - `SesionController#permisosDeLaSesion` · `PermisoRepository#efectivosDe` ·

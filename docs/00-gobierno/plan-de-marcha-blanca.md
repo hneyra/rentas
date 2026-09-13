@@ -50,7 +50,7 @@ Contado por la etiqueta `onda:n`, el 2026-08-29:
 | **Onda 3** — caja, valores y coactiva | 16 | 2 | Dos mitades de cifras (#191, #193) |
 | **Onda 4** — sanciones, licencias y fiscalización | 27 | 11 | Seis mitades de cifras (#194…#199) y cinco defectos o huecos del backend (#351, #358, #396, #397, #398) |
 | **Onda 5** — transversal | 3 | 1 | [#57](https://github.com/hneyra/sgtm/issues/57) construido: **D-07 cerrada** por [ADR-0020](../30-arquitectura/adr/ADR-0020-la-sesion-del-ciudadano.md) y D-15 decidida (camino B). Queda [#415](https://github.com/hneyra/sgtm/issues/415), el enrolamiento del ciudadano en ventanilla, sin el cual el portal está construido y nadie puede entrar por él |
-| **Frontend** | #70…#81 | **0** | Las 134 pantallas dibujadas; **72 lecturas** con conexión propia y tipada contra el contrato. Retirar el proxy de datos es [#400](https://github.com/hneyra/sgtm/issues/400) |
+| **Frontend** | #70…#81 | **0** | Las 134 pantallas dibujadas; **72 lecturas** con conexión propia y tipada contra el contrato. **Puesta al día del 2026-09-13:** eso era `sgtm`. Aquí la interfaz se reimplantó contra `RentasV8.dc.html` —**40 pantallas**, y **dos** con conexión propia: `panel` y `coa-panel`—, y el **proxy de datos salió en #90** con las pantallas de V6 contra las que contestaba, así que [#400](https://github.com/hneyra/sgtm/issues/400) ya no tiene objeto |
 
 Es decir: **lo que este plan llamaba «la determinación no está empezada» está construido**, y lo que
 queda abierto de negocio son las mitades de cifras —las que esperan a D-02b, D-02c o a lo que
@@ -157,33 +157,66 @@ Conviene que esté escrito antes, y no descubrirlo el día de la demostración:
 
 ## 6. Qué la da por terminada
 
-- [x] `./gradlew build verificarAislamiento verificarArquitectura` y `yarn verificar` **corren en CI
-      en cada PR** (`backend.yml`, `frontend.yml`), y son bloqueantes.
-- [ ] **La marcha blanca levantada con un solo comando desde el repositorio limpio.** A medias:
-      `despliegue.yml` la levanta entera en cada PR y la recorre peldaño a peldaño, pero a mano son
-      cuatro pasos —`.env`, los datos de implantación, `docker compose up` y
-      `reconciliar-identidades.sh`—, no uno.
+- [x] `./gradlew build verificarAislamiento verificarArquitectura` y `yarn verificar` **corren en
+      CI, y ninguno se omite a sí mismo.** Vuelto a medir sobre los flujos el 2026-09-13, con dos
+      precisiones que el plan no tenía: `backend.yml` **no filtra por ruta**, así que corre en
+      **cada** PR, mientras que `frontend.yml` corre sobre cada cambio de `frontend/**`; y desde
+      #107 este último **añade un segundo trabajo**, `arnes`, que corre `yarn e2e` en Chromium —son
+      tres trabajos, no dos—. Ningún paso lleva `continue-on-error`, así que un rojo tumba el flujo.
+      Y una medición que conviene tener escrita antes de encender nada: **`main` no está
+      protegida** —`GET /repos/hneyra/rentas/branches/main/protection` devuelve `404 Branch not
+      protected`—, así que el rojo se ve pero no impide mecánicamente un *merge*.
+- [ ] **La marcha blanca levantada con un solo comando desde el repositorio limpio.** Sigue a
+      medias, y **por otro motivo que el que decía el plan**: `despliegue.yml` era de `sgtm` y
+      **aquí no existe** —medido el 2026-09-13: los seis flujos de `.github/workflows/` son
+      descriptor, backend, documentación, registro, imágenes y frontend, y **ninguno levanta la
+      instalación**—. Lo que la levanta hoy vive en `infrastructure`: `arranque-en-limpio.yml`
+      —que levanta la plataforma e `identidad`, **no `rentas`**— y `despliegue/levantar-todo.sh`,
+      que declara el comando único que esta casilla pide
+      (`./levantar-todo.sh identidad rentas`). **No se ejecutó al escribir esta línea**, así que
+      la casilla sigue vacía: lo medido es que el guion existe y qué dice, no que levante.
 - [ ] **Un usuario entra con su clave, ve solo las opciones de su perfil, registra un contribuyente,
-      registra un predio con su ficha catastral, y consulta su determinación.** Las piezas están
-      —la escalera de identidad la comprueba CI, los permisos los aprende la interfaz del backend
-      (ADR-0013), y la determinación se pide y se lee desde #395—, pero **el recorrido completo no
-      está medido de una pieza**.
-- [ ] **Ese recorrido está como prueba de extremo a extremo, no como acta de una demostración.** A
-      medias, y la mitad que falta es la de arriba. Desde I-2 (#28) `frontend/e2e/` **existe**: son
-      **18 caminos en Chromium** más tres accesos, corren con `yarn e2e` y **contra la instalación
-      levantada, no contra el proxy de datos** —el arnés arranca su propio Vite con
-      `VITE_KAMAYUK_PROXY_DE_DATOS=false` y ninguna sección enseña una cifra del artboard, medido—.
-      El acceso es el de verdad, por el formulario de Keycloak, con PKCE y canje. Lo que **no**
-      está es el recorrido de la casilla anterior: los caminos son de lectura, porque la única
-      escritura que esta interfaz publica hoy es `PUT /seguridad/sesion/ejercicio` —y de ella se
-      ejerce el 422—; registrar un contribuyente y registrar un predio con su ficha no se pueden
-      recorrer todavía porque esas pantallas no escriben (F-5) y el predio es de `catastro`. Y **no
-      corre en CI**: el job está declarado en `frontend.yml` con las cuatro cosas que le faltan
-      escritas dentro, y la tercera no se arregla con trabajo —los datos que los caminos afirman
-      salen del volcado de la marcha blanca, que no se versiona en ningún repositorio—.
+      registra un predio con su ficha catastral, y consulta su determinación.** El plan daba las
+      piezas por puestas; **vueltas a medir el 2026-09-13, de las cuatro solo una está**:
+      **«ve solo las opciones de su perfil», sí** —el catálogo se filtra por lo que la cuenta puede
+      abrir (`frontend/src/permisos.ts`, ADR-0013), y dos pruebas de
+      `los-cuarenta-destinos-se-recorren.test.tsx` lo muerden: un módulo que la cuenta no puede
+      abrir **no está en el árbol ni se abre por su hash**, y el centinela comprueba que **con**
+      permiso ese mismo hash sí abre—;
+      **«consulta su determinación», no**: la hoja `territorio` es una de las **38** que dicen por
+      qué no tienen datos, porque `frontend/src/datos/conectores.ts` declara **dos** conectores,
+      `panel` y `coa-panel`, y ninguno es el de la determinación;
+      **«registra», tampoco**: de las **doce** operaciones de `frontend/src/datos/servidas.ts`,
+      **once son `GET`** y la única escritura que esta interfaz publica es
+      `PUT /seguridad/sesion/ejercicio`;
+      y **la escalera de identidad no la comprueba CI aquí**: la recorría `despliegue.yml`, que
+      era de `sgtm` y aquí no existe (casilla anterior).
+- [ ] **Ese recorrido está como prueba de extremo a extremo, no como acta de una demostración.**
+      Sigue sin estar, y lo que describía esta casilla **ya no existe**: el arnés de I-2 (#28)
+      —18 caminos en Chromium más tres accesos, contra la instalación levantada, con
+      `VITE_KAMAYUK_PROXY_DE_DATOS=false`— **salió en #90** con las pantallas de V6 contra las que
+      corría, y con él la bandera, que tampoco existe. Vuelto a medir el 2026-09-13 con `yarn e2e`,
+      lo que hay es **otro arnés**: **47 caminos en Chromium, 0 fallos, 54,4 s** —`e2e/los-cuarenta.spec.ts`,
+      los 40 destinos más su centinela, y `e2e/se-ve.spec.ts`, seis— contra **el bundle construido**
+      (`vite build` + `vite preview --strictPort`) y **sin backend**: la seguridad se contesta con
+      respuestas medidas con `curl` (`src/datos/seguridadMedida.ts`) y lo demás devuelve **404 a
+      propósito**, para que las dos hojas que sí piden se vean **en su estado de error**. Mide lo
+      que las 508 pruebas de `vitest` no pueden —que Tailwind emita el CSS, que el navegador lo
+      aplique, que la rejilla se reacomode, que ninguna tabla desplace la página—, y **desde #107 sí
+      corre en CI**: `frontend.yml`, trabajo `arnes`.
+      Lo que **no** mide, y por eso la casilla sigue vacía, son las dos mitades de siempre: (1) **el
+      acceso de verdad**, por el formulario de Keycloak con PKCE y canje —le faltan el compose de la
+      plataforma, el realm con sus tres cuentas, el volcado de la marcha blanca, que no se versiona
+      en ningún repositorio, y el secreto `KAMAYUK_E2E_CLAVE`; el arnés pasa la puerta por el **tope
+      de idas**, que es un camino declarado y no un truco—; y (2) **el recorrido de la casilla
+      anterior**, que no se puede recorrer porque esta interfaz publica una sola escritura y el
+      predio es de `catastro`.
 - [x] **Todo documento que salga lleva la marca de demostración**, y hay pruebas que se ponen rojas
       si se le quita: 19 en el backend, y el peldaño 9 de `despliegue.yml` —«la marcha blanca se
-      levanta MARCADA»— contra la instalación real.
+      levanta MARCADA»— contra la instalación real. De las dos mitades, **la segunda se quedó en
+      `sgtm`** con su flujo (casilla 2); la primera viajó entera en P5A, y **no se volvió a contar
+      el 2026-09-13**: sin Docker ni PostgreSQL 16 en la máquina, `./gradlew build` no llega al
+      final.
 - [x] **Los cinco issues nuevos están cerrados**, y los de la mitad «estructura» enumeran las filas
       del corpus que entregan.
 
