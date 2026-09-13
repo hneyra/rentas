@@ -18,6 +18,12 @@
    sea una lista**: con dos reglas en el mismo guion, `dice: '#711'` lo satisface
    cualquiera de las dos y una muestra podia ponerse roja por la regla que no era.
 
+   Las dos que las siguen son de `infrastructure`#165, que porto este arreglo a las otras
+   cinco copias: miden `closed`, `fixed` y `resolved`, una en cada lista del guion, que #130
+   anadio y ninguna muestra ejercia. Y ahi se anoto tambien lo que esta autoprueba NO puede
+   ver: si esta copia del guion sigue siendo la misma que las otras cinco. Eso lo comprueba
+   `infrastructure`, en `infra/verificaciones/las-seis-copias-de-la-guarda-del-registro.test.ts`.
+
    La del tercer tiempo de `infrastructure`#114 fija lo que la mudanza
    del registro destapo en tres repositorios a la vez: **una cabecera o un parrafo que citen
    el issue no valen como fila**. Hasta entonces valian, y con eso un PR podia salir en verde
@@ -211,6 +217,31 @@ const CASOS = [
     esperado: 'rojo',
     dice: ['#711', 'GitHub no entiende'],
     noDice: '#712',
+  },
+  {
+    /* `infrastructure`#165, AC-2. #130 le devolvio a `CIERRA` las formas `closed`, `fixed` y
+       `resolved`, y **ninguna muestra lo media**: el trio de arriba solo usa `Cierra` y `Closes`,
+       asi que quitar las tres de `PALABRAS_DE_GITHUB` dejaba esta autoprueba entera en verde. Y
+       el hueco que cerraban es de los caros: un cuerpo que dijera «Fixed #N» cerraba el issue en
+       GitHub y aqui NO EXIGIA FILA. Sin las tres, esta muestra sale verde con «El PR no declara
+       que cierre ningun issue». */
+    nombre: 'cierra con closed, fixed y resolved, toca codigo y NO deja fila: se exige',
+    cuerpo: 'Closed #711.\n\nFixed #712.\n\nResolved #713.',
+    archivos: ['backend/kamayuk-rentas-nucleo/src/main/java/kamayuk/rentas/nucleo/Algo.java'],
+    anadido: '',
+    esperado: 'rojo',
+    dice: ['#711', '#712', '#713', 'falta la fila'],
+  },
+  {
+    // Y las mismas tres en la OTRA lista, la de lo que GitHub cierra: con sus filas puestas y el
+    // castellano al lado, GitHub cierra los tres issues y no hay nada de que avisar. Sin
+    // `closed`, `fixed` y `resolved` en `CIERRA_EN_GITHUB`, esto saldria rojo diciendo que los
+    // tres se quedan abiertos, cuando se cierran.
+    nombre: 'castellano y closed, fixed y resolved para los mismos issues: no avisa',
+    cuerpo: 'Cierra #711, cierra #712 y cierra #713.\n\nClosed #711. Fixed #712. Resolved #713.',
+    archivos: ['backend/kamayuk-rentas-nucleo/src/main/java/kamayuk/rentas/nucleo/Algo.java'],
+    anadido: `+${FILA}\n+| La del segundo (#712) | … | … |\n+| La del tercero (#713) | … | … |`,
+    esperado: 'verde',
   },
 ];
 
