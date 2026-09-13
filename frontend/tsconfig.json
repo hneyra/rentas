@@ -8,6 +8,10 @@
     // COMPILADOR —`@ts-expect-error` falla cuando no hay error— y sin esta linea `tsc` ni
     // lo abriria, asi que las barreras de tipo dejarian de comprobarse en silencio.
     "verificaciones/**/*.tsx",
+    // La siembra de desarrollo (#114). Fuera de `src/` a proposito —ver su cabecera— pero la
+    // compila Vite igual que cualquier modulo, asi que tiene que pasar por `tsc`: un error de
+    // tipos ahi solo aparecerian al abrir `yarn dev`, que es justo cuando nadie lo espera.
+    "desarrollo/**/*.ts",
     // El arnes de extremo a extremo salio en #90 con las pantallas de V6 contra las que corria.
     // Vuelve con la V8 en su propio issue, y esta linea vuelve con el.
     "eslint.prohibiciones.mjs",

@@ -55,7 +55,7 @@ De ahí salen las reglas del predial (NEG-05), el motor de reglas (ARQ-09) y los
 de columna. **No es una sugerencia:** el motor de reglas se escribió una vez sin poder leer esos
 documentos y salieron dos defectos estructurales, los dos en verde.
 
-## 3. Las tres formas de trabajar
+## 3. Las cuatro formas de trabajar
 
 Elige la más barata que sirva para lo que vas a tocar.
 
@@ -64,6 +64,7 @@ Elige la más barata que sirva para lo que vas a tocar.
 | **A** | Sólo las barreras de arquitectura | JDK | Reglas, escáneres, frontera de sistema, muestras |
 | **B** | Las dos barreras | JDK + PostgreSQL 16 | Todo lo anterior más el aislamiento multi-tenant |
 | **C** | La plataforma levantada | Docker | Base con las cuatro bases, identidad con sus dos realms, enrutado |
+| **D** | La interfaz | Node y el clon `kamayuk-lib` | Mirar las 40 pantallas — con el catálogo sembrado, o contra la plataforma |
 
 ### A · Sólo las barreras de arquitectura
 
@@ -177,6 +178,68 @@ cd ../infrastructure/despliegue && ./levantar-todo.sh rentas
 > Medido: el archivo existe y la imagen se construye. Una guía que describe un estado anterior no
 > se lee como desactualizada — se lee como instrucciones, y manda a `infrastructure` a buscar una
 > forma que ya está aquí.
+
+### D · La interfaz, en sus dos niveles
+
+Las 40 pantallas dibujan las cifras de su propia definición, atadas al artboard campo por campo.
+Lo que **no** está en el código es el árbol de módulos: llega de la red —`GET /seguridad/modulos`,
+`GET /seguridad/accesos` y la matriz de permisos—, y sin las tres no hay ni un destino que abrir.
+De ahí los dos niveles: el primero siembra ese árbol, el segundo lo pide de verdad.
+
+#### D.1 · Sin nada levantado — el catálogo sembrado
+
+```bash
+cd frontend
+yarn install          # sólo la primera vez. Exige `../../kamayuk-lib` clonado al lado
+yarn dev              # http://localhost:5173/rentas/
+```
+
+Y ya está: se recorren los 40 destinos **sin PostgreSQL, sin Keycloak, sin Traefik y sin backend**.
+Lo enciende `VITE_KAMAYUK_SIN_PLATAFORMA=true`, que `.env.development` trae puesto y Vite sólo lee
+en modo desarrollo. Hace **dos** cosas, y las dos hacen falta:
+
+1. **Siembra las tres lecturas de seguridad** con `src/datos/seguridadMedida.ts`, que son las
+   respuestas medidas de la instalación —doce módulos, 134 accesos y la matriz entera, capturadas
+   con `curl`—. No son invenciones, y por eso el árbol que se ve es el que sirve el backend.
+2. **Esquiva la puerta de identidad**. Sin eso, el arranque manda a Keycloak antes de dibujar nada
+   y no se monta la aplicación.
+
+Lo que **no** siembra es ningún dato de pantalla: `panel` y `coa-panel` salen a la red, no
+encuentran a nadie y enseñan su estado de error, que es la verdad. Las otras 38 no piden nada y
+dicen por qué. La consola lo anuncia al arrancar, para que un árbol completo sin nada levantado no
+se confunda con «el backend contestó».
+
+**Nada de esto viaja al paquete.** La condición que lo enciende lleva delante un
+`import.meta.env.DEV`, así que `yarn build` la pliega y el `import()` dinámico se cae entero con
+las capturas dentro. Lo miden `e2e/la-siembra-no-viaja-al-bundle.spec.ts` sobre el `dist/` y el
+`Dockerfile` sobre lo servido.
+
+#### D.2 · Contra la plataforma levantada — la identidad y los datos de verdad
+
+Primero la plataforma (§3C) y este repositorio contra ella; después:
+
+```bash
+cd frontend
+yarn dev:con-plataforma    # VITE_KAMAYUK_SIN_PLATAFORMA=false vite
+```
+
+Con la bandera apagada se recorre el camino entero: PKCE contra Keycloak, canje del código, token
+en memoria, y las tres lecturas de seguridad pedidas al backend por el proxy que `vite.config.ts`
+declara hacia Traefik. El árbol que salga será el de **la cuenta con que se entre**: lo que no
+puede abrir, no se ofrece.
+
+Si el backend no está en el 8082, se dice sin editar nada:
+
+```bash
+KAMAYUK_BACKEND=http://localhost:9999 yarn dev:con-plataforma
+```
+
+**Los dos síntomas que conviene reconocer**, porque se parecen y no son lo mismo:
+
+| Lo que se lee | Qué pasa |
+|---|---|
+| «No se pudo llegar al emisor de identidad…», con la URL | Keycloak no está, o `oidcEmisor` apunta a otro sitio |
+| «No se pudo saber qué módulos puede abrir esta cuenta…» | Se llegó a la identidad; el que no contesta es el backend |
 
 ## 4. Puertos
 

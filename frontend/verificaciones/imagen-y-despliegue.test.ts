@@ -171,13 +171,25 @@ describe('AC-2 — la imagen no lleva dentro nada que no deba', () => {
   });
 });
 
-describe('AC-3 — el proxy de datos NO viaja en la imagen', () => {
+describe('AC-3 — lo que se siembra en desarrollo NO viaja en la imagen', () => {
   it('se construye con la bandera apagada, escrito y no supuesto', () => {
-    expect(DOCKERFILE).toMatch(/ENV VITE_KAMAYUK_PROXY_DE_DATOS=false/);
+    // La bandera cambio de nombre y de contenido en #114 —el proxy de datos se fue en #90 y esto
+    // siembra el CATALOGO, no datos de pantalla—, pero la valla es la misma y esta en el mismo
+    // sitio: apagarla aqui hace que el paquete salga limpio por decision y no por casualidad.
+    expect(DOCKERFILE).toMatch(/ENV VITE_KAMAYUK_SIN_PLATAFORMA=false/);
     // Y antes del build, o no serviria de nada.
-    expect(DOCKERFILE.indexOf('VITE_KAMAYUK_PROXY_DE_DATOS=false')).toBeLessThan(
+    expect(DOCKERFILE.indexOf('VITE_KAMAYUK_SIN_PLATAFORMA=false')).toBeLessThan(
       DOCKERFILE.indexOf('RUN yarn build'),
     );
+  });
+
+  it('y la imagen se niega a construirse si lo servido lleva la captura de seguridad', () => {
+    // La tercera mitad de la misma idea: el `ENV` impide que la captura ENTRE, y esto impide que
+    // se PUBLIQUE si entrase por otra via. #44 midio que una comprobacion sobre un artefacto
+    // intermedio no afirma nada sobre el que se publica, asi que esta va en la ultima etapa.
+    expect(DOCKERFILE).toContain('Lo que se sirve lleva la captura de seguridad');
+    expect(DOCKERFILE).toContain("'Ficha catastral rural'");
+    expect(DOCKERFILE).toContain("'transito_rg_sancionadora'");
   });
 
   /**

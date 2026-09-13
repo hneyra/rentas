@@ -62,6 +62,30 @@
  * proxima persona la enciende esperando algo.
  *
  * Lo que NO sale es lo de arriba: el canje, el tope de idas y la marca de salida se quedan.
+ *
+ * <h2>Y lo que ENTRA en su sitio es otra cosa, que si tiene algo que contestar (#114)</h2>
+ *
+ * La bandera retirada se quedo diez meses en `.env.development` sin hacer nada —exactamente lo
+ * que el parrafo de arriba dice que no hay que dejar—, y mientras tanto **no habia forma de
+ * mirar las cuarenta pantallas sin levantar la plataforma entera**: el arbol de modulos llega de
+ * la red, y sin las tres lecturas de seguridad no hay ni un destino que abrir.
+ *
+ * Lo que se siembra es **el catalogo y nada mas** —que pantallas existen—, no datos de pantalla:
+ * esos ya viven en las definiciones. Ver `desarrollo/sembrarElCatalogo.ts`, que ademas explica
+ * por que vive fuera de `src/`.
+ *
+ * <h2>Las dos condiciones son CONSTANTES AL CONSTRUIR, y de eso depende que no viaje nada</h2>
+ *
+ * Vite sustituye `import.meta.env.DEV` por `false` y cada `import.meta.env.VITE_*` por su
+ * literal **al construir**, asi que Rollup pliega la condicion y se lleva por delante el
+ * `import()` dinamico entero, capturas incluidas. Es el mecanismo del proxy de V6, repetido a
+ * proposito porque esta medido por los dos lados: leer la bandera en tiempo de EJECUCION —tras
+ * una funcion, desde `globalThis`, desde `configuracion()`— deja el modulo dentro del paquete.
+ *
+ * **`import.meta.env.DEV` va primero y no sobra.** La bandera sola dependeria de que nadie
+ * encienda la variable al construir; con esta delante, `yarn build` sale limpio **haga lo que
+ * haga el entorno**. Las otras dos vallas siguen donde estaban: el `ENV` explicito del
+ * `Dockerfile` y el `.env*` del `.dockerignore`.
  */
 
 
@@ -97,6 +121,21 @@ export function fallaDeLaPuerta(): FallaDeLaPuerta | null {
 }
 
 /**
+ * **Siembra el catalogo y esquiva la puerta, si y solo si se pidio en desarrollo** (#114).
+ *
+ * Devuelve si se sembro, que es lo que decide si hay que ir a la puerta. Las dos condiciones son
+ * constantes al construir a proposito: ver la cabecera, y `verificaciones/` lo vigila.
+ */
+async function seSembroElCatalogo(): Promise<boolean> {
+  if (!import.meta.env.DEV) return false;
+  if (import.meta.env.VITE_KAMAYUK_SIN_PLATAFORMA !== 'true') return false;
+
+  const { sembrarElCatalogo } = await import('../desarrollo/sembrarElCatalogo.ts');
+  sembrarElCatalogo();
+  return true;
+}
+
+/**
  * Canjea si volvemos del emisor, y solo entonces monta.
  *
  * Devuelve sin montar cuando manda a la puerta: `entrar()` navega fuera de la pagina, asi que
@@ -108,6 +147,15 @@ export function fallaDeLaPuerta(): FallaDeLaPuerta | null {
 export async function arrancar(montar: () => void): Promise<void> {
   laFalla = null;
   await canjearSiVuelve();
+
+  // La siembra va DESPUES del canje y ANTES de la puerta, y las dos cosas importan. Despues,
+  // porque quien vuelve de Keycloak con un `?code=` en la barra tiene que ver su URL limpia
+  // aunque la bandera este encendida; antes, porque esquivar la puerta es la mitad de lo que la
+  // bandera hace — sin eso, `yarn dev` sin Keycloak sigue sin dibujar nada.
+  if (await seSembroElCatalogo()) {
+    montar();
+    return;
+  }
 
   if (token() === null && hayPuerta() && puedeIrALaPuerta() && !vieneDeSalir()) {
     laFalla = await entrar();

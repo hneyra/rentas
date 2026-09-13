@@ -9,6 +9,7 @@
   },
   "scripts": {
     "dev": "vite",
+    "dev:con-plataforma": "VITE_KAMAYUK_SIN_PLATAFORMA=false vite",
     "build": "vite build",
     "preview": "vite preview",
     "lint": "eslint .",
