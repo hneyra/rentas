@@ -40,6 +40,15 @@ const LITERALES = [
   '{{count}} registro_one',
   '{{count}} registro_many',
   '{{count}} registro_other',
+  // Las dos del marco que llevan una cuenta dentro (#133). Sus claves base llegan DERIVADAS de
+  // `textosDelMarco.ts` —como las 747 de las definiciones—; lo que no se puede derivar son sus
+  // formas plurales, por lo mismo que las de `registro`: una clave sola no expresa dos formas.
+  '{{count}} aviso sin leer_one',
+  '{{count}} aviso sin leer_many',
+  '{{count}} aviso sin leer_other',
+  '{{casan}} de {{count}} destino_one',
+  '{{casan}} de {{count}} destino_many',
+  '{{casan}} de {{count}} destino_other',
   'Rentas',
   'Municipalidad Distrital de Catacaos',
   'Mi perfil',
@@ -81,6 +90,14 @@ const PLURALES: Readonly<Record<string, string>> = {
   '{{count}} registro_one': '{{count}} registro',
   '{{count}} registro_many': '{{count}} registros',
   '{{count}} registro_other': '{{count}} registros',
+  '{{count}} aviso sin leer_one': '{{count}} aviso sin leer',
+  '{{count}} aviso sin leer_many': '{{count}} avisos sin leer',
+  '{{count}} aviso sin leer_other': '{{count}} avisos sin leer',
+  // El plural lo decide CUANTOS HAY y no cuantos casan: «1 de 40 destinos», nunca «1 de 40
+  // destino». Por eso `ofrecidos` entra como `count` y `casan` como interpolacion normal.
+  '{{casan}} de {{count}} destino_one': '{{casan}} de {{count}} destino',
+  '{{casan}} de {{count}} destino_many': '{{casan}} de {{count}} destinos',
+  '{{casan}} de {{count}} destino_other': '{{casan}} de {{count}} destinos',
 };
 
 function elQueDeberiaSer(): Readonly<Record<string, string>> {

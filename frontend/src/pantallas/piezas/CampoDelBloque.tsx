@@ -16,6 +16,7 @@ import {
 
 import { useTranslation } from 'react-i18next';
 
+import { MARCA_DE_OPCIONAL } from '../../i18n/textosDelMarco.ts';
 import type { Ausencia } from '../datos.ts';
 import type { Campo as Definicion } from '../tipos.ts';
 
@@ -81,6 +82,11 @@ export function CampoDelBloque({
     // La ayuda puede no estar; `t(undefined)` no vale, asi que se traduce solo si la hay.
     ayuda: ayuda === undefined ? undefined : t(ayuda),
     opcional,
+    // La palabra del «(opcional)» la dice `@kamayuk/ui` por omision, y hasta #133 llegaba al DOM
+    // sin pasar por `t()`: era la unica de `TEXTOS_DE_LA_UI` que este sistema tenia que pasar por
+    // su cuenta. Se pasa SIEMPRE, y no solo cuando `opcional` es cierto, porque una propiedad que
+    // se pone a veces es una propiedad que un dia se olvida.
+    marcaDeOpcional: t(MARCA_DE_OPCIONAL),
   } as const;
 
   switch (tipo) {
