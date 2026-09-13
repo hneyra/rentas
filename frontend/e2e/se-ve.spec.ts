@@ -5,7 +5,7 @@ import { abrir, conLaSeguridadContestada } from './instalacion.ts';
 /**
  * **Que la interfaz se VE** (#107).
  *
- * Todo lo de aqui es lo que las 507 pruebas de `vitest` **no pueden** decir, porque comparan
+ * Todo lo de aqui es lo que las pruebas de `vitest` **no pueden** decir, porque comparan
  * `className` como texto: que Tailwind emita el CSS, que el navegador lo aplique, que la rejilla
  * se reacomode y que un `overflow` no corte una tabla.
  */
