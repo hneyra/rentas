@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { PANTALLAS } from '../pantallas/definiciones/index.ts';
 import type { ClaveDeHoja } from '../pantallas/arbol.ts';
-import { coordenada } from '../pantallas/datos.ts';
+import { coordenada } from '@kamayuk/ui';
 import { CONECTORES, NO_PUBLICADO } from './conectores.ts';
 import type { CorridaDelPredial, DeudaEnCoactiva, Paginado } from './lecturas.ts';
 

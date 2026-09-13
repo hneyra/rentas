@@ -7,16 +7,16 @@ import { describe, expect, it } from 'vitest';
 
 import { ARBOL, CLAVES_DE_HOJA } from '../src/pantallas/arbol.ts';
 import { PANTALLAS } from '../src/pantallas/definiciones/index.ts';
-import {
-  esCampoDeCasilla,
-  esCampoDeLista,
-  esCampoDeSoloLectura,
-  type Bloque,
-  type Campo,
-  type Modulo,
-  type Pantalla,
-  type Tabla,
-} from '../src/pantallas/tipos.ts';
+import type { Modulo } from '../src/pantallas/tipos.ts';
+import type {
+  CampoDeCasilla,
+  CampoDeLista,
+  CampoDeSoloLectura,
+  DefinicionDeBloque as Bloque,
+  DefinicionDeCampo as Campo,
+  DefinicionDePantalla as Pantalla,
+  DefinicionDeTabla as Tabla,
+} from '@kamayuk/ui';
 import {
   artboardV8,
   hojasDelArtboard,
@@ -58,6 +58,17 @@ import {
 // Un solo adaptador, y no dos descriptores. Convertir nuestro lado a la forma posicional del
 // artboard y describir las dos desde ahi deja una sola pieza que pueda equivocarse; con un
 // descriptor por lado, el dia que uno derive el otro le seguiria la corriente.
+
+// Reconocer la rama de un campo. Hasta #153 vivian en `src/pantallas/tipos.ts`, junto al tipo; el
+// tipo subio a `@kamayuk/ui` y ellas no —la libreria no las publica—, y esta prueba es la unica que
+// las usaba. No vale `campo.tipo === 's' || campo.tipo === 's1'`: con dos literales el compilador
+// sabe entrar en la rama y no salir de ella. Reconocerlas por el campo que solo ellas traen
+// funciona en las dos direcciones.
+const esCampoDeLista = (campo: Campo): campo is CampoDeLista => 'opciones' in campo;
+const esCampoDeCasilla = (campo: Campo): campo is CampoDeCasilla => 'casilla' in campo;
+/** Ni desplegable, ni casilla, ni con ayuda posible: lo que queda con un tipo `r`. */
+const esCampoDeSoloLectura = (campo: Campo): campo is CampoDeSoloLectura =>
+  !esCampoDeLista(campo) && !esCampoDeCasilla(campo) && campo.tipo.startsWith('r');
 
 /** Un campo nuestro, en la forma `[etiqueta, tipo, opciones | ayuda]` del artboard. */
 function campoComoElArtboard(campo: Campo): CampoDelArtboard {

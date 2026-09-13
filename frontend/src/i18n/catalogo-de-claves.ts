@@ -1,6 +1,8 @@
+import type { DefinicionDePantalla } from '@kamayuk/ui';
+
 import { ARBOL } from '../pantallas/arbol.ts';
 import { PANTALLAS } from '../pantallas/definiciones/index.ts';
-import type { Modulo, Pantalla } from '../pantallas/tipos.ts';
+import type { Modulo } from '../pantallas/tipos.ts';
 import { NADA_SERVIDO, SERVIDO_Y_SIN_PEDIR, SOLO_BASE } from '../porQueNoHayDato.ts';
 import { clavesDelMarco } from './textosDelMarco.ts';
 
@@ -44,7 +46,7 @@ function deLasPantallas(): readonly string[] {
   // Anotado: `PANTALLAS` es un `as const satisfies` de cuarenta formas distintas, y sin la
   // anotacion el compilador intenta unificar cuarenta y se rinde. La forma comun la da el
   // `satisfies`, que es lo que garantiza que la anotacion no miente.
-  for (const pantalla of Object.values(PANTALLAS) as readonly Pantalla[]) {
+  for (const pantalla of Object.values(PANTALLAS) as readonly DefinicionDePantalla[]) {
     salida.push(pantalla.instruccion);
     for (const bloque of pantalla.bloques) {
       salida.push(bloque.titulo);

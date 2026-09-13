@@ -19,8 +19,8 @@ import { ARTBOARDS, rutaDe } from './artboards.ts';
  * reescritas, la pantalla sigue funcionando y el contrato que el usuario leyo ya no es el que la
  * pantalla cumple.
  *
- * Y hay un motivo mas, de estructura: el interprete trae unos avisos NEUTROS porque esta
- * destinado a `@kamayuk/ui`, donde no puede decir «padron». Los de V8 viven en `rentas`. Ese
+ * Y hay un motivo mas, de estructura: el interprete trae unos avisos NEUTROS porque es de
+ * `@kamayuk/ui` (#153), donde no puede decir «padron». Los de V8 viven en `rentas`. Ese
  * reparto solo se sostiene si alguien comprueba que los de aqui siguen siendo los del artboard —
  * si no, la separacion se convierte en dos textos que divergen.
  */

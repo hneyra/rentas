@@ -1,5 +1,5 @@
 import type { ClaveDeHoja } from '../arbol.ts';
-import type { Pantalla } from '../tipos.ts';
+import type { DefinicionDePantalla as Pantalla } from '@kamayuk/ui';
 
 /**
  * Las cuatro pantallas de **Inicio** (UI-5, #85, AC2).

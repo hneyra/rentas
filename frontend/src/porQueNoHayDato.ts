@@ -1,4 +1,4 @@
-import type { Ausencia } from './pantallas/datos.ts';
+import type { Ausencia } from '@kamayuk/ui';
 import type { Hoja, Operacion } from './pantallas/tipos.ts';
 import { YA_SERVIDAS } from './datos/servidas.ts';
 
@@ -8,7 +8,7 @@ import { YA_SERVIDAS } from './datos/servidas.ts';
  * <h2>Por que vive aqui y no en el interprete</h2>
  *
  * Porque cruza dos cosas que son de ESTE sistema: las operaciones que cada hoja declara y las que
- * su backend sirve. El interprete esta destinado a `@kamayuk/ui` y no puede nombrar ninguna de las
+ * su backend sirve. El interprete es de `@kamayuk/ui` desde #153 y no puede nombrar ninguna de las
  * dos; recibe el resultado ya redactado.
  *
  * <h2>Los cuatro casos NO son uno, y esto esta medido</h2>

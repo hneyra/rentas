@@ -18,24 +18,28 @@
  * grupos que piden accion, y lo demas esta conforme.
  */
 
-import type { Insignia } from '@kamayuk/ui';
-import type { ComponentProps } from 'react';
+import type { TonoDeInsignia } from '@kamayuk/ui';
 
-/**
- * Los cuatro tonos, **derivados de la pieza** y no copiados.
+/*
+ * Los cuatro tonos salen de la libreria, **derivados de la pieza** y no copiados.
  *
- * `@kamayuk/ui` no publica el tipo suelto, y escribir aqui `'ok' | 'atencion' | 'mal' | 'info'`
- * seria una segunda lista que el dia que la libreria cambie se queda vieja **en verde**: la
- * copia compila igual y el rojo aparece en la pantalla. Sacandolo de la pieza, no puede.
+ * Hasta #153 se derivaban aqui mismo —`ComponentProps<typeof Insignia>['tono']`— porque
+ * `@kamayuk/ui` no publicaba el tipo suelto. Desde `kamayuk-lib`#27 lo publica, derivado de la
+ * pieza de la misma forma, como `TonoDeInsignia`: es lo que el interprete le pide a este archivo.
+ *
+ * <h2>Y por que este archivo NO subio con el interprete</h2>
+ *
+ * Porque el reparto es vocabulario de ESTE sistema: «coactiva», «vencida», «con deuda». La
+ * libreria lo recibe por `tonoDeLaInsignia`, que es obligatoria y sin valor por omision —uno que
+ * pintara todo de `ok` dibujaria «Vencida» en verde sin que nada lo delatara—.
  */
-type Tono = ComponentProps<typeof Insignia>['tono'];
 
 /** Lo que ya ha ido mal: hay que actuar hoy. */
 const MAL = /coactiva|observado|vencida|denegado/;
 /** Lo que va a ir mal: hay plazo, pero corre. */
 const ATENCION = /con deuda|por vencer|en tramite|en trámite/;
 
-export function tonoDe(texto: string): Tono {
+export function tonoDe(texto: string): TonoDeInsignia {
   const s = texto.toLowerCase();
   if (MAL.test(s)) return 'mal';
   if (ATENCION.test(s)) return 'atencion';

@@ -3,7 +3,7 @@ import { renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { coordenada } from '../pantallas/datos.ts';
+import { coordenada } from '@kamayuk/ui';
 import { useDatosDeLaHoja } from './useDatosDeLaHoja.ts';
 
 /**

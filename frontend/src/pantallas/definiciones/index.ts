@@ -1,5 +1,5 @@
 import type { ClaveDeHoja } from '../arbol.ts';
-import type { Pantalla } from '../tipos.ts';
+import type { DefinicionDePantalla as Pantalla } from '@kamayuk/ui';
 import { INICIO } from './inicio.ts';
 import { RENTAS_REGISTRO } from './rentas-registro.ts';
 import { FISCALIZACION } from './fiscalizacion.ts';
