@@ -11,6 +11,8 @@ import {
   TarjetaBarraDeTabla,
 } from '@kamayuk/ui';
 
+import { useTranslation } from 'react-i18next';
+
 import type { Ausencia } from '../datos.ts';
 import type { Tabla as Definicion } from '../tipos.ts';
 import { tonoDe } from '../tono.ts';
@@ -51,23 +53,27 @@ export interface TablaDelBloqueProps {
 }
 
 export function TablaDelBloque({ tabla, filas, conteo, ausencia }: TablaDelBloqueProps) {
+  const { t } = useTranslation();
   // El conteo se cuenta solo cuando HAY filas. Sin ellas no se escribe «0 registros»: contar cero
   // sobre una lista que nadie ha pedido es afirmar que esta vacia, y no se sabe.
   const rotuloDelConteo =
     filas === undefined
       ? null
-      : (conteo ?? `${filas.length} ${filas.length === 1 ? 'registro' : 'registros'}`);
+      : (conteo ??
+        // Con plural, que es lo que i18next sabe hacer y una interpolacion a mano no: hay idiomas
+        // con mas de dos formas.
+        t('{{count}} registro', { count: filas.length }));
 
   return (
     <div>
       <TarjetaBarraDeTabla>
-        <p className="m-0 flex-1 min-w-[140px] text-[13px] font-bold">{tabla.titulo}</p>
+        <p className="m-0 flex-1 min-w-[140px] text-[13px] font-bold">{t(tabla.titulo)}</p>
         {rotuloDelConteo === null ? null : (
           <span className="text-[11.5px] text-tinta-3">{rotuloDelConteo}</span>
         )}
         {tabla.accion === undefined ? null : (
           <Boton type="button" tamano="menudo">
-            {tabla.accion}
+            {t(tabla.accion)}
           </Boton>
         )}
       </TarjetaBarraDeTabla>
@@ -77,7 +83,7 @@ export function TablaDelBloque({ tabla, filas, conteo, ausencia }: TablaDelBloqu
           <TablaFila>
             {tabla.columnas.map((c) => (
               <TablaRotulo key={c.rotulo} cifra={c.alineadoDerecha}>
-                {c.rotulo}
+                {t(c.rotulo)}
               </TablaRotulo>
             ))}
           </TablaFila>
@@ -113,11 +119,11 @@ export function TablaDelBloque({ tabla, filas, conteo, ausencia }: TablaDelBloqu
           data-sin-dato=""
           className="m-0 px-[15px] py-[10px] bg-sup text-[12px] leading-[1.5] text-tinta-3 italic text-pretty"
         >
-          {ausencia.enElCampo}
+          {t(ausencia.enElCampo)}
         </p>
       ) : null}
 
-      {tabla.nota === undefined ? null : <TablaNota>{tabla.nota}</TablaNota>}
+      {tabla.nota === undefined ? null : <TablaNota>{t(tabla.nota)}</TablaNota>}
     </div>
   );
 }

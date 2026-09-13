@@ -14,6 +14,8 @@ import {
   tipoDe,
 } from '@kamayuk/ui';
 
+import { useTranslation } from 'react-i18next';
+
 import type { Ausencia } from '../datos.ts';
 import type { Campo as Definicion } from '../tipos.ts';
 
@@ -65,6 +67,7 @@ export function CampoDelBloque({
   enElCampo,
   alCambiar,
 }: CampoDelBloqueProps) {
+  const { t } = useTranslation();
   const tipo = tipoDe(campo.tipo);
   const ancho = anchoCompleto(campo.tipo);
   // «(opcional)» sale de la propia ayuda, como en el artboard: `/opcional/i.test(ayuda)`. No hay
@@ -72,7 +75,13 @@ export function CampoDelBloque({
   const ayuda = 'ayuda' in campo ? campo.ayuda : undefined;
   const opcional = ayuda !== undefined && /opcional/i.test(ayuda);
 
-  const comun = { rotulo: campo.etiqueta, ancho, ayuda, opcional } as const;
+  const comun = {
+    rotulo: t(campo.etiqueta),
+    ancho,
+    // La ayuda puede no estar; `t(undefined)` no vale, asi que se traduce solo si la hay.
+    ayuda: ayuda === undefined ? undefined : t(ayuda),
+    opcional,
+  } as const;
 
   switch (tipo) {
     case 's': {
@@ -85,7 +94,7 @@ export function CampoDelBloque({
           >
             {opciones.map((o) => (
               <Opcion key={o} value={o}>
-                {o}
+                {t(o)}
               </Opcion>
             ))}
           </Desplegable>
@@ -102,7 +111,9 @@ export function CampoDelBloque({
             data-sin-dato={hayDato ? undefined : ''}
             className={hayDato ? undefined : 'text-tinta-3 italic'}
           >
-            {hayDato ? valor : (enElCampo ?? ausencia.enElCampo)}
+            {/* El valor NO se traduce: es un dato, y traducir un importe seria absurdo. La
+                palabra del hueco si, porque es una frase nuestra. */}
+            {hayDato ? valor : t(enElCampo ?? ausencia.enElCampo)}
           </Dato>
         </Etiqueta>
       );
@@ -111,7 +122,7 @@ export function CampoDelBloque({
       return (
         <Etiqueta {...comun} ayuda={undefined}>
           <Casilla
-            rotulo={'casilla' in campo ? campo.casilla : ''}
+            rotulo={'casilla' in campo ? t(campo.casilla) : ''}
             checked={valor === true}
             onCheckedChange={(marcado) => alCambiar(marcado === true)}
           />
@@ -124,7 +135,7 @@ export function CampoDelBloque({
             {/* El disparador ES el control: es lo que la etiqueta apunta y lo que se enfoca con
                 el tabulador. La capa solo lleva el calendario. */}
             <DisparadorEmergente className="w-full box-border border border-borde-campo rounded-sm px-[10px] py-2 bg-superficie text-[13.5px] text-left text-tinta hover:border-borde-hover focus-visible:border-azul focus-visible:ring-[3px] focus-visible:ring-foco outline-none">
-              {typeof valor === 'string' && valor !== '' ? valor : 'dd/mm/aaaa'}
+              {typeof valor === 'string' && valor !== '' ? valor : t('dd/mm/aaaa')}
             </DisparadorEmergente>
             <Capa>
               <Calendario

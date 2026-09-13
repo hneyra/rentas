@@ -1,4 +1,5 @@
 import { Tarjeta, TarjetaCabecera, TarjetaCampos, TarjetaNota } from '@kamayuk/ui';
+import { useTranslation } from 'react-i18next';
 
 import type { Ausencia, Coordenada } from '../datos.ts';
 import { coordenada } from '../datos.ts';
@@ -38,10 +39,13 @@ export function BloqueDeLaPantalla({
   indice,
   alCambiar,
 }: BloqueDeLaPantallaProps) {
+  // El castellano es la clave: ver `src/i18n/i18n.ts`. Aqui no hay nada que inventar — lo que se
+  // traduce es exactamente lo que la definicion dice, que es lo que el artboard dibuja.
+  const { t } = useTranslation();
   return (
     <Tarjeta>
-      <TarjetaCabecera>{bloque.titulo}</TarjetaCabecera>
-      {bloque.nota === '' ? null : <TarjetaNota>{bloque.nota}</TarjetaNota>}
+      <TarjetaCabecera>{t(bloque.titulo)}</TarjetaCabecera>
+      {bloque.nota === '' ? null : <TarjetaNota>{t(bloque.nota)}</TarjetaNota>}
       {bloque.campos.length === 0 ? null : (
         <TarjetaCampos>
           {bloque.campos.map((campo, i) => (

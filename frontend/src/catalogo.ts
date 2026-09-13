@@ -1,3 +1,6 @@
+import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
+
 import type { Catalogo, ModuloDelCatalogo } from '@kamayuk/shell';
 import { ICONOS, seEscribe, tipoDe, type NombreDeIcono } from '@kamayuk/ui';
 
@@ -22,6 +25,10 @@ import { pantallaDe } from './pantallas/definiciones/index.ts';
  * una pantalla de solo lectura con un boton de guardar que no guarda nada.
  *
  * <h2>Lo que este archivo NO hace</h2>
+ *
+ * **Traducir sus rotulos.** El catalogo es DATO y se construye una vez, fuera de React: no puede
+ * llamar a `useTranslation`. Quien lo traduce es `useCatalogo()`, abajo, que si es un gancho — y
+ * de paso vuelve a construirlo cuando el idioma cambie, que es lo que un `const` no haria.
  *
  * **Filtrar por permisos.** El armazon recibe el catalogo YA filtrado —lo dice su javadoc— y quien
  * lo filtra es quien sabe que puede abrir la cuenta. Eso llega cuando la sesion se conecte; hasta
@@ -80,3 +87,35 @@ export const CATALOGO: Catalogo = ARBOL.map(
     })),
   }),
 );
+
+
+/**
+ * El catalogo **con sus rotulos traducidos** (#103).
+ *
+ * Va aparte de `CATALOGO` y no lo sustituye: el de arriba es el dato —lo que este sistema tiene— y
+ * este es como se ensena. Separarlos importa porque las guardas comparan el DATO contra el
+ * artboard, y hacerlo contra una version traducida seria comparar la traduccion.
+ *
+ * El `useMemo` depende de `t`, y de nada mas: `react-i18next` **cambia la identidad de `t` cuando
+ * cambia el idioma**, asi que anadir `i18n.language` al lado no anade nada — el lint lo dice, y
+ * tiene razon. Lo que si haria falta si `t` fuera estable es justo eso, y por eso queda escrito:
+ * sin la dependencia correcta, cambiar de idioma dejaria el arbol en el anterior hasta que algo
+ * mas provocara una pintada, que es un defecto que solo se ve con dos idiomas puestos.
+ */
+export function useCatalogo(): Catalogo {
+  const { t } = useTranslation();
+  return useMemo(
+    () =>
+      CATALOGO.map((modulo) => ({
+        ...modulo,
+        rotulo: t(modulo.rotulo),
+        nota: t(modulo.nota),
+        destinos: modulo.destinos.map((destino) => ({
+          ...destino,
+          rotulo: t(destino.rotulo),
+          instruccion: destino.instruccion === undefined ? undefined : t(destino.instruccion),
+        })),
+      })),
+    [t],
+  );
+}
