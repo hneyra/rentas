@@ -41,7 +41,9 @@ const SE_FUE: readonly { readonly ruta: string; readonly que: string }[] = [
 const ESTA: readonly string[] = [
   'src/aplicacion.tsx',
   'src/catalogo.ts',
-  'src/pantallas/Pantalla.tsx',
+  // `src/pantallas/Pantalla.tsx` salio de aqui en #153: el interprete es de `@kamayuk/ui`, y que
+  // no vuelva lo vigila `el-interprete-es-de-la-libreria.test.ts`. Lo que lo monta, si esta.
+  'src/pantallas/PantallaDeRentas.tsx',
   'src/pantallas/arbol.ts',
   'src/pantallas/definiciones/index.ts',
   'diseno/RentasV8.dc.html',

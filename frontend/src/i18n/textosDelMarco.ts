@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { TextosDelArmazon } from '@kamayuk/shell';
-import { TEXTOS_DE_LA_UI } from '@kamayuk/ui';
+import { TEXTOS_DE_LA_UI, TEXTOS_DEL_INTERPRETE, type TextosDelInterprete } from '@kamayuk/ui';
 
 /**
  * **Las palabras que el MARCO dice por su cuenta, traducidas por este sistema** (#133).
@@ -44,7 +44,7 @@ import { TEXTOS_DE_LA_UI } from '@kamayuk/ui';
  *
  * Un numero, un filtro o el rotulo de una hoja caen en distinto sitio en cada idioma. Partir la
  * frase en dos cadenas decide por el traductor donde va el dato; con `{{…}}` lo decide el idioma.
- * Y los dos que llevan una cuenta van con `{{count}}`, que es lo que hace que i18next elija la
+ * Y los que llevan una cuenta van con `{{count}}`, que es lo que hace que i18next elija la
  * forma plural — con un ternario en el codigo, los idiomas con mas de dos formas se quedan fuera
  * para siempre (es la misma decision que `{{count}} registro`, ver `i18n.ts`).
  */
@@ -109,20 +109,51 @@ export const FRASES_DEL_MARCO = {
 } as const satisfies Record<keyof TextosDelArmazon, string>;
 
 /**
- * La marca de un campo que se puede dejar en blanco, que la dice `@kamayuk/ui` y no el armazon.
+ * **Las tres palabras que el INTERPRETE dice por su cuenta** (#153).
  *
- * Vive aqui y no dentro de `CampoDelBloque` por lo mismo que las de arriba: para que entre sola en
- * el catalogo de claves. Es la unica de `TEXTOS_DE_LA_UI` que este sistema tiene que pasar por su
- * cuenta — las otras tres que se dibujan aqui —la miga, la region de avisos y la lista de la
- * paleta— llegan **dentro** del saco del armazon, y las dos que envuelven una fecha son de
- * `Importe` y `FechaDeCalculo`, que este repositorio todavia no monta. Lo vigila
- * `verificaciones/todo-el-texto-se-traduce.test.tsx`.
+ * Hasta #153 el interprete vivia aqui y las decia con `t()` escrito dentro de sus piezas: la marca
+ * de opcional —que salia de `MARCA_DE_OPCIONAL`, en este mismo archivo—, el marcador de una fecha
+ * sin elegir y el conteo de filas de una tabla. Al subir a `@kamayuk/ui` (`kamayuk-lib`#27) las
+ * tres entran por `textos` —`TEXTOS_DEL_INTERPRETE`—, porque `i18next` no es `peerDependency` de
+ * la libreria.
+ *
+ * Asi que pasan a ser lo que ya eran las treinta y dos del armazon: **un dato que se traduce**, y
+ * no dos llamadas con la frase escrita dentro. Por el mismo motivo que arriba: escritas como literal, el marcador y el
+ * conteo solo entraban en el locale porque `el-locale-esta-completo` los listaba a mano; derivados
+ * de aqui entran solos, y el dia que la libreria anada una cuarta, `useTextosDelInterprete` deja
+ * de compilar.
+ *
+ * **El conteo va con `{{count}}`** y no con el ternario de `TEXTOS_DEL_INTERPRETE.registros`: el
+ * plural lo decide el idioma, y hay idiomas con mas de dos formas.
  */
-export const MARCA_DE_OPCIONAL = TEXTOS_DE_LA_UI.opcional;
+export const FRASES_DEL_INTERPRETE = {
+  opcional: TEXTOS_DEL_INTERPRETE.opcional,
+  marcadorDeFecha: TEXTOS_DEL_INTERPRETE.marcadorDeFecha,
+  registros: '{{count}} registro',
+} as const satisfies Record<keyof TextosDelInterprete, string>;
 
 /** Todo lo que este archivo aporta al inventario del locale. Ver `catalogo-de-claves.ts`. */
 export function clavesDelMarco(): readonly string[] {
-  return [...Object.values(FRASES_DEL_MARCO), MARCA_DE_OPCIONAL];
+  return [...Object.values(FRASES_DEL_MARCO), ...Object.values(FRASES_DEL_INTERPRETE)];
+}
+
+/**
+ * El saco que `<Pantalla>` de `@kamayuk/ui` recibe como `textos`, ya pasado por `t()`.
+ *
+ * Memorizado sobre `t`, por lo mismo que el del armazon: cambia de identidad cuando cambia el
+ * idioma, que es exactamente cuando el saco tiene que rehacerse.
+ */
+export function useTextosDelInterprete(): TextosDelInterprete {
+  const { t } = useTranslation();
+
+  return useMemo<TextosDelInterprete>(
+    () => ({
+      opcional: t(FRASES_DEL_INTERPRETE.opcional),
+      marcadorDeFecha: t(FRASES_DEL_INTERPRETE.marcadorDeFecha),
+      registros: (cuantos) => t(FRASES_DEL_INTERPRETE.registros, { count: cuantos }),
+    }),
+    [t],
+  );
 }
 
 /**

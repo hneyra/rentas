@@ -1,5 +1,4 @@
-import type { Coordenada } from '../pantallas/datos.ts';
-import { coordenada } from '../pantallas/datos.ts';
+import { coordenada, type Coordenada } from '@kamayuk/ui';
 import type { ClaveDeHoja } from '../pantallas/arbol.ts';
 import type { CorridaDelPredial, DeudaEnCoactiva, Paginado } from './lecturas.ts';
 import { RUTAS, pedirPagina, pedirUno } from './lecturas.ts';

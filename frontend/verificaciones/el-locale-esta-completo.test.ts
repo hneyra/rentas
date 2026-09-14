@@ -37,12 +37,13 @@ const LOCALE = join(RAIZ, 'src/i18n/locales/es.json');
 
 /** Las claves que el interprete no puede derivar del dato: las que estan escritas como `t('…')`. */
 const LITERALES = [
+  // Las tres que llevan una cuenta dentro: dos del marco (#133) y el conteo de filas del
+  // interprete (#153). Sus claves base llegan DERIVADAS de `textosDelMarco.ts` —como las 747 de
+  // las definiciones—; lo que no se puede derivar son sus formas plurales: una clave sola no
+  // expresa dos formas. Hasta #153 la de `registro` era un `t()` literal dentro del interprete.
   '{{count}} registro_one',
   '{{count}} registro_many',
   '{{count}} registro_other',
-  // Las dos del marco que llevan una cuenta dentro (#133). Sus claves base llegan DERIVADAS de
-  // `textosDelMarco.ts` —como las 747 de las definiciones—; lo que no se puede derivar son sus
-  // formas plurales, por lo mismo que las de `registro`: una clave sola no expresa dos formas.
   '{{count}} aviso sin leer_one',
   '{{count}} aviso sin leer_many',
   '{{count}} aviso sin leer_other',
@@ -56,7 +57,8 @@ const LITERALES = [
   'Preferencias',
   'Cerrar sesion',
   'Diez modulos y cuarenta submodulos. Catastro y Tesoreria son de otros sistemas.',
-  'dd/mm/aaaa',
+  // `dd/mm/aaaa` salio de aqui en #153: el interprete lo recibe en `textos` y entra DERIVADO de
+  // `FRASES_DEL_INTERPRETE`, como la marca de opcional.
   'no publicado',
   // Las cuatro del catalogo filtrado por permisos (#105). Las cazo `i18next-cli status` en cuanto
   // se escribieron, que es exactamente para lo que esta encadenado en `yarn verificar`.

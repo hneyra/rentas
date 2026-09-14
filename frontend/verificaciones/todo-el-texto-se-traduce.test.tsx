@@ -2,7 +2,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { TEXTOS_DEL_ARMAZON, type TextosDelArmazon } from '@kamayuk/shell';
-import { ProveedorDeTema, TEXTOS_DE_LA_UI } from '@kamayuk/ui';
+import { ProveedorDeTema, TEXTOS_DE_LA_UI, TEXTOS_DEL_INTERPRETE } from '@kamayuk/ui';
 import { cleanup, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -18,13 +18,14 @@ import {
 } from '../src/datos/seguridadMedida.ts';
 import i18n, { ABRE, CIERRA, IDIOMA_MARCADO, IDIOMA_POR_OMISION } from '../src/i18n/i18n.ts';
 import {
+  FRASES_DEL_INTERPRETE,
   FRASES_DEL_MARCO,
-  MARCA_DE_OPCIONAL,
+  useTextosDelInterprete,
   useTextosDelMarco,
 } from '../src/i18n/textosDelMarco.ts';
 import { pantallaDe } from '../src/pantallas/definiciones/index.ts';
 import type { ClaveDeHoja } from '../src/pantallas/arbol.ts';
-import { Pantalla } from '../src/pantallas/Pantalla.tsx';
+import { PantallaDeRentas as Pantalla } from '../src/pantallas/PantallaDeRentas.tsx';
 import { porQueNoHayDato } from '../src/porQueNoHayDato.ts';
 import { hojaDe } from '../src/pantallas/arbol.ts';
 
@@ -56,7 +57,8 @@ import { hojaDe } from '../src/pantallas/arbol.ts';
  *
  * **«(opcional)» salio de aqui en #133**, y es el unico que se ha ido: no era un separador del
  * artboard sino una palabra de `@kamayuk/ui` que llegaba al DOM sin pasar por `t()`. Lo que la
- * exencion hacia era taparlo. Hoy la pasa `CampoDelBloque` y sale marcada como cualquier otra.
+ * exencion hacia era taparlo. Hoy la pasa `PantallaDeRentas` —desde #153, en el saco `textos` del
+ * interprete— y sale marcada como cualquier otra.
  *
  * Los dos nombres son DATOS de una persona, no frases: traducir «J. Cardenas Vega» seria falso.
  * Salen del marco —la cuenta de la barra— y por eso solo hacen falta al montar la aplicacion.
@@ -358,19 +360,70 @@ describe('y el marco tampoco: las treinta y dos palabras del armazon (#133)', ()
 
   it('y las seis de `@kamayuk/ui` estan todas colocadas: ninguna se dibuja por omision', () => {
     // AC2. Tres de las seis viajan DENTRO del saco del armazon —la miga, la region de avisos y la
-    // lista de la paleta—, la marca de opcional la pasa `CampoDelBloque`, y las dos que envuelven
+    // lista de la paleta—, la marca de opcional va en el saco del interprete (#153), y las dos que envuelven
     // una fecha son de `Importe` y `FechaDeCalculo`, que este repositorio no monta. Esta prueba
     // caduca sola el dia que alguna se monte: entonces se pone roja y dice cual.
     expect(FRASES_DEL_MARCO.ruta).toBe(TEXTOS_DE_LA_UI.ruta);
     expect(FRASES_DEL_MARCO.avisos).toBe(TEXTOS_DE_LA_UI.avisos);
     expect(FRASES_DEL_MARCO.sugerenciasDeLaPaleta).toBe(TEXTOS_DE_LA_UI.sugerencias);
-    expect(MARCA_DE_OPCIONAL).toBe(TEXTOS_DE_LA_UI.opcional);
+    expect(FRASES_DEL_INTERPRETE.opcional).toBe(TEXTOS_DE_LA_UI.opcional);
     expect(
       loQueSeImportaDeLaUi().filter((p) => p === 'Importe' || p === 'FechaDeCalculo'),
       'Alguna pantalla monta «Importe» o «FechaDeCalculo», que dicen «al …» y «Cifras\n' +
         '  actualizadas al …» por su cuenta. Pasales `rotuloDeLaFecha` / `rotulo` por `t()`, y\n' +
         '  mete la frase en `textosDelMarco.ts` para que entre en el locale.',
     ).toEqual([]);
+  });
+
+  /**
+   * **Y las tres del INTERPRETE** (#153), que son la mitad que la subida a `@kamayuk/ui` saco de
+   * `t()`.
+   *
+   * Hasta #153 el interprete vivia aqui y llamaba a `t()` por su cuenta. Ahora las recibe en
+   * `textos`. La marca de opcional y el marcador de fecha SI salen en el recorrido de las cuarenta
+   * —hay campos opcionales y fechas sin elegir—, pero **el conteo no**: solo se escribe con filas,
+   * y ninguna pantalla montada suelta las trae. Por eso, como con el armazon, se comprueba ademas
+   * el inventario y que cada entrada pase por `t()`.
+   */
+  it('EL INVENTARIO del interprete: el saco trae las MISMAS llaves que publica la libreria', () => {
+    const { result } = renderHook(() => useTextosDelInterprete());
+    const faltan = Object.keys(TEXTOS_DEL_INTERPRETE).filter((c) => !(c in result.current));
+    const sobran = Object.keys(result.current).filter((c) => !(c in TEXTOS_DEL_INTERPRETE));
+    expect(
+      { faltan, sobran },
+      'El saco de textos del interprete dejo de cuadrar con el de «@kamayuk/ui».\n' +
+        '  Se arregla en `src/i18n/textosDelMarco.ts`.',
+    ).toEqual({ faltan: [], sobran: [] });
+  });
+
+  it('y NINGUNA de las tres del interprete llega sin pasar por `t()`', () => {
+    const { result } = renderHook(() => useTextosDelInterprete());
+    const dichas = {
+      opcional: result.current.opcional,
+      marcadorDeFecha: result.current.marcadorDeFecha,
+      registros: result.current.registros(2),
+    };
+    const escapadas = Object.entries(dichas)
+      .filter(([, dice]) => !dice.startsWith(ABRE))
+      .map(([clave, dice]) => `  «${clave}» dice «${dice}»`);
+    expect(escapadas, `Palabras del interprete sin pasar por «t()»:\n${escapadas.join('\n')}`).toEqual([]);
+  });
+
+  it('y en castellano dicen LO MISMO que la libreria: la subida no cambia lo que se lee', async () => {
+    await i18n.changeLanguage(IDIOMA_POR_OMISION);
+    try {
+      const { result } = renderHook(() => useTextosDelInterprete());
+      expect(result.current.opcional).toBe(TEXTOS_DEL_INTERPRETE.opcional);
+      expect(result.current.marcadorDeFecha).toBe(TEXTOS_DEL_INTERPRETE.marcadorDeFecha);
+      // El plural lo pone i18next y no el ternario de la libreria: tienen que coincidir en los dos.
+      for (const cuantos of [1, 2, 40]) {
+        expect(result.current.registros(cuantos), `con ${String(cuantos)}`).toBe(
+          TEXTOS_DEL_INTERPRETE.registros(cuantos),
+        );
+      }
+    } finally {
+      await i18n.changeLanguage(IDIOMA_MARCADO);
+    }
   });
 
   it('LA APLICACION ENTERA no ensena una sola cadena sin traducir, marco incluido', async () => {

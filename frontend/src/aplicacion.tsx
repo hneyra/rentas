@@ -8,7 +8,7 @@ import escudo from '../diseno/escudo-catacaos.png';
 import { MandoDeTema } from './preferencias/MandoDeTema.tsx';
 import { useCatalogoPermitido } from './datos/useCatalogoPermitido.ts';
 import { traducirCatalogo } from './catalogo.ts';
-import { Pantalla } from './pantallas/Pantalla.tsx';
+import { PantallaDeRentas } from './pantallas/PantallaDeRentas.tsx';
 import type { ClaveDeHoja } from './pantallas/arbol.ts';
 import { pantallaDe } from './pantallas/definiciones/index.ts';
 import { useDatosDeLaHoja } from './datos/useDatosDeLaHoja.ts';
@@ -24,7 +24,7 @@ import { useTextosDelMarco } from './i18n/textosDelMarco.ts';
  *
  * Aqui hay **la costura**: el catalogo de este sistema, la entidad, la cuenta y que hace cada
  * accion del pie. Nada mas. El marco lo dibuja `@kamayuk/shell` —que no sabe que existe Rentas— y
- * el cuerpo de cada pantalla lo dibuja el interprete desde su definicion.
+ * el cuerpo de cada pantalla lo dibuja el interprete de `@kamayuk/ui` desde su definicion (#153).
  *
  * Es la forma que ADR-0030 §4 pide, y se nota en el tamano de este archivo: **la aplicacion de un
  * sistema es una lista de decisiones, no una interfaz**. Cuando `catastro` se reconstruya, su
@@ -132,7 +132,7 @@ function CuerpoDeLaPantalla({ clave }: { readonly clave: ClaveDeHoja }) {
   // Un componente y no una funcion suelta: `useDatosDeLaHoja` es un gancho, y un gancho solo puede
   // llamarse desde un componente. Ademas esto es lo que hace que **solo se vuelva a pintar la
   // pantalla** cuando llega su respuesta, y no el armazon entero.
-  return <Pantalla definicion={pantallaDe(clave)} datos={useDatosDeLaHoja(clave)} />;
+  return <PantallaDeRentas definicion={pantallaDe(clave)} datos={useDatosDeLaHoja(clave)} />;
 }
 
 /**

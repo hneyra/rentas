@@ -5,7 +5,15 @@ import { formatearImporte } from '../../src/dominio/formato.ts';
 // tiene que poder romper es el consumidor.
 import { Importe, Insignia } from '@kamayuk/ui';
 import type { ClaveDeHoja } from '../../src/pantallas/arbol.ts';
-import type { Campo, Operacion, Pantalla, Tabla } from '../../src/pantallas/tipos.ts';
+// Los tipos de una pantalla son de `@kamayuk/ui` desde #153 (`kamayuk-lib`#27). Las barreras se
+// siguen comprobando desde aqui por lo mismo que las de `Importe`: quien las tiene que poder romper
+// es el consumidor, y la libreria tiene las suyas.
+import type {
+  DefinicionDeCampo as Campo,
+  DefinicionDePantalla as Pantalla,
+  DefinicionDeTabla as Tabla,
+} from '@kamayuk/ui';
+import type { Operacion } from '../../src/pantallas/tipos.ts';
 
 /**
  * Las barreras que pone el COMPILADOR, y la prueba de que muerden.

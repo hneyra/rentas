@@ -1,7 +1,7 @@
 /**
  * Los dos avisos del pie, **con las palabras del artboard**.
  *
- * El interprete trae unos neutros, porque esta destinado a `@kamayuk/ui` y alli no puede decir
+ * El interprete trae unos neutros, porque es de `@kamayuk/ui` (#153) y alli no puede decir
  * «padron» —es vocabulario de un contexto, y ADR-0030 §4 lo prohibe—. Los de V8 viven AQUI, que
  * es donde el vocabulario de Rentas si pertenece, y se los pasa quien monta la pantalla.
  *

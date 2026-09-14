@@ -17,6 +17,7 @@
   "{{count}} aviso sin leer_many": "{{count}} avisos sin leer",
   "{{count}} aviso sin leer_one": "{{count}} aviso sin leer",
   "{{count}} aviso sin leer_other": "{{count}} avisos sin leer",
+  "{{count}} registro": "{{count}} registro",
   "{{count}} registro_many": "{{count}} registros",
   "{{count}} registro_one": "{{count}} registro",
   "{{count}} registro_other": "{{count}} registros",

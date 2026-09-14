@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { ErrorDeLaApi } from '../api/cliente.ts';
 import type { ClaveDeHoja } from '../pantallas/arbol.ts';
 import { hojaDe } from '../pantallas/arbol.ts';
-import type { Ausencia, DatosDeLaPantalla } from '../pantallas/datos.ts';
+import type { Ausencia, DatosDeLaPantalla } from '@kamayuk/ui';
 import { porQueNoHayDato } from '../porQueNoHayDato.ts';
 import type { Reparto } from './conectores.ts';
 import { CONECTORES } from './conectores.ts';
