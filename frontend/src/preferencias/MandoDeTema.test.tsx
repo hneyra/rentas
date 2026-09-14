@@ -117,4 +117,5 @@ const ROTULOS: Readonly<Record<(typeof IDENTIDADES)[number], string>> = {
   institucional: 'Institucional',
   'alto-contraste': 'Alto contraste',
   sepia: 'Sepia',
+  clasico: 'Clásico',
 };

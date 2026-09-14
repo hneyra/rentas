@@ -69,7 +69,7 @@ const LITERALES = [
   'No se pudo llegar al emisor de identidad, asi que no se mando a nadie a identificarse.',
   'El emisor es {{emisor}}, y la peticion a {{url}} no llego a completarse: {{motivo}}.',
   'Si esto es un puesto de desarrollo, levante la plataforma; si no, avise a quien la administra. Despues vuelva a cargar la pagina.',
-  // Las once del mando de preferencias (#111). Los rotulos de las tres identidades y de los tres
+  // Las doce del mando de preferencias (#111). Los rotulos de las cuatro identidades y de los tres
   // modos se leen por variable —`t(ROTULO_DE_LA_IDENTIDAD[identidad])`—, asi que `i18next-cli`
   // no los ve: son de la misma familia que las 747 de las definiciones, y por eso estan aqui.
   'Se guarda en este navegador y solo aqui: no viaja al servidor ni cambia lo que ven las demas personas.',
@@ -80,6 +80,8 @@ const LITERALES = [
   'Institucional',
   'Alto contraste',
   'Sepia',
+  // La cuarta identidad, `clasico`, que publica `@kamayuk/ui` desde kamayuk-lib#56.
+  'Clásico',
   'Claro',
   'Oscuro',
   'El del sistema',

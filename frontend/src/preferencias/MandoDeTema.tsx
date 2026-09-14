@@ -29,11 +29,11 @@ import { useTranslation } from 'react-i18next';
  *
  * <h2>Los dos ejes se ofrecen SEPARADOS, porque son dos cosas distintas</h2>
  *
- *     Identidad visual   institucional | alto-contraste | sepia     <- de que servicio es esto
+ *     Identidad visual   institucional | alto-contraste | sepia | clasico   <- de que servicio es esto
  *     Apariencia         claro | oscuro | el del sistema            <- como lo quiere ver quien mira
  *
  * Una sola lista de cinco —«claro, oscuro, alto contraste, sepia claro, sepia oscuro»— obliga a
- * escribir seis entradas y a repensarlas cada vez que entre una identidad. Cruzados son tres por
+ * escribir seis entradas y a repensarlas cada vez que entre una identidad. Cruzados son cuatro por
  * tres, y el tercero del segundo eje —«el del sistema»— no es un tema: es **no elegir**, y por eso
  * vale `null` y quita el atributo en vez de ponerlo en claro.
  *
@@ -56,6 +56,7 @@ const ROTULO_DE_LA_IDENTIDAD: Readonly<Record<Identidad, string>> = {
   institucional: 'Institucional',
   'alto-contraste': 'Alto contraste',
   sepia: 'Sepia',
+  clasico: 'Clásico',
 };
 
 /** Como se lee cada modo. El tercero —no elegir— no esta aqui: no es un modo. */
