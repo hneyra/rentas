@@ -25,12 +25,12 @@ import {
 const TODAS: readonly Hoja[] = ARBOL.flatMap((modulo) => [...modulo.hojas]);
 
 describe('el cruce contra lo que el backend sirve', () => {
-  it('EL CENTINELA: hay cuarenta hojas y dieciocho operaciones servidas', () => {
+  it('EL CENTINELA: hay cuarenta hojas y veinte operaciones servidas', () => {
     // Sin esto, un arbol vacio o unas `YA_SERVIDAS` vacias dejarian todo lo de abajo pasando
     // sobre la nada — y la respuesta seria «ninguna pantalla tiene datos», que ademas parece
     // razonable.
     expect(TODAS).toHaveLength(40);
-    expect(YA_SERVIDAS).toHaveLength(18);
+    expect(YA_SERVIDAS).toHaveLength(20);
   });
 
   it('cruza por RUTA, no por verbo: dos servidas las declara el artboard como `BASE`', () => {
@@ -50,7 +50,7 @@ describe('el cruce contra lo que el backend sirve', () => {
     expect(utiles.every((o) => o.verbo !== 'PUT')).toBe(true);
   });
 
-  it('ocho hojas tienen alguna operacion util, y treinta y dos ninguna', () => {
+  it('catorce hojas tienen alguna operacion util, y veintiseis ninguna', () => {
     const con = TODAS.filter((hoja) => operacionesUtiles(hoja).length > 0);
     // `aut-cat` y `aut-panel` entran con #168, y las dos por la ruta que el ARTBOARD les
     // atribuye: `GET /licencias/ciiu` a la primera y `GET /licencias/funcionamiento` a la
@@ -60,16 +60,34 @@ describe('el cruce contra lo que el backend sirve', () => {
     // que decir cuando NO hay conector, asi que la discrepancia no llega a ninguna pantalla —
     // pero se anota aqui, que es donde se ve.
     expect(con.map((h) => h.clave).sort()).toEqual(
-      ['aut-cat', 'aut-panel', 'coa-cost', 'coa-exp', 'coa-panel', 'panel', 'predios', 'seg-acc', 'seg-panel', 'val-tip', 'valores'].sort(),
+      [
+        'aut-cat',
+        'aut-panel',
+        'coa-cost',
+        'coa-exp',
+        'coa-panel',
+        'ini-flujo',
+        'ini-panel',
+        'ini-parado',
+        'panel',
+        'predios',
+        'seg-acc',
+        'seg-panel',
+        'val-tip',
+        'valores',
+      ].sort(),
     );
-    expect(TODAS.length - con.length).toBe(29);
+    expect(TODAS.length - con.length).toBe(26);
   });
 });
 
 describe('los cuatro casos no se confunden', () => {
   it('sin ninguna servida: «sin conectar», en tono informativo', () => {
-    // `ini-panel` declara `GET /indicadores/recaudacion`, que no esta servida.
-    expect(porQueNoHayDato(hojaDe('ini-panel'))).toBe(NADA_SERVIDO);
+    // `fis-panel` es el ejemplo desde #167, que encendio las dos de indicadores y dejo servida
+    // a `ini-panel`. No vale cualquier hoja sin conector: hace falta una que no declare NINGUNA
+    // operacion servida —`ini-cierre`, por ejemplo, declara varias en `BASE` y por eso dice «sin
+    // verificar», que es el caso de la prueba de abajo y no el de esta.
+    expect(porQueNoHayDato(hojaDe('fis-panel'))).toBe(NADA_SERVIDO);
     expect(NADA_SERVIDO.tono).toBe('info');
   });
 

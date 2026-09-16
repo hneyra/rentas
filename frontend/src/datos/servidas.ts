@@ -1,10 +1,8 @@
 /**
  * Las operaciones que el backend YA sirve en el entorno donde corre la aplicacion.
  *
- * <h2>Catorce: dos de sesion (I-1), cuatro de seguridad (I-3), seis del padron (I-4) y dos de
- * licencias (#168)</h2>
- * <h2>Dieciseis: dos de sesion (I-1), cuatro de seguridad (I-3), seis del padron (I-4) y cuatro
- * de la cobranza coactiva (#170)</h2>
+ * <h2>Veinte: dos de sesion (I-1), cuatro de seguridad (I-3), seis del padron (I-4), dos de
+ * licencias (#168), cuatro de la cobranza coactiva (#170) y dos de indicadores (#167)</h2>
  *
  * La integracion no es un salto. El backend publica 181 operaciones y el proxy simula
  * dieciocho: encenderlas todas a la vez seria cambiar 181 respuestas en una sola tarde sin poder
@@ -67,16 +65,12 @@ export interface OperacionServida {
  * El tipo es `readonly OperacionServida[]` y no una tupla: lo que cambia el dia que se encienda
  * la siguiente es esta lista, y nada mas.
  *
- * <b>Son catorce, y llegaron en cuatro tandas</b>: las dos de sesion que abrieron el camino
+ * <b>Son veinte, y llegaron en cinco tandas</b>: las dos de sesion que abrieron el camino
  * (I-1), las cuatro con que se compone la navegacion (I-3), las seis del padron de contribuyentes
- * (I-4) y las dos de autorizaciones y licencias (#168). Cada tanda dejo escrito lo que vio al
- * encender lo suyo, y las cuatro notas siguen aqui porque lo que se vio es lo que justifica que la
- * ruta este en la lista.
- * <b>Son dieciseis, y llegaron en cuatro tandas</b>: las dos de sesion que abrieron el camino
- * (I-1), las cuatro con que se compone la navegacion (I-3), las seis del padron de
- * contribuyentes (I-4) y las cuatro de la cobranza coactiva (#170). Cada tanda dejo escrito lo
- * que vio al encender lo suyo, y las cuatro notas siguen aqui porque lo que se vio es lo que
- * justifica que la ruta este en la lista.
+ * (I-4), las dos de autorizaciones y licencias (#168), las cuatro de la cobranza coactiva (#170) y
+ * las dos de indicadores con que se conecta el modulo Inicio (#167). Cada tanda dejo escrito lo que
+ * vio al encender lo suyo, y las cinco notas siguen aqui porque lo que se vio es lo que justifica
+ * que la ruta este en la lista.
  *
  * <h2>Las cuatro que enciende I-3, en el orden en que se encendieron</h2>
  *
@@ -227,6 +221,35 @@ export interface OperacionServida {
  * /licencias/funcionamiento`: los ocho que admite son otros. Quien los admitiria es `POST
  * /licencias/funcionamiento/reportes/padron`, y es una <b>escritura</b> por el verbo — esta
  * interfaz hace una sola, y no es esta.
+ * <h2>Y las DOS de indicadores, que enciende #167</h2>
+ *
+ * Son las dos operaciones del modulo <b>Inicio</b>, y lo que se midio al encenderlas no fue una
+ * respuesta de la instalacion sino <b>el contrato generado de los controladores</b>
+ * —`docs/50-api/formas-de-la-api.json`, que `FormasDeLaApiTest` produce del tipo de retorno de
+ * cada uno—. Es lo que decide si una pantalla puede pintarse, y se leyo campo a campo:
+ *
+ * <ol>
+ *   <li><b>`GET /indicadores/recaudacion`</b> publica `ejercicio`, `fechaCalculo`, `calculadoEn`,
+ *       <b>`cargado`</b> —`{importe, actualizadoA}`: lo emitido del ejercicio, como campo—, `kpis`
+ *       —`{label, value, note, importe}`— y `paneles` —`{title, note, rows}` con
+ *       `rows[].{label, sub, value, pct, avanceConocido, importe, cargado, pendiente}`—. Las tres
+ *       ultimas de la fila son las que hacen que «Cuadre por tributo» salga <b>entera</b>: emitido,
+ *       recaudado y saldo son tres `ImporteConFecha` distintos, y no hay que restar ninguno.
+ *       <b>Admite `?ejercicio`, y es opcional</b> (`parametros-de-la-api.json`): sin el contesta
+ *       igual, asi que se pide sin parametros y la respuesta dice de que ejercicio es.</li>
+ *   <li><b>`GET /indicadores/trabajo-parado`</b> publica `ejercicio`, `fechaCalculo`,
+ *       `calculadoEn` y `frentes` —`{frente, modulo, queEstaParado, porQueCuestaDinero, cuantos,
+ *       importe}`—. Cinco de esos seis son las cinco columnas de «Frentes abiertos», columna a
+ *       columna; el sexto, `frente`, es el nombre del enumerado y esta para enrutar. Tambien
+ *       admite `?ejercicio` opcional.</li>
+ * </ol>
+ *
+ * <b>Lo que NO se midio, y hay que decirlo</b>: ninguna de las dos se pidio contra la instalacion.
+ * Las once de I-1/I-3/I-4 se encendieron con su `curl` delante —el 200, su cuerpo, y los campos
+ * nulos que obligaron a cambiar el tipo—, y aqui la medida es el contrato. La diferencia importa
+ * en un sitio concreto: `importe`, `cargado` y `pendiente` estan declarados <b>anulables</b>
+ * porque el controlador los declara `@Nullable`, y el conector los dibuja como «sin cifrar» en vez
+ * de como «0.00» sin haber visto todavia una respuesta con un nulo dentro.
  */
 export const YA_SERVIDAS: readonly OperacionServida[] = [
   { metodo: 'GET', ruta: '/seguridad/sesion' },
@@ -247,6 +270,8 @@ export const YA_SERVIDAS: readonly OperacionServida[] = [
   { metodo: 'GET', ruta: '/coactiva/expedientes/{numero}/proceso' },
   { metodo: 'GET', ruta: '/coactiva/liquidaciones-costas' },
   { metodo: 'GET', ruta: '/coactiva/prescripcion' },
+  { metodo: 'GET', ruta: '/indicadores/recaudacion' },
+  { metodo: 'GET', ruta: '/indicadores/trabajo-parado' },
 ];
 
 /** `/rentas/vehiculos/{placa}` → `^/rentas/vehiculos/[^/]+$`. */

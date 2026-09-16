@@ -7,6 +7,7 @@ import { RUTAS, pedirUno } from './lecturas.ts';
 // tres ramas editan en la misma linea.
 import { CONECTORES_DE_LICENCIAS } from './conectores/licencias.ts';
 import { CONECTORES_DE_COACTIVA } from './conectores/coactiva.ts';
+import { CONECTORES_DE_INICIO } from './conectores/inicio.ts';
 
 /**
  * **Que pantalla pide que, y que de lo que llega dibuja cada campo** (#97).
@@ -114,6 +115,7 @@ export const CONECTORES: Readonly<Partial<Record<ClaveDeHoja, Conector>>> = {
   // Una linea por modulo, y el modulo entero en su archivo: cuatro se conectan a la vez y este
   // registro es el unico que los cuatro tocan. Ver `conectores/coactiva.ts` (#170).
   ...CONECTORES_DE_COACTIVA,
+  ...CONECTORES_DE_INICIO,
 };
 
 export { NO_PUBLICADO };
