@@ -210,7 +210,19 @@ export const ARBOL = [
       {
         clave: 'fis-prog',
         rotulo: 'Programas y cruces',
+        // **Le faltaba `GET /fiscalizacion/programas`, y sin ella las otras dos no se pueden
+        // llamar NUNCA** (#179). Las dos que declaraba llevan `{id}` en la ruta, y ese `{id}` es
+        // el identificador interno del programa —`ProgramaResource.id`, «lo asigna la base»—, no
+        // el «Nº de programa» que esta pantalla teclea, que es `codigo`. La unica operacion que
+        // convierte lo uno en lo otro es esta, y ademas es la que admite `?nDePrograma=`. Sin
+        // ella, pedir la muestra exige inventarse un numero: con uno que no exista el backend
+        // contesta **404** —«No existe el programa de fiscalizacion {id}»—, que no es lo mismo
+        // que la pagina vacia con que contesta un programa sin muestra sorteada.
+        //
+        // El artboard se corrige con el arbol y no despues: `pantallas-del-artboard.test.ts`
+        // compara los dos, asi que tocar uno solo sale rojo. Es lo que hizo #169 con `con-panel`.
         operaciones: [
+          { verbo: 'GET', ruta: '/fiscalizacion/programas', nota: 'ProgramasController' },
           {
             verbo: 'GET',
             ruta: '/fiscalizacion/programas/{id}/muestra',

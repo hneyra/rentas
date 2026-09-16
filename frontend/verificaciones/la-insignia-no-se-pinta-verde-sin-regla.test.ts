@@ -193,6 +193,24 @@ const CONECTADAS: readonly {
       'la ausencia de uno. Con el verde por omision esa raya se pintaba de CONFORME, que es el ' +
       'defecto de #175 en su forma mas pura: una insignia verde sobre una celda vacia',
   },
+  // Las dos de Fiscalizacion entran con #179, DESPUES de escribirse esta guarda — la tercera vez
+  // que pasa, y la tercera que sale roja sola en vez de heredar el defecto en silencio.
+  {
+    hoja: 'fis-prog',
+    bloque: 0,
+    leLlega:
+      'derivado de `contenido[].visitado`: «Inspeccionado» o «Programado». Es un booleano de la ' +
+      'muestra, no un estado que la administracion conceda — «Programado» no dice que algo este ' +
+      'bien, dice que todavia no se ha ido a mirar',
+  },
+  {
+    hoja: 'fis-actas',
+    bloque: 0,
+    leLlega:
+      '`hallazgo` — CONFORME, OMISO, SUBVALUADOR, USO_DISTINTO, NO_UBICADO, o la raya cuando el ' +
+      'acta no lo trae. Solo CONFORME es un juicio favorable; los otros cuatro son lo que el ' +
+      'fiscalizador anoto en campo, y la raya no es ninguna de las dos cosas',
+  },
 ];
 
 /* ── Y el contrato, que es lo que dira cuando el backend publique el estado ─────────────── */

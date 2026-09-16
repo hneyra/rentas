@@ -6,12 +6,21 @@ import { CONECTORES_DE_LICENCIAS } from './conectores/licencias.ts';
 import { CONECTORES_DE_COACTIVA } from './conectores/coactiva.ts';
 import { CONECTORES_DE_INICIO } from './conectores/inicio.ts';
 import { CONECTORES_DE_CONSULTAS } from './conectores/consultas.ts';
+import { CONECTORES_DE_FISCALIZACION } from './conectores/fiscalizacion.ts';
 import { CONECTORES_DE_SEGURIDAD } from './conectores/seguridad.ts';
 
 /**
  * **Que pantalla pide que, y que de lo que llega dibuja cada campo** (#97, #169).
  *
  * <h2>Eran DOS de siete, y son CUATRO: las dos de Consultas entraron en #169</h2>
+ *
+ * Y con #179 son **quince conectores**: las tres hojas de Fiscalizacion —`fis-prog`, `fis-actas`
+ * y `fis-res`— entran juntas, las tres **de tabla**. Su conector vive aparte, en
+ * `conectores/fiscalizacion.ts`, y una de ellas obligo a corregir la declaracion del arbol otra
+ * vez: `fis-prog` declaraba dos operaciones con `{id}` en la ruta y ninguna que publicara un `id`.
+ * Ahi tambien se estrena la segunda razon de hueco que este archivo conocia: no que la operacion
+ * no publique el campo, sino que lo publique **vacio** —D-02a—, que no es lo mismo y no se dice
+ * con la misma palabra.
  *
  * `con-panel` y `con-doc` no estaban en la lista de abajo por un motivo que resulto ser falso:
  * **la hoja declaraba la operacion equivocada**. `con-panel` decia
@@ -215,6 +224,7 @@ export const CONECTORES: Readonly<Partial<Record<ClaveDeHoja, Conector>>> = {
   ...CONECTORES_DE_COACTIVA,
   ...CONECTORES_DE_INICIO,
   ...CONECTORES_DE_CONSULTAS,
+  ...CONECTORES_DE_FISCALIZACION,
   ...CONECTORES_DE_SEGURIDAD,
 };
 

@@ -1,9 +1,10 @@
 /**
  * Las operaciones que el backend YA sirve en el entorno donde corre la aplicacion.
  *
- * <h2>Veinticuatro: dos de sesion (I-1), cuatro de seguridad (I-3), seis del padron (I-4), dos de
+ * <h2>Veintiocho: dos de sesion (I-1), cuatro de seguridad (I-3), seis del padron (I-4), dos de
  * licencias (#168), cuatro de la cobranza coactiva (#170), dos de indicadores (#167), tres de
- * la ventanilla de Consultas (#169) y la bitacora de auditoria (#181)</h2>
+ * la ventanilla de Consultas (#169), la bitacora de auditoria (#181) y cuatro de
+ * Fiscalizacion (#179)</h2>
  *
  * La integracion no es un salto. El backend publica 181 operaciones y el proxy simula
  * dieciocho: encenderlas todas a la vez seria cambiar 181 respuestas en una sola tarde sin poder
@@ -66,13 +67,13 @@ export interface OperacionServida {
  * El tipo es `readonly OperacionServida[]` y no una tupla: lo que cambia el dia que se encienda
  * la siguiente es esta lista, y nada mas.
  *
- * <b>Son veinticuatro, y llegaron en siete tandas</b>: las dos de sesion que abrieron el camino
+ * <b>Son veintiocho, y llegaron en ocho tandas</b>: las dos de sesion que abrieron el camino
  * (I-1), las cuatro con que se compone la navegacion (I-3), las seis del padron de contribuyentes
  * (I-4), las dos de autorizaciones y licencias (#168), las cuatro de la cobranza coactiva (#170),
  * las dos de indicadores con que se conecta el modulo Inicio (#167), las tres de la ventanilla de
- * Consultas (#169) y la bitacora de auditoria (#181). Cada tanda dejo escrito lo que vio al
- * encender lo suyo, y las siete notas siguen aqui porque lo que se vio es lo que justifica que la
- * ruta este en la lista.
+ * Consultas (#169), la bitacora de auditoria (#181) y las cuatro de Fiscalizacion (#179). Cada
+ * tanda dejo escrito lo que vio al encender lo suyo, y las ocho notas siguen aqui porque lo que se
+ * vio es lo que justifica que la ruta este en la lista.
  *
  * <h2>Las cuatro que enciende I-3, en el orden en que se encendieron</h2>
  *
@@ -290,7 +291,7 @@ export interface OperacionServida {
  *
  * <b>Lo que la hace distinta de las veintitres de arriba, y es el motivo de #181</b>:
  * `parametros-de-la-api.json` la declara con <b>`ejercicio` entre los obligatorios</b> —la unica
- * de las veinticuatro que tiene un obligatorio fuera de la ruta— y el controlador lo exige en la
+ * de las veintiocho que tiene un obligatorio fuera de la ruta— y el controlador lo exige en la
  * firma (`@RequestParam("ejercicio") int`), asi que sin el la peticion <b>ni siquiera llega al
  * metodo</b>: Spring contesta 422 «Falta el parametro obligatorio 'ejercicio'». Y no es un filtro
  * que se pueda omitir por comodidad — `ConsultaDeAuditoria` lo dice en su propio javadoc: la tabla
@@ -316,6 +317,46 @@ export interface OperacionServida {
  * esta previsto en los tipos (`simulacion` es anulable) pero <b>no comprobado contra un
  * servidor</b>. Si alguna contesta algo que no cuadre, la pantalla lo dira como averia y no como
  * dato: los cuatro estados de `useDatosDeLaHoja` estan puestos para eso.
+ *
+ * <h2>Las CUATRO de Fiscalizacion (#179), y la que se decidio NO encender</h2>
+ *
+ * Lo que se midio aqui es el contrato generado de los controladores —`formas-de-la-api.json` y
+ * `parametros-de-la-api.json`— <b>y el codigo de los seis controladores</b>, que es donde estaba
+ * lo que el contrato no puede decir: que casi todos los importes de este modulo <b>llegan nulos
+ * hasta D-02a</b>. Ninguna de las cuatro exige parametro de consulta; las dos que llevan algo
+ * obligatorio lo llevan <b>en la ruta</b>.
+ *
+ * <ol>
+ *   <li><b>`GET /fiscalizacion/programas`</b> — la relacion de programas. <b>El artboard no se la
+ *       atribuia a ninguna hoja</b>, y sin ella las otras dos de `fis-prog` no se podian llamar
+ *       nunca: las dos llevan `{id}`, que es el identificador <b>interno</b> del programa y no el
+ *       «Nº de programa» que la pantalla teclea. Corregido en el artboard y en `arbol.ts`, que es
+ *       la unica forma de corregirlo (ver `pantallas/arbol.ts`).</li>
+ *   <li><b>`GET /fiscalizacion/programas/{id}/muestra`</b> — los predios sorteados de ese
+ *       programa. Un `{id}` que no existe da <b>404</b>; un programa sin muestra sorteada da
+ *       <b>200 con pagina vacia</b>, y la pantalla tiene que decir eso distinto de una averia.</li>
+ *   <li><b>`GET /fiscalizacion/actas`</b> — la relacion de actas de inspeccion. Publica el lado
+ *       <b>hallado</b> y no el declarado, que es lo que decide cuantas celdas de su tabla pueden
+ *       llenarse (ver `conectores/fiscalizacion.ts`).</li>
+ *   <li><b>`GET /fiscalizacion/resoluciones/{numero}`</b> — la resolucion de determinacion. El
+ *       numero va en la RUTA y <b>no existe ninguna operacion que publique la relacion</b>, asi
+ *       que la hoja exige sujeto: `#/fis-res/RDF-2026-000001`. Es el mecanismo que #169 dejo
+ *       instalado, y esta es la segunda vez que hace falta.</li>
+ * </ol>
+ *
+ * <b>Y la que NO se enciende, con su motivo</b>: <b>`GET /fiscalizacion/omisos`</b>, que `fis-prog`
+ * si declara. Publica la <b>deteccion</b> —los 3 418 predios que el cruce senala— y la tabla de esa
+ * hoja se titula «Muestra del programa», que son los 96 sorteados; pintar una poblacion bajo el
+ * rotulo de la otra seria un conteo falso con formato de bueno. Ademas sus cuatro importes
+ * —`valorCatastralS`, `valorDeclaradoS`, `diferenciaS` e `impuestoOmitidoS`— salen <b>nulos hasta
+ * D-02a</b>, y `diferenciaS` no llega ni a existir en el dominio: el resource lo pasa `null` a
+ * mano.
+ *
+ * <b>Las tres escrituras del modulo tampoco</b>: `POST /fiscalizacion/programas/{id}/muestra`
+ * —«Regenerar muestra», que es el boton de la tabla—, `POST /fiscalizacion/liquidaciones` y
+ * `PATCH /fiscalizacion/liquidaciones/{numero}/estados`. Esta interfaz hace UNA escritura y no es
+ * ninguna de esas: sortear una muestra o liquidar la deuda de alguien para pintar una pantalla es
+ * el modo de fallo que esta lista existe para no tener.
  */
 export const YA_SERVIDAS: readonly OperacionServida[] = [
   { metodo: 'GET', ruta: '/seguridad/sesion' },
@@ -342,6 +383,10 @@ export const YA_SERVIDAS: readonly OperacionServida[] = [
   { metodo: 'GET', ruta: '/consultas/deudas-con-beneficio' },
   { metodo: 'GET', ruta: '/consultas/constancias/no-adeudo' },
   { metodo: 'GET', ruta: '/seguridad/auditoria' },
+  { metodo: 'GET', ruta: '/fiscalizacion/programas' },
+  { metodo: 'GET', ruta: '/fiscalizacion/programas/{id}/muestra' },
+  { metodo: 'GET', ruta: '/fiscalizacion/actas' },
+  { metodo: 'GET', ruta: '/fiscalizacion/resoluciones/{numero}' },
 ];
 
 /** `/rentas/vehiculos/{placa}` → `^/rentas/vehiculos/[^/]+$`. */

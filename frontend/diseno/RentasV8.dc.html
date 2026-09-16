@@ -479,6 +479,7 @@ const ARBOL = [
         ['BASE', '/fiscalizacion/vehicular', 'ActaVehicularController']],
         [['DataTable', 'Actas por estado, con filtro por programa']]],
       ['fis-prog', 'Programas y cruces', [
+        ['GET', '/fiscalizacion/programas', 'ProgramasController'],
         ['GET', '/fiscalizacion/programas/{id}/muestra', 'MuestraController'],
         ['POST', '/fiscalizacion/programas/{id}/muestra', 'Genera la muestra'],
         ['GET', '/fiscalizacion/omisos', 'OmisosController']],

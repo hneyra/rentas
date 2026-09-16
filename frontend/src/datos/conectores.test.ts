@@ -5,6 +5,11 @@ import type { ClaveDeHoja } from '../pantallas/arbol.ts';
 import { coordenada } from '@kamayuk/ui';
 import { CONECTORES, NO_PUBLICADO } from './conectores.ts';
 import { CONSTANCIA_NEGADA, FICHA, SIN_CAMPANIA } from './conectores/consultasDeMuestra.ts';
+import {
+  ACTA_CON_USO,
+  MUESTRA,
+  RESOLUCION_SIN_CIFRAS,
+} from './conectores/fiscalizacionDeMuestra.ts';
 import type {
   CorridaDelPredial,
   DeudaEnCoactiva,
@@ -237,6 +242,11 @@ const MUESTRAS: Readonly<Partial<Record<ClaveDeHoja, unknown>>> = {
   'con-panel': [FICHA, SIN_CAMPANIA],
   'con-doc': CONSTANCIA_NEGADA,
   'seg-aud': BITACORA,
+  // Las tres de Fiscalizacion (#179). La de `fis-prog` es la **segunda** respuesta —la muestra—,
+  // porque es la que reparte: la relacion de programas solo aporta el `{id}` con que se pide.
+  'fis-prog': MUESTRA,
+  'fis-actas': ACTA_CON_USO,
+  'fis-res': RESOLUCION_SIN_CIFRAS,
 };
 
 /** Los campos de solo lectura de una pantalla, por su coordenada. */
@@ -247,7 +257,7 @@ function soloLecturaDe(clave: ClaveDeHoja): readonly string[] {
 }
 
 describe('los conectores', () => {
-  it('EL CENTINELA: estan los doce que estan, y no cero ni cuarenta', () => {
+  it('EL CENTINELA: estan los quince que estan, y no cero ni cuarenta', () => {
     // Cero dejaria todo lo de abajo sin sujeto. Cuarenta significaria que alguien conecto
     // pantallas cuyas operaciones no publican lo que ensenan, que es lo que este archivo evita.
     // La lista se escribe a mano y crece de una en una: conectar una pantalla es una decision, y
@@ -257,10 +267,16 @@ describe('los conectores', () => {
     // contribuyente en la ruta no piden nada, y la pantalla lo dice en vez de pedir el padron.
     // `seg-aud` llega con #181, y es la primera que EXIGE EJERCICIO: su obligatorio no va en la
     // ruta y sale de la sesion, que es la tercera forma. Ver `conectores/seguridad.ts`.
+    //
+    // Las TRES de Fiscalizacion llegan con #179, y son las primeras **de tabla en bloque**: dos de
+    // ellas no llenan ni un `valores`, porque no tienen un solo campo de solo lectura. `fis-res` es
+    // la segunda hoja que exige sujeto, y ahi no habia alternativa: no existe ninguna operacion
+    // que publique la relacion de resoluciones, asi que no hay «la primera» que tomar.
     expect(Object.keys(CONECTORES).sort()).toEqual(
       [
         'aut-cat', 'aut-tram', 'coa-cost', 'coa-exp', 'coa-panel',
         'con-doc', 'con-panel',
+        'fis-actas', 'fis-prog', 'fis-res',
         'ini-flujo', 'ini-panel', 'ini-parado', 'panel',
         'seg-aud',
       ].sort(),
