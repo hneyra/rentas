@@ -100,7 +100,7 @@ describe('AC4 — la raiz de la API es UNA, escrita en tres sitios que tienen qu
 });
 
 describe('AC7 — lo que se declara servido tiene que publicarlo el backend', () => {
-  it('las doce declaradas: dos de I-1, cuatro de I-3 y seis de I-4', () => {
+  it('las catorce declaradas: dos de I-1, cuatro de I-3, seis de I-4 y dos de #168', () => {
     // La lista escrita a mano es a proposito. Derivarla de `YA_SERVIDAS` la haria pasar diga lo
     // que diga: encender una ruta es una decision, y una decision se revisa leyendo su diff. La
     // lista crece de una en una porque encenderlas todas a la vez seria cambiar 181 respuestas
@@ -119,13 +119,18 @@ describe('AC7 — lo que se declara servido tiene que publicarlo el backend', ()
       'GET /rentas/predial/corridas/ultima',
       'GET /rentas/predial/corridas/{corridaId}/observados',
       'GET /rentas/beneficios',
+      'GET /licencias/ciiu',
+      'GET /licencias/funcionamiento',
     ]);
   });
 
-  it('y la escritura sigue siendo UNA: las seis de I-4 son todas lecturas', () => {
+  it('y la escritura sigue siendo UNA: las seis de I-4 y las dos de #168 son lecturas', () => {
     // Las escrituras cambian datos y quedan auditadas, asi que encender una no es como
     // encender una lectura: si algun dia son cinco, esta cifra lo dice en la revision. I-4
-    // enciende seis rutas y ninguna escribe — el expediente todavia no guarda nada.
+    // enciende seis rutas y ninguna escribe — el expediente todavia no guarda nada. Y #168
+    // enciende dos mas que tampoco: el padron por el que `aut-tram` filtraria de verdad es
+    // `POST /licencias/funcionamiento/reportes/padron`, y quedarse fuera por el verbo es
+    // justo lo que esta cifra vigila.
     expect(YA_SERVIDAS.filter((o) => o.metodo !== 'GET').map((o) => o.ruta)).toEqual([
       '/seguridad/sesion/ejercicio',
     ]);

@@ -100,8 +100,9 @@ export function sembrarElCatalogo(): void {
   console.warn(
     'rentas-web: EL CATALOGO ESTA SEMBRADO, no pedido (VITE_KAMAYUK_SIN_PLATAFORMA=true).\n' +
       'Los doce modulos, los 134 accesos y la matriz de permisos salen de la captura de\n' +
-      '`seguridadMedida.ts`, y no se fue a Keycloak. Las dos pantallas que piden datos —`panel`\n' +
-      'y `coa-panel`— van a fallar, que es la verdad cuando no hay backend.\n' +
+      '`seguridadMedida.ts`, y no se fue a Keycloak. Las pantallas que piden datos —las que\n' +
+      'tienen conector en `datos/conectores.ts`— van a fallar, que es la verdad cuando no hay\n' +
+      'backend.\n' +
       'Para trabajar contra la plataforma levantada: `yarn dev:con-plataforma`.',
   );
 }

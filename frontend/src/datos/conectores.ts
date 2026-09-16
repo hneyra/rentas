@@ -2,6 +2,10 @@ import { coordenada, type Coordenada } from '@kamayuk/ui';
 import type { ClaveDeHoja } from '../pantallas/arbol.ts';
 import type { CorridaDelPredial, DeudaEnCoactiva, Paginado } from './lecturas.ts';
 import { RUTAS, pedirPagina, pedirUno } from './lecturas.ts';
+// Los conectores de cada modulo viven en su archivo, y aqui solo se montan (#168). Aparte porque
+// varios modulos se conectan a la vez: un registro con el codigo de todos dentro es un archivo que
+// tres ramas editan en la misma linea.
+import { CONECTORES_DE_LICENCIAS } from './conectores/licencias.ts';
 
 /**
  * **Que pantalla pide que, y que de lo que llega dibuja cada campo** (#97).
@@ -22,6 +26,12 @@ import { RUTAS, pedirPagina, pedirUno } from './lecturas.ts';
  *     planos**: no distingue propios de heredados, que es justo lo que la pantalla pregunta.
  *
  * Quedan dos, y se hacen enteras y bien. Las otras cinco lo dicen — ver `porQueNoHayDato.ts`.
+ *
+ * <b>Ese «dos» es el de #97 y no la cuenta de hoy</b>: se deja escrito porque es la medida que
+ * justifica la regla de mas abajo, y reescribirlo con el numero de esta semana la dejaria sin
+ * sujeto. Los conectores que llegan despues viven en `conectores/<modulo>.ts` y se montan aqui de
+ * una linea; cada archivo trae su propia medida de que publica su operacion y que no. El centinela
+ * de `conectores.test.ts` es el que dice cuantos hay.
  *
  * <h2>Lo que NO se hace, y es la regla que gobierna este archivo</h2>
  *
@@ -118,6 +128,7 @@ const COA_PANEL: Conector = {
 export const CONECTORES: Readonly<Partial<Record<ClaveDeHoja, Conector>>> = {
   panel: PANEL,
   'coa-panel': COA_PANEL,
+  ...CONECTORES_DE_LICENCIAS,
 };
 
 export { NO_PUBLICADO };
