@@ -824,7 +824,24 @@ export interface TrabajoParado {
   readonly frentes: readonly FrenteParado[];
 }
 
-/** Un movimiento de la bitacora, de `GET /seguridad/auditoria`. */
+/**
+ * Un movimiento de la bitacora, de `GET /seguridad/auditoria`.
+ *
+ * **Son los DOCE campos que el contrato declara, y cuatro de ellos no los lee nadie** (#181). Se
+ * declaran igual, por lo mismo que I-4 anadio `sector`, `simulacion` y `conjunto` a la corrida:
+ * un campo declarado es un campo que el proveedor no puede retirar sin poner rojo este build. Y
+ * aqui ademas se lee de un vistazo lo que la pantalla NO puede sacar de aqui — ver
+ * `conectores/seguridad.ts`, que decide columna por columna.
+ *
+ * **`fecha` es un `Instant` y no una fecha ISO sin hora**, que es la diferencia que decide como se
+ * escribe la columna «Fecha y hora»: llega como `2026-08-13T14:41:12Z`, o sea en **UTC**, y
+ * `formatearFecha` de `dominio/formato.ts` no lo acepta a proposito. El conector lo explica.
+ *
+ * **`operacion` es una palabra de un vocabulario cerrado** —`ALTA`, `MODIFICACION`, `BAJA`,
+ * `ANULACION`, `REVERSION`, `PERMISO`, `ACCESO`, que son los valores del `CHECK` de
+ * `auditoria.operacion`— y no una frase. `ELIMINACION` no existe: la aplicacion no borra
+ * (RNF-051, regla 4).
+ */
 export interface MovimientoDeLaBitacora {
   readonly id: number;
   readonly ejercicio: number;
@@ -832,8 +849,13 @@ export interface MovimientoDeLaBitacora {
   readonly clave: string;
   readonly operacion: string;
   readonly usuario: string;
+  readonly origenEquipo: string | null;
+  readonly origenIp: string | null;
+  /** Instante en **UTC**, `2026-08-13T14:41:12Z`. No es una fecha ISO sin hora. */
   readonly fecha: string;
   readonly observacion: string;
+  readonly datosAnteriores: string | null;
+  readonly datosNuevos: string | null;
 }
 
 // ── La sesion ──────────────────────────────────────────────────────────────────────
@@ -1067,15 +1089,30 @@ export const RUTAS = {
   recaudacion: '/indicadores/recaudacion',
   trabajoParado: '/indicadores/trabajo-parado',
   /**
-   * La bitacora de UN ejercicio (#26).
+   * La bitacora de UN ejercicio (#26, #181).
    *
    * Es la unica de las tres que lo declara en la firma —`@RequestParam("ejercicio") int`—, asi
    * que sin el la peticion no llega al metodo: Spring contesta 422 «Falta el parametro
    * obligatorio 'ejercicio'». El ejercicio es el de la barra global, que es el mismo con el que
    * se piden las señas del conjunto sellado.
+   *
+   * <b>Recibe un `number` y no un `string` desde #181</b>, y no es cosmetico: el ejercicio sale
+   * de `SesionDeLaVentanilla.ejercicioDeTrabajo`, que es `number | null`. Con la firma de texto,
+   * un `String(sesion.ejercicioDeTrabajo)` sobre el nulo daria la cadena `"null"` y saldria a la
+   * red como `?ejercicio=null` — un 422 en vez de un rojo del compilador. Con esta, el nulo no
+   * compila y quien decide que hacer con el es `useDatosDeLaHoja`, que no pide nada y lo dice.
+   *
+   * <b>`&tamano=20` escrito</b>, como en `ciiu` y por lo mismo: la bitacora del artboard lleva
+   * <b>84 182</b> movimientos, asi que la tabla es una ventana y el numero que decide cuantos
+   * viajan tiene que estar a la vista de quien lea esta linea. El parametro esta entre los nueve
+   * opcionales que `parametros-de-la-api.json` publica para esta operacion.
+   *
+   * Los otros ocho —`usuario`, `tabla`, `operacion`, `desde`, `hasta`, `ordenarPor`, `pagina` y
+   * `direccion`— <b>no se mandan</b>: son los mandos que la pantalla dibuja, y hoy no hay por
+   * donde entrarlos (#172).
    */
-  bitacoraDe: (ejercicio: string) =>
-    `/seguridad/auditoria?ejercicio=${encodeURIComponent(ejercicio)}`,
+  bitacoraDe: (ejercicio: number) =>
+    `/seguridad/auditoria?ejercicio=${encodeURIComponent(String(ejercicio))}&tamano=20`,
   arbitrios: '/rentas/arbitrios',
   /**
    * El catalogo CIIU, **una ventana y no la lista entera** (#168).

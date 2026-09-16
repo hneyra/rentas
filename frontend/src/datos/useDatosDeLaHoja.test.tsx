@@ -23,10 +23,15 @@ import { useDatosDeLaHoja } from './useDatosDeLaHoja.ts';
 function arnes() {
   // Un cliente por prueba: compartido, la respuesta de una se quedaria en la cache de la
   // siguiente y el estado «cargando» no se veria nunca.
+  //
+  // Devuelve tambien el cliente —y no solo el envoltorio— desde #181: hay una prueba que mira las
+  // CLAVES con que quedaron las consultas, que es donde se ve si el ejercicio va dentro. Quien
+  // solo quiera montar usa `arnes().wrapper`, o `arnes()` desestructurado.
   const cliente = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return ({ children }: { readonly children: ReactNode }) => (
+  const wrapper = ({ children }: { readonly children: ReactNode }) => (
     <QueryClientProvider client={cliente}>{children}</QueryClientProvider>
   );
+  return { cliente, wrapper };
 }
 
 /** Sustituye `fetch` por una respuesta fija. */
@@ -55,6 +60,54 @@ const CORRIDA = {
   observados: 534,
   etapas: [
     { etapa: 'Lectura del padron', registros: 62418, monto: '—', observados: 0, estado: 'Conforme' },
+  ],
+};
+
+/**
+ * La sesion tal como la contesta la instalacion: **sin ejercicio de trabajo** (#181).
+ *
+ * No es una eleccion de esta prueba, es lo que contesta el backend — `sesionMedida.ts` lo tiene
+ * copiado de un `curl`, y `camino-a-la-api.test.ts` comprueba que sigue siendo `null`. Se escribe
+ * aqui y no se importa porque la captura es de las pruebas del marco y esta prueba no es del
+ * marco; lo que hace falta de ella es el caso, no los bytes.
+ */
+const SIN_EJERCICIO_FIJADO = {
+  usuarioId: 2,
+  cuenta: 'administrador',
+  nombre: 'Administrador del Sistema',
+  ejercicioDeTrabajo: null,
+};
+
+/** Una pagina de la bitacora, con los doce campos que el contrato declara. */
+const BITACORA = {
+  contenido: [
+    {
+      id: 41184,
+      ejercicio: 2024,
+      tabla: 'recibo',
+      clave: '0003-0041184',
+      operacion: 'ANULACION',
+      usuario: 'jcardenas',
+      origenEquipo: 'PC-CAJA-02',
+      origenIp: '10.0.4.12',
+      fecha: '2026-08-13T14:41:12Z',
+      observacion: 'Anulado por duplicado',
+      datosAnteriores: null,
+      datosNuevos: null,
+    },
+  ],
+  pagina: 0,
+  tamano: 20,
+  totalElementos: 84182,
+  totalPaginas: 4210,
+  hayMas: true,
+};
+
+/** La misma forma, otro ejercicio y otro usuario: es lo que distingue una bitacora de la otra. */
+const OTRA_BITACORA = {
+  ...BITACORA,
+  contenido: [
+    { ...BITACORA.contenido[0], id: 30112, ejercicio: 2025, usuario: 'mrios', operacion: 'BAJA' },
   ],
 };
 
@@ -89,7 +142,7 @@ describe('una pantalla SIN conector no toca la red', () => {
 
     // `fis-panel` y no `ini-panel`: desde #167 las tres hojas de Inicio SI tienen conector, y una
     // hoja conectada no sirve de ejemplo de lo que hace una que no lo esta.
-    const { result } = renderHook(() => useDatosDeLaHoja('fis-panel'), { wrapper: arnes() });
+    const { result } = renderHook(() => useDatosDeLaHoja('fis-panel'), { wrapper: arnes().wrapper });
 
     // Es lo que hace que 38 de las 40 pantallas no manden una sola peticion: sin conector, la
     // consulta no se habilita. Sin esto, abrir el arbol entero serian cuarenta idas a la red
@@ -103,7 +156,7 @@ describe('una pantalla SIN conector no toca la red', () => {
 describe('una pantalla CON conector recorre sus estados', () => {
   it('primero dice que esta pidiendo, y no finge un hueco', () => {
     contesta(CORRIDA);
-    const { result } = renderHook(() => useDatosDeLaHoja('panel'), { wrapper: arnes() });
+    const { result } = renderHook(() => useDatosDeLaHoja('panel'), { wrapper: arnes().wrapper });
 
     // Sin este estado, una pantalla llena de huecos durante dos segundos es indistinguible de una
     // pantalla sin backend — y para entonces el usuario ya se fue.
@@ -112,7 +165,7 @@ describe('una pantalla CON conector recorre sus estados', () => {
 
   it('y cuando llega, reparte lo que trae y marca lo que NO trae', async () => {
     contesta(CORRIDA);
-    const { result } = renderHook(() => useDatosDeLaHoja('panel'), { wrapper: arnes() });
+    const { result } = renderHook(() => useDatosDeLaHoja('panel'), { wrapper: arnes().wrapper });
 
     await waitFor(() => {
       expect(result.current.valores?.size).toBeGreaterThan(0);
@@ -126,7 +179,7 @@ describe('una pantalla CON conector recorre sus estados', () => {
 
   it('un 401 se dice como lo que es —vuelva a entrar—, no como «fallo la red»', async () => {
     contesta({ estado: 401, titulo: 'No autorizado' }, 401);
-    const { result } = renderHook(() => useDatosDeLaHoja('panel'), { wrapper: arnes() });
+    const { result } = renderHook(() => useDatosDeLaHoja('panel'), { wrapper: arnes().wrapper });
 
     await waitFor(() => {
       expect(result.current.ausencia.tono).toBe('atencion');
@@ -138,7 +191,7 @@ describe('una pantalla CON conector recorre sus estados', () => {
 
   it('y otro error dice su codigo, para que se pueda buscar', async () => {
     contesta({ estado: 500 }, 500);
-    const { result } = renderHook(() => useDatosDeLaHoja('panel'), { wrapper: arnes() });
+    const { result } = renderHook(() => useDatosDeLaHoja('panel'), { wrapper: arnes().wrapper });
 
     await waitFor(() => {
       expect(result.current.ausencia.enElCampo).toBe('fallo');
@@ -157,7 +210,7 @@ describe('una pantalla CON conector recorre sus estados', () => {
 describe('una pantalla que es de un contribuyente', () => {
   it('sin sujeto NO pide nada, y lo dice con su propia frase', () => {
     const pedidas = contestaSegunLaRuta({});
-    const { result } = renderHook(() => useDatosDeLaHoja('con-panel'), { wrapper: arnes() });
+    const { result } = renderHook(() => useDatosDeLaHoja('con-panel'), { wrapper: arnes().wrapper });
 
     // Lo contrario seria mandar la peticion sin el parametro y ensenar el 422 del backend como si
     // fuera una averia de la pantalla. Y lo OTRO contrario —elegir un contribuyente aqui— pintaria
@@ -173,7 +226,7 @@ describe('una pantalla que es de un contribuyente', () => {
       '/consultas/deudas-con-beneficio': SIN_CAMPANIA,
     });
     const { result } = renderHook(() => useDatosDeLaHoja('con-panel', '00000025673'), {
-      wrapper: arnes(),
+      wrapper: arnes().wrapper,
     });
 
     await waitFor(() => {
@@ -190,7 +243,7 @@ describe('una pantalla que es de un contribuyente', () => {
       '/consultas/deudas-con-beneficio': SIN_CAMPANIA,
     });
     const { result } = renderHook(() => useDatosDeLaHoja('con-panel', '00000025673'), {
-      wrapper: arnes(),
+      wrapper: arnes().wrapper,
     });
 
     await waitFor(() => {
@@ -206,7 +259,7 @@ describe('una pantalla que es de un contribuyente', () => {
       '/consultas/deudas-con-beneficio': SIN_CAMPANIA,
     });
     const { result } = renderHook(() => useDatosDeLaHoja('con-panel', '00000003541'), {
-      wrapper: arnes(),
+      wrapper: arnes().wrapper,
     });
 
     await waitFor(() => {
@@ -221,7 +274,7 @@ describe('una pantalla que es de un contribuyente', () => {
   it('la constancia pide con `codContribuyente`, que es el nombre que ESA operacion admite', async () => {
     const pedidas = contestaSegunLaRuta({ '/consultas/constancias': CONSTANCIA_NEGADA });
     const { result } = renderHook(() => useDatosDeLaHoja('con-doc', '00000025673'), {
-      wrapper: arnes(),
+      wrapper: arnes().wrapper,
     });
 
     await waitFor(() => {
@@ -239,7 +292,7 @@ describe('una pantalla que es de un contribuyente', () => {
       '/consultas/deudas-con-beneficio': SIN_CAMPANIA,
     });
     // Un solo cliente para los dos, que es lo que hay en la aplicacion: la cache es de modulo.
-    const wrapper = arnes();
+    const { wrapper } = arnes();
     const uno = renderHook(() => useDatosDeLaHoja('con-panel', '00000025673'), { wrapper });
     await waitFor(() => {
       expect(uno.result.current.valores?.get(coordenada(0, 6))).toBe('S/ 3,563.24');
@@ -261,5 +314,112 @@ describe('una pantalla que es de un contribuyente', () => {
     await waitFor(() => {
       expect(otro.result.current.valores?.get(coordenada(0, 6))).toBe('S/ 591.94');
     });
+  });
+});
+
+/**
+ * **La hoja cuyo obligatorio sale de la SESION** (#181, AC2 y AC6).
+ *
+ * `GET /seguridad/auditoria` declara `ejercicio` obligatorio y **no va en la ruta**. Asi que la
+ * pregunta que decide esta pantalla no es «llego la respuesta» ni «de quien es», sino **de que
+ * ano**: sin ejercicio la peticion no se manda, y con el equivocado contesta igual de bien.
+ *
+ * Es el modo de fallo caro y por eso se mide contando **las URL que salieron**, no mirando la
+ * pantalla: un conector que pidiera `?ejercicio=null`, o uno que escribiera un `2026` literal,
+ * dibujarian una tabla perfecta en los dos casos.
+ */
+describe('una pantalla que es de un ejercicio de la sesion', () => {
+  it('sin ejercicio en la sesion NO manda la peticion, y lo dice con su propia frase', async () => {
+    // La sesion contesta —200— y lo que no trae es ejercicio. Es el caso MEDIDO de la
+    // instalacion: `administrador` tiene hoy `ejercicioDeTrabajo: null` (ver `sesionMedida.ts`).
+    const pedidas = contestaSegunLaRuta({ '/seguridad/sesion': SIN_EJERCICIO_FIJADO });
+    const { result } = renderHook(() => useDatosDeLaHoja('seg-aud'), { wrapper: arnes().wrapper });
+
+    await waitFor(() => {
+      expect(result.current.ausencia.enElCampo).toBe('falta el ejercicio');
+    });
+    // **Ni una ida a la bitacora.** Lo contrario seria mandarla sin el parametro y ensenar el 422
+    // como si fuera una averia; y lo OTRO contrario —poner el ano de hoy— seria ensenar la
+    // bitacora de un ejercicio que nadie eligio, con cara de ser la buena.
+    expect(pedidas.filter((url) => url.includes('/seguridad/auditoria'))).toEqual([]);
+    expect(result.current.filas).toBeUndefined();
+  });
+
+  it('con ejercicio en la sesion pide la bitacora DE ESE ano', async () => {
+    const pedidas = contestaSegunLaRuta({
+      '/seguridad/sesion': { ...SIN_EJERCICIO_FIJADO, ejercicioDeTrabajo: 2024 },
+      '/seguridad/auditoria': BITACORA,
+    });
+    const { result } = renderHook(() => useDatosDeLaHoja('seg-aud'), { wrapper: arnes().wrapper });
+
+    await waitFor(() => {
+      expect(result.current.filas?.get(0)).toHaveLength(1);
+    });
+    const deLaBitacora = pedidas.filter((url) => url.includes('/seguridad/auditoria'));
+    expect(deLaBitacora).toHaveLength(1);
+    expect(deLaBitacora[0]).toContain('ejercicio=2024');
+    // Y no el del reloj del puesto, que es la otra forma de inventarlo.
+    expect(deLaBitacora[0]).not.toContain(String(new Date().getFullYear()));
+  });
+
+  it('y CAMBIADO el ejercicio de la sesion, cambia lo que se pide — y la clave de cache', async () => {
+    // Sin el ejercicio en la clave de consulta, el segundo ano abriria con las filas del primero
+    // mientras llega lo suyo. En una bitacora de auditoria eso es ensenar los actos de un
+    // ejercicio bajo el rotulo de otro, que es exactamente el modo de fallo del AC2.
+    contestaSegunLaRuta({
+      '/seguridad/sesion': { ...SIN_EJERCICIO_FIJADO, ejercicioDeTrabajo: 2024 },
+      '/seguridad/auditoria': BITACORA,
+    });
+    const primero = arnes();
+    const uno = renderHook(() => useDatosDeLaHoja('seg-aud'), { wrapper: primero.wrapper });
+    await waitFor(() => {
+      expect(uno.result.current.filas?.get(0)?.[0]?.[1]).toBe('jcardenas');
+    });
+
+    // Otro cliente y no `clear()`: lo que se mide es que la clave LLEVA el ejercicio, y con la
+    // cache tirada la clave daria igual. Se comprueba mirando la clave, abajo.
+    const pedidas = contestaSegunLaRuta({
+      '/seguridad/sesion': { ...SIN_EJERCICIO_FIJADO, ejercicioDeTrabajo: 2025 },
+      '/seguridad/auditoria': OTRA_BITACORA,
+    });
+    const otro = renderHook(() => useDatosDeLaHoja('seg-aud'), { wrapper: arnes().wrapper });
+
+    await waitFor(() => {
+      expect(otro.result.current.filas?.get(0)?.[0]?.[1]).toBe('mrios');
+    });
+    expect(pedidas.some((url) => url.includes('ejercicio=2025'))).toBe(true);
+
+    // Y la clave de la consulta lleva el ejercicio al final: dos ejercicios de la misma hoja no
+    // comparten cache, igual que dos contribuyentes no la comparten desde #169.
+    const claves = primero.cliente
+      .getQueryCache()
+      .getAll()
+      .map((consulta) => consulta.queryKey.join('/'));
+    expect(claves).toContain('seg-aud/auditoria//2024');
+  });
+
+  it('si la SESION falla, lo dice como fallo y no como «fije usted el ejercicio»', async () => {
+    // Sin esto, un 401 se leeria como «esta pantalla necesita que elija un ano» y mandaria a
+    // arreglar lo que no esta roto. Es el orden de las tres ramas de `useDatosDeLaHoja`.
+    contesta({ estado: 401 }, 401);
+    const { result } = renderHook(() => useDatosDeLaHoja('seg-aud'), { wrapper: arnes().wrapper });
+
+    await waitFor(() => {
+      expect(result.current.ausencia.enElCampo).toBe('sin acceso');
+    });
+    expect(result.current.ausencia.explicacion).toMatch(/Vuelva a entrar/);
+  });
+
+  it('y las 39 hojas restantes NO piden la sesion: solo la pide quien la exige', async () => {
+    // `enabled` acotado a `exigeEjercicio`. Sin eso, abrir cualquier destino sumaria una ida a
+    // `/seguridad/sesion`, y la siembra de #114 —que afirma CERO peticiones a `/seguridad/` con el
+    // catalogo sembrado— saldria roja por una lectura que esa pantalla no necesita.
+    const pedidas = contestaSegunLaRuta({ '/rentas/predial/corridas/ultima': CORRIDA });
+    const { result } = renderHook(() => useDatosDeLaHoja('panel'), { wrapper: arnes().wrapper });
+
+    await waitFor(() => {
+      expect(result.current.valores?.size).toBeGreaterThan(0);
+    });
+    expect(pedidas.filter((url) => url.includes('/seguridad/sesion'))).toEqual([]);
   });
 });

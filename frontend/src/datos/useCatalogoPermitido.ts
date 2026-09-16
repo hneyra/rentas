@@ -49,6 +49,20 @@ export const LLAVES = {
   modulos: [RAMA, 'modulos'],
   accesos: [RAMA, 'accesos'],
   permisos: [RAMA, 'permisos'],
+  /**
+   * **Quien esta trabajando, y con que ejercicio** (#181).
+   *
+   * No la pide este gancho: la pide `useDatosDeLaHoja`, y **solo** cuando la hoja abierta declara
+   * `exigeEjercicio`. Vive aqui con las otras tres porque es de la misma rama —`seguridad`— y
+   * porque las llaves de esa rama se escriben en un sitio: la siembra de desarrollo (#114) fija
+   * `staleTime: Infinity` sobre `LLAVES.rama` entera, y una llave suelta en otro archivo quedaria
+   * fuera de ese trato sin que nada lo dijera.
+   *
+   * **La siembra NO la siembra**, y es correcto: sembrarla pondria un ejercicio de trabajo
+   * inventado en un puesto sin plataforma, que es justo lo que #181 prohibe. Sin sembrar, `seg-aud`
+   * sale a la red, no encuentra a nadie y ensena su estado de error — como `panel` y `coa-panel`.
+   */
+  sesion: [RAMA, 'sesion'],
 } as const;
 
 /** Que se sabe del catalogo, ademas del catalogo. */

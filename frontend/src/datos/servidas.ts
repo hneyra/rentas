@@ -1,9 +1,9 @@
 /**
  * Las operaciones que el backend YA sirve en el entorno donde corre la aplicacion.
  *
- * <h2>Veintitres: dos de sesion (I-1), cuatro de seguridad (I-3), seis del padron (I-4), dos de
- * licencias (#168), cuatro de la cobranza coactiva (#170), dos de indicadores (#167) y tres de
- * la ventanilla de Consultas (#169)</h2>
+ * <h2>Veinticuatro: dos de sesion (I-1), cuatro de seguridad (I-3), seis del padron (I-4), dos de
+ * licencias (#168), cuatro de la cobranza coactiva (#170), dos de indicadores (#167), tres de
+ * la ventanilla de Consultas (#169) y la bitacora de auditoria (#181)</h2>
  *
  * La integracion no es un salto. El backend publica 181 operaciones y el proxy simula
  * dieciocho: encenderlas todas a la vez seria cambiar 181 respuestas en una sola tarde sin poder
@@ -66,12 +66,13 @@ export interface OperacionServida {
  * El tipo es `readonly OperacionServida[]` y no una tupla: lo que cambia el dia que se encienda
  * la siguiente es esta lista, y nada mas.
  *
- * <b>Son veintitres, y llegaron en seis tandas</b>: las dos de sesion que abrieron el camino
+ * <b>Son veinticuatro, y llegaron en siete tandas</b>: las dos de sesion que abrieron el camino
  * (I-1), las cuatro con que se compone la navegacion (I-3), las seis del padron de contribuyentes
  * (I-4), las dos de autorizaciones y licencias (#168), las cuatro de la cobranza coactiva (#170),
- * las dos de indicadores con que se conecta el modulo Inicio (#167) y las tres de la ventanilla de
- * Consultas (#169). Cada tanda dejo escrito lo que vio al encender lo suyo, y las seis notas siguen
- * aqui porque lo que se vio es lo que justifica que la ruta este en la lista.
+ * las dos de indicadores con que se conecta el modulo Inicio (#167), las tres de la ventanilla de
+ * Consultas (#169) y la bitacora de auditoria (#181). Cada tanda dejo escrito lo que vio al
+ * encender lo suyo, y las siete notas siguen aqui porque lo que se vio es lo que justifica que la
+ * ruta este en la lista.
  *
  * <h2>Las cuatro que enciende I-3, en el orden en que se encendieron</h2>
  *
@@ -278,6 +279,35 @@ export interface OperacionServida {
  *       operacion que la pantalla pinta, que es la de sin parametro.</li>
  * </ol>
  *
+ * <h2>Y la de #181: la primera servida con un parametro OBLIGATORIO que NO va en la ruta</h2>
+ *
+ * <b>`GET /seguridad/auditoria`</b> — la bitacora, y la unica operacion que declara `seg-aud`.
+ * Publica una pagina de doce campos por movimiento —`id`, `ejercicio`, `tabla`, `clave`,
+ * `operacion`, `usuario`, `origenEquipo`, `origenIp`, `fecha`, `observacion`, `datosAnteriores` y
+ * `datosNuevos`—, y las cuatro primeras columnas de «Movimientos» salen de cuatro de ellos. La
+ * quinta, «Riesgo», no la publica nadie; el reparto campo a campo esta en
+ * `conectores/seguridad.ts`.
+ *
+ * <b>Lo que la hace distinta de las veintitres de arriba, y es el motivo de #181</b>:
+ * `parametros-de-la-api.json` la declara con <b>`ejercicio` entre los obligatorios</b> —la unica
+ * de las veinticuatro que tiene un obligatorio fuera de la ruta— y el controlador lo exige en la
+ * firma (`@RequestParam("ejercicio") int`), asi que sin el la peticion <b>ni siquiera llega al
+ * metodo</b>: Spring contesta 422 «Falta el parametro obligatorio 'ejercicio'». Y no es un filtro
+ * que se pueda omitir por comodidad — `ConsultaDeAuditoria` lo dice en su propio javadoc: la tabla
+ * esta <b>particionada por ejercicio</b>, y una consulta sin el recorre todas las particiones.
+ *
+ * Los otros nueve que admite —`usuario`, `tabla`, `operacion`, `desde`, `hasta`, `ordenarPor`,
+ * `pagina`, `tamano`, `direccion`— <b>son opcionales y no se mandan</b>: son los seis mandos que
+ * la pantalla dibuja, y pasarselos al conector es lo que pide #172. De los nueve, `tamano` si se
+ * manda —la bitacora tiene 84 182 movimientos segun el propio artboard, asi que la tabla es una
+ * ventana— por el mismo motivo por el que `RUTAS.ciiu` lo escribe.
+ *
+ * <b>Lo que NO se midio, y hay que decirlo</b>: tampoco esta se pidio contra la instalacion. La
+ * medida es el contrato generado de los controladores y el codigo de `SesionController`,
+ * `ConsultaDeAuditoria` y `Operacion`. Hay un sitio donde eso se nota y esta dicho en el conector:
+ * `fecha` es un `Instant`, o sea que Jackson lo publica en <b>UTC</b>, y esta interfaz lo ensena
+ * tal cual en vez de moverlo a la hora de Lima.
+ *
  * <b>Y lo que NO se pudo hacer con estas tres, dicho aqui y no descubierto luego</b>: no se
  * midieron contra la instalacion con `curl`, como si se midieron las seis de I-4. Lo que se leyo
  * es el contrato generado de los controladores reales —`docs/50-api/formas-de-la-api.json`,
@@ -311,6 +341,7 @@ export const YA_SERVIDAS: readonly OperacionServida[] = [
   { metodo: 'GET', ruta: '/consultas/unificada' },
   { metodo: 'GET', ruta: '/consultas/deudas-con-beneficio' },
   { metodo: 'GET', ruta: '/consultas/constancias/no-adeudo' },
+  { metodo: 'GET', ruta: '/seguridad/auditoria' },
 ];
 
 /** `/rentas/vehiculos/{placa}` → `^/rentas/vehiculos/[^/]+$`. */
