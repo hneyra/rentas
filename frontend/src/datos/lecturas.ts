@@ -859,6 +859,164 @@ export interface MovimientoDeLaBitacora {
   readonly datosNuevos: string | null;
 }
 
+/**
+ * Un programa de fiscalizacion, de `GET /fiscalizacion/programas` (#179).
+ *
+ * **`id` y `codigo` son dos identificadores distintos y ninguno sobra.** `codigo` es el «Nº de
+ * programa» que la pantalla teclea —«PF-2026-014»— y `id` es el que la base asigna; el `{id}` de
+ * `GET /fiscalizacion/programas/{id}/muestra` es el segundo. Esta operacion es la unica que
+ * convierte lo uno en lo otro, y por eso #179 la anadio a la declaracion de la hoja.
+ *
+ * `fechaFin`, `ejercicio`, `sector`, `criterio` y `fiscalizador` son anulables en el origen:
+ * `sector` nulo significa «todo el distrito», y `ejercicio` y `criterio` van nulos en los
+ * programas anteriores a `V60`. Se declaran porque un campo declarado es un campo que el
+ * proveedor no puede retirar sin poner rojo este build.
+ */
+export interface ProgramaDeFiscalizacion {
+  readonly id: number;
+  readonly codigo: string;
+  readonly descripcion: string;
+  readonly tipo: string;
+  readonly fechaInicio: string;
+  readonly fechaFin: string | null;
+  readonly estado: string;
+  readonly ejercicio: string | null;
+  readonly sector: string | null;
+  readonly criterio: string | null;
+  readonly fiscalizador: string | null;
+}
+
+/**
+ * Un predio sorteado en la muestra de un programa, de `GET /fiscalizacion/programas/{id}/muestra`.
+ *
+ * **Las areas llegan como texto y SIN unidad** —`"180.50"`—, que es como el backend serializa un
+ * `AreaM2`; el rotulo de la columna pone los m².
+ *
+ * **`condicion` es lo que la deteccion concluyo el dia del sorteo**, congelado: `CONFORME`,
+ * `OMISO`, `SUBVALUADOR`, `USO_DISTINTO` o `NO_UBICADO`. No es lo que el fiscalizador anote luego
+ * en el acta —eso es `hallazgo`— y los dos pueden discrepar.
+ *
+ * **`visitado` se DERIVA y no se guarda**: es «este predio ya tiene acta en este programa». El
+ * propio backend dice que es de donde sale la columna «Estado» de la grilla.
+ *
+ * Los tres campos del titular van nulos cuando el predio no tiene ninguno vigente.
+ */
+export interface FilaDeLaMuestra {
+  readonly programaId: number;
+  readonly predioId: number;
+  readonly codRefCatastral: string;
+  readonly contribuyenteId: number | null;
+  readonly codContribuyente: string | null;
+  readonly titular: string | null;
+  readonly sector: string | null;
+  readonly condicion: string;
+  readonly areaCatastral: string | null;
+  readonly areaDeclarada: string | null;
+  readonly diferenciaDeArea: string | null;
+  readonly visitado: boolean;
+  readonly fechaSorteo: string;
+}
+
+/**
+ * Un acta de inspeccion, de `GET /fiscalizacion/actas` (#179).
+ *
+ * **Publica el lado HALLADO y no el declarado**, y esa es la propiedad que decide lo que la
+ * pantalla puede dibujar: hay `areaHallada` y `usoHallado`, y no hay `areaDeclarada` ni
+ * `usoDeclarado`. El contraste de los dos lados lo publica la LIQUIDACION —`GET
+ * /fiscalizacion/resultados`, `lineas[]`—, que es otra etapa.
+ *
+ * **`usoHallado` nulo es «no se anoto», que no es «coincide con lo declarado»**, y solo un acta
+ * predial lo lleva. `hallazgo` es lo que una persona anoto —`CONFORME`, `OMISO`, `SUBVALUADOR`,
+ * `USO_DISTINTO`, `NO_UBICADO`— y `estado` el del acta: `ABIERTA`, `LIQUIDADA`, `RELIQUIDADA`,
+ * `TRANSFERIDA` o `ANULADA`.
+ *
+ * Predial y vehicular comparten forma: cual es cual lo dice cual de `predioId` y `vehiculoId`
+ * trae valor. Y del contribuyente publica **solo el identificador**, nunca el nombre.
+ */
+export interface ActaDeFiscalizacion {
+  readonly id: number;
+  readonly programaId: number;
+  readonly version: number;
+  readonly contribuyenteId: number | null;
+  readonly predioId: number | null;
+  readonly vehiculoId: number | null;
+  readonly fichaId: number | null;
+  readonly fechaVisita: string;
+  readonly fiscalizador: string | null;
+  readonly hallazgo: string | null;
+  readonly areaHallada: string | null;
+  readonly usoHallado: string | null;
+  readonly detalle: string | null;
+  readonly estado: string;
+}
+
+/**
+ * Una linea de la resolucion de determinacion, por ejercicio.
+ *
+ * **Los cinco importes son nulos hasta D-02a**, y lo dice el backend en cada uno: sin el cuadro de
+ * valores unitarios firmado no hay base que calcular. Nulo es «sin cifra» y **no cero** — un cero
+ * en una resolucion se lee como «no debe nada».
+ *
+ * Y los nombres no son los que parecen: `determinado` es **la base que resulta de lo hallado**,
+ * `declarado` **la base que consta declarada**, y `diferencia` **el tributo que se dejo de
+ * pagar** —o sea el insoluto omitido, no la resta de las dos bases—. `total` es `diferencia +
+ * multa`, y es nulo si falta cualquiera de las dos: el backend se niega a sumar una cifra con una
+ * ausencia. `condicion` si se conoce siempre.
+ */
+export interface LineaDeterminada {
+  readonly ejercicio: number;
+  readonly determinado: string | null;
+  readonly declarado: string | null;
+  readonly diferencia: string | null;
+  readonly multa: string | null;
+  readonly total: string | null;
+  readonly condicion: string;
+  readonly areaDeclarada: string | null;
+  readonly areaHallada: string | null;
+}
+
+/**
+ * La resolucion de determinacion, de `GET /fiscalizacion/resoluciones/{numero}` (#179).
+ *
+ * **Es de UNA resolucion y el numero va en la RUTA**: `RDF-2026-000001`, que es lo que
+ * `EmitirDocumento` compone —`%s-%d-%06d` con el tipo `RDF`—. No existe ninguna operacion que
+ * publique la relacion de resoluciones, asi que el numero no se puede elegir en pantalla: viaja en
+ * la direccion, como el codigo del contribuyente en Consultas (#169). Un numero que no existe da
+ * **404** «No hay ninguna resolucion de determinacion con el numero '…'».
+ *
+ * **`aLaFecha` no es un adorno**: es el dia al que estan las cifras, dicho aparte para no dejarlo
+ * implicito (regla 9, RNF-075).
+ *
+ * **`cargosAsentados` llega nulo en el `GET`**: solo lo trae la respuesta de `POST
+ * /fiscalizacion/transferencias`, que es la que asienta.
+ *
+ * **Lo que NO publica, y hace falta saberlo antes de leerla**: ningun interes —no lo publica
+ * ninguna de las 16 operaciones de fiscalizacion—, ningun total de la resolucion entera, y ningun
+ * numero de acta: lo que enlaza hacia atras es `nLiquidacion`.
+ */
+export interface ResolucionDeDeterminacion {
+  readonly numero: string;
+  readonly fecha: string;
+  readonly aLaFecha: string;
+  readonly nLiquidacion: string;
+  readonly versionDeLaLiquidacion: number;
+  readonly periodoDesde: number;
+  readonly periodoHasta: number;
+  readonly codContribuyente: string;
+  readonly contribuyente: string;
+  readonly predioId: number | null;
+  readonly vehiculoId: number | null;
+  readonly documentoSustento: string | null;
+  readonly sustento: string | null;
+  readonly baseLegal: string | null;
+  readonly fichaAnteriorId: number | null;
+  readonly fichaNuevaId: number | null;
+  readonly usuarioRegistro: string | null;
+  readonly observacion: string | null;
+  readonly lineas: readonly LineaDeterminada[];
+  readonly cargosAsentados: number | null;
+}
+
 // ── La sesion ──────────────────────────────────────────────────────────────────────
 
 /**
@@ -1085,6 +1243,52 @@ export const RUTAS = {
    */
   prescripcionesDe: (tributo: string) =>
     `/coactiva/prescripcion?tributo=${encodeURIComponent(tributo)}&tamano=1`,
+  /**
+   * El primer programa de fiscalizacion de la relacion (#179).
+   *
+   * **`?tamano=1` y no la pagina entera**, por lo mismo que `expedientesCoactivos`: esta pantalla
+   * dibuja la muestra de UN programa y todavia no tiene con que elegirlo, asi que pedir veinte
+   * para usar uno seria pedir diecinueve que nadie mira. El parametro esta publicado
+   * —`parametros-de-la-api.json`, entre los opcionales de `GET /fiscalizacion/programas`—, que es
+   * la condicion que #26 dejo escrita.
+   *
+   * El dia que la pantalla tenga su caja de busqueda, lo que cambia es esta ruta: el criterio
+   * tambien esta publicado (`nDePrograma`, `ejercicio`).
+   */
+  programasDeFiscalizacion: '/fiscalizacion/programas?tamano=1',
+  /**
+   * Los predios sorteados en la muestra de UN programa.
+   *
+   * `{id}` es el identificador **interno** del programa y sale de la relacion de arriba. No se
+   * inventa: con uno que no exista el backend contesta 404, que no es lo mismo que la pagina
+   * vacia con que contesta un programa sin muestra sorteada.
+   */
+  muestraDelPrograma: (id: number) => `/fiscalizacion/programas/${String(id)}/muestra`,
+  /**
+   * La primera acta de inspeccion de la relacion (#179).
+   *
+   * `?tamano=1` por el mismo motivo que arriba: la tabla de la hoja contrasta los conceptos de UNA
+   * acta —no es una relacion de actas— y la pantalla todavia no tiene con que elegirla.
+   *
+   * **Sin `?programa=`**, que es el unico filtro que la operacion admite: acotarla a un programa
+   * exige haberlo elegido, y elegir uno aqui seria decidir por quien atiende cual de las
+   * inspecciones se mira.
+   */
+  actasDeFiscalizacion: '/fiscalizacion/actas?tamano=1',
+  /**
+   * La resolucion de determinacion de UN numero (#179).
+   *
+   * El numero es el del documento —`RDF-2026-000001`— y va **en la ruta**, no en la cadena de
+   * consulta: la operacion no admite ningun parametro. Se codifica igual que los codigos de
+   * contribuyente de Consultas, porque el dominio lo normaliza con `strip().toUpperCase()` y no
+   * promete que no lleve nada raro dentro.
+   *
+   * **Sin `?formato=`**: con el, la misma ruta contesta el PDF, el XLS o el RTF en vez del JSON
+   * que esta pantalla dibuja. Es exactamente la distincion que #169 tuvo que hacer con
+   * `constancias/no-adeudo`.
+   */
+  resolucionDeDeterminacion: (numero: string) =>
+    `/fiscalizacion/resoluciones/${encodeURIComponent(numero)}`,
   ultimaCorrida: '/rentas/predial/corridas/ultima',
   observados: (corridaId: number) => `/rentas/predial/corridas/${String(corridaId)}/observados`,
   recaudacion: '/indicadores/recaudacion',

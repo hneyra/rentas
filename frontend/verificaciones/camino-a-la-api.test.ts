@@ -103,7 +103,7 @@ describe('AC4 — la raiz de la API es UNA, escrita en tres sitios que tienen qu
 });
 
 describe('AC7 — lo que se declara servido tiene que publicarlo el backend', () => {
-  it('las veinticuatro: I-1, I-3, I-4, #168, #170, #167, las tres de #169 y la de #181', () => {
+  it('las veintiocho: I-1, I-3, I-4, #168, #170, #167, #169, #181 y las cuatro de #179', () => {
     // La lista escrita a mano es a proposito. Derivarla de `YA_SERVIDAS` la haria pasar diga lo
     // que diga: encender una ruta es una decision, y una decision se revisa leyendo su diff. La
     // lista crece de una en una porque encenderlas todas a la vez seria cambiar 181 respuestas
@@ -134,6 +134,10 @@ describe('AC7 — lo que se declara servido tiene que publicarlo el backend', ()
       'GET /consultas/deudas-con-beneficio',
       'GET /consultas/constancias/no-adeudo',
       'GET /seguridad/auditoria',
+      'GET /fiscalizacion/programas',
+      'GET /fiscalizacion/programas/{id}/muestra',
+      'GET /fiscalizacion/actas',
+      'GET /fiscalizacion/resoluciones/{numero}',
     ]);
   });
 
@@ -151,6 +155,10 @@ describe('AC7 — lo que se declara servido tiene que publicarlo el backend', ()
     // con `POST /coactiva/convenios`, que es la unica operacion que publica sus ocho campos y
     // **crea un convenio de fraccionamiento**. Pintar una pantalla no puede fraccionar la deuda
     // de nadie.
+    // #179 enciende cuatro mas y tampoco: es la prueba que deja fuera a `POST
+    // /fiscalizacion/programas/{id}/muestra` —«Regenerar muestra», el boton de la tabla de
+    // `fis-prog`— y a `POST /fiscalizacion/liquidaciones`. Sortear una muestra o liquidar la deuda
+    // de alguien para pintar una pantalla es exactamente lo que esta cifra vigila.
     expect(YA_SERVIDAS.filter((o) => o.metodo !== 'GET').map((o) => o.ruta)).toEqual([
       '/seguridad/sesion/ejercicio',
     ]);
@@ -211,9 +219,9 @@ describe('AC7 — lo que se declara servido tiene que publicarlo el backend', ()
     expect(fuera).not.toContain('GET /consultas/constancias/no-adeudo?formato');
   });
 
-  it('la bitacora declara `ejercicio` OBLIGATORIO, y es la unica de las veinticuatro (#181)', () => {
+  it('la bitacora declara `ejercicio` OBLIGATORIO, y es la unica de las veintiocho (#181)', () => {
     // Es la medida que abrio #181, y la que justifica que `Conector` tenga una tercera forma de
-    // exigir algo. Las otras veintitres, o no tienen obligatorio, o lo llevan **en la ruta** —y en
+    // exigir algo. Las otras veintisiete, o no tienen obligatorio, o lo llevan **en la ruta** —y en
     // la ruta no se olvida, porque sin el la URL no existe—. Este va en la cadena de consulta y
     // sale de la SESION: es el unico que se puede omitir sin que la ruta lo note.
     //
@@ -420,6 +428,10 @@ const CAPTURAS = [
   // MISMO riesgo: un `ficha ?? FICHA` ensenaria la cuenta corriente de un contribuyente inventado
   // con la cara de un dato medido. Ver su javadoc, que dice lo que sostiene y lo que no.
   'src/datos/conectores/consultasDeMuestra.ts',
+  // Y la quinta, por lo mismo (#179): respuestas construidas desde el contrato y el codigo de los
+  // seis controladores de fiscalizacion. Un `resolucion ?? RESOLUCION_SIN_CIFRAS` ensenaria la
+  // determinacion de un contribuyente inventado con la cara de un dato medido.
+  'src/datos/conectores/fiscalizacionDeMuestra.ts',
 ];
 
 describe('las capturas de la instalacion son de las pruebas, y no respaldos de produccion', () => {

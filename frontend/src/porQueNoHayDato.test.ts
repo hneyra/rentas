@@ -25,12 +25,12 @@ import {
 const TODAS: readonly Hoja[] = ARBOL.flatMap((modulo) => [...modulo.hojas]);
 
 describe('el cruce contra lo que el backend sirve', () => {
-  it('EL CENTINELA: hay cuarenta hojas y veinticuatro operaciones servidas', () => {
+  it('EL CENTINELA: hay cuarenta hojas y veintiocho operaciones servidas', () => {
     // Sin esto, un arbol vacio o unas `YA_SERVIDAS` vacias dejarian todo lo de abajo pasando
     // sobre la nada — y la respuesta seria «ninguna pantalla tiene datos», que ademas parece
     // razonable.
     expect(TODAS).toHaveLength(40);
-    expect(YA_SERVIDAS).toHaveLength(24);
+    expect(YA_SERVIDAS).toHaveLength(28);
   });
 
   it('cruza por RUTA, no por verbo: dos servidas las declara el artboard como `BASE`', () => {
@@ -50,7 +50,7 @@ describe('el cruce contra lo que el backend sirve', () => {
     expect(utiles.every((o) => o.verbo !== 'PUT')).toBe(true);
   });
 
-  it('dieciocho hojas tienen alguna operacion util, y veintidos ninguna', () => {
+  it('veintiuna hojas tienen alguna operacion util, y diecinueve ninguna', () => {
     const con = TODAS.filter((hoja) => operacionesUtiles(hoja).length > 0);
     // `aut-cat` y `aut-panel` entran con #168, y las dos por la ruta que el ARTBOARD les
     // atribuye: `GET /licencias/ciiu` a la primera y `GET /licencias/funcionamiento` a la
@@ -65,6 +65,12 @@ describe('el cruce contra lo que el backend sirve', () => {
     // no es la operacion sino lo que ensena —unidades y deuda por FILA, que esa operacion no
     // publica—. Por eso dice «sin pedir» y no «sin conectar»: son cosas distintas para quien tenga
     // que arreglarlas.
+    //
+    // Las tres de Fiscalizacion entran con #179, y **`fis-actas` entra por una declaracion
+    // `BASE`**: el artboard le atribuye `BASE /fiscalizacion/actas` y lo que se enciende es
+    // `GET /fiscalizacion/actas`, que es la misma RUTA. Es el tercer caso de este tipo —los otros
+    // dos son `predios` y `valores`, y estan justo arriba—, y es la razon por la que el cruce mira
+    // la ruta y no el verbo.
     expect(con.map((h) => h.clave).sort()).toEqual(
       [
         'aut-cat',
@@ -75,6 +81,9 @@ describe('el cruce contra lo que el backend sirve', () => {
         'con-contrib',
         'con-doc',
         'con-panel',
+        'fis-actas',
+        'fis-prog',
+        'fis-res',
         'ini-flujo',
         'ini-panel',
         'ini-parado',
@@ -90,7 +99,7 @@ describe('el cruce contra lo que el backend sirve', () => {
         'valores',
       ].sort(),
     );
-    expect(TODAS.length - con.length).toBe(22);
+    expect(TODAS.length - con.length).toBe(19);
   });
 });
 
