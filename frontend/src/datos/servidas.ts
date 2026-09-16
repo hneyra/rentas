@@ -357,6 +357,43 @@ export interface OperacionServida {
  * `PATCH /fiscalizacion/liquidaciones/{numero}/estados`. Esta interfaz hace UNA escritura y no es
  * ninguna de esas: sortear una muestra o liquidar la deuda de alguien para pintar una pantalla es
  * el modo de fallo que esta lista existe para no tener.
+ *
+ * <h2>Las CUATRO de Transito (#180), y las DOS que se comprobaron para dejarlas fuera</h2>
+ *
+ * La medida vuelve a ser el contrato generado de los controladores —`formas-de-la-api.json` para la
+ * respuesta y `parametros-de-la-api.json` para la peticion—, leido campo a campo contra lo que cada
+ * pantalla dibuja, mas el codigo de los tres controladores. Ninguna se pidio contra la instalacion.
+ *
+ * <ol>
+ *   <li><b>`GET /transito/papeletas`</b> — la relacion de papeletas de transito, paginada, con
+ *       veintiun campos por fila. Se enciende por <b>uno</b>: `numero`, que es lo que hace falta
+ *       para pedir el expediente de abajo. Se pide con <b>`?tamano=1`</b>, escrito: la pantalla
+ *       dibuja los actos de UNA papeleta. Sus seis criterios —`nroPapeleta`, `placa`,
+ *       `documentoDelInfractor`, `desde`, `hasta`, `estado`— estan publicados y llegan con
+ *       #172.</li>
+ *   <li><b>`GET /transito/papeletas/{numero}/actos`</b> — el expediente de la papeleta: sus
+ *       `descargos[]` y <b>todos</b> sus `actos[]` con sus `acuses[]`, uno por intento. De ahi
+ *       salen cuatro de las cinco columnas de `tra-pap`; la quinta —«Estado»— no la publica
+ *       <b>nadie</b>, y el porque esta en `conectores/transito.ts`.</li>
+ *   <li><b>`GET /transito/internamientos`</b> — la grilla «Vehiculos en deposito». Publica los
+ *       dias con su `calculadoA` (regla 9) y <b>ningun importe</b>: `tasaDeCustodia` es el
+ *       <b>concepto del TUPA</b>, no una tarifa, y el backend explica en su javadoc que no publica
+ *       «Tasa diaria S/» ni «Custodia S/» porque su ordenanza es <b>D-02b</b>, que sigue abierta.
+ *       Es el unico caso hasta hoy en que un hueco de la interfaz es el de una decision abierta del
+ *       negocio, y no el de un campo que alguien olvido.</li>
+ *   <li><b>`GET /rentas/vehiculos/{placa}`</b> — la ficha del vehiculo, y la primera operacion
+ *       encendida que lleva su sujeto <b>en la ruta</b>. Publica marca, modelo, categoria, anios,
+ *       motor, serie, estado y el historial de placas. Contesta <b>404</b> con una placa que no es
+ *       de esta municipalidad y <b>422</b> con una mal formada: dos respuestas distintas a
+ *       proposito, y la pantalla las dice como averia y no como dato.</li>
+ * </ol>
+ *
+ * <b>Y las DOS que el arbol declara y NO se encienden, comprobadas y no supuestas</b>:
+ * `/transito/descargos` y `/transito/constancias-libres` <b>si</b> estan en el contrato, y las dos
+ * con un solo verbo: <b>`POST`</b>. La primera registra un recurso contra una papeleta —pedirle
+ * datos seria presentar un descargo en nombre de alguien para pintar una pantalla, y ademas sus
+ * filas ya salen por `.../actos`, que publica `descargos[]`—; la segunda contesta <b>`"archivo"`</b>
+ * y no un JSON con campos. Esta interfaz hace UNA escritura, y no es ninguna de las dos.
  */
 export const YA_SERVIDAS: readonly OperacionServida[] = [
   { metodo: 'GET', ruta: '/seguridad/sesion' },
