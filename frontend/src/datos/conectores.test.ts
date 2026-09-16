@@ -10,8 +10,7 @@ import type {
   LiquidacionDeCostas,
   Paginado,
   PrescripcionDeclarada,
-  ProcesoDelExpediente,
-} from './lecturas.ts';
+  ProcesoDelExpediente, IndicadorDeRecaudacion, TrabajoParado } from './lecturas.ts';
 
 /**
  * **Lo que cada pantalla conectada saca de su respuesta** (#97).
@@ -137,6 +136,56 @@ const PADRON = {
   hayMas: false,
 };
 
+const RECAUDACION_MEDIDA: IndicadorDeRecaudacion = {
+  ejercicio: 2026,
+  fechaCalculo: '2026-09-16',
+  calculadoEn: '2026-09-16T10:00:00Z',
+  cargado: { importe: '23725394.80', actualizadoA: '2026-09-16' },
+  kpis: [
+    {
+      label: 'Recaudado 2026',
+      value: 'S/ 18,424,251.20',
+      note: '',
+      importe: { importe: '18424251.20', actualizadoA: '2026-09-16' },
+    },
+    { label: 'Avance de cobranza', value: '77 %', note: '', importe: null },
+  ],
+  paneles: [
+    {
+      title: 'Recaudacion por tributo',
+      note: '',
+      rows: [
+        {
+          label: 'Impuesto predial',
+          sub: '',
+          value: 'S/ 8,420,118.40',
+          pct: 89,
+          avanceConocido: true,
+          importe: { importe: '8420118.40', actualizadoA: '2026-09-16' },
+          cargado: { importe: '9418204.60', actualizadoA: '2026-09-16' },
+          pendiente: { importe: '998086.20', actualizadoA: '2026-09-16' },
+        },
+      ],
+    },
+  ],
+};
+
+const PARADO_MEDIDO: TrabajoParado = {
+  ejercicio: 2026,
+  fechaCalculo: '2026-09-16',
+  calculadoEn: '2026-09-16T10:00:00Z',
+  frentes: [
+    {
+      frente: 'TRANSITO',
+      modulo: 'Transito',
+      queEstaParado: 'papeletas sin resolucion de multa emitida',
+      porQueCuestaDinero: 'sin emitir no se pueden notificar ni cobrar, y prescriben',
+      cuantos: 1842,
+      importe: null,
+    },
+  ],
+};
+
 const MUESTRAS: Readonly<Partial<Record<ClaveDeHoja, unknown>>> = {
   panel: CORRIDA,
   'coa-panel': PAGINA,
@@ -144,6 +193,9 @@ const MUESTRAS: Readonly<Partial<Record<ClaveDeHoja, unknown>>> = {
   'coa-cost': COSTAS,
   'aut-cat': CIIU,
   'aut-tram': PADRON,
+  'ini-panel': [RECAUDACION_MEDIDA, CORRIDA],
+  'ini-flujo': RECAUDACION_MEDIDA,
+  'ini-parado': PARADO_MEDIDO,
 };
 
 /** Los campos de solo lectura de una pantalla, por su coordenada. */
@@ -154,14 +206,17 @@ function soloLecturaDe(clave: ClaveDeHoja): readonly string[] {
 }
 
 describe('los conectores', () => {
-  it('EL CENTINELA: estan los seis que estan, y no cero ni cuarenta', () => {
+  it('EL CENTINELA: estan los nueve que estan, y no cero ni cuarenta', () => {
     // Cero dejaria todo lo de abajo sin sujeto. Cuarenta significaria que alguien conecto
     // pantallas cuyas operaciones no publican lo que ensenan, que es lo que este archivo evita.
     // La lista se escribe a mano y crece de una en una: conectar una pantalla es una decision, y
     // una decision se revisa leyendo su diff. Las dos de licencias llegan con #168, y su medida
     // —que publica cada operacion y que no— esta en `conectores/licencias.ts`.
     expect(Object.keys(CONECTORES).sort()).toEqual(
-      ['aut-cat', 'aut-tram', 'coa-cost', 'coa-exp', 'coa-panel', 'panel'].sort(),
+      [
+        'aut-cat', 'aut-tram', 'coa-cost', 'coa-exp', 'coa-panel',
+        'ini-flujo', 'ini-panel', 'ini-parado', 'panel',
+      ].sort(),
     );
   });
   it('y cada uno tiene su muestra: sin ella, la guarda de abajo se lo saltaria', () => {

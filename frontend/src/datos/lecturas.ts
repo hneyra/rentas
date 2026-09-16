@@ -634,13 +634,28 @@ export interface KpiDeRecaudacion {
   readonly importe: ImporteConFecha | null;
 }
 
-/** Una fila de un panel de avance. */
+/**
+ * Una fila de un panel de avance.
+ *
+ * **Ocho campos, y tres de ellos pueden ser nulos** (#167). `importe`, `cargado` y `pendiente` son
+ * las tres cifras que el `sub` ya decia con palabras, publicadas ademas sin redactar; van nulas en
+ * las filas que no las tienen —el bloque «Recaudacion por mes» agrupa por el mes del abono y no
+ * tiene cargado ni pendiente propios—. Un cero ahi afirmaria que ese mes cargo cero.
+ *
+ * `avanceConocido` es lo que separa el 0 que se midio del 0 que no se pudo medir: con la base en
+ * cero no hay avance que medir, y `pct` vale 0 porque una barra sin numero no se puede pintar.
+ * Dibujar ese 0 como «0 %» diria «no se ha cobrado nada» de un tributo que ni siquiera tiene
+ * cargos asentados.
+ */
 export interface FilaDeAvance {
   readonly label: string;
   readonly sub: string;
   readonly value: string;
   readonly pct: number;
   readonly avanceConocido: boolean;
+  readonly importe: ImporteConFecha | null;
+  readonly cargado: ImporteConFecha | null;
+  readonly pendiente: ImporteConFecha | null;
 }
 
 /** Un panel de avance, con su titulo y su nota. */
@@ -650,22 +665,41 @@ export interface PanelDeAvance {
   readonly rows: readonly FilaDeAvance[];
 }
 
-/** `GET /indicadores/recaudacion`. */
+/**
+ * `GET /indicadores/recaudacion`.
+ *
+ * **`cargado` es lo emitido del ejercicio, y es un campo** (#167). Hasta que el backend lo
+ * publico, la unica forma de leerlo era sacarlo de la frase del KPI «Avance de cobranza» con una
+ * expresion regular; por eso esta declarado aqui y por eso «Emitido del ejercicio» sale de el y no
+ * de ninguna nota.
+ */
 export interface IndicadorDeRecaudacion {
   readonly ejercicio: number;
   readonly fechaCalculo: string;
   readonly calculadoEn: string;
+  readonly cargado: ImporteConFecha;
   readonly kpis: readonly KpiDeRecaudacion[];
   readonly paneles: readonly PanelDeAvance[];
 }
 
-/** Un frente parado, de `GET /indicadores/trabajo-parado`. */
+/**
+ * Un frente parado, de `GET /indicadores/trabajo-parado`.
+ *
+ * **`importe` nulo NO es cero** (#167). De los frentes que la operacion publica, unos se pueden
+ * cifrar y otros no: los que no salen con `importe: null` —nunca `"0.00"`— justamente para que la
+ * interfaz pueda dibujar «sin cifrar» y «S/ 0.00» distinto. Cuando el frente cifrado no tiene ni
+ * una fila, su importe es `"0.00"` de verdad, y esa es la diferencia que hay que poder ver.
+ *
+ * `frente` es el nombre del enumerado —`TRANSITO`, `COACTIVA`—, para enrutar sin traducir. No es
+ * lo que se dibuja: lo que se lee son `modulo` y `queEstaParado`.
+ */
 export interface FrenteParado {
   readonly frente: string;
   readonly modulo: string;
   readonly queEstaParado: string;
   readonly porQueCuestaDinero: string;
   readonly cuantos: number;
+  readonly importe: ImporteConFecha | null;
 }
 
 /** `GET /indicadores/trabajo-parado`. */
