@@ -122,16 +122,24 @@ const COA_PANEL: Conector = {
  *       que no guarda.</li>
  * </ul>
  *
- * <h2>La tabla: cuatro columnas de cinco, y la quinta no tiene llave</h2>
+ * <h2>La tabla: cuatro columnas de cinco, y la quinta YA tiene llave (#177)</h2>
  *
  * «Nº», «Acto», «Fecha» y «Estado» salen de `actuaciones[]` —`numero`, `titulo`, `fecha` y
- * `medida`—. **«Costa S/» se queda en raya, y el motivo es una llave que falta**: `ActoResource`
- * no publica ningun identificador del acto —son diez campos y ninguno es el `actoId`— y
- * `CostaResource` referencia el acto que tarifa **por `actoId`**. Las dos publican el `tipo`,
- * pero emparejar por tipo se rompe el primer dia que un expediente tenga dos EMBARGO o dos
- * TASACION: `costa_acto_uq` es por acto, no por tipo, y la costa de uno acabaria escrita en la
- * fila del otro. Una costa es deuda que se le anade al obligado; ponerla en la fila equivocada es
- * peor que no ponerla. Se cierra publicando `actoId` en `ActoResource`, que es de backend.
+ * `medida`—. **«Costa S/» sigue en raya, pero ya no por falta de llave**: hasta #177
+ * `ActoResource` no publicaba ningun identificador del acto —eran diez campos y ninguno era el
+ * `actoId`—, de modo que lo unico comun con `CostaResource` era el `tipo`, y emparejar por tipo
+ * se rompe el primer dia que un expediente tenga dos EMBARGO o dos TASACION: `costa_acto_uq` es
+ * por acto, no por tipo, y la costa de uno acabaria escrita en la fila del otro. Una costa es
+ * deuda que se le anade al obligado; ponerla en la fila equivocada es peor que no ponerla.
+ *
+ * **Desde #177 `actuaciones[].actoId` viaja**, con el mismo nombre y el mismo tipo que
+ * `costas[].actoId`, y el cruce es posible: lo prueba `LaCostaCaeEnSuActoTest` del backend con un
+ * expediente de dos EMBARGO. Lo que falta ya no es la llave, es **pedir la tercera operacion**:
+ * esta hoja pide dos —la cartera y el proceso— y las costas las publica `GET
+ * /coactiva/liquidaciones-costas`, que es una peticion mas, con su decision de que liquidacion se
+ * mira y que dice la celda del acto que ninguna liquidacion tarifa todavia. Eso es **#200** y no
+ * entra en #177: encender una ruta es una decision que se revisa sola (ver la lista escrita a
+ * mano de `camino-a-la-api.test.ts`).
  *
  * Y «Estado» dibuja `medida`, que es lo unico que la operacion dice de en que quedo el acto. Solo
  * la REC-2 la lleva, asi que las demas filas dicen la raya — nunca «Conforme», que seria afirmar
@@ -170,7 +178,8 @@ const COA_EXP: Conector = {
             acto.numero,
             acto.titulo,
             formatearFecha(acto.fecha),
-            // Ver el javadoc: no hay llave con que emparejar la costa de este acto.
+            // Ver el javadoc: la llave ya esta (`acto.actoId`, #177); lo que falta es pedir
+            // `GET /coactiva/liquidaciones-costas`, que es otra operacion y es #200.
             SIN_DATO,
             acto.medida ?? SIN_DATO,
           ]),

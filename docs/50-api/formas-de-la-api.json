@@ -300,6 +300,7 @@
     },
     "actuaciones": [
       {
+        "actoId": "entero",
         "tipo": "texto",
         "titulo": "texto",
         "numero": "texto",
@@ -3023,6 +3024,7 @@
   "POST /coactiva/expedientes/{numero}/actos": {
     "expediente": "texto",
     "acto": {
+      "actoId": "entero",
       "tipo": "texto",
       "titulo": "texto",
       "numero": "texto",
@@ -3088,6 +3090,7 @@
     ]
   },
   "POST /coactiva/notificaciones": {
+    "actoId": "entero",
     "tipo": "texto",
     "titulo": "texto",
     "numero": "texto",
@@ -3151,6 +3154,7 @@
       {
         "expediente": "texto",
         "acto": {
+          "actoId": "entero",
           "tipo": "texto",
           "titulo": "texto",
           "numero": "texto",

@@ -15,6 +15,20 @@ import org.jspecify.annotations.Nullable;
  * en {@link ProcesoResource}, con la fecha a la que esta (regla 9, RNF-075). Repetirla en cada
  * actuacion invitaria a que una linea del proceso mostrara la deuda de marzo junto a la de agosto.
  *
+ * <h2>Con su identificador, y por una razon concreta (#177)</h2>
+ *
+ * <p>{@code actoId} es el <b>mismo nombre y el mismo tipo</b> con que {@link
+ * LiquidacionResource.CostaResource} referencia el acto que tarifa, porque es la misma llave: la
+ * costa se devenga <b>por acto</b> y {@code costa_acto_uq} (V35) impide tarifarlo dos veces. Sin
+ * el, lo unico comun entre las dos respuestas es {@code tipo}, y emparejar por tipo se rompe el
+ * primer dia que un expediente tenga dos EMBARGO o dos TASACION —que es lo normal—: la costa de uno
+ * acabaria escrita en la fila del otro. Eso no es una columna vacia, es <b>una cifra de deuda
+ * puesta en el acto equivocado</b>, indistinguible de una liquidada de verdad.
+ *
+ * <p>Es el identificador de {@code acto_coactivo}, no el numero impreso: {@code numero} es el del
+ * documento emitido, se reinicia por ejercicio y no es la llave con que la costa referencia nada.
+ *
+ * @param actoId el identificador del acto, con el que la costa liquidada lo referencia
  * @param tipo que acto es
  * @param titulo como se titula el documento que lo materializa
  * @param numero el numero impreso, que es el del documento emitido
@@ -27,6 +41,7 @@ import org.jspecify.annotations.Nullable;
  * @param diligencias las notificaciones del acto, de la primera a la ultima
  */
 public record ActoResource(
+        long actoId,
         String tipo,
         String titulo,
         String numero,
@@ -55,6 +70,7 @@ public record ActoResource(
             traza.add(DiligenciaResource.de(diligencia));
         }
         return new ActoResource(
+                acto.identificador(),
                 acto.tipo().name(),
                 acto.tipo().titulo(),
                 acto.numero(),

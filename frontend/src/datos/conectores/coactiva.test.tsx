@@ -66,6 +66,7 @@ const PROCESO: ProcesoDelExpediente = {
   expediente: EXPEDIENTE,
   actuaciones: [
     {
+      actoId: 11,
       tipo: 'REC1',
       titulo: 'RESOLUCION DE EJECUCION COACTIVA',
       numero: '1',
@@ -78,6 +79,7 @@ const PROCESO: ProcesoDelExpediente = {
       diligencias: [],
     },
     {
+      actoId: 12,
       tipo: 'REC2',
       titulo: 'RESOLUCION DE MEDIDA CAUTELAR (REC 2)',
       numero: '2',
@@ -198,11 +200,13 @@ describe('`coa-exp` — el expediente y sus actos', () => {
     expect(filas?.[1]?.[4]).toBe('RETENCION BANCARIA');
   });
 
-  it('NO empareja la costa de cada acto, porque no hay llave con que emparejarla', () => {
-    // `ActoResource` no publica ningun identificador del acto y `CostaResource` referencia el acto
-    // por `actoId`. Emparejar por `tipo` se rompe el primer dia que un expediente tenga dos
-    // EMBARGO: `costa_acto_uq` es por acto, no por tipo, y la costa de uno acabaria escrita en la
-    // fila del otro. Una costa es deuda que se le anade al obligado.
+  it('NO empareja la costa de cada acto: la llave ya esta, la operacion no se pide (#200)', () => {
+    // Desde #177 `ActoResource` publica `actoId` —el mismo con que `CostaResource` referencia el
+    // acto que tarifa—, asi que el cruce es posible; lo que esta hoja no hace todavia es pedir
+    // `GET /coactiva/liquidaciones-costas`, que es #200. Lo que NUNCA se hara es emparejar por
+    // `tipo`: se rompe el primer dia que un expediente tenga dos EMBARGO —`costa_acto_uq` es por
+    // acto, no por tipo— y la costa de uno acabaria escrita en la fila del otro. Una costa es
+    // deuda que se le anade al obligado.
     const columnaDeCostas = reparto.filas.get(0)?.map((fila) => fila[3]);
     expect(columnaDeCostas).toEqual([SIN_DATO, SIN_DATO]);
     // Y por si alguien la dedujera igualmente: ninguna celda dice lo que valen esas costas.
