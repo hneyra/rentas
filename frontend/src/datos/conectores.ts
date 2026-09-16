@@ -1,19 +1,20 @@
 import { coordenada, type Coordenada } from '@kamayuk/ui';
 import type { ClaveDeHoja } from '../pantallas/arbol.ts';
-import type { CorridaDelPredial, DeudaEnCoactiva, Paginado } from './lecturas.ts';
-import { RUTAS, pedirPagina, pedirUno } from './lecturas.ts';
+import type { CorridaDelPredial } from './lecturas.ts';
+import { RUTAS, pedirUno } from './lecturas.ts';
 // Los conectores de cada modulo viven en su archivo, y aqui solo se montan (#168). Aparte porque
 // varios modulos se conectan a la vez: un registro con el codigo de todos dentro es un archivo que
 // tres ramas editan en la misma linea.
 import { CONECTORES_DE_LICENCIAS } from './conectores/licencias.ts';
+import { CONECTORES_DE_COACTIVA } from './conectores/coactiva.ts';
 
 /**
  * **Que pantalla pide que, y que de lo que llega dibuja cada campo** (#97).
  *
- * <h2>Por que son DOS y no siete</h2>
+ * <h2>«Servida» no es «puede pintarse», y la diferencia se mide campo a campo</h2>
  *
- * Siete hojas declaran alguna operacion servida. Pero «servida» no es «puede pintarse», y la
- * diferencia se midio campo a campo:
+ * Varias hojas declaran alguna operacion servida y aun asi no se conectan, porque lo que la
+ * operacion publica no es lo que la pantalla ensena:
  *
  *   · **`seg-panel`** declara TRES servidas —modulos, sesion y municipalidad— y **ninguna publica
  *     nada de lo que la pantalla ensena**: usuarios registrados, activos, contrasenas caducadas.
@@ -25,7 +26,13 @@ import { CONECTORES_DE_LICENCIAS } from './conectores/licencias.ts';
  *     sensible— no las publica nadie, y la matriz de permisos es, medido, **una bolsa de codigos
  *     planos**: no distingue propios de heredados, que es justo lo que la pantalla pregunta.
  *
- * Quedan dos, y se hacen enteras y bien. Las otras cinco lo dicen — ver `porQueNoHayDato.ts`.
+ * Las que se conectan se hacen enteras y bien; las que no, lo dicen — ver `porQueNoHayDato.ts`.
+ *
+ * <h2>Este archivo es el REGISTRO; cada modulo vive en el suyo</h2>
+ *
+ * Desde #170, un conector se escribe en `conectores/<modulo>.ts` —con su javadoc campo a campo— y
+ * aqui entra **una linea**: varios modulos se conectan a la vez y este es el unico archivo que
+ * todos tocan. `PANEL` se queda porque no es de ningun modulo del arbol: es el panel del padron.
  *
  * <b>Ese «dos» es el de #97 y no la cuenta de hoy</b>: se deja escrito porque es la medida que
  * justifica la regla de mas abajo, y reescribirlo con el numero de esta semana la dejaria sin
@@ -100,35 +107,13 @@ const PANEL: Conector = {
   }),
 };
 
-/**
- * `coa-panel` — los expedientes coactivos abiertos.
- *
- * Sale **uno** de sus cinco campos, y es el unico que la operacion publica de verdad:
- * `totalElementos` de la pagina. Los otros cuatro se quedan en «no publicado» a proposito — ver
- * el javadoc de arriba: contarlos sobre la pagina daria un numero indistinguible de uno real.
- */
-const COA_PANEL: Conector = {
-  clave: ['coa-panel', 'deudas'],
-  pedir: (senal) => pedirPagina<DeudaEnCoactiva>(RUTAS.coactiva, senal),
-  repartir: (pagina: Paginado<DeudaEnCoactiva>): Reparto => ({
-    // `0|0` es el desplegable de ejercicio, no un campo de solo lectura: las coordenadas son las
-    // del bloque entero y no las de los campos `r`. Lo cazo la guarda de este archivo.
-    valores: new Map([[coordenada(0, 1), String(pagina.totalElementos)]]),
-    filas: new Map(),
-    noPublicados: new Map([
-      [coordenada(0, 2), NO_PUBLICADO],
-      [coordenada(0, 3), NO_PUBLICADO],
-      [coordenada(0, 4), NO_PUBLICADO],
-      [coordenada(0, 5), NO_PUBLICADO],
-    ]),
-  }),
-};
-
 /** Las hojas que piden de verdad. Las demas lo dicen; ver `porQueNoHayDato.ts`. */
 export const CONECTORES: Readonly<Partial<Record<ClaveDeHoja, Conector>>> = {
   panel: PANEL,
-  'coa-panel': COA_PANEL,
   ...CONECTORES_DE_LICENCIAS,
+  // Una linea por modulo, y el modulo entero en su archivo: cuatro se conectan a la vez y este
+  // registro es el unico que los cuatro tocan. Ver `conectores/coactiva.ts` (#170).
+  ...CONECTORES_DE_COACTIVA,
 };
 
 export { NO_PUBLICADO };

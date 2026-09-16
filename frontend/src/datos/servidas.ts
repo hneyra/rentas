@@ -3,6 +3,8 @@
  *
  * <h2>Catorce: dos de sesion (I-1), cuatro de seguridad (I-3), seis del padron (I-4) y dos de
  * licencias (#168)</h2>
+ * <h2>Dieciseis: dos de sesion (I-1), cuatro de seguridad (I-3), seis del padron (I-4) y cuatro
+ * de la cobranza coactiva (#170)</h2>
  *
  * La integracion no es un salto. El backend publica 181 operaciones y el proxy simula
  * dieciocho: encenderlas todas a la vez seria cambiar 181 respuestas en una sola tarde sin poder
@@ -70,6 +72,11 @@ export interface OperacionServida {
  * (I-4) y las dos de autorizaciones y licencias (#168). Cada tanda dejo escrito lo que vio al
  * encender lo suyo, y las cuatro notas siguen aqui porque lo que se vio es lo que justifica que la
  * ruta este en la lista.
+ * <b>Son dieciseis, y llegaron en cuatro tandas</b>: las dos de sesion que abrieron el camino
+ * (I-1), las cuatro con que se compone la navegacion (I-3), las seis del padron de
+ * contribuyentes (I-4) y las cuatro de la cobranza coactiva (#170). Cada tanda dejo escrito lo
+ * que vio al encender lo suyo, y las cuatro notas siguen aqui porque lo que se vio es lo que
+ * justifica que la ruta este en la lista.
  *
  * <h2>Las cuatro que enciende I-3, en el orden en que se encendieron</h2>
  *
@@ -159,6 +166,35 @@ export interface OperacionServida {
  * tablas, porque un contribuyente de verdad con los predios del artboard debajo seria peor que
  * una tabla vacia.
  *
+ * <h2>Las CUATRO de #170, las de la cobranza coactiva</h2>
+ *
+ * Son las que encienden `coa-exp` y `coa-cost`, y **ninguna de las cuatro exige un parametro**:
+ * los que se les mandan —`tamano`, `tributo`— son opcionales y estan publicados en
+ * `docs/50-api/parametros-de-la-api.json`, que es la condicion que #26 dejo escrita.
+ *
+ * <ol>
+ *   <li><b>`GET /coactiva/expedientes`</b> — la cartera. De ella sale <b>que</b> expediente
+ *       dibuja `coa-exp`: la pantalla todavia no tiene con que elegirlo, asi que toma el primero
+ *       de la relacion. Es la misma composicion que ya usaba el panel del predial con
+ *       `corridas/ultima` -> `observados`: la segunda lectura no se puede pedir sin la
+ *       primera.</li>
+ *   <li><b>`GET /coactiva/expedientes/{numero}/proceso`</b> — la linea de vida del expediente.
+ *       Publica la cabecera <b>otra vez</b> —`ExpedienteResource` entero— y ademas sus actos, asi
+ *       que los seis campos de la cabecera se leen de aqui y no de la lista: dos fuentes para el
+ *       mismo dato es como se llega a una pantalla que se contradice consigo misma.</li>
+ *   <li><b>`GET /coactiva/liquidaciones-costas`</b> — la relacion de liquidaciones, con el
+ *       detalle de cada una <b>linea por acto</b>. Es la que dibuja `coa-cost`.</li>
+ *   <li><b>`GET /coactiva/prescripcion`</b> — la relacion de prescripciones declaradas. Se pide
+ *       <b>acotada al tributo de la liquidacion</b>, que es la unica llave que las dos
+ *       comparten.</li>
+ * </ol>
+ *
+ * <b>Y la quinta que NO se enciende, con su motivo</b>: `POST /coactiva/convenios` publica los
+ * ocho campos de `coa-cart` y **crea un convenio de fraccionamiento**. No existe el `GET`. Esta
+ * interfaz hace una sola escritura —`PUT /seguridad/sesion/ejercicio`— y desde luego no va a
+ * hacer la segunda para pintar una pantalla: pedir datos fraccionando la deuda de alguien es
+ * exactamente el modo de fallo que esta lista existe para no tener.
+ *
  * <b>`GET /rentas/arbitrios`</b> tambien contesta 200 con lista vacia, medido, y tampoco se
  * enciende: es de la seccion «Valores» (F-6) y no del padron. Encenderla en este PR cambiaria
  * una pantalla que este issue no toca.
@@ -207,6 +243,10 @@ export const YA_SERVIDAS: readonly OperacionServida[] = [
   { metodo: 'GET', ruta: '/rentas/beneficios' },
   { metodo: 'GET', ruta: '/licencias/ciiu' },
   { metodo: 'GET', ruta: '/licencias/funcionamiento' },
+  { metodo: 'GET', ruta: '/coactiva/expedientes' },
+  { metodo: 'GET', ruta: '/coactiva/expedientes/{numero}/proceso' },
+  { metodo: 'GET', ruta: '/coactiva/liquidaciones-costas' },
+  { metodo: 'GET', ruta: '/coactiva/prescripcion' },
 ];
 
 /** `/rentas/vehiculos/{placa}` → `^/rentas/vehiculos/[^/]+$`. */
