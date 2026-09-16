@@ -32,9 +32,9 @@ import { useTextosDelMarco } from './i18n/textosDelMarco.ts';
  *
  * <h2>Lo que todavia NO hace, dicho aqui y no descubierto luego</h2>
  *
- * · **Pedir datos en las 38 pantallas que no tienen backend.** Dos de las cuarenta piden de verdad
- *   —`panel` y `coa-panel`—; el resto dice por que no. Ver `datos/conectores.ts`, que cuenta campo
- *   a campo por que «servida» no es «puede pintarse».
+ * · **Pedir datos en las pantallas que no tienen backend.** Solo piden las que tienen conector en
+ *   `datos/conectores.ts` —el centinela de `conectores.test.ts` dice cuantas son—; el resto dice
+ *   por que no. Ahi esta contado campo a campo por que «servida» no es «puede pintarse».
  * · **Las acciones del pie hacen lo minimo honesto**: imprimir imprime, y las otras tres avisan
  *   de que no escriben todavia. Un boton que no dice nada al pulsarlo se lee como una pantalla
  *   rota; uno que dice lo que hace —y lo que no— se lee como una pantalla a medio conectar, que

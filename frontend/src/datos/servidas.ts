@@ -1,7 +1,8 @@
 /**
  * Las operaciones que el backend YA sirve en el entorno donde corre la aplicacion.
  *
- * <h2>Doce: dos de sesion (I-1), cuatro de seguridad (I-3) y seis del padron (I-4)</h2>
+ * <h2>Catorce: dos de sesion (I-1), cuatro de seguridad (I-3), seis del padron (I-4) y dos de
+ * licencias (#168)</h2>
  *
  * La integracion no es un salto. El backend publica 181 operaciones y el proxy simula
  * dieciocho: encenderlas todas a la vez seria cambiar 181 respuestas en una sola tarde sin poder
@@ -64,10 +65,11 @@ export interface OperacionServida {
  * El tipo es `readonly OperacionServida[]` y no una tupla: lo que cambia el dia que se encienda
  * la siguiente es esta lista, y nada mas.
  *
- * <b>Son doce, y llegaron en tres tandas</b>: las dos de sesion que abrieron el camino (I-1),
- * las cuatro con que se compone la navegacion (I-3) y las seis del padron de contribuyentes
- * (I-4). Cada tanda dejo escrito lo que vio al encender lo suyo, y las tres notas siguen aqui
- * porque lo que se vio es lo que justifica que la ruta este en la lista.
+ * <b>Son catorce, y llegaron en cuatro tandas</b>: las dos de sesion que abrieron el camino
+ * (I-1), las cuatro con que se compone la navegacion (I-3), las seis del padron de contribuyentes
+ * (I-4) y las dos de autorizaciones y licencias (#168). Cada tanda dejo escrito lo que vio al
+ * encender lo suyo, y las cuatro notas siguen aqui porque lo que se vio es lo que justifica que la
+ * ruta este en la lista.
  *
  * <h2>Las cuatro que enciende I-3, en el orden en que se encendieron</h2>
  *
@@ -160,6 +162,35 @@ export interface OperacionServida {
  * <b>`GET /rentas/arbitrios`</b> tambien contesta 200 con lista vacia, medido, y tampoco se
  * enciende: es de la seccion «Valores» (F-6) y no del padron. Encenderla en este PR cambiaria
  * una pantalla que este issue no toca.
+ *
+ * <h2>Y las DOS de licencias (#168), con lo que se midio al encender cada una</h2>
+ *
+ * Lo que se midio aqui **no es un `curl`, y hay que decirlo**: es el contrato generado de los
+ * controladores —`docs/50-api/formas-de-la-api.json` y `parametros-de-la-api.json`, regenerados
+ * para este issue— campo a campo contra lo que cada pantalla dibuja. Es lo que hace que la guarda
+ * de mas abajo pueda ponerse roja sin que nadie levante nada.
+ *
+ * <ol>
+ *   <li><b>`GET /licencias/ciiu`</b> — publica una pagina de ocho campos por fila, y las
+ *       <b>cuatro</b> columnas de la tabla de `aut-cat` salen de cuatro de ellos: `codigo`,
+ *       `descripcion`, `seccion` y `riesgoItse`. Se enciende porque la cobertura es entera, y se
+ *       pide con <b>`?tamano=20`</b> escrito: el catalogo tiene 1 842 giros —el propio artboard lo
+ *       dice, y por eso elige un Combobox— asi que la tabla es una ventana. El parametro con el
+ *       que el buscador filtrara es `?descripcion=`, que el contrato publica.</li>
+ *   <li><b>`GET /licencias/funcionamiento`</b> — publica veintiun campos por licencia, y las
+ *       <b>cinco</b> columnas del padron de `aut-tram` salen de `nroLicencia`, `contribuyente`,
+ *       `denominacionComercial`, `giros[].descripcion` y `estado`. <b>El artboard se la atribuye a
+ *       `aut-panel` y no a `aut-tram`</b>, y aun asi es `aut-tram` quien la pide: es la unica de
+ *       las diecisiete de licencias cuya forma cuadra con lo que esa tabla ensena. El arbol no se
+ *       toca por eso —es la transcripcion del artboard—, y el motivo esta en
+ *       `conectores/licencias.ts`.</li>
+ * </ol>
+ *
+ * <b>Lo que este par NO enciende, y por que.</b> Los seis mandos de `aut-tram` —ejercicio, tipo,
+ * estado, agrupacion y el par Desde/Hasta— <b>no son parametros</b> de `GET
+ * /licencias/funcionamiento`: los ocho que admite son otros. Quien los admitiria es `POST
+ * /licencias/funcionamiento/reportes/padron`, y es una <b>escritura</b> por el verbo — esta
+ * interfaz hace una sola, y no es esta.
  */
 export const YA_SERVIDAS: readonly OperacionServida[] = [
   { metodo: 'GET', ruta: '/seguridad/sesion' },
@@ -174,6 +205,8 @@ export const YA_SERVIDAS: readonly OperacionServida[] = [
   { metodo: 'GET', ruta: '/rentas/predial/corridas/ultima' },
   { metodo: 'GET', ruta: '/rentas/predial/corridas/{corridaId}/observados' },
   { metodo: 'GET', ruta: '/rentas/beneficios' },
+  { metodo: 'GET', ruta: '/licencias/ciiu' },
+  { metodo: 'GET', ruta: '/licencias/funcionamiento' },
 ];
 
 /** `/rentas/vehiculos/{placa}` → `^/rentas/vehiculos/[^/]+$`. */

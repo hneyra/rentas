@@ -25,12 +25,12 @@ import {
 const TODAS: readonly Hoja[] = ARBOL.flatMap((modulo) => [...modulo.hojas]);
 
 describe('el cruce contra lo que el backend sirve', () => {
-  it('EL CENTINELA: hay cuarenta hojas y doce operaciones servidas', () => {
+  it('EL CENTINELA: hay cuarenta hojas y catorce operaciones servidas', () => {
     // Sin esto, un arbol vacio o unas `YA_SERVIDAS` vacias dejarian todo lo de abajo pasando
     // sobre la nada — y la respuesta seria «ninguna pantalla tiene datos», que ademas parece
     // razonable.
     expect(TODAS).toHaveLength(40);
-    expect(YA_SERVIDAS).toHaveLength(12);
+    expect(YA_SERVIDAS).toHaveLength(14);
   });
 
   it('cruza por RUTA, no por verbo: dos servidas las declara el artboard como `BASE`', () => {
@@ -50,12 +50,19 @@ describe('el cruce contra lo que el backend sirve', () => {
     expect(utiles.every((o) => o.verbo !== 'PUT')).toBe(true);
   });
 
-  it('siete hojas tienen alguna operacion util, y treinta y tres ninguna', () => {
+  it('ocho hojas tienen alguna operacion util, y treinta y dos ninguna', () => {
     const con = TODAS.filter((hoja) => operacionesUtiles(hoja).length > 0);
+    // `aut-cat` y `aut-panel` entran con #168, y las dos por la ruta que el ARTBOARD les
+    // atribuye: `GET /licencias/ciiu` a la primera y `GET /licencias/funcionamiento` a la
+    // segunda. **`aut-tram` no esta aqui y si tiene conector**, que es la unica pareja de este
+    // tipo en las cuarenta: la operacion que dibuja sus cinco columnas es la que el artboard le
+    // dio a `aut-panel`, y el arbol es la transcripcion del artboard. Esta funcion solo decide
+    // que decir cuando NO hay conector, asi que la discrepancia no llega a ninguna pantalla —
+    // pero se anota aqui, que es donde se ve.
     expect(con.map((h) => h.clave).sort()).toEqual(
-      ['coa-panel', 'panel', 'predios', 'seg-acc', 'seg-panel', 'valores'].sort(),
+      ['aut-cat', 'aut-panel', 'coa-panel', 'panel', 'predios', 'seg-acc', 'seg-panel', 'valores'].sort(),
     );
-    expect(TODAS.length - con.length).toBe(34);
+    expect(TODAS.length - con.length).toBe(32);
   });
 });
 

@@ -49,10 +49,15 @@ function soloLecturaDe(clave: ClaveDeHoja): readonly string[] {
 }
 
 describe('los conectores', () => {
-  it('EL CENTINELA: hay dos, y no cero ni cuarenta', () => {
+  it('EL CENTINELA: estan los que estan, y no cero ni cuarenta', () => {
     // Cero dejaria todo lo de abajo sin sujeto. Cuarenta significaria que alguien conecto
     // pantallas cuyas operaciones no publican lo que ensenan, que es lo que este archivo evita.
-    expect(Object.keys(CONECTORES).sort()).toEqual(['coa-panel', 'panel']);
+    // La lista se escribe a mano y crece de una en una: conectar una pantalla es una decision, y
+    // una decision se revisa leyendo su diff. Las dos de licencias llegan con #168, y su medida
+    // —que publica cada operacion y que no— esta en `conectores/licencias.ts`.
+    expect(Object.keys(CONECTORES).sort()).toEqual(
+      ['aut-cat', 'aut-tram', 'coa-panel', 'panel'].sort(),
+    );
   });
 
   it('NINGUN campo de una pantalla conectada se queda sin decidir', () => {

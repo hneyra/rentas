@@ -347,6 +347,96 @@ export interface DeudaPorConcepto {
   readonly deuda: PartidasDeLaDeuda;
 }
 
+// ── Autorizaciones y licencias ──────────────────────────────────────────────────────────────
+
+/**
+ * Un giro del catalogo CIIU, tal como `GET /licencias/ciiu` lo publica.
+ *
+ * **Ocho campos, y la pantalla dibuja cuatro.** Los otros cuatro se declaran igualmente, por lo
+ * mismo que `sector`, `simulacion` y `conjunto` en `CorridaDelPredial`: un campo que no se
+ * declara es un campo que el proveedor puede retirar sin que nada se ponga rojo. Y dos de ellos
+ * —`zonificacionCompatible` y `requiereSectorial`— son justo lo que haria falta el dia que
+ * `aut-sol` quiera comprobar la compatibilidad de uso, asi que dejarlos escritos ahorra volver a
+ * leer el contrato.
+ */
+export interface GiroCiiu {
+  readonly codigo: string;
+  readonly descripcion: string;
+  /** La seccion CIIU. Es lo que la columna «Materia» del artboard ensena. */
+  readonly seccion: string;
+  /** El nivel de riesgo ITSE, que es lo que decide la modalidad de la licencia y su plazo. */
+  readonly riesgoItse: string;
+  readonly zonificacionCompatible: string;
+  readonly requiereSectorial: boolean;
+  readonly extendido: boolean;
+  readonly activo: boolean;
+}
+
+/** Un giro autorizado en una licencia de funcionamiento. */
+export interface GiroDeLaLicencia {
+  readonly codigo: string;
+  readonly descripcion: string;
+  /** Si es el giro principal. Es el que la columna «Giro» del padron ensena. */
+  readonly principal: boolean;
+  readonly activo: boolean;
+}
+
+/** Un acto del historial de una licencia de funcionamiento. */
+export interface ActoDeLaLicencia {
+  readonly tipo: string;
+  readonly fecha: string;
+  readonly motivo: string;
+  readonly resolucion: string;
+  readonly observacion: string;
+}
+
+/** Un duplicado emitido de una licencia. */
+export interface DuplicadoDeLaLicencia {
+  readonly numero: number;
+  readonly fecha: string;
+  readonly motivo: string;
+  readonly reimpresion: number;
+}
+
+/**
+ * Una licencia de funcionamiento, tal como `GET /licencias/funcionamiento` la publica.
+ *
+ * **Veintiun campos, y el padron dibuja cinco.** Los dieciseis restantes se declaran por lo mismo
+ * que los cuatro de `GiroCiiu`; ademas, tres de ellos dicen algo que conviene tener a mano:
+ * `estadoALaFecha` es la fecha a la que el estado esta dicho (regla 9), y `fechaDeEmision` y
+ * `fechaDeVencimiento` son las dos que un filtro «Desde/Hasta» usaria — **si la operacion
+ * admitiera ese filtro, que no lo admite**: ver `conectores/licencias.ts`.
+ */
+export interface LicenciaDeFuncionamiento {
+  readonly nroLicencia: string;
+  /** El codigo corto del estado. `estado` es el que se lee. */
+  readonly est: string;
+  readonly estado: string;
+  /** La fecha a la que ese estado esta dicho (regla 9). */
+  readonly estadoALaFecha: string;
+  /** El titular. Es el nombre, no el codigo: el codigo es `codContribuyente`. */
+  readonly contribuyente: string;
+  readonly codContribuyente: string;
+  readonly denominacionComercial: string;
+  readonly direccion: string;
+  readonly tipoDeLicencia: string;
+  readonly areaDelEstablecimiento: string;
+  readonly zonificacion: string;
+  readonly zonaDelTerritorio: string;
+  readonly ordenanzaDeLaZona: string;
+  readonly zonaOrigen: string;
+  readonly comprobacionDelTerritorio: string;
+  readonly aforo: number;
+  readonly fechaDeEmision: string;
+  readonly fechaDeVencimiento: string;
+  readonly nExpediente: string;
+  readonly fechaDeExpediente: string;
+  readonly fichaEconomica: number;
+  readonly giros: readonly GiroDeLaLicencia[];
+  readonly historial: readonly ActoDeLaLicencia[];
+  readonly duplicados: readonly DuplicadoDeLaLicencia[];
+}
+
 // ── El panel ────────────────────────────────────────────────────────────────────────────────
 
 /** Una tarjeta de cabecera del panel. */
@@ -588,6 +678,35 @@ export const RUTAS = {
   bitacoraDe: (ejercicio: string) =>
     `/seguridad/auditoria?ejercicio=${encodeURIComponent(ejercicio)}`,
   arbitrios: '/rentas/arbitrios',
+  /**
+   * El catalogo CIIU, **una ventana y no la lista entera** (#168).
+   *
+   * `?tamano=20` escrito y no omitido, aunque veinte sea tambien el tamano por omision: el
+   * catalogo tiene **1 842 giros** —lo dice el propio artboard, que por eso elige un Combobox y
+   * no un Select— y el numero que decide cuantos viajan tiene que estar a la vista de quien lea
+   * esta linea, no escondido en un valor por omision del backend que puede cambiar sin avisar.
+   *
+   * **Lo contrario seria `?tamano=1842`**, y es exactamente lo que no se hace: mil ochocientas
+   * filas en una tabla que ensena cuatro no las lee nadie, y el buscador que el artboard dibuja
+   * —«Buscar giro o actividad»— existe para no tener que traerlas. Cuando la pantalla sepa pasarle
+   * lo tecleado a su conector, el parametro es **`?descripcion=`**, que el contrato publica
+   * (`docs/50-api/parametros-de-la-api.json`) junto con `codigoCiiu`, `seccion`, `pagina` y
+   * `ordenarPor`. Hoy `Conector.pedir` solo recibe una senal de aborto, asi que no hay de donde
+   * sacar el texto: el hueco esta dicho en `conectores/licencias.ts` y no tapado aqui.
+   */
+  ciiu: '/licencias/ciiu?tamano=20',
+  /**
+   * El padron de licencias de funcionamiento.
+   *
+   * Se pide **pelada**: los seis campos con que el artboard la filtra —ejercicio, tipo de
+   * licencia, estado, agrupacion y el par Desde/Hasta— **no son parametros de esta operacion**.
+   * Los ocho que admite son otros (`nroLicencia`, `nombreDelContribuyente`,
+   * `denominacionComercial`, `direccion`, `nExpediente`, `ordenarPor`, `pagina`, `tamano`), y
+   * mandar un `?ejercicio=` que el contrato no declara seria construir sobre un nombre que nada
+   * de este repositorio puede comprobar — el mismo motivo por el que `/rentas/predios` estuvo
+   * fuera hasta #26.
+   */
+  licenciasDeFuncionamiento: '/licencias/funcionamiento',
   calculoIndividual: '/rentas/predial/calculo-individual',
   calculoMasivo: '/rentas/predial/calculo-masivo',
   calculoVehicular: '/rentas/vehicular/calculo',
