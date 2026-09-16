@@ -1,10 +1,10 @@
 /**
  * Las operaciones que el backend YA sirve en el entorno donde corre la aplicacion.
  *
- * <h2>Veintiocho: dos de sesion (I-1), cuatro de seguridad (I-3), seis del padron (I-4), dos de
+ * <h2>Treinta y dos: dos de sesion (I-1), cuatro de seguridad (I-3), seis del padron (I-4), dos de
  * licencias (#168), cuatro de la cobranza coactiva (#170), dos de indicadores (#167), tres de
  * la ventanilla de Consultas (#169), la bitacora de auditoria (#181) y cuatro de
- * Fiscalizacion (#179)</h2>
+ * Fiscalizacion (#179) y cuatro de Transito (#180)</h2>
  *
  * La integracion no es un salto. El backend publica 181 operaciones y el proxy simula
  * dieciocho: encenderlas todas a la vez seria cambiar 181 respuestas en una sola tarde sin poder
@@ -67,13 +67,13 @@ export interface OperacionServida {
  * El tipo es `readonly OperacionServida[]` y no una tupla: lo que cambia el dia que se encienda
  * la siguiente es esta lista, y nada mas.
  *
- * <b>Son veintiocho, y llegaron en ocho tandas</b>: las dos de sesion que abrieron el camino
+ * <b>Son treinta y dos, y llegaron en nueve tandas</b>: las dos de sesion que abrieron el camino
  * (I-1), las cuatro con que se compone la navegacion (I-3), las seis del padron de contribuyentes
  * (I-4), las dos de autorizaciones y licencias (#168), las cuatro de la cobranza coactiva (#170),
  * las dos de indicadores con que se conecta el modulo Inicio (#167), las tres de la ventanilla de
- * Consultas (#169), la bitacora de auditoria (#181) y las cuatro de Fiscalizacion (#179). Cada
- * tanda dejo escrito lo que vio al encender lo suyo, y las ocho notas siguen aqui porque lo que se
- * vio es lo que justifica que la ruta este en la lista.
+ * Consultas (#169), la bitacora de auditoria (#181) las cuatro de Fiscalizacion (#179) y las
+ * cuatro de Transito (#180). Cada tanda dejo escrito lo que vio al encender lo suyo, y las nueve
+ * notas siguen aqui porque lo que se vio es lo que justifica que la ruta este en la lista.
  *
  * <h2>Las cuatro que enciende I-3, en el orden en que se encendieron</h2>
  *
@@ -291,7 +291,7 @@ export interface OperacionServida {
  *
  * <b>Lo que la hace distinta de las veintitres de arriba, y es el motivo de #181</b>:
  * `parametros-de-la-api.json` la declara con <b>`ejercicio` entre los obligatorios</b> —la unica
- * de las veintiocho que tiene un obligatorio fuera de la ruta— y el controlador lo exige en la
+ * de las treinta y dos que tiene un obligatorio fuera de la ruta— y el controlador lo exige en la
  * firma (`@RequestParam("ejercicio") int`), asi que sin el la peticion <b>ni siquiera llega al
  * metodo</b>: Spring contesta 422 «Falta el parametro obligatorio 'ejercicio'». Y no es un filtro
  * que se pueda omitir por comodidad — `ConsultaDeAuditoria` lo dice en su propio javadoc: la tabla
@@ -387,6 +387,10 @@ export const YA_SERVIDAS: readonly OperacionServida[] = [
   { metodo: 'GET', ruta: '/fiscalizacion/programas/{id}/muestra' },
   { metodo: 'GET', ruta: '/fiscalizacion/actas' },
   { metodo: 'GET', ruta: '/fiscalizacion/resoluciones/{numero}' },
+  { metodo: 'GET', ruta: '/transito/papeletas' },
+  { metodo: 'GET', ruta: '/transito/papeletas/{numero}/actos' },
+  { metodo: 'GET', ruta: '/transito/internamientos' },
+  { metodo: 'GET', ruta: '/rentas/vehiculos/{placa}' },
 ];
 
 /** `/rentas/vehiculos/{placa}` → `^/rentas/vehiculos/[^/]+$`. */

@@ -1,4 +1,4 @@
-import { coordenada, type Coordenada } from '@kamayuk/ui';
+import { coordenada, type Ausencia, type Coordenada, type DatosDeUnaTabla } from '@kamayuk/ui';
 import type { ClaveDeHoja } from '../pantallas/arbol.ts';
 import type { CorridaDelPredial } from './lecturas.ts';
 import { RUTAS, pedirUno } from './lecturas.ts';
@@ -7,6 +7,7 @@ import { CONECTORES_DE_COACTIVA } from './conectores/coactiva.ts';
 import { CONECTORES_DE_INICIO } from './conectores/inicio.ts';
 import { CONECTORES_DE_CONSULTAS } from './conectores/consultas.ts';
 import { CONECTORES_DE_FISCALIZACION } from './conectores/fiscalizacion.ts';
+import { CONECTORES_DE_TRANSITO } from './conectores/transito.ts';
 import { CONECTORES_DE_SEGURIDAD } from './conectores/seguridad.ts';
 
 /**
@@ -72,8 +73,29 @@ import { CONECTORES_DE_SEGURIDAD } from './conectores/seguridad.ts';
 export interface Reparto {
   /** Los campos de solo lectura que SI salen de lo que llego. */
   readonly valores: ReadonlyMap<Coordenada, string>;
-  /** Las filas de la tabla de un bloque. */
+  /** Las filas de la tabla de un bloque, **por indice de bloque**. Sus celdas son cadenas. */
   readonly filas: ReadonlyMap<number, readonly (readonly string[])[]>;
+  /**
+   * Las filas de una tabla **con `clave`**, por esa clave (`kamayuk-lib`#87).
+   *
+   * <h2>Por que hay dos caminos y no uno</h2>
+   *
+   * Porque `filas` —el de arriba, el de #97— lleva `readonly string[]` por fila, y una cadena **no
+   * puede decir que no hay dato**: `''` se lee como un blanco y `'—'` como una raya muda. El
+   * camino de la clave lleva `CeldaDeLaTabla`, que ademas de la cadena admite `{ texto: null,
+   * nota }` — y entonces el interprete escribe la palabra que su tabla declara en `sinDato` y
+   * **anuncia el motivo en la celda**.
+   *
+   * La diferencia no es estetica. `coa-exp` tiene hoy una columna «Costa S/» en raya porque falta
+   * pedir una tercera operacion, y `coa-cost` otra en «Cantidad»: las dos rayas son mudas, y el
+   * motivo —que existe, y esta escrito— vive solo en el javadoc de su conector, donde no lo lee
+   * quien mira la pantalla. Con este camino el motivo viaja con la celda.
+   *
+   * **Es aditivo y no sustituye a nada**: una tabla sin `clave` sigue tomando sus filas del indice
+   * de su bloque, exactamente como antes. Lo estrena Transito (#180); migrar las de Coactiva y las
+   * de Fiscalizacion es otro issue.
+   */
+  readonly tablas?: ReadonlyMap<string, DatosDeUnaTabla>;
   /** Los campos que la operacion servida NO publica, con la palabra que va en su hueco. */
   readonly noPublicados: ReadonlyMap<Coordenada, string>;
 }
@@ -96,6 +118,19 @@ export interface Conector {
    * el `enLaRuta` con que el marco lee el sujeto.
    */
   readonly exigeSujeto?: boolean;
+  /**
+   * **Que decir cuando exige sujeto y la direccion no lo trae**, si no vale la frase de por
+   * omision (#180).
+   *
+   * Las tres operaciones de Consultas son de un **contribuyente** y `useDatosDeLaHoja` lo dice con
+   * esas palabras. `tra-veh` es de una **placa**, y la misma frase le pediria a quien atiende el
+   * codigo de un contribuyente para abrir la ficha de un vehiculo: un mensaje que nombra el dato
+   * equivocado se lee como una pantalla rota, no como una pantalla que espera algo.
+   *
+   * Va aqui —y no en una lista aparte, ni en el gancho con un `if` por hoja— por lo mismo que
+   * `exigeSujeto`: quien sabe que sujeto necesita una hoja es quien la pide.
+   */
+  readonly sinSujeto?: Ausencia;
   /**
    * **Esta hoja es de un ejercicio concreto, y el ejercicio sale de la SESION** (#181).
    *
@@ -225,6 +260,7 @@ export const CONECTORES: Readonly<Partial<Record<ClaveDeHoja, Conector>>> = {
   ...CONECTORES_DE_INICIO,
   ...CONECTORES_DE_CONSULTAS,
   ...CONECTORES_DE_FISCALIZACION,
+  ...CONECTORES_DE_TRANSITO,
   ...CONECTORES_DE_SEGURIDAD,
 };
 

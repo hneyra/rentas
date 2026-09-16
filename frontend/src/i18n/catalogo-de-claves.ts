@@ -62,6 +62,14 @@ function deLasPantallas(): readonly string[] {
       salida.push(tabla.titulo, ...tabla.columnas.map((c) => c.rotulo));
       if (tabla.nota !== undefined) salida.push(tabla.nota);
       if (tabla.accion !== undefined) salida.push(tabla.accion);
+      // La palabra de una celda sin dato y su motivo son TEXTO de la definicion —el interprete los
+      // pasa por `traducir`—, asi que entran en el inventario como el titulo o la nota
+      // (`kamayuk-lib`#87, #180). Sin esta linea se irian al DOM en castellano en cualquier idioma,
+      // y el locale no lo echaria de menos: lo que nadie lista, nadie lo reclama.
+      if (tabla.sinDato !== undefined) {
+        salida.push(tabla.sinDato.texto);
+        if (tabla.sinDato.nota !== undefined) salida.push(tabla.sinDato.nota);
+      }
     }
   }
   return salida;

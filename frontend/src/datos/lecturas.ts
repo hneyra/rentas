@@ -739,6 +739,168 @@ export interface PrescripcionDeclarada {
   readonly observacion: string;
 }
 
+// ── Transito: papeletas, sus actos, el deposito y la ficha del vehiculo (#180) ──────────────
+
+/**
+ * Una papeleta de transito, de `GET /transito/papeletas` (RF-060).
+ *
+ * Los veintiun campos que `PapeletaResource` publica, con la anulabilidad que el controlador
+ * declara. **Se declaran todos aunque `tra-pap` lea uno**: un campo declarado es un campo que el
+ * proveedor no puede retirar sin poner rojo este build, que es lo que I-4 aprendio al encender la
+ * ficha del contribuyente.
+ *
+ * Los importes son texto decimal (regla 1) y `fechaInfraccion` es ISO 8601 sin hora.
+ */
+export interface PapeletaDeTransito {
+  readonly id: number;
+  readonly familia: string;
+  readonly numero: string;
+  readonly fechaInfraccion: string;
+  readonly horaInfraccion: string | null;
+  readonly lugar: string;
+  readonly placa: string | null;
+  readonly vehiculoId: number | null;
+  readonly infractorId: number | null;
+  readonly propietarioId: number | null;
+  readonly contribuyenteId: number | null;
+  readonly predioId: number | null;
+  readonly notificacionPreviaId: number | null;
+  readonly baseImponible: string;
+  readonly porcentajeInfraccion: string;
+  readonly importeInfraccion: string;
+  readonly porcentajeACobrar: string;
+  readonly importeAPagar: string;
+  readonly importeConBeneficio: string | null;
+  readonly estado: string;
+  readonly usuarioRegistro: string | null;
+}
+
+/**
+ * Una diligencia de notificacion de un acto, con su acuse.
+ *
+ * **Vienen todas, una fila por intento**, y el backend dice por que: «quedarse con la ultima
+ * escondería que las dos anteriores no encontraron a nadie, que es justamente lo que hay que poder
+ * mostrar cuando el administrado discute la notificación».
+ */
+export interface AcuseDelActo {
+  readonly intento: number;
+  readonly fecha: string;
+  readonly modalidad: string;
+  readonly resultado: string;
+  readonly recibidoPor: string | null;
+  readonly acuse: string | null;
+  readonly exigibleDesde: string | null;
+}
+
+/**
+ * Un documento emitido por una papeleta, de `GET /transito/papeletas/{numero}/actos`.
+ *
+ * `clase` dice de que registro sale —`RESOLUCION_GERENCIA` o `ACTA_INTERNAMIENTO`—, `tipo` que
+ * documento es dentro de su clase y `numero` el numero impreso. `documentoId` es la fila de
+ * `documento_emitido` con que se reimprime (RF-132): un identificador interno, no un numero de
+ * documento.
+ *
+ * **No publica ningun estado del acto.** Lo unico que dice de como quedo son sus `acuses`, y el
+ * backend prohibe expresamente resumirlos en el ultimo.
+ */
+export interface ActoDeLaPapeleta {
+  readonly clase: string;
+  readonly tipo: string;
+  readonly numero: string;
+  readonly fecha: string;
+  readonly documentoId: number;
+  readonly observacion: string;
+  readonly acuses: readonly AcuseDelActo[];
+}
+
+/** Un recurso presentado contra la papeleta. */
+export interface DescargoDeLaPapeleta {
+  readonly id: number;
+  readonly nDeExpediente: string;
+  readonly fecha: string;
+  readonly tipoDeRecurso: string;
+  readonly presentadoHasta: string;
+  readonly enPlazo: boolean;
+}
+
+/**
+ * El expediente de una papeleta: sus recursos y **todos** sus documentos, en orden de fecha.
+ *
+ * La secuencia es una sola aunque los papeles salgan de tres registros —`resolucion_gerencia`,
+ * `internamiento` e `internamiento_movimiento`—: componerla es del backend, y por eso esta
+ * interfaz no intercala tres listas a mano.
+ */
+export interface ExpedienteDeLaPapeleta {
+  readonly papeleta: string;
+  readonly familia: string;
+  readonly estado: string;
+  readonly descargos: readonly DescargoDeLaPapeleta[];
+  readonly actos: readonly ActoDeLaPapeleta[];
+}
+
+/**
+ * Una fila de la grilla «Vehiculos en deposito», de `GET /transito/internamientos` (RF-064).
+ *
+ * <h2>Dias si, importe no — y lo dice el backend, no esta interfaz</h2>
+ *
+ * `tasaDeCustodia` **no es una tarifa**: es «el concepto del TUPA con que se cobra la custodia».
+ * El propio `InternamientoEnConsulta` lo deja escrito: «el prototipo dibuja "Tasa diaria S/" y
+ * "Custodia S/" en la grilla. Aqui no estan, y no es un olvido: la tarifa de la custodia vive en
+ * `tasa` y su ordenanza es **D-02b, que sigue abierta**. Publicar una cifra compuesta con una
+ * tarifa inventada seria peor que no publicarla —el administrado pagaria lo que la pantalla
+ * diga—». O sea que el hueco de esta pantalla es el de una decision abierta, y no el de un campo
+ * olvidado.
+ *
+ * `dias` va **con su fecha** (`calculadoA`, regla 9 / RNF-075): los dias en deposito de hoy no son
+ * los de manana.
+ */
+export interface InternamientoEnDeposito {
+  readonly id: number;
+  readonly placa: string;
+  readonly papeleta: string | null;
+  readonly deposito: string;
+  readonly fechaDeIngreso: string;
+  readonly fechaDeSalida: string | null;
+  readonly dias: number;
+  /** La fecha con la que se contaron los dias (regla 9, RNF-075). */
+  readonly calculadoA: string;
+  readonly estado: string;
+  /** El **concepto del TUPA**, no un importe. Ver el javadoc de esta interfaz. */
+  readonly tasaDeCustodia: string;
+  readonly acta: string;
+}
+
+/** Un cambio de placa, con quien lo hizo y por que. */
+export interface CambioDePlaca {
+  readonly anterior: string;
+  readonly nueva: string;
+  readonly usuario: string;
+  readonly fecha: string;
+  readonly observacion: string;
+}
+
+/**
+ * La ficha de un vehiculo, de `GET /rentas/vehiculos/{placa}` (RF-024).
+ *
+ * La placa se compara **sin el guion**, asi que `T2G-418` y `T2G418` llevan a la misma ficha. Una
+ * placa que no esta en el padron de esta municipalidad contesta **404**, y una mal formada **422**:
+ * son dos respuestas distintas a proposito, y la pantalla las dice como averia y no como dato.
+ */
+export interface VehiculoServido {
+  readonly id: number;
+  readonly placa: string;
+  readonly contribuyenteId: number;
+  readonly marca: string;
+  readonly modelo: string;
+  readonly categoria: string | null;
+  readonly anioFabricacion: number;
+  readonly anioInscripcion: number;
+  readonly numeroMotor: string | null;
+  readonly numeroSerie: string | null;
+  readonly estado: string;
+  readonly historialDePlacas: readonly CambioDePlaca[];
+}
+
 // ── El panel ────────────────────────────────────────────────────────────────────────────────
 
 /** Una tarjeta de cabecera del panel. */
@@ -1348,6 +1510,60 @@ export const RUTAS = {
    * fuera hasta #26.
    */
   licenciasDeFuncionamiento: '/licencias/funcionamiento',
+  /**
+   * La papeleta que `tra-pap` dibuja: **la primera de la relacion, sin filtrar** (#180).
+   *
+   * `?tamano=1` por lo mismo que `expedientesCoactivos`: esta pantalla ensena los actos de UNA
+   * papeleta y todavia no tiene con que elegirla —su caja de busqueda entra en #172—, asi que
+   * pedir veinte para usar una seria pedir diecinueve que nadie mira.
+   *
+   * **Sin ningun criterio, y hay que decirlo sin mentir**: lo que llega es la primera del padron
+   * de papeletas de transito ordenado por `fechaInfraccion`, no «la papeleta de nadie en
+   * concreto». El dia que la pantalla sepa pasarle lo tecleado a su conector, lo que cambia es
+   * esta linea: los seis criterios estan publicados en `parametros-de-la-api.json`
+   * —`nroPapeleta`, `placa`, `documentoDelInfractor`, `desde`, `hasta` y `estado`—.
+   */
+  papeletas: '/transito/papeletas?tamano=1',
+  /**
+   * Todos los documentos emitidos por UNA papeleta, con sus acuses.
+   *
+   * `{numero}` es el numero impreso y sale de la relacion de arriba: sin una papeleta elegida no
+   * hay expediente que pedir. **Sin `?familia=`**, que es opcional y por omision vale
+   * `TRANSITO` — que es justo la familia de esta hoja.
+   */
+  actosDeLaPapeleta: (numero: string) =>
+    `/transito/papeletas/${encodeURIComponent(numero)}/actos`,
+  /**
+   * La grilla «Vehiculos en deposito», **sin filtrar** (#180).
+   *
+   * `?tamano=20` escrito y no omitido, por lo mismo que `ciiu`: el numero que decide cuantas filas
+   * viajan tiene que estar a la vista de quien lea esta linea y no escondido en un valor por
+   * omision del backend. El artboard dibuja «3 de 188», o sea que la tabla **siempre** fue una
+   * ventana sobre el deposito y no su inventario.
+   *
+   * Es el deposito entero y no el del vehiculo de la direccion: la tabla de esta hoja es la del
+   * deposito, y acotarla a una placa la convertiria en otra cosa. Los cuatro criterios que la
+   * operacion admite —`placa`, `deposito`, `estado`, `aLaFecha`— llegan con #172.
+   */
+  internamientos: '/transito/internamientos?tamano=20',
+  /**
+   * Los internamientos de UNA placa, para los campos que son de **ese** vehiculo (#180).
+   *
+   * `?placa=` lo publica el contrato (`parametros-de-la-api.json`), y es lo que separa las dos
+   * lecturas de esta hoja: la de arriba llena la tabla del deposito y esta dice cuantos dias lleva
+   * dentro el vehiculo que nombra la direccion. Buscar esa fila **dentro** de la pagina de arriba
+   * seria decir «no publicado» cada vez que el vehiculo no cayera entre las veinte primeras.
+   */
+  internamientosDe: (placa: string) =>
+    `/transito/internamientos?placa=${encodeURIComponent(placa)}&tamano=1`,
+  /**
+   * La ficha de UN vehiculo, por su placa (#180).
+   *
+   * La placa va **en la ruta** y no en la cadena de consulta: es la unica de las operaciones
+   * encendidas hasta hoy que lo hace asi. Sin placa no se pide nada —la hoja lo dice—, porque lo
+   * unico que se podria pedir en su lugar es el padron vehicular entero.
+   */
+  vehiculoDe: (placa: string) => `/rentas/vehiculos/${encodeURIComponent(placa)}`,
   calculoIndividual: '/rentas/predial/calculo-individual',
   calculoMasivo: '/rentas/predial/calculo-masivo',
   calculoVehicular: '/rentas/vehicular/calculo',

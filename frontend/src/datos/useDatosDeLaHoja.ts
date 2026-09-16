@@ -181,7 +181,10 @@ export function useDatosDeLaHoja(
     return { ausencia: porQueNoHayDato(hojaDe(clave)) };
   }
 
-  if (faltaElSujeto) return { ausencia: SIN_SUJETO };
+  // El conector puede decirlo con sus palabras: `tra-veh` espera una PLACA, no un contribuyente
+  // (#180). Sin esa salida, la frase de abajo le pediria a quien atiende el codigo de un
+  // contribuyente para abrir la ficha de un vehiculo.
+  if (faltaElSujeto) return { ausencia: conector.sinSujeto ?? SIN_SUJETO };
 
   /*
    * El orden de estas tres importa, y es el de las causas: primero si la sesion fallo, luego si
@@ -203,6 +206,9 @@ export function useDatosDeLaHoja(
   return {
     valores: reparto.valores,
     filas: reparto.filas,
+    // Las tablas con `clave` van aparte: sus celdas pueden decir que no hay dato, y por que
+    // (`kamayuk-lib`#87). Ver `Reparto.tablas`.
+    ...(reparto.tablas === undefined ? {} : { tablas: reparto.tablas }),
     ausenciaPorCampo: reparto.noPublicados,
     // La pantalla SI tiene datos, asi que la frase de arriba no puede decir que no esta conectada.
     // Lo que queda por decir es lo que el campo concreto no trae, y eso va por campo.
