@@ -32,9 +32,16 @@ import { useTextosDelMarco } from './i18n/textosDelMarco.ts';
  *
  * <h2>Lo que todavia NO hace, dicho aqui y no descubierto luego</h2>
  *
+<<<<<<< HEAD
  * · **Pedir datos en las pantallas que no tienen backend.** Solo piden las que tienen conector en
  *   `datos/conectores.ts` —el centinela de `conectores.test.ts` dice cuantas son—; el resto dice
  *   por que no. Ahi esta contado campo a campo por que «servida» no es «puede pintarse».
+=======
+ * · **Pedir datos en las pantallas que no tienen backend.** Solo unas pocas de las cuarenta piden
+ *   de verdad; el resto dice por que no. Cuantas son lo dice el registro `CONECTORES` de
+ *   `datos/conectores.ts`, y por que cada una si o no, el javadoc de su modulo en
+ *   `datos/conectores/` — campo a campo, que es donde se ve que «servida» no es «puede pintarse».
+>>>>>>> 1cfc5d2 (`coa-exp` y `coa-cost` piden de verdad; `coa-cart` no entra (#170))
  * · **Las acciones del pie hacen lo minimo honesto**: imprimir imprime, y las otras tres avisan
  *   de que no escriben todavia. Un boton que no dice nada al pulsarlo se lee como una pantalla
  *   rota; uno que dice lo que hace —y lo que no— se lee como una pantalla a medio conectar, que

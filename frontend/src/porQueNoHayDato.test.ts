@@ -26,11 +26,13 @@ const TODAS: readonly Hoja[] = ARBOL.flatMap((modulo) => [...modulo.hojas]);
 
 describe('el cruce contra lo que el backend sirve', () => {
   it('EL CENTINELA: hay cuarenta hojas y catorce operaciones servidas', () => {
+  it('EL CENTINELA: hay cuarenta hojas y dieciseis operaciones servidas', () => {
     // Sin esto, un arbol vacio o unas `YA_SERVIDAS` vacias dejarian todo lo de abajo pasando
     // sobre la nada — y la respuesta seria «ninguna pantalla tiene datos», que ademas parece
     // razonable.
     expect(TODAS).toHaveLength(40);
     expect(YA_SERVIDAS).toHaveLength(14);
+    expect(YA_SERVIDAS).toHaveLength(16);
   });
 
   it('cruza por RUTA, no por verbo: dos servidas las declara el artboard como `BASE`', () => {
@@ -51,6 +53,13 @@ describe('el cruce contra lo que el backend sirve', () => {
   });
 
   it('ocho hojas tienen alguna operacion util, y treinta y dos ninguna', () => {
+  it('nueve hojas tienen alguna operacion util, y treinta y una ninguna', () => {
+    // Eran seis hasta #170, que enciende las cuatro de la cobranza coactiva. Tres hojas mas las
+    // alcanzan, y **una de las tres no se conecta**: `val-tip` declara `GET
+    // /coactiva/prescripcion` —la misma relacion que lee `coa-cost`— y lo que ensena son los tipos
+    // de valor y el reloj de prescripcion de un valor concreto, que esa relacion no publica. Que
+    // una hoja tenga una operacion util y aun asi no tenga conector es exactamente la distincion
+    // que este archivo existe para mantener: «servida» no es «puede pintarse».
     const con = TODAS.filter((hoja) => operacionesUtiles(hoja).length > 0);
     // `aut-cat` y `aut-panel` entran con #168, y las dos por la ruta que el ARTBOARD les
     // atribuye: `GET /licencias/ciiu` a la primera y `GET /licencias/funcionamiento` a la
@@ -63,6 +72,19 @@ describe('el cruce contra lo que el backend sirve', () => {
       ['aut-cat', 'aut-panel', 'coa-panel', 'panel', 'predios', 'seg-acc', 'seg-panel', 'valores'].sort(),
     );
     expect(TODAS.length - con.length).toBe(32);
+      [
+        'coa-cost',
+        'coa-exp',
+        'coa-panel',
+        'panel',
+        'predios',
+        'seg-acc',
+        'seg-panel',
+        'val-tip',
+        'valores',
+      ].sort(),
+    );
+    expect(TODAS.length - con.length).toBe(31);
   });
 });
 

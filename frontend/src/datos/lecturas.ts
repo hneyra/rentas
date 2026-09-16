@@ -437,6 +437,193 @@ export interface LicenciaDeFuncionamiento {
   readonly duplicados: readonly DuplicadoDeLaLicencia[];
 }
 
+// ── La cobranza coactiva ────────────────────────────────────────────────────────────────────
+
+/** Un valor traido a la cartera coactiva, dentro del expediente. */
+export interface ValorImportadoAlExpediente {
+  readonly valorId: number;
+  readonly fechaDeImportacion: string;
+}
+
+/** Un movimiento del expediente: de que estado a cual, con que papel y por que. */
+export interface MovimientoDelExpediente {
+  readonly tipo: string;
+  readonly estado: string;
+  readonly estadoCodigo: string;
+  readonly direccionReferencial: string;
+  readonly fecha: string;
+  readonly motivo: string;
+  readonly fecDoc: string;
+  readonly numDoc: string;
+  readonly activo: boolean;
+  readonly usuario: string;
+  readonly observaciones: string;
+}
+
+/**
+ * Un expediente coactivo, de `GET /coactiva/expedientes` y de la cabecera del proceso.
+ *
+ * <h2>La deuda viaja UNA vez y con su fecha</h2>
+ *
+ * Regla 9 (RNF-075). `insoluto`, `reajuste`, `interes`, `gastos`, `deudaMateriaDeCobranza`,
+ * `costas` y `totalExigible` estan **todos** a `deudaAlDia`, que es la fecha a la que el backend
+ * proyecto el interes —`?proyectarInteresAl=`, y sin el, hoy—. Por eso `deudaAlDia` no es un
+ * campo mas: es lo que hace que las siete cifras se puedan escribir sin mentir.
+ *
+ * <h2>Y el ejecutor y el auxiliar llegan como TEXTO</h2>
+ *
+ * No como identificador de una lista cerrada. El artboard dibuja los dos como desplegables con
+ * dos opciones cada uno, y son sus nombres de ejemplo: un nombre servido que no este entre ellas
+ * dejaria el control **en blanco** —Radix no dibuja un valor que no es ninguna de sus
+ * opciones—, que es peor que no ponerlo. Ver `conectores/coactiva.ts`.
+ */
+export interface ExpedienteCoactivo {
+  readonly numero: string;
+  readonly ejercicio: number;
+  readonly correlativo: number;
+  readonly codContribuyente: string;
+  readonly ejecutor: string;
+  readonly auxiliar: string;
+  readonly fechaDeApertura: string;
+  readonly asunto: string;
+  readonly direccionReferencial: string;
+  readonly estado: string;
+  readonly estadoCodigo: string;
+  /** Cuantos valores se le importaron. Es una cuenta, no un importe. */
+  readonly valores: number;
+  readonly insoluto: string;
+  readonly reajuste: string;
+  readonly interes: string;
+  readonly gastos: string;
+  readonly deudaMateriaDeCobranza: string;
+  readonly costas: string;
+  readonly totalExigible: string;
+  /** La fecha a la que estan las siete cifras de arriba. Ver el javadoc. */
+  readonly deudaAlDia: string;
+  readonly valoresImportados: readonly ValorImportadoAlExpediente[];
+  readonly historial: readonly MovimientoDelExpediente[];
+}
+
+/** Una diligencia de notificacion de un acto coactivo. */
+export interface DiligenciaDelActo {
+  readonly intento: number;
+  readonly fecha: string;
+  readonly modalidad: string;
+  readonly resultado: string;
+  readonly surtioEfecto: boolean;
+  readonly exigibleDesde: string | null;
+  readonly notificador: string;
+  readonly domicilio: string;
+  readonly receptor: string | null;
+  readonly documentoReceptor: string | null;
+  readonly vinculo: string | null;
+  readonly acuse: string | null;
+  readonly usuario: string | null;
+  readonly observaciones: string;
+}
+
+/**
+ * Un acto dictado en el expediente, de `GET /coactiva/expedientes/{numero}/proceso`.
+ *
+ * **No publica ningun identificador del acto, y hay que saberlo**: `ActoResource` del backend
+ * declara `(tipo, titulo, numero, fecha, descripcion, medida, exigibleDesde, usuario,
+ * observaciones, diligencias)` y ni uno de los diez es el `actoId` con que la liquidacion de
+ * costas referencia el acto que tarifa. Es lo que impide poner la costa de cada acto en la tabla
+ * del expediente — ver `conectores/coactiva.ts`.
+ *
+ * `medida` es nula salvo en la REC-2, que es el unico acto que ordena una medida cautelar.
+ */
+export interface ActoDelExpediente {
+  readonly tipo: string;
+  readonly titulo: string;
+  readonly numero: string;
+  readonly fecha: string;
+  readonly descripcion: string;
+  readonly medida: string | null;
+  readonly exigibleDesde: string | null;
+  readonly usuario: string | null;
+  readonly observaciones: string;
+  readonly diligencias: readonly DiligenciaDelActo[];
+}
+
+/** El seguimiento del expediente: su cabecera y sus actos. */
+export interface ProcesoDelExpediente {
+  readonly expediente: ExpedienteCoactivo;
+  readonly actuaciones: readonly ActoDelExpediente[];
+}
+
+/**
+ * Una linea de la liquidacion de costas: **un acto, un arancel**.
+ *
+ * `arancelFuente` es la llave del parametro sellado con su documento fuente, y es lo que explica
+ * la cifra: sin el, la pantalla ensenaria un importe que nadie puede justificar (ARQ-09 §3).
+ */
+export interface CostaDelActo {
+  readonly actoId: number;
+  readonly acto: string;
+  readonly descripcion: string;
+  readonly montoS: string;
+  readonly arancelFuente: string;
+}
+
+/**
+ * Una liquidacion de costas, de `GET /coactiva/liquidaciones-costas`.
+ *
+ * **Dos fechas y no una**, y el backend lo dice en su propio javadoc: `fecha` es de cuando es
+ * `totalS` —congelado el dia de la liquidacion— y `aLaFecha` es a que dia esta `pendienteS`,
+ * que depende de lo que el libro haya recibido entretanto. Bajo una sola, una liquidacion de
+ * marzo pareceria calculada hoy.
+ *
+ * `pendienteS`, `aLaFecha` y `estado` son nulos en la liquidacion recien registrada: se derivan
+ * de la consulta, no de la liquidacion.
+ */
+export interface LiquidacionDeCostas {
+  readonly nroLiquidacion: string;
+  readonly expedCoact: string;
+  readonly ejercicio: number;
+  readonly fecha: string;
+  readonly tributo: string;
+  /** Lo liquidado, congelado a `fecha`. Es la suma de las lineas de `costas`. */
+  readonly totalS: string;
+  readonly pendienteS: string | null;
+  readonly aLaFecha: string | null;
+  readonly estado: string | null;
+  readonly conjuntoDeParametros: number;
+  readonly observacion: string;
+  readonly usuarioRegistro: string | null;
+  readonly costas: readonly CostaDelActo[];
+}
+
+/**
+ * Una declaracion de prescripcion, de `GET /coactiva/prescripcion`.
+ *
+ * **Es la relacion, no la resolucion**, y la diferencia decide lo que esta interfaz puede
+ * dibujar: la fila lleva el `plazo` que se aplico —leido del conjunto sellado, «4 ANIOS»— y como
+ * se resolvio el rango, pero **no lleva la fecha en que prescribe** ninguna deuda. Esa sale del
+ * computo ejercicio por ejercicio, que solo publica `POST /coactiva/prescripcion`, y el propio
+ * backend advierte que no es «el inicio mas el plazo».
+ *
+ * Sin ninguna cifra de dinero: la prescripcion no extingue un importe, deja sin accion su cobro.
+ */
+export interface PrescripcionDeclarada {
+  readonly id: number;
+  readonly codContribuyente: string | null;
+  readonly contribuyente: string | null;
+  readonly tributo: string;
+  readonly ejercicioDesde: number;
+  readonly ejercicioHasta: number;
+  readonly fechaDePresentacion: string;
+  /** Cual de los plazos del art. 43 se aplico. */
+  readonly plazoAplicable: string;
+  /** El plazo leido del conjunto sellado: cantidad y unidad, «4 ANIOS». */
+  readonly plazo: string;
+  readonly resultado: string;
+  readonly nDeResolucion: string | null;
+  readonly ejerciciosPrescritos: readonly number[];
+  readonly usuario: string;
+  readonly observacion: string;
+}
+
 // ── El panel ────────────────────────────────────────────────────────────────────────────────
 
 /** Una tarjeta de cabecera del panel. */
@@ -663,6 +850,41 @@ export const RUTAS = {
   deudaDe: (codigo: string) =>
     `/consultas/deuda?codContribuyente=${encodeURIComponent(codigo)}`,
   coactiva: '/coactiva/deudas',
+  /**
+   * El primer expediente de la cartera coactiva (#170).
+   *
+   * **`?tamano=1` y no la pagina entera**, porque esta pantalla dibuja UN expediente y todavia no
+   * tiene con que elegirlo: pedir veinte para usar uno seria pedir diecinueve que nadie mira. El
+   * parametro lo publica el contrato —`docs/50-api/parametros-de-la-api.json`, `tamano` entre los
+   * opcionales de `GET /coactiva/expedientes`—, que es la condicion para mandarlo (#26).
+   *
+   * El dia que la pantalla tenga su caja de busqueda, lo que cambia es esta ruta: el criterio
+   * tambien esta publicado (`nroDeExpediente`, `codContribuyente`, `ejecutor`, `estado`).
+   */
+  expedientesCoactivos: '/coactiva/expedientes?tamano=1',
+  /**
+   * El seguimiento de UN expediente: su cabecera, su deuda a la fecha y sus actos.
+   *
+   * `{numero}` es el numero impreso del expediente, y sale de la lista de arriba. No se inventa:
+   * sin un expediente elegido no hay proceso que pedir.
+   */
+  procesoDelExpediente: (numero: string) =>
+    `/coactiva/expedientes/${encodeURIComponent(numero)}/proceso`,
+  /** La primera liquidacion de costas de la relacion. `tamano` esta publicado, como arriba. */
+  liquidacionesDeCostas: '/coactiva/liquidaciones-costas?tamano=1',
+  /**
+   * Las prescripciones declaradas **sobre un tributo**.
+   *
+   * `?tributo=` es el unico parametro que las dos operaciones de `coa-cost` comparten: la
+   * liquidacion publica su `tributo` y la relacion de prescripciones lo admite como filtro. Sin
+   * el, lo que llegaria seria la primera declaracion de la relacion entera —de cualquier
+   * contribuyente y de cualquier tributo—, que al lado de una liquidacion se leeria como suya.
+   *
+   * Lo que NO se puede acotar es el contribuyente: `LiquidacionResource` no publica ninguno, asi
+   * que `?codContribuyente=` —que el contrato si declara— no tiene de donde salir aqui.
+   */
+  prescripcionesDe: (tributo: string) =>
+    `/coactiva/prescripcion?tributo=${encodeURIComponent(tributo)}&tamano=1`,
   ultimaCorrida: '/rentas/predial/corridas/ultima',
   observados: (corridaId: number) => `/rentas/predial/corridas/${String(corridaId)}/observados`,
   recaudacion: '/indicadores/recaudacion',

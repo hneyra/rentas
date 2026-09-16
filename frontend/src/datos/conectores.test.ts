@@ -4,7 +4,14 @@ import { PANTALLAS } from '../pantallas/definiciones/index.ts';
 import type { ClaveDeHoja } from '../pantallas/arbol.ts';
 import { coordenada } from '@kamayuk/ui';
 import { CONECTORES, NO_PUBLICADO } from './conectores.ts';
-import type { CorridaDelPredial, DeudaEnCoactiva, Paginado } from './lecturas.ts';
+import type {
+  CorridaDelPredial,
+  DeudaEnCoactiva,
+  LiquidacionDeCostas,
+  Paginado,
+  PrescripcionDeclarada,
+  ProcesoDelExpediente,
+} from './lecturas.ts';
 
 /**
  * **Lo que cada pantalla conectada saca de su respuesta** (#97).
@@ -41,6 +48,61 @@ const PAGINA: Paginado<DeudaEnCoactiva> = {
   hayMas: true,
 };
 
+/**
+ * Lo que `coa-exp` recibe: el proceso de un expediente. Recortado a lo que el conector usa.
+ *
+ * La forma sale de `docs/50-api/formas-de-la-api.json`; el detalle campo a campo lo prueba
+ * `conectores/coactiva.test.ts`.
+ */
+const PROCESO = {
+  expediente: {
+    numero: '2026-0418',
+    codContribuyente: '00000000008',
+    fechaDeApertura: '2026-08-04',
+    deudaMateriaDeCobranza: '9412.15',
+    costas: '96.00',
+    deudaAlDia: '2026-09-06',
+  },
+  actuaciones: [
+    { numero: '1', titulo: 'RESOLUCION DE EJECUCION COACTIVA', fecha: '2026-08-04', medida: null },
+  ],
+} as unknown as ProcesoDelExpediente;
+
+/** Lo que `coa-cost` recibe: su liquidacion y la prescripcion del mismo tributo. */
+const COSTAS = {
+  liquidacion: {
+    expedCoact: '2026-0418',
+    tributo: 'PREDIAL',
+    totalS: '96.00',
+    fecha: '2026-09-06',
+    costas: [
+      {
+        acto: 'REC1',
+        descripcion: 'Resolucion de ejecucion coactiva',
+        montoS: '18.00',
+        arancelFuente: 'ARANCEL_COSTA:REC1',
+      },
+    ],
+  },
+  prescripcion: { plazo: '4 ANIOS' },
+} as unknown as {
+  readonly liquidacion: LiquidacionDeCostas;
+  readonly prescripcion: PrescripcionDeclarada;
+};
+
+/**
+ * La respuesta con que se ejercita cada conector. **Una por conector, y sin excepcion.**
+ *
+ * Es lo que hace total la guarda de mas abajo: un conector nuevo sin muestra no se salta la
+ * comprobacion en silencio, sale rojo pidiendola.
+ */
+const MUESTRAS: Readonly<Partial<Record<ClaveDeHoja, unknown>>> = {
+  panel: CORRIDA,
+  'coa-panel': PAGINA,
+  'coa-exp': PROCESO,
+  'coa-cost': COSTAS,
+};
+
 /** Los campos de solo lectura de una pantalla, por su coordenada. */
 function soloLecturaDe(clave: ClaveDeHoja): readonly string[] {
   return PANTALLAS[clave].bloques.flatMap((bloque, b) =>
@@ -49,6 +111,7 @@ function soloLecturaDe(clave: ClaveDeHoja): readonly string[] {
 }
 
 describe('los conectores', () => {
+<<<<<<< HEAD
   it('EL CENTINELA: estan los que estan, y no cero ni cuarenta', () => {
     // Cero dejaria todo lo de abajo sin sujeto. Cuarenta significaria que alguien conecto
     // pantallas cuyas operaciones no publican lo que ensenan, que es lo que este archivo evita.
@@ -58,13 +121,33 @@ describe('los conectores', () => {
     expect(Object.keys(CONECTORES).sort()).toEqual(
       ['aut-cat', 'aut-tram', 'coa-panel', 'panel'].sort(),
     );
+=======
+  it('EL CENTINELA: hay cuatro, y no cero ni cuarenta', () => {
+    // Cero dejaria todo lo de abajo sin sujeto. Cuarenta significaria que alguien conecto
+    // pantallas cuyas operaciones no publican lo que ensenan, que es lo que este archivo evita.
+    expect(Object.keys(CONECTORES).sort()).toEqual([
+      'coa-cost',
+      'coa-exp',
+      'coa-panel',
+      'panel',
+    ]);
+  });
+
+  it('y cada uno tiene su muestra: sin ella, la guarda de abajo se lo saltaria', () => {
+    // Una comprobacion que recorre un registro y se calla sobre lo que no reconoce deja de ser
+    // una comprobacion el dia que alguien anade la quinta hoja.
+    const sinMuestra = Object.keys(CONECTORES).filter(
+      (clave) => MUESTRAS[clave as ClaveDeHoja] === undefined,
+    );
+    expect(sinMuestra, 'anade su respuesta a `MUESTRAS`').toEqual([]);
+>>>>>>> 1cfc5d2 (`coa-exp` y `coa-cost` piden de verdad; `coa-cart` no entra (#170))
   });
 
   it('NINGUN campo de una pantalla conectada se queda sin decidir', () => {
     const olvidados: string[] = [];
     for (const [clave, conector] of Object.entries(CONECTORES)) {
       if (conector === undefined) continue;
-      const respuesta = clave === 'panel' ? CORRIDA : PAGINA;
+      const respuesta = MUESTRAS[clave as ClaveDeHoja];
       const reparto = conector.repartir(respuesta as never);
       for (const coord of soloLecturaDe(clave as ClaveDeHoja)) {
         const decidido =
@@ -108,28 +191,5 @@ describe('`panel` — la ultima corrida', () => {
     expect(reparto.noPublicados.get(coordenada(0, 2))).toBe(NO_PUBLICADO);
     // Y por si alguien lo dedujera igualmente: el valor de la etapa no puede aparecer como valor.
     expect([...reparto.valores.values()]).not.toContain('61350');
-  });
-});
-
-describe('`coa-panel` — los expedientes coactivos', () => {
-  const conector = CONECTORES['coa-panel'];
-  if (conector === undefined) throw new Error('falta el conector de `coa-panel`');
-  const reparto = conector.repartir(PAGINA as never);
-
-  it('«expedientes abiertos» sale del TOTAL, no del tamano de la pagina', () => {
-    // `totalElementos` y no `contenido.length`: la pagina trae veinte de 388, y contar lo que
-    // llego daria «20 expedientes abiertos» — un numero exacto y falso.
-    expect(reparto.valores.get(coordenada(0, 1))).toBe('388');
-    expect(reparto.valores.get(coordenada(0, 1))).not.toBe('20');
-  });
-
-  it('y los otros cuatro se declaran «no publicado», en vez de contarse sobre la pagina', () => {
-    // «Con REC notificada», «con medida cautelar» y «sin REC» son agregados que la operacion no
-    // publica; contarlos sobre una pagina de veinte daria ceros indistinguibles de ceros reales.
-    // Y «deuda en cartera» sumada sobre esa pagina seria sencillamente falsa.
-    for (const campo of [2, 3, 4, 5]) {
-      expect(reparto.noPublicados.get(coordenada(0, campo)), `campo ${campo}`).toBe(NO_PUBLICADO);
-    }
-    expect(reparto.valores.size).toBe(1);
   });
 });
