@@ -159,7 +159,10 @@ describe('`seg-aud` — la bitacora de auditoria', () => {
     // TEXTO. La raya no cae en ninguno de los dos grupos que piden accion: no pinta de rojo lo que
     // no se sabe. Es la misma celda que `coa-exp` ya dibuja donde su operacion no llena.
     expect(PANTALLAS['seg-aud'].bloques[0]?.tabla?.columnaDeInsignia).toBe(4);
-    expect(tonoDe(SIN_DATO)).toBe('ok');
+    // `info` y no `ok` desde #175: la raya no es un estado conforme, es la ausencia de estado. El
+    // rotulo de este caso ya decia «con el tono que no afirma nada» — lo que no lo decia era la
+    // asercion, que afirmaba el verde.
+    expect(tonoDe(SIN_DATO)).toBe('info');
   });
 
   it('una bitacora vacia da una tabla vacia, no una fila inventada', () => {

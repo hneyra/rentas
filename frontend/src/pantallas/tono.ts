@@ -11,11 +11,68 @@
  *
  * Son las tres respuestas que una ventanilla necesita de un vistazo: **esto esta mal y hay que
  * actuar** (`mal`), **esto se va a poner mal si nadie lo toca** (`atencion`), y **esto esta bien**
- * (`ok`). `info` no sale de aqui: es para avisos de la pantalla, no para calificar una fila.
+ * (`ok`). Las tres son un JUICIO sobre la fila. La cuarta —`info`— no lo es, y por eso es la que
+ * dice **«no se»**.
  *
- * Lo que NO se hace es enumerar los estados buenos: son muchos mas, cambian con cada modulo, y
- * una lista incompleta pintaria de rojo lo que simplemente no esta en ella. Se enumeran los dos
- * grupos que piden accion, y lo demas esta conforme.
+ * <h2>El verde se GANA. Hasta #175 se regalaba</h2>
+ *
+ * Hasta #175 esto enumeraba solo los dos grupos que piden accion y **todo lo demas caia en `ok`**.
+ * El argumento escrito era que enumerar los estados buenos pintaria de rojo lo que simplemente no
+ * estuviera en la lista — y es cierto, pero la conclusion no se seguia: lo que no esta en ninguna
+ * lista no es ni bueno ni malo, es **desconocido**, y el valor por omision de un semaforo no puede
+ * ser el verde.
+ *
+ * Lo que se midio, con las respuestas interceptadas en Chromium:
+ *
+ * · **`ini-parado`** —la pantalla que enumera el trabajo parado— recibe en su columna de insignia
+ *   `porQueCuestaDinero`, que es una **frase** y no un estado: «sin emitir no se pueden notificar
+ *   ni cobrar, y prescriben». Ninguna regla la reconocia, asi que la interfaz pintaba **en verde,
+ *   con la insignia de «conforme», trabajo que esta parado y cuesta dinero**.
+ * · Y no era solo esa pantalla. De las **17** cadenas que el artboard escribe en una columna de
+ *   insignia, **12** caian en el verde por omision, y entre ellas estaban «Alto» (el riesgo ITSE
+ *   de un giro, que llega del backend en `aut-cat`), «Con diferencia», «Pendiente», «Programado»,
+ *   «En deposito» y «Medio». Al enumerarlas, **solo 6 se ganan el verde**.
+ *
+ * Desde #175 hay **tres** listas y una salida: lo que ninguna reconoce sale con el tono de «no se»
+ * ({@link TONO_SIN_RECONOCER}). Y sigue siendo cierto lo que decia el argumento viejo: una lista
+ * de buenos incompleta no pinta de rojo nada — pinta de **neutro**, que es lo que de verdad sabe.
+ *
+ * <h2>Por que «no se» es `info` y no `atencion`</h2>
+ *
+ * Porque `atencion` afirma algo que nadie midio —«esto se va a poner mal si nadie lo toca»—, y
+ * eso es inventar un estado igual que lo inventaba el verde, solo que hacia el otro lado. Con
+ * `atencion` por omision, las 6 cadenas del artboard y las 4 frases de `ini-parado` saldrian en
+ * ambar: un aviso que sale siempre deja de leerse, y con el se va el ambar que si decia algo.
+ *
+ * `info` es el unico de los cuatro tonos que **no es un juicio** sobre la fila, y por eso es el
+ * unico que puede decir «no se». Y no se pierde nada al usarlo: `Insignia` exige su texto dentro
+ * —`children` no es opcional, porque un estado que solo se comunica por color no se comunica a
+ * quien no distingue ese color—, asi que el tono neutro deja de CALIFICAR el estado sin dejar de
+ * ENSENARLO.
+ *
+ * <h2>Y por que se decide AQUI y no en la libreria</h2>
+ *
+ * Porque se miro antes de escribirlo (`kamayuk-lib`#87): `@kamayuk/ui` **no publica un tono
+ * neutro** que este archivo pudiera heredar. Lo que publica son dos piezas parecidas y distintas,
+ * y la diferencia importa:
+ *
+ * · **`DefinicionDeTabla.sinDato`** es la celda que llega `null` —una raya y su frase, nunca un
+ *   hueco en blanco—. Aqui la celda **si trae valor**: lo que falta no es el dato, es saber que
+ *   significa. Una celda vacia y un estado que no se reconoce no se dibujan igual.
+ * · **`ReglaDeLaInsignia`** ya obliga a lo mismo que esto hace, por la otra via: sus casos llevan
+ *   `otro` **obligatorio**, y su variante por dato lleva `siNoTrae`. O sea, la libreria no deja
+ *   que el sistema se calle sobre lo que no encaja — le exige **nombrarlo**. `tonoDeLaInsignia` es
+ *   la tercera via, la que Rentas usa, y hasta #175 era la unica de las tres que se callaba.
+ *
+ * Asi que no se inventa un concepto nuevo: se nombra el que la libreria ya exige nombrar.
+ *
+ * <h2>Lo que esto NO arregla, y hay issue</h2>
+ *
+ * La quinta columna de `ini-parado` sigue recibiendo una frase donde el artboard dibuja un estado
+ * («Vencida», «Por vencer»). Con el tono de «no se» la pantalla deja de mentir, pero su insignia
+ * no dice nada: quien tiene que publicar el estado es `GET /indicadores/trabajo-parado`, y eso es
+ * issue de backend ([#183](https://github.com/hneyra/rentas/issues/183)). Deducirlo de la frase
+ * en el conector seria **inventarlo**, que es lo que prohibe la regla de `datos/conectores.ts`.
  */
 
 import type { TonoDeInsignia } from '@kamayuk/ui';
@@ -38,10 +95,46 @@ import type { TonoDeInsignia } from '@kamayuk/ui';
 const MAL = /coactiva|observado|vencida|denegado/;
 /** Lo que va a ir mal: hay plazo, pero corre. */
 const ATENCION = /con deuda|por vencer|en tramite|en trámite/;
+/**
+ * Lo que esta conforme. **Enumerado desde #175**, porque el verde hay que ganarlo.
+ *
+ * Las nueve salen del vocabulario que el artboard escribe en una columna de insignia y de lo que
+ * los conectores ponen en ella: «Conforme», «Vigente» y «Activa» (el padron de licencias publica
+ * `VIGENTE`), «Al dia», «Cancelada», «Pagado», «Inspeccionado» y «Bajo» (el riesgo ITSE que
+ * `aut-cat` recibe). **«Emitida» NO esta**: emitir no es cobrar — un valor emitido y sin notificar
+ * es justamente uno de los frentes que `ini-parado` cuenta, y darle verde seria volver al defecto.
+ *
+ * **Va anclada por palabra, y las otras dos no.** No es descuido: una lista de MALOS que se pase
+ * de larga pinta de rojo lo que esta bien, y se ve; una de BUENOS que se pase de larga pinta de
+ * verde lo que esta mal, y no se ve. Sin el ancla, `\bbajo\b` casaria dentro de «tra**bajo**».
+ */
+const CONFORME =
+  /\bconforme\b|\bvigente\b|\bactiv[ao]\b|\bal d[ií]a\b|\bcancelad[ao]\b|\bpagad[ao]\b|\binspeccionad[ao]\b|\bbajo\b/;
+
+/**
+ * El tono de «no se»: ni conforme, ni alarma. Ver el javadoc del archivo.
+ *
+ * Se exporta porque es lo que comprueban la prueba de este reparto y la guarda que barre las 40
+ * definiciones: una guarda que escribiera `'info'` a mano seguiria en verde el dia que este
+ * archivo volviera a `'ok'` por otro camino.
+ */
+export const TONO_SIN_RECONOCER: TonoDeInsignia = 'info';
+
+/**
+ * Si alguna de las tres reglas reconoce el texto, o sea si su tono es un JUICIO y no un «no se».
+ *
+ * Es la mitad que la guarda de #175 necesita para poder decir algo mas fuerte que «no es verde»:
+ * **ningun texto llega a `ok` sin que una regla lo nombre**.
+ */
+export function reconocido(texto: string): boolean {
+  const s = texto.toLowerCase();
+  return MAL.test(s) || ATENCION.test(s) || CONFORME.test(s);
+}
 
 export function tonoDe(texto: string): TonoDeInsignia {
   const s = texto.toLowerCase();
   if (MAL.test(s)) return 'mal';
   if (ATENCION.test(s)) return 'atencion';
-  return 'ok';
+  if (CONFORME.test(s)) return 'ok';
+  return TONO_SIN_RECONOCER;
 }
