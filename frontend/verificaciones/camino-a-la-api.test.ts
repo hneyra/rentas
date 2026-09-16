@@ -103,7 +103,7 @@ describe('AC4 — la raiz de la API es UNA, escrita en tres sitios que tienen qu
 });
 
 describe('AC7 — lo que se declara servido tiene que publicarlo el backend', () => {
-  it('las veintitres: I-1, I-3, I-4, #168, #170, #167 y las tres de #169', () => {
+  it('las veinticuatro: I-1, I-3, I-4, #168, #170, #167, las tres de #169 y la de #181', () => {
     // La lista escrita a mano es a proposito. Derivarla de `YA_SERVIDAS` la haria pasar diga lo
     // que diga: encender una ruta es una decision, y una decision se revisa leyendo su diff. La
     // lista crece de una en una porque encenderlas todas a la vez seria cambiar 181 respuestas
@@ -133,10 +133,11 @@ describe('AC7 — lo que se declara servido tiene que publicarlo el backend', ()
       'GET /consultas/unificada',
       'GET /consultas/deudas-con-beneficio',
       'GET /consultas/constancias/no-adeudo',
+      'GET /seguridad/auditoria',
     ]);
   });
 
-  it('y la escritura sigue siendo UNA: las de I-4, las de #168 y las de #170 son todas lecturas', () => {
+  it('y la escritura sigue siendo UNA: las de I-4, #168, #170 y #181 son todas lecturas', () => {
     // Las escrituras cambian datos y quedan auditadas, asi que encender una no es como
     // encender una lectura: si algun dia son cinco, esta cifra lo dice en la revision. I-4
     // enciende seis rutas y ninguna escribe — el expediente todavia no guarda nada. Y #168
@@ -208,6 +209,42 @@ describe('AC7 — lo que se declara servido tiene que publicarlo el backend', ()
 
     expect(fuera).toContain('GET /consultas/constancias/no-adeudo');
     expect(fuera).not.toContain('GET /consultas/constancias/no-adeudo?formato');
+  });
+
+  it('la bitacora declara `ejercicio` OBLIGATORIO, y es la unica de las veinticuatro (#181)', () => {
+    // Es la medida que abrio #181, y la que justifica que `Conector` tenga una tercera forma de
+    // exigir algo. Las otras veintitres, o no tienen obligatorio, o lo llevan **en la ruta** —y en
+    // la ruta no se olvida, porque sin el la URL no existe—. Este va en la cadena de consulta y
+    // sale de la SESION: es el unico que se puede omitir sin que la ruta lo note.
+    //
+    // Y no se deriva de `parametros-de-la-api.json` a proposito: esta escrito, asi que el dia que
+    // otra operacion encendida gane un obligatorio fuera de la ruta, esto sale rojo y obliga a
+    // mirar si su conector lo manda.
+    const parametros = JSON.parse(readFileSync(PARAMETROS, 'utf8')) as Record<
+      string,
+      { readonly obligatorios: readonly string[] }
+    >;
+
+    expect(parametros['GET /seguridad/auditoria']?.obligatorios).toEqual(['ejercicio']);
+
+    const conObligatorioFueraDeLaRuta = YA_SERVIDAS.filter(
+      (o) => (parametros[`${o.metodo} ${o.ruta}`]?.obligatorios ?? []).length > 0,
+    ).map((o) => `${o.metodo} ${o.ruta}`);
+
+    expect(conObligatorioFueraDeLaRuta).toEqual([
+      // `?contribuyente=` de la ficha unificada, que lo lleva desde #169 y sale de la RUTA de la
+      // hoja: `#/con-panel/00000025673`. Es la segunda forma, y por eso no hizo falta la tercera.
+      'GET /consultas/unificada',
+      'GET /consultas/constancias/no-adeudo',
+      'GET /seguridad/auditoria',
+    ]);
+  });
+
+  it('y la bitacora se pide CON su ejercicio dentro, y con su ventana', () => {
+    // El numero entra como numero y no como texto: con la firma de texto, un
+    // `String(sesion.ejercicioDeTrabajo)` sobre el nulo medido de la instalacion saldria a la red
+    // como `?ejercicio=null` — un 422, y no un rojo del compilador. Ver `RUTAS.bitacoraDe`.
+    expect(RUTAS.bitacoraDe(2026)).toBe('/seguridad/auditoria?ejercicio=2026&tamano=20');
   });
 
   it.each(YA_SERVIDAS.map((o) => `${o.metodo} ${o.ruta}`))(

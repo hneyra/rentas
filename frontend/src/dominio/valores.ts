@@ -29,6 +29,16 @@ export type Importe = string;
 export type Fecha = string;
 
 /**
+ * Un **instante**, en ISO 8601 y con zona: `"2026-08-13T14:41:12Z"` (#181).
+ *
+ * Es lo que publica un `Instant` de Java, y **no es una {@link Fecha}**: lleva hora y lleva zona,
+ * y la zona es UTC. Tiene tipo propio para que no se cuele en `formatearFecha`, que lo rechaza a
+ * proposito —espera ISO sin hora—; quien lo escribe es `formatearInstante`, que **no lo mueve de
+ * zona**. Ver ahi por que.
+ */
+export type Instante = string;
+
+/**
  * El tono de una insignia: los cuatro de `const INS` del artboard.
  *
  * En castellano, que en el artboard estaban en ingles (`warn`, `bad`). Un tono

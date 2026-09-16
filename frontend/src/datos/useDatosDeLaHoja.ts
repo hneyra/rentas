@@ -7,6 +7,9 @@ import type { Ausencia, DatosDeLaPantalla } from '@kamayuk/ui';
 import { porQueNoHayDato } from '../porQueNoHayDato.ts';
 import type { Reparto } from './conectores.ts';
 import { CONECTORES } from './conectores.ts';
+import type { SesionDeLaVentanilla } from './lecturas.ts';
+import { RUTAS, pedirUno } from './lecturas.ts';
+import { LLAVES } from './useCatalogoPermitido.ts';
 
 /**
  * **Los datos de una pantalla, pedidos de verdad** (#97, AC1).
@@ -62,6 +65,31 @@ const SIN_SUJETO: Ausencia = {
   tono: 'info',
 };
 
+/**
+ * **Lo que se dice cuando la hoja es de un ejercicio y la sesion no tiene ninguno** (#181).
+ *
+ * Es la hermana de `SIN_SUJETO` y no una variante suya: alli falta algo que trae la **direccion**
+ * y aqui falta algo que trae la **sesion**. Las dos dicen lo mismo de fondo —no se pide, porque no
+ * se puede pedir bien— y por eso las dos son `info` y no `atencion`: no ha fallado nada.
+ *
+ * Y es la alternativa a las dos cosas que se podrian haber hecho en su lugar, que son las dos que
+ * el AC2 de #181 prohibe por su nombre: escribir un ano fijo, o preguntarle el ano al reloj del
+ * puesto. Las dos harian que esta pantalla contestara **200, con filas, de un ejercicio que nadie
+ * eligio** — y una bitacora de auditoria del ano equivocado no se distingue de una del correcto.
+ *
+ * **No es un caso teorico**: medido contra la instalacion, la cuenta `administrador` contesta
+ * `ejercicioDeTrabajo: null` (ver `sesionMedida.ts`). Es el estado que hay hoy, no el raro.
+ */
+const SIN_EJERCICIO: Ausencia = {
+  enElCampo: 'falta el ejercicio',
+  explicacion:
+    'Esta pantalla es de un ejercicio concreto, y la sesion no tiene ninguno fijado: se fija en ' +
+    'Seguridad · Sistema, y vale para todos los modulos a la vez. Hasta que lo tenga no se pide ' +
+    'nada, porque el ano de hoy no es el ejercicio de trabajo de nadie y una bitacora del ' +
+    'ejercicio equivocado contesta igual de bien que la correcta.',
+  tono: 'info',
+};
+
 /** Lo que se dice cuando la operacion contesto y no habia nada. */
 const VACIO: Ausencia = {
   enElCampo: 'sin datos',
@@ -112,13 +140,38 @@ export function useDatosDeLaHoja(
   // 422 del backend dicho como si fuera una averia.
   const faltaElSujeto = conector?.exigeSujeto === true && (sujeto === null || sujeto === '');
 
+  /*
+   * **El ejercicio de trabajo, y solo para quien lo exige** (#181).
+   *
+   * `enabled` acotado a `exigeEjercicio` es lo que hace que las otras 39 hojas sigan sin pedir la
+   * sesion: sin eso, abrir cualquier destino sumaria una ida a `/seguridad/sesion` — y la siembra
+   * de #114, que afirma **cero peticiones a `/seguridad/`** con el catalogo sembrado, saldria roja
+   * por una lectura que esa pantalla no necesita.
+   *
+   * Va por `useQuery` y no por una lectura suelta porque asi **se comparte**: la llave es de la
+   * rama `seguridad`, o sea que dos hojas que exijan ejercicio piden la sesion una sola vez, y el
+   * dia que la barra global lea quien esta trabajando lee de la misma.
+   */
+  const pideLaSesion = conector?.exigeEjercicio === true;
+  const sesion = useQuery({
+    queryKey: LLAVES.sesion,
+    queryFn: ({ signal }) => pedirUno<SesionDeLaVentanilla>(RUTAS.sesion, signal),
+    enabled: pideLaSesion,
+    retry: false,
+  });
+  const ejercicio = sesion.data?.ejercicioDeTrabajo ?? null;
+  // Sin ejercicio no se pide: no es que se pida peor, es que la operacion lo declara obligatorio y
+  // **la peticion no se manda**. Ver `SIN_EJERCICIO` y el javadoc de `Conector.exigeEjercicio`.
+  const faltaElEjercicio = pideLaSesion && ejercicio === null;
+
   const consulta = useQuery({
     // La clave lleva la hoja dentro: dos pantallas no comparten cache aunque pidan lo mismo. Y
-    // lleva el sujeto al final: dos contribuyentes de la misma hoja tampoco.
-    queryKey: [...(conector?.clave ?? ['sin-conector', clave]), sujeto ?? ''],
-    queryFn: ({ signal }) => conector?.pedir(signal, sujeto) ?? Promise.resolve(null),
+    // lleva el sujeto al final: dos contribuyentes de la misma hoja tampoco. El ejercicio va
+    // detras por lo mismo: cambiarlo en la sesion tiene que traer OTRA bitacora, no la cacheada.
+    queryKey: [...(conector?.clave ?? ['sin-conector', clave]), sujeto ?? '', ejercicio ?? ''],
+    queryFn: ({ signal }) => conector?.pedir(signal, sujeto, ejercicio) ?? Promise.resolve(null),
     // Sin conector no se pide nada. Es lo que hace que 36 de las 40 pantallas no toquen la red.
-    enabled: conector !== undefined && !faltaElSujeto,
+    enabled: conector !== undefined && !faltaElSujeto && !faltaElEjercicio,
     retry: false,
   });
 
@@ -129,6 +182,18 @@ export function useDatosDeLaHoja(
   }
 
   if (faltaElSujeto) return { ausencia: SIN_SUJETO };
+
+  /*
+   * El orden de estas tres importa, y es el de las causas: primero si la sesion fallo, luego si
+   * todavia esta en vuelo, y solo entonces si no trae ejercicio.
+   *
+   * Al reves, mientras la sesion viaja `ejercicio` es `null` y la pantalla diria «falta el
+   * ejercicio» un instante antes de pintarse — o para siempre, si la sesion falla: un 401 se
+   * leeria como «fije usted el ejercicio», que manda a arreglar lo que no esta roto.
+   */
+  if (sesion.isError) return { ausencia: alFallar(sesion.error) };
+  if (pideLaSesion && sesion.isPending) return { ausencia: CARGANDO };
+  if (faltaElEjercicio) return { ausencia: SIN_EJERCICIO };
 
   if (consulta.isPending) return { ausencia: CARGANDO };
   if (consulta.isError) return { ausencia: alFallar(consulta.error) };
@@ -152,4 +217,4 @@ export function useDatosDeLaHoja(
   };
 }
 
-export { CARGANDO, SIN_SUJETO, VACIO, NADA, alFallar };
+export { CARGANDO, SIN_SUJETO, SIN_EJERCICIO, VACIO, NADA, alFallar };

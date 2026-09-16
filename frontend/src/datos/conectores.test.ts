@@ -11,13 +11,15 @@ import type {
   LiquidacionDeCostas,
   Paginado,
   PrescripcionDeclarada,
+  MovimientoDeLaBitacora,
   ProcesoDelExpediente, IndicadorDeRecaudacion, TrabajoParado } from './lecturas.ts';
 
 /**
  * **Lo que cada pantalla conectada saca de su respuesta** (#97).
  *
- * Lo detallado de las dos hojas de Consultas esta en `conectores/consultas.test.ts`, al lado de su
- * conector; aqui quedan el centinela del registro y el recorrido que vale para las once.
+ * Lo detallado de las dos hojas de Consultas esta en `conectores/consultas.test.ts` y lo de la
+ * bitacora en `conectores/seguridad.test.ts`, al lado de su conector; aqui quedan el centinela del
+ * registro y el recorrido que vale para los doce.
  *
  * Lo que se comprueba no es que el mapeo «funcione»: es que **ningun campo se quede sin decidir**.
  * Un campo de solo lectura de una pantalla conectada tiene que estar en uno de los dos sitios —con
@@ -190,6 +192,38 @@ const PARADO_MEDIDO: TrabajoParado = {
   ],
 };
 
+/**
+ * La pagina de la bitacora, con los DOCE campos que el contrato declara (#181).
+ *
+ * Los doce y no los cuatro que el conector lee: una muestra recortada a lo que se usa haria pasar
+ * en verde un conector que leyera un campo con otro nombre —el sintoma mudo de C-1, un
+ * `undefined` donde va una celda—. `origenEquipo`, `origenIp`, `datosAnteriores` y `datosNuevos`
+ * estan aqui **porque llegan**, y el conector tiene que seguir sin ponerlos en ninguna celda.
+ */
+const BITACORA: Paginado<MovimientoDeLaBitacora> = {
+  contenido: [
+    {
+      id: 41184,
+      ejercicio: 2026,
+      tabla: 'recibo',
+      clave: '0003-0041184',
+      operacion: 'ANULACION',
+      usuario: 'jcardenas',
+      origenEquipo: 'PC-CAJA-02',
+      origenIp: '10.0.4.12',
+      fecha: '2026-08-13T14:41:12Z',
+      observacion: 'Anulado por duplicado a pedido del contribuyente',
+      datosAnteriores: '{"estado":"VIGENTE"}',
+      datosNuevos: '{"estado":"ANULADO"}',
+    },
+  ],
+  pagina: 0,
+  tamano: 20,
+  totalElementos: 84182,
+  totalPaginas: 4210,
+  hayMas: true,
+};
+
 const MUESTRAS: Readonly<Partial<Record<ClaveDeHoja, unknown>>> = {
   panel: CORRIDA,
   'coa-panel': PAGINA,
@@ -202,6 +236,7 @@ const MUESTRAS: Readonly<Partial<Record<ClaveDeHoja, unknown>>> = {
   'ini-parado': PARADO_MEDIDO,
   'con-panel': [FICHA, SIN_CAMPANIA],
   'con-doc': CONSTANCIA_NEGADA,
+  'seg-aud': BITACORA,
 };
 
 /** Los campos de solo lectura de una pantalla, por su coordenada. */
@@ -212,7 +247,7 @@ function soloLecturaDe(clave: ClaveDeHoja): readonly string[] {
 }
 
 describe('los conectores', () => {
-  it('EL CENTINELA: estan los once que estan, y no cero ni cuarenta', () => {
+  it('EL CENTINELA: estan los doce que estan, y no cero ni cuarenta', () => {
     // Cero dejaria todo lo de abajo sin sujeto. Cuarenta significaria que alguien conecto
     // pantallas cuyas operaciones no publican lo que ensenan, que es lo que este archivo evita.
     // La lista se escribe a mano y crece de una en una: conectar una pantalla es una decision, y
@@ -220,11 +255,14 @@ describe('los conectores', () => {
     // —que publica cada operacion y que no— esta en `conectores/licencias.ts`. Las dos de
     // Consultas llegan con #169, y son las primeras que EXIGEN SUJETO: sin un codigo de
     // contribuyente en la ruta no piden nada, y la pantalla lo dice en vez de pedir el padron.
+    // `seg-aud` llega con #181, y es la primera que EXIGE EJERCICIO: su obligatorio no va en la
+    // ruta y sale de la sesion, que es la tercera forma. Ver `conectores/seguridad.ts`.
     expect(Object.keys(CONECTORES).sort()).toEqual(
       [
         'aut-cat', 'aut-tram', 'coa-cost', 'coa-exp', 'coa-panel',
         'con-doc', 'con-panel',
         'ini-flujo', 'ini-panel', 'ini-parado', 'panel',
+        'seg-aud',
       ].sort(),
     );
   });

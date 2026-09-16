@@ -6,6 +6,7 @@ import { CONECTORES_DE_LICENCIAS } from './conectores/licencias.ts';
 import { CONECTORES_DE_COACTIVA } from './conectores/coactiva.ts';
 import { CONECTORES_DE_INICIO } from './conectores/inicio.ts';
 import { CONECTORES_DE_CONSULTAS } from './conectores/consultas.ts';
+import { CONECTORES_DE_SEGURIDAD } from './conectores/seguridad.ts';
 
 /**
  * **Que pantalla pide que, y que de lo que llega dibuja cada campo** (#97, #169).
@@ -33,6 +34,17 @@ import { CONECTORES_DE_CONSULTAS } from './conectores/consultas.ts';
  *   · **`seg-acc`** podria dar tres de las cinco columnas de su tabla; las otras dos —origen y
  *     sensible— no las publica nadie, y la matriz de permisos es, medido, **una bolsa de codigos
  *     planos**: no distingue propios de heredados, que es justo lo que la pantalla pregunta.
+ *
+ * <h2>Y `seg-aud`, que no estaba en esas siete y entra con #181</h2>
+ *
+ * No estaba porque su unica operacion —`GET /seguridad/auditoria`— **no estaba servida**: la lista
+ * de `servidas.ts` la enciende en #181. Al encenderla resulto ser la primera con un parametro
+ * **obligatorio que no va en la ruta**, y de ahi sale `Conector.exigeEjercicio`. Su reparto, y por
+ * que la columna «Riesgo» no la publica nadie, en `conectores/seguridad.ts`.
+ *
+ * Las otras tres hojas de Seguridad siguen fuera, y `seg-panel` y `seg-acc` con el motivo de
+ * arriba. `seg-sis` no entra porque su unica servida es **la escritura** —`PUT
+ * /seguridad/sesion/ejercicio`—, y un PUT no dibuja una pantalla.
  *
  * Se hacen enteras y bien las que pueden. Las que no, lo dicen — ver `porQueNoHayDato.ts`.
  *
@@ -75,8 +87,84 @@ export interface Conector {
    * el `enLaRuta` con que el marco lee el sujeto.
    */
   readonly exigeSujeto?: boolean;
-  /** Pide lo de esta hoja. `sujeto` es el de la ruta, o `null` cuando la hoja no lleva. */
-  readonly pedir: (senal: AbortSignal, sujeto: string | null) => Promise<unknown>;
+  /**
+   * **Esta hoja es de un ejercicio concreto, y el ejercicio sale de la SESION** (#181).
+   *
+   * Es la **tercera** forma de exigir algo, y no se parece a las dos anteriores. Sin parametro
+   * obligatorio estaban las once primeras; con el sujeto en la ruta, las dos de Consultas
+   * (`exigeSujeto`, #169). Esta es un obligatorio que **no va en la ruta y no lo elige nadie**:
+   * `GET /seguridad/auditoria` declara `ejercicio` entre sus obligatorios
+   * —`parametros-de-la-api.json`— y el ejercicio de trabajo es del contexto de sesion, que ya lo
+   * publica `GET /seguridad/sesion` y que fija la unica escritura de esta interfaz,
+   * `PUT /seguridad/sesion/ejercicio`.
+   *
+   * Asi que no se le pregunta al usuario y **no se inventa**: ni un literal, ni un
+   * `new Date().getFullYear()`. Un ano de hoy no es el ejercicio de trabajo de nadie —medido, la
+   * cuenta `administrador` de la instalacion lo tiene **nulo**—, y una auditoria del ejercicio
+   * equivocado es peor que una pantalla vacia: contesta 200, con filas, de otro ano. Sin
+   * ejercicio en la sesion no se pide nada y la pantalla lo dice (ver `useDatosDeLaHoja`).
+   *
+   * <h2>La decision del AC3: camino propio, y NO #172 — con los dos candidatos delante</h2>
+   *
+   * Habia dos mecanismos que podian haber servido, y se miraron los dos.
+   *
+   * <b>#172 — «no entra un filtro».</b> Pide que `pedir` reciba lo que la PANTALLA sabe —lo
+   * tecleado en el buscador, los desplegables— para poder mandar los parametros que la operacion
+   * publica. Cinco de los nueve opcionales de esta misma operacion —`usuario`, `tabla`,
+   * `operacion`, `desde`, `hasta`— son exactamente eso, y <b>siguen siendo de #172</b>, que se
+   * queda abierto por ellos.
+   *
+   * <b>`kamayuk-lib`#87 — «la pagina y el orden EN LA RUTA».</b> Desde el 2026-09-16 el interprete
+   * de `@kamayuk/ui` sabe paginar y ordenar contra el servidor: escribe la pagina y el campo de
+   * orden <b>en la ruta de la hoja</b> (`PaginacionDeLaTabla.enLaRuta`, `OrdenDeLaTabla.enLaRuta`)
+   * y quien lee la ruta pide. Es el mismo canal que `enLaRuta` estreno en #169 para el sujeto, o
+   * sea un mecanismo <b>mas parecido a este</b> que el de #172 — y por eso hay que decir por que
+   * tampoco sirve. Cubre los otros cuatro opcionales (`pagina`, `tamano`, `ordenarPor`,
+   * `direccion`), y su adopcion aqui es su propio issue.
+   *
+   * El ejercicio no es ninguno de los dos, por tres diferencias que no son de grado:
+   *
+   * <ol>
+   *   <li><b>No sale de la pantalla.</b> Sale de la sesion, que ninguna de las 40 hojas tiene.
+   *       Meterlo por el canal de «lo que la pantalla sabe» convertiria la sesion en una propiedad
+   *       de cada pantalla, y entonces cada una podria decir un ejercicio distinto.</li>
+   *   <li><b>Y NO puede vivir en la ruta, que es lo que descarta el de la libreria.</b> La ruta la
+   *       escribe cualquiera: con el ejercicio ahi, `#/seg-aud?ejercicio=2019` ensena la bitacora
+   *       de 2019 con la sesion puesta en 2026, y la pantalla no tendria como saber que no es la
+   *       suya. El ejercicio de trabajo es <b>global a la sesion</b> —«decide sobre que ano
+   *       escriben todos los modulos», lo dice la propia hoja `seg-sis`— y lo fija una escritura
+   *       auditada, `PUT /seguridad/sesion/ejercicio`, con su observacion. Un estado que se cambia
+   *       tecleando en la barra de direcciones no puede ser el mismo. La pagina y el orden si
+   *       pueden: cambiarlos no cambia <b>que</b> se esta mirando, solo por donde y en que
+   *       orden.</li>
+   *   <li><b>Sin el no hay peticion, no hay menos filas.</b> Un filtro que falta acota de menos y
+   *       la tabla trae mas; una pagina que falta es la primera. Un obligatorio que falta hace que
+   *       la peticion <b>no se mande</b>. Eso no es un dato de entrada: es una <b>condicion
+   *       previa</b>, del mismo tipo que `exigeSujeto` —y por eso se declara al lado y se resuelve
+   *       en el mismo sitio, con su propia frase—. El AC1 de #172 comprueba que un parametro
+   *       mandado este publicado; ninguna comprobacion sobre el NOMBRE de un parametro puede decir
+   *       que sin el no se puede pedir.</li>
+   * </ol>
+   */
+  readonly exigeEjercicio?: boolean;
+  /**
+   * Pide lo de esta hoja.
+   *
+   * `sujeto` es el de la ruta, o `null` cuando la hoja no lleva. `ejercicio` es el de trabajo de
+   * la sesion, y **solo llega con valor a quien declara `exigeEjercicio`**: a las demas les llega
+   * `null`, porque a las demas no se les pide la sesion.
+   *
+   * **Son tres argumentos posicionales y ya son demasiados**, y queda dicho aqui en vez de
+   * descubrirse: el dia que #172 haga entrar los filtros de la pantalla, lo que entra por aqui es
+   * un objeto —lo que se sabe al pedir— y estos tres son sus tres primeros campos. No se hace hoy
+   * porque cambiar la firma con doce conectores puestos toca cinco archivos que cuatro ramas
+   * comparten, y #172 va a tocarlos igual.
+   */
+  readonly pedir: (
+    senal: AbortSignal,
+    sujeto: string | null,
+    ejercicio: number | null,
+  ) => Promise<unknown>;
   readonly repartir: (respuesta: never) => Reparto;
 }
 
@@ -127,6 +215,7 @@ export const CONECTORES: Readonly<Partial<Record<ClaveDeHoja, Conector>>> = {
   ...CONECTORES_DE_COACTIVA,
   ...CONECTORES_DE_INICIO,
   ...CONECTORES_DE_CONSULTAS,
+  ...CONECTORES_DE_SEGURIDAD,
 };
 
 export { NO_PUBLICADO };

@@ -1,4 +1,4 @@
-import type { Fecha, Importe } from './valores.ts';
+import type { Fecha, Importe, Instante } from './valores.ts';
 
 /**
  * Como se escriben un importe y una fecha en la pantalla.
@@ -84,6 +84,46 @@ export function formatearFecha(fecha: Fecha): string {
 
   const [, anio, mes, dia] = partes;
   return `${dia}/${mes}/${anio}`;
+}
+
+/**
+ * Un instante ISO 8601 en UTC: `2026-08-13T14:41:12Z`. Los segundos y los milisegundos sobran.
+ */
+const INSTANTE_SERVIDO = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::\d{2}(?:\.\d+)?)?Z$/;
+
+/**
+ * `"2026-08-13T14:41:12Z"` -> `"13/08/2026 14:41 UTC"` (#181).
+ *
+ * <h2>Por que dice «UTC» y no lo mueve a la hora de Lima</h2>
+ *
+ * Porque moverlo es aritmetica sobre un instante, y este archivo entero existe para no hacerla:
+ * la unica forma de convertir es construir un `Date` —que arrastra la zona del PUESTO, no la de
+ * la municipalidad— o restar cinco horas a mano, que cruza medianoche y cambia el dia. Las dos
+ * pintarian una hora distinta de la que el servidor publico **sin que nada lo dijera**, y esta
+ * cifra va en una bitacora de auditoria: la hora a la que alguien anulo un recibo es lo que se
+ * presenta cuando alguien pregunta.
+ *
+ * Asi que se escribe lo que llego, con la marca de zona a la vista. Es feo y es cierto. Lo que lo
+ * cerraria de verdad es que el backend publique la fecha ya en la zona de la municipalidad —como
+ * ya hace `CorridaDelPredial.fechaCalculo`, que llega redactada—, y eso es del dueno de
+ * `seguridad`: es **#188**, con sus dos formas medidas. Mientras no lo haga, la alternativa era
+ * ensenar una hora equivocada con cara de exacta.
+ *
+ * Los segundos se dejan fuera porque la columna del artboard escribe `13/08/2026 09:41`.
+ */
+export function formatearInstante(instante: Instante): string {
+  const partes = INSTANTE_SERVIDO.exec(instante.trim());
+
+  if (partes === null) {
+    throw new Error(
+      `Instante con una forma que el backend no sirve: «${instante}». Se espera ISO 8601 en UTC, ` +
+        '«2026-08-13T14:41:12Z». Un `Instant` de Java sale asi; una fecha sin hora es `Fecha`, y ' +
+        'la escribe `formatearFecha`.',
+    );
+  }
+
+  const [, anio, mes, dia, hora, minuto] = partes;
+  return `${dia}/${mes}/${anio} ${hora}:${minuto} UTC`;
 }
 
 /**
