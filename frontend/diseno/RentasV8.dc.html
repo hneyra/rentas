@@ -533,7 +533,9 @@ const ARBOL = [
   ['Consultas', 'Ventanilla y constancias', 'consultas', 'CONSULTAS',
     ['M17.4 11a6.4 6.4 0 1 1-12.8 0 6.4 6.4 0 0 1 12.8 0', 'M15.8 15.8 20.6 20.6'],
     [
-      ['con-panel', 'Panel', [['GET', '/consultas/cuenta-corriente/{codigo}', 'CuentaCorrienteController']],
+      ['con-panel', 'Panel', [
+        ['GET', '/consultas/unificada', 'ConsultaUnificadaController'],
+        ['GET', '/consultas/deudas-con-beneficio', 'DeudasConBeneficioController']],
         []],
       ['con-contrib', 'Contribuyentes', [
         ['BASE', '/consultas/deuda', 'ConsultaDeudaController'],
@@ -547,7 +549,7 @@ const ARBOL = [
         ['BASE', '/consultas/altas-bajas', 'AltasBajasController']],
         []],
       ['con-doc', 'Documentos y beneficios', [
-        ['GET', '/consultas/constancias/no-adeudo?formato', 'ConstanciaController'],
+        ['GET', '/consultas/constancias/no-adeudo', 'ConstanciaController'],
         ['BASE', '/consultas/deudas-con-beneficio', 'DeudasConBeneficioController']],
         [['Alert', 'Con deuda pendiente sale constancia de deuda, no de no adeudo']]]
     ]],

@@ -337,14 +337,128 @@ export interface PartidasDeLaDeuda {
   readonly total: ImporteConFecha;
 }
 
-/** Una obligacion pendiente, de `GET /consultas/deuda`. */
+/**
+ * Una obligacion pendiente, de `GET /consultas/deuda` — y de la constancia de no adeudo.
+ *
+ * **Es la misma fila en las dos**, y no por parecido: las dos salen del mismo puerto
+ * (`ConsultaDeDeudaPublica`), asi que el contrato publica para las dos `tributo`, `ejercicio`,
+ * `predioId`, `vehiculoId`, `periodoDesde`, `periodoHasta`, `fase` y el desglose anidado en
+ * `deuda`. Declararla dos veces con dos nombres seria dos sitios donde equivocarse el dia que el
+ * puerto cambie.
+ *
+ * Los dos identificadores llegan **anulables**: una obligacion es de un predio o de un vehiculo,
+ * nunca de los dos, y las que no son de ninguno —una multa— no traen ninguno.
+ */
 export interface DeudaPorConcepto {
   readonly tributo: string;
   readonly ejercicio: number;
+  readonly predioId: number | null;
+  readonly vehiculoId: number | null;
   readonly periodoDesde: number;
   readonly periodoHasta: number;
   readonly fase: string;
   readonly deuda: PartidasDeLaDeuda;
+}
+
+// ── La ventanilla de Consultas (#169) ───────────────────────────────────────────────────────
+
+/** Quien es, en la cabecera de la ficha unificada. Sin el identificador interno, a proposito. */
+export interface ContribuyenteDeLaFicha {
+  readonly codigo: string;
+  readonly nombre: string;
+  readonly documento: string;
+}
+
+/**
+ * El «Resumen de saldos» de `GET /consultas/unificada`: **las cinco cifras ya sumadas por el
+ * servidor**, y la frase que las explica.
+ *
+ * Las cinco llegan sumadas sobre TODAS las obligaciones —no sobre la pagina— y
+ * `estadoDeLaConsulta` llega redactado (RNF-083). Es literalmente lo que la regla de
+ * `conectores.ts` pide: aqui no hay nada que sumar, y por eso esta pantalla no suma.
+ */
+export interface ResumenDeSaldos {
+  readonly insoluto: ImporteConFecha;
+  readonly reajuste: ImporteConFecha;
+  readonly interes: ImporteConFecha;
+  readonly gasto: ImporteConFecha;
+  readonly total: ImporteConFecha;
+  readonly estadoDeLaConsulta: string;
+}
+
+/**
+ * La ficha unificada de un contribuyente, de `GET /consultas/unificada?contribuyente={codigo}`.
+ *
+ * **Se declaran la cabecera y el resumen, y no las seis secciones paginadas** —deudas
+ * pendientes, pagos, altas y bajas, fraccionamientos, valores y declaraciones—. No es un olvido:
+ * el contrato las publica y `con-panel` **no tiene ni una tabla** donde dibujarlas, asi que
+ * declarar aqui seis tipos de fila seria escribir la forma de lo que ninguna pantalla lee. El dia
+ * que una pestana las dibuje, se declaran con ella.
+ */
+export interface FichaUnificada {
+  readonly contribuyente: ContribuyenteDeLaFicha;
+  /** La fecha de corte con la que se contesto todo lo que depende de hoy. */
+  readonly aLaFecha: string;
+  readonly resumenDeSaldos: ResumenDeSaldos;
+}
+
+/**
+ * Lo que produce el acogimiento **cuando hay campana elegida**, y nulo cuando no.
+ *
+ * `alicuotaAplicada` y no «tasa» (regla 8). Llega como texto en tanto por ciento.
+ */
+export interface SimulacionDelBeneficio {
+  readonly campania: string;
+  readonly alicuotaAplicada: string;
+  readonly baseDelBeneficio: string;
+  readonly baseDelBeneficioImporte: ImporteConFecha;
+  readonly ahorro: ImporteConFecha;
+  readonly deudaConBeneficio: ImporteConFecha;
+}
+
+/** Una campana a la que se puede simular el acogimiento. Sale del conjunto sellado. */
+export interface CampaniaAplicable {
+  readonly nombre: string;
+  readonly alicuota: string;
+  readonly base: string;
+}
+
+/**
+ * La simulacion de acogimiento de un contribuyente, de
+ * `GET /consultas/deudas-con-beneficio?contribuyente={codigo}`.
+ *
+ * **`simulacion` es anulable y hay que tratarlo**: sale nulo cuando no se eligio campana —que es
+ * el caso de esta pantalla, que no tiene con que elegirla— o cuando no hay ninguna publicada. No
+ * sale con ceros a proposito: «se ahorraria 0,00» es una afirmacion sobre una campana, y sin
+ * campana no hay ninguna que hacer.
+ */
+export interface DeudaConBeneficio {
+  readonly contribuyente: ContribuyenteDeLaFicha & { readonly domicilioFiscal: string | null };
+  readonly aLaFecha: string;
+  readonly deudaTotal: ImporteConFecha;
+  readonly deudaAcogida: ImporteConFecha;
+  readonly registrosAcogidos: number;
+  readonly simulacion: SimulacionDelBeneficio | null;
+  readonly campaniasAplicables: readonly CampaniaAplicable[];
+  /** La frase que explica lo anterior, redactada por el servidor (RNF-080, RNF-083). */
+  readonly estadoDeLaSimulacion: string;
+  readonly obligaciones: Paginado<DeudaPorConcepto>;
+}
+
+/**
+ * La constancia de no adeudo, de
+ * `GET /consultas/constancias/no-adeudo?codContribuyente={codigo}`.
+ *
+ * **`seNiega` es el resultado**: cierto significa que el contribuyente debe algo y que lo que
+ * saldria es una constancia de DEUDA, no una de no adeudo. Y `obligaciones` **no viene
+ * paginada**: es la lista entera de lo que impide la constancia, que es lo que permite que la
+ * tabla de esta pantalla cuente sus propias filas sin mentir.
+ */
+export interface ConstanciaDeNoAdeudo {
+  readonly codigoContribuyente: string;
+  readonly fechaDeCorte: string;
+  readonly seNiega: boolean;
+  readonly obligaciones: readonly DeudaPorConcepto[];
 }
 
 // ── Autorizaciones y licencias ──────────────────────────────────────────────────────────────
@@ -883,6 +997,35 @@ export const RUTAS = {
    */
   deudaDe: (codigo: string) =>
     `/consultas/deuda?codContribuyente=${encodeURIComponent(codigo)}`,
+  /**
+   * La ficha unificada de UN contribuyente (#169). `?contribuyente=` es **obligatorio** en el
+   * contrato y en el controlador: sin el, ni siquiera se llega al metodo.
+   */
+  fichaUnificadaDe: (codigo: string) =>
+    `/consultas/unificada?contribuyente=${encodeURIComponent(codigo)}`,
+  /**
+   * La simulacion de acogimiento de UN contribuyente (#169).
+   *
+   * El contrato declara `contribuyente` **opcional** —lo derivo del filtro de la pantalla— y el
+   * controlador lo exige igual: sin el contesta 422 «la simulacion del acogimiento es de una
+   * persona concreta, no del padron entero». Se manda siempre, que es lo unico que hace que la
+   * pantalla no dependa de cual de las dos declaraciones gane.
+   *
+   * **Sin `?benefAplicable=`**: elegir campana es una decision de quien atiende y esta pantalla
+   * no tiene el desplegable que la haria; mandar una fija seria simular un descuento que nadie
+   * pidio sobre la deuda de alguien.
+   */
+  deudasConBeneficioDe: (codigo: string) =>
+    `/consultas/deudas-con-beneficio?contribuyente=${encodeURIComponent(codigo)}`,
+  /**
+   * La constancia de no adeudo de UN contribuyente (#169).
+   *
+   * `?codContribuyente=` y **no `contribuyente`**: aqui el parametro no tiene segundo nombre, al
+   * contrario que en las dos de arriba. Sin `?formato=`, que es lo que distingue el JSON que esta
+   * pantalla pinta del archivo descargable de RF-132.
+   */
+  constanciaDeNoAdeudoDe: (codigo: string) =>
+    `/consultas/constancias/no-adeudo?codContribuyente=${encodeURIComponent(codigo)}`,
   coactiva: '/coactiva/deudas',
   /**
    * El primer expediente de la cartera coactiva (#170).

@@ -2,6 +2,7 @@ import type { Catalogo, ModuloDelCatalogo } from '@kamayuk/shell';
 import { ICONOS, seEscribe, tipoDe, type NombreDeIcono } from '@kamayuk/ui';
 
 import { ARBOL } from './pantallas/arbol.ts';
+import { CONECTORES } from './datos/conectores.ts';
 import { pantallaDe } from './pantallas/definiciones/index.ts';
 
 /**
@@ -63,6 +64,19 @@ function iconoDelTrazo(rotulo: string, trazos: readonly string[]): NombreDeIcono
   return casa;
 }
 
+/**
+ * **Si la direccion de esta hoja lleva un sujeto detras** (#169): `#/con-panel/00000025673`.
+ *
+ * Se DERIVA del conector y no se escribe en una lista aparte, por lo mismo que `seEscribe` sale de
+ * la definicion: dos registros paralelos de claves se desincronizan, y este se desincronizaria en
+ * silencio —el marco ignoraria el codigo de la direccion «porque la hoja no lo declara» y la
+ * pantalla diria que falta el contribuyente **teniendolo delante en la barra**—. Quien sabe si una
+ * hoja necesita sujeto es quien la pide, o sea su conector.
+ */
+function laHojaLlevaSujeto(clave: Parameters<typeof pantallaDe>[0]): boolean {
+  return CONECTORES[clave]?.exigeSujeto === true;
+}
+
 /** Si alguna de las pantallas de una hoja tiene un campo que se escribe. */
 function laHojaSeEscribe(clave: Parameters<typeof pantallaDe>[0]): boolean {
   return pantallaDe(clave).bloques.some((bloque) =>
@@ -92,6 +106,7 @@ export const CATALOGO: Catalogo = ARBOL.map(
       clave: hoja.clave,
       rotulo: hoja.rotulo,
       seEscribe: laHojaSeEscribe(hoja.clave),
+      ...(laHojaLlevaSujeto(hoja.clave) ? { enLaRuta: { sujeto: true } } : {}),
       // La barra gris de V8: que hay que HACER aqui. Vive en la definicion de la pantalla y no en
       // el arbol —dos registros paralelos de cuarenta claves se desincronizan—, y llega al marco
       // por aqui porque el marco no puede saberla.

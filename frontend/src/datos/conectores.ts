@@ -2,20 +2,27 @@ import { coordenada, type Coordenada } from '@kamayuk/ui';
 import type { ClaveDeHoja } from '../pantallas/arbol.ts';
 import type { CorridaDelPredial } from './lecturas.ts';
 import { RUTAS, pedirUno } from './lecturas.ts';
-// Los conectores de cada modulo viven en su archivo, y aqui solo se montan (#168). Aparte porque
-// varios modulos se conectan a la vez: un registro con el codigo de todos dentro es un archivo que
-// tres ramas editan en la misma linea.
 import { CONECTORES_DE_LICENCIAS } from './conectores/licencias.ts';
 import { CONECTORES_DE_COACTIVA } from './conectores/coactiva.ts';
 import { CONECTORES_DE_INICIO } from './conectores/inicio.ts';
+import { CONECTORES_DE_CONSULTAS } from './conectores/consultas.ts';
 
 /**
- * **Que pantalla pide que, y que de lo que llega dibuja cada campo** (#97).
+ * **Que pantalla pide que, y que de lo que llega dibuja cada campo** (#97, #169).
  *
- * <h2>«Servida» no es «puede pintarse», y la diferencia se mide campo a campo</h2>
+ * <h2>Eran DOS de siete, y son CUATRO: las dos de Consultas entraron en #169</h2>
  *
- * Varias hojas declaran alguna operacion servida y aun asi no se conectan, porque lo que la
- * operacion publica no es lo que la pantalla ensena:
+ * `con-panel` y `con-doc` no estaban en la lista de abajo por un motivo que resulto ser falso:
+ * **la hoja declaraba la operacion equivocada**. `con-panel` decia
+ * `GET /consultas/cuenta-corriente/{codigo}` —una pagina de asientos, y esta hoja no tiene tabla—
+ * cuando sus ocho campos son `resumenDeSaldos` de `GET /consultas/unificada`. Corregida la
+ * declaracion (ver `pantallas/arbol.ts`), las dos se pintan. Su conector vive aparte, en
+ * `conectores/consultas.ts`.
+ *
+ * <h2>Por que las otras cinco de las siete siguen sin pedir</h2>
+ *
+ * Siete hojas declaraban alguna operacion servida. Pero «servida» no es «puede pintarse», y la
+ * diferencia se midio campo a campo:
  *
  *   · **`seg-panel`** declara TRES servidas —modulos, sesion y municipalidad— y **ninguna publica
  *     nada de lo que la pantalla ensena**: usuarios registrados, activos, contrasenas caducadas.
@@ -27,19 +34,7 @@ import { CONECTORES_DE_INICIO } from './conectores/inicio.ts';
  *     sensible— no las publica nadie, y la matriz de permisos es, medido, **una bolsa de codigos
  *     planos**: no distingue propios de heredados, que es justo lo que la pantalla pregunta.
  *
- * Las que se conectan se hacen enteras y bien; las que no, lo dicen — ver `porQueNoHayDato.ts`.
- *
- * <h2>Este archivo es el REGISTRO; cada modulo vive en el suyo</h2>
- *
- * Desde #170, un conector se escribe en `conectores/<modulo>.ts` —con su javadoc campo a campo— y
- * aqui entra **una linea**: varios modulos se conectan a la vez y este es el unico archivo que
- * todos tocan. `PANEL` se queda porque no es de ningun modulo del arbol: es el panel del padron.
- *
- * <b>Ese «dos» es el de #97 y no la cuenta de hoy</b>: se deja escrito porque es la medida que
- * justifica la regla de mas abajo, y reescribirlo con el numero de esta semana la dejaria sin
- * sujeto. Los conectores que llegan despues viven en `conectores/<modulo>.ts` y se montan aqui de
- * una linea; cada archivo trae su propia medida de que publica su operacion y que no. El centinela
- * de `conectores.test.ts` es el que dice cuantos hay.
+ * Se hacen enteras y bien las que pueden. Las que no, lo dicen — ver `porQueNoHayDato.ts`.
  *
  * <h2>Lo que NO se hace, y es la regla que gobierna este archivo</h2>
  *
@@ -63,9 +58,25 @@ export interface Reparto {
 }
 
 export interface Conector {
-  /** La clave de consulta de TanStack. Lleva la hoja dentro: dos pantallas no comparten cache. */
+  /**
+   * La clave de consulta de TanStack. Lleva la hoja dentro: dos pantallas no comparten cache.
+   *
+   * **El sujeto no va aqui**: lo anade `useDatosDeLaHoja` al final, porque si no dos
+   * contribuyentes compartirian la cache de la misma hoja y el segundo veria la cuenta del
+   * primero mientras llega la suya.
+   */
   readonly clave: readonly string[];
-  readonly pedir: (senal: AbortSignal) => Promise<unknown>;
+  /**
+   * **Esta hoja es de un sujeto concreto** (#169): sin el no se pide nada y la pantalla lo dice.
+   *
+   * Las tres operaciones de Consultas son de un contribuyente —sin su codigo contestan 422—, y el
+   * codigo viaja en la direccion (`#/<hoja>/<codigo>`). Que este declarado aqui y no en una lista
+   * aparte es lo que hace que el catalogo no pueda desincronizarse: `catalogo.ts` deriva de esto
+   * el `enLaRuta` con que el marco lee el sujeto.
+   */
+  readonly exigeSujeto?: boolean;
+  /** Pide lo de esta hoja. `sujeto` es el de la ruta, o `null` cuando la hoja no lleva. */
+  readonly pedir: (senal: AbortSignal, sujeto: string | null) => Promise<unknown>;
   readonly repartir: (respuesta: never) => Reparto;
 }
 
@@ -108,14 +119,14 @@ const PANEL: Conector = {
   }),
 };
 
+
 /** Las hojas que piden de verdad. Las demas lo dicen; ver `porQueNoHayDato.ts`. */
 export const CONECTORES: Readonly<Partial<Record<ClaveDeHoja, Conector>>> = {
   panel: PANEL,
   ...CONECTORES_DE_LICENCIAS,
-  // Una linea por modulo, y el modulo entero en su archivo: cuatro se conectan a la vez y este
-  // registro es el unico que los cuatro tocan. Ver `conectores/coactiva.ts` (#170).
   ...CONECTORES_DE_COACTIVA,
   ...CONECTORES_DE_INICIO,
+  ...CONECTORES_DE_CONSULTAS,
 };
 
 export { NO_PUBLICADO };

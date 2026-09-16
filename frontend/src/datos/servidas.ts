@@ -1,8 +1,9 @@
 /**
  * Las operaciones que el backend YA sirve en el entorno donde corre la aplicacion.
  *
- * <h2>Veinte: dos de sesion (I-1), cuatro de seguridad (I-3), seis del padron (I-4), dos de
- * licencias (#168), cuatro de la cobranza coactiva (#170) y dos de indicadores (#167)</h2>
+ * <h2>Veintitres: dos de sesion (I-1), cuatro de seguridad (I-3), seis del padron (I-4), dos de
+ * licencias (#168), cuatro de la cobranza coactiva (#170), dos de indicadores (#167) y tres de
+ * la ventanilla de Consultas (#169)</h2>
  *
  * La integracion no es un salto. El backend publica 181 operaciones y el proxy simula
  * dieciocho: encenderlas todas a la vez seria cambiar 181 respuestas en una sola tarde sin poder
@@ -65,12 +66,12 @@ export interface OperacionServida {
  * El tipo es `readonly OperacionServida[]` y no una tupla: lo que cambia el dia que se encienda
  * la siguiente es esta lista, y nada mas.
  *
- * <b>Son veinte, y llegaron en cinco tandas</b>: las dos de sesion que abrieron el camino
+ * <b>Son veintitres, y llegaron en seis tandas</b>: las dos de sesion que abrieron el camino
  * (I-1), las cuatro con que se compone la navegacion (I-3), las seis del padron de contribuyentes
- * (I-4), las dos de autorizaciones y licencias (#168), las cuatro de la cobranza coactiva (#170) y
- * las dos de indicadores con que se conecta el modulo Inicio (#167). Cada tanda dejo escrito lo que
- * vio al encender lo suyo, y las cinco notas siguen aqui porque lo que se vio es lo que justifica
- * que la ruta este en la lista.
+ * (I-4), las dos de autorizaciones y licencias (#168), las cuatro de la cobranza coactiva (#170),
+ * las dos de indicadores con que se conecta el modulo Inicio (#167) y las tres de la ventanilla de
+ * Consultas (#169). Cada tanda dejo escrito lo que vio al encender lo suyo, y las seis notas siguen
+ * aqui porque lo que se vio es lo que justifica que la ruta este en la lista.
  *
  * <h2>Las cuatro que enciende I-3, en el orden en que se encendieron</h2>
  *
@@ -250,6 +251,41 @@ export interface OperacionServida {
  * en un sitio concreto: `importe`, `cargado` y `pendiente` estan declarados <b>anulables</b>
  * porque el controlador los declara `@Nullable`, y el conector los dibuja como «sin cifrar» en vez
  * de como «0.00» sin haber visto todavia una respuesta con un nulo dentro.
+ *
+ * <h2>Las tres de Consultas (#169), y con que se comprobo cada una</h2>
+ *
+ * Son <b>de un contribuyente concreto</b>, las tres, y por eso lo primero que hubo que mirar no
+ * fue la forma de la respuesta sino <b>el contrato de la peticion</b> —
+ * `docs/50-api/parametros-de-la-api.json`, generado de la FIRMA de cada controlador—: es
+ * exactamente lo que dejo fuera a `GET /consultas/deuda` hasta #26. Las tres lo publican:
+ *
+ * <ol>
+ *   <li><b>`GET /consultas/unificada?contribuyente={codigo}`</b> — `contribuyente` es
+ *       <b>obligatorio</b> en el contrato y lo exige el controlador. Publica `contribuyente`
+ *       —codigo, nombre y documento—, `aLaFecha` y `resumenDeSaldos` con sus cinco importes y
+ *       `estadoDeLaConsulta`; ademas, seis secciones paginadas que esta hoja no dibuja porque
+ *       <b>no tiene tabla</b>. Un codigo que no es de esta municipalidad da <b>404</b>
+ *       `NO_ENCONTRADO`, no una ficha vacia: lo dice `ConsultaUnificada#de`.</li>
+ *   <li><b>`GET /consultas/deudas-con-beneficio?contribuyente={codigo}`</b> — el contrato lo
+ *       declara <b>opcional</b> y el controlador lo exige igual: sin el, 422 «contribuyente es
+ *       obligatorio: la simulacion del acogimiento es de una persona concreta, no del padron
+ *       entero». Asi que se manda siempre. `simulacion` llega <b>nula</b> mientras no se elija
+ *       campana con `?benefAplicable=`, y eso no es un hueco de la interfaz: es la operacion
+ *       diciendo que no hay descuento que simular (ver `conectores/consultas.ts`).</li>
+ *   <li><b>`GET /consultas/constancias/no-adeudo?codContribuyente={codigo}`</b> — obligatorio, y
+ *       <b>sin segundo nombre</b>: aqui no vale `contribuyente`. Con `?formato=PDF|XLS|RTF` el
+ *       mismo controlador contesta el archivo (RF-132) y no el JSON; esta lista enciende la
+ *       operacion que la pantalla pinta, que es la de sin parametro.</li>
+ * </ol>
+ *
+ * <b>Y lo que NO se pudo hacer con estas tres, dicho aqui y no descubierto luego</b>: no se
+ * midieron contra la instalacion con `curl`, como si se midieron las seis de I-4. Lo que se leyo
+ * es el contrato generado de los controladores reales —`docs/50-api/formas-de-la-api.json`,
+ * campo a campo— y el codigo de los tres controladores. Que la respuesta de verdad traiga nulos
+ * donde el contrato declara un objeto —lo que en I-4 obligo a cambiar `FichaDelContribuyente`—
+ * esta previsto en los tipos (`simulacion` es anulable) pero <b>no comprobado contra un
+ * servidor</b>. Si alguna contesta algo que no cuadre, la pantalla lo dira como averia y no como
+ * dato: los cuatro estados de `useDatosDeLaHoja` estan puestos para eso.
  */
 export const YA_SERVIDAS: readonly OperacionServida[] = [
   { metodo: 'GET', ruta: '/seguridad/sesion' },
@@ -272,6 +308,9 @@ export const YA_SERVIDAS: readonly OperacionServida[] = [
   { metodo: 'GET', ruta: '/coactiva/prescripcion' },
   { metodo: 'GET', ruta: '/indicadores/recaudacion' },
   { metodo: 'GET', ruta: '/indicadores/trabajo-parado' },
+  { metodo: 'GET', ruta: '/consultas/unificada' },
+  { metodo: 'GET', ruta: '/consultas/deudas-con-beneficio' },
+  { metodo: 'GET', ruta: '/consultas/constancias/no-adeudo' },
 ];
 
 /** `/rentas/vehiculos/{placa}` → `^/rentas/vehiculos/[^/]+$`. */

@@ -406,11 +406,24 @@ export const ARBOL = [
       {
         clave: 'con-panel',
         rotulo: 'Panel',
+        // **Declaraba `GET /consultas/cuenta-corriente/{codigo}`, y esa operacion no pinta esta
+        // pantalla** (#169). El motivo por el que se declaro asi se lee en el bloque: se titula
+        // «Cuenta corriente del contribuyente», y la ruta se eligio por el TITULO. Los ocho campos
+        // dicen otra cosa —contribuyente, documento, fecha de calculo, insoluto, interes y
+        // reajuste, gastos y costas, total y beneficio vigente—, y son punto por punto
+        // `resumenDeSaldos` de `GET /consultas/unificada`.
+        //
+        // Y no se queda ademas, porque aqui no sirve para nada mas: `cuenta-corriente` publica
+        // **una pagina de asientos** —`contenido[]` con `id`, `tipo`, `fase`, `monto`,
+        // `documentoOrigen`…— y esta hoja **no tiene tabla** donde ponerlos. Una operacion
+        // declarada que no puede dibujar ni un campo es la que hace que la siguiente persona
+        // vuelva a creerse que la pantalla esta a una operacion de pintarse y sea la equivocada.
         operaciones: [
+          { verbo: 'GET', ruta: '/consultas/unificada', nota: 'ConsultaUnificadaController' },
           {
             verbo: 'GET',
-            ruta: '/consultas/cuenta-corriente/{codigo}',
-            nota: 'CuentaCorrienteController',
+            ruta: '/consultas/deudas-con-beneficio',
+            nota: 'DeudasConBeneficioController',
           },
         ],
         piezasDeclaradas: [],
@@ -442,11 +455,12 @@ export const ARBOL = [
         clave: 'con-doc',
         rotulo: 'Documentos y beneficios',
         operaciones: [
-          {
-            verbo: 'GET',
-            ruta: '/consultas/constancias/no-adeudo?formato',
-            nota: 'ConstanciaController',
-          },
+          // Declaraba `?formato` (#169), que es **la otra** operacion del mismo controlador: con
+          // ese parametro contesta el PDF, el XLS o el RTF descargable (RF-132), y sin el
+          // contesta el JSON que esta pantalla dibuja. Lo que aqui se pide es el JSON, asi que la
+          // ruta declarada es la de la respuesta que se pinta; la descarga sigue existiendo y la
+          // pediria el pie de la hoja el dia que exporte de verdad.
+          { verbo: 'GET', ruta: '/consultas/constancias/no-adeudo', nota: 'ConstanciaController' },
           {
             verbo: 'BASE',
             ruta: '/consultas/deudas-con-beneficio',

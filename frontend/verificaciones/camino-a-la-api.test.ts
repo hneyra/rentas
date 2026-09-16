@@ -12,6 +12,7 @@ import { describe, expect, it } from 'vitest';
 
 import { PROHIBICIONES } from '../eslint.prohibiciones.mjs';
 import { PREFIJO as RAIZ } from '../src/api/cliente.ts';
+import { RUTAS } from '../src/datos/lecturas.ts';
 import { YA_SERVIDAS } from '../src/datos/servidas.ts';
 import configuracion from '../vite.config.ts';
 
@@ -36,6 +37,8 @@ import configuracion from '../vite.config.ts';
 const AQUI = dirname(fileURLToPath(import.meta.url));
 const FRONTEND = join(AQUI, '..');
 const FORMAS = join(FRONTEND, '../docs/50-api/formas-de-la-api.json');
+/** El contrato de la PETICION: que hace falta para pedir cada operacion (#26). */
+const PARAMETROS = join(FRONTEND, '../docs/50-api/parametros-de-la-api.json');
 
 const declaradas = Object.keys(JSON.parse(readFileSync(FORMAS, 'utf8')) as Record<string, unknown>);
 
@@ -100,7 +103,7 @@ describe('AC4 — la raiz de la API es UNA, escrita en tres sitios que tienen qu
 });
 
 describe('AC7 — lo que se declara servido tiene que publicarlo el backend', () => {
-  it('las veinte: dos de I-1, cuatro de I-3, seis de I-4, dos de #168, cuatro de #170 y dos de #167', () => {
+  it('las veintitres: I-1, I-3, I-4, #168, #170, #167 y las tres de #169', () => {
     // La lista escrita a mano es a proposito. Derivarla de `YA_SERVIDAS` la haria pasar diga lo
     // que diga: encender una ruta es una decision, y una decision se revisa leyendo su diff. La
     // lista crece de una en una porque encenderlas todas a la vez seria cambiar 181 respuestas
@@ -127,6 +130,9 @@ describe('AC7 — lo que se declara servido tiene que publicarlo el backend', ()
       'GET /coactiva/prescripcion',
       'GET /indicadores/recaudacion',
       'GET /indicadores/trabajo-parado',
+      'GET /consultas/unificada',
+      'GET /consultas/deudas-con-beneficio',
+      'GET /consultas/constancias/no-adeudo',
     ]);
   });
 
@@ -158,6 +164,50 @@ describe('AC7 — lo que se declara servido tiene que publicarlo el backend', ()
 
     expect(fuera).not.toContain('GET /rentas/predios');
     expect(fuera).not.toContain('GET /consultas/deuda');
+  });
+
+  it('las tres de Consultas mandan un parametro que el contrato de la PETICION declara', () => {
+    // Es la mitad que #26 enseno y que la lista de arriba no puede ver: una ruta que existe puede
+    // exigir un parametro que nadie declara, y escribirlo en el frontend seria construir sobre un
+    // nombre que nada de este repositorio comprueba. `parametros-de-la-api.json` lo genera
+    // `ParametrosDeLaApiTest` de la FIRMA de cada controlador, asi que si alguien le cambia el
+    // nombre al parametro, esto sale rojo antes de que nadie levante nada.
+    const parametros = JSON.parse(readFileSync(PARAMETROS, 'utf8')) as Record<
+      string,
+      { readonly obligatorios: readonly string[]; readonly opcionales: readonly string[] }
+    >;
+    const declara = (clave: string, parametro: string): boolean => {
+      const suyos = parametros[clave];
+      return (
+        suyos !== undefined && [...suyos.obligatorios, ...suyos.opcionales].includes(parametro)
+      );
+    };
+
+    // `deudas-con-beneficio` lo declara OPCIONAL y el controlador lo exige igual (422 sin el), asi
+    // que se manda siempre: lo que importa aqui es que el nombre exista, no en que lista este.
+    expect(declara('GET /consultas/unificada', 'contribuyente')).toBe(true);
+    expect(declara('GET /consultas/deudas-con-beneficio', 'contribuyente')).toBe(true);
+    expect(declara('GET /consultas/constancias/no-adeudo', 'codContribuyente')).toBe(true);
+
+    // Y lo que se manda es eso y no otra cosa: las rutas se construyen aqui una sola vez.
+    expect(RUTAS.fichaUnificadaDe('A/1')).toBe('/consultas/unificada?contribuyente=A%2F1');
+    expect(RUTAS.deudasConBeneficioDe('A/1')).toBe(
+      '/consultas/deudas-con-beneficio?contribuyente=A%2F1',
+    );
+    expect(RUTAS.constanciaDeNoAdeudoDe('A/1')).toBe(
+      '/consultas/constancias/no-adeudo?codContribuyente=A%2F1',
+    );
+  });
+
+  it('y `constancias/no-adeudo` se enciende SIN `?formato`: el JSON, no el archivo', () => {
+    // El mismo controlador publica las dos. Con `?formato=PDF|XLS|RTF` contesta un `byte[]` con su
+    // `Content-Disposition`, que no es lo que una pantalla pinta; el contrato solo declara la
+    // forma del JSON. Encender la ruta con el parametro dentro —que es como la declaraba el
+    // artboard hasta #169— habria hecho que `laSirveElBackend` no reconociera ninguna de las dos.
+    const fuera = YA_SERVIDAS.map((o) => `${o.metodo} ${o.ruta}`);
+
+    expect(fuera).toContain('GET /consultas/constancias/no-adeudo');
+    expect(fuera).not.toContain('GET /consultas/constancias/no-adeudo?formato');
   });
 
   it.each(YA_SERVIDAS.map((o) => `${o.metodo} ${o.ruta}`))(
@@ -329,6 +379,10 @@ const CAPTURAS = [
   'src/marco/sesionMedida.ts',
   'src/marco/seguridadMedida.ts',
   'src/datos/backendMedido.ts',
+  // La cuarta no es una captura sino respuestas construidas desde el contrato (#169), y corre el
+  // MISMO riesgo: un `ficha ?? FICHA` ensenaria la cuenta corriente de un contribuyente inventado
+  // con la cara de un dato medido. Ver su javadoc, que dice lo que sostiene y lo que no.
+  'src/datos/conectores/consultasDeMuestra.ts',
 ];
 
 describe('las capturas de la instalacion son de las pruebas, y no respaldos de produccion', () => {
