@@ -215,11 +215,18 @@ const INI_FLUJO: Conector = {
  * <b>Lo que hay que mirar al revisar esto</b>: la quinta columna es la de la insignia
  * (`columnaDeInsignia: 4` en la definicion, que viene del artboard) y lo que se le da es
  * `porQueCuestaDinero`, que es una **frase** y no un estado —«sin emitir no se pueden notificar ni
- * cobrar, y prescriben»—. `tono.ts` deduce el color de lo que dice la celda y no reconoce ninguna
- * de esas frases, asi que las pinta `ok`. Es el unico campo del modulo que la operacion publica
- * con una forma distinta de la que el artboard esperaba: el artboard dibuja un estado («Vencida»,
- * «Por vencer») y el backend no publica ninguno. Arreglarlo de verdad es publicar el estado o
- * darle a la columna su propia regla de insignia; deducirlo aqui seria inventarlo.
+ * cobrar, y prescriben»—. Es el unico campo del modulo que la operacion publica con una forma
+ * distinta de la que el artboard esperaba: el artboard dibuja un estado («Vencida», «Por vencer»)
+ * y el backend no publica ninguno.
+ *
+ * **Hasta #175 eso salia VERDE**: `tono.ts` deducia el color de lo que dice la celda y, al no
+ * reconocer ninguna de las cuatro frases, caia en `ok` — o sea que la interfaz pintaba con la
+ * insignia de «conforme» trabajo que esta parado y cuesta dinero. Desde #175 lo que ninguna regla
+ * reconoce sale con el tono de «no se», asi que la pantalla ya no miente; **pero su insignia
+ * tampoco dice nada**, y eso no se arregla aqui: el estado lo tiene que publicar
+ * `GET /indicadores/trabajo-parado` ([#183](https://github.com/hneyra/rentas/issues/183)).
+ * Deducirlo de la frase en este archivo seria inventarlo, que es lo que prohibe la regla de
+ * `conectores.ts`.
  */
 const INI_PARADO: Conector = {
   clave: ['ini-parado', 'trabajo-parado'],
