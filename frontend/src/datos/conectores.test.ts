@@ -96,11 +96,54 @@ const COSTAS = {
  * Es lo que hace total la guarda de mas abajo: un conector nuevo sin muestra no se salta la
  * comprobacion en silencio, sale rojo pidiendola.
  */
+/**
+ * Las dos paginas que Licencias pide, con la forma que `formas-de-la-api.json` publica (#168).
+ *
+ * Llegan aqui al mezclarse #170, que anadio la guarda de «cada conector tiene su muestra». Sin
+ * ellas esa guarda salia roja nombrando las dos hojas: es el modo de fallo que fue escrita para
+ * cazar —un registro que crece y una comprobacion que se calla sobre lo que no reconoce—, y lo
+ * cazo en la primera mezcla que lo puso a prueba.
+ */
+const CIIU = {
+  contenido: [
+    {
+      codigo: 'A-0111-01',
+      descripcion: 'Cultivo de cereales',
+      seccion: 'Agricultura',
+      riesgoItse: 'Bajo',
+    },
+  ],
+  pagina: 0,
+  tamano: 20,
+  totalElementos: 1842,
+  totalPaginas: 93,
+  hayMas: true,
+};
+
+const PADRON = {
+  contenido: [
+    {
+      nroLicencia: 'LF-2026-0001',
+      contribuyente: 'Comercial del Norte S.A.C.',
+      denominacionComercial: 'Bodega El Sol',
+      giros: [{ codigo: 'G-5211-01', descripcion: 'Venta al por menor', principal: true, activo: true }],
+      estado: 'VIGENTE',
+    },
+  ],
+  pagina: 0,
+  tamano: 20,
+  totalElementos: 1,
+  totalPaginas: 1,
+  hayMas: false,
+};
+
 const MUESTRAS: Readonly<Partial<Record<ClaveDeHoja, unknown>>> = {
   panel: CORRIDA,
   'coa-panel': PAGINA,
   'coa-exp': PROCESO,
   'coa-cost': COSTAS,
+  'aut-cat': CIIU,
+  'aut-tram': PADRON,
 };
 
 /** Los campos de solo lectura de una pantalla, por su coordenada. */
@@ -111,28 +154,16 @@ function soloLecturaDe(clave: ClaveDeHoja): readonly string[] {
 }
 
 describe('los conectores', () => {
-<<<<<<< HEAD
-  it('EL CENTINELA: estan los que estan, y no cero ni cuarenta', () => {
+  it('EL CENTINELA: estan los seis que estan, y no cero ni cuarenta', () => {
     // Cero dejaria todo lo de abajo sin sujeto. Cuarenta significaria que alguien conecto
     // pantallas cuyas operaciones no publican lo que ensenan, que es lo que este archivo evita.
     // La lista se escribe a mano y crece de una en una: conectar una pantalla es una decision, y
     // una decision se revisa leyendo su diff. Las dos de licencias llegan con #168, y su medida
     // —que publica cada operacion y que no— esta en `conectores/licencias.ts`.
     expect(Object.keys(CONECTORES).sort()).toEqual(
-      ['aut-cat', 'aut-tram', 'coa-panel', 'panel'].sort(),
+      ['aut-cat', 'aut-tram', 'coa-cost', 'coa-exp', 'coa-panel', 'panel'].sort(),
     );
-=======
-  it('EL CENTINELA: hay cuatro, y no cero ni cuarenta', () => {
-    // Cero dejaria todo lo de abajo sin sujeto. Cuarenta significaria que alguien conecto
-    // pantallas cuyas operaciones no publican lo que ensenan, que es lo que este archivo evita.
-    expect(Object.keys(CONECTORES).sort()).toEqual([
-      'coa-cost',
-      'coa-exp',
-      'coa-panel',
-      'panel',
-    ]);
   });
-
   it('y cada uno tiene su muestra: sin ella, la guarda de abajo se lo saltaria', () => {
     // Una comprobacion que recorre un registro y se calla sobre lo que no reconoce deja de ser
     // una comprobacion el dia que alguien anade la quinta hoja.
@@ -140,7 +171,6 @@ describe('los conectores', () => {
       (clave) => MUESTRAS[clave as ClaveDeHoja] === undefined,
     );
     expect(sinMuestra, 'anade su respuesta a `MUESTRAS`').toEqual([]);
->>>>>>> 1cfc5d2 (`coa-exp` y `coa-cost` piden de verdad; `coa-cart` no entra (#170))
   });
 
   it('NINGUN campo de una pantalla conectada se queda sin decidir', () => {

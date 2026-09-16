@@ -1,13 +1,11 @@
 import { coordenada, type Coordenada } from '@kamayuk/ui';
 import type { ClaveDeHoja } from '../pantallas/arbol.ts';
-import type { CorridaDelPredial, DeudaEnCoactiva, Paginado } from './lecturas.ts';
-import { RUTAS, pedirPagina, pedirUno } from './lecturas.ts';
+import type { CorridaDelPredial } from './lecturas.ts';
+import { RUTAS, pedirUno } from './lecturas.ts';
 // Los conectores de cada modulo viven en su archivo, y aqui solo se montan (#168). Aparte porque
 // varios modulos se conectan a la vez: un registro con el codigo de todos dentro es un archivo que
 // tres ramas editan en la misma linea.
 import { CONECTORES_DE_LICENCIAS } from './conectores/licencias.ts';
-import type { CorridaDelPredial } from './lecturas.ts';
-import { RUTAS, pedirUno } from './lecturas.ts';
 import { CONECTORES_DE_COACTIVA } from './conectores/coactiva.ts';
 
 /**
@@ -112,7 +110,6 @@ const PANEL: Conector = {
 /** Las hojas que piden de verdad. Las demas lo dicen; ver `porQueNoHayDato.ts`. */
 export const CONECTORES: Readonly<Partial<Record<ClaveDeHoja, Conector>>> = {
   panel: PANEL,
-  'coa-panel': COA_PANEL,
   ...CONECTORES_DE_LICENCIAS,
   // Una linea por modulo, y el modulo entero en su archivo: cuatro se conectan a la vez y este
   // registro es el unico que los cuatro tocan. Ver `conectores/coactiva.ts` (#170).

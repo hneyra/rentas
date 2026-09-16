@@ -100,11 +100,7 @@ describe('AC4 — la raiz de la API es UNA, escrita en tres sitios que tienen qu
 });
 
 describe('AC7 — lo que se declara servido tiene que publicarlo el backend', () => {
-<<<<<<< HEAD
-  it('las catorce declaradas: dos de I-1, cuatro de I-3, seis de I-4 y dos de #168', () => {
-=======
-  it('las dieciseis declaradas: dos de I-1, cuatro de I-3, seis de I-4 y cuatro de #170', () => {
->>>>>>> 1cfc5d2 (`coa-exp` y `coa-cost` piden de verdad; `coa-cart` no entra (#170))
+  it('las dieciocho: dos de I-1, cuatro de I-3, seis de I-4, dos de #168 y cuatro de #170', () => {
     // La lista escrita a mano es a proposito. Derivarla de `YA_SERVIDAS` la haria pasar diga lo
     // que diga: encender una ruta es una decision, y una decision se revisa leyendo su diff. La
     // lista crece de una en una porque encenderlas todas a la vez seria cambiar 181 respuestas
@@ -123,20 +119,8 @@ describe('AC7 — lo que se declara servido tiene que publicarlo el backend', ()
       'GET /rentas/predial/corridas/ultima',
       'GET /rentas/predial/corridas/{corridaId}/observados',
       'GET /rentas/beneficios',
-<<<<<<< HEAD
       'GET /licencias/ciiu',
       'GET /licencias/funcionamiento',
-    ]);
-  });
-
-  it('y la escritura sigue siendo UNA: las seis de I-4 y las dos de #168 son lecturas', () => {
-    // Las escrituras cambian datos y quedan auditadas, asi que encender una no es como
-    // encender una lectura: si algun dia son cinco, esta cifra lo dice en la revision. I-4
-    // enciende seis rutas y ninguna escribe — el expediente todavia no guarda nada. Y #168
-    // enciende dos mas que tampoco: el padron por el que `aut-tram` filtraria de verdad es
-    // `POST /licencias/funcionamiento/reportes/padron`, y quedarse fuera por el verbo es
-    // justo lo que esta cifra vigila.
-=======
       'GET /coactiva/expedientes',
       'GET /coactiva/expedientes/{numero}/proceso',
       'GET /coactiva/liquidaciones-costas',
@@ -144,16 +128,20 @@ describe('AC7 — lo que se declara servido tiene que publicarlo el backend', ()
     ]);
   });
 
-  it('y la escritura sigue siendo UNA: las de I-4 y las de #170 son todas lecturas', () => {
+  it('y la escritura sigue siendo UNA: las de I-4, las de #168 y las de #170 son todas lecturas', () => {
     // Las escrituras cambian datos y quedan auditadas, asi que encender una no es como
     // encender una lectura: si algun dia son cinco, esta cifra lo dice en la revision. I-4
+    // enciende seis rutas y ninguna escribe — el expediente todavia no guarda nada. Y #168
+    // enciende dos mas que tampoco: el padron por el que `aut-tram` filtraria de verdad es
+    // `POST /licencias/funcionamiento/reportes/padron`, y quedarse fuera por el verbo es
+    // justo lo que esta cifra vigila.
+    //
     // enciende seis rutas y ninguna escribe — el expediente todavia no guarda nada.
     //
     // #170 enciende otras cuatro y tampoco: es la prueba que impide que `coa-cart` se conecte
     // con `POST /coactiva/convenios`, que es la unica operacion que publica sus ocho campos y
     // **crea un convenio de fraccionamiento**. Pintar una pantalla no puede fraccionar la deuda
     // de nadie.
->>>>>>> 1cfc5d2 (`coa-exp` y `coa-cost` piden de verdad; `coa-cart` no entra (#170))
     expect(YA_SERVIDAS.filter((o) => o.metodo !== 'GET').map((o) => o.ruta)).toEqual([
       '/seguridad/sesion/ejercicio',
     ]);
