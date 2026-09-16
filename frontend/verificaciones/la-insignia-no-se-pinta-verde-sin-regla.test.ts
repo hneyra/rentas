@@ -183,6 +183,16 @@ const CONECTADAS: readonly {
   { hoja: 'coa-exp', bloque: 0, leLlega: 'actuaciones[].medida — la medida cautelar del acto, o «—» cuando no la lleva. Tampoco es un estado' },
   { hoja: 'aut-cat', bloque: 0, leLlega: 'ciiu[].riesgoItse — «Bajo», «Medio», «Alto». Solo «Bajo» es conforme; los otros dos no son un juicio de la administracion' },
   { hoja: 'aut-tram', bloque: 0, leLlega: 'licencias[].estado — el padron publica «VIGENTE», que si es un estado' },
+  // Entro con #181, DESPUES de que se escribiera esta guarda, y por eso este renglon es la prueba
+  // de que la guarda hace lo que dice: la hoja se conecto entre medias y salio roja sola.
+  {
+    hoja: 'seg-aud',
+    bloque: 0,
+    leLlega:
+      'la raya del artboard — «Riesgo» NO LA PUBLICA NADIE, asi que la celda no trae estado sino ' +
+      'la ausencia de uno. Con el verde por omision esa raya se pintaba de CONFORME, que es el ' +
+      'defecto de #175 en su forma mas pura: una insignia verde sobre una celda vacia',
+  },
 ];
 
 /* ── Y el contrato, que es lo que dira cuando el backend publique el estado ─────────────── */
