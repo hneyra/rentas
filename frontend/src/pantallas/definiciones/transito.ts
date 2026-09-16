@@ -69,6 +69,10 @@ export const TRANSITO = {
           { etiqueta: 'Observaciones', tipo: 'a1' },
         ],
         tabla: {
+          // Con `clave`, las filas llegan por `DatosDeLaPantalla.tablas` y sus celdas pueden decir
+          // que NO hay dato —y por que— en vez de una raya muda (`kamayuk-lib`#87, #180).
+          clave: 'actos-de-la-papeleta',
+          sinDato: { texto: '—', nota: 'Ninguna operacion publica este dato.' },
           titulo: 'Actos de la papeleta',
           columnas: [
             { rotulo: 'Nº', alineadoDerecha: false },
@@ -110,6 +114,8 @@ export const TRANSITO = {
           { etiqueta: 'Grúa', tipo: 'c', casilla: 'Se usó grúa para el traslado' },
         ],
         tabla: {
+          clave: 'vehiculos-internados',
+          sinDato: { texto: '—', nota: 'Ninguna operacion publica este dato.' },
           titulo: 'Vehículos internados',
           columnas: [
             { rotulo: 'Placa', alineadoDerecha: false },

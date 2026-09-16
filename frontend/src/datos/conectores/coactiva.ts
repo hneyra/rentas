@@ -38,13 +38,13 @@ import { RUTAS, pedirPagina, pedirUno } from '../lecturas.ts';
  * en este archivo seria castellano que nunca podria traducirse (#103).
  */
 
+/** Lo que va en una celda que la operacion no llena. Es la raya del artboard, no un cero. */
+const SIN_DATO = '—';
+
 /** `"9412.15"` + `"2026-08-04"` -> `"S/ 9,412.15 · 04/08/2026"`. Regla 9. */
 function importeConSuFecha(importe: string, fecha: string): string {
   return `${formatearImporte(importe)} · ${formatearFecha(fecha)}`;
 }
-
-/** Lo que va en una celda que la operacion no llena. Es la raya del artboard, no un cero. */
-const SIN_DATO = '—';
 
 /**
  * `coa-panel` — los expedientes coactivos abiertos.

@@ -211,6 +211,24 @@ const CONECTADAS: readonly {
       'acta no lo trae. Solo CONFORME es un juicio favorable; los otros cuatro son lo que el ' +
       'fiscalizador anoto en campo, y la raya no es ninguna de las dos cosas',
   },
+  // Las dos de Transito entran con #180, y son el PRIMER caso en que la celda de la insignia no
+  // lleva texto sino la ausencia declarada de uno: `tra-pap` usa la celda sin dato de
+  // `kamayuk-lib`#87, que ademas anuncia el motivo dentro.
+  {
+    hoja: 'tra-pap',
+    bloque: 0,
+    leLlega:
+      'NADA — «Estado» no la publica nadie: el expediente trae los `acuses[]` de cada acto, uno ' +
+      'por intento, y ningun estado. Va celda sin dato con su motivo dentro, no una raya muda, y ' +
+      'por eso no hay tono que calificar',
+  },
+  {
+    hoja: 'tra-veh',
+    bloque: 0,
+    leLlega:
+      '`contenido[].estado` del internamiento — EN_DEPOSITO, ENTREGADO, REMATADO. Ninguno es un ' +
+      'juicio de la administracion sobre el vehiculo: dicen donde esta, no si esta conforme',
+  },
 ];
 
 /* ── Y el contrato, que es lo que dira cuando el backend publique el estado ─────────────── */

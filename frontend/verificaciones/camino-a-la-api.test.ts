@@ -103,7 +103,7 @@ describe('AC4 — la raiz de la API es UNA, escrita en tres sitios que tienen qu
 });
 
 describe('AC7 — lo que se declara servido tiene que publicarlo el backend', () => {
-  it('las veintiocho: I-1, I-3, I-4, #168, #170, #167, #169, #181 y las cuatro de #179', () => {
+  it('las treinta y dos: I-1, I-3, I-4, #168, #170, #167, #169, #181, #179 y las cuatro de #180', () => {
     // La lista escrita a mano es a proposito. Derivarla de `YA_SERVIDAS` la haria pasar diga lo
     // que diga: encender una ruta es una decision, y una decision se revisa leyendo su diff. La
     // lista crece de una en una porque encenderlas todas a la vez seria cambiar 181 respuestas
@@ -138,6 +138,10 @@ describe('AC7 — lo que se declara servido tiene que publicarlo el backend', ()
       'GET /fiscalizacion/programas/{id}/muestra',
       'GET /fiscalizacion/actas',
       'GET /fiscalizacion/resoluciones/{numero}',
+      'GET /transito/papeletas',
+      'GET /transito/papeletas/{numero}/actos',
+      'GET /transito/internamientos',
+      'GET /rentas/vehiculos/{placa}',
     ]);
   });
 
@@ -159,6 +163,12 @@ describe('AC7 — lo que se declara servido tiene que publicarlo el backend', ()
     // /fiscalizacion/programas/{id}/muestra` —«Regenerar muestra», el boton de la tabla de
     // `fis-prog`— y a `POST /fiscalizacion/liquidaciones`. Sortear una muestra o liquidar la deuda
     // de alguien para pintar una pantalla es exactamente lo que esta cifra vigila.
+    //
+    // Y #180 enciende cuatro mas que tampoco escriben, que es lo que deja fuera a las dos rutas
+    // que el arbol le atribuye a `tra-pap` y `tra-veh` en `BASE`: `/transito/descargos` y
+    // `/transito/constancias-libres` existen en el contrato **solo como POST**. La primera
+    // presentaria un descargo en nombre de alguien para pintar una pantalla; la segunda contesta
+    // un archivo y no un JSON con campos.
     expect(YA_SERVIDAS.filter((o) => o.metodo !== 'GET').map((o) => o.ruta)).toEqual([
       '/seguridad/sesion/ejercicio',
     ]);
@@ -208,6 +218,56 @@ describe('AC7 — lo que se declara servido tiene que publicarlo el backend', ()
     );
   });
 
+  it('las DOS rutas `BASE` de Transito existen, y SOLO como `POST` (#180)', () => {
+    // El arbol se las atribuye a `tra-pap` y `tra-veh` con verbo `BASE` —«solo se leyo el
+    // `@RequestMapping` de la clase»—. Verificarlas es la mitad del issue, y el resultado no es
+    // «no existen»: existen, y con un solo verbo. Asi que no se encienden, y no por prudencia:
+    // una escribe un descargo en nombre de alguien y la otra contesta un archivo.
+    //
+    // Esta prueba caduca sola el dia que alguien publique el `GET`: entonces se pone roja y dice
+    // que hay algo nuevo que mirar, en vez de dejar la pantalla sin conectar para siempre.
+    const conVerbo = (ruta: string) =>
+      declaradas.filter((clave) => clave.endsWith(` ${ruta}`)).sort();
+
+    expect(conVerbo('/transito/descargos')).toEqual(['POST /transito/descargos']);
+    expect(conVerbo('/transito/constancias-libres')).toEqual(['POST /transito/constancias-libres']);
+
+    // Y lo que esa primera ruta guarda **ya sale** por la que si se enciende: el expediente de la
+    // papeleta publica `descargos[]`. O sea que el hueco no lo es.
+    const actos = JSON.parse(readFileSync(FORMAS, 'utf8')) as Record<string, unknown>;
+    expect(Object.keys(actos['GET /transito/papeletas/{numero}/actos'] as object)).toContain(
+      'descargos',
+    );
+  });
+
+  it('las tres de Transito que se piden admiten lo que se les manda (#180)', () => {
+    const parametros = JSON.parse(readFileSync(PARAMETROS, 'utf8')) as Record<
+      string,
+      { readonly obligatorios: readonly string[]; readonly opcionales: readonly string[] }
+    >;
+    const declara = (clave: string, parametro: string): boolean => {
+      const suyos = parametros[clave];
+      return suyos !== undefined && [...suyos.obligatorios, ...suyos.opcionales].includes(parametro);
+    };
+
+    // `?tamano=` y `?placa=` son los dos unicos parametros que estas hojas mandan hoy. Escribir
+    // uno que el contrato no declare seria construir sobre un nombre que nada de este repositorio
+    // comprueba — es lo que #26 enseno con `/rentas/predios`.
+    expect(declara('GET /transito/papeletas', 'tamano')).toBe(true);
+    expect(declara('GET /transito/internamientos', 'tamano')).toBe(true);
+    expect(declara('GET /transito/internamientos', 'placa')).toBe(true);
+    // Y la ficha del vehiculo lleva la placa EN LA RUTA: no admite ni un parametro.
+    expect(parametros['GET /rentas/vehiculos/{placa}']?.obligatorios).toEqual([]);
+
+    expect(RUTAS.papeletas).toBe('/transito/papeletas?tamano=1');
+    expect(RUTAS.internamientos).toBe('/transito/internamientos?tamano=20');
+    expect(RUTAS.internamientosDe('T2G/418')).toBe(
+      '/transito/internamientos?placa=T2G%2F418&tamano=1',
+    );
+    expect(RUTAS.vehiculoDe('T2G/418')).toBe('/rentas/vehiculos/T2G%2F418');
+    expect(RUTAS.actosDeLaPapeleta('00/41')).toBe('/transito/papeletas/00%2F41/actos');
+  });
+
   it('y `constancias/no-adeudo` se enciende SIN `?formato`: el JSON, no el archivo', () => {
     // El mismo controlador publica las dos. Con `?formato=PDF|XLS|RTF` contesta un `byte[]` con su
     // `Content-Disposition`, que no es lo que una pantalla pinta; el contrato solo declara la
@@ -219,9 +279,9 @@ describe('AC7 — lo que se declara servido tiene que publicarlo el backend', ()
     expect(fuera).not.toContain('GET /consultas/constancias/no-adeudo?formato');
   });
 
-  it('la bitacora declara `ejercicio` OBLIGATORIO, y es la unica de las veintiocho (#181)', () => {
+  it('la bitacora declara `ejercicio` OBLIGATORIO, y es la unica de las treinta y dos (#181)', () => {
     // Es la medida que abrio #181, y la que justifica que `Conector` tenga una tercera forma de
-    // exigir algo. Las otras veintisiete, o no tienen obligatorio, o lo llevan **en la ruta** —y en
+    // exigir algo. Las otras treinta y una, o no tienen obligatorio, o lo llevan **en la ruta** —y en
     // la ruta no se olvida, porque sin el la URL no existe—. Este va en la cadena de consulta y
     // sale de la SESION: es el unico que se puede omitir sin que la ruta lo note.
     //

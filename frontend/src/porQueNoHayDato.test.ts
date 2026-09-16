@@ -25,12 +25,12 @@ import {
 const TODAS: readonly Hoja[] = ARBOL.flatMap((modulo) => [...modulo.hojas]);
 
 describe('el cruce contra lo que el backend sirve', () => {
-  it('EL CENTINELA: hay cuarenta hojas y veintiocho operaciones servidas', () => {
+  it('EL CENTINELA: hay cuarenta hojas y treinta y dos operaciones servidas', () => {
     // Sin esto, un arbol vacio o unas `YA_SERVIDAS` vacias dejarian todo lo de abajo pasando
     // sobre la nada — y la respuesta seria «ninguna pantalla tiene datos», que ademas parece
     // razonable.
     expect(TODAS).toHaveLength(40);
-    expect(YA_SERVIDAS).toHaveLength(28);
+    expect(YA_SERVIDAS).toHaveLength(32);
   });
 
   it('cruza por RUTA, no por verbo: dos servidas las declara el artboard como `BASE`', () => {
@@ -50,7 +50,7 @@ describe('el cruce contra lo que el backend sirve', () => {
     expect(utiles.every((o) => o.verbo !== 'PUT')).toBe(true);
   });
 
-  it('veintiuna hojas tienen alguna operacion util, y diecinueve ninguna', () => {
+  it('veintitres hojas tienen alguna operacion util, y diecisiete ninguna', () => {
     const con = TODAS.filter((hoja) => operacionesUtiles(hoja).length > 0);
     // `aut-cat` y `aut-panel` entran con #168, y las dos por la ruta que el ARTBOARD les
     // atribuye: `GET /licencias/ciiu` a la primera y `GET /licencias/funcionamiento` a la
@@ -71,6 +71,11 @@ describe('el cruce contra lo que el backend sirve', () => {
     // `GET /fiscalizacion/actas`, que es la misma RUTA. Es el tercer caso de este tipo —los otros
     // dos son `predios` y `valores`, y estan justo arriba—, y es la razon por la que el cruce mira
     // la ruta y no el verbo.
+    //
+    // `tra-pap` y `tra-veh` entran con #180, y las dos **por las rutas que el ARTBOARD les
+    // atribuye**: las cuatro de transito que se encienden estan en el arbol de esas dos hojas. Las
+    // otras dos de Transito siguen fuera — `tra-panel` declara `/transito/estado-cuenta` y
+    // `tra-cua` declara `/transito/codigos`, y ninguna de las dos esta servida.
     expect(con.map((h) => h.clave).sort()).toEqual(
       [
         'aut-cat',
@@ -95,11 +100,13 @@ describe('el cruce contra lo que el backend sirve', () => {
         // ella: lo que decide que ensena es `conectores/seguridad.ts`.
         'seg-aud',
         'seg-panel',
+        'tra-pap',
+        'tra-veh',
         'val-tip',
         'valores',
       ].sort(),
     );
-    expect(TODAS.length - con.length).toBe(19);
+    expect(TODAS.length - con.length).toBe(17);
   });
 });
 
@@ -114,9 +121,13 @@ describe('los cuatro casos no se confunden', () => {
   });
 
   it('todo en `BASE`: «sin verificar», y en tono de ATENCION', () => {
-    // `tra-pap` tiene sus cuatro operaciones en `BASE`. Hay controlador y no se sabe llamarlo:
-    // eso merece mas atencion que no tener nada, no menos.
-    expect(porQueNoHayDato(hojaDe('tra-pap'))).toBe(SOLO_BASE);
+    // `tra-cua` tiene su unica operacion en `BASE`. Hay controlador y no se sabe llamarlo: eso
+    // merece mas atencion que no tener nada, no menos.
+    //
+    // **Era `tra-pap` hasta #180**, y dejo de valer porque se comprobo el verbo: de sus cuatro
+    // rutas, tres son `GET` y la cuarta —`/transito/descargos`— es `POST`. Verificarlas es lo que
+    // este caso premia, asi que el ejemplo se muda a la hoja que todavia no lo esta.
+    expect(porQueNoHayDato(hojaDe('tra-cua'))).toBe(SOLO_BASE);
     expect(SOLO_BASE.tono).toBe('atencion');
   });
 

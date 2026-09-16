@@ -13,11 +13,13 @@ import {
 import type {
   CorridaDelPredial,
   DeudaEnCoactiva,
+  ExpedienteDeLaPapeleta,
+  InternamientoEnDeposito,
   LiquidacionDeCostas,
   Paginado,
   PrescripcionDeclarada,
   MovimientoDeLaBitacora,
-  ProcesoDelExpediente, IndicadorDeRecaudacion, TrabajoParado } from './lecturas.ts';
+  ProcesoDelExpediente, IndicadorDeRecaudacion, TrabajoParado, VehiculoServido } from './lecturas.ts';
 
 /**
  * **Lo que cada pantalla conectada saca de su respuesta** (#97).
@@ -229,6 +231,88 @@ const BITACORA: Paginado<MovimientoDeLaBitacora> = {
   hayMas: true,
 };
 
+/**
+ * Lo que `tra-pap` recibe: el expediente de una papeleta con sus actos (#180).
+ *
+ * La forma sale de `docs/50-api/formas-de-la-api.json`; el detalle columna a columna lo prueba
+ * `conectores/transito.test.tsx`.
+ */
+const EXPEDIENTE_DE_PAPELETA: ExpedienteDeLaPapeleta = {
+  papeleta: '0041182',
+  familia: 'TRANSITO',
+  estado: 'NOTIFICADA',
+  descargos: [],
+  actos: [
+    {
+      clase: 'RESOLUCION_GERENCIA',
+      tipo: 'SANCIONADORA',
+      numero: 'RG-2026-0884',
+      fecha: '2026-07-24',
+      documentoId: 41,
+      observacion: 'Emitida por el area de transito',
+      acuses: [],
+    },
+  ],
+};
+
+/** Una fila del deposito, con los once campos que el contrato declara. */
+function internado(campos: Partial<InternamientoEnDeposito> = {}): InternamientoEnDeposito {
+  return {
+    id: 1,
+    placa: 'T2G-418',
+    papeleta: '0041182',
+    deposito: 'DEPOSITO MUNICIPAL 1',
+    fechaDeIngreso: '2026-07-18',
+    fechaDeSalida: null,
+    dias: 54,
+    calculadoA: '2026-09-10',
+    estado: 'EN_DEPOSITO',
+    // El CONCEPTO del TUPA, no una tarifa. Ver `conectores/transito.ts`.
+    tasaDeCustodia: 'TUPA-2.14 CUSTODIA DIARIA',
+    acta: 'ACTA-2026-0311',
+    ...campos,
+  };
+}
+
+/** Una pagina del deposito, con el envoltorio entero. */
+function paginaDeDeposito(
+  contenido: readonly InternamientoEnDeposito[],
+  totalElementos: number,
+): Paginado<InternamientoEnDeposito> {
+  return {
+    contenido,
+    pagina: 0,
+    tamano: 20,
+    totalElementos,
+    totalPaginas: Math.ceil(totalElementos / 20),
+    hayMas: totalElementos > contenido.length,
+  };
+}
+
+/** Lo que `tra-veh` recibe: la ficha, el deposito entero y los internamientos de su placa. */
+const LO_DE_TRA_VEH: readonly [
+  VehiculoServido,
+  Paginado<InternamientoEnDeposito>,
+  Paginado<InternamientoEnDeposito>,
+] = [
+  {
+    id: 7,
+    placa: 'T2G-418',
+    contribuyenteId: 25673,
+    marca: 'TOYOTA',
+    modelo: 'YARIS',
+    categoria: 'M1',
+    anioFabricacion: 2014,
+    anioInscripcion: 2015,
+    numeroMotor: '2NZ-1188412',
+    numeroSerie: 'JTDBT923771118841',
+    estado: 'ACTIVO',
+    historialDePlacas: [],
+  },
+  paginaDeDeposito([internado()], 188),
+  paginaDeDeposito([internado()], 1),
+];
+
 const MUESTRAS: Readonly<Partial<Record<ClaveDeHoja, unknown>>> = {
   panel: CORRIDA,
   'coa-panel': PAGINA,
@@ -247,6 +331,8 @@ const MUESTRAS: Readonly<Partial<Record<ClaveDeHoja, unknown>>> = {
   'fis-prog': MUESTRA,
   'fis-actas': ACTA_CON_USO,
   'fis-res': RESOLUCION_SIN_CIFRAS,
+  'tra-pap': EXPEDIENTE_DE_PAPELETA,
+  'tra-veh': LO_DE_TRA_VEH,
 };
 
 /** Los campos de solo lectura de una pantalla, por su coordenada. */
@@ -257,7 +343,7 @@ function soloLecturaDe(clave: ClaveDeHoja): readonly string[] {
 }
 
 describe('los conectores', () => {
-  it('EL CENTINELA: estan los quince que estan, y no cero ni cuarenta', () => {
+  it('EL CENTINELA: estan los diecisiete que estan, y no cero ni cuarenta', () => {
     // Cero dejaria todo lo de abajo sin sujeto. Cuarenta significaria que alguien conecto
     // pantallas cuyas operaciones no publican lo que ensenan, que es lo que este archivo evita.
     // La lista se escribe a mano y crece de una en una: conectar una pantalla es una decision, y
@@ -272,6 +358,10 @@ describe('los conectores', () => {
     // ellas no llenan ni un `valores`, porque no tienen un solo campo de solo lectura. `fis-res` es
     // la segunda hoja que exige sujeto, y ahi no habia alternativa: no existe ninguna operacion
     // que publique la relacion de resoluciones, asi que no hay «la primera» que tomar.
+    //
+    // Las dos de Transito llegan con #180, y `tra-veh` es la primera cuyo sujeto es una PLACA y
+    // viaja en la RUTA de la operacion (`/rentas/vehiculos/{placa}`) y no en su cadena de
+    // consulta; su medida —que publica cada operacion y que no— esta en `conectores/transito.ts`.
     expect(Object.keys(CONECTORES).sort()).toEqual(
       [
         'aut-cat', 'aut-tram', 'coa-cost', 'coa-exp', 'coa-panel',
@@ -279,6 +369,7 @@ describe('los conectores', () => {
         'fis-actas', 'fis-prog', 'fis-res',
         'ini-flujo', 'ini-panel', 'ini-parado', 'panel',
         'seg-aud',
+        'tra-pap', 'tra-veh',
       ].sort(),
     );
   });
