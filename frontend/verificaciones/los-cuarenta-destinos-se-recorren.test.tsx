@@ -11,6 +11,7 @@ import type { PermisosDeLaSesion } from '../src/datos/lecturas.ts';
 
 import { Aplicacion, CONSULTAS } from '../src/aplicacion.tsx';
 import { CATALOGO } from '../src/catalogo.ts';
+import { FICHA, SIN_CAMPANIA } from '../src/datos/conectores/consultasDeMuestra.ts';
 import { pantallaDe } from '../src/pantallas/definiciones/index.ts';
 import type { ClaveDeHoja } from '../src/pantallas/arbol.ts';
 
@@ -246,6 +247,82 @@ describe('los cuarenta destinos se recorren, en la aplicacion montada', () => {
         `el carril no ofrece «${destino.rotulo}»`,
       ).toBeGreaterThan(0);
     }
+  });
+});
+
+/**
+ * **El contribuyente viaja en la DIRECCION, y la cadena entera lo lleva** (#169).
+ *
+ * Es la unica prueba que recorre el camino completo: catalogo (`enLaRuta`, derivado del conector)
+ * -> `leerLaRuta` del marco -> `useHoja().ruta.sujeto` -> el conector -> la pantalla. Cada tramo
+ * tiene su prueba y ninguna ve los otros: `catalogo.test`-style, `useDatosDeLaHoja.test` monta el
+ * gancho con el sujeto **en la mano**, y el conector reparte una respuesta que le dan. Si el
+ * catalogo dejara de declarar `enLaRuta`, el marco **ignoraria el codigo de la barra** —con un
+ * aviso en consola y nada mas— y la pantalla diria «falta el contribuyente» teniendolo delante.
+ * Eso solo se ve aqui.
+ */
+describe('una hoja de un contribuyente, abierta por su direccion', () => {
+  /** El doble de la instalacion: las tres de seguridad y las dos de la ficha. */
+  function conLaFichaContestada() {
+    const pedidas: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<typeof fetch>((entrada) => {
+        const url = String(entrada);
+        pedidas.push(url);
+        const json = (cuerpo: unknown, estado = 200) =>
+          Promise.resolve(
+            new Response(JSON.stringify(cuerpo), {
+              status: estado,
+              headers: { 'content-type': 'application/json' },
+            }),
+          );
+        const pagina = (contenido: readonly unknown[]) =>
+          json({
+            contenido,
+            pagina: 0,
+            tamano: 200,
+            totalElementos: contenido.length,
+            totalPaginas: 1,
+            hayMas: false,
+          });
+        if (url.includes('/seguridad/modulos')) return pagina(MODULOS_MEDIDOS);
+        if (url.includes('/seguridad/accesos')) return pagina(ACCESOS_MEDIDOS);
+        if (url.includes('/seguridad/sesion/permisos')) return json(permisos);
+        if (url.includes('/consultas/unificada')) return json(FICHA);
+        if (url.includes('/consultas/deudas-con-beneficio')) return json(SIN_CAMPANIA);
+        return json({}, 404);
+      }),
+    );
+    return pedidas;
+  }
+
+  it('el codigo de la direccion llega hasta la peticion, y la pantalla pinta lo que contesto', async () => {
+    const pedidas = conLaFichaContestada();
+    await abrir('con-panel/00000025673');
+
+    // El dato, no el hueco: «S/ 3,563.24» solo puede venir del doble —las cifras del artboard no
+    // viajan en el paquete desde #97—, y el nombre del contribuyente tampoco.
+    await waitFor(() => {
+      expect(screen.getByText('S/ 3,563.24')).toBeTruthy();
+    });
+    expect(screen.getByText('DNI 29614026')).toBeTruthy();
+    expect(
+      pedidas.some((url) => url.includes('/consultas/unificada?contribuyente=00000025673')),
+      'la peticion no llevo el codigo de la direccion',
+    ).toBe(true);
+  });
+
+  it('y la MISMA hoja sin codigo no pide nada: lo dice, con el hueco de cada campo', async () => {
+    const pedidas = conLaFichaContestada();
+    await abrir('con-panel');
+
+    expect(screen.getByRole('heading', { level: 1, name: 'Panel' })).toBeTruthy();
+    expect(pedidas.some((url) => url.includes('/consultas/'))).toBe(false);
+    // La frase va en el hueco de cada campo de solo lectura, que es donde se lee.
+    await waitFor(() => {
+      expect(screen.getAllByText('falta el contribuyente').length).toBeGreaterThan(0);
+    });
   });
 });
 

@@ -4,6 +4,12 @@ import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { coordenada } from '@kamayuk/ui';
+import {
+  CONSTANCIA_NEGADA,
+  FICHA,
+  OTRA_FICHA,
+  SIN_CAMPANIA,
+} from './conectores/consultasDeMuestra.ts';
 import { useDatosDeLaHoja } from './useDatosDeLaHoja.ts';
 
 /**
@@ -55,6 +61,26 @@ const CORRIDA = {
 afterEach(() => {
   vi.unstubAllGlobals();
 });
+
+/** Sustituye `fetch` por un doble que contesta segun la ruta pedida. Devuelve lo que se pidio. */
+function contestaSegunLaRuta(porRuta: Readonly<Record<string, unknown>>): readonly string[] {
+  const pedidas: string[] = [];
+  vi.stubGlobal(
+    'fetch',
+    vi.fn<typeof fetch>((entrada) => {
+      const url = String(entrada);
+      pedidas.push(url);
+      const clave = Object.keys(porRuta).find((trozo) => url.includes(trozo));
+      return Promise.resolve(
+        new Response(JSON.stringify(clave === undefined ? {} : porRuta[clave]), {
+          status: clave === undefined ? 404 : 200,
+          headers: { 'content-type': 'application/json' },
+        }),
+      );
+    }),
+  );
+  return pedidas;
+}
 
 describe('una pantalla SIN conector no toca la red', () => {
   it('no pide nada, y dice por que no hay dato', () => {
@@ -118,5 +144,122 @@ describe('una pantalla CON conector recorre sus estados', () => {
       expect(result.current.ausencia.enElCampo).toBe('fallo');
     });
     expect(result.current.ausencia.explicacion).toContain('500');
+  });
+});
+
+/**
+ * **Una hoja de un contribuyente concreto** (#169).
+ *
+ * Las tres operaciones de Consultas contestan 422 sin el codigo del contribuyente, asi que la
+ * pregunta que decide esta pantalla no es «llego la respuesta» sino **de quien es**. El codigo
+ * viaja en la direccion y llega aqui por `useHoja().ruta.sujeto`.
+ */
+describe('una pantalla que es de un contribuyente', () => {
+  it('sin sujeto NO pide nada, y lo dice con su propia frase', () => {
+    const pedidas = contestaSegunLaRuta({});
+    const { result } = renderHook(() => useDatosDeLaHoja('con-panel'), { wrapper: arnes() });
+
+    // Lo contrario seria mandar la peticion sin el parametro y ensenar el 422 del backend como si
+    // fuera una averia de la pantalla. Y lo OTRO contrario —elegir un contribuyente aqui— pintaria
+    // la cuenta de una persona de verdad a quien nadie pregunto.
+    expect(pedidas).toEqual([]);
+    expect(result.current.ausencia.enElCampo).toBe('falta el contribuyente');
+    expect(result.current.valores).toBeUndefined();
+  });
+
+  it('con sujeto pide SUS DOS operaciones, con el codigo dentro', async () => {
+    const pedidas = contestaSegunLaRuta({
+      '/consultas/unificada': FICHA,
+      '/consultas/deudas-con-beneficio': SIN_CAMPANIA,
+    });
+    const { result } = renderHook(() => useDatosDeLaHoja('con-panel', '00000025673'), {
+      wrapper: arnes(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.valores?.size).toBeGreaterThan(0);
+    });
+    expect(pedidas).toHaveLength(2);
+    expect(pedidas[0]).toContain('/consultas/unificada?contribuyente=00000025673');
+    expect(pedidas[1]).toContain('/consultas/deudas-con-beneficio?contribuyente=00000025673');
+  });
+
+  it('y lo que pinta es lo que CONTESTO el doble, no lo que dice su definicion', async () => {
+    contestaSegunLaRuta({
+      '/consultas/unificada': FICHA,
+      '/consultas/deudas-con-beneficio': SIN_CAMPANIA,
+    });
+    const { result } = renderHook(() => useDatosDeLaHoja('con-panel', '00000025673'), {
+      wrapper: arnes(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.valores?.get(coordenada(0, 6))).toBe('S/ 3,563.24');
+    });
+    expect(result.current.valores?.get(coordenada(0, 1))).toBe('DNI 29614026');
+    expect(result.current.ausenciaPorCampo?.get(coordenada(0, 4))).toBe('no publicado');
+  });
+
+  it('CAMBIADA la respuesta del doble, cambia la pantalla — y es el AC3', async () => {
+    contestaSegunLaRuta({
+      '/consultas/unificada': OTRA_FICHA,
+      '/consultas/deudas-con-beneficio': SIN_CAMPANIA,
+    });
+    const { result } = renderHook(() => useDatosDeLaHoja('con-panel', '00000003541'), {
+      wrapper: arnes(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.valores?.get(coordenada(0, 6))).toBe('S/ 591.94');
+    });
+    // La misma hoja, la misma definicion, otro contribuyente: si algo saliera de la definicion,
+    // este caso y el de arriba darian lo mismo.
+    expect(result.current.valores?.get(coordenada(0, 1))).toBe('DNI 44218937');
+    expect(result.current.valores?.get(coordenada(0, 2))).toBe('31/01/2026');
+  });
+
+  it('la constancia pide con `codContribuyente`, que es el nombre que ESA operacion admite', async () => {
+    const pedidas = contestaSegunLaRuta({ '/consultas/constancias': CONSTANCIA_NEGADA });
+    const { result } = renderHook(() => useDatosDeLaHoja('con-doc', '00000025673'), {
+      wrapper: arnes(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.filas?.get(0)).toHaveLength(2);
+    });
+    expect(pedidas[0]).toContain(
+      '/consultas/constancias/no-adeudo?codContribuyente=00000025673',
+    );
+    expect(result.current.valores?.get(coordenada(0, 5))).toContain('Con deuda al 12/09/2026');
+  });
+
+  it('dos contribuyentes de la misma hoja NO comparten cache', async () => {
+    contestaSegunLaRuta({
+      '/consultas/unificada': FICHA,
+      '/consultas/deudas-con-beneficio': SIN_CAMPANIA,
+    });
+    // Un solo cliente para los dos, que es lo que hay en la aplicacion: la cache es de modulo.
+    const wrapper = arnes();
+    const uno = renderHook(() => useDatosDeLaHoja('con-panel', '00000025673'), { wrapper });
+    await waitFor(() => {
+      expect(uno.result.current.valores?.get(coordenada(0, 6))).toBe('S/ 3,563.24');
+    });
+
+    contestaSegunLaRuta({
+      '/consultas/unificada': OTRA_FICHA,
+      '/consultas/deudas-con-beneficio': SIN_CAMPANIA,
+    });
+    const otro = renderHook(() => useDatosDeLaHoja('con-panel', '00000003541'), { wrapper });
+
+    // **En la PRIMERA pintada**, que es donde esta el defecto: sin el sujeto en la clave, el
+    // segundo contribuyente abre con lo que cacheo el primero —«S/ 3,563.24»— mientras llega lo
+    // suyo, y despues lo sustituye. Esperar a que acabe no ve nada; en una ventanilla, ese
+    // parpadeo es ensenarle a alguien la deuda de otro.
+    expect(otro.result.current.valores?.get(coordenada(0, 6))).not.toBe('S/ 3,563.24');
+    expect(otro.result.current.ausencia.enElCampo).toBe('pidiendo…');
+
+    await waitFor(() => {
+      expect(otro.result.current.valores?.get(coordenada(0, 6))).toBe('S/ 591.94');
+    });
   });
 });

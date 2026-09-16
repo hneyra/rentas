@@ -4,6 +4,7 @@ import { PANTALLAS } from '../pantallas/definiciones/index.ts';
 import type { ClaveDeHoja } from '../pantallas/arbol.ts';
 import { coordenada } from '@kamayuk/ui';
 import { CONECTORES, NO_PUBLICADO } from './conectores.ts';
+import { CONSTANCIA_NEGADA, FICHA, SIN_CAMPANIA } from './conectores/consultasDeMuestra.ts';
 import type {
   CorridaDelPredial,
   DeudaEnCoactiva,
@@ -14,6 +15,9 @@ import type {
 
 /**
  * **Lo que cada pantalla conectada saca de su respuesta** (#97).
+ *
+ * Lo detallado de las dos hojas de Consultas esta en `conectores/consultas.test.ts`, al lado de su
+ * conector; aqui quedan el centinela del registro y el recorrido que vale para las once.
  *
  * Lo que se comprueba no es que el mapeo «funcione»: es que **ningun campo se quede sin decidir**.
  * Un campo de solo lectura de una pantalla conectada tiene que estar en uno de los dos sitios —con
@@ -196,6 +200,8 @@ const MUESTRAS: Readonly<Partial<Record<ClaveDeHoja, unknown>>> = {
   'ini-panel': [RECAUDACION_MEDIDA, CORRIDA],
   'ini-flujo': RECAUDACION_MEDIDA,
   'ini-parado': PARADO_MEDIDO,
+  'con-panel': [FICHA, SIN_CAMPANIA],
+  'con-doc': CONSTANCIA_NEGADA,
 };
 
 /** Los campos de solo lectura de una pantalla, por su coordenada. */
@@ -206,15 +212,18 @@ function soloLecturaDe(clave: ClaveDeHoja): readonly string[] {
 }
 
 describe('los conectores', () => {
-  it('EL CENTINELA: estan los nueve que estan, y no cero ni cuarenta', () => {
+  it('EL CENTINELA: estan los once que estan, y no cero ni cuarenta', () => {
     // Cero dejaria todo lo de abajo sin sujeto. Cuarenta significaria que alguien conecto
     // pantallas cuyas operaciones no publican lo que ensenan, que es lo que este archivo evita.
     // La lista se escribe a mano y crece de una en una: conectar una pantalla es una decision, y
     // una decision se revisa leyendo su diff. Las dos de licencias llegan con #168, y su medida
-    // —que publica cada operacion y que no— esta en `conectores/licencias.ts`.
+    // —que publica cada operacion y que no— esta en `conectores/licencias.ts`. Las dos de
+    // Consultas llegan con #169, y son las primeras que EXIGEN SUJETO: sin un codigo de
+    // contribuyente en la ruta no piden nada, y la pantalla lo dice en vez de pedir el padron.
     expect(Object.keys(CONECTORES).sort()).toEqual(
       [
         'aut-cat', 'aut-tram', 'coa-cost', 'coa-exp', 'coa-panel',
+        'con-doc', 'con-panel',
         'ini-flujo', 'ini-panel', 'ini-parado', 'panel',
       ].sort(),
     );

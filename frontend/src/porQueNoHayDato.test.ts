@@ -25,12 +25,12 @@ import {
 const TODAS: readonly Hoja[] = ARBOL.flatMap((modulo) => [...modulo.hojas]);
 
 describe('el cruce contra lo que el backend sirve', () => {
-  it('EL CENTINELA: hay cuarenta hojas y veinte operaciones servidas', () => {
+  it('EL CENTINELA: hay cuarenta hojas y veintitres operaciones servidas', () => {
     // Sin esto, un arbol vacio o unas `YA_SERVIDAS` vacias dejarian todo lo de abajo pasando
     // sobre la nada — y la respuesta seria «ninguna pantalla tiene datos», que ademas parece
     // razonable.
     expect(TODAS).toHaveLength(40);
-    expect(YA_SERVIDAS).toHaveLength(20);
+    expect(YA_SERVIDAS).toHaveLength(23);
   });
 
   it('cruza por RUTA, no por verbo: dos servidas las declara el artboard como `BASE`', () => {
@@ -50,7 +50,7 @@ describe('el cruce contra lo que el backend sirve', () => {
     expect(utiles.every((o) => o.verbo !== 'PUT')).toBe(true);
   });
 
-  it('catorce hojas tienen alguna operacion util, y veintiseis ninguna', () => {
+  it('diecisiete hojas tienen alguna operacion util, y veintitres ninguna', () => {
     const con = TODAS.filter((hoja) => operacionesUtiles(hoja).length > 0);
     // `aut-cat` y `aut-panel` entran con #168, y las dos por la ruta que el ARTBOARD les
     // atribuye: `GET /licencias/ciiu` a la primera y `GET /licencias/funcionamiento` a la
@@ -59,6 +59,12 @@ describe('el cruce contra lo que el backend sirve', () => {
     // dio a `aut-panel`, y el arbol es la transcripcion del artboard. Esta funcion solo decide
     // que decir cuando NO hay conector, asi que la discrepancia no llega a ninguna pantalla —
     // pero se anota aqui, que es donde se ve.
+    //
+    // `con-contrib`, `con-doc` y `con-panel` entran con #169, y la primera **sin conector y es
+    // correcto que entre**: declara `/consultas/unificada`, que ya esta servida, y lo que le falta
+    // no es la operacion sino lo que ensena —unidades y deuda por FILA, que esa operacion no
+    // publica—. Por eso dice «sin pedir» y no «sin conectar»: son cosas distintas para quien tenga
+    // que arreglarlas.
     expect(con.map((h) => h.clave).sort()).toEqual(
       [
         'aut-cat',
@@ -66,6 +72,9 @@ describe('el cruce contra lo que el backend sirve', () => {
         'coa-cost',
         'coa-exp',
         'coa-panel',
+        'con-contrib',
+        'con-doc',
+        'con-panel',
         'ini-flujo',
         'ini-panel',
         'ini-parado',
@@ -77,7 +86,7 @@ describe('el cruce contra lo que el backend sirve', () => {
         'valores',
       ].sort(),
     );
-    expect(TODAS.length - con.length).toBe(26);
+    expect(TODAS.length - con.length).toBe(23);
   });
 });
 

@@ -41,6 +41,27 @@ const CARGANDO: Ausencia = {
   tono: 'info',
 };
 
+/**
+ * **Lo que se dice cuando la hoja es de un contribuyente y la direccion no nombra a ninguno**
+ * (#169).
+ *
+ * No es «sin conectar» —lo esta— ni «sin datos» —no se ha preguntado nada—: es que **falta el
+ * sujeto**. Es el `en-espera` que `@kamayuk/ui` ya nombra en `EstadoDeUnaLectura`: «falta el sujeto
+ * para poder pedir: no hay nada que pedir todavia».
+ *
+ * Y es la alternativa a lo unico que se podria haber hecho en su lugar, que era elegir un
+ * contribuyente aqui —el primero del padron— y pintar su cuenta corriente: las cifras de una
+ * persona de verdad en una pantalla que nadie le pidio.
+ */
+const SIN_SUJETO: Ausencia = {
+  enElCampo: 'falta el contribuyente',
+  explicacion:
+    'Esta pantalla es de un contribuyente concreto, y la direccion no nombra a ninguno: su codigo ' +
+    'va detras del nombre de la hoja. Hasta que lo lleve no se pide nada, porque pedir la de ' +
+    'cualquiera seria ensenar la cuenta de quien nadie pregunto.',
+  tono: 'info',
+};
+
 /** Lo que se dice cuando la operacion contesto y no habia nada. */
 const VACIO: Ausencia = {
   enElCampo: 'sin datos',
@@ -77,15 +98,27 @@ function alFallar(error: unknown): Ausencia {
 /** Un reparto vacio, para los estados en que no hay nada que repartir. */
 const NADA: Reparto = { valores: new Map(), filas: new Map(), noPublicados: new Map() };
 
-export function useDatosDeLaHoja(clave: ClaveDeHoja): DatosDeLaPantalla {
+/**
+ * @param clave la hoja abierta
+ * @param sujeto el que lleva la ruta —`#/<hoja>/<sujeto>`—, o `null` si no lleva ninguno. Sale de
+ *   `useHoja().ruta` del marco y solo llega con valor en las hojas que lo declaran (#169)
+ */
+export function useDatosDeLaHoja(
+  clave: ClaveDeHoja,
+  sujeto: string | null = null,
+): DatosDeLaPantalla {
   const conector = CONECTORES[clave];
+  // Una hoja de un sujeto sin sujeto no pide: no hay nada que pedir, y lo que llegaria seria un
+  // 422 del backend dicho como si fuera una averia.
+  const faltaElSujeto = conector?.exigeSujeto === true && (sujeto === null || sujeto === '');
 
   const consulta = useQuery({
-    // La clave lleva la hoja dentro: dos pantallas no comparten cache aunque pidan lo mismo.
-    queryKey: conector?.clave ?? ['sin-conector', clave],
-    queryFn: ({ signal }) => conector?.pedir(signal) ?? Promise.resolve(null),
-    // Sin conector no se pide nada. Es lo que hace que 38 de las 40 pantallas no toquen la red.
-    enabled: conector !== undefined,
+    // La clave lleva la hoja dentro: dos pantallas no comparten cache aunque pidan lo mismo. Y
+    // lleva el sujeto al final: dos contribuyentes de la misma hoja tampoco.
+    queryKey: [...(conector?.clave ?? ['sin-conector', clave]), sujeto ?? ''],
+    queryFn: ({ signal }) => conector?.pedir(signal, sujeto) ?? Promise.resolve(null),
+    // Sin conector no se pide nada. Es lo que hace que 36 de las 40 pantallas no toquen la red.
+    enabled: conector !== undefined && !faltaElSujeto,
     retry: false,
   });
 
@@ -94,6 +127,8 @@ export function useDatosDeLaHoja(clave: ClaveDeHoja): DatosDeLaPantalla {
     // lo que el backend sirve.
     return { ausencia: porQueNoHayDato(hojaDe(clave)) };
   }
+
+  if (faltaElSujeto) return { ausencia: SIN_SUJETO };
 
   if (consulta.isPending) return { ausencia: CARGANDO };
   if (consulta.isError) return { ausencia: alFallar(consulta.error) };
@@ -117,4 +152,4 @@ export function useDatosDeLaHoja(clave: ClaveDeHoja): DatosDeLaPantalla {
   };
 }
 
-export { CARGANDO, VACIO, NADA, alFallar };
+export { CARGANDO, SIN_SUJETO, VACIO, NADA, alFallar };

@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Armazon, type AccionesDelSistema } from '@kamayuk/shell';
+import { Armazon, useHoja, type AccionesDelSistema } from '@kamayuk/shell';
 import { ProveedorDeTema, type ConfiguracionDeTema } from '@kamayuk/ui';
 
 import escudo from '../diseno/escudo-catacaos.png';
@@ -133,7 +133,19 @@ function CuerpoDeLaPantalla({ clave }: { readonly clave: ClaveDeHoja }) {
   // Un componente y no una funcion suelta: `useDatosDeLaHoja` es un gancho, y un gancho solo puede
   // llamarse desde un componente. Ademas esto es lo que hace que **solo se vuelva a pintar la
   // pantalla** cuando llega su respuesta, y no el armazon entero.
-  return <PantallaDeRentas definicion={pantallaDe(clave)} datos={useDatosDeLaHoja(clave)} />;
+  //
+  // **El sujeto sale de la RUTA** (#169): las dos hojas de Consultas que piden son de un
+  // contribuyente concreto, y su codigo va en la direccion —`#/con-panel/00000025673`—. Se lee del
+  // marco y no de `window.location` porque el marco ya lo descodifica y **solo entrega lo que la
+  // hoja declara** en su `enLaRuta`; lo que llegue sin declarar se ignora con aviso. Las 38 hojas
+  // que no lo declaran reciben `null` y no cambian en nada.
+  const { ruta } = useHoja();
+  return (
+    <PantallaDeRentas
+      definicion={pantallaDe(clave)}
+      datos={useDatosDeLaHoja(clave, ruta.sujeto)}
+    />
+  );
 }
 
 /**
