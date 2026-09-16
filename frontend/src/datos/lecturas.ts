@@ -639,15 +639,16 @@ export interface DiligenciaDelActo {
 /**
  * Un acto dictado en el expediente, de `GET /coactiva/expedientes/{numero}/proceso`.
  *
- * **No publica ningun identificador del acto, y hay que saberlo**: `ActoResource` del backend
- * declara `(tipo, titulo, numero, fecha, descripcion, medida, exigibleDesde, usuario,
- * observaciones, diligencias)` y ni uno de los diez es el `actoId` con que la liquidacion de
- * costas referencia el acto que tarifa. Es lo que impide poner la costa de cada acto en la tabla
- * del expediente — ver `conectores/coactiva.ts`.
+ * **`actoId` es la llave con que se cruza con su costa** (#177). Es el mismo nombre y el mismo
+ * tipo que `CostaDelActo.actoId`, porque es la misma llave: la costa se devenga por acto
+ * —`costa_acto_uq` lo impide tarifar dos veces— y hasta #177 lo unico comun entre las dos
+ * respuestas era `tipo`. Emparejar por tipo se rompe con dos EMBARGO en el mismo expediente, que
+ * es lo normal: la costa de uno acabaria en la fila del otro — ver `conectores/coactiva.ts`.
  *
  * `medida` es nula salvo en la REC-2, que es el unico acto que ordena una medida cautelar.
  */
 export interface ActoDelExpediente {
+  readonly actoId: number;
   readonly tipo: string;
   readonly titulo: string;
   readonly numero: string;
