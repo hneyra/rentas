@@ -418,7 +418,10 @@ describe('una pantalla que es de un ejercicio de la sesion', () => {
     expect(result.current.ausencia.explicacion).toMatch(/Vuelva a entrar/);
   });
 
-  it('y las 39 hojas restantes NO piden la sesion: solo la pide quien la exige', async () => {
+  it('y las 38 hojas restantes NO piden la sesion: solo la piden quien la exige', async () => {
+    // Eran 39 hasta #237: `territorio` es la segunda que lo exige, y ademas la primera que exige
+    // sujeto Y ejercicio a la vez.
+    //
     // `enabled` acotado a `exigeEjercicio`. Sin eso, abrir cualquier destino sumaria una ida a
     // `/seguridad/sesion`, y la siembra de #114 —que afirma CERO peticiones a `/seguridad/` con el
     // catalogo sembrado— saldria roja por una lectura que esa pantalla no necesita.
@@ -429,5 +432,95 @@ describe('una pantalla que es de un ejercicio de la sesion', () => {
       expect(result.current.valores?.size).toBeGreaterThan(0);
     });
     expect(pedidas.filter((url) => url.includes('/seguridad/sesion'))).toEqual([]);
+  });
+});
+
+/**
+ * **Los DOS vacios de la determinacion predial, que no son el mismo** (#237, #207).
+ *
+ * El backend los publica distintos porque #546 midio el dano de confundirlos: **404** es «ese
+ * codigo no esta en el padron» —la pregunta no tiene sujeto— y **204** es «existe y todavia no se
+ * le ha determinado este ejercicio». Se arreglan de forma distinta: uno escribiendo otro codigo y
+ * el otro determinando.
+ *
+ * Y la mitad que esta prueba cubre y las de `conectores.test.ts` no: que el GANCHO los MIRE. Las de
+ * alli comprueban que el conector declara las dos frases, y con esa comprobacion sola se puede
+ * borrar entera la rama de `useDatosDeLaHoja` que las lee **sin que nada se ponga rojo** — el 404
+ * volveria a decir «fallo (404)» y el 204 «sin datos», que es el estado anterior a este issue.
+ */
+describe('`territorio` — el 404 y el 204 no dicen lo mismo (#237)', () => {
+  /** Contesta la sesion con su ejercicio, y la determinacion con el estado que se le diga. */
+  function conLaDeterminacionEn(estado: number): readonly string[] {
+    const pedidas: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<typeof fetch>((entrada) => {
+        const url = String(entrada);
+        pedidas.push(url);
+        if (url.includes('/seguridad/sesion')) {
+          return Promise.resolve(
+            new Response(JSON.stringify({ ...SIN_EJERCICIO_FIJADO, ejercicioDeTrabajo: 2026 }), {
+              status: 200,
+              headers: { 'content-type': 'application/json' },
+            }),
+          );
+        }
+        // 204 va **sin cuerpo**, que es como lo manda el backend: con uno inventado esta prueba no
+        // mediria nada —`json()` sobre `""` es lo que reventaba—.
+        if (estado === 204) return Promise.resolve(new Response(null, { status: 204 }));
+        return Promise.resolve(
+          new Response(JSON.stringify({ codigo: 'NO_ENCONTRADO' }), {
+            status: estado,
+            headers: { 'content-type': 'application/problem+json' },
+          }),
+        );
+      }),
+    );
+    return pedidas;
+  }
+
+  it('404 dice que el codigo no esta en el padron, y NO «fallo (404)»', async () => {
+    const pedidas = conLaDeterminacionEn(404);
+    const { result } = renderHook(
+      () => useDatosDeLaHoja('territorio', { sujeto: 'NO-EXISTE', parametros: {} }),
+      { wrapper: arnes().wrapper },
+    );
+
+    await waitFor(() => {
+      expect(result.current.ausencia.enElCampo).toBe('no esta en el padron');
+    });
+    expect(result.current.ausencia.enElCampo).not.toBe('fallo');
+    expect(result.current.ausencia.explicacion).not.toMatch(/404/);
+    expect(pedidas.some((url) => url.includes('codContribuyente=NO-EXISTE'))).toBe(true);
+  });
+
+  it('204 dice que todavia no se le ha determinado, y NO «sin datos» ni «fallo»', async () => {
+    // Las dos mitades. Que **no reviente** —hasta #237, `json()` sobre un 204 lanzaba
+    // `SyntaxError: Unexpected end of JSON input`, que no es un `ErrorDeLaApi`, asi que la pantalla
+    // decia «fallo» sin codigo—, y que lo diga con la frase de ESTA hoja y no con la generica.
+    conLaDeterminacionEn(204);
+    const { result } = renderHook(
+      () => useDatosDeLaHoja('territorio', { sujeto: '00000000008', parametros: {} }),
+      { wrapper: arnes().wrapper },
+    );
+
+    await waitFor(() => {
+      expect(result.current.ausencia.enElCampo).toBe('sin determinar');
+    });
+    expect(result.current.ausencia.enElCampo).not.toBe('sin datos');
+    expect(result.current.ausencia.enElCampo).not.toBe('fallo');
+    expect(result.current.ausencia.explicacion).toMatch(/no se ha asentado/);
+  });
+
+  it('sin sujeto en la direccion no pide la determinacion, y lo dice', async () => {
+    const pedidas = conLaDeterminacionEn(200);
+    const { result } = renderHook(() => useDatosDeLaHoja('territorio'), {
+      wrapper: arnes().wrapper,
+    });
+
+    await waitFor(() => {
+      expect(result.current.ausencia.enElCampo).toBe('falta el contribuyente');
+    });
+    expect(pedidas.filter((url) => url.includes('/rentas/predial/determinaciones'))).toEqual([]);
   });
 });

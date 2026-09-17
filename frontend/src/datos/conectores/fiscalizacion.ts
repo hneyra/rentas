@@ -364,6 +364,26 @@ function contrasteDelActa(acta: ActaDeFiscalizacion): readonly (readonly CeldaDe
  * de la relacion —ordenada por `fechaVisita`, «como se recorre una jornada de campo»—, que es lo
  * que ya hacen `coa-exp` y `coa-cost`. Sin ninguna acta, `null`: «sin datos», no una averia.
  *
+ * <h2>Y desde #239 DICE cual es</h2>
+ *
+ * Hasta aqui tomaba la primera y **no decia de quien era**, que es lo que su propio javadoc
+ * denunciaba: un contraste de areas que no nombra al obligado no se puede comprobar contra nada —se
+ * lee como si fuera del contribuyente que uno tenia en la cabeza—. #216 publico `contribuyente` y
+ * `codContribuyente`, asi que ya hay con que decirlo.
+ *
+ * **Va por `Reparto.deQuienEs` y no a un campo**, y esa es la decision que #239 dejaba abierta. El
+ * sitio que el artboard le da al titular en esta hoja es el campo «Contribuyente», que es de tipo
+ * `1` —un **mando**, un control de entrada— y no una celda: escribir dentro el nombre de un acta ya
+ * registrada convierte el formulario con que se registra una inspeccion en algo que parece estar
+ * editando esa. Las tres salidas que el issue ofrecia tocaban el artboard —una celda nueva, o la
+ * nota de la tabla, que `pantallas-del-artboard` compara palabra por palabra— o la libreria. La
+ * cuarta es la que #196 ya tomo para la fecha: se dice **una vez, arriba**, en la frase de pantalla
+ * que el interprete ya dibuja.
+ *
+ * **Nulo es «ya no esta en el padron», no «no publicado»**: los dos campos llegan nulos a la vez
+ * cuando el obligado se dio de baja, y el acta sale igual porque ocultarla esconderia justo el caso
+ * que hay que revisar (#216).
+ *
  * <h2>Media tabla era la raya, y desde #191 no: el acta publica las DOS mitades</h2>
  *
  * Hasta #191 `ActaFiscalizacionResource` publicaba solo el lado hallado —`areaHallada` y
@@ -425,6 +445,9 @@ const FIS_ACTAS: Conector = {
         },
       ],
     ]),
+    // De quien es el acta que se dibuja (#239). Las dos piezas crudas: la frase la redacta el
+    // gancho, que tiene `t()` delante.
+    deQuienEs: { nombre: acta.contribuyente, codigo: acta.codContribuyente },
     noPublicados: new Map(),
   }),
 };

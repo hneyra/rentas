@@ -232,6 +232,19 @@ const CONECTADAS: readonly {
       '`contenido[].estado` del internamiento — EN_DEPOSITO, ENTREGADO, REMATADO. Ninguno es un ' +
       'juicio de la administracion sobre el vehiculo: dicen donde esta, no si esta conforme',
   },
+  // `territorio` entra con #237, DESPUES de escribirse esta guarda — la cuarta vez que pasa, y la
+  // cuarta que sale roja sola. Y es el caso mas extremo de los diez: no le llega NADA.
+  {
+    hoja: 'territorio',
+    bloque: 2,
+    leLlega:
+      'NADA, y esa es la propiedad. La columna «Situacion» del «Cronograma» es de insignia en el ' +
+      'artboard, y el conector NO entrega ni una fila a esa tabla: la determinacion guardada no ' +
+      'dice con que modalidad se emitio, asi que los vencimientos no se pueden resolver (#234) y ' +
+      'la situacion de una cuota es ademas un hecho de cuenta corriente. Sin filas, la tabla ' +
+      'dibuja la frase de pantalla y no hay celda donde pintar un tono — que es lo correcto: una ' +
+      'insignia verde sobre una cuota cuyo vencimiento nadie conoce diria que esta al dia',
+  },
 ];
 
 /* ── Y el contrato, que es lo que dira cuando el backend publique el estado ─────────────── */

@@ -151,6 +151,14 @@ export const ARBOL = [
         clave: 'territorio',
         rotulo: 'Determinación',
         operaciones: [
+          // La UNICA lectura de esta hoja, y llego con #207: hasta entonces declaraba siete
+          // operaciones y ni un `GET`, que es lo que le hacia decir «solo escribe» (#182). Se
+          // anade en el ARTBOARD y aqui a la vez, como #169, #173, #179 y #184.
+          {
+            verbo: 'GET',
+            ruta: '/rentas/predial/determinaciones',
+            nota: 'La última determinación guardada del contribuyente',
+          },
           {
             verbo: 'POST',
             ruta: '/rentas/predial/calculo-individual',

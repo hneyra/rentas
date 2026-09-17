@@ -13,23 +13,27 @@ import { YA_SERVIDAS } from './datos/servidas.ts';
  *
  * <h2>Los cuatro casos NO son uno, y esto esta medido</h2>
  *
- * Sobre las 40 pantallas y las **104** declaraciones de operacion del artboard, remedido en #184
- * —eran 101 hasta que #169 le anadio una a `con-panel`, #179 otra a `fis-prog` y #184 otra a
- * `tra-panel`; las tres cifras de servidas cambiaron ademas porque `YA_SERVIDAS` paso de 8 a 33
- * entre I-4 y #184—:
+ * Sobre las 40 pantallas y las **109** declaraciones de operacion del artboard, **recontadas de
+ * cero en #237 y no arrastradas**: el javadoc decia 104 desde #184 y la cuenta ya no cuadraba
+ * —entre medias entraron declaraciones que nadie volvio a contar—, asi que aqui se escribe lo que
+ * salio de barrer el arbol, no lo que decia la linea anterior mas uno. Las cifras de servidas
+ * cambiaron ademas porque `YA_SERVIDAS` paso de 8 a **36** entre I-4 y #237:
  *
- *   · **14 hojas no declaran ninguna operacion servida.** No hay a quien preguntar.
- *   · **36 de las 104 declaraciones llevan el verbo `BASE`**, que el propio artboard define como
+ *   · **12 hojas no declaran ninguna operacion servida.** No hay a quien preguntar.
+ *   · **36 de las 109 declaraciones llevan el verbo `BASE`**, que el propio artboard define como
  *     «solo se leyo el `@RequestMapping` de la clase: sus metodos no se han verificado». **Once
  *     hojas lo tienen TODO en `BASE`** — de ellas no se sabe ni con que verbo se pediria. Eran
  *     doce hasta que `tra-panel` gano la operacion que la sirve.
- *   · **26 hojas tienen al menos una servida**, y de esas **18** se pintan de verdad.
+ *   · **28 hojas tienen al menos una servida**, **26** declaran ademas alguna de LECTURA, y de
+ *     esas **20** se pintan de verdad — las que tienen conector.
  *   · Y una —`aut-panel`, desde #173— **no declara NINGUNA operacion**, que no es lo mismo que
  *     declararlas todas en `BASE` y hay que no confundirlo: ver el `length > 0` de abajo.
- *   · **Cuatro hojas no declaran ni un `GET` y si declaran escrituras** (#182): `territorio`,
- *     `aut-sol`, `val-val` y `val-cart`. No son pantallas de consulta: son de **ejecutar**, y
- *     decirles «sin conectar» —«ninguna de las operaciones que declara la sirve el backend»— es
- *     falso dos veces, porque el backend SI las sirve y lo que pasa es que escriben.
+ *   · **TRES hojas no declaran ni un `GET` y si declaran escrituras** (#182, #237): `aut-sol`,
+ *     `val-val` y `val-cart`. No son pantallas de consulta: son de **ejecutar**, y decirles «sin
+ *     conectar» —«ninguna de las operaciones que declara la sirve el backend»— es falso dos veces,
+ *     porque el backend SI las sirve y lo que pasa es que escriben. **Eran cuatro**: `territorio`
+ *     salio de aqui en #237, no porque la frase se estrechara sino porque la hoja gano una lectura
+ *     de verdad — y la cuenta se REMIDE, no se amplia a ojo.
  *   · Y el ultimo caso —servida, pedida y vacia— no lo produce este archivo todavia: llega cuando
  *     las pantallas pidan de verdad.
  *
@@ -48,7 +52,7 @@ import { YA_SERVIDAS } from './datos/servidas.ts';
  *
  * <h2>Y la frase que faltaba: «solo escribe» (#182)</h2>
  *
- * `territorio` —la hoja de la Determinacion— declara **siete** operaciones y **ni un `GET`**:
+ * `territorio` —la hoja de la Determinacion— declaraba **siete** operaciones y **ni un `GET`**:
  * cuatro `POST` y tres `BASE` que, medidas contra `docs/50-api/formas-de-la-api.json` y contra sus
  * controladores (`AlcabalaController`, `EspectaculoController`, `VehicularController` publican **un
  * solo metodo y es `@PostMapping`**), tambien escriben. Con las tres frases de antes contestaba
@@ -57,15 +61,20 @@ import { YA_SERVIDAS } from './datos/servidas.ts';
  * ejecuta**: se fija el sujeto y el ejercicio, se confirma —el artboard le declara un `AlertDialog`
  * «Confirmar antes de asentar»— y las cifras que dibuja son la **respuesta** a lo que se ejecuto.
  *
- * El arbol NO se corrigio, y es lo correcto: esta bien transcrito del artboard
- * (`RentasV8.dc.html:454`), y el artboard dice esto a proposito. Lo que falta es una **lectura que
- * el backend no publica**, y tiene su issue: `rentas`#207, que nombra la operacion y lo que tiene
- * que contestar.
+ * El arbol NO se corrigio entonces, y era lo correcto: esta bien transcrito del artboard, y el
+ * artboard dice esto a proposito. Lo que faltaba era una **lectura que el backend no publicaba**, y
+ * tenia su issue: `rentas`#207.
+ *
+ * <b>#207 la publico y #237 la conecta, asi que `territorio` ya no cae aqui.</b> Su hoja declara
+ * hoy `GET /rentas/predial/determinaciones` —en el artboard y en `arbol.ts` a la vez, como #169,
+ * #173, #179 y #184—, tiene conector, y esta funcion ni siquiera se llama para ella. La frase
+ * **no se retira**: la siguen diciendo `aut-sol`, `val-val` y `val-cart`, que siguen sin tener a
+ * quien preguntar.
  *
  * **La condicion no mira el contrato**, que este archivo no puede leer: mira que no haya ni un
- * `GET` declarado y que haya alguna escritura. Barridas las cuarenta hojas, son cuatro —`territorio`,
- * `aut-sol`, `val-val` y `val-cart`—, y las cuatro son de ejecutar: presentar una solicitud, notificar
- * un valor, emitir un lote. `val-val` declara ademas `BASE /consultas/valores`, que el contrato SI
+ * `GET` declarado y que haya alguna escritura. Barridas las cuarenta hojas, son tres —`aut-sol`,
+ * `val-val` y `val-cart`—, y las tres son de ejecutar: presentar una solicitud, notificar un valor,
+ * emitir un lote. `val-val` declara ademas `BASE /consultas/valores`, que el contrato SI
  * publica como `GET`; por eso la frase dice «ninguna es una lectura **comprobada**» y no «todas
  * escriben», que seria mentir sobre esa.
  */

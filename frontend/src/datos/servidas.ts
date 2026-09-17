@@ -446,6 +446,23 @@ export interface OperacionServida {
  * hojas que las ensenan, y las dos de record ademas <b>exigen sujeto</b> —sin licencia, documento o
  * placa contestan 422, «esto seria el padron entero con otro titulo»—.
  */
+/**
+ * <h2>Y la de #237: la primera que contesta 204, y la primera que distingue DOS vacios</h2>
+ *
+ * <b>`GET /rentas/predial/determinaciones`</b> — la ultima determinacion predial guardada de un
+ * contribuyente, que #207 publico a proposito **sin conectar la hoja**. Es la unica lectura de
+ * `territorio`, que hasta aqui declaraba siete operaciones y ni un `GET`.
+ *
+ * <b>Lo que la hace distinta de las treinta y cinco de arriba</b>: sus dos ausencias no son la
+ * misma. Un codigo que no esta en el padron es <b>404</b> nombrandolo —la pregunta no tiene
+ * sujeto—; un contribuyente que existe y todavia no tiene determinacion de ese ejercicio es
+ * <b>204</b> —«todavia no»—. El backend las publica distintas porque #546 midio el dano de
+ * confundirlas, y la pantalla las dice distintas: ver `Conector.sinDato` y `Conector.noEncontrado`.
+ *
+ * <b>Y no trae el cronograma</b>, ni se le pide: `determinacion` no guarda la modalidad, y sin ella
+ * los vencimientos no se pueden resolver (#234). Suponer la trimestral publicaria un cronograma que
+ * el contribuyente puede no haber recibido — regla 5.
+ */
 export const YA_SERVIDAS: readonly OperacionServida[] = [
   { metodo: 'GET', ruta: '/seguridad/sesion' },
   { metodo: 'GET', ruta: '/seguridad/sesion/municipalidad' },
@@ -482,6 +499,7 @@ export const YA_SERVIDAS: readonly OperacionServida[] = [
   { metodo: 'GET', ruta: '/transito/internamientos' },
   { metodo: 'GET', ruta: '/rentas/vehiculos/{placa}' },
   { metodo: 'GET', ruta: '/transito/reportes/resumen-papeletas' },
+  { metodo: 'GET', ruta: '/rentas/predial/determinaciones' },
 ];
 
 /** `/rentas/vehiculos/{placa}` → `^/rentas/vehiculos/[^/]+$`. */

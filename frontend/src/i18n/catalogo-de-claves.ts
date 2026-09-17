@@ -3,7 +3,12 @@ import type { DefinicionDePantalla } from '@kamayuk/ui';
 import { ARBOL } from '../pantallas/arbol.ts';
 import { PANTALLAS } from '../pantallas/definiciones/index.ts';
 import type { Modulo } from '../pantallas/tipos.ts';
-import { NO_PUBLICADO } from '../datos/conectores.ts';
+import {
+  NO_ESTA_EN_EL_PADRON,
+  NO_PUBLICADO,
+  SIN_CRONOGRAMA,
+  TODAVIA_SIN_DETERMINAR,
+} from '../datos/conectores.ts';
 import {
   CARGANDO,
   NO_PUBLICADO_EN_PANTALLA,
@@ -123,11 +128,23 @@ function deLasAusencias(): readonly string[] {
       a.enElCampo,
       a.explicacion,
     ]),
-    ...[CARGANDO, VACIO, SIN_SUJETO, SIN_EJERCICIO, NO_PUBLICADO_EN_PANTALLA, SIN_PLACA].flatMap(
-      (a) => [a.enElCampo, a.explicacion],
-    ),
+    // Y las dos de `territorio` (#237), que son las dos ausencias que la lectura del predial
+    // distingue: 404 «no esta en el padron» y 204 «esta y todavia no se le ha determinado».
+    ...[
+      CARGANDO,
+      VACIO,
+      SIN_SUJETO,
+      SIN_EJERCICIO,
+      NO_PUBLICADO_EN_PANTALLA,
+      SIN_PLACA,
+      NO_ESTA_EN_EL_PADRON,
+      TODAVIA_SIN_DETERMINAR,
+    ].flatMap((a) => [a.enElCampo, a.explicacion]),
     NO_PUBLICADO,
     SIN_CIFRAR,
+    // Un TROZO de pantalla que la operacion no trae, con su motivo: el «Cronograma» de
+    // `territorio` (#234). Viaja como clave por `Reparto.loQueLaOperacionNoTrae`.
+    SIN_CRONOGRAMA,
   ];
 }
 

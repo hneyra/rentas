@@ -32,6 +32,7 @@ import {
 import {
   ACTAS,
   ACTA_CON_USO,
+  ACTA_SIN_PADRON,
   ACTA_SIN_USO,
   ACTA_VEHICULAR,
   EMBUDO,
@@ -528,6 +529,52 @@ describe('`fis-actas` — el contraste de un acta de inspeccion', () => {
 
     expect(filas.map((f) => f[4])).toEqual(['SUBVALUADOR', 'SUBVALUADOR']);
     expect(JSON.stringify(filas)).not.toContain(ACTA_CON_USO.estado);
+  });
+
+  it('LA HOJA DICE DE QUIEN ES EL ACTA que dibuja (#239)', async () => {
+    // Tomaba «la primera de la relacion» y **no decia cual**. Un contraste de areas que no nombra
+    // al obligado se lee como si fuera del contribuyente que uno tenia en la cabeza.
+    const { container } = await pintar('fis-actas', { '/fiscalizacion/actas': ACTAS });
+
+    expect(container.textContent).toContain('MEDINA SILVA, RUFINA');
+    expect(container.textContent).toContain('C-00025673');
+  });
+
+  it('y el nombre NO entra en el mando «Contribuyente»: ese campo es de entrada (#239)', () => {
+    // Es la decision que #239 dejaba abierta. El sitio que el artboard le da al titular es de tipo
+    // `1` —un control de entrada— y `Reparto.valores` son «los campos de solo lectura que si salen
+    // de lo que llego»: escribir dentro el nombre de un acta ya registrada convierte el formulario
+    // con que se registra una inspeccion en algo que parece estar editandola. Va por la frase de
+    // pantalla, que es lo que #196 ya decidio para la fecha.
+    const campos = PANTALLAS['fis-actas'].bloques[0]?.campos ?? [];
+    const titular = campos.findIndex((campo) => campo.etiqueta === 'Contribuyente');
+
+    expect(campos[titular]?.tipo).toBe('1');
+    const reparto = FIS_ACTAS.repartir(ACTA_CON_USO as never);
+    expect(reparto.valores.size).toBe(0);
+    expect(reparto.valores.get(coordenada(0, titular))).toBeUndefined();
+    expect(reparto.deQuienEs).toEqual({
+      nombre: 'MEDINA SILVA, RUFINA',
+      codigo: 'C-00025673',
+    });
+  });
+
+  it('con el titular dado de baja lo dice ASI, y no con la palabra de un hueco (#239, #216)', async () => {
+    // Los dos campos llegan nulos **a la vez** y eso no es un hueco del contrato: el acta sale
+    // igual porque ocultarla esconderia justo el caso que hay que revisar. Con la frase de arriba
+    // se leeria «es de undefined (undefined)»; con «no publicado» se mandaria a arreglar un
+    // backend que no tiene nada que arreglar.
+    const { container } = await pintar('fis-actas', {
+      '/fiscalizacion/actas': { ...ACTAS, contenido: [ACTA_SIN_PADRON] },
+    });
+
+    expect(container.textContent).toContain('ya no esta en el padron');
+    // Y NO la otra frase con los huecos vacios. `not.toContain('undefined')` no medía nada: la
+    // interpolacion de i18next sobre un nulo no escribe «undefined», escribe **nada** — medido al
+    // romperlo, la pantalla decia «Lo que se dibuja es de  ().», que es peor porque no parece un
+    // defecto.
+    expect(container.textContent).not.toContain('es de  (');
+    expect(container.textContent).not.toContain('undefined');
   });
 
   it('sin ninguna acta, la pantalla dice «sin datos» en vez de una tabla vacia', async () => {

@@ -187,6 +187,81 @@ export interface DeterminacionIndividual {
   readonly reglasAplicadas: readonly string[];
 }
 
+/**
+ * Un predio dentro de una determinacion **guardada**, de `GET /rentas/predial/determinaciones`.
+ *
+ * **No lleva codigo catastral, ni ubicacion, ni uso**, al reves que `PredioDeLaBase`: esos tres son
+ * de `catastro` y se resuelven **a una fecha**. Publicarlos aqui serian los de hoy dentro de una
+ * determinacion de hace dos anos, y ni la lectura ni la fila guardada pueden afirmar que sean los
+ * de entonces. Lo dice el javadoc de `DeterminacionGuardadaResource.PredioGuardado`.
+ */
+export interface PredioGuardado {
+  readonly predioId: number;
+  readonly autovaluo: string;
+  readonly valuoExonerado: string;
+  readonly valuoAfecto: string;
+  readonly porcentajePropiedad: string;
+  readonly baseImponible: string;
+  readonly origenDelAutovaluo: string;
+  readonly valuacionConjuntoId: number | null;
+  readonly valuacionHuella: string | null;
+}
+
+/**
+ * La ultima determinacion predial **guardada** de un contribuyente, de
+ * `GET /rentas/predial/determinaciones?codContribuyente=…&ejercicio=…` (#207).
+ *
+ * <h2>No es `DeterminacionIndividual`, y publicarla con esa forma seria el defecto de #194</h2>
+ *
+ * Aquella es la respuesta del `POST` que **dispara** el calculo; esta es la fila que se lee
+ * despues. Es el mismo reparto que el area predial ya tiene entre `CorridaPredialResource` y
+ * `CorridaGuardadaResource`. Lo que cambia no es cosmetico: aqui hay `id`, `conjuntoId`, `estado` y
+ * `origen` —que la escritura no tiene—, y **no hay `modalidad`, `cuotas` ni `simulacion`**.
+ *
+ * <h2>Las cuatro cifras que NO estan guardadas, y de donde salen</h2>
+ *
+ * `uit`, `tramos`, `minimoImponible` y `derechoDeEmision` salen del **conjunto sellado que esa
+ * determinacion fijo** —por su `conjuntoId`, no el vigente de hoy—. Es lo que ARQ-09 §3 promete y
+ * por eso no se guardan dos veces; resolverlos con el vigente publicaria unos tramos que esa
+ * determinacion nunca uso.
+ *
+ * <h2>Y lo que no publica, con su motivo</h2>
+ *
+ * **El cronograma de cuotas**: `determinacion` no guarda su `modalidad` —solo la guarda la corrida
+ * masiva— y sin ella los vencimientos no se pueden resolver. Suponer la trimestral publicaria unos
+ * vencimientos que el contribuyente puede no haber recibido, que es lo que la regla 5 prohibe. Es
+ * #234, y ahi esta escrito ademas que la regla 6 no se cumple del todo para la individual mientras
+ * la modalidad no se guarde.
+ *
+ * **El «Monto deducido»** de la hoja: no lo publica nadie. Lo mas cercano es `valuoExonerado`, que
+ * es la parte exonerada del valuo y **no** el importe que una deduccion resta de la base.
+ *
+ * **Las dos ausencias no son la misma**: 404 es «ese codigo no esta en el padron» y 204 es «existe
+ * y todavia no tiene determinacion de ese ejercicio» (#546).
+ */
+export interface DeterminacionGuardada {
+  readonly id: number;
+  readonly ejercicio: string;
+  readonly codContribuyente: string;
+  readonly sujeto: string;
+  readonly conjuntoId: number;
+  readonly conjunto: string;
+  readonly estado: string;
+  readonly origen: string;
+  readonly predios: readonly PredioGuardado[];
+  readonly valuoTotal: string;
+  readonly valuoExonerado: string;
+  readonly valuoAfecto: string;
+  readonly baseImponible: string;
+  readonly uit: string;
+  readonly tramos: readonly TramoAplicado[];
+  readonly minimoImponible: string;
+  readonly impuestoInsoluto: string;
+  readonly derechoDeEmision: string;
+  readonly totalAPagar: string;
+  readonly reglasAplicadas: readonly string[];
+}
+
 /** La emision masiva del predial, de `POST /rentas/predial/calculo-masivo`. */
 export interface CorridaMasiva {
   readonly ejercicio: string;
@@ -1177,13 +1252,24 @@ export interface FilaDeLaMuestra {
  * inventarles una escritura.
  *
  * Predial y vehicular comparten forma: cual es cual lo dice cual de `predioId` y `vehiculoId`
- * trae valor. Y del contribuyente publica **solo el identificador**, nunca el nombre.
+ * trae valor.
+ *
+ * **Y desde #216 dice DE QUIEN es**: junto al identificador interno viajan `contribuyente` —el
+ * nombre tal como el padron lo escribe— y `codContribuyente`. Hasta entonces publicaba solo
+ * `contribuyenteId`, y un contraste de areas que no nombra al obligado no se puede comprobar contra
+ * nada. Los resuelve `ActasController` con **un** `porIds` por pagina, no uno por fila.
+ *
+ * **Los dos son anulables a la vez, y nulo significa una cosa concreta**: el obligado **ya no esta
+ * en el padron**. El acta sigue saliendo —ocultarla esconderia justo el caso que hay que revisar—,
+ * asi que la pantalla lo dice con esas palabras y no con las de un campo que nadie publica.
  */
 export interface ActaDeFiscalizacion {
   readonly id: number;
   readonly programaId: number;
   readonly version: number;
   readonly contribuyenteId: number | null;
+  readonly contribuyente: string | null;
+  readonly codContribuyente: string | null;
   readonly predioId: number | null;
   readonly vehiculoId: number | null;
   readonly fichaId: number | null;
@@ -1744,6 +1830,26 @@ export const RUTAS = {
   resolucionDeDeterminacion: (numero: string) =>
     `/fiscalizacion/resoluciones/${encodeURIComponent(numero)}`,
   ultimaCorrida: '/rentas/predial/corridas/ultima',
+  /**
+   * La ultima determinacion predial GUARDADA de un contribuyente, de un ejercicio (#207, #237).
+   *
+   * **Los dos parametros van siempre**, y los dos los declara `parametros-de-la-api.json` como
+   * opcionales de la firma: `codContribuyente` lo exige el controlador igual —sin el es 422, «Hay
+   * que decir de que contribuyente se lee la determinacion»— y `ejercicio` ausente significa **el
+   * del reloj del backend**, que no es el de trabajo de la sesion. Dejarlo fuera contestaria 200
+   * con la determinacion de otro ano, que es la clase de acierto que no se distingue del correcto.
+   *
+   * Se manda `ejercicio` y no su alias `ano`: los dos valen —`FiltroDeLaConsulta.elCanonicoOSuAlias`—
+   * y el canonico deja una sola forma en la interfaz.
+   *
+   * **No lleva `?modalidad=` ni nada que resuelva el cronograma**: no existe. `determinacion` no
+   * guarda la modalidad y por eso esta lectura no publica las cuotas (#234).
+   */
+  determinacionGuardada: (codigo: string, ejercicio: number) =>
+    conParametros('/rentas/predial/determinaciones', {
+      codContribuyente: codigo,
+      ejercicio: String(ejercicio),
+    }),
   observados: (corridaId: number) => `/rentas/predial/corridas/${String(corridaId)}/observados`,
   recaudacion: '/indicadores/recaudacion',
   trabajoParado: '/indicadores/trabajo-parado',
@@ -1949,6 +2055,25 @@ export async function pedirPagina<T>(ruta: string, senal?: AbortSignal): Promise
 /** Pide una operacion que contesta un objeto. */
 export async function pedirUno<T>(ruta: string, senal?: AbortSignal): Promise<T> {
   return solicitar<T>(ruta, senal === undefined ? {} : { senal });
+}
+
+/**
+ * **Pide una operacion que contesta un objeto O un 204** (#237).
+ *
+ * Es `pedirUno` con el tipo que dice la verdad. Dos de las lecturas servidas contestan **204 sin
+ * cuerpo** cuando la respuesta es «todavia no» —`GET /rentas/predial/corridas/ultima` desde #523 y
+ * `GET /rentas/predial/determinaciones` desde #207—, y eso no es un fallo ni una lista vacia: es un
+ * hecho del negocio que `useDatosDeLaHoja` dice con su propia frase.
+ *
+ * <h2>Por que hace falta la puerta y no basta con que `solicitar` devuelva `null`</h2>
+ *
+ * Porque `pedirUno<CorridaDelPredial>` promete una corrida, y con un 204 devuelve `null`: el
+ * conector reparte campo a campo sobre `null` y el compilador **no lo ve**. Declarado
+ * `T | null`, quien pide un 204 tiene que decidir que hace con el vacio — que es exactamente la
+ * decision que esta hoja tiene que tomar.
+ */
+export async function pedirUnoOVacio<T>(ruta: string, senal?: AbortSignal): Promise<T | null> {
+  return solicitar<T | null>(ruta, senal === undefined ? {} : { senal });
 }
 
 /**

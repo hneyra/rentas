@@ -235,6 +235,34 @@ export const FRASE_DEL_CONTEO = '{{cuantos}} de {{total}}';
  */
 export const FRASE_DE_LA_FECHA = 'Las cifras son al {{fecha}}.';
 
+/**
+ * **«Lo que se dibuja es de MEDINA SILVA, RUFINA (C-00025673)»: de quien es** (#239).
+ *
+ * Vive aqui por lo mismo que las dos de arriba: el conector entrega **las dos piezas crudas**
+ * —`Reparto.deQuienEs`— y la frase la arma `useDatosDeLaHoja`, que tiene `t()` delante. Ni el
+ * nombre ni el codigo se traducen: son dato.
+ *
+ * <h2>Por que la pantalla lo dice ARRIBA y no en un campo</h2>
+ *
+ * Porque las hojas que toman «la primera de la relacion» no tienen donde. En `fis-actas` el sitio
+ * que el artboard le da al titular es un **mando** —un control de entrada—, y escribir dentro el
+ * nombre de un acta ya registrada hace que el formulario de alta parezca estar editandola. Es la
+ * misma decision de #196 con la fecha, y por el mismo motivo.
+ */
+export const FRASE_DE_QUIEN_ES = 'Lo que se dibuja es de {{nombre}} ({{codigo}}).';
+
+/**
+ * **La otra mitad: el obligado ya no esta en el padron** (#239, #216).
+ *
+ * `contribuyente` y `codContribuyente` llegan nulos **a la vez**, y el backend dice que eso no es
+ * un hueco del contrato sino un hecho: el acta sigue saliendo porque ocultarla esconderia justo el
+ * caso que hay que revisar. Con la frase de arriba se leeria «es de undefined (undefined)», y con
+ * la palabra de un hueco —«no publicado»— se mandaria a arreglar un backend que no tiene nada que
+ * arreglar.
+ */
+export const FRASE_DE_QUIEN_ES_SIN_PADRON =
+  'Lo que se dibuja es de un contribuyente que ya no esta en el padron.';
+
 /** Todo lo que este archivo aporta al inventario del locale. Ver `catalogo-de-claves.ts`. */
 export function clavesDelMarco(): readonly string[] {
   return [
@@ -243,6 +271,8 @@ export function clavesDelMarco(): readonly string[] {
     ...Object.values(FRASES_DE_LAS_TABLAS),
     FRASE_DEL_CONTEO,
     FRASE_DE_LA_FECHA,
+    FRASE_DE_QUIEN_ES,
+    FRASE_DE_QUIEN_ES_SIN_PADRON,
   ];
 }
 
