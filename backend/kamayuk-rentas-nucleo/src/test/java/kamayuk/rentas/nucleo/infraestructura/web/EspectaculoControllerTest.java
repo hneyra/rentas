@@ -362,7 +362,8 @@ class EspectaculoControllerTest {
                     determinacion.reglasAplicadas(),
                     determinacion.origen(),
                     determinacion.estado(),
-                    "cajero.ventanilla");
+                    "cajero.ventanilla",
+                    determinacion.modalidad());
         }
     }
 

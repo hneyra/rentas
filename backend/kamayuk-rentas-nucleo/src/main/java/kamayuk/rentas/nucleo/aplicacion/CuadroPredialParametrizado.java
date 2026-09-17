@@ -5,13 +5,14 @@ import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.SortedSet;
 import kamayuk.rentas.dominio.Alicuota;
 import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.PoliticasDeRedondeo;
+import kamayuk.rentas.nucleo.dominio.predial.ModalidadDelPredial;
 import kamayuk.rentas.nucleo.dominio.predial.Tramo;
 import kamayuk.rentas.parametros.LectorDeParametros;
 import kamayuk.rentas.parametros.ParametroSinPublicar;
@@ -92,9 +93,13 @@ public class CuadroPredialParametrizado {
      */
     static final String TIPO_VENCIMIENTO = "PREDIAL_VENCIMIENTO";
 
-    /** La modalidad de una sola cuota: el articulo 15 a). */
-    public static final String MODALIDAD_CONTADO = "CONTADO";
-
+    /**
+     * La clave con que el conjunto sellado publica el vencimiento de la cuota unica.
+     *
+     * <p>Coincide con el nombre de {@link ModalidadDelPredial#CONTADO} y no se deriva de el: la
+     * clave es del corpus —{@code predial-plazos-y-reajuste.md} §2— y el enumerado es del dominio.
+     * Atarlos haria que renombrar uno cambiara en silencio que fila del conjunto se lee.
+     */
     private static final String CLAVE_CONTADO = "CONTADO";
 
     private final LectorDeParametros parametros;
@@ -242,10 +247,14 @@ public class CuadroPredialParametrizado {
          * calendario de feriados del ejercicio. La fecha resuelta entra como dato del conjunto, que
          * es por ejercicio, y queda amarrada a la determinacion que la uso.
          */
-        public List<LocalDate> vencimientos(String modalidad) {
-            String pedida = modalidad.strip().toUpperCase(Locale.ROOT);
+        public List<LocalDate> vencimientos(ModalidadDelPredial modalidad) {
+            ModalidadDelPredial pedida =
+                    Objects.requireNonNull(
+                            modalidad,
+                            "El cronograma se resuelve para una modalidad concreta: suponerla es"
+                                    + " lo que #234 retiro");
             List<String> claves =
-                    MODALIDAD_CONTADO.equals(pedida)
+                    ModalidadDelPredial.CONTADO == pedida
                             ? List.of(CLAVE_CONTADO)
                             : ordenadasPorOrdinal(
                                     sellados.clavesDe(TIPO_VENCIMIENTO).stream()

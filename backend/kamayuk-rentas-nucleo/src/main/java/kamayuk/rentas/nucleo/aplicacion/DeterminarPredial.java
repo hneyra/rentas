@@ -5,7 +5,6 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -27,6 +26,7 @@ import kamayuk.rentas.nucleo.dominio.predial.CuotaDelPredial;
 import kamayuk.rentas.nucleo.dominio.predial.DetalleDeterminacionPredio;
 import kamayuk.rentas.nucleo.dominio.predial.Determinacion;
 import kamayuk.rentas.nucleo.dominio.predial.DeterminacionPredialCalculada;
+import kamayuk.rentas.nucleo.dominio.predial.ModalidadDelPredial;
 import kamayuk.rentas.nucleo.dominio.predial.OrigenDelAutovaluo;
 import kamayuk.rentas.nucleo.dominio.predial.PredioEnLaBase;
 import kamayuk.rentas.nucleo.dominio.predial.Tramo;
@@ -103,12 +103,25 @@ import org.springframework.stereotype.Service;
  * diga si simula o determina se rechaza en vez de suponer. Suponer «determina» emitiria deuda al
  * pulsar un boton que dice «Simular»; suponer «simula» dejaria de emitirla al pulsar el que dice
  * «Calcular», y ninguna de las dos equivocaciones avisa.
+ *
+ * <h2>La modalidad tampoco se supone, y desde #234 se GUARDA</h2>
+ *
+ * <p>Hasta #234 la modalidad llegaba en el cuerpo y, si no venia, este caso de uso suponia {@code
+ * TRIMESTRAL}. Con ella se resolvian los vencimientos y se repartia el monto, y <b>no se guardaba
+ * en ninguna parte</b>: la unica tabla que la tenia era {@code corrida_predial}, que es de la
+ * emision masiva. La consecuencia es que la regla 6 no se cumplia del todo para la individual —el
+ * impuesto era reproducible y las cuotas no—, y que la lectura de #207 no podia dibujar el
+ * cronograma.
+ *
+ * <p>Las dos mitades se cierran juntas, porque una sin la otra no sirve: {@link Peticion}
+ * <b>exige</b> la modalidad —la misma decision que {@code simulacion}, por el mismo motivo— y
+ * {@code V20} le da a {@code determinacion} su columna, que {@link RegistrarDeterminacionPredial}
+ * escribe. Guardar la supuesta habria sido la otra salida defendible, y se descarto: escribiria en
+ * la fila un cronograma que el contribuyente no eligio, indistinguible dentro de dos anios del que
+ * si eligio.
  */
 @Service
 public class DeterminarPredial {
-
-    /** La modalidad por omision del cronograma: el articulo 15 la escribe en cuatro trimestres. */
-    public static final String MODALIDAD_TRIMESTRAL = "TRIMESTRAL";
 
     private final PadronPredialDelEjercicio yaDeclarados;
     private final PrediosDelContribuyente predios;
@@ -177,13 +190,22 @@ public class DeterminarPredial {
                         detalle,
                         tramos,
                         minimo,
+                        peticion.modalidad(),
                         peticion.simulacion(),
                         observacion);
 
         List<AporteDeTramo> aportes =
                 TramosProgresivosAcumulativos.desglosar(cabecera.baseImponible(), tramos);
         Dinero derechoDeEmision = vigente.derechoDeEmision();
-        String modalidad = peticion.modalidad();
+        // La modalidad sale de la CABECERA y no de la peticion: es la que quedo escrita en la
+        // fila, y es la unica que despues se puede volver a leer (#234). Resolver el cronograma
+        // con la de la peticion y guardar otra dejaria la respuesta y la fila diciendo cosas
+        // distintas sobre el mismo hecho.
+        ModalidadDelPredial modalidad =
+                Objects.requireNonNull(
+                        cabecera.modalidad(),
+                        "La cabecera de una determinacion predial nueva siempre trae su modalidad:"
+                                + " Determinacion.nuevaPredial la exige (#234)");
         List<CuotaDelPredial> cuotas =
                 CronogramaDelPredial.repartir(
                         cabecera.montoDeterminado(), vigente.vencimientos(modalidad), redondeo);
@@ -200,7 +222,6 @@ public class DeterminarPredial {
                 cabecera.montoDeterminado(),
                 derechoDeEmision,
                 cuotas,
-                modalidad,
                 vigente.nombreDelConjunto(),
                 contribuyente.codigo(),
                 contribuyente.nombre(),
@@ -351,14 +372,14 @@ public class DeterminarPredial {
      * @param ejercicio el ejercicio que se determina
      * @param codContribuyente el codigo del contribuyente en el padron
      * @param predios el autovaluo declarado de cada uno de sus predios; hacen falta todos
-     * @param modalidad el cronograma que se aplica; {@link #MODALIDAD_TRIMESTRAL} si no se dice
+     * @param modalidad el cronograma que se aplica; <b>obligatorio</b> desde #234
      * @param simulacion si esto no se guarda
      */
     public record Peticion(
             Ejercicio ejercicio,
             String codContribuyente,
             List<PredioDeclarado> predios,
-            String modalidad,
+            ModalidadDelPredial modalidad,
             boolean simulacion) {
 
         public Peticion {
@@ -368,10 +389,14 @@ public class DeterminarPredial {
                     List.copyOf(
                             Objects.requireNonNull(
                                     predios, "La lista de predios es vacia," + " no nula"));
-            modalidad =
-                    modalidad == null || modalidad.isBlank()
-                            ? MODALIDAD_TRIMESTRAL
-                            : modalidad.strip().toUpperCase(Locale.ROOT);
+            // No hay valor por omision, y es la mitad de #234 que no esta en la base. Antes de
+            // este cambio, un cuerpo sin `modalidad` determinaba TRIMESTRAL en silencio; con la
+            // columna de V20 puesta, ese silencio pasaria a quedar ESCRITO como si el
+            // contribuyente lo hubiera elegido.
+            Objects.requireNonNull(
+                    modalidad,
+                    "La determinacion dice bajo que cronograma se emite: «modalidad» es"
+                            + " obligatoria y no tiene valor por omision (#234)");
         }
     }
 

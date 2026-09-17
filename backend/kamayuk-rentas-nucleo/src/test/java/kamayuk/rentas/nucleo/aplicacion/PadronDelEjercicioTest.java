@@ -35,6 +35,7 @@ import kamayuk.rentas.nucleo.dominio.predial.DetalleDeterminacionPredio;
 import kamayuk.rentas.nucleo.dominio.predial.Determinacion;
 import kamayuk.rentas.nucleo.dominio.predial.DeterminacionPredialCalculada;
 import kamayuk.rentas.nucleo.dominio.predial.DeterminacionRepository;
+import kamayuk.rentas.nucleo.dominio.predial.ModalidadDelPredial;
 import kamayuk.rentas.nucleo.dominio.predial.PredioEnLaBase;
 import kamayuk.rentas.parametros.IdentificadorDeConjunto;
 import kamayuk.rentas.parametros.LectorDeParametros;
@@ -243,7 +244,11 @@ class PadronDelEjercicioTest {
         return servicio(caso, predios)
                 .determinar(
                         new DeterminarPredial.Peticion(
-                                EJERCICIO, caso.codigo(), declarados, "TRIMESTRAL", true),
+                                EJERCICIO,
+                                caso.codigo(),
+                                declarados,
+                                ModalidadDelPredial.TRIMESTRAL,
+                                true),
                         PORQUE);
     }
 

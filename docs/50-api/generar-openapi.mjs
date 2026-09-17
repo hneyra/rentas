@@ -3257,7 +3257,8 @@ const OPERACIONES_ADICIONALES = {
         La última determinación predial **guardada** de un contribuyente para un ejercicio (#207):
         los predios que integran la base con lo que puso cada uno, el valúo total, el exonerado y
         el afecto, la base imponible, los tramos del artículo 13, el mínimo imponible, el impuesto
-        insoluto, el derecho de emisión, el total a pagar y las reglas aplicadas.
+        insoluto, el derecho de emisión, el total a pagar, el cronograma de cuotas con su modalidad
+        y las reglas aplicadas.
 
         Dos fuentes y ninguna más. De las **filas guardadas** salen la cabecera y el detalle por
         predio. De **el conjunto sellado que esa determinación fijó** —por su \`conjuntoId\`, no el
@@ -3265,10 +3266,15 @@ const OPERACIONES_ADICIONALES = {
         ARQ-09 §3 promete, y por eso no se guardan dos veces. Resolverlos con el vigente publicaría
         unos tramos que esa determinación nunca usó si se sellara una segunda versión del ejercicio.
 
-        **No trae el cronograma de cuotas ni la modalidad**, y no es un olvido: \`determinacion\` no
-        guarda la modalidad —sólo la guarda la corrida masiva—, y sin ella los vencimientos no se
-        pueden resolver. Suponer la trimestral publicaría un cronograma que puede no ser el que el
-        contribuyente recibió. Está nombrado y no resuelto: \`rentas\`#234.
+        **Trae el cronograma de cuotas y su modalidad desde #234**, y no salen de la misma clase de
+        sitio: \`modalidad\` es una columna de la fila —\`V20\`— y \`cuotas[]\` se **deriva** de ella,
+        del monto guardado y de los vencimientos de ese mismo conjunto sellado. Las cuotas no se
+        guardan: serían una segunda verdad sobre el mismo hecho.
+
+        **Una determinación anterior a V20 publica el cronograma en blanco** —\`modalidad: null\` y
+        \`cuotas: []\`—, nunca la trimestral supuesta: de aquellas filas la modalidad no consta en
+        ningún sitio, y suponerla publicaría un cronograma que puede no ser el que el contribuyente
+        recibió.
 
         **204 y 404 no dicen lo mismo.** Un código que no está en el padrón es **404** nombrándolo:
         la pregunta no tiene sujeto. Un contribuyente que existe y todavía no tiene determinación de

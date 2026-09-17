@@ -33,6 +33,7 @@ import kamayuk.rentas.nucleo.dominio.predial.DetalleDeterminacionPredio;
 import kamayuk.rentas.nucleo.dominio.predial.Determinacion;
 import kamayuk.rentas.nucleo.dominio.predial.DeterminacionPredialCalculada;
 import kamayuk.rentas.nucleo.dominio.predial.DeterminacionRepository;
+import kamayuk.rentas.nucleo.dominio.predial.ModalidadDelPredial;
 import kamayuk.rentas.nucleo.dominio.predial.PredioEnLaBase;
 import kamayuk.rentas.parametros.IdentificadorDeConjunto;
 import kamayuk.rentas.parametros.LectorDeParametros;
@@ -167,7 +168,11 @@ class DeterminarPredialTest {
                                         .construir())
                         .determinar(
                                 new DeterminarPredial.Peticion(
-                                        EJERCICIO, "C-001", uno, "TRIMESTRAL", false),
+                                        EJERCICIO,
+                                        "C-001",
+                                        uno,
+                                        ModalidadDelPredial.TRIMESTRAL,
+                                        false),
                                 PORQUE);
         assertThat(conLaDeOtroAnio.impuestoInsoluto()).isEqualTo(Dinero.de("234.00"));
     }
@@ -248,7 +253,7 @@ class DeterminarPredialTest {
                                         EJERCICIO,
                                         "C-001",
                                         List.of(declarado(11L, "100000.00")),
-                                        "TRIMESTRAL",
+                                        ModalidadDelPredial.TRIMESTRAL,
                                         true),
                                 PORQUE);
 
@@ -260,6 +265,56 @@ class DeterminarPredialTest {
         assertThat(calculada.tramos()).isNotEmpty();
         assertThat(calculada.cuotas()).hasSize(4);
         assertThat(calculada.nombreDelConjunto()).isEqualTo("2026 v1");
+    }
+
+    @Test
+    @DisplayName("#234 — una peticion sin modalidad no se construye: no hay valor por omision")
+    void sinModalidadNoHayPeticion() {
+        assertThatThrownBy(
+                        () ->
+                                new DeterminarPredial.Peticion(
+                                        EJERCICIO,
+                                        "C-001",
+                                        List.of(declarado(11L, "100000.00")),
+                                        null,
+                                        false))
+                .as(
+                        "hasta #234 esto se leia como TRIMESTRAL, y con V20 esa suposicion quedaria"
+                                + " escrita en la fila como si la hubiera elegido el contribuyente")
+                .isInstanceOf(NullPointerException.class)
+                .hasMessageContaining("modalidad");
+    }
+
+    @Test
+    @DisplayName("#234 — la modalidad pedida queda GUARDADA en la cabecera, y manda el cronograma")
+    void laModalidadQuedaEnLaCabecera() {
+        predios.con(11L, "10001", "AV. GRAU 100", Porcentaje.total());
+
+        DeterminacionPredialCalculada alContado =
+                servicio()
+                        .determinar(
+                                new DeterminarPredial.Peticion(
+                                        EJERCICIO,
+                                        "C-001",
+                                        List.of(declarado(11L, "100000.00")),
+                                        ModalidadDelPredial.CONTADO,
+                                        false),
+                                PORQUE);
+
+        assertThat(alContado.cabecera().modalidad())
+                .as(
+                        "es la CABECERA la que la lleva, que es la fila que queda escrita: en la"
+                                + " respuesta y en la base tiene que ser la misma")
+                .isEqualTo(ModalidadDelPredial.CONTADO);
+        assertThat(alContado.modalidad()).isEqualTo(ModalidadDelPredial.CONTADO);
+        // UNA cuota y no cuatro: con el montaje trimestral, «aplica la modalidad pedida» y
+        // «aplica siempre la trimestral» darian el mismo verde.
+        assertThat(alContado.cuotas()).hasSize(1);
+        assertThat(alContado.cuotas().get(0).vencimiento())
+                .isEqualTo(LocalDate.parse("2026-02-27"));
+        assertThat(alContado.cuotas().get(0).importe())
+                .as("la cuota unica es el impuesto entero, no un cuarto")
+                .isEqualTo(alContado.impuestoInsoluto());
     }
 
     @Test
@@ -323,7 +378,7 @@ class DeterminarPredialTest {
                                                 EJERCICIO,
                                                 "C-001",
                                                 List.of(declarado(11L, "100000.00")),
-                                                "TRIMESTRAL",
+                                                ModalidadDelPredial.TRIMESTRAL,
                                                 true),
                                         PORQUE))
                 .isInstanceOf(ParametrosSellados.ParametroAusente.class)
@@ -348,7 +403,11 @@ class DeterminarPredialTest {
                 servicio()
                         .determinar(
                                 new DeterminarPredial.Peticion(
-                                        EJERCICIO, "C-001", List.of(), "TRIMESTRAL", true),
+                                        EJERCICIO,
+                                        "C-001",
+                                        List.of(),
+                                        ModalidadDelPredial.TRIMESTRAL,
+                                        true),
                                 PORQUE);
 
         assertThat(calculada.cabecera().baseImponible()).isEqualTo(Dinero.de("100000.00"));
@@ -368,7 +427,7 @@ class DeterminarPredialTest {
                                                         EJERCICIO,
                                                         "C-001",
                                                         List.of(),
-                                                        "TRIMESTRAL",
+                                                        ModalidadDelPredial.TRIMESTRAL,
                                                         true),
                                                 PORQUE))
                 .isInstanceOf(DeterminarPredial.PredioSinAutovaluo.class)
@@ -393,7 +452,7 @@ class DeterminarPredialTest {
                                                         EJERCICIO,
                                                         "NO-EXISTE",
                                                         List.of(),
-                                                        "TRIMESTRAL",
+                                                        ModalidadDelPredial.TRIMESTRAL,
                                                         true),
                                                 PORQUE))
                 .isInstanceOf(DeterminarPredial.ContribuyenteInexistente.class);
@@ -483,7 +542,11 @@ class DeterminarPredialTest {
                     servicio()
                             .determinar(
                                     new DeterminarPredial.Peticion(
-                                            EJERCICIO, "C-001", List.of(), "TRIMESTRAL", false),
+                                            EJERCICIO,
+                                            "C-001",
+                                            List.of(),
+                                            ModalidadDelPredial.TRIMESTRAL,
+                                            false),
                                     PORQUE);
 
             assertThat(calculada.cabecera().baseImponible()).isEqualTo(Dinero.de("150000.00"));
@@ -508,7 +571,7 @@ class DeterminarPredialTest {
                                                             EJERCICIO,
                                                             "C-001",
                                                             List.of(),
-                                                            "TRIMESTRAL",
+                                                            ModalidadDelPredial.TRIMESTRAL,
                                                             false),
                                                     PORQUE))
                     .as(
@@ -533,7 +596,7 @@ class DeterminarPredialTest {
                                                             EJERCICIO,
                                                             "C-001",
                                                             List.of(),
-                                                            "TRIMESTRAL",
+                                                            ModalidadDelPredial.TRIMESTRAL,
                                                             false),
                                                     PORQUE))
                     .as(
@@ -573,7 +636,11 @@ class DeterminarPredialTest {
         return servicio()
                 .determinar(
                         new DeterminarPredial.Peticion(
-                                EJERCICIO, "C-001", declarados, "TRIMESTRAL", false),
+                                EJERCICIO,
+                                "C-001",
+                                declarados,
+                                ModalidadDelPredial.TRIMESTRAL,
+                                false),
                         PORQUE);
     }
 
@@ -612,6 +679,9 @@ class DeterminarPredialTest {
                 .texto("PREDIAL_VENCIMIENTO", "2", "2026-05-29")
                 .texto("PREDIAL_VENCIMIENTO", "3", "2026-08-31")
                 .texto("PREDIAL_VENCIMIENTO", "4", "2026-11-30")
+                // El articulo 15 a): la clave del contado, que #234 vuelve pedible desde la
+                // fila guardada. Sin ella el montaje solo sabria dibujar el fraccionado.
+                .texto("PREDIAL_VENCIMIENTO", "CONTADO", "2026-02-27")
                 .numero("REDONDEO", "IMPUESTO_POR_TRAMO", ValorNormativo.de("2"))
                 .texto("REDONDEO", "IMPUESTO_POR_TRAMO", "HALF_UP")
                 .numero("REDONDEO", "BASE_DEL_CONTRIBUYENTE", ValorNormativo.de("2"))
@@ -753,7 +823,8 @@ class DeterminarPredialTest {
                             List.of("RT-011"),
                             kamayuk.rentas.nucleo.dominio.OrigenDeDeterminacion.ORDINARIA,
                             EstadoDeDeterminacion.BORRADOR,
-                            "siembra"));
+                            "siembra",
+                            ModalidadDelPredial.TRIMESTRAL));
             detallePorId.put(id, List.of(detalle));
         }
 
@@ -798,7 +869,8 @@ class DeterminarPredialTest {
                     determinacion.reglasAplicadas(),
                     determinacion.origen(),
                     determinacion.estado(),
-                    "cajero.ventanilla");
+                    "cajero.ventanilla",
+                    determinacion.modalidad());
         }
 
         @Override

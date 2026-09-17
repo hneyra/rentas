@@ -16,6 +16,7 @@ import kamayuk.rentas.nucleo.aplicacion.CuadroPredialParametrizado;
 import kamayuk.rentas.nucleo.aplicacion.DeterminarPredial;
 import kamayuk.rentas.nucleo.aplicacion.DeterminarPredialMasivo;
 import kamayuk.rentas.nucleo.aplicacion.RegistrarCorridaDeEmision;
+import kamayuk.rentas.nucleo.dominio.predial.ModalidadDelPredial;
 import kamayuk.rentas.parametros.FaltaPublicar;
 import kamayuk.rentas.parametros.LectorDeParametros;
 import kamayuk.rentas.parametros.ParametrosSellados;
@@ -311,7 +312,7 @@ public class PredialController {
                                     elEjercicio,
                                     contribuyente,
                                     predios,
-                                    peticion.modalidad() == null ? "" : peticion.modalidad(),
+                                    exigirModalidad(peticion.modalidad()),
                                     simulacion),
                             observacion));
         } catch (DeterminarPredial.ContribuyenteInexistente noEsta) {
@@ -368,7 +369,7 @@ public class PredialController {
                                     peticion.sector(),
                                     peticion.codigoDesde(),
                                     peticion.codigoHasta(),
-                                    peticion.modalidad() == null ? "" : peticion.modalidad(),
+                                    exigirModalidad(peticion.modalidad()),
                                     Boolean.TRUE.equals(peticion.recalculaYaEmitidos()),
                                     simulacion),
                             observacion));
@@ -474,6 +475,34 @@ public class PredialController {
             return Ejercicio.de(LocalDate.now(reloj));
         }
         return ejercicioDe(texto);
+    }
+
+    /**
+     * La modalidad del cronograma, exigida y no supuesta (#234).
+     *
+     * <p>Hasta #234 un cuerpo sin {@code modalidad} determinaba TRIMESTRAL en silencio y esa
+     * suposicion no se guardaba en ninguna parte, asi que la fila no decia bajo que cronograma se
+     * emitio y la lectura de #207 no podia dibujarlo. Con {@code V20} la columna existe, y entonces
+     * las dos salidas son guardar la suposicion —escribir en la fila un cronograma que el
+     * contribuyente no eligio, indistinguible dentro de dos anios del que si eligio— o exigirla. Se
+     * exige, que es la misma decision que {@code simulacion} y por el mismo motivo: aqui no se
+     * elige por el operador.
+     */
+    private static ModalidadDelPredial exigirModalidad(@Nullable String modalidad) {
+        if (modalidad == null || modalidad.isBlank()) {
+            throw new ProblemaDeNegocio(
+                    CodigoDeError.VALIDACION,
+                    "Hay que decir bajo que cronograma se emite: falta «modalidad». Se admiten "
+                            + ModalidadDelPredial.admitidas()
+                            + " (articulo 15 del TUO LTM). No hay valor por omision: el que se"
+                            + " supusiera quedaria escrito en la determinacion como si lo hubiera"
+                            + " elegido el contribuyente");
+        }
+        try {
+            return ModalidadDelPredial.de(modalidad);
+        } catch (ModalidadDelPredial.ModalidadDesconocida noEsNinguna) {
+            throw new ProblemaDeNegocio(CodigoDeError.VALIDACION, mensajeDe(noEsNinguna));
+        }
     }
 
     /** Sin valor por omision: ver el javadoc de la clase. */

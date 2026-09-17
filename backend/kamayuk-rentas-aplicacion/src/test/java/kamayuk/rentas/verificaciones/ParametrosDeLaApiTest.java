@@ -149,9 +149,19 @@ class ParametrosDeLaApiTest {
      * declarado dice a que predio corresponde su autovaluo: falta «predioId»» sobre un elemento de
      * {@code peticion.predios()}. Sin esta lista, la guarda de abajo pediria declararla como
      * parametro de consulta, que es lo contrario de lo que hace falta.
+     *
+     * <p>{@code modalidad} entra aqui por lo mismo y por un motivo mas: es <b>obligatoria</b> desde
+     * #234 en las dos operaciones del predial, asi que una pantalla que no la mandara recibiria un
+     * 422 que nada anuncio. El contrato lo dice antes de que eso pase.
      */
     private static final Map<String, List<String>> EXIGIDOS_EN_EL_CUERPO =
-            Map.of("POST /rentas/predial/calculo-individual", List.of("predioId"));
+            Map.of(
+                    // `modalidad` desde #234: las dos operaciones del predial la EXIGEN en su
+                    // cuerpo y no tiene valor por omision. Antes se suponia TRIMESTRAL, y con la
+                    // columna de V20 puesta esa suposicion quedaria escrita en la determinacion
+                    // como si la hubiera elegido el contribuyente.
+                    "POST /rentas/predial/calculo-individual", List.of("modalidad", "predioId"),
+                    "POST /rentas/predial/calculo-masivo", List.of("modalidad"));
 
     /**
      * Los que solo hacen falta segun el cuerpo, con su motivo.

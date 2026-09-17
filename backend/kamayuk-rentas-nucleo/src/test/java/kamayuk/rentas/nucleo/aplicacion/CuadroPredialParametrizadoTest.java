@@ -8,6 +8,7 @@ import java.util.List;
 import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.ValorNormativo;
+import kamayuk.rentas.nucleo.dominio.predial.ModalidadDelPredial;
 import kamayuk.rentas.nucleo.dominio.predial.Tramo;
 import kamayuk.rentas.parametros.IdentificadorDeConjunto;
 import kamayuk.rentas.parametros.LectorDeParametros;
@@ -172,13 +173,13 @@ class CuadroPredialParametrizadoTest {
     void losVencimientosSalenDelConjunto() {
         CuadroPredialParametrizado.Vigente vigente = cuadroCompleto().vigenteEn(EJERCICIO);
 
-        assertThat(vigente.vencimientos("TRIMESTRAL"))
+        assertThat(vigente.vencimientos(ModalidadDelPredial.TRIMESTRAL))
                 .containsExactly(
                         LocalDate.parse("2026-02-27"),
                         LocalDate.parse("2026-05-29"),
                         LocalDate.parse("2026-08-31"),
                         LocalDate.parse("2026-11-30"));
-        assertThat(vigente.vencimientos(CuadroPredialParametrizado.MODALIDAD_CONTADO))
+        assertThat(vigente.vencimientos(ModalidadDelPredial.CONTADO))
                 .as("el articulo 15 a) es una sola cuota, no las cuatro del inciso b)")
                 .containsExactly(LocalDate.parse("2026-02-27"));
     }
@@ -199,7 +200,7 @@ class CuadroPredialParametrizadoTest {
                         () ->
                                 new CuadroPredialParametrizado(sinCronograma)
                                         .vigenteEn(EJERCICIO)
-                                        .vencimientos("TRIMESTRAL"))
+                                        .vencimientos(ModalidadDelPredial.TRIMESTRAL))
                 .isInstanceOf(CuadroPredialParametrizado.ParametroDelPredialAusente.class)
                 .hasMessageContaining("PREDIAL_VENCIMIENTO:1");
     }

@@ -1036,14 +1036,14 @@
     "algunoDeEstos": [],
     "condicionales": ["codContribuyente", "ejercicio"],
     "opcionales": ["ano"],
-    "enElCuerpo": ["predioId"]
+    "enElCuerpo": ["modalidad", "predioId"]
   },
   "POST /rentas/predial/calculo-masivo": {
     "obligatorios": [],
     "algunoDeEstos": [],
     "condicionales": ["ejercicio"],
     "opcionales": [],
-    "enElCuerpo": []
+    "enElCuerpo": ["modalidad"]
   },
   "POST /rentas/transferencias/predio": {
     "obligatorios": [],

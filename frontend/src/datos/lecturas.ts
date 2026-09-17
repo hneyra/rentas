@@ -216,7 +216,7 @@ export interface PredioGuardado {
  * Aquella es la respuesta del `POST` que **dispara** el calculo; esta es la fila que se lee
  * despues. Es el mismo reparto que el area predial ya tiene entre `CorridaPredialResource` y
  * `CorridaGuardadaResource`. Lo que cambia no es cosmetico: aqui hay `id`, `conjuntoId`, `estado` y
- * `origen` —que la escritura no tiene—, y **no hay `modalidad`, `cuotas` ni `simulacion`**.
+ * `origen` —que la escritura no tiene—, y **no hay `simulacion`**.
  *
  * <h2>Las cuatro cifras que NO estan guardadas, y de donde salen</h2>
  *
@@ -225,13 +225,17 @@ export interface PredioGuardado {
  * por eso no se guardan dos veces; resolverlos con el vigente publicaria unos tramos que esa
  * determinacion nunca uso.
  *
- * <h2>Y lo que no publica, con su motivo</h2>
+ * <h2>El cronograma, que desde #234 SI llega</h2>
  *
- * **El cronograma de cuotas**: `determinacion` no guarda su `modalidad` —solo la guarda la corrida
- * masiva— y sin ella los vencimientos no se pueden resolver. Suponer la trimestral publicaria unos
- * vencimientos que el contribuyente puede no haber recibido, que es lo que la regla 5 prohibe. Es
- * #234, y ahi esta escrito ademas que la regla 6 no se cumple del todo para la individual mientras
- * la modalidad no se guarde.
+ * `determinacion` guarda su `modalidad` desde `V20`, y con ella los vencimientos vuelven a salir
+ * del conjunto sellado que esa determinacion fijo. Las cuotas no estan guardadas: se derivan, que
+ * es lo que evita dos verdades sobre el mismo hecho.
+ *
+ * **Una fila anterior a V20 trae `modalidad: null` y `cuotas: []`**, y eso no es «no hay cuotas»:
+ * es que aquella fila no dice cual era su cronograma. Suponer la trimestral publicaria unos
+ * vencimientos que el contribuyente puede no haber recibido, que es lo que la regla 5 prohibe.
+ *
+ * <h2>Y lo que no publica, con su motivo</h2>
  *
  * **El «Monto deducido»** de la hoja: no lo publica nadie. Lo mas cercano es `valuoExonerado`, que
  * es la parte exonerada del valuo y **no** el importe que una deduccion resta de la base.
@@ -259,6 +263,21 @@ export interface DeterminacionGuardada {
   readonly impuestoInsoluto: string;
   readonly derechoDeEmision: string;
   readonly totalAPagar: string;
+  /**
+   * Bajo que cronograma se emitio: `CONTADO` o `TRIMESTRAL` (#234).
+   *
+   * **Nulo significa «esta fila es anterior a la migracion V20»**, nunca «al contado»: de aquellas
+   * determinaciones la modalidad no consta en ningun sitio. Con nulo, `cuotas` viene vacia.
+   */
+  readonly modalidad: string | null;
+  /**
+   * El cronograma, **derivado** de la modalidad, del monto guardado y de los vencimientos del
+   * conjunto sellado que esa determinacion fijo (#234). No se guarda: serian dos verdades.
+   *
+   * Vacia cuando `modalidad` es nula, y eso **no** significa «no hay cuotas»: significa que la
+   * fila no dice cual era su cronograma.
+   */
+  readonly cuotas: readonly CuotaDeterminada[];
   readonly reglasAplicadas: readonly string[];
 }
 
@@ -1925,8 +1944,9 @@ export const RUTAS = {
    * Se manda `ejercicio` y no su alias `ano`: los dos valen —`FiltroDeLaConsulta.elCanonicoOSuAlias`—
    * y el canonico deja una sola forma en la interfaz.
    *
-   * **No lleva `?modalidad=` ni nada que resuelva el cronograma**: no existe. `determinacion` no
-   * guarda la modalidad y por eso esta lectura no publica las cuotas (#234).
+   * **No lleva `?modalidad=` ni nada que resuelva el cronograma**, y sigue sin existir: desde #234
+   * la modalidad es una COLUMNA de la fila, no un parametro de la consulta. Pedir el cronograma
+   * «como si» fuera otra modalidad seria publicar uno que el contribuyente no recibio.
    */
   determinacionGuardada: (codigo: string, ejercicio: number) =>
     conParametros('/rentas/predial/determinaciones', {

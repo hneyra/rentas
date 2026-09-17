@@ -31,6 +31,7 @@ import kamayuk.rentas.esquema.ContextoDeTenant;
 import kamayuk.rentas.nucleo.dominio.predial.DetalleDeterminacionPredio;
 import kamayuk.rentas.nucleo.dominio.predial.Determinacion;
 import kamayuk.rentas.nucleo.dominio.predial.DeterminacionRepository;
+import kamayuk.rentas.nucleo.dominio.predial.ModalidadDelPredial;
 import kamayuk.rentas.nucleo.dominio.predial.Tramo;
 import kamayuk.rentas.nucleo.infraestructura.DeterminacionRepositoryJdbc;
 import kamayuk.rentas.parametros.LectorDeParametros;
@@ -177,6 +178,7 @@ class RegistrarDeterminacionPredialTest {
                             prediosDeclarados(predioA, predioB),
                             CUADRO_FICTICIO,
                             MINIMO_FICTICIO,
+                            ModalidadDelPredial.TRIMESTRAL,
                             Observacion.de("Primera determinacion del ejercicio 2026"));
 
             assertThat(primera.id()).isNotNull();
@@ -196,6 +198,7 @@ class RegistrarDeterminacionPredialTest {
                             prediosDeclarados(predioA, predioB),
                             CUADRO_FICTICIO,
                             MINIMO_FICTICIO,
+                            ModalidadDelPredial.TRIMESTRAL,
                             Observacion.de("Recalculo con el conjunto sellado corregido"));
 
             assertThat(segunda.id())
@@ -267,6 +270,7 @@ class RegistrarDeterminacionPredialTest {
                                             List.of(),
                                             CUADRO_FICTICIO,
                                             MINIMO_FICTICIO,
+                                            ModalidadDelPredial.TRIMESTRAL,
                                             Observacion.de("No deberia llegar a calcular nada")))
                     .isInstanceOf(RegistrarDeterminacionPredial.SinPrediosDeclarados.class);
         }
@@ -293,6 +297,7 @@ class RegistrarDeterminacionPredialTest {
                             List.of(aporte(predio, "1234.5678")),
                             List.of(Tramo.sinTope(Alicuota.de("1.0"))),
                             MINIMO_FICTICIO,
+                            ModalidadDelPredial.TRIMESTRAL,
                             Observacion.de("Determinacion con redondeo a cuatro decimales"));
 
             sellarConRedondeo(ejercicio, 0, "DOWN", "Redondeo ficticio a cero decimales");
@@ -303,6 +308,7 @@ class RegistrarDeterminacionPredialTest {
                             List.of(aporte(predio, "1234.5678")),
                             List.of(Tramo.sinTope(Alicuota.de("1.0"))),
                             MINIMO_FICTICIO,
+                            ModalidadDelPredial.TRIMESTRAL,
                             Observacion.de("Determinacion con redondeo a cero decimales"));
 
             assertThat(conCuatro.montoDeterminado())
@@ -327,6 +333,7 @@ class RegistrarDeterminacionPredialTest {
                                             List.of(aporte(predio, "1000.00")),
                                             CUADRO_FICTICIO,
                                             MINIMO_FICTICIO,
+                                            ModalidadDelPredial.TRIMESTRAL,
                                             Observacion.de("Determinacion sin redondeo observado")))
                     .as(
                             "sin puntos observados el importe saldria sin redondear y nadie lo"

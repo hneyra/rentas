@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Objects;
 import kamayuk.rentas.nucleo.aplicacion.ConsultaDeLaDeterminacionPredial;
 import kamayuk.rentas.nucleo.dominio.predial.AporteDeTramo;
+import kamayuk.rentas.nucleo.dominio.predial.CuotaDelPredial;
 import kamayuk.rentas.nucleo.dominio.predial.DetalleDeterminacionPredio;
 import org.jspecify.annotations.Nullable;
 
@@ -19,11 +20,15 @@ import org.jspecify.annotations.Nullable;
  * reparto que el área predial ya tiene entre {@link CorridaPredialResource} —la corrida que se
  * acaba de ejecutar— y {@link CorridaGuardadaResource} —la que se lee después—.
  *
- * <p>Lo que <b>no</b> lleva, y está en el javadoc de {@link ConsultaDeLaDeterminacionPredial} con
- * su motivo: {@code modalidad} y {@code cuotas[]}, porque {@code determinacion} no guarda la
- * modalidad y sin ella el cronograma no se puede reproducir ({@code rentas}#234); y {@code
- * simulacion}, porque una simulación no deja fila que leer, así que aquí siempre sería {@code
- * false}.
+ * <p>Lo que <b>no</b> lleva: {@code simulacion}, porque una simulación no deja fila que leer, así
+ * que aquí siempre sería {@code false}.
+ *
+ * <p>Lo que sí lleva desde #234 son {@code modalidad} y {@code cuotas[]}, y <b>no salen de la misma
+ * clase de sitio que el resto</b>: la modalidad es una columna de la fila —{@code V20}—, y las
+ * cuotas se <b>derivan</b> de ella, del monto guardado y de los vencimientos de ese conjunto
+ * sellado. Guardarlas sería una segunda verdad sobre el mismo hecho. Cuando la fila es anterior a
+ * V20 no dice su modalidad, y entonces los dos salen en blanco —{@code null} y {@code []}— en vez
+ * del trimestral supuesto: es el trato que {@code V10} le dio a {@code pago_recibido}.
  *
  * <p>Lo que sí lleva y no está guardado —{@link #uit}, {@link #tramos}, {@link #minimoImponible} y
  * {@link #derechoDeEmision}— sale del <b>conjunto sellado que esa determinación fijó</b>, no del
@@ -75,12 +80,15 @@ public record DeterminacionGuardadaResource(
         String impuestoInsoluto,
         String derechoDeEmision,
         String totalAPagar,
+        @Nullable String modalidad,
+        List<DeterminacionPredialResource.CuotaDeterminada> cuotas,
         List<String> reglasAplicadas) {
 
     public DeterminacionGuardadaResource {
         Objects.requireNonNull(ejercicio, "La determinacion necesita su ejercicio");
         predios = List.copyOf(predios);
         tramos = List.copyOf(tramos);
+        cuotas = List.copyOf(cuotas);
         reglasAplicadas = List.copyOf(reglasAplicadas);
     }
 
@@ -112,6 +120,14 @@ public record DeterminacionGuardadaResource(
                             aporte.porcionGravada().toString(),
                             aporte.aporte().toString()));
         }
+        List<DeterminacionPredialResource.CuotaDeterminada> cuotas = new ArrayList<>();
+        for (CuotaDelPredial cuota : leida.cuotas()) {
+            cuotas.add(
+                    new DeterminacionPredialResource.CuotaDeterminada(
+                            cuota.numero(),
+                            cuota.vencimiento().toString(),
+                            cuota.importe().toString()));
+        }
         Long id = leida.cabecera().id();
         return new DeterminacionGuardadaResource(
                 id == null ? 0L : id,
@@ -133,6 +149,8 @@ public record DeterminacionGuardadaResource(
                 leida.impuestoInsoluto().toString(),
                 leida.derechoDeEmision().toString(),
                 leida.totalAPagar().toString(),
+                leida.modalidad() == null ? null : leida.modalidad().name(),
+                cuotas,
                 leida.cabecera().reglasAplicadas());
     }
 
