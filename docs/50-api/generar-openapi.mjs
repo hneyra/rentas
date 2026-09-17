@@ -3284,14 +3284,12 @@ const OPERACIONES_ADICIONALES = {
       operationId: 'fisc_actas_listado',
       metodo: 'get',
       ruta: '/api/v1/fiscalizacion/actas',
-      parametros: [
-        {
-          nombre: 'programa',
-          descripcion:
-            'Acota a las actas de un programa, por su numero interno; es de donde el embudo saca' +
-            ' cuantas se inspeccionaron',
-        },
-      ],
+      // #242 — tenia UN filtro, `?programa=`, y se retiro. Su unico motivo escrito era
+      // llenar la etapa «Inspeccionados» del embudo con el `totalElementos` de esta
+      // operacion acotada al programa: es la composicion que #196 prohibio, y ademas no
+      // daba el numero —ese total cuenta ACTAS y el embudo cuenta UNIDADES, asi que
+      // refiscalizar un predio lo habria hecho superar a «programados»—. Ninguna pantalla
+      // lo mandaba: `RUTAS.actasDeFiscalizacion` es '/fiscalizacion/actas?tamano=1'.
       paginacion: true,
       titulo: 'Actas de inspección levantadas',
       descripcion:
@@ -3300,13 +3298,17 @@ const OPERACIONES_ADICIONALES = {
         ' `vehiculoId` trae valor. Agregada por #599, y no antes a propósito: #546 midió que un' +
         ' listado no habría llenado la pantalla del acta —el cuerpo del POST tenía nueve campos' +
         ' contra los veintitrés que el manual dibuja— y que lo que faltaba era dónde guardar el' +
-        ' **uso hallado**, hoy `usoHallado` (V76). **`totalElementos` cuenta todas las actas que' +
-        ' el filtro deja pasar, no las de la página**: es de ahí de donde el embudo del programa' +
-        ' llena su etapa «Inspeccionados», y sumar `visitado` fila a fila recompondría esa cifra' +
-        ' sobre la página que se hubiera pedido. Un solo filtro, y es el único que alguien pide:' +
-        ' las dos pantallas del acta no dibujan ninguno —su catálogo no declara ni filtros ni' +
-        ' tabla—, así que publicar el predio, el hallazgo o el estado sería inventar promesas que' +
-        ' ninguna pantalla hace. Exige LECTURA sobre `fisc_predial` **o** sobre `fisc_vehicular`:' +
+        ' **uso hallado**, hoy `usoHallado` (V76). **`totalElementos` cuenta todas las actas de la' +
+        ' municipalidad, no las de la página**, que es lo que promete cualquier relación paginada' +
+        ' de esta API. **No publica ningún filtro** (#242): tenía uno, `?programa=`, y su único' +
+        ' motivo escrito era llenar con este `totalElementos` la etapa «Inspeccionados» del embudo' +
+        ' del programa —la composición que el embudo publicado prohíbe, y que además no daba el' +
+        ' número: este total cuenta **actas** y el embudo cuenta **unidades**, así que' +
+        ' refiscalizar un predio lo habría hecho superar a «programados»—. El embudo lo publica' +
+        ' entero `GET /fiscalizacion/programas/{id}/embudo`. Las dos pantallas del acta no dibujan' +
+        ' ningún filtro —su catálogo no declara ni filtros ni tabla—, así que publicar el' +
+        ' programa, el predio, el hallazgo o el estado sería inventar promesas que ninguna' +
+        ' pantalla hace. Exige LECTURA sobre `fisc_predial` **o** sobre `fisc_vehicular`:' +
         ' un perfil de fiscalización vehicular registraría actas que no podría volver a ver.',
     },
     // #214 — anular un acta, que es la UNICA transicion que este sistema escribe

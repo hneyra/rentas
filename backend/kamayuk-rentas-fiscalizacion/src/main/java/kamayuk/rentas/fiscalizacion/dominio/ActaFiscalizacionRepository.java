@@ -31,16 +31,21 @@ public interface ActaFiscalizacionRepository {
     ActaFiscalizacion anular(long id);
 
     /**
-     * La grilla de actas, paginada (#599).
+     * La grilla de actas de la municipalidad, paginada y <b>sin ningun filtro</b> (#599, #242).
      *
-     * <p>El total del sobre cuenta <b>todas</b> las actas que el criterio deja pasar y no las de la
-     * pagina: la etapa «Inspeccionados» del embudo del programa se llena con ese numero, y contarlo
-     * sobre la pagina daria «20 inspeccionados» en todo programa que pase de veinte actas. Es el
-     * defecto que #25 midio en el resumen de la consulta unificada y #545 en la deteccion de
-     * omisos.
+     * <p>El total del sobre cuenta <b>todas</b> las actas y no las de la pagina, que es lo que
+     * cualquier relacion paginada de esta casa promete: contarlo sobre la pagina daria «20» en toda
+     * municipalidad que pase de veinte actas. Es el defecto que #25 midio en el resumen de la
+     * consulta unificada y #545 en la deteccion de omisos.
+     *
+     * <p><b>Sin criterio, y hasta #242 lo habia.</b> Era uno solo —el programa—, y estaba para
+     * llenar la etapa «Inspeccionados» del embudo con este {@code totalElementos}. No servia para
+     * eso: ese numero cuenta <b>actas</b> y el embudo cuenta <b>unidades</b>, asi que refiscalizar
+     * un predio lo habria hecho superar a «programados». Lo cuenta bien {@link
+     * #prediosConActaEnElPrograma}, por unidad, y el embudo lo publica entero (#196).
      */
     kamayuk.rentas.compartido.Pagina<ActaFiscalizacion> consultar(
-            CriterioDeActas criterio, kamayuk.rentas.compartido.Paginacion paginacion);
+            kamayuk.rentas.compartido.Paginacion paginacion);
 
     /**
      * La próxima versión de un acta para esta <b>unidad</b> dentro de este programa: 1 si nunca se

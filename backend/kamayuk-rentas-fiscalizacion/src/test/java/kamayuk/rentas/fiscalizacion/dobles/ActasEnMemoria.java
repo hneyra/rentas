@@ -110,22 +110,15 @@ public final class ActasEnMemoria implements ActaFiscalizacionRepository {
 
     @Override
     public kamayuk.rentas.compartido.Pagina<ActaFiscalizacion> consultar(
-            kamayuk.rentas.fiscalizacion.dominio.CriterioDeActas criterio,
             kamayuk.rentas.compartido.Paginacion paginacion) {
-        List<ActaFiscalizacion> filtradas =
-                guardadas.stream()
-                        .filter(
-                                acta ->
-                                        criterio.programaId() == null
-                                                || acta.programaId() == criterio.programaId())
-                        .toList();
-        if (filtradas.isEmpty()) {
+        List<ActaFiscalizacion> todas = List.copyOf(guardadas);
+        if (todas.isEmpty()) {
             return kamayuk.rentas.compartido.Pagina.vacia(paginacion);
         }
-        int desde = Math.min((int) paginacion.desplazamiento(), filtradas.size());
-        int hasta = Math.min(desde + paginacion.tamano(), filtradas.size());
+        int desde = Math.min(paginacion.desplazamiento(), todas.size());
+        int hasta = Math.min(desde + paginacion.tamano(), todas.size());
         return kamayuk.rentas.compartido.Pagina.de(
-                filtradas.subList(desde, hasta), paginacion, filtradas.size());
+                todas.subList(desde, hasta), paginacion, todas.size());
     }
 
     /** Siembra un acta ya guardada y devuelve su identificador. */

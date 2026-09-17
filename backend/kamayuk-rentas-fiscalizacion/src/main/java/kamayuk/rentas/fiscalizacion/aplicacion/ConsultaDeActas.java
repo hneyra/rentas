@@ -8,7 +8,6 @@ import kamayuk.rentas.compartido.Paginacion;
 import kamayuk.rentas.fiscalizacion.dominio.ActaConLoDeclarado;
 import kamayuk.rentas.fiscalizacion.dominio.ActaFiscalizacion;
 import kamayuk.rentas.fiscalizacion.dominio.ActaFiscalizacionRepository;
-import kamayuk.rentas.fiscalizacion.dominio.CriterioDeActas;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -47,8 +46,8 @@ public class ConsultaDeActas {
     }
 
     @Transactional(readOnly = true)
-    public Pagina<ActaConLoDeclarado> buscar(CriterioDeActas criterio, Paginacion paginacion) {
-        Pagina<ActaFiscalizacion> pagina = actas.consultar(criterio, paginacion);
+    public Pagina<ActaConLoDeclarado> buscar(Paginacion paginacion) {
+        Pagina<ActaFiscalizacion> pagina = actas.consultar(paginacion);
         Map<Long, ActaConLoDeclarado.LoDeclarado> porFicha =
                 actas.loDeclaradoPorFicha(fichasDe(pagina));
         return pagina.mapear(

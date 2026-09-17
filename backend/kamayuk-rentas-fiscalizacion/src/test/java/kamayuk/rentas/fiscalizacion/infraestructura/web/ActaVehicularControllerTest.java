@@ -94,7 +94,6 @@ class ActaVehicularControllerTest {
 
                         @Override
                         public kamayuk.rentas.compartido.Pagina<ActaFiscalizacion> consultar(
-                                kamayuk.rentas.fiscalizacion.dominio.CriterioDeActas criterio,
                                 kamayuk.rentas.compartido.Paginacion paginacion) {
                             return kamayuk.rentas.compartido.Pagina.vacia(paginacion);
                         }

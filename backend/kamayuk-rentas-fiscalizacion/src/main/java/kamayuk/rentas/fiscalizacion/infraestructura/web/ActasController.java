@@ -16,7 +16,6 @@ import kamayuk.rentas.fiscalizacion.aplicacion.ConsultaDeActas;
 import kamayuk.rentas.fiscalizacion.aplicacion.LiquidarFiscalizacion;
 import kamayuk.rentas.fiscalizacion.dominio.ActaConLoDeclarado;
 import kamayuk.rentas.fiscalizacion.dominio.ActaFiscalizacion;
-import kamayuk.rentas.fiscalizacion.dominio.CriterioDeActas;
 import kamayuk.rentas.web.Api;
 import kamayuk.rentas.web.CodigoDeError;
 import kamayuk.rentas.web.ParametrosDePaginacion;
@@ -29,7 +28,6 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -58,19 +56,41 @@ import org.springframework.web.bind.annotation.RestController;
  * <b>registrando actas que no puede volver a ver</b>. Está censado en {@code
  * AccesosCompartidosTest}, que es lo que impide que la lista crezca sin que el diff lo diga.
  *
- * <h2>Un solo filtro, y el motivo de que no haya más</h2>
+ * <h2>NINGÚN filtro, y el motivo de que se retirara el único que había (#242)</h2>
  *
- * <p>{@code programa}, y está porque lo pide el <b>embudo del programa</b> (#546, AC 10): sus
- * cuatro etapas son «Programados», «Inspeccionados», «Con liquidación» y «Notificadas», y la única
- * que no tenía de dónde salir era la segunda —cuántas actas tiene el programa—. Se llena con el
- * {@code totalElementos} de esta operación acotada al programa, <b>no con una suma</b>: {@code
- * visitado} viaja fila a fila en la muestra y sumarlo en la interfaz recompondría una cifra
- * (RNF-083) sobre la página que se haya pedido.
+ * <p>Hasta #242 esta operación publicaba {@code ?programa=}, y su motivo escrito era el <b>embudo
+ * del programa</b>: «sus cuatro etapas son "Programados", "Inspeccionados", "Con liquidación" y
+ * "Notificadas", y la única que no tenía de dónde salir era la segunda; se llena con el {@code
+ * totalElementos} de esta operación acotada al programa». <b>Las tres cosas que decía no
+ * cuadraban</b>, y por eso el parámetro se fue con su párrafo:
+ *
+ * <ol>
+ *   <li><b>Es otro embudo.</b> Esas cuatro etapas son las del manual; las que dibuja {@code
+ *       fis-panel} —la única hoja del artboard con un embudo— son «Detectados por cruce»,
+ *       «Programados», «Con acta levantada» y «Con diferencia». Sólo coinciden en dos.
+ *   <li><b>La receta está prohibida.</b> Componer una etapa con el {@code totalElementos} de otra
+ *       operación es exactamente lo que #196 midió que no se puede cuadrar: «un embudo compuesto en
+ *       el navegador se lee igual que uno publicado, y sólo uno de los dos se puede cuadrar». El
+ *       embudo lo publica entero {@code GET /fiscalizacion/programas/{id}/embudo} ({@link
+ *       kamayuk.rentas.fiscalizacion.dominio.EmbudoDeFiscalizacion}).
+ *   <li><b>Y no daba el número.</b> El {@code totalElementos} de aquí cuenta <b>actas</b> —filas—,
+ *       y el embudo cuenta <b>unidades fiscalizadas</b>. Refiscalizar un predio levanta una segunda
+ *       acta, así que contar filas hace que «con acta» supere a «programados»: un embudo que se
+ *       ensancha. Lo cuenta bien {@code ActaFiscalizacionRepository#prediosConActaEnElPrograma},
+ *       por unidad, y su prueba lo dice con esas palabras.
+ * </ol>
+ *
+ * <p><b>Y nadie lo mandaba</b>: la única ruta de la interfaz hacia aquí es {@code
+ * RUTAS.actasDeFiscalizacion = '/fiscalizacion/actas?tamano=1'}. Un parámetro publicado cuyo único
+ * motivo declarado es un uso que este sistema prohíbe no se deja «por si acaso»: la primera persona
+ * que lea la razón compondrá el embudo como ahí decía. Se retira, y con él {@code CriterioDeActas},
+ * que no tenía otro campo.
  *
  * <p>Las dos pantallas del acta no dibujan <b>ningún</b> filtro —su catálogo no declara ni filtros
- * ni tabla—, así que no hay ninguno más que derivar del prototipo. Publicar el predio, el hallazgo
- * o el estado sería inventar promesas que ninguna pantalla hace, que es lo que #431, #432 y #544
- * tuvieron que retirar después.
+ * ni tabla—, así que no hay ninguno que derivar del prototipo. Publicar el programa, el predio, el
+ * hallazgo o el estado sería inventar promesas que ninguna pantalla hace, que es lo que #431, #432
+ * y #544 tuvieron que retirar después. Desde #242 la operación sólo admite lo de la paginación, y
+ * {@code GuardiaDeParametros} contesta 422 nombrando cualquier otro.
  */
 @RestController
 @RequestMapping(Api.RAIZ + "/fiscalizacion/actas")
@@ -97,14 +117,10 @@ public class ActasController {
     }
 
     @GetMapping
-    public RespuestaPaginada<ActaFiscalizacionResource> actas(
-            @RequestParam(required = false) @Nullable String programa,
-            ParametrosDePaginacion paginacion) {
+    public RespuestaPaginada<ActaFiscalizacionResource> actas(ParametrosDePaginacion paginacion) {
 
         Pagina<ActaConLoDeclarado> pagina =
-                consulta.buscar(
-                        new CriterioDeActas(programaOpcional(programa)),
-                        paginacion.aPaginacion(ORDEN_POR_OMISION));
+                consulta.buscar(paginacion.aPaginacion(ORDEN_POR_OMISION));
 
         Map<Long, ResumenDeContribuyente> padron = padronDe(pagina);
         return RespuestaPaginada.de(
@@ -219,22 +235,5 @@ public class ActasController {
             ids.add(contraste.acta().contribuyenteId());
         }
         return ids.isEmpty() ? Map.of() : contribuyentes.porIds(ids);
-    }
-
-    private static @Nullable Long programaOpcional(@Nullable String texto) {
-        if (texto == null || texto.isBlank()) {
-            return null;
-        }
-        try {
-            long valor = Long.parseLong(texto.strip());
-            if (valor < 1) {
-                throw new NumberFormatException(texto);
-            }
-            return valor;
-        } catch (NumberFormatException invalido) {
-            throw new ProblemaDeNegocio(
-                    CodigoDeError.VALIDACION,
-                    "El programa se identifica por su numero interno: '" + texto + "'");
-        }
     }
 }

@@ -418,11 +418,19 @@ function contrasteDelActa(acta: ActaDeFiscalizacion): readonly (readonly CeldaDe
  * concepto. Pintar aqui
  * la liquidacion de otra acta seria ensenar el resultado de un paso que esta pantalla no ha dado.
  *
- * <h2>Sin filtrar</h2>
+ * <h2>Sin filtrar, y desde #242 tampoco hay ninguno que mandar</h2>
  *
- * `GET /fiscalizacion/actas` admite **un** filtro, `?programa=`, y no se manda: acotarla exige
- * haber elegido programa, y elegirlo aqui seria decidir por quien atiende cual inspeccion se mira.
- * Los nueve mandos de la pantalla son los de registrar un acta, no los de buscarla.
+ * `GET /fiscalizacion/actas` admitia **un** filtro, `?programa=`, y esta hoja no lo mandaba:
+ * acotarla exige haber elegido programa, y elegirlo aqui seria decidir por quien atiende cual
+ * inspeccion se mira. Los nueve mandos de la pantalla son los de registrar un acta, no los de
+ * buscarla.
+ *
+ * **Ese filtro ya no existe** (#242). Su unico motivo escrito era llenar la etapa «Inspeccionados»
+ * de un embudo con el `totalElementos` de esta operacion acotada al programa, que es exactamente la
+ * composicion que este archivo prohibe y que #196 midio que no se puede cuadrar — y que ademas no
+ * daba el numero, porque ese total cuenta **actas** y el embudo cuenta **unidades**. El embudo lo
+ * publica entero `GET /fiscalizacion/programas/{id}/embudo`, que es lo que `fis-panel` consume.
+ * Hoy la operacion solo admite lo de la paginacion, y cualquier otro parametro es 422.
  */
 const FIS_ACTAS: Conector = {
   clave: ['fis-actas', 'acta-de-inspeccion'],
@@ -658,7 +666,9 @@ const FIS_RES: Conector = {
  *       inspeccion—, y la de `fis-actas` situaba el cierre <b>antes</b> de liquidar —«sin acta
  *       cerrada no se puede liquidar»—, que es lo contrario de lo que #214 llamo «cerrada», o sea
  *       que el acta <b>tenga</b> liquidacion. Con el rotulo corregido la celda dice lo que la
- *       cifra cuenta: la etapa que `ActasController` llama «Inspeccionados».</li>
+ *       cifra cuenta: la etapa que el manual llama «Inspeccionados». La publica el embudo, **en
+ *       unidades**; no se compone con el `totalElementos` de la relacion de actas, que cuenta
+ *       filas y que desde #242 ni siquiera admite acotarse a un programa.</li>
  *   <li><b>`0|5` Con diferencia</b> ← `conDiferencia`.</li>
  * </ul>
  *

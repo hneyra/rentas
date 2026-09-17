@@ -242,7 +242,7 @@ describe('`fis-panel` — el embudo del programa (#196)', () => {
     //      liquidacion. Con aquella definicion la frase se leia «sin liquidacion no se puede
     //      liquidar», asi que las dos «cerrada» no podian ser la misma palabra.
     //
-    // La cifra es la etapa que `ActasController` llama «Inspeccionados», y ahora el rotulo lo dice.
+    // La cifra es la etapa que el manual llama «Inspeccionados», y ahora el rotulo lo dice.
     const reparto = FIS_PANEL.repartir(EMBUDO as never);
 
     expect(reparto.valores.get(coordenada(0, 4))).toBe(String(EMBUDO.conActa));
