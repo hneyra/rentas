@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
 import { ARBOL, hojaDe } from './pantallas/arbol.ts';
+import type { ClaveDeHoja } from './pantallas/arbol.ts';
 import type { Hoja } from './pantallas/tipos.ts';
+import { CONECTORES } from './datos/conectores.ts';
 import { YA_SERVIDAS } from './datos/servidas.ts';
 import {
   NADA_SERVIDO,
@@ -52,13 +54,15 @@ describe('el cruce contra lo que el backend sirve', () => {
 
   it('veintitres hojas tienen alguna operacion util, y diecisiete ninguna', () => {
     const con = TODAS.filter((hoja) => operacionesUtiles(hoja).length > 0);
-    // `aut-cat` y `aut-panel` entran con #168, y las dos por la ruta que el ARTBOARD les
-    // atribuye: `GET /licencias/ciiu` a la primera y `GET /licencias/funcionamiento` a la
-    // segunda. **`aut-tram` no esta aqui y si tiene conector**, que es la unica pareja de este
-    // tipo en las cuarenta: la operacion que dibuja sus cinco columnas es la que el artboard le
-    // dio a `aut-panel`, y el arbol es la transcripcion del artboard. Esta funcion solo decide
-    // que decir cuando NO hay conector, asi que la discrepancia no llega a ninguna pantalla —
-    // pero se anota aqui, que es donde se ve.
+    // `aut-cat` entra con #168 por la ruta que el ARTBOARD le atribuye, `GET /licencias/ciiu`.
+    //
+    // **`aut-tram` esta aqui desde #173, y `aut-panel` ya no.** Hasta entonces era al reves, y era
+    // la unica pareja de este tipo en las cuarenta: `aut-tram` tenia conector y no declaraba la
+    // operacion que lo alimenta, mientras `aut-panel` declaraba esa misma operacion y no podia
+    // dibujar con ella ni un campo. #173 lo decidio con el artboard delante —la tabla «Padron de
+    // licencias» de `aut-tram` cuadra columna a columna con `GET /licencias/funcionamiento`, y las
+    // cinco cifras de `aut-panel` son estados de TRAMITE que nadie publica— y movio la operacion
+    // en el artboard y en el arbol a la vez. La cuenta no se mueve: una sale y otra entra.
     //
     // `con-contrib`, `con-doc` y `con-panel` entran con #169, y la primera **sin conector y es
     // correcto que entre**: declara `/consultas/unificada`, que ya esta servida, y lo que le falta
@@ -79,7 +83,7 @@ describe('el cruce contra lo que el backend sirve', () => {
     expect(con.map((h) => h.clave).sort()).toEqual(
       [
         'aut-cat',
-        'aut-panel',
+        'aut-tram',
         'coa-cost',
         'coa-exp',
         'coa-panel',
@@ -110,6 +114,44 @@ describe('el cruce contra lo que el backend sirve', () => {
   });
 });
 
+/**
+ * **El barrido de #173 (AC4): ninguna hoja pide una operacion que no declara.**
+ *
+ * El desajuste que #173 corrigio no era de una hoja: era un cruce que nadie comprobaba. `aut-tram`
+ * pedia `GET /licencias/funcionamiento` desde #168 y su arbol declaraba otras tres; `aut-panel`
+ * declaraba esa y no podia pedir nada. Mientras eso solo viviera en un javadoc, la siguiente hoja
+ * conectada podia repetirlo sin que nada lo dijera.
+ *
+ * <h2>Lo que este barrido puede comprobar hoy, y lo que no</h2>
+ *
+ * **No** puede comparar ruta con ruta: `Conector.pedir` es una funcion, y la ruta que pide vive
+ * dentro de ella —sacarla a dato es #186, que la necesita para paginar y ordenar en servidor—. Lo
+ * que si puede, y es lo que fallaba, es la condicion NECESARIA: una hoja con conector tiene que
+ * declarar **al menos una operacion de lectura que el backend sirva**. Si no la declara, o pide
+ * algo que no declaro, o no puede pedir nada — y las dos cosas son el defecto.
+ *
+ * Cuando #186 saque la ruta al conector, esto se estrecha a la igualdad y este comentario sobra.
+ */
+describe('AC4 — toda hoja con conector declara la operacion que la sirve', () => {
+  it('las diecisiete que piden de verdad declaran alguna servida de lectura', () => {
+    const mudas = Object.keys(CONECTORES).filter(
+      (clave) => operacionesUtiles(hojaDe(clave as ClaveDeHoja)).length === 0,
+    );
+
+    expect(
+      mudas,
+      'Estas hojas tienen conector y su arbol no declara ni una operacion servida de lectura: o\n' +
+        'piden algo que no declararon —el defecto de `aut-tram` hasta #173— o no pueden pedir\n' +
+        'nada. Se corrige en el ARTBOARD y en `arbol.ts` a la vez, no aflojando esto.',
+    ).toEqual([]);
+  });
+
+  it('EL CENTINELA: y son diecisiete, no cero', () => {
+    // Un registro de conectores vacio dejaria la comprobacion de arriba pasando sobre la nada.
+    expect(Object.keys(CONECTORES)).toHaveLength(17);
+  });
+});
+
 describe('los cuatro casos no se confunden', () => {
   it('sin ninguna servida: «sin conectar», en tono informativo', () => {
     // `fis-panel` es el ejemplo desde #167, que encendio las dos de indicadores y dejo servida
@@ -129,6 +171,18 @@ describe('los cuatro casos no se confunden', () => {
     // este caso premia, asi que el ejemplo se muda a la hoja que todavia no lo esta.
     expect(porQueNoHayDato(hojaDe('tra-cua'))).toBe(SOLO_BASE);
     expect(SOLO_BASE.tono).toBe('atencion');
+  });
+
+  it('sin NINGUNA operacion declarada: «sin conectar», y no «sin verificar»', () => {
+    // `aut-panel` es la primera hoja de las cuarenta que no declara ninguna operacion (#173), y
+    // es la que enseno que `[].every(...)` es `true`: sin el `length > 0` contestaba «sin
+    // verificar», o sea «de las rutas que esta pantalla declara solo se leyo el `@RequestMapping`
+    // de su controlador» — dos afirmaciones falsas sobre una hoja que no declara ninguna ruta.
+    const hoja = hojaDe('aut-panel');
+
+    expect(hoja.operaciones).toEqual([]);
+    expect(porQueNoHayDato(hoja)).toBe(NADA_SERVIDO);
+    expect(porQueNoHayDato(hoja)).not.toBe(SOLO_BASE);
   });
 
   it('con servidas y sin pedirlas: lo dice, en vez de callar', () => {
