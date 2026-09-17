@@ -437,14 +437,14 @@ class OrdenDeLaDeteccionFronteraTest {
 
     // ------------------------------------------------------------------
 
-    private static MvcResult omisos(String ordenarPor, String direccion) throws Exception {
+    private static MvcResult omisos(String ordenarPor, String sentido) throws Exception {
         ingestar(municipalidadA);
         ingestar(municipalidadB);
         return mvc.perform(
                         get("/rentas/api/v1/fiscalizacion/omisos")
                                 .param("ejercicio", EJERCICIO)
                                 .param("ordenarPor", ordenarPor)
-                                .param("direccion", direccion))
+                                .param("sentido", sentido))
                 .andReturn();
     }
 

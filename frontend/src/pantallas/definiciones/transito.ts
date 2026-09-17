@@ -136,7 +136,7 @@ export const TRANSITO = {
               { valor: 'placa', rotulo: 'Placa' },
             ],
             enLaRuta: EN_LA_RUTA.ordenarPor,
-            sentidoEnLaRuta: EN_LA_RUTA.direccion,
+            sentidoEnLaRuta: EN_LA_RUTA.sentido,
             ascendente: 'ASCENDENTE',
             descendente: 'DESCENDENTE',
           },

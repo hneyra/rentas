@@ -122,9 +122,21 @@ public class GuardiaDeParametros implements HandlerInterceptor {
      *
      * <p>Se escriben aqui y no se derivan del record a proposito: derivarlos haria que anadirle un
      * componente a la paginacion ensanchara en silencio lo que toda la API acepta.
+     *
+     * <p><b>El cuarto se llama {@code sentido} y no {@code direccion} desde #236</b>, y el motivo
+     * esta en el javadoc de {@link ParametrosDePaginacion}: admitir estos cuatro en TODA operacion
+     * es reservar cuatro palabras para el dialecto, y {@code direccion} es la palabra con la que el
+     * dominio nombra un domicilio. Mientras el nombre estuvo aqui, toda pantalla con un filtro
+     * «Dirección» nacia rota —Spring ataba el mismo parametro a dos argumentos— y la salida era
+     * renombrar el FILTRO, una pantalla cada vez (#226). Ahora el sentido se aparta una sola vez y
+     * el dominio recupera su palabra.
+     *
+     * <p>Es tambien lo que publica {@code _dialectoDeLaPaginacion} en {@code
+     * docs/50-api/parametros-de-la-api.json}: ese archivo sale de aqui, y el frontend lo cruza
+     * contra {@code EN_LA_RUTA}. Renombrar uno de los dos lados a solas sale rojo.
      */
     public static final Set<String> DIALECTO_DE_LA_PAGINACION =
-            Set.of("pagina", "tamano", "ordenarPor", "direccion");
+            Set.of("pagina", "tamano", "ordenarPor", "sentido");
 
     /**
      * Lo que ya se calculo para cada metodo.

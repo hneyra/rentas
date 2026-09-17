@@ -118,7 +118,7 @@ export const SEGURIDAD = {
               { valor: 'tabla', rotulo: 'Sobre qué' },
             ],
             enLaRuta: EN_LA_RUTA.ordenarPor,
-            sentidoEnLaRuta: EN_LA_RUTA.direccion,
+            sentidoEnLaRuta: EN_LA_RUTA.sentido,
             ascendente: 'ASCENDENTE',
             descendente: 'DESCENDENTE',
           },

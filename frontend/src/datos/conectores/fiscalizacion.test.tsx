@@ -378,7 +378,7 @@ describe('`fis-prog` — la muestra sorteada de un programa', () => {
     const { doble } = await pintar('fis-prog', RUTAS_DE_PROG, null, {
       pagina: '2',
       ordenarPor: 'condicion',
-      direccion: 'DESCENDENTE',
+      sentido: 'DESCENDENTE',
     });
     const urls = doble.mock.calls.map((llamada) => String(llamada[0]));
 
@@ -390,7 +390,7 @@ describe('`fis-prog` — la muestra sorteada de un programa', () => {
     expect(urls[1]).toContain('/fiscalizacion/programas/14/muestra?tamano=20');
     expect(urls[1]).toContain('pagina=2');
     expect(urls[1]).toContain('ordenarPor=condicion');
-    expect(urls[1]).toContain('direccion=DESCENDENTE');
+    expect(urls[1]).toContain('sentido=DESCENDENTE');
   });
 
   it('un `ordenarPor` que la definicion NO ofrece no viaja: lo escribio quien pasaba por ahi', async () => {
@@ -399,13 +399,13 @@ describe('`fis-prog` — la muestra sorteada de un programa', () => {
     // pantalla. Sin campo admitido ordena el backend por el suyo, que es lo que la barra anuncia.
     const { doble } = await pintar('fis-prog', RUTAS_DE_PROG, null, {
       ordenarPor: 'sectorCodigo',
-      direccion: 'DESCENDENTE',
+      sentido: 'DESCENDENTE',
     });
     const muestra = doble.mock.calls.map((l) => String(l[0])).find((u) => u.includes('/muestra'));
 
     expect(muestra).not.toContain('ordenarPor');
     // Y el sentido tampoco: solo acompana a un campo admitido.
-    expect(muestra).not.toContain('direccion');
+    expect(muestra).not.toContain('sentido');
   });
 
   it('`hayMas` y `paginas` los dice el SERVIDOR, y no se cuentan las filas recibidas', () => {
@@ -427,7 +427,7 @@ describe('`fis-prog` — la muestra sorteada de un programa', () => {
       'pagina',
       'tamano',
       'ordenarPor',
-      'direccion',
+      'sentido',
     ]);
     expect(new Set(FIS_PROG.parametros?.map((p) => p.operacion))).toEqual(
       new Set(['GET /fiscalizacion/programas/{id}/muestra']),

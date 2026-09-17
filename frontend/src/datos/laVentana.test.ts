@@ -59,37 +59,48 @@ describe('la ventana sale de la definicion y de la ruta, en ese orden', () => {
 
   it('el sentido solo acompana a un campo admitido, y solo si es uno de los dos declarados', () => {
     // Sin campo, el backend ordena por lo suyo y un sentido suelto no dice nada de esa columna.
-    expect(laVentanaQueSePide('seg-aud', 'movimientos', { direccion: 'DESCENDENTE' })).toEqual({
+    expect(laVentanaQueSePide('seg-aud', 'movimientos', { sentido: 'DESCENDENTE' })).toEqual({
       tamano: '20',
     });
     expect(
       laVentanaQueSePide('seg-aud', 'movimientos', {
         ordenarPor: 'usuarioId',
-        direccion: 'DESCENDENTE',
+        sentido: 'DESCENDENTE',
       }),
-    ).toEqual({ tamano: '20', ordenarPor: 'usuarioId', direccion: 'DESCENDENTE' });
+    ).toEqual({ tamano: '20', ordenarPor: 'usuarioId', sentido: 'DESCENDENTE' });
     // Y un sentido inventado tampoco: los dos valores son del backend —`ASCENDENTE`/`DESCENDENTE`—
     // y `desc` es un 422.
     expect(
-      laVentanaQueSePide('seg-aud', 'movimientos', { ordenarPor: 'usuarioId', direccion: 'desc' }),
+      laVentanaQueSePide('seg-aud', 'movimientos', { ordenarPor: 'usuarioId', sentido: 'desc' }),
+    ).toEqual({ tamano: '20', ordenarPor: 'usuarioId' });
+    // Y el nombre VIEJO ya no es el sitio del sentido: una ruta guardada de antes de #236 no
+    // mueve nada. Es el precio de renombrar, y es el que se eligio: admitir los dos nombres
+    // dejaria `direccion` tomado para siempre, que es justo lo que #236 vino a soltar.
+    expect(
+      laVentanaQueSePide('seg-aud', 'movimientos', {
+        ordenarPor: 'usuarioId',
+        direccion: 'DESCENDENTE',
+      }),
     ).toEqual({ tamano: '20', ordenarPor: 'usuarioId' });
   });
 
   it('`aut-tram` ordena de verdad, que hasta #226 no podia: el sentido tenia el nombre tomado', () => {
     // `GET /licencias/funcionamiento` declaraba en su firma un filtro llamado `direccion` —el
     // domicilio del establecimiento— y recibia ademas `ParametrosDePaginacion`, cuyo sentido del
-    // orden TAMBIEN se llama `direccion`. Spring ataba el mismo parametro de consulta a los dos:
+    // orden se llamaba TAMBIEN `direccion`. Spring ataba el mismo parametro de consulta a los dos:
     // `?ordenarPor=numero&direccion=DESCENDENTE` acotaba el padron a las licencias cuya direccion
     // contiene «DESCENDENTE» —o sea, a ninguna— y ademas ordenaba al reves. Por eso esta fue la
     // unica de las cuatro tablas de #186 que pagino sin `orden`.
     //
-    // Renombrado el filtro a `direccionDelEstablecimiento`, el sentido vuelve a tener su sitio.
+    // #226 renombro el filtro a `direccionDelEstablecimiento` y el sentido recupero su sitio;
+    // #236 aparto ademas el sentido a `sentido`, de modo que el choque no puede volver con la
+    // siguiente pantalla que dibuje un domicilio.
     expect(
       laVentanaQueSePide('aut-tram', 'padron-de-licencias', {
         ordenarPor: 'nombreComercial',
-        direccion: 'DESCENDENTE',
+        sentido: 'DESCENDENTE',
       }),
-    ).toEqual({ tamano: '20', ordenarPor: 'nombreComercial', direccion: 'DESCENDENTE' });
+    ).toEqual({ tamano: '20', ordenarPor: 'nombreComercial', sentido: 'DESCENDENTE' });
 
     // Y el PRIMERO que ofrece es el orden por omision del backend —`numero`—, que es lo que hace
     // que la barra no anuncie un orden distinto del que traen las filas. Lo comprueba contra el

@@ -53,7 +53,7 @@ import type { Paginado } from './lecturas.ts';
  * orden no existe, pero el marco no puede tirar un parametro que la operacion admite.
  */
 export const laVentanaDe = (operacion: string): readonly ParametroDeLaHoja[] =>
-  [EN_LA_RUTA.pagina, EN_LA_RUTA.tamano, EN_LA_RUTA.ordenarPor, EN_LA_RUTA.direccion].map(
+  [EN_LA_RUTA.pagina, EN_LA_RUTA.tamano, EN_LA_RUTA.ordenarPor, EN_LA_RUTA.sentido].map(
     (nombre) => ({ nombre, operacion }),
   );
 
@@ -118,21 +118,21 @@ export function laVentanaQueSePide(
   const admitido =
     orden !== undefined && orden.campos.some((uno) => uno.valor === campo) ? campo : undefined;
 
-  const sentido = enLaRuta[EN_LA_RUTA.direccion];
+  const pedidoElSentido = enLaRuta[EN_LA_RUTA.sentido];
   // El sentido solo viaja si es uno de los dos que la definicion escribe. Y solo acompana a un
   // campo admitido: sin el, el backend ordena por lo suyo y el sentido de otra columna no dice nada.
-  const direccion =
+  const sentido =
     orden !== undefined &&
     admitido !== undefined &&
-    (sentido === orden.ascendente || sentido === orden.descendente)
-      ? sentido
+    (pedidoElSentido === orden.ascendente || pedidoElSentido === orden.descendente)
+      ? pedidoElSentido
       : undefined;
 
   return {
     [EN_LA_RUTA.tamano]: tamano,
     ...(pagina === undefined ? {} : { [EN_LA_RUTA.pagina]: pagina }),
     ...(admitido === undefined ? {} : { [EN_LA_RUTA.ordenarPor]: admitido }),
-    ...(direccion === undefined ? {} : { [EN_LA_RUTA.direccion]: direccion }),
+    ...(sentido === undefined ? {} : { [EN_LA_RUTA.sentido]: sentido }),
   };
 }
 

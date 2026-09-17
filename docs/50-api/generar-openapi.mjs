@@ -161,7 +161,7 @@ function filtrosDe(pantalla) {
  * —que anade uno—: el filtro sigue existiendo y filtrando lo mismo; lo que cambia
  * es el nombre con el que se manda.
  *
- * Las dos entradas son el mismo defecto: se llamaban `direccion`, que es TAMBIEN
+ * Las dos entradas son el mismo defecto: se llamaban `direccion`, que era TAMBIEN
  * el nombre del sentido del orden en `ParametrosDePaginacion` —el dialecto que
  * `GuardiaDeParametros` admite en toda operacion—. Spring ataba el mismo parametro
  * de consulta a los dos argumentos del mismo metodo, asi que
@@ -169,18 +169,28 @@ function filtrosDe(pantalla) {
  * cuya direccion contiene «DESCENDENTE» —o sea a ninguna— y ademas ordenaba al
  * reves; y mandar una direccion de verdad fallaba en el enlace, porque el mismo
  * texto tenia que convertirse a `Paginacion.Direccion`. O sea que el filtro **no
- * se podia usar**, y por eso renombrarlo no rompe ninguna peticion que hoy
- * funcione.
+ * se podia usar**, y por eso renombrarlo no rompio ninguna peticion que
+ * funcionara.
  *
- * Y se nota aqui, no solo en el backend: `reunir` se queda con el primero de dos
+ * Y se notaba aqui, no solo en el backend: `reunir` se queda con el primero de dos
  * parametros homonimos, asi que en estas dos operaciones el `direccion` de la
  * PAGINACION desaparecia del contrato — el YAML decia que no se podia pedir el
- * sentido del orden, y el backend lo aceptaba igual. Con el filtro renombrado,
- * los dos se publican y cada uno dice lo suyo.
+ * sentido del orden, y el backend lo aceptaba igual.
  *
- * Quien lo vigila desde el otro lado es
+ * **Desde #236 el choque ya no existe**: el sentido se llama `sentido`, asi que
+ * `direccion` esta libre y esta tabla ya no es forzosa. Se queda igual, y por un
+ * motivo que no es la inercia: `direccionDelEstablecimiento` y
+ * `direccionDelAnuncio` dicen DE QUIEN es el domicilio, que es informacion que el
+ * rotulo «Dirección» no lleva y que hace falta el dia que una de esas dos
+ * pantallas gane un segundo domicilio. Devolverlos a `direccion` seria una
+ * segunda ruptura del contrato a cambio de nada. Lo que si cambia es el estado:
+ * antes eran obligatorios, ahora son una eleccion.
+ *
+ * Quien vigila el choque desde el otro lado es
  * `ParametrosDeLaConsultaTest#ningunFiltroSeLlamaComoElDialectoDeLaPaginacion`,
- * que recorre TODAS las firmas y no solo estas dos.
+ * que recorre TODAS las firmas y no solo estas dos, y —desde #236—
+ * `elDialectoDeLaPaginacionDiceLoMismoEnTodoElContrato`, que mira el YAML: un
+ * filtro homonimo que `reunir` se tragara no deja huella en ninguna firma.
  */
 const RENOMBRADOS = {
   licencia_funcionamiento: { direccion: 'direccionDelEstablecimiento' },
@@ -197,16 +207,27 @@ function renombrado(id, nombre) {
  *
  * **Los nombres son los del backend, no los que la interfaz propuso.** Cuando
  * se escribieron aqui el backend todavia no tenia capa web; ahora la tiene
- * (`ParametrosDePaginacion` de #6) y manda ella: `ordenarPor` y no `orden`,
- * `direccion` y no `sentido`, y la pagina contada desde 0. Que la interfaz
- * proponga esta bien; que siga proponiendo cuando ya hay respuesta, no.
+ * (`ParametrosDePaginacion` de #6) y manda ella: `ordenarPor` y no `orden`, y la
+ * pagina contada desde 0. Que la interfaz proponga esta bien; que siga
+ * proponiendo cuando ya hay respuesta, no.
+ *
+ * **El cuarto se llama `sentido` desde #236, y ahi la interfaz tenia razon.**
+ * Se llamaba `direccion`, que es TAMBIEN la palabra con la que el dominio
+ * nombra un domicilio, y como `GuardiaDeParametros` admite estos cuatro en TODA
+ * operacion, cualquier pantalla con un filtro «Dirección» nacia rota: Spring
+ * ataba el mismo parametro de consulta a los dos argumentos del mismo metodo.
+ * #226 lo cerro renombrando el FILTRO en las dos operaciones donde el choque ya
+ * existia (`RENOMBRADOS`); #236 midio que ese lado no escala —`direccion` esta
+ * en decenas de columnas y criterios, el sentido en dos sitios— y aparto el
+ * sentido. `OrdenDeLaTabla.sentidoEnLaRuta`, de `@kamayuk/ui`, ya lo llamaba
+ * asi desde el principio.
  */
 const PAGINACION = [
   { nombre: 'pagina', ejemplo: '0', descripcion: 'Pagina que se pide, contada desde 0' },
   { nombre: 'tamano', ejemplo: '20', descripcion: 'Filas por pagina' },
   { nombre: 'ordenarPor', ejemplo: '', descripcion: 'Campo por el que se ordena, en camelCase' },
   {
-    nombre: 'direccion',
+    nombre: 'sentido',
     ejemplo: 'ASCENDENTE',
     descripcion: 'ASCENDENTE | DESCENDENTE',
   },
@@ -383,7 +404,7 @@ const SUPRIMIDOS = {
     'pagina',
     'tamano',
     'ordenarPor',
-    'direccion',
+    'sentido',
   ],
 };
 

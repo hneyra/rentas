@@ -148,7 +148,7 @@ public class LicenciaController {
      *
      * <h2>El filtro del domicilio se llama {@code direccionDelEstablecimiento} (#226)</h2>
      *
-     * <p>Se llamaba {@code direccion}, y ese es tambien el nombre del <b>sentido del orden</b> en
+     * <p>Se llamaba {@code direccion}, que era tambien el nombre del <b>sentido del orden</b> en
      * {@link ParametrosDePaginacion}, que {@code GuardiaDeParametros} admite en toda operacion.
      * Spring ataba el mismo parametro de consulta a los dos argumentos: {@code
      * ?ordenarPor=numero&direccion=DESCENDENTE} acotaba el padron a las licencias cuya direccion
@@ -166,7 +166,13 @@ public class LicenciaController {
      *
      * <p>Sigue publicandose como {@code direccion} en cada fila —{@link LicenciaResource}— y sigue
      * admitiendose como {@code ?ordenarPor=direccion}: lo que cambia es el nombre con el que se
-     * <b>acota</b>, que es el unico de los tres que colisionaba.
+     * <b>acota</b>, que era el unico de los tres que colisionaba.
+     *
+     * <p><b>Y desde #236 el choque ya no existe en la raiz</b>: el sentido del orden se llama
+     * {@code sentido}, asi que {@code direccion} esta libre. Este filtro se queda con su nombre
+     * largo —devolverlo seria una segunda ruptura del contrato a cambio de nada, y ademas dice de
+     * quien es el domicilio—, pero la siguiente pantalla que dibuje una direccion ya no tiene que
+     * renombrar nada.
      */
     @GetMapping("/funcionamiento")
     @RequiereAcceso(acceso = ACCESO_LICENCIA, privilegio = Privilegio.LECTURA)

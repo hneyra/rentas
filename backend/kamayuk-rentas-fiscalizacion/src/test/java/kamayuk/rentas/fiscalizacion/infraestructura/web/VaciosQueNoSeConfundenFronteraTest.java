@@ -305,7 +305,7 @@ class VaciosQueNoSeConfundenFronteraTest {
                                                     + programaConMuestra
                                                     + "/muestra")
                                             .param("ordenarPor", "codRefCatastral")
-                                            .param("direccion", "DESCENDENTE"))
+                                            .param("sentido", "DESCENDENTE"))
                             .andReturn();
 
             assertThat(resultado.getResponse().getStatus()).isEqualTo(200);

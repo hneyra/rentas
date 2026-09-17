@@ -213,7 +213,7 @@ describe('`seg-aud` — la bitacora de auditoria', () => {
         senal: new AbortController().signal,
         sujeto: null,
         ejercicio: 2026,
-        enLaRuta: { pagina: '3', ordenarPor: 'riesgo', direccion: 'DESCENDENTE' },
+        enLaRuta: { pagina: '3', ordenarPor: 'riesgo', sentido: 'DESCENDENTE' },
       });
     } finally {
       globalThis.fetch = original;
@@ -223,7 +223,7 @@ describe('`seg-aud` — la bitacora de auditoria', () => {
     expect(pedidas[0]).toContain('tamano=20');
     expect(pedidas[0]).not.toContain('ordenarPor');
     // Y el sentido sin campo tampoco: solo acompana a uno admitido.
-    expect(pedidas[0]).not.toContain('direccion');
+    expect(pedidas[0]).not.toContain('sentido');
   });
 
   it('una bitacora vacia da una tabla vacia, no una fila inventada', () => {

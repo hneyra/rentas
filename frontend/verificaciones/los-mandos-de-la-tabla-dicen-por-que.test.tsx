@@ -190,7 +190,7 @@ describe('`seg-aud` dibujada: la tabla dice que es una ventana de 84 182', () =>
 
     expect(movimientos).toHaveLength(1);
     expect(movimientos[0]).toEqual({
-      parametros: { pagina: '0', direccion: 'DESCENDENTE' },
+      parametros: { pagina: '0', sentido: 'DESCENDENTE' },
     });
   });
 });

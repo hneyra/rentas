@@ -17,6 +17,7 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import kamayuk.rentas.web.GuardiaDeParametros;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.annotation.AnnotatedElementUtils;
@@ -107,7 +108,10 @@ class ParametrosDeLaApiTest {
                     + " cuerpo del handler, no de una lista escrita a mano. Lo"
                     + " lee el frontend para"
                     + " comprobar que su proxy no sirve una operacion sin lo que el backend exige"
-                    + " (#26).";
+                    + " (#26). Y «_dialectoDeLaPaginacion» son los cuatro nombres que TODA"
+                    + " operacion admite, salgan o no en su lista: es"
+                    + " GuardiaDeParametros.DIALECTO_DE_LA_PAGINACION tal cual, y el frontend lo"
+                    + " cruza contra EN_LA_RUTA (#236).";
 
     /**
      * Los grupos de nombres de los que hay que mandar al menos uno.
@@ -664,7 +668,15 @@ class ParametrosDeLaApiTest {
     /** JSON estable: operaciones ordenadas, y dentro de cada una las cuatro listas. */
     private static String comoJson(Map<String, Map<String, Object>> parametros) {
         StringBuilder json = new StringBuilder("{\n");
-        json.append("  \"_\": ").append(entrecomillado(PROCEDENCIA));
+        json.append("  \"_\": ").append(entrecomillado(PROCEDENCIA)).append(",\n");
+        // El dialecto entero, y no solo los que cada operacion lista: la guarda del frontend
+        // necesita los CUATRO NOMBRES para cruzarlos con `EN_LA_RUTA`, y derivarlos de las listas
+        // de las operaciones seria derivarlos de un sitio donde ya podrian faltar. Salen de la
+        // constante del guardia, que es quien los admite de verdad (#236).
+        json.append("  \"_dialectoDeLaPaginacion\": ");
+        escribirValor(
+                json,
+                new ArrayList<>(new TreeSet<>(GuardiaDeParametros.DIALECTO_DE_LA_PAGINACION)));
         json.append(parametros.isEmpty() ? "\n" : ",\n");
         int quedan = parametros.size();
         for (Map.Entry<String, Map<String, Object>> operacion : parametros.entrySet()) {

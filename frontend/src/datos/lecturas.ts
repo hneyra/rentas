@@ -1905,15 +1905,16 @@ export const RUTAS = {
    * Se pide **sin criterio**: los seis campos con que el artboard la filtra —ejercicio, tipo de
    * licencia, estado, agrupacion y el par Desde/Hasta— **no son parametros de esta operacion**.
    * Los que admite son otros (`nroLicencia`, `nombreDelContribuyente`, `denominacionComercial`,
-   * `direccionDelEstablecimiento`, `nExpediente`, `ordenarPor`, `pagina`, `tamano`, `direccion`), y
+   * `direccionDelEstablecimiento`, `nExpediente`, `ordenarPor`, `pagina`, `tamano`, `sentido`), y
    * mandar un `?ejercicio=` que el contrato no declara seria construir sobre un nombre que nada de
    * este repositorio puede comprobar — el mismo motivo por el que `/rentas/predios` estuvo fuera
    * hasta #26.
    *
    * Lo que entra desde #186 es **la ventana**: `?pagina=` y `?tamano=`. **Y desde #226 tambien el
    * orden**: el filtro del domicilio se llamaba `direccion`, igual que el sentido del orden, y
-   * hasta que se renombro no habia por donde mandar `?direccion=DESCENDENTE` sin acotar ademas el
-   * padron a las licencias cuya direccion contiene esa palabra.
+   * hasta que se renombro no habia por donde mandar el sentido sin acotar ademas el padron a las
+   * licencias cuya direccion contiene esa palabra. Desde #236 el sentido se llama `sentido` y el
+   * choque no puede volver: la palabra del dominio es del dominio.
    */
   licenciasDeFuncionamiento: (ventana: Readonly<Record<string, string>> = {}) =>
     conParametros('/licencias/funcionamiento', ventana),

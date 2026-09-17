@@ -96,7 +96,7 @@ class ElBordeContestaLoMismoTest {
     @DisplayName("un valor que el enumerado no conoce: 422, no 500")
     void elEnumeradoNoLoConoce() throws Exception {
         MvcResult respuesta =
-                mvc.perform(get("/sonda/paginado").param("direccion", "DIAGONAL")).andReturn();
+                mvc.perform(get("/sonda/paginado").param("sentido", "DIAGONAL")).andReturn();
 
         assertThat(respuesta.getResponse().getStatus()).isEqualTo(422);
         assertThat(respuesta.getResponse().getContentAsString()).contains("DIAGONAL");
@@ -151,7 +151,7 @@ class ElBordeContestaLoMismoTest {
         try {
             mvc.perform(get("/sonda/obligatorio"));
             mvc.perform(get("/sonda/paginado").param("pagina", "abc"));
-            mvc.perform(get("/sonda/paginado").param("direccion", "DIAGONAL"));
+            mvc.perform(get("/sonda/paginado").param("sentido", "DIAGONAL"));
             mvc.perform(
                     post("/sonda/cuerpo")
                             .contentType(MediaType.APPLICATION_JSON)
