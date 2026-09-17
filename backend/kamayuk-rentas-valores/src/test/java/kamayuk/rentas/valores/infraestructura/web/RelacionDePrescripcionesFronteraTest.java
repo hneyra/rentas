@@ -118,7 +118,10 @@ class RelacionDePrescripcionesFronteraTest {
                         "RES-001-2033");
         prescritos(municipalidadA, enParte, 2018, true);
         prescritos(municipalidadA, enParte, 2019, true);
-        prescritos(municipalidadA, enParte, 2020, false);
+        // Con una INTERRUPCION del art. 45 de por medio: el computo se reinicio, asi que su
+        // fecha NO es `ejercicio + 5`. Es la unica fila que distingue leer la fecha guardada de
+        // calcularla, y sin ella un recurso que la calculara pasaria en verde.
+        prescritos(municipalidadA, enParte, 2020, false, "2027-01-01");
 
         noProcede =
                 crearPrescripcion(
@@ -240,7 +243,7 @@ class RelacionDePrescripcionesFronteraTest {
                         "\"ejercicios\":["
                                 + "{\"ejercicio\":2018,\"prescribeEl\":\"2023-01-01\",\"prescrita\":true},"
                                 + "{\"ejercicio\":2019,\"prescribeEl\":\"2024-01-01\",\"prescrita\":true},"
-                                + "{\"ejercicio\":2020,\"prescribeEl\":\"2025-01-01\",\"prescrita\":false}]");
+                                + "{\"ejercicio\":2020,\"prescribeEl\":\"2027-01-01\",\"prescrita\":false}]");
         assertThat(json)
                 .as("y el que no procedio tambien lo lleva: su ejercicio sigue siendo exigible")
                 .contains(
@@ -476,6 +479,27 @@ class RelacionDePrescripcionesFronteraTest {
      */
     private static void prescritos(
             long municipalidad, long prescripcion, int ejercicio, boolean prescrita) {
+        prescritos(municipalidad, prescripcion, ejercicio, prescrita, (ejercicio + 5) + "-01-01");
+    }
+
+    /**
+     * Igual, pero con la fecha ESCRITA y no derivada del ejercicio.
+     *
+     * <p>Hace falta uno asi y no es un capricho: con todas las filas en {@code ejercicio + 5}, un
+     * recurso que <b>calculara</b> la fecha con esa misma formula —en vez de leer la que la fila
+     * guarda— pasaria en verde. Comprobado: sale igual de verde que el bueno.
+     *
+     * <p>Y el caso existe en la realidad, que es lo que lo hace obligatorio: una interrupcion del
+     * art. 45 —una notificacion, un reconocimiento de deuda— <b>reinicia el computo</b>, asi que la
+     * fecha guardada se aparta de la formula. Leerla de la fila no es una preferencia: es la unica
+     * forma de que el reloj diga lo que de verdad le pasó a esa deuda.
+     */
+    private static void prescritos(
+            long municipalidad,
+            long prescripcion,
+            int ejercicio,
+            boolean prescrita,
+            String fechaEscrita) {
         comoApp(
                 municipalidad,
                 "INSERT INTO prescripcion_ejercicio (municipalidad_id, prescripcion_id, ejercicio,"
@@ -485,7 +509,7 @@ class RelacionDePrescripcionesFronteraTest {
                 municipalidad,
                 prescripcion,
                 ejercicio,
-                (ejercicio + 5) + "-01-01",
+                fechaEscrita,
                 prescrita);
     }
 
