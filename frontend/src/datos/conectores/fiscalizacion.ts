@@ -396,8 +396,9 @@ function contrasteDelActa(acta: ActaDeFiscalizacion): readonly (readonly CeldaDe
  * —`NO_CONSTA_LO_DECLARADO`— y no con la palabra que manda a buscar lo que ya esta.
  *
  * **`GET /fiscalizacion/resultados` sigue sin pedirse desde aqui**, y no por lo que decia antes:
- * es la LIQUIDACION y esta pantalla es la etapa anterior —su propia nota lo dice, «sin acta cerrada
- * no se puede liquidar»—, y sus lineas son por ejercicio y por unidad, no por concepto. Pintar aqui
+ * es la LIQUIDACION y esta pantalla es la etapa anterior —su propia nota lo dice, «sin acta
+ * levantada no se puede liquidar» (#241)—, y sus lineas son por ejercicio y por unidad, no por
+ * concepto. Pintar aqui
  * la liquidacion de otra acta seria ensenar el resultado de un paso que esta pantalla no ha dado.
  *
  * <h2>Sin filtrar</h2>
@@ -598,14 +599,6 @@ const FIS_RES: Conector = {
   },
 };
 
-/** «Con acta cerrada»: la operacion publica otra cosa, y lo dice en vez de fingirlo. */
-const SIN_ACTA_CERRADA =
-  'Un acta CERRADA no existe en este sistema, y desde #214 tampoco de derecho: «EstadoDeActa» ' +
-  'declara DOS valores —ABIERTA y ANULADA—, porque los tres del medio (LIQUIDADA, RELIQUIDADA, ' +
-  'TRANSFERIDA) no los escribia nadie y los tres se DERIVAN, asi que se retiraron en vez de ' +
-  'inventarles una escritura. Lo que el embudo publica es «conActa», que son las unidades con ' +
-  'acta VIVA —levantada y no anulada—: pintarlo bajo este rotulo seria decir otra cosa.';
-
 /** «Detectados por cruce» de un programa que no declara sus parametros de sorteo. */
 const SIN_PARAMETROS_DEL_SORTEO =
   'El cruce no se pudo resolver: este programa no declara los parametros con que se sortea, y el ' +
@@ -628,7 +621,7 @@ const SIN_PARAMETROS_DEL_SORTEO =
  * que ninguna operacion afirma que signifiquen eso, tres de ellas acotadas a mano al programa, y el
  * resultado **se lee igual** que uno publicado sin que ninguno de los dos se pueda cuadrar.
  *
- * <h2>Campo a campo: TRES de cuatro cifras, y la cuarta dice por que no</h2>
+ * <h2>Campo a campo: las cuatro cifras, y desde #241 las cuatro se pintan</h2>
  *
  * <ul>
  *   <li><b>`0|0` Ejercicio</b> ← `ejercicio` del embudo, no la opcion que toco por omision: es el
@@ -640,14 +633,18 @@ const SIN_PARAMETROS_DEL_SORTEO =
  *       declara sus parametros de sorteo, y entonces el hueco lo dice (ver
  *       `SIN_PARAMETROS_DEL_SORTEO`) — nunca un cero.</li>
  *   <li><b>`0|3` Programados</b> ← `programados`.</li>
- *   <li><b>`0|4` Con acta cerrada</b> → <b>el hueco, con su motivo</b>. `conActa` <b>no es lo
- *       mismo</b> y el backend lo dice en el nombre: cuenta las unidades con acta <b>viva</b>. #215
+ *   <li><b>`0|4` Con acta levantada</b> ← `conActa`. <b>Hasta #241 esta celda era un hueco</b>, y
+ *       lo era por el rotulo: decia «Con acta cerrada», `conActa` cuenta las unidades con acta
+ *       <b>viva</b> —levantada y no anulada— y pintarlo debajo habria dicho otra cosa. #215
  *       planteaba tres salidas —o se cierra #214, o el rotulo cambia en el artboard, o la celda
- *       dice por que no—, y <b>#214 se cerro por el otro lado</b>: retirando `LIQUIDADA`,
- *       `RELIQUIDADA` y `TRANSFERIDA` del enumerado, porque nadie las escribia y las tres se
- *       derivan. O sea que «cerrada» no es un estado de un acta aqui, y la celda lo dice — que es
- *       la tercera salida, y ahora con la medida entera detras. La segunda —cambiar el rotulo— es
- *       del artboard y no se toma desde un conector.</li>
+ *       dice por que no—; se tomo la tercera, y #241 tomo la segunda con la medida entera delante.
+ *       Lo que la decidio no es una opinion sobre el rotulo sino <b>dos frases del propio
+ *       artboard</b>: la nota de esta hoja dice «Lo detectado, lo <b>inspeccionado</b> y lo que
+ *       sostiene una determinacion» —tres cosas para cuatro cifras, y la tercera es la
+ *       inspeccion—, y la de `fis-actas` situaba el cierre <b>antes</b> de liquidar —«sin acta
+ *       cerrada no se puede liquidar»—, que es lo contrario de lo que #214 llamo «cerrada», o sea
+ *       que el acta <b>tenga</b> liquidacion. Con el rotulo corregido la celda dice lo que la
+ *       cifra cuenta: la etapa que `ActasController` llama «Inspeccionados».</li>
  *   <li><b>`0|5` Con diferencia</b> ← `conDiferencia`.</li>
  * </ul>
  *
@@ -674,9 +671,10 @@ const FIS_PANEL: Conector = {
     const valores = new Map<Coordenada, string>([
       [coordenada(0, 1), embudo.codigo],
       [coordenada(0, 3), String(embudo.programados)],
+      [coordenada(0, 4), String(embudo.conActa)],
       [coordenada(0, 5), String(embudo.conDiferencia)],
     ]);
-    const noPublicados = new Map<Coordenada, string>([[coordenada(0, 4), SIN_ACTA_CERRADA]]);
+    const noPublicados = new Map<Coordenada, string>();
 
     // El ejercicio del programa, cuando lo declara. Uno anterior a `V60` no lo lleva, y entonces el
     // desplegable se queda en su primera opcion en vez de afirmar un ano que nadie dijo.
@@ -708,7 +706,6 @@ export {
   FIS_PROG,
   FIS_RES,
   NO_CONSTA_LO_DECLARADO,
-  SIN_ACTA_CERRADA,
   SIN_AREA_HALLADA,
   SIN_CIFRAR,
   SIN_DIFERENCIA_DE_UN_USO,

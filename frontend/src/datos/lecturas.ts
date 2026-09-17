@@ -1339,12 +1339,23 @@ export interface ResolucionEnLaRelacion {
  * ninguna operacion afirma que signifiquen eso, y un embudo compuesto en el navegador **se lee
  * igual** que uno publicado sin que ninguno de los dos se pueda cuadrar.
  *
- * **`conActa` NO es «con acta cerrada», y el nombre lo dice a proposito.** Un acta cerrada no
- * existe aqui: `EstadoDeActa` declara **dos** valores —`ABIERTA` y `ANULADA`— desde #214, que
- * retiro `LIQUIDADA`, `RELIQUIDADA` y `TRANSFERIDA` porque nadie las escribia y las tres se
- * **derivan** —de que exista su liquidacion, de que tenga mas de una version y de que su
- * liquidacion tenga resolucion—. Un `conActaCerrada` valdria cero siempre, en verde y sin sintoma.
- * Lo que este campo cuenta es cuantas unidades del programa tienen acta **viva**.
+ * **`conActa` cuenta las unidades con acta VIVA —levantada y no anulada—, y el nombre lo dice a
+ * proposito.** Un acta *cerrada* no existe aqui: `EstadoDeActa` declara **dos** valores —`ABIERTA`
+ * y `ANULADA`— desde #214, que retiro `LIQUIDADA`, `RELIQUIDADA` y `TRANSFERIDA` porque nadie las
+ * escribia y las tres se **derivan** —de que exista su liquidacion, de que tenga mas de una version
+ * y de que su liquidacion tenga resolucion—.
+ *
+ * **Y desde #241 esta cifra SI llena la tercera celda de `fis-panel`**, que hasta entonces era un
+ * hueco. Lo que cambio no es el campo sino el rotulo: decia «Con acta cerrada» y dice «Con acta
+ * levantada». Lo que la corrigio son dos frases del propio artboard —la nota de `fis-panel`, «lo
+ * detectado, lo INSPECCIONADO y lo que sostiene una determinacion», y la de `fis-actas`, que
+ * situaba el cierre ANTES de liquidar—, o sea que su tercera etapa siempre fue la inspeccion.
+ *
+ * **Lo que no se publica, y no es por falta de dato**: «con liquidacion», que #231 propuso. Se
+ * puede contar —`LiquidarFiscalizacion` escribe la liquidacion y su apertura, y
+ * `CambiarEstadoDeLaLiquidacion` escribe la anulacion, asi que no valdria cero—, pero es la
+ * **cuarta** etapa del embudo del manual, la que va DESPUES de «Inspeccionados», y `fis-panel` no
+ * tiene celda para ella: la suya es «Con diferencia».
  *
  * **`aLaFecha` no es decorativo** (regla 9, RNF-075): las tres ultimas etapas estan congeladas por
  * lo que se sorteo y se visito, y la primera se resuelve contra el padron de HOY.

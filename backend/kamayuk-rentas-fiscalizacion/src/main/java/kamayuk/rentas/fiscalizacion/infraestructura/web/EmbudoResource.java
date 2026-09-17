@@ -11,15 +11,25 @@ import org.jspecify.annotations.Nullable;
  * distintas: serian cuatro peticiones para cuatro numeros que ninguna operacion afirma que
  * signifiquen eso, y el resultado se leeria igual que este sin poder cuadrarse.
  *
- * <h2>{@code conActa} no es «Con acta cerrada», y el nombre lo dice a proposito</h2>
+ * <h2>{@code conActa} es la etapa «Inspeccionados», y el nombre lo dice a proposito</h2>
  *
- * <p>El artboard rotula la tercera etapa «Con acta cerrada», y eso <b>no se puede contestar</b>:
- * {@code EstadoDeActa} declara cinco valores y este sistema solo escribe {@code ABIERTA} —medido:
- * no hay en {@code src/main} un solo camino que mueva el estado de un acta, ni al liquidar ni al
- * transferir—. Un {@code conActaCerrada} valdria cero siempre, en verde y sin sintoma, que es el
- * defecto que #194 midio, y que el estado no lo mueva nada es #214. Lo que este campo cuenta es
- * cuantas unidades del programa tienen acta <b>viva</b>: la etapa que {@code ActasController} llama
- * «Inspeccionados».
+ * <p>Cuenta cuantas unidades del programa tienen acta <b>viva</b> —levantada y no anulada—, que es
+ * la etapa que {@code ActasController} llama «Inspeccionados». El artboard rotulaba esa celda «Con
+ * acta cerrada» y por eso la pantalla la dejaba vacia con su motivo: un acta <i>cerrada</i> no
+ * existe aqui —{@code EstadoDeActa} declara {@code ABIERTA} y {@code ANULADA} desde #214, y la
+ * unica transicion que este sistema escribe es anular—.
+ *
+ * <p><b>#241 midio que el equivocado era el rotulo</b>, con dos frases del propio artboard: la nota
+ * de {@code fis-panel} dice «lo detectado, lo <b>inspeccionado</b> y lo que sostiene una
+ * determinacion» —tres cosas para cuatro cifras—, y la de {@code fis-actas} situaba el cierre
+ * <b>antes</b> de liquidar, que es lo contrario de lo que #214 llamo «cerrada». El rotulo es «Con
+ * acta levantada» y este campo lo llena.
+ *
+ * <p><b>No hay una quinta cifra, y no es por falta de dato</b> (#231). «Con liquidacion» se puede
+ * contar —{@code LiquidarFiscalizacion} la escribe y {@code CambiarEstadoDeLaLiquidacion} la
+ * anula—, pero es la etapa que va <b>despues</b> de «Inspeccionados» en el embudo del manual, y
+ * {@code fis-panel} no tiene celda para ella: la suya es «Con diferencia». Publicarla aqui dejaria
+ * un campo que ninguna pantalla dibuja, que es lo que #431, #432 y #544 tuvieron que retirar.
  *
  * @param programaId el programa
  * @param codigo su «N.º de programa», que es lo que la pantalla teclea
@@ -30,7 +40,8 @@ import org.jspecify.annotations.Nullable;
  *     si el programa no los declara
  * @param parametroQueFalta cual de esos parametros le falta, cuando no hay cifra que dar
  * @param programados cuantas unidades sorteo la muestra
- * @param conActa cuantas tienen acta viva. <b>No es «con acta cerrada»</b>: ver arriba
+ * @param conActa cuantas tienen acta viva: «Inspeccionados», que la pantalla rotula «Con acta
+ *     levantada» desde #241
  * @param conDiferencia cuantas sostienen una determinacion, en la ultima version de su liquidacion
  */
 public record EmbudoResource(

@@ -323,9 +323,10 @@ export const SIN_RESOLUCIONES: Paginado<ResolucionEnLaRelacion> = {
 /**
  * El embudo del programa, con las cuatro cifras cuadradas y su fecha (#196).
  *
- * `conActa` es 84 y **no es «con acta cerrada»**: cuenta las unidades con acta viva. Ningun acta
- * sale de `ABIERTA` en este sistema (#214), asi que un campo que contara las cerradas valdria cero
- * siempre — en verde y sin sintoma.
+ * `conActa` es 84 y cuenta las unidades con acta **viva** —levantada y no anulada—. Ningun acta
+ * sale de `ABIERTA` en este sistema salvo para anularse (#214), asi que un acta *cerrada* no
+ * existe: por eso la tercera celda de `fis-panel` se rotula «Con acta levantada» desde #241, y por
+ * eso esta cifra la llena.
  */
 export const EMBUDO: EmbudoDelPrograma = {
   programaId: 14,

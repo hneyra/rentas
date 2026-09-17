@@ -18,7 +18,6 @@ import {
   FIS_PROG,
   FIS_RES,
   NO_CONSTA_LO_DECLARADO,
-  SIN_ACTA_CERRADA,
   SIN_AREA_HALLADA,
   SIN_CIFRAR,
   SIN_DIFERENCIA_DE_UN_USO,
@@ -161,7 +160,7 @@ describe('las tres formas del hueco no se confunden', () => {
     }
   });
 
-  it('y los OCHO motivos de este modulo son ocho frases distintas, no una raya repetida', () => {
+  it('y los SIETE motivos de este modulo son siete frases distintas, no una raya repetida', () => {
     // Es lo que #195 compra: hasta entonces las celdas vacias de estas tablas decian la misma raya,
     // y sus motivos —que existian y estaban escritos— vivian solo en el javadoc de este conector,
     // donde no los lee quien mira la pantalla.
@@ -171,8 +170,12 @@ describe('las tres formas del hueco no se confunden', () => {
     // `SIN_BASE_OMITIDA` —la resolucion ya la resta (#193)—. Entran dos que la ola nueva hace
     // visibles: `NO_CONSTA_LO_DECLARADO`, que es «no consta» y no «no publicado», y
     // `SIN_DIFERENCIA_DE_UN_USO`, que se queda **con todo publicado** porque la diferencia de un
-    // uso no es un numero. Y `SIN_ACTA_CERRADA` y `SIN_PARAMETROS_DEL_SORTEO` son de `fis-panel`,
-    // que no existia.
+    // uso no es un numero. Y `SIN_PARAMETROS_DEL_SORTEO` es de `fis-panel`, que no existia.
+    //
+    // **Y desde #241 son SIETE.** Sale `SIN_ACTA_CERRADA`, que no lo retira una operacion nueva
+    // sino el ROTULO: aquella celda no estaba vacia porque faltara el dato —`conActa` estaba
+    // publicado desde #217—, sino porque decia «Con acta cerrada» y `conActa` es otra cosa. Con el
+    // rotulo corregido a «Con acta levantada» la celda se llena con lo que siempre hubo.
     const motivos = [
       SIN_TITULAR,
       SIN_DIFERENCIA_ESTIMADA,
@@ -181,8 +184,7 @@ describe('las tres formas del hueco no se confunden', () => {
       SIN_HALLAZGO,
       SIN_AREA_HALLADA,
       SIN_INTERES,
-      SIN_ACTA_CERRADA,
-      SIN_PARAMETROS_DEL_SORTEO,
+          SIN_PARAMETROS_DEL_SORTEO,
     ];
     expect(new Set(motivos).size).toBe(motivos.length);
     for (const motivo of motivos) expect(motivo.length, motivo).toBeGreaterThan(40);
@@ -209,26 +211,45 @@ describe('`fis-panel` — el embudo del programa (#196)', () => {
     expect(urls.some((u) => u.includes('/resultados'))).toBe(false);
   });
 
-  it('las TRES cifras que la operacion publica salen, y la cuarta dice por que no', () => {
+  it('las CUATRO cifras que la operacion publica salen, y ninguna celda queda sin llenar', () => {
     const reparto = FIS_PANEL.repartir(EMBUDO as never);
 
     expect(reparto.valores.get(coordenada(0, 0))).toBe('2026');
     expect(reparto.valores.get(coordenada(0, 1))).toBe('PF-2026-014');
     expect(reparto.valores.get(coordenada(0, 2))).toBe('3418');
     expect(reparto.valores.get(coordenada(0, 3))).toBe('96');
+    expect(reparto.valores.get(coordenada(0, 4))).toBe('84');
     expect(reparto.valores.get(coordenada(0, 5))).toBe('61');
+    // Un embudo con todos sus parametros no deja ni un hueco: es la diferencia que #241 compra.
+    expect(reparto.noPublicados.size).toBe(0);
   });
 
-  it('«Con acta cerrada» NO se llena con `conActa`, que es OTRA COSA (#214)', () => {
-    // El hallazgo que #196 dejo escrito en el nombre del campo: ningun acta sale nunca de
-    // `ABIERTA` en este sistema, asi que un campo que contara las cerradas valdria cero siempre.
-    // `conActa` cuenta las que tienen acta VIVA, y pintarlo bajo ese rotulo diria otra cosa.
+  it('«Con acta levantada» SE llena con `conActa`, y el rotulo es el que se corrigio (#241)', () => {
+    // Lo contrario de lo que esta prueba exigia hasta #241, y el cambio no esta en el dato:
+    // `conActa` se publica desde #217. Lo que cambio es el ROTULO. Aquella celda decia «Con acta
+    // cerrada», y «cerrada» no es un estado de un acta en este sistema —`EstadoDeActa` declara
+    // ABIERTA y ANULADA desde #214, y la unica transicion escrita es anular—, asi que pintar ahi
+    // las actas VIVAS habria dicho otra cosa.
+    //
+    // Lo que decidio en que direccion se corrige son DOS frases del propio artboard, no una
+    // opinion sobre el rotulo:
+    //
+    //   1. la nota de esta misma hoja —«Lo detectado, lo INSPECCIONADO y lo que sostiene una
+    //      determinacion»— nombra tres cosas para cuatro cifras, y la tercera es la inspeccion;
+    //   2. la nota de `fis-actas` situaba el cierre ANTES de liquidar —«sin acta cerrada no se
+    //      puede liquidar»—, que es lo contrario de lo que #214 llamo «cerrada»: que el acta TENGA
+    //      liquidacion. Con aquella definicion la frase se leia «sin liquidacion no se puede
+    //      liquidar», asi que las dos «cerrada» no podian ser la misma palabra.
+    //
+    // La cifra es la etapa que `ActasController` llama «Inspeccionados», y ahora el rotulo lo dice.
     const reparto = FIS_PANEL.repartir(EMBUDO as never);
 
-    expect(reparto.valores.has(coordenada(0, 4))).toBe(false);
-    expect(reparto.noPublicados.get(coordenada(0, 4))).toBe(SIN_ACTA_CERRADA);
-    expect([...reparto.valores.values()]).not.toContain(String(EMBUDO.conActa));
-    expect(PANTALLAS['fis-panel'].bloques[0]?.campos[4]?.etiqueta).toBe('Con acta cerrada');
+    expect(reparto.valores.get(coordenada(0, 4))).toBe(String(EMBUDO.conActa));
+    expect(reparto.noPublicados.has(coordenada(0, 4))).toBe(false);
+    expect(PANTALLAS['fis-panel'].bloques[0]?.campos[4]?.etiqueta).toBe('Con acta levantada');
+    // Y la palabra que prometia un cierre no vuelve por ninguna de las dos hojas.
+    expect(PANTALLAS['fis-panel'].bloques[0]?.campos[4]?.etiqueta).not.toContain('cerrada');
+    expect(PANTALLAS['fis-actas'].bloques[0]?.tabla?.nota).not.toContain('acta cerrada');
   });
 
   it('sin parametros de sorteo, «Detectados por cruce» dice su causa y NO un cero', () => {
