@@ -25,7 +25,8 @@ import { YA_SERVIDAS } from './datos/servidas.ts';
  *     hojas lo tienen TODO en `BASE`** — de ellas no se sabe ni con que verbo se pediria. Eran
  *     doce hasta que `tra-panel` gano la operacion que la sirve.
  *   · **28 hojas tienen al menos una servida**, **26** declaran ademas alguna de LECTURA, y de
- *     esas **20** se pintan de verdad — las que tienen conector.
+ *     esas **21** se pintan de verdad — las que tienen conector. Eran 20 hasta #230, que conecto
+ *     `val-tip` corrigiendo su artboard.
  *   · Y una —`aut-panel`, desde #173— **no declara NINGUNA operacion**, que no es lo mismo que
  *     declararlas todas en `BASE` y hay que no confundirlo: ver el `length > 0` de abajo.
  *   · **TRES hojas no declaran ni un `GET` y si declaran escrituras** (#182, #237): `aut-sol`,

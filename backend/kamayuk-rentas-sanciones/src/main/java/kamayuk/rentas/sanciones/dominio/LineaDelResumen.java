@@ -21,6 +21,25 @@ import org.jspecify.annotations.Nullable;
  * porque se parece a la buena. Los nombres de este record existen para que esa confusión no se
  * pueda escribir sin darse cuenta.
  *
+ * <h2>{@code conResolucionNotificada} se llama así porque es lo único que consta (#222)</h2>
+ *
+ * <p>El panel de tránsito dibuja un recuento rotulado «Notificadas», y ese no se puede publicar:
+ * {@code EstadoDePapeleta} declara {@code NOTIFICADA} y <b>ningún código de producción lo
+ * escribe</b> — medido sobre {@code src/main}, el único {@code UPDATE papeleta} que existe es
+ * {@code SET numero = :numeroNuevo}, y el estado se escribe una sola vez, en el {@code INSERT}, y
+ * siempre {@code IMPUESTA}. Contar {@code estado = 'NOTIFICADA'} daría <b>cero para siempre</b>
+ * bajo un rótulo que dice cuántas se notificaron: la cifra plausible y equivocada.
+ *
+ * <p>Lo que el sistema <b>sí</b> registra de la notificación es la diligencia de la <b>resolución
+ * de gerencia</b> de esa papeleta —una fila de {@code notificacion} con {@code objeto =
+ * 'RESOLUCION'}, #50—, y eso es exactamente lo que esta columna cuenta. No es lo mismo que el
+ * rótulo del artboard prometía, y por eso el rótulo cambia en el artboard y no la cifra aquí: una
+ * papeleta puede estar notificada en la calle sin que conste, y esta columna no la cuenta.
+ *
+ * <p><b>Sin importe al lado, y no por descuido.</b> Las otras tres cuentas llevan su importe porque
+ * alguna pantalla pregunta cuánto suman; de esta no lo pregunta ninguna, y publicar una cifra de
+ * dinero que nadie consume es lo que #184 encontró en las cuatro {@code resumen-*}.
+ *
  * @param clave el valor por el que se agrupó: el estado, el código, las dos letras, el mes o el año
  * @param descripcion su descripción, cuando el agrupador la tiene —el código la trae—; nula si no
  * @param ano el año de la línea, cuando el agrupador lo determina —{@code ANO} y {@code MES}—; nulo
@@ -34,6 +53,9 @@ import org.jspecify.annotations.Nullable;
  * @param importeDeLasPendientes la suma de sus actas
  * @param enCoactiva cuántas de las pendientes están en cobranza coactiva
  * @param importeEnCoactiva la suma de sus actas
+ * @param conResolucionNotificada cuántas tienen ya una resolución de gerencia con al menos una
+ *     diligencia que surtió efecto. <b>No es «cuántas se notificaron»</b> y el nombre lo dice: lo
+ *     notificado es la <b>resolución</b>, que es otro documento. Ver el javadoc de la clase
  */
 public record LineaDelResumen(
         String clave,
@@ -46,7 +68,8 @@ public record LineaDelResumen(
         long pendientes,
         Dinero importeDeLasPendientes,
         long enCoactiva,
-        Dinero importeEnCoactiva) {
+        Dinero importeEnCoactiva,
+        long conResolucionNotificada) {
 
     public LineaDelResumen {
         Objects.requireNonNull(clave, "La linea del resumen necesita su clave");
@@ -55,7 +78,19 @@ public record LineaDelResumen(
         Objects.requireNonNull(
                 importeDeLasPendientes, "La linea necesita el importe de las pendientes");
         Objects.requireNonNull(importeEnCoactiva, "La linea necesita el importe en coactiva");
-        if (cantidad < 0 || pagadas < 0 || pendientes < 0 || enCoactiva < 0) {
+        if (conResolucionNotificada > cantidad) {
+            throw new IllegalArgumentException(
+                    "No puede haber mas papeletas con su resolucion notificada ("
+                            + conResolucionNotificada
+                            + ") que papeletas en el grupo ("
+                            + cantidad
+                            + ")");
+        }
+        if (cantidad < 0
+                || pagadas < 0
+                || pendientes < 0
+                || enCoactiva < 0
+                || conResolucionNotificada < 0) {
             throw new IllegalArgumentException("Ninguna cuenta de un resumen puede ser negativa");
         }
         if (pagadas + pendientes > cantidad) {

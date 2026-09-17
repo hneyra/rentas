@@ -245,6 +245,20 @@ const CONECTADAS: readonly {
       'dibuja la frase de pantalla y no hay celda donde pintar un tono — que es lo correcto: una ' +
       'insignia verde sobre una cuota cuyo vencimiento nadie conoce diria que esta al dia',
   },
+  // `val-tip` entra con #230, DESPUES de escribirse esta guarda — la QUINTA vez, y la quinta que
+  // sale roja sola. Es ademas el primer caso en que la columna de insignia **gana** una regla en
+  // vez de perderla: #218 le quito la suya a `ini-parado` porque le llegaba una frase; aqui llega
+  // un booleano que el backend publica, y «Prescrito» entra en la lista de MALOS de `tono.ts`.
+  {
+    hoja: 'val-tip',
+    bloque: 0,
+    leLlega:
+      'derivado de `ejercicios[].prescrita`, un booleano que la operacion publica: «Prescrito» o ' +
+      '«Vigente». Los dos son un JUICIO y los dos tienen regla — «Vigente» estaba en CONFORME ' +
+      'desde #175 y «Prescrito» entra en MAL con #230, porque un ejercicio prescrito es deuda que ' +
+      'ya no se puede exigir. **No hay tercer valor**: «Por prescribir», que el desplegable ' +
+      '«Estado» ofrece, exigiria un umbral que el corpus de `normativa` no publica (regla 5)',
+  },
 ];
 
 /* ── Y el contrato, que es lo que dira cuando el backend publique el estado ─────────────── */
@@ -252,18 +266,26 @@ const CONECTADAS: readonly {
 const FORMAS = join(RAIZ, '../docs/50-api/formas-de-la-api.json');
 
 describe('ninguna insignia se pinta de verde sin que una regla la reconozca', () => {
-  it('EL CENTINELA: hay 21 columnas de insignia, el artboard les escribe 17 textos y el backend 4 frases', () => {
+  it('EL CENTINELA: hay 21 columnas de insignia, el artboard les escribe 19 textos y el backend 4 frases', () => {
     // Sin esto, un artboard que dejara de traer celdas —o una ruta mal calculada— dejaria todo lo
     // de abajo recorriendo la lista vacia y pasando en verde sobre la nada. Es como este
     // repositorio se quedo sin guarda dos veces (#78, #80).
     //
-    // **Eran 22 hasta #218**, que le quito la insignia a `ini-parado`. Los 17 textos NO cambian, y
-    // eso se midio en vez de suponerlo: «Vencida» la escriben ademas `territorio`, `inf-esc`,
-    // `con-doc` y `val-tip`, y «Por vencer» otras ocho hojas. O sea que lo que se retira es una
-    // columna, no vocabulario — y por eso el reparto de mas abajo sigue diciendo 6/3/2/6.
+    // **Eran 22 hasta #218**, que le quito la insignia a `ini-parado`. Los textos NO cambiaron
+    // entonces, y eso se midio en vez de suponerlo: «Vencida» la escriben ademas `territorio`,
+    // `inf-esc`, `con-doc` y `val-tip`, y «Por vencer» otras ocho hojas. O sea que lo que se
+    // retiro fue una columna, no vocabulario.
+    //
+    // **Y con #230 son 19 textos, y las columnas siguen siendo 21.** `val-tip` cambio lo que su
+    // insignia dice —del estado del PLAZO que el artboard dibujaba, «Por vencer»/«Conforme»/
+    // «Vencida», a lo que la operacion publica, `ejercicios[].prescrita`— asi que sus tres celdas
+    // pasan a escribir «Prescrito» y «Vigente». Las tres que se van **no salen del vocabulario**
+    // —las escriben otras hojas, que es lo mismo que #218 midio— y las dos que entran son nuevas:
+    // 17 -> 19. Su columna no se retira ni se anade: cambia de indice —4 a 3, porque «Valores» e
+    // «Importe S/» salen— y sigue contando una.
     expect(columnasDeInsignia()).toHaveLength(21);
     const textos = new Set(celdasDeInsignia().map((c) => c.texto));
-    expect(textos.size, 'el artboard no escribe ni un texto en una columna de insignia').toBe(17);
+    expect(textos.size, 'el artboard no escribe ni un texto en una columna de insignia').toBe(19);
     expect(frasesDelBackend(), 'el enumerado del backend no trae sus cuatro frentes').toHaveLength(4);
     expect(Object.keys(CONECTORES).length, 'no hay ni un conector que barrer').toBeGreaterThan(10);
   });
@@ -291,7 +313,7 @@ describe('ninguna insignia se pinta de verde sin que una regla la reconozca', ()
     }
   });
 
-  it('EL REPARTO SIGUE DISCRIMINANDO: los 17 textos caen en los cuatro tonos, y no todos en uno', () => {
+  it('EL REPARTO SIGUE DISCRIMINANDO: los 19 textos caen en los cuatro tonos, y no todos en uno', () => {
     // Sin esta, un `tonoDe` que devolviera SIEMPRE el tono de «no se» pasaria las dos de arriba
     // —ninguna seria verde— y dejaria la pantalla tan muda como la dejaba el verde de antes.
     const cuenta = (tono: string) =>
@@ -300,8 +322,13 @@ describe('ninguna insignia se pinta de verde sin que una regla la reconozca', ()
           .filter((c) => tonoDe(c.texto) === tono)
           .map((c) => c.texto),
       ).size;
+    // **6/3/2/6 hasta #230, y 7/4/2/6 desde el.** Los dos textos nuevos de `val-tip` reparten uno
+    // a cada lado, y eso es lo que los hace informativos: «Vigente» ya estaba en CONFORME desde
+    // #175 —lo escribe el padron de licencias— y ahora ademas lo escribe el artboard; «Prescrito»
+    // entra en MAL con este issue, porque un ejercicio prescrito es deuda que ya no se puede
+    // exigir. Recalculado midiendo, no a ojo.
     expect({ ok: cuenta('ok'), mal: cuenta('mal'), atencion: cuenta('atencion'), info: cuenta('info') }).toEqual(
-      { ok: 6, mal: 3, atencion: 2, info: 6 },
+      { ok: 7, mal: 4, atencion: 2, info: 6 },
     );
   });
 

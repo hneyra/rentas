@@ -147,6 +147,17 @@ const PRESCRIPCION: PrescripcionDeclarada = {
   resultado: 'PROCEDE_EN_PARTE',
   nDeResolucion: 'RES-0041-2026',
   ejerciciosPrescritos: [2016, 2017],
+  // El reloj de los seis ejercicios del rango (#230). `coa-cost` no lo dibuja —lee el `plazo` y el
+  // resultado—, y se declara porque el tipo lo exige: un campo declarado es un campo que el
+  // proveedor no puede retirar sin poner rojo este build.
+  ejercicios: [
+    { ejercicio: 2016, prescribeEl: '2021-01-01', prescrita: true },
+    { ejercicio: 2017, prescribeEl: '2022-01-01', prescrita: true },
+    { ejercicio: 2018, prescribeEl: '2023-01-01', prescrita: false },
+    { ejercicio: 2019, prescribeEl: '2024-01-01', prescrita: false },
+    { ejercicio: 2020, prescribeEl: '2025-01-01', prescrita: false },
+    { ejercicio: 2021, prescribeEl: '2026-01-01', prescrita: false },
+  ],
   usuario: 'jperez',
   observacion: 'Solicitud del obligado',
 };

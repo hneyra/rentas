@@ -15,6 +15,7 @@ import { CONECTORES_DE_CONSULTAS } from './conectores/consultas.ts';
 import { CONECTORES_DE_FISCALIZACION } from './conectores/fiscalizacion.ts';
 import { CONECTORES_DE_TRANSITO } from './conectores/transito.ts';
 import { CONECTORES_DE_SEGURIDAD } from './conectores/seguridad.ts';
+import { CONECTORES_DE_VALORES } from './conectores/valores.ts';
 
 /**
  * **Que pantalla pide que, y que de lo que llega dibuja cada campo** (#97, #169).
@@ -616,6 +617,7 @@ export const CONECTORES: Readonly<Partial<Record<ClaveDeHoja, Conector>>> = {
   ...CONECTORES_DE_FISCALIZACION,
   ...CONECTORES_DE_TRANSITO,
   ...CONECTORES_DE_SEGURIDAD,
+  ...CONECTORES_DE_VALORES,
 };
 
 export { NO_ESTA_EN_EL_PADRON, NO_PUBLICADO, SIN_CRONOGRAMA, TODAVIA_SIN_DETERMINAR };

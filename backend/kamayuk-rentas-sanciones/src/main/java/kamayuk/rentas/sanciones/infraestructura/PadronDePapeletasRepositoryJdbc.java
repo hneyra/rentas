@@ -94,6 +94,31 @@ public class PadronDePapeletasRepositoryJdbc extends RepositorioJdbc
     /** Los estados en los que una papeleta ya no se debe. Uno solo, y en un solo sitio. */
     private static final String NO_SE_DEBE = "('PAGADA', 'ANULADA', 'PRESCRITA')";
 
+    /**
+     * Que a esta papeleta se le haya notificado alguna resolucion de gerencia (#222).
+     *
+     * <p>Es lo unico que consta de la notificacion, y no es «la papeleta esta notificada»: {@code
+     * EstadoDePapeleta.NOTIFICADA} no lo escribe nadie —el unico {@code UPDATE papeleta} de {@code
+     * src/main} es {@code SET numero}—, asi que contarlo daria cero para siempre. Lo que si se
+     * registra es la diligencia de la resolucion, en {@code notificacion} con {@code objeto =
+     * 'RESOLUCION'} (#50).
+     *
+     * <p><b>{@code resultado <> 'NO_UBICADO'} y no {@code = 'NOTIFICADO'}</b>: {@code RECHAZADO}
+     * —negarse a recibir— es notificacion valida por el art. 104 a) del TUO del Codigo Tributario,
+     * y {@code ResultadoDeNotificacion.surteEfecto()} lo dice asi en el dominio. Escribir aqui la
+     * lista de los que si surten efecto duplicaria esa regla en SQL y las dos podrian envejecer
+     * aparte; escribir su complemento —uno solo— no.
+     *
+     * <p>Ninguna de las dos tablas filtra por {@code municipalidad_id}: lo hace la politica RLS,
+     * como en el resto de este repositorio.
+     */
+    private static final String CON_RESOLUCION_NOTIFICADA =
+            " EXISTS (SELECT 1 FROM resolucion_gerencia rg"
+                    + "          JOIN notificacion n"
+                    + "            ON n.objeto = 'RESOLUCION' AND n.objeto_id = rg.id"
+                    + "         WHERE rg.papeleta_id = p.id"
+                    + "           AND n.resultado <> 'NO_UBICADO')";
+
     public PadronDePapeletasRepositoryJdbc(JdbcClient jdbc) {
         super(jdbc);
     }
@@ -199,7 +224,10 @@ public class PadronDePapeletasRepositoryJdbc extends RepositorioJdbc
                                 + " count(*) FILTER (WHERE p.estado = 'COACTIVA') AS en_coactiva,"
                                 + " coalesce(sum(p.importe_a_pagar)"
                                 + "          FILTER (WHERE p.estado = 'COACTIVA'), 0)"
-                                + "     AS importe_coactiva"
+                                + "     AS importe_coactiva,"
+                                + " count(*) FILTER (WHERE"
+                                + CON_RESOLUCION_NOTIFICADA
+                                + ") AS con_resolucion_notificada"
                                 + DESDE
                                 + donde
                                 + " GROUP BY "
@@ -301,7 +329,8 @@ public class PadronDePapeletasRepositoryJdbc extends RepositorioJdbc
                 fila.getLong("pendientes"),
                 new Dinero(importe(fila.getBigDecimal("importe_pendientes"))),
                 fila.getLong("en_coactiva"),
-                new Dinero(importe(fila.getBigDecimal("importe_coactiva"))));
+                new Dinero(importe(fila.getBigDecimal("importe_coactiva"))),
+                fila.getLong("con_resolucion_notificada"));
     }
 
     /**

@@ -5,12 +5,11 @@ import java.util.List;
 import java.util.Optional;
 import kamayuk.rentas.compartido.Pagina;
 import kamayuk.rentas.compartido.Paginacion;
-import kamayuk.rentas.dominio.Ejercicio;
-import kamayuk.rentas.valores.dominio.ComputoDeEjercicio;
 import kamayuk.rentas.valores.dominio.CriterioDePrescripciones;
 import kamayuk.rentas.valores.dominio.Prescripcion;
 import kamayuk.rentas.valores.dominio.PrescripcionEnLista;
 import kamayuk.rentas.valores.dominio.PrescripcionRepository;
+import kamayuk.rentas.valores.dominio.RelojDelEjercicio;
 
 /** Un {@link PrescripcionRepository} en memoria, para las pruebas de los casos de uso de #39. */
 public final class PrescripcionesEnMemoria implements PrescripcionRepository {
@@ -81,10 +80,16 @@ public final class PrescripcionesEnMemoria implements PrescripcionRepository {
     }
 
     private static PrescripcionEnLista aFila(Prescripcion prescripcion) {
-        List<Ejercicio> prescritos =
+        // El reloj sale del computo guardado, que es de donde sale en la base (#230): la fila de
+        // la relacion no lo recalcula.
+        List<RelojDelEjercicio> relojes =
                 prescripcion.ejercicios().stream()
-                        .filter(ComputoDeEjercicio::prescrita)
-                        .map(ComputoDeEjercicio::ejercicio)
+                        .map(
+                                computo ->
+                                        new RelojDelEjercicio(
+                                                computo.ejercicio(),
+                                                computo.fechaPrescripcion(),
+                                                computo.prescrita()))
                         .toList();
         Long id = prescripcion.id();
         return new PrescripcionEnLista(
@@ -98,7 +103,7 @@ public final class PrescripcionesEnMemoria implements PrescripcionRepository {
                 prescripcion.plazo(),
                 prescripcion.resultado(),
                 prescripcion.resolucion(),
-                prescritos,
+                relojes,
                 "prueba",
                 prescripcion.observacion().texto());
     }

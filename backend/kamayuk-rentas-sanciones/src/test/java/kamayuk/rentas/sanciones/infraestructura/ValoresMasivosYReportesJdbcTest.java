@@ -1199,6 +1199,87 @@ class ValoresMasivosYReportesJdbcTest {
     // ==================================================================
 
     @Nested
+    @DisplayName("#222 — «Notificadas» no consta, y lo que consta es la RESOLUCION notificada")
+    class LoQueConstaDeLaNotificacion {
+
+        /**
+         * Las tres ramas del predicado, en una sola prueba y por delta.
+         *
+         * <p>El resumen es del padron entero del ejercicio, asi que una prueba por rama contaria
+         * tambien las papeletas de las otras. Lo que se mide es lo que esta llamada anade, que es
+         * lo unico que esta prueba controla.
+         */
+        @Test
+        @DisplayName(
+                "cuenta la que tiene su resolucion notificada, y NO la que no, ni la NO_UBICADO")
+        void cuentaLaResolucionNotificada() {
+            long antes = conResolucionNotificada();
+
+            // 1. Una papeleta a secas: sin resolucion, no hay nada que notificar.
+            papeletaDeTransito("cnot1");
+            assertThat(conResolucionNotificada())
+                    .as("una papeleta sin resolucion no tiene notificacion que constar")
+                    .isEqualTo(antes);
+
+            // 2. Con su ordinaria dictada y NOTIFICADA: esta es la que cuenta.
+            papeletaExigible("cnot2");
+            assertThat(conResolucionNotificada())
+                    .as("la diligencia consta en `notificacion` con objeto = 'RESOLUCION'")
+                    .isEqualTo(antes + 1);
+
+            // 3. Dictada y diligenciada con NO_UBICADO: no surtio efecto, no cuenta.
+            Papeleta noUbicada = papeletaDeTransito("cnot3");
+            ResolverConResolucionDeGerencia.ResolucionDictada dictada = dictarOrdinaria(noUbicada);
+            enTransaccion(
+                    () ->
+                            notificar.registrar(
+                                    dictada.resolucion().numero(),
+                                    new NotificarResolucionDeGerencia.Peticion(
+                                            DILIGENCIA,
+                                            ModalidadDeNotificacion.PERSONAL,
+                                            ResultadoDeNotificacion.NO_UBICADO,
+                                            "V. RETO SANTOS",
+                                            "AV. JOSE DE LAMA 1180 - SULLANA",
+                                            null,
+                                            null,
+                                            null,
+                                            null),
+                                    PORQUE),
+                    "notificador");
+
+            assertThat(conResolucionNotificada())
+                    .as(
+                            "NO_UBICADO es el unico resultado que no surte efecto, y es el unico"
+                                    + " que se reintenta: contarlo diria que se notifico a quien no"
+                                    + " se encontro")
+                    .isEqualTo(antes + 1);
+        }
+
+        @Test
+        @DisplayName("y NO es «papeleta.estado = NOTIFICADA», que nadie escribe nunca")
+        void elEstadoNotificadaNoLoEscribeNadie() {
+            papeletaExigible("cnot4");
+
+            ResumenDePapeletas porEstado = resumenPorEstado();
+
+            assertThat(porEstado.lineas())
+                    .as(
+                            "el unico `UPDATE papeleta` de src/main es `SET numero`: el estado se"
+                                    + " escribe en el INSERT y siempre IMPUESTA, asi que la linea"
+                                    + " NOTIFICADA no existe y contarla daria cero para siempre")
+                    .noneMatch(linea -> "NOTIFICADA".equals(linea.clave()));
+            assertThat(conResolucionNotificada())
+                    .as("mientras que lo que SI consta se cuenta y es positivo")
+                    .isPositive();
+        }
+
+        /** Lo que la linea IMPUESTA del resumen por estado dice de las resoluciones notificadas. */
+        private long conResolucionNotificada() {
+            return lineaDe(resumenPorEstado(), "IMPUESTA").conResolucionNotificada();
+        }
+    }
+
+    @Nested
     @DisplayName("#398 — la agrupacion por ano y el total por mes")
     class ElAnoYElTotalPorMes {
 

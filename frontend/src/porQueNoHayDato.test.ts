@@ -155,7 +155,7 @@ describe('el cruce contra lo que el backend sirve', () => {
  * del otro: quitarle a `fis-res` una de sus dos declaraciones dejaba este en verde.
  */
 describe('AC4 — toda hoja con conector declara la operacion que la sirve', () => {
-  it('las veinte que piden de verdad declaran alguna servida de lectura', () => {
+  it('las veintiuna que piden de verdad declaran alguna servida de lectura', () => {
     const mudas = Object.keys(CONECTORES).filter(
       (clave) => operacionesUtiles(hojaDe(clave as ClaveDeHoja)).length === 0,
     );
@@ -168,9 +168,9 @@ describe('AC4 — toda hoja con conector declara la operacion que la sirve', () 
     ).toEqual([]);
   });
 
-  it('EL CENTINELA: y son veinte, no cero', () => {
+  it('EL CENTINELA: y son veintiuno, no cero', () => {
     // Un registro de conectores vacio dejaria la comprobacion de arriba pasando sobre la nada.
-    expect(Object.keys(CONECTORES)).toHaveLength(20);
+    expect(Object.keys(CONECTORES)).toHaveLength(21);
   });
 });
 

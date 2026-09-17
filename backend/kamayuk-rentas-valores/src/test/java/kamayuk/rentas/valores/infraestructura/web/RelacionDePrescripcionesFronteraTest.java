@@ -118,7 +118,10 @@ class RelacionDePrescripcionesFronteraTest {
                         "RES-001-2033");
         prescritos(municipalidadA, enParte, 2018, true);
         prescritos(municipalidadA, enParte, 2019, true);
-        prescritos(municipalidadA, enParte, 2020, false);
+        // Con una INTERRUPCION del art. 45 de por medio: el computo se reinicio, asi que su
+        // fecha NO es `ejercicio + 5`. Es la unica fila que distingue leer la fecha guardada de
+        // calcularla, y sin ella un recurso que la calculara pasaria en verde.
+        prescritos(municipalidadA, enParte, 2020, false, "2027-01-01");
 
         noProcede =
                 crearPrescripcion(
@@ -225,6 +228,53 @@ class RelacionDePrescripcionesFronteraTest {
                 .as("ninguna cifra de dinero: la prescripcion no extingue un importe")
                 .doesNotContain("importe")
                 .doesNotContain("insoluto");
+    }
+
+    @Test
+    @DisplayName("#230 — publica el RELOJ de cada ejercicio, con la fecha en que prescribe")
+    void publicaElReloj() throws Exception {
+        String json = pedir("/rentas/api/v1/coactiva/prescripcion");
+
+        assertThat(json)
+                .as(
+                        "una entrada por ejercicio del rango, con SU fecha: es la columna «Prescribe"
+                                + " el» de val-tip, que hasta #230 no salia de ningun campo")
+                .contains(
+                        "\"ejercicios\":["
+                                + "{\"ejercicio\":2018,\"prescribeEl\":\"2023-01-01\",\"prescrita\":true},"
+                                + "{\"ejercicio\":2019,\"prescribeEl\":\"2024-01-01\",\"prescrita\":true},"
+                                + "{\"ejercicio\":2020,\"prescribeEl\":\"2027-01-01\",\"prescrita\":false}]");
+        assertThat(json)
+                .as("y el que no procedio tambien lo lleva: su ejercicio sigue siendo exigible")
+                .contains(
+                        "\"ejercicios\":["
+                                + "{\"ejercicio\":2019,\"prescribeEl\":\"2024-01-01\",\"prescrita\":false}]");
+        assertThat(json)
+                .as(
+                        "`plazo` NO es la fecha, y por eso hacia falta el reloj: es el plazo"
+                                + " aplicable, un texto")
+                .contains("\"plazo\":\"4 ANIOS\"");
+        assertThat(json)
+                .as(
+                        "los dos inicios del computo NO viajan: son la explicacion de la"
+                                + " resolucion, y salen del POST que la declara")
+                .doesNotContain("inicioDelComputo")
+                .doesNotContain("nuevoInicioDelComputo");
+    }
+
+    @Test
+    @DisplayName("#230 — «ejerciciosPrescritos» se DERIVA del reloj: no son dos verdades")
+    void losPrescritosSalenDelReloj() throws Exception {
+        String json = pedir("/rentas/api/v1/coactiva/prescripcion", "codContribuyente", "PR-0002");
+
+        assertThat(json)
+                .as(
+                        "el unico ejercicio de QUISPE prescribio, asi que sale en las dos listas y"
+                                + " con la misma fecha")
+                .contains("\"ejerciciosPrescritos\":[2017]")
+                .contains(
+                        "\"ejercicios\":["
+                                + "{\"ejercicio\":2017,\"prescribeEl\":\"2022-01-01\",\"prescrita\":true}]");
     }
 
     @Test
@@ -414,17 +464,52 @@ class RelacionDePrescripcionesFronteraTest {
                 resolucion);
     }
 
+    /**
+     * El computo de un ejercicio, con su fecha de prescripcion DERIVADA del ejercicio (#230).
+     *
+     * <p>Hasta #230 esta fila ponia {@code DATE '2023-01-01'} en todas, y daba igual porque la
+     * relacion no publicaba la fecha. Ahora la publica, y una constante dejaria la prueba en verde
+     * aunque el reloj de un ejercicio se leyera de la fila de otro: lo unico que distingue esas dos
+     * cosas es que cada fila lleve una fecha distinta.
+     *
+     * <p>{@code ejercicio + 5} no es magia: el computo empieza el 1 de enero del ano siguiente
+     * (art. 44) y el plazo corriente es de cuatro anios (art. 43), asi que vence el 1 de enero del
+     * quinto. Aqui es un dato de prueba y no una regla: la regla vive en {@code
+     * ComputoDePrescripcion} y se prueba alli.
+     */
     private static void prescritos(
             long municipalidad, long prescripcion, int ejercicio, boolean prescrita) {
+        prescritos(municipalidad, prescripcion, ejercicio, prescrita, (ejercicio + 5) + "-01-01");
+    }
+
+    /**
+     * Igual, pero con la fecha ESCRITA y no derivada del ejercicio.
+     *
+     * <p>Hace falta uno asi y no es un capricho: con todas las filas en {@code ejercicio + 5}, un
+     * recurso que <b>calculara</b> la fecha con esa misma formula —en vez de leer la que la fila
+     * guarda— pasaria en verde. Comprobado: sale igual de verde que el bueno.
+     *
+     * <p>Y el caso existe en la realidad, que es lo que lo hace obligatorio: una interrupcion del
+     * art. 45 —una notificacion, un reconocimiento de deuda— <b>reinicia el computo</b>, asi que la
+     * fecha guardada se aparta de la formula. Leerla de la fila no es una preferencia: es la unica
+     * forma de que el reloj diga lo que de verdad le pasó a esa deuda.
+     */
+    private static void prescritos(
+            long municipalidad,
+            long prescripcion,
+            int ejercicio,
+            boolean prescrita,
+            String fechaEscrita) {
         comoApp(
                 municipalidad,
                 "INSERT INTO prescripcion_ejercicio (municipalidad_id, prescripcion_id, ejercicio,"
                         + " inicio_computo, inicio_vigente, fecha_prescripcion, prescrita)"
-                        + " VALUES (?, ?, ?, DATE '2019-01-01', DATE '2019-01-01',"
-                        + " DATE '2023-01-01', ?) RETURNING id",
+                        + " VALUES (?, ?, ?, DATE '2019-01-01', DATE '2019-01-01', ?::date, ?)"
+                        + " RETURNING id",
                 municipalidad,
                 prescripcion,
                 ejercicio,
+                fechaEscrita,
                 prescrita);
     }
 

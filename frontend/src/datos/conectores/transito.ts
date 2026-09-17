@@ -182,7 +182,11 @@ const SIN_PLACA: Ausencia = {
  * entero: una cifra exacta y equivocada, que es la peor clase. Con cero lineas pasa lo mismo al
  * reves: no hay de donde sacarlas. En los dos casos los dos campos dicen «no publicado».
  *
- * <h2>Campo a campo: uno de contexto, tres con dato y DOS huecos que nombran al backend</h2>
+ * <h2>Campo a campo: uno de contexto, CUATRO con dato y UN hueco que nombra al backend</h2>
+ *
+ * **Eran tres con dato y dos huecos hasta #222.** «Notificadas» se llama ahora «Con multa
+ * notificada» y trae cifra; «Caducadas sin notificar» sigue sin publicarse, y ya con la medida de
+ * por que.
  *
  * <ul>
  *   <li><b>`0|0` Ejercicio</b> ← el <b>ano de `desde`</b>, que es el rango que la respuesta dice
@@ -202,6 +206,18 @@ const SIN_PLACA: Ausencia = {
  *       rotulos que empareja <b>exacto</b> con lo que la operacion publica: «levantar una papeleta»
  *       es emitirla, y toda fila del padron se levanto —tambien las anuladas y las prescritas—. El
  *       total va <b>calculado en el servidor</b> y no sumando las lineas aqui.</li>
+ *   <li><b>`0|2` Con multa notificada</b> ← `conResolucionNotificada` de la linea, <b>desde
+ *       #222</b>. El rotulo del artboard decia «Notificadas» y eso <b>no consta</b>:
+ *       `EstadoDePapeleta` declara `NOTIFICADA` y <b>ningun codigo de produccion lo escribe</b> —el
+ *       unico `UPDATE papeleta` de `backend/*&#47;src/main` es `SET numero = :numeroNuevo`, y el
+ *       estado se escribe una sola vez, en el `INSERT`, y siempre `IMPUESTA`—, asi que contarlo
+ *       daria <b>cero para siempre</b> bajo un rotulo que afirma lo contrario. Lo que el sistema si
+ *       registra es la diligencia de la <b>resolucion de gerencia</b> de esa papeleta —una fila de
+ *       `notificacion` con `objeto = 'RESOLUCION'`, #50— y eso es lo que el resumen cuenta, con
+ *       `resultado &lt;&gt; 'NO_UBICADO'` porque negarse a recibir es notificacion valida (art. 104
+ *       a)). <b>Se cambio el rotulo en el artboard y no la cifra aqui</b>, que es lo que pedia el
+ *       AC 1 de #222: una papeleta notificada en la calle sin resolucion emitida no entra en este
+ *       recuento, y el rotulo ya no promete que si.</li>
  *   <li><b>`0|3` Canceladas</b> ← `pagadas` de la linea. «Cancelar» es <b>pagar</b>, y no se
  *       decidio por el sonido: el artboard usa la misma palabra en la instruccion de `tra-veh`
  *       —«sin la papeleta cancelada y la custodia pagada no se emite la orden de retiro»—, y el
@@ -216,29 +232,26 @@ const SIN_PLACA: Ausencia = {
  * Son los dos casos que #184 pedia nombrar, y no son el mismo hueco:
  *
  * <ul>
- *   <li><b>`0|2` Notificadas</b> — <b>falta el acto que registra la notificacion de la papeleta en
- *       si</b>. `EstadoDePapeleta` declara `NOTIFICADA` y la secuencia `IMPUESTA → NOTIFICADA → …`,
- *       pero <b>ningun codigo de produccion escribe ese estado</b>: lo midio el backend al escribir
- *       `PapeletasSinNotificar`, cuyo javadoc censa los usos del enumerado en `src/main` y encuentra
- *       `IMPUESTA`, `PAGADA`, `ANULADA` y `PRESCRITA`, y ninguna otra. O sea que pedir esta misma
- *       operacion con `?agrupadoPor=ESTADO` y leer la linea `NOTIFICADA` daria <b>cero, siempre</b>,
- *       bajo un rotulo que dice cuantas se notificaron — la cifra plausible y equivocada. Lo que el
- *       sistema si sabe de la notificacion es indirecto y de <b>otro</b> documento: la resolucion de
- *       multa, cuyos acuses publica `GET /transito/papeletas/{numero}/actos` una papeleta a una
- *       papeleta y no como agregado.</li>
  *   <li><b>`0|4` Caducadas sin notificar</b> — <b>no es un estado</b>, y le faltan <b>las dos
- *       cosas</b>: el acto de arriba, y ademas el <b>plazo</b> para notificar, contra el que se
- *       decide si vencio. Ese plazo es un valor normativo y la regla 5 prohibe compilarlo; el
- *       conjunto sellado publica dos plazos de sanciones —`DESCARGO_PAPELETA` y el de cumplimiento
- *       de la resolucion ordinaria— y <b>ninguno de los dos es este</b>. Es exactamente el mismo
- *       hueco por el que `tra-pap` escribe `NOTIFICADO` tal cual en vez de traducirlo a «Conforme»
- *       (#185): «Conforme» y «Por vencer» son estados <b>del plazo</b>, y el plazo no lo publica
- *       nadie.</li>
+ *       cosas</b>: el acto que registra la notificacion de la papeleta en si, y ademas el
+ *       <b>plazo</b> para notificar, contra el que se decide si vencio. Ese plazo es un valor
+ *       normativo y la regla 5 prohibe compilarlo.
+ *       <p><b>#222 lo comprobo contra el corpus, y no esta</b>: de las <b>nueve</b> filas `PLAZO`
+ *       del derivado publicable de `normativa`
+ *       —`docs/10-negocio/valores-normativos/publicacion/parametros-2026.csv`— tres son de
+ *       <b>prescripcion</b> (art. 43, elegidas por si el deudor declaro), dos fijan <b>cuando
+ *       empieza</b> a contarse (`PRESCRIPCION_INICIO-PREDIAL` y `-VEHICULAR`), una es el
+ *       cumplimiento del REC-1 y las tres `NOTIFICACION_VALOR-*` son el plazo de
+ *       <b>reclamacion</b>, que corre <b>desde</b> la notificacion y no <b>hasta</b> ella. Y los
+ *       dos que `sanciones` ya lee —`DESCARGO_PAPELETA` y `RG_ORDINARIA_CUMPLIMIENTO`— tampoco
+ *       estan publicados ahi. <b>Esta mitad queda bloqueada por la regla 5 y D-02b</b>, y decirlo
+ *       es la respuesta: un plazo inventado aqui no cobra de mas, <b>declara incobrable</b>
+ *       trabajo que todavia se puede cobrar. Es el mismo razonamiento por el que #185 se nego a
+ *       traducir `NOTIFICADO` a «Conforme» y por el que #183 se cerro sin implementarse.</li>
  * </ul>
  *
- * <p>Los dos huecos son informacion: dicen a quien mantiene el backend exactamente que le falta
- * para cerrar este panel —es [#222](https://github.com/hneyra/rentas/issues/222)—. Un cero
- * calculado aqui no lo seria.
+ * <p>El hueco es informacion: dice a quien mantiene el backend exactamente que le falta para cerrar
+ * este panel. Un cero calculado aqui no lo seria.
  *
  * <h2>Lo que NO se hace, y podria parecer que si</h2>
  *
@@ -276,15 +289,17 @@ const TRA_PANEL: Conector = {
       [coordenada(0, 1), String(resumen.papeletas)],
     ]);
     const noPublicados = new Map<Coordenada, string>([
-      // «Notificadas»: ningun codigo de produccion escribe `NOTIFICADA`. Ver el javadoc.
-      [coordenada(0, 2), NO_PUBLICADO],
-      // «Caducadas sin notificar»: no es un estado, y el plazo no lo publica nadie.
+      // «Caducadas sin notificar»: no es un estado, y el plazo con que juzgarlo no lo publica el
+      // corpus — medido en #222, las nueve filas `PLAZO` una por una. Ver el javadoc.
       [coordenada(0, 4), NO_PUBLICADO],
     ]);
     if (delEjercicio === undefined) {
+      noPublicados.set(coordenada(0, 2), NO_PUBLICADO);
       noPublicados.set(coordenada(0, 3), NO_PUBLICADO);
       noPublicados.set(coordenada(0, 5), NO_PUBLICADO);
     } else {
+      // «Con multa notificada»: lo que consta es la diligencia de la RESOLUCION (#222).
+      valores.set(coordenada(0, 2), String(delEjercicio.conResolucionNotificada));
       valores.set(coordenada(0, 3), String(delEjercicio.pagadas));
       valores.set(coordenada(0, 5), String(delEjercicio.enCoactiva));
     }
