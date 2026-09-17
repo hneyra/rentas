@@ -78,3 +78,27 @@ jobs:
         env:
           KAMAYUK_CUERPO_DEL_PR: ${{ github.event.pull_request.body }}
         run: node docs/00-gobierno/verificar-fila-del-registro.mjs --base origin/${{ github.event.pull_request.base.ref }}
+
+      # Y la otra mitad del mismo defecto (#220): un PR que se mezcla sin llegar a `main`.
+      #
+      # La guarda de arriba comprueba dos cosas del CUERPO y las dos pasaron en #209; ninguna
+      # mira `baseRefName`. El PR se abrio contra `issue-173`, se mezclo ahi, y su trabajo no
+      # llego a `main` con el PR en MERGED, el issue cerrado y la fila escrita.
+      #
+      # Va en una guarda aparte y no dentro de la de arriba porque aquella es una de SEIS copias
+      # byte a byte (`infrastructure`#165) y tocarla es tocar los seis repositorios, con
+      # `infrastructure` mezclandose el ultimo. El motivo entero, y lo que eso deja pendiente en
+      # los otros cinco, esta en la cabecera del guion.
+      #
+      # OJO: hoy la CI de este repositorio esta bloqueada por facturacion y falla en segundos sin
+      # ejecutar un paso, asi que estos dos pasos no protegen nada por si solos. La guarda se
+      # corre A MANO —su cabecera trae el comando— y esto queda enganchado para cuando vuelva.
+      - name: Las muestras de la guarda de la rama base, antes de usarla
+        run: node docs/00-gobierno/verificar-las-muestras-de-la-rama-base.mjs
+
+      - name: El PR esta abierto contra `main`, o el apilamiento esta declarado
+        env:
+          KAMAYUK_RAMA_BASE_DEL_PR: ${{ github.event.pull_request.base.ref }}
+          KAMAYUK_CUERPO_DEL_PR: ${{ github.event.pull_request.body }}
+          KAMAYUK_NUMERO_DEL_PR: ${{ github.event.pull_request.number }}
+        run: node docs/00-gobierno/verificar-la-rama-base-del-pr.mjs

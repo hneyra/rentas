@@ -23,6 +23,29 @@
      un numero: le haria exigir la fila de un issue que este PR no cierra (paso en #55).
 
      El resto del cuerpo va en castellano, como el commit y como la fila del registro.
+
+
+     Y LA RAMA CONTRA LA QUE ESTE PR ESTA ABIERTO
+
+     Tiene que ser `main`. Compruebalo —`gh pr view N --json baseRefName`— y si no lo es,
+     retargetealo con `gh pr edit N --base main`.
+
+     Medido en #209 el 2026-09-17: el PR se abrio contra `issue-173`, se mezclo ahi, y su
+     trabajo NO llego a `main`. El PR quedo en MERGED, su issue cerrado, su fila escrita y la
+     guarda del registro en verde — todo verde menos el codigo, que se quedo fuera del arbol.
+     Se descubrio horas despues por una resta de pruebas que no cuadraba: 788 sobre `main` y
+     791 sobre la rama.
+
+     APILAR ES LEGITIMO cuando dos ramas tocan el mismo archivo: abrir la segunda contra la
+     primera es lo que evita el conflicto garantizado. Lo que no puede ser es que retargetear
+     dependa de que alguien se acuerde, asi que **se declara**, con la rama nombrada:
+
+         Apilado sobre <la-rama>
+
+     Es el mismo trato que el auto-cierre: se puede no hacerlo por omision, pero entonces hay
+     que decirlo. Lo comprueba `docs/00-gobierno/verificar-la-rama-base-del-pr.mjs` (#220), que
+     ademas sale rojo —declarado o no— si esa rama YA entro entera en `main`: sobre una rama ya
+     mezclada no queda nada con lo que chocar, y apilarse ahi solo vara el commit.
      ──────────────────────────────────────────────────────────────────────────────────── -->
 
 Closes #
