@@ -261,6 +261,16 @@ docker compose -f despliegue/plataforma.compose.yaml up -d --wait
 # La guarda del registro (#711) y su autoprueba
 node docs/00-gobierno/verificar-fila-del-registro.mjs
 node docs/00-gobierno/verificar-las-muestras-del-registro.mjs
+
+# La guarda de la rama base (#220) y su autoprueba. El PR tiene que estar abierto contra `main`,
+# y si se apila sobre otra rama hay que declararlo en el cuerpo: `Apilado sobre <la-rama>`
+KAMAYUK_RAMA_BASE_DEL_PR=$(gh pr view N --json baseRefName --jq .baseRefName) \
+KAMAYUK_CUERPO_DEL_PR=$(gh pr view N --json body --jq .body) \
+  node docs/00-gobierno/verificar-la-rama-base-del-pr.mjs
+node docs/00-gobierno/verificar-las-muestras-de-la-rama-base.mjs
+
+# Y el barrido: PR ya mezclados cuyo trabajo NO llego a `main`. Necesita `gh`; se corre a mano
+node docs/00-gobierno/barrer-los-pr-mezclados-fuera-de-main.mjs
 ```
 
 **`verificarAislamiento` no se omite sin Docker: falla.** Una prueba bloqueante que se salta a sí
