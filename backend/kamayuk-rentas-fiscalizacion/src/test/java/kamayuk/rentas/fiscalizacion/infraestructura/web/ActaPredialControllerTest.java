@@ -12,6 +12,7 @@ import kamayuk.rentas.catastro.LectorDeFichas;
 import kamayuk.rentas.compartido.Pagina;
 import kamayuk.rentas.compartido.Paginacion;
 import kamayuk.rentas.fiscalizacion.aplicacion.RegistrarActaFiscalizacion;
+import kamayuk.rentas.fiscalizacion.dobles.ContribuyentesDeMentira;
 import kamayuk.rentas.fiscalizacion.dominio.ActaFiscalizacion;
 import kamayuk.rentas.fiscalizacion.dominio.ActaFiscalizacionRepository;
 import kamayuk.rentas.fiscalizacion.dominio.CriterioDeProgramas;
@@ -169,8 +170,19 @@ class ActaPredialControllerTest {
                     },
                     (RegistroDeAuditoria registro) -> {});
 
+    /**
+     * El padron, con el unico obligado que estas peticiones nombran (#216).
+     *
+     * <p>La respuesta del {@code POST} publica {@code contribuyente} y {@code codContribuyente}
+     * como la lectura: son el mismo {@code record}, y dejarlos nulos aqui seria un campo declarado
+     * que en la mitad de sus rutas nunca se llena.
+     */
+    private static final ContribuyentesDeMentira PADRON =
+            new ContribuyentesDeMentira()
+                    .con(10L, "00000010", "PEREZ CASTILLO, JUAN", "Jr. Union 100");
+
     private final MockMvc mvc =
-            MockMvcBuilders.standaloneSetup(new ActaPredialController(servicio))
+            MockMvcBuilders.standaloneSetup(new ActaPredialController(servicio, PADRON))
                     .setControllerAdvice(new ManejadorDeErrores())
                     .setMessageConverters(
                             new JacksonJsonHttpMessageConverter(
@@ -202,6 +214,30 @@ class ActaPredialControllerTest {
                 .contains("\"fichaId\":700")
                 .contains("\"hallazgo\":\"CONFORME\"")
                 .contains("\"predioId\":20");
+    }
+
+    @Test
+    @DisplayName("#216 — la respuesta del POST lleva el nombre LLENO, no nulo")
+    void laRespuestaDelPostLlevaElNombre() throws Exception {
+        // `ActaFiscalizacionResource` es el mismo record que sirve `GET /fiscalizacion/actas`.
+        // Publicar `contribuyente` alli y dejarlo nulo aqui seria un campo declarado que en la
+        // mitad de sus rutas nunca se llena, que es el defecto que #194 midio.
+        String cuerpo =
+                "{\"observacion\":\"Se fiscaliza para la prueba\",\"programaId\":1,"
+                        + "\"contribuyenteId\":10,\"predioId\":20,\"fechaVisita\":\"2026-03-15\","
+                        + "\"fiscalizador\":\"J. Perez\",\"hallazgo\":\"CONFORME\","
+                        + "\"areaHallada\":\"120.50\"}";
+
+        MvcResult resultado =
+                mvc.perform(
+                                post("/rentas/api/v1/fiscalizacion/predial/actas")
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(cuerpo))
+                        .andReturn();
+
+        assertThat(resultado.getResponse().getContentAsString())
+                .contains("\"contribuyente\":\"PEREZ CASTILLO, JUAN\"")
+                .contains("\"codContribuyente\":\"00000010\"");
     }
 
     @Test

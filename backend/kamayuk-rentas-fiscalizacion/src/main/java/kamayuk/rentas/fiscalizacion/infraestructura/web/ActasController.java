@@ -2,12 +2,19 @@ package kamayuk.rentas.fiscalizacion.infraestructura.web;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 import kamayuk.rentas.autorizacion.Privilegio;
 import kamayuk.rentas.autorizacion.RequiereAcceso;
+import kamayuk.rentas.compartido.Pagina;
+import kamayuk.rentas.contribuyentes.DirectorioDeContribuyentes;
+import kamayuk.rentas.contribuyentes.ResumenDeContribuyente;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.fiscalizacion.aplicacion.AnularActaFiscalizacion;
 import kamayuk.rentas.fiscalizacion.aplicacion.ConsultaDeActas;
 import kamayuk.rentas.fiscalizacion.aplicacion.LiquidarFiscalizacion;
+import kamayuk.rentas.fiscalizacion.dominio.ActaConLoDeclarado;
 import kamayuk.rentas.fiscalizacion.dominio.ActaFiscalizacion;
 import kamayuk.rentas.fiscalizacion.dominio.CriterioDeActas;
 import kamayuk.rentas.web.Api;
@@ -78,10 +85,15 @@ public class ActasController {
 
     private final ConsultaDeActas consulta;
     private final AnularActaFiscalizacion anulacion;
+    private final DirectorioDeContribuyentes contribuyentes;
 
-    public ActasController(ConsultaDeActas consulta, AnularActaFiscalizacion anulacion) {
+    public ActasController(
+            ConsultaDeActas consulta,
+            AnularActaFiscalizacion anulacion,
+            DirectorioDeContribuyentes contribuyentes) {
         this.consulta = consulta;
         this.anulacion = anulacion;
+        this.contribuyentes = contribuyentes;
     }
 
     @GetMapping
@@ -89,11 +101,17 @@ public class ActasController {
             @RequestParam(required = false) @Nullable String programa,
             ParametrosDePaginacion paginacion) {
 
-        return RespuestaPaginada.de(
+        Pagina<ActaConLoDeclarado> pagina =
                 consulta.buscar(
                         new CriterioDeActas(programaOpcional(programa)),
-                        paginacion.aPaginacion(ORDEN_POR_OMISION)),
-                ActaFiscalizacionResource::de);
+                        paginacion.aPaginacion(ORDEN_POR_OMISION));
+
+        Map<Long, ResumenDeContribuyente> padron = padronDe(pagina);
+        return RespuestaPaginada.de(
+                pagina,
+                contraste ->
+                        ActaFiscalizacionResource.de(
+                                contraste, padron.get(contraste.acta().contribuyenteId())));
     }
 
     /**
@@ -125,7 +143,7 @@ public class ActasController {
     public ActaFiscalizacionResource anular(
             @PathVariable long id, @RequestBody PeticionDeAnulacion peticion) {
         try {
-            return ActaFiscalizacionResource.de(
+            return conSuObligado(
                     anulacion.anular(
                             id, fechaDe(peticion.fecha()), Observacion.de(peticion.observacion())));
         } catch (LiquidarFiscalizacion.ActaInexistente noEsta) {
@@ -169,6 +187,38 @@ public class ActasController {
     private static String mensajeDe(RuntimeException problema) {
         String mensaje = problema.getMessage();
         return mensaje == null ? problema.getClass().getSimpleName() : mensaje;
+    }
+
+    /**
+     * Los obligados de la página, resueltos a código y nombre en <b>una</b> consulta (#216).
+     *
+     * <p>Igual que {@code OmisosController#padronDe}, y por lo mismo: con {@code porId} en un bucle
+     * una página de veinte actas serían veintiuna consultas, y eso no se nota en la prueba y sí en
+     * el padrón de una provincia.
+     *
+     * <p>Los identificadores que no estén en el padrón simplemente no salen del mapa, y entonces el
+     * recurso publica nombre y código nulos <b>sin ocultar el acta</b>: un acta cuyo obligado se
+     * dio de baja es justamente la que hay que revisar.
+     */
+    /**
+     * El acta que acaba de cambiar de estado, con su obligado resuelto (#216).
+     *
+     * <p>Una lectura, y no cero: la anulacion devuelve el <b>mismo</b> {@code record} que la
+     * lectura, asi que publicar {@code contribuyente} y dejarlo nulo aqui seria un campo declarado
+     * que en una de sus rutas nunca se llena — el defecto que #194 midio.
+     */
+    private ActaFiscalizacionResource conSuObligado(ActaConLoDeclarado contraste) {
+        long contribuyenteId = contraste.acta().contribuyenteId();
+        return ActaFiscalizacionResource.de(
+                contraste, contribuyentes.porIds(Set.of(contribuyenteId)).get(contribuyenteId));
+    }
+
+    private Map<Long, ResumenDeContribuyente> padronDe(Pagina<ActaConLoDeclarado> pagina) {
+        Set<Long> ids = new HashSet<>();
+        for (ActaConLoDeclarado contraste : pagina.contenido()) {
+            ids.add(contraste.acta().contribuyenteId());
+        }
+        return ids.isEmpty() ? Map.of() : contribuyentes.porIds(ids);
     }
 
     private static @Nullable Long programaOpcional(@Nullable String texto) {

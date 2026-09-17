@@ -4,10 +4,14 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.Locale;
+import java.util.Set;
 import kamayuk.rentas.autorizacion.Privilegio;
 import kamayuk.rentas.autorizacion.RequiereAcceso;
+import kamayuk.rentas.contribuyentes.DirectorioDeContribuyentes;
+import kamayuk.rentas.contribuyentes.ResumenDeContribuyente;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.fiscalizacion.aplicacion.RegistrarActaFiscalizacion;
+import kamayuk.rentas.fiscalizacion.dominio.ActaConLoDeclarado;
 import kamayuk.rentas.fiscalizacion.dominio.Hallazgo;
 import kamayuk.rentas.web.Api;
 import kamayuk.rentas.web.CodigoDeError;
@@ -61,9 +65,12 @@ import org.springframework.web.bind.annotation.RestController;
 public class ActaPredialController {
 
     private final RegistrarActaFiscalizacion actas;
+    private final DirectorioDeContribuyentes contribuyentes;
 
-    public ActaPredialController(RegistrarActaFiscalizacion actas) {
+    public ActaPredialController(
+            RegistrarActaFiscalizacion actas, DirectorioDeContribuyentes contribuyentes) {
         this.actas = actas;
+        this.contribuyentes = contribuyentes;
     }
 
     @PostMapping
@@ -72,7 +79,7 @@ public class ActaPredialController {
         Observacion observacion = observacionDe(peticion.observacion());
 
         try {
-            return ActaFiscalizacionResource.de(
+            return conSuObligado(
                     actas.registrarPredial(
                             exigirId(peticion.programaId(), "programaId"),
                             exigirId(peticion.contribuyenteId(), "contribuyenteId"),
@@ -93,6 +100,21 @@ public class ActaPredialController {
     }
 
     // ------------------------------------------------------------------
+
+    /**
+     * El acta recién escrita, con su obligado resuelto (#216).
+     *
+     * <p>Una lectura por acta, y no cero: el {@code record} es el mismo que sirve la lectura, así
+     * que publicar {@code contribuyente} y dejarlo nulo aquí sería un campo declarado que en la
+     * mitad de sus rutas nunca se llena, que es el defecto que #194 midió.
+     */
+    private ActaFiscalizacionResource conSuObligado(ActaConLoDeclarado contraste) {
+        ResumenDeContribuyente enElPadron =
+                contribuyentes
+                        .porIds(Set.of(contraste.acta().contribuyenteId()))
+                        .get(contraste.acta().contribuyenteId());
+        return ActaFiscalizacionResource.de(contraste, enElPadron);
+    }
 
     private static @Nullable Hallazgo hallazgoDe(@Nullable String texto) {
         if (texto == null || texto.isBlank()) {
