@@ -223,10 +223,29 @@ const INI_FLUJO: Conector = {
  * reconocer ninguna de las cuatro frases, caia en `ok` — o sea que la interfaz pintaba con la
  * insignia de «conforme» trabajo que esta parado y cuesta dinero. Desde #175 lo que ninguna regla
  * reconoce sale con el tono de «no se», asi que la pantalla ya no miente; **pero su insignia
- * tampoco dice nada**, y eso no se arregla aqui: el estado lo tiene que publicar
- * `GET /indicadores/trabajo-parado` ([#183](https://github.com/hneyra/rentas/issues/183)).
- * Deducirlo de la frase en este archivo seria inventarlo, que es lo que prohibe la regla de
- * `conectores.ts`.
+ * tampoco dice nada**.
+ *
+ * **Y ya no va a decirlo, porque el backend NO puede publicar el estado**
+ * ([#183](https://github.com/hneyra/rentas/issues/183), cerrado sin implementar el 2026-09-17).
+ * Se midio antes de escribir codigo, y la medida esta entera en el javadoc de
+ * `FrenteDeTrabajo.java`. En corto, dos cosas y las dos de fondo:
+ *
+ *   · **no hay con que juzgar** — los cuatro puertos devuelven un recuento (uno de ellos con su
+ *     suma) y ninguno publica la antiguedad de lo que esta parado; devolver la lista para poder
+ *     medirla es lo que prohibe el AC 4 de #56, porque esta es la pantalla que todo el mundo abre
+ *     al entrar;
+ *   · **y no hay plazo** — «vencida» es «vencida respecto de que», y de las nueve filas `PLAZO`
+ *     que el corpus publica ninguna es el plazo que la administracion tiene para desatascar
+ *     ninguno de los cuatro frentes: las tres de prescripcion se eligen por si el deudor presento
+ *     declaracion, la de coactiva corre **desde** el REC-1 que a estos expedientes les falta, las
+ *     tres de valores corren **desde** la notificacion que a estos valores les falta, y para
+ *     catastro no hay ninguna. Un umbral inventado aqui declararia vencido trabajo que todavia se
+ *     puede hacer.
+ *
+ * Asi que la columna **sobra**, y eso se arregla en el artboard y no en este archivo: mientras
+ * tanto se le sigue pasando `porQueCuestaDinero` y sale con el tono de «no se», que es lo unico
+ * que se puede decir sin inventar. Deducir el estado de la frase aqui seria exactamente lo que
+ * prohibe la regla de `conectores.ts`.
  */
 const INI_PARADO: Conector = {
   clave: ['ini-parado', 'trabajo-parado'],
