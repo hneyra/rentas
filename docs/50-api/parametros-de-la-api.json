@@ -163,7 +163,7 @@
     "obligatorios": [],
     "algunoDeEstos": [],
     "condicionales": [],
-    "opcionales": ["ordenarPor", "pagina", "programa", "sentido", "tamano"],
+    "opcionales": ["ordenarPor", "pagina", "sentido", "tamano"],
     "enElCuerpo": [],
     "orden": { "porOmision": "fechaVisita", "admitidos": ["estado", "fechaVisita", "fecha_visita", "hallazgo", "id", "version"] }
   },

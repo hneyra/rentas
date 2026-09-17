@@ -53,11 +53,30 @@ import org.springframework.web.bind.annotation.RestController;
  * todavía en ninguna tabla del acta; declararlas en el cuerpo sin tabla dejaría la petición
  * aceptando datos que se pierden al guardar, que es peor que no aceptarlos.
  *
- * <p><b>Y con la misma lectura se llena el embudo del programa</b> (#546, AC 10). Sus cuatro etapas
- * son «Programados», «Inspeccionados», «Con liquidación» y «Notificadas»; la primera la da el total
- * de {@code GET /programas/{id}/muestra} y las dos últimas los dos totales de {@code GET
- * /fiscalizacion/resultados}. La que no tenía de dónde salir era «Inspeccionados», y sale del
- * {@code totalElementos} de {@code GET /fiscalizacion/actas?programa=‹id›} —no de una suma—.
+ * <h2>El embudo NO se llena con esta lectura, y hasta #242 este javadoc decía que sí</h2>
+ *
+ * <p>Aquí estuvo escrito que las cuatro etapas del embudo del programa —«Programados»,
+ * «Inspeccionados», «Con liquidación» y «Notificadas»— se llenaban con el {@code totalElementos} de
+ * cuatro operaciones distintas, y la de «Inspeccionados» con {@code GET
+ * /fiscalizacion/actas?programa=‹id›}. <b>Esa receta es exactamente la que #196 prohibió</b>: son
+ * cuatro peticiones para cuatro números que ninguna operación afirma que signifiquen eso, y «un
+ * embudo compuesto en el navegador se lee igual que uno publicado, y sólo uno de los dos se puede
+ * cuadrar». El embudo lo publica <b>entero</b> {@code GET /fiscalizacion/programas/{id}/embudo}
+ * ({@link kamayuk.rentas.fiscalizacion.dominio.EmbudoDeFiscalizacion}), y las cuatro etapas que
+ * {@code fis-panel} dibuja son otras —«Detectados por cruce», «Programados», «Con acta levantada» y
+ * «Con diferencia»—.
+ *
+ * <p><b>Y la receta además no daba el número.</b> El {@code totalElementos} de aquella operación
+ * cuenta <b>actas</b>, o sea filas; el embudo cuenta <b>unidades fiscalizadas</b>. Refiscalizar un
+ * predio levanta una segunda acta, así que contar filas hace que «con acta» supere a «programados»:
+ * un embudo que se ensancha. Es lo que {@code
+ * ActaFiscalizacionRepositoryJdbc#prediosConActaEnElPrograma} evita contando unidades, y lo que su
+ * prueba afirma palabra por palabra.
+ *
+ * <p>Por eso {@code GET /fiscalizacion/actas} ya <b>no publica el filtro {@code ?programa=}</b>
+ * (#242): su único motivo declarado era esta composición, ninguna pantalla lo mandaba —{@code
+ * RUTAS.actasDeFiscalizacion} es {@code '/fiscalizacion/actas?tamano=1'}— y publicar un filtro que
+ * nadie pide es lo que #431, #432 y #544 tuvieron que retirar después.
  */
 @RestController
 @RequestMapping(Api.RAIZ + "/fiscalizacion/predial/actas")

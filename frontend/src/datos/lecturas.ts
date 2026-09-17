@@ -1830,9 +1830,13 @@ export const RUTAS = {
    * `?tamano=1` por el mismo motivo que arriba: la tabla de la hoja contrasta los conceptos de UNA
    * acta —no es una relacion de actas— y la pantalla todavia no tiene con que elegirla.
    *
-   * **Sin `?programa=`**, que es el unico filtro que la operacion admite: acotarla a un programa
-   * exige haberlo elegido, y elegir uno aqui seria decidir por quien atiende cual de las
-   * inspecciones se mira.
+   * **Sin ningun filtro, y desde #242 no hay ninguno que mandar.** La operacion admitia
+   * `?programa=`, y esta hoja no lo mandaba —acotarla a un programa exige haberlo elegido, y
+   * elegir uno aqui seria decidir por quien atiende cual de las inspecciones se mira—. Ese
+   * parametro **ya no existe**: su unico motivo escrito era llenar una etapa de un embudo con el
+   * `totalElementos` de esta operacion, que es la composicion que #196 prohibio y que ademas no
+   * daba el numero —cuenta actas, y el embudo cuenta unidades—. Hoy cualquier parametro que no
+   * sea de la paginacion es 422.
    *
    * <h2>Y NO pagina, que es lo que #228 midio y dejo escrito</h2>
    *

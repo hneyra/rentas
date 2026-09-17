@@ -29,8 +29,14 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>Durante tres issues esta etapa fue un hueco en la pantalla. {@link #conActa} cuenta cuántas
  * unidades del programa <b>tienen acta viva</b> —levantada y no anulada—, que es la etapa que el
- * javadoc de {@code ActasController} llama «Inspeccionados»; el artboard la rotulaba «Con acta
- * cerrada», y pintar una bajo el otro habría dicho otra cosa, así que la celda decía su motivo.
+ * manual llama «Inspeccionados»; el artboard la rotulaba «Con acta cerrada», y pintar una bajo el
+ * otro habría dicho otra cosa, así que la celda decía su motivo.
+ *
+ * <p><b>Y se cuenta aquí, por unidad.</b> Hasta #242 el javadoc de {@code ActasController} y el de
+ * {@code ActaPredialController} decían que esta etapa se llenaba con el {@code totalElementos} de
+ * {@code GET /fiscalizacion/actas?programa=‹id›}. Además de ser la composición que esta misma clase
+ * prohíbe, aquel número cuenta <b>actas</b>: refiscalizar un predio levanta una segunda, y la etapa
+ * habría superado a «programados». El filtro se retiró con su párrafo.
  *
  * <p><b>Lo que #241 midió es que el rótulo era el equivocado</b>, y no con una opinión sino con dos
  * frases del propio artboard:
@@ -57,13 +63,12 @@ import org.jspecify.annotations.Nullable;
  * cuando {@link EstadoDeActa} declaraba cinco valores y este sistema escribía uno—.
  *
  * <p><b>No se publica porque es otra etapa, no porque falte el dato.</b> El embudo del manual tiene
- * cuatro —«Programados», «Inspeccionados», «Con liquidación» y «Notificadas», como lo dicen {@code
- * ActasController} y {@code ActaPredialController}— y en él «Con liquidación» va <b>después</b> de
- * «Inspeccionados»; el de {@code fis-panel} tiene otras cuatro, y su cuarta celda es «Con
- * diferencia». Publicar aquí una quinta cifra dejaría un campo que ninguna pantalla dibuja, que es
- * lo que #431, #432 y #544 tuvieron que retirar después. Y publicarla bajo el rótulo viejo habría
- * dado dos significados a «cerrada» —el del artboard, antes de liquidar; el de #214, después—, que
- * es la segunda verdad que #214 se negó a escribir.
+ * cuatro —«Programados», «Inspeccionados», «Con liquidación» y «Notificadas»— y en él «Con
+ * liquidación» va <b>después</b> de «Inspeccionados»; el de {@code fis-panel} tiene otras cuatro, y
+ * su cuarta celda es «Con diferencia». Publicar aquí una quinta cifra dejaría un campo que ninguna
+ * pantalla dibuja, que es lo que #431, #432 y #544 tuvieron que retirar después. Y publicarla bajo
+ * el rótulo viejo habría dado dos significados a «cerrada» —el del artboard, antes de liquidar; el
+ * de #214, después—, que es la segunda verdad que #214 se negó a escribir.
  *
  * @param programaId el programa
  * @param codigo su «Nº de programa», que es lo que la pantalla teclea

@@ -31,6 +31,7 @@ import kamayuk.rentas.fiscalizacion.infraestructura.LiquidacionRepositoryJdbc;
 import kamayuk.rentas.fiscalizacion.infraestructura.MovimientoDeLiquidacionRepositoryJdbc;
 import kamayuk.rentas.plataforma.tenant.TenantTransactionManager;
 import kamayuk.rentas.web.ConfiguracionDeJson;
+import kamayuk.rentas.web.GuardiaDeParametros;
 import kamayuk.rentas.web.ManejadorDeErrores;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterAll;
@@ -61,9 +62,12 @@ import tools.jackson.databind.json.JsonMapper;
  *
  * <p>Un acta se registraba y no se podia volver a leer. #546 se nego a publicar esta lectura porque
  * el acta no tenia donde consignar el uso hallado y el listado habria publicado la misma foto
- * incompleta; con {@code acta_fiscalizacion.uso_hallado} (V76) ya hay algo que leer, y la etapa
- * «Inspeccionados» del embudo del programa se llena con el {@code totalElementos} de esta operacion
- * acotada al programa — no con una suma sobre la pagina que se haya pedido.
+ * incompleta; con {@code acta_fiscalizacion.uso_hallado} (V76) ya hay algo que leer.
+ *
+ * <p><b>Y lo que esta relacion NO llena es el embudo</b> (#242). Durante tres issues su javadoc
+ * dijo que la etapa «Inspeccionados» salia del {@code totalElementos} de esta operacion acotada al
+ * programa; es la composicion que #196 prohibio, y ademas cuenta actas donde el embudo cuenta
+ * unidades. El filtro se retiro con su motivo, y lo que queda aqui es una relacion sin filtros.
  *
  * <h2>Por que hasta la base, y por HTTP</h2>
  *
@@ -198,6 +202,7 @@ class ListadoDeActasFronteraTest {
                                                                 jdbc, Clock.systemDefaultZone())),
                                                 gestorDeTransacciones),
                                         padron))
+                        .addInterceptors(new GuardiaDeParametros())
                         .setControllerAdvice(new ManejadorDeErrores())
                         .setMessageConverters(
                                 new JacksonJsonHttpMessageConverter(
@@ -235,7 +240,7 @@ class ListadoDeActasFronteraTest {
         @Test
         @DisplayName("sin filtro salen las cuatro de la municipalidad, predial y vehicular")
         void sinFiltroSalenLasCuatro() throws Exception {
-            MvcResult resultado = actas(null, null, null);
+            MvcResult resultado = actas(null, null);
 
             assertThat(resultado.getResponse().getStatus())
                     .as("sin @Transactional la politica RLS no devuelve vacio: revienta (#486)")
@@ -247,7 +252,7 @@ class ListadoDeActasFronteraTest {
         @Test
         @DisplayName("y el uso hallado viaja: es lo que #546 no tenia que publicar")
         void elUsoHalladoViaja() throws Exception {
-            String cuerpo = actas(null, null, null).getResponse().getContentAsString();
+            String cuerpo = actas(null, null).getResponse().getContentAsString();
 
             assertThat(cuerpo).contains("\"usoHallado\":\"COMERCIO\"");
             assertThat(cuerpo).contains("\"hallazgo\":\"USO_DISTINTO\"");
@@ -262,7 +267,7 @@ class ListadoDeActasFronteraTest {
         @DisplayName(
                 "cada acta publica `contribuyente` y `codContribuyente`, no solo el id interno")
         void publicaElNombreYElCodigo() throws Exception {
-            String cuerpo = actas(null, null, null).getResponse().getContentAsString();
+            String cuerpo = actas(null, null).getResponse().getContentAsString();
 
             assertThat(cuerpo)
                     .as(
@@ -278,7 +283,7 @@ class ListadoDeActasFronteraTest {
             // nota en la prueba y si en el padron de una provincia, asi que se mide aqui: la
             // pagina trae cuatro actas y el directorio recibe UNA llamada con los cuatro ids.
             padron.olvidarLasLlamadas();
-            MvcResult resultado = actas(null, null, null);
+            MvcResult resultado = actas(null, null);
 
             assertThat(fiscalizadoresDe(resultado)).hasSize(4);
             assertThat(padron.llamadasAPorIds())
@@ -296,9 +301,9 @@ class ListadoDeActasFronteraTest {
             try {
                 padron = new ContribuyentesDeMentira();
                 rearmarElBorde();
-                String cuerpo = actas(null, null, null).getResponse().getContentAsString();
+                String cuerpo = actas(null, null).getResponse().getContentAsString();
 
-                assertThat(fiscalizadoresDe(actas(null, null, null)))
+                assertThat(fiscalizadoresDe(actas(null, null)))
                         .as("ocultar la fila esconderia justamente el caso que hay que revisar")
                         .containsExactlyInAnyOrder("A. UNO", "A. DOS", "A. TRES", "V. CUATRO");
                 assertThat(cuerpo)
@@ -364,7 +369,7 @@ class ListadoDeActasFronteraTest {
 
         /** El objeto JSON de esa acta, recortado del arreglo por su fiscalizador. */
         private String actaDe(String fiscalizador) throws Exception {
-            String cuerpo = actas(null, null, null).getResponse().getContentAsString();
+            String cuerpo = actas(null, null).getResponse().getContentAsString();
             for (String candidato : cuerpo.split("\\},\\{")) {
                 if (candidato.contains("\"fiscalizador\":\"" + fiscalizador + "\"")) {
                     return candidato;
@@ -374,55 +379,60 @@ class ListadoDeActasFronteraTest {
         }
     }
 
+    /**
+     * #242 — el filtro {@code ?programa=} se retiro, y la operacion no lo ignora: lo rechaza.
+     *
+     * <p>Su unico motivo declarado era llenar la etapa «Inspeccionados» del embudo con este {@code
+     * totalElementos}, que es la composicion que #196 prohibio <b>y que ademas no daba el
+     * numero</b>: este total cuenta actas —filas— y el embudo cuenta unidades, asi que las dos
+     * actas del mismo predio de {@link #refiscalizarNoEnsanchaElEmbudo} lo habrian hecho superar a
+     * «programados». Ninguna pantalla lo mandaba.
+     *
+     * <p>Que sea 422 y no un 200 sin acotar es de {@code GuardiaDeParametros} (#539), que aqui se
+     * registra a proposito: sin el, un parametro que sobra se ignora en silencio y quien lo manda
+     * cree estar mirando una parte cuando mira el todo.
+     */
     @Nested
-    @DisplayName("AC 3b — el embudo cuenta las actas del programa, no las de la pagina")
-    class ElEmbudoCuenta {
+    @DisplayName("#242 — la relacion no publica ningun filtro, y el que habia se rechaza")
+    class SinFiltro {
 
         @Test
-        @DisplayName("el filtro por programa acota de verdad")
-        void elFiltroPorProgramaAcota() throws Exception {
-            assertThat(fiscalizadoresDe(actas(programaPredial, null, null)))
-                    .as(
-                            "un parametro declarado y no leido contesta 200 y devuelve otra cosa"
-                                    + " (#425, #541)")
-                    .containsExactlyInAnyOrder("A. UNO", "A. DOS", "A. TRES");
-            assertThat(fiscalizadoresDe(actas(programaVehicular, null, null)))
-                    .containsExactly("V. CUATRO");
-        }
-
-        @Test
-        @DisplayName("con tamano 1, el total sigue siendo 3: el sobre cuenta el programa entero")
-        void elTotalCuentaElProgramaEntero() throws Exception {
-            MvcResult resultado = actas(programaPredial, 0, 1);
-
-            assertThat(fiscalizadoresDe(resultado)).hasSize(1);
-            assertThat(resultado.getResponse().getContentAsString())
-                    .as("contarlo sobre la pagina daria «1 inspeccionado» (#25, #545)")
-                    .contains("\"totalElementos\":3")
-                    .contains("\"totalPaginas\":3");
-        }
-
-        @Test
-        @DisplayName("un programa sin actas cuenta cero, y eso es lo que el embudo dibuja")
-        void unProgramaSinActasCuentaCero() throws Exception {
-            MvcResult resultado = actas(999_999L, null, null);
-
-            assertThat(resultado.getResponse().getStatus()).isEqualTo(200);
-            assertThat(resultado.getResponse().getContentAsString())
-                    .contains("\"totalElementos\":0");
-        }
-
-        @Test
-        @DisplayName("un programa que no es un numero es 422, no un listado sin filtrar")
-        void unProgramaQueNoEsUnNumeroEs422() throws Exception {
+        @DisplayName("?programa= es 422 nombrandolo, no un listado acotado en silencio")
+        void elProgramaYaNoEsUnFiltro() throws Exception {
             MvcResult resultado =
                     mvc.perform(
                                     get("/rentas/api/v1/fiscalizacion/actas")
-                                            .param("programa", "PF-A-01"))
+                                            .param("programa", String.valueOf(programaPredial)))
                             .andReturn();
 
-            assertThat(resultado.getResponse().getStatus()).isEqualTo(422);
-            assertThat(resultado.getResponse().getContentAsString()).contains("PF-A-01");
+            assertThat(resultado.getResponse().getStatus())
+                    .as(
+                            "un parametro publicado que nadie manda y que solo servia para una"
+                                    + " composicion prohibida no se deja «por si acaso» (#242)")
+                    .isEqualTo(422);
+            assertThat(resultado.getResponse().getContentAsString()).contains("programa");
+        }
+
+        @Test
+        @DisplayName("sin filtro, el total es el de la municipalidad y no el de la pagina")
+        void elTotalEsElDeLaMunicipalidad() throws Exception {
+            MvcResult resultado = actas(0, 1);
+
+            assertThat(fiscalizadoresDe(resultado)).hasSize(1);
+            assertThat(resultado.getResponse().getContentAsString())
+                    .as("contarlo sobre la pagina daria «1» (#25, #545)")
+                    .contains("\"totalElementos\":4")
+                    .contains("\"totalPaginas\":4");
+        }
+
+        @Test
+        @DisplayName("y sin filtro salen las de los DOS programas, que es lo que se retiro")
+        void salenLasDeLosDosProgramas() throws Exception {
+            assertThat(fiscalizadoresDe(actas(null, null)))
+                    .as(
+                            "acotar por programa era lo unico que esta relacion sabia hacer ademas"
+                                    + " de paginar; ahora no acota nada y lo dice")
+                    .containsExactlyInAnyOrder("A. UNO", "A. DOS", "A. TRES", "V. CUATRO");
         }
     }
 
@@ -446,7 +456,7 @@ class ListadoDeActasFronteraTest {
         @Test
         @DisplayName("el acta de la vecina no sale, ni en la lista ni contada en el total")
         void elActaDeLaVecinaNoSale() throws Exception {
-            MvcResult resultado = actas(null, null, null);
+            MvcResult resultado = actas(null, null);
 
             assertThat(fiscalizadoresDe(resultado)).doesNotContain("B. VECINA");
             assertThat(resultado.getResponse().getContentAsString())
@@ -603,13 +613,9 @@ class ListadoDeActasFronteraTest {
         }
     }
 
-    private static MvcResult actas(
-            @Nullable Long programa, @Nullable Integer pagina, @Nullable Integer tamano)
+    private static MvcResult actas(@Nullable Integer pagina, @Nullable Integer tamano)
             throws Exception {
         MockHttpServletRequestBuilder peticion = get("/rentas/api/v1/fiscalizacion/actas");
-        if (programa != null) {
-            peticion = peticion.param("programa", String.valueOf(programa));
-        }
         if (pagina != null) {
             peticion = peticion.param("pagina", String.valueOf(pagina));
         }

@@ -165,27 +165,21 @@ public class ActaFiscalizacionRepositoryJdbc extends RepositorioJdbc
      * La grilla de actas (#599), paginada y ordenada por la fecha de la visita.
      *
      * <p>Un acta predial y una vehicular salen en la <b>misma</b> lista, porque comparten tabla y
-     * ciclo de vida ({@code acta_fiscalizacion}, V4) y porque lo que la pide —el embudo— pregunta
-     * por un programa, que es de un tipo o del otro. Cual es cual lo dice cual de {@code predioId}
-     * y {@code vehiculoId} trae valor, igual que en el dominio.
+     * ciclo de vida ({@code acta_fiscalizacion}, V4) y comparten recurso. Cual es cual lo dice cual
+     * de {@code predioId} y {@code vehiculoId} trae valor, igual que en el dominio.
+     *
+     * <p><b>Sin {@code WHERE} propio y sin parametros</b> (#242): lo unico que acota esta consulta
+     * es la politica RLS. Tenia un filtro por programa, y se fue con el motivo que lo sostenia —ver
+     * {@link kamayuk.rentas.fiscalizacion.dominio.ActaFiscalizacionRepository#consultar}—.
      */
     @Override
     public kamayuk.rentas.compartido.Pagina<ActaFiscalizacion> consultar(
-            kamayuk.rentas.fiscalizacion.dominio.CriterioDeActas criterio,
             kamayuk.rentas.compartido.Paginacion paginacion) {
 
-        StringBuilder donde = new StringBuilder(" WHERE 1 = 1");
-        Map<String, Object> parametros = new HashMap<>();
-        if (criterio.programaId() != null) {
-            donde.append(" AND programa_id = :programaId");
-            parametros.put("programaId", criterio.programaId());
-        }
-
-        String filtro = DESDE + donde;
         return paginar(
-                "SELECT " + COLUMNAS + filtro,
-                "SELECT count(*)" + filtro,
-                parametros,
+                "SELECT " + COLUMNAS + DESDE,
+                "SELECT count(*)" + DESDE,
+                Map.of(),
                 paginacion,
                 ORDEN,
                 ActaFiscalizacionRepositoryJdbc::mapear);

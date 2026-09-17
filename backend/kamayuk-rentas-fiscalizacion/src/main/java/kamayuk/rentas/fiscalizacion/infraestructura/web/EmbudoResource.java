@@ -14,10 +14,13 @@ import org.jspecify.annotations.Nullable;
  * <h2>{@code conActa} es la etapa «Inspeccionados», y el nombre lo dice a proposito</h2>
  *
  * <p>Cuenta cuantas unidades del programa tienen acta <b>viva</b> —levantada y no anulada—, que es
- * la etapa que {@code ActasController} llama «Inspeccionados». El artboard rotulaba esa celda «Con
- * acta cerrada» y por eso la pantalla la dejaba vacia con su motivo: un acta <i>cerrada</i> no
- * existe aqui —{@code EstadoDeActa} declara {@code ABIERTA} y {@code ANULADA} desde #214, y la
- * unica transicion que este sistema escribe es anular—.
+ * la etapa que el manual llama «Inspeccionados». <b>Unidades y no actas</b>: refiscalizar un predio
+ * levanta una segunda, y contar filas haria que esta etapa superara a {@code programados} — que es
+ * por lo que #242 retiro el {@code ?programa=} de {@code GET /fiscalizacion/actas}, cuyo {@code
+ * totalElementos} se dijo durante tres issues que llenaba esta celda. El artboard rotulaba esa
+ * celda «Con acta cerrada» y por eso la pantalla la dejaba vacia con su motivo: un acta
+ * <i>cerrada</i> no existe aqui —{@code EstadoDeActa} declara {@code ABIERTA} y {@code ANULADA}
+ * desde #214, y la unica transicion que este sistema escribe es anular—.
  *
  * <p><b>#241 midio que el equivocado era el rotulo</b>, con dos frases del propio artboard: la nota
  * de {@code fis-panel} dice «lo detectado, lo <b>inspeccionado</b> y lo que sostiene una
