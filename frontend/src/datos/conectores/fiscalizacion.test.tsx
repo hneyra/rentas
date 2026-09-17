@@ -698,6 +698,13 @@ describe('`fis-res` — la resolucion de determinacion', () => {
     expect(JSON.stringify(filas)).not.toContain('0.00');
   });
 
+  it('y dice A QUE DIA estan sus cifras, que aqui es dinero notificable (regla 9)', async () => {
+    expect(FIS_RES.repartir(RESOLUCION_CIFRADA as never).aLaFecha).toBe('2026-06-30');
+
+    const { container } = await pintar('fis-res', RUTA, NUMERO);
+    expect(container.textContent).toContain('30/06/2026');
+  });
+
   it('LA ROTURA DEL AC3: con otra resolucion, la pantalla ensena otro contribuyente', async () => {
     const { container } = await pintar('fis-res', RUTA, NUMERO);
     expect(container.textContent).toContain('Suc. Rufina Medina Medina');

@@ -133,13 +133,21 @@ describe('el cruce contra lo que el backend sirve', () => {
  *
  * <h2>Lo que este barrido puede comprobar hoy, y lo que no</h2>
  *
- * **No** puede comparar ruta con ruta: `Conector.pedir` es una funcion, y la ruta que pide vive
- * dentro de ella —sacarla a dato es #186, que la necesita para paginar y ordenar en servidor—. Lo
- * que si puede, y es lo que fallaba, es la condicion NECESARIA: una hoja con conector tiene que
- * declarar **al menos una operacion de lectura que el backend sirva**. Si no la declara, o pide
- * algo que no declaro, o no puede pedir nada — y las dos cosas son el defecto.
+ * Este barrido comprueba la condicion NECESARIA: una hoja con conector tiene que declarar **al
+ * menos una operacion de lectura que el backend sirva**. Si no la declara, o pide algo que no
+ * declaro, o no puede pedir nada — y las dos cosas son el defecto.
  *
- * Cuando #186 saque la ruta al conector, esto se estrecha a la igualdad y este comentario sobra.
+ * <h2>La IGUALDAD ya se comprueba, y esta en otro sitio (#215)</h2>
+ *
+ * Aqui decia que comparar ruta con ruta no se podia —«`Conector.pedir` es una funcion, y la ruta
+ * que pide vive dentro de ella»— y que cuando #186 sacara la ruta a dato esto se estrecharia. #186
+ * la saco, y la igualdad la comprueba `verificaciones/la-hoja-declara-la-ruta-que-su-conector-pide`:
+ * resuelve `RUTAS` y cruza cada camino contra lo que la hoja declara.
+ *
+ * **Este se queda igual**, y no es redundante: mide otra cosa. Aquel exige que **lo que se pide**
+ * este declarado; este, que haya **algo servido que pedir** — y los dos rojos dicen cosas distintas
+ * a quien los lee. Lo que se midio en #215 es que ninguno de los dos solo habria visto la rotura
+ * del otro: quitarle a `fis-res` una de sus dos declaraciones dejaba este en verde.
  */
 describe('AC4 — toda hoja con conector declara la operacion que la sirve', () => {
   it('las diecinueve que piden de verdad declaran alguna servida de lectura', () => {

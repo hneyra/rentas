@@ -589,6 +589,10 @@ const FIS_RES: Conector = {
           { filas: resolucion.lineas.map((linea) => ({ celdas: filaDelEjercicio(linea) })) },
         ],
       ]),
+      // A que dia estan sus cifras (regla 9, RNF-075). Aqui es **dinero notificable** y no un
+      // recuento, asi que pesa mas que en el embudo: la operacion lo publica aparte del `fecha`
+      // «para no dejarlo implicito», y esta pantalla tampoco tiene un campo libre donde decirlo.
+      aLaFecha: resolucion.aLaFecha,
       noPublicados,
     };
   },
