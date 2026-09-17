@@ -31,6 +31,15 @@ public interface MuestraDelProgramaRepository {
             long programaId, @Nullable Long predioId, Paginacion paginacion);
 
     /**
+     * Cuántas unidades sorteó la muestra del programa: la segunda etapa del embudo (#196).
+     *
+     * <p>Es un {@code count} y no el {@code totalElementos} de una página de tamaño uno: pedir una
+     * página para leer su sobre trae además una fila y deriva su columna «Estado», que es trabajo
+     * que nadie va a mirar.
+     */
+    int tamanoDeLaMuestra(long programaId);
+
+    /**
      * Cuáles de esos predios ya están en la muestra de <b>otro</b> programa que admite visitas
      * ({@code ABIERTO} o {@code EN_PROCESO}): la primera mitad de la exclusión de #481.
      *

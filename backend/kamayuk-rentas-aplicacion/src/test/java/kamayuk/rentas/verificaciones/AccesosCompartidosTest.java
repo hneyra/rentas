@@ -72,7 +72,16 @@ class AccesosCompartidosTest {
                     // otorgar —`ImplantarMunicipalidad` deja dos grupos, y ninguno es ese— y
                     // porque es estructural: quien puede cobrar tiene que poder ver la deuda.
                     "GET /consultas/deuda",
-                    Set.of("caja_tributaria"));
+                    Set.of("caja_tributaria"),
+                    // #196 — el embudo de un programa de fiscalizacion. La pantalla que lo dibuja
+                    // es el PANEL (`fisc_estado_cuenta`) y lo que cuenta es un programa
+                    // (`fisc_programa`). Exigir solo la segunda deja el panel contestando 403 a
+                    // quien puede abrirlo —la misma pantalla que se abre y cuya cifra no se ve—; y
+                    // exigir solo la primera le niega la cuenta a quien administra los programas y
+                    // acaba de sortear la muestra. No se arregla otorgando la opcion ajena en cada
+                    // implantacion: lo que se olvida no avisa (#548).
+                    "GET /fiscalizacion/programas/{id}/embudo",
+                    Set.of("fisc_programa"));
 
     @Test
     @DisplayName("todo endpoint que comparte su acceso esta censado, y el censo no miente")

@@ -9,6 +9,7 @@ import kamayuk.rentas.fiscalizacion.aplicacion.ConsultaDeResoluciones;
 import kamayuk.rentas.fiscalizacion.aplicacion.TransferirARentas;
 import kamayuk.rentas.fiscalizacion.dominio.LineaDeLiquidacion;
 import kamayuk.rentas.fiscalizacion.dominio.ResolucionDeDeterminacion;
+import kamayuk.rentas.fiscalizacion.dominio.TotalesDeLaDeterminacion;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -23,10 +24,36 @@ import org.jspecify.annotations.Nullable;
  * <p>{@code aLaFecha} esta en la raiz y no repetido en cada linea: todas las cifras de esta
  * respuesta son del dia de la resolucion, que es cuando se congelaron (regla 9, RNF-075).
  *
+ * <h2>Los tres totales, y por que los suma el backend (#193)</h2>
+ *
+ * <p>Hasta #193 esta respuesta publicaba {@code lineas[]} y <b>ningun agregado de la resolucion
+ * entera</b>, asi que «Insoluto omitido», «Multa tributaria» y «Total liquidado» —tres de los seis
+ * campos de solo lectura de su pantalla— decian «no publicado». Sumarlos en el navegador daria tres
+ * cifras al centimo indistinguibles de unas liquidadas, sobre el papel que vuelve una diferencia
+ * deuda exigible; los suma {@link TotalesDeLaDeterminacion}, que es quien puede cuadrarlas con lo
+ * que se asienta en el libro. Con cualquier sumando ausente el total sale <b>nulo</b>, nunca
+ * parcial.
+ *
+ * <p>Lo mismo dentro de cada linea con {@code baseOmitida}, que es la columna «Base omitida S/»:
+ * los dos sumandos ya viajaban y la resta no.
+ *
+ * <h2>Lo que sigue sin publicarse, y no por falta de DTO: el INTERES</h2>
+ *
+ * <p>El artboard dibuja dos sitios de interes —el campo «Interes» y la columna «Interes S/»— y
+ * <b>nada del backend puede llenarlos</b>: no hay en este sistema ninguna tasa de interes moratorio
+ * sellada, y ponerle una seria inventar un valor normativo (regla 5). El javadoc de {@code
+ * ModeloDeLaResolucionDeDeterminacion} ya lo dejaba escrito: el cuadro que <b>se imprime</b> lleva
+ * {@code Multa S/} donde el prototipo decia Interes, y el JSON es identico al impreso. O se sella
+ * la tasa o se quita del artboard; las dos son decisiones y ninguna se toma desde aqui.
+ *
  * @param numero el numero de la resolucion, que es el de su documento
  * @param fecha el dia del acto
  * @param aLaFecha el dia al que estan las cifras; el mismo, y dicho aparte para no dejarlo
  *     implicito
+ * @param actaId el acta de inspeccion de la que salio la liquidacion. <b>Es un identificador
+ *     interno y no el numero de un documento</b>: un acta no se numera —lo que la identifica es su
+ *     programa, su unidad y su version— asi que esto sirve para enlazar hacia atras, no para
+ *     escribirlo en un campo rotulado «N.º de acta» (#193)
  * @param nLiquidacion la liquidacion que transfirio
  * @param versionDeLaLiquidacion que version de esa liquidacion
  * @param periodoDesde primer ejercicio fiscalizado
@@ -42,6 +69,11 @@ import org.jspecify.annotations.Nullable;
  * @param fichaNuevaId la version de ficha que abrio; nula en una vehicular
  * @param usuarioRegistro quien la registro
  * @param observacion por que se registro (RNF-052)
+ * @param insolutoOmitido la suma del tributo dejado de pagar de todas las lineas; nulo hasta D-02a
+ * @param multaTributaria la suma de las multas de todas las lineas; nulo hasta D-02a y D-02c
+ * @param totalLiquidado la suma de los dos anteriores; nulo si falta cualquiera
+ * @param esperaSusCifras si los totales siguen pendientes, para que la pantalla escriba «sin cifra»
+ *     en vez de un cero — que un contribuyente leeria como «no debe nada»
  * @param lineas el cuadro de la determinacion, ejercicio por ejercicio
  * @param cargosAsentados cuantos cargos genero; solo en la respuesta de la transferencia
  */
@@ -49,6 +81,7 @@ public record ResolucionResource(
         String numero,
         String fecha,
         String aLaFecha,
+        long actaId,
         String nLiquidacion,
         int versionDeLaLiquidacion,
         int periodoDesde,
@@ -64,6 +97,10 @@ public record ResolucionResource(
         @Nullable Long fichaNuevaId,
         @Nullable String usuarioRegistro,
         String observacion,
+        @Nullable String insolutoOmitido,
+        @Nullable String multaTributaria,
+        @Nullable String totalLiquidado,
+        boolean esperaSusCifras,
         List<LineaDeterminadaResource> lineas,
         @Nullable Integer cargosAsentados) {
 
@@ -89,10 +126,13 @@ public record ResolucionResource(
             lineas.add(LineaDeterminadaResource.de(linea));
         }
 
+        TotalesDeLaDeterminacion totales = TotalesDeLaDeterminacion.de(consultada.lineas());
+
         return new ResolucionResource(
                 resolucion.numero(),
                 resolucion.fecha().toString(),
                 resolucion.fecha().toString(),
+                consultada.liquidacion().actaId(),
                 consultada.liquidacion().numero(),
                 consultada.liquidacion().version(),
                 consultada.liquidacion().ejercicioDesde().valor(),
@@ -108,6 +148,10 @@ public record ResolucionResource(
                 resolucion.fichaNuevaId(),
                 resolucion.usuarioRegistro(),
                 resolucion.observacion().texto(),
+                LineaDeterminadaResource.cifra(totales.insolutoOmitido()),
+                LineaDeterminadaResource.cifra(totales.multaTributaria()),
+                LineaDeterminadaResource.cifra(totales.total()),
+                totales.esperaSusCifras(),
                 List.copyOf(lineas),
                 cargos);
     }
@@ -118,6 +162,8 @@ public record ResolucionResource(
      * @param ejercicio el ejercicio determinado
      * @param determinado la base que resulta de lo hallado; nula hasta D-02a (#198)
      * @param declarado la base que consta declarada; nula hasta D-02a
+     * @param baseOmitida la base que no se declaro —{@code determinado} menos {@code declarado}—,
+     *     hecha aqui y no en la pantalla; nula hasta D-02a y nunca negativa (#193)
      * @param diferencia el tributo que se dejo de pagar; nula hasta D-02a
      * @param multa la multa del art. 176; nula hasta D-02a y D-02c
      * @param total la suma de las dos anteriores; nula si falta cualquiera
@@ -129,6 +175,7 @@ public record ResolucionResource(
             int ejercicio,
             @Nullable String determinado,
             @Nullable String declarado,
+            @Nullable String baseOmitida,
             @Nullable String diferencia,
             @Nullable String multa,
             @Nullable String total,
@@ -141,6 +188,7 @@ public record ResolucionResource(
                     linea.ejercicio().valor(),
                     cifra(linea.baseHallada()),
                     cifra(linea.baseDeclarada()),
+                    cifra(linea.baseOmitida()),
                     cifra(linea.insolutoOmitido()),
                     cifra(linea.multaTributaria()),
                     cifra(total(linea)),
@@ -168,7 +216,7 @@ public record ResolucionResource(
          * <p>Las dos superficies ya no pasan por aqui: viajan como {@link AreaM2} y las escribe el
          * serializador de {@code ConfiguracionDeJson} (#546).
          */
-        private static @Nullable String cifra(@Nullable Object valor) {
+        static @Nullable String cifra(@Nullable Object valor) {
             return switch (valor) {
                 case null -> null;
                 case Dinero dinero -> dinero.valor().toPlainString();

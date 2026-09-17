@@ -104,7 +104,10 @@ class AreaEnUnaSolaFormaTest {
                                 "2026-03-01",
                                 "J. PEREZ",
                                 "SUBVALUADOR",
+                                null,
                                 AREA,
+                                null,
+                                null,
                                 null,
                                 null,
                                 "ABIERTA"));

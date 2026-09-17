@@ -174,6 +174,7 @@ class ResolucionControllerTest {
                                         transferir,
                                         new ConsultaDeResoluciones(
                                                 resoluciones, liquidaciones, directorio, emisor),
+                                        directorio,
                                         reloj))
                         .setControllerAdvice(new ManejadorDeErrores())
                         .setMessageConverters(
@@ -290,6 +291,63 @@ class ResolucionControllerTest {
         assertThat(cuerpo)
                 .as("la consulta no inventa un recuento de cargos: eso es del acto, no de leerlo")
                 .contains("\"cargosAsentados\":null");
+    }
+
+    @Test
+    @DisplayName("#192 — la RELACION publica el numero, que es con lo que se pide la resolucion")
+    void laRelacionPublicaElNumero() throws Exception {
+        transferir(cuerpoCompleto());
+
+        MvcResult resultado =
+                mvc.perform(get("/rentas/api/v1/fiscalizacion/resoluciones")).andReturn();
+
+        assertThat(resultado.getResponse().getStatus()).isEqualTo(200);
+        String cuerpo = resultado.getResponse().getContentAsString();
+        assertThat(cuerpo)
+                .as("sin relacion, esta pantalla no puede tomar «la primera» como las demas")
+                .contains("\"numero\":\"RDF-2026-000001\"")
+                .contains("\"totalElementos\":1");
+        assertThat(cuerpo)
+                .as("el obligado se resuelve en una lectura por pagina, no una por fila")
+                .contains("\"contribuyente\":\"PEREZ, JUAN\"");
+        assertThat(cuerpo)
+                .as("la relacion no lleva ni una cifra: el cuadro lo publica la de al lado (#193)")
+                .doesNotContain("\"insolutoOmitido\"")
+                .doesNotContain("\"lineas\"");
+    }
+
+    @Test
+    @DisplayName("#192 — sin ninguna resolucion la relacion sale vacia, con 200 y no con 404")
+    void laRelacionVaciaEs200() throws Exception {
+        MvcResult resultado =
+                mvc.perform(get("/rentas/api/v1/fiscalizacion/resoluciones")).andReturn();
+
+        assertThat(resultado.getResponse().getStatus()).isEqualTo(200);
+        assertThat(resultado.getResponse().getContentAsString()).contains("\"totalElementos\":0");
+    }
+
+    @Test
+    @DisplayName("#192 — el filtro es el CODIGO del padron, y uno que no existe es 404")
+    void elFiltroEsElCodigoDelPadron() throws Exception {
+        transferir(cuerpoCompleto());
+
+        MvcResult suya =
+                mvc.perform(
+                                get("/rentas/api/v1/fiscalizacion/resoluciones")
+                                        .param("contribuyente", "C-0010"))
+                        .andReturn();
+        assertThat(suya.getResponse().getStatus()).isEqualTo(200);
+        assertThat(suya.getResponse().getContentAsString()).contains("\"totalElementos\":1");
+
+        MvcResult ajena =
+                mvc.perform(
+                                get("/rentas/api/v1/fiscalizacion/resoluciones")
+                                        .param("contribuyente", "C-999999"))
+                        .andReturn();
+        assertThat(ajena.getResponse().getStatus())
+                .as("devolver la relacion entera a quien pregunto por una persona es otra cosa")
+                .isEqualTo(404);
+        assertThat(ajena.getResponse().getContentAsString()).contains("C-999999");
     }
 
     @Test

@@ -3,6 +3,7 @@ package kamayuk.rentas.fiscalizacion.dobles;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import kamayuk.rentas.fiscalizacion.dominio.ActaConLoDeclarado;
 import kamayuk.rentas.fiscalizacion.dominio.ActaFiscalizacion;
 import kamayuk.rentas.fiscalizacion.dominio.ActaFiscalizacionRepository;
 
@@ -17,6 +18,24 @@ public final class ActasEnMemoria implements ActaFiscalizacionRepository {
         ActaFiscalizacion guardada = conIdentificador(acta, siguiente++);
         guardadas.add(guardada);
         return guardada;
+    }
+
+    /**
+     * Sin proyeccion de catastro en memoria no hay lado declarado que devolver (#191). La prueba
+     * que si lo comprueba contra `ficha_ref` es `ListadoDeActasFronteraTest`, que habla con
+     * PostgreSQL.
+     */
+    @Override
+    public java.util.Map<Long, ActaConLoDeclarado.LoDeclarado> loDeclaradoPorFicha(
+            java.util.Set<Long> fichaIds) {
+        return java.util.Map.of();
+    }
+
+    /** El embudo (#196) no se mide contra un doble: lo mide el repositorio contra PostgreSQL. */
+    @Override
+    public int unidadesConActaViva(long programaId) {
+        throw new UnsupportedOperationException(
+                "el embudo se mide contra PostgreSQL, no contra este doble");
     }
 
     @Override

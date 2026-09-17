@@ -446,6 +446,13 @@ class GenerarMuestraTest {
 
     /** La muestra en memoria, con la misma exclusión que la consulta real. */
     private static final class MuestrasEnMemoria implements MuestraDelProgramaRepository {
+
+        /** El embudo (#196) lo mide el repositorio contra PostgreSQL. */
+        @Override
+        public int tamanoDeLaMuestra(long programaId) {
+            throw new UnsupportedOperationException("no lo usa esta prueba");
+        }
+
         private final List<MuestraDelPrograma> guardadas = new ArrayList<>();
 
         void sembrar(long programaId, long predioId) {

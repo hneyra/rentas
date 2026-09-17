@@ -46,6 +46,22 @@ class ActaVehicularControllerTest {
                     new ActaFiscalizacionRepository() {
                         private long siguiente = 1;
 
+                        /** El embudo (#196) lo mide el repositorio contra PostgreSQL. */
+                        @Override
+                        public int unidadesConActaViva(long programaId) {
+                            throw new UnsupportedOperationException("no lo usa esta prueba");
+                        }
+
+                        /** Sin proyeccion de catastro no hay lado declarado que devolver (#191). */
+                        @Override
+                        public java.util.Map<
+                                        Long,
+                                        kamayuk.rentas.fiscalizacion.dominio.ActaConLoDeclarado
+                                                .LoDeclarado>
+                                loDeclaradoPorFicha(java.util.Set<Long> fichaIds) {
+                            return java.util.Map.of();
+                        }
+
                         @Override
                         public ActaFiscalizacion insertar(ActaFiscalizacion acta) {
                             ActaFiscalizacion guardada =

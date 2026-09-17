@@ -67,6 +67,36 @@ public record LineaDeLiquidacion(
 
     private static final int USO_MAXIMO = 60;
 
+    /**
+     * La <b>base omitida</b> de esta línea: la base que resulta de lo hallado menos la que consta
+     * declarada (#193).
+     *
+     * <p>Es la columna «Base omitida S/» que la pantalla {@code resolucion_determinacion_fisc}
+     * dibuja, y hasta #193 no salía de ningún sitio: la resolución publicaba los <b>dos
+     * sumandos</b> —{@code determinado} y {@code declarado}— y no la resta, así que la interfaz
+     * escribía la raya o hacía aritmética sobre dinero en el navegador. La resta la hace quien
+     * puede cuadrarla.
+     *
+     * <p>{@code null} mientras falte cualquiera de las dos bases, que hoy es siempre (D-02a, #198).
+     * Y nunca negativa: quien declaró de <b>más</b> no omitió base ninguna, igual que un área
+     * hallada menor que la declarada no es un hallazgo contra el contribuyente ({@link
+     * ComparacionHalladoDeclarado#diferenciaDeArea}).
+     *
+     * <p>Las dos bases van juntas o no van —lo exige el compacto de arriba y {@code
+     * liquidacion_detalle_cifras_ck} (V39)—, así que la rama de «una sí y otra no» no puede
+     * alcanzarse con una línea construida por este tipo; se escribe igual porque lo que el método
+     * promete es su contrato, no el invariante de quien lo llama.
+     */
+    public @Nullable Dinero baseOmitida() {
+        if (baseDeclarada == null || baseHallada == null) {
+            return null;
+        }
+        if (baseHallada.compareTo(baseDeclarada) <= 0) {
+            return Dinero.CERO;
+        }
+        return baseHallada.menos(baseDeclarada);
+    }
+
     public LineaDeLiquidacion {
         Objects.requireNonNull(ejercicio, "La linea necesita su ejercicio");
         if (conjuntoId <= 0) {

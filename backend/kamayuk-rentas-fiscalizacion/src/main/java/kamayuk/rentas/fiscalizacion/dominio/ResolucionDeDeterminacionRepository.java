@@ -35,6 +35,25 @@ public interface ResolucionDeDeterminacionRepository {
      */
     List<ResolucionDeDeterminacion> deContribuyente(long contribuyenteId);
 
+    /**
+     * La <b>relacion</b> de resoluciones, paginada (#192).
+     *
+     * <p>Hasta #192 no habia ninguna: {@code ResolucionController} publicaba la resolucion por su
+     * numero exacto y la transferencia que la emite, y nada mas. La pantalla que la dibuja solo se
+     * podia abrir con el numero ya en la mano —no hay «la primera de la relacion» cuando no hay
+     * relacion—, asi que abrirla desde el menu no ensenaba ninguna nunca.
+     *
+     * <p>Devuelve {@link ResolucionEnLaRelacion} y no la fila desnuda: el periodo fiscalizado y el
+     * numero de la liquidacion son de la liquidacion, y una relacion que no los diga obliga a abrir
+     * cada fila para saber de que es. Se leen en una consulta y no una por fila.
+     *
+     * <p>{@code totalElementos} cuenta <b>todas</b> las que el criterio deja pasar y no las de la
+     * pagina, por lo mismo que el listado de actas: contarlo sobre la pagina daria «veinte» en toda
+     * municipalidad que pase de veinte resoluciones.
+     */
+    kamayuk.rentas.compartido.Pagina<ResolucionEnLaRelacion> consultar(
+            CriterioDeResoluciones criterio, kamayuk.rentas.compartido.Paginacion paginacion);
+
     /** Esa liquidacion ya se transfirio: transferirla otra vez duplicaria versiones y cargos. */
     final class LiquidacionYaTransferida extends RuntimeException {
 

@@ -318,6 +318,100 @@ class ActaFiscalizacionRepositoryJdbcTest {
     }
 
     @Nested
+    @DisplayName("#196 — «Con acta», la tercera etapa del embudo")
+    class ElEmbudoCuentaUnidades {
+
+        @Test
+        @DisplayName("refiscalizar el mismo predio cuenta UNA unidad, no dos actas")
+        void refiscalizarNoEnsanchaElEmbudo() {
+            TenantContext.fijar(new MunicipalidadId(municipalidadA));
+            long titular = crearContribuyente(municipalidadA, "F-0200", "60100200");
+            long predio = crearPredio(municipalidadA, "F-0200a");
+            long programaId = crearPrograma(municipalidadA, "PF-0200", "PREDIAL");
+
+            transaccion.execute(
+                    estado -> repositorio.insertar(actaSobre(programaId, titular, predio, 1)));
+            assertThat(unidadesDe(programaId)).isEqualTo(1);
+
+            transaccion.execute(
+                    estado -> repositorio.insertar(actaSobre(programaId, titular, predio, 2)));
+
+            assertThat(unidadesDe(programaId))
+                    .as("contar actas haria que «con acta» superara a «programados»")
+                    .isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("dos predios del mismo titular son dos unidades")
+        void dosPrediosSonDosUnidades() {
+            TenantContext.fijar(new MunicipalidadId(municipalidadA));
+            long titular = crearContribuyente(municipalidadA, "F-0201", "60100201");
+            long uno = crearPredio(municipalidadA, "F-0201a");
+            long otro = crearPredio(municipalidadA, "F-0201b");
+            long programaId = crearPrograma(municipalidadA, "PF-0201", "PREDIAL");
+
+            transaccion.execute(
+                    estado -> repositorio.insertar(actaSobre(programaId, titular, uno, 1)));
+            transaccion.execute(
+                    estado -> repositorio.insertar(actaSobre(programaId, titular, otro, 1)));
+
+            assertThat(unidadesDe(programaId)).isEqualTo(2);
+        }
+
+        @Test
+        @DisplayName("un acta ANULADA no cuenta: anularla es decir que esa visita no vale")
+        void elActaAnuladaNoCuenta() {
+            TenantContext.fijar(new MunicipalidadId(municipalidadA));
+            long titular = crearContribuyente(municipalidadA, "F-0202", "60100202");
+            long predio = crearPredio(municipalidadA, "F-0202a");
+            long programaId = crearPrograma(municipalidadA, "PF-0202", "PREDIAL");
+
+            ActaFiscalizacion guardada =
+                    transaccion.execute(
+                            estado ->
+                                    repositorio.insertar(
+                                            actaSobre(programaId, titular, predio, 1)));
+            anular(java.util.Objects.requireNonNull(guardada.id()));
+
+            assertThat(unidadesDe(programaId)).isZero();
+        }
+
+        @Test
+        @DisplayName("un programa sin actas cuenta cero, y cero es un dato")
+        void unProgramaSinActasCuentaCero() {
+            TenantContext.fijar(new MunicipalidadId(municipalidadA));
+            long programaId = crearPrograma(municipalidadA, "PF-0203", "PREDIAL");
+
+            assertThat(unidadesDe(programaId)).isZero();
+        }
+
+        private int unidadesDe(long programaId) {
+            return transaccion.execute(estado -> repositorio.unidadesConActaViva(programaId));
+        }
+
+        /**
+         * Anula el acta por SQL directo: el dominio no tiene ningun camino que mueva el estado, y
+         * ESE es el hallazgo de #196 —{@code EstadoDeActa} declara cinco valores y este sistema
+         * solo escribe {@code ABIERTA}—. La prueba tiene que poder llegar al estado que la consulta
+         * descarta, asi que lo escribe la prueba.
+         */
+        private void anular(long actaId) {
+            try (java.sql.Connection app = base.conexion(BaseDeDatosDePrueba.APP)) {
+                ContextoDeTenant.fijar(app, municipalidadA);
+                try (java.sql.PreparedStatement sentencia =
+                        app.prepareStatement(
+                                "UPDATE acta_fiscalizacion SET estado = 'ANULADA' WHERE id = ?")) {
+                    sentencia.setLong(1, actaId);
+                    sentencia.executeUpdate();
+                }
+                app.commit();
+            } catch (java.sql.SQLException excepcion) {
+                throw new IllegalStateException(excepcion);
+            }
+        }
+    }
+
+    @Nested
     @DisplayName("#599 — el uso hallado, y las guardas que lo sostienen en la base")
     class ElUsoHallado {
 

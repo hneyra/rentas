@@ -123,6 +123,50 @@ public record FilaDeOmisos(
         return ComparacionHalladoDeclarado.diferenciaDeArea(areaDeclarada, areaCatastral);
     }
 
+    /**
+     * La diferencia de valor: lo que el catastro tiene inscrito menos lo que consta declarado
+     * (#194).
+     *
+     * <p><b>Se deriva, y ese es el punto del issue.</b> Hasta #194 la columna «Diferencia S/» de la
+     * pantalla no salía de ningún sitio: {@code OmisoResource} le pasaba {@code null} <b>a mano</b>
+     * y este tipo no tenía ningún campo ni método del que sacarla. Los otros tres importes —{@link
+     * #valorCatastral}, {@link #valorDeclarado} y {@link #impuestoOmitido}— son campos que hoy
+     * valen {@code null} y que el día que D-02a se firme (#198) llegarán con cifra; la diferencia
+     * <b>habría seguido saliendo nula en verde</b>, con el contrato declarando el campo y la
+     * interfaz leyéndolo. Es el modo de fallo que este repositorio persigue: la propiedad se rompe
+     * y no hay síntoma.
+     *
+     * <p>Derivarla y no guardarla es la misma decisión que {@link #diferenciaDeArea}, {@code
+     * MuestraResource.visitado} y el «Estado» de la infracción administrativa (#397): dos verdades
+     * sobre lo mismo divergen, y la que se lee en pantalla acaba siendo la que nadie recalculó.
+     *
+     * <p>Las tres preguntas son las de {@link ComparacionHalladoDeclarado#diferenciaDeArea}, sobre
+     * dinero en vez de sobre superficie:
+     *
+     * <ul>
+     *   <li>Sin uno de los dos lados no hay diferencia: {@code null}. Devolver cero diría «se
+     *       valorizó y coincide», que es lo contrario de «todavía no se puede valorizar» — y hoy,
+     *       con D-02a abierta, ésta es la única rama que se toma.
+     *   <li>Un valor catastral <b>menor o igual</b> que el declarado da cero: declarar de más no es
+     *       un hallazgo contra el contribuyente, y una diferencia negativa en esta columna se
+     *       cobraría al revés.
+     *   <li>Lo demás, la resta.
+     * </ul>
+     *
+     * <p><b>No inventa ninguna cifra</b> (regla 5): no hay aquí ni una alícuota, ni un tramo, ni un
+     * valor unitario. Es una resta de dos importes que otro selló, y por eso se puede escribir hoy
+     * aunque los dos sumandos todavía no existan.
+     */
+    public @Nullable Dinero diferencia() {
+        if (valorCatastral == null || valorDeclarado == null) {
+            return null;
+        }
+        if (valorCatastral.compareTo(valorDeclarado) <= 0) {
+            return Dinero.CERO;
+        }
+        return valorCatastral.menos(valorDeclarado);
+    }
+
     /** Si las cuatro columnas de importe de la pantalla siguen esperando a D-02a. */
     public boolean esperaSusCifras() {
         return impuestoOmitido == null;

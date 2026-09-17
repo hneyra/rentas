@@ -41,6 +41,38 @@ public interface ActaFiscalizacionRepository {
             @org.jspecify.annotations.Nullable Long vehiculoId);
 
     /**
+     * Lo que consigna cada una de esas versiones de ficha: el <b>lado declarado</b> del contraste
+     * que la pantalla del acta dibuja (#191).
+     *
+     * <p>Se pide por lote y no una a una porque quien la llama es un <b>listado</b>: una lectura
+     * por página, igual que {@code DeteccionDeOmisos} resuelve los titulares de la suya. Una
+     * versión que la proyección todavía no tenga simplemente no sale del mapa, y el acta se publica
+     * con su lado declarado nulo — que es lo honesto, y distinto de cero.
+     *
+     * <p>Devuelve lo que consigna la <b>versión</b> y no «lo que el predio tiene hoy»: {@code
+     * acta_fiscalizacion.ficha_id} es la versión que regía a la fecha de la visita, y comparar lo
+     * hallado contra la ficha actual acusaría de subvaluación a quien declaró correctamente sobre
+     * lo que entonces existía (RNF-075). Es el mismo criterio de {@code
+     * LectorDeFichas#areaDeLaVersion}.
+     *
+     * <p>Con el conjunto vacío no hay consulta: un {@code IN ()} no es SQL válido.
+     */
+    java.util.Map<Long, ActaConLoDeclarado.LoDeclarado> loDeclaradoPorFicha(
+            java.util.Set<Long> fichaIds);
+
+    /**
+     * Cuántas <b>unidades</b> del programa tienen acta viva: la tercera etapa del embudo (#196).
+     *
+     * <p>Unidades y no actas. Refiscalizar levanta una segunda acta —versión 2 sobre la misma
+     * unidad, que es justamente lo que {@code acta_fisc_version_uq} permite— y contar filas haría
+     * que esta etapa superara a «programados», o sea un embudo que se ensancha.
+     *
+     * <p>Un acta <b>anulada</b> no cuenta, por lo mismo que no cuenta en {@link
+     * #prediosConActaEnElEjercicio}: anularla es decir que esa visita no vale.
+     */
+    int unidadesConActaViva(long programaId);
+
+    /**
      * Cuáles de esos predios ya tienen acta viva en ese programa (#481).
      *
      * <p>Es de donde la grilla de la muestra deriva su columna «Estado»: guardarlo en la fila

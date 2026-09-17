@@ -249,6 +249,65 @@ public class LiquidacionRepositoryJdbc extends RepositorioJdbc implements Liquid
     }
 
     /**
+     * Cuantas unidades del programa sostienen una determinacion (#196).
+     *
+     * <p>Las tres piezas, y cada una tiene su motivo:
+     *
+     * <ul>
+     *   <li>{@code DISTINCT d.predio_id, d.vehiculo_id} cuenta <b>unidades</b>. Un periodo
+     *       fiscalizado de tres ejercicios produce tres lineas de la misma unidad, y contar lineas
+     *       diria que un predio con diferencia son tres predios.
+     *   <li>{@code d.condicion IN (:condiciones)} recibe la lista de fuera: la decide {@code
+     *       CondicionFiscalizada.hayDiferencia} y escribirla aqui seria una segunda copia de la
+     *       regla, que es lo que #397 midio que diverge.
+     *   <li>El {@code NOT EXISTS} es el mismo {@code soloUltimaVersion} de {@link #consultar}: una
+     *       reliquidacion sustituye a la version anterior, y contar las dos diria que un predio ya
+     *       corregido sigue con diferencia.
+     * </ul>
+     *
+     * <p>No filtra por {@code municipalidad_id} en ninguna de las tres tablas: lo hace RLS.
+     */
+    @Override
+    public int unidadesConDiferencia(
+            long programaId,
+            java.util.Set<kamayuk.rentas.fiscalizacion.dominio.CondicionFiscalizada> condiciones) {
+        if (condiciones.isEmpty()) {
+            return 0;
+        }
+        Map<String, Object> parametros = new HashMap<>();
+        parametros.put("programa", programaId);
+        parametros.put(
+                "condiciones",
+                condiciones.stream()
+                        .map(kamayuk.rentas.fiscalizacion.dominio.CondicionFiscalizada::name)
+                        .toList());
+
+        Integer cuantas =
+                jdbc().sql(
+                                "SELECT count(*) FROM ("
+                                        + "SELECT DISTINCT d.predio_id, d.vehiculo_id"
+                                        + " FROM liquidacion_detalle d"
+                                        + " JOIN liquidacion_fiscalizacion l"
+                                        + "   ON l.municipalidad_id = d.municipalidad_id"
+                                        + "  AND l.id = d.liquidacion_id"
+                                        + " JOIN acta_fiscalizacion a"
+                                        + "   ON a.municipalidad_id = l.municipalidad_id"
+                                        + "  AND a.id = l.acta_id"
+                                        + " WHERE a.programa_id = :programa"
+                                        + "   AND a.estado <> 'ANULADA'"
+                                        + "   AND d.condicion IN (:condiciones)"
+                                        + "   AND NOT EXISTS (SELECT 1 FROM liquidacion_fiscalizacion s"
+                                        + "                    WHERE s.municipalidad_id ="
+                                        + "                          l.municipalidad_id"
+                                        + "                      AND s.liquidacion_anterior_id = l.id))"
+                                        + " u")
+                        .params(parametros)
+                        .query(Integer.class)
+                        .single();
+        return cuantas == null ? 0 : cuantas;
+    }
+
+    /**
      * El siguiente correlativo del ejercicio, en <b>una</b> sentencia.
      *
      * <p>{@code INSERT ... ON CONFLICT DO UPDATE ... RETURNING}: nunca {@code SELECT} + {@code

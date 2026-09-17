@@ -8,6 +8,7 @@ import kamayuk.rentas.auditoria.RegistroDeAuditoria;
 import kamayuk.rentas.catastro.LectorDeFichas;
 import kamayuk.rentas.dominio.AreaM2;
 import kamayuk.rentas.dominio.Observacion;
+import kamayuk.rentas.fiscalizacion.dominio.ActaConLoDeclarado;
 import kamayuk.rentas.fiscalizacion.dominio.ActaFiscalizacion;
 import kamayuk.rentas.fiscalizacion.dominio.ActaFiscalizacionRepository;
 import kamayuk.rentas.fiscalizacion.dominio.Hallazgo;
@@ -59,7 +60,7 @@ public class RegistrarActaFiscalizacion {
     }
 
     @Transactional
-    public ActaFiscalizacion registrarPredial(
+    public ActaConLoDeclarado registrarPredial(
             long programaId,
             long contribuyenteId,
             long predioId,
@@ -92,7 +93,7 @@ public class RegistrarActaFiscalizacion {
     }
 
     @Transactional
-    public ActaFiscalizacion registrarVehicular(
+    public ActaConLoDeclarado registrarVehicular(
             long programaId,
             long contribuyenteId,
             long vehiculoId,
@@ -156,7 +157,19 @@ public class RegistrarActaFiscalizacion {
         }
     }
 
-    private ActaFiscalizacion guardar(ActaFiscalizacion nueva) {
+    /**
+     * Guarda el acta, la audita y devuelve <b>las dos mitades del contraste</b> (#191).
+     *
+     * <p>El lado declarado se resuelve aquí y no en la capa web: si el {@code POST} devolviera el
+     * acta desnuda, su respuesta publicaría {@code areaDeclarada} y {@code usoDeclarado} en nulo
+     * <b>siempre</b>, con el mismo contrato que la lectura de al lado y sin que nada lo dijera. Es
+     * el modo de fallo que #194 midió —un campo declarado que nunca se llena, en verde—, y cuesta
+     * una lectura local de la proyección para evitarlo.
+     *
+     * <p>Un acta vehicular no referencia ninguna versión de ficha, así que no hay nada que leer y
+     * su contraste sale sin lado declarado. Es lo correcto: un vehículo no declara área ni uso.
+     */
+    private ActaConLoDeclarado guardar(ActaFiscalizacion nueva) {
         ActaFiscalizacion guardada = actas.insertar(nueva);
 
         auditoria.registrar(
@@ -168,7 +181,12 @@ public class RegistrarActaFiscalizacion {
                                 guardada.observacion())
                         .con(null, descripcion(guardada)));
 
-        return guardada;
+        Long fichaId = guardada.fichaId();
+        return fichaId == null
+                ? ActaConLoDeclarado.sinLadoDeclarado(guardada)
+                : ActaConLoDeclarado.de(
+                        guardada,
+                        actas.loDeclaradoPorFicha(java.util.Set.of(fichaId)).get(fichaId));
     }
 
     private static String descripcion(ActaFiscalizacion acta) {

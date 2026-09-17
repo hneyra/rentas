@@ -56,4 +56,23 @@ public interface LiquidacionRepository {
 
     /** Las liquidaciones que se le hicieron a un contribuyente, para su estado de cuenta. */
     List<Liquidacion> deContribuyente(long contribuyenteId);
+
+    /**
+     * Cuántas <b>unidades</b> del programa sostienen una determinación: la cuarta etapa del embudo
+     * (#196).
+     *
+     * <p>«Sostiene una determinación» no es una opinión: es {@link
+     * CondicionFiscalizada#hayDiferencia}, que ya decide qué condiciones justifican determinar de
+     * oficio. Quien llama pasa ese conjunto para que la lista no se escriba dos veces — la lección
+     * de #397: dos copias de la misma regla divergen, y la que se lee en pantalla acaba no siendo
+     * la que filtró.
+     *
+     * <p>Cuenta unidades y sólo sobre la <b>última</b> versión de cada liquidación. Las dos cosas
+     * por el mismo motivo: reliquidar emite otra versión que <b>sustituye</b> a la anterior, y
+     * contar las dos diría que un predio corregido a {@code CONFORME} sigue con diferencia. Es el
+     * mismo {@code soloUltimaVersion} que pide la grilla de resultados.
+     *
+     * <p>Un acta anulada no cuenta, igual que en la etapa anterior.
+     */
+    int unidadesConDiferencia(long programaId, java.util.Set<CondicionFiscalizada> condiciones);
 }

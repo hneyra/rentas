@@ -61,6 +61,7 @@ class LiquidacionJdbcTest {
     private static final Observacion OBSERVACION = Observacion.de("Se liquida para la prueba");
     private static final LocalDate HOY = LocalDate.of(2026, 3, 16);
     private static final Ejercicio E2024 = new Ejercicio(2024);
+    private static final Ejercicio E2025 = new Ejercicio(2025);
     private static final Ejercicio E2026 = new Ejercicio(2026);
 
     private static BaseDeDatosDePrueba base;
@@ -215,6 +216,127 @@ class LiquidacionJdbcTest {
                                                     liquidaciones.insertar(
                                                             primera(escenario), List.of())))
                     .isInstanceOf(IllegalArgumentException.class);
+        }
+    }
+
+    @Nested
+    @DisplayName("#196 — «Con diferencia», la cuarta etapa del embudo")
+    class ElEmbudoCuentaUnidades {
+
+        @Test
+        @DisplayName("una unidad con tres ejercicios en diferencia cuenta UNA, no tres")
+        void tresEjerciciosSonUnaUnidad() {
+            TenantContext.fijar(new MunicipalidadId(municipalidadA));
+            Escenario escenario = sembrar(municipalidadA);
+
+            transaccion.execute(
+                    estado ->
+                            liquidaciones.insertar(
+                                    primera(escenario),
+                                    List.of(
+                                            lineaDe(escenario, E2024, CondicionFiscalizada.OMISO),
+                                            lineaDe(
+                                                    escenario,
+                                                    E2025,
+                                                    CondicionFiscalizada.SUBVALUADOR),
+                                            lineaDe(
+                                                    escenario,
+                                                    E2026,
+                                                    CondicionFiscalizada.USO_DISTINTO))));
+
+            assertThat(conDiferenciaDe(escenario))
+                    .as("contar lineas diria que un predio con diferencia son tres predios")
+                    .isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("una unidad CONFORME no cuenta: no sostiene ninguna determinacion")
+        void laConformeNoCuenta() {
+            TenantContext.fijar(new MunicipalidadId(municipalidadA));
+            Escenario escenario = sembrar(municipalidadA);
+
+            transaccion.execute(
+                    estado ->
+                            liquidaciones.insertar(
+                                    primera(escenario),
+                                    List.of(
+                                            lineaDe(
+                                                    escenario,
+                                                    E2024,
+                                                    CondicionFiscalizada.CONFORME))));
+
+            assertThat(conDiferenciaDe(escenario)).isZero();
+        }
+
+        @Test
+        @DisplayName("reliquidar a CONFORME la saca del embudo: cuenta la ULTIMA version")
+        void reliquidarACorformeLaSaca() {
+            TenantContext.fijar(new MunicipalidadId(municipalidadA));
+            Escenario escenario = sembrar(municipalidadA);
+
+            Liquidacion original =
+                    transaccion.execute(
+                            estado ->
+                                    liquidaciones.insertar(
+                                            primera(escenario),
+                                            List.of(
+                                                    lineaDe(
+                                                            escenario,
+                                                            E2024,
+                                                            CondicionFiscalizada.SUBVALUADOR))));
+            assertThat(conDiferenciaDe(escenario))
+                    .as("con una sola version, la unidad esta en el embudo")
+                    .isEqualTo(1);
+
+            int numero = SIGUIENTE.getAndIncrement();
+            transaccion.execute(
+                    estado ->
+                            liquidaciones.insertar(
+                                    original.reliquidadaPor(
+                                            "LIQ-2026-" + String.format("%06d", numero),
+                                            E2026,
+                                            numero,
+                                            E2024,
+                                            E2024,
+                                            TipoDeFiscalizacion.CIERTA,
+                                            "Area corregida",
+                                            HOY,
+                                            OBSERVACION),
+                                    List.of(
+                                            lineaDe(
+                                                    escenario,
+                                                    E2024,
+                                                    CondicionFiscalizada.CONFORME))));
+
+            assertThat(conDiferenciaDe(escenario))
+                    .as("una reliquidacion SUSTITUYE: contar las dos dejaria el predio corregido")
+                    .isZero();
+        }
+
+        private int conDiferenciaDe(Escenario escenario) {
+            return transaccion.execute(
+                    estado ->
+                            liquidaciones.unidadesConDiferencia(
+                                    escenario.programaId(),
+                                    java.util.EnumSet.of(
+                                            CondicionFiscalizada.OMISO,
+                                            CondicionFiscalizada.SUBVALUADOR,
+                                            CondicionFiscalizada.USO_DISTINTO)));
+        }
+
+        private LineaDeLiquidacion lineaDe(
+                Escenario escenario,
+                kamayuk.rentas.dominio.Ejercicio ejercicio,
+                CondicionFiscalizada condicion) {
+            return LineaDeLiquidacion.predialSinCifras(
+                    ejercicio,
+                    escenario.conjunto2024(),
+                    escenario.predioId(),
+                    condicion,
+                    AreaM2.de("120.00"),
+                    AreaM2.de("300.00"),
+                    "CASA_HABITACION",
+                    "CASA_HABITACION");
         }
     }
 
@@ -591,7 +713,8 @@ class LiquidacionJdbcTest {
 
     // ------------------------------------------------------------------
 
-    private record Escenario(long actaId, long predioId, long contribuyenteId, long conjunto2024) {}
+    private record Escenario(
+            long actaId, long predioId, long contribuyenteId, long conjunto2024, long programaId) {}
 
     private static Liquidacion primera(Escenario escenario) {
         int numero = SIGUIENTE.getAndIncrement();
@@ -726,7 +849,8 @@ class LiquidacionJdbcTest {
                         ficha,
                         LocalDate.of(2026, 3, 1));
 
-        return new Escenario(acta, predio, contribuyente, conjuntoSelladoDe(municipalidadId));
+        return new Escenario(
+                acta, predio, contribuyente, conjuntoSelladoDe(municipalidadId), programa);
     }
 
     /**

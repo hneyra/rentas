@@ -4,19 +4,27 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.Locale;
+import java.util.Map;
 import kamayuk.rentas.autorizacion.Privilegio;
 import kamayuk.rentas.autorizacion.RequiereAcceso;
 import kamayuk.rentas.catastro.TransferenciaDeFiscalizacion;
+import kamayuk.rentas.compartido.Pagina;
+import kamayuk.rentas.contribuyentes.DirectorioDeContribuyentes;
+import kamayuk.rentas.contribuyentes.ResumenDeContribuyente;
 import kamayuk.rentas.documentos.EmitirDocumento;
 import kamayuk.rentas.documentos.FormatoDeDocumento;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.fiscalizacion.aplicacion.ConsultaDeResoluciones;
 import kamayuk.rentas.fiscalizacion.aplicacion.LiquidarFiscalizacion;
 import kamayuk.rentas.fiscalizacion.aplicacion.TransferirARentas;
+import kamayuk.rentas.fiscalizacion.dominio.CriterioDeResoluciones;
 import kamayuk.rentas.fiscalizacion.dominio.ResolucionDeDeterminacionRepository;
+import kamayuk.rentas.fiscalizacion.dominio.ResolucionEnLaRelacion;
 import kamayuk.rentas.web.Api;
 import kamayuk.rentas.web.CodigoDeError;
+import kamayuk.rentas.web.ParametrosDePaginacion;
 import kamayuk.rentas.web.ProblemaDeNegocio;
+import kamayuk.rentas.web.RespuestaPaginada;
 import org.jspecify.annotations.Nullable;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
@@ -41,9 +49,27 @@ import org.springframework.web.bind.annotation.RestController;
  *   <li>{@code POST /fiscalizacion/transferencias} es la accion de {@code fisc_resultados}: la
  *       pantalla declara su grilla como endpoint, y transferir necesita verbo propio. Exige el
  *       privilegio de <b>registro</b>: es el acto que cambia el padron.
+ *   <li>{@code GET /fiscalizacion/resoluciones} es la <b>relacion</b> (#192), que hasta ese issue
+ *       no existia.
  *   <li>{@code GET /fiscalizacion/resoluciones/{numero}} es {@code resolucion_determinacion_fisc},
  *       que el contrato ya publicaba y nadie servia.
  * </ul>
+ *
+ * <h2>La relacion, y por que faltaba (#192)</h2>
+ *
+ * <p>Hasta #192 la unica lectura era por numero exacto, y {@code
+ * ConsultaDeResoluciones.deContribuyente} estaba escrita en la capa de aplicacion <b>sin ningun
+ * controlador que la expusiera</b>. La consecuencia medida: la pantalla es la unica del sistema que
+ * no puede tomar «la primera de la relacion» —las demas lo hacen, {@code coa-exp} entre ellas—
+ * porque no habia relacion, de modo que abierta desde el menu no ensenaba una resolucion nunca; el
+ * numero tenia que llegar en la direccion. Y el numero no lo publicaba ninguna otra operacion salvo
+ * la respuesta de la transferencia que la creo.
+ *
+ * <p>Un filtro y no tres. Por que «Estado» y «Ejercicio» <b>no</b> viajan esta medido y escrito en
+ * {@link kamayuk.rentas.fiscalizacion.dominio.CriterioDeResoluciones}: el primero no existe en el
+ * dominio —{@code resolucion_determinacion} no admite {@code UPDATE} desde V49 y no hay historial
+ * del que derivarlo— y el segundo es ambiguo, porque una resolucion tiene el ejercicio de su
+ * numeracion y el periodo que fiscaliza, y no son el mismo.
  *
  * <p>No hay {@code PUT} ni {@code PATCH}, y no es un olvido: {@code resolucion_determinacion} no
  * admite {@code UPDATE} desde V49. Una resolucion equivocada se deja sin efecto con otro acto.
@@ -57,14 +83,22 @@ public class ResolucionController {
 
     static final String ACCESO_RESOLUCION = "resolucion_determinacion_fisc";
 
+    /** El orden por omision de la relacion: el numero, que es como se busca una resolucion. */
+    private static final String ORDEN_POR_OMISION = "numero";
+
     private final TransferirARentas transferir;
     private final ConsultaDeResoluciones consulta;
+    private final DirectorioDeContribuyentes contribuyentes;
     private final Clock reloj;
 
     public ResolucionController(
-            TransferirARentas transferir, ConsultaDeResoluciones consulta, Clock reloj) {
+            TransferirARentas transferir,
+            ConsultaDeResoluciones consulta,
+            DirectorioDeContribuyentes contribuyentes,
+            Clock reloj) {
         this.transferir = transferir;
         this.consulta = consulta;
+        this.contribuyentes = contribuyentes;
         this.reloj = reloj;
     }
 
@@ -113,6 +147,31 @@ public class ResolucionController {
                                                 "La resolucion recien registrada tiene que poder"
                                                         + " leerse en la misma transaccion")),
                 transferencia);
+    }
+
+    /**
+     * La relacion de resoluciones de determinacion (#192, RF-057).
+     *
+     * <p>{@code ?contribuyente=} es el <b>codigo</b> del padron —{@code C-000001}—, el mismo que
+     * teclea {@code GET /fiscalizacion/estado-cuenta} y no el identificador interno, que ninguna
+     * pantalla ensena. Un codigo que no existe es {@code 404} y no una relacion sin filtrar:
+     * devolver todas las resoluciones de la municipalidad a quien pregunto por una persona es
+     * contestar otra cosa con formato de buena (#425, #541).
+     */
+    @GetMapping("/resoluciones")
+    @RequiereAcceso(acceso = ACCESO_RESOLUCION, privilegio = Privilegio.LECTURA)
+    public RespuestaPaginada<ResolucionEnLaRelacionResource> resoluciones(
+            @RequestParam(required = false) @Nullable String contribuyente,
+            ParametrosDePaginacion paginacion) {
+
+        Pagina<ResolucionEnLaRelacion> pagina =
+                consulta.buscar(
+                        new CriterioDeResoluciones(contribuyenteOpcional(contribuyente)),
+                        paginacion.aPaginacion(ORDEN_POR_OMISION));
+
+        Map<Long, ResumenDeContribuyente> padron = padronDe(pagina);
+        return RespuestaPaginada.de(
+                pagina, fila -> ResolucionEnLaRelacionResource.de(fila, padron));
     }
 
     /** La resolucion de determinacion por su numero (RF-057). */
@@ -179,6 +238,39 @@ public class ResolucionController {
 
     private ConsultaDeResoluciones.ResolucionConsultada consultada(String numero) {
         return consulta.porNumero(numero).orElseThrow(() -> noHayResolucion(numero));
+    }
+
+    /**
+     * Los obligados de la pagina, resueltos a codigo y nombre en <b>una</b> consulta.
+     *
+     * <p>Mismo reparto que {@code OmisosController.padronDe}: resolverlo desde el cliente cuesta
+     * una peticion por fila. Quien ya no este en el padron no sale del mapa y su fila se publica
+     * con los dos campos nulos, que es lo que hay que poder ver.
+     */
+    private Map<Long, ResumenDeContribuyente> padronDe(Pagina<ResolucionEnLaRelacion> pagina) {
+        java.util.Set<Long> ids = new java.util.HashSet<>();
+        for (ResolucionEnLaRelacion fila : pagina.contenido()) {
+            ids.add(fila.contribuyenteId());
+        }
+        return ids.isEmpty() ? Map.of() : contribuyentes.porIds(ids);
+    }
+
+    /** El contribuyente del filtro, por su codigo del padron. Sin filtro, todas. */
+    private @Nullable Long contribuyenteOpcional(@Nullable String codigo) {
+        if (codigo == null || codigo.isBlank()) {
+            return null;
+        }
+        String limpio = codigo.strip();
+        return contribuyentes
+                .porCodigo(limpio)
+                .orElseThrow(
+                        () ->
+                                new ProblemaDeNegocio(
+                                        CodigoDeError.NO_ENCONTRADO,
+                                        "No hay ningun contribuyente con el codigo '"
+                                                + limpio
+                                                + "'"))
+                .id();
     }
 
     private static ProblemaDeNegocio noHayResolucion(String numero) {
