@@ -40,8 +40,13 @@ import tools.jackson.databind.json.JsonMapper;
  * este producto no lleva secretos, pero <b>no es lo unico que puede contestar</b>: delante hay un
  * Traefik, y un proxy o una pagina de error puede devolver un eco de la peticion con su cabecera
  * {@code Authorization} dentro — que es el token de servicio de esta municipalidad. Por eso {@link
- * #limpiar} tacha primero y recorta despues: recortar antes dejaria pasar el trozo de token que
- * cupiera.
+ * #limpiar} tacha primero y recorta despues, que es el orden defensivo — aunque, medido, <b>hoy no
+ * es el que sostiene la limpieza</b>: las tres expresiones de abajo casan de forma abierta ({@code
+ * [^\r\n}]+}, {@code [A-Za-z0-9._~+/=-]+}), asi que un fragmento recortado las casa igual y el
+ * orden inverso tampoco deja escapar nada. Se comprobo invirtiendolo: las siete pruebas de {@code
+ * RespuestaAjenaTest} siguen verdes. Se deja asi porque es el orden que seguiria siendo correcto si
+ * alguna expresion pasara a exigir el cierre de las comillas — pero <b>no hay guarda que lo
+ * vigile</b>, y no se escribio una que no pudiera fallar.
  *
  * @param codigo el {@code codigo} del {@code problem+json}, o vacio si no lo dijo
  * @param detalle el {@code detail} del {@code problem+json}, o vacio si no lo dijo
@@ -154,9 +159,11 @@ public record RespuestaAjena(String codigo, String detalle, String cuerpo) {
     /**
      * Tacha, aplana y recorta, <b>en ese orden</b>.
      *
-     * <p>El orden no es de gusto: recortar primero cortaria un token por la mitad y la mitad que
-     * quedara seguiria siendo secreta. Y aplanar —los saltos de linea a un espacio— es lo que hace
-     * que una pagina de error de varias lineas siga siendo <b>una</b> linea del registro.
+     * <p>Tacha primero y recorta despues. <b>Medido, el orden no cambia el resultado hoy</b>: las
+     * tres expresiones casan hasta el final de la linea o del texto, asi que la mitad de un token
+     * que sobreviva al corte tambien queda tachada. Se mantiene porque es el orden que sigue siendo
+     * correcto si alguna expresion pasara a exigir un cierre, y porque tachar sobre el texto entero
+     * no cuesta nada. Lo que NO hay es una prueba que lo distinga, y se intento escribir.
      */
     private static String limpiar(String cuerpo) {
         String tachado = AUTORIZACION.matcher(cuerpo).replaceAll("$1" + reemplazo());

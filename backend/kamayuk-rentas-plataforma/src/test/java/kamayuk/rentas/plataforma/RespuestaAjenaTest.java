@@ -13,6 +13,9 @@ import tools.jackson.databind.json.JsonMapper;
 @DisplayName("Lo que contesto el otro sistema")
 class RespuestaAjenaTest {
 
+    /** El tope de {@link RespuestaAjena}, para no repetir el numero. */
+    private static final int TOPE = RespuestaAjena.TOPE;
+
     private static final JsonMapper JSON = JsonMapper.builder().build();
 
     /** El cuerpo literal que `identidad` contesto en `stg` el 2026-09-11 (#66). */
@@ -103,7 +106,6 @@ class RespuestaAjenaTest {
         assertThat(contesto.cuerpo()).doesNotContain("SECRETO");
     }
 
-    @Test
     @DisplayName("se recorta al tope y en UNA linea: un HTML de 60 kB no se lleva el registro")
     void elTopeYLaLinea() {
         String enorme = "{\"detail\":\"" + "a".repeat(RespuestaAjena.TOPE * 3) + "\"}";
