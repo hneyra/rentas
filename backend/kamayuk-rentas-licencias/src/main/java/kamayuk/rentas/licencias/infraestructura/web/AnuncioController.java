@@ -117,6 +117,19 @@ public class AnuncioController {
      * <p>Con {@code nroAutorizacion}, la fila trae ademas su historial completo: es la ficha que la
      * pantalla dibuja al abrir una autorizacion. Sin el, la fila es la que la grilla pinta y nada
      * mas —una pagina de veinte no puede costar veinte lecturas de detalle—.
+     *
+     * <h2>El filtro del domicilio se llama {@code direccionDelAnuncio} (#226)</h2>
+     *
+     * <p>Se llamaba {@code direccion}, que es tambien el nombre del <b>sentido del orden</b> del
+     * dialecto de la paginacion, admitido en toda operacion: Spring ataba el mismo parametro de
+     * consulta a los dos argumentos y ninguno de los dos usos funcionaba. El motivo entero, con la
+     * medida, esta en {@code LicenciaController#listar}.
+     *
+     * <p><b>No se llama {@code ubicacion}</b>, que seria lo que dice la columna, porque {@link
+     * AnuncioResource} ya publica un campo con ese nombre y <b>es otra cosa</b>: {@code ubicacion}
+     * es el emplazamiento del elemento —fachada, azotea— y la direccion donde esta instalado se
+     * publica como {@code direccion}. Dos nombres cruzados en el mismo recurso; aqui se nombra lo
+     * que el filtro acota y no la columna que lo guarda.
      */
     @GetMapping
     @RequiereAcceso(acceso = ACCESO_ANUNCIOS, privilegio = Privilegio.LECTURA)
@@ -124,7 +137,7 @@ public class AnuncioController {
             @RequestParam(required = false) @Nullable String nroAutorizacion,
             @RequestParam(required = false) @Nullable String contribuyente,
             @RequestParam(required = false) @Nullable String nExpediente,
-            @RequestParam(required = false) @Nullable String direccion,
+            @RequestParam(required = false) @Nullable String direccionDelAnuncio,
             ParametrosDePaginacion paginacion) {
 
         LocalDate hoy = LocalDate.now(reloj);
@@ -146,7 +159,8 @@ public class AnuncioController {
         }
 
         CriterioDeAnuncios criterio =
-                new CriterioDeAnuncios(null, nExpediente, direccion, null, null, null, null);
+                new CriterioDeAnuncios(
+                        null, nExpediente, direccionDelAnuncio, null, null, null, null);
 
         return RespuestaPaginada.de(
                 consulta.buscar(

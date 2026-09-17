@@ -155,6 +155,44 @@ function filtrosDe(pantalla) {
 }
 
 /**
+ * Filtros de pantalla que viajan con OTRO nombre, y por que (#226).
+ *
+ * No es lo mismo que `SUPRIMIDOS` —que retira el parametro— ni que `DEL_BACKEND`
+ * —que anade uno—: el filtro sigue existiendo y filtrando lo mismo; lo que cambia
+ * es el nombre con el que se manda.
+ *
+ * Las dos entradas son el mismo defecto: se llamaban `direccion`, que es TAMBIEN
+ * el nombre del sentido del orden en `ParametrosDePaginacion` —el dialecto que
+ * `GuardiaDeParametros` admite en toda operacion—. Spring ataba el mismo parametro
+ * de consulta a los dos argumentos del mismo metodo, asi que
+ * `?ordenarPor=numero&direccion=DESCENDENTE` acotaba el padron a las licencias
+ * cuya direccion contiene «DESCENDENTE» —o sea a ninguna— y ademas ordenaba al
+ * reves; y mandar una direccion de verdad fallaba en el enlace, porque el mismo
+ * texto tenia que convertirse a `Paginacion.Direccion`. O sea que el filtro **no
+ * se podia usar**, y por eso renombrarlo no rompe ninguna peticion que hoy
+ * funcione.
+ *
+ * Y se nota aqui, no solo en el backend: `reunir` se queda con el primero de dos
+ * parametros homonimos, asi que en estas dos operaciones el `direccion` de la
+ * PAGINACION desaparecia del contrato — el YAML decia que no se podia pedir el
+ * sentido del orden, y el backend lo aceptaba igual. Con el filtro renombrado,
+ * los dos se publican y cada uno dice lo suyo.
+ *
+ * Quien lo vigila desde el otro lado es
+ * `ParametrosDeLaConsultaTest#ningunFiltroSeLlamaComoElDialectoDeLaPaginacion`,
+ * que recorre TODAS las firmas y no solo estas dos.
+ */
+const RENOMBRADOS = {
+  licencia_funcionamiento: { direccion: 'direccionDelEstablecimiento' },
+  anuncios: { direccion: 'direccionDelAnuncio' },
+};
+
+/** El nombre con el que viaja ese filtro de esa pantalla. */
+function renombrado(id, nombre) {
+  return (RENOMBRADOS[id] ?? {})[nombre] ?? nombre;
+}
+
+/**
  * Paginacion y orden, para las operaciones de lectura que traen tabla.
  *
  * **Los nombres son los del backend, no los que la interfaz propuso.** Cuando
@@ -4253,7 +4291,7 @@ for (const grupo of NAV) {
                     })
                   : []),
                 ...filtrosDe(pantalla).map((filtro) => ({
-                  nombre: filtro.nombre,
+                  nombre: renombrado(id, filtro.nombre),
                   ejemplo: '',
                   descripcion: `Filtro «${filtro.etiqueta}» de la pantalla`,
                 })),
@@ -4421,6 +4459,47 @@ for (const retirada of OPERACIONES_RETIRADAS) {
   }
 }
 const vigentes = operaciones.filter((op) => !OPERACIONES_RETIRADAS.has(op.operationId));
+
+/* ── La lista blanca de `?ordenarPor=`, del contrato derivado del backend ──
+   El orden va por LISTA CERRADA: `OrdenSeguro.clausula` contesta 422
+   ORDEN_NO_ADMITIDO con cualquier campo que no este en el `OrdenSeguro.sobre(...)`
+   de su repositorio, y la lista es distinta en cada uno. Hasta #227 el contrato
+   decia solo que `?ordenarPor=` EXISTE, de modo que la unica forma de averiguar
+   que valores admite era probar nombres contra el servidor — o abrir los `.java`
+   del backend, que es lo que la guarda del frontend hacia y este issue retira.
+
+   No se escribe a mano: sale de `parametros-de-la-api.json`, que produce
+   `ParametrosDeLaApiTest` recorriendo el bytecode desde cada handler hasta el
+   `OrdenSeguro` que su paginacion alcanza. Una lista copiada aqui se quedaria
+   vieja EN VERDE el dia que un repositorio le quitara una columna.
+
+   Las operaciones que no lo publican son las que paginan sin que `?ordenarPor=`
+   mande en el ORDER BY —paginan en memoria, o rehacen la paginacion con un campo
+   fijo—; su motivo esta en `ParametrosDeLaApiTest#SIN_ORDEN_PEDIBLE`. Ahi el
+   parametro se queda como estaba: `{ type: string }` y sin enum, que es lo unico
+   cierto. */
+const DEL_CONTRATO = JSON.parse(
+  readFileSync(fileURLToPath(new URL('docs/50-api/parametros-de-la-api.json', raiz)), 'utf8'),
+);
+
+for (const op of vigentes) {
+  const clave = `${op.metodo.toUpperCase()} ${op.ruta.replace(/^\/api\/v1/, '')}`;
+  const orden = DEL_CONTRATO[clave]?.orden;
+  if (!orden) continue;
+  op.parametrosDeConsulta = op.parametrosDeConsulta.map((p) =>
+    p.nombre === 'ordenarPor'
+      ? {
+          ...p,
+          descripcion:
+            'Campo por el que se ordena, en camelCase. Lista cerrada: cualquier otro valor es' +
+            ` 422 ORDEN_NO_ADMITIDO. Sin el, la operacion ordena por «${orden.porOmision}». El` +
+            ' nombre de columna en snake_case se admite tambien, para el cliente que ya conozca' +
+            ' la tabla.',
+          esquema: `{ type: string, enum: [${orden.admitidos.join(', ')}] }`,
+        }
+      : p,
+  );
+}
 
 const porRuta = new Map();
 for (const op of vigentes) {

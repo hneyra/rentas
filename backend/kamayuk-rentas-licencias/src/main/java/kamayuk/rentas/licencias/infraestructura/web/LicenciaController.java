@@ -145,6 +145,28 @@ public class LicenciaController {
      * <p>Con {@code nroLicencia}, la fila trae ademas su historial y sus duplicados: es la ficha
      * que la pantalla dibuja al abrir una licencia. Sin el, la fila es la que la grilla pinta y
      * nada mas —una pagina de veinte no puede costar veinte lecturas de detalle—.
+     *
+     * <h2>El filtro del domicilio se llama {@code direccionDelEstablecimiento} (#226)</h2>
+     *
+     * <p>Se llamaba {@code direccion}, y ese es tambien el nombre del <b>sentido del orden</b> en
+     * {@link ParametrosDePaginacion}, que {@code GuardiaDeParametros} admite en toda operacion.
+     * Spring ataba el mismo parametro de consulta a los dos argumentos: {@code
+     * ?ordenarPor=numero&direccion=DESCENDENTE} acotaba el padron a las licencias cuya direccion
+     * contiene «DESCENDENTE» —o sea a ninguna— <b>y ademas</b> ordenaba al reves, y lo que se veia
+     * era una tabla vacia, que se lee como «este padron no tiene nada». Y al reves: mandar una
+     * direccion de verdad fallaba en el enlace, porque el mismo texto tenia que convertirse a
+     * {@code Paginacion.Direccion}. O sea que este filtro <b>no se podia usar</b>, y por eso
+     * renombrarlo no rompe a nadie: no habia peticion correcta que romper.
+     *
+     * <p>Lo que cede es el filtro y no el dialecto: los cuatro nombres de la paginacion son los
+     * mismos en las 134 pantallas. Y no se llama {@code domicilio} porque el domicilio de un padron
+     * de licencias se confunde con el <b>fiscal</b> del titular, que es otro dato y lo responde
+     * {@code contribuyentes}: esta columna es la del establecimiento, como {@code
+     * areaDelEstablecimiento}.
+     *
+     * <p>Sigue publicandose como {@code direccion} en cada fila —{@link LicenciaResource}— y sigue
+     * admitiendose como {@code ?ordenarPor=direccion}: lo que cambia es el nombre con el que se
+     * <b>acota</b>, que es el unico de los tres que colisionaba.
      */
     @GetMapping("/funcionamiento")
     @RequiereAcceso(acceso = ACCESO_LICENCIA, privilegio = Privilegio.LECTURA)
@@ -153,7 +175,7 @@ public class LicenciaController {
             @RequestParam(required = false) @Nullable String nExpediente,
             @RequestParam(required = false) @Nullable String nombreDelContribuyente,
             @RequestParam(required = false) @Nullable String denominacionComercial,
-            @RequestParam(required = false) @Nullable String direccion,
+            @RequestParam(required = false) @Nullable String direccionDelEstablecimiento,
             ParametrosDePaginacion paginacion) {
 
         LocalDate hoy = LocalDate.now(reloj);
@@ -179,7 +201,7 @@ public class LicenciaController {
                         null,
                         nExpediente,
                         denominacionComercial,
-                        direccion,
+                        direccionDelEstablecimiento,
                         null,
                         null,
                         null,

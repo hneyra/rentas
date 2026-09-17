@@ -101,7 +101,10 @@ class ParametrosDeLaApiTest {
                     + " que mandar al menos uno, que el controlador exige en su cuerpo porque"
                     + " admite varios nombres; «condicionales» son los que solo hacen falta segun"
                     + " el cuerpo de la peticion; «opcionales» es el resto, y «enElCuerpo» son los"
-                    + " que el controlador exige y NO viajan en la URL sino en el cuerpo JSON. Lo"
+                    + " que el controlador exige y NO viajan en la URL sino en el cuerpo JSON;"
+                    + " «orden» dice que campos admite «?ordenarPor=» y por cual ordena la"
+                    + " operacion si no se manda, y sale de OrdenSeguro.camposAdmitidos() y del"
+                    + " cuerpo del handler, no de una lista escrita a mano. Lo"
                     + " lee el frontend para"
                     + " comprobar que su proxy no sirve una operacion sin lo que el backend exige"
                     + " (#26).";
@@ -161,7 +164,160 @@ class ParametrosDeLaApiTest {
                     "POST /rentas/predial/calculo-masivo", List.of("ejercicio"),
                     "POST /rentas/vehicular/calculo", List.of("ejercicio"));
 
+    /**
+     * Las operaciones que paginan y <b>no pueden publicar</b> por que campos dejan ordenar (#227).
+     *
+     * <p>No es una excepcion de comodidad: en las seis, {@code ?ordenarPor=} <b>no llega a ningun
+     * {@code ORDER BY}</b> de este repositorio, asi que no hay lista blanca que publicar y publicar
+     * una la inventaria. Cada linea dice cual de los tres motivos es.
+     *
+     * <p>Se comprueba en las dos direcciones: una operacion que pagina y no esta aqui tiene que
+     * publicar su orden, y una que este aqui tiene que seguir sin poder resolverlo. Una exencion
+     * que ya no exime nada sigue eximiendo a lo que herede ese nombre.
+     */
+    private static final Map<String, String> SIN_ORDEN_PEDIBLE =
+            Map.of(
+                    // Rehace la paginacion: `ConsultaUnificada` compone una `new Paginacion(...)`
+                    // con el campo FIJO de cada relacion —`fecha_valor`, `fecha`,
+                    // `fecha_emision`— antes de pedirla, de modo que lo que el cliente mande en
+                    // `?ordenarPor=` se descarta. Alcanza cuatro listas blancas y ninguna es «la»
+                    // suya.
+                    "GET /consultas/unificada",
+                    "rehace la paginacion por relacion (ConsultaUnificada#ordenadaPor)",
+                    // Paginan EN MEMORIA: el controlador trae la lista entera y la corta con
+                    // `subList`, asi que el orden es el que traiga el origen y `?ordenarPor=` no
+                    // toca nada.
+                    "GET /consultas/predios",
+                    "pagina en memoria sobre la lista ya traida (subList)",
+                    "GET /rentas/predios",
+                    "pagina en memoria sobre la lista ya traida (subList)",
+                    "GET /consultas/deuda",
+                    "el orden lo fija ConsultarDeuda, no un ORDER BY por lista blanca",
+                    "GET /consultas/deudas-con-beneficio",
+                    "la simulacion ordena lo que ya calculo, no una consulta",
+                    // La lista blanca no vive aqui: la ficha la ordena `catastro`, y de este lado
+                    // solo hay el adaptador cliente (P5C). Publicarla exigiria que la publicara su
+                    // dueno, que es lo que ADR-0030 §4 pide.
+                    "GET /catastro/fichas/conciliacion",
+                    "la ordena catastro; aqui solo esta el adaptador cliente");
+
     // ------------------------------------------------------------------
+
+    @Test
+    @DisplayName(
+            "toda operacion que pagina publica que campos admite en ?ordenarPor=, o dice por que no")
+    void todaOperacionQuePaginaPublicaSuOrden() {
+        Map<String, OrdenDeCadaOperacion.Orden> ordenes = OrdenDeCadaOperacion.porOperacion();
+        Set<String> paginan = OrdenDeCadaOperacion.lasQuePaginan();
+
+        assertThat(paginan)
+                .as(
+                        "ninguna operacion recibe ParametrosDePaginacion: este recorrido estaria"
+                                + " midiendo el conjunto vacio")
+                .hasSizeGreaterThan(40);
+        assertThat(ordenes)
+                .as(
+                        "ninguna operacion resolvio su lista blanca: el recorrido del bytecode no"
+                                + " esta llegando al repositorio, y su verde no vale")
+                .hasSizeGreaterThan(40);
+
+        List<String> mudas = new ArrayList<>();
+        for (String operacion : paginan) {
+            if (!ordenes.containsKey(operacion) && !SIN_ORDEN_PEDIBLE.containsKey(operacion)) {
+                mudas.add(
+                        "  "
+                                + operacion
+                                + " alcanza "
+                                + OrdenDeCadaOperacion.cuantasListasAlcanza(operacion)
+                                + " listas blancas");
+            }
+        }
+        assertThat(mudas)
+                .as(
+                        "Una operacion publica «?ordenarPor=» y el contrato no dice que valores"
+                                + " admite. Quien integre tiene que adivinarlos contra el servidor, y"
+                                + " adivinar sobre un ORDER BY significa probar nombres contra"
+                                + " produccion hasta acertar: los que no acierten son 422"
+                                + " ORDEN_NO_ADMITIDO. Si la operacion alcanza VARIAS listas o"
+                                + " NINGUNA, es que su `?ordenarPor=` no manda en el ORDER BY: se"
+                                + " declara en SIN_ORDEN_PEDIBLE con cual de los tres motivos es.\n"
+                                + String.join("\n", mudas))
+                .isEmpty();
+
+        // Y el orden por omision tiene que estar en su propia lista blanca: si no, la operacion
+        // contesta 422 ORDEN_NO_ADMITIDO a toda peticion que NO mande `?ordenarPor=`, o sea a la
+        // primera que hace cualquier pantalla al abrirse.
+        List<String> imposibles = new ArrayList<>();
+        ordenes.forEach(
+                (operacion, orden) -> {
+                    if (!orden.admitidos().contains(orden.porOmision())) {
+                        imposibles.add(
+                                "  "
+                                        + operacion
+                                        + " ordena por omision por «"
+                                        + orden.porOmision()
+                                        + "», que no esta en "
+                                        + orden.admitidos());
+                    }
+                });
+        assertThat(imposibles)
+                .as(
+                        "El orden por omision de un controlador no esta en la lista blanca de su"
+                                + " repositorio: la operacion contesta 422 ORDEN_NO_ADMITIDO a toda"
+                                + " peticion que no mande «?ordenarPor=», que es la primera que"
+                                + " hace cualquier pantalla al abrirse.\n"
+                                + String.join("\n", imposibles))
+                .isEmpty();
+
+        List<String> rancias = new ArrayList<>();
+        for (String operacion : SIN_ORDEN_PEDIBLE.keySet()) {
+            if (!paginan.contains(operacion)) {
+                rancias.add("  " + operacion + " ya no pagina");
+            } else if (ordenes.containsKey(operacion)) {
+                rancias.add("  " + operacion + " ya resuelve UNA lista blanca");
+            }
+        }
+        assertThat(rancias)
+                .as(
+                        "Esto se declara «sin orden pedible» y ya no lo es. Una exencion que no"
+                                + " exime nada no protege nada, y sigue eximiendo a lo que herede"
+                                + " ese nombre: hay que quitar la linea y dejar que el contrato"
+                                + " publique la lista.\n"
+                                + String.join("\n", rancias))
+                .isEmpty();
+    }
+
+    @Test
+    @DisplayName("y lo publicado es lo que el repositorio admite de verdad, no una lista copiada")
+    void loPublicadoEsLoQueElRepositorioAdmite() {
+        // El contraste: las tres que la interfaz ya ofrece ordenar. Salen de una medida —el
+        // `OrdenSeguro.sobre(...)` de su repositorio— y no de leer este archivo, asi que un
+        // generador que publicara siempre la lista vacia produciria un archivo estable y esta
+        // guarda saldria roja.
+        Map<String, OrdenDeCadaOperacion.Orden> ordenes = OrdenDeCadaOperacion.porOperacion();
+
+        assertThat(ordenes.get("GET /licencias/ciiu"))
+                .isNotNull()
+                .satisfies(
+                        orden -> {
+                            assertThat(orden.porOmision()).isEqualTo("codigo");
+                            assertThat(orden.admitidos())
+                                    .contains("codigo", "descripcion", "seccion", "riesgoItse")
+                                    .doesNotContain("nombre");
+                        });
+        assertThat(ordenes.get("GET /seguridad/auditoria"))
+                .isNotNull()
+                .satisfies(
+                        orden -> {
+                            assertThat(orden.porOmision()).isEqualTo("fecha");
+                            assertThat(orden.admitidos()).contains("fecha", "usuarioId", "tabla");
+                        });
+        // La que prueba que el orden por omision se lee del CUERPO del handler y no del archivo:
+        // este controlador publica dos operaciones y ordena cada una por lo suyo.
+        assertThat(ordenes.get("POST /seguridad/respaldos"))
+                .isNotNull()
+                .satisfies(orden -> assertThat(orden.porOmision()).isEqualTo("inicio"));
+    }
 
     @Test
     @DisplayName("el archivo de parametros es el que producen los controladores de hoy")
@@ -344,6 +500,7 @@ class ParametrosDeLaApiTest {
     }
 
     private static Map<String, Map<String, Object>> parametrosPorOperacion() {
+        Map<String, OrdenDeCadaOperacion.Orden> ordenes = OrdenDeCadaOperacion.porOperacion();
         Map<String, Map<String, Object>> porOperacion = new TreeMap<>();
         for (Map.Entry<String, Method> endpoint : EndpointsPublicados.porOperacion().entrySet()) {
             Method metodo = endpoint.getValue();
@@ -367,6 +524,13 @@ class ParametrosDeLaApiTest {
                             new TreeSet<>(
                                     EXIGIDOS_EN_EL_CUERPO.getOrDefault(
                                             endpoint.getKey(), List.of()))));
+            OrdenDeCadaOperacion.Orden orden = ordenes.get(endpoint.getKey());
+            if (orden != null) {
+                Map<String, Object> publicado = new LinkedHashMap<>();
+                publicado.put("porOmision", orden.porOmision());
+                publicado.put("admitidos", orden.admitidos());
+                declarado.put("orden", publicado);
+            }
             porOperacion.put(endpoint.getKey(), declarado);
         }
         return porOperacion;
@@ -508,7 +672,7 @@ class ParametrosDeLaApiTest {
             int campos = operacion.getValue().size();
             for (Map.Entry<String, Object> campo : operacion.getValue().entrySet()) {
                 json.append("    ").append(entrecomillado(campo.getKey())).append(": ");
-                escribirLista(json, campo.getValue());
+                escribirValor(json, campo.getValue());
                 json.append(--campos == 0 ? "" : ",").append('\n');
             }
             json.append("  }").append(--quedan == 0 ? "" : ",").append('\n');
@@ -516,17 +680,35 @@ class ParametrosDeLaApiTest {
         return json.append("}\n").toString();
     }
 
-    private static void escribirLista(StringBuilder json, Object valor) {
-        List<?> lista = (List<?>) valor;
+    /**
+     * Una lista, un objeto o una cadena, en una sola linea.
+     *
+     * <p>{@code orden} es un objeto y no una lista mas: sus dos mitades no son del mismo genero
+     * —una es un nombre y la otra una lista— y aplanarlas en un array obligaria a quien lo lee a
+     * saber que el primer elemento significa otra cosa que el resto.
+     */
+    private static void escribirValor(StringBuilder json, Object valor) {
+        if (valor instanceof Map<?, ?> objeto) {
+            json.append('{');
+            int quedan = objeto.size();
+            for (Map.Entry<?, ?> campo : objeto.entrySet()) {
+                json.append(' ')
+                        .append(entrecomillado(String.valueOf(campo.getKey())))
+                        .append(": ");
+                escribirValor(json, campo.getValue());
+                json.append(--quedan == 0 ? " " : ",");
+            }
+            json.append('}');
+            return;
+        }
+        if (!(valor instanceof List<?> lista)) {
+            json.append(entrecomillado(String.valueOf(valor)));
+            return;
+        }
         json.append('[');
         for (int i = 0; i < lista.size(); i++) {
             json.append(i == 0 ? "" : ", ");
-            Object elemento = lista.get(i);
-            if (elemento instanceof List<?> grupo) {
-                escribirLista(json, grupo);
-            } else {
-                json.append(entrecomillado(String.valueOf(elemento)));
-            }
+            escribirValor(json, lista.get(i));
         }
         json.append(']');
     }

@@ -1,11 +1,12 @@
 {
-  "_": "ARCHIVO GENERADO — no editar a mano. Lo produce ParametrosDeLaApiTest de la FIRMA de cada controlador; se regenera con -Dkamayuk.formas.regenerar=true. Dice que hace falta para PEDIR cada operacion: «obligatorios» sale de @RequestParam required=true sin defaultValue; «algunoDeEstos» son grupos de los que hay que mandar al menos uno, que el controlador exige en su cuerpo porque admite varios nombres; «condicionales» son los que solo hacen falta segun el cuerpo de la peticion; «opcionales» es el resto, y «enElCuerpo» son los que el controlador exige y NO viajan en la URL sino en el cuerpo JSON. Lo lee el frontend para comprobar que su proxy no sirve una operacion sin lo que el backend exige (#26).",
+  "_": "ARCHIVO GENERADO — no editar a mano. Lo produce ParametrosDeLaApiTest de la FIRMA de cada controlador; se regenera con -Dkamayuk.formas.regenerar=true. Dice que hace falta para PEDIR cada operacion: «obligatorios» sale de @RequestParam required=true sin defaultValue; «algunoDeEstos» son grupos de los que hay que mandar al menos uno, que el controlador exige en su cuerpo porque admite varios nombres; «condicionales» son los que solo hacen falta segun el cuerpo de la peticion; «opcionales» es el resto, y «enElCuerpo» son los que el controlador exige y NO viajan en la URL sino en el cuerpo JSON; «orden» dice que campos admite «?ordenarPor=» y por cual ordena la operacion si no se manda, y sale de OrdenSeguro.camposAdmitidos() y del cuerpo del handler, no de una lista escrita a mano. Lo lee el frontend para comprobar que su proxy no sirve una operacion sin lo que el backend exige (#26).",
   "GET /autorizaciones/anuncios": {
     "obligatorios": [],
     "algunoDeEstos": [],
     "condicionales": [],
-    "opcionales": ["contribuyente", "direccion", "nExpediente", "nroAutorizacion", "ordenarPor", "pagina", "tamano"],
-    "enElCuerpo": []
+    "opcionales": ["contribuyente", "direccion", "direccionDelAnuncio", "nExpediente", "nroAutorizacion", "ordenarPor", "pagina", "tamano"],
+    "enElCuerpo": [],
+    "orden": { "porOmision": "numero", "admitidos": ["clase", "expediente", "fechaAutorizacion", "fecha_autorizacion", "numero", "ubicacion"] }
   },
   "GET /catastro/fichas/conciliacion": {
     "obligatorios": [],
@@ -33,21 +34,24 @@
     "algunoDeEstos": [],
     "condicionales": [],
     "opcionales": ["contribuyente", "direccion", "estado", "nExpediente", "ordenarPor", "pagina", "tamano", "tipoDeDeuda"],
-    "enElCuerpo": []
+    "enElCuerpo": [],
+    "orden": { "porOmision": "numero", "admitidos": ["contribuyenteId", "contribuyente_id", "ejercicio", "fechaApertura", "fecha_apertura", "numero"] }
   },
   "GET /coactiva/deudas-en-beneficio": {
     "obligatorios": [],
     "algunoDeEstos": [],
     "condicionales": [],
     "opcionales": ["benefAplicable", "contribuyente", "direccion", "fechaDeCalculo", "ordenarPor", "pagina", "tamano", "tipoDeDeuda"],
-    "enElCuerpo": []
+    "enElCuerpo": [],
+    "orden": { "porOmision": "numero", "admitidos": ["contribuyenteId", "contribuyente_id", "ejercicio", "fechaApertura", "fecha_apertura", "numero"] }
   },
   "GET /coactiva/expedientes": {
     "obligatorios": [],
     "algunoDeEstos": [],
     "condicionales": [],
     "opcionales": ["codContribuyente", "direccion", "ejecutor", "estado", "nroDeExpediente", "ordenarPor", "pagina", "tamano"],
-    "enElCuerpo": []
+    "enElCuerpo": [],
+    "orden": { "porOmision": "numero", "admitidos": ["contribuyenteId", "contribuyente_id", "ejercicio", "fechaApertura", "fecha_apertura", "numero"] }
   },
   "GET /coactiva/expedientes/{numero}/deuda": {
     "obligatorios": [],
@@ -68,21 +72,24 @@
     "algunoDeEstos": [],
     "condicionales": [],
     "opcionales": ["contribuyente", "direccion", "estado", "nroExpedCoact", "nroLiquidacion", "ordenarPor", "pagina", "tamano"],
-    "enElCuerpo": []
+    "enElCuerpo": [],
+    "orden": { "porOmision": "fecha", "admitidos": ["ejercicio", "expedienteId", "expediente_id", "fecha", "numero"] }
   },
   "GET /coactiva/prescripcion": {
     "obligatorios": [],
     "algunoDeEstos": [],
     "condicionales": [],
     "opcionales": ["codContribuyente", "direccion", "ejercicio", "ordenarPor", "pagina", "resultado", "tamano", "tributo"],
-    "enElCuerpo": []
+    "enElCuerpo": [],
+    "orden": { "porOmision": "fechaPresentacion", "admitidos": ["ejercicioDesde", "ejercicioHasta", "ejercicio_desde", "ejercicio_hasta", "fechaPresentacion", "fecha_presentacion", "resultado", "tributo"] }
   },
   "GET /consultas/altas-bajas": {
     "obligatorios": [],
     "algunoDeEstos": [["codContribuyente", "codigoCont"]],
     "condicionales": [],
     "opcionales": ["altaBaja", "ano", "causal", "direccion", "ordenarPor", "pagina", "tamano", "tributo"],
-    "enElCuerpo": []
+    "enElCuerpo": [],
+    "orden": { "porOmision": "fecha_valor", "admitidos": ["ejercicio", "fechaValor", "fecha_valor", "id", "monto"] }
   },
   "GET /consultas/constancias/no-adeudo": {
     "obligatorios": ["codContribuyente"],
@@ -96,7 +103,8 @@
     "algunoDeEstos": [],
     "condicionales": [],
     "opcionales": ["direccion", "ejercicio", "ordenarPor", "pagina", "tamano", "tributo"],
-    "enElCuerpo": []
+    "enElCuerpo": [],
+    "orden": { "porOmision": "fecha_valor", "admitidos": ["ejercicio", "fechaValor", "fecha_valor", "id", "monto"] }
   },
   "GET /consultas/deuda": {
     "obligatorios": [],
@@ -117,7 +125,8 @@
     "algunoDeEstos": [["codContribuyente"]],
     "condicionales": [],
     "opcionales": ["desde", "direccion", "hasta", "ordenarPor", "pagina", "tamano"],
-    "enElCuerpo": []
+    "enElCuerpo": [],
+    "orden": { "porOmision": "fecha_valor", "admitidos": ["ejercicio", "fechaValor", "fecha_valor", "id", "monto"] }
   },
   "GET /consultas/predios": {
     "obligatorios": [],
@@ -138,21 +147,24 @@
     "algunoDeEstos": [],
     "condicionales": [],
     "opcionales": ["codContribuyente", "direccion", "estado", "nroDeValor", "ordenarPor", "pagina", "tamano", "tipo"],
-    "enElCuerpo": []
+    "enElCuerpo": [],
+    "orden": { "porOmision": "fechaEmision", "admitidos": ["ejercicio", "fechaEmision", "fecha_emision", "montoTotal", "monto_total", "numero"] }
   },
   "GET /consultas/vehiculos": {
     "obligatorios": [],
     "algunoDeEstos": [],
     "condicionales": [],
     "opcionales": ["codContribuyente", "contribuyente", "direccion", "estado", "fecha", "nroMotor", "ordenarPor", "pagina", "placa", "tamano"],
-    "enElCuerpo": []
+    "enElCuerpo": [],
+    "orden": { "porOmision": "placa", "admitidos": ["id", "marca", "modelo", "placa"] }
   },
   "GET /fiscalizacion/actas": {
     "obligatorios": [],
     "algunoDeEstos": [],
     "condicionales": [],
     "opcionales": ["direccion", "ordenarPor", "pagina", "programa", "tamano"],
-    "enElCuerpo": []
+    "enElCuerpo": [],
+    "orden": { "porOmision": "fechaVisita", "admitidos": ["estado", "fechaVisita", "fecha_visita", "hallazgo", "id", "version"] }
   },
   "GET /fiscalizacion/estado-cuenta": {
     "obligatorios": [],
@@ -166,21 +178,24 @@
     "algunoDeEstos": [],
     "condicionales": [],
     "opcionales": ["condicion", "direccion", "ejercicio", "ordenarPor", "pagina", "sector", "tamano"],
-    "enElCuerpo": []
+    "enElCuerpo": [],
+    "orden": { "porOmision": "codRefCatastral", "admitidos": ["codRefCatastral", "codigo_ref_catastral", "diferenciaDeArea", "diferencia_de_area", "sector", "sector_codigo"] }
   },
   "GET /fiscalizacion/predial/historico": {
     "obligatorios": [],
     "algunoDeEstos": [],
     "condicionales": [],
     "opcionales": ["codCont", "contribuyente", "direccion", "nLiquidacion", "nNotificacion", "ordenarPor", "pagina", "tamano"],
-    "enElCuerpo": []
+    "enElCuerpo": [],
+    "orden": { "porOmision": "numero", "admitidos": ["fecha", "numero", "version"] }
   },
   "GET /fiscalizacion/programas": {
     "obligatorios": [],
     "algunoDeEstos": [],
     "condicionales": [],
     "opcionales": ["direccion", "ejercicio", "nDePrograma", "ordenarPor", "pagina", "tamano"],
-    "enElCuerpo": []
+    "enElCuerpo": [],
+    "orden": { "porOmision": "codigo", "admitidos": ["codigo", "estado", "fechaFin", "fechaInicio", "fecha_fin", "fecha_inicio", "id"] }
   },
   "GET /fiscalizacion/programas/{id}/embudo": {
     "obligatorios": [],
@@ -194,14 +209,16 @@
     "algunoDeEstos": [],
     "condicionales": [],
     "opcionales": ["direccion", "ordenarPor", "pagina", "predio", "tamano"],
-    "enElCuerpo": []
+    "enElCuerpo": [],
+    "orden": { "porOmision": "codRefCatastral", "admitidos": ["codRefCatastral", "cod_ref_catastral", "condicion", "sector", "sector_codigo"] }
   },
   "GET /fiscalizacion/resoluciones": {
     "obligatorios": [],
     "algunoDeEstos": [],
     "condicionales": [],
     "opcionales": ["contribuyente", "direccion", "ordenarPor", "pagina", "tamano"],
-    "enElCuerpo": []
+    "enElCuerpo": [],
+    "orden": { "porOmision": "numero", "admitidos": ["actaId", "acta_id", "contribuyenteId", "contribuyente_id", "fecha", "numero"] }
   },
   "GET /fiscalizacion/resoluciones/{numero}": {
     "obligatorios": [],
@@ -215,7 +232,8 @@
     "algunoDeEstos": [],
     "condicionales": [],
     "opcionales": ["direccion", "estado", "hallazgo", "ordenarPor", "pagina", "programa", "tamano"],
-    "enElCuerpo": []
+    "enElCuerpo": [],
+    "orden": { "porOmision": "numero", "admitidos": ["fecha", "numero", "version"] }
   },
   "GET /indicadores/recaudacion": {
     "obligatorios": [],
@@ -236,35 +254,40 @@
     "algunoDeEstos": [],
     "condicionales": [],
     "opcionales": ["administrado", "codigoCuis", "direccion", "estado", "nroDeActa", "ordenarPor", "pagina", "tamano"],
-    "enElCuerpo": []
+    "enElCuerpo": [],
+    "orden": { "porOmision": "fechaInfraccion", "admitidos": ["estado", "fase", "fechaInfraccion", "fecha_infraccion", "id", "numero"] }
   },
   "GET /infracciones/administrativas/codigos/reporte": {
     "obligatorios": [],
     "algunoDeEstos": [],
     "condicionales": [],
     "opcionales": ["codigo", "descripcionContiene", "direccion", "fecha", "ordenarPor", "pagina", "tamano"],
-    "enElCuerpo": []
+    "enElCuerpo": [],
+    "orden": { "porOmision": "codigo", "admitidos": ["codigo", "id", "vigenciaDesde", "vigencia_desde"] }
   },
   "GET /infracciones/administrativas/estado-cuenta": {
     "obligatorios": [],
     "algunoDeEstos": [],
     "condicionales": [],
     "opcionales": ["codContribuyente", "direccion", "ordenarPor", "pagina", "papeleta", "tamano"],
-    "enElCuerpo": []
+    "enElCuerpo": [],
+    "orden": { "porOmision": "fechaInfraccion", "admitidos": ["fechaInfraccion", "fecha_infraccion", "id", "numero"] }
   },
   "GET /infracciones/administrativas/reportes/padron-notificaciones": {
     "obligatorios": [],
     "algunoDeEstos": [],
     "condicionales": [],
     "opcionales": ["desde", "direccion", "estado", "hasta", "ordenarPor", "pagina", "tamano"],
-    "enElCuerpo": []
+    "enElCuerpo": [],
+    "orden": { "porOmision": "fecha", "admitidos": ["fecha", "id", "numero"] }
   },
   "GET /infracciones/administrativas/reportes/por-contribuyente": {
     "obligatorios": [],
     "algunoDeEstos": [],
     "condicionales": [],
     "opcionales": ["ano", "codContribuyente", "direccion", "estadoDeDeuda", "ordenarPor", "pagina", "tamano"],
-    "enElCuerpo": []
+    "enElCuerpo": [],
+    "orden": { "porOmision": "fechaInfraccion", "admitidos": ["fechaInfraccion", "fecha_infraccion", "id", "numero"] }
   },
   "GET /infracciones/administrativas/reportes/resumen-recaudacion": {
     "obligatorios": [],
@@ -278,49 +301,56 @@
     "algunoDeEstos": [],
     "condicionales": [],
     "opcionales": ["conPapeleta", "direccion", "fiscalizador", "infraccion", "ordenarPor", "pagina", "tamano", "vencidasAl"],
-    "enElCuerpo": []
+    "enElCuerpo": [],
+    "orden": { "porOmision": "fecha", "admitidos": ["fecha", "id", "numero"] }
   },
   "GET /infracciones/cuis": {
     "obligatorios": [],
     "algunoDeEstos": [],
     "condicionales": [],
     "opcionales": ["codigo", "direccion", "fecha", "materia", "ordenarPor", "pagina", "tamano"],
-    "enElCuerpo": []
+    "enElCuerpo": [],
+    "orden": { "porOmision": "codigo", "admitidos": ["codigo", "id", "vigenciaDesde", "vigencia_desde"] }
   },
   "GET /licencias/certificados": {
     "obligatorios": [],
     "algunoDeEstos": [],
     "condicionales": [],
     "opcionales": ["direccion", "nDeCertificado", "ordenarPor", "pagina", "predio", "solicitante", "tamano", "tipo"],
-    "enElCuerpo": []
+    "enElCuerpo": [],
+    "orden": { "porOmision": "numero", "admitidos": ["codigoPredial", "codigo_predial", "fechaEmision", "fecha_emision", "numero", "tipo", "vigenciaHasta", "vigencia_hasta"] }
   },
   "GET /licencias/ciiu": {
     "obligatorios": [],
     "algunoDeEstos": [],
     "condicionales": [],
     "opcionales": ["codigoCiiu", "descripcion", "direccion", "ordenarPor", "pagina", "seccion", "tamano"],
-    "enElCuerpo": []
+    "enElCuerpo": [],
+    "orden": { "porOmision": "codigo", "admitidos": ["codigo", "descripcion", "riesgoItse", "riesgo_itse", "seccion"] }
   },
   "GET /licencias/edificacion": {
     "obligatorios": [],
     "algunoDeEstos": [],
     "condicionales": [],
     "opcionales": ["direccion", "lugarLt", "lugarMz", "nombreContribuyente", "nroExpediente", "nroLicencia", "ordenarPor", "pagina", "tamano", "tipoTramite"],
-    "enElCuerpo": []
+    "enElCuerpo": [],
+    "orden": { "porOmision": "expediente", "admitidos": ["expediente", "fechaDeclaracion", "fecha_declaracion", "modalidad", "tipoTramite", "tipo_tramite"] }
   },
   "GET /licencias/edificacion/reportes/general": {
     "obligatorios": [],
     "algunoDeEstos": [],
     "condicionales": [],
     "opcionales": ["desde", "direccion", "estado", "hasta", "modalidad", "ordenarPor", "pagina", "tamano"],
-    "enElCuerpo": []
+    "enElCuerpo": [],
+    "orden": { "porOmision": "expediente", "admitidos": ["expediente", "fechaDeclaracion", "fecha_declaracion", "modalidad", "tipoTramite", "tipo_tramite"] }
   },
   "GET /licencias/funcionamiento": {
     "obligatorios": [],
     "algunoDeEstos": [],
     "condicionales": [],
-    "opcionales": ["denominacionComercial", "direccion", "nExpediente", "nombreDelContribuyente", "nroLicencia", "ordenarPor", "pagina", "tamano"],
-    "enElCuerpo": []
+    "opcionales": ["denominacionComercial", "direccion", "direccionDelEstablecimiento", "nExpediente", "nombreDelContribuyente", "nroLicencia", "ordenarPor", "pagina", "tamano"],
+    "enElCuerpo": [],
+    "orden": { "porOmision": "numero", "admitidos": ["direccion", "expediente", "fechaEmision", "fecha_emision", "nombreComercial", "nombre_comercial", "numero"] }
   },
   "GET /licencias/funcionamiento/reportes/resumen-anual": {
     "obligatorios": [],
@@ -348,21 +378,24 @@
     "algunoDeEstos": [],
     "condicionales": [],
     "opcionales": ["anio", "codigoPredial", "direccion", "ejercicio", "ordenarPor", "pagina", "tamano", "uso", "zona"],
-    "enElCuerpo": []
+    "enElCuerpo": [],
+    "orden": { "porOmision": "fechaCalculo", "admitidos": ["fechaCalculo", "fecha_calculo", "id", "periodo", "servicio"] }
   },
   "GET /rentas/beneficios": {
     "obligatorios": [],
     "algunoDeEstos": [],
     "condicionales": [],
     "opcionales": ["contribuyente", "direccion", "estado", "ordenarPor", "pagina", "tamano", "tipo"],
-    "enElCuerpo": []
+    "enElCuerpo": [],
+    "orden": { "porOmision": "vigencia_desde", "admitidos": ["id", "tipo", "tributo", "vigenciaDesde", "vigencia_desde"] }
   },
   "GET /rentas/contribuyentes": {
     "obligatorios": [],
     "algunoDeEstos": [],
     "condicionales": [],
     "opcionales": ["codigo", "direccion", "nombreRazonSocial", "numeroDocumento", "ordenarPor", "pagina", "tamano", "tipoDocumento"],
-    "enElCuerpo": []
+    "enElCuerpo": [],
+    "orden": { "porOmision": "codigo_contribuyente", "admitidos": ["codigoContribuyente", "codigo_contribuyente", "id", "nombreRazonSocial", "nombre_razon_social", "numeroDocumento", "numero_documento"] }
   },
   "GET /rentas/contribuyentes/{id}/ficha": {
     "obligatorios": [],
@@ -397,7 +430,8 @@
     "algunoDeEstos": [],
     "condicionales": [],
     "opcionales": ["direccion", "ordenarPor", "pagina", "tamano"],
-    "enElCuerpo": []
+    "enElCuerpo": [],
+    "orden": { "porOmision": "id", "admitidos": ["id"] }
   },
   "GET /rentas/predial/determinaciones": {
     "obligatorios": [],
@@ -418,7 +452,8 @@
     "algunoDeEstos": [["codContribuyente", "contribuyente"]],
     "condicionales": [],
     "opcionales": ["direccion", "fecha", "ordenarPor", "pagina", "tamano"],
-    "enElCuerpo": []
+    "enElCuerpo": [],
+    "orden": { "porOmision": "placa", "admitidos": ["id", "marca", "modelo", "placa"] }
   },
   "GET /rentas/vehiculos/{placa}": {
     "obligatorios": [],
@@ -432,21 +467,24 @@
     "algunoDeEstos": [],
     "condicionales": [],
     "opcionales": ["direccion", "ordenarPor", "pagina", "tamano"],
-    "enElCuerpo": []
+    "enElCuerpo": [],
+    "orden": { "porOmision": "codigo", "admitidos": ["codigo", "id", "nombre", "tipo"] }
   },
   "GET /seguridad/auditoria": {
     "obligatorios": ["ejercicio"],
     "algunoDeEstos": [],
     "condicionales": [],
     "opcionales": ["desde", "direccion", "hasta", "operacion", "ordenarPor", "pagina", "tabla", "tamano", "usuario"],
-    "enElCuerpo": []
+    "enElCuerpo": [],
+    "orden": { "porOmision": "fecha", "admitidos": ["fecha", "id", "operacion", "tabla", "usuarioId", "usuario_id"] }
   },
   "GET /seguridad/modulos": {
     "obligatorios": [],
     "algunoDeEstos": [],
     "condicionales": [],
     "opcionales": ["direccion", "ordenarPor", "pagina", "tamano"],
-    "enElCuerpo": []
+    "enElCuerpo": [],
+    "orden": { "porOmision": "orden", "admitidos": ["codigo", "id", "nombre", "orden"] }
   },
   "GET /seguridad/parametros/ejercicios/{ejercicio}": {
     "obligatorios": [],
@@ -481,42 +519,48 @@
     "algunoDeEstos": [],
     "condicionales": [],
     "opcionales": ["codContribuyente", "desde", "direccion", "estado", "hasta", "nroDeConvenio", "ordenarPor", "pagina", "tamano"],
-    "enElCuerpo": []
+    "enElCuerpo": [],
+    "orden": { "porOmision": "fecha", "admitidos": ["contribuyenteId", "contribuyente_id", "fecha", "montoTotal", "monto_total", "numero"] }
   },
   "GET /transito/codigos": {
     "obligatorios": [],
     "algunoDeEstos": [],
     "condicionales": [],
     "opcionales": ["codigo", "direccion", "fecha", "ordenarPor", "pagina", "tamano", "textoDeLaInfraccion"],
-    "enElCuerpo": []
+    "enElCuerpo": [],
+    "orden": { "porOmision": "codigo", "admitidos": ["codigo", "id", "vigenciaDesde", "vigencia_desde"] }
   },
   "GET /transito/estado-cuenta": {
     "obligatorios": [],
     "algunoDeEstos": [],
     "condicionales": [],
     "opcionales": ["conductor", "direccion", "ordenarPor", "pagina", "placa", "tamano"],
-    "enElCuerpo": []
+    "enElCuerpo": [],
+    "orden": { "porOmision": "fechaInfraccion", "admitidos": ["fechaInfraccion", "fecha_infraccion", "id", "numero"] }
   },
   "GET /transito/internamientos": {
     "obligatorios": [],
     "algunoDeEstos": [],
     "condicionales": [],
     "opcionales": ["aLaFecha", "deposito", "direccion", "estado", "ordenarPor", "pagina", "placa", "tamano"],
-    "enElCuerpo": []
+    "enElCuerpo": [],
+    "orden": { "porOmision": "fechaIngreso", "admitidos": ["fechaIngreso", "fecha_ingreso", "id", "placa"] }
   },
   "GET /transito/papeletas": {
     "obligatorios": [],
     "algunoDeEstos": [],
     "condicionales": [],
     "opcionales": ["desde", "direccion", "documentoDelInfractor", "estado", "hasta", "nroPapeleta", "ordenarPor", "pagina", "placa", "tamano"],
-    "enElCuerpo": []
+    "enElCuerpo": [],
+    "orden": { "porOmision": "fechaInfraccion", "admitidos": ["fechaInfraccion", "fecha_infraccion", "id", "numero"] }
   },
   "GET /transito/papeletas/busqueda": {
     "obligatorios": [],
     "algunoDeEstos": [],
     "condicionales": [],
     "opcionales": ["direccion", "estadoDeDeuda", "ingresadoPor", "nPlaca", "ordenarPor", "pagina", "papeleta", "tamano"],
-    "enElCuerpo": []
+    "enElCuerpo": [],
+    "orden": { "porOmision": "fechaInfraccion", "admitidos": ["fechaInfraccion", "fecha_infraccion", "id", "numero"] }
   },
   "GET /transito/papeletas/{numero}/actos": {
     "obligatorios": [],
@@ -537,35 +581,40 @@
     "algunoDeEstos": [],
     "condicionales": [],
     "opcionales": ["desde", "direccion", "estado", "hasta", "ordenarPor", "pagina", "tamano"],
-    "enElCuerpo": []
+    "enElCuerpo": [],
+    "orden": { "porOmision": "fechaInfraccion", "admitidos": ["estado", "fechaInfraccion", "fecha_infraccion", "id", "numero", "placa"] }
   },
   "GET /transito/reportes/padron-coactiva": {
     "obligatorios": [],
     "algunoDeEstos": [],
     "condicionales": [],
     "opcionales": ["desde", "direccion", "ejecutor", "estadoDelExpediente", "hasta", "ordenarPor", "pagina", "tamano"],
-    "enElCuerpo": []
+    "enElCuerpo": [],
+    "orden": { "porOmision": "fechaInfraccion", "admitidos": ["estado", "fechaInfraccion", "fecha_infraccion", "id", "numero", "placa"] }
   },
   "GET /transito/reportes/padron-constancias": {
     "obligatorios": [],
     "algunoDeEstos": [],
     "condicionales": [],
     "opcionales": ["desde", "direccion", "hasta", "nDeConstancia", "ordenarPor", "pagina", "tamano", "usuarioQueEmitio"],
-    "enElCuerpo": []
+    "enElCuerpo": [],
+    "orden": { "porOmision": "fechaEmision", "admitidos": ["fechaEmision", "fecha_emision", "id", "numero", "placa"] }
   },
   "GET /transito/reportes/record-conductor": {
     "obligatorios": [],
     "algunoDeEstos": [],
     "condicionales": [],
     "opcionales": ["direccion", "documento", "licencia", "ordenarPor", "pagina", "tamano"],
-    "enElCuerpo": []
+    "enElCuerpo": [],
+    "orden": { "porOmision": "fechaInfraccion", "admitidos": ["estado", "fechaInfraccion", "fecha_infraccion", "id", "numero", "placa"] }
   },
   "GET /transito/reportes/record-vehicular": {
     "obligatorios": [],
     "algunoDeEstos": [],
     "condicionales": [],
     "opcionales": ["direccion", "ordenarPor", "pagina", "placa", "tamano"],
-    "enElCuerpo": []
+    "enElCuerpo": [],
+    "orden": { "porOmision": "fechaInfraccion", "admitidos": ["estado", "fechaInfraccion", "fecha_infraccion", "id", "numero", "placa"] }
   },
   "GET /transito/reportes/resumen-papeletas": {
     "obligatorios": [],
@@ -600,7 +649,8 @@
     "algunoDeEstos": [],
     "condicionales": [],
     "opcionales": ["codContribuyente", "direccion", "ejercicio", "nroDeValor", "ordenarPor", "pagina", "tamano", "tipo"],
-    "enElCuerpo": []
+    "enElCuerpo": [],
+    "orden": { "porOmision": "fechaEmision", "admitidos": ["ejercicio", "fechaEmision", "fecha_emision", "montoTotal", "monto_total", "numero"] }
   },
   "PATCH /coactiva/expedientes/{numero}/direccion-referencial": {
     "obligatorios": [],
@@ -1020,7 +1070,8 @@
     "algunoDeEstos": [],
     "condicionales": [],
     "opcionales": ["direccion", "ordenarPor", "pagina", "tamano"],
-    "enElCuerpo": []
+    "enElCuerpo": [],
+    "orden": { "porOmision": "inicio", "admitidos": ["id", "inicio", "resultado"] }
   },
   "POST /tesoreria/convenios/{numero}/anulacion": {
     "obligatorios": [],

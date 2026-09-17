@@ -1789,8 +1789,8 @@ paths:
         - name: ordenarPor
           in: query
           required: false
-          description: "Campo por el que se ordena, en camelCase"
-          schema: { type: string }
+          description: "Campo por el que se ordena, en camelCase. Lista cerrada: cualquier otro valor es 422 ORDEN_NO_ADMITIDO. Sin el, la operacion ordena por «codigo_contribuyente». El nombre de columna en snake_case se admite tambien, para el cliente que ya conozca la tabla."
+          schema: { type: string, enum: [codigoContribuyente, codigo_contribuyente, id, nombreRazonSocial, nombre_razon_social, numeroDocumento, numero_documento] }
         - name: direccion
           in: query
           required: false
@@ -2812,8 +2812,8 @@ paths:
         - name: ordenarPor
           in: query
           required: false
-          description: "Campo por el que se ordena, en camelCase"
-          schema: { type: string }
+          description: "Campo por el que se ordena, en camelCase. Lista cerrada: cualquier otro valor es 422 ORDEN_NO_ADMITIDO. Sin el, la operacion ordena por «fechaCalculo». El nombre de columna en snake_case se admite tambien, para el cliente que ya conozca la tabla."
+          schema: { type: string, enum: [fechaCalculo, fecha_calculo, id, periodo, servicio] }
         - name: direccion
           in: query
           required: false
@@ -3098,8 +3098,8 @@ paths:
         - name: ordenarPor
           in: query
           required: false
-          description: "Campo por el que se ordena, en camelCase"
-          schema: { type: string }
+          description: "Campo por el que se ordena, en camelCase. Lista cerrada: cualquier otro valor es 422 ORDEN_NO_ADMITIDO. Sin el, la operacion ordena por «vigencia_desde». El nombre de columna en snake_case se admite tambien, para el cliente que ya conozca la tabla."
+          schema: { type: string, enum: [id, tipo, tributo, vigenciaDesde, vigencia_desde] }
         - name: direccion
           in: query
           required: false
@@ -3206,8 +3206,8 @@ paths:
         - name: ordenarPor
           in: query
           required: false
-          description: "Campo por el que se ordena, en camelCase"
-          schema: { type: string }
+          description: "Campo por el que se ordena, en camelCase. Lista cerrada: cualquier otro valor es 422 ORDEN_NO_ADMITIDO. Sin el, la operacion ordena por «codigo». El nombre de columna en snake_case se admite tambien, para el cliente que ya conozca la tabla."
+          schema: { type: string, enum: [codigo, estado, fechaFin, fechaInicio, fecha_fin, fecha_inicio, id] }
         - name: direccion
           in: query
           required: false
@@ -3296,8 +3296,8 @@ paths:
         - name: ordenarPor
           in: query
           required: false
-          description: "Campo por el que se ordena, en camelCase"
-          schema: { type: string }
+          description: "Campo por el que se ordena, en camelCase. Lista cerrada: cualquier otro valor es 422 ORDEN_NO_ADMITIDO. Sin el, la operacion ordena por «codRefCatastral». El nombre de columna en snake_case se admite tambien, para el cliente que ya conozca la tabla."
+          schema: { type: string, enum: [codRefCatastral, cod_ref_catastral, condicion, sector, sector_codigo] }
         - name: direccion
           in: query
           required: false
@@ -3397,8 +3397,8 @@ paths:
         - name: ordenarPor
           in: query
           required: false
-          description: "Campo por el que se ordena, en camelCase"
-          schema: { type: string }
+          description: "Campo por el que se ordena, en camelCase. Lista cerrada: cualquier otro valor es 422 ORDEN_NO_ADMITIDO. Sin el, la operacion ordena por «fechaVisita». El nombre de columna en snake_case se admite tambien, para el cliente que ya conozca la tabla."
+          schema: { type: string, enum: [estado, fechaVisita, fecha_visita, hallazgo, id, version] }
         - name: direccion
           in: query
           required: false
@@ -3510,8 +3510,8 @@ paths:
         - name: ordenarPor
           in: query
           required: false
-          description: "Campo por el que se ordena, en camelCase"
-          schema: { type: string }
+          description: "Campo por el que se ordena, en camelCase. Lista cerrada: cualquier otro valor es 422 ORDEN_NO_ADMITIDO. Sin el, la operacion ordena por «numero». El nombre de columna en snake_case se admite tambien, para el cliente que ya conozca la tabla."
+          schema: { type: string, enum: [fecha, numero, version] }
         - name: direccion
           in: query
           required: false
@@ -3565,8 +3565,8 @@ paths:
         - name: ordenarPor
           in: query
           required: false
-          description: "Campo por el que se ordena, en camelCase"
-          schema: { type: string }
+          description: "Campo por el que se ordena, en camelCase. Lista cerrada: cualquier otro valor es 422 ORDEN_NO_ADMITIDO. Sin el, la operacion ordena por «codRefCatastral». El nombre de columna en snake_case se admite tambien, para el cliente que ya conozca la tabla."
+          schema: { type: string, enum: [codRefCatastral, codigo_ref_catastral, diferenciaDeArea, diferencia_de_area, sector, sector_codigo] }
         - name: direccion
           in: query
           required: false
@@ -3684,8 +3684,8 @@ paths:
         - name: ordenarPor
           in: query
           required: false
-          description: "Campo por el que se ordena, en camelCase"
-          schema: { type: string }
+          description: "Campo por el que se ordena, en camelCase. Lista cerrada: cualquier otro valor es 422 ORDEN_NO_ADMITIDO. Sin el, la operacion ordena por «numero». El nombre de columna en snake_case se admite tambien, para el cliente que ya conozca la tabla."
+          schema: { type: string, enum: [fecha, numero, version] }
         - name: direccion
           in: query
           required: false
@@ -3853,8 +3853,8 @@ paths:
         - name: ordenarPor
           in: query
           required: false
-          description: "Campo por el que se ordena, en camelCase"
-          schema: { type: string }
+          description: "Campo por el que se ordena, en camelCase. Lista cerrada: cualquier otro valor es 422 ORDEN_NO_ADMITIDO. Sin el, la operacion ordena por «numero». El nombre de columna en snake_case se admite tambien, para el cliente que ya conozca la tabla."
+          schema: { type: string, enum: [actaId, acta_id, contribuyenteId, contribuyente_id, fecha, numero] }
         - name: direccion
           in: query
           required: false
@@ -3964,8 +3964,8 @@ paths:
         - name: ordenarPor
           in: query
           required: false
-          description: "Campo por el que se ordena, en camelCase"
-          schema: { type: string }
+          description: "Campo por el que se ordena, en camelCase. Lista cerrada: cualquier otro valor es 422 ORDEN_NO_ADMITIDO. Sin el, la operacion ordena por «fechaInfraccion». El nombre de columna en snake_case se admite tambien, para el cliente que ya conozca la tabla."
+          schema: { type: string, enum: [fechaInfraccion, fecha_infraccion, id, numero] }
         - name: direccion
           in: query
           required: false
@@ -4024,8 +4024,8 @@ paths:
         - name: ordenarPor
           in: query
           required: false
-          description: "Campo por el que se ordena, en camelCase"
-          schema: { type: string }
+          description: "Campo por el que se ordena, en camelCase. Lista cerrada: cualquier otro valor es 422 ORDEN_NO_ADMITIDO. Sin el, la operacion ordena por «fechaInfraccion». El nombre de columna en snake_case se admite tambien, para el cliente que ya conozca la tabla."
+          schema: { type: string, enum: [fechaInfraccion, fecha_infraccion, id, numero] }
         - name: direccion
           in: query
           required: false
@@ -4079,8 +4079,8 @@ paths:
         - name: ordenarPor
           in: query
           required: false
-          description: "Campo por el que se ordena, en camelCase"
-          schema: { type: string }
+          description: "Campo por el que se ordena, en camelCase. Lista cerrada: cualquier otro valor es 422 ORDEN_NO_ADMITIDO. Sin el, la operacion ordena por «codigo». El nombre de columna en snake_case se admite tambien, para el cliente que ya conozca la tabla."
+          schema: { type: string, enum: [codigo, id, vigenciaDesde, vigencia_desde] }
         - name: direccion
           in: query
           required: false
@@ -4176,8 +4176,8 @@ paths:
         - name: ordenarPor
           in: query
           required: false
-          description: "Campo por el que se ordena, en camelCase"
-          schema: { type: string }
+          description: "Campo por el que se ordena, en camelCase. Lista cerrada: cualquier otro valor es 422 ORDEN_NO_ADMITIDO. Sin el, la operacion ordena por «fechaIngreso». El nombre de columna en snake_case se admite tambien, para el cliente que ya conozca la tabla."
+          schema: { type: string, enum: [fechaIngreso, fecha_ingreso, id, placa] }
         - name: direccion
           in: query
           required: false
@@ -4564,8 +4564,8 @@ paths:
         - name: ordenarPor
           in: query
           required: false
-          description: "Campo por el que se ordena, en camelCase"
-          schema: { type: string }
+          description: "Campo por el que se ordena, en camelCase. Lista cerrada: cualquier otro valor es 422 ORDEN_NO_ADMITIDO. Sin el, la operacion ordena por «fechaInfraccion». El nombre de columna en snake_case se admite tambien, para el cliente que ya conozca la tabla."
+          schema: { type: string, enum: [estado, fechaInfraccion, fecha_infraccion, id, numero, placa] }
         - name: direccion
           in: query
           required: false
@@ -4624,8 +4624,8 @@ paths:
         - name: ordenarPor
           in: query
           required: false
-          description: "Campo por el que se ordena, en camelCase"
-          schema: { type: string }
+          description: "Campo por el que se ordena, en camelCase. Lista cerrada: cualquier otro valor es 422 ORDEN_NO_ADMITIDO. Sin el, la operacion ordena por «fechaInfraccion». El nombre de columna en snake_case se admite tambien, para el cliente que ya conozca la tabla."
+          schema: { type: string, enum: [fechaInfraccion, fecha_infraccion, id, numero] }
         - name: direccion
           in: query
           required: false
@@ -4821,8 +4821,8 @@ paths:
         - name: ordenarPor
           in: query
           required: false
-          description: "Campo por el que se ordena, en camelCase"
-          schema: { type: string }
+          description: "Campo por el que se ordena, en camelCase. Lista cerrada: cualquier otro valor es 422 ORDEN_NO_ADMITIDO. Sin el, la operacion ordena por «fechaInfraccion». El nombre de columna en snake_case se admite tambien, para el cliente que ya conozca la tabla."
+          schema: { type: string, enum: [estado, fechaInfraccion, fecha_infraccion, id, numero, placa] }
         - name: direccion
           in: query
           required: false
@@ -4889,8 +4889,8 @@ paths:
         - name: ordenarPor
           in: query
           required: false
-          description: "Campo por el que se ordena, en camelCase"
-          schema: { type: string }
+          description: "Campo por el que se ordena, en camelCase. Lista cerrada: cualquier otro valor es 422 ORDEN_NO_ADMITIDO. Sin el, la operacion ordena por «fechaEmision». El nombre de columna en snake_case se admite tambien, para el cliente que ya conozca la tabla."
+          schema: { type: string, enum: [fechaEmision, fecha_emision, id, numero, placa] }
         - name: direccion
           in: query
           required: false
@@ -5270,8 +5270,8 @@ paths:
         - name: ordenarPor
           in: query
           required: false
-          description: "Campo por el que se ordena, en camelCase"
-          schema: { type: string }
+          description: "Campo por el que se ordena, en camelCase. Lista cerrada: cualquier otro valor es 422 ORDEN_NO_ADMITIDO. Sin el, la operacion ordena por «fechaInfraccion». El nombre de columna en snake_case se admite tambien, para el cliente que ya conozca la tabla."
+          schema: { type: string, enum: [estado, fase, fechaInfraccion, fecha_infraccion, id, numero] }
         - name: direccion
           in: query
           required: false
@@ -5320,8 +5320,8 @@ paths:
         - name: ordenarPor
           in: query
           required: false
-          description: "Campo por el que se ordena, en camelCase"
-          schema: { type: string }
+          description: "Campo por el que se ordena, en camelCase. Lista cerrada: cualquier otro valor es 422 ORDEN_NO_ADMITIDO. Sin el, la operacion ordena por «codigo». El nombre de columna en snake_case se admite tambien, para el cliente que ya conozca la tabla."
+          schema: { type: string, enum: [codigo, id, vigenciaDesde, vigencia_desde] }
         - name: direccion
           in: query
           required: false
@@ -5380,8 +5380,8 @@ paths:
         - name: ordenarPor
           in: query
           required: false
-          description: "Campo por el que se ordena, en camelCase"
-          schema: { type: string }
+          description: "Campo por el que se ordena, en camelCase. Lista cerrada: cualquier otro valor es 422 ORDEN_NO_ADMITIDO. Sin el, la operacion ordena por «codigo». El nombre de columna en snake_case se admite tambien, para el cliente que ya conozca la tabla."
+          schema: { type: string, enum: [codigo, id, vigenciaDesde, vigencia_desde] }
         - name: direccion
           in: query
           required: false
@@ -5470,8 +5470,8 @@ paths:
         - name: ordenarPor
           in: query
           required: false
-          description: "Campo por el que se ordena, en camelCase"
-          schema: { type: string }
+          description: "Campo por el que se ordena, en camelCase. Lista cerrada: cualquier otro valor es 422 ORDEN_NO_ADMITIDO. Sin el, la operacion ordena por «fechaInfraccion». El nombre de columna en snake_case se admite tambien, para el cliente que ya conozca la tabla."
+          schema: { type: string, enum: [fechaInfraccion, fecha_infraccion, id, numero] }
         - name: direccion
           in: query
           required: false
@@ -5621,8 +5621,8 @@ paths:
         - name: ordenarPor
           in: query
           required: false
-          description: "Campo por el que se ordena, en camelCase"
-          schema: { type: string }
+          description: "Campo por el que se ordena, en camelCase. Lista cerrada: cualquier otro valor es 422 ORDEN_NO_ADMITIDO. Sin el, la operacion ordena por «fecha». El nombre de columna en snake_case se admite tambien, para el cliente que ya conozca la tabla."
+          schema: { type: string, enum: [fecha, id, numero] }
         - name: direccion
           in: query
           required: false
@@ -5681,8 +5681,8 @@ paths:
         - name: ordenarPor
           in: query
           required: false
-          description: "Campo por el que se ordena, en camelCase"
-          schema: { type: string }
+          description: "Campo por el que se ordena, en camelCase. Lista cerrada: cualquier otro valor es 422 ORDEN_NO_ADMITIDO. Sin el, la operacion ordena por «fecha». El nombre de columna en snake_case se admite tambien, para el cliente que ya conozca la tabla."
+          schema: { type: string, enum: [fecha, id, numero] }
         - name: direccion
           in: query
           required: false
@@ -5741,8 +5741,8 @@ paths:
         - name: ordenarPor
           in: query
           required: false
-          description: "Campo por el que se ordena, en camelCase"
-          schema: { type: string }
+          description: "Campo por el que se ordena, en camelCase. Lista cerrada: cualquier otro valor es 422 ORDEN_NO_ADMITIDO. Sin el, la operacion ordena por «fechaInfraccion». El nombre de columna en snake_case se admite tambien, para el cliente que ya conozca la tabla."
+          schema: { type: string, enum: [fechaInfraccion, fecha_infraccion, id, numero] }
         - name: direccion
           in: query
           required: false
@@ -6071,8 +6071,8 @@ paths:
         - name: ordenarPor
           in: query
           required: false
-          description: "Campo por el que se ordena, en camelCase"
-          schema: { type: string }
+          description: "Campo por el que se ordena, en camelCase. Lista cerrada: cualquier otro valor es 422 ORDEN_NO_ADMITIDO. Sin el, la operacion ordena por «fecha». El nombre de columna en snake_case se admite tambien, para el cliente que ya conozca la tabla."
+          schema: { type: string, enum: [contribuyenteId, contribuyente_id, fecha, montoTotal, monto_total, numero] }
         - name: direccion
           in: query
           required: false
@@ -6539,8 +6539,8 @@ paths:
         - name: ordenarPor
           in: query
           required: false
-          description: "Campo por el que se ordena, en camelCase"
-          schema: { type: string }
+          description: "Campo por el que se ordena, en camelCase. Lista cerrada: cualquier otro valor es 422 ORDEN_NO_ADMITIDO. Sin el, la operacion ordena por «fecha_valor». El nombre de columna en snake_case se admite tambien, para el cliente que ya conozca la tabla."
+          schema: { type: string, enum: [ejercicio, fechaValor, fecha_valor, id, monto] }
         - name: direccion
           in: query
           required: false
@@ -6838,8 +6838,8 @@ paths:
         - name: ordenarPor
           in: query
           required: false
-          description: "Campo por el que se ordena, en camelCase"
-          schema: { type: string }
+          description: "Campo por el que se ordena, en camelCase. Lista cerrada: cualquier otro valor es 422 ORDEN_NO_ADMITIDO. Sin el, la operacion ordena por «fecha_valor». El nombre de columna en snake_case se admite tambien, para el cliente que ya conozca la tabla."
+          schema: { type: string, enum: [ejercicio, fechaValor, fecha_valor, id, monto] }
         - name: direccion
           in: query
           required: false
@@ -6968,8 +6968,8 @@ paths:
         - name: ordenarPor
           in: query
           required: false
-          description: "Campo por el que se ordena, en camelCase"
-          schema: { type: string }
+          description: "Campo por el que se ordena, en camelCase. Lista cerrada: cualquier otro valor es 422 ORDEN_NO_ADMITIDO. Sin el, la operacion ordena por «fecha_valor». El nombre de columna en snake_case se admite tambien, para el cliente que ya conozca la tabla."
+          schema: { type: string, enum: [ejercicio, fechaValor, fecha_valor, id, monto] }
         - name: direccion
           in: query
           required: false
@@ -7118,8 +7118,8 @@ paths:
         - name: ordenarPor
           in: query
           required: false
-          description: "Campo por el que se ordena, en camelCase"
-          schema: { type: string }
+          description: "Campo por el que se ordena, en camelCase. Lista cerrada: cualquier otro valor es 422 ORDEN_NO_ADMITIDO. Sin el, la operacion ordena por «placa». El nombre de columna en snake_case se admite tambien, para el cliente que ya conozca la tabla."
+          schema: { type: string, enum: [id, marca, modelo, placa] }
         - name: direccion
           in: query
           required: false
@@ -7183,8 +7183,8 @@ paths:
         - name: ordenarPor
           in: query
           required: false
-          description: "Campo por el que se ordena, en camelCase"
-          schema: { type: string }
+          description: "Campo por el que se ordena, en camelCase. Lista cerrada: cualquier otro valor es 422 ORDEN_NO_ADMITIDO. Sin el, la operacion ordena por «fechaEmision». El nombre de columna en snake_case se admite tambien, para el cliente que ya conozca la tabla."
+          schema: { type: string, enum: [ejercicio, fechaEmision, fecha_emision, montoTotal, monto_total, numero] }
         - name: direccion
           in: query
           required: false
@@ -7313,8 +7313,8 @@ paths:
         - name: ordenarPor
           in: query
           required: false
-          description: "Campo por el que se ordena, en camelCase"
-          schema: { type: string }
+          description: "Campo por el que se ordena, en camelCase. Lista cerrada: cualquier otro valor es 422 ORDEN_NO_ADMITIDO. Sin el, la operacion ordena por «fechaEmision». El nombre de columna en snake_case se admite tambien, para el cliente que ya conozca la tabla."
+          schema: { type: string, enum: [ejercicio, fechaEmision, fecha_emision, montoTotal, monto_total, numero] }
         - name: direccion
           in: query
           required: false
@@ -7485,8 +7485,8 @@ paths:
         - name: ordenarPor
           in: query
           required: false
-          description: "Campo por el que se ordena, en camelCase"
-          schema: { type: string }
+          description: "Campo por el que se ordena, en camelCase. Lista cerrada: cualquier otro valor es 422 ORDEN_NO_ADMITIDO. Sin el, la operacion ordena por «fechaPresentacion». El nombre de columna en snake_case se admite tambien, para el cliente que ya conozca la tabla."
+          schema: { type: string, enum: [ejercicioDesde, ejercicioHasta, ejercicio_desde, ejercicio_hasta, fechaPresentacion, fecha_presentacion, resultado, tributo] }
         - name: direccion
           in: query
           required: false
@@ -7601,8 +7601,8 @@ paths:
         - name: ordenarPor
           in: query
           required: false
-          description: "Campo por el que se ordena, en camelCase"
-          schema: { type: string }
+          description: "Campo por el que se ordena, en camelCase. Lista cerrada: cualquier otro valor es 422 ORDEN_NO_ADMITIDO. Sin el, la operacion ordena por «numero». El nombre de columna en snake_case se admite tambien, para el cliente que ya conozca la tabla."
+          schema: { type: string, enum: [contribuyenteId, contribuyente_id, ejercicio, fechaApertura, fecha_apertura, numero] }
         - name: direccion
           in: query
           required: false
@@ -7906,8 +7906,8 @@ paths:
         - name: ordenarPor
           in: query
           required: false
-          description: "Campo por el que se ordena, en camelCase"
-          schema: { type: string }
+          description: "Campo por el que se ordena, en camelCase. Lista cerrada: cualquier otro valor es 422 ORDEN_NO_ADMITIDO. Sin el, la operacion ordena por «fecha». El nombre de columna en snake_case se admite tambien, para el cliente que ya conozca la tabla."
+          schema: { type: string, enum: [ejercicio, expedienteId, expediente_id, fecha, numero] }
         - name: direccion
           in: query
           required: false
@@ -8189,8 +8189,8 @@ paths:
         - name: ordenarPor
           in: query
           required: false
-          description: "Campo por el que se ordena, en camelCase"
-          schema: { type: string }
+          description: "Campo por el que se ordena, en camelCase. Lista cerrada: cualquier otro valor es 422 ORDEN_NO_ADMITIDO. Sin el, la operacion ordena por «numero». El nombre de columna en snake_case se admite tambien, para el cliente que ya conozca la tabla."
+          schema: { type: string, enum: [contribuyenteId, contribuyente_id, ejercicio, fechaApertura, fecha_apertura, numero] }
         - name: direccion
           in: query
           required: false
@@ -8249,8 +8249,8 @@ paths:
         - name: ordenarPor
           in: query
           required: false
-          description: "Campo por el que se ordena, en camelCase"
-          schema: { type: string }
+          description: "Campo por el que se ordena, en camelCase. Lista cerrada: cualquier otro valor es 422 ORDEN_NO_ADMITIDO. Sin el, la operacion ordena por «numero». El nombre de columna en snake_case se admite tambien, para el cliente que ya conozca la tabla."
+          schema: { type: string, enum: [contribuyenteId, contribuyente_id, ejercicio, fechaApertura, fecha_apertura, numero] }
         - name: direccion
           in: query
           required: false
@@ -8294,7 +8294,7 @@ paths:
           required: false
           description: "Filtro «Nº Expediente» de la pantalla"
           schema: { type: string }
-        - name: direccion
+        - name: direccionDelAnuncio
           in: query
           required: false
           description: "Filtro «Dirección» de la pantalla"
@@ -8319,8 +8319,14 @@ paths:
         - name: ordenarPor
           in: query
           required: false
-          description: "Campo por el que se ordena, en camelCase"
+          description: "Campo por el que se ordena, en camelCase. Lista cerrada: cualquier otro valor es 422 ORDEN_NO_ADMITIDO. Sin el, la operacion ordena por «numero». El nombre de columna en snake_case se admite tambien, para el cliente que ya conozca la tabla."
+          schema: { type: string, enum: [clase, expediente, fechaAutorizacion, fecha_autorizacion, numero, ubicacion] }
+        - name: direccion
+          in: query
+          required: false
+          description: "ASCENDENTE | DESCENDENTE"
           schema: { type: string }
+          example: "ASCENDENTE"
       responses:
         200:
           description: Operacion realizada
@@ -8497,7 +8503,7 @@ paths:
           required: false
           description: "Filtro «Denominación Comercial» de la pantalla"
           schema: { type: string }
-        - name: direccion
+        - name: direccionDelEstablecimiento
           in: query
           required: false
           description: "Filtro «Dirección» de la pantalla"
@@ -8517,8 +8523,14 @@ paths:
         - name: ordenarPor
           in: query
           required: false
-          description: "Campo por el que se ordena, en camelCase"
+          description: "Campo por el que se ordena, en camelCase. Lista cerrada: cualquier otro valor es 422 ORDEN_NO_ADMITIDO. Sin el, la operacion ordena por «numero». El nombre de columna en snake_case se admite tambien, para el cliente que ya conozca la tabla."
+          schema: { type: string, enum: [direccion, expediente, fechaEmision, fecha_emision, nombreComercial, nombre_comercial, numero] }
+        - name: direccion
+          in: query
+          required: false
+          description: "ASCENDENTE | DESCENDENTE"
           schema: { type: string }
+          example: "ASCENDENTE"
       responses:
         200:
           description: Operacion realizada
@@ -8749,8 +8761,8 @@ paths:
         - name: ordenarPor
           in: query
           required: false
-          description: "Campo por el que se ordena, en camelCase"
-          schema: { type: string }
+          description: "Campo por el que se ordena, en camelCase. Lista cerrada: cualquier otro valor es 422 ORDEN_NO_ADMITIDO. Sin el, la operacion ordena por «expediente». El nombre de columna en snake_case se admite tambien, para el cliente que ya conozca la tabla."
+          schema: { type: string, enum: [expediente, fechaDeclaracion, fecha_declaracion, modalidad, tipoTramite, tipo_tramite] }
         - name: direccion
           in: query
           required: false
@@ -8930,8 +8942,8 @@ paths:
         - name: ordenarPor
           in: query
           required: false
-          description: "Campo por el que se ordena, en camelCase"
-          schema: { type: string }
+          description: "Campo por el que se ordena, en camelCase. Lista cerrada: cualquier otro valor es 422 ORDEN_NO_ADMITIDO. Sin el, la operacion ordena por «expediente». El nombre de columna en snake_case se admite tambien, para el cliente que ya conozca la tabla."
+          schema: { type: string, enum: [expediente, fechaDeclaracion, fecha_declaracion, modalidad, tipoTramite, tipo_tramite] }
         - name: direccion
           in: query
           required: false
@@ -8985,8 +8997,8 @@ paths:
         - name: ordenarPor
           in: query
           required: false
-          description: "Campo por el que se ordena, en camelCase"
-          schema: { type: string }
+          description: "Campo por el que se ordena, en camelCase. Lista cerrada: cualquier otro valor es 422 ORDEN_NO_ADMITIDO. Sin el, la operacion ordena por «codigo». El nombre de columna en snake_case se admite tambien, para el cliente que ya conozca la tabla."
+          schema: { type: string, enum: [codigo, descripcion, riesgoItse, riesgo_itse, seccion] }
         - name: direccion
           in: query
           required: false
@@ -9065,8 +9077,8 @@ paths:
         - name: ordenarPor
           in: query
           required: false
-          description: "Campo por el que se ordena, en camelCase"
-          schema: { type: string }
+          description: "Campo por el que se ordena, en camelCase. Lista cerrada: cualquier otro valor es 422 ORDEN_NO_ADMITIDO. Sin el, la operacion ordena por «numero». El nombre de columna en snake_case se admite tambien, para el cliente que ya conozca la tabla."
+          schema: { type: string, enum: [codigoPredial, codigo_predial, fechaEmision, fecha_emision, numero, tipo, vigenciaHasta, vigencia_hasta] }
         - name: direccion
           in: query
           required: false
@@ -9183,8 +9195,8 @@ paths:
         - name: ordenarPor
           in: query
           required: false
-          description: "Campo por el que se ordena, en camelCase"
-          schema: { type: string }
+          description: "Campo por el que se ordena, en camelCase. Lista cerrada: cualquier otro valor es 422 ORDEN_NO_ADMITIDO. Sin el, la operacion ordena por «orden». El nombre de columna en snake_case se admite tambien, para el cliente que ya conozca la tabla."
+          schema: { type: string, enum: [codigo, id, nombre, orden] }
         - name: direccion
           in: query
           required: false
@@ -9233,8 +9245,8 @@ paths:
         - name: ordenarPor
           in: query
           required: false
-          description: "Campo por el que se ordena, en camelCase"
-          schema: { type: string }
+          description: "Campo por el que se ordena, en camelCase. Lista cerrada: cualquier otro valor es 422 ORDEN_NO_ADMITIDO. Sin el, la operacion ordena por «codigo». El nombre de columna en snake_case se admite tambien, para el cliente que ya conozca la tabla."
+          schema: { type: string, enum: [codigo, id, nombre, tipo] }
         - name: direccion
           in: query
           required: false
@@ -9489,8 +9501,8 @@ paths:
         - name: ordenarPor
           in: query
           required: false
-          description: "Campo por el que se ordena, en camelCase"
-          schema: { type: string }
+          description: "Campo por el que se ordena, en camelCase. Lista cerrada: cualquier otro valor es 422 ORDEN_NO_ADMITIDO. Sin el, la operacion ordena por «fecha». El nombre de columna en snake_case se admite tambien, para el cliente que ya conozca la tabla."
+          schema: { type: string, enum: [fecha, id, operacion, tabla, usuarioId, usuario_id] }
         - name: direccion
           in: query
           required: false
@@ -9619,8 +9631,8 @@ paths:
         - name: ordenarPor
           in: query
           required: false
-          description: "Campo por el que se ordena, en camelCase"
-          schema: { type: string }
+          description: "Campo por el que se ordena, en camelCase. Lista cerrada: cualquier otro valor es 422 ORDEN_NO_ADMITIDO. Sin el, la operacion ordena por «inicio». El nombre de columna en snake_case se admite tambien, para el cliente que ya conozca la tabla."
+          schema: { type: string, enum: [id, inicio, resultado] }
         - name: direccion
           in: query
           required: false

@@ -75,6 +75,28 @@ describe('la ventana sale de la definicion y de la ruta, en ese orden', () => {
     ).toEqual({ tamano: '20', ordenarPor: 'usuarioId' });
   });
 
+  it('`aut-tram` ordena de verdad, que hasta #226 no podia: el sentido tenia el nombre tomado', () => {
+    // `GET /licencias/funcionamiento` declaraba en su firma un filtro llamado `direccion` —el
+    // domicilio del establecimiento— y recibia ademas `ParametrosDePaginacion`, cuyo sentido del
+    // orden TAMBIEN se llama `direccion`. Spring ataba el mismo parametro de consulta a los dos:
+    // `?ordenarPor=numero&direccion=DESCENDENTE` acotaba el padron a las licencias cuya direccion
+    // contiene «DESCENDENTE» —o sea, a ninguna— y ademas ordenaba al reves. Por eso esta fue la
+    // unica de las cuatro tablas de #186 que pagino sin `orden`.
+    //
+    // Renombrado el filtro a `direccionDelEstablecimiento`, el sentido vuelve a tener su sitio.
+    expect(
+      laVentanaQueSePide('aut-tram', 'padron-de-licencias', {
+        ordenarPor: 'nombreComercial',
+        direccion: 'DESCENDENTE',
+      }),
+    ).toEqual({ tamano: '20', ordenarPor: 'nombreComercial', direccion: 'DESCENDENTE' });
+
+    // Y el PRIMERO que ofrece es el orden por omision del backend —`numero`—, que es lo que hace
+    // que la barra no anuncie un orden distinto del que traen las filas. Lo comprueba contra el
+    // contrato `la-ruta-de-la-hoja-llega-al-conector.test.ts`; aqui se deja escrito cual es.
+    expect(pantallaDe('aut-tram').bloques[0]?.tabla?.orden?.campos[0]?.valor).toBe('numero');
+  });
+
   it('pedir la ventana de una tabla que no declara paginacion REVIENTA nombrandola', () => {
     // Un `{}` silencioso dejaria al conector pidiendo sin tamano mientras la tabla no dibuja ni un
     // mando: veinte filas de un padron entero, sin decir que son una ventana.

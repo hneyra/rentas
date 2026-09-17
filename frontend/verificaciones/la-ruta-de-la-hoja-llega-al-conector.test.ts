@@ -1,6 +1,6 @@
 // @vitest-environment node
 //
-// Lee el contrato y el codigo del BACKEND, los dos del disco. No hay DOM que necesitar.
+// Lee el contrato del disco. No hay DOM que necesitar.
 
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -38,25 +38,44 @@ import { EN_LA_RUTA, hayMasDe, paginasDe } from '../src/pantallas/tablas.ts';
  * que no pagina**, que es peor que ninguna: el mando existe, se pulsa, la direccion cambia y las
  * filas son las mismas.
  *
- * <h2>Y por que esta prueba lee el codigo JAVA del backend</h2>
+ * <h2>La lista blanca del orden sale del CONTRATO, y hasta #227 no podia</h2>
  *
- * Porque **la lista blanca del orden no esta en el contrato**: `parametros-de-la-api.json` publica
- * que existe `?ordenarPor=`, no que valores admite —y `OrdenSeguro` rechaza con **422
- * ORDEN_NO_ADMITIDO** cualquiera que no este en la suya—. El backend vive en este mismo
- * repositorio, asi que la lista se lee de donde esta declarada en vez de copiarse aqui: copiada,
- * el dia que el backend le quite una columna esto seguiria en verde y la pantalla ofreceria un
- * orden que contesta 422. Que el contrato deberia publicarla es otro issue, y esta abierto.
+ * Hasta ese issue el contrato publicaba que existe `?ordenarPor=` y no que valores admite, asi que
+ * esta guarda abria los `.java` del backend —`ORDEN_DEL_BACKEND`, con la ruta del repositorio y el
+ * nombre de su constante— para comprobar que el orden que una tabla ofrece no contesta **422
+ * ORDEN_NO_ADMITIDO**. Funcionaba, pero ataba una guarda del frontend a rutas de archivo del
+ * backend: un acoplamiento al reves, que no sobreviviria a separar `rentas-web`.
+ *
+ * Desde #227 lo publica `parametros-de-la-api.json`, por operacion y **derivado**: el backend
+ * recorre el bytecode desde cada handler hasta el `OrdenSeguro` que su paginacion alcanza, y
+ * escribe `orden: { porOmision, admitidos }`. Esta guarda lee eso y nada mas. Una operacion que
+ * ofrezca orden y no lo publique es roja aqui, no un verde silencioso.
+ *
+ * **Y con eso se cae sola la trampa de #228.** Aquella lectura sacaba los argumentos de
+ * `OrdenSeguro.sobre(...)` con una expresion regular, y por eso se le escapaba `publicandoComo`
+ * —que declara con que nombre publica el recurso una columna y **retira el `camelCase` automatico
+ * de esa columna**—: la guarda daba por bueno el nombre que el backend RECHAZA y por malo el que
+ * ADMITE. El contrato no puede equivocarse ahi porque no interpreta la cadena: llama a
+ * `OrdenSeguro.camposAdmitidos()`, que es el mapa que el propio `clausula(...)` consulta. El
+ * centinela de aquel issue se conserva abajo, leyendo el contrato.
  */
 
 const AQUI = dirname(fileURLToPath(import.meta.url));
 const FRONTEND = join(AQUI, '..');
 const RAIZ = join(FRONTEND, '..');
 const PARAMETROS = join(RAIZ, 'docs/50-api/parametros-de-la-api.json');
-const BACKEND = join(RAIZ, 'backend');
+
+interface OrdenDeUnaOperacion {
+  /** Por que campo ordena el backend cuando no se manda `?ordenarPor=`. */
+  readonly porOmision: string;
+  /** Los que `?ordenarPor=` admite; cualquier otro es 422 ORDEN_NO_ADMITIDO. */
+  readonly admitidos: readonly string[];
+}
 
 interface ParametrosDeUnaOperacion {
   readonly obligatorios: readonly string[];
   readonly opcionales: readonly string[];
+  readonly orden?: OrdenDeUnaOperacion;
 }
 
 const contrato = JSON.parse(readFileSync(PARAMETROS, 'utf8')) as Record<
@@ -234,121 +253,34 @@ describe('una tabla que mueve la ruta tiene quien la lea (#186, AC1; #187, AC3)'
 });
 
 /**
- * **La lista blanca del orden, leida del backend de este mismo repositorio.**
+ * `"fecha_ingreso"` -> `"fechaIngreso"`, como lo hace `OrdenSeguro.sobre`.
  *
- * `repositorio` declara que columnas admite `ORDER BY` —y `OrdenSeguro.sobre` admite ademas su
- * `camelCase`—; `controlador` declara por cual ordena cuando no se manda `?ordenarPor=`.
- *
- * **El primero de `orden.campos` tiene que ser ese**: sin campo en la ruta, el interprete dibuja
- * el primero (`campoOrdenado`) y el conector **no manda nada**, asi que el que ordena es el del
- * backend. Si no coincidieran, la barra diria «ordenado por X» sobre filas ordenadas por Y.
+ * Hace falta para el orden POR OMISION: el contrato publica el literal que el controlador escribe,
+ * y unos escriben el campo del recurso —`fechaVisita`— y otros la columna —`codigo_contribuyente`—.
+ * Traducirlo en el backend seria publicar un nombre que su controlador no dice.
  */
-const ORDEN_DEL_BACKEND: Readonly<
-  Record<string, { readonly repositorio: string; readonly constante: string; readonly controlador: string }>
-> = {
-  'GET /licencias/ciiu': {
-    repositorio: 'kamayuk-rentas-licencias/src/main/java/kamayuk/rentas/licencias/infraestructura/CiiuRepositoryJdbc.java',
-    constante: 'ORDEN',
-    controlador: 'kamayuk-rentas-licencias/src/main/java/kamayuk/rentas/licencias/infraestructura/web/CiiuController.java',
-  },
-  'GET /seguridad/auditoria': {
-    repositorio: 'kamayuk-rentas-seguridad/src/main/java/kamayuk/rentas/seguridad/infraestructura/SesionRepositoryJdbc.java',
-    constante: 'ORDEN_AUDITORIA',
-    controlador: 'kamayuk-rentas-seguridad/src/main/java/kamayuk/rentas/seguridad/infraestructura/web/SesionController.java',
-  },
-  'GET /fiscalizacion/programas/{id}/muestra': {
-    repositorio: 'kamayuk-rentas-fiscalizacion/src/main/java/kamayuk/rentas/fiscalizacion/infraestructura/MuestraDelProgramaRepositoryJdbc.java',
-    constante: 'ORDEN',
-    controlador: 'kamayuk-rentas-fiscalizacion/src/main/java/kamayuk/rentas/fiscalizacion/infraestructura/web/MuestraController.java',
-  },
-  'GET /transito/internamientos': {
-    repositorio: 'kamayuk-rentas-sanciones/src/main/java/kamayuk/rentas/sanciones/infraestructura/InternamientoRepositoryJdbc.java',
-    constante: 'ORDEN',
-    controlador: 'kamayuk-rentas-sanciones/src/main/java/kamayuk/rentas/sanciones/infraestructura/web/InternamientosController.java',
-  },
-};
-
-/** `"fecha_ingreso"` -> `"fechaIngreso"`, como lo hace `OrdenSeguro.sobre`. */
 const aCamelCase = (columna: string): string =>
   columna.replace(/_([a-z0-9])/g, (_todo, letra: string) => letra.toUpperCase());
 
 /**
- * **Los campos que esa operacion admite en `?ordenarPor=`, leidos de su repositorio.**
+ * Lo que el contrato publica del orden de esa operacion, o revienta diciendo que falta.
  *
- * <h2>Se lee la CADENA entera, y no solo `sobre(...)` — es el hallazgo de #228</h2>
- *
- * Hasta este issue esto leia los argumentos de `OrdenSeguro.sobre(...)` y anadia su `camelCase`.
- * Eso era la lista blanca de `OrdenSeguro` **hasta #546**, que le anadio `publicandoComo(campo,
- * columna)`: declara con que nombre publica el RECURSO una columna cuyo `camelCase` no es el campo
- * que sale por HTTP, y **retira el `camelCase` automatico de esa columna** —dejarlo dejaria los dos
- * nombres vivos, que era el defecto de partida—.
- *
- * O sea que con la lectura vieja esta guarda se equivocaba **en las dos direcciones a la vez** sobre
- * toda operacion que lo use: daba por bueno el nombre que el backend RECHAZA y por malo el que
- * ADMITE. Medido con la muestra de `fis-prog`, que es la primera que llega aqui con
- * `publicandoComo("sector", "sector_codigo")`: ofrecer `?ordenarPor=sectorCodigo` pasaba en
- * **verde**, y `OrdenDeLaDeteccionFronteraTest` del backend prueba del otro lado que eso es un
- * **422** —«sectorCodigo es el camelCase automatico que publicandoComo retira, y es el nombre que
- * ninguna fila lleva»—. Un desplegable que se mueve y rompe la tabla, con la guarda en verde.
- *
- * `desempatandoPor` y `conNulosAlFinal` **no cambian la lista** —el primero anade una columna de
- * desempate que el cliente no pide y el segundo declara anulable una ya declarada—, asi que no se
- * leen: lo que hace falta es no confundirlos con `publicandoComo`, y por eso se lee la cadena hasta
- * el `;` y se buscan las llamadas por su nombre en vez de contar parentesis.
+ * `admitidos` trae los dos nombres de cada columna —el `camelCase` que el recurso publica y el
+ * `snake_case` de la tabla—, porque `OrdenSeguro.sobre` admite los dos y el contrato dice lo que
+ * el servidor acepta, no lo que prefeririamos que aceptara.
  */
-function camposAdmitidos(operacion: string): readonly string[] {
-  const donde = ORDEN_DEL_BACKEND[operacion];
-  if (donde === undefined) {
+function ordenDelBackend(operacion: string): OrdenDeUnaOperacion {
+  const orden = contrato[operacion]?.orden;
+  if (orden === undefined) {
     throw new Error(
-      `Una tabla ofrece ordenar por «${operacion}» y aqui no esta escrito donde vive su lista ` +
-        'blanca. Se anade a `ORDEN_DEL_BACKEND` con el repositorio que la declara: sin eso, esta ' +
-        'guarda no puede decir si el orden que se ofrece contesta 422.',
+      `Una tabla ofrece ordenar y «${operacion}» no publica su lista blanca en\n` +
+        '  `docs/50-api/parametros-de-la-api.json`. Eso significa una de dos, y las dos hay que\n' +
+        '  mirarlas: o la operacion pagina sin que `?ordenarPor=` mande en su ORDER BY —esta\n' +
+        '  declarada en `ParametrosDeLaApiTest#SIN_ORDEN_PEDIBLE`, y entonces ofrecer orden aqui\n' +
+        '  seria dibujar un mando que no mueve las filas—, o el contrato se quedo sin regenerar.',
     );
   }
-  const fuente = readFileSync(join(BACKEND, donde.repositorio), 'utf8');
-  // La declaracion ENTERA, hasta su `;`: `sobre(...)` y lo que se le encadene detras.
-  const declaracion = new RegExp(`OrdenSeguro\\s+${donde.constante}\\s*=\\s*([^;]*);`, 's').exec(
-    fuente,
-  )?.[1];
-  const sobre = declaracion === undefined ? null : /OrdenSeguro\.sobre\(([^)]*)\)/s.exec(declaracion);
-  if (declaracion === undefined || sobre?.[1] === undefined) {
-    throw new Error(
-      `No se encontro «${donde.constante} = OrdenSeguro.sobre(...)» en ${donde.repositorio}.\n` +
-        '  O la constante cambio de nombre, o el orden dejo de ir por lista blanca. Las dos cosas\n' +
-        '  hay que mirarlas: esta guarda no puede pasar en verde sin haber leido nada.',
-    );
-  }
-
-  const columnas = [...sobre[1].matchAll(/"([a-z0-9_]+)"/gi)].map((uno) => uno[1] ?? '');
-  const admitidos = new Set([...columnas, ...columnas.map(aCamelCase)]);
-  // Y lo que `publicandoComo` hace, en el mismo orden que el Java: quita el `camelCase` automatico
-  // de la columna renombrada y pone el nombre que el recurso publica. La columna cruda se queda.
-  for (const renombre of declaracion.matchAll(
-    /\.publicandoComo\(\s*"([^"]+)"\s*,\s*"([^"]+)"\s*\)/gs,
-  )) {
-    const campo = renombre[1] ?? '';
-    const columna = renombre[2] ?? '';
-    admitidos.delete(aCamelCase(columna));
-    admitidos.add(campo);
-  }
-  return [...admitidos];
-}
-
-/** Por que campo ordena esa operacion cuando no se manda `?ordenarPor=`. */
-function ordenPorOmision(operacion: string): string {
-  const donde = ORDEN_DEL_BACKEND[operacion];
-  if (donde === undefined) throw new Error(`Falta la fuente del orden de «${operacion}»`);
-  const fuente = readFileSync(join(BACKEND, donde.controlador), 'utf8');
-  const constante = /String ORDEN_POR_OMISION\s*=\s*"([^"]+)"/.exec(fuente)?.[1];
-  const enLinea = /aPaginacion\("([^"]+)"\)/.exec(fuente)?.[1];
-  const porOmision = constante ?? enLinea;
-  if (porOmision === undefined) {
-    throw new Error(
-      `No se encontro el orden por omision en ${donde.controlador}.\n` +
-        '  Sin el, no se puede saber si lo que la barra anuncia es lo que el servidor ordena.',
-    );
-  }
-  return porOmision;
+  return orden;
 }
 
 describe('el orden que se OFRECE lo admite el backend (#186, AC2)', () => {
@@ -366,42 +298,41 @@ describe('el orden que se OFRECE lo admite el backend (#186, AC2)', () => {
       })),
   );
 
-  it('EL CENTINELA: hay tablas que ofrecen orden, y el backend se pudo leer', () => {
+  it('EL CENTINELA: hay tablas que ofrecen orden, y el contrato publica su lista', () => {
     expect(queOrdenan.length, 'ninguna tabla declara `orden`').toBeGreaterThan(0);
-    // Y que la lectura del backend no devuelve una lista vacia, que es como esto pasaria en verde
+    // Y que la lista que el contrato publica no viene vacia, que es como esto pasaria en verde
     // sin haber comprobado nada: una lista vacia no contiene ningun campo… ni lo contradice.
     for (const { operacion } of queOrdenan) {
-      expect(camposAdmitidos(operacion).length, operacion).toBeGreaterThan(1);
+      expect(ordenDelBackend(operacion).admitidos.length, operacion).toBeGreaterThan(1);
     }
   });
 
-  it('EL CENTINELA DE LA LECTURA: `publicandoComo` se lee, y no se regala el nombre interno', () => {
-    // El caso que #228 midio, y que hasta entonces esta guarda daba por bueno **en verde**:
+  it('EL CENTINELA DE #228: `publicandoComo` llega al contrato, y el nombre interno NO', () => {
+    // El caso que #228 midio, y que la lectura por expresion regular daba por bueno **en verde**:
     // `MuestraDelProgramaRepositoryJdbc.ORDEN` lleva `.publicandoComo("sector", "sector_codigo")`,
-    // que RETIRA el `camelCase` automatico. Con la lectura vieja —solo los argumentos de
-    // `sobre(...)`— esta guarda admitia `sectorCodigo`, que el backend contesta con **422**
-    // (`OrdenDeLaDeteccionFronteraTest`), y rechazaba `sector`, que es el que SI admite.
+    // que RETIRA el `camelCase` automatico. Pedir `?ordenarPor=sectorCodigo` es un **422**
+    // (`OrdenDeLaDeteccionFronteraTest` lo prueba del otro lado), y `sector` es el que si admite.
     //
     // Se afirma sobre una operacion concreta y no «alguna con publicandoComo»: una lista vacia no
     // contiene ningun campo… ni lo contradice, y esto tiene que poder ponerse rojo.
-    const admitidos = camposAdmitidos('GET /fiscalizacion/programas/{id}/muestra');
+    const admitidos = ordenDelBackend('GET /fiscalizacion/programas/{id}/muestra').admitidos;
 
     expect(admitidos, 'el nombre que la fila publica').toContain('sector');
     expect(
       admitidos,
-      'El lector dejo de honrar `publicandoComo`: «sectorCodigo» es el camelCase automatico que\n' +
-        '  esa llamada RETIRA, y pedirlo es un 422 ORDEN_NO_ADMITIDO. Dos nombres vivos para la\n' +
-        '  misma columna en la misma operacion es el defecto que #546 cerro en el backend.',
+      'El contrato regala el nombre interno: «sectorCodigo» es el camelCase automatico que\n' +
+        '  `publicandoComo` RETIRA, y pedirlo es un 422 ORDEN_NO_ADMITIDO. Dos nombres vivos para\n' +
+        '  la misma columna en la misma operacion es el defecto que #546 cerro en el backend.',
     ).not.toContain('sectorCodigo');
     // La columna cruda se queda admitida, como dice el javadoc de `publicandoComo`.
     expect(admitidos).toContain('sector_codigo');
     expect(admitidos).toContain('codRefCatastral');
   });
 
-  it('cada campo que se ofrece esta en la lista blanca de su repositorio', () => {
+  it('cada campo que se ofrece esta en la lista blanca que el contrato publica', () => {
     const rechazados: string[] = [];
     for (const { clave, tabla, operacion } of queOrdenan) {
-      const admitidos = camposAdmitidos(operacion);
+      const admitidos = ordenDelBackend(operacion).admitidos;
       for (const campo of tabla.orden?.campos ?? []) {
         if (!admitidos.includes(campo.valor)) {
           rechazados.push(`  ${clave}/${tabla.clave} ofrece «${campo.valor}» y ${operacion} no lo admite`);
@@ -417,14 +348,14 @@ describe('el orden que se OFRECE lo admite el backend (#186, AC2)', () => {
     ).toEqual([]);
   });
 
-  it('y el PRIMERO es el orden por omision del controlador: la barra no puede mentir', () => {
+  it('y el PRIMERO es el orden por omision que el contrato publica: la barra no puede mentir', () => {
     // Sin `?ordenarPor=` en la ruta el interprete anuncia `campos[0]` y el conector no manda nada,
     // asi que ordena el backend por el suyo. Si no coincidieran, la barra diria «ordenado por
     // Actividad» sobre filas ordenadas por codigo — y nadie tiene forma de notarlo.
     const descuadres: string[] = [];
     for (const { clave, tabla, operacion } of queOrdenan) {
       const primero = tabla.orden?.campos[0]?.valor ?? '';
-      const porOmision = ordenPorOmision(operacion);
+      const porOmision = ordenDelBackend(operacion).porOmision;
       if (primero !== porOmision && aCamelCase(porOmision) !== primero) {
         descuadres.push(`  ${clave}/${tabla.clave}: ofrece «${primero}» y ${operacion} ordena por «${porOmision}»`);
       }
