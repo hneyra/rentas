@@ -1,4 +1,5 @@
 import type { ClaveDeHoja } from '../arbol.ts';
+import { EN_LA_RUTA, hayMasDe, paginasDe } from '../tablas.ts';
 import type { DefinicionDePantalla as Pantalla } from '@kamayuk/ui';
 
 /**
@@ -102,6 +103,58 @@ export const FISCALIZACION = {
         tabla: {
           clave: 'muestra-del-programa',
           sinDato: { texto: '—', nota: 'Ninguna operacion del contrato publica este dato.' },
+          /*
+           * **La unica de las seis tablas de #228 que SI es una relacion paginada** (#228).
+           *
+           * Desde #172 su encabezado dice «2 de 84» —`totalElementos` es cuantos predios sorteo el
+           * programa— y hasta este issue **no habia forma de ver los otros 82**: la tabla nombraba
+           * lo que faltaba y no lo daba, que es honesto y peor que incompleto.
+           *
+           * Las otras cinco de aquel issue —`coa-exp`, `coa-cost`, `tra-pap`, `fis-actas` y
+           * `fis-res`— **no entran, y su motivo no es la paginacion**: su tabla no es una relacion
+           * —son los actos de UN expediente, las lineas de UNA liquidacion, los actos de UNA
+           * papeleta, las magnitudes de UN acta y los ejercicios de UNA resolucion— y su `?tamano=1`
+           * sirve para elegir CUAL se dibuja. Lo que les falta es el **selector**, que es un filtro,
+           * o sea `kamayuk-lib`#94 y #172; paginar esa lectura no paginaria su tabla. Esta escrito
+           * ademas en el javadoc de cada ruta en `datos/lecturas.ts`, para que no haya que volver a
+           * medirlo.
+           */
+          paginacion: {
+            en: 'servidor',
+            enLaRuta: EN_LA_RUTA.pagina,
+            tamano: 20,
+            tamanos: [20, 50, 100],
+            tamanoEnLaRuta: EN_LA_RUTA.tamano,
+            hayMas: hayMasDe('muestra-del-programa'),
+            paginas: paginasDe('muestra-del-programa'),
+          },
+          /*
+           * **Dos campos de los tres de la lista blanca, y el tercero se deja fuera a proposito.**
+           *
+           * `MuestraDelProgramaRepositoryJdbc.ORDEN` declara `cod_ref_catastral`, `condicion` y
+           * `sector_codigo`. Los dos primeros son columnas de ESTA tabla —«Codigo predial» y «Causa
+           * del cruce»—; el sector **no se dibuja en ninguna**, y ofrecer ordenar por algo que no
+           * se ve deja la barra anunciando un orden que nadie puede comprobar.
+           *
+           * Y hay un segundo motivo, que es un hallazgo de este issue: ese tercero **se llama
+           * `sector`** y no `sectorCodigo`. `OrdenSeguro.publicandoComo("sector", "sector_codigo")`
+           * RETIRA el `camelCase` automatico, asi que `?ordenarPor=sectorCodigo` contesta **422
+           * ORDEN_NO_ADMITIDO** — y hasta este issue la guarda que cruza el orden ofrecido contra el
+           * backend no sabia leer esa llamada y lo habria dado por bueno. Ahora si.
+           *
+           * El PRIMERO es el `ORDEN_POR_OMISION` de `MuestraController` (`codRefCatastral`): sin
+           * campo en la ruta el conector no manda ninguno, y ordena el backend por el suyo.
+           */
+          orden: {
+            campos: [
+              { valor: 'codRefCatastral', rotulo: 'Código predial' },
+              { valor: 'condicion', rotulo: 'Causa del cruce' },
+            ],
+            enLaRuta: EN_LA_RUTA.ordenarPor,
+            sentidoEnLaRuta: EN_LA_RUTA.direccion,
+            ascendente: 'ASCENDENTE',
+            descendente: 'DESCENDENTE',
+          },
           titulo: 'Muestra del programa',
           accion: 'Regenerar muestra',
           columnas: [

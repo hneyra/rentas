@@ -10,6 +10,8 @@ import { describe, expect, it } from 'vitest';
 import { CONECTORES } from '../src/datos/conectores.ts';
 import { loQueDijoElServidor } from '../src/datos/laVentana.ts';
 import type { Paginado } from '../src/datos/lecturas.ts';
+import { CLAVES_DE_HOJA, type ClaveDeHoja } from '../src/pantallas/arbol.ts';
+import { pantallaDe } from '../src/pantallas/definiciones/index.ts';
 import { hayMasDe, paginasDe } from '../src/pantallas/tablas.ts';
 
 /**
@@ -111,6 +113,69 @@ describe('el total de una tabla sale del envoltorio, y no de una cuenta (#172, A
         '  Los dos salen del envoltorio por `loQueDijoElServidor`, y no de aqui. Con el tope\n' +
         '  alcanzado exacto, contar las filas recibidas dice que no hay pagina siguiente **justo\n' +
         '  cuando la hay**, que es el unico caso en que equivocarse cuesta algo.',
+    ).toEqual([]);
+  });
+});
+
+/**
+ * **Una tabla paginada en servidor tiene quien le publique lo que el servidor dijo** (#228).
+ *
+ * <h2>El hueco que lo trae, medido con una rotura</h2>
+ *
+ * `la-ruta-de-la-hoja-llega-al-conector.test.ts` comprueba que los nombres de `hayMas` y `paginas`
+ * **se deriven** de la clave de la tabla, que es la mitad que impide que se escriban mal. La otra
+ * mitad no la vigilaba nadie: que el conector los **ponga**. Medido quitando
+ * `nombrados: loQueDijoElServidor('muestra-del-programa', muestra)` de `FIS_PROG` — el unico rojo
+ * salio de una prueba escrita en ese mismo PR, o sea que el conector **diecinueve** no habria
+ * tenido quien se lo dijera.
+ *
+ * Y el sintoma es mudo y permanente: sin el nombrado, el interprete no encuentra `hayMas`, lee eso
+ * como «no hay pagina siguiente» y **«Siguiente» sale impedido para siempre** sobre una relacion de
+ * 84 predios — con la barra diciendo «Pagina 1 de undefined» y sin un solo error.
+ *
+ * Es un escaner de fuentes y no un recorrido a proposito, por lo mismo que la regla de arriba: el
+ * recorrido diria que HOY estan; esto dice que **no se puede escribir de la otra forma**.
+ */
+describe('toda tabla paginada en servidor publica lo que el SERVIDOR dijo (#228)', () => {
+  /** Las tablas con `clave` que paginan en servidor, con la hoja que las dibuja. */
+  const paginadas = CLAVES_DE_HOJA.flatMap((hoja: ClaveDeHoja) =>
+    pantallaDe(hoja).bloques.flatMap((bloque) => {
+      const tabla = bloque.tabla;
+      return tabla?.clave === undefined || tabla.paginacion?.en !== 'servidor'
+        ? []
+        : [{ hoja, clave: tabla.clave }];
+    }),
+  );
+
+  it('EL CENTINELA: hay tablas que paginan en servidor, y todas tienen conector', () => {
+    // Sin esto, lo de abajo recorreria una lista vacia y pasaria en verde sobre la nada.
+    expect(paginadas.length, 'ninguna tabla pagina en servidor').toBeGreaterThan(0);
+    const sinConector = paginadas.filter(({ hoja }) => CONECTORES[hoja] === undefined);
+    expect(
+      sinConector.map(({ hoja }) => `  ${hoja}`),
+      'Una hoja declara una tabla paginada en SERVIDOR y no tiene conector: los mandos se\n' +
+        '  dibujarian sobre una pantalla que no pide nada.',
+    ).toEqual([]);
+  });
+
+  it('el conector de cada una llama a `loQueDijoElServidor` con la clave de SU tabla', () => {
+    const fuentes = fuentesDeLosConectores();
+    const mudas: string[] = [];
+    for (const { hoja, clave } of paginadas) {
+      const lallama = fuentes.some(({ texto }) =>
+        texto.includes(`loQueDijoElServidor('${clave}'`),
+      );
+      if (!lallama) mudas.push(`  ${hoja} · tabla «${clave}»`);
+    }
+    expect(
+      mudas,
+      'Una tabla pagina en servidor y su conector no publica lo que el servidor dijo:\n' +
+        `${mudas.join('\n')}\n\n` +
+        '  `paginacion.hayMas` y `paginacion.paginas` son NOMBRES de `nombrados`, no datos: el\n' +
+        '  interprete los busca ahi. Sin ponerlos, lee la ausencia como «no hay pagina siguiente»\n' +
+        '  y **«Siguiente» sale impedido para siempre**, con la barra diciendo «Pagina 1 de\n' +
+        '  undefined» y sin un solo error. Se ponen con `loQueDijoElServidor(<clave>, pagina)`,\n' +
+        '  que copia el envoltorio tal cual y no cuenta nada.',
     ).toEqual([]);
   });
 });

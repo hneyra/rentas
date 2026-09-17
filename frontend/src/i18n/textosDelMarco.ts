@@ -219,6 +219,22 @@ type LasQueSeDibujan = Pick<
  */
 export const FRASE_DEL_CONTEO = '{{cuantos}} de {{total}}';
 
+/**
+ * **«Las cifras son al 17/09/2026»: de cuando son los numeros de esta pantalla** (#196, regla 9).
+ *
+ * Vive aqui por lo mismo que la de arriba: el conector entrega la fecha **cruda** —`Reparto.aLaFecha`—
+ * y la frase la arma `useDatosDeLaHoja`, que es un gancho y tiene `t()` delante. La fecha entra por
+ * interpolacion y no concatenada, porque en otro idioma no cae necesariamente al final; y el
+ * formato es de `@kamayuk/formato`, que no se traduce.
+ *
+ * <h2>Por que la pantalla lo dice ARRIBA y no en un campo</h2>
+ *
+ * Porque regla 9 —RNF-075— obliga a decirlo y **no toda pantalla tiene donde**: `con-panel` dibuja
+ * «Fecha de cálculo» y `fis-panel` no tiene ninguno de sus seis campos libre. Anadirle un septimo
+ * al artboard seria cambiar el diseno para que quepa un dato.
+ */
+export const FRASE_DE_LA_FECHA = 'Las cifras son al {{fecha}}.';
+
 /** Todo lo que este archivo aporta al inventario del locale. Ver `catalogo-de-claves.ts`. */
 export function clavesDelMarco(): readonly string[] {
   return [
@@ -226,6 +242,7 @@ export function clavesDelMarco(): readonly string[] {
     ...Object.values(FRASES_DEL_INTERPRETE),
     ...Object.values(FRASES_DE_LAS_TABLAS),
     FRASE_DEL_CONTEO,
+    FRASE_DE_LA_FECHA,
   ];
 }
 

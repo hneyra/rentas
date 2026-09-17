@@ -3,6 +3,16 @@ import type { DefinicionDePantalla } from '@kamayuk/ui';
 import { ARBOL } from '../pantallas/arbol.ts';
 import { PANTALLAS } from '../pantallas/definiciones/index.ts';
 import type { Modulo } from '../pantallas/tipos.ts';
+import { NO_PUBLICADO } from '../datos/conectores.ts';
+import {
+  CARGANDO,
+  NO_PUBLICADO_EN_PANTALLA,
+  SIN_EJERCICIO,
+  SIN_SUJETO,
+  VACIO,
+} from '../datos/useDatosDeLaHoja.ts';
+import { SIN_CIFRAR } from '../datos/conectores/fiscalizacion.ts';
+import { SIN_PLACA } from '../datos/conectores/transito.ts';
 import { NADA_SERVIDO, SERVIDO_Y_SIN_PEDIR, SOLO_BASE, SOLO_ESCRIBE } from '../porQueNoHayDato.ts';
 import { clavesDelMarco } from './textosDelMarco.ts';
 
@@ -91,12 +101,34 @@ function delArbol(): readonly string[] {
   ]);
 }
 
-/** Las frases con que el sistema explica que no hay dato. */
+/**
+ * **Las frases con que el sistema explica que no hay dato.**
+ *
+ * <h2>Son de DOS sitios, y el segundo faltaba (#215)</h2>
+ *
+ * Las cuatro de `porQueNoHayDato.ts` son de una pantalla **sin conector**. Las otras cinco son de
+ * `useDatosDeLaHoja.ts` y son las de una pantalla **que si pide**: cargando, fallo, vacio, falta el
+ * sujeto, falta el ejercicio y «no publicado». El interprete las pasa por `traducir` igual que a
+ * las primeras, o sea que son claves — y no estaban listadas, asi que en un segundo idioma **la
+ * mitad conectada de la interfaz salia en castellano**. El defecto no tenia rojo porque lo que
+ * nadie lista tampoco nadie lo echa de menos, que es justo lo que este archivo existe para impedir.
+ *
+ * Y con ellas las dos palabras que un conector pone **en el hueco de un campo** —`NO_PUBLICADO` y
+ * `SIN_CIFRAR`—, que viajan por `ausenciaPorCampo` y el interprete tambien traduce. **No entran las
+ * de una CELDA de tabla**: esas son dato de la fila y no pasan por `traducir`.
+ */
 function deLasAusencias(): readonly string[] {
-  return [NADA_SERVIDO, SOLO_BASE, SOLO_ESCRIBE, SERVIDO_Y_SIN_PEDIR].flatMap((a) => [
-    a.enElCampo,
-    a.explicacion,
-  ]);
+  return [
+    ...[NADA_SERVIDO, SOLO_BASE, SOLO_ESCRIBE, SERVIDO_Y_SIN_PEDIR].flatMap((a) => [
+      a.enElCampo,
+      a.explicacion,
+    ]),
+    ...[CARGANDO, VACIO, SIN_SUJETO, SIN_EJERCICIO, NO_PUBLICADO_EN_PANTALLA, SIN_PLACA].flatMap(
+      (a) => [a.enElCampo, a.explicacion],
+    ),
+    NO_PUBLICADO,
+    SIN_CIFRAR,
+  ];
 }
 
 /** El catalogo entero, sin repetidos y en orden. */

@@ -1,17 +1,20 @@
-import { coordenada, type CeldaDeLaTabla } from '@kamayuk/ui';
+import { coordenada, type CeldaDeLaTabla, type Coordenada } from '@kamayuk/ui';
 
 import { formatearImporte } from '../../dominio/formato.ts';
 import type {
   ActaDeFiscalizacion,
+  EmbudoDelPrograma,
   FilaDeLaMuestra,
   LineaDeterminada,
   Paginado,
   ProgramaDeFiscalizacion,
   ResolucionDeDeterminacion,
+  ResolucionEnLaRelacion,
 } from '../lecturas.ts';
 import { RUTAS, pedirPagina, pedirUno } from '../lecturas.ts';
 import type { Conector, Reparto } from '../conectores.ts';
 import { NO_PUBLICADO } from '../conectores.ts';
+import { laVentanaDe, laVentanaQueSePide, loQueDijoElServidor } from '../laVentana.ts';
 
 /**
  * **Las tres hojas de Fiscalizacion, que son de TABLA** (#179).
@@ -120,17 +123,31 @@ const SIN_DIFERENCIA_ESTIMADA =
   'La muestra no publica ni un importe: sortea predios por un criterio de cruce, no los valoriza. ' +
   'Estimar la diferencia aqui exigiria el cuadro de valores unitarios firmado, que es D-02a.';
 
-/** «Declarado» del acta: el acta publica el lado hallado y no el declarado. */
-const SIN_DECLARADO =
-  'ActaFiscalizacionResource publica «areaHallada» y «usoHallado» y NO publica «areaDeclarada» ni ' +
-  '«usoDeclarado»: de las dos mitades que esta tabla contrasta, la operacion sirve una. Quien ' +
-  'publica las dos es GET /fiscalizacion/resultados, que es la liquidacion y no esta etapa.';
+/**
+ * «Declarado» y «Diferencia» del acta cuando el lado declarado **no consta** (#191, #215).
+ *
+ * No es «no publicado»: desde #191 la operacion publica las tres —`areaDeclarada`, `usoDeclarado` y
+ * `diferenciaDeArea`—, resueltas desde la version de ficha que el acta referencia. Que lleguen
+ * nulas significa que **no hay contra que contrastar**, y son dos casos de verdad: un acta
+ * **vehicular** —un vehiculo no tiene area ni uso declarados— y una **predial de un predio sin
+ * ficha registrada a la fecha de la visita**, que es justamente el predio que no consta en el
+ * catastro.
+ *
+ * La distincion no es academica: esto se cierra con una ficha y no publicando un campo, o sea que
+ * decirlo con la palabra de «no publicado» mandaria a quien mantiene el backend a buscar algo que
+ * ya esta.
+ */
+const NO_CONSTA_LO_DECLARADO =
+  'El acta publica su lado declarado desde #191, y en esta llega vacio: no hay contra que ' +
+  'contrastar. Pasa en un acta VEHICULAR —un vehiculo no tiene area ni uso declarados— y en una ' +
+  'predial de un predio sin ficha registrada a la fecha de la visita. No es que falte publicarlo: ' +
+  'es que no consta.';
 
-/** «Diferencia» del acta: es una resta, y no se hace aqui. */
-const SIN_DIFERENCIA_DEL_ACTA =
-  'La diferencia es «hallada − declarada», y no solo falta el minuendo: restar dos magnitudes ' +
-  'servidas para llenar una celda es calcular lo que nadie publico. Quien la publica hecha es la ' +
-  'liquidacion, con «diferenciaDeArea».';
+/** «Diferencia» de la fila del USO: no es un numero, y el artboard la dibuja con una raya. */
+const SIN_DIFERENCIA_DE_UN_USO =
+  'La diferencia de un uso no es un numero: «Casa habitacion» contra «Comercio» no se resta. El ' +
+  'artboard dibuja esa misma celda con una raya, y la operacion tampoco publica ninguna: ' +
+  '«diferenciaDeArea» es de area, como su nombre dice.';
 
 /** «Situacion» del acta: el hallazgo es lo unico que dice en que quedo, y puede no estar. */
 const SIN_HALLAZGO =
@@ -141,11 +158,6 @@ const SIN_HALLAZGO =
 const SIN_AREA_HALLADA =
   'Esta acta no publica ninguna superficie medida en campo. No es cero: cero seria un predio sin ' +
   'area construida.';
-
-/** «Base omitida S/» de la resolucion: es una resta sobre dinero, y no se hace en el navegador. */
-const SIN_BASE_OMITIDA =
-  'La base omitida es «determinado − declarado», y la resolucion publica los dos sumandos y no la ' +
-  'resta. Restarlos aqui seria aritmetica sobre dinero en el navegador (regla 1, RNF-055).';
 
 /** «Interes S/» de la resolucion: no lo publica ninguna de las dieciseis operaciones. */
 const SIN_INTERES =
@@ -167,6 +179,9 @@ const LA_MONEDA = /^S\/\s/;
 function enColumnaDeSoles(importe: string | null): string {
   return importe === null ? SIN_CIFRAR : formatearImporte(importe).replace(LA_MONEDA, '');
 }
+
+/** Las operaciones de este modulo que reciben parametros, escritas una vez (#172). */
+const MUESTRA_DEL_PROGRAMA = 'GET /fiscalizacion/programas/{id}/muestra';
 
 /**
  * `fis-prog` — la muestra sorteada de un programa de fiscalizacion.
@@ -219,15 +234,29 @@ function enColumnaDeSoles(importe: string | null): string {
  *
  * <h2>Sin filtrar, y lo que eso significa aqui</h2>
  *
- * Se dibuja la muestra del **primer** programa de la relacion, ordenada por `codigo`. Los ocho
- * mandos de la pantalla no se mandan: `GET /fiscalizacion/programas` admite `ejercicio` y
- * `nDePrograma` —los dos publicados— y la muestra admite `predio`, y ninguno tiene hoy por donde
- * entrar. El encabezado de la tabla cuenta las filas que llegaron, que es cierto de lo que se ve y
- * no afirma cuantos predios sorteo el programa.
+ * Se dibuja la muestra del **primer** programa de la relacion. Los ocho mandos de la pantalla no se
+ * mandan: `GET /fiscalizacion/programas` admite `ejercicio` y `nDePrograma` —los dos publicados— y
+ * la muestra admite `predio`, y ninguno tiene hoy por donde entrar.
+ *
+ * <h2>Pero desde #228 la ventana SI se mueve, y era el hueco de verdad</h2>
+ *
+ * Desde #172 el encabezado dice **«2 de 84»** —el `totalElementos` que la operacion publica, o sea
+ * cuantos predios sorteo el programa— y la tabla **no declaraba `paginacion`**: nombraba lo que
+ * faltaba y no lo daba, que es honesto y peor que incompleto. Ahora la declara, y este conector lee
+ * la ventana de la ruta de la hoja —`#/fis-prog?pagina=2&ordenarPor=condicion`— con los cuatro
+ * sitios que `laVentanaDe` declara para la operacion de la muestra.
+ *
+ * **La ventana viaja a la MUESTRA y no a la relacion de programas**, que sigue pidiendose con
+ * `?tamano=1`: paginar la relacion cambiaria **cual** programa se dibuja, no que trozo de su
+ * muestra se ve. Son dos lecturas y el mando es de la segunda.
+ *
+ * `hayMas` y `totalPaginas` **los dice el servidor** y viajan por `nombrados`: contar las filas
+ * recibidas diria que no hay pagina siguiente justo cuando el tope se alcanza exacto.
  */
 const FIS_PROG: Conector = {
   clave: ['fis-prog', 'muestra-del-programa'],
-  pedir: async ({ senal }) => {
+  parametros: laVentanaDe(MUESTRA_DEL_PROGRAMA),
+  pedir: async ({ senal, enLaRuta }) => {
     const relacion = await pedirPagina<ProgramaDeFiscalizacion>(
       RUTAS.programasDeFiscalizacion,
       senal,
@@ -236,7 +265,13 @@ const FIS_PROG: Conector = {
     // Sin programa no hay muestra que pedir. `null` es «se pregunto y no hay», que la pantalla
     // dice distinto de un fallo.
     if (primero === undefined) return null;
-    return pedirPagina<FilaDeLaMuestra>(RUTAS.muestraDelPrograma(primero.id), senal);
+    return pedirPagina<FilaDeLaMuestra>(
+      RUTAS.muestraDelPrograma(
+        primero.id,
+        laVentanaQueSePide('fis-prog', 'muestra-del-programa', enLaRuta),
+      ),
+      senal,
+    );
   },
   repartir: (muestra: Paginado<FilaDeLaMuestra>): Reparto => ({
     valores: new Map(),
@@ -261,6 +296,7 @@ const FIS_PROG: Conector = {
         },
       ],
     ]),
+    nombrados: loQueDijoElServidor('muestra-del-programa', muestra),
     noPublicados: new Map(),
   }),
 };
@@ -292,9 +328,13 @@ function contrasteDelActa(acta: ActaDeFiscalizacion): readonly (readonly CeldaDe
   return [
     [
       'Área hallada (m²)',
-      sinDato(SIN_DECLARADO),
+      acta.areaDeclarada ?? sinDato(NO_CONSTA_LO_DECLARADO),
       acta.areaHallada ?? sinDato(SIN_AREA_HALLADA),
-      sinDato(SIN_DIFERENCIA_DEL_ACTA),
+      // **La diferencia se COPIA, no se resta** (#191): la publica el backend «nunca negativa,
+      // nula si falta un lado», con la misma funcion pura que usan la liquidacion y la deteccion.
+      // Restar `hallada − declarada` aqui —con los dos lados ya delante— seria publicar una cifra
+      // que ninguna operacion afirma, y esta es la columna que sostiene la determinacion.
+      acta.diferenciaDeArea ?? sinDato(NO_CONSTA_LO_DECLARADO),
       situacion,
     ],
     ...(acta.usoHallado === null
@@ -302,9 +342,11 @@ function contrasteDelActa(acta: ActaDeFiscalizacion): readonly (readonly CeldaDe
       : [
           [
             'Uso del predio',
-            sinDato(SIN_DECLARADO),
+            acta.usoDeclarado ?? sinDato(NO_CONSTA_LO_DECLARADO),
             acta.usoHallado,
-            sinDato(SIN_DIFERENCIA_DEL_ACTA),
+            // Y esta se queda en la raya con TODO publicado: la diferencia de un uso no es un
+            // numero, y el artboard la dibuja asi.
+            sinDato(SIN_DIFERENCIA_DE_UN_USO),
             situacion,
           ],
         ]),
@@ -322,35 +364,41 @@ function contrasteDelActa(acta: ActaDeFiscalizacion): readonly (readonly CeldaDe
  * de la relacion —ordenada por `fechaVisita`, «como se recorre una jornada de campo»—, que es lo
  * que ya hacen `coa-exp` y `coa-cost`. Sin ninguna acta, `null`: «sin datos», no una averia.
  *
- * <h2>El acta publica el lado HALLADO y NO el declarado, y eso deja media tabla en raya</h2>
+ * <h2>Media tabla era la raya, y desde #191 no: el acta publica las DOS mitades</h2>
  *
- * Es el hallazgo de este issue y no un recorte: `ActaFiscalizacionResource` publica `areaHallada` y
- * `usoHallado` y **no publica `areaDeclarada` ni `usoDeclarado`**. O sea que de las dos mitades que
- * el titulo de la tabla contrasta —«Lo que el verificador midio frente a lo que el titular
- * declaro»—, esta operacion sirve una.
+ * Hasta #191 `ActaFiscalizacionResource` publicaba solo el lado hallado —`areaHallada` y
+ * `usoHallado`—, de modo que de las dos mitades que el titulo de la tabla contrasta —«Lo que el
+ * verificador midio frente a lo que el titular declaro»— la operacion servia una, y `SIN_DATO`
+ * caia en **4 celdas de 10**. Ahora viajan `areaDeclarada`, `usoDeclarado` y `diferenciaDeArea`,
+ * resueltos por `ActaConLoDeclarado` desde la version de ficha que el acta referencia.
  *
  * <ul>
  *   <li><b>Concepto</b> ← el nombre de la magnitud (ver `contrasteDelActa`).</li>
- *   <li><b>Declarado</b> → <b>la raya</b>, las dos filas. No esta en el acta.</li>
+ *   <li><b>Declarado</b> ← `areaDeclarada` y `usoDeclarado`.</li>
  *   <li><b>Verificado</b> ← `areaHallada` y `usoHallado`.</li>
- *   <li><b>Diferencia</b> → <b>la raya</b>. Es `hallada − declarada`, y **no se resta aqui**: no
- *       solo falta el minuendo, es que restar dos magnitudes servidas para llenar una celda es
- *       calcular lo que nadie publico. Quien la publica hecha es la liquidacion, con
- *       `diferenciaDeArea` —«nunca negativa, nula si falta un lado»—, y ademas el artboard dibuja
- *       esa misma celda con una raya en la fila del uso: la diferencia de un uso no es un
- *       numero.</li>
+ *   <li><b>Diferencia</b> ← `diferenciaDeArea` <b>en la fila del area</b>, y <b>copiada</b>: la
+ *       publica el backend «nunca negativa, nula si falta un lado», con la misma funcion pura que
+ *       usan la liquidacion y la deteccion. <b>Aqui no se resta</b> aunque ahora esten los dos
+ *       lados delante — restar dos magnitudes servidas para llenar una celda es publicar una cifra
+ *       que ninguna operacion afirma, y esta es la columna que sostiene la determinacion. En la
+ *       fila del <b>uso</b> se queda en la raya con todo publicado: la diferencia de un uso no es
+ *       un numero, y el artboard la dibuja asi.</li>
  *   <li><b>Situacion</b> ← `hallazgo`, lo que el fiscalizador anoto: `CONFORME`, `OMISO`,
  *       `SUBVALUADOR`, `USO_DISTINTO`, `NO_UBICADO`. <b>No es `estado`</b>, que es en que punto
  *       esta el papel —`ABIERTA`, `LIQUIDADA`, `ANULADA`— y no que se encontro en el predio.</li>
  * </ul>
  *
- * **Quien si publica las dos mitades es `GET /fiscalizacion/resultados`**, cuyas `lineas[]` traen
- * `areaDeclarada`, `areaHallada`, `diferenciaDeArea`, `usoDeclarado` y `usoHallado` — o sea la
- * tabla entera. Y aun asi **no se pide desde aqui**, por dos motivos: es la LIQUIDACION y esta
- * pantalla es la etapa anterior —su propia nota lo dice, «sin acta cerrada no se puede
- * liquidar»—, y sus lineas son por ejercicio y por unidad, no por concepto. Pintar aqui la
- * liquidacion de otra acta seria ensenar el resultado de un paso que esta pantalla todavia no ha
- * dado. Lo que cierra el hueco es que el acta publique lo declarado, y eso tiene su issue.
+ * <h2>Y cuando los tres llegan nulos, eso NO es «no publicado»: es «no consta»</h2>
+ *
+ * Un acta **vehicular** —un vehiculo no tiene area ni uso declarados contra los que contrastar— y
+ * una **predial de un predio sin ficha registrada a la fecha de la visita** llegan con los tres en
+ * nulo. Se cierra con una ficha y no publicando un campo, asi que la celda lo dice con su causa
+ * —`NO_CONSTA_LO_DECLARADO`— y no con la palabra que manda a buscar lo que ya esta.
+ *
+ * **`GET /fiscalizacion/resultados` sigue sin pedirse desde aqui**, y no por lo que decia antes:
+ * es la LIQUIDACION y esta pantalla es la etapa anterior —su propia nota lo dice, «sin acta cerrada
+ * no se puede liquidar»—, y sus lineas son por ejercicio y por unidad, no por concepto. Pintar aqui
+ * la liquidacion de otra acta seria ensenar el resultado de un paso que esta pantalla no ha dado.
  *
  * <h2>Sin filtrar</h2>
  *
@@ -384,7 +432,10 @@ const FIS_ACTAS: Conector = {
 function filaDelEjercicio(linea: LineaDeterminada): readonly CeldaDeLaTabla[] {
   return [
     String(linea.ejercicio),
-    sinDato(SIN_BASE_OMITIDA),
+    // «Base omitida S/» ← `baseOmitida`, que desde #193 la resta el BACKEND: es
+    // «determinado − declarado», nunca negativa. Los dos sumandos ya viajaban y la resta no, y
+    // hacerla aqui seria aritmetica sobre dinero en el navegador (regla 1, RNF-055).
+    enColumnaDeSoles(linea.baseOmitida),
     // «Insoluto S/» ← `diferencia`, que pese al nombre es «el tributo que se dejo de pagar».
     enColumnaDeSoles(linea.diferencia),
     sinDato(SIN_INTERES),
@@ -393,99 +444,259 @@ function filaDelEjercicio(linea: LineaDeterminada): readonly CeldaDeLaTabla[] {
 }
 
 /**
- * `fis-res` — la resolucion de determinacion, por su numero.
+ * Un total de la resolucion, con **cual de los tres huecos** le toca si no hay cifra (#193).
  *
- * <h2>Es la segunda hoja que exige sujeto, y aqui no habia alternativa ninguna</h2>
+ * Los tres no se confunden, y aqui conviven dos:
  *
- * `GET /fiscalizacion/resoluciones/{numero}` es de UNA resolucion, y **no existe ninguna operacion
- * que publique la relacion**: `ResolucionController` publica esta y `POST
- * /fiscalizacion/transferencias`, y nada mas. O sea que no se puede «tomar la primera» como hacen
- * `coa-exp` y las otras dos de este archivo — no hay primera. El numero viaja en la direccion,
- * `#/fis-res/RDF-2026-000001`, que es el mecanismo que #169 dejo instalado: `exigeSujeto` aqui y
- * `enLaRuta` derivado de aqui en `catalogo.ts`.
+ *   · con cifra, la cifra formateada — va a `valores`;
+ *   · sin cifra y `esperaSusCifras`, **«sin cifrar»**: el campo existe y llego vacio (D-02a). Va al
+ *     hueco, porque no es un valor: es la ausencia de uno, con su causa;
+ *   · sin cifra y **sin** esperar, «no publicado»: el backend dice que las cifras estan y no las
+ *     manda. Eso es un defecto suyo y hay que poder verlo, no taparlo con la palabra de D-02a.
  *
- * Sin numero la pantalla **no pide nada y lo dice**. La alternativa era inventarse uno, y con uno
- * que no exista el backend contesta 404 «No hay ninguna resolucion de determinacion con el numero
- * "…"», que se leeria como una averia de la pantalla.
+ * Devuelve la pareja y no solo el texto porque el sitio importa: un `valores` con «sin cifrar»
+ * dentro pintaria esa palabra **como si fuera el importe**, sin el tono ni el `title` con que el
+ * interprete dibuja un hueco.
+ */
+function totalDeLaResolucion(
+  importe: string | null,
+  espera: boolean,
+): { readonly valor: string } | { readonly hueco: string } {
+  if (importe !== null) return { valor: formatearImporte(importe) };
+  return { hueco: espera ? SIN_CIFRAR : NO_PUBLICADO };
+}
+
+/**
+ * `fis-res` — la resolucion de determinacion.
  *
- * <h2>Campo a campo: UNO de seis, y los otros cinco son sumas o no existen</h2>
+ * <h2>Dejo de EXIGIR sujeto y pasa a ADMITIRLO, que no es lo mismo (#192, #215)</h2>
+ *
+ * Exigia sujeto desde #179 y con motivo: `GET /fiscalizacion/resoluciones/{numero}` es de UNA
+ * resolucion y **no existia ninguna operacion que publicara la relacion**, asi que no habia
+ * «primera» que tomar como hacen `coa-exp` y las otras dos de este archivo. La consecuencia estaba
+ * medida: abierta desde el menu, **esta pantalla no ensenaba una resolucion nunca**.
+ *
+ * #192 publico `GET /fiscalizacion/resoluciones`, paginada. Asi que ahora:
  *
  * <ul>
- *   <li><b>`0|1` Contribuyente</b> ← `contribuyente`, el nombre del obligado. Es el unico de los
- *       seis que la operacion publica como campo.</li>
- *   <li><b>`0|0` Nº de acta</b> → <b>«no publicado»</b>. La resolucion enlaza hacia atras con
- *       `nLiquidacion`, que es el numero de la LIQUIDACION; el del acta no aparece —lo que la
- *       liquidacion publica es `actaId`, un identificador interno, y esta operacion ni eso—.
- *       Escribir ahi el numero de liquidacion pondria un documento donde va otro.</li>
- *   <li><b>`0|3` Insoluto omitido</b>, <b>`0|5` Multa tributaria</b> y <b>`0|7` Total
- *       liquidado</b> → <b>«no publicado»</b>, los tres. Son las sumas de las columnas
- *       `diferencia`, `multa` y `total` de la tabla de abajo, y la operacion **no publica ningun
- *       total**: ni por linea agregada ni de la resolucion entera. Sumarlos daria tres cifras
- *       exactas al centimo sobre un papel que vuelve una diferencia deuda exigible.</li>
- *   <li><b>`0|4` Interes</b> → <b>«no publicado»</b>, y este no es una suma: **no existe**. El
- *       propio backend lo deja escrito —la pantalla del prototipo declara «Ejercicio, Determinado,
- *       Declarado, Diferencia, Interes, Total» y el cuadro que se imprime lleva <b>Multa</b> donde
- *       decia Interes—, y ninguna de las dieciseis operaciones de fiscalizacion publica un
- *       interes. Cerrarlo es del backend, y hasta entonces el hueco es lo que lo pide.</li>
+ *   <li>con numero en la direccion —`#/fis-res/RDF-2026-000001`— se pide <b>esa</b>, y la relacion
+ *       no se pide siquiera;</li>
+ *   <li>sin numero se toma <b>la primera de la relacion</b> —`?tamano=1`, ordenada por `numero`,
+ *       que es el `ORDEN_POR_OMISION` de `ResolucionController`— y con ella se pide su detalle.</li>
  * </ul>
  *
- * <h2>La tabla: tres columnas de cinco, y dos de las tres esperan a D-02a</h2>
+ * **Retirar `exigeSujeto` a secas habria costado la mitad buena**: `catalogo.ts` deriva de el el
+ * sitio del sujeto, y sin esa linea el marco **tira** el numero de la direccion con un aviso, de
+ * modo que un enlace a una resolucion concreta abriria siempre la primera del padron. Por eso la
+ * tercera forma, `admiteSujeto`; ver su javadoc en `datos/conectores.ts`.
  *
- * Ver `filaDelEjercicio`. «Base omitida S/» y «Interes S/» dicen la raya —la primera porque es una
- * resta de dos campos publicados y la segunda porque no hay campo—, y «Insoluto S/» y «Total S/»
- * dicen <b>«sin cifrar»</b> mientras D-02a no este cerrada, que es distinto: el campo existe y
- * llega vacio. Las dos ramas estan probadas.
+ * Con la relacion vacia devuelve `null`: «se pregunto y no hay», que la pantalla dice como «sin
+ * datos». Un numero que no existe sigue siendo **404** del backend, y eso es correcto —lo pidio
+ * quien escribio la direccion—.
+ *
+ * <h2>Campo a campo: de UNO de seis a CUATRO de seis (#192, #193)</h2>
+ *
+ * <ul>
+ *   <li><b>`0|1` Contribuyente</b> ← `contribuyente`, el nombre del obligado.</li>
+ *   <li><b>`0|3` Insoluto omitido</b>, <b>`0|5` Multa tributaria</b> y <b>`0|7` Total
+ *       liquidado</b> ← `insolutoOmitido`, `multaTributaria` y `totalLiquidado`, que **suma el
+ *       backend** desde #193 (`TotalesDeLaDeterminacion`, funcion pura). Aqui **no se suma la
+ *       tabla** y eso no cambia: la rotura R2 de #179 midio esa suma dando <b>290.20 al centimo</b>
+ *       —o sea el total real— sobre el papel que vuelve una diferencia deuda exigible. Con D-02a
+ *       abierta los tres llegan nulos y lo que se escribe es <b>«sin cifrar»</b> y no un cero, que
+ *       un contribuyente leeria como «no debe nada»; quien separa ese hueco del otro sin adivinar
+ *       es `esperaSusCifras`. Ver `totalDeLaResolucion`.</li>
+ *   <li><b>`0|0` Nº de acta</b> → <b>«no publicado»</b>, <b>y se decidio con el artboard
+ *       delante</b> (#215). La operacion publica `actaId` desde #193, y escribirlo ahi seria poner
+ *       un identificador donde el usuario espera un papel: el artboard dibuja ese campo con
+ *       <b>«ACT-2026-00418»</b>, o sea el numero de un documento, y el propio backend lo deja
+ *       escrito en su javadoc — «es un identificador interno y no el numero de un documento: un
+ *       acta no se numera —lo que la identifica es su programa, su unidad y su version— asi que
+ *       esto sirve para enlazar hacia atras, <b>no para escribirlo en un campo rotulado N.º de
+ *       acta</b>». Tampoco vale `documentoSustento`, que se parece —en la muestra dice justamente
+ *       «ACT-2026-00418»— y es <b>texto libre del cuerpo de la transferencia</b>: lo teclea quien
+ *       transfiere, y nada garantiza que sea el acta. O un acta se numera, o esa celda pide que se
+ *       numere; las dos son decisiones y ninguna se toma escribiendo un `id` debajo del rotulo.</li>
+ *   <li><b>`0|4` Interes</b> → <b>«no publicado»</b>, y este no es una suma: **no existe**. No hay
+ *       en este sistema ninguna tasa de interes moratorio sellada, y ponerle una seria inventar un
+ *       valor normativo (regla 5) sobre el valor que arranca el plazo del art. 137. El cuadro que
+ *       <b>se imprime</b> lleva «Multa» donde el prototipo decia «Interes». O se sella o se quita
+ *       del artboard: es <b>#213</b>, y hasta entonces el hueco es lo que lo pide.</li>
+ * </ul>
+ *
+ * <h2>La tabla: cuatro columnas de cinco</h2>
+ *
+ * Ver `filaDelEjercicio`. «Base omitida S/» **deja de ser la raya**: la resta el backend desde #193
+ * —`determinado − declarado`, nunca negativa—. «Interes S/» se queda, por lo de arriba. Y las tres
+ * de dinero dicen <b>«sin cifrar»</b> mientras D-02a no este cerrada, que es distinto de la raya:
+ * el campo existe y llega vacio. Las dos ramas estan probadas.
  *
  * <h2>Sin filtrar</h2>
  *
- * No hay nada que filtrar: la operacion no admite ni un parametro. Lo que la pantalla dibuja y no
- * entra en la peticion son sus dos desplegables —«Ejercicios alcanzados» y «Articulo del Codigo
- * Tributario»—, que ademas no son filtros sino decisiones de la emision, o sea de
- * `POST /fiscalizacion/liquidaciones`. Y la resolucion **ya trae su periodo** hecho, en
- * `periodoDesde` y `periodoHasta`.
+ * La operacion del detalle no admite ni un parametro, y a la relacion **no se le manda su unico
+ * filtro** —`?contribuyente=`—: acotarla exige haber elegido a alguien, y elegirlo aqui seria
+ * decidir por quien atiende de quien es la resolucion que se mira. Lo que la pantalla dibuja y no
+ * viaja son sus dos desplegables —«Ejercicios alcanzados» y «Articulo del Codigo Tributario»—, que
+ * ademas no son filtros sino decisiones de la emision, o sea de `POST /fiscalizacion/liquidaciones`.
+ * Y la resolucion **ya trae su periodo** hecho, en `periodoDesde` y `periodoHasta`.
  */
 const FIS_RES: Conector = {
   clave: ['fis-res', 'resolucion-de-determinacion'],
-  exigeSujeto: true,
-  pedir: ({ senal, sujeto }) =>
-    pedirUno<ResolucionDeDeterminacion>(RUTAS.resolucionDeDeterminacion(sujeto ?? ''), senal),
-  repartir: (resolucion: ResolucionDeDeterminacion): Reparto => ({
-    valores: new Map([[coordenada(0, 1), resolucion.contribuyente]]),
-    filas: new Map(),
-    tablas: new Map([
-      [
-        'detalle-por-ejercicio',
-        // Sin total: `lineas[]` son los ejercicios alcanzados y vienen todas, no paginadas.
-        { filas: resolucion.lineas.map((linea) => ({ celdas: filaDelEjercicio(linea) })) },
-      ],
-    ]),
-    noPublicados: new Map([
+  admiteSujeto: true,
+  pedir: async ({ senal, sujeto }) => {
+    // Con numero en la direccion se pide ESE, y la relacion no se toca: pedirla seria una ida de
+    // mas para elegir lo que ya esta elegido.
+    if (sujeto !== null && sujeto !== '') {
+      return pedirUno<ResolucionDeDeterminacion>(RUTAS.resolucionDeDeterminacion(sujeto), senal);
+    }
+    const relacion = await pedirPagina<ResolucionEnLaRelacion>(
+      RUTAS.resolucionesDeDeterminacion,
+      senal,
+    );
+    const primera = relacion.contenido[0];
+    // Sin ninguna transferida no hay resolucion que pedir. `null` es «se pregunto y no hay».
+    if (primera === undefined) return null;
+    return pedirUno<ResolucionDeDeterminacion>(
+      RUTAS.resolucionDeDeterminacion(primera.numero),
+      senal,
+    );
+  },
+  repartir: (resolucion: ResolucionDeDeterminacion): Reparto => {
+    const valores = new Map<Coordenada, string>([[coordenada(0, 1), resolucion.contribuyente]]);
+    const noPublicados = new Map<Coordenada, string>([
+      // El `actaId` es interno y el rotulo pide un documento; el interes no lo publica nadie (#213).
       [coordenada(0, 0), NO_PUBLICADO],
-      [coordenada(0, 3), NO_PUBLICADO],
       [coordenada(0, 4), NO_PUBLICADO],
-      [coordenada(0, 5), NO_PUBLICADO],
-      [coordenada(0, 7), NO_PUBLICADO],
-    ]),
-  }),
+    ]);
+    const totales = [
+      [coordenada(0, 3), resolucion.insolutoOmitido],
+      [coordenada(0, 5), resolucion.multaTributaria],
+      [coordenada(0, 7), resolucion.totalLiquidado],
+    ] as const;
+    for (const [donde, importe] of totales) {
+      const cual = totalDeLaResolucion(importe, resolucion.esperaSusCifras);
+      if ('valor' in cual) valores.set(donde, cual.valor);
+      else noPublicados.set(donde, cual.hueco);
+    }
+
+    return {
+      valores,
+      filas: new Map(),
+      tablas: new Map([
+        [
+          'detalle-por-ejercicio',
+          // Sin total: `lineas[]` son los ejercicios alcanzados y vienen todas, no paginadas.
+          { filas: resolucion.lineas.map((linea) => ({ celdas: filaDelEjercicio(linea) })) },
+        ],
+      ]),
+      // A que dia estan sus cifras (regla 9, RNF-075). Aqui es **dinero notificable** y no un
+      // recuento, asi que pesa mas que en el embudo: la operacion lo publica aparte del `fecha`
+      // «para no dejarlo implicito», y esta pantalla tampoco tiene un campo libre donde decirlo.
+      aLaFecha: resolucion.aLaFecha,
+      noPublicados,
+    };
+  },
 };
 
+/** «Con acta cerrada»: la operacion publica otra cosa, y lo dice en vez de fingirlo. */
+const SIN_ACTA_CERRADA =
+  'Un acta CERRADA no existe en este sistema, y desde #214 tampoco de derecho: «EstadoDeActa» ' +
+  'declara DOS valores —ABIERTA y ANULADA—, porque los tres del medio (LIQUIDADA, RELIQUIDADA, ' +
+  'TRANSFERIDA) no los escribia nadie y los tres se DERIVAN, asi que se retiraron en vez de ' +
+  'inventarles una escritura. Lo que el embudo publica es «conActa», que son las unidades con ' +
+  'acta VIVA —levantada y no anulada—: pintarlo bajo este rotulo seria decir otra cosa.';
+
+/** «Detectados por cruce» de un programa que no declara sus parametros de sorteo. */
+const SIN_PARAMETROS_DEL_SORTEO =
+  'El cruce no se pudo resolver: este programa no declara los parametros con que se sortea, y el ' +
+  'embudo dice cual falta en «parametroQueFalta». No es cero — cero seria «el cruce no senalo a ' +
+  'nadie», que es lo contrario de «el cruce no se pudo hacer».';
+
 /**
- * Las hojas de Fiscalizacion que piden de verdad. **Son tres de cuatro.**
+ * `fis-panel` — el embudo de un programa de fiscalizacion, de lo detectado a lo determinado (#196).
  *
- * <h2>Y `fis-panel` no entra, con su motivo medido</h2>
+ * <h2>Dejo de estar sin conectar, y lo que faltaba era una OPERACION</h2>
  *
- * Declara `GET /fiscalizacion/estado-cuenta`, que **no esta servida** y ademas no publica nada de
- * lo que esa pantalla ensena: sus cuatro cifras son el embudo del programa —detectados por cruce,
- * programados, con acta cerrada, con diferencia— y lo que `estado-cuenta` publica es la deuda de
- * fiscalizacion **de un contribuyente**, que ademas exige `?contribuyente=`.
+ * Declaraba `GET /fiscalizacion/estado-cuenta`, que no publica nada de lo que esta pantalla ensena
+ * —es la deuda de fiscalizacion de UN contribuyente, con `?contribuyente=` obligatorio—. #196
+ * publico `GET /fiscalizacion/programas/{id}/embudo`, que trae **las cuatro cifras juntas, cuadradas
+ * y en una sola lectura**. Se compone como `fis-prog`: la relacion de programas con `?tamano=1` dice
+ * cual programa, y el embudo se pide con su `id`.
  *
- * Las cuatro cifras se podrian componer con `totalElementos` de cuatro operaciones distintas
- * —omisos, muestra, actas y resultados—, y eso es exactamente lo que no se hace: serian cuatro
- * peticiones para cuatro numeros que ninguna operacion afirma que signifiquen eso, y tres de las
- * cuatro habria que acotarlas a un programa que la pantalla no elige. Un embudo compuesto en el
- * navegador se lee igual que uno publicado por el backend, y solo uno de los dos se puede cuadrar.
+ * **Lo que NO se hace, y es la regla de `conectores.ts`**: componer el embudo con el
+ * `totalElementos` de cuatro operaciones distintas. Serian cuatro peticiones para cuatro numeros
+ * que ninguna operacion afirma que signifiquen eso, tres de ellas acotadas a mano al programa, y el
+ * resultado **se lee igual** que uno publicado sin que ninguno de los dos se pueda cuadrar.
+ *
+ * <h2>Campo a campo: TRES de cuatro cifras, y la cuarta dice por que no</h2>
+ *
+ * <ul>
+ *   <li><b>`0|0` Ejercicio</b> ← `ejercicio` del embudo, no la opcion que toco por omision: es el
+ *       ejercicio del programa cuyas cifras estan debajo. Nulo en un programa anterior a `V60`.</li>
+ *   <li><b>`0|1` Programa</b> ← `codigo`, que es el «N.º de programa» que la pantalla teclea —y no
+ *       el `id`, que es interno—. Afirma <b>cual</b> programa se esta mirando, que con el
+ *       desplegable en «Todos» quedaria sin decir.</li>
+ *   <li><b>`0|2` Detectados por cruce</b> ← `detectadosPorCruce`. Nulo cuando el programa no
+ *       declara sus parametros de sorteo, y entonces el hueco lo dice (ver
+ *       `SIN_PARAMETROS_DEL_SORTEO`) — nunca un cero.</li>
+ *   <li><b>`0|3` Programados</b> ← `programados`.</li>
+ *   <li><b>`0|4` Con acta cerrada</b> → <b>el hueco, con su motivo</b>. `conActa` <b>no es lo
+ *       mismo</b> y el backend lo dice en el nombre: cuenta las unidades con acta <b>viva</b>. #215
+ *       planteaba tres salidas —o se cierra #214, o el rotulo cambia en el artboard, o la celda
+ *       dice por que no—, y <b>#214 se cerro por el otro lado</b>: retirando `LIQUIDADA`,
+ *       `RELIQUIDADA` y `TRANSFERIDA` del enumerado, porque nadie las escribia y las tres se
+ *       derivan. O sea que «cerrada» no es un estado de un acta aqui, y la celda lo dice — que es
+ *       la tercera salida, y ahora con la medida entera detras. La segunda —cambiar el rotulo— es
+ *       del artboard y no se toma desde un conector.</li>
+ *   <li><b>`0|5` Con diferencia</b> ← `conDiferencia`.</li>
+ * </ul>
+ *
+ * <h2>Y la hoja dice de CUANDO son</h2>
+ *
+ * `aLaFecha` viaja por `Reparto.aLaFecha` y la pantalla lo escribe arriba (regla 9, RNF-075). No es
+ * decorativo: las tres ultimas etapas estan congeladas por lo que se sorteo y se visito, y la
+ * primera se resuelve contra el padron de **hoy**, asi que dos aperturas del mismo programa en dos
+ * dias pueden dar embudos distintos sin que nada haya fallado.
  */
+const FIS_PANEL: Conector = {
+  clave: ['fis-panel', 'embudo-del-programa'],
+  pedir: async ({ senal }) => {
+    const relacion = await pedirPagina<ProgramaDeFiscalizacion>(
+      RUTAS.programasDeFiscalizacion,
+      senal,
+    );
+    const primero = relacion.contenido[0];
+    // Sin programa no hay embudo. `null` es «se pregunto y no hay», no una averia.
+    if (primero === undefined) return null;
+    return pedirUno<EmbudoDelPrograma>(RUTAS.embudoDelPrograma(primero.id), senal);
+  },
+  repartir: (embudo: EmbudoDelPrograma): Reparto => {
+    const valores = new Map<Coordenada, string>([
+      [coordenada(0, 1), embudo.codigo],
+      [coordenada(0, 3), String(embudo.programados)],
+      [coordenada(0, 5), String(embudo.conDiferencia)],
+    ]);
+    const noPublicados = new Map<Coordenada, string>([[coordenada(0, 4), SIN_ACTA_CERRADA]]);
+
+    // El ejercicio del programa, cuando lo declara. Uno anterior a `V60` no lo lleva, y entonces el
+    // desplegable se queda en su primera opcion en vez de afirmar un ano que nadie dijo.
+    if (embudo.ejercicio !== null) valores.set(coordenada(0, 0), String(embudo.ejercicio));
+    else noPublicados.set(coordenada(0, 0), NO_PUBLICADO);
+
+    if (embudo.detectadosPorCruce !== null) {
+      valores.set(coordenada(0, 2), String(embudo.detectadosPorCruce));
+    } else {
+      noPublicados.set(coordenada(0, 2), SIN_PARAMETROS_DEL_SORTEO);
+    }
+
+    // Esta hoja no tiene tabla: su bloque son dos mandos y cuatro cifras.
+    return { valores, filas: new Map(), aLaFecha: embudo.aLaFecha, noPublicados };
+  },
+};
+
+/** Las cuatro hojas de Fiscalizacion, que desde #215 piden **las cuatro**. */
 export const CONECTORES_DE_FISCALIZACION = {
+  'fis-panel': FIS_PANEL,
   'fis-prog': FIS_PROG,
   'fis-actas': FIS_ACTAS,
   'fis-res': FIS_RES,
@@ -493,19 +704,22 @@ export const CONECTORES_DE_FISCALIZACION = {
 
 export {
   FIS_ACTAS,
+  FIS_PANEL,
   FIS_PROG,
   FIS_RES,
+  NO_CONSTA_LO_DECLARADO,
+  SIN_ACTA_CERRADA,
   SIN_AREA_HALLADA,
-  SIN_BASE_OMITIDA,
   SIN_CIFRAR,
-  SIN_DECLARADO,
-  SIN_DIFERENCIA_DEL_ACTA,
+  SIN_DIFERENCIA_DE_UN_USO,
   SIN_DIFERENCIA_ESTIMADA,
   SIN_HALLAZGO,
   SIN_INTERES,
+  SIN_PARAMETROS_DEL_SORTEO,
   SIN_TITULAR,
   contrasteDelActa,
   enColumnaDeSoles,
   filaDelEjercicio,
   sinDato,
+  totalDeLaResolucion,
 };

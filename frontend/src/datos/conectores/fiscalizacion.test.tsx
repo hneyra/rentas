@@ -14,16 +14,18 @@ import { sinDato as sinDatoDeCoactiva } from './coactiva.ts';
 import { SIN_CIFRAR as SIN_CIFRAR_DE_INICIO } from './inicio.ts';
 import {
   FIS_ACTAS,
+  FIS_PANEL,
   FIS_PROG,
   FIS_RES,
+  NO_CONSTA_LO_DECLARADO,
+  SIN_ACTA_CERRADA,
   SIN_AREA_HALLADA,
-  SIN_BASE_OMITIDA,
   SIN_CIFRAR,
-  SIN_DECLARADO,
-  SIN_DIFERENCIA_DEL_ACTA,
+  SIN_DIFERENCIA_DE_UN_USO,
   SIN_DIFERENCIA_ESTIMADA,
   SIN_HALLAZGO,
   SIN_INTERES,
+  SIN_PARAMETROS_DEL_SORTEO,
   SIN_TITULAR,
   contrasteDelActa,
   sinDato,
@@ -32,12 +34,17 @@ import {
   ACTAS,
   ACTA_CON_USO,
   ACTA_SIN_USO,
+  ACTA_VEHICULAR,
+  EMBUDO,
+  EMBUDO_SIN_PARAMETROS,
   MUESTRA,
   PROGRAMAS,
+  RESOLUCIONES,
   RESOLUCION_CIFRADA,
   RESOLUCION_SIN_CIFRAS,
   SIN_ACTAS,
   SIN_PROGRAMAS,
+  SIN_RESOLUCIONES,
 } from './fiscalizacionDeMuestra.ts';
 
 /**
@@ -68,11 +75,14 @@ function arnes() {
 function PantallaConectada({
   clave,
   sujeto = null,
+  parametros = {},
 }: {
   readonly clave: ClaveDeHoja;
   readonly sujeto?: string | null;
+  /** Lo que la hoja lleva en su ruta: la pagina y el orden que el interprete escribe (#228). */
+  readonly parametros?: Readonly<Record<string, string>>;
 }) {
-  return <PantallaDeRentas definicion={pantallaDe(clave)} datos={useDatosDeLaHoja(clave, { sujeto, parametros: {} })} />;
+  return <PantallaDeRentas definicion={pantallaDe(clave)} datos={useDatosDeLaHoja(clave, { sujeto, parametros })} />;
 }
 
 /**
@@ -102,11 +112,13 @@ async function pintar(
   clave: ClaveDeHoja,
   rutas: Readonly<Record<string, unknown>>,
   sujeto: string | null = null,
+  parametros: Readonly<Record<string, string>> = {},
 ) {
   const doble = contestaPorRuta(rutas);
-  const { container } = render(<PantallaConectada clave={clave} sujeto={sujeto} />, {
-    wrapper: arnes(),
-  });
+  const { container } = render(
+    <PantallaConectada clave={clave} sujeto={sujeto} parametros={parametros} />,
+    { wrapper: arnes() },
+  );
   await waitFor(() => {
     expect(screen.queryByText(/pidiendo/i)).toBeNull();
   });
@@ -150,21 +162,118 @@ describe('las tres formas del hueco no se confunden', () => {
   });
 
   it('y los OCHO motivos de este modulo son ocho frases distintas, no una raya repetida', () => {
-    // Es lo que #195 compra: hasta entonces las ocho celdas vacias de estas tres tablas decian la
-    // misma raya, y sus seis motivos —que existian y estaban escritos— vivian solo en el javadoc
-    // de este conector, donde no los lee quien mira la pantalla.
+    // Es lo que #195 compra: hasta entonces las celdas vacias de estas tablas decian la misma raya,
+    // y sus motivos —que existian y estaban escritos— vivian solo en el javadoc de este conector,
+    // donde no los lee quien mira la pantalla.
+    //
+    // **Siguen siendo ocho y no son los mismos ocho** (#215). Salen dos, porque el backend publico
+    // lo que faltaba: `SIN_DECLARADO` —el acta ya publica su lado declarado (#191)— y
+    // `SIN_BASE_OMITIDA` —la resolucion ya la resta (#193)—. Entran dos que la ola nueva hace
+    // visibles: `NO_CONSTA_LO_DECLARADO`, que es «no consta» y no «no publicado», y
+    // `SIN_DIFERENCIA_DE_UN_USO`, que se queda **con todo publicado** porque la diferencia de un
+    // uso no es un numero. Y `SIN_ACTA_CERRADA` y `SIN_PARAMETROS_DEL_SORTEO` son de `fis-panel`,
+    // que no existia.
     const motivos = [
       SIN_TITULAR,
       SIN_DIFERENCIA_ESTIMADA,
-      SIN_DECLARADO,
-      SIN_DIFERENCIA_DEL_ACTA,
+      NO_CONSTA_LO_DECLARADO,
+      SIN_DIFERENCIA_DE_UN_USO,
       SIN_HALLAZGO,
       SIN_AREA_HALLADA,
-      SIN_BASE_OMITIDA,
       SIN_INTERES,
+      SIN_ACTA_CERRADA,
+      SIN_PARAMETROS_DEL_SORTEO,
     ];
     expect(new Set(motivos).size).toBe(motivos.length);
     for (const motivo of motivos) expect(motivo.length, motivo).toBeGreaterThan(40);
+  });
+});
+
+describe('`fis-panel` — el embudo del programa (#196)', () => {
+  const RUTAS_DE_PANEL = {
+    '/fiscalizacion/programas/14/embudo': EMBUDO,
+    '/fiscalizacion/programas?': PROGRAMAS,
+  };
+
+  it('pide la relacion ACOTADA, y con su `id` pide el embudo: UNA lectura y no cuatro', async () => {
+    const { doble } = await pintar('fis-panel', RUTAS_DE_PANEL);
+    const urls = doble.mock.calls.map((llamada) => String(llamada[0]));
+
+    expect(urls[0]).toContain('/fiscalizacion/programas?tamano=1');
+    expect(urls[1]).toContain('/fiscalizacion/programas/14/embudo');
+    // Y NO se compone con el `totalElementos` de cuatro operaciones, que es lo que
+    // `conectores.ts` prohibe: serian cuatro numeros que ninguna operacion afirma que signifiquen
+    // las cuatro etapas, y tres habria que acotarlas a un programa que la pantalla no elige.
+    expect(urls).toHaveLength(2);
+    expect(urls.some((u) => u.includes('/omisos'))).toBe(false);
+    expect(urls.some((u) => u.includes('/resultados'))).toBe(false);
+  });
+
+  it('las TRES cifras que la operacion publica salen, y la cuarta dice por que no', () => {
+    const reparto = FIS_PANEL.repartir(EMBUDO as never);
+
+    expect(reparto.valores.get(coordenada(0, 0))).toBe('2026');
+    expect(reparto.valores.get(coordenada(0, 1))).toBe('PF-2026-014');
+    expect(reparto.valores.get(coordenada(0, 2))).toBe('3418');
+    expect(reparto.valores.get(coordenada(0, 3))).toBe('96');
+    expect(reparto.valores.get(coordenada(0, 5))).toBe('61');
+  });
+
+  it('«Con acta cerrada» NO se llena con `conActa`, que es OTRA COSA (#214)', () => {
+    // El hallazgo que #196 dejo escrito en el nombre del campo: ningun acta sale nunca de
+    // `ABIERTA` en este sistema, asi que un campo que contara las cerradas valdria cero siempre.
+    // `conActa` cuenta las que tienen acta VIVA, y pintarlo bajo ese rotulo diria otra cosa.
+    const reparto = FIS_PANEL.repartir(EMBUDO as never);
+
+    expect(reparto.valores.has(coordenada(0, 4))).toBe(false);
+    expect(reparto.noPublicados.get(coordenada(0, 4))).toBe(SIN_ACTA_CERRADA);
+    expect([...reparto.valores.values()]).not.toContain(String(EMBUDO.conActa));
+    expect(PANTALLAS['fis-panel'].bloques[0]?.campos[4]?.etiqueta).toBe('Con acta cerrada');
+  });
+
+  it('sin parametros de sorteo, «Detectados por cruce» dice su causa y NO un cero', () => {
+    const reparto = FIS_PANEL.repartir(EMBUDO_SIN_PARAMETROS as never);
+
+    expect(reparto.valores.has(coordenada(0, 2))).toBe(false);
+    expect(reparto.noPublicados.get(coordenada(0, 2))).toBe(SIN_PARAMETROS_DEL_SORTEO);
+    // Cero seria «el cruce no senalo a nadie», que es lo contrario de «el cruce no se pudo hacer».
+    expect([...reparto.valores.values()]).not.toContain('0');
+    // Y las otras tres etapas siguen saliendo: lo que falta es una, no el embudo.
+    expect(reparto.valores.get(coordenada(0, 3))).toBe('96');
+  });
+
+  it('la hoja dice DE CUANDO son sus cifras, y la frase la arma quien tiene `t()` (regla 9)', async () => {
+    // Las tres ultimas etapas estan congeladas y la primera se resuelve contra el padron de HOY,
+    // asi que dos aperturas del mismo programa en dos dias pueden dar embudos distintos sin que
+    // nada haya fallado. Lo que viaja por el conector es la fecha CRUDA: un «al» escrito en un
+    // archivo de datos llegaria al DOM en castellano en cualquier idioma (#103).
+    expect(FIS_PANEL.repartir(EMBUDO as never).aLaFecha).toBe('2026-09-17');
+
+    const { container } = await pintar('fis-panel', RUTAS_DE_PANEL);
+    expect(container.textContent).toContain('17/09/2026');
+  });
+
+  it('sin ningun programa no pide el embudo, y la pantalla dice «sin datos»', async () => {
+    const { container, doble } = await pintar('fis-panel', {
+      '/fiscalizacion/programas?': SIN_PROGRAMAS,
+    });
+
+    expect(doble.mock.calls.map((l) => String(l[0])).some((u) => u.includes('/embudo'))).toBe(false);
+    expect(container.textContent).toContain('sin datos');
+  });
+
+  it('LA ROTURA DEL AC3: con otro embudo, la pantalla ensena otras cifras', async () => {
+    const { container } = await pintar('fis-panel', RUTAS_DE_PANEL);
+    expect(container.textContent).toContain('3418');
+
+    const otro = { ...EMBUDO, detectadosPorCruce: 777, programados: 12 };
+    const segunda = await pintar('fis-panel', {
+      '/fiscalizacion/programas/14/embudo': otro,
+      '/fiscalizacion/programas?': PROGRAMAS,
+    });
+
+    expect(segunda.container.textContent).toContain('777');
+    expect(segunda.container.textContent).not.toContain('3418');
   });
 });
 
@@ -243,6 +352,66 @@ describe('`fis-prog` — la muestra sorteada de un programa', () => {
     expect(container.textContent).toContain('sin datos');
   });
 
+  it('LA VENTANA viaja a la MUESTRA y no a la relacion de programas (#228)', async () => {
+    const { doble } = await pintar('fis-prog', RUTAS_DE_PROG, null, {
+      pagina: '2',
+      ordenarPor: 'condicion',
+      direccion: 'DESCENDENTE',
+    });
+    const urls = doble.mock.calls.map((llamada) => String(llamada[0]));
+
+    // La relacion sigue con `?tamano=1`: paginarla cambiaria CUAL programa se dibuja, no que
+    // trozo de su muestra se ve. Son dos lecturas, y el mando es de la segunda.
+    expect(urls[0]).toBe('/rentas/api/v1/fiscalizacion/programas?tamano=1');
+    expect(urls[0]).not.toContain('pagina=');
+    // Y el tamano NO esta escrito en la ruta: sale de `paginacion.tamano` de su tabla.
+    expect(urls[1]).toContain('/fiscalizacion/programas/14/muestra?tamano=20');
+    expect(urls[1]).toContain('pagina=2');
+    expect(urls[1]).toContain('ordenarPor=condicion');
+    expect(urls[1]).toContain('direccion=DESCENDENTE');
+  });
+
+  it('un `ordenarPor` que la definicion NO ofrece no viaja: lo escribio quien pasaba por ahi', async () => {
+    // La ruta la teclea cualquiera, y `sectorCodigo` es justamente el nombre que
+    // `OrdenSeguro.publicandoComo` RETIRA: reenviarlo seria un 422 dicho como averia de la
+    // pantalla. Sin campo admitido ordena el backend por el suyo, que es lo que la barra anuncia.
+    const { doble } = await pintar('fis-prog', RUTAS_DE_PROG, null, {
+      ordenarPor: 'sectorCodigo',
+      direccion: 'DESCENDENTE',
+    });
+    const muestra = doble.mock.calls.map((l) => String(l[0])).find((u) => u.includes('/muestra'));
+
+    expect(muestra).not.toContain('ordenarPor');
+    // Y el sentido tampoco: solo acompana a un campo admitido.
+    expect(muestra).not.toContain('direccion');
+  });
+
+  it('`hayMas` y `paginas` los dice el SERVIDOR, y no se cuentan las filas recibidas', () => {
+    // El caso que importa: dos filas de una muestra de 84, y el envoltorio dice que hay mas.
+    // Contando las dos que llegaron, «Siguiente» saldria impedido sobre 82 predios sin mirar.
+    const conMas = { ...MUESTRA, totalElementos: 84, totalPaginas: 42, hayMas: true };
+    const nombrados = FIS_PROG.repartir(conMas as never).nombrados;
+
+    expect(nombrados?.get('muestra-del-programa.hayMas')).toBe(true);
+    expect(nombrados?.get('muestra-del-programa.paginas')).toBe('42');
+    expect(FIS_PROG.repartir(conMas as never).tablas?.get('muestra-del-programa')?.totalElementos)
+      .toBe(84);
+  });
+
+  it('y declara los CUATRO sitios de la ventana, para la operacion de la muestra', () => {
+    // Sin esto el marco tira con aviso lo que el destino no declara: el mando escribiria
+    // `?pagina=2`, el conector no lo veria y la tabla dibujaria la pagina 0 con el rotulo de la 3.
+    expect(FIS_PROG.parametros?.map((p) => p.nombre)).toEqual([
+      'pagina',
+      'tamano',
+      'ordenarPor',
+      'direccion',
+    ]);
+    expect(new Set(FIS_PROG.parametros?.map((p) => p.operacion))).toEqual(
+      new Set(['GET /fiscalizacion/programas/{id}/muestra']),
+    );
+  });
+
   it('LA ROTURA DEL AC3: con otra muestra, la pantalla ensena otra cosa', async () => {
     const { container } = await pintar('fis-prog', RUTAS_DE_PROG);
     expect(container.textContent).toContain('02-014-D-14-01');
@@ -276,7 +445,7 @@ describe('`fis-actas` — el contraste de un acta de inspeccion', () => {
     expect(FIS_PROG.exigeSujeto).toBeUndefined();
   });
 
-  it('el lado DECLARADO y la diferencia dicen la raya: el acta no los publica', () => {
+  it('LAS DOS MITADES del contraste salen, y la diferencia COPIADA (#191)', () => {
     const filas = contrasteDelActa(ACTA_CON_USO);
 
     expect(PANTALLAS['fis-actas'].bloques[0]?.tabla?.columnas.map((c) => c.rotulo)).toEqual([
@@ -286,29 +455,35 @@ describe('`fis-actas` — el contraste de un acta de inspeccion', () => {
       'Diferencia',
       'Situación',
     ]);
+    // Eran 4 celdas en raya de 10 —«Declarado» y «Diferencia» de las dos filas— y son **una**:
+    // la diferencia de un uso, que no es un numero ni con todo publicado.
     expect(filas).toEqual([
-      [
-        'Área hallada (m²)',
-        sinDato(SIN_DECLARADO),
-        '198.00',
-        sinDato(SIN_DIFERENCIA_DEL_ACTA),
-        'SUBVALUADOR',
-      ],
-      [
-        'Uso del predio',
-        sinDato(SIN_DECLARADO),
-        'COMERCIO',
-        sinDato(SIN_DIFERENCIA_DEL_ACTA),
-        'SUBVALUADOR',
-      ],
+      ['Área hallada (m²)', '164.50', '198.00', '33.50', 'SUBVALUADOR'],
+      ['Uso del predio', 'CASA_HABITACION', 'COMERCIO', sinDato(SIN_DIFERENCIA_DE_UN_USO), 'SUBVALUADOR'],
     ]);
   });
 
-  it('y la diferencia NO se resta de lo que llego: son dos magnitudes, no una cuenta', () => {
-    // El acta ni siquiera publica el minuendo. Y aunque lo publicara: restar dos importes o dos
-    // areas servidas para llenar una celda es calcular lo que nadie publico.
-    const filas = contrasteDelActa(ACTA_CON_USO);
-    for (const fila of filas) expect(fila[3]).toEqual(sinDato(SIN_DIFERENCIA_DEL_ACTA));
+  it('y la diferencia NO se RESTA, aunque ahora esten los dos lados delante (#191)', () => {
+    // La publica el backend «nunca negativa, nula si falta un lado». Con los dos lados publicados,
+    // restarlos aqui daria la misma cifra y seria calcular lo que nadie publico — y esta es la
+    // columna que sostiene la determinacion. Se comprueba cambiando SOLO la diferencia servida:
+    // si se restara, la celda seguiria diciendo 33.50.
+    const conOtraDiferencia = { ...ACTA_CON_USO, diferenciaDeArea: '7.25' };
+
+    expect(contrasteDelActa(conOtraDiferencia)[0]?.[3]).toBe('7.25');
+  });
+
+  it('con el lado declarado en NULO dice «no consta», que no es «no publicado» (#191)', () => {
+    // Un acta vehicular —un vehiculo no tiene area ni uso declarados— y una predial de un predio
+    // sin ficha a la fecha de la visita. Se cierra con una ficha, no publicando un campo, asi que
+    // la celda no puede decir la palabra que manda a buscar lo que ya esta publicado.
+    const filas = contrasteDelActa(ACTA_VEHICULAR);
+
+    expect(filas).toHaveLength(1);
+    expect(filas[0]?.[1]).toEqual(sinDato(NO_CONSTA_LO_DECLARADO));
+    expect(filas[0]?.[2]).toEqual(sinDato(SIN_AREA_HALLADA));
+    expect(filas[0]?.[3]).toEqual(sinDato(NO_CONSTA_LO_DECLARADO));
+    expect(NO_CONSTA_LO_DECLARADO).not.toBe(NO_PUBLICADO);
   });
 
   it('sin uso anotado, la fila del uso NO sale: nulo es «no se anoto»', () => {
@@ -320,6 +495,9 @@ describe('`fis-actas` — el contraste de un acta de inspeccion', () => {
     expect(filas[0]?.[0]).toBe('Área hallada (m²)');
     // Sin hallazgo anotado, la situacion tambien dice que no hay dato — nunca «Conforme».
     expect(filas[0]?.[4]).toEqual(sinDato(SIN_HALLAZGO));
+    // Y la fila del area sigue trayendo sus dos mitades: lo que falta es el uso, no lo declarado.
+    expect(filas[0]?.[1]).toBe('164.50');
+    expect(filas[0]?.[3]).toBe('33.50');
   });
 
   it('la «Situacion» es el HALLAZGO y no el estado del papel', () => {
@@ -352,55 +530,128 @@ describe('`fis-actas` — el contraste de un acta de inspeccion', () => {
 describe('`fis-res` — la resolucion de determinacion', () => {
   const NUMERO = 'RDF-2026-000001';
   const RUTA = { '/fiscalizacion/resoluciones/': RESOLUCION_SIN_CIFRAS };
+  /** Las dos lecturas: la relacion con `?tamano=1` y el detalle de la que salga de ella. */
+  const RUTAS_DE_RES = {
+    '/fiscalizacion/resoluciones?': RESOLUCIONES,
+    '/fiscalizacion/resoluciones/': RESOLUCION_SIN_CIFRAS,
+  };
 
-  it('EXIGE sujeto, y el numero viaja en la RUTA', async () => {
+  it('ADMITE sujeto y ya no lo exige: con numero en la ruta se pide ESE (#192, #215)', async () => {
     const { doble } = await pintar('fis-res', RUTA, NUMERO);
 
-    expect(FIS_RES.exigeSujeto).toBe(true);
+    expect(FIS_RES.admiteSujeto).toBe(true);
+    expect(FIS_RES.exigeSujeto).toBeUndefined();
+    // Y la relacion NO se pide: seria una ida de mas para elegir lo que ya esta elegido.
+    expect(doble.mock.calls.map((l) => String(l[0]))).toHaveLength(1);
     expect(String(doble.mock.calls[0]?.[0])).toContain(`/fiscalizacion/resoluciones/${NUMERO}`);
     // Sin `?formato=`: con el, la misma ruta contesta el PDF y no el JSON que se pinta.
     expect(String(doble.mock.calls[0]?.[0])).not.toContain('formato');
   });
 
-  it('y sin numero no pide NADA: lo dice en vez de inventarse uno', async () => {
-    const { container, doble } = await pintar('fis-res', RUTA, null);
+  it('y SIN numero toma la primera de la relacion: abierta desde el menu ya ensena una', async () => {
+    // Es la mitad de #215 que mas se nota. Hasta #192 no habia relacion, asi que esta pantalla
+    // abierta desde el menu no ensenaba una resolucion NUNCA.
+    const { container, doble } = await pintar('fis-res', RUTAS_DE_RES, null);
+    const urls = doble.mock.calls.map((l) => String(l[0]));
 
-    expect(doble.mock.calls.map((l) => String(l[0]))).toEqual([]);
-    expect(container.textContent).toContain('falta el contribuyente');
+    expect(urls[0]).toContain('/fiscalizacion/resoluciones?tamano=1');
+    // Sin `?contribuyente=`: acotarla exige haber elegido a alguien, y elegirlo aqui seria decidir
+    // por quien atiende de quien es la resolucion que se mira.
+    expect(urls[0]).not.toContain('contribuyente');
+    expect(urls[1]).toContain(`/fiscalizacion/resoluciones/${NUMERO}`);
+    expect(container.textContent).toContain('Suc. Rufina Medina Medina');
+    expect(container.textContent).not.toContain('falta el contribuyente');
   });
 
-  it('de los SEIS campos sale uno, y los otros cinco dicen «no publicado»', () => {
-    const reparto = FIS_RES.repartir(RESOLUCION_SIN_CIFRAS as never);
+  it('y sin NINGUNA transferida dice «sin datos», que no es una averia', async () => {
+    const { container } = await pintar(
+      'fis-res',
+      { '/fiscalizacion/resoluciones?': SIN_RESOLUCIONES },
+      null,
+    );
+
+    expect(container.textContent).toContain('sin datos');
+  });
+
+  it('el catalogo DERIVA el sitio del sujeto de `admiteSujeto`, o el marco lo tiraria', async () => {
+    // Sin esta derivacion el marco ignora con aviso el numero de la direccion «porque la hoja no
+    // lo declara», y `#/fis-res/RDF-2026-000001` abriria siempre la PRIMERA del padron. Es la
+    // capacidad que retirar `exigeSujeto` a secas habria costado.
+    const { CATALOGO } = await import('../../catalogo.ts');
+    const destino = CATALOGO.flatMap((m) => m.destinos).find((d) => d.clave === 'fis-res');
+
+    expect(destino?.enLaRuta?.sujeto).toBe(true);
+  });
+
+  it('de los SEIS campos salen CUATRO, y los otros dos dicen «no publicado» (#193)', () => {
+    const reparto = FIS_RES.repartir(RESOLUCION_CIFRADA as never);
 
     expect(reparto.valores.get(coordenada(0, 1))).toBe('Suc. Rufina Medina Medina');
+    // Los tres totales, COPIADOS del backend. Eran «no publicado» hasta #193.
+    expect(reparto.valores.get(coordenada(0, 3))).toBe('S/ 201.00');
+    expect(reparto.valores.get(coordenada(0, 5))).toBe('S/ 89.20');
+    expect(reparto.valores.get(coordenada(0, 7))).toBe('S/ 290.20');
+    // «Nº de acta» y «Interes» siguen sin poderse llenar, y por dos motivos distintos.
     expect([...reparto.noPublicados.keys()].sort()).toEqual(
-      [coordenada(0, 0), coordenada(0, 3), coordenada(0, 4), coordenada(0, 5), coordenada(0, 7)]
-        .slice()
-        .sort(),
+      [coordenada(0, 0), coordenada(0, 4)].slice().sort(),
     );
   });
 
-  it('NO suma la tabla para llenar «Total liquidado», «Insoluto omitido» ni «Multa»', () => {
-    // Es la regla que este archivo no negocia. Con la resolucion cifrada la suma saldria al
-    // centimo —290.20— y seria indistinguible de una liquidada de verdad, sobre el papel que
-    // vuelve una diferencia deuda exigible.
-    const reparto = FIS_RES.repartir(RESOLUCION_CIFRADA as never);
-    const escritos = [...reparto.valores.values()];
+  it('SIGUE sin sumar la tabla: los totales los COPIA, y con otros llegan otros', () => {
+    // La regla que este archivo no negocia. Con la resolucion cifrada la suma de las lineas sale
+    // al centimo —201.00 + 89.20 = 290.20— y seria indistinguible de la publicada; lo que separa
+    // las dos es de donde viene el numero. Se comprueba cambiando SOLO los totales servidos: si se
+    // sumaran las lineas, los campos seguirian diciendo 290.20.
+    const conOtrosTotales = {
+      ...RESOLUCION_CIFRADA,
+      insolutoOmitido: '1.00',
+      multaTributaria: '2.00',
+      totalLiquidado: '3.00',
+    };
+    const reparto = FIS_RES.repartir(conOtrosTotales as never);
 
-    for (const campo of [coordenada(0, 3), coordenada(0, 5), coordenada(0, 7)]) {
-      expect(
-        reparto.valores.has(campo),
-        `El campo ${campo} de «fis-res» trae un valor, y la operacion no publica ningun total.\n` +
-          'Sumarlo aqui pone una cifra al centimo en el papel que vuelve una diferencia deuda\n' +
-          'exigible, y nadie podria distinguirla de una liquidada de verdad.',
-      ).toBe(false);
-      expect(reparto.noPublicados.get(campo)).toBe(NO_PUBLICADO);
-    }
-    expect(escritos).not.toContain('S/ 290.20');
-    expect(escritos).not.toContain('290.20');
+    expect(reparto.valores.get(coordenada(0, 3))).toBe('S/ 1.00');
+    expect(reparto.valores.get(coordenada(0, 7))).toBe('S/ 3.00');
+    expect([...reparto.valores.values()]).not.toContain('S/ 290.20');
   });
 
-  it('la tabla: «Base omitida» e «Interes» dicen su motivo, y las otras tres traen dato', () => {
+  it('con los totales nulos dice «sin cifrar» EN EL HUECO, y nunca un cero (D-02a)', () => {
+    const reparto = FIS_RES.repartir(RESOLUCION_SIN_CIFRAS as never);
+
+    // Al hueco y no a `valores`: un valor con «sin cifrar» dentro se pintaria como si fuera el
+    // importe, sin el tono ni el `title` con que el interprete dibuja una ausencia.
+    for (const campo of [coordenada(0, 3), coordenada(0, 5), coordenada(0, 7)]) {
+      expect(reparto.valores.has(campo)).toBe(false);
+      expect(reparto.noPublicados.get(campo)).toBe(SIN_CIFRAR);
+    }
+    expect([...reparto.noPublicados.values()]).not.toContain('0.00');
+  });
+
+  it('y si el backend dice que NO espera y aun asi no manda cifra, eso es «no publicado»', () => {
+    // El tercer hueco, y el que separa un defecto del backend de una decision de negocio abierta.
+    // Con `esperaSusCifras: false` y los totales nulos, decir «sin cifrar» culparia a D-02a de algo
+    // que D-02a ya no explica.
+    const contradictoria = { ...RESOLUCION_SIN_CIFRAS, esperaSusCifras: false };
+    const reparto = FIS_RES.repartir(contradictoria as never);
+
+    expect(reparto.noPublicados.get(coordenada(0, 3))).toBe(NO_PUBLICADO);
+    expect(NO_PUBLICADO).not.toBe(SIN_CIFRAR);
+  });
+
+  it('«Nº de acta» sigue sin llenarse AUNQUE `actaId` llegue: es un identificador interno', () => {
+    // Decidido con el artboard delante (#215): ese campo dibuja «ACT-2026-00418», o sea el numero
+    // de un DOCUMENTO, y `actaId` es lo que la base asigna —«un acta no se numera»—. Escribirlo
+    // crudo pondria un identificador donde el usuario espera un papel.
+    const reparto = FIS_RES.repartir(RESOLUCION_CIFRADA as never);
+
+    expect(reparto.noPublicados.get(coordenada(0, 0))).toBe(NO_PUBLICADO);
+    expect([...reparto.valores.values()]).not.toContain(String(RESOLUCION_CIFRADA.actaId));
+    // Y tampoco el `documentoSustento`, que se PARECE —dice «ACT-2026-00418»— y es texto libre del
+    // cuerpo de la transferencia: lo teclea quien transfiere.
+    expect([...reparto.valores.values()]).not.toContain(RESOLUCION_CIFRADA.documentoSustento);
+  });
+
+  it('la tabla: «Base omitida» DEJA de ser la raya, y sigue sin restarse aqui (#193)', () => {
     const filas = celdasDe(
       FIS_RES.repartir(RESOLUCION_CIFRADA as never),
       'detalle-por-ejercicio',
@@ -413,11 +664,23 @@ describe('`fis-res` — la resolucion de determinacion', () => {
       'Interés S/',
       'Total S/',
     ]);
-    // «Base omitida» seria `determinado − declarado` —33 500 menos 27 400— y no se resta aqui;
-    // «Interes» no lo publica NINGUNA de las dieciseis operaciones de fiscalizacion.
+    // 6 100.00 lo resta el BACKEND —33 500 menos 27 400—, y aqui se copia: restarlo seria
+    // aritmetica sobre dinero en el navegador. «Interes» no lo publica NINGUNA de las dieciseis
+    // operaciones de fiscalizacion, y sigue diciendo su motivo (#213).
     expect(filas).toEqual([
-      ['2024', sinDato(SIN_BASE_OMITIDA), '201.00', sinDato(SIN_INTERES), '290.20'],
+      ['2024', '6,100.00', '201.00', sinDato(SIN_INTERES), '290.20'],
     ]);
+  });
+
+  it('y la base omitida se COPIA: con otra servida, la celda dice otra', () => {
+    // Si se restara `determinado − declarado`, cambiar solo `baseOmitida` no cambiaria la celda.
+    const linea = RESOLUCION_CIFRADA.lineas[0];
+    const otra = {
+      ...RESOLUCION_CIFRADA,
+      lineas: [{ ...linea, baseOmitida: '11.11' }],
+    };
+
+    expect(celdasDe(FIS_RES.repartir(otra as never), 'detalle-por-ejercicio')[0]?.[1]).toBe('11.11');
   });
 
   it('con los importes nulos dice «sin cifrar», que NO es la raya ni un cero (D-02a)', () => {
@@ -427,12 +690,19 @@ describe('`fis-res` — la resolucion de determinacion', () => {
     );
 
     expect(filas).toEqual([
-      ['2024', sinDato(SIN_BASE_OMITIDA), SIN_CIFRAR, sinDato(SIN_INTERES), SIN_CIFRAR],
-      ['2025', sinDato(SIN_BASE_OMITIDA), SIN_CIFRAR, sinDato(SIN_INTERES), SIN_CIFRAR],
+      ['2024', SIN_CIFRAR, SIN_CIFRAR, sinDato(SIN_INTERES), SIN_CIFRAR],
+      ['2025', SIN_CIFRAR, SIN_CIFRAR, sinDato(SIN_INTERES), SIN_CIFRAR],
     ]);
     // El campo existe y llego vacio: decirlo con la celda sin dato pediria publicar lo que ya esta
     // publicado, y con un `0.00` diria que no se debe nada. Son DOS huecos distintos y se ven.
     expect(JSON.stringify(filas)).not.toContain('0.00');
+  });
+
+  it('y dice A QUE DIA estan sus cifras, que aqui es dinero notificable (regla 9)', async () => {
+    expect(FIS_RES.repartir(RESOLUCION_CIFRADA as never).aLaFecha).toBe('2026-06-30');
+
+    const { container } = await pintar('fis-res', RUTA, NUMERO);
+    expect(container.textContent).toContain('30/06/2026');
   });
 
   it('LA ROTURA DEL AC3: con otra resolucion, la pantalla ensena otro contribuyente', async () => {

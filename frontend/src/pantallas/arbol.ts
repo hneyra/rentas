@@ -50,8 +50,22 @@ export const ARBOL = [
       {
         clave: 'ini-panel',
         rotulo: 'Panel',
+        // **Le faltaba la SEGUNDA lectura que su conector pide desde #167** (#215). `INI_PANEL`
+        // pide dos operaciones en un `Promise.all` —el panel de recaudacion y **la ultima corrida
+        // del padron**, de donde sale «Observados sin emision», el unico de sus seis campos que el
+        // panel no toca— y el arbol declaraba solo la primera.
+        //
+        // No rompia nada y mentia: la declaracion de una hoja es lo que `porQueNoHayDato` usa para
+        // redactar por que no hay dato y lo que una revision lee para saber que pide una pantalla.
+        // Es el defecto de `aut-tram` hasta #173 y el de `fis-prog` hasta #179, y lo delato la
+        // guarda `la-hoja-declara-la-ruta-que-su-conector-pide.test.ts` en su primera corrida.
         operaciones: [
           { verbo: 'GET', ruta: '/indicadores/recaudacion', nota: 'IndicadoresController' },
+          {
+            verbo: 'GET',
+            ruta: '/rentas/predial/corridas/ultima',
+            nota: 'CorridaController',
+          },
           { verbo: 'BASE', ruta: '/portal/situacion', nota: 'PortalController' },
         ],
         piezasDeclaradas: [{ pieza: 'Progress', uso: 'La barra de avance por tributo' }],
@@ -190,8 +204,26 @@ export const ARBOL = [
       {
         clave: 'fis-panel',
         rotulo: 'Panel',
+        // **Le faltaban las dos operaciones que la sirven** (#215, #196). Lo unico que declaraba
+        // era `GET /fiscalizacion/estado-cuenta`, que publica **otra cosa**: la deuda de
+        // fiscalizacion de UN contribuyente, con `?contribuyente=` obligatorio, y ni una de las
+        // cuatro cifras del embudo que esta pantalla dibuja. Por eso #179 la dejo sin conectar.
+        //
+        // #196 publico el embudo, y cuelga de un programa —sus cuatro cifras no existen sin uno—,
+        // asi que hacen falta las dos: `GET /fiscalizacion/programas`, que es la unica que publica
+        // el `id`, y el embudo. `estado-cuenta` se queda declarada porque es suya y esta bien
+        // transcrita; lo que la deja fuera es que no publica lo que la hoja ensena.
+        //
+        // El artboard se corrige con el arbol y no despues: `pantallas-del-artboard.test.ts`
+        // compara los dos, asi que tocar uno solo sale rojo. Es lo que hicieron #169 y #179.
         operaciones: [
           { verbo: 'GET', ruta: '/fiscalizacion/estado-cuenta', nota: 'OmisosController' },
+          { verbo: 'GET', ruta: '/fiscalizacion/programas', nota: 'ProgramasController' },
+          {
+            verbo: 'GET',
+            ruta: '/fiscalizacion/programas/{id}/embudo',
+            nota: 'EmbudoController',
+          },
         ],
         piezasDeclaradas: [{ pieza: 'Progress', uso: 'El avance del programa por etapa' }],
       },
@@ -240,6 +272,11 @@ export const ARBOL = [
       {
         clave: 'fis-res',
         rotulo: 'Resultados',
+        // **Y a esta le faltaba la RELACION** (#215, #192). Declaraba `GET
+        // /fiscalizacion/resoluciones/{numero}` y ninguna operacion que publicara un numero, asi
+        // que era la unica hoja del sistema que no podia tomar «la primera de la relacion»
+        // —`coa-exp` y las otras dos de este modulo lo hacen—: abierta desde el menu **no ensenaba
+        // una resolucion nunca**, y el numero tenia que llegar en la direccion. #192 la publico.
         operaciones: [
           { verbo: 'GET', ruta: '/fiscalizacion/resultados', nota: 'LiquidacionController' },
           { verbo: 'POST', ruta: '/fiscalizacion/liquidaciones', nota: 'Liquida la diferencia' },
@@ -248,6 +285,7 @@ export const ARBOL = [
             ruta: '/fiscalizacion/liquidaciones/{numero}/estados',
             nota: 'Cambia el estado',
           },
+          { verbo: 'GET', ruta: '/fiscalizacion/resoluciones', nota: 'ResolucionController' },
           {
             verbo: 'GET',
             ruta: '/fiscalizacion/resoluciones/{numero}',

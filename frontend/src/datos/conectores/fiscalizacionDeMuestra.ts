@@ -1,9 +1,11 @@
 import type {
   ActaDeFiscalizacion,
+  EmbudoDelPrograma,
   FilaDeLaMuestra,
   Paginado,
   ProgramaDeFiscalizacion,
   ResolucionDeDeterminacion,
+  ResolucionEnLaRelacion,
 } from '../lecturas.ts';
 
 /**
@@ -29,6 +31,12 @@ import type {
  *     que escribirlos. `RESOLUCION_SIN_CIFRAS` y `RESOLUCION_CIFRADA` son esas dos.
  *   · **`usoHallado` nulo** — «no se anoto», que no es «coincide con lo declarado», y solo un acta
  *     predial lo lleva. `ACTA_CON_USO` y `ACTA_SIN_USO` son esas dos.
+ *   · **el lado DECLARADO ausente** (#191, #215) — un acta **vehicular**, y una predial de un
+ *     predio sin ficha registrada a la fecha de la visita, llegan con `areaDeclarada`,
+ *     `usoDeclarado` y `diferenciaDeArea` nulos. Eso **no es «no publicado»**: es «no consta», y la
+ *     celda tiene que decir esa causa y no la otra. `ACTA_VEHICULAR` es esa.
+ *   · **los totales de la resolucion** (#193) — `esperaSusCifras` separa «el campo llego vacio» de
+ *     «el campo no esta», y las dos resoluciones lo traen a los dos lados.
  *
  * <h2>Y por que los importes no llevan separador de millares</h2>
  *
@@ -129,7 +137,12 @@ export const ACTA_CON_USO: ActaDeFiscalizacion = {
   fechaVisita: '2026-04-18',
   fiscalizador: 'Reto Santos, Victor',
   hallazgo: 'SUBVALUADOR',
+  // Las dos mitades del contraste, con la diferencia YA RESTADA por el backend (#191): 198.00
+  // menos 164.50. Aqui nunca se resta —es la columna que sostiene la determinacion—, se copia.
+  areaDeclarada: '164.50',
   areaHallada: '198.00',
+  diferenciaDeArea: '33.50',
+  usoDeclarado: 'CASA_HABITACION',
   usoHallado: 'COMERCIO',
   detalle: 'Ampliacion no declarada en el segundo piso',
   estado: 'ABIERTA',
@@ -138,8 +151,30 @@ export const ACTA_CON_USO: ActaDeFiscalizacion = {
 /** La misma acta sin uso anotado: `null` es «no se anoto», y la fila del uso no sale. */
 export const ACTA_SIN_USO: ActaDeFiscalizacion = {
   ...ACTA_CON_USO,
+  usoDeclarado: null,
   usoHallado: null,
   hallazgo: null,
+};
+
+/**
+ * Un acta **vehicular**: las tres del lado declarado en nulo, y eso es un dato (#191).
+ *
+ * Un vehiculo no tiene area ni uso declarados contra los que contrastar, asi que el backend no
+ * tiene de donde sacarlos — igual que una predial de un predio **sin ficha registrada a la fecha de
+ * la visita**, que es justamente el predio que no consta en el catastro. Las dos son «no consta» y
+ * ninguna es «no publicado»: se cierran con una ficha, no publicando un campo.
+ */
+export const ACTA_VEHICULAR: ActaDeFiscalizacion = {
+  ...ACTA_CON_USO,
+  id: 419,
+  predioId: null,
+  vehiculoId: 7714,
+  fichaId: null,
+  areaDeclarada: null,
+  areaHallada: null,
+  diferenciaDeArea: null,
+  usoDeclarado: null,
+  usoHallado: null,
 };
 
 /** La relacion de actas tal como llega con `?tamano=1`. */
@@ -166,6 +201,9 @@ export const RESOLUCION_SIN_CIFRAS: ResolucionDeDeterminacion = {
   numero: 'RDF-2026-000001',
   fecha: '2026-06-30',
   aLaFecha: '2026-06-30',
+  // El identificador INTERNO del acta, que es lo unico que la operacion publica de ella. No es el
+  // «N.º de acta» que el artboard dibuja: un acta no se numera. Ver el javadoc de `FIS_RES`.
+  actaId: 418,
   nLiquidacion: 'LIQ-2026-000418',
   versionDeLaLiquidacion: 1,
   periodoDesde: 2024,
@@ -181,11 +219,19 @@ export const RESOLUCION_SIN_CIFRAS: ResolucionDeDeterminacion = {
   fichaNuevaId: 3313,
   usuarioRegistro: 'jperez',
   observacion: 'Transferida a rentas',
+  // Los tres nulos y `esperaSusCifras: true`: es como llega HOY, con D-02a abierta. El campo
+  // existe y esta vacio, que no es lo mismo que no publicarlo — y por eso la pantalla dice «sin
+  // cifrar» y no «no publicado».
+  insolutoOmitido: null,
+  multaTributaria: null,
+  totalLiquidado: null,
+  esperaSusCifras: true,
   lineas: [
     {
       ejercicio: 2024,
       determinado: null,
       declarado: null,
+      baseOmitida: null,
       diferencia: null,
       multa: null,
       total: null,
@@ -197,6 +243,7 @@ export const RESOLUCION_SIN_CIFRAS: ResolucionDeDeterminacion = {
       ejercicio: 2025,
       determinado: null,
       declarado: null,
+      baseOmitida: null,
       diferencia: null,
       multa: null,
       total: null,
@@ -208,14 +255,27 @@ export const RESOLUCION_SIN_CIFRAS: ResolucionDeDeterminacion = {
   cargosAsentados: null,
 };
 
-/** La misma resolucion el dia que D-02a este cerrada: las mismas lineas con cifra. */
+/**
+ * La misma resolucion el dia que D-02a este cerrada: las mismas lineas con cifra, y **sus tres
+ * totales publicados**.
+ *
+ * Los suma el backend (`TotalesDeLaDeterminacion`) y aqui se copian: 201.00 + 89.20 = 290.20. Esa
+ * suma es la que la rotura R2 de #179 midio dando el total exacto al centimo, y es la razon por la
+ * que la pantalla **no la hace**. `baseOmitida` es `determinado − declarado` —33 500 menos
+ * 27 400—, tambien restada alli.
+ */
 export const RESOLUCION_CIFRADA: ResolucionDeDeterminacion = {
   ...RESOLUCION_SIN_CIFRAS,
+  insolutoOmitido: '201.00',
+  multaTributaria: '89.20',
+  totalLiquidado: '290.20',
+  esperaSusCifras: false,
   lineas: [
     {
       ejercicio: 2024,
       determinado: '33500.00',
       declarado: '27400.00',
+      baseOmitida: '6100.00',
       diferencia: '201.00',
       multa: '89.20',
       total: '290.20',
@@ -224,4 +284,70 @@ export const RESOLUCION_CIFRADA: ResolucionDeDeterminacion = {
       areaHallada: '198.00',
     },
   ],
+};
+
+/** La relacion de resoluciones tal como llega con `?tamano=1` (#192). Sin una sola cifra. */
+export const RESOLUCIONES: Paginado<ResolucionEnLaRelacion> = {
+  contenido: [
+    {
+      numero: 'RDF-2026-000001',
+      fecha: '2026-06-30',
+      codContribuyente: '00000025673',
+      contribuyente: 'Suc. Rufina Medina Medina',
+      predioId: 9014,
+      vehiculoId: null,
+      nLiquidacion: 'LIQ-2026-000418',
+      versionDeLaLiquidacion: 1,
+      actaId: 418,
+      periodoDesde: 2024,
+      periodoHasta: 2026,
+      documentoSustento: 'ACT-2026-00418',
+    },
+  ],
+  pagina: 0,
+  tamano: 1,
+  totalElementos: 12,
+  totalPaginas: 12,
+  hayMas: true,
+};
+
+/** Ninguna: todavia no se ha transferido ni una liquidacion. No es una averia. */
+export const SIN_RESOLUCIONES: Paginado<ResolucionEnLaRelacion> = {
+  ...RESOLUCIONES,
+  contenido: [],
+  totalElementos: 0,
+  totalPaginas: 0,
+  hayMas: false,
+};
+
+/**
+ * El embudo del programa, con las cuatro cifras cuadradas y su fecha (#196).
+ *
+ * `conActa` es 84 y **no es «con acta cerrada»**: cuenta las unidades con acta viva. Ningun acta
+ * sale de `ABIERTA` en este sistema (#214), asi que un campo que contara las cerradas valdria cero
+ * siempre — en verde y sin sintoma.
+ */
+export const EMBUDO: EmbudoDelPrograma = {
+  programaId: 14,
+  codigo: 'PF-2026-014',
+  ejercicio: 2026,
+  aLaFecha: '2026-09-17',
+  detectadosPorCruce: 3418,
+  parametroQueFalta: null,
+  programados: 96,
+  conActa: 84,
+  conDiferencia: 61,
+};
+
+/**
+ * El mismo embudo de un programa que **no declara sus parametros de sorteo**.
+ *
+ * `detectadosPorCruce` llega nulo y `parametroQueFalta` dice cual falta: la ausencia viene con su
+ * causa dentro, y la celda tiene que decirla en vez de un cero — cero seria «el cruce no senalo a
+ * nadie», que es lo contrario de «el cruce no se pudo hacer».
+ */
+export const EMBUDO_SIN_PARAMETROS: EmbudoDelPrograma = {
+  ...EMBUDO,
+  detectadosPorCruce: null,
+  parametroQueFalta: 'sector',
 };

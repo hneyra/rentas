@@ -3,9 +3,23 @@ import { expect, test } from '@playwright/test';
 import { abrir, conLaSeguridadContestada } from './instalacion.ts';
 
 /**
- * **`ini-parado` deja de pintar verde lo que esta parado, medido en el navegador** (#175, AC3).
+ * **`ini-parado` no pinta de ningun semaforo lo que esta parado, medido en el navegador** (#175
+ * AC3, #218).
  *
- * <h2>Por que este camino, si ya hay dos guardas de tonos</h2>
+ * <h2>Lo que este archivo media, y en que cambia con #218</h2>
+ *
+ * Media dos mitades: que la frase de `ini-parado` **no saliera verde** y que el verde **si
+ * llegara** donde se gana. #218 cierra la primera por el otro lado: la quinta columna **deja de
+ * ser de insignia**, porque le llega `porQueCuestaDinero` —una FRASE— y #183 midio que el backend
+ * no puede publicar el estado. O sea que ya no hay semaforo que colorear ahi, y lo que este camino
+ * mide ahora es **que no lo haya**: la frase sigue en su celda, sin fondo de insignia ninguno.
+ *
+ * Y la mitad que #218 dejaria huerfana —«el tono de "no se" llega al navegador»— **no se pierde**:
+ * se muda a `fis-prog`, cuya quinta columna sigue siendo de insignia y trae los dos casos en la
+ * misma tabla —«Inspeccionado» se gana el verde y «Programado» no—. Sin ese tercer camino, la
+ * comprobacion de «esto no es verde» la pasaria tambien una interfaz en la que **nada** es verde.
+ *
+ * <h2>Por que estos caminos, si ya hay dos guardas de tonos</h2>
  *
  * Porque las dos miran codigo. `src/pantallas/tono.test.ts` prueba la funcion; la guarda de
  * `verificaciones/` barre las 40 definiciones y el enumerado del backend. **Ninguna de las dos
@@ -41,6 +55,9 @@ const TONOS = {
   /** `--info-fondo: #e4f4fd`, que es el tono de «no se» desde #175. */
   sinReconocer: 'rgb(228, 244, 253)',
 };
+
+/** Lo que el navegador contesta de una celda de texto: ningun fondo propio. */
+const SIN_FONDO = 'rgba(0, 0, 0, 0)';
 
 /**
  * Las cuatro frases que `GET /indicadores/trabajo-parado` publica, copiadas del enumerado
@@ -104,6 +121,76 @@ const CORRIDA = {
   ],
 };
 
+/**
+ * Las dos lecturas de `fis-prog`, construidas desde `docs/50-api/formas-de-la-api.json`.
+ *
+ * **Sin una sola cifra de dinero**: la muestra no publica ninguna —sus tres magnitudes son areas—
+ * y lo que se mide aqui es el COLOR de la quinta columna. Las dos filas son los dos casos de
+ * `visitado`, que es de donde sale esa columna.
+ */
+const PROGRAMAS = {
+  contenido: [
+    {
+      id: 14,
+      codigo: 'PF-2026-014',
+      descripcion: 'Cruce de area construida en el sector 02',
+      tipo: 'PREDIAL',
+      fechaInicio: '2026-03-02',
+      fechaFin: null,
+      estado: 'EN_PROCESO',
+      ejercicio: '2026',
+      sector: '02',
+      criterio: 'SUBVALUADOR',
+      fiscalizador: 'Reto Santos, Victor',
+    },
+  ],
+  pagina: 0,
+  tamano: 1,
+  totalElementos: 6,
+  totalPaginas: 6,
+  hayMas: true,
+};
+
+const MUESTRA = {
+  contenido: [
+    {
+      programaId: 14,
+      predioId: 9014,
+      codRefCatastral: '02-014-D-14-01',
+      contribuyenteId: 25673,
+      codContribuyente: '00000025673',
+      titular: 'Suc. Rufina Medina Medina',
+      sector: '02',
+      condicion: 'SUBVALUADOR',
+      areaCatastral: '198.00',
+      areaDeclarada: '164.50',
+      diferenciaDeArea: '33.50',
+      visitado: true,
+      fechaSorteo: '2026-03-02',
+    },
+    {
+      programaId: 14,
+      predioId: 9021,
+      codRefCatastral: '04-021-B-07-00',
+      contribuyenteId: null,
+      codContribuyente: null,
+      titular: null,
+      sector: '04',
+      condicion: 'OMISO',
+      areaCatastral: '120.00',
+      areaDeclarada: null,
+      diferenciaDeArea: null,
+      visitado: false,
+      fechaSorteo: '2026-03-02',
+    },
+  ],
+  pagina: 0,
+  tamano: 20,
+  totalElementos: 84,
+  totalPaginas: 5,
+  hayMas: true,
+};
+
 test.use({ colorScheme: 'light' });
 
 test.beforeEach(async ({ page }) => {
@@ -125,27 +212,71 @@ test.beforeEach(async ({ page }) => {
   await page.route('**/rentas/predial/corridas/ultima*', (ruta) =>
     ruta.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(CORRIDA) }),
   );
+  // Las DOS lecturas de `fis-prog`, en su orden: la relacion dice cual programa y la muestra trae
+  // sus predios. El orden de los manejadores importa —el mas especifico va DESPUES—, porque
+  // Playwright los prueba en orden inverso al de registro.
+  await page.route('**/fiscalizacion/programas?*', (ruta) =>
+    ruta.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(PROGRAMAS) }),
+  );
+  await page.route('**/fiscalizacion/programas/*/muestra*', (ruta) =>
+    ruta.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MUESTRA) }),
+  );
 });
 
-test('la insignia de `ini-parado` NO dice «conforme» sobre trabajo parado', async ({ page }) => {
+test('la quinta columna de `ini-parado` dice la frase y NO es un semaforo (#218)', async ({
+  page,
+}) => {
   await abrir(page, 'ini-parado');
 
   for (const frente of FRENTES) {
-    const insignia = page.getByText(frente.porQueCuestaDinero, { exact: true });
-    await expect(insignia, `no se dibujo el frente «${frente.frente}»`).toBeVisible();
+    const celda = page.getByText(frente.porQueCuestaDinero, { exact: true });
+    await expect(celda, `no se dibujo el frente «${frente.frente}»`).toBeVisible();
 
-    const fondo = await insignia.evaluate((e) => getComputedStyle(e).backgroundColor);
+    // **La frase se queda**: lo que #218 retira es la insignia, no la columna. Sin esto, quitar la
+    // columna entera pasaria este camino igual de bien que quitarle el semaforo.
+    await expect(celda).toHaveText(frente.porQueCuestaDinero);
+
+    const fondo = await celda.evaluate((e) => getComputedStyle(e).backgroundColor);
     expect(
       fondo,
       `«${frente.porQueCuestaDinero}» se pinta de VERDE: la interfaz esta diciendo «conforme»\n` +
         'sobre trabajo que esta parado y cuesta dinero. Es el defecto de #175.',
     ).not.toBe(TONOS.ok);
-    expect(fondo, 'el tono de «no se» no llego al navegador').toBe(TONOS.sinReconocer);
-
-    // Y la frase sigue DENTRO de la insignia: el tono neutro deja de calificar el estado, no de
-    // ensenarlo. Un tono que se comunicara solo por color no se comunicaria a quien no lo ve.
-    await expect(insignia).toHaveText(frente.porQueCuestaDinero);
+    // Y tampoco del tono de «no se»: desde #218 ahi no hay insignia ninguna. Un semaforo que no
+    // se puede encender nunca es un semaforo que sobra — #183 midio que el estado del frente no lo
+    // publica nadie y que no hay plazo publicado con el que juzgarlo.
+    expect(
+      fondo,
+      'La quinta columna de `ini-parado` volvio a dibujarse como INSIGNIA. No puede: lo que le\n' +
+        'llega es una frase, y #183 se cerro midiendo que el backend no publica ningun estado.',
+    ).not.toBe(TONOS.sinReconocer);
+    expect(fondo, 'una celda de texto no lleva fondo propio').toBe(SIN_FONDO);
   }
+});
+
+test('y el tono de «no se» SI llega al navegador, en la tabla de `fis-prog` (#218)', async ({
+  page,
+}) => {
+  // La mitad que #218 dejaria huerfana. Se mide en la misma tabla y en la misma corrida, con sus
+  // dos casos: `visitado: true` -> «Inspeccionado», que la lista de CONFORME de `tono.ts` reconoce
+  // y se gana el verde; `visitado: false` -> «Programado», que ninguna regla reconoce —«todavia no
+  // se ha ido a mirar» no es un juicio— y sale con el tono de «no se».
+  await abrir(page, 'fis-prog');
+
+  const inspeccionado = page.getByText('Inspeccionado', { exact: true }).first();
+  await expect(inspeccionado, 'la muestra del programa no se dibujo').toBeVisible();
+  expect(
+    await inspeccionado.evaluate((e) => getComputedStyle(e).backgroundColor),
+    'el verde no llego a la insignia de `fis-prog`',
+  ).toBe(TONOS.ok);
+
+  const programado = page.getByText('Programado', { exact: true }).first();
+  await expect(programado).toBeVisible();
+  expect(
+    await programado.evaluate((e) => getComputedStyle(e).backgroundColor),
+    '«Programado» se pinta de VERDE, y no es un juicio de la administracion: dice que todavia no\n' +
+      'se ha ido a mirar. Es el defecto de #175 en la hoja que lo hereda.',
+  ).toBe(TONOS.sinReconocer);
 });
 
 test('y el verde SI llega donde se ha ganado: «Conforme» en `panel` es verde, «Observado» rojo', async ({

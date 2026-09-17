@@ -28,12 +28,12 @@ import {
 const TODAS: readonly Hoja[] = ARBOL.flatMap((modulo) => [...modulo.hojas]);
 
 describe('el cruce contra lo que el backend sirve', () => {
-  it('EL CENTINELA: hay cuarenta hojas y treinta y tres operaciones servidas', () => {
+  it('EL CENTINELA: hay cuarenta hojas y treinta y cinco operaciones servidas', () => {
     // Sin esto, un arbol vacio o unas `YA_SERVIDAS` vacias dejarian todo lo de abajo pasando
     // sobre la nada — y la respuesta seria «ninguna pantalla tiene datos», que ademas parece
     // razonable.
     expect(TODAS).toHaveLength(40);
-    expect(YA_SERVIDAS).toHaveLength(33);
+    expect(YA_SERVIDAS).toHaveLength(35);
   });
 
   it('cruza por RUTA, no por verbo: dos servidas las declara el artboard como `BASE`', () => {
@@ -53,7 +53,7 @@ describe('el cruce contra lo que el backend sirve', () => {
     expect(utiles.every((o) => o.verbo !== 'PUT')).toBe(true);
   });
 
-  it('veinticuatro hojas tienen alguna operacion util, y dieciseis ninguna', () => {
+  it('veinticinco hojas tienen alguna operacion util, y quince ninguna', () => {
     const con = TODAS.filter((hoja) => operacionesUtiles(hoja).length > 0);
     // `aut-cat` entra con #168 por la ruta que el ARTBOARD le atribuye, `GET /licencias/ciiu`.
     //
@@ -97,6 +97,8 @@ describe('el cruce contra lo que el backend sirve', () => {
         'con-doc',
         'con-panel',
         'fis-actas',
+        // Entra con #215: #196 le publico el embudo que sus cuatro cifras piden.
+        'fis-panel',
         'fis-prog',
         'fis-res',
         'ini-flujo',
@@ -117,7 +119,7 @@ describe('el cruce contra lo que el backend sirve', () => {
         'valores',
       ].sort(),
     );
-    expect(TODAS.length - con.length).toBe(16);
+    expect(TODAS.length - con.length).toBe(15);
   });
 });
 
@@ -131,16 +133,24 @@ describe('el cruce contra lo que el backend sirve', () => {
  *
  * <h2>Lo que este barrido puede comprobar hoy, y lo que no</h2>
  *
- * **No** puede comparar ruta con ruta: `Conector.pedir` es una funcion, y la ruta que pide vive
- * dentro de ella —sacarla a dato es #186, que la necesita para paginar y ordenar en servidor—. Lo
- * que si puede, y es lo que fallaba, es la condicion NECESARIA: una hoja con conector tiene que
- * declarar **al menos una operacion de lectura que el backend sirva**. Si no la declara, o pide
- * algo que no declaro, o no puede pedir nada — y las dos cosas son el defecto.
+ * Este barrido comprueba la condicion NECESARIA: una hoja con conector tiene que declarar **al
+ * menos una operacion de lectura que el backend sirva**. Si no la declara, o pide algo que no
+ * declaro, o no puede pedir nada — y las dos cosas son el defecto.
  *
- * Cuando #186 saque la ruta al conector, esto se estrecha a la igualdad y este comentario sobra.
+ * <h2>La IGUALDAD ya se comprueba, y esta en otro sitio (#215)</h2>
+ *
+ * Aqui decia que comparar ruta con ruta no se podia —«`Conector.pedir` es una funcion, y la ruta
+ * que pide vive dentro de ella»— y que cuando #186 sacara la ruta a dato esto se estrecharia. #186
+ * la saco, y la igualdad la comprueba `verificaciones/la-hoja-declara-la-ruta-que-su-conector-pide`:
+ * resuelve `RUTAS` y cruza cada camino contra lo que la hoja declara.
+ *
+ * **Este se queda igual**, y no es redundante: mide otra cosa. Aquel exige que **lo que se pide**
+ * este declarado; este, que haya **algo servido que pedir** — y los dos rojos dicen cosas distintas
+ * a quien los lee. Lo que se midio en #215 es que ninguno de los dos solo habria visto la rotura
+ * del otro: quitarle a `fis-res` una de sus dos declaraciones dejaba este en verde.
  */
 describe('AC4 — toda hoja con conector declara la operacion que la sirve', () => {
-  it('las dieciocho que piden de verdad declaran alguna servida de lectura', () => {
+  it('las diecinueve que piden de verdad declaran alguna servida de lectura', () => {
     const mudas = Object.keys(CONECTORES).filter(
       (clave) => operacionesUtiles(hojaDe(clave as ClaveDeHoja)).length === 0,
     );
@@ -153,19 +163,23 @@ describe('AC4 — toda hoja con conector declara la operacion que la sirve', () 
     ).toEqual([]);
   });
 
-  it('EL CENTINELA: y son dieciocho, no cero', () => {
+  it('EL CENTINELA: y son diecinueve, no cero', () => {
     // Un registro de conectores vacio dejaria la comprobacion de arriba pasando sobre la nada.
-    expect(Object.keys(CONECTORES)).toHaveLength(18);
+    expect(Object.keys(CONECTORES)).toHaveLength(19);
   });
 });
 
 describe('los cinco casos no se confunden', () => {
   it('sin ninguna servida: «sin conectar», en tono informativo', () => {
-    // `fis-panel` es el ejemplo desde #167, que encendio las dos de indicadores y dejo servida
-    // a `ini-panel`. No vale cualquier hoja sin conector: hace falta una que no declare NINGUNA
-    // operacion servida —`ini-cierre`, por ejemplo, declara varias en `BASE` y por eso dice «sin
+    // **Era `fis-panel` desde #167, y dejo de valer con #215**: #196 le publico su embudo, asi
+    // que ahora declara dos servidas y este caso ya no es el suyo. `seg-sis` si lo es, y ensena la
+    // otra mitad de la regla: su unica servida es `PUT /seguridad/sesion/ejercicio`, y el cruce
+    // solo mira verbos de LECTURA porque **un PUT no dibuja una pantalla**.
+    //
+    // No vale cualquier hoja sin conector: hace falta una que no declare NINGUNA operacion servida
+    // de lectura —`ini-cierre`, por ejemplo, declara varias en `BASE` y por eso dice «sin
     // verificar», que es el caso de la prueba de abajo y no el de esta.
-    expect(porQueNoHayDato(hojaDe('fis-panel'))).toBe(NADA_SERVIDO);
+    expect(porQueNoHayDato(hojaDe('seg-sis'))).toBe(NADA_SERVIDO);
     expect(NADA_SERVIDO.tono).toBe('info');
   });
 

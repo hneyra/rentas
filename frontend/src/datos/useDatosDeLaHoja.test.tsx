@@ -140,11 +140,14 @@ describe('una pantalla SIN conector no toca la red', () => {
     const pedir = vi.fn<typeof fetch>();
     vi.stubGlobal('fetch', pedir);
 
-    // `fis-panel` y no `ini-panel`: desde #167 las tres hojas de Inicio SI tienen conector, y una
-    // hoja conectada no sirve de ejemplo de lo que hace una que no lo esta.
-    const { result } = renderHook(() => useDatosDeLaHoja('fis-panel'), { wrapper: arnes().wrapper });
+    // **Era `fis-panel` hasta #215**, y dejo de valer porque #196 le publico su embudo: ahora
+    // tiene conector, y una hoja conectada no sirve de ejemplo de lo que hace una que no lo esta.
+    // `coa-cart` no declara ninguna operacion servida de lectura —la unica que publica sus ocho
+    // campos es `POST /coactiva/convenios`, que **crea un convenio de fraccionamiento**—, asi que
+    // es el caso entero: ni conector, ni nada que pedir.
+    const { result } = renderHook(() => useDatosDeLaHoja('coa-cart'), { wrapper: arnes().wrapper });
 
-    // Es lo que hace que 38 de las 40 pantallas no manden una sola peticion: sin conector, la
+    // Es lo que hace que 21 de las 40 pantallas no manden una sola peticion: sin conector, la
     // consulta no se habilita. Sin esto, abrir el arbol entero serian cuarenta idas a la red
     // contra rutas que nadie sirve — cuarenta 404 y cuarenta huecos identicos.
     expect(pedir).not.toHaveBeenCalled();

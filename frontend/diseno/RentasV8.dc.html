@@ -425,8 +425,13 @@ const ARBOL = [
   ['Inicio', 'Panel de recaudación', 'inicio', 'INICIO',
     ['M3 10.6 12 3.5l9 7.1', 'M5.6 9.6V20.5h12.8V9.6', 'M10 20.5v-5.4h4v5.4'],
     [
+      /* Le faltaba la SEGUNDA lectura que su conector pide desde #167 (#215): «Observados sin
+         emision» no sale del panel de recaudacion, sale de la ultima corrida del padron. Lo
+         descubrio la guarda nueva `la-hoja-declara-la-ruta-que-su-conector-pide`, en su primera
+         corrida — es el defecto de `aut-tram` hasta #173 y el de `fis-prog` hasta #179, vivo. */
       ['ini-panel', 'Panel', [
         ['GET', '/indicadores/recaudacion', 'IndicadoresController'],
+        ['GET', '/rentas/predial/corridas/ultima', 'CorridaController'],
         ['BASE', '/portal/situacion', 'PortalController']],
         [['Progress', 'La barra de avance por tributo']]],
       ['ini-flujo', 'Recaudación', [['GET', '/indicadores/recaudacion', 'IndicadoresController']],
@@ -471,7 +476,15 @@ const ARBOL = [
     ['M9.5 4.5H8A1.5 1.5 0 0 0 6.5 6v13A1.5 1.5 0 0 0 8 20.5h8a1.5 1.5 0 0 0 1.5-1.5V6A1.5 1.5 0 0 0 16 4.5h-1.5',
      'M9.5 3.2h5v2.8h-5z', 'M9.6 13.2l2 2 3.4-4'],
     [
-      ['fis-panel', 'Panel', [['GET', '/fiscalizacion/estado-cuenta', 'OmisosController']],
+      /* Le faltaban las DOS operaciones que la sirven (#215, #196). Lo unico que declaraba era
+         `estado-cuenta`, que publica otra cosa —la deuda de fiscalizacion de UN contribuyente— y
+         ni una de las cuatro cifras del embudo. El embudo cuelga de un programa, asi que hacen
+         falta las dos: la relacion, que es la unica que publica el `id`, y el embudo. Se corrige
+         aqui y en `arbol.ts` a la vez, como #169 con `con-panel` y #179 con `fis-prog`. */
+      ['fis-panel', 'Panel', [
+        ['GET', '/fiscalizacion/estado-cuenta', 'OmisosController'],
+        ['GET', '/fiscalizacion/programas', 'ProgramasController'],
+        ['GET', '/fiscalizacion/programas/{id}/embudo', 'EmbudoController']],
         [['Progress', 'El avance del programa por etapa']]],
       ['fis-actas', 'Actas', [
         ['BASE', '/fiscalizacion/actas', 'ActasController'],
@@ -484,10 +497,14 @@ const ARBOL = [
         ['POST', '/fiscalizacion/programas/{id}/muestra', 'Genera la muestra'],
         ['GET', '/fiscalizacion/omisos', 'OmisosController']],
         []],
+      /* Y a esta le faltaba la RELACION (#215, #192): declaraba la resolucion por su numero y
+         ninguna operacion que publicara un numero, asi que era la unica hoja del sistema que no
+         podia tomar «la primera de la relacion» — abierta desde el menu no ensenaba una nunca. */
       ['fis-res', 'Resultados', [
         ['GET', '/fiscalizacion/resultados', 'LiquidacionController'],
         ['POST', '/fiscalizacion/liquidaciones', 'Liquida la diferencia'],
         ['PATCH', '/fiscalizacion/liquidaciones/{numero}/estados', 'Cambia el estado'],
+        ['GET', '/fiscalizacion/resoluciones', 'ResolucionController'],
         ['GET', '/fiscalizacion/resoluciones/{numero}', 'ResolucionController']],
         [['AlertDialog', 'Emitir la resolución: es lo que vuelve la diferencia deuda exigible']]]
     ]],
@@ -682,7 +699,15 @@ const PANTALLAS = {
       ['Valores', 'Emitidos y sin notificar', '412', '184,412.00', 'Vencida'],
       ['Coactiva', 'Expedientes importados sin REC', '388', '162,844.00', 'Vencida'],
       ['Fiscalización', 'Actas con diferencia sin emitir', '61', '214,882.40', 'Por vencer'],
-      ['Autorizaciones', 'Solicitudes con el plazo agotado', '42', '0.00', 'Por vencer']], i: 4 }]],
+      ['Autorizaciones', 'Solicitudes con el plazo agotado', '42', '0.00', 'Por vencer']] }]],
+  /* Sin `i`: la quinta columna de `ini-parado` SIGUE, y deja de ser de insignia (#218).
+     El artboard dibujaba aqui un estado del PLAZO —«Vencida», «Por vencer»— y #183 midio
+     que el backend no lo puede publicar: los cuatro puertos de `GET
+     /indicadores/trabajo-parado` devuelven un recuento y ninguno la antiguedad de lo que
+     esta parado, y de las nueve filas `PLAZO` del corpus ninguna es el plazo que la
+     administracion tiene para desatascar ninguno de los cuatro frentes. Lo que llega a esa
+     celda es `porQueCuestaDinero`, que es una FRASE: un semaforo que no se puede encender
+     nunca. Las cinco celdas de arriba se quedan porque son lo que el artboard dibuja. */
   'ini-cierre': [['Cierre del día', 'Lo cobrado en el turno, contra lo contado en caja.', [
     ['Caja', 's', ['C-1', 'C-2', 'C-3']], ['Turno', 's', ['Mañana', 'Tarde']], ['Fecha', 'd'],
     ['Cajero', 'r', 'J. Cárdenas Vega'], ['Recaudado del turno', 'r', 'S/ 9,418.60'], ['Diferencia de arqueo', 'r', 'S/ 0.00']],

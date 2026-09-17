@@ -72,9 +72,17 @@ function iconoDelTrazo(rotulo: string, trazos: readonly string[]): NombreDeIcono
  * silencio —el marco ignoraria el codigo de la direccion «porque la hoja no lo declara» y la
  * pantalla diria que falta el contribuyente **teniendolo delante en la barra**—. Quien sabe si una
  * hoja necesita sujeto es quien la pide, o sea su conector.
+ *
+ * **Son DOS formas de llevarlo y las dos declaran el sitio** (#215): `exigeSujeto` —sin el no se
+ * pide nada— y `admiteSujeto` —con el se pide ESE, y sin el la primera de la relacion—. Lo que
+ * decide si la direccion lo trae es el sitio, y el sitio es el mismo; lo que las separa es que se
+ * hace cuando falta, y eso lo resuelve `useDatosDeLaHoja`. Derivar esto solo de la primera dejaria
+ * a `fis-res` con `#/fis-res/RDF-2026-000001` **tirado por el marco**, «porque la hoja no lo
+ * declara», y abriendo siempre la primera resolucion del padron.
  */
 function laHojaLlevaSujeto(clave: Parameters<typeof pantallaDe>[0]): boolean {
-  return CONECTORES[clave]?.exigeSujeto === true;
+  const conector = CONECTORES[clave];
+  return conector?.exigeSujeto === true || conector?.admiteSujeto === true;
 }
 
 /**
