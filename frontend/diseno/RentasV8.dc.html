@@ -585,7 +585,7 @@ const ARBOL = [
   ['Autorizaciones y licencias', 'Licencias y anuncios', 'autoriz', 'AUTORIZACIONES_Y_LICENCIAS',
     ['M4.4 9.6V20h15.2V9.6', 'M3.2 9.6 5.2 4.6h13.6l2 5z', 'M9.6 20v-5.4h4.8V20'],
     [
-      ['aut-panel', 'Panel', [['GET', '/licencias/funcionamiento', 'LicenciaController']],
+      ['aut-panel', 'Panel', [],
         [['Alert', 'Las de plazo agotado, que ya se entienden otorgadas']]],
       ['aut-sol', 'Solicitudes', [
         ['POST', '/licencias/funcionamiento', 'Licencia de funcionamiento'],
@@ -599,6 +599,7 @@ const ARBOL = [
         ['POST', '/licencias/certificados/{numero}/impresion', 'CertificadoController']],
         [['Combobox', 'El giro CIIU: son 1,842 y no caben en un Select']]],
       ['aut-tram', 'Trámites y plazos', [
+        ['GET', '/licencias/funcionamiento', 'LicenciaController'],
         ['POST', '/licencias/funcionamiento/reportes/padron', 'Padrón de licencias'],
         ['GET', '/licencias/funcionamiento/reportes/resumen-anual', 'Resumen por ejercicio'],
         ['GET', '/licencias/edificacion/reportes/general', 'Reporte de edificación']],

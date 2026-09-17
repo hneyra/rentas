@@ -580,9 +580,29 @@ export const ARBOL = [
       {
         clave: 'aut-panel',
         rotulo: 'Panel',
-        operaciones: [
-          { verbo: 'GET', ruta: '/licencias/funcionamiento', nota: 'LicenciaController' },
-        ],
+        // **Declaraba `GET /licencias/funcionamiento`, y esa operacion no pinta esta pantalla**
+        // (#173). Es el mismo defecto que #169 encontro en `con-panel`, y con la misma causa: la
+        // ruta se eligio por el CONTROLADOR del modulo —la nota lo dice, «LicenciaController»— y
+        // no por lo que la pantalla ensena. Sus cinco cifras son un resumen POR ESTADO DE
+        // TRAMITE —«En evaluacion», «Con requisitos incompletos», «Con plazo agotado»,
+        // «Otorgadas», «Denegadas»— y ninguna operacion del contrato las publica: los dos
+        // reportes que existen agregan por otra cosa —`.../reportes/padron` cuenta `licencias`,
+        // `vigentes`, `vencidas` y `canceladas`, que son estados de la LICENCIA ya emitida, y
+        // `.../reportes/resumen-anual` agrega por ANO—, y contar los estados sobre la pagina de
+        // `GET /licencias/funcionamiento` daria cinco cifras exactas sobre veinte filas de un
+        // padron entero, que es lo que `conectores.ts` prohibe.
+        //
+        // Y se va en vez de quedarse, por lo que #169 dejo escrito: una operacion declarada que no
+        // puede dibujar ni un campo hace que la siguiente persona se crea que la pantalla esta a
+        // una operacion de pintarse, y sea la equivocada. Medido, ademas, en lo que la pantalla
+        // DICE: con ella declarada, `porQueNoHayDato` contestaba «sin pedir» —«esta pantalla SI
+        // tiene operaciones servidas, y la conexion llega en su propio issue»—, que es una
+        // promesa que esa operacion no puede cumplir.
+        //
+        // Queda **sin ninguna operacion**, y es lo que se sabe de ella: no hay a quien
+        // preguntarle sus cinco cifras. Es la primera hoja de las cuarenta en esa situacion, y
+        // `porQueNoHayDato` tuvo que aprender a distinguirla de «todas en BASE» — ver su rojo.
+        operaciones: [],
         piezasDeclaradas: [
           { pieza: 'Alert', uso: 'Las de plazo agotado, que ya se entienden otorgadas' },
         ],
@@ -634,7 +654,22 @@ export const ARBOL = [
       {
         clave: 'aut-tram',
         rotulo: 'Trámites y plazos',
+        // **Le faltaba `GET /licencias/funcionamiento`, que es la que la sirve** (#173). Es la
+        // operacion que el artboard le atribuia a `aut-panel`, y la que cuadra **columna a
+        // columna** con la tabla «Padron de licencias» que esta hoja dibuja: `nroLicencia` → N.º
+        // licencia, `contribuyente` → Titular, `denominacionComercial` → Denominacion,
+        // `giros[].descripcion` → Giro y `estado` → Estado. La pide desde #168 —`AUT_TRAM` en
+        // `datos/conectores/licencias.ts`— y hasta hoy lo hacia **sin declararla**.
+        //
+        // Las otras tres NO se van: son suyas de verdad. `POST .../reportes/padron` es el padron
+        // por el que esta hoja filtraria —admite los seis mandos que `GET /licencias/funcionamiento`
+        // no admite— y ademas publica los cuatro totales; lo que la deja fuera es el verbo, no el
+        // sujeto. Lo que se corrige aqui no es «sobran tres», sino «falta la que se usa».
+        //
+        // El artboard se corrige con el arbol y no despues: `pantallas-del-artboard.test.ts`
+        // compara los dos, asi que tocar uno solo sale rojo. Es lo que hicieron #169 y #179.
         operaciones: [
+          { verbo: 'GET', ruta: '/licencias/funcionamiento', nota: 'LicenciaController' },
           {
             verbo: 'POST',
             ruta: '/licencias/funcionamiento/reportes/padron',

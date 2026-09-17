@@ -212,10 +212,10 @@ export interface OperacionServida {
  *       que el buscador filtrara es `?descripcion=`, que el contrato publica.</li>
  *   <li><b>`GET /licencias/funcionamiento`</b> — publica veintiun campos por licencia, y las
  *       <b>cinco</b> columnas del padron de `aut-tram` salen de `nroLicencia`, `contribuyente`,
- *       `denominacionComercial`, `giros[].descripcion` y `estado`. <b>El artboard se la atribuye a
- *       `aut-panel` y no a `aut-tram`</b>, y aun asi es `aut-tram` quien la pide: es la unica de
- *       las diecisiete de licencias cuya forma cuadra con lo que esa tabla ensena. El arbol no se
- *       toca por eso —es la transcripcion del artboard—, y el motivo esta en
+ *       `denominacionComercial`, `giros[].descripcion` y `estado`. Es la unica de las diecisiete de
+ *       licencias cuya forma cuadra con lo que esa tabla ensena. <b>Hasta #173 el artboard se la
+ *       atribuia a `aut-panel`</b> y `aut-tram` la pedia sin declararla; #173 lo decidio con el
+ *       artboard delante y la movio en los dos sitios a la vez. El motivo, campo a campo, en
  *       `conectores/licencias.ts`.</li>
  * </ol>
  *

@@ -13,13 +13,17 @@ import { YA_SERVIDAS } from './datos/servidas.ts';
  *
  * <h2>Los cuatro casos NO son uno, y esto esta medido</h2>
  *
- * Sobre las 40 pantallas y las 101 declaraciones de operacion del artboard:
+ * Sobre las 40 pantallas y las **103** declaraciones de operacion del artboard, remedido en #173
+ * —eran 101 hasta que #169 le anadio una a `con-panel` y #179 otra a `fis-prog`; las tres cifras
+ * de servidas cambiaron ademas porque `YA_SERVIDAS` paso de 8 a 32 entre I-4 y #180—:
  *
- *   · **33 hojas no declaran ninguna operacion servida.** No hay a quien preguntar.
- *   · **36 de las 101 declaraciones llevan el verbo `BASE`**, que el propio artboard define como
+ *   · **15 hojas no declaran ninguna operacion servida.** No hay a quien preguntar.
+ *   · **36 de las 103 declaraciones llevan el verbo `BASE`**, que el propio artboard define como
  *     «solo se leyo el `@RequestMapping` de la clase: sus metodos no se han verificado». **Doce
  *     hojas lo tienen TODO en `BASE`** — de ellas no se sabe ni con que verbo se pediria.
- *   · **7 hojas tienen al menos una servida**, y de esas solo **dos** se pintan enteras.
+ *   · **25 hojas tienen al menos una servida**, y de esas **17** se pintan de verdad.
+ *   · Y una —`aut-panel`, desde #173— **no declara NINGUNA operacion**, que no es lo mismo que
+ *     declararlas todas en `BASE` y hay que no confundirlo: ver el `length > 0` de abajo.
  *   · Y el cuarto caso —servida, pedida y vacia— no lo produce este archivo todavia: llega cuando
  *     las pantallas pidan de verdad.
  *
@@ -86,7 +90,16 @@ const SERVIDO_Y_SIN_PEDIR: Ausencia = {
 export function porQueNoHayDato(hoja: Hoja): Ausencia {
   if (operacionesUtiles(hoja).length > 0) return SERVIDO_Y_SIN_PEDIR;
   // Todas en `BASE` es peor que ninguna servida: hay controlador, y no se sabe como llamarlo.
-  const todasSonBase = hoja.operaciones.every((o) => o.verbo === 'BASE');
+  //
+  // **El `length > 0` no sobra, y lo demostro #173.** `[].every(...)` es `true` —es la verdad
+  // vacia de JavaScript, no un descuido del motor—, asi que una hoja que no declara NINGUNA
+  // operacion contestaba «sin verificar»: «de las rutas que esta pantalla declara solo se leyo el
+  // `@RequestMapping` de su controlador». Eso afirma dos cosas falsas a la vez —que declara rutas
+  // y que hay un controlador detras— justo de la hoja de la que no se sabe nada. Mientras las
+  // cuarenta declararon al menos una operacion el defecto no tenia sintoma; `aut-panel` se quedo
+  // sin ninguna al devolverle a `aut-tram` la que la sirve, y entonces lo tuvo.
+  const todasSonBase =
+    hoja.operaciones.length > 0 && hoja.operaciones.every((o) => o.verbo === 'BASE');
   return todasSonBase ? SOLO_BASE : NADA_SERVIDO;
 }
 

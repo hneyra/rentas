@@ -75,7 +75,9 @@ import type { Conector, Reparto } from '../conectores.ts';
  *
  * · **`aut-panel`** ensena cinco cifras —«En evaluacion», «Con requisitos incompletos», «Con plazo
  *   agotado», «Otorgadas», «Denegadas»—, o sea **un resumen por estado de tramite**. Ninguna
- *   operacion lo publica: los dos reportes que existen agregan por otra cosa.
+ *   operacion lo publica: los dos reportes que existen agregan por otra cosa. Esta medida es la
+ *   que #173 uso para quitarle la operacion que el artboard le daba: desde ahi **no declara
+ *   ninguna**, y lo que la pantalla dice es «sin conectar».
  *   `POST /licencias/funcionamiento/reportes/padron` cuenta `licencias`, `vigentes`, `vencidas` y
  *   `canceladas` —estados de la LICENCIA ya emitida, no del expediente en tramite: una licencia
  *   vencida no es una solicitud denegada— y ademas es una escritura;
@@ -139,12 +141,13 @@ const AUT_CAT: Conector = {
  * principal de cada licencia (ver `giroQueSeEnsena`). Los seis mandos del bloque son filtros que
  * esta operacion no admite, y eso esta dicho arriba en vez de mandarles un parametro inventado.
  *
- * **La hoja declara otras tres operaciones y ninguna es esta**, y hay que saberlo: el artboard le
- * atribuye `POST …/reportes/padron`, `GET …/reportes/resumen-anual` y
- * `GET /licencias/edificacion/reportes/general`. La que dibuja las cinco columnas que la pantalla
- * ensena es `GET /licencias/funcionamiento` —la que el artboard le atribuye a `aut-panel`—, y por
- * eso es la que se pide. El arbol no se toca: es la transcripcion del artboard y
- * `verificaciones/pantallas-del-artboard.test.ts` la compara contra el.
+ * **Y desde #173 la hoja DECLARA la operacion que pide.** Hasta entonces no: el artboard le
+ * atribuia `POST …/reportes/padron`, `GET …/reportes/resumen-anual` y
+ * `GET /licencias/edificacion/reportes/general`, y le daba a `aut-panel` la que dibuja estas cinco
+ * columnas. #168 lo dejo anotado aqui y no toco el arbol, que era lo correcto —es la transcripcion
+ * del artboard, y cambiarla sin decidirlo la desincroniza de su guarda—; #173 lo decidio y lo
+ * corrigio **en el artboard y en `arbol.ts` a la vez**, como #169 y #179. Las otras tres siguen
+ * declaradas: son suyas, y lo que las deja fuera es el verbo.
  */
 const AUT_TRAM: Conector = {
   clave: ['aut-tram', 'licencias-de-funcionamiento'],
