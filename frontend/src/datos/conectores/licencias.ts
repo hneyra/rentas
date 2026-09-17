@@ -48,9 +48,10 @@ import { laVentanaDe, laVentanaQueSePide, loQueDijoElServidor } from '../laVenta
  *       numero que `conectores.ts` prohibe.</li>
  * </ul>
  *
- * `aut-tram` · bloque 0: **los seis mandos**, y por la misma razon. Los ocho parametros que
+ * `aut-tram` · bloque 0: **los seis mandos**, y por la misma razon. Los nueve parametros que
  * `GET /licencias/funcionamiento` admite son `nroLicencia`, `nombreDelContribuyente`,
- * `denominacionComercial`, `direccion`, `nExpediente`, `ordenarPor`, `pagina` y `tamano`;
+ * `denominacionComercial`, `direccionDelEstablecimiento`, `nExpediente`, `ordenarPor`, `pagina`,
+ * `tamano` y `direccion` —el sentido del orden—;
  * «Ejercicio», «Tipo de licencia», «Estado», «Agrupado por», «Desde» y «Hasta» no estan entre
  * ellos. Quien los quiera es `POST /licencias/funcionamiento/reportes/padron`, que ademas publica
  * los cuatro totales —`licencias`, `vigentes`, `vencidas`, `canceladas`—; es una **escritura** por
@@ -201,6 +202,24 @@ const AUT_CAT: Conector = {
  * Las cinco columnas de «Padron de licencias» salen de la respuesta, y la de «Giro» del giro
  * principal de cada licencia (ver `giroQueSeEnsena`). Los seis mandos del bloque son filtros que
  * esta operacion no admite, y eso esta dicho arriba en vez de mandarles un parametro inventado.
+ *
+ * <h2>Y desde #226 la tabla ordena, que hasta este issue no podia</h2>
+ *
+ * `aut-tram` fue **la unica de las cuatro tablas que #186 pagino sin `orden`**, y no por
+ * prudencia: `?direccion=` estaba tomado. Lo declaraban a la vez el filtro del domicilio —en la
+ * firma de `LicenciaController#listar`— y el sentido del orden de `ParametrosDePaginacion`, que
+ * `GuardiaDeParametros` admite en toda operacion, de modo que Spring ataba el mismo parametro de
+ * consulta a los dos. Apuntar `sentidoEnLaRuta` ahi habria hecho que la flecha dijera
+ * «descendente» mientras el servidor **acotaba el padron a las licencias cuya direccion contiene
+ * «DESCENDENTE»** —o sea, a ninguna— y ademas ordenaba al reves: una tabla vacia que se lee como
+ * «este padron no tiene nada».
+ *
+ * #226 renombra el filtro a `direccionDelEstablecimiento`, asi que el sentido vuelve a tener su
+ * sitio. La tabla ofrece **dos** de sus cinco columnas —ver el comentario de su definicion—, y el
+ * primero es `numero`, que es el `ORDEN_POR_OMISION` de `LicenciaController`. Que lo sea no lo
+ * afirma este archivo: lo comprueba
+ * `verificaciones/la-ruta-de-la-hoja-llega-al-conector.test.ts` contra el contrato, que desde #227
+ * publica la lista blanca y el orden por omision de cada operacion.
  *
  * **Y desde #173 la hoja DECLARA la operacion que pide.** Hasta entonces no: el artboard le
  * atribuia `POST …/reportes/padron`, `GET …/reportes/resumen-anual` y

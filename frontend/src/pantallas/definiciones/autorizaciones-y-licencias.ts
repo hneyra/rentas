@@ -210,8 +210,23 @@ export const AUTORIZACIONES_Y_LICENCIAS = {
             hayMas: hayMasDe('padron-de-licencias'),
             paginas: paginasDe('padron-de-licencias'),
           },
-          // **Sin `orden`, y no por prudencia**: `?direccion=` esta tomado. Ver el javadoc de
-          // `AUT_TRAM` en `datos/conectores/licencias.ts`, donde esta medida la colision.
+          // **Dos de las cinco columnas**, y no es un recorte: `GET /licencias/funcionamiento`
+          // admite ordenar por `numero`, `fechaEmision`, `nombreComercial`, `direccion` y
+          // `expediente`, y de esos cinco solo dos son columnas de esta tabla. Ofrecer «Fecha de
+          // emisión» pondría la flecha sobre un dato que la tabla no enseña. «Titular», «Giro» y
+          // «Estado» no están en la lista blanca: los tres se resuelven al leer —el titular lo
+          // trae otro contexto, el estado se deriva a la fecha y el giro es una lista— y pedirlos
+          // sería un 422.
+          orden: {
+            campos: [
+              { valor: 'numero', rotulo: 'Nº licencia' },
+              { valor: 'nombreComercial', rotulo: 'Denominación' },
+            ],
+            enLaRuta: EN_LA_RUTA.ordenarPor,
+            sentidoEnLaRuta: EN_LA_RUTA.direccion,
+            ascendente: 'ASCENDENTE',
+            descendente: 'DESCENDENTE',
+          },
           titulo: 'Padrón de licencias',
           columnas: [
             { rotulo: 'Nº licencia', alineadoDerecha: false },

@@ -617,6 +617,54 @@ class ParametrosDeLaConsultaTest {
     }
 
     @Test
+    @DisplayName("ningun filtro de una firma se llama como el dialecto de la paginacion (#226)")
+    void ningunFiltroSeLlamaComoElDialectoDeLaPaginacion() {
+        // Se recorren TODAS las firmas y no la que abrio el issue: lo que hace dano no es el
+        // nombre `direccion`, es que Spring ate un mismo nombre de la consulta a dos argumentos
+        // distintos del mismo metodo. Con cualquiera de los cuatro pasa igual.
+        List<String> colisiones = new ArrayList<>();
+        for (Method metodo : EndpointsPublicados.porOperacion().values()) {
+            for (Parameter parametro : metodo.getParameters()) {
+                RequestParam anotacion =
+                        AnnotatedElementUtils.findMergedAnnotation(parametro, RequestParam.class);
+                if (anotacion == null) {
+                    continue;
+                }
+                String declarado =
+                        anotacion.name().isEmpty() ? anotacion.value() : anotacion.name();
+                String nombre = declarado.isEmpty() ? parametro.getName() : declarado;
+                if (GuardiaDeParametros.DIALECTO_DE_LA_PAGINACION.contains(nombre)) {
+                    colisiones.add(
+                            metodo.getDeclaringClass().getSimpleName()
+                                    + "#"
+                                    + metodo.getName()
+                                    + " declara el filtro «"
+                                    + nombre
+                                    + "»");
+                }
+            }
+        }
+
+        assertThat(colisiones)
+                .as(
+                        "Un filtro que se llama como uno de los cuatro nombres de"
+                                + " ParametrosDePaginacion —pagina, tamano, ordenarPor, direccion— esta"
+                                + " atado a DOS cosas a la vez, y las dos las enlaza Spring del mismo"
+                                + " parametro de consulta. Medido en GET /licencias/funcionamiento"
+                                + " (#226): «?ordenarPor=numero&direccion=DESCENDENTE» acotaba el"
+                                + " padron a las licencias cuya direccion contiene «DESCENDENTE» —o sea"
+                                + " a ninguna— Y ademas ordenaba al reves, de modo que la pantalla"
+                                + " ensenaba una tabla vacia que se lee como «este padron no tiene"
+                                + " nada»; y al reves, mandar una direccion de verdad es un 400 de"
+                                + " enlace, porque el mismo texto tiene que convertirse ademas a"
+                                + " Paginacion.Direccion. El contrato tampoco los puede distinguir:"
+                                + " «parametros-de-la-api.json» sale de la FIRMA, y en la firma hay un"
+                                + " solo nombre. Lo que se renombra es el FILTRO —el dialecto de la"
+                                + " paginacion es el mismo en las 134 pantallas y no puede ceder—.")
+                .isEmpty();
+    }
+
+    @Test
     @DisplayName("todo parametro de handler tiene una forma que la guarda de #539 sabe leer")
     void laFormaDeCadaParametroLaEntiendeLaGuarda() {
         List<String> desconocidas = new ArrayList<>();
