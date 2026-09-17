@@ -263,18 +263,18 @@ export const FRASE_DE_QUIEN_ES = 'Lo que se dibuja es de {{nombre}} ({{codigo}})
 export const FRASE_DE_QUIEN_ES_SIN_PADRON =
   'Lo que se dibuja es de un contribuyente que ya no esta en el padron.';
 
-/** Todo lo que este archivo aporta al inventario del locale. Ver `catalogo-de-claves.ts`. */
-export function clavesDelMarco(): readonly string[] {
-  return [
-    ...Object.values(FRASES_DEL_MARCO),
-    ...Object.values(FRASES_DEL_INTERPRETE),
-    ...Object.values(FRASES_DE_LAS_TABLAS),
-    FRASE_DEL_CONTEO,
-    FRASE_DE_LA_FECHA,
-    FRASE_DE_QUIEN_ES,
-    FRASE_DE_QUIEN_ES_SIN_PADRON,
-  ];
-}
+/**
+ * **«No se pudieron pedir los datos de esta pantalla (404)»: el fallo, con su peldano** (#246).
+ *
+ * Vive aqui por lo mismo que las tres de arriba: el peldano es **dato** y entra por interpolacion,
+ * asi que la frase la arma quien tiene `t()` delante —`useDatosDeLaHoja.alFallar`— y no la propia
+ * ausencia. Y hasta #246 no vivia en ninguna parte: el codigo se concatenaba dentro de la frase, o
+ * sea que la cadena que llegaba al interprete era distinta en cada fallo y **ninguna clave del
+ * locale podia casar con ella**.
+ */
+export const FRASE_DEL_FALLO =
+  'No se pudieron pedir los datos de esta pantalla ({{codigo}}). Lo que se ve es su forma, no sus ' +
+  'datos.';
 
 /**
  * El saco que `<Pantalla>` de `@kamayuk/ui` recibe como `textos`, ya pasado por `t()`.
