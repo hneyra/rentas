@@ -84,6 +84,7 @@ import kamayuk.rentas.sanciones.dominio.CriterioDeInternamiento;
 import kamayuk.rentas.sanciones.dominio.Descargo;
 import kamayuk.rentas.sanciones.dominio.EfectoSobreLaMulta;
 import kamayuk.rentas.sanciones.dominio.EstadoDeInternamiento;
+import kamayuk.rentas.sanciones.dominio.EstadoDelActoDeLaPapeleta;
 import kamayuk.rentas.sanciones.dominio.Familia;
 import kamayuk.rentas.sanciones.dominio.InternamientoEnConsulta;
 import kamayuk.rentas.sanciones.dominio.Papeleta;
@@ -92,6 +93,7 @@ import kamayuk.rentas.sanciones.dominio.ResolucionDeGerenciaRepository;
 import kamayuk.rentas.sanciones.dominio.SentidoDelFallo;
 import kamayuk.rentas.sanciones.dominio.TipoDeRecurso;
 import kamayuk.rentas.sanciones.dominio.TipoDeResolucionDeGerencia;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -900,6 +902,56 @@ class SancionesJdbcTest {
         }
 
         @Test
+        @DisplayName("#185 — la grilla dice la clase de CADA vehiculo, y nula cuando no se sabe")
+        void laGrillaDiceLaClaseDeCadaVehiculo() {
+            // Tres filas y tres situaciones distintas: la ficha con categoria, la ficha SIN
+            // categoria —`vehiculo.categoria` admite nulo— y el ingreso que no nombro ninguna
+            // ficha —`internamiento.vehiculo_id` tambien—. Con una sola fila, cualquier columna
+            // constante pasaria: es el mismo motivo por el que la pantalla no puede escribir la
+            // categoria del vehiculo de la direccion en las veinte filas del deposito.
+            Papeleta conCategoria = papeletaDeTransito("C07");
+            long automovil = crearVehiculo(conCategoria.obligadoId(), "T2G-407", "AUTOMOVIL");
+            internarVehiculo(conCategoria, "T2G-407", automovil);
+
+            Papeleta sinCategoria = papeletaDeTransito("C08");
+            long sinClase = crearVehiculo(sinCategoria.obligadoId(), "T2G-408", null);
+            internarVehiculo(sinCategoria, "T2G-408", sinClase);
+
+            Papeleta sinFicha = papeletaDeTransito("C09");
+            internarVehiculo(sinFicha, "T2G-409");
+
+            assertThat(claseEnLaGrillaDe("T2G-407"))
+                    .as(
+                            "la clase sale del padron por el `vehiculo_id` que el propio ingreso"
+                                    + " guarda: es el JOIN que este issue anade (#185)")
+                    .isEqualTo("AUTOMOVIL");
+            assertThat(claseEnLaGrillaDe("T2G-408"))
+                    .as("inscrito y sin categoria declarada: no se sabe, y se dice nulo")
+                    .isNull();
+            assertThat(claseEnLaGrillaDe("T2G-409"))
+                    .as(
+                            "sin ficha en el padron tampoco se sabe. Y el vehiculo NO desaparece"
+                                    + " de la grilla: el JOIN es LEFT, porque se interna lo que se"
+                                    + " interna, este o no inscrito")
+                    .isNull();
+        }
+
+        /** La clase que la grilla publica para esa placa, o nulo. La fila tiene que existir. */
+        private String claseEnLaGrillaDe(String placa) {
+            Pagina<InternamientoEnConsulta> grilla =
+                    enTransaccion(
+                            () ->
+                                    consultaDeDeposito.listar(
+                                            new CriterioDeInternamiento(placa, null, null),
+                                            SANCIONADORA_DESDE,
+                                            Paginacion.de(0, 20, "fechaIngreso")));
+            assertThat(grilla.contenido())
+                    .as("la grilla tiene que traer el internamiento de " + placa)
+                    .hasSize(1);
+            return grilla.contenido().get(0).clase();
+        }
+
+        @Test
         @DisplayName("un vehiculo no entra dos veces sin haber salido")
         void unVehiculoNoEntraDosVecesSinHaberSalido() {
             Papeleta papeleta = papeletaDeTransito("C06");
@@ -972,6 +1024,68 @@ class SancionesJdbcTest {
                     .containsExactly(
                             ResultadoDeNotificacion.NO_UBICADO, ResultadoDeNotificacion.NOTIFICADO);
             assertThat(resolucion.acuses().get(1).exigibleDesde()).isEqualTo(SANCIONADORA_DESDE);
+        }
+
+        @Test
+        @DisplayName("#185 — la resolucion que nadie pudo notificar NO se lee como conforme")
+        void laResolucionNoNotificadaNoSeLeeComoConforme() {
+            Papeleta papeleta = papeletaDeTransito("D04");
+            enTransaccion(
+                    () ->
+                            registrarDescargo.registrar(
+                                    Familia.TRANSITO,
+                                    papeleta.numero(),
+                                    new RegistrarDescargo.Peticion(
+                                            "EXP-D04",
+                                            INFRACCION.plusDays(1),
+                                            TipoDeRecurso.DESCARGO,
+                                            "sustento de la prueba"),
+                                    PORQUE),
+                    "mesa.partes");
+            internarVehiculo(papeleta, "T2G-504");
+            ResolucionDeGerencia ordinaria =
+                    dictar(
+                                    papeleta,
+                                    TipoDeResolucionDeGerencia.ORDINARIA,
+                                    ORDINARIA,
+                                    "EXP-D04",
+                                    SentidoDelFallo.INFUNDADO,
+                                    EfectoSobreLaMulta.SE_MANTIENE)
+                            .resolucion();
+            // DOS intentos, y ninguno encontro a nadie. Con uno solo, «la ultima» y «alguna»
+            // coincidirian y la prueba no distinguiria una cosa de la otra.
+            notificarResolucion(ordinaria.numero(), DILIGENCIA, ResultadoDeNotificacion.NO_UBICADO);
+            notificarResolucion(ordinaria.numero(), DILIGENCIA, ResultadoDeNotificacion.NO_UBICADO);
+
+            ConsultaDeActosDeLaPapeleta.Expediente expediente =
+                    enTransaccion(() -> consultaDeActos.de(Familia.TRANSITO, papeleta.numero()));
+
+            ActoDeLaPapeleta resolucion =
+                    expediente.actos().stream()
+                            .filter(acto -> "ORDINARIA".equals(acto.tipo()))
+                            .findFirst()
+                            .orElseThrow();
+            assertThat(resolucion.acuses())
+                    .as("los dos intentos siguen ahi: el estado no los resume, se anade a ellos")
+                    .hasSize(2);
+            assertThat(resolucion.estado())
+                    .as(
+                            "un acto que nunca se notifico no abre plazo: escribir «Conforme»"
+                                    + " sobre el afirmaria que la papeleta todavia se puede cobrar")
+                    .isEqualTo(EstadoDelActoDeLaPapeleta.NO_NOTIFICADO);
+            assertThat(resolucion.estado().surtioEfecto()).isFalse();
+
+            ActoDeLaPapeleta acta =
+                    expediente.actos().stream()
+                            .filter(acto -> "INGRESO".equals(acto.tipo()))
+                            .findFirst()
+                            .orElseThrow();
+            assertThat(acta.estado())
+                    .as(
+                            "el acta del deposito se entrega en mano con su firma en el papel:"
+                                    + " decir que esta sin diligenciar seria decir que alguien"
+                                    + " tiene pendiente notificarla")
+                    .isEqualTo(EstadoDelActoDeLaPapeleta.SIN_NOTIFICACION);
         }
 
         @Test
@@ -1223,14 +1337,41 @@ class SancionesJdbcTest {
                 "notificador");
     }
 
+    /**
+     * Un vehiculo del padron, para que el internamiento pueda nombrarlo (#185).
+     *
+     * <p>{@code categoria} admite nulo en {@code vehiculo}, y por eso esta prueba siembra las dos
+     * formas: la ficha con categoria y la ficha sin ella. Son dos ausencias distintas y la grilla
+     * tiene que decirlas igual —nulo— sin confundir ninguna con un dato.
+     */
+    private static long crearVehiculo(
+            long contribuyenteId, String placa, @Nullable String categoria) {
+        return insertar(
+                "INSERT INTO vehiculo (municipalidad_id, placa, contribuyente_id, marca, modelo,"
+                        + " categoria, anio_fabricacion, anio_inscripcion) VALUES ("
+                        + municipalidad
+                        + ", '"
+                        + placa
+                        + "', "
+                        + contribuyenteId
+                        + ", 'TOYOTA', 'YARIS', "
+                        + (categoria == null ? "NULL" : "'" + categoria + "'")
+                        + ", 2018, 2019) RETURNING id");
+    }
+
     private static RegistrarInternamiento.Internado internarVehiculo(
             Papeleta papeleta, String placa) {
+        return internarVehiculo(papeleta, placa, null);
+    }
+
+    private static RegistrarInternamiento.Internado internarVehiculo(
+            Papeleta papeleta, String placa, @Nullable Long vehiculoId) {
         return enTransaccion(
                 () ->
                         internar.internar(
                                 new RegistrarInternamiento.Peticion(
                                         placa,
-                                        null,
+                                        vehiculoId,
                                         papeleta.numero(),
                                         "DEPOSITO SULLANA NORTE",
                                         INFRACCION.atStartOfDay(ZoneOffset.UTC).toInstant(),

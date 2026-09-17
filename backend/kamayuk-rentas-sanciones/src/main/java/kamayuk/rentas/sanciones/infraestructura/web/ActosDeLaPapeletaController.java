@@ -10,6 +10,7 @@ import kamayuk.rentas.sanciones.aplicacion.RegistrarDescargo;
 import kamayuk.rentas.sanciones.dominio.ActoDeLaPapeleta;
 import kamayuk.rentas.sanciones.dominio.AcuseDelActo;
 import kamayuk.rentas.sanciones.dominio.Descargo;
+import kamayuk.rentas.sanciones.dominio.EstadoDelActoDeLaPapeleta;
 import kamayuk.rentas.sanciones.dominio.Familia;
 import kamayuk.rentas.web.Api;
 import kamayuk.rentas.web.CodigoDeError;
@@ -104,7 +105,29 @@ public class ActosDeLaPapeletaController {
             LocalDate presentadoHasta,
             boolean enPlazo) {}
 
-    /** Un documento emitido, con su fecha y sus acuses. */
+    /**
+     * Un documento emitido, con su fecha, su estado y sus acuses.
+     *
+     * <h2>{@code estado} se añade a los acuses, no en su lugar (#185)</h2>
+     *
+     * <p>Hasta #185 lo único que este recurso decía de <b>cómo quedó</b> un acto eran sus {@code
+     * acuses}, una fila por intento, y resumirlos en el último lo prohíbe {@code
+     * ConsultaDeActosDeLaPapeleta} en su propio javadoc. La pantalla {@code tra-pap} dibujaba la
+     * columna «Estado» diciendo que no había dato, y era lo correcto: escribir «Conforme» porque el
+     * último intento salió bien afirmaría que la papeleta se puede cobrar, cuando una no notificada
+     * dentro del plazo <b>caduca</b>.
+     *
+     * <p>Lo que se publica ahora es {@link EstadoDelActoDeLaPapeleta}, derivado en el dominio y no
+     * en la pantalla, y {@code acuses} <b>sigue viajando entero</b>: la traza de los tres intentos
+     * está donde estaba, y es lo que el administrado discute. Lo que el estado dice es si el acto
+     * llegó a surtir efecto, que es un hecho de la lista completa y no de su última fila.
+     *
+     * <p><b>Lo que no dice, y por qué:</b> nada del plazo. Ver {@link EstadoDelActoDeLaPapeleta}:
+     * el plazo es un valor del conjunto sellado, y pedirlo aquí dejaría esta operación contestando
+     * 422 en toda municipalidad sin sellar —hoy, todas—.
+     *
+     * @param estado en qué punto de su notificación está, derivado de {@code acuses}
+     */
     public record ActoResource(
             String clase,
             String tipo,
@@ -112,6 +135,7 @@ public class ActosDeLaPapeletaController {
             LocalDate fecha,
             long documentoId,
             String observacion,
+            String estado,
             List<AcuseResource> acuses) {
 
         static ActoResource de(ActoDeLaPapeleta acto) {
@@ -134,6 +158,7 @@ public class ActosDeLaPapeletaController {
                     acto.fecha(),
                     acto.documentoId(),
                     acto.observacion().texto(),
+                    acto.estado().name(),
                     List.copyOf(acuses));
         }
     }

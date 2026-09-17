@@ -810,6 +810,18 @@ export interface ActoDeLaPapeleta {
   readonly fecha: string;
   readonly documentoId: number;
   readonly observacion: string;
+  /**
+   * En que punto de su notificacion esta, **derivado en el backend** de todos sus acuses (#185).
+   *
+   * `SIN_NOTIFICACION` —el acta del deposito, que se entrega en mano—, `SIN_DILIGENCIAR`,
+   * `NO_NOTIFICADO` —hubo intentos y ninguno surtio efecto— y `NOTIFICADO`.
+   *
+   * **No sustituye a `acuses`**, que sigue llegando entero: lo que este campo resume no es la
+   * traza sino el hecho que la traza produce. Y **no dice nada del plazo**: «Conforme» y «Por
+   * vencer» son estados del plazo, que vive en el conjunto sellado, y pedirlo dejaria esta
+   * operacion contestando 422 en toda municipalidad sin sellar.
+   */
+  readonly estado: string;
   readonly acuses: readonly AcuseDelActo[];
 }
 
@@ -857,6 +869,14 @@ export interface ExpedienteDeLaPapeleta {
 export interface InternamientoEnDeposito {
   readonly id: number;
   readonly placa: string;
+  /**
+   * La categoria con que el vehiculo esta inscrito en el padron (#185).
+   *
+   * **Nula** cuando el ingreso no nombro ninguna ficha —se interna lo que se interna, este o no
+   * inscrito— o cuando la ficha no declara categoria. Nunca cadena vacia: en una columna se leeria
+   * como un dato.
+   */
+  readonly clase: string | null;
   readonly papeleta: string | null;
   readonly deposito: string;
   readonly fechaDeIngreso: string;
