@@ -2321,6 +2321,7 @@
       {
         "id": "entero",
         "placa": "texto",
+        "clase": "texto",
         "papeleta": "texto",
         "deposito": "texto",
         "fechaDeIngreso": "fecha",
@@ -2424,6 +2425,7 @@
         "fecha": "fecha",
         "documentoId": "entero",
         "observacion": "texto",
+        "estado": "texto",
         "acuses": [
           {
             "intento": "entero",

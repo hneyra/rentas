@@ -263,6 +263,10 @@ public class InternamientoRepositoryJdbc extends RepositorioJdbc
                 "SELECT "
                         + COLUMNAS
                         + ", p.numero AS numero_papeleta"
+                        // La clase del vehiculo internado (#185). El JOIN es el que el propio
+                        // ingreso permite: `internamiento.vehiculo_id`. Va en la SELECCION y no
+                        // en `desde` —como el de la papeleta— porque el recuento no lo necesita.
+                        + ", v.categoria AS clase_vehiculo"
                         + ", (SELECT m.fecha FROM internamiento_movimiento m"
                         + "    WHERE m.internamiento_id = i.id AND m.tipo = 'LIBERACION'"
                         + "    LIMIT 1) AS fecha_salida"
@@ -274,6 +278,10 @@ public class InternamientoRepositoryJdbc extends RepositorioJdbc
                         + " AS en_abandono"
                         + desde
                         + " LEFT JOIN papeleta p ON p.id = i.papeleta_id"
+                        // LEFT y no JOIN: se interna lo que se interna, este o no inscrito en el
+                        // padron. Con un JOIN interno, el vehiculo sin ficha desapareceria de la
+                        // grilla del deposito, que es donde de verdad esta.
+                        + " LEFT JOIN vehiculo v ON v.id = i.vehiculo_id"
                         + donde;
 
         return paginar(
@@ -359,6 +367,7 @@ public class InternamientoRepositoryJdbc extends RepositorioJdbc
         return new InternamientoEnConsulta(
                 fila.getLong("id"),
                 fila.getString("placa"),
+                fila.getString("clase_vehiculo"),
                 fila.getString("numero_papeleta"),
                 fila.getString("deposito"),
                 ingreso,

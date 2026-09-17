@@ -190,15 +190,24 @@ const SIN_PLACA: Ausencia = {
  *       `documentoId`: es la fila de `documento_emitido` con que se reimprime (RF-132), un
  *       identificador interno, y un numero de base de datos en una columna que dice «Documento» se
  *       lee como el numero del papel.</li>
- *   <li><b>Estado</b> → <b>celda sin dato, con su motivo dentro</b>. `ActoResource` **no publica
- *       ningun estado del acto**: lo
- *       unico que dice de como quedo son sus `acuses`, una fila por intento. Y resumirlos en el
- *       ultimo es justo lo que el backend prohibe en su propio javadoc —«quedarse con la ultima
- *       escondería que las dos anteriores no encontraron a nadie, que es justamente lo que hay que
- *       poder mostrar cuando el administrado discute la notificación»—. En una papeleta ese dato
- *       decide si se puede cobrar: una notificada fuera de plazo **caduca**, y escribir «Conforme»
- *       porque el ultimo intento salio bien seria afirmarlo. Se cierra publicando el estado del
- *       acto en `ActoResource`, que es de backend y tiene su issue.</li>
+ *   <li><b>Estado</b> ← `estado`, <b>desde #185</b>. Hasta ese issue esta celda decia que no habia
+ *       dato, y era lo correcto: lo unico que `ActoResource` publicaba de como quedo un acto eran
+ *       sus `acuses`, una fila por intento, y resumirlos en el ultimo es justo lo que el backend
+ *       prohibe en su propio javadoc —«quedarse con la ultima escondería que las dos anteriores no
+ *       encontraron a nadie, que es justamente lo que hay que poder mostrar cuando el administrado
+ *       discute la notificación»—. Ahora el estado lo <b>deriva el dominio</b> de todos los acuses
+ *       y llega ya hecho: `SIN_NOTIFICACION`, `SIN_DILIGENCIAR`, `NO_NOTIFICADO`, `NOTIFICADO`.
+ *       <p><b>Y se escribe tal cual, sin traducirlo a las palabras del artboard.</b> El artboard
+ *       dibuja «Conforme», «Por vencer» y «Pendiente», que son estados <b>del plazo</b>, y el plazo
+ *       no lo publica nadie —vive en el conjunto sellado, y el backend explica por que no lo pide
+ *       desde esta operacion—. Traducir `NOTIFICADO` a «Conforme» aqui seria afirmar que la
+ *       papeleta todavia se puede cobrar, que es exactamente lo que una notificada fuera de plazo
+ *       NO permite: caduca. El vocabulario que llega es el unico que se puede escribir sin
+ *       inventar.
+ *       <p>Es columna de insignia, y su tono sale de `tonoDe` como el de las demas: ninguna de las
+ *       cuatro palabras la reconoce ninguna de las tres listas, asi que todas caen en el tono de
+ *       «no se» (#175). Es lo correcto —`NOTIFICADO` no es un juicio favorable sobre la papeleta—
+ *       y no hay que tocar `tono.ts` para conseguirlo.</li>
  * </ul>
  */
 const TRA_PAP: Conector = {
@@ -230,11 +239,9 @@ const TRA_PAP: Conector = {
               acto.tipo,
               formatearFecha(acto.fecha),
               acto.clase,
-              sinDato(
-                'El expediente publica los acuses de cada acto, uno por intento, y ningun estado ' +
-                  'del acto. Resumirlos en el ultimo esconderia que los anteriores no encontraron ' +
-                  'a nadie, y en una papeleta eso decide si todavia se puede cobrar.',
-              ),
+              // El estado que el backend DERIVA de todos los acuses (#185), escrito tal cual. Ver
+              // el javadoc: traducirlo a «Conforme» seria afirmar que la papeleta se puede cobrar.
+              acto.estado,
             ],
           })),
         },
@@ -315,15 +322,19 @@ type LoDeTraVeh = readonly [
  *
  * <h2>La tabla «Vehiculos internados»: cuatro columnas de seis</h2>
  *
- * «Placa» ← `placa`, «Ingreso» ← `fechaDeIngreso`, «Dias» ← `dias` y «Situacion» ← `estado`, que
- * es la situacion derivada de los movimientos. Las otras dos llegan **sin dato y con su motivo**:
+ * «Placa» ← `placa`, «Clase» ← `clase` **desde #185**, «Ingreso» ← `fechaDeIngreso`, «Dias» ←
+ * `dias` y «Situacion» ← `estado`, que es la situacion derivada de los movimientos.
+ *
+ * «Clase» era el segundo hueco de esta tabla y ya no lo es: el backend la trae del padron por el
+ * `vehiculo_id` que el propio ingreso guarda, que es lo que evitaba las dos salidas que esta
+ * interfaz NO iba a tomar —pedir una ficha por fila, veinte lecturas para una columna; o escribir
+ * la categoria del vehiculo de la direccion en las veinte filas, que diria que el deposito entero
+ * es de esa clase—. Cuando el vehiculo no esta inscrito, o su ficha no declara categoria, la celda
+ * sigue diciendo que no hay dato con su motivo dentro.
+ *
+ * La que queda **sin dato y con su motivo** es una:
  *
  * <ul>
- *   <li><b>«Clase»</b> — `InternamientoResource` no publica la clase del vehiculo. La publica la
- *       ficha, `categoria`, y **de un vehiculo**: la de la placa de la direccion. Pedir una ficha
- *       por fila serian veinte lecturas para una columna, y escribir la categoria del vehiculo de
- *       la direccion en las veinte filas seria afirmar que el deposito esta lleno de Automoviles
- *       porque el de la direccion lo es.</li>
  *   <li><b>«Custodia S/»</b> — el importe que el backend se niega a componer. El mismo D-02b de
  *       arriba, y en una celda de tabla ni siquiera cabe decirlo con palabras.</li>
  * </ul>
@@ -374,11 +385,15 @@ const TRA_VEH: Conector = {
               clave: String(fila.id),
               celdas: [
                 fila.placa,
-                sinDato(
-                  'La grilla del deposito no publica la clase del vehiculo: la publica la ficha, ' +
-                    'y de un vehiculo. Escribir aqui la del vehiculo de la direccion diria que el ' +
-                    'deposito entero es de esa clase.',
-                ),
+                // La categoria con que el vehiculo internado esta inscrito (#185). Llega NULA en
+                // dos casos que no son lo mismo que un dato: el ingreso que no nombro ninguna
+                // ficha —se interna lo que se interna— y la ficha sin categoria declarada. Los dos
+                // se dicen igual, porque desde aqui no se distinguen y ninguno se puede rellenar.
+                fila.clase ??
+                  sinDato(
+                    'El vehiculo internado no esta en el padron, o su ficha no declara categoria: ' +
+                      'la grilla trae la clase de cada vehiculo, y de este no hay ninguna que traer.',
+                  ),
                 formatearFecha(fila.fechaDeIngreso),
                 String(fila.dias),
                 sinDato(

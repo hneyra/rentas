@@ -41,6 +41,30 @@ public record ActoDeLaPapeleta(
     /** Los actos que salen del internamiento y sus movimientos. */
     public static final String CLASE_INTERNAMIENTO = "ACTA_INTERNAMIENTO";
 
+    /**
+     * En qué punto de su notificación está, derivado de sus acuses (#185).
+     *
+     * <p>Se deriva y no se guarda, por lo mismo que en coactiva: ninguno de los registros de los
+     * que salen estos actos admite {@code UPDATE}. Y no sustituye a {@link #acuses()}, que sigue
+     * viajando entero: ver {@link EstadoDelActoDeLaPapeleta}.
+     */
+    public EstadoDelActoDeLaPapeleta estado() {
+        return EstadoDelActoDeLaPapeleta.de(seNotifica(), acuses);
+    }
+
+    /**
+     * Si este acto se notifica.
+     *
+     * <p>Las actas del depósito no: se entregan en mano al conductor o a quien retira, con su firma
+     * en el papel. Por eso una lista de acuses vacía significa dos cosas distintas según la clase
+     * —«todavía no se ha intentado» en una resolución, «no hay nada que intentar» en un acta—, y
+     * decidirlo aquí es lo que evita que el estado diga que alguien tiene pendiente notificar un
+     * acta de ingreso.
+     */
+    private boolean seNotifica() {
+        return CLASE_RESOLUCION.equals(clase);
+    }
+
     public ActoDeLaPapeleta {
         Objects.requireNonNull(clase, "El acto dice de que registro sale");
         Objects.requireNonNull(tipo, "El acto necesita su tipo");

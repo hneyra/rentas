@@ -211,16 +211,18 @@ const CONECTADAS: readonly {
       'acta no lo trae. Solo CONFORME es un juicio favorable; los otros cuatro son lo que el ' +
       'fiscalizador anoto en campo, y la raya no es ninguna de las dos cosas',
   },
-  // Las dos de Transito entran con #180, y son el PRIMER caso en que la celda de la insignia no
-  // lleva texto sino la ausencia declarada de uno: `tra-pap` usa la celda sin dato de
-  // `kamayuk-lib`#87, que ademas anuncia el motivo dentro.
+  // Las dos de Transito entran con #180. `tra-pap` fue el PRIMER caso en que la celda de la
+  // insignia no llevaba texto sino la ausencia declarada de uno —la celda sin dato de
+  // `kamayuk-lib`#87—, y dejo de serlo con #185: ahora el backend publica el estado.
   {
     hoja: 'tra-pap',
     bloque: 0,
     leLlega:
-      'NADA — «Estado» no la publica nadie: el expediente trae los `acuses[]` de cada acto, uno ' +
-      'por intento, y ningun estado. Va celda sin dato con su motivo dentro, no una raya muda, y ' +
-      'por eso no hay tono que calificar',
+      '`actos[].estado` desde #185 — SIN_NOTIFICACION, SIN_DILIGENCIAR, NO_NOTIFICADO, ' +
+      'NOTIFICADO: en que punto de su NOTIFICACION esta el acto, derivado en el dominio de todos ' +
+      'sus acuses. Ninguno es un juicio sobre la papeleta, y por eso los cuatro caen en el tono ' +
+      'de «no se»: «Conforme» y «Por vencer», que es lo que el artboard dibuja, son estados DEL ' +
+      'PLAZO, y el plazo vive en el conjunto sellado y no lo publica esta operacion',
   },
   {
     hoja: 'tra-veh',

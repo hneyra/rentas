@@ -15,6 +15,7 @@ import type {
   Paginado,
   VehiculoServido,
 } from '../lecturas.ts';
+import { TONO_SIN_RECONOCER, tonoDe } from '../../pantallas/tono.ts';
 import { SIN_PLACA, TRA_PAP, TRA_VEH } from './transito.ts';
 
 /**
@@ -51,6 +52,7 @@ function internado(campos: Partial<InternamientoEnDeposito> = {}): Internamiento
   return {
     id: 1,
     placa: 'T2G-418',
+    clase: 'AUTOMOVIL',
     papeleta: '0041182',
     deposito: 'DEPOSITO MUNICIPAL 1',
     fechaDeIngreso: '2026-07-18',
@@ -99,6 +101,7 @@ const EXPEDIENTE_A: ExpedienteDeLaPapeleta = {
       fecha: '2026-07-18',
       documentoId: 40,
       observacion: 'Vehiculo internado en el acto',
+      estado: 'SIN_NOTIFICACION',
       acuses: [],
     },
     {
@@ -108,6 +111,7 @@ const EXPEDIENTE_A: ExpedienteDeLaPapeleta = {
       fecha: '2026-07-24',
       documentoId: 41,
       observacion: 'Emitida por el area de transito',
+      estado: 'NOTIFICADO',
       acuses: [
         {
           intento: 1,
@@ -145,6 +149,7 @@ const EXPEDIENTE_B: ExpedienteDeLaPapeleta = {
       fecha: '2026-08-02',
       documentoId: 77,
       observacion: 'Resuelve el descargo presentado',
+      estado: 'SIN_DILIGENCIAR',
       acuses: [],
     },
   ],
@@ -281,13 +286,15 @@ describe('`tra-pap` — los actos de una papeleta', () => {
     expect(filas.map((f) => f.celdas[0])).not.toEqual(['1', '2']);
   });
 
-  it('LA ROTURA DEL AC3: «Estado» dice que no hay dato, y NO resume los acuses', () => {
+  it('LA ROTURA DEL AC3: «Estado» sale de `estado`, y NUNCA de la ultima diligencia', () => {
     // El segundo acto lleva DOS acuses y el ultimo salio «ENTREGADO». Quedarse con el ultimo
     // daria una celda que afirma que el acto surtio efecto y esconderia que el primer intento no
     // encontro a nadie — y en una papeleta ese dato decide si todavia se puede cobrar. Lo prohibe
-    // el propio backend en el javadoc de `ConsultaDeActosDeLaPapeleta`.
-    const estado = filas[1]?.celdas[4];
-    expect(estado).toEqual({ texto: null, nota: expect.stringContaining('acuses') });
+    // el propio backend en el javadoc de `ConsultaDeActosDeLaPapeleta`, y desde #185 lo cierra
+    // publicando el estado ya DERIVADO de todos los acuses. Esta celda escribe ese campo y nada
+    // mas: el resultado de una diligencia no puede aparecer aqui por ningun camino.
+    expect(filas[1]?.celdas[4]).toBe('NOTIFICADO');
+    expect(filas[0]?.celdas[4]).toBe('SIN_NOTIFICACION');
     for (const fila of filas) {
       expect(JSON.stringify(fila.celdas)).not.toContain('ENTREGADO');
       expect(JSON.stringify(fila.celdas)).not.toContain('NO_ENCONTRADO');
@@ -309,7 +316,7 @@ describe('`tra-pap` — los actos de una papeleta', () => {
 describe('`tra-veh` — el deposito y el vehiculo de la direccion', () => {
   const reparto = TRA_VEH.repartir([
     vehiculo(),
-    pagina([internado(), internado({ id: 2, placa: 'V1H-882', dias: 39 })], 188),
+    pagina([internado(), internado({ id: 2, placa: 'V1H-882', dias: 39, clase: 'MOTOCICLETA' })], 188),
     pagina([internado()], 1),
   ] as never);
 
@@ -378,8 +385,11 @@ describe('`tra-veh` — el deposito y el vehiculo de la direccion', () => {
     expect(filas[1]?.celdas[2]).toBe('18/07/2026');
     expect(filas[1]?.celdas[3]).toBe('39');
     expect(filas[1]?.celdas[5]).toBe('EN_DEPOSITO');
-    // «Clase» y «Custodia S/»: sin dato, con su motivo.
-    expect(filas[0]?.celdas[1]).toEqual({ texto: null, nota: expect.stringContaining('clase') });
+    // «Clase» ← `clase`, desde #185. Y cada fila la SUYA: una sola clase repetida diria que el
+    // deposito entero es de una.
+    expect(filas[0]?.celdas[1]).toBe('AUTOMOVIL');
+    expect(filas[1]?.celdas[1]).toBe('MOTOCICLETA');
+    // «Custodia S/» sigue siendo un hueco, y NO es un olvido: es D-02b.
     expect(filas[0]?.celdas[4]).toEqual({ texto: null, nota: expect.stringContaining('D-02b') });
   });
 
@@ -468,11 +478,43 @@ describe('LA ROTURA DEL AC3, en el DOM: con otra respuesta, la pantalla ensena o
   });
 
   it('y la celda sin dato llega al DOM MARCADA y con su motivo, no como una raya muda', async () => {
-    const { container } = await pintar('tra-pap', comoTraPap(EXPEDIENTE_A));
+    // Desde #185 la unica celda sin dato de estas dos hojas es «Custodia S/», y no es un olvido:
+    // es D-02b. «Estado» y «Clase» las publica ya el backend y se pintan con lo que llego.
+    const { container } = await pintar(
+      'tra-veh',
+      comoTraVeh(vehiculo(), [internado()], [internado()]),
+      'T2G-418',
+    );
 
     const sinDato = container.querySelectorAll('[data-celda-sin-dato]');
-    // Una por fila: la columna «Estado» de los dos actos.
-    expect(sinDato.length).toBe(2);
-    expect(sinDato[0]?.getAttribute('title')).toContain('acuses');
+    // Una por fila del deposito: la columna «Custodia S/».
+    expect(sinDato.length).toBe(1);
+    expect(sinDato[0]?.getAttribute('title')).toContain('D-02b');
+  });
+
+  it('#185 — «Estado» sale de la respuesta, y NO se traduce a las palabras del artboard', async () => {
+    const { container } = await pintar('tra-pap', comoTraPap(EXPEDIENTE_A));
+
+    // Lo que llego, tal cual: el vocabulario que el dominio deriva de TODOS los acuses.
+    expect(container.textContent).toContain('NOTIFICADO');
+    expect(container.textContent).toContain('SIN_NOTIFICACION');
+    // Y ninguna celda sin dato: la columna que #180 dejo abierta ya tiene que pintar.
+    expect(container.querySelectorAll('[data-celda-sin-dato]').length).toBe(0);
+    // «Conforme» es un estado DEL PLAZO, y el plazo no lo publica nadie: escribirlo aqui
+    // afirmaria que la papeleta todavia se puede cobrar.
+    for (const delPlazo of ['Conforme', 'Por vencer', 'Pendiente']) {
+      expect(container.textContent, `«${delPlazo}» es del artboard, no de la respuesta`).not.toContain(
+        delPlazo,
+      );
+    }
+  });
+
+  it('#185 — un acto que nadie pudo notificar NO se pinta con el tono de conforme', async () => {
+    // El defecto de #175 en la columna nueva: `NO_NOTIFICADO` no lo reconoce ninguna de las tres
+    // listas de `tono.ts`, asi que cae en el tono de «no se» — y no en el verde por omision.
+    expect(tonoDe('NO_NOTIFICADO')).toBe(TONO_SIN_RECONOCER);
+    expect(tonoDe('NOTIFICADO')).toBe(TONO_SIN_RECONOCER);
+    expect(tonoDe('SIN_DILIGENCIAR')).toBe(TONO_SIN_RECONOCER);
+    expect(tonoDe('SIN_NOTIFICACION')).toBe(TONO_SIN_RECONOCER);
   });
 });

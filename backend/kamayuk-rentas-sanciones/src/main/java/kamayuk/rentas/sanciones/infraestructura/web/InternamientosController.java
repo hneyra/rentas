@@ -254,11 +254,19 @@ public class InternamientosController {
     /**
      * Una fila de la grilla.
      *
+     * <p>{@code clase} es la categoría con que el vehículo internado está inscrito (#185). Llega
+     * <b>nula</b> cuando el ingreso no nombró ningún vehículo del padrón —se interna lo que se
+     * interna, esté o no inscrito— o cuando la ficha no declara categoría; nunca como texto vacío,
+     * que en una columna se leería como un dato. El porqué de traerla aquí y no pidiendo la ficha
+     * de cada placa está en {@link InternamientoEnConsulta}.
+     *
+     * @param clase la categoría con que el vehículo está inscrito; nula si no se sabe
      * @param calculadoA el día con el que se contaron los días (regla 9, RNF-075)
      */
     public record InternamientoResource(
             long id,
             String placa,
+            @Nullable String clase,
             @Nullable String papeleta,
             String deposito,
             LocalDate fechaDeIngreso,
@@ -273,6 +281,7 @@ public class InternamientosController {
             return new InternamientoResource(
                     fila.id(),
                     fila.placa(),
+                    fila.clase(),
                     fila.numeroPapeleta(),
                     fila.deposito(),
                     fila.fechaIngreso(),

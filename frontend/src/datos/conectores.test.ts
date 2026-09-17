@@ -250,6 +250,7 @@ const EXPEDIENTE_DE_PAPELETA: ExpedienteDeLaPapeleta = {
       fecha: '2026-07-24',
       documentoId: 41,
       observacion: 'Emitida por el area de transito',
+      estado: 'SIN_DILIGENCIAR',
       acuses: [],
     },
   ],
@@ -260,6 +261,7 @@ function internado(campos: Partial<InternamientoEnDeposito> = {}): Internamiento
   return {
     id: 1,
     placa: 'T2G-418',
+    clase: 'AUTOMOVIL',
     papeleta: '0041182',
     deposito: 'DEPOSITO MUNICIPAL 1',
     fechaDeIngreso: '2026-07-18',
