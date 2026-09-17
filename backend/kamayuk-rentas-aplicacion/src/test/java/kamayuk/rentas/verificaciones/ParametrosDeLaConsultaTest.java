@@ -347,6 +347,10 @@ class ParametrosDeLaConsultaTest {
     /** Donde viaja ese parametro: {@code in: query} con diez. */
     private static final Pattern DONDE_VIAJA = Pattern.compile("          in: (\\S+)");
 
+    /** Lo que ese parametro dice de si mismo: {@code description: "…"}, tambien con diez. */
+    private static final Pattern DESCRIPCION_DEL_PARAMETRO =
+            Pattern.compile("          description:(.*)");
+
     @Test
     @DisplayName("el contrato se lee, y trae parametros de consulta que comparar")
     void elContratoSeLee() throws IOException {
@@ -648,7 +652,7 @@ class ParametrosDeLaConsultaTest {
         assertThat(colisiones)
                 .as(
                         "Un filtro que se llama como uno de los cuatro nombres de"
-                                + " ParametrosDePaginacion —pagina, tamano, ordenarPor, direccion— esta"
+                                + " ParametrosDePaginacion —pagina, tamano, ordenarPor, sentido— esta"
                                 + " atado a DOS cosas a la vez, y las dos las enlaza Spring del mismo"
                                 + " parametro de consulta. Medido en GET /licencias/funcionamiento"
                                 + " (#226): «?ordenarPor=numero&direccion=DESCENDENTE» acotaba el"
@@ -660,7 +664,92 @@ class ParametrosDeLaConsultaTest {
                                 + " Paginacion.Direccion. El contrato tampoco los puede distinguir:"
                                 + " «parametros-de-la-api.json» sale de la FIRMA, y en la firma hay un"
                                 + " solo nombre. Lo que se renombra es el FILTRO —el dialecto de la"
-                                + " paginacion es el mismo en las 134 pantallas y no puede ceder—.")
+                                + " paginacion es el mismo en las 134 pantallas y no puede ceder—."
+                                + " Desde #236 el cuarto nombre es «sentido» y no «direccion», que"
+                                + " es lo que saca del choque a la palabra con la que el dominio"
+                                + " nombra un domicilio: un filtro «Dirección» ya no colisiona.")
+                .isEmpty();
+    }
+
+    /**
+     * Lo que el generador escribe para cada nombre del dialecto, y que nada puede pisar.
+     *
+     * <p>Son los cuatro textos de {@code PAGINACION} en {@code generar-openapi.mjs}. Se comparan
+     * por <b>prefijo</b> porque {@code ordenarPor} lo alarga con su lista blanca desde #227 —«Lista
+     * cerrada: cualquier otro valor es 422…»—, y esa cola depende de la operacion.
+     */
+    private static final Map<String, String> LO_QUE_DICE_EL_DIALECTO =
+            Map.of(
+                    "pagina", "Pagina que se pide, contada desde 0",
+                    "tamano", "Filas por pagina",
+                    "ordenarPor", "Campo por el que se ordena, en camelCase",
+                    "sentido", "ASCENDENTE | DESCENDENTE");
+
+    @Test
+    @DisplayName("el dialecto de la paginacion dice lo mismo en TODO el contrato (#236)")
+    void elDialectoDeLaPaginacionDiceLoMismoEnTodoElContrato() throws IOException {
+        // Por que esto mira el YAML y no las firmas, que es lo que #236 pidio: el choque que hace
+        // dano no deja huella en ninguna firma. `reunir` (generar-openapi.mjs) se queda con el
+        // PRIMERO de dos parametros homonimos, y los filtros de la pantalla van DELANTE de la
+        // paginacion; asi que un filtro que se llame como uno de los cuatro no colisiona en el
+        // contrato: lo sustituye. El YAML sale entonces diciendo que `?sentido=` acota por algo,
+        // y el `sentido` de la paginacion —que el servidor sigue aceptando— desaparece del
+        // contrato sin que nada se ponga rojo. Es exactamente lo que le pasaba a
+        // `GET /licencias/funcionamiento` antes de #226, medido: su `direccion` de paginacion no
+        // estaba publicado.
+        //
+        // Y por eso no basta `ningunFiltroSeLlamaComoElDialectoDeLaPaginacion`, que recorre
+        // @RequestParam: un filtro que el contrato publica y ningun controlador lee —hay 146 de
+        // esos (#544)— no aparece en ninguna firma.
+        Map<String, Map<String, String>> contrato = descripcionesDeConsultaDelContrato();
+
+        assertThat(contrato)
+                .as("el contrato no trajo ninguna operacion: la lectura del YAML se rompio")
+                .isNotEmpty();
+
+        List<String> impostores = new ArrayList<>();
+        List<String> incompletas = new ArrayList<>();
+        for (Map.Entry<String, Map<String, String>> operacion : contrato.entrySet()) {
+            Set<String> delDialecto = new TreeSet<>(operacion.getValue().keySet());
+            delDialecto.retainAll(GuardiaDeParametros.DIALECTO_DE_LA_PAGINACION);
+            for (String nombre : delDialecto) {
+                String dice = operacion.getValue().get(nombre);
+                if (!dice.startsWith(LO_QUE_DICE_EL_DIALECTO.get(nombre))) {
+                    impostores.add(
+                            operacion.getKey() + " publica «" + nombre + "» diciendo: " + dice);
+                }
+            }
+            // Y los cuatro viajan juntos: si uno falta, o lo suprimio alguien a medias o un
+            // homonimo se lo llevo por delante. La operacion que no pagina no publica ninguno.
+            if (!delDialecto.isEmpty()
+                    && !delDialecto.equals(
+                            new TreeSet<>(GuardiaDeParametros.DIALECTO_DE_LA_PAGINACION))) {
+                incompletas.add(operacion.getKey() + " publica solo " + delDialecto);
+            }
+        }
+
+        assertThat(impostores)
+                .as(
+                        "Un parametro del contrato se llama como uno de los cuatro del dialecto"
+                                + " —GuardiaDeParametros.DIALECTO_DE_LA_PAGINACION— y NO es el del"
+                                + " dialecto. Quien lo mande pedira una cosa y obtendra otra: el"
+                                + " servidor admite esos cuatro nombres en toda operacion y los enlaza"
+                                + " a ParametrosDePaginacion, asi que «?sentido=algo» que el contrato"
+                                + " presenta como filtro es, en el servidor, un valor que tiene que"
+                                + " convertirse a Paginacion.Direccion o es un 400 de enlace. Se"
+                                + " arregla renombrando el FILTRO en RENOMBRADOS de"
+                                + " generar-openapi.mjs, nunca el dialecto: el dialecto es el mismo en"
+                                + " las 134 pantallas.")
+                .isEmpty();
+
+        assertThat(incompletas)
+                .as(
+                        "Una operacion publica parte del dialecto de la paginacion y parte no. Los"
+                                + " cuatro los anade el mismo bloque del generador, asi que esto"
+                                + " significa que algo se llevo por delante a los que faltan —un filtro"
+                                + " homonimo, que `reunir` resuelve quedandose con el primero— o que"
+                                + " SUPRIMIDOS retiro unos y no otros. Publicar «?pagina=» sin decir"
+                                + " que se puede ordenar es publicar media ventana.")
                 .isEmpty();
     }
 
@@ -1353,6 +1442,69 @@ class ParametrosDeLaConsultaTest {
             }
         }
         return porOperacion;
+    }
+
+    /**
+     * Lo mismo, pero quedandose ademas con lo que el contrato <b>dice</b> de cada parametro.
+     *
+     * <p>Hace falta para #236: el nombre solo no distingue el {@code sentido} de la paginacion de
+     * un filtro que se llamara igual, y lo que los separa es justo la descripcion.
+     *
+     * <p>La descripcion puede venir entre comillas en una linea —{@code description: "…"}— o como
+     * bloque {@code >-}; de la segunda basta la primera linea, que es donde empieza el texto que se
+     * compara por prefijo.
+     */
+    private static Map<String, Map<String, String>> descripcionesDeConsultaDelContrato()
+            throws IOException {
+        List<String> lineas =
+                Files.readAllLines(
+                        raizDelRepositorio().resolve("docs/50-api/openapi/rentas-v1.yaml"),
+                        StandardCharsets.UTF_8);
+
+        Map<String, Map<String, String>> porOperacion = new TreeMap<>();
+        String rutaActual = null;
+        String operacionActual = null;
+        for (int i = 0; i < lineas.size(); i++) {
+            String linea = lineas.get(i);
+            Matcher ruta = RUTA_DEL_CONTRATO.matcher(linea);
+            if (ruta.matches()) {
+                rutaActual = ruta.group(1);
+                operacionActual = null;
+                continue;
+            }
+            Matcher verbo = VERBO_DEL_CONTRATO.matcher(linea);
+            if (verbo.matches() && rutaActual != null) {
+                operacionActual = verbo.group(1).toUpperCase(Locale.ROOT) + " " + rutaActual;
+                porOperacion.computeIfAbsent(operacionActual, clave -> new LinkedHashMap<>());
+                continue;
+            }
+            Matcher nombre = NOMBRE_DEL_PARAMETRO.matcher(linea);
+            if (nombre.matches() && operacionActual != null && viajaEnLaConsulta(lineas, i)) {
+                porOperacion.get(operacionActual).put(nombre.group(1), descripcionDe(lineas, i));
+            }
+        }
+        return porOperacion;
+    }
+
+    /**
+     * Lo que dice el {@code description:} del parametro que empieza en esa linea, o cadena vacia.
+     */
+    private static String descripcionDe(List<String> lineas, int desde) {
+        for (int i = desde + 1; i < lineas.size() && lineas.get(i).startsWith("          "); i++) {
+            Matcher dice = DESCRIPCION_DEL_PARAMETRO.matcher(lineas.get(i));
+            if (!dice.matches()) {
+                continue;
+            }
+            String texto = dice.group(1).trim();
+            // Un bloque «>-» o «|»: el texto empieza en la linea de debajo.
+            if (texto.isEmpty() || ">-".equals(texto) || "|".equals(texto) || ">".equals(texto)) {
+                return i + 1 < lineas.size() ? lineas.get(i + 1).trim() : "";
+            }
+            return texto.startsWith("\"") && texto.endsWith("\"") && texto.length() >= 2
+                    ? texto.substring(1, texto.length() - 1)
+                    : texto;
+        }
+        return "";
     }
 
     /**

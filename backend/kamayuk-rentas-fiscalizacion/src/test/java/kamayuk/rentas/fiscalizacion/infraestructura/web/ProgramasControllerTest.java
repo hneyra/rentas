@@ -315,7 +315,7 @@ class ProgramasControllerTest {
                                 .param("pagina", "2")
                                 .param("tamano", "5")
                                 .param("ordenarPor", "fechaInicio")
-                                .param("direccion", "DESCENDENTE"))
+                                .param("sentido", "DESCENDENTE"))
                 .andReturn();
 
         assertThat(paginacionesPedidas).hasSize(1);

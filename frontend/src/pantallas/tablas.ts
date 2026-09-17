@@ -33,12 +33,26 @@
  * —`docs/50-api/parametros-de-la-api.json`—, y eso lo comprueba una guarda: mandar uno que el
  * contrato no declare es construir sobre un nombre que nada de este repositorio puede verificar
  * (#26).
+ *
+ * **Y desde #236 son los MISMOS cuatro que el backend admite, no cuatro que se le parecen.** El
+ * cuarto se llamaba `direccion` en los dos lados, que es la palabra con la que el dominio nombra un
+ * domicilio: como `GuardiaDeParametros.DIALECTO_DE_LA_PAGINACION` los admite en TODA operacion,
+ * toda pantalla con un filtro «Dirección» nacia rota —`GET /licencias/funcionamiento`,
+ * `GET /autorizaciones/anuncios`—. El sentido se aparto, y el nombre al que se aparto no se
+ * invento: `OrdenDeLaTabla.sentidoEnLaRuta`, de `@kamayuk/ui`, ya decia `sentido` desde el
+ * principio, de modo que hasta #236 el interprete llamaba «sentido» a lo que escribia en un sitio
+ * llamado «direccion».
+ *
+ * Que los dos lados sigan diciendo lo mismo lo cruza
+ * `verificaciones/el-dialecto-de-la-paginacion-es-el-del-backend.test.ts`, contra
+ * `_dialectoDeLaPaginacion` de `docs/50-api/parametros-de-la-api.json` —que sale de la constante
+ * del guardia—. Renombrar uno de los dos a solas sale rojo.
  */
 export const EN_LA_RUTA = {
   pagina: 'pagina',
   tamano: 'tamano',
   ordenarPor: 'ordenarPor',
-  direccion: 'direccion',
+  sentido: 'sentido',
 } as const;
 
 /**

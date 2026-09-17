@@ -218,9 +218,9 @@ public class ConsultaDeudaController {
                 parametros.ordenarPor() == null || parametros.ordenarPor().isBlank()
                         ? ORDEN_POR_OMISION
                         : parametros.ordenarPor(),
-                parametros.direccion() == null
+                parametros.sentido() == null
                         ? Paginacion.Direccion.DESCENDENTE
-                        : parametros.direccion());
+                        : parametros.sentido());
     }
 
     /**

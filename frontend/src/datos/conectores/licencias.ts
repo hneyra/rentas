@@ -215,7 +215,8 @@ const AUT_CAT: Conector = {
  * «este padron no tiene nada».
  *
  * #226 renombra el filtro a `direccionDelEstablecimiento`, asi que el sentido vuelve a tener su
- * sitio. La tabla ofrece **dos** de sus cinco columnas —ver el comentario de su definicion—, y el
+ * sitio; #236 aparta ademas el sentido a `?sentido=`, de modo que el choque no puede volver con la
+ * siguiente pantalla que dibuje un domicilio. La tabla ofrece **dos** de sus cinco columnas —ver el comentario de su definicion—, y el
  * primero es `numero`, que es el `ORDEN_POR_OMISION` de `LicenciaController`. Que lo sea no lo
  * afirma este archivo: lo comprueba
  * `verificaciones/la-ruta-de-la-hoja-llega-al-conector.test.ts` contra el contrato, que desde #227

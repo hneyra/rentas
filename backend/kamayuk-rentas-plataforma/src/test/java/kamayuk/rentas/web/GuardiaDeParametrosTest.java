@@ -94,7 +94,7 @@ class GuardiaDeParametrosTest {
                                         .param("pagina", "0")
                                         .param("tamano", "20")
                                         .param("ordenarPor", "codigo")
-                                        .param("direccion", "ASCENDENTE"))
+                                        .param("sentido", "ASCENDENTE"))
                         .andReturn();
 
         assertThat(respuesta.getResponse().getStatus())
@@ -104,6 +104,26 @@ class GuardiaDeParametrosTest {
                                 + " pedir la pagina siguiente se contestaria «parametro desconocido:"
                                 + " pagina»")
                 .isEqualTo(200);
+    }
+
+    @Test
+    @DisplayName("y el nombre VIEJO del sentido se contesta 422 nombrandolo (#236)")
+    void elNombreViejoDelSentidoSeRechaza() throws Exception {
+        // El precio de renombrar, y la razon por la que no se publican los dos nombres: una ruta
+        // guardada de antes de #236 no se ignora en silencio —que dejaria el listado ordenado al
+        // reves de lo que la barra dice—, sino que se contesta nombrando el parametro. Un 422 se
+        // ve; un orden distinto del anunciado, no.
+        //
+        // Y `/sonda/padron` SI compone ParametrosDePaginacion, o sea que esto no pasa por no
+        // paginar: pasa porque el dialecto ya no reserva esa palabra.
+        MvcResult respuesta =
+                mvc.perform(get("/sonda/padron").param("direccion", "DESCENDENTE")).andReturn();
+
+        assertThat(respuesta.getResponse().getStatus()).isEqualTo(422);
+        assertThat(respuesta.getResponse().getContentAsString())
+                .as("el mensaje nombra lo que sobra y lo que se admite")
+                .contains("direccion")
+                .contains("sentido");
     }
 
     @Test
