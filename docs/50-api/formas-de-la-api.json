@@ -3248,6 +3248,25 @@
       }
     ]
   },
+  "POST /fiscalizacion/actas/{id}/anulacion": {
+    "id": "entero",
+    "programaId": "entero",
+    "version": "entero",
+    "contribuyenteId": "entero",
+    "predioId": "entero",
+    "vehiculoId": "entero",
+    "fichaId": "entero",
+    "fechaVisita": "texto",
+    "fiscalizador": "texto",
+    "hallazgo": "texto",
+    "areaDeclarada": "texto",
+    "areaHallada": "texto",
+    "diferenciaDeArea": "texto",
+    "usoDeclarado": "texto",
+    "usoHallado": "texto",
+    "detalle": "texto",
+    "estado": "texto"
+  },
   "POST /fiscalizacion/liquidaciones": {
     "numero": "texto",
     "actaId": "entero",

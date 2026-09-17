@@ -1,8 +1,14 @@
 package kamayuk.rentas.fiscalizacion.infraestructura.web;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import kamayuk.rentas.autorizacion.Privilegio;
 import kamayuk.rentas.autorizacion.RequiereAcceso;
+import kamayuk.rentas.dominio.Observacion;
+import kamayuk.rentas.fiscalizacion.aplicacion.AnularActaFiscalizacion;
 import kamayuk.rentas.fiscalizacion.aplicacion.ConsultaDeActas;
+import kamayuk.rentas.fiscalizacion.aplicacion.LiquidarFiscalizacion;
+import kamayuk.rentas.fiscalizacion.dominio.ActaFiscalizacion;
 import kamayuk.rentas.fiscalizacion.dominio.CriterioDeActas;
 import kamayuk.rentas.web.Api;
 import kamayuk.rentas.web.CodigoDeError;
@@ -10,9 +16,14 @@ import kamayuk.rentas.web.ParametrosDePaginacion;
 import kamayuk.rentas.web.ProblemaDeNegocio;
 import kamayuk.rentas.web.RespuestaPaginada;
 import org.jspecify.annotations.Nullable;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -66,9 +77,11 @@ public class ActasController {
     private static final String ORDEN_POR_OMISION = "fechaVisita";
 
     private final ConsultaDeActas consulta;
+    private final AnularActaFiscalizacion anulacion;
 
-    public ActasController(ConsultaDeActas consulta) {
+    public ActasController(ConsultaDeActas consulta, AnularActaFiscalizacion anulacion) {
         this.consulta = consulta;
+        this.anulacion = anulacion;
     }
 
     @GetMapping
@@ -83,7 +96,80 @@ public class ActasController {
                 ActaFiscalizacionResource::de);
     }
 
+    /**
+     * Deja sin efecto una visita: {@code POST /fiscalizacion/actas/{id}/anulacion} (#214).
+     *
+     * <p>Es la <b>única</b> escritura que mueve el estado de un acta, y hasta #214 no existía: los
+     * cinco valores de {@code EstadoDeActa} eran uno alcanzable y cuatro que nadie escribía, de
+     * modo que las tres consultas que descartan lo anulado no descartaban nada.
+     *
+     * <p>{@code MODIFICACION} y no {@code REGISTRO}: no nace ninguna fila, se mueve una columna de
+     * una que ya existe. Y lleva el mismo {@code oTambien} que la lectura de arriba, por lo mismo:
+     * un perfil de fiscalización vehicular que puede levantar un acta tiene que poder anularla.
+     *
+     * <p>El cuerpo es la observación (regla 10) y la fecha del acto, que es la del día en que se
+     * anula y no la de su registro (regla 9). La fecha viaja porque la anulación puede registrarse
+     * después del acto —lo mismo que {@code fecha_anulacion} resuelve en {@code pago_recibido}
+     * (V10)—, y sin ella el asiento diría el día en que alguien tecleó.
+     *
+     * <p>{@code 201} y no {@code 200} por lo mismo que los actos de {@code
+     * DeclaracionJuradaController}: lo que se crea es el <b>acto</b>, que queda en {@code
+     * auditoria} con su antes y su después.
+     */
+    @PostMapping("/{id}/anulacion")
+    @ResponseStatus(HttpStatus.CREATED)
+    @RequiereAcceso(
+            acceso = "fisc_predial",
+            oTambien = "fisc_vehicular",
+            privilegio = Privilegio.MODIFICACION)
+    public ActaFiscalizacionResource anular(
+            @PathVariable long id, @RequestBody PeticionDeAnulacion peticion) {
+        try {
+            return ActaFiscalizacionResource.de(
+                    anulacion.anular(
+                            id, fechaDe(peticion.fecha()), Observacion.de(peticion.observacion())));
+        } catch (LiquidarFiscalizacion.ActaInexistente noEsta) {
+            throw new ProblemaDeNegocio(CodigoDeError.NO_ENCONTRADO, mensajeDe(noEsta));
+        } catch (AnularActaFiscalizacion.ActaConLiquidacionViva
+                | ActaFiscalizacion.TransicionIlegal conflicto) {
+            // 409 y no 422: la peticion es correcta, lo que no admite el acto es la situacion en
+            // que esta el acta. La interfaz distingue las dos para saber si reintentar sirve.
+            throw new ProblemaDeNegocio(CodigoDeError.CONFLICTO, mensajeDe(conflicto));
+        } catch (IllegalArgumentException invalido) {
+            throw new ProblemaDeNegocio(CodigoDeError.VALIDACION, mensajeDe(invalido));
+        }
+    }
+
     // ------------------------------------------------------------------
+
+    /**
+     * El cuerpo de la anulacion: por que se anula (regla 10) y el dia del acto (regla 9).
+     *
+     * <p>No lleva nada mas. Que se anula lo dice la ruta, y lo que el fiscalizador midio no se toca
+     * —desde V19 el privilegio ni siquiera lo permite—.
+     */
+    public record PeticionDeAnulacion(@Nullable String observacion, @Nullable String fecha) {}
+
+    private static LocalDate fechaDe(@Nullable String texto) {
+        if (texto == null || texto.isBlank()) {
+            throw new ProblemaDeNegocio(
+                    CodigoDeError.VALIDACION,
+                    "Falta el campo 'fecha': es el dia en que se anula el acta, y no el dia en que"
+                            + " alguien lo teclea (regla 9)");
+        }
+        try {
+            return LocalDate.parse(texto.strip());
+        } catch (DateTimeParseException malFormada) {
+            throw new ProblemaDeNegocio(
+                    CodigoDeError.VALIDACION,
+                    "La fecha va en formato ISO (AAAA-MM-DD): '" + texto + "'");
+        }
+    }
+
+    private static String mensajeDe(RuntimeException problema) {
+        String mensaje = problema.getMessage();
+        return mensaje == null ? problema.getClass().getSimpleName() : mensaje;
+    }
 
     private static @Nullable Long programaOpcional(@Nullable String texto) {
         if (texto == null || texto.isBlank()) {

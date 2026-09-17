@@ -101,6 +101,7 @@
   "POST /coactiva/notificaciones": ["404"],
   "POST /coactiva/prescripcion": ["404"],
   "POST /coactiva/rec/impresion": ["404"],
+  "POST /fiscalizacion/actas/{id}/anulacion": ["404"],
   "POST /fiscalizacion/liquidaciones": ["404"],
   "POST /fiscalizacion/liquidaciones/{numero}/reliquidaciones": ["404"],
   "POST /fiscalizacion/predial/actas": [],

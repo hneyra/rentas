@@ -45,6 +45,12 @@ class ActaPredialControllerTest {
                     new ActaFiscalizacionRepository() {
                         private long siguiente = 1;
 
+                        /** #214 no pasa por aqui: esta prueba solo registra. */
+                        @Override
+                        public ActaFiscalizacion anular(long id) {
+                            throw new UnsupportedOperationException("no lo usa esta prueba");
+                        }
+
                         /** El embudo (#196) lo mide el repositorio contra PostgreSQL. */
                         @Override
                         public int unidadesConActaViva(long programaId) {

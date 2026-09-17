@@ -212,6 +212,12 @@ class RegistrarActaFiscalizacionTest {
         private final Map<String, Integer> versiones = new HashMap<>();
         private long siguienteId = 1;
 
+        /** #214 no pasa por aqui: esta prueba solo registra. */
+        @Override
+        public ActaFiscalizacion anular(long id) {
+            throw new UnsupportedOperationException("no lo usa esta prueba");
+        }
+
         /**
          * El embudo (#196) no se mide contra un doble: lo mide el repositorio contra PostgreSQL.
          */

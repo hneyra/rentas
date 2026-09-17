@@ -14,6 +14,23 @@ public interface ActaFiscalizacionRepository {
     java.util.Optional<ActaFiscalizacion> findById(long id);
 
     /**
+     * Anula el acta: la unica escritura que mueve su estado (#214).
+     *
+     * <p>Mueve <b>una columna</b> y ninguna mas, y no es una convencion: desde V19 {@code
+     * kamayuk_app} no tiene UPDATE sobre la tabla sino sobre {@code estado}, asi que un {@code
+     * UPDATE} que tocara el area medida o el hallazgo saldria con {@code 42501}. Lo que el
+     * fiscalizador midio en campo no se corrige en la base: se levanta otra acta.
+     *
+     * <p>La transicion la decide el dominio ({@link ActaFiscalizacion#anulada}) <b>antes</b> de
+     * escribir, como en {@code DeclaracionJuradaRepository#marcar}: si es ilegal no se escribe
+     * nada.
+     *
+     * @return el acta ya anulada
+     * @throws ActaFiscalizacion.TransicionIlegal si ya estaba anulada
+     */
+    ActaFiscalizacion anular(long id);
+
+    /**
      * La grilla de actas, paginada (#599).
      *
      * <p>El total del sobre cuenta <b>todas</b> las actas que el criterio deja pasar y no las de la

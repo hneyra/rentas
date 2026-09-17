@@ -38,6 +38,23 @@ public final class ActasEnMemoria implements ActaFiscalizacionRepository {
                 "el embudo se mide contra PostgreSQL, no contra este doble");
     }
 
+    /**
+     * La unica transicion del acta (#214). Reemplaza la fila guardada, que es lo que el {@code
+     * UPDATE (estado)} de V19 hace contra PostgreSQL.
+     */
+    @Override
+    public ActaFiscalizacion anular(long id) {
+        ActaFiscalizacion anterior =
+                findById(id)
+                        .orElseThrow(
+                                () ->
+                                        new IllegalStateException(
+                                                "No hay ninguna acta con identificador " + id));
+        ActaFiscalizacion anulada = anterior.anulada();
+        guardadas.set(guardadas.indexOf(anterior), anulada);
+        return anulada;
+    }
+
     @Override
     public Optional<ActaFiscalizacion> findById(long id) {
         return guardadas.stream().filter(acta -> acta.id() != null && acta.id() == id).findFirst();
@@ -67,7 +84,11 @@ public final class ActasEnMemoria implements ActaFiscalizacionRepository {
     public java.util.Set<Long> prediosConActaEnElPrograma(
             long programaId, java.util.Set<Long> predios) {
         return guardadas.stream()
-                .filter(acta -> acta.programaId() == programaId && acta.predioId() != null)
+                .filter(
+                        acta ->
+                                acta.programaId() == programaId
+                                        && acta.predioId() != null
+                                        && acta.estado().estaViva())
                 .map(ActaFiscalizacion::predioId)
                 .filter(predios::contains)
                 .collect(java.util.stream.Collectors.toSet());
@@ -80,7 +101,8 @@ public final class ActasEnMemoria implements ActaFiscalizacionRepository {
                 .filter(
                         acta ->
                                 acta.predioId() != null
-                                        && acta.fechaVisita().getYear() == ejercicio.valor())
+                                        && acta.fechaVisita().getYear() == ejercicio.valor()
+                                        && acta.estado().estaViva())
                 .map(ActaFiscalizacion::predioId)
                 .filter(predios::contains)
                 .collect(java.util.stream.Collectors.toSet());

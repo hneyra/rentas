@@ -209,4 +209,56 @@ public record ActaFiscalizacion(
     public boolean esPredial() {
         return predioId != null;
     }
+
+    /**
+     * Esta misma acta, anulada (#214). Ninguno de sus demas datos cambia.
+     *
+     * <p><b>Es la unica transicion que existe</b>, y la maquina de estados cabe en dos lineas
+     * porque el enumerado tiene dos valores: {@link EstadoDeActa} explica por que los otros tres se
+     * derivan en vez de guardarse. Anular es terminal —una anulada no revive—, y eso no deja a
+     * nadie sin salida: la correccion de una visita es <b>otra visita</b>, o sea otra version sobre
+     * la misma unidad, que es justamente lo que {@code acta_fisc_version_uq} admite desde V60.
+     *
+     * <p>La comprobacion vive aqui y no en el caso de uso porque es una propiedad del acta:
+     * cualquier camino que la anule manana pasa por esta puerta sin tener que acordarse. Es el
+     * patron de {@code DeclaracionJurada#anulada} (#365).
+     */
+    public ActaFiscalizacion anulada() {
+        if (estado.esTerminal()) {
+            throw new TransicionIlegal(id, estado, EstadoDeActa.ANULADA);
+        }
+        return new ActaFiscalizacion(
+                id,
+                programaId,
+                version,
+                contribuyenteId,
+                predioId,
+                vehiculoId,
+                fichaId,
+                fechaVisita,
+                fiscalizador,
+                hallazgo,
+                areaHallada,
+                usoHallado,
+                detalle,
+                EstadoDeActa.ANULADA,
+                observacion);
+    }
+
+    /** El acta no admite ese acto en el estado en que esta. */
+    public static final class TransicionIlegal extends RuntimeException {
+        @java.io.Serial private static final long serialVersionUID = 1L;
+
+        TransicionIlegal(@Nullable Long id, EstadoDeActa desde, EstadoDeActa hasta) {
+            super(
+                    "El acta "
+                            + id
+                            + " esta "
+                            + desde
+                            + " y no puede pasar a "
+                            + hasta
+                            + ": una anulada no revive, y corregir una visita es levantar otra"
+                            + " acta");
+        }
+    }
 }

@@ -5,6 +5,7 @@ import java.util.Map;
 import kamayuk.rentas.auditoria.OrigenContext;
 import kamayuk.rentas.fiscalizacion.dominio.ActaFiscalizacion;
 import kamayuk.rentas.fiscalizacion.dominio.ActaFiscalizacionRepository;
+import kamayuk.rentas.fiscalizacion.dominio.EstadoDeActa;
 import kamayuk.rentas.persistencia.OrdenSeguro;
 import kamayuk.rentas.persistencia.RepositorioJdbc;
 import org.jspecify.annotations.Nullable;
@@ -14,13 +15,29 @@ import org.springframework.stereotype.Repository;
 /**
  * Las actas de fiscalización contra PostgreSQL. Sigue la plantilla de {@code
  * CuotaDeArbitrioRepositoryJdbc} (#31): ninguna consulta filtra por {@code municipalidad_id} —lo
- * hace la política RLS— y no hay ningún {@code UPDATE} ni {@code DELETE}.
+ * hace la política RLS— y no hay ningún {@code DELETE}.
+ *
+ * <p>Hay <b>un</b> {@code UPDATE}, y sólo desde #214: {@link #anular}, que mueve la columna {@code
+ * estado} y ninguna otra. Es la única transición del acta, y lo que la acota no es esta clase sino
+ * el privilegio: desde V19 {@code kamayuk_app} tiene {@code UPDATE (estado)} y no {@code UPDATE}
+ * sobre la tabla.
  */
 @Repository
 public class ActaFiscalizacionRepositoryJdbc extends RepositorioJdbc
         implements ActaFiscalizacionRepository {
 
     private static final String DESDE = " FROM acta_fiscalizacion";
+
+    /**
+     * Que un acta cuente, escrito una vez y derivado del dominio (#214).
+     *
+     * <p>Las tres consultas que lo preguntan lo escribian cada una por su cuenta —{@code estado <>
+     * 'ANULADA'}, tres veces—, y hasta #214 ninguna de las tres descartaba una sola fila: ningun
+     * camino podia dejar un acta en ese estado. Sale de {@link EstadoDeActa} y no de un literal por
+     * lo mismo que la lista de condiciones con diferencia sale de {@code CondicionFiscalizada}: el
+     * dia que el vocabulario cambie, el SQL cambia con el o no compila.
+     */
+    private static final String VIVA = " AND estado <> '" + EstadoDeActa.ANULADA.name() + "'";
 
     /**
      * Por que se admite ordenar, y por que estas cinco.
@@ -107,6 +124,41 @@ public class ActaFiscalizacionRepositoryJdbc extends RepositorioJdbc
                 .param("id", id)
                 .query(ActaFiscalizacionRepositoryJdbc::mapear)
                 .optional();
+    }
+
+    /**
+     * Anula el acta (#214): el único {@code UPDATE} de esta clase, y sobre una sola columna.
+     *
+     * <p>La transición la calcula el dominio antes de escribir, así que un acta ya anulada no llega
+     * a la sentencia. Lo que impide que dos peticiones simultáneas —que leyeron las dos el mismo
+     * estado— la anulen dos veces no es esa comprobación sino que la segunda no cambia nada: el
+     * estado ya es el que se pedía.
+     */
+    @Override
+    public ActaFiscalizacion anular(long id) {
+        ActaFiscalizacion anterior =
+                findById(id)
+                        .orElseThrow(
+                                () ->
+                                        new IllegalStateException(
+                                                "No hay ninguna acta de fiscalizacion con"
+                                                        + " identificador "
+                                                        + id
+                                                        + " en esta municipalidad"));
+        ActaFiscalizacion anulada = anterior.anulada();
+
+        int filas =
+                jdbc().sql("UPDATE acta_fiscalizacion SET estado = :estado WHERE id = :id")
+                        .param("estado", anulada.estado().name())
+                        .param("id", id)
+                        .update();
+        if (filas == 0) {
+            throw new IllegalStateException(
+                    "No hay ninguna acta de fiscalizacion con identificador "
+                            + id
+                            + " en esta municipalidad");
+        }
+        return anulada;
     }
 
     /**
@@ -256,7 +308,7 @@ public class ActaFiscalizacionRepositoryJdbc extends RepositorioJdbc
                                         + DESDE
                                         + " WHERE programa_id = :programaId"
                                         + "   AND predio_id IN (:predios)"
-                                        + "   AND estado <> 'ANULADA'")
+                                        + VIVA)
                         .param("programaId", programaId)
                         .param("predios", predios)
                         .query(Long.class)
@@ -281,7 +333,8 @@ public class ActaFiscalizacionRepositoryJdbc extends RepositorioJdbc
                                         + "SELECT DISTINCT predio_id, vehiculo_id"
                                         + DESDE
                                         + " WHERE programa_id = :programaId"
-                                        + "   AND estado <> 'ANULADA') u")
+                                        + VIVA
+                                        + ") u")
                         .param("programaId", programaId)
                         .query(Integer.class)
                         .single();
@@ -325,7 +378,7 @@ public class ActaFiscalizacionRepositoryJdbc extends RepositorioJdbc
                                         + DESDE
                                         + " WHERE predio_id IN (:predios)"
                                         + "   AND fecha_visita BETWEEN :desde AND :hasta"
-                                        + "   AND estado <> 'ANULADA'")
+                                        + VIVA)
                         .params(campos)
                         .query(Long.class)
                         .list());

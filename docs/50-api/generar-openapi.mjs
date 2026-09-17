@@ -3193,6 +3193,30 @@ const OPERACIONES_ADICIONALES = {
         ' ninguna pantalla hace. Exige LECTURA sobre `fisc_predial` **o** sobre `fisc_vehicular`:' +
         ' un perfil de fiscalización vehicular registraría actas que no podría volver a ver.',
     },
+    // #214 — anular un acta, que es la UNICA transicion que este sistema escribe
+    // sobre ella. Hasta aqui `EstadoDeActa` declaraba cinco valores y se escribia
+    // uno: ANULADA era inalcanzable y las tres consultas que la descartan no
+    // descartaban nada. Los otros tres —liquidada, reliquidada, transferida— NO
+    // se anadieron: se derivan de la liquidacion, de sus versiones y de su
+    // resolucion, y guardarlos ademas dejaria dos verdades sobre el mismo hecho.
+    {
+      operationId: 'anular_acta_fiscalizacion',
+      metodo: 'post',
+      ruta: '/api/v1/fiscalizacion/actas/{id}/anulacion',
+      titulo: 'Anulación de un acta de inspección',
+      descripcion:
+        'Deja sin efecto una visita: la **única** transición que mueve el estado de un acta. No' +
+        ' borra ni edita nada —el acta se sigue leyendo entera, con quién fue, qué día y qué' +
+        ' midió—; lo que cambia es que deja de contar, y desde entonces la unidad vuelve a poder' +
+        ' sortearse (#481) y el embudo del programa no la cuenta como inspeccionada. Corregir lo' +
+        ' que se midió NO es esto: es levantar otra acta, otra versión sobre la misma unidad.' +
+        ' **Un acta que sostiene una liquidación viva no se anula**: primero se anula la' +
+        ' liquidación, o quedaría determinada de oficio una diferencia que ya no sostiene nadie' +
+        ' — eso responde **409**, igual que anular una ya anulada. Un `id` que no existe en esta' +
+        ' municipalidad es **404**. El cuerpo lleva la observación del usuario, obligatoria' +
+        ' (RNF-052), y la fecha del acto, que es la del día en que se anula y no la de su' +
+        ' registro. Exige MODIFICACION sobre `fisc_predial` **o** sobre `fisc_vehicular`.',
+    },
   ],
   // «Resultados y determinaciones» declara «GET /fiscalizacion/resultados» como
   // su endpoint —la grilla—; emitir la liquidación de un acta y reliquidarla

@@ -223,6 +223,10 @@ class ContratoDeApiTest {
                     // consignar el uso hallado (V76) no habia nada honesto que publicar, y
                     // eso es lo que #546 midio al negarse a esta misma lectura.
                     "GET /fiscalizacion/actas",
+                    // #214: anular el acta. Es una ruta que la pantalla no declara —una pantalla
+                    // declara UN endpoint— y entra por OPERACIONES_ADICIONALES del generador,
+                    // igual que las tres de la liquidacion de abajo.
+                    "POST /fiscalizacion/actas/{id}/anulacion",
                     // #49: la liquidacion, su reliquidacion y su estado, mas las cuatro
                     // consultas del modulo. Las tres primeras son rutas que la pantalla no
                     // declara —una pantalla declara UN endpoint— y entran por

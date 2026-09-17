@@ -1161,8 +1161,11 @@ export interface FilaDeLaMuestra {
  *
  * **`usoHallado` nulo es «no se anoto», que no es «coincide con lo declarado»**, y solo un acta
  * predial lo lleva. `hallazgo` es lo que una persona anoto —`CONFORME`, `OMISO`, `SUBVALUADOR`,
- * `USO_DISTINTO`, `NO_UBICADO`— y `estado` el del acta: `ABIERTA`, `LIQUIDADA`, `RELIQUIDADA`,
- * `TRANSFERIDA` o `ANULADA`.
+ * `USO_DISTINTO`, `NO_UBICADO`— y `estado` el del acta: `ABIERTA` o `ANULADA`, y no mas. Eran
+ * cinco hasta #214, y los otros tres —`LIQUIDADA`, `RELIQUIDADA`, `TRANSFERIDA`— no los escribia
+ * nadie: se DERIVAN de que el acta tenga liquidacion, de que tenga mas de una version y de que su
+ * liquidacion tenga resolucion, asi que se retiraron del enumerado y del `CHECK` en vez de
+ * inventarles una escritura.
  *
  * Predial y vehicular comparten forma: cual es cual lo dice cual de `predioId` y `vehiculoId`
  * trae valor. Y del contribuyente publica **solo el identificador**, nunca el nombre.
