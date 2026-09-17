@@ -436,7 +436,7 @@ const DETERMINACION_GUARDADA: DeterminacionGuardada = {
 };
 
 /**
- * Y la MISMA lectura de una determinacion **anterior a `V20`**: sin modalidad y sin cuotas (#234).
+ * Y la MISMA lectura de una determinacion **anterior a `V21`**: sin modalidad y sin cuotas (#234).
  *
  * Con un solo montaje —el de arriba— «la hoja no dibuja el cronograma porque no esta conectada» y
  * «no lo dibuja porque la fila no dice su modalidad» serian indistinguibles. Son dos cosas, y la

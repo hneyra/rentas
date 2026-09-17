@@ -158,7 +158,7 @@ class ParametrosDeLaApiTest {
             Map.of(
                     // `modalidad` desde #234: las dos operaciones del predial la EXIGEN en su
                     // cuerpo y no tiene valor por omision. Antes se suponia TRIMESTRAL, y con la
-                    // columna de V20 puesta esa suposicion quedaria escrita en la determinacion
+                    // columna de V21 puesta esa suposicion quedaria escrita en la determinacion
                     // como si la hubiera elegido el contribuyente.
                     "POST /rentas/predial/calculo-individual", List.of("modalidad", "predioId"),
                     "POST /rentas/predial/calculo-masivo", List.of("modalidad"));

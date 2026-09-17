@@ -3267,11 +3267,11 @@ const OPERACIONES_ADICIONALES = {
         unos tramos que esa determinación nunca usó si se sellara una segunda versión del ejercicio.
 
         **Trae el cronograma de cuotas y su modalidad desde #234**, y no salen de la misma clase de
-        sitio: \`modalidad\` es una columna de la fila —\`V20\`— y \`cuotas[]\` se **deriva** de ella,
+        sitio: \`modalidad\` es una columna de la fila —\`V21\`— y \`cuotas[]\` se **deriva** de ella,
         del monto guardado y de los vencimientos de ese mismo conjunto sellado. Las cuotas no se
         guardan: serían una segunda verdad sobre el mismo hecho.
 
-        **Una determinación anterior a V20 publica el cronograma en blanco** —\`modalidad: null\` y
+        **Una determinación anterior a V21 publica el cronograma en blanco** —\`modalidad: null\` y
         \`cuotas: []\`—, nunca la trimestral supuesta: de aquellas filas la modalidad no consta en
         ningún sitio, y suponerla publicaría un cronograma que puede no ser el que el contribuyente
         recibió.

@@ -1113,8 +1113,8 @@ class PredialControllerTest {
     }
 
     @Test
-    @DisplayName("#234 — una fila anterior a V20 publica el cronograma EN BLANCO, no el supuesto")
-    void laLecturaDeUnaFilaAnteriorAV20NoInventaElCronograma() throws Exception {
+    @DisplayName("#234 — una fila anterior a V21 publica el cronograma EN BLANCO, no el supuesto")
+    void laLecturaDeUnaFilaAnteriorAV21NoInventaElCronograma() throws Exception {
         predios.con(501L, 11L, "10001", "AV. GRAU 100", Porcentaje.total());
         determinaciones.sembrarSinModalidad(
                 EJERCICIO,
@@ -1134,7 +1134,7 @@ class PredialControllerTest {
                 .contains("\"impuestoInsoluto\"");
         assertThat(json)
                 .as(
-                        "nulo significa «esta fila es anterior a V20», no «al contado»: suponer la"
+                        "nulo significa «esta fila es anterior a V21», no «al contado»: suponer la"
                                 + " trimestral publicaria un cronograma que puede no ser el que el"
                                 + " contribuyente recibio")
                 .contains("\"modalidad\":null")
@@ -1160,7 +1160,7 @@ class PredialControllerTest {
 
         assertThat(resultado.getResponse().getStatus())
                 .as(
-                        "antes de #234 esto determinaba TRIMESTRAL en silencio, y con V20 esa"
+                        "antes de #234 esto determinaba TRIMESTRAL en silencio, y con V21 esa"
                                 + " suposicion quedaria ESCRITA en la fila")
                 .isEqualTo(422);
         assertThat(resultado.getResponse().getContentAsString())
@@ -1642,7 +1642,7 @@ class PredialControllerTest {
         }
 
         /**
-         * Una fila ANTERIOR a V20: la que no dice con que modalidad se emitio (#234).
+         * Una fila ANTERIOR a V21: la que no dice con que modalidad se emitio (#234).
          *
          * <p>Existe para que el montaje no sea uniforme. Con todas las filas trayendo modalidad,
          * «publica el cronograma que la fila dice» y «publica siempre un cronograma» son

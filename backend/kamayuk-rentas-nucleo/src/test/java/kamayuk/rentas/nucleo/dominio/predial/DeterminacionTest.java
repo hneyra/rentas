@@ -144,7 +144,7 @@ class DeterminacionTest {
                                         null))
                 .as(
                         "la base no lo puede exigir —un CHECK no distingue una fila de hoy de una"
-                                + " anterior a V20—, asi que lo exige el unico constructor que hay")
+                                + " anterior a V21—, asi que lo exige el unico constructor que hay")
                 .isInstanceOf(NullPointerException.class)
                 .hasMessageContaining("modalidad");
     }

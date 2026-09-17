@@ -45,9 +45,10 @@ const SIN_CIFRAR = 'sin cifrar';
  * pantalla, y esa es generica. Esta dice el motivo exacto — que no es que a nadie se le ocurriera
  * publicarlo, sino que la fila guardada **no dice con que modalidad se emitio**.
  */
-const SIN_CRONOGRAMA = `El cronograma de cuotas no se dibuja: la determinacion guardada no dice \
-con que modalidad se emitio, y sin ella los vencimientos no se pueden resolver. Suponer la \
-trimestral publicaria unas fechas de pago que el contribuyente puede no haber recibido.`;
+const SIN_CRONOGRAMA = `El cronograma de cuotas no se dibuja todavia en esta pantalla: la \
+operacion ya lo publica —la determinacion guarda con que modalidad se emitio desde #234— y falta \
+el conector que reparta sus filas. Una determinacion anterior a esa migracion sigue sin decir su \
+modalidad, y esa se dibujara en blanco y no con la trimestral supuesta.`;
 
 /** «Detectados por cruce» de un programa que no declara sus parametros de sorteo (#196). */
 const SIN_PARAMETROS_DEL_SORTEO = `El cruce no se pudo resolver: este programa no declara los \

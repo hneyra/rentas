@@ -279,7 +279,7 @@ class DeterminarPredialTest {
                                         null,
                                         false))
                 .as(
-                        "hasta #234 esto se leia como TRIMESTRAL, y con V20 esa suposicion quedaria"
+                        "hasta #234 esto se leia como TRIMESTRAL, y con V21 esa suposicion quedaria"
                                 + " escrita en la fila como si la hubiera elegido el contribuyente")
                 .isInstanceOf(NullPointerException.class)
                 .hasMessageContaining("modalidad");

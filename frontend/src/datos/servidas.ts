@@ -459,7 +459,7 @@ export interface OperacionServida {
  * <b>204</b> —«todavia no»—. El backend las publica distintas porque #546 midio el dano de
  * confundirlas, y la pantalla las dice distintas: ver `Conector.sinDato` y `Conector.noEncontrado`.
  *
- * <b>Y desde #234 SI trae el cronograma</b>: `determinacion` guarda su modalidad —columna de `V20`—
+ * <b>Y desde #234 SI trae el cronograma</b>: `determinacion` guarda su modalidad —columna de `V21`—
  * y con ella los vencimientos vuelven a salir del conjunto sellado que esa determinacion fijo. Las
  * cuotas no estan guardadas, se derivan. Una fila anterior a esa migracion trae `modalidad: null` y
  * `cuotas: []`, que no es «no hay cuotas» sino «esa fila no dice cual era su cronograma»: suponer

@@ -419,7 +419,7 @@ public class DeterminarPredialMasivo {
                                 + "'");
             }
             // Sin valor por omision, igual que la individual (#234). La corrida escribe su
-            // modalidad en `corrida_predial` y —desde V20— en cada `determinacion` que emite:
+            // modalidad en `corrida_predial` y —desde V21— en cada `determinacion` que emite:
             // suponer TRIMESTRAL la escribiria en las decenas de miles de filas de una emision
             // anual como si cada contribuyente la hubiera elegido.
             Objects.requireNonNull(

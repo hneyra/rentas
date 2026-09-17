@@ -1,5 +1,5 @@
 -- ============================================================================
---  V20 — LA DETERMINACION DICE BAJO QUE CRONOGRAMA SE EMITIO (#234)
+--  V21 — LA DETERMINACION DICE BAJO QUE CRONOGRAMA SE EMITIO (#234)
 --
 --  QUE FALTABA, Y POR QUE NADIE PODIA VERLO
 --  ----------------------------------------
@@ -29,9 +29,9 @@
 --  Guardar las cuotas calculadas dejaria DOS VERDADES sobre el mismo hecho —la fila
 --  y el conjunto—, que es lo que #214 acaba de retirar del acta de fiscalizacion.
 --
---  LAS FILAS ANTERIORES A V20 SE QUEDAN EN NULO, Y ES UNA DECISION
+--  LAS FILAS ANTERIORES A V21 SE QUEDAN EN NULO, Y ES UNA DECISION
 --  --------------------------------------------------------------
---  NULO significa «esta fila es anterior a V20», nunca «se pago al contado» ni «fue
+--  NULO significa «esta fila es anterior a V21», nunca «se pago al contado» ni «fue
 --  trimestral». No se rellena hacia atras, y no es por no poder: `kamayuk_app` tiene
 --  UPDATE sobre esta tabla. Es que NO HAY NADA CIERTO QUE ESCRIBIR — la modalidad la
 --  elige el contribuyente y de aquellas filas no consta en ningun sitio—, y escribir
@@ -57,7 +57,7 @@
 --  ------------------------------------------------------
 --  Que una determinacion predial NUEVA no pueda volver a quedarse sin modalidad. No
 --  hay `CHECK` que lo diga: una restriccion no distingue una fila insertada hoy de
---  una anterior a V20, y `NOT NULL` dejaria sin migrar toda base con determinaciones.
+--  una anterior a V21, y `NOT NULL` dejaria sin migrar toda base con determinaciones.
 --  Lo vigila el DOMINIO, donde si es estructural: `Determinacion.nuevaPredial` exige
 --  la modalidad y no hay otra forma de construir una cabecera predial nueva.
 --  `DeterminarPredial` dejo de suponerla, y el borde contesta 422 nombrandola.
@@ -85,6 +85,6 @@ COMMENT ON COLUMN determinacion.modalidad IS
     'Bajo que cronograma del articulo 15 se determino: CONTADO —una cuota— o TRIMESTRAL —cuatro—. '
     'Con ella el cronograma vuelve a ser derivable del `conjunto_id` sellado que la fila fija, sin '
     'guardar las cuotas, que serian una segunda verdad sobre el mismo hecho. NULA significa «fila '
-    'anterior a V20» y NO «al contado»: de aquellas determinaciones la modalidad no consta en '
+    'anterior a V21» y NO «al contado»: de aquellas determinaciones la modalidad no consta en '
     'ningun sitio, y la lectura de #207 publica su cronograma en blanco en vez del trimestral '
     'supuesto (#234).';

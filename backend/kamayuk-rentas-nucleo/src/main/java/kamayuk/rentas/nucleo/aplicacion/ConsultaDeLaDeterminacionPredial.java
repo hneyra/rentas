@@ -48,13 +48,13 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <h2>El cronograma: derivado del conjunto sellado, nunca supuesto (#234)</h2>
  *
- * <p>Desde {@code V20}, {@code determinacion} guarda <b>la modalidad</b>, y con ella el cronograma
+ * <p>Desde {@code V21}, {@code determinacion} guarda <b>la modalidad</b>, y con ella el cronograma
  * vuelve a ser derivable: los vencimientos son las llaves {@code PREDIAL_VENCIMIENTO} de ese mismo
  * conjunto sellado y el importe es el reparto del monto que la fila ya guarda ({@link
  * CronogramaDelPredial}). Las cuotas <b>no</b> se guardan, y es deliberado: serían una segunda
  * verdad sobre el mismo hecho, que es lo que #214 retiró del acta de fiscalización.
  *
- * <p><b>Una fila anterior a V20 publica el cronograma en blanco</b> —{@code modalidad} nula y
+ * <p><b>Una fila anterior a V21 publica el cronograma en blanco</b> —{@code modalidad} nula y
  * {@code cuotas} vacía—, nunca el trimestral supuesto. De aquellas determinaciones la modalidad no
  * consta en ningún sitio: suponerla publicaría un cronograma que puede no ser el que el
  * contribuyente recibió, y ése es justo el modo de fallo que la regla 5 prohíbe.
@@ -196,7 +196,7 @@ public class ConsultaDeLaDeterminacionPredial {
      * @param minimoImponible el mínimo de ese conjunto (RT-014)
      * @param derechoDeEmision el derecho de emisión mecanizada de ese conjunto
      * @param totalAPagar el impuesto determinado más el derecho de emisión
-     * @param modalidad bajo qué cronograma se emitió (V20, #234); <b>nulo</b> si la fila es
+     * @param modalidad bajo qué cronograma se emitió (V21, #234); <b>nulo</b> si la fila es
      *     anterior a la migración, donde significa «no consta» y nunca «al contado»
      * @param cuotas el cronograma derivado del conjunto sellado; <b>vacío</b> cuando la fila no
      *     dice su modalidad, porque entonces no hay cronograma que afirmar
@@ -224,7 +224,7 @@ public class ConsultaDeLaDeterminacionPredial {
             cuotas = List.copyOf(cuotas);
             if (modalidad == null && !cuotas.isEmpty()) {
                 throw new IllegalArgumentException(
-                        "Un cronograma sin modalidad no se puede afirmar: una fila anterior a V20"
+                        "Un cronograma sin modalidad no se puede afirmar: una fila anterior a V21"
                                 + " publica las cuotas en blanco, nunca las trimestrales supuestas"
                                 + " (#234)");
             }

@@ -182,7 +182,7 @@ public class DeterminacionRepositoryJdbc extends RepositorioJdbc
                 .param("estado", determinacion.estado().name())
                 .param("usuario", usuario)
                 // `name()` y no `toString()`: lo que la columna guarda es el nombre del
-                // enumerado, que es lo que `determinacion_modalidad_ck` admite (V20). Nulo en
+                // enumerado, que es lo que `determinacion_modalidad_ck` admite (V21). Nulo en
                 // todo tributo que no sea el predial.
                 .param(
                         "modalidad",
@@ -238,7 +238,7 @@ public class DeterminacionRepositoryJdbc extends RepositorioJdbc
     }
 
     /**
-     * La modalidad de la fila, o {@code null} si la fila es <b>anterior a V20</b>.
+     * La modalidad de la fila, o {@code null} si la fila es <b>anterior a V21</b>.
      *
      * <p>Se LEE de la columna y no se supone. Devolver {@code TRIMESTRAL} cuando la columna viene
      * vacia haria indistinguible una determinacion que se emitio en cuatro cuotas de una de la que

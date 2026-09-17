@@ -482,7 +482,7 @@ public class PredialController {
      *
      * <p>Hasta #234 un cuerpo sin {@code modalidad} determinaba TRIMESTRAL en silencio y esa
      * suposicion no se guardaba en ninguna parte, asi que la fila no decia bajo que cronograma se
-     * emitio y la lectura de #207 no podia dibujarlo. Con {@code V20} la columna existe, y entonces
+     * emitio y la lectura de #207 no podia dibujarlo. Con {@code V21} la columna existe, y entonces
      * las dos salidas son guardar la suposicion —escribir en la fila un cronograma que el
      * contribuyente no eligio, indistinguible dentro de dos anios del que si eligio— o exigirla. Se
      * exige, que es la misma decision que {@code simulacion} y por el mismo motivo: aqui no se

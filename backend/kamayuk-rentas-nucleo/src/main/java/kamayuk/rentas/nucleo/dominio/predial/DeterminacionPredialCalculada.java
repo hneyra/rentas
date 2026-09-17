@@ -82,7 +82,7 @@ public record DeterminacionPredialCalculada(
         if (cabecera.modalidad() == null) {
             throw new IllegalArgumentException(
                     "Toda determinacion predial calculada dice bajo que cronograma se emite, y lo"
-                            + " dice su CABECERA: es el dato que V20 guarda y el unico que se"
+                            + " dice su CABECERA: es el dato que V21 guarda y el unico que se"
                             + " puede volver a leer (#234)");
         }
         Objects.requireNonNull(nombreDelConjunto, "Necesita el nombre del conjunto sellado");
@@ -96,7 +96,7 @@ public record DeterminacionPredialCalculada(
      * Como se paga: la modalidad cuyo cronograma se aplico.
      *
      * <p>No es un componente propio, y no es un detalle: es la de la <b>cabecera</b>, o sea la que
-     * queda escrita en {@code determinacion.modalidad} (V20). Llevarla dos veces —una en la fila y
+     * queda escrita en {@code determinacion.modalidad} (V21). Llevarla dos veces —una en la fila y
      * otra al lado— es la segunda verdad sobre el mismo hecho que #214 retiro del acta de
      * fiscalizacion, y aqui la respuesta y la fila podrian no coincidir.
      */

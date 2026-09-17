@@ -227,11 +227,11 @@ export interface PredioGuardado {
  *
  * <h2>El cronograma, que desde #234 SI llega</h2>
  *
- * `determinacion` guarda su `modalidad` desde `V20`, y con ella los vencimientos vuelven a salir
+ * `determinacion` guarda su `modalidad` desde `V21`, y con ella los vencimientos vuelven a salir
  * del conjunto sellado que esa determinacion fijo. Las cuotas no estan guardadas: se derivan, que
  * es lo que evita dos verdades sobre el mismo hecho.
  *
- * **Una fila anterior a V20 trae `modalidad: null` y `cuotas: []`**, y eso no es «no hay cuotas»:
+ * **Una fila anterior a V21 trae `modalidad: null` y `cuotas: []`**, y eso no es «no hay cuotas»:
  * es que aquella fila no dice cual era su cronograma. Suponer la trimestral publicaria unos
  * vencimientos que el contribuyente puede no haber recibido, que es lo que la regla 5 prohibe.
  *
@@ -266,7 +266,7 @@ export interface DeterminacionGuardada {
   /**
    * Bajo que cronograma se emitio: `CONTADO` o `TRIMESTRAL` (#234).
    *
-   * **Nulo significa «esta fila es anterior a la migracion V20»**, nunca «al contado»: de aquellas
+   * **Nulo significa «esta fila es anterior a la migracion V21»**, nunca «al contado»: de aquellas
    * determinaciones la modalidad no consta en ningun sitio. Con nulo, `cuotas` viene vacia.
    */
   readonly modalidad: string | null;

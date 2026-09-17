@@ -64,7 +64,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  *   <li><b>AC2/AC3</b>: recalcular el mismo contribuyente y ejercicio con otro conjunto sellado
  *       crea <b>otra fila</b>, nunca modifica la primera —{@link DeterminacionRepository} ni
  *       siquiera tiene un metodo de actualizar, y una prueba de reflexion lo deja explicito—.
- *   <li><b>AC4</b>: {@code determinacion_predial_sin_predio_ck} (V20) rechaza en la base cualquier
+ *   <li><b>AC4</b>: {@code determinacion_predial_sin_predio_ck} (V21) rechaza en la base cualquier
  *       intento de guardar una fila {@code PREDIAL} con {@code predio_id} distinto de nulo, aunque
  *       se escriba por SQL directo, no solo a traves del dominio.
  * </ul>
@@ -354,7 +354,7 @@ class RegistrarDeterminacionPredialTest {
         void elCheckRechazaUnPredialConPredioId() throws SQLException {
             long titular = crearContribuyente("DET-0002", "80300002");
             long predio = crearPredio("000000000000000103");
-            long conjunto = sellarConjunto(EJERCICIO, "Conjunto para probar el CHECK de V20");
+            long conjunto = sellarConjunto(EJERCICIO, "Conjunto para probar el CHECK de V21");
 
             try (Connection app = base.conexion(BaseDeDatosDePrueba.APP)) {
                 ContextoDeTenant.fijar(app, municipalidad);
@@ -379,7 +379,7 @@ class RegistrarDeterminacionPredialTest {
                                         sentencia.execute();
                                     }
                                 })
-                        .as("V20: el predial se determina por contribuyente, nunca por un predio")
+                        .as("V21: el predial se determina por contribuyente, nunca por un predio")
                         .isInstanceOf(SQLException.class)
                         .hasMessageContaining("determinacion_predial_sin_predio_ck");
             }

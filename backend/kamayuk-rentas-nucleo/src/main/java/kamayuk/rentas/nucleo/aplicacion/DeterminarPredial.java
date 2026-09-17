@@ -115,7 +115,7 @@ import org.springframework.stereotype.Service;
  *
  * <p>Las dos mitades se cierran juntas, porque una sin la otra no sirve: {@link Peticion}
  * <b>exige</b> la modalidad —la misma decision que {@code simulacion}, por el mismo motivo— y
- * {@code V20} le da a {@code determinacion} su columna, que {@link RegistrarDeterminacionPredial}
+ * {@code V21} le da a {@code determinacion} su columna, que {@link RegistrarDeterminacionPredial}
  * escribe. Guardar la supuesta habria sido la otra salida defendible, y se descarto: escribiria en
  * la fila un cronograma que el contribuyente no eligio, indistinguible dentro de dos anios del que
  * si eligio.
@@ -391,7 +391,7 @@ public class DeterminarPredial {
                                     predios, "La lista de predios es vacia," + " no nula"));
             // No hay valor por omision, y es la mitad de #234 que no esta en la base. Antes de
             // este cambio, un cuerpo sin `modalidad` determinaba TRIMESTRAL en silencio; con la
-            // columna de V20 puesta, ese silencio pasaria a quedar ESCRITO como si el
+            // columna de V21 puesta, ese silencio pasaria a quedar ESCRITO como si el
             // contribuyente lo hubiera elegido.
             Objects.requireNonNull(
                     modalidad,

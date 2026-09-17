@@ -14,7 +14,7 @@ import java.util.stream.Stream;
  * CuadroPredialParametrizado.Vigente#vencimientos}, que compara contra {@code "CONTADO"} y trata
  * <b>cualquier otra cosa</b> como fraccionada: mandar {@code "MENSUAL"} devolvia las cuatro fechas
  * trimestrales con esa etiqueta encima, sin error de ninguna clase. Con la columna {@code
- * determinacion.modalidad} de V20 ese texto pasaria ademas a quedar <b>escrito</b>, y una fila que
+ * determinacion.modalidad} de V21 ese texto pasaria ademas a quedar <b>escrito</b>, y una fila que
  * dice «MENSUAL» y trae cuatro vencimientos trimestrales no la puede interpretar nadie dentro de
  * dos anios.
  *

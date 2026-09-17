@@ -308,8 +308,8 @@ class DeterminacionPredialJdbcTest {
     }
 
     @Test
-    @DisplayName("#234 — una fila anterior a V20 no dice su modalidad, y vuelve nula")
-    void laFilaAnteriorAV20NoDiceSuModalidad() throws SQLException {
+    @DisplayName("#234 — una fila anterior a V21 no dice su modalidad, y vuelve nula")
+    void laFilaAnteriorAV21NoDiceSuModalidad() throws SQLException {
         enA();
         long titular = crearContribuyente(municipalidadA, "DET-3008", "80300308");
         insertarCabeceraPorSql("PREDIAL", null, titular, null);
@@ -320,7 +320,7 @@ class DeterminacionPredialJdbcTest {
         assertThat(anterior).isPresent();
         assertThat(anterior.get().modalidad())
                 .as(
-                        "nulo significa «esta fila es anterior a V20», nunca «al contado»: rellenarlo"
+                        "nulo significa «esta fila es anterior a V21», nunca «al contado»: rellenarlo"
                                 + " al leer repetiria el defecto de #234 un piso mas abajo")
                 .isNull();
     }
@@ -382,9 +382,9 @@ class DeterminacionPredialJdbcTest {
     /**
      * Una cabecera escrita por SQL directo, saltandose el dominio.
      *
-     * <p>Es como se siembra una fila <b>anterior a V20</b> —{@code modalidad} nula—, que por el
+     * <p>Es como se siembra una fila <b>anterior a V21</b> —{@code modalidad} nula—, que por el
      * repositorio ya no se puede escribir: {@link Determinacion#nuevaPredial} la exige. Y es como
-     * se comprueba que los dos {@code CHECK} de V20 muerden aunque nadie pase por Java.
+     * se comprueba que los dos {@code CHECK} de V21 muerden aunque nadie pase por Java.
      */
     private static void insertarCabeceraPorSql(
             String tributo, @Nullable Long vehiculoId, long titular, @Nullable String modalidad)

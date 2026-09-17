@@ -35,7 +35,7 @@ class ModalidadDelPredialTest {
     }
 
     /**
-     * El vocabulario del enumerado es el del {@code CHECK} de V20, y se comprueba: si alguien anade
+     * El vocabulario del enumerado es el del {@code CHECK} de V21, y se comprueba: si alguien anade
      * una modalidad aqui y no en la migracion, el {@code INSERT} falla en produccion y no en
      * ninguna prueba de dominio. Lo que esta lista guarda es el aviso.
      */

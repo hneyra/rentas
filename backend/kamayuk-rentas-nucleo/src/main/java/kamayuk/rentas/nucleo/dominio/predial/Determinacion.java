@@ -11,7 +11,7 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * La cabecera de una determinacion: cuanto le corresponde pagar a un contribuyente en un ejercicio,
- * con que conjunto de parametros se calculo, que reglas se aplicaron y —desde {@code V20} de este
+ * con que conjunto de parametros se calculo, que reglas se aplicaron y —desde {@code V21} de este
  * esquema— bajo que cronograma se emitio (#30, #234; tabla {@code determinacion} del baseline,
  * restringida por {@code determinacion_predial_sin_predio_ck} a que el predial nunca lleve {@code
  * predio_id}).
@@ -51,9 +51,9 @@ import org.jspecify.annotations.Nullable;
  * @param origen de donde sale esta determinacion
  * @param estado en que situacion esta
  * @param usuarioCalculo quien la calculo; nulo en una determinacion que todavia no se guardo
- * @param modalidad bajo que cronograma del articulo 15 se determino el predial (V20, #234). Nulo en
+ * @param modalidad bajo que cronograma del articulo 15 se determino el predial (V21, #234). Nulo en
  *     los demas tributos —no tienen cronograma que resolver aqui— y nulo tambien en una fila
- *     PREDIAL <b>anterior a V20</b>, donde significa «no consta», nunca «al contado». Que una
+ *     PREDIAL <b>anterior a V21</b>, donde significa «no consta», nunca «al contado». Que una
  *     determinacion predial NUEVA no pueda quedarse sin ella lo garantiza {@link #nuevaPredial},
  *     que es la unica forma de construir una: la base no lo puede decir, porque un {@code CHECK} no
  *     distingue una fila de hoy de una de antes de la migracion
@@ -147,7 +147,7 @@ public record Determinacion(
                     "El cronograma de cuotas del articulo 15 es del predial: un "
                             + tributo
                             + " no tiene modalidad que resolver aqui. Ver"
-                            + " determinacion_modalidad_solo_predial_ck (V20)");
+                            + " determinacion_modalidad_solo_predial_ck (V21)");
         }
     }
 
@@ -160,7 +160,7 @@ public record Determinacion(
      * predial nueva puede quedarse sin decir bajo que cronograma se emitio, y no es una convencion
      * que alguien pueda saltarse: este es el unico constructor de una cabecera predial nueva. La
      * base no lo puede exigir —{@code NOT NULL} dejaria sin migrar toda instalacion con
-     * determinaciones anteriores a V20, y un {@code CHECK} no distingue una fila de hoy de una de
+     * determinaciones anteriores a V21, y un {@code CHECK} no distingue una fila de hoy de una de
      * entonces—, asi que lo exige el dominio.
      */
     public static Determinacion nuevaPredial(

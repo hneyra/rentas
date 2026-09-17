@@ -511,24 +511,6 @@ const PANEL: Conector = {
 };
 
 
-/**
- * **Lo que esta hoja no dibuja, y por que** (#237, #234, #252).
- *
- * El «Cronograma» es una tabla entera y no un campo: sin filas, el interprete dibuja la frase de
- * pantalla, y esa es generica. Esta dice el motivo exacto, y **el motivo cambio con #234**: hasta
- * entonces era que `determinacion` no guardaba su modalidad y los vencimientos no se podian
- * resolver; ahora la operacion trae `modalidad` y `cuotas[]`, y lo que falta es el conector que las
- * reparta en las tres columnas que tienen dato —#252—.
- *
- * Decirlo importa: «no lo publica nadie» manda a arreglar un backend que ya esta arreglado, que es
- * el defecto que #239 midio en las actas de fiscalizacion.
- */
-const SIN_CRONOGRAMA =
-  'El cronograma de cuotas no se dibuja todavia en esta pantalla: la operacion ya lo publica ' +
-  '—la determinacion guarda con que modalidad se emitio desde #234— y falta el conector que ' +
-  'reparta sus filas. Una determinacion anterior a esa migracion sigue sin decir su modalidad, y ' +
-  'esa se dibujara en blanco y no con la trimestral supuesta.';
-
 /** Lo que se dice cuando el codigo de la direccion no esta en el padron (#237). */
 const NO_ESTA_EN_EL_PADRON: Ausencia = {
   enElCampo: 'no esta en el padron',

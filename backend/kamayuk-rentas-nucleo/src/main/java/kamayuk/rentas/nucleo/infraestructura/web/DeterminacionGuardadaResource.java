@@ -24,10 +24,10 @@ import org.jspecify.annotations.Nullable;
  * que aquí siempre sería {@code false}.
  *
  * <p>Lo que sí lleva desde #234 son {@code modalidad} y {@code cuotas[]}, y <b>no salen de la misma
- * clase de sitio que el resto</b>: la modalidad es una columna de la fila —{@code V20}—, y las
+ * clase de sitio que el resto</b>: la modalidad es una columna de la fila —{@code V21}—, y las
  * cuotas se <b>derivan</b> de ella, del monto guardado y de los vencimientos de ese conjunto
  * sellado. Guardarlas sería una segunda verdad sobre el mismo hecho. Cuando la fila es anterior a
- * V20 no dice su modalidad, y entonces los dos salen en blanco —{@code null} y {@code []}— en vez
+ * V21 no dice su modalidad, y entonces los dos salen en blanco —{@code null} y {@code []}— en vez
  * del trimestral supuesto: es el trato que {@code V10} le dio a {@code pago_recibido}.
  *
  * <p>Lo que sí lleva y no está guardado —{@link #uit}, {@link #tramos}, {@link #minimoImponible} y
