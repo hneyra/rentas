@@ -9,6 +9,7 @@ import {
   NADA_SERVIDO,
   SERVIDO_Y_SIN_PEDIR,
   SOLO_BASE,
+  SOLO_ESCRIBE,
   operacionesUtiles,
   porQueNoHayDato,
 } from './porQueNoHayDato.ts';
@@ -152,7 +153,7 @@ describe('AC4 — toda hoja con conector declara la operacion que la sirve', () 
   });
 });
 
-describe('los cuatro casos no se confunden', () => {
+describe('los cinco casos no se confunden', () => {
   it('sin ninguna servida: «sin conectar», en tono informativo', () => {
     // `fis-panel` es el ejemplo desde #167, que encendio las dos de indicadores y dejo servida
     // a `ini-panel`. No vale cualquier hoja sin conector: hace falta una que no declare NINGUNA
@@ -185,20 +186,48 @@ describe('los cuatro casos no se confunden', () => {
     expect(porQueNoHayDato(hoja)).not.toBe(SOLO_BASE);
   });
 
+  it('ni un `GET` y con escrituras: «solo escribe», que no es «sin conectar» (#182)', () => {
+    // `territorio` es la hoja de la Determinacion, y declara SIETE operaciones: cuatro `POST` y
+    // tres `BASE` que —medidas contra el contrato y contra sus controladores— tambien son `POST`.
+    // Con las tres frases de antes decia «sin conectar», o sea «ninguna de las operaciones que
+    // declara la sirve el backend», que es falso: las sirve todas. Lo que pasa es que escriben.
+    const hoja = hojaDe('territorio');
+
+    expect(hoja.operaciones.some((o) => o.verbo === 'GET')).toBe(false);
+    expect(porQueNoHayDato(hoja)).toBe(SOLO_ESCRIBE);
+    expect(porQueNoHayDato(hoja)).not.toBe(NADA_SERVIDO);
+  });
+
+  it('y el barrido da CUATRO, todas de ejecutar: ninguna otra hoja cae aqui (#182)', () => {
+    // Si la condicion se ensanchara —por ejemplo contando `BASE` como escritura— entrarian hojas
+    // que si son de consulta, y la frase dejaria de decir la verdad sin que nada lo notara.
+    const soloEscriben = TODAS.filter((h) => porQueNoHayDato(h) === SOLO_ESCRIBE);
+
+    expect(soloEscriben.map((h) => h.clave).sort()).toEqual(
+      ['aut-sol', 'territorio', 'val-cart', 'val-val'].sort(),
+    );
+  });
+
+  it('una hoja SIN operaciones no «escribe»: no se sabe nada de ella', () => {
+    // Los dos lados de la condicion. `aut-panel` no declara ninguna operacion desde #173, y eso no
+    // es ejecutar: es no tener a quien preguntar. Sin el `algunaEscribe` caeria en «solo escribe».
+    expect(porQueNoHayDato(hojaDe('aut-panel'))).toBe(NADA_SERVIDO);
+  });
+
   it('con servidas y sin pedirlas: lo dice, en vez de callar', () => {
     expect(porQueNoHayDato(hojaDe('seg-panel'))).toBe(SERVIDO_Y_SIN_PEDIR);
   });
 
-  it('y las tres frases son DISTINTAS, que es lo que las hace servir de algo', () => {
-    const frases = [NADA_SERVIDO, SOLO_BASE, SERVIDO_Y_SIN_PEDIR];
-    expect(new Set(frases.map((a) => a.enElCampo)).size).toBe(3);
-    expect(new Set(frases.map((a) => a.explicacion)).size).toBe(3);
+  it('y las CUATRO frases son DISTINTAS, que es lo que las hace servir de algo', () => {
+    const frases = [NADA_SERVIDO, SOLO_BASE, SOLO_ESCRIBE, SERVIDO_Y_SIN_PEDIR];
+    expect(new Set(frases.map((a) => a.enElCampo)).size).toBe(4);
+    expect(new Set(frases.map((a) => a.explicacion)).size).toBe(4);
   });
 
   it('NINGUNA dice un cero ni una cifra: no saber no es una afirmacion', () => {
     // Es la regla que motiva todo esto. Un «0» donde no se ha contado nada es indistinguible de
     // un cero real, y en recaudacion eso se lee como «no debe nada».
-    for (const ausencia of [NADA_SERVIDO, SOLO_BASE, SERVIDO_Y_SIN_PEDIR]) {
+    for (const ausencia of [NADA_SERVIDO, SOLO_BASE, SOLO_ESCRIBE, SERVIDO_Y_SIN_PEDIR]) {
       expect(ausencia.enElCampo, `«${ausencia.enElCampo}» lleva un digito`).not.toMatch(/\d/);
       expect(ausencia.enElCampo).not.toMatch(/^0|S\//);
     }
