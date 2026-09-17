@@ -600,7 +600,7 @@ class ConciliacionCatastroRentasJdbcTest {
                                                     primera.totalPaginas() - 1,
                                                     1,
                                                     "codRefCatastral",
-                                                    Paginacion.Direccion.ASCENDENTE))
+                                                    Paginacion.Sentido.ASCENDENTE))
                                     .contenido())
                     .as("un paginador por el que se navega entero sin encontrar una fila miente")
                     .hasSize(1);
@@ -613,7 +613,7 @@ class ConciliacionCatastroRentasJdbcTest {
                                                     primera.totalPaginas(),
                                                     1,
                                                     "codRefCatastral",
-                                                    Paginacion.Direccion.ASCENDENTE))
+                                                    Paginacion.Sentido.ASCENDENTE))
                                     .contenido())
                     .isEmpty();
         }
@@ -831,11 +831,11 @@ class ConciliacionCatastroRentasJdbcTest {
             new BusquedaDeFichas(null, null, null, null, null);
 
     private static Paginacion unaPagina(int tamano) {
-        return new Paginacion(0, tamano, "codRefCatastral", Paginacion.Direccion.ASCENDENTE);
+        return new Paginacion(0, tamano, "codRefCatastral", Paginacion.Sentido.ASCENDENTE);
     }
 
     private static Paginacion unaPagina() {
-        return new Paginacion(0, 20, "codRefCatastral", Paginacion.Direccion.ASCENDENTE);
+        return new Paginacion(0, 20, "codRefCatastral", Paginacion.Sentido.ASCENDENTE);
     }
 
     private static FichaConciliada unica(Pagina<FichaConciliada> pagina) {

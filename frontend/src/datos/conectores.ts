@@ -6,6 +6,7 @@ import {
   type FilaDeLaTabla,
 } from '@kamayuk/ui';
 import type { ClaveDeHoja } from '../pantallas/arbol.ts';
+import { NO_PUBLICADO, SIN_CRONOGRAMA, type PalabraDeHueco } from './palabrasDeHueco.ts';
 import type { CorridaDelPredial, DeterminacionGuardada } from './lecturas.ts';
 import { RUTAS, pedirUnoOVacio } from './lecturas.ts';
 import {
@@ -186,11 +187,13 @@ export interface Reparto {
    *
    * Lo que viaja es **una clave de traduccion** declarada como constante —nunca una frase compuesta
    * aqui—, por lo mismo que todo lo demas de este archivo: un conector es dato y no tiene `t()`
-   * delante (#103). Y hay que listarla en `i18n/catalogo-de-claves.ts`, como `SIN_PLACA`.
+   * delante (#103). Y desde #246 no hay que acordarse de listarla: el tipo es `PalabraDeHueco`, o
+   * sea que una frase que no este en `palabrasDeHueco.ts` **no compila**, y lo que esta alli lo
+   * deriva solo el inventario del locale.
    */
-  readonly loQueLaOperacionNoTrae?: string;
+  readonly loQueLaOperacionNoTrae?: PalabraDeHueco;
   /** Los campos que la operacion servida NO publica, con la palabra que va en su hueco. */
-  readonly noPublicados: ReadonlyMap<Coordenada, string>;
+  readonly noPublicados: ReadonlyMap<Coordenada, PalabraDeHueco>;
 }
 
 /**
@@ -468,9 +471,6 @@ export function loQueLaHojaDeclara(
   return salida;
 }
 
-/** La palabra del hueco cuando la operacion se pidio y no trae ese dato. */
-const NO_PUBLICADO = 'no publicado';
-
 /**
  * `panel` — el estado de la ultima corrida del padron.
  *
@@ -510,18 +510,6 @@ const PANEL: Conector = {
   }),
 };
 
-
-/**
- * **Lo que esta hoja no dibuja, y por que** (#237, #234).
- *
- * El «Cronograma» es una tabla entera y no un campo: sin filas, el interprete dibuja la frase de
- * pantalla, y esa es generica. Esta dice el motivo exacto — que no es que a nadie se le ocurriera
- * publicarlo, sino que la fila guardada **no dice con que modalidad se emitio**.
- */
-const SIN_CRONOGRAMA =
-  'El cronograma de cuotas no se dibuja: la determinacion guardada no dice con que modalidad se ' +
-  'emitio, y sin ella los vencimientos no se pueden resolver. Suponer la trimestral publicaria ' +
-  'unas fechas de pago que el contribuyente puede no haber recibido.';
 
 /** Lo que se dice cuando el codigo de la direccion no esta en el padron (#237). */
 const NO_ESTA_EN_EL_PADRON: Ausencia = {

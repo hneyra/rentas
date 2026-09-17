@@ -14,6 +14,7 @@ import {
   FRASE_DE_QUIEN_ES,
   FRASE_DE_QUIEN_ES_SIN_PADRON,
   FRASE_DEL_CONTEO,
+  FRASE_DEL_FALLO,
 } from '../i18n/textosDelMarco.ts';
 import type { SesionDeLaVentanilla } from './lecturas.ts';
 import { RUTAS, pedirUno } from './lecturas.ts';
@@ -107,28 +108,62 @@ const VACIO: Ausencia = {
   tono: 'info',
 };
 
-/** Lo que se dice cuando fallo, con el peldano si lo hay. */
-function alFallar(error: unknown): Ausencia {
+/**
+ * **Lo que se dice cuando la sesion ya no vale** (401).
+ *
+ * Vive fuera de `alFallar` desde #246, y no por gusto: escrita dentro de la funcion es una frase
+ * que **ninguna guarda ve**. El inventario del locale deriva las ausencias de lo que los modulos
+ * exportan, y `alFallar` exportaba una funcion, no sus palabras; y la guarda que monta las 40
+ * pantallas no llega aqui, porque un 401 no se dibuja en un montaje sin doble de `fetch`. Medido:
+ * las cinco frases de esta funcion **no estaban en el locale**, o sea que en un segundo idioma
+ * salian en castellano.
+ */
+const SIN_SESION: Ausencia = {
+  enElCampo: 'sin acceso',
+  explicacion: 'La sesion no vale para pedir estos datos. Vuelva a entrar.',
+  tono: 'atencion',
+};
+
+/** Lo que se dice cuando la cuenta entro y no le alcanza (403). Ver `SIN_SESION`. */
+const SIN_PERMISO: Ausencia = {
+  enElCampo: 'sin acceso',
+  explicacion: 'Su cuenta no tiene permiso para ver los datos de esta pantalla.',
+  tono: 'atencion',
+};
+
+/** Lo que se dice cuando fallo y no hay peldano que nombrar. Ver `SIN_SESION`. */
+const FALLO: Ausencia = {
+  enElCampo: 'fallo',
+  explicacion:
+    'No se pudieron pedir los datos de esta pantalla. Lo que se ve es su forma, no sus datos.',
+  tono: 'atencion',
+};
+
+/**
+ * **Lo que se dice cuando fallo, con el peldano si lo hay.**
+ *
+ * <h2>El peldano entra por INTERPOLACION, y hasta #246 no podia entrar de ninguna forma</h2>
+ *
+ * La frase se componia concatenando el codigo dentro —«… de esta pantalla (404). …»—, asi que la
+ * cadena que llegaba al interprete **era distinta en cada fallo**: no hay locale que pueda tener
+ * esa clave, ni uno solo de sus infinitos valores. Con `{{codigo}}` la clave es una, el idioma
+ * decide donde cae el numero, y la frase se arma aqui —que es donde hay `t()`— como las de #196 y
+ * #239.
+ *
+ * Por eso recibe `t`: las dos llamadas de `useDatosDeLaHoja` lo tienen delante.
+ */
+function alFallar(
+  error: unknown,
+  t: (clave: string, datos?: Readonly<Record<string, unknown>>) => string,
+): Ausencia {
   const esDeLaApi = error instanceof ErrorDeLaApi;
   const codigo = esDeLaApi ? error.estado : null;
-  if (codigo === 401 || codigo === 403) {
-    return {
-      enElCampo: 'sin acceso',
-      explicacion:
-        codigo === 401
-          ? 'La sesion no vale para pedir estos datos. Vuelva a entrar.'
-          : 'Su cuenta no tiene permiso para ver los datos de esta pantalla.',
-      tono: 'atencion',
-    };
-  }
-  return {
-    enElCampo: 'fallo',
-    explicacion:
-      'No se pudieron pedir los datos de esta pantalla' +
-      (codigo === null ? '.' : ` (${String(codigo)}).`) +
-      ' Lo que se ve es su forma, no sus datos.',
-    tono: 'atencion',
-  };
+  if (codigo === 401) return SIN_SESION;
+  if (codigo === 403) return SIN_PERMISO;
+  if (codigo === null) return FALLO;
+  // Ya traducida: lo que el interprete reciba entonces no es una clave, y su `traducir` lo
+  // devuelve tal cual. Es el mismo trato que `conFrasesDePantalla` da a sus trozos.
+  return { ...FALLO, explicacion: t(FRASE_DEL_FALLO, { codigo }) };
 }
 
 /**
@@ -270,7 +305,7 @@ export function useDatosDeLaHoja(
    * ejercicio» un instante antes de pintarse — o para siempre, si la sesion falla: un 401 se
    * leeria como «fije usted el ejercicio», que manda a arreglar lo que no esta roto.
    */
-  if (sesion.isError) return { ausencia: alFallar(sesion.error) };
+  if (sesion.isError) return { ausencia: alFallar(sesion.error, t) };
   if (pideLaSesion && sesion.isPending) return { ausencia: CARGANDO };
   if (faltaElEjercicio) return { ausencia: SIN_EJERCICIO };
 
@@ -288,7 +323,7 @@ export function useDatosDeLaHoja(
       consulta.error instanceof ErrorDeLaApi && consulta.error.estado === 404
         ? conector.noEncontrado
         : undefined;
-    return { ausencia: suyo ?? alFallar(consulta.error) };
+    return { ausencia: suyo ?? alFallar(consulta.error, t) };
   }
   // Y el vacio tambien: `null` es lo que devuelve un 204 —o una relacion sin ninguna fila—, y
   // «todavia no se ha determinado» no es «no hay nada que ensenar».
@@ -368,9 +403,12 @@ function deQuienEs(
 
 export {
   CARGANDO,
+  FALLO,
   NADA,
   NO_PUBLICADO_EN_PANTALLA,
   SIN_EJERCICIO,
+  SIN_PERMISO,
+  SIN_SESION,
   SIN_SUJETO,
   VACIO,
   alFallar,

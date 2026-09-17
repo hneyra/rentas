@@ -1277,7 +1277,7 @@ class ConvenioJdbcTest {
                                                 0,
                                                 20,
                                                 "fecha",
-                                                kamayuk.rentas.compartido.Paginacion.Direccion
+                                                kamayuk.rentas.compartido.Paginacion.Sentido
                                                         .ASCENDENTE)))
                 .contenido()
                 .get(0);
@@ -1298,7 +1298,7 @@ class ConvenioJdbcTest {
                                                 0,
                                                 20,
                                                 "fecha",
-                                                kamayuk.rentas.compartido.Paginacion.Direccion
+                                                kamayuk.rentas.compartido.Paginacion.Sentido
                                                         .ASCENDENTE)))
                 .contenido();
     }

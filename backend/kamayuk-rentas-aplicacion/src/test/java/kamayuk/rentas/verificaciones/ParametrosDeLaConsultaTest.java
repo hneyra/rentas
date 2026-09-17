@@ -661,7 +661,7 @@ class ParametrosDeLaConsultaTest {
                                 + " ensenaba una tabla vacia que se lee como «este padron no tiene"
                                 + " nada»; y al reves, mandar una direccion de verdad es un 400 de"
                                 + " enlace, porque el mismo texto tiene que convertirse ademas a"
-                                + " Paginacion.Direccion. El contrato tampoco los puede distinguir:"
+                                + " Paginacion.Sentido. El contrato tampoco los puede distinguir:"
                                 + " «parametros-de-la-api.json» sale de la FIRMA, y en la firma hay un"
                                 + " solo nombre. Lo que se renombra es el FILTRO —el dialecto de la"
                                 + " paginacion es el mismo en las 134 pantallas y no puede ceder—."
@@ -736,7 +736,7 @@ class ParametrosDeLaConsultaTest {
                                 + " servidor admite esos cuatro nombres en toda operacion y los enlaza"
                                 + " a ParametrosDePaginacion, asi que «?sentido=algo» que el contrato"
                                 + " presenta como filtro es, en el servidor, un valor que tiene que"
-                                + " convertirse a Paginacion.Direccion o es un 400 de enlace. Se"
+                                + " convertirse a Paginacion.Sentido o es un 400 de enlace. Se"
                                 + " arregla renombrando el FILTRO en RENOMBRADOS de"
                                 + " generar-openapi.mjs, nunca el dialecto: el dialecto es el mismo en"
                                 + " las 134 pantallas.")

@@ -739,7 +739,7 @@ class EscrituraDeDeclaracionJuradaJdbcTest {
                         new BusquedaDeFichas(codigo, null, null, null, null),
                         ejercicio,
                         HOY,
-                        new Paginacion(0, 20, "codRefCatastral", Paginacion.Direccion.ASCENDENTE));
+                        new Paginacion(0, 20, "codRefCatastral", Paginacion.Sentido.ASCENDENTE));
         assertThat(pagina.contenido()).as("una ficha por predio en la grilla").hasSize(1);
         return pagina.contenido().get(0).conciliada();
     }

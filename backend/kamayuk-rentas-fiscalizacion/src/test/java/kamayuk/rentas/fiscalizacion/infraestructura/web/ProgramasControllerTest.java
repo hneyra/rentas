@@ -322,8 +322,7 @@ class ProgramasControllerTest {
         assertThat(paginacionesPedidas.get(0).pagina()).isEqualTo(2);
         assertThat(paginacionesPedidas.get(0).tamano()).isEqualTo(5);
         assertThat(paginacionesPedidas.get(0).ordenarPor()).isEqualTo("fechaInicio");
-        assertThat(paginacionesPedidas.get(0).direccion())
-                .isEqualTo(Paginacion.Direccion.DESCENDENTE);
+        assertThat(paginacionesPedidas.get(0).sentido()).isEqualTo(Paginacion.Sentido.DESCENDENTE);
     }
 
     /**

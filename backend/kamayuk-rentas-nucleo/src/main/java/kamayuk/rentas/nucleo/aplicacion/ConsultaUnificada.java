@@ -166,25 +166,23 @@ public class ConsultaUnificada {
                         criterio.codigoContribuyente(),
                         null,
                         null,
-                        ordenadaPor(paginacion, "fecha_valor", Paginacion.Direccion.DESCENDENTE)),
+                        ordenadaPor(paginacion, "fecha_valor", Paginacion.Sentido.DESCENDENTE)),
                 libro.altasYBajasDe(
                         criterio.codigoContribuyente(),
                         criterio.alcance().tributo(),
-                        ordenadaPor(paginacion, "fecha_valor", Paginacion.Direccion.DESCENDENTE)),
+                        ordenadaPor(paginacion, "fecha_valor", Paginacion.Sentido.DESCENDENTE)),
                 convenios.deTodoElContribuyente(
                         criterio.codigoContribuyente(),
                         criterio.aLaFecha(),
-                        ordenadaPor(paginacion, "fecha", Paginacion.Direccion.DESCENDENTE)),
+                        ordenadaPor(paginacion, "fecha", Paginacion.Sentido.DESCENDENTE)),
                 valores.deTodoElContribuyente(
                         contribuyente.id(),
                         criterio.aLaFecha(),
-                        ordenadaPor(paginacion, "fecha_emision", Paginacion.Direccion.DESCENDENTE)),
+                        ordenadaPor(paginacion, "fecha_emision", Paginacion.Sentido.DESCENDENTE)),
                 declaraciones.deContribuyente(
                         contribuyente.id(),
                         ordenadaPor(
-                                paginacion,
-                                "fecha_presentacion",
-                                Paginacion.Direccion.DESCENDENTE)));
+                                paginacion, "fecha_presentacion", Paginacion.Sentido.DESCENDENTE)));
     }
 
     /**
@@ -199,8 +197,8 @@ public class ConsultaUnificada {
      * el endpoint de esa pestaña, que si lo admite.
      */
     private static Paginacion ordenadaPor(
-            Paginacion pedida, String campo, Paginacion.Direccion direccion) {
-        return new Paginacion(pedida.pagina(), pedida.tamano(), campo, direccion);
+            Paginacion pedida, String campo, Paginacion.Sentido sentido) {
+        return new Paginacion(pedida.pagina(), pedida.tamano(), campo, sentido);
     }
 
     /**

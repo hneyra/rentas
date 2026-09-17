@@ -1,25 +1,13 @@
-import type { DefinicionDePantalla } from '@kamayuk/ui';
+import type { Ausencia, DefinicionDePantalla } from '@kamayuk/ui';
 
 import { ARBOL } from '../pantallas/arbol.ts';
 import { PANTALLAS } from '../pantallas/definiciones/index.ts';
 import type { Modulo } from '../pantallas/tipos.ts';
-import {
-  NO_ESTA_EN_EL_PADRON,
-  NO_PUBLICADO,
-  SIN_CRONOGRAMA,
-  TODAVIA_SIN_DETERMINAR,
-} from '../datos/conectores.ts';
-import {
-  CARGANDO,
-  NO_PUBLICADO_EN_PANTALLA,
-  SIN_EJERCICIO,
-  SIN_SUJETO,
-  VACIO,
-} from '../datos/useDatosDeLaHoja.ts';
-import { SIN_CIFRAR } from '../datos/conectores/fiscalizacion.ts';
-import { SIN_PLACA } from '../datos/conectores/transito.ts';
-import { NADA_SERVIDO, SERVIDO_Y_SIN_PEDIR, SOLO_BASE, SOLO_ESCRIBE } from '../porQueNoHayDato.ts';
-import { clavesDelMarco } from './textosDelMarco.ts';
+import { CONECTORES } from '../datos/conectores.ts';
+import { PALABRAS_DE_HUECO } from '../datos/palabrasDeHueco.ts';
+import * as laPantallaQuePide from '../datos/useDatosDeLaHoja.ts';
+import * as laPantallaSinConector from '../porQueNoHayDato.ts';
+import * as elMarco from './textosDelMarco.ts';
 
 /**
  * **Todas las cadenas traducibles del sistema, sacadas de donde estan** (#103).
@@ -107,45 +95,97 @@ function delArbol(): readonly string[] {
 }
 
 /**
- * **Las frases con que el sistema explica que no hay dato.**
+ * **Las frases con que el sistema explica que no hay dato, DERIVADAS** (#215, #237, #246).
  *
- * <h2>Son de DOS sitios, y el segundo faltaba (#215)</h2>
+ * <h2>Aqui habia una lista a mano, y era el agujero de este archivo</h2>
  *
- * Las cuatro de `porQueNoHayDato.ts` son de una pantalla **sin conector**. Las otras cinco son de
- * `useDatosDeLaHoja.ts` y son las de una pantalla **que si pide**: cargando, fallo, vacio, falta el
- * sujeto, falta el ejercicio y «no publicado». El interprete las pasa por `traducir` igual que a
- * las primeras, o sea que son claves — y no estaban listadas, asi que en un segundo idioma **la
- * mitad conectada de la interfaz salia en castellano**. El defecto no tenia rojo porque lo que
- * nadie lista tampoco nadie lo echa de menos, que es justo lo que este archivo existe para impedir.
+ * Todo lo demas del catalogo se deriva del dato —las 40 pantallas, el arbol, el marco— y el
+ * javadoc de arriba dice por que: «un olvido ahi no produce ningun rojo — nadie echa de menos lo
+ * que nadie listo». Menos esto, que hasta #246 era **una importacion por constante**: once
+ * `Ausencia` nombradas una a una y tres palabras de hueco.
  *
- * Y con ellas las dos palabras que un conector pone **en el hueco de un campo** —`NO_PUBLICADO` y
- * `SIN_CIFRAR`—, que viajan por `ausenciaPorCampo` y el interprete tambien traduce. **No entran las
- * de una CELDA de tabla**: esas son dato de la fila y no pasan por `traducir`.
+ * Y mordio tres veces. #215 encontro cinco de `useDatosDeLaHoja.ts` sin listar —«en un segundo
+ * idioma la mitad conectada de la interfaz salia en castellano»—; #237 anadio tres mas y tuvo que
+ * acordarse; y al medir #246 seguian fuera **las cinco frases de `alFallar`** y
+ * **`SIN_PARAMETROS_DEL_SORTEO`**, que entro en #196 y nadie inventario. Ninguna de las tres tuvo
+ * rojo: la guarda del locale compara el locale contra este catalogo, y el catalogo tampoco las
+ * tenia.
+ *
+ * <h2>De donde salen ahora, y por que de ahi</h2>
+ *
+ * · **De lo que los dos modulos de frases EXPORTAN**, filtrado por forma: lo que tiene
+ *   `enElCampo`, `explicacion` y `tono` es una `Ausencia` y entra. Una frase nueva entra sola con
+ *   solo declararla al lado de sus hermanas.
+ * · **De los CONECTORES**, campo por campo: `sinSujeto`, `sinDato` y `noEncontrado` son
+ *   `Ausencia` y viajan a la pantalla igual. Se recorre el conector entero y no esos tres nombres,
+ *   asi que el dia que `Conector` gane un cuarto canal no hay que volver aqui.
+ * · **De `PALABRAS_DE_HUECO`**, que ademas es de donde sale el TIPO con que estan declarados
+ *   `Reparto.noPublicados` y `Reparto.loQueLaOperacionNoTrae`: una palabra que no este alli **no
+ *   compila**, y la que esta, entra en el locale sin que nadie la liste.
+ *
+ * Lo que la forma no puede ver —una `Ausencia` escrita dentro de una funcion, o en un modulo que
+ * esto no recorre— lo vigila `verificaciones/ninguna-ausencia-se-queda-sin-inventariar.test.ts`,
+ * que barre las fuentes y sale roja nombrando el archivo. Derivar cubre lo corriente; el centinela
+ * cubre que derivar se haya quedado corto.
+ *
+ * <h2>Lo que NO entra</h2>
+ *
+ * Las palabras de una **celda** de tabla: son dato de la fila y no pasan por `traducir`.
  */
+function esUnaAusencia(valor: unknown): valor is Ausencia {
+  if (typeof valor !== 'object' || valor === null) return false;
+  const quiza = valor as Partial<Ausencia>;
+  return (
+    typeof quiza.enElCampo === 'string' &&
+    typeof quiza.explicacion === 'string' &&
+    typeof quiza.tono === 'string'
+  );
+}
+
+/** Todas las `Ausencia` que el sistema puede ensenar, sacadas de donde estan declaradas. */
+function lasAusenciasDelSistema(): readonly Ausencia[] {
+  const salida: Ausencia[] = [];
+  for (const modulo of [laPantallaSinConector, laPantallaQuePide]) {
+    for (const exportado of Object.values(modulo)) {
+      if (esUnaAusencia(exportado)) salida.push(exportado);
+    }
+  }
+  for (const conector of Object.values(CONECTORES)) {
+    if (conector === undefined) continue;
+    for (const campo of Object.values(conector)) {
+      if (esUnaAusencia(campo)) salida.push(campo);
+    }
+  }
+  return salida;
+}
+
 function deLasAusencias(): readonly string[] {
   return [
-    ...[NADA_SERVIDO, SOLO_BASE, SOLO_ESCRIBE, SERVIDO_Y_SIN_PEDIR].flatMap((a) => [
-      a.enElCampo,
-      a.explicacion,
-    ]),
-    // Y las dos de `territorio` (#237), que son las dos ausencias que la lectura del predial
-    // distingue: 404 «no esta en el padron» y 204 «esta y todavia no se le ha determinado».
-    ...[
-      CARGANDO,
-      VACIO,
-      SIN_SUJETO,
-      SIN_EJERCICIO,
-      NO_PUBLICADO_EN_PANTALLA,
-      SIN_PLACA,
-      NO_ESTA_EN_EL_PADRON,
-      TODAVIA_SIN_DETERMINAR,
-    ].flatMap((a) => [a.enElCampo, a.explicacion]),
-    NO_PUBLICADO,
-    SIN_CIFRAR,
-    // Un TROZO de pantalla que la operacion no trae, con su motivo: el «Cronograma» de
-    // `territorio` (#234). Viaja como clave por `Reparto.loQueLaOperacionNoTrae`.
-    SIN_CRONOGRAMA,
+    ...lasAusenciasDelSistema().flatMap((a) => [a.enElCampo, a.explicacion]),
+    ...Object.values(PALABRAS_DE_HUECO),
   ];
+}
+
+/**
+ * **Lo que dice el MARCO, derivado de lo que `textosDelMarco.ts` exporta** (#133, #246).
+ *
+ * Aquel archivo tenia su propia `clavesDelMarco()`, que juntaba los tres sacos **y nombraba a mano
+ * las cuatro frases sueltas** —la del conteo, la de la fecha, las dos de quien es—. Es la misma
+ * lista a mano de aqui abajo y con el mismo modo de fallo: la quinta frase suelta se escribe, no
+ * se lista, y nadie se entera. Derivado del modulo entero no hay quinta que olvidar — una cadena
+ * exportada, o un saco de cadenas, es una clave; los ganchos son funciones y no entran.
+ */
+function delMarco(): readonly string[] {
+  const salida: string[] = [];
+  for (const exportado of Object.values(elMarco)) {
+    if (typeof exportado === 'string') salida.push(exportado);
+    else if (typeof exportado === 'object' && exportado !== null) {
+      for (const frase of Object.values(exportado)) {
+        if (typeof frase === 'string') salida.push(frase);
+      }
+    }
+  }
+  return salida;
 }
 
 /** El catalogo entero, sin repetidos y en orden. */
@@ -154,7 +194,7 @@ export function catalogoDeClaves(): readonly string[] {
     ...deLasPantallas(),
     ...delArbol(),
     ...deLasAusencias(),
-    ...clavesDelMarco(),
+    ...delMarco(),
   ]);
   return [...todas].filter((c) => c.trim() !== '').sort((a, b) => a.localeCompare(b, 'es'));
 }

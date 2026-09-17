@@ -13,7 +13,12 @@ import type {
 } from '../lecturas.ts';
 import { RUTAS, pedirPagina, pedirUno } from '../lecturas.ts';
 import type { Conector, Reparto } from '../conectores.ts';
-import { NO_PUBLICADO } from '../conectores.ts';
+import {
+  NO_PUBLICADO,
+  SIN_CIFRAR,
+  SIN_PARAMETROS_DEL_SORTEO,
+  type PalabraDeHueco,
+} from '../palabrasDeHueco.ts';
 import { laVentanaDe, laVentanaQueSePide, loQueDijoElServidor } from '../laVentana.ts';
 
 /**
@@ -163,14 +168,6 @@ const SIN_AREA_HALLADA =
 const SIN_INTERES =
   'Ninguna de las dieciseis operaciones de fiscalizacion publica un interes: el cuadro que se ' +
   'imprime lleva «Multa» donde el prototipo decia «Interes». Cerrarlo es del backend.';
-
-/**
- * Lo que va donde la operacion publica el campo y lo contesta **vacio** (D-02a). Nunca `0.00`.
- *
- * Es la misma palabra que `conectores/inicio.ts` escribe cuando un frente no se puede cifrar, y
- * por el mismo motivo: un cero donde no se ha calculado nada se lee como «no debe nada».
- */
-const SIN_CIFRAR = 'sin cifrar';
 
 /** El prefijo de moneda que `formatearImporte` pone siempre; la columna ya lo dice en su rotulo. */
 const LA_MONEDA = /^S\/\s/;
@@ -485,7 +482,7 @@ function filaDelEjercicio(linea: LineaDeterminada): readonly CeldaDeLaTabla[] {
 function totalDeLaResolucion(
   importe: string | null,
   espera: boolean,
-): { readonly valor: string } | { readonly hueco: string } {
+): { readonly valor: string } | { readonly hueco: PalabraDeHueco } {
   if (importe !== null) return { valor: formatearImporte(importe) };
   return { hueco: espera ? SIN_CIFRAR : NO_PUBLICADO };
 }
@@ -587,7 +584,7 @@ const FIS_RES: Conector = {
   },
   repartir: (resolucion: ResolucionDeDeterminacion): Reparto => {
     const valores = new Map<Coordenada, string>([[coordenada(0, 1), resolucion.contribuyente]]);
-    const noPublicados = new Map<Coordenada, string>([
+    const noPublicados = new Map<Coordenada, PalabraDeHueco>([
       // El `actaId` es interno y el rotulo pide un documento; el interes no lo publica nadie (#213).
       [coordenada(0, 0), NO_PUBLICADO],
       [coordenada(0, 4), NO_PUBLICADO],
@@ -621,12 +618,6 @@ const FIS_RES: Conector = {
     };
   },
 };
-
-/** «Detectados por cruce» de un programa que no declara sus parametros de sorteo. */
-const SIN_PARAMETROS_DEL_SORTEO =
-  'El cruce no se pudo resolver: este programa no declara los parametros con que se sortea, y el ' +
-  'embudo dice cual falta en «parametroQueFalta». No es cero — cero seria «el cruce no senalo a ' +
-  'nadie», que es lo contrario de «el cruce no se pudo hacer».';
 
 /**
  * `fis-panel` — el embudo de un programa de fiscalizacion, de lo detectado a lo determinado (#196).
@@ -697,7 +688,7 @@ const FIS_PANEL: Conector = {
       [coordenada(0, 4), String(embudo.conActa)],
       [coordenada(0, 5), String(embudo.conDiferencia)],
     ]);
-    const noPublicados = new Map<Coordenada, string>();
+    const noPublicados = new Map<Coordenada, PalabraDeHueco>();
 
     // El ejercicio del programa, cuando lo declara. Uno anterior a `V60` no lo lleva, y entonces el
     // desplegable se queda en su primera opcion en vez de afirmar un ano que nadie dijo.

@@ -176,7 +176,7 @@ public class GenerarMuestra {
                                     pagina,
                                     TAMANO_DE_PAGINA,
                                     ORDEN_DEL_RECORRIDO,
-                                    Paginacion.Direccion.ASCENDENTE));
+                                    Paginacion.Sentido.ASCENDENTE));
 
             Reparto reparto = repartir(encontradas.contenido(), programaId, ejercicio, fechaSorteo);
             sorteadas.addAll(reparto.admitidas());

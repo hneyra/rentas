@@ -117,7 +117,7 @@ public final class ExpedientesEnMemoria implements ExpedienteRepository {
         return consultar(
                         criterio,
                         new Paginacion(
-                                0, Integer.MAX_VALUE, "numero", Paginacion.Direccion.ASCENDENTE))
+                                0, Integer.MAX_VALUE, "numero", Paginacion.Sentido.ASCENDENTE))
                 .totalElementos();
     }
 

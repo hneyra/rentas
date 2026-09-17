@@ -365,7 +365,7 @@ describe('el orden que se OFRECE lo admite el backend (#186, AC2)', () => {
 
   it('y los dos sentidos son los del backend: `ASCENDENTE` y `DESCENDENTE`', () => {
     // Son dato y no una constante de la libreria porque un sistema escribe `asc` y otro
-    // `ASCENDENTE`. El de aqui es el de `Paginacion.Direccion`, y mandar el otro es un 422.
+    // `ASCENDENTE`. El de aqui es el de `Paginacion.Sentido`, y mandar el otro es un 422.
     for (const { clave, tabla } of queOrdenan) {
       expect(tabla.orden?.ascendente, `${clave}/${tabla.clave}`).toBe('ASCENDENTE');
       expect(tabla.orden?.descendente, `${clave}/${tabla.clave}`).toBe('DESCENDENTE');

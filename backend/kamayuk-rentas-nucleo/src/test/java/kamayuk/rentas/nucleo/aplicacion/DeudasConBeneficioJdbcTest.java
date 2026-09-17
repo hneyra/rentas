@@ -100,7 +100,7 @@ class DeudasConBeneficioJdbcTest {
             Clock.fixed(Instant.parse("2026-08-28T10:00:00Z"), ZoneId.of("America/Lima"));
 
     private static final Paginacion PAGINA =
-            new Paginacion(0, 20, "ejercicio", Paginacion.Direccion.DESCENDENTE);
+            new Paginacion(0, 20, "ejercicio", Paginacion.Sentido.DESCENDENTE);
 
     /** Ninguna cifra de esta clase es normativa: son datos de prueba (regla 5, D-02b). */
     private static final String MITAD = "50";
@@ -414,7 +414,7 @@ class DeudasConBeneficioJdbcTest {
             asentarCargo(id, "MULTA_TRANSITO", Dinero.de("200.00"));
 
             Paginacion deUnaEnUna =
-                    new Paginacion(0, 1, "ejercicio", Paginacion.Direccion.DESCENDENTE);
+                    new Paginacion(0, 1, "ejercicio", Paginacion.Sentido.DESCENDENTE);
             SimularAcogimiento.Simulacion resultado =
                     simulacion.de(criterio(codigo, null, CAMPANIA_TOTAL), deUnaEnUna);
 
@@ -462,7 +462,7 @@ class DeudasConBeneficioJdbcTest {
                                                     0,
                                                     20,
                                                     "insoluto",
-                                                    Paginacion.Direccion.ASCENDENTE)))
+                                                    Paginacion.Sentido.ASCENDENTE)))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("insoluto");
         }

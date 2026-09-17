@@ -2,7 +2,7 @@ import { coordenada, type Coordenada } from '@kamayuk/ui';
 
 import { formatearImporte } from '../../dominio/formato.ts';
 import type { Conector, Reparto } from '../conectores.ts';
-import { NO_PUBLICADO } from '../conectores.ts';
+import { NO_PUBLICADO, type PalabraDeHueco } from '../palabrasDeHueco.ts';
 import type {
   CorridaDelPredial,
   FilaDeAvance,
@@ -145,7 +145,7 @@ const INI_PANEL: Conector = {
     CorridaDelPredial,
   ]): Reparto => {
     const valores = new Map<Coordenada, string>();
-    const noPublicados = new Map<Coordenada, string>();
+    const noPublicados = new Map<Coordenada, PalabraDeHueco>();
     const poner = (coord: Coordenada, valor: string | undefined) => {
       if (valor === undefined) noPublicados.set(coord, NO_PUBLICADO);
       else valores.set(coord, valor);

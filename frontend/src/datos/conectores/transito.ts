@@ -11,7 +11,7 @@ import type {
 } from '../lecturas.ts';
 import { RUTAS, pedirPagina, pedirUno } from '../lecturas.ts';
 import type { Conector, Reparto } from '../conectores.ts';
-import { NO_PUBLICADO } from '../conectores.ts';
+import { NO_PUBLICADO, type PalabraDeHueco } from '../palabrasDeHueco.ts';
 import { laVentanaDe, laVentanaQueSePide, loQueDijoElServidor } from '../laVentana.ts';
 
 /**
@@ -288,7 +288,7 @@ const TRA_PANEL: Conector = {
       // El total, calculado en el servidor. No se suman las lineas aqui.
       [coordenada(0, 1), String(resumen.papeletas)],
     ]);
-    const noPublicados = new Map<Coordenada, string>([
+    const noPublicados = new Map<Coordenada, PalabraDeHueco>([
       // «Caducadas sin notificar»: no es un estado, y el plazo con que juzgarlo no lo publica el
       // corpus — medido en #222, las nueve filas `PLAZO` una por una. Ver el javadoc.
       [coordenada(0, 4), NO_PUBLICADO],

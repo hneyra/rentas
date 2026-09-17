@@ -316,7 +316,7 @@ class ConsultarDeudaTest {
                 new CriterioDeDeudaPorContribuyente(codigo, fecha, fase, Agregacion.POR_OBLIGACION);
         return consulta.porContribuyente(
                 criterio,
-                new Paginacion(pagina, tamano, "ejercicio", Paginacion.Direccion.ASCENDENTE));
+                new Paginacion(pagina, tamano, "ejercicio", Paginacion.Sentido.ASCENDENTE));
     }
 
     private void cargar(

@@ -604,7 +604,7 @@ class CarteraCuadraConLaConsultaJdbcTest {
                                                     actual,
                                                     2,
                                                     "ejercicio",
-                                                    Paginacion.Direccion.ASCENDENTE)));
+                                                    Paginacion.Sentido.ASCENDENTE)));
             todas.addAll(leida.contenido());
             if (todas.size() >= leida.totalElementos() || leida.contenido().isEmpty()) {
                 return todas;
