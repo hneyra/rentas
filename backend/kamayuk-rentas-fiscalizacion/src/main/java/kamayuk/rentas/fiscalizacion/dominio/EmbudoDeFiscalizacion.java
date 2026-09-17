@@ -25,25 +25,45 @@ import org.jspecify.annotations.Nullable;
  * <b>segunda</b> acta (versión 2) y reliquidar emite una <b>segunda</b> liquidación: contar filas
  * haría que «con acta» superara a «programados», que es un embudo que se ensancha.
  *
- * <h2>Lo que este tipo NO dice, medido</h2>
+ * <h2>La tercera etapa se llama «Inspeccionados», y el rótulo del artboard se corrigió (#241)</h2>
  *
- * <p><b>«Con acta cerrada», que es como el artboard rotula la tercera etapa, sigue sin
- * publicarse</b> — pero desde #214 ya no porque no se pueda contestar. Hasta entonces {@link
- * EstadoDeActa} declaraba cinco valores y este sistema escribía uno: toda acta nacía {@code
- * ABIERTA} y no había en {@code src/main} un solo camino que la moviera, así que un {@code
- * conActaCerrada} derivado del estado valdría <b>cero siempre</b> —el defecto que #194 midió—.
+ * <p>Durante tres issues esta etapa fue un hueco en la pantalla. {@link #conActa} cuenta cuántas
+ * unidades del programa <b>tienen acta viva</b> —levantada y no anulada—, que es la etapa que el
+ * javadoc de {@code ActasController} llama «Inspeccionados»; el artboard la rotulaba «Con acta
+ * cerrada», y pintar una bajo el otro habría dicho otra cosa, así que la celda decía su motivo.
  *
- * <p>#214 cerró eso de la única manera que no inventa una segunda verdad: el estado del acta se
- * quedó en lo único que no se deriva de nada —viva o anulada—, y «cerrada» es <b>que tenga
- * liquidación</b>, que es un hecho que ya está escrito en {@code liquidacion_fiscalizacion} y que
- * {@link LiquidacionRepository#ultimaVersionDeActa} ya contesta. O sea que se puede contar. No se
- * cuenta <b>aquí</b> porque es otra etapa del embudo y otro contrato publicado, y el nombre que se
- * le ponga decide qué dibuja la pantalla: es #231.
+ * <p><b>Lo que #241 midió es que el rótulo era el equivocado</b>, y no con una opinión sino con dos
+ * frases del propio artboard:
  *
- * <p>Lo que sí se puede contar, y es lo que {@link #conActa} cuenta, es cuántas unidades del
- * programa <b>tienen acta viva</b> —levantada y no anulada—: la etapa que el javadoc de {@code
- * ActasController} llama «Inspeccionados». Se publica con ese nombre y no con el del artboard,
- * porque no son lo mismo.
+ * <ol>
+ *   <li>la nota de {@code fis-panel} —«Lo detectado, lo <b>inspeccionado</b> y lo que sostiene una
+ *       determinación»— nombra <b>tres</b> cosas para cuatro cifras, y la tercera es la inspección;
+ *   <li>la nota de {@code fis-actas} situaba el cierre <b>antes</b> de liquidar —«sin acta cerrada
+ *       no se puede liquidar»—, o sea lo contrario de lo que #214 llamó «cerrada»: que el acta
+ *       <b>tenga</b> liquidación. Con aquella definición la frase del artboard se leía «sin
+ *       liquidación no se puede liquidar», de modo que las dos «cerrada» no podían ser la misma
+ *       palabra.
+ * </ol>
+ *
+ * <p>Así que la tercera etapa de este embudo siempre fue la inspección, el rótulo pasó a «Con acta
+ * levantada» —en el artboard y en la definición de la pantalla a la vez— y esta cifra la llena.
+ *
+ * <h2>Lo que este tipo NO dice, y por qué NO es que no se pueda contar (#231)</h2>
+ *
+ * <p>«Con liquidación» <b>se puede contar</b>, y eso no está en duda: {@code LiquidarFiscalizacion}
+ * escribe la liquidación y su apertura, {@code CambiarEstadoDeLaLiquidacion} escribe la anulación,
+ * y {@link LiquidacionRepository#ultimaVersionDeActa} ya lo consulta para rechazar la segunda
+ * liquidación. No valdría cero siempre —que es el defecto que #194 midió con el estado del acta,
+ * cuando {@link EstadoDeActa} declaraba cinco valores y este sistema escribía uno—.
+ *
+ * <p><b>No se publica porque es otra etapa, no porque falte el dato.</b> El embudo del manual tiene
+ * cuatro —«Programados», «Inspeccionados», «Con liquidación» y «Notificadas», como lo dicen {@code
+ * ActasController} y {@code ActaPredialController}— y en él «Con liquidación» va <b>después</b> de
+ * «Inspeccionados»; el de {@code fis-panel} tiene otras cuatro, y su cuarta celda es «Con
+ * diferencia». Publicar aquí una quinta cifra dejaría un campo que ninguna pantalla dibuja, que es
+ * lo que #431, #432 y #544 tuvieron que retirar después. Y publicarla bajo el rótulo viejo habría
+ * dado dos significados a «cerrada» —el del artboard, antes de liquidar; el de #214, después—, que
+ * es la segunda verdad que #214 se negó a escribir.
  *
  * @param programaId el programa
  * @param codigo su «Nº de programa», que es lo que la pantalla teclea
@@ -57,7 +77,8 @@ import org.jspecify.annotations.Nullable;
  *     #detectadosPorCruce} no se puede resolver. Nombrarlo es lo único honesto que se puede hacer
  *     con un programa registrado antes de {@code V60}
  * @param programados cuántas unidades sorteó la muestra
- * @param conActa cuántas de ellas tienen acta viva. <b>No es «con acta cerrada»</b>: ver arriba
+ * @param conActa cuántas de ellas tienen acta viva: la etapa «Inspeccionados», que la pantalla
+ *     rotula «Con acta levantada» desde #241
  * @param conDiferencia cuántas unidades tienen, en la <b>última</b> versión de su liquidación, al
  *     menos una línea cuya condición justifica determinar de oficio ({@link
  *     CondicionFiscalizada#hayDiferencia})

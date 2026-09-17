@@ -352,8 +352,9 @@ export interface OperacionServida {
  *       cuatro cifras de `fis-panel`, juntas y cuadradas en UNA lectura. Es lo que esa hoja no
  *       tenia: lo unico que declaraba era `estado-cuenta`, que publica la deuda de fiscalizacion de
  *       un contribuyente y ni una de las cuatro. <b>No admite ni un parametro</b>, y una de sus
- *       cifras —`conActa`— <b>no es</b> el rotulo que el artboard dibuja: ver
- *       `conectores/fiscalizacion.ts`.</li>
+ *       cifras —`conActa`— <b>no era</b> el rotulo que el artboard dibujaba, y desde #241 lo es:
+ *       la celda decia «Con acta cerrada» y dice «Con acta levantada», que es lo que la cifra
+ *       cuenta. Ver `conectores/fiscalizacion.ts`.</li>
  * </ol>
  *
  * <b>Y `GET /fiscalizacion/estado-cuenta` sigue apagada</b>, aunque `fis-panel` la declare y ya este
