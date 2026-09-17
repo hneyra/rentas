@@ -1784,6 +1784,7 @@
         ],
         "predios": [
           {
+            "predioId": "entero",
             "codigoReferenciaCatastral": "texto",
             "tipo": "texto",
             "direccion": "texto",
