@@ -68,7 +68,7 @@ function internado(campos: Partial<InternamientoEnDeposito> = {}): Internamiento
   };
 }
 
-/** Una linea de resumen, con los trece campos que el contrato declara. */
+/** Una linea de resumen, con los catorce campos que el contrato declara. */
 function lineaDelResumen(
   campos: Partial<ResumenDePapeletas['lineas'][number]> = {},
 ): ResumenDePapeletas['lineas'][number] {
@@ -85,6 +85,7 @@ function lineaDelResumen(
     enCoactiva: 388,
     importeEnCoactiva: '71148.00',
     conResolucionNotificada: 5884,
+    conResolucionDeMulta: 388,
     actualizadoA: '2026-09-17',
     ...campos,
   };
@@ -297,7 +298,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('`tra-panel` — los cinco recuentos del ejercicio (#184, #222)', () => {
+describe('`tra-panel` — los cinco recuentos del ejercicio (#184, #222, #243)', () => {
   const reparto = TRA_PANEL.repartir(resumen() as never);
 
   it('el EJERCICIO sale de `desde` y no de la primera opcion del desplegable', () => {
@@ -311,13 +312,36 @@ describe('`tra-panel` — los cinco recuentos del ejercicio (#184, #222)', () =>
     expect(otro.valores.get(coordenada(0, 0))).toBe('2024');
   });
 
-  it('los CUATRO recuentos que la operacion publica salen de ella, uno a uno', () => {
-    // «Levantadas» es el total del RESUMEN —calculado en el servidor—, y los otros tres son de la
-    // linea del ejercicio. **Eran tres hasta #222**, que publico `conResolucionNotificada`.
+  it('los TRES recuentos que la operacion publica como HECHO salen de ella, uno a uno', () => {
+    // «Levantadas» es el total del RESUMEN —calculado en el servidor—, y los otros dos son de la
+    // linea del ejercicio. **Eran cuatro hasta #243**: «Canceladas» dibujaba `pagadas`, que cuenta
+    // `p.estado = 'PAGADA'` y que nadie escribe.
     expect(reparto.valores.get(coordenada(0, 1))).toBe('8412');
     expect(reparto.valores.get(coordenada(0, 2))).toBe('5884');
-    expect(reparto.valores.get(coordenada(0, 3))).toBe('2118');
     expect(reparto.valores.get(coordenada(0, 5))).toBe('388');
+  });
+
+  it('«Con resolucion de multa» es `conResolucionDeMulta`, y NO `enCoactiva` (#243)', () => {
+    // El defecto que #243 mide: `EstadoDePapeleta.COACTIVA` no lo escribe nadie —el unico
+    // `UPDATE papeleta` de `src/main` es `SET numero`—, asi que `enCoactiva` es cero para siempre.
+    // Lo que consta es que la resolucion de multa este emitida. Los dos campos llegan con valores
+    // DISTINTOS a proposito: con los dos en 388 esta prueba no distinguiria cual se leyo.
+    const otro = TRA_PANEL.repartir(
+      resumen({
+        lineas: [lineaDelResumen({ enCoactiva: 7, conResolucionDeMulta: 441 })],
+      }) as never,
+    );
+    expect(otro.valores.get(coordenada(0, 5))).toBe('441');
+    expect([...otro.valores.values()], 'se leyo el estado que nadie escribe').not.toContain('7');
+  });
+
+  it('«Canceladas» dice «no publicado» y NO el `pagadas` que sigue llegando (#243)', () => {
+    // La cifra del artboard es 2 118 y el campo llega con ella, asi que la tentacion cabe entera.
+    // Es cero para siempre en una instalacion nueva —nadie escribe `PAGADA`— y no se deriva de
+    // nada: el libro no tiene por donde cruzar a una papeleta. Se publica el campo y NO se dibuja.
+    expect(reparto.noPublicados.get(coordenada(0, 3))).toBe(NO_PUBLICADO);
+    expect(reparto.valores.has(coordenada(0, 3))).toBe(false);
+    expect([...reparto.valores.values()]).not.toContain('2118');
   });
 
   it('«Con multa notificada» es `conResolucionNotificada`, y NO el estado de la papeleta', () => {
@@ -342,7 +366,7 @@ describe('`tra-panel` — los cinco recuentos del ejercicio (#184, #222)', () =>
     expect(raro.valores.get(coordenada(0, 1))).toBe('9999');
   });
 
-  it('el UNICO que nadie publica lo dice, y no con un cero', () => {
+  it('los DOS que nadie publica lo dicen, y no con un cero', () => {
     // «Caducadas sin notificar» ni siquiera es un estado: necesita el acto de la notificacion y
     // ademas un PLAZO contra el que juzgarla, que es valor normativo. #222 conto las nueve filas
     // `PLAZO` del corpus una por una y ninguna es esa —tres de prescripcion, dos de su inicio,
@@ -350,6 +374,8 @@ describe('`tra-panel` — los cinco recuentos del ejercicio (#184, #222)', () =>
     // esta mitad esta bloqueada, y decirlo es la respuesta.
     expect(reparto.noPublicados.get(coordenada(0, 4))).toBe(NO_PUBLICADO);
     expect(reparto.valores.has(coordenada(0, 4))).toBe(false);
+    // Y el segundo hueco, desde #243: «Canceladas».
+    expect(reparto.noPublicados.get(coordenada(0, 3))).toBe(NO_PUBLICADO);
     // Y «Notificadas» ya NO esta aqui: desde #222 el rotulo dice «Con multa notificada» y trae
     // cifra. Que siga en `noPublicados` seria un hueco que ya no existe.
     expect(reparto.noPublicados.has(coordenada(0, 2))).toBe(false);
@@ -372,19 +398,24 @@ describe('`tra-panel` — los cinco recuentos del ejercicio (#184, #222)', () =>
         desde: '2025-01-01',
         papeletas: 8500,
         lineas: [
-          lineaDelResumen({ clave: '2025', ano: 2025, cantidad: 88, pagadas: 11, enCoactiva: 3 }),
+          lineaDelResumen({
+            clave: '2025',
+            ano: 2025,
+            cantidad: 88,
+            conResolucionNotificada: 11,
+            conResolucionDeMulta: 3,
+          }),
           lineaDelResumen(),
         ],
       }) as never,
     );
-    // Primero el dano y luego la forma: las 11 pagadas de 2025 NO pueden acabar bajo un rotulo
-    // que dice «Canceladas» de un panel que se titula «Papeletas del ejercicio».
+    // Primero el dano y luego la forma: las 11 de 2025 NO pueden acabar bajo un rotulo del
+    // ejercicio entero en un panel que se titula «Papeletas del ejercicio».
     expect(
       [...dosAnos.valores.values()],
       'Se escribio la cuenta de UNA linea bajo un rotulo del ejercicio entero',
     ).not.toContain('11');
     expect(dosAnos.noPublicados.get(coordenada(0, 2))).toBe(NO_PUBLICADO);
-    expect(dosAnos.noPublicados.get(coordenada(0, 3))).toBe(NO_PUBLICADO);
     expect(dosAnos.noPublicados.get(coordenada(0, 5))).toBe(NO_PUBLICADO);
     expect(dosAnos.valores.get(coordenada(0, 1))).toBe('8500');
   });
@@ -394,7 +425,6 @@ describe('`tra-panel` — los cinco recuentos del ejercicio (#184, #222)', () =>
     // pagada. Deducir es lo que este archivo no hace: lo que no llego, no se escribe.
     const vacio = TRA_PANEL.repartir(resumen({ papeletas: 0, lineas: [] }) as never);
     expect(vacio.noPublicados.get(coordenada(0, 2))).toBe(NO_PUBLICADO);
-    expect(vacio.noPublicados.get(coordenada(0, 3))).toBe(NO_PUBLICADO);
     expect(vacio.noPublicados.get(coordenada(0, 5))).toBe(NO_PUBLICADO);
     expect(vacio.valores.get(coordenada(0, 1))).toBe('0');
   });
@@ -652,7 +682,7 @@ describe('LA ROTURA DEL AC3, en el DOM: con otra respuesta, la pantalla ensena o
     // escribe en el texto y no en un `<input>`, al contrario que los de `tra-veh`.
     const { container } = await pintar('tra-panel', comoTraPanel(resumen()));
     expect(container.textContent).toContain('Levantadas8412');
-    expect(container.textContent).toContain('Canceladas2118');
+    expect(container.textContent).toContain('Con multa notificada5884');
 
     const otro = await pintar(
       'tra-panel',
@@ -661,19 +691,31 @@ describe('LA ROTURA DEL AC3, en el DOM: con otra respuesta, la pantalla ensena o
           desde: '2025-01-01',
           hasta: '2025-12-31',
           papeletas: 311,
-          lineas: [lineaDelResumen({ clave: '2025', ano: 2025, pagadas: 77, enCoactiva: 4 })],
+          lineas: [
+            lineaDelResumen({
+              clave: '2025',
+              ano: 2025,
+              conResolucionNotificada: 77,
+              conResolucionDeMulta: 4,
+            }),
+          ],
         }),
       ),
     );
     expect(otro.container.textContent).toContain('Ejercicio2025');
     expect(otro.container.textContent).toContain('Levantadas311');
-    expect(otro.container.textContent).toContain('Canceladas77');
+    expect(otro.container.textContent).toContain('Con multa notificada77');
+    expect(otro.container.textContent).toContain('Con resolución de multa4');
     expect(otro.container.textContent).not.toContain('8412');
 
     for (const celda of FILA_DEL_ARTBOARD['tra-panel']) {
       expect(otro.container.textContent, `«${celda}» es del artboard`).not.toContain(celda);
     }
-    // Y los dos huecos llegan al DOM diciendolo, no en blanco.
+    // Y los dos huecos llegan al DOM diciendolo, no en blanco. Desde #243 son dos: «Canceladas»
+    // se sumo a «Caducadas sin notificar», y la cifra del artboard —2 118— NO puede aparecer
+    // aunque el campo `pagadas` siga llegando con ella.
+    expect(container.textContent).toContain('Canceladasno publicado');
+    expect(container.textContent).not.toContain('2118');
     expect(otro.container.textContent).toContain(NO_PUBLICADO);
   });
 

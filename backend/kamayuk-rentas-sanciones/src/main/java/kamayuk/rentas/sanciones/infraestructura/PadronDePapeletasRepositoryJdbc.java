@@ -119,6 +119,28 @@ public class PadronDePapeletasRepositoryJdbc extends RepositorioJdbc
                     + "         WHERE rg.papeleta_id = p.id"
                     + "           AND n.resultado <> 'NO_UBICADO')";
 
+    /**
+     * Que a esta papeleta ya se le emitio su resolucion de multa (#243).
+     *
+     * <p>Es {@code it.valor_id IS NOT NULL} sobre el mismo {@code LEFT JOIN} que ya trae el numero
+     * del valor al padron: la fila {@code GENERADO} de {@code papeleta_masivo_item}, que {@code
+     * papeleta_valor_unico_uq} garantiza unica. <b>No hay un segundo cruce</b> y no se toca ni una
+     * tabla de {@code valores}: {@code sanciones} ve de los valores lo que {@code
+     * EmisionDeValoresDeMultas} publica, y sus tablas no.
+     *
+     * <p><b>Es completo</b>, medido: el unico sitio de {@code src/main} que llama a {@code
+     * emitirPorMulta} es {@code ProcesarPapeletaDeLaCorrida}, y esa es tambien la unica escritura
+     * de {@code papeleta_masivo_item}. No hay camino por el que una papeleta reciba su resolucion
+     * de multa sin dejar esa fila.
+     *
+     * <p><b>Y es lo que este sistema llama «enviada a coactiva»</b>: el padron {@code
+     * transito_padron_coactiva} se define con este mismo predicado —{@code
+     * CriterioDePadron.conValorEmitido}— y su documento se titula «Padron de papeletas con
+     * resolucion de multa emitida». No es el expediente coactivo, que vive en {@code coactiva} y
+     * cuelga del valor, no de la papeleta.
+     */
+    private static final String CON_RESOLUCION_DE_MULTA = " it.valor_id IS NOT NULL";
+
     public PadronDePapeletasRepositoryJdbc(JdbcClient jdbc) {
         super(jdbc);
     }
@@ -228,6 +250,9 @@ public class PadronDePapeletasRepositoryJdbc extends RepositorioJdbc
                                 + " count(*) FILTER (WHERE"
                                 + CON_RESOLUCION_NOTIFICADA
                                 + ") AS con_resolucion_notificada"
+                                + ", count(*) FILTER (WHERE"
+                                + CON_RESOLUCION_DE_MULTA
+                                + ") AS con_resolucion_de_multa"
                                 + DESDE
                                 + donde
                                 + " GROUP BY "
@@ -330,7 +355,8 @@ public class PadronDePapeletasRepositoryJdbc extends RepositorioJdbc
                 new Dinero(importe(fila.getBigDecimal("importe_pendientes"))),
                 fila.getLong("en_coactiva"),
                 new Dinero(importe(fila.getBigDecimal("importe_coactiva"))),
-                fila.getLong("con_resolucion_notificada"));
+                fila.getLong("con_resolucion_notificada"),
+                fila.getLong("con_resolucion_de_multa"));
     }
 
     /**

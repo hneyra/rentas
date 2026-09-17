@@ -33,9 +33,18 @@ export const TRANSITO = {
           // rotulo y no la cifra: una papeleta notificada en la calle sin resolucion emitida no
           // entra en este recuento, y el rotulo ya no promete que si.
           { etiqueta: 'Con multa notificada', tipo: 'r' },
+          // «Canceladas» conserva su rotulo y deja de traer cifra (#243): `pagadas` cuenta
+          // `p.estado = 'PAGADA'` y NADIE lo escribe. No se deriva de nada —el libro no cruza a
+          // una papeleta—, asi que la celda dice «no publicado» y nombra lo que falta.
           { etiqueta: 'Canceladas', tipo: 'r' },
           { etiqueta: 'Caducadas sin notificar', tipo: 'r' },
-          { etiqueta: 'En coactiva', tipo: 'r' },
+          // **«Con resolucion de multa», y hasta #243 decia «En coactiva»** (y su gemelo en el
+          // artboard). Mismo defecto y misma salida que «Notificadas» en #222: `enCoactiva` cuenta
+          // `p.estado = 'COACTIVA'`, que nadie escribe. Lo que SI consta de esa etapa es que la
+          // resolucion de multa este emitida —la fila `GENERADO` de `papeleta_masivo_item`—, que
+          // es el predicado con que el backend define `transito_padron_coactiva`. Se cambia el
+          // rotulo y la cifra pasa a ser un hecho.
+          { etiqueta: 'Con resolución de multa', tipo: 'r' },
         ],
       },
     ],

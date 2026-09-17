@@ -52,6 +52,14 @@ public record ResumenDePapeletasResource(
      * ?agrupadoPor=ESTADO} con clave {@code NOTIFICADA} vale cero para siempre. El nombre del campo
      * dice lo que cuenta para que nadie lo dibuje bajo otro rótulo sin darse cuenta.
      *
+     * <p>{@code conResolucionDeMulta} <b>no es «cuántas están en coactiva»</b> (#243). Cuenta las
+     * que ya tienen emitida su resolución de multa —su fila {@code GENERADO} de {@code
+     * papeleta_masivo_item} con el valor puesto—, que es lo que este contexto sabe de esa etapa y
+     * el mismo predicado con que {@code transito_padron_coactiva} define «las enviadas a cobranza».
+     * {@code enCoactiva} sigue publicándose y cuenta {@code p.estado = 'COACTIVA'}, que <b>nadie
+     * escribe</b>: en una instalación nueva vale cero para siempre, y el panel de tránsito ya no lo
+     * dibuja por eso.
+     *
      * <p>{@code ano} sale <b>solo</b> cuando el agrupador lo determina —{@code ANO} y {@code MES}—
      * y va nulo con los otros tres (#398). La columna «Año» de {@code transito_resumen_papeletas}
      * se dibuja con este campo y no con {@code clave}: la clave es el estado cuando se agrupa por
@@ -70,6 +78,7 @@ public record ResumenDePapeletasResource(
             long enCoactiva,
             Dinero importeEnCoactiva,
             long conResolucionNotificada,
+            long conResolucionDeMulta,
             LocalDate actualizadoA) {
 
         static Linea de(LineaDelResumen linea, LocalDate aLaFecha) {
@@ -86,6 +95,7 @@ public record ResumenDePapeletasResource(
                     linea.enCoactiva(),
                     linea.importeEnCoactiva(),
                     linea.conResolucionNotificada(),
+                    linea.conResolucionDeMulta(),
                     aLaFecha);
         }
     }

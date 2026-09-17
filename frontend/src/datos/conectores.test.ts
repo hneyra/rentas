@@ -352,6 +352,7 @@ const RESUMEN_DE_PAPELETAS: ResumenDePapeletas = {
       enCoactiva: 388,
       importeEnCoactiva: '71148.00',
       conResolucionNotificada: 5884,
+      conResolucionDeMulta: 388,
       actualizadoA: '2026-09-17',
     },
   ],

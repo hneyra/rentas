@@ -29,7 +29,7 @@ import { laVentanaDe, laVentanaQueSePide, loQueDijoElServidor } from '../laVenta
  *   <tr><th>Hoja</th><th>Operaciones</th><th>Que llena</th></tr>
  *   <tr><td>`tra-panel`</td><td>`GET /transito/reportes/resumen-papeletas`</td><td>el
  *     desplegable de ejercicio y **tres de sus cinco recuentos**; los otros dos dicen «no
- *     publicado» y nombran lo que falta</td></tr>
+ *     publicado» y nombran lo que falta (#243)</td></tr>
  *   <tr><td>`tra-pap`</td><td>`GET /transito/papeletas` -> `GET
  *     /transito/papeletas/{numero}/actos`</td><td>**solo su tabla**: cero campos de solo
  *     lectura</td></tr>
@@ -182,11 +182,12 @@ const SIN_PLACA: Ausencia = {
  * entero: una cifra exacta y equivocada, que es la peor clase. Con cero lineas pasa lo mismo al
  * reves: no hay de donde sacarlas. En los dos casos los dos campos dicen «no publicado».
  *
- * <h2>Campo a campo: uno de contexto, CUATRO con dato y UN hueco que nombra al backend</h2>
+ * <h2>Campo a campo: uno de contexto, TRES con dato y DOS huecos que nombran al backend</h2>
  *
- * **Eran tres con dato y dos huecos hasta #222.** «Notificadas» se llama ahora «Con multa
- * notificada» y trae cifra; «Caducadas sin notificar» sigue sin publicarse, y ya con la medida de
- * por que.
+ * **Fueron tres con dato y dos huecos, luego cuatro y uno, y desde #243 tres y dos otra vez.**
+ * «Notificadas» se llama «Con multa notificada» y trae cifra (#222); «Canceladas» **deja de traer
+ * cifra** porque la suya valia cero para siempre (#243); «En coactiva» pasa a «Con resolucion de
+ * multa», que es lo que de esa etapa consta; «Caducadas sin notificar» sigue sin publicarse.
  *
  * <ul>
  *   <li><b>`0|0` Ejercicio</b> ← el <b>ano de `desde`</b>, que es el rango que la respuesta dice
@@ -218,20 +219,38 @@ const SIN_PLACA: Ausencia = {
  *       a)). <b>Se cambio el rotulo en el artboard y no la cifra aqui</b>, que es lo que pedia el
  *       AC 1 de #222: una papeleta notificada en la calle sin resolucion emitida no entra en este
  *       recuento, y el rotulo ya no promete que si.</li>
- *   <li><b>`0|3` Canceladas</b> ← `pagadas` de la linea. «Cancelar» es <b>pagar</b>, y no se
- *       decidio por el sonido: el artboard usa la misma palabra en la instruccion de `tra-veh`
- *       —«sin la papeleta cancelada y la custodia pagada no se emite la orden de retiro»—, y el
- *       prototipo del monolito dibuja la casilla «Multa cancelada» con el marcador «Recibo de la
- *       papeleta». El SQL que la cuenta es `count(*) FILTER (WHERE p.estado = 'PAGADA')`.</li>
- *   <li><b>`0|5` En coactiva</b> ← `enCoactiva` de la linea, que es
- *       `count(*) FILTER (WHERE p.estado = 'COACTIVA')`. El rotulo y el estado dicen lo mismo.</li>
+ *   <li><b>`0|5` Con resolucion de multa</b> ← `conResolucionDeMulta`, <b>desde #243</b>. El rotulo
+ *       del artboard decia «En coactiva» y lo llenaba `enCoactiva`, que es
+ *       `count(*) FILTER (WHERE p.estado = 'COACTIVA')` — y <b>nadie escribe ese estado</b>. Ver
+ *       abajo. Lo que si consta, y es de este contexto entero, es que a la papeleta ya se le
+ *       <b>emitio su resolucion de multa</b>: la fila `GENERADO` de `papeleta_masivo_item` con su
+ *       `valor_id`. Es el mismo predicado con que el backend define el padron
+ *       `transito_padron_coactiva` —«Padron de papeletas con resolucion de multa emitida»—, asi
+ *       que es la etapa que el rotulo queria nombrar, dicha con lo que el sistema sabe.
+ *       <b>Se cambio el rotulo en el artboard y en la definicion a la vez</b>, como #222.</li>
  * </ul>
  *
- * <h2>Y los dos que dicen «no publicado», con lo que le falta al backend en cada uno</h2>
+ * <h2>Y los TRES que dicen «no publicado», con lo que le falta al backend en cada uno</h2>
  *
- * Son los dos casos que #184 pedia nombrar, y no son el mismo hueco:
+ * Eran dos y desde #243 son tres, y no son el mismo hueco:
  *
  * <ul>
+ *   <li><b>`0|3` Canceladas</b> — <b>desde #243</b>, y hasta aqui dibujaba `pagadas`. «Cancelar»
+ *       es <b>pagar</b>, y eso este sistema <b>no lo sabe de una papeleta</b>. La medida: de los
+ *       siete valores de `EstadoDePapeleta` la produccion escribe <b>uno</b> —hay un solo `INSERT
+ *       INTO papeleta`, las dos fabricas ponen `IMPUESTA` y el unico `UPDATE papeleta` de
+ *       `src/main` es `SET numero = :numeroNuevo`—, asi que
+ *       `count(*) FILTER (WHERE p.estado = 'PAGADA')` es <b>cero para siempre</b> en una
+ *       instalacion nueva. Y no se puede derivar de otro sitio: lo cobrado vive en el libro y
+ *       `cuenta_corriente_asiento` no lleva ni `papeleta_id` ni `valor_id`, y `valor.estado =
+ *       'PAGADO'` tampoco lo escribe nadie —medido, en `src/main` solo aparece como filtro de
+ *       lectura—. Escribirlo en la papeleta seria ademas una <b>segunda verdad</b> sobre el dinero,
+ *       que es lo que #214 se nego a introducir.
+ *       <p><b>En una instalacion con el padron migrado esa columna PUEDE traer cifras</b>, y por
+ *       eso el campo `pagadas` se sigue publicando: lo escribio otro sistema. Lo que no se hace es
+ *       dibujarlo <b>aqui</b>, al lado de «Levantadas», que este sistema si produce — un panel que
+ *       mezcla dos procedencias sin decirlo se lee como si todas sus cifras valieran lo mismo. El
+ *       hueco nombra lo que falta: el acto que registre el cobro <b>contra la papeleta</b>.</li>
  *   <li><b>`0|4` Caducadas sin notificar</b> — <b>no es un estado</b>, y le faltan <b>las dos
  *       cosas</b>: el acto que registra la notificacion de la papeleta en si, y ademas el
  *       <b>plazo</b> para notificar, contra el que se decide si vencio. Ese plazo es un valor
@@ -262,6 +281,14 @@ const SIN_PLACA: Ausencia = {
  *       pendiente se puede cobrar, y una caducada es justamente la que <b>ya no</b>. Ponerla ahi
  *       diria que hay 1 842 papeletas incobrables donde las hay cobrables, debajo de una
  *       instruccion que manda atenderlas primero.</li>
+ *   <li><b>«Con resolucion de multa» ← `enCoactiva`</b>, que es el campo que ocupaba esa celda y
+ *       que sigue llegando. Es cero para siempre —nadie escribe ese estado— y ademas dice otra
+ *       cosa: el expediente coactivo cuelga del <b>valor</b> y lo lleva otro contexto. Dejarlo
+ *       habria sido cambiar el rotulo sin cambiar la cifra, que es lo contrario de lo que #222
+ *       hizo con «Notificadas».</li>
+ *   <li><b>«Canceladas» ← `conResolucionDeMulta`</b>, ni ninguna otra cuenta que quepa en ese
+ *       hueco. Una multa <b>emitida</b> es exactamente lo contrario de una <b>cancelada</b>:
+ *       ponerla ahi diria que se cobro lo que acaba de formalizarse para cobrar.</li>
  *   <li><b>«Notificadas» ← `papeletas` − `pendientes`</b>, o cualquier otra resta. Aritmetica en el
  *       navegador sobre cifras que nadie publico junta, y ademas falsa: las pagadas, las anuladas y
  *       las prescritas no son las notificadas.</li>
@@ -289,19 +316,23 @@ const TRA_PANEL: Conector = {
       [coordenada(0, 1), String(resumen.papeletas)],
     ]);
     const noPublicados = new Map<Coordenada, PalabraDeHueco>([
+      // «Canceladas»: `pagadas` cuenta `p.estado = 'PAGADA'`, y NADIE lo escribe — el unico
+      // `UPDATE papeleta` de `src/main` es `SET numero`. Cero para siempre bajo un rotulo que
+      // afirma que se cobro. No se deriva de nada: el libro no cruza a una papeleta (#243).
+      [coordenada(0, 3), NO_PUBLICADO],
       // «Caducadas sin notificar»: no es un estado, y el plazo con que juzgarlo no lo publica el
       // corpus — medido en #222, las nueve filas `PLAZO` una por una. Ver el javadoc.
       [coordenada(0, 4), NO_PUBLICADO],
     ]);
     if (delEjercicio === undefined) {
       noPublicados.set(coordenada(0, 2), NO_PUBLICADO);
-      noPublicados.set(coordenada(0, 3), NO_PUBLICADO);
       noPublicados.set(coordenada(0, 5), NO_PUBLICADO);
     } else {
       // «Con multa notificada»: lo que consta es la diligencia de la RESOLUCION (#222).
       valores.set(coordenada(0, 2), String(delEjercicio.conResolucionNotificada));
-      valores.set(coordenada(0, 3), String(delEjercicio.pagadas));
-      valores.set(coordenada(0, 5), String(delEjercicio.enCoactiva));
+      // «Con resolucion de multa»: lo que consta de la etapa que el rotulo llamaba «En
+      // coactiva» — la multa formalizada, que es de este contexto entero (#243).
+      valores.set(coordenada(0, 5), String(delEjercicio.conResolucionDeMulta));
     }
     // Esta hoja no tiene tabla: su bloque son seis campos.
     return { valores, filas: new Map(), noPublicados };

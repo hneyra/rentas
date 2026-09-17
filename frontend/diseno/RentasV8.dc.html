@@ -863,10 +863,22 @@ const PANTALLAS = {
      publicado»: además del acto le falta un PLAZO de notificación de la papeleta, y de las nueve
      filas `PLAZO` del corpus de `normativa` ninguna es esa —tres son de prescripción, dos de su
      inicio, una del cumplimiento del REC-1 y tres del plazo de RECLAMACIÓN, que corre DESDE la
-     notificación y no HASTA ella—. Regla 5: no se inventa. */
+     notificación y no HASTA ella—. Regla 5: no se inventa.
+
+     Y «En coactiva» pasa a llamarse «Con resolución de multa» (#243, y su gemelo en la definición).
+     La misma medida alcanza a los DOS recuentos que #184 sí conectó: `pagadas` es
+     `FILTER (WHERE p.estado = 'PAGADA')` y `enCoactiva` es `FILTER (WHERE p.estado = 'COACTIVA')`,
+     y de los siete valores de `EstadoDePapeleta` la producción escribe UNO. Los dos valían cero
+     para siempre. «Canceladas» se queda con su rótulo y pasa a decir «no publicado»: lo cobrado
+     vive en el libro y el libro no tiene por dónde cruzar a una papeleta —`cuenta_corriente_asiento`
+     no lleva `papeleta_id` ni `valor_id`—, así que no hay cifra honesta que poner. «En coactiva»
+     sí tiene una: lo que consta de esa etapa es que la resolución de multa esté EMITIDA —la fila
+     `GENERADO` de `papeleta_masivo_item` con su `valor_id`—, que es el mismo predicado con que el
+     backend define el padrón `transito_padron_coactiva`. Se cambia el rótulo y la cifra pasa a ser
+     un hecho; el expediente coactivo cuelga del VALOR y es de otro contexto. */
   'tra-panel': [['Papeletas del ejercicio', 'Por situación, con lo que se puede y no se puede cobrar.', [
     ['Ejercicio', 's', ['2026', '2025']], ['Levantadas', 'r', '8,412'], ['Con multa notificada', 'r', '5,884'],
-    ['Canceladas', 'r', '2,118'], ['Caducadas sin notificar', 'r', '1,842'], ['En coactiva', 'r', '388']]]],
+    ['Canceladas', 'r', '2,118'], ['Caducadas sin notificar', 'r', '1,842'], ['Con resolución de multa', 'r', '388']]]],
   'tra-pap': [['Papeleta de tránsito', 'La fecha de notificación decide si la papeleta se puede cobrar.', [
     ['Nº de papeleta', ''], ['Placa', ''], ['Fecha de la infracción', 'd'], ['Hora', ''],
     ['Código de infracción', 's', ['M-01 — Conducir sin licencia', 'M-08 — Exceso de velocidad', 'G-58 — Estacionar en zona rígida', 'L-05 — No portar SOAT']],

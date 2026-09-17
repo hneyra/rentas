@@ -841,6 +841,43 @@ class ValoresMasivosYReportesJdbcTest {
             assertThat(papeleta.numero()).isNotBlank();
         }
 
+        /**
+         * #243 — «En coactiva» tampoco consta, y lo que si consta se cuenta con su nombre.
+         *
+         * <p>El montaje siembra DOS papeletas y solo una pasa por la corrida, porque con las dos
+         * emitidas {@code conResolucionDeMulta} valdria {@code cantidad} y leer {@code cantidad}
+         * pasaria esta prueba en verde con el {@code FILTER} quitado. Se agrupa por CODIGO y no por
+         * ESTADO justamente para poder mirarlas por separado: cada papeleta de este archivo trae su
+         * propio codigo de infraccion, asi que cada una es una linea de una fila.
+         */
+        @Test
+        @DisplayName("el estado COACTIVA no lo escribe nadie, y la multa EMITIDA si consta (#243)")
+        void enCoactivaEsCeroYLaResolucionDeMultaSeCuenta() {
+            Papeleta conMulta = papeletaExigible("rm1");
+            Papeleta sinMulta = papeletaDeTransito("rm2");
+            generar.generar(corridaDe(conMulta).identificador());
+
+            ResumenDePapeletas resumen = resumenAgrupadoPor(AgrupacionDelResumen.CODIGO);
+            LineaDelResumen laDeLaMulta = lineaDe(resumen, codigoDe("rm1"));
+            LineaDelResumen laOtra = lineaDe(resumen, codigoDe("rm2"));
+
+            assertThat(laDeLaMulta.conResolucionDeMulta())
+                    .as("su resolucion de multa esta emitida: es la fila GENERADO de la corrida")
+                    .isOne();
+            assertThat(laOtra.conResolucionDeMulta())
+                    .as(
+                            "y la que no paso por la corrida no la tiene — sin esta, contar"
+                                    + " `cantidad` pasaria igual")
+                    .isZero();
+            assertThat(laDeLaMulta.enCoactiva())
+                    .as(
+                            "mientras el estado sigue diciendo IMPUESTA: nadie escribe"
+                                    + " papeleta.estado al pasar la multa a cobranza, y el rotulo"
+                                    + " «En coactiva» dibujaba esto")
+                    .isZero();
+            assertThat(sinMulta.numero()).isNotBlank();
+        }
+
         @Test
         @DisplayName("anulado el recibo, la recaudacion vuelve a lo que era")
         void elReciboAnuladoDejaDeContar() {
@@ -1182,6 +1219,47 @@ class ValoresMasivosYReportesJdbcTest {
                                                             + " DATE '2020-01-01'")))
                     .as("una constancia se entrega: una equivocada se deja sin efecto con otra")
                     .isEqualTo("42501");
+        }
+
+        /**
+         * V20 — de la papeleta solo se pueden mover `numero` y `estado` (#243).
+         *
+         * <p>Hasta V20 `kamayuk_app` tenia UPDATE sobre la TABLA: la placa, la hora, el lugar y el
+         * importe a pagar —lo que el inspector escribio en la calle— se podian reescribir desde la
+         * aplicacion. Se le deja `numero`, que es lo unico que este sistema escribe (#46), y
+         * `estado`, que es la unica otra columna que un acto futuro puede mover.
+         *
+         * <p>Se comprueban las DOS direcciones en la misma prueba, y no es adorno: con solo la
+         * mitad negativa, un `REVOKE UPDATE` sin el `GRANT` de vuelta —o sea dejar la papeleta sin
+         * poder renumerarse— pasaria en verde.
+         */
+        @Test
+        @DisplayName("de la papeleta solo se mueven `numero` y `estado`, no lo que se midio (#243)")
+        void deLaPapeletaSoloSeMueveElNumero() throws SQLException {
+            Papeleta papeleta = papeletaDeTransito("priv1");
+
+            assertThat(
+                            estadoSqlDelFallo(
+                                    () ->
+                                            ejecutarComoApp(
+                                                    "UPDATE papeleta SET placa = 'ZZZ-999'"
+                                                            + " WHERE id = "
+                                                            + papeleta.identificador())))
+                    .as("la placa la anoto el inspector: corregirla no es un UPDATE")
+                    .isEqualTo("42501");
+            assertThat(
+                            estadoSqlDelFallo(
+                                    () ->
+                                            ejecutarComoApp(
+                                                    "UPDATE papeleta SET importe_a_pagar = 1"
+                                                            + " WHERE id = "
+                                                            + papeleta.identificador())))
+                    .as("ni el importe del acta, que es lo que se cobra")
+                    .isEqualTo("42501");
+
+            ejecutarComoApp(
+                    "UPDATE papeleta SET numero = 'PT-PRIV1-B' WHERE id = "
+                            + papeleta.identificador());
         }
 
         @Test
@@ -1860,6 +1938,11 @@ class ValoresMasivosYReportesJdbcTest {
      * <p>El código va en mayúsculas porque el repositorio lo busca así: {@code CodigoInfraccion}
      * normaliza a mayúsculas al leer, y un código sembrado en minúsculas no se encuentra nunca.
      */
+    /** El codigo de infraccion que {@link #papeletaDeTransito} le pone a esa papeleta. */
+    private static String codigoDe(String sufijo) {
+        return ("G-" + sufijo).toUpperCase(java.util.Locale.ROOT);
+    }
+
     private static Papeleta papeletaDeTransito(String sufijo) {
         long obligado = crearContribuyente(sufijo);
         String codigo = ("G-" + sufijo).toUpperCase(java.util.Locale.ROOT);
