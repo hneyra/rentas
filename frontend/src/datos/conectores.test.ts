@@ -361,9 +361,28 @@ const RESUMEN_DE_PAPELETAS: ResumenDePapeletas = {
  * Lo que `territorio` recibe: la ultima determinacion guardada de un contribuyente (#207).
  *
  * Recortada a la forma del contrato —`docs/50-api/formas-de-la-api.json`, `GET
- * /rentas/predial/determinaciones`—. **Trae veinte campos y la pantalla no pinta ninguno**, y eso
- * no es un descuido del conector: es que `territorio` tiene un solo campo de solo lectura en sus
- * tres bloques y no lo publica nadie. Ver el javadoc de `TERRITORIO`.
+ * /rentas/predial/determinaciones`—. Traia **veinte campos y la pantalla no pintaba ninguno**
+ * hasta #245, que le da su bloque a la memoria del calculo.
+ *
+ * <h2>La muestra CUADRA, y tres de sus cifras estan puestas para separar lo que se confunde</h2>
+ *
+ * Una muestra uniforme no distingue nada. Esta se derivo a mano con la escala de 2026 —UIT 5 350,
+ * tramos a 15 y 60 UIT— sobre una base de 400 000,75, y trae **tres** cosas que ninguna muestra
+ * redonda tendria:
+ *
+ *   · **Los TRES tramos, y el tercero SIN TOPE** (`limiteSuperior: null`). Con una lista vacia
+ *     —como estaba— o con tramos todos acotados, la celda que dice «Sin tope» no se ejerce nunca,
+ *     y el conector podria escribir cualquier cosa ahi sin que nada se enterara.
+ *   · **Un aporte que `formatearImporte` NO admite**: 79 000,75 x 1 % = `790.00750000`, con
+ *     cuatro decimales significativos. Es el que prueba que `formatearImporteSinRedondear` no es
+ *     decoracion — con aportes redondos, los dos formateadores darian lo mismo.
+ *   · **Y por eso la suma de los aportes NO es el impuesto**: 160,50 + 1 444,50 + 790,0075 =
+ *     2 395,0075, y `impuestoInsoluto` es **2 395,01**. Un centimo, que es exactamente lo que
+ *     `AporteDeTramo` avisa por escrito (ADR-0018). Con una muestra que cuadrara al centimo,
+ *     sumar los tramos aqui para «adelantar» el insoluto pasaria en verde.
+ *
+ * `valuoExonerado` es **12 200,00 y no cero** por el mismo motivo: con cero no se distinguiria de
+ * `valuoTotal` menos `valuoAfecto`, ni se veria que «Monto deducido» sigue sin rellenarse con el.
  */
 const DETERMINACION_GUARDADA: DeterminacionGuardada = {
   id: 9014,
@@ -375,16 +394,39 @@ const DETERMINACION_GUARDADA: DeterminacionGuardada = {
   estado: 'VIGENTE',
   origen: 'INDIVIDUAL',
   predios: [],
-  valuoTotal: '184200.00',
-  valuoExonerado: '0.00',
-  valuoAfecto: '184200.00',
-  baseImponible: '184200.00',
+  valuoTotal: '412200.75',
+  valuoExonerado: '12200.00',
+  valuoAfecto: '400000.75',
+  baseImponible: '400000.75',
   uit: '5350.00',
-  tramos: [],
-  minimoImponible: '321.00',
-  impuestoInsoluto: '702.60',
-  derechoDeEmision: '4.60',
-  totalAPagar: '707.20',
+  tramos: [
+    {
+      orden: 1,
+      limiteSuperior: '80250.00',
+      alicuota: '0.2000',
+      porcionGravada: '80250.00',
+      aporte: '160.50000000',
+    },
+    {
+      orden: 2,
+      limiteSuperior: '321000.00',
+      alicuota: '0.6000',
+      porcionGravada: '240750.00',
+      aporte: '1444.50000000',
+    },
+    // El ultimo, **sin tope**: `limiteSuperior` nulo. Ver el javadoc.
+    {
+      orden: 3,
+      limiteSuperior: null,
+      alicuota: '1.0000',
+      porcionGravada: '79000.75',
+      aporte: '790.00750000',
+    },
+  ],
+  minimoImponible: '32.10',
+  impuestoInsoluto: '2395.01',
+  derechoDeEmision: '4.50',
+  totalAPagar: '2399.51',
   reglasAplicadas: ['RT-002'],
 };
 
@@ -517,9 +559,11 @@ describe('los conectores', () => {
     // publicado» en vez de leer la primera. Su medida esta en `conectores/transito.ts`.
     //
     // `territorio` llega con #237 sobre la lectura que #207 publico a proposito **sin conectar la
-    // hoja**, y es la primera que exige SUJETO y EJERCICIO a la vez. Y la primera que no pinta ni
-    // una celda de lo que le llega: su unico campo de solo lectura —«Monto deducido»— no lo publica
-    // nadie, y lo que esta conexion compra son sus TRES ausencias distintas. Ver `conectores.ts`.
+    // hoja**, y es la primera que exige SUJETO y EJERCICIO a la vez. Llego sin pintar ni una celda
+    // —su unico campo de solo lectura, «Monto deducido», no lo publica nadie— y lo que compro
+    // entonces fueron sus TRES ausencias distintas. **Desde #245 pinta la memoria del calculo**,
+    // diez campos y la tabla de los tramos del articulo 13: lo que faltaba no era backend sino
+    // sitio en el artboard, y su propia instruccion ya lo prometia. Ver `conectores.ts`.
     //
     // `val-tip` llega con #230, y es la primera que entra **corrigiendo el artboard a la vez**:
     // declaraba `GET /coactiva/prescripcion` desde #170 y aun asi no podia pintarse, porque su
@@ -631,13 +675,96 @@ describe('`territorio` — la determinacion guardada, y sus TRES ausencias (#237
     // Lo mas cercano que llega es la parte exonerada del valuo, que no es el importe que una
     // deduccion resta de la base. Pintar uno por otro daria una cifra al centimo indistinguible de
     // la correcta — y en un beneficio de pensionista esa cifra decide cuanto se cobra.
+    //
+    // **Y desde #245 esto hay que decirlo de otra forma**: `valuoExonerado` SI esta en la
+    // pantalla, en su propio campo de la memoria (`2|1`), asi que «no aparece en ningun valor» ya
+    // no vale como prueba y seria ademas falsa. Lo que se afirma es lo que importa: que el hueco
+    // del «Monto deducido» sigue siendo un hueco, y que la celda que lleva la parte exonerada del
+    // valuo es la que se llama asi.
     const reparto = conector.repartir(DETERMINACION_GUARDADA as never);
+    const memoria = PANTALLAS.territorio.bloques[2];
 
     expect(reparto.noPublicados.get(coordenada(1, 3))).toBe(NO_PUBLICADO);
-    expect(reparto.valores.size).toBe(0);
-    expect(JSON.stringify([...reparto.valores.values()])).not.toContain(
-      DETERMINACION_GUARDADA.valuoExonerado,
+    expect(reparto.valores.has(coordenada(1, 3))).toBe(false);
+    expect(PANTALLAS.territorio.bloques[1]?.campos[3]?.etiqueta).toBe('Monto deducido');
+    expect(memoria?.campos[1]?.etiqueta).toBe('Valúo exonerado');
+    expect(reparto.valores.get(coordenada(2, 1))).toBe('S/ 12,200.00');
+  });
+
+  it('la MEMORIA se pinta entera: diez de diez, y ninguna cifra compuesta aqui (#245)', () => {
+    // El bloque que #245 le da a la hoja. Los nueve importes llegan formateados y sin tocar, y el
+    // decimo es el nombre del conjunto SELLADO, que es lo que hace reproducible la memoria
+    // (ARQ-09 §3): `uit`, `tramos`, `minimoImponible` y `derechoDeEmision` salen del conjunto que
+    // ESA determinacion fijo y no del vigente hoy.
+    const reparto = conector.repartir(DETERMINACION_GUARDADA as never);
+    const memoria = PANTALLAS.territorio.bloques[2];
+
+    expect(memoria?.titulo).toBe('Memoria del cálculo');
+    expect(memoria?.campos).toHaveLength(10);
+    const pintados = Array.from({ length: 10 }, (_, campo) =>
+      reparto.valores.get(coordenada(2, campo)),
     );
+    expect(pintados).toEqual([
+      'S/ 412,200.75',
+      'S/ 12,200.00',
+      'S/ 400,000.75',
+      'S/ 400,000.75',
+      'S/ 5,350.00',
+      'S/ 32.10',
+      'S/ 2,395.01',
+      'S/ 4.50',
+      'S/ 2,399.51',
+      '2026 v1',
+    ]);
+    // Ninguno de los diez dice «no publicado»: la operacion los publica todos.
+    for (let campo = 0; campo < 10; campo += 1) {
+      expect(reparto.noPublicados.has(coordenada(2, campo))).toBe(false);
+    }
+  });
+
+  it('NO suma los tramos para adelantar el insoluto, y la muestra prueba que no cuadraria', () => {
+    // 160,50 + 1 444,50 + 790,0075 = 2 395,0075, y el impuesto es 2 395,01. **Un centimo**, y es
+    // el que `AporteDeTramo` avisa por escrito: los aportes corren sin redondear (ADR-0018) y el
+    // unico redondeo es el del cierre de la regla. Sumarlos aqui daria una cifra exacta y
+    // equivocada al lado de la que manda, que es la que la operacion publica.
+    const reparto = conector.repartir(DETERMINACION_GUARDADA as never);
+    const sumaDeLosAportes = DETERMINACION_GUARDADA.tramos.reduce(
+      (total, tramo) => total + Number(tramo.aporte),
+      0,
+    );
+
+    expect(sumaDeLosAportes).not.toBe(Number(DETERMINACION_GUARDADA.impuestoInsoluto));
+    expect(reparto.valores.get(coordenada(2, 6))).toBe('S/ 2,395.01');
+  });
+
+  it('los TRAMOS salen de `tramos`, y el que no tiene tope dice «Sin tope» en vez de una raya', () => {
+    // La tabla lleva `clave`, asi que sus filas viajan por `tablas` y sus celdas pueden decir que
+    // no hay dato. Aqui hace falta: `limiteSuperior` es **nulo en el ultimo tramo**, y eso no es un
+    // hueco del backend sino que ese tramo no tiene tope. Con una cadena —`'—'`— la pantalla
+    // diria lo mismo que dice cuando falta un dato.
+    const reparto = conector.repartir(DETERMINACION_GUARDADA as never);
+    const tabla = reparto.tablas?.get('tramos-del-articulo-13');
+    const definicion = PANTALLAS.territorio.bloques[2]?.tabla;
+
+    expect(definicion?.titulo).toBe('Tramos del artículo 13');
+    expect(definicion?.clave).toBe('tramos-del-articulo-13');
+    expect(definicion?.sinDato?.texto).toBe('Sin tope');
+    expect(tabla?.filas).toHaveLength(3);
+    expect(tabla?.filas[0]?.celdas).toEqual([
+      '1',
+      'S/ 80,250.00',
+      '0.2000 %',
+      'S/ 80,250.00',
+      // Sin redondear, y por eso no pasa por `formatearImporte`: reventaria con ocho decimales.
+      'S/ 160.50000000',
+    ]);
+    // El tercero: sin tope, y con el aporte que **ningun** formateador de dos decimales admite.
+    expect(tabla?.filas[2]?.celdas[1]).toEqual({ texto: null });
+    expect(tabla?.filas[2]?.celdas[4]).toBe('S/ 790.00750000');
+    // Cinco celdas por fila, que son las cinco columnas que la definicion declara.
+    expect(definicion?.columnas).toHaveLength(5);
+    // Sin total publicado: la operacion no pagina tramos, los publica enteros.
+    expect(tabla?.totalElementos).toBeUndefined();
   });
 
   it('el «Cronograma» no se dibuja, y la pantalla dice POR QUE (#234)', () => {
@@ -645,13 +772,19 @@ describe('`territorio` — la determinacion guardada, y sus TRES ausencias (#237
     // eso: la determinacion guardada **no dice con que modalidad se emitio**, y sin ella los
     // vencimientos no se pueden resolver. Suponer la trimestral publicaria unas fechas de pago que
     // el contribuyente puede no haber recibido (regla 5).
+    //
+    // **Es el bloque 3 desde #245**, que mete la memoria delante. Y lo que la hoja tiene ahora son
+    // DOS tablas: una llena y otra vacia, asi que la frase de pantalla —que es de la hoja entera—
+    // tiene que seguir nombrando la que falta. La nombra.
     const reparto = conector.repartir(DETERMINACION_GUARDADA as never);
-    const cronograma = PANTALLAS.territorio.bloques[2]?.tabla;
+    const cronograma = PANTALLAS.territorio.bloques[3]?.tabla;
 
     expect(cronograma?.titulo).toBe('Cronograma');
-    expect(reparto.filas.has(2)).toBe(false);
-    expect(reparto.tablas).toBeUndefined();
+    expect(cronograma?.clave).toBeUndefined();
+    expect(reparto.filas.has(3)).toBe(false);
+    expect(reparto.tablas?.has('cronograma')).toBe(false);
     expect(reparto.loQueLaOperacionNoTrae).toBe(SIN_CRONOGRAMA);
+    expect(SIN_CRONOGRAMA).toContain('cronograma');
     expect(SIN_CRONOGRAMA).toContain('modalidad');
   });
 });

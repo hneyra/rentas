@@ -236,7 +236,11 @@ const CONECTADAS: readonly {
   // cuarta que sale roja sola. Y es el caso mas extremo de los diez: no le llega NADA.
   {
     hoja: 'territorio',
-    bloque: 2,
+    // **Bloque 3 desde #245**, que mete «Memoria del calculo» delante. La memoria trae tabla —los
+    // tramos del articulo 13— y NO es de insignia: sus cinco columnas son un ordinal, tres
+    // importes y una alicuota, y ninguna es un juicio sobre nada. Por eso sigue habiendo una sola
+    // entrada de `territorio` aqui.
+    bloque: 3,
     leLlega:
       'NADA, y esa es la propiedad. La columna «Situacion» del «Cronograma» es de insignia en el ' +
       'artboard, y el conector NO entrega ni una fila a esa tabla: la determinacion guardada no ' +
@@ -257,7 +261,8 @@ const CONECTADAS: readonly {
       '«Vigente». Los dos son un JUICIO y los dos tienen regla — «Vigente» estaba en CONFORME ' +
       'desde #175 y «Prescrito» entra en MAL con #230, porque un ejercicio prescrito es deuda que ' +
       'ya no se puede exigir. **No hay tercer valor**: «Por prescribir», que el desplegable ' +
-      '«Estado» ofrece, exigiria un umbral que el corpus de `normativa` no publica (regla 5)',
+      '«Estado» ofrecio hasta #244, exigiria un umbral que el corpus de `normativa` no publica ' +
+      '(regla 5) — y por eso ese mando pregunta ahora por el resultado de la solicitud',
   },
 ];
 

@@ -97,8 +97,9 @@ const VAL_TIP: Conector = {
                 // La fecha que el backend publica, formateada y no calculada.
                 formatearFecha(reloj.prescribeEl),
                 // Dos valores, y son los dos que el dato admite: `prescrita` es booleano. «Por
-                // prescribir» —la tercera opcion del desplegable «Estado»— exigiria un umbral que
-                // el corpus no publica, y no se inventa (regla 5).
+                // prescribir» —que el desplegable «Estado» ofrecia hasta #244— exigiria un umbral
+                // que el corpus no publica, y no se inventa (regla 5). Ese mando pregunta ahora
+                // por el resultado de la solicitud, que es lo que `?resultado=` admite.
                 reloj.prescrita ? 'Prescrito' : 'Vigente',
               ],
             })),

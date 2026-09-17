@@ -71,6 +71,71 @@ export function formatearImporte(valor: Importe): string {
 }
 
 /**
+ * `"426.94050000"` -> `"S/ 426.94050000"`: un importe INTERMEDIO, con todos sus decimales (#245).
+ *
+ * <h2>Por que no vale `formatearImporte`, y por que no es una relajacion suya</h2>
+ *
+ * Porque el aporte de un tramo del articulo 13 **no esta redondeado, y es a proposito**: ADR-0018
+ * fija que los intermedios corren sin redondear y que el unico redondeo es el del cierre de la
+ * regla, asi que `AporteDeTramo.aporte` sale de multiplicar una porcion de dos decimales por una
+ * alicuota de seis y llega con ocho. `formatearImporte` **revienta** con eso, y tiene razon:
+ * recortarlo alli seria aritmetica sobre dinero (regla 1), y su javadoc dice que un centimo que
+ * desaparece al pintarlo no deja rastro en ningun sitio.
+ *
+ * Asi que esto no redondea tampoco. **Escribe lo que llego**, agrupando los millares y sin tocar
+ * ni un digito de la parte decimal. Es lo correcto justamente donde se usa: en una memoria de
+ * calculo, el intermedio sin redondear es el dato — su suma puede diferir en un centimo del
+ * impuesto, y `AporteDeTramo` lo dice por escrito. La cifra que manda es la del impuesto, que si
+ * esta redondeada y va por `formatearImporte`.
+ *
+ * Exige al menos un decimal, como los publica el backend, y revienta con lo que no sea un decimal
+ * en texto: escribir `NaN` en una columna de soles se lee como un dato.
+ */
+export function formatearImporteSinRedondear(valor: Importe): string {
+  const limpio = valor.trim();
+
+  if (!/^-?\d+\.\d+$/.test(limpio)) {
+    throw new Error(
+      `Importe intermedio con una forma que el backend no sirve: «${valor}». ` +
+        'Se espera texto decimal con al menos un decimal y sin separador de miles. ' +
+        'Redondear aqui seria aritmetica sobre dinero (regla 1, RNF-055).',
+    );
+  }
+
+  const negativo = limpio.startsWith('-');
+  const sinSigno = negativo ? limpio.slice(1) : limpio;
+  const [enteraCruda, decimales] = sinSigno.split(DECIMAL);
+  const entera = (enteraCruda ?? '').replace(/^0+(?=\d)/, '');
+  const agrupada = entera.replace(/\B(?=(\d{3})+(?!\d))/g, MILES);
+
+  return `${negativo ? '-' : ''}${MONEDA} ${agrupada}${DECIMAL}${decimales ?? ''}`;
+}
+
+/**
+ * `"0.2000"` -> `"0.2000 %"`, que es como el backend mismo la escribe (#245).
+ *
+ * Una alicuota se publica **en tanto por ciento** —`Alicuota` lo dice en su fabrica: «a partir de
+ * su representacion decimal en texto, en tanto por ciento»—, asi que lo unico que falta es el
+ * simbolo. Y **no se le quitan los ceros de la derecha**: `Alicuota.toString()` del backend es
+ * `valor.toPlainString() + " %"`, y escribir aqui otra cosa haria que la misma alicuota se leyera
+ * distinta segun quien la imprima.
+ *
+ * Se llama alicuota y jamas «tasa» (regla 8): una tasa es un TIPO DE TRIBUTO.
+ */
+export function formatearAlicuota(alicuota: string): string {
+  const limpio = alicuota.trim();
+
+  if (!/^\d+(\.\d+)?$/.test(limpio)) {
+    throw new Error(
+      `Alicuota con una forma que el backend no sirve: «${alicuota}». ` +
+        'Se espera texto decimal no negativo, en tanto por ciento.',
+    );
+  }
+
+  return `${limpio} %`;
+}
+
+/**
  * `1842` -> `"1,842"`: un CONTEO, agrupado como el artboard agrupa las cifras (#172).
  *
  * No es `formatearImporte` sin el simbolo, y por eso no lo reutiliza: un importe llega como

@@ -183,6 +183,73 @@ export const RENTAS_REGISTRO = {
           { etiqueta: 'Monto deducido', tipo: 'r' },
         ],
       },
+      // **El bloque de la MEMORIA, y lo decide el propio artboard** (#245, y su gemelo en
+      // `diseno/RentasV8.dc.html`).
+      //
+      // Hasta aqui `territorio` tenia **un solo campo de solo lectura en sus tres bloques**
+      // —«Monto deducido»— y ni siquiera ese lo publica nadie, de modo que #237 conecto la hoja a
+      // `GET /rentas/predial/determinaciones` —veinte campos— y no pinto ni una celda. El issue
+      // preguntaba si le falta a la hoja un bloque de resultado o si es correcto que una pantalla
+      // de EJECUTAR no ensene lo determinado. Lo contesta el artboard, dos veces:
+      //
+      //   · **Su instruccion ya lo prometia**: «fije el sujeto y el ejercicio, y **compruebe la
+      //     memoria del calculo** antes de asentar la determinacion». No habia donde comprobarla.
+      //   · **Y ya dibujaba lo determinado**, en el cronograma de abajo. Las cifras cuadran al
+      //     centimo y no por casualidad: 151,36 + 3 x 146,86 = 591,94 = 587,44 + 4,50 —el derecho
+      //     de emision de la hoja `valores`—, y 587,44 es la escala de esa misma hoja sobre una
+      //     base de 151 406,75: 80 250,00 x 0,2 % = 160,50 mas 71 156,75 x 0,6 % = 426,94. La
+      //     base es el autovaluo de los dos predios de `predios` con su % de propiedad. O sea que
+      //     **la memoria ya estaba en el artboard, repartida en tres hojas**, y esta enseñaba su
+      //     resultado sin enseñar de donde salia. «Una pantalla de ejecutar no muestra lo
+      //     determinado» lo refuta el cronograma, que es lo determinado.
+      //
+      // Los diez campos son los diez que la operacion publica y que esta hoja puede afirmar; los
+      // otros diez o son el mando «Contribuyente» (`sujeto`, `codContribuyente`), o son de otra
+      // hoja (`predios[]` es de `predios`), o son la nota de la memoria (`reglasAplicadas[]`), o
+      // son identificadores (`id`, `conjuntoId`) y el estado y el origen de la fila.
+      //
+      // **Y ninguno de los nueve importes necesita una fecha (regla 9)**: no son
+      // `deudaActualizadaA(fecha)` —no corren intereses aqui—, son lo que quedo asentado para un
+      // EJERCICIO bajo un CONJUNTO SELLADO, y los dos estan en la pantalla: el ejercicio en el
+      // bloque 0 y el conjunto en el ultimo campo de este. Ese campo no es decoracion: es lo que
+      // hace reproducible la memoria (ARQ-09 §3), porque `uit`, `tramos`, `minimoImponible` y
+      // `derechoDeEmision` salen del conjunto que ESA determinacion fijo y no del vigente hoy.
+      {
+        titulo: 'Memoria del cálculo',
+        nota: 'De qué valúo salió el impuesto, con qué tramos y bajo qué conjunto sellado.',
+        campos: [
+          { etiqueta: 'Valúo total', tipo: 'r' },
+          { etiqueta: 'Valúo exonerado', tipo: 'r' },
+          { etiqueta: 'Valúo afecto', tipo: 'r' },
+          { etiqueta: 'Base imponible', tipo: 'r' },
+          { etiqueta: 'UIT del ejercicio', tipo: 'r' },
+          { etiqueta: 'Mínimo imponible', tipo: 'r' },
+          { etiqueta: 'Impuesto insoluto', tipo: 'r' },
+          { etiqueta: 'Derecho de emisión', tipo: 'r' },
+          { etiqueta: 'Total a pagar', tipo: 'r' },
+          { etiqueta: 'Conjunto normativo', tipo: 'r' },
+        ],
+        tabla: {
+          // Con `clave`, las filas llegan por `DatosDeLaPantalla.tablas` (`kamayuk-lib`#87, #180).
+          // Aqui hace falta de verdad: `limiteSuperior` es **nulo en el ultimo tramo**, y una
+          // cadena no puede decir por que no hay dato. Con `sinDato`, esa celda dice «Sin tope»
+          // —traducido— en vez de una raya muda que se leeria como un hueco del backend.
+          clave: 'tramos-del-articulo-13',
+          sinDato: {
+            texto: 'Sin tope',
+            nota: 'El último tramo del artículo 13 no tiene límite superior: se aplica a todo lo que exceda del anterior.',
+          },
+          titulo: 'Tramos del artículo 13',
+          columnas: [
+            { rotulo: 'Tramo', alineadoDerecha: false },
+            { rotulo: 'Límite superior S/', alineadoDerecha: true },
+            { rotulo: 'Alícuota', alineadoDerecha: true },
+            { rotulo: 'Porción gravada S/', alineadoDerecha: true },
+            { rotulo: 'Aporte S/', alineadoDerecha: true },
+          ],
+          nota: 'Los aportes corren sin redondear (ADR-0018): su suma puede diferir en un céntimo del impuesto insoluto, que es la cifra que manda.',
+        },
+      },
       {
         titulo: 'Cuotas del ejercicio',
         nota: '',

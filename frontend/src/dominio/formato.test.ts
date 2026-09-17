@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest';
 
 import {
   compararImportes,
+  formatearAlicuota,
   formatearFecha,
   formatearFechaEnPalabras,
   formatearImporte,
+  formatearImporteSinRedondear,
   formatearInstante,
 } from './formato.ts';
 
@@ -44,6 +46,69 @@ describe('un importe se escribe como el artboard lo escribe', () => {
     // en una columna de importes no lo mira nadie dos veces, y un centimo que
     // desaparece al pintarlo no deja rastro en ningun sitio.
     expect(() => formatearImporte(servido)).toThrow(/no sirve/);
+  });
+});
+
+describe('un importe INTERMEDIO se escribe con todos sus decimales (#245)', () => {
+  it.each([
+    ['160.50000000', 'S/ 160.50000000'],
+    // El que trae el defecto: 79 000,75 x 1 % — cuatro decimales significativos, y ninguna forma
+    // de escribirlo con dos que no sea redondear, que es aritmetica sobre dinero (regla 1).
+    ['790.00750000', 'S/ 790.00750000'],
+    ['71156.75', 'S/ 71,156.75'],
+    ['1234567.894050', 'S/ 1,234,567.894050'],
+    ['-426.9405', '-S/ 426.9405'],
+    ['  426.9405  ', 'S/ 426.9405'],
+    ['0007.5', 'S/ 7.5'],
+  ])('«%s» -> «%s»', (servido, mostrado) => {
+    expect(formatearImporteSinRedondear(servido)).toBe(mostrado);
+  });
+
+  it('EL CONTRASTE: `formatearImporte` revienta con lo que este escribe, y por eso hacen falta dos', () => {
+    // Si `formatearImporte` lo admitiera, este formateador seria una copia con otro nombre. No lo
+    // admite: su javadoc dice que recortar es aritmetica y que el backend decide el redondeo con
+    // su `NUMERIC(x,2)`. Ese rojo es el que se veria en la pantalla si un aporte de tramo pasara
+    // por el formateador equivocado — la hoja entera, no la celda.
+    expect(() => formatearImporte('790.00750000')).toThrow(/forma que el backend no sirve/);
+    expect(formatearImporteSinRedondear('790.00750000')).toBe('S/ 790.00750000');
+  });
+
+  it('y no redondea NUNCA: lo que llega con cuatro decimales sale con cuatro', () => {
+    expect(formatearImporteSinRedondear('790.0075')).toBe('S/ 790.0075');
+    expect(formatearImporteSinRedondear('790.0075')).not.toContain('790.01');
+  });
+
+  it('revienta con lo que no es un decimal servido, en vez de escribirlo tal cual', () => {
+    // Exige al menos un decimal: los intermedios los publican asi. Un `NaN` o un texto en una
+    // columna de soles se lee como un dato del padron.
+    for (const malo of ['', 'NaN', '790', '1,234.50', '790,0075', 'S/ 790.00']) {
+      expect(() => formatearImporteSinRedondear(malo)).toThrow(/forma que el backend no sirve/);
+    }
+  });
+});
+
+describe('una alicuota se escribe como el backend mismo la escribe (#245)', () => {
+  it.each([
+    ['0.2000', '0.2000 %'],
+    ['0.6000', '0.6000 %'],
+    ['1.0000', '1.0000 %'],
+    ['0', '0 %'],
+    ['  1.0000  ', '1.0000 %'],
+  ])('«%s» -> «%s»', (servido, mostrado) => {
+    expect(formatearAlicuota(servido)).toBe(mostrado);
+  });
+
+  it('NO le quita los ceros de la derecha, y eso es la propiedad', () => {
+    // `Alicuota.toString()` del backend es `valor.toPlainString() + " %"`. Recortar aqui haria que
+    // la misma alicuota se leyera distinta segun quien la imprima.
+    expect(formatearAlicuota('0.2000')).toBe('0.2000 %');
+    expect(formatearAlicuota('0.2000')).not.toBe('0.2 %');
+  });
+
+  it('revienta con lo que no es un decimal en tanto por ciento', () => {
+    for (const malo of ['', '0.2 %', '-0.2', 'medio']) {
+      expect(() => formatearAlicuota(malo)).toThrow(/forma que el backend no sirve/);
+    }
   });
 });
 
