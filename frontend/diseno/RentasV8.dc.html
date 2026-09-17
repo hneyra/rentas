@@ -457,6 +457,7 @@ const ARBOL = [
         ['POST', '/rentas/contribuyentes/{id}/contactos', 'Añade un contacto']],
         [['DataTable', 'El padrón pide orden y filtro por columna; TanStack Table, que shadcn envuelve']]],
       ['territorio', 'Determinación', [
+        ['GET', '/rentas/predial/determinaciones', 'La última determinación guardada del contribuyente'],
         ['POST', '/rentas/predial/calculo-individual', 'Determina un contribuyente'],
         ['POST', '/rentas/predial/calculo-masivo', 'Emisión anual del padrón'],
         ['POST', '/rentas/deuda/altas', 'MovimientosDeDeudaController'],

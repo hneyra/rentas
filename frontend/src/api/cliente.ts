@@ -150,5 +150,18 @@ export async function solicitar<T>(ruta: string, opciones: OpcionesDeSolicitud =
     throw new ErrorDeLaApi(respuesta.status, `${metodo} ${ruta}`, await problemaDe(respuesta));
   }
 
+  // **Un 204 no trae cuerpo, y `json()` sobre un cuerpo vacio REVIENTA** (#237).
+  //
+  // No es teorico y no lo trae la ruta nueva: `GET /rentas/predial/corridas/ultima` ya contesta
+  // 204 desde #523 y la sirve `panel` desde I-4. Sobre una base sin ninguna corrida esta linea
+  // lanzaba `SyntaxError: Unexpected end of JSON input`, que no es un `ErrorDeLaApi`, asi que la
+  // pantalla decia **«fallo»** —con su tono de atencion— donde la verdad es «todavia no se ha
+  // corrido». Un vacio dicho como una averia manda a mirar los registros del servidor.
+  //
+  // `null` y no `{}`: un objeto vacio se repartiria campo a campo dando `undefined` en cada celda,
+  // que es una pantalla llena de huecos sin decir por que. `null` es lo que `useDatosDeLaHoja` ya
+  // reconoce como «se pregunto y no hay».
+  if (respuesta.status === 204) return null as T;
+
   return (await respuesta.json()) as T;
 }

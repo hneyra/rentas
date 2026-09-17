@@ -6,8 +6,8 @@ import {
   type FilaDeLaTabla,
 } from '@kamayuk/ui';
 import type { ClaveDeHoja } from '../pantallas/arbol.ts';
-import type { CorridaDelPredial } from './lecturas.ts';
-import { RUTAS, pedirUno } from './lecturas.ts';
+import type { CorridaDelPredial, DeterminacionGuardada } from './lecturas.ts';
+import { RUTAS, pedirUnoOVacio } from './lecturas.ts';
 import { CONECTORES_DE_LICENCIAS } from './conectores/licencias.ts';
 import { CONECTORES_DE_COACTIVA } from './conectores/coactiva.ts';
 import { CONECTORES_DE_INICIO } from './conectores/inicio.ts';
@@ -135,8 +135,69 @@ export interface Reparto {
    * primera se resuelve contra el padron de hoy—.
    */
   readonly aLaFecha?: string;
+  /**
+   * **De quien es lo que esta pantalla dibuja**, cuando la operacion lo publica (#239).
+   *
+   * <h2>El hueco que lo trae</h2>
+   *
+   * Hay hojas que dibujan **una** de muchas y toman «la primera de la relacion» porque todavia no
+   * tienen con que elegirla: `fis-actas`, `coa-exp`, `coa-cost`, `tra-pap`. Hasta #239 ninguna
+   * decia **cual**, y un contraste de areas que no nombra al obligado no se puede comprobar contra
+   * nada — se lee como si fuera del contribuyente que uno tenia en la cabeza.
+   *
+   * <h2>Por que va por aqui y no a un campo de la pantalla</h2>
+   *
+   * Porque el sitio que el artboard le da al titular en `fis-actas` es un **mando** —`tipo: '1'`,
+   * un control de entrada— y `valores` son «los campos de solo lectura que si salen de lo que
+   * llego»: meter ahi el nombre de un acta ya registrada convertiria el formulario de alta en algo
+   * que parece estar editando esa acta. Y anadirle una celda al bloque es cambiar el artboard para
+   * que quepa un dato, que es al reves de como se decide aqui.
+   *
+   * **Es exactamente la decision de #196 y se resuelve igual**: se dice **una vez, arriba**, en la
+   * frase de pantalla que el interprete ya dibuja, al lado de `aLaFecha`. Las tres salidas que #239
+   * ofrecia tocaban el artboard (una celda nueva, o la nota de la tabla, que `pantallas-del-artboard`
+   * compara palabra por palabra) o la libreria (un valor dentro de un mando); esta no toca ninguno
+   * de los dos.
+   *
+   * <h2>Nulo no es «no publicado»: es que ya no esta en el padron</h2>
+   *
+   * Los dos campos son anulables **a la vez** y el backend dice que nulo significa que el obligado
+   * ya no esta en el padron (#216). Asi que la frase que se lee es otra, y no la de un hueco.
+   *
+   * Lo que viaja por aqui son **las dos piezas crudas**, nunca la frase: un conector es dato y no
+   * tiene `t()` delante, y «El acta es de …» escrito aqui llegaria al DOM en castellano en
+   * cualquier idioma (#103). La redacta `useDatosDeLaHoja`, que es un gancho.
+   */
+  readonly deQuienEs?: DeQuienEs;
+  /**
+   * **Un TROZO de la pantalla que la operacion no trae, con su motivo** (#237).
+   *
+   * `noPublicados` dice lo que le falta a un **campo**, y para eso basta una palabra en su hueco.
+   * Una **tabla** entera no tiene hueco donde escribirla: sin filas, el interprete dibuja la frase
+   * de pantalla —la de arriba— y esa es generica. El «Cronograma» de `territorio` es el caso: no lo
+   * publica nadie, y el motivo no es «se nos paso» sino que `determinacion` **no guarda su
+   * modalidad**, asi que los vencimientos no se pueden resolver (#234).
+   *
+   * Lo que viaja es **una clave de traduccion** declarada como constante —nunca una frase compuesta
+   * aqui—, por lo mismo que todo lo demas de este archivo: un conector es dato y no tiene `t()`
+   * delante (#103). Y hay que listarla en `i18n/catalogo-de-claves.ts`, como `SIN_PLACA`.
+   */
+  readonly loQueLaOperacionNoTrae?: string;
   /** Los campos que la operacion servida NO publica, con la palabra que va en su hueco. */
   readonly noPublicados: ReadonlyMap<Coordenada, string>;
+}
+
+/**
+ * **De quien es lo que la pantalla dibuja** (#239). Ver `Reparto.deQuienEs`.
+ *
+ * Los dos son nulos **a la vez**, y eso no es un hueco del contrato: es que el obligado ya no esta
+ * en el padron (#216).
+ */
+export interface DeQuienEs {
+  /** El nombre tal como el padron lo escribe. */
+  readonly nombre: string | null;
+  /** Su codigo en el padron. */
+  readonly codigo: string | null;
 }
 
 /**
@@ -301,6 +362,31 @@ export interface Conector {
    */
   readonly sinSujeto?: Ausencia;
   /**
+   * **Que decir cuando la operacion contesta que TODAVIA NO HAY**, si no vale la frase de por
+   * omision (#237).
+   *
+   * Es la hermana de `sinSujeto` y vive al lado por lo mismo: quien sabe que significa un vacio en
+   * una hoja es quien la pide. La de por omision —`VACIO`, «sin datos»— dice «todavia no existe el
+   * dato que esta pantalla ensena», que vale para una relacion vacia y **no** para
+   * `GET /rentas/predial/determinaciones`: alli el 204 es «este contribuyente existe y todavia no
+   * se le ha determinado este ejercicio», que es un hecho del expediente y no de la pantalla, y lo
+   * que hay que hacer con el es **determinarlo**.
+   */
+  readonly sinDato?: Ausencia;
+  /**
+   * **Que decir cuando la operacion contesta 404**, si no vale la frase de por omision (#237).
+   *
+   * Sin esto un 404 sale por `alFallar` como «fallo (404)», o sea **como una averia**. Y no lo es:
+   * la lectura del predial contesta 404 cuando el codigo **no esta en el padron** —lo dice
+   * nombrandolo— y 204 cuando esta y no tiene determinacion. Son dos vacios distintos a proposito
+   * (#546), y decirlos igual es exactamente el defecto que el backend evito al publicarlos
+   * distintos.
+   *
+   * El tono tambien cambia: «el codigo que trae la direccion no existe» se arregla escribiendo otro
+   * codigo, no reintentando.
+   */
+  readonly noEncontrado?: Ausencia;
+  /**
    * **Los parametros que esta hoja lleva en su ruta**, y a que operacion viajan (#172, #186).
    *
    * Declarados aqui y no en una lista aparte por lo mismo que `exigeSujeto`: quien sabe que
@@ -389,7 +475,10 @@ const NO_PUBLICADO = 'no publicado';
  */
 const PANEL: Conector = {
   clave: ['panel', 'ultima-corrida'],
-  pedir: ({ senal }) => pedirUno<CorridaDelPredial>(RUTAS.ultimaCorrida, senal),
+  // `pedirUnoOVacio` y no `pedirUno`: sin ninguna corrida del ejercicio esta operacion contesta
+  // **204 sin cuerpo** (#523), y hasta #237 eso reventaba en `respuesta.json()` — la pantalla decia
+  // «fallo» donde la verdad es «todavia no se ha corrido».
+  pedir: ({ senal }) => pedirUnoOVacio<CorridaDelPredial>(RUTAS.ultimaCorrida, senal),
   repartir: (corrida: CorridaDelPredial): Reparto => ({
     valores: new Map([
       [coordenada(0, 1), corrida.fechaCalculo],
@@ -416,9 +505,110 @@ const PANEL: Conector = {
 };
 
 
+/**
+ * **Lo que esta hoja no dibuja, y por que** (#237, #234).
+ *
+ * El «Cronograma» es una tabla entera y no un campo: sin filas, el interprete dibuja la frase de
+ * pantalla, y esa es generica. Esta dice el motivo exacto — que no es que a nadie se le ocurriera
+ * publicarlo, sino que la fila guardada **no dice con que modalidad se emitio**.
+ */
+const SIN_CRONOGRAMA =
+  'El cronograma de cuotas no se dibuja: la determinacion guardada no dice con que modalidad se ' +
+  'emitio, y sin ella los vencimientos no se pueden resolver. Suponer la trimestral publicaria ' +
+  'unas fechas de pago que el contribuyente puede no haber recibido.';
+
+/** Lo que se dice cuando el codigo de la direccion no esta en el padron (#237). */
+const NO_ESTA_EN_EL_PADRON: Ausencia = {
+  enElCampo: 'no esta en el padron',
+  explicacion:
+    'El codigo de contribuyente que trae la direccion no existe en esta municipalidad, y por eso ' +
+    'no hay determinacion que leer. No es una averia y reintentar no lo cambia: se abre con otro ' +
+    'codigo.',
+  tono: 'atencion',
+};
+
+/** Lo que se dice cuando el contribuyente existe y todavia no se le ha determinado (#237). */
+const TODAVIA_SIN_DETERMINAR: Ausencia = {
+  enElCampo: 'sin determinar',
+  explicacion:
+    'Este contribuyente esta en el padron y todavia no tiene determinacion de este ejercicio: no ' +
+    'es que falte un dato, es que el calculo no se ha asentado. Se asienta desde esta misma ' +
+    'pantalla, y entonces lo que quede asentado es lo que se lee aqui.',
+  tono: 'info',
+};
+
+/**
+ * `territorio` — la Determinacion, y la unica hoja de las cuarenta que NO se pintaba por declarar
+ * solo escrituras (#182, #207, #237).
+ *
+ * <h2>Lo que cambia, que no es lo que se ve sino lo que se dice</h2>
+ *
+ * Hasta aqui decia «solo escribe», que era cierto y ya no lo es: `GET
+ * /rentas/predial/determinaciones` existe desde #207 y es una lectura. Con ella la hoja pide de
+ * verdad, y sus TRES ausencias dejan de ser una sola frase de pantalla apagada.
+ *
+ * <h2>Y ahora la parte incomoda: de lo que llega no se pinta NI UNA celda, y esta medido</h2>
+ *
+ * La operacion publica **veinte campos** —hasta los tramos del articulo 13— y esta pantalla tiene
+ * **un solo campo de solo lectura en sus tres bloques**: «Monto deducido». Los otros nueve son
+ * mandos —el desplegable del ejercicio, las cajas de la declaracion, la deduccion, la
+ * inafectacion— porque `territorio` es una pantalla de **ejecutar** y no de consultar, y eso el
+ * artboard lo hace a proposito (#182 lo comprobo, y por eso #237 deja fuera cambiarlo).
+ *
+ * Y el unico campo de solo lectura que tiene **no lo publica nadie**: «Monto deducido» es el
+ * importe que una deduccion resta de la base, y lo mas cercano que llega es `valuoExonerado`, que
+ * es la parte exonerada del valuo. No son lo mismo y pintar uno por otro seria una cifra al
+ * centimo indistinguible de la correcta.
+ *
+ * **Asi que lo que esta conexion compra no es una celda: es que las tres ausencias se distingan.**
+ * `GET` a 404 —«ese codigo no esta en el padron»—, a 204 —«esta, y todavia no se le ha
+ * determinado»— y a 200 con el cronograma que nadie publica. Las tres decian lo mismo antes, y las
+ * tres se arreglan de forma distinta. Que la hoja tenga donde ensenar los veinte campos que la
+ * operacion si publica es **otra cosa** y es del artboard, no de aqui.
+ *
+ * <h2>Exige las dos cosas: el sujeto y el ejercicio</h2>
+ *
+ * Es el primer conector con `exigeSujeto` y `exigeEjercicio` a la vez, y las dos por el mismo
+ * motivo que en sus estrenos: sin `codContribuyente` la operacion es 422 —«no se contesta la de
+ * cualquiera»— y sin `ejercicio` contesta **200 con la determinacion del ano del reloj del
+ * backend**, que no es el de trabajo de la sesion. Un acierto de ese tipo no se distingue del
+ * correcto.
+ *
+ * <h2>El boton que determina no refresca nada, porque no existe</h2>
+ *
+ * La otra decision que #237 dejaba abierta. La definicion de esta hoja **no declara ningun acto**:
+ * el artboard le atribuye un `AlertDialog` «Confirmar antes de asentar», y eso es una pieza
+ * declarada, no un acto montado. Mientras no haya boton no hay nada que refrescar, y escribir aqui
+ * la invalidacion de una cache que nadie va a tocar es codigo que no puede fallar ni acertar.
+ */
+const TERRITORIO: Conector = {
+  clave: ['territorio', 'determinacion-guardada'],
+  exigeSujeto: true,
+  exigeEjercicio: true,
+  noEncontrado: NO_ESTA_EN_EL_PADRON,
+  sinDato: TODAVIA_SIN_DETERMINAR,
+  pedir: ({ senal, sujeto, ejercicio }) =>
+    pedirUnoOVacio<DeterminacionGuardada>(
+      // Los dos van con valor: el marco no deja llegar aqui sin sujeto y sin ejercicio de sesion.
+      RUTAS.determinacionGuardada(sujeto ?? '', ejercicio ?? 0),
+      senal,
+    ),
+  repartir: (): Reparto => ({
+    // Ni una: el unico campo de solo lectura de la pantalla es «Monto deducido», y no lo publica
+    // nadie. Ver el javadoc.
+    valores: new Map(),
+    // Sin filas para el «Cronograma» — y no `[]`, que significaria «la operacion contesto que no
+    // hay ninguna cuota». No contesto eso: no contesta nada del cronograma.
+    filas: new Map(),
+    loQueLaOperacionNoTrae: SIN_CRONOGRAMA,
+    noPublicados: new Map([[coordenada(1, 3), NO_PUBLICADO]]),
+  }),
+};
+
 /** Las hojas que piden de verdad. Las demas lo dicen; ver `porQueNoHayDato.ts`. */
 export const CONECTORES: Readonly<Partial<Record<ClaveDeHoja, Conector>>> = {
   panel: PANEL,
+  territorio: TERRITORIO,
   ...CONECTORES_DE_LICENCIAS,
   ...CONECTORES_DE_COACTIVA,
   ...CONECTORES_DE_INICIO,
@@ -428,4 +618,4 @@ export const CONECTORES: Readonly<Partial<Record<ClaveDeHoja, Conector>>> = {
   ...CONECTORES_DE_SEGURIDAD,
 };
 
-export { NO_PUBLICADO };
+export { NO_ESTA_EN_EL_PADRON, NO_PUBLICADO, SIN_CRONOGRAMA, TODAVIA_SIN_DETERMINAR };

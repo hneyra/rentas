@@ -131,6 +131,9 @@ export const ACTA_CON_USO: ActaDeFiscalizacion = {
   programaId: 14,
   version: 1,
   contribuyenteId: 25673,
+  // Desde #216 el acta dice de quien es, y no solo su identificador interno.
+  contribuyente: 'MEDINA SILVA, RUFINA',
+  codContribuyente: 'C-00025673',
   predioId: 9014,
   vehiculoId: null,
   fichaId: 3312,
@@ -175,6 +178,19 @@ export const ACTA_VEHICULAR: ActaDeFiscalizacion = {
   diferenciaDeArea: null,
   usoDeclarado: null,
   usoHallado: null,
+};
+
+/**
+ * Un acta cuyo obligado **ya no esta en el padron**: los dos campos del titular en nulo (#216).
+ *
+ * No es un hueco del contrato y no se dice con la palabra de uno: el acta sale igual porque
+ * ocultarla esconderia justo el caso que hay que revisar.
+ */
+export const ACTA_SIN_PADRON: ActaDeFiscalizacion = {
+  ...ACTA_CON_USO,
+  id: 420,
+  contribuyente: null,
+  codContribuyente: null,
 };
 
 /** La relacion de actas tal como llega con `?tamano=1`. */

@@ -6,10 +6,15 @@ import type { ClaveDeHoja } from '../pantallas/arbol.ts';
 import { hojaDe } from '../pantallas/arbol.ts';
 import type { Ausencia, DatosDeLaPantalla, DatosDeUnaTabla, RutaDeLaHoja } from '@kamayuk/ui';
 import { porQueNoHayDato } from '../porQueNoHayDato.ts';
-import type { Reparto } from './conectores.ts';
+import type { DeQuienEs, Reparto } from './conectores.ts';
 import { CONECTORES, loQueLaHojaDeclara } from './conectores.ts';
 import { formatearEntero, formatearFecha } from '../dominio/formato.ts';
-import { FRASE_DE_LA_FECHA, FRASE_DEL_CONTEO } from '../i18n/textosDelMarco.ts';
+import {
+  FRASE_DE_LA_FECHA,
+  FRASE_DE_QUIEN_ES,
+  FRASE_DE_QUIEN_ES_SIN_PADRON,
+  FRASE_DEL_CONTEO,
+} from '../i18n/textosDelMarco.ts';
 import type { SesionDeLaVentanilla } from './lecturas.ts';
 import { RUTAS, pedirUno } from './lecturas.ts';
 import { LLAVES } from './useCatalogoPermitido.ts';
@@ -270,8 +275,26 @@ export function useDatosDeLaHoja(
   if (faltaElEjercicio) return { ausencia: SIN_EJERCICIO };
 
   if (consulta.isPending) return { ausencia: CARGANDO };
-  if (consulta.isError) return { ausencia: alFallar(consulta.error) };
-  if (consulta.data === null || consulta.data === undefined) return { ausencia: VACIO };
+  /*
+   * **El 404 lo puede decir el conector con sus palabras** (#237).
+   *
+   * `alFallar` lo redacta como «fallo (404)», o sea como una averia, y en la lectura del predial no
+   * lo es: 404 es «ese codigo no esta en el padron» y 204 es «esta y todavia no se le determino».
+   * El backend los publica distintos a proposito (#546); decirlos igual aqui tiraria la mitad de
+   * esa decision en el ultimo paso.
+   */
+  if (consulta.isError) {
+    const suyo =
+      consulta.error instanceof ErrorDeLaApi && consulta.error.estado === 404
+        ? conector.noEncontrado
+        : undefined;
+    return { ausencia: suyo ?? alFallar(consulta.error) };
+  }
+  // Y el vacio tambien: `null` es lo que devuelve un 204 —o una relacion sin ninguna fila—, y
+  // «todavia no se ha determinado» no es «no hay nada que ensenar».
+  if (consulta.data === null || consulta.data === undefined) {
+    return { ausencia: conector.sinDato ?? VACIO };
+  }
 
   const reparto = conector.repartir(consulta.data as never);
   return {
@@ -293,16 +316,54 @@ export function useDatosDeLaHoja(
     // archivo de datos llegaria al DOM en castellano en cualquier idioma (#103). Se concatenan dos
     // frases enteras y no media —cada una se traduce sola—, y por eso las dos van ya traducidas: lo
     // que el interprete reciba entonces no es una clave, y su `traducir` lo devuelve tal cual.
-    ausencia:
-      reparto.aLaFecha === undefined
-        ? NO_PUBLICADO_EN_PANTALLA
-        : {
-            ...NO_PUBLICADO_EN_PANTALLA,
-            explicacion: `${t(NO_PUBLICADO_EN_PANTALLA.explicacion)} ${t(FRASE_DE_LA_FECHA, {
-              fecha: formatearFecha(reparto.aLaFecha),
-            })}`,
-          },
+    //
+    // **Y desde #239 tambien DE QUIEN es lo que se dibuja**, por el mismo canal y por el mismo
+    // motivo: las hojas que toman «la primera de la relacion» no tienen en el artboard donde
+    // decirlo —en `fis-actas` el sitio del titular es un MANDO—, y anadirles una celda seria
+    // cambiar el diseno para que quepa un dato.
+    //
+    // Los trozos se arman en una lista y se juntan, en vez de anidar dos ternarios: con dos
+    // canales opcionales son cuatro combinaciones, y la que lleva los dos no la escribiria nadie.
+    ausencia: conFrasesDePantalla(reparto, t),
   };
+}
+
+/**
+ * **La frase de pantalla, con lo que la operacion haya dicho de mas** (#196, #239).
+ *
+ * Cada trozo es una frase ENTERA y ya traducida —nunca media—: lo que el interprete recibe entonces
+ * no es una clave, y su `traducir` lo devuelve tal cual. Partirlas decidiria por el traductor donde
+ * cae el dato, y por eso los datos entran por interpolacion.
+ */
+function conFrasesDePantalla(
+  reparto: Reparto,
+  t: (clave: string, datos?: Readonly<Record<string, unknown>>) => string,
+): Ausencia {
+  const trozos = [t(NO_PUBLICADO_EN_PANTALLA.explicacion)];
+  if (reparto.aLaFecha !== undefined) {
+    trozos.push(t(FRASE_DE_LA_FECHA, { fecha: formatearFecha(reparto.aLaFecha) }));
+  }
+  if (reparto.deQuienEs !== undefined) trozos.push(deQuienEs(reparto.deQuienEs, t));
+  // Un trozo entero que la operacion no trae, con su motivo (#237). Es una clave, no una frase.
+  if (reparto.loQueLaOperacionNoTrae !== undefined) trozos.push(t(reparto.loQueLaOperacionNoTrae));
+  if (trozos.length === 1) return NO_PUBLICADO_EN_PANTALLA;
+  return { ...NO_PUBLICADO_EN_PANTALLA, explicacion: trozos.join(' ') };
+}
+
+/**
+ * **De quien es lo que se dibuja, o que ya no esta en el padron** (#239).
+ *
+ * Los dos campos llegan nulos **a la vez**, y eso no es un hueco del contrato: es un hecho que
+ * #216 publica a proposito —el acta sigue saliendo porque ocultarla esconderia justo el caso que
+ * hay que revisar—. Con la frase de arriba se leeria «es de undefined (undefined)».
+ */
+function deQuienEs(
+  quien: DeQuienEs,
+  t: (clave: string, datos?: Readonly<Record<string, unknown>>) => string,
+): string {
+  if (quien.nombre === null || quien.codigo === null) return t(FRASE_DE_QUIEN_ES_SIN_PADRON);
+  // Ni el nombre ni el codigo pasan por `traducir`: son dato, como una celda.
+  return t(FRASE_DE_QUIEN_ES, { nombre: quien.nombre, codigo: quien.codigo });
 }
 
 export {

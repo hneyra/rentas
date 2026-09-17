@@ -28,12 +28,12 @@ import {
 const TODAS: readonly Hoja[] = ARBOL.flatMap((modulo) => [...modulo.hojas]);
 
 describe('el cruce contra lo que el backend sirve', () => {
-  it('EL CENTINELA: hay cuarenta hojas y treinta y cinco operaciones servidas', () => {
+  it('EL CENTINELA: hay cuarenta hojas y treinta y seis operaciones servidas', () => {
     // Sin esto, un arbol vacio o unas `YA_SERVIDAS` vacias dejarian todo lo de abajo pasando
     // sobre la nada — y la respuesta seria «ninguna pantalla tiene datos», que ademas parece
     // razonable.
     expect(TODAS).toHaveLength(40);
-    expect(YA_SERVIDAS).toHaveLength(35);
+    expect(YA_SERVIDAS).toHaveLength(36);
   });
 
   it('cruza por RUTA, no por verbo: dos servidas las declara el artboard como `BASE`', () => {
@@ -53,7 +53,7 @@ describe('el cruce contra lo que el backend sirve', () => {
     expect(utiles.every((o) => o.verbo !== 'PUT')).toBe(true);
   });
 
-  it('veinticinco hojas tienen alguna operacion util, y quince ninguna', () => {
+  it('veintiseis hojas tienen alguna operacion util, y catorce ninguna', () => {
     const con = TODAS.filter((hoja) => operacionesUtiles(hoja).length > 0);
     // `aut-cat` entra con #168 por la ruta que el ARTBOARD le atribuye, `GET /licencias/ciiu`.
     //
@@ -112,6 +112,11 @@ describe('el cruce contra lo que el backend sirve', () => {
         // ella: lo que decide que ensena es `conectores/seguridad.ts`.
         'seg-aud',
         'seg-panel',
+        // **Entra con #237, y es la primera que deja de decir «solo escribe»**: su arbol
+        // declaraba siete operaciones y ni un `GET` porque el backend no publicaba ninguna lectura
+        // suya. #207 publico `GET /rentas/predial/determinaciones` y #237 la declara en el ARTBOARD
+        // y en `arbol.ts` a la vez, que es el mismo movimiento de #169, #173, #179 y #184.
+        'territorio',
         'tra-panel',
         'tra-pap',
         'tra-veh',
@@ -119,7 +124,7 @@ describe('el cruce contra lo que el backend sirve', () => {
         'valores',
       ].sort(),
     );
-    expect(TODAS.length - con.length).toBe(15);
+    expect(TODAS.length - con.length).toBe(14);
   });
 });
 
@@ -150,7 +155,7 @@ describe('el cruce contra lo que el backend sirve', () => {
  * del otro: quitarle a `fis-res` una de sus dos declaraciones dejaba este en verde.
  */
 describe('AC4 — toda hoja con conector declara la operacion que la sirve', () => {
-  it('las diecinueve que piden de verdad declaran alguna servida de lectura', () => {
+  it('las veinte que piden de verdad declaran alguna servida de lectura', () => {
     const mudas = Object.keys(CONECTORES).filter(
       (clave) => operacionesUtiles(hojaDe(clave as ClaveDeHoja)).length === 0,
     );
@@ -163,9 +168,9 @@ describe('AC4 — toda hoja con conector declara la operacion que la sirve', () 
     ).toEqual([]);
   });
 
-  it('EL CENTINELA: y son diecinueve, no cero', () => {
+  it('EL CENTINELA: y son veinte, no cero', () => {
     // Un registro de conectores vacio dejaria la comprobacion de arriba pasando sobre la nada.
-    expect(Object.keys(CONECTORES)).toHaveLength(19);
+    expect(Object.keys(CONECTORES)).toHaveLength(20);
   });
 });
 
@@ -207,24 +212,44 @@ describe('los cinco casos no se confunden', () => {
   });
 
   it('ni un `GET` y con escrituras: «solo escribe», que no es «sin conectar» (#182)', () => {
-    // `territorio` es la hoja de la Determinacion, y declara SIETE operaciones: cuatro `POST` y
-    // tres `BASE` que —medidas contra el contrato y contra sus controladores— tambien son `POST`.
-    // Con las tres frases de antes decia «sin conectar», o sea «ninguna de las operaciones que
-    // declara la sirve el backend», que es falso: las sirve todas. Lo que pasa es que escriben.
-    const hoja = hojaDe('territorio');
+    // **El ejemplo era `territorio` hasta #237, y dejo de valer.** No porque la frase cambiara: la
+    // hoja gano una lectura de verdad —`GET /rentas/predial/determinaciones`, que #207 publico— y
+    // desde entonces no cumple la condicion. `aut-sol` si la cumple y ensena lo mismo: declara
+    // `POST /autorizaciones/solicitudes` y ni un `GET`. Con las tres frases de antes decia «sin
+    // conectar», o sea «ninguna de las operaciones que declara la sirve el backend», que es falso:
+    // lo que pasa es que escribe.
+    const hoja = hojaDe('aut-sol');
 
     expect(hoja.operaciones.some((o) => o.verbo === 'GET')).toBe(false);
     expect(porQueNoHayDato(hoja)).toBe(SOLO_ESCRIBE);
     expect(porQueNoHayDato(hoja)).not.toBe(NADA_SERVIDO);
   });
 
-  it('y el barrido da CUATRO, todas de ejecutar: ninguna otra hoja cae aqui (#182)', () => {
+  it('y `territorio` ya NO cae aqui: con un `GET` declarado, la frase no es la suya (#237)', () => {
+    // Es la otra mitad de la condicion, y el motivo de que esta cuenta se REMIDA y no se amplie a
+    // ojo: la hoja sigue teniendo sus cuatro `POST` y sus tres `BASE`, y aun asi sale por otra
+    // puerta porque ahora hay una lectura que pedirle. Sin esta prueba, quitarle el `GET` al arbol
+    // volveria a dejarla en «solo escribe» **con conector**, que es una pantalla que pide de verdad
+    // diciendo que no consulta.
+    const hoja = hojaDe('territorio');
+
+    expect(hoja.operaciones.some((o) => o.verbo === 'GET')).toBe(true);
+    expect(porQueNoHayDato(hoja)).not.toBe(SOLO_ESCRIBE);
+    expect(operacionesUtiles(hoja).map((o) => o.ruta)).toEqual([
+      '/rentas/predial/determinaciones',
+    ]);
+  });
+
+  it('y el barrido da TRES, todas de ejecutar: ninguna otra hoja cae aqui (#182, #237)', () => {
     // Si la condicion se ensanchara —por ejemplo contando `BASE` como escritura— entrarian hojas
     // que si son de consulta, y la frase dejaria de decir la verdad sin que nada lo notara.
+    //
+    // **Eran cuatro y son tres**, y la que salio lo hizo por la unica via legitima: ganar una
+    // lectura. La cuenta se vuelve a contar entera en vez de tachar un nombre.
     const soloEscriben = TODAS.filter((h) => porQueNoHayDato(h) === SOLO_ESCRIBE);
 
     expect(soloEscriben.map((h) => h.clave).sort()).toEqual(
-      ['aut-sol', 'territorio', 'val-cart', 'val-val'].sort(),
+      ['aut-sol', 'val-cart', 'val-val'].sort(),
     );
   });
 

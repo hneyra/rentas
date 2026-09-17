@@ -1,10 +1,17 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { PANTALLAS } from '../pantallas/definiciones/index.ts';
 import type { ClaveDeHoja } from '../pantallas/arbol.ts';
 import { coordenada } from '@kamayuk/ui';
-import { CONECTORES, NO_PUBLICADO } from './conectores.ts';
+import {
+  CONECTORES,
+  NO_ESTA_EN_EL_PADRON,
+  NO_PUBLICADO,
+  SIN_CRONOGRAMA,
+  TODAVIA_SIN_DETERMINAR,
+} from './conectores.ts';
 import { CONSTANCIA_NEGADA, FICHA, SIN_CAMPANIA } from './conectores/consultasDeMuestra.ts';
+import { RUTAS } from './lecturas.ts';
 import {
   ACTA_CON_USO,
   EMBUDO,
@@ -13,6 +20,7 @@ import {
 } from './conectores/fiscalizacionDeMuestra.ts';
 import type {
   CorridaDelPredial,
+  DeterminacionGuardada,
   DeudaEnCoactiva,
   ExpedienteDeLaPapeleta,
   InternamientoEnDeposito,
@@ -348,8 +356,40 @@ const RESUMEN_DE_PAPELETAS: ResumenDePapeletas = {
   ],
 };
 
+/**
+ * Lo que `territorio` recibe: la ultima determinacion guardada de un contribuyente (#207).
+ *
+ * Recortada a la forma del contrato —`docs/50-api/formas-de-la-api.json`, `GET
+ * /rentas/predial/determinaciones`—. **Trae veinte campos y la pantalla no pinta ninguno**, y eso
+ * no es un descuido del conector: es que `territorio` tiene un solo campo de solo lectura en sus
+ * tres bloques y no lo publica nadie. Ver el javadoc de `TERRITORIO`.
+ */
+const DETERMINACION_GUARDADA: DeterminacionGuardada = {
+  id: 9014,
+  ejercicio: '2026',
+  codContribuyente: '00000000008',
+  sujeto: 'MEDINA SILVA, RUFINA',
+  conjuntoId: 3,
+  conjunto: '2026 v1',
+  estado: 'VIGENTE',
+  origen: 'INDIVIDUAL',
+  predios: [],
+  valuoTotal: '184200.00',
+  valuoExonerado: '0.00',
+  valuoAfecto: '184200.00',
+  baseImponible: '184200.00',
+  uit: '5350.00',
+  tramos: [],
+  minimoImponible: '321.00',
+  impuestoInsoluto: '702.60',
+  derechoDeEmision: '4.60',
+  totalAPagar: '707.20',
+  reglasAplicadas: ['RT-002'],
+};
+
 const MUESTRAS: Readonly<Partial<Record<ClaveDeHoja, unknown>>> = {
   panel: CORRIDA,
+  territorio: DETERMINACION_GUARDADA,
   'coa-panel': PAGINA,
   // `coa-exp` recibe el proceso **y lo que se pudo saber de sus costas** desde #200: son dos
   // operaciones que se cruzan por `actoId`, y la del cruce puede fallar sin tumbar la tabla.
@@ -384,7 +424,7 @@ function soloLecturaDe(clave: ClaveDeHoja): readonly string[] {
 }
 
 describe('los conectores', () => {
-  it('EL CENTINELA: estan los diecinueve que estan, y no cero ni cuarenta', () => {
+  it('EL CENTINELA: estan los veinte que estan, y no cero ni cuarenta', () => {
     // Cero dejaria todo lo de abajo sin sujeto. Cuarenta significaria que alguien conecto
     // pantallas cuyas operaciones no publican lo que ensenan, que es lo que este archivo evita.
     // La lista se escribe a mano y crece de una en una: conectar una pantalla es una decision, y
@@ -415,13 +455,18 @@ describe('los conectores', () => {
     // FORMA de la respuesta y no solo de sus campos: pide `?agrupadoPor=ANO` sin rango, o sea el
     // ejercicio en curso, y de ahi sale UNA linea; si llegaran mas, dos de sus campos dicen «no
     // publicado» en vez de leer la primera. Su medida esta en `conectores/transito.ts`.
+    //
+    // `territorio` llega con #237 sobre la lectura que #207 publico a proposito **sin conectar la
+    // hoja**, y es la primera que exige SUJETO y EJERCICIO a la vez. Y la primera que no pinta ni
+    // una celda de lo que le llega: su unico campo de solo lectura —«Monto deducido»— no lo publica
+    // nadie, y lo que esta conexion compra son sus TRES ausencias distintas. Ver `conectores.ts`.
     expect(Object.keys(CONECTORES).sort()).toEqual(
       [
         'aut-cat', 'aut-tram', 'coa-cost', 'coa-exp', 'coa-panel',
         'con-doc', 'con-panel',
         'fis-actas', 'fis-panel', 'fis-prog', 'fis-res',
         'ini-flujo', 'ini-panel', 'ini-parado', 'panel',
-        'seg-aud',
+        'seg-aud', 'territorio',
         'tra-panel', 'tra-pap', 'tra-veh',
       ].sort(),
     );
@@ -453,6 +498,94 @@ describe('los conectores', () => {
         'publicado». Se dibujarian con el motivo de la pantalla, que en una conectada dice que SI\n' +
         `esta conectada — un hueco mintiendo sobre su propia causa:\n${olvidados.join('\n')}`,
     ).toEqual([]);
+  });
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+describe('`territorio` — la determinacion guardada, y sus TRES ausencias (#237)', () => {
+  const conector = CONECTORES.territorio;
+  if (conector === undefined) throw new Error('falta el conector de `territorio`');
+
+  it('exige sujeto Y ejercicio: sin uno de los dos no se pide nada', () => {
+    // Sin `codContribuyente` la operacion es 422 —«no se contesta la de cualquiera»— y sin
+    // `ejercicio` contesta 200 con la del ano del reloj del BACKEND, que no es el de trabajo de la
+    // sesion. La segunda es la peligrosa: contesta bien, con cifras, de otro ejercicio.
+    expect(conector.exigeSujeto).toBe(true);
+    expect(conector.exigeEjercicio).toBe(true);
+  });
+
+  it('manda los DOS parametros, con el codigo codificado, y no uno solo', async () => {
+    // Se mide lo que SALE por el cable y no lo que compone `RUTAS`: entre las dos hay un conector,
+    // y es justo donde se pierde un argumento. Un codigo con una barra dentro ya rompio esto una
+    // vez (#26), y el ejercicio que no viaja no da error: contesta 200, de otro ano.
+    const doble = vi.fn<typeof fetch>(() =>
+      Promise.resolve(new Response(null, { status: 204 })),
+    );
+    vi.stubGlobal('fetch', doble);
+
+    const vacio = await conector.pedir({
+      senal: new AbortController().signal,
+      sujeto: 'A/1',
+      ejercicio: 2025,
+      enLaRuta: {},
+    });
+
+    expect(String(doble.mock.calls[0]?.[0])).toBe(
+      '/rentas/api/v1/rentas/predial/determinaciones?codContribuyente=A%2F1&ejercicio=2025',
+    );
+    // Y el 204 llega como `null` y no revienta en `json()`, que es lo que hacia hasta #237.
+    expect(vacio).toBeNull();
+    expect(RUTAS.determinacionGuardada('A/1', 2025)).toBe(
+      '/rentas/predial/determinaciones?codContribuyente=A%2F1&ejercicio=2025',
+    );
+  });
+
+  it('LAS DOS AUSENCIAS NO SE CONFUNDEN: 404 no dice lo mismo que 204', () => {
+    // Es la mitad de #207 que la pantalla podia tirar en el ultimo paso. El backend las publica
+    // distintas porque #546 midio el dano de confundirlas: «ese codigo no existe» se arregla
+    // escribiendo otro, y «todavia no se le ha determinado» se arregla determinando.
+    expect(conector.noEncontrado).toBe(NO_ESTA_EN_EL_PADRON);
+    expect(conector.sinDato).toBe(TODAVIA_SIN_DETERMINAR);
+    expect(NO_ESTA_EN_EL_PADRON.enElCampo).not.toBe(TODAVIA_SIN_DETERMINAR.enElCampo);
+    expect(NO_ESTA_EN_EL_PADRON.explicacion).not.toBe(TODAVIA_SIN_DETERMINAR.explicacion);
+    // Y los tonos tampoco: un codigo que no existe pide corregir la direccion; un ejercicio sin
+    // determinar no es ninguna anomalia.
+    expect(NO_ESTA_EN_EL_PADRON.tono).toBe('atencion');
+    expect(TODAVIA_SIN_DETERMINAR.tono).toBe('info');
+    // Ninguna de las dos dice una cifra: no saber no es una afirmacion.
+    expect(NO_ESTA_EN_EL_PADRON.enElCampo).not.toMatch(/\d/);
+    expect(TODAVIA_SIN_DETERMINAR.enElCampo).not.toMatch(/\d/);
+  });
+
+  it('el «Monto deducido» dice «no publicado», y NO se rellena con `valuoExonerado`', () => {
+    // Lo mas cercano que llega es la parte exonerada del valuo, que no es el importe que una
+    // deduccion resta de la base. Pintar uno por otro daria una cifra al centimo indistinguible de
+    // la correcta — y en un beneficio de pensionista esa cifra decide cuanto se cobra.
+    const reparto = conector.repartir(DETERMINACION_GUARDADA as never);
+
+    expect(reparto.noPublicados.get(coordenada(1, 3))).toBe(NO_PUBLICADO);
+    expect(reparto.valores.size).toBe(0);
+    expect(JSON.stringify([...reparto.valores.values()])).not.toContain(
+      DETERMINACION_GUARDADA.valuoExonerado,
+    );
+  });
+
+  it('el «Cronograma» no se dibuja, y la pantalla dice POR QUE (#234)', () => {
+    // Y no con `[]`, que significaria «la operacion contesto que no hay ninguna cuota». No contesto
+    // eso: la determinacion guardada **no dice con que modalidad se emitio**, y sin ella los
+    // vencimientos no se pueden resolver. Suponer la trimestral publicaria unas fechas de pago que
+    // el contribuyente puede no haber recibido (regla 5).
+    const reparto = conector.repartir(DETERMINACION_GUARDADA as never);
+    const cronograma = PANTALLAS.territorio.bloques[2]?.tabla;
+
+    expect(cronograma?.titulo).toBe('Cronograma');
+    expect(reparto.filas.has(2)).toBe(false);
+    expect(reparto.tablas).toBeUndefined();
+    expect(reparto.loQueLaOperacionNoTrae).toBe(SIN_CRONOGRAMA);
+    expect(SIN_CRONOGRAMA).toContain('modalidad');
   });
 });
 
