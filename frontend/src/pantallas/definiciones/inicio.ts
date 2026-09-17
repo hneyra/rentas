@@ -102,7 +102,20 @@ export const INICIO = {
             { rotulo: 'Importe S/', alineadoDerecha: true },
             { rotulo: 'Situación', alineadoDerecha: false },
           ],
-          columnaDeInsignia: 4,
+          // **Sin `columnaDeInsignia`, y la columna se queda** (#218, y su gemelo en el artboard).
+          //
+          // La quinta era de insignia —`i: 4` transcrito del artboard, que dibuja ahi un estado
+          // del PLAZO: «Vencida», «Por vencer»— y lo que llega a esa celda es
+          // `frentes[].porQueCuestaDinero`, que es una FRASE. #175 dejo de pintarla en verde; #183
+          // pregunto lo otro —que el backend publique la situacion— y **se cerro sin implementarlo,
+          // con la medida delante**: los cuatro puertos de `GET /indicadores/trabajo-parado`
+          // devuelven un agregado y ninguno publica la antiguedad de lo que esta parado, y de las
+          // nueve filas `PLAZO` del corpus ninguna es el plazo que la administracion tiene para
+          // desatascar ninguno de los cuatro frentes.
+          //
+          // O sea que era un semaforo que **no se podia encender nunca**. Lo que sobra es la
+          // insignia, no la columna: «Que falta» dice el frente y esta dice por que cuesta dinero,
+          // que es lo que la pantalla existe para decir.
         },
       },
     ],

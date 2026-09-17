@@ -682,7 +682,15 @@ const PANTALLAS = {
       ['Valores', 'Emitidos y sin notificar', '412', '184,412.00', 'Vencida'],
       ['Coactiva', 'Expedientes importados sin REC', '388', '162,844.00', 'Vencida'],
       ['Fiscalización', 'Actas con diferencia sin emitir', '61', '214,882.40', 'Por vencer'],
-      ['Autorizaciones', 'Solicitudes con el plazo agotado', '42', '0.00', 'Por vencer']], i: 4 }]],
+      ['Autorizaciones', 'Solicitudes con el plazo agotado', '42', '0.00', 'Por vencer']] }]],
+  /* Sin `i`: la quinta columna de `ini-parado` SIGUE, y deja de ser de insignia (#218).
+     El artboard dibujaba aqui un estado del PLAZO —«Vencida», «Por vencer»— y #183 midio
+     que el backend no lo puede publicar: los cuatro puertos de `GET
+     /indicadores/trabajo-parado` devuelven un recuento y ninguno la antiguedad de lo que
+     esta parado, y de las nueve filas `PLAZO` del corpus ninguna es el plazo que la
+     administracion tiene para desatascar ninguno de los cuatro frentes. Lo que llega a esa
+     celda es `porQueCuestaDinero`, que es una FRASE: un semaforo que no se puede encender
+     nunca. Las cinco celdas de arriba se quedan porque son lo que el artboard dibuja. */
   'ini-cierre': [['Cierre del día', 'Lo cobrado en el turno, contra lo contado en caja.', [
     ['Caja', 's', ['C-1', 'C-2', 'C-3']], ['Turno', 's', ['Mañana', 'Tarde']], ['Fecha', 'd'],
     ['Cajero', 'r', 'J. Cárdenas Vega'], ['Recaudado del turno', 'r', 'S/ 9,418.60'], ['Diferencia de arqueo', 'r', 'S/ 0.00']],

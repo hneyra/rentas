@@ -66,13 +66,24 @@
  *
  * Asi que no se inventa un concepto nuevo: se nombra el que la libreria ya exige nombrar.
  *
- * <h2>Lo que esto NO arregla, y hay issue</h2>
+ * <h2>Lo que esto no arreglaba, y como se cerro: quitando la columna (#218)</h2>
  *
- * La quinta columna de `ini-parado` sigue recibiendo una frase donde el artboard dibuja un estado
- * («Vencida», «Por vencer»). Con el tono de «no se» la pantalla deja de mentir, pero su insignia
- * no dice nada: quien tiene que publicar el estado es `GET /indicadores/trabajo-parado`, y eso es
- * issue de backend ([#183](https://github.com/hneyra/rentas/issues/183)). Deducirlo de la frase
- * en el conector seria **inventarlo**, que es lo que prohibe la regla de `datos/conectores.ts`.
+ * Hasta #218 la quinta columna de `ini-parado` recibia una frase donde el artboard dibuja un
+ * estado («Vencida», «Por vencer»). Con el tono de «no se» la pantalla dejo de mentir, pero su
+ * insignia no decia nada, y aqui quedaba escrito que lo que faltaba era que el backend publicara
+ * el estado ([#183](https://github.com/hneyra/rentas/issues/183)).
+ *
+ * **#183 se midio y se cerro sin implementarlo**: los cuatro puertos de
+ * `GET /indicadores/trabajo-parado` devuelven un agregado y **ninguno publica la antiguedad** de
+ * lo que esta parado —devolver la lista para poder medirla es lo que prohibe el AC 4 de #56—, y de
+ * las **nueve** filas `PLAZO` del corpus **ninguna** es el plazo que la administracion tiene para
+ * desatascar ninguno de los cuatro frentes. O sea que no era una insignia que esperaba a alguien:
+ * era una que **no se podia encender nunca**.
+ *
+ * Asi que lo que sobraba era la columna de insignia, y #218 la quito **en el artboard y en la
+ * definicion a la vez**. La quinta columna sigue, y sigue diciendo `porQueCuestaDinero`. Este
+ * reparto **no cambia**: deducir el estado de la frase, aqui o en el conector, seria
+ * **inventarlo** — y es lo que prohibe la regla de `datos/conectores.ts`.
  */
 
 import type { TonoDeInsignia } from '@kamayuk/ui';

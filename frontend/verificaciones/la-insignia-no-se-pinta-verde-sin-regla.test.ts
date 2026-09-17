@@ -174,17 +174,12 @@ const CONECTADAS: readonly {
   readonly leLlega: string;
 }[] = [
   { hoja: 'panel', bloque: 0, leLlega: 'etapas[].estado — un estado de verdad: «Conforme», «Observado»' },
-  {
-    hoja: 'ini-parado',
-    bloque: 0,
-    leLlega:
-      'frentes[].porQueCuestaDinero — UNA FRASE, no un estado. Es el defecto de #175, y el ' +
-      'estado NO lo va a publicar el backend: #183 se midio y se cerro sin implementar el ' +
-      '2026-09-17 —los cuatro puertos devuelven un recuento y ninguno la antiguedad de lo que ' +
-      'esta parado, y de las nueve filas `PLAZO` del corpus ninguna es el plazo que la ' +
-      'administracion tiene para desatascar ninguno de los cuatro frentes—. Lo que sobra es la ' +
-      'COLUMNA, y eso es del artboard',
-  },
+  // `ini-parado` ESTUVO aqui, y salio con #218: su quinta columna dejo de ser de insignia. No es
+  // que se conectara peor —sigue conectada y sigue dibujando su quinta columna—, es que la
+  // insignia no tenia con que encenderse: le llegaba `frentes[].porQueCuestaDinero`, una FRASE, y
+  // #183 midio que el backend no puede publicar el estado. Quitarla de esta lista no es opcional:
+  // la prueba de TOTALIDAD marca como sobrante una declaracion sin columna viva, y salio roja
+  // sola —«sobra una declaracion en `CONECTADAS`: ['ini-parado']»—.
   { hoja: 'con-doc', bloque: 0, leLlega: 'obligaciones[].fase — `Fase`: ORDINARIA, VALOR, COACTIVA, CONVENIO. Solo COACTIVA es un juicio' },
   { hoja: 'coa-exp', bloque: 0, leLlega: 'actuaciones[].medida — la medida cautelar del acto, o «—» cuando no la lleva. Tampoco es un estado' },
   { hoja: 'aut-cat', bloque: 0, leLlega: 'ciiu[].riesgoItse — «Bajo», «Medio», «Alto». Solo «Bajo» es conforme; los otros dos no son un juicio de la administracion' },
@@ -244,11 +239,16 @@ const CONECTADAS: readonly {
 const FORMAS = join(RAIZ, '../docs/50-api/formas-de-la-api.json');
 
 describe('ninguna insignia se pinta de verde sin que una regla la reconozca', () => {
-  it('EL CENTINELA: hay 22 columnas de insignia, el artboard les escribe 17 textos y el backend 4 frases', () => {
+  it('EL CENTINELA: hay 21 columnas de insignia, el artboard les escribe 17 textos y el backend 4 frases', () => {
     // Sin esto, un artboard que dejara de traer celdas —o una ruta mal calculada— dejaria todo lo
     // de abajo recorriendo la lista vacia y pasando en verde sobre la nada. Es como este
     // repositorio se quedo sin guarda dos veces (#78, #80).
-    expect(columnasDeInsignia()).toHaveLength(22);
+    //
+    // **Eran 22 hasta #218**, que le quito la insignia a `ini-parado`. Los 17 textos NO cambian, y
+    // eso se midio en vez de suponerlo: «Vencida» la escriben ademas `territorio`, `inf-esc`,
+    // `con-doc` y `val-tip`, y «Por vencer» otras ocho hojas. O sea que lo que se retira es una
+    // columna, no vocabulario — y por eso el reparto de mas abajo sigue diciendo 6/3/2/6.
+    expect(columnasDeInsignia()).toHaveLength(21);
     const textos = new Set(celdasDeInsignia().map((c) => c.texto));
     expect(textos.size, 'el artboard no escribe ni un texto en una columna de insignia').toBe(17);
     expect(frasesDelBackend(), 'el enumerado del backend no trae sus cuatro frentes').toHaveLength(4);
@@ -320,6 +320,36 @@ describe('ninguna insignia se pinta de verde sin que una regla la reconozca', ()
       CONECTADAS.filter((c) => !vivas.has(`${c.hoja}·${String(c.bloque)}`)).map((c) => c.hoja),
       'sobra una declaracion en `CONECTADAS`',
     ).toEqual([]);
+  });
+
+  it('LA COLUMNA DE `ini-parado` NO es de insignia, ni en el arbol ni en el artboard (#218)', () => {
+    // El centinela de esta decision, y mira **las dos fuentes**: volver a poner `columnaDeInsignia`
+    // en la definicion sin tocar el artboard —o al reves— ya sale rojo en
+    // `pantallas-del-artboard.test.ts`, pero ponerlo en las dos a la vez no lo veria nadie. Esto
+    // si: para encender otra vez esa insignia hay que borrar esta prueba, y borrarla obliga a leer
+    // por que se apago.
+    //
+    // Lo que se retiro es la INSIGNIA, no la columna: la quinta sigue ahi y sigue diciendo
+    // `porQueCuestaDinero`, que es lo que esta pantalla existe para decir.
+    const tabla = pantallaDe('ini-parado').bloques[0]?.tabla;
+    expect(tabla?.columnas.map((c) => c.rotulo)).toEqual([
+      'Módulo',
+      'Qué falta',
+      'Registros',
+      'Importe S/',
+      'Situación',
+    ]);
+    expect(
+      tabla?.columnaDeInsignia,
+      'La quinta columna de `ini-parado` volvio a ser de insignia, y no se puede encender:\n' +
+        '  lo que llega a esa celda es `frentes[].porQueCuestaDinero`, que es UNA FRASE. #183 se\n' +
+        '  midio y se cerro sin implementar —ninguno de los cuatro puertos publica la antiguedad\n' +
+        '  de lo que esta parado, y de las nueve filas `PLAZO` del corpus ninguna es su plazo—.',
+    ).toBeUndefined();
+    expect(
+      artboardV8().pantallas['ini-parado']?.[0]?.[3]?.i,
+      'El artboard volvio a declarar `i: 4` en la tabla de `ini-parado`.',
+    ).toBeUndefined();
   });
 
   /**
