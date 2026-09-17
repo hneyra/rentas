@@ -890,6 +890,58 @@ export interface InternamientoEnDeposito {
   readonly acta: string;
 }
 
+/**
+ * Una linea de un resumen de papeletas, de `GET /transito/reportes/resumen-*` (#53, #184).
+ *
+ * <h2>Aqui no hay ni una cifra de recaudacion, y lo dice el backend</h2>
+ *
+ * Todos los importes son **los del acta** —`papeleta.importe_a_pagar`, congelado al registrar la
+ * papeleta—, agrupados por el estado en que esta cada una. `importeDeLasPagadas` es «cuanto sumaban
+ * las actas de las que constan pagadas» y **no** «cuanto se cobro»: no cuenta los intereses
+ * cobrados, cuenta entero un pago parcial y sigue contando un recibo anulado. Lo recaudado sale del
+ * libro y tiene su propia operacion, `GET /transito/reportes/resumen-recaudacion`.
+ *
+ * `clave` es el valor por el que se agrupo —el estado, el codigo, las dos letras, el mes o el ano—
+ * y `ano` sale **solo** cuando el agrupador lo determina (`ANO` y `MES`); con los otros tres va
+ * nulo, porque agrupar por estado, por codigo o por iniciales mezcla anos dentro de un grupo.
+ */
+export interface LineaDelResumenDePapeletas {
+  readonly clave: string;
+  readonly descripcion: string | null;
+  readonly ano: number | null;
+  readonly cantidad: number;
+  readonly importe: string;
+  readonly pagadas: number;
+  readonly importeDeLasPagadas: string;
+  readonly pendientes: number;
+  readonly importeDeLasPendientes: string;
+  readonly enCoactiva: number;
+  readonly importeEnCoactiva: string;
+  /** El dia al que se leyeron los estados (regla 9, RNF-075). */
+  readonly actualizadoA: string;
+}
+
+/**
+ * Un resumen de papeletas entero, de `GET /transito/reportes/resumen-papeletas` (#53, #184).
+ *
+ * `papeletas` es el total **calculado en el servidor** —la suma de las `cantidad` de las lineas—, y
+ * por eso esta interfaz no lo recompone: recomponer una cifra en el cliente es como se acaba
+ * mostrando un total que no coincide con el papel exportado.
+ *
+ * `desde` y `hasta` **viajan dentro** y no son decorativos: un resumen sin fechas no existe (regla
+ * 9, RNF-075). Cuando no se mandan, el backend toma el ejercicio en curso de su reloj y **dice
+ * cual**, que es lo que permite a la pantalla escribirlo en vez de suponerlo.
+ */
+export interface ResumenDePapeletas {
+  readonly agrupadoPor: string;
+  readonly desde: string;
+  readonly hasta: string;
+  readonly papeletas: number;
+  readonly importeTotal: string;
+  readonly actualizadoA: string;
+  readonly lineas: readonly LineaDelResumenDePapeletas[];
+}
+
 /** Un cambio de placa, con quien lo hizo y por que. */
 export interface CambioDePlaca {
   readonly anterior: string;
@@ -1584,6 +1636,30 @@ export const RUTAS = {
    * unico que se podria pedir en su lugar es el padron vehicular entero.
    */
   vehiculoDe: (placa: string) => `/rentas/vehiculos/${encodeURIComponent(placa)}`,
+  /**
+   * El resumen de papeletas del ejercicio en curso, **agrupado por ano** (#184).
+   *
+   * <h2>`?agrupadoPor=ANO` escrito, aunque sea el valor por omision</h2>
+   *
+   * Por lo mismo que el `?tamano=20` de `ciiu` y de `internamientos`: lo que decide la **forma** de
+   * la respuesta tiene que estar a la vista de quien lea esta linea, y no escondido en un valor por
+   * omision del backend que puede cambiar sin avisar —de hecho ya cambio una vez: hasta #398 el
+   * agrupador por omision era `ESTADO`—. El parametro esta entre los tres opcionales que
+   * `parametros-de-la-api.json` publica para esta operacion.
+   *
+   * <h2>Y es el agrupador que hace que la respuesta traiga UNA linea</h2>
+   *
+   * No se mandan `desde` ni `hasta`, asi que el backend acota al **ejercicio en curso de su reloj**
+   * —del 1 de enero al 31 de diciembre— y lo dice dentro de la respuesta. Un rango de un ano
+   * natural agrupado por ano da **exactamente un grupo**, y de esa linea salen «Canceladas» y «En
+   * coactiva», que son cuentas del ejercicio entero y no de un trozo suyo. Es una invariante de lo
+   * que se pide, no una suposicion sobre lo que llega: el conector la **comprueba**, y si alguna
+   * vez no se cumple dice «no publicado» en vez de dibujar un subconjunto (ver `conectores/transito.ts`).
+   *
+   * El dia que el desplegable «Ejercicio» de la pantalla sepa pasarle lo elegido a su conector, lo
+   * que cambia es esta linea: `desde` y `hasta` estan publicados, y el hueco es #172.
+   */
+  resumenDePapeletas: '/transito/reportes/resumen-papeletas?agrupadoPor=ANO',
   calculoIndividual: '/rentas/predial/calculo-individual',
   calculoMasivo: '/rentas/predial/calculo-masivo',
   calculoVehicular: '/rentas/vehicular/calculo',

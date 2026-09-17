@@ -28,12 +28,12 @@ import {
 const TODAS: readonly Hoja[] = ARBOL.flatMap((modulo) => [...modulo.hojas]);
 
 describe('el cruce contra lo que el backend sirve', () => {
-  it('EL CENTINELA: hay cuarenta hojas y treinta y dos operaciones servidas', () => {
+  it('EL CENTINELA: hay cuarenta hojas y treinta y tres operaciones servidas', () => {
     // Sin esto, un arbol vacio o unas `YA_SERVIDAS` vacias dejarian todo lo de abajo pasando
     // sobre la nada — y la respuesta seria «ninguna pantalla tiene datos», que ademas parece
     // razonable.
     expect(TODAS).toHaveLength(40);
-    expect(YA_SERVIDAS).toHaveLength(32);
+    expect(YA_SERVIDAS).toHaveLength(33);
   });
 
   it('cruza por RUTA, no por verbo: dos servidas las declara el artboard como `BASE`', () => {
@@ -53,7 +53,7 @@ describe('el cruce contra lo que el backend sirve', () => {
     expect(utiles.every((o) => o.verbo !== 'PUT')).toBe(true);
   });
 
-  it('veintitres hojas tienen alguna operacion util, y diecisiete ninguna', () => {
+  it('veinticuatro hojas tienen alguna operacion util, y dieciseis ninguna', () => {
     const con = TODAS.filter((hoja) => operacionesUtiles(hoja).length > 0);
     // `aut-cat` entra con #168 por la ruta que el ARTBOARD le atribuye, `GET /licencias/ciiu`.
     //
@@ -78,9 +78,14 @@ describe('el cruce contra lo que el backend sirve', () => {
     // la ruta y no el verbo.
     //
     // `tra-pap` y `tra-veh` entran con #180, y las dos **por las rutas que el ARTBOARD les
-    // atribuye**: las cuatro de transito que se encienden estan en el arbol de esas dos hojas. Las
-    // otras dos de Transito siguen fuera — `tra-panel` declara `/transito/estado-cuenta` y
-    // `tra-cua` declara `/transito/codigos`, y ninguna de las dos esta servida.
+    // atribuye**: las cuatro de transito que se encienden estan en el arbol de esas dos hojas.
+    //
+    // **`tra-panel` entra con #184**, y no porque su arbol ya la declarara: declaraba solo
+    // `BASE /transito/estado-cuenta` —el estado de cuenta de UNA PLACA, y este panel no tiene
+    // placa— y lo que se le anadio, en el ARTBOARD y en `arbol.ts` a la vez, es
+    // `GET /transito/reportes/resumen-papeletas`, que estaba publicada y no consumia nadie. Es el
+    // mismo movimiento de #169, #173 y #179. La que sigue fuera es `tra-cua`, que declara
+    // `/transito/codigos` y no esta servida.
     expect(con.map((h) => h.clave).sort()).toEqual(
       [
         'aut-cat',
@@ -105,13 +110,14 @@ describe('el cruce contra lo que el backend sirve', () => {
         // ella: lo que decide que ensena es `conectores/seguridad.ts`.
         'seg-aud',
         'seg-panel',
+        'tra-panel',
         'tra-pap',
         'tra-veh',
         'val-tip',
         'valores',
       ].sort(),
     );
-    expect(TODAS.length - con.length).toBe(17);
+    expect(TODAS.length - con.length).toBe(16);
   });
 });
 
@@ -134,7 +140,7 @@ describe('el cruce contra lo que el backend sirve', () => {
  * Cuando #186 saque la ruta al conector, esto se estrecha a la igualdad y este comentario sobra.
  */
 describe('AC4 — toda hoja con conector declara la operacion que la sirve', () => {
-  it('las diecisiete que piden de verdad declaran alguna servida de lectura', () => {
+  it('las dieciocho que piden de verdad declaran alguna servida de lectura', () => {
     const mudas = Object.keys(CONECTORES).filter(
       (clave) => operacionesUtiles(hojaDe(clave as ClaveDeHoja)).length === 0,
     );
@@ -147,9 +153,9 @@ describe('AC4 — toda hoja con conector declara la operacion que la sirve', () 
     ).toEqual([]);
   });
 
-  it('EL CENTINELA: y son diecisiete, no cero', () => {
+  it('EL CENTINELA: y son dieciocho, no cero', () => {
     // Un registro de conectores vacio dejaria la comprobacion de arriba pasando sobre la nada.
-    expect(Object.keys(CONECTORES)).toHaveLength(17);
+    expect(Object.keys(CONECTORES)).toHaveLength(18);
   });
 });
 

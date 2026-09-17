@@ -1,4 +1,4 @@
-import { coordenada, type Ausencia, type CeldaDeLaTabla } from '@kamayuk/ui';
+import { coordenada, type Ausencia, type CeldaDeLaTabla, type Coordenada } from '@kamayuk/ui';
 
 import { formatearFecha } from '../../dominio/formato.ts';
 import type {
@@ -6,6 +6,7 @@ import type {
   InternamientoEnDeposito,
   Paginado,
   PapeletaDeTransito,
+  ResumenDePapeletas,
   VehiculoServido,
 } from '../lecturas.ts';
 import { RUTAS, pedirPagina, pedirUno } from '../lecturas.ts';
@@ -13,15 +14,21 @@ import type { Conector, Reparto } from '../conectores.ts';
 import { NO_PUBLICADO } from '../conectores.ts';
 
 /**
- * **Las dos hojas de Transito que piden de verdad** (#180).
+ * **Las hojas de Transito que piden de verdad** (#180, #184).
  *
  * Un archivo por modulo, como Licencias (#168), Coactiva (#170), Inicio (#167) y Consultas
  * (#169): el registro de `conectores.ts` es de todos los modulos y un conector es de uno, asi que
  * en `CONECTORES` hay **una linea** por modulo y conectar una hoja no toca el unico archivo que
  * todas las ramas comparten.
  *
+ * **Y con #184 son TRES**: `tra-panel` entra sobre `GET /transito/reportes/resumen-papeletas`,
+ * que estaba publicada desde siempre y no la consumia nadie.
+ *
  * <table>
  *   <tr><th>Hoja</th><th>Operaciones</th><th>Que llena</th></tr>
+ *   <tr><td>`tra-panel`</td><td>`GET /transito/reportes/resumen-papeletas`</td><td>el
+ *     desplegable de ejercicio y **tres de sus cinco recuentos**; los otros dos dicen «no
+ *     publicado» y nombran lo que falta</td></tr>
  *   <tr><td>`tra-pap`</td><td>`GET /transito/papeletas` -> `GET
  *     /transito/papeletas/{numero}/actos`</td><td>**solo su tabla**: cero campos de solo
  *     lectura</td></tr>
@@ -105,14 +112,11 @@ import { NO_PUBLICADO } from '../conectores.ts';
  *
  * <h2>Y `tra-panel` y `tra-cua` NO entran, con su medida</h2>
  *
- * · **`tra-panel`** ensena cinco recuentos de papeletas por situacion —levantadas, notificadas,
- *   canceladas, caducadas sin notificar, en coactiva—. La unica operacion que el arbol le atribuye
- *   es `BASE /transito/estado-cuenta`, que publica **el estado de cuenta de una placa** y no un
- *   resumen del ejercicio; contar los cinco sobre la pagina de `GET /transito/papeletas` daria
- *   cinco numeros exactos sobre veinte filas de un padron entero, que es la regla de
- *   `conectores.ts` al pie de la letra. **Y los agregados si existen**: el contrato publica cuatro
- *   `GET /transito/reportes/resumen-*` que no consume nadie. Conectarlos es otro issue, y esta
- *   abierto.
+ * · **`tra-panel`** entro con #184, y su reparto esta abajo. Lo que decia aqui —«la unica
+ *   operacion que el arbol le atribuye es `BASE /transito/estado-cuenta`, que publica el estado de
+ *   cuenta de una placa y no un resumen del ejercicio»— seguia siendo cierto, y lo que faltaba era
+ *   declarar la que si la sirve: se corrigio en el ARTBOARD y en `arbol.ts` a la vez, como #169,
+ *   #173 y #179.
  *
  * · **`tra-cua`** ensena el cuadro de infracciones con su escala en % de UIT. `GET
  *   /transito/codigos` esta en el contrato y **no esta en `YA_SERVIDAS`**: encenderla es conectar
@@ -150,6 +154,141 @@ const SIN_PLACA: Ausencia = {
     'detras del nombre de la hoja. Hasta que la lleve no se pide su ficha, porque lo unico que se ' +
     'podria pedir en su lugar es el padron vehicular entero.',
   tono: 'info',
+};
+
+/**
+ * `tra-panel` — los cinco recuentos de papeletas del ejercicio (#184).
+ *
+ * <h2>De DIEZ rutas publicadas, una; y de cuatro `resumen-*`, tambien una</h2>
+ *
+ * El contrato publica diez operaciones bajo `/transito/reportes/` y hasta #184 ninguna hoja
+ * nombraba una sola: el backend iba por delante de la interfaz. La medida —cual de las cuatro
+ * `resumen-*` dibuja este panel, y por que las otras tres no— esta en `datos/servidas.ts`, y en
+ * corto: las dos de codigo y placa publican **la misma forma** agrupada por otra dimension, y la de
+ * recaudacion publica **importes del libro** cuando aqui no se dibuja ni uno.
+ *
+ * <h2>Se pide UNA vez, sin filtrar, y la respuesta dice de que ejercicio es</h2>
+ *
+ * `RUTAS.resumenDePapeletas` lleva `?agrupadoPor=ANO` escrito y **no lleva `desde` ni `hasta`**, asi
+ * que el backend acota al ejercicio en curso de su reloj y lo publica dentro (regla 9, RNF-075). Un
+ * rango de un ano natural agrupado por ano da **exactamente un grupo**, y esa es la unica linea que
+ * este conector lee.
+ *
+ * **Y esa invariante se comprueba en vez de suponerse.** Si algun dia llegara mas de una linea
+ * —porque el rango dejara de ser de un ano—, leer la primera pondria en «Canceladas» y «En
+ * coactiva» las cuentas de **un trozo** del periodo bajo unos rotulos que hablan del ejercicio
+ * entero: una cifra exacta y equivocada, que es la peor clase. Con cero lineas pasa lo mismo al
+ * reves: no hay de donde sacarlas. En los dos casos los dos campos dicen «no publicado».
+ *
+ * <h2>Campo a campo: uno de contexto, tres con dato y DOS huecos que nombran al backend</h2>
+ *
+ * <ul>
+ *   <li><b>`0|0` Ejercicio</b> ← el <b>ano de `desde`</b>, que es el rango que la respuesta dice
+ *       haber contado. Es un desplegable, y se rellena por lo mismo que `ini-panel` rellena el
+ *       suyo: es el ejercicio del que son las cifras de debajo, y dejarlo en la primera opcion
+ *       —«2026», la que el artboard escribio primero— seria afirmarlo sin saberlo. Lo tecleado gana
+ *       sobre esto, como en cualquier campo.
+ *       <p><b>Y hay una limitacion medida que se deja escrita en vez de descubrirse</b>: el
+ *       desplegable lleva las dos opciones del artboard —«2026» y «2025»—, asi que un ejercicio
+ *       que no sea ninguna de las dos deja el control <b>en blanco</b>. Es lo mismo que `coa-exp`
+ *       midio con «Ejecutor coactivo» y lo que hace que `tra-veh` no escriba «Deposito» ni «Clase
+ *       de vehiculo». <b>Aqui si se escribe igual</b>, y es una eleccion: en blanco no se afirma
+ *       nada y las cinco cifras de debajo siguen siendo las que llegaron, mientras que no
+ *       escribirlo dejaria el desplegable en «2026» —en 2027, sobre cifras de 2027—, que es
+ *       afirmar un ano que nadie dijo. Su prueba esta escrita.</li>
+ *   <li><b>`0|1` Levantadas</b> ← `papeletas`, el total del resumen. Es el unico de los cinco
+ *       rotulos que empareja <b>exacto</b> con lo que la operacion publica: «levantar una papeleta»
+ *       es emitirla, y toda fila del padron se levanto —tambien las anuladas y las prescritas—. El
+ *       total va <b>calculado en el servidor</b> y no sumando las lineas aqui.</li>
+ *   <li><b>`0|3` Canceladas</b> ← `pagadas` de la linea. «Cancelar» es <b>pagar</b>, y no se
+ *       decidio por el sonido: el artboard usa la misma palabra en la instruccion de `tra-veh`
+ *       —«sin la papeleta cancelada y la custodia pagada no se emite la orden de retiro»—, y el
+ *       prototipo del monolito dibuja la casilla «Multa cancelada» con el marcador «Recibo de la
+ *       papeleta». El SQL que la cuenta es `count(*) FILTER (WHERE p.estado = 'PAGADA')`.</li>
+ *   <li><b>`0|5` En coactiva</b> ← `enCoactiva` de la linea, que es
+ *       `count(*) FILTER (WHERE p.estado = 'COACTIVA')`. El rotulo y el estado dicen lo mismo.</li>
+ * </ul>
+ *
+ * <h2>Y los dos que dicen «no publicado», con lo que le falta al backend en cada uno</h2>
+ *
+ * Son los dos casos que #184 pedia nombrar, y no son el mismo hueco:
+ *
+ * <ul>
+ *   <li><b>`0|2` Notificadas</b> — <b>falta el acto que registra la notificacion de la papeleta en
+ *       si</b>. `EstadoDePapeleta` declara `NOTIFICADA` y la secuencia `IMPUESTA → NOTIFICADA → …`,
+ *       pero <b>ningun codigo de produccion escribe ese estado</b>: lo midio el backend al escribir
+ *       `PapeletasSinNotificar`, cuyo javadoc censa los usos del enumerado en `src/main` y encuentra
+ *       `IMPUESTA`, `PAGADA`, `ANULADA` y `PRESCRITA`, y ninguna otra. O sea que pedir esta misma
+ *       operacion con `?agrupadoPor=ESTADO` y leer la linea `NOTIFICADA` daria <b>cero, siempre</b>,
+ *       bajo un rotulo que dice cuantas se notificaron — la cifra plausible y equivocada. Lo que el
+ *       sistema si sabe de la notificacion es indirecto y de <b>otro</b> documento: la resolucion de
+ *       multa, cuyos acuses publica `GET /transito/papeletas/{numero}/actos` una papeleta a una
+ *       papeleta y no como agregado.</li>
+ *   <li><b>`0|4` Caducadas sin notificar</b> — <b>no es un estado</b>, y le faltan <b>las dos
+ *       cosas</b>: el acto de arriba, y ademas el <b>plazo</b> para notificar, contra el que se
+ *       decide si vencio. Ese plazo es un valor normativo y la regla 5 prohibe compilarlo; el
+ *       conjunto sellado publica dos plazos de sanciones —`DESCARGO_PAPELETA` y el de cumplimiento
+ *       de la resolucion ordinaria— y <b>ninguno de los dos es este</b>. Es exactamente el mismo
+ *       hueco por el que `tra-pap` escribe `NOTIFICADO` tal cual en vez de traducirlo a «Conforme»
+ *       (#185): «Conforme» y «Por vencer» son estados <b>del plazo</b>, y el plazo no lo publica
+ *       nadie.</li>
+ * </ul>
+ *
+ * <p>Los dos huecos son informacion: dicen a quien mantiene el backend exactamente que le falta
+ * para cerrar este panel —es [#222](https://github.com/hneyra/rentas/issues/222)—. Un cero
+ * calculado aqui no lo seria.
+ *
+ * <h2>Lo que NO se hace, y podria parecer que si</h2>
+ *
+ * <ul>
+ *   <li><b>«Caducadas sin notificar» ← `pendientes`</b>. La linea publica `pendientes`
+ *       —`estado NOT IN ('PAGADA','ANULADA','PRESCRITA')`, o sea «las que siguen debiendose»— y es
+ *       un numero que cabe en ese hueco sin que nada chirrie. <b>No es lo mismo</b>: una papeleta
+ *       pendiente se puede cobrar, y una caducada es justamente la que <b>ya no</b>. Ponerla ahi
+ *       diria que hay 1 842 papeletas incobrables donde las hay cobrables, debajo de una
+ *       instruccion que manda atenderlas primero.</li>
+ *   <li><b>«Notificadas» ← `papeletas` − `pendientes`</b>, o cualquier otra resta. Aritmetica en el
+ *       navegador sobre cifras que nadie publico junta, y ademas falsa: las pagadas, las anuladas y
+ *       las prescritas no son las notificadas.</li>
+ *   <li><b>La fecha al lado de cada recuento</b>. `actualizadoA` llega y no se escribe: el bloque no
+ *       tiene ningun campo donde ponerla, y pegarla a tres cifras de un formulario de seis campos
+ *       la repetiria tres veces. Lo que si se escribe es el <b>ejercicio</b>, que es el rango que se
+ *       conto — la parte de la regla 9 que esta pantalla tiene sitio para decir. Es la misma
+ *       decision que `ini-parado` y `panel` toman con sus recuentos, y la contraria a la de «Dias de
+ *       custodia» de `tra-veh`, donde la fecha cambia lo que la cifra significa y hay un campo
+ *       suelto para ella.</li>
+ * </ul>
+ */
+const TRA_PANEL: Conector = {
+  clave: ['tra-panel', 'resumen-de-papeletas'],
+  pedir: (senal) => pedirUno<ResumenDePapeletas>(RUTAS.resumenDePapeletas, senal),
+  repartir: (resumen: ResumenDePapeletas): Reparto => {
+    // Ver el javadoc: un rango de un ano natural agrupado por ANO da exactamente un grupo. Se
+    // COMPRUEBA, porque leer la primera de varias pondria las cuentas de un trozo del periodo bajo
+    // rotulos que hablan del ejercicio entero.
+    const delEjercicio = resumen.lineas.length === 1 ? resumen.lineas[0] : undefined;
+    const valores = new Map<Coordenada, string>([
+      // El ejercicio que la respuesta dice haber contado, y no el que toco por omision.
+      [coordenada(0, 0), resumen.desde.slice(0, 4)],
+      // El total, calculado en el servidor. No se suman las lineas aqui.
+      [coordenada(0, 1), String(resumen.papeletas)],
+    ]);
+    const noPublicados = new Map<Coordenada, string>([
+      // «Notificadas»: ningun codigo de produccion escribe `NOTIFICADA`. Ver el javadoc.
+      [coordenada(0, 2), NO_PUBLICADO],
+      // «Caducadas sin notificar»: no es un estado, y el plazo no lo publica nadie.
+      [coordenada(0, 4), NO_PUBLICADO],
+    ]);
+    if (delEjercicio === undefined) {
+      noPublicados.set(coordenada(0, 3), NO_PUBLICADO);
+      noPublicados.set(coordenada(0, 5), NO_PUBLICADO);
+    } else {
+      valores.set(coordenada(0, 3), String(delEjercicio.pagadas));
+      valores.set(coordenada(0, 5), String(delEjercicio.enCoactiva));
+    }
+    // Esta hoja no tiene tabla: su bloque son seis campos.
+    return { valores, filas: new Map(), noPublicados };
+  },
 };
 
 /**
@@ -421,14 +560,15 @@ const TRA_VEH: Conector = {
 };
 
 /**
- * Las dos hojas de Transito que piden de verdad. Se montan de **una linea** en `CONECTORES`.
+ * Las TRES hojas de Transito que piden de verdad. Se montan de **una linea** en `CONECTORES`.
  *
- * Son dos de cuatro: `tra-panel` y `tra-cua` se quedan fuera, y su motivo esta arriba.
+ * Son tres de cuatro: la que se queda fuera es `tra-cua`, y su motivo esta arriba.
  */
 export const CONECTORES_DE_TRANSITO = {
+  'tra-panel': TRA_PANEL,
   'tra-pap': TRA_PAP,
   'tra-veh': TRA_VEH,
 } as const;
 
-export { TRA_PAP, TRA_VEH, SIN_PLACA };
+export { TRA_PANEL, TRA_PAP, TRA_VEH, SIN_PLACA };
 export type { LoDeTraVeh };

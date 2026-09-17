@@ -394,6 +394,40 @@ export interface OperacionServida {
  * datos seria presentar un descargo en nombre de alguien para pintar una pantalla, y ademas sus
  * filas ya salen por `.../actos`, que publica `descargos[]`—; la segunda contesta <b>`"archivo"`</b>
  * y no un JSON con campos. Esta interfaz hace UNA escritura, y no es ninguna de las dos.
+ *
+ * <h2>Y la QUINTA de Transito (#184): el resumen que ya estaba publicado y no consumia nadie</h2>
+ *
+ * <p><b>`GET /transito/reportes/resumen-papeletas`</b> — el agregado de papeletas por grupo, con el
+ * total del ejercicio y una linea por grupo de doce campos. Es una de las <b>diez</b> rutas bajo
+ * `/transito/reportes/` que el contrato publica y que ninguna pantalla nombraba: el backend iba por
+ * delante de la interfaz, y lo que faltaba era medir cual de ellas dibuja este panel.
+ *
+ * <p><b>Se midieron las cuatro `resumen-*` contra los cinco recuentos de `tra-panel`, y solo esta
+ * sirve</b>:
+ *
+ * <ul>
+ *   <li><b>`resumen-por-codigo`</b> y <b>`resumen-por-placa`</b> publican <b>la misma forma</b>
+ *       agrupada por otra cosa —el codigo de infraccion y las dos iniciales de la placa—. No
+ *       aportan ni un campo que esta no tenga, y lo que traen viene repartido por una dimension
+ *       que este panel no dibuja. Ademas <b>ninguna hoja del artboard las ensena</b>: sus pantallas
+ *       son opciones del catalogo (`transito_resumen_codigo`, `transito_resumen_placa`) y RentasV8
+ *       tiene cuatro hojas de Transito, ninguna de las dos.</li>
+ *   <li><b>`resumen-recaudacion`</b> publica <b>importes del libro</b> —lo cobrado por mes y fase—
+ *       y `tra-panel` no dibuja ni un importe: sus cinco campos son recuentos de papeletas. Y su
+ *       `abonos` <b>no es «papeletas pagadas»</b>: el propio `RecaudacionDeMultasResource` lo deja
+ *       escrito —«una papeleta se puede pagar en varios abonos y un recibo puede abonar varias
+ *       papeletas»—, asi que usarlo para «Canceladas» seria exactamente la cifra parecida-y-distinta
+ *       que ese controlador entero existe para evitar.</li>
+ * </ul>
+ *
+ * <p>Con la que se enciende, `tra-panel` llena <b>tres</b> de sus cinco recuentos y su desplegable
+ * de ejercicio; los otros dos dicen «no publicado» y <b>nombran lo que le falta al backend</b>. El
+ * reparto campo a campo, y los dos huecos con su causa, en `conectores/transito.ts`.
+ *
+ * <p><b>Las otras seis de `/transito/reportes/` siguen fuera</b> —`padron`, `padron-coactiva`,
+ * `padron-constancias`, `record-conductor`, `record-vehicular` y el `POST` del emisor—: son de las
+ * hojas que las ensenan, y las dos de record ademas <b>exigen sujeto</b> —sin licencia, documento o
+ * placa contestan 422, «esto seria el padron entero con otro titulo»—.
  */
 export const YA_SERVIDAS: readonly OperacionServida[] = [
   { metodo: 'GET', ruta: '/seguridad/sesion' },
@@ -428,6 +462,7 @@ export const YA_SERVIDAS: readonly OperacionServida[] = [
   { metodo: 'GET', ruta: '/transito/papeletas/{numero}/actos' },
   { metodo: 'GET', ruta: '/transito/internamientos' },
   { metodo: 'GET', ruta: '/rentas/vehiculos/{placa}' },
+  { metodo: 'GET', ruta: '/transito/reportes/resumen-papeletas' },
 ];
 
 /** `/rentas/vehiculos/{placa}` → `^/rentas/vehiculos/[^/]+$`. */

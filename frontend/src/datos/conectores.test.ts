@@ -19,7 +19,7 @@ import type {
   Paginado,
   PrescripcionDeclarada,
   MovimientoDeLaBitacora,
-  ProcesoDelExpediente, IndicadorDeRecaudacion, TrabajoParado, VehiculoServido } from './lecturas.ts';
+  ProcesoDelExpediente, IndicadorDeRecaudacion, ResumenDePapeletas, TrabajoParado, VehiculoServido } from './lecturas.ts';
 
 /**
  * **Lo que cada pantalla conectada saca de su respuesta** (#97).
@@ -315,6 +315,38 @@ const LO_DE_TRA_VEH: readonly [
   paginaDeDeposito([internado()], 1),
 ];
 
+/**
+ * Lo que `tra-panel` recibe: el resumen del ejercicio en curso, agrupado por ano (#184).
+ *
+ * **Una sola linea, y no es casualidad**: se pide `?agrupadoPor=ANO` sin rango, o sea del 1 de
+ * enero al 31 de diciembre, y un ano natural agrupado por ano da exactamente un grupo. El conector
+ * lo comprueba; el caso de varias lineas vive en `conectores/transito.test.tsx`.
+ */
+const RESUMEN_DE_PAPELETAS: ResumenDePapeletas = {
+  agrupadoPor: 'ANO',
+  desde: '2026-01-01',
+  hasta: '2026-12-31',
+  papeletas: 8412,
+  importeTotal: '1542880.00',
+  actualizadoA: '2026-09-17',
+  lineas: [
+    {
+      clave: '2026',
+      descripcion: null,
+      ano: 2026,
+      cantidad: 8412,
+      importe: '1542880.00',
+      pagadas: 2118,
+      importeDeLasPagadas: '388440.00',
+      pendientes: 6294,
+      importeDeLasPendientes: '1154440.00',
+      enCoactiva: 388,
+      importeEnCoactiva: '71148.00',
+      actualizadoA: '2026-09-17',
+    },
+  ],
+};
+
 const MUESTRAS: Readonly<Partial<Record<ClaveDeHoja, unknown>>> = {
   panel: CORRIDA,
   'coa-panel': PAGINA,
@@ -333,6 +365,7 @@ const MUESTRAS: Readonly<Partial<Record<ClaveDeHoja, unknown>>> = {
   'fis-prog': MUESTRA,
   'fis-actas': ACTA_CON_USO,
   'fis-res': RESOLUCION_SIN_CIFRAS,
+  'tra-panel': RESUMEN_DE_PAPELETAS,
   'tra-pap': EXPEDIENTE_DE_PAPELETA,
   'tra-veh': LO_DE_TRA_VEH,
 };
@@ -345,7 +378,7 @@ function soloLecturaDe(clave: ClaveDeHoja): readonly string[] {
 }
 
 describe('los conectores', () => {
-  it('EL CENTINELA: estan los diecisiete que estan, y no cero ni cuarenta', () => {
+  it('EL CENTINELA: estan los dieciocho que estan, y no cero ni cuarenta', () => {
     // Cero dejaria todo lo de abajo sin sujeto. Cuarenta significaria que alguien conecto
     // pantallas cuyas operaciones no publican lo que ensenan, que es lo que este archivo evita.
     // La lista se escribe a mano y crece de una en una: conectar una pantalla es una decision, y
@@ -364,6 +397,12 @@ describe('los conectores', () => {
     // Las dos de Transito llegan con #180, y `tra-veh` es la primera cuyo sujeto es una PLACA y
     // viaja en la RUTA de la operacion (`/rentas/vehiculos/{placa}`) y no en su cadena de
     // consulta; su medida —que publica cada operacion y que no— esta en `conectores/transito.ts`.
+    //
+    // `tra-panel` llega con #184, sobre una ruta que YA estaba publicada y que no consumia nadie
+    // —una de las diez de `/transito/reportes/`—. Es la primera hoja cuyo reparto depende de la
+    // FORMA de la respuesta y no solo de sus campos: pide `?agrupadoPor=ANO` sin rango, o sea el
+    // ejercicio en curso, y de ahi sale UNA linea; si llegaran mas, dos de sus campos dicen «no
+    // publicado» en vez de leer la primera. Su medida esta en `conectores/transito.ts`.
     expect(Object.keys(CONECTORES).sort()).toEqual(
       [
         'aut-cat', 'aut-tram', 'coa-cost', 'coa-exp', 'coa-panel',
@@ -371,7 +410,7 @@ describe('los conectores', () => {
         'fis-actas', 'fis-prog', 'fis-res',
         'ini-flujo', 'ini-panel', 'ini-parado', 'panel',
         'seg-aud',
-        'tra-pap', 'tra-veh',
+        'tra-panel', 'tra-pap', 'tra-veh',
       ].sort(),
     );
   });
