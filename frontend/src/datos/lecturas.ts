@@ -1455,6 +1455,15 @@ export const RUTAS = {
    *
    * El dia que la pantalla tenga su caja de busqueda, lo que cambia es esta ruta: el criterio
    * tambien esta publicado (`nroDeExpediente`, `codContribuyente`, `ejecutor`, `estado`).
+   *
+   * <h2>Y NO pagina, que es lo que #228 midio y dejo escrito</h2>
+   *
+   * La tabla de esta hoja son los ACTOS de un expediente, **no una relacion**, y este `?tamano=1` sirve para elegir
+   * CUAL se dibuja: paginar esta lectura **no paginaria esa tabla**. Asi que lo que le falta no
+   * son los mandos —que #186 dejo instalados y que `fis-prog` estrena en #228— sino el
+   * **selector**, y un selector es un filtro: `kamayuk-lib`#94 —el interprete guarda lo tecleado
+   * en el estado de `<Pantalla>` y no lo publica por ningun lado— y #172. Escrito aqui para que no
+   * haya que volver a medirlo.
    */
   expedientesCoactivos: '/coactiva/expedientes?tamano=1',
   /**
@@ -1465,7 +1474,18 @@ export const RUTAS = {
    */
   procesoDelExpediente: (numero: string) =>
     `/coactiva/expedientes/${encodeURIComponent(numero)}/proceso`,
-  /** La primera liquidacion de costas de la relacion. `tamano` esta publicado, como arriba. */
+  /**
+   * La primera liquidacion de costas de la relacion. `tamano` esta publicado, como arriba.
+   *
+   * <h2>Y NO pagina, que es lo que #228 midio y dejo escrito</h2>
+   *
+   * La tabla de esta hoja son las LINEAS de una liquidacion, **no una relacion**, y este `?tamano=1` sirve para elegir
+   * CUAL se dibuja: paginar esta lectura **no paginaria esa tabla**. Asi que lo que le falta no
+   * son los mandos —que #186 dejo instalados y que `fis-prog` estrena en #228— sino el
+   * **selector**, y un selector es un filtro: `kamayuk-lib`#94 —el interprete guarda lo tecleado
+   * en el estado de `<Pantalla>` y no lo publica por ningun lado— y #172. Escrito aqui para que no
+   * haya que volver a medirlo.
+   */
   liquidacionesDeCostas: '/coactiva/liquidaciones-costas?tamano=1',
   /**
    * **Las liquidaciones de costas de UN expediente** (#200).
@@ -1519,8 +1539,18 @@ export const RUTAS = {
    * `{id}` es el identificador **interno** del programa y sale de la relacion de arriba. No se
    * inventa: con uno que no exista el backend contesta 404, que no es lo mismo que la pagina
    * vacia con que contesta un programa sin muestra sorteada.
+   *
+   * <h2>Y desde #228 la ventana entra por parametro</h2>
+   *
+   * Es la unica de las seis tablas que #228 midio que **si es una relacion paginada**, y la unica
+   * que tenia sintoma: desde #172 su encabezado dice «2 de 84» y no habia forma de ver los otros
+   * 82. `pagina`, `tamano`, `ordenarPor` y `direccion` estan entre los cinco opcionales que
+   * `parametros-de-la-api.json` publica para esta operacion, y el tamano **no se escribe aqui**
+   * sino que sale de `paginacion.tamano` de su tabla (ver `datos/laVentana.ts`): en dos sitios
+   * diverge, y entonces los mandos cuentan paginas de cien sobre respuestas de veinte.
    */
-  muestraDelPrograma: (id: number) => `/fiscalizacion/programas/${String(id)}/muestra`,
+  muestraDelPrograma: (id: number, ventana: Readonly<Record<string, string>> = {}) =>
+    conParametros(`/fiscalizacion/programas/${String(id)}/muestra`, ventana),
   /**
    * La primera acta de inspeccion de la relacion (#179).
    *
@@ -1530,6 +1560,15 @@ export const RUTAS = {
    * **Sin `?programa=`**, que es el unico filtro que la operacion admite: acotarla a un programa
    * exige haberlo elegido, y elegir uno aqui seria decidir por quien atiende cual de las
    * inspecciones se mira.
+   *
+   * <h2>Y NO pagina, que es lo que #228 midio y dejo escrito</h2>
+   *
+   * La tabla de esta hoja son las MAGNITUDES de un acta, **no una relacion**, y este `?tamano=1` sirve para elegir
+   * CUAL se dibuja: paginar esta lectura **no paginaria esa tabla**. Asi que lo que le falta no
+   * son los mandos —que #186 dejo instalados y que `fis-prog` estrena en #228— sino el
+   * **selector**, y un selector es un filtro: `kamayuk-lib`#94 —el interprete guarda lo tecleado
+   * en el estado de `<Pantalla>` y no lo publica por ningun lado— y #172. Escrito aqui para que no
+   * haya que volver a medirlo.
    */
   actasDeFiscalizacion: '/fiscalizacion/actas?tamano=1',
   /**
@@ -1623,6 +1662,15 @@ export const RUTAS = {
    * concreto». El dia que la pantalla sepa pasarle lo tecleado a su conector, lo que cambia es
    * esta linea: los seis criterios estan publicados en `parametros-de-la-api.json`
    * —`nroPapeleta`, `placa`, `documentoDelInfractor`, `desde`, `hasta` y `estado`—.
+   *
+   * <h2>Y NO pagina, que es lo que #228 midio y dejo escrito</h2>
+   *
+   * La tabla de esta hoja son los ACTOS de una papeleta, **no una relacion**, y este `?tamano=1` sirve para elegir
+   * CUAL se dibuja: paginar esta lectura **no paginaria esa tabla**. Asi que lo que le falta no
+   * son los mandos —que #186 dejo instalados y que `fis-prog` estrena en #228— sino el
+   * **selector**, y un selector es un filtro: `kamayuk-lib`#94 —el interprete guarda lo tecleado
+   * en el estado de `<Pantalla>` y no lo publica por ningun lado— y #172. Escrito aqui para que no
+   * haya que volver a medirlo.
    */
   papeletas: '/transito/papeletas?tamano=1',
   /**

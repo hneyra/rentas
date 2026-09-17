@@ -256,6 +256,11 @@ const ORDEN_DEL_BACKEND: Readonly<
     constante: 'ORDEN_AUDITORIA',
     controlador: 'kamayuk-rentas-seguridad/src/main/java/kamayuk/rentas/seguridad/infraestructura/web/SesionController.java',
   },
+  'GET /fiscalizacion/programas/{id}/muestra': {
+    repositorio: 'kamayuk-rentas-fiscalizacion/src/main/java/kamayuk/rentas/fiscalizacion/infraestructura/MuestraDelProgramaRepositoryJdbc.java',
+    constante: 'ORDEN',
+    controlador: 'kamayuk-rentas-fiscalizacion/src/main/java/kamayuk/rentas/fiscalizacion/infraestructura/web/MuestraController.java',
+  },
   'GET /transito/internamientos': {
     repositorio: 'kamayuk-rentas-sanciones/src/main/java/kamayuk/rentas/sanciones/infraestructura/InternamientoRepositoryJdbc.java',
     constante: 'ORDEN',
@@ -267,7 +272,30 @@ const ORDEN_DEL_BACKEND: Readonly<
 const aCamelCase = (columna: string): string =>
   columna.replace(/_([a-z0-9])/g, (_todo, letra: string) => letra.toUpperCase());
 
-/** Los campos que esa operacion admite en `?ordenarPor=`, leidos de su repositorio. */
+/**
+ * **Los campos que esa operacion admite en `?ordenarPor=`, leidos de su repositorio.**
+ *
+ * <h2>Se lee la CADENA entera, y no solo `sobre(...)` — es el hallazgo de #228</h2>
+ *
+ * Hasta este issue esto leia los argumentos de `OrdenSeguro.sobre(...)` y anadia su `camelCase`.
+ * Eso era la lista blanca de `OrdenSeguro` **hasta #546**, que le anadio `publicandoComo(campo,
+ * columna)`: declara con que nombre publica el RECURSO una columna cuyo `camelCase` no es el campo
+ * que sale por HTTP, y **retira el `camelCase` automatico de esa columna** —dejarlo dejaria los dos
+ * nombres vivos, que era el defecto de partida—.
+ *
+ * O sea que con la lectura vieja esta guarda se equivocaba **en las dos direcciones a la vez** sobre
+ * toda operacion que lo use: daba por bueno el nombre que el backend RECHAZA y por malo el que
+ * ADMITE. Medido con la muestra de `fis-prog`, que es la primera que llega aqui con
+ * `publicandoComo("sector", "sector_codigo")`: ofrecer `?ordenarPor=sectorCodigo` pasaba en
+ * **verde**, y `OrdenDeLaDeteccionFronteraTest` del backend prueba del otro lado que eso es un
+ * **422** —«sectorCodigo es el camelCase automatico que publicandoComo retira, y es el nombre que
+ * ninguna fila lleva»—. Un desplegable que se mueve y rompe la tabla, con la guarda en verde.
+ *
+ * `desempatandoPor` y `conNulosAlFinal` **no cambian la lista** —el primero anade una columna de
+ * desempate que el cliente no pide y el segundo declara anulable una ya declarada—, asi que no se
+ * leen: lo que hace falta es no confundirlos con `publicandoComo`, y por eso se lee la cadena hasta
+ * el `;` y se buscan las llamadas por su nombre en vez de contar parentesis.
+ */
 function camposAdmitidos(operacion: string): readonly string[] {
   const donde = ORDEN_DEL_BACKEND[operacion];
   if (donde === undefined) {
@@ -278,19 +306,32 @@ function camposAdmitidos(operacion: string): readonly string[] {
     );
   }
   const fuente = readFileSync(join(BACKEND, donde.repositorio), 'utf8');
-  const casado = new RegExp(
-    `OrdenSeguro\\s+${donde.constante}\\s*=\\s*[\\s\\n]*OrdenSeguro\\.sobre\\(([^;]*?)\\)`,
-    's',
-  ).exec(fuente);
-  if (casado?.[1] === undefined) {
+  // La declaracion ENTERA, hasta su `;`: `sobre(...)` y lo que se le encadene detras.
+  const declaracion = new RegExp(`OrdenSeguro\\s+${donde.constante}\\s*=\\s*([^;]*);`, 's').exec(
+    fuente,
+  )?.[1];
+  const sobre = declaracion === undefined ? null : /OrdenSeguro\.sobre\(([^)]*)\)/s.exec(declaracion);
+  if (declaracion === undefined || sobre?.[1] === undefined) {
     throw new Error(
       `No se encontro «${donde.constante} = OrdenSeguro.sobre(...)» en ${donde.repositorio}.\n` +
         '  O la constante cambio de nombre, o el orden dejo de ir por lista blanca. Las dos cosas\n' +
         '  hay que mirarlas: esta guarda no puede pasar en verde sin haber leido nada.',
     );
   }
-  const columnas = [...casado[1].matchAll(/"([a-z0-9_]+)"/gi)].map((uno) => uno[1] ?? '');
-  return [...columnas, ...columnas.map(aCamelCase)];
+
+  const columnas = [...sobre[1].matchAll(/"([a-z0-9_]+)"/gi)].map((uno) => uno[1] ?? '');
+  const admitidos = new Set([...columnas, ...columnas.map(aCamelCase)]);
+  // Y lo que `publicandoComo` hace, en el mismo orden que el Java: quita el `camelCase` automatico
+  // de la columna renombrada y pone el nombre que el recurso publica. La columna cruda se queda.
+  for (const renombre of declaracion.matchAll(
+    /\.publicandoComo\(\s*"([^"]+)"\s*,\s*"([^"]+)"\s*\)/gs,
+  )) {
+    const campo = renombre[1] ?? '';
+    const columna = renombre[2] ?? '';
+    admitidos.delete(aCamelCase(columna));
+    admitidos.add(campo);
+  }
+  return [...admitidos];
 }
 
 /** Por que campo ordena esa operacion cuando no se manda `?ordenarPor=`. */
@@ -332,6 +373,29 @@ describe('el orden que se OFRECE lo admite el backend (#186, AC2)', () => {
     for (const { operacion } of queOrdenan) {
       expect(camposAdmitidos(operacion).length, operacion).toBeGreaterThan(1);
     }
+  });
+
+  it('EL CENTINELA DE LA LECTURA: `publicandoComo` se lee, y no se regala el nombre interno', () => {
+    // El caso que #228 midio, y que hasta entonces esta guarda daba por bueno **en verde**:
+    // `MuestraDelProgramaRepositoryJdbc.ORDEN` lleva `.publicandoComo("sector", "sector_codigo")`,
+    // que RETIRA el `camelCase` automatico. Con la lectura vieja —solo los argumentos de
+    // `sobre(...)`— esta guarda admitia `sectorCodigo`, que el backend contesta con **422**
+    // (`OrdenDeLaDeteccionFronteraTest`), y rechazaba `sector`, que es el que SI admite.
+    //
+    // Se afirma sobre una operacion concreta y no «alguna con publicandoComo»: una lista vacia no
+    // contiene ningun campo… ni lo contradice, y esto tiene que poder ponerse rojo.
+    const admitidos = camposAdmitidos('GET /fiscalizacion/programas/{id}/muestra');
+
+    expect(admitidos, 'el nombre que la fila publica').toContain('sector');
+    expect(
+      admitidos,
+      'El lector dejo de honrar `publicandoComo`: «sectorCodigo» es el camelCase automatico que\n' +
+        '  esa llamada RETIRA, y pedirlo es un 422 ORDEN_NO_ADMITIDO. Dos nombres vivos para la\n' +
+        '  misma columna en la misma operacion es el defecto que #546 cerro en el backend.',
+    ).not.toContain('sectorCodigo');
+    // La columna cruda se queda admitida, como dice el javadoc de `publicandoComo`.
+    expect(admitidos).toContain('sector_codigo');
+    expect(admitidos).toContain('codRefCatastral');
   });
 
   it('cada campo que se ofrece esta en la lista blanca de su repositorio', () => {

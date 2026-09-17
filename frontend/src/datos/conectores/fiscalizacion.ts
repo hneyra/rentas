@@ -12,6 +12,7 @@ import type {
 import { RUTAS, pedirPagina, pedirUno } from '../lecturas.ts';
 import type { Conector, Reparto } from '../conectores.ts';
 import { NO_PUBLICADO } from '../conectores.ts';
+import { laVentanaDe, laVentanaQueSePide, loQueDijoElServidor } from '../laVentana.ts';
 
 /**
  * **Las tres hojas de Fiscalizacion, que son de TABLA** (#179).
@@ -168,6 +169,9 @@ function enColumnaDeSoles(importe: string | null): string {
   return importe === null ? SIN_CIFRAR : formatearImporte(importe).replace(LA_MONEDA, '');
 }
 
+/** Las operaciones de este modulo que reciben parametros, escritas una vez (#172). */
+const MUESTRA_DEL_PROGRAMA = 'GET /fiscalizacion/programas/{id}/muestra';
+
 /**
  * `fis-prog` — la muestra sorteada de un programa de fiscalizacion.
  *
@@ -219,15 +223,29 @@ function enColumnaDeSoles(importe: string | null): string {
  *
  * <h2>Sin filtrar, y lo que eso significa aqui</h2>
  *
- * Se dibuja la muestra del **primer** programa de la relacion, ordenada por `codigo`. Los ocho
- * mandos de la pantalla no se mandan: `GET /fiscalizacion/programas` admite `ejercicio` y
- * `nDePrograma` —los dos publicados— y la muestra admite `predio`, y ninguno tiene hoy por donde
- * entrar. El encabezado de la tabla cuenta las filas que llegaron, que es cierto de lo que se ve y
- * no afirma cuantos predios sorteo el programa.
+ * Se dibuja la muestra del **primer** programa de la relacion. Los ocho mandos de la pantalla no se
+ * mandan: `GET /fiscalizacion/programas` admite `ejercicio` y `nDePrograma` —los dos publicados— y
+ * la muestra admite `predio`, y ninguno tiene hoy por donde entrar.
+ *
+ * <h2>Pero desde #228 la ventana SI se mueve, y era el hueco de verdad</h2>
+ *
+ * Desde #172 el encabezado dice **«2 de 84»** —el `totalElementos` que la operacion publica, o sea
+ * cuantos predios sorteo el programa— y la tabla **no declaraba `paginacion`**: nombraba lo que
+ * faltaba y no lo daba, que es honesto y peor que incompleto. Ahora la declara, y este conector lee
+ * la ventana de la ruta de la hoja —`#/fis-prog?pagina=2&ordenarPor=condicion`— con los cuatro
+ * sitios que `laVentanaDe` declara para la operacion de la muestra.
+ *
+ * **La ventana viaja a la MUESTRA y no a la relacion de programas**, que sigue pidiendose con
+ * `?tamano=1`: paginar la relacion cambiaria **cual** programa se dibuja, no que trozo de su
+ * muestra se ve. Son dos lecturas y el mando es de la segunda.
+ *
+ * `hayMas` y `totalPaginas` **los dice el servidor** y viajan por `nombrados`: contar las filas
+ * recibidas diria que no hay pagina siguiente justo cuando el tope se alcanza exacto.
  */
 const FIS_PROG: Conector = {
   clave: ['fis-prog', 'muestra-del-programa'],
-  pedir: async ({ senal }) => {
+  parametros: laVentanaDe(MUESTRA_DEL_PROGRAMA),
+  pedir: async ({ senal, enLaRuta }) => {
     const relacion = await pedirPagina<ProgramaDeFiscalizacion>(
       RUTAS.programasDeFiscalizacion,
       senal,
@@ -236,7 +254,13 @@ const FIS_PROG: Conector = {
     // Sin programa no hay muestra que pedir. `null` es «se pregunto y no hay», que la pantalla
     // dice distinto de un fallo.
     if (primero === undefined) return null;
-    return pedirPagina<FilaDeLaMuestra>(RUTAS.muestraDelPrograma(primero.id), senal);
+    return pedirPagina<FilaDeLaMuestra>(
+      RUTAS.muestraDelPrograma(
+        primero.id,
+        laVentanaQueSePide('fis-prog', 'muestra-del-programa', enLaRuta),
+      ),
+      senal,
+    );
   },
   repartir: (muestra: Paginado<FilaDeLaMuestra>): Reparto => ({
     valores: new Map(),
@@ -261,6 +285,7 @@ const FIS_PROG: Conector = {
         },
       ],
     ]),
+    nombrados: loQueDijoElServidor('muestra-del-programa', muestra),
     noPublicados: new Map(),
   }),
 };

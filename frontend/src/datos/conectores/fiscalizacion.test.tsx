@@ -68,11 +68,14 @@ function arnes() {
 function PantallaConectada({
   clave,
   sujeto = null,
+  parametros = {},
 }: {
   readonly clave: ClaveDeHoja;
   readonly sujeto?: string | null;
+  /** Lo que la hoja lleva en su ruta: la pagina y el orden que el interprete escribe (#228). */
+  readonly parametros?: Readonly<Record<string, string>>;
 }) {
-  return <PantallaDeRentas definicion={pantallaDe(clave)} datos={useDatosDeLaHoja(clave, { sujeto, parametros: {} })} />;
+  return <PantallaDeRentas definicion={pantallaDe(clave)} datos={useDatosDeLaHoja(clave, { sujeto, parametros })} />;
 }
 
 /**
@@ -102,11 +105,13 @@ async function pintar(
   clave: ClaveDeHoja,
   rutas: Readonly<Record<string, unknown>>,
   sujeto: string | null = null,
+  parametros: Readonly<Record<string, string>> = {},
 ) {
   const doble = contestaPorRuta(rutas);
-  const { container } = render(<PantallaConectada clave={clave} sujeto={sujeto} />, {
-    wrapper: arnes(),
-  });
+  const { container } = render(
+    <PantallaConectada clave={clave} sujeto={sujeto} parametros={parametros} />,
+    { wrapper: arnes() },
+  );
   await waitFor(() => {
     expect(screen.queryByText(/pidiendo/i)).toBeNull();
   });
@@ -241,6 +246,66 @@ describe('`fis-prog` — la muestra sorteada de un programa', () => {
       false,
     );
     expect(container.textContent).toContain('sin datos');
+  });
+
+  it('LA VENTANA viaja a la MUESTRA y no a la relacion de programas (#228)', async () => {
+    const { doble } = await pintar('fis-prog', RUTAS_DE_PROG, null, {
+      pagina: '2',
+      ordenarPor: 'condicion',
+      direccion: 'DESCENDENTE',
+    });
+    const urls = doble.mock.calls.map((llamada) => String(llamada[0]));
+
+    // La relacion sigue con `?tamano=1`: paginarla cambiaria CUAL programa se dibuja, no que
+    // trozo de su muestra se ve. Son dos lecturas, y el mando es de la segunda.
+    expect(urls[0]).toBe('/rentas/api/v1/fiscalizacion/programas?tamano=1');
+    expect(urls[0]).not.toContain('pagina=');
+    // Y el tamano NO esta escrito en la ruta: sale de `paginacion.tamano` de su tabla.
+    expect(urls[1]).toContain('/fiscalizacion/programas/14/muestra?tamano=20');
+    expect(urls[1]).toContain('pagina=2');
+    expect(urls[1]).toContain('ordenarPor=condicion');
+    expect(urls[1]).toContain('direccion=DESCENDENTE');
+  });
+
+  it('un `ordenarPor` que la definicion NO ofrece no viaja: lo escribio quien pasaba por ahi', async () => {
+    // La ruta la teclea cualquiera, y `sectorCodigo` es justamente el nombre que
+    // `OrdenSeguro.publicandoComo` RETIRA: reenviarlo seria un 422 dicho como averia de la
+    // pantalla. Sin campo admitido ordena el backend por el suyo, que es lo que la barra anuncia.
+    const { doble } = await pintar('fis-prog', RUTAS_DE_PROG, null, {
+      ordenarPor: 'sectorCodigo',
+      direccion: 'DESCENDENTE',
+    });
+    const muestra = doble.mock.calls.map((l) => String(l[0])).find((u) => u.includes('/muestra'));
+
+    expect(muestra).not.toContain('ordenarPor');
+    // Y el sentido tampoco: solo acompana a un campo admitido.
+    expect(muestra).not.toContain('direccion');
+  });
+
+  it('`hayMas` y `paginas` los dice el SERVIDOR, y no se cuentan las filas recibidas', () => {
+    // El caso que importa: dos filas de una muestra de 84, y el envoltorio dice que hay mas.
+    // Contando las dos que llegaron, «Siguiente» saldria impedido sobre 82 predios sin mirar.
+    const conMas = { ...MUESTRA, totalElementos: 84, totalPaginas: 42, hayMas: true };
+    const nombrados = FIS_PROG.repartir(conMas as never).nombrados;
+
+    expect(nombrados?.get('muestra-del-programa.hayMas')).toBe(true);
+    expect(nombrados?.get('muestra-del-programa.paginas')).toBe('42');
+    expect(FIS_PROG.repartir(conMas as never).tablas?.get('muestra-del-programa')?.totalElementos)
+      .toBe(84);
+  });
+
+  it('y declara los CUATRO sitios de la ventana, para la operacion de la muestra', () => {
+    // Sin esto el marco tira con aviso lo que el destino no declara: el mando escribiria
+    // `?pagina=2`, el conector no lo veria y la tabla dibujaria la pagina 0 con el rotulo de la 3.
+    expect(FIS_PROG.parametros?.map((p) => p.nombre)).toEqual([
+      'pagina',
+      'tamano',
+      'ordenarPor',
+      'direccion',
+    ]);
+    expect(new Set(FIS_PROG.parametros?.map((p) => p.operacion))).toEqual(
+      new Set(['GET /fiscalizacion/programas/{id}/muestra']),
+    );
   });
 
   it('LA ROTURA DEL AC3: con otra muestra, la pantalla ensena otra cosa', async () => {
