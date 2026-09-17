@@ -70,6 +70,13 @@ function deLasPantallas(): readonly string[] {
         salida.push(tabla.sinDato.texto);
         if (tabla.sinDato.nota !== undefined) salida.push(tabla.sinDato.nota);
       }
+      // Los rotulos de los campos por los que se ordena son FRASES —el interprete los pasa por
+      // `resolverTexto`, o sea por `traducir`— y salen en el desplegable de la barra de la tabla
+      // (#186). Lo que NO entra es `campo.valor`: eso viaja al servidor, y cambiar de idioma no
+      // puede cambiar lo que se pide.
+      if (tabla.orden !== undefined) {
+        salida.push(...tabla.orden.campos.map((campo) => campo.rotulo));
+      }
     }
   }
   return salida;

@@ -2,7 +2,13 @@ import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { TextosDelArmazon } from '@kamayuk/shell';
-import { TEXTOS_DE_LA_UI, TEXTOS_DEL_INTERPRETE, type TextosDelInterprete } from '@kamayuk/ui';
+import {
+  TEXTOS_DE_LA_UI,
+  TEXTOS_DE_LAS_PIEZAS,
+  TEXTOS_DEL_INTERPRETE,
+  type TextosDeLasPiezas,
+  type TextosDelInterprete,
+} from '@kamayuk/ui';
 
 /**
  * **Las palabras que el MARCO dice por su cuenta, traducidas por este sistema** (#133).
@@ -132,9 +138,95 @@ export const FRASES_DEL_INTERPRETE = {
   registros: '{{count}} registro',
 } as const satisfies Record<keyof TextosDelInterprete, string>;
 
+/**
+ * **Las palabras de los MANDOS de una tabla, y la del conteo con total** (#186, #187).
+ *
+ * <h2>Por que hacen falta el dia que una tabla pagina, y no antes</h2>
+ *
+ * `<Pantalla textos>` recibe `Partial<TextosDeLaPantalla>`, o sea que lo que este sistema no pasa
+ * lo pone la libreria por omision — **en castellano**. Mientras ninguna tabla declaraba
+ * `paginacion` ni `orden`, ninguna de estas palabras llegaba al DOM y no faltaba ninguna. Con la
+ * primera tabla paginada llegan las dieciseis de golpe: «Anterior», «Siguiente», «Pagina 3 de
+ * 4 210», el motivo del mando impedido y los dos nombres accesibles de los desplegables.
+ *
+ * Sin pasarlas, la pantalla saldria **a medias** en un segundo idioma —el cuerpo traducido y los
+ * mandos de la tabla en castellano—, que es exactamente el defecto que #133 cerro para el armazon.
+ * Y no lo veria la guarda de cobertura mas que si monta una tabla CON mandos, que es lo que
+ * `los-mandos-de-la-tabla-hablan-el-idioma-de-la-sesion` hace.
+ *
+ * <h2>Por que es un saco aparte y no mas claves en `FRASES_DEL_INTERPRETE`</h2>
+ *
+ * Porque aquel es `satisfies Record<keyof TextosDelInterprete, string>` y `TextosDelInterprete`
+ * son **tres**: una cuarta clave no compila. Los mandos viven en `TextosDeLasPiezas`, que es el
+ * saco hermano, y de el se toma **solo lo que se dibuja**: las demas piezas de #44 y #66 —lecturas,
+ * actos, acciones— este sistema no las usa, y prometer su traduccion seria inventario que nadie
+ * reclama.
+ */
+export const FRASES_DE_LAS_TABLAS = {
+  paginaAnterior: 'Anterior',
+  paginaSiguiente: 'Siguiente',
+  pagina: 'Pagina {{pagina}}',
+  paginaDe: 'Pagina {{pagina}} de {{paginas}}',
+  yaEsLaPrimeraPagina: 'Esta es la primera pagina: no hay ninguna antes.',
+  noHayMasPaginas: 'No hay ninguna pagina despues de esta.',
+  filasPorPagina: 'Cuantas filas por pagina',
+  ordenarLaLista: 'Ordenar la lista',
+  pasarAAscendente: 'Ordenar de menor a mayor',
+  pasarADescendente: 'Ordenar de mayor a menor',
+  mandosDeLaTabla: 'Mandos de «{{tabla}}»',
+  // Las dos flechas del sentido entran por el saco **aunque sean signos y no palabras**, y no es
+  // celo: la libreria lo dice en su propio javadoc —«es un signo, y entra por el saco igual: hay
+  // escrituras que lo giran»— y ademas la guarda de cobertura las ve llegar al DOM sin `t()`. En
+  // castellano se traducen a si mismas; en una escritura de derecha a izquierda, no.
+  flechaAscendente: TEXTOS_DE_LAS_PIEZAS.flechaAscendente,
+  flechaDescendente: TEXTOS_DE_LAS_PIEZAS.flechaDescendente,
+  celdaSinDato: TEXTOS_DE_LAS_PIEZAS.celdaSinDato,
+  porQueLaCeldaNoTieneDato: 'Aqui no hay dato, y no es un cero.',
+  tablaSinMotivo: 'Esta lista no tiene filas, y la definicion de la pantalla no dice por que.',
+} as const satisfies Record<keyof LasQueSeDibujan, string>;
+
+/**
+ * Las de `TextosDeLasPiezas` que este sistema **si** dibuja. Derivado del tipo de la libreria: el
+ * dia que una cambie de nombre, esto deja de compilar en vez de dejar una clave huerfana.
+ */
+type LasQueSeDibujan = Pick<
+  TextosDeLasPiezas,
+  | 'paginaAnterior'
+  | 'paginaSiguiente'
+  | 'pagina'
+  | 'paginaDe'
+  | 'yaEsLaPrimeraPagina'
+  | 'noHayMasPaginas'
+  | 'filasPorPagina'
+  | 'ordenarLaLista'
+  | 'pasarAAscendente'
+  | 'pasarADescendente'
+  | 'mandosDeLaTabla'
+  | 'flechaAscendente'
+  | 'flechaDescendente'
+  | 'celdaSinDato'
+  | 'porQueLaCeldaNoTieneDato'
+  | 'tablaSinMotivo'
+>;
+
+/**
+ * **«20 de 1 842»: el conteo de una tabla que sabe su total publicado** (#172, AC2).
+ *
+ * Esta frase vive aqui y no en el conector porque el conector es **dato** y no tiene `t()`
+ * delante: escrita alli, el «de» llegaria al DOM en castellano en cualquier idioma (#103). Lo que
+ * el conector entrega es el numero —`TablaRepartida.total`—, y la frase la arma
+ * `useDatosDeLaHoja`, que es un gancho.
+ */
+export const FRASE_DEL_CONTEO = '{{cuantos}} de {{total}}';
+
 /** Todo lo que este archivo aporta al inventario del locale. Ver `catalogo-de-claves.ts`. */
 export function clavesDelMarco(): readonly string[] {
-  return [...Object.values(FRASES_DEL_MARCO), ...Object.values(FRASES_DEL_INTERPRETE)];
+  return [
+    ...Object.values(FRASES_DEL_MARCO),
+    ...Object.values(FRASES_DEL_INTERPRETE),
+    ...Object.values(FRASES_DE_LAS_TABLAS),
+    FRASE_DEL_CONTEO,
+  ];
 }
 
 /**
@@ -143,14 +235,33 @@ export function clavesDelMarco(): readonly string[] {
  * Memorizado sobre `t`, por lo mismo que el del armazon: cambia de identidad cuando cambia el
  * idioma, que es exactamente cuando el saco tiene que rehacerse.
  */
-export function useTextosDelInterprete(): TextosDelInterprete {
+export function useTextosDelInterprete(): TextosDelInterprete & LasQueSeDibujan {
   const { t } = useTranslation();
 
-  return useMemo<TextosDelInterprete>(
+  return useMemo<TextosDelInterprete & LasQueSeDibujan>(
     () => ({
       opcional: t(FRASES_DEL_INTERPRETE.opcional),
       marcadorDeFecha: t(FRASES_DEL_INTERPRETE.marcadorDeFecha),
       registros: (cuantos) => t(FRASES_DEL_INTERPRETE.registros, { count: cuantos }),
+
+      // Los mandos de una tabla (#186). Las cifras entran por interpolacion y no concatenadas:
+      // en otro idioma «Pagina 3 de 4 210» pone el numero en otro sitio.
+      paginaAnterior: t(FRASES_DE_LAS_TABLAS.paginaAnterior),
+      paginaSiguiente: t(FRASES_DE_LAS_TABLAS.paginaSiguiente),
+      pagina: (pagina) => t(FRASES_DE_LAS_TABLAS.pagina, { pagina }),
+      paginaDe: (pagina, paginas) => t(FRASES_DE_LAS_TABLAS.paginaDe, { pagina, paginas }),
+      yaEsLaPrimeraPagina: t(FRASES_DE_LAS_TABLAS.yaEsLaPrimeraPagina),
+      noHayMasPaginas: t(FRASES_DE_LAS_TABLAS.noHayMasPaginas),
+      filasPorPagina: t(FRASES_DE_LAS_TABLAS.filasPorPagina),
+      ordenarLaLista: t(FRASES_DE_LAS_TABLAS.ordenarLaLista),
+      pasarAAscendente: t(FRASES_DE_LAS_TABLAS.pasarAAscendente),
+      pasarADescendente: t(FRASES_DE_LAS_TABLAS.pasarADescendente),
+      mandosDeLaTabla: (tabla) => t(FRASES_DE_LAS_TABLAS.mandosDeLaTabla, { tabla }),
+      flechaAscendente: t(FRASES_DE_LAS_TABLAS.flechaAscendente),
+      flechaDescendente: t(FRASES_DE_LAS_TABLAS.flechaDescendente),
+      celdaSinDato: t(FRASES_DE_LAS_TABLAS.celdaSinDato),
+      porQueLaCeldaNoTieneDato: t(FRASES_DE_LAS_TABLAS.porQueLaCeldaNoTieneDato),
+      tablaSinMotivo: t(FRASES_DE_LAS_TABLAS.tablaSinMotivo),
     }),
     [t],
   );

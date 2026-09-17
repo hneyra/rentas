@@ -1,4 +1,4 @@
-import { coordenada } from '@kamayuk/ui';
+import { coordenada, type CeldaDeLaTabla } from '@kamayuk/ui';
 
 import { formatearImporte } from '../../dominio/formato.ts';
 import type {
@@ -70,7 +70,8 @@ import { NO_PUBLICADO } from '../conectores.ts';
  *
  * Asi que aqui hay **dos palabras distintas y no una**, y la diferencia importa:
  *
- *   · **`—`** (`SIN_DATO`) — la operacion **no tiene ese campo**. Se cierra publicandolo.
+ *   · **la celda sin dato** (`sinDato`) — la operacion **no tiene ese campo**. Se cierra
+ *     publicandolo, y **desde #195 la celda dice cual de los motivos es el suyo**.
  *   · **«sin cifrar»** (`SIN_CIFRAR`) — la operacion tiene el campo y lo contesto **vacio**. Se
  *     cierra cerrando D-02a, que es una decision de negocio y no de backend.
  *
@@ -91,32 +92,65 @@ import { NO_PUBLICADO } from '../conectores.ts';
  */
 
 /**
- * Lo que va en una celda cuya columna la operacion **no publica**. Es la raya del artboard.
+ * **Una celda que llego sin dato, con el motivo dentro** (`kamayuk-lib`#87, #195).
+ *
+ * Era `SIN_DATO = '—'`, una raya escrita como cualquier otra cadena, y la raya **sigue siendo lo
+ * que se ve**: la declara cada tabla en su `sinDato`. Lo que cambia es que la celda dice **por
+ * que**, anunciado con `title`. Aqui eso vale doble, porque en este modulo las celdas vacias
+ * tienen **cinco motivos distintos** y la raya decia lo mismo de los cinco: quien mira la pantalla
+ * no podia distinguir «esto no lo publica nadie» de «esto es una resta que no se hace aqui».
+ *
+ * `texto: null` es «aqui no hay dato»: nunca `''` y **nunca un `0`**, que en una columna de
+ * diferencias se leeria como «no hay diferencia».
  *
  * Escrita aqui y no importada de `conectores/coactiva.ts`, que tiene la misma: un conector no
  * depende de otro modulo para una palabra. Que las dos digan lo mismo lo sujeta una prueba, que es
  * mas barato que el acoplamiento y falla igual de fuerte.
- *
- * <h2>Y por que se escribe una raya en vez de usar la celda sin dato de la libreria</h2>
- *
- * Porque **todavia no llega hasta aqui**, y conviene que este medido antes de que alguien lo
- * intente. `@kamayuk/ui` publica desde `kamayuk-lib`#87 una `CeldaDeLaTabla` que dice esto mucho
- * mejor que una raya —`{ texto: null, nota }`: `null` es «aqui no hay dato» y lo pinta la tabla con
- * su palabra, nunca con `''` ni con un `0`, y la `nota` explica por que— con sus dos reglas puras,
- * `textoDeLaCelda` y `notaDeLaCelda`.
- *
- * Pero el camino por el que estas cuarenta pantallas entregan sus filas es
- * `DatosDeLaPantalla.filas`, **por indice de bloque**, y ahi la celda sigue declarada `string`:
- * `readonly filas?: ReadonlyMap<number, readonly (readonly string[])[]>` (`interprete/datos.ts`),
- * que `BloqueDeLaPantalla` envuelve en `{ celdas }`. La forma larga solo viaja por el camino de las
- * tablas **con nombre** —`tablas`, de `kamayuk-lib`#65—, y ninguna de las cuarenta definiciones de
- * este sistema declara `clave` en su tabla; anadirsela es tocar el artboard, contra el que
- * `pantallas-del-artboard.test.ts` las compara campo a campo.
- *
- * O sea que adoptarla es un trabajo entero y no una linea, y tiene su issue. Mientras tanto, la
- * raya es lo que ya escriben `coa-exp` y `coa-cost`, y lo que el artboard dibuja.
  */
-const SIN_DATO = '—';
+const sinDato = (porQue: string): CeldaDeLaTabla => ({ texto: null, nota: porQue });
+
+/** «Contribuyente» de la muestra: la fila sorteada no siempre trae titular. */
+const SIN_TITULAR =
+  'La muestra sortea PREDIOS, y esta fila no trae titular: el predio no tiene ninguno inscrito, o ' +
+  'la vista que la sirve no lo trajo. Pedirselo al padron por fila serian veinte lecturas para ' +
+  'una columna.';
+
+/** «Diferencia estimada S/» de la muestra: no hay ningun importe que ensenar. */
+const SIN_DIFERENCIA_ESTIMADA =
+  'La muestra no publica ni un importe: sortea predios por un criterio de cruce, no los valoriza. ' +
+  'Estimar la diferencia aqui exigiria el cuadro de valores unitarios firmado, que es D-02a.';
+
+/** «Declarado» del acta: el acta publica el lado hallado y no el declarado. */
+const SIN_DECLARADO =
+  'ActaFiscalizacionResource publica «areaHallada» y «usoHallado» y NO publica «areaDeclarada» ni ' +
+  '«usoDeclarado»: de las dos mitades que esta tabla contrasta, la operacion sirve una. Quien ' +
+  'publica las dos es GET /fiscalizacion/resultados, que es la liquidacion y no esta etapa.';
+
+/** «Diferencia» del acta: es una resta, y no se hace aqui. */
+const SIN_DIFERENCIA_DEL_ACTA =
+  'La diferencia es «hallada − declarada», y no solo falta el minuendo: restar dos magnitudes ' +
+  'servidas para llenar una celda es calcular lo que nadie publico. Quien la publica hecha es la ' +
+  'liquidacion, con «diferenciaDeArea».';
+
+/** «Situacion» del acta: el hallazgo es lo unico que dice en que quedo, y puede no estar. */
+const SIN_HALLAZGO =
+  'El acta no trae hallazgo anotado, y es lo unico que publica de en que quedo la inspeccion: no ' +
+  'hay una situacion por concepto. Escribir «Conforme» seria afirmar que el predio esta en regla.';
+
+/** «Area hallada» sin medir: el acta existe y la magnitud no llego. */
+const SIN_AREA_HALLADA =
+  'Esta acta no publica ninguna superficie medida en campo. No es cero: cero seria un predio sin ' +
+  'area construida.';
+
+/** «Base omitida S/» de la resolucion: es una resta sobre dinero, y no se hace en el navegador. */
+const SIN_BASE_OMITIDA =
+  'La base omitida es «determinado − declarado», y la resolucion publica los dos sumandos y no la ' +
+  'resta. Restarlos aqui seria aritmetica sobre dinero en el navegador (regla 1, RNF-055).';
+
+/** «Interes S/» de la resolucion: no lo publica ninguna de las dieciseis operaciones. */
+const SIN_INTERES =
+  'Ninguna de las dieciseis operaciones de fiscalizacion publica un interes: el cuadro que se ' +
+  'imprime lleva «Multa» donde el prototipo decia «Interes». Cerrarlo es del backend.';
 
 /**
  * Lo que va donde la operacion publica el campo y lo contesta **vacio** (D-02a). Nunca `0.00`.
@@ -193,7 +227,7 @@ function enColumnaDeSoles(importe: string | null): string {
  */
 const FIS_PROG: Conector = {
   clave: ['fis-prog', 'muestra-del-programa'],
-  pedir: async (senal) => {
+  pedir: async ({ senal }) => {
     const relacion = await pedirPagina<ProgramaDeFiscalizacion>(
       RUTAS.programasDeFiscalizacion,
       senal,
@@ -206,17 +240,25 @@ const FIS_PROG: Conector = {
   },
   repartir: (muestra: Paginado<FilaDeLaMuestra>): Reparto => ({
     valores: new Map(),
-    filas: new Map([
+    // Vacio: esta tabla lleva `clave` desde #195, asi que sus filas van por `tablas`.
+    filas: new Map(),
+    tablas: new Map([
       [
-        0,
-        muestra.contenido.map((fila) => [
-          fila.codRefCatastral,
-          fila.titular ?? SIN_DATO,
-          fila.condicion,
-          // Ver el javadoc: la muestra no publica un solo importe, y estimarlo pide D-02a.
-          SIN_DATO,
-          fila.visitado ? 'Inspeccionado' : 'Programado',
-        ]),
+        'muestra-del-programa',
+        {
+          filas: muestra.contenido.map((fila) => ({
+            clave: fila.codRefCatastral,
+            celdas: [
+              fila.codRefCatastral,
+              fila.titular ?? sinDato(SIN_TITULAR),
+              fila.condicion,
+              sinDato(SIN_DIFERENCIA_ESTIMADA),
+              fila.visitado ? 'Inspeccionado' : 'Programado',
+            ],
+          })),
+          // El que la OPERACION publica: cuantos predios sorteo el programa, y no cuantos llegaron.
+          totalElementos: muestra.totalElementos,
+        },
       ],
     ]),
     noPublicados: new Map(),
@@ -242,16 +284,30 @@ const FIS_PROG: Conector = {
  * un acta predial lo lleva—: una fila con cuatro rayas de cinco no informaria de eso, informaria de
  * que la pantalla esta rota.
  */
-function contrasteDelActa(acta: ActaDeFiscalizacion): readonly (readonly string[])[] {
+function contrasteDelActa(acta: ActaDeFiscalizacion): readonly (readonly CeldaDeLaTabla[])[] {
   // `hallazgo` es lo que una persona anoto en campo, y es lo unico que el acta dice de en que
   // quedo cada magnitud: no hay una situacion por concepto. Va igual en las dos filas porque el
   // acta no la reparte, y decir «Conforme» en una y no en otra seria repartirla aqui.
-  const situacion = acta.hallazgo ?? SIN_DATO;
+  const situacion = acta.hallazgo ?? sinDato(SIN_HALLAZGO);
   return [
-    ['Área hallada (m²)', SIN_DATO, acta.areaHallada ?? SIN_DATO, SIN_DATO, situacion],
+    [
+      'Área hallada (m²)',
+      sinDato(SIN_DECLARADO),
+      acta.areaHallada ?? sinDato(SIN_AREA_HALLADA),
+      sinDato(SIN_DIFERENCIA_DEL_ACTA),
+      situacion,
+    ],
     ...(acta.usoHallado === null
       ? []
-      : [['Uso del predio', SIN_DATO, acta.usoHallado, SIN_DATO, situacion]]),
+      : [
+          [
+            'Uso del predio',
+            sinDato(SIN_DECLARADO),
+            acta.usoHallado,
+            sinDato(SIN_DIFERENCIA_DEL_ACTA),
+            situacion,
+          ],
+        ]),
   ];
 }
 
@@ -304,28 +360,34 @@ function contrasteDelActa(acta: ActaDeFiscalizacion): readonly (readonly string[
  */
 const FIS_ACTAS: Conector = {
   clave: ['fis-actas', 'acta-de-inspeccion'],
-  pedir: async (senal) => {
+  pedir: async ({ senal }) => {
     const relacion = await pedirPagina<ActaDeFiscalizacion>(RUTAS.actasDeFiscalizacion, senal);
     return relacion.contenido[0] ?? null;
   },
   repartir: (acta: ActaDeFiscalizacion): Reparto => ({
     valores: new Map(),
-    filas: new Map([[0, contrasteDelActa(acta)]]),
+    filas: new Map(),
+    tablas: new Map([
+      [
+        'declarado-contra-verificado',
+        {
+          // Sin total: las filas son las MAGNITUDES que el acta publica, no una pagina de nada.
+          filas: contrasteDelActa(acta).map((celdas) => ({ celdas })),
+        },
+      ],
+    ]),
     noPublicados: new Map(),
   }),
 };
 
 /** Una linea de la resolucion, en las cinco columnas de «Detalle por ejercicio». */
-function filaDelEjercicio(linea: LineaDeterminada): readonly string[] {
+function filaDelEjercicio(linea: LineaDeterminada): readonly CeldaDeLaTabla[] {
   return [
     String(linea.ejercicio),
-    // «Base omitida S/» es `determinado − declarado`, y la resolucion publica los dos sumandos y
-    // no la resta. Restarlos aqui seria aritmetica sobre dinero en el navegador (regla 1).
-    SIN_DATO,
+    sinDato(SIN_BASE_OMITIDA),
     // «Insoluto S/» ← `diferencia`, que pese al nombre es «el tributo que se dejo de pagar».
     enColumnaDeSoles(linea.diferencia),
-    // «Interes S/» no lo publica NINGUNA de las dieciseis operaciones de fiscalizacion.
-    SIN_DATO,
+    sinDato(SIN_INTERES),
     enColumnaDeSoles(linea.total),
   ];
 }
@@ -385,11 +447,18 @@ function filaDelEjercicio(linea: LineaDeterminada): readonly string[] {
 const FIS_RES: Conector = {
   clave: ['fis-res', 'resolucion-de-determinacion'],
   exigeSujeto: true,
-  pedir: (senal, sujeto) =>
+  pedir: ({ senal, sujeto }) =>
     pedirUno<ResolucionDeDeterminacion>(RUTAS.resolucionDeDeterminacion(sujeto ?? ''), senal),
   repartir: (resolucion: ResolucionDeDeterminacion): Reparto => ({
     valores: new Map([[coordenada(0, 1), resolucion.contribuyente]]),
-    filas: new Map([[0, resolucion.lineas.map(filaDelEjercicio)]]),
+    filas: new Map(),
+    tablas: new Map([
+      [
+        'detalle-por-ejercicio',
+        // Sin total: `lineas[]` son los ejercicios alcanzados y vienen todas, no paginadas.
+        { filas: resolucion.lineas.map((linea) => ({ celdas: filaDelEjercicio(linea) })) },
+      ],
+    ]),
     noPublicados: new Map([
       [coordenada(0, 0), NO_PUBLICADO],
       [coordenada(0, 3), NO_PUBLICADO],
@@ -426,9 +495,17 @@ export {
   FIS_ACTAS,
   FIS_PROG,
   FIS_RES,
+  SIN_AREA_HALLADA,
+  SIN_BASE_OMITIDA,
   SIN_CIFRAR,
-  SIN_DATO,
+  SIN_DECLARADO,
+  SIN_DIFERENCIA_DEL_ACTA,
+  SIN_DIFERENCIA_ESTIMADA,
+  SIN_HALLAZGO,
+  SIN_INTERES,
+  SIN_TITULAR,
   contrasteDelActa,
   enColumnaDeSoles,
   filaDelEjercicio,
+  sinDato,
 };

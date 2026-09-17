@@ -1,12 +1,15 @@
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 
 import { ErrorDeLaApi } from '../api/cliente.ts';
 import type { ClaveDeHoja } from '../pantallas/arbol.ts';
 import { hojaDe } from '../pantallas/arbol.ts';
-import type { Ausencia, DatosDeLaPantalla } from '@kamayuk/ui';
+import type { Ausencia, DatosDeLaPantalla, DatosDeUnaTabla, RutaDeLaHoja } from '@kamayuk/ui';
 import { porQueNoHayDato } from '../porQueNoHayDato.ts';
 import type { Reparto } from './conectores.ts';
-import { CONECTORES } from './conectores.ts';
+import { CONECTORES, loQueLaHojaDeclara } from './conectores.ts';
+import { formatearEntero } from '../dominio/formato.ts';
+import { FRASE_DEL_CONTEO } from '../i18n/textosDelMarco.ts';
 import type { SesionDeLaVentanilla } from './lecturas.ts';
 import { RUTAS, pedirUno } from './lecturas.ts';
 import { LLAVES } from './useCatalogoPermitido.ts';
@@ -123,19 +126,62 @@ function alFallar(error: unknown): Ausencia {
   };
 }
 
+/**
+ * **El total publicado, convertido en la frase que se lee**: «20 de 1 842» (#172, AC2).
+ *
+ * Es lo unico que esta funcion hace, y es lo que el conector no puede hacer: un conector es dato y
+ * no tiene `t()` delante, asi que un «de» escrito alli llegaria al DOM en castellano en cualquier
+ * idioma (#103). Lo que viaja por `TablaRepartida.total` es el numero que la OPERACION publica
+ * —`totalElementos`—, nunca uno contado sobre la pagina.
+ *
+ * Sin `total`, la tabla no recibe conteo y el interprete cuenta las filas que tiene delante
+ * —«20 registros»—, que es cierto de lo que se ve y no afirma ningun tamano de padron.
+ */
+function conConteo(
+  tablas: NonNullable<Reparto['tablas']>,
+  t: (clave: string, datos?: Readonly<Record<string, unknown>>) => string,
+): ReadonlyMap<string, DatosDeUnaTabla> {
+  return new Map(
+    [...tablas].map(([clave, tabla]) => [
+      clave,
+      {
+        filas: tabla.filas,
+        ...(tabla.totalElementos === undefined
+          ? {}
+          : {
+              conteo: t(FRASE_DEL_CONTEO, {
+                cuantos: formatearEntero(tabla.filas.length),
+                total: formatearEntero(tabla.totalElementos),
+              }),
+            }),
+      },
+    ]),
+  );
+}
+
 /** Un reparto vacio, para los estados en que no hay nada que repartir. */
 const NADA: Reparto = { valores: new Map(), filas: new Map(), noPublicados: new Map() };
 
+/** Una ruta vacia, para quien monte una pantalla suelta sin marco que le de la suya. */
+const SIN_RUTA: RutaDeLaHoja = { sujeto: null, parametros: {} };
+
 /**
  * @param clave la hoja abierta
- * @param sujeto el que lleva la ruta —`#/<hoja>/<sujeto>`—, o `null` si no lleva ninguno. Sale de
- *   `useHoja().ruta` del marco y solo llega con valor en las hojas que lo declaran (#169)
+ * @param ruta **la de la hoja, entera** (#172): su sujeto —`#/<hoja>/<sujeto>`— y sus parametros,
+ *   que es donde el interprete de `@kamayuk/ui` deja la pagina y el campo de orden que se
+ *   eligieron. Sale de `useHoja().ruta` del marco, que ya entrega **solo lo que el destino
+ *   declara**. Hasta #172 solo entraba el sujeto, y entonces el mando de pagina habria movido la
+ *   direccion sin que nadie volviera a pedir
  */
 export function useDatosDeLaHoja(
   clave: ClaveDeHoja,
-  sujeto: string | null = null,
+  ruta: RutaDeLaHoja = SIN_RUTA,
 ): DatosDeLaPantalla {
+  const { t } = useTranslation();
   const conector = CONECTORES[clave];
+  const sujeto = ruta.sujeto;
+  // Solo lo que el conector declara, y en su orden: de aqui sale tambien la llave de la cache.
+  const enLaRuta = loQueLaHojaDeclara(conector, ruta.parametros);
   // Una hoja de un sujeto sin sujeto no pide: no hay nada que pedir, y lo que llegaria seria un
   // 422 del backend dicho como si fuera una averia.
   const faltaElSujeto = conector?.exigeSujeto === true && (sujeto === null || sujeto === '');
@@ -168,8 +214,17 @@ export function useDatosDeLaHoja(
     // La clave lleva la hoja dentro: dos pantallas no comparten cache aunque pidan lo mismo. Y
     // lleva el sujeto al final: dos contribuyentes de la misma hoja tampoco. El ejercicio va
     // detras por lo mismo: cambiarlo en la sesion tiene que traer OTRA bitacora, no la cacheada.
-    queryKey: [...(conector?.clave ?? ['sin-conector', clave]), sujeto ?? '', ejercicio ?? ''],
-    queryFn: ({ signal }) => conector?.pedir(signal, sujeto, ejercicio) ?? Promise.resolve(null),
+    // Y lo de la ruta detras, serializado: cambiar de pagina o de orden tiene que traer OTRA
+    // respuesta. Sin esto, el mando movería la direccion, `pedir` no se volveria a llamar y la
+    // tabla dibujaria la pagina 0 con el rotulo «Pagina 3» — en verde y sin un solo error.
+    queryKey: [
+      ...(conector?.clave ?? ['sin-conector', clave]),
+      sujeto ?? '',
+      ejercicio ?? '',
+      JSON.stringify(enLaRuta),
+    ],
+    queryFn: ({ signal }) =>
+      conector?.pedir({ senal: signal, sujeto, ejercicio, enLaRuta }) ?? Promise.resolve(null),
     // Sin conector no se pide nada. Es lo que hace que 36 de las 40 pantallas no toquen la red.
     enabled: conector !== undefined && !faltaElSujeto && !faltaElEjercicio,
     retry: false,
@@ -207,8 +262,12 @@ export function useDatosDeLaHoja(
     valores: reparto.valores,
     filas: reparto.filas,
     // Las tablas con `clave` van aparte: sus celdas pueden decir que no hay dato, y por que
-    // (`kamayuk-lib`#87). Ver `Reparto.tablas`.
-    ...(reparto.tablas === undefined ? {} : { tablas: reparto.tablas }),
+    // (`kamayuk-lib`#87). Ver `Reparto.tablas`. Aqui es donde el TOTAL publicado se convierte en
+    // la frase que se lee, porque aqui hay `t()` y en el conector no (#172).
+    ...(reparto.tablas === undefined ? {} : { tablas: conConteo(reparto.tablas, t) }),
+    // Lo que el SERVIDOR dijo de la ventana: `hayMas` y `totalPaginas` (#187). El interprete los
+    // busca por nombre, y los nombres los deriva el conector con `hayMasDe` y `paginasDe`.
+    ...(reparto.nombrados === undefined ? {} : { nombrados: reparto.nombrados }),
     ausenciaPorCampo: reparto.noPublicados,
     // La pantalla SI tiene datos, asi que la frase de arriba no puede decir que no esta conectada.
     // Lo que queda por decir es lo que el campo concreto no trae, y eso va por campo.

@@ -1,4 +1,5 @@
 import type { ClaveDeHoja } from '../arbol.ts';
+import { EN_LA_RUTA, hayMasDe, paginasDe } from '../tablas.ts';
 import type { DefinicionDePantalla as Pantalla } from '@kamayuk/ui';
 
 /**
@@ -128,6 +129,36 @@ export const AUTORIZACIONES_Y_LICENCIAS = {
           },
         ],
         tabla: {
+          // Con `clave`, las filas llegan por `DatosDeLaPantalla.tablas` — que es el unico camino
+          // por el que viaja el TOTAL publicado, «20 de 1 842» (#172).
+          clave: 'giros-ciiu',
+          // El catalogo son 1 842 giros: esta tabla es una ventana, y sin mandos no lo diria
+          // (#186). `hayMas` y `paginas` los dice el SERVIDOR, y el conector los pone con esos
+          // nombres — derivados del de la tabla, ver `pantallas/tablas.ts`.
+          paginacion: {
+            en: 'servidor',
+            enLaRuta: EN_LA_RUTA.pagina,
+            tamano: 20,
+            tamanos: [20, 50, 100],
+            tamanoEnLaRuta: EN_LA_RUTA.tamano,
+            hayMas: hayMasDe('giros-ciiu'),
+            paginas: paginasDe('giros-ciiu'),
+          },
+          // La lista blanca es la de `CiiuRepositoryJdbc`, medida y no supuesta; el PRIMERO es el
+          // `ORDEN_POR_OMISION` de `CiiuController` (`codigo`), que es lo que hace que la barra no
+          // mienta cuando la ruta no trae ninguno. Ver `datos/laVentana.ts`.
+          orden: {
+            campos: [
+              { valor: 'codigo', rotulo: 'Código CIIU' },
+              { valor: 'descripcion', rotulo: 'Actividad' },
+              { valor: 'seccion', rotulo: 'Materia' },
+              { valor: 'riesgoItse', rotulo: 'Riesgo' },
+            ],
+            enLaRuta: EN_LA_RUTA.ordenarPor,
+            sentidoEnLaRuta: EN_LA_RUTA.direccion,
+            ascendente: 'ASCENDENTE',
+            descendente: 'DESCENDENTE',
+          },
           titulo: 'Giros CIIU',
           accion: 'Añadir giro',
           columnas: [
@@ -169,6 +200,18 @@ export const AUTORIZACIONES_Y_LICENCIAS = {
           { etiqueta: 'Hasta', tipo: 'd' },
         ],
         tabla: {
+          clave: 'padron-de-licencias',
+          paginacion: {
+            en: 'servidor',
+            enLaRuta: EN_LA_RUTA.pagina,
+            tamano: 20,
+            tamanos: [20, 50, 100],
+            tamanoEnLaRuta: EN_LA_RUTA.tamano,
+            hayMas: hayMasDe('padron-de-licencias'),
+            paginas: paginasDe('padron-de-licencias'),
+          },
+          // **Sin `orden`, y no por prudencia**: `?direccion=` esta tomado. Ver el javadoc de
+          // `AUT_TRAM` en `datos/conectores/licencias.ts`, donde esta medida la colision.
           titulo: 'Padrón de licencias',
           columnas: [
             { rotulo: 'Nº licencia', alineadoDerecha: false },

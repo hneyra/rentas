@@ -223,7 +223,7 @@ function PantallaConectada({
   readonly clave: ClaveDeHoja;
   readonly sujeto?: string | null;
 }) {
-  return <PantallaDeRentas definicion={pantallaDe(clave)} datos={useDatosDeLaHoja(clave, sujeto)} />;
+  return <PantallaDeRentas definicion={pantallaDe(clave)} datos={useDatosDeLaHoja(clave, { sujeto, parametros: {} })} />;
 }
 
 /** Sustituye `fetch` por un doble que contesta segun la RUTA, y dice a que se llamo. */
@@ -562,10 +562,22 @@ describe('`tra-veh` — el deposito y el vehiculo de la direccion', () => {
     expect(filas[0]?.celdas[4]).toEqual({ texto: null, nota: expect.stringContaining('D-02b') });
   });
 
-  it('y NO escribe su propio conteo: «188 registros» seria un castellano sin `t()`', () => {
-    // El interprete cuenta las filas que recibe con la palabra que SU saco traduce. Escribir aqui
-    // `totalElementos` diria ademas «188» sobre una tabla de dos filas.
-    expect(reparto.tablas?.get('vehiculos-internados')?.conteo).toBeUndefined();
+  it('entrega el TOTAL que la operacion publica, y no una cuenta de las filas (#172)', () => {
+    // Lo que viaja es un NUMERO y no una frase: el «de» de «2 de 188» lo pone `useDatosDeLaHoja`
+    // con `t()`, porque escrito aqui seria castellano que nunca podria traducirse (#103).
+    //
+    // Y es el de la OPERACION. La muestra trae dos filas y `totalElementos: 188`: si alguien
+    // cambiara esto por `contenido.length`, este caso diria 2 y la pantalla afirmaria que el
+    // deposito entero son dos vehiculos.
+    expect(reparto.tablas?.get('vehiculos-internados')?.totalElementos).toBe(188);
+    expect(reparto.tablas?.get('vehiculos-internados')?.filas).toHaveLength(2);
+  });
+
+  it('y el `hayMas` y las paginas los dice el SERVIDOR, no la cuenta de las filas (#187)', () => {
+    // Con el tope alcanzado exacto, contar las filas recibidas diria que no hay pagina siguiente
+    // justo cuando la hay. Por eso los dos salen del envoltorio.
+    expect(reparto.nombrados?.get('vehiculos-internados.hayMas')).toBe(true);
+    expect(reparto.nombrados?.get('vehiculos-internados.paginas')).toBe('10');
   });
 });
 

@@ -2,7 +2,12 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { TEXTOS_DEL_ARMAZON, type TextosDelArmazon } from '@kamayuk/shell';
-import { ProveedorDeTema, TEXTOS_DE_LA_UI, TEXTOS_DEL_INTERPRETE } from '@kamayuk/ui';
+import {
+  ProveedorDeTema,
+  TEXTOS_DE_LA_UI,
+  TEXTOS_DE_LAS_PIEZAS,
+  TEXTOS_DEL_INTERPRETE,
+} from '@kamayuk/ui';
 import { cleanup, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -19,6 +24,7 @@ import {
 import i18n, { ABRE, CIERRA, IDIOMA_MARCADO, IDIOMA_POR_OMISION } from '../src/i18n/i18n.ts';
 import {
   FRASES_DEL_INTERPRETE,
+  FRASES_DE_LAS_TABLAS,
   FRASES_DEL_MARCO,
   useTextosDelInterprete,
   useTextosDelMarco,
@@ -387,13 +393,32 @@ describe('y el marco tampoco: las treinta y dos palabras del armazon (#133)', ()
    */
   it('EL INVENTARIO del interprete: el saco trae las MISMAS llaves que publica la libreria', () => {
     const { result } = renderHook(() => useTextosDelInterprete());
+    // Desde #186 el saco es el de `TextosDelInterprete` **mas** las palabras de los mandos de una
+    // tabla, que viven en el saco hermano de la libreria (`TextosDeLasPiezas`): lo que no puede es
+    // traer una llave que la libreria no publique por ninguno de los dos, porque entonces seria
+    // una palabra que este sistema traduce y nadie dibuja.
+    const publicadas = { ...TEXTOS_DEL_INTERPRETE, ...TEXTOS_DE_LAS_PIEZAS };
     const faltan = Object.keys(TEXTOS_DEL_INTERPRETE).filter((c) => !(c in result.current));
-    const sobran = Object.keys(result.current).filter((c) => !(c in TEXTOS_DEL_INTERPRETE));
+    const sobran = Object.keys(result.current).filter((c) => !(c in publicadas));
     expect(
       { faltan, sobran },
       'El saco de textos del interprete dejo de cuadrar con el de «@kamayuk/ui».\n' +
         '  Se arregla en `src/i18n/textosDelMarco.ts`.',
     ).toEqual({ faltan: [], sobran: [] });
+  });
+
+  it('y las palabras de los MANDOS de una tabla estan TODAS, o los mandos salen en castellano', () => {
+    // La mitad cara de #186: `<Pantalla textos>` es `Partial`, asi que lo que este sistema no pase
+    // lo pone la libreria **en castellano** y no hay ningun rojo — hasta que alguien pide un
+    // segundo idioma y ve «Anterior» bajo una tabla traducida. Esta lista es la de las que se
+    // dibujan, derivada de `FRASES_DE_LAS_TABLAS`.
+    const { result } = renderHook(() => useTextosDelInterprete());
+    const sinPasar = Object.keys(FRASES_DE_LAS_TABLAS).filter(
+      (clave) => !(clave in result.current),
+    );
+    expect(sinPasar, `Palabras de los mandos que el saco no pasa: ${sinPasar.join(', ')}`).toEqual(
+      [],
+    );
   });
 
   it('y NINGUNA de las tres del interprete llega sin pasar por `t()`', () => {

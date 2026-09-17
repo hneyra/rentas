@@ -201,7 +201,10 @@ describe('`aut-cat` — el catalogo de giros CIIU', () => {
   });
 
   it('las cuatro columnas salen de los cuatro campos, en el orden de la definicion', () => {
-    const filas = AUT_CAT.repartir(CIIU_A as never).filas.get(0);
+    // Desde #172 las filas van por `tablas`: es el camino por el que viaja el total publicado.
+    const filas = (
+      AUT_CAT.repartir(CIIU_A as never).tablas?.get('giros-ciiu')?.filas ?? []
+    ).map((fila) => fila.celdas);
 
     expect(PANTALLAS['aut-cat'].bloques[0]?.tabla?.columnas.map((c) => c.rotulo)).toEqual([
       'Código CIIU',
@@ -260,7 +263,9 @@ describe('`aut-tram` — el padron de licencias de funcionamiento', () => {
   });
 
   it('las cinco columnas salen de la respuesta, y «Giro» del giro PRINCIPAL', () => {
-    const filas = AUT_TRAM.repartir(PADRON_A as never).filas.get(0);
+    const filas = (
+      AUT_TRAM.repartir(PADRON_A as never).tablas?.get('padron-de-licencias')?.filas ?? []
+    ).map((fila) => fila.celdas);
 
     expect(PANTALLAS['aut-tram'].bloques[0]?.tabla?.columnas.map((c) => c.rotulo)).toEqual([
       'Nº licencia',

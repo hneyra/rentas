@@ -1,7 +1,10 @@
+import type { CeldaDeLaTabla } from '@kamayuk/ui';
+
 import { formatearInstante } from '../../dominio/formato.ts';
 import type { MovimientoDeLaBitacora, Paginado } from '../lecturas.ts';
 import { RUTAS, pedirPagina } from '../lecturas.ts';
 import type { Conector, Reparto } from '../conectores.ts';
+import { laVentanaDe, laVentanaQueSePide, loQueDijoElServidor } from '../laVentana.ts';
 
 /**
  * **La bitacora de auditoria, que es la primera hoja cuyo obligatorio sale de la SESION** (#181).
@@ -167,8 +170,28 @@ import type { Conector, Reparto } from '../conectores.ts';
  * </ul>
  */
 
-/** Lo que va en una celda que la operacion no llena. Es la raya del artboard, no un cero. */
-const SIN_DATO = '—';
+/**
+ * **La celda que llego sin dato, con el motivo dentro** (`kamayuk-lib`#87, #187).
+ *
+ * Era la raya del artboard escrita como cualquier otra cadena, y la raya **sigue siendo lo que se
+ * ve**: la declara la tabla en su `sinDato`. Lo que cambia es que ahora la celda dice **por que**,
+ * anunciado con `title`, en vez de dejar el motivo en el javadoc de este archivo donde no lo lee
+ * quien mira la pantalla.
+ *
+ * `texto: null` es «aqui no hay dato»: nunca `''` —que se lee como un blanco— y nunca un `0`
+ * —que en una bitacora de auditoria se leeria como «riesgo cero»—.
+ */
+const sinDato = (porQue: string): CeldaDeLaTabla => ({ texto: null, nota: porQue });
+
+/**
+ * El motivo de «Riesgo», escrito UNA vez: es el que viaja en la celda y el que explica el javadoc.
+ *
+ * Es dato y no se traduce, igual que la celda: lo que se traduce es la palabra de la tabla.
+ */
+const SIN_RIESGO_PUBLICADO =
+  'Ninguna operacion del contrato publica un riesgo: AuditoriaResource tiene doce campos y ' +
+  'ninguno es ese. Deducirlo del acto —una anulacion es alta, un acceso es bajo— seria escribir ' +
+  'aqui una clasificacion de riesgo que nadie ha aprobado.';
 
 /** El punto medio del artboard. Es un separador, no una palabra: lo que sale de aqui es dato. */
 const JUNTO = ' · ';
@@ -198,24 +221,42 @@ function detalleDelMovimiento(movimiento: MovimientoDeLaBitacora): string {
 const SEG_AUD: Conector = {
   clave: ['seg-aud', 'auditoria'],
   exigeEjercicio: true,
-  pedir: (senal, _sujeto, ejercicio) =>
-    pedirPagina<MovimientoDeLaBitacora>(RUTAS.bitacoraDe(ejercicio ?? 0), senal),
+  // La ventana de «Movimientos». El `ejercicio` NO esta aqui y no puede estarlo: sale de la
+  // sesion, no de la ruta. Ver el javadoc de `Conector.exigeEjercicio`.
+  parametros: laVentanaDe('GET /seguridad/auditoria'),
+  pedir: ({ senal, ejercicio, enLaRuta }) =>
+    pedirPagina<MovimientoDeLaBitacora>(
+      RUTAS.bitacoraDe(ejercicio ?? 0, laVentanaQueSePide('seg-aud', 'movimientos', enLaRuta)),
+      senal,
+    ),
   repartir: (pagina: Paginado<MovimientoDeLaBitacora>): Reparto => ({
     valores: new Map(),
-    filas: new Map([
+    // Vacio: esta tabla lleva `clave` desde #187, asi que sus filas van por `tablas` — que es el
+    // camino cuyas celdas pueden decir que no hay dato, y el unico por el que viaja el total.
+    filas: new Map(),
+    tablas: new Map([
       [
-        0,
-        pagina.contenido.map((movimiento) => [
-          formatearInstante(movimiento.fecha),
-          movimiento.usuario,
-          movimiento.operacion,
-          detalleDelMovimiento(movimiento),
-          // Ver el javadoc: el riesgo no lo publica nadie, y deducirlo del acto seria escribir
-          // aqui una clasificacion de riesgo que nadie ha aprobado.
-          SIN_DATO,
-        ]),
+        'movimientos',
+        {
+          filas: pagina.contenido.map((movimiento) => ({
+            // La clave de React: dos movimientos del mismo usuario y del mismo acto no comparten
+            // el instante, y aun asi el unico identificador de verdad es el de la fila.
+            clave: String(movimiento.id),
+            celdas: [
+              formatearInstante(movimiento.fecha),
+              movimiento.usuario,
+              movimiento.operacion,
+              detalleDelMovimiento(movimiento),
+              sinDato(SIN_RIESGO_PUBLICADO),
+            ],
+          })),
+          // 84 182 movimientos, dichos por la operacion y no contados aqui: la pagina trae veinte.
+          totalElementos: pagina.totalElementos,
+        },
       ],
     ]),
+    // `hayMas` y `totalPaginas` los dice el SERVIDOR (#187, AC2).
+    nombrados: loQueDijoElServidor('movimientos', pagina),
     noPublicados: new Map(),
   }),
 };
@@ -229,4 +270,4 @@ export const CONECTORES_DE_SEGURIDAD = {
   'seg-aud': SEG_AUD,
 };
 
-export { SEG_AUD, SIN_DATO, detalleDelMovimiento };
+export { SEG_AUD, SIN_RIESGO_PUBLICADO, detalleDelMovimiento, sinDato };

@@ -1,4 +1,5 @@
 import type { ClaveDeHoja } from '../arbol.ts';
+import { EN_LA_RUTA, hayMasDe, paginasDe } from '../tablas.ts';
 import type { DefinicionDePantalla as Pantalla } from '@kamayuk/ui';
 
 /**
@@ -116,6 +117,29 @@ export const TRANSITO = {
         tabla: {
           clave: 'vehiculos-internados',
           sinDato: { texto: '—', nota: 'Ninguna operacion publica este dato.' },
+          // El deposito son 188 internamientos y el artboard escribe «3 de 188»: la tabla siempre
+          // fue una ventana, y desde #186 lo es de verdad.
+          paginacion: {
+            en: 'servidor',
+            enLaRuta: EN_LA_RUTA.pagina,
+            tamano: 20,
+            tamanos: [20, 50, 100],
+            tamanoEnLaRuta: EN_LA_RUTA.tamano,
+            hayMas: hayMasDe('vehiculos-internados'),
+            paginas: paginasDe('vehiculos-internados'),
+          },
+          // La lista blanca es la de `InternamientoRepositoryJdbc`; el primero es el
+          // `ORDEN_POR_OMISION` de `InternamientosController` (`fechaIngreso`).
+          orden: {
+            campos: [
+              { valor: 'fechaIngreso', rotulo: 'Ingreso' },
+              { valor: 'placa', rotulo: 'Placa' },
+            ],
+            enLaRuta: EN_LA_RUTA.ordenarPor,
+            sentidoEnLaRuta: EN_LA_RUTA.direccion,
+            ascendente: 'ASCENDENTE',
+            descendente: 'DESCENDENTE',
+          },
           titulo: 'Vehículos internados',
           columnas: [
             { rotulo: 'Placa', alineadoDerecha: false },

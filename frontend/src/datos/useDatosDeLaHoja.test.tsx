@@ -225,7 +225,7 @@ describe('una pantalla que es de un contribuyente', () => {
       '/consultas/unificada': FICHA,
       '/consultas/deudas-con-beneficio': SIN_CAMPANIA,
     });
-    const { result } = renderHook(() => useDatosDeLaHoja('con-panel', '00000025673'), {
+    const { result } = renderHook(() => useDatosDeLaHoja('con-panel', { sujeto: '00000025673', parametros: {} }), {
       wrapper: arnes().wrapper,
     });
 
@@ -242,7 +242,7 @@ describe('una pantalla que es de un contribuyente', () => {
       '/consultas/unificada': FICHA,
       '/consultas/deudas-con-beneficio': SIN_CAMPANIA,
     });
-    const { result } = renderHook(() => useDatosDeLaHoja('con-panel', '00000025673'), {
+    const { result } = renderHook(() => useDatosDeLaHoja('con-panel', { sujeto: '00000025673', parametros: {} }), {
       wrapper: arnes().wrapper,
     });
 
@@ -258,7 +258,7 @@ describe('una pantalla que es de un contribuyente', () => {
       '/consultas/unificada': OTRA_FICHA,
       '/consultas/deudas-con-beneficio': SIN_CAMPANIA,
     });
-    const { result } = renderHook(() => useDatosDeLaHoja('con-panel', '00000003541'), {
+    const { result } = renderHook(() => useDatosDeLaHoja('con-panel', { sujeto: '00000003541', parametros: {} }), {
       wrapper: arnes().wrapper,
     });
 
@@ -273,7 +273,7 @@ describe('una pantalla que es de un contribuyente', () => {
 
   it('la constancia pide con `codContribuyente`, que es el nombre que ESA operacion admite', async () => {
     const pedidas = contestaSegunLaRuta({ '/consultas/constancias': CONSTANCIA_NEGADA });
-    const { result } = renderHook(() => useDatosDeLaHoja('con-doc', '00000025673'), {
+    const { result } = renderHook(() => useDatosDeLaHoja('con-doc', { sujeto: '00000025673', parametros: {} }), {
       wrapper: arnes().wrapper,
     });
 
@@ -293,7 +293,7 @@ describe('una pantalla que es de un contribuyente', () => {
     });
     // Un solo cliente para los dos, que es lo que hay en la aplicacion: la cache es de modulo.
     const { wrapper } = arnes();
-    const uno = renderHook(() => useDatosDeLaHoja('con-panel', '00000025673'), { wrapper });
+    const uno = renderHook(() => useDatosDeLaHoja('con-panel', { sujeto: '00000025673', parametros: {} }), { wrapper });
     await waitFor(() => {
       expect(uno.result.current.valores?.get(coordenada(0, 6))).toBe('S/ 3,563.24');
     });
@@ -302,7 +302,7 @@ describe('una pantalla que es de un contribuyente', () => {
       '/consultas/unificada': OTRA_FICHA,
       '/consultas/deudas-con-beneficio': SIN_CAMPANIA,
     });
-    const otro = renderHook(() => useDatosDeLaHoja('con-panel', '00000003541'), { wrapper });
+    const otro = renderHook(() => useDatosDeLaHoja('con-panel', { sujeto: '00000003541', parametros: {} }), { wrapper });
 
     // **En la PRIMERA pintada**, que es donde esta el defecto: sin el sujeto en la clave, el
     // segundo contribuyente abre con lo que cacheo el primero —«S/ 3,563.24»— mientras llega lo
@@ -342,7 +342,7 @@ describe('una pantalla que es de un ejercicio de la sesion', () => {
     // como si fuera una averia; y lo OTRO contrario —poner el ano de hoy— seria ensenar la
     // bitacora de un ejercicio que nadie eligio, con cara de ser la buena.
     expect(pedidas.filter((url) => url.includes('/seguridad/auditoria'))).toEqual([]);
-    expect(result.current.filas).toBeUndefined();
+    expect(result.current.tablas).toBeUndefined();
   });
 
   it('con ejercicio en la sesion pide la bitacora DE ESE ano', async () => {
@@ -353,7 +353,7 @@ describe('una pantalla que es de un ejercicio de la sesion', () => {
     const { result } = renderHook(() => useDatosDeLaHoja('seg-aud'), { wrapper: arnes().wrapper });
 
     await waitFor(() => {
-      expect(result.current.filas?.get(0)).toHaveLength(1);
+      expect(result.current.tablas?.get('movimientos')?.filas).toHaveLength(1);
     });
     const deLaBitacora = pedidas.filter((url) => url.includes('/seguridad/auditoria'));
     expect(deLaBitacora).toHaveLength(1);
@@ -373,7 +373,9 @@ describe('una pantalla que es de un ejercicio de la sesion', () => {
     const primero = arnes();
     const uno = renderHook(() => useDatosDeLaHoja('seg-aud'), { wrapper: primero.wrapper });
     await waitFor(() => {
-      expect(uno.result.current.filas?.get(0)?.[0]?.[1]).toBe('jcardenas');
+      expect(uno.result.current.tablas?.get('movimientos')?.filas[0]?.celdas[1]).toBe(
+        'jcardenas',
+      );
     });
 
     // Otro cliente y no `clear()`: lo que se mide es que la clave LLEVA el ejercicio, y con la
@@ -385,17 +387,20 @@ describe('una pantalla que es de un ejercicio de la sesion', () => {
     const otro = renderHook(() => useDatosDeLaHoja('seg-aud'), { wrapper: arnes().wrapper });
 
     await waitFor(() => {
-      expect(otro.result.current.filas?.get(0)?.[0]?.[1]).toBe('mrios');
+      expect(otro.result.current.tablas?.get('movimientos')?.filas[0]?.celdas[1]).toBe('mrios');
     });
     expect(pedidas.some((url) => url.includes('ejercicio=2025'))).toBe(true);
 
-    // Y la clave de la consulta lleva el ejercicio al final: dos ejercicios de la misma hoja no
-    // comparten cache, igual que dos contribuyentes no la comparten desde #169.
+    // Y la clave de la consulta lleva el ejercicio: dos ejercicios de la misma hoja no comparten
+    // cache, igual que dos contribuyentes no la comparten desde #169. Desde #172 lleva ademas lo
+    // que la hoja trae en su ruta —la pagina y el orden—, por lo mismo: cambiar de pagina tiene
+    // que traer OTRA respuesta, y con la clave sin ello el mando moveria la direccion y la tabla
+    // seguiria dibujando la pagina 0.
     const claves = primero.cliente
       .getQueryCache()
       .getAll()
       .map((consulta) => consulta.queryKey.join('/'));
-    expect(claves).toContain('seg-aud/auditoria//2024');
+    expect(claves).toContain('seg-aud/auditoria//2024/{}');
   });
 
   it('si la SESION falla, lo dice como fallo y no como «fije usted el ejercicio»', async () => {

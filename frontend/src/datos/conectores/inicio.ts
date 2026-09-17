@@ -135,7 +135,7 @@ function cuadreDelTributo(fila: FilaDeAvance): readonly string[] {
  */
 const INI_PANEL: Conector = {
   clave: ['ini-panel', 'recaudacion', 'ultima-corrida'],
-  pedir: (senal) =>
+  pedir: ({ senal }) =>
     Promise.all([
       pedirUno<IndicadorDeRecaudacion>(RUTAS.recaudacion, senal),
       pedirUno<CorridaDelPredial>(RUTAS.ultimaCorrida, senal),
@@ -188,7 +188,7 @@ const INI_PANEL: Conector = {
  */
 const INI_FLUJO: Conector = {
   clave: ['ini-flujo', 'recaudacion'],
-  pedir: (senal) => pedirUno<IndicadorDeRecaudacion>(RUTAS.recaudacion, senal),
+  pedir: ({ senal }) => pedirUno<IndicadorDeRecaudacion>(RUTAS.recaudacion, senal),
   repartir: (recaudacion: IndicadorDeRecaudacion): Reparto => {
     const porTributo = panelPorTributo(recaudacion);
     return {
@@ -249,7 +249,7 @@ const INI_FLUJO: Conector = {
  */
 const INI_PARADO: Conector = {
   clave: ['ini-parado', 'trabajo-parado'],
-  pedir: (senal) => pedirUno<TrabajoParado>(RUTAS.trabajoParado, senal),
+  pedir: ({ senal }) => pedirUno<TrabajoParado>(RUTAS.trabajoParado, senal),
   repartir: (parado: TrabajoParado): Reparto => ({
     valores: new Map(),
     filas: new Map([

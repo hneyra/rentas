@@ -1,4 +1,5 @@
 import type { ClaveDeHoja } from '../arbol.ts';
+import { EN_LA_RUTA, hayMasDe, paginasDe } from '../tablas.ts';
 import type { DefinicionDePantalla as Pantalla } from '@kamayuk/ui';
 
 /**
@@ -88,6 +89,39 @@ export const SEGURIDAD = {
           { etiqueta: 'Buscar en el detalle', tipo: '1' },
         ],
         tabla: {
+          // Con `clave`, las celdas pueden decir que NO hay dato y por que —«Riesgo» no la publica
+          // nadie— y la tabla puede llevar su total publicado (`kamayuk-lib`#87, #187).
+          clave: 'movimientos',
+          sinDato: {
+            texto: '—',
+            nota: 'Ninguna operacion del contrato publica este dato.',
+          },
+          // La bitacora son 84 182 movimientos. Sin mandos, la pantalla ensena veinte y no dice
+          // que son una ventana (#187).
+          paginacion: {
+            en: 'servidor',
+            enLaRuta: EN_LA_RUTA.pagina,
+            tamano: 20,
+            tamanos: [20, 50, 100],
+            tamanoEnLaRuta: EN_LA_RUTA.tamano,
+            hayMas: hayMasDe('movimientos'),
+            paginas: paginasDe('movimientos'),
+          },
+          // La lista blanca es la de `SesionRepositoryJdbc.ORDEN_AUDITORIA`; el primero es el
+          // `aPaginacion("fecha")` de `SesionController`. «Riesgo» y «Detalle» no estan, y no
+          // pueden estar: el riesgo no existe como dato y el detalle son tres columnas juntas.
+          orden: {
+            campos: [
+              { valor: 'fecha', rotulo: 'Fecha y hora' },
+              { valor: 'usuarioId', rotulo: 'Usuario' },
+              { valor: 'operacion', rotulo: 'Acto' },
+              { valor: 'tabla', rotulo: 'Sobre qué' },
+            ],
+            enLaRuta: EN_LA_RUTA.ordenarPor,
+            sentidoEnLaRuta: EN_LA_RUTA.direccion,
+            ascendente: 'ASCENDENTE',
+            descendente: 'DESCENDENTE',
+          },
           titulo: 'Movimientos',
           columnas: [
             { rotulo: 'Fecha y hora', alineadoDerecha: false },

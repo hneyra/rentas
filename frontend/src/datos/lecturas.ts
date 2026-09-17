@@ -1465,6 +1465,26 @@ export const RUTAS = {
   /** La primera liquidacion de costas de la relacion. `tamano` esta publicado, como arriba. */
   liquidacionesDeCostas: '/coactiva/liquidaciones-costas?tamano=1',
   /**
+   * **Las liquidaciones de costas de UN expediente** (#200).
+   *
+   * `?nroExpedCoact=` lo publica el contrato entre los opcionales de esta operacion
+   * (`docs/50-api/parametros-de-la-api.json`), y es lo que separa esta ruta de la de arriba: alli
+   * se toma la primera de la relacion entera —de cualquier expediente— y aqui se piden **las de
+   * este**, porque la costa de un acto puede estar en cualquiera de ellas.
+   *
+   * <h2>`?tamano=100` escrito, y por que ese numero y no `1`</h2>
+   *
+   * Porque lo que se busca no es «una liquidacion» sino **todas las de un expediente**: con
+   * `?tamano=1` la costa de un acto liquidado en la segunda tanda diria que no esta liquidado, que
+   * es exactamente la clase de hueco falso que #200 existe para no crear. Cien es holgado —un
+   * expediente con cien tandas de liquidacion no existe— y **el conector comprueba `hayMas`**: si
+   * alguna vez no cupieran, las celdas lo dicen en vez de afirmar que no hay costa.
+   *
+   * El tope del backend es 500 (`Paginacion.TAMANO_MAXIMO`).
+   */
+  liquidacionesDelExpediente: (numero: string) =>
+    `/coactiva/liquidaciones-costas?nroExpedCoact=${encodeURIComponent(numero)}&tamano=100`,
+  /**
    * Las prescripciones declaradas **sobre un tributo**.
    *
    * `?tributo=` es el unico parametro que las dos operaciones de `coa-cost` comparten: la
@@ -1541,47 +1561,53 @@ export const RUTAS = {
    * red como `?ejercicio=null` — un 422 en vez de un rojo del compilador. Con esta, el nulo no
    * compila y quien decide que hacer con el es `useDatosDeLaHoja`, que no pide nada y lo dice.
    *
-   * <b>`&tamano=20` escrito</b>, como en `ciiu` y por lo mismo: la bitacora del artboard lleva
-   * <b>84 182</b> movimientos, asi que la tabla es una ventana y el numero que decide cuantos
-   * viajan tiene que estar a la vista de quien lea esta linea. El parametro esta entre los nueve
-   * opcionales que `parametros-de-la-api.json` publica para esta operacion.
+   * <b>La ventana entra por `ventana` y ya no esta escrita aqui</b> (#186): la bitacora del
+   * artboard lleva <b>84 182</b> movimientos, asi que la tabla es una ventana de verdad —`pagina`,
+   * `tamano`, `ordenarPor` y `direccion` salen de la ruta de la hoja y del `paginacion.tamano` que
+   * su tabla declara—. Los cuatro estan entre los nueve opcionales que `parametros-de-la-api.json`
+   * publica para esta operacion.
    *
-   * Los otros ocho —`usuario`, `tabla`, `operacion`, `desde`, `hasta`, `ordenarPor`, `pagina` y
-   * `direccion`— <b>no se mandan</b>: son los mandos que la pantalla dibuja, y hoy no hay por
-   * donde entrarlos (#172).
+   * Los otros cinco —`usuario`, `tabla`, `operacion`, `desde` y `hasta`— <b>siguen sin mandarse</b>:
+   * son los mandos del formulario de filtro, y esos son de #172.
    */
-  bitacoraDe: (ejercicio: number) =>
-    `/seguridad/auditoria?ejercicio=${encodeURIComponent(String(ejercicio))}&tamano=20`,
+  bitacoraDe: (ejercicio: number, ventana: Readonly<Record<string, string>> = {}) =>
+    conParametros(`/seguridad/auditoria?ejercicio=${encodeURIComponent(String(ejercicio))}`, ventana),
   arbitrios: '/rentas/arbitrios',
   /**
-   * El catalogo CIIU, **una ventana y no la lista entera** (#168).
+   * El catalogo CIIU, **una ventana y no la lista entera** (#168, #172, #186).
    *
-   * `?tamano=20` escrito y no omitido, aunque veinte sea tambien el tamano por omision: el
-   * catalogo tiene **1 842 giros** —lo dice el propio artboard, que por eso elige un Combobox y
-   * no un Select— y el numero que decide cuantos viajan tiene que estar a la vista de quien lea
-   * esta linea, no escondido en un valor por omision del backend que puede cambiar sin avisar.
+   * El catalogo tiene **1 842 giros** —lo dice el propio artboard, que por eso elige un Combobox y
+   * no un Select—, asi que esta tabla siempre fue una ventana. **Lo contrario seria
+   * `?tamano=1842`**: mil ochocientas filas en una tabla que ensena cuatro no las lee nadie.
    *
-   * **Lo contrario seria `?tamano=1842`**, y es exactamente lo que no se hace: mil ochocientas
-   * filas en una tabla que ensena cuatro no las lee nadie, y el buscador que el artboard dibuja
-   * —«Buscar giro o actividad»— existe para no tener que traerlas. Cuando la pantalla sepa pasarle
-   * lo tecleado a su conector, el parametro es **`?descripcion=`**, que el contrato publica
-   * (`docs/50-api/parametros-de-la-api.json`) junto con `codigoCiiu`, `seccion`, `pagina` y
-   * `ordenarPor`. Hoy `Conector.pedir` solo recibe una senal de aborto, asi que no hay de donde
-   * sacar el texto: el hueco esta dicho en `conectores/licencias.ts` y no tapado aqui.
+   * <h2>Y desde #186 el tamano NO se escribe aqui</h2>
+   *
+   * Lo declara la tabla —`paginacion.tamano` en `definiciones/autorizaciones-y-licencias.ts`— y lo
+   * lee `laVentanaQueSePide`. Escrito en los dos sitios, el dia que uno suba, los mandos contarian
+   * paginas de cien sobre respuestas de veinte (#186, AC3).
+   *
+   * Lo que entra por `ventana` son los cuatro del dialecto de paginacion —`pagina`, `tamano`,
+   * `ordenarPor`, `direccion`— y **`descripcion`**, que es el buscador que el artboard dibuja
+   * («Buscar giro o actividad»). Los cinco los publica el contrato
+   * (`docs/50-api/parametros-de-la-api.json`), que es la condicion para mandarlos (#26).
    */
-  ciiu: '/licencias/ciiu?tamano=20',
+  ciiu: (ventana: Readonly<Record<string, string>> = {}) =>
+    conParametros('/licencias/ciiu', ventana),
   /**
-   * El padron de licencias de funcionamiento.
+   * El padron de licencias de funcionamiento (#168, #186).
    *
-   * Se pide **pelada**: los seis campos con que el artboard la filtra —ejercicio, tipo de
+   * Se pide **sin criterio**: los seis campos con que el artboard la filtra —ejercicio, tipo de
    * licencia, estado, agrupacion y el par Desde/Hasta— **no son parametros de esta operacion**.
-   * Los ocho que admite son otros (`nroLicencia`, `nombreDelContribuyente`,
-   * `denominacionComercial`, `direccion`, `nExpediente`, `ordenarPor`, `pagina`, `tamano`), y
-   * mandar un `?ejercicio=` que el contrato no declara seria construir sobre un nombre que nada
-   * de este repositorio puede comprobar — el mismo motivo por el que `/rentas/predios` estuvo
-   * fuera hasta #26.
+   * Los que admite son otros (`nroLicencia`, `nombreDelContribuyente`, `denominacionComercial`,
+   * `direccion`, `nExpediente`, `ordenarPor`, `pagina`, `tamano`), y mandar un `?ejercicio=` que el
+   * contrato no declara seria construir sobre un nombre que nada de este repositorio puede
+   * comprobar — el mismo motivo por el que `/rentas/predios` estuvo fuera hasta #26.
+   *
+   * Lo que si entra desde #186 es **la ventana**: `?pagina=` y `?tamano=`. **Y el orden no**, y no
+   * por prudencia: ver el javadoc de `AUT_TRAM`, donde esta medida la colision de `?direccion=`.
    */
-  licenciasDeFuncionamiento: '/licencias/funcionamiento',
+  licenciasDeFuncionamiento: (ventana: Readonly<Record<string, string>> = {}) =>
+    conParametros('/licencias/funcionamiento', ventana),
   /**
    * La papeleta que `tra-pap` dibuja: **la primera de la relacion, sin filtrar** (#180).
    *
@@ -1606,18 +1632,19 @@ export const RUTAS = {
   actosDeLaPapeleta: (numero: string) =>
     `/transito/papeletas/${encodeURIComponent(numero)}/actos`,
   /**
-   * La grilla «Vehiculos en deposito», **sin filtrar** (#180).
-   *
-   * `?tamano=20` escrito y no omitido, por lo mismo que `ciiu`: el numero que decide cuantas filas
-   * viajan tiene que estar a la vista de quien lea esta linea y no escondido en un valor por
-   * omision del backend. El artboard dibuja «3 de 188», o sea que la tabla **siempre** fue una
-   * ventana sobre el deposito y no su inventario.
+   * La grilla «Vehiculos en deposito», **sin filtrar** (#180, #186).
    *
    * Es el deposito entero y no el del vehiculo de la direccion: la tabla de esta hoja es la del
    * deposito, y acotarla a una placa la convertiria en otra cosa. Los cuatro criterios que la
-   * operacion admite —`placa`, `deposito`, `estado`, `aLaFecha`— llegan con #172.
+   * operacion admite —`placa`, `deposito`, `estado`, `aLaFecha`— siguen sin tener por donde
+   * entrar: son mandos del formulario, y eso es lo que #172 dejo abierto.
+   *
+   * El artboard dibuja «3 de 188», o sea que la tabla **siempre** fue una ventana sobre el
+   * deposito y no su inventario. Desde #186 lo es de verdad: el tamano lo declara la tabla y la
+   * pagina viene de la ruta.
    */
-  internamientos: '/transito/internamientos?tamano=20',
+  internamientos: (ventana: Readonly<Record<string, string>> = {}) =>
+    conParametros('/transito/internamientos', ventana),
   /**
    * Los internamientos de UNA placa, para los campos que son de **ese** vehiculo (#180).
    *
@@ -1667,6 +1694,27 @@ export const RUTAS = {
   espectaculos: '/rentas/espectaculos',
   conjuntoSellado: (ejercicio: string) => `/seguridad/parametros/ejercicios/${ejercicio}`,
 } as const;
+
+/**
+ * **Una ruta con sus parametros, escritos una sola vez y siempre codificados** (#172).
+ *
+ * Hace falta desde que lo que se manda no es fijo: la pagina, el campo de orden y lo tecleado en un
+ * buscador salen de la ruta de la hoja, asi que la cadena de consulta se COMPONE en vez de estar
+ * escrita. Componerla a mano en cada conector es como se llega a un `?` de mas, a un `&` de menos y
+ * a un valor sin codificar — y un codigo con una barra dentro ya rompio esto una vez (#26).
+ *
+ * Un parametro vacio **no viaja**: `?descripcion=` no es «buscar la cadena vacia», es no buscar.
+ */
+export function conParametros(
+  ruta: string,
+  parametros: Readonly<Record<string, string>>,
+): string {
+  const partes = Object.entries(parametros)
+    .filter(([, valor]) => valor !== '')
+    .map(([nombre, valor]) => `${nombre}=${encodeURIComponent(valor)}`);
+  if (partes.length === 0) return ruta;
+  return `${ruta}${ruta.includes('?') ? '&' : '?'}${partes.join('&')}`;
+}
 
 /** Pide una operacion paginada y devuelve solo su contenido. */
 export async function pedirLista<T>(ruta: string, senal?: AbortSignal): Promise<readonly T[]> {

@@ -72,6 +72,10 @@ export const COACTIVA = {
           },
         ],
         tabla: {
+          // Con `clave`, «Costa S/» y «Estado» pueden decir que no hay dato **y por que**, en vez
+          // de una raya muda cuyo motivo solo vive en el javadoc del conector (#195).
+          clave: 'actos-del-expediente',
+          sinDato: { texto: '—', nota: 'Ninguna operacion del contrato publica este dato.' },
           titulo: 'Actos del expediente',
           accion: 'Dictar acto',
           columnas: [
@@ -143,6 +147,9 @@ export const COACTIVA = {
           },
         ],
         tabla: {
+          // «Cantidad» dice por que esta vacia: el arancel tarifa el acto UNA vez (#195).
+          clave: 'costas-por-acto',
+          sinDato: { texto: '—', nota: 'Ninguna operacion del contrato publica este dato.' },
           titulo: 'Costas por acto',
           columnas: [
             { rotulo: 'Acto', alineadoDerecha: false },

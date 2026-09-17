@@ -350,7 +350,9 @@ const RESUMEN_DE_PAPELETAS: ResumenDePapeletas = {
 const MUESTRAS: Readonly<Partial<Record<ClaveDeHoja, unknown>>> = {
   panel: CORRIDA,
   'coa-panel': PAGINA,
-  'coa-exp': PROCESO,
+  // `coa-exp` recibe el proceso **y lo que se pudo saber de sus costas** desde #200: son dos
+  // operaciones que se cruzan por `actoId`, y la del cruce puede fallar sin tumbar la tabla.
+  'coa-exp': { proceso: PROCESO, costas: { seSupo: true, porActo: new Map([[11, '18.00']]) } },
   'coa-cost': COSTAS,
   'aut-cat': CIIU,
   'aut-tram': PADRON,
