@@ -13,15 +13,17 @@ import { YA_SERVIDAS } from './datos/servidas.ts';
  *
  * <h2>Los cuatro casos NO son uno, y esto esta medido</h2>
  *
- * Sobre las 40 pantallas y las **103** declaraciones de operacion del artboard, remedido en #173
- * —eran 101 hasta que #169 le anadio una a `con-panel` y #179 otra a `fis-prog`; las tres cifras
- * de servidas cambiaron ademas porque `YA_SERVIDAS` paso de 8 a 32 entre I-4 y #180—:
+ * Sobre las 40 pantallas y las **104** declaraciones de operacion del artboard, remedido en #184
+ * —eran 101 hasta que #169 le anadio una a `con-panel`, #179 otra a `fis-prog` y #184 otra a
+ * `tra-panel`; las tres cifras de servidas cambiaron ademas porque `YA_SERVIDAS` paso de 8 a 33
+ * entre I-4 y #184—:
  *
- *   · **15 hojas no declaran ninguna operacion servida.** No hay a quien preguntar.
- *   · **36 de las 103 declaraciones llevan el verbo `BASE`**, que el propio artboard define como
- *     «solo se leyo el `@RequestMapping` de la clase: sus metodos no se han verificado». **Doce
- *     hojas lo tienen TODO en `BASE`** — de ellas no se sabe ni con que verbo se pediria.
- *   · **25 hojas tienen al menos una servida**, y de esas **17** se pintan de verdad.
+ *   · **14 hojas no declaran ninguna operacion servida.** No hay a quien preguntar.
+ *   · **36 de las 104 declaraciones llevan el verbo `BASE`**, que el propio artboard define como
+ *     «solo se leyo el `@RequestMapping` de la clase: sus metodos no se han verificado». **Once
+ *     hojas lo tienen TODO en `BASE`** — de ellas no se sabe ni con que verbo se pediria. Eran
+ *     doce hasta que `tra-panel` gano la operacion que la sirve.
+ *   · **26 hojas tienen al menos una servida**, y de esas **18** se pintan de verdad.
  *   · Y una —`aut-panel`, desde #173— **no declara NINGUNA operacion**, que no es lo mismo que
  *     declararlas todas en `BASE` y hay que no confundirlo: ver el `length > 0` de abajo.
  *   · **Cuatro hojas no declaran ni un `GET` y si declaran escrituras** (#182): `territorio`,

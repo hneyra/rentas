@@ -278,7 +278,28 @@ export const ARBOL = [
       {
         clave: 'tra-panel',
         rotulo: 'Panel',
+        // **Declaraba SOLO `BASE /transito/estado-cuenta`, y esa operacion no pinta esta pantalla**
+        // (#184). Es el caso de #169 y #173: la ruta se eligio por el CONTROLADOR del modulo —la
+        // nota lo dice— y no por lo que la pantalla ensena. `/transito/estado-cuenta` publica el
+        // estado de cuenta de UNA PLACA, y este panel no tiene placa: son cinco recuentos del
+        // ejercicio entero.
+        //
+        // Los agregados si existen, y estaban publicados sin que nadie los nombrara: el contrato
+        // trae DIEZ rutas bajo `/transito/reportes/` y ninguna hoja declaraba una sola. La que
+        // dibuja este panel es `resumen-papeletas` —medida contra las otras tres `resumen-*`, ver
+        // `datos/servidas.ts`—, y de ella salen tres de los cinco recuentos.
+        //
+        // **`/transito/estado-cuenta` se queda**, al contrario que en #173. Alli la operacion se
+        // fue porque la hoja de la que salia SI la puede dibujar (`aut-tram`); aqui no hay otra
+        // hoja de Transito que ensene el estado de cuenta de una placa, asi que retirarla de este
+        // arbol la borraria del mapa entero. Sigue en `BASE` —«solo se leyo el `@RequestMapping`
+        // de la clase»— y eso es exactamente lo que se sabe de ella.
         operaciones: [
+          {
+            verbo: 'GET',
+            ruta: '/transito/reportes/resumen-papeletas',
+            nota: 'ResumenesDeTransitoController',
+          },
           {
             verbo: 'BASE',
             ruta: '/transito/estado-cuenta',

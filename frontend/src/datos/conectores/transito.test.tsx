@@ -14,9 +14,10 @@ import type {
   InternamientoEnDeposito,
   Paginado,
   VehiculoServido,
+  ResumenDePapeletas,
 } from '../lecturas.ts';
 import { TONO_SIN_RECONOCER, tonoDe } from '../../pantallas/tono.ts';
-import { SIN_PLACA, TRA_PAP, TRA_VEH } from './transito.ts';
+import { SIN_PLACA, TRA_PANEL, TRA_PAP, TRA_VEH } from './transito.ts';
 
 /**
  * **Que `tra-pap` y `tra-veh` ensenen lo que LLEGO, y que lo que no llego lo DIGAN** (#180).
@@ -63,6 +64,46 @@ function internado(campos: Partial<InternamientoEnDeposito> = {}): Internamiento
     // El CONCEPTO del TUPA, no una tarifa. Ver `conectores/transito.ts`.
     tasaDeCustodia: 'TUPA-2.14 CUSTODIA DIARIA',
     acta: 'ACTA-2026-0311',
+    ...campos,
+  };
+}
+
+/** Una linea de resumen, con los doce campos que el contrato declara. */
+function lineaDelResumen(
+  campos: Partial<ResumenDePapeletas['lineas'][number]> = {},
+): ResumenDePapeletas['lineas'][number] {
+  return {
+    clave: '2026',
+    descripcion: null,
+    ano: 2026,
+    cantidad: 8412,
+    importe: '1542880.00',
+    pagadas: 2118,
+    importeDeLasPagadas: '388440.00',
+    pendientes: 6294,
+    importeDeLasPendientes: '1154440.00',
+    enCoactiva: 388,
+    importeEnCoactiva: '71148.00',
+    actualizadoA: '2026-09-17',
+    ...campos,
+  };
+}
+
+/**
+ * Un resumen de papeletas, con los siete campos que el contrato declara.
+ *
+ * Por omision **una sola linea**, que es lo que devuelve la peticion que el conector hace:
+ * `?agrupadoPor=ANO` sin rango, o sea un ano natural agrupado por ano.
+ */
+function resumen(campos: Partial<ResumenDePapeletas> = {}): ResumenDePapeletas {
+  return {
+    agrupadoPor: 'ANO',
+    desde: '2026-01-01',
+    hasta: '2026-12-31',
+    papeletas: 8412,
+    importeTotal: '1542880.00',
+    actualizadoA: '2026-09-17',
+    lineas: [lineaDelResumen()],
     ...campos,
   };
 }
@@ -158,6 +199,9 @@ const EXPEDIENTE_B: ExpedienteDeLaPapeleta = {
 // ── Lo que el ARTBOARD dibuja, y que por tanto no puede salir de una respuesta ──────────────
 
 const FILA_DEL_ARTBOARD = {
+  // Las cinco cifras que `RentasV8.dc.html` dibuja en `tra-panel`. Ninguna puede llegar al DOM
+  // desde un resumen que no las trae: si aparecen, es que la pantalla las lleva dentro.
+  'tra-panel': ['8,412', '5,884', '2,118', '1,842', '388'],
   'tra-pap': ['Levantamiento', 'Cedula 2026-0884', 'Conforme', 'Por vencer'],
   'tra-veh': ['V1H-882', 'M4J-118', 'Camioneta', 'Motocicleta'],
 } as const;
@@ -216,6 +260,11 @@ async function pintar(
   return { container, pedidas };
 }
 
+/** Lo que `tra-panel` necesita del doble: una sola operacion. */
+function comoTraPanel(cuerpo: ResumenDePapeletas) {
+  return [['/transito/reportes/resumen-papeletas', cuerpo]] as const;
+}
+
 /** Lo que `tra-pap` necesita del doble: la relacion y el expediente de la primera. */
 function comoTraPap(expediente: ExpedienteDeLaPapeleta) {
   return [
@@ -245,6 +294,126 @@ function valoresEscritos(container: HTMLElement): readonly string[] {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+});
+
+describe('`tra-panel` — los cinco recuentos del ejercicio (#184)', () => {
+  const reparto = TRA_PANEL.repartir(resumen() as never);
+
+  it('el EJERCICIO sale de `desde` y no de la primera opcion del desplegable', () => {
+    // Es el rango que la respuesta DICE haber contado (regla 9, RNF-075). Dejarlo en «2026»
+    // porque es lo que el artboard escribio primero seria afirmarlo sin saberlo: con la misma
+    // pantalla contra un backend puesto en 2025, la cifra seria de 2025 y el rotulo diria 2026.
+    expect(reparto.valores.get(coordenada(0, 0))).toBe('2026');
+    const otro = TRA_PANEL.repartir(
+      resumen({ desde: '2024-01-01', hasta: '2024-12-31' }) as never,
+    );
+    expect(otro.valores.get(coordenada(0, 0))).toBe('2024');
+  });
+
+  it('los TRES recuentos que la operacion publica salen de ella, uno a uno', () => {
+    // «Levantadas» es el total del RESUMEN —calculado en el servidor—, y los otros dos son de la
+    // linea del ejercicio.
+    expect(reparto.valores.get(coordenada(0, 1))).toBe('8412');
+    expect(reparto.valores.get(coordenada(0, 3))).toBe('2118');
+    expect(reparto.valores.get(coordenada(0, 5))).toBe('388');
+  });
+
+  it('«Levantadas» es `papeletas` y NO la suma de las lineas hecha aqui', () => {
+    // El total va calculado en el servidor: recomponerlo en el cliente es como se acaba
+    // mostrando una cifra que no coincide con el papel exportado. Con un `papeletas` que no
+    // cuadre con las lineas, lo que se dibuja es el del servidor.
+    const raro = TRA_PANEL.repartir(
+      resumen({ papeletas: 9999, lineas: [lineaDelResumen({ cantidad: 1 })] }) as never,
+    );
+    expect(raro.valores.get(coordenada(0, 1))).toBe('9999');
+  });
+
+  it('los DOS que nadie publica lo dicen, y no con un cero', () => {
+    // «Notificadas»: ningun codigo de produccion escribe `NOTIFICADA`, asi que contarlo daria
+    // cero siempre bajo un rotulo que dice cuantas se notificaron. «Caducadas sin notificar» ni
+    // siquiera es un estado: necesita ademas un plazo, que es valor normativo (regla 5).
+    expect(reparto.noPublicados.get(coordenada(0, 2))).toBe(NO_PUBLICADO);
+    expect(reparto.noPublicados.get(coordenada(0, 4))).toBe(NO_PUBLICADO);
+    expect(reparto.valores.has(coordenada(0, 2))).toBe(false);
+    expect(reparto.valores.has(coordenada(0, 4))).toBe(false);
+  });
+
+  it('«Caducadas sin notificar» NO se rellena con `pendientes`, que es el numero que encajaria', () => {
+    // 6 294 cabe en ese hueco sin que nada chirrie, y es la cifra equivocada: una papeleta
+    // pendiente SE PUEDE cobrar y una caducada es justo la que ya no. Debajo de una instruccion
+    // que manda atenderlas primero, ese numero manda a atender lo que no hace falta.
+    expect(JSON.stringify([...reparto.valores])).not.toContain('6294');
+  });
+
+  it('con VARIAS lineas, los dos de la linea dicen «no publicado» en vez de leer la primera', () => {
+    // La peticion es de un ano natural agrupado por ano, o sea UNA linea. Si algun dia llegaran
+    // dos, leer la primera pondria las cuentas de un TROZO del periodo bajo unos rotulos que
+    // hablan del ejercicio entero: exacta y equivocada. «Levantadas» sigue saliendo, porque el
+    // total del resumen si cubre todo lo que llego.
+    const dosAnos = TRA_PANEL.repartir(
+      resumen({
+        desde: '2025-01-01',
+        papeletas: 8500,
+        lineas: [
+          lineaDelResumen({ clave: '2025', ano: 2025, cantidad: 88, pagadas: 11, enCoactiva: 3 }),
+          lineaDelResumen(),
+        ],
+      }) as never,
+    );
+    // Primero el dano y luego la forma: las 11 pagadas de 2025 NO pueden acabar bajo un rotulo
+    // que dice «Canceladas» de un panel que se titula «Papeletas del ejercicio».
+    expect(
+      [...dosAnos.valores.values()],
+      'Se escribio la cuenta de UNA linea bajo un rotulo del ejercicio entero',
+    ).not.toContain('11');
+    expect(dosAnos.noPublicados.get(coordenada(0, 3))).toBe(NO_PUBLICADO);
+    expect(dosAnos.noPublicados.get(coordenada(0, 5))).toBe(NO_PUBLICADO);
+    expect(dosAnos.valores.get(coordenada(0, 1))).toBe('8500');
+  });
+
+  it('y sin ninguna linea tampoco se deduce un cero', () => {
+    // Un resumen vacio dice que no hubo papeletas, y de ahi se PODRIA deducir que no hay ninguna
+    // pagada. Deducir es lo que este archivo no hace: lo que no llego, no se escribe.
+    const vacio = TRA_PANEL.repartir(resumen({ papeletas: 0, lineas: [] }) as never);
+    expect(vacio.noPublicados.get(coordenada(0, 3))).toBe(NO_PUBLICADO);
+    expect(vacio.noPublicados.get(coordenada(0, 5))).toBe(NO_PUBLICADO);
+    expect(vacio.valores.get(coordenada(0, 1))).toBe('0');
+  });
+
+  it('y un ejercicio FUERA de las opciones del desplegable deja el control en BLANCO', async () => {
+    // Medido, y queda escrito porque es una limitacion real de esta hoja: el desplegable lleva
+    // las opciones del artboard —«2026» y «2025»—, y un valor servido que no sea una de ellas no
+    // se dibuja. El reparto **si** lo lleva: lo que se pierde es la casilla, no el dato.
+    //
+    // Se deja asi a proposito. La alternativa era no escribir el ejercicio nunca, y entonces el
+    // desplegable se quedaria en su primera opcion —«2026»— afirmando un ano que nadie dijo: en
+    // 2027 diria «2026» sobre cifras de 2027, que es peor que decir nada. En blanco no se afirma
+    // nada, y las cinco cifras de debajo siguen siendo las que llegaron. El dia que el
+    // desplegable se llene con los ejercicios que existan en vez de con dos literales del
+    // artboard, esto deja de poder pasar.
+    const reparto2024 = TRA_PANEL.repartir(
+      resumen({ desde: '2024-01-01', hasta: '2024-12-31' }) as never,
+    );
+    expect(reparto2024.valores.get(coordenada(0, 0))).toBe('2024');
+
+    const { container } = await pintar(
+      'tra-panel',
+      comoTraPanel(resumen({ desde: '2024-01-01', hasta: '2024-12-31' })),
+    );
+    expect(container.textContent).not.toContain('Ejercicio2024');
+    // Y lo que si llega es todo lo demas: la casilla en blanco no se lleva la pantalla por
+    // delante.
+    expect(container.textContent).toContain('Levantadas8412');
+  });
+
+  it('esta hoja no tiene tabla: su bloque son seis campos', () => {
+    // El tipo de la definicion ya lo dice —el bloque de `tra-panel` no declara `tabla`, y por eso
+    // esta linea no compilaria si se escribiera `.tabla`—, asi que lo que se afirma aqui es que
+    // el reparto no intente llenar ninguna por ninguno de los dos caminos.
+    expect(PANTALLAS['tra-panel'].bloques[0]?.campos).toHaveLength(6);
+    expect(reparto.filas.size).toBe(0);
+    expect(reparto.tablas).toBeUndefined();
+  });
 });
 
 describe('`tra-pap` — los actos de una papeleta', () => {
@@ -445,6 +614,36 @@ describe('LA ROTURA DEL AC3, en el DOM: con otra respuesta, la pantalla ensena o
     for (const celda of FILA_DEL_ARTBOARD['tra-pap']) {
       expect(otra.container.textContent, `«${celda}» es del artboard`).not.toContain(celda);
     }
+  });
+
+  it('`tra-panel` dibuja las cifras que llegaron, y ninguna de las cinco del artboard', async () => {
+    // Los seis campos de esta hoja son de solo lectura o un desplegable: el interprete los
+    // escribe en el texto y no en un `<input>`, al contrario que los de `tra-veh`.
+    const { container } = await pintar('tra-panel', comoTraPanel(resumen()));
+    expect(container.textContent).toContain('Levantadas8412');
+    expect(container.textContent).toContain('Canceladas2118');
+
+    const otro = await pintar(
+      'tra-panel',
+      comoTraPanel(
+        resumen({
+          desde: '2025-01-01',
+          hasta: '2025-12-31',
+          papeletas: 311,
+          lineas: [lineaDelResumen({ clave: '2025', ano: 2025, pagadas: 77, enCoactiva: 4 })],
+        }),
+      ),
+    );
+    expect(otro.container.textContent).toContain('Ejercicio2025');
+    expect(otro.container.textContent).toContain('Levantadas311');
+    expect(otro.container.textContent).toContain('Canceladas77');
+    expect(otro.container.textContent).not.toContain('8412');
+
+    for (const celda of FILA_DEL_ARTBOARD['tra-panel']) {
+      expect(otro.container.textContent, `«${celda}» es del artboard`).not.toContain(celda);
+    }
+    // Y los dos huecos llegan al DOM diciendolo, no en blanco.
+    expect(otro.container.textContent).toContain(NO_PUBLICADO);
   });
 
   it('`tra-veh` tambien, y su tabla sale del deposito que contesto', async () => {

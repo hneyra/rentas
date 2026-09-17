@@ -103,7 +103,7 @@ describe('AC4 — la raiz de la API es UNA, escrita en tres sitios que tienen qu
 });
 
 describe('AC7 — lo que se declara servido tiene que publicarlo el backend', () => {
-  it('las treinta y dos: I-1, I-3, I-4, #168, #170, #167, #169, #181, #179 y las cuatro de #180', () => {
+  it('las treinta y tres: I-1, I-3, I-4, #168, #170, #167, #169, #181, #179, #180 y la de #184', () => {
     // La lista escrita a mano es a proposito. Derivarla de `YA_SERVIDAS` la haria pasar diga lo
     // que diga: encender una ruta es una decision, y una decision se revisa leyendo su diff. La
     // lista crece de una en una porque encenderlas todas a la vez seria cambiar 181 respuestas
@@ -142,6 +142,7 @@ describe('AC7 — lo que se declara servido tiene que publicarlo el backend', ()
       'GET /transito/papeletas/{numero}/actos',
       'GET /transito/internamientos',
       'GET /rentas/vehiculos/{placa}',
+      'GET /transito/reportes/resumen-papeletas',
     ]);
   });
 
@@ -279,7 +280,7 @@ describe('AC7 — lo que se declara servido tiene que publicarlo el backend', ()
     expect(fuera).not.toContain('GET /consultas/constancias/no-adeudo?formato');
   });
 
-  it('la bitacora declara `ejercicio` OBLIGATORIO, y es la unica de las treinta y dos (#181)', () => {
+  it('la bitacora declara `ejercicio` OBLIGATORIO, y es la unica de las treinta y tres (#181)', () => {
     // Es la medida que abrio #181, y la que justifica que `Conector` tenga una tercera forma de
     // exigir algo. Las otras treinta y una, o no tienen obligatorio, o lo llevan **en la ruta** —y en
     // la ruta no se olvida, porque sin el la URL no existe—. Este va en la cadena de consulta y
