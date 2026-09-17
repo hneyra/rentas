@@ -664,7 +664,7 @@ class NotificacionYPaseJdbcTest {
                                                                     0,
                                                                     20,
                                                                     "observacion",
-                                                                    Paginacion.Direccion
+                                                                    Paginacion.Sentido
                                                                             .ASCENDENTE))))
                     .as("el nombre de columna no se puede parametrizar en un ORDER BY")
                     .isInstanceOf(OrdenSeguro.OrdenNoAdmitido.class);
@@ -702,7 +702,7 @@ class NotificacionYPaseJdbcTest {
         }
 
         private Paginacion unaPagina() {
-            return new Paginacion(0, 200, "numero", Paginacion.Direccion.ASCENDENTE);
+            return new Paginacion(0, 200, "numero", Paginacion.Sentido.ASCENDENTE);
         }
     }
 
@@ -748,7 +748,7 @@ class NotificacionYPaseJdbcTest {
                                                             0,
                                                             1,
                                                             "numero",
-                                                            Paginacion.Direccion.ASCENDENTE)))
+                                                            Paginacion.Sentido.ASCENDENTE)))
                             .totalElementos();
 
             assertThat(cuantosSinNotificar())

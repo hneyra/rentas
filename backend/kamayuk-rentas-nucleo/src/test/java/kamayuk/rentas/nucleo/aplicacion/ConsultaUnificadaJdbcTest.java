@@ -135,7 +135,7 @@ class ConsultaUnificadaJdbcTest {
             Clock.fixed(Instant.parse("2026-08-28T10:00:00Z"), ZoneId.of("America/Lima"));
 
     private static final Paginacion PAGINA =
-            new Paginacion(0, 20, "ejercicio", Paginacion.Direccion.DESCENDENTE);
+            new Paginacion(0, 20, "ejercicio", Paginacion.Sentido.DESCENDENTE);
 
     private static BaseDeDatosDePrueba base;
     private static long municipalidad;
@@ -330,7 +330,7 @@ class ConsultaUnificadaJdbcTest {
                                                     0,
                                                     20,
                                                     "fecha_valor",
-                                                    Paginacion.Direccion.DESCENDENTE)));
+                                                    Paginacion.Sentido.DESCENDENTE)));
 
             assertThat(individual).isNotNull();
             assertThat(ficha.pagos().totalElementos()).isEqualTo(individual.totalElementos());
@@ -362,7 +362,7 @@ class ConsultaUnificadaJdbcTest {
                                                     0,
                                                     20,
                                                     "fecha_valor",
-                                                    Paginacion.Direccion.DESCENDENTE)));
+                                                    Paginacion.Sentido.DESCENDENTE)));
 
             assertThat(individual).isNotNull();
             assertThat(ficha.altasYBajas().totalElementos())
@@ -384,7 +384,7 @@ class ConsultaUnificadaJdbcTest {
             Pagina<ConvenioEnConsulta> individual =
                     consultaDeConvenios.listar(
                             new CriterioDeConvenios(null, codigo, null, null, null, HOY),
-                            new Paginacion(0, 20, "fecha", Paginacion.Direccion.DESCENDENTE));
+                            new Paginacion(0, 20, "fecha", Paginacion.Sentido.DESCENDENTE));
 
             assertThat(ficha.fraccionamientos().totalElementos())
                     .isEqualTo(individual.totalElementos());
@@ -410,8 +410,7 @@ class ConsultaUnificadaJdbcTest {
             Pagina<ConsultaDeValores.FilaDeValor> individual =
                     consultaDeValores.buscar(
                             new CriterioDeConsultaDeValores(null, id, null, null, null, HOY),
-                            new Paginacion(
-                                    0, 20, "fecha_emision", Paginacion.Direccion.DESCENDENTE));
+                            new Paginacion(0, 20, "fecha_emision", Paginacion.Sentido.DESCENDENTE));
 
             assertThat(ficha.valores().totalElementos()).isEqualTo(individual.totalElementos());
             ValorDelContribuyente enLaFicha = ficha.valores().contenido().getFirst();
@@ -436,7 +435,7 @@ class ConsultaUnificadaJdbcTest {
             ConsultaUnificada.Ficha ficha =
                     consulta.de(
                             criterio(codigo),
-                            new Paginacion(0, 1, "ejercicio", Paginacion.Direccion.DESCENDENTE));
+                            new Paginacion(0, 1, "ejercicio", Paginacion.Sentido.DESCENDENTE));
 
             assertThat(ficha.deudas().contenido()).hasSize(1);
             assertThat(ficha.deudas().totalElementos()).isEqualTo(2);

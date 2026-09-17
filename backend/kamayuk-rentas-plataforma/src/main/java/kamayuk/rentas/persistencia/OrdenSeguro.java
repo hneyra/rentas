@@ -173,7 +173,7 @@ public final class OrdenSeguro {
         if (columna == null) {
             throw new OrdenNoAdmitido(paginacion.ordenarPor(), columnasPorCampo.keySet());
         }
-        String clausula = "ORDER BY " + columna + " " + paginacion.direccion().sql();
+        String clausula = "ORDER BY " + columna + " " + paginacion.sentido().sql();
         if (nulosAlFinal.contains(columna)) {
             clausula = clausula + " NULLS LAST";
         }

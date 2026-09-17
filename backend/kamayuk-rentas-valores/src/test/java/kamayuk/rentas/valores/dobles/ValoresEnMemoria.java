@@ -142,7 +142,7 @@ public final class ValoresEnMemoria implements ValorRepository {
         return consultar(
                         criterio,
                         new Paginacion(
-                                0, Integer.MAX_VALUE, "numero", Paginacion.Direccion.ASCENDENTE))
+                                0, Integer.MAX_VALUE, "numero", Paginacion.Sentido.ASCENDENTE))
                 .totalElementos();
     }
 

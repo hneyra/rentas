@@ -155,7 +155,7 @@ public class LicenciaController {
      * contiene «DESCENDENTE» —o sea a ninguna— <b>y ademas</b> ordenaba al reves, y lo que se veia
      * era una tabla vacia, que se lee como «este padron no tiene nada». Y al reves: mandar una
      * direccion de verdad fallaba en el enlace, porque el mismo texto tenia que convertirse a
-     * {@code Paginacion.Direccion}. O sea que este filtro <b>no se podia usar</b>, y por eso
+     * {@code Paginacion.Sentido}. O sea que este filtro <b>no se podia usar</b>, y por eso
      * renombrarlo no rompe a nadie: no habia peticion correcta que romper.
      *
      * <p>Lo que cede es el filtro y no el dialecto: los cuatro nombres de la paginacion son los

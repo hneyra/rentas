@@ -1138,7 +1138,7 @@ class ExpedienteCoactivoJdbcTest {
     }
 
     private static Paginacion unaPagina() {
-        return new Paginacion(0, 200, "numero", Paginacion.Direccion.ASCENDENTE);
+        return new Paginacion(0, 200, "numero", Paginacion.Sentido.ASCENDENTE);
     }
 
     /** Un contribuyente con su cargo de predial ya asentado en el libro. */

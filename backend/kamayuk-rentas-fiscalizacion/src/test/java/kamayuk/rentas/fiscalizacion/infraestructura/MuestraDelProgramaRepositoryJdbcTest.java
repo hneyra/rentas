@@ -52,7 +52,7 @@ class MuestraDelProgramaRepositoryJdbcTest {
     private static final LocalDate SORTEO = LocalDate.of(2026, 3, 15);
     private static final Instant REGISTRO = Instant.parse("2026-03-15T10:00:00Z");
     private static final Paginacion PRIMERA =
-            new Paginacion(0, 20, "codRefCatastral", Paginacion.Direccion.ASCENDENTE);
+            new Paginacion(0, 20, "codRefCatastral", Paginacion.Sentido.ASCENDENTE);
 
     private static BaseDeDatosDePrueba base;
     private static long municipalidadA;

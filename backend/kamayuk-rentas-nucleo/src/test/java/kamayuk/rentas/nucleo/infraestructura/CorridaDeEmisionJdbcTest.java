@@ -148,7 +148,7 @@ class CorridaDeEmisionJdbcTest {
                                 repositorio.observadosDe(
                                         requireId(guardada),
                                         new Paginacion(
-                                                0, 20, "id", Paginacion.Direccion.ASCENDENTE)));
+                                                0, 20, "id", Paginacion.Sentido.ASCENDENTE)));
 
         assertThat(observados.contenido()).hasSize(1);
         assertThat(observados.contenido().get(0).codContribuyente()).isEqualTo("C-000042");

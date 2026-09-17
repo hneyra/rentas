@@ -677,7 +677,7 @@ class TransferenciaJdbcTest {
                             resoluciones.consultar(
                                     criterio,
                                     new Paginacion(
-                                            0, 50, "numero", Paginacion.Direccion.ASCENDENTE)));
+                                            0, 50, "numero", Paginacion.Sentido.ASCENDENTE)));
         }
     }
 

@@ -24,7 +24,7 @@ import org.jspecify.annotations.Nullable;
  * ?ordenarPor=numero&direccion=DESCENDENTE} acotaba el padron a las licencias cuya direccion
  * contiene «DESCENDENTE» —o sea a ninguna— y ademas ordenaba al reves; y mandar una direccion de
  * verdad era un 400 de enlace, porque el mismo texto tenia que convertirse a {@link
- * Paginacion.Direccion}. <b>El filtro no se podia usar.</b>
+ * Paginacion.Sentido}. <b>El filtro no se podia usar.</b>
  *
  * <p>#226 cedio por el lado del filtro, en las dos operaciones donde el choque existia: {@code
  * direccionDelEstablecimiento} y {@code direccionDelAnuncio}. #236 midio que ceder por ese lado no
@@ -37,9 +37,14 @@ import org.jspecify.annotations.Nullable;
  * —{@code _dialectoDeLaPaginacion} de {@code docs/50-api/parametros-de-la-api.json}, que sale de la
  * constante del guardia, contra {@code EN_LA_RUTA} de {@code frontend/src/pantallas/tablas.ts}—.
  *
- * <p><b>Lo que NO se renombro es el tipo</b>, {@link Paginacion.Direccion}: no viaja por la URL, lo
- * sujeta el compilador en los 28 archivos que lo nombran, y mezclarlo aqui habria enterrado el
- * cambio del contrato bajo 85 renombres mecanicos. Esta abierto aparte.
+ * <p><b>Y desde #250 el tipo dice la misma palabra</b>, {@link Paginacion.Sentido}. #236 lo dejo
+ * fuera a proposito —no viaja por la URL, lo sujeta el compilador, y mezclarlo habria enterrado un
+ * cambio de contrato de 79 operaciones bajo renombres mecanicos— y lo mando a su propio issue. Alli
+ * se midio lo que hacia falta medir: de los <b>81</b> {@code .direccion()} del arbol, <b>cuatro</b>
+ * son de este tipo y <b>77</b> son un domicilio —de un predio, de una licencia, de una
+ * notificacion, de un terreno—, asi que no era un {@code sed} y por eso no se hizo de paso. Ahora
+ * quien persigue {@code ?sentido=} desde el borde hasta el {@code ORDER BY} lee la misma palabra en
+ * todo el camino.
  *
  * <p><b>Y no se publican los dos nombres.</b> Medido al decidirlo: el unico cliente de esta API es
  * {@code rentas-web} —{@code caja} consume {@code POST /pagos}, que no pagina; {@code catastro},
@@ -56,7 +61,7 @@ public record ParametrosDePaginacion(
         @Nullable Integer pagina,
         @Nullable Integer tamano,
         @Nullable String ordenarPor,
-        Paginacion.@Nullable Direccion sentido) {
+        Paginacion.@Nullable Sentido sentido) {
 
     private static final int PAGINA_POR_OMISION = 0;
     private static final int TAMANO_POR_OMISION = 20;
@@ -73,6 +78,6 @@ public record ParametrosDePaginacion(
                 pagina == null ? PAGINA_POR_OMISION : pagina,
                 tamano == null ? TAMANO_POR_OMISION : tamano,
                 ordenarPor == null || ordenarPor.isBlank() ? ordenPorOmision : ordenarPor,
-                sentido == null ? Paginacion.Direccion.ASCENDENTE : sentido);
+                sentido == null ? Paginacion.Sentido.ASCENDENTE : sentido);
     }
 }

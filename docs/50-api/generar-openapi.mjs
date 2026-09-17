@@ -168,7 +168,8 @@ function filtrosDe(pantalla) {
  * `?ordenarPor=numero&direccion=DESCENDENTE` acotaba el padron a las licencias
  * cuya direccion contiene «DESCENDENTE» —o sea a ninguna— y ademas ordenaba al
  * reves; y mandar una direccion de verdad fallaba en el enlace, porque el mismo
- * texto tenia que convertirse a `Paginacion.Direccion`. O sea que el filtro **no
+ * texto tenia que convertirse a `Paginacion.Sentido` —que hasta #250 se llamaba
+ * `Paginacion.Direccion`, y ese es el nombre con el que choco—. O sea que el filtro **no
  * se podia usar**, y por eso renombrarlo no rompio ninguna peticion que
  * funcionara.
  *

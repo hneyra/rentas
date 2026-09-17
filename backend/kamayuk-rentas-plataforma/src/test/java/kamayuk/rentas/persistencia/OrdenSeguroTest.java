@@ -19,9 +19,7 @@ class OrdenSeguroTest {
     @DisplayName("arma la clausula con la columna y el sentido")
     void armaLaClausula() {
         assertThat(ORDEN.clausula(Paginacion.de(0, 10, "codigo"))).isEqualTo("ORDER BY codigo ASC");
-        assertThat(
-                        ORDEN.clausula(
-                                new Paginacion(0, 10, "codigo", Paginacion.Direccion.DESCENDENTE)))
+        assertThat(ORDEN.clausula(new Paginacion(0, 10, "codigo", Paginacion.Sentido.DESCENDENTE)))
                 .isEqualTo("ORDER BY codigo DESC");
     }
 
@@ -82,7 +80,7 @@ class OrdenSeguroTest {
                 .isEqualTo("ORDER BY orden ASC, id ASC");
         assertThat(
                         conDesempate.clausula(
-                                new Paginacion(0, 10, "codigo", Paginacion.Direccion.DESCENDENTE)))
+                                new Paginacion(0, 10, "codigo", Paginacion.Sentido.DESCENDENTE)))
                 .as("el desempate va siempre ASC: lo que hace falta es que el orden sea total")
                 .isEqualTo("ORDER BY codigo DESC, id ASC");
         assertThat(conDesempate.clausula(Paginacion.de(0, 10, "id")))
@@ -106,7 +104,7 @@ class OrdenSeguroTest {
         assertThat(
                         conNulos.clausula(
                                 new Paginacion(
-                                        0, 10, "sectorCodigo", Paginacion.Direccion.DESCENDENTE)))
+                                        0, 10, "sectorCodigo", Paginacion.Sentido.DESCENDENTE)))
                 .as("sin esto, «de mayor a menor» abre por las filas sin valor")
                 .isEqualTo("ORDER BY sector_codigo DESC NULLS LAST");
     }
@@ -122,10 +120,7 @@ class OrdenSeguroTest {
         assertThat(
                         conNulos.clausula(
                                 new Paginacion(
-                                        0,
-                                        10,
-                                        "diferenciaDeArea",
-                                        Paginacion.Direccion.DESCENDENTE)))
+                                        0, 10, "diferenciaDeArea", Paginacion.Sentido.DESCENDENTE)))
                 .isEqualTo("ORDER BY diferencia_de_area DESC NULLS LAST, id ASC");
     }
 

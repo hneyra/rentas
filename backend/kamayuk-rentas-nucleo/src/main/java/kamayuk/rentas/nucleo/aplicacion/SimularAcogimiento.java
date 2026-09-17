@@ -186,7 +186,7 @@ public class SimularAcogimiento {
                 "tributo".equals(paginacion.ordenarPor())
                         ? Comparator.comparing(ObligacionPublica::tributo)
                         : Comparator.comparing((ObligacionPublica o) -> o.ejercicio().valor());
-        if (paginacion.direccion() == Paginacion.Direccion.DESCENDENTE) {
+        if (paginacion.sentido() == Paginacion.Sentido.DESCENDENTE) {
             primario = primario.reversed();
         }
         seleccionadas.sort(

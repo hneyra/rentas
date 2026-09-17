@@ -18,14 +18,14 @@ import java.util.Objects;
  * en español (ARQ-04 §3). Lo que se queda en ingles son los patrones que no cruzan la frontera:
  * {@code ViaRepository}, {@code findById}.
  */
-public record Paginacion(int pagina, int tamano, String ordenarPor, Direccion direccion) {
+public record Paginacion(int pagina, int tamano, String ordenarPor, Sentido sentido) {
 
     /** Un tope, para que nadie pida el padron entero en una peticion HTTP. */
     public static final int TAMANO_MAXIMO = 500;
 
     public Paginacion {
         Objects.requireNonNull(ordenarPor, "Un listado paginado necesita un orden estable");
-        Objects.requireNonNull(direccion, "La direccion del orden es obligatoria");
+        Objects.requireNonNull(sentido, "El sentido del orden es obligatorio");
         if (pagina < 0) {
             throw new IllegalArgumentException("La pagina se cuenta desde 0: " + pagina);
         }
@@ -41,7 +41,7 @@ public record Paginacion(int pagina, int tamano, String ordenarPor, Direccion di
     }
 
     public static Paginacion de(int pagina, int tamano, String ordenarPor) {
-        return new Paginacion(pagina, tamano, ordenarPor, Direccion.ASCENDENTE);
+        return new Paginacion(pagina, tamano, ordenarPor, Sentido.ASCENDENTE);
     }
 
     /**
@@ -52,13 +52,13 @@ public record Paginacion(int pagina, int tamano, String ordenarPor, Direccion di
     }
 
     /** Sentido del orden. */
-    public enum Direccion {
+    public enum Sentido {
         ASCENDENTE("ASC"),
         DESCENDENTE("DESC");
 
         private final String sql;
 
-        Direccion(String sql) {
+        Sentido(String sql) {
             this.sql = sql;
         }
 

@@ -146,7 +146,7 @@ public class ConsultaDelEmbudo {
                                         0,
                                         UNA_FILA,
                                         ORDEN_DEL_RECORRIDO,
-                                        Paginacion.Direccion.ASCENDENTE))
+                                        Paginacion.Sentido.ASCENDENTE))
                         .totalElementos();
     }
 

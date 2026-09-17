@@ -424,7 +424,7 @@ public class ConsultarDeuda {
                 "tributo".equals(paginacion.ordenarPor())
                         ? Comparator.comparing(r -> r.obligacion().tributo())
                         : Comparator.comparing((Renglon r) -> r.obligacion().ejercicio().valor());
-        if (paginacion.direccion() == Paginacion.Direccion.DESCENDENTE) {
+        if (paginacion.sentido() == Paginacion.Sentido.DESCENDENTE) {
             primario = primario.reversed();
         }
         renglones.sort(

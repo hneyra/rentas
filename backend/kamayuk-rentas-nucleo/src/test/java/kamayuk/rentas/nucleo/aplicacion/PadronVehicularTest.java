@@ -399,7 +399,7 @@ class PadronVehicularTest {
             return consulta.buscar(
                     criterio,
                     LocalDate.now(RELOJ),
-                    new Paginacion(0, 20, "placa", Paginacion.Direccion.ASCENDENTE));
+                    new Paginacion(0, 20, "placa", Paginacion.Sentido.ASCENDENTE));
         }
 
         /**

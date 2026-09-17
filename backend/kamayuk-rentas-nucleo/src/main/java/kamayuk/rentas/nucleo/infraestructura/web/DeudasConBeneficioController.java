@@ -214,7 +214,7 @@ public class DeudasConBeneficioController {
                         ? ORDEN_POR_OMISION
                         : parametros.ordenarPor(),
                 parametros.sentido() == null
-                        ? Paginacion.Direccion.DESCENDENTE
+                        ? Paginacion.Sentido.DESCENDENTE
                         : parametros.sentido());
     }
 }
