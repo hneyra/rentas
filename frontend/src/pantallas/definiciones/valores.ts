@@ -179,18 +179,44 @@ export const VALORES = {
             tipo: 's',
             opciones: ['Todos', 'Vigente', 'Por prescribir', 'Prescrito'],
           },
-          { etiqueta: 'Prescriben este año', tipo: 'r' },
+          // **«Declaraciones», y no «Prescriben este año»** (#230, y su gemelo en el artboard).
+          // Lo de antes era un agregado del padron —cuantos valores prescriben dentro del ano en
+          // curso y cuanto suman— que ninguna operacion publica; contarlo sobre la pagina que llega
+          // daria una cifra sobre veinte de cientos. Este es `totalElementos`, que la operacion
+          // publica sobre la bitacora entera: el mismo camino que #172 abrio para «3 de 188».
+          { etiqueta: 'Declaraciones', tipo: 'r' },
         ],
         tabla: {
+          // Con `clave`, las filas llegan por `DatosDeLaPantalla.tablas` (`kamayuk-lib`#87, #180).
+          clave: 'reloj-de-prescripcion',
+          sinDato: { texto: '—', nota: 'Ninguna operacion publica este dato.' },
           titulo: 'Reloj de prescripción',
+          // **Cuatro columnas, y hasta #230 eran cinco.** El artboard dibujaba un reloj agregado
+          // POR EJERCICIO —«Ejercicio · Valores · Importe S/ · Prescribe el · Situación»— sobre una
+          // operacion que publica la bitacora de DECLARACIONES. Lo que cambia, y por que:
+          //
+          //   · **«Valores» e «Importe S/» salen.** El backend se niega a publicarlos por escrito y
+          //     con su motivo: «la prescripcion no extingue un importe: deja sin accion su cobro …
+          //     publicar aqui un importe obligaria ademas a decir a que fecha (regla 9), y la fecha
+          //     que tendria sentido no es un dato de esta fila sino del libro» (`PrescripcionEnLista`).
+          //     Agruparlos aqui es lo que prohibe `datos/conectores.ts`, y sobre una pagina de
+          //     veinte de cientos seria ademas una cifra falsa.
+          //   · **«Prescribe el» se queda**, y desde #230 tiene de donde salir:
+          //     `ejercicios[].prescribeEl`. Viaja como DATO —la fecha que el computo resolvio el dia
+          //     de la solicitud, con el plazo del conjunto sellado de entonces—, y no se resta aqui.
+          //   · **«Contribuyente» entra**: la fila ya no es un tramo del padron sino el ejercicio de
+          //     la declaracion de alguien, y una fecha de prescripcion sin decir de quien no dice nada.
           columnas: [
+            { rotulo: 'Contribuyente', alineadoDerecha: false },
             { rotulo: 'Ejercicio', alineadoDerecha: false },
-            { rotulo: 'Valores', alineadoDerecha: true },
-            { rotulo: 'Importe S/', alineadoDerecha: true },
             { rotulo: 'Prescribe el', alineadoDerecha: false },
             { rotulo: 'Situación', alineadoDerecha: false },
           ],
-          columnaDeInsignia: 4,
+          // Sigue siendo de insignia, y ahora se puede encender: le llega `prescrita`, un booleano
+          // que el backend publica, no una frase. Dos valores y no tres — «Por prescribir» exigiria
+          // un umbral que el corpus no publica (regla 5), y es lo que #218 tuvo que retirar en
+          // `ini-parado` por no tenerlo.
+          columnaDeInsignia: 3,
           nota: 'Declarar la prescripción es un acto: se hace de oficio o a pedido, y queda en la bitácora.',
         },
       },

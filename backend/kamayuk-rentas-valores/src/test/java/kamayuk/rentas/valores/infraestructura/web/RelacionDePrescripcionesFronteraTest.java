@@ -228,6 +228,53 @@ class RelacionDePrescripcionesFronteraTest {
     }
 
     @Test
+    @DisplayName("#230 — publica el RELOJ de cada ejercicio, con la fecha en que prescribe")
+    void publicaElReloj() throws Exception {
+        String json = pedir("/rentas/api/v1/coactiva/prescripcion");
+
+        assertThat(json)
+                .as(
+                        "una entrada por ejercicio del rango, con SU fecha: es la columna «Prescribe"
+                                + " el» de val-tip, que hasta #230 no salia de ningun campo")
+                .contains(
+                        "\"ejercicios\":["
+                                + "{\"ejercicio\":2018,\"prescribeEl\":\"2023-01-01\",\"prescrita\":true},"
+                                + "{\"ejercicio\":2019,\"prescribeEl\":\"2024-01-01\",\"prescrita\":true},"
+                                + "{\"ejercicio\":2020,\"prescribeEl\":\"2025-01-01\",\"prescrita\":false}]");
+        assertThat(json)
+                .as("y el que no procedio tambien lo lleva: su ejercicio sigue siendo exigible")
+                .contains(
+                        "\"ejercicios\":["
+                                + "{\"ejercicio\":2019,\"prescribeEl\":\"2024-01-01\",\"prescrita\":false}]");
+        assertThat(json)
+                .as(
+                        "`plazo` NO es la fecha, y por eso hacia falta el reloj: es el plazo"
+                                + " aplicable, un texto")
+                .contains("\"plazo\":\"4 ANIOS\"");
+        assertThat(json)
+                .as(
+                        "los dos inicios del computo NO viajan: son la explicacion de la"
+                                + " resolucion, y salen del POST que la declara")
+                .doesNotContain("inicioDelComputo")
+                .doesNotContain("nuevoInicioDelComputo");
+    }
+
+    @Test
+    @DisplayName("#230 — «ejerciciosPrescritos» se DERIVA del reloj: no son dos verdades")
+    void losPrescritosSalenDelReloj() throws Exception {
+        String json = pedir("/rentas/api/v1/coactiva/prescripcion", "codContribuyente", "PR-0002");
+
+        assertThat(json)
+                .as(
+                        "el unico ejercicio de QUISPE prescribio, asi que sale en las dos listas y"
+                                + " con la misma fecha")
+                .contains("\"ejerciciosPrescritos\":[2017]")
+                .contains(
+                        "\"ejercicios\":["
+                                + "{\"ejercicio\":2017,\"prescribeEl\":\"2022-01-01\",\"prescrita\":true}]");
+    }
+
+    @Test
     @DisplayName("«codContribuyente» acota, y un codigo que no esta en el padron es 404")
     void elContribuyenteAcota() throws Exception {
         String json = pedir("/rentas/api/v1/coactiva/prescripcion", "codContribuyente", "PR-0002");
@@ -414,17 +461,31 @@ class RelacionDePrescripcionesFronteraTest {
                 resolucion);
     }
 
+    /**
+     * El computo de un ejercicio, con su fecha de prescripcion DERIVADA del ejercicio (#230).
+     *
+     * <p>Hasta #230 esta fila ponia {@code DATE '2023-01-01'} en todas, y daba igual porque la
+     * relacion no publicaba la fecha. Ahora la publica, y una constante dejaria la prueba en verde
+     * aunque el reloj de un ejercicio se leyera de la fila de otro: lo unico que distingue esas dos
+     * cosas es que cada fila lleve una fecha distinta.
+     *
+     * <p>{@code ejercicio + 5} no es magia: el computo empieza el 1 de enero del ano siguiente
+     * (art. 44) y el plazo corriente es de cuatro anios (art. 43), asi que vence el 1 de enero del
+     * quinto. Aqui es un dato de prueba y no una regla: la regla vive en {@code
+     * ComputoDePrescripcion} y se prueba alli.
+     */
     private static void prescritos(
             long municipalidad, long prescripcion, int ejercicio, boolean prescrita) {
         comoApp(
                 municipalidad,
                 "INSERT INTO prescripcion_ejercicio (municipalidad_id, prescripcion_id, ejercicio,"
                         + " inicio_computo, inicio_vigente, fecha_prescripcion, prescrita)"
-                        + " VALUES (?, ?, ?, DATE '2019-01-01', DATE '2019-01-01',"
-                        + " DATE '2023-01-01', ?) RETURNING id",
+                        + " VALUES (?, ?, ?, DATE '2019-01-01', DATE '2019-01-01', ?::date, ?)"
+                        + " RETURNING id",
                 municipalidad,
                 prescripcion,
                 ejercicio,
+                (ejercicio + 5) + "-01-01",
                 prescrita);
     }
 

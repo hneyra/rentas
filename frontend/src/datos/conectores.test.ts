@@ -351,6 +351,7 @@ const RESUMEN_DE_PAPELETAS: ResumenDePapeletas = {
       importeDeLasPendientes: '1154440.00',
       enCoactiva: 388,
       importeEnCoactiva: '71148.00',
+      conResolucionNotificada: 5884,
       actualizadoA: '2026-09-17',
     },
   ],
@@ -387,6 +388,64 @@ const DETERMINACION_GUARDADA: DeterminacionGuardada = {
   reglasAplicadas: ['RT-002'],
 };
 
+/**
+ * Lo que `val-tip` recibe: la bitacora de declaraciones de prescripcion, con su reloj (#230).
+ *
+ * **Los quince campos que la operacion publica**, y no los cuatro que el conector lee, por lo mismo
+ * que `BITACORA`: una muestra recortada dejaria pasar en verde un conector que leyera un campo con
+ * otro nombre.
+ *
+ * Dos declaraciones y no una: la tabla es una fila por **ejercicio**, y con una sola declaracion no
+ * se veria que las filas se aplanan de varias. La primera trae los dos estados de la insignia
+ * —prescrito y vigente—; la segunda, un `contribuyente` nulo, que es la fila que hay que revisar.
+ */
+const BITACORA_DE_PRESCRIPCIONES: Paginado<PrescripcionDeclarada> = {
+  contenido: [
+    {
+      id: 41,
+      codContribuyente: 'PR-0001',
+      contribuyente: 'CHAVEZ IPANAQUE, MARIA',
+      tributo: 'PREDIAL',
+      ejercicioDesde: 2021,
+      ejercicioHasta: 2022,
+      fechaDePresentacion: '2026-03-02',
+      plazoAplicable: 'DECLARACION_PRESENTADA',
+      plazo: '4 ANIOS',
+      resultado: 'PROCEDE_EN_PARTE',
+      nDeResolucion: 'RES-0041-2026',
+      ejerciciosPrescritos: [2021],
+      ejercicios: [
+        { ejercicio: 2021, prescribeEl: '2025-12-31', prescrita: true },
+        { ejercicio: 2022, prescribeEl: '2026-12-31', prescrita: false },
+      ],
+      usuario: 'jperez',
+      observacion: 'Solicitud del obligado',
+    },
+    {
+      id: 42,
+      codContribuyente: 'PR-0002',
+      contribuyente: null,
+      tributo: 'ARBITRIO',
+      ejercicioDesde: 2020,
+      ejercicioHasta: 2020,
+      fechaDePresentacion: '2026-04-18',
+      plazoAplicable: 'SIN_DECLARACION',
+      plazo: '6 ANIOS',
+      resultado: 'PROCEDE',
+      nDeResolucion: null,
+      ejerciciosPrescritos: [2020],
+      ejercicios: [{ ejercicio: 2020, prescribeEl: '2026-12-31', prescrita: true }],
+      usuario: 'jperez',
+      observacion: 'De oficio',
+    },
+  ],
+  pagina: 0,
+  tamano: 20,
+  totalElementos: 48,
+  totalPaginas: 3,
+  hayMas: true,
+};
+
 const MUESTRAS: Readonly<Partial<Record<ClaveDeHoja, unknown>>> = {
   panel: CORRIDA,
   territorio: DETERMINACION_GUARDADA,
@@ -414,6 +473,7 @@ const MUESTRAS: Readonly<Partial<Record<ClaveDeHoja, unknown>>> = {
   'tra-panel': RESUMEN_DE_PAPELETAS,
   'tra-pap': EXPEDIENTE_DE_PAPELETA,
   'tra-veh': LO_DE_TRA_VEH,
+  'val-tip': BITACORA_DE_PRESCRIPCIONES,
 };
 
 /** Los campos de solo lectura de una pantalla, por su coordenada. */
@@ -424,7 +484,7 @@ function soloLecturaDe(clave: ClaveDeHoja): readonly string[] {
 }
 
 describe('los conectores', () => {
-  it('EL CENTINELA: estan los veinte que estan, y no cero ni cuarenta', () => {
+  it('EL CENTINELA: estan los veintiuno que estan, y no cero ni cuarenta', () => {
     // Cero dejaria todo lo de abajo sin sujeto. Cuarenta significaria que alguien conecto
     // pantallas cuyas operaciones no publican lo que ensenan, que es lo que este archivo evita.
     // La lista se escribe a mano y crece de una en una: conectar una pantalla es una decision, y
@@ -460,6 +520,12 @@ describe('los conectores', () => {
     // hoja**, y es la primera que exige SUJETO y EJERCICIO a la vez. Y la primera que no pinta ni
     // una celda de lo que le llega: su unico campo de solo lectura —«Monto deducido»— no lo publica
     // nadie, y lo que esta conexion compra son sus TRES ausencias distintas. Ver `conectores.ts`.
+    //
+    // `val-tip` llega con #230, y es la primera que entra **corrigiendo el artboard a la vez**:
+    // declaraba `GET /coactiva/prescripcion` desde #170 y aun asi no podia pintarse, porque su
+    // tabla dibujaba un agregado por ejercicio y la operacion publica una fila por solicitud. Su
+    // medida —que dos de sus cinco columnas el backend se niega a publicar por escrito, y que la
+    // tercera si se podia y estaba guardada desde #39— esta en `conectores/valores.ts`.
     expect(Object.keys(CONECTORES).sort()).toEqual(
       [
         'aut-cat', 'aut-tram', 'coa-cost', 'coa-exp', 'coa-panel',
@@ -468,6 +534,7 @@ describe('los conectores', () => {
         'ini-flujo', 'ini-panel', 'ini-parado', 'panel',
         'seg-aud', 'territorio',
         'tra-panel', 'tra-pap', 'tra-veh',
+        'val-tip',
       ].sort(),
     );
   });

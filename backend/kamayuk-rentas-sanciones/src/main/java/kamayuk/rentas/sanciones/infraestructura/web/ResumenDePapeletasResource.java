@@ -45,6 +45,13 @@ public record ResumenDePapeletasResource(
     /**
      * Una línea del resumen, con la misma fecha que el resumen entero.
      *
+     * <p>{@code conResolucionNotificada} <b>no es «cuántas se notificaron»</b> (#222). Cuenta las
+     * que ya tienen una resolución de gerencia con una diligencia que surtió efecto, que es lo
+     * único que consta: nadie escribe {@code EstadoDePapeleta.NOTIFICADA} —el único {@code UPDATE
+     * papeleta} de {@code src/main} es {@code SET numero}—, así que una línea {@code
+     * ?agrupadoPor=ESTADO} con clave {@code NOTIFICADA} vale cero para siempre. El nombre del campo
+     * dice lo que cuenta para que nadie lo dibuje bajo otro rótulo sin darse cuenta.
+     *
      * <p>{@code ano} sale <b>solo</b> cuando el agrupador lo determina —{@code ANO} y {@code MES}—
      * y va nulo con los otros tres (#398). La columna «Año» de {@code transito_resumen_papeletas}
      * se dibuja con este campo y no con {@code clave}: la clave es el estado cuando se agrupa por
@@ -62,6 +69,7 @@ public record ResumenDePapeletasResource(
             Dinero importeDeLasPendientes,
             long enCoactiva,
             Dinero importeEnCoactiva,
+            long conResolucionNotificada,
             LocalDate actualizadoA) {
 
         static Linea de(LineaDelResumen linea, LocalDate aLaFecha) {
@@ -77,6 +85,7 @@ public record ResumenDePapeletasResource(
                     linea.importeDeLasPendientes(),
                     linea.enCoactiva(),
                     linea.importeEnCoactiva(),
+                    linea.conResolucionNotificada(),
                     aLaFecha);
         }
     }

@@ -785,13 +785,35 @@ export interface LiquidacionDeCostas {
 }
 
 /**
+ * **El reloj de UN ejercicio de una declaracion**, dentro de `GET /coactiva/prescripcion` (#230).
+ *
+ * `prescribeEl` es la fecha que `ComputoDePrescripcion` resolvio **el dia de la solicitud**, con el
+ * plazo del conjunto sellado de entonces y las interrupciones y suspensiones ya aplicadas. No es
+ * «el inicio mas el plazo» y no se recalcula al leer: recalcular daria otro dia en cuanto un plazo
+ * cambiara, y la resolucion ya emitida dice lo que dice (regla 9, ARQ-09 §3).
+ *
+ * `prescrita` vale lo que valia **a `fechaDePresentacion`**, no a hoy. Es lo que la resolucion
+ * resolvio, y por eso la fila que lo lleva lleva tambien esa fecha.
+ */
+export interface RelojDeUnEjercicio {
+  readonly ejercicio: number;
+  /** El dia en que el plazo vence, en ISO. */
+  readonly prescribeEl: string;
+  readonly prescrita: boolean;
+}
+
+/**
  * Una declaracion de prescripcion, de `GET /coactiva/prescripcion`.
  *
  * **Es la relacion, no la resolucion**, y la diferencia decide lo que esta interfaz puede
  * dibujar: la fila lleva el `plazo` que se aplico —leido del conjunto sellado, «4 ANIOS»— y como
- * se resolvio el rango, pero **no lleva la fecha en que prescribe** ninguna deuda. Esa sale del
- * computo ejercicio por ejercicio, que solo publica `POST /coactiva/prescripcion`, y el propio
- * backend advierte que no es «el inicio mas el plazo».
+ * se resolvio el rango. Lo que **no** lleva son los dos inicios del computo ni los hechos alegados
+ * —la explicacion de por que la fecha no es «el inicio mas el plazo»—, que salen enteros del `POST`.
+ *
+ * **Desde #230 si lleva el reloj**: `ejercicios[]`, una entrada por ejercicio del rango con su
+ * `prescribeEl`. Hasta entonces la operacion publicaba solo `ejerciciosPrescritos` —que anios, sin
+ * cuando— y `val-tip` no tenia de donde sacar su columna «Prescribe el»: `plazo` es el plazo
+ * **aplicable**, un texto, no un vencimiento.
  *
  * Sin ninguna cifra de dinero: la prescripcion no extingue un importe, deja sin accion su cobro.
  */
@@ -810,6 +832,8 @@ export interface PrescripcionDeclarada {
   readonly resultado: string;
   readonly nDeResolucion: string | null;
   readonly ejerciciosPrescritos: readonly number[];
+  /** El reloj de cada ejercicio del rango solicitado, en orden (#230). */
+  readonly ejercicios: readonly RelojDeUnEjercicio[];
   readonly usuario: string;
   readonly observacion: string;
 }
@@ -992,6 +1016,18 @@ export interface LineaDelResumenDePapeletas {
   readonly importeDeLasPendientes: string;
   readonly enCoactiva: number;
   readonly importeEnCoactiva: string;
+  /**
+   * **Cuantas tienen ya una resolucion de gerencia notificada** (#222).
+   *
+   * No es «cuantas se notificaron», y el nombre lo dice: lo notificado es la **resolucion**, que es
+   * otro documento. `EstadoDePapeleta` declara `NOTIFICADA` y nadie lo escribe —el unico `UPDATE
+   * papeleta` de `src/main` es `SET numero`—, asi que contar ese estado daria cero para siempre.
+   * Una papeleta notificada en la calle sin resolucion emitida **no entra aqui**.
+   *
+   * Sin importe al lado, al reves que las otras tres cuentas: ninguna pantalla pregunta cuanto
+   * suman, y publicar dinero que nadie consume es lo que #184 encontro en las cuatro `resumen-*`.
+   */
+  readonly conResolucionNotificada: number;
   /** El dia al que se leyeron los estados (regla 9, RNF-075). */
   readonly actualizadoA: string;
 }
@@ -1727,6 +1763,20 @@ export const RUTAS = {
    */
   prescripcionesDe: (tributo: string) =>
     `/coactiva/prescripcion?tributo=${encodeURIComponent(tributo)}&tamano=1`,
+  /**
+   * **La bitacora entera de declaraciones de prescripcion**, sin filtrar (#230).
+   *
+   * No lleva `?tributo=` —al reves que `prescripcionesDe`, que es de `coa-cost` y acota a la
+   * liquidacion que dibuja al lado—: `val-tip` ensena la bitacora, y acotarla a un tributo
+   * elegido aqui seria elegir por quien mira. Los tres desplegables de la pantalla todavia no
+   * llegan al conector, y eso es #172.
+   *
+   * **`?tamano=20` y no la relacion entera**, que es lo que el backend daria por omision. Lo que
+   * se dibuja son los ejercicios de esas veinte declaraciones, asi que la tabla ensena una
+   * ventana; que no lleve mando para moverla esta dicho en el javadoc de su conector, con el
+   * motivo —la fila de la tabla y el elemento de la pagina no son la misma cosa—.
+   */
+  prescripciones: '/coactiva/prescripcion?tamano=20',
   /**
    * El primer programa de fiscalizacion de la relacion (#179).
    *

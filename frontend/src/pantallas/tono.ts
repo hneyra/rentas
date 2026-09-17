@@ -102,8 +102,21 @@ import type { TonoDeInsignia } from '@kamayuk/ui';
  * pintara todo de `ok` dibujaria «Vencida» en verde sin que nada lo delatara—.
  */
 
-/** Lo que ya ha ido mal: hay que actuar hoy. */
-const MAL = /coactiva|observado|vencida|denegado/;
+/**
+ * Lo que ya ha ido mal: hay que actuar hoy.
+ *
+ * **«Prescrito» entra con #230**, y es la primera palabra que se anade a esta lista desde #175.
+ * Es un juicio y no un estado neutro: un ejercicio prescrito es deuda que la administracion **ya no
+ * puede exigir** —el art. 43 del TUO del Codigo Tributario le quita la accion, no la obligacion—, y
+ * la pantalla que la escribe, `val-tip`, existe para que eso se vea venir. Con el tono de «no se»
+ * saldria del mismo color que «Vigente» en la columna de al lado, que es lo contrario de lo que
+ * esta tabla tiene que decir de un vistazo.
+ *
+ * Va anclada por palabra como la lista de CONFORME: sin el ancla, `prescrit` casaria dentro de
+ * cualquier palabra que lo contenga, y una lista de MALOS que se pasa de larga pinta de rojo lo que
+ * esta bien.
+ */
+const MAL = /coactiva|observado|vencida|denegado|\bprescrit[ao]\b/;
 /** Lo que va a ir mal: hay plazo, pero corre. */
 const ATENCION = /con deuda|por vencer|en tramite|en trámite/;
 /**

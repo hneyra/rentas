@@ -61,9 +61,18 @@ function cuerpoDelConector(hoja: ClaveDeHoja): string {
   const constante = constanteDe(hoja);
   const archivos = [
     join(AQUI, '../src/datos/conectores.ts'),
-    ...['coactiva', 'consultas', 'fiscalizacion', 'inicio', 'licencias', 'seguridad', 'transito'].map(
-      (modulo) => join(CONECTORES_DIR, `${modulo}.ts`),
-    ),
+    ...[
+      'coactiva',
+      'consultas',
+      'fiscalizacion',
+      'inicio',
+      'licencias',
+      'seguridad',
+      'transito',
+      // `valores` entra con #230. La lista se escribe a mano —no se lee el directorio— porque un
+      // archivo que dejara de existir tiene que salir roja aqui, no desaparecer en silencio.
+      'valores',
+    ].map((modulo) => join(CONECTORES_DIR, `${modulo}.ts`)),
   ];
   for (const archivo of archivos) {
     const texto = readFileSync(archivo, 'utf8');

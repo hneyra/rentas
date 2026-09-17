@@ -25,6 +25,7 @@ import kamayuk.rentas.valores.dominio.HechoDelComputo;
 import kamayuk.rentas.valores.dominio.Prescripcion;
 import kamayuk.rentas.valores.dominio.PrescripcionEnLista;
 import kamayuk.rentas.valores.dominio.PrescripcionRepository;
+import kamayuk.rentas.valores.dominio.RelojDelEjercicio;
 import kamayuk.rentas.valores.dominio.ResultadoDeLaSolicitud;
 import org.jspecify.annotations.Nullable;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -67,19 +68,39 @@ public class PrescripcionRepositoryJdbc extends RepositorioJdbc implements Presc
                     .desempatandoPor("id");
 
     /**
-     * Los ejercicios que de verdad prescribieron, en una sola consulta y no una por fila.
+     * El reloj de la pagina entera, en UNA consulta (#230).
      *
-     * <p>Correlacionada con {@code municipalidad_id} ademas de con {@code prescripcion_id}: la RLS
-     * ya acota las dos tablas, y nombrarlo deja explicito que la fila hija es de la misma
-     * municipalidad que su cabecera, como hace el {@code NOT EXISTS} de {@code
-     * AsientoRepositoryJdbc}.
+     * <p>Sustituye al {@code string_agg} de los ejercicios prescritos que esta clase agregaba en la
+     * propia seleccion: aquel publicaba <b>que</b> anios prescribieron y tiraba <b>cuando</b>, que
+     * es la columna «Prescribe el» de {@code val-tip}. Y eran dos verdades sobre el mismo hecho
+     * —una agregada en SQL, otra leida de las mismas filas—, asi que ahora {@code
+     * PrescripcionEnLista.ejerciciosPrescritos()} se deriva de esto.
+     *
+     * <p><b>Una consulta por pagina, no una por fila</b>, que era el motivo por el que el computo
+     * no viajaba: {@code = ANY(:ids)} con los identificadores de la pagina, igual que {@code
+     * DirectorioDeContribuyentes.porIds} resuelve los nombres en esa misma transaccion. No filtra
+     * por {@code municipalidad_id}: lo hace la politica RLS.
      */
-    private static final String EJERCICIOS_PRESCRITOS =
-            "(SELECT string_agg(pe.ejercicio::text, ',' ORDER BY pe.ejercicio)"
-                    + "   FROM prescripcion_ejercicio pe"
-                    + "  WHERE pe.municipalidad_id = p.municipalidad_id"
-                    + "    AND pe.prescripcion_id = p.id"
-                    + "    AND pe.prescrita) AS ejercicios_prescritos";
+    private List<RelojDeUnaFila> relojesDe(List<Long> ids) {
+        return jdbc().sql(
+                        "SELECT prescripcion_id, ejercicio, fecha_prescripcion, prescrita"
+                                + " FROM prescripcion_ejercicio"
+                                + " WHERE prescripcion_id = ANY(:ids)"
+                                + " ORDER BY prescripcion_id, ejercicio")
+                .param("ids", ids.toArray(Long[]::new))
+                .query(
+                        (ResultSet fila, int numero) ->
+                                new RelojDeUnaFila(
+                                        fila.getLong("prescripcion_id"),
+                                        new RelojDelEjercicio(
+                                                new Ejercicio(fila.getInt("ejercicio")),
+                                                fila.getDate("fecha_prescripcion").toLocalDate(),
+                                                fila.getBoolean("prescrita"))))
+                .list();
+    }
+
+    /** Un reloj con la declaracion a la que pertenece, para repartirlos por fila. */
+    private record RelojDeUnaFila(long prescripcionId, RelojDelEjercicio reloj) {}
 
     public PrescripcionRepositoryJdbc(JdbcClient jdbc) {
         super(jdbc);
@@ -200,11 +221,11 @@ public class PrescripcionRepositoryJdbc extends RepositorioJdbc implements Presc
     /**
      * La relacion de declaraciones (#674).
      *
-     * <p><b>Una consulta por pagina, no una por fila.</b> Los ejercicios que prescribieron se
-     * agregan en la propia seleccion con {@link #EJERCICIOS_PRESCRITOS}; leerlos con {@link
-     * #ejerciciosDe} por cada fila serian veinte consultas para una pagina de veinte, y ademas
-     * traerian el computo entero —los dos inicios y la fecha de cada ejercicio—, que es la
-     * resolucion y no la relacion.
+     * <p><b>Una consulta por pagina, no una por fila.</b> El reloj de todos los ejercicios de la
+     * pagina sale de {@link #relojesDe} con un solo {@code = ANY(:ids)}; leerlos con {@link
+     * #ejerciciosDe} por cada fila serian veinte consultas para una pagina de veinte. Lo que sigue
+     * sin traerse son los <b>hechos</b> alegados —la explicacion del computo—, que si serian una
+     * consulta mas y que solo la resolucion dibuja.
      *
      * <p><b>Sin indice nuevo, y medido en vez de supuesto.</b> {@code prescripcion} crece una fila
      * por solicitud presentada, no una por predio ni por asiento: el padron de Catacaos tiene 10
@@ -243,12 +264,26 @@ public class PrescripcionRepositoryJdbc extends RepositorioJdbc implements Presc
         String seleccion =
                 "SELECT p.id, p.contribuyente_id, p.tributo, p.ejercicio_desde,"
                         + " p.ejercicio_hasta, p.fecha_presentacion, p.causal, p.plazo_anios,"
-                        + " p.resultado, p.resolucion, p.usuario_registro, p.observacion, "
-                        + EJERCICIOS_PRESCRITOS
+                        + " p.resultado, p.resolucion, p.usuario_registro, p.observacion"
                         + desde;
         String conteo = "SELECT count(*)" + desde;
 
-        return paginar(seleccion, conteo, parametros, paginacion, ORDEN, this::mapearFila);
+        Pagina<PrescripcionEnLista> pagina =
+                paginar(seleccion, conteo, parametros, paginacion, ORDEN, this::mapearFila);
+        if (pagina.estaVacia()) {
+            return pagina;
+        }
+
+        List<Long> ids = pagina.contenido().stream().map(PrescripcionEnLista::id).toList();
+        Map<Long, List<RelojDelEjercicio>> porFila = new LinkedHashMap<>();
+        for (RelojDeUnaFila fila : relojesDe(ids)) {
+            porFila.computeIfAbsent(fila.prescripcionId(), id -> new ArrayList<>())
+                    .add(fila.reloj());
+        }
+        // `List.of()` no es «no se sabe»: una declaracion sin ninguna fila de computo no puede
+        // existir —`Prescripcion` rechaza la lista vacia—, asi que esto solo ocurriria con la tabla
+        // corrompida, y entonces la fila sale sin reloj en vez de tirar la pagina entera.
+        return pagina.mapear(fila -> fila.con(porFila.getOrDefault(fila.id(), List.of())));
     }
 
     private PrescripcionEnLista mapearFila(ResultSet fila, int numeroDeFila) throws SQLException {
@@ -263,21 +298,10 @@ public class PrescripcionRepositoryJdbc extends RepositorioJdbc implements Presc
                 new Plazo(fila.getInt("plazo_anios"), UnidadDePlazo.ANIOS),
                 ResultadoDeLaSolicitud.valueOf(fila.getString("resultado")),
                 fila.getString("resolucion"),
-                prescritos(fila.getString("ejercicios_prescritos")),
+                // El reloj llega despues, para la pagina entera de una vez: ver `buscar`.
+                List.of(),
                 fila.getString("usuario_registro"),
                 fila.getString("observacion"));
-    }
-
-    /** Nulo es «ninguno prescribio», que es una lista vacia y no una falta de dato. */
-    private static List<Ejercicio> prescritos(@Nullable String agregados) {
-        if (agregados == null || agregados.isBlank()) {
-            return List.of();
-        }
-        List<Ejercicio> ejercicios = new ArrayList<>();
-        for (String anio : agregados.split(",")) {
-            ejercicios.add(new Ejercicio(Integer.parseInt(anio.strip())));
-        }
-        return ejercicios;
     }
 
     private List<ComputoDeEjercicio> ejerciciosDe(long prescripcionId) {

@@ -24,7 +24,15 @@ export const TRANSITO = {
         campos: [
           { etiqueta: 'Ejercicio', tipo: 's', opciones: ['2026', '2025'] },
           { etiqueta: 'Levantadas', tipo: 'r' },
-          { etiqueta: 'Notificadas', tipo: 'r' },
+          // **«Con multa notificada», y hasta #222 decia «Notificadas»** (y su gemelo en el
+          // artboard). El rotulo prometia cuantas papeletas se notificaron, y eso NO CONSTA:
+          // `EstadoDePapeleta` declara `NOTIFICADA` y ningun codigo de produccion lo escribe —el
+          // unico `UPDATE papeleta` de `src/main` es `SET numero`, y el estado se escribe una vez,
+          // en el `INSERT`, y siempre `IMPUESTA`—. Lo que si consta es la diligencia de la
+          // resolucion de gerencia de esa papeleta, que el resumen publica desde #222. Se cambia el
+          // rotulo y no la cifra: una papeleta notificada en la calle sin resolucion emitida no
+          // entra en este recuento, y el rotulo ya no promete que si.
+          { etiqueta: 'Con multa notificada', tipo: 'r' },
           { etiqueta: 'Canceladas', tipo: 'r' },
           { etiqueta: 'Caducadas sin notificar', tipo: 'r' },
           { etiqueta: 'En coactiva', tipo: 'r' },

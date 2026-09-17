@@ -821,8 +821,23 @@ const PANTALLAS = {
       n: 'Emitir la resolución de determinación es lo que convierte esto en deuda exigible.' }]],
 
   /* ═══ Tránsito ═══ */
+  /* «Notificadas» pasa a llamarse «Con multa notificada» (#222, y su gemelo en
+     `src/pantallas/definiciones/transito.ts`). El rótulo prometía cuántas papeletas se notificaron,
+     y eso NO CONSTA: `EstadoDePapeleta` declara `NOTIFICADA` y ningún código de producción lo
+     escribe — medido sobre el `src/main` de los diecisiete módulos, el único `UPDATE papeleta` que existe es
+     `SET numero = :numeroNuevo`, y el estado se escribe una sola vez, en el `INSERT`, y siempre
+     `IMPUESTA`. Contarlo daría cero para siempre bajo un rótulo que afirma lo contrario.
+     Lo que el sistema SÍ registra es la diligencia de la resolución de gerencia de esa papeleta
+     —una fila de `notificacion` con `objeto = 'RESOLUCION'`—, y eso es lo que el resumen publica
+     desde #222 en `lineas[].conResolucionNotificada`. Se cambia el rótulo y no la cifra, que es lo
+     que pedía el AC 1: una papeleta puede estar notificada en la calle sin que conste, y este
+     recuento no la cuenta. «Caducadas sin notificar» se queda como está y sigue diciendo «no
+     publicado»: además del acto le falta un PLAZO de notificación de la papeleta, y de las nueve
+     filas `PLAZO` del corpus de `normativa` ninguna es esa —tres son de prescripción, dos de su
+     inicio, una del cumplimiento del REC-1 y tres del plazo de RECLAMACIÓN, que corre DESDE la
+     notificación y no HASTA ella—. Regla 5: no se inventa. */
   'tra-panel': [['Papeletas del ejercicio', 'Por situación, con lo que se puede y no se puede cobrar.', [
-    ['Ejercicio', 's', ['2026', '2025']], ['Levantadas', 'r', '8,412'], ['Notificadas', 'r', '5,884'],
+    ['Ejercicio', 's', ['2026', '2025']], ['Levantadas', 'r', '8,412'], ['Con multa notificada', 'r', '5,884'],
     ['Canceladas', 'r', '2,118'], ['Caducadas sin notificar', 'r', '1,842'], ['En coactiva', 'r', '388']]]],
   'tra-pap': [['Papeleta de tránsito', 'La fecha de notificación decide si la papeleta se puede cobrar.', [
     ['Nº de papeleta', ''], ['Placa', ''], ['Fecha de la infracción', 'd'], ['Hora', ''],
@@ -1074,16 +1089,37 @@ const PANTALLAS = {
       ['Generación de cedulones', '8,224', '—', '0', 'Conforme'],
       ['Notificación', '4,118', '—', '4,106', 'Observado']], i: 4,
       n: 'La notificación es el cuello de botella: lo emitido y no notificado no cobra.' }]],
+  /* El reloj es POR DECLARACIÓN Y EJERCICIO, y no por ejercicio a secas (#230, y su gemelo en
+     `src/pantallas/definiciones/valores.ts`). La hoja declara `GET /coactiva/prescripcion`, que
+     publica la bitácora de declaraciones —una fila por solicitud, con el cómputo de cada ejercicio
+     de su rango—, y el artboard dibujaba un agregado del padrón entero. Se cambian TRES cosas:
+       · «Valores» e «Importe S/» SALEN. El backend se niega a publicarlos por escrito, y con su
+         motivo: «la prescripción no extingue un importe: deja sin acción su cobro (art. 43 del TUO
+         del Código Tributario) … publicar aquí un importe obligaría además a decir a qué fecha
+         (regla 9), y la fecha que tendría sentido no es un dato de esta fila sino del libro»
+         (`PrescripcionEnLista`). Contarlos y sumarlos en la interfaz, sobre una página de veinte de
+         cientos, es lo que la regla de `datos/conectores.ts` prohíbe.
+       · «Prescribe el» SE QUEDA y por fin tiene de dónde salir: `ejercicios[].prescribeEl`, la
+         fecha que `ComputoDePrescripcion` resolvió el día de la solicitud y que `V28` guarda en
+         `prescripcion_ejercicio`. Hasta #230 la operación la tiraba. `plazo` NO servía: es el
+         plazo aplicable —«4 ANIOS»—, un texto y no un vencimiento.
+       · «Contribuyente» ENTRA, porque la fila ya no es un tramo del padrón sino el ejercicio de la
+         declaración de ALGUIEN, y una fecha de prescripción sin decir de quién es no dice nada.
+     Y «Situación» son DOS valores y no tres: `ejercicios[].prescrita` es booleano —lo que la
+     resolución resolvió, a su fecha—. «Por prescribir» exigiría un umbral —cuánto de cerca es
+     «cerca»— que el corpus de `normativa` no publica, y no se inventa (regla 5). El desplegable
+     «Estado» conserva sus tres opciones porque es un MANDO y no un dato: nadie le pasa todavía lo
+     tecleado al conector, y eso es #172. */
   'val-tip': [['Tipos de valor y prescripción', 'La deuda prescribe a los cuatro años; un acto de cobranza reinicia el plazo.', [
     ['Tipo de valor', 's', ['Todos', 'Orden de pago', 'Resolución de determinación', 'Resolución de multa']],
     ['Ejercicio', 's', ['Todos', '2026', '2025', '2024', '2023', '2022']],
     ['Estado', 's', ['Todos', 'Vigente', 'Por prescribir', 'Prescrito']],
-    ['Prescriben este año', 'r', '412 valores · S/ 184,412.00']],
-    { t: 'Reloj de prescripción', cn: '4 tramos', c: [['Ejercicio', 0], ['Valores', 1], ['Importe S/', 1], ['Prescribe el', 0], ['Situación', 0]], f: [
-      ['2022', '412', '184,412.00', '31/12/2026', 'Por vencer'],
-      ['2023', '588', '244,116.00', '31/12/2027', 'Conforme'],
-      ['2024', '844', '388,240.00', '31/12/2028', 'Conforme'],
-      ['2021 y anteriores', '188', '84,116.00', 'Vencido', 'Vencida']], i: 4,
+    ['Declaraciones', 'r', '48']],
+    { t: 'Reloj de prescripción', cn: '4 de 48', c: [['Contribuyente', 0], ['Ejercicio', 0], ['Prescribe el', 0], ['Situación', 0]], f: [
+      ['Chávez Ipanaqué, María', '2021', '31/12/2025', 'Prescrito'],
+      ['Chávez Ipanaqué, María', '2022', '31/12/2026', 'Vigente'],
+      ['Sernaqué Correa, Luis', '2020', '31/12/2024', 'Prescrito'],
+      ['Sernaqué Correa, Luis', '2023', '31/12/2027', 'Vigente']], i: 3,
       n: 'Declarar la prescripción es un acto: se hace de oficio o a pedido, y queda en la bitácora.' }]]
 };
 
