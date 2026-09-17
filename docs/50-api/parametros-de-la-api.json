@@ -399,6 +399,13 @@
     "opcionales": ["direccion", "ordenarPor", "pagina", "tamano"],
     "enElCuerpo": []
   },
+  "GET /rentas/predial/determinaciones": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["ano", "codContribuyente", "ejercicio"],
+    "enElCuerpo": []
+  },
   "GET /rentas/predios": {
     "obligatorios": [],
     "algunoDeEstos": [["codContribuyente", "contribuyente"]],
@@ -705,6 +712,13 @@
     "algunoDeEstos": [],
     "condicionales": [],
     "opcionales": ["proyectarInteresAl"],
+    "enElCuerpo": []
+  },
+  "POST /fiscalizacion/actas/{id}/anulacion": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
     "enElCuerpo": []
   },
   "POST /fiscalizacion/liquidaciones": {

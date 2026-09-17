@@ -27,14 +27,18 @@ import org.jspecify.annotations.Nullable;
  *
  * <h2>Lo que este tipo NO dice, medido</h2>
  *
- * <p><b>«Con acta cerrada», que es como el artboard rotula la tercera etapa, no se puede
- * contestar.</b> {@link EstadoDeActa} declara cinco valores —{@code ABIERTA}, {@code LIQUIDADA},
- * {@code RELIQUIDADA}, {@code TRANSFERIDA}, {@code ANULADA}— y <b>ninguno salvo el primero lo
- * escribe nadie</b>: toda acta nace {@code ABIERTA} en {@link ActaFiscalizacion#nuevaPredial} y en
- * {@link ActaFiscalizacion#nuevaVehicular}, y no hay en {@code src/main} un solo camino que la
- * mueva —ni {@code LiquidarFiscalizacion}, ni {@code TransferirARentas}—. Un {@code conActaCerrada}
- * valdría <b>cero siempre</b>, y eso es justo el defecto que #194 midió: un campo declarado que
- * nunca se llena, en verde y sin síntoma. Que el estado de un acta no lo mueva nada es #214.
+ * <p><b>«Con acta cerrada», que es como el artboard rotula la tercera etapa, sigue sin
+ * publicarse</b> — pero desde #214 ya no porque no se pueda contestar. Hasta entonces {@link
+ * EstadoDeActa} declaraba cinco valores y este sistema escribía uno: toda acta nacía {@code
+ * ABIERTA} y no había en {@code src/main} un solo camino que la moviera, así que un {@code
+ * conActaCerrada} derivado del estado valdría <b>cero siempre</b> —el defecto que #194 midió—.
+ *
+ * <p>#214 cerró eso de la única manera que no inventa una segunda verdad: el estado del acta se
+ * quedó en lo único que no se deriva de nada —viva o anulada—, y «cerrada» es <b>que tenga
+ * liquidación</b>, que es un hecho que ya está escrito en {@code liquidacion_fiscalizacion} y que
+ * {@link LiquidacionRepository#ultimaVersionDeActa} ya contesta. O sea que se puede contar. No se
+ * cuenta <b>aquí</b> porque es otra etapa del embudo y otro contrato publicado, y el nombre que se
+ * le ponga decide qué dibuja la pantalla: es #231.
  *
  * <p>Lo que sí se puede contar, y es lo que {@link #conActa} cuenta, es cuántas unidades del
  * programa <b>tienen acta viva</b> —levantada y no anulada—: la etapa que el javadoc de {@code

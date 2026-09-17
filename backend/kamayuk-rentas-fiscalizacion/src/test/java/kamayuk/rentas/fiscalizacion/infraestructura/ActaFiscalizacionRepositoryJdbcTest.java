@@ -18,6 +18,7 @@ import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.esquema.BaseDeDatosDePrueba;
 import kamayuk.rentas.esquema.ContextoDeTenant;
 import kamayuk.rentas.fiscalizacion.dominio.ActaFiscalizacion;
+import kamayuk.rentas.fiscalizacion.dominio.EstadoDeActa;
 import kamayuk.rentas.fiscalizacion.dominio.Hallazgo;
 import kamayuk.rentas.plataforma.tenant.TenantTransactionManager;
 import org.junit.jupiter.api.AfterAll;
@@ -390,23 +391,171 @@ class ActaFiscalizacionRepositoryJdbcTest {
         }
 
         /**
-         * Anula el acta por SQL directo: el dominio no tiene ningun camino que mueva el estado, y
-         * ESE es el hallazgo de #196 —{@code EstadoDeActa} declara cinco valores y este sistema
-         * solo escribe {@code ABIERTA}—. La prueba tiene que poder llegar al estado que la consulta
-         * descarta, asi que lo escribe la prueba.
+         * Anula el acta <b>por el camino del sistema</b>, que desde #214 existe.
+         *
+         * <p>Hasta entonces esta prueba lo escribia con un {@code UPDATE} suyo, y tenia que decir
+         * por que: «el dominio no tiene ningun camino que mueva el estado». Era el hallazgo de #196
+         * en su forma mas cruda —una prueba que fabrica el estado que la consulta descarta porque
+         * el sistema no lo sabe producir—, y es justo lo que #214 cerro.
          */
         private void anular(long actaId) {
-            try (java.sql.Connection app = base.conexion(BaseDeDatosDePrueba.APP)) {
+            transaccion.execute(estado -> repositorio.anular(actaId));
+        }
+    }
+
+    @Nested
+    @DisplayName("#214 — la unica transicion del acta, y las tres consultas que la miran")
+    class LaAnulacion {
+
+        @Test
+        @DisplayName("anular mueve el estado y NO borra nada: el acta se sigue leyendo entera")
+        void anularNoBorraNada() {
+            TenantContext.fijar(new MunicipalidadId(municipalidadA));
+            long titular = crearContribuyente(municipalidadA, "F-0214", "60100214");
+            long predio = crearPredio(municipalidadA, "F-0214a");
+            long programaId = crearPrograma(municipalidadA, "PF-0214", "PREDIAL");
+
+            ActaFiscalizacion guardada =
+                    transaccion.execute(
+                            estado ->
+                                    repositorio.insertar(
+                                            actaSobre(programaId, titular, predio, 1)));
+            long actaId = java.util.Objects.requireNonNull(guardada.id());
+
+            ActaFiscalizacion anulada = transaccion.execute(estado -> repositorio.anular(actaId));
+            assertThat(anulada.estado()).isEqualTo(EstadoDeActa.ANULADA);
+
+            ActaFiscalizacion releida =
+                    transaccion.execute(estado -> repositorio.findById(actaId).orElseThrow());
+            assertThat(releida.estado()).isEqualTo(EstadoDeActa.ANULADA);
+            assertThat(releida.fiscalizador())
+                    .as("regla 4: no se borra ni se edita lo que se midio en campo")
+                    .isEqualTo(guardada.fiscalizador());
+            assertThat(releida.areaHallada()).isEqualTo(guardada.areaHallada());
+            assertThat(releida.fechaVisita()).isEqualTo(guardada.fechaVisita());
+        }
+
+        @Test
+        @DisplayName("y las TRES consultas que filtran por ANULADA cambian de respuesta")
+        void lasTresConsultasCambianDeRespuesta() {
+            TenantContext.fijar(new MunicipalidadId(municipalidadA));
+            long titular = crearContribuyente(municipalidadA, "F-0215", "60100215");
+            long predio = crearPredio(municipalidadA, "F-0215a");
+            long programaId = crearPrograma(municipalidadA, "PF-0215", "PREDIAL");
+            java.util.Set<Long> predios = java.util.Set.of(predio);
+            kamayuk.rentas.dominio.Ejercicio ejercicio =
+                    kamayuk.rentas.dominio.Ejercicio.de(VISITA);
+
+            ActaFiscalizacion guardada =
+                    transaccion.execute(
+                            estado ->
+                                    repositorio.insertar(
+                                            actaSobre(programaId, titular, predio, 1)));
+            long actaId = java.util.Objects.requireNonNull(guardada.id());
+
+            assertThat(unidades(programaId)).isEqualTo(1);
+            assertThat(enElPrograma(programaId, predios)).containsExactly(predio);
+            assertThat(enElEjercicio(ejercicio, predios)).containsExactly(predio);
+
+            transaccion.execute(estado -> repositorio.anular(actaId));
+
+            assertThat(unidades(programaId))
+                    .as("la tercera etapa del embudo no cuenta una visita que no vale")
+                    .isZero();
+            assertThat(enElPrograma(programaId, predios))
+                    .as("la salvedad de #481 —«salvo que su acta se anulara»— ya no es teorica")
+                    .isEmpty();
+            assertThat(enElEjercicio(ejercicio, predios)).isEmpty();
+        }
+
+        private int unidades(long programaId) {
+            Integer cuantas =
+                    transaccion.execute(estado -> repositorio.unidadesConActaViva(programaId));
+            return java.util.Objects.requireNonNull(cuantas);
+        }
+
+        private java.util.Set<Long> enElPrograma(long programaId, java.util.Set<Long> predios) {
+            return java.util.Objects.requireNonNull(
+                    transaccion.execute(
+                            estado -> repositorio.prediosConActaEnElPrograma(programaId, predios)));
+        }
+
+        private java.util.Set<Long> enElEjercicio(
+                kamayuk.rentas.dominio.Ejercicio ejercicio, java.util.Set<Long> predios) {
+            return java.util.Objects.requireNonNull(
+                    transaccion.execute(
+                            estado -> repositorio.prediosConActaEnElEjercicio(ejercicio, predios)));
+        }
+
+        @Test
+        @DisplayName(
+                "del acta solo se puede mover el estado: el area medida la niega el privilegio")
+        void loMedidoEnCampoNoSePuedeReescribir() {
+            TenantContext.fijar(new MunicipalidadId(municipalidadA));
+            long titular = crearContribuyente(municipalidadA, "F-0216", "60100216");
+            long predio = crearPredio(municipalidadA, "F-0216a");
+            long programaId = crearPrograma(municipalidadA, "PF-0216", "PREDIAL");
+
+            ActaFiscalizacion guardada =
+                    transaccion.execute(
+                            estado ->
+                                    repositorio.insertar(
+                                            actaSobre(programaId, titular, predio, 1)));
+            long actaId = java.util.Objects.requireNonNull(guardada.id());
+
+            org.assertj.core.api.Assertions.assertThatThrownBy(
+                            () ->
+                                    porSql(
+                                            "UPDATE acta_fiscalizacion SET area_hallada = 999"
+                                                    + " WHERE id = "
+                                                    + actaId))
+                    .as("el titular firma el acta: corregir lo medido es levantar otra (V19)")
+                    .isInstanceOf(SQLException.class)
+                    .satisfies(
+                            error ->
+                                    assertThat(((SQLException) error).getSQLState())
+                                            .as("42501 es «privilegio insuficiente»")
+                                            .isEqualTo("42501"));
+        }
+
+        @Test
+        @DisplayName("y el CHECK ya no admite los tres valores que nadie escribia")
+        void elCheckSoloAdmiteLosDosAlcanzables() {
+            TenantContext.fijar(new MunicipalidadId(municipalidadA));
+            long titular = crearContribuyente(municipalidadA, "F-0217", "60100217");
+            long predio = crearPredio(municipalidadA, "F-0217a");
+            long programaId = crearPrograma(municipalidadA, "PF-0217", "PREDIAL");
+
+            ActaFiscalizacion guardada =
+                    transaccion.execute(
+                            estado ->
+                                    repositorio.insertar(
+                                            actaSobre(programaId, titular, predio, 1)));
+            long actaId = java.util.Objects.requireNonNull(guardada.id());
+
+            org.assertj.core.api.Assertions.assertThatThrownBy(
+                            () ->
+                                    porSql(
+                                            "UPDATE acta_fiscalizacion SET estado = 'LIQUIDADA'"
+                                                    + " WHERE id = "
+                                                    + actaId))
+                    .as("que este liquidada se DERIVA de que tenga liquidacion, no se guarda aqui")
+                    .isInstanceOf(SQLException.class)
+                    .satisfies(
+                            error ->
+                                    assertThat(((SQLException) error).getSQLState())
+                                            .as("23514 es «viola una restriccion CHECK»")
+                                            .isEqualTo("23514"));
+        }
+
+        /** Una sentencia suelta como {@code kamayuk_app}, para medir el privilegio y el CHECK. */
+        private void porSql(String sentencia) throws SQLException {
+            try (Connection app = base.conexion(BaseDeDatosDePrueba.APP)) {
                 ContextoDeTenant.fijar(app, municipalidadA);
-                try (java.sql.PreparedStatement sentencia =
-                        app.prepareStatement(
-                                "UPDATE acta_fiscalizacion SET estado = 'ANULADA' WHERE id = ?")) {
-                    sentencia.setLong(1, actaId);
-                    sentencia.executeUpdate();
+                try (PreparedStatement orden = app.prepareStatement(sentencia)) {
+                    orden.executeUpdate();
                 }
                 app.commit();
-            } catch (java.sql.SQLException excepcion) {
-                throw new IllegalStateException(excepcion);
             }
         }
     }

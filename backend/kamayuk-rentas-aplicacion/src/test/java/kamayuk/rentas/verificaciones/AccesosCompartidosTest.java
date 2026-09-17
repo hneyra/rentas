@@ -64,6 +64,13 @@ class AccesosCompartidosTest {
                     // encontro en la caja, una pantalla que escribe y no ve lo que escribio.
                     "GET /fiscalizacion/actas",
                     Set.of("fisc_vehicular"),
+                    // #214 — anular un acta, que es la UNICA transicion que este sistema escribe
+                    // sobre ella. Comparte acceso por lo mismo que la lectura de arriba y con mas
+                    // motivo: un perfil de fiscalizacion vehicular que puede levantar un acta y no
+                    // puede anularla se queda con una visita que no vale contando en el embudo y
+                    // excluyendo su unidad del siguiente sorteo (#481), sin nadie que lo deshaga.
+                    "POST /fiscalizacion/actas/{id}/anulacion",
+                    Set.of("fisc_vehicular"),
                     // #548 — la grilla de deuda de la caja tributaria. `POST
                     // /tesoreria/caja/cobranza` exige `obligaciones[]` con tributo, ejercicio y
                     // unidad una a una, y esta es la UNICA lectura que las publica asi: sin ella,

@@ -3163,6 +3163,62 @@ const OPERACIONES_ADICIONALES = {
   // vehicular comparten tabla, tipo de dominio y recurso; dos listados serian
   // dos copias de la misma consulta. Por eso el acceso lo comparten las dos
   // opciones (`RequiereAcceso.oTambien`, censado en `AccesosCompartidosTest`).
+  // `predial_individual` declara «POST /rentas/predial/calculo-individual» como su
+  // endpoint, y esa operacion ESCRIBE: dispara el calculo y, con `simulacion:false`,
+  // inserta una fila cada vez que se le llama. La hoja `territorio` era la unica de
+  // las cuarenta con siete operaciones y ni una lectura (#182), asi que no tenia con
+  // que dibujarse: abrir una pantalla no puede determinar de oficio a nadie.
+  predial_individual: [
+    {
+      operationId: 'ultima_determinacion_predial',
+      metodo: 'get',
+      ruta: '/api/v1/rentas/predial/determinaciones',
+      titulo: 'Ultima determinacion predial de un contribuyente',
+      parametros: [
+        {
+          nombre: 'codContribuyente',
+          requerido: true,
+          ejemplo: '',
+          descripcion:
+            'De quien se lee la determinacion. Sin el es 422: no se contesta la de cualquiera',
+        },
+        {
+          nombre: 'ejercicio',
+          ejemplo: '2026',
+          descripcion: 'El ejercicio cuya ultima determinacion se pide. Ausente, el del reloj',
+        },
+        {
+          nombre: 'ano',
+          ejemplo: '2026',
+          descripcion: 'El mismo dato con el rotulo del prototipo; el canonico es «ejercicio»',
+        },
+      ],
+      descripcion: bloque(`
+        La última determinación predial **guardada** de un contribuyente para un ejercicio (#207):
+        los predios que integran la base con lo que puso cada uno, el valúo total, el exonerado y
+        el afecto, la base imponible, los tramos del artículo 13, el mínimo imponible, el impuesto
+        insoluto, el derecho de emisión, el total a pagar y las reglas aplicadas.
+
+        Dos fuentes y ninguna más. De las **filas guardadas** salen la cabecera y el detalle por
+        predio. De **el conjunto sellado que esa determinación fijó** —por su \`conjuntoId\`, no el
+        vigente de hoy— salen la UIT, los tramos, el mínimo y el derecho de emisión: es lo que
+        ARQ-09 §3 promete, y por eso no se guardan dos veces. Resolverlos con el vigente publicaría
+        unos tramos que esa determinación nunca usó si se sellara una segunda versión del ejercicio.
+
+        **No trae el cronograma de cuotas ni la modalidad**, y no es un olvido: \`determinacion\` no
+        guarda la modalidad —sólo la guarda la corrida masiva—, y sin ella los vencimientos no se
+        pueden resolver. Suponer la trimestral publicaría un cronograma que puede no ser el que el
+        contribuyente recibió. Está nombrado y no resuelto: \`rentas\`#234.
+
+        **204 y 404 no dicen lo mismo.** Un código que no está en el padrón es **404** nombrándolo:
+        la pregunta no tiene sujeto. Un contribuyente que existe y todavía no tiene determinación de
+        ese ejercicio es **204**: la respuesta es «todavía no». Devolver lo mismo en los dos casos es
+        el defecto que #546 midió.
+
+        Exige LECTURA sobre \`predial_individual\`: leer una determinación no es determinarla.
+      `),
+    },
+  ],
   fisc_predial: [
     {
       operationId: 'fisc_actas_listado',
@@ -3192,6 +3248,30 @@ const OPERACIONES_ADICIONALES = {
         ' tabla—, así que publicar el predio, el hallazgo o el estado sería inventar promesas que' +
         ' ninguna pantalla hace. Exige LECTURA sobre `fisc_predial` **o** sobre `fisc_vehicular`:' +
         ' un perfil de fiscalización vehicular registraría actas que no podría volver a ver.',
+    },
+    // #214 — anular un acta, que es la UNICA transicion que este sistema escribe
+    // sobre ella. Hasta aqui `EstadoDeActa` declaraba cinco valores y se escribia
+    // uno: ANULADA era inalcanzable y las tres consultas que la descartan no
+    // descartaban nada. Los otros tres —liquidada, reliquidada, transferida— NO
+    // se anadieron: se derivan de la liquidacion, de sus versiones y de su
+    // resolucion, y guardarlos ademas dejaria dos verdades sobre el mismo hecho.
+    {
+      operationId: 'anular_acta_fiscalizacion',
+      metodo: 'post',
+      ruta: '/api/v1/fiscalizacion/actas/{id}/anulacion',
+      titulo: 'Anulación de un acta de inspección',
+      descripcion:
+        'Deja sin efecto una visita: la **única** transición que mueve el estado de un acta. No' +
+        ' borra ni edita nada —el acta se sigue leyendo entera, con quién fue, qué día y qué' +
+        ' midió—; lo que cambia es que deja de contar, y desde entonces la unidad vuelve a poder' +
+        ' sortearse (#481) y el embudo del programa no la cuenta como inspeccionada. Corregir lo' +
+        ' que se midió NO es esto: es levantar otra acta, otra versión sobre la misma unidad.' +
+        ' **Un acta que sostiene una liquidación viva no se anula**: primero se anula la' +
+        ' liquidación, o quedaría determinada de oficio una diferencia que ya no sostiene nadie' +
+        ' — eso responde **409**, igual que anular una ya anulada. Un `id` que no existe en esta' +
+        ' municipalidad es **404**. El cuerpo lleva la observación del usuario, obligatoria' +
+        ' (RNF-052), y la fecha del acto, que es la del día en que se anula y no la de su' +
+        ' registro. Exige MODIFICACION sobre `fisc_predial` **o** sobre `fisc_vehicular`.',
     },
   ],
   // «Resultados y determinaciones» declara «GET /fiscalizacion/resultados» como

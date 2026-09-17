@@ -84,39 +84,49 @@ class EmbudoDeFiscalizacionTest {
     }
 
     @Test
-    @DisplayName(
-            "y NINGUN camino de este sistema mueve el estado de un acta: por eso no hay «cerrada»")
-    void ningunCaminoMueveElEstadoDeUnActa() {
-        assertThat(
-                        ActaFiscalizacion.nuevaPredial(
-                                        1L,
-                                        1,
-                                        1L,
-                                        1L,
-                                        null,
-                                        HOY,
-                                        "J. Perez",
-                                        Hallazgo.CONFORME,
-                                        null,
-                                        null,
-                                        null,
-                                        kamayuk.rentas.dominio.Observacion.de("siembra"))
-                                .estado())
-                .as("un `conActaCerrada` valdria cero siempre, en verde y sin sintoma (#194)")
-                .isEqualTo(EstadoDeActa.ABIERTA);
-        assertThat(
-                        ActaFiscalizacion.nuevaVehicular(
-                                        1L,
-                                        1,
-                                        1L,
-                                        1L,
-                                        HOY,
-                                        "J. Perez",
-                                        Hallazgo.CONFORME,
-                                        null,
-                                        kamayuk.rentas.dominio.Observacion.de("siembra"))
-                                .estado())
-                .isEqualTo(EstadoDeActa.ABIERTA);
+    @DisplayName("el acta nace viva, y la UNICA transicion que este sistema escribe es anularla")
+    void laUnicaTransicionDelActaEsAnularla() {
+        ActaFiscalizacion nueva =
+                ActaFiscalizacion.nuevaPredial(
+                        1L,
+                        1,
+                        1L,
+                        1L,
+                        null,
+                        HOY,
+                        "J. Perez",
+                        Hallazgo.CONFORME,
+                        null,
+                        null,
+                        null,
+                        kamayuk.rentas.dominio.Observacion.de("siembra"));
+
+        assertThat(nueva.estado()).isEqualTo(EstadoDeActa.ABIERTA);
+        assertThat(nueva.estado().estaViva())
+                .as("toda acta nace contando: es lo que `conActa` cuenta")
+                .isTrue();
+
+        ActaFiscalizacion anulada = nueva.anulada();
+        assertThat(anulada.estado()).isEqualTo(EstadoDeActa.ANULADA);
+        assertThat(anulada.estado().estaViva())
+                .as("anularla es justamente decir que esa visita no vale (#481)")
+                .isFalse();
+
+        assertThatThrownBy(anulada::anulada)
+                .as("una anulada no revive: corregir una visita es levantar otra acta")
+                .isInstanceOf(ActaFiscalizacion.TransicionIlegal.class)
+                .hasMessageContaining("no revive");
+    }
+
+    @Test
+    @DisplayName("y el enumerado no declara ningun valor que nadie pueda escribir (#214)")
+    void ningunValorInalcanzable() {
+        assertThat(EstadoDeActa.values())
+                .as(
+                        "liquidada, reliquidada y transferida se DERIVAN de la liquidacion, de sus"
+                                + " versiones y de su resolucion; guardarlas aqui dejaria dos"
+                                + " verdades sobre el mismo hecho (V19)")
+                .containsExactly(EstadoDeActa.ABIERTA, EstadoDeActa.ANULADA);
     }
 
     private static EmbudoDeFiscalizacion embudo(

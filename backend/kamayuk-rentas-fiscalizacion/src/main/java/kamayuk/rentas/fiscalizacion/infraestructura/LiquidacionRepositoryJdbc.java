@@ -16,6 +16,7 @@ import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.fiscalizacion.dominio.CondicionFiscalizada;
 import kamayuk.rentas.fiscalizacion.dominio.CriterioDeLiquidaciones;
+import kamayuk.rentas.fiscalizacion.dominio.EstadoDeActa;
 import kamayuk.rentas.fiscalizacion.dominio.LineaDeLiquidacion;
 import kamayuk.rentas.fiscalizacion.dominio.Liquidacion;
 import kamayuk.rentas.fiscalizacion.dominio.LiquidacionRepository;
@@ -294,7 +295,9 @@ public class LiquidacionRepositoryJdbc extends RepositorioJdbc implements Liquid
                                         + "   ON a.municipalidad_id = l.municipalidad_id"
                                         + "  AND a.id = l.acta_id"
                                         + " WHERE a.programa_id = :programa"
-                                        + "   AND a.estado <> 'ANULADA'"
+                                        + "   AND a.estado <> '"
+                                        + EstadoDeActa.ANULADA.name()
+                                        + "'"
                                         + "   AND d.condicion IN (:condiciones)"
                                         + "   AND NOT EXISTS (SELECT 1 FROM liquidacion_fiscalizacion s"
                                         + "                    WHERE s.municipalidad_id ="

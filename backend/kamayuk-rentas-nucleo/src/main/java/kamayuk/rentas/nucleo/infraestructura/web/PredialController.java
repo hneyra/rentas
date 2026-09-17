@@ -11,6 +11,7 @@ import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.dominio.PoliticasDeRedondeo;
 import kamayuk.rentas.nucleo.aplicacion.CandadoDeEmision;
+import kamayuk.rentas.nucleo.aplicacion.ConsultaDeLaDeterminacionPredial;
 import kamayuk.rentas.nucleo.aplicacion.CuadroPredialParametrizado;
 import kamayuk.rentas.nucleo.aplicacion.DeterminarPredial;
 import kamayuk.rentas.nucleo.aplicacion.DeterminarPredialMasivo;
@@ -135,17 +136,73 @@ public class PredialController {
     private final DeterminarPredial individual;
     private final DeterminarPredialMasivo masivo;
     private final RegistrarCorridaDeEmision corridas;
+    private final ConsultaDeLaDeterminacionPredial determinaciones;
     private final Clock reloj;
 
     public PredialController(
             DeterminarPredial individual,
             DeterminarPredialMasivo masivo,
             RegistrarCorridaDeEmision corridas,
+            ConsultaDeLaDeterminacionPredial determinaciones,
             Clock reloj) {
         this.individual = individual;
         this.masivo = masivo;
         this.corridas = corridas;
+        this.determinaciones = determinaciones;
         this.reloj = reloj;
+    }
+
+    /**
+     * La ultima determinacion predial GUARDADA de un contribuyente (#207).
+     *
+     * <h2>Por que hacia falta</h2>
+     *
+     * <p>{@code territorio} —la hoja de la Determinacion— era la unica de las cuarenta que
+     * declaraba siete operaciones y <b>ni una lectura</b>: las siete escriben. La que se le
+     * atribuia es el {@code POST} de aqui abajo, que <b>dispara</b> el calculo; abrir una pantalla
+     * no puede determinar de oficio a nadie, y con {@code simulacion=false} cada llamada inserta
+     * una fila.
+     *
+     * <h2>204 y 404 no dicen lo mismo, y aqui se distinguen</h2>
+     *
+     * <p>Un codigo que no esta en el padron es <b>404</b> nombrandolo: la pregunta no tiene sujeto.
+     * Un contribuyente que existe y no tiene determinacion de ese ejercicio es <b>204</b>: la
+     * respuesta es «todavia no». Devolver lo mismo en los dos casos es el defecto que #546 midio en
+     * el modulo de fiscalizacion, y el 204 es ademas lo que ya hace {@code GET
+     * /predial/corridas/ultima} de aqui arriba.
+     *
+     * <p>{@code LECTURA} sobre {@code predial_individual}, que es la opcion de la pantalla que
+     * determina — la misma que el {@code POST}, con el privilegio que corresponde a leer.
+     */
+    @GetMapping("/determinaciones")
+    @RequiereAcceso(acceso = "predial_individual", privilegio = Privilegio.LECTURA)
+    public ResponseEntity<DeterminacionGuardadaResource> ultimaDeterminacion(
+            @RequestParam(required = false) @Nullable String codContribuyente,
+            @RequestParam(required = false) @Nullable String ejercicio,
+            @RequestParam(required = false) @Nullable String ano) {
+
+        String contribuyente =
+                exigir(
+                        codContribuyente,
+                        "Hay que decir de que contribuyente se lee la determinacion: falta"
+                                + " «codContribuyente»");
+        Ejercicio elEjercicio = ejercicioDe(FiltroDeLaConsulta.elCanonicoOSuAlias(ejercicio, ano));
+
+        try {
+            return determinaciones
+                    .ultimaDe(contribuyente, elEjercicio)
+                    .map(leida -> ResponseEntity.ok(DeterminacionGuardadaResource.de(leida)))
+                    .orElseGet(() -> ResponseEntity.noContent().build());
+        } catch (DeterminarPredial.ContribuyenteInexistente noEsta) {
+            throw new ProblemaDeNegocio(CodigoDeError.NO_ENCONTRADO, mensajeDe(noEsta));
+        } catch (CuadroPredialParametrizado.ParametroDelPredialAusente
+                | ParametrosSellados.ParametroAusente
+                | LectorDeParametros.EjercicioSinSellar falta) {
+            // El conjunto que la determinacion fijo ya no publica una de sus cifras. No es un
+            // campo de la peticion: es que reproducir aquella determinacion exige un valor que
+            // falta, y el 422 sale nombrando la llave (#604, #691).
+            throw FaltaPublicar.problema(falta);
+        }
     }
 
     /**

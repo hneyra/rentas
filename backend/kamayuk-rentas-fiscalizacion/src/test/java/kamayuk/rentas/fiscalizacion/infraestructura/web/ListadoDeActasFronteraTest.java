@@ -2,17 +2,20 @@ package kamayuk.rentas.fiscalizacion.infraestructura.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
 import java.io.IOException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import kamayuk.rentas.auditoria.AuditoriaJdbc;
 import kamayuk.rentas.auditoria.Origen;
 import kamayuk.rentas.auditoria.OrigenContext;
 import kamayuk.rentas.compartido.TenantContext;
@@ -20,8 +23,11 @@ import kamayuk.rentas.dominio.MunicipalidadId;
 import kamayuk.rentas.esquema.BaseDeDatosDePrueba;
 import kamayuk.rentas.esquema.ContextoDeTenant;
 import kamayuk.rentas.esquema.ProyeccionDeCatastro;
+import kamayuk.rentas.fiscalizacion.aplicacion.AnularActaFiscalizacion;
 import kamayuk.rentas.fiscalizacion.aplicacion.ConsultaDeActas;
 import kamayuk.rentas.fiscalizacion.infraestructura.ActaFiscalizacionRepositoryJdbc;
+import kamayuk.rentas.fiscalizacion.infraestructura.LiquidacionRepositoryJdbc;
+import kamayuk.rentas.fiscalizacion.infraestructura.MovimientoDeLiquidacionRepositoryJdbc;
 import kamayuk.rentas.plataforma.tenant.TenantTransactionManager;
 import kamayuk.rentas.web.ConfiguracionDeJson;
 import kamayuk.rentas.web.ManejadorDeErrores;
@@ -34,6 +40,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.aop.framework.ProxyFactory;
+import org.springframework.http.MediaType;
 import org.springframework.http.converter.json.JacksonJsonHttpMessageConverter;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
@@ -150,6 +157,15 @@ class ListadoDeActasFronteraTest {
                                         envolver(
                                                 new ConsultaDeActas(
                                                         new ActaFiscalizacionRepositoryJdbc(jdbc)),
+                                                gestor),
+                                        envolver(
+                                                new AnularActaFiscalizacion(
+                                                        new ActaFiscalizacionRepositoryJdbc(jdbc),
+                                                        new LiquidacionRepositoryJdbc(jdbc),
+                                                        new MovimientoDeLiquidacionRepositoryJdbc(
+                                                                jdbc),
+                                                        new AuditoriaJdbc(
+                                                                jdbc, Clock.systemDefaultZone())),
                                                 gestor)))
                         .setControllerAdvice(new ManejadorDeErrores())
                         .setMessageConverters(
@@ -383,6 +399,116 @@ class ListadoDeActasFronteraTest {
     }
 
     // ------------------------------------------------------------------
+
+    @Nested
+    @DisplayName("#214 — anular el acta, de HTTP a PostgreSQL")
+    class LaAnulacionPorHttp {
+
+        @Test
+        @DisplayName("el acta se anula por su ruta y la columna se mueve de verdad")
+        void elActaSeAnulaPorSuRuta() throws Exception {
+            long actaId = idDelActa("A. TRES");
+
+            MvcResult resultado =
+                    mvc.perform(
+                                    post(
+                                                    "/rentas/api/v1/fiscalizacion/actas/{id}/anulacion",
+                                                    actaId)
+                                            .contentType(MediaType.APPLICATION_JSON)
+                                            .content(
+                                                    "{\"observacion\":\"El predio visitado no era"
+                                                            + " ese\",\"fecha\":\"2026-04-01\"}"))
+                            .andReturn();
+
+            assertThat(resultado.getResponse().getStatus())
+                    .as(
+                            "201: lo que se crea es el ACTO, que queda en auditoria con su antes y"
+                                    + " su despues")
+                    .isEqualTo(201);
+            assertThat(resultado.getResponse().getContentAsString())
+                    .contains("\"estado\":\"ANULADA\"");
+            assertThat(estadoEnLaBase(actaId))
+                    .as("sin @Transactional el SET LOCAL no llega y la politica RLS no deja tocar")
+                    .isEqualTo("ANULADA");
+        }
+
+        @Test
+        @DisplayName("y anularla dos veces es 409: una anulada no revive")
+        void anularDosVecesEsConflicto() throws Exception {
+            long actaId = idDelActa("V. CUATRO");
+            anular(actaId);
+
+            assertThat(anular(actaId).getResponse().getStatus()).isEqualTo(409);
+        }
+
+        @Test
+        @DisplayName("un acta que no existe es 404, y no 500")
+        void unActaQueNoExisteEs404() throws Exception {
+            assertThat(anular(999_999L).getResponse().getStatus()).isEqualTo(404);
+        }
+
+        @Test
+        @DisplayName("sin observacion no se anula: regla 10")
+        void sinObservacionNoSeAnula() throws Exception {
+            long actaId = idDelActa("A. UNO");
+
+            MvcResult resultado =
+                    mvc.perform(
+                                    post(
+                                                    "/rentas/api/v1/fiscalizacion/actas/{id}/anulacion",
+                                                    actaId)
+                                            .contentType(MediaType.APPLICATION_JSON)
+                                            .content("{\"fecha\":\"2026-04-01\"}"))
+                            .andReturn();
+
+            assertThat(resultado.getResponse().getStatus()).isEqualTo(422);
+            assertThat(estadoEnLaBase(actaId)).as("y nada se movio").isEqualTo("ABIERTA");
+        }
+
+        private MvcResult anular(long actaId) throws Exception {
+            return mvc.perform(
+                            post("/rentas/api/v1/fiscalizacion/actas/{id}/anulacion", actaId)
+                                    .contentType(MediaType.APPLICATION_JSON)
+                                    .content(
+                                            "{\"observacion\":\"La visita no"
+                                                    + " vale\",\"fecha\":\"2026-04-01\"}"))
+                    .andReturn();
+        }
+    }
+
+    private static long idDelActa(String fiscalizador) {
+        return consultarComoApp(
+                "SELECT id FROM acta_fiscalizacion WHERE fiscalizador = '" + fiscalizador + "'");
+    }
+
+    private static String estadoEnLaBase(long actaId) {
+        try (Connection app = base.conexion(BaseDeDatosDePrueba.APP)) {
+            ContextoDeTenant.fijar(app, municipalidadA);
+            try (PreparedStatement sentencia =
+                    app.prepareStatement("SELECT estado FROM acta_fiscalizacion WHERE id = ?")) {
+                sentencia.setLong(1, actaId);
+                try (ResultSet fila = sentencia.executeQuery()) {
+                    fila.next();
+                    return fila.getString(1);
+                }
+            }
+        } catch (SQLException excepcion) {
+            throw new IllegalStateException(excepcion);
+        }
+    }
+
+    private static long consultarComoApp(String sql) {
+        try (Connection app = base.conexion(BaseDeDatosDePrueba.APP)) {
+            ContextoDeTenant.fijar(app, municipalidadA);
+            try (PreparedStatement sentencia = app.prepareStatement(sql);
+                    ResultSet fila = sentencia.executeQuery()) {
+                fila.next();
+                return fila.getLong(1);
+            }
+        } catch (SQLException excepcion) {
+            throw new IllegalStateException(excepcion);
+        }
+    }
 
     private static MvcResult actas(
             @Nullable Long programa, @Nullable Integer pagina, @Nullable Integer tamano)
