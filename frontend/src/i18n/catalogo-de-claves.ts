@@ -3,7 +3,7 @@ import type { DefinicionDePantalla } from '@kamayuk/ui';
 import { ARBOL } from '../pantallas/arbol.ts';
 import { PANTALLAS } from '../pantallas/definiciones/index.ts';
 import type { Modulo } from '../pantallas/tipos.ts';
-import { NADA_SERVIDO, SERVIDO_Y_SIN_PEDIR, SOLO_BASE } from '../porQueNoHayDato.ts';
+import { NADA_SERVIDO, SERVIDO_Y_SIN_PEDIR, SOLO_BASE, SOLO_ESCRIBE } from '../porQueNoHayDato.ts';
 import { clavesDelMarco } from './textosDelMarco.ts';
 
 /**
@@ -86,7 +86,7 @@ function delArbol(): readonly string[] {
 
 /** Las frases con que el sistema explica que no hay dato. */
 function deLasAusencias(): readonly string[] {
-  return [NADA_SERVIDO, SOLO_BASE, SERVIDO_Y_SIN_PEDIR].flatMap((a) => [
+  return [NADA_SERVIDO, SOLO_BASE, SOLO_ESCRIBE, SERVIDO_Y_SIN_PEDIR].flatMap((a) => [
     a.enElCampo,
     a.explicacion,
   ]);
