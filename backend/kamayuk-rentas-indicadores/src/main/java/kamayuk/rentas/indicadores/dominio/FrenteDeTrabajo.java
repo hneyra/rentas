@@ -39,6 +39,61 @@ package kamayuk.rentas.indicadores.dominio;
  *       diferencia» seria darle a la pantalla de aterrizaje una cifra que ninguna pantalla del
  *       modulo puede confirmar (AC 2.4 leido al derecho).
  * </ul>
+ *
+ * <h2>Y por que NO publica una situacion, que es lo que #183 vino a pedir</h2>
+ *
+ * <p>La quinta columna de {@code ini-parado} es la de la insignia, y el artboard dibuja ahi un
+ * <b>estado</b> —«Vencida», «Por vencer»—. Hoy la interfaz le pasa {@link #porQueCuestaDinero}, que
+ * es una frase; desde #175 sale con el tono de «no se» y por tanto la insignia no enciende. La
+ * salida honesta habria sido publicar aqui la situacion del frente, cerrada y anulable como ya lo
+ * es el importe. <b>Se midio, y no se puede.</b> #183 se cerro sin implementarlo, y queda escrito
+ * aqui porque este es el enumerado que alguien va a mirar cuando se lo vuelva a preguntar.
+ *
+ * <p><b>Primero: no hay con que juzgar.</b> Los cuatro puertos devuelven un <b>agregado</b> —{@code
+ * PapeletasSinNotificar} un recuento y una suma; {@code ValoresSinNotificar}, {@code
+ * ExpedientesSinRec} y {@code PrediosSinConciliar} un recuento a secas— y ninguno publica la
+ * <b>antiguedad</b> de lo que esta parado: ni la fecha del mas viejo, ni cuantos pasan de un
+ * umbral. Y no es un olvido que se arregle anadiendo un campo: lo que no pueden devolver es la
+ * <b>lista</b>, porque la pantalla de aterrizaje la abre todo el mundo al entrar y recorrer el
+ * padron entero es lo que el AC 4 de #56 prohibe y {@code PanelSinRecorrerElLibroTest} comprueba.
+ *
+ * <p><b>Segundo, y es el que cierra la puerta: no hay plazo publicado para ninguno de los
+ * cuatro.</b> «Vencida» es «vencida respecto de que», y ese «que» es un valor normativo que la
+ * regla 5 prohibe compilar. Medido el 2026-09-17 sobre el derivado publicable del corpus —el CSV de
+ * {@code normativa}, nueve filas de tipo {@code PLAZO}—:
+ *
+ * <ul>
+ *   <li>las tres de prescripcion del art. 43 del TUO del Codigo Tributario se distinguen por si el
+ *       <b>deudor presento o no su declaracion</b>. Una papeleta de transito, un expediente
+ *       coactivo y un predio sin conciliar no tienen declaracion que presentar, asi que elegir una
+ *       de las tres seria inventar cual aplica;
+ *   <li>{@code REC1_CUMPLIMIENTO} son siete dias habiles <b>de notificado el REC-1</b>, y el frente
+ *       de coactiva es precisamente «expedientes <b>sin</b> REC-1»: el plazo arranca en un acto que
+ *       todavia no ocurrio;
+ *   <li>las tres de {@code NOTIFICACION_VALOR} son el plazo de <b>reclamacion</b> que corre desde
+ *       la notificacion, y el frente de valores es «emitidos y <b>sin</b> notificar»: mismo caso;
+ *   <li>las dos de {@code PRESCRIPCION_INICIO} fijan <b>cuando empieza</b> a contarse el plazo —un
+ *       ano de desfase—, no cuanto puede estar algo parado;
+ *   <li>y para el frente de catastro el corpus no publica ninguna, porque no hay norma que ponga
+ *       plazo a conciliar una ficha con el padron.
+ * </ul>
+ *
+ * <p>Los dos plazos que {@code sanciones} ya lee —{@code DESCARGO_PAPELETA} y el de cumplimiento de
+ * la resolucion ordinaria— tampoco sirven, y ademas <b>tampoco estan publicados</b> en ese CSV: no
+ * son «el plazo que tiene la administracion para emitir», que es el que este frente necesitaria.
+ *
+ * <p><b>Y el remate, que es por que no se publica el campo «por si acaso».</b> Si ningun frente se
+ * puede juzgar, {@code situacion} saldria <b>nula en los cuatro, siempre</b>. Eso no es el caso que
+ * el issue describia —un frente que no se puede cifrar entre otros que si— sino un campo que no
+ * dice nada nunca; y peor, pondria roja a proposito la guarda {@code
+ * la-insignia-no-se-pinta-verde-sin-regla} de la interfaz, que al verlo pide «dale a la columna su
+ * regla de insignia sobre ESE campo». La regla no tendria sobre que decidir. Lo que sobra es la
+ * <b>columna</b>, no la regla: se arregla en el artboard.
+ *
+ * <p>Cuando alguna de las dos cosas cambie —un puerto que pueda decir la antiguedad sin devolver la
+ * lista, o un plazo que el corpus selle—, esto se reabre con el plazo delante y no antes. Un umbral
+ * inventado aqui no cobra de mas: <b>declara vencido trabajo que todavia se puede hacer</b>, o
+ * tranquiliza sobre el que ya no.
  */
 public enum FrenteDeTrabajo {
 

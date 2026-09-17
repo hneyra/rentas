@@ -177,7 +177,13 @@ const CONECTADAS: readonly {
   {
     hoja: 'ini-parado',
     bloque: 0,
-    leLlega: 'frentes[].porQueCuestaDinero — UNA FRASE, no un estado. Es el defecto de #175, y el estado lo tiene que publicar el backend (#183)',
+    leLlega:
+      'frentes[].porQueCuestaDinero — UNA FRASE, no un estado. Es el defecto de #175, y el ' +
+      'estado NO lo va a publicar el backend: #183 se midio y se cerro sin implementar el ' +
+      '2026-09-17 —los cuatro puertos devuelven un recuento y ninguno la antiguedad de lo que ' +
+      'esta parado, y de las nueve filas `PLAZO` del corpus ninguna es el plazo que la ' +
+      'administracion tiene para desatascar ninguno de los cuatro frentes—. Lo que sobra es la ' +
+      'COLUMNA, y eso es del artboard',
   },
   { hoja: 'con-doc', bloque: 0, leLlega: 'obligaciones[].fase — `Fase`: ORDINARIA, VALOR, COACTIVA, CONVENIO. Solo COACTIVA es un juicio' },
   { hoja: 'coa-exp', bloque: 0, leLlega: 'actuaciones[].medida — la medida cautelar del acto, o «—» cuando no la lleva. Tampoco es un estado' },
@@ -316,6 +322,15 @@ describe('ninguna insignia se pinta de verde sin que una regla la reconozca', ()
     ).toEqual([]);
   });
 
+  /**
+   * **Sigue viva despues de #183, y por un motivo distinto del que la puso aqui.**
+   *
+   * Nacio diciendo «cuando el backend publique el estado, esto sale rojo y dice que hacer». #183
+   * midio que **no lo puede publicar** —ver el `leLlega` de `ini-parado` y el javadoc de
+   * `FrenteDeTrabajo.java`—, asi que ya no esta esperando a nadie: lo que vigila ahora es que
+   * nadie anada el campo **sin la medida delante**. Si algun dia aparece, el rojo sigue diciendo
+   * lo que hay que hacer, y ademas obliga a volver a leer por que no se pudo.
+   */
   it('EL CONTRATO lo confirma: `trabajo-parado` no publica ningun estado — y cuando lo publique, esto sale rojo', () => {
     const formas = JSON.parse(readFileSync(FORMAS, 'utf8')) as Record<string, unknown>;
     const forma = formas['GET /indicadores/trabajo-parado'] as
@@ -329,10 +344,15 @@ describe('ninguna insignia se pinta de verde sin que una regla la reconozca', ()
     );
     expect(
       campos.filter((c) => /estado|situacion|situación/i.test(c)),
-      'EL BACKEND YA PUBLICA EL ESTADO DEL FRENTE (#183), y esta guarda esta roja a proposito:\n' +
-        '  · dale a la columna de `ini-parado` su regla de insignia sobre ESE campo,\n' +
-        '  · deja de mandarle `porQueCuestaDinero`, que es una frase y nunca fue un estado,\n' +
-        '  · y borra esta comprobacion, que ya no tiene nada que vigilar.',
+      'EL BACKEND PUBLICA UN ESTADO DEL FRENTE, y esta guarda esta roja a proposito.\n' +
+        '  #183 se midio el 2026-09-17 y se cerro DICIENDO QUE NO SE PUEDE: los cuatro puertos\n' +
+        '  devuelven un recuento y ninguno la antiguedad de lo que esta parado, y de las nueve\n' +
+        '  filas `PLAZO` del corpus ninguna es el plazo que la administracion tiene para\n' +
+        '  desatascar ninguno de los cuatro frentes. Asi que antes de tocar la interfaz:\n' +
+        '  · lee el javadoc de `FrenteDeTrabajo.java` y comprueba cual de las dos cosas cambio,\n' +
+        '  · si de verdad hay con que juzgar, dale a la columna su regla sobre ESE campo y deja\n' +
+        '    de mandarle `porQueCuestaDinero`, que es una frase y nunca fue un estado,\n' +
+        '  · y si no la hay, el campo sobra: lo que hay que quitar es la columna, en el artboard.',
     ).toEqual([]);
   });
 });
