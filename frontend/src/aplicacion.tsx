@@ -139,11 +139,19 @@ function CuerpoDeLaPantalla({ clave }: { readonly clave: ClaveDeHoja }) {
   // marco y no de `window.location` porque el marco ya lo descodifica y **solo entrega lo que la
   // hoja declara** en su `enLaRuta`; lo que llegue sin declarar se ignora con aviso. Las 38 hojas
   // que no lo declaran reciben `null` y no cambian en nada.
-  const { ruta } = useHoja();
+  //
+  // **Y desde #172 lo que se le pasa es la ruta ENTERA**, no solo su sujeto: los mandos de una
+  // tabla paginada escriben la pagina y el campo de orden **en la ruta de la hoja** y no piden
+  // nada (`MandosDeLaTabla.tsx` de `@kamayuk/ui`), asi que quien pide tiene que leerla. Con solo
+  // el sujeto, pulsar «Siguiente» movia la direccion y nadie volvia a pedir.
+  const hoja = useHoja();
   return (
+    // `hoja` es ademas lo que el interprete necesita para ESCRIBIR ahi: sin ella, la tabla guarda
+    // la pagina en su propio estado —no sobrevive a recargar y, peor, no llega al conector—.
     <PantallaDeRentas
       definicion={pantallaDe(clave)}
-      datos={useDatosDeLaHoja(clave, ruta.sujeto)}
+      datos={useDatosDeLaHoja(clave, hoja.ruta)}
+      hoja={hoja}
     />
   );
 }

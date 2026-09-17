@@ -261,7 +261,12 @@ describe('AC7 — lo que se declara servido tiene que publicarlo el backend', ()
     expect(parametros['GET /rentas/vehiculos/{placa}']?.obligatorios).toEqual([]);
 
     expect(RUTAS.papeletas).toBe('/transito/papeletas?tamano=1');
-    expect(RUTAS.internamientos).toBe('/transito/internamientos?tamano=20');
+    // La del deposito pasa a componerse con la ventana que su tabla declara (#186): el tamano ya
+    // no esta escrito aqui, porque en dos sitios diverge. Sin ventana, la ruta pelada.
+    expect(RUTAS.internamientos()).toBe('/transito/internamientos');
+    expect(RUTAS.internamientos({ tamano: '20', pagina: '2' })).toBe(
+      '/transito/internamientos?tamano=20&pagina=2',
+    );
     expect(RUTAS.internamientosDe('T2G/418')).toBe(
       '/transito/internamientos?placa=T2G%2F418&tamano=1',
     );
@@ -313,7 +318,11 @@ describe('AC7 — lo que se declara servido tiene que publicarlo el backend', ()
     // El numero entra como numero y no como texto: con la firma de texto, un
     // `String(sesion.ejercicioDeTrabajo)` sobre el nulo medido de la instalacion saldria a la red
     // como `?ejercicio=null` — un 422, y no un rojo del compilador. Ver `RUTAS.bitacoraDe`.
-    expect(RUTAS.bitacoraDe(2026)).toBe('/seguridad/auditoria?ejercicio=2026&tamano=20');
+    expect(RUTAS.bitacoraDe(2026)).toBe('/seguridad/auditoria?ejercicio=2026');
+    // Y la ventana entra aparte desde #186: el tamano lo declara la tabla, no esta ruta.
+    expect(RUTAS.bitacoraDe(2026, { tamano: '20', pagina: '3' })).toBe(
+      '/seguridad/auditoria?ejercicio=2026&tamano=20&pagina=3',
+    );
   });
 
   it.each(YA_SERVIDAS.map((o) => `${o.metodo} ${o.ruta}`))(

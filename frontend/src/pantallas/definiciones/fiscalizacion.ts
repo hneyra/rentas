@@ -57,6 +57,9 @@ export const FISCALIZACION = {
           },
         ],
         tabla: {
+          // «Declarado» y «Diferencia» dicen su motivo, que no es el mismo (#195).
+          clave: 'declarado-contra-verificado',
+          sinDato: { texto: '—', nota: 'Ninguna operacion del contrato publica este dato.' },
           titulo: 'Declarado contra verificado',
           columnas: [
             { rotulo: 'Concepto', alineadoDerecha: false },
@@ -97,6 +100,8 @@ export const FISCALIZACION = {
           { etiqueta: 'Fecha de cierre', tipo: 'd' },
         ],
         tabla: {
+          clave: 'muestra-del-programa',
+          sinDato: { texto: '—', nota: 'Ninguna operacion del contrato publica este dato.' },
           titulo: 'Muestra del programa',
           accion: 'Regenerar muestra',
           columnas: [
@@ -140,6 +145,8 @@ export const FISCALIZACION = {
           { etiqueta: 'Total liquidado', tipo: 'r' },
         ],
         tabla: {
+          clave: 'detalle-por-ejercicio',
+          sinDato: { texto: '—', nota: 'Ninguna operacion del contrato publica este dato.' },
           titulo: 'Detalle por ejercicio',
           columnas: [
             { rotulo: 'Ejercicio', alineadoDerecha: false },

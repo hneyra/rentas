@@ -12,6 +12,7 @@ import type {
 import { RUTAS, pedirPagina, pedirUno } from '../lecturas.ts';
 import type { Conector, Reparto } from '../conectores.ts';
 import { NO_PUBLICADO } from '../conectores.ts';
+import { laVentanaDe, laVentanaQueSePide, loQueDijoElServidor } from '../laVentana.ts';
 
 /**
  * **Las hojas de Transito que piden de verdad** (#180, #184).
@@ -61,10 +62,10 @@ import { NO_PUBLICADO } from '../conectores.ts';
  * `Conector.pedir` recibe una senal de aborto y el sujeto de la ruta, y nada mas. Es el mismo
  * hueco que `conectores/licencias.ts` dejo declarado, y lo cierra **#172**.
  *
- * Mientras tanto, lo que se pide esta escrito donde se ve —`RUTAS.papeletas` lleva `?tamano=1` y
- * `RUTAS.internamientos` lleva `?tamano=20`— y **ninguna de las dos pantallas afirma un tamano de
- * padron**: el encabezado que dibuja el interprete cuenta las filas que recibe, que es cierto de
- * lo que se ve. Lo que el artboard escribia —«3 de 188»— si lo seria, y por eso no se escribe.
+ * Mientras tanto, lo que se pide esta escrito donde se ve —`RUTAS.papeletas` lleva `?tamano=1`, y
+ * el de la tabla del deposito lo declara su `paginacion.tamano`—. **Y desde #172 «3 de 188» si se
+ * escribe**, porque ya no es una cuenta de aqui: es `totalElementos`, que la operacion publica
+ * sobre el deposito entero y que hasta este issue llegaba y se tiraba.
  *
  * <h2>Las tres celdas que nadie publica lo DICEN, y ese camino es nuevo</h2>
  *
@@ -82,11 +83,12 @@ import { NO_PUBLICADO } from '../conectores.ts';
  * `sinDato` —traducida, nunca un `''` ni un `0`— y **anuncia el motivo en la propia celda**. Las
  * tres notas de aqui abajo son ese motivo.
  *
- * **Y lo que NO se adopta de #87, dicho aqui y no descubierto luego**: la paginacion y el orden en
- * servidor. Las tres operaciones de estas hojas admiten `pagina`, `tamano` y `ordenarPor`, y el
- * interprete ya sabe escribirlos en la ruta; lo que falta es de este lado y es lo mismo que le
- * falta al filtro de #172 —`Conector.pedir` recibe una senal y el sujeto, y no la ruta de la hoja,
- * asi que nadie podria PEDIR la pagina que el mando escribiese—. Adoptarlo tiene su issue.
+ * **Y desde #186 la tabla del deposito pagina y ordena de verdad.** Lo que faltaba era de este
+ * lado —`Conector.pedir` no recibia la ruta de la hoja, asi que nadie podia PEDIR la pagina que el
+ * mando escribiese— y lo abrio #172: hoy `tra-veh` declara sus cuatro parametros, lee la ventana
+ * de la ruta y entrega el `hayMas` y el `totalPaginas` que el backend publica. La tabla de
+ * `tra-pap` **no** pagina, y no es un olvido: se pide con `?tamano=1` porque esta pantalla dibuja
+ * los actos de UNA papeleta, no una relacion de papeletas.
  *
  * <h2>Las dos rutas `BASE` que el arbol declara y que NO se encienden</h2>
  *
@@ -261,7 +263,7 @@ const SIN_PLACA: Ausencia = {
  */
 const TRA_PANEL: Conector = {
   clave: ['tra-panel', 'resumen-de-papeletas'],
-  pedir: (senal) => pedirUno<ResumenDePapeletas>(RUTAS.resumenDePapeletas, senal),
+  pedir: ({ senal }) => pedirUno<ResumenDePapeletas>(RUTAS.resumenDePapeletas, senal),
   repartir: (resumen: ResumenDePapeletas): Reparto => {
     // Ver el javadoc: un rango de un ano natural agrupado por ANO da exactamente un grupo. Se
     // COMPRUEBA, porque leer la primera de varias pondria las cuentas de un trozo del periodo bajo
@@ -351,7 +353,7 @@ const TRA_PANEL: Conector = {
  */
 const TRA_PAP: Conector = {
   clave: ['tra-pap', 'actos-de-la-papeleta'],
-  pedir: async (senal) => {
+  pedir: async ({ senal }) => {
     const relacion = await pedirPagina<PapeletaDeTransito>(RUTAS.papeletas, senal);
     const primera = relacion.contenido[0];
     // Sin papeleta no hay expediente que pedir. `null` es «se pregunto y no hay», que la pantalla
@@ -486,13 +488,19 @@ const TRA_VEH: Conector = {
   clave: ['tra-veh', 'deposito'],
   exigeSujeto: true,
   sinSujeto: SIN_PLACA,
-  pedir: (senal, sujeto) => {
+  // La ventana de la tabla del deposito. La tercera lectura —la de ESTA placa— no pagina: es una
+  // fila, y se pide con `?tamano=1`.
+  parametros: laVentanaDe('GET /transito/internamientos'),
+  pedir: ({ senal, sujeto, enLaRuta }) => {
     // `useDatosDeLaHoja` no llama a `pedir` sin sujeto cuando `exigeSujeto` esta puesto; el `??`
     // es para el compilador, no una rama que se ejecute.
     const placa = sujeto ?? '';
     return Promise.all([
       pedirUno<VehiculoServido>(RUTAS.vehiculoDe(placa), senal),
-      pedirPagina<InternamientoEnDeposito>(RUTAS.internamientos, senal),
+      pedirPagina<InternamientoEnDeposito>(
+        RUTAS.internamientos(laVentanaQueSePide('tra-veh', 'vehiculos-internados', enLaRuta)),
+        senal,
+      ),
       pedirPagina<InternamientoEnDeposito>(RUTAS.internamientosDe(placa), senal),
     ]);
   },
@@ -543,13 +551,17 @@ const TRA_VEH: Conector = {
                 fila.estado,
               ],
             })),
-            // **Sin `conteo`**, y a proposito: el interprete cuenta las filas que recibe —«20
-            // registros»— con la palabra que SU saco traduce. Escribirlo aqui con
-            // `totalElementos` diria «188 registros» sobre una tabla de veinte filas, y ademas
-            // meteria en el DOM un «registros» en castellano que no pasa por `t()` (#103).
+            // **El total que la OPERACION publica** (#172). Hasta este issue no viajaba, y el
+            // encabezado contaba las filas que tenia delante: cierto de lo que se ve, y sin decir
+            // que son una ventana sobre el deposito entero —el artboard escribe «3 de 188»—. Lo
+            // que NO se hace sigue igual: contarlo aqui. El «de» lo pone `useDatosDeLaHoja` con
+            // `t()`, porque escrito en este archivo seria castellano que nunca podria traducirse.
+            totalElementos: deposito.totalElementos,
           },
         ],
       ]),
+      // `hayMas` y `totalPaginas`, dichos por el SERVIDOR (#187).
+      nombrados: loQueDijoElServidor('vehiculos-internados', deposito),
       noPublicados: new Map([
         ...(suyo === undefined ? ([[coordenada(0, 6), NO_PUBLICADO]] as const) : []),
         [coordenada(0, 7), NO_PUBLICADO],

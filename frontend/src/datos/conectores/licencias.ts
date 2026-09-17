@@ -1,6 +1,7 @@
 import { RUTAS, pedirPagina } from '../lecturas.ts';
 import type { GiroCiiu, LicenciaDeFuncionamiento, Paginado } from '../lecturas.ts';
 import type { Conector, Reparto } from '../conectores.ts';
+import { laVentanaDe, laVentanaQueSePide, loQueDijoElServidor } from '../laVentana.ts';
 
 /**
  * **Autorizaciones y licencias: las dos hojas que se pintan enteras** (#168).
@@ -115,21 +116,81 @@ function giroQueSeEnsena(licencia: LicenciaDeFuncionamiento): string {
   return (principal ?? licencia.giros[0])?.descripcion ?? '';
 }
 
+/** Las dos operaciones de este modulo, escritas una vez: son la llave del contrato (#172). */
+const CIIU = 'GET /licencias/ciiu';
+const FUNCIONAMIENTO = 'GET /licencias/funcionamiento';
+
 /**
  * `aut-cat` — el catalogo de giros CIIU.
  *
  * Las cuatro columnas de «Giros CIIU» salen de los cuatro campos que las llenan, una a una. No
  * hay ningun campo de solo lectura que decidir: los tres mandos del bloque son filtros, y lo que
  * cada uno no puede hacer esta arriba.
+ *
+ * <h2>Desde #172 la tabla dice «20 de 1 842» y no «20 registros»</h2>
+ *
+ * `totalElementos` llegaba en cada respuesta y se tiraba, de modo que el encabezado contaba las
+ * filas que tenia delante. Contar veinte no es mentir —hay veinte dibujadas— pero **pierde justo
+ * lo que esta pantalla necesita decir**: que son una ventana sobre 1 842 giros, que es lo que el
+ * artboard escribe («4 de 1,842») y el motivo por el que dibuja un combobox y no un Select.
+ *
+ * Lo que viaja es **el numero que la operacion publica**, no uno contado aqui: esa es la mitad
+ * que separa esto de lo que `conectores.ts` prohibe. El «de» es una frase y la pone
+ * `useDatosDeLaHoja` con `t()`, porque un «de» escrito en este archivo nunca podria traducirse.
+ *
+ * <h2>Y desde #186 la ventana se mueve de verdad</h2>
+ *
+ * La tabla declara `paginacion: { en: 'servidor' }` y `orden` con la lista blanca de
+ * `CiiuRepositoryJdbc` —`codigo`, `descripcion`, `seccion`, `riesgoItse`—, y el primero es el
+ * `ORDEN_POR_OMISION` de `CiiuController`. El interprete escribe la pagina y el campo **en la ruta
+ * de la hoja** y este conector los lee: `#/aut-cat?pagina=2&ordenarPor=descripcion`.
+ *
+ * `hayMas` y `totalPaginas` **los dice el servidor** y viajan por `nombrados`: contar las filas
+ * recibidas diria que no hay pagina siguiente justo cuando el tope se alcanza exacto.
+ *
+ * <h2>El buscador: el parametro YA entra, y lo que falta es el mando</h2>
+ *
+ * `?descripcion=` esta declarado aqui, o sea que el marco lo conserva en la ruta, entra en la
+ * llave de la cache y viaja a la operacion: `#/aut-cat?descripcion=bodega` acota el catalogo de
+ * verdad. **Lo que no hay es quien lo escriba desde la pantalla**, y esto esta medido y no
+ * supuesto: `@kamayuk/ui` guarda lo tecleado en el estado de `<Pantalla>` (`Tecleado`,
+ * `Pantalla.tsx:113`) y **no lo publica por ningun lado** — ni en `nombrados`, que es lo unico
+ * que las acciones de #66 resuelven, ni por una `prop` de salida. O sea que un campo del bloque no
+ * puede llegar a la ruta, y la caja «Buscar giro o actividad» sigue sin mover nada.
+ *
+ * Eso es de la libreria y tiene su issue; aqui queda **el canal entero de este lado**, que es lo
+ * que #172 pedia.
  */
 const AUT_CAT: Conector = {
   clave: ['aut-cat', 'ciiu'],
-  pedir: (senal) => pedirPagina<GiroCiiu>(RUTAS.ciiu, senal),
+  parametros: [...laVentanaDe(CIIU), { nombre: 'descripcion', operacion: CIIU }],
+  pedir: ({ senal, enLaRuta }) =>
+    pedirPagina<GiroCiiu>(
+      RUTAS.ciiu({
+        ...laVentanaQueSePide('aut-cat', 'giros-ciiu', enLaRuta),
+        // Lo tecleado en el buscador, cuando la ruta lo trae. `descripcion` lo publica el
+        // contrato; `codigoCiiu` y `seccion` tambien, y entran el dia que haya con que escribirlos.
+        ...(enLaRuta.descripcion === undefined ? {} : { descripcion: enLaRuta.descripcion }),
+      }),
+      senal,
+    ),
   repartir: (pagina: Paginado<GiroCiiu>): Reparto => ({
     valores: new Map(),
-    filas: new Map([
-      [0, pagina.contenido.map((giro) => [giro.codigo, giro.descripcion, giro.seccion, giro.riesgoItse])],
+    filas: new Map(),
+    tablas: new Map([
+      [
+        'giros-ciiu',
+        {
+          filas: pagina.contenido.map((giro) => ({
+            clave: giro.codigo,
+            celdas: [giro.codigo, giro.descripcion, giro.seccion, giro.riesgoItse],
+          })),
+          // El que la OPERACION publica, sobre el catalogo entero. Nunca `contenido.length`.
+          totalElementos: pagina.totalElementos,
+        },
+      ],
     ]),
+    nombrados: loQueDijoElServidor('giros-ciiu', pagina),
     noPublicados: new Map(),
   }),
 };
@@ -151,21 +212,36 @@ const AUT_CAT: Conector = {
  */
 const AUT_TRAM: Conector = {
   clave: ['aut-tram', 'licencias-de-funcionamiento'],
-  pedir: (senal) => pedirPagina<LicenciaDeFuncionamiento>(RUTAS.licenciasDeFuncionamiento, senal),
+  parametros: laVentanaDe(FUNCIONAMIENTO),
+  pedir: ({ senal, enLaRuta }) =>
+    pedirPagina<LicenciaDeFuncionamiento>(
+      RUTAS.licenciasDeFuncionamiento(
+        laVentanaQueSePide('aut-tram', 'padron-de-licencias', enLaRuta),
+      ),
+      senal,
+    ),
   repartir: (pagina: Paginado<LicenciaDeFuncionamiento>): Reparto => ({
     valores: new Map(),
-    filas: new Map([
+    filas: new Map(),
+    tablas: new Map([
       [
-        0,
-        pagina.contenido.map((licencia) => [
-          licencia.nroLicencia,
-          licencia.contribuyente,
-          licencia.denominacionComercial,
-          giroQueSeEnsena(licencia),
-          licencia.estado,
-        ]),
+        'padron-de-licencias',
+        {
+          filas: pagina.contenido.map((licencia) => ({
+            clave: licencia.nroLicencia,
+            celdas: [
+              licencia.nroLicencia,
+              licencia.contribuyente,
+              licencia.denominacionComercial,
+              giroQueSeEnsena(licencia),
+              licencia.estado,
+            ],
+          })),
+          totalElementos: pagina.totalElementos,
+        },
       ],
     ]),
+    nombrados: loQueDijoElServidor('padron-de-licencias', pagina),
     noPublicados: new Map(),
   }),
 };

@@ -4,7 +4,7 @@ import { PANTALLAS } from '../../pantallas/definiciones/index.ts';
 import { tonoDe } from '../../pantallas/tono.ts';
 import type { MovimientoDeLaBitacora, Paginado } from '../lecturas.ts';
 import { RUTAS } from '../lecturas.ts';
-import { SEG_AUD, SIN_DATO, detalleDelMovimiento } from './seguridad.ts';
+import { SEG_AUD, SIN_RIESGO_PUBLICADO, detalleDelMovimiento } from './seguridad.ts';
 
 /**
  * **La bitacora, columna por columna** (#181).
@@ -44,8 +44,17 @@ function pagina(...movimientos: readonly MovimientoDeLaBitacora[]): Paginado<Mov
   };
 }
 
+/**
+ * Las celdas de cada fila de «Movimientos».
+ *
+ * **Salen de `tablas` y no de `filas` desde #187**: esta tabla lleva `clave`, que es el unico
+ * camino cuyas celdas pueden decir que no hay dato —y por que—. Por `filas` la celda es una cadena
+ * y «Riesgo» solo podia ser una raya muda.
+ */
 const filasDe = (respuesta: Paginado<MovimientoDeLaBitacora>) =>
-  SEG_AUD.repartir(respuesta as never).filas.get(0) ?? [];
+  (SEG_AUD.repartir(respuesta as never).tablas?.get('movimientos')?.filas ?? []).map(
+    (fila) => fila.celdas,
+  );
 
 describe('`seg-aud` — la bitacora de auditoria', () => {
   it('declara que exige EJERCICIO, que es lo que impide que se pida sin el', () => {
@@ -72,7 +81,12 @@ describe('`seg-aud` — la bitacora de auditoria', () => {
       );
     }) as typeof fetch;
     try {
-      await SEG_AUD.pedir(new AbortController().signal, null, 2025);
+      await SEG_AUD.pedir({
+        senal: new AbortController().signal,
+        sujeto: null,
+        ejercicio: 2025,
+        enLaRuta: {},
+      });
     } finally {
       globalThis.fetch = original;
     }
@@ -144,25 +158,72 @@ describe('`seg-aud` — la bitacora de auditoria', () => {
     // auditor. Ninguna de las operaciones del contrato publica un riesgo.
     const filas = filasDe(pagina(movimiento(), movimiento({ operacion: 'ACCESO' })));
 
-    expect(filas.map((f) => f[4])).toEqual([SIN_DATO, SIN_DATO]);
+    // Y desde #187 la celda ademas dice POR QUE: `texto: null` es «aqui no hay dato» —la palabra
+    // la pone la tabla en su `sinDato`, traducida— y la nota viaja con la celda hasta el `title`.
+    // Con la raya suelta, el motivo vivia solo en el javadoc de este conector.
+    expect(filas.map((f) => f[4])).toEqual([
+      { texto: null, nota: SIN_RIESGO_PUBLICADO },
+      { texto: null, nota: SIN_RIESGO_PUBLICADO },
+    ]);
     // Y da igual el acto: dos actos de «riesgo» distinto en el artboard dan la misma celda.
-    expect(filas[0]?.[4]).toBe(filas[1]?.[4]);
+    expect(filas[0]?.[4]).toEqual(filas[1]?.[4]);
     // Ninguna celda dice una de las tres palabras del desplegable, que es como se veria la
     // deduccion si alguien la escribiera.
     for (const palabra of ['Alto', 'Medio', 'Bajo']) {
-      expect(filas.flat().join(' '), palabra).not.toContain(palabra);
+  expect(JSON.stringify(filas), palabra).not.toContain(palabra);
     }
   });
 
-  it('y la raya de «Riesgo» es la que el artboard ya usa, con el tono que no afirma nada', () => {
-    // La columna 4 es la de insignia, asi que la celda se dibuja como insignia y su tono sale del
-    // TEXTO. La raya no cae en ninguno de los dos grupos que piden accion: no pinta de rojo lo que
-    // no se sabe. Es la misma celda que `coa-exp` ya dibuja donde su operacion no llena.
+  it('y la raya de «Riesgo» es la que el artboard ya usa, y la declara la TABLA', () => {
+    // La columna 4 es la de insignia. Con la celda sin dato el interprete NO dibuja insignia: pinta
+    // la palabra de `sinDato` con su `title` (`TablaDelBloque.tsx`), o sea que no pinta de ningun
+    // color lo que no se sabe — que es mejor que el tono `info` que la raya tenia como cadena.
     expect(PANTALLAS['seg-aud'].bloques[0]?.tabla?.columnaDeInsignia).toBe(4);
-    // `info` y no `ok` desde #175: la raya no es un estado conforme, es la ausencia de estado. El
-    // rotulo de este caso ya decia «con el tono que no afirma nada» — lo que no lo decia era la
-    // asercion, que afirmaba el verde.
-    expect(tonoDe(SIN_DATO)).toBe('info');
+    expect(PANTALLAS['seg-aud'].bloques[0]?.tabla?.sinDato?.texto).toBe('—');
+    // Y la raya, si alguna vez se pinta como texto, sigue sin afirmar nada (#175).
+    expect(tonoDe('—')).toBe('info');
+  });
+
+  it('entrega el TOTAL publicado y el `hayMas` del SERVIDOR, no cuentas de la pagina (#172, #187)', () => {
+    const reparto = SEG_AUD.repartir(pagina(movimiento()) as never);
+
+    // 84 182 movimientos: la pagina trae uno. Si esto fuera `contenido.length`, la pantalla diria
+    // «1 de 1» sobre la bitacora entera.
+    expect(reparto.tablas?.get('movimientos')?.totalElementos).toBe(84182);
+    expect(reparto.nombrados?.get('movimientos.hayMas')).toBe(true);
+    expect(reparto.nombrados?.get('movimientos.paginas')).toBe('4210');
+  });
+
+  it('la ventana sale de la RUTA, y un `ordenarPor` que la definicion no ofrece NO viaja', async () => {
+    // La ruta la escribe cualquiera. Reenviar lo que traiga seria un 422 ORDEN_NO_ADMITIDO
+    // dibujado como una averia de la pantalla.
+    const pedidas: string[] = [];
+    const original = globalThis.fetch;
+    globalThis.fetch = ((entrada: RequestInfo | URL) => {
+      pedidas.push(String(entrada));
+      return Promise.resolve(
+        new Response(JSON.stringify(pagina()), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }),
+      );
+    }) as typeof fetch;
+    try {
+      await SEG_AUD.pedir({
+        senal: new AbortController().signal,
+        sujeto: null,
+        ejercicio: 2026,
+        enLaRuta: { pagina: '3', ordenarPor: 'riesgo', direccion: 'DESCENDENTE' },
+      });
+    } finally {
+      globalThis.fetch = original;
+    }
+
+    expect(pedidas[0]).toContain('pagina=3');
+    expect(pedidas[0]).toContain('tamano=20');
+    expect(pedidas[0]).not.toContain('ordenarPor');
+    // Y el sentido sin campo tampoco: solo acompana a uno admitido.
+    expect(pedidas[0]).not.toContain('direccion');
   });
 
   it('una bitacora vacia da una tabla vacia, no una fila inventada', () => {

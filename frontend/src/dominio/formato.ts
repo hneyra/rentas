@@ -71,6 +71,28 @@ export function formatearImporte(valor: Importe): string {
 }
 
 /**
+ * `1842` -> `"1,842"`: un CONTEO, agrupado como el artboard agrupa las cifras (#172).
+ *
+ * No es `formatearImporte` sin el simbolo, y por eso no lo reutiliza: un importe llega como
+ * **texto** desde el backend y esta funcion recibe un `number`, porque lo que cuenta es un conteo
+ * —`totalElementos`— y un conteo no es dinero. Sin decimales, por lo mismo: no hay medio
+ * expediente.
+ *
+ * Revienta con lo que no es un entero no negativo en vez de escribirlo tal cual: un `1.5` o un
+ * `NaN` en el encabezado de una tabla se lee como un dato del padron.
+ */
+export function formatearEntero(cuantos: number): string {
+  if (!Number.isInteger(cuantos) || cuantos < 0) {
+    throw new Error(
+      `Un conteo es un entero no negativo, y llego «${String(cuantos)}». ` +
+        'Escribirlo tal cual pondria esa cifra en el encabezado de una tabla, donde se lee como ' +
+        'el tamano del padron.',
+    );
+  }
+  return String(cuantos).replace(/\B(?=(\d{3})+(?!\d))/g, MILES);
+}
+
+/**
  * `"2026-09-06"` -> `"06/09/2026"`, que es como el artboard escribe las fechas.
  */
 export function formatearFecha(fecha: Fecha): string {

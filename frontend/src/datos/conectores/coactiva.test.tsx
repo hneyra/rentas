@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { coordenada } from '@kamayuk/ui';
 
+import type { Reparto } from '../conectores.ts';
 import { NO_PUBLICADO } from '../conectores.ts';
 import type {
   DeudaEnCoactiva,
@@ -17,7 +18,15 @@ import { useDatosDeLaHoja } from '../useDatosDeLaHoja.ts';
 import type { ClaveDeHoja } from '../../pantallas/arbol.ts';
 import { pantallaDe } from '../../pantallas/definiciones/index.ts';
 import { PantallaDeRentas } from '../../pantallas/PantallaDeRentas.tsx';
-import { COA_COST, COA_EXP, COA_PANEL, SIN_DATO } from './coactiva.ts';
+import {
+  COA_COST,
+  COA_EXP,
+  COA_PANEL,
+  SIN_CANTIDAD,
+  SIN_MEDIDA,
+  costasPorActo,
+  sinDato,
+} from './coactiva.ts';
 
 /**
  * **Lo que las hojas de Coactiva ensenan es lo que llego, y no lo de su definicion** (#170, AC3).
@@ -155,8 +164,15 @@ function envolver<T>(contenido: readonly T[]): Paginado<T> {
 
 // ── El reparto, campo a campo ────────────────────────────────────────────────────────────────
 
-describe('`coa-exp` — el expediente y sus actos', () => {
-  const reparto = COA_EXP.repartir(PROCESO as never);
+/** Las celdas de cada fila de una tabla con `clave`. Las dos de Coactiva lo son desde #195. */
+const celdasDe = (reparto: Reparto, clave: string) =>
+  (reparto.tablas?.get(clave)?.filas ?? []).map((fila) => fila.celdas);
+
+describe('`coa-exp` — el expediente, sus actos y la costa de cada uno', () => {
+  const reparto = COA_EXP.repartir({
+    proceso: PROCESO,
+    costas: costasPorActo([LIQUIDACION]),
+  } as never);
 
   it('los cinco campos que la operacion publica salen de la respuesta', () => {
     expect(reparto.valores.get(coordenada(0, 0))).toBe('2026-0418');
@@ -173,8 +189,15 @@ describe('`coa-exp` — el expediente y sus actos', () => {
 
   it('y con OTRA respuesta sale otro valor: no hay ninguna constante escrita aqui', () => {
     const otro = COA_EXP.repartir({
-      ...PROCESO,
-      expediente: { ...PROCESO.expediente, deudaMateriaDeCobranza: '1.23', deudaAlDia: '2027-01-31' },
+      proceso: {
+        ...PROCESO,
+        expediente: {
+          ...PROCESO.expediente,
+          deudaMateriaDeCobranza: '1.23',
+          deudaAlDia: '2027-01-31',
+        },
+      },
+      costas: costasPorActo([LIQUIDACION]),
     } as never);
 
     expect(otro.valores.get(coordenada(0, 6))).toBe('S/ 1.23 · 31/01/2027');
@@ -186,31 +209,102 @@ describe('`coa-exp` — el expediente y sus actos', () => {
   });
 
   it('la tabla sale de `actuaciones`, y su columna «Estado» dibuja la MEDIDA', () => {
-    const filas = reparto.filas.get(0);
+    const filas = celdasDe(reparto, 'actos-del-expediente');
     expect(filas).toHaveLength(2);
-    expect(filas?.[0]).toEqual([
+    expect(filas[0]).toEqual([
       '1',
       'RESOLUCION DE EJECUCION COACTIVA',
       '04/08/2026',
-      SIN_DATO,
-      SIN_DATO,
+      '18.00',
+      sinDato(SIN_MEDIDA),
     ]);
-    // Solo la REC-2 lleva medida; las demas filas dicen la raya y **nunca «Conforme»**, que
-    // seria afirmar que el acto surtio efecto sin que nadie lo haya publicado.
-    expect(filas?.[1]?.[4]).toBe('RETENCION BANCARIA');
+    // Solo la REC-2 lleva medida; las demas dicen que no hay dato **y por que** (#195) y nunca
+    // «Conforme», que seria afirmar que el acto surtio efecto sin que nadie lo haya publicado.
+    expect(filas[1]?.[4]).toBe('RETENCION BANCARIA');
   });
 
-  it('NO empareja la costa de cada acto: la llave ya esta, la operacion no se pide (#200)', () => {
+  it('LA COLUMNA «Costa S/» se cruza por `actoId`, y cada costa cae en SU fila (#200)', () => {
     // Desde #177 `ActoResource` publica `actoId` —el mismo con que `CostaResource` referencia el
-    // acto que tarifa—, asi que el cruce es posible; lo que esta hoja no hace todavia es pedir
-    // `GET /coactiva/liquidaciones-costas`, que es #200. Lo que NUNCA se hara es emparejar por
-    // `tipo`: se rompe el primer dia que un expediente tenga dos EMBARGO —`costa_acto_uq` es por
-    // acto, no por tipo— y la costa de uno acabaria escrita en la fila del otro. Una costa es
-    // deuda que se le anade al obligado.
-    const columnaDeCostas = reparto.filas.get(0)?.map((fila) => fila[3]);
-    expect(columnaDeCostas).toEqual([SIN_DATO, SIN_DATO]);
-    // Y por si alguien la dedujera igualmente: ninguna celda dice lo que valen esas costas.
-    expect(reparto.filas.get(0)?.flat()).not.toContain('18.00');
+    // acto que tarifa—. 18.00 es la del REC1 (actoId 11) y 78.00 la del REC2 (actoId 12).
+    expect(celdasDe(reparto, 'actos-del-expediente').map((fila) => fila[3])).toEqual([
+      '18.00',
+      '78.00',
+    ]);
+  });
+
+  it('LA ROTURA DE #200: con DOS actos del MISMO tipo, cada costa sigue cayendo en su fila', () => {
+    // Es el caso que hacia indistinguible el par por `tipo`, y el que `LaCostaCaeEnSuActoTest` del
+    // backend prueba. Emparejando por tipo, las dos filas dirian la MISMA costa —la primera que
+    // casara— y una costa es deuda que se le anade al obligado: ponerla en la fila equivocada es
+    // peor que no ponerla.
+    const dosEmbargos = {
+      ...PROCESO,
+      actuaciones: [
+        { ...PROCESO.actuaciones[0]!, actoId: 21, tipo: 'EMBARGO', numero: '3' },
+        { ...PROCESO.actuaciones[1]!, actoId: 22, tipo: 'EMBARGO', numero: '4', medida: null },
+      ],
+    };
+    const susCostas = {
+      ...LIQUIDACION,
+      costas: [
+        { ...LIQUIDACION.costas[0]!, actoId: 21, acto: 'EMBARGO', montoS: '40.00' },
+        { ...LIQUIDACION.costas[1]!, actoId: 22, acto: 'EMBARGO', montoS: '55.00' },
+      ],
+    };
+    const cruzado = COA_EXP.repartir({
+      proceso: dosEmbargos,
+      costas: costasPorActo([susCostas]),
+    } as never);
+
+    expect(celdasDe(cruzado, 'actos-del-expediente').map((fila) => fila[3])).toEqual([
+      '40.00',
+      '55.00',
+    ]);
+  });
+
+  it('un acto que ninguna liquidacion tarifa dice su motivo, y NO un cero', () => {
+    // Cero significa «el arancel dice que no cuesta nada». Lo que pasa es que no se ha liquidado,
+    // y las dos cosas se cobran distinto.
+    const sinLiquidar = COA_EXP.repartir({
+      proceso: PROCESO,
+      costas: costasPorActo([{ ...LIQUIDACION, costas: [] }]),
+    } as never);
+    const columna = celdasDe(sinLiquidar, 'actos-del-expediente').map((fila) => fila[3]);
+
+    for (const celda of columna) {
+      expect(celda).toMatchObject({ texto: null });
+      expect(JSON.stringify(celda)).toContain('no se ha liquidado');
+    }
+    expect(JSON.stringify(columna)).not.toContain('0.00');
+  });
+
+  it('y la costa se toma de CUALQUIERA de las liquidaciones del expediente, sin sumarlas', () => {
+    // Un expediente puede tener varias tandas de liquidacion y `costa_acto_uq` garantiza que un
+    // acto se tarifa UNA vez: lo que hay que hacer es recorrerlas, no sumarlas — sumar dos
+    // importes servidos en el navegador es aritmetica sobre dinero (regla 1).
+    const enDosTandas = costasPorActo([
+      { ...LIQUIDACION, costas: [LIQUIDACION.costas[0]!] },
+      { ...LIQUIDACION, nroLiquidacion: 'LQ-2026-0092', costas: [LIQUIDACION.costas[1]!] },
+    ]);
+    const cruzado = COA_EXP.repartir({ proceso: PROCESO, costas: enDosTandas } as never);
+
+    expect(celdasDe(cruzado, 'actos-del-expediente').map((fila) => fila[3])).toEqual([
+      '18.00',
+      '78.00',
+    ]);
+  });
+
+  it('y si DOS liquidaciones tarifan el mismo acto, la celda lo dice en vez de elegir una', () => {
+    // `costa_acto_uq` dice que no puede pasar. Si pasara, elegir una pondria un importe plausible
+    // donde hay una contradiccion, en una columna que es deuda del obligado.
+    const repetido = costasPorActo([LIQUIDACION, LIQUIDACION]);
+    const cruzado = COA_EXP.repartir({ proceso: PROCESO, costas: repetido } as never);
+
+    expect(repetido.seSupo).toBe(false);
+    for (const fila of celdasDe(cruzado, 'actos-del-expediente')) {
+      expect(fila[3]).toMatchObject({ texto: null });
+      expect(JSON.stringify(fila[3])).toContain('costa_acto_uq');
+    }
   });
 });
 
@@ -260,13 +354,13 @@ describe('`coa-cost` — las costas liquidadas y el plazo de prescripcion', () =
     expect([...reparto.valores.values()]).not.toContain('S/ 96.00');
   });
 
-  it('la tabla sale de `costas[]`, y «Cantidad» dice la raya', () => {
-    const filas = reparto.filas.get(0);
+  it('la tabla sale de `costas[]`, y «Cantidad» dice POR QUE no hay dato (#195)', () => {
+    const filas = (reparto.tablas?.get('costas-por-acto')?.filas ?? []).map((f) => f.celdas);
     expect(filas).toHaveLength(2);
-    expect(filas?.[0]).toEqual([
+    expect(filas[0]).toEqual([
       'Resolucion de ejecucion coactiva',
       'ARANCEL_COSTA:REC1 (Ord. 012-2025)',
-      SIN_DATO,
+      sinDato(SIN_CANTIDAD),
       '18.00',
     ]);
     expect(pantallaDe('coa-cost').bloques[0]?.tabla?.columnas).toHaveLength(4);

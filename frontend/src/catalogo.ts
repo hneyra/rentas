@@ -77,6 +77,35 @@ function laHojaLlevaSujeto(clave: Parameters<typeof pantallaDe>[0]): boolean {
   return CONECTORES[clave]?.exigeSujeto === true;
 }
 
+/**
+ * **Los parametros que esta hoja lleva en su ruta**: `#/aut-cat?pagina=2&ordenarPor=descripcion`
+ * (#172, #186).
+ *
+ * Se DERIVA del conector, igual y por lo mismo que `enLaRuta.sujeto`: el marco **ignora con aviso**
+ * lo que un destino no declara, asi que una lista paralela aqui se desincronizaria en silencio y
+ * el sintoma seria el peor de todos —el mando de pagina moveria la direccion, el marco tiraria el
+ * parametro, el conector no lo veria y la tabla dibujaria la pagina 0 con el rotulo «Pagina 3»—.
+ * Quien sabe que parametros necesita una hoja es quien la pide, o sea su conector.
+ */
+function losSitiosDeLaHoja(clave: Parameters<typeof pantallaDe>[0]): readonly string[] {
+  return (CONECTORES[clave]?.parametros ?? []).map((parametro) => parametro.nombre);
+}
+
+/** El `enLaRuta` del destino, o nada si la hoja no lleva ni sujeto ni parametros. */
+function enLaRutaDeLaHoja(
+  clave: Parameters<typeof pantallaDe>[0],
+): { readonly enLaRuta: { sujeto?: boolean; parametros?: readonly string[] } } | Record<never, never> {
+  const sujeto = laHojaLlevaSujeto(clave);
+  const parametros = losSitiosDeLaHoja(clave);
+  if (!sujeto && parametros.length === 0) return {};
+  return {
+    enLaRuta: {
+      ...(sujeto ? { sujeto: true } : {}),
+      ...(parametros.length === 0 ? {} : { parametros }),
+    },
+  };
+}
+
 /** Si alguna de las pantallas de una hoja tiene un campo que se escribe. */
 function laHojaSeEscribe(clave: Parameters<typeof pantallaDe>[0]): boolean {
   return pantallaDe(clave).bloques.some((bloque) =>
@@ -106,7 +135,7 @@ export const CATALOGO: Catalogo = ARBOL.map(
       clave: hoja.clave,
       rotulo: hoja.rotulo,
       seEscribe: laHojaSeEscribe(hoja.clave),
-      ...(laHojaLlevaSujeto(hoja.clave) ? { enLaRuta: { sujeto: true } } : {}),
+      ...enLaRutaDeLaHoja(hoja.clave),
       // La barra gris de V8: que hay que HACER aqui. Vive en la definicion de la pantalla y no en
       // el arbol —dos registros paralelos de cuarenta claves se desincronizan—, y llega al marco
       // por aqui porque el marco no puede saberla.

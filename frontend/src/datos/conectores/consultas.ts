@@ -88,7 +88,7 @@ const importe = (valor: { readonly importe: string }): string => formatearImport
 export const CON_PANEL: Conector = {
   clave: ['con-panel', 'unificada'],
   exigeSujeto: true,
-  pedir: async (senal, sujeto) => {
+  pedir: async ({ senal, sujeto }) => {
     // `Promise.all` y no dos lecturas con estado propio: `Reparto` reparte UNA respuesta, asi que
     // si una de las dos falla la pantalla dice que fallo entera en vez de pintar la mitad. Pintar
     // la mitad se puede —`DatosDeLaPantalla.lecturas` de #44 es justo eso— y pide un `Reparto` que
@@ -175,7 +175,7 @@ function cuotasDe(obligacion: DeudaPorConcepto): string {
 export const CON_DOC: Conector = {
   clave: ['con-doc', 'constancia-de-no-adeudo'],
   exigeSujeto: true,
-  pedir: (senal, sujeto) =>
+  pedir: ({ senal, sujeto }) =>
     pedirUno<ConstanciaDeNoAdeudo>(RUTAS.constanciaDeNoAdeudoDe(sujeto ?? ''), senal),
   repartir: (constancia: ConstanciaDeNoAdeudo): Reparto => {
     const alDia = formatearFecha(constancia.fechaDeCorte);

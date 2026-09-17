@@ -1,4 +1,10 @@
-import { coordenada, type Ausencia, type Coordenada, type DatosDeUnaTabla } from '@kamayuk/ui';
+import {
+  coordenada,
+  type Ausencia,
+  type Coordenada,
+  type DatoConNombre,
+  type FilaDeLaTabla,
+} from '@kamayuk/ui';
 import type { ClaveDeHoja } from '../pantallas/arbol.ts';
 import type { CorridaDelPredial } from './lecturas.ts';
 import { RUTAS, pedirUno } from './lecturas.ts';
@@ -76,7 +82,7 @@ export interface Reparto {
   /** Las filas de la tabla de un bloque, **por indice de bloque**. Sus celdas son cadenas. */
   readonly filas: ReadonlyMap<number, readonly (readonly string[])[]>;
   /**
-   * Las filas de una tabla **con `clave`**, por esa clave (`kamayuk-lib`#87).
+   * Las filas de una tabla **con `clave`**, por esa clave (`kamayuk-lib`#87, #180).
    *
    * <h2>Por que hay dos caminos y no uno</h2>
    *
@@ -86,27 +92,142 @@ export interface Reparto {
    * nota }` — y entonces el interprete escribe la palabra que su tabla declara en `sinDato` y
    * **anuncia el motivo en la celda**.
    *
-   * La diferencia no es estetica. `coa-exp` tiene hoy una columna «Costa S/» en raya porque falta
-   * pedir una tercera operacion, y `coa-cost` otra en «Cantidad»: las dos rayas son mudas, y el
-   * motivo —que existe, y esta escrito— vive solo en el javadoc de su conector, donde no lo lee
-   * quien mira la pantalla. Con este camino el motivo viaja con la celda.
+   * **Y es ademas el unico camino por el que viaja el total publicado** (#172): ver
+   * `TablaRepartida.total`. Una tabla que quiera decir «20 de 1 842» declara `clave`, y con eso el
+   * total tiene un solo sitio donde vivir en vez de dos que se contradigan.
    *
    * **Es aditivo y no sustituye a nada**: una tabla sin `clave` sigue tomando sus filas del indice
-   * de su bloque, exactamente como antes. Lo estrena Transito (#180); migrar las de Coactiva y las
-   * de Fiscalizacion es otro issue.
+   * de su bloque, exactamente como antes.
    */
-  readonly tablas?: ReadonlyMap<string, DatosDeUnaTabla>;
+  readonly tablas?: ReadonlyMap<string, TablaRepartida>;
+  /**
+   * **Lo que el SERVIDOR dijo de la ventana**, por su nombre (#187).
+   *
+   * Es el canal que `DefinicionDeTabla.paginacion` lee: `hayMas` y `paginas` son **nombres** de
+   * `DatosDeLaPantalla.nombrados` y no los datos —el interprete los busca ahi
+   * (`TablaDelBloque.tsx`)—, y los nombres se derivan del de la tabla con `hayMasDe` y `paginasDe`
+   * para que no haya dos registros paralelos que se desincronicen.
+   *
+   * Lo que entra aqui es **lo que el envoltorio de la respuesta publica** —`hayMas`,
+   * `totalPaginas`—, jamas una cuenta sobre las filas recibidas: con el tope alcanzado, contarlas
+   * diria que no hay pagina siguiente justo cuando la hay. Lo vigila
+   * `verificaciones/el-total-es-el-que-publica-la-operacion.test.ts`.
+   */
+  readonly nombrados?: ReadonlyMap<string, DatoConNombre>;
   /** Los campos que la operacion servida NO publica, con la palabra que va en su hueco. */
   readonly noPublicados: ReadonlyMap<Coordenada, string>;
+}
+
+/**
+ * Lo que un conector entrega de una tabla **con `clave`**: sus filas y el total que la operacion
+ * publica.
+ *
+ * Es `DatosDeUnaTabla` de `@kamayuk/ui` con una diferencia deliberada: alli el conteo es la
+ * **frase** que se lee y aqui es el **numero** que llego. La frase la redacta `useDatosDeLaHoja`,
+ * que es un gancho y tiene `t()` delante; escrita aqui seria «20 de 1 842» en castellano dentro de
+ * un archivo de datos, y eso es exactamente lo que #103 prohibe —una cadena que llega al DOM sin
+ * pasar por `t()`—.
+ */
+export interface TablaRepartida {
+  readonly filas: readonly FilaDeLaTabla[];
+  /**
+   * **El total que la OPERACION publica**, y jamas uno contado aqui sobre la pagina.
+   *
+   * <h2>Se llama como el campo del envoltorio, y eso no es pereza</h2>
+   *
+   * `totalElementos` es el nombre que el backend publica en su envoltorio de paginacion, asi que
+   * el nombre dice **de donde sale**. Y ademas es lo unico que la prohibicion de ESLint deja
+   * pasar: `total…` declarado `number` esta prohibido —un importe pierde centimos como `number`
+   * (regla 1)— con dos excepciones escritas, `totalElementos` y `totalPaginas`, que son las dos
+   * del envoltorio. Un `total: number` aqui habria arrancado con un `eslint-disable`.
+   *
+   * La diferencia es la regla de este archivo vista desde el otro lado. `coa-panel` no lee
+   * `totalElementos` **a proposito**: sus campos preguntan «con REC notificada» y «con medida
+   * cautelar», y contarlos sobre la pagina daria un numero indistinguible de uno real. Lo que
+   * entra aqui es lo contrario: un total que el backend ya conto sobre el padron entero y que hoy
+   * llega y se tira, de modo que el encabezado dice «20 registros» donde el artboard dice «20 de
+   * 1 842».
+   *
+   * Sin el, el interprete cuenta las filas que recibe —que es cierto de lo que se ve— y no afirma
+   * ningun tamano de padron.
+   */
+  readonly totalElementos?: number;
+}
+
+/**
+ * **Un parametro que esta hoja lleva en su ruta y manda a una operacion** (#172, #186).
+ *
+ * <h2>Un solo nombre, y no dos registros</h2>
+ *
+ * `nombre` es a la vez **el sitio de la ruta** —`#/aut-cat?pagina=2`— y **el parametro del
+ * contrato** —`GET /licencias/ciiu?pagina=2`—. Con dos nombres distintos haria falta una tabla de
+ * equivalencias que no protege de nada y que hay que leer dos veces para seguir una peticion desde
+ * la barra de direcciones hasta la red. Ver `pantallas/tablas.ts`.
+ *
+ * <h2>Para que sirve estar declarado, que son tres cosas y ninguna es documentacion</h2>
+ *
+ * <ol>
+ *   <li><b>El marco entrega el valor.</b> `catalogo.ts` DERIVA de aqui el `enLaRuta.parametros`
+ *       del destino, y `@kamayuk/shell` ignora con aviso lo que un destino no declara. Sin esta
+ *       linea, el mando de pagina escribiria `?pagina=2` y el marco lo tiraria.</li>
+ *   <li><b>La cache se entera.</b> `useDatosDeLaHoja` mete estos valores en la llave de la
+ *       consulta: sin ellos, cambiar de pagina no volveria a pedir y la tabla ensenaria la pagina
+ *       0 diciendo «Pagina 3».</li>
+ *   <li><b>El contrato lo publica.</b> Una guarda lo cruza contra
+ *       `docs/50-api/parametros-de-la-api.json`, que sale de la FIRMA de cada controlador: mandar
+ *       un parametro que el contrato no declara es construir sobre un nombre que nada de este
+ *       repositorio puede comprobar — es lo que #26 enseno con `/rentas/predios`.</li>
+ * </ol>
+ */
+export interface ParametroDeLaHoja {
+  /** El sitio de la ruta, que es tambien el nombre del parametro. Ver el javadoc: es uno solo. */
+  readonly nombre: string;
+  /** La operacion a la que viaja, con su verbo: `GET /licencias/ciiu`. */
+  readonly operacion: string;
+}
+
+/**
+ * **Lo que se sabe al pedir** (#172).
+ *
+ * Eran tres argumentos posicionales —`(senal, sujeto, ejercicio)`— y #181 dejo escrito que ya eran
+ * demasiados y que el dia que entrara el filtro de la pantalla lo que entraria seria **un objeto**.
+ * Es este, y no se anadio un cuarto: los tres de antes son sus tres primeros campos y el cuarto
+ * es la ruta.
+ *
+ * <h2>Por que la ruta entera y no «el filtro»</h2>
+ *
+ * Porque la ruta es el unico sitio donde el interprete de `@kamayuk/ui` puede dejar lo que se
+ * elige en una tabla: la pagina y el campo de orden los ESCRIBE ahi y no pide nada
+ * (`MandosDeLaTabla.tsx`). O sea que «el filtro que entra al conector» (#172) y «la pagina que el
+ * mando movio» (#186, #187) **son el mismo canal**, y un segundo camino para el filtro dejaria dos
+ * formas de decir lo mismo.
+ *
+ * Lo que llega aqui es **solo lo que el conector declara** en `Conector.parametros`: el marco tira
+ * con aviso lo que el destino no declaro, asi que `#/aut-cat?loQueSea=1` no entra.
+ */
+export interface LoQueSeSabeAlPedir {
+  readonly senal: AbortSignal;
+  /** El de la ruta, o `null` cuando la hoja no lleva. */
+  readonly sujeto: string | null;
+  /**
+   * El de trabajo de la sesion, y **solo llega con valor a quien declara `exigeEjercicio`**: a las
+   * demas les llega `null`, porque a las demas no se les pide la sesion.
+   */
+  readonly ejercicio: number | null;
+  /**
+   * Lo que la hoja lleva en su ruta, ya descodificado: la pagina y el orden que el interprete
+   * escribio, y los filtros que la hoja declare. Vacio en las hojas que no declaran ninguno.
+   */
+  readonly enLaRuta: Readonly<Record<string, string>>;
 }
 
 export interface Conector {
   /**
    * La clave de consulta de TanStack. Lleva la hoja dentro: dos pantallas no comparten cache.
    *
-   * **El sujeto no va aqui**: lo anade `useDatosDeLaHoja` al final, porque si no dos
-   * contribuyentes compartirian la cache de la misma hoja y el segundo veria la cuenta del
-   * primero mientras llega la suya.
+   * **Ni el sujeto ni lo de la ruta van aqui**: los anade `useDatosDeLaHoja` al final, porque si
+   * no dos contribuyentes compartirian la cache de la misma hoja —y el segundo veria la cuenta del
+   * primero mientras llega la suya— y la pagina 3 se dibujaria con las filas de la 0.
    */
   readonly clave: readonly string[];
   /**
@@ -132,6 +253,14 @@ export interface Conector {
    */
   readonly sinSujeto?: Ausencia;
   /**
+   * **Los parametros que esta hoja lleva en su ruta**, y a que operacion viajan (#172, #186).
+   *
+   * Declarados aqui y no en una lista aparte por lo mismo que `exigeSujeto`: quien sabe que
+   * necesita una hoja para pedir es quien la pide. De aqui salen el `enLaRuta.parametros` del
+   * catalogo, la llave de la cache y la guarda contra el contrato. Ver `ParametroDeLaHoja`.
+   */
+  readonly parametros?: readonly ParametroDeLaHoja[];
+  /**
    * **Esta hoja es de un ejercicio concreto, y el ejercicio sale de la SESION** (#181).
    *
    * Es la **tercera** forma de exigir algo, y no se parece a las dos anteriores. Sin parametro
@@ -148,68 +277,55 @@ export interface Conector {
    * equivocado es peor que una pantalla vacia: contesta 200, con filas, de otro ano. Sin
    * ejercicio en la sesion no se pide nada y la pantalla lo dice (ver `useDatosDeLaHoja`).
    *
-   * <h2>La decision del AC3: camino propio, y NO #172 — con los dos candidatos delante</h2>
-   *
-   * Habia dos mecanismos que podian haber servido, y se miraron los dos.
-   *
-   * <b>#172 — «no entra un filtro».</b> Pide que `pedir` reciba lo que la PANTALLA sabe —lo
-   * tecleado en el buscador, los desplegables— para poder mandar los parametros que la operacion
-   * publica. Cinco de los nueve opcionales de esta misma operacion —`usuario`, `tabla`,
-   * `operacion`, `desde`, `hasta`— son exactamente eso, y <b>siguen siendo de #172</b>, que se
-   * queda abierto por ellos.
-   *
-   * <b>`kamayuk-lib`#87 — «la pagina y el orden EN LA RUTA».</b> Desde el 2026-09-16 el interprete
-   * de `@kamayuk/ui` sabe paginar y ordenar contra el servidor: escribe la pagina y el campo de
-   * orden <b>en la ruta de la hoja</b> (`PaginacionDeLaTabla.enLaRuta`, `OrdenDeLaTabla.enLaRuta`)
-   * y quien lee la ruta pide. Es el mismo canal que `enLaRuta` estreno en #169 para el sujeto, o
-   * sea un mecanismo <b>mas parecido a este</b> que el de #172 — y por eso hay que decir por que
-   * tampoco sirve. Cubre los otros cuatro opcionales (`pagina`, `tamano`, `ordenarPor`,
-   * `direccion`), y su adopcion aqui es su propio issue.
-   *
-   * El ejercicio no es ninguno de los dos, por tres diferencias que no son de grado:
+   * <h2>Y por que NO es un parametro de la ruta, con los dos candidatos delante (#181, AC3)</h2>
    *
    * <ol>
    *   <li><b>No sale de la pantalla.</b> Sale de la sesion, que ninguna de las 40 hojas tiene.
    *       Meterlo por el canal de «lo que la pantalla sabe» convertiria la sesion en una propiedad
    *       de cada pantalla, y entonces cada una podria decir un ejercicio distinto.</li>
-   *   <li><b>Y NO puede vivir en la ruta, que es lo que descarta el de la libreria.</b> La ruta la
-   *       escribe cualquiera: con el ejercicio ahi, `#/seg-aud?ejercicio=2019` ensena la bitacora
-   *       de 2019 con la sesion puesta en 2026, y la pantalla no tendria como saber que no es la
-   *       suya. El ejercicio de trabajo es <b>global a la sesion</b> —«decide sobre que ano
-   *       escriben todos los modulos», lo dice la propia hoja `seg-sis`— y lo fija una escritura
-   *       auditada, `PUT /seguridad/sesion/ejercicio`, con su observacion. Un estado que se cambia
-   *       tecleando en la barra de direcciones no puede ser el mismo. La pagina y el orden si
-   *       pueden: cambiarlos no cambia <b>que</b> se esta mirando, solo por donde y en que
+   *   <li><b>Y NO puede vivir en la ruta.</b> La ruta la escribe cualquiera: con el ejercicio ahi,
+   *       `#/seg-aud?ejercicio=2019` ensena la bitacora de 2019 con la sesion puesta en 2026, y la
+   *       pantalla no tendria como saber que no es la suya. El ejercicio de trabajo es <b>global a
+   *       la sesion</b> y lo fija una escritura auditada, con su observacion. La pagina y el orden
+   *       si pueden: cambiarlos no cambia <b>que</b> se esta mirando, solo por donde y en que
    *       orden.</li>
    *   <li><b>Sin el no hay peticion, no hay menos filas.</b> Un filtro que falta acota de menos y
    *       la tabla trae mas; una pagina que falta es la primera. Un obligatorio que falta hace que
    *       la peticion <b>no se mande</b>. Eso no es un dato de entrada: es una <b>condicion
    *       previa</b>, del mismo tipo que `exigeSujeto` —y por eso se declara al lado y se resuelve
-   *       en el mismo sitio, con su propia frase—. El AC1 de #172 comprueba que un parametro
-   *       mandado este publicado; ninguna comprobacion sobre el NOMBRE de un parametro puede decir
-   *       que sin el no se puede pedir.</li>
+   *       en el mismo sitio, con su propia frase—.</li>
    * </ol>
    */
   readonly exigeEjercicio?: boolean;
-  /**
-   * Pide lo de esta hoja.
-   *
-   * `sujeto` es el de la ruta, o `null` cuando la hoja no lleva. `ejercicio` es el de trabajo de
-   * la sesion, y **solo llega con valor a quien declara `exigeEjercicio`**: a las demas les llega
-   * `null`, porque a las demas no se les pide la sesion.
-   *
-   * **Son tres argumentos posicionales y ya son demasiados**, y queda dicho aqui en vez de
-   * descubrirse: el dia que #172 haga entrar los filtros de la pantalla, lo que entra por aqui es
-   * un objeto —lo que se sabe al pedir— y estos tres son sus tres primeros campos. No se hace hoy
-   * porque cambiar la firma con doce conectores puestos toca cinco archivos que cuatro ramas
-   * comparten, y #172 va a tocarlos igual.
-   */
-  readonly pedir: (
-    senal: AbortSignal,
-    sujeto: string | null,
-    ejercicio: number | null,
-  ) => Promise<unknown>;
+  /** Pide lo de esta hoja, con lo que se sabe al pedir. Ver `LoQueSeSabeAlPedir`. */
+  readonly pedir: (lo: LoQueSeSabeAlPedir) => Promise<unknown>;
   readonly repartir: (respuesta: never) => Reparto;
+}
+
+/**
+ * **Lo que la hoja lleva en su ruta, de lo que SU CONECTOR declara y nada mas** (#172).
+ *
+ * Filtra por `Conector.parametros` y no por lo que traiga la direccion, por lo mismo que el marco
+ * tira con aviso lo que un destino no declara: un `#/aut-cat?loQueSea=1` no puede convertirse en
+ * un `GET /licencias/ciiu?loQueSea=1`, que es un parametro escrito por quien pasaba por ahi.
+ *
+ * Y el orden es el DECLARADO y no el de la direccion, porque de esto sale la llave de la cache:
+ * con el orden de la ruta, `?pagina=2&tamano=20` y `?tamano=20&pagina=2` serian dos entradas
+ * distintas de la misma pagina.
+ *
+ * Un parametro vacio no esta: `?descripcion=` es no filtrar, y mandarlo seria acotar por la cadena
+ * vacia.
+ */
+export function loQueLaHojaDeclara(
+  conector: Conector | undefined,
+  parametros: Readonly<Record<string, string>>,
+): Readonly<Record<string, string>> {
+  const salida: Record<string, string> = {};
+  for (const { nombre } of conector?.parametros ?? []) {
+    const valor = parametros[nombre];
+    if (valor !== undefined && valor.trim() !== '') salida[nombre] = valor;
+  }
+  return salida;
 }
 
 /** La palabra del hueco cuando la operacion se pidio y no trae ese dato. */
@@ -225,7 +341,7 @@ const NO_PUBLICADO = 'no publicado';
  */
 const PANEL: Conector = {
   clave: ['panel', 'ultima-corrida'],
-  pedir: (senal) => pedirUno<CorridaDelPredial>(RUTAS.ultimaCorrida, senal),
+  pedir: ({ senal }) => pedirUno<CorridaDelPredial>(RUTAS.ultimaCorrida, senal),
   repartir: (corrida: CorridaDelPredial): Reparto => ({
     valores: new Map([
       [coordenada(0, 1), corrida.fechaCalculo],

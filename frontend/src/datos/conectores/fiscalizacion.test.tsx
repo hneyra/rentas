@@ -8,16 +8,25 @@ import type { ClaveDeHoja } from '../../pantallas/arbol.ts';
 import { PantallaDeRentas } from '../../pantallas/PantallaDeRentas.tsx';
 import { useDatosDeLaHoja } from '../useDatosDeLaHoja.ts';
 import { coordenada } from '@kamayuk/ui';
+import type { Reparto } from '../conectores.ts';
 import { NO_PUBLICADO } from '../conectores.ts';
-import { SIN_DATO as SIN_DATO_DE_COACTIVA } from './coactiva.ts';
+import { sinDato as sinDatoDeCoactiva } from './coactiva.ts';
 import { SIN_CIFRAR as SIN_CIFRAR_DE_INICIO } from './inicio.ts';
 import {
   FIS_ACTAS,
   FIS_PROG,
   FIS_RES,
+  SIN_AREA_HALLADA,
+  SIN_BASE_OMITIDA,
   SIN_CIFRAR,
-  SIN_DATO,
+  SIN_DECLARADO,
+  SIN_DIFERENCIA_DEL_ACTA,
+  SIN_DIFERENCIA_ESTIMADA,
+  SIN_HALLAZGO,
+  SIN_INTERES,
+  SIN_TITULAR,
   contrasteDelActa,
+  sinDato,
 } from './fiscalizacion.ts';
 import {
   ACTAS,
@@ -63,7 +72,7 @@ function PantallaConectada({
   readonly clave: ClaveDeHoja;
   readonly sujeto?: string | null;
 }) {
-  return <PantallaDeRentas definicion={pantallaDe(clave)} datos={useDatosDeLaHoja(clave, sujeto)} />;
+  return <PantallaDeRentas definicion={pantallaDe(clave)} datos={useDatosDeLaHoja(clave, { sujeto, parametros: {} })} />;
 }
 
 /**
@@ -108,25 +117,54 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('las tres palabras del hueco no se confunden', () => {
-  it('«no publicado», «—» y «sin cifrar» son TRES cadenas distintas', () => {
-    // Si algun dia dos de ellas coinciden, esta prueba lo dice: son tres causas con tres arreglos
-    // distintos —publicar el campo, publicar la columna, cerrar D-02a— y una pantalla que las
-    // dijera igual mandaria a quien mantiene el backend a buscar lo que ya esta publicado.
-    expect(new Set([NO_PUBLICADO, SIN_DATO, SIN_CIFRAR]).size).toBe(3);
+/**
+ * Las celdas de cada fila de una tabla **con `clave`**.
+ *
+ * Las tres tablas de este modulo pasaron a ese camino en #195: por `filas` —el del indice de
+ * bloque— la celda es una cadena, y una cadena no puede decir que no hay dato ni por que.
+ */
+const celdasDe = (reparto: Reparto, clave: string) =>
+  (reparto.tablas?.get(clave)?.filas ?? []).map((fila) => fila.celdas);
+
+describe('las tres formas del hueco no se confunden', () => {
+  it('«no publicado», la celda sin dato y «sin cifrar» son TRES cosas distintas', () => {
+    // Son tres causas con tres arreglos distintos —publicar el campo, publicar la columna, cerrar
+    // D-02a— y una pantalla que las dijera igual mandaria a quien mantiene el backend a buscar lo
+    // que ya esta publicado. Desde #195 la del medio ya no es una cadena: es `{ texto: null }`, y
+    // eso la separa de las otras dos **en el tipo** y no solo en el valor.
+    expect(sinDato('lo que sea')).toEqual({ texto: null, nota: 'lo que sea' });
+    expect(new Set([NO_PUBLICADO, SIN_CIFRAR]).size).toBe(2);
   });
 
-  it('y son las MISMAS palabras que ya escriben Coactiva e Inicio', () => {
+  it('y la celda sin dato es la MISMA forma que escribe Coactiva', () => {
     // Estan escritas dos veces a proposito —un conector no depende de otro modulo para una
     // palabra—, asi que lo que impide que se separen es esto y no el compilador.
-    expect(SIN_DATO).toBe(SIN_DATO_DE_COACTIVA);
+    expect(sinDato('mismo motivo')).toEqual(sinDatoDeCoactiva('mismo motivo'));
     expect(SIN_CIFRAR).toBe(SIN_CIFRAR_DE_INICIO);
   });
 
-  it('ninguna de las tres dice un cero ni una cifra', () => {
-    for (const palabra of [NO_PUBLICADO, SIN_DATO, SIN_CIFRAR]) {
+  it('ninguna dice un cero ni una cifra', () => {
+    for (const palabra of [NO_PUBLICADO, SIN_CIFRAR]) {
       expect(palabra, `«${palabra}» lleva un digito`).not.toMatch(/\d/);
     }
+  });
+
+  it('y los OCHO motivos de este modulo son ocho frases distintas, no una raya repetida', () => {
+    // Es lo que #195 compra: hasta entonces las ocho celdas vacias de estas tres tablas decian la
+    // misma raya, y sus seis motivos —que existian y estaban escritos— vivian solo en el javadoc
+    // de este conector, donde no los lee quien mira la pantalla.
+    const motivos = [
+      SIN_TITULAR,
+      SIN_DIFERENCIA_ESTIMADA,
+      SIN_DECLARADO,
+      SIN_DIFERENCIA_DEL_ACTA,
+      SIN_HALLAZGO,
+      SIN_AREA_HALLADA,
+      SIN_BASE_OMITIDA,
+      SIN_INTERES,
+    ];
+    expect(new Set(motivos).size).toBe(motivos.length);
+    for (const motivo of motivos) expect(motivo.length, motivo).toBeGreaterThan(40);
   });
 });
 
@@ -146,7 +184,7 @@ describe('`fis-prog` — la muestra sorteada de un programa', () => {
   });
 
   it('las cinco columnas salen en el orden de la definicion, y cuatro traen dato', () => {
-    const filas = FIS_PROG.repartir(MUESTRA as never).filas.get(0);
+    const filas = celdasDe(FIS_PROG.repartir(MUESTRA as never), 'muestra-del-programa');
 
     expect(PANTALLAS['fis-prog'].bloques[0]?.tabla?.columnas.map((c) => c.rotulo)).toEqual([
       'Código predial',
@@ -156,9 +194,22 @@ describe('`fis-prog` — la muestra sorteada de un programa', () => {
       'Estado',
     ]);
     expect(filas).toEqual([
-      ['02-014-D-14-01', 'Suc. Rufina Medina Medina', 'SUBVALUADOR', SIN_DATO, 'Inspeccionado'],
-      // Sin titular vigente: la raya, y NO una palabra que afirme que el predio no tiene dueno.
-      ['04-021-B-07-00', SIN_DATO, 'OMISO', SIN_DATO, 'Programado'],
+      [
+        '02-014-D-14-01',
+        'Suc. Rufina Medina Medina',
+        'SUBVALUADOR',
+        sinDato(SIN_DIFERENCIA_ESTIMADA),
+        'Inspeccionado',
+      ],
+      // Sin titular vigente: la celda dice que no hay dato **y por que**, y NO una palabra que
+      // afirme que el predio no tiene dueno.
+      [
+        '04-021-B-07-00',
+        sinDato(SIN_TITULAR),
+        'OMISO',
+        sinDato(SIN_DIFERENCIA_ESTIMADA),
+        'Programado',
+      ],
     ]);
   });
 
@@ -166,9 +217,9 @@ describe('`fis-prog` — la muestra sorteada de un programa', () => {
     // Las tres magnitudes que publica son areas en m² —`areaCatastral`, `areaDeclarada` y
     // `diferenciaDeArea`—, y ninguna es dinero. Escribir `33.50` bajo un rotulo que dice «S/»
     // seria ensenar metros como soles.
-    const filas = FIS_PROG.repartir(MUESTRA as never).filas.get(0) ?? [];
-    for (const fila of filas) expect(fila[3]).toBe(SIN_DATO);
-    expect(filas.flat()).not.toContain('33.50');
+    const filas = celdasDe(FIS_PROG.repartir(MUESTRA as never), 'muestra-del-programa');
+    for (const fila of filas) expect(fila[3]).toEqual(sinDato(SIN_DIFERENCIA_ESTIMADA));
+    expect(JSON.stringify(filas)).not.toContain('33.50');
   });
 
   it('no decide ningun campo: los ocho del bloque son mandos, no cifras', () => {
@@ -236,8 +287,20 @@ describe('`fis-actas` — el contraste de un acta de inspeccion', () => {
       'Situación',
     ]);
     expect(filas).toEqual([
-      ['Área hallada (m²)', SIN_DATO, '198.00', SIN_DATO, 'SUBVALUADOR'],
-      ['Uso del predio', SIN_DATO, 'COMERCIO', SIN_DATO, 'SUBVALUADOR'],
+      [
+        'Área hallada (m²)',
+        sinDato(SIN_DECLARADO),
+        '198.00',
+        sinDato(SIN_DIFERENCIA_DEL_ACTA),
+        'SUBVALUADOR',
+      ],
+      [
+        'Uso del predio',
+        sinDato(SIN_DECLARADO),
+        'COMERCIO',
+        sinDato(SIN_DIFERENCIA_DEL_ACTA),
+        'SUBVALUADOR',
+      ],
     ]);
   });
 
@@ -245,7 +308,7 @@ describe('`fis-actas` — el contraste de un acta de inspeccion', () => {
     // El acta ni siquiera publica el minuendo. Y aunque lo publicara: restar dos importes o dos
     // areas servidas para llenar una celda es calcular lo que nadie publico.
     const filas = contrasteDelActa(ACTA_CON_USO);
-    for (const fila of filas) expect(fila[3]).toBe(SIN_DATO);
+    for (const fila of filas) expect(fila[3]).toEqual(sinDato(SIN_DIFERENCIA_DEL_ACTA));
   });
 
   it('sin uso anotado, la fila del uso NO sale: nulo es «no se anoto»', () => {
@@ -255,8 +318,8 @@ describe('`fis-actas` — el contraste de un acta de inspeccion', () => {
 
     expect(filas).toHaveLength(1);
     expect(filas[0]?.[0]).toBe('Área hallada (m²)');
-    // Sin hallazgo anotado, la situacion tambien es la raya — nunca «Conforme».
-    expect(filas[0]?.[4]).toBe(SIN_DATO);
+    // Sin hallazgo anotado, la situacion tambien dice que no hay dato — nunca «Conforme».
+    expect(filas[0]?.[4]).toEqual(sinDato(SIN_HALLAZGO));
   });
 
   it('la «Situacion» es el HALLAZGO y no el estado del papel', () => {
@@ -265,7 +328,7 @@ describe('`fis-actas` — el contraste de un acta de inspeccion', () => {
     const filas = contrasteDelActa(ACTA_CON_USO);
 
     expect(filas.map((f) => f[4])).toEqual(['SUBVALUADOR', 'SUBVALUADOR']);
-    expect(filas.flat()).not.toContain(ACTA_CON_USO.estado);
+    expect(JSON.stringify(filas)).not.toContain(ACTA_CON_USO.estado);
   });
 
   it('sin ninguna acta, la pantalla dice «sin datos» en vez de una tabla vacia', async () => {
@@ -337,8 +400,11 @@ describe('`fis-res` — la resolucion de determinacion', () => {
     expect(escritos).not.toContain('290.20');
   });
 
-  it('la tabla: «Base omitida» e «Interes» dicen la raya, y las otras tres traen dato', () => {
-    const filas = FIS_RES.repartir(RESOLUCION_CIFRADA as never).filas.get(0);
+  it('la tabla: «Base omitida» e «Interes» dicen su motivo, y las otras tres traen dato', () => {
+    const filas = celdasDe(
+      FIS_RES.repartir(RESOLUCION_CIFRADA as never),
+      'detalle-por-ejercicio',
+    );
 
     expect(PANTALLAS['fis-res'].bloques[0]?.tabla?.columnas.map((c) => c.rotulo)).toEqual([
       'Ejercicio',
@@ -349,19 +415,24 @@ describe('`fis-res` — la resolucion de determinacion', () => {
     ]);
     // «Base omitida» seria `determinado − declarado` —33 500 menos 27 400— y no se resta aqui;
     // «Interes» no lo publica NINGUNA de las dieciseis operaciones de fiscalizacion.
-    expect(filas).toEqual([['2024', SIN_DATO, '201.00', SIN_DATO, '290.20']]);
+    expect(filas).toEqual([
+      ['2024', sinDato(SIN_BASE_OMITIDA), '201.00', sinDato(SIN_INTERES), '290.20'],
+    ]);
   });
 
   it('con los importes nulos dice «sin cifrar», que NO es la raya ni un cero (D-02a)', () => {
-    const filas = FIS_RES.repartir(RESOLUCION_SIN_CIFRAS as never).filas.get(0);
+    const filas = celdasDe(
+      FIS_RES.repartir(RESOLUCION_SIN_CIFRAS as never),
+      'detalle-por-ejercicio',
+    );
 
     expect(filas).toEqual([
-      ['2024', SIN_DATO, SIN_CIFRAR, SIN_DATO, SIN_CIFRAR],
-      ['2025', SIN_DATO, SIN_CIFRAR, SIN_DATO, SIN_CIFRAR],
+      ['2024', sinDato(SIN_BASE_OMITIDA), SIN_CIFRAR, sinDato(SIN_INTERES), SIN_CIFRAR],
+      ['2025', sinDato(SIN_BASE_OMITIDA), SIN_CIFRAR, sinDato(SIN_INTERES), SIN_CIFRAR],
     ]);
-    // El campo existe y llego vacio: decirlo con la raya pediria publicar lo que ya esta
-    // publicado, y con un `0.00` diria que no se debe nada.
-    expect(filas?.flat()).not.toContain('0.00');
+    // El campo existe y llego vacio: decirlo con la celda sin dato pediria publicar lo que ya esta
+    // publicado, y con un `0.00` diria que no se debe nada. Son DOS huecos distintos y se ven.
+    expect(JSON.stringify(filas)).not.toContain('0.00');
   });
 
   it('LA ROTURA DEL AC3: con otra resolucion, la pantalla ensena otro contribuyente', async () => {

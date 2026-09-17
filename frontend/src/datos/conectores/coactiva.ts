@@ -1,9 +1,10 @@
-import { coordenada } from '@kamayuk/ui';
+import { coordenada, type CeldaDeLaTabla } from '@kamayuk/ui';
 
 import type { Conector, Reparto } from '../conectores.ts';
 import { NO_PUBLICADO } from '../conectores.ts';
 import { formatearFecha, formatearImporte } from '../../dominio/formato.ts';
 import type {
+  ActoDelExpediente,
   DeudaEnCoactiva,
   LiquidacionDeCostas,
   Paginado,
@@ -38,8 +39,28 @@ import { RUTAS, pedirPagina, pedirUno } from '../lecturas.ts';
  * en este archivo seria castellano que nunca podria traducirse (#103).
  */
 
-/** Lo que va en una celda que la operacion no llena. Es la raya del artboard, no un cero. */
-const SIN_DATO = '—';
+/**
+ * **Una celda que llego sin dato, con el motivo dentro** (`kamayuk-lib`#87, #195).
+ *
+ * Era `SIN_DATO = '—'`, la raya del artboard escrita como cualquier otra cadena. La raya **sigue
+ * siendo lo que se ve** —la declara la tabla en su `sinDato`—, y lo que cambia es que la celda
+ * dice **por que**, anunciado con `title`: hasta #195 el motivo existia, estaba escrito, y vivia
+ * solo en el javadoc de este archivo, donde no lo lee quien mira la pantalla.
+ *
+ * `texto: null` es «aqui no hay dato»: nunca `''` —que se lee como un blanco— y **nunca un `0`**,
+ * que en una columna de costas se leeria como «este acto no cuesta nada».
+ */
+const sinDato = (porQue: string): CeldaDeLaTabla => ({ texto: null, nota: porQue });
+
+/** Lo que dice la celda de un acto en el que la operacion no publica en que quedo. */
+/** Lo que dice la celda «Cantidad» de `coa-cost`. El arancel tarifa el acto una vez. */
+const SIN_CANTIDAD =
+  'CostaResource no publica ninguna cantidad, y no es un olvido: el arancel tarifa el acto una ' +
+  'vez y «costa_acto_uq» impide liquidarlo dos, asi que una cantidad solo podria valer uno.';
+
+const SIN_MEDIDA =
+  'El expediente solo publica en que quedo un acto cuando dicto una medida cautelar; de este no ' +
+  'publica ninguna. Escribir «Conforme» aqui seria afirmar que el acto surtio efecto.';
 
 /** `"9412.15"` + `"2026-08-04"` -> `"S/ 9,412.15 · 04/08/2026"`. Regla 9. */
 function importeConSuFecha(importe: string, fecha: string): string {
@@ -60,7 +81,7 @@ function importeConSuFecha(importe: string, fecha: string): string {
  */
 const COA_PANEL: Conector = {
   clave: ['coa-panel', 'deudas'],
-  pedir: (senal) => pedirPagina<DeudaEnCoactiva>(RUTAS.coactiva, senal),
+  pedir: ({ senal }) => pedirPagina<DeudaEnCoactiva>(RUTAS.coactiva, senal),
   repartir: (pagina: Paginado<DeudaEnCoactiva>): Reparto => ({
     // `0|0` es el desplegable de ejercicio, no un campo de solo lectura: las coordenadas son las
     // del bloque entero y no las de los campos `r`. Lo cazo la guarda de este archivo.
@@ -145,9 +166,85 @@ const COA_PANEL: Conector = {
  * la REC-2 la lleva, asi que las demas filas dicen la raya — nunca «Conforme», que seria afirmar
  * que el acto surtio efecto sin que nadie lo haya publicado.
  */
+/** Lo que `coa-exp` recibe: el proceso del expediente y lo que se pudo saber de sus costas. */
+interface ProcesoYSusCostas {
+  readonly proceso: ProcesoDelExpediente;
+  readonly costas: CostasDelExpediente;
+}
+
+/**
+ * **Lo que se sabe de las costas de un expediente**: la tarifada de cada acto, o por que no.
+ *
+ * Es una union de dos ramas y no un mapa con huecos, a proposito: «este acto todavia no se
+ * liquido» y «no se pudo preguntar por las costas» son cosas distintas y la celda tiene que poder
+ * decir cual. Con un mapa vacio las dos se dirian igual, y la segunda es una averia disfrazada de
+ * hecho del negocio.
+ */
+type CostasDelExpediente =
+  | { readonly seSupo: true; readonly porActo: ReadonlyMap<number, string> }
+  | { readonly seSupo: false; readonly porQue: string };
+
+/**
+ * **La costa de cada acto, cruzada por `actoId`** (#200).
+ *
+ * <h2>Por `actoId` y NUNCA por `tipo`</h2>
+ *
+ * Hasta #177 `ActoResource` no publicaba ningun identificador —eran diez campos y ninguno era el
+ * `actoId`—, asi que lo unico comun con `CostaResource` era el `tipo`. Emparejar por tipo se rompe
+ * el primer dia que un expediente tenga **dos EMBARGO** o dos TASACION: `costa_acto_uq` es por
+ * acto y no por tipo, y la costa de uno acabaria escrita en la fila del otro. Una costa es deuda
+ * que se le anade al obligado; ponerla en la fila equivocada es peor que no ponerla.
+ *
+ * <h2>Y aqui NO se suma, que es lo que parecia que habia que hacer</h2>
+ *
+ * Un expediente puede tener **varias** liquidaciones y la costa de un acto esta en una de ellas,
+ * asi que hay que recorrerlas todas. Recorrerlas **no es sumarlas**: `costa_acto_uq` garantiza que
+ * un acto se tarifa <b>una sola vez</b>, o sea que lo que se busca es una fila y no un total. Y
+ * eso importa por la regla 1: sumar dos importes servidos en el navegador es aritmetica sobre
+ * dinero, y el importe llega como texto justamente para que nadie la haga.
+ *
+ * Si alguna vez llegaran **dos** costas del mismo acto, la garantia de la base se habria roto y
+ * aqui no se elige una: la celda lo dice. Elegir la primera pondria un importe plausible donde
+ * hay una contradiccion.
+ */
+function costasPorActo(liquidaciones: readonly LiquidacionDeCostas[]): CostasDelExpediente {
+  const porActo = new Map<number, string>();
+  const repetidos: number[] = [];
+  for (const liquidacion of liquidaciones) {
+    for (const costa of liquidacion.costas) {
+      if (porActo.has(costa.actoId)) repetidos.push(costa.actoId);
+      porActo.set(costa.actoId, costa.montoS);
+    }
+  }
+  if (repetidos.length > 0) {
+    return {
+      seSupo: false,
+      porQue:
+        'Dos liquidaciones distintas tarifan el mismo acto, y «costa_acto_uq» dice que eso no ' +
+        `puede pasar (actos ${repetidos.join(', ')}). Elegir una de las dos pondria un importe ` +
+        'plausible donde hay una contradiccion, en una columna que es deuda del obligado.',
+    };
+  }
+  return { seSupo: true, porActo };
+}
+
+/** La celda «Costa S/» de una actuacion: el importe que la tarifa, o por que no lo hay. */
+function costaDelActo(acto: ActoDelExpediente, costas: CostasDelExpediente): CeldaDeLaTabla {
+  if (!costas.seSupo) return sinDato(costas.porQue);
+  const tarifada = costas.porActo.get(acto.actoId);
+  if (tarifada !== undefined) {
+    // Tal como llega y sin el simbolo, que lo lleva el rotulo de la columna — igual que `coa-cost`.
+    return tarifada;
+  }
+  return sinDato(
+    'Ninguna liquidacion de costas de este expediente tarifa este acto todavia. **No es cero**: ' +
+      'cero seria que el arancel dice que no cuesta nada, y lo que pasa es que no se ha liquidado.',
+  );
+}
+
 const COA_EXP: Conector = {
   clave: ['coa-exp', 'proceso'],
-  pedir: async (senal) => {
+  pedir: async ({ senal }) => {
     const cartera = await pedirPagina<{ readonly numero: string }>(
       RUTAS.expedientesCoactivos,
       senal,
@@ -156,9 +253,13 @@ const COA_EXP: Conector = {
     // Sin expediente no hay proceso que pedir. `null` es «se pregunto y no hay», que la pantalla
     // dice distinto de un fallo.
     if (primero === undefined) return null;
-    return pedirUno<ProcesoDelExpediente>(RUTAS.procesoDelExpediente(primero.numero), senal);
+    const proceso = await pedirUno<ProcesoDelExpediente>(
+      RUTAS.procesoDelExpediente(primero.numero),
+      senal,
+    );
+    return { proceso, costas: await costasDe(primero.numero, senal) };
   },
-  repartir: (proceso: ProcesoDelExpediente): Reparto => {
+  repartir: ({ proceso, costas }: ProcesoYSusCostas): Reparto => {
     const { expediente } = proceso;
     return {
       valores: new Map([
@@ -171,24 +272,71 @@ const COA_EXP: Conector = {
         ],
         [coordenada(0, 7), importeConSuFecha(expediente.costas, expediente.deudaAlDia)],
       ]),
-      filas: new Map([
+      // Vacio: esta tabla lleva `clave` desde #195, asi que sus filas van por `tablas` — el unico
+      // camino cuyas celdas pueden decir que no hay dato y por que.
+      filas: new Map(),
+      tablas: new Map([
         [
-          0,
-          proceso.actuaciones.map((acto) => [
-            acto.numero,
-            acto.titulo,
-            formatearFecha(acto.fecha),
-            // Ver el javadoc: la llave ya esta (`acto.actoId`, #177); lo que falta es pedir
-            // `GET /coactiva/liquidaciones-costas`, que es otra operacion y es #200.
-            SIN_DATO,
-            acto.medida ?? SIN_DATO,
-          ]),
+          'actos-del-expediente',
+          {
+            filas: proceso.actuaciones.map((acto) => ({
+              clave: String(acto.actoId),
+              celdas: [
+                acto.numero,
+                acto.titulo,
+                formatearFecha(acto.fecha),
+                costaDelActo(acto, costas),
+                acto.medida ?? sinDato(SIN_MEDIDA),
+              ],
+            })),
+            // **Sin total**: `actuaciones[]` no es una pagina —el proceso las publica todas— asi
+            // que no hay ningun `totalElementos` que enseñar, y el interprete cuenta las que hay.
+          },
         ],
       ]),
       noPublicados: new Map([[coordenada(0, 2), NO_PUBLICADO]]),
     };
   },
 };
+
+/**
+ * Las liquidaciones de costas de un expediente, **sin poder tumbar la pantalla** (#200).
+ *
+ * Es una tercera lectura para UNA columna de cinco, asi que su fallo no puede costar la tabla
+ * entera: con un `Promise.all`, un 500 de esta operacion dejaria `coa-exp` diciendo «fallo» y las
+ * otras cuatro columnas —que salen de operaciones que contestaron bien— sin dibujarse. Asi que se
+ * atrapa aqui y lo que se pierde es la celda, que ademas dice por que.
+ *
+ * Y `hayMas` se mira: si las liquidaciones de este expediente no cupieran en la pagina que se
+ * pide, un acto liquidado en la siguiente diria «no se ha liquidado» — un hueco falso, que es peor
+ * que un hueco.
+ */
+async function costasDe(numero: string, senal: AbortSignal): Promise<CostasDelExpediente> {
+  try {
+    const relacion = await pedirPagina<LiquidacionDeCostas>(
+      RUTAS.liquidacionesDelExpediente(numero),
+      senal,
+    );
+    if (relacion.hayMas) {
+      return {
+        seSupo: false,
+        porQue:
+          `Las liquidaciones de costas de ${numero} no caben en una pagina ` +
+          `(${String(relacion.totalElementos)} en total). Con solo las primeras, un acto ` +
+          'liquidado en la siguiente diria que no esta liquidado, que es un hueco falso.',
+      };
+    }
+    return costasPorActo(relacion.contenido);
+  } catch (fallo) {
+    return {
+      seSupo: false,
+      porQue:
+        'No se pudieron pedir las liquidaciones de costas de este expediente' +
+        (fallo instanceof Error && fallo.message !== '' ? `: ${fallo.message}` : '.') +
+        ' Las otras cuatro columnas si llegaron, y por eso la tabla se dibuja igual.',
+    };
+  }
+}
 
 /** Lo que `coa-cost` necesita de sus dos operaciones, ya pedido. */
 interface CostasYPrescripcion {
@@ -245,7 +393,7 @@ interface CostasYPrescripcion {
  */
 const COA_COST: Conector = {
   clave: ['coa-cost', 'liquidacion-de-costas'],
-  pedir: async (senal) => {
+  pedir: async ({ senal }) => {
     const relacion = await pedirPagina<LiquidacionDeCostas>(RUTAS.liquidacionesDeCostas, senal);
     const liquidacion = relacion.contenido[0];
     if (liquidacion === undefined) return null;
@@ -263,16 +411,23 @@ const COA_COST: Conector = {
         ? []
         : ([[coordenada(0, 5), prescripcion.plazo]] as const)),
     ]),
-    filas: new Map([
+    filas: new Map(),
+    tablas: new Map([
       [
-        0,
-        liquidacion.costas.map((costa) => [
-          costa.descripcion,
-          costa.arancelFuente,
-          // Ver el javadoc: el arancel tarifa el acto una vez, y la cantidad no se publica.
-          SIN_DATO,
-          costa.montoS,
-        ]),
+        'costas-por-acto',
+        {
+          filas: liquidacion.costas.map((costa) => ({
+            clave: String(costa.actoId),
+            celdas: [
+              costa.descripcion,
+              costa.arancelFuente,
+              // Desde #195 la celda dice POR QUE, y no solo que no hay: el arancel tarifa el acto
+              // una vez, asi que una cantidad no significaria nada aqui.
+              sinDato(SIN_CANTIDAD),
+              costa.montoS,
+            ],
+          })),
+        },
       ],
     ]),
     noPublicados: new Map([
@@ -307,5 +462,15 @@ export const CONECTORES_DE_COACTIVA = {
   'coa-cost': COA_COST,
 } as const;
 
-export { COA_PANEL, COA_EXP, COA_COST, SIN_DATO, importeConSuFecha };
-export type { CostasYPrescripcion };
+export {
+  COA_PANEL,
+  COA_EXP,
+  COA_COST,
+  SIN_CANTIDAD,
+  SIN_MEDIDA,
+  costaDelActo,
+  costasPorActo,
+  importeConSuFecha,
+  sinDato,
+};
+export type { CostasDelExpediente, CostasYPrescripcion, ProcesoYSusCostas };
