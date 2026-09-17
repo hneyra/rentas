@@ -16,9 +16,14 @@ import org.jspecify.annotations.Nullable;
  *
  * <h2>Lo que NO lleva, y es lo primero que hay que mirar</h2>
  *
- * <p><b>Ningun identificador interno.</b> Ni el de la municipalidad —que es la clave del
- * aislamiento— ni el del contribuyente. La municipalidad se nombra por ubigeo y nombre; la persona,
- * por el codigo con el que esa municipalidad la identifica, que es el que figura en su recibo.
+ * <p><b>Ni el identificador de la municipalidad ni el del contribuyente.</b> El primero es la clave
+ * del aislamiento; el segundo, el de la persona. La municipalidad se nombra por ubigeo y nombre; la
+ * persona, por el codigo con el que esa municipalidad la identifica, que es el que figura en su
+ * recibo.
+ *
+ * <p>El del <b>predio</b> si viaja, y desde #199 en las <b>dos</b> listas que hablan de el: {@code
+ * obligaciones[].predioId} lo publicaba ya, y {@code predios[].predioId} es lo que permite cruzar
+ * las dos. El motivo entero esta en {@link PredioDelPortal}.
  *
  * <p><b>Ningun copropietario.</b> Cada predio publica el porcentaje del <b>consultado</b> y nada
  * mas; la porcion que no le corresponde no se menciona (ADR-0019).
@@ -137,14 +142,47 @@ public record SituacionDelCiudadanoResource(
     /**
      * Un predio del ciudadano.
      *
-     * <p>Sin {@code predioId}: el identificador interno no le sirve de nada a quien mira su propia
-     * ficha, y publicarlo invitaria a usarlo como parametro de otra llamada. El predio se
-     * identifica por su codigo de referencia catastral, que es el que figura en su recibo.
+     * <h2>Con {@code predioId}, y la decision esta al reves que antes de #199</h2>
+     *
+     * <p>Hasta #199 este recurso no lo publicaba, y el motivo escrito era bueno: «el identificador
+     * interno no le sirve de nada a quien mira su propia ficha, y publicarlo invitaria a usarlo
+     * como parametro de otra llamada». Lo que no era cierto es que la respuesta lo cumpliera:
+     * {@link ConsultaUnificadaResource.ObligacionDeLaFicha#predioId()} publica <b>ese mismo
+     * identificador interno</b>, en el mismo cuerpo y para el mismo predio. Lo que habia no era «el
+     * id no se publica», era <b>se publica en una lista y no en la otra</b>, que es justo la
+     * combinacion que impide cruzarlas.
+     *
+     * <p>Y sin cruce, el ciudadano con <b>dos</b> predios —lo normal en cuanto hay una cochera o un
+     * segundo piso independizado— ve dos listas y nada dice cual es de cual. Emparejar por orden de
+     * aparicion o por tributo daria una respuesta plausible y equivocada: «S/ 412.00 del predio de
+     * la Av. Grau» escrito sobre el predio de al lado. Eso no es una columna vacia, es <b>una cifra
+     * de deuda puesta en el predio equivocado</b>, indistinguible de una correcta.
+     *
+     * <p><b>Se corrige por el lado del predio y no por el de la obligacion</b>, y de las dos
+     * salidas que #199 admitia esta es la unica que no rompe nada: {@code ObligacionDeLaFicha} es
+     * el <b>mismo tipo</b> que sirve la ficha 360° del back-office —{@code GET
+     * /consultas/unificada}—, donde {@code predioId} es la llave con que el funcionario abre el
+     * predio; quitarlo alli para arreglar el portal seria cambiar de sitio el hueco. Y el camino
+     * contrario —que la obligacion publicara el codigo de referencia catastral— exigiria que {@code
+     * cuentacorriente} conociera el catastro, que es la arista que ARQ-01 §4 prohibe.
+     *
+     * <p>{@code predioId} es el <b>mismo nombre y la misma llave</b> con que la obligacion
+     * referencia el predio; el tipo es {@code long} y no {@code Long} porque aqui siempre hay
+     * predio, mientras que alli es nulo en cuanto la obligacion es vehicular.
+     *
+     * <p>Lo que <b>sigue sin publicarse</b> es el identificador de la municipalidad y el del
+     * contribuyente: esos si son la clave del aislamiento, y ninguna lista de esta respuesta los
+     * nombra. Publicar el del predio no abre ninguna puerta que {@code obligaciones[]} no tuviera
+     * abierta: bajo {@code /portal/**} el sujeto sale del token y no hay ni un parametro que
+     * teclear (ver {@code PortalController}).
      *
      * <p>{@code porcentajeTitularidad} viaja como texto y no como numero (regla 1), igual que en
      * {@link PredioEncontradoResource}.
+     *
+     * @param predioId el identificador con el que {@code obligaciones[].predioId} lo referencia
      */
     public record PredioDelPortal(
+            long predioId,
             String codigoReferenciaCatastral,
             String tipo,
             String direccion,
@@ -152,6 +190,7 @@ public record SituacionDelCiudadanoResource(
 
         static PredioDelPortal de(PredioDelContribuyente predio) {
             return new PredioDelPortal(
+                    predio.predioId(),
                     predio.codigoReferenciaCatastral(),
                     predio.tipo(),
                     predio.direccion(),
