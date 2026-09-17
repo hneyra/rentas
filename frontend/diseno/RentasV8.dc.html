@@ -762,6 +762,34 @@ const PANTALLAS = {
       ['Nº de resolución', '', 'Se exige si hay deducción'],
       ['Inafectación', 's', ['Ninguna', 'Gobierno central', 'Entidad religiosa', 'Cuerpo de bomberos', 'Beneficencia']],
       ['Monto deducido', 'r', 'S/ 0.00']]],
+    /* El bloque de la MEMORIA entra con #245, y lo decide el propio artboard.
+       · Su INSTRUCCIÓN ya prometía esto —«fije el sujeto y el ejercicio, y **compruebe la memoria
+         del cálculo** antes de asentar la determinación»— y no había un solo campo donde
+         comprobarla: de los diez de la hoja, nueve eran mandos y el único de sólo lectura era
+         «Monto deducido», que además no lo publica nadie.
+       · Y el artboard ya dibujaba el RESULTADO, en el cronograma de abajo: 151,36 + 3 × 146,86 =
+         591,94, que es exactamente 587,44 de impuesto insoluto + 4,50 de derecho de emisión (el
+         de la hoja «valores»); y 587,44 es exactamente la escala de la hoja «valores» sobre una
+         base de 151 406,75 —80 250,00 × 0,2 % = 160,50 y 71 156,75 × 0,6 % = 426,94—, que es el
+         autovalúo de los dos predios de «predios» con su % de propiedad. O sea que la memoria ya
+         ESTABA en el artboard, repartida en tres hojas, y esta hoja enseñaba su resultado sin
+         enseñar de dónde salía. Así que «una pantalla de ejecutar no muestra lo determinado» lo
+         refuta el propio artboard: el cronograma es lo determinado.
+       Las cifras de ejemplo de abajo no se inventaron: se derivaron de las que el artboard ya
+       traía. Y el ejemplo tiene DOS tramos y no tres porque el backend no publica el que no
+       aportó —«Un tramo que no recibio nada de la base no aparece en la lista: no aporto»,
+       `TramosProgresivosAcumulativos.desglosar`—. */
+    ['Memoria del cálculo', 'De qué valúo salió el impuesto, con qué tramos y bajo qué conjunto sellado.', [
+      ['Valúo total', 'r', 'S/ 170,616.75'], ['Valúo exonerado', 'r', 'S/ 0.00'],
+      ['Valúo afecto', 'r', 'S/ 170,616.75'], ['Base imponible', 'r', 'S/ 151,406.75'],
+      ['UIT del ejercicio', 'r', 'S/ 5,350.00'], ['Mínimo imponible', 'r', 'S/ 32.10'],
+      ['Impuesto insoluto', 'r', 'S/ 587.44'], ['Derecho de emisión', 'r', 'S/ 4.50'],
+      ['Total a pagar', 'r', 'S/ 591.94'], ['Conjunto normativo', 'r', '2026 v1']],
+      { t: 'Tramos del artículo 13', cn: '2 tramos con aporte',
+        c: [['Tramo', 0], ['Límite superior S/', 1], ['Alícuota', 1], ['Porción gravada S/', 1], ['Aporte S/', 1]], f: [
+        ['1', '80,250.00', '0.2000 %', '80,250.00', '160.50000000'],
+        ['2', '321,000.00', '0.6000 %', '71,156.75', '426.94050000']],
+        n: 'Los aportes corren sin redondear (ADR-0018): su suma puede diferir en un céntimo del impuesto insoluto, que es la cifra que manda.' }],
     ['Cuotas del ejercicio', '', [],
       { t: 'Cronograma', cn: '4 cuotas trimestrales',
         c: [['Cuota', 0], ['Vencimiento', 0], ['Importe S/', 1], ['Situación', 0]], f: [

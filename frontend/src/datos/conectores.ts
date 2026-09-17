@@ -8,6 +8,11 @@ import {
 import type { ClaveDeHoja } from '../pantallas/arbol.ts';
 import type { CorridaDelPredial, DeterminacionGuardada } from './lecturas.ts';
 import { RUTAS, pedirUnoOVacio } from './lecturas.ts';
+import {
+  formatearAlicuota,
+  formatearImporte,
+  formatearImporteSinRedondear,
+} from '../dominio/formato.ts';
 import { CONECTORES_DE_LICENCIAS } from './conectores/licencias.ts';
 import { CONECTORES_DE_COACTIVA } from './conectores/coactiva.ts';
 import { CONECTORES_DE_INICIO } from './conectores/inicio.ts';
@@ -548,24 +553,40 @@ const TODAVIA_SIN_DETERMINAR: Ausencia = {
  * /rentas/predial/determinaciones` existe desde #207 y es una lectura. Con ella la hoja pide de
  * verdad, y sus TRES ausencias dejan de ser una sola frase de pantalla apagada.
  *
- * <h2>Y ahora la parte incomoda: de lo que llega no se pinta NI UNA celda, y esta medido</h2>
+ * <h2>Hasta #245 no pintaba NI UNA celda, y el que no cabia era el artboard</h2>
  *
- * La operacion publica **veinte campos** —hasta los tramos del articulo 13— y esta pantalla tiene
- * **un solo campo de solo lectura en sus tres bloques**: «Monto deducido». Los otros nueve son
- * mandos —el desplegable del ejercicio, las cajas de la declaracion, la deduccion, la
- * inafectacion— porque `territorio` es una pantalla de **ejecutar** y no de consultar, y eso el
- * artboard lo hace a proposito (#182 lo comprobo, y por eso #237 deja fuera cambiarlo).
+ * La operacion publica **veinte campos** —hasta los tramos del articulo 13— y esta pantalla tenia
+ * **un solo campo de solo lectura en sus tres bloques**: «Monto deducido», que ademas no lo
+ * publica nadie. Lo que #237 compro entonces no fue una celda sino que las tres ausencias se
+ * distinguieran: 404 «ese codigo no esta en el padron», 204 «esta, y todavia no se le ha
+ * determinado» y 200 con el cronograma que nadie publica.
  *
- * Y el unico campo de solo lectura que tiene **no lo publica nadie**: «Monto deducido» es el
- * importe que una deduccion resta de la base, y lo mas cercano que llega es `valuoExonerado`, que
- * es la parte exonerada del valuo. No son lo mismo y pintar uno por otro seria una cifra al
- * centimo indistinguible de la correcta.
+ * **#245 le da su sitio a la memoria**, y la decision la toma el artboard, no este archivo: su
+ * instruccion ya prometia «compruebe la **memoria del calculo** antes de asentar la
+ * determinacion» sin un campo donde comprobarla, y su cronograma ya dibujaba **lo determinado**
+ * —151,36 + 3 x 146,86 = 591,94 = 587,44 + 4,50—, que es la escala de la hoja `valores` sobre la
+ * base de los predios de `predios`. O sea que la memoria estaba en el artboard repartida en tres
+ * hojas, y esta ensenaba el resultado sin ensenar de donde salia. Ver `definiciones/rentas-registro.ts`.
  *
- * **Asi que lo que esta conexion compra no es una celda: es que las tres ausencias se distingan.**
- * `GET` a 404 —«ese codigo no esta en el padron»—, a 204 —«esta, y todavia no se le ha
- * determinado»— y a 200 con el cronograma que nadie publica. Las tres decian lo mismo antes, y las
- * tres se arreglan de forma distinta. Que la hoja tenga donde ensenar los veinte campos que la
- * operacion si publica es **otra cosa** y es del artboard, no de aqui.
+ * Asi que el bloque 2 se llena entero: **diez de diez**, y ninguno calculado aqui.
+ *
+ * <h2>Lo que sigue sin pintarse, y por que</h2>
+ *
+ * **«Monto deducido»** (`1|3`) es el importe que una deduccion resta de la base, y lo mas cercano
+ * que llega es `valuoExonerado`, que es la parte exonerada del valuo. No son lo mismo y pintar uno
+ * por otro seria una cifra al centimo indistinguible de la correcta — en un beneficio de
+ * pensionista esa cifra decide cuanto se cobra. Sigue diciendo «no publicado».
+ *
+ * **El «Cronograma»**, que es #234 y no un descuido: ver abajo.
+ *
+ * <h2>El aporte de un tramo NO pasa por `formatearImporte`, y no es un detalle</h2>
+ *
+ * `AporteDeTramo.aporte` llega **sin redondear** —ADR-0018: los intermedios corren sin redondear,
+ * y el unico redondeo es el del cierre de la regla—, o sea con ocho decimales:
+ * `porcionGravada.por(alicuota.movePointLeft(2))`. `formatearImporte` **revienta** con eso, y tiene
+ * razon; recortarlo aqui seria aritmetica sobre dinero (regla 1). Va por
+ * `formatearImporteSinRedondear`, que escribe lo que llego. La cifra que manda es
+ * `impuestoInsoluto`, que si esta redondeada y esta arriba, en su campo.
  *
  * <h2>Exige las dos cosas: el sujeto y el ejercicio</h2>
  *
@@ -594,13 +615,57 @@ const TERRITORIO: Conector = {
       RUTAS.determinacionGuardada(sujeto ?? '', ejercicio ?? 0),
       senal,
     ),
-  repartir: (): Reparto => ({
-    // Ni una: el unico campo de solo lectura de la pantalla es «Monto deducido», y no lo publica
-    // nadie. Ver el javadoc.
-    valores: new Map(),
-    // Sin filas para el «Cronograma» — y no `[]`, que significaria «la operacion contesto que no
-    // hay ninguna cuota». No contesto eso: no contesta nada del cronograma.
+  repartir: (determinacion: DeterminacionGuardada): Reparto => ({
+    // Los diez de la «Memoria del calculo», y ni uno compuesto aqui: los nueve importes y el
+    // nombre del conjunto sellado llegan tal cual. La pantalla NO suma los tramos para adelantar
+    // el insoluto —lo pide— por lo mismo que `con-panel` no suma interes y reajuste: el dia que el
+    // total y el desglose discreparan nadie sabria cual mirar (RNF-083), y aqui ademas no cuadran
+    // por construccion, porque los aportes no estan redondeados y el impuesto si.
+    valores: new Map([
+      [coordenada(2, 0), formatearImporte(determinacion.valuoTotal)],
+      [coordenada(2, 1), formatearImporte(determinacion.valuoExonerado)],
+      [coordenada(2, 2), formatearImporte(determinacion.valuoAfecto)],
+      [coordenada(2, 3), formatearImporte(determinacion.baseImponible)],
+      [coordenada(2, 4), formatearImporte(determinacion.uit)],
+      [coordenada(2, 5), formatearImporte(determinacion.minimoImponible)],
+      [coordenada(2, 6), formatearImporte(determinacion.impuestoInsoluto)],
+      [coordenada(2, 7), formatearImporte(determinacion.derechoDeEmision)],
+      [coordenada(2, 8), formatearImporte(determinacion.totalAPagar)],
+      // El conjunto SELLADO, y no su identificador: es lo que hace reproducible la memoria
+      // (ARQ-09 §3). `uit`, `tramos`, `minimoImponible` y `derechoDeEmision` salen del conjunto
+      // que ESA determinacion fijo, no del vigente hoy.
+      [coordenada(2, 9), determinacion.conjunto],
+    ]),
+    // Vacio: la tabla de los tramos lleva `clave`, asi que sus filas van por `tablas`. Y el
+    // «Cronograma» no lleva filas — y no `[]`, que significaria «la operacion contesto que no hay
+    // ninguna cuota». No contesto eso: no contesta nada del cronograma.
     filas: new Map(),
+    tablas: new Map([
+      [
+        'tramos-del-articulo-13',
+        {
+          filas: determinacion.tramos.map((tramo) => ({
+            clave: String(tramo.orden),
+            celdas: [
+              String(tramo.orden),
+              // **Nulo en el ultimo tramo, y no es un hueco**: ese tramo no tiene tope. Por eso la
+              // tabla declara `sinDato` con la palabra —«Sin tope»— y su motivo: una raya muda se
+              // leeria como un campo que al backend se le paso publicar.
+              tramo.limiteSuperior === null
+                ? { texto: null }
+                : formatearImporte(tramo.limiteSuperior),
+              formatearAlicuota(tramo.alicuota),
+              formatearImporte(tramo.porcionGravada),
+              // Sin redondear: ver el javadoc. `formatearImporte` reventaria con sus ocho
+              // decimales, y recortarlos aqui seria aritmetica sobre dinero.
+              formatearImporteSinRedondear(tramo.aporte),
+            ],
+          })),
+          // Sin `totalElementos`: la operacion no pagina tramos, los publica enteros. Lo que se ve
+          // es todo lo que hay, asi que el interprete cuenta las filas y no afirma ningun total.
+        },
+      ],
+    ]),
     loQueLaOperacionNoTrae: SIN_CRONOGRAMA,
     noPublicados: new Map([[coordenada(1, 3), NO_PUBLICADO]]),
   }),

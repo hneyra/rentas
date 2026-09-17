@@ -209,13 +209,15 @@ describe('el artboard V8 sigue diciendo lo que esta guarda cree que dice', () =>
 
   it('EL CENTINELA: y las pantallas traen contenido, no cascarones', () => {
     // Cuarenta claves con una lista vacia detras tambien pasarian el centinela de arriba. Estas
-    // son las cifras del artboard de hoy, contadas sobre el: 45 bloques, 302 campos y 31 tablas.
+    // son las cifras del artboard de hoy, contadas sobre el: 46 bloques, 312 campos y 32 tablas.
+    // **Eran 45, 302 y 31 hasta #245**, que le da a `territorio` su bloque «Memoria del calculo»:
+    // diez campos de solo lectura y la tabla de los tramos del articulo 13.
     const bloques = Object.values(artboardV8().pantallas);
     const planos = bloques.flat();
 
-    expect(planos.length, 'el artboard no declaro ni un bloque').toBe(45);
-    expect(planos.reduce((total, bloque) => total + bloque[2].length, 0)).toBe(302);
-    expect(planos.filter((bloque) => bloque.length === 4).length).toBe(31);
+    expect(planos.length, 'el artboard no declaro ni un bloque').toBe(46);
+    expect(planos.reduce((total, bloque) => total + bloque[2].length, 0)).toBe(312);
+    expect(planos.filter((bloque) => bloque.length === 4).length).toBe(32);
   });
 
   it('EL CENTINELA: y las claves del artboard son las mismas que las del codigo', () => {
@@ -273,9 +275,10 @@ describe('el artboard conserva las cifras que las definiciones ya no llevan', ()
 
   it('cada campo de solo lectura trae su valor', () => {
     const soloLectura = bloques.flatMap((b) => b[2]).filter((c) => c[1] === 'r' || c[1] === 'r1');
-    // 102, medido. Se afirma el numero y no «mas de cero»: perder la mitad seria igual de grave
-    // que perderlas todas, y «mas de cero» no lo veria.
-    expect(soloLectura.length, 'el artboard perdio campos de solo lectura').toBe(102);
+    // 112, medido —102 hasta #245, mas los diez de la memoria de `territorio`—. Se afirma el
+    // numero y no «mas de cero»: perder la mitad seria igual de grave que perderlas todas, y
+    // «mas de cero» no lo veria.
+    expect(soloLectura.length, 'el artboard perdio campos de solo lectura').toBe(112);
     const sinValor = soloLectura.filter((c) => c[2] === undefined || c[2] === '');
     expect(
       sinValor.map((c) => `  «${String(c[0])}»`),
@@ -286,7 +289,7 @@ describe('el artboard conserva las cifras que las definiciones ya no llevan', ()
 
   it('y cada tabla trae sus filas', () => {
     const tablas = bloques.map((b) => b[3]).filter((t) => t !== undefined);
-    expect(tablas.length, 'el artboard perdio tablas').toBe(31);
+    expect(tablas.length, 'el artboard perdio tablas').toBe(32);
     const vacias = tablas.filter((t) => t.f.length === 0).map((t) => `  «${t.t}»`);
     expect(vacias, `Hay tablas del artboard sin filas:\n${vacias.join('\n')}`).toEqual([]);
   });

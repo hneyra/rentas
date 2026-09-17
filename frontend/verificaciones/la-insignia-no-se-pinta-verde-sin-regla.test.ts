@@ -236,7 +236,11 @@ const CONECTADAS: readonly {
   // cuarta que sale roja sola. Y es el caso mas extremo de los diez: no le llega NADA.
   {
     hoja: 'territorio',
-    bloque: 2,
+    // **Bloque 3 desde #245**, que mete «Memoria del calculo» delante. La memoria trae tabla —los
+    // tramos del articulo 13— y NO es de insignia: sus cinco columnas son un ordinal, tres
+    // importes y una alicuota, y ninguna es un juicio sobre nada. Por eso sigue habiendo una sola
+    // entrada de `territorio` aqui.
+    bloque: 3,
     leLlega:
       'NADA, y esa es la propiedad. La columna «Situacion» del «Cronograma» es de insignia en el ' +
       'artboard, y el conector NO entrega ni una fila a esa tabla: la determinacion guardada no ' +
