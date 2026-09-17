@@ -24,7 +24,11 @@ import { YA_SERVIDAS } from './datos/servidas.ts';
  *   · **25 hojas tienen al menos una servida**, y de esas **17** se pintan de verdad.
  *   · Y una —`aut-panel`, desde #173— **no declara NINGUNA operacion**, que no es lo mismo que
  *     declararlas todas en `BASE` y hay que no confundirlo: ver el `length > 0` de abajo.
- *   · Y el cuarto caso —servida, pedida y vacia— no lo produce este archivo todavia: llega cuando
+ *   · **Cuatro hojas no declaran ni un `GET` y si declaran escrituras** (#182): `territorio`,
+ *     `aut-sol`, `val-val` y `val-cart`. No son pantallas de consulta: son de **ejecutar**, y
+ *     decirles «sin conectar» —«ninguna de las operaciones que declara la sirve el backend»— es
+ *     falso dos veces, porque el backend SI las sirve y lo que pasa es que escriben.
+ *   · Y el ultimo caso —servida, pedida y vacia— no lo produce este archivo todavia: llega cuando
  *     las pantallas pidan de verdad.
  *
  * Meter los tres primeros en un «no hay datos» unico seria mentir por omision: «este modulo no
@@ -39,10 +43,43 @@ import { YA_SERVIDAS } from './datos/servidas.ts';
  *
  * **Solo lectura**, porque una hoja cuya unica servida es `PUT /seguridad/sesion/ejercicio` no
  * tiene con que pintarse: un PUT no devuelve una pantalla.
+ *
+ * <h2>Y la frase que faltaba: «solo escribe» (#182)</h2>
+ *
+ * `territorio` —la hoja de la Determinacion— declara **siete** operaciones y **ni un `GET`**:
+ * cuatro `POST` y tres `BASE` que, medidas contra `docs/50-api/formas-de-la-api.json` y contra sus
+ * controladores (`AlcabalaController`, `EspectaculoController`, `VehicularController` publican **un
+ * solo metodo y es `@PostMapping`**), tambien escriben. Con las tres frases de antes contestaba
+ * «sin conectar», cuyo texto dice «ninguna de las operaciones que declara la sirve el backend» — y
+ * eso es **falso**: el backend las sirve todas. Lo que ocurre es que **esta pantalla no consulta,
+ * ejecuta**: se fija el sujeto y el ejercicio, se confirma —el artboard le declara un `AlertDialog`
+ * «Confirmar antes de asentar»— y las cifras que dibuja son la **respuesta** a lo que se ejecuto.
+ *
+ * El arbol NO se corrigio, y es lo correcto: esta bien transcrito del artboard
+ * (`RentasV8.dc.html:454`), y el artboard dice esto a proposito. Lo que falta es una **lectura que
+ * el backend no publica**, y tiene su issue: `rentas`#207, que nombra la operacion y lo que tiene
+ * que contestar.
+ *
+ * **La condicion no mira el contrato**, que este archivo no puede leer: mira que no haya ni un
+ * `GET` declarado y que haya alguna escritura. Barridas las cuarenta hojas, son cuatro —`territorio`,
+ * `aut-sol`, `val-val` y `val-cart`—, y las cuatro son de ejecutar: presentar una solicitud, notificar
+ * un valor, emitir un lote. `val-val` declara ademas `BASE /consultas/valores`, que el contrato SI
+ * publica como `GET`; por eso la frase dice «ninguna es una lectura **comprobada**» y no «todas
+ * escriben», que seria mentir sobre esa.
  */
 
 /** Los verbos con los que se puede pedir algo para dibujarlo. */
 const DE_LECTURA = new Set(['GET', 'BASE']);
+
+/**
+ * Los verbos que **cambian datos**. Una operacion con uno de estos no dibuja una pantalla: la
+ * ejecuta.
+ *
+ * `BASE` no esta aqui y no puede estarlo: significa «solo se leyo el `@RequestMapping` de la
+ * clase», o sea que el verbo **no se sabe**. Meterlo seria afirmar que escribe, que es justo la
+ * clase de invencion que este archivo existe para evitar.
+ */
+const DE_ESCRITURA = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
 /** Las rutas que el backend sirve, sin el verbo. Ver el javadoc: el cruce va por ruta. */
 const RUTAS_SERVIDAS = new Set(YA_SERVIDAS.map((o) => o.ruta));
@@ -72,6 +109,16 @@ const SOLO_BASE: Ausencia = {
   tono: 'atencion',
 };
 
+const SOLO_ESCRIBE: Ausencia = {
+  enElCampo: 'solo escribe',
+  explicacion:
+    'Esta pantalla no consulta: ejecuta. Ninguna de las operaciones que declara es una lectura ' +
+    'comprobada, y las que si se verificaron escriben —disparan un calculo, dan de alta o de baja ' +
+    'una deuda—: una escritura no devuelve una pantalla. Lo que se ve es su forma; sus cifras ' +
+    'saldrian de la respuesta a lo que se ejecute, o de una lectura que todavia no publica nadie.',
+  tono: 'atencion',
+};
+
 const SERVIDO_Y_SIN_PEDIR: Ausencia = {
   enElCampo: 'sin pedir',
   explicacion:
@@ -98,9 +145,23 @@ export function porQueNoHayDato(hoja: Hoja): Ausencia {
   // y que hay un controlador detras— justo de la hoja de la que no se sabe nada. Mientras las
   // cuarenta declararon al menos una operacion el defecto no tenia sintoma; `aut-panel` se quedo
   // sin ninguna al devolverle a `aut-tram` la que la sirve, y entonces lo tuvo.
+  // Ni un `GET` y alguna escritura: la hoja **ejecuta**, y decirle «sin conectar» es mentir (#182).
+  //
+  // Los dos lados de la condicion hacen falta. Sin «ni un `GET`», caeria aqui cualquier hoja con un
+  // boton; sin «alguna escritura», caeria la que no declara NADA —y esa no ejecuta: no se sabe nada
+  // de ella, que es `aut-panel` desde #173—.
+  //
+  // **Y va ANTES de `todasSonBase`, que no es indiferente.** Detras, una hoja toda en `BASE` ya
+  // habria salido por «sin verificar» y entonces meter `BASE` en `DE_ESCRITURA` no cambiaria ni una
+  // respuesta: el error seria **indetectable**, y la afirmacion de que `BASE` no escribe no la
+  // sostendria ninguna prueba. Delante, ensancharla asi convierte a `tra-cua` —una sola operacion,
+  // en `BASE`— en una hoja que «solo escribe», y eso sale rojo. Medido en las dos posiciones.
+  const niUnaLectura = !hoja.operaciones.some((o) => o.verbo === 'GET');
+  const algunaEscribe = hoja.operaciones.some((o) => DE_ESCRITURA.has(o.verbo));
+  if (niUnaLectura && algunaEscribe) return SOLO_ESCRIBE;
   const todasSonBase =
     hoja.operaciones.length > 0 && hoja.operaciones.every((o) => o.verbo === 'BASE');
   return todasSonBase ? SOLO_BASE : NADA_SERVIDO;
 }
 
-export { NADA_SERVIDO, SOLO_BASE, SERVIDO_Y_SIN_PEDIR };
+export { NADA_SERVIDO, SOLO_BASE, SOLO_ESCRIBE, SERVIDO_Y_SIN_PEDIR };
