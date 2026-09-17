@@ -12,6 +12,7 @@ import kamayuk.rentas.catastro.LectorDeFichas;
 import kamayuk.rentas.compartido.Pagina;
 import kamayuk.rentas.compartido.Paginacion;
 import kamayuk.rentas.fiscalizacion.aplicacion.RegistrarActaFiscalizacion;
+import kamayuk.rentas.fiscalizacion.dobles.ContribuyentesDeMentira;
 import kamayuk.rentas.fiscalizacion.dominio.ActaFiscalizacion;
 import kamayuk.rentas.fiscalizacion.dominio.ActaFiscalizacionRepository;
 import kamayuk.rentas.fiscalizacion.dominio.CriterioDeProgramas;
@@ -170,8 +171,19 @@ class ActaVehicularControllerTest {
                     },
                     (RegistroDeAuditoria registro) -> {});
 
+    /**
+     * El padron, con el unico obligado que estas peticiones nombran (#216).
+     *
+     * <p>La respuesta del {@code POST} publica {@code contribuyente} y {@code codContribuyente}
+     * como la lectura: son el mismo {@code record}, y dejarlos nulos aqui seria un campo declarado
+     * que en la mitad de sus rutas nunca se llena.
+     */
+    private static final ContribuyentesDeMentira PADRON =
+            new ContribuyentesDeMentira()
+                    .con(10L, "00000010", "PEREZ CASTILLO, JUAN", "Jr. Union 100");
+
     private final MockMvc mvc =
-            MockMvcBuilders.standaloneSetup(new ActaVehicularController(servicio))
+            MockMvcBuilders.standaloneSetup(new ActaVehicularController(servicio, PADRON))
                     .setControllerAdvice(new ManejadorDeErrores())
                     .setMessageConverters(
                             new JacksonJsonHttpMessageConverter(
@@ -202,6 +214,28 @@ class ActaVehicularControllerTest {
                 .contains("\"fichaId\":null")
                 .contains("\"vehiculoId\":30")
                 .contains("\"hallazgo\":\"OMISO\"");
+    }
+
+    @Test
+    @DisplayName("#216 — la respuesta del POST lleva el nombre LLENO, como la del acta predial")
+    void laRespuestaDelPostLlevaElNombre() throws Exception {
+        // Las dos escrituras del acta devuelven el MISMO record que la lectura, asi que las dos lo
+        // resuelven. Dejarlo nulo en una de ellas es el defecto de #194.
+        String cuerpo =
+                "{\"observacion\":\"Se fiscaliza para la prueba\",\"programaId\":2,"
+                        + "\"contribuyenteId\":10,\"vehiculoId\":30,\"fechaVisita\":\"2026-03-15\","
+                        + "\"fiscalizador\":\"J. Perez\",\"hallazgo\":\"OMISO\"}";
+
+        MvcResult resultado =
+                mvc.perform(
+                                post("/rentas/api/v1/fiscalizacion/vehicular")
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(cuerpo))
+                        .andReturn();
+
+        assertThat(resultado.getResponse().getContentAsString())
+                .contains("\"contribuyente\":\"PEREZ CASTILLO, JUAN\"")
+                .contains("\"codContribuyente\":\"00000010\"");
     }
 
     @Test

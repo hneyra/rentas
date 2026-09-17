@@ -98,6 +98,8 @@ class AreaEnUnaSolaFormaTest {
                                 2L,
                                 1,
                                 3L,
+                                "PEREZ, JUAN",
+                                "00000003",
                                 4L,
                                 null,
                                 null,

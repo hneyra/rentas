@@ -31,8 +31,25 @@ public final class ContribuyentesDeMentira implements DirectorioDeContribuyentes
         return porId.values().stream().filter(r -> r.codigo().equals(codigo)).findFirst();
     }
 
+    /**
+     * Cuantas veces se ha llamado a {@link #porIds}, para medir que una pagina cuesta UNA consulta.
+     *
+     * <p>Una lectura por fila no falla ninguna prueba: devuelve lo mismo. Lo que hace es convertir
+     * una pagina de veinte en veintiuna consultas, y eso solo se ve contandolas.
+     */
+    private int llamadasAPorIds;
+
+    public int llamadasAPorIds() {
+        return llamadasAPorIds;
+    }
+
+    public void olvidarLasLlamadas() {
+        llamadasAPorIds = 0;
+    }
+
     @Override
     public Map<Long, ResumenDeContribuyente> porIds(Set<Long> ids) {
+        llamadasAPorIds++;
         Map<Long, ResumenDeContribuyente> encontrados = new HashMap<>();
         for (Long id : ids) {
             ResumenDeContribuyente resumen = porId.get(id);

@@ -25,6 +25,7 @@ import kamayuk.rentas.esquema.ContextoDeTenant;
 import kamayuk.rentas.esquema.ProyeccionDeCatastro;
 import kamayuk.rentas.fiscalizacion.aplicacion.AnularActaFiscalizacion;
 import kamayuk.rentas.fiscalizacion.aplicacion.ConsultaDeActas;
+import kamayuk.rentas.fiscalizacion.dobles.ContribuyentesDeMentira;
 import kamayuk.rentas.fiscalizacion.infraestructura.ActaFiscalizacionRepositoryJdbc;
 import kamayuk.rentas.fiscalizacion.infraestructura.LiquidacionRepositoryJdbc;
 import kamayuk.rentas.fiscalizacion.infraestructura.MovimientoDeLiquidacionRepositoryJdbc;
@@ -97,6 +98,13 @@ class ListadoDeActasFronteraTest {
 
     private static int siguienteCatastral = 1;
 
+    /**
+     * El padron en memoria, sembrado en {@link #provisionar()} con los ids que salen del INSERT.
+     */
+    private static ContribuyentesDeMentira padron;
+
+    private static PlatformTransactionManager gestorDeTransacciones;
+
     @BeforeAll
     static void provisionar() throws SQLException, IOException {
         base = BaseDeDatosDePrueba.provisionar();
@@ -104,6 +112,12 @@ class ListadoDeActasFronteraTest {
         municipalidadB = crearMunicipalidad("270102", "Municipalidad vecina");
 
         long titularA = crearContribuyente(municipalidadA, "A-000001", "70900001");
+        // El padron que ActasController consulta para poner el nombre en cada acta (#216). Los
+        // identificadores son los de esta siembra: `titularB` no entra, porque una lectura desde la
+        // municipalidad A no puede nombrar a nadie de la vecina.
+        padron =
+                new ContribuyentesDeMentira()
+                        .con(titularA, "A-000001", "TITULAR, PRUEBA", "Jr. Union de prueba");
         programaPredial = crearPrograma(municipalidadA, "PF-A-01", "PREDIAL");
         programaVehicular = crearPrograma(municipalidadA, "PF-A-02", "VEHICULAR");
 
@@ -149,15 +163,24 @@ class ListadoDeActasFronteraTest {
         pool.setPassword(base.clave(BaseDeDatosDePrueba.APP));
 
         jdbc = JdbcClient.create(pool);
-        PlatformTransactionManager gestor = new TenantTransactionManager(pool);
+        gestorDeTransacciones = new TenantTransactionManager(pool);
+        rearmarElBorde();
+    }
 
+    /**
+     * El borde, con el padron que {@link #padron} tenga en ese momento.
+     *
+     * <p>Se rearma y no se parchea porque el controlador recibe el directorio por constructor: es
+     * lo que permite montar el caso del obligado que ya no esta en el padron sin tocar la base.
+     */
+    private static void rearmarElBorde() {
         mvc =
                 MockMvcBuilders.standaloneSetup(
                                 new ActasController(
                                         envolver(
                                                 new ConsultaDeActas(
                                                         new ActaFiscalizacionRepositoryJdbc(jdbc)),
-                                                gestor),
+                                                gestorDeTransacciones),
                                         envolver(
                                                 new AnularActaFiscalizacion(
                                                         new ActaFiscalizacionRepositoryJdbc(jdbc),
@@ -166,7 +189,8 @@ class ListadoDeActasFronteraTest {
                                                                 jdbc),
                                                         new AuditoriaJdbc(
                                                                 jdbc, Clock.systemDefaultZone())),
-                                                gestor)))
+                                                gestorDeTransacciones),
+                                        padron))
                         .setControllerAdvice(new ManejadorDeErrores())
                         .setMessageConverters(
                                 new JacksonJsonHttpMessageConverter(
@@ -220,6 +244,63 @@ class ListadoDeActasFronteraTest {
 
             assertThat(cuerpo).contains("\"usoHallado\":\"COMERCIO\"");
             assertThat(cuerpo).contains("\"hallazgo\":\"USO_DISTINTO\"");
+        }
+    }
+
+    @Nested
+    @DisplayName("#216 — el acta dice DE QUIEN es, y el padron se resuelve una vez por pagina")
+    class DeQuienEsElActa {
+
+        @Test
+        @DisplayName(
+                "cada acta publica `contribuyente` y `codContribuyente`, no solo el id interno")
+        void publicaElNombreYElCodigo() throws Exception {
+            String cuerpo = actas(null, null, null).getResponse().getContentAsString();
+
+            assertThat(cuerpo)
+                    .as(
+                            "hasta #216 viajaba `contribuyenteId` y nada mas: el acta no decia de quien era")
+                    .contains("\"contribuyente\":\"TITULAR, PRUEBA\"")
+                    .contains("\"codContribuyente\":\"A-000001\"");
+        }
+
+        @Test
+        @DisplayName("y el padron se consulta UNA vez por pagina, no una por fila")
+        void unaConsultaPorPagina() throws Exception {
+            // Con `porId` en un bucle, una pagina de cuatro actas serian cinco consultas. No se
+            // nota en la prueba y si en el padron de una provincia, asi que se mide aqui: la
+            // pagina trae cuatro actas y el directorio recibe UNA llamada con los cuatro ids.
+            padron.olvidarLasLlamadas();
+            MvcResult resultado = actas(null, null, null);
+
+            assertThat(fiscalizadoresDe(resultado)).hasSize(4);
+            assertThat(padron.llamadasAPorIds())
+                    .as("una consulta por fila es el defecto que `porIds` existe para impedir")
+                    .isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName(
+                "un obligado que ya no esta en el padron sale con nulos, y el acta NO se oculta")
+        void elQueNoEstaEnElPadronSaleConNulos() throws Exception {
+            // El acta de la municipalidad vecina no es visible desde aqui, asi que el caso se monta
+            // con un padron que no conoce a nadie: es el mismo efecto que un titular dado de baja.
+            ContribuyentesDeMentira recordado = padron;
+            try {
+                padron = new ContribuyentesDeMentira();
+                rearmarElBorde();
+                String cuerpo = actas(null, null, null).getResponse().getContentAsString();
+
+                assertThat(fiscalizadoresDe(actas(null, null, null)))
+                        .as("ocultar la fila esconderia justamente el caso que hay que revisar")
+                        .containsExactlyInAnyOrder("A. UNO", "A. DOS", "A. TRES", "V. CUATRO");
+                assertThat(cuerpo)
+                        .contains("\"contribuyente\":null")
+                        .contains("\"codContribuyente\":null");
+            } finally {
+                padron = recordado;
+                rearmarElBorde();
+            }
         }
     }
 
@@ -426,7 +507,12 @@ class ListadoDeActasFronteraTest {
                                     + " su despues")
                     .isEqualTo(201);
             assertThat(resultado.getResponse().getContentAsString())
-                    .contains("\"estado\":\"ANULADA\"");
+                    .contains("\"estado\":\"ANULADA\"")
+                    // #216: la anulacion devuelve el MISMO record que la lectura, asi que tambien
+                    // resuelve el obligado. Dejarlo nulo aqui seria un campo declarado que en una
+                    // de sus rutas nunca se llena.
+                    .contains("\"contribuyente\":\"TITULAR, PRUEBA\"")
+                    .contains("\"codContribuyente\":\"A-000001\"");
             assertThat(estadoEnLaBase(actaId))
                     .as("sin @Transactional el SET LOCAL no llega y la politica RLS no deja tocar")
                     .isEqualTo("ANULADA");

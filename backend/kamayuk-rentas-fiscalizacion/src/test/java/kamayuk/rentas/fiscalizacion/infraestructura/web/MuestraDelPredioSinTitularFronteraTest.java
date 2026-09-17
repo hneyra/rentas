@@ -176,7 +176,7 @@ class MuestraDelPredioSinTitularFronteraTest {
                                                 new ConsultaDeMuestra(programas, muestras, actas),
                                                 gestor),
                                         new PadronDeLaPrueba()),
-                                new ActaPredialController(registroDeActas))
+                                new ActaPredialController(registroDeActas, new PadronDeLaPrueba()))
                         .setControllerAdvice(new ManejadorDeErrores())
                         .setMessageConverters(
                                 new JacksonJsonHttpMessageConverter(
