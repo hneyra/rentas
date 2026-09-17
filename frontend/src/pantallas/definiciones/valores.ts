@@ -159,25 +159,57 @@ export const VALORES = {
         titulo: 'Tipos de valor y prescripción',
         nota: 'La deuda prescribe a los cuatro años; un acto de cobranza reinicia el plazo.',
         campos: [
+          // **Los tres mandos, corregidos en #244** (y su gemelo en el artboard). Ninguno llega
+          // todavia al conector —eso es #172—, y aun asi dos de los tres preguntaban lo que `GET
+          // /coactiva/prescripcion` no admite. Lo que decide cada uno es la operacion:
+          //
+          //   · **«Tipo de valor» era «Orden de pago · RD · RM», y eso no existe aqui.** Ni como
+          //     filtro —los opcionales de la operacion son `codContribuyente`, `ejercicio`,
+          //     `resultado` y `tributo`, y ninguno es un tipo de valor— ni como dato: la fila de
+          //     esta tabla es el ejercicio de una DECLARACION, y una declaracion es sobre un
+          //     TRIBUTO. `PrescripcionEnListaResource` lo publica; ningun campo suyo dice tipo de
+          //     valor. Asi que el mando pregunta por el tributo.
+          //   · **Y es una CAJA y no un desplegable**, que es la mitad que no se ve. Un
+          //     desplegable promete una lista cerrada, y `prescripcion.tributo` es `varchar(20)`
+          //     **sin `CHECK`** —los de esa tabla son `causal`, `ejercicios`, `plazo_anios` y
+          //     `resultado`— y `Prescripcion` solo comprueba que mida de 1 a 20 caracteres. El
+          //     vocabulario cerrado que si existe, `TributoDelLibro`, cierra
+          //     `cuenta_corriente_asiento.tributo` y lo dice en su javadoc, no esta. Una opcion
+          //     con otra grafia no daria error: daria CERO filas, que se lee como «no hay
+          //     declaraciones de ese tributo». Es el defecto que ese enumerado documenta
+          //     —`ARBITRIO` contra `ARBITRIOS`— visto desde la interfaz.
+          { etiqueta: 'Tributo', tipo: '', ayuda: 'El tributo tal como el libro lo escribe; en blanco, todos' },
+          // **«Ejercicio» era el unico que cableaba, y aun asi su rotulo mentia.** `?ejercicio=`
+          // acota por el RANGO SOLICITADO —`ejercicio_desde <= :ejercicio AND ejercicio_hasta >=
+          // :ejercicio`, `PrescripcionRepositoryJdbc`— y no por lo que prescribio;
+          // `CriterioDePrescripciones` explica por que es deliberado —filtrar por «los que
+          // prescribieron» esconderia las `NO_PROCEDE`, que son las que dicen que ese ejercicio
+          // sigue siendo exigible—. Y la tabla de debajo tiene una columna que se llama
+          // «Ejercicio»: con el mando llamado igual, pedir 2024 y ver filas de 2021 se lee como
+          // una averia. Se ven todos los ejercicios de las declaraciones que PIDIERON 2024.
+          //
+          // «Todos» es **no mandar el parametro**: es opcional, y sin el la relacion es «todas las
+          // declaraciones de esta municipalidad» (`CriterioDePrescripciones`).
           {
-            etiqueta: 'Tipo de valor',
-            tipo: 's',
-            opciones: [
-              'Todos',
-              'Orden de pago',
-              'Resolución de determinación',
-              'Resolución de multa',
-            ],
-          },
-          {
-            etiqueta: 'Ejercicio',
+            etiqueta: 'Ejercicio solicitado',
             tipo: 's',
             opciones: ['Todos', '2026', '2025', '2024', '2023', '2022'],
           },
+          // **«Estado» confundia el resultado de la SOLICITUD con la situacion del EJERCICIO.**
+          // Lo que la operacion admite es `?resultado=`, que es como se resolvio la solicitud:
+          // `PROCEDE`, `PROCEDE_EN_PARTE`, `NO_PROCEDE` —los tres del `CHECK`
+          // `prescripcion_resultado_check`, y el controlador contesta 422 nombrandolos si llega
+          // otro—. La situacion del ejercicio ya esta dibujada, en la columna «Situacion» de la
+          // tabla, y **no tiene filtro**: `prescrita` no es un parametro.
+          //
+          // Y con esto **«Por prescribir» sale**, que es lo que la regla 5 pedia: exigia un umbral
+          // —cuanto de cerca es «cerca»— que el corpus de `normativa` no publica. Es la misma
+          // salida que #218 dio a la insignia de `ini-parado`: no se inventa el umbral, se retira
+          // la opcion que lo necesitaba.
           {
-            etiqueta: 'Estado',
+            etiqueta: 'Resultado de la solicitud',
             tipo: 's',
-            opciones: ['Todos', 'Vigente', 'Por prescribir', 'Prescrito'],
+            opciones: ['Todos', 'Procede', 'Procede en parte', 'No procede'],
           },
           // **«Declaraciones», y no «Prescriben este año»** (#230, y su gemelo en el artboard).
           // Lo de antes era un agregado del padron —cuantos valores prescriben dentro del ano en
@@ -215,7 +247,9 @@ export const VALORES = {
           // Sigue siendo de insignia, y ahora se puede encender: le llega `prescrita`, un booleano
           // que el backend publica, no una frase. Dos valores y no tres — «Por prescribir» exigiria
           // un umbral que el corpus no publica (regla 5), y es lo que #218 tuvo que retirar en
-          // `ini-parado` por no tenerlo.
+          // `ini-parado` por no tenerlo. **Desde #244 tampoco esta en el mando de arriba**: el
+          // desplegable que la ofrecia era «Estado», y ahora pregunta por el resultado de la
+          // solicitud, que si tiene tres valores publicados.
           columnaDeInsignia: 3,
           nota: 'Declarar la prescripción es un acto: se hace de oficio o a pedido, y queda en la bitácora.',
         },

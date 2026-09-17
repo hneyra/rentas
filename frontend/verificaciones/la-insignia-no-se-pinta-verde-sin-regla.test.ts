@@ -257,7 +257,8 @@ const CONECTADAS: readonly {
       '«Vigente». Los dos son un JUICIO y los dos tienen regla — «Vigente» estaba en CONFORME ' +
       'desde #175 y «Prescrito» entra en MAL con #230, porque un ejercicio prescrito es deuda que ' +
       'ya no se puede exigir. **No hay tercer valor**: «Por prescribir», que el desplegable ' +
-      '«Estado» ofrece, exigiria un umbral que el corpus de `normativa` no publica (regla 5)',
+      '«Estado» ofrecio hasta #244, exigiria un umbral que el corpus de `normativa` no publica ' +
+      '(regla 5) — y por eso ese mando pregunta ahora por el resultado de la solicitud',
   },
 ];
 

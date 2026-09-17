@@ -1107,13 +1107,40 @@ const PANTALLAS = {
          declaración de ALGUIEN, y una fecha de prescripción sin decir de quién es no dice nada.
      Y «Situación» son DOS valores y no tres: `ejercicios[].prescrita` es booleano —lo que la
      resolución resolvió, a su fecha—. «Por prescribir» exigiría un umbral —cuánto de cerca es
-     «cerca»— que el corpus de `normativa` no publica, y no se inventa (regla 5). El desplegable
-     «Estado» conserva sus tres opciones porque es un MANDO y no un dato: nadie le pasa todavía lo
-     tecleado al conector, y eso es #172. */
+     «cerca»— que el corpus de `normativa` no publica, y no se inventa (regla 5).
+
+     Y los TRES MANDOS se corrigen en #244, que es lo que #230 dejó escrito y sin hacer. Ninguno
+     llega todavía al conector —eso es #172—, y aun así dos de los tres preguntaban lo que esta
+     operación no admite. Lo que decide cada uno es `GET /coactiva/prescripcion`:
+       · «Tipo de valor» —Orden de pago, RD, RM— NO EXISTE como filtro y no existe como dato: no
+         hay un tipo de valor en ninguna fila de esta hoja, porque la fila es el ejercicio de una
+         DECLARACIÓN y una declaración es sobre un TRIBUTO. Se llama «Tributo», que es el filtro
+         que la operación sí admite y el campo que `PrescripcionEnListaResource` sí publica.
+         **Y es una caja y no un desplegable**: `prescripcion.tributo` es `varchar(20)` SIN
+         `CHECK` —los cuatro de esa tabla son `causal`, `ejercicios`, `plazo_anios` y `resultado`,
+         y ninguno es el tributo—, y `Prescripcion` sólo comprueba que mida de 1 a 20 caracteres.
+         El vocabulario cerrado que existe —`TributoDelLibro`— cierra `cuenta_corriente_asiento`
+         y lo dice en su propio javadoc; un desplegable aquí prometería una lista que esta columna
+         no promete, y una opción con otra grafía no da error: da CERO filas, que se lee como «no
+         hay declaraciones de ese tributo». Es el defecto que ese enumerado documenta —`ARBITRIO`
+         contra `ARBITRIOS`— visto desde la interfaz.
+       · «Estado» —Vigente, Por prescribir, Prescrito— confundía dos cosas. Lo que la operación
+         admite es `?resultado=`, y es CÓMO SE RESOLVIÓ LA SOLICITUD: `PROCEDE`,
+         `PROCEDE_EN_PARTE`, `NO_PROCEDE`, los tres del `CHECK` de `prescripcion`. La situación
+         del ejercicio ya está en la tabla, en «Situación», y no tiene filtro. Se llama
+         «Resultado de la solicitud» y lleva esos tres. Con eso «Por prescribir» SALE, que es lo
+         que la regla 5 pedía: no hay umbral publicado con que decidir qué es «cerca».
+       · «Ejercicio» sí cablea, y aun así su rótulo mentía al lado de una columna que se llama
+         igual: `?ejercicio=` acota por el RANGO SOLICITADO —`ejercicio_desde <= :ejercicio AND
+         ejercicio_hasta >= :ejercicio`— y no por lo que prescribió, y `CriterioDePrescripciones`
+         explica por qué es deliberado. Pedir 2024 no deja ver sólo las filas de 2024: deja ver
+         TODOS los ejercicios de las declaraciones que pidieron 2024. Se llama «Ejercicio
+         solicitado». «Todos» es no mandar el parámetro, que es lo que la operación hace con él
+         ausente. */
   'val-tip': [['Tipos de valor y prescripción', 'La deuda prescribe a los cuatro años; un acto de cobranza reinicia el plazo.', [
-    ['Tipo de valor', 's', ['Todos', 'Orden de pago', 'Resolución de determinación', 'Resolución de multa']],
-    ['Ejercicio', 's', ['Todos', '2026', '2025', '2024', '2023', '2022']],
-    ['Estado', 's', ['Todos', 'Vigente', 'Por prescribir', 'Prescrito']],
+    ['Tributo', '', 'El tributo tal como el libro lo escribe; en blanco, todos'],
+    ['Ejercicio solicitado', 's', ['Todos', '2026', '2025', '2024', '2023', '2022']],
+    ['Resultado de la solicitud', 's', ['Todos', 'Procede', 'Procede en parte', 'No procede']],
     ['Declaraciones', 'r', '48']],
     { t: 'Reloj de prescripción', cn: '4 de 48', c: [['Contribuyente', 0], ['Ejercicio', 0], ['Prescribe el', 0], ['Situación', 0]], f: [
       ['Chávez Ipanaqué, María', '2021', '31/12/2025', 'Prescrito'],
