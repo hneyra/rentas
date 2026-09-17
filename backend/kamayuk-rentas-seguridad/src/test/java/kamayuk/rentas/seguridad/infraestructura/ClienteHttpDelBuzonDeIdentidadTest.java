@@ -46,6 +46,20 @@ class ClienteHttpDelBuzonDeIdentidadTest {
                     + "\"cuerpo\":\"{\\\"usuarioId\\\":3,\\\"cuenta\\\":\\\"jperez\\\"}\","
                     + "\"huella\":\"abc\",\"creadoEn\":\"2026-09-09T12:00:00Z\"}],\"quedan\":4}";
 
+    /** Los tres cuerpos con que `identidad` contesta 403, tal como los escribe hoy. */
+    private static final String SIN_FICHA =
+            "{\"detail\":\"La cuenta «1c5e82f7-a3da-4ad2-9a5a-82b48deea3ca» no esta dada de alta"
+                    + " en este sistema. No es que le falte un privilegio: no tiene ninguna ficha"
+                    + " aqui\",\"codigo\":\"SIN_PRIVILEGIO\"}";
+
+    private static final String SIN_EL_PRIVILEGIO =
+            "{\"detail\":\"No tiene el privilegio LECTURA sobre eventos\","
+                    + "\"codigo\":\"SIN_PRIVILEGIO\"}";
+
+    private static final String SIN_IDENTIDAD_DE_SERVICIO =
+            "{\"detail\":\"El token no identifica una cuenta de servicio de un sistema\","
+                    + "\"codigo\":\"SIN_IDENTIDAD_DE_SERVICIO\"}";
+
     private BuzonDeMentira buzon;
 
     @BeforeEach
@@ -143,25 +157,105 @@ class ClienteHttpDelBuzonDeIdentidadTest {
     }
 
     @Test
-    @DisplayName("un 401 es transitorio y nombra la credencial; un 403, el grupo que falta")
+    @DisplayName("un 401 es transitorio, nombra la credencial y dice lo que el emisor contesto")
     void credencialQueNoVale() {
-        buzon.responde(401, "{\"codigo\":\"NO_AUTENTICADO\"}");
+        buzon.responde(
+                401,
+                "{\"codigo\":\"NO_AUTENTICADO\",\"detail\":\"La peticion no trae"
+                        + " un token valido\"}");
         assertThatThrownBy(() -> cliente().pendientes(10))
                 .as(
                         "[un 401 NO es AcuseRechazado: la clave se arregla en el despliegue y el"
                                 + " evento tiene que seguir en el buzon]")
                 .isInstanceOf(IdentidadNoContesta.class)
                 .hasMessageContaining("401")
+                .hasMessageContaining("NO_AUTENTICADO")
                 .hasMessageContaining("kamayuk.identidad.credencial");
         assertThatThrownBy(() -> cliente().acusar(List.of(UUID.randomUUID())))
                 .isInstanceOf(IdentidadNoContesta.class)
                 .isNotInstanceOf(AcuseRechazado.class);
+    }
 
-        buzon.responde(403, "{\"codigo\":\"SIN_IDENTIDAD_DE_SERVICIO\"}");
+    /**
+     * <b>El defecto de #66</b>: cualquier 403 decia «falta afiliarla al grupo «Consumidores del
+     * buzon»» y el cuerpo se tiraba. Medido en `stg` el 2026-09-11, lo que `identidad` contestaba
+     * era la rama CONTRARIA y la afiliacion estaba bien; se perdieron horas mirando ahi.
+     *
+     * <p>Las cuatro ramas van en la misma prueba a proposito: lo que hay que demostrar no es que
+     * cada una diga algo, sino que dicen cosas <b>distintas</b>. Una prueba por rama pasaria en
+     * verde con un texto fijo que las nombrara a todas.
+     */
+    @Test
+    @DisplayName("los tres 403 de `identidad` producen tres mensajes DISTINTOS, y el cuerpo viaja")
+    void losTres403NoSeConfunden() {
+        buzon.responde(403, SIN_FICHA);
         assertThatThrownBy(() -> cliente().pendientes(10))
+                .as(
+                        "[esta es la que se midio en `stg`: mandar a afiliar al grupo una cuenta"
+                                + " que no tiene ficha es mandar al sitio equivocado]")
                 .isInstanceOf(IdentidadNoContesta.class)
                 .hasMessageContaining("403")
+                .hasMessageContaining("SIN_PRIVILEGIO")
+                .hasMessageContaining("1c5e82f7-a3da-4ad2-9a5a-82b48deea3ca")
+                .hasMessageContaining("NO tiene ficha")
+                .hasMessageNotContaining("Consumidores del buzon");
+
+        buzon.responde(403, SIN_EL_PRIVILEGIO);
+        assertThatThrownBy(() -> cliente().pendientes(10))
+                .as("[y esta SI es la del grupo: la cuenta existe y no esta afiliada]")
+                .isInstanceOf(IdentidadNoContesta.class)
+                .hasMessageContaining("No tiene el privilegio LECTURA")
                 .hasMessageContaining("Consumidores del buzon");
+
+        buzon.responde(403, SIN_IDENTIDAD_DE_SERVICIO);
+        assertThatThrownBy(() -> cliente().pendientes(10))
+                .as("[un token que no es de una cuenta de servicio no lo arregla ningun permiso]")
+                .isInstanceOf(IdentidadNoContesta.class)
+                .hasMessageContaining("SIN_IDENTIDAD_DE_SERVICIO")
+                .hasMessageContaining("cliente confidencial")
+                .hasMessageNotContaining("Consumidores del buzon");
+    }
+
+    @Test
+    @DisplayName("un 403 que no dice por que LO DICE, en vez de elegir una rama")
+    void unCuatrocientosTresMudo() {
+        buzon.responde(403, "");
+
+        assertThatThrownBy(() -> cliente().pendientes(10))
+                .as(
+                        "[quedarse con la rama del grupo cuando el emisor no dijo nada es"
+                                + " exactamente el defecto de #66, con el cuerpo vacio de excusa]")
+                .isInstanceOf(IdentidadNoContesta.class)
+                .hasMessageContaining("403")
+                .hasMessageContaining("VACIO")
+                .hasMessageNotContaining("Consumidores del buzon");
+
+        buzon.responde(403, "<html><title>403 Forbidden</title>");
+        assertThatThrownBy(() -> cliente().pendientes(10))
+                .as("[y un HTML es un proxy contestando por el, que es OTRO sitio donde mirar]")
+                .isInstanceOf(IdentidadNoContesta.class)
+                .hasMessageContaining("403 Forbidden")
+                .hasMessageNotContaining("Consumidores del buzon");
+    }
+
+    @Test
+    @DisplayName("el cuerpo viaja SIN el token: un eco de la peticion no se lleva la credencial")
+    void elCuerpoNoSeLlevaElToken() {
+        // SIN «codigo» a proposito: es justo el caso en que el cuerpo entero viaja al mensaje —un
+        // proxy delante contestando por `identidad`, con el eco de la peticion dentro—. Con un
+        // «codigo» el mensaje se compone de el y del detalle, y esta prueba no podria fallar.
+        buzon.responde(
+                403,
+                "{\"error\":\"forbidden\",\"peticion\":{\"Authorization\":\"Bearer"
+                        + " el-token-de-servicio\"}}");
+
+        assertThatThrownBy(() -> cliente().pendientes(10))
+                .as(
+                        "[este mensaje acaba en el registro de la corrida: un token ahi es un"
+                                + " incidente, no una molestia]")
+                .isInstanceOf(IdentidadNoContesta.class)
+                .hasMessageContaining("forbidden")
+                .hasMessageNotContaining("el-token-de-servicio");
     }
 
     @Test
