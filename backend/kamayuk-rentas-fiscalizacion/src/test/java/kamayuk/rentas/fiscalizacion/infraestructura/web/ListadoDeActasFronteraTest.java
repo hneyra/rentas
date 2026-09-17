@@ -112,12 +112,19 @@ class ListadoDeActasFronteraTest {
         municipalidadB = crearMunicipalidad("270102", "Municipalidad vecina");
 
         long titularA = crearContribuyente(municipalidadA, "A-000001", "70900001");
+        // Un SEGUNDO obligado en la misma municipalidad, y no por adorno: con las cuatro actas del
+        // mismo titular el conjunto de ids tiene UN elemento, y entonces un bucle `porIds` sobre
+        // ese conjunto hace tambien UNA llamada — la prueba de «una consulta por pagina» pasaba en
+        // verde con la consulta por fila puesta, si el bucle iba DESPUES de deduplicar, que es
+        // justo como lo escribiria quien creyera estar optimizando. Con dos titulares, no.
+        long titularAdos = crearContribuyente(municipalidadA, "A-000002", "70900002");
         // El padron que ActasController consulta para poner el nombre en cada acta (#216). Los
         // identificadores son los de esta siembra: `titularB` no entra, porque una lectura desde la
         // municipalidad A no puede nombrar a nadie de la vecina.
         padron =
                 new ContribuyentesDeMentira()
-                        .con(titularA, "A-000001", "TITULAR, PRUEBA", "Jr. Union de prueba");
+                        .con(titularA, "A-000001", "TITULAR, PRUEBA", "Jr. Union de prueba")
+                        .con(titularAdos, "A-000002", "SEGUNDA, TITULAR", "Jr. Union 2");
         programaPredial = crearPrograma(municipalidadA, "PF-A-01", "PREDIAL");
         programaVehicular = crearPrograma(municipalidadA, "PF-A-02", "VEHICULAR");
 
@@ -147,7 +154,7 @@ class ListadoDeActasFronteraTest {
         // «A. TRES» es de un predio que no consta en el catastro: sin ficha, sin lado declarado.
         sembrarPredial(municipalidadA, programaPredial, titularA, "OMISO", null, "A. TRES");
         // Y una vehicular de OTRO programa: sale sin filtro y no en la del programa predial.
-        sembrarVehicular(municipalidadA, programaVehicular, titularA, "A04", "V. CUATRO");
+        sembrarVehicular(municipalidadA, programaVehicular, titularAdos, "A04", "V. CUATRO");
 
         long titularB = crearContribuyente(municipalidadB, "B-000001", "70900002");
         long programaB = crearPrograma(municipalidadB, "PF-B-01", "PREDIAL");
