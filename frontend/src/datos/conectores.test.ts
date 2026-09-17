@@ -428,7 +428,24 @@ const DETERMINACION_GUARDADA: DeterminacionGuardada = {
   impuestoInsoluto: '2395.01',
   derechoDeEmision: '4.50',
   totalAPagar: '2399.51',
+  // Al contado y con UNA cuota, no cuatro: si el montaje trajera la trimestral, un conector que
+  // dibujara siempre cuatro filas pasaria en verde igual (#234).
+  modalidad: 'CONTADO',
+  cuotas: [{ numero: 1, vencimiento: '2026-02-27', importe: '2395.01' }],
   reglasAplicadas: ['RT-002'],
+};
+
+/**
+ * Y la MISMA lectura de una determinacion **anterior a `V21`**: sin modalidad y sin cuotas (#234).
+ *
+ * Con un solo montaje —el de arriba— «la hoja no dibuja el cronograma porque no esta conectada» y
+ * «no lo dibuja porque la fila no dice su modalidad» serian indistinguibles. Son dos cosas, y la
+ * segunda se seguira diciendo cuando #252 conecte la tabla.
+ */
+const DETERMINACION_SIN_MODALIDAD: DeterminacionGuardada = {
+  ...DETERMINACION_GUARDADA,
+  modalidad: null,
+  cuotas: [],
 };
 
 /**
@@ -768,11 +785,11 @@ describe('`territorio` — la determinacion guardada, y sus TRES ausencias (#237
     expect(tabla?.totalElementos).toBeUndefined();
   });
 
-  it('el «Cronograma» no se dibuja, y la pantalla dice POR QUE (#234)', () => {
-    // Y no con `[]`, que significaria «la operacion contesto que no hay ninguna cuota». No contesto
-    // eso: la determinacion guardada **no dice con que modalidad se emitio**, y sin ella los
-    // vencimientos no se pueden resolver. Suponer la trimestral publicaria unas fechas de pago que
-    // el contribuyente puede no haber recibido (regla 5).
+  it('el «Cronograma» sigue sin dibujarse, y la pantalla dice el motivo NUEVO (#234, #252)', () => {
+    // Y no con `[]`, que significaria «la operacion contesto que no hay ninguna cuota». Lo que
+    // cambia con #234 es la MITAD del motivo: la operacion ya publica `modalidad` y `cuotas[]`, y
+    // lo que falta es el conector que las reparta. Decir «no lo publica nadie» mandaria a arreglar
+    // un backend que ya esta arreglado, que es el defecto de #239.
     //
     // **Es el bloque 3 desde #245**, que mete la memoria delante. Y lo que la hoja tiene ahora son
     // DOS tablas: una llena y otra vacia, asi que la frase de pantalla —que es de la hoja entera—
@@ -786,7 +803,18 @@ describe('`territorio` — la determinacion guardada, y sus TRES ausencias (#237
     expect(reparto.tablas?.has('cronograma')).toBe(false);
     expect(reparto.loQueLaOperacionNoTrae).toBe(SIN_CRONOGRAMA);
     expect(SIN_CRONOGRAMA).toContain('cronograma');
-    expect(SIN_CRONOGRAMA).toContain('modalidad');
+    expect(SIN_CRONOGRAMA).toContain('#234');
+    expect(SIN_CRONOGRAMA).not.toContain('no lo publica');
+  });
+
+  it('y la operacion trae de verdad el cronograma que la hoja no dibuja (#234)', () => {
+    // El contraste que hace que la prueba de arriba signifique algo: si la lectura no trajera
+    // nada, «no lo dibuja porque falta conectarlo» seria falso y nadie lo notaria.
+    expect(DETERMINACION_GUARDADA.modalidad).toBe('CONTADO');
+    expect(DETERMINACION_GUARDADA.cuotas).toHaveLength(1);
+    expect(DETERMINACION_SIN_MODALIDAD.modalidad).toBeNull();
+    expect(DETERMINACION_SIN_MODALIDAD.cuotas).toHaveLength(0);
+    expect(conector.repartir(DETERMINACION_SIN_MODALIDAD as never).filas.has(3)).toBe(false);
   });
 });
 

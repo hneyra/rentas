@@ -31,6 +31,7 @@ import kamayuk.rentas.esquema.ContextoDeTenant;
 import kamayuk.rentas.nucleo.dominio.predial.DetalleDeterminacionPredio;
 import kamayuk.rentas.nucleo.dominio.predial.Determinacion;
 import kamayuk.rentas.nucleo.dominio.predial.DeterminacionRepository;
+import kamayuk.rentas.nucleo.dominio.predial.ModalidadDelPredial;
 import kamayuk.rentas.nucleo.dominio.predial.Tramo;
 import kamayuk.rentas.nucleo.infraestructura.DeterminacionRepositoryJdbc;
 import kamayuk.rentas.parametros.LectorDeParametros;
@@ -63,7 +64,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  *   <li><b>AC2/AC3</b>: recalcular el mismo contribuyente y ejercicio con otro conjunto sellado
  *       crea <b>otra fila</b>, nunca modifica la primera —{@link DeterminacionRepository} ni
  *       siquiera tiene un metodo de actualizar, y una prueba de reflexion lo deja explicito—.
- *   <li><b>AC4</b>: {@code determinacion_predial_sin_predio_ck} (V20) rechaza en la base cualquier
+ *   <li><b>AC4</b>: {@code determinacion_predial_sin_predio_ck} (V21) rechaza en la base cualquier
  *       intento de guardar una fila {@code PREDIAL} con {@code predio_id} distinto de nulo, aunque
  *       se escriba por SQL directo, no solo a traves del dominio.
  * </ul>
@@ -177,6 +178,7 @@ class RegistrarDeterminacionPredialTest {
                             prediosDeclarados(predioA, predioB),
                             CUADRO_FICTICIO,
                             MINIMO_FICTICIO,
+                            ModalidadDelPredial.TRIMESTRAL,
                             Observacion.de("Primera determinacion del ejercicio 2026"));
 
             assertThat(primera.id()).isNotNull();
@@ -196,6 +198,7 @@ class RegistrarDeterminacionPredialTest {
                             prediosDeclarados(predioA, predioB),
                             CUADRO_FICTICIO,
                             MINIMO_FICTICIO,
+                            ModalidadDelPredial.TRIMESTRAL,
                             Observacion.de("Recalculo con el conjunto sellado corregido"));
 
             assertThat(segunda.id())
@@ -267,6 +270,7 @@ class RegistrarDeterminacionPredialTest {
                                             List.of(),
                                             CUADRO_FICTICIO,
                                             MINIMO_FICTICIO,
+                                            ModalidadDelPredial.TRIMESTRAL,
                                             Observacion.de("No deberia llegar a calcular nada")))
                     .isInstanceOf(RegistrarDeterminacionPredial.SinPrediosDeclarados.class);
         }
@@ -293,6 +297,7 @@ class RegistrarDeterminacionPredialTest {
                             List.of(aporte(predio, "1234.5678")),
                             List.of(Tramo.sinTope(Alicuota.de("1.0"))),
                             MINIMO_FICTICIO,
+                            ModalidadDelPredial.TRIMESTRAL,
                             Observacion.de("Determinacion con redondeo a cuatro decimales"));
 
             sellarConRedondeo(ejercicio, 0, "DOWN", "Redondeo ficticio a cero decimales");
@@ -303,6 +308,7 @@ class RegistrarDeterminacionPredialTest {
                             List.of(aporte(predio, "1234.5678")),
                             List.of(Tramo.sinTope(Alicuota.de("1.0"))),
                             MINIMO_FICTICIO,
+                            ModalidadDelPredial.TRIMESTRAL,
                             Observacion.de("Determinacion con redondeo a cero decimales"));
 
             assertThat(conCuatro.montoDeterminado())
@@ -327,6 +333,7 @@ class RegistrarDeterminacionPredialTest {
                                             List.of(aporte(predio, "1000.00")),
                                             CUADRO_FICTICIO,
                                             MINIMO_FICTICIO,
+                                            ModalidadDelPredial.TRIMESTRAL,
                                             Observacion.de("Determinacion sin redondeo observado")))
                     .as(
                             "sin puntos observados el importe saldria sin redondear y nadie lo"
@@ -347,7 +354,7 @@ class RegistrarDeterminacionPredialTest {
         void elCheckRechazaUnPredialConPredioId() throws SQLException {
             long titular = crearContribuyente("DET-0002", "80300002");
             long predio = crearPredio("000000000000000103");
-            long conjunto = sellarConjunto(EJERCICIO, "Conjunto para probar el CHECK de V20");
+            long conjunto = sellarConjunto(EJERCICIO, "Conjunto para probar el CHECK de V21");
 
             try (Connection app = base.conexion(BaseDeDatosDePrueba.APP)) {
                 ContextoDeTenant.fijar(app, municipalidad);
@@ -372,7 +379,7 @@ class RegistrarDeterminacionPredialTest {
                                         sentencia.execute();
                                     }
                                 })
-                        .as("V20: el predial se determina por contribuyente, nunca por un predio")
+                        .as("V21: el predial se determina por contribuyente, nunca por un predio")
                         .isInstanceOf(SQLException.class)
                         .hasMessageContaining("determinacion_predial_sin_predio_ck");
             }

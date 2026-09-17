@@ -15,8 +15,10 @@ import kamayuk.rentas.nucleo.dominio.OrigenDeDeterminacion;
 import kamayuk.rentas.nucleo.dominio.predial.DetalleDeterminacionPredio;
 import kamayuk.rentas.nucleo.dominio.predial.Determinacion;
 import kamayuk.rentas.nucleo.dominio.predial.DeterminacionRepository;
+import kamayuk.rentas.nucleo.dominio.predial.ModalidadDelPredial;
 import kamayuk.rentas.nucleo.dominio.predial.OrigenDelAutovaluo;
 import kamayuk.rentas.persistencia.RepositorioJdbc;
+import org.jspecify.annotations.Nullable;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 
@@ -40,7 +42,8 @@ public class DeterminacionRepositoryJdbc extends RepositorioJdbc
     private static final String COLUMNAS_CABECERA =
             "d.id, d.ejercicio, d.tributo, d.periodo, d.contribuyente_id, d.predio_id,"
                     + " d.vehiculo_id, d.conjunto_id, d.base_imponible, d.monto_determinado,"
-                    + " d.reglas_aplicadas, d.origen, d.estado, d.usuario_calculo";
+                    + " d.reglas_aplicadas, d.origen, d.estado, d.usuario_calculo,"
+                    + " d.modalidad";
 
     private static final String COLUMNAS_DETALLE =
             "t.id, t.predio_id, t.autovaluo, t.valuo_exonerado, t.porcentaje_propiedad,"
@@ -156,14 +159,14 @@ public class DeterminacionRepositoryJdbc extends RepositorioJdbc
                                 + " (municipalidad_id, ejercicio, tributo, periodo,"
                                 + "  contribuyente_id, predio_id, vehiculo_id, conjunto_id,"
                                 + "  base_imponible, monto_determinado, reglas_aplicadas,"
-                                + "  origen, estado, usuario_calculo)"
+                                + "  origen, estado, usuario_calculo, modalidad)"
                                 + " VALUES ("
                                 + MUNICIPALIDAD_ACTUAL
                                 + ", :ejercicio, :tributo, :periodo, :contribuyenteId,"
                                 + "  :predioId, :vehiculoId, :conjuntoId, :baseImponible,"
                                 + "  :montoDeterminado,"
                                 + "  string_to_array(:reglas, ',')::varchar(200)[],"
-                                + "  :origen, :estado, :usuario)"
+                                + "  :origen, :estado, :usuario, :modalidad)"
                                 + " RETURNING id")
                 .param("ejercicio", determinacion.ejercicio().valor())
                 .param("tributo", determinacion.tributo())
@@ -178,6 +181,12 @@ public class DeterminacionRepositoryJdbc extends RepositorioJdbc
                 .param("origen", determinacion.origen().name())
                 .param("estado", determinacion.estado().name())
                 .param("usuario", usuario)
+                // `name()` y no `toString()`: lo que la columna guarda es el nombre del
+                // enumerado, que es lo que `determinacion_modalidad_ck` admite (V21). Nulo en
+                // todo tributo que no sea el predial.
+                .param(
+                        "modalidad",
+                        determinacion.modalidad() == null ? null : determinacion.modalidad().name())
                 .query(Long.class)
                 .single();
     }
@@ -197,7 +206,8 @@ public class DeterminacionRepositoryJdbc extends RepositorioJdbc
                 determinacion.reglasAplicadas(),
                 determinacion.origen(),
                 determinacion.estado(),
-                usuario);
+                usuario,
+                determinacion.modalidad());
     }
 
     private static Determinacion mapearCabecera(ResultSet fila, int numeroDeFila)
@@ -223,7 +233,19 @@ public class DeterminacionRepositoryJdbc extends RepositorioJdbc
                 reglasDe(fila.getArray("reglas_aplicadas")),
                 OrigenDeDeterminacion.valueOf(fila.getString("origen")),
                 EstadoDeDeterminacion.valueOf(fila.getString("estado")),
-                fila.getString("usuario_calculo"));
+                fila.getString("usuario_calculo"),
+                modalidadDe(fila.getString("modalidad")));
+    }
+
+    /**
+     * La modalidad de la fila, o {@code null} si la fila es <b>anterior a V21</b>.
+     *
+     * <p>Se LEE de la columna y no se supone. Devolver {@code TRIMESTRAL} cuando la columna viene
+     * vacia haria indistinguible una determinacion que se emitio en cuatro cuotas de una de la que
+     * no consta nada, que es el defecto entero de #234 movido un piso mas abajo.
+     */
+    private static @Nullable ModalidadDelPredial modalidadDe(@Nullable String columna) {
+        return columna == null ? null : ModalidadDelPredial.valueOf(columna);
     }
 
     private static List<String> reglasDe(Array arreglo) throws SQLException {

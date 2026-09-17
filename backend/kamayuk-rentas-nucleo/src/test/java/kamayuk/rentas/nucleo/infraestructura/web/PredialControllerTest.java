@@ -43,12 +43,14 @@ import kamayuk.rentas.nucleo.dominio.OrigenDeDeterminacion;
 import kamayuk.rentas.nucleo.dominio.predial.DetalleDeterminacionPredio;
 import kamayuk.rentas.nucleo.dominio.predial.Determinacion;
 import kamayuk.rentas.nucleo.dominio.predial.DeterminacionRepository;
+import kamayuk.rentas.nucleo.dominio.predial.ModalidadDelPredial;
 import kamayuk.rentas.nucleo.dominio.predial.ValuacionRecibida;
 import kamayuk.rentas.parametros.IdentificadorDeConjunto;
 import kamayuk.rentas.parametros.LectorDeParametros;
 import kamayuk.rentas.parametros.ParametrosSellados;
 import kamayuk.rentas.web.ConfiguracionDeJson;
 import kamayuk.rentas.web.ManejadorDeErrores;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -128,7 +130,7 @@ class PredialControllerTest {
                                         .param("ano", "2026")
                                         .contentType(MediaType.APPLICATION_JSON)
                                         .content(
-                                                "{\"simulacion\":true,\"predios\":"
+                                                "{\"modalidad\":\"TRIMESTRAL\",\"simulacion\":true,\"predios\":"
                                                         + "[{\"predioId\":11,\"autovaluo\":\"100000.00\"}]}"))
                         .andReturn();
 
@@ -200,7 +202,7 @@ class PredialControllerTest {
                                 post("/rentas/api/v1/rentas/predial/calculo-individual")
                                         .contentType(MediaType.APPLICATION_JSON)
                                         .content(
-                                                "{\"simulacion\":false,\"codContribuyente\":\"C-001\","
+                                                "{\"modalidad\":\"TRIMESTRAL\",\"simulacion\":false,\"codContribuyente\":\"C-001\","
                                                         + "\"ejercicio\":\"2026\","
                                                         + "\"observacion\":\"Emision ordinaria del ejercicio\","
                                                         + "\"predios\":[{\"predioId\":11,"
@@ -228,7 +230,7 @@ class PredialControllerTest {
                                 post("/rentas/api/v1/rentas/predial/calculo-individual")
                                         .contentType(MediaType.APPLICATION_JSON)
                                         .content(
-                                                "{\"simulacion\":true,\"codContribuyente\":\"C-001\","
+                                                "{\"modalidad\":\"TRIMESTRAL\",\"simulacion\":true,\"codContribuyente\":\"C-001\","
                                                         + "\"ejercicio\":\"2026\",\"predios\":"
                                                         + "[{\"predioId\":11,\"autovaluo\":\"100000.00\"}]}"))
                         .andReturn();
@@ -251,7 +253,7 @@ class PredialControllerTest {
                                 post("/rentas/api/v1/rentas/predial/calculo-individual")
                                         .contentType(MediaType.APPLICATION_JSON)
                                         .content(
-                                                "{\"simulacion\":true,\"codContribuyente\":\"C-001\","
+                                                "{\"modalidad\":\"TRIMESTRAL\",\"simulacion\":true,\"codContribuyente\":\"C-001\","
                                                         + "\"ejercicio\":\"2026\",\"predios\":"
                                                         + "[{\"predioId\":11,\"autovaluo\":\"100000.00\"}]}"))
                         .andReturn();
@@ -268,7 +270,7 @@ class PredialControllerTest {
                                 post("/rentas/api/v1/rentas/predial/calculo-individual")
                                         .contentType(MediaType.APPLICATION_JSON)
                                         .content(
-                                                "{\"simulacion\":true,\"codContribuyente\":\"NO-EXISTE\","
+                                                "{\"modalidad\":\"TRIMESTRAL\",\"simulacion\":true,\"codContribuyente\":\"NO-EXISTE\","
                                                         + "\"ejercicio\":\"2026\"}"))
                         .andReturn();
 
@@ -296,7 +298,8 @@ class PredialControllerTest {
                 mvc.perform(
                                 post("/rentas/api/v1/rentas/predial/calculo-masivo")
                                         .contentType(MediaType.APPLICATION_JSON)
-                                        .content("{\"simulacion\":true}"))
+                                        .content(
+                                                "{\"modalidad\":\"TRIMESTRAL\",\"simulacion\":true}"))
                         .andReturn();
 
         assertThat(simulada.getResponse().getStatus()).isEqualTo(201);
@@ -310,7 +313,7 @@ class PredialControllerTest {
                                 post("/rentas/api/v1/rentas/predial/calculo-masivo")
                                         .contentType(MediaType.APPLICATION_JSON)
                                         .content(
-                                                "{\"simulacion\":false,"
+                                                "{\"modalidad\":\"TRIMESTRAL\",\"simulacion\":false,"
                                                         + "\"observacion\":\"Emision anual del ejercicio\"}"))
                         .andReturn();
 
@@ -340,7 +343,7 @@ class PredialControllerTest {
         mvc.perform(
                         post("/rentas/api/v1/rentas/predial/calculo-masivo")
                                 .contentType(MediaType.APPLICATION_JSON)
-                                .content("{\"simulacion\":true}"))
+                                .content("{\"modalidad\":\"TRIMESTRAL\",\"simulacion\":true}"))
                 .andReturn();
 
         MvcResult ultima =
@@ -374,14 +377,15 @@ class PredialControllerTest {
                 mvc.perform(
                                 post("/rentas/api/v1/rentas/predial/calculo-masivo")
                                         .contentType(MediaType.APPLICATION_JSON)
-                                        .content("{\"simulacion\":true,\"incluyeArbitrios\":true}"))
+                                        .content(
+                                                "{\"modalidad\":\"TRIMESTRAL\",\"simulacion\":true,\"incluyeArbitrios\":true}"))
                         .andReturn();
         MvcResult conCuponera =
                 mvc.perform(
                                 post("/rentas/api/v1/rentas/predial/calculo-masivo")
                                         .contentType(MediaType.APPLICATION_JSON)
                                         .content(
-                                                "{\"simulacion\":true,\"generaCuponeraPdf\":true}"))
+                                                "{\"modalidad\":\"TRIMESTRAL\",\"simulacion\":true,\"generaCuponeraPdf\":true}"))
                         .andReturn();
 
         assertThat(conArbitrios.getResponse().getStatus()).isEqualTo(422);
@@ -397,7 +401,8 @@ class PredialControllerTest {
                 mvc.perform(
                                 post("/rentas/api/v1/rentas/predial/calculo-masivo")
                                         .contentType(MediaType.APPLICATION_JSON)
-                                        .content("{\"simulacion\":true,\"alcance\":\"SECTOR\"}"))
+                                        .content(
+                                                "{\"modalidad\":\"TRIMESTRAL\",\"simulacion\":true,\"alcance\":\"SECTOR\"}"))
                         .andReturn();
 
         assertThat(resultado.getResponse().getStatus()).isEqualTo(422);
@@ -414,7 +419,7 @@ class PredialControllerTest {
                                 post("/rentas/api/v1/rentas/predial/calculo-masivo")
                                         .contentType(MediaType.APPLICATION_JSON)
                                         .content(
-                                                "{\"simulacion\":true,\"alcance\":\"TODO EL"
+                                                "{\"modalidad\":\"TRIMESTRAL\",\"simulacion\":true,\"alcance\":\"TODO EL"
                                                         + " PADRON\"}"))
                         .andReturn();
 
@@ -438,7 +443,7 @@ class PredialControllerTest {
                                 post("/rentas/api/v1/rentas/predial/calculo-masivo")
                                         .contentType(MediaType.APPLICATION_JSON)
                                         .content(
-                                                "{\"simulacion\":true,\"alcance\":\"RANGO_DE_CODIGO\","
+                                                "{\"modalidad\":\"TRIMESTRAL\",\"simulacion\":true,\"alcance\":\"RANGO_DE_CODIGO\","
                                                         + "\"codigoDesde\":\"C-001\"}"))
                         .andReturn();
 
@@ -456,7 +461,7 @@ class PredialControllerTest {
                                 post("/rentas/api/v1/rentas/predial/calculo-masivo")
                                         .contentType(MediaType.APPLICATION_JSON)
                                         .content(
-                                                "{\"simulacion\":false,\"ejercicio\":\"2026\","
+                                                "{\"modalidad\":\"TRIMESTRAL\",\"simulacion\":false,\"ejercicio\":\"2026\","
                                                         + "\"alcance\":\"RANGO_DE_CODIGO\","
                                                         + "\"codigoDesde\":\"C-002\",\"codigoHasta\":\"C-999\","
                                                         + "\"recalculaYaEmitidos\":true,"
@@ -483,7 +488,7 @@ class PredialControllerTest {
                                 post("/rentas/api/v1/rentas/predial/calculo-masivo")
                                         .contentType(MediaType.APPLICATION_JSON)
                                         .content(
-                                                "{\"simulacion\":false,\"ejercicio\":\"2026\","
+                                                "{\"modalidad\":\"TRIMESTRAL\",\"simulacion\":false,\"ejercicio\":\"2026\","
                                                         + "\"observacion\":\"Emision anual\"}"))
                         .andReturn();
         assertThat(primera.getResponse().getContentAsString())
@@ -495,7 +500,7 @@ class PredialControllerTest {
                         post("/rentas/api/v1/rentas/predial/calculo-masivo")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(
-                                        "{\"simulacion\":false,\"ejercicio\":\"2026\","
+                                        "{\"modalidad\":\"TRIMESTRAL\",\"simulacion\":false,\"ejercicio\":\"2026\","
                                                 + "\"alcance\":\"OBSERVADOS\","
                                                 + "\"recalculaYaEmitidos\":true,"
                                                 + "\"observacion\":\"Segunda pasada de la campana\"}"))
@@ -518,7 +523,7 @@ class PredialControllerTest {
                         post("/rentas/api/v1/rentas/predial/calculo-masivo")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(
-                                        "{\"simulacion\":false,\"ejercicio\":\"2026\","
+                                        "{\"modalidad\":\"TRIMESTRAL\",\"simulacion\":false,\"ejercicio\":\"2026\","
                                                 + "\"alcance\":\"OBSERVADOS\","
                                                 + "\"recalculaYaEmitidos\":true,"
                                                 + "\"observacion\":\"Segunda pasada\"}"))
@@ -537,7 +542,7 @@ class PredialControllerTest {
         mvc.perform(
                         post("/rentas/api/v1/rentas/predial/calculo-masivo")
                                 .contentType(MediaType.APPLICATION_JSON)
-                                .content("{\"simulacion\":true}"))
+                                .content("{\"modalidad\":\"TRIMESTRAL\",\"simulacion\":true}"))
                 .andReturn();
 
         assertThat(comprobador.acceso).isEqualTo("predial_masivo");
@@ -562,7 +567,8 @@ class PredialControllerTest {
                 mvc.perform(
                                 post("/rentas/api/v1/rentas/predial/calculo-masivo")
                                         .contentType(MediaType.APPLICATION_JSON)
-                                        .content("{\"simulacion\":true,\"ejercicio\":\"2026\"}"))
+                                        .content(
+                                                "{\"modalidad\":\"TRIMESTRAL\",\"simulacion\":true,\"ejercicio\":\"2026\"}"))
                         .andReturn();
 
         assertThat(sinRecalcular.getResponse().getContentAsString())
@@ -574,7 +580,7 @@ class PredialControllerTest {
                                 post("/rentas/api/v1/rentas/predial/calculo-masivo")
                                         .contentType(MediaType.APPLICATION_JSON)
                                         .content(
-                                                "{\"simulacion\":true,\"ejercicio\":\"2026\","
+                                                "{\"modalidad\":\"TRIMESTRAL\",\"simulacion\":true,\"ejercicio\":\"2026\","
                                                         + "\"recalculaYaEmitidos\":true}"))
                         .andReturn();
 
@@ -865,7 +871,7 @@ class PredialControllerTest {
                                 post("/rentas/api/v1/rentas/predial/calculo-individual")
                                         .contentType(MediaType.APPLICATION_JSON)
                                         .content(
-                                                "{\"simulacion\":false,\"codContribuyente\":\"C-001\","
+                                                "{\"modalidad\":\"TRIMESTRAL\",\"simulacion\":false,\"codContribuyente\":\"C-001\","
                                                         + "\"ejercicio\":\"2026\",\"observacion\":"
                                                         + "\"Emision ordinaria del ejercicio\","
                                                         + "\"predios\":[{\"predioId\":11,\"autovaluo\":\"100000.00\"}]}"))
@@ -895,6 +901,7 @@ class PredialControllerTest {
                 7L,
                 501L,
                 EstadoDeDeterminacion.EMITIDA,
+                ModalidadDelPredial.TRIMESTRAL,
                 DetalleDeterminacionPredio.nuevo(
                         11L,
                         Dinero.de("100000.00"),
@@ -906,6 +913,7 @@ class PredialControllerTest {
                 8L,
                 502L,
                 EstadoDeDeterminacion.BORRADOR,
+                ModalidadDelPredial.CONTADO,
                 DetalleDeterminacionPredio.nuevo(
                         12L,
                         Dinero.de("120000.00"),
@@ -931,7 +939,7 @@ class PredialControllerTest {
         return post("/rentas/api/v1/rentas/predial/calculo-masivo")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
-                        "{\"simulacion\":true,\"ejercicio\":\"2026\","
+                        "{\"modalidad\":\"TRIMESTRAL\",\"simulacion\":true,\"ejercicio\":\"2026\","
                                 + "\"recalculaYaEmitidos\":true}");
     }
 
@@ -939,7 +947,7 @@ class PredialControllerTest {
         return post("/rentas/api/v1/rentas/predial/calculo-individual")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
-                        "{\"simulacion\":true,\"codContribuyente\":\"C-001\",\"ejercicio\":\"2026\","
+                        "{\"modalidad\":\"TRIMESTRAL\",\"simulacion\":true,\"codContribuyente\":\"C-001\",\"ejercicio\":\"2026\","
                                 + "\"predios\":[{\"predioId\":11,\"autovaluo\":\"100000.00\"}]}");
     }
 
@@ -947,7 +955,7 @@ class PredialControllerTest {
         return post("/rentas/api/v1/rentas/predial/calculo-individual")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
-                        "{\"simulacion\":false,\"codContribuyente\":\"C-001\",\"ejercicio\":\"2026\","
+                        "{\"modalidad\":\"TRIMESTRAL\",\"simulacion\":false,\"codContribuyente\":\"C-001\",\"ejercicio\":\"2026\","
                                 + "\"predios\":[{\"predioId\":11,\"autovaluo\":\"100000.00\"}]}");
     }
 
@@ -965,7 +973,7 @@ class PredialControllerTest {
                                 post("/rentas/api/v1/rentas/predial/calculo-masivo")
                                         .contentType(MediaType.APPLICATION_JSON)
                                         .content(
-                                                "{\"observacion\":\"Emision anual\","
+                                                "{\"modalidad\":\"TRIMESTRAL\",\"observacion\":\"Emision anual\","
                                                         + "\"ejercicio\":\"2026\","
                                                         + "\"alcance\":\"TODOS\","
                                                         + "\"simulacion\":true}"))
@@ -1029,7 +1037,7 @@ class PredialControllerTest {
                                         .param("ano", "2026")
                                         .contentType(MediaType.APPLICATION_JSON)
                                         .content(
-                                                "{\"simulacion\":false,\"observacion\":\"Determinacion"
+                                                "{\"modalidad\":\"TRIMESTRAL\",\"simulacion\":false,\"observacion\":\"Determinacion"
                                                         + " anual\",\"predios\":[{\"predioId\":11,\"autovaluo\":\"100000.00\"}]}"))
                         .andReturn();
         assertThat(escritura.getResponse().getStatus()).isEqualTo(201);
@@ -1065,34 +1073,137 @@ class PredialControllerTest {
     }
 
     @Test
-    @DisplayName("#207 — y NO publica el cronograma, porque la modalidad no se guarda (#234)")
-    void laLecturaNoInventaElCronograma() throws Exception {
+    @DisplayName("#234 — la lectura publica el cronograma que la fila DICE: al contado, UNA cuota")
+    void laLecturaPublicaElCronogramaAlContado() throws Exception {
         predios.con(11L, "10001", "AV. GRAU 100", Porcentaje.total());
-        mvc.perform(
-                        post("/rentas/api/v1/rentas/predial/calculo-individual")
-                                .param("codContribuyente", "C-001")
-                                .param("ano", "2026")
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(
-                                        "{\"simulacion\":false,\"observacion\":\"Determinacion"
-                                                + " anual\",\"predios\":[{\"predioId\":11,\"autovaluo\":\"100000.00\"}]}"))
-                .andReturn();
+        mvc.perform(determinarCon("CONTADO")).andReturn();
 
         String json = leer("C-001", "2026").getResponse().getContentAsString();
 
         assertThat(json)
-                .as("y hay cuerpo que mirar: con un 204 este `doesNotContain` pasaria vacio")
+                .as("y hay cuerpo que mirar: con un 204 esto pasaria sobre la cadena vacia")
+                .contains("\"impuestoInsoluto\"");
+        // CONTADO y no TRIMESTRAL, y UNA cuota y no cuatro: es lo que distingue «publica la
+        // modalidad que la fila guarda» de «publica siempre la trimestral supuesta», que era
+        // exactamente el defecto de #234. Con el montaje trimestral las dos pasan en verde.
+        assertThat(json).contains("\"modalidad\":\"CONTADO\"");
+        assertThat(json).contains("\"vencimiento\":\"2026-02-27\"");
+        assertThat(contarCuotas(json))
+                .as("el articulo 15 a) es una sola cuota, no las cuatro del inciso b)")
+                .isEqualTo(1);
+        assertThat(json)
+                .as("y no se cuela `simulacion`: una simulacion no deja fila que leer")
+                .doesNotContain("\"simulacion\"");
+    }
+
+    @Test
+    @DisplayName("#234 — y con la trimestral son las CUATRO fechas del conjunto sellado")
+    void laLecturaPublicaElCronogramaTrimestral() throws Exception {
+        predios.con(11L, "10001", "AV. GRAU 100", Porcentaje.total());
+        mvc.perform(determinarCon("TRIMESTRAL")).andReturn();
+
+        String json = leer("C-001", "2026").getResponse().getContentAsString();
+
+        assertThat(json).contains("\"modalidad\":\"TRIMESTRAL\"");
+        assertThat(contarCuotas(json)).isEqualTo(4);
+        assertThat(json)
+                .as("las fechas no se calculan: salen del conjunto que ESA determinacion fijo")
+                .contains("\"vencimiento\":\"2026-02-27\"")
+                .contains("\"vencimiento\":\"2026-11-30\"");
+    }
+
+    @Test
+    @DisplayName("#234 — una fila anterior a V21 publica el cronograma EN BLANCO, no el supuesto")
+    void laLecturaDeUnaFilaAnteriorAV21NoInventaElCronograma() throws Exception {
+        predios.con(501L, 11L, "10001", "AV. GRAU 100", Porcentaje.total());
+        determinaciones.sembrarSinModalidad(
+                EJERCICIO,
+                9L,
+                501L,
+                DetalleDeterminacionPredio.nuevo(
+                        11L,
+                        Dinero.de("100000.00"),
+                        Dinero.CERO,
+                        Porcentaje.total(),
+                        Dinero.de("100000.00")));
+
+        String json = leer("C-001", "2026").getResponse().getContentAsString();
+
+        assertThat(json)
+                .as("y hay cuerpo que mirar: con un 204 esto pasaria sobre la cadena vacia")
                 .contains("\"impuestoInsoluto\"");
         assertThat(json)
                 .as(
-                        "`determinacion` no guarda la modalidad, y suponer TRIMESTRAL publicaria un"
-                                + " cronograma que puede no ser el que el contribuyente recibio")
-                .doesNotContain("\"cuotas\"")
-                .doesNotContain("\"modalidad\"")
+                        "nulo significa «esta fila es anterior a V21», no «al contado»: suponer la"
+                                + " trimestral publicaria un cronograma que puede no ser el que el"
+                                + " contribuyente recibio")
+                .contains("\"modalidad\":null")
+                .contains("\"cuotas\":[]")
                 .doesNotContain("\"vencimiento\"");
-        assertThat(json)
-                .as("y tampoco se cuela `simulacion`: una simulacion no deja fila que leer")
-                .doesNotContain("\"simulacion\"");
+    }
+
+    @Test
+    @DisplayName("#234 — determinar sin decir la modalidad es 422, y la nombra")
+    void determinarSinModalidadEs422() throws Exception {
+        predios.con(11L, "10001", "AV. GRAU 100", Porcentaje.total());
+
+        MvcResult resultado =
+                mvc.perform(
+                                post("/rentas/api/v1/rentas/predial/calculo-individual")
+                                        .param("codContribuyente", "C-001")
+                                        .param("ano", "2026")
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(
+                                                "{\"simulacion\":false,\"observacion\":\"Determinacion"
+                                                        + " anual\",\"predios\":[{\"predioId\":11,\"autovaluo\":\"100000.00\"}]}"))
+                        .andReturn();
+
+        assertThat(resultado.getResponse().getStatus())
+                .as(
+                        "antes de #234 esto determinaba TRIMESTRAL en silencio, y con V21 esa"
+                                + " suposicion quedaria ESCRITA en la fila")
+                .isEqualTo(422);
+        assertThat(resultado.getResponse().getContentAsString())
+                .contains("modalidad")
+                .contains("CONTADO, TRIMESTRAL");
+        assertThat(determinaciones.insertadas)
+                .as("y no se asienta nada: el rechazo es antes de escribir")
+                .isZero();
+    }
+
+    @Test
+    @DisplayName("#234 — una modalidad que no es del articulo 15 es 422, y dice cuales si")
+    void unaModalidadInventadaEs422() throws Exception {
+        predios.con(11L, "10001", "AV. GRAU 100", Porcentaje.total());
+
+        MvcResult resultado = mvc.perform(determinarCon("MENSUAL")).andReturn();
+
+        assertThat(resultado.getResponse().getStatus())
+                .as(
+                        "antes de #234 'MENSUAL' devolvia las cuatro fechas trimestrales con esa"
+                                + " etiqueta encima, y sin error de ninguna clase")
+                .isEqualTo(422);
+        assertThat(resultado.getResponse().getContentAsString())
+                .contains("MENSUAL")
+                .contains("CONTADO, TRIMESTRAL");
+    }
+
+    @Test
+    @DisplayName("#234 — la corrida masiva tampoco supone: sin modalidad, 422")
+    void laCorridaMasivaSinModalidadEs422() throws Exception {
+        MvcResult resultado =
+                mvc.perform(
+                                post("/rentas/api/v1/rentas/predial/calculo-masivo")
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content("{\"simulacion\":true,\"ejercicio\":\"2026\"}"))
+                        .andReturn();
+
+        assertThat(resultado.getResponse().getStatus())
+                .as(
+                        "una emision anual escribe la modalidad en decenas de miles de filas: suponerla"
+                                + " ahi es el mismo defecto multiplicado")
+                .isEqualTo(422);
+        assertThat(resultado.getResponse().getContentAsString()).contains("modalidad");
     }
 
     @Test
@@ -1150,7 +1261,7 @@ class PredialControllerTest {
                                 .param("ano", "2026")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(
-                                        "{\"simulacion\":false,\"observacion\":\"Determinacion"
+                                        "{\"modalidad\":\"TRIMESTRAL\",\"simulacion\":false,\"observacion\":\"Determinacion"
                                                 + " anual\",\"predios\":[{\"predioId\":11,\"autovaluo\":\"100000.00\"}]}"))
                 .andReturn();
 
@@ -1204,6 +1315,25 @@ class PredialControllerTest {
                                 .numero("PREDIAL_MINIMO", null, ValorNormativo.de("0.6"))
                                 .numero("DERECHO_EMISION_PREDIAL", null, ValorNormativo.de("9.90")))
                 .construir();
+    }
+
+    /** Determina C-001 con la modalidad que se le diga, para poder contrastar dos cronogramas. */
+    private static org.springframework.test.web.servlet.RequestBuilder determinarCon(
+            String modalidad) {
+        return post("/rentas/api/v1/rentas/predial/calculo-individual")
+                .param("codContribuyente", "C-001")
+                .param("ano", "2026")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                        "{\"modalidad\":\""
+                                + modalidad
+                                + "\",\"simulacion\":false,\"observacion\":\"Determinacion"
+                                + " anual\",\"predios\":[{\"predioId\":11,\"autovaluo\":\"100000.00\"}]}");
+    }
+
+    /** Cuantas cuotas trae el JSON, contadas por sus vencimientos. */
+    private static int contarCuotas(String json) {
+        return json.split("\"vencimiento\"", -1).length - 1;
     }
 
     private MvcResult leer(String codContribuyente, String ano) throws Exception {
@@ -1290,7 +1420,12 @@ class PredialControllerTest {
                                 .texto("PREDIAL_VENCIMIENTO", "1", "2026-02-27")
                                 .texto("PREDIAL_VENCIMIENTO", "2", "2026-05-29")
                                 .texto("PREDIAL_VENCIMIENTO", "3", "2026-08-31")
-                                .texto("PREDIAL_VENCIMIENTO", "4", "2026-11-30"))
+                                .texto("PREDIAL_VENCIMIENTO", "4", "2026-11-30")
+                                // El articulo 15 a): la clave del contado, que #234 vuelve pedible
+                                // desde la
+                                // fila guardada. Sin ella el montaje solo sabria dibujar el
+                                // fraccionado.
+                                .texto("PREDIAL_VENCIMIENTO", "CONTADO", "2026-02-27"))
                 .construir();
     }
 
@@ -1497,7 +1632,28 @@ class PredialControllerTest {
         private final List<Long> determinados = new ArrayList<>();
 
         void sembrarEmitida(Ejercicio ejercicio, long id, DetalleDeterminacionPredio... detalle) {
-            sembrar(ejercicio, id, 501L, EstadoDeDeterminacion.EMITIDA, detalle);
+            sembrar(
+                    ejercicio,
+                    id,
+                    501L,
+                    EstadoDeDeterminacion.EMITIDA,
+                    ModalidadDelPredial.TRIMESTRAL,
+                    detalle);
+        }
+
+        /**
+         * Una fila ANTERIOR a V21: la que no dice con que modalidad se emitio (#234).
+         *
+         * <p>Existe para que el montaje no sea uniforme. Con todas las filas trayendo modalidad,
+         * «publica el cronograma que la fila dice» y «publica siempre un cronograma» son
+         * indistinguibles.
+         */
+        void sembrarSinModalidad(
+                Ejercicio ejercicio,
+                long id,
+                long contribuyenteId,
+                DetalleDeterminacionPredio... detalle) {
+            sembrar(ejercicio, id, contribuyenteId, EstadoDeDeterminacion.EMITIDA, null, detalle);
         }
 
         void sembrar(
@@ -1505,6 +1661,7 @@ class PredialControllerTest {
                 long id,
                 long contribuyenteId,
                 EstadoDeDeterminacion estado,
+                @Nullable ModalidadDelPredial modalidad,
                 DetalleDeterminacionPredio... detalle) {
             cabeceras.add(
                     new Determinacion(
@@ -1521,7 +1678,8 @@ class PredialControllerTest {
                             List.of("RT-011"),
                             OrigenDeDeterminacion.ORDINARIA,
                             estado,
-                            "siembra"));
+                            "siembra",
+                            modalidad));
             detallePorId.put(id, List.of(detalle));
         }
 
@@ -1574,7 +1732,8 @@ class PredialControllerTest {
                             determinacion.reglasAplicadas(),
                             determinacion.origen(),
                             determinacion.estado(),
-                            "cajero.ventanilla");
+                            "cajero.ventanilla",
+                            determinacion.modalidad());
             // Lo que inserta queda guardado desde #207. Hasta entonces este doble aceptaba la
             // escritura y la olvidaba, asi que ninguna prueba podia determinar y volver a leer.
             cabeceras.add(guardada);

@@ -19,6 +19,7 @@ import kamayuk.rentas.nucleo.dominio.CorridaDeEmision;
 import kamayuk.rentas.nucleo.dominio.EstadoDeDeterminacion;
 import kamayuk.rentas.nucleo.dominio.predial.DetalleDeterminacionPredio;
 import kamayuk.rentas.nucleo.dominio.predial.DeterminacionPredialCalculada;
+import kamayuk.rentas.nucleo.dominio.predial.ModalidadDelPredial;
 import kamayuk.rentas.parametros.ParametrosSellados;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
@@ -257,7 +258,7 @@ public class DeterminarPredialMasivo {
                                 peticion.sector(),
                                 peticion.codigoDesde(),
                                 peticion.codigoHasta(),
-                                peticion.modalidad(),
+                                peticion.modalidad().name(),
                                 corrida.simulacion(),
                                 corrida.nombreDelConjunto(),
                                 corrida.leidos(),
@@ -365,7 +366,7 @@ public class DeterminarPredialMasivo {
      * @param ejercicio el ejercicio que se recalcula
      * @param alcance {@link #ALCANCE_TODOS} o {@link #ALCANCE_SECTOR}
      * @param sector obligatorio con {@link #ALCANCE_SECTOR}
-     * @param modalidad el cronograma que se aplica a las cuotas
+     * @param modalidad el cronograma que se aplica a las cuotas; <b>obligatorio</b> desde #234
      * @param recalculaYaEmitidos si tambien entran los que ya tienen su determinacion emitida
      * @param simulacion si la corrida no guarda ninguna determinacion
      */
@@ -375,7 +376,7 @@ public class DeterminarPredialMasivo {
             @Nullable String sector,
             @Nullable String codigoDesde,
             @Nullable String codigoHasta,
-            String modalidad,
+            ModalidadDelPredial modalidad,
             boolean recalculaYaEmitidos,
             boolean simulacion) {
 
@@ -417,10 +418,14 @@ public class DeterminarPredialMasivo {
                                 + codigoHasta
                                 + "'");
             }
-            modalidad =
-                    modalidad == null || modalidad.isBlank()
-                            ? DeterminarPredial.MODALIDAD_TRIMESTRAL
-                            : modalidad.strip().toUpperCase(Locale.ROOT);
+            // Sin valor por omision, igual que la individual (#234). La corrida escribe su
+            // modalidad en `corrida_predial` y —desde V21— en cada `determinacion` que emite:
+            // suponer TRIMESTRAL la escribiria en las decenas de miles de filas de una emision
+            // anual como si cada contribuyente la hubiera elegido.
+            Objects.requireNonNull(
+                    modalidad,
+                    "La corrida dice bajo que cronograma emite: «modalidad» es obligatoria y no"
+                            + " tiene valor por omision (#234)");
         }
     }
 

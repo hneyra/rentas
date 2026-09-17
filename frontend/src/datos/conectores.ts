@@ -181,9 +181,9 @@ export interface Reparto {
    *
    * `noPublicados` dice lo que le falta a un **campo**, y para eso basta una palabra en su hueco.
    * Una **tabla** entera no tiene hueco donde escribirla: sin filas, el interprete dibuja la frase
-   * de pantalla —la de arriba— y esa es generica. El «Cronograma» de `territorio` es el caso: no lo
-   * publica nadie, y el motivo no es «se nos paso» sino que `determinacion` **no guarda su
-   * modalidad**, asi que los vencimientos no se pueden resolver (#234).
+   * de pantalla —la de arriba— y esa es generica. El «Cronograma» de `territorio` es el caso, y
+   * desde #234 su motivo **cambio de mitad**: ya no es que nadie lo publique —la operacion trae
+   * `modalidad` y `cuotas[]`— sino que esta hoja todavia no lo dibuja (#252).
    *
    * Lo que viaja es **una clave de traduccion** declarada como constante —nunca una frase compuesta
    * aqui—, por lo mismo que todo lo demas de este archivo: un conector es dato y no tiene `t()`
@@ -565,7 +565,8 @@ const TODAVIA_SIN_DETERMINAR: Ausencia = {
  * por otro seria una cifra al centimo indistinguible de la correcta — en un beneficio de
  * pensionista esa cifra decide cuanto se cobra. Sigue diciendo «no publicado».
  *
- * **El «Cronograma»**, que es #234 y no un descuido: ver abajo.
+ * **El «Cronograma»**, que ya no es #234 —la operacion trae `modalidad` y `cuotas[]` desde
+ * esa migracion— sino el conector que las reparta: ver abajo, y #252.
  *
  * <h2>El aporte de un tramo NO pasa por `formatearImporte`, y no es un detalle</h2>
  *
@@ -626,7 +627,9 @@ const TERRITORIO: Conector = {
     ]),
     // Vacio: la tabla de los tramos lleva `clave`, asi que sus filas van por `tablas`. Y el
     // «Cronograma» no lleva filas — y no `[]`, que significaria «la operacion contesto que no hay
-    // ninguna cuota». No contesto eso: no contesta nada del cronograma.
+    // ninguna cuota». Desde #234 la operacion SI trae `cuotas[]`; lo que falta es el conector que
+    // las reparta, y eso es #252. Repartirlas aqui de paso seria conectar una tabla sin haber
+    // decidido que dice su cuarta columna —«Situacion», que es cuenta corriente y no calculo—.
     filas: new Map(),
     tablas: new Map([
       [

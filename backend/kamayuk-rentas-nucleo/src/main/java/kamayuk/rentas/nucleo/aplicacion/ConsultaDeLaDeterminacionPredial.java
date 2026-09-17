@@ -7,10 +7,14 @@ import kamayuk.rentas.contribuyentes.ResumenDeContribuyente;
 import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.nucleo.dominio.predial.AporteDeTramo;
+import kamayuk.rentas.nucleo.dominio.predial.CronogramaDelPredial;
+import kamayuk.rentas.nucleo.dominio.predial.CuotaDelPredial;
 import kamayuk.rentas.nucleo.dominio.predial.DetalleDeterminacionPredio;
 import kamayuk.rentas.nucleo.dominio.predial.Determinacion;
 import kamayuk.rentas.nucleo.dominio.predial.DeterminacionRepository;
+import kamayuk.rentas.nucleo.dominio.predial.ModalidadDelPredial;
 import kamayuk.rentas.nucleo.dominio.predial.TramosProgresivosAcumulativos;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -42,15 +46,20 @@ import org.springframework.transaction.annotation.Transactional;
  * segunda versión del ejercicio, esta lectura publicaría unos tramos que la determinación nunca
  * usó.
  *
- * <h2>Lo que esta lectura NO publica, y por qué</h2>
+ * <h2>El cronograma: derivado del conjunto sellado, nunca supuesto (#234)</h2>
  *
- * <p><b>La modalidad y el cronograma de cuotas.</b> {@code determinacion} no guarda la modalidad
- * —sólo la guarda {@code corrida_predial}, que es de la emisión masiva—, y sin ella {@code
- * Vigente#vencimientos} no se puede llamar: las cuatro fechas dependen de si el contribuyente pagó
- * al contado o en cuatro trimestres. Suponer {@code TRIMESTRAL} —que es lo que hace el {@code POST}
- * cuando el cuerpo no la dice— publicaría un cronograma que puede no ser el que el contribuyente
- * recibió, y ése es justo el modo de fallo que la regla 5 prohíbe. Está nombrado y no resuelto:
- * {@code rentas}#234.
+ * <p>Desde {@code V21}, {@code determinacion} guarda <b>la modalidad</b>, y con ella el cronograma
+ * vuelve a ser derivable: los vencimientos son las llaves {@code PREDIAL_VENCIMIENTO} de ese mismo
+ * conjunto sellado y el importe es el reparto del monto que la fila ya guarda ({@link
+ * CronogramaDelPredial}). Las cuotas <b>no</b> se guardan, y es deliberado: serían una segunda
+ * verdad sobre el mismo hecho, que es lo que #214 retiró del acta de fiscalización.
+ *
+ * <p><b>Una fila anterior a V21 publica el cronograma en blanco</b> —{@code modalidad} nula y
+ * {@code cuotas} vacía—, nunca el trimestral supuesto. De aquellas determinaciones la modalidad no
+ * consta en ningún sitio: suponerla publicaría un cronograma que puede no ser el que el
+ * contribuyente recibió, y ése es justo el modo de fallo que la regla 5 prohíbe.
+ *
+ * <h2>Lo que esta lectura NO publica, y por qué</h2>
  *
  * <p><b>El «Monto deducido» y la «Situación» de cada cuota</b>, que la hoja también dibuja: el
  * primero no lo publica nadie —lo más cercano es {@code valuoExonerado}, que no es un monto
@@ -125,6 +134,18 @@ public class ConsultaDeLaDeterminacionPredial {
                 TramosProgresivosAcumulativos.desglosar(cabecera.baseImponible(), sellado.tramos());
         Dinero derechoDeEmision = sellado.derechoDeEmision();
 
+        // El cronograma solo se resuelve si la fila DICE con que modalidad se emitio. Sin ella no
+        // se llama a `vencimientos`: llamarla con la trimestral por omision publicaria cuatro
+        // fechas que esta lectura no puede afirmar (#234).
+        ModalidadDelPredial modalidad = cabecera.modalidad();
+        List<CuotaDelPredial> cuotas =
+                modalidad == null
+                        ? List.of()
+                        : CronogramaDelPredial.repartir(
+                                cabecera.montoDeterminado(),
+                                sellado.vencimientos(modalidad),
+                                sellado.redondeo());
+
         return new Guardada(
                 cabecera,
                 detalle,
@@ -138,7 +159,9 @@ public class ConsultaDeLaDeterminacionPredial {
                 tramos,
                 sellado.minimoImponible(),
                 derechoDeEmision,
-                cabecera.montoDeterminado().mas(derechoDeEmision));
+                cabecera.montoDeterminado().mas(derechoDeEmision),
+                modalidad,
+                cuotas);
     }
 
     private static long identificadorDe(Determinacion cabecera) {
@@ -153,11 +176,12 @@ public class ConsultaDeLaDeterminacionPredial {
     /**
      * Una determinación predial guardada, con lo que su conjunto sellado determina.
      *
-     * <p>No es {@code DeterminacionPredialCalculada}: aquella lleva el cronograma y la modalidad
-     * —que son entradas del {@code POST} y no filas guardadas— y el {@code simulacion}, que aquí no
-     * tiene sentido porque una simulación no deja fila que leer. Tener dos tipos y no uno es lo que
-     * impide que esta lectura publique un campo nulo con el mismo contrato que la escritura, que es
-     * el modo de fallo que #194 midió.
+     * <p>No es {@code DeterminacionPredialCalculada}: aquella lleva el {@code simulacion}, que aquí
+     * no tiene sentido porque una simulación no deja fila que leer, y publica la memoria del
+     * cálculo —el código catastral, la dirección y el uso de cada predio— que se resuelve <b>a una
+     * fecha</b> y que esta lectura no puede afirmar años después. Tener dos tipos y no uno es lo
+     * que impide que esta lectura publique un campo nulo con el mismo contrato que la escritura,
+     * que es el modo de fallo que #194 midió.
      *
      * @param cabecera la fila de {@code determinacion}
      * @param predios lo que puso cada predio, de {@code determinacion_predio_detalle}
@@ -172,6 +196,10 @@ public class ConsultaDeLaDeterminacionPredial {
      * @param minimoImponible el mínimo de ese conjunto (RT-014)
      * @param derechoDeEmision el derecho de emisión mecanizada de ese conjunto
      * @param totalAPagar el impuesto determinado más el derecho de emisión
+     * @param modalidad bajo qué cronograma se emitió (V21, #234); <b>nulo</b> si la fila es
+     *     anterior a la migración, donde significa «no consta» y nunca «al contado»
+     * @param cuotas el cronograma derivado del conjunto sellado; <b>vacío</b> cuando la fila no
+     *     dice su modalidad, porque entonces no hay cronograma que afirmar
      */
     public record Guardada(
             Determinacion cabecera,
@@ -186,11 +214,20 @@ public class ConsultaDeLaDeterminacionPredial {
             List<AporteDeTramo> tramos,
             Dinero minimoImponible,
             Dinero derechoDeEmision,
-            Dinero totalAPagar) {
+            Dinero totalAPagar,
+            @Nullable ModalidadDelPredial modalidad,
+            List<CuotaDelPredial> cuotas) {
 
         public Guardada {
             predios = List.copyOf(predios);
             tramos = List.copyOf(tramos);
+            cuotas = List.copyOf(cuotas);
+            if (modalidad == null && !cuotas.isEmpty()) {
+                throw new IllegalArgumentException(
+                        "Un cronograma sin modalidad no se puede afirmar: una fila anterior a V21"
+                                + " publica las cuotas en blanco, nunca las trimestrales supuestas"
+                                + " (#234)");
+            }
         }
 
         /** El impuesto anual determinado, que es lo que la cabecera guarda. */

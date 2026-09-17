@@ -2107,6 +2107,14 @@
     "impuestoInsoluto": "texto",
     "derechoDeEmision": "texto",
     "totalAPagar": "texto",
+    "modalidad": "texto",
+    "cuotas": [
+      {
+        "numero": "entero",
+        "vencimiento": "texto",
+        "importe": "texto"
+      }
+    ],
     "reglasAplicadas": [
       "texto"
     ]

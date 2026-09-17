@@ -21,7 +21,9 @@ import kamayuk.rentas.esquema.BaseDeDatosDePrueba;
 import kamayuk.rentas.esquema.ContextoDeTenant;
 import kamayuk.rentas.nucleo.dominio.predial.DetalleDeterminacionPredio;
 import kamayuk.rentas.nucleo.dominio.predial.Determinacion;
+import kamayuk.rentas.nucleo.dominio.predial.ModalidadDelPredial;
 import kamayuk.rentas.plataforma.tenant.TenantTransactionManager;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -251,6 +253,109 @@ class DeterminacionPredialJdbcTest {
         assertThat(ultimaDesdeB).isEmpty();
     }
 
+    @Test
+    @DisplayName("#234 — la modalidad se guarda y vuelve, y es LA DE CADA FILA")
+    void laModalidadSobrevive() throws SQLException {
+        enA();
+        long alContado = crearContribuyente(municipalidadA, "DET-3006", "80300306");
+        long aPlazos = crearContribuyente(municipalidadA, "DET-3007", "80300307");
+        long predio = crearPredio(municipalidadA, "000000000000000306");
+
+        // DOS contribuyentes con DOS modalidades distintas, y no uno con la que sea: con el
+        // montaje uniforme, «devuelve la modalidad de la fila» y «devuelve siempre TRIMESTRAL»
+        // dan exactamente el mismo verde.
+        Determinacion deContado =
+                transaccion.execute(
+                        estado ->
+                                repositorio.insertar(
+                                        cabecera(
+                                                alContado,
+                                                Dinero.de("1000.00"),
+                                                ModalidadDelPredial.CONTADO),
+                                        List.of(detalleDe(predio, "1000.00"))));
+        Determinacion deTrimestres =
+                transaccion.execute(
+                        estado ->
+                                repositorio.insertar(
+                                        cabecera(
+                                                aPlazos,
+                                                Dinero.de("2000.00"),
+                                                ModalidadDelPredial.TRIMESTRAL),
+                                        List.of(detalleDe(predio, "2000.00"))));
+
+        assertThat(deContado.modalidad())
+                .as("lo que insertar DEVUELVE ya trae la modalidad con que se escribio")
+                .isEqualTo(ModalidadDelPredial.CONTADO);
+
+        Optional<Determinacion> leidaDeContado =
+                transaccion.execute(estado -> repositorio.findById(deContado.id()));
+        Optional<Determinacion> leidaDeTrimestres =
+                transaccion.execute(estado -> repositorio.findById(deTrimestres.id()));
+
+        assertThat(leidaDeContado).isPresent();
+        assertThat(leidaDeContado.get().modalidad()).isEqualTo(ModalidadDelPredial.CONTADO);
+        assertThat(leidaDeTrimestres).isPresent();
+        assertThat(leidaDeTrimestres.get().modalidad()).isEqualTo(ModalidadDelPredial.TRIMESTRAL);
+
+        Optional<Determinacion> ultima =
+                transaccion.execute(estado -> repositorio.ultimaPredialDe(EJERCICIO, alContado));
+        assertThat(ultima).isPresent();
+        assertThat(ultima.get().modalidad())
+                .as(
+                        "la lectura de #207 lee por aqui: si la columna no viajara, el cronograma"
+                                + " volveria a ser el supuesto")
+                .isEqualTo(ModalidadDelPredial.CONTADO);
+    }
+
+    @Test
+    @DisplayName("#234 — una fila anterior a V21 no dice su modalidad, y vuelve nula")
+    void laFilaAnteriorAV21NoDiceSuModalidad() throws SQLException {
+        enA();
+        long titular = crearContribuyente(municipalidadA, "DET-3008", "80300308");
+        insertarCabeceraPorSql("PREDIAL", null, titular, null);
+
+        Optional<Determinacion> anterior =
+                transaccion.execute(estado -> repositorio.ultimaPredialDe(EJERCICIO, titular));
+
+        assertThat(anterior).isPresent();
+        assertThat(anterior.get().modalidad())
+                .as(
+                        "nulo significa «esta fila es anterior a V21», nunca «al contado»: rellenarlo"
+                                + " al leer repetiria el defecto de #234 un piso mas abajo")
+                .isNull();
+    }
+
+    @Test
+    @DisplayName("#234 — la base rechaza una modalidad que no es del articulo 15")
+    void laBaseRechazaUnaModalidadInventada() throws SQLException {
+        enA();
+        long titular = crearContribuyente(municipalidadA, "DET-3009", "80300309");
+
+        assertThatThrownBy(() -> insertarCabeceraPorSql("PREDIAL", null, titular, "MENSUAL"))
+                .as(
+                        "antes de #234 'MENSUAL' devolvia las cuatro fechas trimestrales con esa"
+                                + " etiqueta encima; escrito en una columna, nadie lo puede interpretar")
+                .isInstanceOf(SQLException.class)
+                .hasMessageContaining("determinacion_modalidad_ck");
+    }
+
+    @Test
+    @DisplayName("#234 — el cronograma es del predial: un vehicular con modalidad no entra")
+    void soloElPredialLlevaModalidad() throws SQLException {
+        enA();
+        long titular = crearContribuyente(municipalidadA, "DET-3010", "80300310");
+        long vehiculo = crearVehiculo(municipalidadA, titular, "AAA-100");
+
+        assertThatThrownBy(
+                        () -> insertarCabeceraPorSql("VEHICULAR", vehiculo, titular, "TRIMESTRAL"))
+                .isInstanceOf(SQLException.class)
+                .hasMessageContaining("determinacion_modalidad_solo_predial_ck");
+
+        // Y el mismo vehicular SIN modalidad si entra: sin este contraste, la guarda de arriba
+        // podria estar rojo por cualquier otra cosa de la fila.
+        insertarCabeceraPorSql("VEHICULAR", vehiculo, titular, null);
+    }
+
     // ---------------------------------------------------------------- utilidades
 
     private static void enA() {
@@ -259,8 +364,60 @@ class DeterminacionPredialJdbcTest {
     }
 
     private static Determinacion cabecera(long titular, Dinero base) {
+        return cabecera(titular, base, ModalidadDelPredial.TRIMESTRAL);
+    }
+
+    private static Determinacion cabecera(
+            long titular, Dinero base, ModalidadDelPredial modalidad) {
         return Determinacion.nuevaPredial(
-                EJERCICIO, titular, conjuntoDeA(), base, Dinero.de("8.00"), List.of("RT-011"));
+                EJERCICIO,
+                titular,
+                conjuntoDeA(),
+                base,
+                Dinero.de("8.00"),
+                List.of("RT-011"),
+                modalidad);
+    }
+
+    /**
+     * Una cabecera escrita por SQL directo, saltandose el dominio.
+     *
+     * <p>Es como se siembra una fila <b>anterior a V21</b> —{@code modalidad} nula—, que por el
+     * repositorio ya no se puede escribir: {@link Determinacion#nuevaPredial} la exige. Y es como
+     * se comprueba que los dos {@code CHECK} de V21 muerden aunque nadie pase por Java.
+     */
+    private static void insertarCabeceraPorSql(
+            String tributo, @Nullable Long vehiculoId, long titular, @Nullable String modalidad)
+            throws SQLException {
+        try (Connection app = base.conexion(BaseDeDatosDePrueba.APP)) {
+            ContextoDeTenant.fijar(app, municipalidadA);
+            try (PreparedStatement sentencia =
+                    app.prepareStatement(
+                            "INSERT INTO determinacion (municipalidad_id, ejercicio, tributo,"
+                                    + " contribuyente_id, vehiculo_id, conjunto_id, base_imponible,"
+                                    + " monto_determinado, reglas_aplicadas, origen, estado,"
+                                    + " usuario_calculo, modalidad)"
+                                    + " VALUES (?, 2026, ?, ?, ?, ?, 1000, 8,"
+                                    + " ARRAY['RT-011']::varchar(200)[], 'ORDINARIA', 'BORRADOR',"
+                                    + " 'siembra', ?)")) {
+                sentencia.setLong(1, municipalidadA);
+                sentencia.setString(2, tributo);
+                sentencia.setLong(3, titular);
+                if (vehiculoId == null) {
+                    sentencia.setNull(4, java.sql.Types.BIGINT);
+                } else {
+                    sentencia.setLong(4, vehiculoId);
+                }
+                sentencia.setLong(5, conjuntoDeA());
+                if (modalidad == null) {
+                    sentencia.setNull(6, java.sql.Types.VARCHAR);
+                } else {
+                    sentencia.setString(6, modalidad);
+                }
+                sentencia.executeUpdate();
+                app.commit();
+            }
+        }
     }
 
     private static DetalleDeterminacionPredio detalleDe(long predio, String importe) {
@@ -367,6 +524,24 @@ class DeterminacionPredialJdbcTest {
                 sentencia.setLong(1, municipalidad);
                 sentencia.setString(2, codigo);
                 sentencia.setString(3, dni);
+                return devolverId(app, sentencia);
+            }
+        }
+    }
+
+    private static long crearVehiculo(long municipalidad, long titular, String placa)
+            throws SQLException {
+        try (Connection app = base.conexion(BaseDeDatosDePrueba.APP)) {
+            ContextoDeTenant.fijar(app, municipalidad);
+            try (PreparedStatement sentencia =
+                    app.prepareStatement(
+                            "INSERT INTO vehiculo (municipalidad_id, placa, contribuyente_id,"
+                                    + " marca, modelo, anio_fabricacion, anio_inscripcion)"
+                                    + " VALUES (?, ?, ?, 'MARCA', 'MODELO', 2026, 2026)"
+                                    + " RETURNING id")) {
+                sentencia.setLong(1, municipalidad);
+                sentencia.setString(2, placa);
+                sentencia.setLong(3, titular);
                 return devolverId(app, sentencia);
             }
         }

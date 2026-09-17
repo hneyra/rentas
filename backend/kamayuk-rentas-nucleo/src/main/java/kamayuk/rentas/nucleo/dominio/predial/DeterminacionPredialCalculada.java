@@ -40,7 +40,6 @@ import kamayuk.rentas.dominio.Dinero;
  * @param impuestoInsoluto el impuesto anual determinado, ya redondeado
  * @param derechoDeEmision el derecho de emision mecanizada
  * @param cuotas el cronograma, cada cuota con su vencimiento
- * @param modalidad como se paga: la modalidad cuyo cronograma se aplico
  * @param nombreDelConjunto como se nombra el conjunto sellado donde lo lee una persona
  * @param codContribuyente el codigo del contribuyente en el padron
  * @param sujeto de quien es esta determinacion, ya redactado
@@ -58,7 +57,6 @@ public record DeterminacionPredialCalculada(
         Dinero impuestoInsoluto,
         Dinero derechoDeEmision,
         List<CuotaDelPredial> cuotas,
-        String modalidad,
         String nombreDelConjunto,
         String codContribuyente,
         String sujeto,
@@ -81,12 +79,29 @@ public record DeterminacionPredialCalculada(
         Objects.requireNonNull(minimoImponible, "Necesita el minimo imponible del ejercicio");
         Objects.requireNonNull(impuestoInsoluto, "Necesita el impuesto insoluto");
         Objects.requireNonNull(derechoDeEmision, "Necesita el derecho de emision");
-        Objects.requireNonNull(modalidad, "Necesita la modalidad de pago");
+        if (cabecera.modalidad() == null) {
+            throw new IllegalArgumentException(
+                    "Toda determinacion predial calculada dice bajo que cronograma se emite, y lo"
+                            + " dice su CABECERA: es el dato que V21 guarda y el unico que se"
+                            + " puede volver a leer (#234)");
+        }
         Objects.requireNonNull(nombreDelConjunto, "Necesita el nombre del conjunto sellado");
         Objects.requireNonNull(codContribuyente, "Necesita el codigo del contribuyente");
         Objects.requireNonNull(sujeto, "Necesita de quien es (ADR-0016 §1)");
         Objects.requireNonNull(
                 fechaCalculo, "Toda cifra dice a que fecha esta calculada (regla 9, RNF-075)");
+    }
+
+    /**
+     * Como se paga: la modalidad cuyo cronograma se aplico.
+     *
+     * <p>No es un componente propio, y no es un detalle: es la de la <b>cabecera</b>, o sea la que
+     * queda escrita en {@code determinacion.modalidad} (V21). Llevarla dos veces —una en la fila y
+     * otra al lado— es la segunda verdad sobre el mismo hecho que #214 retiro del acta de
+     * fiscalizacion, y aqui la respuesta y la fila podrian no coincidir.
+     */
+    public ModalidadDelPredial modalidad() {
+        return Objects.requireNonNull(cabecera.modalidad());
     }
 
     /** Lo que se paga en total: el impuesto mas el derecho de emision. */

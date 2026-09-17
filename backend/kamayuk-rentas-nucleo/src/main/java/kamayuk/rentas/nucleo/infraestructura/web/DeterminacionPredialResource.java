@@ -141,7 +141,7 @@ public record DeterminacionPredialResource(
                 calculada.impuestoInsoluto().toString(),
                 calculada.derechoDeEmision().toString(),
                 calculada.totalAPagar().toString(),
-                calculada.modalidad(),
+                calculada.modalidad().name(),
                 cuotas,
                 calculada.cabecera().reglasAplicadas());
     }

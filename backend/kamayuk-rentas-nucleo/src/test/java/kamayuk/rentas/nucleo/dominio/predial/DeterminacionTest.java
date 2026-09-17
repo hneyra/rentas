@@ -54,6 +54,7 @@ class DeterminacionTest {
                                         List.of("ALICUOTA_VEHICULAR"),
                                         OrigenDeDeterminacion.ORDINARIA,
                                         EstadoDeDeterminacion.BORRADOR,
+                                        null,
                                         null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("vehiculoId");
@@ -126,5 +127,66 @@ class DeterminacionTest {
                                         Dinero.de("10"),
                                         List.of(" ")))
                 .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    @DisplayName("#234 — una determinacion predial nueva no se puede construir sin su modalidad")
+    void unaPredialNuevaNoSePuedeConstruirSinModalidad() {
+        assertThatThrownBy(
+                        () ->
+                                Determinacion.nuevaPredial(
+                                        EJERCICIO,
+                                        1L,
+                                        3L,
+                                        Dinero.de("1000"),
+                                        Dinero.de("10"),
+                                        List.of("RT-011"),
+                                        null))
+                .as(
+                        "la base no lo puede exigir —un CHECK no distingue una fila de hoy de una"
+                                + " anterior a V21—, asi que lo exige el unico constructor que hay")
+                .isInstanceOf(NullPointerException.class)
+                .hasMessageContaining("modalidad");
+    }
+
+    @Test
+    @DisplayName("#234 — y la que si la lleva la conserva, sin normalizar nada por su cuenta")
+    void unaPredialNuevaConservaSuModalidad() {
+        Determinacion alContado =
+                Determinacion.nuevaPredial(
+                        EJERCICIO,
+                        1L,
+                        3L,
+                        Dinero.de("1000"),
+                        Dinero.de("10"),
+                        List.of("RT-011"),
+                        ModalidadDelPredial.CONTADO);
+
+        assertThat(alContado.modalidad()).isEqualTo(ModalidadDelPredial.CONTADO);
+    }
+
+    @Test
+    @DisplayName("#234 — el cronograma es del predial: un vehicular con modalidad no se construye")
+    void soloElPredialLlevaModalidad() {
+        assertThatThrownBy(
+                        () ->
+                                new Determinacion(
+                                        null,
+                                        EJERCICIO,
+                                        "VEHICULAR",
+                                        null,
+                                        1L,
+                                        null,
+                                        2L,
+                                        3L,
+                                        Dinero.de("1000"),
+                                        Dinero.de("10"),
+                                        List.of("ALICUOTA_VEHICULAR"),
+                                        OrigenDeDeterminacion.ORDINARIA,
+                                        EstadoDeDeterminacion.BORRADOR,
+                                        null,
+                                        ModalidadDelPredial.TRIMESTRAL))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("determinacion_modalidad_solo_predial_ck");
     }
 }

@@ -459,9 +459,12 @@ export interface OperacionServida {
  * <b>204</b> —«todavia no»—. El backend las publica distintas porque #546 midio el dano de
  * confundirlas, y la pantalla las dice distintas: ver `Conector.sinDato` y `Conector.noEncontrado`.
  *
- * <b>Y no trae el cronograma</b>, ni se le pide: `determinacion` no guarda la modalidad, y sin ella
- * los vencimientos no se pueden resolver (#234). Suponer la trimestral publicaria un cronograma que
- * el contribuyente puede no haber recibido — regla 5.
+ * <b>Y desde #234 SI trae el cronograma</b>: `determinacion` guarda su modalidad —columna de `V21`—
+ * y con ella los vencimientos vuelven a salir del conjunto sellado que esa determinacion fijo. Las
+ * cuotas no estan guardadas, se derivan. Una fila anterior a esa migracion trae `modalidad: null` y
+ * `cuotas: []`, que no es «no hay cuotas» sino «esa fila no dice cual era su cronograma»: suponer
+ * la trimestral publicaria uno que el contribuyente puede no haber recibido — regla 5. Dibujarlo en
+ * la hoja es otra cosa, y es #252.
  */
 export const YA_SERVIDAS: readonly OperacionServida[] = [
   { metodo: 'GET', ruta: '/seguridad/sesion' },

@@ -17,6 +17,7 @@ import kamayuk.rentas.nucleo.dominio.predial.DetalleDeterminacionPredio;
 import kamayuk.rentas.nucleo.dominio.predial.Determinacion;
 import kamayuk.rentas.nucleo.dominio.predial.DeterminacionRepository;
 import kamayuk.rentas.nucleo.dominio.predial.MinimoImponible;
+import kamayuk.rentas.nucleo.dominio.predial.ModalidadDelPredial;
 import kamayuk.rentas.nucleo.dominio.predial.RT011BaseImponibleDelContribuyente;
 import kamayuk.rentas.nucleo.dominio.predial.Tramo;
 import kamayuk.rentas.nucleo.dominio.predial.TramosProgresivosAcumulativos;
@@ -90,6 +91,7 @@ public class RegistrarDeterminacionPredial {
      *     propiedad y base ya ponderada); nunca vacio (NEG-05 §1: sin predios no hay base)
      * @param tramos el cuadro progresivo vigente, resuelto por quien conoce la ordenanza (D-02b)
      * @param minimoImponible el minimo del ejercicio (D-02b)
+     * @param modalidad bajo que cronograma del articulo 15 se emite; se GUARDA en la fila (#234)
      * @param observacion por que se registra (regla 10)
      */
     @Transactional
@@ -99,9 +101,17 @@ public class RegistrarDeterminacionPredial {
             List<DetalleDeterminacionPredio> predios,
             List<Tramo> tramos,
             Dinero minimoImponible,
+            ModalidadDelPredial modalidad,
             Observacion observacion) {
         return registrar(
-                ejercicio, contribuyenteId, predios, tramos, minimoImponible, false, observacion);
+                ejercicio,
+                contribuyenteId,
+                predios,
+                tramos,
+                minimoImponible,
+                modalidad,
+                false,
+                observacion);
     }
 
     /**
@@ -126,6 +136,7 @@ public class RegistrarDeterminacionPredial {
             List<DetalleDeterminacionPredio> predios,
             List<Tramo> tramos,
             Dinero minimoImponible,
+            ModalidadDelPredial modalidad,
             boolean simulacion,
             Observacion observacion) {
         Objects.requireNonNull(ejercicio, "La determinacion necesita su ejercicio");
@@ -158,7 +169,8 @@ public class RegistrarDeterminacionPredial {
                         conjuntoId,
                         baseContribuyente,
                         montoDeterminado,
-                        List.of(rt011.identificador().valor(), "RT-013", "RT-014"));
+                        List.of(rt011.identificador().valor(), "RT-013", "RT-014"),
+                        modalidad);
 
         if (simulacion) {
             return nueva;
@@ -197,7 +209,9 @@ public class RegistrarDeterminacionPredial {
                 + determinacion.montoDeterminado()
                 + "\",\"reglasAplicadas\":"
                 + reglas
-                + "}";
+                + ",\"modalidad\":\""
+                + determinacion.modalidad()
+                + "\"}";
     }
 
     /** Se pidio determinar un contribuyente sin ningun predio declarado. */
