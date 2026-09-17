@@ -1010,10 +1010,26 @@ export interface LineaDelResumenDePapeletas {
   readonly ano: number | null;
   readonly cantidad: number;
   readonly importe: string;
+  /**
+   * **Cuantas constan `PAGADA`** — y eso NO es «cuantas se pagaron» (#243).
+   *
+   * El nombre dice lo que cuenta: las filas cuya columna `estado` vale `PAGADA`. **Nadie la
+   * escribe** —el unico `UPDATE papeleta` de `src/main` es `SET numero`—, asi que en una
+   * instalacion nueva es cero para siempre; en una con el padron migrado puede traer lo que el
+   * sistema anterior dejo escrito. Por eso el campo se publica y `tra-panel` **no lo dibuja**: un
+   * rotulo de pantalla afirma un hecho, y este sistema no sabe si una papeleta se pago —lo cobrado
+   * vive en el libro, que no tiene por donde cruzar a una papeleta—.
+   */
   readonly pagadas: number;
   readonly importeDeLasPagadas: string;
   readonly pendientes: number;
   readonly importeDeLasPendientes: string;
+  /**
+   * **Cuantas constan `COACTIVA`**, con la misma salvedad que `pagadas` (#243).
+   *
+   * Tampoco lo escribe nadie. Lo que este sistema si sabe de esa etapa es `conResolucionDeMulta`,
+   * y es lo que el panel dibuja en su lugar.
+   */
   readonly enCoactiva: number;
   readonly importeEnCoactiva: string;
   /**
@@ -1028,6 +1044,19 @@ export interface LineaDelResumenDePapeletas {
    * suman, y publicar dinero que nadie consume es lo que #184 encontro en las cuatro `resumen-*`.
    */
   readonly conResolucionNotificada: number;
+  /**
+   * **Cuantas tienen ya emitida su resolucion de multa** (#243).
+   *
+   * No es «cuantas estan en coactiva»: el expediente coactivo cuelga del **valor** y vive en otro
+   * contexto. Esto es la fila `GENERADO` de `papeleta_masivo_item` con su `valor_id`, o sea que la
+   * multa ya se formalizo — y es el mismo predicado con que `transito_padron_coactiva` define «las
+   * papeletas enviadas a cobranza».
+   *
+   * Nace porque `enCoactiva` **no se puede dibujar**: cuenta `p.estado = 'COACTIVA'` y de los siete
+   * valores de `EstadoDePapeleta` la produccion escribe **uno**. Sin importe al lado, por lo mismo
+   * que `conResolucionNotificada`.
+   */
+  readonly conResolucionDeMulta: number;
   /** El dia al que se leyeron los estados (regla 9, RNF-075). */
   readonly actualizadoA: string;
 }

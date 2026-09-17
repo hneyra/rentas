@@ -40,6 +40,36 @@ import org.jspecify.annotations.Nullable;
  * alguna pantalla pregunta cuánto suman; de esta no lo pregunta ninguna, y publicar una cifra de
  * dinero que nadie consume es lo que #184 encontró en las cuatro {@code resumen-*}.
  *
+ * <h2>{@code conResolucionDeMulta} nace por el mismo motivo, y alcanza a {@code enCoactiva} (#243)
+ * </h2>
+ *
+ * <p>La misma medida de #222 dice más de lo que aquel issue miró: de los <b>siete</b> valores de
+ * {@link EstadoDePapeleta} la producción escribe <b>uno</b>. Así que {@link #pagadas} —{@code
+ * FILTER (WHERE p.estado = 'PAGADA')}— y {@link #enCoactiva} —{@code FILTER (WHERE p.estado =
+ * 'COACTIVA')}— valen <b>cero para siempre</b> en una instalación nueva, igual que valdría {@code
+ * NOTIFICADA}.
+ *
+ * <p><b>Los dos campos se quedan, y el panel deja de dibujarlos.</b> No es una contradicción: el
+ * nombre de este campo dice <b>lo que cuenta</b> —«cuántas constan {@code PAGADA}», que es
+ * literalmente cierto—, y el rótulo de una pantalla dice <b>un hecho</b> —«cuántas se pagaron»—,
+ * que este sistema no sabe. En una instalación con datos migrados esas columnas pueden traer
+ * valores que otro sistema escribió, y esta lectura tiene que poder contarlos; lo que no puede es
+ * dibujarlos en un panel junto a cifras que este sistema sí produce, porque entonces la pantalla
+ * mezcla dos procedencias sin decirlo.
+ *
+ * <p>Lo que <b>sí</b> consta de esa etapa, y este contexto lo posee entero, es que a la papeleta ya
+ * se le <b>emitió su resolución de multa</b>: la fila {@code GENERADO} de {@code
+ * papeleta_masivo_item} con su {@code valor_id}. Eso es {@code conResolucionDeMulta}, y es el mismo
+ * predicado con que {@code transito_padron_coactiva} define «las papeletas enviadas a cobranza».
+ * <b>Sin importe</b>, por lo mismo que la de arriba.
+ *
+ * <p>Lo que <b>no</b> se hace es derivar «cancelada» de nada. Lo cobrado vive en el libro y el
+ * libro no tiene por dónde cruzar a una papeleta —{@code cuenta_corriente_asiento} no lleva ni
+ * {@code papeleta_id} ni {@code valor_id}—, y {@code valor.estado = 'PAGADO'} tampoco lo escribe
+ * nadie: medido, {@code 'PAGADO'} sólo aparece en {@code src/main} como filtro de lectura.
+ * Escribirlo en la papeleta sería además una <b>segunda verdad</b> sobre el mismo hecho, que es lo
+ * que #214 se negó a introducir.
+ *
  * @param clave el valor por el que se agrupó: el estado, el código, las dos letras, el mes o el año
  * @param descripcion su descripción, cuando el agrupador la tiene —el código la trae—; nula si no
  * @param ano el año de la línea, cuando el agrupador lo determina —{@code ANO} y {@code MES}—; nulo
@@ -56,6 +86,10 @@ import org.jspecify.annotations.Nullable;
  * @param conResolucionNotificada cuántas tienen ya una resolución de gerencia con al menos una
  *     diligencia que surtió efecto. <b>No es «cuántas se notificaron»</b> y el nombre lo dice: lo
  *     notificado es la <b>resolución</b>, que es otro documento. Ver el javadoc de la clase
+ * @param conResolucionDeMulta cuántas tienen ya emitida su resolución de multa, o sea su fila
+ *     {@code GENERADO} en {@code papeleta_masivo_item} con el valor puesto. <b>No es «cuántas están
+ *     en cobranza coactiva»</b>: el expediente coactivo cuelga del valor y vive en otro contexto.
+ *     Ver el javadoc de la clase
  */
 public record LineaDelResumen(
         String clave,
@@ -69,7 +103,8 @@ public record LineaDelResumen(
         Dinero importeDeLasPendientes,
         long enCoactiva,
         Dinero importeEnCoactiva,
-        long conResolucionNotificada) {
+        long conResolucionNotificada,
+        long conResolucionDeMulta) {
 
     public LineaDelResumen {
         Objects.requireNonNull(clave, "La linea del resumen necesita su clave");
@@ -86,11 +121,20 @@ public record LineaDelResumen(
                             + cantidad
                             + ")");
         }
+        if (conResolucionDeMulta > cantidad) {
+            throw new IllegalArgumentException(
+                    "No puede haber mas papeletas con su resolucion de multa emitida ("
+                            + conResolucionDeMulta
+                            + ") que papeletas en el grupo ("
+                            + cantidad
+                            + ")");
+        }
         if (cantidad < 0
                 || pagadas < 0
                 || pendientes < 0
                 || enCoactiva < 0
-                || conResolucionNotificada < 0) {
+                || conResolucionNotificada < 0
+                || conResolucionDeMulta < 0) {
             throw new IllegalArgumentException("Ninguna cuenta de un resumen puede ser negativa");
         }
         if (pagadas + pendientes > cantidad) {

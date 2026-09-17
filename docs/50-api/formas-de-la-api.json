@@ -2666,6 +2666,7 @@
         "enCoactiva": "entero",
         "importeEnCoactiva": "texto",
         "conResolucionNotificada": "entero",
+        "conResolucionDeMulta": "entero",
         "actualizadoA": "fecha"
       }
     ]
@@ -2691,6 +2692,7 @@
         "enCoactiva": "entero",
         "importeEnCoactiva": "texto",
         "conResolucionNotificada": "entero",
+        "conResolucionDeMulta": "entero",
         "actualizadoA": "fecha"
       }
     ]
@@ -2716,6 +2718,7 @@
         "enCoactiva": "entero",
         "importeEnCoactiva": "texto",
         "conResolucionNotificada": "entero",
+        "conResolucionDeMulta": "entero",
         "actualizadoA": "fecha"
       }
     ]
