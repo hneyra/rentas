@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import kamayuk.rentas.plataforma.CredencialDeServicio;
+import kamayuk.rentas.plataforma.RespuestaAjena;
 import kamayuk.rentas.seguridad.dominio.EventoDeIdentidadRecibido;
 import kamayuk.rentas.seguridad.dominio.FuenteDeEventosDeIdentidad;
 import tools.jackson.core.JacksonException;
@@ -34,11 +35,33 @@ import tools.jackson.databind.json.JsonMapper;
  * <h2>Todo fallo es transitorio, incluido el 401 y el 403</h2>
  *
  * <p>Lo que aqui no puede pasar es que un fallo de transporte se lleve un evento. Un 401 es una
- * clave que no vale o que no esta; un 403 es una cuenta de servicio que {@code identidad} conoce y
- * que no esta afiliada a su grupo «Consumidores del buzon» —nace sin miembros, a proposito, y
- * afiliarla es del despliegue—. Los dos se arreglan del lado del despliegue y cambian solos;
- * mientras tanto la corrida sale en rojo diciendo cual de los dos es, y la copia se queda como
- * estaba.
+ * clave que no vale o que no esta; un 403 es {@code identidad} negandose, y <b>hay tres 403
+ * distintos</b>. Los dos se arreglan del lado del despliegue y cambian solos; mientras tanto la
+ * corrida sale en rojo diciendo cual de los dos es, y la copia se queda como estaba.
+ *
+ * <h2>El 403 NO SE ADIVINA: se lee del cuerpo (#66)</h2>
+ *
+ * <p><b>Hasta #66 este cliente mapeaba cualquier 403 a «falta afiliarla al grupo «Consumidores del
+ * buzon»» y tiraba el cuerpo</b>, que es lo unico que lo distinguiria. Medido en el cluster de
+ * `stg` el 2026-09-11: lo que `identidad` contestaba era la rama <b>contraria</b> —{@code
+ * SIN_PRIVILEGIO} «la cuenta no esta dada de alta en este sistema», porque el token salia sin
+ * {@code preferred_username} y el guardia caia al {@code sub}—, y la afiliacion al grupo, a donde
+ * el mensaje mandaba a mirar, estaba perfectamente bien. Se perdieron horas mirando el sitio
+ * equivocado.
+ *
+ * <p>Los tres 403 de `identidad` y sus remedios, que son distintos:
+ *
+ * <ul>
+ *   <li>{@code SIN_PRIVILEGIO} + «no esta dada de alta» — la cuenta no tiene ficha: falta el alta,
+ *       o el claim con que se la busca. Afiliarla a un grupo <b>no lo arregla</b>.
+ *   <li>{@code SIN_PRIVILEGIO} + «no tiene el privilegio» — la cuenta existe: falta afiliarla al
+ *       grupo «Consumidores del buzon», que nace sin miembros a proposito.
+ *   <li>{@code SIN_IDENTIDAD_DE_SERVICIO} — el token no identifica una cuenta de servicio: no falta
+ *       ningun permiso, hay que pedir otro token con el cliente confidencial que toca.
+ * </ul>
+ *
+ * <p>Y si no dijo cual, el mensaje <b>lo dice</b> en vez de elegir uno. Lo que contesto viaja
+ * siempre, tachado y recortado por {@link RespuestaAjena}.
  *
  * <p>Lo unico que no es transitorio es un acuse que el emisor rechaza por su contenido (422): eso
  * es {@link FuenteDeEventosDeIdentidad.AcuseRechazado}, se registra y no se reintenta.
@@ -80,7 +103,7 @@ public class ClienteHttpDelBuzonDeIdentidad implements FuenteDeEventosDeIdentida
         conCredencial(peticion);
         HttpResponse<String> respuesta = enviar(peticion, "leer el buzon de identidad");
         if (respuesta.statusCode() != 200) {
-            throw noContesto(respuesta.statusCode(), "leer el buzon");
+            throw noContesto(respuesta.statusCode(), respuesta.body(), "leer el buzon");
         }
         JsonNode cuerpo = arbol(respuesta.body(), "leer el buzon");
         List<EventoDeIdentidadRecibido> eventos = new ArrayList<>();
@@ -124,6 +147,7 @@ public class ClienteHttpDelBuzonDeIdentidad implements FuenteDeEventosDeIdentida
         }
         throw noContesto(
                 estado,
+                respuesta.body(),
                 "acusar. Los eventos SI estan resueltos aqui: se volveran a servir y se"
                         + " descartaran por deduplicacion");
     }
@@ -135,25 +159,70 @@ public class ClienteHttpDelBuzonDeIdentidad implements FuenteDeEventosDeIdentida
         return estado >= 400 && estado < 500 && estado != 401 && estado != 403;
     }
 
-    private static IdentidadNoContesta noContesto(int estado, String que) {
+    /**
+     * El mensaje de un estado que no es 200, con lo que el emisor contesto DENTRO.
+     *
+     * <p>No es estatico porque necesita el {@link JsonMapper}: leer el {@code codigo} del cuerpo es
+     * la diferencia entre decir la rama que es y adivinar una.
+     */
+    private IdentidadNoContesta noContesto(int estado, String cuerpo, String que) {
+        RespuestaAjena contesto = RespuestaAjena.de(json, cuerpo);
+        String loQueDijo = ", y contesto " + contesto.comoTexto();
         return switch (estado) {
             case 401 ->
                     new IdentidadNoContesta(
                             "`identidad` contesto 401 al "
                                     + que
-                                    + ": la credencial de servicio no vale o no se manda"
+                                    + loQueDijo
+                                    + ". La credencial de servicio no vale o no se manda"
                                     + " (kamayuk.identidad.cliente, kamayuk.identidad.credencial)."
                                     + " Se arregla en el despliegue, no en el evento");
             case 403 ->
                     new IdentidadNoContesta(
                             "`identidad` contesto 403 al "
                                     + que
-                                    + ": la cuenta de servicio de `rentas` existe y no tiene el"
-                                    + " acceso «eventos» — falta afiliarla al grupo «Consumidores"
-                                    + " del buzon» de su municipalidad en `identidad`. Se arregla"
-                                    + " en el despliegue, no en el evento");
-            default -> new IdentidadNoContesta("`identidad` contesto " + estado + " al " + que);
+                                    + loQueDijo
+                                    + ". "
+                                    + remedioDel403(contesto));
+            default ->
+                    new IdentidadNoContesta(
+                            "`identidad` contesto " + estado + " al " + que + loQueDijo);
         };
+    }
+
+    /**
+     * Que hay que ir a arreglar, segun lo que el emisor DIJO y no segun lo que se supone.
+     *
+     * <p>Los dos {@code SIN_PRIVILEGIO} de `identidad` llevan el mismo codigo —lo separa su texto,
+     * {@code GuardiaDeAcceso} desde #29 §8—, asi que aqui se mira el detalle. Es fragil por
+     * definicion, y por eso el remedio va <b>detras</b> del cuerpo literal: si el emisor reescribe
+     * su frase, quien lee el registro sigue teniendo delante lo que contesto de verdad.
+     */
+    private static String remedioDel403(RespuestaAjena contesto) {
+        if (contesto.sinDecirPorQue()) {
+            return "Y NO dijo cual de sus tres 403 es, asi que aqui no se elige ninguno: el"
+                    + " remedio sale del «codigo», y sin el hay que mirar quien contesto —puede"
+                    + " no ser `identidad` sino un proxy delante";
+        }
+        if ("SIN_IDENTIDAD_DE_SERVICIO".equals(contesto.codigo())) {
+            return "El token NO identifica una cuenta de servicio de un sistema: no falta ningun"
+                    + " permiso y afiliar a nadie a ningun grupo no lo arregla — hay que pedir el"
+                    + " token con el cliente confidencial que toca (kamayuk.identidad.cliente,"
+                    + " kamayuk.identidad.credencial)";
+        }
+        if (contesto.dice("no esta dada de alta")) {
+            return "La cuenta NO tiene ficha en `identidad`: NO se arregla afiliandola a ningun"
+                    + " grupo — o falta el alta, o el claim con que `identidad` la busca no es el"
+                    + " que el token trae (un `sub` en vez de `preferred_username` es la firma de"
+                    + " un realm con los ambitos incompletos)";
+        }
+        if (contesto.dice("privilegio")) {
+            return "La cuenta de servicio de `rentas` existe y no tiene el acceso «eventos» —"
+                    + " falta afiliarla al grupo «Consumidores del buzon» de su municipalidad en"
+                    + " `identidad`. Se arregla en el despliegue, no en el evento";
+        }
+        return "El «codigo» que contesto no es ninguno de los tres que este cliente sabe leer:"
+                + " el remedio esta en lo que dijo, arriba";
     }
 
     private EventoDeIdentidadRecibido leer(JsonNode evento) {

@@ -13,6 +13,7 @@ import java.util.UUID;
 import kamayuk.rentas.nucleo.dominio.proyeccion.FuenteDeHechosDeCatastro;
 import kamayuk.rentas.nucleo.dominio.proyeccion.HechoRecibido;
 import kamayuk.rentas.plataforma.CredencialDeServicio;
+import kamayuk.rentas.plataforma.RespuestaAjena;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
@@ -59,6 +60,28 @@ import tools.jackson.databind.json.JsonMapper;
  * <p>Lo que sigue siendo un fallo de transporte es un hecho <b>sin tipo</b>: eso no es una
  * capacidad que falte sino una respuesta que no tiene la forma de un hecho, y se arregla mirando el
  * despliegue.
+ *
+ * <h2>Y lo que el otro sistema contesto VIAJA en el mensaje (#166)</h2>
+ *
+ * <p><b>Hasta #166 aqui se decia el codigo de estado y se tiraba el cuerpo.</b> No es el defecto de
+ * su hermano —este nunca invento una causa, {@code ClienteHttpDelBuzonDeIdentidad} si (#66)— pero
+ * deja el mismo agujero: medido en `stg`, el {@code CronJob} del ingestor lleva <b>todas</b> sus
+ * corridas en rojo con «`catastro` contesto 403 al leer el buzon de catastro», y con eso no se
+ * puede saber cual de las tres ramas del 403 de `catastro` es, que se arreglan en tres sitios
+ * distintos:
+ *
+ * <ul>
+ *   <li>{@code SIN_MUNICIPALIDAD} — el token no lleva el claim que acota la corrida. Es del emisor
+ *       y de la cuenta de servicio del cliente confidencial, no de ningun permiso.
+ *   <li>{@code SIN_PRIVILEGIO} + «no esta dada de alta» — la cuenta no tiene ficha en `catastro`.
+ *       Concederle un acceso no lo arregla.
+ *   <li>{@code SIN_PRIVILEGIO} + «no tiene el privilegio» — la cuenta existe y le falta {@code
+ *       consulta_fichas}, que es el acceso con el que `catastro` publica su buzon.
+ * </ul>
+ *
+ * <p>Lo que contesto viaja tachado y recortado por {@link RespuestaAjena}: un eco de la peticion
+ * con la cabecera {@code Authorization} dentro seria el token de servicio de esta municipalidad en
+ * un registro.
  */
 public class ClienteHttpDelBuzonDeCatastro implements FuenteDeHechosDeCatastro {
 
@@ -110,11 +133,11 @@ public class ClienteHttpDelBuzonDeCatastro implements FuenteDeHechosDeCatastro {
         conCredencial(peticion);
         HttpResponse<String> respuesta = enviar(peticion, "acusar los hechos aplicados");
         if (respuesta.statusCode() != 200) {
-            throw new CatastroNoContesta(
-                    "`catastro` contesto "
-                            + respuesta.statusCode()
-                            + " al acusar. Los hechos SI estan aplicados aqui: se volveran a"
-                            + " servir y se descartaran por deduplicacion");
+            throw noContesto(
+                    respuesta.statusCode(),
+                    respuesta.body(),
+                    "acusar. Los hechos SI estan aplicados aqui: se volveran a servir y se"
+                            + " descartaran por deduplicacion");
         }
     }
 
@@ -154,8 +177,7 @@ public class ClienteHttpDelBuzonDeCatastro implements FuenteDeHechosDeCatastro {
         conCredencial(peticion);
         HttpResponse<String> respuesta = enviar(peticion, que);
         if (respuesta.statusCode() != 200) {
-            throw new CatastroNoContesta(
-                    "`catastro` contesto " + respuesta.statusCode() + " al " + que);
+            throw noContesto(respuesta.statusCode(), respuesta.body(), que);
         }
         try {
             return json.readTree(respuesta.body());
@@ -163,6 +185,71 @@ public class ClienteHttpDelBuzonDeCatastro implements FuenteDeHechosDeCatastro {
             throw new CatastroNoContesta(
                     "`catastro` contesto algo que no es JSON al " + que, ilegible);
         }
+    }
+
+    /**
+     * El mensaje de un estado que no es 200, con lo que `catastro` contesto DENTRO (#166).
+     *
+     * <p>No es estatico porque necesita el {@link JsonMapper}: leer el {@code codigo} del {@code
+     * problem+json} es la diferencia entre «contesto 403» —que no se puede diagnosticar— y decir
+     * cual de sus tres 403 es.
+     *
+     * <p>Y <b>no inventa</b> una rama cuando el emisor no la dijo: lo dice. Esa es la mitad del
+     * defecto de #66 que aqui nunca hubo y que no se va a estrenar.
+     */
+    private CatastroNoContesta noContesto(int estado, String cuerpo, String que) {
+        RespuestaAjena contesto = RespuestaAjena.de(json, cuerpo);
+        String mensaje =
+                "`catastro` contesto "
+                        + estado
+                        + " al "
+                        + que
+                        + ", y contesto "
+                        + contesto.comoTexto();
+        if (estado == 401) {
+            return new CatastroNoContesta(
+                    mensaje
+                            + ". La credencial de servicio no vale o no se manda"
+                            + " (kamayuk.rentas.ingestor.identidad.cliente,"
+                            + " kamayuk.catastro.credencial). Se arregla en el despliegue, no en"
+                            + " el hecho");
+        }
+        if (estado == 403) {
+            return new CatastroNoContesta(mensaje + ". " + remedioDel403(contesto));
+        }
+        return new CatastroNoContesta(mensaje);
+    }
+
+    /**
+     * Que hay que ir a arreglar, segun lo que `catastro` DIJO.
+     *
+     * <p>Sus dos {@code SIN_PRIVILEGIO} llevan el mismo codigo —los separa su texto, {@code
+     * GuardiaDeAcceso}— asi que aqui se mira el detalle. El remedio va <b>detras</b> del cuerpo
+     * literal a proposito: si el emisor reescribe su frase, quien lee el registro sigue teniendo
+     * delante lo que contesto de verdad.
+     */
+    private static String remedioDel403(RespuestaAjena contesto) {
+        if (contesto.sinDecirPorQue()) {
+            return "Y NO dijo por que, asi que aqui no se elige ninguna rama: hay que mirar quien"
+                    + " contesto, que puede no ser `catastro` sino un proxy delante";
+        }
+        if (contesto.dice("SIN_MUNICIPALIDAD")) {
+            return "El token NO identifica una municipalidad: no falta ningun permiso — el claim"
+                    + " sale de la cuenta de servicio del cliente confidencial"
+                    + " kamayuk-rentas-servicio-<ubigeo> en el emisor (ADR-0028 §2)";
+        }
+        if (contesto.dice("no esta dada de alta")) {
+            return "La cuenta de servicio NO tiene ficha en `catastro`: concederle un acceso no lo"
+                    + " arregla — o falta el alta en la copia local de `catastro`, o el claim con"
+                    + " que la busca no es el que el token trae";
+        }
+        if (contesto.dice("privilegio")) {
+            return "La cuenta existe y le falta el acceso «consulta_fichas», que es con el que"
+                    + " `catastro` publica su buzon —LECTURA para leerlo y REGISTRO para"
+                    + " acusarlo—. Se concede en `identidad`, no aqui";
+        }
+        return "El «codigo» que contesto no es ninguno de los que este cliente sabe leer: el"
+                + " remedio esta en lo que dijo, arriba";
     }
 
     /**
