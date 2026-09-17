@@ -3,9 +3,9 @@ package kamayuk.rentas.nucleo.infraestructura.ingestor;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import java.io.BufferedReader;
+import java.io.BufferedInputStream;
 import java.io.IOException;
-import java.io.InputStreamReader;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.ServerSocket;
@@ -356,15 +356,21 @@ class ElTokenDeServicioTest {
          */
         private record Peticion(String autorizacion, String cuerpo) {}
 
+        /**
+         * El cuerpo se lee en BYTES, y eso viene de un rojo (#212).
+         *
+         * <p>{@code Content-Length} cuenta <b>bytes</b>; leyendo ese numero de <b>caracteres</b>
+         * con un {@code Reader}, un cuerpo con {@code §} o {@code «»} pide mas de los que van a
+         * llegar, el hilo se queda bloqueado en el {@code read} y este servidor no contesta nunca.
+         * Hoy por aqui solo viaja ASCII, asi que era una bomba sin cebar; el gemelo de {@code
+         * seguridad} si la tenia cebada y fallaba una de cada dos pasadas.
+         */
         private static Peticion leerPeticion(Socket cliente) throws IOException {
-            BufferedReader lector =
-                    new BufferedReader(
-                            new InputStreamReader(
-                                    cliente.getInputStream(), StandardCharsets.UTF_8));
+            InputStream entrada = new BufferedInputStream(cliente.getInputStream());
             int longitud = 0;
             String autorizacion = "";
-            String linea = lector.readLine();
-            while (linea != null && !linea.isEmpty()) {
+            String linea = leerLinea(entrada);
+            while (!linea.isEmpty()) {
                 String enMinusculas = linea.toLowerCase(java.util.Locale.ROOT);
                 if (enMinusculas.startsWith("content-length:")) {
                     longitud = Integer.parseInt(linea.substring(linea.indexOf(':') + 1).trim());
@@ -372,18 +378,30 @@ class ElTokenDeServicioTest {
                 if (enMinusculas.startsWith("authorization:")) {
                     autorizacion = linea.substring(linea.indexOf(':') + 1).trim();
                 }
-                linea = lector.readLine();
+                linea = leerLinea(entrada);
             }
-            char[] cuerpo = new char[longitud];
-            int leidos = 0;
-            while (leidos < longitud) {
-                int n = lector.read(cuerpo, leidos, longitud - leidos);
-                if (n < 0) {
-                    break;
+            return new Peticion(
+                    autorizacion, new String(entrada.readNBytes(longitud), StandardCharsets.UTF_8));
+        }
+
+        /**
+         * Una linea de la cabecera, leida octeto a octeto sobre el flujo de BYTES.
+         *
+         * <p>No vale envolverlo en un {@code Reader} ni para esto: el decodificador se llevaria por
+         * delante los bytes del cuerpo que ya estan en el buffer.
+         *
+         * @return la linea sin su fin de linea; vacia tanto en la linea en blanco como al final
+         */
+        private static String leerLinea(InputStream entrada) throws IOException {
+            StringBuilder linea = new StringBuilder();
+            int octeto = entrada.read();
+            while (octeto >= 0 && octeto != '\n') {
+                if (octeto != '\r') {
+                    linea.append((char) octeto);
                 }
-                leidos += n;
+                octeto = entrada.read();
             }
-            return new Peticion(autorizacion, new String(cuerpo, 0, Math.max(leidos, 0)));
+            return linea.toString();
         }
 
         private static void responder(Socket cliente, int estado, String cuerpo)

@@ -1,8 +1,8 @@
 package kamayuk.rentas.nucleo.aplicacion;
 
-import java.io.BufferedReader;
+import java.io.BufferedInputStream;
 import java.io.IOException;
-import java.io.InputStreamReader;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.ServerSocket;
@@ -26,8 +26,21 @@ import java.util.function.BiFunction;
  * <p>Checkstyle prohibe importar de {@code com.sun} —con razon: es API interna del JDK— y lo dijo
  * en la primera corrida completa. {@code EmisorDeMentira} ya habia resuelto esto antes con un
  * socket pelado, asi que aqui se hace igual en vez de abrir una excepcion a la regla.
+ *
+ * <h2>El cuerpo se lee en BYTES, y eso viene de un rojo (#212)</h2>
+ *
+ * <p>{@code Content-Length} cuenta <b>bytes</b>. Leyendo ese numero de <b>caracteres</b> con un
+ * {@code Reader}, un cuerpo con {@code §} o {@code «»} —y el aviso al responsable de catastro acaba
+ * en «(ADR-0026 §4).»— pide mas de los que van a llegar: el hilo se queda bloqueado en el {@code
+ * read}, este servidor <b>no contesta nunca</b>, y el cliente muere a los diez segundos con {@code
+ * HttpTimeoutException}. El cuerpo entraba igual en la lista de la prueba, pero solo despues de que
+ * el cliente se rindiera y cerrara — o sea que la asercion media una carrera. El gemelo de esto en
+ * {@code seguridad} fallaba una de cada dos pasadas.
  */
 final class ServidorDeMentira implements AutoCloseable {
+
+    /** Lo que se espera a que termine de llegar lo anunciado, antes de rendirse (#212). */
+    private static final java.time.Duration ESPERA_DE_LECTURA = java.time.Duration.ofSeconds(2);
 
     private final ServerSocket puerta;
     private final Thread atencion;
@@ -83,38 +96,29 @@ final class ServidorDeMentira implements AutoCloseable {
     @SuppressWarnings("checkstyle:IllegalCatch")
     private void contestar(Socket conexion) {
         try (Socket abierta = conexion;
-                BufferedReader entrada =
-                        new BufferedReader(
-                                new InputStreamReader(
-                                        abierta.getInputStream(), StandardCharsets.UTF_8));
+                InputStream entrada = new BufferedInputStream(abierta.getInputStream());
                 OutputStream salida = abierta.getOutputStream()) {
-            String peticion = entrada.readLine();
-            if (peticion == null) {
+            // Que nunca se quede callado: si lo anunciado no termina de llegar, este servidor se
+            // rinde antes de que el cliente agote SU plazo, y el rojo lo pone la prueba (#212).
+            abierta.setSoTimeout((int) ESPERA_DE_LECTURA.toMillis());
+            String peticion = leerLinea(entrada);
+            if (peticion.isEmpty()) {
                 return;
             }
             String ruta = peticion.split(" ")[1];
             int largo = 0;
-            String linea;
-            while ((linea = entrada.readLine()) != null && !linea.isEmpty()) {
+            String linea = leerLinea(entrada);
+            while (!linea.isEmpty()) {
                 if (linea.toLowerCase(java.util.Locale.ROOT).startsWith("content-length:")) {
                     largo = Integer.parseInt(linea.substring(linea.indexOf(':') + 1).strip());
                 }
+                linea = leerLinea(entrada);
             }
-            char[] cuerpo = new char[largo];
-            if (largo > 0) {
-                int leidos = 0;
-                while (leidos < largo) {
-                    int ahora = entrada.read(cuerpo, leidos, largo - leidos);
-                    if (ahora < 0) {
-                        break;
-                    }
-                    leidos += ahora;
-                }
-            }
+            String cuerpo = new String(entrada.readNBytes(largo), StandardCharsets.UTF_8);
             String respuesta;
             int estado = 200;
             try {
-                respuesta = responder.apply(ruta, new String(cuerpo));
+                respuesta = responder.apply(ruta, cuerpo);
             } catch (RuntimeException fallo) {
                 estado = 500;
                 respuesta = "{\"error\":\"" + fallo.getClass().getSimpleName() + "\"}";
@@ -132,5 +136,25 @@ final class ServidorDeMentira implements AutoCloseable {
         } catch (IOException seCorto) {
             // El cliente cerro antes de leer. No es un fallo de la prueba.
         }
+    }
+
+    /**
+     * Una linea de la cabecera, leida octeto a octeto sobre el flujo de BYTES.
+     *
+     * <p>No vale envolverlo en un {@code Reader} ni para esto: el decodificador se llevaria por
+     * delante los bytes del cuerpo que ya estan en el buffer.
+     *
+     * @return la linea sin su fin de linea; cadena vacia tanto en la linea en blanco como al final
+     */
+    private static String leerLinea(InputStream entrada) throws IOException {
+        StringBuilder linea = new StringBuilder();
+        int octeto = entrada.read();
+        while (octeto >= 0 && octeto != '\n') {
+            if (octeto != '\r') {
+                linea.append((char) octeto);
+            }
+            octeto = entrada.read();
+        }
+        return linea.toString();
     }
 }

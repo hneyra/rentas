@@ -20,8 +20,10 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import kamayuk.rentas.compartido.TenantContext;
@@ -102,8 +104,18 @@ class IngestionDeCatastroJdbcTest {
     private static ServidorDeMentira canalDelResponsable;
     private static JsonMapper json;
 
-    /** Los avisos que el canal del responsable recibio de verdad. */
-    private static final List<String> AVISOS = new CopyOnWriteArrayList<>();
+    /**
+     * Los avisos que el canal del responsable recibio de verdad.
+     *
+     * <p>Es una cola con espera y no una lista porque la entrega la hace <b>otro hilo</b>: el del
+     * servidor de mentira. Afirmar sobre ella en cuanto vuelve la llamada es afirmar sobre una
+     * carrera, y su gemela en {@code seguridad} fallaba una de cada dos pasadas por eso (#212).
+     * Quien espera es {@link #esperaUnAviso()}.
+     */
+    private static final BlockingQueue<String> AVISOS = new LinkedBlockingQueue<>();
+
+    /** Lo que se espera a la entrega antes de decir que NO llego (#212). */
+    private static final java.time.Duration PLAZO_DEL_AVISO = java.time.Duration.ofSeconds(5);
 
     /**
      * Lo que el ingestor escribio en el registro.
@@ -487,10 +499,16 @@ class IngestionDeCatastroJdbcTest {
         assertThat(ACUSADOS).as("apartado Y acusado, para que deje de servirse").hasSize(1);
 
         // Y EL AVISO LLEGA. No que la linea exista: que el canal del responsable lo reciba.
-        assertThat(AVISOS).hasSize(1);
-        assertThat(AVISOS.get(0))
+        assertThat(esperaUnAviso())
                 .contains("Responsable de Catastro")
-                .contains("LA PROYECCION DEL PADRON ESTA INCOMPLETA");
+                .contains("LA PROYECCION DEL PADRON ESTA INCOMPLETA")
+                .as(
+                        "y llega ENTERO: la cola del texto, con su caracter no ASCII y la llave que"
+                                + " cierra el JSON [si el servidor de mentira contara los caracteres del"
+                                + " `Content-Length` en vez de sus bytes, aqui no llegaria nada]")
+                .contains("(ADR-0026 §4).")
+                .endsWith("}");
+        assertThat(AVISOS).as("y no llego un segundo aviso").isEmpty();
     }
 
     @Test
@@ -909,6 +927,32 @@ class IngestionDeCatastroJdbcTest {
     }
 
     /** El buzon de `catastro`, servido por HTTP de verdad. */
+    /**
+     * El aviso que el canal del responsable recibio, esperando a que llegue.
+     *
+     * <p>Si no llega, el rojo dice <b>que no llego</b> — y no un {@code []} sin sujeto, que es como
+     * salia el rojo intermitente que abrio #212.
+     */
+    private static String esperaUnAviso() {
+        try {
+            String aviso = AVISOS.poll(PLAZO_DEL_AVISO.toMillis(), TimeUnit.MILLISECONDS);
+            if (aviso == null) {
+                throw new AssertionError(
+                        "EL AVISO NO LLEGO al canal del responsable ("
+                                + canalDelResponsable.raiz()
+                                + ") en "
+                                + PLAZO_DEL_AVISO.toSeconds()
+                                + " s. El canal esta levantado y escuchando, asi que o no se hizo"
+                                + " el POST, o se hizo a otra direccion, o el canal no pudo leer"
+                                + " el cuerpo que se le mando (#54, ADR-0026 §4).");
+            }
+            return aviso;
+        } catch (InterruptedException interrumpido) {
+            Thread.currentThread().interrupt();
+            throw new AssertionError("Se interrumpio esperando el aviso", interrumpido);
+        }
+    }
+
     private static String servirElBuzon(String ruta, String peticion) {
         if (ruta.endsWith("/acuse")) {
             for (var id : json.readTree(peticion).path("eventoIds")) {

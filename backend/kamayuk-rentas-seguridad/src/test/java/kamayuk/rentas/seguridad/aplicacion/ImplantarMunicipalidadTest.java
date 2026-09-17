@@ -3,9 +3,9 @@ package kamayuk.rentas.seguridad.aplicacion;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowable;
 
-import java.io.BufferedReader;
+import java.io.BufferedInputStream;
 import java.io.IOException;
-import java.io.InputStreamReader;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.ServerSocket;
@@ -763,32 +763,29 @@ class ImplantarMunicipalidadTest {
             return List.copyOf(acusados);
         }
 
+        /**
+         * El cuerpo se lee en BYTES, y eso viene de un rojo (#212).
+         *
+         * <p>{@code Content-Length} cuenta <b>bytes</b>; leyendo ese numero de <b>caracteres</b>
+         * con un {@code Reader}, un cuerpo con {@code §} o {@code «»} pide mas de los que van a
+         * llegar, el hilo se queda bloqueado en el {@code read} y este servidor no contesta nunca.
+         * Hoy por aqui solo viaja ASCII, asi que era una bomba sin cebar; el gemelo de {@code
+         * seguridad} si la tenia cebada y fallaba una de cada dos pasadas.
+         */
         private void atender(Socket cliente) throws IOException {
-            BufferedReader lector =
-                    new BufferedReader(
-                            new InputStreamReader(
-                                    cliente.getInputStream(), StandardCharsets.UTF_8));
-            String primera = lector.readLine();
-            String linea = primera == null ? "" : primera;
+            InputStream entrada = new BufferedInputStream(cliente.getInputStream());
+            String linea = leerLinea(entrada);
             int longitud = 0;
-            String cabecera = lector.readLine();
-            while (cabecera != null && !cabecera.isEmpty()) {
+            String cabecera = leerLinea(entrada);
+            while (!cabecera.isEmpty()) {
                 if (cabecera.toLowerCase(Locale.ROOT).startsWith("content-length:")) {
                     longitud =
                             Integer.parseInt(cabecera.substring(cabecera.indexOf(':') + 1).trim());
                 }
-                cabecera = lector.readLine();
+                cabecera = leerLinea(entrada);
             }
-            char[] datos = new char[longitud];
-            int leidos = 0;
-            while (leidos < longitud) {
-                int n = lector.read(datos, leidos, longitud - leidos);
-                if (n < 0) {
-                    break;
-                }
-                leidos += n;
-            }
-            String cuerpoDeLaPeticion = new String(datos, 0, Math.max(leidos, 0));
+            String cuerpoDeLaPeticion =
+                    new String(entrada.readNBytes(longitud), StandardCharsets.UTF_8);
 
             if (estadoDeNegativa != 0) {
                 responder(cliente, estadoDeNegativa, "{\"detail\":\"la cuenta no esta afiliada\"}");
@@ -878,6 +875,26 @@ class ImplantarMunicipalidadTest {
                     + "\",\"creadoEn\":\""
                     + evento.creadoEn()
                     + "\"}";
+        }
+
+        /**
+         * Una linea de la cabecera, leida octeto a octeto sobre el flujo de BYTES.
+         *
+         * <p>No vale envolverlo en un {@code Reader} ni para esto: el decodificador se llevaria por
+         * delante los bytes del cuerpo que ya estan en el buffer.
+         *
+         * @return la linea sin su fin de linea; vacia tanto en la linea en blanco como al final
+         */
+        private static String leerLinea(InputStream entrada) throws IOException {
+            StringBuilder linea = new StringBuilder();
+            int octeto = entrada.read();
+            while (octeto >= 0 && octeto != '\n') {
+                if (octeto != '\r') {
+                    linea.append((char) octeto);
+                }
+                octeto = entrada.read();
+            }
+            return linea.toString();
         }
 
         private static void responder(Socket cliente, int estado, String cuerpo)
