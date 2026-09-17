@@ -8,8 +8,8 @@ import type { Ausencia, DatosDeLaPantalla, DatosDeUnaTabla, RutaDeLaHoja } from 
 import { porQueNoHayDato } from '../porQueNoHayDato.ts';
 import type { Reparto } from './conectores.ts';
 import { CONECTORES, loQueLaHojaDeclara } from './conectores.ts';
-import { formatearEntero } from '../dominio/formato.ts';
-import { FRASE_DEL_CONTEO } from '../i18n/textosDelMarco.ts';
+import { formatearEntero, formatearFecha } from '../dominio/formato.ts';
+import { FRASE_DE_LA_FECHA, FRASE_DEL_CONTEO } from '../i18n/textosDelMarco.ts';
 import type { SesionDeLaVentanilla } from './lecturas.ts';
 import { RUTAS, pedirUno } from './lecturas.ts';
 import { LLAVES } from './useCatalogoPermitido.ts';
@@ -159,6 +159,22 @@ function conConteo(
   );
 }
 
+/**
+ * **Lo que dice una pantalla CONECTADA, arriba y una sola vez** (#97).
+ *
+ * Va aqui y no escrito dentro del `return` para que entre en el inventario del locale: el
+ * interprete lo pasa por `traducir`, o sea que es una clave, y **una clave que nadie lista nadie la
+ * echa de menos** (#103). Ver `i18n/catalogo-de-claves.ts`.
+ */
+const NO_PUBLICADO_EN_PANTALLA: Ausencia = {
+  enElCampo: 'no publicado',
+  explicacion:
+    'Esta pantalla lee del sistema. Los campos marcados «no publicado» los pide y la operacion ' +
+    'que los sirve no los trae: no se calculan aqui, porque un numero deducido seria ' +
+    'indistinguible de uno real.',
+  tono: 'info',
+};
+
 /** Un reparto vacio, para los estados en que no hay nada que repartir. */
 const NADA: Reparto = { valores: new Map(), filas: new Map(), noPublicados: new Map() };
 
@@ -271,15 +287,30 @@ export function useDatosDeLaHoja(
     ausenciaPorCampo: reparto.noPublicados,
     // La pantalla SI tiene datos, asi que la frase de arriba no puede decir que no esta conectada.
     // Lo que queda por decir es lo que el campo concreto no trae, y eso va por campo.
-    ausencia: {
-      enElCampo: 'no publicado',
-      explicacion:
-        'Esta pantalla lee del sistema. Los campos marcados «no publicado» los pide y la ' +
-        'operacion que los sirve no los trae: no se calculan aqui, porque un numero deducido ' +
-        'seria indistinguible de uno real.',
-      tono: 'info',
-    },
+    //
+    // **Y de cuando son las cifras, cuando la operacion lo dice** (#196, regla 9 / RNF-075). La
+    // frase se arma AQUI y no en el conector porque aqui hay `t()` y alli no: un «al» escrito en un
+    // archivo de datos llegaria al DOM en castellano en cualquier idioma (#103). Se concatenan dos
+    // frases enteras y no media —cada una se traduce sola—, y por eso las dos van ya traducidas: lo
+    // que el interprete reciba entonces no es una clave, y su `traducir` lo devuelve tal cual.
+    ausencia:
+      reparto.aLaFecha === undefined
+        ? NO_PUBLICADO_EN_PANTALLA
+        : {
+            ...NO_PUBLICADO_EN_PANTALLA,
+            explicacion: `${t(NO_PUBLICADO_EN_PANTALLA.explicacion)} ${t(FRASE_DE_LA_FECHA, {
+              fecha: formatearFecha(reparto.aLaFecha),
+            })}`,
+          },
   };
 }
 
-export { CARGANDO, SIN_SUJETO, SIN_EJERCICIO, VACIO, NADA, alFallar };
+export {
+  CARGANDO,
+  NADA,
+  NO_PUBLICADO_EN_PANTALLA,
+  SIN_EJERCICIO,
+  SIN_SUJETO,
+  VACIO,
+  alFallar,
+};

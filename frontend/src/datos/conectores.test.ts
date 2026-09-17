@@ -7,6 +7,7 @@ import { CONECTORES, NO_PUBLICADO } from './conectores.ts';
 import { CONSTANCIA_NEGADA, FICHA, SIN_CAMPANIA } from './conectores/consultasDeMuestra.ts';
 import {
   ACTA_CON_USO,
+  EMBUDO,
   MUESTRA,
   RESOLUCION_SIN_CIFRAS,
 } from './conectores/fiscalizacionDeMuestra.ts';
@@ -362,6 +363,9 @@ const MUESTRAS: Readonly<Partial<Record<ClaveDeHoja, unknown>>> = {
   'con-panel': [FICHA, SIN_CAMPANIA],
   'con-doc': CONSTANCIA_NEGADA,
   'seg-aud': BITACORA,
+  // La de `fis-panel` es la **segunda** respuesta —el embudo—, que es lo que `repartir` recibe
+  // (#215, #196): la relacion de programas solo sirve para saber de que programa es.
+  'fis-panel': EMBUDO,
   // Las tres de Fiscalizacion (#179). La de `fis-prog` es la **segunda** respuesta —la muestra—,
   // porque es la que reparte: la relacion de programas solo aporta el `{id}` con que se pide.
   'fis-prog': MUESTRA,
@@ -380,7 +384,7 @@ function soloLecturaDe(clave: ClaveDeHoja): readonly string[] {
 }
 
 describe('los conectores', () => {
-  it('EL CENTINELA: estan los dieciocho que estan, y no cero ni cuarenta', () => {
+  it('EL CENTINELA: estan los diecinueve que estan, y no cero ni cuarenta', () => {
     // Cero dejaria todo lo de abajo sin sujeto. Cuarenta significaria que alguien conecto
     // pantallas cuyas operaciones no publican lo que ensenan, que es lo que este archivo evita.
     // La lista se escribe a mano y crece de una en una: conectar una pantalla es una decision, y
@@ -400,6 +404,12 @@ describe('los conectores', () => {
     // viaja en la RUTA de la operacion (`/rentas/vehiculos/{placa}`) y no en su cadena de
     // consulta; su medida —que publica cada operacion y que no— esta en `conectores/transito.ts`.
     //
+    // `fis-panel` llega con #215, y con ella Fiscalizacion queda entera: era la unica de las cuatro
+    // que #179 no conecto, y no por falta de tiempo —no habia nada que pedirle, porque lo unico
+    // que declaraba era `estado-cuenta`, que publica la deuda de UN contribuyente y ni una de sus
+    // cuatro cifras—. #196 publico el embudo, y es la primera hoja que dice **de cuando son sus
+    // cifras** por el canal de `Reparto.aLaFecha` (regla 9).
+    //
     // `tra-panel` llega con #184, sobre una ruta que YA estaba publicada y que no consumia nadie
     // —una de las diez de `/transito/reportes/`—. Es la primera hoja cuyo reparto depende de la
     // FORMA de la respuesta y no solo de sus campos: pide `?agrupadoPor=ANO` sin rango, o sea el
@@ -409,7 +419,7 @@ describe('los conectores', () => {
       [
         'aut-cat', 'aut-tram', 'coa-cost', 'coa-exp', 'coa-panel',
         'con-doc', 'con-panel',
-        'fis-actas', 'fis-prog', 'fis-res',
+        'fis-actas', 'fis-panel', 'fis-prog', 'fis-res',
         'ini-flujo', 'ini-panel', 'ini-parado', 'panel',
         'seg-aud',
         'tra-panel', 'tra-pap', 'tra-veh',

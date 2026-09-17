@@ -103,7 +103,7 @@ describe('AC4 — la raiz de la API es UNA, escrita en tres sitios que tienen qu
 });
 
 describe('AC7 — lo que se declara servido tiene que publicarlo el backend', () => {
-  it('las treinta y tres: I-1, I-3, I-4, #168, #170, #167, #169, #181, #179, #180 y la de #184', () => {
+  it('las treinta y cinco: I-1, I-3, I-4, #168, #170, #167, #169, #181, #179, #180, #184 y las dos de #215', () => {
     // La lista escrita a mano es a proposito. Derivarla de `YA_SERVIDAS` la haria pasar diga lo
     // que diga: encender una ruta es una decision, y una decision se revisa leyendo su diff. La
     // lista crece de una en una porque encenderlas todas a la vez seria cambiar 181 respuestas
@@ -136,7 +136,9 @@ describe('AC7 — lo que se declara servido tiene que publicarlo el backend', ()
       'GET /seguridad/auditoria',
       'GET /fiscalizacion/programas',
       'GET /fiscalizacion/programas/{id}/muestra',
+      'GET /fiscalizacion/programas/{id}/embudo',
       'GET /fiscalizacion/actas',
+      'GET /fiscalizacion/resoluciones',
       'GET /fiscalizacion/resoluciones/{numero}',
       'GET /transito/papeletas',
       'GET /transito/papeletas/{numero}/actos',

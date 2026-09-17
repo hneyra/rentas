@@ -28,12 +28,12 @@ import {
 const TODAS: readonly Hoja[] = ARBOL.flatMap((modulo) => [...modulo.hojas]);
 
 describe('el cruce contra lo que el backend sirve', () => {
-  it('EL CENTINELA: hay cuarenta hojas y treinta y tres operaciones servidas', () => {
+  it('EL CENTINELA: hay cuarenta hojas y treinta y cinco operaciones servidas', () => {
     // Sin esto, un arbol vacio o unas `YA_SERVIDAS` vacias dejarian todo lo de abajo pasando
     // sobre la nada — y la respuesta seria «ninguna pantalla tiene datos», que ademas parece
     // razonable.
     expect(TODAS).toHaveLength(40);
-    expect(YA_SERVIDAS).toHaveLength(33);
+    expect(YA_SERVIDAS).toHaveLength(35);
   });
 
   it('cruza por RUTA, no por verbo: dos servidas las declara el artboard como `BASE`', () => {
@@ -53,7 +53,7 @@ describe('el cruce contra lo que el backend sirve', () => {
     expect(utiles.every((o) => o.verbo !== 'PUT')).toBe(true);
   });
 
-  it('veinticuatro hojas tienen alguna operacion util, y dieciseis ninguna', () => {
+  it('veinticinco hojas tienen alguna operacion util, y quince ninguna', () => {
     const con = TODAS.filter((hoja) => operacionesUtiles(hoja).length > 0);
     // `aut-cat` entra con #168 por la ruta que el ARTBOARD le atribuye, `GET /licencias/ciiu`.
     //
@@ -97,6 +97,8 @@ describe('el cruce contra lo que el backend sirve', () => {
         'con-doc',
         'con-panel',
         'fis-actas',
+        // Entra con #215: #196 le publico el embudo que sus cuatro cifras piden.
+        'fis-panel',
         'fis-prog',
         'fis-res',
         'ini-flujo',
@@ -117,7 +119,7 @@ describe('el cruce contra lo que el backend sirve', () => {
         'valores',
       ].sort(),
     );
-    expect(TODAS.length - con.length).toBe(16);
+    expect(TODAS.length - con.length).toBe(15);
   });
 });
 
@@ -140,7 +142,7 @@ describe('el cruce contra lo que el backend sirve', () => {
  * Cuando #186 saque la ruta al conector, esto se estrecha a la igualdad y este comentario sobra.
  */
 describe('AC4 — toda hoja con conector declara la operacion que la sirve', () => {
-  it('las dieciocho que piden de verdad declaran alguna servida de lectura', () => {
+  it('las diecinueve que piden de verdad declaran alguna servida de lectura', () => {
     const mudas = Object.keys(CONECTORES).filter(
       (clave) => operacionesUtiles(hojaDe(clave as ClaveDeHoja)).length === 0,
     );
@@ -153,19 +155,23 @@ describe('AC4 — toda hoja con conector declara la operacion que la sirve', () 
     ).toEqual([]);
   });
 
-  it('EL CENTINELA: y son dieciocho, no cero', () => {
+  it('EL CENTINELA: y son diecinueve, no cero', () => {
     // Un registro de conectores vacio dejaria la comprobacion de arriba pasando sobre la nada.
-    expect(Object.keys(CONECTORES)).toHaveLength(18);
+    expect(Object.keys(CONECTORES)).toHaveLength(19);
   });
 });
 
 describe('los cinco casos no se confunden', () => {
   it('sin ninguna servida: «sin conectar», en tono informativo', () => {
-    // `fis-panel` es el ejemplo desde #167, que encendio las dos de indicadores y dejo servida
-    // a `ini-panel`. No vale cualquier hoja sin conector: hace falta una que no declare NINGUNA
-    // operacion servida —`ini-cierre`, por ejemplo, declara varias en `BASE` y por eso dice «sin
+    // **Era `fis-panel` desde #167, y dejo de valer con #215**: #196 le publico su embudo, asi
+    // que ahora declara dos servidas y este caso ya no es el suyo. `seg-sis` si lo es, y ensena la
+    // otra mitad de la regla: su unica servida es `PUT /seguridad/sesion/ejercicio`, y el cruce
+    // solo mira verbos de LECTURA porque **un PUT no dibuja una pantalla**.
+    //
+    // No vale cualquier hoja sin conector: hace falta una que no declare NINGUNA operacion servida
+    // de lectura —`ini-cierre`, por ejemplo, declara varias en `BASE` y por eso dice «sin
     // verificar», que es el caso de la prueba de abajo y no el de esta.
-    expect(porQueNoHayDato(hojaDe('fis-panel'))).toBe(NADA_SERVIDO);
+    expect(porQueNoHayDato(hojaDe('seg-sis'))).toBe(NADA_SERVIDO);
     expect(NADA_SERVIDO.tono).toBe('info');
   });
 

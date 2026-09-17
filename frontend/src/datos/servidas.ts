@@ -318,7 +318,7 @@ export interface OperacionServida {
  * servidor</b>. Si alguna contesta algo que no cuadre, la pantalla lo dira como averia y no como
  * dato: los cuatro estados de `useDatosDeLaHoja` estan puestos para eso.
  *
- * <h2>Las CUATRO de Fiscalizacion (#179), y la que se decidio NO encender</h2>
+ * <h2>Las SEIS de Fiscalizacion —cuatro de #179 y dos de #215—, y la que se decidio NO encender</h2>
  *
  * Lo que se midio aqui es el contrato generado de los controladores —`formas-de-la-api.json` y
  * `parametros-de-la-api.json`— <b>y el codigo de los seis controladores</b>, que es donde estaba
@@ -339,10 +339,26 @@ export interface OperacionServida {
  *       <b>hallado</b> y no el declarado, que es lo que decide cuantas celdas de su tabla pueden
  *       llenarse (ver `conectores/fiscalizacion.ts`).</li>
  *   <li><b>`GET /fiscalizacion/resoluciones/{numero}`</b> — la resolucion de determinacion. El
- *       numero va en la RUTA y <b>no existe ninguna operacion que publique la relacion</b>, asi
- *       que la hoja exige sujeto: `#/fis-res/RDF-2026-000001`. Es el mecanismo que #169 dejo
- *       instalado, y esta es la segunda vez que hace falta.</li>
+ *       numero va en la RUTA. Desde #193 publica ademas sus <b>tres totales</b> y su `actaId`, y
+ *       cada linea su `baseOmitida`; con D-02a abierta los importes llegan nulos y por eso publica
+ *       `esperaSusCifras`, para que la pantalla pueda escribir «sin cifrar» en vez de un cero
+ *       <b>sin adivinar</b> por que el campo esta vacio.</li>
+ *   <li><b>`GET /fiscalizacion/resoluciones`</b> (#192, y se enciende en #215) — la <b>relacion</b>,
+ *       paginada. Hasta #192 no existia, y esa ausencia era lo unico que obligaba a `fis-res` a
+ *       exigir sujeto: era la unica hoja del sistema que no podia tomar «la primera de la
+ *       relacion», de modo que abierta desde el menu <b>no ensenaba una resolucion nunca</b>. Su
+ *       unico filtro es `?contribuyente=`, por el <b>codigo del padron</b>, y no se manda.</li>
+ *   <li><b>`GET /fiscalizacion/programas/{id}/embudo`</b> (#196, y se enciende en #215) — las
+ *       cuatro cifras de `fis-panel`, juntas y cuadradas en UNA lectura. Es lo que esa hoja no
+ *       tenia: lo unico que declaraba era `estado-cuenta`, que publica la deuda de fiscalizacion de
+ *       un contribuyente y ni una de las cuatro. <b>No admite ni un parametro</b>, y una de sus
+ *       cifras —`conActa`— <b>no es</b> el rotulo que el artboard dibuja: ver
+ *       `conectores/fiscalizacion.ts`.</li>
  * </ol>
+ *
+ * <b>Y `GET /fiscalizacion/estado-cuenta` sigue apagada</b>, aunque `fis-panel` la declare y ya este
+ * conectada: publica la deuda de fiscalizacion de UN contribuyente —con `?contribuyente=`— y esta
+ * pantalla no elige a ninguno. Que una hoja tenga conector no enciende sus otras rutas.
  *
  * <b>Y la que NO se enciende, con su motivo</b>: <b>`GET /fiscalizacion/omisos`</b>, que `fis-prog`
  * si declara. Publica la <b>deteccion</b> —los 3 418 predios que el cruce senala— y la tabla de esa
@@ -456,7 +472,9 @@ export const YA_SERVIDAS: readonly OperacionServida[] = [
   { metodo: 'GET', ruta: '/seguridad/auditoria' },
   { metodo: 'GET', ruta: '/fiscalizacion/programas' },
   { metodo: 'GET', ruta: '/fiscalizacion/programas/{id}/muestra' },
+  { metodo: 'GET', ruta: '/fiscalizacion/programas/{id}/embudo' },
   { metodo: 'GET', ruta: '/fiscalizacion/actas' },
+  { metodo: 'GET', ruta: '/fiscalizacion/resoluciones' },
   { metodo: 'GET', ruta: '/fiscalizacion/resoluciones/{numero}' },
   { metodo: 'GET', ruta: '/transito/papeletas' },
   { metodo: 'GET', ruta: '/transito/papeletas/{numero}/actos' },

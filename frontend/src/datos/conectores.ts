@@ -114,6 +114,27 @@ export interface Reparto {
    * `verificaciones/el-total-es-el-que-publica-la-operacion.test.ts`.
    */
   readonly nombrados?: ReadonlyMap<string, DatoConNombre>;
+  /**
+   * **El dia al que estan las cifras de esta pantalla**, en ISO y sin formatear (#196, regla 9).
+   *
+   * <h2>Por que hace falta un canal y no vale un campo mas</h2>
+   *
+   * Porque regla 9 —RNF-075— dice que **toda cifra mostrada indica su fecha**, y hay pantallas
+   * cuyo artboard no dibuja ningun campo donde decirla: `con-panel` tiene «Fecha de cálculo» y
+   * `fis-panel` **no tiene ninguno de sus seis libre**. Inventarle un septimo seria cambiar el
+   * artboard para que quepa un dato, que es al reves de como se decide aqui.
+   *
+   * Asi que se dice **una vez, arriba**: `useDatosDeLaHoja` lo mete en la frase de pantalla que el
+   * interprete ya dibuja. Lo que viaja por aqui es la fecha **cruda** y no la frase, por lo mismo
+   * que `TablaRepartida.totalElementos` viaja como numero: un conector es dato y no tiene `t()`
+   * delante, y «al 17/09/2026» escrito aqui llegaria al DOM en castellano en cualquier idioma
+   * (#103).
+   *
+   * No es de toda pantalla: lo pone quien recibe un `aLaFecha` de su operacion. `fis-panel` es la
+   * primera, y no es decorativo —las tres ultimas etapas de su embudo estan congeladas y la
+   * primera se resuelve contra el padron de hoy—.
+   */
+  readonly aLaFecha?: string;
   /** Los campos que la operacion servida NO publica, con la palabra que va en su hueco. */
   readonly noPublicados: ReadonlyMap<Coordenada, string>;
 }
@@ -239,6 +260,33 @@ export interface Conector {
    * el `enLaRuta` con que el marco lee el sujeto.
    */
   readonly exigeSujeto?: boolean;
+  /**
+   * **Esta hoja LEE el sujeto de la ruta si lo trae, y sin el toma la primera de la relacion**
+   * (#215).
+   *
+   * Es la hermana de `exigeSujeto` y no una variante suya: alli el sujeto es una **condicion
+   * previa** —sin el no se pide nada y la pantalla lo dice— y aqui es una **eleccion**.
+   *
+   * <h2>El caso que la trae, y por que no bastaba ninguno de los dos extremos</h2>
+   *
+   * `fis-res` exigia sujeto desde #179, y con motivo: `GET /fiscalizacion/resoluciones/{numero}` es
+   * de UNA resolucion y **no existia ninguna operacion que publicara la relacion**, asi que no
+   * habia «primera» que tomar. #192 la publico, y entonces la hoja podia tomarla como `coa-exp`.
+   *
+   * Retirar `exigeSujeto` a secas —que es lo que #215 propone— arregla lo que mas se nota —abierta
+   * desde el menu la pantalla **no ensenaba una resolucion nunca**— y **pierde lo otro**:
+   * `catalogo.ts` deriva `enLaRuta.sujeto` de `exigeSujeto`, y sin esa linea el marco **tira** el
+   * numero de la direccion, de modo que `#/fis-res/RDF-2026-000001` dejaria de abrir esa
+   * resolucion. Dos capacidades por una.
+   *
+   * Asi que se declara la tercera forma, que es la union de las dos: el catalogo deriva el sitio
+   * del sujeto de `exigeSujeto` **o** de esta, y `useDatosDeLaHoja` solo se detiene por la primera.
+   * Quien decide que hacer sin sujeto es el conector, que es quien sabe si hay una primera.
+   *
+   * **Las dos juntas no tienen sentido** —«sin el no pido nada» y «sin el tomo la primera» se
+   * contradicen— y lo vigila una guarda.
+   */
+  readonly admiteSujeto?: boolean;
   /**
    * **Que decir cuando exige sujeto y la direccion no lo trae**, si no vale la frase de por
    * omision (#180).

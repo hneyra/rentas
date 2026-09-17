@@ -1154,10 +1154,19 @@ export interface FilaDeLaMuestra {
 /**
  * Un acta de inspeccion, de `GET /fiscalizacion/actas` (#179).
  *
- * **Publica el lado HALLADO y no el declarado**, y esa es la propiedad que decide lo que la
- * pantalla puede dibujar: hay `areaHallada` y `usoHallado`, y no hay `areaDeclarada` ni
- * `usoDeclarado`. El contraste de los dos lados lo publica la LIQUIDACION —`GET
- * /fiscalizacion/resultados`, `lineas[]`—, que es otra etapa.
+ * **Publica LAS DOS MITADES del contraste desde #191**, y eso es lo que decide lo que la pantalla
+ * puede dibujar. Hasta entonces sólo había `areaHallada` y `usoHallado`, y las columnas «Declarado»
+ * y «Diferencia» salían en raya en todas sus filas; ahora viajan `areaDeclarada`, `usoDeclarado` y
+ * `diferenciaDeArea`, resueltos por `ActaConLoDeclarado` desde la versión de ficha que el acta
+ * referencia.
+ *
+ * **`diferenciaDeArea` viaja HECHA, y ese es el punto**: «nunca negativa, nula si falta un lado».
+ * Restar aquí dos magnitudes servidas para llenar una celda es calcular lo que nadie publicó, y esa
+ * columna es la que sostiene la determinación.
+ *
+ * **Los tres son nulos y eso NO es «no publicado»: es «no consta»** — un acta **vehicular** no
+ * tiene área ni uso declarados contra los que contrastar, y una predial de un predio sin ficha
+ * registrada a la fecha de la visita tampoco. Se cierra con una ficha, no publicando un campo.
  *
  * **`usoHallado` nulo es «no se anoto», que no es «coincide con lo declarado»**, y solo un acta
  * predial lo lleva. `hallazgo` es lo que una persona anoto —`CONFORME`, `OMISO`, `SUBVALUADOR`,
@@ -1181,7 +1190,10 @@ export interface ActaDeFiscalizacion {
   readonly fechaVisita: string;
   readonly fiscalizador: string | null;
   readonly hallazgo: string | null;
+  readonly areaDeclarada: string | null;
   readonly areaHallada: string | null;
+  readonly diferenciaDeArea: string | null;
+  readonly usoDeclarado: string | null;
   readonly usoHallado: string | null;
   readonly detalle: string | null;
   readonly estado: string;
@@ -1204,6 +1216,14 @@ export interface LineaDeterminada {
   readonly ejercicio: number;
   readonly determinado: string | null;
   readonly declarado: string | null;
+  /**
+   * **La base que no se declaró, `determinado − declarado`, RESTADA POR EL BACKEND** (#193).
+   *
+   * Los dos sumandos ya viajaban y la resta no, así que la columna «Base omitida S/» decía la raya:
+   * restarlos aquí sería aritmética sobre dinero en el navegador (regla 1, RNF-055). Nunca
+   * negativa, por lo mismo que `diferenciaDeArea`; nula hasta D-02a.
+   */
+  readonly baseOmitida: string | null;
   readonly diferencia: string | null;
   readonly multa: string | null;
   readonly total: string | null;
@@ -1227,14 +1247,28 @@ export interface LineaDeterminada {
  * **`cargosAsentados` llega nulo en el `GET`**: solo lo trae la respuesta de `POST
  * /fiscalizacion/transferencias`, que es la que asienta.
  *
+ * **Y desde #193 publica sus TRES totales**, sumados por `TotalesDeLaDeterminacion` —funcion pura,
+ * regla 6— en vez de dejarlos a la pantalla: sumar las lineas aqui daria tres cifras al centimo
+ * indistinguibles de unas liquidadas sobre el papel que vuelve una diferencia **deuda exigible**.
+ * Con cualquier sumando ausente el total sale **nulo**, nunca parcial, y `esperaSusCifras` dice
+ * cual de los dos huecos es el suyo: el campo existe y llego vacio (D-02a), que no es lo mismo que
+ * no publicarlo.
+ *
  * **Lo que NO publica, y hace falta saberlo antes de leerla**: ningun interes —no lo publica
- * ninguna de las 16 operaciones de fiscalizacion—, ningun total de la resolucion entera, y ningun
- * numero de acta: lo que enlaza hacia atras es `nLiquidacion`.
+ * ninguna de las 16 operaciones de fiscalizacion, y es #213—, y ningun **numero de acta**: lo que
+ * enlaza hacia atras es `nLiquidacion`, y `actaId` es un identificador **interno** —el propio
+ * backend lo dice: «un acta no se numera, asi que esto sirve para enlazar hacia atras, no para
+ * escribirlo en un campo rotulado N.º de acta»—.
  */
 export interface ResolucionDeDeterminacion {
   readonly numero: string;
   readonly fecha: string;
   readonly aLaFecha: string;
+  /**
+   * El acta de la que salio la liquidacion. **Identificador interno, no el numero de un
+   * documento**: ver el javadoc de arriba y el de `FIS_RES` en `conectores/fiscalizacion.ts`.
+   */
+  readonly actaId: number;
   readonly nLiquidacion: string;
   readonly versionDeLaLiquidacion: number;
   readonly periodoDesde: number;
@@ -1250,8 +1284,84 @@ export interface ResolucionDeDeterminacion {
   readonly fichaNuevaId: number | null;
   readonly usuarioRegistro: string | null;
   readonly observacion: string | null;
+  /** La suma del tributo dejado de pagar de todas las lineas; nulo hasta D-02a (#193). */
+  readonly insolutoOmitido: string | null;
+  /** La suma de las multas de todas las lineas; nulo hasta D-02a y D-02c (#193). */
+  readonly multaTributaria: string | null;
+  /** La suma de los dos anteriores; **nulo si falta cualquiera**, jamas parcial (#193). */
+  readonly totalLiquidado: string | null;
+  /**
+   * **Si los totales siguen pendientes** (#193), publicado justo para que la interfaz pueda
+   * escribir «sin cifrar» en vez de un cero — que un contribuyente leeria como «no debe nada»—
+   * **sin adivinar** por que el campo llego vacio.
+   */
+  readonly esperaSusCifras: boolean;
   readonly lineas: readonly LineaDeterminada[];
   readonly cargosAsentados: number | null;
+}
+
+/**
+ * Una fila de la relacion de resoluciones, de `GET /fiscalizacion/resoluciones` (#192).
+ *
+ * **Lleva lo que hace falta para ELEGIR una y ni una cifra**: el cuadro de la determinacion y sus
+ * tres totales los publica `GET /fiscalizacion/resoluciones/{numero}`, y traerlos aqui obligaria a
+ * leer el detalle de cada fila de la pagina para pintar una lista que no los dibuja.
+ *
+ * Hasta #192 **no existia**, y la consecuencia esta medida: esta era la unica hoja del sistema que
+ * no podia tomar «la primera de la relacion» —`coa-exp`, `coa-cost`, `tra-pap`, `fis-prog` y
+ * `fis-actas` lo hacen— porque no habia relacion, de modo que abierta desde el menu **no ensenaba
+ * una resolucion nunca**.
+ *
+ * `contribuyente` sale del padron en UNA lectura por pagina, y es nulo —con su codigo— si el padron
+ * ya no lo tiene: la fila sale igual, porque ocultarla escondia justo el caso que hay que revisar.
+ */
+export interface ResolucionEnLaRelacion {
+  readonly numero: string;
+  readonly fecha: string;
+  readonly codContribuyente: string | null;
+  readonly contribuyente: string | null;
+  readonly predioId: number | null;
+  readonly vehiculoId: number | null;
+  readonly nLiquidacion: string;
+  readonly versionDeLaLiquidacion: number;
+  readonly actaId: number;
+  readonly periodoDesde: number;
+  readonly periodoHasta: number;
+  readonly documentoSustento: string;
+}
+
+/**
+ * El embudo de un programa de fiscalizacion, de `GET /fiscalizacion/programas/{id}/embudo` (#196).
+ *
+ * **Las cuatro cifras juntas, cuadradas y en UNA lectura**, que es lo que hace que `fis-panel` deje
+ * de estar sin conectar. Componerlas con el `totalElementos` de cuatro operaciones distintas es
+ * exactamente lo que `datos/conectores.ts` prohibe: cuatro peticiones para cuatro numeros que
+ * ninguna operacion afirma que signifiquen eso, y un embudo compuesto en el navegador **se lee
+ * igual** que uno publicado sin que ninguno de los dos se pueda cuadrar.
+ *
+ * **`conActa` NO es «con acta cerrada», y el nombre lo dice a proposito.** Un acta cerrada no
+ * existe aqui: `EstadoDeActa` declara **dos** valores —`ABIERTA` y `ANULADA`— desde #214, que
+ * retiro `LIQUIDADA`, `RELIQUIDADA` y `TRANSFERIDA` porque nadie las escribia y las tres se
+ * **derivan** —de que exista su liquidacion, de que tenga mas de una version y de que su
+ * liquidacion tenga resolucion—. Un `conActaCerrada` valdria cero siempre, en verde y sin sintoma.
+ * Lo que este campo cuenta es cuantas unidades del programa tienen acta **viva**.
+ *
+ * **`aLaFecha` no es decorativo** (regla 9, RNF-075): las tres ultimas etapas estan congeladas por
+ * lo que se sorteo y se visito, y la primera se resuelve contra el padron de HOY.
+ *
+ * `detectadosPorCruce` es nulo si el programa no declara sus parametros de sorteo, y entonces
+ * `parametroQueFalta` dice cual — o sea que la ausencia viene **con su causa dentro**.
+ */
+export interface EmbudoDelPrograma {
+  readonly programaId: number;
+  readonly codigo: string;
+  readonly ejercicio: number | null;
+  readonly aLaFecha: string;
+  readonly detectadosPorCruce: number | null;
+  readonly parametroQueFalta: string | null;
+  readonly programados: number;
+  readonly conActa: number;
+  readonly conDiferencia: number;
 }
 
 // ── La sesion ──────────────────────────────────────────────────────────────────────
@@ -1552,6 +1662,22 @@ export const RUTAS = {
   muestraDelPrograma: (id: number, ventana: Readonly<Record<string, string>> = {}) =>
     conParametros(`/fiscalizacion/programas/${String(id)}/muestra`, ventana),
   /**
+   * **El embudo de UN programa: las cuatro cifras de `fis-panel`, juntas y cuadradas** (#196).
+   *
+   * `{id}` es el mismo identificador interno de la muestra, y sale de la misma relacion. La
+   * operacion **no admite ni un parametro** —`parametros-de-la-api.json` la declara con los cuatro
+   * grupos vacios—, asi que aqui no hay ventana ni filtro que componer: el embudo es de un programa
+   * y ya.
+   *
+   * <h2>Y por que esta ruta existe en vez de componer el embudo aqui</h2>
+   *
+   * Porque las cuatro etapas se podian componer con el `totalElementos` de cuatro operaciones
+   * distintas —omisos, muestra, actas y resultados— y eso es lo que `datos/conectores.ts` prohibe:
+   * serian cuatro peticiones para cuatro numeros que ninguna operacion afirma que signifiquen eso,
+   * tres de ellas acotadas a mano al programa. #196 lo publico del lado que puede cuadrarlo.
+   */
+  embudoDelPrograma: (id: number) => `/fiscalizacion/programas/${String(id)}/embudo`,
+  /**
    * La primera acta de inspeccion de la relacion (#179).
    *
    * `?tamano=1` por el mismo motivo que arriba: la tabla de la hoja contrasta los conceptos de UNA
@@ -1571,6 +1697,27 @@ export const RUTAS = {
    * haya que volver a medirlo.
    */
   actasDeFiscalizacion: '/fiscalizacion/actas?tamano=1',
+  /**
+   * **La primera resolucion de determinacion de la relacion** (#192, #215).
+   *
+   * Hasta #192 esta operacion **no existia**, y era lo que obligaba a `fis-res` a exigir sujeto:
+   * era la unica hoja del sistema que no podia tomar «la primera de la relacion» —`coa-exp` y las
+   * otras dos de este modulo lo hacen— porque no habia relacion, de modo que abierta desde el menu
+   * **no ensenaba una resolucion nunca**. Esa era la mitad de #215 que mas se nota.
+   *
+   * <h2>Y NO pagina, que es lo que #228 midio y dejo escrito</h2>
+   *
+   * La tabla de esta hoja son los EJERCICIOS de una resolucion, **no una relacion**, y este
+   * `?tamano=1` sirve para elegir CUAL se dibuja: paginar esta lectura **no paginaria esa tabla**.
+   * Lo que le falta no son los mandos sino el **selector**, que es un filtro —`kamayuk-lib`#94 y
+   * #172—. Lo que si tiene desde #215 es la otra mitad: si la direccion trae un numero, se pide
+   * ESE y esta lectura no se hace (ver `FIS_RES`).
+   *
+   * **Sin `?contribuyente=`**, que es el unico filtro que la operacion admite: acotarla exige haber
+   * elegido a alguien, y elegirlo aqui seria decidir por quien atiende de quien es la resolucion
+   * que se mira. Ademas un codigo que no existe es **404** y no una relacion sin filtrar.
+   */
+  resolucionesDeDeterminacion: '/fiscalizacion/resoluciones?tamano=1',
   /**
    * La resolucion de determinacion de UN numero (#179).
    *
