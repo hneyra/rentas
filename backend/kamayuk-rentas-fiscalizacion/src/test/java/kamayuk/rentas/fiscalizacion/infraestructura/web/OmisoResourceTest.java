@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 import kamayuk.rentas.contribuyentes.ResumenDeContribuyente;
 import kamayuk.rentas.dominio.AreaM2;
+import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.fiscalizacion.dominio.CondicionFiscalizada;
 import kamayuk.rentas.fiscalizacion.dominio.FilaDeOmisos;
@@ -18,8 +19,12 @@ import org.junit.jupiter.api.Test;
  * <p>Hasta #545 la columna «Titular» de {@code fisc_omisos} ensenaba {@code C-000001}. Resolver el
  * nombre desde el cliente cuesta una peticion por fila, y esta lectura ya cruza catastro con
  * rentas: el nombre lo tiene delante.
+ *
+ * <p>Y desde #194, la cuarta columna de importe: «Diferencia S/» se pasaba {@code null} a mano en
+ * el resource y no existia en el dominio, asi que el dia que D-02a se firmara habria seguido
+ * saliendo nula en verde mientras las otras tres se llenaban solas.
  */
-@DisplayName("#545 — El titular de la fila de omisos")
+@DisplayName("#545, #194 — El titular de la fila de omisos, y su «Diferencia S/»")
 class OmisoResourceTest {
 
     private static final long UNO = 41L;
@@ -96,6 +101,56 @@ class OmisoResourceTest {
         assertThat(fila.valorDeclaradoS()).isNull();
         assertThat(fila.diferenciaS()).isNull();
         assertThat(fila.impuestoOmitidoS()).isNull();
+    }
+
+    @Test
+    @DisplayName("#194 — con los dos valores cifrados, «Diferencia S/» sale RESTADA y no nula")
+    void laDiferenciaSaleRestada() {
+        OmisoResource fila = OmisoResource.de(valorizada("4800.00", "3000.00"), PADRON);
+
+        assertThat(fila.diferenciaS())
+                .as("hasta #194 este campo se pasaba `null` a mano y no existia en el dominio")
+                .isEqualTo("1800.00");
+    }
+
+    @Test
+    @DisplayName("#194 — quien declaro de mas no tiene diferencia en contra: cero, no negativo")
+    void declararDeMasNoEsUnaDiferenciaEnContra() {
+        OmisoResource fila = OmisoResource.de(valorizada("3000.00", "4800.00"), PADRON);
+
+        assertThat(fila.diferenciaS())
+                .as(
+                        "una diferencia negativa en esta columna se cobraria al reves. Sale «0» y"
+                                + " no «0.00» porque es Dinero.CERO, el mismo cero que la columna"
+                                + " hermana de superficie ya publica con AreaM2.CERO")
+                .isEqualTo("0");
+    }
+
+    @Test
+    @DisplayName("#194 — con un solo lado cifrado no hay diferencia: nula, nunca cero")
+    void conUnSoloLadoNoHayDiferencia() {
+        assertThat(OmisoResource.de(valorizada("4800.00", null), PADRON).diferenciaS())
+                .as("un cero diria «se valorizo y coincide», que es lo contrario de lo que pasa")
+                .isNull();
+        assertThat(OmisoResource.de(valorizada(null, "3000.00"), PADRON).diferenciaS()).isNull();
+    }
+
+    private static FilaDeOmisos valorizada(
+            @org.jspecify.annotations.Nullable String catastral,
+            @org.jspecify.annotations.Nullable String declarado) {
+        return new FilaDeOmisos(
+                7L,
+                "000000000000000020",
+                "01",
+                List.of(UNO),
+                new Ejercicio(2024),
+                CondicionFiscalizada.SUBVALUADOR,
+                false,
+                AreaM2.de("300.00"),
+                AreaM2.de("200.00"),
+                catastral == null ? null : Dinero.de(catastral),
+                declarado == null ? null : Dinero.de(declarado),
+                null);
     }
 
     private static FilaDeOmisos fila(List<Long> titulares) {

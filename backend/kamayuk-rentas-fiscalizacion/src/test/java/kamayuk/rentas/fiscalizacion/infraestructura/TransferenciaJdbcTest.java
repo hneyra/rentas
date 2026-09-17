@@ -28,6 +28,8 @@ import kamayuk.rentas.auditoria.Origen;
 import kamayuk.rentas.auditoria.OrigenContext;
 import kamayuk.rentas.catastro.TransferenciaDeFiscalizacion;
 import kamayuk.rentas.catastro.prueba.CatastroEnMemoria;
+import kamayuk.rentas.compartido.Pagina;
+import kamayuk.rentas.compartido.Paginacion;
 import kamayuk.rentas.compartido.TenantContext;
 import kamayuk.rentas.contribuyentes.aplicacion.DirectorioJdbc;
 import kamayuk.rentas.contribuyentes.infraestructura.ContribuyenteRepositoryJdbc;
@@ -55,12 +57,14 @@ import kamayuk.rentas.esquema.ContextoDeTenant;
 import kamayuk.rentas.fiscalizacion.aplicacion.ConsultaDeResoluciones;
 import kamayuk.rentas.fiscalizacion.aplicacion.TransferirARentas;
 import kamayuk.rentas.fiscalizacion.dominio.CondicionFiscalizada;
+import kamayuk.rentas.fiscalizacion.dominio.CriterioDeResoluciones;
 import kamayuk.rentas.fiscalizacion.dominio.EstadoDeLiquidacion;
 import kamayuk.rentas.fiscalizacion.dominio.LineaDeLiquidacion;
 import kamayuk.rentas.fiscalizacion.dominio.Liquidacion;
 import kamayuk.rentas.fiscalizacion.dominio.MovimientoDeLiquidacion;
 import kamayuk.rentas.fiscalizacion.dominio.ResolucionDeDeterminacion;
 import kamayuk.rentas.fiscalizacion.dominio.ResolucionDeDeterminacionRepository;
+import kamayuk.rentas.fiscalizacion.dominio.ResolucionEnLaRelacion;
 import kamayuk.rentas.fiscalizacion.dominio.TipoDeFiscalizacion;
 import kamayuk.rentas.plataforma.tenant.TenantTransactionManager;
 import org.junit.jupiter.api.AfterAll;
@@ -611,6 +615,73 @@ class TransferenciaJdbcTest {
     }
 
     @Nested
+    @DisplayName("#192 — La RELACION de resoluciones, que no existia")
+    class DeLaRelacion {
+
+        @Test
+        @DisplayName("la fila trae la liquidacion que transfirio y el periodo, en una consulta")
+        void laFilaTraeLoQueHaceFaltaParaElegir() {
+            Escenario escenario = sembrar(municipalidadA, Dinero.de("450.00"));
+            TransferirARentas.Transferencia hecha = transferir(escenario);
+
+            Pagina<ResolucionEnLaRelacion> relacion =
+                    relacionDe(CriterioDeResoluciones.deContribuyente(escenario.contribuyenteId()));
+
+            assertThat(relacion.contenido()).hasSize(1);
+            assertThat(relacion.totalElementos()).isEqualTo(1);
+            ResolucionEnLaRelacion fila = relacion.contenido().get(0);
+            assertThat(fila.numero()).isEqualTo(hecha.resolucion().numero());
+            assertThat(fila.numeroDeLiquidacion())
+                    .as("una relacion que no dice de que es obliga a abrir cada fila para saberlo")
+                    .isEqualTo(escenario.numeroDeLiquidacion());
+            assertThat(fila.periodoDesde().valor()).isEqualTo(FISCALIZADO.valor());
+            assertThat(fila.periodoHasta().valor()).isEqualTo(FISCALIZADO.valor());
+            assertThat(fila.actaId()).isEqualTo(escenario.actaId());
+        }
+
+        @Test
+        @DisplayName("el filtro por contribuyente acota de verdad, y el sobre cuenta lo filtrado")
+        void elFiltroPorContribuyenteAcota() {
+            Escenario escenario = sembrar(municipalidadA, Dinero.de("450.00"));
+            transferir(escenario);
+            Escenario otro = sembrar(municipalidadA, Dinero.de("450.00"));
+            transferir(otro);
+
+            Pagina<ResolucionEnLaRelacion> suya =
+                    relacionDe(CriterioDeResoluciones.deContribuyente(otro.contribuyenteId()));
+
+            assertThat(suya.totalElementos())
+                    .as("un parametro declarado y no leido contesta 200 y devuelve otra cosa")
+                    .isEqualTo(1);
+            assertThat(suya.contenido().get(0).numeroDeLiquidacion())
+                    .isEqualTo(otro.numeroDeLiquidacion());
+        }
+
+        @Test
+        @DisplayName("desde B no se ve la de A: lo decide RLS y no un WHERE que alguien olvida")
+        void desdeBNoSeVeLaRelacionDeA() {
+            Escenario escenario = sembrar(municipalidadA, Dinero.de("450.00"));
+            TransferirARentas.Transferencia deLaA = transferir(escenario);
+
+            TenantContext.fijar(new MunicipalidadId(municipalidadB));
+            Pagina<ResolucionEnLaRelacion> desdeB = relacionDe(CriterioDeResoluciones.todas());
+
+            assertThat(desdeB.contenido())
+                    .extracting(ResolucionEnLaRelacion::numero)
+                    .doesNotContain(deLaA.resolucion().numero());
+        }
+
+        private Pagina<ResolucionEnLaRelacion> relacionDe(CriterioDeResoluciones criterio) {
+            return transaccion.execute(
+                    estado ->
+                            resoluciones.consultar(
+                                    criterio,
+                                    new Paginacion(
+                                            0, 50, "numero", Paginacion.Direccion.ASCENDENTE)));
+        }
+    }
+
+    @Nested
     @DisplayName("#593 — El papel se descarga de lo guardado, y descargarlo no emite nada")
     class DeLaDescargaDelPapel {
 
@@ -979,6 +1050,15 @@ class TransferenciaJdbcTest {
         @Override
         public Optional<ResolucionDeDeterminacion> porNumero(String numero) {
             return real.porNumero(numero);
+        }
+
+        @Override
+        public kamayuk.rentas.compartido.Pagina<
+                        kamayuk.rentas.fiscalizacion.dominio.ResolucionEnLaRelacion>
+                consultar(
+                        kamayuk.rentas.fiscalizacion.dominio.CriterioDeResoluciones criterio,
+                        kamayuk.rentas.compartido.Paginacion paginacion) {
+            return real.consultar(criterio, paginacion);
         }
 
         @Override

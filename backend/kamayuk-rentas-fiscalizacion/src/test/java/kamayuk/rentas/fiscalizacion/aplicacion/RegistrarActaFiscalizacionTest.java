@@ -14,6 +14,7 @@ import kamayuk.rentas.catastro.LectorDeFichas;
 import kamayuk.rentas.compartido.Pagina;
 import kamayuk.rentas.compartido.Paginacion;
 import kamayuk.rentas.dominio.Observacion;
+import kamayuk.rentas.fiscalizacion.dominio.ActaConLoDeclarado;
 import kamayuk.rentas.fiscalizacion.dominio.ActaFiscalizacion;
 import kamayuk.rentas.fiscalizacion.dominio.ActaFiscalizacionRepository;
 import kamayuk.rentas.fiscalizacion.dominio.CriterioDeProgramas;
@@ -106,7 +107,7 @@ class RegistrarActaFiscalizacionTest {
     @Test
     @DisplayName("resuelve la ficha vigente a la fecha de la visita, no la de hoy")
     void resuelveLaFichaVigenteALaFechaDeLaVisita() {
-        ActaFiscalizacion guardada =
+        ActaConLoDeclarado guardada =
                 servicio.registrarPredial(
                         PROGRAMA_PREDIAL,
                         1L,
@@ -119,14 +120,14 @@ class RegistrarActaFiscalizacionTest {
                         null,
                         OBSERVACION);
 
-        assertThat(guardada.fichaId()).isEqualTo(900L);
+        assertThat(guardada.acta().fichaId()).isEqualTo(900L);
         assertThat(auditados).hasSize(1);
     }
 
     @Test
     @DisplayName("un acta vehicular nunca lleva ficha")
     void unActaVehicularNuncaLlevaFicha() {
-        ActaFiscalizacion guardada =
+        ActaConLoDeclarado guardada =
                 servicio.registrarVehicular(
                         PROGRAMA_VEHICULAR,
                         1L,
@@ -137,8 +138,8 @@ class RegistrarActaFiscalizacionTest {
                         null,
                         OBSERVACION);
 
-        assertThat(guardada.fichaId()).isNull();
-        assertThat(guardada.esPredial()).isFalse();
+        assertThat(guardada.acta().fichaId()).isNull();
+        assertThat(guardada.acta().esPredial()).isFalse();
     }
 
     @Test
@@ -180,7 +181,7 @@ class RegistrarActaFiscalizacionTest {
     @Test
     @DisplayName("refiscalizar al mismo contribuyente agrega una version, no reemplaza la anterior")
     void refiscalizarAgregaUnaVersion() {
-        ActaFiscalizacion primera =
+        ActaConLoDeclarado primera =
                 servicio.registrarVehicular(
                         PROGRAMA_VEHICULAR,
                         1L,
@@ -190,7 +191,7 @@ class RegistrarActaFiscalizacionTest {
                         Hallazgo.OMISO,
                         null,
                         OBSERVACION);
-        ActaFiscalizacion segunda =
+        ActaConLoDeclarado segunda =
                 servicio.registrarVehicular(
                         PROGRAMA_VEHICULAR,
                         1L,
@@ -201,8 +202,8 @@ class RegistrarActaFiscalizacionTest {
                         null,
                         OBSERVACION);
 
-        assertThat(primera.version()).isEqualTo(1);
-        assertThat(segunda.version()).isEqualTo(2);
+        assertThat(primera.acta().version()).isEqualTo(1);
+        assertThat(segunda.acta().version()).isEqualTo(2);
         assertThat(actas.filas).hasSize(2);
     }
 
@@ -210,6 +211,22 @@ class RegistrarActaFiscalizacionTest {
         private final List<ActaFiscalizacion> filas = new ArrayList<>();
         private final Map<String, Integer> versiones = new HashMap<>();
         private long siguienteId = 1;
+
+        /**
+         * El embudo (#196) no se mide contra un doble: lo mide el repositorio contra PostgreSQL.
+         */
+        @Override
+        public int unidadesConActaViva(long programaId) {
+            throw new UnsupportedOperationException(
+                    "el embudo se mide contra PostgreSQL, no contra este doble");
+        }
+
+        /** Sin proyeccion de catastro no hay lado declarado que devolver (#191). */
+        @Override
+        public Map<Long, ActaConLoDeclarado.LoDeclarado> loDeclaradoPorFicha(
+                java.util.Set<Long> fichaIds) {
+            return Map.of();
+        }
 
         @Override
         public ActaFiscalizacion insertar(ActaFiscalizacion acta) {

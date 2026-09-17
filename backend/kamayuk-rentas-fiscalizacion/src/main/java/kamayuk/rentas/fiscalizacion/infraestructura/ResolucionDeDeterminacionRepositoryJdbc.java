@@ -10,6 +10,7 @@ import kamayuk.rentas.auditoria.OrigenContext;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.fiscalizacion.dominio.ResolucionDeDeterminacion;
 import kamayuk.rentas.fiscalizacion.dominio.ResolucionDeDeterminacionRepository;
+import kamayuk.rentas.persistencia.OrdenSeguro;
 import kamayuk.rentas.persistencia.RepositorioJdbc;
 import org.jspecify.annotations.Nullable;
 import org.springframework.dao.DuplicateKeyException;
@@ -120,6 +121,85 @@ public class ResolucionDeDeterminacionRepositoryJdbc extends RepositorioJdbc
                 .param("contribuyente", contribuyenteId)
                 .query(ResolucionDeDeterminacionRepositoryJdbc::mapear)
                 .list();
+    }
+
+    /**
+     * Lo que la relacion ensena de cada resolucion, con su liquidacion, en UNA consulta (#192).
+     *
+     * <p>El {@code JOIN} es interno y no externo a proposito: {@code
+     * resolucion_determinacion.liquidacion_id} es {@code NOT NULL} y tiene foranea (V49), asi que
+     * no puede haber una resolucion sin liquidacion. Con un {@code LEFT JOIN} una fila huerfana
+     * saldria con el periodo en blanco en vez de no salir, y aqui no hay ninguna que ocultar.
+     *
+     * <p>Las columnas del {@code SELECT} van con alias para que la lista blanca de orden pueda
+     * nombrarlas sin ambiguedad: {@code numero} y {@code version} estan en las dos tablas.
+     */
+    private static final String RELACION =
+            "SELECT r.numero, r.fecha, r.contribuyente_id, r.predio_id, r.vehiculo_id,"
+                    + " r.documento_sustento, l.numero AS numero_liquidacion,"
+                    + " l.version AS version_liquidacion, l.acta_id, l.ejercicio_desde,"
+                    + " l.ejercicio_hasta"
+                    + " FROM resolucion_determinacion r"
+                    + " JOIN liquidacion_fiscalizacion l ON l.id = r.liquidacion_id";
+
+    private static final String CONTEO =
+            "SELECT count(*) FROM resolucion_determinacion r"
+                    + " JOIN liquidacion_fiscalizacion l ON l.id = r.liquidacion_id";
+
+    /**
+     * Por que se admite ordenar, y por que estas cuatro.
+     *
+     * <p>Son las que la fila <b>ensena con ese nombre</b>: pedir por un nombre que la fila no
+     * publica es el defecto que #608 tuvo que arreglar con {@code publicandoComo}. {@code
+     * desempatandoPor("numero")} da el orden total que una lectura paginada necesita —{@code fecha}
+     * empata en cuanto dos resoluciones se dictan el mismo dia, que es lo normal en una tanda— y se
+     * elige {@code numero} y no {@code id} porque el numero SI sale en la fila: un desempate por
+     * una columna que el cliente no ve es indistinguible de un orden inestable (#543, #548).
+     */
+    static final OrdenSeguro ORDEN =
+            OrdenSeguro.sobre("numero", "fecha", "contribuyente_id", "acta_id")
+                    .publicandoComo("actaId", "acta_id")
+                    .desempatandoPor("numero");
+
+    @Override
+    public kamayuk.rentas.compartido.Pagina<
+                    kamayuk.rentas.fiscalizacion.dominio.ResolucionEnLaRelacion>
+            consultar(
+                    kamayuk.rentas.fiscalizacion.dominio.CriterioDeResoluciones criterio,
+                    kamayuk.rentas.compartido.Paginacion paginacion) {
+
+        StringBuilder donde = new StringBuilder(" WHERE 1 = 1");
+        Map<String, Object> parametros = new HashMap<>();
+        if (criterio.contribuyenteId() != null) {
+            donde.append(" AND r.contribuyente_id = :contribuyente");
+            parametros.put("contribuyente", criterio.contribuyenteId());
+        }
+
+        return paginar(
+                RELACION + donde,
+                CONTEO + donde,
+                parametros,
+                paginacion,
+                ORDEN,
+                ResolucionDeDeterminacionRepositoryJdbc::mapearLaRelacion);
+    }
+
+    private static kamayuk.rentas.fiscalizacion.dominio.ResolucionEnLaRelacion mapearLaRelacion(
+            java.sql.ResultSet fila, int numeroDeFila) throws java.sql.SQLException {
+        Object predioId = fila.getObject("predio_id");
+        Object vehiculoId = fila.getObject("vehiculo_id");
+        return new kamayuk.rentas.fiscalizacion.dominio.ResolucionEnLaRelacion(
+                fila.getString("numero"),
+                fila.getDate("fecha").toLocalDate(),
+                fila.getLong("contribuyente_id"),
+                predioId == null ? null : fila.getLong("predio_id"),
+                vehiculoId == null ? null : fila.getLong("vehiculo_id"),
+                fila.getString("numero_liquidacion"),
+                fila.getInt("version_liquidacion"),
+                fila.getLong("acta_id"),
+                new kamayuk.rentas.dominio.Ejercicio(fila.getInt("ejercicio_desde")),
+                new kamayuk.rentas.dominio.Ejercicio(fila.getInt("ejercicio_hasta")),
+                fila.getString("documento_sustento"));
     }
 
     private static ResolucionDeDeterminacion conIdentificador(

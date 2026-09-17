@@ -35,6 +35,15 @@ import org.jspecify.annotations.Nullable;
  * (#198). Viajan en {@code null} y la interfaz escribe «sin cifra». Ponerles un número supuesto
  * produciría una esquela de cobranza sobre un valor inventado.
  *
+ * <p><b>Pero los cuatro llegan por el mismo camino desde #194, y hasta ese issue no era así.</b>
+ * Tres mapeaban un campo de {@link FilaDeOmisos} que hoy vale {@code null}; {@code diferenciaS} se
+ * pasaba literalmente {@code null} <b>aquí</b>, y no existía ningún {@code diferencia} en el
+ * dominio del que pudiera salir. La consecuencia no era cosmética: el día que D-02a se firme, los
+ * otros tres se llenan solos —el dominio los calcula y este {@code record} ya los copia— y éste
+ * habría seguido saliendo nulo <b>en verde</b>, con el contrato declarando el campo y la interfaz
+ * leyéndolo. Ahora sale de {@link FilaDeOmisos#diferencia()}, que es donde se derivan los otros
+ * derivados de la fila.
+ *
  * <p>Lo que sí viaja con valor es la comparación de superficies, que es estructura, y viaja como
  * {@link AreaM2}: el serializador que {@code ConfiguracionDeJson} registra la escribe {@code
  * "180.50"}, sin unidad. Hasta #546 estos tres campos eran {@code String} compuestos con {@code
@@ -61,7 +70,9 @@ import org.jspecify.annotations.Nullable;
  * @param diferenciaDeArea la diferencia, nunca negativa
  * @param valorCatastralS siempre {@code null} hasta D-02a
  * @param valorDeclaradoS siempre {@code null} hasta D-02a
- * @param diferenciaS siempre {@code null} hasta D-02a
+ * @param diferenciaS el valor catastral menos el declarado, <b>derivado</b> por {@link
+ *     FilaDeOmisos#diferencia()} (#194); nulo mientras cualquiera de los dos lo sea, o sea hasta
+ *     D-02a
  * @param impuestoOmitidoS siempre {@code null} hasta D-02a
  */
 public record OmisoResource(
@@ -124,7 +135,7 @@ public record OmisoResource(
                 fila.diferenciaDeArea(),
                 texto(fila.valorCatastral()),
                 texto(fila.valorDeclarado()),
-                null,
+                texto(fila.diferencia()),
                 texto(fila.impuestoOmitido()));
     }
 

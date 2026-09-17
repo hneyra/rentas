@@ -930,7 +930,10 @@
         "fechaVisita": "texto",
         "fiscalizador": "texto",
         "hallazgo": "texto",
+        "areaDeclarada": "texto",
         "areaHallada": "texto",
+        "diferenciaDeArea": "texto",
+        "usoDeclarado": "texto",
         "usoHallado": "texto",
         "detalle": "texto",
         "estado": "texto"
@@ -1075,6 +1078,17 @@
     "totalPaginas": "entero",
     "hayMas": "booleano"
   },
+  "GET /fiscalizacion/programas/{id}/embudo": {
+    "programaId": "entero",
+    "codigo": "texto",
+    "ejercicio": "entero",
+    "aLaFecha": "texto",
+    "detectadosPorCruce": "entero",
+    "parametroQueFalta": "texto",
+    "programados": "entero",
+    "conActa": "entero",
+    "conDiferencia": "entero"
+  },
   "GET /fiscalizacion/programas/{id}/muestra": {
     "contenido": [
       {
@@ -1099,10 +1113,34 @@
     "totalPaginas": "entero",
     "hayMas": "booleano"
   },
+  "GET /fiscalizacion/resoluciones": {
+    "contenido": [
+      {
+        "numero": "texto",
+        "fecha": "texto",
+        "codContribuyente": "texto",
+        "contribuyente": "texto",
+        "predioId": "entero",
+        "vehiculoId": "entero",
+        "nLiquidacion": "texto",
+        "versionDeLaLiquidacion": "entero",
+        "actaId": "entero",
+        "periodoDesde": "entero",
+        "periodoHasta": "entero",
+        "documentoSustento": "texto"
+      }
+    ],
+    "pagina": "entero",
+    "tamano": "entero",
+    "totalElementos": "entero",
+    "totalPaginas": "entero",
+    "hayMas": "booleano"
+  },
   "GET /fiscalizacion/resoluciones/{numero}": {
     "numero": "texto",
     "fecha": "texto",
     "aLaFecha": "texto",
+    "actaId": "entero",
     "nLiquidacion": "texto",
     "versionDeLaLiquidacion": "entero",
     "periodoDesde": "entero",
@@ -1118,11 +1156,16 @@
     "fichaNuevaId": "entero",
     "usuarioRegistro": "texto",
     "observacion": "texto",
+    "insolutoOmitido": "texto",
+    "multaTributaria": "texto",
+    "totalLiquidado": "texto",
+    "esperaSusCifras": "booleano",
     "lineas": [
       {
         "ejercicio": "entero",
         "determinado": "texto",
         "declarado": "texto",
+        "baseOmitida": "texto",
         "diferencia": "texto",
         "multa": "texto",
         "total": "texto",
@@ -3302,7 +3345,10 @@
     "fechaVisita": "texto",
     "fiscalizador": "texto",
     "hallazgo": "texto",
+    "areaDeclarada": "texto",
     "areaHallada": "texto",
+    "diferenciaDeArea": "texto",
+    "usoDeclarado": "texto",
     "usoHallado": "texto",
     "detalle": "texto",
     "estado": "texto"
@@ -3333,6 +3379,7 @@
     "numero": "texto",
     "fecha": "texto",
     "aLaFecha": "texto",
+    "actaId": "entero",
     "nLiquidacion": "texto",
     "versionDeLaLiquidacion": "entero",
     "periodoDesde": "entero",
@@ -3348,11 +3395,16 @@
     "fichaNuevaId": "entero",
     "usuarioRegistro": "texto",
     "observacion": "texto",
+    "insolutoOmitido": "texto",
+    "multaTributaria": "texto",
+    "totalLiquidado": "texto",
+    "esperaSusCifras": "booleano",
     "lineas": [
       {
         "ejercicio": "entero",
         "determinado": "texto",
         "declarado": "texto",
+        "baseOmitida": "texto",
         "diferencia": "texto",
         "multa": "texto",
         "total": "texto",
@@ -3374,7 +3426,10 @@
     "fechaVisita": "texto",
     "fiscalizador": "texto",
     "hallazgo": "texto",
+    "areaDeclarada": "texto",
     "areaHallada": "texto",
+    "diferenciaDeArea": "texto",
+    "usoDeclarado": "texto",
     "usoHallado": "texto",
     "detalle": "texto",
     "estado": "texto"

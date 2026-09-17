@@ -46,6 +46,54 @@ public final class ResolucionesEnMemoria implements ResolucionDeDeterminacionRep
         return guardada;
     }
 
+    /**
+     * La relacion en memoria, ordenada por numero y paginada a mano (#192).
+     *
+     * <p>No compone el {@code JOIN} con la liquidacion: el doble no tiene liquidaciones. Lo que
+     * comprueba contra la base de verdad —el periodo y el numero de la liquidacion en cada fila— es
+     * {@code TransferenciaJdbcTest}.
+     */
+    @Override
+    public kamayuk.rentas.compartido.Pagina<
+                    kamayuk.rentas.fiscalizacion.dominio.ResolucionEnLaRelacion>
+            consultar(
+                    kamayuk.rentas.fiscalizacion.dominio.CriterioDeResoluciones criterio,
+                    kamayuk.rentas.compartido.Paginacion paginacion) {
+        List<ResolucionDeDeterminacion> filtradas =
+                guardadas.stream()
+                        .filter(
+                                r ->
+                                        criterio.contribuyenteId() == null
+                                                || r.contribuyenteId()
+                                                        == criterio.contribuyenteId())
+                        .sorted(Comparator.comparing(ResolucionDeDeterminacion::numero))
+                        .toList();
+        int desde = Math.min(paginacion.pagina() * paginacion.tamano(), filtradas.size());
+        int hasta = Math.min(desde + paginacion.tamano(), filtradas.size());
+        return kamayuk.rentas.compartido.Pagina.de(
+                filtradas.subList(desde, hasta).stream()
+                        .map(ResolucionesEnMemoria::enLaRelacion)
+                        .toList(),
+                paginacion,
+                filtradas.size());
+    }
+
+    private static kamayuk.rentas.fiscalizacion.dominio.ResolucionEnLaRelacion enLaRelacion(
+            ResolucionDeDeterminacion resolucion) {
+        return new kamayuk.rentas.fiscalizacion.dominio.ResolucionEnLaRelacion(
+                resolucion.numero(),
+                resolucion.fecha(),
+                resolucion.contribuyenteId(),
+                resolucion.predioId(),
+                resolucion.vehiculoId(),
+                "LIQ-EN-MEMORIA",
+                1,
+                resolucion.liquidacionId(),
+                new kamayuk.rentas.dominio.Ejercicio(resolucion.fecha().getYear()),
+                new kamayuk.rentas.dominio.Ejercicio(resolucion.fecha().getYear()),
+                resolucion.documentoSustento());
+    }
+
     @Override
     public Optional<ResolucionDeDeterminacion> porNumero(String numero) {
         return guardadas.stream().filter(r -> r.numero().equalsIgnoreCase(numero)).findFirst();

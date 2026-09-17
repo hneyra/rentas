@@ -133,6 +133,22 @@ public class MuestraDelProgramaRepositoryJdbc extends RepositorioJdbc
     }
 
     /**
+     * Cuantas unidades sortea la muestra del programa (#196).
+     *
+     * <p>Sin {@code DISTINCT}: la muestra es una fila por predio y {@code programa_muestra} solo se
+     * agrega, asi que contar filas ES contar unidades. No filtra por municipalidad: RLS.
+     */
+    @Override
+    public int tamanoDeLaMuestra(long programaId) {
+        Integer cuantas =
+                jdbc().sql("SELECT count(*)" + DESDE + " WHERE programa_id = :programaId")
+                        .param("programaId", programaId)
+                        .query(Integer.class)
+                        .single();
+        return cuantas == null ? 0 : cuantas;
+    }
+
+    /**
      * Los predios que otro programa <b>que admite visitas</b> ya se llevó.
      *
      * <p>El estado se lee de {@code programa_fiscalizacion} y no se copia en la fila: un programa

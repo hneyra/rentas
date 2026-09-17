@@ -34,6 +34,17 @@ public final class LiquidacionesEnMemoria implements LiquidacionRepository {
         contribuyentePorActa.put(actaId, contribuyenteId);
     }
 
+    /**
+     * El embudo (#196) se mide contra PostgreSQL: el DISTINCT y la ultima version son del motor.
+     */
+    @Override
+    public int unidadesConDiferencia(
+            long programaId,
+            java.util.Set<kamayuk.rentas.fiscalizacion.dominio.CondicionFiscalizada> condiciones) {
+        throw new UnsupportedOperationException(
+                "el embudo se mide contra PostgreSQL, no contra este doble");
+    }
+
     @Override
     public Liquidacion insertar(Liquidacion liquidacion, List<LineaDeLiquidacion> nuevas) {
         long id = siguiente++;

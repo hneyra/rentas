@@ -3,16 +3,20 @@ package kamayuk.rentas.fiscalizacion.aplicacion;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import kamayuk.rentas.compartido.Pagina;
+import kamayuk.rentas.compartido.Paginacion;
 import kamayuk.rentas.contribuyentes.DirectorioDeContribuyentes;
 import kamayuk.rentas.contribuyentes.ResumenDeContribuyente;
 import kamayuk.rentas.documentos.EmitirDocumento;
 import kamayuk.rentas.documentos.FormatoDeDocumento;
 import kamayuk.rentas.dominio.Ejercicio;
+import kamayuk.rentas.fiscalizacion.dominio.CriterioDeResoluciones;
 import kamayuk.rentas.fiscalizacion.dominio.LineaDeLiquidacion;
 import kamayuk.rentas.fiscalizacion.dominio.Liquidacion;
 import kamayuk.rentas.fiscalizacion.dominio.LiquidacionRepository;
 import kamayuk.rentas.fiscalizacion.dominio.ResolucionDeDeterminacion;
 import kamayuk.rentas.fiscalizacion.dominio.ResolucionDeDeterminacionRepository;
+import kamayuk.rentas.fiscalizacion.dominio.ResolucionEnLaRelacion;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -114,6 +118,29 @@ public class ConsultaDeResoluciones {
     @Transactional(readOnly = true)
     public List<ResolucionConsultada> deContribuyente(long contribuyenteId) {
         return resoluciones.deContribuyente(contribuyenteId).stream().map(this::componer).toList();
+    }
+
+    /**
+     * La <b>relacion</b> de resoluciones de determinacion, paginada (#192).
+     *
+     * <p>Es la operacion que faltaba, y lo que faltaba no era un filtro: era poder llegar a una
+     * resolucion sin saber su numero. La pantalla {@code resolucion_determinacion_fisc} es la unica
+     * del sistema que no puede tomar «la primera de la relacion» como hacen las demas, porque no
+     * hay relacion; abierta desde el menu no ensena ninguna nunca.
+     *
+     * <p><b>No compone {@link ResolucionConsultada}</b>, y esa es la decision. Componerla lee la
+     * liquidacion, su detalle y el padron <b>por fila</b>: para una resolucion son tres consultas y
+     * esta bien; para una pagina de veinte son sesenta. La relacion devuelve {@link
+     * ResolucionEnLaRelacion}, que el repositorio resuelve en una sola consulta, y quien quiera el
+     * cuadro entero pide esa resolucion por su numero.
+     *
+     * <p>{@code @Transactional(readOnly = true)} por lo mismo que las de arriba: sin transaccion no
+     * hay {@code SET LOCAL} y la politica RLS falla en vez de devolver filas.
+     */
+    @Transactional(readOnly = true)
+    public Pagina<ResolucionEnLaRelacion> buscar(
+            CriterioDeResoluciones criterio, Paginacion paginacion) {
+        return resoluciones.consultar(criterio, paginacion);
     }
 
     private ResolucionConsultada componer(ResolucionDeDeterminacion resolucion) {

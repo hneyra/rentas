@@ -182,11 +182,25 @@
     "opcionales": ["direccion", "ejercicio", "nDePrograma", "ordenarPor", "pagina", "tamano"],
     "enElCuerpo": []
   },
+  "GET /fiscalizacion/programas/{id}/embudo": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
   "GET /fiscalizacion/programas/{id}/muestra": {
     "obligatorios": [],
     "algunoDeEstos": [],
     "condicionales": [],
     "opcionales": ["direccion", "ordenarPor", "pagina", "predio", "tamano"],
+    "enElCuerpo": []
+  },
+  "GET /fiscalizacion/resoluciones": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["contribuyente", "direccion", "ordenarPor", "pagina", "tamano"],
     "enElCuerpo": []
   },
   "GET /fiscalizacion/resoluciones/{numero}": {

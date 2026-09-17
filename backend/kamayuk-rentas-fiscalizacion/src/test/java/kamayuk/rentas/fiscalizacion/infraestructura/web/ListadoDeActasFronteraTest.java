@@ -19,6 +19,7 @@ import kamayuk.rentas.compartido.TenantContext;
 import kamayuk.rentas.dominio.MunicipalidadId;
 import kamayuk.rentas.esquema.BaseDeDatosDePrueba;
 import kamayuk.rentas.esquema.ContextoDeTenant;
+import kamayuk.rentas.esquema.ProyeccionDeCatastro;
 import kamayuk.rentas.fiscalizacion.aplicacion.ConsultaDeActas;
 import kamayuk.rentas.fiscalizacion.infraestructura.ActaFiscalizacionRepositoryJdbc;
 import kamayuk.rentas.plataforma.tenant.TenantTransactionManager;
@@ -100,9 +101,29 @@ class ListadoDeActasFronteraTest {
         programaVehicular = crearPrograma(municipalidadA, "PF-A-02", "VEHICULAR");
 
         // Tres actas prediales del mismo programa: son las que el embudo tiene que contar.
-        sembrarPredial(municipalidadA, programaPredial, titularA, "CONFORME", null, "A. UNO");
+        // «A. UNO» midio lo mismo que consta declarado: diferencia cero, y eso es un dato.
         sembrarPredial(
-                municipalidadA, programaPredial, titularA, "USO_DISTINTO", "COMERCIO", "A. DOS");
+                municipalidadA,
+                programaPredial,
+                titularA,
+                "CONFORME",
+                null,
+                "A. UNO",
+                "120.00",
+                "120.00",
+                "CASA HABITACION");
+        // «A. DOS» midio 180 m2 de mas y otro uso: las dos mitades del contraste (#191).
+        sembrarPredial(
+                municipalidadA,
+                programaPredial,
+                titularA,
+                "USO_DISTINTO",
+                "COMERCIO",
+                "A. DOS",
+                "300.00",
+                "120.00",
+                "CASA HABITACION");
+        // «A. TRES» es de un predio que no consta en el catastro: sin ficha, sin lado declarado.
         sembrarPredial(municipalidadA, programaPredial, titularA, "OMISO", null, "A. TRES");
         // Y una vehicular de OTRO programa: sale sin filtro y no en la del programa predial.
         sembrarVehicular(municipalidadA, programaVehicular, titularA, "A04", "V. CUATRO");
@@ -110,6 +131,10 @@ class ListadoDeActasFronteraTest {
         long titularB = crearContribuyente(municipalidadB, "B-000001", "70900002");
         long programaB = crearPrograma(municipalidadB, "PF-B-01", "PREDIAL");
         sembrarPredial(municipalidadB, programaB, titularB, "CONFORME", null, "B. VECINA");
+
+        // El paso que en produccion dispara un evento de `catastro`: sin el, `ficha_ref` esta
+        // vacia y el lado declarado del contraste sale nulo aunque el escenario tenga fichas.
+        ProyeccionDeCatastro.proyectar(base, municipalidadA);
 
         DriverManagerDataSource pool = new DriverManagerDataSource();
         pool.setUrl(base.url());
@@ -179,6 +204,69 @@ class ListadoDeActasFronteraTest {
 
             assertThat(cuerpo).contains("\"usoHallado\":\"COMERCIO\"");
             assertThat(cuerpo).contains("\"hallazgo\":\"USO_DISTINTO\"");
+        }
+    }
+
+    @Nested
+    @DisplayName("#191 — el lado DECLARADO del contraste, que faltaba entero")
+    class ElLadoDeclarado {
+
+        @Test
+        @DisplayName("el acta publica las dos mitades y la diferencia HECHA, no la raya")
+        void lasDosMitadesYLaDiferencia() throws Exception {
+            String dos = actaDe("A. DOS");
+
+            assertThat(dos)
+                    .as("la tabla se titula «lo que el verificador midio frente a lo declarado»")
+                    .contains("\"areaDeclarada\":\"120.00\"")
+                    .contains("\"areaHallada\":\"300.00\"")
+                    .contains("\"usoDeclarado\":\"CASA HABITACION\"")
+                    .contains("\"usoHallado\":\"COMERCIO\"");
+            assertThat(dos)
+                    .as("restarla en el navegador es publicar una cifra que nadie afirma")
+                    .contains("\"diferenciaDeArea\":\"180.00\"");
+        }
+
+        @Test
+        @DisplayName("medir lo mismo que consta declarado da CERO, y cero es un dato")
+        void medirLoMismoDaCero() throws Exception {
+            assertThat(actaDe("A. UNO"))
+                    .contains("\"areaDeclarada\":\"120.00\"")
+                    .as("«0» y no «0.00»: es AreaM2.CERO, la misma que publica la deteccion")
+                    .contains("\"diferenciaDeArea\":\"0\"");
+        }
+
+        @Test
+        @DisplayName("un predio que no consta en el catastro sale sin lado declarado, no con cero")
+        void sinFichaNoHayLadoDeclarado() throws Exception {
+            String tres = actaDe("A. TRES");
+
+            assertThat(tres)
+                    .as("un cero diria «declaro cero», que es una acusacion y no un dato ausente")
+                    .contains("\"areaDeclarada\":null")
+                    .contains("\"usoDeclarado\":null")
+                    .contains("\"diferenciaDeArea\":null");
+        }
+
+        @Test
+        @DisplayName(
+                "un acta vehicular no tiene lado declarado: un vehiculo no declara area ni uso")
+        void unActaVehicularNoTieneLadoDeclarado() throws Exception {
+            assertThat(actaDe("V. CUATRO"))
+                    .contains("\"areaDeclarada\":null")
+                    .contains("\"usoDeclarado\":null")
+                    .contains("\"diferenciaDeArea\":null");
+        }
+
+        /** El objeto JSON de esa acta, recortado del arreglo por su fiscalizador. */
+        private String actaDe(String fiscalizador) throws Exception {
+            String cuerpo = actas(null, null, null).getResponse().getContentAsString();
+            for (String candidato : cuerpo.split("\\},\\{")) {
+                if (candidato.contains("\"fiscalizador\":\"" + fiscalizador + "\"")) {
+                    return candidato;
+                }
+            }
+            throw new AssertionError("No salio el acta de " + fiscalizador + ": " + cuerpo);
         }
     }
 
@@ -339,22 +427,83 @@ class ListadoDeActasFronteraTest {
             String hallazgo,
             @Nullable String usoHallado,
             String fiscalizador) {
+        sembrarPredial(
+                municipalidadId,
+                programaId,
+                contribuyenteId,
+                hallazgo,
+                usoHallado,
+                fiscalizador,
+                null,
+                null,
+                null);
+    }
+
+    /**
+     * El acta predial, con lo que midio en campo y con la VERSION de ficha que referencia (#191).
+     *
+     * <p>La ficha se proyecta como {@code rol_ingestor_catastro} y no como {@code kamayuk_app}: la
+     * aplicacion solo tiene {@code SELECT} sobre {@code ficha_ref} (V4), que es justo lo que hace
+     * que esta lectura sea una lectura y no otra copia del padron.
+     */
+    private static void sembrarPredial(
+            long municipalidadId,
+            long programaId,
+            long contribuyenteId,
+            String hallazgo,
+            @Nullable String usoHallado,
+            String fiscalizador,
+            @Nullable String areaHallada,
+            @Nullable String areaDeclarada,
+            @Nullable String usoDeclarado) {
         long predioId = crearPredio(municipalidadId);
+        Long fichaId =
+                areaDeclarada == null && usoDeclarado == null
+                        ? null
+                        : crearFicha(municipalidadId, predioId, areaDeclarada, usoDeclarado);
         ejecutarComoApp(
                 municipalidadId,
                 "INSERT INTO acta_fiscalizacion (municipalidad_id, programa_id, version,"
-                        + " contribuyente_id, predio_id, fecha_visita, fiscalizador, hallazgo,"
-                        + " uso_hallado, estado, observacion, usuario_registro)"
-                        + " VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, 'ABIERTA', 'siembra', 'prueba')"
-                        + " RETURNING id",
+                        + " contribuyente_id, predio_id, ficha_id, fecha_visita, fiscalizador,"
+                        + " hallazgo, area_hallada, uso_hallado, estado, observacion,"
+                        + " usuario_registro)"
+                        + " VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, 'ABIERTA', 'siembra',"
+                        + "         'prueba') RETURNING id",
                 municipalidadId,
                 programaId,
                 contribuyenteId,
                 predioId,
+                fichaId,
                 VISITA,
                 fiscalizador,
                 hallazgo,
+                areaHallada == null ? null : new java.math.BigDecimal(areaHallada),
                 usoHallado);
+    }
+
+    /**
+     * Una version de ficha del escenario. La <b>proyecta</b> {@link ProyeccionDeCatastro} al final
+     * de la siembra, que es el unico camino por el que una fila entra en {@code ficha_ref}: lleva
+     * su evento y su huella (V9) y la escribe {@code rol_ingestor_catastro}, porque {@code
+     * kamayuk_app} solo tiene {@code SELECT} sobre esa tabla (V4).
+     */
+    private static long crearFicha(
+            long municipalidadId,
+            long predioId,
+            @Nullable String areaTerreno,
+            @Nullable String uso) {
+        return ejecutarComoApp(
+                municipalidadId,
+                "INSERT INTO ficha_catastral_de_prueba (municipalidad_id, predio_id, tipo, version,"
+                        + " area_terreno, uso, vigencia_desde, origen, documento_origen,"
+                        + " observacion, usuario_registro)"
+                        + " VALUES (?, ?, 'UNICA', 1, ?, ?, ?, 'DECLARACION_JURADA', 'DJ-SIEMBRA',"
+                        + "         'Siembra de la prueba', 'prueba') RETURNING id",
+                municipalidadId,
+                predioId,
+                areaTerreno == null ? null : new java.math.BigDecimal(areaTerreno),
+                uso,
+                VISITA.minusYears(1));
     }
 
     private static void sembrarVehicular(
@@ -442,7 +591,12 @@ class ListadoDeActasFronteraTest {
     }
 
     private static long ejecutarComoApp(long municipalidadId, String sql, Object... valores) {
-        try (Connection app = base.conexion(BaseDeDatosDePrueba.APP)) {
+        return ejecutarComo(BaseDeDatosDePrueba.APP, municipalidadId, sql, valores);
+    }
+
+    private static long ejecutarComo(
+            String rol, long municipalidadId, String sql, Object... valores) {
+        try (Connection app = base.conexion(rol)) {
             ContextoDeTenant.fijar(app, municipalidadId);
             try (PreparedStatement sentencia = app.prepareStatement(sql)) {
                 for (int i = 0; i < valores.length; i++) {

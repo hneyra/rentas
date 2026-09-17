@@ -3104,6 +3104,53 @@ const OPERACIONES_ADICIONALES = {
         ' maneras distintas (#586).',
     },
   ],
+  // `fisc_estado_cuenta` es la pantalla del PANEL de Fiscalizacion, y lo que
+  // dibuja son cuatro cifras de un embudo —detectados por cruce, programados,
+  // con acta, con diferencia—. Lo que declaraba es «GET /fiscalizacion/estado-cuenta»,
+  // que publica OTRA cosa: la deuda de fiscalizacion de UN contribuyente, con
+  // `?contribuyente=` obligatorio y ni una de las cuatro cifras.
+  //
+  // Es UNA operacion y no cuatro a proposito (#196): las cuatro se podian sacar
+  // del `totalElementos` de omisos, muestra, actas y resultados y componerlas en
+  // el navegador, y eso son cuatro peticiones para cuatro numeros que ninguna
+  // operacion afirma que signifiquen eso, tres de ellas acotadas a mano al
+  // programa. Un embudo compuesto en el navegador se lee igual que uno publicado
+  // y solo uno de los dos se puede cuadrar.
+  //
+  // Cuelga de `/programas/{id}` porque el embudo es DE un programa: sus cuatro
+  // cifras no existen sin uno, igual que la muestra.
+  fisc_estado_cuenta: [
+    {
+      operationId: 'fisc_embudo_del_programa',
+      metodo: 'get',
+      ruta: '/api/v1/fiscalizacion/programas/{id}/embudo',
+      antes: true,
+      parametros: [
+        {
+          nombre: 'id',
+          en: 'path',
+          descripcion: 'El programa cuyo embudo se lee; sale de `GET /fiscalizacion/programas`',
+        },
+      ],
+      titulo: 'Embudo de un programa de fiscalización',
+      descripcion:
+        'Las cuatro etapas del programa en una sola lectura y sobre la misma foto: cuántos predios' +
+        ' señala el cruce, cuántos sorteó la muestra, cuántas unidades tienen acta viva y cuántas' +
+        ' sostienen una determinación. Agregada por #196: `fis-panel` era la única hoja de' +
+        ' Fiscalización sin conectar, y no por falta de tiempo —no había nada que pedirle—.' +
+        ' **Las cuatro cuentan UNIDADES, no papeles**: refiscalizar levanta una segunda acta y' +
+        ' reliquidar emite una segunda liquidación, y contar filas haría que el embudo se' +
+        ' ensanchara. `detectadosPorCruce` se resuelve contra el padrón de HOY con los parámetros' +
+        ' del propio programa, así que se mueve sola mientras las otras tres están congeladas por' +
+        ' lo que se sorteó y se visitó: por eso la respuesta lleva `aLaFecha` (regla 9). Si el' +
+        ' programa no declara sus parámetros de sorteo —los anteriores a V60 no los tienen— sale' +
+        ' nula y `parametroQueFalta` nombra cuál. **`conActa` NO es «con acta cerrada»**: el' +
+        ' estado de un acta no lo mueve nada en este sistema —toda acta nace ABIERTA y ningún' +
+        ' camino la cambia—, así que un campo con ese nombre valdría cero siempre; lo que se' +
+        ' cuenta es cuántas unidades tienen acta levantada y no anulada. Un programa que no existe' +
+        ' es 404 y no cuatro ceros, que se leerían como «no ha detectado nada».',
+    },
+  ],
   // `fisc_predial` declara «POST /fiscalizacion/predial/actas» como su endpoint
   // —levantar el acta— y hasta #599 no habia por donde volver a leerla. #546 se
   // nego a publicar la lectura y dejo el motivo escrito: el cuerpo del POST
@@ -3194,6 +3241,55 @@ const OPERACIONES_ADICIONALES = {
         ' versión anterior queda intacta, así que el padrón anterior se reconstruye pidiendo la' +
         ' ficha vigente a una fecha anterior. Sin sustento documental no se transfiere, y' +
         ' transferir dos veces la misma liquidación se rechaza.',
+    },
+  ],
+  // `resolucion_determinacion_fisc` declara «GET /fiscalizacion/resoluciones/{numero}» como su
+  // unico endpoint: la resolucion POR SU NUMERO EXACTO. Hasta #192 no habia
+  // ninguna RELACION, y `ConsultaDeResoluciones.deContribuyente` estaba escrita
+  // en la capa de aplicacion sin ningun controlador que la expusiera.
+  //
+  // Lo que eso costaba, medido: esta es la unica pantalla del sistema que no
+  // puede tomar «la primera de la relacion» —las demas lo hacen, `coa-exp`
+  // entre ellas— porque no hay primera, asi que abierta desde el menu no
+  // ensena una resolucion nunca: el numero tiene que llegar en la direccion. Y
+  // el numero no lo publica ninguna otra operacion salvo la respuesta del POST
+  // que la creo.
+  //
+  // UN filtro y no tres. «Estado» no existe en el dominio —`resolucion_determinacion`
+  // no admite UPDATE desde V49 y no hay historial del que derivarlo, al reves
+  // que la liquidacion— y «Ejercicio» es ambiguo: una resolucion tiene el de su
+  // numeracion y el periodo que fiscaliza, y no son el mismo. Publicar
+  // cualquiera de los dos seria un filtro que no filtra o uno que elige en
+  // silencio, que es lo que #431, #432 y #544 tuvieron que retirar.
+  resolucion_determinacion_fisc: [
+    {
+      operationId: 'fisc_resoluciones_listado',
+      metodo: 'get',
+      ruta: '/api/v1/fiscalizacion/resoluciones',
+      antes: true,
+      parametros: [
+        {
+          nombre: 'contribuyente',
+          descripcion:
+            'Acota a las resoluciones de un contribuyente, por su CODIGO del padron; un codigo' +
+            ' que no existe es 404 y no la relacion entera',
+        },
+      ],
+      paginacion: true,
+      titulo: 'Relación de resoluciones de determinación',
+      descripcion:
+        'Las resoluciones de determinación de fiscalización de la municipalidad, para poder' +
+        ' ELEGIR una en vez de tener que llegar con su número en la mano. Agregada por #192: la' +
+        ' pantalla declaraba sólo la lectura por número exacto, así que era la única del sistema' +
+        ' que no podía abrir por «la primera de la relación» —no había relación— y abierta desde' +
+        ' el menú no enseñaba ninguna nunca. Cada fila lleva lo que hace falta para elegir —el' +
+        ' número con el que se pide entera, el día del acto, el obligado, la unidad, la' +
+        ' liquidación que transfirió y el periodo alcanzado— y **ni una cifra**: el cuadro de la' +
+        ' determinación y sus tres totales los publica la operación de al lado (#193). Un solo' +
+        ' filtro, `contribuyente`, y es el que el caso de uso ya servía sin que nadie lo' +
+        ' expusiera; «Estado» no existe —una resolución no admite UPDATE (V49) y no hay historial' +
+        ' del que derivarlo— y «Ejercicio» es ambiguo, porque una resolución tiene el de su' +
+        ' numeración y el periodo que fiscaliza.',
     },
   ],
   // «Histórico de fiscalización predial» declara su GET; mover la liquidación

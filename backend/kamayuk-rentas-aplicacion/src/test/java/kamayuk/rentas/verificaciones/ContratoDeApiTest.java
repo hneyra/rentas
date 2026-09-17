@@ -233,6 +233,11 @@ class ContratoDeApiTest {
                     "GET /fiscalizacion/resultados",
                     "GET /fiscalizacion/omisos",
                     "GET /fiscalizacion/estado-cuenta",
+                    // #196: el embudo del programa, que es lo que `fis-panel` dibuja. La pantalla
+                    // declaraba `estado-cuenta`, que publica la deuda de UN contribuyente y ni una
+                    // de sus cuatro cifras, asi que era la unica hoja de Fiscalizacion sin nada
+                    // que pedir.
+                    "GET /fiscalizacion/programas/{id}/embudo",
                     "GET /fiscalizacion/predial/historico",
                     // #52: la transferencia a rentas —la frontera delicada, RF-054— y la
                     // resolucion de determinacion que la materializa (RF-057). La primera es una
@@ -240,6 +245,11 @@ class ContratoDeApiTest {
                     // entra por OPERACIONES_ADICIONALES del generador; la segunda ya estaba en el
                     // contrato desde el prototipo y no la servia nadie.
                     "POST /fiscalizacion/transferencias",
+                    // #192: la RELACION de resoluciones, que no existia. `ConsultaDeResoluciones
+                    // .deContribuyente` estaba escrita y ningun controlador la exponia, de modo
+                    // que la pantalla solo se podia abrir con el numero ya en la mano — la unica
+                    // del sistema que no puede tomar «la primera de la relacion», porque no habia.
+                    "GET /fiscalizacion/resoluciones",
                     "GET /fiscalizacion/resoluciones/{numero}",
                     "GET /transito/papeletas",
                     "GET /transito/papeletas/busqueda",
