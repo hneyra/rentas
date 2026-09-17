@@ -2343,6 +2343,67 @@ paths:
           $ref: "#/components/responses/SinMunicipalidad"
         "422":
           $ref: "#/components/responses/ErrorDeValidacion"
+  "/rentas/predial/determinaciones":
+    get:
+      operationId: ultima_determinacion_predial
+      summary: "Ultima determinacion predial de un contribuyente"
+      description: >-
+        La última determinación predial **guardada** de un contribuyente para un ejercicio (#207):
+        los predios que integran la base con lo que puso cada uno, el valúo total, el exonerado y
+        el afecto, la base imponible, los tramos del artículo 13, el mínimo imponible, el impuesto
+        insoluto, el derecho de emisión, el total a pagar y las reglas aplicadas.
+
+        Dos fuentes y ninguna más. De las **filas guardadas** salen la cabecera y el detalle por
+        predio. De **el conjunto sellado que esa determinación fijó** —por su `conjuntoId`, no el
+        vigente de hoy— salen la UIT, los tramos, el mínimo y el derecho de emisión: es lo que
+        ARQ-09 §3 promete, y por eso no se guardan dos veces. Resolverlos con el vigente publicaría
+        unos tramos que esa determinación nunca usó si se sellara una segunda versión del ejercicio.
+
+        **No trae el cronograma de cuotas ni la modalidad**, y no es un olvido: `determinacion` no
+        guarda la modalidad —sólo la guarda la corrida masiva—, y sin ella los vencimientos no se
+        pueden resolver. Suponer la trimestral publicaría un cronograma que puede no ser el que el
+        contribuyente recibió. Está nombrado y no resuelto: `rentas`#234.
+
+        **204 y 404 no dicen lo mismo.** Un código que no está en el padrón es **404** nombrándolo:
+        la pregunta no tiene sujeto. Un contribuyente que existe y todavía no tiene determinación de
+        ese ejercicio es **204**: la respuesta es «todavía no». Devolver lo mismo en los dos casos es
+        el defecto que #546 midió.
+
+        Exige LECTURA sobre `predial_individual`: leer una determinación no es determinarla.
+      tags: ["Rentas · Registro"]
+      parameters:
+        - name: codContribuyente
+          in: query
+          required: false
+          description: "De quien se lee la determinacion. Sin el es 422: no se contesta la de cualquiera"
+          schema: { type: string }
+        - name: ejercicio
+          in: query
+          required: false
+          description: "El ejercicio cuya ultima determinacion se pide. Ausente, el del reloj"
+          schema: { type: string }
+          example: "2026"
+        - name: ano
+          in: query
+          required: false
+          description: "El mismo dato con el rotulo del prototipo; el canonico es «ejercicio»"
+          schema: { type: string }
+          example: "2026"
+      responses:
+        200:
+          description: Operacion realizada
+          content:
+            application/json:
+              schema: { type: object }
+        "404":
+          description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "403":
+          $ref: "#/components/responses/SinMunicipalidad"
+        "422":
+          $ref: "#/components/responses/ErrorDeValidacion"
   "/rentas/predial/calculo-masivo":
     post:
       operationId: predial_masivo

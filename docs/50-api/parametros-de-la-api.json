@@ -399,6 +399,13 @@
     "opcionales": ["direccion", "ordenarPor", "pagina", "tamano"],
     "enElCuerpo": []
   },
+  "GET /rentas/predial/determinaciones": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["ano", "codContribuyente", "ejercicio"],
+    "enElCuerpo": []
+  },
   "GET /rentas/predios": {
     "obligatorios": [],
     "algunoDeEstos": [["codContribuyente", "contribuyente"]],

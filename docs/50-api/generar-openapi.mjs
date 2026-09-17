@@ -3163,6 +3163,62 @@ const OPERACIONES_ADICIONALES = {
   // vehicular comparten tabla, tipo de dominio y recurso; dos listados serian
   // dos copias de la misma consulta. Por eso el acceso lo comparten las dos
   // opciones (`RequiereAcceso.oTambien`, censado en `AccesosCompartidosTest`).
+  // `predial_individual` declara «POST /rentas/predial/calculo-individual» como su
+  // endpoint, y esa operacion ESCRIBE: dispara el calculo y, con `simulacion:false`,
+  // inserta una fila cada vez que se le llama. La hoja `territorio` era la unica de
+  // las cuarenta con siete operaciones y ni una lectura (#182), asi que no tenia con
+  // que dibujarse: abrir una pantalla no puede determinar de oficio a nadie.
+  predial_individual: [
+    {
+      operationId: 'ultima_determinacion_predial',
+      metodo: 'get',
+      ruta: '/api/v1/rentas/predial/determinaciones',
+      titulo: 'Ultima determinacion predial de un contribuyente',
+      parametros: [
+        {
+          nombre: 'codContribuyente',
+          requerido: true,
+          ejemplo: '',
+          descripcion:
+            'De quien se lee la determinacion. Sin el es 422: no se contesta la de cualquiera',
+        },
+        {
+          nombre: 'ejercicio',
+          ejemplo: '2026',
+          descripcion: 'El ejercicio cuya ultima determinacion se pide. Ausente, el del reloj',
+        },
+        {
+          nombre: 'ano',
+          ejemplo: '2026',
+          descripcion: 'El mismo dato con el rotulo del prototipo; el canonico es «ejercicio»',
+        },
+      ],
+      descripcion: bloque(`
+        La última determinación predial **guardada** de un contribuyente para un ejercicio (#207):
+        los predios que integran la base con lo que puso cada uno, el valúo total, el exonerado y
+        el afecto, la base imponible, los tramos del artículo 13, el mínimo imponible, el impuesto
+        insoluto, el derecho de emisión, el total a pagar y las reglas aplicadas.
+
+        Dos fuentes y ninguna más. De las **filas guardadas** salen la cabecera y el detalle por
+        predio. De **el conjunto sellado que esa determinación fijó** —por su \`conjuntoId\`, no el
+        vigente de hoy— salen la UIT, los tramos, el mínimo y el derecho de emisión: es lo que
+        ARQ-09 §3 promete, y por eso no se guardan dos veces. Resolverlos con el vigente publicaría
+        unos tramos que esa determinación nunca usó si se sellara una segunda versión del ejercicio.
+
+        **No trae el cronograma de cuotas ni la modalidad**, y no es un olvido: \`determinacion\` no
+        guarda la modalidad —sólo la guarda la corrida masiva—, y sin ella los vencimientos no se
+        pueden resolver. Suponer la trimestral publicaría un cronograma que puede no ser el que el
+        contribuyente recibió. Está nombrado y no resuelto: \`rentas\`#234.
+
+        **204 y 404 no dicen lo mismo.** Un código que no está en el padrón es **404** nombrándolo:
+        la pregunta no tiene sujeto. Un contribuyente que existe y todavía no tiene determinación de
+        ese ejercicio es **204**: la respuesta es «todavía no». Devolver lo mismo en los dos casos es
+        el defecto que #546 midió.
+
+        Exige LECTURA sobre \`predial_individual\`: leer una determinación no es determinarla.
+      `),
+    },
+  ],
   fisc_predial: [
     {
       operationId: 'fisc_actas_listado',

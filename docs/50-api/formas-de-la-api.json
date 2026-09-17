@@ -2058,6 +2058,50 @@
     "totalPaginas": "entero",
     "hayMas": "booleano"
   },
+  "GET /rentas/predial/determinaciones": {
+    "id": "entero",
+    "ejercicio": "texto",
+    "codContribuyente": "texto",
+    "sujeto": "texto",
+    "conjuntoId": "entero",
+    "conjunto": "texto",
+    "estado": "texto",
+    "origen": "texto",
+    "predios": [
+      {
+        "predioId": "entero",
+        "autovaluo": "texto",
+        "valuoExonerado": "texto",
+        "valuoAfecto": "texto",
+        "porcentajePropiedad": "texto",
+        "baseImponible": "texto",
+        "origenDelAutovaluo": "texto",
+        "valuacionConjuntoId": "entero",
+        "valuacionHuella": "texto"
+      }
+    ],
+    "valuoTotal": "texto",
+    "valuoExonerado": "texto",
+    "valuoAfecto": "texto",
+    "baseImponible": "texto",
+    "uit": "texto",
+    "tramos": [
+      {
+        "orden": "entero",
+        "limiteSuperior": "texto",
+        "alicuota": "texto",
+        "porcionGravada": "texto",
+        "aporte": "texto"
+      }
+    ],
+    "minimoImponible": "texto",
+    "impuestoInsoluto": "texto",
+    "derechoDeEmision": "texto",
+    "totalAPagar": "texto",
+    "reglasAplicadas": [
+      "texto"
+    ]
+  },
   "GET /rentas/predios": {
     "contenido": [
       {

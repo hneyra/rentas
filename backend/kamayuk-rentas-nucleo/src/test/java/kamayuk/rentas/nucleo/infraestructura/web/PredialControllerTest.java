@@ -1015,6 +1015,205 @@ class PredialControllerTest {
         }
     }
 
+    // ---------------------------------------------------------------- #207
+
+    @Test
+    @DisplayName("#207 — determinar y volver a leer da el MISMO centimo, sin volver a determinar")
+    void leerLaDeterminacionGuardada() throws Exception {
+        predios.con(11L, "10001", "AV. GRAU 100", Porcentaje.total());
+
+        MvcResult escritura =
+                mvc.perform(
+                                post("/rentas/api/v1/rentas/predial/calculo-individual")
+                                        .param("codContribuyente", "C-001")
+                                        .param("ano", "2026")
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(
+                                                "{\"simulacion\":false,\"observacion\":\"Determinacion"
+                                                        + " anual\",\"predios\":[{\"predioId\":11,\"autovaluo\":\"100000.00\"}]}"))
+                        .andReturn();
+        assertThat(escritura.getResponse().getStatus()).isEqualTo(201);
+        int insertadasTrasDeterminar = determinaciones.insertadas;
+
+        MvcResult lectura = leer("C-001", "2026");
+
+        assertThat(lectura.getResponse().getStatus()).isEqualTo(200);
+        String json = lectura.getResponse().getContentAsString();
+        String escrito = escritura.getResponse().getContentAsString();
+
+        assertThat(json)
+                .as("la lectura afirma lo que la fila guarda, no lo que el POST devolvio de paso")
+                .contains("\"baseImponible\":\"100000.00\"")
+                .contains("\"impuestoInsoluto\":\"270.00\"")
+                .contains("\"reglasAplicadas\":[\"RT-011\",\"RT-013\",\"RT-014\"]");
+        assertThat(json)
+                .as("y lo que no esta guardado sale del conjunto SELLADO que la fila fijo")
+                .contains("\"conjuntoId\":77")
+                .contains("\"conjunto\":\"2026 v1\"")
+                .contains("\"uit\":\"5500.00\"")
+                .contains("\"alicuota\":\"0.2\"")
+                .contains("\"derechoDeEmision\":\"4.50\"")
+                .contains("\"totalAPagar\":\"274.50\"");
+        assertThat(escrito)
+                .as("el mismo centimo que la escritura: regla 6, y por eso no se guarda dos veces")
+                .contains("\"totalAPagar\":\"274.50\"")
+                .contains("\"impuestoInsoluto\":\"270.00\"");
+
+        assertThat(determinaciones.insertadas)
+                .as("leer no determina: el POST inserta una fila CADA vez que se le llama")
+                .isEqualTo(insertadasTrasDeterminar);
+    }
+
+    @Test
+    @DisplayName("#207 — y NO publica el cronograma, porque la modalidad no se guarda (#234)")
+    void laLecturaNoInventaElCronograma() throws Exception {
+        predios.con(11L, "10001", "AV. GRAU 100", Porcentaje.total());
+        mvc.perform(
+                        post("/rentas/api/v1/rentas/predial/calculo-individual")
+                                .param("codContribuyente", "C-001")
+                                .param("ano", "2026")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        "{\"simulacion\":false,\"observacion\":\"Determinacion"
+                                                + " anual\",\"predios\":[{\"predioId\":11,\"autovaluo\":\"100000.00\"}]}"))
+                .andReturn();
+
+        String json = leer("C-001", "2026").getResponse().getContentAsString();
+
+        assertThat(json)
+                .as("y hay cuerpo que mirar: con un 204 este `doesNotContain` pasaria vacio")
+                .contains("\"impuestoInsoluto\"");
+        assertThat(json)
+                .as(
+                        "`determinacion` no guarda la modalidad, y suponer TRIMESTRAL publicaria un"
+                                + " cronograma que puede no ser el que el contribuyente recibio")
+                .doesNotContain("\"cuotas\"")
+                .doesNotContain("\"modalidad\"")
+                .doesNotContain("\"vencimiento\"");
+        assertThat(json)
+                .as("y tampoco se cuela `simulacion`: una simulacion no deja fila que leer")
+                .doesNotContain("\"simulacion\"");
+    }
+
+    @Test
+    @DisplayName("#207 — un contribuyente sin determinacion de ese ejercicio es 204, no 404")
+    void sinDeterminacionDeEseEjercicioEs204() throws Exception {
+        MvcResult resultado = leer("C-001", "2026");
+
+        assertThat(resultado.getResponse().getStatus())
+                .as("«todavia no se le ha determinado» no es «ese contribuyente no existe» (#546)")
+                .isEqualTo(204);
+        assertThat(resultado.getResponse().getContentAsString()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("#207 — un codigo que no esta en el padron es 404, y lo nombra")
+    void unCodigoQueNoEstaEnElPadronEs404() throws Exception {
+        MvcResult resultado = leer("C-999", "2026");
+
+        assertThat(resultado.getResponse().getStatus()).isEqualTo(404);
+        assertThat(resultado.getResponse().getContentAsString()).contains("C-999");
+    }
+
+    @Test
+    @DisplayName("#207 — sin decir de quien, 422: no se contesta la determinacion de cualquiera")
+    void sinContribuyenteEs422() throws Exception {
+        MvcResult resultado =
+                mvc.perform(
+                                get("/rentas/api/v1/rentas/predial/determinaciones")
+                                        .param("ano", "2026"))
+                        .andReturn();
+
+        assertThat(resultado.getResponse().getStatus()).isEqualTo(422);
+        assertThat(resultado.getResponse().getContentAsString()).contains("codContribuyente");
+    }
+
+    @Test
+    @DisplayName("#207 — el acceso es el de su pantalla, con LECTURA y no con REGISTRO")
+    void elAccesoDeLaLectura() throws Exception {
+        leer("C-001", "2026");
+
+        assertThat(comprobador.acceso).isEqualTo("predial_individual");
+        assertThat(comprobador.privilegio)
+                .as("leer una determinacion no es determinarla")
+                .isEqualTo(Privilegio.LECTURA);
+    }
+
+    @Test
+    @DisplayName(
+            "#207 — y lee el conjunto que la determinacion FIJO, no el que rige hoy (ARQ-09 §3)")
+    void laLecturaUsaElConjuntoSelladoDeLaDeterminacion() throws Exception {
+        predios.con(11L, "10001", "AV. GRAU 100", Porcentaje.total());
+        mvc.perform(
+                        post("/rentas/api/v1/rentas/predial/calculo-individual")
+                                .param("codContribuyente", "C-001")
+                                .param("ano", "2026")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        "{\"simulacion\":false,\"observacion\":\"Determinacion"
+                                                + " anual\",\"predios\":[{\"predioId\":11,\"autovaluo\":\"100000.00\"}]}"))
+                .andReturn();
+
+        // Se sella una SEGUNDA version del mismo ejercicio, con otra UIT y otra alicuota. La
+        // determinacion de arriba no cambia: fijo su `conjunto_id` y ahi se queda.
+        mvc = montarCon(conDosVersiones(cuadroCompleto(), cuadroDeLaSegundaVersion()));
+
+        String json = leer("C-001", "2026").getResponse().getContentAsString();
+
+        assertThat(json)
+                .as(
+                        "resolver con `vigenteEn` publicaria unos tramos que esta determinacion"
+                                + " nunca uso, y el contribuyente ya tiene el papel")
+                .contains("\"uit\":\"5500.00\"")
+                .contains("\"alicuota\":\"0.2\"")
+                .doesNotContain("\"uit\":\"9999.00\"");
+    }
+
+    /**
+     * Un lector con dos conjuntos: el que rige HOY y el que una determinacion vieja fijo.
+     *
+     * <p>Sin los dos distintos, `delConjunto` y `vigenteEn` son indistinguibles y la prueba de
+     * arriba saldria verde con cualquiera de las dos — que es el defecto que existe para impedir.
+     */
+    private static LectorDeParametros conDosVersiones(
+            ParametrosSellados elDeLaDeterminacion, ParametrosSellados elDeHoy) {
+        return new LectorDeParametros() {
+            @Override
+            public ParametrosSellados vigenteEn(Ejercicio ejercicio) {
+                return elDeHoy;
+            }
+
+            @Override
+            public ParametrosSellados porConjunto(IdentificadorDeConjunto identificador) {
+                return elDeLaDeterminacion;
+            }
+
+            @Override
+            public IdentificadorDeConjunto conjuntoVigenteEn(Ejercicio ejercicio) {
+                return IdentificadorDeConjunto.de(78L);
+            }
+        };
+    }
+
+    /** La segunda version sellada del mismo ejercicio: otra UIT y otra escala. */
+    private static ParametrosSellados cuadroDeLaSegundaVersion() {
+        return conRedondeo(
+                        ParametrosSellados.de(EJERCICIO, 2)
+                                .numero("UIT", null, ValorNormativo.de("9999.00"))
+                                .numero("TRAMO_PREDIAL", "1", ValorNormativo.de("0.9"))
+                                .numero("PREDIAL_MINIMO", null, ValorNormativo.de("0.6"))
+                                .numero("DERECHO_EMISION_PREDIAL", null, ValorNormativo.de("9.90")))
+                .construir();
+    }
+
+    private MvcResult leer(String codContribuyente, String ano) throws Exception {
+        return mvc.perform(
+                        get("/rentas/api/v1/rentas/predial/determinaciones")
+                                .param("codContribuyente", codContribuyente)
+                                .param("ano", ano))
+                .andReturn();
+    }
+
     private MockMvc montar(ParametrosSellados sellados) {
         return montarCon(lector(sellados));
     }
@@ -1047,7 +1246,14 @@ class PredialControllerTest {
                         new CandadoDeEmision(valuacion),
                         RELOJ);
         return MockMvcBuilders.standaloneSetup(
-                        new PredialController(individual, masivo, rastro, RELOJ))
+                        new PredialController(
+                                individual,
+                                masivo,
+                                rastro,
+                                new kamayuk.rentas.nucleo.aplicacion
+                                        .ConsultaDeLaDeterminacionPredial(
+                                        new DirectorioDePrueba(), determinaciones, cuadro),
+                                RELOJ))
                 .addInterceptors(new GuardiaDeAcceso(comprobador, RELOJ))
                 .setControllerAdvice(new ManejadorDeErrores())
                 .setMessageConverters(
@@ -1331,8 +1537,12 @@ class PredialControllerTest {
 
         @Override
         public Optional<Determinacion> ultimaPredialDe(Ejercicio ejercicio, long contribuyenteId) {
+            // Filtra por ejercicio desde #207: sin eso, «este contribuyente no tiene determinacion
+            // de ESE ejercicio» no se puede medir, y el 204 de la lectura saldria verde por
+            // casualidad.
             return cabeceras.stream()
                     .filter(c -> c.contribuyenteId() == contribuyenteId)
+                    .filter(c -> c.ejercicio().equals(ejercicio))
                     .reduce((primera, segunda) -> segunda);
         }
 
@@ -1349,21 +1559,27 @@ class PredialControllerTest {
             }
             insertadas++;
             determinados.add(determinacion.contribuyenteId());
-            return new Determinacion(
-                    900L + insertadas,
-                    determinacion.ejercicio(),
-                    determinacion.tributo(),
-                    determinacion.periodo(),
-                    determinacion.contribuyenteId(),
-                    determinacion.predioId(),
-                    determinacion.vehiculoId(),
-                    determinacion.conjuntoId(),
-                    determinacion.baseImponible(),
-                    determinacion.montoDeterminado(),
-                    determinacion.reglasAplicadas(),
-                    determinacion.origen(),
-                    determinacion.estado(),
-                    "cajero.ventanilla");
+            Determinacion guardada =
+                    new Determinacion(
+                            900L + insertadas,
+                            determinacion.ejercicio(),
+                            determinacion.tributo(),
+                            determinacion.periodo(),
+                            determinacion.contribuyenteId(),
+                            determinacion.predioId(),
+                            determinacion.vehiculoId(),
+                            determinacion.conjuntoId(),
+                            determinacion.baseImponible(),
+                            determinacion.montoDeterminado(),
+                            determinacion.reglasAplicadas(),
+                            determinacion.origen(),
+                            determinacion.estado(),
+                            "cajero.ventanilla");
+            // Lo que inserta queda guardado desde #207. Hasta entonces este doble aceptaba la
+            // escritura y la olvidaba, asi que ninguna prueba podia determinar y volver a leer.
+            cabeceras.add(guardada);
+            detallePorId.put(java.util.Objects.requireNonNull(guardada.id()), List.copyOf(detalle));
+            return guardada;
         }
 
         @Override

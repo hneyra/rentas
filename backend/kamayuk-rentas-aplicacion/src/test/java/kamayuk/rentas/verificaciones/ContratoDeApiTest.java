@@ -135,6 +135,10 @@ class ContratoDeApiTest {
                     // que la pantalla de Rentas · Registro dibuja.
                     "GET /rentas/predios",
                     "POST /rentas/predial/calculo-individual",
+                    // #207: la lectura de la determinacion individual, que faltaba entera. La
+                    // hoja `territorio` declaraba siete operaciones y ni un GET, y la que se le
+                    // atribuia es la escritura de arriba: una escritura no dibuja una pantalla.
+                    "GET /rentas/predial/determinaciones",
                     "POST /rentas/predial/calculo-masivo",
                     "GET /rentas/predial/corridas/ultima",
                     "GET /rentas/predial/corridas/{corridaId}/observados",

@@ -57,6 +57,7 @@
   "GET /rentas/declaraciones/{djNro}/hoja": ["404"],
   "GET /rentas/predial/corridas/ultima": [],
   "GET /rentas/predial/corridas/{corridaId}/observados": [],
+  "GET /rentas/predial/determinaciones": ["404"],
   "GET /rentas/predios": ["404"],
   "GET /rentas/vehiculos": ["404"],
   "GET /rentas/vehiculos/{placa}": ["404"],
