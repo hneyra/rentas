@@ -263,7 +263,7 @@ const SIN_PLACA: Ausencia = {
  */
 const TRA_PANEL: Conector = {
   clave: ['tra-panel', 'resumen-de-papeletas'],
-  pedir: (senal) => pedirUno<ResumenDePapeletas>(RUTAS.resumenDePapeletas, senal),
+  pedir: ({ senal }) => pedirUno<ResumenDePapeletas>(RUTAS.resumenDePapeletas, senal),
   repartir: (resumen: ResumenDePapeletas): Reparto => {
     // Ver el javadoc: un rango de un ano natural agrupado por ANO da exactamente un grupo. Se
     // COMPRUEBA, porque leer la primera de varias pondria las cuentas de un trozo del periodo bajo
