@@ -13,8 +13,13 @@
  * el usuario no envie un DNI de siete digitos y espere a que el servidor se lo rechace; **la
  * que decide sigue siendo la del servidor**, que es la unica que ve el padron entero.
  *
- * Los tres son los de `DOCS` del artboard (`RentasV6.dc.html:969`), y que sigan siendo esos lo
- * comprueba `verificaciones/secciones-del-artboard.test.ts` leyendo el `.dc.html`.
+ * Los tres son los de `DOCS` del artboard de la **V6**, y **hoy no los comprueba nadie** (#255,
+ * #262). Hasta aqui ponia que lo hacia `verificaciones/secciones-del-artboard.test.ts` leyendo
+ * `RentasV6.dc.html:969`: la guarda y el artboard salieron los dos con la V6 en #90, y
+ * `la-v6-no-esta.test.ts` impide que vuelvan. O sea que estas tres longitudes no las sostiene ni
+ * el contrato —ninguna operacion publica el catalogo de tipos de documento, medido arriba— ni un
+ * artboard que este arbol tenga. Contra que se sostienen en V8 lo decide #262, que ademas mide
+ * que este archivo **no lo importa ninguna fuente de produccion**.
  */
 
 /** Tipo de documento -> cuantos digitos tiene. */

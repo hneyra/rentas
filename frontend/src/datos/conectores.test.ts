@@ -73,7 +73,7 @@ const PAGINA: Paginado<DeudaEnCoactiva> = {
  * Lo que `coa-exp` recibe: el proceso de un expediente. Recortado a lo que el conector usa.
  *
  * La forma sale de `docs/50-api/formas-de-la-api.json`; el detalle campo a campo lo prueba
- * `conectores/coactiva.test.ts`.
+ * `conectores/coactiva.test.tsx`.
  */
 const PROCESO = {
   expediente: {

@@ -11,10 +11,11 @@ import {
 /**
  * La regla del documento, sin montar nada (AC7).
  *
- * Que las tres longitudes sean las del artboard lo comprueba
- * `verificaciones/secciones-del-artboard.test.ts`, leyendo `const DOCS` del `.dc.html`. Lo que
- * se prueba aqui es el COMPORTAMIENTO: que un tipo desconocido reviente en vez de suponer ocho,
- * que la limpieza recorte a la longitud de su tipo y que «completo» sea exacto y no «al menos».
+ * Que las tres longitudes sean las del artboard **ya no lo comprueba nadie**: lo hacia
+ * `verificaciones/secciones-del-artboard.test.ts` leyendo `const DOCS` del `.dc.html` de la V6, y
+ * la guarda salio con la V6 en #90 (#255, #262). Lo que se prueba aqui es, como siempre, el
+ * COMPORTAMIENTO: que un tipo desconocido reviente en vez de suponer ocho, que la limpieza recorte
+ * a la longitud de su tipo y que «completo» sea exacto y no «al menos».
  */
 
 describe('cuantos digitos tiene cada documento', () => {

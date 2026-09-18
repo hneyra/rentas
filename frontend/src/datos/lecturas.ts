@@ -6,9 +6,11 @@ import { solicitar } from '../api/cliente.ts';
  * <h2>Por que existe este archivo y no un `solicitar()` suelto en cada pantalla</h2>
  *
  * Porque **la forma se declara una vez**. `docs/50-api/formas-de-la-api.json` dice que publica
- * cada operacion, y `src/datos/formas.test.ts` comprueba campo a campo que el proxy sirve eso
- * mismo; lo que faltaba era que la pantalla lo LEYERA con esos nombres. Un `solicitar<any>` en
- * cada seccion volveria a abrir la puerta que #4 cerro: la pantalla se escribiria contra los
+ * cada operacion, y `verificaciones/la-lectura-declara-lo-que-la-operacion-publica.test.ts`
+ * comprueba campo a campo que lo que aqui se declara sea eso mismo —antes lo hacia
+ * `src/datos/formas.test.ts` contra el proxy de la V6, que salio en #90—; lo que faltaba era que
+ * la pantalla lo LEYERA con esos nombres. Un `solicitar<any>` en cada seccion volveria a abrir
+ * la puerta que #4 cerro: la pantalla se escribiria contra los
  * campos que alguien recuerde, y el desajuste no aparece hasta que el backend contesta.
  *
  * <h2>Los importes son texto, y ninguno viaja sin su fecha</h2>
@@ -48,8 +50,14 @@ export interface Paginado<T> {
  *
  * **Son ocho campos, y no hay un noveno.** Ni el estado de cobranza ni la deuda estan aqui, que
  * son las dos cosas sobre las que el artboard construye la fila de la lista. No es un olvido de
- * este archivo: es lo que declara `docs/50-api/formas-de-la-api.json`, y lo comprueba
- * `verificaciones/secciones-del-artboard.test.ts` leyendo el propio archivo de formas.
+ * este archivo: es lo que declara `docs/50-api/formas-de-la-api.json`, que lo publica con esos
+ * ocho campos y ninguno mas.
+ *
+ * **Y hoy ninguna guarda lo cruza** (#255). Lo hacia `verificaciones/secciones-del-artboard.test.ts`,
+ * que salio con la V6 en #90; la que ocupa su sitio,
+ * `verificaciones/la-lectura-declara-lo-que-la-operacion-publica.test.ts`, solo compara las
+ * lecturas que **algun conector pide**, y esta no la pide ninguno. La afirmacion se comprueba
+ * abriendo el archivo de formas, que es de este arbol.
  */
 export interface ContribuyenteDelPadron {
   readonly id: number;
@@ -160,10 +168,19 @@ export interface CuotaDeterminada {
 /**
  * La memoria del predial de un contribuyente, de `POST /rentas/predial/calculo-individual`.
  *
- * **Los tres totales viajan juntos y los tres se dibujan** —insoluto, derecho de emision y
- * total—, pero la pantalla no los suma: los pide. Que cuadren con los tramos que ella misma
- * ensena lo comprueba `secciones/determinacion.ts`, y por que se comprueba en vez de calcular
- * esta escrito ahi.
+ * **Los tres totales viajan juntos** —insoluto, derecho de emision y total—, y el dia que una
+ * pantalla los dibuje **no los sumara: los pedira**. La regla no es de este archivo: la escribe la
+ * prohibicion `aritmetica-con-importes` de ESLint —«El total lo calcula el backend y lo sostiene
+ * con su fecha: pidelo, no lo sumes»—, y esta guardado ademas por el tipo, porque `Importe` no
+ * admite aritmetica.
+ *
+ * **Y que cuadren con los tramos que la pantalla ensena NO lo comprueba nadie hoy, que es
+ * distinto de que no deba comprobarse** (#255, #262). Hasta aqui ponia que lo comprobaba
+ * `secciones/determinacion.ts` —la seccion de la V6, que salio del arbol en #90—, y esa
+ * comprobacion **no tiene donde correr**: `POST /rentas/predial/calculo-individual` no esta en
+ * `datos/servidas.ts` ni lo pide ningun conector, asi que esta lectura no la lee ninguna hoja. La
+ * suma exacta en centimos con la que se haria sigue en `dominio/aritmetica.ts`, tambien sin
+ * consumidor.
  */
 export interface DeterminacionIndividual {
   readonly ejercicio: string;
@@ -311,9 +328,21 @@ export interface DeterminacionVehicular {
 /**
  * La alcabala de una transferencia, de `POST /rentas/alcabala`.
  *
- * **Cuatro campos, y ninguno es una fecha.** No es un olvido de este archivo: es lo que
- * declara `docs/50-api/formas-de-la-api.json`, y es lo que impide dibujar sus dos importes
- * (regla 9). Medido y razonado en `secciones/determinacion.ts`.
+ * **Ninguno de sus campos es una fecha, y eso se comprueba sin salir de este arbol.**
+ * `docs/50-api/formas-de-la-api.json` publica para esta operacion exactamente `id`, `ejercicio`,
+ * `predioId`, `contribuyenteId`, `baseImponible` y `montoDeterminado`, y ni uno es `fechaCalculo`.
+ * Contadas hoy las seis determinaciones del contrato, **tres la publican** —`calculo-individual`,
+ * `calculo-masivo` y `vehicular/calculo`— y **tres no**: esta, `POST /rentas/espectaculos` y
+ * `GET /rentas/predial/determinaciones`. Los dos campos que esta lectura no declara son las dos
+ * llaves ajenas, que ninguna pantalla necesita.
+ *
+ * **Lo que la regla 9 exige de aqui esta escrito y NO esta verificado** (#255, #261). Mientras la
+ * respuesta no publique su fecha, sus dos importes no se pueden dibujar; y hoy eso **no lo impide
+ * ninguna guarda**, porque no hay donde incumplirlo: ninguna de las cuarenta hojas dibuja la
+ * alcabala y ningun conector pide esta lectura. Hasta aqui esta frase delegaba su medida y su
+ * razonamiento en `secciones/determinacion.ts` —la seccion de la V6, que salio del arbol en #90—,
+ * o sea que la prohibicion mas cara del archivo se apoyaba en algo que no se podia abrir. #261
+ * dice que haria falta para volver a sostenerla.
  */
 export interface DeterminacionDeAlcabala {
   readonly id: number;
@@ -1590,7 +1619,7 @@ export interface MunicipalidadDeLaSesion {
  * boolean activo)`, el esquema no tiene `padre_id` ni tabla de submodulos —cero coincidencias
  * de `submodulo|modulo_padre|padre_id` en todo `db/migration/`— y ninguna de las 181
  * operaciones publica una jerarquia. Por eso el arbol es un **empalme** y no una copia: los
- * modulos son de aqui y los cuarenta destinos son del artboard (`marco/arbol.ts`).
+ * modulos son de aqui y los cuarenta destinos son del artboard (`pantallas/arbol.ts`).
  *
  * `activo` viaja como campo porque la consulta no lo filtra —`SELECT id, codigo, nombre,
  * orden, activo FROM modulo_sistema`, sin `WHERE`—, asi que la lista incluye los inactivos y
@@ -1632,7 +1661,7 @@ export interface AccesoDelSistema {
  * generador describe el tipo de retorno de cada controlador y este devuelve un
  * `Map<String, List<String>>`. O sea que la comparacion campo a campo del AC5 de #4 **no puede
  * aplicarse aqui**: lo unico que el contrato promete es que es un objeto. Lo que sostiene la
- * lectura son las 134 llaves medidas en `marco/seguridadMedida.ts`.
+ * lectura son las 134 llaves medidas en `datos/seguridadMedida.ts`.
  */
 export type PermisosDeLaSesion = Readonly<Record<string, readonly string[]>>;
 

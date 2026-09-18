@@ -35,9 +35,16 @@ import type { Paginado } from './lecturas.ts';
  * Porque el interprete, sin campo en la ruta, dibuja **el primero de `orden.campos`**
  * (`campoOrdenado`, `MandosDeLaTabla.tsx`), y el backend, sin `ordenarPor`, ordena por su
  * `ORDEN_POR_OMISION`. Que los dos coincidan es lo que hace que la barra no mienta sobre el orden
- * de las filas, y por eso **`campos[0]` es el orden por omision de la operacion** —medido controlador
- * a controlador, y escrito en el javadoc de cada conector—. Lo vigila
- * `verificaciones/el-orden-que-se-ofrece-lo-admite-el-backend.test.ts`.
+ * de las filas, y por eso **`campos[0]` es el orden por omision de la operacion** —medido
+ * controlador a controlador, y escrito en el javadoc de cada conector—.
+ *
+ * **Y eso es lo unico que lo sostiene: no lo vigila ninguna guarda** (#255, #263). Hasta aqui
+ * ponia que lo vigilaba `el-orden-que-se-ofrece-lo-admite-el-backend.test.ts`, que **no existe**
+ * —cero coincidencias de ese nombre fuera de esta frase—. La que se le parece,
+ * `verificaciones/el-dialecto-de-la-paginacion-es-el-del-backend.test.ts`, cruza los cuatro
+ * NOMBRES de parametro contra el contrato y no mira que campo ordena por omision ninguna
+ * operacion. Si los dos lados dejan de coincidir, la barra dice «ordenado por X» y las filas
+ * llegan ordenadas por otra cosa, **en verde**.
  *
  * La alternativa era copiar aqui la regla del interprete —«el de la ruta si es admitido, o el
  * primero»— y mandar siempre un `ordenarPor`. Es una segunda copia de una regla de la libreria, y

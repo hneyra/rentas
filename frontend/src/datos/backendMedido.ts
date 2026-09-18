@@ -37,9 +37,10 @@ import type {
  *
  * <h2>Solo lo importan las pruebas, y hay una guarda</h2>
  *
- * Como sus dos hermanos `marco/sesionMedida.ts` y `marco/seguridadMedida.ts`: `verificaciones/camino-a-la-api.test.ts` comprueba que ninguna
- * fuente de produccion lo importe. Sin esa guarda, esto acabaria siendo el respaldo que hace que
- * una pantalla ensene contribuyentes de Catacaos con el token de cualquier otra municipalidad.
+ * Como sus dos hermanos `datos/sesionMedida.ts` y `datos/seguridadMedida.ts`:
+ * `verificaciones/camino-a-la-api.test.ts` comprueba que ninguna fuente de produccion lo
+ * importe. Sin esa guarda, esto acabaria siendo el respaldo que hace que una pantalla ensene
+ * contribuyentes de Catacaos con el token de cualquier otra municipalidad.
  */
 
 /** Cuantos contribuyentes tiene el padron de la municipalidad 9. */
