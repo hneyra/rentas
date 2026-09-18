@@ -151,8 +151,8 @@ class ProcedimientoSancionadorRepositoryJdbcTest {
     void pagadaYCoactivaSeDicenConLaPalabraDeLaDeuda() {
         acta("AC-PAGA-01", null);
         acta("AC-COAC-01", null);
-        moverEstado("AC-PAGA-01", "PAGADA");
-        moverEstado("AC-COAC-01", "COACTIVA");
+        comoUnPadronMigrado("AC-PAGA-01", "PAGADA");
+        comoUnPadronMigrado("AC-COAC-01", "COACTIVA");
 
         assertThat(faseDe("AC-PAGA-01", CORTE)).isEqualTo(FaseDelProcedimiento.PAGADA);
         assertThat(faseDe("AC-COAC-01", CORTE)).isEqualTo(FaseDelProcedimiento.COACTIVA);
@@ -163,7 +163,7 @@ class ProcedimientoSancionadorRepositoryJdbcTest {
     void laFaseMasAvanzadaGana() {
         Papeleta acta = acta("AC-PAGA-02", null);
         dictarResolucionAdministrativa(acta.identificador(), "RIS-0002");
-        moverEstado("AC-PAGA-02", "PAGADA");
+        comoUnPadronMigrado("AC-PAGA-02", "PAGADA");
 
         assertThat(faseDe("AC-PAGA-02", CORTE)).isEqualTo(FaseDelProcedimiento.PAGADA);
     }
@@ -172,7 +172,7 @@ class ProcedimientoSancionadorRepositoryJdbcTest {
     @DisplayName("un acta anulada no tiene fase: ninguna de las cinco palabras la nombra")
     void unActaAnuladaNoTieneFase() {
         acta("AC-ANUL-01", null);
-        moverEstado("AC-ANUL-01", "ANULADA");
+        comoUnPadronMigrado("AC-ANUL-01", "ANULADA");
 
         assertThat(faseDe("AC-ANUL-01", CORTE)).isNull();
         // Y la que saldria sola —la de la rama ELSE— seria justo la equivocada.
@@ -226,9 +226,9 @@ class ProcedimientoSancionadorRepositoryJdbcTest {
         dictarResolucionAdministrativa(pagada.identificador(), "RIS-0006");
         acta("AC-F-COAC", null);
         acta("AC-F-ANUL", null);
-        moverEstado("AC-F-PAGA", "PAGADA");
-        moverEstado("AC-F-COAC", "COACTIVA");
-        moverEstado("AC-F-ANUL", "ANULADA");
+        comoUnPadronMigrado("AC-F-PAGA", "PAGADA");
+        comoUnPadronMigrado("AC-F-COAC", "COACTIVA");
+        comoUnPadronMigrado("AC-F-ANUL", "ANULADA");
 
         List<ProcedimientoSancionador> todas = todas(CORTE);
 
@@ -391,11 +391,26 @@ class ProcedimientoSancionadorRepositoryJdbcTest {
     }
 
     /**
-     * Mueve el estado de la DEUDA por SQL directo, que es lo único que hay hoy: nada en {@code
-     * sanciones} lo mueve todavía —la papeleta nace {@code IMPUESTA} y ahí se queda—. Lo que esta
-     * prueba necesita es una fila en cada estado, no el camino que la lleva ahí.
+     * Pone el estado de la DEUDA por SQL directo: es un <b>padrón migrado</b>, no una transición.
+     *
+     * <h2>Se llamaba «mover el estado», y ese nombre prometía un camino que no existe (#259)</h2>
+     *
+     * <p>Nada en {@code sanciones} mueve {@code papeleta.estado} —la papeleta nace {@code IMPUESTA}
+     * y ahí se queda, y el único {@code UPDATE papeleta} de {@code src/main} es {@code SET numero}
+     * (#46, #243)—. Así que las dos fases que de aquí se derivan, {@link
+     * FaseDelProcedimiento#PAGADA} y {@link FaseDelProcedimiento#COACTIVA}, <b>no las produce
+     * ningún camino de producción</b>: las produce una fila que otro sistema dejó escrita.
+     *
+     * <p>#259 lo miró y decidió que las dos fases <b>se quedan</b>, por el mismo motivo por el que
+     * no se retira ningún valor de {@code EstadoDePapeleta}: una instalación con el padrón migrado
+     * las tiene, y son ciertas. Lo que cambia es que el nombre lo diga, porque «mover el estado»
+     * hacía parecer que la prueba tomaba un atajo sobre un camino que podría escribirse, y no lo
+     * hay.
+     *
+     * <p>Lo mismo, con la siembra completa de los siete estados y con la guarda que muerde, en
+     * {@code PapeletaRepositoryJdbcTest.VocabularioDeLectura}.
      */
-    private static void moverEstado(String numeroActa, String estado) {
+    private static void comoUnPadronMigrado(String numeroActa, String estado) {
         ejecutar(
                 "UPDATE papeleta SET estado = '"
                         + estado

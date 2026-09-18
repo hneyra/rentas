@@ -197,7 +197,10 @@ public class PapeletaRepositoryJdbc extends RepositorioJdbc implements PapeletaR
             parametros.put("ingresadoPor", criterio.ingresadoPor());
         }
         if (criterio.soloPendientes()) {
-            condiciones.add("p.estado NOT IN ('PAGADA', 'ANULADA', 'PRESCRITA')");
+            // La lista sale del enumerado y no se escribe aqui (#259): hasta entonces
+            // estaba tres veces —esta, la de PadronDePapeletasRepositoryJdbc y la de
+            // PapeletaDelPadron.estaPendiente(), que es la que la API publica—.
+            condiciones.add("p.estado NOT IN " + EstadoDePapeleta.NO_SE_DEBE);
         }
 
         String donde = " WHERE " + String.join(" AND ", condiciones);
