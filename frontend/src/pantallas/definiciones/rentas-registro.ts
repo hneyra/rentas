@@ -255,6 +255,17 @@ export const RENTAS_REGISTRO = {
         nota: '',
         campos: [],
         tabla: {
+          // Con `clave`, las filas llegan por `DatosDeLaPantalla.tablas` (#252). Aqui hace falta
+          // por lo mismo que en los tramos y por un motivo distinto: la cuarta columna
+          // —«Situación»— **no la publica ninguna operación servida**, y una cadena no puede decir
+          // por qué no hay dato. Con `sinDato`, esa celda dice la raya del artboard **y anuncia el
+          // motivo**; con `''` sería un blanco, y con `'—'` escrito como celda sería una raya muda
+          // indistinguible de un dato que se perdió por el camino.
+          clave: 'cronograma',
+          sinDato: {
+            texto: '—',
+            nota: 'La situación de una cuota es un hecho de cuenta corriente —si se pagó, cuándo y cuánto— y no del cálculo: ninguna operación servida la publica.',
+          },
           titulo: 'Cronograma',
           columnas: [
             { rotulo: 'Cuota', alineadoDerecha: false },
