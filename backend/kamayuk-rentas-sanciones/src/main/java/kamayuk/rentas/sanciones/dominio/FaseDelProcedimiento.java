@@ -56,6 +56,36 @@ package kamayuk.rentas.sanciones.dominio;
  * pantalla dibuja «—». Elegir «la más parecida» —{@code CONSTATADA}, que es la que saldría sola—
  * pondría en la grilla una cifra plausible y equivocada, que es peor que un hueco visible.
  *
+ * <h2>Dos de las cinco fases sólo las produce un PADRÓN MIGRADO (#259)</h2>
+ *
+ * <p>{@link #PAGADA} y {@link #COACTIVA} se derivan de {@code papeleta.estado}, y ese estado
+ * <b>este sistema no lo mueve nunca</b>: la papeleta nace {@code IMPUESTA} y el único {@code UPDATE
+ * papeleta} de {@code src/main} es {@code SET numero} (#46, #243). Así que en una instalación nueva
+ * las dos ramas son inalcanzables, y las pruebas que las cubren siembran el estado por SQL directo
+ * —{@code comoUnPadronMigrado}, en {@code ProcedimientoSancionadorRepositoryJdbcTest}—.
+ *
+ * <p><b>Las dos se quedan</b>, y por el mismo motivo por el que no se retira ningún valor de {@link
+ * EstadoDePapeleta}: en una instalación con el padrón migrado esas filas existen y dicen la verdad.
+ * Retirar la fase no borraría una rama muerta — dejaría que la papeleta migrada cayese por el
+ * {@code ELSE} y saliese en la grilla como {@code CONSTATADA}, que es exactamente la «cifra
+ * plausible y equivocada» que esta clase se niega a dibujar dos párrafos más arriba.
+ *
+ * <p><b>Y no se derivan de otro hecho, que era la otra salida.</b> Medido para #259:
+ *
+ * <ul>
+ *   <li><b>{@code PAGADA} desde el libro</b>: {@code cuenta_corriente_asiento} no lleva {@code
+ *       papeleta_id} ni {@code valor_id} —sus veintitrés columnas están en {@code V1}—, así que no
+ *       hay por dónde cruzar un abono con una papeleta sin decidir antes una columna nueva. Es una
+ *       decisión de esquema, no de código.
+ *   <li><b>{@code COACTIVA} desde el pase</b>: el método que el issue proponía añadir a {@code
+ *       EmisionDeValoresDeMultas} —{@code conPaseACoactiva(Collection&lt;Long&gt;)}— <b>ya
+ *       existe</b>, está implementado y no lo llama nadie en {@code src/main}. Y aunque se llamara
+ *       no serviría <b>aquí</b>: esto es un {@code CASE} de SQL que el {@code SELECT} y el {@code
+ *       WHERE} comparten, y un puerto de Java no se puede meter dentro de un {@code WHERE} sin
+ *       partir en dos la única copia de la expresión, que es justo lo que el apartado siguiente
+ *       explica que no se hace.
+ * </ul>
+ *
  * <h2>Por qué la expresión SQL vive aquí</h2>
  *
  * <p>Mismo motivo que {@link AgrupacionDelResumen}: es una constante que se concatena a la

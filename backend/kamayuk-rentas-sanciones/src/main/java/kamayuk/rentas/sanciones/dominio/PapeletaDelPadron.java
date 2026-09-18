@@ -73,10 +73,15 @@ public record PapeletaDelPadron(
         Objects.requireNonNull(importeAPagar, "La fila necesita el importe del acta");
     }
 
-    /** Si esta papeleta sigue debiéndose: ni pagada, ni anulada, ni prescrita. */
+    /**
+     * Si esta papeleta sigue debiéndose: ni pagada, ni anulada, ni prescrita.
+     *
+     * <p>Lo contesta el propio estado (#259). Hasta entonces esta expresión repetía en Java la
+     * lista que el {@code WHERE} de {@code soloPendientes} lleva en SQL, y es <b>esta</b> la que la
+     * API publica como {@code pendiente}: divergir habría hecho que la grilla marcara pendiente una
+     * fila que el filtro de pendientes no devuelve.
+     */
     public boolean estaPendiente() {
-        return estado != EstadoDePapeleta.PAGADA
-                && estado != EstadoDePapeleta.ANULADA
-                && estado != EstadoDePapeleta.PRESCRITA;
+        return estado.seDebe();
     }
 }

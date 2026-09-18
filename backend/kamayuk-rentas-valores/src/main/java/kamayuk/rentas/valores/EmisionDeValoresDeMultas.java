@@ -69,9 +69,20 @@ public interface EmisionDeValoresDeMultas {
      * De entre esos valores, cuales ya tienen su pase a coactiva ({@code PCO} de {@code
      * valor_movimiento}, V28).
      *
-     * <p>Es lo que el padron de papeletas enviadas a coactiva necesita, y se pregunta <b>en
-     * bloque</b>: un padron de doscientas filas que preguntara una por una haria doscientas
-     * consultas por pagina.
+     * <p>Se pregunta <b>en bloque</b>: un padron de doscientas filas que preguntara una por una
+     * haria doscientas consultas por pagina.
+     *
+     * <p><b>NO LO LLAMA NADIE, y esta medido (#259).</b> Este docblock decia que «es lo que el
+     * padron de papeletas enviadas a coactiva necesita», y no lo es: #243 definio ese padron como
+     * «con resolucion de multa emitida» —{@code it.valor_id IS NOT NULL} sobre la fila GENERADO de
+     * la corrida, en {@code PadronDePapeletasRepositoryJdbc}—, que es un hecho distinto y de
+     * `sanciones`. En todo {@code src/main} de los diecisiete modulos la unica mencion de este
+     * metodo es su propia implementacion delegando en el repositorio.
+     *
+     * <p>Se deja declarado y no se retira porque cual de los dos hechos es «enviada a coactiva» —el
+     * pase PCO del valor o la resolucion de multa emitida— es una decision de producto y no de
+     * codigo, y retirar una API publica de `valores` desde un issue de decision de `sanciones`
+     * seria tomarla de lado. Queda escrito aqui, que es donde se vuelve a mirar.
      *
      * @return los identificadores, de entre los preguntados, con pase; vacio si ninguno
      */

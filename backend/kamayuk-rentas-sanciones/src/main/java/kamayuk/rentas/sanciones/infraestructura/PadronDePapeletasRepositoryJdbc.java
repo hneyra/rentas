@@ -91,8 +91,16 @@ public class PadronDePapeletasRepositoryJdbc extends RepositorioJdbc
     private static final OrdenSeguro ORDEN =
             OrdenSeguro.sobre("fecha_infraccion", "numero", "placa", "estado", "id");
 
-    /** Los estados en los que una papeleta ya no se debe. Uno solo, y en un solo sitio. */
-    private static final String NO_SE_DEBE = "('PAGADA', 'ANULADA', 'PRESCRITA')";
+    /**
+     * Los estados en los que una papeleta ya no se debe.
+     *
+     * <p><b>Ahora sí es uno solo y en un solo sitio</b> (#259). Este docblock decía eso mismo
+     * cuando la lista estaba <b>tres</b> veces: aquí, escrita a mano otra vez en {@code
+     * PapeletaRepositoryJdbc} y una tercera en Java en {@code PapeletaDelPadron.estaPendiente()},
+     * que es la que la API publica como {@code pendiente}. Las tres se derivan ahora de {@code
+     * EstadoDePapeleta.seDebe()}, así que no hay dónde escribir la cuarta ni cómo divergir.
+     */
+    private static final String NO_SE_DEBE = EstadoDePapeleta.NO_SE_DEBE;
 
     /**
      * Que a esta papeleta se le haya notificado alguna resolucion de gerencia (#222).
