@@ -7,19 +7,24 @@ import type { Importe } from './valores.ts';
  *
  * Porque la regla no dice que nadie sume: dice que **no sume la pantalla**. Su prohibicion de
  * ESLint —`aritmetica-con-importes`— lo escribe con todas las letras: *«El total lo calcula el
- * backend y lo sostiene con su fecha: pidelo, no lo sumes»*. Este archivo tiene exactamente dos
- * consumidores, y ninguno es una pantalla que se invente un total:
+ * backend y lo sostiene con su fecha: pidelo, no lo sumes»*. Sumar dos cifras que el backend ya
+ * publico es otra cosa: no decide cuanto se debe, comprueba que lo publicado cuadre consigo mismo.
  *
- *   1. **`datos/operaciones.ts`**, que es el backend simulado. Ahi la memoria del predial deja
- *      de copiar sus dos totales del artboard y los DERIVA —el insoluto es la suma de los tres
- *      tramos, el total es el insoluto mas el derecho de emision—, que es lo que hace que
- *      cambiar un tramo mueva lo que depende de el. Un total copiado se veria idéntico y
- *      estaria muerto: el artboard cuadra hoy, y seguiria «cuadrando» el dia que dejara de
- *      cuadrar.
- *   2. **`secciones/determinacion.ts`**, que **no suma para mostrar**: comprueba. La pantalla
- *      dibuja el insoluto y el total que la respuesta publica —pidelos, no los sumes— y ademas
- *      verifica que cuadren con las filas que esta ensenando. Si no cuadran, lo dice en vez de
- *      dibujar un total que miente sobre sus propios sumandos.
+ * <h2>Y hoy no lo usa nadie, que es lo que hay que saber antes de tocarlo</h2>
+ *
+ * **Medido (#255, #262): el unico `import` de este archivo es su propia prueba.** Hasta aqui
+ * ponia que tenia «exactamente dos consumidores» y los nombraba —`datos/operaciones.ts`, el
+ * backend simulado, y `secciones/determinacion.ts`, que no sumaba para mostrar sino que
+ * comprobaba—; los dos eran de la V6 y **salieron del arbol en #90**, con lo que la frase quedo
+ * afirmando de dos archivos que no se pueden abrir. La segunda mitad es la que importa y sigue en
+ * pie como intencion: la pantalla dibuja el insoluto y el total que la respuesta publica, y ademas
+ * verifica que cuadren con las filas que esta ensenando; si no cuadran, lo dice en vez de dibujar
+ * un total que miente sobre sus propios sumandos.
+ *
+ * Esa comprobacion **no tiene donde correr todavia**: la lectura que la pedia,
+ * `DeterminacionIndividual`, sale de `POST /rentas/predial/calculo-individual`, que no esta en
+ * `datos/servidas.ts` ni lo pide ningun conector. Si este archivo se queda o se retira lo decide
+ * #262; lo que no puede volver a pasar es que lo justifique nombrando a quien ya no esta.
  *
  * <h2>Centimos enteros, y no decimales de coma flotante</h2>
  *

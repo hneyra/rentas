@@ -867,8 +867,35 @@ export const ARBOL = [
         piezasDeclaradas: [{ pieza: 'Progress', uso: 'La corrida, con sus observados' }],
       },
       {
+        // **«Prescripción», y no «Tipos y prescripción»** (#254, y su gemelo en el artboard).
+        // Con los tres mandos corregidos en #244 **no queda una sola cosa en esta hoja que sea un
+        // tipo de valor**: la nota, la instruccion, los tres mandos, el campo, la tabla y las dos
+        // operaciones son de prescripcion. Los tipos de valor los llevan `val-val` —su desplegable
+        // «Tipo de valor»: Orden de pago, RD, RM y RPF— y `val-cart`, y esos si los tienen como
+        // dato.
+        //
+        // **Y se midio de donde sale cada mitad del rotulo antes de tocarlo**, que es lo que el
+        // issue pedia:
+        //
+        //   · **El rotulo del MODULO —«Valores»— no es nuestro y no se toca.** Lo pisa
+        //     `GET /seguridad/modulos` (`permisos.ts`, `componer`: `{ ...nuestroModulo, rotulo:
+        //     modulo.nombre }`), y el manual lo respalda —NEG-03 §Valores, `cap. 3 §Valores`—.
+        //   · **El rotulo de la HOJA si es nuestro.** El backend no publica ninguno: lo que
+        //     `GET /seguridad/accesos` trae son los codigos de opcion del manual —`prescripcion`,
+        //     `notificacion_valores`…—, y `componer` los usa para saber si la cuenta puede abrir
+        //     algo, nunca para rotular un destino. Los cuarenta destinos salen del artboard y de
+        //     aqui.
+        //   · **Y el menu del manual NO dice «Tipos y prescripcion»**: medido, ni esa cadena ni
+        //     «Tipos de valor» aparecen **una sola vez** en todo `../sgtm`. Lo que NEG-03 lista
+        //     bajo Valores para estas dos operaciones es la opcion `prescripcion`, «Prescripcion
+        //     de la deuda». O sea que la mitad «Tipos» no venia del manual: se invento en el
+        //     artboard.
+        //
+        // **La clave `val-tip` se queda**, y no es descuido: es la direccion de la hoja
+        // (`#/val-tip`), la llave de `CONECTORES`, `PANTALLAS` y `ClaveDeHoja`, y la que el
+        // artboard usa. Renombrarla es mover una ruta, que es otro trabajo y otro issue.
         clave: 'val-tip',
-        rotulo: 'Tipos y prescripción',
+        rotulo: 'Prescripción',
         operaciones: [
           { verbo: 'GET', ruta: '/coactiva/prescripcion', nota: 'PrescripcionController' },
           { verbo: 'POST', ruta: '/coactiva/prescripcion', nota: 'Declara la prescripción' },

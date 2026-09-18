@@ -6,9 +6,13 @@ import { peldanoDe } from './escalera.ts';
 /**
  * Los cuatro peldanos, sin montar nada (AC6).
  *
- * Aqui se mide **el mapa**: que estado y que codigo llevan a que remedio. Que ademas se vea en
- * pantalla se mide en `aplicacion.test.tsx`, y las dos mitades hacen falta: un mapa correcto que
- * nadie dibuja no ayuda a nadie, y una pantalla que dibuja el peldano equivocado se ve bien.
+ * Aqui se mide **el mapa**: que estado y que codigo llevan a que remedio. Las dos mitades hacen
+ * falta —un mapa correcto que nadie dibuja no ayuda a nadie, y una pantalla que dibuja el peldano
+ * equivocado se ve bien—, y **la otra mitad no esta medida porque no existe**: hasta aqui ponia
+ * que se media en `aplicacion.test.tsx`, que no es un archivo de este arbol, y lo cierto es que
+ * **ninguna pantalla dibuja el peldano**: `escalera.ts` no lo importa ninguna fuente de
+ * produccion (#255, #262). Mientras siga asi, un 403 `SIN_PRIVILEGIO` y una averia de verdad se
+ * ven igual, que es justo lo que ese archivo existe para evitar.
  */
 
 function fallo(estado: number, codigo: string | null, mensaje: string): ErrorDeLaApi {

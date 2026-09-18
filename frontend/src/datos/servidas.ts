@@ -51,7 +51,10 @@
  * un 502 ruidoso **cualquier 404** de una ruta declarada, dando por hecho que un 404 significaba
  * «esa ruta no esta publicada». No lo significa. El cuarto peldano de la escalera de identidad
  * —el token identifica a alguien que no es usuario de esta municipalidad— es un <b>404 legitimo
- * de una ruta que si existe</b>, y confundirlos se lo tragaba entero. Ver `api/proxy.ts`.
+ * de una ruta que si existe</b>, y confundirlos se lo tragaba entero. Esa heuristica vivia en
+ * `api/proxy.ts`, que salio con la V6 en #90; lo que la sustituye esta medido en
+ * `verificaciones/camino-a-la-api.test.ts`, que cruza cada entrada de esta lista contra el
+ * contrato y lo dice **sin que nadie levante un backend**.
  */
 
 /** Una operacion que el backend ya sirve. Se compara por verbo y por ruta, con sus `{...}`. */
@@ -90,7 +93,8 @@ export interface OperacionServida {
  *   <li><b>`GET /seguridad/sesion/permisos`.</b> Llegan <b>134</b> llaves, una por acceso, cada
  *       una con sus siete privilegios. Y al pedirla con las <b>dos</b> cuentas de la
  *       instalacion salieron <b>identicas</b>, llave a llave: ninguna de las dos ejercita el
- *       filtro. Eso cambio como se prueba el AC2 — ver `marco/seguridadMedida.ts`.</li>
+ *       filtro. Eso cambio como se prueba el AC2 — ver `datos/seguridadMedida.ts`, que es donde
+ *       esa captura vive desde #90.</li>
  *   <li><b>`PUT /seguridad/sesion/ejercicio`.</b> La primera <b>escritura</b> de esta interfaz.
  *       Con observacion contesta 200 y la sesion con su ejercicio dentro; sin ella contesta
  *       <b>500</b>, que es el defecto #30 y no se arregla aqui — se rodea no mandando nunca una

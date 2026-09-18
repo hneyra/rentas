@@ -156,7 +156,14 @@ export const VALORES = {
     instruccion: 'declarar la prescripción es un acto: se hace de oficio o a pedido, y queda en la bitácora.',
     bloques: [
       {
-        titulo: 'Tipos de valor y prescripción',
+        // **«Prescripcion de la deuda», y no «Tipos de valor y prescripcion»** (#254, y su gemelo
+        // en el artboard). Es el nombre con que NEG-03 lista la opcion `prescripcion` del modulo
+        // Valores, que es de donde salen estas dos operaciones. Lo que se retira es «Tipos de
+        // valor»: despues de #244 no hay en esta hoja un solo campo, mando, columna ni operacion
+        // que lo sea, y un titulo que promete uno es lo que hace que alguien vuelva a anadir el
+        // mando que #244 quito. El motivo largo, con de donde sale cada pieza del rotulo, esta en
+        // el comentario de `val-tip` en `pantallas/arbol.ts`.
+        titulo: 'Prescripción de la deuda',
         nota: 'La deuda prescribe a los cuatro años; un acto de cobranza reinicia el plazo.',
         campos: [
           // **Los tres mandos, corregidos en #244** (y su gemelo en el artboard). Ninguno llega
