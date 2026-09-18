@@ -1,6 +1,7 @@
 import {
   coordenada,
   type Ausencia,
+  type CeldaDeLaTabla,
   type Coordenada,
   type DatoConNombre,
   type FilaDeLaTabla,
@@ -11,6 +12,7 @@ import type { CorridaDelPredial, DeterminacionGuardada } from './lecturas.ts';
 import { RUTAS, pedirUnoOVacio } from './lecturas.ts';
 import {
   formatearAlicuota,
+  formatearFecha,
   formatearImporte,
   formatearImporteSinRedondear,
 } from '../dominio/formato.ts';
@@ -532,6 +534,45 @@ const TODAVIA_SIN_DETERMINAR: Ausencia = {
 };
 
 /**
+ * **El motivo de «Situacion», escrito UNA vez** (#252): el que viaja en la celda y el que explica
+ * el javadoc de abajo.
+ *
+ * Es dato y no se traduce, igual que la celda —lo que se traduce es la palabra que la tabla
+ * declara en `sinDato`—, por lo mismo que el `SIN_RIESGO_PUBLICADO` de `conectores/seguridad.ts`.
+ */
+const SIN_SITUACION_PUBLICADA =
+  'La situacion de una cuota es un hecho de CUENTA CORRIENTE —si se pago, cuando y cuanto— y no ' +
+  'del calculo: ninguna operacion servida la publica. Deducirla del vencimiento —«vencida» ' +
+  'porque la fecha paso— diria que hay deuda sin haber mirado un solo pago.';
+
+/** La celda que llego sin dato, con el motivo dentro (`kamayuk-lib`#87, #187). */
+const sinDato = (porQue: string): CeldaDeLaTabla => ({ texto: null, nota: porQue });
+
+/**
+ * **Las filas del «Cronograma»: una por cuota, y ni una compuesta aqui** (#252).
+ *
+ * Vacia cuando la fila es anterior a `V21` — pero entonces esta tabla **no se entrega**: ver el
+ * javadoc de `TERRITORIO`, porque `[]` y «no hay tabla» no dicen lo mismo.
+ */
+function cronogramaDe(determinacion: DeterminacionGuardada): readonly FilaDeLaTabla[] {
+  return determinacion.cuotas.map((cuota) => ({
+    // El numero de la cuota, que es el unico identificador que la operacion publica de ella.
+    clave: String(cuota.numero),
+    celdas: [
+      // `cuota.numero` y no el indice de la lista: el numero lo dice la operacion. Y **no «1 de
+      // 4»**, que es lo que el artboard dibuja: «de» es una palabra, y una celda es dato y no pasa
+      // por `t()` (#103). El cuantas-son lo dice la tabla, que ensena sus filas.
+      String(cuota.numero),
+      formatearFecha(cuota.vencimiento),
+      // Redondeado, al reves que el aporte de un tramo: la cuota es una cifra de cierre —el
+      // conjunto sellado la redondea en `PuntoDeRedondeo.CUOTA`— y llega con sus dos decimales.
+      formatearImporte(cuota.importe),
+      sinDato(SIN_SITUACION_PUBLICADA),
+    ],
+  }));
+}
+
+/**
  * `territorio` — la Determinacion, y la unica hoja de las cuarenta que NO se pintaba por declarar
  * solo escrituras (#182, #207, #237).
  *
@@ -565,8 +606,52 @@ const TODAVIA_SIN_DETERMINAR: Ausencia = {
  * por otro seria una cifra al centimo indistinguible de la correcta — en un beneficio de
  * pensionista esa cifra decide cuanto se cobra. Sigue diciendo «no publicado».
  *
- * **El «Cronograma»**, que ya no es #234 —la operacion trae `modalidad` y `cuotas[]` desde
- * esa migracion— sino el conector que las reparta: ver abajo, y #252.
+ * <h2>Y el «Cronograma» se reparte con #252: TRES columnas de cuatro</h2>
+ *
+ * La operacion trae `modalidad` y `cuotas[]` desde #234, y de ahi salen **numero, vencimiento e
+ * importe**, tal como llegan. Lo que hay que decidir al conectarla es lo otro:
+ *
+ * <ul>
+ *   <li><b>«Situacion» no se llena, y eso es la decision</b>. Es un hecho de <b>cuenta
+ *       corriente</b> —si esa cuota se pago, cuando y cuanto— y ninguna operacion servida lo
+ *       publica. Las dos formas de rellenarla son inventarla: deducirla del vencimiento diria
+ *       «vencida» sobre una cuota que puede estar pagada —deuda afirmada sin mirar un solo pago—,
+ *       y dejarla en blanco la haria indistinguible de un dato que se perdio por el camino. Va la
+ *       celda sin dato con su motivo dentro, que es lo que `seg-aud` hizo con «Riesgo» en #187.
+ *       Publicarla es otra cosa y el issue lo dice: no cabe en esta lectura.</li>
+ *   <li><b>Y NO se suman las cuotas para componer un total</b>. Es la regla de este archivo en su
+ *       forma mas tentadora: la operacion publica CADA cuota y no su suma, asi que la suma no se
+ *       escribe. Y aqui ademas seria falsa de dos maneras a la vez — las cuotas reparten el
+ *       <b>impuesto insoluto</b> y no el total a pagar, o sea que su suma no es «Total a pagar»
+ *       aunque lo parezca; y el reparto deja el resto en la <b>ultima</b> cuota, no en la primera.
+ *       Por eso la tabla tampoco lleva `totalElementos`: la operacion no pagina cuotas.</li>
+ * </ul>
+ *
+ * <h2>Y al ponerlas una al lado de otra salio que el artboard y la operacion no dicen lo mismo</h2>
+ *
+ * El artboard dibuja la cuota 1 **mayor** —«el derecho de emision se cobra entero en la primera
+ * cuponera»— y lo que la operacion publica es lo contrario: las cuotas reparten el insoluto, el
+ * derecho de emision no esta en ninguna, y el centimo del redondeo lo lleva la **ultima**. Aqui se
+ * dibuja **lo que la operacion publica**, que es lo unico que esta pantalla puede afirmar; cual de
+ * los dos cronogramas es el que se cobra es una decision de negocio y esta medida en
+ * [#264](https://github.com/hneyra/rentas/issues/264). Lo que haria falta para llenar «Situacion»,
+ * en [#265](https://github.com/hneyra/rentas/issues/265).
+ *
+ * <h2>Y una fila anterior a `V21` NO recibe la tabla, que no es lo mismo que recibirla vacia</h2>
+ *
+ * Con `modalidad: null` la operacion contesta `cuotas: []`, y eso **no** es «esta determinacion no
+ * tiene cuotas»: es que aquella fila no dice con que cronograma se emitio. Entregar `[]` haria que
+ * el interprete dibujara el vacio de la tabla —«no hay filas»—, que es una afirmacion distinta y
+ * falsa. Sin entregarla, la tabla dibuja la ausencia, y la frase de pantalla la dice con su motivo
+ * exacto: `SIN_CRONOGRAMA`, que desde #252 sale **solo** en ese caso. Nunca las cuatro trimestrales
+ * supuestas.
+ *
+ * <h2>Las cifras de las cuotas tampoco necesitan una fecha (regla 9)</h2>
+ *
+ * Por lo mismo que las diez de la memoria: no son `deudaActualizadaA(fecha)` —no corren intereses
+ * aqui—, son el reparto de lo que quedo asentado para un EJERCICIO bajo un CONJUNTO SELLADO, y los
+ * dos estan en la pantalla. Y cada fila dice ademas **su** vencimiento, que es la fecha que esa
+ * cifra tiene.
  *
  * <h2>El aporte de un tramo NO pasa por `formatearImporte`, y no es un detalle</h2>
  *
@@ -625,17 +710,28 @@ const TERRITORIO: Conector = {
       // que ESA determinacion fijo, no del vigente hoy.
       [coordenada(2, 9), determinacion.conjunto],
     ]),
-    // Vacio: la tabla de los tramos lleva `clave`, asi que sus filas van por `tablas`. Y el
-    // «Cronograma» no lleva filas — y no `[]`, que significaria «la operacion contesto que no hay
-    // ninguna cuota». Desde #234 la operacion SI trae `cuotas[]`; lo que falta es el conector que
-    // las reparta, y eso es #252. Repartirlas aqui de paso seria conectar una tabla sin haber
-    // decidido que dice su cuarta columna —«Situacion», que es cuenta corriente y no calculo—.
+    // Vacio: las DOS tablas de la hoja llevan `clave`, asi que sus filas van por `tablas` — que es
+    // el camino cuyas celdas pueden decir que no hay dato, y el unico que «Situacion» admite.
     filas: new Map(),
-    tablas: new Map([
-      [
-        'tramos-del-articulo-13',
-        {
-          filas: determinacion.tramos.map((tramo) => ({
+    tablas: tablasDe(determinacion),
+    // Solo cuando la fila no dice su modalidad: ver el javadoc. Desde #252 la hoja conectada no
+    // puede seguir diciendo «falta el conector» sobre una tabla que acaba de dibujarse.
+    ...(determinacion.modalidad === null ? { loQueLaOperacionNoTrae: SIN_CRONOGRAMA } : {}),
+    noPublicados: new Map([[coordenada(1, 3), NO_PUBLICADO]]),
+  }),
+};
+
+/**
+ * **Las dos tablas de la hoja**: los tramos siempre, y el cronograma **solo si la fila lo dice**.
+ *
+ * La ausencia de la segunda es deliberada y no un `[]`: ver el javadoc de `TERRITORIO`.
+ */
+function tablasDe(determinacion: DeterminacionGuardada): ReadonlyMap<string, TablaRepartida> {
+  const tablas = new Map<string, TablaRepartida>([
+    [
+      'tramos-del-articulo-13',
+      {
+        filas: determinacion.tramos.map((tramo) => ({
             clave: String(tramo.orden),
             celdas: [
               String(tramo.orden),
@@ -649,18 +745,25 @@ const TERRITORIO: Conector = {
               formatearImporte(tramo.porcionGravada),
               // Sin redondear: ver el javadoc. `formatearImporte` reventaria con sus ocho
               // decimales, y recortarlos aqui seria aritmetica sobre dinero.
-              formatearImporteSinRedondear(tramo.aporte),
-            ],
-          })),
-          // Sin `totalElementos`: la operacion no pagina tramos, los publica enteros. Lo que se ve
-          // es todo lo que hay, asi que el interprete cuenta las filas y no afirma ningun total.
-        },
-      ],
-    ]),
-    loQueLaOperacionNoTrae: SIN_CRONOGRAMA,
-    noPublicados: new Map([[coordenada(1, 3), NO_PUBLICADO]]),
-  }),
-};
+          formatearImporteSinRedondear(tramo.aporte),
+        ],
+      })),
+      // Sin `totalElementos`: la operacion no pagina tramos, los publica enteros. Lo que se ve
+      // es todo lo que hay, asi que el interprete cuenta las filas y no afirma ningun total.
+    },
+    ],
+  ]);
+  // **Y la segunda tabla solo si la fila DICE con que modalidad se emitio** (#252). Con `null` no
+  // se entrega: `[]` diria «esta determinacion no tiene cuotas», que es una afirmacion, y lo que
+  // pasa es que no consta cual era su cronograma.
+  if (determinacion.modalidad !== null) {
+    // Sin `totalElementos`, por lo mismo que los tramos y por uno mas: sumar las cuotas para
+    // componer un total es justo lo que este archivo prohibe, y ademas no daria «Total a pagar»
+    // —las cuotas reparten el insoluto, sin el derecho de emision—.
+    tablas.set('cronograma', { filas: cronogramaDe(determinacion) });
+  }
+  return tablas;
+}
 
 /** Las hojas que piden de verdad. Las demas lo dicen; ver `porQueNoHayDato.ts`. */
 export const CONECTORES: Readonly<Partial<Record<ClaveDeHoja, Conector>>> = {

@@ -242,12 +242,13 @@ const CONECTADAS: readonly {
     // entrada de `territorio` aqui.
     bloque: 3,
     leLlega:
-      'NADA, y esa es la propiedad. La columna «Situacion» del «Cronograma» es de insignia en el ' +
-      'artboard, y el conector NO entrega ni una fila a esa tabla: la determinacion guardada no ' +
-      'dice con que modalidad se emitio, asi que los vencimientos no se pueden resolver (#234) y ' +
-      'la situacion de una cuota es ademas un hecho de cuenta corriente. Sin filas, la tabla ' +
-      'dibuja la frase de pantalla y no hay celda donde pintar un tono — que es lo correcto: una ' +
-      'insignia verde sobre una cuota cuyo vencimiento nadie conoce diria que esta al dia',
+      'la raya del artboard — **desde #252 el «Cronograma» SI recibe filas** (numero, vencimiento ' +
+      'e importe de cada cuota), pero su cuarta columna, la de la insignia, sigue sin tener que ' +
+      'pintar: «Situacion» es un hecho de CUENTA CORRIENTE —si esa cuota se pago— y no lo publica ' +
+      'ninguna operacion servida. La celda llega sin dato y con el motivo dentro, como la de ' +
+      '«Riesgo» en `seg-aud`, asi que el interprete escribe la raya que la tabla declara y NO ' +
+      'llama a `tonoDeLaInsignia`. Es lo correcto: deducir el tono del vencimiento pintaria de ' +
+      'rojo —«vencida»— una cuota que puede estar pagada, y de verde una que no lo esta',
   },
   // `val-tip` entra con #230, DESPUES de escribirse esta guarda — la QUINTA vez, y la quinta que
   // sale roja sola. Es ademas el primer caso en que la columna de insignia **gana** una regla en

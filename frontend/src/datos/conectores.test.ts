@@ -449,6 +449,42 @@ const DETERMINACION_SIN_MODALIDAD: DeterminacionGuardada = {
 };
 
 /**
+ * Y la MISMA determinacion emitida al **fraccionado del articulo 15 b)** (#252).
+ *
+ * <h2>Las cuatro cifras estan puestas para separar lo que se confunde, y ninguna es redonda</h2>
+ *
+ * Una muestra de cuatro cuotas iguales, con fechas iguales o con importes que sumaran el total, no
+ * distinguiria una implementacion buena de una mala. Esta trae **cuatro** contrastes:
+ *
+ *   · **Cuatro cuotas, y la del contado es una**: con un solo montaje, un conector que dibujara
+ *     siempre cuatro filas —o siempre una— pasaria en verde. Los dos montajes se reparten con el
+ *     mismo codigo y se comprueban por separado.
+ *   · **Las cuatro fechas son distintas**, y son las del conjunto sellado —`PREDIAL_VENCIMIENTO`
+ *     «1».. «4» de `PredialControllerTest`, no inventadas aqui—. Con las cuatro iguales, un
+ *     conector que tomara el vencimiento de la primera para todas las filas no se veria.
+ *   · **El centimo lo lleva la ULTIMA cuota, no la primera**: 2 395,01 / 4 = 598,7525, que
+ *     redondeado en `PuntoDeRedondeo.CUOTA` —dos decimales, HALF_UP, del conjunto sellado— da
+ *     598,75, y `CronogramaDelPredial` le da el resto a la ultima: 598,76. **El artboard dibuja lo
+ *     contrario** —«por eso la cuota 1 es mayor»—, asi que una muestra copiada de el habria
+ *     escondido esto en vez de ensenarlo (ver el issue que sale de aqui).
+ *   · **Y las cuotas suman el INSOLUTO, no el total a pagar**: 598,75 x 3 + 598,76 = 2 395,01, y
+ *     `totalAPagar` es 2 399,51 — el derecho de emision, 4,50, **no** se reparte. Con una muestra
+ *     que sumara el total, sumar las cuatro cuotas para «adelantar» el total a pagar pasaria en
+ *     verde, que es exactamente la tentacion que la regla de `conectores.ts` prohibe.
+ */
+const DETERMINACION_TRIMESTRAL: DeterminacionGuardada = {
+  ...DETERMINACION_GUARDADA,
+  modalidad: 'TRIMESTRAL',
+  cuotas: [
+    { numero: 1, vencimiento: '2026-02-27', importe: '598.75' },
+    { numero: 2, vencimiento: '2026-05-29', importe: '598.75' },
+    { numero: 3, vencimiento: '2026-08-31', importe: '598.75' },
+    // La ultima se lleva el resto (ADR-0018, y el javadoc de `CronogramaDelPredial`).
+    { numero: 4, vencimiento: '2026-11-30', importe: '598.76' },
+  ],
+};
+
+/**
  * Lo que `val-tip` recibe: la bitacora de declaraciones de prescripcion, con su reloj (#230).
  *
  * **Los quince campos que la operacion publica**, y no los cuatro que el conector lee, por lo mismo
@@ -785,36 +821,150 @@ describe('`territorio` — la determinacion guardada, y sus TRES ausencias (#237
     expect(tabla?.totalElementos).toBeUndefined();
   });
 
-  it('el «Cronograma» sigue sin dibujarse, y la pantalla dice el motivo NUEVO (#234, #252)', () => {
-    // Y no con `[]`, que significaria «la operacion contesto que no hay ninguna cuota». Lo que
-    // cambia con #234 es la MITAD del motivo: la operacion ya publica `modalidad` y `cuotas[]`, y
-    // lo que falta es el conector que las reparta. Decir «no lo publica nadie» mandaria a arreglar
-    // un backend que ya esta arreglado, que es el defecto de #239.
+  it('el CRONOGRAMA se reparte: una fila por cuota, con lo que la operacion publica (#252)', () => {
+    // **Es el bloque 3 desde #245**, que mete la memoria delante, y su tabla lleva `clave` desde
+    // #252: sus filas viajan por `tablas`, que es el unico camino cuyas celdas pueden decir que no
+    // hay dato — y «Situacion» lo necesita.
     //
-    // **Es el bloque 3 desde #245**, que mete la memoria delante. Y lo que la hoja tiene ahora son
-    // DOS tablas: una llena y otra vacia, asi que la frase de pantalla —que es de la hoja entera—
-    // tiene que seguir nombrando la que falta. La nombra.
-    const reparto = conector.repartir(DETERMINACION_GUARDADA as never);
+    // Las tres columnas que se llenan llegan **tal cual**: el numero que la cuota dice, la fecha
+    // que el conjunto sellado fijo y el importe ya redondeado en `PuntoDeRedondeo.CUOTA`. Ninguna
+    // se compone aqui, y por eso la muestra trae cuatro fechas distintas: con las cuatro iguales,
+    // un conector que repitiera la de la primera cuota pasaria en verde.
+    const reparto = conector.repartir(DETERMINACION_TRIMESTRAL as never);
     const cronograma = PANTALLAS.territorio.bloques[3]?.tabla;
+    const tabla = reparto.tablas?.get('cronograma');
 
     expect(cronograma?.titulo).toBe('Cronograma');
-    expect(cronograma?.clave).toBeUndefined();
+    expect(cronograma?.clave).toBe('cronograma');
+    expect(cronograma?.columnas).toHaveLength(4);
+    // Las filas NO van por el indice del bloque: la tabla lleva clave.
     expect(reparto.filas.has(3)).toBe(false);
-    expect(reparto.tablas?.has('cronograma')).toBe(false);
-    expect(reparto.loQueLaOperacionNoTrae).toBe(SIN_CRONOGRAMA);
-    expect(SIN_CRONOGRAMA).toContain('cronograma');
-    expect(SIN_CRONOGRAMA).toContain('#234');
-    expect(SIN_CRONOGRAMA).not.toContain('no lo publica');
+    expect(tabla?.filas).toHaveLength(4);
+    expect(tabla?.filas.map((fila) => fila.celdas.slice(0, 3))).toEqual([
+      ['1', '27/02/2026', 'S/ 598.75'],
+      ['2', '29/05/2026', 'S/ 598.75'],
+      ['3', '31/08/2026', 'S/ 598.75'],
+      // La ultima lleva el centimo del resto, y no la primera: el artboard dibuja lo contrario.
+      ['4', '30/11/2026', 'S/ 598.76'],
+    ]);
+    // Y la del CONTADO es **una**, con la misma linea de codigo: el articulo 15 a) no es cuatro.
+    const alContado = conector.repartir(DETERMINACION_GUARDADA as never).tablas?.get('cronograma');
+    expect(alContado?.filas).toHaveLength(1);
+    expect(alContado?.filas[0]?.celdas.slice(0, 3)).toEqual(['1', '27/02/2026', 'S/ 2,395.01']);
+    // Nada que decir de una ventana: la operacion no pagina cuotas, las publica enteras.
+    expect(tabla?.totalElementos).toBeUndefined();
   });
 
-  it('y la operacion trae de verdad el cronograma que la hoja no dibuja (#234)', () => {
-    // El contraste que hace que la prueba de arriba signifique algo: si la lectura no trajera
-    // nada, «no lo dibuja porque falta conectarlo» seria falso y nadie lo notaria.
-    expect(DETERMINACION_GUARDADA.modalidad).toBe('CONTADO');
-    expect(DETERMINACION_GUARDADA.cuotas).toHaveLength(1);
+  it('el numero de la CUOTA sale de su campo, no de contar filas — y esto se midio', () => {
+    // **Esta prueba existe porque la rotura salio VERDE.** Cambiar `String(cuota.numero)` por
+    // `String(i + 1)` no rompia nada: en las dos muestras de arriba el numero coincide con la
+    // posicion, que es lo que `CronogramaDelPredial` compone **hoy** —`vencimientos.get(i)` con
+    // `i + 1`—. Una muestra uniforme en ese eje no separa leer un campo de contar filas.
+    //
+    // Asi que se ejerce con una respuesta **cuyo orden no es el de los numeros**. No es la que el
+    // backend compone hoy y se dice: lo que se afirma es que la celda dice lo que la operacion
+    // publica en `numero`, y no la posicion en que llego. El dia que esa lista se pida ordenada
+    // por vencimiento, o que una cuota anulada deje un hueco, el indice mentiria sin que nadie lo
+    // notara — y la cuota es lo que el contribuyente busca en su cuponera.
+    const alReves: DeterminacionGuardada = {
+      ...DETERMINACION_TRIMESTRAL,
+      cuotas: [...DETERMINACION_TRIMESTRAL.cuotas].reverse(),
+    };
+
+    const filas = conector.repartir(alReves as never).tablas?.get('cronograma')?.filas ?? [];
+
+    expect(filas.map((fila) => fila.celdas[0])).toEqual(['4', '3', '2', '1']);
+    // Y la clave de React es la misma que la celda: dos filas con la clave «1» se pisarian.
+    expect(filas.map((fila) => fila.clave)).toEqual(['4', '3', '2', '1']);
+    // Cada fila conserva ademas SU fecha y SU importe: no se reordena nada aqui.
+    expect(filas[0]?.celdas.slice(1, 3)).toEqual(['30/11/2026', 'S/ 598.76']);
+  });
+
+  it('«SITUACION» no se llena: la celda dice que no hay dato y anuncia por que (#252)', () => {
+    // Es la decision del issue, y se toma antes de pintar: la situacion de una cuota es un hecho de
+    // CUENTA CORRIENTE —si se pago, cuando y cuanto— y ninguna operacion servida la publica.
+    // Deducirla del vencimiento diria «vencida» sobre una cuota que puede estar pagada, o sea
+    // afirmar deuda sin haber mirado un solo pago; dejarla en blanco la haria indistinguible de un
+    // dato perdido por el camino. Va la celda sin dato, con el motivo dentro (#187).
+    const reparto = conector.repartir(DETERMINACION_TRIMESTRAL as never);
+    const cronograma = PANTALLAS.territorio.bloques[3]?.tabla;
+    const filas = reparto.tablas?.get('cronograma')?.filas ?? [];
+
+    expect(filas).toHaveLength(4);
+    for (const fila of filas) {
+      const situacion = fila.celdas[3];
+      expect(typeof situacion, 'la situacion se colo como cadena').not.toBe('string');
+      expect(situacion).toMatchObject({ texto: null });
+      expect((situacion as { readonly nota?: string }).nota).toContain('CUENTA CORRIENTE');
+    }
+    // Y la palabra que se PINTA la declara la tabla, no la celda: sin `sinDato` seria la raya muda
+    // del saco, que no distingue «nadie lo publica» de «esto esta roto».
+    expect(cronograma?.sinDato?.texto).toBe('—');
+    expect(cronograma?.sinDato?.nota).toContain('cuenta corriente');
+    // Ninguna celda del cronograma dice un estado: ni deducido del vencimiento ni de ningun pago.
+    const dichas = filas.flatMap((fila) =>
+      fila.celdas.filter((celda): celda is string => typeof celda === 'string'),
+    );
+    expect(dichas.filter((celda) => /vencid|pagad|cancelad|al dia|por vencer/i.test(celda))).toEqual(
+      [],
+    );
+  });
+
+  it('NO se suman las cuotas para componer un total, y la muestra prueba que seria falso', () => {
+    // La tentacion concreta de este conector: la operacion publica CADA cuota y no su suma. Y aqui
+    // la suma seria falsa de dos maneras a la vez — las cuotas reparten el **insoluto** (2 395,01)
+    // y no el total a pagar (2 399,51), porque el derecho de emision no se prorratea; y un importe
+    // sacado de dividir el total entre cuatro (599,8775) no es ninguno de los cuatro publicados.
+    const reparto = conector.repartir(DETERMINACION_TRIMESTRAL as never);
+    const tabla = reparto.tablas?.get('cronograma');
+    const centimos = DETERMINACION_TRIMESTRAL.cuotas.reduce(
+      (total, cuota) => total + Math.round(Number(cuota.importe) * 100),
+      0,
+    );
+
+    expect(centimos).toBe(Math.round(Number(DETERMINACION_TRIMESTRAL.impuestoInsoluto) * 100));
+    expect(centimos).not.toBe(Math.round(Number(DETERMINACION_TRIMESTRAL.totalAPagar) * 100));
+    // Ni la suma ni el cociente aparecen en ninguna celda de la tabla.
+    const dichas = (tabla?.filas ?? []).flatMap((fila) =>
+      fila.celdas.filter((celda): celda is string => typeof celda === 'string'),
+    );
+    expect(dichas).not.toContain('S/ 2,399.51');
+    expect(dichas).not.toContain('S/ 2,395.01');
+    expect(dichas).not.toContain('S/ 599.88');
+    expect(tabla?.totalElementos).toBeUndefined();
+  });
+
+  it('una fila anterior a V21 NO recibe la tabla, y la pantalla dice por que (#234, #252)', () => {
+    // La mitad que ninguna conexion arregla. Y **no se entrega `[]`**: eso significaria «la
+    // operacion contesto que no hay ninguna cuota», que es una afirmacion; lo que pasa es que
+    // aquella fila no dice con que cronograma se emitio. Sin tabla, el interprete dibuja la
+    // ausencia y la frase de pantalla trae el motivo exacto.
+    const enBlanco = conector.repartir(DETERMINACION_SIN_MODALIDAD as never);
+
     expect(DETERMINACION_SIN_MODALIDAD.modalidad).toBeNull();
     expect(DETERMINACION_SIN_MODALIDAD.cuotas).toHaveLength(0);
-    expect(conector.repartir(DETERMINACION_SIN_MODALIDAD as never).filas.has(3)).toBe(false);
+    expect(enBlanco.tablas?.has('cronograma')).toBe(false);
+    expect(enBlanco.filas.has(3)).toBe(false);
+    // Y no se lleva por delante la otra tabla de la hoja: los tramos siguen ahi.
+    expect(enBlanco.tablas?.get('tramos-del-articulo-13')?.filas).toHaveLength(3);
+    expect(enBlanco.loQueLaOperacionNoTrae).toBe(SIN_CRONOGRAMA);
+    expect(SIN_CRONOGRAMA).toContain('cronograma');
+    // La frase ya no manda a arreglar un backend arreglado ni un conector que ya existe (#239).
+    expect(SIN_CRONOGRAMA).not.toContain('no lo publica');
+    expect(SIN_CRONOGRAMA).not.toContain('conector');
+    expect(SIN_CRONOGRAMA).not.toContain('todavia');
+  });
+
+  it('y las DOS que si dicen su modalidad no arrastran esa frase: seria mentir sobre lo pintado', () => {
+    // El contraste que hace que la prueba de arriba signifique algo. Sin el, una frase escrita
+    // siempre pasaria las dos, y la pantalla diria «no consta el cronograma» debajo de la tabla del
+    // cronograma.
+    expect(DETERMINACION_GUARDADA.modalidad).toBe('CONTADO');
+    expect(DETERMINACION_TRIMESTRAL.modalidad).toBe('TRIMESTRAL');
+    expect(conector.repartir(DETERMINACION_GUARDADA as never).loQueLaOperacionNoTrae).toBeUndefined();
+    expect(
+      conector.repartir(DETERMINACION_TRIMESTRAL as never).loQueLaOperacionNoTrae,
+    ).toBeUndefined();
   });
 });
 

@@ -39,16 +39,27 @@ const NO_PUBLICADO = 'no publicado';
 const SIN_CIFRAR = 'sin cifrar';
 
 /**
- * **Lo que `territorio` no dibuja, y por que** (#237, #234).
+ * **Lo que `territorio` no dibuja de UNA determinacion, y por que** (#237, #234, #252).
  *
  * El «Cronograma» es una tabla entera y no un campo: sin filas, el interprete dibuja la frase de
- * pantalla, y esa es generica. Esta dice el motivo exacto — que no es que a nadie se le ocurriera
- * publicarlo, sino que la fila guardada **no dice con que modalidad se emitio**.
+ * pantalla, y esa es generica. Esta dice el motivo exacto.
+ *
+ * <h2>La mitad que #252 le quita, y la que le deja</h2>
+ *
+ * Hasta aqui esta frase salia **siempre**, porque la hoja no repartia ni una cuota. Desde #252 la
+ * tabla se dibuja, y entonces esta frase ya no puede decir «falta el conector»: **saldria mintiendo
+ * justo sobre la pantalla que acaba de conectarse**, que es el defecto que #239 midio —una frase
+ * que manda a arreglar algo que ya esta arreglado—.
+ *
+ * Lo que queda es el caso que ninguna conexion arregla: una fila **anterior a `V21`** no dice con
+ * que modalidad se emitio, asi que sus vencimientos no se pueden resolver. Esa determinacion sale
+ * con `modalidad: null` y `cuotas: []`, y esto es lo que se lee entonces. Es la unica situacion en
+ * que la frase viaja.
  */
-const SIN_CRONOGRAMA = `El cronograma de cuotas no se dibuja todavia en esta pantalla: la \
-operacion ya lo publica —la determinacion guarda con que modalidad se emitio desde #234— y falta \
-el conector que reparta sus filas. Una determinacion anterior a esa migracion sigue sin decir su \
-modalidad, y esa se dibujara en blanco y no con la trimestral supuesta.`;
+const SIN_CRONOGRAMA = `De esta determinacion no consta con que cronograma se emitio: su fila es \
+anterior a la migracion que guarda la modalidad, asi que sus vencimientos no se pueden resolver y \
+la tabla queda en blanco. No es que no tenga cuotas — es que no se sabe cuales fueron, y las \
+trimestrales supuestas serian unos vencimientos que el contribuyente puede no haber recibido.`;
 
 /** «Detectados por cruce» de un programa que no declara sus parametros de sorteo (#196). */
 const SIN_PARAMETROS_DEL_SORTEO = `El cruce no se pudo resolver: este programa no declara los \
