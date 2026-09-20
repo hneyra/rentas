@@ -1,6 +1,8 @@
 package kamayuk.rentas.nucleo.infraestructura.web;
 
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.LocalDate;
 import kamayuk.rentas.autorizacion.Privilegio;
 import kamayuk.rentas.autorizacion.RequiereAcceso;
 import kamayuk.rentas.dominio.Dinero;
@@ -51,6 +53,14 @@ import org.springframework.web.bind.annotation.RestController;
  * abierta). Ahora es <b>422 nombrando la llave</b>, como en {@code PredialController} (#395) y
  * {@code VehicularController} (#399), que ya lo hacían para {@code ParametroAusente}: esta pantalla
  * y la de espectáculos eran las dos de Rentas que se habían quedado fuera.
+ *
+ * <h2>La respuesta dice a qué fecha está calculada (#276)</h2>
+ *
+ * <p>La regla 9 —RNF-075— pide que toda cifra mostrada indique su fecha, y esta operación publicaba
+ * dos importes y ninguna. Eso dejaba la hoja de la alcabala sin poder conectarse: la guarda del
+ * frontend la tenía escrita como «NO SE DIBUJA» desde #261. La fecha sale del {@link Clock}
+ * inyectado y se toma <b>antes</b> de determinar, que es lo que hace {@code VehicularController}
+ * con {@code CalculoVehicularResource}.
  */
 @RestController
 @RequestMapping(Api.RAIZ + "/rentas/alcabala")
@@ -58,9 +68,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class AlcabalaController {
 
     private final RegistrarAlcabala servicio;
+    private final Clock reloj;
 
-    public AlcabalaController(RegistrarAlcabala servicio) {
+    public AlcabalaController(RegistrarAlcabala servicio, Clock reloj) {
         this.servicio = servicio;
+        this.reloj = reloj;
     }
 
     @PostMapping
@@ -69,9 +81,11 @@ public class AlcabalaController {
         Observacion observacion = observacionDe(peticion.observacion());
         long transferenciaId = exigirId(peticion.transferenciaId(), "transferenciaId");
         Dinero autovaluoAjustado = dineroDe(peticion.autovaluoAjustado(), "autovaluoAjustado");
+        LocalDate fechaCalculo = LocalDate.now(reloj);
 
         try {
             return DeterminacionAlcabalaResource.de(
+                    fechaCalculo,
                     servicio.determinar(transferenciaId, autovaluoAjustado, observacion));
         } catch (RegistrarAlcabala.TransferenciaInexistente inexistente) {
             throw new ProblemaDeNegocio(CodigoDeError.NO_ENCONTRADO, mensajeDe(inexistente));

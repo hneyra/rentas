@@ -95,6 +95,26 @@ class EspectaculoControllerTest {
         assertThat(auditoria.registros).hasSize(1);
     }
 
+    /**
+     * <b>La cifra dice a que fecha esta calculada, y no es la del evento</b> (#276).
+     *
+     * <p>El cuerpo de la peticion trae {@code fechaEvento} = 2026-09-12 y el reloj de la prueba
+     * esta fijo en el 2026-08-29: las dos fechas son distintas a proposito, para que publicar la
+     * del evento en vez de la del calculo no pueda pasar por verde.
+     */
+    @Test
+    @DisplayName("#276 — la respuesta publica «fechaCalculo», que no es «fechaEvento»")
+    void laRespuestaPublicaSuFechaDeCalculo() throws Exception {
+        MvcResult resultado = mvc.perform(registrar()).andReturn();
+
+        assertThat(resultado.getResponse().getStatus()).isEqualTo(201);
+        assertThat(resultado.getResponse().getContentAsString())
+                .as("el dia en que se determino, tomado del reloj inyectado")
+                .contains("\"fechaCalculo\":\"2026-08-29\"")
+                .as("y no el dia en que se celebra el espectaculo, que llega en la peticion")
+                .doesNotContain("2026-09-12");
+    }
+
     @Test
     @DisplayName("un ejercicio sin conjunto sellado es 422 y nombra el ejercicio, no 500")
     void elEjercicioSinSellarSeNombra() throws Exception {
@@ -184,7 +204,7 @@ class EspectaculoControllerTest {
         RegistrarEspectaculo servicio =
                 new RegistrarEspectaculo(
                         new EventosEnMemoria(), determinaciones, parametros, auditoria, RELOJ);
-        return MockMvcBuilders.standaloneSetup(new EspectaculoController(servicio))
+        return MockMvcBuilders.standaloneSetup(new EspectaculoController(servicio, RELOJ))
                 .addInterceptors(new GuardiaDeAcceso(comprobador, RELOJ))
                 .setControllerAdvice(new ManejadorDeErrores())
                 .setMessageConverters(

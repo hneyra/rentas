@@ -23,6 +23,16 @@ import { fuentesDeLosConectores } from './los-conectores-del-arbol.ts';
  * guarda es el peor estado posible: quien venga a conectar la hoja se la encuentra y la cree
  * cubierta.
  *
+ * <h2>Y la mitad que caducaba ya caduco: #276</h2>
+ *
+ * La lista nacio con **tres** entradas y hoy tiene **una**. Las dos que se fueron —la alcabala y
+ * los espectaculos— no se retiraron porque alguien se acordara: el tercer centinela de abajo cruza
+ * cada entrada contra el contrato y se puso **rojo** en cuanto `POST /rentas/alcabala` publico su
+ * `fechaCalculo`, diciendo que la entrada sobraba. Esa es la salida (b) de #261 —que el backend
+ * publique la fecha— y es la buena; la tomo #276 para las dos operaciones a la vez. Lo que la
+ * caducidad demuestra es que esta guarda no se queda vieja en verde, que era el modo de fallo de
+ * la prohibicion que vino a sustituir.
+ *
  * <h2>Lo que esto SI verifica, y lo que no</h2>
  *
  * Verifica que **ninguna lectura con un importe y sin una fecha se quede sin veredicto escrito**,
@@ -35,17 +45,17 @@ import { fuentesDeLosConectores } from './los-conectores-del-arbol.ts';
  *
  * Porque **el contrato no publica ningun tipo de dinero**: `docs/50-api/formas-de-la-api.json`
  * reduce cada hoja a `texto`, `entero`, `fecha`, `booleano`, `instante`, `objeto` o `archivo`, y
- * los 3 241 campos tipados no traen ni uno «importe» —un `BigDecimal` sale como `texto`, igual que
+ * los 3 250 campos tipados no traen ni uno «importe» —un `BigDecimal` sale como `texto`, igual que
  * un nombre—. Del lado de TypeScript pasa lo mismo: `baseImponible` es `string`, y tambien lo es
  * `sujeto`. Asi que el nombre es la unica senal que hay, y se declara como lo que es: una
  * heuristica.
  *
  * <h2>Lo que la heuristica caza de mas, y por que NO lleva lista de excepciones</h2>
  *
- * Sobre los 622 campos, el patron atrapa **dos** que no son cifras: `baseLegal` —la norma que
+ * Sobre los 624 campos, el patron atrapa **dos** que no son cifras: `baseLegal` —la norma que
  * ampara un beneficio o una resolucion— y `arancelFuente` —de donde salio el arancel de una
  * costa—. Se escribio la lista de excepciones y luego **se midio si cambiaba la respuesta: no la
- * cambia**, ni una entrada, con lista y sin ella son los mismos 11 candidatos, porque las tres
+ * cambia**, ni una entrada, con lista y sin ella son los mismos 9 candidatos, porque las tres
  * lecturas que las llevan —`BeneficioServido`, `ResolucionDeDeterminacion`, `CostaDelActo`— traen
  * su fecha de todas formas. Una excepcion que no puede cambiar ningun veredicto es una linea que
  * se queda vieja sin dar rojo, asi que se retiro y la medida se escribe aqui. Si algun dia una
@@ -58,8 +68,8 @@ import { fuentesDeLosConectores } from './los-conectores-del-arbol.ts';
  *
  * <h2>Y «es una fecha» tampoco puede salir del tipo del contrato</h2>
  *
- * Medido sobre las 166 operaciones: de las **210** apariciones de un campo cuyo nombre dice fecha,
- * **76 estan tipadas `texto`** y no `fecha` —`fechaCalculo` sale `texto` cinco veces y `fecha`
+ * Medido sobre las 167 operaciones: de las **213** apariciones de un campo cuyo nombre dice fecha,
+ * **79 estan tipadas `texto`** y no `fecha` —`fechaCalculo` sale `texto` siete veces y `fecha`
  * dos—, y hay **19** nombres tipados `fecha`/`instante` que no dicen «fecha» (`actualizadoA`,
  * `deudaAlDia`, `exigibleDesde`, `vencimiento`…). Un solo criterio se equivoca en las dos
  * direcciones; por eso el cruce con el contrato de abajo acepta **las dos senales** —el nombre o
@@ -73,13 +83,16 @@ import { fuentesDeLosConectores } from './los-conectores-del-arbol.ts';
  * segundo centinela exige que **cada** envoltorio de un anidado sin fecha o bien traiga la suya o
  * bien este el mismo en la lista. Medido hoy: 8 anidados, 10 pares hijo-envoltorio, **cero
  * huerfanos** — y los dos que se apoyan en la lista son los hijos de `DeterminacionGuardada`, que
- * es justamente la entrada que dice por que se dibuja sin fecha.
+ * es justamente la entrada que dice por que se dibuja sin fecha. Con una sola entrada en la lista,
+ * ese apoyo es todo lo que la sostiene: si `DeterminacionGuardada` se retirara, sus dos hijos
+ * saldrian huerfanos aqui.
  *
  * <h2>El tamano de la lista, medido antes de escribirla</h2>
  *
- * Sobre las **78** interfaces y **622** campos de `lecturas.ts`: **11** traen un importe y ninguna
- * fecha, de las cuales **3 son sueltas** —las tres entradas de abajo— y **8 anidadas**. Si el
- * criterio hubiera dado cuarenta, la lista seria ruido y esta guarda no se habria escrito.
+ * Sobre las **78** interfaces y **624** campos de `lecturas.ts`: **9** traen un importe y ninguna
+ * fecha, de las cuales **1 es suelta** —la unica entrada de abajo— y **8 anidadas**. Nacieron 11 y
+ * 3: las dos que faltan ganaron su fecha en #276. Si el criterio hubiera dado cuarenta, la lista
+ * seria ruido y esta guarda no se habria escrito.
  */
 
 const AQUI = dirname(fileURLToPath(import.meta.url));
@@ -101,22 +114,6 @@ interface Veredicto {
 }
 
 const UN_IMPORTE_SIN_SU_FECHA: Readonly<Record<string, Veredicto>> = {
-  DeterminacionDeAlcabala: {
-    veredicto: 'NO SE DIBUJA',
-    operacion: 'POST /rentas/alcabala',
-    motivo:
-      'Sus dos importes no se pueden fechar: la operacion publica seis campos y ninguno es ' +
-      '`fechaCalculo`, que si llevan las otras determinaciones. Mientras el backend no la ' +
-      'publique (#261, salida (b)), la hoja de la alcabala no se conecta: dibujar `montoDeterminado` ' +
-      'sin decir a que fecha esta es exactamente lo que la regla 9 prohibe.',
-  },
-  DeterminacionDeEspectaculo: {
-    veredicto: 'NO SE DIBUJA',
-    operacion: 'POST /rentas/espectaculos',
-    motivo:
-      'El mismo hueco que la alcabala, medido desde F-6: `ingresoDeclarado` y `montoDeterminado` ' +
-      'sin fecha. Ninguna de las cuarenta hojas la dibuja y ningun conector la pide.',
-  },
   DeterminacionGuardada: {
     veredicto: 'SE DIBUJA',
     operacion: 'GET /rentas/predial/determinaciones',
@@ -250,9 +247,11 @@ describe('una lectura con importe y sin fecha dice que se hace con ella (#261)',
   });
 
   it('LA CADUCIDAD: la operacion de cada entrada sigue sin publicar una fecha', () => {
-    // Esta es la mitad que caduca sola SIN que nadie toque `lecturas.ts`: el dia que el backend
-    // publique `fechaCalculo` para la alcabala, la entrada sobra y esto lo dice. Se miran las dos
-    // senales —el nombre y el tipo— porque cada una por separado se equivoca: ver el javadoc.
+    // Esta es la mitad que caduca sola SIN que nadie toque `lecturas.ts`, y ya caduco dos veces:
+    // el dia que el backend publico `fechaCalculo` para la alcabala y los espectaculos —#276, la
+    // salida (b) de #261— esto se puso rojo diciendo que sus entradas sobraban, y por eso no
+    // estan. Lo que vigila ahora es la que queda. Se miran las dos senales —el nombre y el tipo—
+    // porque cada una por separado se equivoca: ver el javadoc.
     const yaLaPublican: string[] = [];
     for (const [tipo, suyo] of Object.entries(UN_IMPORTE_SIN_SU_FECHA)) {
       const forma = formaDe(suyo.operacion);
@@ -274,9 +273,11 @@ describe('una lectura con importe y sin fecha dice que se hace con ella (#261)',
   });
 
   it('LO QUE NO SE DIBUJA no lo pide ningun conector, y lo que se dibuja SI', () => {
-    // La otra mitad que muerde: el dia que alguien conecte la hoja de la alcabala sin resolver la
-    // fecha, el tipo aparece en un conector y esto se pone rojo. Se mira el NOMBRE en toda la
-    // fuente y no solo el `pedir<…>`: importarlo ya es el primer paso, y es lo que #261 midio.
+    // La otra mitad que muerde: el dia que alguien conecte una hoja cuya lectura dice «NO SE
+    // DIBUJA» sin resolver la fecha, el tipo aparece en un conector y esto se pone rojo. Se mira
+    // el NOMBRE en toda la fuente y no solo el `pedir<…>`: importarlo ya es el primer paso, y es
+    // lo que #261 midio. Hoy solo queda la rama contraria —«SE DIBUJA» y nadie lo pide—, porque
+    // las dos entradas «NO SE DIBUJA» se fueron con la fecha que #276 publico.
     const fuentes = fuentesDeLosConectores().map((uno) => readFileSync(uno, 'utf8'));
     const desfases: string[] = [];
     for (const [tipo, suyo] of Object.entries(UN_IMPORTE_SIN_SU_FECHA)) {

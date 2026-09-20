@@ -1,6 +1,7 @@
 package kamayuk.rentas.nucleo.infraestructura.web;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import kamayuk.rentas.autorizacion.Privilegio;
@@ -39,6 +40,12 @@ import org.springframework.web.bind.annotation.RestController;
  * ninguna de las dos lo es: falta publicar una cifra, y decir cuál es lo único que separa «no hay
  * ordenanza» de un impuesto calculado con una alícuota inventada. Ahora es <b>422 nombrando la
  * llave</b>, como en {@code PredialController} (#395) y {@code VehicularController} (#399).
+ *
+ * <h2>La respuesta dice a qué fecha está calculada (#276)</h2>
+ *
+ * <p>El mismo hueco de la regla 9 que la alcabala, y el mismo remedio: la fecha sale del {@link
+ * Clock} inyectado y se toma <b>antes</b> de registrar. No es {@code fechaEvento} —cuándo se
+ * celebra el espectáculo, que llega en la petición—, sino cuándo se determinó el impuesto.
  */
 @RestController
 @RequestMapping(Api.RAIZ + "/rentas/espectaculos")
@@ -46,9 +53,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class EspectaculoController {
 
     private final RegistrarEspectaculo servicio;
+    private final Clock reloj;
 
-    public EspectaculoController(RegistrarEspectaculo servicio) {
+    public EspectaculoController(RegistrarEspectaculo servicio, Clock reloj) {
         this.servicio = servicio;
+        this.reloj = reloj;
     }
 
     @PostMapping
@@ -56,9 +65,11 @@ public class EspectaculoController {
     public DeterminacionEspectaculoResource registrar(@RequestBody PeticionDeEspectaculo peticion) {
         Observacion observacion = observacionDe(peticion.observacion());
         long organizadorId = exigirId(peticion.organizadorId(), "organizadorId");
+        LocalDate fechaCalculo = LocalDate.now(reloj);
 
         try {
             return DeterminacionEspectaculoResource.de(
+                    fechaCalculo,
                     servicio.registrar(
                             organizadorId,
                             exigir(peticion.denominacion(), "denominacion"),
