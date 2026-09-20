@@ -3,10 +3,11 @@
 // Compila CSS de verdad y lee archivos del disco. No es un DOM lo que necesita.
 
 import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { ARTBOARDS, rutaDe } from './artboards.ts';
+import { ARTBOARDS, RAIZ, rutaDe } from './artboards.ts';
 import {
   RAIZ_DE_UI,
   clasesDe,
@@ -84,13 +85,31 @@ import {
  * interprete monta, y la primera —el grafico— estrena `fill-*` y una utilidad arbitraria para el
  * radio. Fuera de esta lista, una clase suya mal escrita dejaria la barra sin color en una pantalla
  * que se dibuja igual.
+ *
+ * <h2>Las TRES de este arbol se resuelven contra ESTE archivo, y no contra el `cwd` (#295)</h2>
+ *
+ * Hasta #295 eran `fuentesDe('src/pantallas')`, `fuentesDe('src/piezas')` y
+ * `fuentesDe('src/preferencias')`, o sea rutas relativas que `readdirSync` resuelve contra el
+ * directorio de trabajo. Funcionaban porque `yarn test` se lanza desde `frontend/`, y eran —con el
+ * `readFileSync('package.json')` de `las-peerdependencies-estan`— las unicas rutas de este
+ * directorio que no derivaban su raiz de `import.meta.url`: las otras 41 guardas si.
+ * Medido corriendo la suite desde la raiz del repositorio —
+ * `vitest run --root frontend`, con el `cwd` un nivel mas arriba—: el archivo entero caia en la
+ * RECOLECCION con `ENOENT: no such file or directory, scandir 'src/pantallas'`, sin llegar a
+ * ejecutar ni una prueba. Y el otro desenlace es peor que el rojo: un `cwd` que si tuviera un
+ * `src/pantallas` se habria leido en silencio, que es el modo de fallo de #91 —medir el arbol
+ * equivocado— un nivel mas arriba.
+ *
+ * `RAIZ_DE_UI` no tenia el defecto: sale de `requerir.resolve('@kamayuk/ui')`, que va por el
+ * enlace y es absoluta.
  */
-const FUENTES = [
-  ...fuentesDe(RAIZ_DE_UI),
-  ...fuentesDe('src/pantallas'),
-  ...fuentesDe('src/piezas'),
-  ...fuentesDe('src/preferencias'),
+const RAICES: readonly { readonly raiz: string; readonly que: string }[] = [
+  { raiz: RAIZ_DE_UI, que: 'las piezas de `@kamayuk/ui`' },
+  { raiz: join(RAIZ, 'src', 'pantallas'), que: 'el interprete y la costura de este arbol' },
+  { raiz: join(RAIZ, 'src', 'piezas'), que: 'las piezas del consumidor (#288)' },
+  { raiz: join(RAIZ, 'src', 'preferencias'), que: 'el mando de los temas (#111)' },
 ];
+const FUENTES = RAICES.flatMap((r) => fuentesDe(r.raiz));
 const CLASES = [...new Set(FUENTES.flatMap((f) => clasesDe(readFileSync(f, 'utf8'))))].sort();
 
 const HOJA_DEL_ARTBOARD = (() => {
@@ -116,6 +135,28 @@ describe('Tailwind emite lo que las piezas piden', () => {
   it('EL CENTINELA: hay fuentes, clases y valores que comprobar', async () => {
     // Sin esto, un cambio de ruta o de extension dejaria las tres listas vacias y todo lo de
     // abajo pasando en verde sobre la nada. Ya paso en este repositorio con el artboard (#78).
+    //
+    // **Y se pregunta RAIZ POR RAIZ, y no por el total** (#295). Un umbral sobre la suma contesta
+    // «¿hay bastantes?», y hoy son **43 fuentes: 40 de la libreria y UNA de cada uno de los tres
+    // directorios de aqui**. O sea que las tres de este arbol podian quedarse a cero a la vez y
+    // 40 >= 15 seguiria en verde — justo las tres que estrenan utilidades que ninguna otra usa:
+    // `accent-azul` de `src/preferencias` (#111) y los `fill-*` del grafico de `src/piezas`
+    // (#288). Preguntando raiz por raiz, la que se quede vacia sale nombrada.
+    //
+    // Lo que NO se hace es escribir los 43 nombres, y no por pereza: 40 de ellos viven en
+    // `kamayuk-lib`, que este repositorio no gobierna. Medido sobre su `git log` el 2026-09-20:
+    // **10 de sus 101 commits** anaden o borran un `.tsx` de `paquetes/ui` —49 altas y bajas de
+    // archivo en trece dias—, o sea que una lista literal saldria roja AQUI, y bloqueando, una de
+    // cada diez veces que alguien toca alla. La identidad se pregunta al nivel que no se mueve:
+    // las raices.
+    const vacias = RAICES.filter((r) => fuentesDe(r.raiz).length === 0).map(
+      (r) => `  ${r.raiz} — ${r.que}`,
+    );
+    expect(
+      vacias,
+      'Hay una raiz que no aporto ni una pieza, y lo de abajo se mediria sin ella:\n' +
+        `${vacias.join('\n')}`,
+    ).toEqual([]);
     expect(FUENTES.length, 'no se leyo ni una pieza').toBeGreaterThanOrEqual(15);
     expect(CLASES.length, 'no se extrajo ni una clase').toBeGreaterThanOrEqual(60);
     expect(COLORES_DEL_ARTBOARD.length, 'el artboard no declaro ni un color').toBe(38);
