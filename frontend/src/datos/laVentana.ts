@@ -35,16 +35,19 @@ import type { Paginado } from './lecturas.ts';
  * Porque el interprete, sin campo en la ruta, dibuja **el primero de `orden.campos`**
  * (`campoOrdenado`, `MandosDeLaTabla.tsx`), y el backend, sin `ordenarPor`, ordena por su
  * `ORDEN_POR_OMISION`. Que los dos coincidan es lo que hace que la barra no mienta sobre el orden
- * de las filas, y por eso **`campos[0]` es el orden por omision de la operacion** —medido
- * controlador a controlador, y escrito en el javadoc de cada conector—.
+ * de las filas, y por eso **`campos[0]` es el orden por omision de la operacion**.
  *
- * **Y eso es lo unico que lo sostiene: no lo vigila ninguna guarda** (#255, #263). Hasta aqui
- * ponia que lo vigilaba `el-orden-que-se-ofrece-lo-admite-el-backend.test.ts`, que **no existe**
- * —cero coincidencias de ese nombre fuera de esta frase—. La que se le parece,
+ * **Y desde #263 lo vigila una guarda de verdad**:
+ * `verificaciones/el-orden-que-se-ofrece-lo-admite-el-backend.test.ts` cruza, hoja por hoja, el
+ * `campos[0]` que la definicion ofrece contra el `orden.porOmision` que
+ * `docs/50-api/parametros-de-la-api.json` publica de su operacion —y de paso, que ningun campo
+ * ofrecido este fuera de la lista blanca—. Hasta entonces esta frase nombraba ese archivo sin que
+ * existiera (#255): lo unico que lo sostenia era «medido controlador a controlador, y escrito en
+ * el javadoc de cada conector». La que se le parece,
  * `verificaciones/el-dialecto-de-la-paginacion-es-el-del-backend.test.ts`, cruza los cuatro
  * NOMBRES de parametro contra el contrato y no mira que campo ordena por omision ninguna
  * operacion. Si los dos lados dejan de coincidir, la barra dice «ordenado por X» y las filas
- * llegan ordenadas por otra cosa, **en verde**.
+ * llegan ordenadas por otra cosa, **en verde** — y eso es lo que ahora sale rojo.
  *
  * La alternativa era copiar aqui la regla del interprete —«el de la ruta si es admitido, o el
  * primero»— y mandar siempre un `ordenarPor`. Es una segunda copia de una regla de la libreria, y
