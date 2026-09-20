@@ -38,46 +38,52 @@
  *
  * `SIN_PRIVILEGIO` y `SIN_MUNICIPALIDAD` son el sistema funcionando: contesto lo que tenia que
  * contestar. Pintarlas de rojo de «algo se rompio» manda a mirar un despliegue cuando lo que
- * falta es una fila en una tabla de permisos. `esAveria` es lo que separa las dos cosas, y la
- * pantalla lo usa para elegir el tono y para decidir si ofrece reintentar.
+ * falta es una fila en una tabla de permisos. `esAveria` es lo que separa las dos cosas, y desde
+ * #283 la pantalla lo usa **de verdad** para elegir el tono: `atencion` solo cuando algo se
+ * rompio, `info` cuando el backend contesto lo que tenia que contestar.
  *
  * <h2>Es una funcion pura, y eso es deliberado</h2>
  *
  * Sin React, sin `fetch` y sin reloj: entra un fallo, sale que decir. Los siete peldanos se
  * prueban sin montar nada.
  *
- * <h2>Y NINGUNA FUENTE DE PRODUCCION LO IMPORTA. Por que se queda igual, y hasta cuando</h2>
+ * <h2>Y DESDE #283 LA DIBUJA UNA PANTALLA. Que cupo, que no, y donde vive lo que falta</h2>
  *
- * **Medido (#262): el unico `import` de este archivo es `escalera.test.ts`.** Hasta #255 su
- * prueba decia que la otra mitad se media en `aplicacion.test.tsx`, que no es un archivo de este
- * arbol. Conviene decir las dos cosas que se midieron al decidir que aun asi se queda:
+ * Hasta #283 el unico `import` de este archivo era su prueba, y su javadoc lo decia con las dos
+ * medidas que lo sostenian. Ahora tiene **un** consumidor de produccion y solo uno:
+ * `datos/useDatosDeLaHoja.ts`, cuyo `alFallar` ya no tiene escalera propia —tenia tres respuestas,
+ * `SIN_SESION` para el 401, `SIN_PERMISO` para **cualquier** 403 y `FALLO` con el codigo
+ * interpolado para todo lo demas— sino que pregunta aqui y traduce el peldano a la `Ausencia` que
+ * el interprete sabe dibujar. Lo que se gana es exactamente lo que #262 midio que faltaba: los
+ * **dos** 403 dejan de leerse igual —uno lo arregla el administrador del emisor, el otro quien
+ * administre los perfiles— y el **422** deja de salir como «fallo (422)», o sea como una averia.
  *
- * **Uno: lo que llega hoy a la pantalla NO es esto, y no es «no se pudo» para todo.**
- * `datos/useDatosDeLaHoja.ts` tiene su propia escalera dentro de `alFallar`, con tres respuestas
- * —`SIN_SESION` para el 401, `SIN_PERMISO` para cualquier 403 y `FALLO` con el codigo
- * interpolado para el resto—. O sea que un 403 y una averia **no** se ven igual: se ven con
- * frases distintas. Lo que `alFallar` no separa es lo que esta escalera existe para separar: los
- * **dos** 403 —`SIN_MUNICIPALIDAD` es del administrador y `SIN_PRIVILEGIO` es de los perfiles, y
- * hoy leen lo mismo— y el **422**, que sale como «fallo (422)», o sea como una averia, cuando es
- * la regla concreta que se incumplio.
+ * <h2>Como cabe un peldano de siete campos en una ausencia de tres</h2>
  *
- * **Dos: por que no se enchufa de una vez.** Porque no cabe. Lo que una pantalla puede ensenar
- * es una `Ausencia` de `@kamayuk/ui`, y una `Ausencia` tiene **tres** campos —`enElCampo`,
- * `explicacion` y `tono`—; un `Peldano` tiene **seis**. `remedio` y `pideIdentidad` no tienen
- * donde ir: el primero se podria pegar a `explicacion`, pero el segundo es un **boton** que el
- * interprete no dibuja. Enchufarlo pide ensanchar la forma en la libreria o que la pantalla
- * dibuje el peldano ella misma, y las dos cosas son un issue con su propia medida.
+ * No se ensancho nada. Se midio que **seis de los siete campos ya tenian donde ir**:
  *
- * **Y por que no se retira, que era la otra salida.** Porque los cinco peldanos medidos son
- * `curl` contra una instalacion levantada —con su realm, su token y su cuenta—, y este puesto no
- * la tiene: borrarlos tira una medida que no se puede rehacer aqui. Es lo contrario de
- * `dominio/aritmetica.ts`, que #262 si retiro: aquello era una suma que cualquiera vuelve a
- * escribir en diez minutos.
+ * <table>
+ *   <tr><td>`enElHueco`</td><td>→ `Ausencia.enElCampo`</td></tr>
+ *   <tr><td>`titulo`, `detalle`, `remedio`</td><td>→ `Ausencia.explicacion`, armada con `t()` y
+ *     `FRASE_DEL_PELDANO`: los tres entran por interpolacion, que es lo unico que deja al
+ *     traductor decidir el orden</td></tr>
+ *   <tr><td>`esAveria`</td><td>→ `Ausencia.tono`: `atencion` si lo es, `info` si no</td></tr>
+ *   <tr><td>`clave`</td><td>no se dibuja: es el identificador que las pruebas nombran</td></tr>
+ * </table>
  *
- * **Hasta cuando.** Hasta que `Ausencia` pueda llevar el remedio, o hasta que una pantalla
- * dibuje el peldano por su cuenta. El dia que esto gane un importador de produccion, este
- * parrafo deja de ser cierto — y para que no se quede diciendolo, `escalera.test.ts` lo
- * comprueba y sale rojo nombrando el archivo que lo importo.
+ * El que **no** cabe es `pideIdentidad`, porque es un **boton** y el interprete no dibuja ninguno
+ * en el hueco de una ausencia. De los siete peldanos lo lleva **uno** —`sin-identidad`—, asi que
+ * lo que se pierde hoy es el atajo de ese caso, no su frase: «Vuelva a identificarse para seguir
+ * trabajando» se lee igual. Ensanchar `Ausencia` para que lo lleve es de `@kamayuk/ui`, o sea de
+ * los **seis** consumidores de `consumidores.json`, y por eso se pide alli y no se hace aqui.
+ *
+ * <h2>Y por que no se retiro, que era la otra salida</h2>
+ *
+ * Porque los cinco peldanos medidos son `curl` contra una instalacion levantada —con su realm, su
+ * token y su cuenta—, y este puesto no la tiene: borrarlos tira una medida que no se puede
+ * rehacer aqui. Es lo contrario de `dominio/aritmetica.ts`, que #262 si retiro: aquello era una
+ * suma que cualquiera vuelve a escribir en diez minutos. Que siga habiendo **un** consumidor y no
+ * cero ni dos lo vigila `escalera.test.ts`, que sale rojo nombrando los archivos.
  */
 
 import { ErrorDeLaApi } from './cliente.ts';
@@ -93,6 +99,28 @@ export interface Peldano {
     | 'no-permitido'
     | 'no-valido'
     | 'averia';
+  /**
+   * **La palabra del hueco de un campo: una o dos, en minuscula.**
+   *
+   * Es el unico campo que no sale del `curl`: lo pide el sitio donde el peldano se DIBUJA. Una
+   * `Ausencia` de `@kamayuk/ui` tiene tres campos, y el primero —`enElCampo`— es «lo corto, dentro
+   * del hueco de un campo». Sin esta palabra, quien enchufa la escalera tiene que escribir siete
+   * en otro archivo, y siete frases escritas lejos de su peldano son siete que el inventario del
+   * locale puede no alcanzar — que es el defecto que #283 vino a cerrar, no a mover de sitio.
+   *
+   * Vive con las otras dos frases fijas del peldano —`titulo` y `remedio`— y por eso el centinela
+   * de `ninguna-ausencia-se-queda-sin-inventariar.test.ts` la barre con ellas.
+   */
+  readonly enElHueco: string;
+  /**
+   * **El estado HTTP, cuando lo hubo. `null` si la peticion no llego a contestar.**
+   *
+   * Va APARTE de las frases y no pegado a ninguna, y esa es la leccion de #246: un numero dentro
+   * de una frase la deja fuera del locale para siempre —la cadena es distinta en cada fallo y
+   * ninguna clave puede casar con ella—. Aqui es un dato, y quien dibuja lo mete por
+   * interpolacion. Es lo que se dicta a soporte.
+   */
+  readonly estado: number | null;
   readonly titulo: string;
   /** Lo que paso, en una frase. Cuando el backend lo dice, es lo que el backend dijo. */
   readonly detalle: string;
@@ -124,6 +152,9 @@ export function peldanoDe(fallo: unknown): Peldano {
   if (!(fallo instanceof ErrorDeLaApi)) {
     return {
       clave: 'averia',
+      enElHueco: 'fallo',
+      // No hubo respuesta: no hay estado que dictar, y un 0 escrito aqui seria un estado inventado.
+      estado: null,
       titulo: 'El sistema no contesta',
       detalle:
         'La peticion no llego a completarse. El backend puede estar apagado, o este puesto no ' +
@@ -137,6 +168,8 @@ export function peldanoDe(fallo: unknown): Peldano {
   if (fallo.estado === 401) {
     return {
       clave: 'sin-identidad',
+      enElHueco: 'sin sesion',
+      estado: fallo.estado,
       titulo: 'Hay que volver a identificarse',
       detalle: loQueDijo(fallo, 'La peticion no trae un token valido.'),
       remedio:
@@ -150,6 +183,8 @@ export function peldanoDe(fallo: unknown): Peldano {
   if (fallo.estado === 403 && fallo.codigo === 'SIN_MUNICIPALIDAD') {
     return {
       clave: 'sin-municipalidad',
+      enElHueco: 'sin municipalidad',
+      estado: fallo.estado,
       titulo: 'Esta cuenta no tiene municipalidad asignada',
       detalle: loQueDijo(fallo, 'El token no identifica una municipalidad.'),
       remedio:
@@ -165,6 +200,8 @@ export function peldanoDe(fallo: unknown): Peldano {
   if (fallo.estado === 403 && fallo.codigo === 'SIN_PRIVILEGIO') {
     return {
       clave: 'sin-privilegio',
+      enElHueco: 'sin permiso',
+      estado: fallo.estado,
       titulo: 'Falta un permiso para esta operacion',
       detalle: loQueDijo(fallo, 'La cuenta no tiene el privilegio que esta operacion pide.'),
       remedio:
@@ -178,6 +215,8 @@ export function peldanoDe(fallo: unknown): Peldano {
   if (fallo.estado === 403) {
     return {
       clave: 'no-permitido',
+      enElHueco: 'sin acceso',
+      estado: fallo.estado,
       titulo: 'La operacion no se permitio',
       detalle: loQueDijo(fallo, 'El backend rechazo la peticion.'),
       remedio: 'No es una averia. Revise con que cuenta esta trabajando.',
@@ -189,11 +228,17 @@ export function peldanoDe(fallo: unknown): Peldano {
   if (fallo.estado === 404) {
     return {
       clave: 'no-encontrado',
+      enElHueco: 'no encontrado',
+      estado: fallo.estado,
       titulo: 'No se encontro lo solicitado',
       // Tal cual. El 404 de esta escalera es «el token identifica a 'X', que no es un usuario
       // de esta municipalidad», y esa frase nombra la cuenta: resumirla borraria el unico dato
       // con el que se arregla.
-      detalle: loQueDijo(fallo, `El backend no encontro «${fallo.operacion}».`),
+      // El RESPALDO —lo que se lee cuando el backend no dijo nada— nombraba la operacion dentro
+      // de la frase, y asi **no puede ser una clave**: la cadena era distinta en cada ruta y
+      // ninguna entrada del locale podia casar con ella. Es el defecto de #246 un nivel al lado, y
+      // el dato no se pierde: `operacion` sigue en el `ErrorDeLaApi` que se recibio (#283).
+      detalle: loQueDijo(fallo, 'El backend no encontro lo que esta pantalla le pidio.'),
       remedio:
         'Revise con que cuenta esta entrando: puede ser valida en el emisor de identidad y no ' +
         'estar dada de alta en esta municipalidad.',
@@ -205,6 +250,8 @@ export function peldanoDe(fallo: unknown): Peldano {
   if (fallo.estado === 422) {
     return {
       clave: 'no-valido',
+      enElHueco: 'dato rechazado',
+      estado: fallo.estado,
       titulo: 'Lo que se mandó no cumple una regla',
       // Tal cual, y esta es la unica respuesta de la escalera donde el texto del backend NO es
       // un respaldo sino el dato: es la regla concreta que se incumplio, con su cifra dentro
@@ -222,8 +269,13 @@ export function peldanoDe(fallo: unknown): Peldano {
 
   return {
     clave: 'averia',
+    enElHueco: 'fallo',
+    estado: fallo.estado,
     titulo: 'El sistema no pudo contestar',
-    detalle: `${loQueDijo(fallo, fallo.operacion)} (${String(fallo.estado)})`,
+    // Ni el estado ni la operacion van pegados a la frase: los dos son datos, la frase es una
+    // clave, y juntos no pueden ser ninguna de las dos cosas. El estado se dicta a soporte desde
+    // `estado`, que quien dibuja mete por interpolacion (#283).
+    detalle: loQueDijo(fallo, 'El backend no pudo completar la peticion.'),
     remedio: 'Reintente en unos segundos. Si sigue igual, avise a soporte con este mensaje.',
     pideIdentidad: false,
     esAveria: true,

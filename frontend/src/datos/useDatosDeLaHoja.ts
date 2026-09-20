@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 
 import { ErrorDeLaApi } from '../api/cliente.ts';
+import { peldanoDe } from '../api/escalera.ts';
 import type { ClaveDeHoja } from '../pantallas/arbol.ts';
 import { hojaDe } from '../pantallas/arbol.ts';
 import type { Ausencia, DatosDeLaPantalla, DatosDeUnaTabla, RutaDeLaHoja } from '@kamayuk/ui';
@@ -14,7 +15,8 @@ import {
   FRASE_DE_QUIEN_ES,
   FRASE_DE_QUIEN_ES_SIN_PADRON,
   FRASE_DEL_CONTEO,
-  FRASE_DEL_FALLO,
+  FRASE_DEL_PELDANO,
+  FRASE_DEL_PELDANO_CON_ESTADO,
 } from '../i18n/textosDelMarco.ts';
 import type { SesionDeLaVentanilla } from './lecturas.ts';
 import { RUTAS, pedirUno } from './lecturas.ts';
@@ -109,61 +111,63 @@ const VACIO: Ausencia = {
 };
 
 /**
- * **Lo que se dice cuando la sesion ya no vale** (401).
+ * **Lo que se dice cuando fallo: el peldano de la escalera, traducido a una ausencia** (#283).
  *
- * Vive fuera de `alFallar` desde #246, y no por gusto: escrita dentro de la funcion es una frase
- * que **ninguna guarda ve**. El inventario del locale deriva las ausencias de lo que los modulos
- * exportan, y `alFallar` exportaba una funcion, no sus palabras; y la guarda que monta las 40
- * pantallas no llega aqui, porque un 401 no se dibuja en un montaje sin doble de `fetch`. Medido:
- * las cinco frases de esta funcion **no estaban en el locale**, o sea que en un segundo idioma
- * salian en castellano.
- */
-const SIN_SESION: Ausencia = {
-  enElCampo: 'sin acceso',
-  explicacion: 'La sesion no vale para pedir estos datos. Vuelva a entrar.',
-  tono: 'atencion',
-};
-
-/** Lo que se dice cuando la cuenta entro y no le alcanza (403). Ver `SIN_SESION`. */
-const SIN_PERMISO: Ausencia = {
-  enElCampo: 'sin acceso',
-  explicacion: 'Su cuenta no tiene permiso para ver los datos de esta pantalla.',
-  tono: 'atencion',
-};
-
-/** Lo que se dice cuando fallo y no hay peldano que nombrar. Ver `SIN_SESION`. */
-const FALLO: Ausencia = {
-  enElCampo: 'fallo',
-  explicacion:
-    'No se pudieron pedir los datos de esta pantalla. Lo que se ve es su forma, no sus datos.',
-  tono: 'atencion',
-};
-
-/**
- * **Lo que se dice cuando fallo, con el peldano si lo hay.**
+ * <h2>Aqui habia una escalera corta, y separaba tres cosas donde hay siete</h2>
  *
- * <h2>El peldano entra por INTERPOLACION, y hasta #246 no podia entrar de ninguna forma</h2>
+ * Daba tres respuestas —`SIN_SESION` para el 401, `SIN_PERMISO` para **cualquier** 403 y un
+ * `FALLO` con el codigo interpolado para todo lo demas—, y #262 midio lo que eso deja sin decir:
  *
- * La frase se componia concatenando el codigo dentro —«… de esta pantalla (404). …»—, asi que la
- * cadena que llegaba al interprete **era distinta en cada fallo**: no hay locale que pueda tener
- * esa clave, ni uno solo de sus infinitos valores. Con `{{codigo}}` la clave es una, el idioma
- * decide donde cae el numero, y la frase se arma aqui —que es donde hay `t()`— como las de #196 y
- * #239.
+ * · **Los dos 403 se leian igual.** `SIN_MUNICIPALIDAD` —el token no dice de que municipalidad es
+ *   la cuenta— lo arregla el administrador en el emisor de identidad; `SIN_PRIVILEGIO` lo arregla
+ *   quien administre los perfiles. Con una sola frase para los dos, quien atiende tiene que
+ *   llamar por telefono para averiguar a cual de los dos llamar.
+ * · **El 422 salia como «fallo (422)»**, o sea **como una averia**, con el tono de que algo se
+ *   rompio y el remedio de avisar a soporte — para una observacion de tres letras.
  *
- * Por eso recibe `t`: las dos llamadas de `useDatosDeLaHoja` lo tienen delante.
+ * Los siete peldanos y sus siete remedios ya estaban escritos y medidos con `curl` en
+ * `api/escalera.ts`, sin un solo consumidor de produccion. Esto es ese consumidor.
+ *
+ * <h2>Los tres campos de una `Ausencia` llevan seis de los siete del peldano</h2>
+ *
+ * `enElHueco` es la palabra del hueco; `titulo`, `detalle` y `remedio` se arman en la explicacion
+ * con `FRASE_DEL_PELDANO`; y `esAveria` elige el tono —`atencion` solo si algo se rompio de
+ * verdad—. El que no cabe es `pideIdentidad`, que es un **boton** que el interprete no dibuja en
+ * el hueco de una ausencia: lo lleva uno de los siete, y su frase se lee igual.
+ *
+ * <h2>Por que los tres trozos entran por INTERPOLACION, y no concatenados</h2>
+ *
+ * Es la leccion de #246, y aqui vale doble: el `detalle` **es lo que el backend dijo** cuando dijo
+ * algo, con su cifra dentro. Concatenado, la cadena que llegaria al interprete seria distinta en
+ * cada fallo y ninguna clave del locale podria casar con ella. Con `FRASE_DEL_PELDANO` la clave es
+ * una y el idioma decide el orden.
+ *
+ * Y los trozos van **ya pasados por `t()`**: los tres son frases escritas en `api/escalera.ts`, o
+ * sea claves, y el inventario del locale las deriva de alli (ver `i18n/catalogo-de-claves.ts`). El
+ * `detalle` que viene del backend no es ninguna clave, y `t()` devuelve tal cual lo que no conoce
+ * —sin separadores de espacio de nombre, ver `i18n.ts`—, asi que pasarlo no le hace nada.
  */
 function alFallar(
   error: unknown,
   t: (clave: string, datos?: Readonly<Record<string, unknown>>) => string,
 ): Ausencia {
-  const esDeLaApi = error instanceof ErrorDeLaApi;
-  const codigo = esDeLaApi ? error.estado : null;
-  if (codigo === 401) return SIN_SESION;
-  if (codigo === 403) return SIN_PERMISO;
-  if (codigo === null) return FALLO;
-  // Ya traducida: lo que el interprete reciba entonces no es una clave, y su `traducir` lo
-  // devuelve tal cual. Es el mismo trato que `conFrasesDePantalla` da a sus trozos.
-  return { ...FALLO, explicacion: t(FRASE_DEL_FALLO, { codigo }) };
+  const peldano = peldanoDe(error);
+  return {
+    enElCampo: peldano.enElHueco,
+    explicacion: t(
+      // Dos claves y no una con el hueco vacio: ver `FRASE_DEL_PELDANO_CON_ESTADO`.
+      peldano.estado === null ? FRASE_DEL_PELDANO : FRASE_DEL_PELDANO_CON_ESTADO,
+      {
+        titulo: t(peldano.titulo),
+        detalle: t(peldano.detalle),
+        remedio: t(peldano.remedio),
+        estado: peldano.estado,
+      },
+    ),
+    // «El sistema funcionando» no se pinta de «algo se rompio»: un 403 en tono de averia manda a
+    // mirar un despliegue cuando lo que falta es una fila en una tabla de permisos.
+    tono: peldano.esAveria ? 'atencion' : 'info',
+  };
 }
 
 /**
@@ -313,10 +317,12 @@ export function useDatosDeLaHoja(
   /*
    * **El 404 lo puede decir el conector con sus palabras** (#237).
    *
-   * `alFallar` lo redacta como «fallo (404)», o sea como una averia, y en la lectura del predial no
-   * lo es: 404 es «ese codigo no esta en el padron» y 204 es «esta y todavia no se le determino».
-   * El backend los publica distintos a proposito (#546); decirlos igual aqui tiraria la mitad de
-   * esa decision en el ultimo paso.
+   * Desde #283 `alFallar` ya no lo redacta como «fallo (404)»: el peldano `no-encontrado` de la
+   * escalera dice que la cuenta puede ser valida en el emisor y no estar dada de alta aqui. Eso
+   * sirve para la cadena de identidad y **no** para la lectura del predial, donde 404 es «ese
+   * codigo no esta en el padron» y 204 «esta y todavia no se le determino». El backend los publica
+   * distintos a proposito (#546); decirlos igual aqui tiraria la mitad de esa decision en el
+   * ultimo paso.
    */
   if (consulta.isError) {
     const suyo =
@@ -403,12 +409,9 @@ function deQuienEs(
 
 export {
   CARGANDO,
-  FALLO,
   NADA,
   NO_PUBLICADO_EN_PANTALLA,
   SIN_EJERCICIO,
-  SIN_PERMISO,
-  SIN_SESION,
   SIN_SUJETO,
   VACIO,
   alFallar,

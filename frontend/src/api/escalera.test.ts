@@ -146,12 +146,20 @@ describe('AC6 — lo que SI es una averia', () => {
     expect(peldano.pideIdentidad).toBe(false);
   });
 
-  it('un 500 del backend, con su estado dentro para dictarlo a soporte', () => {
+  it('un 500 del backend, con su estado APARTE para dictarlo a soporte', () => {
     const peldano = peldanoDe(fallo(500, 'ERROR_INTERNO', 'Algo se rompio'));
 
     expect(peldano.clave).toBe('averia');
     expect(peldano.esAveria).toBe(true);
-    expect(peldano.detalle).toContain('500');
+    // Hasta #283 el estado iba pegado a la frase —«Algo se rompio (500)»—, y una frase con un
+    // numero dentro no puede ser clave de ningun locale: es distinta en cada fallo. Ahora es un
+    // dato, y quien dibuja lo mete por interpolacion.
+    expect(peldano.estado).toBe(500);
+    expect(peldano.detalle).not.toContain('500');
+  });
+
+  it('y un corte de red no inventa un estado: no hubo respuesta que dictar', () => {
+    expect(peldanoDe(new TypeError('Failed to fetch')).estado).toBeNull();
   });
 
   it('y los tres peldanos de autorizacion NO son averias: es el sistema funcionando', () => {
@@ -170,7 +178,7 @@ describe('AC6 — lo que SI es una averia', () => {
 });
 
 
-/* ── Y la decision de #262, vigilada ────────────────────────────────────────────────────── */
+/* ── Y la decision de #283, vigilada ────────────────────────────────────────────────────── */
 
 const RAIZ_DE_SRC = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -185,27 +193,33 @@ function fuentesDeProduccion(desde: string = RAIZ_DE_SRC): readonly string[] {
 }
 
 /**
- * **`escalera.ts` sigue sin consumidor de produccion, que es lo que su javadoc afirma** (#262).
+ * **`escalera.ts` tiene DOS consumidores de produccion, y se sabe cual es cada uno** (#262, #283).
  *
- * <h2>Por que esta guarda es de UN archivo y no del arbol entero</h2>
+ * <h2>De que guarda viene esta</h2>
  *
- * Porque se midio la version ancha y no se sostiene. «Un modulo de `src/` cuyo unico importador
- * es su prueba» da hoy **un** candidato —este—, que es justo el que se decidio dejar: una guarda
- * cuya poblacion entera es su propia excepcion no protege nada. Y «ningun importador de
- * produccion», que es la version util, barre **ocho** de los 55 modulos que no son prueba, de los
- * cuales **siete** son legitimos por su clase —la entrada `main.tsx`, dos dobles `*DeMuestra.ts`,
- * dos capturas `*Medid[oa].ts`, el inventario `i18n/catalogo-de-claves.ts` y este—, o sea una
- * lista de excepciones mas larga que la senal. Para cinco de esos ocho **ya existe la guarda**
- * con otro nombre: el `CAPTURAS` de `verificaciones/camino-a-la-api.test.ts`, que exige que cada
- * captura «solo la importen archivos de prueba».
+ * #262 midio que este archivo no lo importaba nadie mas que su prueba, decidio dejarlo en el arbol
+ * —sus cinco peldanos son `curl` contra una instalacion que este puesto no tiene— y escribio una
+ * guarda que salia roja **el dia que alguien lo enchufara**, para que el javadoc no se quedara
+ * afirmando lo contrario de lo que pasa. Ese dia fue #283, y la guarda mordio: nombro
+ * `datos/useDatosDeLaHoja.ts` y `i18n/catalogo-de-claves.ts`.
  *
- * Asi que el criterio se aplica donde es senal: **atado al modulo que eligio no tener
- * consumidor**. No prohibe nada; obliga a que el javadoc y el arbol digan lo mismo. El dia que
- * alguien enchufe la escalera —que es lo que se quiere—, esto sale rojo nombrando el archivo que
- * la importo, y quien lo lea sabe que hay un parrafo que corregir en vez de dejarlo afirmando lo
- * contrario de lo que pasa. Es el defecto de #255, con rojo esta vez.
+ * <h2>Por que sigue habiendo guarda, y no una linea menos</h2>
+ *
+ * Porque la afirmacion que hay que sostener cambio, no desaparecio. Los dos consumidores no son
+ * intercambiables y cada uno tiene su motivo:
+ *
+ * · **`datos/useDatosDeLaHoja.ts`** la DIBUJA: traduce el peldano a la `Ausencia` que el
+ *   interprete de `@kamayuk/ui` sabe pintar. Si desapareciera, la escalera volveria a no tener
+ *   quien la ensene y el javadoc de `escalera.ts` —que dice que la dibuja una pantalla— mentiria.
+ * · **`i18n/catalogo-de-claves.ts`** la INVENTARIA: llama a `peldanoDe` con un fallo por peldano
+ *   para que sus frases entren en el locale. Si desapareciera, las cuatro frases de cada peldano
+ *   saldrian en castellano en cualquier idioma, y la guarda del locale no lo veria.
+ *
+ * Un tercero —una pantalla que se monte su propia escalera, un conector que decida por su cuenta
+ * que es una averia— es lo que esto existe para que no pase en silencio: dos escaleras que dicen
+ * cosas distintas del mismo 403 es peor que una escalera corta.
  */
-describe('#262 — la decision de dejar `escalera.ts` sin consumidor sigue siendo cierta', () => {
+describe('#283 — quien importa la escalera, y para que', () => {
   it('EL CENTINELA: el barrido ve el arbol de `src/`, y se ve a si mismo fuera', () => {
     // Sin esto, un `readdirSync` sobre la carpeta equivocada dejaria la prueba de abajo en verde
     // para siempre sobre la lista vacia, que es como una barrera se apaga sin que nadie la borre.
@@ -218,26 +232,24 @@ describe('#262 — la decision de dejar `escalera.ts` sin consumidor sigue siend
     expect(fuentes).not.toContain('api/escalera.test.ts');
   });
 
-  it('ninguna fuente de produccion de `src/` la importa', () => {
+  it('la importan exactamente dos fuentes de produccion, y son esas dos', () => {
     const importa = /from\s+'[^']*\/escalera\.ts'/;
-    const culpables = fuentesDeProduccion().filter(
-      (ruta) =>
-        ruta !== 'api/escalera.ts' &&
-        importa.test(readFileSync(join(RAIZ_DE_SRC, ruta), 'utf8')),
+    const quienes = fuentesDeProduccion().filter(
+      (ruta) => ruta !== 'api/escalera.ts' && importa.test(readFileSync(join(RAIZ_DE_SRC, ruta), 'utf8')),
     );
 
     expect(
-      culpables,
-      'ALGUIEN ENCHUFO LA ESCALERA, Y SU JAVADOC SIGUE DICIENDO QUE NADIE LO HIZO:\n' +
-        `${culpables.map((ruta) => `  src/${ruta}`).join('\n')}\n\n` +
-        '  Es una buena noticia y hay que terminarla. `src/api/escalera.ts` lleva un apartado\n' +
-        '  —«Y NINGUNA FUENTE DE PRODUCCION LO IMPORTA»— que explica por que se quedo en el\n' +
-        '  arbol sin consumidor y hasta cuando: hasta que `Ausencia` pueda llevar el remedio, o\n' +
-        '  hasta que una pantalla dibuje el peldano. Si ya pasa una de las dos, ese apartado\n' +
-        '  sobra, y el javadoc de esta prueba y el de `datos/useDatosDeLaHoja.ts` —que tiene su\n' +
-        '  propia escalera corta en `alFallar`— tienen que decir cual de las dos escaleras manda.\n' +
-        '  Dejar los tres textos como estan es el defecto de #255: una afirmacion que ya no se\n' +
-        '  sostiene y nadie ve caer.',
-    ).toEqual([]);
+      [...quienes].sort((a, b) => a.localeCompare(b)),
+      'LOS CONSUMIDORES DE LA ESCALERA YA NO SON LOS DOS QUE SU JAVADOC NOMBRA:\n' +
+        `${quienes.map((ruta) => `  src/${ruta}`).join('\n')}\n\n` +
+        '  Si FALTA alguno: `datos/useDatosDeLaHoja.ts` es quien la dibuja y\n' +
+        '  `i18n/catalogo-de-claves.ts` quien mete sus frases en el locale. Sin el primero la\n' +
+        '  escalera vuelve a no tener quien la ensene —y el apartado «Y DESDE #283 LA DIBUJA UNA\n' +
+        '  PANTALLA» de `escalera.ts` pasa a ser falso—; sin el segundo, las cuatro frases de cada\n' +
+        '  peldano salen en castellano en cualquier idioma.\n' +
+        '  Si SOBRA alguno: hay una segunda escalera, y dos escaleras que contestan cosas\n' +
+        '  distintas al mismo 403 son peor que la escalera corta que #283 retiro. O se enchufa a\n' +
+        '  `useDatosDeLaHoja`, o este javadoc y el de `escalera.ts` tienen que decir por que no.',
+    ).toEqual(['datos/useDatosDeLaHoja.ts', 'i18n/catalogo-de-claves.ts']);
   });
 });

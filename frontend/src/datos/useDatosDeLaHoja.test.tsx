@@ -180,16 +180,19 @@ describe('una pantalla CON conector recorre sus estados', () => {
     expect(result.current.ausenciaPorCampo?.get(coordenada(0, 2))).toBe('no publicado');
   });
 
-  it('un 401 se dice como lo que es —vuelva a entrar—, no como «fallo la red»', async () => {
-    contesta({ estado: 401, titulo: 'No autorizado' }, 401);
+  it('un 401 se dice como lo que es —vuelva a identificarse—, no como «fallo la red»', async () => {
+    contesta({ codigo: 'NO_AUTENTICADO', title: 'No autorizado' }, 401);
     const { result } = renderHook(() => useDatosDeLaHoja('panel'), { wrapper: arnes().wrapper });
 
     await waitFor(() => {
-      expect(result.current.ausencia.tono).toBe('atencion');
+      expect(result.current.ausencia.enElCampo).toBe('sin sesion');
     });
     // La diferencia decide que hace el usuario: recargar no arregla una sesion caducada.
-    expect(result.current.ausencia.explicacion).toMatch(/Vuelva a entrar/);
-    expect(result.current.ausencia.enElCampo).toBe('sin acceso');
+    expect(result.current.ausencia.explicacion).toMatch(/Vuelva a identificarse/);
+    // Y NO va en tono de averia: la sesion caducada es el sistema funcionando, y pintarla de
+    // «algo se rompio» manda a mirar un despliegue. Hasta #283 los seis peldanos que no son una
+    // averia salian en `atencion`, o sea con el mismo color que un 500.
+    expect(result.current.ausencia.tono).toBe('info');
   });
 
   it('y otro error dice su codigo, para que se pueda buscar', async () => {
@@ -200,6 +203,93 @@ describe('una pantalla CON conector recorre sus estados', () => {
       expect(result.current.ausencia.enElCampo).toBe('fallo');
     });
     expect(result.current.ausencia.explicacion).toContain('500');
+    // Esto SI es una averia, y es el unico caso en que el tono lo dice.
+    expect(result.current.ausencia.tono).toBe('atencion');
+  });
+});
+
+/**
+ * **Los dos 403 no se leen igual, y el 422 no se lee como una averia** (#283, #262).
+ *
+ * Es lo que `api/escalera.ts` tenia medido con `curl` desde I-1 y ninguna pantalla dibujaba. La
+ * escalera corta que habia aqui contestaba `SIN_PERMISO` a **cualquier** 403 y «fallo (422)» al
+ * 422, o sea que mandaba a pedir un permiso a quien tenia que llamar al administrador, y a
+ * soporte a quien habia escrito una observacion de tres letras.
+ */
+describe('la escalera de identidad, dibujada', () => {
+  it('403 SIN_MUNICIPALIDAD manda al administrador del emisor, y no a pedir un permiso', async () => {
+    contesta(
+      { codigo: 'SIN_MUNICIPALIDAD', mensaje: 'El token no identifica una municipalidad' },
+      403,
+    );
+    const { result } = renderHook(() => useDatosDeLaHoja('panel'), { wrapper: arnes().wrapper });
+
+    await waitFor(() => {
+      expect(result.current.ausencia.enElCampo).toBe('sin municipalidad');
+    });
+    // Lo que el backend dijo viaja entero: es el unico dato con el que se arregla.
+    expect(result.current.ausencia.explicacion).toContain(
+      'El token no identifica una municipalidad',
+    );
+    expect(result.current.ausencia.explicacion).toMatch(/administrador del sistema/);
+    expect(result.current.ausencia.tono).toBe('info');
+  });
+
+  it('403 SIN_PRIVILEGIO manda a pedir el permiso, y NO dice lo mismo que el otro 403', async () => {
+    contesta(
+      { codigo: 'SIN_PRIVILEGIO', mensaje: 'No tiene el privilegio LECTURA sobre corridas' },
+      403,
+    );
+    const { result } = renderHook(() => useDatosDeLaHoja('panel'), { wrapper: arnes().wrapper });
+
+    await waitFor(() => {
+      expect(result.current.ausencia.enElCampo).toBe('sin permiso');
+    });
+    // El mensaje del backend nombra el privilegio y la opcion: es lo que hay que pedir.
+    expect(result.current.ausencia.explicacion).toContain(
+      'No tiene el privilegio LECTURA sobre corridas',
+    );
+    expect(result.current.ausencia.explicacion).toMatch(/perfiles/);
+  });
+
+  it('un 403 SIN codigo no se hace pasar por ninguno de los dos', async () => {
+    // Adivinar mandaria a la mitad de los casos a pedir un permiso que no falta.
+    contesta({ title: 'Forbidden' }, 403);
+    const { result } = renderHook(() => useDatosDeLaHoja('panel'), { wrapper: arnes().wrapper });
+
+    await waitFor(() => {
+      expect(result.current.ausencia.enElCampo).toBe('sin acceso');
+    });
+  });
+
+  it('el 422 NO se lee como una averia: es una regla del dominio, con su cifra dentro', async () => {
+    contesta(
+      {
+        codigo: 'VALIDACION',
+        mensaje: 'Ejercicio fuera de rango: 1800. Se admite de 1990 a 2100',
+      },
+      422,
+    );
+    const { result } = renderHook(() => useDatosDeLaHoja('panel'), { wrapper: arnes().wrapper });
+
+    await waitFor(() => {
+      expect(result.current.ausencia.enElCampo).toBe('dato rechazado');
+    });
+    // Hasta #283 esto salia como «No se pudieron pedir los datos de esta pantalla (422)», o sea
+    // como si algo se hubiera roto, y el remedio era avisar a soporte. La regla y su cifra —lo
+    // unico con lo que quien esta delante corrige lo que escribio— no llegaban a la pantalla.
+    expect(result.current.ausencia.explicacion).toContain('Se admite de 1990 a 2100');
+    expect(result.current.ausencia.explicacion).toMatch(/Corrija/);
+    expect(result.current.ausencia.tono).toBe('info');
+  });
+
+  it('y el estado va en la frase, aparte del texto, para dictarlo a soporte', async () => {
+    contesta({ title: 'Forbidden' }, 403);
+    const { result } = renderHook(() => useDatosDeLaHoja('panel'), { wrapper: arnes().wrapper });
+
+    await waitFor(() => {
+      expect(result.current.ausencia.explicacion).toContain('(403)');
+    });
   });
 });
 
@@ -413,9 +503,9 @@ describe('una pantalla que es de un ejercicio de la sesion', () => {
     const { result } = renderHook(() => useDatosDeLaHoja('seg-aud'), { wrapper: arnes().wrapper });
 
     await waitFor(() => {
-      expect(result.current.ausencia.enElCampo).toBe('sin acceso');
+      expect(result.current.ausencia.enElCampo).toBe('sin sesion');
     });
-    expect(result.current.ausencia.explicacion).toMatch(/Vuelva a entrar/);
+    expect(result.current.ausencia.explicacion).toMatch(/Vuelva a identificarse/);
   });
 
   it('y las 38 hojas restantes NO piden la sesion: solo la piden quien la exige', async () => {

@@ -271,17 +271,40 @@ export const FRASE_DE_QUIEN_ES_SIN_PADRON =
   'Lo que se dibuja es de un contribuyente que ya no esta en el padron.';
 
 /**
- * **«No se pudieron pedir los datos de esta pantalla (404)»: el fallo, con su peldano** (#246).
+ * **El peldano de la escalera, dicho en una frase** (#246, #283).
  *
- * Vive aqui por lo mismo que las tres de arriba: el peldano es **dato** y entra por interpolacion,
- * asi que la frase la arma quien tiene `t()` delante —`useDatosDeLaHoja.alFallar`— y no la propia
- * ausencia. Y hasta #246 no vivia en ninguna parte: el codigo se concatenaba dentro de la frase, o
- * sea que la cadena que llegaba al interprete era distinta en cada fallo y **ninguna clave del
- * locale podia casar con ella**.
+ * <h2>Los tres trozos son DATO, y por eso la frase esta aqui y no en el peldano</h2>
+ *
+ * Lo que `api/escalera.ts` devuelve son tres frases sueltas —`titulo`, `detalle` y `remedio`—, y
+ * el `detalle` no siempre es una frase escrita en este arbol: **cuando el backend dijo algo, es lo
+ * que el backend dijo**, con su cifra dentro —«al menos 5 caracteres», «Se admite de 1990 a
+ * 2100»—. Pegarlas con `+` donde se dibujan dejaria una cadena distinta en cada fallo, que es
+ * exactamente lo que #246 arreglo para la frase anterior: **ninguna clave del locale podria casar
+ * con ella**. Aqui la clave es una sola, y el idioma decide donde cae cada trozo.
+ *
+ * Hasta #283 esto era `FRASE_DEL_FALLO`, que llevaba el **codigo** de estado interpolado y decia
+ * lo mismo para los seis peldanos que no son una averia. El codigo no se pierde, y ahora se lee en
+ * los siete y no solo en el que fallaba: viaja en `Peldano.estado` —un dato, aparte de toda
+ * frase— y lo coloca la clave hermana de aqui abajo.
+ *
+ * <h2>Por que la raya y no un punto</h2>
+ *
+ * Porque el trozo de en medio no es nuestro: el backend manda su mensaje con punto final o sin el
+ * —medido, los dos 422 de la instalacion no lo llevan—, y un punto escrito aqui daria «…(ADR-0008).
+ * Corrija…» o «…peticion.. Corrija…» segun el caso. La raya separa las dos cosas sea cual sea.
  */
-export const FRASE_DEL_FALLO =
-  'No se pudieron pedir los datos de esta pantalla ({{codigo}}). Lo que se ve es su forma, no sus ' +
-  'datos.';
+export const FRASE_DEL_PELDANO = '{{titulo}}. {{detalle}} — {{remedio}}';
+
+/**
+ * **La misma frase cuando el backend llego a contestar, con el estado que se dicta a soporte.**
+ *
+ * Son dos claves y no una con el hueco vacio porque «El sistema no contesta ().» no lo escribiria
+ * nadie, y porque quien traduzca tiene que poder mover el parentesis de sitio. La eleccion entre
+ * las dos la hace `useDatosDeLaHoja.alFallar` mirando `Peldano.estado`, que es `null` cuando la
+ * peticion no llego a contestar —un corte de red— y el numero en los otros seis peldanos.
+ */
+export const FRASE_DEL_PELDANO_CON_ESTADO =
+  '{{titulo}} ({{estado}}). {{detalle}} — {{remedio}}';
 
 /**
  * **Las palabras del grafico de `ini-flujo`, la primera pieza del consumidor** (#288).
