@@ -1,15 +1,12 @@
 package kamayuk.rentas.valores;
 
 import java.time.LocalDate;
-import java.util.Collection;
-import java.util.Set;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.Observacion;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Emitir la resolucion de multa de una papeleta, y saber cual de ellas ya paso a coactiva (#53,
- * RF-066, RF-073).
+ * Emitir la resolucion de multa de una papeleta (#53, RF-066, RF-073).
  *
  * <p>Es la <b>tercera</b> API publica de {@code valores}, despues de {@link
  * ValoresDelContribuyente} y {@link ValoresEnCoactiva}. Vive en el paquete raiz, no en {@code
@@ -30,6 +27,24 @@ import org.jspecify.annotations.Nullable;
  * <p>Por eso el metodo <b>devuelve</b> el numero y no lo recibe. Si lo recibiera, el dia que
  * alguien quisiera «una serie propia para las multas» le bastaria con pasar otro texto, y las dos
  * numeraciones divergirian sin que nada lo dijera.
+ *
+ * <h2>Lo que este puerto ya no publica: el pase a coactiva en bloque</h2>
+ *
+ * <p>Hasta #266 aqui habia un segundo metodo, {@code conPaseACoactiva(Collection<Long>)}, que
+ * contestaba cuales de unos valores tenian su movimiento {@code PCO} (V28). Se retiro con su
+ * implementacion, su metodo de repositorio, su consulta JDBC y su doble: <b>no lo llamaba nadie en
+ * {@code src/main}</b> y el consumidor para el que se escribio no puede existir. El padron de
+ * papeletas enviadas a coactiva lo definio #243 como «con resolucion de multa emitida» —{@code
+ * it.valor_id IS NOT NULL}, un hecho de {@code sanciones}—, y la fase {@code COACTIVA} de {@code
+ * FaseDelProcedimiento} es un {@code CASE} de SQL que el {@code SELECT} y el {@code WHERE}
+ * comparten: un puerto de Java no entra en ese {@code WHERE} sin partir en dos la unica copia de la
+ * expresion.
+ *
+ * <p>Y el hecho que contestaba <b>sigue publicado</b>, por el camino que si tiene consumidor:
+ * {@link ValorParaCoactiva#conPaseACoactiva()}, que {@code coactiva} lee en {@code
+ * ImportarValoresACoactiva}. Es el mismo {@code EXISTS} sobre {@code valor_movimiento} con {@code
+ * tipo = 'PCO'}, valor a valor en vez de en bloque. No se perdio ninguna pregunta: se retiro la
+ * unica de las dos formas que nadie hacia.
  *
  * <h2>Lo que este puerto NO decide</h2>
  *
@@ -64,29 +79,6 @@ public interface EmisionDeValoresDeMultas {
             @Nullable Long vehiculoId,
             LocalDate fecha,
             Observacion observacion);
-
-    /**
-     * De entre esos valores, cuales ya tienen su pase a coactiva ({@code PCO} de {@code
-     * valor_movimiento}, V28).
-     *
-     * <p>Se pregunta <b>en bloque</b>: un padron de doscientas filas que preguntara una por una
-     * haria doscientas consultas por pagina.
-     *
-     * <p><b>NO LO LLAMA NADIE, y esta medido (#259).</b> Este docblock decia que «es lo que el
-     * padron de papeletas enviadas a coactiva necesita», y no lo es: #243 definio ese padron como
-     * «con resolucion de multa emitida» —{@code it.valor_id IS NOT NULL} sobre la fila GENERADO de
-     * la corrida, en {@code PadronDePapeletasRepositoryJdbc}—, que es un hecho distinto y de
-     * `sanciones`. En todo {@code src/main} de los diecisiete modulos la unica mencion de este
-     * metodo es su propia implementacion delegando en el repositorio.
-     *
-     * <p>Se deja declarado y no se retira porque cual de los dos hechos es «enviada a coactiva» —el
-     * pase PCO del valor o la resolucion de multa emitida— es una decision de producto y no de
-     * codigo, y retirar una API publica de `valores` desde un issue de decision de `sanciones`
-     * seria tomarla de lado. Queda escrito aqui, que es donde se vuelve a mirar.
-     *
-     * @return los identificadores, de entre los preguntados, con pase; vacio si ninguno
-     */
-    Set<Long> conPaseACoactiva(Collection<Long> valorIds);
 
     /** La obligacion no debe nada a la fecha del criterio: no hay valor que emitir. */
     final class SinDeudaQueFormalizar extends RuntimeException {

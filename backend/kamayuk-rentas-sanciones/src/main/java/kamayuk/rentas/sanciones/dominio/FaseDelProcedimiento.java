@@ -78,12 +78,16 @@ package kamayuk.rentas.sanciones.dominio;
  *       hay por dónde cruzar un abono con una papeleta sin decidir antes una columna nueva. Es una
  *       decisión de esquema, no de código.
  *   <li><b>{@code COACTIVA} desde el pase</b>: el método que el issue proponía añadir a {@code
- *       EmisionDeValoresDeMultas} —{@code conPaseACoactiva(Collection&lt;Long&gt;)}— <b>ya
- *       existe</b>, está implementado y no lo llama nadie en {@code src/main}. Y aunque se llamara
- *       no serviría <b>aquí</b>: esto es un {@code CASE} de SQL que el {@code SELECT} y el {@code
+ *       EmisionDeValoresDeMultas} —{@code conPaseACoactiva(Collection&lt;Long&gt;)}— existía ya,
+ *       implementado y sin que lo llamara nadie en {@code src/main}. Y aunque se llamara no
+ *       serviría <b>aquí</b>: esto es un {@code CASE} de SQL que el {@code SELECT} y el {@code
  *       WHERE} comparten, y un puerto de Java no se puede meter dentro de un {@code WHERE} sin
  *       partir en dos la única copia de la expresión, que es justo lo que el apartado siguiente
- *       explica que no se hace.
+ *       explica que no se hace. Por eso #266 lo <b>retiró</b> —con su implementación, su método de
+ *       repositorio y su doble—: un puerto que no puede tener consumidor aquí y no lo tiene en
+ *       ningún otro sitio no es una API, es una promesa de que la fase se deriva, y no se deriva.
+ *       El mismo hecho lo sigue publicando {@code ValorParaCoactiva#conPaseACoactiva()}, que {@code
+ *       coactiva} sí lee.
  * </ul>
  *
  * <h2>Por qué la expresión SQL vive aquí</h2>

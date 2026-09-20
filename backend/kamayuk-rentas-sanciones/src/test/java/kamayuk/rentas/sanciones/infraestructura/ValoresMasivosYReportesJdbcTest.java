@@ -122,7 +122,6 @@ import kamayuk.rentas.sanciones.infraestructura.web.ResumenesDeTransitoControlle
 import kamayuk.rentas.valores.EmisionDeValoresDeMultas;
 import kamayuk.rentas.valores.aplicacion.EmisionDeValoresDeMultasValores;
 import kamayuk.rentas.valores.aplicacion.RegistrarValor;
-import kamayuk.rentas.valores.infraestructura.MovimientoDeValorRepositoryJdbc;
 import kamayuk.rentas.valores.infraestructura.ValorRepositoryJdbc;
 import kamayuk.rentas.web.CodigoDeError;
 import kamayuk.rentas.web.ProblemaDeNegocio;
@@ -349,9 +348,7 @@ class ValoresMasivosYReportesJdbcTest {
                         new RegistrarValor(
                                 new ValorRepositoryJdbc(jdbc), deudas, fases, auditoria, RELOJ));
         EmisionDeValoresDeMultas emision =
-                envolver(
-                        new EmisionDeValoresDeMultasValores(
-                                registrarValor, new MovimientoDeValorRepositoryJdbc(jdbc), deudas));
+                envolver(new EmisionDeValoresDeMultasValores(registrarValor, deudas));
 
         registrarPapeleta = envolver(new RegistrarPapeleta(papeletas, codigos, cargos, auditoria));
         resolver =

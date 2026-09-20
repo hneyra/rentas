@@ -1,17 +1,14 @@
 package kamayuk.rentas.valores.aplicacion;
 
 import java.time.LocalDate;
-import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
-import java.util.Set;
 import kamayuk.rentas.cuentacorriente.ConsultaDeDeudaPublica;
 import kamayuk.rentas.cuentacorriente.ObligacionPublica;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.valores.EmisionDeValoresDeMultas;
 import kamayuk.rentas.valores.ValorDeMulta;
-import kamayuk.rentas.valores.dominio.MovimientoDeValorRepository;
 import kamayuk.rentas.valores.dominio.SelectorDeObligacion;
 import kamayuk.rentas.valores.dominio.TipoValor;
 import kamayuk.rentas.valores.dominio.Valor;
@@ -45,15 +42,10 @@ public class EmisionDeValoresDeMultasValores implements EmisionDeValoresDeMultas
     private static final TipoValor TIPO = TipoValor.RESOLUCION_DE_MULTA;
 
     private final RegistrarValor registrar;
-    private final MovimientoDeValorRepository movimientos;
     private final ConsultaDeDeudaPublica deuda;
 
-    public EmisionDeValoresDeMultasValores(
-            RegistrarValor registrar,
-            MovimientoDeValorRepository movimientos,
-            ConsultaDeDeudaPublica deuda) {
+    public EmisionDeValoresDeMultasValores(RegistrarValor registrar, ConsultaDeDeudaPublica deuda) {
         this.registrar = registrar;
-        this.movimientos = movimientos;
         this.deuda = deuda;
     }
 
@@ -123,13 +115,6 @@ public class EmisionDeValoresDeMultasValores implements EmisionDeValoresDeMultas
             // `valores.aplicacion` sin cruzar el limite del modulo (ARQ-01 §4).
             throw new SinDeudaQueFormalizar(mensajeDe(sinDeuda));
         }
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public Set<Long> conPaseACoactiva(Collection<Long> valorIds) {
-        Objects.requireNonNull(valorIds, "La coleccion es vacia, no nula");
-        return movimientos.conPaseACoactiva(valorIds);
     }
 
     /** Si esa obligacion concreta debe algo a esa fecha. */

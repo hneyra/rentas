@@ -138,25 +138,6 @@ public class MovimientoDeValorRepositoryJdbc extends RepositorioJdbc
     }
 
     @Override
-    public java.util.Set<Long> conPaseACoactiva(java.util.Collection<Long> valorIds) {
-        if (valorIds.isEmpty()) {
-            // IN () no es SQL valido, y la respuesta a «cuales de estos cero tienen pase»
-            // es el conjunto vacio, no un error.
-            return java.util.Set.of();
-        }
-        List<Long> conPase =
-                jdbc().sql(
-                                "SELECT valor_id FROM valor_movimiento"
-                                        + " WHERE tipo = 'PCO' AND valor_id IN (:valores)")
-                        .param("valores", List.copyOf(valorIds))
-                        // Mapeo explicito y no query(Long.class): la columna es NOT NULL, y el
-                        // atajo devuelve List<@Nullable Long>, que NullAway rechaza con razon.
-                        .query((fila, numeroDeFila) -> fila.getLong("valor_id"))
-                        .list();
-        return java.util.Set.copyOf(conPase);
-    }
-
-    @Override
     public List<MovimientoDeValor> deValor(long valorId) {
         return jdbc().sql(
                         "SELECT "
