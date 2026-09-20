@@ -73,16 +73,6 @@ public final class MovimientosEnMemoria implements MovimientoDeValorRepository {
                 .findFirst();
     }
 
-    /** La misma pregunta que {@link #paseDe}, en bloque (#53). */
-    @Override
-    public java.util.Set<Long> conPaseACoactiva(java.util.Collection<Long> valorIds) {
-        return guardados.stream()
-                .filter(m -> m.tipo() == TipoDeMovimiento.PCO)
-                .map(MovimientoDeValor::valorId)
-                .filter(valorIds::contains)
-                .collect(java.util.stream.Collectors.toUnmodifiableSet());
-    }
-
     @Override
     public List<MovimientoDeValor> deValor(long valorId) {
         return guardados.stream().filter(m -> m.valorId() == valorId).toList();

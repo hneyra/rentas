@@ -40,18 +40,6 @@ public interface MovimientoDeValorRepository {
     /** El pase a coactiva de este valor, si ya se dio. */
     Optional<MovimientoDeValor> paseDe(long valorId);
 
-    /**
-     * De entre esos valores, cuales tienen su pase a coactiva ({@code PCO}), en una sola consulta
-     * (#53).
-     *
-     * <p>Existe para el padron de papeletas enviadas a coactiva. Con {@link #paseDe} en un bucle,
-     * una pagina de doscientas filas serian doscientas consultas, y ese es el camino por el que un
-     * padron acaba tardando segundos por pagina.
-     *
-     * @return los identificadores con pase, de entre los preguntados; vacio si la coleccion lo esta
-     */
-    java.util.Set<Long> conPaseACoactiva(java.util.Collection<Long> valorIds);
-
     /** Todos los movimientos del valor, del primero al ultimo. */
     List<MovimientoDeValor> deValor(long valorId);
 }
