@@ -1,5 +1,7 @@
 import type { Ausencia, DefinicionDePantalla, PiezaDeLaPantalla } from '@kamayuk/ui';
 
+import { ErrorDeLaApi } from '../api/cliente.ts';
+import { peldanoDe } from '../api/escalera.ts';
 import { ARBOL } from '../pantallas/arbol.ts';
 import { bloquesDe } from '../pantallas/bloques.ts';
 import { PANTALLAS } from '../pantallas/definiciones/index.ts';
@@ -166,6 +168,49 @@ function lasAusenciasDelSistema(): readonly Ausencia[] {
   return salida;
 }
 
+/** Lo que se pidio, para construir los fallos. No se lee en ninguna frase: ver el 404 de #283. */
+const OPERACION_DE_MUESTRA = 'GET /seguridad/sesion';
+
+/**
+ * **Un fallo por peldano de la escalera, con el cuerpo VACIO** (#283).
+ *
+ * El cuerpo vacio no es un descuido: es lo que hace que `peldanoDe` conteste su **respaldo**, o
+ * sea la frase escrita en este arbol, que es la que puede ser clave. Con un `mensaje` dentro
+ * contestaria lo que dijo el backend, que es dato y no se traduce.
+ *
+ * La lista es a mano —ocho fallos para siete peldanos, porque `averia` se llega de dos maneras— y
+ * eso es una lista que alguien puede olvidar ampliar. Por eso no es la unica linea de defensa:
+ * `verificaciones/ninguna-ausencia-se-queda-sin-inventariar.test.ts` barre `api/escalera.ts` y
+ * exige que **toda** frase escrita dentro de un peldano este en este catalogo, asi que un octavo
+ * peldano que nadie anada aqui sale rojo nombrando el archivo y la linea. Es el reparto de #246:
+ * derivar cubre lo corriente, el centinela cubre que derivar se haya quedado corto.
+ */
+const LOS_FALLOS_DE_LA_ESCALERA: readonly unknown[] = [
+  // Un corte de red no llega como `ErrorDeLaApi`, y tambien tiene que decir algo.
+  new TypeError('Failed to fetch'),
+  new ErrorDeLaApi(401, OPERACION_DE_MUESTRA),
+  new ErrorDeLaApi(403, OPERACION_DE_MUESTRA, { codigo: 'SIN_MUNICIPALIDAD' }),
+  new ErrorDeLaApi(403, OPERACION_DE_MUESTRA, { codigo: 'SIN_PRIVILEGIO' }),
+  new ErrorDeLaApi(403, OPERACION_DE_MUESTRA),
+  new ErrorDeLaApi(404, OPERACION_DE_MUESTRA),
+  new ErrorDeLaApi(422, OPERACION_DE_MUESTRA),
+  new ErrorDeLaApi(500, OPERACION_DE_MUESTRA),
+];
+
+/**
+ * **Las frases de los siete peldanos** (#283).
+ *
+ * `datos/useDatosDeLaHoja.ts` las dibuja: `enElHueco` va en el hueco del campo y los otros tres se
+ * arman en la explicacion con `FRASE_DEL_PELDANO`, los tres pasados por `t()`. O sea que son
+ * claves, y una clave que nadie lista nadie la echa de menos. `estado` no entra: es un numero.
+ */
+function deLosPeldanos(): readonly string[] {
+  return LOS_FALLOS_DE_LA_ESCALERA.flatMap((fallo) => {
+    const peldano = peldanoDe(fallo);
+    return [peldano.enElHueco, peldano.titulo, peldano.detalle, peldano.remedio];
+  });
+}
+
 function deLasAusencias(): readonly string[] {
   return [
     ...lasAusenciasDelSistema().flatMap((a) => [a.enElCampo, a.explicacion]),
@@ -201,6 +246,7 @@ export function catalogoDeClaves(): readonly string[] {
     ...deLasPantallas(),
     ...delArbol(),
     ...deLasAusencias(),
+    ...deLosPeldanos(),
     ...delMarco(),
   ]);
   return [...todas].filter((c) => c.trim() !== '').sort((a, b) => a.localeCompare(b, 'es'));

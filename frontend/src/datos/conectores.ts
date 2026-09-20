@@ -387,9 +387,11 @@ export interface Conector {
   /**
    * **Que decir cuando la operacion contesta 404**, si no vale la frase de por omision (#237).
    *
-   * Sin esto un 404 sale por `alFallar` como «fallo (404)», o sea **como una averia**. Y no lo es:
-   * la lectura del predial contesta 404 cuando el codigo **no esta en el padron** —lo dice
-   * nombrandolo— y 204 cuando esta y no tiene determinacion. Son dos vacios distintos a proposito
+   * Sin esto un 404 sale por `alFallar` con el peldano `no-encontrado` de la escalera, que habla
+   * de la CUENTA —«puede ser valida en el emisor de identidad y no estar dada de alta en esta
+   * municipalidad»—. Y aqui no es eso: la lectura del predial contesta 404 cuando el codigo **no
+   * esta en el padron** —lo dice nombrandolo— y 204 cuando esta y no tiene determinacion.
+   * (Hasta #283 salia como «fallo (404)», o sea **como una averia**, que era peor todavia.) Son dos vacios distintos a proposito
    * (#546), y decirlos igual es exactamente el defecto que el backend evito al publicarlos
    * distintos.
    *
