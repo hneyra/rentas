@@ -148,6 +148,30 @@ class SancionesJdbcTest {
     private static final LocalDate INFRACCION = LocalDate.of(2026, 3, 4);
 
     /**
+     * Las <b>10:00 del día de la infracción</b>, hora del Perú, como instante.
+     *
+     * <p>Es el ingreso al depósito de casi todas las pruebas de esta clase, y su hora está elegida
+     * para <b>no</b> distinguir nada: a las 10:00 de Catacaos la fecha UTC y la local coinciden,
+     * así que ninguna de esas pruebas cambia de color según la zona. Las dos que SÍ tienen que
+     * distinguir usan {@link #INGRESO_NOCTURNO} y están en {@code ElInternamientoNocturno}.
+     *
+     * <p>Hasta #273 esto era {@code INFRACCION.atStartOfDay(ZoneOffset.UTC)}, que es la medianoche
+     * UTC, o sea las <b>19:00 del día 3</b> en el Perú: sembraba dentro de la franja rota sin
+     * decirlo, y con la zona puesta la cuenta de días habría salido en 29 en vez de 28. Está
+     * escrito como instante UTC y no compuesto con {@code ZonaHoraria.DEL_PRODUCTO} a propósito:
+     * una prueba que compusiera la hora con la misma constante que verifica no verificaría nada.
+     */
+    private static final Instant INGRESO_DE_DIA = Instant.parse("2026-03-04T15:00:00Z");
+
+    /**
+     * Las <b>20:00 del día de la infracción</b>, hora del Perú: la franja de #273.
+     *
+     * <p>El mismo instante en UTC ya es del <b>día 5</b>. Todo internamiento entre las 19:00 y la
+     * medianoche caía ahí, y son cinco horas de cada día, no un caso de borde.
+     */
+    private static final Instant INGRESO_NOCTURNO = Instant.parse("2026-03-05T01:00:00Z");
+
+    /**
      * Hasta cuándo se admite el descargo, con el plazo <b>parametrizado</b> de 5 días hábiles.
      *
      * <p>La cuenta, día a día: la papeleta es del miércoles 4; el cómputo empieza el jueves 5 (día
@@ -973,6 +997,116 @@ class SancionesJdbcTest {
     }
 
     @Nested
+    @DisplayName("#273 — el internamiento nocturno: lo que la zona del producto arregla")
+    class ElInternamientoNocturno {
+
+        /**
+         * Las 20:00 del 4 de marzo. En UTC ese instante ya es del 5, y ESA es la trampa.
+         *
+         * <p>Esta escrito aqui y no recalculado: el dia local del ingreso es lo que la prueba
+         * verifica, asi que derivarlo con la misma conversion que ejercita no verificaria nada.
+         */
+        private static final LocalDate DIA_DEL_INGRESO = LocalDate.of(2026, 3, 4);
+
+        @Test
+        @DisplayName("AC 1a — su custodia cuenta el dia entero, no uno de menos")
+        void laCustodiaCuentaElDiaQueLeCorresponde() {
+            Papeleta papeleta = papeletaDeTransito("Z01");
+            internarVehiculo(papeleta, "T2G-701", null, INGRESO_NOCTURNO);
+
+            Pagina<InternamientoEnConsulta> grilla =
+                    enTransaccion(
+                            () ->
+                                    consultaDeDeposito.listar(
+                                            new CriterioDeInternamiento("T2G-701", null, null),
+                                            SANCIONADORA_DESDE,
+                                            Paginacion.de(0, 20, "fechaIngreso")));
+
+            assertThat(grilla.contenido()).hasSize(1);
+            InternamientoEnConsulta fila = grilla.contenido().get(0);
+            // Los dias PRIMERO, y a proposito: es la cifra que devenga la custodia, asi que es la
+            // que tiene que aparecer en el rojo cuando alguien vuelva a truncar el ingreso en UTC.
+            assertThat(fila.dias())
+                    .as(
+                            "del 4 de marzo al 15 de abril son 42 dias. Truncando el ingreso en"
+                                    + " UTC salian 41: un dia de custodia que el deposito dejaba"
+                                    + " de devengar en las cinco horas de cada dia entre las 19:00"
+                                    + " y la medianoche")
+                    .isEqualTo(42);
+            assertThat(fila.fechaIngreso())
+                    .as("entro el 4 a las 20:00 hora de Catacaos; en UTC ese instante es del 5")
+                    .isEqualTo(DIA_DEL_INGRESO);
+        }
+
+        @Test
+        @DisplayName("AC 1b — y se puede liberar esa misma noche, que es cuando el titular paga")
+        void seLiberaEsaMismaNoche() {
+            Papeleta papeleta = papeletaDeTransito("Z02");
+            internarVehiculo(papeleta, "T2G-702", null, INGRESO_NOCTURNO);
+            String recibo = cobrarCustodia(papeleta.obligadoId());
+
+            LiberarVehiculoInternado.Liberado liberado =
+                    liberarVehiculo("T2G-702", recibo, DIA_DEL_INGRESO);
+
+            assertThat(liberado.estado())
+                    .as(
+                            "con el ingreso truncado en UTC, `ingreso` salia el 5 y la guarda"
+                                    + " rechazaba una liberacion del 4 por «anterior al ingreso»:"
+                                    + " el vehiculo se quedaba en el deposito hasta el dia"
+                                    + " siguiente por un desfase de zona")
+                    .isEqualTo(EstadoDeInternamiento.LIBERADO);
+            assertThat(liberado.movimiento().diasCustodia())
+                    .as("entro y salio el mismo dia: cero dias, no un dia negativo ni uno de mas")
+                    .isZero();
+        }
+
+        @Test
+        @DisplayName("y la guarda NO se retiro: una liberacion de VERDAD anterior sigue rota")
+        void laGuardaSigueMordiendo() {
+            Papeleta papeleta = papeletaDeTransito("Z03");
+            internarVehiculo(papeleta, "T2G-703", null, INGRESO_NOCTURNO);
+            String recibo = cobrarCustodia(papeleta.obligadoId());
+
+            // Sin esta prueba, quitar el `isBefore` entero dejaria las dos de arriba en verde. Lo
+            // que #273 arreglo es CON QUE dia se compara, no que se comparara.
+            assertThatThrownBy(
+                            () -> liberarVehiculo("T2G-703", recibo, DIA_DEL_INGRESO.minusDays(1)))
+                    .isInstanceOf(LiberarVehiculoInternado.LiberacionAnteriorAlIngreso.class)
+                    .hasMessageContaining("no se pudo liberar el 2026-03-03");
+        }
+
+        @Test
+        @DisplayName(
+                "el acta imprime el 4, y el expediente ensena el 4: los otros dos truncamientos")
+        void elActaYElExpedienteDicenElMismoDiaLocal() {
+            Papeleta papeleta = papeletaDeTransito("Z04");
+            RegistrarInternamiento.Internado internado =
+                    internarVehiculo(papeleta, "T2G-704", null, INGRESO_NOCTURNO);
+
+            // `RegistrarInternamiento:96`: el dia que el acta imprime. El renderizador escribe
+            // «Datos al <dia>» y el PDF es texto plano, que es como la prueba de la custodia
+            // pagada comprueba el recibo unas lineas mas arriba.
+            assertThat(new String(internado.acta().contenido(), StandardCharsets.ISO_8859_1))
+                    .as("es la fecha que consta en un documento, no una casilla de pantalla")
+                    .contains("Datos al " + DIA_DEL_INGRESO)
+                    .doesNotContain("Datos al " + DIA_DEL_INGRESO.plusDays(1));
+
+            // `ConsultaDeActosDeLaPapeleta:96`: el dia que la consulta ensena.
+            ConsultaDeActosDeLaPapeleta.Expediente expediente =
+                    enTransaccion(() -> consultaDeActos.de(Familia.TRANSITO, papeleta.numero()));
+
+            ActoDeLaPapeleta acta =
+                    expediente.actos().stream()
+                            .filter(acto -> "INGRESO".equals(acto.tipo()))
+                            .findFirst()
+                            .orElseThrow();
+            assertThat(acta.fecha())
+                    .as("el expediente ensena el mismo dia que el acta imprimio: el 4, no el 5")
+                    .isEqualTo(DIA_DEL_INGRESO);
+        }
+    }
+
+    @Nested
     @DisplayName("AC 4 y 5 — todos los documentos con su fecha y su acuse, y su auditoria")
     class ElExpedienteDeLaPapeleta {
 
@@ -1536,6 +1670,11 @@ class SancionesJdbcTest {
 
     private static RegistrarInternamiento.Internado internarVehiculo(
             Papeleta papeleta, String placa, @Nullable Long vehiculoId) {
+        return internarVehiculo(papeleta, placa, vehiculoId, INGRESO_DE_DIA);
+    }
+
+    private static RegistrarInternamiento.Internado internarVehiculo(
+            Papeleta papeleta, String placa, @Nullable Long vehiculoId, Instant ingreso) {
         return enTransaccion(
                 () ->
                         internar.internar(
@@ -1544,7 +1683,7 @@ class SancionesJdbcTest {
                                         vehiculoId,
                                         papeleta.numero(),
                                         "DEPOSITO SULLANA NORTE",
-                                        INFRACCION.atStartOfDay(ZoneOffset.UTC).toInstant(),
+                                        ingreso,
                                         "CUSTODIA",
                                         "Conducir sin licencia vigente"),
                                 FormatoDeDocumento.PDF,
@@ -1552,12 +1691,17 @@ class SancionesJdbcTest {
     }
 
     private static LiberarVehiculoInternado.Liberado liberarVehiculo(String placa, String recibo) {
+        return liberarVehiculo(placa, recibo, ORDINARIA);
+    }
+
+    private static LiberarVehiculoInternado.Liberado liberarVehiculo(
+            String placa, String recibo, LocalDate fecha) {
         return enTransaccion(
                 () ->
                         liberar.liberar(
                                 new LiberarVehiculoInternado.Peticion(
                                         placa,
-                                        ORDINARIA,
+                                        fecha,
                                         recibo,
                                         "SERNAQUE VILLEGAS, DORIS",
                                         "DNI 44218937",

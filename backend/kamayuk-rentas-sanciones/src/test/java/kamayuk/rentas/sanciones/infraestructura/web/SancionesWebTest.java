@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
+import java.util.concurrent.atomic.AtomicReference;
+import kamayuk.rentas.sanciones.aplicacion.RegistrarInternamiento;
 import kamayuk.rentas.web.ConfiguracionDeJson;
 import kamayuk.rentas.web.ManejadorDeErrores;
 import org.junit.jupiter.api.DisplayName;
@@ -200,6 +202,62 @@ class SancionesWebTest {
         assertThat(resultado.getResponse().getContentAsString())
                 .as("se queja de lo que falta, no de lo que sobra: lo que sobra ni se lee")
                 .contains("nDeExpediente");
+    }
+
+    @Test
+    @DisplayName("#273 — el dia que manda la pantalla entra como su medianoche LOCAL, no la UTC")
+    void elDiaDeIngresoEntraComoMedianocheLocal() throws Exception {
+        // Es el quinto truncamiento de #273 y el unico que va en sentido contrario: de dia a
+        // instante. Tiene que usar la misma zona que lo vuelve a truncar aguas abajo, o el dia no
+        // sobrevive a su propia ida y vuelta y el acta imprime el dia ANTERIOR.
+        AtomicReference<java.time.Instant> capturado = new AtomicReference<>();
+        RegistrarInternamiento registrar =
+                new RegistrarInternamiento(null, null, null, null, RELOJ) {
+                    @Override
+                    public Internado internar(
+                            Peticion peticion,
+                            kamayuk.rentas.documentos.FormatoDeDocumento formato,
+                            kamayuk.rentas.dominio.Observacion observacion) {
+                        capturado.set(peticion.fechaIngreso());
+                        // Cortar aqui es el enunciado: lo que se mide es lo que el controlador
+                        // COMPUSO, y montar el caso de uso entero para eso seria otra prueba —la
+                        // tiene SancionesJdbcTest, contra PostgreSQL—.
+                        throw new IllegalArgumentException("capturado");
+                    }
+                };
+
+        MockMvc soloElIngreso =
+                MockMvcBuilders.standaloneSetup(
+                                new InternamientosController(null, registrar, null, RELOJ))
+                        .setControllerAdvice(new ManejadorDeErrores())
+                        .setMessageConverters(
+                                new JacksonJsonHttpMessageConverter(
+                                        JsonMapper.builder()
+                                                .addModule(
+                                                        new ConfiguracionDeJson()
+                                                                .moduloDeObjetosDeValor())
+                                                .build()))
+                        .build();
+
+        soloElIngreso
+                .perform(
+                        post("/rentas/api/v1/transito/internamientos")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        "{\"observacion\":\"Se interna por la prueba\","
+                                                + "\"placa\":\"T2G-418\","
+                                                + "\"deposito\":\"DEPOSITO NORTE\","
+                                                + "\"fechaDeIngreso\":\"2026-08-02\","
+                                                + "\"tasaDeCustodia\":\"CUSTODIA\","
+                                                + "\"motivo\":\"x\"}"))
+                .andReturn();
+
+        assertThat(capturado.get())
+                .as(
+                        "la medianoche del 2 de agosto en el Peru son las 05:00 UTC. Con la"
+                                + " medianoche UTC —2026-08-02T00:00:00Z— el ingreso entraba como"
+                                + " las 19:00 del dia 1 y el acta lo fechaba el 1")
+                .isEqualTo(java.time.Instant.parse("2026-08-02T05:00:00Z"));
     }
 
     private MvcResult enviar(String ruta, String cuerpo) throws Exception {

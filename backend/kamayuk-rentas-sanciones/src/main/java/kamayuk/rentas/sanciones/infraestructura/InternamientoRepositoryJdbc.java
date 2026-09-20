@@ -15,6 +15,7 @@ import java.util.Optional;
 import kamayuk.rentas.compartido.Pagina;
 import kamayuk.rentas.compartido.Paginacion;
 import kamayuk.rentas.dominio.Observacion;
+import kamayuk.rentas.dominio.ZonaHoraria;
 import kamayuk.rentas.persistencia.OrdenSeguro;
 import kamayuk.rentas.persistencia.RepositorioJdbc;
 import kamayuk.rentas.sanciones.dominio.CriterioDeInternamiento;
@@ -65,16 +66,6 @@ public class InternamientoRepositoryJdbc extends RepositorioJdbc
                     + "        WHERE m.internamiento_id = i.id AND m.tipo = 'ABANDONO')";
 
     private static final OrdenSeguro ORDEN = OrdenSeguro.sobre("fecha_ingreso", "placa", "id");
-
-    /**
-     * La zona con la que se lee la fecha de ingreso.
-     *
-     * <p>{@code fecha_ingreso} es {@code timestamptz} y la fecha que la grilla muestra tiene que
-     * ser la misma que el acta imprimió. UTC porque es la zona con la que el resto del sistema
-     * interpreta los instantes; una zona local aquí haría que un ingreso de las 20:00 apareciera
-     * como del día siguiente.
-     */
-    private static final java.time.ZoneOffset UTC = java.time.ZoneOffset.UTC;
 
     public InternamientoRepositoryJdbc(JdbcClient jdbc) {
         super(jdbc);
@@ -350,8 +341,13 @@ public class InternamientoRepositoryJdbc extends RepositorioJdbc
 
     private static InternamientoEnConsulta mapearConsulta(ResultSet fila, LocalDate aLaFecha)
             throws SQLException {
-        LocalDate ingreso =
-                fila.getTimestamp("fecha_ingreso").toInstant().atZone(UTC).toLocalDate();
+        // LAS DOS PUNTAS DEL INTERVALO, EN LA MISMA ZONA (#273). Aqui estaba el desequilibrio
+        // que hacia dificil ver el defecto: `fecha_salida` es un DATE y ya es un dia local —no
+        // pasa por ninguna zona—, mientras que `fecha_ingreso` es un timestamptz que se truncaba
+        // en UTC. Con Catacaos a -05:00, todo ingreso entre las 19:00 y la medianoche caia en el
+        // dia siguiente y su custodia se devengaba con UN DIA DE MENOS. Arreglar solo una de las
+        // dos puntas no habria quitado el defecto: lo habria cambiado de sitio.
+        LocalDate ingreso = ZonaHoraria.diaDe(fila.getTimestamp("fecha_ingreso").toInstant());
         Date salidaSql = fila.getDate("fecha_salida");
         LocalDate salida = salidaSql == null ? null : salidaSql.toLocalDate();
         LocalDate corte = salida == null ? aLaFecha : salida;
