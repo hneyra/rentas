@@ -121,8 +121,17 @@ function bloqueComoElArtboard(bloque: Bloque): BloqueDelArtboard {
  * meterlas en esta lista compararia un bloque contra una pieza y daria un rojo sobre algo que el
  * artboard nunca dijo.
  *
- * Y que la pieza este ENGANCHADA donde el artboard la declara no se queda sin guarda: lo comprueba
- * `las-piezas-del-consumidor-son-las-que-el-artboard-declara`, al final de este archivo.
+ * Y que la pieza este ENGANCHADA donde el artboard la declara no se queda sin guarda, pero la
+ * guarda **no esta aqui**: lo comprueba `el-grafico-de-ini-flujo-se-dibuja.test.tsx`. Medido
+ * desenganchando el `{ tipo: 'delConsumidor' }` de `ini-flujo` (#282): este archivo pasa
+ * **96 de 96 en verde** y el otro cae con **ocho rojas**, la primera «`ini-flujo` declara la
+ * pieza, sin `ajustes`».
+ *
+ * Hasta #282 esta frase mandaba a una guarda llamada
+ * las-piezas-del-consumidor-son-las-que-el-artboard-declara, «al final de este archivo», y **no
+ * existia ninguna de las dos cosas**: cero coincidencias de ese nombre en el arbol, y los
+ * `describe` de aqui son cuatro y ninguno es ese. La cobertura si estaba; lo que mentia era la
+ * cita. Va sin comillas invertidas porque con ellas la guarda de #255 vuelve a dispararse.
  */
 function pantallaComoElArtboard(pantalla: Pantalla): readonly BloqueDelArtboard[] {
   return bloquesDe(pantalla).map(bloqueComoElArtboard);
