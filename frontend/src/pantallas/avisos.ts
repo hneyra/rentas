@@ -33,6 +33,13 @@
  * con la misma medida escrita al lado, que es como se corrigio en su dia el rotulo de `val-tip`:
  * el artboard es el diseno contra el que se reimplanta, no un registro de una medicion.
  *
+ * **Ese «uno» era la cuenta del dia, con la regla de entonces**, y no se reescribe porque es la
+ * medicion que se hizo. #291 midio la regla en vez de la frase —«algun campo que no sea de solo
+ * lectura» da 39 de 40 porque en un tablero lo que se escribe son los FILTROS— y la cambio por el
+ * verbo que la hoja declara: hoy la rama de consulta la dicen **25** de las cuarenta. El argumento
+ * de arriba no dependia de la cuenta sino de que la rama es generica para los diez modulos, asi
+ * que sale reforzado.
+ *
  * <h2>Lo que esto NO es</h2>
  *
  * **No es el saco de textos del marco.** Son dos frases de ESTE sistema, guardadas contra el

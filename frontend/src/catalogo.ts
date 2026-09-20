@@ -1,8 +1,8 @@
 import type { Catalogo, ModuloDelCatalogo } from '@kamayuk/shell';
-import { ICONOS, seEscribe, tipoDe, type NombreDeIcono } from '@kamayuk/ui';
+import { ICONOS, type NombreDeIcono } from '@kamayuk/ui';
 
 import { ARBOL } from './pantallas/arbol.ts';
-import { bloquesDe } from './pantallas/bloques.ts';
+import { laHojaEscribe } from './pantallas/tipos.ts';
 import { CONECTORES } from './datos/conectores.ts';
 import { pantallaDe } from './pantallas/definiciones/index.ts';
 
@@ -16,12 +16,21 @@ import { pantallaDe } from './pantallas/definiciones/index.ts';
  * otro lado. Asi que alguien tiene que traducir los diez modulos y las cuarenta hojas de este
  * sistema a la forma generica, y ese alguien vive aqui. Es literalmente la costura del reparto.
  *
- * <h2>`seEscribe` sale del DATO, y por eso se calcula aqui</h2>
+ * <h2>`seEscribe` sale del DATO, y desde #291 del dato que corresponde</h2>
  *
- * El armazon decide las acciones del pie —limpiar y guardar, o exportar e imprimir— segun si la
- * pantalla tiene algun campo que se escriba. Esa pregunta solo la puede contestar quien tiene las
- * definiciones, o sea este sistema. Pasarla como bandera a mano seria dejar la puerta abierta a
- * una pantalla de solo lectura con un boton de guardar que no guarda nada.
+ * El armazon decide las acciones del pie —limpiar y guardar, o exportar e imprimir— y el aviso del
+ * medio segun si la hoja se escribe. Esa pregunta solo la puede contestar este sistema, y pasarla
+ * como bandera a mano dejaria la puerta abierta a una pantalla de solo lectura con un boton de
+ * guardar que no guarda nada. Sigue siendo verdad. Lo que #291 midio es que **la puerta estaba
+ * abierta igual, por el otro lado**.
+ *
+ * Hasta #291 la pregunta se contestaba con las definiciones: «¿tiene algun campo que no sea de
+ * solo lectura?». Eso da **39 de 40**, porque en un tablero los campos que se escriben son **los
+ * filtros**, y con ellas el pie ponia «Nada se escribe hasta que pulse Guardar.» al lado de un
+ * «Guardar» deshabilitado en treinta y nueve pantallas — `ACCIONES` de `aplicacion.tsx` solo
+ * atiende `imprimir`. Hoy la contesta `laHojaEscribe()`, con el **verbo** que la hoja declara:
+ * **15 de 40**, y los diez paneles fuera. El porque entero, con sus parejas medidas, esta en
+ * `pantallas/tipos.ts`.
  *
  * <h2>Lo que este archivo NO hace</h2>
  *
@@ -115,18 +124,6 @@ function enLaRutaDeLaHoja(
   };
 }
 
-/**
- * Si alguna de las pantallas de una hoja tiene un campo que se escribe.
- *
- * **Solo los bloques** (#288): una pieza del consumidor no tiene campos del interprete, asi que no
- * hay ninguno que se escriba en ella. Lo que dibuje por dentro es de quien la escribio, y el dia que
- * una pieza traiga un formulario sera ella la que lo diga y no este recorrido.
- */
-function laHojaSeEscribe(clave: Parameters<typeof pantallaDe>[0]): boolean {
-  return bloquesDe(pantallaDe(clave)).some((bloque) =>
-    bloque.campos.some((campo) => seEscribe(tipoDe(campo.tipo))),
-  );
-}
 
 /**
  * El **codigo de modulo** de cada entrada del catalogo, por su clave.
@@ -149,7 +146,7 @@ export const CATALOGO: Catalogo = ARBOL.map(
     destinos: modulo.hojas.map((hoja) => ({
       clave: hoja.clave,
       rotulo: hoja.rotulo,
-      seEscribe: laHojaSeEscribe(hoja.clave),
+      seEscribe: laHojaEscribe(hoja),
       ...enLaRutaDeLaHoja(hoja.clave),
       // La barra gris de V8: que hay que HACER aqui. Vive en la definicion de la pantalla y no en
       // el arbol —dos registros paralelos de cuarenta claves se desincronizan—, y llega al marco

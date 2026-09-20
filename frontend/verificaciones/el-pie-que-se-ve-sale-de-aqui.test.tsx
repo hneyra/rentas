@@ -32,9 +32,19 @@ import { AVISOS_DE_V8 } from '../src/pantallas/avisos.ts';
  *
  * Porque el armazon elige entre las dos frases con `destino.seEscribe` —`avisoDelPie()` de
  * `@kamayuk/shell`—, y con un solo destino la otra rama no se mide. Y cual es de cada clase **se
- * deriva del catalogo**, no se escribe: son 39 de escritura y **una** de consulta, `seg-panel`, y
- * esa proporcion es justamente lo que hizo falsa la frase de V8 (ver `avisos.ts`). El dia que una
- * hoja cambie de clase, esto sigue midiendo las dos ramas sin que nadie vuelva aqui.
+ * deriva del catalogo**, no se escribe. Cuando #281 lo midio eran 39 de escritura y **una** de
+ * consulta, `seg-panel`, y esa proporcion es justamente lo que hizo falsa la frase de V8 (ver
+ * `avisos.ts`); **desde #291 son 15 y 25**, porque la clase la decide el verbo que la hoja declara
+ * y no si algun campo suyo se puede teclear. Esto no cambio ni una linea: el dia que una hoja
+ * cambie de clase sigue midiendo las dos ramas sin que nadie vuelva aqui, que es para lo que se
+ * derivaba.
+ *
+ * <h2>Lo que esta guarda NO mide, y quien lo mide</h2>
+ *
+ * **A quien se le dice cada frase.** Aqui se abre un destino de cada clase y se comprueba que la
+ * frase es palabra por palabra la de `avisos.ts`; que la clase sea la que corresponde a esa hoja
+ * lo comprueba `el-pie-no-promete-guardar-donde-la-hoja-no-escribe` (#291), que recorre las
+ * cuarenta.
  */
 
 const DE_CONSULTA = CATALOGO.flatMap((m) => m.destinos).filter((d) => !d.seEscribe);

@@ -1638,8 +1638,8 @@ class Component extends DCLogic {
         };
       })(),
       volver: () => (s.dest ? this.pedirCierre(s.dest) : null),
-      /* Una pantalla de sólo lectura no se guarda: ofrece imprimir y exportar.
-         Una con campos, sí, y avisa de lo que el acto implica.
+      /* Una pantalla que no escribe no se guarda: ofrece imprimir y exportar.
+         Una que escribe, sí, y avisa de lo que el acto implica.
 
          #281 — el aviso de consulta decía «Los datos son los que figuran EN EL PADRÓN a la
          fecha de hoy.», y se le quitan esas tres palabras porque son falsas donde la frase
@@ -1651,9 +1651,44 @@ class Component extends DCLogic {
          —Seguridad, Infracciones y Tránsito incluidos—, y este archivo nombra además tres
          padrones distintos —el tributario, el de licencias y `transito_padron_coactiva`—,
          así que «el padrón», con artículo determinado, tampoco tendría a qué referirse.
-         La frase neutra es la que es verdad en las cuarenta. */
+         La frase neutra es la que es verdad en las cuarenta.
+         (Esa cuenta —39 y 1— es la de la regla de ENTONCES, la de los campos. #291 la
+         cambió, y hoy la rama de consulta la dicen 25 de las 40; el argumento no depende
+         de la cuenta sino de que la rama es genérica para los diez módulos, así que sale
+         reforzado, no tocado.)
+
+         #291 — `editable` se calculaba con los CAMPOS: «algún campo que no sea `esRo`».
+         Medido sobre este mismo archivo, eso es verdad en 39 de las 40 de `PANTALLAS`, y la
+         única que quedaba fuera era `seg-panel`. No era un buen corte, y el motivo está
+         delante en este mismo archivo: en un tablero, los campos que se escriben son **los
+         filtros**. `ini-panel` tiene «Ejercicio» y cinco cifras `esRo`; con la regla vieja
+         ofrecía «Limpiar» y «Guardar» y decía «Nada se escribe hasta que pulse Guardar» de un
+         tablero que no guarda nada. Los diez paneles —uno por módulo— hacían lo mismo.
+
+         Y no hay forma de separar un filtro de un dato que se guarda mirando el campo: en
+         `ini-flujo`, «Desde» y «Hasta» son fechas y son filtros; en `fis-actas`, «Fecha de
+         inspección» es una fecha y es un dato del acta. Mismo tipo, distinto papel. Tampoco
+         el bloque los separa: los dos llevan su tabla debajo.
+
+         Lo que sí lo dice es el VERBO que la hoja declara en `ARBOL`, que ya está aquí:
+         `hojaActual.ops`. Con él son **15 de 40** —predios, territorio, fis-prog, fis-res,
+         coa-exp, coa-cart, coa-cost, aut-sol, aut-cat, aut-tram, seg-acc, seg-sis, val-val,
+         val-cart, val-tip—, y los diez paneles caen del lado de consulta, que es donde
+         estaban. `BASE` no cuenta y no puede contar: significa que del controlador sólo se
+         leyó el `@RequestMapping` de la clase, o sea que el verbo NO SE SABE, y ofrecer
+         «Guardar» por una ruta cuyo verbo nadie verificó es inventarlo. `fis-actas` declara
+         tres `BASE` y nada más: por eso no escribe.
+
+         La misma medida, y la misma regla, están en
+         `frontend/src/pantallas/tipos.ts:laHojaEscribe`. Aquí el botón «Guardar» funciona
+         —esto es una maqueta y saca un toast—, así que en este archivo la regla vieja no
+         mentía; en la implantación sí, porque allí sólo `imprimir` está atendido. Se corrige
+         igualmente, porque este archivo es el diseño contra el que se reimplanta: dejada la
+         regla vieja aquí, el defecto vuelve en la siguiente pasada. */
+
       pie: (() => {
-        const editable = hojaActual ? this.bloques(s.dest).some((b) => b.campos.some((c) => !c.esRo)) : false;
+        const ESCRIBEN = ['POST', 'PUT', 'PATCH'];
+        const editable = hojaActual ? hojaActual.ops.some((o) => ESCRIBEN.indexOf(o[0]) >= 0) : false;
         const acciones = editable
           ? [['Limpiar', 0], ['Guardar', 1]]
           : [['Exportar', 0], ['Imprimir', 1]];
