@@ -113,6 +113,15 @@ export interface EtapaDeLaCorrida {
  * los nombraba. Un campo que no se declara es un campo que el proveedor puede retirar sin que
  * nada se ponga rojo, y `simulacion` no es un adorno: dice si esa corrida emitio de verdad o fue
  * un ensayo, que es la diferencia entre una deuda que existe y una que no.
+ *
+ * **Y diez desde #271**, con los dos agregados que el panel dibuja arriba: `determinados` y
+ * `montoEmitido`. Los dos estaban en `corrida_predial` desde que la corrida deja rastro, y hasta
+ * #271 salian **solo dentro de una fila de `etapas`** — de modo que pintarlos exigia leer la
+ * segunda fila de la tabla aqui, que es lo que la regla de `conectores.ts` prohibe.
+ *
+ * El tercer campo del panel —«Derecho de emision»— **sigue sin publicarse**, y no por descuido:
+ * la corrida lo *aplica* dentro del total de cada contribuyente y **no lo sella**. Ver el javadoc
+ * del conector en `conectores.ts`.
  */
 export interface CorridaDelPredial {
   readonly id: number;
@@ -125,6 +134,18 @@ export interface CorridaDelPredial {
   /** El conjunto sellado de `normativa` con que se calculo. Vacio si no consta. */
   readonly conjunto: string;
   readonly fechaCalculo: string;
+  /**
+   * Cuantas cuentas quedaron determinadas. En una corrida simulada, cuantas se simularon: lo dice
+   * `simulacion`, y la etapa de la tabla se rotula «Simulados» en vez de «Determinados».
+   */
+  readonly determinados: number;
+  /**
+   * Lo que la corrida determino en total, **impuesto mas derecho de emision**, en texto.
+   *
+   * Es la columna `monto_emitido` de la corrida —lo que se escribio el dia que se corrio—, no una
+   * suma sobre nada. Viene sin formatear: `"9418204.60"`.
+   */
+  readonly montoEmitido: string;
   readonly observados: number;
   readonly etapas: readonly EtapaDeLaCorrida[];
 }

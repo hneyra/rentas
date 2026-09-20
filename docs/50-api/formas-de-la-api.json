@@ -2059,6 +2059,8 @@
     "simulacion": "booleano",
     "conjunto": "texto",
     "fechaCalculo": "texto",
+    "determinados": "entero",
+    "montoEmitido": "texto",
     "observados": "entero",
     "etapas": [
       {

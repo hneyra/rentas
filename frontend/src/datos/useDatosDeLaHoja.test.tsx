@@ -10,6 +10,7 @@ import {
   OTRA_FICHA,
   SIN_CAMPANIA,
 } from './conectores/consultasDeMuestra.ts';
+import type { CorridaDelPredial } from './lecturas.ts';
 import { useDatosDeLaHoja } from './useDatosDeLaHoja.ts';
 
 /**
@@ -49,7 +50,15 @@ function contesta(cuerpo: unknown, estado = 200) {
   );
 }
 
-const CORRIDA = {
+/**
+ * La ultima corrida, **con su tipo delante** (#271).
+ *
+ * Sin el `: CorridaDelPredial` esta constante era un objeto suelto que el compilador no comparaba
+ * con nada, asi que cuando la operacion publico `determinados` y `montoEmitido` el fixture se
+ * quedo corto **en verde**: `tsc` no dijo nada y el rojo llego al montar la hoja, desde dentro de
+ * `formatearEntero`. Con el tipo, el que falte un campo no compila.
+ */
+const CORRIDA: CorridaDelPredial = {
   id: 1,
   ejercicio: '2026',
   alcance: 'PADRON',
@@ -57,6 +66,8 @@ const CORRIDA = {
   simulacion: false,
   conjunto: 'V3',
   fechaCalculo: '28/01/2026 02:14',
+  determinados: 58412,
+  montoEmitido: '8772431.05',
   observados: 534,
   etapas: [
     { etapa: 'Lectura del padron', registros: 62418, monto: '—', observados: 0, estado: 'Conforme' },
@@ -175,9 +186,14 @@ describe('una pantalla CON conector recorre sus estados', () => {
     });
     expect(result.current.valores?.get(coordenada(0, 1))).toBe('28/01/2026 02:14');
     expect(result.current.filas?.get(0)).toHaveLength(1);
-    // Y los tres que la operacion no publica van marcados campo a campo, no con el motivo de la
-    // pantalla: la pantalla SI esta conectada, y decir lo contrario ahi seria falso.
-    expect(result.current.ausenciaPorCampo?.get(coordenada(0, 2))).toBe('no publicado');
+    // Y el que la operacion no publica va marcado campo a campo, no con el motivo de la pantalla:
+    // la pantalla SI esta conectada, y decir lo contrario ahi seria falso.
+    //
+    // Eran TRES hasta #271, cuando la corrida publico `determinados` y `montoEmitido` como campos.
+    // Queda «Derecho de emision» —`0|5`—, que la corrida aplica y no sella: ver el javadoc de
+    // `PANEL` en `conectores.ts`. La coordenada se cambia y no se borra la asercion: lo que esto
+    // mide es que el hueco viaje POR CAMPO, y sin ninguno no habria como medirlo.
+    expect(result.current.ausenciaPorCampo?.get(coordenada(0, 5))).toBe('no publicado');
   });
 
   it('un 401 se dice como lo que es —vuelva a identificarse—, no como «fallo la red»', async () => {

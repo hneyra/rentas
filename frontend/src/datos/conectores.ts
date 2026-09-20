@@ -12,6 +12,7 @@ import type { CorridaDelPredial, DeterminacionGuardada } from './lecturas.ts';
 import { RUTAS, pedirUnoOVacio } from './lecturas.ts';
 import {
   formatearAlicuota,
+  formatearEntero,
   formatearFecha,
   formatearImporte,
   formatearImporteSinRedondear,
@@ -479,9 +480,37 @@ export function loQueLaHojaDeclara(
  * `panel` — el estado de la ultima corrida del padron.
  *
  * De `CorridaDelPredial` salen la fecha, los observados y **las cinco columnas de la tabla, que
- * cuadran una a una** con `EtapaDeLaCorrida`. Lo que no sale —cuentas emitidas, monto determinado,
- * derecho de emision— no se deduce de las etapas aunque se parezca: la ultima etapa trae 61 350
- * registros y la pantalla ensena 61 350 cuentas emitidas, y **que coincidan no las hace lo mismo**.
+ * cuadran una a una** con `EtapaDeLaCorrida`.
+ *
+ * <h2>Cinco de seis desde #271, y ninguno deducido</h2>
+ *
+ * «Cuentas emitidas» y «Monto determinado» eran dos de los tres huecos de esta pantalla, y lo eran
+ * por el sitio correcto: **la operacion no los publicaba como campo**. El dato lo sabia la corrida
+ * —son las columnas `determinados` y `monto_emitido` de `corrida_predial`, escritas el dia que se
+ * corrio— y viajaba solo **dentro de una fila de `etapas`**.
+ *
+ * Sacarlos de ahi aqui es lo que la regla de arriba prohibe, y sigue prohibido: la ultima etapa
+ * trae 61 350 registros y el artboard ensena 61 350 cuentas emitidas, y **que coincidan no las
+ * hace lo mismo** —una es cuantas cuponeras se generaron y la otra cuantas cuentas quedaron
+ * emitidas—. Lo que cambio no es esta regla: es que el backend publica los dos campos (#271), y
+ * de ahi salen. La tabla los sigue ensenando porque el recurso compone sus etapas **de los mismos
+ * campos**, asi que no hay dos verdades que se puedan desincronizar.
+ *
+ * <h2>Y el sexto se queda con su hueco: «Derecho de emision» (D-02b)</h2>
+ *
+ * Medido antes de intentarlo, y sale en contra:
+ *
+ *   · `corrida_predial` tiene dieciocho columnas y **ninguna** es el derecho de emision. La
+ *     corrida lo **aplica** —entra en `monto_emitido`, dentro del total de cada contribuyente— y
+ *     **no lo sella**.
+ *   · Lo unico que sella del conjunto es su **nombre** —«2026 v1», `varchar(60)`—, y la lectura
+ *     que devolveria aquel valor pide el `conjuntoId`. No hay lectura por nombre; y en una corrida
+ *     que no determino a nadie ese nombre es la cadena vacia.
+ *   · El unico camino que queda es el conjunto vigente **hoy**, que no tiene por que ser el que la
+ *     corrida uso. Eso es una cifra equivocada de la peor clase: parece correcta.
+ *
+ * Un hueco que dice «no publicado» manda a arreglar la corrida, que es donde esta el trabajo: una
+ * columna mas, escrita el dia de la emision. Ver `CorridaGuardadaResource`.
  */
 const PANEL: Conector = {
   clave: ['panel', 'ultima-corrida'],
@@ -492,7 +521,13 @@ const PANEL: Conector = {
   repartir: (corrida: CorridaDelPredial): Reparto => ({
     valores: new Map([
       [coordenada(0, 1), corrida.fechaCalculo],
-      [coordenada(0, 3), String(corrida.observados)],
+      // Los dos conteos con `formatearEntero` y no con `String`: el artboard escribe «61,350» con
+      // millares, y una emision anual los tiene. Con `String` los observados salian sin agrupar
+      // desde F-6 —invisible mientras fueran 534— y los dos campos del mismo bloque habrian
+      // escrito la misma clase de cifra de dos maneras en cuanto pasaran del millar.
+      [coordenada(0, 2), formatearEntero(corrida.determinados)],
+      [coordenada(0, 3), formatearEntero(corrida.observados)],
+      [coordenada(0, 4), formatearImporte(corrida.montoEmitido)],
     ]),
     filas: new Map([
       [
@@ -506,11 +541,8 @@ const PANEL: Conector = {
         ]),
       ],
     ]),
-    noPublicados: new Map([
-      [coordenada(0, 2), NO_PUBLICADO],
-      [coordenada(0, 4), NO_PUBLICADO],
-      [coordenada(0, 5), NO_PUBLICADO],
-    ]),
+    // Solo «Derecho de emision»: la corrida lo aplica y no lo sella. Ver el javadoc de arriba.
+    noPublicados: new Map([[coordenada(0, 5), NO_PUBLICADO]]),
   }),
 };
 

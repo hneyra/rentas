@@ -120,6 +120,12 @@ export const FICHA_MEDIDA: FichaDelContribuyente = {
  * La ultima corrida de la municipalidad 9, tal cual.
  *
  * Trae `sector`, `simulacion` y `conjunto`, que el contrato declara y el port de F-6 no leia.
+ *
+ * **`determinados` y `montoEmitido` no estaban en la captura del 2026-09-07**: la operacion no los
+ * publicaba todavia y los estrena #271. Los dos valores de abajo **no se inventan**: la captura
+ * guarda las etapas de esta misma corrida, y el recurso compone la etapa «Simulados» de esos dos
+ * campos exactos —`registros: 0` y `monto: '0.00'`—. O sea que estaban medidos, dentro de la
+ * tabla; lo que cambia es por donde salen.
  */
 export const CORRIDA_MEDIDA: CorridaDelPredial = {
   id: 20,
@@ -129,6 +135,8 @@ export const CORRIDA_MEDIDA: CorridaDelPredial = {
   simulacion: true,
   conjunto: '',
   fechaCalculo: '2026-09-01',
+  determinados: 0,
+  montoEmitido: '0.00',
   observados: 0,
   etapas: [
     { etapa: 'Padrón leído', registros: 0, monto: '', observados: 0, estado: 'OK' },
