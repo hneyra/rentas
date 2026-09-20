@@ -10,6 +10,8 @@ import {
   type TextosDelInterprete,
 } from '@kamayuk/ui';
 
+import { AVISOS_DE_V8 } from '../pantallas/avisos.ts';
+
 /**
  * **Las palabras que el MARCO dice por su cuenta, traducidas por este sistema** (#133).
  *
@@ -101,8 +103,13 @@ export const FRASES_DEL_MARCO = {
   guardar: 'Guardar',
   exportar: 'Exportar',
   imprimir: 'Imprimir',
-  nadaSeEscribeTodavia: 'Nada se escribe hasta que pulse Guardar.',
-  datosDeHoy: 'Los datos son los que figuran a la fecha de hoy.',
+  // **Los dos avisos del pie NO se escriben aqui** (#281). Salen de `pantallas/avisos.ts`, que es
+  // la copia guardada palabra por palabra contra `diseno/RentasV8.dc.html`. Escritos aqui a mano
+  // —como estuvieron hasta #281— habia dos copias de cada frase: la vigilada, que no se veia, y
+  // esta, que se veia y no la vigilaba nadie. Y ya diferian: a `datosDeHoy` le faltaban las tres
+  // palabras «en el padrón» que V8 escribia. Derivadas, cambiar una sola de las dos es imposible.
+  nadaSeEscribeTodavia: AVISOS_DE_V8.escritura,
+  datosDeHoy: AVISOS_DE_V8.consulta,
 
   // ── El aviso de cambios sin guardar ──────────────────────────────────────────────────────────
   hayCambiosSinGuardar: '{{rotulo}} tiene cambios sin guardar',

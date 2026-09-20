@@ -497,8 +497,8 @@ describe('AC1 — el token no toca el almacenamiento del navegador', () => {
  * cualquier otra municipalidad.
  */
 const CAPTURAS = [
-  'src/marco/sesionMedida.ts',
-  'src/marco/seguridadMedida.ts',
+  'src/datos/sesionMedida.ts',
+  'src/datos/seguridadMedida.ts',
   'src/datos/backendMedido.ts',
   // La cuarta no es una captura sino respuestas construidas desde el contrato (#169), y corre el
   // MISMO riesgo: un `ficha ?? FICHA` ensenaria la cuenta corriente de un contribuyente inventado
@@ -511,6 +511,33 @@ const CAPTURAS = [
 ];
 
 describe('las capturas de la instalacion son de las pruebas, y no respaldos de produccion', () => {
+  it('EL CENTINELA: la lista nombra archivos que existen, y no se deja ninguno fuera (#277)', () => {
+    // Las dos primeras entradas dijeron `src/marco/` hasta #277, y `src/marco/` salio del arbol
+    // con la V6 (#90): los dos archivos viven en `src/datos/`. La guarda seguia mordiendo **por
+    // casualidad**, porque casa por NOMBRE de archivo y no por ruta, asi que la ruta falsa no
+    // producia ningun rojo. Dos consecuencias, y las dos callaban: el `ruta !== captura` de abajo
+    // dejaba de excluir la captura de si misma, y una TERCERA entrada mal escrita habria pasado
+    // igual de inadvertida.
+    //
+    // La lista se sigue escribiendo a mano —cada entrada lleva su motivo, y eso no sale del
+    // disco—, pero se cruza con el barrido: `deProduccion` ya se deriva de `src/` con
+    // `readdirSync`, y el nombre de un dato medido o construido es su propia senal. Asi la lista
+    // no puede nombrar lo que no existe, ni dejarse fuera una captura nueva.
+    const conNombreDeCaptura = deProduccion
+      .filter((ruta) => /(Medid[oa]|DeMuestra)\.ts$/.test(ruta))
+      .sort();
+
+    expect(
+      conNombreDeCaptura,
+      'La lista de capturas y los archivos que el arbol tiene no cuadran.\n\n' +
+        '  Si sobra una entrada: nombra una ruta que no existe —se movio, o se escribio mal— y\n' +
+        '  esta guarda lleva desde entonces vigilando un archivo por su nombre a secas.\n' +
+        '  Si falta una: hay un dato medido o construido desde el contrato que nadie vigila, y es\n' +
+        '  el peor material que hay en `src/` porque PARECE un dato legitimo. Anadela CON SU\n' +
+        '  MOTIVO, como las cinco de arriba.',
+    ).toEqual([...CAPTURAS].sort());
+  });
+
   it.each(CAPTURAS)('«%s» solo la importan archivos de prueba', (captura) => {
     const archivo = captura.slice(captura.lastIndexOf('/') + 1);
     // Se busca un `import ... from '…/<archivo>'` y **no una mencion cualquiera**, y esa
