@@ -2,7 +2,6 @@ package kamayuk.rentas.sanciones.aplicacion;
 
 import java.time.Clock;
 import java.time.LocalDate;
-import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Objects;
@@ -13,6 +12,7 @@ import kamayuk.rentas.documentos.EmitirDocumento;
 import kamayuk.rentas.documentos.FormatoDeDocumento;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.Observacion;
+import kamayuk.rentas.dominio.ZonaHoraria;
 import kamayuk.rentas.sanciones.dominio.EstadoDeInternamiento;
 import kamayuk.rentas.sanciones.dominio.Internamiento;
 import kamayuk.rentas.sanciones.dominio.InternamientoRepository;
@@ -93,7 +93,13 @@ public class LiberarVehiculoInternado {
             Peticion peticion, FormatoDeDocumento formato, Observacion observacion) {
 
         Internamiento internamiento = vigenteDe(peticion.placa());
-        LocalDate ingreso = LocalDate.ofInstant(internamiento.fechaIngreso(), ZoneOffset.UTC);
+        // EL DIA DEL INGRESO, EN LA ZONA DEL PRODUCTO Y NO EN UTC (#273). `fechaIngreso` es
+        // un instante y `peticion.fecha()` es un dia local: compararlos exige truncar el
+        // primero con la zona en la que se cuenta el segundo. Con UTC, un vehiculo internado
+        // a las 20:00 constaba ingresado al dia SIGUIENTE, y el titular que pagaba la
+        // custodia y lo retiraba esa misma noche se llevaba un rechazo por una liberacion
+        // «anterior al ingreso» que no era anterior a nada.
+        LocalDate ingreso = ZonaHoraria.diaDe(internamiento.fechaIngreso());
         if (peticion.fecha().isBefore(ingreso)) {
             throw new LiberacionAnteriorAlIngreso(internamiento, peticion.fecha());
         }

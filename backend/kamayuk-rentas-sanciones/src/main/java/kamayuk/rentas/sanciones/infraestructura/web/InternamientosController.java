@@ -3,12 +3,12 @@ package kamayuk.rentas.sanciones.infraestructura.web;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneOffset;
 import java.time.format.DateTimeParseException;
 import kamayuk.rentas.autorizacion.Privilegio;
 import kamayuk.rentas.autorizacion.RequiereAcceso;
 import kamayuk.rentas.documentos.FormatoDeDocumento;
 import kamayuk.rentas.dominio.Observacion;
+import kamayuk.rentas.dominio.ZonaHoraria;
 import kamayuk.rentas.sanciones.aplicacion.ConsultaDeInternamientos;
 import kamayuk.rentas.sanciones.aplicacion.LiberarVehiculoInternado;
 import kamayuk.rentas.sanciones.aplicacion.RegistrarDescargo;
@@ -192,11 +192,14 @@ public class InternamientosController {
         try {
             return Instant.parse(limpio);
         } catch (DateTimeParseException noEsInstante) {
-            // La pantalla manda a veces solo el dia; se toma su comienzo en UTC, que es la zona
-            // con la que el resto del sistema interpreta los instantes.
-            return PeticionesDeSanciones.fechaOpcional(limpio, "fechaDeIngreso")
-                    .atStartOfDay(ZoneOffset.UTC)
-                    .toInstant();
+            // La pantalla manda a veces solo el dia, y este es el UNICO de los cinco sitios de
+            // #273 que va en el sentido contrario: de dia a instante. Por eso importa que use la
+            // misma zona que `ZonaHoraria.diaDe`, que es quien vuelve a truncarlo aguas abajo
+            // —`RegistrarInternamiento` lo imprime en el acta y la grilla cuenta dias desde el—.
+            // Con la medianoche UTC, «interno el dia D» entraba como las 19:00 del dia D-1 y
+            // salia fechado el D-1 en el documento: el dia no sobrevivia a su propia ida y vuelta.
+            return ZonaHoraria.comienzoDelDia(
+                    PeticionesDeSanciones.fechaOpcional(limpio, "fechaDeIngreso"));
         }
     }
 

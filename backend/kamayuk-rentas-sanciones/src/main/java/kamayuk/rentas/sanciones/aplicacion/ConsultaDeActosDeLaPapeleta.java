@@ -1,9 +1,9 @@
 package kamayuk.rentas.sanciones.aplicacion;
 
-import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import kamayuk.rentas.dominio.ZonaHoraria;
 import kamayuk.rentas.sanciones.dominio.ActoDeLaPapeleta;
 import kamayuk.rentas.sanciones.dominio.AcuseDelActo;
 import kamayuk.rentas.sanciones.dominio.Descargo;
@@ -93,7 +93,9 @@ public class ConsultaDeActosDeLaPapeleta {
                             ActoDeLaPapeleta.CLASE_INTERNAMIENTO,
                             "INGRESO",
                             internamiento.acta(),
-                            internamiento.fechaIngreso().atZone(ZoneOffset.UTC).toLocalDate(),
+                            // En la zona del producto, no en UTC (#273): el expediente tiene
+                            // que ensenar el mismo dia que imprimio el acta.
+                            ZonaHoraria.diaDe(internamiento.fechaIngreso()),
                             internamiento.documentoId(),
                             internamiento.observacion(),
                             List.of()));

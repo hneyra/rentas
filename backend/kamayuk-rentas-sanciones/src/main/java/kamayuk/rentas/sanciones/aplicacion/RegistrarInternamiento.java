@@ -3,7 +3,6 @@ package kamayuk.rentas.sanciones.aplicacion;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneOffset;
 import java.util.Objects;
 import kamayuk.rentas.auditoria.Auditoria;
 import kamayuk.rentas.auditoria.Operacion;
@@ -12,6 +11,7 @@ import kamayuk.rentas.documentos.EmitirDocumento;
 import kamayuk.rentas.documentos.FormatoDeDocumento;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.Observacion;
+import kamayuk.rentas.dominio.ZonaHoraria;
 import kamayuk.rentas.sanciones.dominio.Familia;
 import kamayuk.rentas.sanciones.dominio.Internamiento;
 import kamayuk.rentas.sanciones.dominio.InternamientoRepository;
@@ -93,7 +93,9 @@ public class RegistrarInternamiento {
                         });
 
         Papeleta papeleta = papeletaDe(peticion);
-        LocalDate dia = LocalDate.ofInstant(peticion.fechaIngreso(), ZoneOffset.UTC);
+        // El dia que el acta imprime, en la zona del producto y no en UTC (#273): un ingreso
+        // de las 20:00 salia fechado al dia siguiente, y esa fecha consta en un documento.
+        LocalDate dia = ZonaHoraria.diaDe(peticion.fechaIngreso());
         Instant ahora = reloj.instant();
 
         // El acta se emite ANTES de insertar la fila porque su numero ES el de la fila: el

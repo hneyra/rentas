@@ -207,6 +207,16 @@ public class ValorMasivoRepositoryJdbc extends RepositorioJdbc implements ValorM
                 aOffset(fila.getTimestamp("fecha_procesado")));
     }
 
+    /**
+     * La marca de proceso tal como la API la publica.
+     *
+     * <p><b>Este {@code ZoneOffset.UTC} se queda, y no es un pendiente de #273.</b> Es uno de los
+     * cuatro inocuos de los nueve que {@code rentas}#224 inventario: {@code atOffset} presenta el
+     * mismo instante con desfase cero y no lo trunca a ningun dia, asi que aqui la zona no decide
+     * nada —a diferencia de los cinco que #273 arreglo, donde decidia que dia constaba—. Que la API
+     * publique esta hora en la zona de la municipalidad en vez de en UTC es {@code rentas}#188, que
+     * cambia el contrato y va aparte.
+     */
     private static @Nullable OffsetDateTime aOffset(@Nullable Timestamp marca) {
         return marca == null ? null : marca.toInstant().atOffset(java.time.ZoneOffset.UTC);
     }
