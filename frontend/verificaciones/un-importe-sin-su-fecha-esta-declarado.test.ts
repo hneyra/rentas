@@ -3,11 +3,13 @@
 // Lee `lecturas.ts`, los conectores y el contrato del disco, y parsea el primero con el compilador
 // de TypeScript. No hay DOM que necesitar.
 
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
+
+import { fuentesDeLosConectores } from './los-conectores-del-arbol.ts';
 
 /**
  * **Una lectura que trae un importe y ninguna fecha dice que se hace con el** (#261).
@@ -84,15 +86,6 @@ const AQUI = dirname(fileURLToPath(import.meta.url));
 const FRONTEND = join(AQUI, '..');
 const FORMAS = join(FRONTEND, '../docs/50-api/formas-de-la-api.json');
 const LECTURAS = join(FRONTEND, 'src/datos/lecturas.ts');
-
-/** Los conectores de verdad: los `*.ts` del arbol de conectores, sin pruebas ni muestras. */
-function fuentesDeLosConectores(): readonly string[] {
-  const carpeta = join(FRONTEND, 'src/datos/conectores');
-  const hijos = readdirSync(carpeta)
-    .filter((uno) => uno.endsWith('.ts') && !uno.includes('.test.') && !uno.includes('DeMuestra'))
-    .map((uno) => join(carpeta, uno));
-  return [join(FRONTEND, 'src/datos/conectores.ts'), ...hijos];
-}
 
 /**
  * **Que se hace con una lectura que trae un importe y ninguna fecha.**
