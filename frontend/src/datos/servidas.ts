@@ -109,9 +109,17 @@ export interface OperacionServida {
  * «Accesos y politicas», las dos opciones con las que se administra el catalogo. **Asi que la
  * navegacion de esta aplicacion se compone hoy de dos operaciones que una cuenta de ventanilla
  * no tiene por que poder llamar**, y a la que no las tenga le contestaran 403 `SIN_PRIVILEGIO`:
- * no se quedaria sin un modulo, se quedaria sin arbol. Es exactamente el caso del AC7, y por
- * eso la pantalla lo explica y ofrece reintentar en vez de dibujar un marco vacio. Cerrarlo de
- * verdad no es de este lado: es publicar el menu de la sesion —el catalogo filtrado por quien
+ * no se quedaria sin un modulo, se quedaria sin arbol.
+ *
+ * **Y lo que se ve cuando pasa NO es lo que decia aqui hasta #282.** Este parrafo prometia que
+ * «la pantalla lo explica y ofrece reintentar», y eso era el AC7 de la V6: lo dibujaba una
+ * pantalla de `src/marco/` que salio con ella en #90. Medido en la V8: `useCatalogoPermitido`
+ * mete el 403 en su rama de **error** —solo el 401 tiene frase propia— y `aplicacion.tsx` dibuja
+ * un parrafo centrado con ese `porQue`. O sea que **si** se distingue de un marco vacio, que era
+ * la mitad que mas importaba; lo que NO hay es boton de reintentar —la palabra sale dos veces en
+ * `src/` y las dos son prosa o frase de pantalla, ningun `onClick`— ni la frase que nombraba las
+ * dos opciones que faltan, que es el unico dato con el que se arregla. Cerrarlo de verdad, en
+ * cambio, no es de este lado: es publicar el menu de la sesion —el catalogo filtrado por quien
  * pregunta— y eso es del dueno de `seguridad`.
  *
  * <h2>Las seis de I-4, con lo que se vio al encender cada una</h2>

@@ -441,8 +441,18 @@ describe('AC8 — el contrato, la instalacion y lo que se lee dicen lo mismo', (
 
   it('ninguna operacion publica un menu de la sesion: por eso el arbol se compone aqui', () => {
     // Si `seguridad` publicara el catalogo YA filtrado por quien pregunta, componerlo en la
-    // interfaz —con dos operaciones de administracion, ver `SinArbol.tsx`— sobraria. Hoy no lo
-    // publica: cero operaciones cuyo nombre hable de un menu, un arbol o una navegacion.
+    // interfaz —con dos operaciones de ADMINISTRACION— sobraria. Hoy no lo publica: cero
+    // operaciones cuyo nombre hable de un menu, un arbol o una navegacion.
+    //
+    // Que las dos sean de administracion no es una suposicion, y esta medido en
+    // `src/datos/servidas.ts`: `GET /seguridad/modulos` declara `@RequiereAcceso(acceso =
+    // "modulos")` y `GET /seguridad/accesos`, `acceso = "accesos"` — «Modulos del sistema» y
+    // «Accesos y politicas». Hasta #282 esto mandaba a ver un SinArbol.tsx —escrito sin comillas
+    // invertidas, porque con ellas la guarda de #255 vuelve a dispararse sobre la cita de la
+    // cita—: era la pantalla con que la V6 contaba este caso (#33, AC7) y salio del arbol con
+    // ella en #90, de modo que `src/marco/` esta en la lista de `la-v6-no-esta.test.ts` y no
+    // puede volver. Lo que la V8 hace en su lugar —un parrafo con el motivo, sin boton de
+    // reintentar y sin nombrar las dos opciones— esta medido en `src/datos/servidas.ts`.
     const candidatas = Object.keys(formas).filter((clave) =>
       /menu|arbol|navegacion|submodulo/i.test(clave),
     );
