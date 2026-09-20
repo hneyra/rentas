@@ -123,6 +123,33 @@ class AlcabalaControllerTest {
         assertThat(auditoria.registros).hasSize(1);
     }
 
+    /**
+     * <b>La cifra dice a que fecha esta calculada</b> (#276, salida (b) de #261).
+     *
+     * <p>Hasta #276 esta operacion publicaba seis campos y ninguno era una fecha, de modo que sus
+     * dos importes no se podian dibujar sin incumplir la regla 9 (RNF-075). Se comprueba contra el
+     * <b>reloj fijo</b> de la prueba y no contra «hoy»: si la fecha saliera de {@code
+     * LocalDate.now()} en vez del {@link Clock} inyectado, la respuesta traeria el dia en que se
+     * corre el build y esto se pondria rojo.
+     */
+    @Test
+    @DisplayName("#276 — la respuesta publica «fechaCalculo», y sale del reloj inyectado")
+    void laRespuestaPublicaSuFechaDeCalculo() throws Exception {
+        MvcResult resultado =
+                mvc.perform(
+                                post("/rentas/api/v1/rentas/alcabala")
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(CUERPO))
+                        .andReturn();
+
+        assertThat(resultado.getResponse().getStatus()).isEqualTo(201);
+        assertThat(resultado.getResponse().getContentAsString())
+                .as(
+                        "el reloj de la prueba esta fijo en el 2026-08-29 de Lima: una fecha"
+                                + " tomada del reloj del sistema diria el dia de hoy")
+                .contains("\"fechaCalculo\":\"2026-08-29\"");
+    }
+
     @Test
     @DisplayName("un ejercicio sin conjunto sellado es 422 y nombra el ejercicio, no 500")
     void elEjercicioSinSellarSeNombra() throws Exception {
@@ -253,7 +280,7 @@ class AlcabalaControllerTest {
                         parametros,
                         auditoria,
                         RELOJ);
-        return MockMvcBuilders.standaloneSetup(new AlcabalaController(servicio))
+        return MockMvcBuilders.standaloneSetup(new AlcabalaController(servicio, RELOJ))
                 .addInterceptors(new GuardiaDeAcceso(comprobador, RELOJ))
                 .setControllerAdvice(new ManejadorDeErrores())
                 .setMessageConverters(

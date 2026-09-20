@@ -4029,6 +4029,7 @@
     "ejercicio": "texto",
     "predioId": "entero",
     "contribuyenteId": "entero",
+    "fechaCalculo": "texto",
     "baseImponible": "texto",
     "montoDeterminado": "texto"
   },
@@ -4192,6 +4193,7 @@
     "id": "entero",
     "ejercicio": "texto",
     "organizadorId": "entero",
+    "fechaCalculo": "texto",
     "ingresoDeclarado": "texto",
     "montoDeterminado": "texto"
   },

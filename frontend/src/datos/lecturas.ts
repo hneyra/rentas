@@ -344,56 +344,54 @@ export interface DeterminacionVehicular {
 /**
  * La alcabala de una transferencia, de `POST /rentas/alcabala`.
  *
- * **Ninguno de sus campos es una fecha, y eso se comprueba sin salir de este arbol.**
- * `docs/50-api/formas-de-la-api.json` publica para esta operacion exactamente `id`, `ejercicio`,
- * `predioId`, `contribuyenteId`, `baseImponible` y `montoDeterminado`, y ni uno es `fechaCalculo`.
- * Contadas hoy las seis determinaciones del contrato, **tres la publican** —`calculo-individual`,
- * `calculo-masivo` y `vehicular/calculo`— y **tres no**: esta, `POST /rentas/espectaculos` y
- * `GET /rentas/predial/determinaciones`. Los dos campos que esta lectura no declara son las dos
- * llaves ajenas, que ninguna pantalla necesita.
+ * **Desde #276 la operacion publica su `fechaCalculo`, y por eso sus importes ya se pueden
+ * dibujar.** `docs/50-api/formas-de-la-api.json` publica para esta operacion `id`, `ejercicio`,
+ * `predioId`, `contribuyenteId`, `fechaCalculo`, `baseImponible` y `montoDeterminado`. Los dos
+ * campos que esta lectura no declara son las dos llaves ajenas, que ninguna pantalla necesita.
  *
- * <h2>Lo que la regla 9 exige de aqui, y que parte de ello se verifica</h2>
+ * <h2>Lo que la regla 9 exigia de aqui, y como se resolvio</h2>
  *
- * Mientras la respuesta no publique su fecha, sus dos importes **no se pueden dibujar**. Desde
- * #261 eso ya no es una frase suelta: esta lectura figura en la lista de
+ * Hasta #276 la respuesta traia dos importes y ninguna fecha, de modo que dibujarlos habria sido
+ * exactamente lo que la regla 9 —RNF-075, «no existe la deuda: es `deudaActualizadaA(fecha)`, y
+ * toda cifra mostrada indica su fecha»— prohibe. Habia dos salidas escritas en #261, y se tomo la
+ * buena: **que el backend publique la fecha**, en vez de dejar la prohibicion escrita sobre una
+ * pantalla que no existe. `AlcabalaController` la tenia en el momento de determinar.
+ *
+ * Mientras tanto esta lectura figuraba en la lista de
  * `verificaciones/un-importe-sin-su-fecha-esta-declarado.test.ts` con el veredicto **«NO SE
- * DIBUJA»**, y lo que esa guarda comprueba es exactamente esto y nada mas:
+ * DIBUJA»**, y esa entrada **caduco sola**: la guarda cruza la lista contra el contrato y se pone
+ * roja el dia que la operacion publica una fecha, diciendo que la entrada sobra. Eso es lo que
+ * paso en #276, y por eso la entrada ya no esta.
  *
- * <ul>
- *   <li>que **ninguna lectura suelta con un importe y sin fecha se quede sin veredicto escrito**
- *       —hoy son tres: esta, `DeterminacionDeEspectaculo` y `DeterminacionGuardada`—;</li>
- *   <li>que **ningun conector nombre** las que dicen «NO SE DIBUJA»: se pone roja el dia que
- *       alguien conecte la hoja de la alcabala sin haber resuelto la fecha;</li>
- *   <li>que el contrato **siga sin publicar** una fecha para `POST /rentas/alcabala`: el dia que
- *       la publique —la salida buena, (b) de #261— la entrada sobra y sale en rojo diciendolo.</li>
- * </ul>
- *
- * **Y lo que esa guarda NO comprueba, que conviene saber antes de apoyarse en ella**: que una
- * cifra ya dibujada lleve su fecha al lado. Eso se ve donde se dibuja, y aqui no hay nada
- * dibujado. Ademas «es un importe» lo decide el **nombre** del campo, porque ni el contrato ni
- * TypeScript publican un tipo de dinero —un `BigDecimal` sale `texto`, igual que un nombre—: la
- * medida de esa heuristica, con lo que caza de mas y de menos, esta en el javadoc de la guarda.
- *
- * Hasta #255 esta frase delegaba su medida y su razonamiento en `secciones/determinacion.ts` —la
- * seccion de la V6, que salio del arbol en #90—, o sea que la prohibicion mas cara del archivo se
- * apoyaba en algo que no se podia abrir.
+ * **Lo que sigue sin estar hecho, y conviene saberlo**: ninguna de las cuarenta hojas dibuja la
+ * alcabala todavia, y `POST /rentas/alcabala` no esta en `servidas.ts`. Lo que #276 retiro es el
+ * impedimento, no la conexion. Quien venga a conectarla tiene que poner la fecha **al lado de la
+ * cifra**: eso la guarda no lo comprueba —se ve donde se dibuja— y lo dice su javadoc.
  */
 export interface DeterminacionDeAlcabala {
   readonly id: number;
   readonly ejercicio: string;
+  /** El dia al que estan calculados los dos importes de abajo (regla 9, RNF-075; #276). */
+  readonly fechaCalculo: string;
   readonly baseImponible: string;
   readonly montoDeterminado: string;
 }
 
 /**
- * El impuesto a un espectaculo, de `POST /rentas/espectaculos`. **Tampoco lleva fecha**: el
- * contrato publica `id`, `ejercicio`, `organizadorId`, `ingresoDeclarado` y `montoDeterminado`, y
- * ni uno es `fechaCalculo`. Tiene el mismo hueco que la alcabala y la misma entrada —«NO SE
- * DIBUJA»— en `verificaciones/un-importe-sin-su-fecha-esta-declarado.test.ts` (#261).
+ * El impuesto a un espectaculo, de `POST /rentas/espectaculos`. **Tambien lleva su fecha desde
+ * #276**: el contrato publica `id`, `ejercicio`, `organizadorId`, `fechaCalculo`,
+ * `ingresoDeclarado` y `montoDeterminado`. Tenia el mismo hueco que la alcabala —medido desde
+ * F-6— y se cerro en el mismo sitio y por el mismo motivo.
+ *
+ * `fechaCalculo` **no es la fecha del evento**: aquella se manda en la peticion y dice cuando se
+ * celebra el espectaculo; esta dice cuando se determino el impuesto, que es la que la regla 9
+ * pide al lado de la cifra.
  */
 export interface DeterminacionDeEspectaculo {
   readonly id: number;
   readonly ejercicio: string;
+  /** El dia en que se determino el impuesto, que no es el dia del evento (#276). */
+  readonly fechaCalculo: string;
   readonly ingresoDeclarado: string;
   readonly montoDeterminado: string;
 }
