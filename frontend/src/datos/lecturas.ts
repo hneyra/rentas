@@ -259,6 +259,16 @@ export interface PredioGuardado {
  *
  * **Las dos ausencias no son la misma**: 404 es «ese codigo no esta en el padron» y 204 es «existe
  * y todavia no tiene determinacion de ese ejercicio» (#546).
+ *
+ * <h2>Nueve importes y ninguna fecha, y eso esta decidido por escrito</h2>
+ *
+ * Es la tercera lectura suelta del arbol con importes y sin fecha, y la unica de las tres que **se
+ * dibuja**. La regla 9 no la alcanza y el motivo esta escrito en el javadoc de `TERRITORIO`
+ * (`datos/conectores.ts`): sus cifras no son `deudaActualizadaA(fecha)` —aqui no corren
+ * intereses—, sino el reparto de lo que quedo asentado para un EJERCICIO bajo un CONJUNTO
+ * SELLADO, y los dos estan en la pantalla. Desde #261 ese veredicto figura ademas en
+ * `verificaciones/un-importe-sin-su-fecha-esta-declarado.test.ts`, que lo cruza con los conectores
+ * y con el contrato.
  */
 export interface DeterminacionGuardada {
   readonly id: number;
@@ -336,13 +346,31 @@ export interface DeterminacionVehicular {
  * `GET /rentas/predial/determinaciones`. Los dos campos que esta lectura no declara son las dos
  * llaves ajenas, que ninguna pantalla necesita.
  *
- * **Lo que la regla 9 exige de aqui esta escrito y NO esta verificado** (#255, #261). Mientras la
- * respuesta no publique su fecha, sus dos importes no se pueden dibujar; y hoy eso **no lo impide
- * ninguna guarda**, porque no hay donde incumplirlo: ninguna de las cuarenta hojas dibuja la
- * alcabala y ningun conector pide esta lectura. Hasta aqui esta frase delegaba su medida y su
- * razonamiento en `secciones/determinacion.ts` —la seccion de la V6, que salio del arbol en #90—,
- * o sea que la prohibicion mas cara del archivo se apoyaba en algo que no se podia abrir. #261
- * dice que haria falta para volver a sostenerla.
+ * <h2>Lo que la regla 9 exige de aqui, y que parte de ello se verifica</h2>
+ *
+ * Mientras la respuesta no publique su fecha, sus dos importes **no se pueden dibujar**. Desde
+ * #261 eso ya no es una frase suelta: esta lectura figura en la lista de
+ * `verificaciones/un-importe-sin-su-fecha-esta-declarado.test.ts` con el veredicto **«NO SE
+ * DIBUJA»**, y lo que esa guarda comprueba es exactamente esto y nada mas:
+ *
+ * <ul>
+ *   <li>que **ninguna lectura suelta con un importe y sin fecha se quede sin veredicto escrito**
+ *       —hoy son tres: esta, `DeterminacionDeEspectaculo` y `DeterminacionGuardada`—;</li>
+ *   <li>que **ningun conector nombre** las que dicen «NO SE DIBUJA»: se pone roja el dia que
+ *       alguien conecte la hoja de la alcabala sin haber resuelto la fecha;</li>
+ *   <li>que el contrato **siga sin publicar** una fecha para `POST /rentas/alcabala`: el dia que
+ *       la publique —la salida buena, (b) de #261— la entrada sobra y sale en rojo diciendolo.</li>
+ * </ul>
+ *
+ * **Y lo que esa guarda NO comprueba, que conviene saber antes de apoyarse en ella**: que una
+ * cifra ya dibujada lleve su fecha al lado. Eso se ve donde se dibuja, y aqui no hay nada
+ * dibujado. Ademas «es un importe» lo decide el **nombre** del campo, porque ni el contrato ni
+ * TypeScript publican un tipo de dinero —un `BigDecimal` sale `texto`, igual que un nombre—: la
+ * medida de esa heuristica, con lo que caza de mas y de menos, esta en el javadoc de la guarda.
+ *
+ * Hasta #255 esta frase delegaba su medida y su razonamiento en `secciones/determinacion.ts` —la
+ * seccion de la V6, que salio del arbol en #90—, o sea que la prohibicion mas cara del archivo se
+ * apoyaba en algo que no se podia abrir.
  */
 export interface DeterminacionDeAlcabala {
   readonly id: number;
@@ -351,7 +379,12 @@ export interface DeterminacionDeAlcabala {
   readonly montoDeterminado: string;
 }
 
-/** El impuesto a un espectaculo, de `POST /rentas/espectaculos`. Tampoco lleva fecha. */
+/**
+ * El impuesto a un espectaculo, de `POST /rentas/espectaculos`. **Tampoco lleva fecha**: el
+ * contrato publica `id`, `ejercicio`, `organizadorId`, `ingresoDeclarado` y `montoDeterminado`, y
+ * ni uno es `fechaCalculo`. Tiene el mismo hueco que la alcabala y la misma entrada —«NO SE
+ * DIBUJA»— en `verificaciones/un-importe-sin-su-fecha-esta-declarado.test.ts` (#261).
+ */
 export interface DeterminacionDeEspectaculo {
   readonly id: number;
   readonly ejercicio: string;
