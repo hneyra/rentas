@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { laVentanaQueSePide, loQueDijoElServidor } from './laVentana.ts';
+import { bloquesDe } from '../pantallas/bloques.ts';
 import { pantallaDe } from '../pantallas/definiciones/index.ts';
 
 /**
@@ -15,7 +16,7 @@ describe('la ventana sale de la definicion y de la ruta, en ese orden', () => {
     // Es lo que cierra el AC3 de #186: el tamano vivia escrito en `RUTAS` y ahora vive en la
     // definicion, que es donde el interprete lo lee para dibujar los mandos. En dos sitios diverge.
     expect(laVentanaQueSePide('aut-cat', 'giros-ciiu', {})).toEqual({ tamano: '20' });
-    expect(pantallaDe('aut-cat').bloques[0]?.tabla?.paginacion?.tamano).toBe(20);
+    expect(bloquesDe(pantallaDe('aut-cat'))[0]?.tabla?.paginacion?.tamano).toBe(20);
   });
 
   it('la pagina 0 no viaja: es la del backend por omision, y la direccion se lee mejor corta', () => {
@@ -105,7 +106,7 @@ describe('la ventana sale de la definicion y de la ruta, en ese orden', () => {
     // Y el PRIMERO que ofrece es el orden por omision del backend —`numero`—, que es lo que hace
     // que la barra no anuncie un orden distinto del que traen las filas. Lo comprueba contra el
     // contrato `la-ruta-de-la-hoja-llega-al-conector.test.ts`; aqui se deja escrito cual es.
-    expect(pantallaDe('aut-tram').bloques[0]?.tabla?.orden?.campos[0]?.valor).toBe('numero');
+    expect(bloquesDe(pantallaDe('aut-tram'))[0]?.tabla?.orden?.campos[0]?.valor).toBe('numero');
   });
 
   it('pedir la ventana de una tabla que no declara paginacion REVIENTA nombrandola', () => {

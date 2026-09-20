@@ -1,5 +1,7 @@
 import type { ClaveDeHoja } from '../arbol.ts';
-import type { DefinicionDePantalla as Pantalla } from '@kamayuk/ui';
+import type { DefinicionDePantalla as Pantalla, PiezaDeLaPantalla as Pieza } from '@kamayuk/ui';
+
+import { GRAFICO_DE_RECAUDACION } from '../../piezas/serieDeAvance.ts';
 
 /**
  * Las cuatro pantallas de **Inicio** (UI-5, #85, AC2).
@@ -12,6 +14,13 @@ import type { DefinicionDePantalla as Pantalla } from '@kamayuk/ui';
  * El `satisfies` no es decorativo: `Partial<Record<ClaveDeHoja, Pantalla>>` es lo que hace que
  * una clave mal escrita —`'ini-panels'`— no compile, en vez de quedarse como una pantalla
  * huerfana que nadie abre nunca.
+ *
+ * <h2>Y desde #288 lleva `Pantalla<Pieza>`, porque una de las cuatro trae un grafico</h2>
+ *
+ * `DefinicionDePantalla` por omision solo admite bloques —es la de `kamayuk-lib`#27— y `ini-flujo`
+ * lleva ademas `{ tipo: 'delConsumidor' }`, que es el punto de extension de `kamayuk-lib`#44 AC-2.
+ * Lo que cambia es el parametro del tipo, no la forma de los bloques: un arreglo de bloques cabe en
+ * uno de piezas, asi que las otras tres siguen escritas igual.
  */
 export const INICIO = {
   'ini-panel': {
@@ -66,6 +75,26 @@ export const INICIO = {
           nota: 'El saldo por cobrar no es deuda perdida: es lo que sigue vivo mientras no prescriba.',
         },
       },
+      /*
+       * **El grafico que el artboard pide, enganchado por `delConsumidor`** (#288).
+       *
+       * `diseno/RentasV8.dc.html:438` declara para esta hoja
+       * `['Chart', 'Barras horizontales; recharts, que shadcn envuelve']`, y hasta este issue esa
+       * serie se dibujaba **solo** como tabla. El componente vive en `src/piezas/`, no en
+       * `@kamayuk/ui`: lo decide `kamayuk-lib`#25 y sube alla con el segundo sistema que pida una
+       * serie.
+       *
+       * **Va DESPUES del bloque, y el orden no es estetico.** Los datos del interprete van por
+       * indice de pieza —`filas` por indice de bloque, `valores` por `bloque|campo`— y el recorrido
+       * numera en anchura, asi que el bloque conserva el 0 mientras nada se le ponga delante. Con
+       * el grafico primero, `INI_FLUJO` tendria que repartir sus filas al 1 y sus campos al `1|0`,
+       * y equivocarse ahi no da ningun error: pinta la tabla vacia.
+       *
+       * **Sin `ajustes`**, porque el punto de extension no los tiene: «un dato sin tipo es un
+       * contrato que ningun compilador lee». Lo suyo lo lee de `datos.nombrados`, donde el conector
+       * deja la serie (`piezas/serieDeAvance.ts`).
+       */
+      { tipo: 'delConsumidor', clave: GRAFICO_DE_RECAUDACION },
     ],
   },
   'ini-parado': {
@@ -148,4 +177,4 @@ export const INICIO = {
       },
     ],
   },
-} satisfies Partial<Record<ClaveDeHoja, Pantalla>>;
+} satisfies Partial<Record<ClaveDeHoja, Pantalla<Pieza>>>;

@@ -13,6 +13,7 @@ import { CONECTORES } from '../src/datos/conectores.ts';
 import { YA_SERVIDAS } from '../src/datos/servidas.ts';
 import { CATALOGO } from '../src/catalogo.ts';
 import { CLAVES_DE_HOJA, type ClaveDeHoja } from '../src/pantallas/arbol.ts';
+import { bloquesDe } from '../src/pantallas/bloques.ts';
 import { pantallaDe } from '../src/pantallas/definiciones/index.ts';
 import { EN_LA_RUTA, hayMasDe, paginasDe } from '../src/pantallas/tablas.ts';
 
@@ -91,7 +92,7 @@ function loPublica(operacion: string, parametro: string): boolean {
 
 /** Las tablas de una hoja que llevan `clave`, con ella. */
 function tablasDe(clave: ClaveDeHoja): readonly (DefinicionDeTabla & { readonly clave: string })[] {
-  return pantallaDe(clave).bloques.flatMap((bloque) => {
+  return bloquesDe(pantallaDe(clave)).flatMap((bloque) => {
     const tabla = bloque.tabla;
     return tabla?.clave === undefined
       ? []

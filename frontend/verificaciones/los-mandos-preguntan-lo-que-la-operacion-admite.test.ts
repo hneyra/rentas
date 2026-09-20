@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import { ARBOL, type ClaveDeHoja } from '../src/pantallas/arbol.ts';
+import { bloquesDe } from '../src/pantallas/bloques.ts';
 import { PANTALLAS } from '../src/pantallas/definiciones/index.ts';
 import type { Modulo } from '../src/pantallas/tipos.ts';
 
@@ -92,7 +93,7 @@ function operacionDe(clave: ClaveDeHoja): string {
 
 /** Los mandos de una hoja: todo campo que no sea de solo lectura. */
 function mandosDe(clave: ClaveDeHoja): readonly string[] {
-  return PANTALLAS[clave].bloques.flatMap((bloque) =>
+  return bloquesDe(PANTALLAS[clave]).flatMap((bloque) =>
     bloque.campos.filter((campo) => !campo.tipo.startsWith('r')).map((campo) => campo.etiqueta),
   );
 }

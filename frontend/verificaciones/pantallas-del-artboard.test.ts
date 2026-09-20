@@ -6,6 +6,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { ARBOL, CLAVES_DE_HOJA } from '../src/pantallas/arbol.ts';
+import { bloquesDe } from '../src/pantallas/bloques.ts';
 import { PANTALLAS } from '../src/pantallas/definiciones/index.ts';
 import type { Modulo } from '../src/pantallas/tipos.ts';
 import type {
@@ -14,9 +15,13 @@ import type {
   CampoDeSoloLectura,
   DefinicionDeBloque as Bloque,
   DefinicionDeCampo as Campo,
-  DefinicionDePantalla as Pantalla,
+  DefinicionDePantalla,
   DefinicionDeTabla as Tabla,
+  PiezaDeLaPantalla as Pieza,
 } from '@kamayuk/ui';
+
+/** Una pantalla de este sistema: bloques y, desde #288, piezas del consumidor. */
+type Pantalla = DefinicionDePantalla<Pieza>;
 import {
   artboardV8,
   hojasDelArtboard,
@@ -107,9 +112,20 @@ function bloqueComoElArtboard(bloque: Bloque): BloqueDelArtboard {
   return [bloque.titulo, bloque.nota, campos, tablaComoElArtboard(bloque.tabla)];
 }
 
-/** Una pantalla nuestra, en la forma del artboard. */
+/**
+ * Una pantalla nuestra, en la forma del artboard.
+ *
+ * **Solo los bloques** (#288): desde que `ini-flujo` lleva el `Chart` que el artboard le declara, una
+ * definicion puede traer piezas que no son bloques. El artboard NO las dibuja —las declara en
+ * `const ARBOL`, y esa mitad la compara `moduloComoElArtboard` con `piezasDeclaradas`—, asi que
+ * meterlas en esta lista compararia un bloque contra una pieza y daria un rojo sobre algo que el
+ * artboard nunca dijo.
+ *
+ * Y que la pieza este ENGANCHADA donde el artboard la declara no se queda sin guarda: lo comprueba
+ * `las-piezas-del-consumidor-son-las-que-el-artboard-declara`, al final de este archivo.
+ */
 function pantallaComoElArtboard(pantalla: Pantalla): readonly BloqueDelArtboard[] {
-  return pantalla.bloques.map(bloqueComoElArtboard);
+  return bloquesDe(pantalla).map(bloqueComoElArtboard);
 }
 
 /**

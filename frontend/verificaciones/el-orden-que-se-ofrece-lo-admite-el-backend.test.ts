@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 import type { DefinicionDeTabla } from '@kamayuk/ui';
 
 import type { ClaveDeHoja } from '../src/pantallas/arbol.ts';
+import { tablasDe } from '../src/pantallas/bloques.ts';
 import { CONECTORES } from '../src/datos/conectores.ts';
 import { pantallaDe } from '../src/pantallas/definiciones/index.ts';
 import { EN_LA_RUTA } from '../src/pantallas/tablas.ts';
@@ -93,9 +94,9 @@ const VENTANA_POR_HOJA: ReadonlyMap<ClaveDeHoja, readonly string[]> = new Map(
 /** Las hojas cuya definicion declara alguna tabla ordenable, con esas tablas. */
 const ORDENABLES_POR_HOJA: ReadonlyMap<ClaveDeHoja, readonly DefinicionDeTabla[]> = new Map(
   [...Object.keys(CONECTORES)].flatMap((hoja) => {
-    const suyas = pantallaDe(hoja as ClaveDeHoja)
-      .bloques.map((bloque) => bloque.tabla)
-      .filter((tabla): tabla is DefinicionDeTabla => tabla?.orden !== undefined);
+    const suyas = tablasDe(pantallaDe(hoja as ClaveDeHoja)).filter(
+      (tabla): tabla is DefinicionDeTabla => tabla.orden !== undefined,
+    );
     return suyas.length === 0 ? [] : [[hoja as ClaveDeHoja, suyas] as const];
   }),
 );
