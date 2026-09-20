@@ -19,10 +19,24 @@ import { ARTBOARDS, rutaDe } from './artboards.ts';
  * reescritas, la pantalla sigue funcionando y el contrato que el usuario leyo ya no es el que la
  * pantalla cumple.
  *
- * Y hay un motivo mas, de estructura: el interprete trae unos avisos NEUTROS porque es de
- * `@kamayuk/ui` (#153), donde no puede decir «padron». Los de V8 viven en `rentas`. Ese
- * reparto solo se sostiene si alguien comprueba que los de aqui siguen siendo los del artboard —
- * si no, la separacion se convierte en dos textos que divergen.
+ * <h2>Esta guarda mira el DISENO; hay otra que mira el DOM, y hacen falta las dos (#281)</h2>
+ *
+ * Esto compara `AVISOS_DE_V8` contra el artboard y **no monta nada**. Hasta #281 era lo unico que
+ * miraba esa constante —medido en #262: su unico `import` era este—, mientras el pie que el
+ * usuario leia salia de dos frases escritas a mano en `i18n/textosDelMarco.ts`. Asi que esta
+ * guarda podia estar verde para siempre con el pie diciendo otra cosa, y la decia.
+ *
+ * Desde #281 el saco del marco **deriva** de `AVISOS_DE_V8`, y quien comprueba que lo que se
+ * dibuja es de verdad eso es `el-pie-que-se-ve-sale-de-aqui.test.tsx`, que monta la aplicacion y
+ * lee el pie del DOM. Ninguna de las dos sirve sola: aquella no sabe que dice el diseno, y esta no
+ * sabe que llega a la pantalla.
+ *
+ * <h2>Y el aviso de consulta perdio «en el padrón» en el artboard, no aqui</h2>
+ *
+ * Porque no era verdad donde salia: la rama de consulta la ensena **una** de las cuarenta hojas
+ * —`seg-panel`, que cuenta usuarios, permisos y contrasenas—, y es generica para los diez modulos.
+ * La medida entera esta en el javadoc de `src/pantallas/avisos.ts` y, resumida, en el comentario
+ * que quedo al lado de la frase en el propio artboard.
  */
 
 const ARTBOARD = (() => {

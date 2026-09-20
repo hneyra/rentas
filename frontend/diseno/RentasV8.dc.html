@@ -1639,7 +1639,19 @@ class Component extends DCLogic {
       })(),
       volver: () => (s.dest ? this.pedirCierre(s.dest) : null),
       /* Una pantalla de sólo lectura no se guarda: ofrece imprimir y exportar.
-         Una con campos, sí, y avisa de lo que el acto implica. */
+         Una con campos, sí, y avisa de lo que el acto implica.
+
+         #281 — el aviso de consulta decía «Los datos son los que figuran EN EL PADRÓN a la
+         fecha de hoy.», y se le quitan esas tres palabras porque son falsas donde la frase
+         sale. Medido sobre este mismo archivo: de las cuarenta pantallas de `PANTALLAS`,
+         `editable` es falso en UNA —`seg-panel`—, la única cuyos campos son todos `r`. Y lo
+         que `seg-panel` enseña son usuarios registrados, activos, con permiso total, cuentas
+         inactivas con permisos, contraseñas caducadas y la última restauración verificada:
+         ni una cifra de un padrón. La rama de consulta es genérica para los diez módulos
+         —Seguridad, Infracciones y Tránsito incluidos—, y este archivo nombra además tres
+         padrones distintos —el tributario, el de licencias y `transito_padron_coactiva`—,
+         así que «el padrón», con artículo determinado, tampoco tendría a qué referirse.
+         La frase neutra es la que es verdad en las cuarenta. */
       pie: (() => {
         const editable = hojaActual ? this.bloques(s.dest).some((b) => b.campos.some((c) => !c.esRo)) : false;
         const acciones = editable
@@ -1648,7 +1660,7 @@ class Component extends DCLogic {
         return {
           aviso: editable
             ? 'Nada se escribe hasta que pulse Guardar.'
-            : 'Los datos son los que figuran en el padrón a la fecha de hoy.',
+            : 'Los datos son los que figuran a la fecha de hoy.',
           acciones: acciones.map((a) => ({
             label: a[0],
             ir: () => {
