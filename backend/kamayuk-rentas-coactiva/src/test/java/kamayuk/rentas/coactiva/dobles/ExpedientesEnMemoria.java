@@ -3,6 +3,7 @@ package kamayuk.rentas.coactiva.dobles;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -111,14 +112,50 @@ public final class ExpedientesEnMemoria implements ExpedienteRepository {
         return encontrados;
     }
 
+    /**
+     * Una pagina de UNA fila, no de {@code Integer.MAX_VALUE}.
+     *
+     * <p>Lo que se lee de ella es {@code totalElementos}, que es el numero de filas que el filtro
+     * dejo pasar y no depende del tamano. Y {@code Paginacion} rechaza cualquier tamano fuera de
+     * 1..500: pedir el maximo entero no traia mas filas, lanzaba —«El tamano de pagina va de 1 a
+     * 500»— en cuanto alguien llamaba a {@link #contar}, que hasta #272 no lo hacia nadie.
+     */
+    private static final Paginacion UNA_FILA =
+            new Paginacion(0, 1, "numero", Paginacion.Sentido.ASCENDENTE);
+
     /** Cuenta lo mismo que {@link #consultar} filtra, reusandolo: aqui no hay dos criterios. */
     @Override
     public long contar(CriterioDeExpedientes criterio) {
-        return consultar(
-                        criterio,
-                        new Paginacion(
-                                0, Integer.MAX_VALUE, "numero", Paginacion.Sentido.ASCENDENTE))
-                .totalElementos();
+        return consultar(criterio, UNA_FILA).totalElementos();
+    }
+
+    /**
+     * Agrupa lo mismo que {@link #consultar} devuelve, reusandolo: aqui tampoco hay dos criterios.
+     *
+     * <p>Que la agrupacion la haga PostgreSQL de verdad —y con la MISMA derivacion del estado que
+     * la grilla— lo verifica {@code ExpedienteCoactivoJdbcTest}; esto solo existe para que el
+     * controlador se pueda probar sin base.
+     */
+    @Override
+    public Map<EstadoDelExpediente, Long> contarPorEstado(CriterioDeExpedientes criterio) {
+        Map<EstadoDelExpediente, Long> porEstado = new EnumMap<>(EstadoDelExpediente.class);
+        for (EstadoDelExpediente etapa : EstadoDelExpediente.values()) {
+            long cuantos = contar(conEstado(criterio, etapa));
+            if (cuantos > 0) {
+                porEstado.put(etapa, cuantos);
+            }
+        }
+        return porEstado;
+    }
+
+    private static CriterioDeExpedientes conEstado(
+            CriterioDeExpedientes criterio, EstadoDelExpediente etapa) {
+        return new CriterioDeExpedientes(
+                criterio.numero(),
+                criterio.contribuyenteId(),
+                criterio.ejecutor(),
+                etapa,
+                criterio.ejercicio());
     }
 
     @Override

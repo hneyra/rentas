@@ -5,6 +5,7 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.util.Collection;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -273,6 +274,42 @@ public class ExpedienteRepositoryJdbc extends RepositorioJdbc implements Expedie
                 .query(Long.class)
                 .optional()
                 .orElse(0L);
+    }
+
+    /**
+     * El mismo {@code FROM} y el mismo {@code WHERE}, agrupados por la etapa derivada (#272).
+     *
+     * <p>Una sola consulta y no siete {@code count(*)}: las siete darian las mismas cifras leidas
+     * en siete instantes distintos, y el resumen podria no cuadrar consigo mismo.
+     *
+     * <p>El {@code GROUP BY} repite la subconsulta de {@link #ESTADO_DERIVADO} en vez de agrupar
+     * por el alias, porque un alias del {@code SELECT} no esta disponible en el {@code GROUP BY} de
+     * PostgreSQL cuando ademas hay que nombrarlo en el {@code SELECT} agregado.
+     */
+    @Override
+    public Map<EstadoDelExpediente, Long> contarPorEstado(CriterioDeExpedientes criterio) {
+        Map<String, Object> parametros = new HashMap<>();
+        String desde = desdeDeLaConsulta(criterio, parametros);
+
+        Map<EstadoDelExpediente, Long> porEstado = new EnumMap<>(EstadoDelExpediente.class);
+        jdbc().sql(
+                        "SELECT "
+                                + ESTADO_DERIVADO
+                                + " AS estado_derivado, count(*) AS cuantos"
+                                + desde
+                                + " GROUP BY "
+                                + ESTADO_DERIVADO)
+                .params(parametros)
+                .query(
+                        (fila, numeroDeFila) -> {
+                            porEstado.put(
+                                    EstadoDelExpediente.porNombre(
+                                            fila.getString("estado_derivado")),
+                                    fila.getLong("cuantos"));
+                            return null;
+                        })
+                .list();
+        return porEstado;
     }
 
     /** El {@code FROM} y el {@code WHERE} de la consulta de expedientes, en un solo sitio. */

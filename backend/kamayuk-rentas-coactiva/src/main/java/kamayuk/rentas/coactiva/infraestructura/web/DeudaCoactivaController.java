@@ -10,8 +10,10 @@ import java.util.Set;
 import kamayuk.rentas.autorizacion.Privilegio;
 import kamayuk.rentas.autorizacion.RequiereAcceso;
 import kamayuk.rentas.coactiva.aplicacion.ConsultaDeDeudasCoactivas;
+import kamayuk.rentas.coactiva.aplicacion.ConsultaDeExpedientes;
 import kamayuk.rentas.coactiva.dominio.CriterioDeExpedientes;
 import kamayuk.rentas.coactiva.dominio.EstadoDelExpediente;
+import kamayuk.rentas.coactiva.dominio.ResumenDeLaCartera;
 import kamayuk.rentas.compartido.Pagina;
 import kamayuk.rentas.contribuyentes.DirectorioDeContribuyentes;
 import kamayuk.rentas.contribuyentes.ResumenDeContribuyente;
@@ -27,7 +29,15 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Las dos consultas de deuda en coactiva por HTTP (RF-107).
+ * Las dos consultas de deuda en coactiva y el resumen de su cartera, por HTTP (RF-107, #272).
+ *
+ * <h2>El resumen cuenta expedientes; las dos consultas devuelven su deuda</h2>
+ *
+ * <p>{@code GET /coactiva/cartera/resumen} entro con #272 y no repite ninguna de las dos: contesta
+ * <b>cuantos</b> expedientes hay en cada etapa, sin una sola cifra de dinero y sin paginar. Vive
+ * aqui —y no en {@code ExpedienteController}— por el acceso: la pantalla que lo pide es {@code
+ * coa-panel}, que ya abre {@code GET /coactiva/deudas} con {@link #ACCESO_DEUDAS}, y colgarlo de
+ * {@code coactiva_expedientes} dejaria el panel contestando 403 a quien puede abrirlo.
  *
  * <h2>Los dos filtros que se rechazan, y por que no se traducen a algo parecido</h2>
  *
@@ -72,14 +82,17 @@ public class DeudaCoactivaController {
     private static final String FRACCIONADO = "FRACCIONADO";
 
     private final ConsultaDeDeudasCoactivas consulta;
+    private final ConsultaDeExpedientes expedientes;
     private final DirectorioDeContribuyentes contribuyentes;
     private final Clock reloj;
 
     public DeudaCoactivaController(
             ConsultaDeDeudasCoactivas consulta,
+            ConsultaDeExpedientes expedientes,
             DirectorioDeContribuyentes contribuyentes,
             Clock reloj) {
         this.consulta = consulta;
+        this.expedientes = expedientes;
         this.contribuyentes = contribuyentes;
         this.reloj = reloj;
     }
@@ -159,6 +172,42 @@ public class DeudaCoactivaController {
                                 nombreDe(padron, fila.deuda().expediente().contribuyenteId())));
     }
 
+    /**
+     * El resumen de la cartera coactiva: cuantos expedientes hay en cada etapa (#272, RF-100).
+     *
+     * <h2>Que corrige, y por que era un defecto en verde</h2>
+     *
+     * <p>El panel {@code coa-panel} dibujaba «Expedientes abiertos» con el {@code totalElementos}
+     * de {@code GET /coactiva/deudas}. La unidad era la correcta —esa consulta devuelve una fila
+     * por <b>expediente</b> y no por deuda—, pero el adjetivo no: ese total cuenta <b>todos</b> los
+     * expedientes del criterio, concluidos incluidos, y ademas cuenta los que la propia respuesta
+     * descarta por no tener nada que cobrar. Aqui {@code expedientes} y {@code abiertos} viajan
+     * separados y con su nombre.
+     *
+     * <h2>Ninguna cifra de dinero</h2>
+     *
+     * <p>«Deuda en cartera» no se publica, y esta escrito por que en {@code
+     * ConsultaDeExpedientes.resumenDeLaCartera}: componerla costaria una lectura del libro por
+     * expediente y contaria dos veces la obligacion que dos expedientes del mismo obligado
+     * formalizaran por dos valores distintos. Un importe casi correcto en un panel es peor que un
+     * hueco: nadie lo comprueba porque se parece al bueno.
+     *
+     * <p>Sin {@code ejercicio}, la cartera entera. La fecha de la respuesta es la de la lectura: el
+     * estado se deriva del ultimo movimiento y no se sabe reconstruir a un dia pasado.
+     */
+    @GetMapping("/cartera/resumen")
+    @RequiereAcceso(acceso = ACCESO_DEUDAS, privilegio = Privilegio.LECTURA)
+    public ResumenDeLaCarteraResource resumenDeLaCartera(
+            @RequestParam(required = false) @Nullable String ejercicio) {
+
+        Integer delEjercicio = ejercicioOpcional(ejercicio);
+        ResumenDeLaCartera resumen =
+                expedientes.resumenDeLaCartera(
+                        new CriterioDeExpedientes(null, null, null, null, delEjercicio));
+
+        return ResumenDeLaCarteraResource.de(resumen, delEjercicio, LocalDate.now(reloj));
+    }
+
     // ------------------------------------------------------------------
 
     private CriterioDeExpedientes criterioDe(
@@ -197,6 +246,19 @@ public class DeudaCoactivaController {
                         + " es D-02b (#191): el efecto de un beneficio sobre el importe no esta"
                         + " decidido. La consulta lista la deuda coactiva de los obligados con"
                         + " beneficio REGISTRADO y vigente, nombrando cual es");
+    }
+
+    private static @Nullable Integer ejercicioOpcional(@Nullable String texto) {
+        String valor = vacioAnulo(texto);
+        if (valor == null) {
+            return null;
+        }
+        try {
+            return Integer.valueOf(valor);
+        } catch (NumberFormatException invalido) {
+            throw new ProblemaDeNegocio(
+                    CodigoDeError.VALIDACION, "El ejercicio va en cuatro digitos: '" + texto + "'");
+        }
     }
 
     private static @Nullable EstadoDelExpediente estadoOpcional(@Nullable String texto) {

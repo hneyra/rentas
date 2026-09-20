@@ -324,6 +324,12 @@ class ContratoDeApiTest {
                     "POST /coactiva/convenios",
                     "GET /coactiva/deudas",
                     "GET /coactiva/deudas-en-beneficio",
+                    // #272 — el resumen de la cartera por etapa. Cuelga de la misma opcion que
+                    // `GET /coactiva/deudas` —`coactiva_consulta_deudas`, que es la que la
+                    // pantalla del panel ya abre— y no de `coactiva_expedientes`: el panel
+                    // contestaria 403 a quien puede abrirlo. Cierra el rotulo que hasta ahora
+                    // decia «Expedientes abiertos» sobre el total de TODOS los expedientes.
+                    "GET /coactiva/cartera/resumen",
                     // #44 — RF-110..RF-113: la licencia de funcionamiento y su catalogo CIIU.
                     "GET /licencias/funcionamiento",
                     "POST /licencias/funcionamiento",

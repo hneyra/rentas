@@ -30,6 +30,13 @@
     "opcionales": ["vigenteA"],
     "enElCuerpo": []
   },
+  "GET /coactiva/cartera/resumen": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": ["ejercicio"],
+    "enElCuerpo": []
+  },
   "GET /coactiva/deudas": {
     "obligatorios": [],
     "algunoDeEstos": [],

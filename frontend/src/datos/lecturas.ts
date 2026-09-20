@@ -715,6 +715,60 @@ export interface LicenciaDeFuncionamiento {
 
 // ── La cobranza coactiva ────────────────────────────────────────────────────────────────────
 
+/**
+ * Una etapa del procedimiento con cuantos expedientes hay en ella, dentro de
+ * `GET /coactiva/cartera/resumen` (#272).
+ *
+ * `expedientes: 0` **es un hecho medido**, no un hueco: la operacion publica las siete etapas
+ * siempre, con cero donde no hay ninguno. Una etapa ausente y una etapa vacia se leen igual en una
+ * lista, y solo una de las dos dice algo.
+ */
+export interface EtapaDeLaCartera {
+  readonly etapa: string;
+  readonly codigo: string;
+  readonly etiqueta: string;
+  readonly expedientes: number;
+}
+
+/**
+ * El resumen de la cartera coactiva, de `GET /coactiva/cartera/resumen` (#272).
+ *
+ * <h2>`expedientes` y `abiertos` NO son el mismo numero</h2>
+ *
+ * Y por eso viajan los dos. `expedientes` cuenta todos los del criterio —concluidos incluidos, y
+ * es exactamente el `totalElementos` de `GET /coactiva/deudas`, que es lo que esta hoja dibujaba
+ * bajo el rotulo «Expedientes abiertos» hasta #272—; `abiertos` descuenta los concluidos. Un
+ * expediente **suspendido** cuenta como abierto: el procedimiento esta detenido, no terminado.
+ *
+ * <h2>Las etapas son disjuntas, y `abiertos` no es su suma</h2>
+ *
+ * El estado es el del ultimo movimiento con estado, asi que un expediente esta en una etapa y solo
+ * en una: el que tiene la medida trabada cuenta en `conMedidaCautelar` y **no** en
+ * `conRecNotificada`. `abiertos` incluye ademas `REC1_EMITIDA`, `REC2_EMITIDA` y `SUSPENDIDO`, que
+ * no son ninguna de las tres que el panel nombra — `porEtapa` es lo que permite cuadrarlo, y por
+ * eso se declara aunque hoy ninguna celda lo dibuje.
+ *
+ * <h2>Ninguna cifra de dinero, y no hay que deducirla</h2>
+ *
+ * «Deuda en cartera» **no la publica esta operacion ni ninguna otra**, y el motivo esta escrito en
+ * el contrato: componerla costaria una lectura del libro por expediente y contaria dos veces la
+ * obligacion que dos expedientes del mismo obligado formalizaran. El conector deja ese campo en
+ * «no publicado»; sumarla aqui seria justo lo que `conectores.ts` prohibe.
+ *
+ * `aLaFecha` es **el dia de la lectura** y no una fecha de corte: el estado se deriva del ultimo
+ * movimiento y el backend no sabe reconstruirlo a un dia pasado.
+ */
+export interface ResumenDeLaCarteraCoactiva {
+  readonly aLaFecha: string;
+  readonly ejercicio: number | null;
+  readonly expedientes: number;
+  readonly abiertos: number;
+  readonly sinRec: number;
+  readonly conRecNotificada: number;
+  readonly conMedidaCautelar: number;
+  readonly porEtapa: readonly EtapaDeLaCartera[];
+}
+
 /** Un valor traido a la cartera coactiva, dentro del expediente. */
 export interface ValorImportadoAlExpediente {
   readonly valorId: number;
@@ -1804,6 +1858,16 @@ export const RUTAS = {
   constanciaDeNoAdeudoDe: (codigo: string) =>
     `/consultas/constancias/no-adeudo?codContribuyente=${encodeURIComponent(codigo)}`,
   coactiva: '/coactiva/deudas',
+  /**
+   * El resumen de la cartera coactiva por etapa (#272).
+   *
+   * **Sin `?ejercicio=`**, y eso es una decision y no un olvido: el desplegable «Ejercicio» del
+   * bloque no esta conectado a nada —el interprete guarda lo tecleado en el estado de
+   * `<Pantalla>` y no lo publica (`kamayuk-lib`#94, #172)—, asi que mandar un ejercicio aqui
+   * seria mandar uno que nadie eligio. La operacion lo admite y lo devuelve en la respuesta; el
+   * dia que el mando publique su valor, lo que cambia es esta ruta.
+   */
+  resumenDeLaCarteraCoactiva: '/coactiva/cartera/resumen',
   /**
    * El primer expediente de la cartera coactiva (#170).
    *

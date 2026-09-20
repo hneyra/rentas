@@ -571,6 +571,7 @@ export const ARBOL = [
         operaciones: [
           { verbo: 'GET', ruta: '/coactiva/deudas', nota: 'DeudaCoactivaController' },
           { verbo: 'GET', ruta: '/coactiva/deudas-en-beneficio', nota: 'La que está en convenio' },
+          { verbo: 'GET', ruta: '/coactiva/cartera/resumen', nota: 'La cartera por etapa' },
         ],
         piezasDeclaradas: [
           {

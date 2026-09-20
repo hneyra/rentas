@@ -1369,6 +1369,54 @@ const VOCABULARIOS = {
  *   que este archivo devuelva el contrato tal como esta comprometido (#312).
  */
 const OPERACIONES_ADICIONALES = {
+  // El resumen de la cartera coactiva por etapa (#272, RF-100). Cuelga de
+  // `coactiva_consulta_deudas` —la opcion que `coa-panel` ya abre para pedir
+  // `GET /coactiva/deudas`— y no de `coactiva_expedientes`: colgarlo de la opcion de
+  // la grilla dejaria el panel contestando 403 a quien puede abrirlo.
+  coactiva_consulta_deudas: [
+    {
+      operationId: 'coactiva_cartera_resumen',
+      metodo: 'get',
+      ruta: '/api/v1/coactiva/cartera/resumen',
+      titulo: 'Resumen de la cartera coactiva, por etapa',
+      descripcion: literal(`
+        Cuántos expedientes coactivos hay **en cada etapa del procedimiento**, sin traerse
+        ninguno y sin paginar.
+
+        **\`expedientes\` y \`abiertos\` no son el mismo número, y por eso viajan los dos.**
+        El primero cuenta todos los del criterio, concluidos incluidos —es exactamente el
+        \`totalElementos\` de \`GET /coactiva/deudas\`—; el segundo descuenta los concluidos.
+        Un expediente **suspendido** cuenta como abierto: el procedimiento está detenido, no
+        terminado.
+
+        **Las etapas son disjuntas.** El estado es el del último movimiento con estado, así
+        que un expediente está en una y sólo en una: el que tiene la medida trabada cuenta en
+        \`conMedidaCautelar\` y **no** en \`conRecNotificada\`. Por eso \`abiertos\` no es la
+        suma de las tres etapas que el panel nombra —faltan \`REC1_EMITIDA\`,
+        \`REC2_EMITIDA\` y \`SUSPENDIDO\`—, y \`porEtapa\` trae las **siete** con su recuento
+        para poder cuadrarlo. Una etapa sin ningún expediente sale con cero y no se omite.
+
+        **Sin ninguna cifra de dinero, y es deliberado.** «Deuda en cartera» no se publica
+        aquí: la deuda de un expediente se compone leyendo el libro del obligado a la fecha,
+        así que sumarla sobre la cartera costaría una lectura por expediente y contaría dos
+        veces la obligación que dos expedientes del mismo obligado formalizaran por dos
+        valores distintos —\`expediente_valor_unico_uq\` impide que un **valor** viva en dos
+        expedientes, no que dos valores formalicen la misma obligación—.
+
+        \`aLaFecha\` es **el día de la lectura**, no una fecha de corte: el estado se deriva
+        del último movimiento y no se sabe reconstruir a un día pasado.
+      `),
+      parametros: [
+        {
+          nombre: 'ejercicio',
+          ejemplo: '2026',
+          descripcion:
+            'Ejercicio del expediente; sin él, la cartera entera. Es el mismo filtro que la' +
+            ' grilla de expedientes aplica, resuelto con el mismo WHERE',
+        },
+      ],
+    },
+  ],
   // El trabajo parado por modulo de la pantalla de aterrizaje (#549, RF-130).
   // Sale de `inicio` —es la segunda lectura de esa misma pantalla— y no de
   // ninguna de los cuatro modulos que cuenta: la pregunta es transversal, y

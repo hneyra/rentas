@@ -103,7 +103,7 @@ describe('AC4 — la raiz de la API es UNA, escrita en tres sitios que tienen qu
 });
 
 describe('AC7 — lo que se declara servido tiene que publicarlo el backend', () => {
-  it('las treinta y seis: I-1, I-3, I-4, #168, #170, #167, #169, #181, #179, #180, #184, #215 y #237', () => {
+  it('las treinta y siete: I-1, I-3, I-4, #168, #170, #167, #169, #181, #179, #180, #184, #215, #237 y #272', () => {
     // La lista escrita a mano es a proposito. Derivarla de `YA_SERVIDAS` la haria pasar diga lo
     // que diga: encender una ruta es una decision, y una decision se revisa leyendo su diff. La
     // lista crece de una en una porque encenderlas todas a la vez seria cambiar 181 respuestas
@@ -149,6 +149,9 @@ describe('AC7 — lo que se declara servido tiene que publicarlo el backend', ()
       // primera de la lista que contesta **204 sin cuerpo** —y la segunda que puede hacerlo: la de
       // la corrida ya lo hacia y nadie lo habia mirado, ver `api/cliente.ts`—.
       'GET /rentas/predial/determinaciones',
+      // #272. El resumen de la cartera coactiva por etapa: cuatro de los cinco campos de
+      // `coa-panel`, que hasta ahora sacaba UNO del `totalElementos` de otra operacion.
+      'GET /coactiva/cartera/resumen',
     ]);
   });
 

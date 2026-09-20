@@ -8,11 +8,11 @@ import { coordenada } from '@kamayuk/ui';
 import type { Reparto } from '../conectores.ts';
 import { NO_PUBLICADO } from '../conectores.ts';
 import type {
-  DeudaEnCoactiva,
   LiquidacionDeCostas,
   Paginado,
   PrescripcionDeclarada,
   ProcesoDelExpediente,
+  ResumenDeLaCarteraCoactiva,
 } from '../lecturas.ts';
 import { useDatosDeLaHoja } from '../useDatosDeLaHoja.ts';
 import type { ClaveDeHoja } from '../../pantallas/arbol.ts';
@@ -379,31 +379,69 @@ describe('`coa-cost` — las costas liquidadas y el plazo de prescripcion', () =
   });
 });
 
-describe('`coa-panel` — se mudo de archivo, y sigue pintando UNO de sus cinco', () => {
-  const PAGINA: Paginado<DeudaEnCoactiva> = {
-    contenido: [],
-    pagina: 0,
-    tamano: 20,
-    totalElementos: 388,
-    totalPaginas: 20,
-    hayMas: true,
-  };
-  const reparto = COA_PANEL.repartir(PAGINA as never);
+/**
+ * Lo que `coa-panel` recibe desde #272. **Las cifras NO son las del artboard** —1 184 / 796 / 412
+ * / 388—: una muestra que las repitiera no distinguiria la pantalla que dibuja lo que llego de la
+ * que dibuja lo que su definicion ya decia.
+ *
+ * Y no cuadran entre si a proposito: 12 + 9 + 5 = 26, y `abiertos` dice 37. La diferencia son los
+ * que estan en REC-1 emitida, REC-2 emitida o suspendidos —7 + 3 + 1—, que estan abiertos y no
+ * son ninguna de las tres etapas que el panel nombra. Si el conector intentara cuadrarlas, esto
+ * saldria rojo.
+ */
+const RESUMEN: ResumenDeLaCarteraCoactiva = {
+  aLaFecha: '2026-09-20',
+  ejercicio: null,
+  expedientes: 41,
+  abiertos: 37,
+  sinRec: 12,
+  conRecNotificada: 9,
+  conMedidaCautelar: 5,
+  porEtapa: [
+    { etapa: 'INICIADO', codigo: '000', etiqueta: 'INICIADO', expedientes: 12 },
+    { etapa: 'REC1_EMITIDA', codigo: '011', etiqueta: 'REC 01 EMITIDO', expedientes: 7 },
+    { etapa: 'REC1_NOTIFICADA', codigo: '012', etiqueta: 'REC 01 NOTIFICADA', expedientes: 9 },
+    { etapa: 'REC2_EMITIDA', codigo: '021', etiqueta: 'REC 02 EMITIDA', expedientes: 3 },
+    { etapa: 'MEDIDA_CAUTELAR', codigo: '031', etiqueta: 'MEDIDA CAUTELAR', expedientes: 5 },
+    { etapa: 'SUSPENDIDO', codigo: '041', etiqueta: 'SUSPENDIDO', expedientes: 1 },
+    { etapa: 'CONCLUIDO', codigo: '051', etiqueta: 'CONCLUIDO', expedientes: 4 },
+  ],
+};
 
-  it('«expedientes abiertos» sale del TOTAL, no del tamano de la pagina', () => {
-    // `totalElementos` y no `contenido.length`: la pagina trae veinte de 388, y contar lo que
-    // llego daria «20 expedientes abiertos» — un numero exacto y falso.
-    expect(reparto.valores.get(coordenada(0, 1))).toBe('388');
-    expect(reparto.valores.get(coordenada(0, 1))).not.toBe('20');
+describe('`coa-panel` — cuatro de sus cinco, y el rotulo que #272 corrigio', () => {
+  const reparto = COA_PANEL.repartir(RESUMEN as never);
+
+  it('«Expedientes abiertos» dice `abiertos`, NO el total de la cartera', () => {
+    // Es el defecto que #272 midio: hasta entonces este campo salia del `totalElementos` de
+    // `GET /coactiva/deudas`, que cuenta TODOS los expedientes —concluidos incluidos— bajo un
+    // rotulo que promete los abiertos. Los dos numeros llegan ahora por separado, y el que se
+    // dibuja es el que el rotulo nombra.
+    expect(reparto.valores.get(coordenada(0, 1))).toBe('37');
+    expect(reparto.valores.get(coordenada(0, 1))).not.toBe('41');
   });
 
-  it('y los otros cuatro se declaran «no publicado», como antes de la mudanza', () => {
-    // #170 no los toca: se podrian deducir de `ultimaActuacion.acto` y `totalS`, pero **solo
-    // sobre la pagina que llego**, que es justo lo prohibido.
-    for (const campo of [2, 3, 4, 5]) {
-      expect(reparto.noPublicados.get(coordenada(0, campo)), `campo ${campo}`).toBe(NO_PUBLICADO);
-    }
-    expect(reparto.valores.size).toBe(1);
+  it('cada etapa va a SU campo, y no se reparten de cualquier manera', () => {
+    expect(reparto.valores.get(coordenada(0, 2))).toBe('9');
+    expect(reparto.valores.get(coordenada(0, 3))).toBe('5');
+    expect(reparto.valores.get(coordenada(0, 4))).toBe('12');
+  });
+
+  it('y aqui no se suma nada: «abiertos» no es la suma de las tres etapas', () => {
+    // 12 + 9 + 5 = 26, y el campo dice 37. Cuadrarlo seria inventarse los expedientes que estan
+    // en REC-1 emitida, REC-2 emitida o suspendidos, que la operacion publica en `porEtapa` y
+    // esta pantalla no tiene donde dibujar.
+    const sumaDeLasTres = RESUMEN.sinRec + RESUMEN.conRecNotificada + RESUMEN.conMedidaCautelar;
+    expect(String(sumaDeLasTres)).not.toBe(reparto.valores.get(coordenada(0, 1)));
+  });
+
+  it('«Deuda en cartera» sigue siendo el unico «no publicado», con su motivo', () => {
+    // Ninguna operacion del contrato publica la deuda de la cartera: componerla costaria una
+    // lectura del libro por expediente y contaria dos veces la obligacion que dos expedientes del
+    // mismo obligado formalizaran. Sumar `totalS` de la pagina de `/coactiva/deudas` daria un
+    // numero indistinguible de uno real, que es justo lo que `conectores.ts` prohibe.
+    expect(reparto.noPublicados.get(coordenada(0, 5))).toBe(NO_PUBLICADO);
+    expect(reparto.noPublicados.size).toBe(1);
+    expect(reparto.valores.size).toBe(4);
   });
 });
 
@@ -415,6 +453,7 @@ interface Instalacion {
   readonly proceso: ProcesoDelExpediente;
   readonly liquidaciones: readonly LiquidacionDeCostas[];
   readonly prescripciones: readonly PrescripcionDeclarada[];
+  readonly resumen: ResumenDeLaCarteraCoactiva;
 }
 
 const COMO_LLEGA: Instalacion = {
@@ -422,6 +461,7 @@ const COMO_LLEGA: Instalacion = {
   proceso: PROCESO,
   liquidaciones: [LIQUIDACION],
   prescripciones: [PRESCRIPCION],
+  resumen: RESUMEN,
 };
 
 /** Las URL que se pidieron, en orden. Es lo que dice si la segunda lectura se acoto bien. */
@@ -441,6 +481,9 @@ function contesta(instalacion: Instalacion) {
             headers: { 'content-type': 'application/json' },
           }),
         );
+      // El resumen PRIMERO: no es prefijo de nadie, pero dejarlo detras invitaria a que alguien
+      // lo colara bajo `/coactiva/expedientes` el dia que la ruta cambie.
+      if (url.includes('/coactiva/cartera/resumen')) return json(instalacion.resumen);
       // El proceso PRIMERO: `/coactiva/expedientes` es prefijo suyo.
       if (url.includes('/proceso')) return json(instalacion.proceso);
       if (url.includes('/coactiva/expedientes')) return json(envolver(instalacion.cartera));
@@ -562,5 +605,55 @@ describe('`coa-cost` dibujada: cada una de sus dos lecturas mueve lo suyo', () =
     expect(screen.getByText('6 ANIOS')).toBeInTheDocument();
     expect(screen.queryByText('4 ANIOS')).toBeNull();
     expect(screen.getByText('S/ 96.00 · 06/09/2026')).toBeInTheDocument();
+  });
+});
+
+describe('`coa-panel` dibujada: ensena lo que llego, y no las cifras del artboard (#272)', () => {
+  it('las cuatro cifras son las de la respuesta, no las 1.184 / 796 / 412 / 388 del artboard', async () => {
+    await dibujar('coa-panel', COMO_LLEGA);
+
+    expect(screen.getByText('37')).toBeInTheDocument();
+    expect(screen.getByText('9')).toBeInTheDocument();
+    expect(screen.getByText('5')).toBeInTheDocument();
+    expect(screen.getByText('12')).toBeInTheDocument();
+    // Las del artboard no se ven por ningun lado: si se vieran, la pantalla estaria dibujando su
+    // definicion y no el dato.
+    for (const delArtboard of ['1,184', '796', '412', '388']) {
+      expect(screen.queryByText(delArtboard), delArtboard).toBeNull();
+    }
+    // Y «Deuda en cartera» dice por que no hay dato, en vez de un cero o una raya muda.
+    expect(screen.getAllByText('no publicado').length).toBe(1);
+  });
+
+  it('LA ROTURA: se cambia el resumen del doble y las cuatro cifras cambian con el', async () => {
+    const unmount = await dibujar('coa-panel', COMO_LLEGA);
+    unmount();
+
+    await dibujar('coa-panel', {
+      ...COMO_LLEGA,
+      resumen: {
+        ...RESUMEN,
+        abiertos: 601,
+        conRecNotificada: 214,
+        conMedidaCautelar: 77,
+        sinRec: 310,
+      },
+    });
+
+    expect(screen.getByText('601')).toBeInTheDocument();
+    expect(screen.getByText('214')).toBeInTheDocument();
+    expect(screen.getByText('77')).toBeInTheDocument();
+    expect(screen.getByText('310')).toBeInTheDocument();
+    expect(screen.queryByText('37')).toBeNull();
+  });
+
+  it('y NO pide `GET /coactiva/deudas`: esa cifra ya no sale de ahi', async () => {
+    // Era su unica lectura hasta #272, y de su `totalElementos` salia «Expedientes abiertos» —un
+    // total que cuenta TODOS los expedientes, concluidos incluidos—. Si volviera a pedirse, o
+    // bien se estaria contando otra vez lo mismo o bien se estaria componiendo en el cliente.
+    await dibujar('coa-panel', COMO_LLEGA);
+
+    expect(pedidas.some((url) => url.includes('/coactiva/cartera/resumen'))).toBe(true);
+    expect(pedidas.some((url) => url.includes('/coactiva/deudas'))).toBe(false);
   });
 });
