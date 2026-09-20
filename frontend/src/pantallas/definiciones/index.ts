@@ -1,5 +1,5 @@
 import type { ClaveDeHoja } from '../arbol.ts';
-import type { DefinicionDePantalla as Pantalla } from '@kamayuk/ui';
+import type { DefinicionDePantalla, PiezaDeLaPantalla as Pieza } from '@kamayuk/ui';
 import { INICIO } from './inicio.ts';
 import { RENTAS_REGISTRO } from './rentas-registro.ts';
 import { FISCALIZACION } from './fiscalizacion.ts';
@@ -10,6 +10,9 @@ import { COACTIVA } from './coactiva.ts';
 import { AUTORIZACIONES_Y_LICENCIAS } from './autorizaciones-y-licencias.ts';
 import { SEGURIDAD } from './seguridad.ts';
 import { VALORES } from './valores.ts';
+
+/** La forma comun de las cuarenta: una pantalla que puede llevar PIEZAS y no solo bloques (#288). */
+type Pantalla = DefinicionDePantalla<Pieza>;
 
 /**
  * **Las cuarenta pantallas de V8**, reunidas (UI-5, #85, AC2).
@@ -24,6 +27,13 @@ import { VALORES } from './valores.ts';
  *
  * Que ademas **digan lo que el artboard dice** es otra cosa, y de eso responde la guarda
  * anti-deriva: el compilador cuenta, no lee.
+ *
+ * <h2>Y desde #288 la forma comun admite PIEZAS, no solo bloques</h2>
+ *
+ * `ini-flujo` lleva el grafico que el artboard le pide, que es un `{ tipo: 'delConsumidor' }`, o sea
+ * una pieza del interprete y no un bloque. `Pantalla` es `DefinicionDePantalla<Pieza>` en vez de
+ * `DefinicionDePantalla` a secas; las otras 39 no cambian —un arreglo de bloques cabe en uno de
+ * piezas— y quien recorra `bloques` para leer sus campos filtra con `bloquesDe` (`../bloques.ts`).
  */
 export const PANTALLAS = {
   ...INICIO,

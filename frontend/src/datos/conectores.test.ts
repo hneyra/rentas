@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { bloquesConSuIndice } from '../pantallas/bloques.ts';
 import { PANTALLAS } from '../pantallas/definiciones/index.ts';
 import type { ClaveDeHoja } from '../pantallas/arbol.ts';
 import { coordenada } from '@kamayuk/ui';
@@ -572,9 +573,14 @@ const MUESTRAS: Readonly<Partial<Record<ClaveDeHoja, unknown>>> = {
   'val-tip': BITACORA_DE_PRESCRIPCIONES,
 };
 
-/** Los campos de solo lectura de una pantalla, por su coordenada. */
+/**
+ * Los campos de solo lectura de una pantalla, por su coordenada.
+ *
+ * Por `bloquesConSuIndice` y no filtrando (#288): el indice de un bloque es lo que empareja sus
+ * datos, asi que renumerar despues de saltarse una pieza del consumidor los mandaria a otro sitio.
+ */
 function soloLecturaDe(clave: ClaveDeHoja): readonly string[] {
-  return PANTALLAS[clave].bloques.flatMap((bloque, b) =>
+  return bloquesConSuIndice(PANTALLAS[clave]).flatMap(([bloque, b]) =>
     bloque.campos.flatMap((campo, c) => (campo.tipo.startsWith('r') ? [coordenada(b, c)] : [])),
   );
 }

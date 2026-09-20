@@ -11,6 +11,7 @@ import { CONECTORES } from '../src/datos/conectores.ts';
 import { loQueDijoElServidor } from '../src/datos/laVentana.ts';
 import type { Paginado } from '../src/datos/lecturas.ts';
 import { CLAVES_DE_HOJA, type ClaveDeHoja } from '../src/pantallas/arbol.ts';
+import { tablasDe } from '../src/pantallas/bloques.ts';
 import { pantallaDe } from '../src/pantallas/definiciones/index.ts';
 import { hayMasDe, paginasDe } from '../src/pantallas/tablas.ts';
 
@@ -139,12 +140,11 @@ describe('el total de una tabla sale del envoltorio, y no de una cuenta (#172, A
 describe('toda tabla paginada en servidor publica lo que el SERVIDOR dijo (#228)', () => {
   /** Las tablas con `clave` que paginan en servidor, con la hoja que las dibuja. */
   const paginadas = CLAVES_DE_HOJA.flatMap((hoja: ClaveDeHoja) =>
-    pantallaDe(hoja).bloques.flatMap((bloque) => {
-      const tabla = bloque.tabla;
-      return tabla?.clave === undefined || tabla.paginacion?.en !== 'servidor'
+    tablasDe(pantallaDe(hoja)).flatMap((tabla) =>
+      tabla.clave === undefined || tabla.paginacion?.en !== 'servidor'
         ? []
-        : [{ hoja, clave: tabla.clave }];
-    }),
+        : [{ hoja, clave: tabla.clave }],
+    ),
   );
 
   it('EL CENTINELA: hay tablas que paginan en servidor, y todas tienen conector', () => {

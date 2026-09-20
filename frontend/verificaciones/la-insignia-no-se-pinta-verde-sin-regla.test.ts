@@ -9,6 +9,7 @@ import { describe, expect, it } from 'vitest';
 
 import { CONECTORES } from '../src/datos/conectores.ts';
 import type { ClaveDeHoja } from '../src/pantallas/arbol.ts';
+import { bloquesDe } from '../src/pantallas/bloques.ts';
 import { PANTALLAS, pantallaDe } from '../src/pantallas/definiciones/index.ts';
 import { TONO_SIN_RECONOCER, reconocido, tonoDe } from '../src/pantallas/tono.ts';
 import { artboardV8 } from './artboard-v8.ts';
@@ -72,7 +73,9 @@ interface CeldaDeInsignia {
 function celdasDeInsignia(): readonly CeldaDeInsignia[] {
   const artboard = artboardV8();
   return hojas().flatMap((hoja) =>
-    pantallaDe(hoja).bloques.flatMap((bloque, b) => {
+    // `bloquesDe` y no `bloques` (#288): `b` indexa los BLOQUES del artboard, que no conoce las
+    // piezas del consumidor. Contarlas aqui correria el indice y compararia contra otro bloque.
+    bloquesDe(pantallaDe(hoja)).flatMap((bloque, b) => {
       const tabla = bloque.tabla;
       if (tabla?.columnaDeInsignia === undefined) return [];
       const columna = tabla.columnaDeInsignia;
@@ -99,7 +102,7 @@ function celdasDeInsignia(): readonly CeldaDeInsignia[] {
 /** Las columnas de insignia declaradas por las 40 definiciones, hoja a hoja. */
 function columnasDeInsignia(): readonly { readonly hoja: ClaveDeHoja; readonly bloque: number }[] {
   return hojas().flatMap((hoja) =>
-    pantallaDe(hoja).bloques.flatMap((bloque, b) =>
+    bloquesDe(pantallaDe(hoja)).flatMap((bloque, b) =>
       bloque.tabla?.columnaDeInsignia === undefined ? [] : [{ hoja, bloque: b }],
     ),
   );
@@ -377,7 +380,7 @@ describe('ninguna insignia se pinta de verde sin que una regla la reconozca', ()
     //
     // Lo que se retiro es la INSIGNIA, no la columna: la quinta sigue ahi y sigue diciendo
     // `porQueCuestaDinero`, que es lo que esta pantalla existe para decir.
-    const tabla = pantallaDe('ini-parado').bloques[0]?.tabla;
+    const tabla = bloquesDe(pantallaDe('ini-parado'))[0]?.tabla;
     expect(tabla?.columnas.map((c) => c.rotulo)).toEqual([
       'Módulo',
       'Qué falta',

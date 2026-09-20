@@ -12,6 +12,7 @@ import type { PermisosDeLaSesion } from '../src/datos/lecturas.ts';
 import { Aplicacion, CONSULTAS } from '../src/aplicacion.tsx';
 import { CATALOGO } from '../src/catalogo.ts';
 import { FICHA, SIN_CAMPANIA } from '../src/datos/conectores/consultasDeMuestra.ts';
+import { bloquesDe } from '../src/pantallas/bloques.ts';
 import { pantallaDe } from '../src/pantallas/definiciones/index.ts';
 import type { ClaveDeHoja } from '../src/pantallas/arbol.ts';
 
@@ -153,7 +154,8 @@ describe('los cuarenta destinos se recorren, en la aplicacion montada', () => {
       `«${destino.clave}» no abrio por su hash`,
     ).toBeTruthy();
     expect(screen.getByText(new RegExp(escapar(definicion.instruccion)))).toBeTruthy();
-    for (const bloque of definicion.bloques) {
+    // Solo los bloques (#288): ver `la-siembra-abre-los-destinos`.
+    for (const bloque of bloquesDe(definicion)) {
       expect(
         screen.getByRole('heading', { level: 2, name: bloque.titulo }),
         `«${destino.clave}» no pinto el bloque «${bloque.titulo}»`,

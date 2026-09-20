@@ -1,6 +1,7 @@
-import { coordenada, type Coordenada } from '@kamayuk/ui';
+import { coordenada, type Coordenada, type DatoConNombre } from '@kamayuk/ui';
 
 import { formatearImporte } from '../../dominio/formato.ts';
+import { nombreDelAvance, nombreDelTributo } from '../../piezas/serieDeAvance.ts';
 import type { Conector, Reparto } from '../conectores.ts';
 import { NO_PUBLICADO, type PalabraDeHueco } from '../palabrasDeHueco.ts';
 import type {
@@ -107,6 +108,25 @@ function panelPorTributo(recaudacion: IndicadorDeRecaudacion): PanelDeAvance | u
   return recaudacion.paneles.find((panel) => /tributo/i.test(panel.title));
 }
 
+/**
+ * **La serie que dibuja el grafico de barras horizontales** (#288), sacada de las MISMAS filas.
+ *
+ * Se compone del mismo `porTributo.rows` que llena la tabla, y en el mismo sitio, para que las
+ * dos mitades de la pantalla no puedan decir cosas distintas: el artboard dibuja las dos —la
+ * tabla con las cifras exactas y el grafico con la proporcion— y si cada una saliera de su propio
+ * recorrido, un filtro anadido a una y no a la otra pasaria en verde.
+ *
+ * Lo que viaja es `pct`, y va **solo cuando `avanceConocido`**: ver `serieDeAvance.ts`.
+ */
+function serieDelGrafico(filas: readonly FilaDeAvance[]): ReadonlyMap<string, DatoConNombre> {
+  const nombrados = new Map<string, DatoConNombre>();
+  filas.forEach((fila, i) => {
+    nombrados.set(nombreDelTributo(i), fila.label);
+    if (fila.avanceConocido) nombrados.set(nombreDelAvance(i), String(fila.pct));
+  });
+  return nombrados;
+}
+
 /** Las cinco celdas de una fila de «Cuadre por tributo», en el orden de sus columnas. */
 function cuadreDelTributo(fila: FilaDeAvance): readonly string[] {
   return [
@@ -185,6 +205,13 @@ const INI_PANEL: Conector = {
  * `ini-panel`. **El periodo y el tributo no filtran todavia**: la operacion admite `?ejercicio` y
  * nada mas (`parametros-de-la-api.json`), asi que se piden todos los tributos del ejercicio que la
  * respuesta diga.
+ *
+ * <h2>Y desde #288 reparte ademas la serie del grafico</h2>
+ *
+ * El artboard dibuja las DOS cosas para esta hoja —la tabla y un `Chart` de barras horizontales—,
+ * y las dos salen del mismo `porTributo.rows`: la tabla por `filas`, el grafico por `nombrados`.
+ * Ver `piezas/serieDeAvance.ts`, que es donde se escribe el nombre de cada dato y por
+ * que la magnitud de la barra es `pct` y no un importe.
  */
 const INI_FLUJO: Conector = {
   clave: ['ini-flujo', 'recaudacion'],
@@ -197,6 +224,8 @@ const INI_FLUJO: Conector = {
       // vacia afirmaria que no hay ni un tributo con movimiento.
       filas:
         porTributo === undefined ? new Map() : new Map([[0, porTributo.rows.map(cuadreDelTributo)]]),
+      // Y sin el bloque tampoco hay serie: el grafico dice que no la hay, por lo mismo.
+      nombrados: serieDelGrafico(porTributo?.rows ?? []),
       noPublicados: new Map(),
     };
   },

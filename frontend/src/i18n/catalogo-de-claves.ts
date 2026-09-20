@@ -1,6 +1,7 @@
-import type { Ausencia, DefinicionDePantalla } from '@kamayuk/ui';
+import type { Ausencia, DefinicionDePantalla, PiezaDeLaPantalla } from '@kamayuk/ui';
 
 import { ARBOL } from '../pantallas/arbol.ts';
+import { bloquesDe } from '../pantallas/bloques.ts';
 import { PANTALLAS } from '../pantallas/definiciones/index.ts';
 import type { Modulo } from '../pantallas/tipos.ts';
 import { CONECTORES } from '../datos/conectores.ts';
@@ -43,15 +44,21 @@ import * as elMarco from './textosDelMarco.ts';
  * (#97), y no se traducirian aunque existieran: un importe no tiene traduccion.
  */
 
-/** Todo lo que las 40 pantallas dicen. */
+/**
+ * Todo lo que las 40 pantallas dicen.
+ *
+ * **Los bloques, y no todas las piezas** (#288): lo que una pieza del consumidor dice es de ella y
+ * entra en el catalogo por donde entra lo del marco —un saco exportado de `textosDelMarco.ts`—,
+ * porque una pieza no tiene titulo, nota ni campos que recorrer. Ver `FRASES_DEL_GRAFICO`.
+ */
 function deLasPantallas(): readonly string[] {
   const salida: string[] = [];
   // Anotado: `PANTALLAS` es un `as const satisfies` de cuarenta formas distintas, y sin la
   // anotacion el compilador intenta unificar cuarenta y se rinde. La forma comun la da el
   // `satisfies`, que es lo que garantiza que la anotacion no miente.
-  for (const pantalla of Object.values(PANTALLAS) as readonly DefinicionDePantalla[]) {
+  for (const pantalla of Object.values(PANTALLAS) as readonly DefinicionDePantalla<PiezaDeLaPantalla>[]) {
     salida.push(pantalla.instruccion);
-    for (const bloque of pantalla.bloques) {
+    for (const bloque of bloquesDe(pantalla)) {
       salida.push(bloque.titulo);
       if (bloque.nota !== '') salida.push(bloque.nota);
       for (const campo of bloque.campos) {

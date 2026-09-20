@@ -2,6 +2,7 @@ import type { Catalogo, ModuloDelCatalogo } from '@kamayuk/shell';
 import { ICONOS, seEscribe, tipoDe, type NombreDeIcono } from '@kamayuk/ui';
 
 import { ARBOL } from './pantallas/arbol.ts';
+import { bloquesDe } from './pantallas/bloques.ts';
 import { CONECTORES } from './datos/conectores.ts';
 import { pantallaDe } from './pantallas/definiciones/index.ts';
 
@@ -114,9 +115,15 @@ function enLaRutaDeLaHoja(
   };
 }
 
-/** Si alguna de las pantallas de una hoja tiene un campo que se escribe. */
+/**
+ * Si alguna de las pantallas de una hoja tiene un campo que se escribe.
+ *
+ * **Solo los bloques** (#288): una pieza del consumidor no tiene campos del interprete, asi que no
+ * hay ninguno que se escriba en ella. Lo que dibuje por dentro es de quien la escribio, y el dia que
+ * una pieza traiga un formulario sera ella la que lo diga y no este recorrido.
+ */
 function laHojaSeEscribe(clave: Parameters<typeof pantallaDe>[0]): boolean {
-  return pantallaDe(clave).bloques.some((bloque) =>
+  return bloquesDe(pantallaDe(clave)).some((bloque) =>
     bloque.campos.some((campo) => seEscribe(tipoDe(campo.tipo))),
   );
 }

@@ -1,6 +1,7 @@
 import type { DatoConNombre, DefinicionDeTabla, OrdenDeLaTabla, PaginacionDeLaTabla } from '@kamayuk/ui';
 
 import type { ClaveDeHoja } from '../pantallas/arbol.ts';
+import { tablasDe } from '../pantallas/bloques.ts';
 import type { ParametroDeLaHoja } from './conectores.ts';
 import { pantallaDe } from '../pantallas/definiciones/index.ts';
 import { EN_LA_RUTA, hayMasDe, paginasDe } from '../pantallas/tablas.ts';
@@ -69,9 +70,9 @@ export const laVentanaDe = (operacion: string): readonly ParametroDeLaHoja[] =>
 
 /** La tabla `clave` de una hoja, con la paginacion y el orden que declara. Revienta si no esta. */
 function tablaDeclarada(hoja: ClaveDeHoja, clave: string): DefinicionDeTabla {
-  const tabla = pantallaDe(hoja)
-    .bloques.map((bloque) => bloque.tabla)
-    .find((una): una is DefinicionDeTabla => una?.clave === clave);
+  const tabla = tablasDe(pantallaDe(hoja)).find(
+    (una): una is DefinicionDeTabla => una.clave === clave,
+  );
   if (tabla === undefined) {
     throw new Error(
       `La hoja «${hoja}» no tiene ninguna tabla con la clave «${clave}».\n\n` +

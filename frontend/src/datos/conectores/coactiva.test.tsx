@@ -16,6 +16,7 @@ import type {
 } from '../lecturas.ts';
 import { useDatosDeLaHoja } from '../useDatosDeLaHoja.ts';
 import type { ClaveDeHoja } from '../../pantallas/arbol.ts';
+import { bloquesDe } from '../../pantallas/bloques.ts';
 import { pantallaDe } from '../../pantallas/definiciones/index.ts';
 import { PantallaDeRentas } from '../../pantallas/PantallaDeRentas.tsx';
 import {
@@ -374,7 +375,7 @@ describe('`coa-cost` — las costas liquidadas y el plazo de prescripcion', () =
       sinDato(SIN_CANTIDAD),
       '18.00',
     ]);
-    expect(pantallaDe('coa-cost').bloques[0]?.tabla?.columnas).toHaveLength(4);
+    expect(bloquesDe(pantallaDe('coa-cost'))[0]?.tabla?.columnas).toHaveLength(4);
   });
 });
 

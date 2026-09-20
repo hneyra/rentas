@@ -50,6 +50,11 @@ const LITERALES = [
   '{{casan}} de {{count}} destino_one',
   '{{casan}} de {{count}} destino_many',
   '{{casan}} de {{count}} destino_other',
+  // Y la del grafico de `ini-flujo` (#288), por lo mismo: su clave base entra derivada de
+  // `FRASES_DEL_GRAFICO` y sus dos formas no se pueden derivar de una sola cadena.
+  '{{count}} tributo no dibuja barra porque su avance no esta medido; su fila esta en la tabla._one',
+  '{{count}} tributo no dibuja barra porque su avance no esta medido; su fila esta en la tabla._many',
+  '{{count}} tributo no dibuja barra porque su avance no esta medido; su fila esta en la tabla._other',
   'Rentas',
   'Municipalidad Distrital de Catacaos',
   'Mi perfil',
@@ -102,6 +107,13 @@ const PLURALES: Readonly<Record<string, string>> = {
   '{{casan}} de {{count}} destino_one': '{{casan}} de {{count}} destino',
   '{{casan}} de {{count}} destino_many': '{{casan}} de {{count}} destinos',
   '{{casan}} de {{count}} destino_other': '{{casan}} de {{count}} destinos',
+  // El grafico (#288). En singular es una fila de la tabla; en plural, varias.
+  '{{count}} tributo no dibuja barra porque su avance no esta medido; su fila esta en la tabla._one':
+    '{{count}} tributo no dibuja barra porque su avance no esta medido; su fila esta en la tabla.',
+  '{{count}} tributo no dibuja barra porque su avance no esta medido; su fila esta en la tabla._many':
+    '{{count}} tributos no dibujan barra porque su avance no esta medido; sus filas estan en la tabla.',
+  '{{count}} tributo no dibuja barra porque su avance no esta medido; su fila esta en la tabla._other':
+    '{{count}} tributos no dibujan barra porque su avance no esta medido; sus filas estan en la tabla.',
 };
 
 function elQueDeberiaSer(): Readonly<Record<string, string>> {

@@ -277,6 +277,45 @@ export const FRASE_DEL_FALLO =
   'datos.';
 
 /**
+ * **Las palabras del grafico de `ini-flujo`, la primera pieza del consumidor** (#288).
+ *
+ * <h2>Por que van en un saco de este archivo y no escritas dentro del componente</h2>
+ *
+ * Por lo mismo que las treinta y dos del armazon y las tres del interprete: el locale de este
+ * repositorio **se deriva del dato** (`catalogo-de-claves.ts`), y `delMarco()` recorre lo que este
+ * modulo exporta. Una frase escrita dentro del componente entraria en el locale solo si alguien se
+ * acordara de listarla a mano, y el olvido no produce ningun rojo — es el defecto que #215, #237 y
+ * #246 pagaron tres veces.
+ *
+ * <h2>Y por que el componente las pasa por `t()` y no por el `traducir` del interprete</h2>
+ *
+ * Porque dos de las tres llevan un dato dentro y entran por **interpolacion**: `traducir` es
+ * `(texto: string) => string` y no admite parametros, asi que `{{avance}}` llegaria al DOM tal
+ * cual. Las piezas del consumidor son componentes de este sistema y pueden usar `useTranslation()`
+ * —el punto de extension lo dice: «cierra sobre sus propios hooks»—, que es lo mismo que hace
+ * `useDatosDeLaHoja` con las cuatro frases de arriba.
+ */
+export const FRASES_DEL_GRAFICO = {
+  /** La cabecera de la tarjeta del grafico. */
+  titulo: 'Avance de la recaudacion por tributo',
+  /**
+   * El nombre accesible de la figura. No se dibuja, y por eso hace falta: un grafico sin nombre es
+   * un hueco para quien no lo ve, y un recorrido de nodos de texto no lo echaria de menos.
+   */
+  rotulo: 'Barras del avance de cobranza de cada tributo, en tanto por ciento',
+  /** El rotulo de cada marca del eje, y el de la punta de cada barra. */
+  tantoPorCiento: '{{avance}} %',
+  /**
+   * Lo que se dice de los tributos que llegaron **sin avance medido**: no dibujan barra.
+   *
+   * Va con `{{count}}` y no con un ternario: el plural lo decide el idioma. Y se dice en vez de
+   * dibujarlos al cero, que es la misma decision que la celda «sin medir» de la tabla — un tributo
+   * sin cargos asentados con la barra vacia se lee como «no se ha cobrado nada».
+   */
+  sinMedir: '{{count}} tributo no dibuja barra porque su avance no esta medido; su fila esta en la tabla.',
+} as const;
+
+/**
  * El saco que `<Pantalla>` de `@kamayuk/ui` recibe como `textos`, ya pasado por `t()`.
  *
  * Memorizado sobre `t`, por lo mismo que el del armazon: cambia de identidad cuando cambia el

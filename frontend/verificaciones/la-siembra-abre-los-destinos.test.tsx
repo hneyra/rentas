@@ -5,6 +5,7 @@ import { sembrarElCatalogo } from '../desarrollo/sembrarElCatalogo.ts';
 import { Aplicacion, CONSULTAS } from '../src/aplicacion.tsx';
 import { CATALOGO } from '../src/catalogo.ts';
 import type { ClaveDeHoja } from '../src/pantallas/arbol.ts';
+import { bloquesDe } from '../src/pantallas/bloques.ts';
 import { pantallaDe } from '../src/pantallas/definiciones/index.ts';
 
 /**
@@ -118,7 +119,9 @@ describe('con el catalogo sembrado, la interfaz se recorre sin backend', () => {
       screen.getByRole('heading', { level: 1, name: destino.rotulo }),
       `«${destino.clave}» no abrio por su hash`,
     ).toBeTruthy();
-    for (const bloque of definicion.bloques) {
+    // Solo los bloques (#288): una pieza del consumidor pone su propia cabecera, y no es un bloque
+    // del artboard que esta guarda tenga que reconocer.
+    for (const bloque of bloquesDe(definicion)) {
       expect(
         screen.getByRole('heading', { level: 2, name: bloque.titulo }),
         `«${destino.clave}» no pinto el bloque «${bloque.titulo}»`,

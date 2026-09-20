@@ -79,8 +79,18 @@ import {
  * `src/preferencias` entra con #111. Es la unica pieza que este repositorio dibuja fuera del
  * interprete, y llego escribiendo clases que ninguna otra usa —`accent-azul` entre ellas—: dejarla
  * fuera de esta lista seria dejar sin vigilar justo la unica que estrena utilidades.
+ *
+ * `src/piezas` entra con #288, por lo mismo y con mas motivo: son las piezas del consumidor que el
+ * interprete monta, y la primera —el grafico— estrena `fill-*` y una utilidad arbitraria para el
+ * radio. Fuera de esta lista, una clase suya mal escrita dejaria la barra sin color en una pantalla
+ * que se dibuja igual.
  */
-const FUENTES = [...fuentesDe(RAIZ_DE_UI), ...fuentesDe('src/pantallas'), ...fuentesDe('src/preferencias')];
+const FUENTES = [
+  ...fuentesDe(RAIZ_DE_UI),
+  ...fuentesDe('src/pantallas'),
+  ...fuentesDe('src/piezas'),
+  ...fuentesDe('src/preferencias'),
+];
 const CLASES = [...new Set(FUENTES.flatMap((f) => clasesDe(readFileSync(f, 'utf8'))))].sort();
 
 const HOJA_DEL_ARTBOARD = (() => {
