@@ -1,5 +1,5 @@
 import type { Ausencia } from '@kamayuk/ui';
-import type { Hoja, Operacion } from './pantallas/tipos.ts';
+import { laHojaEscribe, type Hoja, type Operacion } from './pantallas/tipos.ts';
 import { YA_SERVIDAS } from './datos/servidas.ts';
 
 /**
@@ -83,15 +83,6 @@ import { YA_SERVIDAS } from './datos/servidas.ts';
 /** Los verbos con los que se puede pedir algo para dibujarlo. */
 const DE_LECTURA = new Set(['GET', 'BASE']);
 
-/**
- * Los verbos que **cambian datos**. Una operacion con uno de estos no dibuja una pantalla: la
- * ejecuta.
- *
- * `BASE` no esta aqui y no puede estarlo: significa «solo se leyo el `@RequestMapping` de la
- * clase», o sea que el verbo **no se sabe**. Meterlo seria afirmar que escribe, que es justo la
- * clase de invencion que este archivo existe para evitar.
- */
-const DE_ESCRITURA = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
 /** Las rutas que el backend sirve, sin el verbo. Ver el javadoc: el cruce va por ruta. */
 const RUTAS_SERVIDAS = new Set(YA_SERVIDAS.map((o) => o.ruta));
@@ -164,12 +155,16 @@ export function porQueNoHayDato(hoja: Hoja): Ausencia {
   // de ella, que es `aut-panel` desde #173—.
   //
   // **Y va ANTES de `todasSonBase`, que no es indiferente.** Detras, una hoja toda en `BASE` ya
-  // habria salido por «sin verificar» y entonces meter `BASE` en `DE_ESCRITURA` no cambiaria ni una
-  // respuesta: el error seria **indetectable**, y la afirmacion de que `BASE` no escribe no la
+  // habria salido por «sin verificar» y entonces meter `BASE` en `VERBOS_QUE_ESCRIBEN` no cambiaria
+  // ni una respuesta: el error seria **indetectable**, y la afirmacion de que `BASE` no escribe no la
   // sostendria ninguna prueba. Delante, ensancharla asi convierte a `tra-cua` —una sola operacion,
   // en `BASE`— en una hoja que «solo escribe», y eso sale rojo. Medido en las dos posiciones.
   const niUnaLectura = !hoja.operaciones.some((o) => o.verbo === 'GET');
-  const algunaEscribe = hoja.operaciones.some((o) => DE_ESCRITURA.has(o.verbo));
+  // **El `Set` es el de `pantallas/tipos.ts` desde #291**, y no uno de aqui. Era el mismo con un
+  // `DELETE` de mas que `Verbo` ni siquiera admite: dos listas de la misma pregunta, que es el
+  // modo de fallo que #254, #277 y #281 vienen persiguiendo. El motivo por el que `BASE` no esta
+  // dentro —y lo que pasa si se mete— vive alli, con el resto.
+  const algunaEscribe = laHojaEscribe(hoja);
   if (niUnaLectura && algunaEscribe) return SOLO_ESCRIBE;
   const todasSonBase =
     hoja.operaciones.length > 0 && hoja.operaciones.every((o) => o.verbo === 'BASE');
