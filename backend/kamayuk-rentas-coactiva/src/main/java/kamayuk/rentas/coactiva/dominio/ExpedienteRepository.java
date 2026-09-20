@@ -3,6 +3,7 @@ package kamayuk.rentas.coactiva.dominio;
 import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import kamayuk.rentas.compartido.Pagina;
@@ -85,6 +86,24 @@ public interface ExpedienteRepository {
      * aterrizaje (AC 2.4 de #549).
      */
     long contar(CriterioDeExpedientes criterio);
+
+    /**
+     * Cuantos expedientes hay <b>en cada etapa</b>, sin traerse ninguno (#272).
+     *
+     * <p>Es el mismo {@code FROM} y el mismo {@code WHERE} de {@link #consultar} y {@link #contar}
+     * —la derivacion del estado desde el ultimo movimiento incluida— con un {@code GROUP BY} por
+     * encima. Que sea el mismo es lo que impide que «sin REC» signifique una cosa en la grilla del
+     * modulo, otra en el panel de aterrizaje y una tercera en el panel del propio modulo: son tres
+     * lectores de la misma derivacion, no tres copias suyas.
+     *
+     * <p><b>Una sola consulta.</b> Siete {@code count(*)} —uno por etapa— darian las mismas cifras
+     * y no serian el mismo instante: entre el primero y el septimo cabe un cambio de estado, y el
+     * resumen saldria sin cuadrar consigo mismo.
+     *
+     * @return las etapas que tienen al menos un expediente; las demas no aparecen, y es {@link
+     *     ResumenDeLaCartera} quien las completa con cero
+     */
+    Map<EstadoDelExpediente, Long> contarPorEstado(CriterioDeExpedientes criterio);
 
     /** Ese valor ya estaba en un expediente coactivo. */
     final class ValorYaEnUnExpediente extends RuntimeException {

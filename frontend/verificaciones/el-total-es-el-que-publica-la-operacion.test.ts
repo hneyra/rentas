@@ -247,15 +247,33 @@ describe('y medido sobre el reparto, no solo sobre el texto', () => {
     expect(dicho.get(paginasDe('movimientos'))).toBe('1');
   });
 
-  it('`coa-panel` sigue SIN contar sus cuatro recuentos, que es la regla hermana', () => {
-    // La que esta prueba no puede relajar. `totalElementos` llena UN campo —«expedientes
-    // abiertos», que es literalmente lo que la operacion cuenta— y los otros cuatro preguntan
-    // otra cosa: «con REC notificada», «con medida cautelar». Contarlos sobre la pagina daria un
-    // numero indistinguible de uno real.
-    const reparto = CONECTORES['coa-panel']?.repartir(ventana([{}, {}], 388) as never);
+  it('`coa-panel` sigue SIN contar nada, y desde #272 ya no lee ningun `totalElementos`', () => {
+    // La que esta prueba no puede relajar, y que #272 dejo mas estricta. Hasta entonces el panel
+    // sacaba «Expedientes abiertos» del `totalElementos` de `GET /coactiva/deudas` —una pagina de
+    // expedientes— y los otros cuatro decian «no publicado». Ahora **no hay pagina**: los cuatro
+    // recuentos los publica `GET /coactiva/cartera/resumen` ya contados sobre la cartera entera,
+    // y lo que este reparto tiene prohibido es componer cualquiera de ellos.
+    //
+    // La respuesta que se le pasa no cuadra a proposito: 12 + 9 + 5 = 26 y `abiertos` dice 37.
+    // Un conector que intentara cuadrarlos escribiria 26 aqui, y saldria rojo.
+    const reparto = CONECTORES['coa-panel']?.repartir({
+      aLaFecha: '2026-09-20',
+      ejercicio: null,
+      expedientes: 41,
+      abiertos: 37,
+      sinRec: 12,
+      conRecNotificada: 9,
+      conMedidaCautelar: 5,
+      porEtapa: [],
+    } as never);
 
-    expect(reparto?.valores.get('0|1')).toBe('388');
-    expect(reparto?.valores.size).toBe(1);
-    expect(reparto?.noPublicados.size).toBe(4);
+    // El rotulo dice «abiertos», y la cifra es la de `abiertos` — no la de `expedientes`, que
+    // cuenta tambien los concluidos. Es el defecto que #272 midio.
+    expect(reparto?.valores.get('0|1')).toBe('37');
+    expect(reparto?.valores.get('0|1')).not.toBe('41');
+    expect(reparto?.valores.get('0|1')).not.toBe('26');
+    expect(reparto?.valores.size).toBe(4);
+    // «Deuda en cartera» es el unico que queda, y ninguna operacion del contrato lo publica.
+    expect(reparto?.noPublicados.size).toBe(1);
   });
 });

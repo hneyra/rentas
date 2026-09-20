@@ -39,6 +39,7 @@ import kamayuk.rentas.coactiva.dominio.InformeDeImportacion;
 import kamayuk.rentas.coactiva.dominio.MotivoDeRechazo;
 import kamayuk.rentas.coactiva.dominio.MovimientoDelExpediente;
 import kamayuk.rentas.coactiva.dominio.PlantillaDeNumeroDeExpediente;
+import kamayuk.rentas.coactiva.dominio.ResumenDeLaCartera;
 import kamayuk.rentas.coactiva.dominio.TipoDeMovimientoDelExpediente;
 import kamayuk.rentas.coactiva.dominio.ValorRechazado;
 import kamayuk.rentas.compartido.Pagina;
@@ -1067,6 +1068,130 @@ class ExpedienteCoactivoJdbcTest {
 
         private long cuantosSinRec() {
             return enTransaccion(puerto::cuantosSinRec1);
+        }
+    }
+
+    @Nested
+    @DisplayName("#272 — El resumen de la cartera: cuantos hay en cada etapa")
+    class ElResumenDeLaCartera {
+
+        /**
+         * <b>La muestra NO es uniforme, y eso es la prueba.</b> Si los cinco expedientes de aqui
+         * estuvieran en el mismo estado, una asercion que dice «cuenta los que tienen REC
+         * notificada» saldria verde con la agrupacion entera borrada. Aqui hay uno en cada una de
+         * cinco etapas distintas, y ademas uno CONCLUIDO, que es lo unico que puede separar
+         * «abiertos» de «todos».
+         */
+        @Test
+        @DisplayName("agrupa por la etapa DERIVADA, y cada cifra es la que la grilla anuncia")
+        void agrupaPorLaEtapaDerivada() {
+            ResumenDeLaCartera antes = resumen(null);
+
+            mover(abrirExpediente("R-0040"), EstadoDelExpediente.REC1_NOTIFICADA);
+            mover(abrirExpediente("R-0041"), EstadoDelExpediente.REC1_NOTIFICADA);
+            mover(abrirExpediente("R-0042"), EstadoDelExpediente.MEDIDA_CAUTELAR);
+            mover(abrirExpediente("R-0043"), EstadoDelExpediente.SUSPENDIDO);
+            mover(abrirExpediente("R-0044"), EstadoDelExpediente.CONCLUIDO);
+            abrirExpediente("R-0045");
+
+            ResumenDeLaCartera despues = resumen(null);
+
+            assertThat(despues.en(EstadoDelExpediente.REC1_NOTIFICADA))
+                    .as("dos pasaron a REC 01 NOTIFICADA, y ninguna otra etapa los cuenta")
+                    .isEqualTo(antes.en(EstadoDelExpediente.REC1_NOTIFICADA) + 2);
+            assertThat(despues.en(EstadoDelExpediente.MEDIDA_CAUTELAR))
+                    .isEqualTo(antes.en(EstadoDelExpediente.MEDIDA_CAUTELAR) + 1);
+            assertThat(despues.en(EstadoDelExpediente.SUSPENDIDO))
+                    .isEqualTo(antes.en(EstadoDelExpediente.SUSPENDIDO) + 1);
+            assertThat(despues.en(EstadoDelExpediente.CONCLUIDO))
+                    .isEqualTo(antes.en(EstadoDelExpediente.CONCLUIDO) + 1);
+            assertThat(despues.en(EstadoDelExpediente.INICIADO))
+                    .as("el que no se movio sigue sin REC, y los cinco movidos salieron de ahi")
+                    .isEqualTo(antes.en(EstadoDelExpediente.INICIADO) + 1);
+
+            // El cruce que impide que el panel y la grilla cuenten cosas distintas: las siete
+            // etapas, una a una, contra el `totalElementos` del filtro de `coactiva_expedientes`.
+            for (EstadoDelExpediente etapa : EstadoDelExpediente.values()) {
+                assertThat(despues.en(etapa))
+                        .as(
+                                "el resumen y la grilla derivan el estado con el MISMO SQL; si"
+                                        + " divergen, el panel dice una cosa y la grilla otra — "
+                                        + etapa)
+                        .isEqualTo(filtrarPor(etapa).totalElementos());
+            }
+        }
+
+        @Test
+        @DisplayName("«abiertos» descuenta los concluidos, y «todos» no: no son el mismo numero")
+        void abiertosNoEsTodos() {
+            mover(abrirExpediente("R-0046"), EstadoDelExpediente.CONCLUIDO);
+            mover(abrirExpediente("R-0047"), EstadoDelExpediente.SUSPENDIDO);
+
+            ResumenDeLaCartera resumen = resumen(null);
+            long concluidos = filtrarPor(EstadoDelExpediente.CONCLUIDO).totalElementos();
+
+            assertThat(concluidos)
+                    .as("sin ningun concluido esta prueba no separaria nada")
+                    .isPositive();
+            assertThat(resumen.expedientes())
+                    .as(
+                            "es el MISMO numero que `GET /coactiva/deudas` publica como"
+                                    + " totalElementos, y es el que el panel dibujaba bajo el"
+                                    + " rotulo «Expedientes abiertos» (#272)")
+                    .isEqualTo(todos().totalElementos());
+            assertThat(resumen.abiertos())
+                    .as("un expediente concluido no esta abierto")
+                    .isEqualTo(todos().totalElementos() - concluidos)
+                    .isLessThan(resumen.expedientes());
+            assertThat(resumen.abiertos())
+                    .as("un expediente suspendido si lo esta: detenido no es terminado")
+                    .isGreaterThanOrEqualTo(
+                            filtrarPor(EstadoDelExpediente.SUSPENDIDO).totalElementos());
+        }
+
+        @Test
+        @DisplayName("el filtro por ejercicio acota el resumen igual que acota la grilla")
+        void elFiltroPorEjercicioAcota() {
+            abrirExpediente("R-0048");
+
+            assertThat(resumen(2026).expedientes())
+                    .as("todos los expedientes de esta prueba se abren en 2026")
+                    .isEqualTo(resumen(null).expedientes())
+                    .isPositive();
+            assertThat(resumen(2025).expedientes())
+                    .as("en 2025 no se abrio ninguno; si el filtro no viajara, saldria el total")
+                    .isZero();
+        }
+
+        private String abrirExpediente(String sufijo) {
+            long contribuyente = contribuyenteConDeuda(sufijo);
+            pasarACoactiva(emitir(contribuyente, "OP-2026-" + sufijo));
+            return importarTodo(contribuyente, "R. MENDOZA CRUZ").expedienteAbierto().numero();
+        }
+
+        private void mover(String numero, EstadoDelExpediente nuevo) {
+            enTransaccion(
+                    () ->
+                            cambiarEstado.cambiar(
+                                    numero,
+                                    nuevo,
+                                    IMPORTACION,
+                                    "la prueba lo mueve",
+                                    null,
+                                    null,
+                                    PORQUE));
+        }
+
+        private ResumenDeLaCartera resumen(Integer ejercicio) {
+            return enTransaccion(
+                    () ->
+                            consulta.resumenDeLaCartera(
+                                    new CriterioDeExpedientes(null, null, null, null, ejercicio)));
+        }
+
+        private Pagina<ConsultaDeExpedientes.ExpedienteConDeuda> todos() {
+            return enTransaccion(
+                    () -> consulta.buscar(CriterioDeExpedientes.todos(), IMPORTACION, unaPagina()));
         }
     }
 

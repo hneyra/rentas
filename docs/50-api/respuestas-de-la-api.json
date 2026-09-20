@@ -4,6 +4,7 @@
   "GET /catastro/fichas/conciliacion": [],
   "GET /catastro/fichas/conciliacion/resumen": [],
   "GET /catastro/predios/{predioId}/titulares": [],
+  "GET /coactiva/cartera/resumen": [],
   "GET /coactiva/deudas": [],
   "GET /coactiva/deudas-en-beneficio": [],
   "GET /coactiva/expedientes": [],

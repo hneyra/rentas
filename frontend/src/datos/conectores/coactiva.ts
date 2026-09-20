@@ -5,11 +5,10 @@ import { NO_PUBLICADO } from '../conectores.ts';
 import { formatearFecha, formatearImporte } from '../../dominio/formato.ts';
 import type {
   ActoDelExpediente,
-  DeudaEnCoactiva,
   LiquidacionDeCostas,
-  Paginado,
   PrescripcionDeclarada,
   ProcesoDelExpediente,
+  ResumenDeLaCarteraCoactiva,
 } from '../lecturas.ts';
 import { RUTAS, pedirPagina, pedirUno } from '../lecturas.ts';
 
@@ -68,31 +67,60 @@ function importeConSuFecha(importe: string, fecha: string): string {
 }
 
 /**
- * `coa-panel` — los expedientes coactivos abiertos.
+ * `coa-panel` — la cartera coactiva por etapa (#170, #272).
  *
- * Sale **uno** de sus cinco campos, y es el unico que la operacion publica de verdad:
- * `totalElementos` de la pagina. Los otros cuatro se quedan en «no publicado» a proposito — ver
- * el javadoc de arriba: contarlos sobre la pagina daria un numero indistinguible de uno real.
+ * <h2>Lo que #272 corrigio: un rotulo que prometia una cosa sobre una cifra que era otra</h2>
  *
- * **#170 no lo toca**, y no por prudencia: «con REC notificada», «con medida cautelar» y «sin
- * REC» se podrian deducir de `ultimaActuacion.acto` y «deuda en cartera» sumando `totalS`,
- * **pero solo sobre la pagina que llego**. Eso es justo lo prohibido. Cerrarlo pide un agregado
- * del backend —la cartera por etapa—, y eso es otro issue.
+ * Hasta #272 el unico campo con dato era «Expedientes abiertos», y lo llenaba el
+ * `totalElementos` de `GET /coactiva/deudas`. La **unidad** era la correcta —esa operacion
+ * devuelve una fila por expediente y no por deuda, medido en `ConsultaDeDeudasCoactivas`—, pero
+ * el **adjetivo** no: ese total cuenta TODOS los expedientes del criterio, concluidos incluidos,
+ * y ademas cuenta los que la propia respuesta descarta por no tener nada que cobrar. O sea que la
+ * pantalla decia «abiertos» sobre el numero de «todos», en verde. Es el mismo modo de fallo que
+ * #254 encontro en `val-tip`.
+ *
+ * Ahora los cuatro campos que se dibujan salen de **una sola** operacion —`GET
+ * /coactiva/cartera/resumen`— y cada uno de un campo que se llama como el rotulo:
+ *
+ * <table>
+ *   <tr><td>Expedientes abiertos</td><td>`abiertos` — todos menos los concluidos</td></tr>
+ *   <tr><td>Con REC notificada</td><td>`conRecNotificada`</td></tr>
+ *   <tr><td>Con medida cautelar</td><td>`conMedidaCautelar`</td></tr>
+ *   <tr><td>Sin REC</td><td>`sinRec`</td></tr>
+ * </table>
+ *
+ * **Las tres ultimas son etapas DISJUNTAS y no suman «abiertos»**: el estado es el del ultimo
+ * movimiento, asi que un expediente con la medida trabada cuenta en «Con medida cautelar» y no en
+ * «Con REC notificada», y quedan fuera de las tres los que estan en REC-1 emitida, REC-2 emitida
+ * o suspendidos. Aqui no se resta ni se suma nada para que cuadren: cuadrarlas es `porEtapa`, que
+ * la lectura declara y esta pantalla no dibuja porque el artboard no tiene donde.
+ *
+ * <h2>«Deuda en cartera» se queda en «no publicado», con el motivo medido</h2>
+ *
+ * Es el quinto campo y **sigue sin dato**, y no por falta de sumandos: `GET /coactiva/deudas`
+ * publica `totalS` por expediente y sumarlo daria un numero. Daria uno **de la pagina que llego**,
+ * que es justo lo que `conectores.ts` prohibe. Y el backend tampoco la publica, por dos razones
+ * que estan escritas en el contrato: componerla cuesta una lectura del libro **por expediente**
+ * —lo mismo que `ExpedientesSinRec` se nego a pagar en la pantalla de aterrizaje— y no seria
+ * segura, porque dos expedientes del mismo obligado pueden formalizar la misma obligacion por dos
+ * valores distintos y la suma la contaria dos veces. Un importe casi correcto en un panel es peor
+ * que un hueco: nadie lo comprueba porque se parece al bueno.
  */
 const COA_PANEL: Conector = {
-  clave: ['coa-panel', 'deudas'],
-  pedir: ({ senal }) => pedirPagina<DeudaEnCoactiva>(RUTAS.coactiva, senal),
-  repartir: (pagina: Paginado<DeudaEnCoactiva>): Reparto => ({
+  clave: ['coa-panel', 'resumenDeLaCarteraCoactiva'],
+  pedir: ({ senal }) =>
+    pedirUno<ResumenDeLaCarteraCoactiva>(RUTAS.resumenDeLaCarteraCoactiva, senal),
+  repartir: (resumen: ResumenDeLaCarteraCoactiva): Reparto => ({
     // `0|0` es el desplegable de ejercicio, no un campo de solo lectura: las coordenadas son las
     // del bloque entero y no las de los campos `r`. Lo cazo la guarda de este archivo.
-    valores: new Map([[coordenada(0, 1), String(pagina.totalElementos)]]),
-    filas: new Map(),
-    noPublicados: new Map([
-      [coordenada(0, 2), NO_PUBLICADO],
-      [coordenada(0, 3), NO_PUBLICADO],
-      [coordenada(0, 4), NO_PUBLICADO],
-      [coordenada(0, 5), NO_PUBLICADO],
+    valores: new Map([
+      [coordenada(0, 1), String(resumen.abiertos)],
+      [coordenada(0, 2), String(resumen.conRecNotificada)],
+      [coordenada(0, 3), String(resumen.conMedidaCautelar)],
+      [coordenada(0, 4), String(resumen.sinRec)],
     ]),
+    filas: new Map(),
+    noPublicados: new Map([[coordenada(0, 5), NO_PUBLICADO]]),
   }),
 };
 

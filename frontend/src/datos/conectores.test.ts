@@ -22,7 +22,7 @@ import {
 import type {
   CorridaDelPredial,
   DeterminacionGuardada,
-  DeudaEnCoactiva,
+  ResumenDeLaCarteraCoactiva,
   ExpedienteDeLaPapeleta,
   InternamientoEnDeposito,
   LiquidacionDeCostas,
@@ -61,13 +61,30 @@ const CORRIDA: CorridaDelPredial = {
   ],
 };
 
-const PAGINA: Paginado<DeudaEnCoactiva> = {
-  contenido: [],
-  pagina: 0,
-  tamano: 20,
-  totalElementos: 388,
-  totalPaginas: 20,
-  hayMas: true,
+/**
+ * Lo que `coa-panel` recibe desde #272: el resumen de la cartera coactiva, por etapa.
+ *
+ * Las cifras NO son las del artboard —1 184 / 796 / 412 / 388—, y eso es deliberado: una muestra
+ * que las repitiera no podria distinguir la pantalla que dibuja lo que llego de la que dibuja lo
+ * que su definicion ya decia.
+ */
+const RESUMEN_DE_CARTERA: ResumenDeLaCarteraCoactiva = {
+  aLaFecha: '2026-09-20',
+  ejercicio: null,
+  expedientes: 41,
+  abiertos: 37,
+  sinRec: 12,
+  conRecNotificada: 9,
+  conMedidaCautelar: 5,
+  porEtapa: [
+    { etapa: 'INICIADO', codigo: '000', etiqueta: 'INICIADO', expedientes: 12 },
+    { etapa: 'REC1_EMITIDA', codigo: '011', etiqueta: 'REC 01 EMITIDO', expedientes: 7 },
+    { etapa: 'REC1_NOTIFICADA', codigo: '012', etiqueta: 'REC 01 NOTIFICADA', expedientes: 9 },
+    { etapa: 'REC2_EMITIDA', codigo: '021', etiqueta: 'REC 02 EMITIDA', expedientes: 3 },
+    { etapa: 'MEDIDA_CAUTELAR', codigo: '031', etiqueta: 'MEDIDA CAUTELAR', expedientes: 5 },
+    { etapa: 'SUSPENDIDO', codigo: '041', etiqueta: 'SUSPENDIDO', expedientes: 1 },
+    { etapa: 'CONCLUIDO', codigo: '051', etiqueta: 'CONCLUIDO', expedientes: 4 },
+  ],
 };
 
 /**
@@ -546,7 +563,7 @@ const BITACORA_DE_PRESCRIPCIONES: Paginado<PrescripcionDeclarada> = {
 const MUESTRAS: Readonly<Partial<Record<ClaveDeHoja, unknown>>> = {
   panel: CORRIDA,
   territorio: DETERMINACION_GUARDADA,
-  'coa-panel': PAGINA,
+  'coa-panel': RESUMEN_DE_CARTERA,
   // `coa-exp` recibe el proceso **y lo que se pudo saber de sus costas** desde #200: son dos
   // operaciones que se cruzan por `actoId`, y la del cruce puede fallar sin tumbar la tabla.
   'coa-exp': { proceso: PROCESO, costas: { seSupo: true, porActo: new Map([[11, '18.00']]) } },

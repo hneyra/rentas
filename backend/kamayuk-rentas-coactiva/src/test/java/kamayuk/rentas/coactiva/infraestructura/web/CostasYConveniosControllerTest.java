@@ -134,6 +134,7 @@ class CostasYConveniosControllerTest {
                     new DeudaCoactivaController(
                             new ConsultaDeDeudasCoactivas(
                                     consulta, expedientes, actos, valores, new SinBeneficios()),
+                            consulta,
                             contribuyentes,
                             RELOJ));
 

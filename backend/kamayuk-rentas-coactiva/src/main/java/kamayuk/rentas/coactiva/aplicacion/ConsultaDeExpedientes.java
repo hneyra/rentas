@@ -20,6 +20,7 @@ import kamayuk.rentas.coactiva.dominio.MovimientoDelExpediente;
 import kamayuk.rentas.coactiva.dominio.MovimientoDelExpedienteRepository;
 import kamayuk.rentas.coactiva.dominio.ObligacionDeCostas;
 import kamayuk.rentas.coactiva.dominio.ObligacionDelExpediente;
+import kamayuk.rentas.coactiva.dominio.ResumenDeLaCartera;
 import kamayuk.rentas.coactiva.dominio.ValorDelExpediente;
 import kamayuk.rentas.compartido.Pagina;
 import kamayuk.rentas.compartido.Paginacion;
@@ -108,6 +109,27 @@ public class ConsultaDeExpedientes {
                                         aLaFecha,
                                         obligacionesPorContribuyente,
                                         valoresPorContribuyente)));
+    }
+
+    /**
+     * El resumen de la cartera: cuantos expedientes hay en cada etapa (#272, RF-100).
+     *
+     * <p><b>Sin deuda.</b> Este resumen cuenta carpetas y no cifra ninguna, y eso no es un
+     * descuido: la deuda de un expediente se compone leyendo el libro del obligado a la fecha
+     * —{@link #deudaDe}— , asi que cifrar la cartera entera costaria una lectura del libro por
+     * expediente. Es la misma decision que {@code ExpedientesSinRec} tomo para el frente de
+     * aterrizaje, y ademas la cifra no seria segura: dos expedientes del mismo obligado pueden
+     * formalizar la <b>misma</b> obligacion por dos valores distintos —la deduplicacion de {@code
+     * componerDeuda} existe justamente porque eso pasa dentro de uno—, y sumarlos contaria esa
+     * obligacion dos veces. {@code expediente_valor_unico_uq} impide que un <b>valor</b> viva en
+     * dos expedientes; no impide que dos valores formalicen la misma obligacion.
+     *
+     * <p>{@code @Transactional(readOnly = true)}: sin transaccion no hay {@code SET LOCAL} y la
+     * politica RLS no puede evaluar {@code app.municipalidad_id}.
+     */
+    @Transactional(readOnly = true)
+    public ResumenDeLaCartera resumenDeLaCartera(CriterioDeExpedientes criterio) {
+        return new ResumenDeLaCartera(expedientes.contarPorEstado(criterio));
     }
 
     /** Un expediente por su numero, con su historial, su direccion vigente y su deuda. */

@@ -77,7 +77,6 @@ const LA_FORMA_DE: Readonly<Record<string, string>> = {
   CorridaDelPredial: 'GET /rentas/predial/corridas/ultima',
   DeterminacionGuardada: 'GET /rentas/predial/determinaciones',
   DeudaConBeneficio: 'GET /consultas/deudas-con-beneficio',
-  DeudaEnCoactiva: 'GET /coactiva/deudas',
   EmbudoDelPrograma: 'GET /fiscalizacion/programas/{id}/embudo',
   ExpedienteDeLaPapeleta: 'GET /transito/papeletas/{numero}/actos',
   FichaUnificada: 'GET /consultas/unificada',
@@ -94,6 +93,7 @@ const LA_FORMA_DE: Readonly<Record<string, string>> = {
   ProgramaDeFiscalizacion: 'GET /fiscalizacion/programas',
   ResolucionDeDeterminacion: 'GET /fiscalizacion/resoluciones/{numero}',
   ResolucionEnLaRelacion: 'GET /fiscalizacion/resoluciones',
+  ResumenDeLaCarteraCoactiva: 'GET /coactiva/cartera/resumen',
   ResumenDePapeletas: 'GET /transito/reportes/resumen-papeletas',
   TrabajoParado: 'GET /indicadores/trabajo-parado',
   VehiculoServido: 'GET /rentas/vehiculos/{placa}',
@@ -102,8 +102,13 @@ const LA_FORMA_DE: Readonly<Record<string, string>> = {
 /**
  * **Lo que un tipo NO declara a proposito**, con su motivo.
  *
- * Son dos, y las dos son «lo que ninguna pantalla lee todavia», nunca «lo que se nos paso». Una
- * excepcion sin motivo escrito es como esta guarda se acaba vaciando.
+ * Es una, y es «lo que ninguna pantalla lee todavia», nunca «lo que se nos paso». Una excepcion
+ * sin motivo escrito es como esta guarda se acaba vaciando.
+ *
+ * <b>Eran dos hasta #272</b>: `DeudaEnCoactiva` estaba aqui con tres campos —`tributos`,
+ * `ultimaActuacion` y `beneficios`— porque eran los sumandos con que se habria deducido «con REC
+ * notificada» sobre la pagina que llego. Sale porque `coa-panel` **ya no pide esa operacion**: las
+ * tres cifras las publica `GET /coactiva/cartera/resumen`, contadas sobre la cartera entera.
  */
 const DECLARADO_QUE_NO_SE_DECLARA: Readonly<Record<string, readonly string[]>> = {
   // Las seis secciones paginadas de la ficha unificada. El contrato las publica y `con-panel` **no
@@ -117,12 +122,6 @@ const DECLARADO_QUE_NO_SE_DECLARA: Readonly<Record<string, readonly string[]>> =
     'valores',
     'declaracionesJuradas',
   ],
-  // `coa-panel` dibuja **un** campo de cinco, y los otros cuatro dicen «no publicado» porque
-  // contarlos sobre la pagina que llego daria un numero indistinguible de uno real (la regla de
-  // `conectores.ts`). Los tres campos de aqui son justamente los que invitarian a esa cuenta:
-  // `ultimaActuacion.acto` daria «con REC notificada» y «con medida cautelar» sobre veinte filas de
-  // cientos. Declararlos seria poner el sumando delante de quien tiene prohibido sumarlo.
-  DeudaEnCoactiva: ['tributos', 'ultimaActuacion', 'beneficios'],
 };
 
 /** Las propiedades declaradas por cada `export interface` de `lecturas.ts`. */

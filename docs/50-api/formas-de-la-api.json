@@ -96,6 +96,23 @@
       }
     ]
   },
+  "GET /coactiva/cartera/resumen": {
+    "aLaFecha": "fecha",
+    "ejercicio": "entero",
+    "expedientes": "entero",
+    "abiertos": "entero",
+    "sinRec": "entero",
+    "conRecNotificada": "entero",
+    "conMedidaCautelar": "entero",
+    "porEtapa": [
+      {
+        "etapa": "texto",
+        "codigo": "texto",
+        "etiqueta": "texto",
+        "expedientes": "entero"
+      }
+    ]
+  },
   "GET /coactiva/deudas": {
     "contenido": [
       {

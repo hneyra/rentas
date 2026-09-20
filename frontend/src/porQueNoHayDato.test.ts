@@ -33,7 +33,7 @@ describe('el cruce contra lo que el backend sirve', () => {
     // sobre la nada — y la respuesta seria «ninguna pantalla tiene datos», que ademas parece
     // razonable.
     expect(TODAS).toHaveLength(40);
-    expect(YA_SERVIDAS).toHaveLength(36);
+    expect(YA_SERVIDAS).toHaveLength(37);
   });
 
   it('cruza por RUTA, no por verbo: dos servidas las declara el artboard como `BASE`', () => {

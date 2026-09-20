@@ -190,6 +190,14 @@ export interface OperacionServida {
  *       comparten.</li>
  * </ol>
  *
+ * <h2>Y la de #272: el resumen de la cartera</h2>
+ *
+ * <b>`GET /coactiva/cartera/resumen`</b> — cuantos expedientes hay en cada etapa. Es lo que
+ * enciende `coa-panel`, que hasta #272 sacaba su unico campo del `totalElementos` de
+ * `GET /coactiva/deudas` — una cifra que cuenta TODOS los expedientes, concluidos incluidos, bajo
+ * el rotulo «Expedientes abiertos». Tampoco exige ningun parametro: `ejercicio` es opcional y esta
+ * publicado, y esta interfaz **no lo manda** porque el desplegable del bloque no publica su valor.
+ *
  * <b>Y la quinta que NO se enciende, con su motivo</b>: `POST /coactiva/convenios` publica los
  * ocho campos de `coa-cart` y **crea un convenio de fraccionamiento**. No existe el `GET`. Esta
  * interfaz hace una sola escritura —`PUT /seguridad/sesion/ejercicio`— y desde luego no va a
@@ -507,6 +515,7 @@ export const YA_SERVIDAS: readonly OperacionServida[] = [
   { metodo: 'GET', ruta: '/rentas/vehiculos/{placa}' },
   { metodo: 'GET', ruta: '/transito/reportes/resumen-papeletas' },
   { metodo: 'GET', ruta: '/rentas/predial/determinaciones' },
+  { metodo: 'GET', ruta: '/coactiva/cartera/resumen' },
 ];
 
 /** `/rentas/vehiculos/{placa}` → `^/rentas/vehiculos/[^/]+$`. */
