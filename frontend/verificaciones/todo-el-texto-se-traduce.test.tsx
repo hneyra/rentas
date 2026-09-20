@@ -500,8 +500,11 @@ function fuentesDeProduccion(desde = join(RAIZ, 'src')): readonly string[] {
  * Las piezas que `src/` importa de `@kamayuk/ui`, por su nombre.
  *
  * Se leen del `import` y no de un `grep` del archivo entero: este repositorio tiene un tipo del
- * dominio que se llama `Importe` —un texto con centimos— y buscar la palabra suelta daria rojo
- * sobre `dominio/aritmetica.ts`, que no dibuja nada.
+ * dominio que se llama `Importe` —un texto con centimos, declarado en `src/dominio/valores.ts`—
+ * y buscar la palabra suelta daria rojo sobre todos los archivos que lo nombran, empezando por
+ * `dominio/formato.ts`, que no dibuja nada. Hasta #262 el ejemplo era `dominio/aritmetica.ts`,
+ * que se retiro con su prueba por no tener consumidor: el ejemplo se cayo, el motivo no, porque
+ * el tipo sigue y sigue llamandose igual.
  */
 function loQueSeImportaDeLaUi(): readonly string[] {
   const piezas = new Set<string>();

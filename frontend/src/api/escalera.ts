@@ -1,9 +1,9 @@
 /**
  * La escalera de identidad, leida desde la pantalla.
  *
- * <h2>Los cuatro peldanos son cuatro remedios distintos, y por eso no se pueden juntar</h2>
+ * <h2>Los cinco peldanos medidos son cinco remedios distintos, y por eso no se pueden juntar</h2>
  *
- * Medido con `curl` contra la instalacion, la cadena de seguridad del backend contesta cuatro
+ * Medido con `curl` contra la instalacion, la cadena de seguridad del backend contesta cinco
  * cosas distintas a la misma peticion segun quien la haga:
  *
  * <table>
@@ -23,11 +23,16 @@
  * Se admite de 1990 a 2100». Sin este peldano las dos caian en `averia`, o sea que escribir
  * «ok» en un campo mandaba a **avisar a soporte** — y con el tono de que algo se rompio.
  *
- * Y se arreglan de cuatro maneras que no se parecen: volver a identificarse; que el
- * administrador asigne la municipalidad a la cuenta; pedir el permiso que falta; y revisar con
- * que cuenta se esta entrando. Ensenar «no se pudo» para las cuatro obliga a quien atiende a
- * llamar por telefono para averiguar cual de las cuatro es — y las cuatro llegan ya
- * distinguidas en el `codigo`, que es una extension del contrato y no una frase.
+ * Y se arreglan de maneras que no se parecen: volver a identificarse; que el administrador
+ * asigne la municipalidad a la cuenta; pedir el permiso que falta; revisar con que cuenta se
+ * esta entrando; y corregir lo que se escribio. Ensenar «no se pudo» para todas obliga a quien
+ * atiende a llamar por telefono para averiguar cual es — y llegan ya distinguidas en el
+ * `codigo`, que es una extension del contrato y no una frase.
+ *
+ * A los cinco medidos se suman **dos que no salen de un `curl` y hacen falta igual**: un 403 sin
+ * `codigo` —`no-permitido`, que no se hace pasar por ninguno de los dos que si lo llevan— y
+ * `averia`, que recoge el corte de red y el 5xx. Siete claves en total, cinco medidas y dos de
+ * respaldo; el `clave` de abajo es la cuenta que vale.
  *
  * <h2>Dos de ellas NO son averias, y decirlo importa</h2>
  *
@@ -38,8 +43,41 @@
  *
  * <h2>Es una funcion pura, y eso es deliberado</h2>
  *
- * Sin React, sin `fetch` y sin reloj: entra un fallo, sale que decir. Los cuatro peldanos se
- * prueban sin montar nada, y la pantalla que los ensena se prueba una vez.
+ * Sin React, sin `fetch` y sin reloj: entra un fallo, sale que decir. Los siete peldanos se
+ * prueban sin montar nada.
+ *
+ * <h2>Y NINGUNA FUENTE DE PRODUCCION LO IMPORTA. Por que se queda igual, y hasta cuando</h2>
+ *
+ * **Medido (#262): el unico `import` de este archivo es `escalera.test.ts`.** Hasta #255 su
+ * prueba decia que la otra mitad se media en `aplicacion.test.tsx`, que no es un archivo de este
+ * arbol. Conviene decir las dos cosas que se midieron al decidir que aun asi se queda:
+ *
+ * **Uno: lo que llega hoy a la pantalla NO es esto, y no es «no se pudo» para todo.**
+ * `datos/useDatosDeLaHoja.ts` tiene su propia escalera dentro de `alFallar`, con tres respuestas
+ * —`SIN_SESION` para el 401, `SIN_PERMISO` para cualquier 403 y `FALLO` con el codigo
+ * interpolado para el resto—. O sea que un 403 y una averia **no** se ven igual: se ven con
+ * frases distintas. Lo que `alFallar` no separa es lo que esta escalera existe para separar: los
+ * **dos** 403 —`SIN_MUNICIPALIDAD` es del administrador y `SIN_PRIVILEGIO` es de los perfiles, y
+ * hoy leen lo mismo— y el **422**, que sale como «fallo (422)», o sea como una averia, cuando es
+ * la regla concreta que se incumplio.
+ *
+ * **Dos: por que no se enchufa de una vez.** Porque no cabe. Lo que una pantalla puede ensenar
+ * es una `Ausencia` de `@kamayuk/ui`, y una `Ausencia` tiene **tres** campos —`enElCampo`,
+ * `explicacion` y `tono`—; un `Peldano` tiene **seis**. `remedio` y `pideIdentidad` no tienen
+ * donde ir: el primero se podria pegar a `explicacion`, pero el segundo es un **boton** que el
+ * interprete no dibuja. Enchufarlo pide ensanchar la forma en la libreria o que la pantalla
+ * dibuje el peldano ella misma, y las dos cosas son un issue con su propia medida.
+ *
+ * **Y por que no se retira, que era la otra salida.** Porque los cinco peldanos medidos son
+ * `curl` contra una instalacion levantada —con su realm, su token y su cuenta—, y este puesto no
+ * la tiene: borrarlos tira una medida que no se puede rehacer aqui. Es lo contrario de
+ * `dominio/aritmetica.ts`, que #262 si retiro: aquello era una suma que cualquiera vuelve a
+ * escribir en diez minutos.
+ *
+ * **Hasta cuando.** Hasta que `Ausencia` pueda llevar el remedio, o hasta que una pantalla
+ * dibuje el peldano por su cuenta. El dia que esto gane un importador de produccion, este
+ * parrafo deja de ser cierto — y para que no se quede diciendolo, `escalera.test.ts` lo
+ * comprueba y sale rojo nombrando el archivo que lo importo.
  */
 
 import { ErrorDeLaApi } from './cliente.ts';
