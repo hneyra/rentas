@@ -178,9 +178,15 @@ export interface CuotaDeterminada {
  * distinto de que no deba comprobarse** (#255, #262). Hasta aqui ponia que lo comprobaba
  * `secciones/determinacion.ts` —la seccion de la V6, que salio del arbol en #90—, y esa
  * comprobacion **no tiene donde correr**: `POST /rentas/predial/calculo-individual` no esta en
- * `datos/servidas.ts` ni lo pide ningun conector, asi que esta lectura no la lee ninguna hoja. La
- * suma exacta en centimos con la que se haria sigue en `dominio/aritmetica.ts`, tambien sin
- * consumidor.
+ * `datos/servidas.ts` ni lo pide ningun conector, asi que esta lectura no la lee ninguna hoja.
+ *
+ * La suma exacta en centimos con la que se haria vivia en `dominio/aritmetica.ts`, y **#262 la
+ * retiro con su prueba**: no la importaba ninguna fuente de produccion, y lo unico que podia
+ * pedirsela era esta lectura, que tampoco lee nadie. No se ha perdido —esta en el `git log` de
+ * este repositorio, que el dia que la operacion se sirva vale mas que volver a escribirla—; lo
+ * que se retiro es la afirmacion de que la comprobacion existe. Cuando `calculo-individual` entre
+ * en `YA_SERVIDAS` y esta lectura gane conector, la suma vuelve con el, y entonces tendra quien
+ * la llame el mismo dia que se escriba.
  */
 export interface DeterminacionIndividual {
   readonly ejercicio: string;
