@@ -4430,6 +4430,36 @@
     "resumen": "texto",
     "nombreDeArchivo": "texto"
   },
+  "POST /transito/papeletas/{numero}/anulacion": {
+    "papeleta": {
+      "id": "entero",
+      "familia": "texto",
+      "numero": "texto",
+      "fechaInfraccion": "texto",
+      "horaInfraccion": "texto",
+      "lugar": "texto",
+      "placa": "texto",
+      "vehiculoId": "entero",
+      "infractorId": "entero",
+      "propietarioId": "entero",
+      "contribuyenteId": "entero",
+      "predioId": "entero",
+      "notificacionPreviaId": "entero",
+      "baseImponible": "texto",
+      "porcentajeInfraccion": "texto",
+      "importeInfraccion": "texto",
+      "porcentajeACobrar": "texto",
+      "importeAPagar": "texto",
+      "importeConBeneficio": "texto",
+      "estado": "texto",
+      "usuarioRegistro": "texto"
+    },
+    "dadoDeBaja": {
+      "importe": "texto",
+      "actualizadoA": "fecha"
+    },
+    "asientosDeBaja": "entero"
+  },
   "POST /transito/reportes": "objeto",
   "POST /transito/resoluciones/ordinaria": {
     "id": "entero",

@@ -231,6 +231,11 @@ class ContratoDeApiTest {
                     // declara UN endpoint— y entra por OPERACIONES_ADICIONALES del generador,
                     // igual que las tres de la liquidacion de abajo.
                     "POST /fiscalizacion/actas/{id}/anulacion",
+                    // #267: anular la papeleta. La unica transicion que este sistema escribe
+                    // sobre ella, y la que vuelve reales las dos guardas que hasta ahora no
+                    // descartaban nada. Entra por OPERACIONES_ADICIONALES igual que la del acta:
+                    // la pantalla de papeletas declara su grilla, no este acto.
+                    "POST /transito/papeletas/{numero}/anulacion",
                     // #49: la liquidacion, su reliquidacion y su estado, mas las cuatro
                     // consultas del modulo. Las tres primeras son rutas que la pantalla no
                     // declara —una pantalla declara UN endpoint— y entran por

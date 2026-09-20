@@ -35,11 +35,13 @@ import java.util.stream.Collectors;
  *       —{@code v.estado = 'COACTIVA' OR EXISTS(valor_movimiento PCO)}—. Lo que este contexto
  *       posee de esa etapa es que la <b>resolución de multa esté emitida</b>, y eso lo publica el
  *       resumen desde #243 como {@code conResolucionDeMulta}.</td></tr>
- *   <tr><td>{@link #ANULADA}</td><td><b>No se deriva de nada</b>: es un acto de la administración,
- *       igual que el {@code ANULADA} del acta de fiscalización (#214). Hoy no existe el acto que
- *       la escriba.</td></tr>
- *   <tr><td>{@link #PRESCRITA}</td><td><b>Tampoco se deriva de nada</b>: la declara un acto. Hoy
- *       tampoco existe — {@code DeclararPrescripcion} mueve el <b>valor</b>, no la papeleta.</td></tr>
+ *   <tr><td>{@link #ANULADA}</td><td><b>Se escribe, desde #267.</b> No se deriva de nada: es un
+ *       acto de la administración, igual que el {@code ANULADA} del acta de fiscalización (#214),
+ *       y ahora existe el acto que la escribe — {@code AnularPapeleta}, publicado como {@code POST
+ *       /transito/papeletas/&#123;numero&#125;/anulacion}.</td></tr>
+ *   <tr><td>{@link #PRESCRITA}</td><td><b>No se escribe, y #267 lo decidió con la medida.</b>
+ *       Tampoco se deriva de nada —la declara un acto—, pero ese acto habla del <b>valor</b> y no
+ *       de la papeleta: ver abajo.</td></tr>
  * </table>
  *
  * <h2>Por qué no se retira ninguno del ENUMERADO, y sí se estrecha el privilegio</h2>
@@ -91,6 +93,30 @@ import java.util.stream.Collectors;
  * 'PAGADA'} suyo <b>es un hecho cierto del sistema anterior</b>, no una promesa vacía. Retirar el
  * valor no borraría una columna que nadie llena: dejaría de poder leerse lo que ya está escrito.
  *
+ * <h2>#267 añadió UNA escritura, y midió por qué no dos</h2>
+ *
+ * <p>De los seis valores que nadie escribía, {@link #ANULADA} y {@link #PRESCRITA} eran los dos que
+ * <b>no se derivan de nada</b>: los declara un acto. #267 añadió el primero y <b>no</b> el segundo,
+ * y no es una media medida sino lo que salió de mirar {@code DeclararPrescripcion}:
+ *
+ * <ol>
+ *   <li>Su firma —{@code declarar(contribuyenteId, tributo, ejercicioDesde, ejercicioHasta, …)}—
+ *       <b>no nombra ninguna papeleta</b>, ni su cuerpo tampoco: resuelve ejercicio por ejercicio y
+ *       marca {@code PRESCRITO} los valores que {@code ValorRepository.cobrablesDe} devuelve.
+ *   <li>Volver del valor a la papeleta —{@code valor} → {@code papeleta_masivo_item.valor_id} →
+ *       {@code papeleta}— es un cruce que vive en {@code sanciones}, y {@code valores} no lo puede
+ *       hacer: no hay ningún puerto de {@code sanciones} que lo publique.
+ *   <li>Y <b>no sería completo</b>: una papeleta sólo tiene valor si pasó la corrida masiva, que
+ *       exige su resolución de multa dictada <b>y</b> notificada. La que nunca llegó ahí no
+ *       recibiría {@code PRESCRITA} jamás, mientras la deuda que originó prescribe igual.
+ *   <li>Y ya hay dos sitios donde la prescripción consta —la fila de {@code prescripcion} y el
+ *       estado del valor—, porque #674 decidió que <b>no</b> toca el libro. La columna de la
+ *       papeleta sería el tercero.
+ * </ol>
+ *
+ * <p>Así que {@code PRESCRITA} se queda donde están {@link #PAGADA} y {@link #COACTIVA}: un valor
+ * que sólo un padrón migrado trae y que este sistema lee pero no escribe.
+ *
  * <h2>Y por eso {@link #NO_SE_DEBE} vive aquí, y en un solo sitio de verdad</h2>
  *
  * <p>Hasta #259 la lista de los estados en los que una papeleta ya no se debe estaba <b>tres
@@ -118,10 +144,10 @@ public enum EstadoDePapeleta {
     /** Nadie lo escribe: en {@code valores} es un predicado sobre el pase (PCO). */
     COACTIVA(true),
 
-    /** Nadie lo escribe todavía: es un acto de la administración, y no existe. */
+    /** El segundo valor que este sistema escribe: el acto de {@code AnularPapeleta} (#267). */
     ANULADA(false),
 
-    /** Nadie lo escribe todavía: lo declara un acto, y hoy sólo alcanza al valor. */
+    /** Nadie lo escribe: lo declara un acto, y ese acto alcanza al valor y no a la papeleta. */
     PRESCRITA(false);
 
     /**

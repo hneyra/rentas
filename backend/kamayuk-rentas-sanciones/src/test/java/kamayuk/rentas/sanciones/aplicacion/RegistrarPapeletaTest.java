@@ -298,6 +298,11 @@ class RegistrarPapeletaTest {
         public Papeleta cambiarNumero(long papeletaId, String numeroNuevo, String motivo) {
             throw new UnsupportedOperationException("esta prueba no cambia numeros");
         }
+
+        @Override
+        public Papeleta anular(long papeletaId) {
+            throw new UnsupportedOperationException("esta prueba no anula papeletas");
+        }
     }
 
     private static final class CargosDeMentira implements GeneradorDeCargos {

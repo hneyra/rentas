@@ -52,6 +52,24 @@ public interface CorridaDeValoresRepository {
     /** Marca el candidato como sin deuda que formalizar. */
     ItemDeCorrida marcarSinDeuda(long itemId);
 
+    /**
+     * El número de la resolución de multa que ya formaliza esa papeleta, si la hay (#267).
+     *
+     * <p>Es la fila {@code GENERADO} de {@code papeleta_masivo_item}, que {@code
+     * papeleta_valor_unico_uq} garantiza única, y <b>es completo</b> por lo que {@code
+     * PadronDePapeletasRepositoryJdbc} ya tenía medido: el único sitio de {@code src/main} que
+     * llama a {@code emitirPorMulta} es {@code ProcesarPapeletaDeLaCorrida}, y esa es también la
+     * única escritura de esta tabla. No hay camino por el que una papeleta reciba su resolución de
+     * multa sin dejar esa fila.
+     *
+     * <p>Se pregunta desde {@code AnularPapeleta}, y no toca ni una tabla de {@code valores}:
+     * {@code sanciones} ve de los valores lo que {@code EmisionDeValoresDeMultas} publica, y sus
+     * tablas no.
+     *
+     * @return el número impreso del valor, o vacío si esa papeleta no tiene ninguno
+     */
+    Optional<String> valorEmitidoDe(long papeletaId);
+
     /** Marca el candidato como no procedente, diciendo por qué. */
     ItemDeCorrida marcarNoProcede(long itemId, String motivo);
 

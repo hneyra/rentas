@@ -212,6 +212,23 @@ public class CorridaDeValoresRepositoryJdbc extends RepositorioJdbc
         return leerItem(itemId);
     }
 
+    /**
+     * La resolución de multa que ya formaliza esa papeleta (#267).
+     *
+     * <p>Un solo {@code SELECT} sobre {@code papeleta_masivo_item} y ninguna tabla de {@code
+     * valores}: el número impreso está aquí porque {@code marcarGenerado} lo copió, que es lo mismo
+     * que hace el padrón de #243.
+     */
+    @Override
+    public Optional<String> valorEmitidoDe(long papeletaId) {
+        return jdbc().sql(
+                        "SELECT valor_numero FROM papeleta_masivo_item"
+                                + " WHERE papeleta_id = :papeletaId AND estado = 'GENERADO'")
+                .param("papeletaId", papeletaId)
+                .query(String.class)
+                .optional();
+    }
+
     // ------------------------------------------------------------------
 
     /**

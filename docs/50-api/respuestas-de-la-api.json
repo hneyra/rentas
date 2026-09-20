@@ -152,6 +152,7 @@
   "POST /transito/descargos": ["404"],
   "POST /transito/internamientos": ["404"],
   "POST /transito/internamientos/{placa}/liberacion": ["404"],
+  "POST /transito/papeletas/{numero}/anulacion": ["404"],
   "POST /transito/reportes": [],
   "POST /transito/resoluciones/ordinaria": ["404"],
   "POST /transito/resoluciones/sancionadora": ["404"],

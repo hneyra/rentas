@@ -3983,6 +3983,67 @@ paths:
           $ref: "#/components/responses/SinMunicipalidad"
         "422":
           $ref: "#/components/responses/ErrorDeValidacion"
+  "/transito/papeletas/{numero}/anulacion":
+    post:
+      operationId: anular_papeleta
+      summary: "Anulación de una papeleta"
+      description: >-
+        Deja sin efecto una papeleta: la **única** transición que mueve su estado. Hasta
+        #267 no existía ninguna —el único `UPDATE papeleta` del sistema era el cambio de
+        número—, de modo que las dos guardas que descartan una papeleta muerta, al
+        registrar un descargo y al dictar una resolución de gerencia, no descartaban nada.
+
+        **No borra ni edita nada más** (regla 4): la papeleta se sigue leyendo entera —qué
+        placa, qué día, qué importe— y lo único que cambia es que deja de contar.
+        Corregir lo que el inspector tomó mal en campo NO es esto: es anular ésta y
+        levantar otra.
+
+        **Y da de baja lo que la papeleta cargó en el libro**, con causal `ERROR_MATERIAL`
+        y la observación como motivo de cada asiento. Sin eso quedaría anulada —o sea «ya
+        no se debe»— y debiendo en la cuenta corriente, que es la misma cifra contada de
+        dos maneras.
+
+        **Una papeleta cuya multa ya se formalizó en una resolución de multa no se anula**:
+        primero se deja sin efecto ese valor, o quedaría cobrando una sanción que ya no
+        existe — eso responde **409**, igual que anular una que ya no debe nada (anulada,
+        prescrita o pagada; lo cobrado de más se devuelve, no se anula). Un número que no
+        existe en esta municipalidad es **404**.
+
+        El cuerpo lleva la observación del usuario, obligatoria (RNF-052), la fecha del
+        acto —que es la del día en que se anula y además la fecha valor de los asientos de
+        la baja— y la familia, que por omisión es tránsito: `papeleta` es una sola tabla
+        y el acto sirve también a las infracciones administrativas. Exige MODIFICACION
+        sobre `papeletas` **o** sobre `infracciones_adm`.
+
+        **`PRESCRITA` no la escribe nadie, y #267 lo midió**: la prescripción se declara
+        sobre el **valor** y no sobre la papeleta, que no aparece ni en la firma de ese
+        acto.
+      tags: ["Tránsito"]
+      parameters:
+        - name: numero
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        201:
+          description: Operacion realizada
+          content:
+            application/json:
+              schema: { type: object }
+        "404":
+          description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "403":
+          $ref: "#/components/responses/SinMunicipalidad"
+        "422":
+          $ref: "#/components/responses/ErrorDeValidacion"
   "/transito/papeletas/busqueda":
     get:
       operationId: transito_busqueda

@@ -1951,6 +1951,57 @@ const OPERACIONES_ADICIONALES = {
   // SI tiene su pantalla de notificacion en el manual; transito no, y sin ella
   // la sancionadora no se puede dictar nunca porque su plazo se cuenta desde
   // que la ordinaria surte efecto (#50, RF-074).
+  // #267 — anular la papeleta, que es la UNICA transicion que este sistema
+  // escribe sobre ella. `papeletas` declara su grilla como endpoint; el acto
+  // necesita ruta propia, igual que la anulacion del acta de #214.
+  //
+  // Y NO es una ruta inventada: la pestana «Cancelacion» de esta misma pantalla
+  // del prototipo dibuja «Anulo / Papeleta anulada». Lo que NO se implementa de
+  // esa pestana es su desplegable «Motivo de anulacion» —cuatro rotulos, uno de
+  // ellos «DESCARGO FUNDADO», que en este sistema NO es anular la papeleta sino
+  // la resolucion de gerencia que la deja sin efecto—: ese vocabulario exige su
+  // propia columna y su decision, y aproximarlo sobre las seis causales de baja
+  // de #684 seria lo que #427 y #546 se negaron a hacer.
+  papeletas: [
+    {
+      operationId: 'anular_papeleta',
+      metodo: 'post',
+      ruta: '/api/v1/transito/papeletas/{numero}/anulacion',
+      titulo: 'Anulación de una papeleta',
+      descripcion: bloque(`
+        Deja sin efecto una papeleta: la **única** transición que mueve su estado. Hasta
+        #267 no existía ninguna —el único \`UPDATE papeleta\` del sistema era el cambio de
+        número—, de modo que las dos guardas que descartan una papeleta muerta, al
+        registrar un descargo y al dictar una resolución de gerencia, no descartaban nada.
+
+        **No borra ni edita nada más** (regla 4): la papeleta se sigue leyendo entera —qué
+        placa, qué día, qué importe— y lo único que cambia es que deja de contar.
+        Corregir lo que el inspector tomó mal en campo NO es esto: es anular ésta y
+        levantar otra.
+
+        **Y da de baja lo que la papeleta cargó en el libro**, con causal \`ERROR_MATERIAL\`
+        y la observación como motivo de cada asiento. Sin eso quedaría anulada —o sea «ya
+        no se debe»— y debiendo en la cuenta corriente, que es la misma cifra contada de
+        dos maneras.
+
+        **Una papeleta cuya multa ya se formalizó en una resolución de multa no se anula**:
+        primero se deja sin efecto ese valor, o quedaría cobrando una sanción que ya no
+        existe — eso responde **409**, igual que anular una que ya no debe nada (anulada,
+        prescrita o pagada; lo cobrado de más se devuelve, no se anula). Un número que no
+        existe en esta municipalidad es **404**.
+
+        El cuerpo lleva la observación del usuario, obligatoria (RNF-052), la fecha del
+        acto —que es la del día en que se anula y además la fecha valor de los asientos de
+        la baja— y la familia, que por omisión es tránsito: \`papeleta\` es una sola tabla
+        y el acto sirve también a las infracciones administrativas. Exige MODIFICACION
+        sobre \`papeletas\` **o** sobre \`infracciones_adm\`.
+
+        **\`PRESCRITA\` no la escribe nadie, y #267 lo midió**: la prescripción se declara
+        sobre el **valor** y no sobre la papeleta, que no aparece ni en la firma de ese
+        acto.
+      `),
+    },
+  ],
   transito_rg_ordinaria: [
     {
       operationId: 'notificar_resolucion_transito',
