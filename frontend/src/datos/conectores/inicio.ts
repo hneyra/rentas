@@ -38,8 +38,10 @@ import { RUTAS, pedirUno } from '../lecturas.ts';
  *   se parezca**: la etapa «Lectura del padron» trae 62 418 registros y el artboard ensena 62 418
  *   contribuyentes activos. Que coincidan no las hace lo mismo —una es cuantas filas leyo la
  *   corrida y la otra cuantos contribuyentes estan activos hoy—, y el dia que difieran nadie
- *   sabria que el numero era deducido. Es el mismo razonamiento con que `panel` se niega a deducir
- *   «cuentas emitidas» de su ultima etapa.
+ *   sabria que el numero era deducido. Es el mismo razonamiento con que `panel` se negaba a
+ *   deducir «cuentas emitidas» de su ultima etapa — y la salida fue la que aqui todavia no
+ *   existe: en #271 la corrida **publico el campo**, y entonces el conector lo lee. Mientras
+ *   ninguna operacion publique «contribuyentes activos», este hueco se queda.
  * · **`ini-flujo` · «Avance» de una fila sin base** — la operacion publica `pct: 0` **y**
  *   `avanceConocido: false`, que es justamente el par que separa el cero medido del cero que no se
  *   pudo medir. Ahi se escribe `sin medir`, nunca `0 %`: un tributo sin cargos asentados dibujado

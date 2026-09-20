@@ -139,6 +139,8 @@ function corrida(observados: number): CorridaDelPredial {
     simulacion: false,
     conjunto: 'V3',
     fechaCalculo: '28/01/2026 02:14',
+    determinados: 61350,
+    montoEmitido: '9418204.60',
     observados,
     etapas: [],
   };

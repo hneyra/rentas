@@ -54,6 +54,10 @@ const CORRIDA: CorridaDelPredial = {
   simulacion: false,
   conjunto: 'V3',
   fechaCalculo: '28/01/2026 02:14',
+  // Deliberadamente distinto de los 61 350 registros de la ultima etapa: con los dos iguales,
+  // «lee el campo» y «lee la ultima fila de la tabla» pasarian la misma prueba (#271).
+  determinados: 58412,
+  montoEmitido: '8772431.05',
   observados: 534,
   etapas: [
     { etapa: 'Lectura del padron', registros: 62418, monto: '—', observados: 0, estado: 'Conforme' },
@@ -996,9 +1000,11 @@ describe('`panel` — la ultima corrida', () => {
   if (conector === undefined) throw new Error('falta el conector de `panel`');
   const reparto = conector.repartir(CORRIDA as never);
 
-  it('la fecha y los observados salen de la respuesta', () => {
+  it('la fecha, los observados y los dos agregados salen de la respuesta', () => {
     expect(reparto.valores.get(coordenada(0, 1))).toBe('28/01/2026 02:14');
+    expect(reparto.valores.get(coordenada(0, 2))).toBe('58,412');
     expect(reparto.valores.get(coordenada(0, 3))).toBe('534');
+    expect(reparto.valores.get(coordenada(0, 4))).toBe('S/ 8,772,431.05');
   });
 
   it('la tabla sale de `etapas`, con sus cinco columnas en orden', () => {
@@ -1010,13 +1016,27 @@ describe('`panel` — la ultima corrida', () => {
     expect(filas?.[0]).toHaveLength(5);
   });
 
-  it('NO deduce «cuentas emitidas» de la ultima etapa, aunque el numero coincida', () => {
+  it('«cuentas emitidas» sale del CAMPO publicado, no de la ultima etapa (#271)', () => {
     // La ultima etapa trae 61 350 registros y el artboard ensena 61 350 cuentas emitidas. **Que
     // coincidan no las hace lo mismo**: una es «cuantas cuponeras se generaron» y la otra «cuantas
     // cuentas quedaron emitidas», y el dia que difieran nadie sabria que el numero era deducido.
-    expect(reparto.valores.has(coordenada(0, 2))).toBe(false);
-    expect(reparto.noPublicados.get(coordenada(0, 2))).toBe(NO_PUBLICADO);
-    // Y por si alguien lo dedujera igualmente: el valor de la etapa no puede aparecer como valor.
+    //
+    // Desde #271 el dia que difieren es HOY, y por eso la muestra los separa: la operacion publica
+    // `determinados: 58 412` y la etapa trae 61 350. Solo una de las dos cifras es correcta.
+    expect(reparto.valores.get(coordenada(0, 2))).toBe('58,412');
+    // Ni agrupado ni sin agrupar: los 61 350 de la etapa no pueden llegar a un campo por ningun
+    // camino, y las dos formas se comprueban porque el campo agrupa y la celda no.
     expect([...reparto.valores.values()]).not.toContain('61350');
+    expect([...reparto.valores.values()]).not.toContain('61,350');
+    // Y el monto tampoco se recoge de la celda de la etapa, que trae otro.
+    expect([...reparto.valores.values()]).not.toContain('S/ 9,418,204.60');
+  });
+
+  it('«Derecho de emision» se queda sin publicar, y es el UNICO hueco', () => {
+    // La corrida lo aplica —entra en `montoEmitido`— y no lo sella: `corrida_predial` no tiene
+    // columna para el, y lo unico que guarda del conjunto es su NOMBRE, que no sirve para volver
+    // a leerlo. Lo unico que quedaria es el conjunto vigente hoy, que no tiene por que ser aquel.
+    expect(reparto.noPublicados.get(coordenada(0, 5))).toBe(NO_PUBLICADO);
+    expect([...reparto.noPublicados.keys()]).toEqual([coordenada(0, 5)]);
   });
 });

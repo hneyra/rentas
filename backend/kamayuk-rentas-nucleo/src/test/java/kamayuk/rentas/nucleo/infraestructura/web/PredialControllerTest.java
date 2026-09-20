@@ -357,6 +357,12 @@ class PredialControllerTest {
         assertThat(cuerpo)
                 .as("lleva el id: es con lo que la pantalla pide despues sus observados")
                 .contains("\"id\":");
+        // Y los dos agregados que el panel dibuja arriba (#271). Iban solo DENTRO de una fila de
+        // `etapas`, y sacarlos de la tabla en el navegador es lo que `conectores.ts` prohibe.
+        assertThat(cuerpo)
+                .as("«cuentas emitidas» y «monto determinado» son campos, no una celda de la tabla")
+                .contains("\"determinados\":")
+                .contains("\"montoEmitido\":");
     }
 
     @Test
