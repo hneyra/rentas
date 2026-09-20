@@ -4,6 +4,7 @@
 
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
@@ -40,7 +41,14 @@ import { enlacesDeclarados, loQuePideElEnlace } from './enlace.ts';
 const requerir = createRequire(import.meta.url);
 const RAIZ = fileURLToPath(new URL('..', import.meta.url));
 
-const CRUDO = readFileSync('package.json', 'utf8');
+// **Contra `RAIZ`, y no contra el `cwd`** (#295). Era `readFileSync('package.json')`, con la
+// constante de arriba ya calculada dos lineas antes y sin usar para esto. Funcionaba porque
+// `yarn test` se lanza desde `frontend/`; medido con el `cwd` un nivel mas arriba
+// —`vitest run --root frontend` desde la raiz del repositorio—, el archivo entero caia en la
+// RECOLECCION con `ENOENT: no such file or directory, open 'package.json'`. Y en una raiz que SI
+// tuviera un `package.json` —la del repositorio, la de un monorepo— habria leido el manifiesto
+// equivocado y comparado versiones que no son las de este frontend, en verde.
+const CRUDO = readFileSync(join(RAIZ, 'package.json'), 'utf8');
 const ENLACES = enlacesDeclarados(CRUDO);
 
 const mio = JSON.parse(CRUDO) as {
