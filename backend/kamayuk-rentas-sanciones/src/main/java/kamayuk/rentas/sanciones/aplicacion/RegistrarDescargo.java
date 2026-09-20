@@ -42,6 +42,12 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>No se descarga contra una papeleta anulada ni prescrita: no hay nada que impugnar. Sí contra
  * una pagada —el manual admite el reclamo por pago indebido— y contra una que ya esté en coactiva,
  * porque el recurso es justamente lo que puede suspender el procedimiento.
+ *
+ * <p><b>Y hasta #267 esta guarda no descartaba nada</b>, medido: los dos valores que mira eran los
+ * dos que ningún camino de producción podía escribir —el único {@code UPDATE papeleta} de {@code
+ * src/main} era {@code SET numero}—, así que estaba escrita, probada con dobles, e inerte. Lo que
+ * la vuelve real es {@link AnularPapeleta}; {@code PRESCRITA} sigue siendo un valor que sólo un
+ * padrón migrado trae, y {@code EstadoDePapeleta} lleva la medida de por qué.
  */
 @Service
 public class RegistrarDescargo {

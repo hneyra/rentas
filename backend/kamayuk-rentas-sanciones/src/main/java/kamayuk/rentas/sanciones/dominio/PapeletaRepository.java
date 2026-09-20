@@ -35,4 +35,21 @@ public interface PapeletaRepository {
      * usuario_registro} en {@link #insertar}.
      */
     Papeleta cambiarNumero(long papeletaId, String numeroNuevo, String motivo);
+
+    /**
+     * Anula la papeleta: la <b>única</b> escritura que mueve su estado (#267).
+     *
+     * <p>Mueve <b>una columna</b> y ninguna más, y no es una convención: desde {@code V20} {@code
+     * kamayuk_app} no tiene {@code UPDATE} sobre la tabla sino sobre {@code (numero, estado)}, así
+     * que un {@code UPDATE} que tocara la placa, la hora, el lugar o el importe saldría con {@code
+     * 42501}. Lo que el inspector escribió en la calle y firmó el infractor no se corrige en la
+     * base: se anula la papeleta y se levanta otra.
+     *
+     * <p>La transición la decide el dominio ({@link Papeleta#anulada}) <b>antes</b> de escribir,
+     * como en {@code ActaFiscalizacionRepository#anular}: si es ilegal no se escribe nada.
+     *
+     * @return la papeleta ya anulada
+     * @throws Papeleta.TransicionIlegal si en ese estado ya no se debe nada
+     */
+    Papeleta anular(long papeletaId);
 }

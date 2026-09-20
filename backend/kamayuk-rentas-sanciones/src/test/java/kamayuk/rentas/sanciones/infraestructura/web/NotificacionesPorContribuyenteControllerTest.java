@@ -133,5 +133,10 @@ class NotificacionesPorContribuyenteControllerTest {
         public Papeleta cambiarNumero(long papeletaId, String numeroNuevo, String motivo) {
             throw new UnsupportedOperationException("esta prueba no escribe");
         }
+
+        @Override
+        public Papeleta anular(long papeletaId) {
+            throw new UnsupportedOperationException("esta prueba no anula papeletas");
+        }
     }
 }

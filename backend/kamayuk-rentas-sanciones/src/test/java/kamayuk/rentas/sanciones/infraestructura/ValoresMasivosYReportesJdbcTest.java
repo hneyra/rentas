@@ -78,6 +78,7 @@ import kamayuk.rentas.esquema.BaseDeDatosDePrueba;
 import kamayuk.rentas.esquema.ContextoDeTenant;
 import kamayuk.rentas.plataforma.tenant.TenantTransactionManager;
 import kamayuk.rentas.sanciones.PapeletasSinNotificar;
+import kamayuk.rentas.sanciones.aplicacion.AnularPapeleta;
 import kamayuk.rentas.sanciones.aplicacion.ConsultaDeLaCorridaDeValores;
 import kamayuk.rentas.sanciones.aplicacion.ConsultaDeLaHojaDePapeleta;
 import kamayuk.rentas.sanciones.aplicacion.ConsultaDePadronesDeSanciones;
@@ -100,6 +101,7 @@ import kamayuk.rentas.sanciones.dominio.CriterioDeConstancias;
 import kamayuk.rentas.sanciones.dominio.CriterioDePadron;
 import kamayuk.rentas.sanciones.dominio.EfectoSobreLaMulta;
 import kamayuk.rentas.sanciones.dominio.EstadoDeItemDeCorrida;
+import kamayuk.rentas.sanciones.dominio.EstadoDePapeleta;
 import kamayuk.rentas.sanciones.dominio.Familia;
 import kamayuk.rentas.sanciones.dominio.ItemDeCorrida;
 import kamayuk.rentas.sanciones.dominio.LineaDelResumen;
@@ -237,6 +239,7 @@ class ValoresMasivosYReportesJdbcTest {
     private static IniciarCorridaDeValores iniciar;
     private static ProcesarPapeletaDeLaCorrida procesar;
     private static GenerarCorridaDeValores generar;
+    private static AnularPapeleta anularPapeleta;
     private static EmitirConstanciaLibre emitirConstancia;
     private static ConsultaDePadronesDeSanciones consultaDePadrones;
     private static ConsultaDeResumenesDeSanciones consultaDeResumenes;
@@ -381,6 +384,7 @@ class ValoresMasivosYReportesJdbcTest {
                 envolver(
                         new ProcesarPapeletaDeLaCorrida(
                                 papeletas, resoluciones, diligencias, emision, corridas));
+        anularPapeleta = envolver(new AnularPapeleta(papeletas, corridas, extincion, auditoria));
         generar =
                 new GenerarCorridaDeValores(
                         envolver(new ConsultaDeLaCorridaDeValores(corridas)), procesar);
@@ -1708,6 +1712,94 @@ class ValoresMasivosYReportesJdbcTest {
             assertThat(rtf)
                     .as("y dice a que fecha son sus importes")
                     .contains("Cifras al " + INFRACCION);
+        }
+    }
+
+    // ==================================================================
+    //  #267 — la papeleta con resolucion de multa emitida no se anula
+    // ==================================================================
+
+    /**
+     * El equivalente exacto de {@code ActaConLiquidacionViva} (#214), y por el mismo motivo: anular
+     * la papeleta cuya multa ya se formalizo dejaria ese valor —y quiza su expediente coactivo—
+     * cobrando una sancion que no existe. {@code sanciones} no tiene ningun puerto para anular un
+     * valor, asi que lo que hace es rechazar nombrando el valor que lo impide.
+     *
+     * <p>Las dos direcciones en la misma prueba, y no es adorno: con solo la mitad negativa, una
+     * guarda que rechazara SIEMPRE —por ejemplo leyendo mal el estado del item— pasaria en verde.
+     */
+    @Nested
+    @DisplayName("#267 — anular una papeleta que ya tiene resolucion de multa")
+    class LaAnulacionContraLaCorrida {
+
+        @Test
+        @DisplayName("con la resolucion de multa emitida no se anula, y se dice cual lo impide")
+        void conResolucionDeMultaNoSeAnula() {
+            Papeleta papeleta = papeletaExigible("anul1");
+            CorridaDeValores corrida = corridaDe(papeleta);
+            generar.generar(corrida.identificador());
+
+            String numeroDelValor = itemsDe(corrida).get(0).valorNumero();
+            assertThat(numeroDelValor).as("la corrida tuvo que emitirlo de verdad").isNotNull();
+
+            assertThatThrownBy(
+                            () ->
+                                    enTransaccion(
+                                            () ->
+                                                    anularPapeleta.anular(
+                                                            Familia.TRANSITO,
+                                                            papeleta.numero(),
+                                                            EXIGIBLE_DESDE,
+                                                            PORQUE)))
+                    .isInstanceOf(AnularPapeleta.PapeletaConResolucionDeMulta.class)
+                    .hasMessageContaining(numeroDelValor);
+
+            assertThat(enTransaccion(() -> papeletas.porId(papeleta.identificador())))
+                    .as("y no escribe nada: la papeleta se queda como estaba")
+                    .get()
+                    .extracting(Papeleta::estado)
+                    .isEqualTo(EstadoDePapeleta.IMPUESTA);
+        }
+
+        @Test
+        @DisplayName("sin resolucion de multa emitida si se anula")
+        void sinResolucionDeMultaSiSeAnula() {
+            Papeleta papeleta = papeletaDeTransito("anul2");
+
+            AnularPapeleta.Anulada anulada =
+                    enTransaccion(
+                            () ->
+                                    anularPapeleta.anular(
+                                            Familia.TRANSITO,
+                                            papeleta.numero(),
+                                            EXIGIBLE_DESDE,
+                                            PORQUE));
+
+            assertThat(anulada.papeleta().estado()).isEqualTo(EstadoDePapeleta.ANULADA);
+        }
+
+        @Test
+        @DisplayName("un candidato que NO PROCEDE no impide anular: no hay valor que lo sostenga")
+        void unCandidatoQueNoProcedeNoImpideAnular() {
+            Papeleta papeleta = papeletaDeTransito("anul3");
+            CorridaDeValores corrida = corridaDe(papeleta);
+            generar.generar(corrida.identificador());
+
+            assertThat(itemsDe(corrida).get(0).estado())
+                    .as("sin ordinaria dictada la corrida no lo formaliza")
+                    .isEqualTo(EstadoDeItemDeCorrida.NO_PROCEDE);
+
+            assertThat(
+                            enTransaccion(
+                                            () ->
+                                                    anularPapeleta.anular(
+                                                            Familia.TRANSITO,
+                                                            papeleta.numero(),
+                                                            EXIGIBLE_DESDE,
+                                                            PORQUE))
+                                    .papeleta()
+                                    .estado())
+                    .isEqualTo(EstadoDePapeleta.ANULADA);
         }
     }
 

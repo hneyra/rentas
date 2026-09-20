@@ -88,7 +88,17 @@ class AccesosCompartidosTest {
                     // acaba de sortear la muestra. No se arregla otorgando la opcion ajena en cada
                     // implantacion: lo que se olvida no avisa (#548).
                     "GET /fiscalizacion/programas/{id}/embudo",
-                    Set.of("fisc_programa"));
+                    Set.of("fisc_programa"),
+                    // #267 — anular una papeleta, que es la UNICA transicion que este sistema
+                    // escribe sobre ella. La ruta dice «transito» porque esa es la pantalla que
+                    // el manual da, pero `papeleta` es UNA tabla y el acto sirve a las dos
+                    // familias: exigir solo `papeletas` dejaria a quien opera las infracciones
+                    // administrativas sin poder anular la suya, o sea con una papeleta que no
+                    // vale contando en su padron y en su estado de cuenta. Es lo mismo que #214
+                    // decidio para el acta, y el mismo sintoma de #548: una pantalla que escribe
+                    // y no puede deshacer lo que escribio.
+                    "POST /transito/papeletas/{numero}/anulacion",
+                    Set.of("infracciones_adm"));
 
     @Test
     @DisplayName("todo endpoint que comparte su acceso esta censado, y el censo no miente")

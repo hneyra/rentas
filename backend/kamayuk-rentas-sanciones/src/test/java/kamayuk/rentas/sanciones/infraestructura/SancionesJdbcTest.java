@@ -68,6 +68,7 @@ import kamayuk.rentas.dominio.ResultadoDeNotificacion;
 import kamayuk.rentas.esquema.BaseDeDatosDePrueba;
 import kamayuk.rentas.esquema.ContextoDeTenant;
 import kamayuk.rentas.plataforma.tenant.TenantTransactionManager;
+import kamayuk.rentas.sanciones.aplicacion.AnularPapeleta;
 import kamayuk.rentas.sanciones.aplicacion.ConsultaDeActosDeLaPapeleta;
 import kamayuk.rentas.sanciones.aplicacion.ConsultaDeInternamientos;
 import kamayuk.rentas.sanciones.aplicacion.LiberarVehiculoInternado;
@@ -84,6 +85,7 @@ import kamayuk.rentas.sanciones.dominio.CriterioDeInternamiento;
 import kamayuk.rentas.sanciones.dominio.Descargo;
 import kamayuk.rentas.sanciones.dominio.EfectoSobreLaMulta;
 import kamayuk.rentas.sanciones.dominio.EstadoDeInternamiento;
+import kamayuk.rentas.sanciones.dominio.EstadoDePapeleta;
 import kamayuk.rentas.sanciones.dominio.EstadoDelActoDeLaPapeleta;
 import kamayuk.rentas.sanciones.dominio.Familia;
 import kamayuk.rentas.sanciones.dominio.InternamientoEnConsulta;
@@ -206,6 +208,7 @@ class SancionesJdbcTest {
 
     private static RegistrarPapeleta registrarPapeleta;
     private static RegistrarDescargo registrarDescargo;
+    private static AnularPapeleta anularPapeleta;
     private static ResolverConResolucionDeGerencia resolver;
     private static NotificarResolucionDeGerencia notificar;
     private static RegistrarInternamiento internar;
@@ -295,6 +298,13 @@ class SancionesJdbcTest {
         registrarPapeleta = envolver(new RegistrarPapeleta(papeletas, codigos, cargos, auditoria));
         registrarDescargo =
                 envolver(new RegistrarDescargo(papeletas, descargos, plazos, auditoria, RELOJ));
+        anularPapeleta =
+                envolver(
+                        new AnularPapeleta(
+                                papeletas,
+                                new CorridaDeValoresRepositoryJdbc(jdbc),
+                                extincion,
+                                auditoria));
         resolver =
                 envolver(
                         new ResolverConResolucionDeGerencia(
@@ -1206,13 +1216,18 @@ class SancionesJdbcTest {
             assertThat(desdeB).as("RLS: no es que este vacia, es que no existe").isEmpty();
         }
 
+        /**
+         * Hasta #267 esta prueba fabricaba el estado con un {@code UPDATE papeleta SET estado =
+         * 'ANULADA'} crudo, desde la propia prueba, porque <b>ningun camino de produccion podia
+         * llevar una papeleta a ese estado</b>. Ahora lo hace el acto, que es lo que convierte la
+         * guarda en real: si {@code AnularPapeleta} dejara de escribir la columna, esto se pondria
+         * rojo en vez de seguir verde sobre un estado inventado.
+         */
         @Test
         @DisplayName("y una resolucion sobre una papeleta anulada no se dicta")
-        void noSeResuelveSobreUnaPapeletaAnulada() throws SQLException {
+        void noSeResuelveSobreUnaPapeletaAnulada() {
             Papeleta papeleta = papeletaDeTransito("E04");
-            ejecutarComoApp(
-                    "UPDATE papeleta SET estado = 'ANULADA' WHERE id = "
-                            + papeleta.identificador());
+            anular(papeleta);
 
             assertThatThrownBy(
                             () ->
@@ -1224,6 +1239,153 @@ class SancionesJdbcTest {
                                             null,
                                             null))
                     .isInstanceOf(RegistrarDescargo.PapeletaSinNadaQueImpugnar.class);
+        }
+    }
+
+    // ==================================================================
+    //  #267 — anular la papeleta: la unica transicion que este sistema escribe
+    // ==================================================================
+
+    /**
+     * Lo que esta seccion defiende, y ninguna prueba con dobles podia:
+     *
+     * <ul>
+     *   <li>que el acto exista de verdad contra el motor, con el privilegio que {@code V20} dejo
+     *       puesto —{@code GRANT UPDATE (numero, estado)}— y ni una columna mas;
+     *   <li>que la guarda {@code PapeletaSinNadaQueImpugnar} <b>pueda morder</b>. Hasta #267 no
+     *       podia: los dos valores que mira eran inalcanzables, y las pruebas que la cubrian se
+     *       escribian a si mismas el estado que verificaban con un {@code UPDATE} crudo;
+     *   <li>y que anular no deje a la papeleta <b>anulada y debiendo</b>, que es el defecto que
+     *       {@code ObligacionDeLaPapeleta} nombra.
+     * </ul>
+     */
+    @Nested
+    @DisplayName("#267 — la papeleta se anula, y entonces las dos guardas descartan de verdad")
+    class LaAnulacionDeLaPapeleta {
+
+        @Test
+        @DisplayName("anular mueve el estado, no borra nada y da de baja lo que la papeleta cargo")
+        void anularDaDeBajaLoQueLaPapeletaCargo() {
+            Papeleta papeleta = papeletaDeTransito("F01");
+            assertThat(deudaDe(papeleta, ORDINARIA)).isEqualTo(MULTA);
+
+            AnularPapeleta.Anulada anulada = anular(papeleta);
+
+            assertThat(anulada.papeleta().estado()).isEqualTo(EstadoDePapeleta.ANULADA);
+            assertThat(anulada.baja().importe()).isEqualTo(MULTA);
+            assertThat(anulada.baja().asientos())
+                    .as("un abono por cada parte del desglose con importe")
+                    .isEqualTo(1);
+
+            assertThat(
+                            enTransaccion(
+                                    () -> papeletas.porNumero(Familia.TRANSITO, papeleta.numero())))
+                    .as("la fila sigue entera (regla 4, RNF-051): lo unico que cambia es el estado")
+                    .get()
+                    .satisfies(
+                            releida -> {
+                                assertThat(releida.estado()).isEqualTo(EstadoDePapeleta.ANULADA);
+                                assertThat(releida.importeAPagar()).isEqualTo(MULTA);
+                                assertThat(releida.placa()).isEqualTo(papeleta.placa());
+                                assertThat(releida.lugar()).isEqualTo(papeleta.lugar());
+                                assertThat(releida.fechaInfraccion())
+                                        .isEqualTo(papeleta.fechaInfraccion());
+                            });
+
+            assertThat(deudaDe(papeleta, ORDINARIA))
+                    .as("y sin esto quedaria ANULADA —o sea «no se debe»— y debiendo en el libro")
+                    .isEqualTo(Dinero.CERO);
+
+            assertThat(causalDelUltimoAbono(papeleta))
+                    .as("«la baja que deshace un alta que no debio existir», y no la de #684")
+                    .isEqualTo(CausalDeBaja.ERROR_MATERIAL.name());
+            assertThat(motivoDelUltimoAbono(papeleta))
+                    .as("el motivo del asiento es la observacion de quien anula (regla 10)")
+                    .isEqualTo(PORQUE.texto());
+        }
+
+        /**
+         * <b>La mitad mas valiosa de #267.</b> Anular de verdad y despues intentar descargar: no
+         * hay ningun doble que fabrique el estado, y si el acto no escribiera la columna esta
+         * prueba fallaria por no lanzar nada.
+         */
+        @Test
+        @DisplayName("contra una papeleta anulada no se registra descargo: la guarda YA muerde")
+        void laGuardaDelDescargoYaPuedeMorder() {
+            Papeleta papeleta = papeletaDeTransito("F02");
+
+            assertThat(
+                            enTransaccion(
+                                    () ->
+                                            registrarDescargo.registrar(
+                                                    Familia.TRANSITO,
+                                                    papeleta.numero(),
+                                                    new RegistrarDescargo.Peticion(
+                                                            "EXP-F02",
+                                                            INFRACCION.plusDays(2),
+                                                            TipoDeRecurso.DESCARGO,
+                                                            "Antes de anular si se admite"),
+                                                    PORQUE),
+                                    "mesa.partes"))
+                    .as("viva, el recurso entra: si no, esta prueba no distinguiria nada")
+                    .isNotNull();
+
+            anular(papeleta);
+
+            assertThatThrownBy(
+                            () ->
+                                    enTransaccion(
+                                            () ->
+                                                    registrarDescargo.registrar(
+                                                            Familia.TRANSITO,
+                                                            papeleta.numero(),
+                                                            new RegistrarDescargo.Peticion(
+                                                                    "EXP-F02-B",
+                                                                    INFRACCION.plusDays(3),
+                                                                    TipoDeRecurso.RECONSIDERACION,
+                                                                    "Contra una multa que ya no"
+                                                                            + " existe"),
+                                                            PORQUE),
+                                            "mesa.partes"))
+                    .isInstanceOf(RegistrarDescargo.PapeletaSinNadaQueImpugnar.class)
+                    .hasMessageContaining("ANULADA");
+        }
+
+        @Test
+        @DisplayName("una papeleta ya anulada no se vuelve a anular")
+        void unaPapeletaYaAnuladaNoSeVuelveAAnular() {
+            Papeleta papeleta = papeletaDeTransito("F03");
+            anular(papeleta);
+
+            assertThatThrownBy(() -> anular(papeleta))
+                    .isInstanceOf(Papeleta.TransicionIlegal.class)
+                    .hasMessageContaining("ANULADA");
+        }
+
+        @Test
+        @DisplayName("el acto queda en auditoria con su antes y su despues")
+        void elActoQuedaEnAuditoria() {
+            Papeleta papeleta = papeletaDeTransito("F04");
+            anular(papeleta);
+
+            assertThat(
+                            enTransaccion(
+                                    () ->
+                                            jdbc.sql(
+                                                            "SELECT datos_anteriores::text || ' ->"
+                                                                    + " ' || datos_nuevos::text FROM"
+                                                                    + " auditoria WHERE tabla ="
+                                                                    + " 'papeleta' AND clave = :clave"
+                                                                    + " AND operacion = 'MODIFICACION'"
+                                                                    + " ORDER BY id DESC LIMIT 1")
+                                                    .param(
+                                                            "clave",
+                                                            String.valueOf(
+                                                                    papeleta.identificador()))
+                                                    .query(String.class)
+                                                    .single()))
+                    .as("el antes y el despues del acto, que es lo que la regla 10 exige guardar")
+                    .isEqualTo("{\"estado\": \"IMPUESTA\"} -> {\"estado\": \"ANULADA\"}");
         }
     }
 
@@ -1288,6 +1450,14 @@ class SancionesJdbcTest {
                                 MULTA,
                                 null,
                                 PORQUE));
+    }
+
+    private static AnularPapeleta.Anulada anular(Papeleta papeleta) {
+        return enTransaccion(
+                () ->
+                        anularPapeleta.anular(
+                                papeleta.familia(), papeleta.numero(), ORDINARIA, PORQUE),
+                "gerente");
     }
 
     private static ResolverConResolucionDeGerencia.ResolucionDictada dictar(

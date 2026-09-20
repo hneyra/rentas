@@ -1116,6 +1116,13 @@
     "opcionales": [],
     "enElCuerpo": []
   },
+  "POST /transito/papeletas/{numero}/anulacion": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
   "POST /transito/reportes": {
     "obligatorios": [],
     "algunoDeEstos": [],

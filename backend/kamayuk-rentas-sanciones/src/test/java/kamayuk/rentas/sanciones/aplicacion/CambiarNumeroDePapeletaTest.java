@@ -126,5 +126,10 @@ class CambiarNumeroDePapeletaTest {
             }
             throw new IllegalStateException("No hay papeleta con id " + papeletaId);
         }
+
+        @Override
+        public Papeleta anular(long papeletaId) {
+            throw new UnsupportedOperationException("esta prueba no anula papeletas");
+        }
     }
 }

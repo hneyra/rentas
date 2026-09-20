@@ -171,6 +171,102 @@ class PapeletaTest {
                 OBSERVACION);
     }
 
+    // ==================================================================
+    //  #267 — la unica transicion que este sistema escribe
+    // ==================================================================
+
+    @Test
+    @DisplayName("anular mueve el estado y NADA mas")
+    void anularMueveElEstadoYNadaMas() {
+        Papeleta impuesta = transitoConId("PT-0100", "ABC-123", 7L);
+
+        Papeleta anulada = impuesta.anulada();
+
+        assertThat(anulada.estado()).isEqualTo(EstadoDePapeleta.ANULADA);
+        assertThat(anulada.id()).isEqualTo(impuesta.id());
+        assertThat(anulada.numero()).isEqualTo(impuesta.numero());
+        assertThat(anulada.placa()).isEqualTo(impuesta.placa());
+        assertThat(anulada.fechaInfraccion()).isEqualTo(impuesta.fechaInfraccion());
+        assertThat(anulada.lugar()).isEqualTo(impuesta.lugar());
+        assertThat(anulada.importeAPagar())
+                .as("regla 4: no se borra ni se edita, la papeleta se sigue leyendo entera")
+                .isEqualTo(impuesta.importeAPagar());
+        assertThat(anulada.importeInfraccion()).isEqualTo(impuesta.importeInfraccion());
+        assertThat(anulada.usuarioRegistro()).isEqualTo(impuesta.usuarioRegistro());
+    }
+
+    /**
+     * La siembra NO es uniforme a proposito: uno por cada estado en el que ya no se debe nada, y
+     * uno de los que si. Con una sola papeleta {@code IMPUESTA} esta prueba pasaria con la guarda
+     * entera borrada, que es el modo de fallo que #243 midio cuatro veces.
+     */
+    @Test
+    @DisplayName("de los tres estados en que ya no se debe nada, no se anula: uno por uno")
+    void desdeLosTresEstadosTerminalesNoSeAnula() {
+        for (EstadoDePapeleta terminal : EstadoDePapeleta.values()) {
+            if (terminal.seDebe()) {
+                continue;
+            }
+            Papeleta muerta = transitoEn("PT-01" + terminal.ordinal(), terminal);
+            assertThatThrownBy(muerta::anulada)
+                    .as("desde %s no se anula", terminal)
+                    .isInstanceOf(Papeleta.TransicionIlegal.class)
+                    .hasMessageContaining(terminal.name());
+        }
+        assertThat(
+                        java.util.Arrays.stream(EstadoDePapeleta.values())
+                                .filter(estado -> !estado.seDebe())
+                                .count())
+                .as("si algun dia son menos de tres, esta prueba dejaria de ejercerlos todos")
+                .isEqualTo(3L);
+    }
+
+    @Test
+    @DisplayName("de los cuatro estados en que todavia se debe, si se anula: uno por uno")
+    void desdeLosCuatroEstadosVivosSiSeAnula() {
+        int vivos = 0;
+        for (EstadoDePapeleta vivo : EstadoDePapeleta.values()) {
+            if (!vivo.seDebe()) {
+                continue;
+            }
+            vivos++;
+            assertThat(transitoEn("PT-02" + vivo.ordinal(), vivo).anulada().estado())
+                    .as("desde %s si se anula", vivo)
+                    .isEqualTo(EstadoDePapeleta.ANULADA);
+        }
+        assertThat(vivos).isEqualTo(4);
+    }
+
+    private static Papeleta transitoEn(String numero, EstadoDePapeleta estado) {
+        Papeleta base = transitoConId(numero, "ABC-123", 9L);
+        return new Papeleta(
+                base.id(),
+                base.familia(),
+                base.numero(),
+                base.codigoInfraccionId(),
+                base.fechaInfraccion(),
+                base.horaInfraccion(),
+                base.lugar(),
+                base.placa(),
+                base.vehiculoId(),
+                base.licenciaConducir(),
+                base.infractorId(),
+                base.propietarioId(),
+                base.contribuyenteId(),
+                base.predioId(),
+                base.notificacionPreviaId(),
+                base.obligadoId(),
+                base.baseImponible(),
+                base.porcentajeInfraccion(),
+                base.importeInfraccion(),
+                base.porcentajeACobrar(),
+                base.importeAPagar(),
+                base.importeConBeneficio(),
+                estado,
+                base.usuarioRegistro(),
+                base.observacion());
+    }
+
     private static Papeleta transitoConId(String numero, String placa, long id) {
         Papeleta nueva = transitoDe(numero, placa);
         return new Papeleta(

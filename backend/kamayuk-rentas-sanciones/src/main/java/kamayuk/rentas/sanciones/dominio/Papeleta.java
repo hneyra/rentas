@@ -303,4 +303,84 @@ public record Papeleta(
                 usuarioRegistro,
                 observacion);
     }
+
+    /**
+     * Esta misma papeleta, anulada (#267). Ninguno de sus demás datos cambia.
+     *
+     * <p><b>Es la única transición que este sistema escribe</b>, y hasta #267 no existía ninguna:
+     * {@link EstadoDePapeleta} declara siete valores y la producción escribía uno —{@code
+     * IMPUESTA}, en el {@code INSERT}—, de modo que {@code ANULADA} era inalcanzable y las dos
+     * guardas que la descartan —{@code RegistrarDescargo} y {@code
+     * ResolverConResolucionDeGerencia}, con su {@code PapeletaSinNadaQueImpugnar}— no descartaban
+     * nada. Es el mismo hueco que #214 cerró en el acta de fiscalización, y se cierra igual: el
+     * acto existe, escribe una sola columna, y el privilegio ya estaba puesto desde {@code V20}
+     * ({@code GRANT UPDATE (numero, estado)}).
+     *
+     * <p><b>{@code PRESCRITA} no se añade</b>, y no por olvido: la prescripción se dice en el
+     * <b>valor</b> —{@code DeclararPrescripcion} marca {@code PRESCRITO} lo que alcanza— y no en la
+     * papeleta, que ni siquiera aparece en la firma de ese acto. {@link EstadoDePapeleta} lleva la
+     * medida.
+     *
+     * <p><b>De qué estados se puede anular</b>: de los que todavía se deben, y eso no es una
+     * segunda lista sino {@link EstadoDePapeleta#seDebe()}, que es donde #259 dejó esa verdad. Una
+     * {@code PAGADA} no se anula —lo que corresponde con lo cobrado de más es una devolución, que
+     * es otro procedimiento—, y una {@code ANULADA} o {@code PRESCRITA} ya terminó.
+     *
+     * <p>La comprobación vive aquí y no en el caso de uso porque es una propiedad de la papeleta:
+     * cualquier camino que la anule mañana pasa por esta puerta sin tener que acordarse. Es el
+     * patrón de {@code ActaFiscalizacion#anulada} (#214) y de {@code DeclaracionJurada#anulada}.
+     *
+     * <p><b>No borra nada</b> (regla 4, RNF-051): la papeleta se sigue leyendo entera —qué placa,
+     * qué día, qué importe— y lo único que cambia es que deja de contar. Corregir lo que el
+     * inspector tomó mal en campo <b>no</b> es esto ni es un {@code UPDATE}: es anular ésta y
+     * levantar otra, que es exactamente lo que {@code V20} escribió al estrechar el privilegio.
+     */
+    public Papeleta anulada() {
+        if (!estado.seDebe()) {
+            throw new TransicionIlegal(numero, estado);
+        }
+        return new Papeleta(
+                id,
+                familia,
+                numero,
+                codigoInfraccionId,
+                fechaInfraccion,
+                horaInfraccion,
+                lugar,
+                placa,
+                vehiculoId,
+                licenciaConducir,
+                infractorId,
+                propietarioId,
+                contribuyenteId,
+                predioId,
+                notificacionPreviaId,
+                obligadoId,
+                baseImponible,
+                porcentajeInfraccion,
+                importeInfraccion,
+                porcentajeACobrar,
+                importeAPagar,
+                importeConBeneficio,
+                EstadoDePapeleta.ANULADA,
+                usuarioRegistro,
+                observacion);
+    }
+
+    /** La papeleta no admite ese acto en el estado en que está. */
+    public static final class TransicionIlegal extends RuntimeException {
+
+        @java.io.Serial private static final long serialVersionUID = 1L;
+
+        TransicionIlegal(String numero, EstadoDePapeleta desde) {
+            super(
+                    "La papeleta "
+                            + numero
+                            + " esta "
+                            + desde
+                            + " y no puede anularse: en ese estado ya no se debe nada, y lo que"
+                            + " corresponde con lo cobrado de mas es una devolucion, no una"
+                            + " anulacion");
+        }
+    }
 }

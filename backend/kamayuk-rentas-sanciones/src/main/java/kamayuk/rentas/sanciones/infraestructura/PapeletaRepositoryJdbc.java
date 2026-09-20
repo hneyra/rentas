@@ -255,6 +255,41 @@ public class PapeletaRepositoryJdbc extends RepositorioJdbc implements PapeletaR
                         () -> new IllegalStateException("La papeleta desaparecio tras el cambio"));
     }
 
+    /**
+     * Anula la papeleta (#267): el segundo y último {@code UPDATE} de esta clase, y sobre una sola
+     * columna.
+     *
+     * <p>La transición la calcula el dominio antes de escribir ({@link Papeleta#anulada}), así que
+     * una papeleta que ya no debe nada no llega a la sentencia. Lo que impide que dos peticiones
+     * simultáneas —que leyeron las dos el mismo estado— la anulen dos veces no es esa comprobación
+     * sino que la segunda no cambia nada: el estado ya es el que se pedía.
+     */
+    @Override
+    public Papeleta anular(long papeletaId) {
+        Papeleta anterior =
+                porId(papeletaId)
+                        .orElseThrow(
+                                () ->
+                                        new IllegalStateException(
+                                                "No hay ninguna papeleta con identificador "
+                                                        + papeletaId
+                                                        + " en esta municipalidad"));
+        Papeleta anulada = anterior.anulada();
+
+        int filas =
+                jdbc().sql("UPDATE papeleta SET estado = :estado WHERE id = :id")
+                        .param("estado", anulada.estado().name())
+                        .param("id", papeletaId)
+                        .update();
+        if (filas == 0) {
+            throw new IllegalStateException(
+                    "No hay ninguna papeleta con identificador "
+                            + papeletaId
+                            + " en esta municipalidad");
+        }
+        return anulada;
+    }
+
     private static Papeleta conId(Papeleta papeleta, long id, String usuarioRegistro) {
         return new Papeleta(
                 id,
