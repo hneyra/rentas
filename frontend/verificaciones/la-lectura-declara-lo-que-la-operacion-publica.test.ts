@@ -10,6 +10,11 @@ import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
 import { YA_SERVIDAS } from '../src/datos/servidas.ts';
+import {
+  fuentesDeLosConectores,
+  modulosDelArbol,
+  modulosQueElRepartoImporta,
+} from './los-conectores-del-arbol.ts';
 
 /**
  * **Una lectura declara TODO lo que su operacion publica** (#239).
@@ -40,18 +45,25 @@ import { YA_SERVIDAS } from '../src/datos/servidas.ts';
  * entera. Y derivarla de los conectores la haria pasar diga lo que diga. Escrita, un tipo nuevo que
  * nadie anada aqui lo caza el centinela de abajo, que exige que la tabla cubra **todas** las
  * lecturas que los conectores piden.
+ *
+ * <h2>Pero la lista de CONECTORES no se escribe a mano, y aqui esta por que (#277)</h2>
+ *
+ * Lo estuvo, y se quedo vieja: enumeraba siete modulos y le faltaba `valores`, que existe desde
+ * que se separo `val-tip`. **Nadie se entero**, porque el unico tipo que `valores.ts` pide
+ * —`PrescripcionDeclarada`— lo pide tambien `coactiva.ts`, que si estaba: el centinela seguia
+ * cuadrando sobre un conjunto al que le faltaba un archivo entero. Eso es lo peor que le puede
+ * pasar a esta guarda, porque el centinela de abajo es **todo** lo que la ata al arbol: si un
+ * conector no se lee, ni sus tipos entran en la comparacion ni su ausencia se nombra.
+ *
+ * Asi que el conjunto sale del disco (`los-conectores-del-arbol.ts`), y **con su propio
+ * centinela**: la derivacion no puede encoger en silencio, porque se cruza con la que el reparto
+ * declara en sus `import`.
  */
 
 const AQUI = dirname(fileURLToPath(import.meta.url));
 const FRONTEND = join(AQUI, '..');
 const FORMAS = join(FRONTEND, '../docs/50-api/formas-de-la-api.json');
 const LECTURAS = join(FRONTEND, 'src/datos/lecturas.ts');
-const CONECTORES = [
-  join(FRONTEND, 'src/datos/conectores.ts'),
-  ...['coactiva', 'consultas', 'fiscalizacion', 'inicio', 'licencias', 'seguridad', 'transito'].map(
-    (modulo) => join(FRONTEND, `src/datos/conectores/${modulo}.ts`),
-  ),
-];
 
 /**
  * **Que tipo de `lecturas.ts` es la forma de que operacion del contrato.**
@@ -142,7 +154,7 @@ function formaDe(clave: string): Readonly<Record<string, unknown>> {
 /** Los tipos que los conectores piden, por las cuatro puertas que hay para pedirlos. */
 function tiposQueSePiden(): readonly string[] {
   const nombres = new Set<string>();
-  for (const archivo of CONECTORES) {
+  for (const archivo of fuentesDeLosConectores()) {
     const texto = readFileSync(archivo, 'utf8');
     for (const uno of texto.matchAll(/\bpedir(?:UnoOVacio|Uno|Pagina|Lista)<(\w+)>/g)) {
       nombres.add(uno[1] ?? '');
@@ -152,6 +164,25 @@ function tiposQueSePiden(): readonly string[] {
 }
 
 describe('una lectura declara lo que su operacion publica (#239)', () => {
+  it('EL CENTINELA DEL CONJUNTO: los conectores salen del disco, y no encogen en silencio', () => {
+    // Este va primero porque los otros tres se miden SOBRE el: un conjunto que encoge los deja
+    // comparando de menos y en verde, que es lo que paso con `valores` entre #230 y #277.
+    //
+    // Las dos derivaciones son independientes —una lee el directorio, la otra los `import` del
+    // reparto— y por eso el cruce muerde por los dos lados: un modulo que el filtro deje de casar
+    // desaparece de la primera, y uno que nadie ate a una hoja no aparece en la segunda.
+    const delArbol = modulosDelArbol();
+    expect(delArbol.length, 'el arbol de conectores vino vacio: no hay nada que leer').toBeGreaterThan(0);
+    expect(
+      delArbol,
+      'Los conectores del disco no son los que `src/datos/conectores.ts` importa.\n\n' +
+        '  Si falta uno del lado del arbol: el filtro de `los-conectores-del-arbol.ts` dejo de\n' +
+        '  casarlo, y sus tipos han dejado de compararse contra el contrato SIN que nada se ponga\n' +
+        '  rojo — que es como esta guarda se apaga sola.\n' +
+        '  Si falta uno del lado del reparto: hay un conector que ninguna hoja pide.',
+    ).toEqual(modulosQueElRepartoImporta());
+  });
+
   it('EL CENTINELA: la tabla cubre todas las lecturas que los conectores piden', () => {
     // Sin esto, un tipo nuevo que nadie anadiera aqui se quedaria sin comparar para siempre — que
     // es como una barrera se apaga sin que nadie la borre (#78, #80). Y al reves: una entrada que
