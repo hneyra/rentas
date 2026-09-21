@@ -115,6 +115,11 @@ const CORRIDA = {
   conjunto: 'V3',
   fechaCalculo: '28/01/2026 02:14',
   observados: 534,
+  // Los dos que #271 anadio a la operacion. Sin ellos el conector llama a `formatearEntero` con
+  // `undefined`, revienta, y el armazon **no llega a montarse**: el rojo sale como un tiempo
+  // agotado esperando la barra, sin nombrar ni este archivo ni el campo que falta.
+  determinados: 58412,
+  montoEmitido: '8772431.05',
   etapas: [
     { etapa: 'Lectura del padron', registros: 62418, monto: '—', observados: 0, estado: 'Conforme' },
     { etapa: 'Generacion de cuponeras', registros: 61350, monto: '—', observados: 534, estado: 'Observado' },
