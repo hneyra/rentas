@@ -100,8 +100,13 @@ test('«ini-flujo» monta el grafico que el artboard le declara, y sin datos dic
 
   // Sin backend no hay serie, y el lienzo no se dibuja: se dice por que no hay dato. Es la palabra
   // de la pantalla —la misma que sale en cada campo—, no una escrita dentro del grafico.
+  //
+  // **Y la palabra es «no encontrado», no «fallo»** (#283): hasta que la escalera de identidad se
+  // enchufo a la pantalla, un 404 salia por la rama generica y se leia como una averia. Ahora dice
+  // que la operacion no encontro lo que se le pidio, que es otra cosa y tiene otro remedio. Este
+  // camino se escribio antes que #283 y afirmaba la palabra vieja.
   await expect(grafico.locator('.recharts-surface')).toHaveCount(0);
-  expect(await grafico.textContent()).toContain('fallo');
+  expect(await grafico.textContent()).toContain('no encontrado');
 
   // Y la tabla del artboard sigue ahi, al lado (AC-5).
   await expect(page.getByText('Cuadre por tributo')).toBeVisible();
