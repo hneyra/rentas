@@ -115,7 +115,9 @@ class TrabajoParadoControllerTest {
 
         assertThat(cuerpo).contains("\"ejercicio\":2026");
         assertThat(cuerpo).contains("\"fechaCalculo\":\"2026-08-13\"");
-        assertThat(cuerpo).contains("\"calculadoEn\":\"2026-08-13T14:05:31Z\"");
+        // Con el desfase de la zona del producto y no en UTC (#188): el reloj esta fijado a las
+        // 14:05:31Z, que en `America/Lima` son las 09:05:31.
+        assertThat(cuerpo).contains("\"calculadoEn\":\"2026-08-13T09:05:31-05:00\"");
         assertThat(cuerpo)
                 .contains(
                         "\"frente\":\"TRANSITO\",\"modulo\":\"Transito\","

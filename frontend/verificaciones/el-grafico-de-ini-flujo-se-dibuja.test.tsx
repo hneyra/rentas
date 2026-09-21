@@ -86,7 +86,7 @@ function recaudacion(
   return {
     ejercicio: 2026,
     fechaCalculo: '2026-09-16',
-    calculadoEn: '2026-09-16T10:00:00Z',
+    calculadoEn: '2026-09-16T05:00:00-05:00',
     cargado: conFecha('23725394.80'),
     kpis: [{ label: 'Recaudado 2026', value: '', note: '', importe: conFecha('18424251.20') }],
     paneles: [

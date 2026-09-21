@@ -209,7 +209,7 @@ test.beforeEach(async ({ page }) => {
       body: JSON.stringify({
         ejercicio: 2026,
         fechaCalculo: '2026-09-16',
-        calculadoEn: '2026-09-16T10:00:00Z',
+        calculadoEn: '2026-09-16T05:00:00-05:00',
         frentes: FRENTES,
       }),
     }),

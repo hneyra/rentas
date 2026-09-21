@@ -325,9 +325,11 @@ export interface OperacionServida {
  *
  * <b>Lo que NO se midio, y hay que decirlo</b>: tampoco esta se pidio contra la instalacion. La
  * medida es el contrato generado de los controladores y el codigo de `SesionController`,
- * `ConsultaDeAuditoria` y `Operacion`. Hay un sitio donde eso se nota y esta dicho en el conector:
- * `fecha` es un `Instant`, o sea que Jackson lo publica en <b>UTC</b>, y esta interfaz lo ensena
- * tal cual en vez de moverlo a la hora de Lima.
+ * `ConsultaDeAuditoria` y `Operacion`. Habia un sitio donde eso se notaba —`fecha` era un
+ * `Instant`, o sea que Jackson lo publicaba en <b>UTC</b>, y esta interfaz lo ensenaba tal cual
+ * antes que moverlo a la hora de Lima—, y <b>#188 lo cerro por el otro lado</b>: el `Resource`
+ * declara un `OffsetDateTime` y la hora llega ya con el desfase de la municipalidad. La interfaz
+ * sigue sin mover nada; lo que cambio es lo que le llega.
  *
  * <b>Y lo que NO se pudo hacer con estas tres, dicho aqui y no descubierto luego</b>: no se
  * midieron contra la instalacion con `curl`, como si se midieron las seis de I-4. Lo que se leyo

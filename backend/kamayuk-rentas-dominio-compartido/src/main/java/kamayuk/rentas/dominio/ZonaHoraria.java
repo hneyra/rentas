@@ -2,6 +2,7 @@ package kamayuk.rentas.dominio;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.Objects;
 
@@ -36,10 +37,13 @@ import java.util.Objects;
  * unico que esta clase aporta es con que zona se lee. Recalcular en 2037 el dia de un hecho de 2027
  * da el mismo dia.
  *
- * <p><b>Que NO resuelve.</b> La hora que la API <i>publica</i> sigue saliendo en UTC; cambiarla es
- * {@code rentas}#188, que toca el contrato. Y los cuatro {@code ZoneOffset.UTC} que convierten un
- * {@link Instant} a {@code OffsetDateTime} —el mismo instante, sin truncar— se quedan donde estan y
- * lo dicen en su javadoc.
+ * <p><b>Que resuelve ya, y que no.</b> Desde {@code rentas}#188 la hora que la API <i>publica</i>
+ * tambien sale de aqui: {@link #conSuDesfase(Instant)} es lo que convierte el instante en el {@code
+ * OffsetDateTime} que viaja en el JSON, con {@code -05:00} a la vista en vez de una {@code Z}. Lo
+ * que <b>no</b> cambio son los cuatro {@code ZoneOffset.UTC} que #273 dejo: ninguno de los cuatro
+ * sale por HTTP —tres son parametros de un {@code INSERT} y el cuarto mapea una columna a un record
+ * de dominio que ningun controlador devuelve—, asi que se quedan donde estan y lo dicen en su
+ * javadoc.
  */
 public final class ZonaHoraria {
 
@@ -79,5 +83,30 @@ public final class ZonaHoraria {
     public static Instant comienzoDelDia(LocalDate dia) {
         Objects.requireNonNull(dia, "No hay comienzo sin dia");
         return dia.atStartOfDay(DEL_PRODUCTO).toInstant();
+    }
+
+    /**
+     * El mismo instante, visto desde la zona del producto y <b>llevando su desfase encima</b>.
+     *
+     * <p>Es lo unico que un {@code Resource} tiene que llamar para publicar una hora ({@code
+     * rentas}#188). Jackson serializa el {@link OffsetDateTime} que devuelve como {@code
+     * 2026-08-13T09:41:12-05:00}, y esos digitos ya son la hora de aqui: quien los lee no tiene que
+     * saber donde esta la municipalidad ni mover nada. Un {@link Instant} salia como {@code
+     * 2026-08-13T14:41:12Z} y dejaba esa resta al cliente — que es como la bitacora de auditoria
+     * acabo enseniando las 14:41 de un recibo anulado a las 09:41.
+     *
+     * <p><b>Por que un {@code OffsetDateTime} y no un {@code LocalDateTime} ni una cadena
+     * redactada.</b> Un {@code LocalDateTime} publica los mismos digitos y <b>pierde el
+     * desfase</b>: el cliente vuelve a adivinar, y esta vez sin saber siquiera que esta adivinando.
+     * Una cadena redactada —{@code "13/08/2026 09:41"}— se pinta mas barato y no se ordena ni se
+     * filtra sin volver a parsearla, ademas de meter el formato de presentacion en el contrato.
+     *
+     * <p><b>No convierte nada.</b> El instante que entra y el que sale son el mismo punto en la
+     * linea del tiempo; lo unico que cambia es con que desfase se presenta. Por eso esto no es
+     * aritmetica sobre un instante y no puede correr un dia.
+     */
+    public static OffsetDateTime conSuDesfase(Instant instante) {
+        Objects.requireNonNull(instante, "No hay hora publicada sin instante");
+        return instante.atZone(DEL_PRODUCTO).toOffsetDateTime();
     }
 }

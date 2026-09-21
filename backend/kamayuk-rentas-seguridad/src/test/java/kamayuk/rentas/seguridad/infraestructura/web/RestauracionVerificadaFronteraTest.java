@@ -276,7 +276,11 @@ class RestauracionVerificadaFronteraTest {
                 "2026-08-30T06:07:00Z",
                 "EXITOSO",
                 "s3://kamayuk-stg/base",
-                "2026-08-31T22:15:00Z",
+                // Las 21:15 del 31 de agosto en el Peru, escritas como el instante UTC que la
+                // base guarda. En UTC ya es el dia 1 de septiembre, y esa discrepancia es lo que
+                // hace que esta muestra distinga algo: a mediodia las dos lecturas coinciden y
+                // una asercion sembrada ahi pasaria igual publicando en UTC (#188).
+                "2026-09-01T02:15:00Z",
                 QUIEN_VERIFICA);
 
         String cuerpo = cuerpoDe();
@@ -285,8 +289,15 @@ class RestauracionVerificadaFronteraTest {
                 .as(
                         "es la columna que la pantalla existe para decir: sin ella el recurso no"
                                 + " contesta si la copia se pudo restaurar alguna vez")
-                .contains("\"ultimaRestauracionVerificada\":\"2026-08-31T22:15:00Z\"")
+                .contains("\"ultimaRestauracionVerificada\":\"2026-08-31T21:15:00-05:00\"")
                 .contains("\"ultimaRestauracionVerificadaPor\":\"" + QUIEN_VERIFICA + "\"");
+
+        assertThat(cuerpo)
+                .as(
+                        "y NO sale la fecha UTC, que es el dia SIGUIENTE: una copia verificada la"
+                                + " noche del 31 constaba verificada el 1 (#188)")
+                .doesNotContain("2026-09-01")
+                .doesNotContain("Z\"");
     }
 
     @Test

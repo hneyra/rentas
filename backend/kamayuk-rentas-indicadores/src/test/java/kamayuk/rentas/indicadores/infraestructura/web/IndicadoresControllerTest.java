@@ -103,7 +103,13 @@ class IndicadoresControllerTest {
     void diceAQueHoraSeLeyo() throws Exception {
         // Un panel se recarga cada pocos minutos y dos lecturas del mismo dia dan cifras
         // distintas: sin la hora, dos capturas del mismo panel no se distinguen.
-        assertThat(panel("")).contains("\"calculadoEn\":\"2026-08-13T14:05:31Z\"");
+        //
+        // Y la hora sale con el desfase de la zona del producto, no en UTC (#188): el reloj de
+        // esta prueba esta fijado a las 14:05:31Z, que en `America/Lima` son las 09:05:31. Antes
+        // salia «2026-08-13T14:05:31Z» y quien lo leyera tenia que saber donde esta la
+        // municipalidad para restar cinco horas.
+        assertThat(panel("")).contains("\"calculadoEn\":\"2026-08-13T09:05:31-05:00\"");
+        assertThat(panel("")).doesNotContain("14:05:31Z");
     }
 
     @Test

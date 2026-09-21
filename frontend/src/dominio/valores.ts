@@ -29,12 +29,14 @@ export type Importe = string;
 export type Fecha = string;
 
 /**
- * Un **instante**, en ISO 8601 y con zona: `"2026-08-13T14:41:12Z"` (#181).
+ * Un **instante**, en ISO 8601 y con su desfase: `"2026-08-13T09:41:12-05:00"` (#181, #188).
  *
- * Es lo que publica un `Instant` de Java, y **no es una {@link Fecha}**: lleva hora y lleva zona,
- * y la zona es UTC. Tiene tipo propio para que no se cuele en `formatearFecha`, que lo rechaza a
- * proposito —espera ISO sin hora—; quien lo escribe es `formatearInstante`, que **no lo mueve de
- * zona**. Ver ahi por que.
+ * Es lo que publica un `OffsetDateTime` de Java, y **no es una {@link Fecha}**: lleva hora y lleva
+ * desfase. Hasta #188 era un `Instant` y llegaba en UTC —`"…T14:41:12Z"`—, de modo que la
+ * pantalla no podia decir la hora de aqui sin inventarla; ahora los digitos que vienen **ya son la
+ * hora de la municipalidad**. Tiene tipo propio para que no se cuele en `formatearFecha`, que lo
+ * rechaza a proposito —espera ISO sin hora—; quien lo escribe es `formatearInstante`, que **no lo
+ * mueve de zona** y exige el desfase en vez de calcularlo. Ver ahi por que.
  */
 export type Instante = string;
 

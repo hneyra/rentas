@@ -1,8 +1,9 @@
 package kamayuk.rentas.indicadores.infraestructura.web;
 
-import java.time.Instant;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.List;
+import kamayuk.rentas.dominio.ZonaHoraria;
 import kamayuk.rentas.indicadores.dominio.FrenteParado;
 import kamayuk.rentas.indicadores.dominio.TrabajoParado;
 import kamayuk.rentas.web.ImporteActualizado;
@@ -30,17 +31,18 @@ import org.jspecify.annotations.Nullable;
  *
  * @param ejercicio el ejercicio contra el que se cuenta lo que depende de el
  * @param fechaCalculo el dia al que corresponden los recuentos
- * @param calculadoEn el instante exacto en que se leyeron
+ * @param calculadoEn el instante exacto en que se leyeron, con el desfase de la zona del producto y
+ *     no en UTC (#188)
  * @param frentes uno por frente visible; vacia si el perfil no puede ver ninguno
  */
 public record TrabajoParadoResource(
-        int ejercicio, LocalDate fechaCalculo, Instant calculadoEn, List<Frente> frentes) {
+        int ejercicio, LocalDate fechaCalculo, OffsetDateTime calculadoEn, List<Frente> frentes) {
 
     public static TrabajoParadoResource de(TrabajoParado parado) {
         return new TrabajoParadoResource(
                 parado.ejercicio().valor(),
                 parado.fechaCalculo(),
-                parado.calculadoEn(),
+                ZonaHoraria.conSuDesfase(parado.calculadoEn()),
                 parado.frentes().stream().map(Frente::de).toList());
     }
 

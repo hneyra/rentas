@@ -101,7 +101,7 @@ const BITACORA = {
       usuario: 'jcardenas',
       origenEquipo: 'PC-CAJA-02',
       origenIp: '10.0.4.12',
-      fecha: '2026-08-13T14:41:12Z',
+      fecha: '2026-08-13T09:41:12-05:00',
       observacion: 'Anulado por duplicado',
       datosAnteriores: null,
       datosNuevos: null,

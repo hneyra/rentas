@@ -2,6 +2,7 @@ package kamayuk.rentas.seguridad.infraestructura.web;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -13,6 +14,7 @@ import kamayuk.rentas.autorizacion.Privilegio;
 import kamayuk.rentas.autorizacion.RequiereAcceso;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.Observacion;
+import kamayuk.rentas.dominio.ZonaHoraria;
 import kamayuk.rentas.seguridad.aplicacion.AdministrarSesion;
 import kamayuk.rentas.seguridad.aplicacion.IdentidadDeLaSesion;
 import kamayuk.rentas.seguridad.aplicacion.MunicipalidadDeLaSesion;
@@ -340,20 +342,36 @@ public class SesionController {
     public record CambioDeClaveIniciado(String gestionadaPor, String destino) {}
 
     public record SesionResource(
-            long id, long usuarioId, Instant inicio, @Nullable Integer ejercicioDeTrabajo) {
+            long id, long usuarioId, OffsetDateTime inicio, @Nullable Integer ejercicioDeTrabajo) {
 
         static SesionResource de(Sesion sesion) {
             return new SesionResource(
                     sesion.id(),
                     sesion.usuarioId(),
-                    sesion.inicio(),
+                    ZonaHoraria.conSuDesfase(sesion.inicio()),
                     sesion.ejercicioDeTrabajo() == null
                             ? null
                             : sesion.ejercicioDeTrabajo().valor());
         }
     }
 
-    /** Lo que el manual pide ver: quien, desde que maquina e IP, cuando, sobre que y por que. */
+    /**
+     * Lo que el manual pide ver: quien, desde que maquina e IP, cuando, sobre que y por que.
+     *
+     * <p><b>{@code fecha} es un {@link OffsetDateTime} y no un {@link Instant}, y esa es la
+     * diferencia de {@code rentas}#188.</b> Sale como {@code 2026-08-13T09:41:12-05:00}, con la
+     * hora de la municipalidad y su desfase delante; antes salia como {@code 2026-08-13T14:41:12Z},
+     * y la pantalla no podia decir «09:41» sin inventarlo —construir un {@code Date} arrastra la
+     * zona del PUESTO, y restar cinco horas a mano cruza medianoche y cambia el dia—. Esta es la
+     * operacion donde mas duele: la pregunta que esta bitacora contesta es a que hora se anulo un
+     * recibo, y cinco horas de diferencia sin ningun sintoma es lo que se presenta cuando alguien
+     * pregunta por una baja.
+     *
+     * <p>El instante no se mueve: {@link ZonaHoraria#conSuDesfase(Instant)} presenta el mismo punto
+     * de la linea del tiempo con otro desfase. Lo que se publica aqui NO es un {@code
+     * LocalDateTime} —perderia el desfase y dejaria al cliente adivinando otra vez— ni una cadena
+     * redactada, que no se ordena ni se filtra sin volver a parsearla.
+     */
     public record AuditoriaResource(
             long id,
             int ejercicio,
@@ -363,7 +381,7 @@ public class SesionController {
             String usuario,
             @Nullable String origenEquipo,
             @Nullable String origenIp,
-            Instant fecha,
+            OffsetDateTime fecha,
             String observacion,
             @Nullable String datosAnteriores,
             @Nullable String datosNuevos) {
@@ -378,7 +396,7 @@ public class SesionController {
                     registro.usuario(),
                     registro.origenEquipo(),
                     registro.origenIp(),
-                    registro.fecha(),
+                    ZonaHoraria.conSuDesfase(registro.fecha()),
                     registro.observacion(),
                     registro.datosAnteriores(),
                     registro.datosNuevos());
@@ -400,26 +418,37 @@ public class SesionController {
      */
     public record RespaldoResource(
             long id,
-            Instant inicio,
-            @Nullable Instant fin,
+            OffsetDateTime inicio,
+            @Nullable OffsetDateTime fin,
             String resultado,
             String destino,
             @Nullable Long tamanoBytes,
             @Nullable String detalle,
-            @Nullable Instant ultimaRestauracionVerificada,
+            @Nullable OffsetDateTime ultimaRestauracionVerificada,
             @Nullable String ultimaRestauracionVerificadaPor) {
 
         static RespaldoResource de(Respaldo respaldo) {
             return new RespaldoResource(
                     respaldo.id(),
-                    respaldo.inicio(),
-                    respaldo.fin(),
+                    ZonaHoraria.conSuDesfase(respaldo.inicio()),
+                    publicada(respaldo.fin()),
                     respaldo.resultado(),
                     respaldo.destino(),
                     respaldo.tamanoBytes(),
                     respaldo.detalle(),
-                    respaldo.ultimaRestauracionVerificada(),
+                    publicada(respaldo.ultimaRestauracionVerificada()),
                     respaldo.ultimaRestauracionVerificadaPor());
+        }
+
+        /**
+         * Lo mismo que {@link ZonaHoraria#conSuDesfase(Instant)}, dejando pasar el nulo.
+         *
+         * <p>Dos de las tres horas de este recurso son nulas mientras nadie las haya producido —un
+         * respaldo en curso no tiene {@code fin}, y casi ninguna copia se restauro nunca—, y un
+         * nulo se publica como {@code null}, no como una hora inventada.
+         */
+        private static @Nullable OffsetDateTime publicada(@Nullable Instant hora) {
+            return hora == null ? null : ZonaHoraria.conSuDesfase(hora);
         }
     }
 }

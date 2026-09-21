@@ -56,8 +56,9 @@ import { laVentanaDe, laVentanaQueSePide, loQueDijoElServidor } from '../laVenta
  *
  * <table>
  *   <tr><th>Columna</th><th>De donde</th></tr>
- *   <tr><td>0 · Fecha y hora</td><td>`fecha`, que es un `Instant` y llega en <b>UTC</b>. Se
- *     escribe con su marca de zona y no se mueve — ver `formatearInstante`</td></tr>
+ *   <tr><td>0 · Fecha y hora</td><td>`fecha`, que desde #188 llega con el <b>desfase de la
+ *     municipalidad</b> —`2026-08-13T09:41:12-05:00`—. Se escribe tal cual y no se mueve: la zona
+ *     se lee del dato, nunca del navegador — ver `formatearInstante`</td></tr>
  *   <tr><td>1 · Usuario</td><td>`usuario`</td></tr>
  *   <tr><td>2 · Acto</td><td>`operacion`, la palabra del vocabulario cerrado que la bitacora
  *     guarda</td></tr>

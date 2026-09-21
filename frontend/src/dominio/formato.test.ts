@@ -202,34 +202,54 @@ describe('la fecha en palabras, como el artboard escribe la de corte', () => {
   });
 });
 
-describe('un instante se escribe con su zona, y NO se mueve de ella (#181)', () => {
+describe('un instante se escribe con la hora que trae, y NO se mueve de ella (#181, #188)', () => {
   it.each([
-    ['2026-08-13T14:41:12Z', '13/08/2026 14:41 UTC'],
-    // Sin segundos y con milisegundos: las dos formas que un `Instant` de Java puede tomar.
-    ['2026-08-13T14:41Z', '13/08/2026 14:41 UTC'],
-    ['2026-01-01T00:00:00.000Z', '01/01/2026 00:00 UTC'],
+    ['2026-08-13T09:41:12-05:00', '13/08/2026 09:41'],
+    // Sin segundos y con milisegundos: las dos formas que un `OffsetDateTime` de Java puede tomar.
+    ['2026-08-13T09:41-05:00', '13/08/2026 09:41'],
+    ['2026-01-01T00:00:00.000-05:00', '01/01/2026 00:00'],
+    // `America/Lima` ha estado a -04:00 —enero de 1990—, asi que el desfase no se da por sabido.
+    ['1990-01-16T00:30:00-04:00', '16/01/1990 00:30'],
   ])('«%s» -> «%s»', (servido, mostrado) => {
     expect(formatearInstante(servido)).toBe(mostrado);
   });
 
-  it('la misma medianoche NO se corre un dia, que es lo que haria un `Date`', () => {
-    // `new Date("2026-01-01T00:00:00Z").toLocaleString()` en Lima da el 31 de diciembre. Este
-    // archivo no construye ninguno, asi que da igual donde corra: la prueba pasa en cualquier
-    // zona, que es lo que la hace valer algo.
-    expect(formatearInstante('2026-01-01T00:00:00Z')).toContain('01/01/2026');
+  it('un movimiento de las 20:15 se queda en su dia: es donde UTC ya seria el siguiente', () => {
+    // LA muestra que distingue algo. A mediodia las dos lecturas coinciden y una prueba sembrada
+    // ahi sale verde aunque el formateador convierta; entre las 19:00 y la medianoche no
+    // coinciden, y ahi un fallo no cambia la hora sino la FECHA. El mismo instante en UTC es el
+    // «2026-08-14T01:15:00Z», o sea el dia 14.
+    expect(formatearInstante('2026-08-13T20:15:00-05:00')).toBe('13/08/2026 20:15');
   });
 
-  it('y dice la zona, porque la hora es de UTC y la pantalla no puede afirmar que es la de aqui', () => {
-    // En una bitacora de auditoria, «a que hora se anulo ese recibo» es la pregunta. Pintar
-    // 14:41 sin decir de donde es, en un sitio que esta a UTC-5, son cinco horas de diferencia
-    // sin ningun sintoma.
-    expect(formatearInstante('2026-08-13T14:41:12Z')).toMatch(/UTC$/);
+  it('la misma medianoche NO se corre un dia, que es lo que haria un `Date`', () => {
+    // `new Date('2026-01-01T00:00:00-05:00').toLocaleString()` da el 1 de enero en Lima, el 31 de
+    // diciembre en Los Angeles y las 06:00 del 1 en Madrid: TRES lecturas de la misma bitacora,
+    // segun donde este el puesto. Este archivo no construye ningun `Date`, asi que la prueba pasa
+    // en cualquier zona — que es lo que la hace valer algo.
+    expect(formatearInstante('2026-01-01T00:00:00-05:00')).toBe('01/01/2026 00:00');
+  });
+
+  it('y ya NO dice la zona, porque la hora que llega es la de la municipalidad (#188)', () => {
+    // Hasta #188 escribia «13/08/2026 14:41 UTC»: el backend publicaba un `Instant` y la pantalla
+    // no podia decir «09:41» sin inventarlo. Ahora el desfase viene en el dato y los digitos ya
+    // son los de aqui, asi que la marca sobra — y el artboard escribe «13/08/2026 09:41».
+    expect(formatearInstante('2026-08-13T09:41:12-05:00')).not.toMatch(/UTC/);
+  });
+
+  it('se niega a un instante en UTC, que es como se veria una regresion de #188', () => {
+    // No se pinta «14:41» de un recibo anulado a las 09:41, y no se convierte tampoco: convertir
+    // exigiria saber la zona, y saberla aqui es exactamente lo que #188 existe para no hacer. Se
+    // rompe nombrando el issue, porque lo que hay que arreglar esta en el `Resource`.
+    expect(() => formatearInstante('2026-08-13T14:41:12Z')).toThrow(/#188/);
+    expect(() => formatearInstante('2026-08-13T14:41Z')).toThrow(/#188/);
+    expect(() => formatearInstante('2026-01-01T00:00:00.000Z')).toThrow(/#188/);
   });
 
   it('se niega con lo que NO es un instante, en vez de escribirlo a medias', () => {
-    // Una fecha sin hora es una `Fecha` y la escribe `formatearFecha`; una con desfase no la
-    // publica ningun `Instant` de este backend, y admitirla seria admitir una hora sin zona fija.
-    for (const raro of ['2026-08-13', '13/08/2026 14:41', '2026-08-13T14:41:12-05:00', '']) {
+    // Una fecha sin hora es una `Fecha` y la escribe `formatearFecha`; una hora sin desfase es una
+    // hora sin zona, y admitirla seria volver a dejar al cliente adivinando.
+    for (const raro of ['2026-08-13', '13/08/2026 14:41', '2026-08-13T14:41:12', '']) {
       expect(() => formatearInstante(raro), raro).toThrow(/no sirve/i);
     }
   });
@@ -238,6 +258,6 @@ describe('un instante se escribe con su zona, y NO se mueve de ella (#181)', () 
     // Es la mitad que hace que el tipo `Instante` sirva de algo. Sin ella, alguien pasaria el
     // instante por `formatearFecha` y lo que saldria seria un error de forma, no un dato malo —
     // pero solo porque la expresion regular lo caza por casualidad. Aqui queda escrito.
-    expect(() => formatearFecha('2026-08-13T14:41:12Z')).toThrow();
+    expect(() => formatearFecha('2026-08-13T09:41:12-05:00')).toThrow();
   });
 });

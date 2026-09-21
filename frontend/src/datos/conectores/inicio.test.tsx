@@ -81,7 +81,7 @@ function recaudacion(
   return {
     ejercicio,
     fechaCalculo: '2026-09-16',
-    calculadoEn: '2026-09-16T10:00:00Z',
+    calculadoEn: '2026-09-16T05:00:00-05:00',
     cargado: conFecha(cargado),
     kpis: [
       {
@@ -151,7 +151,7 @@ function trabajoParado(cuantos: number, importe: string | null): TrabajoParado {
   return {
     ejercicio: 2026,
     fechaCalculo: '2026-09-16',
-    calculadoEn: '2026-09-16T10:00:00Z',
+    calculadoEn: '2026-09-16T05:00:00-05:00',
     frentes: [
       {
         frente: 'TRANSITO',

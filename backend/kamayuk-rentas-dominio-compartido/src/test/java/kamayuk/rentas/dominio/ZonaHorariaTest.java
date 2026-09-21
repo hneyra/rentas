@@ -11,7 +11,8 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 /**
- * #273 — La zona del producto: que sea la del Peru, que sea de la IANA y que no se lea sola.
+ * #273, #188 — La zona del producto: que sea la del Peru, que sea de la IANA, que no se lea sola y
+ * que la hora que se publica la lleve encima.
  *
  * <p>Ninguna prueba de esta clase llama a {@code Instant.now()} ni a {@code LocalDate.now()}: todos
  * los instantes estan escritos. La regla 6 no se relaja porque el sujeto sea una zona.
@@ -140,6 +141,48 @@ class ZonaHorariaTest {
             assertThatThrownBy(() -> ZonaHoraria.comienzoDelDia(null))
                     .isInstanceOf(NullPointerException.class)
                     .hasMessage("No hay comienzo sin dia");
+        }
+    }
+
+    @Nested
+    @DisplayName("conSuDesfase: la hora que la API publica (#188)")
+    class LaHoraQueSePublica {
+
+        @Test
+        @DisplayName("el mismo instante, pero escrito con -05:00 en vez de con una Z")
+        void lleveElDesfaseEncima() {
+            assertThat(ZonaHoraria.conSuDesfase(LAS_OCHO_DE_LA_NOCHE))
+                    .as("los digitos que salen ya son la hora de aqui: no hay nada que restar")
+                    .hasToString("2026-03-04T20:00-05:00");
+            assertThat(LAS_OCHO_DE_LA_NOCHE.atOffset(ZoneOffset.UTC))
+                    .as("y asi salia antes de #188: el dia 5 y a las 01:00")
+                    .hasToString("2026-03-05T01:00Z");
+        }
+
+        @Test
+        @DisplayName("no mueve el instante: es el mismo punto de la linea del tiempo")
+        void noMueveElInstante() {
+            // Es la diferencia entre presentar y convertir. Si esto dejara de cumplirse, el
+            // instante publicado no seria el instante ocurrido y la bitacora mentiria.
+            assertThat(ZonaHoraria.conSuDesfase(LAS_OCHO_DE_LA_NOCHE).toInstant())
+                    .isEqualTo(LAS_OCHO_DE_LA_NOCHE);
+        }
+
+        @Test
+        @DisplayName("y el desfase sale de la zona, no de un -05:00 escrito: en 1990 es -04:00")
+        void elDesfaseSaleDeLaZona() {
+            // La misma medida que `noEsUnDesfaseFijo`, del lado de la publicacion: un `-05:00`
+            // cableado fecharia este hecho el dia 15 y una hora antes de lo que fue.
+            assertThat(ZonaHoraria.conSuDesfase(Instant.parse("1990-01-16T04:30:00Z")))
+                    .hasToString("1990-01-16T00:30-04:00");
+        }
+
+        @Test
+        @DisplayName("sin instante no hay hora publicada")
+        void sinInstanteNoHayHora() {
+            assertThatThrownBy(() -> ZonaHoraria.conSuDesfase(null))
+                    .isInstanceOf(NullPointerException.class)
+                    .hasMessage("No hay hora publicada sin instante");
         }
     }
 }

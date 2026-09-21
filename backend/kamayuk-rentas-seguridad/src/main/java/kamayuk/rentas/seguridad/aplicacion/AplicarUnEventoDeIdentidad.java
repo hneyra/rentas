@@ -49,15 +49,15 @@ import tools.jackson.databind.json.JsonMapper;
  * llega y no existe se crea: el cuerpo es la fila entera, asi que alta y modificacion son la misma
  * escritura ({@code INSERT ... ON CONFLICT DO UPDATE}).
  *
- * <p><b>Los tres {@code ZoneOffset.UTC} de esta clase se quedan, y no son un pendiente de #273.</b>
- * {@code rentas}#224 inventario nueve {@code ZoneOffset.UTC} y #273 arreglo <b>cinco</b>: los que
- * truncaban un {@link java.time.Instant} a un {@code LocalDate}, donde la zona decide <i>que dia
- * es</i>. Estos tres no truncan nada: {@code reloj.instant().atOffset(ZoneOffset.UTC)} es el mismo
- * instante visto con desfase cero, y lo que se guarda en un {@code timestamptz} es el instante, no
- * el desfase con que se presento. Cambiarlos a {@link kamayuk.rentas.dominio.ZonaHoraria} no
- * cambiaria ni una fila: seria ruido con aspecto de arreglo. Queda dicho aqui para que el siguiente
- * barrido no los cuente como pendientes —y para que quien quiera publicar la hora en la zona de la
- * municipalidad sepa que eso es #188, que toca el contrato, y no esto—.
+ * <p><b>Los tres {@code ZoneOffset.UTC} de esta clase se quedan, y ya no son un pendiente de
+ * nadie.</b> {@code rentas}#224 inventario nueve {@code ZoneOffset.UTC}: #273 arreglo <b>cinco</b>
+ * —los que truncaban un {@link java.time.Instant} a un {@code LocalDate}, donde la zona decide
+ * <i>que dia es</i>— y #188 se llevo la publicacion de la hora a {@link
+ * kamayuk.rentas.dominio.ZonaHoraria#conSuDesfase(java.time.Instant)}. Estos tres no son ninguna de
+ * las dos cosas: no truncan y <b>no salen por HTTP</b>. Son el parametro {@code :cuando} de tres
+ * {@code INSERT}, y lo que un {@code timestamptz} guarda es el instante, no el desfase con que se
+ * presento. Cambiarlos no cambiaria ni una fila: seria ruido con aspecto de arreglo. Queda dicho
+ * aqui, con su motivo, para que el siguiente barrido no los cuente como pendientes.
  */
 @Service
 public class AplicarUnEventoDeIdentidad extends RepositorioJdbc {
@@ -129,8 +129,9 @@ public class AplicarUnEventoDeIdentidad extends RepositorioJdbc {
                 .param("cuerpo", evento.cuerpo())
                 .param("huella", recortar(evento.huella(), LARGO_DE_LA_HUELLA))
                 .param("motivo", recortar(motivo, LARGO_DEL_MOTIVO))
-                // UTC a proposito y NO es un pendiente de #273: el mismo instante con desfase
-                // cero, sin truncar a ningun dia. Ver el javadoc de la clase.
+                // UTC a proposito: parametro de un INSERT, no una hora publicada. El mismo
+                // instante con desfase cero, sin truncar a ningun dia, y la columna guarda el
+                // instante y no el desfase. Ni #273 ni #188 lo tocan. Ver el javadoc de la clase.
                 .param("cuando", reloj.instant().atOffset(ZoneOffset.UTC))
                 .update();
     }
@@ -160,7 +161,7 @@ public class AplicarUnEventoDeIdentidad extends RepositorioJdbc {
                         .param("tipo", recortar(evento.tipoPublicado(), LARGO_DEL_TIPO))
                         .param("sujetoId", evento.sujetoId())
                         .param("huella", recortar(evento.huella(), LARGO_DE_LA_HUELLA))
-                        // UTC a proposito, como arriba: mismo instante, sin truncar.
+                        // UTC a proposito, como arriba: parametro de un INSERT, no publicacion.
                         .param("cuando", reloj.instant().atOffset(ZoneOffset.UTC))
                         .update();
         return escritas == 1;
@@ -233,7 +234,8 @@ public class AplicarUnEventoDeIdentidad extends RepositorioJdbc {
                         .param("activo", activo)
                         .param(
                                 "fechaBaja",
-                                // UTC a proposito, como arriba: mismo instante, sin truncar.
+                                // UTC a proposito, como arriba: parametro de un INSERT, no
+                                // publicacion.
                                 activo ? null : reloj.instant().atOffset(ZoneOffset.UTC))
                         .param("usuarioBaja", activo ? null : textoONulo(cuerpo, "usuarioBaja"))
                         .param("grupo", grupo)
