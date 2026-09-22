@@ -119,9 +119,10 @@ export interface EtapaDeLaCorrida {
  * #271 salian **solo dentro de una fila de `etapas`** — de modo que pintarlos exigia leer la
  * segunda fila de la tabla aqui, que es lo que la regla de `conectores.ts` prohibe.
  *
- * El tercer campo del panel —«Derecho de emision»— **sigue sin publicarse**, y no por descuido:
- * la corrida lo *aplica* dentro del total de cada contribuyente y **no lo sella**. Ver el javadoc
- * del conector en `conectores.ts`.
+ * **Y doce desde #312**: `conjuntoId` y `derechoDeEmision`, el tercer campo del panel. Hasta
+ * entonces la corrida *aplicaba* el derecho dentro del total de cada contribuyente y **no lo
+ * sellaba**; `V23` le dio columna, y las dos llegan **nulas** de toda corrida escrita antes de
+ * esa migracion —que no es lo mismo que cero—. Ver el javadoc del conector en `conectores.ts`.
  */
 export interface CorridaDelPredial {
   readonly id: number;
@@ -133,6 +134,13 @@ export interface CorridaDelPredial {
   readonly simulacion: boolean;
   /** El conjunto sellado de `normativa` con que se calculo. Vacio si no consta. */
   readonly conjunto: string;
+  /**
+   * El identificador de ese conjunto, con el que se vuelve a leer su cuadro (ARQ-09 §3).
+   *
+   * `conjunto` es su NOMBRE y no sirve para eso: no hay lectura por nombre. **Nulo** cuando la
+   * corrida no lo sello —es anterior a `V23` (#312), o no determino a nadie—.
+   */
+  readonly conjuntoId: number | null;
   readonly fechaCalculo: string;
   /**
    * Cuantas cuentas quedaron determinadas. En una corrida simulada, cuantas se simularon: lo dice
@@ -146,6 +154,17 @@ export interface CorridaDelPredial {
    * suma sobre nada. Viene sin formatear: `"9418204.60"`.
    */
   readonly montoEmitido: string;
+  /**
+   * El derecho de emision que **esa corrida** aplico a cada cuenta, en texto. Sin formatear.
+   *
+   * Es la columna `derecho_emision` que `V23` anadio (#312): lo que el conjunto sellado le dio el
+   * dia de la emision, no lo que diria el conjunto vigente hoy.
+   *
+   * **Nulo no es cero.** Nulo dice «esa corrida no lo guardo» —la fila es anterior a `V23`, o no
+   * determino a nadie y no hubo conjunto—; `"0.00"` diria «no se cobro derecho de emision», que es
+   * falso: se cobro, y esta sumado dentro de `montoEmitido`.
+   */
+  readonly derechoDeEmision: string | null;
   readonly observados: number;
   readonly etapas: readonly EtapaDeLaCorrida[];
 }

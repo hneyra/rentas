@@ -126,6 +126,12 @@ export const FICHA_MEDIDA: FichaDelContribuyente = {
  * guarda las etapas de esta misma corrida, y el recurso compone la etapa «Simulados» de esos dos
  * campos exactos —`registros: 0` y `monto: '0.00'`—. O sea que estaban medidos, dentro de la
  * tabla; lo que cambia es por donde salen.
+ *
+ * **Y `conjuntoId` y `derechoDeEmision` van NULOS, que tampoco es una invencion** (#312). Esta
+ * corrida determino a cero contribuyentes —de ahi `conjunto: ''`—, asi que no resolvio ningun
+ * conjunto sellado y no hay derecho que sellar. Una instalacion con `V23` aplicada contestaria
+ * exactamente esto de esta misma corrida. Un `'0.00'` diria que no se cobro derecho de emision,
+ * que ademas de falso seria inventado.
  */
 export const CORRIDA_MEDIDA: CorridaDelPredial = {
   id: 20,
@@ -134,9 +140,11 @@ export const CORRIDA_MEDIDA: CorridaDelPredial = {
   sector: null,
   simulacion: true,
   conjunto: '',
+  conjuntoId: null,
   fechaCalculo: '2026-09-01',
   determinados: 0,
   montoEmitido: '0.00',
+  derechoDeEmision: null,
   observados: 0,
   etapas: [
     { etapa: 'Padrón leído', registros: 0, monto: '', observados: 0, estado: 'OK' },

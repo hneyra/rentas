@@ -27,6 +27,10 @@ import org.jspecify.annotations.Nullable;
  * @param modalidad el cronograma aplicado a las cuotas
  * @param simulacion si la corrida no guardo ninguna determinacion
  * @param conjunto el conjunto sellado con que se calculo; vacio si no se determino ninguna
+ * @param conjuntoId el identificador de ese conjunto, con el que se vuelve a leer su cuadro; nulo
+ *     si la corrida es anterior a {@code V23} o si no determino a nadie
+ * @param derechoDeEmision el derecho de emision que la corrida aplico a cada cuenta, sellado el dia
+ *     de la emision; nulo si la corrida es anterior a {@code V23} o si no determino a nadie
  * @param leidos cuantos contribuyentes miro en total
  * @param determinados cuantos se determinaron
  * @param montoEmitido la suma de lo determinado, impuesto mas derecho de emision
@@ -43,6 +47,8 @@ public record CorridaDeEmision(
         String modalidad,
         boolean simulacion,
         String conjunto,
+        @Nullable Long conjuntoId,
+        @Nullable Dinero derechoDeEmision,
         int leidos,
         int determinados,
         Dinero montoEmitido,
@@ -58,6 +64,19 @@ public record CorridaDeEmision(
         Objects.requireNonNull(
                 fechaCalculo, "Toda cifra dice a que fecha esta calculada (regla 9)");
         observados = List.copyOf(Objects.requireNonNull(observados, "La lista es vacia, no nula"));
+        /* **El sello viaja entero o no viaja** (#312, V23). La cifra sin su conjunto
+        vuelve a ser un numero sin fuente —que es lo que esta columna existe para
+        dejar de ser— y el conjunto sin su cifra deja el campo del panel vacio
+        habiendola sabido. El `CHECK` de la base dice lo mismo; esto lo dice donde
+        se construye, que es antes de que ninguna fila se escriba. */
+        if ((conjuntoId == null) != (derechoDeEmision == null)) {
+            throw new IllegalArgumentException(
+                    "Una corrida sella su derecho de emision JUNTO AL conjunto del que salio, o no"
+                            + " sella ninguno de los dos: conjuntoId="
+                            + conjuntoId
+                            + ", derechoDeEmision="
+                            + derechoDeEmision);
+        }
         if (determinados > leidos) {
             throw new IllegalArgumentException(
                     "Una corrida no puede determinar a mas contribuyentes de los que miro: "

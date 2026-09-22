@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 
+import type { CorridaDelPredial } from '../src/datos/lecturas.ts';
 import { abrir, conLaSeguridadContestada } from './instalacion.ts';
 
 /**
@@ -105,8 +106,12 @@ const FRENTES = [
 /**
  * La ultima corrida del padron, **medida contra la instalacion** el 2026-09-07 y recortada a lo
  * que la tabla de `panel` dibuja. Es la misma que ejercita `src/datos/conectores.test.ts`.
+ *
+ * **Y lleva el tipo de la operacion** (#312). Sin el, el fixture se quedo corto dos veces al
+ * crecer esta misma operacion —#271 y #313— y el rojo salio como un tiempo agotado esperando la
+ * barra, sin nombrar ni el archivo ni el campo. Con el tipo, un campo que falte no compila.
  */
-const CORRIDA = {
+const CORRIDA: CorridaDelPredial = {
   id: 1,
   ejercicio: '2026',
   alcance: 'PADRON',
@@ -120,6 +125,12 @@ const CORRIDA = {
   // agotado esperando la barra, sin nombrar ni este archivo ni el campo que falta.
   determinados: 58412,
   montoEmitido: '8772431.05',
+  // Y los dos que #312 anadio: el conjunto sellado con que emitio y el derecho que aplico. Este
+  // arnes no abre `panel` —lo que mira es `ini-panel`—, pero el fixture es la forma de la
+  // operacion y un fixture corto se queda corto en silencio, que es como se rompieron dos caminos
+  // en la ola anterior.
+  conjuntoId: 77,
+  derechoDeEmision: '4.50',
   etapas: [
     { etapa: 'Lectura del padron', registros: 62418, monto: '—', observados: 0, estado: 'Conforme' },
     { etapa: 'Generacion de cuponeras', registros: 61350, monto: '—', observados: 534, estado: 'Observado' },

@@ -7,7 +7,12 @@ import {
   type FilaDeLaTabla,
 } from '@kamayuk/ui';
 import type { ClaveDeHoja } from '../pantallas/arbol.ts';
-import { NO_PUBLICADO, SIN_CRONOGRAMA, type PalabraDeHueco } from './palabrasDeHueco.ts';
+import {
+  NO_CONSTA_EN_LA_CORRIDA,
+  NO_PUBLICADO,
+  SIN_CRONOGRAMA,
+  type PalabraDeHueco,
+} from './palabrasDeHueco.ts';
 import type { CorridaDelPredial, DeterminacionGuardada } from './lecturas.ts';
 import { RUTAS, pedirUnoOVacio } from './lecturas.ts';
 import {
@@ -496,21 +501,28 @@ export function loQueLaHojaDeclara(
  * de ahi salen. La tabla los sigue ensenando porque el recurso compone sus etapas **de los mismos
  * campos**, asi que no hay dos verdades que se puedan desincronizar.
  *
- * <h2>Y el sexto se queda con su hueco: «Derecho de emision» (D-02b)</h2>
+ * <h2>Y el sexto desde #312: «Derecho de emision», con DOS ausencias que no se confunden</h2>
  *
- * Medido antes de intentarlo, y sale en contra:
+ * Este era el ultimo hueco de la pantalla, y lo era por el sitio correcto: `corrida_predial`
+ * tenia dieciocho columnas y **ninguna** era el derecho de emision. La corrida lo **aplicaba**
+ * —entra en `montoEmitido`, dentro del total de cada contribuyente— y no lo **sellaba**. Lo unico
+ * que guardaba del conjunto era su **nombre** —«2026 v1», `varchar(60)`—, que no sirve para volver
+ * a leerlo, asi que el unico camino que quedaba era el conjunto vigente **hoy**: una cifra
+ * equivocada de la peor clase, porque parece correcta.
  *
- *   · `corrida_predial` tiene dieciocho columnas y **ninguna** es el derecho de emision. La
- *     corrida lo **aplica** —entra en `monto_emitido`, dentro del total de cada contribuyente— y
- *     **no lo sella**.
- *   · Lo unico que sella del conjunto es su **nombre** —«2026 v1», `varchar(60)`—, y la lectura
- *     que devolveria aquel valor pide el `conjuntoId`. No hay lectura por nombre; y en una corrida
- *     que no determino a nadie ese nombre es la cadena vacia.
- *   · El unico camino que queda es el conjunto vigente **hoy**, que no tiene por que ser el que la
- *     corrida uso. Eso es una cifra equivocada de la peor clase: parece correcta.
+ * `V23` sello la columna, y desde entonces la operacion publica el campo. **Aqui no se compone
+ * nada**: se dibuja `derechoDeEmision` tal como llega, formateado, igual que los otros cinco.
  *
- * Un hueco que dice «no publicado» manda a arreglar la corrida, que es donde esta el trabajo: una
- * columna mas, escrita el dia de la emision. Ver `CorridaGuardadaResource`.
+ * **Y cuando llega nulo la palabra es OTRA.** Nulo no dice «el backend no lo publica» —lo publica—
+ * ni dice cero: dice que **esa corrida** no lo guardo, porque su fila es anterior a `V23` o porque
+ * no determino a nadie y entonces no hubo conjunto sellado del que sacarlo. Ninguna conexion lo
+ * arregla y no hay nada cierto que escribir, asi que la palabra es `NO_CONSTA_EN_LA_CORRIDA` y no
+ * `NO_PUBLICADO`. Un `S/ 0.00` seria peor que las dos: el derecho de aquella corrida **se cobro**,
+ * y esta sumado dentro de `montoEmitido`.
+ *
+ * **Esto no cierra D-02b**, y conviene no leerlo asi: el valor efectivo lo fija la ordenanza local
+ * y hoy no lo publica nadie, de modo que en una instalacion de verdad toda corrida que determine a
+ * alguien sigue sin poder terminar. Lo que se cierra es que la corrida lo aplicara y lo olvidara.
  */
 const PANEL: Conector = {
   clave: ['panel', 'ultima-corrida'],
@@ -528,6 +540,12 @@ const PANEL: Conector = {
       [coordenada(0, 2), formatearEntero(corrida.determinados)],
       [coordenada(0, 3), formatearEntero(corrida.observados)],
       [coordenada(0, 4), formatearImporte(corrida.montoEmitido)],
+      // El sexto campo desde #312, y **solo si la corrida lo sello**: sin el, el hueco de abajo
+      // dice cual de las dos ausencias es. No se pone una cadena vacia en su lugar, que seria un
+      // campo con dato y en blanco — se lee como «no hay derecho» en vez de «no consta».
+      ...(corrida.derechoDeEmision === null
+        ? []
+        : [[coordenada(0, 5), formatearImporte(corrida.derechoDeEmision)] as const]),
     ]),
     filas: new Map([
       [
@@ -541,8 +559,13 @@ const PANEL: Conector = {
         ]),
       ],
     ]),
-    // Solo «Derecho de emision»: la corrida lo aplica y no lo sella. Ver el javadoc de arriba.
-    noPublicados: new Map([[coordenada(0, 5), NO_PUBLICADO]]),
+    // **Vacio cuando la corrida sello su derecho**, y con UNA entrada cuando no. La palabra no es
+    // `NO_PUBLICADO` —la operacion SI lo publica— sino la de «esa corrida no lo guardo». Ver el
+    // javadoc de arriba: son dos ausencias distintas y el backend no puede arreglar la segunda.
+    noPublicados:
+      corrida.derechoDeEmision === null
+        ? new Map([[coordenada(0, 5), NO_CONSTA_EN_LA_CORRIDA]])
+        : new Map(),
   }),
 };
 
@@ -813,4 +836,10 @@ export const CONECTORES: Readonly<Partial<Record<ClaveDeHoja, Conector>>> = {
   ...CONECTORES_DE_VALORES,
 };
 
-export { NO_ESTA_EN_EL_PADRON, NO_PUBLICADO, SIN_CRONOGRAMA, TODAVIA_SIN_DETERMINAR };
+export {
+  NO_CONSTA_EN_LA_CORRIDA,
+  NO_ESTA_EN_EL_PADRON,
+  NO_PUBLICADO,
+  SIN_CRONOGRAMA,
+  TODAVIA_SIN_DETERMINAR,
+};

@@ -17,6 +17,7 @@ import kamayuk.rentas.nucleo.dominio.CorridaDeEmision;
 import kamayuk.rentas.nucleo.dominio.CorridaDeEmisionRepository;
 import kamayuk.rentas.persistencia.OrdenSeguro;
 import kamayuk.rentas.persistencia.RepositorioJdbc;
+import org.jspecify.annotations.Nullable;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 
@@ -33,7 +34,7 @@ public class CorridaDeEmisionRepositoryJdbc extends RepositorioJdbc
 
     private static final String COLUMNAS =
             "id, ejercicio, alcance, sector, codigo_desde, codigo_hasta, modalidad,"
-                    + " simulacion, conjunto,"
+                    + " simulacion, conjunto, conjunto_id, derecho_emision,"
                     + " leidos, determinados, monto_emitido, fecha_calculo";
 
     /**
@@ -52,6 +53,12 @@ public class CorridaDeEmisionRepositoryJdbc extends RepositorioJdbc
     public CorridaDeEmision guardar(CorridaDeEmision corrida, Observacion observacion) {
         String usuario = OrigenContext.actual().usuario();
 
+        /* El derecho va como `BigDecimal` y nunca como `double` (regla 1, RNF-055), y
+        nulo cuando la corrida no sello ninguno: un cero aqui diria «no se cobro
+        derecho», que es falso —se cobro, y esta dentro de `monto_emitido`—. */
+        Dinero derecho = corrida.derechoDeEmision();
+        java.math.BigDecimal derechoEmision = derecho == null ? null : derecho.valor();
+
         /* `fecha_registro` sale del reloj inyectado y no de `now()`: la fila tiene
         que caer en el mismo instante con que se determino, que es lo que #24
         dejo escrito para la auditoria y vale igual aqui. */
@@ -60,14 +67,16 @@ public class CorridaDeEmisionRepositoryJdbc extends RepositorioJdbc
                                 "INSERT INTO corrida_predial"
                                         + " (municipalidad_id, ejercicio, alcance, sector, codigo_desde,"
                                         + "  codigo_hasta,"
-                                        + "  modalidad, simulacion, conjunto, leidos,"
+                                        + "  modalidad, simulacion, conjunto, conjunto_id,"
+                                        + "  derecho_emision, leidos,"
                                         + "  determinados, monto_emitido, fecha_calculo,"
                                         + "  usuario_registro, fecha_registro, observacion)"
                                         + " VALUES ("
                                         + MUNICIPALIDAD_ACTUAL
                                         + ", :ejercicio, :alcance, :sector, :codigoDesde,"
                                         + "  :codigoHasta, :modalidad,"
-                                        + "  :simulacion, :conjunto, :leidos, :determinados,"
+                                        + "  :simulacion, :conjunto, :conjuntoId,"
+                                        + "  :derechoEmision, :leidos, :determinados,"
                                         + "  :monto, :fechaCalculo, :usuario, :registro,"
                                         + "  :observacion)"
                                         + " RETURNING id")
@@ -79,6 +88,8 @@ public class CorridaDeEmisionRepositoryJdbc extends RepositorioJdbc
                         .param("modalidad", corrida.modalidad())
                         .param("simulacion", corrida.simulacion())
                         .param("conjunto", corrida.conjunto())
+                        .param("conjuntoId", corrida.conjuntoId())
+                        .param("derechoEmision", derechoEmision)
                         .param("leidos", corrida.leidos())
                         .param("determinados", corrida.determinados())
                         .param("monto", corrida.montoEmitido().valor())
@@ -114,6 +125,8 @@ public class CorridaDeEmisionRepositoryJdbc extends RepositorioJdbc
                 corrida.modalidad(),
                 corrida.simulacion(),
                 corrida.conjunto(),
+                corrida.conjuntoId(),
+                corrida.derechoDeEmision(),
                 corrida.leidos(),
                 corrida.determinados(),
                 corrida.montoEmitido(),
@@ -174,11 +187,30 @@ public class CorridaDeEmisionRepositoryJdbc extends RepositorioJdbc
                 fila.getString("modalidad"),
                 fila.getBoolean("simulacion"),
                 fila.getString("conjunto"),
+                /* `getObject(…, Long.class)` y no `getLong`, que devuelve 0 para un NULL:
+                una corrida anterior a `V23` saldria sellada con el conjunto numero cero.
+                Lo mismo con el derecho, donde `getBigDecimal` ya devuelve null. */
+                fila.getObject("conjunto_id", Long.class),
+                derechoSellado(fila),
                 fila.getInt("leidos"),
                 fila.getInt("determinados"),
                 new Dinero(fila.getBigDecimal("monto_emitido")),
                 fila.getObject("fecha_calculo", java.time.LocalDate.class),
                 List.of());
+    }
+
+    /**
+     * El derecho que la corrida sello, o {@code null} si no sello ninguno (#312).
+     *
+     * <p>Se lee con {@code getBigDecimal}, que ya devuelve {@code null} para un {@code NULL} de
+     * SQL. Lo que NO vale es envolverlo sin mirar: {@code new Dinero(null)} revienta, y lo que hace
+     * falta aqui es que una corrida anterior a {@code V23} salga <b>sin cifra</b>, no con cero — un
+     * cero diria que no se cobro derecho de emision, y eso es falso.
+     */
+    @Nullable
+    private static Dinero derechoSellado(ResultSet fila) throws SQLException {
+        java.math.BigDecimal sellado = fila.getBigDecimal("derecho_emision");
+        return sellado == null ? null : new Dinero(sellado);
     }
 
     private static CorridaDeEmision.Observado mapearObservado(ResultSet fila, int numero)

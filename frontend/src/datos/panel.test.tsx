@@ -32,10 +32,19 @@ import { useDatosDeLaHoja } from './useDatosDeLaHoja.ts';
  * Y se contesta dos veces con corridas distintas, que es la diferencia entre conectar y **parecer**
  * conectado: una pantalla que dibuja cifras propias se ve igual que una conectada mientras el doble
  * conteste lo que ella ya dibujaba.
+ *
+ * <h2>Y el sexto campo desde #312, con sus DOS corridas</h2>
+ *
+ * «Derecho de emision» era el ultimo hueco. `V23` le dio columna a `corrida_predial` y la operacion
+ * lo publica, asi que aqui se monta con **dos** respuestas: una que lo sello —`3.70`, que no es el
+ * `S/ 4.50` del artboard, para que ensenarlo no pueda salir de la definicion— y otra **anterior al
+ * sello**, que lo trae nulo. Sin la segunda la rama del nulo no correria nunca y un `S/ 0.00`
+ * saldria en verde — y un cero afirma que no se cobro derecho de emision, que es falso: se cobro,
+ * y esta sumado dentro de `montoEmitido`.
  */
 
 /** Lo que el artboard dibuja en `panel`, y que por tanto no puede salir de una respuesta. */
-const DEL_ARTBOARD = ['61,350', 'S/ 9,418,204.60'] as const;
+const DEL_ARTBOARD = ['61,350', 'S/ 9,418,204.60', 'S/ 4.50'] as const;
 
 function arnes() {
   // Un cliente por prueba: compartido, la respuesta de la primera se quedaria en la cache de la
@@ -76,9 +85,13 @@ function corrida(cambios: Partial<CorridaDelPredial> = {}): CorridaDelPredial {
     sector: null,
     simulacion: false,
     conjunto: '2026 v1',
+    conjuntoId: 77,
     fechaCalculo: '28/01/2026 02:14',
     determinados: 58_412,
     montoEmitido: '8772431.05',
+    // El derecho que ESTA corrida sello (#312). No es el `S/ 4.50` del artboard a proposito: si la
+    // pantalla lo ensenara, no se sabria si lo saco de la respuesta o de su propia definicion.
+    derechoDeEmision: '3.70',
     observados: 1204,
     // Las cifras del ARTBOARD, en la tabla. Si alguna sube a un campo, es que se dedujo de aqui.
     etapas: [
@@ -143,34 +156,59 @@ describe('`panel` — el estado de la emision', () => {
   });
 
   /**
-   * **«Derecho de emision» sigue sin cifra, y lo que esta prueba puede afirmar esta medido.**
+   * **«Derecho de emision» ensena la cifra que la corrida SELLO** (#312, D-02b).
    *
-   * La corrida lo **aplica** —esta dentro de `montoEmitido`— y **no lo sella**: `corrida_predial`
-   * no tiene columna para el, y lo unico que guarda del conjunto es su NOMBRE. Leerlo del conjunto
-   * vigente hoy daria una cifra que parece correcta y no es la que la corrida uso.
+   * <h2>Que decia esta prueba antes</h2>
    *
-   * <h2>Lo que este archivo NO puede vigilar, y donde si se vigila</h2>
+   * Decia que ahi no aparecia **ninguna** cifra, y estaba bien dicho mientras `corrida_predial` no
+   * tuviera columna: la corrida lo aplicaba —dentro de `montoEmitido`— y no lo guardaba, asi que
+   * el unico numero disponible era el del conjunto vigente hoy, que no tiene por que ser aquel.
    *
-   * Que el conector **declare** el hueco no se ve desde el DOM: medido quitando la entrada de
-   * `noPublicados`, la pantalla sigue escribiendo «no publicado» ahi, porque una hoja conectada da
-   * esa misma palabra a **todo** campo que el reparto no llena —`NO_PUBLICADO_EN_PANTALLA` de
-   * `useDatosDeLaHoja`—. O sea que una asercion sobre esa palabra pasaria con la declaracion y sin
-   * ella, y una prueba que no puede fallar no protege nada.
-   *
-   * Lo que si muerde es `conectores.test.ts` —que exige la entrada, y que sea la unica— y la guarda
-   * que ya existia, «NINGUN campo de una pantalla conectada se queda sin decidir»: las dos salieron
-   * rojas con esa misma rotura. Lo que esta prueba afirma es lo que **solo** se ve en el DOM: que
-   * ahi no aparece ninguna **cifra**, ni la del artboard ni una traida del conjunto de hoy.
+   * `V23` sello la columna. Ahora la cifra sale, y lo que hay que medir es **cual**: la de la
+   * respuesta —`S/ 3.70`— y no la del artboard, que es `S/ 4.50` y esta en `DEL_ARTBOARD`.
    */
-  it('«Derecho de emision» no ensena ninguna cifra', async () => {
+  it('«Derecho de emision» ensena el que llego, y no el del artboard', async () => {
     contesta(corrida());
     const { container } = arnes()();
 
     await waitFor(() => {
       expect(screen.getByText('58,412')).toBeInTheDocument();
     });
+    expect(screen.getByText('S/ 3.70')).toBeInTheDocument();
     expect(container.textContent).not.toContain('S/ 4.50');
     // Y no se cuela el importe de la corrida en su lugar: el monto sale UNA vez, en su campo.
     expect(screen.getAllByText('S/ 8,772,431.05')).toHaveLength(1);
+  });
+
+  /**
+   * **Una corrida ANTERIOR al sello dice la palabra que le toca, y no un cero** (#312).
+   *
+   * <h2>Esto es lo que una muestra uniforme no podria decir</h2>
+   *
+   * Con solo la corrida sellada, un conector que escribiera `S/ 0.00` —o que siguiera diciendo «no
+   * publicado»— pasaria en verde. Las dos afirmaciones son falsas: el derecho de aquella corrida
+   * **se cobro** —esta sumado dentro de `montoEmitido`— y la operacion **si** publica el campo.
+   *
+   * <h2>Y aqui la asercion SI muerde, que antes de #312 no podia</h2>
+   *
+   * «No publicado» es lo que `useDatosDeLaHoja` pone en todo campo que el reparto no llena, asi
+   * que afirmarlo pasaria con la declaracion del conector y sin ella —medido en #271—. Esta
+   * palabra no la pone nadie mas: solo puede haber llegado del conector.
+   */
+  it('con una corrida anterior al sello, el campo dice «no consta en la corrida»', async () => {
+    contesta(corrida({ conjuntoId: null, derechoDeEmision: null }));
+    const { container } = arnes()();
+
+    await waitFor(() => {
+      expect(screen.getByText('58,412')).toBeInTheDocument();
+    });
+    expect(screen.getByText('no consta en la corrida')).toBeInTheDocument();
+    // `queryByText` y NO `container.textContent`: la frase de PANTALLA cita «no publicado» dentro
+    // de su explicacion —«Los campos marcados «no publicado» los pide y la operacion que los sirve
+    // no los trae»— y esa frase sale siempre. Lo que aqui no puede haber es un CAMPO que diga esa
+    // palabra, que es lo que `queryByText` busca: un nodo cuyo texto entero sea ese.
+    expect(screen.queryByText('no publicado')).toBeNull();
+    expect(container.textContent).not.toContain('S/ 0.00');
+    expect(container.textContent).not.toContain('S/ 3.70');
   });
 });

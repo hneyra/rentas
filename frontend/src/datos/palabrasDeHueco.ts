@@ -61,6 +61,24 @@ anterior a la migracion que guarda la modalidad, asi que sus vencimientos no se 
 la tabla queda en blanco. No es que no tenga cuotas — es que no se sabe cuales fueron, y las \
 trimestrales supuestas serian unos vencimientos que el contribuyente puede no haber recibido.`;
 
+/**
+ * **Lo que va donde una CORRIDA no sello el dato que el campo pide** (#312, D-02b).
+ *
+ * No es `NO_PUBLICADO` y no es `SIN_CIFRAR`, y las tres se leen distinto:
+ *
+ *   · `NO_PUBLICADO` dice «la operacion no trae ese campo» — el trabajo esta en el backend.
+ *   · `SIN_CIFRAR` dice «lo trae y viene vacio porque no se ha calculado».
+ *   · esta dice «lo trae, y **esa corrida** no lo guardo»: la fila es anterior a `V23`, o la
+ *     corrida no determino a nadie y entonces no hubo conjunto sellado del que sacarlo. Ninguna
+ *     conexion lo arregla y el backend no tiene nada que hacer — no hay nada cierto que escribir.
+ *
+ * **Y sobre todo no es un cero.** El derecho de emision de aquella corrida SE COBRO: esta sumado
+ * dentro de `montoEmitido`, de donde no se puede volver a separar. Un `S/ 0.00` ahi afirmaria que
+ * no se cobro, que en un sistema de recaudacion es la afirmacion mas cara que se puede hacer por
+ * descuido.
+ */
+const NO_CONSTA_EN_LA_CORRIDA = 'no consta en la corrida';
+
 /** «Detectados por cruce» de un programa que no declara sus parametros de sorteo (#196). */
 const SIN_PARAMETROS_DEL_SORTEO = `El cruce no se pudo resolver: este programa no declara los \
 parametros con que se sortea, y el embudo dice cual falta en «parametroQueFalta». No es cero — \
@@ -77,6 +95,7 @@ cero seria «el cruce no senalo a nadie», que es lo contrario de «el cruce no 
 export const PALABRAS_DE_HUECO = {
   NO_PUBLICADO,
   SIN_CIFRAR,
+  NO_CONSTA_EN_LA_CORRIDA,
   SIN_CRONOGRAMA,
   SIN_PARAMETROS_DEL_SORTEO,
 } as const;
@@ -111,4 +130,10 @@ type Afirmar<T extends true> = T;
  */
 export type ElTipoSujeta = Afirmar<string extends PalabraDeHueco ? false : true>;
 
-export { NO_PUBLICADO, SIN_CIFRAR, SIN_CRONOGRAMA, SIN_PARAMETROS_DEL_SORTEO };
+export {
+  NO_PUBLICADO,
+  SIN_CIFRAR,
+  NO_CONSTA_EN_LA_CORRIDA,
+  SIN_CRONOGRAMA,
+  SIN_PARAMETROS_DEL_SORTEO,
+};
