@@ -842,6 +842,46 @@ const DEL_BACKEND = {
  * pantalla que todavia no la tiene.
  */
 const DESCRIPCIONES = {
+  // Coactiva · Las dos consultas de deuda (#307). Lo que hay que declarar de ellas
+  // no es lo que devuelven sino QUE CUENTA su recuento: no son las filas que salen.
+  coactiva_consulta_deudas: bloque(`
+    La deuda en cobranza coactiva **por expediente** y a la fecha de la consulta, con su estado
+    procesal, los tributos que agrupa y la última actuación registrada.
+
+    **El recuento se llama \`expedientesDelCriterio\` y no \`totalElementos\`, porque no cuenta
+    las filas que devuelve** (#307). La página se compone con la grilla de expedientes y
+    **después** se descartan los que no tienen nada que cobrar —«consulta de deudas»: un
+    expediente pagado no es una deuda—, así que el número que la base contó son expedientes y
+    las filas que salen son menos: la página puede traer diecisiete filas con el recuento
+    diciendo 1 184. Bajo el nombre de siempre, un cliente lo dibujaría como «20 de 1 184» sobre
+    diecisiete filas y repartiría páginas cortas sin motivo visible.
+
+    **El descarte no se puede adelantar al \`WHERE\`, y está medido.** No hay columna: la deuda
+    de un expediente se compone cruzando lo que sus valores formalizan con lo que el libro dice
+    a la fecha, más sus costas, y esas dos cifras se piden por API pública porque son de otros
+    contextos. Resolverlo en Java antes de paginar costaría una lectura del libro **por
+    expediente de la cartera entera y en cada página que alguien mire**: medido el 2026-09-21,
+    componer una página de 20 son 218 sentencias y cada expediente añade 10,7, o sea unas
+    12 600 por página sobre una cartera de 1 184. Es el precio que \`ExpedientesSinRec\` se negó
+    a pagar (#549) y el mismo que dejó «Deuda en cartera» sin publicar (#272).
+
+    \`totalPaginas\` y \`hayMas\` sí salen de ese recuento, y es lo correcto: lo que se reparte
+    en páginas son los expedientes del criterio.
+  `),
+  coactiva_deudas_beneficio: bloque(`
+    La deuda coactiva de los obligados **con beneficio registrado y vigente** a la fecha de
+    cálculo, nombrando el beneficio, su clase, su base legal y el porcentaje o el importe que la
+    norma declara.
+
+    **Sin ningún descuento aplicado**, y el recurso no tiene dónde ponerlo: sobre qué parte de la
+    deuda se aplica un beneficio, en qué orden respecto del fraccionamiento y con qué redondeo es
+    D-02b. Lo que viaja es lo **declarado** por la ordenanza, que es dato transcrito al registrar
+    el beneficio; una cifra rebajada que la ventanilla no cobra se imprime y se entrega.
+
+    **Su recuento es \`expedientesDelCriterio\`, igual que el de la otra consulta y por el mismo
+    motivo, sólo que aquí descarta dos veces** (#307): los expedientes sin nada que cobrar y los
+    obligados sin beneficio registrado. O sea que el recuento y las filas se separan todavía más.
+  `),
   // Cuenta corriente · Consultas (#640, #662)
   consulta_altas_bajas: bloque(`
     Los **actos** de alta y de baja de deuda de un contribuyente (RF-043, RF-044), con el documento
@@ -1385,7 +1425,8 @@ const OPERACIONES_ADICIONALES = {
 
         **\`expedientes\` y \`abiertos\` no son el mismo número, y por eso viajan los dos.**
         El primero cuenta todos los del criterio, concluidos incluidos —es exactamente el
-        \`totalElementos\` de \`GET /coactiva/deudas\`—; el segundo descuenta los concluidos.
+        recuento que \`GET /coactiva/deudas\` publica como \`expedientesDelCriterio\` (#307)—;
+        el segundo descuenta los concluidos.
         Un expediente **suspendido** cuenta como abierto: el procedimiento está detenido, no
         terminado.
 

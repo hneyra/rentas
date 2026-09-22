@@ -755,9 +755,10 @@ export interface EtapaDeLaCartera {
  * <h2>`expedientes` y `abiertos` NO son el mismo numero</h2>
  *
  * Y por eso viajan los dos. `expedientes` cuenta todos los del criterio —concluidos incluidos, y
- * es exactamente el `totalElementos` de `GET /coactiva/deudas`, que es lo que esta hoja dibujaba
- * bajo el rotulo «Expedientes abiertos» hasta #272—; `abiertos` descuenta los concluidos. Un
- * expediente **suspendido** cuenta como abierto: el procedimiento esta detenido, no terminado.
+ * es exactamente el recuento que `GET /coactiva/deudas` publica como `expedientesDelCriterio`
+ * (#307), que es lo que esta hoja dibujaba bajo el rotulo «Expedientes abiertos» hasta #272—;
+ * `abiertos` descuenta los concluidos. Un expediente **suspendido** cuenta como abierto: el
+ * procedimiento esta detenido, no terminado.
  *
  * <h2>Las etapas son disjuntas, y `abiertos` no es su suma</h2>
  *

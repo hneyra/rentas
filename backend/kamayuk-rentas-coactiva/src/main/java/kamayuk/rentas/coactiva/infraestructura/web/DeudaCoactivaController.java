@@ -14,14 +14,12 @@ import kamayuk.rentas.coactiva.aplicacion.ConsultaDeExpedientes;
 import kamayuk.rentas.coactiva.dominio.CriterioDeExpedientes;
 import kamayuk.rentas.coactiva.dominio.EstadoDelExpediente;
 import kamayuk.rentas.coactiva.dominio.ResumenDeLaCartera;
-import kamayuk.rentas.compartido.Pagina;
 import kamayuk.rentas.contribuyentes.DirectorioDeContribuyentes;
 import kamayuk.rentas.contribuyentes.ResumenDeContribuyente;
 import kamayuk.rentas.web.Api;
 import kamayuk.rentas.web.CodigoDeError;
 import kamayuk.rentas.web.ParametrosDePaginacion;
 import kamayuk.rentas.web.ProblemaDeNegocio;
-import kamayuk.rentas.web.RespuestaPaginada;
 import org.jspecify.annotations.Nullable;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -97,10 +95,18 @@ public class DeudaCoactivaController {
         this.reloj = reloj;
     }
 
-    /** La deuda en cobranza coactiva por expediente, a hoy (RF-107). */
+    /**
+     * La deuda en cobranza coactiva por expediente, a hoy (RF-107).
+     *
+     * <p><b>No sale como {@code RespuestaPaginada}</b>, y con su hermana de beneficio son las dos
+     * unicas de esta API que no —medido sobre el contrato: 53 relaciones paginadas publican {@code
+     * totalElementos} y estas dos no—. El motivo es que su recuento cuenta <b>expedientes del
+     * criterio</b> y no las filas que devuelve, porque los expedientes sin nada que cobrar se
+     * descartan despues de componer la pagina. Vease {@link RespuestaDeDeudasCoactivas} (#307).
+     */
     @GetMapping("/deudas")
     @RequiereAcceso(acceso = ACCESO_DEUDAS, privilegio = Privilegio.LECTURA)
-    public RespuestaPaginada<DeudaCoactivaResource> deudas(
+    public RespuestaDeDeudasCoactivas<DeudaCoactivaResource> deudas(
             @RequestParam(required = false) @Nullable String tipoDeDeuda,
             @RequestParam(required = false) @Nullable String contribuyente,
             @RequestParam(required = false) @Nullable String nExpediente,
@@ -110,7 +116,7 @@ public class DeudaCoactivaController {
         exigirTipoTributario(tipoDeDeuda);
         LocalDate aLaFecha = LocalDate.now(reloj);
 
-        Pagina<ConsultaDeDeudasCoactivas.DeudaEnCoactiva> pagina =
+        ConsultaDeDeudasCoactivas.PaginaDeDeudas<ConsultaDeDeudasCoactivas.DeudaEnCoactiva> pagina =
                 consulta.deudas(
                         criterioDe(nExpediente, contribuyente, estado),
                         aLaFecha,
@@ -122,7 +128,7 @@ public class DeudaCoactivaController {
                                 .map(fila -> fila.expediente().contribuyenteId())
                                 .collect(java.util.stream.Collectors.toCollection(HashSet::new)));
 
-        return RespuestaPaginada.de(
+        return RespuestaDeDeudasCoactivas.de(
                 pagina,
                 fila ->
                         DeudaCoactivaResource.de(
@@ -140,7 +146,7 @@ public class DeudaCoactivaController {
      */
     @GetMapping("/deudas-en-beneficio")
     @RequiereAcceso(acceso = ACCESO_BENEFICIO, privilegio = Privilegio.LECTURA)
-    public RespuestaPaginada<DeudaCoactivaResource> enBeneficio(
+    public RespuestaDeDeudasCoactivas<DeudaCoactivaResource> enBeneficio(
             @RequestParam(required = false) @Nullable String tipoDeDeuda,
             @RequestParam(required = false) @Nullable String contribuyente,
             @RequestParam(required = false) @Nullable String benefAplicable,
@@ -151,11 +157,12 @@ public class DeudaCoactivaController {
         exigirQueNoSePidaUnBeneficioConcreto(benefAplicable);
         LocalDate aLaFecha = fechaOpcional(fechaDeCalculo, "fechaDeCalculo", LocalDate.now(reloj));
 
-        Pagina<ConsultaDeDeudasCoactivas.DeudaConBeneficio> pagina =
-                consulta.enBeneficio(
-                        criterioDe(null, contribuyente, null),
-                        aLaFecha,
-                        paginacion.aPaginacion(ORDEN_POR_OMISION));
+        ConsultaDeDeudasCoactivas.PaginaDeDeudas<ConsultaDeDeudasCoactivas.DeudaConBeneficio>
+                pagina =
+                        consulta.enBeneficio(
+                                criterioDe(null, contribuyente, null),
+                                aLaFecha,
+                                paginacion.aPaginacion(ORDEN_POR_OMISION));
 
         Map<Long, ResumenDeContribuyente> padron =
                 padronDe(
@@ -163,7 +170,7 @@ public class DeudaCoactivaController {
                                 .map(fila -> fila.deuda().expediente().contribuyenteId())
                                 .collect(java.util.stream.Collectors.toCollection(HashSet::new)));
 
-        return RespuestaPaginada.de(
+        return RespuestaDeDeudasCoactivas.de(
                 pagina,
                 fila ->
                         DeudaCoactivaResource.de(
