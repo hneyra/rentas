@@ -71,13 +71,15 @@ function importeConSuFecha(importe: string, fecha: string): string {
  *
  * <h2>Lo que #272 corrigio: un rotulo que prometia una cosa sobre una cifra que era otra</h2>
  *
- * Hasta #272 el unico campo con dato era «Expedientes abiertos», y lo llenaba el
- * `totalElementos` de `GET /coactiva/deudas`. La **unidad** era la correcta —esa operacion
- * devuelve una fila por expediente y no por deuda, medido en `ConsultaDeDeudasCoactivas`—, pero
- * el **adjetivo** no: ese total cuenta TODOS los expedientes del criterio, concluidos incluidos,
- * y ademas cuenta los que la propia respuesta descarta por no tener nada que cobrar. O sea que la
- * pantalla decia «abiertos» sobre el numero de «todos», en verde. Es el mismo modo de fallo que
- * #254 encontro en `val-tip`.
+ * Hasta #272 el unico campo con dato era «Expedientes abiertos», y lo llenaba el recuento de
+ * `GET /coactiva/deudas`. La **unidad** era la correcta —esa operacion devuelve una fila por
+ * expediente y no por deuda, medido en `ConsultaDeDeudasCoactivas`—, pero el **adjetivo** no: ese
+ * recuento cuenta TODOS los expedientes del criterio, concluidos incluidos, y ademas cuenta los
+ * que la propia respuesta descarta por no tener nada que cobrar. O sea que la pantalla decia
+ * «abiertos» sobre el numero de «todos», en verde. Es el mismo modo de fallo que #254 encontro en
+ * `val-tip`. Desde #307 ese campo **ya no se llama `totalElementos`** sino
+ * `expedientesDelCriterio`, justamente para que nadie vuelva a leerlo como el total de una
+ * relacion.
  *
  * Ahora los cuatro campos que se dibujan salen de **una sola** operacion —`GET
  * /coactiva/cartera/resumen`— y cada uno de un campo que se llama como el rotulo:

@@ -201,10 +201,12 @@ export interface OperacionServida {
  * <h2>Y la de #272: el resumen de la cartera</h2>
  *
  * <b>`GET /coactiva/cartera/resumen`</b> — cuantos expedientes hay en cada etapa. Es lo que
- * enciende `coa-panel`, que hasta #272 sacaba su unico campo del `totalElementos` de
+ * enciende `coa-panel`, que hasta #272 sacaba su unico campo del recuento de
  * `GET /coactiva/deudas` — una cifra que cuenta TODOS los expedientes, concluidos incluidos, bajo
- * el rotulo «Expedientes abiertos». Tampoco exige ningun parametro: `ejercicio` es opcional y esta
- * publicado, y esta interfaz **no lo manda** porque el desplegable del bloque no publica su valor.
+ * el rotulo «Expedientes abiertos», y que desde #307 esa operacion publica como
+ * `expedientesDelCriterio` y no como `totalElementos`. Tampoco exige ningun parametro:
+ * `ejercicio` es opcional y esta publicado, y esta interfaz **no lo manda** porque el desplegable
+ * del bloque no publica su valor.
  *
  * <b>Y la quinta que NO se enciende, con su motivo</b>: `POST /coactiva/convenios` publica los
  * ocho campos de `coa-cart` y **crea un convenio de fraccionamiento**. No existe el `GET`. Esta

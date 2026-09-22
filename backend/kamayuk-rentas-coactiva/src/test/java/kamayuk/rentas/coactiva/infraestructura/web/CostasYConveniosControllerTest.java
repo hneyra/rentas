@@ -44,6 +44,8 @@ import kamayuk.rentas.tesoreria.ConvenioCoactivo;
 import kamayuk.rentas.tesoreria.CuotaDelConvenio;
 import kamayuk.rentas.tesoreria.FraccionamientoCoactivo;
 import kamayuk.rentas.tesoreria.SolicitudDeConvenioCoactivo;
+import kamayuk.rentas.valores.ObligacionDelValor;
+import kamayuk.rentas.valores.ValorParaCoactiva;
 import kamayuk.rentas.web.ConfiguracionDeJson;
 import kamayuk.rentas.web.ManejadorDeErrores;
 import org.junit.jupiter.api.AfterEach;
@@ -375,6 +377,68 @@ class CostasYConveniosControllerTest {
         assertThat(resultado.getResponse().getContentAsString()).contains("D-02b");
     }
 
+    // ---------------------------------------- #307: el recuento dice lo que cuenta
+
+    @Test
+    @DisplayName("#307 — el recuento se llama «expedientesDelCriterio», y no es el de las filas")
+    void elRecuentoDiceQueCuenta() throws Exception {
+        // DOS expedientes en la cartera, y a proposito no del mismo tipo: al primero se le importa
+        // el valor que formaliza el PREDIAL que el libro tiene con S/ 500; el segundo no tiene
+        // ningun valor, asi que no hay nada que cobrarle y la consulta lo descarta DESPUES de que
+        // la base lo contara. Con los dos iguales —los dos con deuda— esta prueba pasaria diga lo
+        // que diga el recuento, que es como el defecto sobrevivio hasta ahora.
+        conSuValor(expedienteConRec1());
+        expedienteSinValores("EXP-2026-000002");
+
+        MvcResult resultado = listarDeudas("tipoDeDeuda=TRIBUTARIA");
+
+        assertThat(resultado.getResponse().getStatus()).isEqualTo(200);
+        String cuerpo = resultado.getResponse().getContentAsString();
+
+        assertThat(cuerpo)
+                .as("una fila: la del expediente que si tiene algo que cobrar")
+                .contains("EXP-2026-000001")
+                .doesNotContain("EXP-2026-000002");
+        assertThat(cuerpo)
+                .as("y el recuento son los DOS expedientes que cumplen el criterio, con su nombre")
+                .contains("\"expedientesDelCriterio\":2");
+        assertThat(cuerpo)
+                .as(
+                        "«totalElementos» promete «las filas que devolveria la consulta sin"
+                                + " paginar», y aqui serian 2 contra 1: publicarlo con ese nombre"
+                                + " es lo que dejaba a la grilla diciendo «20 de 1 184» sobre"
+                                + " diecisiete filas (#307)")
+                .doesNotContain("totalElementos");
+        assertThat(cuerpo)
+                .as("la paginacion sigue repartiendo lo que se reparte: los expedientes")
+                .contains("\"totalPaginas\":1")
+                .contains("\"hayMas\":false");
+    }
+
+    @Test
+    @DisplayName("#307 — «deudas en beneficio» publica el mismo recuento, y descarta dos veces")
+    void elRecuentoDeLasDeudasEnBeneficio() throws Exception {
+        conSuValor(expedienteConRec1());
+        expedienteSinValores("EXP-2026-000002");
+
+        MvcResult resultado =
+                deudasMvc
+                        .perform(
+                                MockMvcRequestBuilders.get(
+                                        "/rentas/api/v1/coactiva/deudas-en-beneficio"))
+                        .andReturn();
+
+        assertThat(resultado.getResponse().getStatus()).isEqualTo(200);
+        String cuerpo = resultado.getResponse().getContentAsString();
+        assertThat(cuerpo)
+                .as("sin ningun beneficio registrado no sale ninguna fila...")
+                .contains("\"contenido\":[]");
+        assertThat(cuerpo)
+                .as("...y aun asi el recuento son los dos expedientes del criterio, dicho asi")
+                .contains("\"expedientesDelCriterio\":2")
+                .doesNotContain("totalElementos");
+    }
+
     // ---------------------------------------- #562: lo que falta publicar es 422, no 500
 
     @Test
@@ -680,6 +744,51 @@ class CostasYConveniosControllerTest {
                         Instant.parse("2026-06-18T09:00:00Z"),
                         Observacion.de("Se dicta para la prueba")));
         return expediente.numero();
+    }
+
+    /**
+     * Le importa al expediente el valor que formaliza el PREDIAL que {@code libro} tiene.
+     *
+     * <p>Sin esto un expediente no tiene nada que cobrar: la deuda se compone cruzando lo que sus
+     * valores formalizan con lo que el libro dice, y sin valores ese cruce es vacio.
+     */
+    private void conSuValor(String numero) {
+        long expediente = expedientes.porNumero(numero).orElseThrow().identificador();
+        valores.con(
+                new ValorParaCoactiva(
+                        11L,
+                        "OP",
+                        "OP-2026-000011",
+                        EJERCICIO,
+                        LocalDate.of(2026, 3, 2),
+                        7L,
+                        "EXIGIBLE",
+                        HOY,
+                        LocalDate.of(2026, 5, 5),
+                        true,
+                        Dinero.de("500.00"),
+                        LocalDate.of(2026, 3, 2),
+                        List.of(new ObligacionDelValor("PREDIAL", EJERCICIO, null, null))));
+        expedientes.importar(expediente, 11L, HOY);
+    }
+
+    /** Un expediente abierto y sin un solo valor: cuenta en la cartera y no tiene deuda. */
+    private void expedienteSinValores(String numero) {
+        expedientes.abrir(
+                new ExpedienteCoactivo(
+                        null,
+                        numero,
+                        EJERCICIO,
+                        2,
+                        7L,
+                        "EJECUTOR COACTIVO",
+                        null,
+                        HOY,
+                        null,
+                        "AV. GRAU 200",
+                        Instant.parse("2026-06-18T09:00:00Z"),
+                        null,
+                        Observacion.de("Se abre para la prueba")));
     }
 
     private static MockMvc construir(Object controlador) {

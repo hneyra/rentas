@@ -277,3 +277,94 @@ describe('y medido sobre el reparto, no solo sobre el texto', () => {
     expect(reparto?.noPublicados.size).toBe(1);
   });
 });
+
+/**
+ * **Y dos operaciones cuyo recuento NO cuenta las filas que devuelven** (#307).
+ *
+ * <h2>Por que esta guarda tiene que saberlo, y no basta con que el backend lo arregle</h2>
+ *
+ * `GET /coactiva/deudas` compone su pagina con la grilla de expedientes y **despues** descarta los
+ * que no tienen nada que cobrar —la deuda se relee del libro y no hay columna por la que filtrar en
+ * SQL—. O sea que el numero que la base conto son **expedientes del criterio** y las filas que
+ * salen son menos: la pagina puede traer diecisiete filas con el recuento diciendo 1 184.
+ *
+ * Mientras ese campo se llamara `totalElementos`, el conector numero dieciocho lo habria copiado
+ * al total de su tabla **y las dos pruebas de arriba habrian pasado**: la regla que vigilan es «no
+ * lo cuentes tu, leelo del envoltorio», y leerlo del envoltorio es exactamente lo que habria
+ * hecho. El resultado —«20 de 1 184» sobre diecisiete filas, y paginas cortas sin motivo— no
+ * produce ningun sintoma: sale un numero, de la forma correcta, en el sitio correcto, y coincide
+ * con el bueno siempre que ningun expediente de la pagina este pagado, que es como se prueba a
+ * mano. Es el defecto que #25 midio en `consulta_valores`.
+ *
+ * Asi que el backend le cambio el **nombre** —`expedientesDelCriterio`—, y esto es lo que impide
+ * que vuelva: si alguien publica otra vez `totalElementos` ahi, esto sale rojo nombrando #307 antes
+ * de que ninguna pantalla lo lea. Y si un conector llegara a leer el campo nuevo para un total de
+ * tabla, la primera de las pruebas de arriba lo caza: lo unico que admite a la derecha de
+ * `totalElementos:` es `<loQueLlego>.totalElementos`.
+ *
+ * Se mira el CONTRATO —`docs/50-api/formas-de-la-api.json`, que `FormasDeLaApiTest` deriva de los
+ * controladores— y no un tipo de este arbol, por lo mismo que `el-dialecto-de-la-paginacion`: asi
+ * no se compara la interfaz consigo misma.
+ */
+describe('un recuento que no cuenta sus propias filas no se llama `totalElementos` (#307)', () => {
+  /** La operacion -> como se llama ahi el recuento, porque no es el total de la relacion. */
+  const RECUENTO_QUE_NO_ES_EL_DE_SUS_FILAS: Readonly<Record<string, string>> = {
+    'GET /coactiva/deudas': 'expedientesDelCriterio',
+    'GET /coactiva/deudas-en-beneficio': 'expedientesDelCriterio',
+  };
+
+  const FORMAS = join(AQUI, '../../docs/50-api/formas-de-la-api.json');
+  const formas = JSON.parse(readFileSync(FORMAS, 'utf8')) as Readonly<
+    Record<string, Record<string, unknown>>
+  >;
+
+  it('EL CENTINELA: el contrato se lee y declara las dos operaciones', () => {
+    // Sin esto, un archivo que dejara de declararlas —o una ruta mal escrita aqui— haria pasar en
+    // verde la comprobacion de abajo sobre el conjunto vacio.
+    expect(Object.keys(formas).length, 'el contrato de formas no se leyo').toBeGreaterThan(50);
+    for (const operacion of Object.keys(RECUENTO_QUE_NO_ES_EL_DE_SUS_FILAS)) {
+      expect(
+        formas[operacion],
+        `docs/50-api/formas-de-la-api.json no declara «${operacion}».\n\n` +
+          '  O la operacion se retiro, o se renombro la ruta. Si se retiro, esta entrada sobra.',
+      ).toBeDefined();
+    }
+  });
+
+  it('cada una publica su recuento con el nombre de lo que cuenta, y no el de siempre', () => {
+    const mal: string[] = [];
+    for (const [operacion, campo] of Object.entries(RECUENTO_QUE_NO_ES_EL_DE_SUS_FILAS)) {
+      const forma = formas[operacion] ?? {};
+      if (!(campo in forma)) mal.push(`  ${operacion}: no publica «${campo}»`);
+      if ('totalElementos' in forma) mal.push(`  ${operacion}: publica «totalElementos»`);
+    }
+    expect(
+      mal,
+      'Una operacion cuyo recuento NO cuenta las filas que devuelve lo publica como si lo\n' +
+        `hiciera:\n${mal.join('\n')}\n\n` +
+        '  `GET /coactiva/deudas` descarta los expedientes sin nada que cobrar DESPUES de\n' +
+        '  componer la pagina, asi que su recuento son los expedientes del criterio: 1 184 con\n' +
+        '  diecisiete filas delante. Bajo el nombre `totalElementos` un conector lo copiaria al\n' +
+        '  total de su tabla —y con razon: es lo que esta guarda le pide—, y la grilla escribiria\n' +
+        '  «20 de 1 184» sobre diecisiete filas, repartiendo paginas cortas sin motivo visible.\n' +
+        '  No produce ningun sintoma y coincide con el bueno siempre que nadie haya pagado.\n\n' +
+        '  Se llama `expedientesDelCriterio` (#307). Si de verdad cambio lo que la operacion\n' +
+        '  cuenta, lo que hay que mover es esta tabla, y entonces alguien tiene que mirar si la\n' +
+        '  pantalla puede volver a leerlo como el total de su relacion.',
+    ).toEqual([]);
+  });
+
+  it('EL CONTRARIO: las demas relaciones paginadas siguen publicando `totalElementos`', () => {
+    // Si el backend dejara de publicarlo en TODAS, la comprobacion de arriba pasaria en verde
+    // sobre un contrato en el que nadie publica ningun total, que no es lo que dice.
+    // `_` es la nota de procedencia del archivo, y es una CADENA: hay que saltarla o el `in`
+    // lanza en vez de comparar.
+    const conTotal = Object.entries(formas).filter(
+      ([, forma]) => typeof forma === 'object' && forma !== null && 'totalElementos' in forma,
+    );
+    expect(
+      conTotal.length,
+      'ninguna operacion del contrato publica `totalElementos`: esto ya no compara nada',
+    ).toBeGreaterThan(20);
+  });
+});

@@ -54,7 +54,6 @@ import kamayuk.rentas.coactiva.dominio.ObligacionDelExpediente;
 import kamayuk.rentas.coactiva.dominio.PlantillaDeNumeroDeExpediente;
 import kamayuk.rentas.coactiva.dominio.TipoDeActoCoactivo;
 import kamayuk.rentas.coactiva.dominio.TipoDeMedidaCautelar;
-import kamayuk.rentas.compartido.Pagina;
 import kamayuk.rentas.compartido.Paginacion;
 import kamayuk.rentas.compartido.TenantContext;
 import kamayuk.rentas.contribuyentes.DirectorioDeContribuyentes;
@@ -1177,14 +1176,15 @@ class CostasYFraccionamientoJdbcTest {
             String expediente = expedienteConRec1("CONS-1");
             liquidarTodo(expediente);
 
-            Pagina<ConsultaDeDeudasCoactivas.DeudaEnCoactiva> pagina =
-                    enTransaccion(
-                            () ->
-                                    consultaDeDeudas.deudas(
-                                            new CriterioDeExpedientes(
-                                                    expediente, null, null, null, null),
-                                            LIQUIDACION,
-                                            Paginacion.de(0, 20, "numero")));
+            ConsultaDeDeudasCoactivas.PaginaDeDeudas<ConsultaDeDeudasCoactivas.DeudaEnCoactiva>
+                    pagina =
+                            enTransaccion(
+                                    () ->
+                                            consultaDeDeudas.deudas(
+                                                    new CriterioDeExpedientes(
+                                                            expediente, null, null, null, null),
+                                                    LIQUIDACION,
+                                                    Paginacion.de(0, 20, "numero")));
 
             assertThat(pagina.contenido())
                     .singleElement()
@@ -1209,21 +1209,61 @@ class CostasYFraccionamientoJdbcTest {
             String expediente = expedienteConRec1("CONS-2");
             pagarTodo(expediente);
 
-            assertThat(
+            ConsultaDeDeudasCoactivas.PaginaDeDeudas<ConsultaDeDeudasCoactivas.DeudaEnCoactiva>
+                    pagina =
                             enTransaccion(
-                                            () ->
-                                                    consultaDeDeudas.deudas(
-                                                            new CriterioDeExpedientes(
-                                                                    expediente,
-                                                                    null,
-                                                                    null,
-                                                                    null,
-                                                                    null),
-                                                            LIQUIDACION,
-                                                            Paginacion.de(0, 20, "numero")))
-                                    .contenido())
+                                    () ->
+                                            consultaDeDeudas.deudas(
+                                                    new CriterioDeExpedientes(
+                                                            expediente, null, null, null, null),
+                                                    LIQUIDACION,
+                                                    Paginacion.de(0, 20, "numero")));
+
+            assertThat(pagina.contenido())
                     .as("«consulta de DEUDAS»: un expediente pagado no es una deuda")
                     .isEmpty();
+            assertThat(pagina.expedientesDelCriterio())
+                    .as(
+                            "y el recuento NO es cero: el expediente cumple el criterio y la base"
+                                    + " lo conto. Que las dos cifras se separen es el hecho, y por eso"
+                                    + " el campo se llama «expedientesDelCriterio» y no"
+                                    + " «totalElementos» (#307)")
+                    .isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("#307 — el recuento publicado es el que la base conto, no el de las filas")
+        void elRecuentoEsElDelCriterio() {
+            // La cartera de esta clase ya tiene expedientes de las demas pruebas; lo que este
+            // añade es que al menos uno este PAGADO, para que las dos cifras no puedan coincidir
+            // por casualidad. Con todos los expedientes con deuda, cualquier implementacion
+            // —incluida la que publica `filas.size()`— saldria verde.
+            pagarTodo(expedienteConRec1("CONS-6"));
+            expedienteConRec1("CONS-7");
+
+            ConsultaDeDeudasCoactivas.PaginaDeDeudas<ConsultaDeDeudasCoactivas.DeudaEnCoactiva>
+                    pagina =
+                            enTransaccion(
+                                    () ->
+                                            consultaDeDeudas.deudas(
+                                                    CriterioDeExpedientes.todos(),
+                                                    LIQUIDACION,
+                                                    Paginacion.de(0, 500, "numero")));
+            long enLaCartera =
+                    enTransaccion(() -> expedientes.contar(CriterioDeExpedientes.todos()));
+
+            assertThat(pagina.expedientesDelCriterio())
+                    .as("es exactamente el mismo `count(*)` que reparte las paginas")
+                    .isEqualTo(enLaCartera);
+            assertThat(pagina.contenido().size())
+                    .as(
+                            "y las filas son MENOS: el descarte de los expedientes sin nada que"
+                                    + " cobrar sigue alcanzando a alguno, asi que el recuento no puede"
+                                    + " anunciarse como «las filas que devolveria sin paginar»")
+                    .isLessThan((int) pagina.expedientesDelCriterio());
+            assertThat(pagina.totalPaginas())
+                    .as("y la paginacion se reparte sobre el recuento, no sobre las filas")
+                    .isEqualTo(1);
         }
 
         @Test
@@ -1272,13 +1312,14 @@ class CostasYFraccionamientoJdbcTest {
             liquidarTodo(conBeneficio);
             String sinBeneficio = expedienteConRec1("CONS-5");
 
-            Pagina<ConsultaDeDeudasCoactivas.DeudaConBeneficio> pagina =
-                    enTransaccion(
-                            () ->
-                                    consultaDeDeudas.enBeneficio(
-                                            CriterioDeExpedientes.todos(),
-                                            LIQUIDACION,
-                                            Paginacion.de(0, 50, "numero")));
+            ConsultaDeDeudasCoactivas.PaginaDeDeudas<ConsultaDeDeudasCoactivas.DeudaConBeneficio>
+                    pagina =
+                            enTransaccion(
+                                    () ->
+                                            consultaDeDeudas.enBeneficio(
+                                                    CriterioDeExpedientes.todos(),
+                                                    LIQUIDACION,
+                                                    Paginacion.de(0, 50, "numero")));
 
             assertThat(pagina.contenido())
                     .as("solo los obligados con beneficio registrado y vigente a la fecha")

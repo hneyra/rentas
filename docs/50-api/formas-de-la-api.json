@@ -150,7 +150,7 @@
     ],
     "pagina": "entero",
     "tamano": "entero",
-    "totalElementos": "entero",
+    "expedientesDelCriterio": "entero",
     "totalPaginas": "entero",
     "hayMas": "booleano"
   },
@@ -191,7 +191,7 @@
     ],
     "pagina": "entero",
     "tamano": "entero",
-    "totalElementos": "entero",
+    "expedientesDelCriterio": "entero",
     "totalPaginas": "entero",
     "hayMas": "booleano"
   },
