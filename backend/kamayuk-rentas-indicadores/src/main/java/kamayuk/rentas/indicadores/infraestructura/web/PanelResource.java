@@ -1,9 +1,10 @@
 package kamayuk.rentas.indicadores.infraestructura.web;
 
-import java.time.Instant;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.List;
 import kamayuk.rentas.dominio.Dinero;
+import kamayuk.rentas.dominio.ZonaHoraria;
 import kamayuk.rentas.indicadores.dominio.AvanceDeRecaudacion;
 import kamayuk.rentas.indicadores.dominio.Cartera;
 import kamayuk.rentas.indicadores.dominio.Indicador;
@@ -34,7 +35,9 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>{@code calculadoEn} es el instante con zona, junto a la {@code fechaCalculo} del dia
  * tributario: dos lecturas del mismo dia dan cifras distintas y sin la hora no se distinguen (AC 2
- * de #56).
+ * de #56). <b>Y desde #188 lleva el desfase de verdad</b> —{@code 2026-09-16T05:00:00-05:00}— en
+ * vez de la {@code Z} de UTC: la hora a la que se leyo el panel es la de la municipalidad, y un
+ * panel calculado a las 20:00 salia fechado el dia siguiente.
  *
  * <h2>Lo cargado es un campo (#549)</h2>
  *
@@ -58,7 +61,7 @@ import org.jspecify.annotations.Nullable;
 public record PanelResource(
         int ejercicio,
         LocalDate fechaCalculo,
-        Instant calculadoEn,
+        OffsetDateTime calculadoEn,
         ImporteActualizado cargado,
         List<Kpi> kpis,
         List<Bloque> paneles) {
@@ -67,7 +70,7 @@ public record PanelResource(
         return new PanelResource(
                 avance.ejercicio().valor(),
                 avance.fechaCalculo(),
-                avance.calculadoEn(),
+                ZonaHoraria.conSuDesfase(avance.calculadoEn()),
                 new ImporteActualizado(avance.cargado(), avance.cargadoA()),
                 avance.indicadores().stream().map(Kpi::de).toList(),
                 avance.carteras().stream().map(Bloque::de).toList());

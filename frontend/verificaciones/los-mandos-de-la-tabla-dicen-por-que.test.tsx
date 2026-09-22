@@ -49,7 +49,7 @@ const BITACORA = {
       usuario: 'jcardenas',
       origenEquipo: 'PC-CAJA-02',
       origenIp: '10.0.4.12',
-      fecha: '2026-08-13T14:41:12Z',
+      fecha: '2026-08-13T09:41:12-05:00',
       observacion: 'Anulado por duplicado a pedido del contribuyente',
       datosAnteriores: '{}',
       datosNuevos: '{}',
@@ -62,7 +62,7 @@ const BITACORA = {
   hayMas: true,
 };
 
-const SESION = { id: 9, usuarioId: 1, inicio: '2026-09-17T08:00:00Z', ejercicioDeTrabajo: 2026 };
+const SESION = { id: 9, usuarioId: 1, inicio: '2026-09-17T03:00:00-05:00', ejercicioDeTrabajo: 2026 };
 
 function contesta() {
   vi.stubGlobal(

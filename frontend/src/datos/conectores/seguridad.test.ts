@@ -25,7 +25,7 @@ function movimiento(cambios: Partial<MovimientoDeLaBitacora> = {}): MovimientoDe
     usuario: 'jcardenas',
     origenEquipo: 'PC-CAJA-02',
     origenIp: '10.0.4.12',
-    fecha: '2026-08-13T14:41:12Z',
+    fecha: '2026-08-13T09:41:12-05:00',
     observacion: 'Anulado por duplicado a pedido del contribuyente',
     datosAnteriores: '{"estado":"VIGENTE"}',
     datosNuevos: '{"estado":"ANULADO"}',
@@ -116,11 +116,30 @@ describe('`seg-aud` — la bitacora de auditoria', () => {
     expect(filasDe(pagina(movimiento()))[0]).toHaveLength(5);
   });
 
-  it('la fecha se escribe con su zona, y NO se mueve a la hora del puesto', () => {
-    // `fecha` es un `Instant`, o sea UTC. Moverlo exige un `Date` —que arrastra la zona de la
-    // MAQUINA— o restar cinco horas a mano; las dos pintarian una hora distinta de la publicada
-    // sin que nada lo dijera, en la pantalla que responde «a que hora se anulo ese recibo».
-    expect(filasDe(pagina(movimiento()))[0]?.[0]).toBe('13/08/2026 14:41 UTC');
+  it('la fecha se escribe con la hora de la municipalidad, y NO con la del puesto', () => {
+    // Desde #188 `fecha` llega con su desfase —`-05:00`—, asi que los digitos que se pintan son
+    // los que vinieron. Moverlos exigiria un `Date`, que arrastra la zona de la MAQUINA: la misma
+    // bitacora se leeria distinta en dos navegadores, en la pantalla que responde «a que hora se
+    // anulo ese recibo».
+    expect(filasDe(pagina(movimiento()))[0]?.[0]).toBe('13/08/2026 09:41');
+  });
+
+  it('un movimiento de las 20:15 se queda en su dia, que es donde UTC ya seria el siguiente', () => {
+    // La muestra que distingue algo. A mediodia UTC y la zona del producto coinciden en el dia y
+    // una prueba sembrada ahi no mide nada; entre las 19:00 y la medianoche NO coinciden, y ahi
+    // un fallo no cambia la hora: cambia la FECHA que consta en la bitacora.
+    const nocturno = movimiento({ fecha: '2026-08-13T20:15:00-05:00' });
+
+    expect(filasDe(pagina(nocturno))[0]?.[0]).toBe('13/08/2026 20:15');
+  });
+
+  it('y si el backend volviera a publicar en UTC, la celda no se pinta: se rompe', () => {
+    // La regresion de #188 seria un `Resource` que vuelve a declarar un `Instant`. Pintarlo
+    // serian cinco horas de diferencia sin ningun sintoma, y esta vez sin la marca « UTC» que lo
+    // delataba antes. Mejor que la pantalla diga averia.
+    const enUtc = movimiento({ fecha: '2026-08-14T01:15:00Z' });
+
+    expect(() => filasDe(pagina(enUtc))).toThrow(/#188/);
   });
 
   it('«Acto» dice la palabra que la bitacora guarda, no la frase del artboard', () => {

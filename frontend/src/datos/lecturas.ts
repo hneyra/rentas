@@ -1368,9 +1368,10 @@ export interface TrabajoParado {
  * aqui ademas se lee de un vistazo lo que la pantalla NO puede sacar de aqui — ver
  * `conectores/seguridad.ts`, que decide columna por columna.
  *
- * **`fecha` es un `Instant` y no una fecha ISO sin hora**, que es la diferencia que decide como se
- * escribe la columna «Fecha y hora»: llega como `2026-08-13T14:41:12Z`, o sea en **UTC**, y
- * `formatearFecha` de `dominio/formato.ts` no lo acepta a proposito. El conector lo explica.
+ * **`fecha` es un instante y no una fecha ISO sin hora**, que es la diferencia que decide como se
+ * escribe la columna «Fecha y hora»: llega como `2026-08-13T09:41:12-05:00` —desde #188 con el
+ * desfase de la municipalidad, antes en UTC— y `formatearFecha` de `dominio/formato.ts` no lo
+ * acepta a proposito. El conector lo explica.
  *
  * **`operacion` es una palabra de un vocabulario cerrado** —`ALTA`, `MODIFICACION`, `BAJA`,
  * `ANULACION`, `REVERSION`, `PERMISO`, `ACCESO`, que son los valores del `CHECK` de
@@ -1386,7 +1387,7 @@ export interface MovimientoDeLaBitacora {
   readonly usuario: string;
   readonly origenEquipo: string | null;
   readonly origenIp: string | null;
-  /** Instante en **UTC**, `2026-08-13T14:41:12Z`. No es una fecha ISO sin hora. */
+  /** Instante **con su desfase**, `2026-08-13T09:41:12-05:00` (#188). No es una fecha ISO sin hora. */
   readonly fecha: string;
   readonly observacion: string;
   readonly datosAnteriores: string | null;

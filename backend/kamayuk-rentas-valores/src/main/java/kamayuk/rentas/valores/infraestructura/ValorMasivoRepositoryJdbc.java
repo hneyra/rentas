@@ -208,14 +208,19 @@ public class ValorMasivoRepositoryJdbc extends RepositorioJdbc implements ValorM
     }
 
     /**
-     * La marca de proceso tal como la API la publica.
+     * La marca de proceso de un item, leida de su columna.
      *
-     * <p><b>Este {@code ZoneOffset.UTC} se queda, y no es un pendiente de #273.</b> Es uno de los
-     * cuatro inocuos de los nueve que {@code rentas}#224 inventario: {@code atOffset} presenta el
-     * mismo instante con desfase cero y no lo trunca a ningun dia, asi que aqui la zona no decide
-     * nada —a diferencia de los cinco que #273 arreglo, donde decidia que dia constaba—. Que la API
-     * publique esta hora en la zona de la municipalidad en vez de en UTC es {@code rentas}#188, que
-     * cambia el contrato y va aparte.
+     * <p><b>Este {@code ZoneOffset.UTC} se queda, y ya no es un pendiente de nadie.</b> Es el
+     * cuarto de los inocuos que {@code rentas}#224 inventario, y no lo toca ni #273 ni #188 por dos
+     * motivos distintos: {@code atOffset} presenta el mismo instante con desfase cero y <b>no lo
+     * trunca</b> a ningun dia —a diferencia de los cinco que #273 arreglo, donde la zona decidia
+     * que dia constaba—, y sobre todo <b>este valor no sale por HTTP</b>. {@code ValorMasivoItem}
+     * es un record de dominio que ningun controlador devuelve: medido, {@code fechaProcesado} no
+     * aparece en {@code docs/50-api/formas-de-la-api.json}, y un {@code grep} de {@code
+     * .fechaProcesado()} sobre el arbol entero no devuelve ni una linea. Si algun dia esta marca se
+     * publicara, la hora saldria de {@link
+     * kamayuk.rentas.dominio.ZonaHoraria#conSuDesfase(java.time.Instant)} como las siete que #188
+     * convirtio, y no de aqui.
      */
     private static @Nullable OffsetDateTime aOffset(@Nullable Timestamp marca) {
         return marca == null ? null : marca.toInstant().atOffset(java.time.ZoneOffset.UTC);

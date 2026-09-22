@@ -183,7 +183,7 @@ const PADRON = {
 const RECAUDACION_MEDIDA: IndicadorDeRecaudacion = {
   ejercicio: 2026,
   fechaCalculo: '2026-09-16',
-  calculadoEn: '2026-09-16T10:00:00Z',
+  calculadoEn: '2026-09-16T05:00:00-05:00',
   cargado: { importe: '23725394.80', actualizadoA: '2026-09-16' },
   kpis: [
     {
@@ -217,7 +217,7 @@ const RECAUDACION_MEDIDA: IndicadorDeRecaudacion = {
 const PARADO_MEDIDO: TrabajoParado = {
   ejercicio: 2026,
   fechaCalculo: '2026-09-16',
-  calculadoEn: '2026-09-16T10:00:00Z',
+  calculadoEn: '2026-09-16T05:00:00-05:00',
   frentes: [
     {
       frente: 'TRANSITO',
@@ -249,7 +249,7 @@ const BITACORA: Paginado<MovimientoDeLaBitacora> = {
       usuario: 'jcardenas',
       origenEquipo: 'PC-CAJA-02',
       origenIp: '10.0.4.12',
-      fecha: '2026-08-13T14:41:12Z',
+      fecha: '2026-08-13T09:41:12-05:00',
       observacion: 'Anulado por duplicado a pedido del contribuyente',
       datosAnteriores: '{"estado":"VIGENTE"}',
       datosNuevos: '{"estado":"ANULADO"}',

@@ -13,6 +13,7 @@ import kamayuk.rentas.dominio.Alicuota;
 import kamayuk.rentas.dominio.AreaM2;
 import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.dominio.Porcentaje;
+import kamayuk.rentas.dominio.ZonaHoraria;
 import kamayuk.rentas.web.ConfiguracionDeJson;
 import kamayuk.rentas.web.ImporteActualizado;
 import kamayuk.rentas.web.RespuestaPaginada;
@@ -117,6 +118,30 @@ class FormaSegunJacksonTest {
         assertThat(mapper.writeValueAsString(Alicuota.de("0.60"))).isEqualTo("\"0.60\"");
         assertThat(mapper.writeValueAsString(Porcentaje.de("50.00"))).isEqualTo("\"50.00\"");
         assertThat(mapper.writeValueAsString(AreaM2.de("120.50"))).isEqualTo("\"120.50\"");
+    }
+
+    @Test
+    @DisplayName("una hora publicada sale con su desfase, y Jackson no la devuelve a UTC (#188)")
+    void laHoraSaleConSuDesfase() {
+        // #188 cambio los siete campos de hora de `Instant` a `OffsetDateTime`, y eso solo sirve
+        // si Jackson escribe el desfase que el valor lleva. No es gratis suponerlo: Jackson tiene
+        // una opcion —`WRITE_DATES_WITH_CONTEXT_TIME_ZONE`— que normaliza a la zona del contexto
+        // y dejaria salir «…T14:41:12Z» desde un valor que dice «09:41:12-05:00», sin que nada lo
+        // dijera. Asi que aqui no se razona: se serializa.
+        JsonMapper mapper =
+                JsonMapper.builder()
+                        .addModule(new ConfiguracionDeJson().moduloDeObjetosDeValor())
+                        .build();
+
+        // Las 20:15 del 13 de agosto en el Peru. En UTC ya es el dia 14, que es lo que hace que
+        // esta muestra distinga algo: un fallo aqui no cambia la hora, cambia la fecha.
+        Instant nocturno = Instant.parse("2026-08-14T01:15:00Z");
+
+        assertThat(mapper.writeValueAsString(ZonaHoraria.conSuDesfase(nocturno)))
+                .isEqualTo("\"2026-08-13T20:15:00-05:00\"");
+        assertThat(mapper.writeValueAsString(nocturno))
+                .as("y asi salia antes de #188, con el dia 14 y la resta a cuenta del cliente")
+                .isEqualTo("\"2026-08-14T01:15:00Z\"");
     }
 
     // ------------------------------------------------------------------
