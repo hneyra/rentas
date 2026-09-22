@@ -51,6 +51,12 @@ import org.springframework.transaction.support.TransactionTemplate;
 @DisplayName("#523 — La corrida de emision predial deja rastro")
 class CorridaDeEmisionJdbcTest {
 
+    /** El conjunto con que la corrida de prueba emitio, sellado en la fila (V23, #312). */
+    private static final long CONJUNTO_SELLADO = 31L;
+
+    /** El derecho de emision que esa corrida aplico a cada cuenta, en soles. */
+    private static final String DERECHO_SELLADO = "4.50";
+
     private static final Clock RELOJ =
             Clock.fixed(Instant.parse("2026-01-28T07:14:00Z"), ZoneId.of("America/Lima"));
 
@@ -117,6 +123,11 @@ class CorridaDeEmisionJdbcTest {
         assertThat(ultima.get().leidos()).isEqualTo(3);
         assertThat(ultima.get().montoEmitido()).isEqualTo(Dinero.de("9412204.60"));
         assertThat(ultima.get().fechaCalculo()).isEqualTo(LocalDate.of(2026, 1, 28));
+        // **El sello de V23 (#312).** La corrida aplicaba el derecho dentro de `monto_emitido` y
+        // no lo guardaba; ahora vuelve con el, y con el conjunto del que salio — que es lo unico
+        // con lo que se puede volver a leer aquel cuadro sin mirar el conjunto vigente HOY.
+        assertThat(ultima.get().derechoDeEmision()).isEqualTo(Dinero.de(DERECHO_SELLADO));
+        assertThat(ultima.get().conjuntoId()).isEqualTo(CONJUNTO_SELLADO);
     }
 
     /**
@@ -184,6 +195,10 @@ class CorridaDeEmisionJdbcTest {
                                         "TRIMESTRAL",
                                         true,
                                         "",
+                                        // Una simulacion que no resolvio ningun conjunto: no hay
+                                        // nada que sellar, y los dos van nulos a la vez (V23).
+                                        null,
+                                        null,
                                         5,
                                         5,
                                         Dinero.de("500.00"),
@@ -233,6 +248,86 @@ class CorridaDeEmisionJdbcTest {
                 .as(
                         "la corrida de A no existe para B: RLS con FORCE, y conectados como kamayuk_app")
                 .isEmpty();
+    }
+
+    /**
+     * <b>Una corrida escrita ANTES de {@code V23} se relee sin sello, y sin inventarle uno</b>
+     * (#312).
+     *
+     * <h2>Por que esta fila se escribe con SQL crudo y no con el repositorio</h2>
+     *
+     * <p>Porque el repositorio de hoy ya no puede producirla: el {@code INSERT} nombra las dos
+     * columnas nuevas. Lo que hay en una base en marcha son filas escritas por el codigo de ayer,
+     * que no las nombraba, y esas son las que esta lectura tiene que saber leer. Insertarla a mano
+     * es la unica forma de tener una.
+     *
+     * <h2>Y por que importa que NO vuelva con ceros</h2>
+     *
+     * <p>{@code ResultSet.getLong} devuelve {@code 0} para un {@code NULL} de SQL <b>sin
+     * avisar</b>: con el, esta corrida saldria sellada con «el conjunto numero cero», que no
+     * existe. Y un derecho de cero diria «no se cobro derecho de emision», que es falso — se cobro,
+     * y esta sumado dentro de {@code monto_emitido}. Las dos son cifras equivocadas que parecen
+     * correctas, que es justo lo que #312 viene a quitar de en medio.
+     */
+    @Test
+    @DisplayName("una corrida anterior a V23 se relee con el sello en nulo, no en cero")
+    void laCorridaAnteriorALaMigracionSeReleeSinSello() {
+        TenantContext.fijar(new MunicipalidadId(municipalidadA));
+
+        // La fila tal como la escribia el codigo anterior a #312: sin `conjunto_id` ni
+        // `derecho_emision`. El ejercicio es suyo y de nadie mas, para que sea «la ultima».
+        ejecutarComoApp(
+                "INSERT INTO corrida_predial (municipalidad_id, ejercicio, alcance, modalidad,"
+                        + " simulacion, conjunto, leidos, determinados, monto_emitido,"
+                        + " fecha_calculo, usuario_registro, fecha_registro, observacion)"
+                        + " VALUES ("
+                        + municipalidadA
+                        + ", 2021, 'TODOS', 'TRIMESTRAL', false, '2021 v1', 3, 3, 3000.00,"
+                        + " DATE '2021-01-28', 'jefe.rentas', now(), 'Emision anual 2021')");
+
+        Optional<CorridaDeEmision> ultima =
+                transaccion.execute(estado -> repositorio.ultimaDe(new Ejercicio(2021)));
+
+        assertThat(ultima).isPresent();
+        assertThat(ultima.get().conjuntoId())
+                .as(
+                        "`getLong` devolveria 0 y la corrida saldria sellada con un conjunto que no existe")
+                .isNull();
+        assertThat(ultima.get().derechoDeEmision())
+                .as("un cero diria «no se cobro derecho», y se cobro: esta dentro de monto_emitido")
+                .isNull();
+        // Y lo demas de la fila se lee igual que siempre: lo que falta es el sello, no la corrida.
+        assertThat(ultima.get().determinados()).isEqualTo(3);
+        assertThat(ultima.get().montoEmitido()).isEqualTo(Dinero.de("3000.00"));
+    }
+
+    /**
+     * <b>El `CHECK` de {@code V23} no deja media fila sellada</b> (#312).
+     *
+     * <p>El dominio lo exige al construir, pero el dominio no es lo unico que escribe en esta
+     * tabla: una carga, un arreglo a mano o un codigo futuro entran por SQL. La cifra sin su
+     * conjunto vuelve a ser un numero sin fuente —que es lo que la columna existe para dejar de
+     * ser—, asi que la base lo rechaza tambien.
+     */
+    @Test
+    @DisplayName("media fila sellada no entra: el derecho sin su conjunto lo rechaza la base")
+    void mediaFilaSelladaNoEntra() {
+        TenantContext.fijar(new MunicipalidadId(municipalidadA));
+
+        assertThatThrownBy(
+                        () ->
+                                ejecutarComoApp(
+                                        "INSERT INTO corrida_predial (municipalidad_id, ejercicio,"
+                                                + " alcance, modalidad, simulacion, conjunto,"
+                                                + " derecho_emision, leidos, determinados,"
+                                                + " monto_emitido, fecha_calculo, usuario_registro,"
+                                                + " fecha_registro, observacion) VALUES ("
+                                                + municipalidadA
+                                                + ", 2020, 'TODOS', 'TRIMESTRAL', false, '2020"
+                                                + " v1', 4.50, 1, 1, 100.00, DATE '2020-01-28',"
+                                                + " 'jefe.rentas', now(), 'media fila')"))
+                .as("una cifra sellada sin el conjunto del que salio no se puede contrastar")
+                .hasMessageContaining("corrida_predial_sello_completo_ck");
     }
 
     /**
@@ -292,6 +387,8 @@ class CorridaDeEmisionJdbcTest {
                 "TRIMESTRAL",
                 false,
                 "Conjunto 2026 v1",
+                CONJUNTO_SELLADO,
+                Dinero.de(DERECHO_SELLADO),
                 leidos,
                 determinados,
                 Dinero.de(monto),

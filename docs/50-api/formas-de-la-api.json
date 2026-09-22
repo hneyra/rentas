@@ -2058,9 +2058,11 @@
     "sector": "texto",
     "simulacion": "booleano",
     "conjunto": "texto",
+    "conjuntoId": "entero",
     "fechaCalculo": "texto",
     "determinados": "entero",
     "montoEmitido": "texto",
+    "derechoDeEmision": "texto",
     "observados": "entero",
     "etapas": [
       {

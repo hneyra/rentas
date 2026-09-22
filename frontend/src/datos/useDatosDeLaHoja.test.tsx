@@ -57,6 +57,11 @@ function contesta(cuerpo: unknown, estado = 200) {
  * con nada, asi que cuando la operacion publico `determinados` y `montoEmitido` el fixture se
  * quedo corto **en verde**: `tsc` no dijo nada y el rojo llego al montar la hoja, desde dentro de
  * `formatearEntero`. Con el tipo, el que falte un campo no compila.
+ *
+ * **Y es una corrida ANTERIOR a `V23`** (#312): las dos columnas del sello en nulo. Se elige asi
+ * porque es la unica que deja algo que medir aqui —un campo con su propia palabra en el hueco—, y
+ * porque esa palabra es la que distingue que el hueco viaja POR CAMPO: la de la pantalla seria
+ * «no publicado».
  */
 const CORRIDA: CorridaDelPredial = {
   id: 1,
@@ -65,9 +70,11 @@ const CORRIDA: CorridaDelPredial = {
   sector: null,
   simulacion: false,
   conjunto: 'V3',
+  conjuntoId: null,
   fechaCalculo: '28/01/2026 02:14',
   determinados: 58412,
   montoEmitido: '8772431.05',
+  derechoDeEmision: null,
   observados: 534,
   etapas: [
     { etapa: 'Lectura del padron', registros: 62418, monto: '—', observados: 0, estado: 'Conforme' },
@@ -190,10 +197,14 @@ describe('una pantalla CON conector recorre sus estados', () => {
     // la pantalla SI esta conectada, y decir lo contrario ahi seria falso.
     //
     // Eran TRES hasta #271, cuando la corrida publico `determinados` y `montoEmitido` como campos.
-    // Queda «Derecho de emision» —`0|5`—, que la corrida aplica y no sella: ver el javadoc de
-    // `PANEL` en `conectores.ts`. La coordenada se cambia y no se borra la asercion: lo que esto
-    // mide es que el hueco viaje POR CAMPO, y sin ninguno no habria como medirlo.
-    expect(result.current.ausenciaPorCampo?.get(coordenada(0, 5))).toBe('no publicado');
+    // Queda «Derecho de emision» —`0|5`—, y desde #312 **por otro motivo**: la operacion SI lo
+    // publica, y esta corrida —anterior a `V23`— lo trae nulo. Por eso la palabra no es «no
+    // publicado»: es la de «esa corrida no lo guardo».
+    //
+    // **Y justo esa diferencia es lo que hace que esta asercion muerda.** «No publicado» es lo que
+    // `useDatosDeLaHoja` pone en TODO campo que el reparto no llene, asi que afirmarlo pasaria
+    // igual con la declaracion del conector y sin ella. Esta palabra solo puede venir del conector.
+    expect(result.current.ausenciaPorCampo?.get(coordenada(0, 5))).toBe('no consta en la corrida');
   });
 
   it('un 401 se dice como lo que es —vuelva a identificarse—, no como «fallo la red»', async () => {

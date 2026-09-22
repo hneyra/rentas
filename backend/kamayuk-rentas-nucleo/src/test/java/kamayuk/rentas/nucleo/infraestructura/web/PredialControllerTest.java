@@ -363,6 +363,57 @@ class PredialControllerTest {
                 .as("«cuentas emitidas» y «monto determinado» son campos, no una celda de la tabla")
                 .contains("\"determinados\":")
                 .contains("\"montoEmitido\":");
+        // Y el sello de V23 (#312): la corrida que no determino a nadie no resolvio ningun
+        // conjunto, asi que no tiene derecho que sellar — y lo dice con NULO, no con cero. Un
+        // `"0.00"` aqui afirmaria que no se cobro derecho de emision.
+        assertThat(cuerpo)
+                .as("nulo dice «esta corrida no lo guardo»; cero diria «no se cobro»")
+                .contains("\"derechoDeEmision\":null")
+                .contains("\"conjuntoId\":null");
+    }
+
+    /**
+     * <b>La corrida que SI determina sella lo que aplico</b> (#312, V23, D-02b).
+     *
+     * <h2>Por que hacen falta las dos corridas y no basta esta</h2>
+     *
+     * <p>{@link #laCorridaDejaRastro()} corre sobre un padron vacio: no determina a nadie, no
+     * resuelve ningun conjunto, y su sello sale <b>nulo</b>. Esta corre sobre un padron con un
+     * contribuyente y su sello sale <b>escrito</b>. Con una sola de las dos, una implementacion que
+     * devolviera siempre cero —o siempre nulo— pasaria en verde.
+     *
+     * <h2>Las cifras de la muestra no coinciden entre si</h2>
+     *
+     * <p>El conjunto vigente del doble es el <b>77</b>, el derecho <b>4,50</b>, los determinados
+     * <b>1</b> y el monto <b>274,50</b>: cuatro cifras distintas. Con dos iguales, «publica el
+     * conjunto sellado» y «publica cuantos determino» pasarian la misma asercion.
+     *
+     * <p><b>Esto no cierra D-02b.</b> El {@code 4.50} de aqui lo pone el cuadro de la prueba; en
+     * una instalacion de verdad {@code DERECHO_EMISION_PREDIAL} sigue sin publicarlo nadie, y una
+     * corrida que determine a alguien todavia revienta con {@code ParametroAusente} nombrando la
+     * llave. Lo que se prueba es que, cuando el valor existe, la corrida lo <b>conserva</b>.
+     */
+    @Test
+    @DisplayName("#312 — la corrida que determina sella el derecho y el conjunto del que salio")
+    void laCorridaSellaElDerechoQueAplico() throws Exception {
+        predios.con(11L, "10001", "AV. GRAU 100", Porcentaje.total());
+        sembrarUnPadronQueSeRecalcula();
+        mvc = montar(cuadroCompleto());
+
+        mvc.perform(recalcularElPadron()).andReturn();
+
+        MvcResult ultima =
+                mvc.perform(get("/rentas/api/v1/rentas/predial/corridas/ultima")).andReturn();
+        String cuerpo = ultima.getResponse().getContentAsString();
+
+        assertThat(ultima.getResponse().getStatus()).isEqualTo(200);
+        assertThat(cuerpo)
+                .as("determino a alguien, asi que hubo conjunto y hubo derecho: %s", cuerpo)
+                .contains("\"determinados\":1")
+                .contains("\"derechoDeEmision\":\"4.50\"")
+                .contains("\"conjuntoId\":77");
+        // Texto y no coma flotante (regla 1, RNF-055): `4.50` en un `double` viaja como `4.5`.
+        assertThat(cuerpo).doesNotContain("\"derechoDeEmision\":4.5");
     }
 
     @Test
@@ -1800,6 +1851,8 @@ class PredialControllerTest {
                             corrida.modalidad(),
                             corrida.simulacion(),
                             corrida.conjunto(),
+                            corrida.conjuntoId(),
+                            corrida.derechoDeEmision(),
                             corrida.leidos(),
                             corrida.determinados(),
                             corrida.montoEmitido(),

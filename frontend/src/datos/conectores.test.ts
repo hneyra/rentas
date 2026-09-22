@@ -8,6 +8,7 @@ import {
   CONECTORES,
   NO_ESTA_EN_EL_PADRON,
   NO_PUBLICADO,
+  NO_CONSTA_EN_LA_CORRIDA,
   SIN_CRONOGRAMA,
   TODAVIA_SIN_DETERMINAR,
 } from './conectores.ts';
@@ -53,16 +54,35 @@ const CORRIDA: CorridaDelPredial = {
   sector: null,
   simulacion: false,
   conjunto: 'V3',
+  // El sello que `V23` anadio (#312). El identificador NO es el `id` de la corrida ni ninguna de
+  // sus cifras: con dos iguales, «publica el conjunto sellado» y «publica el id» pasarian lo mismo.
+  conjuntoId: 77,
   fechaCalculo: '28/01/2026 02:14',
   // Deliberadamente distinto de los 61 350 registros de la ultima etapa: con los dos iguales,
   // «lee el campo» y «lee la ultima fila de la tabla» pasarian la misma prueba (#271).
   determinados: 58412,
   montoEmitido: '8772431.05',
+  derechoDeEmision: '4.50',
   observados: 534,
   etapas: [
     { etapa: 'Lectura del padron', registros: 62418, monto: '—', observados: 0, estado: 'Conforme' },
     { etapa: 'Generacion de cuponeras', registros: 61350, monto: '—', observados: 534, estado: 'Observado' },
   ],
+};
+
+/**
+ * **La misma corrida, escrita ANTES de `V23`**: sin conjunto sellado y sin derecho (#312).
+ *
+ * No es una variante decorativa. Sin ella la muestra de `panel` seria uniforme —todas las corridas
+ * selladas— y la rama del nulo no correria nunca: un conector que dibujara `S/ 0.00` donde no hay
+ * nada sellado, o que siguiera diciendo «no publicado», saldria en verde. Y son dos afirmaciones
+ * distintas y las dos falsas: el derecho de aquella corrida se cobro —esta dentro de
+ * `montoEmitido`— y la operacion SI publica el campo.
+ */
+const CORRIDA_ANTERIOR_AL_SELLO: CorridaDelPredial = {
+  ...CORRIDA,
+  conjuntoId: null,
+  derechoDeEmision: null,
 };
 
 /**
@@ -1032,11 +1052,33 @@ describe('`panel` — la ultima corrida', () => {
     expect([...reparto.valores.values()]).not.toContain('S/ 9,418,204.60');
   });
 
-  it('«Derecho de emision» se queda sin publicar, y es el UNICO hueco', () => {
-    // La corrida lo aplica —entra en `montoEmitido`— y no lo sella: `corrida_predial` no tiene
-    // columna para el, y lo unico que guarda del conjunto es su NOMBRE, que no sirve para volver
-    // a leerlo. Lo unico que quedaria es el conjunto vigente hoy, que no tiene por que ser aquel.
-    expect(reparto.noPublicados.get(coordenada(0, 5))).toBe(NO_PUBLICADO);
-    expect([...reparto.noPublicados.keys()]).toEqual([coordenada(0, 5)]);
+  it('«Derecho de emision» sale del campo SELLADO, y la pantalla no deja ningun hueco (#312)', () => {
+    // `V23` le dio columna a la corrida: el derecho que aplico queda escrito el dia de la emision
+    // y la operacion lo publica. Aqui no se compone nada —se formatea lo que llego—, y por eso la
+    // cifra es `4.50` y no la del artboard ni una traida del conjunto vigente hoy.
+    expect(reparto.valores.get(coordenada(0, 5))).toBe('S/ 4.50');
+    expect([...reparto.noPublicados.keys()]).toEqual([]);
+  });
+
+  /**
+   * **Las dos ausencias no se confunden, y no son un cero** (#312, D-02b).
+   *
+   * Una corrida anterior a `V23` trae el campo en nulo. Eso NO es «no publicado» —la operacion lo
+   * publica, y decirlo mandaria a arreglar un backend que ya esta arreglado, que es el defecto de
+   * #239— y sobre todo no es `S/ 0.00`: el derecho de aquella corrida se cobro y esta sumado
+   * dentro de `montoEmitido`.
+   */
+  it('una corrida ANTERIOR al sello dice «no consta», ni «no publicado» ni cero', () => {
+    const anterior = conector.repartir(CORRIDA_ANTERIOR_AL_SELLO as never);
+
+    expect(anterior.noPublicados.get(coordenada(0, 5))).toBe(NO_CONSTA_EN_LA_CORRIDA);
+    expect(anterior.noPublicados.get(coordenada(0, 5))).not.toBe(NO_PUBLICADO);
+    expect([...anterior.noPublicados.keys()]).toEqual([coordenada(0, 5)]);
+    // Y el campo no se llena con nada: ni cero, ni la cadena vacia, ni la cifra de otra corrida.
+    expect(anterior.valores.has(coordenada(0, 5))).toBe(false);
+    expect([...anterior.valores.values()]).not.toContain('S/ 0.00');
+    expect([...anterior.valores.values()]).not.toContain('S/ 4.50');
+    // Lo demas de la corrida se sigue dibujando: lo que falta es el sello, no la corrida entera.
+    expect(anterior.valores.get(coordenada(0, 2))).toBe('58,412');
   });
 });

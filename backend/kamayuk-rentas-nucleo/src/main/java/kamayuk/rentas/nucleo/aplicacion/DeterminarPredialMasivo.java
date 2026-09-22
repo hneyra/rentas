@@ -49,6 +49,24 @@ import org.springframework.stereotype.Service;
  * fecha de la corrida: una transferencia posterior a la primera determinacion cambia quien paga que
  * parte, y congelarlo dejaria cobrando al que ya vendio.
  *
+ * <h2>Lo que la corrida SELLA, y por que no basta con aplicarlo (#312)</h2>
+ *
+ * <p>Hasta {@code V23} la corrida escribia el <b>nombre</b> del conjunto y nada mas. El derecho de
+ * emision lo <i>aplicaba</i> —entra en {@code monto_emitido} dentro del {@code totalAPagar()} de
+ * cada contribuyente— y no lo guardaba, asi que la unica huella de esa cifra quedaba sumada dentro
+ * de otra. Volver a decirla exigia leer el conjunto vigente <b>hoy</b>, que no tiene por que ser el
+ * que la corrida uso: una cifra equivocada de la peor clase, porque parece correcta.
+ *
+ * <p>Ahora se sellan las dos piezas —{@code conjunto_id} y {@code derecho_emision}—, y se toman
+ * <b>de la determinacion que se acaba de calcular</b>, no de una relectura posterior. Es la misma
+ * regla que ARQ-09 §3 le impone a cada {@code determinacion}: el conjunto se resuelve una vez y
+ * queda escrito donde se uso.
+ *
+ * <p><b>Esto no cierra D-02b.</b> {@code DERECHO_EMISION_PREDIAL} es de ordenanza local y hoy no lo
+ * publica nadie, asi que hoy una corrida que determine a alguien ni siquiera termina: el cuadro
+ * revienta con {@code ParametroAusente} nombrando la llave. Sellarlo hace que, el dia que el valor
+ * exista, la corrida lo <b>conserve</b> en vez de aplicarlo y olvidarlo.
+ *
  * <h2>Una transaccion por contribuyente</h2>
  *
  * <p>Esta clase <b>no</b> abre transaccion. Cada determinacion abre la suya al entrar en {@link
@@ -154,6 +172,19 @@ public class DeterminarPredialMasivo {
         List<DeterminacionPredialCalculada> determinadas = new ArrayList<>();
         Dinero emitido = Dinero.CERO;
         String conjunto = "";
+        /* **Lo que la corrida SELLA del conjunto que uso** (#312, V23). Se toma de la
+        determinacion que se acaba de calcular —o sea DURANTE la corrida— y no se vuelve
+        a leer al terminar: eso seria el conjunto vigente en ese momento, no el que cobro.
+        Es el de la ULTIMA determinacion, igual que `conjunto` (el nombre) desde antes de
+        #312, de modo que nombre, identificador y cifra hablan del mismo conjunto. Lo que
+        esto NO resuelve: cada determinacion lee `vigenteEn(ejercicio)` por su cuenta, asi
+        que un conjunto sellado a mitad de una corrida la partiria en dos, y la fila solo
+        guarda uno. Pasaba igual con el nombre; no lo introduce #312 y queda dicho en el PR.
+        Se quedan nulos si la corrida no determina a nadie: entonces no hay conjunto que
+        sellar, y un cero diria «no se cobro derecho». Van juntos, que es lo que
+        `CorridaDeEmision` exige y el `CHECK` de V23 repite. */
+        Long conjuntoId = null;
+        Dinero derechoDeEmision = null;
 
         Map<Long, ResumenDeContribuyente> nombres =
                 directorio.porIds(
@@ -213,6 +244,8 @@ public class DeterminarPredialMasivo {
                 determinadas.add(calculada);
                 emitido = emitido.mas(calculada.totalAPagar());
                 conjunto = calculada.nombreDelConjunto();
+                conjuntoId = calculada.cabecera().conjuntoId();
+                derechoDeEmision = calculada.derechoDeEmision();
             } catch (DeterminarPredial.PredioSinAutovaluo
                     | DeterminarPredial.SinPrediosEnElPadron
                     | DeterminarPredial.PredioAjeno motivo) {
@@ -261,6 +294,8 @@ public class DeterminarPredialMasivo {
                                 peticion.modalidad().name(),
                                 corrida.simulacion(),
                                 corrida.nombreDelConjunto(),
+                                conjuntoId,
+                                derechoDeEmision,
                                 corrida.leidos(),
                                 corrida.determinados(),
                                 corrida.montoEmitido(),

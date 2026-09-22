@@ -2,6 +2,7 @@ package kamayuk.rentas.nucleo.infraestructura.web;
 
 import java.util.List;
 import java.util.Objects;
+import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.nucleo.dominio.CorridaDeEmision;
 import org.jspecify.annotations.Nullable;
 
@@ -33,30 +34,30 @@ import org.jspecify.annotations.Nullable;
  * que la fila siga siendo la segunda y siga llamandose asi. Son el mismo hecho, y por eso se
  * publica <b>una vez</b> y en los dos sitios se lee el mismo campo.
  *
- * <h2>Y el derecho de emision NO se publica, medido (#271, D-02b)</h2>
+ * <h2>Y el derecho de emision, que la corrida ya SELLA (#312, D-02b)</h2>
  *
- * <p>El panel dibuja un tercer campo —«Derecho de emision»— y este recurso <b>no lo trae</b>. No es
- * un olvido:
+ * <p>El panel dibuja un tercer campo —«Derecho de emision»— y hasta #312 este recurso <b>no lo
+ * traia</b>, con cuatro motivos medidos en #271: {@code corrida_predial} no tenia columna para el,
+ * lo unico que guardaba del conjunto era su <b>nombre</b> —{@code varchar(60)}, y la cadena vacia
+ * en una corrida que no determino a nadie—, el unico camino restante era {@code
+ * vigenteEn(ejercicio)} —el conjunto de <b>hoy</b>, que no tiene por que ser aquel— y esa lectura
+ * ademas contestaria 422, porque {@code DERECHO_EMISION_PREDIAL} es de ordenanza local y no lo
+ * publica nadie.
  *
- * <ul>
- *   <li>{@code corrida_predial} tiene dieciocho columnas y <b>ninguna</b> es el derecho de emision:
- *       la corrida lo <i>aplica</i> —entra en {@code monto_emitido} dentro del total de cada
- *       contribuyente— y no lo <b>sella</b>.
- *   <li>Lo que si sella es {@code conjunto}, que es el <b>nombre</b> del conjunto —{@code
- *       varchar(60)}, «2026 v1»— y no su identificador. {@code
- *       CuadroPredialParametrizado.delConjunto} pide un {@code long conjuntoId}, y no hay lectura
- *       por nombre: ni por ahi se llega al conjunto que la corrida uso. Y en una corrida que no
- *       determino a nadie ese nombre es la cadena vacia.
- *   <li>El unico camino que queda es {@code vigenteEn(ejercicio)}, o sea <b>el conjunto sellado de
- *       hoy</b>, que no tiene por que ser aquel. Publicar eso seria una cifra equivocada de la peor
- *       clase: parece correcta.
- *   <li>Y encima romperia la lectura. {@code DERECHO_EMISION_PREDIAL} es de ordenanza local (D-02b)
- *       y hoy no esta publicado en ningun sitio; {@code ParametrosSellados.exigirNumero} lanza
- *       {@code ParametroAusente}, asi que leer una corrida que termino bien contestaria 422.
- * </ul>
+ * <p>Lo que {@code V23} cambia es el primero, que es el unico que se podia arreglar aqui: la
+ * corrida <b>sella</b> el derecho que aplico y el {@code conjunto_id} del que salio, el dia de la
+ * emision. Asi que {@link #derechoDeEmision} no se lee de ningun conjunto: es la <b>columna</b>, y
+ * viaja en texto y no en coma flotante (regla 1).
  *
- * <p>Se queda con su hueco hasta que la corrida lo selle —una columna mas en {@code
- * corrida_predial}, escrita el dia de la corrida—, que es lo que hay que hacer y no esta hecho.
+ * <p><b>Y es anulable, que no es lo mismo que cero.</b> Nulo significa «esa corrida no lo guardo»
+ * —es anterior a {@code V23}, o no determino a nadie y entonces no hubo conjunto que sellar—. Cero
+ * significaria «no se cobro derecho de emision», que es falso: se cobro, y esta sumado dentro de
+ * {@link #montoEmitido}. Son dos ausencias distintas y la pantalla las dice con palabras distintas
+ * ({@code palabrasDeHueco.ts}).
+ *
+ * <p><b>Esto no cierra D-02b</b>, y conviene no leerlo asi: el valor efectivo lo fija la ordenanza
+ * local y hoy sigue sin publicarlo nadie. Lo que se cierra es que la corrida lo aplicara y lo
+ * olvidara.
  *
  * @param id el de la corrida, con el que se piden sus observados
  * @param ejercicio el ejercicio recalculado
@@ -64,11 +65,16 @@ import org.jspecify.annotations.Nullable;
  * @param sector cual, cuando el alcance es SECTOR
  * @param simulacion si la corrida no asento ninguna determinacion
  * @param conjunto el conjunto sellado con que se emitio (ARQ-09 §3)
+ * @param conjuntoId el identificador de ese conjunto, con el que se vuelve a leer su cuadro; nulo
+ *     si la corrida no lo sello. Es el mismo par —nombre e identificador— que publica {@code GET
+ *     /rentas/predial/determinaciones}
  * @param fechaCalculo el dia al que corresponden sus cifras (regla 9)
  * @param determinados cuantas cuentas quedaron determinadas; en una simulacion, cuantas se
  *     simularon
  * @param montoEmitido lo que la corrida determino en total —impuesto mas derecho de emision—, en
  *     texto y no en coma flotante (regla 1)
+ * @param derechoDeEmision el derecho de emision que la corrida aplico a cada cuenta, en texto y no
+ *     en coma flotante (regla 1); <b>nulo</b> cuando esa corrida no lo sello, que no es cero
  * @param observados cuantos quedaron fuera; la lista se pide aparte
  * @param etapas el resumen por etapa, en el orden en que ocurrieron
  */
@@ -79,9 +85,11 @@ public record CorridaGuardadaResource(
         @Nullable String sector,
         boolean simulacion,
         String conjunto,
+        @Nullable Long conjuntoId,
         String fechaCalculo,
         int determinados,
         String montoEmitido,
+        @Nullable String derechoDeEmision,
         int observados,
         List<CorridaPredialResource.Etapa> etapas) {
 
@@ -93,6 +101,19 @@ public record CorridaGuardadaResource(
         Objects.requireNonNull(ejercicio, "La corrida necesita su ejercicio");
         Objects.requireNonNull(montoEmitido, "La corrida necesita lo que emitio");
         etapas = List.copyOf(etapas);
+    }
+
+    /**
+     * El derecho que la corrida sello, en texto, o {@code null} si no sello ninguno (#312).
+     *
+     * <p>El {@code null} se conserva hasta el JSON <b>a proposito</b>: {@code "0.00"} diria que no
+     * se cobro derecho de emision, y de una corrida anterior a {@code V23} eso es falso —se cobro,
+     * y esta dentro de {@code monto_emitido}—. Quien dibuja necesita poder distinguirlo.
+     */
+    @Nullable
+    private static String derechoSellado(CorridaDeEmision corrida) {
+        Dinero sellado = corrida.derechoDeEmision();
+        return sellado == null ? null : sellado.toString();
     }
 
     public static CorridaGuardadaResource de(CorridaDeEmision corrida) {
@@ -115,9 +136,11 @@ public record CorridaGuardadaResource(
                 corrida.sector(),
                 corrida.simulacion(),
                 corrida.conjunto(),
+                corrida.conjuntoId(),
                 corrida.fechaCalculo().toString(),
                 corrida.determinados(),
                 corrida.montoEmitido().toString(),
+                derechoSellado(corrida),
                 fuera,
                 etapas);
     }
