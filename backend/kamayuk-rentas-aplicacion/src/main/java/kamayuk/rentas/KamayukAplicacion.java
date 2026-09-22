@@ -1,6 +1,7 @@
 package kamayuk.rentas;
 
 import java.time.Clock;
+import kamayuk.rentas.dominio.ZonaHoraria;
 import kamayuk.rentas.plataforma.ConfiguracionDeTenant;
 import kamayuk.rentas.plataforma.SeguridadWeb;
 import org.springframework.boot.SpringApplication;
@@ -75,9 +76,36 @@ public class KamayukAplicacion {
      * fecha —la auditoria se particiona por ejercicio— pero sigue siendo indeseable que sea
      * imposible de fijar en una prueba. Un {@code Clock} inyectado resuelve las dos cosas sin
      * discutir con nadie.
+     *
+     * <p><b>Lleva la zona del producto, y no la del servidor</b> ({@code rentas}#316). {@code
+     * LocalDate.now(reloj)} trunca con la zona <i>del reloj</i>, y {@code src/main} lo llama 126
+     * veces para decidir que dia es: vencimientos, plazos, cuentas de dias, la fecha que consta en
+     * un acto. Con {@code Clock.systemDefaultZone()} ese dia era el del sistema operativo que
+     * sirviera la peticion, y con la JVM en UTC todo lo que ocurriera entre las 19:00 y la
+     * medianoche de Catacaos se fechaba <b>el dia siguiente</b> —y la noche del 31 de diciembre, en
+     * el ejercicio siguiente—.
+     *
+     * <p><b>Por que aqui y no en los 126 sitios</b>, medido el 2026-09-22 sobre {@code
+     * backend/*&#47;src/main} sin contar comentarios —el issue dice 127 porque su {@code grep}
+     * contaba tambien uno de {@code FichasDelPadronHttp}—: el reloj se lee en 172 sitios, todos con
+     * el nombre {@code reloj}, y <b>solo los 126 {@code LocalDate.now(reloj)} dependen de su
+     * zona</b>. Los 43 {@code reloj.instant()} no la leen —un instante es el mismo punto en
+     * cualquier zona—, y los tres {@code OffsetDateTime.now(reloj)} ({@code AuditoriaJdbc}, {@code
+     * CorridaDeEmisionRepositoryJdbc} y {@code CacheDeSnapshotsJdbc}) van a columnas {@code
+     * timestamptz}, que guardan el instante y descartan el desfase con que llega: cambia {@code
+     * +00:00} por {@code -05:00} y la fila es la misma. No hay ni un {@code LocalDateTime.now},
+     * {@code ZonedDateTime.now}, {@code reloj.getZone()} ni {@code setClock} en produccion, y los
+     * dos componentes que reciben el reloj —{@code GuardiaDeAcceso} y {@code
+     * TokenDeServicioDeKeycloak}— estan contados arriba. O sea que fijar la zona aqui cambia
+     * exactamente los 126 sitios que tenia que cambiar y ninguno mas; reescribirlos a {@code
+     * ZonaHoraria.diaDe(reloj.instant())} tocaria 86 archivos para llegar al mismo dia.
+     *
+     * <p>Que no vuelva un reloj sin esta zona lo vigila {@code
+     * NingunRelojSinLaZonaDelProductoTest}; que el dia salga bien en la franja en que las dos zonas
+     * discrepan, {@code ElDiaDelRelojEsElDelProductoTest}.
      */
     @Bean
     Clock reloj() {
-        return Clock.systemDefaultZone();
+        return Clock.system(ZonaHoraria.DEL_PRODUCTO);
     }
 }
