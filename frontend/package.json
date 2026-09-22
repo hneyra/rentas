@@ -5,7 +5,7 @@
   "version": "0.1.0",
   "description": "rentas — interfaz web. F-1: el andamiaje, sus reglas y su CI; ninguna pantalla todavia.",
   "engines": {
-    "node": ">=22"
+    "node": "^24.21.0"
   },
   "scripts": {
     "dev": "vite",

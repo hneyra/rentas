@@ -43,9 +43,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # La version NO se escribe aqui: sale de `.nvmrc`, que es la unica fuente (#289). Con el
+      # literal, este flujo y quien clona el repositorio son dos numeros que nada ata, y la
+      # deriva no da la cara hasta que algo se comporta distinto en CI que en el puesto.
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version-file: .nvmrc
 
       # No escribe el archivo: lo regenera en memoria y exige que sea el mismo.
       # Se comprobó que muerde, en las dos direcciones: retocando un `summary`

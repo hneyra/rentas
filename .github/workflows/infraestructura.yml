@@ -59,9 +59,12 @@ jobs:
           # alcanza al suyo: sin esto, `Not Found` al pedir la rama por omision.
           token: ${{ secrets.GH_CLONE_KEY || github.token }}
 
+      # La version NO se escribe aqui: sale de `.nvmrc`, que es la unica fuente (#289). Con el
+      # literal, este flujo y quien clona el repositorio son dos numeros que nada ata, y la
+      # deriva no da la cara hasta que algo se comporta distinto en CI que en el puesto.
       - uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version-file: rentas/.nvmrc
 
       - name: Instalar
         working-directory: rentas/infrastructure

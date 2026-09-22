@@ -67,9 +67,12 @@ jobs:
         with:
           fetch-depth: 0
 
+      # La version NO se escribe aqui: sale de `.nvmrc`, que es la unica fuente (#289). Con el
+      # literal, este flujo y quien clona el repositorio son dos numeros que nada ata, y la
+      # deriva no da la cara hasta que algo se comporta distinto en CI que en el puesto.
       - uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version-file: .nvmrc
 
       - name: La autoprueba de la guarda, antes de usarla
         run: node docs/00-gobierno/verificar-las-muestras-del-registro.mjs
