@@ -147,6 +147,12 @@ export const RUTAS_DE_CODIGO = [
   // no tenga que volver a medirlo»: este es el siguiente.
   /^frontend\/Dockerfile$/,
   /^despliegue\/compose\.yaml$/,
+  // Y `.nvmrc`, por el mismo argumento que el manifiesto de arriba: si aquel decide QUE viaja
+  // al bundle, este decide CON QUE se construye. Desde #289 es la unica fuente de la version
+  // de Node —los cinco pasos de `setup-node` la leen de aqui, ninguno la escribe— asi que
+  // moverla cambia el runtime de la CI entera y el del puesto. Sin esta linea, ese PR saldria
+  // verde sin dejar fila.
+  /^\.nvmrc$/,
   /^infra\//,
 ];
 

@@ -153,6 +153,18 @@ const CASOS = [
     dice: ['#75', 'falta la fila'],
   },
   {
+    // #289. `.nvmrc` es la UNICA fuente de la version de Node desde que los cinco pasos de
+    // `setup-node` la leen de ahi. Moverla cambia con que runtime se construye el bundle y con
+    // cual corren las guardas, en los cinco flujos a la vez, y sin esta ruta ese PR saldria
+    // verde sin dejar fila: exactamente el hueco que #74 destapo con el manifiesto.
+    nombre: 'cierra un issue, mueve la version de Node y NO deja fila',
+    cuerpo: 'Closes #289.\n\nLa unica fuente de la version.',
+    archivos: ['.nvmrc'],
+    anadido: '',
+    esperado: 'rojo',
+    dice: ['#289', 'falta la fila'],
+  },
+  {
     nombre: 'cierra un issue, toca backend y SI deja su fila',
     cuerpo: 'Closes #711.',
     archivos: ['backend/kamayuk-rentas-nucleo/src/main/java/kamayuk/rentas/nucleo/Algo.java'],

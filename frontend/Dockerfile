@@ -36,15 +36,23 @@
 # ## Las dos etapas se tratan distinto a proposito
 #
 # `construccion` se tira: nada de ella se publica, y por eso su base es la etiqueta movil
-# `node:22-alpine` —la version mayor es la que `frontend.yml` declara (`node-version: "22"`) y lo
-# que fija que se instale es `yarn.lock` con `--frozen-lockfile`—.
+# `node:24-alpine` —el parche lo mueve Docker, y lo que fija que se instale es `yarn.lock` con
+# `--frozen-lockfile`—.
+#
+# **La MAYOR no es libre**: tiene que ser la de `.nvmrc`, que desde #289 es el unico sitio donde
+# se dice la version de Node. Este archivo no puede leerla —un `FROM` no admite sustitucion sin
+# un `ARG`, y meterlo aqui obligaria a pasarlo en los tres sitios que construyen la imagen—, asi
+# que la copia se vigila: `la-version-de-node-es-una-sola.test.ts` cruza esta etiqueta contra
+# `.nvmrc` y sale roja si se separan. Hasta #289 este comentario decia que la mayor era «la que
+# `frontend.yml` declara», y `frontend.yml` ya no declara ninguna: ese es exactamente el modo de
+# fallo de tener la version escrita en siete sitios.
 #
 # `interfaz` SI se publica, asi que su base va clavada: `nginx:1.31.5-alpine`, no `stable-alpine`
 # ni `1.31`. Es lo que permite que un escaneo de imagenes diga de que version habla, y actualizar
 # el numero es la correccion cuando el escaneo encuentre algo, no ignorar el hallazgo.
 
 # ---------------------------------------------------------------------------
-FROM node:22-alpine AS construccion
+FROM node:24-alpine AS construccion
 
 # EL `WORKDIR` REPRODUCE LA DISPOSICION DE CLONES HERMANOS, Y NO ES COSMETICO (#75).
 #

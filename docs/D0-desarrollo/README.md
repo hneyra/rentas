@@ -35,6 +35,9 @@ IdeaProjects/
 # 1 · Prerrequisitos. Docker sólo hace falta para la plataforma; hay salida sin él
 java -version && node --version && yarn --version
 
+# La versión de Node NO se elige: la dice `.nvmrc`, y es la misma que instala la CI (#289)
+cat .nvmrc   # y `node --version` de arriba tiene que decir esa mayor
+
 # 2 · Las barreras de arquitectura. NO necesitan Docker, ni base de datos, ni red
 cd backend && ./gradlew verificarArquitectura
 
@@ -54,6 +57,29 @@ El árbol de módulos va **sembrado** con la captura de la instalación y la pue
 esquiva: lo enciende `VITE_KAMAYUK_SIN_PLATAFORMA`, que `.env.development` trae puesto y que
 `yarn build` no puede leer. Contra la plataforma de verdad es `yarn dev:con-plataforma`. Los dos
 niveles, con lo que se ve en cada uno, están en [DEV-01 §3D](entorno-local.md).
+
+### Node: no hay gestor de versiones, así que es un tarball
+
+`.nvmrc` dice qué versión usa este repositorio y `frontend/package.json` la exige al instalar
+—`engines` es un pin desde #289, no un suelo: yarn falla si no cuadra, y medido con Node 22.14.0
+no sólo en `yarn install` sino también en `yarn run` («Commands cannot run with an incompatible
+environment»)—. No hay `nvm`, `volta`,
+`fnm` ni `asdf` en el puesto, así que se instala el tarball oficial y se mueven los enlaces:
+
+```bash
+V=$(cat .nvmrc)
+cd ~/.local/toolchain
+curl -O https://nodejs.org/dist/v$V/node-v$V-linux-x64.tar.xz
+curl -O https://nodejs.org/dist/v$V/SHASUMS256.txt
+grep "node-v$V-linux-x64.tar.xz" SHASUMS256.txt | sha256sum -c -   # y sólo si dice OK
+tar -xf node-v$V-linux-x64.tar.xz
+~/.local/toolchain/node-v$V-linux-x64/bin/corepack enable \
+  --install-directory ~/.local/toolchain/node-v$V-linux-x64/bin   # yarn sale de aquí
+for b in node npm npx yarn; do ln -sfn ~/.local/toolchain/node-v$V-linux-x64/bin/$b ~/.local/bin/$b; done
+```
+
+**El árbol de la versión anterior no se borra**, y eso es lo que hace reversible la subida: para
+volver, los mismos `ln -sfn` apuntando al directorio viejo. Nada más se tocó.
 
 > Este párrafo decía «lo que todavía no hay es una aplicación que arrancar: no existe ni una clase
 > de negocio, así que no hay `bootRun`, ni API, ni pantalla». Era cierto en F-1 y dejó de serlo en
