@@ -1,5 +1,6 @@
 import type { Page } from '@playwright/test';
 
+import type { Paginado } from '../src/datos/lecturas.ts';
 import {
   ACCESOS_MEDIDOS,
   MODULOS_MEDIDOS,
@@ -51,6 +52,22 @@ import {
 const IDAS = 'kamayuk.pkce.idas';
 const TOPE_DE_IDAS = 3;
 
+/**
+ * El envoltorio con que el backend pagina, **con su tipo** (#314): lo que el arnes sirve es la
+ * forma de una operacion, y una forma sin tipo se queda corta en silencio —que es como se rompieron
+ * dos caminos en la ola 8—. Lo exige `verificaciones/los-fixtures-del-arnes-llevan-tipo.test.ts`.
+ */
+function paginaDe<T>(contenido: readonly T[]): Paginado<T> {
+  return {
+    contenido,
+    pagina: 0,
+    tamano: 200,
+    totalElementos: contenido.length,
+    totalPaginas: 1,
+    hayMas: false,
+  };
+}
+
 export async function conLaSeguridadContestada(pagina: Page): Promise<void> {
   await pagina.addInitScript(
     ([clave, tope]: readonly [string, string]) => {
@@ -61,25 +78,15 @@ export async function conLaSeguridadContestada(pagina: Page): Promise<void> {
 
   await pagina.route('**/rentas/api/v1/**', async (ruta) => {
     const url = ruta.request().url();
-    const json = (cuerpo: unknown) =>
-      ruta.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify(cuerpo),
-      });
-    const pagina_ = (contenido: readonly unknown[]) =>
-      json({
-        contenido,
-        pagina: 0,
-        tamano: 200,
-        totalElementos: contenido.length,
-        totalPaginas: 1,
-        hayMas: false,
-      });
+    // El cuerpo llega ya serializado, y se serializa donde el valor todavia tiene su tipo: un
+    // `(cuerpo: unknown) => JSON.stringify(cuerpo)` lo borraria, y la guarda de los fixtures lo
+    // leeria como un fixture sin tipo — que es lo que seria.
+    const json = (cuerpo: string) =>
+      ruta.fulfill({ status: 200, contentType: 'application/json', body: cuerpo });
 
-    if (url.includes('/seguridad/modulos')) return pagina_(MODULOS_MEDIDOS);
-    if (url.includes('/seguridad/accesos')) return pagina_(ACCESOS_MEDIDOS);
-    if (url.includes('/seguridad/sesion/permisos')) return json(PERMISOS_MEDIDOS);
+    if (url.includes('/seguridad/modulos')) return json(JSON.stringify(paginaDe(MODULOS_MEDIDOS)));
+    if (url.includes('/seguridad/accesos')) return json(JSON.stringify(paginaDe(ACCESOS_MEDIDOS)));
+    if (url.includes('/seguridad/sesion/permisos')) return json(JSON.stringify(PERMISOS_MEDIDOS));
     // Ver el javadoc: lo demas no se inventa.
     return ruta.fulfill({ status: 404, contentType: 'application/json', body: '{}' });
   });

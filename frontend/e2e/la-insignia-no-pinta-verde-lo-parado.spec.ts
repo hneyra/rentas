@@ -1,6 +1,13 @@
 import { expect, test } from '@playwright/test';
 
-import type { CorridaDelPredial } from '../src/datos/lecturas.ts';
+import type {
+  CorridaDelPredial,
+  FilaDeLaMuestra,
+  FrenteParado,
+  Paginado,
+  ProgramaDeFiscalizacion,
+  TrabajoParado,
+} from '../src/datos/lecturas.ts';
 import { abrir, conLaSeguridadContestada } from './instalacion.ts';
 
 /**
@@ -68,7 +75,7 @@ const SIN_FONDO = 'rgba(0, 0, 0, 0)';
  * `verificaciones/la-insignia-no-se-pinta-verde-sin-regla.test.ts` lee ese Java y comprueba las
  * frases una a una. Aqui hacen de cuerpo de una respuesta, que es lo que un arnes necesita.
  */
-const FRENTES = [
+const FRENTES: readonly FrenteParado[] = [
   {
     frente: 'TRANSITO',
     modulo: 'Transito',
@@ -144,7 +151,7 @@ const CORRIDA: CorridaDelPredial = {
  * y lo que se mide aqui es el COLOR de la quinta columna. Las dos filas son los dos casos de
  * `visitado`, que es de donde sale esa columna.
  */
-const PROGRAMAS = {
+const PROGRAMAS: Paginado<ProgramaDeFiscalizacion> = {
   contenido: [
     {
       id: 14,
@@ -167,7 +174,7 @@ const PROGRAMAS = {
   hayMas: true,
 };
 
-const MUESTRA = {
+const MUESTRA: Paginado<FilaDeLaMuestra> = {
   contenido: [
     {
       programaId: 14,
@@ -207,6 +214,14 @@ const MUESTRA = {
   hayMas: true,
 };
 
+/** `GET /indicadores/trabajo-parado`, con los cuatro frentes de arriba. */
+const TRABAJO_PARADO: TrabajoParado = {
+  ejercicio: 2026,
+  fechaCalculo: '2026-09-16',
+  calculadoEn: '2026-09-16T05:00:00-05:00',
+  frentes: FRENTES,
+};
+
 test.use({ colorScheme: 'light' });
 
 test.beforeEach(async ({ page }) => {
@@ -217,12 +232,7 @@ test.beforeEach(async ({ page }) => {
     ruta.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({
-        ejercicio: 2026,
-        fechaCalculo: '2026-09-16',
-        calculadoEn: '2026-09-16T05:00:00-05:00',
-        frentes: FRENTES,
-      }),
+      body: JSON.stringify(TRABAJO_PARADO),
     }),
   );
   await page.route('**/rentas/predial/corridas/ultima*', (ruta) =>
