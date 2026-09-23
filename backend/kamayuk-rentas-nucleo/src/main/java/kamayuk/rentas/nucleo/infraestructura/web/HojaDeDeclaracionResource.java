@@ -57,12 +57,19 @@ public record HojaDeDeclaracionResource(
     public record DeclaranteResource(
             String codigo, String nombre, String documento, @Nullable String domicilioFiscal) {}
 
-    /** Una linea de la tabla de predios de la hoja. */
+    /**
+     * Una linea de la tabla de predios de la hoja.
+     *
+     * <p>{@code codRefCatastral}, {@code direccion} y {@code tipo} solo son nulos en la linea de un
+     * predio que la determinacion cobro y que el padron al 1 de enero del ejercicio no pone a
+     * nombre del declarante; {@code faltan} lo dice (#328). La linea sale igual: sin ella, {@code
+     * valuoAfectoTotal} deja de ser la suma de la tabla.
+     */
     public record PredioDeLaHojaResource(
             long predioId,
-            String codRefCatastral,
-            String direccion,
-            String tipo,
+            @Nullable String codRefCatastral,
+            @Nullable String direccion,
+            @Nullable String tipo,
             String porcentajePropiedad,
             @Nullable String autovaluo,
             @Nullable String valuoExonerado,

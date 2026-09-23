@@ -13,6 +13,8 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -64,6 +66,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.annotation.AnnotationTransactionAttributeSource;
 import org.springframework.transaction.interceptor.TransactionInterceptor;
 import org.springframework.transaction.support.TransactionTemplate;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
@@ -101,6 +104,8 @@ class EscrituraDeDeclaracionJuradaJdbcTest {
     private static final LocalDate HOY = LocalDate.of(2026, 8, 28);
     private static final LocalDate ALTA = LocalDate.of(2026, 1, 1);
     private static final LocalDate PLAZO = LocalDate.of(2026, 6, 30);
+
+    private static final JsonMapper JSON = JsonMapper.builder().build();
 
     private static BaseDeDatosDePrueba base;
     private static long municipalidad;
@@ -479,6 +484,135 @@ class EscrituraDeDeclaracionJuradaJdbcTest {
                     .doesNotContain("DONDE VIVE DESDE SETIEMBRE 2");
             assertThat(hojaDe(numero, "2026-09-15")).contains("DONDE VIVE DESDE SETIEMBRE 2");
         }
+
+        /**
+         * <b>Las filas son lo que se cobro</b> (#328).
+         *
+         * <p>A declaro P1 y P, se determino con los dos, y vendio P el 15 de marzo. La hoja pedida
+         * en agosto sin {@code fecha} sacaba las filas del padron de ese dia —solo P1— y las cifras
+         * de la determinacion del ejercicio —con P—: un papel que se firma bajo juramento con un
+         * total que no es la suma de sus filas.
+         */
+        @Test
+        @DisplayName("#328 — con determinacion, las filas son su detalle y suman el total")
+        void conDeterminacionLasFilasSonElDetalle() throws Exception {
+            String codigoQueSeQueda = nuevoCodigoCatastral();
+            long seQueda = crearPredioConFicha(municipalidad, codigoQueSeQueda);
+            String codigoVendido = nuevoCodigoCatastral();
+            long vendido = crearPredioConFicha(municipalidad, codigoVendido);
+            String contribuyente = nuevoContribuyente(municipalidad);
+            long contribuyenteId = idDeContribuyente(contribuyente);
+            PrediosDeLaHoja.del(contribuyenteId, seQueda, codigoQueSeQueda, "CALLE QUE SE QUEDA 5");
+            PrediosDeLaHoja.delEntre(
+                    contribuyenteId,
+                    vendido,
+                    codigoVendido,
+                    "CALLE LA VENTA 33",
+                    "2019-06-01",
+                    "2026-03-14");
+            String numero = numeroDe(presentar(contribuyente, seQueda));
+            Map<Long, String> autovaluos = new LinkedHashMap<>();
+            autovaluos.put(seQueda, "100000.00");
+            autovaluos.put(vendido, "200000.00");
+            determinarConDetalle(contribuyenteId, "1470.00", autovaluos);
+
+            JsonNode hoja = JSON.readTree(hojaDe(numero));
+
+            assertThat(codigosDe(hoja))
+                    .as("el predio vendido en marzo se cobro en 2026, y la hoja lo consigna")
+                    .containsExactlyInAnyOrder(codigoQueSeQueda, codigoVendido);
+            assertThat(sumaDeValuoAfecto(hoja))
+                    .as("el total de un papel que se firma es la suma de sus filas")
+                    .isEqualByComparingTo(hoja.get("valuoAfectoTotal").asString())
+                    .isEqualByComparingTo("300000.00");
+        }
+
+        @Test
+        @DisplayName("#328 — sin determinacion, los predios son los del padron al 1 de enero")
+        void sinDeterminacionElPadronEsElDelPrimeroDeEnero() throws Exception {
+            String codigoQueSeQueda = nuevoCodigoCatastral();
+            long seQueda = crearPredioConFicha(municipalidad, codigoQueSeQueda);
+            String codigoVendido = nuevoCodigoCatastral();
+            long vendido = crearPredioConFicha(municipalidad, codigoVendido);
+            String contribuyente = nuevoContribuyente(municipalidad);
+            long contribuyenteId = idDeContribuyente(contribuyente);
+            PrediosDeLaHoja.del(contribuyenteId, seQueda, codigoQueSeQueda, "CALLE QUE SE QUEDA 6");
+            PrediosDeLaHoja.delEntre(
+                    contribuyenteId,
+                    vendido,
+                    codigoVendido,
+                    "CALLE LA VENTA 34",
+                    "2019-06-01",
+                    "2026-03-14");
+            String numero = numeroDe(presentar(contribuyente, seQueda));
+
+            JsonNode hoja = JSON.readTree(hojaDe(numero));
+
+            assertThat(codigosDe(hoja))
+                    .as(
+                            "la hoja es del EJERCICIO 2026 y el obligado de 2026 es el titular al 1"
+                                    + " de enero (TUO LTM art. 10): reimprimirla otro dia no puede"
+                                    + " dar otra hoja")
+                    .containsExactlyInAnyOrder(codigoQueSeQueda, codigoVendido);
+        }
+
+        /**
+         * Un predio que la determinacion cobro y que el padron al 1 de enero ya no pone a nombre
+         * del declarante: una titularidad registrada <b>despues</b> de determinar con fecha
+         * anterior al ejercicio. La fila sale igual —es lo que se cobro, y sin ella el total deja
+         * de ser la suma—, sin el codigo ni la direccion que no hay de donde leer, y la hoja lo
+         * dice en {@code faltan} en vez de inventarlos.
+         */
+        @Test
+        @DisplayName(
+                "#328 — un predio del detalle que no consta al 1 de enero sale igual, y se dice")
+        void unPredioDelDetalleQueNoConstaSaleYSeDice() throws Exception {
+            String codigoQueSeQueda = nuevoCodigoCatastral();
+            long seQueda = crearPredioConFicha(municipalidad, codigoQueSeQueda);
+            String codigoRetroactivo = nuevoCodigoCatastral();
+            long retroactivo = crearPredioConFicha(municipalidad, codigoRetroactivo);
+            String contribuyente = nuevoContribuyente(municipalidad);
+            long contribuyenteId = idDeContribuyente(contribuyente);
+            PrediosDeLaHoja.del(contribuyenteId, seQueda, codigoQueSeQueda, "CALLE QUE SE QUEDA 7");
+            PrediosDeLaHoja.delEntre(
+                    contribuyenteId,
+                    retroactivo,
+                    codigoRetroactivo,
+                    "CALLE RETROACTIVA 8",
+                    "2019-06-01",
+                    "2025-12-20");
+            String numero = numeroDe(presentar(contribuyente, seQueda));
+            Map<Long, String> autovaluos = new LinkedHashMap<>();
+            autovaluos.put(seQueda, "100000.00");
+            autovaluos.put(retroactivo, "200000.00");
+            determinarConDetalle(contribuyenteId, "1470.00", autovaluos);
+
+            JsonNode hoja = JSON.readTree(hojaDe(numero));
+
+            assertThat(hoja.get("predios")).hasSize(2);
+            assertThat(sumaDeValuoAfecto(hoja))
+                    .isEqualByComparingTo(hoja.get("valuoAfectoTotal").asString());
+            assertThat(hoja.get("faltan").toString())
+                    .as("y dice cual es y que hay que hacer, en vez de callarlo")
+                    .contains("predio " + retroactivo)
+                    .contains("2026-01-01");
+        }
+
+        private static List<String> codigosDe(JsonNode hoja) {
+            List<String> codigos = new ArrayList<>();
+            for (JsonNode fila : hoja.get("predios")) {
+                codigos.add(fila.get("codRefCatastral").asString());
+            }
+            return codigos;
+        }
+
+        private static BigDecimal sumaDeValuoAfecto(JsonNode hoja) {
+            BigDecimal suma = BigDecimal.ZERO;
+            for (JsonNode fila : hoja.get("predios")) {
+                suma = suma.add(new BigDecimal(fila.get("valuoAfecto").asString()));
+            }
+            return suma;
+        }
     }
 
     @Nested
@@ -668,6 +802,21 @@ class EscrituraDeDeclaracionJuradaJdbcTest {
     private static void determinar(
             long contribuyenteId, long predioId, String autovaluo, String impuesto)
             throws SQLException {
+        determinarConDetalle(contribuyenteId, impuesto, Map.of(predioId, autovaluo));
+    }
+
+    /**
+     * Una determinacion con VARIOS predios en su detalle, todos al 100 % y sin parte exonerada: la
+     * base de la cabecera es la suma de sus autovaluos (RT-011), que es lo que la hoja tiene que
+     * poder recomponer sumando sus filas (#328).
+     */
+    private static void determinarConDetalle(
+            long contribuyenteId, String impuesto, Map<Long, String> autovaluoPorPredio)
+            throws SQLException {
+        BigDecimal suma = BigDecimal.ZERO;
+        for (String autovaluo : autovaluoPorPredio.values()) {
+            suma = suma.add(new BigDecimal(autovaluo));
+        }
         try (Connection app = base.conexion(BaseDeDatosDePrueba.APP)) {
             ContextoDeTenant.fijar(app, municipalidad);
             long determinacion;
@@ -684,7 +833,7 @@ class EscrituraDeDeclaracionJuradaJdbcTest {
                                     + " RETURNING id")) {
                 cabecera.setLong(1, municipalidad);
                 cabecera.setLong(2, contribuyenteId);
-                cabecera.setString(3, autovaluo);
+                cabecera.setString(3, suma.toPlainString());
                 cabecera.setString(4, impuesto);
                 cabecera.setLong(5, municipalidad);
                 try (ResultSet fila = cabecera.executeQuery()) {
@@ -692,20 +841,22 @@ class EscrituraDeDeclaracionJuradaJdbcTest {
                     determinacion = fila.getLong(1);
                 }
             }
-            try (PreparedStatement detalle =
-                    app.prepareStatement(
-                            "INSERT INTO determinacion_predio_detalle (municipalidad_id,"
-                                    + " ejercicio, determinacion_id, predio_id, autovaluo,"
-                                    + " valuo_exonerado, porcentaje_propiedad,"
-                                    + " base_imponible_predio)"
-                                    + " VALUES (?, 2026, ?, ?, CAST(? AS dinero), 0, 100,"
-                                    + "         CAST(? AS dinero))")) {
-                detalle.setLong(1, municipalidad);
-                detalle.setLong(2, determinacion);
-                detalle.setLong(3, predioId);
-                detalle.setString(4, autovaluo);
-                detalle.setString(5, autovaluo);
-                detalle.executeUpdate();
+            for (Map.Entry<Long, String> predio : autovaluoPorPredio.entrySet()) {
+                try (PreparedStatement detalle =
+                        app.prepareStatement(
+                                "INSERT INTO determinacion_predio_detalle (municipalidad_id,"
+                                        + " ejercicio, determinacion_id, predio_id, autovaluo,"
+                                        + " valuo_exonerado, porcentaje_propiedad,"
+                                        + " base_imponible_predio)"
+                                        + " VALUES (?, 2026, ?, ?, CAST(? AS dinero), 0, 100,"
+                                        + "         CAST(? AS dinero))")) {
+                    detalle.setLong(1, municipalidad);
+                    detalle.setLong(2, determinacion);
+                    detalle.setLong(3, predio.getKey());
+                    detalle.setString(4, predio.getValue());
+                    detalle.setString(5, predio.getValue());
+                    detalle.executeUpdate();
+                }
             }
             app.commit();
         }
@@ -1072,18 +1223,47 @@ class EscrituraDeDeclaracionJuradaJdbcTest {
     private static final class PrediosDeLaHoja
             implements kamayuk.rentas.catastro.PrediosDelContribuyente {
 
-        private static final Map<Long, List<kamayuk.rentas.catastro.PredioDelContribuyente>> SUYOS =
-                new java.util.LinkedHashMap<>();
+        /**
+         * Una cuota con su vigencia; {@code desde} y {@code hasta} nulos son «siempre» (#328).
+         *
+         * <p>Hasta #328 este doble contestaba lo mismo a cualquier fecha: la hoja podia leer el
+         * padron del dia en que se pide y ninguna prueba lo distinguia del padron del ejercicio.
+         */
+        private record Cuota(
+                kamayuk.rentas.catastro.PredioDelContribuyente predio,
+                @org.jspecify.annotations.Nullable LocalDate desde,
+                @org.jspecify.annotations.Nullable LocalDate hasta) {
+
+            boolean vigenteEn(LocalDate fecha) {
+                return (desde == null || !fecha.isBefore(desde))
+                        && (hasta == null || !fecha.isAfter(hasta));
+            }
+        }
+
+        private static final Map<Long, List<Cuota>> SUYOS = new java.util.LinkedHashMap<>();
 
         static void del(long contribuyenteId, long predioId, String codigo, String direccion) {
+            delEntre(contribuyenteId, predioId, codigo, direccion, null, null);
+        }
+
+        static void delEntre(
+                long contribuyenteId,
+                long predioId,
+                String codigo,
+                String direccion,
+                @org.jspecify.annotations.Nullable String desde,
+                @org.jspecify.annotations.Nullable String hasta) {
             SUYOS.computeIfAbsent(contribuyenteId, quien -> new java.util.ArrayList<>())
                     .add(
-                            new kamayuk.rentas.catastro.PredioDelContribuyente(
-                                    predioId,
-                                    codigo,
-                                    "URBANO",
-                                    direccion,
-                                    kamayuk.rentas.dominio.Porcentaje.total()));
+                            new Cuota(
+                                    new kamayuk.rentas.catastro.PredioDelContribuyente(
+                                            predioId,
+                                            codigo,
+                                            "URBANO",
+                                            direccion,
+                                            kamayuk.rentas.dominio.Porcentaje.total()),
+                                    desde == null ? null : LocalDate.parse(desde),
+                                    hasta == null ? null : LocalDate.parse(hasta)));
         }
 
         static void limpiar() {
@@ -1093,7 +1273,10 @@ class EscrituraDeDeclaracionJuradaJdbcTest {
         @Override
         public List<kamayuk.rentas.catastro.PredioDelContribuyente> de(
                 long contribuyenteId, LocalDate fecha) {
-            return List.copyOf(SUYOS.getOrDefault(contribuyenteId, List.of()));
+            return SUYOS.getOrDefault(contribuyenteId, List.of()).stream()
+                    .filter(cuota -> cuota.vigenteEn(fecha))
+                    .map(Cuota::predio)
+                    .toList();
         }
     }
 }

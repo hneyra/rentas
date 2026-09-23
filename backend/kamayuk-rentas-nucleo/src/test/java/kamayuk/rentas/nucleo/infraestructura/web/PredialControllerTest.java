@@ -94,6 +94,9 @@ class PredialControllerTest {
     private final DeterminacionesEnMemoria determinaciones = new DeterminacionesEnMemoria();
     private final PrediosDePrueba predios = new PrediosDePrueba();
 
+    /** Las fichas que leen la determinacion y el alcance de la corrida; por omision, ninguna. */
+    private final FichasDePrueba fichas = new FichasDePrueba();
+
     /**
      * En que estado esta la valuacion del ejercicio cuando se monta el controlador (P5C).
      *
@@ -644,6 +647,93 @@ class PredialControllerTest {
         assertThat(recalculando.getResponse().getContentAsString())
                 .contains("\"observados\":[]")
                 .contains("\"conjunto\":\"2026 v1\"");
+    }
+
+    // ------------------------------------ la corrida lee el padron al 1 de enero (#328)
+
+    /**
+     * <b>El que vende durante el ejercicio sigue en la emision del ejercicio</b> (#328, TUO LTM
+     * art. 10).
+     *
+     * <p>A —C-001— tiene P1 y P al 1 de enero y los declaro en febrero (determinacion EMITIDA con
+     * los dos en el detalle); vende P a B el 15 de marzo; la corrida es de agosto con «recalcula ya
+     * emitidos». Leyendo el padron del dia de la corrida, el detalle trae P y el padron no, salta
+     * {@code PredioAjeno} y A queda observado —fuera de la emision 2026 entera, con P1—. Basta una
+     * venta en enero, antes de la corrida de febrero.
+     */
+    @Test
+    @DisplayName("#328 — el que vendio en marzo sale DETERMINADO por la corrida, no observado")
+    void laCorridaDeterminaAlQueVendioDuranteElEjercicio() throws Exception {
+        predios.con(501L, 11L, "10001", "AV. GRAU 100", Porcentaje.total());
+        predios.conVigencia(501L, 33L, "10033", "CALLE LA VENTA 33", "2019-06-01", "2026-03-14");
+        predios.conVigencia(502L, 33L, "10033", "CALLE LA VENTA 33", "2026-03-15", null);
+        determinaciones.sembrar(
+                EJERCICIO,
+                7L,
+                501L,
+                EstadoDeDeterminacion.EMITIDA,
+                ModalidadDelPredial.TRIMESTRAL,
+                DetalleDeterminacionPredio.nuevo(
+                        11L,
+                        Dinero.de("100000.00"),
+                        Dinero.CERO,
+                        Porcentaje.total(),
+                        Dinero.de("100000.00")),
+                DetalleDeterminacionPredio.nuevo(
+                        33L,
+                        Dinero.de("200000.00"),
+                        Dinero.CERO,
+                        Porcentaje.total(),
+                        Dinero.de("200000.00")));
+
+        MvcResult corrida = mvc.perform(asentarLaCorrida("TODOS", null)).andReturn();
+
+        String cuerpo = corrida.getResponse().getContentAsString();
+        assertThat(cuerpo)
+                .as("A es el obligado de 2026: observarlo lo saca de la emision. %s", cuerpo)
+                .contains("\"observados\":[]");
+        assertThat(determinaciones.determinados).containsExactly(501L);
+        // Base 300 000,00 —P1 y P al 100 %—: 82 500 x 0.2 % = 165.00 ; 217 500 x 0.6 % = 1 305.00
+        // ; 1 470.00 de impuesto y 4.50 de derecho de emision.
+        assertThat(cuerpo).contains("\"monto\":\"1474.50\"");
+        assertThat(cuerpo)
+                .as("la fecha de calculo de la corrida sigue siendo la del reloj (regla 9)")
+                .contains("\"fechaCalculo\":\"2026-08-29\"");
+    }
+
+    /**
+     * <b>El sector del alcance es el de la ficha al 1 de enero</b> (#328).
+     *
+     * <p>P1 esta en el sector 03 al 1 de enero y una resectorizacion lo pasa al 05 el 1 de junio.
+     * La corrida de agosto «por sector 03» es la emision de los predios que en 2026 estaban en el
+     * 03: con la ficha del dia de la corrida, A quedaba fuera de su sector y de ningun otro.
+     */
+    @Test
+    @DisplayName("#328 — el sector del alcance es el de la ficha al 1 de enero, no el de hoy")
+    void elSectorDelAlcanceEsElDelPrimeroDeEnero() throws Exception {
+        predios.con(501L, 11L, "10001", "AV. GRAU 100", Porcentaje.total());
+        fichas.sector(11L, "03", "2026-06-01", "05");
+        sembrarUnPadronQueSeRecalcula();
+
+        mvc.perform(asentarLaCorrida("SECTOR", "03")).andReturn();
+
+        assertThat(determinaciones.determinados)
+                .as("la emision del sector 03 de 2026 es la de los predios que en 2026 eran del 03")
+                .containsExactly(501L);
+    }
+
+    private static org.springframework.test.web.servlet.RequestBuilder asentarLaCorrida(
+            String alcance, @Nullable String sector) {
+        return post("/rentas/api/v1/rentas/predial/calculo-masivo")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                        "{\"modalidad\":\"TRIMESTRAL\",\"simulacion\":false,\"ejercicio\":\"2026\","
+                                + "\"alcance\":\""
+                                + alcance
+                                + "\","
+                                + (sector == null ? "" : "\"sector\":\"" + sector + "\",")
+                                + "\"recalculaYaEmitidos\":true,"
+                                + "\"observacion\":\"Emision anual del ejercicio\"}");
     }
 
     // ------------------------------------------------- falta publicar, y se dice (#540)
@@ -1412,7 +1502,7 @@ class PredialControllerTest {
                 new DeterminarPredial(
                         padron,
                         predios,
-                        new SinCaracteristicas(),
+                        fichas,
                         new DirectorioDePrueba(),
                         cuadro,
                         new kamayuk.rentas.nucleo.dobles.ValuacionesSelladasEnMemoria(),
@@ -1428,7 +1518,7 @@ class PredialControllerTest {
                         padron,
                         individual,
                         new DirectorioDePrueba(),
-                        new SinCaracteristicas(),
+                        fichas,
                         rastro,
                         new CandadoDeEmision(valuacion),
                         RELOJ);
@@ -1603,8 +1693,25 @@ class PredialControllerTest {
          * declarado, asi que el segundo contribuyente heredaba el predio del primero y salia
          * observado por no declararlo (#577).
          */
-        private final Map<Long, List<PredioDelContribuyente>> porContribuyente =
-                new LinkedHashMap<>();
+        private final Map<Long, List<Cuota>> porContribuyente = new LinkedHashMap<>();
+
+        /**
+         * Una cuota con su vigencia (#328); {@code desde} y {@code hasta} nulos son «siempre».
+         *
+         * <p>Hasta #328 este doble contestaba lo mismo a cualquier fecha, y con el reloj fijo en
+         * agosto «el padron de hoy» y «el padron al 1 de enero» eran la misma lista: la corrida
+         * podia leer la titularidad del dia de la corrida y ninguna prueba lo distinguia.
+         */
+        private record Cuota(
+                PredioDelContribuyente predio,
+                @Nullable LocalDate desde,
+                @Nullable LocalDate hasta) {
+
+            boolean vigenteEn(LocalDate fecha) {
+                return (desde == null || !fecha.isBefore(desde))
+                        && (hasta == null || !fecha.isAfter(hasta));
+            }
+        }
 
         void con(long predioId, String codigo, String direccion, Porcentaje cuota) {
             con(501L, predioId, codigo, direccion, cuota);
@@ -1618,19 +1725,69 @@ class PredialControllerTest {
                 Porcentaje cuota) {
             porContribuyente
                     .computeIfAbsent(contribuyenteId, quien -> new ArrayList<>())
-                    .add(new PredioDelContribuyente(predioId, codigo, "URBANO", direccion, cuota));
+                    .add(
+                            new Cuota(
+                                    new PredioDelContribuyente(
+                                            predioId, codigo, "URBANO", direccion, cuota),
+                                    null,
+                                    null));
+        }
+
+        void conVigencia(
+                long contribuyenteId,
+                long predioId,
+                String codigo,
+                String direccion,
+                String desde,
+                @Nullable String hasta) {
+            porContribuyente
+                    .computeIfAbsent(contribuyenteId, quien -> new ArrayList<>())
+                    .add(
+                            new Cuota(
+                                    new PredioDelContribuyente(
+                                            predioId,
+                                            codigo,
+                                            "URBANO",
+                                            direccion,
+                                            Porcentaje.total()),
+                                    LocalDate.parse(desde),
+                                    hasta == null ? null : LocalDate.parse(hasta)));
         }
 
         @Override
         public List<PredioDelContribuyente> de(long contribuyenteId, LocalDate fecha) {
-            return List.copyOf(porContribuyente.getOrDefault(contribuyenteId, List.of()));
+            return porContribuyente.getOrDefault(contribuyenteId, List.of()).stream()
+                    .filter(cuota -> cuota.vigenteEn(fecha))
+                    .map(Cuota::predio)
+                    .toList();
         }
     }
 
-    private static final class SinCaracteristicas implements LectorDeCaracteristicas {
+    /**
+     * Las fichas: por omision ninguna, y con {@link #sector} un predio que cambia de sector en una
+     * fecha (#328). Contesta segun la fecha, igual que el padron.
+     */
+    private static final class FichasDePrueba implements LectorDeCaracteristicas {
+
+        private long predioId;
+        private @Nullable String sectorAntes;
+        private @Nullable LocalDate cambiaEl;
+        private @Nullable String sectorDespues;
+
+        void sector(long predio, String antes, String cambia, String despues) {
+            this.predioId = predio;
+            this.sectorAntes = antes;
+            this.cambiaEl = LocalDate.parse(cambia);
+            this.sectorDespues = despues;
+        }
+
         @Override
-        public Optional<CaracteristicasDelPredio> de(long predioId, LocalDate fecha) {
-            return Optional.empty();
+        public Optional<CaracteristicasDelPredio> de(long predio, LocalDate fecha) {
+            if (cambiaEl == null || predio != predioId) {
+                return Optional.empty();
+            }
+            String sector = fecha.isBefore(cambiaEl) ? sectorAntes : sectorDespues;
+            return Optional.of(new CaracteristicasDelPredio(null, sector, null));
         }
     }
 

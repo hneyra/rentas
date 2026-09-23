@@ -54,9 +54,17 @@ import org.springframework.stereotype.Service;
  *
  * <h2>El % de propiedad no lo manda quien pide</h2>
  *
- * <p>Sale de {@code titularidad} a la fecha de calculo, por {@link PrediosDelContribuyente}. Es lo
- * unico que impide que la base se pueda inflar o desinflar desde el cuerpo de la peticion, y por
- * eso {@link PredioDeclarado} no tiene campo para el.
+ * <p>Sale de {@code titularidad} por {@link PrediosDelContribuyente}. Es lo unico que impide que la
+ * base se pueda inflar o desinflar desde el cuerpo de la peticion, y por eso {@link
+ * PredioDeclarado} no tiene campo para el.
+ *
+ * <h2>Dos fechas, y no una (#328)</h2>
+ *
+ * <p>El padron —quien es titular, con que {@code %}, y las caracteristicas del predio— se lee a la
+ * <b>fecha de referencia</b>, {@link Ejercicio#primerDia()}: el obligado de 2026 es el titular al 1
+ * de enero de 2026 (TUO LTM art. 10; NEG-05 §3), y el que vende en marzo sigue debiendo 2026. La
+ * <b>fecha de calculo</b> es la del reloj y es la que viaja con la cifra (regla 9). Hasta #328 las
+ * dos eran la misma variable, y la titularidad salia del dia en que alguien pulsaba el boton.
  *
  * <h2>El autovaluo: de donde sale, y que manda cuando hay dos (#38, AC-2)</h2>
  *
@@ -166,7 +174,9 @@ public class DeterminarPredial {
         Objects.requireNonNull(peticion, "Hace falta la peticion");
         Objects.requireNonNull(observacion, "Toda modificacion exige la observacion (regla 10)");
 
-        LocalDate hoy = LocalDate.now(reloj);
+        // Solo la fecha que se PUBLICA con la cifra (regla 9). La del padron es otra, y la fija
+        // `componerLaBase` desde el ejercicio: hasta #328 las dos eran esta misma variable.
+        LocalDate fechaDeCalculo = LocalDate.now(reloj);
         ResumenDeContribuyente contribuyente =
                 directorio
                         .porCodigo(peticion.codContribuyente())
@@ -176,7 +186,7 @@ public class DeterminarPredial {
         CuadroPredialParametrizado.Vigente vigente = cuadro.vigenteEn(peticion.ejercicio());
         PoliticasDeRedondeo redondeo = vigente.redondeo();
 
-        List<PredioEnLaBase> enLaBase = componerLaBase(contribuyente, peticion, hoy, redondeo);
+        List<PredioEnLaBase> enLaBase = componerLaBase(contribuyente, peticion, redondeo);
 
         List<Tramo> tramos = vigente.tramos();
         Dinero minimo = vigente.minimoImponible();
@@ -225,17 +235,33 @@ public class DeterminarPredial {
                 vigente.nombreDelConjunto(),
                 contribuyente.codigo(),
                 contribuyente.nombre(),
-                hoy);
+                fechaDeCalculo);
     }
 
+    /**
+     * La base del contribuyente, leida del padron <b>a la fecha de referencia del ejercicio</b>.
+     *
+     * <h2>Por que no recibe una fecha (#328)</h2>
+     *
+     * <p>Hasta #328 recibia {@code hoy}, la misma variable que se publica como fecha de calculo, y
+     * con ella leia la titularidad: si el contribuyente tiene base ({@link SinPrediosEnElPadron}),
+     * si un predio declarado sigue siendo suyo ({@link PredioAjeno}) y con que {@code %} pondera
+     * cada predio. Las tres son hechos <b>del ejercicio</b>: el caracter de sujeto del impuesto se
+     * atribuye con la situacion juridica al 1 de enero (TUO LTM art. 10), y una transferencia
+     * durante el ejercicio no cambia al obligado del ejercicio (NEG-05 §3). Con la fecha del reloj,
+     * una venta en marzo le cargaba 2026 al comprador, dejaba al vendedor sin base o «ajeno», y
+     * recalcular 2026 en 2027 daba otro obligado y otro importe — la regla 6 rota.
+     *
+     * <p>La fecha la dice {@link Ejercicio#primerDia()}, que es la unica fuente de verdad de «la
+     * fecha del ejercicio» en este dominio. Derivarla aqui, en vez de recibirla, es lo que impide
+     * que la fecha de calculo vuelva a colarse por el argumento.
+     */
     private List<PredioEnLaBase> componerLaBase(
-            ResumenDeContribuyente contribuyente,
-            Peticion peticion,
-            LocalDate hoy,
-            PoliticasDeRedondeo redondeo) {
-        List<PredioDelContribuyente> suyos = predios.de(contribuyente.id(), hoy);
+            ResumenDeContribuyente contribuyente, Peticion peticion, PoliticasDeRedondeo redondeo) {
+        LocalDate fechaDeReferencia = peticion.ejercicio().primerDia();
+        List<PredioDelContribuyente> suyos = predios.de(contribuyente.id(), fechaDeReferencia);
         if (suyos.isEmpty()) {
-            throw new SinPrediosEnElPadron(contribuyente.codigo());
+            throw new SinPrediosEnElPadron(contribuyente.codigo(), fechaDeReferencia);
         }
 
         List<PredioDeclarado> pedidos = autovaluosDe(contribuyente, peticion);
@@ -250,7 +276,10 @@ public class DeterminarPredial {
             declarados.remove(predio.predioId());
         }
         if (!declarados.isEmpty()) {
-            throw new PredioAjeno(contribuyente.codigo(), declarados.keySet().iterator().next());
+            throw new PredioAjeno(
+                    contribuyente.codigo(),
+                    declarados.keySet().iterator().next(),
+                    fechaDeReferencia);
         }
 
         Map<Long, PredioDeclarado> porPredio = new LinkedHashMap<>();
@@ -274,7 +303,10 @@ public class DeterminarPredial {
             if (declarado == null && !mandaLaSellada) {
                 throw new PredioSinAutovaluo(predio, sellada);
             }
-            Optional<CaracteristicasDelPredio> rasgos = caracteristicas.de(predio.predioId(), hoy);
+            // Las del 1 de enero tambien: la determinacion consulta las caracteristicas vigentes a
+            // la fecha de referencia, no las actuales (NEG-05 §3, consecuencia 1).
+            Optional<CaracteristicasDelPredio> rasgos =
+                    caracteristicas.de(predio.predioId(), fechaDeReferencia);
             Dinero exonerado =
                     declarado == null || declarado.valuoExonerado() == null
                             ? Dinero.CERO
@@ -433,15 +465,22 @@ public class DeterminarPredial {
         }
     }
 
-    /** El contribuyente existe y no tiene ningun predio a su nombre a la fecha de calculo. */
+    /**
+     * El contribuyente existe y no tiene ningun predio a su nombre al 1 de enero del ejercicio.
+     *
+     * <p>Es lo que le pasa, por ejemplo, al que compra durante el ejercicio: su primer ejercicio es
+     * el siguiente (TUO LTM art. 10, #328).
+     */
     public static final class SinPrediosEnElPadron extends RuntimeException {
         @java.io.Serial private static final long serialVersionUID = 1L;
 
-        SinPrediosEnElPadron(String codigo) {
+        SinPrediosEnElPadron(String codigo, LocalDate fechaDeReferencia) {
             super(
                     "El contribuyente "
                             + codigo
-                            + " no tiene ningun predio a su nombre a la fecha de calculo: un"
+                            + " no tiene ningun predio a su nombre al "
+                            + fechaDeReferencia
+                            + ", la fecha de referencia del ejercicio (TUO LTM art. 10): un"
                             + " contribuyente sin predios no tiene base imponible cero, no tiene"
                             + " determinacion (NEG-05 §1)");
         }
@@ -515,18 +554,25 @@ public class DeterminarPredial {
         }
     }
 
-    /** Se declaro un predio que no es del contribuyente a la fecha de calculo. */
+    /**
+     * Se declaro un predio que no es del contribuyente al 1 de enero del ejercicio.
+     *
+     * <p>Una venta del propio ejercicio ya no lo dispara (#328): el que vende en marzo sigue siendo
+     * el titular al 1 de enero.
+     */
     public static final class PredioAjeno extends RuntimeException {
         @java.io.Serial private static final long serialVersionUID = 1L;
 
-        PredioAjeno(String codigo, long predioId) {
+        PredioAjeno(String codigo, long predioId, LocalDate fechaDeReferencia) {
             super(
                     "El predio "
                             + predioId
                             + " no esta a nombre del contribuyente "
                             + codigo
-                            + " a la fecha de calculo: la titularidad sale del padron, no de la"
-                            + " peticion");
+                            + " al "
+                            + fechaDeReferencia
+                            + ", la fecha de referencia del ejercicio (TUO LTM art. 10): la"
+                            + " titularidad sale del padron, no de la peticion");
         }
     }
 }

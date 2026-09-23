@@ -141,7 +141,17 @@ las reglas. Se rompe en dos pasos:
   hipótesis». La grilla «detalle de los predios» del SRTM vive dentro de una única determinación.
 - **La fecha de referencia** son las características del predio vigentes al 1 de enero.
 
-Las dos están implementadas: `ReglaDeAgregacion` y `RangoDeEjercicios` en `sgtm-parametros`.
+La primera está implementada con `ReglaDeAgregacion`, que se escribió en `sgtm-parametros` y hoy
+vive en `kamayuk-rentas-parametros`. **La segunda no lo estaba, aunque esta línea lo afirmó hasta
+[#328](https://github.com/hneyra/rentas/issues/328)**: citaba `RangoDeEjercicios`, que es la
+vigencia de una regla —en qué ejercicios rige— y no la fecha a la que se lee el padrón, mientras
+`DeterminarPredial` leía la titularidad, el % de propiedad y las características **del día del
+reloj**. Una venta en marzo le cargaba el ejercicio al comprador y sacaba al vendedor de la emisión.
+Desde #328 la fecha de referencia es `Ejercicio.primerDia()` y la leen `DeterminarPredial`,
+`DeterminarPredialMasivo` (el sector del alcance) y la hoja de la declaración jurada; la fecha de
+cálculo sigue siendo la del reloj y viaja aparte, con la cifra (regla 9). La consecuencia de NEG-05
+§3 que sí es cierta «independientemente del valor exacto» —una transferencia durante el ejercicio
+no cambia al obligado del ejercicio (TUO LTM art. 10)— es la que fijan las pruebas de #328.
 
 ## Cómo se cierra una decisión
 

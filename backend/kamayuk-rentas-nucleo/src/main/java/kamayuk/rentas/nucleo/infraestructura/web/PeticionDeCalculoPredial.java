@@ -11,8 +11,9 @@ import org.jspecify.annotations.Nullable;
  * monetaria (regla 1).
  *
  * <p><b>No hay campo para el porcentaje de propiedad</b>, y es deliberado: sale de {@code
- * titularidad} a la fecha de calculo. Admitirlo aqui dejaria inflar o desinflar la base del
- * contribuyente desde la peticion, y la cifra resultante seria indistinguible de la correcta.
+ * titularidad} al 1 de enero del ejercicio (#328). Admitirlo aqui dejaria inflar o desinflar la
+ * base del contribuyente desde la peticion, y la cifra resultante seria indistinguible de la
+ * correcta.
  *
  * <p><b>El autovaluo, en cambio, si se declara</b>, y tambien es deliberado: el sistema no sabe
  * valorizar un predio todavia —faltan el cuadro de valores unitarios y la tabla de depreciacion

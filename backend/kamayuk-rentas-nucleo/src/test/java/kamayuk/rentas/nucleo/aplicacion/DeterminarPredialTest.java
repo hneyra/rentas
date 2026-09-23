@@ -626,6 +626,174 @@ class DeterminarPredialTest {
         }
     }
 
+    /**
+     * <b>El obligado del ejercicio es el titular al 1 de enero</b> (#328; TUO LTM art. 10; NEG-05
+     * §3: «una transferencia durante el ejercicio no cambia al obligado del ejercicio»).
+     *
+     * <p>La siembra es la venta del issue: P (autovaluo 200 000,00) es 100 % de A —C-001— hasta el
+     * 14 de marzo de 2026 y 100 % de B —C-002— desde el 15, y el reloj esta en el 1 de abril. Con
+     * la UIT de 5 500,00 y el cuadro del articulo 13, el predial 2026 de P es 82 500 x 0,2 % + 117
+     * 500 x 0,6 % = <b>870,00</b>, y lo debe A. Es la siembra que distingue: con el doble anterior,
+     * que contestaba lo mismo a cualquier fecha, leer el padron del reloj y leerlo al 1 de enero
+     * daban el mismo verde.
+     */
+    @org.junit.jupiter.api.Nested
+    @DisplayName("#328 — la titularidad que se determina es la del 1 de enero, no la del reloj")
+    class LaTitularidadDelPrimeroDeEnero {
+
+        /** El 1 de abril de 2026, con la venta del 15 de marzo ya registrada. */
+        private static final Clock PRIMERO_DE_ABRIL =
+                Clock.fixed(Instant.parse("2026-04-01T15:00:00Z"), ZoneId.of("America/Lima"));
+
+        /** Un omiso o una fiscalizacion: el mismo ejercicio 2026, determinado en 2027. */
+        private static final Clock EN_2027 =
+                Clock.fixed(Instant.parse("2027-05-10T15:00:00Z"), ZoneId.of("America/Lima"));
+
+        private static final long P = 33L;
+
+        @BeforeEach
+        void venderAMitadDeAnio() {
+            predios.conVigencia(
+                    501L,
+                    P,
+                    "10033",
+                    "CALLE LA VENTA 33",
+                    Porcentaje.total(),
+                    "2019-06-01",
+                    "2026-03-14");
+            predios.conVigencia(
+                    502L, P, "10033", "CALLE LA VENTA 33", Porcentaje.total(), "2026-03-15", null);
+        }
+
+        @Test
+        @DisplayName("el que vendio en marzo es el obligado: P entra al 100 % y da 870,00")
+        void elVendedorEsElObligadoDelEjercicio() {
+            DeterminacionPredialCalculada calculada =
+                    determinarA("C-001", PRIMERO_DE_ABRIL, declarado(P, "200000.00"));
+
+            assertThat(calculada.predios())
+                    .as(
+                            "el 1 de abril P ya no esta a nombre de A, y aun asi es SUYO en 2026:"
+                                    + " leer el padron del reloj lo dejaba sin base")
+                    .extracting(PredioEnLaBase::predioId)
+                    .containsExactly(P);
+            assertThat(calculada.predios().get(0).porcentajePropiedad())
+                    .isEqualTo(Porcentaje.total());
+            assertThat(calculada.cabecera().baseImponible()).isEqualTo(Dinero.de("200000.00"));
+            // 82 500 x 0.2 % = 165.00 ; 117 500 x 0.6 % = 705.00 ; total 870.00
+            assertThat(calculada.impuestoInsoluto()).isEqualTo(Dinero.de("870.00"));
+            assertThat(calculada.fechaCalculo())
+                    .as(
+                            "la fecha de CALCULO sigue siendo la del reloj (regla 9): son dos"
+                                    + " fechas, y fundirlas al reves tambien es el defecto")
+                    .isEqualTo(LocalDate.parse("2026-04-01"));
+        }
+
+        @Test
+        @DisplayName("el que compro en marzo no tiene base en 2026: SinPrediosEnElPadron")
+        void elCompradorNoTieneBaseEnElEjercicio() {
+            assertThatThrownBy(
+                            () -> determinarA("C-002", PRIMERO_DE_ABRIL, declarado(P, "200000.00")))
+                    .as(
+                            "B paga desde 2027. Determinarle 2026 le cargaria 870,00 que no debe, y"
+                                    + " con A emitido en febrero el mismo predio se cobraria dos"
+                                    + " veces")
+                    .isInstanceOf(DeterminarPredial.SinPrediosEnElPadron.class)
+                    .hasMessageContaining("C-002")
+                    .hasMessageContaining("2026-01-01");
+        }
+
+        @Test
+        @DisplayName(
+                "con otros predios y los autovaluos del ejercicio, el vendedor no es PredioAjeno")
+        void elVendedorConOtrosPrediosNoEsPredioAjeno() {
+            predios.con(11L, "10001", "AV. GRAU 100", Porcentaje.total());
+            // Lo que A declaro en febrero, antes de vender: los dos predios.
+            determinaciones.sembrarDelEjercicio(
+                    EJERCICIO,
+                    7L,
+                    DetalleDeterminacionPredio.nuevo(
+                            11L,
+                            Dinero.de("100000.00"),
+                            Dinero.CERO,
+                            Porcentaje.total(),
+                            Dinero.de("100000.00")),
+                    DetalleDeterminacionPredio.nuevo(
+                            P,
+                            Dinero.de("200000.00"),
+                            Dinero.CERO,
+                            Porcentaje.total(),
+                            Dinero.de("200000.00")));
+
+            DeterminacionPredialCalculada calculada = determinarA("C-001", PRIMERO_DE_ABRIL);
+
+            assertThat(calculada.predios())
+                    .extracting(PredioEnLaBase::predioId)
+                    .containsExactlyInAnyOrder(11L, P);
+            // 82 500 x 0.2 % = 165.00 ; 217 500 x 0.6 % = 1 305.00 ; total 1 470.00
+            assertThat(calculada.impuestoInsoluto()).isEqualTo(Dinero.de("1470.00"));
+        }
+
+        @Test
+        @DisplayName("recalcular 2026 en 2027 da el mismo obligado y el mismo centimo (regla 6)")
+        void recalcularElEjercicioOtroAnioDaElMismoCentimo() {
+            DeterminacionPredialCalculada enAbril =
+                    determinarA("C-001", PRIMERO_DE_ABRIL, declarado(P, "200000.00"));
+            DeterminacionPredialCalculada enElSiguiente =
+                    determinarA("C-001", EN_2027, declarado(P, "200000.00"));
+
+            assertThat(enElSiguiente.impuestoInsoluto())
+                    .as(
+                            "un omiso determinado en 2027 leia la titularidad de 2027: otro"
+                                    + " obligado y otro importe para el MISMO ejercicio")
+                    .isEqualTo(enAbril.impuestoInsoluto())
+                    .isEqualTo(Dinero.de("870.00"));
+            assertThat(enElSiguiente.fechaCalculo()).isEqualTo(LocalDate.parse("2027-05-10"));
+            assertThatThrownBy(() -> determinarA("C-002", EN_2027, declarado(P, "200000.00")))
+                    .isInstanceOf(DeterminarPredial.SinPrediosEnElPadron.class);
+        }
+
+        @Test
+        @DisplayName("el uso que se enseña es el de la ficha al 1 de enero, no el de hoy")
+        void elUsoEsElDeLaFichaAlPrimeroDeEnero() {
+            LectorDeCaracteristicas fichas =
+                    new UnaFichaQueCambiaDeUso(
+                            P, "CASA HABITACION", LocalDate.parse("2026-03-01"), "COMERCIO");
+
+            PredioEnLaBase enLaBase =
+                    servicioCon(conjunto().construir(), PRIMERO_DE_ABRIL, fichas)
+                            .determinar(
+                                    new DeterminarPredial.Peticion(
+                                            EJERCICIO,
+                                            "C-001",
+                                            List.of(declarado(P, "200000.00")),
+                                            ModalidadDelPredial.TRIMESTRAL,
+                                            false),
+                                    PORQUE)
+                            .predios()
+                            .get(0);
+
+            assertThat(enLaBase.uso())
+                    .as(
+                            "NEG-05 §3: la determinacion consulta las caracteristicas vigentes a la"
+                                    + " fecha de referencia, no las actuales")
+                    .isEqualTo("CASA HABITACION");
+        }
+
+        private DeterminacionPredialCalculada determinarA(
+                String codigo, Clock reloj, DeterminarPredial.PredioDeclarado... declarados) {
+            return servicioCon(conjunto().construir(), reloj, new SinCaracteristicas())
+                    .determinar(
+                            new DeterminarPredial.Peticion(
+                                    EJERCICIO,
+                                    codigo,
+                                    List.of(declarados),
+                                    ModalidadDelPredial.TRIMESTRAL,
+                                    false),
+                            PORQUE);
+        }
+    }
+
     private DeterminacionPredialCalculada determinar(
             DeterminarPredial.PredioDeclarado uno, DeterminarPredial.PredioDeclarado otro) {
         List<DeterminarPredial.PredioDeclarado> declarados = new ArrayList<>();
@@ -653,16 +821,21 @@ class DeterminarPredialTest {
     }
 
     private DeterminarPredial servicioCon(ParametrosSellados sellados) {
+        return servicioCon(sellados, RELOJ, new SinCaracteristicas());
+    }
+
+    private DeterminarPredial servicioCon(
+            ParametrosSellados sellados, Clock reloj, LectorDeCaracteristicas fichas) {
         LectorDeParametros lector = lector(sellados);
         return new DeterminarPredial(
                 new PadronPredialDelEjercicio(determinaciones),
                 predios,
-                new SinCaracteristicas(),
+                fichas,
                 new DirectorioDePrueba(),
                 new CuadroPredialParametrizado(lector),
                 valuaciones,
-                new RegistrarDeterminacionPredial(determinaciones, lector, auditoria, RELOJ),
-                RELOJ);
+                new RegistrarDeterminacionPredial(determinaciones, lector, auditoria, reloj),
+                reloj);
     }
 
     private static ParametrosSellados.Constructor conjunto() {
@@ -732,14 +905,44 @@ class DeterminarPredialTest {
 
     // ---------------------------------------------------------------- dobles
 
+    /**
+     * Los predios de cada contribuyente, <b>con la vigencia de cada cuota</b> (#328).
+     *
+     * <p>Hasta #328 este doble ignoraba los dos argumentos —devolvia la misma lista a quien se
+     * preguntara y a la fecha que se preguntara— con el reloj fijo en agosto. Era la muestra
+     * uniforme: «el padron del dia de calculo» y «el padron al 1 de enero» daban el mismo verde, y
+     * por eso ninguna prueba vio que la determinacion leia la titularidad del reloj. Ahora cada
+     * cuota tiene su vigencia, como {@code titularidad}: la transferencia cierra la anterior el dia
+     * antes ({@code GestorDeTitularidad}).
+     */
     private static final class PrediosDePrueba implements PrediosDelContribuyente {
 
-        private final List<PredioDelContribuyente> suyos = new ArrayList<>();
+        /** Una cuota de titularidad; {@code desde} y {@code hasta} nulos son «siempre». */
+        private record Cuota(
+                long contribuyenteId,
+                PredioDelContribuyente predio,
+                @org.jspecify.annotations.Nullable LocalDate desde,
+                @org.jspecify.annotations.Nullable LocalDate hasta) {
+
+            boolean vigenteEn(long quien, LocalDate fecha) {
+                return contribuyenteId == quien
+                        && (desde == null || !fecha.isBefore(desde))
+                        && (hasta == null || !fecha.isAfter(hasta));
+            }
+        }
+
+        private final List<Cuota> cuotas = new ArrayList<>();
 
         void con(long predioId, String codigo, String direccion, Porcentaje cuota) {
-            // Sin decir otra cosa, el predio tiene dueño completo: la cuota del contribuyente ES
-            // todo lo registrado.
-            suyos.add(new PredioDelContribuyente(predioId, codigo, "URBANO", direccion, cuota));
+            // Sin decir otra cosa, el predio tiene dueño completo —la cuota del contribuyente ES
+            // todo lo registrado— y es de C-001 desde siempre.
+            cuotas.add(
+                    new Cuota(
+                            DirectorioDePrueba.UNO.id(),
+                            new PredioDelContribuyente(
+                                    predioId, codigo, "URBANO", direccion, cuota),
+                            null,
+                            null));
         }
 
         /** Un predio cuyas cuotas NO cubren el predio entero (#690). */
@@ -749,14 +952,39 @@ class DeterminarPredialTest {
                 String direccion,
                 Porcentaje cuota,
                 Porcentaje registrado) {
-            suyos.add(
-                    new PredioDelContribuyente(
-                            predioId, codigo, "URBANO", direccion, cuota, registrado));
+            cuotas.add(
+                    new Cuota(
+                            DirectorioDePrueba.UNO.id(),
+                            new PredioDelContribuyente(
+                                    predioId, codigo, "URBANO", direccion, cuota, registrado),
+                            null,
+                            null));
+        }
+
+        /** Una cuota con su vigencia, de cualquiera de los dos contribuyentes (#328). */
+        void conVigencia(
+                long contribuyenteId,
+                long predioId,
+                String codigo,
+                String direccion,
+                Porcentaje cuota,
+                String desde,
+                @org.jspecify.annotations.Nullable String hasta) {
+            cuotas.add(
+                    new Cuota(
+                            contribuyenteId,
+                            new PredioDelContribuyente(
+                                    predioId, codigo, "URBANO", direccion, cuota),
+                            LocalDate.parse(desde),
+                            hasta == null ? null : LocalDate.parse(hasta)));
         }
 
         @Override
         public List<PredioDelContribuyente> de(long contribuyenteId, LocalDate fecha) {
-            return List.copyOf(suyos);
+            return cuotas.stream()
+                    .filter(cuota -> cuota.vigenteEn(contribuyenteId, fecha))
+                    .map(Cuota::predio)
+                    .toList();
         }
     }
 
@@ -768,10 +996,33 @@ class DeterminarPredialTest {
         }
     }
 
+    /**
+     * La ficha de UN predio que cambia de uso a mitad del ejercicio (#328).
+     *
+     * <p>Contesta segun la fecha, igual que el padron: un doble que ignorase el argumento no
+     * distinguiria «el uso al 1 de enero» de «el uso de hoy».
+     */
+    private record UnaFichaQueCambiaDeUso(
+            long predioId, String usoAntes, LocalDate cambiaEl, String usoDespues)
+            implements LectorDeCaracteristicas {
+        @Override
+        public Optional<CaracteristicasDelPredio> de(long predio, LocalDate fecha) {
+            if (predio != predioId) {
+                return Optional.empty();
+            }
+            String uso = fecha.isBefore(cambiaEl) ? usoAntes : usoDespues;
+            return Optional.of(new CaracteristicasDelPredio(uso, null, null));
+        }
+    }
+
     private static final class DirectorioDePrueba implements DirectorioDeContribuyentes {
 
         private static final ResumenDeContribuyente UNO =
                 new ResumenDeContribuyente(501L, "C-001", "SUC. RUFINA MEDINA MEDINA", "03593174");
+
+        /** El comprador de #328: sin un segundo contribuyente, una venta no tiene a quien ir. */
+        private static final ResumenDeContribuyente DOS =
+                new ResumenDeContribuyente(502L, "C-002", "SULLON VILCHEZ, JOSE RAUL", "29614026");
 
         @Override
         public List<ResumenDeContribuyente> buscar(String texto, int maximo) {
@@ -780,7 +1031,10 @@ class DeterminarPredialTest {
 
         @Override
         public Optional<ResumenDeContribuyente> porCodigo(String codigo) {
-            return "C-001".equals(codigo) ? Optional.of(UNO) : Optional.empty();
+            if (UNO.codigo().equals(codigo)) {
+                return Optional.of(UNO);
+            }
+            return DOS.codigo().equals(codigo) ? Optional.of(DOS) : Optional.empty();
         }
 
         @Override
@@ -788,6 +1042,9 @@ class DeterminarPredialTest {
             Map<Long, ResumenDeContribuyente> encontrados = new LinkedHashMap<>();
             if (ids.contains(UNO.id())) {
                 encontrados.put(UNO.id(), UNO);
+            }
+            if (ids.contains(DOS.id())) {
+                encontrados.put(DOS.id(), DOS);
             }
             return encontrados;
         }
