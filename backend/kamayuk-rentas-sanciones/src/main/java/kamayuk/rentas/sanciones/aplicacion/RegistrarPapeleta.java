@@ -231,8 +231,13 @@ public class RegistrarPapeleta {
         return guardada;
     }
 
+    /**
+     * La de {@link ObligacionDeLaPapeleta#referenciaDe}, y no otra copia (#371): es la que el libro
+     * compara para saber si una obligación la originó sólo esta papeleta, así que si las dos
+     * escrituras divergieran la contención rechazaría hasta la baja de una papeleta sola.
+     */
     private static String referenciaExternaDe(Papeleta papeleta) {
-        return "PAPELETA-" + papeleta.id();
+        return ObligacionDeLaPapeleta.referenciaDe(papeleta);
     }
 
     private static String descripcion(Papeleta papeleta) {

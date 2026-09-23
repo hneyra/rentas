@@ -14,6 +14,7 @@ import kamayuk.rentas.cuentacorriente.CausalDeBaja;
 import kamayuk.rentas.cuentacorriente.DeudaAcogida;
 import kamayuk.rentas.cuentacorriente.ExtincionDeDeuda;
 import kamayuk.rentas.cuentacorriente.MovimientoAsentado;
+import kamayuk.rentas.cuentacorriente.ObligacionCompartida;
 import kamayuk.rentas.cuentacorriente.SeleccionDeObligacion;
 import kamayuk.rentas.dominio.Alicuota;
 import kamayuk.rentas.dominio.Dinero;
@@ -168,6 +169,28 @@ class AnulacionDePapeletaControllerTest {
 
         assertThat(resultado.getResponse().getStatus()).isEqualTo(409);
         assertThat(resultado.getResponse().getContentAsString()).contains("RM-2026-000123");
+    }
+
+    /**
+     * #371: el libro rechaza porque otra papeleta del mismo obligado comparte la obligacion. La
+     * respuesta es 409 —la peticion es correcta, lo que no admite el acto es la situacion del
+     * libro— y nombra la otra papeleta por su numero impreso, no por su referencia interna.
+     */
+    @Test
+    @DisplayName("con la obligacion compartida con otra papeleta, 409 nombrandola")
+    void conLaObligacionCompartidaEs409() throws Exception {
+        repositorio.crear("PT-0005", EstadoDePapeleta.IMPUESTA);
+        repositorio.crear("PT-0006", EstadoDePapeleta.IMPUESTA);
+        long otra = repositorio.porNumero("PT-0006").orElseThrow().identificador();
+        extincion.compartidaCon("PAPELETA-" + otra);
+
+        MvcResult resultado =
+                anular("PT-0005", "{\"observacion\":\"error material\",\"fecha\":\"2026-04-01\"}");
+
+        assertThat(resultado.getResponse().getStatus()).isEqualTo(409);
+        assertThat(resultado.getResponse().getContentAsString())
+                .contains("PT-0006")
+                .doesNotContain("PAPELETA-" + otra);
     }
 
     @Test
@@ -328,16 +351,26 @@ class AnulacionDePapeletaControllerTest {
 
         private @Nullable CausalDeBaja causal;
         private @Nullable LocalDate fecha;
+        private @Nullable String compartidaCon;
+
+        /** Como si el libro tuviera en la misma obligacion la multa de ese otro origen (#371). */
+        void compartidaCon(String otroOrigen) {
+            this.compartidaCon = otroOrigen;
+        }
 
         @Override
-        public MovimientoAsentado extinguir(
+        public MovimientoAsentado extinguirLoOriginadoPor(
                 long contribuyenteId,
                 SeleccionDeObligacion obligacion,
                 LocalDate fecha,
                 String documentoOrigen,
-                @Nullable String referenciaExterna,
+                String referenciaExterna,
                 CausalDeBaja causal,
                 Observacion observacion) {
+            if (compartidaCon != null) {
+                throw new ObligacionCompartida(
+                        obligacion, referenciaExterna, List.of(compartidaCon));
+            }
             this.causal = causal;
             this.fecha = fecha;
             return new MovimientoAsentado(

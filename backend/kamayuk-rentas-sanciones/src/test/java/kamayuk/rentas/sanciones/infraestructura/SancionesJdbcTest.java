@@ -2,6 +2,7 @@ package kamayuk.rentas.sanciones.infraestructura;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowable;
 
 import java.io.IOException;
 import java.math.RoundingMode;
@@ -73,6 +74,7 @@ import kamayuk.rentas.sanciones.aplicacion.ConsultaDeActosDeLaPapeleta;
 import kamayuk.rentas.sanciones.aplicacion.ConsultaDeInternamientos;
 import kamayuk.rentas.sanciones.aplicacion.LiberarVehiculoInternado;
 import kamayuk.rentas.sanciones.aplicacion.NotificarResolucionDeGerencia;
+import kamayuk.rentas.sanciones.aplicacion.ObligacionCompartidaConOtraPapeleta;
 import kamayuk.rentas.sanciones.aplicacion.PlazosDeSancionesParametrizados;
 import kamayuk.rentas.sanciones.aplicacion.RegistrarDescargo;
 import kamayuk.rentas.sanciones.aplicacion.RegistrarInternamiento;
@@ -1524,6 +1526,112 @@ class SancionesJdbcTest {
     }
 
     // ==================================================================
+    //  #371 — dos papeletas del mismo obligado, del mismo ejercicio y sin vehiculo del padron
+    // ==================================================================
+
+    /**
+     * <b>La siembra que distingue (#371).</b> Hasta aqui cada papeleta de esta clase nacia con un
+     * contribuyente propio —{@link #papeletaDeTransito(String)} crea uno por sufijo—, y con esa
+     * muestra uniforme «dar de baja la obligacion de la papeleta» y «dar de baja la papeleta» son
+     * la misma cifra. Aqui el obligado es UNO, el ejercicio el mismo y el vehiculo nulo, que es lo
+     * corriente en una combi fuera del padron: T-001 por 440 y T-002 por 220 caen en la misma
+     * obligacion del libro, {@code (obligado, MULTA_TRANSITO, 2026, sin unidad)}, con 660.
+     */
+    @Nested
+    @DisplayName("#371 — anular o dejar sin efecto una papeleta no extingue la multa de otra")
+    class LaObligacionCompartida {
+
+        private static final Dinero T001 = Dinero.de("440.00");
+        private static final Dinero T002 = Dinero.de("220.00");
+        private static final Dinero LAS_DOS = Dinero.de("660.00");
+
+        @Test
+        @DisplayName("anular T-001 con T-002 en la misma obligacion: 409 que nombra T-002, y 660")
+        void anularNoExtingueLaOtraMulta() {
+            long obligado = crearContribuyente("OC1");
+            Papeleta t001 = papeletaDeTransito("OC1-T001", obligado, T001);
+            Papeleta t002 = papeletaDeTransito("OC1-T002", obligado, T002);
+            assertThat(t001.vehiculoId()).as("la siembra: sin vehiculo del padron").isNull();
+            assertThat(deudaDe(t001, ORDINARIA))
+                    .as("las dos multas caen en la misma obligacion del libro")
+                    .isEqualTo(LAS_DOS);
+
+            Throwable rechazo = catchThrowable(() -> anular(t001));
+
+            assertThat(deudaDe(t002, ORDINARIA))
+                    .as(
+                            "T-002 sigue debiendo lo suyo: anular T-001 no puede extinguir una"
+                                    + " multa sin ningun acto que la sustente")
+                    .isEqualTo(LAS_DOS);
+            assertThat(rechazo)
+                    .as("y se rechaza diciendo que otra papeleta comparte la obligacion")
+                    .isInstanceOf(ObligacionCompartidaConOtraPapeleta.class)
+                    .hasMessageContaining(t002.numero());
+            assertThat(enTransaccion(() -> papeletas.porId(t001.identificador())))
+                    .as("el rechazo deshace el acto entero: T-001 no queda ANULADA debiendo")
+                    .get()
+                    .extracting(Papeleta::estado)
+                    .isEqualTo(EstadoDePapeleta.IMPUESTA);
+        }
+
+        @Test
+        @DisplayName("dejar sin efecto T-002 por resolucion fundada tampoco se lleva T-001")
+        void dejarSinEfectoNoExtingueLaOtraMulta() {
+            long obligado = crearContribuyente("OC2");
+            Papeleta t001 = papeletaDeTransito("OC2-T001", obligado, T001);
+            Papeleta t002 = papeletaDeTransito("OC2-T002", obligado, T002);
+            enTransaccion(
+                    () ->
+                            registrarDescargo.registrar(
+                                    Familia.TRANSITO,
+                                    t002.numero(),
+                                    new RegistrarDescargo.Peticion(
+                                            "EXP-OC2",
+                                            INFRACCION.plusDays(2),
+                                            TipoDeRecurso.DESCARGO,
+                                            "El vehiculo estaba en el taller"),
+                                    PORQUE),
+                    "mesa.partes");
+
+            Throwable rechazo =
+                    catchThrowable(
+                            () ->
+                                    dictar(
+                                            t002,
+                                            TipoDeResolucionDeGerencia.ORDINARIA,
+                                            ORDINARIA,
+                                            "EXP-OC2",
+                                            SentidoDelFallo.FUNDADO,
+                                            EfectoSobreLaMulta.SE_DEJA_SIN_EFECTO));
+
+            assertThat(deudaDe(t001, ORDINARIA))
+                    .as("T-001 sigue debiendo: la resolucion de T-002 no la dejo sin efecto")
+                    .isEqualTo(LAS_DOS);
+            assertThat(rechazo)
+                    .as("y se rechaza nombrando la papeleta con la que comparte la obligacion")
+                    .isInstanceOf(ObligacionCompartidaConOtraPapeleta.class)
+                    .hasMessageContaining(t001.numero());
+            assertThat(cuantasResoluciones(t002, "ORDINARIA"))
+                    .as("el rechazo deshace la resolucion entera, con su papel y su numero")
+                    .isZero();
+        }
+
+        @Test
+        @DisplayName("con su obligacion para ella sola, la papeleta se sigue anulando entera")
+        void sinCompartirSeAnulaComoSiempre() {
+            long obligado = crearContribuyente("OC3");
+            Papeleta sola = papeletaDeTransito("OC3-T001", obligado, T001);
+
+            AnularPapeleta.Anulada anulada = anular(sola);
+
+            assertThat(anulada.baja().importe())
+                    .as("el control: la contencion no bloquea la obligacion de una sola papeleta")
+                    .isEqualTo(T001);
+            assertThat(deudaDe(sola, ORDINARIA)).isEqualTo(Dinero.CERO);
+        }
+    }
+
+    // ==================================================================
     //  Utilidades
     // ==================================================================
 
@@ -1561,7 +1669,14 @@ class SancionesJdbcTest {
 
     /** Una papeleta de tránsito con su cargo ya asentado en el libro. */
     private static Papeleta papeletaDeTransito(String sufijo) {
-        long obligado = crearContribuyente(sufijo);
+        return papeletaDeTransito(sufijo, crearContribuyente(sufijo), MULTA);
+    }
+
+    /**
+     * Una papeleta de tránsito <b>de un obligado que ya existe</b>, por el importe que se pida
+     * (#371): es lo que deja sembrar dos papeletas en la misma obligación del libro.
+     */
+    private static Papeleta papeletaDeTransito(String sufijo, long obligado, Dinero multa) {
         crearCodigo("G-" + sufijo);
         return enTransaccion(
                 () ->
@@ -1579,9 +1694,9 @@ class SancionesJdbcTest {
                                 obligado,
                                 Dinero.de("5350.00"),
                                 Alicuota.de("8"),
-                                MULTA,
+                                multa,
                                 Alicuota.de("100"),
-                                MULTA,
+                                multa,
                                 null,
                                 PORQUE));
     }

@@ -7,6 +7,7 @@ import kamayuk.rentas.auditoria.RegistroDeAuditoria;
 import kamayuk.rentas.cuentacorriente.CausalDeBaja;
 import kamayuk.rentas.cuentacorriente.ExtincionDeDeuda;
 import kamayuk.rentas.cuentacorriente.MovimientoAsentado;
+import kamayuk.rentas.cuentacorriente.ObligacionCompartida;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.sanciones.dominio.CorridaDeValoresRepository;
 import kamayuk.rentas.sanciones.dominio.Familia;
@@ -87,6 +88,16 @@ import org.springframework.transaction.annotation.Transactional;
  * una resolución de gerencia que la ordena y un recurso que la motiva. Aquí no hay recurso ni
  * resolución: hay un acto de la administración sobre su propio error.
  *
+ * <h2>Y sólo si la obligación es sólo suya (#371)</h2>
+ *
+ * <p>La obligación del libro no identifica a la papeleta: dos multas del mismo obligado, del mismo
+ * ejercicio y de la misma unidad —o sin vehículo del padrón— se suman en una. Por eso la baja pasa
+ * por {@link ExtincionDeDeuda#extinguirLoOriginadoPor}, que antes de abonar comprueba que todos los
+ * cargos lleven la referencia de esta papeleta; si hay otra, se rechaza con {@link
+ * ObligacionCompartidaConOtraPapeleta} nombrándola. Bloquea una anulación legítima, y es a
+ * propósito: la alternativa era extinguir la multa de otra papeleta sin ningún acto. Que la
+ * papeleta sea la unidad de su obligación es #465.
+ *
  * <p>Y si la multa ya estaba cobrada no se llega hasta aquí: {@link Papeleta#anulada} lo rechaza
  * antes, porque una {@code PAGADA} ya no se debe. Lo que corresponde con lo cobrado de más es una
  * devolución, que es otro procedimiento.
@@ -122,6 +133,8 @@ public class AnularPapeleta {
      * @throws RegistrarDescargo.PapeletaInexistente si no hay ninguna con ese número en esa familia
      * @throws PapeletaConResolucionDeMulta si su multa ya se formalizó en una resolución de multa
      * @throws Papeleta.TransicionIlegal si en ese estado ya no se debe nada
+     * @throws ObligacionCompartidaConOtraPapeleta si su obligacion del libro tiene tambien la multa
+     *     de otra papeleta (#371): anularla extinguiria las dos
      */
     @Transactional
     public Anulada anular(
@@ -137,19 +150,29 @@ public class AnularPapeleta {
 
         Papeleta anulada = papeletas.anular(antes.identificador());
 
-        MovimientoAsentado baja =
-                extincion.extinguir(
-                        antes.obligadoId(),
-                        ObligacionDeLaPapeleta.de(antes),
-                        fecha,
-                        "ANULACION PAPELETA " + antes.numero(),
-                        ObligacionDeLaPapeleta.referenciaDe(antes),
-                        // «La baja que deshace un alta que no debio existir», que es lo que una
-                        // anulacion de papeleta es. La declara quien anula, como en #684: un
-                        // puerto que la dedujera de su unico caller de hoy afirmaria manana lo
-                        // que ya no es cierto.
-                        CausalDeBaja.ERROR_MATERIAL,
-                        observacion);
+        MovimientoAsentado baja;
+        try {
+            // La variante que comprueba el origen (#371): la obligacion de la papeleta es la de
+            // todas las multas del obligado en ese tributo, ejercicio y unidad, y `extinguir` a
+            // secas se llevaba tambien las de las otras papeletas.
+            baja =
+                    extincion.extinguirLoOriginadoPor(
+                            antes.obligadoId(),
+                            ObligacionDeLaPapeleta.de(antes),
+                            fecha,
+                            "ANULACION PAPELETA " + antes.numero(),
+                            ObligacionDeLaPapeleta.referenciaDe(antes),
+                            // «La baja que deshace un alta que no debio existir», que es lo que
+                            // una anulacion de papeleta es. La declara quien anula, como en #684:
+                            // un puerto que la dedujera de su unico caller de hoy afirmaria
+                            // manana lo que ya no es cierto.
+                            CausalDeBaja.ERROR_MATERIAL,
+                            observacion);
+        } catch (ObligacionCompartida compartida) {
+            // Se relanza y la transaccion entera se deshace: tampoco queda la papeleta ANULADA,
+            // que es justo el «anulada y debiendo» que esta clase existe para impedir.
+            throw ObligacionDeLaPapeleta.compartida(antes, compartida, papeletas, "anularla");
+        }
 
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe(

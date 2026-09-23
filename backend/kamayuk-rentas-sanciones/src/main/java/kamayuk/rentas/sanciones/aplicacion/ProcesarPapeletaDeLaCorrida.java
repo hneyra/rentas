@@ -4,11 +4,11 @@ import java.time.LocalDate;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
-import kamayuk.rentas.dominio.Ejercicio;
+import kamayuk.rentas.cuentacorriente.ObligacionCompartida;
+import kamayuk.rentas.cuentacorriente.SeleccionDeObligacion;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.sanciones.dominio.CorridaDeValores;
 import kamayuk.rentas.sanciones.dominio.CorridaDeValoresRepository;
-import kamayuk.rentas.sanciones.dominio.Familia;
 import kamayuk.rentas.sanciones.dominio.ItemDeCorrida;
 import kamayuk.rentas.sanciones.dominio.NotificacionDeResolucion;
 import kamayuk.rentas.sanciones.dominio.NotificacionDeResolucionRepository;
@@ -59,9 +59,22 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>Las tres se guardan como {@code NO_PROCEDE} con su motivo, y no como un fallo: un candidato al
  * que le falta la notificación no es un error del proceso, es trabajo pendiente de otra área, y
  * quien opera necesita saber cuál de las tres le tocó. Un único «no procede» le dejaría adivinando.
+ *
+ * <h2>Y dos más que pone el libro (#371)</h2>
+ *
+ * <p>Las tres de arriba se evalúan para <b>la papeleta</b>, pero lo que se formaliza es su
+ * <b>obligación</b>, y la clave del libro no distingue una papeleta de otra: todas las multas del
+ * obligado en ese tributo, ejercicio y unidad se suman en una. Así que la emisión se rechaza
+ * también —y se guarda como {@code NO_PROCEDE}, nombrando la otra papeleta— cuando la obligación la
+ * comparte otra multa, y cuando ya no está en {@code ORDINARIA} porque un valor ya la formalizó.
+ * Sin eso, T-001 exigible emitía una RM por la suya y por la de T-002, que no tenía ningún acto que
+ * ordenara su cobranza, y el ítem de T-002 emitía otra por lo mismo.
  */
 @Service
 public class ProcesarPapeletaDeLaCorrida {
+
+    /** El largo de {@code papeleta_masivo_item.motivo}. */
+    private static final int LARGO_DEL_MOTIVO = 200;
 
     private final PapeletaRepository papeletas;
     private final ResolucionDeGerenciaRepository resoluciones;
@@ -122,16 +135,18 @@ public class ProcesarPapeletaDeLaCorrida {
             return Resultado.NO_PROCEDE;
         }
 
+        // La obligacion sale de ObligacionDeLaPapeleta, la unica fuente de «que obligacion es la
+        // de esta papeleta», y no de otra composicion a mano (#371).
+        SeleccionDeObligacion obligacion = ObligacionDeLaPapeleta.de(papeleta);
         try {
             ValorDeMulta valor =
                     emision.emitirPorMulta(
                             papeleta.obligadoId(),
-                            ObligacionDeLaPapeleta.tributoDe(papeleta.familia()),
-                            Ejercicio.de(papeleta.fechaInfraccion()),
-                            papeleta.familia() == Familia.ADMINISTRATIVA
-                                    ? papeleta.predioId()
-                                    : null,
-                            papeleta.familia() == Familia.TRANSITO ? papeleta.vehiculoId() : null,
+                            obligacion.tributo(),
+                            obligacion.ejercicio(),
+                            obligacion.predioId(),
+                            obligacion.vehiculoId(),
+                            ObligacionDeLaPapeleta.referenciaDe(papeleta),
                             corrida.fechaCriterio(),
                             observacion);
             corridas.marcarGenerado(itemId, valor.id(), valor.numero());
@@ -139,7 +154,29 @@ public class ProcesarPapeletaDeLaCorrida {
         } catch (EmisionDeValoresDeMultas.SinDeudaQueFormalizar nadaQueFormalizar) {
             corridas.marcarSinDeuda(itemId);
             return Resultado.SIN_DEUDA;
+        } catch (ObligacionCompartida compartida) {
+            // NO_PROCEDE y no un fallo, igual que las otras tres razones: no es un error del
+            // proceso sino un hecho que quien opera tiene que ver, con la otra papeleta nombrada.
+            corridas.marcarNoProcede(
+                    itemId,
+                    recortado(
+                            ObligacionDeLaPapeleta.compartida(
+                                            papeleta, compartida, papeletas, "una RM")
+                                    .motivo()));
+            return Resultado.NO_PROCEDE;
+        } catch (EmisionDeValoresDeMultas.ObligacionYaFormalizada yaFormalizada) {
+            corridas.marcarNoProcede(
+                    itemId,
+                    "Su obligacion del libro ya no esta en ORDINARIA: un valor ya la formalizo");
+            return Resultado.NO_PROCEDE;
         }
+    }
+
+    /** {@code papeleta_masivo_item.motivo} es {@code varchar(200)}. */
+    private static String recortado(String motivo) {
+        return motivo.length() <= LARGO_DEL_MOTIVO
+                ? motivo
+                : motivo.substring(0, LARGO_DEL_MOTIVO - 3) + "...";
     }
 
     // ------------------------------------------------------------------

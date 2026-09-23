@@ -4,6 +4,7 @@ import kamayuk.rentas.autorizacion.Privilegio;
 import kamayuk.rentas.autorizacion.RequiereAcceso;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.sanciones.aplicacion.AnularPapeleta;
+import kamayuk.rentas.sanciones.aplicacion.ObligacionCompartidaConOtraPapeleta;
 import kamayuk.rentas.sanciones.aplicacion.RegistrarDescargo;
 import kamayuk.rentas.sanciones.dominio.Familia;
 import kamayuk.rentas.sanciones.dominio.Papeleta;
@@ -83,6 +84,7 @@ public class AnulacionDePapeletaController {
             throw new ProblemaDeNegocio(
                     CodigoDeError.NO_ENCONTRADO, PeticionesDeSanciones.mensajeDe(noExiste));
         } catch (AnularPapeleta.PapeletaConResolucionDeMulta
+                | ObligacionCompartidaConOtraPapeleta
                 | Papeleta.TransicionIlegal conflicto) {
             // 409 y no 422: la peticion es correcta, lo que no admite el acto es la situacion en
             // que esta la papeleta. La interfaz distingue las dos para saber si reintentar sirve.

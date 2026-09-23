@@ -65,11 +65,26 @@ public interface EmisionDeValoresDeMultas {
      * @param tributo el tributo con que la multa se asento en el libro
      * @param ejercicio el ejercicio de la obligacion
      * @param predioId la unidad, en una multa administrativa que cuelga de un predio
+     *     <p>Y desde #371 formaliza la obligacion <b>solo si es de esa multa</b>. La clave del
+     *     libro no distingue la papeleta: todas las multas del obligado en ese tributo, ejercicio y
+     *     unidad se suman en una obligacion, y una RM sobre ella formalizaba tambien la de otra
+     *     papeleta sin ningun acto que ordenara su cobranza —y el item de esa otra emitia una
+     *     segunda RM por la misma deuda—. Por eso se rechaza la obligacion compartida y la que ya
+     *     no esta en {@code ORDINARIA}.
+     * @param contribuyenteId el obligado de la papeleta; ya resuelto por quien llama
+     * @param tributo el tributo con que la multa se asento en el libro
+     * @param ejercicio el ejercicio de la obligacion
+     * @param predioId la unidad, en una multa administrativa que cuelga de un predio
      * @param vehiculoId la unidad, en una multa de transito de un vehiculo del padron
+     * @param referenciaDelOrigen la referencia con que la papeleta marco su cargo en el libro
+     *     (#371); es lo que deja comprobar que nadie mas origino esa deuda
      * @param fecha a que fecha se evalua la deuda y con la que nace el valor (regla 9); es la
      *     {@code fecha_criterio} congelada de la corrida, nunca «hoy»
      * @param observacion por que se emite (regla 10)
      * @throws SinDeudaQueFormalizar si esa obligacion no debe nada a esa fecha
+     * @throws kamayuk.rentas.cuentacorriente.ObligacionCompartida si otra papeleta —u otro origen—
+     *     tiene deuda en esa misma obligacion, nombrandolo
+     * @throws ObligacionYaFormalizada si esa obligacion ya no esta en {@code ORDINARIA}
      */
     ValorDeMulta emitirPorMulta(
             long contribuyenteId,
@@ -77,8 +92,22 @@ public interface EmisionDeValoresDeMultas {
             Ejercicio ejercicio,
             @Nullable Long predioId,
             @Nullable Long vehiculoId,
+            String referenciaDelOrigen,
             LocalDate fecha,
             Observacion observacion);
+
+    /**
+     * La deuda de esa obligacion ya la formalizo un valor: paso a {@code VALOR} o a {@code
+     * COACTIVA} (#371). Otra resolucion de multa seria un segundo titulo por la misma deuda.
+     */
+    final class ObligacionYaFormalizada extends RuntimeException {
+
+        @java.io.Serial private static final long serialVersionUID = 1L;
+
+        public ObligacionYaFormalizada(String mensaje) {
+            super(mensaje);
+        }
+    }
 
     /** La obligacion no debe nada a la fecha del criterio: no hay valor que emitir. */
     final class SinDeudaQueFormalizar extends RuntimeException {

@@ -55,7 +55,6 @@ import kamayuk.rentas.sanciones.dominio.ResolucionDeGerenciaRepository;
 import kamayuk.rentas.sanciones.dominio.TipoDeResolucionDeGerencia;
 import kamayuk.rentas.web.ConfiguracionDeJson;
 import kamayuk.rentas.web.ManejadorDeErrores;
-import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -648,12 +647,12 @@ class ResolucionesDeGerenciaControllerTest {
     private static final class SinExtincion implements ExtincionDeDeuda {
 
         @Override
-        public MovimientoAsentado extinguir(
+        public MovimientoAsentado extinguirLoOriginadoPor(
                 long contribuyenteId,
                 SeleccionDeObligacion obligacion,
                 LocalDate fecha,
                 String documentoOrigen,
-                @Nullable String referenciaExterna,
+                String referenciaExterna,
                 CausalDeBaja causal,
                 Observacion observacion) {
             throw new UnsupportedOperationException(

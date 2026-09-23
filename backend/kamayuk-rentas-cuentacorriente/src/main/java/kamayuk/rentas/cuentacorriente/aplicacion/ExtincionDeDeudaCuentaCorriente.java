@@ -86,6 +86,15 @@ import org.springframework.transaction.annotation.Transactional;
  * eso lo que se extingue es {@link CalculoDeDeuda#extinguibleDesde}: lo que se debia ese dia y
  * ningun abono posterior ha extinguido. Y si eso es cero no se asienta nada, que es lo que {@link
  * ExtincionDeDeuda} promete —lo que sobra de verdad es un pago, y eso es una devolucion—.
+ *
+ * <h2>Y solo si nadie mas origino esa deuda (#371)</h2>
+ *
+ * <p>La obligacion es contribuyente, tributo, ejercicio y unidad, y no dice que acto cargo cada
+ * parte: dos papeletas del mismo obligado y ejercicio sin vehiculo del padron son una sola. Por
+ * eso, despues del candado y antes de abonar, {@link
+ * kamayuk.rentas.cuentacorriente.dominio.CargosDeUnSoloOrigen} mira la referencia de cada cargo de
+ * origen, y si alguno es de otro no se asienta nada. Despues del candado y no antes: un cargo de
+ * otra papeleta que entrara entre la comprobacion y la baja se extinguiria igual.
  */
 @Service
 public class ExtincionDeDeudaCuentaCorriente implements ExtincionDeDeuda {
@@ -113,26 +122,40 @@ public class ExtincionDeDeudaCuentaCorriente implements ExtincionDeDeuda {
         this.redondeo = redondeo;
     }
 
+    /**
+     * La contencion de #371: se bloquea la obligacion, <b>despues</b> se mira quien origino su
+     * deuda, y solo entonces se abona. En ese orden, un cargo de otra papeleta que entre mientras
+     * tanto espera al candado y no se cuela entre la comprobacion y la baja.
+     */
     @Override
     @Transactional
-    public MovimientoAsentado extinguir(
+    public MovimientoAsentado extinguirLoOriginadoPor(
             long contribuyenteId,
             SeleccionDeObligacion obligacion,
             LocalDate fecha,
             String documentoOrigen,
-            @Nullable String referenciaExterna,
+            String referenciaExterna,
             CausalDeBaja causal,
             Observacion observacion) {
 
         ClaveDeObligacion clave =
-                new ClaveDeObligacion(
-                        contribuyenteId,
-                        obligacion.tributo(),
-                        obligacion.ejercicio(),
-                        obligacion.predioId(),
-                        obligacion.vehiculoId());
+                OrigenDeLaObligacionCuentaCorriente.claveDe(contribuyenteId, obligacion);
         saldos.bloquear(clave);
+        OrigenDeLaObligacionCuentaCorriente.exigirUnSoloOrigen(
+                asientos, contribuyenteId, obligacion, referenciaExterna);
+        return darDeBaja(clave, fecha, documentoOrigen, referenciaExterna, causal, observacion);
+    }
 
+    // ------------------------------------------------------------------
+
+    /** La baja misma, con la obligacion ya bloqueada y su origen ya comprobado. */
+    private MovimientoAsentado darDeBaja(
+            ClaveDeObligacion clave,
+            LocalDate fecha,
+            String documentoOrigen,
+            String referenciaExterna,
+            CausalDeBaja causal,
+            Observacion observacion) {
         List<DeudaAcogida> dadasDeBaja = new ArrayList<>();
         int escritos = 0;
         for (SaldoProyectado fila : saldos.deLaObligacion(clave)) {
@@ -164,8 +187,6 @@ public class ExtincionDeDeudaCuentaCorriente implements ExtincionDeDeuda {
         }
         return new MovimientoAsentado(dadasDeBaja, escritos, fecha);
     }
-
-    // ------------------------------------------------------------------
 
     private void asentar(
             ClaveDeSaldo cuota,

@@ -601,7 +601,7 @@ class ExtincionEsUnaBajaJdbcTest {
         MovimientoAsentado asentado =
                 transaccion.execute(
                         estado ->
-                                extincion.extinguir(
+                                extincion.extinguirLoOriginadoPor(
                                         titular,
                                         new SeleccionDeObligacion(tributo, EJERCICIO, null, null),
                                         fecha,
