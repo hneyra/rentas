@@ -22,12 +22,14 @@ import kamayuk.rentas.cuentacorriente.CausalDeBaja;
 import kamayuk.rentas.cuentacorriente.dominio.Asiento;
 import kamayuk.rentas.cuentacorriente.dominio.CalculoDeDeuda;
 import kamayuk.rentas.cuentacorriente.dominio.ClaveDeSaldo;
+import kamayuk.rentas.cuentacorriente.dominio.Concepto;
 import kamayuk.rentas.cuentacorriente.dominio.Divergencia;
 import kamayuk.rentas.cuentacorriente.dominio.Fase;
 import kamayuk.rentas.cuentacorriente.dominio.MovimientoDeDeuda;
 import kamayuk.rentas.cuentacorriente.dominio.PoliticaDeMora;
 import kamayuk.rentas.cuentacorriente.dominio.SaldoProyectado;
 import kamayuk.rentas.cuentacorriente.dominio.SentidoDelMovimiento;
+import kamayuk.rentas.cuentacorriente.dominio.TipoAsiento;
 import kamayuk.rentas.cuentacorriente.infraestructura.AsientoRepositoryJdbc;
 import kamayuk.rentas.cuentacorriente.infraestructura.SaldoRepositoryJdbc;
 import kamayuk.rentas.documentos.DocumentoRepositoryJdbc;
@@ -138,6 +140,7 @@ class SaldoYMovimientosTest {
                 envolver(
                         new RegistrarMovimientoDeDeuda(
                                 asientos,
+                                saldos,
                                 registrarAsiento,
                                 new CalculoDeDeuda(new SinAcumulacionDePrueba()),
                                 new PoliticaDeRedondeo(2, RoundingMode.HALF_UP),
@@ -491,6 +494,71 @@ class SaldoYMovimientosTest {
                 .startsWith("NC-2026-");
     }
 
+    // ---------- #445 ----------
+    //
+    // La siembra que distingue: el cobro tiene fecha valor POSTERIOR a la de la baja. Todas
+    // las de arriba ponen la baja despues del cobro —o sin cobro—, y con ellas medir «lo que
+    // se debia a la fecha de la baja» y medir «lo que queda por extinguir» dan la misma cifra;
+    // por eso estaban en verde con el defecto dentro.
+
+    @Test
+    @DisplayName(
+            "#445 — una baja fechada antes de un cobro no extingue lo que el cobro ya extinguio")
+    void unaBajaFechadaAntesDeUnCobroSeRechaza() {
+        long titular = crearContribuyente("M-0445", "70104450");
+        sembrarElPredialDelPredio7(titular);
+        cobrar(titular, 1, "148.30", LocalDate.of(2026, 3, 10));
+
+        // Llega despues del cobro, pero fechada el 03-01. Al 03-01 el abono del 03-10 queda
+        // fuera del corte y la cuota «debe» 148,30: medida asi, la baja pasaba y la cuota 1
+        // quedaba en -148,30 —el estado que BajaMayorQueLaDeuda declara imposible—.
+        assertThatThrownBy(
+                        () ->
+                                movimientos.registrar(
+                                        bajaDelPredio7(
+                                                titular, 1, "148.30", LocalDate.of(2026, 3, 1)),
+                                        codigoDe(titular),
+                                        OBSERVACION))
+                .isInstanceOf(RegistrarMovimientoDeDeuda.BajaMayorQueLaDeuda.class)
+                .hasMessageContaining("a esa fecha solo se deben 0.00");
+
+        assertThat(saldoDeLaCuota(titular, 1))
+                .as(
+                        "la cuota 1 ya la extinguio el cobro: queda en cero, no en -148,30 —que"
+                                + " es lo que la orden de caja neteaba contra las otras cuotas y"
+                                + " la cobranza no, y el pago se rechazaba (#445, escenario A)—")
+                .isEqualTo(Dinero.de("0.00"));
+    }
+
+    @Test
+    @DisplayName("#445 — el reparto de una fila salta la cuota que un cobro posterior ya extinguio")
+    void elRepartoSaltaLaCuotaQueUnCobroPosteriorYaExtinguio() {
+        long titular = crearContribuyente("M-0446", "70104460");
+        sembrarElPredialDelPredio7(titular);
+        // Al 06-15 deben las cuotas 1 y 2; la 1 se cobra el 06-20, despues de la fecha valor
+        // de la baja que llega a continuacion.
+        cobrar(titular, 1, "148.30", LocalDate.of(2026, 6, 20));
+
+        RegistrarMovimientoDeDeuda.Registro registro =
+                movimientos.registrarRepartido(
+                        bajaDelPredio7(titular, 1, "148.30", LocalDate.of(2026, 6, 15)),
+                        null,
+                        RegistrarMovimientoDeDeuda.ComprobacionDeUnidad.NO_APLICA,
+                        codigoDe(titular),
+                        OBSERVACION);
+
+        assertThat(registro.asientos())
+                .as(
+                        "el reparto recorre las cuotas de la primera a la ultima: si mide la"
+                                + " cuota 1 al 06-15 le carga los 148,30 a ella, que el cobro del"
+                                + " 06-20 ya extinguio, y deja viva la 2")
+                .singleElement()
+                .extracting(Asiento::periodo)
+                .isEqualTo(2);
+        assertThat(saldoDeLaCuota(titular, 1)).isEqualTo(Dinero.de("0.00"));
+        assertThat(saldoDeLaCuota(titular, 2)).isEqualTo(Dinero.de("0.00"));
+    }
+
     // ------------------------------------------------------------------
 
     /**
@@ -544,6 +612,78 @@ class SaldoYMovimientosTest {
                 // Toda baja declara su causal desde #684: es el sustento juridico del acto y el
                 // constructor no admite una sin ella.
                 CausalDeBaja.ERROR_MATERIAL);
+    }
+
+    // ---------- La siembra de #445 ----------
+
+    /** El predio de la siembra de {@code CarteraCuadraConLaConsultaJdbcTest}, que #445 cita. */
+    private static final long PREDIO = 7L;
+
+    private static ClaveDeSaldo claveDelPredio7(long titular, int periodo) {
+        return new ClaveDeSaldo(titular, "PREDIAL", EJERCICIO, periodo, PREDIO, null);
+    }
+
+    /**
+     * PREDIAL 2026 del predio 7 en cuatro cuotas de 148,30, con la fecha valor de su vencimiento:
+     * la forma de {@code CarteraCuadraConLaConsultaJdbcTest}, que es la de la carga de datos.
+     */
+    private static void sembrarElPredialDelPredio7(long titular) {
+        asentar(titular, 1, TipoAsiento.CARGO, "148.30", LocalDate.of(2026, 2, 28), "EM-2026-445");
+        asentar(titular, 2, TipoAsiento.CARGO, "148.30", LocalDate.of(2026, 5, 31), "EM-2026-445");
+        asentar(titular, 3, TipoAsiento.CARGO, "148.30", LocalDate.of(2026, 8, 31), "EM-2026-445");
+        asentar(titular, 4, TipoAsiento.CARGO, "148.30", LocalDate.of(2026, 11, 30), "EM-2026-445");
+    }
+
+    /** El abono que escribe la cobranza: {@code ABONO} de insoluto, con el recibo por sustento. */
+    private static void cobrar(long titular, int cuota, String importe, LocalDate fecha) {
+        asentar(titular, cuota, TipoAsiento.ABONO, importe, fecha, "RECIBO 001-0000445");
+    }
+
+    private static void asentar(
+            long titular,
+            int cuota,
+            TipoAsiento tipo,
+            String importe,
+            LocalDate fecha,
+            String documento) {
+        registrarAsiento.asentar(
+                Asiento.nuevo(
+                        EJERCICIO,
+                        titular,
+                        "PREDIAL",
+                        Concepto.INSOLUTO,
+                        tipo,
+                        Fase.ORDINARIA,
+                        cuota,
+                        PREDIO,
+                        null,
+                        null,
+                        Dinero.de(importe),
+                        fecha,
+                        documento),
+                OBSERVACION);
+    }
+
+    private static MovimientoDeDeuda bajaDelPredio7(
+            long titular, int cuota, String insoluto, LocalDate fechaValor) {
+        return new MovimientoDeDeuda(
+                SentidoDelMovimiento.BAJA,
+                claveDelPredio7(titular, cuota),
+                Dinero.de(insoluto),
+                Dinero.CERO,
+                Dinero.CERO,
+                Dinero.CERO,
+                Fase.ORDINARIA,
+                fechaValor,
+                "RES-2026-0445",
+                null,
+                CausalDeBaja.ERROR_MATERIAL);
+    }
+
+    private static Dinero saldoDeLaCuota(long titular, int cuota) {
+        return enTransaccion(() -> saldos.buscar(claveDelPredio7(titular, cuota)))
+                .orElseThrow()
+                .insolutoSaldo();
     }
 
     /** Deja la fila de saldo con una cifra que el libro no respalda. */

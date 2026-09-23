@@ -75,6 +75,17 @@ import org.springframework.transaction.annotation.Transactional;
  * AcogimientoAConvenioCuentaCorriente} y {@link RegistroDeAbonosCuentaCorriente}: si una cobranza y
  * una baja se cruzan, la que llegue segunda relee el libro con lo que dejo la primera y da de baja
  * lo que <b>queda</b>. Sin el candado, las dos leerian la misma deuda y la extinguirian dos veces.
+ *
+ * <h2>Lo que queda se mide desde la fecha de la resolucion, no a esa fecha (#445)</h2>
+ *
+ * <p>El candado solo cumplia la promesa de arriba si la segunda llegaba con fecha igual o
+ * posterior. La fecha de la resolucion la teclea quien la dicta y es retroactiva a proposito, y
+ * releer el libro <b>a</b> esa fecha —{@link CalculoDeDeuda#deudaActualizadaA}— descarta el cobro
+ * que entro despues de ella: una multa pagada el 20 de abril y dejada sin efecto por una resolucion
+ * fechada el 15 se releia entera y se daba de baja entera, y la obligacion quedaba en negativo. Por
+ * eso lo que se extingue es {@link CalculoDeDeuda#extinguibleDesde}: lo que se debia ese dia y
+ * ningun abono posterior ha extinguido. Y si eso es cero no se asienta nada, que es lo que {@link
+ * ExtincionDeDeuda} promete —lo que sobra de verdad es un pago, y eso es una devolucion—.
  */
 @Service
 public class ExtincionDeDeudaCuentaCorriente implements ExtincionDeDeuda {
@@ -126,7 +137,9 @@ public class ExtincionDeDeudaCuentaCorriente implements ExtincionDeDeuda {
         int escritos = 0;
         for (SaldoProyectado fila : saldos.deLaObligacion(clave)) {
             List<Asiento> delLibro = asientos.deLaObligacion(fila.clave());
-            DeudaActualizada pendiente = calculo.deudaActualizadaA(delLibro, fecha, redondeo);
+            // Lo que queda por extinguir DESDE la fecha, no lo que se debia a ella (#445): un
+            // cobro con fecha posterior ya extinguio su parte.
+            DeudaActualizada pendiente = calculo.extinguibleDesde(delLibro, fecha, redondeo);
             if (!pendiente.total().esPositivo()) {
                 continue;
             }

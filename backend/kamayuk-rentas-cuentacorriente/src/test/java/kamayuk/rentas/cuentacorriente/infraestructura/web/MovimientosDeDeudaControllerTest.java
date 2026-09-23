@@ -405,7 +405,7 @@ class MovimientosDeDeudaControllerTest {
         private @Nullable Observacion ultimaObservacion;
 
         MovimientosEspiados() {
-            super(null, null, null, null, null, null);
+            super(null, null, null, null, null, null, null);
         }
 
         private @Nullable ComprobacionDeUnidad ultimaComprobacion;

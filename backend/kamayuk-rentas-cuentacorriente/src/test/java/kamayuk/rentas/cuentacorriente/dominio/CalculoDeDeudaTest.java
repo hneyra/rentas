@@ -238,6 +238,148 @@ class CalculoDeDeudaTest {
                 .isEqualTo(Dinero.de(1000));
     }
 
+    // ---------- #445: lo extinguible no es lo que se debia ----------
+    //
+    // La siembra que distingue: el abono tiene fecha valor POSTERIOR a la fecha que se pregunta.
+    // Con el abono antes, «lo que se debia a esa fecha» y «lo que queda por extinguir» dan lo
+    // mismo, y cualquiera de las dos funciones pasaria.
+
+    @Test
+    @DisplayName(
+            "#445 — con un cobro posterior, extinguibleDesde da 0,00 donde deudaActualizadaA da"
+                    + " 148,30")
+    void unCobroPosteriorYaExtinguioLaDeuda() {
+        List<Asiento> asientos =
+                List.of(
+                        cargo(Concepto.INSOLUTO, Dinero.de("148.30"), LocalDate.of(2026, 2, 28)),
+                        abono(Concepto.INSOLUTO, Dinero.de("148.30"), LocalDate.of(2026, 3, 10)));
+        CalculoDeDeuda calculo = new CalculoDeDeuda(new SinAcumulacionDePrueba());
+        LocalDate laBaja = LocalDate.of(2026, 3, 1);
+
+        assertThat(calculo.deudaActualizadaA(asientos, laBaja, REDONDEO).insoluto())
+                .as("lo que se debia el 03-01: el cobro del 03-10 es del futuro visto desde ahi")
+                .isEqualTo(Dinero.de("148.30"));
+        DeudaActualizada extinguible = calculo.extinguibleDesde(asientos, laBaja, REDONDEO);
+        assertThat(extinguible.insoluto())
+                .as(
+                        "pero lo que queda por extinguir es cero: el cobro ya lo extinguio, y una"
+                                + " baja del 03-01 lo extinguiria por segunda vez")
+                .isEqualTo(Dinero.de("0.00"));
+        assertThat(extinguible.fecha())
+                .as("la cifra dice su fecha, que es la del acto (regla 9)")
+                .isEqualTo(laBaja);
+    }
+
+    @Test
+    @DisplayName("#445 — un cobro posterior parcial deja extinguible exactamente lo que no alcanzo")
+    void unCobroPosteriorParcialDejaElResto() {
+        List<Asiento> asientos =
+                List.of(
+                        cargo(Concepto.INSOLUTO, Dinero.de("148.30"), LocalDate.of(2026, 2, 28)),
+                        abono(Concepto.INSOLUTO, Dinero.de("100.00"), LocalDate.of(2026, 3, 10)));
+        CalculoDeDeuda calculo = new CalculoDeDeuda(new SinAcumulacionDePrueba());
+
+        assertThat(
+                        calculo.extinguibleDesde(asientos, LocalDate.of(2026, 3, 1), REDONDEO)
+                                .insoluto())
+                .as("148,30 menos los 100,00 que el cobro del 03-10 ya extinguio")
+                .isEqualTo(Dinero.de("48.30"));
+    }
+
+    @Test
+    @DisplayName("#445 — sin nada posterior, extinguibleDesde y deudaActualizadaA coinciden")
+    void sinNadaPosteriorCoincideConLaDeuda() {
+        List<Asiento> asientos =
+                List.of(
+                        cargo(Concepto.INSOLUTO, Dinero.de("148.30"), LocalDate.of(2026, 2, 28)),
+                        cargo(Concepto.GASTO, Dinero.de("12.00"), LocalDate.of(2026, 2, 28)),
+                        abono(Concepto.INSOLUTO, Dinero.de("40.00"), LocalDate.of(2026, 3, 10)));
+        CalculoDeDeuda calculo = new CalculoDeDeuda(new SinAcumulacionDePrueba());
+        LocalDate hoy = LocalDate.of(2026, 9, 23);
+
+        assertThat(calculo.extinguibleDesde(asientos, hoy, REDONDEO))
+                .as(
+                        "el caso de todos los dias —la baja con la fecha de hoy— no cambia: la"
+                                + " cuenta es la misma que ensena la pantalla (#551)")
+                .isEqualTo(calculo.deudaActualizadaA(asientos, hoy, REDONDEO));
+    }
+
+    @Test
+    @DisplayName("#445 — un cargo posterior no se puede extinguir con una baja anterior a el")
+    void unCargoPosteriorNoEsExtinguibleAntes() {
+        List<Asiento> asientos =
+                List.of(
+                        cargo(Concepto.INSOLUTO, Dinero.de("100.00"), LocalDate.of(2026, 2, 28)),
+                        cargo(Concepto.INSOLUTO, Dinero.de("50.00"), LocalDate.of(2026, 4, 1)));
+        CalculoDeDeuda calculo = new CalculoDeDeuda(new SinAcumulacionDePrueba());
+
+        assertThat(
+                        calculo.extinguibleDesde(asientos, LocalDate.of(2026, 3, 1), REDONDEO)
+                                .insoluto())
+                .as(
+                        "el 03-01 los 50,00 del 04-01 todavia no se deben: el minimo es el del"
+                                + " 03-01, igual que antes de #445")
+                .isEqualTo(Dinero.de("100.00"));
+    }
+
+    @Test
+    @DisplayName("#445 — el minimo es parte por parte: un cobro de insoluto no toca el gasto")
+    void elMinimoEsParteAParte() {
+        List<Asiento> asientos =
+                List.of(
+                        cargo(Concepto.INSOLUTO, Dinero.de("148.30"), LocalDate.of(2026, 2, 28)),
+                        cargo(Concepto.GASTO, Dinero.de("12.00"), LocalDate.of(2026, 2, 28)),
+                        abono(Concepto.INSOLUTO, Dinero.de("148.30"), LocalDate.of(2026, 3, 10)),
+                        cargo(Concepto.GASTO, Dinero.de("5.00"), LocalDate.of(2026, 3, 20)));
+        CalculoDeDeuda calculo = new CalculoDeDeuda(new SinAcumulacionDePrueba());
+
+        DeudaActualizada extinguible =
+                calculo.extinguibleDesde(asientos, LocalDate.of(2026, 3, 1), REDONDEO);
+
+        assertThat(extinguible.insoluto()).isEqualTo(Dinero.de("0.00"));
+        assertThat(extinguible.gasto())
+                .as(
+                        "el gasto del 03-01 sigue vivo y el del 03-20 todavia no existe: es 12,00,"
+                                + " y no el 0,00 del insoluto ni los 17,00 del final")
+                .isEqualTo(Dinero.de("12.00"));
+    }
+
+    @Test
+    @DisplayName("#445 — por periodo: cada cuota con su propio minimo, del primero al ultimo")
+    void porPeriodoCadaCuotaConSuMinimo() {
+        List<Asiento> asientos =
+                List.of(
+                        cargoDeLaCuota(2, "148.30", LocalDate.of(2026, 5, 31)),
+                        cargoDeLaCuota(1, "148.30", LocalDate.of(2026, 2, 28)),
+                        abonoDeLaCuota(1, "148.30", LocalDate.of(2026, 6, 20)),
+                        cargoDeLaCuota(3, "148.30", LocalDate.of(2026, 8, 31)));
+        CalculoDeDeuda calculo = new CalculoDeDeuda(new SinAcumulacionDePrueba());
+
+        java.util.Map<Integer, DeudaActualizada> porPeriodo =
+                calculo.extinguiblePorPeriodoDesde(asientos, LocalDate.of(2026, 6, 15), REDONDEO);
+
+        assertThat(porPeriodo.keySet())
+                .as("del primero al ultimo, no en el orden de la lista (#551)")
+                .containsExactly(1, 2, 3);
+        assertThat(porPeriodo.get(1).insoluto())
+                .as("la cuota 1 la extinguio el cobro del 06-20")
+                .isEqualTo(Dinero.de("0.00"));
+        assertThat(porPeriodo.get(2).insoluto())
+                .as("la cuota 2 no la toco nadie")
+                .isEqualTo(Dinero.de("148.30"));
+        assertThat(porPeriodo.get(3).insoluto())
+                .as("y la 3 vence el 08-31: el 06-15 no se debe")
+                .isEqualTo(Dinero.CERO);
+    }
+
+    private static Asiento cargoDeLaCuota(int cuota, String monto, LocalDate fechaValor) {
+        return asiento(Concepto.INSOLUTO, TipoAsiento.CARGO, Dinero.de(monto), fechaValor, cuota);
+    }
+
+    private static Asiento abonoDeLaCuota(int cuota, String monto, LocalDate fechaValor) {
+        return asiento(Concepto.INSOLUTO, TipoAsiento.ABONO, Dinero.de(monto), fechaValor, cuota);
+    }
+
     private static Asiento cargo(Concepto concepto, Dinero monto, LocalDate fechaValor) {
         return asiento(concepto, TipoAsiento.CARGO, monto, fechaValor);
     }
@@ -248,6 +390,11 @@ class CalculoDeDeudaTest {
 
     private static Asiento asiento(
             Concepto concepto, TipoAsiento tipo, Dinero monto, LocalDate fechaValor) {
+        return asiento(concepto, tipo, monto, fechaValor, 1);
+    }
+
+    private static Asiento asiento(
+            Concepto concepto, TipoAsiento tipo, Dinero monto, LocalDate fechaValor, int cuota) {
         Asiento nuevo =
                 Asiento.nuevo(
                         EJERCICIO,
@@ -256,7 +403,7 @@ class CalculoDeDeudaTest {
                         concepto,
                         tipo,
                         Fase.ORDINARIA,
-                        1,
+                        cuota,
                         null,
                         null,
                         null,

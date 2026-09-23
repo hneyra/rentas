@@ -164,6 +164,7 @@ class AltaDeDeudaRepetidaFronteraTest {
                                         envolver(
                                                 new RegistrarMovimientoDeDeuda(
                                                         asientos,
+                                                        new SaldoRepositoryJdbc(jdbc),
                                                         registrarAsiento,
                                                         new CalculoDeDeuda(new SinAcumulacion()),
                                                         new PoliticaDeRedondeo(

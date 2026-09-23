@@ -190,6 +190,7 @@ class DeudaPorPeriodoFronteraTest {
                                         envolver(
                                                 new RegistrarMovimientoDeDeuda(
                                                         asientos,
+                                                        saldos,
                                                         registrarAsiento,
                                                         calculo,
                                                         redondeo,

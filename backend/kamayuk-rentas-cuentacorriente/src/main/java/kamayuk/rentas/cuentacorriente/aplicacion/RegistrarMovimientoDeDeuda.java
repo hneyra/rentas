@@ -12,6 +12,7 @@ import kamayuk.rentas.cuentacorriente.dominio.ClaveDeSaldo;
 import kamayuk.rentas.cuentacorriente.dominio.DeudaActualizada;
 import kamayuk.rentas.cuentacorriente.dominio.MovimientoDeDeuda;
 import kamayuk.rentas.cuentacorriente.dominio.RangoDeCuotas;
+import kamayuk.rentas.cuentacorriente.dominio.SaldoRepository;
 import kamayuk.rentas.cuentacorriente.dominio.SentidoDelMovimiento;
 import kamayuk.rentas.documentos.EmitirDocumento;
 import kamayuk.rentas.documentos.FormatoDeDocumento;
@@ -34,13 +35,29 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <h2>Una baja no puede quitar mas de lo que hay</h2>
  *
- * <p>{@link #registrar} comprueba, parte por parte, que la baja no exceda la deuda vigente <b>a su
- * fecha valor</b>, usando {@link CalculoDeDeuda#deudaActualizadaA} —la funcion de #22—. Comparar
+ * <p>{@link #registrar} comprueba, parte por parte, que la baja no exceda lo que queda <b>por
+ * extinguir</b> desde su fecha valor, usando {@link CalculoDeDeuda#extinguibleDesde}. Comparar
  * contra «la deuda» sin fecha no significaria nada (regla 9), y comparar solo el total dejaria
  * pasar una baja que extingue S/ 500 de interes inexistente compensandolos con insoluto que si
  * existe: el total cuadraria y el desglose quedaria mal.
  *
+ * <p>Hasta #445 comparaba contra {@link CalculoDeDeuda#deudaActualizadaA} a la fecha valor, que
+ * contesta otra pregunta —cuanto se debia ese dia— y descarta todo asiento posterior. Una baja
+ * fechada el 1 de marzo sobre una cuota cobrada el 10 de marzo veia la cuota entera, pasaba, y la
+ * dejaba en negativo: el cobro y la baja extinguian dos veces la misma deuda.
+ *
  * <p>Un alta no tiene ese limite: incorporar deuda que no estaba es exactamente para lo que existe.
+ *
+ * <h2>Y la comprobacion se hace con la obligacion bloqueada (#445)</h2>
+ *
+ * <p>Comprobar y asentar no es atomico por estar en la misma transaccion: con READ COMMITTED, dos
+ * bajas simultaneas de la misma cuota —un reintento tras un tiempo de espera agotado, que es
+ * realista porque el PDF se genera dentro de la transaccion— leian las dos la misma deuda, pasaban
+ * las dos la guarda y asentaban las dos. Por eso {@link #registrar} y {@link #registrarRepartido}
+ * piden {@link SaldoRepository#bloquear} <b>antes</b> de leer el libro, como ya lo hacian la
+ * cobranza, el convenio y la extincion: la que llega segunda espera, relee el libro con lo que dejo
+ * la primera y se rechaza por su motivo. Cada acto toca una sola obligacion, asi que no hay orden
+ * de candados que acordar con nadie.
  *
  * <h2>Lo que si tiene el alta: no se puede hacer dos veces (#588)</h2>
  *
@@ -73,6 +90,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class RegistrarMovimientoDeDeuda {
 
     private final AsientoRepository asientos;
+    private final SaldoRepository saldos;
     private final RegistrarAsiento registrarAsiento;
     private final CalculoDeDeuda calculo;
     private final PoliticaDeRedondeo redondeo;
@@ -81,12 +99,14 @@ public class RegistrarMovimientoDeDeuda {
 
     public RegistrarMovimientoDeDeuda(
             AsientoRepository asientos,
+            SaldoRepository saldos,
             RegistrarAsiento registrarAsiento,
             CalculoDeDeuda calculo,
             PoliticaDeRedondeo redondeo,
             EmitirDocumento documentos,
             TitularesDeLaUnidad titulares) {
         this.asientos = asientos;
+        this.saldos = saldos;
         this.registrarAsiento = registrarAsiento;
         this.calculo = calculo;
         this.redondeo = redondeo;
@@ -182,6 +202,10 @@ public class RegistrarMovimientoDeDeuda {
         registrarAsiento.exigirEjercicioAsentable(movimiento.clave().ejercicio());
         exigirQueLaUnidadSeaDelContribuyente(movimiento, comprobacion);
 
+        // El candado antes de leer el libro (#445): sin el, dos bajas simultaneas leen la
+        // misma deuda y la extinguen dos veces. Todas las cuotas del rango son de la misma
+        // obligacion, asi que es uno.
+        saldos.bloquear(ClaveDeObligacion.de(movimiento.clave()));
         List<MovimientoDeDeuda> porCuota = movimiento.enCadaCuota(cuotas);
         for (MovimientoDeDeuda deLaCuota : porCuota) {
             if (deLaCuota.sentido() == SentidoDelMovimiento.BAJA) {
@@ -220,7 +244,8 @@ public class RegistrarMovimientoDeDeuda {
      * <p>Repartir en la pantalla tampoco se puede: {@code ObligacionConDeudaResource} publica el
      * total del grupo y <b>no el importe de cada periodo</b>, asi que quien atiende tendria que
      * adivinar el reparto de un acto que extingue deuda del municipio. Lo sabe el servidor, y solo
-     * el, porque el reparto depende de cuanto queda vivo en cada cuota a la fecha valor.
+     * el, porque el reparto depende de cuanto queda por extinguir en cada cuota desde la fecha
+     * valor (#445).
      *
      * <p>Lo que se declara es el <b>total del acto</b>. Se recorren las cuotas de la primera a la
      * ultima y a cada una se le asigna, por cada parte del desglose, lo menor entre lo que queda
@@ -251,6 +276,8 @@ public class RegistrarMovimientoDeDeuda {
         }
         registrarAsiento.exigirEjercicioAsentable(movimiento.clave().ejercicio());
         exigirQueLaUnidadSeaDelContribuyente(movimiento, comprobacion);
+        // El mismo candado que la baja de una sola cuota, y por lo mismo (#445).
+        saldos.bloquear(ClaveDeObligacion.de(movimiento.clave()));
         List<MovimientoDeDeuda> partes = repartir(movimiento, cuotas);
         return asentarYEmitir(
                 movimiento,
@@ -314,7 +341,8 @@ public class RegistrarMovimientoDeDeuda {
         Dinero gasto = movimiento.gasto();
 
         List<MovimientoDeDeuda> partes = new ArrayList<>();
-        for (Map.Entry<Integer, DeudaActualizada> cuota : deudaPorCuota(movimiento).entrySet()) {
+        for (Map.Entry<Integer, DeudaActualizada> cuota :
+                extinguiblePorCuota(movimiento).entrySet()) {
             int periodo = cuota.getKey();
             if (cuotas != null && (periodo < cuotas.desde() || periodo > cuotas.hasta())) {
                 continue;
@@ -368,17 +396,21 @@ public class RegistrarMovimientoDeDeuda {
     }
 
     /**
-     * Lo que debe cada cuota de la obligacion a la fecha valor, de la primera a la ultima.
+     * Lo que cada cuota de la obligacion tiene por extinguir desde la fecha valor, de la primera a
+     * la ultima.
      *
-     * <p><b>La cuenta la hace {@link CalculoDeDeuda#deudaPorPeriodoA}</b>, que es la misma que usa
-     * la lectura desglosada de {@code consulta_deuda} (#551). No es un detalle de reutilizacion:
-     * quien atiende lee en pantalla el importe de la cuota y lo manda como baja, asi que las dos
-     * cifras <b>tienen</b> que ser la misma al centimo — dos copias de la cuenta divergen y el acto
-     * empieza a rechazar importes que la pantalla acaba de publicar, o peor, a admitir los que no
-     * (#397).
+     * <p><b>La cuenta la hace {@link CalculoDeDeuda#extinguiblePorPeriodoDesde}</b> (#445), que
+     * esta construida sobre {@link CalculoDeDeuda#deudaPorPeriodoA} —la misma que usa la lectura
+     * desglosada de {@code consulta_deuda} (#551)— y da su misma cifra cuando el libro no tiene
+     * nada posterior a la fecha valor. No es un detalle de reutilizacion: quien atiende lee en
+     * pantalla el importe de la cuota y lo manda como baja, asi que las dos cifras <b>tienen</b>
+     * que ser la misma al centimo — dos copias de la cuenta divergen y el acto empieza a rechazar
+     * importes que la pantalla acaba de publicar, o peor, a admitir los que no (#397). Y cuando si
+     * hay algo posterior —un cobro que entro despues de la fecha valor de la baja—, la diferencia
+     * es justo lo que ese cobro ya extinguio, que la baja no puede volver a extinguir.
      */
-    private Map<Integer, DeudaActualizada> deudaPorCuota(MovimientoDeDeuda movimiento) {
-        return calculo.deudaPorPeriodoA(
+    private Map<Integer, DeudaActualizada> extinguiblePorCuota(MovimientoDeDeuda movimiento) {
+        return calculo.extinguiblePorPeriodoDesde(
                 asientos.deTodosLosPeriodosDe(ClaveDeObligacion.de(movimiento.clave())),
                 movimiento.fechaValor(),
                 redondeo);
@@ -626,10 +658,11 @@ public class RegistrarMovimientoDeDeuda {
         ClaveDeSaldo clave = movimiento.clave();
         // Por la obligacion y no por CriterioDeDeuda: ese criterio busca por codigo de
         // contribuyente —es lo que teclea quien atiende— y aqui ya se tiene el
-        // identificador. La fecha de corte es la fecha valor de la propia baja: se
-        // compara contra lo que se debia el dia que la baja surte efecto, no hoy.
+        // identificador. Y contra lo que queda por EXTINGUIR desde la fecha valor, no contra
+        // lo que se debia ese dia (#445): un abono con fecha posterior ya extinguio su parte,
+        // y medir la deuda antes de el la contaria dos veces.
         DeudaActualizada vigente =
-                calculo.deudaActualizadaA(
+                calculo.extinguibleDesde(
                         asientos.deLaObligacion(clave), movimiento.fechaValor(), redondeo);
 
         comprobar("insoluto", movimiento.insoluto(), vigente.insoluto());
