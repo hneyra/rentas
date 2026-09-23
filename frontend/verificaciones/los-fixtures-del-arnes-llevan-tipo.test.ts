@@ -92,16 +92,45 @@ function revisar(archivos: readonly string[]): Revision {
   const servidos: Servido[] = [];
   const sinTipo: string[] = [];
 
+  /** Si el simbolo (de un tipo o de un valor) resuelve a algo declarado en `src/datos/`. */
+  const enDatos = (simbolo: ts.Symbol | undefined): boolean =>
+    (simbolo?.declarations ?? []).some((d) =>
+      d.getSourceFile().fileName.split('/').join(sep).startsWith(DATOS),
+    );
+
+  /** Sigue un alias de importacion hasta el simbolo real, si lo es. */
+  const sinAlias = (simbolo: ts.Symbol | undefined): ts.Symbol | undefined =>
+    simbolo !== undefined && (simbolo.flags & ts.SymbolFlags.Alias) !== 0
+      ? verificador.getAliasedSymbol(simbolo)
+      : simbolo;
+
   /** El nombre del tipo si se declara en `src/datos/`, mirando dentro de las listas. */
   const declaradoEnDatos = (tipo: ts.Type): boolean => {
     if (verificador.isArrayType(tipo)) {
       const [elemento] = verificador.getTypeArguments(tipo as ts.TypeReference);
       return elemento !== undefined && declaradoEnDatos(elemento);
     }
-    const simbolo = tipo.aliasSymbol ?? tipo.getSymbol();
-    return (simbolo?.declarations ?? []).some((d) =>
-      d.getSourceFile().fileName.split('/').join(sep).startsWith(DATOS),
-    );
+    return enDatos(tipo.aliasSymbol ?? tipo.getSymbol());
+  };
+
+  /**
+   * El respaldo para cuando el tipo APARENTE ya no lo dice.
+   *
+   * Un alias que es la aplicacion directa de un generico —`type PermisosDeLaSesion =
+   * Readonly<Record<string, readonly string[]>>`, sin campos propios— pierde su `aliasSymbol` al
+   * preguntar por el tipo de una expresion: el compilador contesta con el generico de la
+   * biblioteca, no con el nombre de `src/datos/`. Medido con `PERMISOS_MEDIDOS`: la pregunta por
+   * tipo decia `Readonly<Record<string, readonly string[]>>`, sin simbolo en `src/datos/`, aunque
+   * la constante SI lleva `: PermisosDeLaSesion` escrito. Aqui se pregunta por esa anotacion, no
+   * por el tipo aparente: se sigue la referencia hasta su declaracion y se mira que puso el autor.
+   */
+  const declaradoPorAnotacion = (expresion: ts.Expression): boolean => {
+    if (!ts.isIdentifier(expresion)) return false;
+    const simboloDelValor = sinAlias(verificador.getSymbolAtLocation(expresion));
+    const declaracion = simboloDelValor?.declarations?.find(ts.isVariableDeclaration);
+    const nodoDeTipo = declaracion?.type;
+    if (nodoDeTipo === undefined || !ts.isTypeReferenceNode(nodoDeTipo)) return false;
+    return enDatos(sinAlias(verificador.getSymbolAtLocation(nodoDeTipo.typeName)));
   };
 
   for (const archivo of archivos) {
@@ -122,8 +151,11 @@ function revisar(archivos: readonly string[]): Revision {
       }
       const tipo = verificador.getTypeAtLocation(expresion);
       const nombre = verificador.typeToString(tipo);
-      if (declaradoEnDatos(tipo)) servidos.push({ donde: donde(valor), tipo: nombre });
-      else sinTipo.push(`${donde(valor)} — «${texto}» es \`${nombre}\`, que no es una forma de src/datos/`);
+      if (declaradoEnDatos(tipo) || declaradoPorAnotacion(expresion)) {
+        servidos.push({ donde: donde(valor), tipo: nombre });
+      } else {
+        sinTipo.push(`${donde(valor)} — «${texto}» es \`${nombre}\`, que no es una forma de src/datos/`);
+      }
     };
 
     const visitar = (nodo: ts.Node): void => {
@@ -173,7 +205,11 @@ describe('los fixtures del arnes llevan el tipo de su operacion', () => {
       expect.arrayContaining([
         'Paginado<ModuloDelSistema>',
         'Paginado<AccesoDelSistema>',
-        'PermisosDeLaSesion',
+        // El nombre que imprime el compilador para `PERMISOS_MEDIDOS`: `PermisosDeLaSesion` es
+        // un alias directo a un generico de biblioteca, y TypeScript contesta con el generico y
+        // no con el alias (ver el javadoc de `declaradoPorAnotacion`). Que ESTE en la lista es lo
+        // que importa: pasa por la anotacion de su declaracion, no por el tipo aparente.
+        'Readonly<Record<string, readonly string[]>>',
         'TrabajoParado',
         'CorridaDelPredial',
         'Paginado<ProgramaDeFiscalizacion>',
