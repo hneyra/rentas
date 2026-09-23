@@ -104,13 +104,43 @@ function revisar(archivos: readonly string[]): Revision {
       ? verificador.getAliasedSymbol(simbolo)
       : simbolo;
 
-  /** El nombre del tipo si se declara en `src/datos/`, mirando dentro de las listas. */
+  /**
+   * El nombre del tipo si se declara en `src/datos/`, mirando dentro de las listas Y dentro de
+   * los argumentos de un generico.
+   *
+   * **Que el CONTENEDOR sea de `src/datos/` no alcanza** (hallazgo de revision, #314): un
+   * `Paginado<T>` es de `src/datos/` para cualquier `T`, y `T` —la fila— es exactamente la parte
+   * que se rompe en silencio (es el defecto de #313, un nivel mas adentro). `Paginado<Fila>`
+   * pasaba aqui con `Fila` inventada en el propio arnes, sin tocar `src/datos/` en absoluto.
+   * Medido con un fixture sintetico —`Paginado<NoEsDelContrato>`, con `NoEsDelContrato` una
+   * interfaz declarada en el propio `e2e/`— antes de este cambio: **aceptado**. Ahora se exige
+   * que CADA argumento de tipo sea tambien de `src/datos/`, recursivamente: cubre `Paginado<Fila>`
+   * y `readonly Fila[]` por igual, porque `getTypeArguments` de un tipo no generico devuelve una
+   * lista vacia y la recursion no exige nada de mas.
+   */
   const declaradoEnDatos = (tipo: ts.Type): boolean => {
     if (verificador.isArrayType(tipo)) {
       const [elemento] = verificador.getTypeArguments(tipo as ts.TypeReference);
       return elemento !== undefined && declaradoEnDatos(elemento);
     }
-    return enDatos(tipo.aliasSymbol ?? tipo.getSymbol());
+    if (!enDatos(tipo.aliasSymbol ?? tipo.getSymbol())) return false;
+    return verificador
+      .getTypeArguments(tipo as ts.TypeReference)
+      .every((argumento) => declaradoEnDatos(argumento));
+  };
+
+  /**
+   * Igual que `declaradoEnDatos`, pero sobre la ANOTACION ESCRITA de un nodo de tipo —recorriendo
+   * `readonly T[]` y los argumentos de un generico como `Paginado<T>`— en vez de sobre el tipo
+   * aparente. La usan las dos rutas de abajo: la del respaldo por alias colapsado, y la recursion
+   * dentro de un generico de `declaradoPorAnotacion` (misma razon: un argumento de tipo puede ser
+   * el mismo alias colapsado que motiva el respaldo, y ahi tambien hay que preguntar la anotacion).
+   */
+  const declaradoPorNodoDeTipo = (nodo: ts.TypeNode): boolean => {
+    if (ts.isArrayTypeNode(nodo)) return declaradoPorNodoDeTipo(nodo.elementType);
+    if (!ts.isTypeReferenceNode(nodo)) return false;
+    if (!enDatos(sinAlias(verificador.getSymbolAtLocation(nodo.typeName)))) return false;
+    return (nodo.typeArguments ?? []).every((argumento) => declaradoPorNodoDeTipo(argumento));
   };
 
   /**
@@ -122,15 +152,16 @@ function revisar(archivos: readonly string[]): Revision {
    * biblioteca, no con el nombre de `src/datos/`. Medido con `PERMISOS_MEDIDOS`: la pregunta por
    * tipo decia `Readonly<Record<string, readonly string[]>>`, sin simbolo en `src/datos/`, aunque
    * la constante SI lleva `: PermisosDeLaSesion` escrito. Aqui se pregunta por esa anotacion, no
-   * por el tipo aparente: se sigue la referencia hasta su declaracion y se mira que puso el autor.
+   * por el tipo aparente: se sigue la referencia hasta su declaracion y se mira que puso el autor,
+   * con `declaradoPorNodoDeTipo` para que un generico en la anotacion tambien mire sus argumentos.
    */
   const declaradoPorAnotacion = (expresion: ts.Expression): boolean => {
     if (!ts.isIdentifier(expresion)) return false;
     const simboloDelValor = sinAlias(verificador.getSymbolAtLocation(expresion));
     const declaracion = simboloDelValor?.declarations?.find(ts.isVariableDeclaration);
     const nodoDeTipo = declaracion?.type;
-    if (nodoDeTipo === undefined || !ts.isTypeReferenceNode(nodoDeTipo)) return false;
-    return enDatos(sinAlias(verificador.getSymbolAtLocation(nodoDeTipo.typeName)));
+    if (nodoDeTipo === undefined) return false;
+    return declaradoPorNodoDeTipo(nodoDeTipo);
   };
 
   for (const archivo of archivos) {
@@ -228,14 +259,16 @@ describe('los fixtures del arnes llevan el tipo de su operacion', () => {
     ).toEqual([]);
   });
 
-  it('la muestra que la viola sale roja, con sus cinco formas', () => {
+  it('la muestra que la viola sale roja, con sus seis formas', () => {
     const { sinTipo } = revisar([MUESTRA]);
     expect(sinTipo.map((uno) => uno.replace(/ — .*/, ''))).toEqual([
-      'verificaciones/muestra-del-arnes/fixtures-sin-tipo.ts:23',
-      'verificaciones/muestra-del-arnes/fixtures-sin-tipo.ts:31',
-      'verificaciones/muestra-del-arnes/fixtures-sin-tipo.ts:37',
-      'verificaciones/muestra-del-arnes/fixtures-sin-tipo.ts:42',
       'verificaciones/muestra-del-arnes/fixtures-sin-tipo.ts:48',
+      'verificaciones/muestra-del-arnes/fixtures-sin-tipo.ts:56',
+      'verificaciones/muestra-del-arnes/fixtures-sin-tipo.ts:62',
+      'verificaciones/muestra-del-arnes/fixtures-sin-tipo.ts:67',
+      'verificaciones/muestra-del-arnes/fixtures-sin-tipo.ts:73',
+      // (6) el generico ES de `src/datos/`, pero su argumento no: hallazgo de revision (#314).
+      'verificaciones/muestra-del-arnes/fixtures-sin-tipo.ts:82',
     ]);
   }, 60_000);
 });

@@ -1,4 +1,4 @@
-// Viola: `verificaciones/los-fixtures-del-arnes-llevan-tipo.test.ts`. A PROPOSITO, las cinco formas.
+// Viola: `verificaciones/los-fixtures-del-arnes-llevan-tipo.test.ts`. A PROPOSITO, las seis formas.
 //
 // Compila, pasa el lint y Playwright la ejecutaria sin rechistar: el arnes transpila sin comprobar
 // tipos, y aunque `tsc` la lee —esta bajo `verificaciones/`— no tiene contra que compararla. Es la
@@ -10,12 +10,37 @@
 
 import type { Page } from '@playwright/test';
 
-import type { CorridaDelPredial } from '../../src/datos/lecturas.ts';
+import type { CorridaDelPredial, Paginado } from '../../src/datos/lecturas.ts';
 
 /** (1) Un objeto literal, sin tipo: `tsc` no lo compara con nada. */
 const CORRIDA_CORTA = {
   id: 1,
   ejercicio: '2026',
+};
+
+/**
+ * (6) Una interfaz que NO es del contrato, declarada aqui mismo y no en `src/datos/`: es lo que
+ * seria la fila de una pagina inventada.
+ */
+interface NoEsDelContrato {
+  readonly inventado: string;
+}
+
+/**
+ * (6, sigue) Un generico DE `src/datos/` —`Paginado<T>`— instanciado con un `T` que NO lo es.
+ *
+ * Hallazgo de revision (#314): la comprobacion original solo miraba el CONTENEDOR (`Paginado`,
+ * que si es de `src/datos/`) y nunca el ARGUMENTO. `T` es la fila, y la fila es exactamente la
+ * parte que se rompe en silencio si crece sin que el fixture la seria —el defecto de #313, un
+ * nivel mas adentro del contenedor que #312 ya tipaba—.
+ */
+const PAGINA_DE_INVENTADO: Paginado<NoEsDelContrato> = {
+  contenido: [{ inventado: 'x' }],
+  pagina: 0,
+  tamano: 1,
+  totalElementos: 1,
+  totalPaginas: 1,
+  hayMas: false,
 };
 
 export async function sirveFixturesSinTipo(pagina: Page): Promise<void> {
@@ -48,4 +73,13 @@ export async function sirveFixturesSinTipo(pagina: Page): Promise<void> {
       ruta.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(cuerpo) }),
     );
   await json(CORRIDA_CORTA);
+
+  // (6) El CONTENEDOR es de `src/datos/` —`Paginado`— pero el ARGUMENTO no lo es.
+  await pagina.route('**/fiscalizacion/programas/*/inventado*', (ruta) =>
+    ruta.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(PAGINA_DE_INVENTADO),
+    }),
+  );
 }
