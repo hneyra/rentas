@@ -40,6 +40,15 @@ public interface PagoRecibidoRepository {
 
     Optional<PagoRecibido> porPagoId(UUID pagoId);
 
+    /**
+     * La anulacion que nombra este pago, si ya hay una en el buzon —en cualquier estado— (#428).
+     *
+     * <p>Es la pregunta que se hace al imputar un cobro, y se hace por {@code pago_original_id},
+     * que es la clave que {@code V8} puso para esto: «una anulacion dice QUE pago deshace». Hasta
+     * #428 la columna se escribia y nadie la leia. La indexa {@code V24}.
+     */
+    Optional<PagoRecibido> anulacionDe(UUID pagoId);
+
     /** Marca la imputacion, con su hora y cuantos asientos dejo. */
     void marcarAplicado(long id, int asientos, Instant cuando);
 

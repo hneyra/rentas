@@ -68,7 +68,12 @@ public class RecibirPago {
      * obligacion ya se extinguio o la referencia no se puede leer, ningun reintento lo va a
      * arreglar.
      *
+     * <p>La excepcion es «todavia no»: una anulacion que llega antes que su cobro no se rechaza, se
+     * devuelve a quien la entrego para que la reintente (#428).
+     *
      * @return el pago tal como quedo. Si ya estaba, el que estaba: <b>sin volver a imputar</b>
+     * @throws AnulacionAntesQueSuCobro si es una anulacion y el cobro que nombra todavia no esta
+     *     imputado. No deja nada escrito
      */
     public Recibido recibir(PagoRecibido pago) {
         Objects.requireNonNull(pago, "No se recibe un pago nulo");
@@ -78,7 +83,11 @@ public class RecibirPago {
         } catch (RegistroDeAbonos.SinDeudaQueAbonar
                 | RegistroDeAbonos.SinAbonosQueReversar
                 | RegistroDeAbonos.ImporteCobradoNoCuadra
-                | ReferenciaDeObligacion.ReferenciaIlegible noSePudo) {
+                | ReferenciaDeObligacion.ReferenciaIlegible
+                | ImputacionDelPago.ElCobroFueRechazado
+                | ImputacionDelPago.AnuladoAntesDeImputarse noSePudo) {
+            // Y NO `AnulacionAntesQueSuCobro`, a proposito (#428): es «todavia no», y ver su
+            // javadoc. Anadirla aqui es la rotura que su prueba demuestra.
             return new Recibido(rechazo.rechazar(pago, motivoDe(noSePudo)), true);
         }
     }
@@ -111,6 +120,31 @@ public class RecibirPago {
      * error, es «ya lo tengo», que es lo que permite al publicador de la caja reintentar sin miedo.
      */
     public record Recibido(PagoRecibido pago, boolean nuevo) {}
+
+    /**
+     * La anulacion nombra un cobro que todavia no llego, o que todavia no confirmo (#428).
+     *
+     * <h2>Es «todavia no», y por eso esta clase NO la atrapa</h2>
+     *
+     * <p>Las que {@link #recibir} atrapa son «nunca»: reintentar no las va a arreglar, y por eso
+     * dejan el pago {@code RECHAZADO}, que no se reintenta solo. Esta es lo contrario, y es la
+     * misma distincion que {@code AplicarUnEventoDeIdentidad.TodaviaNo} hace en el consumidor de
+     * identidad. Tratarla como «nunca» fue exactamente el defecto: hasta #428 este caso salia como
+     * {@code SinAbonosQueReversar}, la anulacion quedaba {@code RECHAZADA} con 201, la caja la
+     * marcaba {@code ENTREGADO}, y el cobro que llegaba despues se imputaba sobre un recibo ya
+     * devuelto.
+     *
+     * <p>Sale de {@link ImputacionDelPago} sin atrapar, y la transaccion se deshace entera: ni la
+     * fila de la anulacion queda. {@code PagoController} contesta 503, que la caja reintenta, y
+     * cuando el cobro ya esta {@code APLICADO} el reintento lo reversa.
+     */
+    public static final class AnulacionAntesQueSuCobro extends RuntimeException {
+        @java.io.Serial private static final long serialVersionUID = 1L;
+
+        public AnulacionAntesQueSuCobro(String mensaje) {
+            super(mensaje);
+        }
+    }
 
     private static void exigirQueNoHayaTransaccionAbierta() {
         if (TransactionSynchronizationManager.isActualTransactionActive()) {

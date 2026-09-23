@@ -75,12 +75,26 @@ public class PagoController {
         this.reloj = reloj;
     }
 
-    /** Recibe un pago de la caja y lo imputa. */
+    /**
+     * Recibe un pago de la caja y lo imputa.
+     *
+     * <p><b>503 si es una anulacion que llego antes que su cobro</b> (#428). No es 201 —para la
+     * caja un 201 es «entregado», y la anulacion no se registro— ni 409 —«ya lo tengo», que tampoco
+     * es cierto— ni 422 —la peticion esta bien, y reintentarla SI cambia el resultado—. El
+     * publicador de la caja reintenta cualquier 5xx y entrega el cobro antes que su anulacion, asi
+     * que la vuelta siguiente la encuentra con su cobro ya imputado; y si agota los intentos, la da
+     * por muerta con alerta, que deja el caso a la vista en vez de cerrado en falso.
+     */
     @PostMapping
     @RequiereAcceso(acceso = ACCESO, privilegio = Privilegio.REGISTRO)
     public ResponseEntity<PagoResource> recibir(@RequestBody PeticionDePago peticion) {
         PagoRecibido pago = leer(peticion);
-        RecibirPago.Recibido recibido = recibir.recibir(pago);
+        RecibirPago.Recibido recibido;
+        try {
+            recibido = recibir.recibir(pago);
+        } catch (RecibirPago.AnulacionAntesQueSuCobro todaviaNo) {
+            throw new ProblemaDeNegocio(CodigoDeError.SERVICIO_NO_DISPONIBLE, mensajeDe(todaviaNo));
+        }
         HttpStatus estado = recibido.nuevo() ? HttpStatus.CREATED : HttpStatus.CONFLICT;
         return ResponseEntity.status(estado)
                 .body(PagoResource.de(recibido.pago(), recibido.nuevo()));
