@@ -24,7 +24,8 @@ import org.jspecify.annotations.Nullable;
  * @param autovaluo el autovaluo del predio (RT-010: terreno + construccion + obras)
  * @param valuoExonerado la parte del autovaluo que no esta afecta (V56); cero si no hay ninguna
  * @param porcentajePropiedad el % de propiedad del contribuyente sobre este predio al 1 de enero
- *     del ejercicio, la fecha de referencia (#328)
+ *     del ejercicio, antes de las transferencias de ese dia ({@code
+ *     Ejercicio.fechaDeLaTitularidad()}, #328)
  * @param baseImponiblePredio el aporte de este predio a la base del contribuyente, ya ponderado
  * @param origen de donde salio el autovaluo: declarado, o sellado por {@code catastro} (#38)
  * @param valuacionConjuntoId el conjunto de parametros que fijo la corrida de valuacion; {@code

@@ -48,11 +48,14 @@ import org.springframework.stereotype.Service;
  * emision y el cronograma—.
  *
  * <p><b>No cambia quien es el obligado ni con que porcentaje.</b> La titularidad y el {@code %} de
- * propiedad se leen al 1 de enero del ejercicio ({@link Ejercicio#primerDia()}), igual que el
- * sector del alcance: el caracter de sujeto del impuesto se atribuye con arreglo a la situacion
- * juridica configurada al 1 de enero del año al que corresponde la obligacion (TUO LTM art. 10), y
- * una transferencia durante el ejercicio no cambia al obligado del ejercicio (NEG-05 §3). El que
- * vende en marzo sigue debiendo el ejercicio entero; el que compra paga desde el siguiente.
+ * propiedad se leen al 1 de enero del ejercicio <b>antes de las transferencias de ese dia</b>
+ * ({@link Ejercicio#fechaDeLaTitularidad()}, el 31 de diciembre del año anterior); el sector del
+ * alcance, que es una caracteristica del predio, al 1 de enero ({@link Ejercicio#primerDia()}). El
+ * caracter de sujeto del impuesto se atribuye con arreglo a la situacion juridica configurada al 1
+ * de enero del año al que corresponde la obligacion, y «cuando se efectue cualquier transferencia,
+ * el adquirente asume la condicion de contribuyente a partir del 1 de enero del año siguiente de
+ * producido el hecho» (TUO LTM art. 10; NEG-05 §3). El que vende en marzo —o el mismo 1 de enero—
+ * sigue debiendo el ejercicio entero; el que compra paga desde el siguiente.
  *
  * <p>Hasta #328 este parrafo decia lo contrario —que el porcentaje «se vuelve a leer de {@code
  * titularidad} a la fecha de la corrida» porque «congelarlo dejaria cobrando al que ya vendio»— y
@@ -181,7 +184,8 @@ public class DeterminarPredialMasivo {
         candado.exigirLaValuacionCompleta(peticion.ejercicio());
 
         // Dos fechas (#328): la de CALCULO es la que se publica con la corrida (regla 9); la de
-        // REFERENCIA es a la que se lee el padron —aqui, el sector del alcance—.
+        // REFERENCIA es a la que se lee la ficha —aqui, el sector del alcance—. La titularidad la
+        // lee `DeterminarPredial`, a `Ejercicio.fechaDeLaTitularidad()`.
         LocalDate fechaDeCalculo = LocalDate.now(reloj);
         LocalDate fechaDeReferencia = peticion.ejercicio().primerDia();
         List<PadronPredialDelEjercicio.DeterminacionConDetalle> declarados =

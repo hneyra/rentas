@@ -53,7 +53,8 @@ import org.springframework.transaction.annotation.Transactional;
  *       (GOB-03), los aranceles (D-02b) y el {@code % actualizacion} (D-11).
  *   <li><b>Los predios</b>, con determinacion, son <b>su detalle</b>: lo que se cobro, de donde
  *       salen ya los dos totales, y por eso los totales son la suma de las filas (#328). Sin
- *       determinacion, los del padron <b>al 1 de enero del ejercicio</b>. De catastro —{@code
+ *       determinacion, los del padron <b>al 1 de enero del ejercicio, antes de las transferencias
+ *       de ese dia</b> ({@link Ejercicio#fechaDeLaTitularidad()}). De catastro —{@code
  *       PrediosDelContribuyente} a esa misma fecha— salen solo el codigo, la direccion y el tipo.
  * </ul>
  *
@@ -65,7 +66,10 @@ import org.springframework.transaction.annotation.Transactional;
  * que declaro P1 y P, pedida despues de vender P, salia con una sola fila y con un valuo afecto
  * total y un impuesto que incluian P. Un papel que se firma bajo juramento con un total que no es
  * la suma de sus filas, y que ademas cambiaba segun el dia en que se reimprimiera. El obligado del
- * ejercicio es el titular al 1 de enero (TUO LTM art. 10), y esa es la fecha a la que se lee.
+ * ejercicio es el titular al 1 de enero (TUO LTM art. 10), y esa es la fecha a la que se lee: la de
+ * {@link Ejercicio#fechaDeLaTitularidad()}, el 31 de diciembre del año anterior, porque «el
+ * adquirente asume la condicion de contribuyente a partir del 1 de enero del año siguiente de
+ * producido el hecho» y una venta fechada el mismo 1 de enero ya figura en el padron a ese dia.
  *
  * <p>El <b>domicilio</b> sigue a la fecha de corte: es otra decision, con su motivo arriba, y no
  * cambia.
@@ -105,7 +109,8 @@ public class ConsultaDeLaHojaDeDeclaracion {
      * La hoja de esa declaracion, o vacio si no hay ninguna con ese numero en ese ejercicio.
      *
      * @param aLaFecha a que dia se resuelve el domicilio (regla 9). La titularidad NO: es la del 1
-     *     de enero del ejercicio, por el mismo motivo que la determinacion (#328)
+     *     de enero del ejercicio antes de las transferencias de ese dia ({@link
+     *     Ejercicio#fechaDeLaTitularidad()}), por el mismo motivo que la determinacion (#328)
      */
     @Transactional(readOnly = true)
     public Optional<Hoja> de(String numero, Ejercicio ejercicio, LocalDate aLaFecha) {
@@ -125,10 +130,11 @@ public class ConsultaDeLaHojaDeDeclaracion {
         Optional<Determinacion> determinacion =
                 determinaciones.ultimaPredialDe(ejercicio, contribuyenteId);
 
-        // El padron DEL EJERCICIO, no el del dia en que se pide (#328).
-        LocalDate fechaDeReferencia = ejercicio.primerDia();
+        // El padron DEL EJERCICIO, no el del dia en que se pide (#328): la titularidad al 1 de
+        // enero antes de las transferencias de ese dia, que es la misma que determino.
+        LocalDate fechaDeLaTitularidad = ejercicio.fechaDeLaTitularidad();
         Map<Long, PredioDelContribuyente> delEjercicio = new LinkedHashMap<>();
-        for (PredioDelContribuyente predio : predios.de(contribuyenteId, fechaDeReferencia)) {
+        for (PredioDelContribuyente predio : predios.de(contribuyenteId, fechaDeLaTitularidad)) {
             delEjercicio.put(predio.predioId(), predio);
         }
 
@@ -143,7 +149,7 @@ public class ConsultaDeLaHojaDeDeclaracion {
             for (DetalleDeterminacionPredio detalle : cobrado) {
                 PredioDelContribuyente predio = delEjercicio.get(detalle.predioId());
                 if (predio == null) {
-                    faltan.add(noConstaEnElEjercicio(detalle.predioId(), fechaDeReferencia));
+                    faltan.add(noConstaEnElEjercicio(detalle.predioId(), fechaDeLaTitularidad));
                 }
                 filas.add(FilaDePredio.cobrada(detalle, predio));
             }
@@ -176,11 +182,11 @@ public class ConsultaDeLaHojaDeDeclaracion {
      * deja de ser la suma de las filas; lo que no sale es el codigo ni la direccion, que no hay de
      * donde leer, y se dice aqui en vez de inventarlos.
      */
-    private static String noConstaEnElEjercicio(long predioId, LocalDate fechaDeReferencia) {
+    private static String noConstaEnElEjercicio(long predioId, LocalDate fechaDeLaTitularidad) {
         return "El predio "
                 + predioId
                 + " esta en la determinacion del ejercicio y al "
-                + fechaDeReferencia
+                + fechaDeLaTitularidad
                 + " no consta a nombre de este contribuyente: la titularidad cambio despues de"
                 + " determinar. La fila consigna lo que se cobro, sin codigo ni direccion que"
                 + " leer; hay que volver a determinar el ejercicio";
@@ -214,7 +220,7 @@ public class ConsultaDeLaHojaDeDeclaracion {
     }
 
     /**
-     * La hoja entera, con su fecha de corte.
+     * La hoja entera, con su fecha de corte: la del domicilio, no la de los predios (#328).
      *
      * @param declarante nulo si el contribuyente ya no esta en el padron; la hoja lo dice en vez de
      *     inventar un nombre
@@ -237,7 +243,7 @@ public class ConsultaDeLaHojaDeDeclaracion {
      *
      * <p>El {@code porcentajePropiedad} sale de la determinacion cuando la hay —es el que se uso
      * para calcular, y la hoja tiene que decir el que se aplico, no el de hoy— y de la titularidad
-     * al 1 de enero del ejercicio cuando no.
+     * del ejercicio ({@link Ejercicio#fechaDeLaTitularidad()}) cuando no.
      *
      * @param codigoReferenciaCatastral nulo, igual que {@code direccion} y {@code tipo}, solo en la
      *     fila de un predio cobrado que el padron al 1 de enero no pone a nombre del declarante: la

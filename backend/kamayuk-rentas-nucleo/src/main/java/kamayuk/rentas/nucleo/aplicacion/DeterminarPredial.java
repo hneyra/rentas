@@ -60,11 +60,26 @@ import org.springframework.stereotype.Service;
  *
  * <h2>Dos fechas, y no una (#328)</h2>
  *
- * <p>El padron —quien es titular, con que {@code %}, y las caracteristicas del predio— se lee a la
- * <b>fecha de referencia</b>, {@link Ejercicio#primerDia()}: el obligado de 2026 es el titular al 1
- * de enero de 2026 (TUO LTM art. 10; NEG-05 §3), y el que vende en marzo sigue debiendo 2026. La
- * <b>fecha de calculo</b> es la del reloj y es la que viaja con la cifra (regla 9). Hasta #328 las
- * dos eran la misma variable, y la titularidad salia del dia en que alguien pulsaba el boton.
+ * <p>El padron se lee a la <b>fecha de referencia</b> del ejercicio, y la <b>fecha de calculo</b>
+ * es la del reloj y es la que viaja con la cifra (regla 9). Hasta #328 las dos eran la misma
+ * variable, y la titularidad salia del dia en que alguien pulsaba el boton. La de referencia tiene
+ * a su vez dos lecturas, y las dos las dice {@link Ejercicio}:
+ *
+ * <ul>
+ *   <li><b>Quien es titular y con que {@code %}</b>, a {@link Ejercicio#fechaDeLaTitularidad()}: el
+ *       31 de diciembre del año anterior, o sea la situacion juridica al 1 de enero <b>antes</b> de
+ *       cualquier transferencia de ese dia. TUO LTM art. 10, segundo parrafo: «cuando se efectue
+ *       cualquier transferencia, el adquirente asume la condicion de contribuyente a partir del 1
+ *       de enero del año siguiente de producido el hecho». El que vende en marzo —o el mismo 1 de
+ *       enero— sigue debiendo 2026; el que compro el 31 de diciembre ya lo debe.
+ *   <li><b>Las caracteristicas del predio</b>, a {@link Ejercicio#primerDia()}: NEG-05 §3 las pide
+ *       «vigentes a la fecha de referencia», y para ellas no hay regla de transferencia.
+ * </ul>
+ *
+ * <p>Leer la titularidad tambien al 1 de enero parecia lo mismo y no lo es: el padron cierra la
+ * cuota anterior el dia antes de la transferencia, asi que con una venta fechada el 1 de enero a
+ * ese dia ya consta el comprador, y se le cargaba un ejercicio que la ley le da al vendedor (#328,
+ * ronda 1 de la revision).
  *
  * <h2>El autovaluo: de donde sale, y que manda cuando hay dos (#38, AC-2)</h2>
  *
@@ -174,8 +189,8 @@ public class DeterminarPredial {
         Objects.requireNonNull(peticion, "Hace falta la peticion");
         Objects.requireNonNull(observacion, "Toda modificacion exige la observacion (regla 10)");
 
-        // Solo la fecha que se PUBLICA con la cifra (regla 9). La del padron es otra, y la fija
-        // `componerLaBase` desde el ejercicio: hasta #328 las dos eran esta misma variable.
+        // Solo la fecha que se PUBLICA con la cifra (regla 9). Las del padron son otras, y las fija
+        // `componerLaBase` desde el ejercicio: hasta #328 las tres eran esta misma variable.
         LocalDate fechaDeCalculo = LocalDate.now(reloj);
         ResumenDeContribuyente contribuyente =
                 directorio
@@ -239,7 +254,7 @@ public class DeterminarPredial {
     }
 
     /**
-     * La base del contribuyente, leida del padron <b>a la fecha de referencia del ejercicio</b>.
+     * La base del contribuyente, leida del padron <b>a las fechas de referencia del ejercicio</b>.
      *
      * <h2>Por que no recibe una fecha (#328)</h2>
      *
@@ -252,16 +267,20 @@ public class DeterminarPredial {
      * una venta en marzo le cargaba 2026 al comprador, dejaba al vendedor sin base o «ajeno», y
      * recalcular 2026 en 2027 daba otro obligado y otro importe — la regla 6 rota.
      *
-     * <p>La fecha la dice {@link Ejercicio#primerDia()}, que es la unica fuente de verdad de «la
-     * fecha del ejercicio» en este dominio. Derivarla aqui, en vez de recibirla, es lo que impide
-     * que la fecha de calculo vuelva a colarse por el argumento.
+     * <p>Las fechas las dice {@link Ejercicio}, que es la unica fuente de verdad de «la fecha del
+     * ejercicio» en este dominio: la titularidad a {@link Ejercicio#fechaDeLaTitularidad()} —el 31
+     * de diciembre del año anterior, porque una transferencia fechada el mismo 1 de enero no cambia
+     * al obligado de ese ejercicio (TUO LTM art. 10, segundo parrafo)— y las caracteristicas a
+     * {@link Ejercicio#primerDia()}. Derivarlas aqui, en vez de recibirlas, es lo que impide que la
+     * fecha de calculo vuelva a colarse por el argumento.
      */
     private List<PredioEnLaBase> componerLaBase(
             ResumenDeContribuyente contribuyente, Peticion peticion, PoliticasDeRedondeo redondeo) {
+        LocalDate fechaDeLaTitularidad = peticion.ejercicio().fechaDeLaTitularidad();
         LocalDate fechaDeReferencia = peticion.ejercicio().primerDia();
-        List<PredioDelContribuyente> suyos = predios.de(contribuyente.id(), fechaDeReferencia);
+        List<PredioDelContribuyente> suyos = predios.de(contribuyente.id(), fechaDeLaTitularidad);
         if (suyos.isEmpty()) {
-            throw new SinPrediosEnElPadron(contribuyente.codigo(), fechaDeReferencia);
+            throw new SinPrediosEnElPadron(contribuyente.codigo(), fechaDeLaTitularidad);
         }
 
         List<PredioDeclarado> pedidos = autovaluosDe(contribuyente, peticion);
@@ -279,7 +298,7 @@ public class DeterminarPredial {
             throw new PredioAjeno(
                     contribuyente.codigo(),
                     declarados.keySet().iterator().next(),
-                    fechaDeReferencia);
+                    fechaDeLaTitularidad);
         }
 
         Map<Long, PredioDeclarado> porPredio = new LinkedHashMap<>();
@@ -466,21 +485,23 @@ public class DeterminarPredial {
     }
 
     /**
-     * El contribuyente existe y no tiene ningun predio a su nombre al 1 de enero del ejercicio.
+     * El contribuyente existe y no tiene ningun predio a su nombre al 1 de enero del ejercicio,
+     * antes de las transferencias de ese dia ({@link Ejercicio#fechaDeLaTitularidad()}).
      *
-     * <p>Es lo que le pasa, por ejemplo, al que compra durante el ejercicio: su primer ejercicio es
-     * el siguiente (TUO LTM art. 10, #328).
+     * <p>Es lo que le pasa, por ejemplo, al que compra durante el ejercicio —tambien el mismo 1 de
+     * enero—: su primer ejercicio es el siguiente (TUO LTM art. 10, #328).
      */
     public static final class SinPrediosEnElPadron extends RuntimeException {
         @java.io.Serial private static final long serialVersionUID = 1L;
 
-        SinPrediosEnElPadron(String codigo, LocalDate fechaDeReferencia) {
+        SinPrediosEnElPadron(String codigo, LocalDate fechaDeLaTitularidad) {
             super(
                     "El contribuyente "
                             + codigo
                             + " no tiene ningun predio a su nombre al "
-                            + fechaDeReferencia
-                            + ", la fecha de referencia del ejercicio (TUO LTM art. 10): un"
+                            + fechaDeLaTitularidad
+                            + ", antes de cualquier transferencia del 1 de enero del ejercicio"
+                            + " (TUO LTM art. 10: el adquirente asume desde el año siguiente): un"
                             + " contribuyente sin predios no tiene base imponible cero, no tiene"
                             + " determinacion (NEG-05 §1)");
         }
@@ -555,23 +576,25 @@ public class DeterminarPredial {
     }
 
     /**
-     * Se declaro un predio que no es del contribuyente al 1 de enero del ejercicio.
+     * Se declaro un predio que no es del contribuyente al 1 de enero del ejercicio, antes de las
+     * transferencias de ese dia ({@link Ejercicio#fechaDeLaTitularidad()}).
      *
-     * <p>Una venta del propio ejercicio ya no lo dispara (#328): el que vende en marzo sigue siendo
-     * el titular al 1 de enero.
+     * <p>Una venta del propio ejercicio ya no lo dispara (#328): el que vende en marzo —o el mismo
+     * 1 de enero— sigue siendo el sujeto del ejercicio.
      */
     public static final class PredioAjeno extends RuntimeException {
         @java.io.Serial private static final long serialVersionUID = 1L;
 
-        PredioAjeno(String codigo, long predioId, LocalDate fechaDeReferencia) {
+        PredioAjeno(String codigo, long predioId, LocalDate fechaDeLaTitularidad) {
             super(
                     "El predio "
                             + predioId
                             + " no esta a nombre del contribuyente "
                             + codigo
                             + " al "
-                            + fechaDeReferencia
-                            + ", la fecha de referencia del ejercicio (TUO LTM art. 10): la"
+                            + fechaDeLaTitularidad
+                            + ", antes de cualquier transferencia del 1 de enero del ejercicio"
+                            + " (TUO LTM art. 10: el adquirente asume desde el año siguiente): la"
                             + " titularidad sale del padron, no de la peticion");
         }
     }

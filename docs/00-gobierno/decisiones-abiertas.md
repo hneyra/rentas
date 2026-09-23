@@ -147,11 +147,20 @@ vive en `kamayuk-rentas-parametros`. **La segunda no lo estaba, aunque esta lín
 vigencia de una regla —en qué ejercicios rige— y no la fecha a la que se lee el padrón, mientras
 `DeterminarPredial` leía la titularidad, el % de propiedad y las características **del día del
 reloj**. Una venta en marzo le cargaba el ejercicio al comprador y sacaba al vendedor de la emisión.
-Desde #328 la fecha de referencia es `Ejercicio.primerDia()` y la leen `DeterminarPredial`,
-`DeterminarPredialMasivo` (el sector del alcance) y la hoja de la declaración jurada; la fecha de
+Desde #328 la fecha de referencia sale de `Ejercicio`, con **dos lecturas**: las características
+del predio —el uso, el sector del alcance de la masiva— a `Ejercicio.primerDia()`, el 1 de enero;
+y **quién es titular y con qué %** a `Ejercicio.fechaDeLaTitularidad()`, el **31 de diciembre del
+año anterior**. La segunda no es un día antes por capricho: el TUO LTM art. 10, segundo párrafo,
+dice que «cuando se efectúe cualquier transferencia, el adquirente asume la condición de
+contribuyente a partir del 1 de enero del año siguiente de producido el hecho», y el padrón cierra
+la cuota anterior el día antes de la transferencia; leída al 1 de enero, una venta fechada ese
+mismo día ya mostraba al comprador y le cargaba un ejercicio que la ley deja al vendedor. Así, una
+venta del 2026-01-01 deja 2026 al vendedor y una del 2025-12-31 se lo da al comprador. Las leen
+`DeterminarPredial`, `DeterminarPredialMasivo` y la hoja de la declaración jurada; la fecha de
 cálculo sigue siendo la del reloj y viaja aparte, con la cifra (regla 9). La consecuencia de NEG-05
 §3 que sí es cierta «independientemente del valor exacto» —una transferencia durante el ejercicio
-no cambia al obligado del ejercicio (TUO LTM art. 10)— es la que fijan las pruebas de #328.
+no cambia al obligado del ejercicio— es la que fijan las pruebas de #328, con los dos bordes del 1
+de enero.
 
 ## Cómo se cierra una decisión
 

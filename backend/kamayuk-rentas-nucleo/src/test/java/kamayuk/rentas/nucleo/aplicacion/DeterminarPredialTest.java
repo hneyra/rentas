@@ -700,7 +700,7 @@ class DeterminarPredialTest {
                                     + " veces")
                     .isInstanceOf(DeterminarPredial.SinPrediosEnElPadron.class)
                     .hasMessageContaining("C-002")
-                    .hasMessageContaining("2026-01-01");
+                    .hasMessageContaining("2025-12-31");
         }
 
         @Test
@@ -783,6 +783,103 @@ class DeterminarPredialTest {
         private DeterminacionPredialCalculada determinarA(
                 String codigo, Clock reloj, DeterminarPredial.PredioDeclarado... declarados) {
             return servicioCon(conjunto().construir(), reloj, new SinCaracteristicas())
+                    .determinar(
+                            new DeterminarPredial.Peticion(
+                                    EJERCICIO,
+                                    codigo,
+                                    List.of(declarados),
+                                    ModalidadDelPredial.TRIMESTRAL,
+                                    false),
+                            PORQUE);
+        }
+    }
+
+    /**
+     * <b>Una transferencia del mismo 1 de enero no cambia al obligado de ese ejercicio</b> (#328,
+     * ronda 1; TUO LTM art. 10, segundo parrafo: «cuando se efectue cualquier transferencia, el
+     * adquirente asume la condicion de contribuyente a partir del 1 de enero del año siguiente de
+     * producido el hecho»).
+     *
+     * <p>Es el borde que la lectura al 1 de enero no ve: {@code GestorDeTitularidad} cierra la
+     * cuota anterior el dia antes de la transferencia, asi que con una venta fechada 2026-01-01 el
+     * padron a ese dia ya dice «B» — y B asume desde 2027. Las dos pruebas se distinguen por un
+     * dia: la venta del 1 de enero deja 2026 al vendedor, la del 31 de diciembre se lo da al
+     * comprador. Con el reloj en abril, lejos de las dos fechas, para que el reloj no decida nada.
+     */
+    @org.junit.jupiter.api.Nested
+    @DisplayName("#328 — la transferencia fechada el 1 de enero es del ejercicio siguiente")
+    class LaTransferenciaDelPrimeroDeEnero {
+
+        private static final Clock EN_ABRIL =
+                Clock.fixed(Instant.parse("2026-04-01T15:00:00Z"), ZoneId.of("America/Lima"));
+
+        private static final long P = 44L;
+
+        @Test
+        @DisplayName("vendida el 2026-01-01: 2026 sigue siendo del vendedor, no del comprador")
+        void laVentaDelPrimeroDeEneroDejaElEjercicioAlVendedor() {
+            // A -> B con fecha 2026-01-01: la cuota de A se cierra el 2025-12-31.
+            predios.conVigencia(
+                    501L,
+                    P,
+                    "10044",
+                    "CALLE ANO NUEVO 44",
+                    Porcentaje.total(),
+                    "2019-06-01",
+                    "2025-12-31");
+            predios.conVigencia(
+                    502L, P, "10044", "CALLE ANO NUEVO 44", Porcentaje.total(), "2026-01-01", null);
+
+            DeterminacionPredialCalculada deA = determinarA("C-001", declarado(P, "200000.00"));
+
+            assertThat(deA.predios())
+                    .as(
+                            "el hecho se produjo en 2026, asi que B asume desde el 1 de enero de"
+                                    + " 2027: leer la titularidad al 2026-01-01 ya ve a B y deja a"
+                                    + " A sin base")
+                    .extracting(PredioEnLaBase::predioId)
+                    .containsExactly(P);
+            assertThat(deA.impuestoInsoluto()).isEqualTo(Dinero.de("870.00"));
+            assertThatThrownBy(() -> determinarA("C-002", declarado(P, "200000.00")))
+                    .as("y a B no se le puede cargar 2026: lo pagaria dos veces con A")
+                    .isInstanceOf(DeterminarPredial.SinPrediosEnElPadron.class)
+                    .hasMessageContaining("C-002")
+                    .hasMessageContaining("2025-12-31");
+        }
+
+        @Test
+        @DisplayName("comprada el 2025-12-31: 2026 ya es del comprador")
+        void laCompraDelTreintaYUnoDeDiciembreEsDelComprador() {
+            // A -> B con fecha 2025-12-31: la cuota de A se cierra el 2025-12-30.
+            predios.conVigencia(
+                    501L,
+                    P,
+                    "10044",
+                    "CALLE ANO NUEVO 44",
+                    Porcentaje.total(),
+                    "2019-06-01",
+                    "2025-12-30");
+            predios.conVigencia(
+                    502L, P, "10044", "CALLE ANO NUEVO 44", Porcentaje.total(), "2025-12-31", null);
+
+            DeterminacionPredialCalculada deB = determinarA("C-002", declarado(P, "200000.00"));
+
+            assertThat(deB.predios())
+                    .as(
+                            "el hecho se produjo en 2025: B asume desde el 1 de enero de 2026, y"
+                                    + " leer la titularidad antes del 31 de diciembre se lo"
+                                    + " devolveria a A")
+                    .extracting(PredioEnLaBase::predioId)
+                    .containsExactly(P);
+            assertThat(deB.impuestoInsoluto()).isEqualTo(Dinero.de("870.00"));
+            assertThatThrownBy(() -> determinarA("C-001", declarado(P, "200000.00")))
+                    .isInstanceOf(DeterminarPredial.SinPrediosEnElPadron.class)
+                    .hasMessageContaining("C-001");
+        }
+
+        private DeterminacionPredialCalculada determinarA(
+                String codigo, DeterminarPredial.PredioDeclarado... declarados) {
+            return servicioCon(conjunto().construir(), EN_ABRIL, new SinCaracteristicas())
                     .determinar(
                             new DeterminarPredial.Peticion(
                                     EJERCICIO,

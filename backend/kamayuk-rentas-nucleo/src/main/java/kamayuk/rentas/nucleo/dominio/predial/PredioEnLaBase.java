@@ -14,10 +14,10 @@ import org.jspecify.annotations.Nullable;
  * leer y no se persiste: duplicar la direccion en {@code determinacion_predio_detalle} la dejaria
  * envejecer aparte de la del padron.
  *
- * <p><b>El porcentaje no se teclea.</b> Sale de {@code titularidad} al 1 de enero del ejercicio —la
- * fecha de referencia, no la de calculo (#328)—, que es la unica fuente de quien es dueno de que
- * parte. Es lo que impide que la base del contribuyente se pueda inflar o desinflar desde la
- * peticion.
+ * <p><b>El porcentaje no se teclea.</b> Sale de {@code titularidad} al 1 de enero del ejercicio,
+ * antes de las transferencias de ese dia —{@code Ejercicio.fechaDeLaTitularidad()}, no la fecha de
+ * calculo (#328)—, que es la unica fuente de quien es dueno de que parte. Es lo que impide que la
+ * base del contribuyente se pueda inflar o desinflar desde la peticion.
  *
  * @param predioId el predio
  * @param codigoReferenciaCatastral como se le nombra en el padron
@@ -114,7 +114,10 @@ public record PredioEnLaBase(
                 null);
     }
 
-    /** Las cuotas del predio cubren el predio entero al 1 de enero del ejercicio (#328). */
+    /**
+     * Las cuotas del predio cubren el predio entero al 1 de enero del ejercicio, antes de las
+     * transferencias de ese dia (#328).
+     */
     public boolean titularidadCompleta() {
         return porcentajeRegistradoDelPredio.valor().compareTo(java.math.BigDecimal.valueOf(100))
                 == 0;

@@ -557,6 +557,46 @@ class EscrituraDeDeclaracionJuradaJdbcTest {
         }
 
         /**
+         * Los dos bordes del 1 de enero en la misma hoja (#328, ronda 1): el predio que el
+         * declarante vendio con fecha 2026-01-01 sigue siendo suyo en 2026 —el adquirente asume
+         * desde el 1 de enero del año siguiente al hecho, TUO LTM art. 10— y el que compro con
+         * fecha 2025-12-31 ya lo es. Leer la titularidad al 2026-01-01 pierde el primero.
+         */
+        @Test
+        @DisplayName("#328 — la venta fechada el 1 de enero no saca el predio de la hoja del año")
+        void laVentaDelPrimeroDeEneroSigueEnLaHoja() throws Exception {
+            String codigoVendido = nuevoCodigoCatastral();
+            long vendido = crearPredioConFicha(municipalidad, codigoVendido);
+            String codigoComprado = nuevoCodigoCatastral();
+            long comprado = crearPredioConFicha(municipalidad, codigoComprado);
+            String contribuyente = nuevoContribuyente(municipalidad);
+            long contribuyenteId = idDeContribuyente(contribuyente);
+            PrediosDeLaHoja.delEntre(
+                    contribuyenteId,
+                    vendido,
+                    codigoVendido,
+                    "CALLE VENDIDA EL 1 DE ENERO 9",
+                    "2019-06-01",
+                    "2025-12-31");
+            PrediosDeLaHoja.delEntre(
+                    contribuyenteId,
+                    comprado,
+                    codigoComprado,
+                    "CALLE COMPRADA EL 31 DE DICIEMBRE 10",
+                    "2025-12-31",
+                    null);
+            String numero = numeroDe(presentar(contribuyente, comprado));
+
+            JsonNode hoja = JSON.readTree(hojaDe(numero));
+
+            assertThat(codigosDe(hoja))
+                    .as(
+                            "vendido el 2026-01-01, el comprador asume en 2027; comprado el"
+                                    + " 2025-12-31, el declarante asume en 2026")
+                    .containsExactlyInAnyOrder(codigoVendido, codigoComprado);
+        }
+
+        /**
          * Un predio que la determinacion cobro y que el padron al 1 de enero ya no pone a nombre
          * del declarante: una titularidad registrada <b>despues</b> de determinar con fecha
          * anterior al ejercicio. La fila sale igual —es lo que se cobro, y sin ella el total deja
@@ -595,7 +635,7 @@ class EscrituraDeDeclaracionJuradaJdbcTest {
             assertThat(hoja.get("faltan").toString())
                     .as("y dice cual es y que hay que hacer, en vez de callarlo")
                     .contains("predio " + retroactivo)
-                    .contains("2026-01-01");
+                    .contains("2025-12-31");
         }
 
         private static List<String> codigosDe(JsonNode hoja) {
