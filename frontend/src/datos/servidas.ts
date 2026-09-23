@@ -111,16 +111,16 @@ export interface OperacionServida {
  * no tiene por que poder llamar**, y a la que no las tenga le contestaran 403 `SIN_PRIVILEGIO`:
  * no se quedaria sin un modulo, se quedaria sin arbol.
  *
- * **Y lo que se ve cuando pasa NO es lo que decia aqui hasta #282.** Este parrafo prometia que
- * «la pantalla lo explica y ofrece reintentar», y eso era el AC7 de la V6: lo dibujaba una
- * pantalla de `src/marco/` que salio con ella en #90. Medido en la V8: `useCatalogoPermitido`
- * mete el 403 en su rama de **error** —solo el 401 tiene frase propia— y `aplicacion.tsx` dibuja
- * un parrafo centrado con ese `porQue`. O sea que **si** se distingue de un marco vacio, que era
- * la mitad que mas importaba; lo que NO hay es boton de reintentar —la palabra sale dos veces en
- * `src/` y las dos son prosa o frase de pantalla, ningun `onClick`— ni la frase que nombraba las
- * dos opciones que faltan, que es el unico dato con el que se arregla. Cerrarlo de verdad, en
- * cambio, no es de este lado: es publicar el menu de la sesion —el catalogo filtrado por quien
- * pregunta— y eso es del dueno de `seguridad`.
+ * **Y lo que se ve cuando pasa volvio en #311.** Hasta #282 este parrafo prometia que «la
+ * pantalla lo explica y ofrece reintentar» —el AC7 de la V6, que salio con `src/marco/` en #90—;
+ * #282 lo corrigio a lo medido, que era un parrafo generico sin boton. Desde #311
+ * `useCatalogoPermitido` tiene rama propia para el 403 `SIN_PRIVILEGIO` —`sin-privilegio`—, y
+ * `aplicacion.tsx` la dibuja **nombrando las opciones que faltan por su nombre del catalogo**
+ * (`OPCIONES_QUE_LEEN_EL_CATALOGO`, vigiladas contra el controlador y el catalogo de opciones) y
+ * **ofreciendo reintentar**, que vuelve a pedir las tres y monta el arbol si esta vez contestan.
+ * Solo esa rama lo ofrece: en un 401 o un 500 reintentar no arregla nada. Cerrarlo de verdad, en
+ * cambio, sigue sin ser de este lado: es publicar el menu de la sesion —el catalogo filtrado por
+ * quien pregunta— y eso es del dueno de `seguridad`.
  *
  * <h2>Las seis de I-4, con lo que se vio al encender cada una</h2>
  *

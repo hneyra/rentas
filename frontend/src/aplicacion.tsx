@@ -2,11 +2,11 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Armazon, useHoja, type AccionesDelSistema } from '@kamayuk/shell';
-import { ProveedorDeTema, type ConfiguracionDeTema } from '@kamayuk/ui';
+import { Alerta, Boton, ProveedorDeTema, type ConfiguracionDeTema } from '@kamayuk/ui';
 
 import escudo from '../diseno/escudo-catacaos.png';
 import { MandoDeTema } from './preferencias/MandoDeTema.tsx';
-import { useCatalogoPermitido } from './datos/useCatalogoPermitido.ts';
+import { useCatalogoPermitido, type CatalogoDeLaSesion } from './datos/useCatalogoPermitido.ts';
 import { traducirCatalogo } from './catalogo.ts';
 import { PantallaDeRentas } from './pantallas/PantallaDeRentas.tsx';
 import type { ClaveDeHoja } from './pantallas/arbol.ts';
@@ -205,6 +205,10 @@ function ArmazonDelSistema() {
    * `los-cuarenta-destinos-se-recorren` y `la-siembra-abre-los-destinos`, y el volcado del rojo es
    * literalmente ese `data-slot="destino-no-ofrecido"`.
    */
+  if (sesion.estado === 'sin-privilegio') {
+    return <FaltanOpcionesParaLeerElCatalogo sesion={sesion} />;
+  }
+
   if (sesion.estado !== 'compuesto') {
     return (
       <div className="grid min-h-screen place-items-center p-[30px] bg-fondo">
@@ -267,6 +271,64 @@ function ArmazonDelSistema() {
         }}
       />
     </>
+  );
+}
+
+/**
+ * **A la cuenta le faltan las opciones con que se lee el catalogo** (#311, el AC7 de #33).
+ *
+ * «Cada cinco minutos» no es una estimacion: es la ventana del `CronJob` que corre el consumidor
+ * del buzon de `identidad` (`VENTANA_DEL_CONSUMIDOR_DE_IDENTIDAD` en
+ * `infrastructure/src/descriptor.ts`). Por eso el boton no se pulsa una vez y se abandona.
+ *
+ * `GET /seguridad/{modulos,accesos}` contesto 403 `SIN_PRIVILEGIO`, y sin esas dos lecturas no
+ * hay arbol. Se dice **que opciones faltan, por su nombre del catalogo** —el dato con que quien
+ * administra los perfiles la encuentra— y se ofrece **reintentar**, que aqui si arregla: el
+ * guardia comprueba cada peticion contra la base (ADR-0013), asi que en cuanto la opcion llega a
+ * este sistema la siguiente peticion pasa, sin cerrar la sesion.
+ *
+ * Tono `info` y no `mal`: el sistema contesto lo que tenia que contestar. Pintarlo de averia
+ * manda a mirar un despliegue cuando lo que falta es una fila en una tabla de permisos — el mismo
+ * criterio que `esAveria` de `api/escalera.ts` desde #283.
+ *
+ * Lo que de verdad lo cerraria no es de este lado: que `seguridad` publique **el menu de la
+ * sesion**, el catalogo ya filtrado por quien pregunta, que no pida una opcion de administracion.
+ */
+function FaltanOpcionesParaLeerElCatalogo({ sesion }: { readonly sesion: CatalogoDeLaSesion }) {
+  const { t } = useTranslation();
+  const reintentar = sesion.reintentar;
+
+  return (
+    <div className="grid min-h-screen place-items-center p-[30px] bg-fondo">
+      <div data-slot="catalogo-sin-privilegio" className="max-w-[64ch]">
+        <Alerta tono="info" titulo={t('A esta cuenta le faltan opciones para ver sus modulos')}>
+          <p className="m-0">{sesion.porQue}</p>
+          <ul className="mt-[10px] mb-0 pl-[20px] list-disc">
+            {sesion.faltan.map((nombre) => (
+              <li key={nombre} className="font-bold">
+                {t(nombre)}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-[10px] mb-0">
+            {t(
+              'Cuando se las den, pulse Reintentar: no hace falta volver a entrar. El permiso se ' +
+                'da en identidad, y este sistema lo recoge cada cinco minutos.',
+            )}
+          </p>
+        </Alerta>
+        {reintentar === null ? null : (
+          <Boton
+            variante="primario"
+            className="mt-[14px]"
+            disabled={sesion.reintentando}
+            onClick={reintentar}
+          >
+            {t('Reintentar')}
+          </Boton>
+        )}
+      </div>
+    </div>
   );
 }
 
