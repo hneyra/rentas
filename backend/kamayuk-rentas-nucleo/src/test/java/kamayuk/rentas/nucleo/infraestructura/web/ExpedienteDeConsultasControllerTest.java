@@ -269,6 +269,17 @@ class ExpedienteDeConsultasControllerTest {
         }
 
         @Override
+        public List<kamayuk.rentas.nucleo.dominio.Transferencia> historicoDeVehiculo(
+                long vehiculoId) {
+            return List.of();
+        }
+
+        @Override
+        public List<Long> vehiculosQueTransfirioDespuesDe(long transferenteId, LocalDate fecha) {
+            return List.of();
+        }
+
+        @Override
         public Optional<Long> contribuyentePorCodigo(String codigo) {
             return CODIGO.equals(codigo) ? Optional.of(622L) : Optional.empty();
         }

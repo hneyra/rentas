@@ -29,6 +29,8 @@ import kamayuk.rentas.nucleo.aplicacion.ValoresReferenciales;
 import kamayuk.rentas.nucleo.dominio.CambioDePlaca;
 import kamayuk.rentas.nucleo.dominio.CriterioDeVehiculo;
 import kamayuk.rentas.nucleo.dominio.MarcaYModelo;
+import kamayuk.rentas.nucleo.dominio.Transferencia;
+import kamayuk.rentas.nucleo.dominio.TransferenciaRepository;
 import kamayuk.rentas.nucleo.dominio.ValorReferencial;
 import kamayuk.rentas.nucleo.dominio.ValorReferencialRepository;
 import kamayuk.rentas.nucleo.dominio.Vehiculo;
@@ -571,6 +573,7 @@ class VehicularControllerTest {
         RegistrarDeterminacionVehicular servicio =
                 new RegistrarDeterminacionVehicular(
                         vehiculos,
+                        new SinTransferencias(),
                         new ValoresReferenciales(vehiculos, lector),
                         determinaciones,
                         lector,
@@ -692,6 +695,44 @@ class VehicularControllerTest {
         @Override
         public List<MarcaYModelo> catalogo(IdentificadorDeConjunto conjunto) {
             return List.of();
+        }
+    }
+
+    /**
+     * Ningun vehiculo cambio de manos: el titular de hoy es el del 1 de enero (#329), y el unico
+     * contribuyente del padron es el de {@link #EL_VEHICULO}. Lo que ocurre con una transferencia
+     * se mide contra la base, en {@code CalculoVehicularPorContribuyenteFronteraTest}.
+     */
+    private static final class SinTransferencias implements TransferenciaRepository {
+
+        @Override
+        public Transferencia insertar(Transferencia transferencia) {
+            throw new UnsupportedOperationException("El calculo no registra transferencias");
+        }
+
+        @Override
+        public Optional<Transferencia> findById(long id) {
+            return Optional.empty();
+        }
+
+        @Override
+        public List<Transferencia> historicoDePredio(long predioId) {
+            return List.of();
+        }
+
+        @Override
+        public List<Transferencia> historicoDeVehiculo(long vehiculoId) {
+            return List.of();
+        }
+
+        @Override
+        public List<Long> vehiculosQueTransfirioDespuesDe(long transferenteId, LocalDate fecha) {
+            return List.of();
+        }
+
+        @Override
+        public Optional<Long> contribuyentePorCodigo(String codigo) {
+            return Optional.of(EL_VEHICULO.contribuyenteId());
         }
     }
 

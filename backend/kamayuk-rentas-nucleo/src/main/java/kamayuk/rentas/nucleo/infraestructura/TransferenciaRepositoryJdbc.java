@@ -2,6 +2,7 @@ package kamayuk.rentas.nucleo.infraestructura;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import kamayuk.rentas.auditoria.OrigenContext;
@@ -100,6 +101,33 @@ public class TransferenciaRepositoryJdbc extends RepositorioJdbc
                                 + " ORDER BY t.fecha_transferencia, t.id")
                 .param("predio", predioId)
                 .query(TransferenciaRepositoryJdbc::mapear)
+                .list();
+    }
+
+    @Override
+    public List<Transferencia> historicoDeVehiculo(long vehiculoId) {
+        return jdbc().sql(
+                        "SELECT "
+                                + COLUMNAS
+                                + " FROM transferencia t"
+                                + " WHERE t.vehiculo_id = :vehiculo"
+                                + " ORDER BY t.fecha_transferencia, t.id")
+                .param("vehiculo", vehiculoId)
+                .query(TransferenciaRepositoryJdbc::mapear)
+                .list();
+    }
+
+    @Override
+    public List<Long> vehiculosQueTransfirioDespuesDe(long transferenteId, LocalDate fecha) {
+        return jdbc().sql(
+                        "SELECT DISTINCT t.vehiculo_id FROM transferencia t"
+                                + " WHERE t.transferente_id = :transferente"
+                                + " AND t.vehiculo_id IS NOT NULL"
+                                + " AND t.fecha_transferencia > :fecha"
+                                + " ORDER BY t.vehiculo_id")
+                .param("transferente", transferenteId)
+                .param("fecha", fecha)
+                .query((fila, numeroDeFila) -> fila.getLong("vehiculo_id"))
                 .list();
     }
 

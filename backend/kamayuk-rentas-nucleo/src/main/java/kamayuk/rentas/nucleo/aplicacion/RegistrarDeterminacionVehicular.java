@@ -2,19 +2,30 @@ package kamayuk.rentas.nucleo.aplicacion;
 
 import java.time.Clock;
 import java.time.LocalDate;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import kamayuk.rentas.auditoria.Auditoria;
 import kamayuk.rentas.auditoria.Operacion;
 import kamayuk.rentas.auditoria.RegistroDeAuditoria;
+import kamayuk.rentas.compartido.Paginacion;
 import kamayuk.rentas.dominio.Alicuota;
 import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.Observacion;
+import kamayuk.rentas.nucleo.dominio.CriterioDeVehiculo;
+import kamayuk.rentas.nucleo.dominio.EstadoVehiculo;
+import kamayuk.rentas.nucleo.dominio.TransferenciaRepository;
 import kamayuk.rentas.nucleo.dominio.ValorReferencial;
 import kamayuk.rentas.nucleo.dominio.Vehiculo;
+import kamayuk.rentas.nucleo.dominio.VehiculoEncontrado;
 import kamayuk.rentas.nucleo.dominio.VehiculoRepository;
 import kamayuk.rentas.nucleo.dominio.predial.Determinacion;
 import kamayuk.rentas.nucleo.dominio.predial.DeterminacionRepository;
 import kamayuk.rentas.nucleo.dominio.vehicular.ImpuestoVehicular;
+import kamayuk.rentas.nucleo.dominio.vehicular.PropietarioAlPrimeroDeEnero;
 import kamayuk.rentas.parametros.LectorDeParametros;
 import kamayuk.rentas.parametros.ParametrosSellados;
 import org.springframework.stereotype.Service;
@@ -41,6 +52,15 @@ import org.springframework.transaction.annotation.Transactional;
  * ellas la determinación <b>falla nombrando la llave</b> y no calcula con cero, que es lo que hacía
  * antes: un mínimo en cero no falla, deja el impuesto en su importe bruto y solo se nota en los
  * vehículos baratos —los que el mínimo existe para cubrir—.
+ *
+ * <p><b>El ejercicio se determina a quien era propietario al 1 de enero</b> (TUO LTM art. 31;
+ * #329), no a quien figura hoy como titular. Hasta #329 se asentaba a {@code
+ * Vehiculo#contribuyenteId}, que cada transferencia sobrescribe: un vehículo vendido a mitad de año
+ * le dejaba al comprador el impuesto de un ejercicio en el que nunca fue contribuyente, y al
+ * vendedor sin el suyo. Ahora lo decide {@link PropietarioAlPrimeroDeEnero} sobre el histórico de
+ * {@code transferencia} —con la convención del mismo 1 de enero escrita allí—, y con la misma regla
+ * {@link #vehiculosDe} resuelve sobre qué vehículos calcula una persona: los que tenía ese día, no
+ * los que tiene hoy.
  *
  * <p><b>Ningún asiento de cuenta corriente se genera aquí</b>, igual que en {@link
  * RegistrarDeterminacionPredial}: trasladar el monto a una deuda exigible es un acto posterior
@@ -74,7 +94,11 @@ public class RegistrarDeterminacionVehicular {
 
     private static final String TABLA_AUDITADA = "determinacion";
 
+    /** El orden con que se listan los vehículos de una persona: el mismo que tenía la consulta. */
+    private static final String ORDEN_POR_OMISION = "placa";
+
     private final VehiculoRepository vehiculos;
+    private final TransferenciaRepository transferencias;
     private final ValoresReferenciales valoresReferenciales;
     private final DeterminacionRepository determinaciones;
     private final LectorDeParametros parametros;
@@ -83,12 +107,14 @@ public class RegistrarDeterminacionVehicular {
 
     public RegistrarDeterminacionVehicular(
             VehiculoRepository vehiculos,
+            TransferenciaRepository transferencias,
             ValoresReferenciales valoresReferenciales,
             DeterminacionRepository determinaciones,
             LectorDeParametros parametros,
             Auditoria auditoria,
             Clock reloj) {
         this.vehiculos = vehiculos;
+        this.transferencias = transferencias;
         this.valoresReferenciales = valoresReferenciales;
         this.determinaciones = determinaciones;
         this.parametros = parametros;
@@ -132,11 +158,12 @@ public class RegistrarDeterminacionVehicular {
 
         Dinero montoDeterminado =
                 ImpuestoVehicular.calcular(valorReferencial.valor(), alicuota, minimoImponible);
+        long propietario = propietarioAlPrimeroDeEnero(vehiculo, vehiculoId, ejercicio);
 
         Determinacion nueva =
                 Determinacion.nuevaVehicular(
                         ejercicio,
-                        vehiculo.contribuyenteId(),
+                        propietario,
                         vehiculoId,
                         conjuntoId,
                         valorReferencial.valor(),
@@ -151,6 +178,80 @@ public class RegistrarDeterminacionVehicular {
         Determinacion guardada = determinaciones.insertar(nueva);
         auditar(guardada, observacion);
         return new Calculo(guardada, conjunto, alicuota, minimoImponible);
+    }
+
+    /**
+     * Los vehículos activos de los que la persona era propietaria al 1 de enero del ejercicio: el
+     * objetivo del cálculo por contribuyente (#329).
+     *
+     * <p>Hasta #329 eran sus {@code ACTIVO} de hoy, y la lista contestaba la pregunta equivocada:
+     * el vendedor de junio ya no veía el vehículo del que era contribuyente, y el comprador veía
+     * uno del que no lo era. Ahora se reúnen los candidatos —los que tiene hoy más los que
+     * transfirió después del 1 de enero— y a cada uno se le pregunta de quién era ese día con
+     * {@link PropietarioAlPrimeroDeEnero}, la misma regla con que {@link #calcular} decide a quién
+     * asentar: así la lista y la determinación no pueden discrepar. Los que compró después del 1 de
+     * enero quedan fuera por esa misma pregunta.
+     *
+     * <p>Un código que no es de nadie en esta municipalidad devuelve la lista vacía, igual que
+     * antes.
+     */
+    @Transactional(readOnly = true)
+    public List<Vehiculo> vehiculosDe(String codContribuyente, Ejercicio ejercicio) {
+        Optional<Long> persona = transferencias.contribuyentePorCodigo(codContribuyente);
+        if (persona.isEmpty()) {
+            return List.of();
+        }
+        long quien = persona.get();
+
+        Map<Long, Vehiculo> candidatos = new LinkedHashMap<>();
+        CriterioDeVehiculo suyosHoy =
+                new CriterioDeVehiculo(null, null, codContribuyente, EstadoVehiculo.ACTIVO);
+        for (VehiculoEncontrado fila :
+                vehiculos
+                        .buscar(
+                                suyosHoy,
+                                Paginacion.de(0, Paginacion.TAMANO_MAXIMO, ORDEN_POR_OMISION))
+                        .contenido()) {
+            candidatos.put(idDe(fila.vehiculo()), fila.vehiculo());
+        }
+        for (long vehiculoId :
+                transferencias.vehiculosQueTransfirioDespuesDe(quien, ejercicio.primerDia())) {
+            vehiculos
+                    .findById(vehiculoId)
+                    .filter(vehiculo -> vehiculo.estado() == EstadoVehiculo.ACTIVO)
+                    .ifPresent(vehiculo -> candidatos.putIfAbsent(vehiculoId, vehiculo));
+        }
+
+        return candidatos.entrySet().stream()
+                .filter(
+                        candidato ->
+                                propietarioAlPrimeroDeEnero(
+                                                candidato.getValue(), candidato.getKey(), ejercicio)
+                                        == quien)
+                .map(Map.Entry::getValue)
+                .sorted(Comparator.comparing(Vehiculo::placa))
+                .toList();
+    }
+
+    /**
+     * De quién era el vehículo al 1 de enero del ejercicio: la regla pura sobre su histórico de
+     * transferencias. Es el único sitio de esta clase que lee el titular, para que el cálculo
+     * puntual y el de una persona no puedan contestar distinto.
+     */
+    private long propietarioAlPrimeroDeEnero(
+            Vehiculo vehiculo, long vehiculoId, Ejercicio ejercicio) {
+        return PropietarioAlPrimeroDeEnero.de(
+                vehiculo.contribuyenteId(),
+                transferencias.historicoDeVehiculo(vehiculoId),
+                ejercicio);
+    }
+
+    private static long idDe(Vehiculo vehiculo) {
+        Long id = vehiculo.id();
+        if (id == null) {
+            throw new IllegalStateException("Un vehiculo leido de la base tiene identificador");
+        }
+        return id;
     }
 
     /**
