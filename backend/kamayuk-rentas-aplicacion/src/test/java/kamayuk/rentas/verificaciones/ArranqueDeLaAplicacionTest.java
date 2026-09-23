@@ -145,6 +145,14 @@ class ArranqueDeLaAplicacionTest {
         assertThat(contexto.getBeanNamesForType(ComprobadorDeAcceso.class))
                 .as("el puerto que el guardia pide en cada peticion")
                 .isNotEmpty();
+
+        // #316: el reloj que llega a los 126 `LocalDate.now(reloj)` es el del contexto VIVO, y
+        // solo aqui se ve si otro bean lo sustituye. Uno y con la zona del producto.
+        assertThat(contexto.getBeansOfType(java.time.Clock.class).values())
+                .as("un solo reloj en el contexto, y con ZonaHoraria.DEL_PRODUCTO")
+                .singleElement()
+                .extracting(java.time.Clock::getZone)
+                .isEqualTo(kamayuk.rentas.dominio.ZonaHoraria.DEL_PRODUCTO);
     }
 
     @Test
