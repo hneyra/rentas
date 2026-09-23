@@ -112,6 +112,23 @@ public class PagoRecibidoRepositoryJdbc extends RepositorioJdbc
                 .optional();
     }
 
+    /**
+     * La primera, si hubiera mas de una: la caja no anula dos veces el mismo recibo, y la pregunta
+     * es si hay alguna.
+     */
+    @Override
+    public Optional<PagoRecibido> anulacionDe(UUID pagoId) {
+        return jdbc().sql(
+                        "SELECT "
+                                + COLUMNAS
+                                + " FROM pago_recibido"
+                                + " WHERE pago_original_id = :pago AND tipo = 'PAGO_ANULADO'"
+                                + " ORDER BY id LIMIT 1")
+                .param("pago", pagoId)
+                .query(PagoRecibidoRepositoryJdbc::mapear)
+                .optional();
+    }
+
     @Override
     public void marcarAplicado(long id, int asientos, Instant cuando) {
         jdbc().sql(

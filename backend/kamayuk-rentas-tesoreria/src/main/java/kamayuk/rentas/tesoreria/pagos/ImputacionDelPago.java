@@ -3,6 +3,9 @@ package kamayuk.rentas.tesoreria.pagos;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.UUID;
 import kamayuk.rentas.cuentacorriente.AbonoAsentado;
 import kamayuk.rentas.cuentacorriente.RegistroDeAbonos;
 import kamayuk.rentas.cuentacorriente.ReversionDeAbonos;
@@ -55,6 +58,11 @@ public class ImputacionDelPago {
      * @throws RegistroDeAbonos.SinAbonosQueReversar si la anulacion no encuentra que deshacer
      * @throws RegistroDeAbonos.ImporteCobradoNoCuadra si el libro extinguiria una cifra distinta de
      *     la que la caja cobro (#39)
+     * @throws ElCobroFueRechazado si la anulacion nombra un cobro que nunca toco el libro (#428)
+     * @throws AnuladoAntesDeImputarse si el cobro ya tiene una anulacion en el buzon (#428)
+     * @throws RecibirPago.AnulacionAntesQueSuCobro si la anulacion nombra un cobro que todavia no
+     *     llego, o que todavia no confirmo. <b>Es la unica de las seis que NO se atrapa</b>: es
+     *     «todavia no», y no «nunca» (#428)
      */
     @Transactional
     public RecibirPago.Recibido recibirEImputar(PagoRecibido pago) {
@@ -112,8 +120,34 @@ public class ImputacionDelPago {
                         + pago.motivoDeLaAnulacionExigido());
     }
 
-    /** Abona en el libro lo que el pago cobro. */
+    /**
+     * Abona en el libro lo que el pago cobro, <b>si nadie lo anulo antes</b> (#428).
+     *
+     * <p>La comprobacion va antes de tocar nada, y es la defensa del otro lado de {@link
+     * #reversar}: aquella impide que una anulacion adelantada se cierre en falso, y esta impide que
+     * un cobro se impute sobre una anulacion que ya esta en el buzon —la que el codigo de antes de
+     * #428 dejaba {@code RECHAZADA} con 201, y cualquier camino que un dia se salte a {@link
+     * #reversar}—. Sin ella, el cobro de un recibo que la caja ya devolvio extinguia la deuda: el
+     * contribuyente al dia con un dinero que tiene otra vez en el bolsillo.
+     *
+     * <p>Se busca por {@code pago_original_id}, que es la clave que {@code V8} puso para esto y que
+     * {@code V24} indexa; no por el numero del papel.
+     */
     private int imputar(PagoRecibido pago) {
+        Optional<PagoRecibido> anulacion = buzon.anulacionDe(pago.pagoId());
+        if (anulacion.isPresent()) {
+            throw new AnuladoAntesDeImputarse(
+                    "El pago "
+                            + pago.pagoId()
+                            + " del recibo "
+                            + pago.reciboNumero()
+                            + " fue anulado antes de imputarse: la anulacion "
+                            + anulacion.get().pagoId()
+                            + " ya esta en el buzon ("
+                            + anulacion.get().estado()
+                            + "). La caja devolvio ese dinero, asi que imputarlo extinguiria"
+                            + " deuda sin cobro; no se toca el libro");
+        }
         Long contribuyenteId = pago.contribuyenteId();
         if (contribuyenteId == null) {
             throw new RegistroDeAbonos.SinDeudaQueAbonar(
@@ -164,14 +198,96 @@ public class ImputacionDelPago {
      * respuesta, cuando lo cierto es que ese recibo estuvo vigente hasta julio. Es la regla 9 y
      * ADR-0006 —el libro no se reescribe—. Lo que esa fecha NO decide es el ejercicio: la reversion
      * cae en el de la obligacion que el recibo cobro, aunque se anule al ano siguiente (#424).
+     *
+     * <h2>Y antes de tocar el libro, el buzon decide (#428)</h2>
+     *
+     * <p>La anulacion nombra un pago —{@code pagoOriginalId}— y es ese pago, y no el numero del
+     * papel, lo que se busca primero. Hasta #428 se iba derecho al libro por {@code "RECIBO " +
+     * numero}, y «no encuentro asientos» tenia dos lecturas —o nunca toco el libro, o ya se
+     * reversaron— cuando le faltaba una tercera: <b>todavia no llego</b>. La caja entrega el cobro
+     * antes que su anulacion, pero no espera a que se confirme: si el cobro se queda esperando un
+     * candado mas de 30 s, o cae en una replica que se apaga, la anulacion llega sola.
+     *
+     * <ul>
+     *   <li><b>No esta, o esta {@code EN_TRANSITO}:</b> {@link
+     *       RecibirPago.AnulacionAntesQueSuCobro}. No se atrapa: la transaccion se deshace entera
+     *       —tampoco queda la fila de la anulacion, o el reintento recibiria 409 «ya lo tengo»— y
+     *       el borde contesta 503, que la caja reintenta. Si agota los intentos da el evento por
+     *       muerto con alerta: el caso queda a la vista en vez de cerrado en falso. En {@code READ
+     *       COMMITTED} no hay carrera: si el cobro no confirmo, esta transaccion no lo ve; si lo ve
+     *       {@code APLICADO}, sus asientos ya estan confirmados.
+     *   <li><b>{@code RECHAZADO}:</b> el cobro nunca toco el libro y no hay nada que deshacer.
+     *       Sigue siendo un rechazo, pero con ese motivo — esperar aqui seria esperar para siempre.
+     *   <li><b>{@code APLICADO}:</b> se reversa, y se reversan <b>los asientos de ese pago</b>: su
+     *       documento de origen, y no el que la anulacion dice.
+     * </ul>
+     *
+     * <p>Que el cobro no este nunca no es un caso: la caja se niega a anular un recibo cuyo cobro
+     * no esta en su buzon de salida ({@code AnularRecibo.publicarLaAnulacion}), asi que un recibo
+     * de antes de P5D no produce anulacion que llegue aqui.
      */
     private int reversar(PagoRecibido pago) {
+        UUID nombrado = Objects.requireNonNull(pago.pagoOriginalId());
+        PagoRecibido original = buzon.porPagoId(nombrado).orElse(null);
+        if (original == null || original.estado() == EstadoDelPagoRecibido.EN_TRANSITO) {
+            throw new RecibirPago.AnulacionAntesQueSuCobro(
+                    "La anulacion "
+                            + pago.pagoId()
+                            + " del recibo "
+                            + pago.reciboNumero()
+                            + " nombra el pago "
+                            + nombrado
+                            + ", que "
+                            + (original == null
+                                    ? "todavia no esta en el buzon"
+                                    : "todavia no se imputo")
+                            + ". Es «todavia no» y no «nunca»: no se registra nada y se espera el"
+                            + " reintento de la caja, que entrega el cobro antes que su anulacion");
+        }
+        if (original.estado() == EstadoDelPagoRecibido.RECHAZADO) {
+            throw new ElCobroFueRechazado(
+                    "La anulacion "
+                            + pago.pagoId()
+                            + " nombra el pago "
+                            + nombrado
+                            + ", que quedo RECHAZADO y nunca toco el libro: no hay nada que"
+                            + " reversar");
+        }
         ReversionDeAbonos reversion =
                 abonos.reversarAbonos(
-                        pago.documentoDeOrigen(),
+                        original.documentoDeOrigen(),
                         pago.documentoDeLaAnulacion(),
                         pago.fechaDeAnulacionExigida(),
                         porLaAnulacion(pago));
         return reversion.asientos();
+    }
+
+    /**
+     * La anulacion nombra un cobro que quedo {@code RECHAZADO}: nunca toco el libro (#428).
+     *
+     * <p>{@link RecibirPago} la atrapa y la anulacion queda {@code RECHAZADA} con este motivo. No
+     * es «todavia no»: el cobro no se va a imputar nunca, asi que esperarlo dejaria a la caja
+     * reintentando hasta dar el evento por muerto.
+     */
+    public static final class ElCobroFueRechazado extends RuntimeException {
+        @java.io.Serial private static final long serialVersionUID = 1L;
+
+        ElCobroFueRechazado(String mensaje) {
+            super(mensaje);
+        }
+    }
+
+    /**
+     * El cobro llega con una anulacion suya ya en el buzon (#428).
+     *
+     * <p>{@link RecibirPago} la atrapa y el cobro queda {@code RECHAZADO} con el motivo «anulado
+     * antes de imputarse», sin un solo asiento. Es dinero que la caja ya devolvio.
+     */
+    public static final class AnuladoAntesDeImputarse extends RuntimeException {
+        @java.io.Serial private static final long serialVersionUID = 1L;
+
+        AnuladoAntesDeImputarse(String mensaje) {
+            super(mensaje);
+        }
     }
 }
