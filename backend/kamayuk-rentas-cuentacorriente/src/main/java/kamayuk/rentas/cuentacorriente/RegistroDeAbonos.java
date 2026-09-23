@@ -104,8 +104,9 @@ public interface RegistroDeAbonos {
      * @param documentoDeLaReversion el documento que sustenta los asientos nuevos. <b>Tiene que ser
      *     distinto del anterior</b>, y no es una formalidad: si la reversion se marcara con el
      *     mismo documento, una segunda llamada la encontraria y reversaria la reversion
-     * @param fecha fecha valor de la reversion; decide ademas en que particion caen los asientos
-     *     nuevos
+     * @param fecha fecha valor de la reversion. No decide en que ejercicio caen los asientos
+     *     nuevos: cada uno cae en el de la obligacion que deshace, aunque se anule al ano siguiente
+     *     (#424)
      * @param observacion por que se reversa (regla 10); queda como {@code motivo} de cada asiento
      * @return cuantos asientos se escribieron y cuanto vuelve a deberse
      * @throws SinAbonosQueReversar si ese documento no origino ningun asiento reversable

@@ -582,49 +582,81 @@ public record Asiento(
      * con el {@link TipoAsiento} <b>opuesto</b> y {@code asientoReversadoId} apuntando al original.
      *
      * <p>«Un asiento equivocado no se corrige, se reversa» (V2): esta es la unica forma de
-     * corregirlo, y deja <b>dos</b> filas en el libro, ninguna modificada. El {@code ejercicio} de
-     * la reversion es el de su propia {@code fecha}, no el del original: una reversion de diciembre
-     * de 2026 hecha en enero de 2027 cae en la particion 2027, como cualquier asiento nuevo.
+     * corregirlo, y deja <b>dos</b> filas en el libro, ninguna modificada.
+     *
+     * <p><b>El {@code ejercicio} de la reversion es el del original, no el de su {@code fecha}</b>
+     * (#424). El ejercicio es parte de la identidad de la obligacion —{@link ClaveDeSaldo}, {@code
+     * saldo_uq}—, y la reversion deshace un asiento de <b>esa</b> obligacion: el abono de ARBITRIO
+     * 2026 cobrado y anulado el 5 de enero de 2027 se reversa en 2026. Tomarlo de la fecha dejaba
+     * la cuota de 2026 «pagada» con un recibo anulado y hacia deber a la de 2027 lo que nadie
+     * emitio. La {@code fecha} si es la de la reversion, y solo decide su fecha valor —cuando se
+     * deshizo, que es la regla 9—, no a que obligacion pertenece. Y como el libro esta particionado
+     * por la misma columna, la reversion cae en la particion del original, que existe porque el
+     * original se guardo en ella.
+     *
+     * <p>Que la clave de saldo no cambie no se deja a un comentario: se comprueba al construir.
      *
      * @param original el asiento que se corrige; tiene que estar ya guardado
-     * @param fecha fecha valor de la reversion
+     * @param fecha fecha valor de la reversion; no decide su ejercicio, que es el del original
      * @param documentoOrigen el documento que sustenta la reversion
      * @param motivo por que se reversa; regla 10 lo exige y aqui, ademas, casi siempre lo exige
      *     tambien {@link Concepto#exigeMotivo()}
+     * @throws IllegalStateException si la reversion no fuera de la misma obligacion que el original
      */
     public static Asiento reversionDe(
             Asiento original, LocalDate fecha, String documentoOrigen, String motivo) {
         Long idOriginal =
                 Objects.requireNonNull(
                         original.id(), "Solo se reversa un asiento que ya esta en el libro");
-        return new Asiento(
-                null,
-                Ejercicio.de(fecha),
-                original.contribuyenteId(),
-                original.tributo(),
-                original.concepto(),
-                original.tipo().opuesto(),
-                original.fase(),
-                original.periodo(),
-                original.predioId(),
-                original.vehiculoId(),
-                original.referenciaExterna(),
-                original.monto(),
-                fecha,
-                documentoOrigen,
-                idOriginal,
-                null,
-                motivo,
-                // El acto se COPIA, como todo lo demas: la reversion de una baja sigue
-                // siendo del acto de esa baja. Que no la cuente «lo cargado» no lo decide
-                // esta columna sino `asiento_reversado_id IS NULL`, que #56 ya puso.
-                original.acto(),
-                // Y la declaracion tambien: reversar un alta declarada de titular anterior no
-                // deshace la declaracion, la contabiliza al reves.
-                original.unidadDeTitularAnterior(),
-                // Y la causal, por lo mismo que el acto (#684): la reversion de una baja por
-                // prescripcion sigue siendo el rastro de aquella baja por prescripcion. Perderla
-                // aqui dejaria la fila que DESHACE el acto fuera del filtro que lo encuentra.
-                original.causal());
+        Asiento reversion =
+                new Asiento(
+                        null,
+                        // La obligacion y no la fecha (#424): una reversion es de la MISMA
+                        // obligacion que el asiento que deshace, y el ejercicio es parte de ella.
+                        original.ejercicio(),
+                        original.contribuyenteId(),
+                        original.tributo(),
+                        original.concepto(),
+                        original.tipo().opuesto(),
+                        original.fase(),
+                        original.periodo(),
+                        original.predioId(),
+                        original.vehiculoId(),
+                        original.referenciaExterna(),
+                        original.monto(),
+                        fecha,
+                        documentoOrigen,
+                        idOriginal,
+                        null,
+                        motivo,
+                        // El acto se COPIA, como todo lo demas: la reversion de una baja sigue
+                        // siendo del acto de esa baja. Que no la cuente «lo cargado» no lo decide
+                        // esta columna sino `asiento_reversado_id IS NULL`, que #56 ya puso.
+                        original.acto(),
+                        // Y la declaracion tambien: reversar un alta declarada de titular
+                        // anterior no deshace la declaracion, la contabiliza al reves.
+                        original.unidadDeTitularAnterior(),
+                        // Y la causal, por lo mismo que el acto (#684): la reversion de una baja
+                        // por prescripcion sigue siendo el rastro de aquella baja por
+                        // prescripcion. Perderla aqui dejaria la fila que DESHACE el acto fuera
+                        // del filtro que lo encuentra.
+                        original.causal());
+        // La invariante que #424 encontro rota, dicha por el codigo: la reversion toca la misma
+        // fila de `saldo_proyectado` que el original. `RegistrarAsiento.reversar` reproyecta SOLO
+        // la clave de la reversion, asi que si difirieran la obligacion reversada no volveria a
+        // deber y otra —que nadie emitio— deberia en su lugar, con el total del contribuyente
+        // cuadrando y cada obligacion mal.
+        ClaveDeSaldo deLaObligacion = ClaveDeSaldo.de(original);
+        ClaveDeSaldo deLaReversion = ClaveDeSaldo.de(reversion);
+        if (!deLaReversion.equals(deLaObligacion)) {
+            throw new IllegalStateException(
+                    "La reversion del asiento "
+                            + idOriginal
+                            + " tiene que ser de su misma obligacion (#424): el original es de "
+                            + deLaObligacion
+                            + " y la reversion quedaria en "
+                            + deLaReversion);
+        }
+        return reversion;
     }
 }
