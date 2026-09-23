@@ -22,21 +22,27 @@ import kamayuk.rentas.nucleo.dominio.Transferencia;
  *
  * <p>El titular del vehículo es un atributo que cada transferencia <b>sobrescribe</b>, pero cada
  * una deja su fila en {@code transferencia} con quién sale, quién entra y en qué fecha. Esa cadena
- * basta para contestar: si hay transferencias con fecha <b>posterior</b> al 1 de enero, el
- * propietario de ese día es el <b>transferente de la primera</b> de ellas —el que tenía el vehículo
- * cuando empezó la cadena del ejercicio—; si no hay ninguna, nadie lo cambió de manos desde
- * entonces y es el titular de hoy.
+ * basta para contestar: si hay transferencias fechadas <b>desde</b> el 1 de enero —ese día
+ * incluido—, el contribuyente del ejercicio es el <b>transferente de la primera</b> de ellas —el
+ * que tenía el vehículo cuando empezó la cadena del ejercicio—; si no hay ninguna, nadie lo cambió
+ * de manos desde entonces y es el titular de hoy.
  *
  * <h2>La convención del mismo 1 de enero</h2>
  *
- * <p>Una transferencia fechada <b>el propio 1 de enero</b> no es posterior a él: ese día el
- * vehículo ya es del adquiriente, y el ejercicio es suyo. Es la misma convención que la titularidad
- * predial, donde {@code GestorDeTitularidad#transferir} cierra la cuota del transferente el día
- * anterior a la fecha de la transferencia y abre la del adquiriente <b>ese mismo día</b>: con las
- * dos reglas iguales, un predio y un vehículo vendidos juntos el 1 de enero cambian de
- * contribuyente en el mismo ejercicio. El segundo párrafo del art. 31, leído al pie de la letra,
- * diría otra cosa para ese único día; se eligió la primera frase —«propietarias al 1 de enero»— y
- * lo fija {@code PropietarioAlPrimeroDeEneroTest}.
+ * <p>Una transferencia fechada <b>el propio 1 de enero</b> deja ese ejercicio al
+ * <b>transferente</b>. Lo decide el segundo párrafo del art. 31, transcrito en {@code
+ * normativa/docs/10-negocio/valores-normativos/vehicular-valores-referenciales-2026.md:42}: «Cuando
+ * se efectúe una transferencia, el adquirente asume la condición de contribuyente a partir del 1 de
+ * enero del año siguiente». Vendido el 2026-01-01, el comprador es contribuyente desde el
+ * 2027-01-01, y el 2026 sigue siendo del vendedor; vendido el 2025-12-31, el 2026 ya es del
+ * comprador. Por eso la comparación es «fecha &gt;= 1 de enero» y no «fecha &gt; 1 de enero».
+ *
+ * <p>La convención de la titularidad predial —{@code GestorDeTitularidad#transferir} cierra la
+ * cuota del transferente el día anterior y abre la del adquiriente ese mismo día— <b>no manda
+ * aquí</b>: la primera versión de esta regla la copió y le daba el ejercicio al adquiriente, contra
+ * la letra del artículo. La determinación predial se corrige en el mismo sentido en su propio issue
+ * (Ref #328). Lo fijan {@code PropietarioAlPrimeroDeEneroTest}, {@code
+ * RegistrarDeterminacionVehicularTest} y {@code CalculoVehicularPorContribuyenteFronteraTest}.
  *
  * <p><b>Sin base, sin reloj</b> (regla 6): la fecha es {@link Ejercicio#primerDia()} del ejercicio
  * que entra como argumento, así que recalcular 2026 en 2037 da el mismo contribuyente. Lo que
@@ -63,8 +69,8 @@ public final class PropietarioAlPrimeroDeEnero {
      * @param transferencias el histórico de transferencias <b>de ese vehículo</b>, en cualquier
      *     orden
      * @param ejercicio el ejercicio que se determina
-     * @return el transferente de la primera transferencia posterior al 1 de enero, o el titular de
-     *     hoy si no hay ninguna
+     * @return el transferente de la primera transferencia fechada desde el 1 de enero —ese día
+     *     incluido—, o el titular de hoy si no hay ninguna
      */
     public static long de(
             long titularActual, List<Transferencia> transferencias, Ejercicio ejercicio) {
@@ -72,7 +78,7 @@ public final class PropietarioAlPrimeroDeEnero {
         Objects.requireNonNull(ejercicio, "Hay que decir de que ejercicio se habla");
         LocalDate primerDia = ejercicio.primerDia();
         return transferencias.stream()
-                .filter(transferencia -> transferencia.fechaTransferencia().isAfter(primerDia))
+                .filter(transferencia -> !transferencia.fechaTransferencia().isBefore(primerDia))
                 .min(CRONOLOGICO)
                 .map(Transferencia::transferenteId)
                 .orElse(titularActual);

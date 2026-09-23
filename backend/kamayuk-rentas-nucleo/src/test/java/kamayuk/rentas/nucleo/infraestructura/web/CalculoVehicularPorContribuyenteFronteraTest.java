@@ -90,6 +90,9 @@ class CalculoVehicularPorContribuyenteFronteraTest {
     private static final String VENDEDOR = "C-VEND-329";
     private static final String COMPRADOR = "C-COMP-329";
     private static final String PLACA = "V3L-329";
+    private static final String VENDEDOR_EN_ENERO = "C-VEN1-329";
+    private static final String COMPRADOR_EN_ENERO = "C-COM1-329";
+    private static final String PLACA_DE_ENERO = "E1N-329";
     private static final String MARCA = "TOYOTA";
     private static final String MODELO = "ETIOS";
     private static final Ejercicio FABRICACION = new Ejercicio(2023);
@@ -98,6 +101,8 @@ class CalculoVehicularPorContribuyenteFronteraTest {
     private static long municipalidad;
     private static long vendedor;
     private static long comprador;
+    private static long vendedorEnEnero;
+    private static long compradorEnEnero;
     private static TenantTransactionManager gestor;
     private static AdministrarParametros administrarParametros;
     private static MockMvc mvc;
@@ -108,6 +113,10 @@ class CalculoVehicularPorContribuyenteFronteraTest {
         municipalidad = crearMunicipalidad();
         vendedor = crearContribuyente(VENDEDOR, "32900001", "VENDEDOR, A MITAD DE ANIO");
         comprador = crearContribuyente(COMPRADOR, "32900002", "COMPRADOR, A MITAD DE ANIO");
+        vendedorEnEnero =
+                crearContribuyente(VENDEDOR_EN_ENERO, "32900003", "VENDEDOR, EL 1 DE ENERO");
+        compradorEnEnero =
+                crearContribuyente(COMPRADOR_EN_ENERO, "32900004", "COMPRADOR, EL 1 DE ENERO");
 
         DriverManagerDataSource pool = new DriverManagerDataSource();
         pool.setUrl(base.url());
@@ -192,6 +201,31 @@ class CalculoVehicularPorContribuyenteFronteraTest {
                     false,
                     "Tarjeta de propiedad",
                     Observacion.de("Compraventa del vehiculo a mitad de anio"));
+
+            // El borde: otro vehiculo, de otra pareja, vendido el mismo 1 de enero de 2026. Por
+            // el art. 31 el comprador es contribuyente desde el 1 de enero de 2027.
+            Vehiculo deEnero =
+                    new TransactionTemplate(gestor)
+                            .execute(
+                                    estado ->
+                                            vehiculos.save(
+                                                    Vehiculo.nuevo(
+                                                            Placa.de(PLACA_DE_ENERO),
+                                                            vendedorEnEnero,
+                                                            MARCA,
+                                                            MODELO,
+                                                            "M1",
+                                                            FABRICACION,
+                                                            new Ejercicio(2024))));
+            transferir.transferirVehiculo(
+                    requireId(deEnero),
+                    compradorEnEnero,
+                    TipoTransferencia.COMPRA_VENTA,
+                    LocalDate.of(2026, 1, 1),
+                    Dinero.de("60000.00"),
+                    false,
+                    "Tarjeta de propiedad",
+                    Observacion.de("Compraventa del vehiculo el primer dia del ejercicio"));
         } finally {
             TenantContext.limpiar();
             OrigenContext.limpiar();
@@ -256,6 +290,28 @@ class CalculoVehicularPorContribuyenteFronteraTest {
         assertThat(determinacion.path("placa").asString()).isEqualTo(PLACA);
         assertThat(determinacion.path("contribuyenteId").asLong()).isEqualTo(comprador);
         assertThat(delVendedor.getResponse().getStatus()).isEqualTo(404);
+    }
+
+    @Test
+    @DisplayName("vendido el mismo 1 de enero: 2026 lo calcula el vendedor, no el comprador")
+    void vendidoElPrimeroDeEneroLoCalculaElVendedor() throws Exception {
+        MvcResult delVendedor = calcularPara(VENDEDOR_EN_ENERO, "2026");
+        MvcResult delComprador = calcularPara(COMPRADOR_EN_ENERO, "2026");
+
+        assertThat(delVendedor.getResponse().getStatus())
+                .as(
+                        "el adquirente asume la condicion de contribuyente a partir del 1 de enero"
+                                + " del anio siguiente: el 2026 sigue siendo del vendedor")
+                .isEqualTo(201);
+        JsonNode determinacion = unicaDeterminacion(delVendedor);
+        assertThat(determinacion.path("placa").asString()).isEqualTo(PLACA_DE_ENERO);
+        assertThat(determinacion.path("contribuyenteId").asLong()).isEqualTo(vendedorEnEnero);
+        assertThat(delComprador.getResponse().getStatus()).isEqualTo(404);
+
+        MvcResult delCompradorEn2027 = calcularPara(COMPRADOR_EN_ENERO, "2027");
+        assertThat(delCompradorEn2027.getResponse().getStatus()).isEqualTo(201);
+        assertThat(unicaDeterminacion(delCompradorEn2027).path("contribuyenteId").asLong())
+                .isEqualTo(compradorEnEnero);
     }
 
     // ------------------------------------------------------------------

@@ -275,7 +275,7 @@ class ExpedienteDeConsultasControllerTest {
         }
 
         @Override
-        public List<Long> vehiculosQueTransfirioDespuesDe(long transferenteId, LocalDate fecha) {
+        public List<Long> vehiculosQueTransfirioDesde(long transferenteId, LocalDate fecha) {
             return List.of();
         }
 

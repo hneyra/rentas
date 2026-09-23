@@ -118,12 +118,12 @@ public class TransferenciaRepositoryJdbc extends RepositorioJdbc
     }
 
     @Override
-    public List<Long> vehiculosQueTransfirioDespuesDe(long transferenteId, LocalDate fecha) {
+    public List<Long> vehiculosQueTransfirioDesde(long transferenteId, LocalDate fecha) {
         return jdbc().sql(
                         "SELECT DISTINCT t.vehiculo_id FROM transferencia t"
                                 + " WHERE t.transferente_id = :transferente"
                                 + " AND t.vehiculo_id IS NOT NULL"
-                                + " AND t.fecha_transferencia > :fecha"
+                                + " AND t.fecha_transferencia >= :fecha"
                                 + " ORDER BY t.vehiculo_id")
                 .param("transferente", transferenteId)
                 .param("fecha", fecha)

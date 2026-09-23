@@ -187,10 +187,10 @@ public class RegistrarDeterminacionVehicular {
      * <p>Hasta #329 eran sus {@code ACTIVO} de hoy, y la lista contestaba la pregunta equivocada:
      * el vendedor de junio ya no veía el vehículo del que era contribuyente, y el comprador veía
      * uno del que no lo era. Ahora se reúnen los candidatos —los que tiene hoy más los que
-     * transfirió después del 1 de enero— y a cada uno se le pregunta de quién era ese día con
-     * {@link PropietarioAlPrimeroDeEnero}, la misma regla con que {@link #calcular} decide a quién
-     * asentar: así la lista y la determinación no pueden discrepar. Los que compró después del 1 de
-     * enero quedan fuera por esa misma pregunta.
+     * transfirió <b>desde</b> el 1 de enero, ese día incluido— y a cada uno se le pregunta de quién
+     * era el ejercicio con {@link PropietarioAlPrimeroDeEnero}, la misma regla con que {@link
+     * #calcular} decide a quién asentar: así la lista y la determinación no pueden discrepar. Los
+     * que compró desde el 1 de enero quedan fuera por esa misma pregunta.
      *
      * <p>Un código que no es de nadie en esta municipalidad devuelve la lista vacía, igual que
      * antes.
@@ -215,7 +215,7 @@ public class RegistrarDeterminacionVehicular {
             candidatos.put(idDe(fila.vehiculo()), fila.vehiculo());
         }
         for (long vehiculoId :
-                transferencias.vehiculosQueTransfirioDespuesDe(quien, ejercicio.primerDia())) {
+                transferencias.vehiculosQueTransfirioDesde(quien, ejercicio.primerDia())) {
             vehiculos
                     .findById(vehiculoId)
                     .filter(vehiculo -> vehiculo.estado() == EstadoVehiculo.ACTIVO)

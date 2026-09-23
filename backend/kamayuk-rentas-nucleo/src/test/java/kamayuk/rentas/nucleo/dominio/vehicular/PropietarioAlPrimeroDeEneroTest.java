@@ -55,12 +55,31 @@ class PropietarioAlPrimeroDeEneroTest {
         assertThat(PropietarioAlPrimeroDeEnero.de(B, historico, DE_2026)).isEqualTo(B);
     }
 
+    /**
+     * El borde del mismo 1 de enero. El art. 31, segundo parrafo: «Cuando se efectue una
+     * transferencia, el adquirente asume la condicion de contribuyente a partir del 1 de enero del
+     * ano siguiente». Una transferencia del 2026-01-01 hace al adquiriente contribuyente desde el
+     * 2027-01-01: el 2026 sigue siendo del transferente.
+     */
     @Test
-    @DisplayName("vendido el mismo 1 de enero: el propietario de ese dia ya es el comprador")
-    void vendidoElPrimeroDeEneroEsDelComprador() {
+    @DisplayName(
+            "vendido el mismo 1 de enero: el ejercicio es del vendedor, el siguiente del comprador")
+    void vendidoElPrimeroDeEneroEsDelVendedor() {
         List<Transferencia> historico = List.of(de(1L, A, B, LocalDate.of(2026, 1, 1)));
 
+        assertThat(PropietarioAlPrimeroDeEnero.de(B, historico, DE_2026))
+                .as("el adquirente es contribuyente a partir del 1 de enero del anio siguiente")
+                .isEqualTo(A);
+        assertThat(PropietarioAlPrimeroDeEnero.de(B, historico, new Ejercicio(2027))).isEqualTo(B);
+    }
+
+    @Test
+    @DisplayName("vendido el 31 de diciembre: el ejercicio siguiente ya es del comprador")
+    void vendidoElTreintaYUnoDeDiciembreEsDelComprador() {
+        List<Transferencia> historico = List.of(de(1L, A, B, LocalDate.of(2025, 12, 31)));
+
         assertThat(PropietarioAlPrimeroDeEnero.de(B, historico, DE_2026)).isEqualTo(B);
+        assertThat(PropietarioAlPrimeroDeEnero.de(B, historico, new Ejercicio(2025))).isEqualTo(A);
     }
 
     @Test
@@ -106,7 +125,7 @@ class PropietarioAlPrimeroDeEneroTest {
     }
 
     @Test
-    @DisplayName("una cadena anterior y otra dentro: cuenta la primera posterior al 1 de enero")
+    @DisplayName("una cadena anterior y otra dentro: cuenta la primera desde el 1 de enero")
     void soloCuentanLasPosterioresAlPrimeroDeEnero() {
         List<Transferencia> historico =
                 List.of(

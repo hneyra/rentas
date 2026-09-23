@@ -313,14 +313,17 @@ class RegistrarDeterminacionVehicularTest {
         }
 
         /**
-         * El borde: la transferencia fechada el mismo 1 de enero. La convencion es la de la
-         * titularidad predial —la cuota del transferente se cierra el dia anterior y la del
-         * adquiriente abre ese mismo dia—, asi que al 1 de enero el propietario ya es el comprador.
+         * El borde: la transferencia fechada el mismo 1 de enero. El art. 31, segundo parrafo, lo
+         * decide: «el adquirente asume la condicion de contribuyente a partir del 1 de enero del
+         * ano siguiente». Vendido el 2026-01-01, el 2026 es del vendedor y el 2027 del comprador.
          */
         @Test
-        @DisplayName("vendido el mismo 1 de enero: el ejercicio ya es del comprador")
+        @DisplayName(
+                "vendido el mismo 1 de enero: 2026 se determina al vendedor y 2027 al comprador")
         void unaTransferenciaDelPrimeroDeEnero() throws SQLException {
             long vehiculoId = crearVehiculoConValorReferencial("W7G-777", "MAZDA", "DEMIO");
+            sellarConValorReferencialYAlicuota(
+                    new Ejercicio(2027), "MAZDA", "DEMIO", new BigDecimal("1.0"));
             venderAlComprador(vehiculoId, LocalDate.of(2026, 1, 1));
 
             Determinacion de2026 =
@@ -331,8 +334,59 @@ class RegistrarDeterminacionVehicularTest {
                                     false,
                                     Observacion.de("Vendido el primer dia del ejercicio"))
                             .determinacion();
+            Determinacion de2027 =
+                    registrar
+                            .calcular(
+                                    vehiculoId,
+                                    new Ejercicio(2027),
+                                    false,
+                                    Observacion.de("El ejercicio siguiente a la venta"))
+                            .determinacion();
 
-            assertThat(contribuyenteDeLaFila(de2026)).isEqualTo(comprador);
+            assertThat(contribuyenteDeLaFila(de2026))
+                    .as(
+                            "vendido el 1 de enero de 2026, el comprador es contribuyente desde el"
+                                    + " 1 de enero de 2027: el 2026 sigue siendo del vendedor")
+                    .isEqualTo(contribuyente);
+            assertThat(contribuyenteDeLaFila(de2027)).isEqualTo(comprador);
+        }
+
+        /**
+         * El otro lado del borde: vendido el ultimo dia de un ejercicio, el siguiente ya es del
+         * comprador. Se mide con el 31 de diciembre de 2026 y no con el de 2025 porque la base de
+         * prueba solo tiene las particiones de {@code auditoria} de 2026 y 2027, y la transferencia
+         * se audita en el ejercicio de su fecha; el 2025-12-31 lo fija la prueba pura.
+         */
+        @Test
+        @DisplayName(
+                "vendido el 31 de diciembre de 2026: 2026 es del vendedor y 2027 del comprador")
+        void unaTransferenciaDelTreintaYUnoDeDiciembre() throws SQLException {
+            long vehiculoId = crearVehiculoConValorReferencial("W8H-888", "KIA", "PICANTO");
+            sellarConValorReferencialYAlicuota(
+                    new Ejercicio(2027), "KIA", "PICANTO", new BigDecimal("1.0"));
+            venderAlComprador(vehiculoId, LocalDate.of(2026, 12, 31));
+
+            Determinacion de2026 =
+                    registrar
+                            .calcular(
+                                    vehiculoId,
+                                    EJERCICIO_AFECTO,
+                                    false,
+                                    Observacion.de("Vendido el ultimo dia del ejercicio"))
+                            .determinacion();
+            Determinacion de2027 =
+                    registrar
+                            .calcular(
+                                    vehiculoId,
+                                    new Ejercicio(2027),
+                                    false,
+                                    Observacion.de("El ejercicio siguiente a la venta"))
+                            .determinacion();
+
+            assertThat(contribuyenteDeLaFila(de2026)).isEqualTo(contribuyente);
+            assertThat(contribuyenteDeLaFila(de2027))
+                    .as("vendido el 31 de diciembre, al 1 de enero siguiente ya era del comprador")
+                    .isEqualTo(comprador);
         }
     }
 
