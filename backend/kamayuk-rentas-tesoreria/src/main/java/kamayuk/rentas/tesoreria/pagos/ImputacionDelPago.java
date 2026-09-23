@@ -162,7 +162,8 @@ public class ImputacionDelPago {
      * manda se descartaba en el borde. Anular en julio un recibo de marzo escribia entonces la
      * reversion en marzo: un estado de cuenta al 30 de abril recalculado despues cambiaba de
      * respuesta, cuando lo cierto es que ese recibo estuvo vigente hasta julio. Es la regla 9 y
-     * ADR-0006 —el libro no se reescribe—, y ademas decide en que particion caen los asientos.
+     * ADR-0006 —el libro no se reescribe—. Lo que esa fecha NO decide es el ejercicio: la reversion
+     * cae en el de la obligacion que el recibo cobro, aunque se anule al ano siguiente (#424).
      */
     private int reversar(PagoRecibido pago) {
         ReversionDeAbonos reversion =

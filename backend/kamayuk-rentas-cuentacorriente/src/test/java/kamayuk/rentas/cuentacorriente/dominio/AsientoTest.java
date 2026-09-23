@@ -87,11 +87,63 @@ class AsientoTest {
         assertThat(reversion.monto()).isEqualTo(cargo.monto());
         assertThat(reversion.contribuyenteId()).isEqualTo(cargo.contribuyenteId());
         assertThat(reversion.ejercicio())
-                .as("cae en la particion de su propia fecha, no en la del original")
-                .isEqualTo(Ejercicio.de(LocalDate.of(2026, 4, 15)));
+                .as(
+                        "es el del original: la reversion es de su misma obligacion (#424). Dentro"
+                                + " de 2026 no distingue nada; lo distingue la muestra de abajo")
+                .isEqualTo(cargo.ejercicio());
         assertThat(cargo.tipo())
                 .as("el original no cambia: la reversion es un asiento nuevo, no una edicion")
                 .isEqualTo(TipoAsiento.CARGO);
+    }
+
+    /**
+     * La muestra que faltaba (#424): una reversion que <b>cruza el ano</b>. Con el original y la
+     * reversion dentro de 2026 —la unica muestra que habia— «el ejercicio del original» y «el de la
+     * fecha de la reversion» son el mismo numero, y la prueba pasa igual con cualquiera de los dos.
+     *
+     * <p>Es el escenario del issue: ARBITRIO 2026, cuota 12, del predio 7, cobrado por caja el
+     * 2027-01-05 y anulado ese mismo dia. El abono se asento en el ejercicio de la cuota; su
+     * reversion tiene que caer en la misma obligacion, o la deuda no vuelve a la que se pago y
+     * aparece otra en 2027 que nadie emitio.
+     */
+    @Test
+    @DisplayName(
+            "#424 — la reversion de enero de 2027 de un abono de 2026 es de la obligacion 2026")
+    void laReversionQueCruzaElAnoEsDeLaMismaObligacion() {
+        Asiento abono = abonoDeCaja(new Ejercicio(2026), 12, LocalDate.of(2027, 1, 5));
+
+        Asiento reversion =
+                Asiento.reversionDe(
+                        abono,
+                        LocalDate.of(2027, 1, 5),
+                        "ANULACION 001-123",
+                        "recibo mal cobrado, anulado en el dia");
+
+        assertThat(reversion.ejercicio())
+                .as("el de la obligacion que se cobro, no el de la fecha de la anulacion")
+                .isEqualTo(new Ejercicio(2026));
+        assertThat(ClaveDeSaldo.de(reversion))
+                .as("la reversion deshace el abono en SU obligacion: misma clave de saldo")
+                .isEqualTo(ClaveDeSaldo.de(abono));
+        assertThat(reversion.fechaValor())
+                .as("y la fecha valor sigue siendo la de la anulacion (C-1, regla 9)")
+                .isEqualTo(LocalDate.of(2027, 1, 5));
+    }
+
+    @Test
+    @DisplayName("#424 — y al reves: anular en diciembre de 2026 un adelanto de 2027 vuelve a 2027")
+    void laReversionDeUnAdelantoVuelveAlEjercicioSiguiente() {
+        Asiento adelanto = abonoDeCaja(new Ejercicio(2027), 1, LocalDate.of(2026, 12, 15));
+
+        Asiento reversion =
+                Asiento.reversionDe(
+                        adelanto,
+                        LocalDate.of(2026, 12, 15),
+                        "ANULACION 001-124",
+                        "adelanto cobrado al contribuyente equivocado");
+
+        assertThat(reversion.ejercicio()).isEqualTo(new Ejercicio(2027));
+        assertThat(ClaveDeSaldo.de(reversion)).isEqualTo(ClaveDeSaldo.de(adelanto));
     }
 
     @Test
@@ -146,5 +198,32 @@ class AsientoTest {
                 monto,
                 LocalDate.of(2026, 3, 1),
                 "EM-2026-0001");
+    }
+
+    /**
+     * El abono de insoluto que la cobranza escribe (#33): con el ejercicio <b>de la cuota</b> y la
+     * fecha <b>de pago</b>, como hace {@code RegistroDeAbonosCuentaCorriente}. Ya guardado, que es
+     * lo unico que se puede reversar.
+     */
+    private static Asiento abonoDeCaja(Ejercicio ejercicio, int cuota, LocalDate fechaDePago) {
+        return new Asiento(
+                20L,
+                ejercicio,
+                1L,
+                "ARBITRIO",
+                Concepto.INSOLUTO,
+                TipoAsiento.ABONO,
+                Fase.ORDINARIA,
+                cuota,
+                7L,
+                null,
+                null,
+                Dinero.de("20.00"),
+                fechaDePago,
+                "RECIBO 001-123",
+                null,
+                "cajera.ventanilla",
+                "cobro en ventanilla",
+                null);
     }
 }

@@ -102,7 +102,10 @@ public class RegistrarAsiento {
      *
      * <p>{@link #reversar} no la lleva y no la necesita: el ejercicio de una reversion es el del
      * asiento que reversa, y ese esta guardado, o sea que su particion existe. Ponersela ahi seria
-     * una consulta por reversion para una condicion que no puede darse.
+     * una consulta por reversion para una condicion que no puede darse. Hasta #424 esta premisa era
+     * falsa —{@link Asiento#reversionDe} tomaba el ejercicio de la fecha de la reversion—, y lo que
+     * la hace cierta ahora es que {@link Asiento#reversionDe} copia el del original y comprueba que
+     * la clave de saldo no cambia.
      */
     public void exigirEjercicioAsentable(Ejercicio ejercicio) {
         List<Ejercicio> asentables = repositorio.ejerciciosAsentables();
@@ -126,8 +129,8 @@ public class RegistrarAsiento {
      * se corrige, se reversa»).
      *
      * @param asientoId el asiento a reversar
-     * @param fecha fecha valor de la reversion; decide en que particion cae (ejercicio de la
-     *     reversion, no el del original)
+     * @param fecha fecha valor de la reversion. No decide su ejercicio ni su particion: son los del
+     *     original, porque la reversion es de la misma obligacion (#424)
      * @param documentoOrigen el documento que sustenta la reversion
      * @param observacion por que se reversa
      */
