@@ -451,8 +451,8 @@ describe('AC8 — el contrato, la instalacion y lo que se lee dicen lo mismo', (
     // invertidas, porque con ellas la guarda de #255 vuelve a dispararse sobre la cita de la
     // cita—: era la pantalla con que la V6 contaba este caso (#33, AC7) y salio del arbol con
     // ella en #90, de modo que `src/marco/` esta en la lista de `la-v6-no-esta.test.ts` y no
-    // puede volver. Lo que la V8 hace en su lugar —un parrafo con el motivo, sin boton de
-    // reintentar y sin nombrar las dos opciones— esta medido en `src/datos/servidas.ts`.
+    // puede volver. Lo que la V8 hace en su lugar —desde #311, nombrar las opciones que faltan y
+    // ofrecer reintentar, y solo en el 403 `SIN_PRIVILEGIO`— esta en `src/datos/servidas.ts`.
     const candidatas = Object.keys(formas).filter((clave) =>
       /menu|arbol|navegacion|submodulo/i.test(clave),
     );

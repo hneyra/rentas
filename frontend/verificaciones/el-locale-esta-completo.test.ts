@@ -71,6 +71,15 @@ const LITERALES = [
   'La sesion no vale para saber que puede abrir esta cuenta. Vuelva a entrar.',
   'No se pudo saber que modulos puede abrir esta cuenta, asi que no se ofrece ninguno. Ofrecerlos todos ante un fallo convertiria un problema de red en un agujero de autorizacion.',
   'Esta cuenta no puede abrir ningun modulo de este sistema. No es un fallo: es una cuenta sin permisos, o afiliada a un grupo que no los tiene.',
+  // Las del 403 SIN_PRIVILEGIO sobre el catalogo (#311): la frase, el titulo, el remedio y el
+  // boton, escritos como `t('…')`; y los NOMBRES de las dos opciones, que se leen por variable
+  // —`t(nombre)`, de `OPCIONES_QUE_LEEN_EL_CATALOGO`— y por eso `i18next-cli` no los ve.
+  'Esta cuenta no tiene permiso para leer el catalogo de este sistema, asi que no hay modulos que ofrecerle. No es una averia: le falta el permiso de lectura en estas opciones, y lo da quien administre los perfiles.',
+  'A esta cuenta le faltan opciones para ver sus modulos',
+  'Cuando se las den, pulse Reintentar: no hace falta volver a entrar. El permiso se da en identidad, y este sistema lo recoge cada cinco minutos.',
+  'Reintentar',
+  'Módulos del sistema',
+  'Accesos y políticas',
   // Las tres de la puerta que no contesta (#112). La segunda lleva interpolacion: el emisor, la
   // URL y lo que dijo el navegador son dato, y por eso van entre llaves y no escritos.
   'No se pudo llegar al emisor de identidad, asi que no se mando a nadie a identificarse.',

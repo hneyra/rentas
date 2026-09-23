@@ -13,13 +13,17 @@ import { RUTAS, pedirLista, pedirPagina, pedirUno } from './lecturas.ts';
 /**
  * **El catalogo que el armazon recibe, filtrado por lo que la cuenta puede abrir** (#105).
  *
- * <h2>Los cuatro estados, y por que «sin permiso» NO es un error</h2>
+ * <h2>Los cinco estados, y por que «sin permiso» NO es un error</h2>
  *
  * · **Pidiendo** — no se ofrece nada todavia. Ofrecer el catalogo entero «mientras llega» seria
  *   ensenar durante un segundo justo lo que este issue existe para esconder, y un segundo basta
  *   para pulsar.
  * · **Error** — no se sabe que puede la cuenta, asi que **no se ofrece nada** y se dice. Ofrecerlo
  *   todo ante un fallo convierte un problema de red en un agujero de autorizacion.
+ * · **Sin privilegio para leer el catalogo** (#311) — `GET /seguridad/{modulos,accesos}` contesto
+ *   403 `SIN_PRIVILEGIO`. Tampoco es un error: el sistema contesto lo que tenia que contestar, y
+ *   se arregla dando una opcion. Por eso es la unica rama que **nombra lo que falta** y la unica
+ *   que **ofrece reintentar** — ver `OPCIONES_QUE_LEEN_EL_CATALOGO`.
  * · **Sin permiso para nada** — se pidio, contesto, y esta cuenta no puede abrir ni un modulo. **No
  *   es un error**: es una cuenta recien creada o mal afiliada, y quien la mire tiene que poder
  *   distinguirlo de un backend caido. Una pantalla en blanco no distingue las dos.
@@ -65,12 +69,87 @@ export const LLAVES = {
   sesion: [RAMA, 'sesion'],
 } as const;
 
+/**
+ * **Las dos opciones que pide leer el catalogo, con su nombre del CATALOGO** (#311).
+ *
+ * `GET /seguridad/modulos` declara `@RequiereAcceso(acceso = "modulos", …)` y `GET
+ * /seguridad/accesos`, `acceso = "accesos"` (`SeguridadController`). A la cuenta que no las tenga
+ * le contestan **403 `SIN_PRIVILEGIO`**, y lo unico con que eso se arregla es saber **que**
+ * opciones pedir — por el nombre con que las encuentra quien administra los perfiles, no por su
+ * codigo.
+ *
+ * <h2>Por que el nombre esta escrito aqui, y no se lee</h2>
+ *
+ * Porque **se lee de la misma lectura que fallo**: el nombre de un acceso lo publica `GET
+ * /seguridad/accesos`, y es justo la que contesto 403. No hay otra operacion de este backend que
+ * lo diga —`/sesion/permisos` trae codigos y privilegios, no nombres—, y pedirselo a `identidad`
+ * seria una lectura mas a otro sistema para ensenar dos frases fijas.
+ *
+ * Asi que se escribe, y **se escribe lo que el backend siembra**: `SembradorDelCatalogo` lee
+ * `docs/10-negocio/catalogo-de-opciones.md` y mete ese nombre en `acceso.nombre`, que es lo que
+ * `GET /seguridad/accesos` devuelve (la captura de `seguridadMedida.ts` lo dice igual). Que los
+ * dos codigos y los dos nombres sigan siendo esos lo vigila
+ * `verificaciones/las-opciones-que-leen-el-catalogo-son-las-del-backend.test.ts`, que lee el
+ * controlador y el catalogo de opciones: escritos a mano sin esa guarda, renombrar la opcion alla
+ * dejaria esta pantalla mandando a pedir una que no existe.
+ *
+ * Los nombres pasan por `t()` al dibujarse, por variable; por eso estan en `LITERALES` de la
+ * guarda del locale, como los rotulos del mando de temas.
+ */
+export const OPCIONES_QUE_LEEN_EL_CATALOGO = {
+  modulos: { codigo: 'modulos', nombre: 'Módulos del sistema' },
+  accesos: { codigo: 'accesos', nombre: 'Accesos y políticas' },
+} as const;
+
 /** Que se sabe del catalogo, ademas del catalogo. */
 export interface CatalogoDeLaSesion extends CatalogoCompuesto {
-  /** `null` mientras se pide. Distinto de «ninguno», que es una lista vacia. */
-  readonly estado: 'pidiendo' | 'error' | 'sin-permiso' | 'compuesto';
+  /**
+   * Distinto de «ninguno», que es una lista vacia. `sin-privilegio` es el 403 `SIN_PRIVILEGIO`
+   * sobre las lecturas del catalogo (#311): no es un error, y se arregla dando una opcion.
+   */
+  readonly estado: 'pidiendo' | 'error' | 'sin-privilegio' | 'sin-permiso' | 'compuesto';
   /** Que decir cuando no hay arbol. Vacio cuando si lo hay. */
   readonly porQue: string;
+  /**
+   * Los NOMBRES —en castellano, sin traducir: son claves— de las opciones cuyo 403 dejo sin
+   * arbol. Vacio fuera de `sin-privilegio`.
+   */
+  readonly faltan: readonly string[];
+  /**
+   * Volver a pedir las tres. **Solo en `sin-privilegio`**, y `null` en todo lo demas: en un 401
+   * reintentar trae el mismo token y el mismo 401, y un boton que no arregla nada es lo que #291
+   * retiro de 39 pantallas. En el 403 si arregla: el guardia comprueba cada peticion contra la
+   * base (ADR-0013), asi que en cuanto la opcion llega la siguiente peticion pasa, sin cerrar la
+   * sesion.
+   */
+  readonly reintentar: (() => void) | null;
+  /** Si hay una vuelta en curso. Para no ofrecer pulsar otra vez mientras. */
+  readonly reintentando: boolean;
+}
+
+/** Lo que no cambia fuera de `sin-privilegio`. */
+const SIN_REMEDIO = { faltan: [], reintentar: null, reintentando: false } as const;
+
+/** El 403 `SIN_PRIVILEGIO`, y solo ese: el `SIN_MUNICIPALIDAD` no se arregla dando una opcion. */
+function esSinPrivilegio(error: unknown): boolean {
+  return error instanceof ErrorDeLaApi && error.estado === 403 && error.codigo === 'SIN_PRIVILEGIO';
+}
+
+/**
+ * **El `problem+json` de un 403, en los tres campos que esta rama mira** (#311).
+ *
+ * Vive aqui, y no en `api/cliente.ts` junto a `CuerpoDeProblema` —la forma completa, con sus siete
+ * campos opcionales—: esta es la forma REDUCIDA con la que el arnes de extremo a extremo
+ * (`e2e/el-403-del-catalogo.spec.ts`) simula la respuesta, y `estado` en `title`/`status`/`codigo`
+ * es lo unico que `esSinPrivilegio` lee. Declararla bajo `src/datos/` —y no como objeto literal en
+ * el arnes— es lo que `verificaciones/los-fixtures-del-arnes-llevan-tipo.test.ts` de #314 exige de
+ * todo cuerpo que `e2e/` sirve: sin tipo, un campo que cambie de nombre compilaria igual y el rojo
+ * saldria como un tiempo agotado sin nombrar ni el archivo ni el campo (#313).
+ */
+export interface CuerpoDelSinPrivilegio {
+  readonly title: string;
+  readonly status: number;
+  readonly codigo: string;
 }
 
 const VACIO: CatalogoCompuesto = {
@@ -117,29 +196,68 @@ export function useCatalogoPermitido(): CatalogoDeLaSesion {
   }, [modulos.data, accesos.data, permisos.data]);
 
   if (modulos.isError || accesos.isError || permisos.isError) {
-    const error = modulos.error ?? accesos.error ?? permisos.error;
-    const codigo = error instanceof ErrorDeLaApi ? error.estado : null;
+    const errores = [modulos.error, accesos.error, permisos.error].filter((e) => e !== null);
+    const es401 = errores.some((e) => e instanceof ErrorDeLaApi && e.estado === 401);
+
+    // **El 403 `SIN_PRIVILEGIO` tiene rama propia (#311), y solo cuando es TODO lo que paso.**
+    // Solo las dos del catalogo lo pueden dar —`/sesion/permisos` declara `SESION_PROPIA` y pasa
+    // con un token valido—, y si ademas algo se rompio, decir «le faltan estas opciones» seria
+    // mentir: dadas, la pantalla seguiria sin arbol.
+    const soloFaltanOpciones =
+      !permisos.isError &&
+      (!modulos.isError || esSinPrivilegio(modulos.error)) &&
+      (!accesos.isError || esSinPrivilegio(accesos.error));
+
+    if (!es401 && soloFaltanOpciones) {
+      const faltan = [
+        ...(modulos.isError ? [OPCIONES_QUE_LEEN_EL_CATALOGO.modulos.nombre] : []),
+        ...(accesos.isError ? [OPCIONES_QUE_LEEN_EL_CATALOGO.accesos.nombre] : []),
+      ];
+      return {
+        ...VACIO,
+        estado: 'sin-privilegio',
+        porQue: t(
+          'Esta cuenta no tiene permiso para leer el catalogo de este sistema, asi que no hay ' +
+            'modulos que ofrecerle. No es una averia: le falta el permiso de lectura en estas ' +
+            'opciones, y lo da quien administre los perfiles.',
+        ),
+        faltan,
+        // Las tres, y no solo las que fallaron: quien da una opcion puede estar cambiando el
+        // grupo entero, y la matriz de `/sesion/permisos` es la que filtra el arbol que se monte.
+        reintentar: () => {
+          void Promise.all([modulos.refetch(), accesos.refetch(), permisos.refetch()]);
+        },
+        reintentando: modulos.isFetching || accesos.isFetching || permisos.isFetching,
+      };
+    }
+
     return {
       ...VACIO,
+      ...SIN_REMEDIO,
       estado: 'error',
-      porQue:
-        codigo === 401
-          ? t('La sesion no vale para saber que puede abrir esta cuenta. Vuelva a entrar.')
-          : t(
-              'No se pudo saber que modulos puede abrir esta cuenta, asi que no se ofrece ninguno. ' +
-                'Ofrecerlos todos ante un fallo convertiria un problema de red en un agujero de ' +
-                'autorizacion.',
-            ),
+      porQue: es401
+        ? t('La sesion no vale para saber que puede abrir esta cuenta. Vuelva a entrar.')
+        : t(
+            'No se pudo saber que modulos puede abrir esta cuenta, asi que no se ofrece ninguno. ' +
+              'Ofrecerlos todos ante un fallo convertiria un problema de red en un agujero de ' +
+              'autorizacion.',
+          ),
     };
   }
 
   if (compuesto === null) {
-    return { ...VACIO, estado: 'pidiendo', porQue: t('Averiguando que puede abrir esta cuenta.') };
+    return {
+      ...VACIO,
+      ...SIN_REMEDIO,
+      estado: 'pidiendo',
+      porQue: t('Averiguando que puede abrir esta cuenta.'),
+    };
   }
 
   if (compuesto.catalogo.length === 0) {
     return {
       ...compuesto,
+      ...SIN_REMEDIO,
       estado: 'sin-permiso',
       porQue: t(
         'Esta cuenta no puede abrir ningun modulo de este sistema. No es un fallo: es una cuenta ' +
@@ -148,7 +266,7 @@ export function useCatalogoPermitido(): CatalogoDeLaSesion {
     };
   }
 
-  return { ...compuesto, estado: 'compuesto', porQue: '' };
+  return { ...compuesto, ...SIN_REMEDIO, estado: 'compuesto', porQue: '' };
 }
 
 /** El catalogo a secas, para quien solo quiera eso. */
