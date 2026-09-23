@@ -301,7 +301,9 @@ public class ConsultarDeuda {
      * <p>Y la cuenta es <b>la misma</b> que hace {@code RegistrarMovimientoDeDeuda} al repartir una
      * baja (#598): es la misma funcion pura sobre los mismos asientos. Escribirla dos veces dejaria
      * que lo que se lee en pantalla y lo que el acto puede extinguir divergieran sin que ninguna
-     * cifra pareciera mal (#397).
+     * cifra pareciera mal (#397). El reparto la llama a traves de {@link
+     * CalculoDeDeuda#extinguiblePorPeriodoDesde} (#445), que da esta misma cifra cuando nada del
+     * libro es posterior a la fecha, y le resta lo que un cobro posterior ya extinguio cuando si.
      */
     private Map<ClaveDeObligacion, Map<Integer, DeudaActualizada>> deudaPorPeriodoDe(
             List<Renglon> deLaPagina, LocalDate fecha) {

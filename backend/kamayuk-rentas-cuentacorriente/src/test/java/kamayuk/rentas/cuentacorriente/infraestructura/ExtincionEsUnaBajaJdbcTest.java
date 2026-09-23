@@ -456,6 +456,77 @@ class ExtincionEsUnaBajaJdbcTest {
     }
 
     // ------------------------------------------------------------------
+    //  #445 — la resolucion fechada ANTES de un cobro
+    // ------------------------------------------------------------------
+
+    /**
+     * La siembra que distingue (#445): el cobro tiene fecha valor <b>posterior</b> a la de la
+     * resolucion. Las pruebas de arriba cobran el 05-12 y resuelven el 06-15, y con ese orden «lo
+     * que se debia a la fecha» y «lo que queda por extinguir» son la misma cifra.
+     *
+     * <p>La fecha de la resolucion la teclea quien la dicta y es retroactiva a proposito ({@code
+     * ResolverConResolucionDeGerencia.Peticion}); el cobro pudo entrar entre esa fecha y el dia en
+     * que se registra.
+     */
+    @Nested
+    @DisplayName(
+            "#445 — Una resolucion fechada antes de un cobro no extingue lo que el cobro ya extinguio")
+    class FechadaAntesDelCobro {
+
+        @Test
+        @DisplayName("la multa ya pagada no produce ningun asiento: el movimiento sale vacio")
+        void laMultaYaPagadaNoProduceNingunAsiento() throws SQLException {
+            long titular = nuevoTitular();
+
+            emitirMulta(titular, "MULTA_TRANSITO", "330.00", LocalDate.of(2026, 4, 2));
+            cobrar(titular, "MULTA_TRANSITO", "330.00", LocalDate.of(2026, 4, 20));
+
+            // Se registra el 04-25 una resolucion FECHADA el 04-15. Releida al 04-15, la multa
+            // «debe» 330,00, y asentarlos dejaba la obligacion en -330,00: una baja de lo que ya
+            // se pago, cuando el contrato promete cero asientos y derivarla a devolucion.
+            MovimientoAsentado baja =
+                    extinguir(titular, "MULTA_TRANSITO", LocalDate.of(2026, 4, 15));
+
+            assertThat(baja.estaVacio())
+                    .as(
+                            "ExtincionDeDeuda: «una obligacion que ya no deba nada no produce"
+                                    + " ningun asiento y devuelve un movimiento vacio»")
+                    .isTrue();
+            assertThat(baja.asientos()).isZero();
+            assertThat(baja.importe()).isEqualTo(Dinero.CERO);
+            assertThat(delLibro(titular))
+                    .as("en el libro, el cargo y el cobro; ninguna baja")
+                    .extracting(Asiento::tipo)
+                    .containsExactly(TipoAsiento.CARGO, TipoAsiento.ABONO);
+            assertThat(netoDelLibro(titular))
+                    .as("lo que sobra de verdad es un pago, y eso es una devolucion; no una baja")
+                    .isEqualTo(Dinero.de("0.00"));
+        }
+
+        @Test
+        @DisplayName(
+                "la multa pagada a medias despues: se extingue solo lo que el cobro no alcanzo")
+        void laMultaPagadaAMediasExtingueSoloElResto() throws SQLException {
+            long titular = nuevoTitular();
+
+            emitirMulta(titular, "MULTA_ADMINISTRATIVA", "300.00", LocalDate.of(2026, 3, 4));
+            cobrar(titular, "MULTA_ADMINISTRATIVA", "150.00", LocalDate.of(2026, 5, 12));
+
+            MovimientoAsentado baja =
+                    extinguir(titular, "MULTA_ADMINISTRATIVA", LocalDate.of(2026, 4, 15));
+
+            assertThat(baja.importe())
+                    .as(
+                            "al 04-15 se debian 300,00, pero 150,00 los extinguio el cobro del"
+                                    + " 05-12: lo que queda por extinguir es 150,00")
+                    .isEqualTo(Dinero.de("150.00"));
+            assertThat(netoDelLibro(titular))
+                    .as("y la obligacion queda en cero, no en -150,00")
+                    .isEqualTo(Dinero.de("0.00"));
+        }
+    }
+
+    // ------------------------------------------------------------------
     //  El aislamiento lo pone la politica
     // ------------------------------------------------------------------
 
@@ -522,13 +593,18 @@ class ExtincionEsUnaBajaJdbcTest {
      * sanciones} llama cuando una resolucion de gerencia deja la multa sin efecto.
      */
     private static MovimientoAsentado extinguir(long titular, String tributo) {
+        return extinguir(titular, tributo, RESOLUCION);
+    }
+
+    /** La misma, con la fecha que la resolucion declara (#445). */
+    private static MovimientoAsentado extinguir(long titular, String tributo, LocalDate fecha) {
         MovimientoAsentado asentado =
                 transaccion.execute(
                         estado ->
                                 extincion.extinguir(
                                         titular,
                                         new SeleccionDeObligacion(tributo, EJERCICIO, null, null),
-                                        RESOLUCION,
+                                        fecha,
                                         "RESOLUCION RG-2026-000123",
                                         "PT-000123",
                                         CausalDeBaja.RESOLUCION_QUE_DEJA_SIN_EFECTO,
@@ -541,6 +617,11 @@ class ExtincionEsUnaBajaJdbcTest {
      * acto —no nace de un alta de deuda—, con el acta como documento de origen.
      */
     private static void emitirMulta(long titular, String tributo, String importe) {
+        emitirMulta(titular, tributo, importe, LocalDate.of(2026, 3, 4));
+    }
+
+    private static void emitirMulta(
+            long titular, String tributo, String importe, LocalDate fechaValor) {
         transaccion.execute(
                 estado -> {
                     registrar.asentar(
@@ -556,7 +637,7 @@ class ExtincionEsUnaBajaJdbcTest {
                                     null,
                                     "PT-000123",
                                     Dinero.de(importe),
-                                    LocalDate.of(2026, 3, 4),
+                                    fechaValor,
                                     "ACTA PT-000123"),
                             Observacion.de("Emision de la prueba de #662"));
                     return null;
@@ -568,6 +649,10 @@ class ExtincionEsUnaBajaJdbcTest {
      * —{@code ABONO} de concepto {@code INSOLUTO}, con el recibo como documento de origen—.
      */
     private static void cobrar(long titular, String tributo, String importe) {
+        cobrar(titular, tributo, importe, LocalDate.of(2026, 5, 12));
+    }
+
+    private static void cobrar(long titular, String tributo, String importe, LocalDate fechaValor) {
         transaccion.execute(
                 estado -> {
                     registrar.asentar(
@@ -583,7 +668,7 @@ class ExtincionEsUnaBajaJdbcTest {
                                     null,
                                     null,
                                     Dinero.de(importe),
-                                    LocalDate.of(2026, 5, 12),
+                                    fechaValor,
                                     "RECIBO 001-0000042"),
                             Observacion.de("Cobranza de la prueba de #662"));
                     return null;
@@ -627,6 +712,30 @@ class ExtincionEsUnaBajaJdbcTest {
     }
 
     // ------------------------------------------------------------------
+
+    /** Lo que el libro tiene de ese titular, en el orden en que se asento. */
+    private static List<Asiento> delLibro(long titular) {
+        List<Asiento> leidos = transaccion.execute(estado -> asientos.deContribuyente(titular));
+        return java.util.Objects.requireNonNull(leidos);
+    }
+
+    /**
+     * El insoluto neto del libro, sin fecha de corte: cargos menos abonos. Es la cifra que #445
+     * encontro en negativo, y la que la proyeccion copia.
+     */
+    private static Dinero netoDelLibro(long titular) {
+        Dinero neto = Dinero.CERO;
+        for (Asiento asiento : delLibro(titular)) {
+            if (asiento.concepto() != Concepto.INSOLUTO) {
+                continue;
+            }
+            neto =
+                    asiento.tipo() == TipoAsiento.CARGO
+                            ? neto.mas(asiento.monto())
+                            : neto.menos(asiento.monto());
+        }
+        return neto;
+    }
 
     private static Dinero cargado(String tributo) {
         CargadoEnElLibro leido =

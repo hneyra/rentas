@@ -168,6 +168,7 @@ class AltaDeDeudaSobreUnVehiculoFronteraTest {
                 envolver(
                         new RegistrarMovimientoDeDeuda(
                                 asientos,
+                                new SaldoRepositoryJdbc(jdbc),
                                 envolver(
                                         new RegistrarAsiento(
                                                 asientos,

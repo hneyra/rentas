@@ -36,7 +36,8 @@ import org.jspecify.annotations.Nullable;
 public interface ExtincionDeDeuda {
 
     /**
-     * Da de baja, parte por parte, lo que esa obligacion deba a la fecha.
+     * Da de baja, parte por parte, lo que esa obligacion deba a la fecha y ningun abono posterior
+     * haya extinguido ya (#445).
      *
      * <p>Escribe un abono por cada parte del desglose con importe —insoluto, reajuste, interes,
      * gasto—, en la fase en la que la obligacion esta. Es exactamente lo que {@code
@@ -53,11 +54,14 @@ public interface ExtincionDeDeuda {
      *
      * <p>Una obligacion que ya no deba nada <b>no produce ningun asiento</b> y devuelve un
      * movimiento vacio: la deuda pudo pagarse mientras el recurso se tramitaba, y en ese caso lo
-     * que corresponde no es una baja sino una devolucion, que es otro procedimiento.
+     * que corresponde no es una baja sino una devolucion, que es otro procedimiento. Tambien cuando
+     * el pago tiene fecha <b>posterior</b> a la de la resolucion (#445): la fecha es retroactiva, y
+     * lo que ya se pago despues de ella no se vuelve a extinguir.
      *
      * @param contribuyenteId el obligado; lo resolvio quien llama
      * @param obligacion el tributo, ejercicio y unidad cuya deuda se extingue
-     * @param fecha la fecha valor de los asientos y la de relectura de la deuda (regla 9)
+     * @param fecha la fecha valor de los asientos y desde la que se mide lo extinguible (regla 9):
+     *     lo que se debia ese dia, menos lo que un abono posterior ya extinguio
      * @param documentoOrigen el papel que la ordena; en {@code sanciones}, el numero de la
      *     resolucion de gerencia
      * @param referenciaExterna como entra la referencia del contexto que pide la baja, si la hay
