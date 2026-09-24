@@ -165,6 +165,7 @@ public class ActasController {
         } catch (LiquidarFiscalizacion.ActaInexistente noEsta) {
             throw new ProblemaDeNegocio(CodigoDeError.NO_ENCONTRADO, mensajeDe(noEsta));
         } catch (AnularActaFiscalizacion.ActaConLiquidacionViva
+                | AnularActaFiscalizacion.ActaConResolucionEnPie
                 | ActaFiscalizacion.TransicionIlegal conflicto) {
             // 409 y no 422: la peticion es correcta, lo que no admite el acto es la situacion en
             // que esta el acta. La interfaz distingue las dos para saber si reintentar sirve.

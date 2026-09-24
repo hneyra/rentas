@@ -2,6 +2,7 @@ package kamayuk.rentas.fiscalizacion.infraestructura.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
 import java.time.Clock;
@@ -28,9 +29,11 @@ import kamayuk.rentas.fiscalizacion.dobles.LiquidacionesEnMemoria;
 import kamayuk.rentas.fiscalizacion.dobles.MovimientosDeLiquidacionEnMemoria;
 import kamayuk.rentas.fiscalizacion.dobles.PadronDeMentira;
 import kamayuk.rentas.fiscalizacion.dobles.ParametrosDeMentira;
+import kamayuk.rentas.fiscalizacion.dobles.ResolucionesEnMemoria;
 import kamayuk.rentas.fiscalizacion.dobles.TitularesDeMentira;
 import kamayuk.rentas.fiscalizacion.dominio.ActaFiscalizacion;
 import kamayuk.rentas.fiscalizacion.dominio.Hallazgo;
+import kamayuk.rentas.fiscalizacion.dominio.ResolucionDeDeterminacion;
 import kamayuk.rentas.nucleo.DeclaracionDelEjercicio;
 import kamayuk.rentas.web.ConfiguracionDeJson;
 import kamayuk.rentas.web.ManejadorDeErrores;
@@ -59,6 +62,7 @@ class LiquidacionControllerTest {
     private static final long FICHA_VIGENTE = 900L;
 
     private LiquidacionesEnMemoria liquidaciones;
+    private ResolucionesEnMemoria resoluciones;
     private MockMvc mvc;
     private long actaId;
 
@@ -66,6 +70,7 @@ class LiquidacionControllerTest {
     void armar() {
         ActasEnMemoria actas = new ActasEnMemoria();
         liquidaciones = new LiquidacionesEnMemoria();
+        resoluciones = new ResolucionesEnMemoria();
         MovimientosDeLiquidacionEnMemoria movimientos = new MovimientosDeLiquidacionEnMemoria();
         ParametrosDeMentira parametros = new ParametrosDeMentira().sellar(2024, 41L, 1);
         PadronDeMentira catastro =
@@ -126,7 +131,7 @@ class LiquidacionControllerTest {
                                         liquidar,
                                         new ReliquidarFiscalizacion(liquidaciones, liquidar),
                                         new CambiarEstadoDeLaLiquidacion(
-                                                liquidaciones, movimientos),
+                                                liquidaciones, movimientos, resoluciones),
                                         consulta,
                                         directorio,
                                         reloj),
@@ -313,7 +318,64 @@ class LiquidacionControllerTest {
                 .contains("\"fechaDeConsulta\":\"2026-03-16\"");
     }
 
+    @Test
+    @DisplayName("#338 — una NOTIFICADA no vuelve a ABIERTA: 409 y el historial no se mueve")
+    void unaNotificadaNoVuelveAAbierta() throws Exception {
+        liquidar();
+        String numero = liquidaciones.versionesDeActa(actaId).get(0).numero();
+        assertThat(moverA(numero, "LIQUIDADA").getResponse().getStatus()).isEqualTo(200);
+        assertThat(moverA(numero, "NOTIFICADA").getResponse().getStatus()).isEqualTo(200);
+
+        MvcResult resultado = moverA(numero, "ABIERTA");
+
+        assertThat(resultado.getResponse().getStatus())
+                .as("el papel ya esta en manos del contribuyente")
+                .isEqualTo(409);
+        assertThat(resultado.getResponse().getContentAsString()).contains("NOTIFICADA");
+    }
+
+    @Test
+    @DisplayName("#338 — una liquidacion con su RDF no pasa a ANULADA: 409 nombrando la RDF")
+    void conSuResolucionNoSeAnula() throws Exception {
+        liquidar();
+        var liquidacion = liquidaciones.versionesDeActa(actaId).get(0);
+        assertThat(moverA(liquidacion.numero(), "LIQUIDADA").getResponse().getStatus())
+                .isEqualTo(200);
+        resoluciones.registrar(
+                ResolucionDeDeterminacion.predial(
+                        "RDF-2026-000004",
+                        1L,
+                        liquidacion.identificador(),
+                        CONTRIBUYENTE,
+                        PREDIO,
+                        FICHA_DECLARADA,
+                        FICHA_VIGENTE,
+                        HOY,
+                        "INFORME 12-2026",
+                        "Ampliacion detectada",
+                        "TUO LTM art. 14",
+                        OBSERVACION));
+
+        MvcResult resultado = moverA(liquidacion.numero(), "ANULADA");
+
+        assertThat(resultado.getResponse().getStatus()).isEqualTo(409);
+        assertThat(resultado.getResponse().getContentAsString()).contains("RDF-2026-000004");
+    }
+
     // ------------------------------------------------------------------
+
+    private MvcResult moverA(String numero, String estado) throws Exception {
+        return mvc.perform(
+                        patch("/rentas/api/v1/fiscalizacion/liquidaciones/" + numero + "/estados")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        "{\"nuevoEstado\":\""
+                                                + estado
+                                                + "\",\"motivo\":\"prueba\","
+                                                + "\"fecha\":\"2026-03-16\","
+                                                + "\"observacion\":\"Movimiento de la prueba\"}"))
+                .andReturn();
+    }
 
     private MvcResult liquidar() throws Exception {
         return mvc.perform(

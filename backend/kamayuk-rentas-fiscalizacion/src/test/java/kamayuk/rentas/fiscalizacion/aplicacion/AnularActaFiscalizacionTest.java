@@ -19,12 +19,14 @@ import kamayuk.rentas.fiscalizacion.dobles.LiquidacionesEnMemoria;
 import kamayuk.rentas.fiscalizacion.dobles.MovimientosDeLiquidacionEnMemoria;
 import kamayuk.rentas.fiscalizacion.dobles.PadronDeMentira;
 import kamayuk.rentas.fiscalizacion.dobles.ParametrosDeMentira;
+import kamayuk.rentas.fiscalizacion.dobles.ResolucionesEnMemoria;
 import kamayuk.rentas.fiscalizacion.dominio.ActaFiscalizacion;
 import kamayuk.rentas.fiscalizacion.dominio.EstadoDeActa;
 import kamayuk.rentas.fiscalizacion.dominio.EstadoDeLiquidacion;
 import kamayuk.rentas.fiscalizacion.dominio.Hallazgo;
 import kamayuk.rentas.fiscalizacion.dominio.Liquidacion;
 import kamayuk.rentas.fiscalizacion.dominio.MovimientoDeLiquidacion;
+import kamayuk.rentas.fiscalizacion.dominio.ResolucionDeDeterminacion;
 import kamayuk.rentas.fiscalizacion.dominio.TipoDeFiscalizacion;
 import kamayuk.rentas.nucleo.DeclaracionDelEjercicio;
 import org.junit.jupiter.api.BeforeEach;
@@ -55,6 +57,7 @@ class AnularActaFiscalizacionTest {
     private ActasEnMemoria actas;
     private LiquidacionesEnMemoria liquidaciones;
     private MovimientosDeLiquidacionEnMemoria movimientos;
+    private ResolucionesEnMemoria resoluciones;
     private List<RegistroDeAuditoria> auditados;
     private AnularActaFiscalizacion anular;
     private LiquidarFiscalizacion liquidar;
@@ -65,6 +68,7 @@ class AnularActaFiscalizacionTest {
         actas = new ActasEnMemoria();
         liquidaciones = new LiquidacionesEnMemoria();
         movimientos = new MovimientosDeLiquidacionEnMemoria();
+        resoluciones = new ResolucionesEnMemoria();
         auditados = new ArrayList<>();
 
         PadronDeMentira catastro =
@@ -98,7 +102,11 @@ class AnularActaFiscalizacionTest {
 
         anular =
                 new AnularActaFiscalizacion(
-                        actas, liquidaciones, movimientos, registro -> auditados.add(registro));
+                        actas,
+                        liquidaciones,
+                        movimientos,
+                        resoluciones,
+                        registro -> auditados.add(registro));
 
         actaId =
                 actas.sembrar(
@@ -195,6 +203,58 @@ class AnularActaFiscalizacionTest {
         ActaFiscalizacion anulada = anular.anular(actaId, HOY, OBSERVACION).acta();
 
         assertThat(anulada.estado()).isEqualTo(EstadoDeActa.ANULADA);
+    }
+
+    @Test
+    @DisplayName("#338 — con la liquidacion anulada pero su RDF en pie, la visita NO se anula: 409")
+    void conLaLiquidacionAnuladaYSuResolucionEnPieNoSeAnula() {
+        Liquidacion emitida =
+                liquidar.liquidar(
+                        actaId,
+                        E2025,
+                        E2025,
+                        TipoDeFiscalizacion.CIERTA,
+                        "Subvaluacion detectada",
+                        HOY,
+                        OBSERVACION);
+        // La liquidacion se transfirio —su resolucion de determinacion existe— y DESPUES llego a
+        // ANULADA, que es lo que hasta #338 admitia CambiarEstadoDeLaLiquidacion. Se escribe el
+        // movimiento directo porque ese camino ya no existe: lo que se prueba es que una que ya
+        // quedo asi no habilite anular su visita.
+        resoluciones.registrar(
+                ResolucionDeDeterminacion.predial(
+                        "RDF-2026-000004",
+                        1L,
+                        emitida.identificador(),
+                        CONTRIBUYENTE,
+                        PREDIO,
+                        FICHA,
+                        FICHA + 1,
+                        HOY,
+                        "INFORME 12-2026",
+                        "Subvaluacion detectada",
+                        "TUO LTM art. 14",
+                        OBSERVACION));
+        movimientos.insertar(
+                MovimientoDeLiquidacion.cambioDeEstado(
+                        emitida.identificador(),
+                        EstadoDeLiquidacion.ANULADA,
+                        HOY,
+                        "Se deja sin efecto",
+                        OBSERVACION));
+
+        assertThatThrownBy(() -> anular.anular(actaId, HOY, OBSERVACION))
+                .as(
+                        "anular la liquidacion no toca la resolucion: la visita seguiria"
+                                + " sosteniendo un acto vigente")
+                .isInstanceOf(AnularActaFiscalizacion.ActaConResolucionEnPie.class)
+                .hasMessageContaining("RDF-2026-000004")
+                .hasMessageContaining(emitida.numero());
+
+        assertThat(actas.findById(actaId).orElseThrow().estado())
+                .as("y no se escribio nada")
+                .isEqualTo(EstadoDeActa.ABIERTA);
+        assertThat(auditados).isEmpty();
     }
 
     @Test
