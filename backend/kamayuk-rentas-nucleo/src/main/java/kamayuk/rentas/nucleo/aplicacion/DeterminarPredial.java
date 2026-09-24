@@ -20,6 +20,8 @@ import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.dominio.PoliticasDeRedondeo;
 import kamayuk.rentas.dominio.Porcentaje;
 import kamayuk.rentas.dominio.PuntoDeRedondeo;
+import kamayuk.rentas.nucleo.BeneficioRegistrado;
+import kamayuk.rentas.nucleo.BeneficiosDelContribuyente;
 import kamayuk.rentas.nucleo.dominio.predial.AporteDeTramo;
 import kamayuk.rentas.nucleo.dominio.predial.CronogramaDelPredial;
 import kamayuk.rentas.nucleo.dominio.predial.CuotaDelPredial;
@@ -146,12 +148,16 @@ import org.springframework.stereotype.Service;
 @Service
 public class DeterminarPredial {
 
+    /** El tributo con que {@code beneficio.tributo} nombra al predial. */
+    private static final String TRIBUTO_PREDIAL = "PREDIAL";
+
     private final PadronPredialDelEjercicio yaDeclarados;
     private final PrediosDelContribuyente predios;
     private final LectorDeCaracteristicas caracteristicas;
     private final DirectorioDeContribuyentes directorio;
     private final CuadroPredialParametrizado cuadro;
     private final ValuacionRecibida valuaciones;
+    private final BeneficiosDelContribuyente beneficios;
     private final RegistrarDeterminacionPredial registro;
     private final Clock reloj;
 
@@ -162,6 +168,7 @@ public class DeterminarPredial {
             DirectorioDeContribuyentes directorio,
             CuadroPredialParametrizado cuadro,
             ValuacionRecibida valuaciones,
+            BeneficiosDelContribuyente beneficios,
             RegistrarDeterminacionPredial registro,
             Clock reloj) {
         this.yaDeclarados = yaDeclarados;
@@ -170,6 +177,7 @@ public class DeterminarPredial {
         this.directorio = directorio;
         this.cuadro = cuadro;
         this.valuaciones = valuaciones;
+        this.beneficios = beneficios;
         this.registro = registro;
         this.reloj = reloj;
     }
@@ -197,6 +205,7 @@ public class DeterminarPredial {
                         .porCodigo(peticion.codContribuyente())
                         .orElseThrow(
                                 () -> new ContribuyenteInexistente(peticion.codContribuyente()));
+        exigirQueNoHayaUnBeneficioSinRegla(contribuyente, peticion.ejercicio());
 
         CuadroPredialParametrizado.Vigente vigente = cuadro.vigenteEn(peticion.ejercicio());
         PoliticasDeRedondeo redondeo = vigente.redondeo();
@@ -251,6 +260,24 @@ public class DeterminarPredial {
                 contribuyente.codigo(),
                 contribuyente.nombre(),
                 fechaDeCalculo);
+    }
+
+    /**
+     * La guarda de RT-012 (#331): con un beneficio del predial vigente a la fecha de referencia del
+     * ejercicio, no se emite, porque la deduccion que ese beneficio da no se sabe aplicar todavia
+     * (#464). Ver {@link BeneficioPredialSinRegla}.
+     */
+    private void exigirQueNoHayaUnBeneficioSinRegla(
+            ResumenDeContribuyente contribuyente, Ejercicio ejercicio) {
+        LocalDate fechaDeReferencia = ejercicio.primerDia();
+        List<BeneficioRegistrado> delPredial =
+                beneficios.vigentesA(contribuyente.id(), fechaDeReferencia).stream()
+                        .filter(beneficio -> TRIBUTO_PREDIAL.equals(beneficio.tributo()))
+                        .toList();
+        if (!delPredial.isEmpty()) {
+            throw new BeneficioPredialSinRegla(
+                    contribuyente.codigo(), fechaDeReferencia, delPredial);
+        }
     }
 
     /**
@@ -504,6 +531,42 @@ public class DeterminarPredial {
                             + " (TUO LTM art. 10: el adquirente asume desde el año siguiente): un"
                             + " contribuyente sin predios no tiene base imponible cero, no tiene"
                             + " determinacion (NEG-05 §1)");
+        }
+    }
+
+    /**
+     * El contribuyente tiene un beneficio del predial que rige al 1 de enero del ejercicio, y la
+     * regla que lo aplica —RT-012, las deducciones del pensionista y del adulto mayor (TUO LTM art.
+     * 19, Ley 30490)— todavia no existe (#331, #464).
+     *
+     * <p>No se emite. Hasta #331 la cadena encadenaba RT-011, RT-013 y RT-014 sin RT-012, y a quien
+     * la ley le deduce 50 UIT se le emitia la cifra entera sin decirlo: la misma cifra que a su
+     * vecino sin beneficio. Negarse es peor para la emision —el contribuyente queda sin determinar,
+     * o observado en la masiva— y mejor para el contribuyente: lo que falta se ve, en vez de
+     * cobrarse.
+     *
+     * <p>Lo que se mira es el <b>beneficio concedido</b> y no la {@code condicion_especial}: la
+     * condicion se registra, el beneficio es el acto que valido los requisitos. Y se mira a {@link
+     * Ejercicio#primerDia()}, la fecha de referencia (NEG-05 §3): un beneficio cesado antes no
+     * cuenta. Que pasa con uno concedido a mitad del ejercicio es el caso c03 de RT-012, sin
+     * decidir, y lo decide #464 con el resto de la regla.
+     */
+    public static final class BeneficioPredialSinRegla extends RuntimeException {
+        @java.io.Serial private static final long serialVersionUID = 1L;
+
+        BeneficioPredialSinRegla(
+                String codigo, LocalDate fechaDeReferencia, List<BeneficioRegistrado> vigentes) {
+            super(
+                    "El contribuyente "
+                            + codigo
+                            + " tiene un beneficio del predial que rige al "
+                            + fechaDeReferencia
+                            + " ("
+                            + vigentes.stream()
+                                    .map(b -> b.tipo() + ", " + b.baseLegal())
+                                    .collect(java.util.stream.Collectors.joining("; "))
+                            + ") y la regla que lo aplica, RT-012, todavia no existe (#464):"
+                            + " determinarlo sin la deduccion le cobraria de mas. No se emite");
         }
     }
 

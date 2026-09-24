@@ -26,6 +26,8 @@ import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.dominio.Porcentaje;
 import kamayuk.rentas.dominio.ValorNormativo;
+import kamayuk.rentas.nucleo.BeneficioRegistrado;
+import kamayuk.rentas.nucleo.BeneficiosDelContribuyente;
 import kamayuk.rentas.nucleo.dominio.EstadoDeDeterminacion;
 import kamayuk.rentas.nucleo.dominio.predial.AporteDeTramo;
 import kamayuk.rentas.nucleo.dominio.predial.CuotaDelPredial;
@@ -40,6 +42,7 @@ import kamayuk.rentas.parametros.LectorDeParametros;
 import kamayuk.rentas.parametros.ParametrosSellados;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -69,6 +72,7 @@ class DeterminarPredialTest {
     private DeterminacionesEnMemoria determinaciones;
     private PrediosDePrueba predios;
     private AuditoriaDePrueba auditoria;
+    private BeneficiosEnMemoria beneficios;
 
     /** Lo que `catastro` sello. Nace VACIO: sin valuacion, manda el autovaluo declarado (#38). */
     private kamayuk.rentas.nucleo.dobles.ValuacionesSelladasEnMemoria valuaciones;
@@ -79,6 +83,7 @@ class DeterminarPredialTest {
         determinaciones = new DeterminacionesEnMemoria();
         predios = new PrediosDePrueba();
         auditoria = new AuditoriaDePrueba();
+        beneficios = new BeneficiosEnMemoria();
     }
 
     @Test
@@ -456,6 +461,93 @@ class DeterminarPredialTest {
                                                         true),
                                                 PORQUE))
                 .isInstanceOf(DeterminarPredial.ContribuyenteInexistente.class);
+    }
+
+    @Nested
+    @DisplayName(
+            "#331 — con un beneficio PREDIAL vigente al 1 de enero no se emite: RT-012 no existe")
+    class LaGuardaDeLasDeducciones {
+
+        /** Mismo predio, mismo autovaluo: 80 000,00 x 0,2 % = 160,00 para quien no tiene nada. */
+        private void mismosPrediosParaLosDos() {
+            predios.conVigencia(
+                    501L, 31L, "10031", "AV. SULLANA 31", Porcentaje.total(), "2015-01-01", null);
+            predios.conVigencia(
+                    502L, 32L, "10032", "AV. SULLANA 32", Porcentaje.total(), "2015-01-01", null);
+        }
+
+        private DeterminacionPredialCalculada determinarA(String codigo, long predioId) {
+            return servicio()
+                    .determinar(
+                            new DeterminarPredial.Peticion(
+                                    EJERCICIO,
+                                    codigo,
+                                    List.of(declarado(predioId, "80000.00")),
+                                    ModalidadDelPredial.TRIMESTRAL,
+                                    true),
+                            PORQUE);
+        }
+
+        @Test
+        @DisplayName("el pensionista no recibe la cifra sin deducir; el vecino identico si")
+        void conBeneficioNoSeEmiteYSinElSi() {
+            mismosPrediosParaLosDos();
+            beneficios.de(501L, pensionista("2025-06-01", null));
+
+            assertThatThrownBy(() -> determinarA("C-001", 31L))
+                    .as(
+                            "sin RT-012, emitir le cobraria 160,00 a quien la ley le deduce 50"
+                                    + " UIT: eso es lo que hacia el codigo hasta #331")
+                    .isInstanceOf(DeterminarPredial.BeneficioPredialSinRegla.class)
+                    .hasMessageContaining("C-001")
+                    .hasMessageContaining("PENSIONISTA")
+                    .hasMessageContaining("RT-012")
+                    .hasMessageContaining("2026-01-01");
+            assertThat(determinarA("C-002", 32L).impuestoInsoluto())
+                    .as("el mismo predio sin beneficio se determina como siempre")
+                    .isEqualTo(Dinero.de("160.00"));
+        }
+
+        @Test
+        @DisplayName("un beneficio cesado antes del 1 de enero no detiene la emision")
+        void elBeneficioCesadoNoCuenta() {
+            mismosPrediosParaLosDos();
+            beneficios.de(501L, pensionista("2020-01-01", "2025-12-31"));
+
+            assertThat(determinarA("C-001", 31L).impuestoInsoluto()).isEqualTo(Dinero.de("160.00"));
+        }
+
+        @Test
+        @DisplayName("un beneficio de otro tributo no es del predial")
+        void unBeneficioDeOtroTributoNoCuenta() {
+            mismosPrediosParaLosDos();
+            beneficios.de(
+                    501L,
+                    new BeneficioRegistrado(
+                            "DESCUENTO",
+                            "DESCUENTO",
+                            "ARBITRIOS",
+                            null,
+                            null,
+                            "Ordenanza de prueba",
+                            LocalDate.parse("2025-01-01"),
+                            null));
+
+            assertThat(determinarA("C-001", 31L).impuestoInsoluto()).isEqualTo(Dinero.de("160.00"));
+        }
+
+        private static BeneficioRegistrado pensionista(
+                String desde, @org.jspecify.annotations.Nullable String hasta) {
+            return new BeneficioRegistrado(
+                    "PENSIONISTA",
+                    "DEDUCCION",
+                    "PREDIAL",
+                    null,
+                    null,
+                    "TUO LTM art. 19",
+                    LocalDate.parse(desde),
+                    hasta == null ? null : LocalDate.parse(hasta));
+        }
     }
 
     // ---------------------------------------------------------------- utilidades
@@ -931,6 +1023,7 @@ class DeterminarPredialTest {
                 new DirectorioDePrueba(),
                 new CuadroPredialParametrizado(lector),
                 valuaciones,
+                beneficios,
                 new RegistrarDeterminacionPredial(determinaciones, lector, auditoria, reloj),
                 reloj);
     }
@@ -1012,6 +1105,25 @@ class DeterminarPredialTest {
      * cuota tiene su vigencia, como {@code titularidad}: la transferencia cierra la anterior el dia
      * antes ({@code GestorDeTitularidad}).
      */
+    /** Los beneficios registrados; responde por vigencia, como el puerto promete. */
+    private static final class BeneficiosEnMemoria implements BeneficiosDelContribuyente {
+
+        private final Map<Long, List<BeneficioRegistrado>> porContribuyente = new LinkedHashMap<>();
+
+        void de(long contribuyenteId, BeneficioRegistrado beneficio) {
+            porContribuyente
+                    .computeIfAbsent(contribuyenteId, id -> new ArrayList<>())
+                    .add(beneficio);
+        }
+
+        @Override
+        public List<BeneficioRegistrado> vigentesA(long contribuyenteId, LocalDate aLaFecha) {
+            return porContribuyente.getOrDefault(contribuyenteId, List.of()).stream()
+                    .filter(beneficio -> beneficio.rigeEn(aLaFecha))
+                    .toList();
+        }
+    }
+
     private static final class PrediosDePrueba implements PrediosDelContribuyente {
 
         /** Una cuota de titularidad; {@code desde} y {@code hasta} nulos son «siempre». */

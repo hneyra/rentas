@@ -31,6 +31,7 @@ import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.Porcentaje;
 import kamayuk.rentas.dominio.ValorNormativo;
+import kamayuk.rentas.nucleo.BeneficioRegistrado;
 import kamayuk.rentas.nucleo.aplicacion.CandadoDeEmision;
 import kamayuk.rentas.nucleo.aplicacion.CuadroPredialParametrizado;
 import kamayuk.rentas.nucleo.aplicacion.DeterminarPredial;
@@ -93,6 +94,9 @@ class PredialControllerTest {
     private final ComprobadorDePrueba comprobador = new ComprobadorDePrueba();
     private final DeterminacionesEnMemoria determinaciones = new DeterminacionesEnMemoria();
     private final PrediosDePrueba predios = new PrediosDePrueba();
+
+    /** Los beneficios registrados de cada contribuyente (#331); por omision, ninguno. */
+    private final Map<Long, List<BeneficioRegistrado>> beneficios = new LinkedHashMap<>();
 
     /** Las fichas que leen la determinacion y el alcance de la corrida; por omision, ninguna. */
     private final FichasDePrueba fichas = new FichasDePrueba();
@@ -699,6 +703,63 @@ class PredialControllerTest {
         assertThat(cuerpo)
                 .as("la fecha de calculo de la corrida sigue siendo la del reloj (regla 9)")
                 .contains("\"fechaCalculo\":\"2026-08-29\"");
+    }
+
+    @Test
+    @DisplayName(
+            "#331 — con un beneficio PREDIAL sin RT-012, el calculo individual es 422 y lo dice")
+    void elBeneficioSinReglaEsUn422() throws Exception {
+        predios.con(11L, "10001", "AV. GRAU 100", Porcentaje.total());
+        beneficios.put(501L, List.of(pensionista()));
+
+        MvcResult resultado = mvc.perform(simularIndividual()).andReturn();
+
+        assertThat(resultado.getResponse().getStatus())
+                .as("sin la guarda, sale un 201 con la cifra sin deducir")
+                .isEqualTo(422);
+        assertThat(resultado.getResponse().getContentAsString())
+                .contains("VALIDACION")
+                .contains("RT-012")
+                .contains("PENSIONISTA");
+    }
+
+    @Test
+    @DisplayName("#331 — y la corrida lo deja observado, fuera de la emision, en vez de cobrarle")
+    void laCorridaObservaAlDelBeneficioSinRegla() throws Exception {
+        predios.con(11L, "10001", "AV. GRAU 100", Porcentaje.total());
+        beneficios.put(501L, List.of(pensionista()));
+        determinaciones.sembrar(
+                EJERCICIO,
+                7L,
+                501L,
+                EstadoDeDeterminacion.EMITIDA,
+                ModalidadDelPredial.TRIMESTRAL,
+                DetalleDeterminacionPredio.nuevo(
+                        11L,
+                        Dinero.de("100000.00"),
+                        Dinero.CERO,
+                        Porcentaje.total(),
+                        Dinero.de("100000.00")));
+
+        MvcResult corrida = mvc.perform(asentarLaCorrida("TODOS", null)).andReturn();
+
+        String cuerpo = corrida.getResponse().getContentAsString();
+        assertThat(cuerpo).as(cuerpo).contains("C-001").contains("RT-012");
+        assertThat(determinaciones.determinados)
+                .as("el pensionista no se determina: queda observado, a la vista")
+                .isEmpty();
+    }
+
+    private static BeneficioRegistrado pensionista() {
+        return new BeneficioRegistrado(
+                "PENSIONISTA",
+                "DEDUCCION",
+                "PREDIAL",
+                null,
+                null,
+                "TUO LTM art. 19",
+                LocalDate.parse("2024-03-01"),
+                null);
     }
 
     /**
@@ -1506,6 +1567,10 @@ class PredialControllerTest {
                         new DirectorioDePrueba(),
                         cuadro,
                         new kamayuk.rentas.nucleo.dobles.ValuacionesSelladasEnMemoria(),
+                        (contribuyenteId, fecha) ->
+                                beneficios.getOrDefault(contribuyenteId, List.of()).stream()
+                                        .filter(beneficio -> beneficio.rigeEn(fecha))
+                                        .toList(),
                         new RegistrarDeterminacionPredial(
                                 determinaciones, lector, auditoria, RELOJ),
                         RELOJ);
