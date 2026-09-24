@@ -1489,6 +1489,61 @@ class PredialControllerTest {
     }
 
     /**
+     * <b>La lectura publica los importes de cierre con dos decimales, con la forma que entrega la
+     * cache</b> (#354).
+     *
+     * <p>Todas las demas pruebas de esta clase siembran la UIT como {@code "5500.00"}, y esa es la
+     * muestra uniforme que escondia el defecto: la copia local de {@code normativa} no la entrega
+     * asi. {@code valor_numerico} es {@code monto_calc}, o sea {@code numeric(18,6)}, y {@code
+     * CacheDeSnapshotsJdbc} lo lee con {@code getObject().toString()}: llega {@code "5500.000000"}.
+     * Sin tocarla, {@code Dinero.toString()} la publicaba tal cual; el minimo imponible salia con
+     * catorce decimales —{@code Dinero.por} no redondea, por diseño— y los limites de tramo con
+     * doce. La interfaz exige dos decimales como mucho ({@code formatearImporte}), y con razon: asi
+     * que el 100 % de estas lecturas tumbaba la pantalla el dia que el conjunto se sellara.
+     *
+     * <p>La base, {@code 400000.75}, recorre los TRES tramos y deja en el ultimo una porcion con
+     * centimos —{@code 70000.75}—: con una base redonda, una porcion recortada a entero pasaria. Y
+     * el aporte de ese tramo, {@code 700.0075}, <b>sigue entero</b>: es un intermedio sin redondear
+     * (ADR-0018, #245) y recortarlo seria redondear en el borde lo que el calculo no redondeo.
+     */
+    @Test
+    @DisplayName("#354 — la lectura publica uit, minimo, limites y porciones con dos decimales")
+    void laLecturaPublicaLosImportesDeCierreConDosDecimales() throws Exception {
+        mvc = montar(cuadroConLaFormaDeLaCache());
+        predios.con(11L, "10001", "AV. GRAU 100", Porcentaje.total());
+        mvc.perform(
+                        post("/rentas/api/v1/rentas/predial/calculo-individual")
+                                .param("codContribuyente", "C-001")
+                                .param("ano", "2026")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        "{\"modalidad\":\"CONTADO\",\"simulacion\":false,\"observacion\":\"Determinacion"
+                                                + " anual\",\"predios\":[{\"predioId\":11,\"autovaluo\":\"400000.75\"}]}"))
+                .andReturn();
+
+        MvcResult resultado = leer("C-001", "2026");
+
+        assertThat(resultado.getResponse().getStatus()).isEqualTo(200);
+        String json = resultado.getResponse().getContentAsString();
+        assertThat(json)
+                .as(
+                        "la cache entrega numeric(18,6): publicarlo con toString() hace que la"
+                                + " interfaz reviente al formatear el importe")
+                .contains("\"uit\":\"5500.00\"")
+                .contains("\"minimoImponible\":\"33.00\"")
+                .contains("\"limiteSuperior\":\"82500.00\"")
+                .contains("\"limiteSuperior\":\"330000.00\"")
+                .contains("\"porcionGravada\":\"82500.00\"")
+                .contains("\"porcionGravada\":\"247500.00\"")
+                .contains("\"porcionGravada\":\"70000.75\"")
+                .contains("\"derechoDeEmision\":\"4.50\"")
+                .contains("\"totalAPagar\":\"2354.51\"");
+        assertThat(json)
+                .as("el aporte es un intermedio sin redondear (#245): no pasa por el ayudante")
+                .containsPattern("\"aporte\":\"700\\.0075\\d*\"");
+    }
+
+    /**
      * Un lector con dos conjuntos: el que rige HOY y el que una determinacion vieja fijo.
      *
      * <p>Sin los dos distintos, `delConjunto` y `vigenteEn` son indistinguibles y la prueba de
@@ -1638,6 +1693,33 @@ class PredialControllerTest {
                                 // fila guardada. Sin ella el montaje solo sabria dibujar el
                                 // fraccionado.
                                 .texto("PREDIAL_VENCIMIENTO", "CONTADO", "2026-02-27"))
+                .construir();
+    }
+
+    /**
+     * El cuadro completo <b>con la forma que entrega la cache</b>: cada numero con los seis
+     * decimales de {@code monto_calc} (#354). Ver {@link
+     * #laLecturaPublicaLosImportesDeCierreConDosDecimales()}.
+     */
+    private static ParametrosSellados cuadroConLaFormaDeLaCache() {
+        return ParametrosSellados.de(EJERCICIO, 1)
+                .numero("UIT", null, ValorNormativo.de("5500.000000"))
+                .numero("TRAMO_PREDIAL", "1", ValorNormativo.de("0.200000"))
+                .numero("TRAMO_PREDIAL_LIMITE", "1", ValorNormativo.de("15.000000"))
+                .numero("TRAMO_PREDIAL", "2", ValorNormativo.de("0.600000"))
+                .numero("TRAMO_PREDIAL_LIMITE", "2", ValorNormativo.de("60.000000"))
+                .numero("TRAMO_PREDIAL", "3", ValorNormativo.de("1.000000"))
+                .numero("PREDIAL_MINIMO", null, ValorNormativo.de("0.600000"))
+                .numero("DERECHO_EMISION_PREDIAL", null, ValorNormativo.de("4.500000"))
+                .texto("PREDIAL_VENCIMIENTO", "CONTADO", "2026-02-27")
+                .numero("REDONDEO", "IMPUESTO_POR_TRAMO", ValorNormativo.de("2.000000"))
+                .texto("REDONDEO", "IMPUESTO_POR_TRAMO", "HALF_UP")
+                .numero("REDONDEO", "BASE_DEL_CONTRIBUYENTE", ValorNormativo.de("2.000000"))
+                .texto("REDONDEO", "BASE_DEL_CONTRIBUYENTE", "HALF_UP")
+                .numero("REDONDEO", "BASE_IMPONIBLE_DEL_PREDIO", ValorNormativo.de("2.000000"))
+                .texto("REDONDEO", "BASE_IMPONIBLE_DEL_PREDIO", "HALF_UP")
+                .numero("REDONDEO", "CUOTA", ValorNormativo.de("2.000000"))
+                .texto("REDONDEO", "CUOTA", "HALF_UP")
                 .construir();
     }
 
