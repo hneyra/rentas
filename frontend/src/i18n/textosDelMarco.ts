@@ -307,6 +307,22 @@ export const FRASE_DEL_PELDANO_CON_ESTADO =
   '{{titulo}} ({{estado}}). {{detalle}} — {{remedio}}';
 
 /**
+ * **La frase de una hoja que no se pudo dibujar** (#354).
+ *
+ * La dibuja la frontera de error que envuelve el cuerpo de cada hoja (`aplicacion.tsx`), con el
+ * motivo por interpolacion: el `message` de lo que se lanzo —«Importe con una forma que el backend
+ * no sirve: «5500.000000»…»—, que es dato y no clave, por lo mismo que el `detalle` de un peldano.
+ *
+ * Dice tres cosas a proposito, y las tres son las que el operador no puede adivinar: que la
+ * respuesta SI llego —no es la red ni un permiso, que tienen su propia frase—, que el resto del
+ * sistema sigue disponible, y que reintentar no lo cambia. La raya por el mismo motivo que la de
+ * `FRASE_DEL_PELDANO`: el motivo no es nuestro, y trae su punto final o no.
+ */
+export const FRASE_DE_LA_HOJA_QUE_NO_SE_DIBUJA =
+  'La respuesta llego y esta pantalla no la pudo dibujar: {{motivo}} — Reintentar no lo cambia, ' +
+  'y el resto de las pantallas sigue disponible. Avise a soporte con este mensaje.';
+
+/**
  * **Las palabras del grafico de `ini-flujo`, la primera pieza del consumidor** (#288).
  *
  * <h2>Por que van en un saco de este archivo y no escritas dentro del componente</h2>

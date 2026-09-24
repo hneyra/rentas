@@ -2328,7 +2328,12 @@ export async function pedirPagina<T>(ruta: string, senal?: AbortSignal): Promise
   return solicitar<Paginado<T>>(ruta, senal === undefined ? {} : { senal });
 }
 
-/** Pide una operacion que contesta un objeto. */
+/**
+ * Pide una operacion que contesta un objeto.
+ *
+ * **Y solo un objeto**: si la operacion contesta 204, esto lanza `VacioNoAdmitido` (#354). Las que
+ * pueden contestar «todavia no hay» se piden con `pedirUnoOVacio`, cuyo tipo lo dice.
+ */
 export async function pedirUno<T>(ruta: string, senal?: AbortSignal): Promise<T> {
   return solicitar<T>(ruta, senal === undefined ? {} : { senal });
 }
@@ -2343,13 +2348,19 @@ export async function pedirUno<T>(ruta: string, senal?: AbortSignal): Promise<T>
  *
  * <h2>Por que hace falta la puerta y no basta con que `solicitar` devuelva `null`</h2>
  *
- * Porque `pedirUno<CorridaDelPredial>` promete una corrida, y con un 204 devuelve `null`: el
- * conector reparte campo a campo sobre `null` y el compilador **no lo ve**. Declarado
+ * Porque `pedirUno<CorridaDelPredial>` promete una corrida, y hasta #354 con un 204 devolvia
+ * `null`: el conector repartia campo a campo sobre `null` y el compilador **no lo veia**. Declarado
  * `T | null`, quien pide un 204 tiene que decidir que hace con el vacio — que es exactamente la
  * decision que esta hoja tiene que tomar.
+ *
+ * Y desde #354 la otra mitad tambien se cumple: `pedirUno` ya no devuelve ese `null`, lanza
+ * `VacioNoAdmitido`. Lo midio `ini-panel`, el segundo consumidor de la ruta de la corrida, que
+ * seguia en `pedirUno` y tumbaba la aplicacion entera con un `TypeError` en el render.
  */
 export async function pedirUnoOVacio<T>(ruta: string, senal?: AbortSignal): Promise<T | null> {
-  return solicitar<T | null>(ruta, senal === undefined ? {} : { senal });
+  // `admiteVacio` es lo que distingue esta puerta de `pedirUno` desde #354: sin el, el cliente
+  // convierte el 204 en `VacioNoAdmitido` en vez de en un `null` que el tipo de `T` no declara.
+  return solicitar<T>(ruta, { admiteVacio: true, ...(senal === undefined ? {} : { senal }) });
 }
 
 /**

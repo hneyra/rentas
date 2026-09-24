@@ -6,6 +6,7 @@ import type { ClaveDeHoja } from '../../pantallas/arbol.ts';
 import { pantallaDe } from '../../pantallas/definiciones/index.ts';
 import { PantallaDeRentas } from '../../pantallas/PantallaDeRentas.tsx';
 import type { CorridaDelPredial, IndicadorDeRecaudacion, TrabajoParado } from '../lecturas.ts';
+import { SIN_CORRIDA_DEL_EJERCICIO } from '../palabrasDeHueco.ts';
 import { useDatosDeLaHoja } from '../useDatosDeLaHoja.ts';
 
 /**
@@ -45,6 +46,15 @@ function arnes() {
     );
 }
 
+/**
+ * Lo que contesta una ruta con **204 y sin cuerpo** (#354).
+ *
+ * Un simbolo y no `null`: `null` es un cuerpo JSON valido —`"null"` con 200—, y lo que el backend
+ * manda cuando no hay corrida del ejercicio no es eso, es un 204 sin una sola letra
+ * (`PredialController`, #523). Son dos respuestas distintas y el cliente las trata distinto.
+ */
+const SIN_CUERPO = Symbol('204');
+
 /** Sustituye `fetch` por una respuesta por ruta. Lo que no este declarado contesta 404. */
 function contesta(porRuta: Readonly<Record<string, unknown>>) {
   vi.stubGlobal(
@@ -54,6 +64,9 @@ function contesta(porRuta: Readonly<Record<string, unknown>>) {
       const ruta = Object.keys(porRuta).find((r) => url.includes(r));
       if (ruta === undefined) {
         return Promise.resolve(new Response('{}', { status: 404 }));
+      }
+      if (porRuta[ruta] === SIN_CUERPO) {
+        return Promise.resolve(new Response(null, { status: 204 }));
       }
       return Promise.resolve(
         new Response(JSON.stringify(porRuta[ruta]), {
@@ -233,6 +246,47 @@ describe('`ini-panel` — el avance del ejercicio', () => {
     // Ninguna de las dos operaciones publica cuantos contribuyentes estan activos. Deducirlo de
     // la corrida daria un numero indistinguible de uno real.
     expect(screen.getAllByText('no publicado').length).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * **Sin corrida del ejercicio, la hoja dice «todavia no» en su campo y el resto sigue en pie**
+ * (#354).
+ *
+ * Es el estado de cualquier municipalidad entre el 1 de enero y su primera corrida del ano, o
+ * recien implantada: `/indicadores/recaudacion` contesta 200 y `/rentas/predial/corridas/ultima`
+ * contesta **204**. Hasta #354 el conector pedia la corrida con `pedirUno`, que con un 204 devuelve
+ * un `null` que su tipo no declara, y `repartir` leia `corrida.observados` sobre el: un `TypeError`
+ * en el render que se llevaba la aplicacion entera — barra, arbol y pie — por un campo de seis.
+ *
+ * La muestra **no** es la vacia: la recaudacion trae cifras de verdad, porque lo que se afirma es
+ * que el hueco de la corrida es de UN campo y no de la pantalla. Una hoja que dijera «sin datos»
+ * de arriba abajo pasaria la mitad de «no revienta» y esconderia cinco cifras que si llegaron.
+ */
+describe('`ini-panel` sin corrida del ejercicio (#354)', () => {
+  it('la corrida en 204: las cinco de la recaudacion salen, y «Observados» dice «sin corrida»', async () => {
+    contesta({
+      [RECAUDACION]: recaudacion(2026, '23725394.80', '18424251.20', '77 %', {
+        nombre: 'Impuesto predial',
+        cargado: '9418204.60',
+        cobrado: '8420118.40',
+        pendiente: '998086.20',
+        pct: 89,
+      }),
+      [CORRIDA]: SIN_CUERPO,
+    });
+    arnes()('ini-panel');
+
+    await waitFor(() => {
+      expect(screen.getByText('S/ 23,725,394.80')).toBeInTheDocument();
+    });
+    expect(screen.getByText('S/ 18,424,251.20')).toBeInTheDocument();
+    expect(screen.getByText('77 %')).toBeInTheDocument();
+    // La palabra de «todavia no se ha corrido», en el campo que la corrida llenaria. No es
+    // «no publicado» —la operacion SI lo publica— ni un cero: cero observados es un resultado, y
+    // aqui no hay resultado todavia.
+    expect(screen.getByText(SIN_CORRIDA_DEL_EJERCICIO)).toBeInTheDocument();
+    expect(screen.queryByText('0')).toBeNull();
   });
 });
 

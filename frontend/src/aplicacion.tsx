@@ -11,7 +11,8 @@ import { traducirCatalogo } from './catalogo.ts';
 import { PantallaDeRentas } from './pantallas/PantallaDeRentas.tsx';
 import type { ClaveDeHoja } from './pantallas/arbol.ts';
 import { pantallaDe } from './pantallas/definiciones/index.ts';
-import { useDatosDeLaHoja } from './datos/useDatosDeLaHoja.ts';
+import { alNoPoderDibujarla, useDatosDeLaHoja } from './datos/useDatosDeLaHoja.ts';
+import { FronteraDeLaHoja } from './pantallas/FronteraDeLaHoja.tsx';
 import type { FallaDeLaPuerta } from './api/identidad.ts';
 import { abrirLaCuenta, salir } from './api/identidad.ts';
 import { fallaDeLaPuerta } from './arranque.ts';
@@ -157,6 +158,58 @@ function CuerpoDeLaPantalla({ clave }: { readonly clave: ClaveDeHoja }) {
 }
 
 /**
+ * **El cuerpo de la hoja, dentro de su frontera** (#354).
+ *
+ * Lo que la hoja lance al dibujarse —un conector que recibe una forma que no esperaba, el
+ * interprete, una pieza— se queda en ella: la barra, el arbol y el pie siguen en pie y el cuerpo
+ * dice «fallo» con su motivo. Sin esto, react-router lo recogia con su pantalla por omision,
+ * «Unexpected Application Error!», en ingles y en lugar del armazon entero. Ver
+ * `pantallas/FronteraDeLaHoja.tsx`.
+ *
+ * <h2>Dos fronteras y no una, y el motivo es el interprete</h2>
+ *
+ * Lo primero que se intenta en lugar de la hoja es **la misma pantalla con una ausencia**: su
+ * titulo, sus bloques y cada hueco diciendo «fallo», que es como dice cualquier otra hoja que no
+ * tiene su dato. Pero si lo que lanzo fue el interprete con esa definicion, dibujarla otra vez
+ * lanzaria lo mismo, y un error dentro de lo que dibuja una frontera ya no lo recoge ella: sube a
+ * la siguiente, que es la de react-router. La segunda frontera es para eso, y lo que dibuja no
+ * depende de la definicion: la frase sola.
+ *
+ * `reinicio` es la hoja y su ruta: ver el javadoc de la frontera para por que no es una `key`.
+ */
+function HojaConFrontera({ clave }: { readonly clave: ClaveDeHoja }) {
+  const { t } = useTranslation();
+  const hoja = useHoja();
+  const reinicio = `${clave}|${JSON.stringify(hoja.ruta)}`;
+
+  return (
+    <FronteraDeLaHoja
+      reinicio={reinicio}
+      enSuLugar={(lanzado) => (
+        <FronteraDeLaHoja
+          reinicio={reinicio}
+          enSuLugar={(otraVez) => (
+            <div data-slot="hoja-sin-dibujar" className="p-[30px]">
+              <Alerta tono="atencion">
+                <p className="m-0">{alNoPoderDibujarla(otraVez, t).explicacion}</p>
+              </Alerta>
+            </div>
+          )}
+        >
+          <PantallaDeRentas
+            definicion={pantallaDe(clave)}
+            datos={{ ausencia: alNoPoderDibujarla(lanzado, t) }}
+            hoja={hoja}
+          />
+        </FronteraDeLaHoja>
+      )}
+    >
+      <CuerpoDeLaPantalla clave={clave} />
+    </FronteraDeLaHoja>
+  );
+}
+
+/**
  * El armazon y lo que lo alimenta.
  *
  * Va **dentro** del proveedor y no fuera, y no es un detalle de orden: `useCatalogoPermitido` es un
@@ -262,7 +315,7 @@ function ArmazonDelSistema() {
             ? t('Diez modulos y cuarenta submodulos. Catastro y Tesoreria son de otros sistemas.')
             : sesion.porQue
         }
-        pantalla={(hoja) => <CuerpoDeLaPantalla clave={hoja.destino.clave as ClaveDeHoja} />}
+        pantalla={(hoja) => <HojaConFrontera clave={hoja.destino.clave as ClaveDeHoja} />}
       />
       <MandoDeTema
         abierto={preferencias}
