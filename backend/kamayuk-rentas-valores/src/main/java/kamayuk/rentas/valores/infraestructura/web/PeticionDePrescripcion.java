@@ -42,10 +42,15 @@ public record PeticionDePrescripcion(
      * @param causal la causal tal como la nombra el art. 45 o el 46
      * @param fechaDesde el dia del acto, o el primero del intervalo suspendido
      * @param fechaHasta el ultimo dia del intervalo suspendido; no va en una interrupcion
+     * @param ejercicios de que ejercicios es la deuda que el hecho interrumpe o suspende (#334).
+     *     <b>Obligatorio en cuanto el rango tiene mas de un ejercicio</b>: sin el, 422 nombrando el
+     *     hecho, porque suponer «todos» es el defecto que #334 cerro. En una solicitud de un solo
+     *     ejercicio puede faltar, y entonces es ese. Cada uno tiene que estar dentro del rango
      */
     public record PeticionDeHecho(
             @Nullable String clase,
             @Nullable String causal,
             @Nullable String fechaDesde,
-            @Nullable String fechaHasta) {}
+            @Nullable String fechaHasta,
+            @Nullable List<@Nullable Integer> ejercicios) {}
 }

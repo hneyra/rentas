@@ -3278,7 +3278,10 @@
         "clase": "texto",
         "causal": "texto",
         "fechaDesde": "texto",
-        "fechaHasta": "texto"
+        "fechaHasta": "texto",
+        "ejercicios": [
+          "entero"
+        ]
       }
     ],
     "observacion": "texto"

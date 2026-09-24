@@ -368,14 +368,18 @@ class NotificacionYPaseJdbcTest {
         @DisplayName("se guarda con su computo y sus hechos, y se relee identica")
         void seGuardaConSuComputoYSusHechos() {
             long contribuyente = crearContribuyente("PR-0001", "50300011");
+            // Cada uno con su alcance (#334, V25), y el segundo de dos ejercicios: el arreglo
+            // tiene que volver con los dos y en orden.
             HechoDelComputo interrupcion =
                     HechoDelComputo.interrupcion(
-                            "pago parcial de la deuda", LocalDate.of(2022, 5, 5));
+                                    "pago parcial de la deuda", LocalDate.of(2022, 5, 5))
+                            .para(new Ejercicio(2018));
             HechoDelComputo suspension =
                     HechoDelComputo.suspension(
-                            "procedimiento contencioso tributario",
-                            LocalDate.of(2023, 1, 1),
-                            LocalDate.of(2023, 6, 1));
+                                    "procedimiento contencioso tributario",
+                                    LocalDate.of(2023, 1, 1),
+                                    LocalDate.of(2023, 6, 1))
+                            .para(new Ejercicio(2019), new Ejercicio(2018));
 
             Prescripcion guardada =
                     enTransaccion(
@@ -410,6 +414,88 @@ class NotificacionYPaseJdbcTest {
             assertThat(releida.hechos()).containsExactly(interrupcion, suspension);
             assertThat(releida.plazo()).isEqualTo(Plazo.de("4 ANIOS"));
             assertThat(releida.usuarioRegistro()).isEqualTo("ventanilla.valores");
+        }
+
+        @Test
+        @DisplayName("#334 — un hecho sin alcance se guarda NULO y se relee sin declarar")
+        void elHechoSinAlcanceSeReleeSinDeclarar() {
+            // Es la forma de una fila anterior a V25. El caso de uso ya no guarda ninguno asi, pero
+            // la lectura tiene que seguir sabiendo leerlas sin inventarles un alcance.
+            long contribuyente = crearContribuyente("PH-0001", "50300021");
+            HechoDelComputo anterior =
+                    HechoDelComputo.interrupcion(
+                            "pago parcial de la deuda", LocalDate.of(2022, 5, 5));
+
+            Prescripcion guardada =
+                    enTransaccion(
+                            () ->
+                                    prescripciones.insertar(
+                                            new Prescripcion(
+                                                    null,
+                                                    contribuyente,
+                                                    "PREDIAL",
+                                                    new Ejercicio(2018),
+                                                    new Ejercicio(2019),
+                                                    LocalDate.of(2026, 6, 1),
+                                                    CausalDePrescripcion.DECLARACION_PRESENTADA,
+                                                    Plazo.de("4 ANIOS"),
+                                                    conjuntoId,
+                                                    ResultadoDeLaSolicitud.PROCEDE_EN_PARTE,
+                                                    null,
+                                                    List.of(
+                                                            computo(2018, true),
+                                                            computo(2019, false)),
+                                                    List.of(anterior),
+                                                    null,
+                                                    Observacion.de("Se resuelve la solicitud"))));
+
+            Prescripcion releida =
+                    enTransaccion(() -> prescripciones.porId(guardada.id()).orElseThrow());
+
+            assertThat(releida.hechos()).containsExactly(anterior);
+            assertThat(releida.hechos().get(0).alcance().declarado()).isFalse();
+        }
+
+        @Test
+        @DisplayName("#334 — la base rechaza un alcance vacio: no declarar no es «de ninguno»")
+        void laBaseRechazaUnAlcanceVacio() {
+            long contribuyente = crearContribuyente("PH-0002", "50300022");
+            Prescripcion guardada =
+                    enTransaccion(
+                            () ->
+                                    prescripciones.insertar(
+                                            new Prescripcion(
+                                                    null,
+                                                    contribuyente,
+                                                    "PREDIAL",
+                                                    new Ejercicio(2018),
+                                                    new Ejercicio(2018),
+                                                    LocalDate.of(2026, 6, 1),
+                                                    CausalDePrescripcion.DECLARACION_PRESENTADA,
+                                                    Plazo.de("4 ANIOS"),
+                                                    conjuntoId,
+                                                    ResultadoDeLaSolicitud.PROCEDE,
+                                                    null,
+                                                    List.of(computo(2018, true)),
+                                                    List.of(),
+                                                    null,
+                                                    Observacion.de("Se resuelve la solicitud"))));
+
+            assertThat(
+                            estadoSqlDelFallo(
+                                    () ->
+                                            ejecutarComoApp(
+                                                    "INSERT INTO prescripcion_hecho"
+                                                            + " (municipalidad_id, prescripcion_id,"
+                                                            + "  clase, causal, fecha_desde,"
+                                                            + "  ejercicios)"
+                                                            + " VALUES ("
+                                                            + municipalidad
+                                                            + ", "
+                                                            + guardada.id()
+                                                            + ", 'INTERRUPCION', 'pago',"
+                                                            + " DATE '2022-05-05', '{}')")))
+                    .isEqualTo("23514");
         }
 
         @Test

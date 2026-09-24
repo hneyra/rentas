@@ -17,6 +17,7 @@ import kamayuk.rentas.dominio.Plazo;
 import kamayuk.rentas.dominio.UnidadDePlazo;
 import kamayuk.rentas.persistencia.OrdenSeguro;
 import kamayuk.rentas.persistencia.RepositorioJdbc;
+import kamayuk.rentas.valores.dominio.AlcanceDelHecho;
 import kamayuk.rentas.valores.dominio.CausalDePrescripcion;
 import kamayuk.rentas.valores.dominio.ClaseDeHecho;
 import kamayuk.rentas.valores.dominio.ComputoDeEjercicio;
@@ -169,15 +170,17 @@ public class PrescripcionRepositoryJdbc extends RepositorioJdbc implements Presc
             jdbc().sql(
                             "INSERT INTO prescripcion_hecho"
                                     + " (municipalidad_id, prescripcion_id, clase, causal,"
-                                    + "  fecha_desde, fecha_hasta)"
+                                    + "  fecha_desde, fecha_hasta, ejercicios)"
                                     + " VALUES ("
                                     + MUNICIPALIDAD_ACTUAL
-                                    + ", :prescripcionId, :clase, :causal, :desde, :hasta)")
+                                    + ", :prescripcionId, :clase, :causal, :desde, :hasta,"
+                                    + "  string_to_array(CAST(:ejercicios AS text), ',')::ejercicio[])")
                     .param("prescripcionId", id)
                     .param("clase", hecho.clase().name())
                     .param("causal", hecho.causal())
                     .param("desde", hecho.desde())
                     .param("hasta", hecho.hasta())
+                    .param("ejercicios", ejerciciosComoTexto(hecho.alcance()))
                     .update();
         }
 
@@ -328,7 +331,10 @@ public class PrescripcionRepositoryJdbc extends RepositorioJdbc implements Presc
         List<HechoDelComputo> hechos = new ArrayList<>();
         hechos.addAll(
                 jdbc().sql(
-                                "SELECT clase, causal, fecha_desde, fecha_hasta"
+                                "SELECT clase, causal, fecha_desde, fecha_hasta,"
+                                        // Un arreglo de un DOMINIO llega como PGobject; como
+                                        // smallint[], como numeros.
+                                        + " ejercicios::smallint[] AS ejercicios"
                                         + " FROM prescripcion_hecho"
                                         + " WHERE prescripcion_id = :id"
                                         + " ORDER BY fecha_desde, id")
@@ -340,10 +346,46 @@ public class PrescripcionRepositoryJdbc extends RepositorioJdbc implements Presc
                                             ClaseDeHecho.valueOf(fila.getString("clase")),
                                             fila.getString("causal"),
                                             fila.getDate("fecha_desde").toLocalDate(),
-                                            hasta == null ? null : hasta.toLocalDate());
+                                            hasta == null ? null : hasta.toLocalDate(),
+                                            alcanceDe(fila.getArray("ejercicios")));
                                 })
                         .list());
         return hechos;
+    }
+
+    /**
+     * El alcance de un hecho como lo escribe {@code string_to_array} (#334): los anos separados por
+     * comas, o {@code null} si no esta declarado —y entonces la columna queda nula—. Es el mismo
+     * camino que {@code DeterminacionRepositoryJdbc} usa para {@code reglas_aplicadas}, porque un
+     * parametro con nombre de {@code JdbcClient} no mapea una coleccion a un arreglo de PostgreSQL.
+     * No deberia llegar nunca uno sin declarar: {@code DeclararPrescripcion} los resuelve todos
+     * antes de guardar, y {@code prescripcion_hecho_ejercicios_ck} no mira si la columna es nula
+     * porque las filas anteriores a V25 lo son.
+     */
+    private static @Nullable String ejerciciosComoTexto(AlcanceDelHecho alcance) {
+        if (!alcance.declarado()) {
+            return null;
+        }
+        StringBuilder texto = new StringBuilder();
+        for (Ejercicio ejercicio : alcance.ejercicios()) {
+            if (!texto.isEmpty()) {
+                texto.append(',');
+            }
+            texto.append(ejercicio.valor());
+        }
+        return texto.toString();
+    }
+
+    /** Nulo es una fila anterior a V25: su alcance no consta, y no se inventa (ver V25). */
+    private static AlcanceDelHecho alcanceDe(java.sql.@Nullable Array arreglo) throws SQLException {
+        if (arreglo == null) {
+            return AlcanceDelHecho.sinDeclarar();
+        }
+        List<Ejercicio> ejercicios = new ArrayList<>();
+        for (Object anio : (Object[]) arreglo.getArray()) {
+            ejercicios.add(new Ejercicio(((Number) anio).intValue()));
+        }
+        return AlcanceDelHecho.de(ejercicios);
     }
 
     private Cabecera mapearCabecera(ResultSet fila, int numeroDeFila) throws SQLException {

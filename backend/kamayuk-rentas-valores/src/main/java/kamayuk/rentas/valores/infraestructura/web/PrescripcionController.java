@@ -18,6 +18,7 @@ import kamayuk.rentas.parametros.LectorDeParametros;
 import kamayuk.rentas.valores.aplicacion.ConsultaDePrescripciones;
 import kamayuk.rentas.valores.aplicacion.DeclararPrescripcion;
 import kamayuk.rentas.valores.aplicacion.PlazosParametrizados;
+import kamayuk.rentas.valores.dominio.AlcanceDelHecho;
 import kamayuk.rentas.valores.dominio.CausalDePrescripcion;
 import kamayuk.rentas.valores.dominio.ClaseDeHecho;
 import kamayuk.rentas.valores.dominio.CriterioDePrescripciones;
@@ -187,7 +188,10 @@ public class PrescripcionController {
             // de las dos cosas —«corrige el formulario» o «hay que publicar una cifra»— y acaba
             // enumerando las dos, que es peor que no decir nada.
             throw FaltaPublicar.problema(falta);
-        } catch (DeclararPrescripcion.RangoInvertido | IllegalArgumentException invalido) {
+        } catch (DeclararPrescripcion.RangoInvertido
+                | DeclararPrescripcion.HechoSinAlcance
+                | DeclararPrescripcion.AlcanceFueraDelRango
+                | IllegalArgumentException invalido) {
             throw new ProblemaDeNegocio(CodigoDeError.VALIDACION, mensajeDe(invalido));
         }
     }
@@ -245,12 +249,38 @@ public class PrescripcionController {
             try {
                 hechos.add(
                         new HechoDelComputo(
-                                clase, exigir(hecho.causal(), "hechos[].causal"), desde, hasta));
+                                clase,
+                                exigir(hecho.causal(), "hechos[].causal"),
+                                desde,
+                                hasta,
+                                alcanceDe(hecho.ejercicios())));
             } catch (IllegalArgumentException invalido) {
                 throw new ProblemaDeNegocio(CodigoDeError.VALIDACION, mensajeDe(invalido));
             }
         }
         return hechos;
+    }
+
+    /**
+     * El alcance tal como llega (#334). Que falte no se resuelve aqui: si puede faltar depende del
+     * rango, y eso lo decide {@link DeclararPrescripcion}. Lo que si se rechaza aqui es la forma:
+     * una lista vacia —declarar que el hecho no es de ningun ejercicio no es no declararlo—, un
+     * elemento nulo o un ano fuera del dominio. Las tres son {@code IllegalArgumentException}, y
+     * {@link #hechosDe} las convierte en 422.
+     */
+    private static AlcanceDelHecho alcanceDe(@Nullable List<@Nullable Integer> ejercicios) {
+        if (ejercicios == null) {
+            return AlcanceDelHecho.sinDeclarar();
+        }
+        List<Ejercicio> declarados = new ArrayList<>(ejercicios.size());
+        for (Integer anio : ejercicios) {
+            if (anio == null) {
+                throw new IllegalArgumentException(
+                        "El campo 'hechos[].ejercicios' lleva un ejercicio vacio");
+            }
+            declarados.add(new Ejercicio(anio));
+        }
+        return AlcanceDelHecho.de(declarados);
     }
 
     private static ClaseDeHecho claseDe(@Nullable String texto) {

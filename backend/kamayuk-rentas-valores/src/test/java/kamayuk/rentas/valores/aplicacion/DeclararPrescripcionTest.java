@@ -14,6 +14,7 @@ import kamayuk.rentas.valores.dobles.ParametrosDeMentira;
 import kamayuk.rentas.valores.dobles.PrescripcionesEnMemoria;
 import kamayuk.rentas.valores.dobles.ValoresEnMemoria;
 import kamayuk.rentas.valores.dominio.CausalDePrescripcion;
+import kamayuk.rentas.valores.dominio.ComputoDeEjercicio;
 import kamayuk.rentas.valores.dominio.EstadoDeValor;
 import kamayuk.rentas.valores.dominio.HechoDelComputo;
 import kamayuk.rentas.valores.dominio.Prescripcion;
@@ -23,6 +24,7 @@ import kamayuk.rentas.valores.dominio.Valor;
 import kamayuk.rentas.valores.dominio.ValorDetalle;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -118,7 +120,8 @@ class DeclararPrescripcionTest {
         assertThat(declarada.resultado()).isEqualTo(ResultadoDeLaSolicitud.NO_PROCEDE);
         assertThat(declarada.ejercicios().get(0).inicioVigente())
                 .isEqualTo(LocalDate.of(2024, 2, 3));
-        assertThat(declarada.hechos()).containsExactly(pago);
+        // Guardado con su alcance: en un rango de uno, el hecho es de ese ejercicio (#334).
+        assertThat(declarada.hechos()).containsExactly(pago.para(new Ejercicio(2020)));
         assertThat(declarada.resolucion()).isEqualTo("RES-001");
     }
 
@@ -190,6 +193,223 @@ class DeclararPrescripcionTest {
                                         null,
                                         OBSERVACION))
                 .isInstanceOf(DeclararPrescripcion.RangoInvertido.class);
+    }
+
+    /**
+     * #334 — Un rango de <b>varios</b> ejercicios, <b>con</b> hechos.
+     *
+     * <p>Es la siembra que faltaba: la muestra de arriba —un solo ejercicio con un hecho posterior
+     * a su inicio— pasa igual aplicando cada hecho a su ejercicio que aplicandolos todos a todos, y
+     * por eso el defecto vivio. Aqui cada hecho es de la deuda de UN ejercicio, lo dice, y hay otro
+     * ejercicio en el rango al que no le toca. Todos son PREDIAL con DECLARACION_PRESENTADA (4
+     * anios) y desfase de 1 anio, como en el issue.
+     */
+    @Nested
+    @DisplayName("#334 — Cada hecho, en el computo de su ejercicio y en el tramo en que corre")
+    class CadaHechoEnSuEjercicio {
+
+        private final Ejercicio e2019 = new Ejercicio(2019);
+        private final Ejercicio e2020 = new Ejercicio(2020);
+        private final Ejercicio e2021 = new Ejercicio(2021);
+
+        @Test
+        @DisplayName("(a) el pago del 2019 no hace 422 en 2021, y 2021 sale prescrito")
+        void a() {
+            // El pago de la cuota de mayo del 2021 es de la deuda del 2021 y ocurre ANTES de que
+            // su plazo empiece (2022-01-01): sin el recorte, el inicio vigente quedaria en el
+            // 2021-06-01 y la solicitud entera saldria 422.
+            Prescripcion declarada =
+                    declararConHechos(
+                            2019,
+                            2021,
+                            LocalDate.of(2026, 3, 1),
+                            HechoDelComputo.interrupcion(
+                                            "pago parcial del predial 2019",
+                                            LocalDate.of(2021, 3, 15))
+                                    .para(e2019),
+                            HechoDelComputo.interrupcion(
+                                            "pago de la cuota de mayo del predial 2021",
+                                            LocalDate.of(2021, 5, 31))
+                                    .para(e2021));
+
+            assertThat(declarada.ejerciciosPrescritos()).containsExactly(e2019, e2020, e2021);
+            assertThat(declarada.resultado()).isEqualTo(ResultadoDeLaSolicitud.PROCEDE);
+            // El pago del 2019 SI reinicia el 2019: se aplica a su ejercicio, y solo a el.
+            assertThat(computoDe(declarada, e2019).inicioVigente())
+                    .isEqualTo(LocalDate.of(2021, 3, 16));
+            assertThat(computoDe(declarada, e2020).inicioVigente())
+                    .isEqualTo(LocalDate.of(2021, 1, 1));
+            assertThat(computoDe(declarada, e2021).inicioVigente())
+                    .isEqualTo(LocalDate.of(2022, 1, 1));
+            assertThat(computoDe(declarada, e2021).fechaPrescripcion())
+                    .isEqualTo(LocalDate.of(2026, 1, 1));
+        }
+
+        @Test
+        @DisplayName("(a) de un solo ejercicio: el pago de su propia cuota no hace 422")
+        void aDeUnSoloEjercicio() {
+            // «El rodeo no alcanza»: partir la solicitud por ano no evita este caso. Y sin alcance
+            // declarado, porque en un rango de uno no hay a donde mas pertenecer.
+            Prescripcion declarada =
+                    declararConHechos(
+                            2021,
+                            2021,
+                            LocalDate.of(2026, 3, 1),
+                            HechoDelComputo.interrupcion(
+                                    "pago de la cuota de mayo del predial 2021",
+                                    LocalDate.of(2021, 5, 31)));
+
+            assertThat(declarada.resultado()).isEqualTo(ResultadoDeLaSolicitud.PROCEDE);
+            assertThat(declarada.ejercicios().get(0).inicioVigente())
+                    .isEqualTo(LocalDate.of(2022, 1, 1));
+        }
+
+        @Test
+        @DisplayName("(b) ni la reclamacion del 2019 ni la del 2021 niegan el 2021: PROCEDE")
+        void b() {
+            // La del 2019 no es del 2021. La del 2021 si lo es, pero termino antes de que su plazo
+            // empezara: sin el recorte suma 289 dias, el 2021 vence el 2026-10-17 y la solicitud
+            // sale PROCEDE_EN_PARTE.
+            Prescripcion declarada =
+                    declararConHechos(
+                            2019,
+                            2021,
+                            LocalDate.of(2026, 6, 1),
+                            HechoDelComputo.suspension(
+                                            "reclamacion contra la RD del predial 2019",
+                                            LocalDate.of(2020, 2, 1),
+                                            LocalDate.of(2020, 12, 15))
+                                    .para(e2019),
+                            HechoDelComputo.suspension(
+                                            "reclamacion contra la determinacion del predial 2021",
+                                            LocalDate.of(2021, 3, 1),
+                                            LocalDate.of(2021, 12, 15))
+                                    .para(e2021));
+
+            assertThat(declarada.resultado()).isEqualTo(ResultadoDeLaSolicitud.PROCEDE);
+            assertThat(computoDe(declarada, e2021).fechaPrescripcion())
+                    .isEqualTo(LocalDate.of(2026, 1, 1));
+            // Y la del 2019 si corre el 2019, que es de quien es: 318 dias desde el 2024-01-01,
+            // que es bisiesto.
+            assertThat(computoDe(declarada, e2019).fechaPrescripcion())
+                    .isEqualTo(LocalDate.of(2024, 11, 14));
+        }
+
+        @Test
+        @DisplayName("(c) el pago del 2019 no reinicia el 2020: PROCEDE_EN_PARTE")
+        void c() {
+            Prescripcion declarada =
+                    declararConHechos(
+                            2019,
+                            2020,
+                            LocalDate.of(2025, 2, 3),
+                            HechoDelComputo.interrupcion(
+                                            "pago parcial del predial 2019",
+                                            LocalDate.of(2021, 3, 10))
+                                    .para(e2019));
+
+            assertThat(declarada.resultado()).isEqualTo(ResultadoDeLaSolicitud.PROCEDE_EN_PARTE);
+            assertThat(declarada.ejerciciosPrescritos()).containsExactly(e2020);
+            assertThat(computoDe(declarada, e2020).fechaPrescripcion())
+                    .isEqualTo(LocalDate.of(2025, 1, 1));
+            assertThat(computoDe(declarada, e2019).fechaPrescripcion())
+                    .isEqualTo(LocalDate.of(2025, 3, 11));
+        }
+
+        @Test
+        @DisplayName("un hecho de dos ejercicios actua en los dos, y en ninguno mas")
+        void unHechoDeDosEjercicios() {
+            // Un reconocimiento expreso de la deuda del 2019 y del 2020 en el mismo escrito.
+            Prescripcion declarada =
+                    declararConHechos(
+                            2019,
+                            2021,
+                            LocalDate.of(2026, 3, 1),
+                            HechoDelComputo.interrupcion(
+                                            "reconocimiento expreso de la obligacion",
+                                            LocalDate.of(2023, 4, 4))
+                                    .para(e2019, e2020));
+
+            assertThat(computoDe(declarada, e2019).inicioVigente())
+                    .isEqualTo(LocalDate.of(2023, 4, 5));
+            assertThat(computoDe(declarada, e2020).inicioVigente())
+                    .isEqualTo(LocalDate.of(2023, 4, 5));
+            assertThat(computoDe(declarada, e2021).inicioVigente())
+                    .isEqualTo(LocalDate.of(2022, 1, 1));
+            assertThat(declarada.ejerciciosPrescritos()).containsExactly(e2021);
+        }
+
+        @Test
+        @DisplayName("en un rango de varios, un hecho sin alcance se rechaza nombrandolo")
+        void sinAlcanceEnUnRangoSeRechaza() {
+            // Suponer «todos» es el defecto: no se supone nada.
+            assertThatThrownBy(
+                            () ->
+                                    declararConHechos(
+                                            2019,
+                                            2021,
+                                            LocalDate.of(2026, 3, 1),
+                                            HechoDelComputo.interrupcion(
+                                                    "pago parcial del predial 2019",
+                                                    LocalDate.of(2021, 3, 15))))
+                    .isInstanceOf(DeclararPrescripcion.HechoSinAlcance.class)
+                    .hasMessageContaining("'pago parcial del predial 2019'")
+                    .hasMessageContaining("2021-03-15")
+                    .hasMessageContaining("ejercicios");
+            assertThat(prescripciones.porId(1L)).isEmpty();
+        }
+
+        @Test
+        @DisplayName("un hecho que nombra un ejercicio fuera del rango se rechaza nombrandolo")
+        void fueraDelRangoSeRechaza() {
+            assertThatThrownBy(
+                            () ->
+                                    declararConHechos(
+                                            2019,
+                                            2021,
+                                            LocalDate.of(2026, 3, 1),
+                                            HechoDelComputo.interrupcion(
+                                                            "pago parcial del predial 2018",
+                                                            LocalDate.of(2021, 3, 15))
+                                                    .para(new Ejercicio(2018))))
+                    .isInstanceOf(DeclararPrescripcion.AlcanceFueraDelRango.class)
+                    .hasMessageContaining("'pago parcial del predial 2018'")
+                    .hasMessageContaining("2018");
+            assertThat(prescripciones.porId(1L)).isEmpty();
+        }
+
+        @Test
+        @DisplayName("lo que se guarda es el hecho con su alcance, tambien el completado")
+        void seGuardaConSuAlcance() {
+            HechoDelComputo pago =
+                    HechoDelComputo.interrupcion(
+                            "pago de la cuota de mayo del predial 2021", LocalDate.of(2021, 5, 31));
+
+            Prescripcion declarada = declararConHechos(2021, 2021, LocalDate.of(2026, 3, 1), pago);
+
+            assertThat(declarada.hechos()).containsExactly(pago.para(e2021));
+        }
+
+        private ComputoDeEjercicio computoDe(Prescripcion prescripcion, Ejercicio ejercicio) {
+            return prescripcion.ejercicios().stream()
+                    .filter(computo -> computo.ejercicio().equals(ejercicio))
+                    .findFirst()
+                    .orElseThrow();
+        }
+    }
+
+    private Prescripcion declararConHechos(
+            int desde, int hasta, LocalDate presentacion, HechoDelComputo... hechos) {
+        return servicio.declarar(
+                CONTRIBUYENTE,
+                "PREDIAL",
+                new Ejercicio(desde),
+                new Ejercicio(hasta),
+                presentacion,
+                CausalDePrescripcion.DECLARACION_PRESENTADA,
+                List.of(hechos),
+                null,
+                OBSERVACION);
     }
 
     // ------------------------------------------------------------------
