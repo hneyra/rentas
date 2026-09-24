@@ -163,6 +163,24 @@ final class PadronDeLaSiembraEnMemoria
             }
 
             @Override
+            public List<Transferencia> historicoDeVehiculo(long vehiculoId) {
+                return transferencias.stream()
+                        .filter(t -> t.vehiculoId() != null && t.vehiculoId() == vehiculoId)
+                        .toList();
+            }
+
+            @Override
+            public List<Long> vehiculosQueTransfirioDesde(long transferenteId, LocalDate fecha) {
+                return transferencias.stream()
+                        .filter(t -> t.vehiculoId() != null)
+                        .filter(t -> t.transferenteId() == transferenteId)
+                        .filter(t -> t.fechaTransferencia().isAfter(fecha))
+                        .map(Transferencia::vehiculoId)
+                        .distinct()
+                        .toList();
+            }
+
+            @Override
             public Optional<Long> contribuyentePorCodigo(String codigo) {
                 return porCodigo(codigo).map(ResumenDeContribuyente::id);
             }

@@ -381,6 +381,16 @@ class AlcabalaControllerTest {
         }
 
         @Override
+        public List<Transferencia> historicoDeVehiculo(long vehiculoId) {
+            return List.of();
+        }
+
+        @Override
+        public List<Long> vehiculosQueTransfirioDesde(long transferenteId, LocalDate fecha) {
+            return List.of();
+        }
+
+        @Override
         public Optional<Long> contribuyentePorCodigo(String codigo) {
             return Optional.empty();
         }

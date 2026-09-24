@@ -11,20 +11,25 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.ZoneId;
 import kamayuk.rentas.auditoria.AuditoriaJdbc;
 import kamayuk.rentas.auditoria.Origen;
 import kamayuk.rentas.auditoria.OrigenContext;
+import kamayuk.rentas.catastro.prueba.TitularidadDelEscenario;
 import kamayuk.rentas.compartido.TenantContext;
+import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.MunicipalidadId;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.dominio.Placa;
 import kamayuk.rentas.esquema.BaseDeDatosDePrueba;
 import kamayuk.rentas.esquema.ContextoDeTenant;
+import kamayuk.rentas.nucleo.dominio.TipoTransferencia;
 import kamayuk.rentas.nucleo.dominio.Vehiculo;
 import kamayuk.rentas.nucleo.dominio.predial.Determinacion;
 import kamayuk.rentas.nucleo.infraestructura.DeterminacionRepositoryJdbc;
+import kamayuk.rentas.nucleo.infraestructura.TransferenciaRepositoryJdbc;
 import kamayuk.rentas.nucleo.infraestructura.ValorReferencialRepositoryJdbc;
 import kamayuk.rentas.nucleo.infraestructura.VehiculoRepositoryJdbc;
 import kamayuk.rentas.parametros.LectorDeParametros;
@@ -51,8 +56,9 @@ import org.springframework.transaction.support.TransactionTemplate;
  * {@code RegistrarDeterminacionVehicular} contra PostgreSQL real (#32).
  *
  * <p>Lo que este archivo verifica con la base de por medio: el modo simulación no escribe nada, el
- * plazo de afectación se respeta sin intervención manual, y la alícuota sale del conjunto sellado
- * —cambiarla cambia el importe—.
+ * plazo de afectación se respeta sin intervención manual, la alícuota sale del conjunto sellado
+ * —cambiarla cambia el importe—, y el ejercicio se determina a quien era propietario <b>al 1 de
+ * enero</b> y no a quien lo es hoy (TUO LTM art. 31, #329).
  */
 @DisplayName("#32 — Registrar la determinacion vehicular")
 class RegistrarDeterminacionVehicularTest {
@@ -66,19 +72,23 @@ class RegistrarDeterminacionVehicularTest {
     private static BaseDeDatosDePrueba base;
     private static long municipalidad;
     private static long contribuyente;
+    private static long comprador;
     private static JdbcClient jdbc;
     private static TenantTransactionManager gestor;
     private static TransactionTemplate transaccion;
     private static VehiculoRepositoryJdbc vehiculos;
     private static DeterminacionRepositoryJdbc determinaciones;
     private static RegistrarDeterminacionVehicular registrar;
+    private static RegistrarTransferencia transferir;
     private static AdministrarParametros administrarParametros;
 
     @BeforeAll
     static void provisionar() throws SQLException, IOException {
         base = BaseDeDatosDePrueba.provisionar();
         municipalidad = crearMunicipalidad();
-        contribuyente = crearContribuyente();
+        contribuyente =
+                crearContribuyente("C-VEHDET-1", "40404141", "TITULAR, DETERMINACION VEHICULAR");
+        comprador = crearContribuyente("C-VEHDET-2", "40404142", "COMPRADOR, A MITAD DE ANIO");
 
         DriverManagerDataSource pool = new DriverManagerDataSource();
         pool.setUrl(base.url());
@@ -103,12 +113,23 @@ class RegistrarDeterminacionVehicularTest {
                 envolver(
                         new RegistrarDeterminacionVehicular(
                                 vehiculos,
+                                new TransferenciaRepositoryJdbc(jdbc),
                                 new ValoresReferenciales(
                                         new ValorReferencialRepositoryJdbc(jdbc), parametros),
                                 determinaciones,
                                 parametros,
                                 new AuditoriaJdbc(jdbc, RELOJ),
                                 RELOJ));
+        // La transferencia por el camino de verdad: el caso de uso que sobrescribe el titular del
+        // vehiculo y deja la fecha solo en la fila de `transferencia` (#329). La titularidad
+        // predial no la toca una transferencia de vehiculo, pero el constructor la pide.
+        transferir =
+                envolver(
+                        new RegistrarTransferencia(
+                                new TransferenciaRepositoryJdbc(jdbc),
+                                new TitularidadDelEscenario(jdbc),
+                                vehiculos,
+                                new AuditoriaJdbc(jdbc, RELOJ)));
     }
 
     @SuppressWarnings("unchecked")
@@ -247,7 +268,155 @@ class RegistrarDeterminacionVehicularTest {
         }
     }
 
+    @Nested
+    @DisplayName("El ejercicio es de quien era propietario al 1 de enero (TUO LTM art. 31, #329)")
+    class ElPropietarioAlPrimeroDeEnero {
+
+        /**
+         * La siembra que distingue: una transferencia <b>dentro</b> del ejercicio. Un vehiculo sin
+         * transferencias —la muestra de las demas pruebas de este archivo— da el mismo verde con el
+         * titular de hoy y con el del 1 de enero.
+         */
+        @Test
+        @DisplayName("vendido el 10 de junio: 2026 se determina al vendedor y 2027 al comprador")
+        void unaTransferenciaDentroDelEjercicio() throws SQLException {
+            long vehiculoId = crearVehiculoConValorReferencial("W6F-666", "SUZUKI", "SWIFT");
+            sellarConValorReferencialYAlicuota(
+                    new Ejercicio(2027), "SUZUKI", "SWIFT", new BigDecimal("1.0"));
+            venderAlComprador(vehiculoId, LocalDate.of(2026, 6, 10));
+
+            Determinacion de2026 =
+                    registrar
+                            .calcular(
+                                    vehiculoId,
+                                    EJERCICIO_AFECTO,
+                                    false,
+                                    Observacion.de("Determinacion del ejercicio de la venta"))
+                            .determinacion();
+            Determinacion de2027 =
+                    registrar
+                            .calcular(
+                                    vehiculoId,
+                                    new Ejercicio(2027),
+                                    false,
+                                    Observacion.de("Determinacion del ejercicio siguiente"))
+                            .determinacion();
+
+            assertThat(contribuyenteDeLaFila(de2026))
+                    .as(
+                            "al 1 de enero de 2026 el vehiculo era del vendedor: el comprador asume"
+                                    + " la condicion de contribuyente desde el 1 de enero de 2027")
+                    .isEqualTo(contribuyente);
+            assertThat(contribuyenteDeLaFila(de2027))
+                    .as("al 1 de enero de 2027 ya era del comprador")
+                    .isEqualTo(comprador);
+        }
+
+        /**
+         * El borde: la transferencia fechada el mismo 1 de enero. El art. 31, segundo parrafo, lo
+         * decide: «el adquirente asume la condicion de contribuyente a partir del 1 de enero del
+         * ano siguiente». Vendido el 2026-01-01, el 2026 es del vendedor y el 2027 del comprador.
+         */
+        @Test
+        @DisplayName(
+                "vendido el mismo 1 de enero: 2026 se determina al vendedor y 2027 al comprador")
+        void unaTransferenciaDelPrimeroDeEnero() throws SQLException {
+            long vehiculoId = crearVehiculoConValorReferencial("W7G-777", "MAZDA", "DEMIO");
+            sellarConValorReferencialYAlicuota(
+                    new Ejercicio(2027), "MAZDA", "DEMIO", new BigDecimal("1.0"));
+            venderAlComprador(vehiculoId, LocalDate.of(2026, 1, 1));
+
+            Determinacion de2026 =
+                    registrar
+                            .calcular(
+                                    vehiculoId,
+                                    EJERCICIO_AFECTO,
+                                    false,
+                                    Observacion.de("Vendido el primer dia del ejercicio"))
+                            .determinacion();
+            Determinacion de2027 =
+                    registrar
+                            .calcular(
+                                    vehiculoId,
+                                    new Ejercicio(2027),
+                                    false,
+                                    Observacion.de("El ejercicio siguiente a la venta"))
+                            .determinacion();
+
+            assertThat(contribuyenteDeLaFila(de2026))
+                    .as(
+                            "vendido el 1 de enero de 2026, el comprador es contribuyente desde el"
+                                    + " 1 de enero de 2027: el 2026 sigue siendo del vendedor")
+                    .isEqualTo(contribuyente);
+            assertThat(contribuyenteDeLaFila(de2027)).isEqualTo(comprador);
+        }
+
+        /**
+         * El otro lado del borde: vendido el ultimo dia de un ejercicio, el siguiente ya es del
+         * comprador. Se mide con el 31 de diciembre de 2026 y no con el de 2025 porque la base de
+         * prueba solo tiene las particiones de {@code auditoria} de 2026 y 2027, y la transferencia
+         * se audita en el ejercicio de su fecha; el 2025-12-31 lo fija la prueba pura.
+         */
+        @Test
+        @DisplayName(
+                "vendido el 31 de diciembre de 2026: 2026 es del vendedor y 2027 del comprador")
+        void unaTransferenciaDelTreintaYUnoDeDiciembre() throws SQLException {
+            long vehiculoId = crearVehiculoConValorReferencial("W8H-888", "KIA", "PICANTO");
+            sellarConValorReferencialYAlicuota(
+                    new Ejercicio(2027), "KIA", "PICANTO", new BigDecimal("1.0"));
+            venderAlComprador(vehiculoId, LocalDate.of(2026, 12, 31));
+
+            Determinacion de2026 =
+                    registrar
+                            .calcular(
+                                    vehiculoId,
+                                    EJERCICIO_AFECTO,
+                                    false,
+                                    Observacion.de("Vendido el ultimo dia del ejercicio"))
+                            .determinacion();
+            Determinacion de2027 =
+                    registrar
+                            .calcular(
+                                    vehiculoId,
+                                    new Ejercicio(2027),
+                                    false,
+                                    Observacion.de("El ejercicio siguiente a la venta"))
+                            .determinacion();
+
+            assertThat(contribuyenteDeLaFila(de2026)).isEqualTo(contribuyente);
+            assertThat(contribuyenteDeLaFila(de2027))
+                    .as("vendido el 31 de diciembre, al 1 de enero siguiente ya era del comprador")
+                    .isEqualTo(comprador);
+        }
+    }
+
     // ------------------------------------------------------------------
+
+    /** Vende el vehiculo del titular de siempre al comprador, por el caso de uso de verdad. */
+    private static void venderAlComprador(long vehiculoId, LocalDate fecha) {
+        transferir.transferirVehiculo(
+                vehiculoId,
+                comprador,
+                TipoTransferencia.COMPRA_VENTA,
+                fecha,
+                Dinero.de("60000.00"),
+                false,
+                "Tarjeta de propiedad",
+                Observacion.de("Compraventa del vehiculo a mitad de anio"));
+    }
+
+    /**
+     * El contribuyente de la fila que quedo en {@code determinacion}, leido de la tabla y no del
+     * objeto devuelto: lo que se cobra es lo que se asento.
+     */
+    private static long contribuyenteDeLaFila(Determinacion determinacion) {
+        return transaccion.execute(
+                estado ->
+                        jdbc.sql("SELECT contribuyente_id FROM determinacion WHERE id = :id")
+                                .param("id", determinacion.id())
+                                .query(Long.class)
+                                .single());
+    }
 
     private static long contarFilas(String tabla) throws SQLException {
         return transaccion.execute(
@@ -407,7 +576,8 @@ class RegistrarDeterminacionVehicularTest {
         }
     }
 
-    private static long crearContribuyente() throws SQLException {
+    private static long crearContribuyente(String codigo, String documento, String nombre)
+            throws SQLException {
         try (Connection app = base.conexion(BaseDeDatosDePrueba.APP)) {
             ContextoDeTenant.fijar(app, municipalidad);
             try (PreparedStatement sentencia =
@@ -415,10 +585,12 @@ class RegistrarDeterminacionVehicularTest {
                             "INSERT INTO contribuyente (municipalidad_id, codigo_contribuyente,"
                                     + " tipo_documento, numero_documento, tipo_persona,"
                                     + " nombre_razon_social, usuario_registro)"
-                                    + " VALUES (?, 'C-VEHDET-1', 'DNI', '40404141', 'NATURAL',"
-                                    + " 'TITULAR, DETERMINACION VEHICULAR', 'siembra') RETURNING"
-                                    + " id")) {
+                                    + " VALUES (?, ?, 'DNI', ?, 'NATURAL', ?, 'siembra')"
+                                    + " RETURNING id")) {
                 sentencia.setLong(1, municipalidad);
+                sentencia.setString(2, codigo);
+                sentencia.setString(3, documento);
+                sentencia.setString(4, nombre);
                 try (ResultSet fila = sentencia.executeQuery()) {
                     fila.next();
                     long id = fila.getLong(1);

@@ -6,17 +6,12 @@ import java.util.ArrayList;
 import java.util.List;
 import kamayuk.rentas.autorizacion.Privilegio;
 import kamayuk.rentas.autorizacion.RequiereAcceso;
-import kamayuk.rentas.compartido.Pagina;
-import kamayuk.rentas.compartido.Paginacion;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.dominio.Placa;
 import kamayuk.rentas.nucleo.aplicacion.ConsultaDeVehiculos;
 import kamayuk.rentas.nucleo.aplicacion.RegistrarDeterminacionVehicular;
-import kamayuk.rentas.nucleo.dominio.CriterioDeVehiculo;
-import kamayuk.rentas.nucleo.dominio.EstadoVehiculo;
 import kamayuk.rentas.nucleo.dominio.Vehiculo;
-import kamayuk.rentas.nucleo.dominio.VehiculoEncontrado;
 import kamayuk.rentas.parametros.FaltaPublicar;
 import kamayuk.rentas.parametros.LectorDeParametros;
 import kamayuk.rentas.parametros.ParametrosSellados;
@@ -37,11 +32,15 @@ import org.springframework.web.bind.annotation.RestController;
  * Cálculo del impuesto vehicular: {@code POST /api/v1/rentas/vehicular/calculo} (RF-025, #32).
  *
  * <p>Resuelve el objetivo de tres formas —un {@code vehiculoId}, una {@code placa}, o todos los
- * vehículos activos de un {@code codContribuyente}—, tal como pide el catálogo («por contribuyente
- * o por placa»). Cuando el objetivo es un contribuyente, un vehículo fuera de su plazo de
- * afectación se excluye del resultado en silencio —es la respuesta automática que #32 exige—;
- * cuando el objetivo es un vehículo puntual, la misma situación se informa como error: quien pidió
- * ese vehículo esperaba una respuesta sobre él, no una lista vacía.
+ * vehículos activos de los que un {@code codContribuyente} <b>era propietario al 1 de enero</b> del
+ * ejercicio (TUO LTM art. 31; #329)—, tal como pide el catálogo («por contribuyente o por placa»).
+ * La lista la arma {@link RegistrarDeterminacionVehicular#vehiculosDe} con la misma regla con que
+ * decide a quién se asienta cada determinación: hasta #329 eran los {@code ACTIVO} de hoy, y el
+ * vendedor de junio no veía el vehículo del que seguía siendo contribuyente. Cuando el objetivo es
+ * un contribuyente, un vehículo fuera de su plazo de afectación se excluye del resultado en
+ * silencio —es la respuesta automática que #32 exige—; cuando el objetivo es un vehículo puntual,
+ * la misma situación se informa como error: quien pidió ese vehículo esperaba una respuesta sobre
+ * él, no una lista vacía.
  *
  * <h2>Los filtros del contrato se leen de la consulta; lo demás, del cuerpo (#399)</h2>
  *
@@ -108,8 +107,6 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiereAcceso(acceso = "vehicular_calculo", privilegio = Privilegio.REGISTRO)
 public class VehicularController {
 
-    private static final String ORDEN_POR_OMISION = "placa";
-
     private static final String OBSERVACION_DE_LA_SIMULACION =
             "Simulacion del impuesto vehicular: se calcula y no se asienta ninguna determinacion"
                     + " (#399)";
@@ -152,7 +149,7 @@ public class VehicularController {
         List<DeterminacionVehicularResource> resultado = new ArrayList<>();
         RegistrarDeterminacionVehicular.@Nullable Calculo ultimo = null;
         try {
-            for (Vehiculo vehiculo : resolverVehiculos(objetivo)) {
+            for (Vehiculo vehiculo : resolverVehiculos(objetivo, delCalculo)) {
                 try {
                     RegistrarDeterminacionVehicular.Calculo calculo =
                             servicio.calcular(
@@ -198,7 +195,7 @@ public class VehicularController {
         }
     }
 
-    private List<Vehiculo> resolverVehiculos(Objetivo objetivo) {
+    private List<Vehiculo> resolverVehiculos(Objetivo objetivo, Ejercicio ejercicio) {
         Long vehiculoId = objetivo.vehiculoId();
         if (vehiculoId != null) {
             return List.of(
@@ -226,20 +223,16 @@ public class VehicularController {
         }
         String codContribuyente = objetivo.codContribuyente();
         if (codContribuyente != null) {
-            CriterioDeVehiculo criterio =
-                    new CriterioDeVehiculo(null, null, codContribuyente, EstadoVehiculo.ACTIVO);
-            Pagina<VehiculoEncontrado> pagina =
-                    consultaDeVehiculos.activosDe(
-                            criterio,
-                            Paginacion.de(0, Paginacion.TAMANO_MAXIMO, ORDEN_POR_OMISION));
-            if (pagina.contenido().isEmpty()) {
+            List<Vehiculo> suyos = servicio.vehiculosDe(codContribuyente, ejercicio);
+            if (suyos.isEmpty()) {
                 throw new ProblemaDeNegocio(
                         CodigoDeError.NO_ENCONTRADO,
                         "El contribuyente '"
                                 + codContribuyente
-                                + "' no tiene ningun vehiculo activo");
+                                + "' no tenia ningun vehiculo activo al 1 de enero de "
+                                + ejercicio);
             }
-            return pagina.contenido().stream().map(VehiculoEncontrado::vehiculo).toList();
+            return suyos;
         }
         throw new ProblemaDeNegocio(
                 CodigoDeError.VALIDACION,
