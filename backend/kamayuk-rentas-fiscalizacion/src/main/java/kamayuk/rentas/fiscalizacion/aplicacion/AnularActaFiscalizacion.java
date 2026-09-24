@@ -12,6 +12,7 @@ import kamayuk.rentas.fiscalizacion.dominio.EstadoDeLiquidacion;
 import kamayuk.rentas.fiscalizacion.dominio.Liquidacion;
 import kamayuk.rentas.fiscalizacion.dominio.LiquidacionRepository;
 import kamayuk.rentas.fiscalizacion.dominio.MovimientoDeLiquidacionRepository;
+import kamayuk.rentas.fiscalizacion.dominio.ResolucionDeDeterminacionRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,6 +40,20 @@ import org.springframework.transaction.annotation.Transactional;
  * contribuyente. La regla 4 dice cómo se sale de ahí: primero se anula la liquidación ({@code
  * CambiarEstadoDeLaLiquidacion}), que es un movimiento de su historial, y después la visita.
  *
+ * <h2>Y una liquidación transferida no se anula (#338)</h2>
+ *
+ * <p>Ese orden sólo vale para una liquidación <b>sin resolución de determinación</b>. Hasta #338
+ * este javadoc daba por cerrada cualquier liquidación ANULADA, y la premisa era falsa: anularla no
+ * toca la resolución —{@code resolucion_determinacion} no admite {@code UPDATE} ni tiene estado— ni
+ * los cargos que asentó. Así se llegaba a una RDF vigente y descargable sostenida por una
+ * liquidación anulada y por una visita anulada.
+ *
+ * <p>Desde #338 {@code CambiarEstadoDeLaLiquidacion} no deja anular una liquidación con RDF, y aquí
+ * se comprueba lo mismo ({@link ActaConResolucionEnPie}): sin esta segunda comprobación, una
+ * liquidación que llegó a ANULADA con su RDF antes de #338 seguiría habilitando que se anule su
+ * visita. Con resolución, el orden es otro: primero se deja sin efecto la RDF —un acto que todavía
+ * no existe—, después la liquidación y al final la visita.
+ *
  * <p>Se comprueba sobre la <b>última</b> versión, que es la que está en pie: una reliquidación
  * anterior anulada no revive nada.
  *
@@ -56,16 +71,19 @@ public class AnularActaFiscalizacion {
     private final ActaFiscalizacionRepository actas;
     private final LiquidacionRepository liquidaciones;
     private final MovimientoDeLiquidacionRepository movimientos;
+    private final ResolucionDeDeterminacionRepository resoluciones;
     private final Auditoria auditoria;
 
     public AnularActaFiscalizacion(
             ActaFiscalizacionRepository actas,
             LiquidacionRepository liquidaciones,
             MovimientoDeLiquidacionRepository movimientos,
+            ResolucionDeDeterminacionRepository resoluciones,
             Auditoria auditoria) {
         this.actas = actas;
         this.liquidaciones = liquidaciones;
         this.movimientos = movimientos;
+        this.resoluciones = resoluciones;
         this.auditoria = auditoria;
     }
 
@@ -77,6 +95,7 @@ public class AnularActaFiscalizacion {
      * @param observacion por qué se anula (regla 10, RNF-052)
      * @throws LiquidarFiscalizacion.ActaInexistente si no hay ninguna con ese identificador
      * @throws ActaConLiquidacionViva si su contraste ya se liquidó y la liquidación sigue en pie
+     * @throws ActaConResolucionEnPie si la liquidación está anulada pero su RDF sigue vigente
      * @throws ActaFiscalizacion.TransicionIlegal si ya estaba anulada
      */
     @Transactional
@@ -113,6 +132,13 @@ public class AnularActaFiscalizacion {
         if (!estado.estaCerrada()) {
             throw new ActaConLiquidacionViva(actaId, ultima.numero(), estado);
         }
+        resoluciones
+                .deLiquidacion(ultima.identificador())
+                .ifPresent(
+                        resolucion -> {
+                            throw new ActaConResolucionEnPie(
+                                    actaId, ultima.numero(), resolucion.numero());
+                        });
     }
 
     /**
@@ -151,6 +177,26 @@ public class AnularActaFiscalizacion {
                             + estado.etiqueta()
                             + ": primero se anula la liquidacion y despues la visita, o quedaria"
                             + " determinada de oficio una diferencia que ya no sostiene nadie");
+        }
+    }
+
+    /**
+     * La liquidacion de la visita esta anulada, pero su resolucion de determinacion sigue vigente
+     * (#338): anular la visita dejaria esa RDF sostenida por nada.
+     */
+    public static final class ActaConResolucionEnPie extends RuntimeException {
+        @java.io.Serial private static final long serialVersionUID = 1L;
+
+        ActaConResolucionEnPie(long actaId, String liquidacion, String resolucion) {
+            super(
+                    "El acta "
+                            + actaId
+                            + " sostiene la liquidacion "
+                            + liquidacion
+                            + ", anulada pero transferida con la resolucion de determinacion "
+                            + resolucion
+                            + ": anular la liquidacion no dejo sin efecto esa resolucion, y hasta"
+                            + " que se deje no se anula la visita que la sustenta");
         }
     }
 }

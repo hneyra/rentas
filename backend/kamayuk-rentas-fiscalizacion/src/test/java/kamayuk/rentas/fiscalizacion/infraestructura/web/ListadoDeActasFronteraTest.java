@@ -29,6 +29,7 @@ import kamayuk.rentas.fiscalizacion.dobles.ContribuyentesDeMentira;
 import kamayuk.rentas.fiscalizacion.infraestructura.ActaFiscalizacionRepositoryJdbc;
 import kamayuk.rentas.fiscalizacion.infraestructura.LiquidacionRepositoryJdbc;
 import kamayuk.rentas.fiscalizacion.infraestructura.MovimientoDeLiquidacionRepositoryJdbc;
+import kamayuk.rentas.fiscalizacion.infraestructura.ResolucionDeDeterminacionRepositoryJdbc;
 import kamayuk.rentas.plataforma.tenant.TenantTransactionManager;
 import kamayuk.rentas.web.ConfiguracionDeJson;
 import kamayuk.rentas.web.GuardiaDeParametros;
@@ -197,6 +198,8 @@ class ListadoDeActasFronteraTest {
                                                         new ActaFiscalizacionRepositoryJdbc(jdbc),
                                                         new LiquidacionRepositoryJdbc(jdbc),
                                                         new MovimientoDeLiquidacionRepositoryJdbc(
+                                                                jdbc),
+                                                        new ResolucionDeDeterminacionRepositoryJdbc(
                                                                 jdbc),
                                                         new AuditoriaJdbc(
                                                                 jdbc, Clock.systemDefaultZone())),

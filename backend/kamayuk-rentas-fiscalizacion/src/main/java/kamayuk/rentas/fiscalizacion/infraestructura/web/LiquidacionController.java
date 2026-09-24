@@ -287,7 +287,9 @@ public class LiquidacionController {
         } catch (CambiarEstadoDeLaLiquidacion.LiquidacionInexistente noExiste) {
             throw new ProblemaDeNegocio(CodigoDeError.NO_ENCONTRADO, mensajeDe(noExiste));
         } catch (CambiarEstadoDeLaLiquidacion.LiquidacionAnulada
-                | CambiarEstadoDeLaLiquidacion.SinCambio enConflicto) {
+                | CambiarEstadoDeLaLiquidacion.SinCambio
+                | CambiarEstadoDeLaLiquidacion.TransicionIlegal
+                | CambiarEstadoDeLaLiquidacion.LiquidacionConResolucion enConflicto) {
             throw new ProblemaDeNegocio(CodigoDeError.CONFLICTO, mensajeDe(enConflicto));
         } catch (IllegalArgumentException invalido) {
             throw new ProblemaDeNegocio(CodigoDeError.VALIDACION, mensajeDe(invalido));
