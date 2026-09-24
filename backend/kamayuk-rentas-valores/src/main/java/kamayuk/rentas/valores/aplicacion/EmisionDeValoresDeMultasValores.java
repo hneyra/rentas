@@ -4,7 +4,10 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Objects;
 import kamayuk.rentas.cuentacorriente.ConsultaDeDeudaPublica;
+import kamayuk.rentas.cuentacorriente.ObligacionCompartida;
 import kamayuk.rentas.cuentacorriente.ObligacionPublica;
+import kamayuk.rentas.cuentacorriente.OrigenDeLaObligacion;
+import kamayuk.rentas.cuentacorriente.SeleccionDeObligacion;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.valores.EmisionDeValoresDeMultas;
@@ -43,10 +46,13 @@ public class EmisionDeValoresDeMultasValores implements EmisionDeValoresDeMultas
 
     private final RegistrarValor registrar;
     private final ConsultaDeDeudaPublica deuda;
+    private final OrigenDeLaObligacion origen;
 
-    public EmisionDeValoresDeMultasValores(RegistrarValor registrar, ConsultaDeDeudaPublica deuda) {
+    public EmisionDeValoresDeMultasValores(
+            RegistrarValor registrar, ConsultaDeDeudaPublica deuda, OrigenDeLaObligacion origen) {
         this.registrar = registrar;
         this.deuda = deuda;
+        this.origen = origen;
     }
 
     /**
@@ -61,16 +67,23 @@ public class EmisionDeValoresDeMultasValores implements EmisionDeValoresDeMultas
      * la prueba de #53 esperaba SIN_DEUDA y recibio un fallo de confirmacion.
      */
     @Override
-    @Transactional(noRollbackFor = SinDeudaQueFormalizar.class)
+    @Transactional(
+            noRollbackFor = {
+                SinDeudaQueFormalizar.class,
+                ObligacionCompartida.class,
+                ObligacionYaFormalizada.class
+            })
     public ValorDeMulta emitirPorMulta(
             long contribuyenteId,
             String tributo,
             Ejercicio ejercicio,
             @Nullable Long predioId,
             @Nullable Long vehiculoId,
+            String referenciaDelOrigen,
             LocalDate fecha,
             Observacion observacion) {
 
+        Objects.requireNonNull(referenciaDelOrigen, "Hay que decir que multa se formaliza (#371)");
         Objects.requireNonNull(tributo, "La multa se formaliza sobre un tributo");
         Objects.requireNonNull(ejercicio, "La multa se formaliza sobre un ejercicio");
         Objects.requireNonNull(fecha, "La emision necesita su fecha (regla 9)");
@@ -90,6 +103,23 @@ public class EmisionDeValoresDeMultasValores implements EmisionDeValoresDeMultas
                             + " no debe nada al "
                             + fecha
                             + ": no hay nada que formalizar");
+        }
+
+        // La contencion de #371, ANTES de numerar nada: la obligacion es la de todas las multas
+        // del obligado en ese tributo, ejercicio y unidad. Si otra papeleta tiene deuda en ella,
+        // una RM la formalizaria tambien; y si ya salio de ORDINARIA, un valor ya la formalizo y
+        // `moverAValor` volveria a abonar una ORDINARIA que no debe nada.
+        SeleccionDeObligacion obligacion =
+                new SeleccionDeObligacion(tributo, ejercicio, predioId, vehiculoId);
+        origen.exigirQueSoloLaOrigine(contribuyenteId, obligacion, referenciaDelOrigen);
+        if (!origen.sigueEnOrdinaria(contribuyenteId, obligacion)) {
+            throw new ObligacionYaFormalizada(
+                    "La obligacion de "
+                            + tributo
+                            + " del ejercicio "
+                            + ejercicio.valor()
+                            + " ya no esta en ORDINARIA: un valor ya la formalizo, y otra"
+                            + " resolucion de multa seria un segundo titulo por la misma deuda");
         }
 
         try {

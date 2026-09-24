@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
@@ -49,6 +50,7 @@ import kamayuk.rentas.cuentacorriente.aplicacion.ConsultarDeuda;
 import kamayuk.rentas.cuentacorriente.aplicacion.ExtincionDeDeudaCuentaCorriente;
 import kamayuk.rentas.cuentacorriente.aplicacion.GeneradorDeCargosCuentaCorriente;
 import kamayuk.rentas.cuentacorriente.aplicacion.MovimientoDeFaseCuentaCorriente;
+import kamayuk.rentas.cuentacorriente.aplicacion.OrigenDeLaObligacionCuentaCorriente;
 import kamayuk.rentas.cuentacorriente.aplicacion.RecaudacionDelLibroCuentaCorriente;
 import kamayuk.rentas.cuentacorriente.aplicacion.RegistrarAsiento;
 import kamayuk.rentas.cuentacorriente.aplicacion.RegistroDeAbonosCuentaCorriente;
@@ -351,7 +353,13 @@ class ValoresMasivosYReportesJdbcTest {
                         new RegistrarValor(
                                 new ValorRepositoryJdbc(jdbc), deudas, fases, auditoria, RELOJ));
         EmisionDeValoresDeMultas emision =
-                envolver(new EmisionDeValoresDeMultasValores(registrarValor, deudas));
+                envolver(
+                        new EmisionDeValoresDeMultasValores(
+                                registrarValor,
+                                deudas,
+                                envolver(
+                                        new OrigenDeLaObligacionCuentaCorriente(
+                                                asientos, saldos))));
 
         registrarPapeleta = envolver(new RegistrarPapeleta(papeletas, codigos, cargos, auditoria));
         resolver =
@@ -1804,6 +1812,112 @@ class ValoresMasivosYReportesJdbcTest {
     }
 
     // ==================================================================
+    //  #371 — la corrida y la obligacion que dos papeletas comparten
+    // ==================================================================
+
+    /**
+     * <b>La siembra que distingue (#371).</b> Los ayudantes de esta clase crean un contribuyente
+     * por papeleta, y la prueba «las dos papeletas se formalizan» de {@code LaNumeracion} usa dos
+     * obligados: con esa muestra, «formalizar la obligacion de la papeleta» y «formalizar la
+     * papeleta» son lo mismo. Aqui el obligado es UNO, del mismo ejercicio y sin vehiculo del
+     * padron: T-001 por 440 y T-002 por 220 en una sola obligacion del libro, con 660.
+     */
+    @Nested
+    @DisplayName("#371 — la corrida no formaliza la multa de otra papeleta ni emite dos veces")
+    class LaObligacionCompartida {
+
+        private static final Dinero T001 = Dinero.de("440.00");
+        private static final Dinero T002 = Dinero.de("220.00");
+        private static final BigDecimal LAS_DOS = new BigDecimal("660.00");
+
+        @Test
+        @DisplayName("T-001 exigible y T-002 sin resolucion: la RM nunca es de 660")
+        void laExigibleNoArrastraALaQueNoLoEs() {
+            long obligado = crearContribuyente("oc1");
+            Papeleta t001 = papeletaExigible("oc1-t001", obligado, T001);
+            Papeleta t002 = papeletaDeTransito("oc1-t002", obligado, T002);
+
+            CorridaDeValores corrida = corridaDe(t001, t002);
+            generar.generar(corrida.identificador());
+
+            assertThat(totalesDeLasRm(obligado))
+                    .as(
+                            "una RM por 660 formalizaria tambien la multa de T-002, que no tiene"
+                                    + " ningun acto que ordene su cobranza")
+                    .doesNotContain(LAS_DOS);
+            assertThat(itemDe(corrida, t001))
+                    .as("y el item de T-001 dice con que papeleta comparte la obligacion")
+                    .satisfies(
+                            item -> {
+                                assertThat(item.estado())
+                                        .isEqualTo(EstadoDeItemDeCorrida.NO_PROCEDE);
+                                assertThat(item.motivo()).contains(t002.numero());
+                            });
+        }
+
+        @Test
+        @DisplayName("las dos exigibles: nunca dos RM por lo mismo, y ORDINARIA nunca en negativo")
+        void lasDosExigiblesNoSeFormalizanDosVeces() {
+            long obligado = crearContribuyente("oc2");
+            Papeleta t001 = papeletaExigible("oc2-t001", obligado, T001);
+            Papeleta t002 = papeletaExigible("oc2-t002", obligado, T002);
+
+            CorridaDeValores corrida = corridaDe(t001, t002);
+            generar.generar(corrida.identificador());
+
+            assertThat(totalesDeLasRm(obligado))
+                    .as("dos titulos por la misma deuda, y coactiva admitiria los dos")
+                    .hasSizeLessThanOrEqualTo(1);
+            assertThat(saldoEnOrdinaria(obligado))
+                    .as("moverAValor por segunda vez deja ORDINARIA en -660")
+                    .isGreaterThanOrEqualTo(BigDecimal.ZERO);
+            assertThat(itemDe(corrida, t001).motivo())
+                    .as("cada item dice con que papeleta comparte la obligacion")
+                    .contains(t002.numero());
+            assertThat(itemDe(corrida, t002).motivo()).contains(t001.numero());
+        }
+
+        @Test
+        @DisplayName("una obligacion que ya no esta en ORDINARIA no se vuelve a formalizar")
+        void laYaFormalizadaNoSeFormalizaOtraVez() {
+            long obligado = crearContribuyente("oc3");
+            Papeleta sola = papeletaExigible("oc3-t001", obligado, T001);
+            // Otro valor ya formalizo esa obligacion: la llevo entera a VALOR.
+            enTransaccion(
+                    () ->
+                            registrarValor.emitir(
+                                    kamayuk.rentas.valores.dominio.TipoValor.RESOLUCION_DE_MULTA,
+                                    obligado,
+                                    List.of(
+                                            new kamayuk.rentas.valores.dominio.SelectorDeObligacion(
+                                                    "MULTA_TRANSITO",
+                                                    new Ejercicio(2026),
+                                                    null,
+                                                    null)),
+                                    PORQUE,
+                                    EXIGIBLE_DESDE));
+
+            CorridaDeValores corrida = corridaDe(sola);
+            generar.generar(corrida.identificador());
+
+            assertThat(totalesDeLasRm(obligado))
+                    .as("la corrida no emite una segunda RM por la deuda que ya esta en VALOR")
+                    .hasSize(1);
+            assertThat(saldoEnOrdinaria(obligado))
+                    .as("ni abona otra vez una ORDINARIA que ya no debe nada")
+                    .isGreaterThanOrEqualTo(BigDecimal.ZERO);
+            assertThat(itemsDe(corrida).get(0))
+                    .as("y lo dice: NO_PROCEDE porque la obligacion ya salio de ORDINARIA")
+                    .satisfies(
+                            item -> {
+                                assertThat(item.estado())
+                                        .isEqualTo(EstadoDeItemDeCorrida.NO_PROCEDE);
+                                assertThat(item.motivo()).contains("ORDINARIA");
+                            });
+        }
+    }
+
+    // ==================================================================
     //  Ayudas
     // ==================================================================
 
@@ -1931,6 +2045,50 @@ class ValoresMasivosYReportesJdbcTest {
                                 PORQUE));
     }
 
+    /** Una corrida sobre varias papeletas a la vez, con la fecha en que todas son exigibles. */
+    private static CorridaDeValores corridaDe(Papeleta una, Papeleta... otras) {
+        List<String> numeros = new java.util.ArrayList<>();
+        numeros.add(una.numero());
+        for (Papeleta otra : otras) {
+            numeros.add(otra.numero());
+        }
+        return enTransaccion(
+                () -> iniciar.porSeleccion(Familia.TRANSITO, numeros, EXIGIBLE_DESDE, PORQUE));
+    }
+
+    private static ItemDeCorrida itemDe(CorridaDeValores corrida, Papeleta papeleta) {
+        return itemsDe(corrida).stream()
+                .filter(item -> item.papeletaId() == papeleta.identificador())
+                .findFirst()
+                .orElseThrow();
+    }
+
+    /** El total de cada RM emitida al obligado, leido de la tabla y no del informe (#371). */
+    private static List<BigDecimal> totalesDeLasRm(long obligado) {
+        return enTransaccion(
+                () ->
+                        jdbc.sql(
+                                        "SELECT monto_total FROM valor WHERE contribuyente_id ="
+                                                + " :obligado AND tipo = 'RM' ORDER BY id")
+                                .param("obligado", obligado)
+                                .query(BigDecimal.class)
+                                .list());
+    }
+
+    /** Lo que el libro dice que queda en ORDINARIA: cargos menos abonos de esa fase (#371). */
+    private static BigDecimal saldoEnOrdinaria(long obligado) {
+        return enTransaccion(
+                () ->
+                        jdbc.sql(
+                                        "SELECT coalesce(sum(CASE WHEN tipo = 'CARGO' THEN monto"
+                                                + " ELSE -monto END), 0) FROM"
+                                                + " cuenta_corriente_asiento WHERE contribuyente_id"
+                                                + " = :obligado AND fase = 'ORDINARIA'")
+                                .param("obligado", obligado)
+                                .query(BigDecimal.class)
+                                .single());
+    }
+
     private static List<ItemDeCorrida> itemsDe(CorridaDeValores corrida) {
         return enTransaccion(() -> corridas.items(corrida.identificador(), 0, 100));
     }
@@ -2033,7 +2191,14 @@ class ValoresMasivosYReportesJdbcTest {
     }
 
     private static Papeleta papeletaDeTransito(String sufijo) {
-        long obligado = crearContribuyente(sufijo);
+        return papeletaDeTransito(sufijo, crearContribuyente(sufijo), MULTA);
+    }
+
+    /**
+     * Una papeleta de tránsito <b>de un obligado que ya existe</b>, por el importe que se pida
+     * (#371): es lo que deja sembrar dos papeletas en la misma obligación del libro.
+     */
+    private static Papeleta papeletaDeTransito(String sufijo, long obligado, Dinero multa) {
         String codigo = ("G-" + sufijo).toUpperCase(java.util.Locale.ROOT);
         crearCodigo(codigo);
         return enTransaccion(
@@ -2052,16 +2217,21 @@ class ValoresMasivosYReportesJdbcTest {
                                 obligado,
                                 Dinero.de("5350.00"),
                                 Alicuota.de("8"),
-                                MULTA,
+                                multa,
                                 Alicuota.de("100"),
-                                MULTA,
+                                multa,
                                 null,
                                 PORQUE));
     }
 
     /** Una papeleta con su ordinaria dictada, notificada y con el plazo ya vencido. */
     private static Papeleta papeletaExigible(String sufijo) {
-        Papeleta papeleta = papeletaDeTransito(sufijo);
+        return papeletaExigible(sufijo, crearContribuyente(sufijo), MULTA);
+    }
+
+    /** La misma, de un obligado que ya existe y por el importe que se pida (#371). */
+    private static Papeleta papeletaExigible(String sufijo, long obligado, Dinero multa) {
+        Papeleta papeleta = papeletaDeTransito(sufijo, obligado, multa);
         ResolverConResolucionDeGerencia.ResolucionDictada dictada = dictarOrdinaria(papeleta);
         NotificarResolucionDeGerencia.Diligencia diligencia =
                 enTransaccion(

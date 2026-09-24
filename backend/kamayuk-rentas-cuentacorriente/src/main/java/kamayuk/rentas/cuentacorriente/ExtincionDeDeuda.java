@@ -2,7 +2,6 @@ package kamayuk.rentas.cuentacorriente;
 
 import java.time.LocalDate;
 import kamayuk.rentas.dominio.Observacion;
-import org.jspecify.annotations.Nullable;
 
 /**
  * Extingue con asientos la deuda que una obligacion tiene a una fecha (#50, RF-064).
@@ -37,7 +36,8 @@ public interface ExtincionDeDeuda {
 
     /**
      * Da de baja, parte por parte, lo que esa obligacion deba a la fecha y ningun abono posterior
-     * haya extinguido ya (#445).
+     * haya extinguido ya (#445), <b>solo si</b> toda su deuda la origino {@code referenciaExterna}
+     * (#371).
      *
      * <p>Escribe un abono por cada parte del desglose con importe —insoluto, reajuste, interes,
      * gasto—, en la fase en la que la obligacion esta. Es exactamente lo que {@code
@@ -58,28 +58,46 @@ public interface ExtincionDeDeuda {
      * el pago tiene fecha <b>posterior</b> a la de la resolucion (#445): la fecha es retroactiva, y
      * lo que ya se pago despues de ella no se vuelve a extinguir.
      *
+     * <h2>Solo lo que origino quien la pide (#371)</h2>
+     *
+     * <p>La clave del libro no distingue el acto que origino cada cargo, y dos papeletas del mismo
+     * obligado, del mismo ejercicio y de la misma unidad —o sin unidad— comparten obligacion. Hasta
+     * #371 este puerto se llamaba {@code extinguir} y daba de baja la obligacion entera: anular
+     * T-001 se llevaba tambien la multa de T-002. Ahora, con la obligacion ya bloqueada y antes de
+     * abonar nada, se comprueba que todos los cargos que originaron deuda lleven esa referencia; si
+     * aparece otra, no se asienta nada y se lanza {@link ObligacionCompartida} nombrandola.
+     *
+     * <p>La variante que no comprobaba <b>se retiro</b> del puerto, no se dejo al lado: sin ningun
+     * llamador en {@code src/main} la habria acusado {@code PuertosSinConsumidorTest}, y dejarla
+     * publicada era dejar a mano la llamada que extingue lo ajeno. Rechazar bloquea una baja
+     * legitima sobre una obligacion compartida, y es a proposito: dice que otro origen la comparte
+     * en vez de extinguirlo sin acto que lo sustente. Tampoco reparte lo pagado entre los origenes:
+     * eso es la imputacion de un pago parcial (D-14). Que la papeleta sea la unidad de su
+     * obligacion es #465.
+     *
      * @param contribuyenteId el obligado; lo resolvio quien llama
      * @param obligacion el tributo, ejercicio y unidad cuya deuda se extingue
      * @param fecha la fecha valor de los asientos y desde la que se mide lo extinguible (regla 9):
      *     lo que se debia ese dia, menos lo que un abono posterior ya extinguio
      * @param documentoOrigen el papel que la ordena; en {@code sanciones}, el numero de la
      *     resolucion de gerencia
-     * @param referenciaExterna como entra la referencia del contexto que pide la baja, si la hay
+     * @param referenciaExterna la referencia con que quien pide marco su cargo: la que se exige a
+     *     todos los cargos de la obligacion, y la que llevan los abonos de la baja
      * @param causal el sustento juridico de la baja, con vocabulario cerrado (#684). <b>La declara
-     *     quien llama</b>, no la adivina esta implementacion: hoy el unico camino es la resolucion
-     *     de gerencia que deja la multa sin efecto —y quien llama acaba de comprobarlo—, pero un
-     *     puerto que lo dedujera de su unico caller de hoy afirmaria manana lo que ya no es cierto
+     *     quien llama</b>, no la adivina esta implementacion: un puerto que lo dedujera de sus
+     *     callers de hoy afirmaria manana lo que ya no es cierto
      * @param observacion por que se extingue (regla 10); queda como {@code motivo} de cada asiento.
      *     <b>No es la causal</b>: una es el sustento y la otra el relato de quien firma, y
      *     componerlas en una sola cadena fue el defecto que #684 cerro
      * @return lo que de verdad se dio de baja, con su fecha
+     * @throws ObligacionCompartida si algun cargo que origino deuda es de otro origen
      */
-    MovimientoAsentado extinguir(
+    MovimientoAsentado extinguirLoOriginadoPor(
             long contribuyenteId,
             SeleccionDeObligacion obligacion,
             LocalDate fecha,
             String documentoOrigen,
-            @Nullable String referenciaExterna,
+            String referenciaExterna,
             CausalDeBaja causal,
             Observacion observacion);
 }

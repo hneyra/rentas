@@ -14,6 +14,7 @@ import kamayuk.rentas.cuentacorriente.CausalDeBaja;
 import kamayuk.rentas.cuentacorriente.ConsultaDeDeudaPublica;
 import kamayuk.rentas.cuentacorriente.ExtincionDeDeuda;
 import kamayuk.rentas.cuentacorriente.MovimientoAsentado;
+import kamayuk.rentas.cuentacorriente.ObligacionCompartida;
 import kamayuk.rentas.cuentacorriente.ObligacionPublica;
 import kamayuk.rentas.cuentacorriente.SeleccionDeObligacion;
 import kamayuk.rentas.documentos.EmitirDocumento;
@@ -141,6 +142,8 @@ public class ResolverConResolucionDeGerencia {
      * @throws OrdinariaSinDictar si se pide la sancionadora y no hay ordinaria
      * @throws OrdinariaSinNotificar si la ordinaria no está notificada
      * @throws PlazoDeLaOrdinariaEnCurso si el plazo de la ordinaria todavía corre
+     * @throws ObligacionCompartidaConOtraPapeleta si deja la multa sin efecto y su obligación del
+     *     libro tiene también la multa de otra papeleta (#371)
      */
     @Transactional
     public ResolucionDictada dictar(
@@ -241,20 +244,30 @@ public class ResolverConResolucionDeGerencia {
 
         MovimientoAsentado baja = null;
         if (registrada.dejaLaMultaSinEfecto()) {
-            baja =
-                    extincion.extinguir(
-                            papeleta.obligadoId(),
-                            obligacion,
-                            peticion.fecha(),
-                            "RESOLUCION " + registrada.numero(),
-                            ObligacionDeLaPapeleta.referenciaDe(papeleta),
-                            // La causal la declara quien dicta la resolucion, que es quien
-                            // acaba de comprobar `dejaLaMultaSinEfecto()` en la linea de
-                            // arriba (#684). Es una de las seis del desplegable de RF-044, y
-                            // no una traduccion aproximada: la resolucion de gerencia que
-                            // deja la multa sin efecto ES «RESOLUCIÓN QUE DEJA SIN EFECTO».
-                            CausalDeBaja.RESOLUCION_QUE_DEJA_SIN_EFECTO,
-                            observacion);
+            try {
+                // La variante que comprueba el origen (#371): la obligacion es la de todas las
+                // multas del obligado en ese tributo, ejercicio y unidad, y dejar sin efecto ESTA
+                // no puede extinguir las otras. El rechazo deshace la transaccion entera, con la
+                // resolucion y su papel: no queda una resolucion que dice «sin efecto» y una
+                // deuda que no se movio.
+                baja =
+                        extincion.extinguirLoOriginadoPor(
+                                papeleta.obligadoId(),
+                                obligacion,
+                                peticion.fecha(),
+                                "RESOLUCION " + registrada.numero(),
+                                ObligacionDeLaPapeleta.referenciaDe(papeleta),
+                                // La causal la declara quien dicta la resolucion, que es quien
+                                // acaba de comprobar `dejaLaMultaSinEfecto()` en la linea de
+                                // arriba (#684). Es una de las seis del desplegable de RF-044, y
+                                // no una traduccion aproximada: la resolucion de gerencia que
+                                // deja la multa sin efecto ES «RESOLUCIÓN QUE DEJA SIN EFECTO».
+                                CausalDeBaja.RESOLUCION_QUE_DEJA_SIN_EFECTO,
+                                observacion);
+            } catch (ObligacionCompartida compartida) {
+                throw ObligacionDeLaPapeleta.compartida(
+                        papeleta, compartida, papeletas, "dejarla sin efecto");
+            }
         }
 
         auditoria.registrar(
