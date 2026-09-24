@@ -162,12 +162,21 @@ async function problemaDe(respuesta: Response): Promise<CuerpoDeProblema> {
 /**
  * Pide una operacion y devuelve su cuerpo. Con `admiteVacio`, el tipo dice ademas `null`: es lo
  * que devuelve un 204, y solo quien lo declara lo recibe (#354).
+ *
+ * La segunda sobrecarga declara `admiteVacio?: false`, y no es redundante: con el `boolean` de
+ * `OpcionesDeSolicitud`, un `admiteVacio` que llegara como `boolean` —no como el literal `true`—
+ * caeria en ella, que promete `T`, y en ejecucion el `if` de abajo mira el VALOR y devolveria
+ * `null`. Es el `null as T` que #354 quito, entrando por la sobrecarga. Asi un `boolean` no casa con
+ * ninguna y no compila (barrera en `verificaciones/tipos/barreras-de-tipos.tsx`).
  */
 export async function solicitar<T>(
   ruta: string,
   opciones: OpcionesDeSolicitud & { readonly admiteVacio: true },
 ): Promise<T | null>;
-export async function solicitar<T>(ruta: string, opciones?: OpcionesDeSolicitud): Promise<T>;
+export async function solicitar<T>(
+  ruta: string,
+  opciones?: OpcionesDeSolicitud & { readonly admiteVacio?: false },
+): Promise<T>;
 export async function solicitar<T>(
   ruta: string,
   opciones: OpcionesDeSolicitud = {},
