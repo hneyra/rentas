@@ -22,10 +22,11 @@ import kamayuk.rentas.dominio.Observacion;
  *
  * <p>ARQ-01 §3.8: «tesoreria asienta abonos; nunca determina. Si la caja calcula deuda, el sistema
  * tiene dos verdades». <b>Sigue siendo cierto</b>, y por eso hay que decir con precision para que
- * entra {@code cobrado} desde #39: el <i>cuanto</i> lo resuelve este contexto releyendo {@code
- * deudaActualizadaA(fechaDePago)} sobre su propio libro, dentro de la misma transaccion en la que
- * asienta. Lo cobrado no decide nada — no se abona, no se reparte y no se suma a nada—: se
- * <b>compara</b>, y si no cuadra al centimo no se asienta ninguna fila.
+ * entra {@code cobrado} desde #39: el <i>cuanto</i> lo resuelve este contexto releyendo sobre su
+ * propio libro lo que queda por extinguir desde la fecha de pago —{@code
+ * extinguibleDesde(fechaDePago)}, #471—, dentro de la misma transaccion en la que asienta. Lo
+ * cobrado no decide nada — no se abona, no se reparte y no se suma a nada—: se <b>compara</b>, y si
+ * no cuadra al centimo no se asienta ninguna fila.
  *
  * <p>La diferencia es la que separa un dato de entrada de una comprobacion. Un importe que
  * decidiera cuanto se extingue seria la caja calculando deuda; un importe que solo puede impedir
@@ -46,8 +47,10 @@ public interface RegistroDeAbonos {
      *   <li>bloquea en la base las filas de saldo de cada obligacion marcada, en orden estable
      *       —para que dos cobranzas concurrentes con selecciones que se solapan se serialicen en
      *       vez de bloquearse mutuamente—;
-     *   <li>relee la deuda de cada cuota con {@code deudaActualizadaA(fechaDePago)}, ya con el
-     *       libro que la cobranza anterior dejo;
+     *   <li>relee lo que queda por extinguir de cada cuota con {@code
+     *       extinguibleDesde(fechaDePago)}, ya con el libro que la cobranza anterior dejo —y con
+     *       los abonos de fecha valor posterior dentro: un cobro que la caja entrega tarde no
+     *       vuelve a extinguir lo que otro, fechado despues, ya extinguio (#471)—;
      *   <li><b>compara lo releido con {@code cobrado}, ANTES de escribir una sola fila</b>, y si no
      *       coinciden al centimo lanza {@link ImporteCobradoNoCuadra} sin asentar nada (#39);
      *   <li>asienta el cargo del reajuste y del interes <b>devengados y no asentados</b> —al
@@ -68,7 +71,8 @@ public interface RegistroDeAbonos {
      * @param documentoOrigen el numero del recibo que origina el abono
      * @param observacion por que se abona (regla 10)
      * @return un {@link AbonoAsentado} por obligacion que tenia deuda, en el orden recibido
-     * @throws SinDeudaQueAbonar si ninguna de las obligaciones marcadas tenia deuda a esa fecha
+     * @throws SinDeudaQueAbonar si ninguna de las obligaciones marcadas tenia nada por extinguir
+     *     desde esa fecha
      * @throws ImporteCobradoNoCuadra si lo que el libro extinguiria no es, al centimo, {@code
      *     cobrado}
      */

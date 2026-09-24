@@ -56,6 +56,14 @@ import org.springframework.transaction.annotation.Transactional;
  * cero, porque la unica {@code PoliticaDeMora} implementada es la que no acumula nada (D-02a); el
  * dia que deje de serlo, esto es lo que evita una condonacion silenciosa en todo el padron.
  *
+ * <h2>Lo pendiente se mide desde la fecha, no a ella (#471)</h2>
+ *
+ * <p>Lo que se acoge —y lo que {@link #deudaAcogible} ofrece congelar— es {@link
+ * CalculoDeDeuda#extinguibleDesde}, la misma respuesta que #445 dejo para la baja y la extincion.
+ * Un convenio que se formaliza con una fecha anterior a un cobro que ya esta en el libro no acoge
+ * lo que ese cobro extinguio. Sin nada posterior a la fecha —el caso de todos los dias— la cifra es
+ * la misma que {@code deudaActualizadaA}.
+ *
  * <h2>Devolver no es reversar</h2>
  *
  * <p>{@link #devolver} mueve al reves <b>lo pendiente ahora</b>, no lo que se acogio entonces.
@@ -116,8 +124,7 @@ public class AcogimientoAConvenioCuentaCorriente implements AcogimientoAConvenio
             ClaveDeObligacion obligacion = claveDe(contribuyenteId, seleccion);
             for (SaldoProyectado fila : saldos.deLaObligacion(obligacion)) {
                 DeudaActualizada deuda =
-                        calculo.deudaActualizadaA(
-                                asientos.deLaObligacion(fila.clave()), fechaDeCorte, redondeo);
+                        pendienteDesde(asientos.deLaObligacion(fila.clave()), fechaDeCorte);
                 if (!deuda.total().esPositivo()) {
                     continue;
                 }
@@ -197,7 +204,7 @@ public class AcogimientoAConvenioCuentaCorriente implements AcogimientoAConvenio
             ClaveDeSaldo clave = claveDe(contribuyenteId, cuota);
             List<Asiento> delLibro = asientos.deLaObligacion(clave);
 
-            DeudaActualizada pendiente = calculo.deudaActualizadaA(delLibro, fecha, redondeo);
+            DeudaActualizada pendiente = pendienteDesde(delLibro, fecha);
             if (!pendiente.total().esPositivo()) {
                 continue;
             }
@@ -252,6 +259,24 @@ public class AcogimientoAConvenioCuentaCorriente implements AcogimientoAConvenio
         }
 
         return new MovimientoAsentado(movidas, escritos, fecha);
+    }
+
+    /**
+     * Lo que una cuota tiene por mover a convenio —o de vuelta— con fecha valor {@code fecha}: lo
+     * que queda por extinguir <b>desde</b> esa fecha, no lo que se debia <b>a</b> ella (#471).
+     *
+     * <p>Mover de fase es abonar en la de salida, y un abono con fecha en el pasado tiene la misma
+     * pregunta que la baja de #445: si el libro ya tiene un cobro con fecha valor posterior, ese
+     * cobro ya extinguio parte de la cuota. Con {@code deudaActualizadaA(fecha)} el convenio
+     * formalizado antes de ese cobro acogia una deuda que ya no existia, y el cronograma se firmaba
+     * sobre ella.
+     *
+     * <p>Es <b>un solo</b> metodo para la lectura y para el movimiento porque {@link
+     * AcogimientoAConvenio#deudaAcogible} promete que salen del mismo sitio: si la lectura midiera
+     * una cosa y el movimiento otra, el preconvenio congelaria una composicion y se acogeria otra.
+     */
+    private DeudaActualizada pendienteDesde(List<Asiento> delLibro, LocalDate fecha) {
+        return calculo.extinguibleDesde(delLibro, fecha, redondeo);
     }
 
     private void asentar(
