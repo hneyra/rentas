@@ -9,6 +9,7 @@ import kamayuk.rentas.auditoria.RegistroDeAuditoria;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.dominio.Plazo;
+import kamayuk.rentas.valores.dominio.AlcanceDelHecho;
 import kamayuk.rentas.valores.dominio.CausalDePrescripcion;
 import kamayuk.rentas.valores.dominio.ComputoDeEjercicio;
 import kamayuk.rentas.valores.dominio.ComputoDePrescripcion;
@@ -101,6 +102,21 @@ import org.springframework.transaction.annotation.Transactional;
  * redondear hacia el contribuyente —extinguiendo deuda viva— o hacia la municipalidad —cobrando lo
  * prescrito—.
  *
+ * <h2>Cada hecho, en el computo de su ejercicio (#334)</h2>
+ *
+ * <p>Los arts. 45 y 46 interrumpen o suspenden el plazo de una deuda concreta, no el de todo el
+ * rango. Hasta #334 este caso de uso pasaba la <b>misma</b> lista de hechos al computo de cada
+ * ejercicio: el pago parcial del predial 2019 reiniciaba tambien el plazo del 2020 —negando una
+ * prescripcion que procedia— y, en un rango hasta 2021, dejaba el inicio vigente del 2021 antes de
+ * su inicio y la solicitud entera salia 422.
+ *
+ * <p>Ahora cada hecho declara su {@link AlcanceDelHecho}, y el filtro se hace <b>aqui</b>, antes de
+ * llamar a {@link ComputoDePrescripcion#resolver}: la funcion pura recibe los hechos de un
+ * ejercicio y no aprende nada de rangos. Lo que no se hace es suponer: en un rango de mas de un
+ * ejercicio, un hecho sin alcance es {@link HechoSinAlcance}, porque suponer «todos» es el defecto
+ * entero. En un rango de uno no hay a donde mas pertenecer y se completa con ese ejercicio, que es
+ * lo que se guarda.
+ *
  * <h2>El plazo y el inicio salen del parametro, no del codigo</h2>
  *
  * <p>Los dos: cuantos anios dura (art. 43, segun la causal) y desde cuando se cuenta (art. 44,
@@ -137,7 +153,8 @@ public class DeclararPrescripcion {
      * @param fechaPresentacion cuando se presento; es la fecha a la que se resuelve el computo y de
      *     la que sale el conjunto de parametros, no "hoy"
      * @param causal cual de los tres plazos del art. 43 aplica
-     * @param hechos las interrupciones y suspensiones alegadas; puede ir vacia
+     * @param hechos las interrupciones y suspensiones alegadas; puede ir vacia. Cada una con su
+     *     alcance, salvo en un rango de un solo ejercicio (#334)
      * @param resolucion el numero de la resolucion, si ya se emitio
      * @param observacion por que se declara (regla 10)
      */
@@ -157,6 +174,8 @@ public class DeclararPrescripcion {
             throw new RangoInvertido(ejercicioDesde, ejercicioHasta);
         }
 
+        List<HechoDelComputo> conAlcance = conSuAlcance(hechos, ejercicioDesde, ejercicioHasta);
+
         PlazosParametrizados.Vigentes vigentes = plazos.aLaFechaDe(fechaPresentacion);
         Plazo plazo = vigentes.paraPrescribir(causal);
         Plazo desfase = vigentes.inicioDelComputo(tributo);
@@ -167,7 +186,10 @@ public class DeclararPrescripcion {
             Ejercicio ejercicio = new Ejercicio(anio);
             ComputoDePrescripcion.Computo computo =
                     ComputoDePrescripcion.resolver(
-                            inicioDelComputo(ejercicio, desfase), plazo, hechos, fechaPresentacion);
+                            inicioDelComputo(ejercicio, desfase),
+                            plazo,
+                            delEjercicio(conAlcance, ejercicio),
+                            fechaPresentacion);
             if (computo.prescrita()) {
                 prescritos++;
             }
@@ -189,7 +211,7 @@ public class DeclararPrescripcion {
                                 ResultadoDeLaSolicitud.de(prescritos, computos.size()),
                                 resolucion,
                                 computos,
-                                hechos,
+                                conAlcance,
                                 null,
                                 observacion));
 
@@ -199,6 +221,39 @@ public class DeclararPrescripcion {
     }
 
     // ------------------------------------------------------------------
+
+    /**
+     * Los hechos con su alcance resuelto, o el rechazo que nombra al que no lo tiene (#334).
+     *
+     * <p>Se resuelve <b>antes</b> de leer ningun parametro: un hecho mal declarado es un error de
+     * la peticion, y tiene que decirse aunque falte publicar el plazo.
+     */
+    private static List<HechoDelComputo> conSuAlcance(
+            List<HechoDelComputo> hechos, Ejercicio desde, Ejercicio hasta) {
+        List<HechoDelComputo> resueltos = new ArrayList<>(hechos.size());
+        for (HechoDelComputo hecho : hechos) {
+            if (!hecho.alcance().declarado()) {
+                if (!desde.equals(hasta)) {
+                    throw new HechoSinAlcance(hecho, desde, hasta);
+                }
+                resueltos.add(hecho.con(AlcanceDelHecho.de(desde)));
+                continue;
+            }
+            for (Ejercicio ejercicio : hecho.alcance().ejercicios()) {
+                if (ejercicio.compareTo(desde) < 0 || ejercicio.compareTo(hasta) > 0) {
+                    throw new AlcanceFueraDelRango(hecho, ejercicio, desde, hasta);
+                }
+            }
+            resueltos.add(hecho);
+        }
+        return List.copyOf(resueltos);
+    }
+
+    /** Los hechos que actuan sobre el computo de ese ejercicio, y ninguno mas (#334). */
+    private static List<HechoDelComputo> delEjercicio(
+            List<HechoDelComputo> hechos, Ejercicio ejercicio) {
+        return hechos.stream().filter(hecho -> hecho.alcance().alcanza(ejercicio)).toList();
+    }
 
     /**
      * El dia 1 del computo: el 1 de enero del ejercicio mas el desfase parametrizado (art. 44).
@@ -259,6 +314,47 @@ public class DeclararPrescripcion {
                 + "\",\"prescritos\":"
                 + prescripcion.ejerciciosPrescritos().size()
                 + "}";
+    }
+
+    /**
+     * Un hecho sin alcance en una solicitud de mas de un ejercicio (#334): 422 nombrandolo.
+     *
+     * <p>No se supone que alcanza a todos, porque eso es el defecto: el pago parcial del predial
+     * 2019 no interrumpe el plazo del 2020.
+     */
+    public static final class HechoSinAlcance extends RuntimeException {
+
+        @java.io.Serial private static final long serialVersionUID = 1L;
+
+        HechoSinAlcance(HechoDelComputo hecho, Ejercicio desde, Ejercicio hasta) {
+            super(
+                    "El hecho "
+                            + hecho.descripcion()
+                            + " no dice de que ejercicio es la deuda que toca: en una solicitud de "
+                            + desde.valor()
+                            + " a "
+                            + hasta.valor()
+                            + " hay que declararlo en 'hechos[].ejercicios'");
+        }
+    }
+
+    /** Un hecho que dice ser de un ejercicio que la solicitud no pide (#334): 422 nombrandolo. */
+    public static final class AlcanceFueraDelRango extends RuntimeException {
+
+        @java.io.Serial private static final long serialVersionUID = 1L;
+
+        AlcanceFueraDelRango(
+                HechoDelComputo hecho, Ejercicio fuera, Ejercicio desde, Ejercicio hasta) {
+            super(
+                    "El hecho "
+                            + hecho.descripcion()
+                            + " declara el ejercicio "
+                            + fuera.valor()
+                            + ", que no esta en la solicitud: va de "
+                            + desde.valor()
+                            + " a "
+                            + hasta.valor());
+        }
     }
 
     /** El rango de ejercicios va al reves. */

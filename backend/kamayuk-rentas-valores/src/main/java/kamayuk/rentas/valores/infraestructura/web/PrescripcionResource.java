@@ -1,6 +1,7 @@
 package kamayuk.rentas.valores.infraestructura.web;
 
 import java.util.List;
+import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.valores.dominio.ComputoDeEjercicio;
 import kamayuk.rentas.valores.dominio.HechoDelComputo;
 import kamayuk.rentas.valores.dominio.Prescripcion;
@@ -67,16 +68,30 @@ public record PrescripcionResource(
         }
     }
 
-    /** Un acto que interrumpio o suspendio el computo. */
+    /**
+     * Un acto que interrumpio o suspendio el computo.
+     *
+     * @param ejercicios de que ejercicios era la deuda que tocaba (#334). {@code null} solo en una
+     *     resolucion anterior a {@code V25}, que se guardo sin esta columna y cuyo computo aplico
+     *     el hecho a todo el rango: se publica en blanco y no reconstruido, igual que {@code V21}
+     *     trata la modalidad de las determinaciones de antes
+     */
     public record HechoResource(
-            String clase, String causal, String fechaDesde, @Nullable String fechaHasta) {
+            String clase,
+            String causal,
+            String fechaDesde,
+            @Nullable String fechaHasta,
+            @Nullable List<Integer> ejercicios) {
 
         static HechoResource de(HechoDelComputo hecho) {
             return new HechoResource(
                     hecho.clase().name(),
                     hecho.causal(),
                     hecho.desde().toString(),
-                    hecho.hasta() == null ? null : hecho.hasta().toString());
+                    hecho.hasta() == null ? null : hecho.hasta().toString(),
+                    hecho.alcance().declarado()
+                            ? hecho.alcance().ejercicios().stream().map(Ejercicio::valor).toList()
+                            : null);
         }
     }
 }

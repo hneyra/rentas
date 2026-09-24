@@ -149,6 +149,76 @@ class PrescripcionControllerTest {
         assertThat(cuerpo).contains("\"resultado\":\"NO_PROCEDE\"");
         assertThat(cuerpo).contains("\"nuevoInicioDelComputo\":\"2024-02-03\"");
         assertThat(cuerpo).contains("\"causal\":\"pago parcial de la deuda\"");
+        assertThat(cuerpo)
+                .as("#334 — en un rango de uno, el hecho sin alcance es de ese ejercicio")
+                .contains("\"ejercicios\":[2020]");
+    }
+
+    @Test
+    @DisplayName("#334 — el pago del 2019 alegado en un rango hasta 2021 no hace 422")
+    void elPagoDeUnEjercicioNoTumbaElRango() throws Exception {
+        MvcResult resultado =
+                declararRango(
+                        """
+                        {"codContribuyente":"C-0007","tributo":"PREDIAL",
+                         "ejercicioDesde":2019,"ejercicioHasta":2021,
+                         "fechaDePresentacion":"2026-03-01",
+                         "plazoAplicable":"DECLARACION_PRESENTADA",
+                         "hechos":[{"clase":"INTERRUPCION","causal":"pago parcial del predial 2019",
+                                    "fechaDesde":"2021-03-15","ejercicios":[2019]}],
+                         "observacion":"Se resuelve la solicitud"}
+                        """);
+
+        assertThat(resultado.getResponse().getStatus())
+                .as(resultado.getResponse().getContentAsString())
+                .isEqualTo(201);
+        String cuerpo = resultado.getResponse().getContentAsString();
+        assertThat(cuerpo).contains("\"resultado\":\"PROCEDE\"");
+        assertThat(cuerpo)
+                .as("la resolucion dice de que ejercicio era el hecho que alego")
+                .contains("\"ejercicios\":[2019]");
+    }
+
+    @Test
+    @DisplayName("#334 — en un rango de varios, un hecho sin 'ejercicios' es 422 nombrandolo")
+    void sinAlcanceEnUnRango422() throws Exception {
+        MvcResult resultado =
+                declararRango(
+                        """
+                        {"codContribuyente":"C-0007","tributo":"PREDIAL",
+                         "ejercicioDesde":2019,"ejercicioHasta":2021,
+                         "fechaDePresentacion":"2026-03-01",
+                         "plazoAplicable":"DECLARACION_PRESENTADA",
+                         "hechos":[{"clase":"INTERRUPCION","causal":"pago parcial del predial 2019",
+                                    "fechaDesde":"2021-03-15"}],
+                         "observacion":"Se resuelve la solicitud"}
+                        """);
+
+        assertThat(resultado.getResponse().getStatus()).isEqualTo(422);
+        assertThat(resultado.getResponse().getContentAsString())
+                .contains("VALIDACION")
+                .contains("pago parcial del predial 2019")
+                .contains("hechos[].ejercicios");
+        assertThat(prescripciones.porId(1L)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("#334 — 'ejercicios' vacio es 422: declarar que no es de ninguno no es omitirlo")
+    void alcanceVacio422() throws Exception {
+        MvcResult resultado =
+                declararRango(
+                        """
+                        {"codContribuyente":"C-0007","tributo":"PREDIAL",
+                         "ejercicioDesde":2020,"ejercicioHasta":2020,
+                         "fechaDePresentacion":"2026-06-01",
+                         "plazoAplicable":"DECLARACION_PRESENTADA",
+                         "hechos":[{"clase":"INTERRUPCION","causal":"pago parcial",
+                                    "fechaDesde":"2024-02-02","ejercicios":[]}],
+                         "observacion":"Se resuelve la solicitud"}
+                        """);
+
+        assertThat(resultado.getResponse().getStatus()).isEqualTo(422);
+        assertThat(prescripciones.porId(1L)).isEmpty();
     }
 
     @Test
