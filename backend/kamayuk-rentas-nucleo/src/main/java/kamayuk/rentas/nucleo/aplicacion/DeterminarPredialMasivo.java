@@ -19,6 +19,7 @@ import kamayuk.rentas.nucleo.dominio.CorridaDeEmision;
 import kamayuk.rentas.nucleo.dominio.EstadoDeDeterminacion;
 import kamayuk.rentas.nucleo.dominio.predial.DetalleDeterminacionPredio;
 import kamayuk.rentas.nucleo.dominio.predial.DeterminacionPredialCalculada;
+import kamayuk.rentas.nucleo.dominio.predial.MinimoImponible;
 import kamayuk.rentas.nucleo.dominio.predial.ModalidadDelPredial;
 import kamayuk.rentas.parametros.ParametrosSellados;
 import org.jspecify.annotations.Nullable;
@@ -274,13 +275,16 @@ public class DeterminarPredialMasivo {
             } catch (DeterminarPredial.PredioSinAutovaluo
                     | DeterminarPredial.SinPrediosEnElPadron
                     | DeterminarPredial.PredioAjeno
-                    | DeterminarPredial.BeneficioPredialSinRegla motivo) {
+                    | DeterminarPredial.BeneficioPredialSinRegla
+                    | MinimoImponible.BaseAfectaCero motivo) {
                 // El padron AL 1 DE ENERO cambio entre la primera determinacion y esta corrida
                 // —algo registrado despues con fecha anterior al ejercicio—: un predio nuevo sin
                 // declarar, o uno que ya no era suyo. Una venta del propio ejercicio ya no llega
                 // aqui (#328). Se observa y la corrida sigue: es exactamente lo que la pantalla
                 // llama «contribuyentes observados que quedan fuera de la emision». Y el que tiene
                 // un beneficio del predial sin RT-012 (#331): queda fuera hasta #464, a la vista.
+                // Y el de base afecta cero (#332): NEG-05 no dice si paga el minimo o nada, y
+                // RegistrarDeterminacionPredial ya deshizo su transaccion sin escribir la fila.
                 observados.add(new Observado(codigo, nombre, String.valueOf(motivo.getMessage())));
             } catch (CuadroPredialParametrizado.ParametroDelPredialAusente falta) {
                 // Esta le pasa a TODOS por igual —es del conjunto, no del contribuyente—, asi que

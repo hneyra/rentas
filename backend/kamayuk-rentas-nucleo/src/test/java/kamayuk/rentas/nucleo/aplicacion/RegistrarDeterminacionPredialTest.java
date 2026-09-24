@@ -31,6 +31,7 @@ import kamayuk.rentas.esquema.ContextoDeTenant;
 import kamayuk.rentas.nucleo.dominio.predial.DetalleDeterminacionPredio;
 import kamayuk.rentas.nucleo.dominio.predial.Determinacion;
 import kamayuk.rentas.nucleo.dominio.predial.DeterminacionRepository;
+import kamayuk.rentas.nucleo.dominio.predial.MinimoImponible;
 import kamayuk.rentas.nucleo.dominio.predial.ModalidadDelPredial;
 import kamayuk.rentas.nucleo.dominio.predial.Tramo;
 import kamayuk.rentas.nucleo.infraestructura.DeterminacionRepositoryJdbc;
@@ -340,6 +341,91 @@ class RegistrarDeterminacionPredialTest {
                                     + " distinguiria del correcto")
                     .isInstanceOf(PoliticasDeRedondeoSelladas.SinPuntosObservados.class)
                     .hasMessageContaining("D-03c");
+        }
+    }
+
+    /**
+     * <b>RT-014 sobre una base afecta cero</b> (#332), con la base de por medio: lo que el issue
+     * pide es un rechazo <b>y ninguna fila en {@code determinacion}</b>, y eso solo lo puede decir
+     * PostgreSQL. El exonerado es igual al autovaluo —lo que {@code
+     * det_predio_detalle_exonerado_cabe_ck} admite— y el minimo es 33,00, el de 2026.
+     */
+    @Nested
+    @DisplayName("#332 — con la base afecta cero no se cobra el minimo en silencio")
+    class LaBaseAfectaCero {
+
+        private final Dinero minimo = Dinero.de("33.00");
+
+        @Test
+        @DisplayName("exonerado igual al autovaluo: se niega nombrando RT-014-c02/c03, sin fila")
+        void conLaBaseCeroNoHayFila() throws SQLException {
+            long titular = crearContribuyente("DET-0005", "80300005");
+            long predio = crearPredio("000000000000000106");
+            sellarConjunto(EJERCICIO, "Conjunto para el templo inafecto");
+
+            assertThatThrownBy(
+                            () ->
+                                    registrar.registrar(
+                                            EJERCICIO,
+                                            titular,
+                                            List.of(
+                                                    DetalleDeterminacionPredio.nuevo(
+                                                            predio,
+                                                            Dinero.de("250000.00"),
+                                                            Dinero.de("250000.00"),
+                                                            Porcentaje.total(),
+                                                            Dinero.CERO)),
+                                            CUADRO_FICTICIO,
+                                            minimo,
+                                            ModalidadDelPredial.TRIMESTRAL,
+                                            Observacion.de("Determinacion del templo inafecto")))
+                    .as("hasta #332 esto asentaba 33,00 sobre una base afecta cero")
+                    .isInstanceOf(MinimoImponible.BaseAfectaCero.class)
+                    .hasMessageContaining("RT-014-c02")
+                    .hasMessageContaining("RT-014-c03");
+
+            assertThat(filasDe(titular)).as("ninguna fila en determinacion").isZero();
+        }
+
+        @Test
+        @DisplayName("el borde del otro lado: una base de S/ 1,00 sigue asentando el minimo")
+        void conUnaBaseDeUnSolSeAsientaElMinimo() throws SQLException {
+            long titular = crearContribuyente("DET-0006", "80300006");
+            long predio = crearPredio("000000000000000107");
+            sellarConjunto(EJERCICIO, "Conjunto para el predio casi exonerado");
+
+            Determinacion determinada =
+                    registrar.registrar(
+                            EJERCICIO,
+                            titular,
+                            List.of(
+                                    DetalleDeterminacionPredio.nuevo(
+                                            predio,
+                                            Dinero.de("250000.00"),
+                                            Dinero.de("249999.00"),
+                                            Porcentaje.total(),
+                                            Dinero.de("1.00"))),
+                            CUADRO_FICTICIO,
+                            minimo,
+                            ModalidadDelPredial.TRIMESTRAL,
+                            Observacion.de("Determinacion del predio casi exonerado"));
+
+            assertThat(determinada.baseImponible()).isEqualTo(Dinero.de("1.00"));
+            assertThat(determinada.montoDeterminado()).isEqualTo(Dinero.de("33.00"));
+            assertThat(filasDe(titular)).isEqualTo(1L);
+        }
+
+        private long filasDe(long titular) {
+            Long filas =
+                    transaccion.execute(
+                            estado ->
+                                    jdbc.sql(
+                                                    "SELECT count(*) FROM determinacion WHERE"
+                                                            + " contribuyente_id = :titular")
+                                            .param("titular", titular)
+                                            .query(Long.class)
+                                            .single());
+            return java.util.Objects.requireNonNull(filas);
         }
     }
 

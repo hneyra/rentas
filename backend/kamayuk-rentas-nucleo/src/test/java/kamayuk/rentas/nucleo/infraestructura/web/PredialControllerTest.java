@@ -750,6 +750,101 @@ class PredialControllerTest {
                 .isEmpty();
     }
 
+    /**
+     * <b>El minimo sobre una base afecta cero</b> (#332).
+     *
+     * <p>El escenario del issue: el unico predio de C-001 es un templo inafecto (art. 17 del TUO
+     * LTM), autovaluo S/ 250 000 y {@code valuoExonerado} 250 000. La siembra que distingue es la
+     * base <b>exactamente</b> cero: con cualquier base positiva, cobrar el minimo y negarse a
+     * decidir dan la misma cifra. Se asienta, no se simula, para que «ninguna fila» signifique
+     * algo.
+     */
+    @Test
+    @DisplayName(
+            "#332 — con la base afecta cero, el calculo individual es 422, nombra RT-014-c02/c03 y"
+                    + " no asienta nada")
+    void laBaseAfectaCeroEsUn422() throws Exception {
+        predios.con(11L, "10001", "AV. GRAU 100", Porcentaje.total());
+
+        MvcResult resultado = mvc.perform(asentarConExonerado("250000.00")).andReturn();
+
+        String cuerpo = resultado.getResponse().getContentAsString();
+        assertThat(resultado.getResponse().getStatus())
+                .as(
+                        "sin la condicion sale un 201 con 33,00 —el minimo sobre una base"
+                                + " inafecta—, y sin el catch del controlador, un 500")
+                .isEqualTo(422);
+        assertThat(cuerpo)
+                .as(cuerpo)
+                .contains("VALIDACION")
+                .contains("RT-014-c02")
+                .contains("RT-014-c03")
+                .doesNotContain("parametroQueFalta");
+        assertThat(determinaciones.insertadas).as("ninguna fila en determinacion").isZero();
+        assertThat(auditoria.registros).isEmpty();
+    }
+
+    @Test
+    @DisplayName(
+            "#332 — el borde del otro lado: una base afecta de S/ 1,00 sigue determinando 33,00")
+    void unaBaseDeUnSolSigueDeterminandoElMinimo() throws Exception {
+        predios.con(11L, "10001", "AV. GRAU 100", Porcentaje.total());
+
+        MvcResult resultado = mvc.perform(asentarConExonerado("249999.00")).andReturn();
+
+        String cuerpo = resultado.getResponse().getContentAsString();
+        assertThat(resultado.getResponse().getStatus()).as(cuerpo).isEqualTo(201);
+        // Sin la comilla de cierre a proposito: el minimo sale de UIT x % sin redondear y viaja
+        // con cinco decimales («33.00000»). Lo que esta prueba fija es la cifra, no su escala.
+        assertThat(cuerpo)
+                .contains("\"baseImponible\":\"1.00\"")
+                .contains("\"minimoImponible\":\"33.00")
+                .contains("\"impuestoInsoluto\":\"33.00");
+        assertThat(determinaciones.insertadas).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("#332 — y la corrida deja observado al de base afecta cero, en vez de cobrarle")
+    void laCorridaObservaAlDeBaseAfectaCero() throws Exception {
+        predios.con(11L, "10001", "AV. GRAU 100", Porcentaje.total());
+        determinaciones.sembrar(
+                EJERCICIO,
+                7L,
+                501L,
+                EstadoDeDeterminacion.EMITIDA,
+                ModalidadDelPredial.TRIMESTRAL,
+                DetalleDeterminacionPredio.nuevo(
+                        11L,
+                        Dinero.de("250000.00"),
+                        Dinero.de("250000.00"),
+                        Porcentaje.total(),
+                        Dinero.CERO));
+
+        MvcResult corrida = mvc.perform(asentarLaCorrida("TODOS", null)).andReturn();
+
+        String cuerpo = corrida.getResponse().getContentAsString();
+        assertThat(corrida.getResponse().getStatus()).as(cuerpo).isEqualTo(201);
+        assertThat(cuerpo).as(cuerpo).contains("C-001").contains("RT-014-c02");
+        assertThat(determinaciones.determinados)
+                .as("el inafecto no se determina: queda observado, a la vista")
+                .isEmpty();
+    }
+
+    /** Asienta C-001 con su predio 11 de 250 000,00 y el exonerado que se le diga (#332). */
+    private static org.springframework.test.web.servlet.RequestBuilder asentarConExonerado(
+            String valuoExonerado) {
+        return post("/rentas/api/v1/rentas/predial/calculo-individual")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                        "{\"modalidad\":\"TRIMESTRAL\",\"simulacion\":false,"
+                                + "\"codContribuyente\":\"C-001\",\"ejercicio\":\"2026\","
+                                + "\"observacion\":\"Determinacion del templo inafecto\","
+                                + "\"predios\":[{\"predioId\":11,\"autovaluo\":\"250000.00\","
+                                + "\"valuoExonerado\":\""
+                                + valuoExonerado
+                                + "\"}]}");
+    }
+
     private static BeneficioRegistrado pensionista() {
         return new BeneficioRegistrado(
                 "PENSIONISTA",
