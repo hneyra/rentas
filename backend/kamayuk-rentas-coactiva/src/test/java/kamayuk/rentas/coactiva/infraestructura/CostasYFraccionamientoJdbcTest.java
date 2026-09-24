@@ -239,6 +239,10 @@ class CostasYFraccionamientoJdbcTest {
     private static ConsultaDeCostas consultaDeCostas;
     private static ConsultaDeDeudasCoactivas consultaDeDeudas;
     private static FraccionarEnCoactiva fraccionar;
+
+    /** El puerto hacia tesoreria, envuelto como en produccion; #406 lo vigila por dentro. */
+    private static FraccionamientoCoactivo puertoDeConvenios;
+
     private static FormalizarConvenio formalizar;
     private static CerrarConvenio cerrar;
 
@@ -396,8 +400,7 @@ class CostasYFraccionamientoJdbcTest {
                                 new CondicionesParametrizadas(lector),
                                 auditoria,
                                 RELOJ));
-        FraccionamientoCoactivo puertoDeConvenios =
-                envolver(new FraccionamientoCoactivoTesoreria(preconvenios));
+        puertoDeConvenios = envolver(new FraccionamientoCoactivoTesoreria(preconvenios));
         fraccionar =
                 envolver(new FraccionarEnCoactiva(expedientes, movimientos, puertoDeConvenios));
 
@@ -1111,6 +1114,7 @@ class CostasYFraccionamientoJdbcTest {
                                                                     EJERCICIO,
                                                                     null,
                                                                     null))),
+                                            null,
                                             PORQUE))
                     .isInstanceOf(FraccionarEnCoactiva.DeudaAjenaAlProcedimiento.class)
                     .hasMessageContaining("ARBITRIO")
@@ -1155,6 +1159,7 @@ class CostasYFraccionamientoJdbcTest {
                                                     EJERCICIO,
                                                     null,
                                                     null))),
+                            null,
                             PORQUE);
 
             assertThat(convenio.total())
@@ -1164,6 +1169,183 @@ class CostasYFraccionamientoJdbcTest {
                     .as("y tambien viene de coactiva: se asento en esa fase")
                     .allSatisfy(cuota -> assertThat(cuota.faseOrigen()).isEqualTo("COACTIVA"));
         }
+    }
+
+    /**
+     * #406 — La puerta por la que entra el borde, contra RLS de verdad.
+     *
+     * <p>{@code ConvenioCoactivoController} llama a la sobrecarga de <b>tres</b> argumentos —la que
+     * lleva la clave de idempotencia—, y hasta #406 esa era la que no llevaba
+     * {@code @Transactional}: la anotacion estaba en la de dos, que el controlador no usa y que era
+     * justo la que ejercian todas las pruebas de esta clase. Sin transaccion no hay {@code SET
+     * LOCAL}, la politica de {@code expediente_coactivo} evalua {@code current_setting} en su forma
+     * estricta, y la lectura del expediente revienta con un {@code DataAccessException} que el
+     * borde contesta como 500.
+     *
+     * <p>Por eso estas pruebas pasan por {@link #envolver} —el mismo {@code TransactionInterceptor}
+     * con {@code AnnotationTransactionAttributeSource} que aplica Spring— y no abren transaccion
+     * por su cuenta: una prueba que la abriera por fuera taparia exactamente lo que miden.
+     */
+    @Nested
+    @DisplayName("#406 — La puerta que usa el controlador, contra RLS de verdad")
+    class DeLaPuertaDelBorde {
+
+        @Test
+        @DisplayName(
+                "con la clave de idempotencia del borde se registra el preconvenio, y no un error"
+                        + " de la base")
+        void laPuertaDelBordeRegistra() {
+            long titular = contribuyenteConDeuda("FRAC-406-1");
+            String expediente = expedienteDe(titular, "FRAC-406-1");
+            enCoactiva(titular);
+
+            ConvenioCoactivo convenio =
+                    fraccionar.fraccionar(
+                            peticionDe(
+                                    expediente,
+                                    List.of(
+                                            new SeleccionDeObligacion(
+                                                    "PREDIAL", EJERCICIO, null, null))),
+                            "406-intento-a",
+                            PORQUE);
+
+            assertThat(convenio.tipo()).isEqualTo(TipoDeConvenio.COACTIVO.name());
+            assertThat(convenio.estado()).isEqualTo(EstadoDeConvenio.PRECONVENIO.name());
+            assertThat(porNumero(convenio.numero()).contribuyenteId())
+                    .as("el convenio quedo escrito, y a nombre del obligado del expediente")
+                    .isEqualTo(titular);
+        }
+
+        @Test
+        @DisplayName(
+                "un expediente que no existe es ExpedienteInexistente —el 404—, no un error de la"
+                        + " base")
+        void unExpedienteQueNoExisteNoEsUnErrorDeLaBase() {
+            assertThatThrownBy(
+                            () ->
+                                    fraccionar.fraccionar(
+                                            peticionDe(
+                                                    "EXP-406-NO-EXISTE",
+                                                    List.of(
+                                                            new SeleccionDeObligacion(
+                                                                    "PREDIAL", EJERCICIO, null,
+                                                                    null))),
+                                            null,
+                                            PORQUE))
+                    .as(
+                            "el borde traduce esta excepcion a 404; un DataAccessException sale"
+                                    + " como 500 con incidencia")
+                    .isInstanceOf(CambiarEstadoDelExpediente.ExpedienteInexistente.class);
+        }
+
+        /**
+         * La lectura del expediente, la simulacion de la guarda y el registro corren en UNA
+         * transaccion.
+         *
+         * <p>Envolver solo la lectura haria verde a las dos de arriba y dejaria la guarda y la
+         * escritura en transacciones distintas. Se mide con el identificador de transaccion que
+         * PostgreSQL reparte, en dos sitios: cada llamada a los dos repositorios y al puerto lo
+         * anota <b>antes</b> de delegar, desde la conexion que Spring tenga ligada en ese momento;
+         * y la fila de {@code convenio} lo lleva en su {@code xmin}, que es el de la transaccion
+         * que la inserto <b>de verdad</b> — aunque alguien abriera una nueva por dentro del puerto,
+         * donde el testigo ya no ve.
+         */
+        @Test
+        @DisplayName(
+                "la lectura del expediente, la simulacion de la guarda y el registro comparten una"
+                        + " sola transaccion")
+        void todoCorreEnUnaTransaccion() {
+            long titular = contribuyenteConDeuda("FRAC-406-2");
+            String expediente = expedienteDe(titular, "FRAC-406-2");
+            enCoactiva(titular);
+
+            List<String> transacciones = new ArrayList<>();
+            FraccionarEnCoactiva vigilado =
+                    envolver(
+                            new FraccionarEnCoactiva(
+                                    testigo(
+                                            kamayuk.rentas.coactiva.dominio.ExpedienteRepository
+                                                    .class,
+                                            expedientes,
+                                            transacciones),
+                                    testigo(
+                                            kamayuk.rentas.coactiva.dominio
+                                                    .MovimientoDelExpedienteRepository.class,
+                                            movimientos,
+                                            transacciones),
+                                    testigo(
+                                            FraccionamientoCoactivo.class,
+                                            puertoDeConvenios,
+                                            transacciones)));
+
+            ConvenioCoactivo convenio =
+                    vigilado.fraccionar(
+                            peticionDe(
+                                    expediente,
+                                    List.of(
+                                            new SeleccionDeObligacion(
+                                                    "PREDIAL", EJERCICIO, null, null))),
+                            null,
+                            PORQUE);
+
+            assertThat(transacciones)
+                    .as("se leyo el expediente, su historial, se simulo y se registro")
+                    .extracting(anotada -> anotada.substring(0, anotada.indexOf('@')))
+                    .containsExactly("porNumero", "deExpediente", "simular", "registrar");
+            String laDeLaLectura = transacciones.get(0).substring("porNumero@".length());
+            assertThat(transacciones)
+                    .as(
+                            "las cuatro llamadas con el mismo identificador: la guarda y la"
+                                    + " escritura no pueden quedar en transacciones distintas")
+                    .extracting(anotada -> anotada.substring(anotada.indexOf('@') + 1))
+                    .containsOnly(laDeLaLectura);
+            String laQueInserto =
+                    enTransaccion(
+                            () ->
+                                    jdbc.sql("SELECT xmin::text FROM convenio WHERE numero = ?")
+                                            .param(convenio.numero())
+                                            .query(String.class)
+                                            .single());
+            assertThat(laQueInserto)
+                    .as(
+                            "y el convenio lo inserto esa misma transaccion, no una que se abrio"
+                                    + " aparte por dentro del puerto")
+                    .isEqualTo(laDeLaLectura);
+        }
+    }
+
+    /**
+     * Un doble que delega en el objeto de verdad y anota {@code metodo@xid} antes de cada llamada.
+     *
+     * <p>El identificador se pide con el mismo {@link #jdbc} que usan los repositorios, asi que
+     * sale de la conexion que la transaccion en curso tenga ligada; sin transaccion, de una
+     * conexion en autocommit que abre la suya. Va reducido a 32 bits —sin la epoca— para que se
+     * pueda comparar con el {@code xmin} de una fila, que es un {@code xid}.
+     */
+    @SuppressWarnings("unchecked")
+    private static <T> T testigo(Class<T> puerto, T objetivo, List<String> anotaciones) {
+        return (T)
+                java.lang.reflect.Proxy.newProxyInstance(
+                        puerto.getClassLoader(),
+                        new Class<?>[] {puerto},
+                        (proxy, metodo, argumentos) -> {
+                            if (metodo.getDeclaringClass() == Object.class) {
+                                return metodo.invoke(objetivo, argumentos);
+                            }
+                            anotaciones.add(
+                                    metodo.getName()
+                                            + "@"
+                                            + jdbc.sql(
+                                                            "SELECT (txid_current() % 4294967296)"
+                                                                    + "::text")
+                                                    .query(String.class)
+                                                    .single());
+                            try {
+                                return metodo.invoke(objetivo, argumentos);
+                            } catch (java.lang.reflect.InvocationTargetException fallo) {
+                                throw fallo.getCause();
+                            }
+                        });
     }
 
     @Nested
@@ -1366,6 +1548,7 @@ class CostasYFraccionamientoJdbcTest {
                 peticionDe(
                         expediente,
                         List.of(new SeleccionDeObligacion("PREDIAL", EJERCICIO, null, null))),
+                null,
                 PORQUE);
     }
 
