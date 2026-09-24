@@ -4326,6 +4326,7 @@
         "placa": "texto",
         "contribuyenteId": "entero",
         "baseImponible": "texto",
+        "origenDeLaBase": "texto",
         "montoDeterminado": "texto",
         "simulacion": "booleano"
       }

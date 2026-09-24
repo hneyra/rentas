@@ -393,6 +393,83 @@ class RegistrarDeterminacionVehicularTest {
     // ------------------------------------------------------------------
 
     /** Vende el vehiculo del titular de siempre al comprador, por el caso de uso de verdad. */
+    @Nested
+    @DisplayName("La base es la del art. 32: el mayor entre la adquisicion y la tabla (#330)")
+    class LaBaseDelArticulo32 {
+
+        /**
+         * La siembra que distingue: una adquisicion DISTINTA de la tabla, por encima y por debajo.
+         * Con la adquisicion ausente o igual a la tabla —la muestra de las demas pruebas de este
+         * archivo— la implementacion que la ignora da el mismo verde. La tabla vale 10 000,00 y la
+         * alicuota es 1 %.
+         */
+        @Test
+        @DisplayName("comprado en 30 000,00 con tabla de 10 000,00: la base es 30 000,00")
+        void laAdquisicionMayorManda() {
+            long vehiculoId = crearVehiculoConValorReferencial("W7A-701", "TOYOTA", "HILUX");
+            capturarAdquisicion(vehiculoId, "30000.00", LocalDate.of(2024, 3, 2));
+
+            Determinacion determinada = determinar(vehiculoId, EJERCICIO_AFECTO);
+
+            assertThat(determinada.baseImponible().valor())
+                    .as("el art. 32 toma el valor de adquisicion: la tabla es solo el piso")
+                    .isEqualByComparingTo("30000.00");
+            assertThat(determinada.montoDeterminado().valor()).isEqualByComparingTo("300.00");
+        }
+
+        @Test
+        @DisplayName("comprado en 8 000,00 con tabla de 10 000,00: la tabla es el piso")
+        void laTablaEsElPiso() {
+            long vehiculoId = crearVehiculoConValorReferencial("W7B-702", "TOYOTA", "YARIS");
+            capturarAdquisicion(vehiculoId, "8000.00", LocalDate.of(2024, 3, 2));
+
+            Determinacion determinada = determinar(vehiculoId, EJERCICIO_AFECTO);
+
+            assertThat(determinada.baseImponible().valor())
+                    .as("«en ningun caso sera menor» que la tabla")
+                    .isEqualByComparingTo("10000.00");
+        }
+
+        /**
+         * La adquisicion es la del propietario al 1 de enero: la del primero es la del vehiculo, la
+         * de uno posterior es el valor de su transferencia (60 000,00 en {@code
+         * venderAlComprador}).
+         */
+        @Test
+        @DisplayName(
+                "vendido en junio en 60 000,00: 2026 usa la del vendedor y 2027 la del comprador")
+        void laAdquisicionEsLaDelPropietarioDelEjercicio() throws SQLException {
+            long vehiculoId = crearVehiculoConValorReferencial("W7C-703", "NISSAN", "FRONTIER");
+            sellarConValorReferencialYAlicuota(
+                    new Ejercicio(2027), "NISSAN", "FRONTIER", new BigDecimal("1.0"));
+            capturarAdquisicion(vehiculoId, "30000.00", LocalDate.of(2024, 3, 2));
+            venderAlComprador(vehiculoId, LocalDate.of(2026, 6, 10));
+
+            assertThat(determinar(vehiculoId, EJERCICIO_AFECTO).baseImponible().valor())
+                    .as("2026 es del vendedor, y su adquisicion es la del vehiculo")
+                    .isEqualByComparingTo("30000.00");
+            assertThat(determinar(vehiculoId, new Ejercicio(2027)).baseImponible().valor())
+                    .as("2027 es del comprador, y su adquisicion es lo que pago en junio")
+                    .isEqualByComparingTo("60000.00");
+        }
+
+        private void capturarAdquisicion(long vehiculoId, String valor, LocalDate fecha) {
+            transaccion.executeWithoutResult(
+                    estado ->
+                            vehiculos.save(
+                                    vehiculos
+                                            .findById(vehiculoId)
+                                            .orElseThrow()
+                                            .conAdquisicion(Dinero.de(valor), fecha)));
+        }
+
+        private Determinacion determinar(long vehiculoId, Ejercicio ejercicio) {
+            return registrar
+                    .calcular(vehiculoId, ejercicio, false, Observacion.de("Determinacion #330"))
+                    .determinacion();
+        }
+    }
+
     private static void venderAlComprador(long vehiculoId, LocalDate fecha) {
         transferir.transferirVehiculo(
                 vehiculoId,

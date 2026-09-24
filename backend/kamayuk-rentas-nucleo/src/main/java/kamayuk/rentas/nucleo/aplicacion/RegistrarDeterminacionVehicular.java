@@ -17,6 +17,7 @@ import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.nucleo.dominio.CriterioDeVehiculo;
 import kamayuk.rentas.nucleo.dominio.EstadoVehiculo;
+import kamayuk.rentas.nucleo.dominio.Transferencia;
 import kamayuk.rentas.nucleo.dominio.TransferenciaRepository;
 import kamayuk.rentas.nucleo.dominio.ValorReferencial;
 import kamayuk.rentas.nucleo.dominio.Vehiculo;
@@ -24,7 +25,10 @@ import kamayuk.rentas.nucleo.dominio.VehiculoEncontrado;
 import kamayuk.rentas.nucleo.dominio.VehiculoRepository;
 import kamayuk.rentas.nucleo.dominio.predial.Determinacion;
 import kamayuk.rentas.nucleo.dominio.predial.DeterminacionRepository;
+import kamayuk.rentas.nucleo.dominio.vehicular.AdquisicionDelPropietario;
+import kamayuk.rentas.nucleo.dominio.vehicular.BaseImponibleVehicular;
 import kamayuk.rentas.nucleo.dominio.vehicular.ImpuestoVehicular;
+import kamayuk.rentas.nucleo.dominio.vehicular.OrigenDeLaBase;
 import kamayuk.rentas.nucleo.dominio.vehicular.PropietarioAlPrimeroDeEnero;
 import kamayuk.rentas.parametros.LectorDeParametros;
 import kamayuk.rentas.parametros.ParametrosSellados;
@@ -156,9 +160,22 @@ public class RegistrarDeterminacionVehicular {
                         sellados.exigirNumero(ALICUOTA_VEHICULAR, null).valor().toPlainString());
         Dinero minimoImponible = minimoImponibleDe(sellados);
 
-        Dinero montoDeterminado =
-                ImpuestoVehicular.calcular(valorReferencial.valor(), alicuota, minimoImponible);
-        long propietario = propietarioAlPrimeroDeEnero(vehiculo, vehiculoId, ejercicio);
+        // El contribuyente del ejercicio (art. 31, #329) y el precio al que ESE entro al
+        // patrimonio (art. 32, #330) salen de la misma historia, leida una vez: asi la base no
+        // puede ser la de un propietario y la determinacion de otro.
+        List<Transferencia> historia = transferencias.historicoDeVehiculo(vehiculoId);
+        long propietario =
+                PropietarioAlPrimeroDeEnero.de(vehiculo.contribuyenteId(), historia, ejercicio);
+        BaseImponibleVehicular base =
+                BaseImponibleVehicular.segunArticulo32(
+                        AdquisicionDelPropietario.de(
+                                        propietario,
+                                        vehiculo.valorAdquisicion(),
+                                        historia,
+                                        ejercicio)
+                                .orElse(null),
+                        valorReferencial.valor());
+        Dinero montoDeterminado = ImpuestoVehicular.calcular(base, alicuota, minimoImponible);
 
         Determinacion nueva =
                 Determinacion.nuevaVehicular(
@@ -166,18 +183,18 @@ public class RegistrarDeterminacionVehicular {
                         propietario,
                         vehiculoId,
                         conjuntoId,
-                        valorReferencial.valor(),
+                        base.valor(),
                         montoDeterminado,
                         java.util.List.of(ALICUOTA_VEHICULAR, MINIMO_VEHICULAR));
 
         String conjunto = sellados.ejercicio() + " v" + sellados.version();
         if (simulacion) {
-            return new Calculo(nueva, conjunto, alicuota, minimoImponible);
+            return new Calculo(nueva, conjunto, alicuota, minimoImponible, base.origen());
         }
 
         Determinacion guardada = determinaciones.insertar(nueva);
         auditar(guardada, observacion);
-        return new Calculo(guardada, conjunto, alicuota, minimoImponible);
+        return new Calculo(guardada, conjunto, alicuota, minimoImponible, base.origen());
     }
 
     /**
@@ -276,12 +293,14 @@ public class RegistrarDeterminacionVehicular {
      * @param conjunto cómo se nombra el conjunto sellado que la produjo: «2026 v1»
      * @param alicuota la alícuota del ejercicio, leída de ese conjunto
      * @param minimoImponible el mínimo del ejercicio, ya convertido a soles
+     * @param origenDeLaBase de cuál de los dos operandos del art. 32 salió la base (#330)
      */
     public record Calculo(
             Determinacion determinacion,
             String conjunto,
             Alicuota alicuota,
-            Dinero minimoImponible) {}
+            Dinero minimoImponible,
+            OrigenDeLaBase origenDeLaBase) {}
 
     private void auditar(Determinacion guardada, Observacion observacion) {
         auditoria.registrar(

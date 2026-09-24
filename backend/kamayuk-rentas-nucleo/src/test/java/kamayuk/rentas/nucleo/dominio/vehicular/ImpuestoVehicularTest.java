@@ -8,14 +8,14 @@ import kamayuk.rentas.dominio.Dinero;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-@DisplayName("#32 — ImpuestoVehicular: valor referencial por alicuota, con el minimo")
+@DisplayName("#32 — ImpuestoVehicular: base imponible por alicuota, con el minimo")
 class ImpuestoVehicularTest {
 
     @Test
     @DisplayName("aplica la alicuota sobre el valor referencial")
     void aplicaLaAlicuotaSobreElValorReferencial() {
         Dinero resultado =
-                ImpuestoVehicular.calcular(Dinero.de("10000.00"), Alicuota.de("1.0"), Dinero.CERO);
+                ImpuestoVehicular.calcular(base("10000.00"), Alicuota.de("1.0"), Dinero.CERO);
         assertThat(resultado).isEqualTo(Dinero.de("100.00"));
     }
 
@@ -23,8 +23,7 @@ class ImpuestoVehicularTest {
     @DisplayName("el minimo imponible sustituye el calculo cuando este no lo alcanza")
     void aplicaElMinimoCuandoElCalculoNoLoAlcanza() {
         Dinero resultado =
-                ImpuestoVehicular.calcular(
-                        Dinero.de("100.00"), Alicuota.de("1.0"), Dinero.de("50.00"));
+                ImpuestoVehicular.calcular(base("100.00"), Alicuota.de("1.0"), Dinero.de("50.00"));
         assertThat(resultado).isEqualTo(Dinero.de("50.00"));
     }
 
@@ -32,15 +31,19 @@ class ImpuestoVehicularTest {
     @DisplayName("el minimo nunca reduce un calculo que ya lo supera")
     void elMinimoNuncaReduceElCalculo() {
         Dinero resultado =
-                ImpuestoVehicular.calcular(
-                        Dinero.de("10000.00"), Alicuota.de("1.0"), Dinero.de("1.00"));
+                ImpuestoVehicular.calcular(base("10000.00"), Alicuota.de("1.0"), Dinero.de("1.00"));
         assertThat(resultado).isEqualTo(Dinero.de("100.00"));
     }
 
     @Test
     @DisplayName("una alicuota nula no se admite: no hay valor por omision")
     void unaAlicuotaNulaNoSeAdmite() {
-        assertThatThrownBy(() -> ImpuestoVehicular.calcular(Dinero.de("1000"), null, Dinero.CERO))
+        assertThatThrownBy(() -> ImpuestoVehicular.calcular(base("1000"), null, Dinero.CERO))
                 .isInstanceOf(NullPointerException.class);
+    }
+
+    /** Una base del art. 32 sin adquisicion: la tabla, dicha como tal (#330). */
+    private static BaseImponibleVehicular base(String tabla) {
+        return BaseImponibleVehicular.segunArticulo32(null, Dinero.de(tabla));
     }
 }
