@@ -44,8 +44,12 @@ import kamayuk.rentas.dominio.Observacion;
 public interface AcogimientoAConvenio {
 
     /**
-     * Que deuda tienen esas obligaciones a la fecha, cuota por cuota y con su fase. <b>No escribe
-     * nada.</b>
+     * Que deuda tienen esas obligaciones por acoger desde la fecha, cuota por cuota y con su fase.
+     * <b>No escribe nada.</b>
+     *
+     * <p>Lo que queda por extinguir <b>desde</b> {@code fechaDeCorte}, no lo que se debia a ella
+     * (#471): un cobro con fecha valor posterior que ya esta en el libro ya extinguio su parte, y
+     * congelarla en el cronograma seria fraccionar una deuda que no existe.
      *
      * <p>Es lo que el preconvenio congela para simular el cronograma: la fila que acaba en {@code
      * convenio_deuda}. Que la lectura y el movimiento salgan del mismo sitio es lo que impide que
@@ -63,9 +67,10 @@ public interface AcogimientoAConvenio {
      * Mueve a fase de convenio lo que esas cuotas deban a la fecha, y devuelve lo que movio.
      *
      * <p>Lo que entra es la lista congelada por el preconvenio —de ahi salen las cuotas y sus fases
-     * de origen— y lo que se mueve es <b>lo pendiente a {@code fecha}</b>, releido del libro: entre
-     * la simulacion y la firma pudo pagarse una cuota, y acoger la cifra vieja dejaria al libro
-     * contando una deuda que ya no existe.
+     * de origen— y lo que se mueve es <b>lo pendiente desde {@code fecha}</b>, releido del libro:
+     * entre la simulacion y la firma pudo pagarse una cuota, y acoger la cifra vieja dejaria al
+     * libro contando una deuda que ya no existe. Y ese pago puede tener fecha valor
+     * <b>posterior</b> a la de la formalizacion; lo que ya extinguio tampoco se acoge (#471).
      *
      * @param contribuyenteId el titular; un convenio es de uno solo
      * @param acogidas las cuotas del preconvenio, con su fase de origen

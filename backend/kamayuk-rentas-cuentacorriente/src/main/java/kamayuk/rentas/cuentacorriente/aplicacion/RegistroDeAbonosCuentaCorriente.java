@@ -61,6 +61,16 @@ import org.springframework.transaction.annotation.Transactional;
  * transaccion daria el mismo resultado visible, pero escribiria en el libro para borrarlo despues,
  * que es lo contrario de lo que ADR-0006 pide de este camino.
  *
+ * <h2>Lo que queda por extinguir desde la fecha de pago, no lo que se debia a ella (#471)</h2>
+ *
+ * <p>Lo cobrable de cada cuota es {@link CalculoDeDeuda#extinguibleDesde}, la misma respuesta que
+ * #445 dejo para la baja, su reparto y la extincion. {@code deudaActualizadaA(fechaDePago)}
+ * contesta otra pregunta —cuanto se debia ese dia— y descarta todo asiento posterior al corte: un
+ * pago que la caja entrega tarde, fechado antes de otro cobro que ya esta en el libro, volvia a
+ * abonar la cuota que ese cobro extinguio y la dejaba en negativo. La guarda de #39 no lo paraba,
+ * porque comparaba lo cobrado con esa misma cifra y cuadraba. Sin nada posterior a la fecha de pago
+ * —el cobro de ventanilla del dia, que es el de siempre— las dos dan el mismo centimo.
+ *
  * <h2>Por cuota, no por obligacion</h2>
  *
  * <p>El cajero marca «predial 2026 del predio 7». El libro cuenta por cuota, y cada cuota puede
@@ -155,7 +165,7 @@ public class RegistroDeAbonosCuentaCorriente implements RegistroDeAbonos {
         }
 
         // 3. La comprobacion de #39. Se hace contra `cobrado` y no contra lo releido: una
-        //    comparacion de `deudaActualizadaA(fechaDePago)` consigo misma se cumple siempre y no
+        //    comparacion de `extinguibleDesde(fechaDePago)` consigo misma se cumple siempre y no
         //    protege de nada.
         if (!segunElLibro.equals(cobrado)) {
             throw ImporteCobradoNoCuadra.de(cobrado, segunElLibro, fechaDePago);
@@ -261,7 +271,11 @@ public class RegistroDeAbonosCuentaCorriente implements RegistroDeAbonos {
             ClaveDeSaldo cuota = fila.clave();
             List<Asiento> delLibro = asientos.deLaObligacion(cuota);
 
-            DeudaActualizada cobrable = calculo.deudaActualizadaA(delLibro, fechaDePago, redondeo);
+            // Lo que queda por extinguir DESDE la fecha de pago, no lo que se debia A ella (#471):
+            // la caja puede entregar tarde un cobro fechado antes de otro que ya esta en el libro,
+            // y medido a su fecha ese abono posterior queda fuera del corte y la cuota se
+            // abonaria dos veces. La guarda de #39 no lo para, porque compara con esta misma cifra.
+            DeudaActualizada cobrable = calculo.extinguibleDesde(delLibro, fechaDePago, redondeo);
             DeudaActualizada yaAsentado = calculo.asentadoA(delLibro, fechaDePago);
 
             if (!cobrable.total().esPositivo()) {
