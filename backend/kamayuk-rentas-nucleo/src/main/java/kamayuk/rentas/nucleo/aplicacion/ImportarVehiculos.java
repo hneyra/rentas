@@ -2,12 +2,14 @@ package kamayuk.rentas.nucleo.aplicacion;
 
 import java.io.IOException;
 import java.io.Reader;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import kamayuk.rentas.carga.InformeDeImportacion;
 import kamayuk.rentas.carga.InformeDeImportacion.FilaRechazada;
 import kamayuk.rentas.carga.LectorDeFilasCsv;
 import kamayuk.rentas.carga.LectorDeFilasCsv.FilaCsv;
+import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.dominio.Placa;
@@ -18,8 +20,14 @@ import org.springframework.stereotype.Service;
 
 /**
  * Carga del padron vehicular desde un archivo: una fila por vehiculo, columnas {@code
- * placa,codigoContribuyente,marca,modelo,categoria,anioFabricacion,anioInscripcion} —{@code
- * categoria} admite quedar vacia—.
+ * placa,codigoContribuyente,marca,modelo,categoria,anioFabricacion,anioInscripcion,valorAdquisicion,
+ * fechaAdquisicion} —{@code categoria} admite quedar vacia, y las tres ultimas pueden faltar—.
+ *
+ * <p>{@code valorAdquisicion} (en soles, con punto decimal) y {@code fechaAdquisicion} (ISO) son el
+ * operando del art. 32 del TUO LTM que hasta #330 no entraba al sistema: sin ellos la base del
+ * impuesto es la tabla, y la determinacion lo dice ({@code TABLA_SIN_ADQUISICION}). Un valor en
+ * otra moneda no tiene donde declararse —la columna es en soles— y convertirlo exige el tipo de
+ * cambio sellado, que no se publica: quien carga lo convierte antes, o deja la celda vacia.
  *
  * <h2>Rechazo por fila, no por archivo</h2>
  *
@@ -115,8 +123,36 @@ public class ImportarVehiculos {
                         ? ejercicio(campos.get(6), "anio de inscripcion")
                         : fabricacion;
 
-        return Vehiculo.nuevo(
-                placa, contribuyenteId, marca, modelo, categoria, fabricacion, inscripcion);
+        Vehiculo vehiculo =
+                Vehiculo.nuevo(
+                        placa, contribuyenteId, marca, modelo, categoria, fabricacion, inscripcion);
+        String valorAdquisicion = campos.size() > 7 ? campos.get(7).strip() : "";
+        if (valorAdquisicion.isEmpty()) {
+            return vehiculo;
+        }
+        String fechaAdquisicion = campos.size() > 8 ? campos.get(8).strip() : "";
+        return vehiculo.conAdquisicion(
+                importe(valorAdquisicion),
+                fechaAdquisicion.isEmpty() ? null : fecha(fechaAdquisicion));
+    }
+
+    private static Dinero importe(String texto) {
+        try {
+            return Dinero.de(texto);
+        } catch (NumberFormatException noEsImporte) {
+            throw new IllegalArgumentException(
+                    "El valor de adquisicion no es un importe en soles: '" + texto + "'",
+                    noEsImporte);
+        }
+    }
+
+    private static LocalDate fecha(String texto) {
+        try {
+            return LocalDate.parse(texto);
+        } catch (java.time.format.DateTimeParseException noEsFecha) {
+            throw new IllegalArgumentException(
+                    "La fecha de adquisicion no es una fecha ISO: '" + texto + "'", noEsFecha);
+        }
     }
 
     private static Ejercicio ejercicio(String texto, String queEs) {

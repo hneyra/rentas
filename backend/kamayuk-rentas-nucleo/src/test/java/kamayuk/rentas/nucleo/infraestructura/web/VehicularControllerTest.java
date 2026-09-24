@@ -260,6 +260,26 @@ class VehicularControllerTest {
     }
 
     @Test
+    @DisplayName(
+            "#330 — sin valor de adquisicion la respuesta dice TABLA_SIN_ADQUISICION, no «el mayor»")
+    void sinAdquisicionLaBaseDiceDeDondeSalio() throws Exception {
+        MvcResult resultado =
+                mvc.perform(
+                                post("/rentas/api/v1/rentas/vehicular/calculo")
+                                        .param("placa", "V1H-882")
+                                        .param("ejercicio", "2026")
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content("{\"simulacion\":true}"))
+                        .andReturn();
+
+        assertThat(resultado.getResponse().getContentAsString())
+                .as(
+                        "la base es la tabla porque falta el otro operando del art. 32, no porque"
+                                + " haya ganado una comparacion que no se hizo")
+                .contains("\"origenDeLaBase\":\"TABLA_SIN_ADQUISICION\"");
+    }
+
+    @Test
     @DisplayName("mandarlo en el cuerpo ya no cambia nada: es una cifra normativa, no un dato")
     void elMinimoDelClienteYaNoEntra() throws Exception {
         MvcResult resultado =

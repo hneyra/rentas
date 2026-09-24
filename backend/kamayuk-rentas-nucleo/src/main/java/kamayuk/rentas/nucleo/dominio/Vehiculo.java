@@ -1,6 +1,8 @@
 package kamayuk.rentas.nucleo.dominio;
 
+import java.time.LocalDate;
 import java.util.Objects;
+import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.Placa;
 import org.jspecify.annotations.Nullable;
@@ -20,6 +22,11 @@ import org.jspecify.annotations.Nullable;
  *
  * @param id nulo mientras el vehiculo no se ha guardado; lo asigna la base
  * @param placa la placa <b>tal como se escribio</b>. La unicidad es sobre su forma sin guion
+ * @param valorAdquisicion el valor original de adquisicion del <b>primer</b> propietario
+ *     registrado, en soles (TUO LTM art. 32; #330); nulo si no se capturo. El de un propietario
+ *     posterior es el valor de su transferencia, y lo resuelve {@code AdquisicionDelPropietario},
+ *     no esta columna
+ * @param fechaAdquisicion cuando lo adquirio ese primer propietario; nula si no se capturo
  */
 public record Vehiculo(
         @Nullable Long id,
@@ -32,7 +39,9 @@ public record Vehiculo(
         Ejercicio anioInscripcion,
         @Nullable String numeroMotor,
         @Nullable String numeroSerie,
-        EstadoVehiculo estado) {
+        EstadoVehiculo estado,
+        @Nullable Dinero valorAdquisicion,
+        @Nullable LocalDate fechaAdquisicion) {
 
     private static final int TEXTO_MAXIMO = 60;
     private static final int IDENTIFICACION_MAXIMA = 40;
@@ -53,6 +62,10 @@ public record Vehiculo(
         categoria = recortar(categoria, "categoria", CATEGORIA_MAXIMA);
         numeroMotor = recortar(numeroMotor, "numero de motor", IDENTIFICACION_MAXIMA);
         numeroSerie = recortar(numeroSerie, "numero de serie", IDENTIFICACION_MAXIMA);
+        if (valorAdquisicion != null && !valorAdquisicion.esPositivo()) {
+            throw new IllegalArgumentException(
+                    "El valor de adquisicion, si se declara, es positivo: " + valorAdquisicion);
+        }
         if (contribuyenteId < 1) {
             throw new IllegalArgumentException(
                     "El vehiculo necesita un contribuyente propietario: " + contribuyenteId);
@@ -67,6 +80,54 @@ public record Vehiculo(
                             + anioFabricacion
                             + ")");
         }
+    }
+
+    /** Un vehiculo sin su adquisicion capturada: la forma de antes de #330. */
+    public Vehiculo(
+            @Nullable Long id,
+            Placa placa,
+            long contribuyenteId,
+            String marca,
+            String modelo,
+            @Nullable String categoria,
+            Ejercicio anioFabricacion,
+            Ejercicio anioInscripcion,
+            @Nullable String numeroMotor,
+            @Nullable String numeroSerie,
+            EstadoVehiculo estado) {
+        this(
+                id,
+                placa,
+                contribuyenteId,
+                marca,
+                modelo,
+                categoria,
+                anioFabricacion,
+                anioInscripcion,
+                numeroMotor,
+                numeroSerie,
+                estado,
+                null,
+                null);
+    }
+
+    /** El mismo vehiculo con su adquisicion capturada (#330): lo que declara el alta. */
+    public Vehiculo conAdquisicion(Dinero valor, @Nullable LocalDate fecha) {
+        Objects.requireNonNull(valor, "La adquisicion que se captura trae su valor");
+        return new Vehiculo(
+                id,
+                placa,
+                contribuyenteId,
+                marca,
+                modelo,
+                categoria,
+                anioFabricacion,
+                anioInscripcion,
+                numeroMotor,
+                numeroSerie,
+                estado,
+                valor,
+                fecha);
     }
 
     /** Un vehiculo que todavia no esta en la base. */
@@ -121,7 +182,9 @@ public record Vehiculo(
                 anioInscripcion,
                 numeroMotor,
                 numeroSerie,
-                estado);
+                estado,
+                valorAdquisicion,
+                fechaAdquisicion);
     }
 
     /**
@@ -144,7 +207,9 @@ public record Vehiculo(
                 anioInscripcion,
                 numeroMotor,
                 numeroSerie,
-                estado);
+                estado,
+                valorAdquisicion,
+                fechaAdquisicion);
     }
 
     /**

@@ -10,6 +10,7 @@ import java.util.Objects;
 import java.util.Optional;
 import kamayuk.rentas.compartido.Pagina;
 import kamayuk.rentas.compartido.Paginacion;
+import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.Placa;
 import kamayuk.rentas.nucleo.dominio.CambioDePlaca;
@@ -29,7 +30,8 @@ public class VehiculoRepositoryJdbc extends RepositorioJdbc implements VehiculoR
 
     private static final String COLUMNAS =
             "id, placa, contribuyente_id, marca, modelo, categoria, anio_fabricacion,"
-                    + " anio_inscripcion, numero_motor, numero_serie, estado";
+                    + " anio_inscripcion, numero_motor, numero_serie, estado, valor_adquisicion,"
+                    + " fecha_adquisicion";
 
     /** El nombre con el que la auditoria llavea al vehiculo. */
     static final String TABLA = "vehiculo";
@@ -42,7 +44,8 @@ public class VehiculoRepositoryJdbc extends RepositorioJdbc implements VehiculoR
     private static final String COLUMNAS_CON_TITULAR =
             "v.id, v.placa, v.contribuyente_id, v.marca, v.modelo, v.categoria,"
                     + " v.anio_fabricacion, v.anio_inscripcion, v.numero_motor, v.numero_serie,"
-                    + " v.estado, c.nombre_razon_social, c.codigo_contribuyente";
+                    + " v.estado, v.valor_adquisicion, v.fecha_adquisicion, c.nombre_razon_social,"
+                    + " c.codigo_contribuyente";
 
     public VehiculoRepositoryJdbc(JdbcClient jdbc) {
         super(jdbc);
@@ -167,11 +170,12 @@ public class VehiculoRepositoryJdbc extends RepositorioJdbc implements VehiculoR
                                 "INSERT INTO vehiculo"
                                         + " (municipalidad_id, placa, contribuyente_id, marca,"
                                         + "  modelo, categoria, anio_fabricacion, anio_inscripcion,"
-                                        + "  numero_motor, numero_serie, estado)"
+                                        + "  numero_motor, numero_serie, estado, valor_adquisicion, fecha_adquisicion)"
                                         + " VALUES ("
                                         + MUNICIPALIDAD_ACTUAL
                                         + ", :placa, :contribuyente, :marca, :modelo, :categoria,"
-                                        + "  :fabricacion, :inscripcion, :motor, :serie, :estado)"
+                                        + "  :fabricacion, :inscripcion, :motor, :serie, :estado, :valorAdquisicion,"
+                                        + "  :fechaAdquisicion)"
                                         + " RETURNING id")
                         .params(parametros(vehiculo))
                         .query(Long.class)
@@ -187,7 +191,9 @@ public class VehiculoRepositoryJdbc extends RepositorioJdbc implements VehiculoR
                 vehiculo.anioInscripcion(),
                 vehiculo.numeroMotor(),
                 vehiculo.numeroSerie(),
-                vehiculo.estado());
+                vehiculo.estado(),
+                vehiculo.valorAdquisicion(),
+                vehiculo.fechaAdquisicion());
     }
 
     private Vehiculo actualizar(Vehiculo vehiculo) {
@@ -206,7 +212,9 @@ public class VehiculoRepositoryJdbc extends RepositorioJdbc implements VehiculoR
                                        anio_inscripcion = :inscripcion,
                                        numero_motor = :motor,
                                        numero_serie = :serie,
-                                       estado = :estado
+                                       estado = :estado,
+                                       valor_adquisicion = :valorAdquisicion,
+                                       fecha_adquisicion = :fechaAdquisicion
                                  WHERE id = :id
                                 """)
                         .params(parametros(vehiculo))
@@ -230,6 +238,10 @@ public class VehiculoRepositoryJdbc extends RepositorioJdbc implements VehiculoR
         valores.put("motor", vehiculo.numeroMotor());
         valores.put("serie", vehiculo.numeroSerie());
         valores.put("estado", vehiculo.estado().name());
+        valores.put(
+                "valorAdquisicion",
+                vehiculo.valorAdquisicion() == null ? null : vehiculo.valorAdquisicion().valor());
+        valores.put("fechaAdquisicion", vehiculo.fechaAdquisicion());
         return valores;
     }
 
@@ -253,6 +265,10 @@ public class VehiculoRepositoryJdbc extends RepositorioJdbc implements VehiculoR
                 new Ejercicio(fila.getInt("anio_inscripcion")),
                 fila.getString("numero_motor"),
                 fila.getString("numero_serie"),
-                EstadoVehiculo.valueOf(fila.getString("estado")));
+                EstadoVehiculo.valueOf(fila.getString("estado")),
+                fila.getBigDecimal("valor_adquisicion") == null
+                        ? null
+                        : new Dinero(fila.getBigDecimal("valor_adquisicion")),
+                fila.getObject("fecha_adquisicion", java.time.LocalDate.class));
     }
 }

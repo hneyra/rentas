@@ -22,7 +22,9 @@ import kamayuk.rentas.carga.LectorDeFilasCsv.FilaCsv;
 import kamayuk.rentas.cuentacorriente.TributoDelLibro;
 import kamayuk.rentas.dominio.CodigoReferenciaCatastral;
 import kamayuk.rentas.dominio.ComposicionCatastral;
+import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.dominio.Observacion;
+import kamayuk.rentas.nucleo.dominio.Vehiculo;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -99,6 +101,37 @@ class ArchivosDeEjemploDeRentasTest {
                                 + " o una placa del padron: si una falla, sale aqui")
                 .isEmpty();
         assertThat(informe.nuevas()).isEqualTo(informe.totalFilas()).isGreaterThanOrEqualTo(7);
+    }
+
+    @Test
+    @DisplayName(
+            "#330 — el valor y la fecha de adquisicion entran por la carga; si faltan, no se inventan")
+    void laAdquisicionEntraPorLaCarga() {
+        String codigo = "C-000007";
+        String archivo =
+                "placa,codigoContribuyente,marca,modelo,categoria,anioFabricacion,anioInscripcion,"
+                        + "valorAdquisicion,fechaAdquisicion\n"
+                        + "Z9A-330,"
+                        + codigo
+                        + ",TOYOTA,HILUX,M1,2024,2024,120000.00,2024-03-02\n"
+                        + "Z9B-330,"
+                        + codigo
+                        + ",TOYOTA,YARIS,M1,2024,2024,,\n";
+
+        InformeDeImportacion informe =
+                importarVehiculos().importar(new java.io.StringReader(archivo), observacion);
+
+        assertThat(informe.rechazadas()).isEmpty();
+        Vehiculo conAdquisicion =
+                padron.findByPlaca(kamayuk.rentas.dominio.Placa.de("Z9A-330")).orElseThrow();
+        assertThat(conAdquisicion.valorAdquisicion()).isEqualTo(Dinero.de("120000.00"));
+        assertThat(conAdquisicion.fechaAdquisicion()).isEqualTo(java.time.LocalDate.of(2024, 3, 2));
+        assertThat(
+                        padron.findByPlaca(kamayuk.rentas.dominio.Placa.de("Z9B-330"))
+                                .orElseThrow()
+                                .valorAdquisicion())
+                .as("sin el dato, nulo: la base dira TABLA_SIN_ADQUISICION en vez de suponerlo")
+                .isNull();
     }
 
     @Test

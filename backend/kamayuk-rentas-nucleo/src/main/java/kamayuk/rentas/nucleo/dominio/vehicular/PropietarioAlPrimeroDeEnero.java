@@ -56,7 +56,7 @@ public final class PropietarioAlPrimeroDeEnero {
      * registraron. No se confía en el orden de la lista que llega: el histórico lo trae ordenado,
      * pero una regla pura no depende de cómo la llamen.
      */
-    private static final Comparator<Transferencia> CRONOLOGICO =
+    static final Comparator<Transferencia> CRONOLOGICO =
             Comparator.comparing(Transferencia::fechaTransferencia)
                     .thenComparingLong(PropietarioAlPrimeroDeEnero::ordenDeRegistro);
 

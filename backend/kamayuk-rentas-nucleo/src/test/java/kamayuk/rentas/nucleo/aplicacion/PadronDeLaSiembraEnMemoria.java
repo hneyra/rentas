@@ -364,7 +364,9 @@ final class PadronDeLaSiembraEnMemoria
                         vehiculo.anioInscripcion(),
                         vehiculo.numeroMotor(),
                         vehiculo.numeroSerie(),
-                        vehiculo.estado());
+                        vehiculo.estado(),
+                        vehiculo.valorAdquisicion(),
+                        vehiculo.fechaAdquisicion());
         vehiculos.put(id, guardado);
         return guardado;
     }

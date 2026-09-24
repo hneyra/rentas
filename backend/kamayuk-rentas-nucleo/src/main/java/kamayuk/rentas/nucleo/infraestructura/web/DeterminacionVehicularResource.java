@@ -19,10 +19,18 @@ import kamayuk.rentas.nucleo.dominio.predial.Determinacion;
  * menor—, asi que el nombre equivocado solo se delataria en los vehiculos recien comprados, que son
  * justo los que mas valen.
  *
- * <p>Los dos operandos que la memoria del calculo compara <b>no viajan</b>, y no por descuido:
- * {@code Determinacion} guarda la base y no de que salio. Publicarlos exige guardarlos, y eso es
- * una columna mas de {@code determinacion} — otro issue, con su migracion. Mientras tanto el nombre
- * dice lo que hay.
+ * <h2>Y dice de cual de los dos salio (#330)</h2>
+ *
+ * <p>Hasta #330 este javadoc afirmaba «el mayor entre el de adquisicion y el referencial», y el
+ * codigo no leia el de adquisicion: la base era siempre la tabla, y la respuesta la rotulaba como
+ * el resultado de una comparacion que no se hacia. Ahora la compara {@code
+ * BaseImponibleVehicular#segunArticulo32}, y {@code origenDeLaBase} lo dice: {@code ADQUISICION},
+ * {@code TABLA}, o {@code TABLA_SIN_ADQUISICION} cuando no hay valor de adquisicion capturado —la
+ * base es la tabla porque falta el otro operando, no porque haya ganado—.
+ *
+ * <p>El origen viaja en la respuesta del calculo, pero <b>no se guarda</b> todavia en {@code
+ * determinacion}: eso es una columna mas y un componente mas de {@code Determinacion}, con su
+ * migracion, y queda en su propio issue.
  *
  * <p>{@code baseImponible} y {@code montoDeterminado} viajan como texto y no como {@link
  * kamayuk.rentas.dominio.Dinero}: son la cifra fija con que se determinó, no un saldo que cambie
@@ -43,6 +51,7 @@ import kamayuk.rentas.nucleo.dominio.predial.Determinacion;
  * @param contribuyenteId de quién es
  * @param baseImponible el mayor entre el valor de adquisición y el referencial del MEF; no es «el
  *     valor referencial», y por eso ya no se llama así (#577)
+ * @param origenDeLaBase {@code ADQUISICION}, {@code TABLA} o {@code TABLA_SIN_ADQUISICION} (#330)
  * @param montoDeterminado el impuesto resultante
  * @param simulacion si es {@code true}, esta determinación no se guardó (modo simulación, RF-025)
  */
@@ -53,6 +62,7 @@ public record DeterminacionVehicularResource(
         String placa,
         long contribuyenteId,
         String baseImponible,
+        String origenDeLaBase,
         String montoDeterminado,
         boolean simulacion) {
 
@@ -66,6 +76,7 @@ public record DeterminacionVehicularResource(
                 vehiculo.placa().toString(),
                 determinacion.contribuyenteId(),
                 determinacion.baseImponible().valor().toPlainString(),
+                calculo.origenDeLaBase().name(),
                 determinacion.montoDeterminado().valor().toPlainString(),
                 determinacion.esNueva());
     }
