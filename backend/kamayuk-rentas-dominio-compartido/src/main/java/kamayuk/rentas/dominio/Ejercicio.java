@@ -55,9 +55,40 @@ public record Ejercicio(int valor) implements Comparable<Ejercicio> {
      * predial se calcula sobre «la UIT vigente al 1 de enero del año al que corresponde el
      * impuesto» (art. 13, ultimo parrafo). Cuando hay que resolver que valor normativo rige un
      * ejercicio, este es el dia contra el que se compara.
+     *
+     * <p><b>Pero quien es el sujeto no se lee a este dia</b>, sino a {@link
+     * #fechaDeLaTitularidad()}: una transferencia fechada el mismo 1 de enero ya figura en el
+     * padron a este dia, y no cambia al obligado del ejercicio.
      */
     public LocalDate primerDia() {
         return LocalDate.of(valor, 1, 1);
+    }
+
+    /**
+     * El dia al que se lee <b>quien</b> es el sujeto del impuesto del ejercicio y con que cuota: el
+     * 31 de diciembre del año anterior (#328).
+     *
+     * <p>La situacion juridica «configurada al 1 de enero» (TUO LTM art. 10, primer parrafo) es la
+     * de <b>antes</b> de cualquier transferencia de ese dia, porque el segundo parrafo del mismo
+     * articulo lo dice sin excepcion: «cuando se efectue cualquier transferencia, el adquirente
+     * asume la condicion de contribuyente a partir del 1 de enero del año siguiente de producido el
+     * hecho» —la misma regla que el art. 31 da para el vehicular, que es el que el corpus de {@code
+     * normativa} transcribe ({@code vehicular-valores-referenciales-2026.md})—. Una venta fechada
+     * el 2026-01-01 es un hecho de 2026: el comprador asume en 2027 y 2026 sigue siendo del
+     * vendedor. Una fechada el 2025-12-31 es un hecho de 2025: el comprador asume en 2026.
+     *
+     * <p>Leer la titularidad a {@link #primerDia()} da lo contrario en el primer caso, porque el
+     * padron cierra la cuota anterior <b>el dia antes</b> de la transferencia ({@code
+     * GestorDeTitularidad} de {@code catastro}): con la venta del 1 de enero, al 1 de enero ya
+     * consta el comprador. Al 31 de diciembre del año anterior, en cambio, las dos ventas caen del
+     * lado que la ley manda. Las caracteristicas del predio no tienen esa regla y se siguen leyendo
+     * a {@link #primerDia()}.
+     *
+     * <p>Se calcula sin pasar por {@link #anterior()} a proposito: el ejercicio minimo tambien
+     * tiene titulares, y su año anterior no es un ejercicio admitido.
+     */
+    public LocalDate fechaDeLaTitularidad() {
+        return primerDia().minusDays(1);
     }
 
     /** El 31 de diciembre del ejercicio. */

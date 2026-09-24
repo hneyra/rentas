@@ -14,9 +14,10 @@ import org.jspecify.annotations.Nullable;
  * leer y no se persiste: duplicar la direccion en {@code determinacion_predio_detalle} la dejaria
  * envejecer aparte de la del padron.
  *
- * <p><b>El porcentaje no se teclea.</b> Sale de {@code titularidad} a la fecha de calculo, que es
- * la unica fuente de quien es dueno de que parte. Es lo que impide que la base del contribuyente se
- * pueda inflar o desinflar desde la peticion.
+ * <p><b>El porcentaje no se teclea.</b> Sale de {@code titularidad} al 1 de enero del ejercicio,
+ * antes de las transferencias de ese dia —{@code Ejercicio.fechaDeLaTitularidad()}, no la fecha de
+ * calculo (#328)—, que es la unica fuente de quien es dueno de que parte. Es lo que impide que la
+ * base del contribuyente se pueda inflar o desinflar desde la peticion.
  *
  * @param predioId el predio
  * @param codigoReferenciaCatastral como se le nombra en el padron
@@ -26,13 +27,14 @@ import org.jspecify.annotations.Nullable;
  * @param autovaluo el autovaluo declarado del predio (RT-010: terreno + construccion + obras)
  * @param valuoExonerado la parte del autovaluo que no esta afecta
  * @param baseImponiblePredio lo que este predio aporta a la base, ya ponderado por el porcentaje
- * @param porcentajeRegistradoDelPredio lo que suman <b>todas</b> las cuotas del predio a la fecha
- *     de calculo, las de este contribuyente y las de los demas (#690). Cuando es menor que 100, la
- *     base de este predio sale ponderada por una titularidad que <b>no cubre el predio entero</b>:
- *     en Catacaos eso pasa en 304 predios, con cincuenta sumas distintas por debajo de cien y una
- *     de 0,349 %. La determinacion se hace igual —es correcta para lo registrado, y no determinar
- *     dejaria sin emitir a un tercio del padron—, pero sale <b>dicho</b>: una cifra ponderada por
- *     una titularidad incompleta no se distingue de una correcta si nada la acompaña
+ * @param porcentajeRegistradoDelPredio lo que suman <b>todas</b> las cuotas del predio al 1 de
+ *     enero del ejercicio, las de este contribuyente y las de los demas (#690, #328). Cuando es
+ *     menor que 100, la base de este predio sale ponderada por una titularidad que <b>no cubre el
+ *     predio entero</b>: en Catacaos eso pasa en 304 predios, con cincuenta sumas distintas por
+ *     debajo de cien y una de 0,349 %. La determinacion se hace igual —es correcta para lo
+ *     registrado, y no determinar dejaria sin emitir a un tercio del padron—, pero sale
+ *     <b>dicho</b>: una cifra ponderada por una titularidad incompleta no se distingue de una
+ *     correcta si nada la acompaña
  * @param origenDelAutovaluo de donde salio la cifra con que se determino este predio (#38)
  * @param valuacionConjuntoId el conjunto con que `catastro` la calculo; {@code null} si es
  *     declarada
@@ -112,7 +114,10 @@ public record PredioEnLaBase(
                 null);
     }
 
-    /** Las cuotas del predio cubren el predio entero a la fecha de calculo. */
+    /**
+     * Las cuotas del predio cubren el predio entero al 1 de enero del ejercicio, antes de las
+     * transferencias de ese dia (#328).
+     */
     public boolean titularidadCompleta() {
         return porcentajeRegistradoDelPredio.valor().compareTo(java.math.BigDecimal.valueOf(100))
                 == 0;

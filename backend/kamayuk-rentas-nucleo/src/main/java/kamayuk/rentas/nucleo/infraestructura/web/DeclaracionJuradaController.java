@@ -82,10 +82,11 @@ public class DeclaracionJuradaController {
      * base.
      *
      * <p>Devuelve lo que el sistema <b>tiene</b> —el declarante con su domicilio vigente a la
-     * fecha, sus predios con su {@code %} de propiedad, y las cifras de la ultima determinacion del
-     * ejercicio— y una lista {@code faltan} con lo que no puede consignar todavia, cada cosa con su
-     * motivo. Un campo nulo es un campo que no hay: publicar cero seria escribir «no debe nada» en
-     * un papel que alguien firma.
+     * fecha, sus predios <b>del ejercicio</b> con su {@code %} de propiedad (los del detalle de la
+     * ultima determinacion del ejercicio, o los del padron al 1 de enero; nunca los del dia que se
+     * pide, #328), y las cifras de esa determinacion— y una lista {@code faltan} con lo que no
+     * puede consignar todavia, cada cosa con su motivo. Un campo nulo es un campo que no hay:
+     * publicar cero seria escribir «no debe nada» en un papel que alguien firma.
      *
      * <p>Una DJ que no existe es <b>404</b>, no una hoja vacia.
      */
@@ -106,7 +107,7 @@ public class DeclaracionJuradaController {
     }
 
     /**
-     * La fecha de corte de la hoja; ausente, hoy.
+     * La fecha de corte de la hoja —a la que se lee el domicilio, y nada mas (#328)—; ausente, hoy.
      *
      * <p>No es {@code fechaDe}: aquella exige el campo —es la fecha de presentacion, que sin ella
      * no hay acto— y esta admite que falte, porque «a que dia se lee» tiene una respuesta por

@@ -10,8 +10,15 @@ import org.jspecify.annotations.Nullable;
  * {@code camelCase} (ARQ-04 §3).
  *
  * <p><b>Los importes viajan como texto</b>, igual que en {@code DeterminacionPredialResource}: son
- * las cifras fijas con que se determino, no un saldo que cambie con el tiempo, y la fecha a la que
- * se leyeron es <b>una sola</b> para toda la hoja — {@code aLaFecha} (regla 9).
+ * las cifras fijas con que se determino, no un saldo que cambie con el tiempo.
+ *
+ * <p><b>La hoja no se lee a una sola fecha, y {@code aLaFecha} no las dice todas</b> (#328). Los
+ * predios, sus cifras y los dos totales son <b>del ejercicio</b>: salen del detalle de la ultima
+ * determinacion del ejercicio cuando la hay, y el codigo, la direccion y el tipo —o las filas
+ * enteras, sin determinacion— del padron al 1 de enero antes de las transferencias de ese dia
+ * ({@code Ejercicio.fechaDeLaTitularidad()}), que no depende de cuando se pida. {@code aLaFecha} es
+ * la fecha de corte a la que se resuelve <b>solo el domicilio fiscal</b> del declarante (regla 9):
+ * reimprimir la hoja otro dia puede cambiar el domicilio, y nada mas.
  *
  * <p><b>Un campo nulo es un campo que no hay, y por eso {@code faltan} viene lleno.</b> Sin
  * determinacion del ejercicio no hay autovaluo, ni valuo afecto, ni impuesto: publicar cero seria
@@ -57,12 +64,19 @@ public record HojaDeDeclaracionResource(
     public record DeclaranteResource(
             String codigo, String nombre, String documento, @Nullable String domicilioFiscal) {}
 
-    /** Una linea de la tabla de predios de la hoja. */
+    /**
+     * Una linea de la tabla de predios de la hoja.
+     *
+     * <p>{@code codRefCatastral}, {@code direccion} y {@code tipo} solo son nulos en la linea de un
+     * predio que la determinacion cobro y que el padron al 1 de enero del ejercicio no pone a
+     * nombre del declarante; {@code faltan} lo dice (#328). La linea sale igual: sin ella, {@code
+     * valuoAfectoTotal} deja de ser la suma de la tabla.
+     */
     public record PredioDeLaHojaResource(
             long predioId,
-            String codRefCatastral,
-            String direccion,
-            String tipo,
+            @Nullable String codRefCatastral,
+            @Nullable String direccion,
+            @Nullable String tipo,
             String porcentajePropiedad,
             @Nullable String autovaluo,
             @Nullable String valuoExonerado,

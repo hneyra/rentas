@@ -46,14 +46,33 @@ import org.springframework.transaction.annotation.Transactional;
  *   <li><b>El declarante</b>, del padron: {@code DirectorioDeContribuyentes}. El domicilio es el
  *       <b>vigente a la fecha de corte</b> y no «el ultimo» (regla 9): la hoja de una DJ de marzo
  *       tiene que poder reimprimirse como se imprimio.
- *   <li><b>Los predios</b>, de catastro: {@code PrediosDelContribuyente}, con su {@code %} de
- *       titularidad. Es la misma lectura que usa {@code GET /rentas/predios}.
  *   <li><b>Las cifras</b> —autovaluo, valuo exonerado, valuo afecto y el impuesto— de la <b>ultima
  *       determinacion predial del ejercicio</b> de ese contribuyente, que es el unico sitio donde
  *       el sistema las tiene. No se derivan aqui: el autovaluo <b>se declara</b> (#395), porque el
  *       sistema no sabe valorizar mientras falten el cuadro de valores unitarios y la depreciacion
  *       (GOB-03), los aranceles (D-02b) y el {@code % actualizacion} (D-11).
+ *   <li><b>Los predios</b>, con determinacion, son <b>su detalle</b>: lo que se cobro, de donde
+ *       salen ya los dos totales, y por eso los totales son la suma de las filas (#328). Sin
+ *       determinacion, los del padron <b>al 1 de enero del ejercicio, antes de las transferencias
+ *       de ese dia</b> ({@link Ejercicio#fechaDeLaTitularidad()}). De catastro —{@code
+ *       PrediosDelContribuyente} a esa misma fecha— salen solo el codigo, la direccion y el tipo.
  * </ul>
+ *
+ * <h2>Por que el padron del ejercicio y no el del dia que se pide (#328)</h2>
+ *
+ * <p>Hasta #328 las filas salian de {@code PrediosDelContribuyente} a la fecha de corte —hoy, si la
+ * peticion no trae {@code fecha}— y las cifras de la determinacion del ejercicio. Con una venta a
+ * mitad de año las dos lecturas dejaban de hablar del mismo conjunto: la hoja de un contribuyente
+ * que declaro P1 y P, pedida despues de vender P, salia con una sola fila y con un valuo afecto
+ * total y un impuesto que incluian P. Un papel que se firma bajo juramento con un total que no es
+ * la suma de sus filas, y que ademas cambiaba segun el dia en que se reimprimiera. El obligado del
+ * ejercicio es el titular al 1 de enero (TUO LTM art. 10), y esa es la fecha a la que se lee: la de
+ * {@link Ejercicio#fechaDeLaTitularidad()}, el 31 de diciembre del año anterior, porque «el
+ * adquirente asume la condicion de contribuyente a partir del 1 de enero del año siguiente de
+ * producido el hecho» y una venta fechada el mismo 1 de enero ya figura en el padron a ese dia.
+ *
+ * <p>El <b>domicilio</b> sigue a la fecha de corte: es otra decision, con su motivo arriba, y no
+ * cambia.
  *
  * <h2>Lo que la hoja NO puede consignar todavia, dicho por su nombre</h2>
  *
@@ -89,7 +108,9 @@ public class ConsultaDeLaHojaDeDeclaracion {
     /**
      * La hoja de esa declaracion, o vacio si no hay ninguna con ese numero en ese ejercicio.
      *
-     * @param aLaFecha a que dia se resuelven el domicilio y la titularidad (regla 9)
+     * @param aLaFecha a que dia se resuelve el domicilio (regla 9). La titularidad NO: es la del 1
+     *     de enero del ejercicio antes de las transferencias de ese dia ({@link
+     *     Ejercicio#fechaDeLaTitularidad()}), por el mismo motivo que la determinacion (#328)
      */
     @Transactional(readOnly = true)
     public Optional<Hoja> de(String numero, Ejercicio ejercicio, LocalDate aLaFecha) {
@@ -108,33 +129,36 @@ public class ConsultaDeLaHojaDeDeclaracion {
 
         Optional<Determinacion> determinacion =
                 determinaciones.ultimaPredialDe(ejercicio, contribuyenteId);
-        Map<Long, DetalleDeterminacionPredio> cifras = new LinkedHashMap<>();
-        determinacion
-                .map(Determinacion::id)
-                .ifPresent(
-                        id ->
-                                determinaciones
-                                        .detalleDe(id)
-                                        .forEach(
-                                                detalle ->
-                                                        cifras.put(detalle.predioId(), detalle)));
+
+        // El padron DEL EJERCICIO, no el del dia en que se pide (#328): la titularidad al 1 de
+        // enero antes de las transferencias de ese dia, que es la misma que determino.
+        LocalDate fechaDeLaTitularidad = ejercicio.fechaDeLaTitularidad();
+        Map<Long, PredioDelContribuyente> delEjercicio = new LinkedHashMap<>();
+        for (PredioDelContribuyente predio : predios.de(contribuyenteId, fechaDeLaTitularidad)) {
+            delEjercicio.put(predio.predioId(), predio);
+        }
 
         List<FilaDePredio> filas = new ArrayList<>();
-        for (PredioDelContribuyente predio : predios.de(contribuyenteId, aLaFecha)) {
-            DetalleDeterminacionPredio detalle = cifras.get(predio.predioId());
-            filas.add(
-                    new FilaDePredio(
-                            predio.predioId(),
-                            predio.codigoReferenciaCatastral(),
-                            predio.direccion(),
-                            predio.tipo(),
-                            detalle == null
-                                    ? predio.porcentajeTitularidad()
-                                    : detalle.porcentajePropiedad(),
-                            detalle == null ? null : detalle.autovaluo(),
-                            detalle == null ? null : detalle.valuoExonerado(),
-                            detalle == null ? null : detalle.baseImponiblePredio()));
+        List<String> faltan = new ArrayList<>();
+        if (determinacion.isPresent()) {
+            List<DetalleDeterminacionPredio> cobrado =
+                    determinacion
+                            .map(Determinacion::id)
+                            .map(determinaciones::detalleDe)
+                            .orElse(List.of());
+            for (DetalleDeterminacionPredio detalle : cobrado) {
+                PredioDelContribuyente predio = delEjercicio.get(detalle.predioId());
+                if (predio == null) {
+                    faltan.add(noConstaEnElEjercicio(detalle.predioId(), fechaDeLaTitularidad));
+                }
+                filas.add(FilaDePredio.cobrada(detalle, predio));
+            }
+        } else {
+            for (PredioDelContribuyente predio : delEjercicio.values()) {
+                filas.add(FilaDePredio.sinCifras(predio));
+            }
         }
+        faltan.addAll(loQueFalta(determinacion.isPresent(), ejercicio));
 
         return Optional.of(
                 new Hoja(
@@ -145,7 +169,27 @@ public class ConsultaDeLaHojaDeDeclaracion {
                         List.copyOf(filas),
                         determinacion.map(Determinacion::baseImponible).orElse(null),
                         determinacion.map(Determinacion::montoDeterminado).orElse(null),
-                        List.copyOf(loQueFalta(determinacion.isPresent(), ejercicio))));
+                        List.copyOf(faltan)));
+    }
+
+    /**
+     * Un predio que la determinacion cobro y que el padron al 1 de enero no pone a nombre de este
+     * contribuyente (#328).
+     *
+     * <p>Solo pasa si la titularidad cambio <b>despues</b> de determinar con una fecha anterior al
+     * ejercicio —una transferencia inscrita tarde—, o con una determinacion anterior a #328, que
+     * leia el padron del dia. La fila sale igual, porque es lo que se cobro y sin ella el total
+     * deja de ser la suma de las filas; lo que no sale es el codigo ni la direccion, que no hay de
+     * donde leer, y se dice aqui en vez de inventarlos.
+     */
+    private static String noConstaEnElEjercicio(long predioId, LocalDate fechaDeLaTitularidad) {
+        return "El predio "
+                + predioId
+                + " esta en la determinacion del ejercicio y al "
+                + fechaDeLaTitularidad
+                + " no consta a nombre de este contribuyente: la titularidad cambio despues de"
+                + " determinar. La fila consigna lo que se cobro, sin codigo ni direccion que"
+                + " leer; hay que volver a determinar el ejercicio";
     }
 
     /**
@@ -176,7 +220,7 @@ public class ConsultaDeLaHojaDeDeclaracion {
     }
 
     /**
-     * La hoja entera, con su fecha de corte.
+     * La hoja entera, con su fecha de corte: la del domicilio, no la de los predios (#328).
      *
      * @param declarante nulo si el contribuyente ya no esta en el padron; la hoja lo dice en vez de
      *     inventar un nombre
@@ -199,15 +243,47 @@ public class ConsultaDeLaHojaDeDeclaracion {
      *
      * <p>El {@code porcentajePropiedad} sale de la determinacion cuando la hay —es el que se uso
      * para calcular, y la hoja tiene que decir el que se aplico, no el de hoy— y de la titularidad
-     * vigente cuando no.
+     * del ejercicio ({@link Ejercicio#fechaDeLaTitularidad()}) cuando no.
+     *
+     * @param codigoReferenciaCatastral nulo, igual que {@code direccion} y {@code tipo}, solo en la
+     *     fila de un predio cobrado que el padron al 1 de enero no pone a nombre del declarante: la
+     *     hoja lo dice en {@code faltan} (#328)
      */
     public record FilaDePredio(
             long predioId,
-            String codigoReferenciaCatastral,
-            String direccion,
-            String tipo,
+            @Nullable String codigoReferenciaCatastral,
+            @Nullable String direccion,
+            @Nullable String tipo,
             Porcentaje porcentajePropiedad,
             @Nullable Dinero autovaluo,
             @Nullable Dinero valuoExonerado,
-            @Nullable Dinero valuoAfecto) {}
+            @Nullable Dinero valuoAfecto) {
+
+        /** La fila de lo que se cobro: las cifras y el % del detalle; del padron, el nombre. */
+        static FilaDePredio cobrada(
+                DetalleDeterminacionPredio detalle, @Nullable PredioDelContribuyente predio) {
+            return new FilaDePredio(
+                    detalle.predioId(),
+                    predio == null ? null : predio.codigoReferenciaCatastral(),
+                    predio == null ? null : predio.direccion(),
+                    predio == null ? null : predio.tipo(),
+                    detalle.porcentajePropiedad(),
+                    detalle.autovaluo(),
+                    detalle.valuoExonerado(),
+                    detalle.baseImponiblePredio());
+        }
+
+        /** La fila de un predio del ejercicio sin determinacion: nada que consignar como cifra. */
+        static FilaDePredio sinCifras(PredioDelContribuyente predio) {
+            return new FilaDePredio(
+                    predio.predioId(),
+                    predio.codigoReferenciaCatastral(),
+                    predio.direccion(),
+                    predio.tipo(),
+                    predio.porcentajeTitularidad(),
+                    null,
+                    null,
+                    null);
+        }
+    }
 }

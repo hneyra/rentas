@@ -42,12 +42,32 @@ import org.springframework.stereotype.Service;
  * fuente y que NEG-05 §0.1 advierte que <b>multiplica</b> importes: omitirlo no es neutro. Los
  * autovaluos que la corrida usa son los del <b>mismo</b> ejercicio.
  *
- * <h2>Lo que si cambia al recalcular</h2>
+ * <h2>Lo que si cambia al recalcular, y lo que no (#328)</h2>
  *
- * <p>El conjunto sellado —de ahi salen la UIT, los tramos, el minimo, el derecho de emision y el
- * cronograma— y el <b>porcentaje de propiedad</b>, que se vuelve a leer de {@code titularidad} a la
- * fecha de la corrida: una transferencia posterior a la primera determinacion cambia quien paga que
- * parte, y congelarlo dejaria cobrando al que ya vendio.
+ * <p><b>Cambia el conjunto sellado</b> —de ahi salen la UIT, los tramos, el minimo, el derecho de
+ * emision y el cronograma—.
+ *
+ * <p><b>No cambia quien es el obligado ni con que porcentaje.</b> La titularidad y el {@code %} de
+ * propiedad se leen al 1 de enero del ejercicio <b>antes de las transferencias de ese dia</b>
+ * ({@link Ejercicio#fechaDeLaTitularidad()}, el 31 de diciembre del año anterior); el sector del
+ * alcance, que es una caracteristica del predio, al 1 de enero ({@link Ejercicio#primerDia()}). El
+ * caracter de sujeto del impuesto se atribuye con arreglo a la situacion juridica configurada al 1
+ * de enero del año al que corresponde la obligacion, y «cuando se efectue cualquier transferencia,
+ * el adquirente asume la condicion de contribuyente a partir del 1 de enero del año siguiente de
+ * producido el hecho» (TUO LTM art. 10; NEG-05 §3). El que vende en marzo —o el mismo 1 de enero—
+ * sigue debiendo el ejercicio entero; el que compra paga desde el siguiente.
+ *
+ * <p>Hasta #328 este parrafo decia lo contrario —que el porcentaje «se vuelve a leer de {@code
+ * titularidad} a la fecha de la corrida» porque «congelarlo dejaria cobrando al que ya vendio»— y
+ * la corrida lo cumplia. La premisa era falsa: cobrarle al que vendio durante el ejercicio es
+ * exactamente lo que la ley manda. Y la consecuencia no era un matiz: el detalle del vendedor traia
+ * el predio vendido y el padron del dia no, saltaba {@link DeterminarPredial.PredioAjeno} y el
+ * vendedor quedaba observado, <b>fuera de la emision del ejercicio con todos sus predios</b>.
+ * Bastaba una venta en enero, antes de la corrida de febrero.
+ *
+ * <p>Lo que el padron al 1 de enero SI puede cambiar entre dos corridas es lo que se registra
+ * despues <b>con fecha anterior</b> —una transferencia inscrita tarde, un predio dado de alta con
+ * vigencia retroactiva—, y eso es lo que sigue saliendo observado.
  *
  * <h2>Lo que la corrida SELLA, y por que no basta con aplicarlo (#312)</h2>
  *
@@ -163,7 +183,11 @@ public class DeterminarPredialMasivo {
         // Comprobarlo despues seria descubrirlo con los papeles ya notificados.
         candado.exigirLaValuacionCompleta(peticion.ejercicio());
 
-        LocalDate hoy = LocalDate.now(reloj);
+        // Dos fechas (#328): la de CALCULO es la que se publica con la corrida (regla 9); la de
+        // REFERENCIA es a la que se lee la ficha —aqui, el sector del alcance—. La titularidad la
+        // lee `DeterminarPredial`, a `Ejercicio.fechaDeLaTitularidad()`.
+        LocalDate fechaDeCalculo = LocalDate.now(reloj);
+        LocalDate fechaDeReferencia = peticion.ejercicio().primerDia();
         List<PadronPredialDelEjercicio.DeterminacionConDetalle> declarados =
                 padron.ultimasDe(peticion.ejercicio());
 
@@ -220,7 +244,8 @@ public class DeterminarPredialMasivo {
                                         + " emitirla"));
                 continue;
             }
-            if (!enElAlcance(fila.detalle(), peticion, codigo, observadosPrevios, hoy)) {
+            if (!enElAlcance(
+                    fila.detalle(), peticion, codigo, observadosPrevios, fechaDeReferencia)) {
                 continue;
             }
 
@@ -249,10 +274,11 @@ public class DeterminarPredialMasivo {
             } catch (DeterminarPredial.PredioSinAutovaluo
                     | DeterminarPredial.SinPrediosEnElPadron
                     | DeterminarPredial.PredioAjeno motivo) {
-                // El padron cambio entre la primera determinacion y esta corrida: un predio nuevo
-                // sin declarar, o uno que ya no es suyo. Se observa y la corrida sigue: es
-                // exactamente lo que la pantalla llama «contribuyentes observados que quedan fuera
-                // de la emision».
+                // El padron AL 1 DE ENERO cambio entre la primera determinacion y esta corrida
+                // —algo registrado despues con fecha anterior al ejercicio—: un predio nuevo sin
+                // declarar, o uno que ya no era suyo. Una venta del propio ejercicio ya no llega
+                // aqui (#328). Se observa y la corrida sigue: es exactamente lo que la pantalla
+                // llama «contribuyentes observados que quedan fuera de la emision».
                 observados.add(new Observado(codigo, nombre, String.valueOf(motivo.getMessage())));
             } catch (CuadroPredialParametrizado.ParametroDelPredialAusente falta) {
                 // Esta le pasa a TODOS por igual —es del conjunto, no del contribuyente—, asi que
@@ -273,7 +299,7 @@ public class DeterminarPredialMasivo {
                         determinadas.size(),
                         emitido,
                         List.copyOf(observados),
-                        hoy);
+                        fechaDeCalculo);
 
         /* **Y deja rastro** (#523). Va al final, con el bucle ya terminado y sus
         determinaciones confirmadas cada una en su transaccion: si escribir el
@@ -320,16 +346,22 @@ public class DeterminarPredialMasivo {
      * <p>Se determina igual sobre <b>todos</b> sus predios, tambien los de otros sectores: la base
      * es del contribuyente (NEG-05 §1) y recortarla al sector produciria el mismo error a la baja
      * que calcular predio por predio. El sector elige a quien se emite, no que se le cobra.
+     *
+     * <p>El sector es el de la ficha a la fecha de referencia del ejercicio (#328): la emision «del
+     * sector 03» de 2026 es la de los predios que en 2026 estaban en el 03, y con la ficha del dia
+     * de la corrida una resectorizacion a mitad de año dejaba al contribuyente fuera de su sector y
+     * de ningun otro.
      */
     private boolean enElAlcance(
             List<DetalleDeterminacionPredio> detalle,
             Peticion peticion,
             String codigoContribuyente,
             Set<String> observadosDeLaCorridaAnterior,
-            LocalDate hoy) {
+            LocalDate fechaDeReferencia) {
 
         return switch (peticion.alcance()) {
-            case ALCANCE_SECTOR -> tieneUnPredioEnElSector(detalle, peticion.sector(), hoy);
+            case ALCANCE_SECTOR ->
+                    tieneUnPredioEnElSector(detalle, peticion.sector(), fechaDeReferencia);
             case ALCANCE_RANGO_DE_CODIGO -> enElTramo(codigoContribuyente, peticion);
             case ALCANCE_OBSERVADOS -> observadosDeLaCorridaAnterior.contains(codigoContribuyente);
             default -> true;
@@ -337,14 +369,16 @@ public class DeterminarPredialMasivo {
     }
 
     private boolean tieneUnPredioEnElSector(
-            List<DetalleDeterminacionPredio> detalle, @Nullable String sector, LocalDate hoy) {
+            List<DetalleDeterminacionPredio> detalle,
+            @Nullable String sector,
+            LocalDate fechaDeReferencia) {
         if (sector == null) {
             return true;
         }
         for (DetalleDeterminacionPredio predio : detalle) {
             String suyo =
                     caracteristicas
-                            .de(predio.predioId(), hoy)
+                            .de(predio.predioId(), fechaDeReferencia)
                             .map(CaracteristicasDelPredio::sectorCodigo)
                             .orElse(null);
             if (sector.equalsIgnoreCase(suyo)) {

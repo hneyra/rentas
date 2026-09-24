@@ -151,9 +151,9 @@ public record DeterminacionPredialResource(
      *
      * @param baseImponible lo que este predio puso, ya ponderado por el % de propiedad. Es la cifra
      *     que RNF-083 prohibe recomponer: no es el valuo afecto, es el valuo afecto por la cuota
-     * @param porcentajeRegistradoDelPredio lo que suman <b>todas</b> las cuotas del predio a la
-     *     fecha de calculo (#690). No es {@code porcentajePropiedad}: aquel es la parte de este
-     *     contribuyente, este es cuanto del predio tiene dueño registrado
+     * @param porcentajeRegistradoDelPredio lo que suman <b>todas</b> las cuotas del predio al 1 de
+     *     enero del ejercicio (#690, #328). No es {@code porcentajePropiedad}: aquel es la parte de
+     *     este contribuyente, este es cuanto del predio tiene dueño registrado
      * @param titularidadCompleta si esa suma llega a 100. Viaja <b>derivado y no derivable</b> a
      *     proposito: la comparacion es de una cifra decimal contra 100 y hacerla en la pantalla es
      *     invitar a que 99,9999 se lea como completo. Cuando es {@code false}, la base de este
