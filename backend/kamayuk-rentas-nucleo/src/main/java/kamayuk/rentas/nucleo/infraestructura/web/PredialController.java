@@ -320,7 +320,8 @@ public class PredialController {
         } catch (DeterminarPredial.SinPrediosEnElPadron
                 | DeterminarPredial.PredioSinAutovaluo
                 | DeterminarPredial.PredioRepetido
-                | DeterminarPredial.PredioAjeno mal) {
+                | DeterminarPredial.PredioAjeno
+                | DeterminarPredial.BeneficioPredialSinRegla mal) {
             throw new ProblemaDeNegocio(CodigoDeError.VALIDACION, mensajeDe(mal));
         } catch (CuadroPredialParametrizado.ParametroDelPredialAusente
                 | ParametrosSellados.ParametroAusente
