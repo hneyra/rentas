@@ -79,6 +79,18 @@ trimestrales supuestas serian unos vencimientos que el contribuyente puede no ha
  */
 const NO_CONSTA_EN_LA_CORRIDA = 'no consta en la corrida';
 
+/**
+ * **Lo que va donde un campo sale de la ultima corrida y el ejercicio todavia no tiene ninguna**
+ * (#354).
+ *
+ * `GET /rentas/predial/corridas/ultima` contesta **204** cuando no hay corrida ni simulacion del
+ * ejercicio (#523), y eso es el estado normal de cualquier municipalidad entre el 1 de enero y su
+ * primera corrida, o recien implantada. No es `NO_PUBLICADO` —la operacion SI publica el campo— ni
+ * `NO_CONSTA_EN_LA_CORRIDA` —no hay corrida de la que no conste—, y sobre todo no es un cero: «cero
+ * observados» es el resultado de una corrida limpia, y aqui no hay resultado todavia.
+ */
+const SIN_CORRIDA_DEL_EJERCICIO = 'todavia sin corrida';
+
 /** «Detectados por cruce» de un programa que no declara sus parametros de sorteo (#196). */
 const SIN_PARAMETROS_DEL_SORTEO = `El cruce no se pudo resolver: este programa no declara los \
 parametros con que se sortea, y el embudo dice cual falta en «parametroQueFalta». No es cero — \
@@ -96,6 +108,7 @@ export const PALABRAS_DE_HUECO = {
   NO_PUBLICADO,
   SIN_CIFRAR,
   NO_CONSTA_EN_LA_CORRIDA,
+  SIN_CORRIDA_DEL_EJERCICIO,
   SIN_CRONOGRAMA,
   SIN_PARAMETROS_DEL_SORTEO,
 } as const;
@@ -134,6 +147,7 @@ export {
   NO_PUBLICADO,
   SIN_CIFRAR,
   NO_CONSTA_EN_LA_CORRIDA,
+  SIN_CORRIDA_DEL_EJERCICIO,
   SIN_CRONOGRAMA,
   SIN_PARAMETROS_DEL_SORTEO,
 };

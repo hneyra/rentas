@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { ErrorDeLaApi, solicitar } from './cliente.ts';
+import { ErrorDeLaApi, VacioNoAdmitido, solicitar } from './cliente.ts';
+import { peldanoDe } from './escalera.ts';
 import { fijarToken } from './identidad.ts';
 
 /**
@@ -43,6 +44,46 @@ describe('el cliente de la API de rentas', () => {
 
     await expect(solicitar('/contribuyentes')).rejects.toBeInstanceOf(ErrorDeLaApi);
     await expect(solicitar('/contribuyentes')).rejects.toMatchObject({ estado: 403 });
+  });
+});
+
+/**
+ * **Un 204 solo es `null` para quien lo admite** (#354).
+ *
+ * Hasta #354 el cliente convertia todo 204 en `null as T`, y el `as` era la mentira: `pedirUno<T>`
+ * prometia `T` y entregaba `null`. `ini-panel` repartio sobre el en el render y tumbo la aplicacion
+ * entera. Las dos mitades se miden por separado, porque una sin la otra es el defecto: todo `null`
+ * es el `as` de antes, y ningun `null` rompe `panel` y `territorio`, que dicen «todavia no» con el.
+ */
+describe('#354 — el 204 y quien lo admite', () => {
+  it('sin `admiteVacio`, un 204 lanza `VacioNoAdmitido`, que nombra la operacion', async () => {
+    fetchQueContesta(new Response(null, { status: 204 }));
+
+    const pedida = solicitar('/rentas/predial/corridas/ultima');
+
+    await expect(pedida).rejects.toBeInstanceOf(VacioNoAdmitido);
+    await expect(solicitar('/rentas/predial/corridas/ultima')).rejects.toThrow(
+      /GET \/rentas\/predial\/corridas\/ultima contesto 204.*pedirUnoOVacio/,
+    );
+  });
+
+  it('y la escalera lo dice como una averia con su 204, no como «el sistema no contesta»', async () => {
+    fetchQueContesta(new Response(null, { status: 204 }));
+
+    const lanzado: unknown = await solicitar('/indicadores/recaudacion').catch((e: unknown) => e);
+
+    // Es un `ErrorDeLaApi`: el backend SI contesto, y lo que falla es quien pidio sin admitir el
+    // vacio. El peldano de un corte de red —«el sistema no contesta»— mandaria a mirar la red.
+    expect(lanzado).toBeInstanceOf(ErrorDeLaApi);
+    expect(peldanoDe(lanzado)).toMatchObject({ clave: 'averia', estado: 204, esAveria: true });
+  });
+
+  it('con `admiteVacio`, el mismo 204 es `null`', async () => {
+    fetchQueContesta(new Response(null, { status: 204 }));
+
+    await expect(
+      solicitar('/rentas/predial/corridas/ultima', { admiteVacio: true }),
+    ).resolves.toBeNull();
   });
 });
 

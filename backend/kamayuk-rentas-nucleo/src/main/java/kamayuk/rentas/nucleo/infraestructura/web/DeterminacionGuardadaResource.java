@@ -1,8 +1,10 @@
 package kamayuk.rentas.nucleo.infraestructura.web;
 
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.nucleo.aplicacion.ConsultaDeLaDeterminacionPredial;
 import kamayuk.rentas.nucleo.dominio.predial.AporteDeTramo;
 import kamayuk.rentas.nucleo.dominio.predial.CuotaDelPredial;
@@ -38,6 +40,14 @@ import org.jspecify.annotations.Nullable;
  * cifra que se dibuja, no un {@code Dinero} con el que operar. Y ninguna se recompone en la
  * interfaz (RNF-083): la base de cada predio ya viene ponderada, y sumar autovalúos para
  * adelantarla daría una cifra parecida y equivocada.
+ *
+ * <p><b>Los que salen del conjunto sellado se publican con dos decimales, y por un solo sitio</b>
+ * (#354): {@link #importeDeCierre(Dinero)}. La copia local de {@code normativa} entrega cada número
+ * como {@code numeric(18,6)} —la UIT llega {@code "5500.000000"}—, {@code Dinero.por} no redondea
+ * por diseño —el mínimo salía con catorce decimales, los límites de tramo con doce— y {@code
+ * toString()} lo publicaba tal cual. La interfaz exige dos como mucho y revienta con más, con
+ * razón. El aporte de cada tramo <b>no</b> pasa por ahí: es un intermedio sin redondear (ADR-0018,
+ * #245).
  *
  * @param id el identificador de la determinación guardada
  * @param ejercicio el ejercicio determinado
@@ -114,10 +124,12 @@ public record DeterminacionGuardadaResource(
                     new DeterminacionPredialResource.TramoAplicado(
                             aporte.orden(),
                             aporte.tieneTope()
-                                    ? Objects.requireNonNull(aporte.limiteSuperior()).toString()
+                                    ? importeDeCierre(
+                                            Objects.requireNonNull(aporte.limiteSuperior()))
                                     : null,
                             aporte.alicuota().valor().toPlainString(),
-                            aporte.porcionGravada().toString(),
+                            importeDeCierre(aporte.porcionGravada()),
+                            // Entero, y a proposito: ver el javadoc de la clase.
                             aporte.aporte().toString()));
         }
         List<DeterminacionPredialResource.CuotaDeterminada> cuotas = new ArrayList<>();
@@ -143,15 +155,42 @@ public record DeterminacionGuardadaResource(
                 leida.valuoExonerado().toString(),
                 leida.valuoAfecto().toString(),
                 leida.cabecera().baseImponible().toString(),
-                leida.uit().toString(),
+                importeDeCierre(leida.uit()),
                 tramos,
-                leida.minimoImponible().toString(),
+                importeDeCierre(leida.minimoImponible()),
                 leida.impuestoInsoluto().toString(),
-                leida.derechoDeEmision().toString(),
-                leida.totalAPagar().toString(),
+                importeDeCierre(leida.derechoDeEmision()),
+                importeDeCierre(leida.totalAPagar()),
                 leida.modalidad() == null ? null : leida.modalidad().name(),
                 cuotas,
                 leida.cabecera().reglasAplicadas());
+    }
+
+    /**
+     * La escala con que el contrato publica un importe de cierre: dos decimales, que es la forma
+     * que la interfaz admite ({@code formatearImporte}, {@code IMPORTE_SERVIDO}). No es un
+     * parámetro tributario ni una política de redondeo: es la forma del texto en el borde del
+     * contrato.
+     */
+    private static final int ESCALA_DEL_CONTRATO = 2;
+
+    /**
+     * <b>Un importe de cierre con la escala del contrato</b> (#354): la única fuente de verdad de
+     * cómo se escribe {@code uit}, {@code minimoImponible}, {@code limiteSuperior}, {@code
+     * porcionGravada}, {@code derechoDeEmision} y {@code totalAPagar}.
+     *
+     * <p><b>No redondea</b>: {@link RoundingMode#UNNECESSARY} lanza si hubiera un decimal
+     * significativo más allá del segundo. {@code 5500.000000} pasa a {@code 5500.00} y {@code
+     * 33.00000000000000} a {@code 33.00}, porque el 0,6 % de una UIT múltiplo de 50 es exacto. Si
+     * un día un conjunto sellado produjera un céntimo partido, esta lectura fallaría en vez de
+     * publicar una cifra redondeada aquí que nadie decidió redondear (D-03, ADR-0018): recortarla
+     * en el borde sería la aritmética sobre dinero que la interfaz se niega a hacer, hecha un paso
+     * antes.
+     */
+    private static String importeDeCierre(Dinero importe) {
+        return importe.valor()
+                .setScale(ESCALA_DEL_CONTRATO, RoundingMode.UNNECESSARY)
+                .toPlainString();
     }
 
     /**

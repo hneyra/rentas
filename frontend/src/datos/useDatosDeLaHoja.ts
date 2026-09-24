@@ -17,6 +17,7 @@ import {
   FRASE_DEL_CONTEO,
   FRASE_DEL_PELDANO,
   FRASE_DEL_PELDANO_CON_ESTADO,
+  FRASE_DE_LA_HOJA_QUE_NO_SE_DIBUJA,
 } from '../i18n/textosDelMarco.ts';
 import type { SesionDeLaVentanilla } from './lecturas.ts';
 import { RUTAS, pedirUno } from './lecturas.ts';
@@ -167,6 +168,33 @@ function alFallar(
     // «El sistema funcionando» no se pinta de «algo se rompio»: un 403 en tono de averia manda a
     // mirar un despliegue cuando lo que falta es una fila en una tabla de permisos.
     tono: peldano.esAveria ? 'atencion' : 'info',
+  };
+}
+
+/**
+ * **Lo que se dice cuando la hoja no se pudo DIBUJAR: lo que lanzo, convertido en ausencia** (#354).
+ *
+ * No es `alFallar`, y no puede serlo: alli la peticion fallo y el peldano de la escalera dice por
+ * que —la red, la sesion, un permiso—. Aqui la respuesta llego bien y lo que fallo es este arbol al
+ * traducirla: un conector que recibe una forma que no esperaba y lo dice lanzando, como
+ * `formatearImporte` hace a proposito. El peldano de averia diria «el sistema no contesta», que
+ * manda a mirar el backend cuando el backend contesto.
+ *
+ * La recoge la frontera de `aplicacion.tsx`, que envuelve el cuerpo de cada hoja. La palabra del
+ * hueco es la de siempre —«fallo»—, y el motivo es el `message` de lo que se lanzo: sin el, quien
+ * lo reporta no puede decir que valor fue ni en que hoja.
+ */
+function alNoPoderDibujarla(
+  lanzado: unknown,
+  t: (clave: string, datos?: Readonly<Record<string, unknown>>) => string,
+): Ausencia {
+  return {
+    enElCampo: 'fallo',
+    explicacion: t(FRASE_DE_LA_HOJA_QUE_NO_SE_DIBUJA, {
+      motivo: lanzado instanceof Error ? lanzado.message : String(lanzado),
+    }),
+    // `atencion`: aqui si se rompio algo, y es de este arbol.
+    tono: 'atencion',
   };
 }
 
@@ -415,4 +443,5 @@ export {
   SIN_SUJETO,
   VACIO,
   alFallar,
+  alNoPoderDibujarla,
 };

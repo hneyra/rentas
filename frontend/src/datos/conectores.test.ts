@@ -409,18 +409,25 @@ const RESUMEN_DE_PAPELETAS: ResumenDePapeletas = {
  *
  * <h2>La muestra CUADRA, y tres de sus cifras estan puestas para separar lo que se confunde</h2>
  *
- * Una muestra uniforme no distingue nada. Esta se derivo a mano con la escala de 2026 —UIT 5 350,
- * tramos a 15 y 60 UIT— sobre una base de 400 000,75, y trae **tres** cosas que ninguna muestra
- * redonda tendria:
+ * Una muestra uniforme no distingue nada. **Desde #354 sus cifras de la memoria son MEDIDAS**, no
+ * derivadas a mano: son las que publica `PredialControllerTest` —su prueba de #354— determinando
+ * una base de 400 000,75 con el conjunto de 2026 tal como lo entrega la copia local —UIT 5 500,
+ * tramos a 15 y 60 UIT, cada numero con los seis decimales de `numeric(18,6)`— y leyendo despues.
+ * Hasta #354 la muestra ponia `uit: '5350.00'` y `minimoImponible: '32.10'`: la UIT de 2025 bajo
+ * un conjunto «2026 v1», y con una forma —dos decimales— que el backend NO producia entonces. La
+ * pantalla se probaba contra lo que se esperaba y no contra lo que llegaba, y por eso nadie vio
+ * que la respuesta de verdad la tumbaba. Y trae **tres** cosas que ninguna muestra redonda
+ * tendria:
  *
  *   · **Los TRES tramos, y el tercero SIN TOPE** (`limiteSuperior: null`). Con una lista vacia
  *     —como estaba— o con tramos todos acotados, la celda que dice «Sin tope» no se ejerce nunca,
  *     y el conector podria escribir cualquier cosa ahi sin que nada se enterara.
- *   · **Un aporte que `formatearImporte` NO admite**: 79 000,75 x 1 % = `790.00750000`, con
- *     cuatro decimales significativos. Es el que prueba que `formatearImporteSinRedondear` no es
+ *   · **Un aporte que `formatearImporte` NO admite**: 70 000,75 x 1 % = `700.0075`, con cuatro
+ *     decimales significativos —y veinte escritos, que es como llega: el aporte no pasa por la
+ *     escala del contrato (#245, #354)—. Es el que prueba que `formatearImporteSinRedondear` no es
  *     decoracion — con aportes redondos, los dos formateadores darian lo mismo.
- *   · **Y por eso la suma de los aportes NO es el impuesto**: 160,50 + 1 444,50 + 790,0075 =
- *     2 395,0075, y `impuestoInsoluto` es **2 395,01**. Un centimo, que es exactamente lo que
+ *   · **Y por eso la suma de los aportes NO es el impuesto**: 165,00 + 1 485,00 + 700,0075 =
+ *     2 350,0075, y `impuestoInsoluto` es **2 350,01**. Un centimo, que es exactamente lo que
  *     `AporteDeTramo` avisa por escrito (ADR-0018). Con una muestra que cuadrara al centimo,
  *     sumar los tramos aqui para «adelantar» el insoluto pasaria en verde.
  *
@@ -441,40 +448,41 @@ const DETERMINACION_GUARDADA: DeterminacionGuardada = {
   valuoExonerado: '12200.00',
   valuoAfecto: '400000.75',
   baseImponible: '400000.75',
-  uit: '5350.00',
+  // Medidas desde aqui hasta `cuotas`: ver el javadoc (#354).
+  uit: '5500.00',
   tramos: [
     {
       orden: 1,
-      limiteSuperior: '80250.00',
-      alicuota: '0.2000',
-      porcionGravada: '80250.00',
-      aporte: '160.50000000',
+      limiteSuperior: '82500.00',
+      alicuota: '0.200000',
+      porcionGravada: '82500.00',
+      aporte: '165.00000000000000000000',
     },
     {
       orden: 2,
-      limiteSuperior: '321000.00',
-      alicuota: '0.6000',
-      porcionGravada: '240750.00',
-      aporte: '1444.50000000',
+      limiteSuperior: '330000.00',
+      alicuota: '0.600000',
+      porcionGravada: '247500.00',
+      aporte: '1485.00000000000000000000',
     },
     // El ultimo, **sin tope**: `limiteSuperior` nulo. Ver el javadoc.
     {
       orden: 3,
       limiteSuperior: null,
-      alicuota: '1.0000',
-      porcionGravada: '79000.75',
-      aporte: '790.00750000',
+      alicuota: '1.000000',
+      porcionGravada: '70000.75',
+      aporte: '700.00750000000000000000',
     },
   ],
-  minimoImponible: '32.10',
-  impuestoInsoluto: '2395.01',
+  minimoImponible: '33.00',
+  impuestoInsoluto: '2350.01',
   derechoDeEmision: '4.50',
-  totalAPagar: '2399.51',
+  totalAPagar: '2354.51',
   // Al contado y con UNA cuota, no cuatro: si el montaje trajera la trimestral, un conector que
   // dibujara siempre cuatro filas pasaria en verde igual (#234).
   modalidad: 'CONTADO',
-  cuotas: [{ numero: 1, vencimiento: '2026-02-27', importe: '2395.01' }],
-  reglasAplicadas: ['RT-002'],
+  cuotas: [{ numero: 1, vencimiento: '2026-02-27', importe: '2350.01' }],
+  reglasAplicadas: ['RT-011', 'RT-013', 'RT-014'],
 };
 
 /**
@@ -504,13 +512,13 @@ const DETERMINACION_SIN_MODALIDAD: DeterminacionGuardada = {
  *   · **Las cuatro fechas son distintas**, y son las del conjunto sellado —`PREDIAL_VENCIMIENTO`
  *     «1».. «4» de `PredialControllerTest`, no inventadas aqui—. Con las cuatro iguales, un
  *     conector que tomara el vencimiento de la primera para todas las filas no se veria.
- *   · **El centimo lo lleva la ULTIMA cuota, no la primera**: 2 395,01 / 4 = 598,7525, que
+ *   · **El centimo lo lleva la ULTIMA cuota, no la primera**: 2 350,01 / 4 = 587,5025, que
  *     redondeado en `PuntoDeRedondeo.CUOTA` —dos decimales, HALF_UP, del conjunto sellado— da
- *     598,75, y `CronogramaDelPredial` le da el resto a la ultima: 598,76. **El artboard dibuja lo
+ *     587,50, y `CronogramaDelPredial` le da el resto a la ultima: 587,51. **El artboard dibuja lo
  *     contrario** —«por eso la cuota 1 es mayor»—, asi que una muestra copiada de el habria
  *     escondido esto en vez de ensenarlo (ver el issue que sale de aqui).
- *   · **Y las cuotas suman el INSOLUTO, no el total a pagar**: 598,75 x 3 + 598,76 = 2 395,01, y
- *     `totalAPagar` es 2 399,51 — el derecho de emision, 4,50, **no** se reparte. Con una muestra
+ *   · **Y las cuotas suman el INSOLUTO, no el total a pagar**: 587,50 x 3 + 587,51 = 2 350,01, y
+ *     `totalAPagar` es 2 354,51 — el derecho de emision, 4,50, **no** se reparte. Con una muestra
  *     que sumara el total, sumar las cuatro cuotas para «adelantar» el total a pagar pasaria en
  *     verde, que es exactamente la tentacion que la regla de `conectores.ts` prohibe.
  */
@@ -518,11 +526,11 @@ const DETERMINACION_TRIMESTRAL: DeterminacionGuardada = {
   ...DETERMINACION_GUARDADA,
   modalidad: 'TRIMESTRAL',
   cuotas: [
-    { numero: 1, vencimiento: '2026-02-27', importe: '598.75' },
-    { numero: 2, vencimiento: '2026-05-29', importe: '598.75' },
-    { numero: 3, vencimiento: '2026-08-31', importe: '598.75' },
+    { numero: 1, vencimiento: '2026-02-27', importe: '587.50' },
+    { numero: 2, vencimiento: '2026-05-29', importe: '587.50' },
+    { numero: 3, vencimiento: '2026-08-31', importe: '587.50' },
     // La ultima se lleva el resto (ADR-0018, y el javadoc de `CronogramaDelPredial`).
-    { numero: 4, vencimiento: '2026-11-30', importe: '598.76' },
+    { numero: 4, vencimiento: '2026-11-30', importe: '587.51' },
   ],
 };
 
@@ -810,11 +818,11 @@ describe('`territorio` — la determinacion guardada, y sus TRES ausencias (#237
       'S/ 12,200.00',
       'S/ 400,000.75',
       'S/ 400,000.75',
-      'S/ 5,350.00',
-      'S/ 32.10',
-      'S/ 2,395.01',
+      'S/ 5,500.00',
+      'S/ 33.00',
+      'S/ 2,350.01',
       'S/ 4.50',
-      'S/ 2,399.51',
+      'S/ 2,354.51',
       '2026 v1',
     ]);
     // Ninguno de los diez dice «no publicado»: la operacion los publica todos.
@@ -824,7 +832,7 @@ describe('`territorio` — la determinacion guardada, y sus TRES ausencias (#237
   });
 
   it('NO suma los tramos para adelantar el insoluto, y la muestra prueba que no cuadraria', () => {
-    // 160,50 + 1 444,50 + 790,0075 = 2 395,0075, y el impuesto es 2 395,01. **Un centimo**, y es
+    // 165,00 + 1 485,00 + 700,0075 = 2 350,0075, y el impuesto es 2 350,01. **Un centimo**, y es
     // el que `AporteDeTramo` avisa por escrito: los aportes corren sin redondear (ADR-0018) y el
     // unico redondeo es el del cierre de la regla. Sumarlos aqui daria una cifra exacta y
     // equivocada al lado de la que manda, que es la que la operacion publica.
@@ -835,7 +843,7 @@ describe('`territorio` — la determinacion guardada, y sus TRES ausencias (#237
     );
 
     expect(sumaDeLosAportes).not.toBe(Number(DETERMINACION_GUARDADA.impuestoInsoluto));
-    expect(reparto.valores.get(coordenada(2, 6))).toBe('S/ 2,395.01');
+    expect(reparto.valores.get(coordenada(2, 6))).toBe('S/ 2,350.01');
   });
 
   it('los TRAMOS salen de `tramos`, y el que no tiene tope dice «Sin tope» en vez de una raya', () => {
@@ -853,15 +861,15 @@ describe('`territorio` — la determinacion guardada, y sus TRES ausencias (#237
     expect(tabla?.filas).toHaveLength(3);
     expect(tabla?.filas[0]?.celdas).toEqual([
       '1',
-      'S/ 80,250.00',
-      '0.2000 %',
-      'S/ 80,250.00',
-      // Sin redondear, y por eso no pasa por `formatearImporte`: reventaria con ocho decimales.
-      'S/ 160.50000000',
+      'S/ 82,500.00',
+      '0.200000 %',
+      'S/ 82,500.00',
+      // Sin redondear, y por eso no pasa por `formatearImporte`: reventaria con veinte decimales.
+      'S/ 165.00000000000000000000',
     ]);
     // El tercero: sin tope, y con el aporte que **ningun** formateador de dos decimales admite.
     expect(tabla?.filas[2]?.celdas[1]).toEqual({ texto: null });
-    expect(tabla?.filas[2]?.celdas[4]).toBe('S/ 790.00750000');
+    expect(tabla?.filas[2]?.celdas[4]).toBe('S/ 700.00750000000000000000');
     // Cinco celdas por fila, que son las cinco columnas que la definicion declara.
     expect(definicion?.columnas).toHaveLength(5);
     // Sin total publicado: la operacion no pagina tramos, los publica enteros.
@@ -888,16 +896,16 @@ describe('`territorio` — la determinacion guardada, y sus TRES ausencias (#237
     expect(reparto.filas.has(3)).toBe(false);
     expect(tabla?.filas).toHaveLength(4);
     expect(tabla?.filas.map((fila) => fila.celdas.slice(0, 3))).toEqual([
-      ['1', '27/02/2026', 'S/ 598.75'],
-      ['2', '29/05/2026', 'S/ 598.75'],
-      ['3', '31/08/2026', 'S/ 598.75'],
+      ['1', '27/02/2026', 'S/ 587.50'],
+      ['2', '29/05/2026', 'S/ 587.50'],
+      ['3', '31/08/2026', 'S/ 587.50'],
       // La ultima lleva el centimo del resto, y no la primera: el artboard dibuja lo contrario.
-      ['4', '30/11/2026', 'S/ 598.76'],
+      ['4', '30/11/2026', 'S/ 587.51'],
     ]);
     // Y la del CONTADO es **una**, con la misma linea de codigo: el articulo 15 a) no es cuatro.
     const alContado = conector.repartir(DETERMINACION_GUARDADA as never).tablas?.get('cronograma');
     expect(alContado?.filas).toHaveLength(1);
-    expect(alContado?.filas[0]?.celdas.slice(0, 3)).toEqual(['1', '27/02/2026', 'S/ 2,395.01']);
+    expect(alContado?.filas[0]?.celdas.slice(0, 3)).toEqual(['1', '27/02/2026', 'S/ 2,350.01']);
     // Nada que decir de una ventana: la operacion no pagina cuotas, las publica enteras.
     expect(tabla?.totalElementos).toBeUndefined();
   });
@@ -924,7 +932,7 @@ describe('`territorio` — la determinacion guardada, y sus TRES ausencias (#237
     // Y la clave de React es la misma que la celda: dos filas con la clave «1» se pisarian.
     expect(filas.map((fila) => fila.clave)).toEqual(['4', '3', '2', '1']);
     // Cada fila conserva ademas SU fecha y SU importe: no se reordena nada aqui.
-    expect(filas[0]?.celdas.slice(1, 3)).toEqual(['30/11/2026', 'S/ 598.76']);
+    expect(filas[0]?.celdas.slice(1, 3)).toEqual(['30/11/2026', 'S/ 587.51']);
   });
 
   it('«SITUACION» no se llena: la celda dice que no hay dato y anuncia por que (#252)', () => {
@@ -959,9 +967,9 @@ describe('`territorio` — la determinacion guardada, y sus TRES ausencias (#237
 
   it('NO se suman las cuotas para componer un total, y la muestra prueba que seria falso', () => {
     // La tentacion concreta de este conector: la operacion publica CADA cuota y no su suma. Y aqui
-    // la suma seria falsa de dos maneras a la vez — las cuotas reparten el **insoluto** (2 395,01)
-    // y no el total a pagar (2 399,51), porque el derecho de emision no se prorratea; y un importe
-    // sacado de dividir el total entre cuatro (599,8775) no es ninguno de los cuatro publicados.
+    // la suma seria falsa de dos maneras a la vez — las cuotas reparten el **insoluto** (2 350,01)
+    // y no el total a pagar (2 354,51), porque el derecho de emision no se prorratea; y un importe
+    // sacado de dividir el total entre cuatro (588,6275) no es ninguno de los cuatro publicados.
     const reparto = conector.repartir(DETERMINACION_TRIMESTRAL as never);
     const tabla = reparto.tablas?.get('cronograma');
     const centimos = DETERMINACION_TRIMESTRAL.cuotas.reduce(
@@ -975,9 +983,9 @@ describe('`territorio` — la determinacion guardada, y sus TRES ausencias (#237
     const dichas = (tabla?.filas ?? []).flatMap((fila) =>
       fila.celdas.filter((celda): celda is string => typeof celda === 'string'),
     );
-    expect(dichas).not.toContain('S/ 2,399.51');
-    expect(dichas).not.toContain('S/ 2,395.01');
-    expect(dichas).not.toContain('S/ 599.88');
+    expect(dichas).not.toContain('S/ 2,354.51');
+    expect(dichas).not.toContain('S/ 2,350.01');
+    expect(dichas).not.toContain('S/ 588.63');
     expect(tabla?.totalElementos).toBeUndefined();
   });
 

@@ -97,10 +97,45 @@ export class ErrorDeLaApi extends Error {
   }
 }
 
+/**
+ * **Una operacion contesto 204 a quien no admite el vacio** (#354).
+ *
+ * Es un `ErrorDeLaApi` —con el estado que llego— y no un error suelto, para que la escalera lo
+ * diga con su peldano de averia y dicte el 204 a soporte: es un defecto de ESTE arbol, no del
+ * usuario, y el remedio es el de una averia. Sin cuerpo de problema a proposito: el `detalle` que
+ * se dibuja es entonces el respaldo traducible de la escalera, y el nombre de la operacion y la
+ * salida —`pedirUnoOVacio`— van en `message`, que es lo que lee quien depura.
+ *
+ * <h2>Por que existe, y por que no basta con el `null` de antes</h2>
+ *
+ * Hasta #354 un 204 salia de aqui como `null as T`: `pedirUno<CorridaDelPredial>` prometia una
+ * corrida y devolvia `null`, y el compilador no lo veia. `panel` se paso a `pedirUnoOVacio` en
+ * #237; `ini-panel`, que pide la MISMA ruta, no, y repartia `corrida.observados` sobre `null` en el
+ * render — la aplicacion entera caia. Con esto el tercer consumidor de una ruta 204 no puede
+ * repetirlo: o la pide con la puerta que admite el vacio, y entonces su tipo dice `T | null`, o
+ * recibe este error por el camino de `isError`, con su frase, en vez de un `TypeError` en el render.
+ */
+export class VacioNoAdmitido extends ErrorDeLaApi {
+  constructor(operacion: string) {
+    super(204, operacion);
+    this.name = 'VacioNoAdmitido';
+    this.message =
+      `${operacion} contesto 204 sin cuerpo, y quien la pidio no admite el vacio: si esa ` +
+      'operacion puede contestar «todavia no hay», se pide con pedirUnoOVacio.';
+  }
+}
+
 export interface OpcionesDeSolicitud {
   readonly metodo?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   readonly cuerpo?: unknown;
   readonly senal?: AbortSignal;
+  /**
+   * **Quien pide admite un 204 sin cuerpo, y lo recibe como `null`** (#237, #354).
+   *
+   * Solo lo pasa `pedirUnoOVacio`, que es la puerta cuyo tipo dice `T | null`. Sin el, un 204 es
+   * `VacioNoAdmitido`: ver su javadoc.
+   */
+  readonly admiteVacio?: boolean;
 }
 
 /**
@@ -124,7 +159,28 @@ async function problemaDe(respuesta: Response): Promise<CuerpoDeProblema> {
  *
  * @param ruta relativa al prefijo del sistema, empezando por `/`
  */
-export async function solicitar<T>(ruta: string, opciones: OpcionesDeSolicitud = {}): Promise<T> {
+/**
+ * Pide una operacion y devuelve su cuerpo. Con `admiteVacio`, el tipo dice ademas `null`: es lo
+ * que devuelve un 204, y solo quien lo declara lo recibe (#354).
+ *
+ * La segunda sobrecarga declara `admiteVacio?: false`, y no es redundante: con el `boolean` de
+ * `OpcionesDeSolicitud`, un `admiteVacio` que llegara como `boolean` —no como el literal `true`—
+ * caeria en ella, que promete `T`, y en ejecucion el `if` de abajo mira el VALOR y devolveria
+ * `null`. Es el `null as T` que #354 quito, entrando por la sobrecarga. Asi un `boolean` no casa con
+ * ninguna y no compila (barrera en `verificaciones/tipos/barreras-de-tipos.tsx`).
+ */
+export async function solicitar<T>(
+  ruta: string,
+  opciones: OpcionesDeSolicitud & { readonly admiteVacio: true },
+): Promise<T | null>;
+export async function solicitar<T>(
+  ruta: string,
+  opciones?: OpcionesDeSolicitud & { readonly admiteVacio?: false },
+): Promise<T>;
+export async function solicitar<T>(
+  ruta: string,
+  opciones: OpcionesDeSolicitud = {},
+): Promise<T | null> {
   const metodo = opciones.metodo ?? 'GET';
   const credencial = token();
 
@@ -161,7 +217,14 @@ export async function solicitar<T>(ruta: string, opciones: OpcionesDeSolicitud =
   // `null` y no `{}`: un objeto vacio se repartiria campo a campo dando `undefined` en cada celda,
   // que es una pantalla llena de huecos sin decir por que. `null` es lo que `useDatosDeLaHoja` ya
   // reconoce como «se pregunto y no hay».
-  if (respuesta.status === 204) return null as T;
+  //
+  // **Y solo a quien lo admite** (#354). Hasta aqui era `null as T` para todos, y ese `as` era la
+  // mentira: `pedirUno<T>` prometia `T` y entregaba `null`, y `ini-panel` repartio sobre el en el
+  // render. Ahora quien no lo declara recibe un error con nombre, que viaja por `isError`.
+  if (respuesta.status === 204) {
+    if (opciones.admiteVacio === true) return null;
+    throw new VacioNoAdmitido(`${metodo} ${ruta}`);
+  }
 
   return (await respuesta.json()) as T;
 }

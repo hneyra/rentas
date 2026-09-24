@@ -14,6 +14,7 @@ import type {
   DefinicionDeTabla as Tabla,
 } from '@kamayuk/ui';
 import type { Operacion } from '../../src/pantallas/tipos.ts';
+import { solicitar } from '../../src/api/cliente.ts';
 
 /**
  * Las barreras que pone el COMPILADOR, y la prueba de que muerden.
@@ -174,3 +175,24 @@ export const operacionConVerboInventado: Operacion = {
   ruta: '/rentas/contribuyentes/{id}',
   nota: 'ContribuyenteController',
 };
+
+/* ── #354: solo quien declara el vacio recibe `null`, y su tipo lo dice ───────────────────── */
+
+/**
+ * `solicitar` tiene dos sobrecargas: con `admiteVacio: true` devuelve `T | null`, y sin el `T`,
+ * porque un 204 lanza `VacioNoAdmitido`. La que promete `T` **no puede aceptar un `boolean`**: con
+ * `admiteVacio: admite` y `admite === true` en ejecucion, el 204 es `null` —el `if` de `solicitar`
+ * mira el valor, no el tipo— y el tipo diria `T`. Es el mismo `null as T` que #354 quito, entrando
+ * por la sobrecarga. Por eso la segunda declara `admiteVacio?: false`: un `boolean` no casa con
+ * ninguna de las dos y no compila, y quien de verdad no sabe si admite el vacio tiene que decidirlo.
+ */
+export async function vacioConUnBooleano(admite: boolean): Promise<string> {
+  // @ts-expect-error — un `boolean` no es el literal `true`: prometeria `string` y podria dar `null`.
+  return solicitar<string>('/rentas/predial/corridas/ultima', { admiteVacio: admite });
+}
+
+/** Y con el literal `true` el tipo dice `null`: no se puede usar como si no pudiera serlo. */
+export async function vacioComoSiNoLoFuera(): Promise<string> {
+  // @ts-expect-error — `string | null` no es `string`: un 204 admitido llega como `null`.
+  return solicitar<string>('/rentas/predial/corridas/ultima', { admiteVacio: true });
+}

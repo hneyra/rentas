@@ -3,7 +3,7 @@ import { coordenada, type Coordenada, type DatoConNombre } from '@kamayuk/ui';
 import { formatearImporte } from '../../dominio/formato.ts';
 import { nombreDelAvance, nombreDelTributo } from '../../piezas/serieDeAvance.ts';
 import type { Conector, Reparto } from '../conectores.ts';
-import { NO_PUBLICADO, type PalabraDeHueco } from '../palabrasDeHueco.ts';
+import { NO_PUBLICADO, SIN_CORRIDA_DEL_EJERCICIO, type PalabraDeHueco } from '../palabrasDeHueco.ts';
 import type {
   CorridaDelPredial,
   FilaDeAvance,
@@ -13,7 +13,7 @@ import type {
   PanelDeAvance,
   TrabajoParado,
 } from '../lecturas.ts';
-import { RUTAS, pedirUno } from '../lecturas.ts';
+import { RUTAS, pedirUno, pedirUnoOVacio } from '../lecturas.ts';
 
 /**
  * **Las tres hojas de Inicio, conectadas** (#167).
@@ -154,17 +154,30 @@ function cuadreDelTributo(fila: FilaDeAvance): readonly string[] {
  * primera opcion: es el ejercicio del que son las cifras que estan debajo, y afirmarlo con la
  * opcion que toco por omision seria afirmarlo sin saberlo. Lo tecleado gana sobre esto, como en
  * cualquier campo.
+ *
+ * <h2>Y la corrida puede no existir todavia, que no es lo mismo que fallar (#354)</h2>
+ *
+ * Sin corrida ni simulacion del ejercicio, `GET /rentas/predial/corridas/ultima` contesta **204**
+ * (#523): es el estado de cualquier municipalidad entre el 1 de enero y su primera corrida, o recien
+ * implantada, y esta es la PRIMERA hoja del arbol. Por eso la corrida se pide con `pedirUnoOVacio`,
+ * como `panel` desde #237, y su tipo dice `CorridaDelPredial | null`: el vacio es de UN campo —el
+ * sexto— y se dice en ese campo con su palabra, mientras las cinco cifras de la recaudacion, que si
+ * llegaron, se dibujan. No se captura ningun FALLO: si la corrida falla, la pantalla sigue diciendo
+ * que fallo, por lo del parrafo de arriba.
+ *
+ * Hasta #354 la pedia `pedirUno`, que con el 204 devolvia un `null` que su tipo no declaraba, y
+ * `corrida.observados` lanzaba en el render: la aplicacion entera caia por un campo de seis.
  */
 const INI_PANEL: Conector = {
   clave: ['ini-panel', 'recaudacion', 'ultima-corrida'],
   pedir: ({ senal }) =>
     Promise.all([
       pedirUno<IndicadorDeRecaudacion>(RUTAS.recaudacion, senal),
-      pedirUno<CorridaDelPredial>(RUTAS.ultimaCorrida, senal),
+      pedirUnoOVacio<CorridaDelPredial>(RUTAS.ultimaCorrida, senal),
     ]),
   repartir: ([recaudacion, corrida]: readonly [
     IndicadorDeRecaudacion,
-    CorridaDelPredial,
+    CorridaDelPredial | null,
   ]): Reparto => {
     const valores = new Map<Coordenada, string>();
     const noPublicados = new Map<Coordenada, PalabraDeHueco>();
@@ -189,7 +202,11 @@ const INI_PANEL: Conector = {
     poner(coordenada(0, 3), kpiLlamado(recaudacion, 'Avance de cobranza')?.value);
     // «Contribuyentes activos»: ver el javadoc de arriba. No lo publica ninguna de las dos.
     poner(coordenada(0, 4), undefined);
-    poner(coordenada(0, 5), String(corrida.observados));
+    // «Observados sin emision» sale de la corrida, y sin corrida del ejercicio no hay resultado
+    // que contar: ni «no publicado» —la operacion SI lo publica— ni un cero, que es lo que da una
+    // corrida limpia.
+    if (corrida === null) noPublicados.set(coordenada(0, 5), SIN_CORRIDA_DEL_EJERCICIO);
+    else poner(coordenada(0, 5), String(corrida.observados));
 
     return { valores, filas: new Map(), noPublicados };
   },
