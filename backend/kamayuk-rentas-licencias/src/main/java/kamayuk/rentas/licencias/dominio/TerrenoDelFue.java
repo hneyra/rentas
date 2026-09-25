@@ -2,6 +2,7 @@ package kamayuk.rentas.licencias.dominio;
 
 import java.time.Instant;
 import java.util.Objects;
+import java.util.regex.Pattern;
 import kamayuk.rentas.dominio.AreaM2;
 import kamayuk.rentas.dominio.Medida;
 import kamayuk.rentas.dominio.Observacion;
@@ -60,6 +61,20 @@ public record TerrenoDelFue(
     /** {@code edificacion_terreno.lote varchar(10)} (V1). Ver {@link #MANZANA_MAXIMA} (#422). */
     public static final int LOTE_MAXIMO = 10;
 
+    /**
+     * {@code edificacion_terreno.cod_catastral}, que desde V29 es el dominio {@code cod_catastral}:
+     * de 18 a 25 digitos, el mismo {@code CHECK} (#408).
+     *
+     * <p>Hasta #408 la columna era {@code varchar(20)} y aqui no se validaba nada: ningun codigo
+     * real cabia —D-10 duda entre 21 y 23 posiciones— y la base lo rechazaba con 22001, que el
+     * borde contestaba 500. Validado aqui, un codigo mal escrito sale 422 con su mensaje.
+     *
+     * <p><b>No</b> se valida con {@link kamayuk.rentas.dominio.CodigoReferenciaCatastral#de}: fija
+     * las 23 posiciones del manual y rechazaria las 21 del prototipo, que es cerrar D-10 por la
+     * puerta de atras. Mientras siga abierta, lo que se exige es lo que la columna admite.
+     */
+    private static final Pattern CODIGO_CATASTRAL_ADMITIDO = Pattern.compile("[0-9]{18,25}");
+
     public TerrenoDelFue {
         Objects.requireNonNull(direccion, "El terreno necesita su direccion");
         Objects.requireNonNull(areaTerreno, "El terreno necesita su area");
@@ -69,6 +84,14 @@ public record TerrenoDelFue(
         direccion = direccion.strip();
         if (direccion.isEmpty()) {
             throw new IllegalArgumentException("La direccion del terreno no puede estar vacia");
+        }
+        if (codigoCatastral != null
+                && !CODIGO_CATASTRAL_ADMITIDO.matcher(codigoCatastral).matches()) {
+            throw new IllegalArgumentException(
+                    "El codigo catastral '"
+                            + codigoCatastral
+                            + "' no es un codigo de referencia catastral: van de 18 a 25 digitos,"
+                            + " sin letras ni separadores");
         }
         if (manzana != null && manzana.length() > MANZANA_MAXIMA) {
             throw new IllegalArgumentException(

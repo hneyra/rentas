@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import kamayuk.rentas.nucleo.aplicacion.DeterminarPredialMasivo;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Lo que hizo una corrida de emision anual, tal como sale por {@code predial_masivo} ({@code POST
@@ -24,6 +25,9 @@ import kamayuk.rentas.nucleo.aplicacion.DeterminarPredialMasivo;
  * @param fechaCalculo el dia al que corresponde la corrida (regla 9)
  * @param etapas el resumen por etapa, en el orden en que ocurrieron
  * @param observados los contribuyentes que quedan fuera de la emision, con su motivo
+ * @param aviso nulo si la corrida dejo su rastro; si no lo pudo escribir, por que (#408). La
+ *     corrida se hizo igual —sus determinaciones ya estan confirmadas— y contestarla con 500
+ *     invitaba a repetirla; esta respuesta es entonces la unica copia de sus observados
  */
 public record CorridaPredialResource(
         String ejercicio,
@@ -32,7 +36,8 @@ public record CorridaPredialResource(
         String conjunto,
         String fechaCalculo,
         List<Etapa> etapas,
-        List<ObservadoResource> observados) {
+        List<ObservadoResource> observados,
+        @Nullable String aviso) {
 
     private static final String ESTADO_OK = "OK";
     private static final String ESTADO_CON_OBSERVACIONES = "CON OBSERVACIONES";
@@ -75,7 +80,8 @@ public record CorridaPredialResource(
                 corrida.nombreDelConjunto(),
                 corrida.fechaCalculo().toString(),
                 etapas,
-                observados);
+                observados,
+                corrida.aviso());
     }
 
     /**

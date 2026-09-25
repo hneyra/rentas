@@ -55,6 +55,17 @@ public record CorridaDeEmision(
         LocalDate fechaCalculo,
         List<Observado> observados) {
 
+    /**
+     * {@code corrida_predial.sector varchar(20)} desde V29 (#408).
+     *
+     * <p>Es el ancho de {@code predio_ref.sector_codigo} (V4), con el que el alcance se compara: un
+     * sector mas largo no puede elegir a ningun predio. Hasta #408 la columna era {@code
+     * varchar(10)} y nada lo topaba antes de la base; el rastro reventaba con 22001 al final, con
+     * la emision ya hecha. {@code DeterminarPredialMasivo.Peticion} topa con esta misma cifra,
+     * antes de determinar a nadie.
+     */
+    public static final int SECTOR_MAXIMO = 20;
+
     public CorridaDeEmision {
         Objects.requireNonNull(ejercicio, "La corrida necesita su ejercicio");
         Objects.requireNonNull(alcance, "La corrida necesita su alcance");
@@ -64,6 +75,10 @@ public record CorridaDeEmision(
         Objects.requireNonNull(
                 fechaCalculo, "Toda cifra dice a que fecha esta calculada (regla 9)");
         observados = List.copyOf(Objects.requireNonNull(observados, "La lista es vacia, no nula"));
+        if (sector != null && sector.length() > SECTOR_MAXIMO) {
+            throw new IllegalArgumentException(
+                    "El sector '" + sector + "' excede los " + SECTOR_MAXIMO + " caracteres");
+        }
         /* **El sello viaja entero o no viaja** (#312, V23). La cifra sin su conjunto
         vuelve a ser un numero sin fuente —que es lo que esta columna existe para
         dejar de ser— y el conjunto sin su cifra deja el campo del panel vacio
@@ -95,10 +110,29 @@ public record CorridaDeEmision(
      */
     public record Observado(String codContribuyente, String nombre, String motivo) {
 
+        /**
+         * {@code corrida_predial_observado.nombre varchar(240)} desde V29 (#408).
+         *
+         * <p>El nombre se copia <b>entero</b> de {@code contribuyente.nombre_razon_social}, que
+         * admite 240 —una «SUCESION INDIVISA …» con sus herederos los usa—. Hasta #408 la columna
+         * era {@code varchar(200)}: el rastro reventaba con 22001 y la lista de observados se
+         * perdia. Recortarlo aqui se descarto: un nombre truncado es otro contribuyente en el
+         * informe.
+         */
+        public static final int NOMBRE_MAXIMO = 240;
+
         public Observado {
             Objects.requireNonNull(codContribuyente, "El observado necesita su codigo");
             Objects.requireNonNull(nombre, "El observado necesita su nombre, aunque sea vacio");
             Objects.requireNonNull(motivo, "Un observado sin motivo no se puede arreglar");
+            if (nombre.length() > NOMBRE_MAXIMO) {
+                throw new IllegalArgumentException(
+                        "El nombre del observado "
+                                + codContribuyente
+                                + " excede los "
+                                + NOMBRE_MAXIMO
+                                + " caracteres");
+            }
         }
     }
 }

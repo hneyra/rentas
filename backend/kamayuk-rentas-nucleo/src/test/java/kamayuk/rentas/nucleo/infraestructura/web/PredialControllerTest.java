@@ -113,6 +113,14 @@ class PredialControllerTest {
      */
     private ValuacionRecibida valuacion = new ValuacionCerradaYCompleta();
 
+    /**
+     * Donde escribe su rastro la corrida (#523). Por omision, en memoria; #408 lo cambia por uno
+     * que falla para medir que la emision no se contesta como fallida por perder su resumen. Va
+     * antes de {@code mvc} por lo mismo que {@link #valuacion}.
+     */
+    private kamayuk.rentas.nucleo.dominio.CorridaDeEmisionRepository corridas =
+            new CorridasEnMemoria();
+
     private MockMvc mvc = montar(cuadroCompleto());
 
     @BeforeEach
@@ -377,6 +385,78 @@ class PredialControllerTest {
                 .as("nulo dice «esta corrida no lo guardo»; cero diria «no se cobro»")
                 .contains("\"derechoDeEmision\":null")
                 .contains("\"conjuntoId\":null");
+    }
+
+    /**
+     * <b>Si el rastro no se escribe, lo que se pierde es el rastro y no la emision</b> (#408).
+     *
+     * <p>El rastro se escribe al final, con cada determinacion ya confirmada en su transaccion.
+     * Hasta #408 un fallo al escribirlo —un nombre de observado mas ancho que su columna, 22001—
+     * subia hasta el borde y la corrida contestaba 500: una emision HECHA se contestaba como
+     * fallida, lo que invita a repetirla y crea otra determinacion por contribuyente (ADR-0007), y
+     * la lista de observados se perdia con la respuesta. Ahora contesta 201 con el resumen, los
+     * observados y un aviso, y sin identificador de rastro.
+     */
+    @Test
+    @DisplayName(
+            "#408 — si el rastro no se escribe, la corrida contesta su resumen con un aviso y no"
+                    + " 500")
+    void siElRastroNoSeEscribeLaCorridaContestaConUnAviso() throws Exception {
+        sembrarDosContribuyentes();
+        corridas = new CorridasQueNoSeEscriben();
+        mvc = montar(cuadroCompleto());
+
+        MvcResult resultado =
+                mvc.perform(
+                                post("/rentas/api/v1/rentas/predial/calculo-masivo")
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(
+                                                "{\"modalidad\":\"TRIMESTRAL\",\"simulacion\":true,"
+                                                        + "\"ejercicio\":\"2026\"}"))
+                        .andReturn();
+
+        assertThat(resultado.getResponse().getStatus())
+                .as("la emision se hizo: contestarla como fallida invita a repetirla")
+                .isEqualTo(201);
+        String cuerpo = resultado.getResponse().getContentAsString();
+        assertThat(cuerpo)
+                .as("el observado viaja en la respuesta aunque su rastro no se haya escrito")
+                .contains("SUC. RUFINA MEDINA MEDINA")
+                .contains("\"aviso\":\"");
+        assertThat(cuerpo).contains("no se pudo guardar");
+    }
+
+    /**
+     * <b>Un sector mas ancho que su columna se rechaza antes de determinar a nadie</b> (#408).
+     *
+     * <p>El sector se compara con {@code predio_ref.sector_codigo varchar(20)} y se guarda en
+     * {@code corrida_predial.sector}. Hasta #408 la peticion solo lo recortaba: uno mas largo
+     * llegaba al rastro, al final, con la emision ya hecha.
+     */
+    @Test
+    @DisplayName("#408 — un sector de 21 caracteres sale 422 y no determina a nadie")
+    void unSectorMasAnchoQueSuColumnaSale422() throws Exception {
+        sembrarDosContribuyentes();
+
+        MvcResult resultado =
+                mvc.perform(
+                                post("/rentas/api/v1/rentas/predial/calculo-masivo")
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(
+                                                "{\"modalidad\":\"TRIMESTRAL\",\"simulacion\":false,"
+                                                        + "\"ejercicio\":\"2026\",\"alcance\":\"SECTOR\","
+                                                        + "\"sector\":\"SECTOR-URB-0000-04081\","
+                                                        + "\"observacion\":\"Emision del sector\"}"))
+                        .andReturn();
+
+        assertThat(resultado.getResponse().getStatus()).isEqualTo(422);
+        assertThat(resultado.getResponse().getContentAsString()).contains("20");
+        assertThat(determinaciones.insertadas)
+                .as("rechazado antes del bucle: nadie determinado")
+                .isZero();
+        assertThat(((CorridasEnMemoria) corridas).guardadas)
+                .as("ni rastro de una corrida que no se corrio")
+                .isEmpty();
     }
 
     /**
@@ -1823,7 +1903,7 @@ class PredialControllerTest {
         /* El rastro de la corrida (#523) va contra un repositorio en memoria: lo que
         esta prueba mira es el transporte, y que la corrida se escriba de verdad lo
         mide `CorridaDeEmisionJdbcTest` contra PostgreSQL. */
-        RegistrarCorridaDeEmision rastro = new RegistrarCorridaDeEmision(new CorridasEnMemoria());
+        RegistrarCorridaDeEmision rastro = new RegistrarCorridaDeEmision(corridas);
         DeterminarPredialMasivo masivo =
                 new DeterminarPredialMasivo(
                         padron,
@@ -2431,6 +2511,40 @@ class PredialControllerTest {
                             .map(kamayuk.rentas.nucleo.dominio.CorridaDeEmision::observados)
                             .orElse(java.util.List.of());
             return new kamayuk.rentas.compartido.Pagina<>(filas, 0, 20, filas.size());
+        }
+    }
+
+    /**
+     * Un rastro que no se deja escribir (#408): el 22001 de un nombre de observado mas ancho que su
+     * columna, tal como Spring lo traduce. Lo demas no se usa: la corrida solo escribe.
+     */
+    private static final class CorridasQueNoSeEscriben
+            implements kamayuk.rentas.nucleo.dominio.CorridaDeEmisionRepository {
+
+        @Override
+        public kamayuk.rentas.nucleo.dominio.CorridaDeEmision guardar(
+                kamayuk.rentas.nucleo.dominio.CorridaDeEmision corrida,
+                kamayuk.rentas.dominio.Observacion observacion) {
+            throw new org.springframework.dao.DataIntegrityViolationException(
+                    "ERROR: value too long for type character varying(200)");
+        }
+
+        @Override
+        public java.util.Optional<kamayuk.rentas.nucleo.dominio.CorridaDeEmision> ultimaDe(
+                kamayuk.rentas.dominio.Ejercicio ejercicio) {
+            return java.util.Optional.empty();
+        }
+
+        @Override
+        public java.util.List<kamayuk.rentas.nucleo.dominio.CorridaDeEmision> ultimas(int cuantas) {
+            return java.util.List.of();
+        }
+
+        @Override
+        public kamayuk.rentas.compartido.Pagina<
+                        kamayuk.rentas.nucleo.dominio.CorridaDeEmision.Observado>
+                observadosDe(long corridaId, kamayuk.rentas.compartido.Paginacion paginacion) {
+            return new kamayuk.rentas.compartido.Pagina<>(java.util.List.of(), 0, 20, 0);
         }
     }
 
