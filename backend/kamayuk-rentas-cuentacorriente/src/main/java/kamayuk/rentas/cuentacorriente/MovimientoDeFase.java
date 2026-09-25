@@ -90,6 +90,13 @@ public interface MovimientoDeFase {
      *
      * <p>El par va, como el de {@link #moverAValor}, en la fila anual (periodo nulo).
      *
+     * <p><b>A diferencia de {@link #moverAValor}, no cristaliza el devengo antes del par</b>
+     * (#365): cuanto entra en coactiva lo decide el libro, y cristalizar antes lo cambiaria, que es
+     * una decision de cobranza todavia sin tomar. Con una mora que devengue, el par adelanta el
+     * ultimo movimiento y el interes devengado desde la OP se pierde en cada paso a coactiva; hoy
+     * no se ve porque la unica politica de mora no devenga, y el encendido de la mora (D-02) exige
+     * resolverlo antes.
+     *
      * @param contribuyenteId a quien se le cobra
      * @param obligacion que obligacion entra en coactiva
      * @param referenciaExterna como entra el valor que origina el movimiento, sin clave foranea

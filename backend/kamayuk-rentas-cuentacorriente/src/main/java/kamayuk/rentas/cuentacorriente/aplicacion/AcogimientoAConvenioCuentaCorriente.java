@@ -225,8 +225,8 @@ public class AcogimientoAConvenioCuentaCorriente implements AcogimientoAConvenio
             // 1. El devengo que todavia no estaba en el libro, cristalizado en la fase
             //    de la que se sale. Sin esto, el asiento del par mueve el «ultimo
             //    movimiento» hacia adelante y el interes acumulado hasta hoy se pierde. La
-            //    cuenta es la de CristalizacionDelDevengo, la misma de todo camino que escribe
-            //    en el libro (#365).
+            //    cuenta es la de CristalizacionDelDevengo, la misma de los seis caminos que
+            //    #365 recorre (no todavia la de todo escritor: ver su javadoc).
             for (CristalizacionDelDevengo.Devengo devengo :
                     cristalizacion.sinAsentar(delLibro, fecha, redondeo)) {
                 asentar(

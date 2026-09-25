@@ -47,15 +47,17 @@ import org.springframework.transaction.annotation.Transactional;
  * siguiente.
  *
  * <p>Por eso {@link #moverAValor} carga primero lo devengado y no asentado en <b>cada cuota</b> de
- * la obligacion —{@link CristalizacionDelDevengo}, la cuenta de todo camino que escribe en el
- * libro—, y despues escribe el par. En cada cuota y no solo en la del par, como el convenio, porque
- * es la obligacion entera la que cambia de fase. El cargo cae en la fase ordinaria, donde esta la
- * deuda, y el par saca de ahi el monto que la OP congelo, que ya lo incluye.
+ * la obligacion —{@link CristalizacionDelDevengo}, la cuenta de los seis caminos que #365 recorre—,
+ * y despues escribe el par. En cada cuota y no solo en la del par, como el convenio, porque es la
+ * obligacion entera la que cambia de fase. El cargo cae en la fase ordinaria, donde esta la deuda,
+ * y el par saca de ahi el monto que la OP congelo, que ya lo incluye.
  *
  * <p><b>El paso a coactiva no lo hace todavia</b>, y no por olvido: alli el monto lo decide el
  * libro —el neto en VALOR, acotado por lo que se debe—, y cristalizar antes cambiaria cuanto entra
  * en coactiva. Que el interes devengado despues de la OP se mueva con ella o se quede en VALOR es
- * una decision de cobranza que #365 no toma; queda dicho en su PR.
+ * una decision de cobranza que #365 no toma; queda dicho en su PR. <b>Mientras no se tome, el par
+ * VALOR→COACTIVA adelanta el ancla y ese interes se pierde en cada paso a coactiva</b>: el
+ * encendido de la mora (D-02) exige resolverlo antes.
  */
 @Service
 public class MovimientoDeFaseCuentaCorriente implements MovimientoDeFase {

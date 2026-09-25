@@ -254,10 +254,11 @@ public final class CalculoDeDeuda {
      * deuda negativa.
      *
      * <p>La diferencia entre las dos funciones es exactamente lo que hay que cristalizar, y desde
-     * #365 la calcula {@link CristalizacionDelDevengo} para todo camino que escribe. Que sean dos
-     * metodos de la misma clase pura, sobre los mismos asientos, es lo que garantiza que se netee
-     * igual en los dos: calcular una en el dominio y la otra en un {@code SUM} de SQL seria volver
-     * a tener dos definiciones de lo mismo.
+     * #365 la calcula {@link CristalizacionDelDevengo} para los seis caminos que ese issue recorre
+     * —no todavia para todo escritor: ver su javadoc—. Que sean dos metodos de la misma clase pura,
+     * sobre los mismos asientos, es lo que garantiza que se netee igual en los dos: calcular una en
+     * el dominio y la otra en un {@code SUM} de SQL seria volver a tener dos definiciones de lo
+     * mismo.
      *
      * @param asientos los de <b>una</b> obligacion
      * @param fecha la fecha de corte; ningun asiento posterior entra

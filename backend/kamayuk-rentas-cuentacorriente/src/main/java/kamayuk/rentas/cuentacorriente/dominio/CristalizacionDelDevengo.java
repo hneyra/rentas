@@ -24,8 +24,16 @@ import kamayuk.rentas.dominio.PoliticaDeRedondeo;
  * olvidada en la extincion, la baja manual, el pase a valor y la reversion. Hoy no se nota porque
  * la unica {@link PoliticaDeMora} de {@code src/main} no devenga nada; el dia que D-02 fije la TIM,
  * esos cuatro caminos habrian dado saldos negativos, condonaciones sin acto y una OP que no
- * coincide con el libro, sin ningun error de por medio. Por eso vive aqui, una vez, y todos la
- * llaman.
+ * coincide con el libro, sin ningun error de por medio. Por eso vive aqui, una vez, y la llaman
+ * esos seis.
+ *
+ * <p><b>No la llaman todavia todos los escritores del libro</b>, y el encendido de la mora exige
+ * resolver antes los dos que faltan: {@code MovimientoDeFaseCuentaCorriente.moverACoactiva}, cuyo
+ * par {@code AJUSTE} se lleva el interes devengado despues de la OP en cada paso a coactiva (cuanto
+ * entra en coactiva es una decision de cobranza que #365 no toma), y {@code
+ * GeneradorDeCargosCuentaCorriente}, cuyo cargo sobre una obligacion que ya devenga adelanta el
+ * ancla igual. Mientras falten, que la mora no devengue es lo unico que hace correctos sus
+ * importes.
  *
  * <h2>La cuenta</h2>
  *
