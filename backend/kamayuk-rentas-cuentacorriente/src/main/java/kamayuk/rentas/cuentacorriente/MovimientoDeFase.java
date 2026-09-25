@@ -34,6 +34,10 @@ public interface MovimientoDeFase {
      * lo cuenta. El monto es el que quien llama ya congelo —no se relee la deuda aqui—, porque este
      * contexto no sabe congelar nada, solo asentar lo que le piden (regla 2).
      *
+     * <p>Antes del par carga, en cada cuota de la obligacion, el reajuste y el interes devengados
+     * que el libro todavia no tenia (#365): el par adelanta el ultimo movimiento, y sin ese cargo
+     * el libro perderia al dia siguiente el interes que la OP acaba de congelar.
+     *
      * @param ejercicio el ejercicio de la obligacion que se mueve
      * @param contribuyenteId a quien se le cobra
      * @param tributo el tributo de la obligacion, tal como lo nombra quien pide el movimiento
@@ -85,6 +89,13 @@ public interface MovimientoDeFase {
      * </ul>
      *
      * <p>El par va, como el de {@link #moverAValor}, en la fila anual (periodo nulo).
+     *
+     * <p><b>A diferencia de {@link #moverAValor}, no cristaliza el devengo antes del par</b>
+     * (#365): cuanto entra en coactiva lo decide el libro, y cristalizar antes lo cambiaria, que es
+     * una decision de cobranza todavia sin tomar. Con una mora que devengue, el par adelanta el
+     * ultimo movimiento y el interes devengado desde la OP se pierde en cada paso a coactiva; hoy
+     * no se ve porque la unica politica de mora no devenga, y el encendido de la mora (D-02) exige
+     * resolverlo antes.
      *
      * @param contribuyenteId a quien se le cobra
      * @param obligacion que obligacion entra en coactiva

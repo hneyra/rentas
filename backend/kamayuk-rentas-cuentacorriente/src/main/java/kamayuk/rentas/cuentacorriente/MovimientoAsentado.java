@@ -16,6 +16,11 @@ import kamayuk.rentas.dominio.Dinero;
  * cuota —antes de mover se cristaliza el devengo que todavia no estaba asentado, y eso agrega las
  * suyas—, asi que deducirlas de la lista seria deducir mal.
  *
+ * <p>Lo mismo vale cuando lo devuelve {@link ExtincionDeDeuda}, y hasta #365 no era cierto: la
+ * extincion abonaba el devengo sin cargarlo antes, y sus filas eran solo los abonos. Desde #365 las
+ * dos cristalizan con {@code CristalizacionDelDevengo}, y {@link #asientos} cuenta tambien esos
+ * cargos.
+ *
  * @param movidas una fila por cuota que tenia deuda, en el orden en que se movieron
  * @param asientos cuantas filas se escribieron en el libro; nunca las que se borraron, porque no se
  *     borra ninguna

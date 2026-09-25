@@ -15,6 +15,7 @@ import kamayuk.rentas.cuentacorriente.dominio.CalculoDeDeuda;
 import kamayuk.rentas.cuentacorriente.dominio.ClaveDeObligacion;
 import kamayuk.rentas.cuentacorriente.dominio.ClaveDeSaldo;
 import kamayuk.rentas.cuentacorriente.dominio.Concepto;
+import kamayuk.rentas.cuentacorriente.dominio.CristalizacionDelDevengo;
 import kamayuk.rentas.cuentacorriente.dominio.DeudaActualizada;
 import kamayuk.rentas.cuentacorriente.dominio.Fase;
 import kamayuk.rentas.cuentacorriente.dominio.SaldoProyectado;
@@ -95,6 +96,18 @@ import org.springframework.transaction.annotation.Transactional;
  * kamayuk.rentas.cuentacorriente.dominio.CargosDeUnSoloOrigen} mira la referencia de cada cargo de
  * origen, y si alguno es de otro no se asienta nada. Despues del candado y no antes: un cargo de
  * otra papeleta que entrara entre la comprobacion y la baja se extinguiria igual.
+ *
+ * <h2>Antes de abonar el devengo, cargarlo (#365)</h2>
+ *
+ * <p>Lo que se extingue es lo que se debe a la fecha, y eso incluye el reajuste y el interes que
+ * {@link CalculoDeDeuda#deudaActualizadaA} proyecta y el libro todavia no tiene. Abonarlos sin
+ * haberlos cargado dejaba {@code netear(INTERES)} en negativo para siempre: la multa sin efecto
+ * quedaba con un saldo a favor que no existe. Por eso, por cada cuota, primero se asienta el cargo
+ * de lo devengado —{@link CristalizacionDelDevengo}, la misma cuenta que la cobranza y el convenio—
+ * y despues los abonos. El cargo lleva el documento de la resolucion, que es el papel que explica
+ * las dos filas, pero <b>no</b> el acto {@code BAJA_DEUDA} ni la causal: no extingue nada, es la
+ * misma fila que la cobranza escribe al cristalizar, y estamparlo lo haria salir en la relacion de
+ * altas y bajas (RF-045) como una baja que no es.
  */
 @Service
 public class ExtincionDeDeudaCuentaCorriente implements ExtincionDeDeuda {
@@ -107,6 +120,7 @@ public class ExtincionDeDeudaCuentaCorriente implements ExtincionDeDeuda {
     private final SaldoRepository saldos;
     private final RegistrarAsiento registrar;
     private final CalculoDeDeuda calculo;
+    private final CristalizacionDelDevengo cristalizacion;
     private final PoliticaDeRedondeo redondeo;
 
     public ExtincionDeDeudaCuentaCorriente(
@@ -119,6 +133,7 @@ public class ExtincionDeDeudaCuentaCorriente implements ExtincionDeDeuda {
         this.saldos = saldos;
         this.registrar = registrar;
         this.calculo = calculo;
+        this.cristalizacion = new CristalizacionDelDevengo(calculo);
         this.redondeo = redondeo;
     }
 
@@ -165,6 +180,28 @@ public class ExtincionDeDeudaCuentaCorriente implements ExtincionDeDeuda {
             DeudaActualizada pendiente = calculo.extinguibleDesde(delLibro, fecha, redondeo);
             if (!pendiente.total().esPositivo()) {
                 continue;
+            }
+            // El cargo de lo devengado antes de abonarlo (#365): sin el, el abono del interes
+            // deja la cuota con un interes negativo que ningun acto explica.
+            for (CristalizacionDelDevengo.Devengo devengo :
+                    cristalizacion.sinAsentar(delLibro, fecha, redondeo)) {
+                registrar.asentar(
+                        Asiento.nuevo(
+                                fila.clave().ejercicio(),
+                                fila.clave().contribuyenteId(),
+                                fila.clave().tributo(),
+                                devengo.parte(),
+                                TipoAsiento.CARGO,
+                                fila.fase(),
+                                fila.clave().periodo() == 0 ? null : fila.clave().periodo(),
+                                fila.clave().predioId(),
+                                fila.clave().vehiculoId(),
+                                null,
+                                devengo.monto(),
+                                fecha,
+                                documentoOrigen),
+                        observacion);
+                escritos++;
             }
             for (Concepto parte : PARTES) {
                 Dinero importe = parteDe(pendiente, parte);

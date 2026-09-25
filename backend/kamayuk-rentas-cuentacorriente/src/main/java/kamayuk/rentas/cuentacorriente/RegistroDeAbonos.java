@@ -105,6 +105,11 @@ public interface RegistroDeAbonos {
      * abonos vuelve a dar lo que daba: es la consecuencia de que el libro sea la unica verdad
      * (ADR-0006).
      *
+     * <p>Y la deuda que vuelve a mostrar incluye el interes del tiempo en que el cobro parecia
+     * valido (#365): antes de reversar se cristaliza el devengo que el libro tendria a {@code
+     * fecha} si ese documento no se hubiera asentado nunca. Sin eso, los reversos —que llevan la
+     * fecha de la anulacion— adelantaban el ultimo movimiento y ese interes se perdia.
+     *
      * @param documentoOrigen el documento cuyos asientos se deshacen; en tesoreria, {@code "RECIBO
      *     001-0000123"}
      * @param documentoDeLaReversion el documento que sustenta los asientos nuevos. <b>Tiene que ser
