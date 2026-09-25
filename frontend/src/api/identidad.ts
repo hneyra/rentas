@@ -136,7 +136,13 @@ export function vieneDeSalir(): boolean {
   return sessionStorage.getItem(SALIDA) === '1';
 }
 
-/** Vuelve a permitir la ida a la puerta. Es el «Volver a identificarse» de la pantalla parada. */
+/**
+ * Vuelve a permitir la ida a la puerta. Es el «Volver a identificarse» de la pantalla parada.
+ *
+ * **Su consumidor es `useCatalogoPermitido`** (#355), que lo pone en el remedio del 401 **antes** de
+ * `entrar()`. Entre #90 —que se llevo `Puerta.tsx` y su boton— y #355 no tuvo ninguno, y con eso
+ * la marca de salida y el tope de idas frenaban para siempre: nadie los levantaba.
+ */
 export function olvidarLaParada(): void {
   sessionStorage.removeItem(IDAS);
   sessionStorage.removeItem(SALIDA);
@@ -263,6 +269,9 @@ export type Vuelta =
   | { readonly estado: 'sin-vuelta' }
   | { readonly estado: 'canjeado' }
   | { readonly estado: 'fallo'; readonly motivo: string; readonly detalle: string };
+
+/** La vuelta que no se pudo canjear: la unica que tiene algo que contar (#355). */
+export type VueltaFallida = Extract<Vuelta, { readonly estado: 'fallo' }>;
 
 /**
  * Si venimos de Keycloak, canjea el codigo por un token.

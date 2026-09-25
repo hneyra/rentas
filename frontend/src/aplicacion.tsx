@@ -13,9 +13,9 @@ import type { ClaveDeHoja } from './pantallas/arbol.ts';
 import { pantallaDe } from './pantallas/definiciones/index.ts';
 import { alNoPoderDibujarla, useDatosDeLaHoja } from './datos/useDatosDeLaHoja.ts';
 import { FronteraDeLaHoja } from './pantallas/FronteraDeLaHoja.tsx';
-import type { FallaDeLaPuerta } from './api/identidad.ts';
+import type { FallaDeLaPuerta, VueltaFallida } from './api/identidad.ts';
 import { abrirLaCuenta, salir } from './api/identidad.ts';
-import { fallaDeLaPuerta } from './arranque.ts';
+import { fallaDeLaPuerta, vueltaFallida } from './arranque.ts';
 import { useTextosDelMarco } from './i18n/textosDelMarco.ts';
 
 /**
@@ -218,7 +218,7 @@ function HojaConFrontera({ clave }: { readonly clave: ClaveDeHoja }) {
  * reventaba con «No QueryClient set, use QueryClientProvider to set one» — en las cuarenta pruebas
  * del recorrido a la vez.
  */
-function ArmazonDelSistema() {
+function ArmazonDelSistema({ vuelta }: { readonly vuelta: VueltaFallida | null }) {
   const { t } = useTranslation();
   // Las treinta y dos palabras que el marco dice por su cuenta, en el idioma de la sesion (#133).
   // Sin esto el armazon usa las suyas por omision y la pantalla sale a medias: el cuerpo
@@ -260,6 +260,18 @@ function ArmazonDelSistema() {
    */
   if (sesion.estado === 'sin-privilegio') {
     return <FaltanOpcionesParaLeerElCatalogo sesion={sesion} />;
+  }
+
+  // El 401 con su remedio (#355). Antes de la rama generica de abajo, que era donde caia: un
+  // parrafo suelto sin nada que pulsar, y la pestana sin forma de volver a entrar.
+  if (sesion.volverAEntrar !== null) {
+    return (
+      <HayQueVolverAIdentificarse
+        porQue={sesion.porQue}
+        volverAEntrar={sesion.volverAEntrar}
+        vuelta={vuelta}
+      />
+    );
   }
 
   if (sesion.estado !== 'compuesto') {
@@ -386,6 +398,89 @@ function FaltanOpcionesParaLeerElCatalogo({ sesion }: { readonly sesion: Catalog
 }
 
 /**
+ * **La sesion no vale, y se ofrece volver a identificarse** (#355).
+ *
+ * <h2>De que defecto viene</h2>
+ *
+ * Tras «Cerrar sesion» la marca de salida impide que el arranque vuelva a entrar solo —y es
+ * correcto—, asi que se monta, las tres lecturas del catalogo contestan 401 y hasta #355 lo que se
+ * dibujaba era un parrafo que decia «Vuelva a entrar.» **sin nada que pulsar**. F5 repetia lo mismo,
+ * porque la marca vive lo que la pestana: cada cambio de turno dejaba la pestana inservible. El
+ * boton que la levantaba se fue con `Puerta.tsx` en #90; vuelve aqui, con el remedio decidido en
+ * `useCatalogoPermitido` y no en este archivo.
+ *
+ * <h2>Si lo que freno fue un canje fallido, se dice el motivo del emisor</h2>
+ *
+ * Con el tope de idas agotado el 401 es consecuencia, no causa: lo que paso es que el emisor
+ * rechazo la vuelta —un `redirect_uri` mal declarado, un codigo ya usado, «La vuelta no cuadra con
+ * la ida»—. Su `motivo` y su `detalle` **sustituyen** a la frase generica: con las dos, la que se
+ * lee primero es la que no dice nada de lo que paso. Es el unico diagnostico de una configuracion
+ * equivocada, y hasta #355 se tiraba en el arranque.
+ *
+ * <h2>Y si al pulsar el emisor no contesta, se explica como desde #112</h2>
+ *
+ * `entrar()` pregunta primero si el emisor esta; si no, devuelve la falla y no navega. Un boton
+ * que en ese caso no hiciera nada seria el `al: () => {}` de #115 con otra forma, asi que la falla
+ * se ensena con la misma pantalla que ensena el arranque.
+ */
+function HayQueVolverAIdentificarse({
+  porQue,
+  volverAEntrar,
+  vuelta,
+}: {
+  readonly porQue: string;
+  readonly volverAEntrar: () => Promise<FallaDeLaPuerta | null>;
+  readonly vuelta: VueltaFallida | null;
+}) {
+  const { t } = useTranslation();
+  const [falla, setFalla] = useState<FallaDeLaPuerta | null>(null);
+  // La sonda puede tardar hasta ocho segundos: mientras, el boton no se ofrece otra vez.
+  const [yendo, setYendo] = useState(false);
+
+  if (falla !== null) return <LaPuertaNoContesto falla={falla} />;
+
+  return (
+    <div className="grid min-h-screen place-items-center p-[30px] bg-fondo">
+      <div data-slot="hay-que-volver-a-identificarse" className="max-w-[64ch]">
+        {vuelta === null ? (
+          <Alerta tono="info">
+            <p className="m-0">{porQue}</p>
+          </Alerta>
+        ) : (
+          <Alerta
+            tono="atencion"
+            titulo={t('El emisor de identidad no dejo terminar la entrada: {{motivo}}.', {
+              motivo: vuelta.motivo,
+            })}
+          >
+            <p className="m-0 break-words">
+              {t('Lo que contesto: {{detalle}}', { detalle: vuelta.detalle })}
+            </p>
+          </Alerta>
+        )}
+        <Boton
+          variante="primario"
+          className="mt-[14px]"
+          disabled={yendo}
+          onClick={() => {
+            setYendo(true);
+            void volverAEntrar().then((otra) => {
+              // `null` es que el navegador se va: no hay nada que volver a dibujar.
+              if (otra !== null) {
+                setFalla(otra);
+                setYendo(false);
+              }
+            });
+          }}
+        >
+          {t('Volver a identificarse')}
+        </Boton>
+      </div>
+    </div>
+  );
+}
+
+/**
  * **Cuando no se pudo ni llegar al emisor de identidad** (#112).
  *
  * <h2>Por que esto se dibuja ANTES que nada, y no como un estado mas del catalogo</h2>
@@ -443,6 +538,8 @@ export function Aplicacion() {
   // Se lee aqui y no en `main.tsx` porque el montaje no lleva argumentos a proposito: ver
   // `arranque.ts`. Al llegar aqui la pasada de arranque ya termino, asi que el valor esta fijo.
   const falla = fallaDeLaPuerta();
+  // Y por lo mismo la vuelta fallida del emisor (#355): la dice la rama del 401, si se llega a ella.
+  const vuelta = vueltaFallida();
 
   return (
     <ProveedorDeTema configuracion={TEMA}>
@@ -450,7 +547,7 @@ export function Aplicacion() {
         <LaPuertaNoContesto falla={falla} />
       ) : (
         <QueryClientProvider client={CONSULTAS}>
-          <ArmazonDelSistema />
+          <ArmazonDelSistema vuelta={vuelta} />
         </QueryClientProvider>
       )}
     </ProveedorDeTema>

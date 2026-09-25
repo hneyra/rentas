@@ -3,7 +3,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { arrancar, fallaDeLaPuerta } from './arranque.ts';
+import { arrancar, fallaDeLaPuerta, vueltaFallida } from './arranque.ts';
 import { fijarToken, token, vieneDeSalir } from './api/identidad.ts';
 import { CONSULTAS } from './aplicacion.tsx';
 import { LLAVES } from './datos/useCatalogoPermitido.ts';
@@ -181,6 +181,42 @@ describe('la puerta de identidad, en el arranque', () => {
 
     expect(asignar).not.toHaveBeenCalled();
     expect(monto).toBe(true);
+  });
+});
+
+/**
+ * **La vuelta fallida del emisor se guarda, y no se arrastra** (#355).
+ *
+ * `canjearSiVuelve` devuelve por que no se pudo canjear, y hasta #355 el arranque lo tiraba: con el
+ * tope agotado, la aplicacion montaba diciendo un 401 sin causa. Lo que se ve con ella lo mide
+ * `volverAIdentificarse.test.tsx`; aqui, que se guarde solo la que FALLO y solo en su pasada.
+ */
+describe('#355 — la vuelta fallida del emisor llega a la aplicacion', () => {
+  it('un ?error= del emisor con el tope agotado: monta, y la vuelta dice su motivo y su detalle', async () => {
+    fijarToken(null);
+    sessionStorage.setItem('kamayuk.pkce.idas', '3');
+    ubicacion('http://localhost:5173/rentas/?error=invalid_client&error_description=Cliente%20desconocido');
+
+    await arrancar(() => {});
+
+    expect(vueltaFallida()).toEqual({
+      estado: 'fallo',
+      motivo: 'El emisor no reconoce a este cliente',
+      detalle: 'Cliente desconocido',
+    });
+  });
+
+  it('y la pasada siguiente, sin vuelta, la olvida: F5 no ensena un fallo que ya paso', async () => {
+    fijarToken(null);
+    sessionStorage.setItem('kamayuk.pkce.idas', '3');
+    ubicacion('http://localhost:5173/rentas/?error=access_denied');
+    await arrancar(() => {});
+    expect(vueltaFallida()).not.toBeNull();
+
+    ubicacion('http://localhost:5173/rentas/');
+    await arrancar(() => {});
+
+    expect(vueltaFallida()).toBeNull();
   });
 });
 

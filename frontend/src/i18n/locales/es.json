@@ -344,6 +344,7 @@
   "El derecho de emisión se cobra entero en la primera cuponera, no prorrateado: por eso la cuota 1 es mayor.": "El derecho de emisión se cobra entero en la primera cuponera, no prorrateado: por eso la cuota 1 es mayor.",
   "el ejercicio es global a la sesión: decide sobre qué año escriben todos los módulos.": "el ejercicio es global a la sesión: decide sobre qué año escriben todos los módulos.",
   "El ejercicio es global a la sesión: decide sobre qué año escriben todos los módulos.": "El ejercicio es global a la sesión: decide sobre qué año escriben todos los módulos.",
+  "El emisor de identidad no dejo terminar la entrada: {{motivo}}.": "El emisor de identidad no dejo terminar la entrada: {{motivo}}.",
   "El emisor es {{emisor}}, y la peticion a {{url}} no llego a completarse: {{motivo}}.": "El emisor es {{emisor}}, y la peticion a {{url}} no llego a completarse: {{motivo}}.",
   "El giro decide la modalidad y el plazo.": "El giro decide la modalidad y el plazo.",
   "El orden es legal, no una preferencia: sin acta no hay resolución, y sin notificación la sanción no es exigible.": "El orden es legal, no una preferencia: sin acta no hay resolución, y sin notificación la sanción no es exigible.",
@@ -547,6 +548,7 @@
   "Lo cobrado en el turno, contra lo contado en caja.": "Lo cobrado en el turno, contra lo contado en caja.",
   "Lo cobrado por concepto": "Lo cobrado por concepto",
   "Lo detectado, lo inspeccionado y lo que sostiene una determinación.": "Lo detectado, lo inspeccionado y lo que sostiene una determinación.",
+  "Lo que contesto: {{detalle}}": "Lo que contesto: {{detalle}}",
   "Lo que el verificador midió frente a lo que el titular declaró.": "Lo que el verificador midió frente a lo que el titular declaró.",
   "Lo que hay que revisar": "Lo que hay que revisar",
   "Lo que hay que saber antes de volver al predio": "Lo que hay que saber antes de volver al predio",
@@ -938,5 +940,6 @@
   "Vílchez Rojas, Andrés": "Vílchez Rojas, Andrés",
   "Viudo(a)": "Viudo(a)",
   "Volver": "Volver",
+  "Volver a identificarse": "Volver a identificarse",
   "vreto": "vreto"
 }

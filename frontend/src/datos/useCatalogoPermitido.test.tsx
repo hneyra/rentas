@@ -125,6 +125,15 @@ function elBotonDeReintentar() {
   return screen.queryByRole('button', { name: 'Reintentar' });
 }
 
+/**
+ * El remedio del 401 (#355). Se mira en TODAS las ramas, y no solo en la suya: una pantalla que lo
+ * pusiera en cualquier error saldria verde si solo se probara el 401 — y en un 500 o en un 403
+ * volver a identificarse no arregla nada, solo manda de paseo a Keycloak.
+ */
+function elBotonDeVolver() {
+  return screen.queryByRole('button', { name: 'Volver a identificarse' });
+}
+
 describe('el 403 SIN_PRIVILEGIO sobre el catalogo (#311)', () => {
   it('nombra las DOS opciones por su nombre del catalogo, no por su codigo, y ofrece reintentar', async () => {
     contestan = { ...BIEN, modulos: SIN_PRIVILEGIO, accesos: SIN_PRIVILEGIO };
@@ -135,6 +144,7 @@ describe('el 403 SIN_PRIVILEGIO sobre el catalogo (#311)', () => {
     const faltan = [...(aviso?.querySelectorAll('li') ?? [])].map((li) => li.textContent);
     expect(faltan).toEqual(['Módulos del sistema', 'Accesos y políticas']);
     expect(elBotonDeReintentar(), 'el 403 no ofrece reintentar').not.toBeNull();
+    expect(elBotonDeVolver(), 'el 403 manda a identificarse otra vez').toBeNull();
     expect(elArmazon()).toBeNull();
   });
 
@@ -172,6 +182,8 @@ describe('y las otras ramas NO ofrecen reintentar: no arreglaria nada', () => {
 
     expect(screen.getByText(/Vuelva a entrar/)).toBeTruthy();
     expect(elBotonDeReintentar(), 'un 401 ofrece reintentar').toBeNull();
+    // Pero SI ofrece volver a identificarse, que es lo que arregla un 401 (#355).
+    expect(elBotonDeVolver(), 'el 401 no trae su remedio').not.toBeNull();
     expect(document.querySelector('[data-slot="catalogo-sin-privilegio"]')).toBeNull();
   });
 
@@ -181,6 +193,7 @@ describe('y las otras ramas NO ofrecen reintentar: no arreglaria nada', () => {
 
     expect(screen.getByText(/No se pudo saber que modulos puede abrir esta cuenta/)).toBeTruthy();
     expect(elBotonDeReintentar(), 'un 500 ofrece reintentar').toBeNull();
+    expect(elBotonDeVolver(), 'un 500 manda a identificarse otra vez').toBeNull();
     expect(screen.queryByText('Módulos del sistema')).toBeNull();
   });
 
@@ -194,6 +207,7 @@ describe('y las otras ramas NO ofrecen reintentar: no arreglaria nada', () => {
 
     expect(document.querySelector('[data-slot="catalogo-sin-privilegio"]')).toBeNull();
     expect(elBotonDeReintentar(), 'un SIN_MUNICIPALIDAD ofrece reintentar').toBeNull();
+    expect(elBotonDeVolver(), 'un SIN_MUNICIPALIDAD manda a identificarse otra vez').toBeNull();
   });
 
   it('un 403 SIN_PRIVILEGIO junto a un 500 no se hace pasar por falta de permiso', async () => {

@@ -85,6 +85,11 @@ const LITERALES = [
   'No se pudo llegar al emisor de identidad, asi que no se mando a nadie a identificarse.',
   'El emisor es {{emisor}}, y la peticion a {{url}} no llego a completarse: {{motivo}}.',
   'Si esto es un puesto de desarrollo, levante la plataforma; si no, avise a quien la administra. Despues vuelva a cargar la pagina.',
+  // Las tres del 401 con su remedio (#355): el boton, y el motivo y el detalle de una vuelta
+  // fallida del emisor, que son dato y por eso van entre llaves.
+  'Volver a identificarse',
+  'El emisor de identidad no dejo terminar la entrada: {{motivo}}.',
+  'Lo que contesto: {{detalle}}',
   // Las doce del mando de preferencias (#111). Los rotulos de las cuatro identidades y de los tres
   // modos se leen por variable —`t(ROTULO_DE_LA_IDENTIDAD[identidad])`—, asi que `i18next-cli`
   // no los ve: son de la misma familia que las 747 de las definiciones, y por eso estan aqui.

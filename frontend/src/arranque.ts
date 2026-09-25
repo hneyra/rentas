@@ -30,9 +30,22 @@
  *     sin token y sin ella el arranque volveria a entrar solo — con la sesion del emisor viva,
  *     quien acaba de cerrar sesion se encuentra DENTRO OTRA VEZ con la misma cuenta.
  *
- * Cuando uno de los dos frena, se monta igual: la aplicacion pide la sesion, recibe su 401 y
- * `Puerta` lo explica con su boton. Que es mejor que una pagina en blanco con un motivo escrito
- * solo en la consola.
+ * Cuando uno de los dos frena, se monta igual: la aplicacion pide el catalogo, recibe su 401 y
+ * lo explica con un boton «Volver a identificarse», que es el que levanta los dos frenos
+ * (`olvidarLaParada`) y va a la puerta. Que es mejor que una pagina en blanco con un motivo
+ * escrito solo en la consola.
+ *
+ * **Ese boton faltaba entre #90 y #355**, y la frase de arriba lo prometia igual: #90 se llevo
+ * `Puerta.tsx` con la V6, y lo que quedo en su sitio fue un parrafo suelto que decia «Vuelva a
+ * entrar.» sin nada que pulsar. Con la marca de salida puesta, F5 repetia lo mismo —la marca vive
+ * lo que la pestana—, asi que tras «Cerrar sesion» la pestana ya no podia volver a entrar. Hoy el
+ * remedio viaja con el estado del 401, en `datos/useCatalogoPermitido.ts`, como el `reintentar`
+ * del 403 (#311).
+ *
+ * **Y si lo que freno fue un canje fallido, se dice por que** (#355): la `Vuelta` de
+ * `canjearSiVuelve` se guarda como se guarda la falla de la puerta, y la aplicacion ensena su
+ * `motivo` y su `detalle` en vez de la frase generica del 401. Tirarla —como hacia la V6 y siguio
+ * haciendo esto hasta #355— perdia el unico diagnostico de un `redirect_uri` mal declarado.
  *
  * <h2>Y hay un TERCER caso en que se monta: cuando la ida no llega a ocurrir (#112)</h2>
  *
@@ -89,7 +102,7 @@
  */
 
 
-import type { FallaDeLaPuerta } from './api/identidad.ts';
+import type { FallaDeLaPuerta, VueltaFallida } from './api/identidad.ts';
 import {
   canjearSiVuelve,
   entrar,
@@ -121,6 +134,25 @@ export function fallaDeLaPuerta(): FallaDeLaPuerta | null {
 }
 
 /**
+ * La vuelta del emisor que no se pudo canjear en la ultima pasada, o `null` (#355).
+ *
+ * Por lo mismo que `laFalla`: el montaje no lleva argumentos, y quien la lee es la aplicacion.
+ * Solo se guarda la que FALLO: `canjeado` y `sin-vuelta` no tienen nada que contar.
+ */
+let laVuelta: VueltaFallida | null = null;
+
+/**
+ * Por que el emisor no dejo terminar la entrada, si volvimos de el con un fallo.
+ *
+ * `canjearSiVuelve` devuelve el motivo para que quien la llama **decida** con el (su javadoc lo
+ * dice), y el arranque decide dos cosas: volver a la puerta mientras el tope lo admita, y, cuando
+ * ya no, que la aplicacion monte diciendo esto en vez de un 401 sin causa.
+ */
+export function vueltaFallida(): VueltaFallida | null {
+  return laVuelta;
+}
+
+/**
  * **Siembra el catalogo y esquiva la puerta, si y solo si se pidio en desarrollo** (#114).
  *
  * Devuelve si se sembro, que es lo que decide si hay que ir a la puerta. Las dos condiciones son
@@ -146,7 +178,8 @@ async function seSembroElCatalogo(): Promise<boolean> {
  */
 export async function arrancar(montar: () => void): Promise<void> {
   laFalla = null;
-  await canjearSiVuelve();
+  const vuelta = await canjearSiVuelve();
+  laVuelta = vuelta.estado === 'fallo' ? vuelta : null;
 
   // La siembra va DESPUES del canje y ANTES de la puerta, y las dos cosas importan. Despues,
   // porque quien vuelve de Keycloak con un `?code=` en la barra tiene que ver su URL limpia
