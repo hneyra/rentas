@@ -25,6 +25,7 @@ import kamayuk.rentas.documentos.RenderizadorXls;
 import kamayuk.rentas.dominio.AreaM2;
 import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.dominio.Observacion;
+import kamayuk.rentas.licencias.dobles.AplicacionesEnMemoria;
 import kamayuk.rentas.licencias.dobles.CajaDeMentira;
 import kamayuk.rentas.licencias.dobles.CatalogoEnMemoria;
 import kamayuk.rentas.licencias.dobles.DerechosDeMentira;
@@ -299,6 +300,7 @@ class ElItseDecideLaLicenciaTest {
                                                 List.of(DERECHO_LICENCIA),
                                                 Dinero.de("50.00"),
                                                 HOY)),
+                        new AplicacionesEnMemoria(),
                         new PadronDeMentira()
                                 .con(
                                         new ResumenDeContribuyente(
