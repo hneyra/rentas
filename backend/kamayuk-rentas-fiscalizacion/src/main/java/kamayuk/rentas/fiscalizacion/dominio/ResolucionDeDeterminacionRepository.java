@@ -2,6 +2,7 @@ package kamayuk.rentas.fiscalizacion.dominio;
 
 import java.util.List;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Las transferencias a rentas con su resolucion de determinacion. Ningun metodo recibe la
@@ -29,6 +30,39 @@ public interface ResolucionDeDeterminacionRepository {
 
     /** La transferencia de una liquidacion, si ya se transfirio. */
     Optional<ResolucionDeDeterminacion> deLiquidacion(long liquidacionId);
+
+    /**
+     * Las resoluciones vivas sobre una unidad, con el periodo de la liquidacion que las sostiene,
+     * de la primera a la ultima (#462).
+     *
+     * <p>Devuelve la fila de la relacion y no la resolucion desnuda porque lo que {@link
+     * UnidadYaDeterminada} necesita saber —que ejercicios determina cada una— es de la liquidacion,
+     * y se lee en la misma consulta. Filtra por la unidad y no por el periodo: el solape lo decide
+     * la regla, que es pura, y una unidad tiene un punado de resoluciones.
+     *
+     * <p>«Vivas» son hoy <b>todas</b>: no existe el acto que deja sin efecto una resolucion de
+     * determinacion. El dia que exista, esta lectura es la que tiene que dejar fuera las que se
+     * dejaron sin efecto, y es la unica.
+     *
+     * @param predioId la unidad, si es predial
+     * @param vehiculoId la unidad, si es vehicular
+     */
+    List<ResolucionEnLaRelacion> vigentesSobreLaUnidad(
+            @Nullable Long predioId, @Nullable Long vehiculoId);
+
+    /**
+     * Serializa, hasta que la transaccion termine, las transferencias sobre esa unidad (#462).
+     *
+     * <p>Es la garantia del motor que {@link UnidadYaDeterminada} necesita: dos transferencias
+     * simultaneas de dos liquidaciones distintas sobre la misma unidad no chocan en ningun indice
+     * —{@code resolucion_determinacion_liquidacion_uq} es por liquidacion— y pasan las dos por
+     * cualquier comprobacion en Java. Con el candado tomado antes de leer, la segunda espera a que
+     * la primera confirme y ya ve su resolucion.
+     *
+     * @param predioId la unidad, si es predial
+     * @param vehiculoId la unidad, si es vehicular
+     */
+    void bloquearLaUnidad(@Nullable Long predioId, @Nullable Long vehiculoId);
 
     /**
      * Las transferencias que se le hicieron a un contribuyente, de la mas reciente a la primera.

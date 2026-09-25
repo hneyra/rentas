@@ -77,7 +77,7 @@ class ResolucionControllerTest {
         actas = new ActasEnMemoria();
         liquidaciones = new LiquidacionesEnMemoria();
         movimientos = new MovimientosDeLiquidacionEnMemoria();
-        resoluciones = new ResolucionesEnMemoria();
+        resoluciones = new ResolucionesEnMemoria(liquidaciones);
         padron = new PadronQueVersiona().con(PREDIO, "120.00", "CASA_HABITACION");
 
         Clock reloj = Clock.fixed(HOY.atStartOfDay(ZoneOffset.UTC).toInstant(), ZoneOffset.UTC);
@@ -285,6 +285,28 @@ class ResolucionControllerTest {
         MvcResult segunda = transferir(cuerpoCompleto());
 
         assertThat(segunda.getResponse().getStatus()).isEqualTo(409);
+        assertThat(padron.escrituras()).isEqualTo(1);
+        assertThat(resoluciones.cuantas()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName(
+            "#462 — otra liquidacion del mismo predio y ejercicio da 409 nombrando la RDF"
+                    + " anterior, no 500")
+    void otraLiquidacionDeLoMismo409() throws Exception {
+        assertThat(transferir(cuerpoCompleto()).getResponse().getStatus()).isEqualTo(201);
+        String segunda = segundaVisitaLiquidada();
+
+        MvcResult resultado = transferir(cuerpoCompleto().replace("LIQ-2026-000001", segunda));
+
+        assertThat(resultado.getResponse().getStatus())
+                .as(
+                        "la peticion esta bien; lo que no la admite es la RDF que ya determina lo mismo")
+                .isEqualTo(409);
+        assertThat(resultado.getResponse().getContentAsString())
+                .contains("CONFLICTO")
+                .contains("RDF-2026-000001")
+                .contains("primero hay que dejar sin efecto");
         assertThat(padron.escrituras()).isEqualTo(1);
         assertThat(resoluciones.cuantas()).isEqualTo(1);
     }
@@ -579,6 +601,53 @@ class ResolucionControllerTest {
     }
 
     // ------------------------------------------------------------------
+
+    /**
+     * La segunda visita al mismo predio —acta version 2— con su liquidacion LIQUIDADA del mismo
+     * ejercicio, 2024 (#462). Devuelve su numero.
+     */
+    private String segundaVisitaLiquidada() {
+        long otraActa =
+                actas.sembrar(
+                        ActaFiscalizacion.nuevaPredial(
+                                1L,
+                                2,
+                                CONTRIBUYENTE,
+                                PREDIO,
+                                null,
+                                LocalDate.of(2026, 5, 1),
+                                "J. Perez",
+                                Hallazgo.SUBVALUADOR,
+                                AreaM2.de("300.00"),
+                                null,
+                                "segunda visita",
+                                OBSERVACION));
+        Liquidacion otra =
+                liquidaciones.insertar(
+                        Liquidacion.primera(
+                                "LIQ-2026-000002",
+                                new Ejercicio(2026),
+                                2L,
+                                otraActa,
+                                new Ejercicio(2024),
+                                new Ejercicio(2024),
+                                TipoDeFiscalizacion.CIERTA,
+                                "Segunda visita",
+                                HOY,
+                                OBSERVACION),
+                        liquidaciones.lineasDe(liquidacion.identificador()));
+        movimientos.insertar(
+                MovimientoDeLiquidacion.apertura(
+                        otra.identificador(), HOY, "emitida", OBSERVACION));
+        movimientos.insertar(
+                MovimientoDeLiquidacion.cambioDeEstado(
+                        otra.identificador(),
+                        EstadoDeLiquidacion.LIQUIDADA,
+                        HOY,
+                        "cerrada",
+                        OBSERVACION));
+        return otra.numero();
+    }
 
     private MvcResult transferir(String cuerpo) throws Exception {
         return mvc.perform(

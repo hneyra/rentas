@@ -85,7 +85,7 @@ class TransferirARentasTest {
         liquidaciones = new LiquidacionesEnMemoria();
         movimientos = new MovimientosDeLiquidacionEnMemoria();
         actas = new ActasEnMemoria();
-        resoluciones = new ResolucionesEnMemoria();
+        resoluciones = new ResolucionesEnMemoria(liquidaciones);
         padron = new PadronQueVersiona().con(PREDIO, "120.00", "CASA_HABITACION");
         cargos = new CargosEnMemoria();
         documentos = new DocumentosEnMemoria();
@@ -296,6 +296,106 @@ class TransferirARentasTest {
             assertThat(padron.escrituras()).isEqualTo(1);
             assertThat(padron.vigenteDe(PREDIO).version()).isEqualTo(2);
             assertThat(resoluciones.cuantas()).isEqualTo(1);
+        }
+    }
+
+    @Nested
+    @DisplayName("#462 — Una determinacion de oficio viva por unidad y ejercicio")
+    class UnaDeterminacionPorUnidadYEjercicio {
+
+        // La AC 6 de arriba transfiere DOS VECES LA MISMA liquidacion: esa siembra da igual con la
+        // guarda por liquidacion que con la guarda por unidad y ejercicio, asi que no distingue
+        // entre las dos. Estas tres si: (a) y (b) son OTRA liquidacion sobre lo mismo, y (c) es
+        // otra liquidacion sobre la misma unidad y OTRO ejercicio, que es el control que impide
+        // «arreglarlo» rechazando cualquier segunda RDF del vehiculo.
+
+        @Test
+        @DisplayName(
+                "(a) transferida la v1, la v2 que la reliquida no se transfiere: una RDF, y los"
+                        + " cargos no se duplican")
+        void laReliquidacionDeUnaTransferidaNoSeTransfiere() {
+            Liquidacion primera =
+                    vehicularLista(1, "LIQ-2026-000010", 10L, E2024, E2025, conCifrasVehicular());
+            TransferirARentas.Transferencia hecha = transferir(primera);
+            assertThat(cargos.asentados()).as("la siembra: la v1 asento sus cuatro").hasSize(4);
+
+            // La v2 entra por el repositorio y no por `ReliquidarFiscalizacion`: desde #462 ese
+            // camino se niega a reliquidar una liquidacion con RDF (lo prueba
+            // `LiquidarYReliquidarTest`), y esta es la segunda barrera, la que vale tambien para
+            // la v2 que ya exista o la que una reliquidacion simultanea deje escrita.
+            Liquidacion segunda =
+                    liquidaciones.insertar(
+                            primera.reliquidadaPor(
+                                    "LIQ-2026-000011",
+                                    new Ejercicio(2026),
+                                    11L,
+                                    E2024,
+                                    E2025,
+                                    TipoDeFiscalizacion.CIERTA,
+                                    "Reliquidada tras la transferencia",
+                                    HOY,
+                                    PORQUE),
+                            conCifrasVehicular());
+            cerrar(segunda);
+
+            assertThatThrownBy(() -> transferir(segunda))
+                    .as("la v2 esta LIQUIDADA y es la ultima version: solo la frena la unidad")
+                    .isInstanceOf(TransferirARentas.YaDeterminadaDeOficio.class)
+                    .hasMessageContaining(hecha.resolucion().numero())
+                    .hasMessageContaining("primero hay que dejar sin efecto");
+
+            assertThat(resoluciones.cuantas()).as("una resolucion, no dos").isEqualTo(1);
+            assertThat(cargos.asentados())
+                    .as(
+                            "los cargos de la v1 y ni uno mas: la misma obligacion no se carga dos veces")
+                    .hasSize(4);
+            assertThat(documentos.cuantos()).as("y un solo papel notificable").isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName(
+                "(b) la segunda visita al mismo vehiculo y el mismo ejercicio no se transfiere")
+        void laSegundaVisitaDelMismoEjercicioNoSeTransfiere() {
+            TransferirARentas.Transferencia hecha =
+                    transferir(
+                            vehicularLista(
+                                    1, "LIQ-2026-000010", 10L, E2024, E2024, conCifrasVehicular()));
+
+            // Otra acta, version 2 del mismo vehiculo: «refiscalizar no reemplaza el acta
+            // anterior, agrega una version», y `ActaYaLiquidada` solo mira ESA acta.
+            Liquidacion deLaSegundaVisita =
+                    vehicularLista(2, "LIQ-2026-000020", 20L, E2024, E2024, conCifrasVehicular());
+
+            assertThatThrownBy(() -> transferir(deLaSegundaVisita))
+                    .isInstanceOf(TransferirARentas.YaDeterminadaDeOficio.class)
+                    .hasMessageContaining(hecha.resolucion().numero())
+                    .hasMessageContaining("2024");
+
+            assertThat(resoluciones.cuantas()).isEqualTo(1);
+            assertThat(cargos.asentados()).hasSize(2);
+        }
+
+        @Test
+        @DisplayName(
+                "(c) el control: dos visitas del mismo vehiculo con ejercicios disjuntos se"
+                        + " transfieren las dos")
+        void conEjerciciosDisjuntosSeTransfierenLasDos() {
+            TransferirARentas.Transferencia de2024 =
+                    transferir(
+                            vehicularLista(
+                                    1, "LIQ-2026-000010", 10L, E2024, E2024, conCifrasVehicular()));
+            TransferirARentas.Transferencia de2025 =
+                    transferir(
+                            vehicularLista(
+                                    2, "LIQ-2026-000020", 20L, E2025, E2025, conCifrasVehicular()));
+
+            assertThat(de2025.resolucion().numero()).isNotEqualTo(de2024.resolucion().numero());
+            assertThat(resoluciones.cuantas())
+                    .as("la invariante es por unidad Y ejercicio, no por unidad")
+                    .isEqualTo(2);
+            assertThat(cargos.asentados())
+                    .extracting(CargosEnMemoria.Cargo::ejercicio)
+                    .containsExactly(E2024, E2024, E2025, E2025);
         }
     }
 
@@ -540,6 +640,98 @@ class TransferirARentasTest {
                             guardada.identificador(), estado, HOY, "cerrada", PORQUE));
         }
         return guardada;
+    }
+
+    private static final long VEHICULO = 55L;
+
+    /**
+     * Un acta vehicular —la version {@code versionDelActa} de la visita al mismo {@link #VEHICULO}—
+     * con su liquidacion LIQUIDADA sobre {@code desde}–{@code hasta} (#462).
+     *
+     * <p>Vehicular porque es el camino por el que el defecto se alcanza hoy: el predial revienta
+     * antes, en el padron, desde P5C. Las lineas se filtran al periodo pedido.
+     */
+    private Liquidacion vehicularLista(
+            int versionDelActa,
+            String numero,
+            long correlativo,
+            Ejercicio desde,
+            Ejercicio hasta,
+            List<LineaDeLiquidacion> lineas) {
+        long actaId =
+                actas.sembrar(
+                        ActaFiscalizacion.nuevaVehicular(
+                                1L,
+                                versionDelActa,
+                                CONTRIBUYENTE,
+                                VEHICULO,
+                                LocalDate.of(2026, 3, versionDelActa),
+                                "J. Perez",
+                                Hallazgo.OMISO,
+                                null,
+                                PORQUE));
+        Liquidacion guardada =
+                liquidaciones.insertar(
+                        Liquidacion.primera(
+                                numero,
+                                new Ejercicio(2026),
+                                correlativo,
+                                actaId,
+                                desde,
+                                hasta,
+                                TipoDeFiscalizacion.CIERTA,
+                                "Vehiculo no declarado",
+                                HOY,
+                                PORQUE),
+                        lineas.stream()
+                                .filter(
+                                        linea ->
+                                                linea.ejercicio().compareTo(desde) >= 0
+                                                        && linea.ejercicio().compareTo(hasta) <= 0)
+                                .toList());
+        cerrar(guardada);
+        return guardada;
+    }
+
+    /** La abre y la pasa a LIQUIDADA, que es lo que la transferencia exige (AC 3). */
+    private void cerrar(Liquidacion liquidacion) {
+        movimientos.insertar(
+                MovimientoDeLiquidacion.apertura(
+                        liquidacion.identificador(), HOY, "emitida", PORQUE));
+        movimientos.insertar(
+                MovimientoDeLiquidacion.cambioDeEstado(
+                        liquidacion.identificador(),
+                        EstadoDeLiquidacion.LIQUIDADA,
+                        HOY,
+                        "cerrada",
+                        PORQUE));
+    }
+
+    /** El contraste vehicular con importes, como dato de prueba (ver {@link #conCifras}). */
+    private static List<LineaDeLiquidacion> conCifrasVehicular() {
+        return List.of(
+                lineaVehicular(E2024, Dinero.de("300.00"), Dinero.de("100.00")),
+                lineaVehicular(E2025, Dinero.de("320.00"), Dinero.de("100.00")));
+    }
+
+    private static LineaDeLiquidacion lineaVehicular(
+            Ejercicio ejercicio, Dinero insoluto, Dinero multa) {
+        return new LineaDeLiquidacion(
+                null,
+                null,
+                ejercicio,
+                CONJUNTO,
+                null,
+                VEHICULO,
+                CondicionFiscalizada.OMISO,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                insoluto,
+                multa);
     }
 
     /** El contraste tal como lo emite #49 hoy: estructura si, importes no (D-02a, #198). */

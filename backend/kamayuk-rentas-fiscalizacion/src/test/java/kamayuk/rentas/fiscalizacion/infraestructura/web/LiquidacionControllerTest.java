@@ -129,7 +129,8 @@ class LiquidacionControllerTest {
                 MockMvcBuilders.standaloneSetup(
                                 new LiquidacionController(
                                         liquidar,
-                                        new ReliquidarFiscalizacion(actas, liquidaciones, liquidar),
+                                        new ReliquidarFiscalizacion(
+                                                actas, liquidaciones, liquidar, resoluciones),
                                         new CambiarEstadoDeLaLiquidacion(
                                                 liquidaciones, movimientos, resoluciones),
                                         consulta,
@@ -360,6 +361,37 @@ class LiquidacionControllerTest {
 
         assertThat(resultado.getResponse().getStatus()).isEqualTo(409);
         assertThat(resultado.getResponse().getContentAsString()).contains("RDF-2026-000004");
+    }
+
+    @Test
+    @DisplayName("#462 — reliquidar una liquidacion con su RDF es 409 nombrando la RDF, no 500")
+    void reliquidarConSuResolucion409() throws Exception {
+        liquidar();
+        var liquidacion = liquidaciones.versionesDeActa(actaId).get(0);
+        assertThat(moverA(liquidacion.numero(), "LIQUIDADA").getResponse().getStatus())
+                .isEqualTo(200);
+        resoluciones.registrar(
+                ResolucionDeDeterminacion.predial(
+                        "RDF-2026-000004",
+                        1L,
+                        liquidacion.identificador(),
+                        CONTRIBUYENTE,
+                        PREDIO,
+                        FICHA_DECLARADA,
+                        FICHA_VIGENTE,
+                        HOY,
+                        "INFORME 12-2026",
+                        "Ampliacion detectada",
+                        "TUO LTM art. 14",
+                        OBSERVACION));
+
+        MvcResult resultado = reliquidarCon(liquidacion.numero(), "{\"ejercicio\":\"2024\"}");
+
+        assertThat(resultado.getResponse().getStatus()).isEqualTo(409);
+        assertThat(resultado.getResponse().getContentAsString())
+                .contains("CONFLICTO")
+                .contains("primero hay que dejar sin efecto la RDF-2026-000004");
+        assertThat(liquidaciones.versionesDeActa(actaId)).as("no nace la version 2").hasSize(1);
     }
 
     @Test

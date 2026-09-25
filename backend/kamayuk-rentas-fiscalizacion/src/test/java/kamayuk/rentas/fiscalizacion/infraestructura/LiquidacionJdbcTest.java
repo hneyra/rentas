@@ -964,7 +964,12 @@ class LiquidacionJdbcTest {
                         registro -> {});
         return new CasosDeUso(
                 envolver(liquidar),
-                envolver(new ReliquidarFiscalizacion(actas, liquidaciones, liquidar)),
+                envolver(
+                        new ReliquidarFiscalizacion(
+                                actas,
+                                liquidaciones,
+                                liquidar,
+                                new ResolucionDeDeterminacionRepositoryJdbc(jdbc))),
                 envolver(
                         new AnularActaFiscalizacion(
                                 actas,

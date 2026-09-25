@@ -110,6 +110,63 @@ public class ResolucionDeDeterminacionRepositoryJdbc extends RepositorioJdbc
                 .optional();
     }
 
+    /**
+     * Las resoluciones de la unidad con el periodo de su liquidacion, en una consulta (#462).
+     *
+     * <p>Es el mismo {@code JOIN} que la relacion, y por lo mismo interno: no hay resolucion sin
+     * liquidacion. Las dos tablas son de fiscalizacion, asi que la lectura no cruza ninguna
+     * frontera. Sin {@code WHERE municipalidad_id}: lo pone RLS (regla 2).
+     */
+    @Override
+    public List<kamayuk.rentas.fiscalizacion.dominio.ResolucionEnLaRelacion> vigentesSobreLaUnidad(
+            @Nullable Long predioId, @Nullable Long vehiculoId) {
+        return jdbc().sql(
+                        RELACION
+                                + (predioId != null
+                                        ? " WHERE r.predio_id = :unidad"
+                                        : " WHERE r.vehiculo_id = :unidad")
+                                + " ORDER BY r.fecha, r.numero")
+                .param("unidad", unidad(predioId, vehiculoId))
+                .query(ResolucionDeDeterminacionRepositoryJdbc::mapearLaRelacion)
+                .list();
+    }
+
+    /**
+     * Un candado <b>de transaccion</b> por unidad, nunca de sesion (#462).
+     *
+     * <p>Uno de sesion sobrevive a la devolucion de la conexion al pool y bloquearia la peticion de
+     * otra municipalidad: es la regla 3 aplicada a los candados, como en {@code
+     * CacheDeSnapshotsJdbc} y en {@code ValorRepositoryJdbc}. La clave es la unidad dentro de la
+     * municipalidad —que sale del contexto que fijo {@code SET LOCAL}, no de un argumento (regla
+     * 2)— reducida a un {@code bigint} con {@code hashtextextended} y con el prefijo {@code
+     * determinacion|}, que la separa de las claves de los valores. Dos unidades con la misma huella
+     * solo se esperarian de mas; nunca se dejarian pasar.
+     *
+     * <p>Es por unidad y no por unidad y ejercicio: un solo candado por transferencia no puede
+     * interbloquearse con otro, y dos transferencias sobre el mismo vehiculo son raras y cortas. El
+     * {@code count(*)} es porque la funcion devuelve {@code void}, que no se puede mapear.
+     */
+    @Override
+    public void bloquearLaUnidad(@Nullable Long predioId, @Nullable Long vehiculoId) {
+        String clave = (predioId != null ? "p" : "v") + unidad(predioId, vehiculoId);
+        jdbc().sql(
+                        "SELECT count(*) FROM (SELECT pg_advisory_xact_lock(hashtextextended("
+                                + "'determinacion|' || "
+                                + MUNICIPALIDAD_ACTUAL
+                                + " || '|' || :clave, 0))) AS candado")
+                .param("clave", clave)
+                .query(Long.class)
+                .single();
+    }
+
+    private static long unidad(@Nullable Long predioId, @Nullable Long vehiculoId) {
+        if ((predioId == null) == (vehiculoId == null)) {
+            throw new IllegalArgumentException(
+                    "Una resolucion determina un predio o un vehiculo, nunca los dos ni ninguno");
+        }
+        return predioId != null ? predioId : java.util.Objects.requireNonNull(vehiculoId);
+    }
+
     @Override
     public List<ResolucionDeDeterminacion> deContribuyente(long contribuyenteId) {
         return jdbc().sql(

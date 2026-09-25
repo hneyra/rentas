@@ -24,6 +24,7 @@ import kamayuk.rentas.fiscalizacion.dominio.Hallazgo;
 import kamayuk.rentas.fiscalizacion.dominio.LineaDeLiquidacion;
 import kamayuk.rentas.fiscalizacion.dominio.Liquidacion;
 import kamayuk.rentas.fiscalizacion.dominio.MovimientoDeLiquidacion;
+import kamayuk.rentas.fiscalizacion.dominio.ResolucionDeDeterminacion;
 import kamayuk.rentas.fiscalizacion.dominio.TipoDeFiscalizacion;
 import kamayuk.rentas.nucleo.DeclaracionDelEjercicio;
 import kamayuk.rentas.parametros.LectorDeParametros;
@@ -64,6 +65,7 @@ class LiquidarYReliquidarTest {
     private DeclaracionesDeMentira rentas;
     private LiquidarFiscalizacion liquidar;
     private ReliquidarFiscalizacion reliquidar;
+    private ResolucionesEnMemoria resoluciones;
     private ConsultaDeLiquidaciones consulta;
     private long actaId;
 
@@ -105,7 +107,8 @@ class LiquidarYReliquidarTest {
                         catastro,
                         rentas,
                         registro -> {});
-        reliquidar = new ReliquidarFiscalizacion(actas, liquidaciones, liquidar);
+        resoluciones = new ResolucionesEnMemoria(liquidaciones);
+        reliquidar = new ReliquidarFiscalizacion(actas, liquidaciones, liquidar, resoluciones);
         consulta = new ConsultaDeLiquidaciones(liquidaciones, movimientos);
 
         actaId =
@@ -518,6 +521,73 @@ class LiquidarYReliquidarTest {
                                             OBSERVACION))
                     .isInstanceOf(ReliquidarFiscalizacion.EjercicioSinLineaAnterior.class)
                     .hasMessageContaining("2025");
+        }
+    }
+
+    @Nested
+    @DisplayName("#462 — una liquidacion con su RDF no se reliquida")
+    class ConSuResolucionNoSeReliquida {
+
+        private static final String RDF = "RDF-2026-000004";
+
+        @Test
+        @DisplayName(
+                "reliquidar una liquidacion ya transferida se rechaza nombrando la RDF, y no nace"
+                        + " la v2")
+        void reliquidarUnaTransferidaSeRechaza() {
+            // Hasta #462 solo se exigia que fuera la ultima version, y la v2 nacia LIQUIDABLE y
+            // TRANSFERIBLE: la guarda de la transferencia era por liquidacion, y la v2 es otra.
+            Liquidacion primera = liquidarDe(E2024, E2024);
+            transferidaCon(primera, RDF);
+
+            assertThatThrownBy(() -> reliquidarSinCorregir(primera))
+                    .as(
+                            "mientras no exista el acto que deja sin efecto la RDF y revierte sus cargos")
+                    .isInstanceOf(ReliquidarFiscalizacion.LiquidacionConResolucion.class)
+                    .hasMessageContaining("primero hay que dejar sin efecto la " + RDF);
+
+            assertThat(liquidaciones.versionesDeActa(actaId))
+                    .as("no nace ninguna version 2")
+                    .hasSize(1);
+        }
+
+        @Test
+        @DisplayName("el control: la misma liquidacion sin RDF si se reliquida")
+        void sinResolucionSeReliquida() {
+            // La MISMA siembra menos la resolucion: lo que separa el rojo del verde es la RDF.
+            Liquidacion primera = liquidarDe(E2024, E2024);
+
+            assertThat(reliquidarSinCorregir(primera).liquidacion().version()).isEqualTo(2);
+        }
+
+        /** La resolucion que la transferencia registra, escrita a mano en el doble. */
+        private void transferidaCon(Liquidacion liquidacion, String numero) {
+            resoluciones.registrar(
+                    ResolucionDeDeterminacion.predial(
+                            numero,
+                            1L,
+                            liquidacion.identificador(),
+                            CONTRIBUYENTE,
+                            PREDIO,
+                            FICHA_DECLARADA,
+                            FICHA_VIGENTE,
+                            HOY,
+                            "INFORME 12-2026",
+                            "Ampliacion detectada",
+                            "TUO LTM art. 14",
+                            OBSERVACION));
+        }
+
+        private ReliquidarFiscalizacion.Resultado reliquidarSinCorregir(Liquidacion anterior) {
+            return reliquidar.reliquidar(
+                    anterior.numero(),
+                    E2024,
+                    E2024,
+                    TipoDeFiscalizacion.CIERTA,
+                    "Se corrige la liquidacion transferida",
+                    List.of(),
+                    HOY,
+                    OBSERVACION);
         }
     }
 

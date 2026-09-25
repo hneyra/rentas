@@ -16,6 +16,7 @@ import kamayuk.rentas.fiscalizacion.dominio.LineaDeLiquidacion;
 import kamayuk.rentas.fiscalizacion.dominio.Liquidacion;
 import kamayuk.rentas.fiscalizacion.dominio.LiquidacionRepository;
 import kamayuk.rentas.fiscalizacion.dominio.PlantillaDeNumeroDeLiquidacion;
+import kamayuk.rentas.fiscalizacion.dominio.ResolucionDeDeterminacionRepository;
 import kamayuk.rentas.fiscalizacion.dominio.TipoDeFiscalizacion;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -63,13 +64,18 @@ public class ReliquidarFiscalizacion {
     private final LiquidacionRepository liquidaciones;
     private final LiquidarFiscalizacion liquidar;
 
+    /** Solo para leer si la anterior ya tiene su resolucion de determinacion (#462). */
+    private final ResolucionDeDeterminacionRepository resoluciones;
+
     public ReliquidarFiscalizacion(
             ActaFiscalizacionRepository actas,
             LiquidacionRepository liquidaciones,
-            LiquidarFiscalizacion liquidar) {
+            LiquidarFiscalizacion liquidar,
+            ResolucionDeDeterminacionRepository resoluciones) {
         this.actas = actas;
         this.liquidaciones = liquidaciones;
         this.liquidar = liquidar;
+        this.resoluciones = resoluciones;
     }
 
     /**
@@ -81,6 +87,7 @@ public class ReliquidarFiscalizacion {
      *     los demás
      * @param observacion por qué se reliquida (regla 10)
      * @throws ActaFiscalizacion.ActaAnulada si la visita que la sustenta esta anulada (#339)
+     * @throws LiquidacionConResolucion si la que se corrige ya tiene su resolucion (#462)
      */
     @Transactional
     public Resultado reliquidar(
@@ -114,6 +121,17 @@ public class ReliquidarFiscalizacion {
         if (ultima.version() != anterior.version()) {
             throw new NoEsLaUltimaVersion(numeroAnterior, ultima.numero());
         }
+        // Hasta #462 esto era todo, y la v2 de una liquidacion ya transferida nacia LIQUIDABLE y
+        // TRANSFERIBLE: otra fila, otra liquidacion, y la guarda de la transferencia era por
+        // liquidacion. Corregir lo que ya se determino de oficio es dejar sin efecto la RDF y
+        // revertir sus cargos, y ese acto todavia no existe; mientras tanto no se abre una
+        // version que solo serviria para determinar dos veces lo mismo.
+        resoluciones
+                .deLiquidacion(anterior.identificador())
+                .ifPresent(
+                        resolucion -> {
+                            throw new LiquidacionConResolucion(numeroAnterior, resolucion.numero());
+                        });
 
         List<LineaDeLiquidacion> lineasAnteriores =
                 liquidaciones.lineasDe(anterior.identificador());
@@ -228,6 +246,29 @@ public class ReliquidarFiscalizacion {
                             + ultima
                             + ": se reliquida la ultima version, o la cadena de versiones se"
                             + " bifurca y el historico deja de poder reconstruir el proceso");
+        }
+    }
+
+    /**
+     * La liquidacion ya se transfirio: su resolucion de determinacion esta notificada y sus cargos
+     * en el libro (#462). Mismo criterio que {@code
+     * CambiarEstadoDeLaLiquidacion.LiquidacionConResolucion} (#338), que impide anularla por lo
+     * mismo.
+     */
+    public static final class LiquidacionConResolucion extends RuntimeException {
+        @java.io.Serial private static final long serialVersionUID = 1L;
+
+        LiquidacionConResolucion(String numero, String resolucion) {
+            super(
+                    "La liquidacion "
+                            + numero
+                            + " ya se transfirio con la resolucion de determinacion "
+                            + resolucion
+                            + ": reliquidarla abriria una version que determinaria otra vez los"
+                            + " mismos ejercicios de la misma unidad, y primero hay que dejar sin"
+                            + " efecto la "
+                            + resolucion
+                            + " y revertir sus cargos, un acto que todavia no existe");
         }
     }
 
