@@ -16,6 +16,7 @@ import kamayuk.rentas.nucleo.aplicacion.CuadroPredialParametrizado;
 import kamayuk.rentas.nucleo.aplicacion.DeterminarPredial;
 import kamayuk.rentas.nucleo.aplicacion.DeterminarPredialMasivo;
 import kamayuk.rentas.nucleo.aplicacion.RegistrarCorridaDeEmision;
+import kamayuk.rentas.nucleo.dominio.predial.MinimoImponible;
 import kamayuk.rentas.nucleo.dominio.predial.ModalidadDelPredial;
 import kamayuk.rentas.parametros.FaltaPublicar;
 import kamayuk.rentas.parametros.LectorDeParametros;
@@ -321,7 +322,8 @@ public class PredialController {
                 | DeterminarPredial.PredioSinAutovaluo
                 | DeterminarPredial.PredioRepetido
                 | DeterminarPredial.PredioAjeno
-                | DeterminarPredial.BeneficioPredialSinRegla mal) {
+                | DeterminarPredial.BeneficioPredialSinRegla
+                | MinimoImponible.BaseAfectaCero mal) {
             throw new ProblemaDeNegocio(CodigoDeError.VALIDACION, mensajeDe(mal));
         } catch (CuadroPredialParametrizado.ParametroDelPredialAusente
                 | ParametrosSellados.ParametroAusente

@@ -42,7 +42,10 @@ import org.springframework.transaction.annotation.Transactional;
  *       lo inventa.
  *   <li>{@code TramosProgresivosAcumulativos.calcular} (RT-013) aplica el cuadro sobre esa base ya
  *       agregada, nunca predio por predio (NEG-05 §1).
- *   <li>{@code MinimoImponible.aplicar} (RT-014) sustituye el resultado si no llega al minimo.
+ *   <li>{@code MinimoImponible.aplicarSobreBase} (RT-014) sustituye el resultado si no llega al
+ *       minimo. Con la base afecta exactamente cero no sustituye nada: lanza {@link
+ *       MinimoImponible.BaseAfectaCero}, porque NEG-05 no decide si ahi se cobra el minimo o nada
+ *       (RT-014-c02/c03) y hasta #332 este servicio cobraba el minimo sin decirlo.
  * </ol>
  *
  * <p><b>El redondeo se lee del conjunto sellado</b>, con {@link PoliticasDeRedondeoSelladas}: es el
@@ -160,7 +163,11 @@ public class RegistrarDeterminacionPredial {
 
         Dinero impuestoPorTramos =
                 TramosProgresivosAcumulativos.calcular(baseContribuyente, tramos, redondeo);
-        Dinero montoDeterminado = MinimoImponible.aplicar(impuestoPorTramos, minimoImponible);
+        // Sobre la BASE, y no solo sobre el impuesto (#332): con la base afecta exactamente cero,
+        // RT-014 no esta decidida (NEG-05, RT-014-c02/c03) y no se asienta ninguna fila.
+        Dinero montoDeterminado =
+                MinimoImponible.aplicarSobreBase(
+                        impuestoPorTramos, baseContribuyente, minimoImponible);
 
         Determinacion nueva =
                 Determinacion.nuevaPredial(
