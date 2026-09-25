@@ -26,6 +26,8 @@ import kamayuk.rentas.auditoria.OrigenContext;
 import kamayuk.rentas.compartido.Pagina;
 import kamayuk.rentas.compartido.Paginacion;
 import kamayuk.rentas.compartido.TenantContext;
+import kamayuk.rentas.cuentacorriente.ClaveDeObligacionPublica;
+import kamayuk.rentas.cuentacorriente.MovimientoDeFase;
 import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.MunicipalidadId;
@@ -39,6 +41,7 @@ import kamayuk.rentas.valores.dominio.SelectorDeObligacion;
 import kamayuk.rentas.valores.dominio.TipoValor;
 import kamayuk.rentas.valores.dominio.Valor;
 import kamayuk.rentas.valores.dominio.ValorDetalle;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -509,6 +512,157 @@ class ValorRepositoryJdbcTest {
                         TenantContext.fijar(new MunicipalidadId(municipalidadA));
                         return accion.get();
                     });
+        }
+    }
+
+    /**
+     * #366 — dos peticiones simultaneas que formalizan la misma obligacion.
+     *
+     * <p>Lo que ninguna prueba con dobles puede decir: que la regla {@code ObligacionYaFormalizada}
+     * se evalua <b>despues</b> de un candado sobre la obligacion. Sin el, las dos transacciones
+     * preguntan antes de que ninguna haya confirmado su valor, las dos oyen «no hay ninguno» y las
+     * dos emiten: el mismo doble envio que la regla rechaza en serie pasa en paralelo.
+     *
+     * <p>La prueba fuerza ese solape en vez de esperarlo: la deuda —que {@code RegistrarValor} lee
+     * despues de evaluar la regla— es una barrera para dos. Sin candado, los dos hilos llegan a
+     * ella con la regla ya evaluada y salen juntos. Con candado, el segundo se queda esperando en
+     * la base y la barrera caduca sola: el primero emite y confirma, y el segundo entra leyendo su
+     * valor.
+     */
+    @Nested
+    @DisplayName("#366 — dos emisiones simultaneas de la misma obligacion")
+    class DosEmisionesSimultaneas {
+
+        private static final LocalDate FECHA = LocalDate.of(2034, 3, 15);
+        private static final SelectorDeObligacion EL_PREDIAL =
+                new SelectorDeObligacion("PREDIAL", new Ejercicio(2033), 3661L, null);
+
+        @Test
+        @DisplayName("la segunda espera a la primera, y ya no encuentra la obligacion libre")
+        void laSegundaEsperaYNoEmite() throws InterruptedException {
+            TenantContext.fijar(new MunicipalidadId(municipalidadA));
+            long obligado = crearContribuyente(municipalidadA, "V-0366", "50203661");
+            java.util.concurrent.CyclicBarrier solape = new java.util.concurrent.CyclicBarrier(2);
+            List<String> pares = java.util.Collections.synchronizedList(new ArrayList<>());
+            kamayuk.rentas.valores.aplicacion.RegistrarValor registrar =
+                    new kamayuk.rentas.valores.aplicacion.RegistrarValor(
+                            repositorio,
+                            (contribuyenteId, fecha) -> {
+                                try {
+                                    solape.await(3, TimeUnit.SECONDS);
+                                } catch (TimeoutException
+                                        | java.util.concurrent.BrokenBarrierException caducada) {
+                                    // Con candado es lo esperado: el otro hilo no puede llegar.
+                                } catch (InterruptedException interrumpido) {
+                                    Thread.currentThread().interrupt();
+                                }
+                                return List.of(
+                                        new kamayuk.rentas.cuentacorriente.ObligacionPublica(
+                                                "PREDIAL",
+                                                new Ejercicio(2033),
+                                                3661L,
+                                                null,
+                                                fecha,
+                                                Dinero.de("100.00"),
+                                                Dinero.CERO,
+                                                Dinero.CERO,
+                                                Dinero.CERO));
+                            },
+                            new MovimientoDeFase() {
+                                @Override
+                                public void moverAValor(
+                                        Ejercicio ejercicio,
+                                        long contribuyenteId,
+                                        String tributo,
+                                        @Nullable Integer periodo,
+                                        @Nullable Long predioId,
+                                        @Nullable Long vehiculoId,
+                                        String referenciaExterna,
+                                        Dinero monto,
+                                        LocalDate fechaValor,
+                                        String documentoOrigen,
+                                        Observacion observacion) {
+                                    pares.add(referenciaExterna);
+                                }
+
+                                @Override
+                                public Dinero moverACoactiva(
+                                        long contribuyenteId,
+                                        ClaveDeObligacionPublica obligacion,
+                                        String referenciaExterna,
+                                        LocalDate fechaValor,
+                                        String documentoOrigen,
+                                        Observacion observacion) {
+                                    throw new AssertionError(
+                                            "emitir un valor pasa la deuda a VALOR, no a COACTIVA");
+                                }
+                            },
+                            registro -> {},
+                            java.time.Clock.systemUTC());
+
+            ExecutorService hilos = Executors.newFixedThreadPool(2);
+            CountDownLatch salida = new CountDownLatch(1);
+            List<Future<String>> futuros = new ArrayList<>();
+            for (int i = 0; i < 2; i++) {
+                futuros.add(
+                        hilos.submit(
+                                () -> {
+                                    salida.await();
+                                    TenantContext.fijar(new MunicipalidadId(municipalidadA));
+                                    OrigenContext.fijar(new Origen("hilo-366", null, null));
+                                    try {
+                                        return transaccion.execute(
+                                                estado ->
+                                                        registrar
+                                                                .emitir(
+                                                                        TipoValor.ORDEN_DE_PAGO,
+                                                                        obligado,
+                                                                        List.of(EL_PREDIAL),
+                                                                        Observacion.de(
+                                                                                "Doble envio de"
+                                                                                        + " la prueba"),
+                                                                        FECHA)
+                                                                .numero());
+                                    } catch (
+                                            kamayuk.rentas.valores.aplicacion.RegistrarValor
+                                                            .YaFormalizada
+                                                    rechazo) {
+                                        return rechazo.getClass().getSimpleName();
+                                    } finally {
+                                        TenantContext.limpiar();
+                                        OrigenContext.limpiar();
+                                    }
+                                }));
+            }
+            salida.countDown();
+
+            List<String> resultados = new ArrayList<>();
+            for (Future<String> futuro : futuros) {
+                try {
+                    resultados.add(futuro.get(30, TimeUnit.SECONDS));
+                } catch (ExecutionException | TimeoutException fallo) {
+                    throw new AssertionError("Una emision concurrente fallo", fallo);
+                }
+            }
+            hilos.shutdown();
+
+            List<Valor> emitidos =
+                    transaccion.execute(
+                            estado -> {
+                                TenantContext.fijar(new MunicipalidadId(municipalidadA));
+                                return repositorio
+                                        .buscar(
+                                                new CriterioDeValor(null, obligado, null, null),
+                                                Paginacion.de(0, 20, "numero"))
+                                        .contenido();
+                            });
+            assertThat(emitidos)
+                    .as("dos peticiones simultaneas, un solo titulo: %s", resultados)
+                    .hasSize(1);
+            assertThat(pares).as("y un solo par AJUSTE").hasSize(1);
+            assertThat(resultados)
+                    .as("la que llego segundo se rechaza")
+                    .containsExactlyInAnyOrder(emitidos.get(0).numero(), "YaFormalizada");
         }
     }
 

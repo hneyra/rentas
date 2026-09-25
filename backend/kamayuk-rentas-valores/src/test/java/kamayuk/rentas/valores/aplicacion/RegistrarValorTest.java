@@ -168,10 +168,16 @@ class RegistrarValorTest {
                 .isInstanceOf(RegistrarValor.ObligacionSinDeuda.class);
     }
 
+    /**
+     * Hasta #366 esta prueba emitia dos OP sobre la <b>misma</b> obligacion —PREDIAL 2025 del
+     * predio 55— y solo miraba que los numeros fueran distintos: daba por bueno el doble titulo. Lo
+     * que mide es la numeracion, y la mide igual con dos obligaciones distintas.
+     */
     @Test
     @DisplayName("dos emisiones seguidas, mismo tipo y ejercicio, sacan correlativos distintos")
     void dosEmisionesSacanCorrelativosDistintos() {
         deuda.con(obligacionSimple("PREDIAL", EJERCICIO_DEUDA, 55L, null, Dinero.de(100)));
+        deuda.con(obligacionSimple("PREDIAL", EJERCICIO_DEUDA, 56L, null, Dinero.de(100)));
 
         Valor primero =
                 servicio.emitir(
@@ -183,10 +189,97 @@ class RegistrarValorTest {
                 servicio.emitir(
                         TipoValor.ORDEN_DE_PAGO,
                         7L,
-                        List.of(new SelectorDeObligacion("PREDIAL", EJERCICIO_DEUDA, 55L, null)),
+                        List.of(new SelectorDeObligacion("PREDIAL", EJERCICIO_DEUDA, 56L, null)),
                         OBSERVACION);
 
         assertThat(primero.numero()).isNotEqualTo(segundo.numero());
+    }
+
+    @Test
+    @DisplayName("#366 — el mismo selector dos veces, aunque cambie la caja, no emite nada")
+    void elMismoSelectorDosVecesNoEmite() {
+        deuda.con(obligacionSimple("PREDIAL", EJERCICIO_DEUDA, 55L, null, Dinero.de(800)));
+
+        assertThatThrownBy(
+                        () ->
+                                servicio.emitir(
+                                        TipoValor.ORDEN_DE_PAGO,
+                                        7L,
+                                        List.of(
+                                                new SelectorDeObligacion(
+                                                        "PREDIAL", EJERCICIO_DEUDA, 55L, null),
+                                                new SelectorDeObligacion(
+                                                        " predial", EJERCICIO_DEUDA, 55L, null)),
+                                        OBSERVACION))
+                .isInstanceOf(RegistrarValor.ObligacionRepetida.class)
+                .hasMessageContaining("PREDIAL del ejercicio 2025 del predio 55");
+        assertThat(repositorio.guardados).isEmpty();
+        assertThat(movimiento.movimientos).isEmpty();
+    }
+
+    @Test
+    @DisplayName("#366 — una segunda OP con la primera viva se rechaza nombrando la primera")
+    void segundaOpConLaPrimeraVivaSeRechaza() {
+        deuda.con(obligacionSimple("PREDIAL", EJERCICIO_DEUDA, 55L, null, Dinero.de(100)));
+        SelectorDeObligacion predial =
+                new SelectorDeObligacion("PREDIAL", EJERCICIO_DEUDA, 55L, null);
+        Valor primera = servicio.emitir(TipoValor.ORDEN_DE_PAGO, 7L, List.of(predial), OBSERVACION);
+
+        assertThatThrownBy(
+                        () ->
+                                servicio.emitir(
+                                        TipoValor.ORDEN_DE_PAGO, 7L, List.of(predial), OBSERVACION))
+                .isInstanceOf(RegistrarValor.YaFormalizada.class)
+                .hasMessageContaining(primera.numero())
+                .extracting(fallo -> ((RegistrarValor.YaFormalizada) fallo).numero())
+                .isEqualTo(primera.numero());
+        assertThat(repositorio.guardados).hasSize(1);
+        assertThat(movimiento.movimientos).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("#366 — con la OP ya ANULADA la obligacion vuelve a estar libre")
+    void conLaOpAnuladaSeVuelveAEmitir() {
+        deuda.con(obligacionSimple("PREDIAL", EJERCICIO_DEUDA, 55L, null, Dinero.de(100)));
+        SelectorDeObligacion predial =
+                new SelectorDeObligacion("PREDIAL", EJERCICIO_DEUDA, 55L, null);
+        Valor primera = servicio.emitir(TipoValor.ORDEN_DE_PAGO, 7L, List.of(predial), OBSERVACION);
+        repositorio.anular(primera);
+
+        Valor segunda = servicio.emitir(TipoValor.ORDEN_DE_PAGO, 7L, List.of(predial), OBSERVACION);
+
+        assertThat(segunda.numero())
+                .as("vivo es la frontera de NO_TERMINAL: un valor anulado ya no formaliza nada")
+                .isNotEqualTo(primera.numero());
+    }
+
+    @Test
+    @DisplayName("#366 — una RD sobre una obligacion con una OP viva se emite sin mover la fase")
+    void unaRdConUnaOpVivaNoMueveLaFase() {
+        deuda.con(obligacionSimple("PREDIAL", EJERCICIO_DEUDA, 55L, null, Dinero.de(100)));
+        deuda.con(obligacionSimple("ARBITRIO", EJERCICIO_DEUDA, 55L, null, Dinero.de(40)));
+        servicio.emitir(
+                TipoValor.ORDEN_DE_PAGO,
+                7L,
+                List.of(new SelectorDeObligacion("PREDIAL", EJERCICIO_DEUDA, 55L, null)),
+                OBSERVACION);
+
+        Valor rd =
+                servicio.emitir(
+                        TipoValor.RESOLUCION_DE_DETERMINACION,
+                        7L,
+                        List.of(
+                                new SelectorDeObligacion("PREDIAL", EJERCICIO_DEUDA, 55L, null),
+                                new SelectorDeObligacion("ARBITRIO", EJERCICIO_DEUDA, 55L, null)),
+                        OBSERVACION);
+
+        assertThat(repositorio.guardados).hasSize(2);
+        assertThat(movimiento.movimientos)
+                .as(
+                        "el PREDIAL ya esta en VALOR por la OP; el ARBITRIO, que ningun valor"
+                                + " formalizaba, si se mueve con la RD")
+                .extracting(MovimientoDeMentira.Movimiento::documentoOrigen)
+                .containsExactly("OP-2026-000001", rd.numero());
     }
 
     @Test
@@ -242,6 +335,7 @@ class RegistrarValorTest {
         private final Map<String, Long> correlativos = new HashMap<>();
         private final List<Valor> guardados = new ArrayList<>();
         private List<ValorDetalle> detalleGuardado = List.of();
+        private final Map<Long, List<ValorDetalle>> detalles = new HashMap<>();
 
         @Override
         public Valor insertar(Valor valor, List<ValorDetalle> detalle) {
@@ -264,6 +358,7 @@ class RegistrarValorTest {
                             valor.observacion());
             guardados.add(conId);
             detalleGuardado = List.copyOf(detalle);
+            detalles.put(conId.id(), detalleGuardado);
             return conId;
         }
 
@@ -279,13 +374,69 @@ class RegistrarValorTest {
         }
 
         @Override
-        public Optional<Valor> vivoSobre(long contribuyenteId, SelectorDeObligacion obligacion) {
-            throw new UnsupportedOperationException();
+        public List<Valor> vivosSobre(long contribuyenteId, SelectorDeObligacion obligacion) {
+            return guardados.stream()
+                    .filter(v -> v.contribuyenteId() == contribuyenteId)
+                    .filter(
+                            v ->
+                                    v.estado() != EstadoDeValor.PAGADO
+                                            && v.estado() != EstadoDeValor.ANULADO
+                                            && v.estado() != EstadoDeValor.PRESCRITO)
+                    .filter(
+                            v ->
+                                    detalles.getOrDefault(v.id(), List.of()).stream()
+                                            .anyMatch(
+                                                    d ->
+                                                            d.tributo()
+                                                                            .equalsIgnoreCase(
+                                                                                    obligacion
+                                                                                            .tributo())
+                                                                    && d.ejercicio()
+                                                                            .equals(
+                                                                                    obligacion
+                                                                                            .ejercicio())
+                                                                    && java.util.Objects.equals(
+                                                                            d.predioId(),
+                                                                            obligacion.predioId())
+                                                                    && java.util.Objects.equals(
+                                                                            d.vehiculoId(),
+                                                                            obligacion
+                                                                                    .vehiculoId())))
+                    .toList();
         }
+
+        /** Sin transacciones ni hilos no hay nada que bloquear; lo mide la prueba JDBC (#366). */
+        @Override
+        public void bloquearLasObligaciones(
+                long contribuyenteId, java.util.Collection<SelectorDeObligacion> obligaciones) {}
 
         @Override
         public Valor cambiarEstado(long valorId, EstadoDeValor nuevo) {
             throw new UnsupportedOperationException();
+        }
+
+        /** Lo que haria el acto de anulacion, que todavia no existe (#366 lo deja fuera). */
+        void anular(Valor valor) {
+            guardados.replaceAll(
+                    v ->
+                            v.id() != null && v.id().equals(valor.id())
+                                    ? new Valor(
+                                            v.id(),
+                                            v.tipo(),
+                                            v.numero(),
+                                            v.ejercicio(),
+                                            v.contribuyenteId(),
+                                            v.baseLegal(),
+                                            v.montoInsoluto(),
+                                            v.montoReajuste(),
+                                            v.montoInteres(),
+                                            v.montoGasto(),
+                                            v.proyectadoA(),
+                                            EstadoDeValor.ANULADO,
+                                            v.fechaEmision(),
+                                            v.usuarioRegistro(),
+                                            v.observacion())
+                                    : v);
         }
 
         @Override
