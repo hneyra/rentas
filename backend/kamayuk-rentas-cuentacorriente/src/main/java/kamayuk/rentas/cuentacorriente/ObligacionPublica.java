@@ -7,8 +7,8 @@ import kamayuk.rentas.dominio.Ejercicio;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Lo que otro contexto necesita saber de una obligacion con deuda, via {@link
- * ConsultaDeDeudaPublica}.
+ * Lo que otro contexto necesita saber de una obligacion del libro, via {@link
+ * ConsultaDeDeudaPublica}: con deuda o ya saldada, que es lo que dice {@link #estaPendiente()}.
  *
  * <p>Trae el desglose completo —insoluto, reajuste, interes, gasto—, el mismo que {@code
  * DeudaActualizada}: un consumidor que solo necesita el total lo pide con {@link #total()}, pero
@@ -91,6 +91,24 @@ public record ObligacionPublica(
     /** La suma de las cuatro partes, nunca una quinta cifra calculada aparte. */
     public Dinero total() {
         return insoluto.mas(reajuste).mas(interes).mas(gasto);
+    }
+
+    /**
+     * Si la obligacion <b>debe algo</b> a su fecha: su total es positivo (#401).
+     *
+     * <p>Es la unica definicion de «pendiente» fuera del modulo. El libro devuelve tambien las
+     * obligaciones saldadas —cobradas, dadas de baja, prescritas—, con sus cuatro partes en 0,00,
+     * porque la constancia de no adeudo las imprime como «Cancelado». Hasta #401 cada consumidor
+     * que necesitaba solo las que deben escribia su propia comparacion, o la olvidaba: salian
+     * valores de 0,00, ordenes de cobro que la caja rechazaba y fichas con «N obligaciones con
+     * saldo» a quien no debe nada.
+     *
+     * <p>Una obligacion con total negativo —un pago en exceso— tampoco esta pendiente: es un hecho
+     * del libro, pero no deuda por cobrar ({@link CarteraDelLibro#pendientePorTributo}, que lo dice
+     * en SQL con la misma regla).
+     */
+    public boolean estaPendiente() {
+        return total().esPositivo();
     }
 
     /** Con que clave se cruza esta fila con las obligaciones de otro contexto (#407). */

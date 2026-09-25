@@ -293,6 +293,60 @@ class EmitirOrdenDeCobroTest {
         }
     }
 
+    /**
+     * #401 — la siembra que distingue: tres obligaciones del mismo contribuyente, y solo una con
+     * deuda. Con toda obligacion debiendo, que es la siembra de siempre, «esta en el libro» y «debe
+     * algo» son lo mismo y ninguna prueba puede separarlos.
+     */
+    @Nested
+    @DisplayName("#401 — Lo saldado sigue en el libro, pero no se cobra")
+    class LoSaldado {
+
+        @BeforeEach
+        void sembrarLasTres() {
+            // Con deuda: PREDIAL 2026 del predio 71, 300,00.
+            libro.debe(CONTRIBUYENTE, "PREDIAL", 2026, 71L, "300.00", "0.00", "0.00", "0.00");
+            // Pagada: cargo de 400,00 y abono de 400,00, cobrado en caja e imputado.
+            libro.debe(CONTRIBUYENTE, "PREDIAL", 2025, 7L, "400.00", "0.00", "0.00", "0.00");
+            libro.salda("PREDIAL", 2025);
+            // Dada de baja por prescripcion declarada.
+            libro.debe(CONTRIBUYENTE, "PREDIAL", 2019, 7L, "180.00", "0.00", "0.00", "0.00");
+            libro.salda("PREDIAL", 2019);
+        }
+
+        @Test
+        @DisplayName("la pagada, marcada junto a la de 2026, sale en sinDeuda y no llega a la caja")
+        void laPagadaSaleEnSinDeuda() {
+            EmitirOrdenDeCobro.Emision emision =
+                    emitir.emitir(peticion(List.of(pagada(), predial().get(0))), PORQUE);
+
+            assertThat(emision.emitidas())
+                    .extracting(e -> e.referencia().texto())
+                    .containsExactly("PREDIAL|2026|" + CONTRIBUYENTE + "|71||2026-03-16");
+            assertThat(emision.sinDeuda())
+                    .as("la saldada se dice, no se cobra: una orden de 0,00 la rechaza la caja")
+                    .containsExactly(pagada());
+            assertThat(caja.recibidas())
+                    .extracting(OrdenesDeCobro.Peticion::importe)
+                    .containsExactly(Dinero.de("300.00"));
+        }
+
+        @Test
+        @DisplayName("solo la pagada es NadaQueCobrar (422), no una llamada a la caja")
+        void soloLaPagadaEsNadaQueCobrar() {
+            assertThatThrownBy(() -> emitir.emitir(peticion(List.of(pagada())), PORQUE))
+                    .as(
+                            "con la saldada en la lista, la caja recibia 0,00, lo rechazaba y la"
+                                    + " ventanilla leia 503 «la caja no contesta»")
+                    .isInstanceOf(EmitirOrdenDeCobro.NadaQueCobrar.class);
+            assertThat(caja.recibidas()).isEmpty();
+        }
+
+        private static SeleccionDeObligacion pagada() {
+            return new SeleccionDeObligacion("PREDIAL", new Ejercicio(2025), 7L, null);
+        }
+    }
+
     // ------------------------------------------------------------------
 
     private static List<SeleccionDeObligacion> predial() {

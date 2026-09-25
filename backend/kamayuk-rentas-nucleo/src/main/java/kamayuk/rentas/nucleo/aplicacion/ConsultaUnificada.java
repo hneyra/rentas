@@ -140,8 +140,11 @@ public class ConsultaUnificada {
                                                         + criterio.codigoContribuyente()
                                                         + " en esta municipalidad"));
 
-        List<ObligacionPublica> todas =
-                deuda.deTodoElContribuyente(contribuyente.id(), criterio.aLaFecha());
+        // Las que deben, y no todas las del libro (#401): «Deudas Pendientes», el resumen y el
+        // «Estado de la consulta» hablan de obligaciones con saldo, y una pagada, dada de baja o
+        // prescrita sigue en el libro en 0,00. Con todas, la ficha decia «3 obligaciones con
+        // saldo» el mismo dia que la constancia decia «no adeuda».
+        List<ObligacionPublica> todas = deuda.pendientesDe(contribuyente.id(), criterio.aLaFecha());
         List<ObligacionPublica> delAlcance = new ArrayList<>();
         for (ObligacionPublica obligacion : todas) {
             if (criterio.alcance().incluye(obligacion.tributo())) {
@@ -204,10 +207,10 @@ public class ConsultaUnificada {
     /**
      * Recorta la lista ya ordenada a la pagina pedida.
      *
-     * <p>En memoria y no en SQL a proposito: {@link ConsultaDeDeudaPublica#deTodoElContribuyente}
-     * devuelve la lista completa —para un contribuyente nunca es larga— y el resumen necesita
-     * <b>todas</b> las obligaciones para sumar. Pedirlas dos veces, una entera para sumar y otra
-     * paginada para listar, serian dos recorridos del libro para responder lo mismo.
+     * <p>En memoria y no en SQL a proposito: {@link ConsultaDeDeudaPublica#pendientesDe} devuelve
+     * la lista completa —para un contribuyente nunca es larga— y el resumen necesita <b>todas</b>
+     * las obligaciones para sumar. Pedirlas dos veces, una entera para sumar y otra paginada para
+     * listar, serian dos recorridos del libro para responder lo mismo.
      */
     private static <T> Pagina<T> pagina(List<T> todas, Paginacion paginacion) {
         int desde = Math.min(paginacion.desplazamiento(), todas.size());
@@ -342,8 +345,8 @@ public class ConsultaUnificada {
          * podria no cuadrar con el desglose que esta encima de el en la misma pantalla.
          *
          * <p>Todas las obligaciones vienen de una sola llamada a {@link
-         * ConsultaDeDeudaPublica#deTodoElContribuyente}, asi que comparten fecha de corte y
-         * sumarlas no mezcla cifras de dias distintos.
+         * ConsultaDeDeudaPublica#pendientesDe}, asi que comparten fecha de corte y sumarlas no
+         * mezcla cifras de dias distintos.
          */
         static ResumenDeSaldos de(List<ObligacionPublica> obligaciones, LocalDate aLaFecha) {
             Dinero insoluto = Dinero.CERO;

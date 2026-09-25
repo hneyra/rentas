@@ -133,8 +133,7 @@ class ConsultaDeDeudaCuentaCorrienteTest {
     void cadaCampoDeObligacionPublicaEsElQueLeToca() {
         cargar("VEHICULAR", 2026, null, 77L, Dinero.de("321.55"));
 
-        List<ObligacionPublica> obligaciones =
-                puerto.deTodoElContribuyente(titular, LocalDate.of(2026, 6, 1));
+        List<ObligacionPublica> obligaciones = puerto.todasDe(titular, LocalDate.of(2026, 6, 1));
 
         assertThat(obligaciones)
                 .singleElement()
@@ -168,7 +167,7 @@ class ConsultaDeDeudaCuentaCorrienteTest {
         cargar(otro, "ARBITRIO", Fase.CONVENIO, Dinero.de("120.00"));
 
         assertThat(ObligacionPublica.FASE_DE_CONVENIO).isEqualTo(Fase.CONVENIO.name());
-        assertThat(puerto.deTodoElContribuyente(otro, LocalDate.of(2026, 6, 1)))
+        assertThat(puerto.todasDe(otro, LocalDate.of(2026, 6, 1)))
                 .hasSize(2)
                 .allSatisfy(
                         o -> {
@@ -201,13 +200,13 @@ class ConsultaDeDeudaCuentaCorrienteTest {
         cargar(otro, "PREDIAL", Fase.COACTIVA, total);
         // El acogimiento: abono en COACTIVA y cargo en CONVENIO, con FRACCIONAMIENTO.
         mover(otro, Fase.COACTIVA, Fase.CONVENIO, total, LocalDate.of(2026, 4, 1));
-        assertThat(puerto.deTodoElContribuyente(otro, LocalDate.of(2026, 6, 1)))
+        assertThat(puerto.todasDe(otro, LocalDate.of(2026, 6, 1)))
                 .singleElement()
                 .satisfies(o -> assertThat(o.fase()).isEqualTo("CONVENIO"));
 
         // El quiebre: el par al reves.
         mover(otro, Fase.CONVENIO, Fase.COACTIVA, total, LocalDate.of(2026, 5, 1));
-        assertThat(puerto.deTodoElContribuyente(otro, LocalDate.of(2026, 6, 1)))
+        assertThat(puerto.todasDe(otro, LocalDate.of(2026, 6, 1)))
                 .singleElement()
                 .satisfies(
                         o -> {
@@ -225,7 +224,55 @@ class ConsultaDeDeudaCuentaCorrienteTest {
     @DisplayName("un contribuyente sin asientos da una lista vacia por el puerto tambien")
     void sinAsientosListaVacia() {
         long otro = crearContribuyenteAdicional();
-        assertThat(puerto.deTodoElContribuyente(otro, LocalDate.of(2026, 6, 1))).isEmpty();
+        assertThat(puerto.todasDe(otro, LocalDate.of(2026, 6, 1))).isEmpty();
+    }
+
+    /**
+     * #401 — la siembra que distingue: la misma persona con una obligacion que debe y otra pagada.
+     * Con las dos debiendo, {@code todasDe} y {@code pendientesDe} devolverian lo mismo.
+     */
+    @Test
+    @DisplayName("#401 — todasDe trae la pagada en 0,00; pendientesDe, solo la que debe")
+    void todasTraeLaSaldadaYPendientesNo() throws SQLException {
+        long quien = crearContribuyente("D-PORT-401", "80500401");
+        asentar(quien, TipoAsiento.CARGO, Concepto.INSOLUTO, 5L, Dinero.de("300.00"));
+        asentar(quien, TipoAsiento.CARGO, Concepto.INSOLUTO, 7L, Dinero.de("400.00"));
+        // El cobro imputado: un ABONO contra la parte que paga, que es lo que se netea.
+        asentar(quien, TipoAsiento.ABONO, Concepto.INSOLUTO, 7L, Dinero.de("400.00"));
+        LocalDate fecha = LocalDate.of(2026, 6, 1);
+
+        assertThat(puerto.todasDe(quien, fecha))
+                .as(
+                        "la saldada SIGUE: la constancia de no adeudo la imprime como «Cancelado»"
+                                + " y fiscalizacion la distingue de la que nunca se asento")
+                .extracting(ObligacionPublica::predioId, ObligacionPublica::total)
+                .containsExactlyInAnyOrder(
+                        org.assertj.core.groups.Tuple.tuple(5L, Dinero.de("300.00")),
+                        org.assertj.core.groups.Tuple.tuple(7L, Dinero.de("0.00")));
+        assertThat(puerto.pendientesDe(quien, fecha))
+                .as("lo que se formaliza, se cobra y se cuenta «con saldo» es solo lo que debe")
+                .extracting(ObligacionPublica::predioId)
+                .containsExactly(5L);
+    }
+
+    private void asentar(
+            long contribuyente, TipoAsiento tipo, Concepto concepto, long predioId, Dinero monto) {
+        registrarAsiento.asentar(
+                Asiento.nuevo(
+                        new Ejercicio(2026),
+                        contribuyente,
+                        "PREDIAL",
+                        concepto,
+                        tipo,
+                        Fase.ORDINARIA,
+                        null,
+                        predioId,
+                        null,
+                        null,
+                        monto,
+                        LocalDate.of(2026, 3, 1),
+                        tipo == TipoAsiento.CARGO ? "RES-PRUEBA-0401" : "RECIBO 001-0000401"),
+                OBSERVACION);
     }
 
     private void cargar(

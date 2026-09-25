@@ -23,7 +23,7 @@ public final class LibroDeMentira implements ConsultaDeDeudaPublica {
     }
 
     @Override
-    public List<ObligacionPublica> deTodoElContribuyente(long contribuyenteId, LocalDate fecha) {
+    public List<ObligacionPublica> todasDe(long contribuyenteId, LocalDate fecha) {
         return obligaciones.stream()
                 .map(
                         obligacion ->

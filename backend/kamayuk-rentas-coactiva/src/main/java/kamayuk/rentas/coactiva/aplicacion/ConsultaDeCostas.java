@@ -100,10 +100,11 @@ public class ConsultaDeCostas {
             LocalDate aLaFecha,
             Map<Long, List<ObligacionPublica>> porContribuyente) {
 
+        // Todas, a sabiendas (#401): aqui se SUMA lo pendiente de la liquidacion, y la saldada
+        // suma 0,00, que es justo lo que la deja CANCELADA en `EstadoDeLaLiquidacion`.
         List<ObligacionPublica> obligaciones =
                 porContribuyente.computeIfAbsent(
-                        liquidacion.contribuyenteId(),
-                        id -> deuda.deTodoElContribuyente(id, aLaFecha));
+                        liquidacion.contribuyenteId(), id -> deuda.todasDe(id, aLaFecha));
 
         Dinero pendiente = Dinero.de("0.00");
         for (ObligacionPublica obligacion : obligaciones) {

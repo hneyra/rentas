@@ -23,6 +23,7 @@ import kamayuk.rentas.compartido.TenantContext;
 import kamayuk.rentas.contribuyentes.aplicacion.DirectorioJdbc;
 import kamayuk.rentas.contribuyentes.infraestructura.ContribuyenteRepositoryJdbc;
 import kamayuk.rentas.contribuyentes.infraestructura.FichaRepositoryJdbc;
+import kamayuk.rentas.cuentacorriente.ObligacionPublica;
 import kamayuk.rentas.cuentacorriente.aplicacion.ConsultaDeDeudaCuentaCorriente;
 import kamayuk.rentas.cuentacorriente.aplicacion.ConsultarDeuda;
 import kamayuk.rentas.cuentacorriente.aplicacion.RegistrarAsiento;
@@ -449,6 +450,31 @@ class DeudasConBeneficioJdbcTest {
             assertThat(resultado.acogimiento().ahorro()).isEqualTo(Dinero.de("100.00"));
         }
 
+        /**
+         * #401 — la siembra que distingue: una que debe y una pagada. Con las dos debiendo, contar
+         * las filas del libro y contar las que tienen saldo da lo mismo.
+         */
+        @Test
+        @DisplayName("#401 — una obligacion pagada no se cuenta como registro acogido")
+        void laPagadaNoSeAcoge() {
+            String codigo = crearContribuyente(municipalidad, "BEN-401");
+            long id = idDe(codigo);
+            asentarCargo(id, "PREDIAL", Dinero.de("800.00"));
+            asentarCargo(id, "MULTA_TRANSITO", Dinero.de("200.00"));
+            asentarPago(id, "MULTA_TRANSITO", Dinero.de("200.00"));
+
+            SimularAcogimiento.Simulacion resultado =
+                    simulacion.de(criterio(codigo, null, CAMPANIA_TOTAL), PAGINA);
+
+            assertThat(resultado.registrosAcogidos())
+                    .as("la multa pagada esta en el libro en 0,00, pero no se acoge a nada")
+                    .isEqualTo(1);
+            assertThat(resultado.obligaciones().contenido())
+                    .extracting(ObligacionPublica::tributo)
+                    .containsExactly("PREDIAL");
+            assertThat(resultado.deudaTotal()).isEqualTo(Dinero.de("800.00"));
+        }
+
         @Test
         @DisplayName("un orden que la rejilla no admite se rechaza en vez de ignorarse")
         void ordenNoAdmitido() {
@@ -511,6 +537,31 @@ class DeudasConBeneficioJdbcTest {
 
     private void asentarCargo(long contribuyenteId, String tributo, Dinero monto) {
         asentarCargo(contribuyenteId, tributo, Concepto.INSOLUTO, monto);
+    }
+
+    /**
+     * El cobro que salda la obligacion, imputado como lo imputa el buzon: un ABONO contra la parte
+     * que paga —el insoluto—, que es lo que {@code CalculoDeDeuda} netea.
+     */
+    private void asentarPago(long contribuyenteId, String tributo, Dinero monto) {
+        transaccion.execute(
+                estado ->
+                        registrarAsiento.asentar(
+                                Asiento.nuevo(
+                                        EJERCICIO,
+                                        contribuyenteId,
+                                        tributo,
+                                        Concepto.INSOLUTO,
+                                        TipoAsiento.ABONO,
+                                        Fase.ORDINARIA,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        monto,
+                                        LocalDate.of(2026, 3, 15),
+                                        "RECIBO 001-0000401"),
+                                Observacion.de("Se asienta el cobro de la prueba")));
     }
 
     private void asentarCargo(

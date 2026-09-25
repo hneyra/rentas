@@ -2852,7 +2852,7 @@ class SancionesJdbcTest {
 
     private static Dinero deudaDe(Papeleta papeleta, LocalDate fecha) {
         List<ObligacionPublica> obligaciones =
-                enTransaccion(() -> deudas.deTodoElContribuyente(papeleta.obligadoId(), fecha));
+                enTransaccion(() -> deudas.todasDe(papeleta.obligadoId(), fecha));
         Dinero total = Dinero.CERO;
         for (ObligacionPublica obligacion : obligaciones) {
             if ("MULTA_TRANSITO".equals(obligacion.tributo())) {

@@ -439,8 +439,7 @@ class ExtincionEsUnaBajaJdbcTest {
             // mueven con este cambio —lo que ya extinguia, extingue igual—, y esta prueba
             // es lo que impide que alguien lo suponga en vez de medirlo.
             List<ObligacionPublica> abiertas =
-                    transaccion.execute(
-                            estado -> deudas.deTodoElContribuyente(titular, RESOLUCION));
+                    transaccion.execute(estado -> deudas.todasDe(titular, RESOLUCION));
 
             assertThat(abiertas).isNotNull();
             Dinero queda = Dinero.CERO;

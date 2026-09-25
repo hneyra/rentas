@@ -25,6 +25,7 @@ import kamayuk.rentas.compartido.TenantContext;
 import kamayuk.rentas.contribuyentes.aplicacion.DirectorioJdbc;
 import kamayuk.rentas.contribuyentes.infraestructura.ContribuyenteRepositoryJdbc;
 import kamayuk.rentas.contribuyentes.infraestructura.FichaRepositoryJdbc;
+import kamayuk.rentas.cuentacorriente.CausalDeBaja;
 import kamayuk.rentas.cuentacorriente.MovimientoDelLibro;
 import kamayuk.rentas.cuentacorriente.ObligacionPublica;
 import kamayuk.rentas.cuentacorriente.aplicacion.ConsultaDeDeudaCuentaCorriente;
@@ -550,6 +551,49 @@ class ConsultaUnificadaJdbcTest {
         }
     }
 
+    /**
+     * #401 — la siembra que distingue: tres obligaciones en el libro y solo una con deuda.
+     *
+     * <p>La unica prueba del «Sin deuda pendiente» era la de un contribuyente sin ningun asiento, y
+     * la del resumen sembraba solo obligaciones que deben: con esas dos, «esta en el libro» y
+     * «tiene saldo» dan lo mismo. Aqui la pagada y la dada de baja estan en el libro, en 0,00, que
+     * es como {@code ConsultarDeuda} las devuelve de verdad.
+     */
+    @Nested
+    @DisplayName("#401 — Lo saldado no es una deuda pendiente")
+    class DeLoSaldado {
+
+        @Test
+        @DisplayName("con una con deuda, una pagada y una dada de baja: «1 obligacion con saldo»")
+        void soloCuentaLaQueDebe() {
+            String codigo = crearContribuyente(municipalidad, "UNIF-401");
+            long id = idDe(codigo);
+            // Con deuda: PREDIAL 2026, 300,00.
+            asentarCargo(id, "PREDIAL", Dinero.de("300.00"));
+            // Pagada: cargo de 400,00 y abono de 400,00, cobrado e imputado.
+            asentarCargo(id, "ARBITRIO", Dinero.de("400.00"));
+            asentarCobroImputado(id, "ARBITRIO", Dinero.de("400.00"));
+            // Dada de baja por prescripcion declarada.
+            asentarAltaDeDeuda(id, "ALCABALA", Dinero.de("250.00"));
+            asentarBajaPorPrescripcion(id, "ALCABALA", Dinero.de("250.00"));
+
+            ConsultaUnificada.Ficha ficha = consulta.de(criterio(codigo), PAGINA);
+
+            assertThat(ficha.resumen().estadoDeLaConsulta())
+                    .as(
+                            "la ficha no puede decir «3 obligaciones con saldo» mientras la"
+                                    + " constancia dice «no adeuda»")
+                    .isEqualTo("1 obligacion con saldo al 2026-08-28");
+            assertThat(ficha.resumen().obligaciones()).isEqualTo(1);
+            assertThat(ficha.resumen().total()).isEqualTo(Dinero.de("300.00"));
+            assertThat(ficha.deudas().contenido())
+                    .as("«Deudas Pendientes» no lleva filas en 0,00")
+                    .extracting(ObligacionPublica::tributo)
+                    .containsExactly("PREDIAL");
+            assertThat(ficha.deudas().totalElementos()).isEqualTo(1);
+        }
+    }
+
     @Nested
     @DisplayName("Aislamiento")
     class DelAislamiento {
@@ -669,6 +713,57 @@ class ConsultaUnificadaJdbcTest {
                     for (Asiento asiento : alta.enAsientos()) {
                         registrarAsiento.asentar(
                                 asiento, Observacion.de("Se da de alta la deuda de la prueba"));
+                    }
+                    return null;
+                });
+    }
+
+    /**
+     * El cobro de la caja, imputado como lo imputa el buzon: un ABONO contra la <b>parte</b> que
+     * paga —aqui el insoluto—, que es lo que {@code CalculoDeDeuda} netea. Un abono de concepto
+     * {@code PAGO}, como el de {@link #asentarPago}, no netea contra ningun cargo.
+     */
+    private void asentarCobroImputado(long contribuyenteId, String tributo, Dinero monto) {
+        transaccion.execute(
+                estado ->
+                        registrarAsiento.asentar(
+                                Asiento.nuevo(
+                                        EJERCICIO,
+                                        contribuyenteId,
+                                        tributo,
+                                        Concepto.INSOLUTO,
+                                        TipoAsiento.ABONO,
+                                        Fase.ORDINARIA,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        monto,
+                                        LocalDate.of(2026, 3, 15),
+                                        "RECIBO 001-0000401"),
+                                Observacion.de("Se imputa el cobro de la prueba")));
+    }
+
+    /** Una BAJA de deuda con su causal (#684), por el mismo camino que el alta. */
+    private void asentarBajaPorPrescripcion(long contribuyenteId, String tributo, Dinero monto) {
+        MovimientoDeDeuda baja =
+                new MovimientoDeDeuda(
+                        SentidoDelMovimiento.BAJA,
+                        new ClaveDeSaldo(contribuyenteId, tributo, EJERCICIO, 1, null, null),
+                        monto,
+                        Dinero.CERO,
+                        Dinero.CERO,
+                        Dinero.CERO,
+                        Fase.ORDINARIA,
+                        LocalDate.of(2026, 4, 6),
+                        "RES-BAJA DE LA PRUEBA",
+                        null,
+                        CausalDeBaja.PRESCRIPCION_DECLARADA);
+        transaccion.execute(
+                estado -> {
+                    for (Asiento asiento : baja.enAsientos()) {
+                        registrarAsiento.asentar(
+                                asiento, Observacion.de("Se da de baja la deuda prescrita"));
                     }
                     return null;
                 });

@@ -268,9 +268,12 @@ public class ConsultaDeExpedientes {
             return new Composicion(List.of(), DeudaDelExpediente.ninguna(aLaFecha));
         }
 
+        // Todas, a sabiendas (#401): la composicion del expediente lista las obligaciones de SUS
+        // valores, y la que ya se cobro sigue siendo suya —en 0,00, que es lo que dice que se
+        // cobro—. Solo las pendientes harian desaparecer lineas del expediente al pagarlas.
         List<ObligacionPublica> obligaciones =
                 obligacionesPorContribuyente.computeIfAbsent(
-                        contribuyente, id -> deuda.deTodoElContribuyente(id, aLaFecha));
+                        contribuyente, id -> deuda.todasDe(id, aLaFecha));
 
         List<ObligacionDelExpediente> lineas = new ArrayList<>();
         DeudaDelExpediente acumulada = DeudaDelExpediente.ninguna(aLaFecha);

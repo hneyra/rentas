@@ -482,7 +482,7 @@ class ReciboConDosDeudoresTest {
 
     /** Lo que ese deudor sigue debiendo de ese predio, por el mismo puerto que valora la orden. */
     private static Dinero deudaDe(long contribuyenteId, long predio) {
-        return libro.deTodoElContribuyente(contribuyenteId, HOY).stream()
+        return libro.todasDe(contribuyenteId, HOY).stream()
                 .filter(o -> o.predioId() != null && predio == o.predioId())
                 .map(ObligacionPublica::total)
                 .reduce(Dinero.CERO, Dinero::mas);

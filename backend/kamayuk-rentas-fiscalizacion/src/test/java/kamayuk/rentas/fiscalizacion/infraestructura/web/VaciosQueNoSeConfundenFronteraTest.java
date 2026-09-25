@@ -435,7 +435,7 @@ class VaciosQueNoSeConfundenFronteraTest {
             implements kamayuk.rentas.cuentacorriente.ConsultaDeDeudaPublica {
 
         @Override
-        public List<kamayuk.rentas.cuentacorriente.ObligacionPublica> deTodoElContribuyente(
+        public List<kamayuk.rentas.cuentacorriente.ObligacionPublica> todasDe(
                 long contribuyenteId, LocalDate aLaFecha) {
             return List.of(
                     new kamayuk.rentas.cuentacorriente.ObligacionPublica(

@@ -1445,12 +1445,12 @@ class CostasYFraccionamientoJdbcTest {
     /**
      * #407, ronda 1 — Lo que entra en COACTIVA es lo que el libro tiene en VALOR, y nada mas.
      *
-     * <p>La primera version movia {@code deTodoElContribuyente(...).total()}: lo pendiente de la
-     * obligacion <b>en todas sus fases</b>. La prueba del camino de produccion no lo distinguia
-     * porque toda su deuda estaba en VALOR. Estas tres siembras si: un cargo ordinario que ningun
-     * valor formaliza, una obligacion que dos valores traen en dos importaciones distintas, y un
-     * abono que el libro asento fuera de VALOR. En las tres, mover «lo pendiente» deja una fase en
-     * negativo o cuenta en COACTIVA deuda que no le toca.
+     * <p>La primera version movia {@code todasDe(...).total()}: lo pendiente de la obligacion <b>en
+     * todas sus fases</b>. La prueba del camino de produccion no lo distinguia porque toda su deuda
+     * estaba en VALOR. Estas tres siembras si: un cargo ordinario que ningun valor formaliza, una
+     * obligacion que dos valores traen en dos importaciones distintas, y un abono que el libro
+     * asento fuera de VALOR. En las tres, mover «lo pendiente» deja una fase en negativo o cuenta
+     * en COACTIVA deuda que no le toca.
      */
     @Nested
     @DisplayName(

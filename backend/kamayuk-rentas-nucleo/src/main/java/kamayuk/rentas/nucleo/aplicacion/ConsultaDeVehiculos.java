@@ -104,8 +104,9 @@ public class ConsultaDeVehiculos {
     private ImporteActualizado deudaDe(Vehiculo vehiculo, LocalDate fecha) {
         long id = Objects.requireNonNull(vehiculo.id(), "Un vehiculo leido de la base tiene id");
         Dinero total = Dinero.CERO;
-        for (ObligacionPublica obligacion :
-                deuda.deTodoElContribuyente(vehiculo.contribuyenteId(), fecha)) {
+        // Todas, a sabiendas (#401): solo se suma, y una saldada suma 0,00. Filtrar dejaria
+        // fuera ademas la de saldo negativo, que #401 no decide.
+        for (ObligacionPublica obligacion : deuda.todasDe(vehiculo.contribuyenteId(), fecha)) {
             if (Objects.equals(obligacion.vehiculoId(), id)) {
                 total = total.mas(obligacion.total());
             }

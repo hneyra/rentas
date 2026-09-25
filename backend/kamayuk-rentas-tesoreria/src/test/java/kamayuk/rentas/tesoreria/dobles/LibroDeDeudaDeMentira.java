@@ -44,9 +44,30 @@ public final class LibroDeDeudaDeMentira implements ConsultaDeDeudaPublica {
         return this;
     }
 
-    /** Lo que hace el pago cuando se imputa: la obligacion deja de tener deuda. */
+    /**
+     * Lo que hace el pago cuando se imputa: la obligacion deja de tener deuda, <b>pero no deja el
+     * libro</b> (#401).
+     *
+     * <p>Hasta #401 este doble borraba la fila, y con eso modelaba el javadoc de {@code
+     * EmitirOrdenDeCobro} —«el libro ya no tiene su deuda»— y no el libro de verdad: {@code
+     * ConsultarDeuda} agrupa todos los asientos de la obligacion, netea el cargo contra el abono y
+     * la devuelve con sus cuatro partes en 0,00. Con la fila borrada, la prueba de «emitir dos
+     * veces» pasaba sin que la emision distinguiera nada.
+     */
     public void salda(String tributo, int ejercicio) {
-        filas.removeIf(f -> f.tributo.equals(tributo) && f.ejercicio.valor() == ejercicio);
+        filas.replaceAll(
+                f ->
+                        f.tributo.equals(tributo) && f.ejercicio.valor() == ejercicio
+                                ? new Fila(
+                                        f.contribuyenteId,
+                                        f.tributo,
+                                        f.ejercicio,
+                                        f.predioId,
+                                        Dinero.CERO,
+                                        Dinero.CERO,
+                                        Dinero.CERO,
+                                        Dinero.CERO)
+                                : f);
     }
 
     /** Cuantas veces se ha leido el libro. */
@@ -55,7 +76,7 @@ public final class LibroDeDeudaDeMentira implements ConsultaDeDeudaPublica {
     }
 
     @Override
-    public List<ObligacionPublica> deTodoElContribuyente(long contribuyenteId, LocalDate fecha) {
+    public List<ObligacionPublica> todasDe(long contribuyenteId, LocalDate fecha) {
         consultas++;
         List<ObligacionPublica> deuda = new ArrayList<>();
         for (Fila fila : filas) {

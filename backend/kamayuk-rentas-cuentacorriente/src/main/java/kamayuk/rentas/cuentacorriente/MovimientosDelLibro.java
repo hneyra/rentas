@@ -56,9 +56,9 @@ public interface MovimientosDelLibro {
      * cosas. La distincion la mantiene {@code cuentacorriente} y no quien pregunta, que es justo el
      * conocimiento que este puerto existe para no repartir.
      *
-     * <p>Paginado, a diferencia de {@link ConsultaDeDeudaPublica#deTodoElContribuyente}: las
-     * obligaciones con deuda de un contribuyente son pocas, pero sus pagos son los de todos los
-     * anios que lleve pagando.
+     * <p>Paginado, a diferencia de {@link ConsultaDeDeudaPublica#todasDe}: las obligaciones con
+     * deuda de un contribuyente son pocas, pero sus pagos son los de todos los anios que lleve
+     * pagando.
      *
      * @param codigoContribuyente el codigo del titular, tal como lo teclea la pantalla
      * @param desde fecha valor minima, inclusive; {@code null} trae desde el primer pago

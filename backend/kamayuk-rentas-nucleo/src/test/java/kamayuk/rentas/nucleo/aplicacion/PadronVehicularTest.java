@@ -474,8 +474,7 @@ class PadronVehicularTest {
         }
 
         @Override
-        public List<ObligacionPublica> deTodoElContribuyente(
-                long contribuyenteId, LocalDate fecha) {
+        public List<ObligacionPublica> todasDe(long contribuyenteId, LocalDate fecha) {
             return porContribuyente.getOrDefault(contribuyenteId, List.of());
         }
     }

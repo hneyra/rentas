@@ -118,8 +118,10 @@ final class ObligacionDeLaPapeleta {
     static @Nullable ObligacionPublica deudaDe(
             Papeleta papeleta, ConsultaDeDeudaPublica deudas, LocalDate fecha) {
         SeleccionDeObligacion obligacion = de(papeleta);
-        for (ObligacionPublica publica :
-                deudas.deTodoElContribuyente(papeleta.obligadoId(), fecha)) {
+        // Todas, a sabiendas (#401): «nulo» es «el libro no tiene nada en ella», y una multa ya
+        // pagada no es eso —la resolucion de gerencia imprime su 0,00—. Quien necesita saber si
+        // debe lo pregunta a la obligacion devuelta, con `estaPendiente()`.
+        for (ObligacionPublica publica : deudas.todasDe(papeleta.obligadoId(), fecha)) {
             if (publica.tributo().equals(obligacion.tributo())
                     && publica.ejercicio().equals(obligacion.ejercicio())
                     && Objects.equals(publica.predioId(), obligacion.predioId())

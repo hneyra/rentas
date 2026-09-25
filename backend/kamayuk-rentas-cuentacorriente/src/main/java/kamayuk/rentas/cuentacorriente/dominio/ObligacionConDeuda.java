@@ -43,4 +43,15 @@ public record ObligacionConDeuda(
         Objects.requireNonNull(fase, "La obligacion necesita su fase");
         Objects.requireNonNull(deuda, "La obligacion necesita su deuda actualizada");
     }
+
+    /**
+     * Si la obligacion debe algo a la fecha de corte: su total es positivo (#401).
+     *
+     * <p>La misma regla que {@code ObligacionPublica#estaPendiente()}, del lado de dentro del
+     * modulo: la fila se llama «con deuda», pero {@code ConsultarDeuda#todasLasObligacionesDe} la
+     * devuelve tambien saldada, en 0,00, porque la constancia imprime esas como «Cancelado».
+     */
+    public boolean estaPendiente() {
+        return deuda.total().esPositivo();
+    }
 }

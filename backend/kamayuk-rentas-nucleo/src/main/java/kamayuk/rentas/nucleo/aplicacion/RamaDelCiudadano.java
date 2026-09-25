@@ -100,8 +100,9 @@ public class RamaDelCiudadano {
         }
         ContribuyenteAcreditado contribuyente = encontrado.get();
 
-        List<ObligacionPublica> obligaciones =
-                deuda.deTodoElContribuyente(contribuyente.id(), aLaFecha);
+        // Las que deben (#401): el portal las lista como «obligaciones con saldo», y una pagada
+        // sigue en el libro en 0,00.
+        List<ObligacionPublica> obligaciones = deuda.pendientesDe(contribuyente.id(), aLaFecha);
         List<PredioDelContribuyente> suyos = predios.de(contribuyente.id(), aLaFecha);
 
         registrarElAcceso(contribuyente, aLaFecha, obligaciones.size(), suyos.size());

@@ -125,8 +125,9 @@ public class ConsultaPrediosController {
                                 predios.de(contribuyenteId.get(), fechaDeCorte), codigoPredial));
         todos.sort(Comparator.comparing(PredioDelContribuyente::codigoReferenciaCatastral));
 
-        List<ObligacionPublica> obligaciones =
-                deuda.deTodoElContribuyente(contribuyenteId.get(), fechaDeCorte);
+        // Todas, a sabiendas (#401): aqui solo se SUMA la deuda de cada predio, y una saldada
+        // suma 0,00. Filtrar dejaria fuera ademas la de saldo negativo, que #401 no decide.
+        List<ObligacionPublica> obligaciones = deuda.todasDe(contribuyenteId.get(), fechaDeCorte);
 
         int desde = Math.min(paginacion.desplazamiento(), todos.size());
         int hasta = Math.min(desde + paginacion.tamano(), todos.size());
@@ -207,8 +208,8 @@ public class ConsultaPrediosController {
     /**
      * La deuda de un predio es la suma de sus obligaciones: un predio puede tener el predial de mas
      * de un ejercicio a la vez. Las obligaciones comparten la misma fecha de corte —vienen de una
-     * sola llamada a {@link ConsultaDeDeudaPublica#deTodoElContribuyente}—, asi que sumarlas no
-     * mezcla cifras de fechas distintas.
+     * sola llamada a {@link ConsultaDeDeudaPublica#todasDe}—, asi que sumarlas no mezcla cifras de
+     * fechas distintas.
      */
     private static ImporteActualizado deudaDe(
             long predioId, List<ObligacionPublica> obligaciones, LocalDate fecha) {

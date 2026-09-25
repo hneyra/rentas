@@ -53,9 +53,17 @@ import org.springframework.stereotype.Service;
  *
  * <p>La clave es {@code (sistemaOrigen, referenciaExterna)} y la referencia <b>lleva dentro la
  * fecha</b> a la que se calculo el importe (regla 9): dos emisiones del mismo dia son un reintento
- * y devuelven la orden que ya estaba, con {@code nueva = false}. Y una obligacion ya pagada no
- * llega hasta aqui: el libro ya no tiene su deuda, asi que la emision no la encuentra y se rechaza
- * con {@link NadaQueCobrar} — que es la misma barrera que tenia el monolito, movida de sitio.
+ * y devuelven la orden que ya estaba, con {@code nueva = false}.
+ *
+ * <h2>Una obligacion ya pagada SI llega hasta aqui, y no se cobra (#401)</h2>
+ *
+ * <p>El libro no olvida una obligacion saldada: la devuelve con sus cuatro partes en 0,00. Hasta
+ * #401 este javadoc afirmaba lo contrario —«el libro ya no tiene su deuda»—, la emision leia todas
+ * las filas, encontraba la saldada y le mandaba a la caja una orden de 0,00; la caja la rechazaba,
+ * {@code ClienteHttpDeCaja} lo convertia en {@link OrdenesDeCobro.CajaInalcanzable} y la ventanilla
+ * leia 503 «la caja no contesta». Ahora se leen solo las {@link ConsultaDeDeudaPublica#pendientesDe
+ * pendientes}: la saldada marcada junto a otras sale en {@link Emision#sinDeuda}, y si es la unica
+ * se rechaza con {@link NadaQueCobrar}.
  */
 @Service
 public class EmitirOrdenDeCobro {
@@ -85,8 +93,10 @@ public class EmitirOrdenDeCobro {
         Objects.requireNonNull(peticion, "No se emite una orden sin peticion");
         Objects.requireNonNull(observacion, "Sin observacion no se guarda (regla 10, RNF-052)");
 
+        // Las que DEBEN, y no todas las del libro (#401): una saldada sigue en el libro en 0,00,
+        // y mandarla a la caja era una orden que la caja rechaza y la ventanilla leia como 503.
         List<ObligacionPublica> conDeuda =
-                libro.deTodoElContribuyente(peticion.contribuyenteId(), peticion.aLaFecha());
+                libro.pendientesDe(peticion.contribuyenteId(), peticion.aLaFecha());
 
         List<Emitida> emitidas = new ArrayList<>(peticion.obligaciones().size());
         List<SeleccionDeObligacion> sinDeuda = new ArrayList<>();
