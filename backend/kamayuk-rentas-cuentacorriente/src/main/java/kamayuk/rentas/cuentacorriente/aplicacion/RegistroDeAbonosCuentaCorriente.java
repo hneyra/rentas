@@ -7,6 +7,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import kamayuk.rentas.cuentacorriente.AbonoAsentado;
+import kamayuk.rentas.cuentacorriente.ObligacionDelDeudor;
 import kamayuk.rentas.cuentacorriente.RegistroDeAbonos;
 import kamayuk.rentas.cuentacorriente.ReversionDeAbonos;
 import kamayuk.rentas.cuentacorriente.SeleccionDeObligacion;
@@ -78,6 +79,14 @@ import org.springframework.transaction.annotation.Transactional;
  * cuota, con <b>su</b> periodo y <b>su</b> fase; abonarlo todo en fase ordinaria dejaria la cuota
  * de coactiva intacta y la ordinaria en negativo, y el expediente coactivo seguiria vivo sobre una
  * deuda ya cobrada.
+ *
+ * <h2>Cada linea con su deudor (#431)</h2>
+ *
+ * <p>La clave de cada obligacion se compone con el deudor <b>de su linea</b>, no con uno comun a
+ * todo el cobro: un recibo de caja junta ordenes de deudores distintos. Lo que sigue siendo uno es
+ * la comprobacion de #39 —sobre el total, antes de escribir— y el orden de los candados, que ahora
+ * desempata por el deudor para seguir siendo total cuando dos condominos comparten el resto de la
+ * clave.
  */
 @Service
 public class RegistroDeAbonosCuentaCorriente implements RegistroDeAbonos {
@@ -108,8 +117,7 @@ public class RegistroDeAbonosCuentaCorriente implements RegistroDeAbonos {
     @Override
     @Transactional
     public List<AbonoAsentado> abonarPagoIntegro(
-            long contribuyenteId,
-            List<SeleccionDeObligacion> obligaciones,
+            List<ObligacionDelDeudor> obligaciones,
             Dinero cobrado,
             LocalDate fechaDePago,
             String documentoOrigen,
@@ -120,11 +128,13 @@ public class RegistroDeAbonosCuentaCorriente implements RegistroDeAbonos {
         if (obligaciones.isEmpty()) {
             throw new IllegalArgumentException("No se puede abonar sin marcar ninguna obligacion");
         }
-        Set<SeleccionDeObligacion> sinRepetir = new LinkedHashSet<>(obligaciones);
+        // Repetida es el mismo PAR: dos condominos del mismo predio comparten la seleccion y son
+        // dos obligaciones distintas del libro (#431).
+        Set<ObligacionDelDeudor> sinRepetir = new LinkedHashSet<>(obligaciones);
         if (sinRepetir.size() != obligaciones.size()) {
             throw new IllegalArgumentException(
-                    "La misma obligacion viene marcada dos veces: cobrarla dos veces en el mismo"
-                            + " recibo es cobrarla de mas");
+                    "La misma obligacion del mismo deudor viene marcada dos veces: cobrarla dos"
+                            + " veces en el mismo recibo es cobrarla de mas");
         }
 
         // 1. Bloquear TODO antes de leer nada, y en un orden que no dependa de como
@@ -132,7 +142,7 @@ public class RegistroDeAbonosCuentaCorriente implements RegistroDeAbonos {
         //    mismos candados en el mismo orden, o se abrazan y las dos esperan.
         List<ClaveDeObligacion> aBloquear =
                 sinRepetir.stream()
-                        .map(seleccion -> claveDe(contribuyenteId, seleccion))
+                        .map(RegistroDeAbonosCuentaCorriente::claveDe)
                         .sorted(ORDEN_ESTABLE)
                         .toList();
         for (ClaveDeObligacion clave : aBloquear) {
@@ -146,9 +156,8 @@ public class RegistroDeAbonosCuentaCorriente implements RegistroDeAbonos {
         //    para deshacerlo despues es lo contrario de lo que ADR-0006 pide de este camino.
         List<PlanDeAbono> planes = new ArrayList<>();
         Dinero segunElLibro = Dinero.CERO;
-        for (SeleccionDeObligacion seleccion : sinRepetir) {
-            PlanDeAbono plan =
-                    planificarUna(claveDe(contribuyenteId, seleccion), seleccion, fechaDePago);
+        for (ObligacionDelDeudor marcada : sinRepetir) {
+            PlanDeAbono plan = planificarUna(claveDe(marcada), marcada, fechaDePago);
             if (plan != null) {
                 planes.add(plan);
                 segunElLibro = segunElLibro.mas(plan.resumen().total());
@@ -259,7 +268,7 @@ public class RegistroDeAbonosCuentaCorriente implements RegistroDeAbonos {
      * todavia no se hubiera extinguido. Ese momento es donde vive la comprobacion.
      */
     private @org.jspecify.annotations.Nullable PlanDeAbono planificarUna(
-            ClaveDeObligacion obligacion, SeleccionDeObligacion seleccion, LocalDate fechaDePago) {
+            ClaveDeObligacion obligacion, ObligacionDelDeudor marcada, LocalDate fechaDePago) {
 
         List<AsientoPlaneado> planeados = new ArrayList<>();
         Dinero insoluto = Dinero.CERO;
@@ -311,8 +320,7 @@ public class RegistroDeAbonosCuentaCorriente implements RegistroDeAbonos {
         return total.esPositivo()
                 ? new PlanDeAbono(
                         List.copyOf(planeados),
-                        new AbonoAsentado(
-                                seleccion, fechaDePago, insoluto, reajuste, interes, gasto))
+                        new AbonoAsentado(marcada, fechaDePago, insoluto, reajuste, interes, gasto))
                 : null;
     }
 
@@ -356,21 +364,34 @@ public class RegistroDeAbonosCuentaCorriente implements RegistroDeAbonos {
         };
     }
 
-    private static ClaveDeObligacion claveDe(
-            long contribuyenteId, SeleccionDeObligacion seleccion) {
+    /** La clave del libro de esa linea: con SU deudor, no con uno comun a todo el cobro (#431). */
+    private static ClaveDeObligacion claveDe(ObligacionDelDeudor marcada) {
+        SeleccionDeObligacion seleccion = marcada.obligacion();
         return new ClaveDeObligacion(
-                contribuyenteId,
+                marcada.contribuyenteId(),
                 seleccion.tributo(),
                 seleccion.ejercicio(),
                 seleccion.predioId(),
                 seleccion.vehiculoId());
     }
 
-    /** El orden en que se piden los candados. Total y estable: no depende de nulos ni del mapa. */
+    /**
+     * El orden en que se piden los candados. Total y estable: no depende de nulos ni del mapa.
+     *
+     * <p>El deudor va al final, como desempate (#431): hasta que un cobro pudo llevar lineas de
+     * varios deudores todas compartian el suyo y no hacia falta. Sin el, dos condominos del mismo
+     * predio empataban y su orden quedaba al de la llegada: dos cobranzas que los marcaran al reves
+     * pedirian los mismos candados al reves. Lo muerde {@code OrdenDeLosCandadosDelCobroTest}.
+     *
+     * <p>Que vaya al final no es lo que evita el abrazo con el convenio: el convenio bloquea claves
+     * de un solo deudor, y en ellas cualquier posicion del deudor da el mismo orden. Va al final
+     * porque solo desempata.
+     */
     private static final Comparator<ClaveDeObligacion> ORDEN_ESTABLE =
             Comparator.comparing(ClaveDeObligacion::tributo)
                     .thenComparingInt(clave -> clave.ejercicio().valor())
                     .thenComparingLong(clave -> clave.predioId() == null ? 0L : clave.predioId())
                     .thenComparingLong(
-                            clave -> clave.vehiculoId() == null ? 0L : clave.vehiculoId());
+                            clave -> clave.vehiculoId() == null ? 0L : clave.vehiculoId())
+                    .thenComparingLong(ClaveDeObligacion::contribuyenteId);
 }

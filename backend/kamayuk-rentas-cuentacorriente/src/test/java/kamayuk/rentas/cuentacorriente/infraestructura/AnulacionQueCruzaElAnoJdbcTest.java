@@ -18,6 +18,7 @@ import kamayuk.rentas.auditoria.AuditoriaJdbc;
 import kamayuk.rentas.auditoria.Origen;
 import kamayuk.rentas.auditoria.OrigenContext;
 import kamayuk.rentas.compartido.TenantContext;
+import kamayuk.rentas.cuentacorriente.ObligacionDelDeudor;
 import kamayuk.rentas.cuentacorriente.RegistroDeAbonos;
 import kamayuk.rentas.cuentacorriente.SeleccionDeObligacion;
 import kamayuk.rentas.cuentacorriente.aplicacion.RegistrarAsiento;
@@ -196,8 +197,11 @@ class AnulacionQueCruzaElAnoJdbcTest {
         // 2. Caja lo cobra el 2027-01-05: el abono lleva el ejercicio DE LA CUOTA y la fecha
         //    DE PAGO, que es lo que ConciliacionDeCaja da por sentado.
         abonos.abonarPagoIntegro(
-                contribuyente,
-                List.of(new SeleccionDeObligacion(TRIBUTO, EJERCICIO_DE_LA_CUOTA, PREDIO, null)),
+                List.of(
+                        new ObligacionDelDeudor(
+                                contribuyente,
+                                new SeleccionDeObligacion(
+                                        TRIBUTO, EJERCICIO_DE_LA_CUOTA, PREDIO, null))),
                 INSOLUTO,
                 DIA_DE_CAJA,
                 RECIBO,

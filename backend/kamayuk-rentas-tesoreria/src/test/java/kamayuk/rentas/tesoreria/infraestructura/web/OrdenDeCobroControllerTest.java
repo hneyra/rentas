@@ -103,7 +103,10 @@ class OrdenDeCobroControllerTest {
         assertThat(json).contains("\"actualizadoA\":\"2026-03-16\"");
         assertThat(json)
                 .as("la referencia lleva la fecha dentro: regla 9 aplicada a la identidad")
-                .contains("\"referenciaExterna\":\"PREDIAL|2026|71||2026-03-16\"");
+                .contains(
+                        "\"referenciaExterna\":\"PREDIAL|2026|"
+                                + CONTRIBUYENTE
+                                + "|71||2026-03-16\"");
         assertThat(json).contains("\"nueva\":true");
     }
 

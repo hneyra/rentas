@@ -23,10 +23,15 @@ import org.jspecify.annotations.Nullable;
  *
  * <h2>El formato</h2>
  *
- * <p>{@code TRIBUTO|EJERCICIO|PREDIO|VEHICULO|FECHA}, con los dos de la unidad vacios cuando no la
- * hay. La barra vertical y no la coma ni los dos puntos: un tributo no la lleva nunca, y el
- * separador tiene que ser algo que ningun componente pueda contener — es la misma decision que #428
- * tomo con el numero de la notificacion administrativa.
+ * <p>{@code TRIBUTO|EJERCICIO|CONTRIBUYENTE|PREDIO|VEHICULO|FECHA}, con los dos de la unidad vacios
+ * cuando no la hay. La barra vertical y no la coma ni los dos puntos: un tributo no la lleva nunca,
+ * y el separador tiene que ser algo que ningun componente pueda contener — es la misma decision que
+ * #428 tomo con el numero de la notificacion administrativa.
+ *
+ * <p>{@link #leer} acepta tambien la forma de <b>cinco</b> partes, la de antes de #431 —{@code
+ * TRIBUTO|EJERCICIO|PREDIO|VEHICULO|FECHA}—, y no por nostalgia: es lo que el parrafo de arriba
+ * sobre los pagos en vuelo pide. Una orden emitida la vispera del despliegue vuelve con esa forma,
+ * y su deudor sigue saliendo de donde salia, del {@code pagador.idExterno} del pago.
  *
  * <h2>Por que la fecha esta DENTRO de la referencia</h2>
  *
@@ -46,13 +51,37 @@ import org.jspecify.annotations.Nullable;
  * mira: al imputar el pago lo que importa es contra que se abona, y cuanto lo dice el importe
  * cobrado.
  *
- * <p><b>No lleva el contribuyente</b>, y es deliberado: el pagador viaja aparte en la orden, y una
- * obligacion identificada por su deudor haria imposible que un tercero pague la deuda de otro, que
- * es legitimo y corriente en ventanilla.
+ * <h2>Por que lleva al DEUDOR (#431)</h2>
+ *
+ * <p>Hasta #431 esta cabecera decia lo contrario: «no lleva el contribuyente, y es deliberado: una
+ * obligacion identificada por su deudor haria imposible que un tercero pague la deuda de otro». La
+ * premisa confundia al <b>deudor</b> con el <b>pagador</b>, y fallaba por dos caminos:
+ *
+ * <ul>
+ *   <li><b>Un recibo con ordenes de dos deudores se rechazaba.</b> La caja junta ordenes en un
+ *       recibo y publica un solo pagador —el de la primera orden—; sin el deudor en la referencia,
+ *       el libro buscaba todas las lineas bajo ese pagador, la del otro deudor no tenia saldo y el
+ *       pago quedaba {@code RECHAZADO}. Una hija que paga su predial y el de su madre en la misma
+ *       cola dejaba 500,00 en caja y a las dos debiendolo todo.
+ *   <li><b>Dos condominos se cobraban la misma orden.</b> La idempotencia de la caja es por
+ *       referencia, el libro admite la misma obligacion para dos titulares ({@code saldo_uq} lleva
+ *       {@code contribuyente_id}), y el segundo que emitia el mismo dia recibia la orden del
+ *       primero: su importe, y el primero de pagador. Pagarla extinguia la deuda del otro.
+ * </ul>
+ *
+ * <p>En el libro, la identidad de una obligacion <b>incluye a su deudor</b> ({@code
+ * ClaveDeObligacion}), y esta referencia es el nombre de esa obligacion al otro lado de la
+ * frontera. Llevarlo no impide que pague un tercero: el pagador viaja aparte ({@code
+ * pagadorDocumento}, {@code pagadorNombre}), y es precisamente el deudor en la referencia lo que
+ * permite que el pago de un tercero se impute a quien debe y no a quien pago.
+ *
+ * <p>{@code contribuyenteId} es nulo <b>solo</b> en una referencia de cinco partes, leida de un
+ * pago en vuelo; toda orden que este sistema emite desde #431 lo lleva.
  */
 public record ReferenciaDeObligacion(
         String tributo,
         Ejercicio ejercicio,
+        @Nullable Long contribuyenteId,
         @Nullable Long predioId,
         @Nullable Long vehiculoId,
         LocalDate actualizadoA) {
@@ -67,6 +96,10 @@ public record ReferenciaDeObligacion(
             throw new IllegalArgumentException(
                     "El tributo no puede estar vacio ni contener el separador: '" + tributo + "'");
         }
+        if (contribuyenteId != null && contribuyenteId <= 0) {
+            throw new IllegalArgumentException(
+                    "El deudor es un contribuyente del padron: " + contribuyenteId);
+        }
         if (predioId != null && vehiculoId != null) {
             throw new IllegalArgumentException(
                     "Una obligacion es de un predio o de un vehiculo, no de los dos");
@@ -74,21 +107,31 @@ public record ReferenciaDeObligacion(
         Objects.requireNonNull(actualizadoA, "Toda cifra indica su fecha (regla 9, RNF-075)");
     }
 
-    public static ReferenciaDeObligacion de(SeleccionDeObligacion obligacion, LocalDate aLaFecha) {
+    /** La orden de un deudor: la obligacion que se cobra y de quien es (#431). */
+    public static ReferenciaDeObligacion de(
+            long contribuyenteId, SeleccionDeObligacion obligacion, LocalDate aLaFecha) {
         return new ReferenciaDeObligacion(
                 obligacion.tributo(),
                 obligacion.ejercicio(),
+                contribuyenteId,
                 obligacion.predioId(),
                 obligacion.vehiculoId(),
                 aLaFecha);
     }
 
-    /** Lo que viaja a la caja. */
+    /**
+     * Lo que viaja a la caja.
+     *
+     * <p>Con el deudor dentro (#431). Sin el —solo en una referencia de cinco partes que se leyo de
+     * un pago en vuelo— devuelve esa misma forma, de modo que leer y volver a escribir no cambia el
+     * texto.
+     */
     public String texto() {
         return tributo
                 + SEPARADOR
                 + ejercicio.valor()
                 + SEPARADOR
+                + (contribuyenteId == null ? "" : contribuyenteId + SEPARADOR)
                 + (predioId == null ? "" : predioId)
                 + SEPARADOR
                 + (vehiculoId == null ? "" : vehiculoId)
@@ -107,22 +150,41 @@ public record ReferenciaDeObligacion(
     public static ReferenciaDeObligacion leer(String texto) {
         Objects.requireNonNull(texto, "No hay referencia que leer");
         String[] partes = texto.split("\\|", -1);
-        if (partes.length != 5) {
-            throw new ReferenciaIlegible(texto, "tiene " + partes.length + " partes y necesita 5");
+        if (partes.length != 5 && partes.length != 6) {
+            throw new ReferenciaIlegible(
+                    texto,
+                    "tiene "
+                            + partes.length
+                            + " partes y necesita 6 —o 5, la forma de antes de #431, sin deudor—");
         }
+        // Las dos formas se distinguen por la cuenta, y solo por ella: la de cinco es la de una
+        // orden emitida antes de #431, y su deudor lo pone quien imputa (el pagador del pago).
+        boolean conDeudor = partes.length == 6;
+        int unidad = conDeudor ? 3 : 2;
         try {
+            if (conDeudor && partes[2].isEmpty()) {
+                throw new IllegalArgumentException(
+                        "la forma de seis partes lleva siempre al deudor en la tercera");
+            }
             return new ReferenciaDeObligacion(
                     partes[0],
                     new Ejercicio(Integer.parseInt(partes[1])),
-                    partes[2].isEmpty() ? null : Long.parseLong(partes[2]),
-                    partes[3].isEmpty() ? null : Long.parseLong(partes[3]),
-                    LocalDate.parse(partes[4]));
+                    conDeudor ? Long.parseLong(partes[2]) : null,
+                    partes[unidad].isEmpty() ? null : Long.parseLong(partes[unidad]),
+                    partes[unidad + 1].isEmpty() ? null : Long.parseLong(partes[unidad + 1]),
+                    LocalDate.parse(partes[unidad + 2]));
         } catch (IllegalArgumentException | java.time.format.DateTimeParseException malEscrita) {
             throw new ReferenciaIlegible(texto, malEscrita.getMessage());
         }
     }
 
-    /** La obligacion, sin la fecha: contra esto se imputa el pago. */
+    /**
+     * La obligacion, sin la fecha ni el deudor: contra esto se imputa el pago.
+     *
+     * <p>Sin el deudor porque {@link SeleccionDeObligacion} es lo que la ventanilla marca y no lo
+     * lleva; quien imputa lo empareja con el deudor de esta referencia —o con el pagador, si es de
+     * cinco partes— antes de ir al libro (#431).
+     */
     public SeleccionDeObligacion comoSeleccion() {
         return new SeleccionDeObligacion(tributo, ejercicio, predioId, vehiculoId);
     }

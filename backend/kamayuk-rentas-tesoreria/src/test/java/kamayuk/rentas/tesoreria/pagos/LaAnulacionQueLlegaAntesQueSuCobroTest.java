@@ -392,7 +392,7 @@ class LaAnulacionQueLlegaAntesQueSuCobroTest {
 
     private static PagoRecibido pagoDe(UUID pagoId, String sufijo, long predio, String importe) {
         ReferenciaDeObligacion referencia =
-                new ReferenciaDeObligacion(TRIBUTO, EJERCICIO, predio, null, HOY);
+                new ReferenciaDeObligacion(TRIBUTO, EJERCICIO, contribuyente, predio, null, HOY);
         String cuerpo =
                 "{\"pagoId\":\""
                         + pagoId

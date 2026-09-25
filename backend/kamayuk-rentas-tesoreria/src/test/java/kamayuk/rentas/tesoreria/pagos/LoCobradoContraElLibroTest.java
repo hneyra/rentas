@@ -438,7 +438,8 @@ class LoCobradoContraElLibroTest {
     private static PagoRecibido pagoInventado(
             long predio, String importe, LocalDate fechaDePago, String sufijo) {
         return pago(
-                new ReferenciaDeObligacion(TRIBUTO, EJERCICIO, predio, null, fechaDePago),
+                new ReferenciaDeObligacion(
+                        TRIBUTO, EJERCICIO, contribuyente, predio, null, fechaDePago),
                 Dinero.de(importe),
                 fechaDePago,
                 "RECIBO 001-" + sufijo);

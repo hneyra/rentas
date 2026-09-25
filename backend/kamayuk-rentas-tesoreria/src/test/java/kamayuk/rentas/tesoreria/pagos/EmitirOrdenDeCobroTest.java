@@ -124,7 +124,7 @@ class EmitirOrdenDeCobroTest {
             assertThat(emitida.actualizadoA()).isEqualTo(MARZO);
             assertThat(emitida.referencia().texto())
                     .as("regla 9: no existe «la deuda», existe la deuda a una fecha")
-                    .isEqualTo("PREDIAL|2026|71||2026-03-16");
+                    .isEqualTo("PREDIAL|2026|" + CONTRIBUYENTE + "|71||2026-03-16");
             assertThat(caja.recibidas().get(0).actualizadoA()).isEqualTo(MARZO);
         }
     }
@@ -179,6 +179,43 @@ class EmitirOrdenDeCobroTest {
                                     + " podria cobrar por ninguna via")
                     .isNotEqualTo(enMarzo);
             assertThat(enAbril.nueva()).isTrue();
+        }
+
+        @Test
+        @DisplayName(
+                "#431 — dos condominos del mismo predio, el mismo dia, son DOS ordenes con su"
+                        + " importe y su deudor")
+        void dosCondominosSonDosOrdenes() {
+            // La siembra que distingue: el MISMO predio y el MISMO dia, dos titulares y dos
+            // importes. Con una sola persona, o con dos predios, la referencia sin deudor ya
+            // separaba las ordenes y la prueba no veria nada.
+            long condominoA = 4_411L;
+            long condominoB = 4_412L;
+            libro.debe(condominoA, "PREDIAL", 2026, 10L, "300.00", "0.00", "0.00", "0.00");
+            libro.debe(condominoB, "PREDIAL", 2026, 10L, "200.00", "0.00", "0.00", "0.00");
+
+            EmitirOrdenDeCobro.Emitida deA =
+                    emitir.emitir(peticionDe(condominoA, predialDel(10L)), PORQUE)
+                            .emitidas()
+                            .get(0);
+            EmitirOrdenDeCobro.Emitida deB =
+                    emitir.emitir(peticionDe(condominoB, predialDel(10L)), PORQUE)
+                            .emitidas()
+                            .get(0);
+
+            assertThat(deB.ordenId())
+                    .as(
+                            "la idempotencia de la caja es por referencia: sin el deudor dentro, B"
+                                    + " recibia la orden de A —con el importe de A y A de"
+                                    + " pagador— y pagarla extinguia la deuda del otro")
+                    .isNotEqualTo(deA.ordenId());
+            assertThat(deB.nueva()).isTrue();
+            assertThat(caja.recibidas())
+                    .extracting(OrdenesDeCobro.Peticion::importe)
+                    .containsExactly(Dinero.de("300.00"), Dinero.de("200.00"));
+            assertThat(caja.recibidas())
+                    .extracting(OrdenesDeCobro.Peticion::contribuyenteId)
+                    .containsExactly(condominoA, condominoB);
         }
 
         @Test
@@ -260,6 +297,16 @@ class EmitirOrdenDeCobroTest {
 
     private static List<SeleccionDeObligacion> predial() {
         return List.of(new SeleccionDeObligacion("PREDIAL", new Ejercicio(2026), 71L, null));
+    }
+
+    private static List<SeleccionDeObligacion> predialDel(long predio) {
+        return List.of(new SeleccionDeObligacion("PREDIAL", new Ejercicio(2026), predio, null));
+    }
+
+    private static EmitirOrdenDeCobro.Peticion peticionDe(
+            long contribuyente, List<SeleccionDeObligacion> obligaciones) {
+        return new EmitirOrdenDeCobro.Peticion(
+                contribuyente, obligaciones, MARZO, null, null, null);
     }
 
     private static EmitirOrdenDeCobro.Peticion peticion(List<SeleccionDeObligacion> obligaciones) {

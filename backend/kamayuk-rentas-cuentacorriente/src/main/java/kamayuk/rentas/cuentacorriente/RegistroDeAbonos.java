@@ -45,14 +45,16 @@ public interface RegistroDeAbonos {
      *
      * <ol>
      *   <li>bloquea en la base las filas de saldo de cada obligacion marcada, en orden estable
-     *       —para que dos cobranzas concurrentes con selecciones que se solapan se serialicen en
-     *       vez de bloquearse mutuamente—;
+     *       sobre la clave completa —deudor incluido— para que dos cobranzas concurrentes con
+     *       selecciones que se solapan se serialicen en vez de bloquearse mutuamente;
      *   <li>relee lo que queda por extinguir de cada cuota con {@code
      *       extinguibleDesde(fechaDePago)}, ya con el libro que la cobranza anterior dejo —y con
      *       los abonos de fecha valor posterior dentro: un cobro que la caja entrega tarde no
      *       vuelve a extinguir lo que otro, fechado despues, ya extinguio (#471)—;
      *   <li><b>compara lo releido con {@code cobrado}, ANTES de escribir una sola fila</b>, y si no
-     *       coinciden al centimo lanza {@link ImporteCobradoNoCuadra} sin asentar nada (#39);
+     *       coinciden al centimo lanza {@link ImporteCobradoNoCuadra} sin asentar nada (#39). Es
+     *       <b>una</b> comparacion sobre el total del cobro, aunque sus lineas sean de deudores
+     *       distintos (#431): la caja cobro un recibo, no una cifra por deudor;
      *   <li>asienta el cargo del reajuste y del interes <b>devengados y no asentados</b> —al
      *       cobrarlos dejan de ser una proyeccion y pasan a ser un hecho— y, contra ellos, el abono
      *       de las cuatro partes.
@@ -63,8 +65,9 @@ public interface RegistroDeAbonos {
      * de {@code CONDONACION} con su motivo, y la escribira quien tenga los valores de la ordenanza
      * firmados.
      *
-     * @param contribuyenteId a quien se le cobra; lo resolvio quien llama
-     * @param obligaciones las marcadas en ventanilla; sin repetidas
+     * @param obligaciones las marcadas en ventanilla, <b>cada una con su deudor</b> (#431); sin
+     *     repetidas. Un recibo puede cobrar ordenes de deudores distintos —la caja publica un solo
+     *     pagador—, y cada abono se asienta a nombre del deudor de su linea, no de quien pago
      * @param cobrado lo que la caja cobro de verdad, tal como lo publico con el pago. <b>No se
      *     abona: se compara</b> — ver la cabecera de esta interfaz
      * @param fechaDePago la fecha a la que se relee la deuda y se imputan los asientos (regla 9)
@@ -77,8 +80,7 @@ public interface RegistroDeAbonos {
      *     cobrado}
      */
     List<AbonoAsentado> abonarPagoIntegro(
-            long contribuyenteId,
-            List<SeleccionDeObligacion> obligaciones,
+            List<ObligacionDelDeudor> obligaciones,
             Dinero cobrado,
             LocalDate fechaDePago,
             String documentoOrigen,
