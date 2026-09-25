@@ -1151,6 +1151,14 @@ const PANTALLAS = {
      resolución resolvió, a su fecha—. «Por prescribir» exigiría un umbral —cuánto de cerca es
      «cerca»— que el corpus de `normativa` no publica, y no se inventa (regla 5).
 
+     Y desde #388 esa fecha SE ESCRIBE: entra «Presentada el» y «Situación» pasa a llamarse
+     «Situación al presentar». `prescrita` vale lo que valía el día de la solicitud, no hoy, y sin
+     su fecha la fila se leía como la situación de hoy junto a un «Prescribe el» que ya pasó. Las
+     cuatro filas de muestra guardan la relación que `ComputoDePrescripcion` impone: «Prescrito»
+     cuando la presentación no es anterior al vencimiento, «Vigente» cuando lo es. Y el «Vigente»
+     de esta columna NO se pinta en el verde de conforme: lo decide una regla de insignia de la
+     columna en la definición, con el tono de «no se».
+
      Y los TRES MANDOS se corrigen en #244, que es lo que #230 dejó escrito y sin hacer. Ninguno
      llega todavía al conector —eso es #172—, y aun así dos de los tres preguntaban lo que esta
      operación no admite. Lo que decide cada uno es `GET /coactiva/prescripcion`:
@@ -1184,11 +1192,11 @@ const PANTALLAS = {
     ['Ejercicio solicitado', 's', ['Todos', '2026', '2025', '2024', '2023', '2022']],
     ['Resultado de la solicitud', 's', ['Todos', 'Procede', 'Procede en parte', 'No procede']],
     ['Declaraciones', 'r', '48']],
-    { t: 'Reloj de prescripción', cn: '4 de 48', c: [['Contribuyente', 0], ['Ejercicio', 0], ['Prescribe el', 0], ['Situación', 0]], f: [
-      ['Chávez Ipanaqué, María', '2021', '31/12/2025', 'Prescrito'],
-      ['Chávez Ipanaqué, María', '2022', '31/12/2026', 'Vigente'],
-      ['Sernaqué Correa, Luis', '2020', '31/12/2024', 'Prescrito'],
-      ['Sernaqué Correa, Luis', '2023', '31/12/2027', 'Vigente']], i: 3,
+    { t: 'Reloj de prescripción', cn: '4 de 48', c: [['Contribuyente', 0], ['Ejercicio', 0], ['Prescribe el', 0], ['Presentada el', 0], ['Situación al presentar', 0]], f: [
+      ['Chávez Ipanaqué, María', '2021', '31/12/2025', '02/03/2026', 'Prescrito'],
+      ['Chávez Ipanaqué, María', '2022', '31/12/2026', '02/03/2026', 'Vigente'],
+      ['Sernaqué Correa, Luis', '2020', '31/12/2024', '15/06/2025', 'Prescrito'],
+      ['Sernaqué Correa, Luis', '2023', '31/12/2027', '15/06/2025', 'Vigente']], i: 4,
       n: 'Declarar la prescripción es un acto: se hace de oficio o a pedido, y queda en la bitácora.' }]]
 };
 
