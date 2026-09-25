@@ -503,6 +503,100 @@ class PredialControllerTest {
         assertThat(cuerpo).doesNotContain("\"derechoDeEmision\":4.5");
     }
 
+    /**
+     * <b>{@code ?simulacion=false} contesta la ultima EMISION, y sin el parametro la ruta contesta
+     * lo de siempre</b> (#357).
+     *
+     * <p>La muestra es la que distingue: primero se emite el padron y <b>despues</b> se simula. Con
+     * el orden al reves, «la ultima corrida» y «la ultima emision» serian la misma y una ruta que
+     * ignorara el parametro —que es lo que hace Spring con uno que la firma no declara— pasaria en
+     * verde.
+     */
+    @Test
+    @DisplayName("#357 — ?simulacion=false devuelve la emision aunque despues se simulara")
+    void laUltimaEmisionNoLaTapaUnaSimulacionPosterior() throws Exception {
+        predios.con(11L, "10001", "AV. GRAU 100", Porcentaje.total());
+        sembrarUnPadronQueSeRecalcula();
+        mvc = montar(cuadroCompleto());
+
+        assertThat(
+                        mvc.perform(asentarLaCorrida("TODOS", null))
+                                .andReturn()
+                                .getResponse()
+                                .getStatus())
+                .isEqualTo(201);
+        assertThat(mvc.perform(recalcularElPadron()).andReturn().getResponse().getStatus())
+                .isEqualTo(201);
+
+        MvcResult emision =
+                mvc.perform(
+                                get("/rentas/api/v1/rentas/predial/corridas/ultima")
+                                        .param("simulacion", "false"))
+                        .andReturn();
+        assertThat(emision.getResponse().getStatus()).isEqualTo(200);
+        assertThat(emision.getResponse().getContentAsString())
+                .as("la emision de verdad, y no el ensayo que se corrio despues")
+                .contains("\"simulacion\":false")
+                .contains("\"id\":1,");
+
+        assertThat(
+                        mvc.perform(get("/rentas/api/v1/rentas/predial/corridas/ultima"))
+                                .andReturn()
+                                .getResponse()
+                                .getContentAsString())
+                .as("sin el parametro, lo de siempre: la ultima corrida, simulaciones incluidas")
+                .contains("\"simulacion\":true")
+                .contains("\"id\":2,");
+    }
+
+    /**
+     * <b>Con solo simulaciones del ejercicio, {@code ?simulacion=false} contesta 204</b> (#357):
+     * «todavia no se ha emitido», y no el ensayo con cara de emision.
+     */
+    @Test
+    @DisplayName("#357 — con solo una simulacion, ?simulacion=false es 204")
+    void conSoloUnaSimulacionNoHayEmision() throws Exception {
+        mvc.perform(
+                        post("/rentas/api/v1/rentas/predial/calculo-masivo")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"modalidad\":\"TRIMESTRAL\",\"simulacion\":true}"))
+                .andReturn();
+
+        assertThat(
+                        mvc.perform(get("/rentas/api/v1/rentas/predial/corridas/ultima"))
+                                .andReturn()
+                                .getResponse()
+                                .getStatus())
+                .isEqualTo(200);
+        assertThat(
+                        mvc.perform(
+                                        get("/rentas/api/v1/rentas/predial/corridas/ultima")
+                                                .param("simulacion", "false"))
+                                .andReturn()
+                                .getResponse()
+                                .getStatus())
+                .as("un ensayo no es una emision")
+                .isEqualTo(204);
+    }
+
+    /**
+     * <b>{@code ?simulacion=true} se rechaza, no se ignora</b> (#357). La ruta sabe contestar dos
+     * preguntas —la ultima corrida y la ultima emision— y «la ultima simulacion» no es ninguna de
+     * las dos. Ignorarlo contestaria una emision a quien pidio un ensayo.
+     */
+    @Test
+    @DisplayName("#357 — ?simulacion=true es 422, no la ultima corrida en silencio")
+    void soloSeFiltraPorEmision() throws Exception {
+        MvcResult resultado =
+                mvc.perform(
+                                get("/rentas/api/v1/rentas/predial/corridas/ultima")
+                                        .param("simulacion", "true"))
+                        .andReturn();
+
+        assertThat(resultado.getResponse().getStatus()).isEqualTo(422);
+        assertThat(resultado.getResponse().getContentAsString()).contains("simulacion");
+    }
+
     @Test
     @DisplayName("el acceso de la lectura de la corrida es el de su pantalla, con LECTURA")
     void elAccesoDeLaLecturaDeLaCorrida() throws Exception {
@@ -2495,6 +2589,18 @@ class PredialControllerTest {
                     .findFirst();
         }
 
+        /* El filtro que el SQL hace con `AND NOT simulacion` (#357). Aqui se mide que
+        la ruta pida esta lectura y no la otra; que la consulta filtre de verdad lo mide
+        `CorridaDeEmisionJdbcTest` contra PostgreSQL. */
+        @Override
+        public java.util.Optional<kamayuk.rentas.nucleo.dominio.CorridaDeEmision> ultimaEmisionDe(
+                kamayuk.rentas.dominio.Ejercicio ejercicio) {
+            return guardadas.reversed().stream()
+                    .filter(corrida -> corrida.ejercicio().equals(ejercicio))
+                    .filter(corrida -> !corrida.simulacion())
+                    .findFirst();
+        }
+
         @Override
         public java.util.List<kamayuk.rentas.nucleo.dominio.CorridaDeEmision> ultimas(int cuantas) {
             return guardadas.reversed().stream().limit(cuantas).toList();
@@ -2531,6 +2637,12 @@ class PredialControllerTest {
 
         @Override
         public java.util.Optional<kamayuk.rentas.nucleo.dominio.CorridaDeEmision> ultimaDe(
+                kamayuk.rentas.dominio.Ejercicio ejercicio) {
+            return java.util.Optional.empty();
+        }
+
+        @Override
+        public java.util.Optional<kamayuk.rentas.nucleo.dominio.CorridaDeEmision> ultimaEmisionDe(
                 kamayuk.rentas.dominio.Ejercicio ejercicio) {
             return java.util.Optional.empty();
         }

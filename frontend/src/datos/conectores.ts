@@ -30,6 +30,7 @@ import { CONECTORES_DE_FISCALIZACION } from './conectores/fiscalizacion.ts';
 import { CONECTORES_DE_TRANSITO } from './conectores/transito.ts';
 import { CONECTORES_DE_SEGURIDAD } from './conectores/seguridad.ts';
 import { CONECTORES_DE_VALORES } from './conectores/valores.ts';
+import { porQueNoEsLaEmisionDelEjercicio } from './conectores/laEmision.ts';
 
 /**
  * **Que pantalla pide que, y que de lo que llega dibuja cada campo** (#97, #169).
@@ -482,6 +483,27 @@ export function loQueLaHojaDeclara(
 }
 
 /**
+ * Lo que dice `panel` cuando el ejercicio todavia no tiene ninguna emision (#357).
+ *
+ * `?simulacion=false` contesta 204 aunque se haya simulado, y ese es el estado de cualquier
+ * municipalidad entre el 1 de enero y su primera emision. La frase de por omision —«sin datos»—
+ * diria que a la pantalla le falta algo, y lo que pasa es un hecho del ejercicio: todavia no se ha
+ * emitido. Lo que hay que hacer con el es simular, revisar los observados y emitir.
+ */
+const TODAVIA_SIN_EMITIR: Ausencia = {
+  // La misma palabra que `SIN_EMISION_DEL_EJERCICIO`, con la que `ini-panel` dice lo mismo en su
+  // campo. Escrita como literal y no importada: el inventario del locale solo lee frases literales
+  // de una `Ausencia` (`ninguna-ausencia-se-queda-sin-inventariar`). Que coincidan lo vigila
+  // `conectores.test.ts`.
+  enElCampo: 'todavia sin emitir',
+  explicacion:
+    'Este ejercicio todavia no tiene ninguna emision del predial: no es que falte un dato, es que ' +
+    'no se ha emitido. Si ya se simulo, la simulacion no cuenta — un ensayo no asienta deuda. Se ' +
+    'emite desde el calculo masivo, despues de revisar sus observados.',
+  tono: 'info',
+};
+
+/**
  * `panel` — el estado de la ultima corrida del padron.
  *
  * De `CorridaDelPredial` salen la fecha, los observados y **las cinco columnas de la tabla, que
@@ -523,23 +545,48 @@ export function loQueLaHojaDeclara(
  * **Esto no cierra D-02b**, y conviene no leerlo asi: el valor efectivo lo fija la ordenanza local
  * y hoy no lo publica nadie, de modo que en una instalacion de verdad toda corrida que determine a
  * alguien sigue sin poder terminar. Lo que se cierra es que la corrida lo aplicara y lo olvidara.
+ *
+ * <h2>La ultima EMISION, y no la ultima corrida (#357)</h2>
+ *
+ * El bloque se llama «Estado de la emision» y sus rotulos afirman una: «Cuentas emitidas», «Monto
+ * determinado». Hasta #357 se pedia la ultima corrida, **simulaciones incluidas** —la ruta las
+ * devuelve a proposito, porque la pantalla del calculo masivo las necesita—, y el reparto no leia
+ * `simulacion` ni `alcance`: una simulacion del sector 04 corrida despues de emitir el padron
+ * escribia sus 120 cuentas bajo «Cuentas emitidas» y la emision de verdad dejaba de verse. Esa
+ * garantia existia hasta I-4 y se fue con la V6 en #90.
+ *
+ * Ahora se pide `?simulacion=false` (`RUTAS.ultimaEmision`) y el 204 —ejercicio sin emitir, aunque
+ * se haya simulado— se dice con `TODAVIA_SIN_EMITIR`. Y el reparto lleva su red: si la corrida que
+ * llega es un ensayo, o de una parte del padron, «Cuentas emitidas» y «Monto determinado» no la
+ * escriben y su hueco dice por que (`porQueNoEsLaEmisionDelEjercicio`). Los rotulos no cambian: la
+ * definicion esta atada campo a campo al artboard.
  */
 const PANEL: Conector = {
-  clave: ['panel', 'ultima-corrida'],
-  // `pedirUnoOVacio` y no `pedirUno`: sin ninguna corrida del ejercicio esta operacion contesta
-  // **204 sin cuerpo** (#523), y hasta #237 eso reventaba en `respuesta.json()` — la pantalla decia
-  // «fallo» donde la verdad es «todavia no se ha corrido».
-  pedir: ({ senal }) => pedirUnoOVacio<CorridaDelPredial>(RUTAS.ultimaCorrida, senal),
-  repartir: (corrida: CorridaDelPredial): Reparto => ({
+  clave: ['panel', 'ultima-emision'],
+  // `pedirUnoOVacio` y no `pedirUno`: sin ninguna emision del ejercicio esta operacion contesta
+  // **204 sin cuerpo** (#523, #357), y hasta #237 eso reventaba en `respuesta.json()` — la pantalla
+  // decia «fallo» donde la verdad es «todavia no se ha emitido».
+  pedir: ({ senal }) => pedirUnoOVacio<CorridaDelPredial>(RUTAS.ultimaEmision, senal),
+  sinDato: TODAVIA_SIN_EMITIR,
+  repartir: (corrida: CorridaDelPredial): Reparto => {
+    const noEsLaEmision = porQueNoEsLaEmisionDelEjercicio(corrida);
+    return {
     valores: new Map([
       [coordenada(0, 1), corrida.fechaCalculo],
       // Los dos conteos con `formatearEntero` y no con `String`: el artboard escribe «61,350» con
       // millares, y una emision anual los tiene. Con `String` los observados salian sin agrupar
       // desde F-6 —invisible mientras fueran 534— y los dos campos del mismo bloque habrian
       // escrito la misma clase de cifra de dos maneras en cuanto pasaran del millar.
-      [coordenada(0, 2), formatearEntero(corrida.determinados)],
+      //
+      // «Cuentas emitidas» y «Monto determinado» **solo si la corrida es la emision del ejercicio**
+      // (#357): de un ensayo o de una parte del padron van al hueco de abajo con su motivo.
+      ...(noEsLaEmision === null
+        ? [
+            [coordenada(0, 2), formatearEntero(corrida.determinados)] as const,
+            [coordenada(0, 4), formatearImporte(corrida.montoEmitido)] as const,
+          ]
+        : []),
       [coordenada(0, 3), formatearEntero(corrida.observados)],
-      [coordenada(0, 4), formatearImporte(corrida.montoEmitido)],
       // El sexto campo desde #312, y **solo si la corrida lo sello**: sin el, el hueco de abajo
       // dice cual de las dos ausencias es. No se pone una cadena vacia en su lugar, que seria un
       // campo con dato y en blanco — se lee como «no hay derecho» en vez de «no consta».
@@ -559,15 +606,25 @@ const PANEL: Conector = {
         ]),
       ],
     ]),
-    // **Vacio cuando la corrida sello su derecho**, y con UNA entrada cuando no. La palabra no es
-    // `NO_PUBLICADO` —la operacion SI lo publica— sino la de «esa corrida no lo guardo». Ver el
-    // javadoc de arriba: son dos ausencias distintas y el backend no puede arreglar la segunda.
-    noPublicados:
-      corrida.derechoDeEmision === null
-        ? new Map([[coordenada(0, 5), NO_CONSTA_EN_LA_CORRIDA]])
-        : new Map(),
-  }),
+    // **Vacio cuando la corrida es la emision del ejercicio y sello su derecho.** La palabra del
+    // derecho no es `NO_PUBLICADO` —la operacion SI lo publica— sino la de «esa corrida no lo
+    // guardo». Ver el javadoc de arriba: son dos ausencias distintas y el backend no puede arreglar
+    // la segunda. Y las dos cifras de la emision, con el motivo de #357 cuando no lo es.
+    noPublicados: new Map<Coordenada, PalabraDeHueco>([
+      ...(noEsLaEmision === null
+        ? []
+        : [
+            [coordenada(0, 2), noEsLaEmision] as const,
+            [coordenada(0, 4), noEsLaEmision] as const,
+          ]),
+      ...(corrida.derechoDeEmision === null
+        ? [[coordenada(0, 5), NO_CONSTA_EN_LA_CORRIDA] as const]
+        : []),
+    ]),
+    };
+  },
 };
+
 
 
 /** Lo que se dice cuando el codigo de la direccion no esta en el padron (#237). */
@@ -842,4 +899,5 @@ export {
   NO_PUBLICADO,
   SIN_CRONOGRAMA,
   TODAVIA_SIN_DETERMINAR,
+  TODAVIA_SIN_EMITIR,
 };

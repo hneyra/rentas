@@ -430,7 +430,7 @@
     "obligatorios": [],
     "algunoDeEstos": [],
     "condicionales": [],
-    "opcionales": ["ejercicio"],
+    "opcionales": ["ejercicio", "simulacion"],
     "enElCuerpo": []
   },
   "GET /rentas/predial/corridas/{corridaId}/observados": {

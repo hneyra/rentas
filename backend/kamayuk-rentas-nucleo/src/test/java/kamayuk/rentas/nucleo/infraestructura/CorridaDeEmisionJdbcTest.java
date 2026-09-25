@@ -222,6 +222,87 @@ class CorridaDeEmisionJdbcTest {
                 .isTrue();
     }
 
+    /**
+     * <b>«La ultima corrida» y «la ultima emision» son dos preguntas, y una simulacion posterior no
+     * tapa la emision</b> (#357).
+     *
+     * <h2>La muestra que distingue</h2>
+     *
+     * <p>Una emision real con id N y, despues, una simulacion con id N+1 del mismo ejercicio: es el
+     * orden en que pasa de verdad —se emite el padron y luego alguien simula un sector para revisar
+     * sus observados—. Con la simulacion <b>antes</b> que la emision, «la ultima» y «la ultima
+     * emision» serian la misma fila y cualquier consulta pasaria. Y las cifras de las dos no se
+     * parecen —61 350 cuentas y S/ 9,418,204.60 frente a 120 y S/ 18,400.00—, para que leer la
+     * equivocada no pueda coincidir con la correcta.
+     *
+     * <p>Y la lectura de siempre no cambia: {@link CorridaDeEmisionRepositoryJdbc#ultimaDe} sigue
+     * devolviendo la simulacion, que es lo que necesita la pantalla del calculo masivo.
+     */
+    @Test
+    @DisplayName("#357 — la ultima EMISION no es la ultima simulacion del mismo ejercicio")
+    void laUltimaEmisionNoEsLaSimulacionPosterior() {
+        TenantContext.fijar(new MunicipalidadId(municipalidadA));
+
+        CorridaDeEmision emision =
+                transaccion.execute(
+                        estado ->
+                                repositorio.guardar(
+                                        corridaDe(2017, 62418, 61350, "9418204.60", List.of()),
+                                        Observacion.de("Emision anual 2017")));
+        CorridaDeEmision simulacion =
+                transaccion.execute(
+                        estado ->
+                                repositorio.guardar(
+                                        simulacionDelSector(2017, "04", 120, "18400.00"),
+                                        Observacion.de("Simulacion del sector 04")));
+        assertThat(requireId(simulacion))
+                .as("la muestra exige la simulacion DESPUES de la emision")
+                .isGreaterThan(requireId(emision));
+
+        Optional<CorridaDeEmision> ultimaEmision =
+                transaccion.execute(estado -> repositorio.ultimaEmisionDe(new Ejercicio(2017)));
+
+        assertThat(ultimaEmision).isPresent();
+        assertThat(ultimaEmision.get().id())
+                .as("la emision de verdad, y no el ensayo que se corrio despues")
+                .isEqualTo(emision.id());
+        assertThat(ultimaEmision.get().simulacion()).isFalse();
+        assertThat(ultimaEmision.get().determinados()).isEqualTo(61350);
+        assertThat(ultimaEmision.get().montoEmitido()).isEqualTo(Dinero.de("9418204.60"));
+
+        Optional<CorridaDeEmision> ultima =
+                transaccion.execute(estado -> repositorio.ultimaDe(new Ejercicio(2017)));
+        assertThat(ultima.map(CorridaDeEmision::id))
+                .as("la especificacion que ya existia no cambia: la ultima corrida es el ensayo")
+                .contains(requireId(simulacion));
+    }
+
+    /**
+     * <b>Un ejercicio con solo simulaciones no tiene emision</b>, y la lectura lo dice vacia en vez
+     * de devolver el ensayo (#357): es el caso de «una simulacion pasa por emision».
+     */
+    @Test
+    @DisplayName("#357 — con solo simulaciones del ejercicio, no hay ultima emision")
+    void conSoloSimulacionesNoHayEmision() {
+        TenantContext.fijar(new MunicipalidadId(municipalidadA));
+
+        transaccion.execute(
+                estado ->
+                        repositorio.guardar(
+                                simulacionDelSector(2016, "04", 58412, "8772431.05"),
+                                Observacion.de("Simulacion del padron 2016")));
+
+        Optional<CorridaDeEmision> ultima =
+                transaccion.execute(estado -> repositorio.ultimaDe(new Ejercicio(2016)));
+        Optional<CorridaDeEmision> ultimaEmision =
+                transaccion.execute(estado -> repositorio.ultimaEmisionDe(new Ejercicio(2016)));
+
+        assertThat(ultima).as("la corrida existe: es un ensayo").isPresent();
+        assertThat(ultimaEmision)
+                .as("un ensayo no es una emision: no hay deuda asentada que ensenar")
+                .isEmpty();
+    }
+
     @Test
     @DisplayName("sin corridas del ejercicio no hay cabecera de ceros: no hay nada")
     void sinCorridasNoHayCabeceraDeCeros() {
@@ -468,6 +549,30 @@ class CorridaDeEmisionJdbcTest {
                 Dinero.de(monto),
                 LocalDate.of(2026, 1, 28),
                 observados);
+    }
+
+    /**
+     * Una simulacion acotada a un sector, sin conjunto sellado: no determino nada que sellar (V23).
+     */
+    private static CorridaDeEmision simulacionDelSector(
+            int ejercicio, String sector, int determinados, String monto) {
+        return new CorridaDeEmision(
+                null,
+                new Ejercicio(ejercicio),
+                "SECTOR",
+                sector,
+                null,
+                null,
+                "TRIMESTRAL",
+                true,
+                "",
+                null,
+                null,
+                determinados,
+                determinados,
+                Dinero.de(monto),
+                LocalDate.of(2026, 2, 3),
+                List.of());
     }
 
     private static List<CorridaDeEmision.Observado> observadosDePrueba() {

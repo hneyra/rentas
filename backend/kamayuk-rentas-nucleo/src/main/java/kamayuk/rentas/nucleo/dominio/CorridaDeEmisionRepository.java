@@ -34,6 +34,21 @@ public interface CorridaDeEmisionRepository {
      */
     Optional<CorridaDeEmision> ultimaDe(Ejercicio ejercicio);
 
+    /**
+     * La ultima corrida del ejercicio que <b>emitio de verdad</b>: las simulaciones no cuentan
+     * (#357). Sin observados, por lo mismo que {@link #ultimaDe}.
+     *
+     * <p>«La ultima corrida» y «la ultima emision» son dos preguntas distintas, y hasta #357 una
+     * sola lectura contestaba las dos. La pantalla del calculo masivo necesita la primera,
+     * simulaciones incluidas —ver los observados antes de emitir es para lo que se simula—. El
+     * estado de la emision necesita la segunda: una simulacion no asienta ninguna deuda, y sus
+     * agregados escritos bajo «Cuentas emitidas» afirman una emision que no existe, o tapan la que
+     * si.
+     *
+     * <p>Vacio si el ejercicio no tiene ninguna emision, aunque tenga simulaciones.
+     */
+    Optional<CorridaDeEmision> ultimaEmisionDe(Ejercicio ejercicio);
+
     /** Los observados de una corrida, paginados: son la lista de cosas que arreglar. */
     Pagina<CorridaDeEmision.Observado> observadosDe(long corridaId, Paginacion paginacion);
 

@@ -212,3 +212,56 @@ describe('`panel` — el estado de la emision', () => {
     expect(container.textContent).not.toContain('S/ 3.70');
   });
 });
+
+/**
+ * **El estado de la emision pide la ultima EMISION, y sin ninguna lo dice** (#357).
+ *
+ * La ruta de siempre devuelve la ultima corrida, simulaciones incluidas, porque la pantalla del
+ * calculo masivo las necesita. Este bloque se llama «Estado de la emision» y no puede ensenar un
+ * ensayo: pide `?simulacion=false`, y el 204 que entonces llega —ejercicio sin emitir, aunque se
+ * haya simulado— se dice con su palabra y no con el «sin datos» generico.
+ */
+describe('`panel` — la ultima EMISION, no la ultima corrida (#357)', () => {
+  /** Como `contesta`, pero guarda lo que se pidio y admite un 204 sin cuerpo. */
+  function contestaYAnota(respuesta: CorridaDelPredial | null): string[] {
+    const pedidas: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<typeof fetch>((entrada) => {
+        pedidas.push(String(entrada));
+        return Promise.resolve(
+          respuesta === null
+            ? new Response(null, { status: 204 })
+            : new Response(JSON.stringify(respuesta), {
+                status: 200,
+                headers: { 'content-type': 'application/json' },
+              }),
+        );
+      }),
+    );
+    return pedidas;
+  }
+
+  it('la peticion lleva `?simulacion=false`', async () => {
+    const pedidas = contestaYAnota(corrida());
+    arnes()();
+
+    await waitFor(() => {
+      expect(screen.getByText('58,412')).toBeInTheDocument();
+    });
+    expect(pedidas.some((url) => url.includes('/rentas/predial/corridas/ultima'))).toBe(true);
+    expect(pedidas.filter((url) => url.includes('/corridas/ultima'))).toEqual(
+      pedidas.filter((url) => url.includes('/corridas/ultima?simulacion=false')),
+    );
+  });
+
+  it('con un 204 dice «todavia sin emitir», y no «sin datos»', async () => {
+    contestaYAnota(null);
+    arnes()();
+
+    await waitFor(() => {
+      expect(screen.getAllByText('todavia sin emitir').length).toBeGreaterThan(0);
+    });
+    expect(screen.queryByText('sin datos')).toBeNull();
+  });
+});

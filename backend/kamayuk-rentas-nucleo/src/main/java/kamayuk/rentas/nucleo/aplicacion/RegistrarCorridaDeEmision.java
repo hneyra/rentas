@@ -55,6 +55,15 @@ public class RegistrarCorridaDeEmision {
         return repositorio.ultimaDe(ejercicio);
     }
 
+    /**
+     * La ultima corrida del ejercicio que emitio de verdad, sin sus observados (#357). Vacio si
+     * solo hay simulaciones, o ninguna corrida.
+     */
+    @Transactional(readOnly = true)
+    public Optional<CorridaDeEmision> ultimaEmisionDe(Ejercicio ejercicio) {
+        return repositorio.ultimaEmisionDe(ejercicio);
+    }
+
     /** Las ultimas corridas, mas reciente primero. */
     @Transactional(readOnly = true)
     public List<CorridaDeEmision> ultimas(int cuantas) {
