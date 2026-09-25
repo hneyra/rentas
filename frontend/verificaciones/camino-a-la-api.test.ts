@@ -106,8 +106,8 @@ describe('AC7 — lo que se declara servido tiene que publicarlo el backend', ()
   it('las treinta y siete: I-1, I-3, I-4, #168, #170, #167, #169, #181, #179, #180, #184, #215, #237 y #272', () => {
     // La lista escrita a mano es a proposito. Derivarla de `YA_SERVIDAS` la haria pasar diga lo
     // que diga: encender una ruta es una decision, y una decision se revisa leyendo su diff. La
-    // lista crece de una en una porque encenderlas todas a la vez seria cambiar 181 respuestas
-    // en una tarde sin poder decir cual rompio la pantalla; que cada una exista en el contrato
+    // lista crece de una en una porque encenderlas todas a la vez seria cambiar todas las
+    // respuestas en una tarde sin poder decir cual rompio la pantalla; que cada una exista en el contrato
     // lo comprueba el caso de mas abajo.
     expect(YA_SERVIDAS.map((o) => `${o.metodo} ${o.ruta}`)).toEqual([
       'GET /seguridad/sesion',

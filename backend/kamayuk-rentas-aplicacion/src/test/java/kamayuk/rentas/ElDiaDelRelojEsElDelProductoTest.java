@@ -21,11 +21,11 @@ import org.junit.jupiter.params.provider.CsvSource;
  *
  * <h2>Que se mide</h2>
  *
- * <p>{@code backend/*&#47;src/main} tiene 126 {@code LocalDate.now(reloj)} —vencimientos, plazos,
- * cuentas de dias, la fecha que consta en un acto—, y los 126 leen el {@link Clock} de {@link
- * KamayukAplicacion#reloj()}. {@code LocalDate.now(Clock)} trunca con la zona <b>del reloj</b>, asi
- * que el dia de esos 126 sitios es el que diga la zona de ese bean. Esta prueba toma el bean de
- * produccion, conserva su zona, le fija el instante y pregunta que dia es.
+ * <p>{@code backend/*&#47;src/main} tiene {@code MEDIDO: 126 LocalDate.now(reloj) en el codigo de
+ * src/main} —vencimientos, plazos, cuentas de dias, la fecha que consta en un acto—, y todos leen
+ * el {@link Clock} de {@link KamayukAplicacion#reloj()}. {@code LocalDate.now(Clock)} trunca con la
+ * zona <b>del reloj</b>, asi que el dia de esos sitios es el que diga la zona de ese bean. Esta
+ * prueba toma el bean de produccion, conserva su zona, le fija el instante y pregunta que dia es.
  *
  * <h2>Por que en la franja de las 19:00 a la medianoche, y con la JVM en otra zona</h2>
  *

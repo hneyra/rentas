@@ -28,8 +28,8 @@ import { catalogoDeClaves } from '../src/i18n/catalogo-de-claves.ts';
  *
  * <h2>Y por que el locale se REGENERA en vez de escribirse</h2>
  *
- * Porque son 753 entradas derivadas de las definiciones: a mano se quedan viejas a la primera
- * pantalla nueva. `KAMAYUK_REGENERAR=1 yarn vitest run verificaciones/el-locale-esta-completo` lo
+ * Porque son `MEDIDO: 957 entradas de es.json`, y salen del dato: a mano se quedan viejas a la
+ * primera pantalla nueva. `KAMAYUK_REGENERAR=1 yarn vitest run verificaciones/el-locale-esta-completo` lo
  * vuelve a escribir, que es el mismo trato que `kamayuk-lib` da a su archivo de temas.
  */
 
@@ -38,8 +38,8 @@ const LOCALE = join(RAIZ, 'src/i18n/locales/es.json');
 /** Las claves que el interprete no puede derivar del dato: las que estan escritas como `t('…')`. */
 const LITERALES = [
   // Las tres que llevan una cuenta dentro: dos del marco (#133) y el conteo de filas del
-  // interprete (#153). Sus claves base llegan DERIVADAS de `textosDelMarco.ts` —como las 747 de
-  // las definiciones—; lo que no se puede derivar son sus formas plurales: una clave sola no
+  // interprete (#153). Sus claves base llegan DERIVADAS de `textosDelMarco.ts` —como las de las
+  // definiciones—; lo que no se puede derivar son sus formas plurales: una clave sola no
   // expresa dos formas. Hasta #153 la de `registro` era un `t()` literal dentro del interprete.
   '{{count}} registro_one',
   '{{count}} registro_many',
@@ -93,7 +93,7 @@ const LITERALES = [
   'No se pudo salir hacia el emisor de identidad. El navegador dijo: «{{motivo}}».',
   // Las doce del mando de preferencias (#111). Los rotulos de las cuatro identidades y de los tres
   // modos se leen por variable —`t(ROTULO_DE_LA_IDENTIDAD[identidad])`—, asi que `i18next-cli`
-  // no los ve: son de la misma familia que las 747 de las definiciones, y por eso estan aqui.
+  // no los ve: son de la misma familia que las de las definiciones, y por eso estan aqui.
   'Se guarda en este navegador y solo aqui: no viaja al servidor ni cambia lo que ven las demas personas.',
   'Identidad visual',
   'La paleta con que se dibuja este servicio.',

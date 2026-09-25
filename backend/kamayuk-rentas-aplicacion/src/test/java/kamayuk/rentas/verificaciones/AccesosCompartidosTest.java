@@ -34,10 +34,10 @@ import org.springframework.core.annotation.AnnotatedElementUtils;
  *
  * <p>Lo que la prueba <b>no</b> mira es el privilegio: no hace falta, porque el guardia exige el
  * mismo sobre la alternativa que sobre la opcion propia y {@code GuardiaDeAccesoTest} lo mide. Lo
- * que si comprueba es que la opcion alternativa <b>exista en el catalogo de las 130</b>: un acceso
- * inventado no lo tiene nadie, asi que la alternativa no autorizaria a nadie y el endpoint
- * pareceria compartido sin estarlo —la trampa que #366 documento al nombrar
- * «consulta_contribuyentes», una opcion que no existe—.
+ * que si comprueba es que la opcion alternativa <b>exista en el catalogo</b>: un acceso inventado
+ * no lo tiene nadie, asi que la alternativa no autorizaria a nadie y el endpoint pareceria
+ * compartido sin estarlo —la trampa que #366 documento al nombrar «consulta_contribuyentes», una
+ * opcion que no existe—.
  */
 @DisplayName("Los accesos que dos opciones comparten (#548)")
 class AccesosCompartidosTest {

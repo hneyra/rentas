@@ -24,11 +24,11 @@ import org.junit.jupiter.api.Test;
  * proxy servia un {@code licenciaConducir} que ningun {@code Resource} modela— y la respuesta de
  * entonces fue un guardia con los veinte campos de <b>un</b> recurso, escrito a mano.
  *
- * <p>Esto es ese guardia para las 179 operaciones y sin lista que mantener: los campos salen de los
- * {@code record} del backend, y el archivo que produce lo lee el frontend
- * (`frontend/verificaciones/formas-del-backend.test.ts`) para comparar contra lo que el proxy
- * publica. Es lo que permite encender una ruta —#400— habiendo comprobado que la pantalla ya lee la
- * forma que el servidor manda, sin levantar los dos procesos.
+ * <p>Esto es ese guardia para las {@code MEDIDO: 168 operaciones de formas-de-la-api.json} y sin
+ * lista que mantener: los campos salen de los {@code record} del backend, y el archivo que produce
+ * lo lee el frontend (`frontend/verificaciones/formas-del-backend.test.ts`) para comparar contra lo
+ * que el proxy publica. Es lo que permite encender una ruta —#400— habiendo comprobado que la
+ * pantalla ya lee la forma que el servidor manda, sin levantar los dos procesos.
  *
  * <h2>Por que un archivo comprometido y no una comparacion en memoria</h2>
  *

@@ -39,9 +39,9 @@ import tools.jackson.databind.json.JsonMapper;
  * una respuesta con el mismo modulo que registra la aplicacion y se compara su arbol de claves
  * contra lo que el resolutor dice de ese mismo tipo.
  *
- * <h2>Por que un ejemplo y no las 178</h2>
+ * <h2>Por que un ejemplo y no todos</h2>
  *
- * <p>Porque instanciar los 178 recursos exigiria inventar un valor valido para cada componente, y
+ * <p>Porque instanciar todos los recursos exigiria inventar un valor valido para cada componente, y
  * varios objetos de valor validan en su constructor —un ejercicio fuera de rango, un codigo de
  * referencia catastral con otro formato—: la mitad se caeria construyendo, y una prueba que salta
  * la mitad de sus casos no dice lo que parece decir. El ejemplo lleva <b>lo que puede

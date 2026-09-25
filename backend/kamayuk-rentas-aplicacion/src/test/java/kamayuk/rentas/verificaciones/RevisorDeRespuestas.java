@@ -44,8 +44,8 @@ import org.jspecify.annotations.Nullable;
  *   <li>los metodos de <b>su misma clase</b> a los que llama —es la forma de {@code
  *       noEstaEnElPadron(codigo)}, que #622 extrajo a un ayudante privado en seis controladores—;
  *   <li>y los metodos de los <b>colaboradores inyectados</b> a los que llama, resueltos por el tipo
- *       declarado del campo. Sin este tercero se escaparia todo lo que lanza la capa de aplicacion
- *       —doce archivos hoy—, y el censo diria que no hay {@code 404} donde lo hay a diario.
+ *       declarado del campo. Sin este tercero se escaparia todo lo que lanza la capa de aplicacion,
+ *       y el censo diria que no hay {@code 404} donde lo hay a diario.
  * </ol>
  *
  * <p><b>Lo que no ve, dicho para que nadie lo de por cubierto:</b> un {@code 404} que nazca a tres

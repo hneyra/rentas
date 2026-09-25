@@ -78,12 +78,12 @@ public class KamayukAplicacion {
      * discutir con nadie.
      *
      * <p><b>Lleva la zona del producto, y no la del servidor</b> ({@code rentas}#316). {@code
-     * LocalDate.now(reloj)} trunca con la zona <i>del reloj</i>, y {@code src/main} lo llama 126
-     * veces para decidir que dia es: vencimientos, plazos, cuentas de dias, la fecha que consta en
-     * un acto. Con {@code Clock.systemDefaultZone()} ese dia era el del sistema operativo que
-     * sirviera la peticion, y con la JVM en UTC todo lo que ocurriera entre las 19:00 y la
-     * medianoche de Catacaos se fechaba <b>el dia siguiente</b> —y la noche del 31 de diciembre, en
-     * el ejercicio siguiente—.
+     * LocalDate.now(reloj)} trunca con la zona <i>del reloj</i>, y en {@code src/main} hay {@code
+     * MEDIDO: 126 LocalDate.now(reloj) en el codigo de src/main} que deciden que dia es:
+     * vencimientos, plazos, cuentas de dias, la fecha que consta en un acto. Con {@code
+     * Clock.systemDefaultZone()} ese dia era el del sistema operativo que sirviera la peticion, y
+     * con la JVM en UTC todo lo que ocurriera entre las 19:00 y la medianoche de Catacaos se
+     * fechaba <b>el dia siguiente</b> —y la noche del 31 de diciembre, en el ejercicio siguiente—.
      *
      * <p><b>Por que aqui y no en los 126 sitios</b>, medido el 2026-09-22 sobre {@code
      * backend/*&#47;src/main} sin contar comentarios —el issue dice 127 porque su {@code grep}
