@@ -369,7 +369,7 @@ class AsientoRepositoryJdbcTest {
                                             titular,
                                             "PREDIAL",
                                             1,
-                                            Concepto.PAGO,
+                                            Concepto.INSOLUTO,
                                             TipoAsiento.ABONO,
                                             Dinero.de(100),
                                             LocalDate.of(2026, 8, 1))));
@@ -392,8 +392,8 @@ class AsientoRepositoryJdbcTest {
             assertThat(alCorteDeAbril)
                     .as("el pago de agosto es posterior al corte de abril: no cuenta todavia")
                     .singleElement()
-                    .extracting(Asiento::concepto)
-                    .isEqualTo(Concepto.INSOLUTO);
+                    .extracting(Asiento::tipo)
+                    .isEqualTo(TipoAsiento.CARGO);
         }
     }
 
@@ -401,8 +401,14 @@ class AsientoRepositoryJdbcTest {
     @DisplayName("Pagos (#25, RF-048)")
     class Pagos {
 
+        /**
+         * El abono de un cobro es un {@code ABONO} de la parte que extingue —aqui el insoluto—, que
+         * es lo que escribe la cobranza; hasta #447 esta prueba sembraba un concepto {@code PAGO}
+         * que ningun camino escribe, y por eso no podia fallar. La siembra con cada forma que el
+         * libro si escribe esta en {@code LosPagosSonLoQueEntroPorCajaJdbcTest}.
+         */
         @Test
-        @DisplayName("solo trae abonos de concepto PAGO, no otros movimientos de deuda")
+        @DisplayName("solo trae el abono de un cobro, no el cargo ni otros movimientos de deuda")
         void soloTraeAbonosDePago() {
             TenantContext.fijar(new MunicipalidadId(municipalidadA));
             long titular = crearContribuyente(municipalidadA, "L-0040", "50100040");
@@ -425,7 +431,7 @@ class AsientoRepositoryJdbcTest {
                                             titular,
                                             "PREDIAL",
                                             1,
-                                            Concepto.PAGO,
+                                            Concepto.INSOLUTO,
                                             TipoAsiento.ABONO,
                                             Dinero.de(100),
                                             LocalDate.of(2026, 3, 15))));
@@ -451,8 +457,11 @@ class AsientoRepositoryJdbcTest {
             assertThat(pagos.contenido())
                     .as("ni el cargo insoluto ni la compensacion son un pago")
                     .singleElement()
-                    .extracting(Asiento::concepto)
-                    .isEqualTo(Concepto.PAGO);
+                    .satisfies(
+                            pago -> {
+                                assertThat(pago.tipo()).isEqualTo(TipoAsiento.ABONO);
+                                assertThat(pago.concepto()).isEqualTo(Concepto.INSOLUTO);
+                            });
         }
 
         @Test
@@ -468,7 +477,7 @@ class AsientoRepositoryJdbcTest {
                                             titular,
                                             "PREDIAL",
                                             1,
-                                            Concepto.PAGO,
+                                            Concepto.INSOLUTO,
                                             TipoAsiento.ABONO,
                                             Dinero.de(100),
                                             LocalDate.of(2026, 1, 10))));
@@ -479,7 +488,7 @@ class AsientoRepositoryJdbcTest {
                                             titular,
                                             "PREDIAL",
                                             2,
-                                            Concepto.PAGO,
+                                            Concepto.INSOLUTO,
                                             TipoAsiento.ABONO,
                                             Dinero.de(100),
                                             LocalDate.of(2026, 6, 10))));

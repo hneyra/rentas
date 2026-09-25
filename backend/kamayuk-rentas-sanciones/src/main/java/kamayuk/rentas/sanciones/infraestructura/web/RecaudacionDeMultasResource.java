@@ -12,11 +12,11 @@ import kamayuk.rentas.dominio.Dinero;
 /**
  * El resumen de recaudación por multas, por HTTP (#53, RF-073, RF-074, #398).
  *
- * <p>Cada cifra viene del <b>libro</b>: es la suma de los abonos vivos —{@code ABONO} de concepto
- * {@code PAGO} que nadie ha reversado—, agregada por PostgreSQL. Ni una se recompone en la
- * interfaz. Sumar los importes de las papeletas en estado {@code PAGADA} daría una cifra parecida y
- * distinta: no contaría los intereses cobrados, contaría entero un pago parcial y seguiría contando
- * un recibo anulado (AC 3 de #53).
+ * <p>Cada cifra viene del <b>libro</b>: es la suma de los abonos vivos —el {@code ABONO} con que la
+ * cobranza extingue una parte del desglose, que nadie ha reversado (#447)—, agregada por
+ * PostgreSQL. Ni una se recompone en la interfaz. Sumar los importes de las papeletas en estado
+ * {@code PAGADA} daría una cifra parecida y distinta: no contaría los intereses cobrados, contaría
+ * entero un pago parcial y seguiría contando un recibo anulado (AC 3 de #53).
  *
  * <p>{@code abonos} no es decorativo: sin él, «300,00» no dice si son tres pagos o uno, y quien
  * cuadre la caja no tiene con qué contrastar.

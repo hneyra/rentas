@@ -342,7 +342,7 @@ class ConsultaUnificadaControllerTest {
                                     7L,
                                     new Ejercicio(2026),
                                     "PREDIAL",
-                                    "PAGO",
+                                    "INSOLUTO",
                                     "ABONO",
                                     "ORDINARIA",
                                     null,

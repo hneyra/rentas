@@ -27,11 +27,15 @@ import kamayuk.rentas.contribuyentes.infraestructura.ContribuyenteRepositoryJdbc
 import kamayuk.rentas.contribuyentes.infraestructura.FichaRepositoryJdbc;
 import kamayuk.rentas.cuentacorriente.CausalDeBaja;
 import kamayuk.rentas.cuentacorriente.MovimientoDelLibro;
+import kamayuk.rentas.cuentacorriente.ObligacionDelDeudor;
 import kamayuk.rentas.cuentacorriente.ObligacionPublica;
+import kamayuk.rentas.cuentacorriente.RegistroDeAbonos;
+import kamayuk.rentas.cuentacorriente.SeleccionDeObligacion;
 import kamayuk.rentas.cuentacorriente.aplicacion.ConsultaDeDeudaCuentaCorriente;
 import kamayuk.rentas.cuentacorriente.aplicacion.ConsultarDeuda;
 import kamayuk.rentas.cuentacorriente.aplicacion.MovimientosDelLibroCuentaCorriente;
 import kamayuk.rentas.cuentacorriente.aplicacion.RegistrarAsiento;
+import kamayuk.rentas.cuentacorriente.aplicacion.RegistroDeAbonosCuentaCorriente;
 import kamayuk.rentas.cuentacorriente.dominio.Agregacion;
 import kamayuk.rentas.cuentacorriente.dominio.Asiento;
 import kamayuk.rentas.cuentacorriente.dominio.CalculoDeDeuda;
@@ -147,6 +151,7 @@ class ConsultaUnificadaJdbcTest {
 
     private static ConsultaUnificada consulta;
     private static RegistrarAsiento registrarAsiento;
+    private static RegistroDeAbonos abonos;
     private static ConsultarDeuda consultarDeuda;
     private static AsientoRepositoryJdbc asientos;
     private static ConvenioRepositoryJdbc convenios;
@@ -183,6 +188,12 @@ class ConsultaUnificadaJdbcTest {
         CalculoDeDeuda calculo = new CalculoDeDeuda(new SinAcumulacion());
         PoliticaDeRedondeo redondeo = new PoliticaDeRedondeo(2, RoundingMode.HALF_UP);
         consultarDeuda = envolver(new ConsultarDeuda(asientos, saldos, calculo, redondeo, RELOJ));
+        // La cobranza de verdad (#447): el pago de la ficha lo asienta el mismo metodo que
+        // llama ImputacionDelPago cuando el buzon trae el cobro de caja.
+        abonos =
+                envolver(
+                        new RegistroDeAbonosCuentaCorriente(
+                                asientos, saldos, registrarAsiento, calculo, redondeo));
 
         convenios = new ConvenioRepositoryJdbc(jdbc);
         consultaDeConvenios =
@@ -267,7 +278,11 @@ class ConsultaUnificadaJdbcTest {
             assertThat(ficha.deudas().contenido())
                     .as("el predial de 2026 y el arbitrio de 2026, cada uno su obligacion")
                     .hasSize(2);
-            assertThat(ficha.pagos().contenido()).as("el abono del recibo").hasSize(1);
+            assertThat(ficha.pagos().contenido())
+                    .as("el abono del recibo, tal como lo asienta la cobranza (#447)")
+                    .singleElement()
+                    .extracting(MovimientoDelLibro::documentoOrigen)
+                    .isEqualTo("RECIBO 001-0000123");
             assertThat(ficha.altasYBajas().contenido())
                     .as("el alta de deuda registrada; los tres cargos son la emision (#640)")
                     .hasSize(1);
@@ -645,15 +660,21 @@ class ConsultaUnificadaJdbcTest {
     /**
      * Un contribuyente con algo en cada seccion: dos obligaciones con deuda —predial y arbitrio—,
      * un pago, un convenio, un valor emitido y una declaracion jurada.
+     *
+     * <p>El pago va <b>antes</b> que el resto del predial: la cobranza abona la obligacion entera
+     * (#447), asi que con los 800,00 ya asentados cobrar 120,00 no cuadraria y la caja lo
+     * rechazaria. Y va sobre la misma obligacion y no sobre otra unidad: una obligacion saldada
+     * cuenta en {@code consulta_deuda} y no en «Deudas Pendientes» (#401), y la comparacion de las
+     * dos dejaria de ser sobre las mismas filas.
      */
     private String contribuyenteCompleto(String sufijo) {
         String codigo = crearContribuyente(municipalidad, sufijo);
         long id = idDe(codigo);
 
+        asentarCargo(id, "PREDIAL", Dinero.de("120.00"));
+        cobrarPorCaja(id, "PREDIAL", Dinero.de("120.00"));
         asentarCargo(id, "PREDIAL", Dinero.de("800.00"));
         asentarCargo(id, "ARBITRIO", Dinero.de("300.00"));
-        asentarCargo(id, "PREDIAL", Dinero.de("120.00"));
-        asentarPago(id, "PREDIAL", Dinero.de("120.00"));
 
         registrarConvenio(id);
         emitirValor(id);
@@ -721,7 +742,7 @@ class ConsultaUnificadaJdbcTest {
     /**
      * El cobro de la caja, imputado como lo imputa el buzon: un ABONO contra la <b>parte</b> que
      * paga —aqui el insoluto—, que es lo que {@code CalculoDeDeuda} netea. Un abono de concepto
-     * {@code PAGO}, como el de {@link #asentarPago}, no netea contra ningun cargo.
+     * {@code PAGO} no netea contra ningun cargo, y ningun camino de cobranza lo escribe (#447).
      */
     private void asentarCobroImputado(long contribuyenteId, String tributo, Dinero monto) {
         transaccion.execute(
@@ -769,25 +790,23 @@ class ConsultaUnificadaJdbcTest {
                 });
     }
 
-    private void asentarPago(long contribuyenteId, String tributo, Dinero monto) {
-        transaccion.execute(
-                estado ->
-                        registrarAsiento.asentar(
-                                Asiento.nuevo(
-                                        EJERCICIO,
-                                        contribuyenteId,
-                                        tributo,
-                                        Concepto.PAGO,
-                                        TipoAsiento.ABONO,
-                                        Fase.ORDINARIA,
-                                        null,
-                                        null,
-                                        null,
-                                        null,
-                                        monto,
-                                        LocalDate.of(2026, 3, 15),
-                                        "RECIBO 001-0000123"),
-                                Observacion.de("Se asienta el cobro de la prueba")));
+    /**
+     * El cobro de caja por el camino de produccion (#447): {@link
+     * RegistroDeAbonos#abonarPagoIntegro}, que abona la parte que se debe —aqui el insoluto— con el
+     * recibo como documento de origen. Hasta #447 este metodo sembraba a mano un {@code ABONO} de
+     * concepto {@code PAGO}, que ningun camino de cobranza escribe y el unico que el historial de
+     * pagos sabia leer: la prueba de la seccion no podia fallar.
+     */
+    private void cobrarPorCaja(long contribuyenteId, String tributo, Dinero monto) {
+        abonos.abonarPagoIntegro(
+                List.of(
+                        new ObligacionDelDeudor(
+                                contribuyenteId,
+                                new SeleccionDeObligacion(tributo, EJERCICIO, null, null))),
+                monto,
+                LocalDate.of(2026, 3, 15),
+                "RECIBO 001-0000123",
+                Observacion.de("Se cobra en ventanilla el predial de la prueba"));
     }
 
     /**

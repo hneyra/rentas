@@ -9,9 +9,14 @@ import org.jspecify.annotations.Nullable;
  * Lo que pide {@code consulta_pagos} (RF-048): el historial de pagos de un contribuyente, entre dos
  * fechas opcionales.
  *
- * <p>Un pago es un asiento {@code ABONO} de concepto {@link Concepto#PAGO}: los demas abonos
- * —compensacion, anulacion, condonacion, ajuste, fraccionamiento— son movimientos de deuda, no
- * cobros, y {@link CriterioDeAltasBajas} ya los cubre con su propio filtro (RF-045).
+ * <p>Un pago es un asiento de <b>dinero que entro por caja</b>: el {@code ABONO} con que la
+ * cobranza extingue una de las cuatro partes del desglose —insoluto, reajuste, interes o gasto—,
+ * que no nacio de una baja de deuda y que nadie ha reversado. Es el mismo criterio que la
+ * recaudacion, y lo escribe una sola vez el adaptador del libro (#447). Un pago <b>no</b> es un
+ * abono de concepto {@link Concepto#PAGO}: ningun camino de cobranza escribe ese concepto, y
+ * filtrar por el dejaba el historial vacio de todo contribuyente que hubiera pagado. Los demas
+ * abonos —compensacion, anulacion, condonacion, ajuste, fraccionamiento, la baja— mueven deuda, no
+ * la cobran, y los actos de alta y baja los cubre {@link CriterioDeAltasBajas} (RF-045).
  *
  * @param codigoContribuyente el titular; es lo que teclea quien atiende
  * @param desde fecha valor minima, inclusive; {@code null} trae desde el primer pago

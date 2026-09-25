@@ -48,11 +48,13 @@ public interface RecaudacionDelLibro {
      * Lo cobrado de esos tributos entre las dos fechas, desglosado por tributo, ejercicio, mes y
      * fase de cobranza.
      *
-     * <p>Un cobro es un asiento {@code ABONO} de concepto {@code PAGO} <b>que nadie ha
-     * reversado</b> —un recibo anulado conserva sus asientos, no se borran (V2)—, exactamente el
-     * mismo criterio que {@link ConciliacionDeCaja#abonadoPor}. Los demas abonos —condonacion,
-     * ajuste, fraccionamiento— mueven deuda pero no son dinero que entro, y contarlos inflaria la
-     * recaudacion con bajas de deuda.
+     * <p>Un cobro es el {@code ABONO} con que la cobranza extingue una parte del desglose
+     * —insoluto, reajuste, interes o gasto— <b>que nadie ha reversado</b> —un recibo anulado
+     * conserva sus asientos, no se borran (V2)—, el mismo criterio que {@link
+     * ConciliacionDeCaja#abonadoPor} y, al asiento, el mismo que el historial de pagos de {@link
+     * MovimientosDelLibro#pagosDe} (#447). No es un abono de concepto {@code PAGO}, que nadie
+     * escribe. Los demas abonos —condonacion, ajuste, fraccionamiento— mueven deuda pero no son
+     * dinero que entro, y contarlos inflaria la recaudacion con bajas de deuda.
      *
      * <p>El desglose por <b>fase</b> es lo que la pantalla llama «tipo de cobranza»: ordinaria,
      * valor, coactiva o convenio. El desglose por <b>mes</b> es el de la {@code fecha_valor} del
