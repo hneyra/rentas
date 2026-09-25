@@ -420,11 +420,68 @@ class ValorRepositoryJdbcTest {
                     .isEqualTo("OP-2026-037220");
         }
 
+        /**
+         * La siembra de arriba distingue la unidad solo por el vehiculo: con todos los detalles en
+         * {@code predio_id} nulo, quitar el filtro del predio no pondria nada en rojo. Aqui el
+         * mismo obligado tiene, en el mismo ejercicio y el mismo tributo, un valor vivo sobre OTRO
+         * predio: preguntar por el predio 501 no puede contestar con el del 502, ni con el que no
+         * nombra predio.
+         */
+        @Test
+        @DisplayName("el predio tambien es la unidad: el valor vivo de otro predio no la formaliza")
+        void elValorDeOtroPredioNoLaFormaliza() {
+            TenantContext.fijar(new MunicipalidadId(municipalidadA));
+            long obligado = crearContribuyente(municipalidadA, "V-0374", "50203741");
+            SelectorDeObligacion delPredio501 =
+                    new SelectorDeObligacion("MULTA_ADMINISTRATIVA", EJERCICIO, 501L, null);
+
+            enA(
+                    () -> {
+                        emitir(
+                                obligado,
+                                "OP-2026-037401",
+                                "MULTA_ADMINISTRATIVA",
+                                2026,
+                                502L,
+                                null);
+                        emitir(
+                                obligado,
+                                "OP-2026-037402",
+                                "MULTA_ADMINISTRATIVA",
+                                2026,
+                                null,
+                                null);
+                        return null;
+                    });
+
+            assertThat(enA(() -> repositorio.vivoSobre(obligado, delPredio501)))
+                    .as("los dos vivos son de otra unidad: el predio 502 y ningun predio")
+                    .isEmpty();
+
+            enA(() -> emitir(obligado, "OP-2026-037403", "MULTA_ADMINISTRATIVA", 2026, 501L, null));
+
+            assertThat(enA(() -> repositorio.vivoSobre(obligado, delPredio501)))
+                    .as("el del predio 501, y no el primero que emitio el obligado")
+                    .get()
+                    .extracting(Valor::numero)
+                    .isEqualTo("OP-2026-037403");
+        }
+
         private Valor emitir(
                 long contribuyente,
                 String numero,
                 String tributo,
                 int ejercicio,
+                @org.jspecify.annotations.Nullable Long vehiculoId) {
+            return emitir(contribuyente, numero, tributo, ejercicio, null, vehiculoId);
+        }
+
+        private Valor emitir(
+                long contribuyente,
+                String numero,
+                String tributo,
+                int ejercicio,
+                @org.jspecify.annotations.Nullable Long predioId,
                 @org.jspecify.annotations.Nullable Long vehiculoId) {
             return repositorio.insertar(
                     valorDe(contribuyente, numero, Dinero.de("440.00")),
@@ -433,7 +490,7 @@ class ValorRepositoryJdbcTest {
                                     tributo,
                                     new Ejercicio(ejercicio),
                                     null,
-                                    null,
+                                    predioId,
                                     vehiculoId,
                                     null,
                                     Dinero.de("440.00"),

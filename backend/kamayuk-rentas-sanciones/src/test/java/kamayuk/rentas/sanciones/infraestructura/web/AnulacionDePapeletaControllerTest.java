@@ -5,7 +5,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import kamayuk.rentas.auditoria.RegistroDeAuditoria;
 import kamayuk.rentas.compartido.Pagina;
@@ -160,7 +162,7 @@ class AnulacionDePapeletaControllerTest {
     @DisplayName("con un valor vivo sobre su obligacion, 409 nombrando el valor")
     void conValorVivoEs409() throws Exception {
         repositorio.crear("PT-0004", EstadoDePapeleta.IMPUESTA);
-        valores.conValorVivo("RM-2026-000123");
+        valores.conValorVivo(RepositorioDeMentira.OBLIGADO, "RM-2026-000123");
 
         MvcResult resultado =
                 anular("PT-0004", "{\"observacion\":\"error material\",\"fecha\":\"2026-04-01\"}");
@@ -171,6 +173,35 @@ class AnulacionDePapeletaControllerTest {
                 .as("se pregunta por la obligacion del libro que la papeleta cargo (#372)")
                 .extracting(SeleccionDeObligacion::tributo)
                 .isEqualTo("MULTA_TRANSITO");
+    }
+
+    /**
+     * El valor vivo es de un contribuyente, y el guardia tiene que preguntar por el que DEBE la
+     * multa: {@code papeleta.obligadoId()}. La siembra distingue cada id que la papeleta lleva —la
+     * propia papeleta, la infraccion, el infractor y el obligado son cuatro numeros distintos— y el
+     * valor vivo lo tiene el infractor, que aqui no es quien debe: si el guardia preguntara por
+     * otro id, la primera papeleta saldria 201 y la segunda 409.
+     */
+    @Test
+    @DisplayName("pregunta por el valor vivo del OBLIGADO, no del infractor ni de otro id")
+    void preguntaPorElObligado() throws Exception {
+        repositorio.crear("PT-0007", EstadoDePapeleta.IMPUESTA, 812L, 813L);
+        repositorio.crear("PT-0008", EstadoDePapeleta.IMPUESTA, 814L, 815L);
+        valores.conValorVivo(812L, "RM-2026-000812");
+        valores.conValorVivo(815L, "RM-2026-000815");
+
+        MvcResult delObligado =
+                anular("PT-0007", "{\"observacion\":\"error material\",\"fecha\":\"2026-04-01\"}");
+        MvcResult delInfractor =
+                anular("PT-0008", "{\"observacion\":\"error material\",\"fecha\":\"2026-04-01\"}");
+
+        assertThat(delObligado.getResponse().getStatus())
+                .as("el obligado 812 tiene RM-2026-000812 viva sobre la multa de PT-0007")
+                .isEqualTo(409);
+        assertThat(delObligado.getResponse().getContentAsString()).contains("RM-2026-000812");
+        assertThat(delInfractor.getResponse().getStatus())
+                .as("la RM viva de PT-0008 es del infractor 815, que no debe esta multa: 814 no")
+                .isEqualTo(201);
     }
 
     /**
@@ -222,11 +253,19 @@ class AnulacionDePapeletaControllerTest {
 
     private static final class RepositorioDeMentira implements PapeletaRepository {
 
+        /** Distinto del id de la papeleta y del de la infraccion, que empiezan en 1. */
+        static final long OBLIGADO = 700L;
+
         private final List<Papeleta> filas = new ArrayList<>();
         private long siguiente = 1;
         private @Nullable Familia ultimaFamiliaPedida;
 
         void crear(String numero, EstadoDePapeleta estado) {
+            crear(numero, estado, OBLIGADO, null);
+        }
+
+        void crear(
+                String numero, EstadoDePapeleta estado, long obligado, @Nullable Long infractor) {
             filas.add(
                     new Papeleta(
                             siguiente++,
@@ -239,12 +278,12 @@ class AnulacionDePapeletaControllerTest {
                             "ABC-123",
                             null,
                             null,
+                            infractor,
                             null,
                             null,
                             null,
                             null,
-                            null,
-                            1L,
+                            obligado,
                             Dinero.de("5500"),
                             Alicuota.de("8"),
                             Dinero.de("440"),
@@ -300,20 +339,24 @@ class AnulacionDePapeletaControllerTest {
         }
     }
 
-    /** Lo que {@code valores} contesta: un valor vivo sobre la obligacion, o ninguno (#372). */
+    /**
+     * Lo que {@code valores} contesta: un valor vivo sobre la obligacion, o ninguno (#372). Por
+     * contribuyente, como el puerto de verdad: un doble que ignorara el id dejaria sin vigilar que
+     * el guardia pase el obligado y no otro numero de la papeleta.
+     */
     private static final class ValoresDeMentira implements ValoresSobreUnaObligacion {
 
-        private @Nullable String vivo;
+        private final Map<Long, String> vivoPorContribuyente = new HashMap<>();
         private @Nullable SeleccionDeObligacion preguntada;
 
-        void conValorVivo(String numeroDelValor) {
-            this.vivo = numeroDelValor;
+        void conValorVivo(long contribuyenteId, String numeroDelValor) {
+            vivoPorContribuyente.put(contribuyenteId, numeroDelValor);
         }
 
         @Override
         public Optional<String> vivoSobre(long contribuyenteId, SeleccionDeObligacion obligacion) {
             this.preguntada = obligacion;
-            return Optional.ofNullable(vivo);
+            return Optional.ofNullable(vivoPorContribuyente.get(contribuyenteId));
         }
     }
 
