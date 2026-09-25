@@ -249,8 +249,7 @@ class CadaObligacionDelPortalCaeEnSuPredioTest {
                         pedido -> Optional.of(contribuyente),
                         (contribuyenteId, fecha) -> List.copyOf(obligaciones),
                         (contribuyenteId, fecha) -> List.copyOf(predios),
-                        registro -> {},
-                        RELOJ);
+                        registro -> {});
 
         return MockMvcBuilders.standaloneSetup(
                         new PortalController(

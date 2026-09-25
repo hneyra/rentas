@@ -117,7 +117,6 @@ public class CambiarEstadoDelExpediente {
 
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe(
-                                fecha,
                                 "expediente_movimiento",
                                 String.valueOf(registrado.id()),
                                 Operacion.MODIFICACION,

@@ -1,8 +1,6 @@
 package kamayuk.rentas.auditoria;
 
-import java.time.LocalDate;
 import java.util.Objects;
-import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.Observacion;
 import org.jspecify.annotations.Nullable;
 
@@ -12,13 +10,20 @@ import org.jspecify.annotations.Nullable;
  * <p>La {@link Observacion} es un campo del registro y no un {@code String} opcional: es la
  * diferencia entre una regla que se cumple y una que se recuerda. Ver ADR-0008 y la regla 10.
  *
- * <p>El {@link Ejercicio} es la <b>clave de particion</b> de la tabla, asi que no es un dato
- * decorativo: si no coincide con ninguna particion, la insercion falla. Entra como argumento y no
- * se deduce del reloj, por la misma razon que las reglas tributarias no leen la hora: una
- * reejecucion tiene que producir el mismo resultado. Para el caso corriente esta {@link
- * #enLaFechaDe}.
+ * <p><b>No lleva ni fecha ni ejercicio, y es a proposito</b> (#398). El ejercicio es la clave de
+ * particion de {@code auditoria}, y lo decide quien pone la fecha: {@link AuditoriaJdbc}, con un
+ * solo instante de su reloj para las dos columnas. Hasta #398 este registro traia el ejercicio y
+ * cada llamador lo deducia de la fecha que tuviera a mano —la de presentacion de la DJ, la de la
+ * transferencia, la de la infraccion—, con la premisa de que asi «una reejecucion produce el mismo
+ * resultado». La premisa era falsa: la {@code fecha} de la fila ya salia del reloj, y lo unico que
+ * se conseguia era tener dos fuentes para el mismo hecho. Una transferencia de diciembre registrada
+ * en enero iba a una particion que no existe, y una DJ de 2026 anulada en 2027 quedaba archivada en
+ * 2026 con fecha de 2027, donde la bitacora no la encuentra.
  *
- * @param ejercicio ejercicio al que se imputa el acto; clave de particion
+ * <p>Sin el campo, el uso equivocado <b>no se puede escribir</b>, y por eso no hace falta ninguna
+ * guarda. La fecha de negocio, donde importa, va dentro de {@code datosNuevos}: es un dato del
+ * acto, no la fecha del asiento en la bitacora.
+ *
  * @param tabla tabla afectada
  * @param clave clave de la fila afectada, en texto
  * @param operacion que clase de acto es
@@ -27,7 +32,6 @@ import org.jspecify.annotations.Nullable;
  * @param datosNuevos estado resultante en JSON, si lo hay
  */
 public record RegistroDeAuditoria(
-        Ejercicio ejercicio,
         String tabla,
         String clave,
         Operacion operacion,
@@ -39,7 +43,6 @@ public record RegistroDeAuditoria(
     private static final int CLAVE_MAXIMO = 120;
 
     public RegistroDeAuditoria {
-        Objects.requireNonNull(ejercicio, "La auditoria se particiona por ejercicio");
         Objects.requireNonNull(tabla, "Hay que decir sobre que tabla fue");
         Objects.requireNonNull(clave, "Hay que decir sobre que fila fue");
         Objects.requireNonNull(operacion, "Hay que decir que clase de acto fue");
@@ -61,20 +64,20 @@ public record RegistroDeAuditoria(
         }
     }
 
-    /** El caso corriente: el ejercicio sale de la fecha de la operacion, que entra como dato. */
+    /**
+     * El caso corriente: sin el antes y el despues.
+     *
+     * <p>El nombre se conserva del tiempo en que recibia la fecha, porque la fecha sigue siendo la
+     * del acto: solo que ahora la pone {@link AuditoriaJdbc} y no el llamador (#398).
+     */
     public static RegistroDeAuditoria enLaFechaDe(
-            LocalDate fecha,
-            String tabla,
-            String clave,
-            Operacion operacion,
-            Observacion observacion) {
-        return new RegistroDeAuditoria(
-                Ejercicio.de(fecha), tabla, clave, operacion, observacion, null, null);
+            String tabla, String clave, Operacion operacion, Observacion observacion) {
+        return new RegistroDeAuditoria(tabla, clave, operacion, observacion, null, null);
     }
 
     /** El mismo registro con el antes y el despues. */
     public RegistroDeAuditoria con(@Nullable String datosAnteriores, @Nullable String datosNuevos) {
         return new RegistroDeAuditoria(
-                ejercicio, tabla, clave, operacion, observacion, datosAnteriores, datosNuevos);
+                tabla, clave, operacion, observacion, datosAnteriores, datosNuevos);
     }
 }

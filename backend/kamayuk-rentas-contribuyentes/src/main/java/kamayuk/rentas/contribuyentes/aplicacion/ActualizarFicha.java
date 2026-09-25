@@ -1,6 +1,5 @@
 package kamayuk.rentas.contribuyentes.aplicacion;
 
-import java.time.Clock;
 import java.time.LocalDate;
 import java.util.Optional;
 import kamayuk.rentas.auditoria.Auditoria;
@@ -32,12 +31,10 @@ public class ActualizarFicha {
 
     private final FichaRepository repositorio;
     private final Auditoria auditoria;
-    private final Clock reloj;
 
-    public ActualizarFicha(FichaRepository repositorio, Auditoria auditoria, Clock reloj) {
+    public ActualizarFicha(FichaRepository repositorio, Auditoria auditoria) {
         this.repositorio = repositorio;
         this.auditoria = auditoria;
-        this.reloj = reloj;
     }
 
     /**
@@ -159,11 +156,7 @@ public class ActualizarFicha {
             String despues) {
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe(
-                                LocalDate.now(reloj),
-                                tabla,
-                                String.valueOf(clave),
-                                operacion,
-                                observacion)
+                                tabla, String.valueOf(clave), operacion, observacion)
                         .con(antes, despues));
     }
 

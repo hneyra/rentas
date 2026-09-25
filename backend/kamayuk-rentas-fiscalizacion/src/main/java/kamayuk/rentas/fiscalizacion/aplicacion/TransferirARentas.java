@@ -1,6 +1,5 @@
 package kamayuk.rentas.fiscalizacion.aplicacion;
 
-import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Objects;
@@ -137,7 +136,6 @@ public class TransferirARentas {
     private final DirectorioDeContribuyentes contribuyentes;
     private final EmitirDocumento documentos;
     private final Auditoria auditoria;
-    private final Clock reloj;
 
     public TransferirARentas(
             LiquidacionRepository liquidaciones,
@@ -148,8 +146,7 @@ public class TransferirARentas {
             GeneradorDeCargos cargos,
             DirectorioDeContribuyentes contribuyentes,
             EmitirDocumento documentos,
-            Auditoria auditoria,
-            Clock reloj) {
+            Auditoria auditoria) {
         this.liquidaciones = liquidaciones;
         this.movimientos = movimientos;
         this.actas = actas;
@@ -159,7 +156,6 @@ public class TransferirARentas {
         this.contribuyentes = contribuyentes;
         this.documentos = documentos;
         this.auditoria = auditoria;
-        this.reloj = reloj;
     }
 
     /**
@@ -287,7 +283,6 @@ public class TransferirARentas {
 
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe(
-                                LocalDate.now(reloj),
                                 TABLA_AUDITADA,
                                 String.valueOf(registrada.identificador()),
                                 Operacion.ALTA,

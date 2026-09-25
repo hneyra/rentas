@@ -45,7 +45,6 @@ public class RegistrarBeneficio {
 
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe(
-                                beneficio.vigenciaDesde(),
                                 "beneficio",
                                 String.valueOf(guardado.id()),
                                 Operacion.ALTA,
@@ -65,7 +64,7 @@ public class RegistrarBeneficio {
 
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe(
-                                fecha, "beneficio", String.valueOf(id), Operacion.BAJA, observacion)
+                                "beneficio", String.valueOf(id), Operacion.BAJA, observacion)
                         .con(descripcion(vigente), descripcion(cesado)));
 
         return cesado;

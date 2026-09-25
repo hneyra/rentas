@@ -138,7 +138,6 @@ public class NotificarResolucionDeGerencia {
 
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe(
-                                peticion.fechaDeLaDiligencia(),
                                 TABLA_AUDITADA,
                                 String.valueOf(guardada.id()),
                                 Operacion.ALTA,

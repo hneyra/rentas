@@ -164,7 +164,6 @@ public class FormalizarConvenio {
 
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe(
-                                fecha,
                                 "convenio_movimiento",
                                 String.valueOf(formalizacion.id()),
                                 Operacion.ALTA,

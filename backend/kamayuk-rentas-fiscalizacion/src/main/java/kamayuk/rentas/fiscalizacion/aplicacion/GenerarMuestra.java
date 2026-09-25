@@ -203,7 +203,6 @@ public class GenerarMuestra {
 
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe(
-                                fechaSorteo,
                                 TABLA_AUDITADA,
                                 String.valueOf(programaId),
                                 Operacion.ALTA,

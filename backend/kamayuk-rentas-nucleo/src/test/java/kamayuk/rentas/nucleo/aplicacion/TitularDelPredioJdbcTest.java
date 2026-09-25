@@ -114,8 +114,7 @@ class TitularDelPredioJdbcTest {
                         new DirectorioJdbc(
                                 new ContribuyenteRepositoryJdbc(jdbc),
                                 new FichaRepositoryJdbc(jdbc)),
-                        new AuditoriaJdbc(jdbc, RELOJ),
-                        RELOJ);
+                        new AuditoriaJdbc(jdbc, RELOJ));
         consulta = envolver(sinTransaccion, gestor);
     }
 

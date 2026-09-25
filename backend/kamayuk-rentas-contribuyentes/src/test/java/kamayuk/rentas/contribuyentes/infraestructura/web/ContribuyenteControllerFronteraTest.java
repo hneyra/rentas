@@ -124,7 +124,7 @@ class ContribuyenteControllerFronteraTest {
                                         // `@NullMarked` es una promesa rota que el dia que alguien
                                         // anada un caso de escritura aqui sale como un NPE.
                                         new RegistrarContribuyente(
-                                                repositorio, new AuditoriaJdbc(jdbc, RELOJ), RELOJ),
+                                                repositorio, new AuditoriaJdbc(jdbc, RELOJ)),
                                         (usuario, acceso, privilegio, fecha) -> true,
                                         RELOJ))
                         // #539: el mismo interceptor que instala la aplicacion. Sin el, pedir por

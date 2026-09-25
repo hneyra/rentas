@@ -1,7 +1,5 @@
 package kamayuk.rentas.seguridad.aplicacion;
 
-import java.time.Clock;
-import java.time.LocalDate;
 import kamayuk.rentas.auditoria.Auditoria;
 import kamayuk.rentas.auditoria.Operacion;
 import kamayuk.rentas.auditoria.OrigenContext;
@@ -32,17 +30,12 @@ public class AdministrarSesion {
     private final SesionRepository sesiones;
     private final LecturaDeLaCopiaLocal administracion;
     private final Auditoria auditoria;
-    private final Clock reloj;
 
     public AdministrarSesion(
-            SesionRepository sesiones,
-            LecturaDeLaCopiaLocal administracion,
-            Auditoria auditoria,
-            Clock reloj) {
+            SesionRepository sesiones, LecturaDeLaCopiaLocal administracion, Auditoria auditoria) {
         this.sesiones = sesiones;
         this.administracion = administracion;
         this.auditoria = auditoria;
-        this.reloj = reloj;
     }
 
     /**
@@ -67,7 +60,6 @@ public class AdministrarSesion {
 
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe(
-                                LocalDate.now(reloj),
                                 "sesion",
                                 String.valueOf(actualizada.id()),
                                 Operacion.MODIFICACION,
@@ -126,11 +118,7 @@ public class AdministrarSesion {
 
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe(
-                                LocalDate.now(reloj),
-                                "usuario",
-                                String.valueOf(usuarioId),
-                                Operacion.ACCESO,
-                                observacion)
+                                "usuario", String.valueOf(usuarioId), Operacion.ACCESO, observacion)
                         .con(null, "{\"cambioDeClave\":\"delegado al proveedor de identidad\"}"));
 
         return DESTINO_DEL_PROVEEDOR;

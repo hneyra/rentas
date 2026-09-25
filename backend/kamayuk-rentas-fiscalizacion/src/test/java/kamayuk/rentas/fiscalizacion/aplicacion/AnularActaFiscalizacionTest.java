@@ -3,9 +3,7 @@ package kamayuk.rentas.fiscalizacion.aplicacion;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import java.time.Clock;
 import java.time.LocalDate;
-import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import kamayuk.rentas.auditoria.Operacion;
@@ -97,8 +95,7 @@ class AnularActaFiscalizacionTest {
                         catastro,
                         catastro,
                         rentas,
-                        registro -> {},
-                        Clock.fixed(HOY.atStartOfDay(ZoneOffset.UTC).toInstant(), ZoneOffset.UTC));
+                        registro -> {});
 
         anular =
                 new AnularActaFiscalizacion(
@@ -144,6 +141,11 @@ class AnularActaFiscalizacionTest {
                 .as("regla 10 y RNF-052: la auditoria dice de que estado venia")
                 .contains("ABIERTA");
         assertThat(registro.datosNuevos()).contains("ANULADA");
+        assertThat(registro.datosNuevos())
+                .as(
+                        "#398: el dia de la anulacion es del acto y no de la fila de auditoria, y"
+                                + " no queda en ningun otro sitio")
+                .contains("\"fechaAnulacion\":\"" + HOY + "\"");
     }
 
     @Test

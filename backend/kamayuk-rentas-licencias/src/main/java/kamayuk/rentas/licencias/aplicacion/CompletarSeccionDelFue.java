@@ -253,7 +253,6 @@ public class CompletarSeccionDelFue {
             FueDeEdificacion fue, SeccionDelFue seccion, int version, Observacion observacion) {
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe(
-                                fue.fechaDeclaracion(),
                                 "licencia_edificacion",
                                 String.valueOf(fue.identificador()),
                                 // Es un ALTA y no una MODIFICACION: no se sobrescribe nada, se

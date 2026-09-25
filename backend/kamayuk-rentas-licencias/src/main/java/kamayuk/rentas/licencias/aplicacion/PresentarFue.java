@@ -116,7 +116,6 @@ public class PresentarFue {
 
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe(
-                                solicitud.fechaDeclaracion(),
                                 "licencia_edificacion",
                                 String.valueOf(presentado.identificador()),
                                 Operacion.ALTA,

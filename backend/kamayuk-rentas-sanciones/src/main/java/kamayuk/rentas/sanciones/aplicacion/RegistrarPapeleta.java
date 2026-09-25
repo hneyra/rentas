@@ -221,7 +221,6 @@ public class RegistrarPapeleta {
 
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe(
-                                fechaInfraccion,
                                 TABLA_AUDITADA,
                                 String.valueOf(guardada.id()),
                                 Operacion.ALTA,

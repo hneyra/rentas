@@ -110,8 +110,7 @@ class TransferirARentasTest {
                                         RegimenDeLaInstalacion.REAL),
                                 (RegistroDeAuditoria registro) -> {},
                                 RELOJ),
-                        (RegistroDeAuditoria registro) -> {},
-                        RELOJ);
+                        (RegistroDeAuditoria registro) -> {});
     }
 
     @Nested

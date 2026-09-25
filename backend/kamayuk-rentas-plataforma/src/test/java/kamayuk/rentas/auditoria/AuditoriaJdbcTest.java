@@ -12,7 +12,6 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
 import kamayuk.rentas.compartido.TenantContext;
-import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.MunicipalidadId;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.esquema.BaseDeDatosDePrueba;
@@ -43,10 +42,10 @@ class AuditoriaJdbcTest {
      * la base. Si saliera de la base, la fila podria caer en un dia distinto del ejercicio con que
      * se particiono.
      */
-    private static final Clock RELOJ =
-            Clock.fixed(Instant.parse("2026-08-18T10:00:00Z"), ZoneId.of("America/Lima"));
+    private static final ZoneId ZONA_DEL_PRODUCTO = ZoneId.of("America/Lima");
 
-    private static final Ejercicio EJERCICIO = new Ejercicio(2026);
+    private static final Clock RELOJ =
+            Clock.fixed(Instant.parse("2026-08-18T10:00:00Z"), ZONA_DEL_PRODUCTO);
 
     private static BaseDeDatosDePrueba base;
     private static long municipalidadA;
@@ -98,7 +97,6 @@ class AuditoriaJdbcTest {
                 estado -> {
                     auditoria.registrar(
                             new RegistroDeAuditoria(
-                                    EJERCICIO,
                                     "via",
                                     "4321",
                                     Operacion.ALTA,
@@ -269,7 +267,6 @@ class AuditoriaJdbcTest {
                                         estado -> {
                                             auditoria.registrar(
                                                     new RegistroDeAuditoria(
-                                                            EJERCICIO,
                                                             "via",
                                                             "9",
                                                             Operacion.ALTA,
@@ -290,13 +287,17 @@ class AuditoriaJdbcTest {
         // Las particiones declaradas son 2026 y 2027. Que falle es lo correcto: la
         // alternativa —una particion por omision— guardaria la fila donde nadie la
         // busca, y una auditoria que no se encuentra es una auditoria que no existe.
+        // Desde #398 el ejercicio sale del reloj, asi que lo que llega a 2035 es el reloj.
+        AuditoriaJdbc en2035 =
+                new AuditoriaJdbc(
+                        jdbc,
+                        Clock.fixed(Instant.parse("2035-03-01T15:00:00Z"), ZONA_DEL_PRODUCTO));
         assertThatThrownBy(
                         () ->
                                 transaccion.execute(
                                         estado -> {
-                                            auditoria.registrar(
+                                            en2035.registrar(
                                                     new RegistroDeAuditoria(
-                                                            new Ejercicio(2035),
                                                             "via",
                                                             "10",
                                                             Operacion.ALTA,
@@ -310,12 +311,56 @@ class AuditoriaJdbcTest {
                 .hasMessageContaining("partition");
     }
 
+    /**
+     * La fecha y el ejercicio salen del mismo instante, leido en la zona del reloj (#398).
+     *
+     * <p>Las 23:30 del 31 de diciembre en Lima son ya las 04:30 del 1 de enero en UTC. La fila es
+     * del ejercicio que termina, con la fecha que termina: si el año se leyera en otra zona que la
+     * fecha —o de otra fuente—, la fila caeria en {@code auditoria_2027} con fecha de 2026, y la
+     * bitacora, que filtra por ejercicio y por rango de fecha, no la encontraria en ninguno de los
+     * dos.
+     */
+    @Test
+    @DisplayName(
+            "en Nochevieja la fila es del ejercicio de su propia fecha, leida en la zona del reloj")
+    void enNocheviejaElEjercicioEsElDeLaFecha() throws SQLException {
+        AuditoriaJdbc enNochevieja =
+                new AuditoriaJdbc(
+                        jdbc,
+                        Clock.fixed(Instant.parse("2027-01-01T04:30:00Z"), ZONA_DEL_PRODUCTO));
+        transaccion.execute(
+                estado -> {
+                    enNochevieja.registrar(
+                            new RegistroDeAuditoria(
+                                    "via",
+                                    "nochevieja",
+                                    Operacion.MODIFICACION,
+                                    Observacion.de(
+                                            "Cambio registrado a las 23:30 del 31 de diciembre"),
+                                    null,
+                                    null));
+                    return null;
+                });
+
+        try (Connection admin = base.conexionAdmin();
+                PreparedStatement sentencia =
+                        admin.prepareStatement(
+                                "SELECT ejercicio, (fecha AT TIME ZONE 'America/Lima')::date::text"
+                                        + " FROM auditoria WHERE clave = 'nochevieja'");
+                ResultSet fila = sentencia.executeQuery()) {
+            assertThat(fila.next()).isTrue();
+            assertThat(fila.getInt(1))
+                    .as("en UTC ya es 2027, pero el año de la municipalidad es 2026")
+                    .isEqualTo(2026);
+            assertThat(fila.getString(2)).isEqualTo("2026-12-31");
+        }
+    }
+
     private void registrarUnaFilaCualquiera(String clave) {
         transaccion.execute(
                 estado -> {
                     auditoria.registrar(
                             new RegistroDeAuditoria(
-                                    EJERCICIO,
                                     "via",
                                     clave,
                                     Operacion.MODIFICACION,

@@ -230,7 +230,6 @@ public class RevalidarLicenciaDeEdificacion {
 
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe(
-                                fecha,
                                 "edificacion_vigencia",
                                 String.valueOf(concedida.id()),
                                 Operacion.ALTA,

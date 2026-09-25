@@ -1,7 +1,5 @@
 package kamayuk.rentas.nucleo.aplicacion;
 
-import java.time.Clock;
-import java.time.LocalDate;
 import kamayuk.rentas.auditoria.Auditoria;
 import kamayuk.rentas.auditoria.Operacion;
 import kamayuk.rentas.auditoria.RegistroDeAuditoria;
@@ -40,12 +38,10 @@ public class CambiarPlaca {
 
     private final VehiculoRepository repositorio;
     private final Auditoria auditoria;
-    private final Clock reloj;
 
-    public CambiarPlaca(VehiculoRepository repositorio, Auditoria auditoria, Clock reloj) {
+    public CambiarPlaca(VehiculoRepository repositorio, Auditoria auditoria) {
         this.repositorio = repositorio;
         this.auditoria = auditoria;
-        this.reloj = reloj;
     }
 
     @Transactional
@@ -72,7 +68,6 @@ public class CambiarPlaca {
 
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe(
-                                LocalDate.now(reloj),
                                 "vehiculo",
                                 String.valueOf(vehiculoId),
                                 Operacion.MODIFICACION,

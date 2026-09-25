@@ -1,6 +1,5 @@
 package kamayuk.rentas.nucleo.aplicacion;
 
-import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Objects;
@@ -69,19 +68,16 @@ public class RamaDelCiudadano {
     private final ConsultaDeDeudaPublica deuda;
     private final PrediosDelContribuyente predios;
     private final Auditoria auditoria;
-    private final Clock reloj;
 
     public RamaDelCiudadano(
             AcreditacionEnElPadron acreditacion,
             ConsultaDeDeudaPublica deuda,
             PrediosDelContribuyente predios,
-            Auditoria auditoria,
-            Clock reloj) {
+            Auditoria auditoria) {
         this.acreditacion = acreditacion;
         this.deuda = deuda;
         this.predios = predios;
         this.auditoria = auditoria;
-        this.reloj = reloj;
     }
 
     /**
@@ -139,10 +135,6 @@ public class RamaDelCiudadano {
             int predios) {
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe(
-                                // Del reloj inyectado: la particion de la bitacora es el ejercicio
-                                // del ACTO, y consultar en 2027 la deuda al 31/12/2026 es un acto
-                                // de 2027.
-                                LocalDate.now(reloj),
                                 TABLA_AUDITADA,
                                 "contribuyente=" + contribuyente.codigo(),
                                 Operacion.ACCESO,

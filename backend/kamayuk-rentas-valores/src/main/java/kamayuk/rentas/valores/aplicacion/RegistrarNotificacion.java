@@ -187,7 +187,6 @@ public class RegistrarNotificacion {
     private void auditar(Valor valor, Notificacion notificacion, Observacion observacion) {
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe(
-                                notificacion.fechaDeLaDiligencia(),
                                 "notificacion",
                                 String.valueOf(notificacion.id()),
                                 Operacion.ALTA,

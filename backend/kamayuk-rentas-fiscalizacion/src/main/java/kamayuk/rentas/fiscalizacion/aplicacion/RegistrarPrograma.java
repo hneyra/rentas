@@ -71,7 +71,6 @@ public class RegistrarPrograma {
 
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe(
-                                fechaInicio,
                                 TABLA_AUDITADA,
                                 String.valueOf(guardado.id()),
                                 Operacion.ALTA,

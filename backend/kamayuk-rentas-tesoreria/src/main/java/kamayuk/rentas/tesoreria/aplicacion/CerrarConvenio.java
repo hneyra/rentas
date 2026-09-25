@@ -216,7 +216,6 @@ public class CerrarConvenio {
 
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe(
-                                peticion.fecha(),
                                 "convenio_movimiento",
                                 String.valueOf(cierre.id()),
                                 Operacion.ANULACION,

@@ -163,7 +163,6 @@ public class RegistrarTransferencia {
     private void auditar(Transferencia guardada, Observacion observacion) {
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe(
-                                guardada.fechaTransferencia(),
                                 "transferencia",
                                 String.valueOf(guardada.id()),
                                 Operacion.ALTA,
@@ -171,6 +170,11 @@ public class RegistrarTransferencia {
                         .con(null, descripcion(guardada)));
     }
 
+    /**
+     * Lleva {@code fechaTransferencia}, que es la fecha de negocio: desde #398 la fila de auditoria
+     * se fecha y se particiona con el dia en que se REGISTRA, y la compra de diciembre registrada
+     * en enero perderia su fecha si no viajara aqui.
+     */
     private static String descripcion(Transferencia transferencia) {
         return "{\"objeto\":\""
                 + transferencia.objeto()
@@ -180,6 +184,8 @@ public class RegistrarTransferencia {
                 + transferencia.adquirienteId()
                 + ",\"tipoTransferencia\":\""
                 + transferencia.tipoTransferencia()
+                + "\",\"fechaTransferencia\":\""
+                + transferencia.fechaTransferencia()
                 + "\",\"porcentajeTransferido\":\""
                 + transferencia.porcentajeTransferido()
                 + "\"}";

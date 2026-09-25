@@ -1,7 +1,5 @@
 package kamayuk.rentas.seguridad.aplicacion;
 
-import java.time.Clock;
-import java.time.LocalDate;
 import java.util.List;
 import kamayuk.rentas.auditoria.Auditoria;
 import kamayuk.rentas.auditoria.Operacion;
@@ -52,12 +50,10 @@ import org.springframework.transaction.annotation.Transactional;
 public class SembradorDelCatalogo extends RepositorioJdbc {
 
     private final Auditoria auditoria;
-    private final Clock reloj;
 
-    public SembradorDelCatalogo(JdbcClient jdbc, Auditoria auditoria, Clock reloj) {
+    public SembradorDelCatalogo(JdbcClient jdbc, Auditoria auditoria) {
         super(jdbc);
         this.auditoria = auditoria;
-        this.reloj = reloj;
     }
 
     /**
@@ -93,8 +89,7 @@ public class SembradorDelCatalogo extends RepositorioJdbc {
             return 0;
         }
         auditoria.registrar(
-                RegistroDeAuditoria.enLaFechaDe(
-                                LocalDate.now(reloj), "acceso", "catalogo", Operacion.ALTA, porQue)
+                RegistroDeAuditoria.enLaFechaDe("acceso", "catalogo", Operacion.ALTA, porQue)
                         .con(
                                 null,
                                 "{\"accesosCreados\":"

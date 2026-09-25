@@ -118,8 +118,7 @@ class RegistrarDeterminacionVehicularTest {
                                         new ValorReferencialRepositoryJdbc(jdbc), parametros),
                                 determinaciones,
                                 parametros,
-                                new AuditoriaJdbc(jdbc, RELOJ),
-                                RELOJ));
+                                new AuditoriaJdbc(jdbc, RELOJ)));
         // La transferencia por el camino de verdad: el caso de uso que sobrescribe el titular del
         // vehiculo y deja la fecha solo en la fila de `transferencia` (#329). La titularidad
         // predial no la toca una transferencia de vehiculo, pero el constructor la pide.

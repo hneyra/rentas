@@ -194,7 +194,6 @@ public class AnularPapeleta {
 
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe(
-                                fecha,
                                 TABLA_AUDITADA,
                                 String.valueOf(antes.identificador()),
                                 Operacion.MODIFICACION,

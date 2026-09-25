@@ -1024,7 +1024,7 @@ class DeterminarPredialTest {
                 new CuadroPredialParametrizado(lector),
                 valuaciones,
                 beneficios,
-                new RegistrarDeterminacionPredial(determinaciones, lector, auditoria, reloj),
+                new RegistrarDeterminacionPredial(determinaciones, lector, auditoria),
                 reloj);
     }
 

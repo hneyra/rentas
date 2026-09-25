@@ -99,7 +99,7 @@ class AdministrarSesionTest {
         sesion =
                 envolver(
                         new AdministrarSesion(
-                                new SesionRepositoryJdbc(jdbc), administracion, auditoria, RELOJ),
+                                new SesionRepositoryJdbc(jdbc), administracion, auditoria),
                         gestor);
 
         crearUsuarioEn(municipalidadA, "operador.a");
@@ -667,7 +667,6 @@ class AdministrarSesionTest {
                                 new AuditoriaJdbc(jdbc, reloj)
                                         .registrar(
                                                 RegistroDeAuditoria.enLaFechaDe(
-                                                        LocalDate.now(reloj),
                                                         tabla,
                                                         clave,
                                                         operacion,

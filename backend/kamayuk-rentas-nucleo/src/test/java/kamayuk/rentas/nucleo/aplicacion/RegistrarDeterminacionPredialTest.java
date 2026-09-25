@@ -127,7 +127,7 @@ class RegistrarDeterminacionPredialTest {
         registrar =
                 envolver(
                         new RegistrarDeterminacionPredial(
-                                repositorio, parametros, new AuditoriaJdbc(jdbc, RELOJ), RELOJ));
+                                repositorio, parametros, new AuditoriaJdbc(jdbc, RELOJ)));
     }
 
     @SuppressWarnings("unchecked")

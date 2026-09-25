@@ -1,6 +1,5 @@
 package kamayuk.rentas.fiscalizacion.aplicacion;
 
-import java.time.Clock;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -103,7 +102,6 @@ public class LiquidarFiscalizacion {
     private final LectorDeFichas fichas;
     private final DeclaracionesDelEjercicio declaraciones;
     private final Auditoria auditoria;
-    private final Clock reloj;
 
     public LiquidarFiscalizacion(
             ActaFiscalizacionRepository actas,
@@ -113,8 +111,7 @@ public class LiquidarFiscalizacion {
             LectorDeCaracteristicas caracteristicas,
             LectorDeFichas fichas,
             DeclaracionesDelEjercicio declaraciones,
-            Auditoria auditoria,
-            Clock reloj) {
+            Auditoria auditoria) {
         this.actas = actas;
         this.liquidaciones = liquidaciones;
         this.movimientos = movimientos;
@@ -123,7 +120,6 @@ public class LiquidarFiscalizacion {
         this.fichas = fichas;
         this.declaraciones = declaraciones;
         this.auditoria = auditoria;
-        this.reloj = reloj;
     }
 
     /**
@@ -324,7 +320,6 @@ public class LiquidarFiscalizacion {
     private void auditar(Liquidacion guardada, Observacion observacion) {
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe(
-                                LocalDate.now(reloj),
                                 TABLA_AUDITADA,
                                 String.valueOf(guardada.identificador()),
                                 Operacion.ALTA,

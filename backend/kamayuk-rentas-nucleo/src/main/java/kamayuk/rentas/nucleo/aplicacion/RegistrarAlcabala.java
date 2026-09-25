@@ -1,7 +1,5 @@
 package kamayuk.rentas.nucleo.aplicacion;
 
-import java.time.Clock;
-import java.time.LocalDate;
 import java.util.List;
 import java.util.Objects;
 import kamayuk.rentas.auditoria.Auditoria;
@@ -52,19 +50,16 @@ public class RegistrarAlcabala {
     private final DeterminacionRepository determinaciones;
     private final LectorDeParametros parametros;
     private final Auditoria auditoria;
-    private final Clock reloj;
 
     public RegistrarAlcabala(
             TransferenciaRepository transferencias,
             DeterminacionRepository determinaciones,
             LectorDeParametros parametros,
-            Auditoria auditoria,
-            Clock reloj) {
+            Auditoria auditoria) {
         this.transferencias = transferencias;
         this.determinaciones = determinaciones;
         this.parametros = parametros;
         this.auditoria = auditoria;
-        this.reloj = reloj;
     }
 
     /**
@@ -136,7 +131,6 @@ public class RegistrarAlcabala {
     private void auditar(Determinacion guardada, EleccionDeBase eleccion, Observacion observacion) {
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe(
-                                LocalDate.now(reloj),
                                 TABLA_AUDITADA,
                                 String.valueOf(guardada.id()),
                                 Operacion.ALTA,

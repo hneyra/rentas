@@ -111,8 +111,7 @@ class RegistrarEspectaculoTest {
                                                 new kamayuk.rentas.contribuyentes.infraestructura
                                                         .FichaRepositoryJdbc(jdbc)),
                                         gestor),
-                                new AuditoriaJdbc(jdbc, RELOJ),
-                                RELOJ),
+                                new AuditoriaJdbc(jdbc, RELOJ)),
                         gestor);
     }
 

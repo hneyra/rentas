@@ -129,9 +129,7 @@ class LecturasDeLaCopiaLocalDePuntaAPuntaTest {
         // su transaccion y su contexto. Es lo unico de esta clase que fija el inquilino a mano, y
         // se limpia enseguida — lo que se mide es la PETICION, que no lo tiene puesto.
         SembradorDelCatalogo sembrador =
-                proxificado(
-                        new SembradorDelCatalogo(jdbc, new AuditoriaJdbc(jdbc, RELOJ), RELOJ),
-                        gestor);
+                proxificado(new SembradorDelCatalogo(jdbc, new AuditoriaJdbc(jdbc, RELOJ)), gestor);
         sembrar(sembrador, municipalidadA);
         sembrar(sembrador, municipalidadB);
 

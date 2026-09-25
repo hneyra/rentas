@@ -1,6 +1,5 @@
 package kamayuk.rentas.nucleo.aplicacion;
 
-import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Set;
@@ -63,21 +62,18 @@ public class RegistrarEspectaculo {
     private final LectorDeParametros parametros;
     private final DirectorioDeContribuyentes padron;
     private final Auditoria auditoria;
-    private final Clock reloj;
 
     public RegistrarEspectaculo(
             EspectaculoPublicoRepository eventos,
             DeterminacionRepository determinaciones,
             LectorDeParametros parametros,
             DirectorioDeContribuyentes padron,
-            Auditoria auditoria,
-            Clock reloj) {
+            Auditoria auditoria) {
         this.eventos = eventos;
         this.determinaciones = determinaciones;
         this.parametros = parametros;
         this.padron = padron;
         this.auditoria = auditoria;
-        this.reloj = reloj;
     }
 
     /**
@@ -177,7 +173,6 @@ public class RegistrarEspectaculo {
     private void auditar(Determinacion guardada, Observacion observacion) {
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe(
-                                LocalDate.now(reloj),
                                 TABLA_AUDITADA,
                                 String.valueOf(guardada.id()),
                                 Operacion.ALTA,

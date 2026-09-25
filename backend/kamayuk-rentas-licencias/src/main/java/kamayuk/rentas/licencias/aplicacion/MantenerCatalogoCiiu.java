@@ -1,7 +1,6 @@
 package kamayuk.rentas.licencias.aplicacion;
 
 import java.time.Clock;
-import java.time.LocalDate;
 import java.util.Objects;
 import kamayuk.rentas.auditoria.Auditoria;
 import kamayuk.rentas.auditoria.Operacion;
@@ -88,7 +87,6 @@ public class MantenerCatalogoCiiu {
 
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe(
-                                LocalDate.now(reloj),
                                 "ciiu",
                                 String.valueOf(guardado.identificador()),
                                 Operacion.ALTA,

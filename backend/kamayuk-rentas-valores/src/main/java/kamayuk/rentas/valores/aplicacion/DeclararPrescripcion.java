@@ -337,7 +337,6 @@ public class DeclararPrescripcion {
         Prescripcion prescripcion = declarada.prescripcion();
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe(
-                                prescripcion.fechaPresentacion(),
                                 "prescripcion",
                                 String.valueOf(prescripcion.id()),
                                 Operacion.ALTA,

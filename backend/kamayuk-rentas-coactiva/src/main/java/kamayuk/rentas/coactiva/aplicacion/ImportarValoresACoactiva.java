@@ -292,7 +292,6 @@ public class ImportarValoresACoactiva {
             Observacion observacion) {
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe(
-                                fecha,
                                 "expediente_coactivo",
                                 String.valueOf(expediente.identificador()),
                                 Operacion.ALTA,

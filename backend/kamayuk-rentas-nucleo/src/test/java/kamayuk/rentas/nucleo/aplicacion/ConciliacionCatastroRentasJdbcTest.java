@@ -149,8 +149,7 @@ class ConciliacionCatastroRentasJdbcTest {
                         new GrillaDelEscenario(jdbc),
                         declaraciones,
                         new ConciliacionRepositoryJdbc(jdbc),
-                        new AuditoriaJdbc(jdbc, RELOJ),
-                        RELOJ);
+                        new AuditoriaJdbc(jdbc, RELOJ));
         consulta = envolver(sinTransaccion, gestor);
     }
 

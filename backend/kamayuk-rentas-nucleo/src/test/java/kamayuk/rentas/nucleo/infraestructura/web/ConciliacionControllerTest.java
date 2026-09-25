@@ -81,8 +81,7 @@ class ConciliacionControllerTest {
                                             new PadronDePrueba(),
                                             declaraciones,
                                             recuento,
-                                            auditoria,
-                                            RELOJ),
+                                            auditoria),
                                     comprobador,
                                     RELOJ))
                     .setControllerAdvice(new ManejadorDeErrores())

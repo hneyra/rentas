@@ -80,7 +80,7 @@ class AutorizacionTest {
         permisos = new LecturaDeLaCopiaLocalJdbc(jdbc);
 
         SembradorDelCatalogo objetivo =
-                new SembradorDelCatalogo(jdbc, new AuditoriaJdbc(jdbc, RELOJ), RELOJ);
+                new SembradorDelCatalogo(jdbc, new AuditoriaJdbc(jdbc, RELOJ));
         ProxyFactory fabrica = new ProxyFactory(objetivo);
         fabrica.setProxyTargetClass(true);
         fabrica.addAdvice(

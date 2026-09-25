@@ -100,8 +100,8 @@ class PadronVehicularTest {
         repositorio = new VehiculoRepositoryJdbc(jdbc);
         AuditoriaJdbc auditoria = new AuditoriaJdbc(jdbc, RELOJ);
 
-        registrar = envolver(new RegistrarVehiculo(repositorio, auditoria, RELOJ), pool);
-        cambiarPlaca = envolver(new CambiarPlaca(repositorio, auditoria, RELOJ), pool);
+        registrar = envolver(new RegistrarVehiculo(repositorio, auditoria), pool);
+        cambiarPlaca = envolver(new CambiarPlaca(repositorio, auditoria), pool);
         // La consulta se envuelve igual que las escrituras, y por el mismo motivo:
         // sin transaccion no hay SET LOCAL y la politica RLS no puede evaluarse.
         // Leer «simple» desde el controlador no funcionaria nunca.

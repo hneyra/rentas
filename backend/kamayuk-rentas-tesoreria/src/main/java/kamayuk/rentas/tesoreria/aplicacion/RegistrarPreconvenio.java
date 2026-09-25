@@ -200,7 +200,6 @@ public class RegistrarPreconvenio {
         Convenio guardado = convenios.registrar(convenio, clave);
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe(
-                                peticion.fecha(),
                                 "convenio",
                                 String.valueOf(guardado.id()),
                                 Operacion.ALTA,

@@ -146,8 +146,7 @@ class CalculoVehicularPorContribuyenteFronteraTest {
                                         new ValorReferencialRepositoryJdbc(jdbc), parametros),
                                 new DeterminacionRepositoryJdbc(jdbc),
                                 parametros,
-                                auditoria,
-                                RELOJ));
+                                auditoria));
         RegistrarTransferencia transferir =
                 conLaTransaccionQueDiceLaAnotacion(
                         new RegistrarTransferencia(

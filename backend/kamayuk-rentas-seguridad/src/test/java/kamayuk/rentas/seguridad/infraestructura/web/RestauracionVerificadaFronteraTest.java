@@ -142,8 +142,7 @@ class RestauracionVerificadaFronteraTest {
         TenantTransactionManager gestor = new TenantTransactionManager(pool);
         AdministrarSesion administrar =
                 conLaTransaccionQueDiceLaAnotacion(
-                        new AdministrarSesion(new SesionRepositoryJdbc(jdbc), null, null, RELOJ),
-                        gestor);
+                        new AdministrarSesion(new SesionRepositoryJdbc(jdbc), null, null), gestor);
 
         comprobador = new ComprobadorQueConcede();
         mvc =

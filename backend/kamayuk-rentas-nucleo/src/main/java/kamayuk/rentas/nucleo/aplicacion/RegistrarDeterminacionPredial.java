@@ -1,7 +1,5 @@
 package kamayuk.rentas.nucleo.aplicacion;
 
-import java.time.Clock;
-import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -71,17 +69,14 @@ public class RegistrarDeterminacionPredial {
     private final DeterminacionRepository repositorio;
     private final LectorDeParametros parametros;
     private final Auditoria auditoria;
-    private final Clock reloj;
 
     public RegistrarDeterminacionPredial(
             DeterminacionRepository repositorio,
             LectorDeParametros parametros,
-            Auditoria auditoria,
-            Clock reloj) {
+            Auditoria auditoria) {
         this.repositorio = repositorio;
         this.parametros = parametros;
         this.auditoria = auditoria;
-        this.reloj = reloj;
     }
 
     /**
@@ -191,7 +186,6 @@ public class RegistrarDeterminacionPredial {
     private void auditar(Determinacion guardada, Observacion observacion) {
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe(
-                                LocalDate.now(reloj),
                                 "determinacion",
                                 String.valueOf(guardada.id()),
                                 Operacion.ALTA,

@@ -120,12 +120,11 @@ public class AnularActaFiscalizacion {
 
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe(
-                                fecha,
                                 TABLA_AUDITADA,
                                 String.valueOf(actaId),
                                 Operacion.MODIFICACION,
                                 observacion)
-                        .con(descripcion(antes), descripcion(anulada)));
+                        .con(descripcion(antes), descripcionDeLaAnulacion(anulada, fecha)));
 
         return conLoDeclarado(anulada);
     }
@@ -168,6 +167,15 @@ public class AnularActaFiscalizacion {
 
     private static String descripcion(ActaFiscalizacion acta) {
         return "{\"estado\":\"" + acta.estado() + "\"}";
+    }
+
+    /**
+     * El estado anulado con el dia del acto. Hasta #398 ese dia solo llegaba a la auditoria como el
+     * ejercicio de su particion —ni siquiera como fecha—; desde #398 la particion es la del dia en
+     * que se registra, y el dia de la anulacion, que es un dato del acto, viaja aqui.
+     */
+    private static String descripcionDeLaAnulacion(ActaFiscalizacion acta, LocalDate fecha) {
+        return "{\"estado\":\"" + acta.estado() + "\",\"fechaAnulacion\":\"" + fecha + "\"}";
     }
 
     /**

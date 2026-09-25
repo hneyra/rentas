@@ -3,10 +3,7 @@ package kamayuk.rentas.sanciones.aplicacion;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import java.time.Clock;
-import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -35,8 +32,6 @@ import org.junit.jupiter.api.Test;
 class MantenerCatalogoDeInfraccionesTest {
 
     private static final Observacion OBSERVACION = Observacion.de("Se registra para la prueba");
-    private static final Clock RELOJ =
-            Clock.fixed(Instant.parse("2026-06-01T00:00:00Z"), ZoneOffset.UTC);
 
     private RepositorioEnMemoria repositorio;
     private AuditoriaDeMentira auditoria;
@@ -46,7 +41,7 @@ class MantenerCatalogoDeInfraccionesTest {
     void preparar() {
         repositorio = new RepositorioEnMemoria();
         auditoria = new AuditoriaDeMentira();
-        servicio = new MantenerCatalogoDeInfracciones(repositorio, auditoria, RELOJ);
+        servicio = new MantenerCatalogoDeInfracciones(repositorio, auditoria);
     }
 
     @Test

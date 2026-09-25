@@ -70,7 +70,6 @@ public class RegistrarAsiento {
 
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe(
-                                guardado.fechaValor(),
                                 "cuenta_corriente_asiento",
                                 String.valueOf(guardado.id()),
                                 Operacion.ALTA,
@@ -149,7 +148,6 @@ public class RegistrarAsiento {
 
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe(
-                                fecha,
                                 "cuenta_corriente_asiento",
                                 String.valueOf(guardado.id()),
                                 Operacion.REVERSION,

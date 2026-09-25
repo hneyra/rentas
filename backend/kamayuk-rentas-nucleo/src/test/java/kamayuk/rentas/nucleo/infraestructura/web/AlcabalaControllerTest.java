@@ -369,11 +369,7 @@ class AlcabalaControllerTest {
     private MockMvc montar(LectorDeParametros parametros) {
         RegistrarAlcabala servicio =
                 new RegistrarAlcabala(
-                        new TransferenciasDePrueba(),
-                        determinaciones,
-                        parametros,
-                        auditoria,
-                        RELOJ);
+                        new TransferenciasDePrueba(), determinaciones, parametros, auditoria);
         return MockMvcBuilders.standaloneSetup(new AlcabalaController(servicio, RELOJ))
                 .addInterceptors(new GuardiaDeAcceso(comprobador, RELOJ))
                 .setControllerAdvice(new ManejadorDeErrores())

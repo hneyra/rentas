@@ -1,6 +1,5 @@
 package kamayuk.rentas.nucleo.aplicacion;
 
-import java.time.Clock;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -74,17 +73,12 @@ public class ConsultaDeTitulares {
     private final TitularesDelPredio titulares;
     private final DirectorioDeContribuyentes padron;
     private final Auditoria auditoria;
-    private final Clock reloj;
 
     public ConsultaDeTitulares(
-            TitularesDelPredio titulares,
-            DirectorioDeContribuyentes padron,
-            Auditoria auditoria,
-            Clock reloj) {
+            TitularesDelPredio titulares, DirectorioDeContribuyentes padron, Auditoria auditoria) {
         this.titulares = titulares;
         this.padron = padron;
         this.auditoria = auditoria;
-        this.reloj = reloj;
     }
 
     /**
@@ -148,10 +142,6 @@ public class ConsultaDeTitulares {
     private void registrarElAcceso(long predioId, LocalDate vigenteA, int cuantos) {
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe(
-                                // Del reloj inyectado, no de vigenteA: la particion de la bitacora
-                                // es el ejercicio del ACTO, y preguntar en 2026 por el titular de
-                                // 2024 es un acto de 2026.
-                                LocalDate.now(reloj),
                                 TABLA_AUDITADA,
                                 "predio=" + predioId + ";vigenteA=" + vigenteA,
                                 Operacion.ACCESO,

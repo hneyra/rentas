@@ -34,7 +34,7 @@ class ArchivoDeContribuyentesDeEjemploTest {
         Auditoria auditoria = registro -> {};
         Clock reloj = Clock.fixed(Instant.parse("2026-08-28T10:00:00Z"), ZoneId.of("America/Lima"));
         ImportarContribuyentes importar =
-                new ImportarContribuyentes(new RegistrarContribuyente(padron, auditoria, reloj));
+                new ImportarContribuyentes(new RegistrarContribuyente(padron, auditoria));
 
         InformeDeImportacion informe =
                 importar.importar(
@@ -55,7 +55,7 @@ class ArchivoDeContribuyentesDeEjemploTest {
         Auditoria auditoria = registro -> {};
         Clock reloj = Clock.fixed(Instant.parse("2026-08-28T10:00:00Z"), ZoneId.of("America/Lima"));
         ImportarContribuyentes importar =
-                new ImportarContribuyentes(new RegistrarContribuyente(padron, auditoria, reloj));
+                new ImportarContribuyentes(new RegistrarContribuyente(padron, auditoria));
         Observacion observacion = Observacion.de("Carga del archivo de ejemplo (#290)");
 
         int primera = importar.importar(abrir("contribuyentes.csv"), observacion).nuevas();
