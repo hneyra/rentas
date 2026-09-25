@@ -129,18 +129,57 @@ class RegistrarValorTest {
         assertThat(registrado.referenciaExterna()).isEqualTo("VALOR-" + guardado.numero());
     }
 
+    /**
+     * #401 — la siembra que distingue: tres obligaciones del contribuyente y solo una con deuda.
+     *
+     * <p>Hasta #401 esta prueba se llamaba {@code obligacionEnCeroNoMueveFase}: emitia la OP sobre
+     * una obligacion en 0,00 y solo comprobaba que la fase no se movia. Daba por bueno lo que el
+     * issue mide como defecto —un acto de 0,00 en {@code EMITIDO}, con el correlativo de la serie
+     * consumido, que se puede notificar y pasar a coactiva—.
+     */
     @Test
-    @DisplayName("una obligacion con deuda en cero no mueve fase: no hay nada que mover")
-    void obligacionEnCeroNoMueveFase() {
-        deuda.con(obligacionSimple("PREDIAL", EJERCICIO_DEUDA, 55L, null, Dinero.CERO));
+    @DisplayName("#401 — una obligacion pagada o dada de baja no se formaliza: ObligacionSinDeuda")
+    void unaObligacionSaldadaNoSeFormaliza() {
+        // Con deuda: PREDIAL 2026, 300,00.
+        deuda.con(obligacionSimple("PREDIAL", new Ejercicio(2026), 7L, null, Dinero.de(300)));
+        // Pagada: el cargo de 400,00 y el abono de 400,00 netean a cero, y sigue en el libro.
+        deuda.con(obligacionSimple("PREDIAL", EJERCICIO_DEUDA, 7L, null, Dinero.CERO));
+        // Dada de baja por prescripcion declarada: tambien a cero, tambien en el libro.
+        deuda.con(obligacionSimple("PREDIAL", new Ejercicio(2019), 7L, null, Dinero.CERO));
 
-        servicio.emitir(
-                TipoValor.ORDEN_DE_PAGO,
-                7L,
-                List.of(new SelectorDeObligacion("PREDIAL", EJERCICIO_DEUDA, 55L, null)),
-                OBSERVACION);
-
+        assertThatThrownBy(
+                        () ->
+                                servicio.emitir(
+                                        TipoValor.ORDEN_DE_PAGO,
+                                        7L,
+                                        List.of(
+                                                new SelectorDeObligacion(
+                                                        "PREDIAL", EJERCICIO_DEUDA, 7L, null)),
+                                        OBSERVACION))
+                .isInstanceOf(RegistrarValor.ObligacionSinDeuda.class);
+        assertThat(repositorio.guardados).as("ni un valor de 0,00 en EMITIDO").isEmpty();
+        assertThat(repositorio.correlativos)
+                .as("ni el correlativo de la serie consumido por un acto que no exige nada")
+                .isEmpty();
         assertThat(movimiento.movimientos).isEmpty();
+    }
+
+    @Test
+    @DisplayName("#401 — la obligacion con deuda, de la misma siembra, si se formaliza")
+    void laObligacionConDeudaDeLaMismaSiembraSiSeFormaliza() {
+        deuda.con(obligacionSimple("PREDIAL", new Ejercicio(2026), 7L, null, Dinero.de(300)));
+        deuda.con(obligacionSimple("PREDIAL", EJERCICIO_DEUDA, 7L, null, Dinero.CERO));
+        deuda.con(obligacionSimple("PREDIAL", new Ejercicio(2019), 7L, null, Dinero.CERO));
+
+        Valor guardado =
+                servicio.emitir(
+                        TipoValor.ORDEN_DE_PAGO,
+                        7L,
+                        List.of(new SelectorDeObligacion("PREDIAL", new Ejercicio(2026), 7L, null)),
+                        OBSERVACION);
+
+        assertThat(guardado.total()).isEqualTo(Dinero.de(300));
+        assertThat(movimiento.movimientos).hasSize(1);
     }
 
     @Test
@@ -500,8 +539,7 @@ class RegistrarValorTest {
         }
 
         @Override
-        public List<ObligacionPublica> deTodoElContribuyente(
-                long contribuyenteId, LocalDate fecha) {
+        public List<ObligacionPublica> todasDe(long contribuyenteId, LocalDate fecha) {
             return List.copyOf(obligaciones);
         }
     }

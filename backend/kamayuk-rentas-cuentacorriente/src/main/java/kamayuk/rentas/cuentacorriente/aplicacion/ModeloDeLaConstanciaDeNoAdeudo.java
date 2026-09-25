@@ -23,9 +23,10 @@ import kamayuk.rentas.documentos.Tabla;
  * <h2>Ninguna cifra se recompone aqui</h2>
  *
  * <p>El saldo de cada fila es el total que {@code ObligacionConDeuda} ya trae calculado, formateado
- * y nada mas (RNF-083). Y la situacion —«Pendiente» o «Cancelado»— se lee de {@code esPositivo()}
- * sobre ese mismo total, que es de donde la lee {@link ConstanciaDeNoAdeudo#seNiega()}: si se
- * derivara por otro camino, una fila podria decir «Cancelado» en un papel que se niega.
+ * y nada mas (RNF-083). Y la situacion —«Pendiente» o «Cancelado»— se lee de {@code
+ * ObligacionConDeuda#estaPendiente()}, que es de donde la lee {@link
+ * ConstanciaDeNoAdeudo#seNiega()} (#401): si se derivara por otro camino, una fila podria decir
+ * «Cancelado» en un papel que se niega.
  *
  * <h2>Dos lineas de firma, y ninguna digital</h2>
  *
@@ -50,7 +51,7 @@ public final class ModeloDeLaConstanciaDeNoAdeudo {
 
         List<List<String>> filas = new ArrayList<>();
         for (ObligacionConDeuda obligacion : constancia.obligaciones()) {
-            boolean pendiente = obligacion.deuda().total().esPositivo();
+            boolean pendiente = obligacion.estaPendiente();
             filas.add(
                     List.of(
                             obligacion.tributo(),

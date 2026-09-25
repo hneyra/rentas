@@ -2305,9 +2305,7 @@ class ValoresMasivosYReportesJdbcTest {
      * una cifra escrita a mano dejaria la comprobacion de #39 comparandose contra si misma.
      */
     private static Dinero loQueDebeAlDia(long contribuyenteId, SeleccionDeObligacion obligacion) {
-        return enTransaccion(
-                        () -> deudas.deTodoElContribuyente(contribuyenteId, EXIGIBLE_DESDE),
-                        "cajero")
+        return enTransaccion(() -> deudas.todasDe(contribuyenteId, EXIGIBLE_DESDE), "cajero")
                 .stream()
                 .filter(
                         publica ->

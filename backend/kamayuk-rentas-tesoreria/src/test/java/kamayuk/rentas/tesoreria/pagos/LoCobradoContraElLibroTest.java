@@ -260,7 +260,7 @@ class LoCobradoContraElLibroTest {
             assertThat(abonadoPor(orden.documento(), D1))
                     .as("y lo asentado es exactamente lo cobrado, al centimo")
                     .isEqualTo(orden.importe());
-            // Saldada NO es lo mismo que ausente: `deTodoElContribuyente` sigue devolviendo la
+            // Saldada NO es lo mismo que ausente: `todasDe` sigue devolviendo la
             // obligacion, con sus cuatro partes en cero. Lo comprobo el primer rojo de esta
             // prueba, que esperaba una lista vacia y recibio `insoluto=0.00`.
             assertThat(deudaDe(predio, D1))
@@ -535,7 +535,7 @@ class LoCobradoContraElLibroTest {
 
     /** Lo que sigue debiendose de ese predio, leido por el mismo puerto que valora la orden. */
     private static List<ObligacionPublica> deudaDe(long predio, LocalDate aLaFecha) {
-        return libro.deTodoElContribuyente(contribuyente, aLaFecha).stream()
+        return libro.todasDe(contribuyente, aLaFecha).stream()
                 .filter(
                         obligacion ->
                                 obligacion.predioId() != null && predio == obligacion.predioId())

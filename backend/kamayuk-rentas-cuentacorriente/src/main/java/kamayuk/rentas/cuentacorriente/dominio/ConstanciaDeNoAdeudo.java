@@ -9,8 +9,8 @@ import java.util.Objects;
  * constancia de no adeudo a la fecha de corte, y el detalle que lo sustenta.
  *
  * <p>{@code seNiega} es {@code true} si <b>alguna</b> obligacion tiene saldo pendiente a la fecha,
- * sin importar su fase: basta una con {@link kamayuk.rentas.dominio.Dinero#esPositivo()} para negar
- * la constancia (criterio de aceptacion de #25). No hay «casi no debe».
+ * sin importar su fase: basta una que {@link ObligacionConDeuda#estaPendiente()} para negar la
+ * constancia (criterio de aceptacion de #25). No hay «casi no debe».
  *
  * @param codigoContribuyente a quien se le niega o se le emite
  * @param fecha la fecha de corte con que se evaluo (regla 9, RNF-075)
@@ -33,7 +33,7 @@ public record ConstanciaDeNoAdeudo(
 
     public static ConstanciaDeNoAdeudo de(
             String codigoContribuyente, LocalDate fecha, List<ObligacionConDeuda> obligaciones) {
-        boolean seNiega = obligaciones.stream().anyMatch(o -> o.deuda().total().esPositivo());
+        boolean seNiega = obligaciones.stream().anyMatch(ObligacionConDeuda::estaPendiente);
         return new ConstanciaDeNoAdeudo(codigoContribuyente, fecha, obligaciones, seNiega);
     }
 }

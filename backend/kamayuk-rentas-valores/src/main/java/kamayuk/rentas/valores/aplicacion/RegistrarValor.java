@@ -33,12 +33,11 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <h2>Un valor no crea deuda: la formaliza</h2>
  *
- * <p>Cada {@link SelectorDeObligacion} se cruza contra {@link
- * ConsultaDeDeudaPublica#deTodoElContribuyente}, que es la unica fuente de cuanto se debe. El
- * desglose que este servicio congela en {@link ValorDetalle} —insoluto, reajuste, interes, gasto—
- * es exactamente el que devuelve esa consulta —nunca uno calculado aqui—, y una vez guardado no se
- * vuelve a leer: reimprimir el valor dos anios despues devuelve ese mismo desglose (AC de #37),
- * aunque el saldo real haya cambiado.
+ * <p>Cada {@link SelectorDeObligacion} se cruza contra {@link ConsultaDeDeudaPublica#pendientesDe},
+ * que es la unica fuente de cuanto se debe. El desglose que este servicio congela en {@link
+ * ValorDetalle} —insoluto, reajuste, interes, gasto— es exactamente el que devuelve esa consulta
+ * —nunca uno calculado aqui—, y una vez guardado no se vuelve a leer: reimprimir el valor dos anios
+ * despues devuelve ese mismo desglose (AC de #37), aunque el saldo real haya cambiado.
  *
  * <p>Formalizar mueve la deuda de la fase ordinaria a la fase {@code VALOR} del libro, con {@link
  * MovimientoDeFase} (#21). Las tres escrituras —congelar el detalle, mover la fase, numerar—
@@ -166,7 +165,10 @@ public class RegistrarValor {
         }
 
         LocalDate hoy = fecha;
-        List<ObligacionPublica> disponibles = deuda.deTodoElContribuyente(contribuyenteId, hoy);
+        // Solo las que deben (#401). Con todas las del libro, una obligacion pagada o dada de baja
+        // se encontraba en 0,00 y salia un valor de 0,00 en EMITIDO, con su correlativo
+        // consumido, que se podia notificar y pasar a coactiva.
+        List<ObligacionPublica> disponibles = deuda.pendientesDe(contribuyenteId, hoy);
 
         List<ValorDetalle> detalle = new ArrayList<>(obligaciones.size());
         List<ObligacionPublica> aMover = new ArrayList<>(obligaciones.size());
@@ -223,8 +225,9 @@ public class RegistrarValor {
             SelectorDeObligacion selector = obligaciones.get(i);
             ObligacionPublica obligacion = aMover.get(i);
             // Con un valor vivo de otro tipo la deuda ya salio de ORDINARIA: moverla otra vez
-            // dejaria en el libro dos salidas por una sola deuda.
-            if (obligacion.total().esPositivo() && !formalizaciones.get(i).yaEstaEnFaseValor()) {
+            // dejaria en el libro dos salidas por una sola deuda. Que haya algo que mover ya no se
+            // pregunta aqui: solo llega lo que `pendientesDe` devolvio (#401).
+            if (!formalizaciones.get(i).yaEstaEnFaseValor()) {
                 movimiento.moverAValor(
                         obligacion.ejercicio(),
                         contribuyenteId,

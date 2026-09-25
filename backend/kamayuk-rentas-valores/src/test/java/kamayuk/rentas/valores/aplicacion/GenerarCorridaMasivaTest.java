@@ -215,8 +215,7 @@ class GenerarCorridaMasivaTest {
         }
 
         @Override
-        public List<ObligacionPublica> deTodoElContribuyente(
-                long contribuyenteId, LocalDate fecha) {
+        public List<ObligacionPublica> todasDe(long contribuyenteId, LocalDate fecha) {
             return List.copyOf(porContribuyente.getOrDefault(contribuyenteId, List.of()));
         }
     }

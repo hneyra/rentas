@@ -29,6 +29,7 @@ import kamayuk.rentas.contribuyentes.AcreditacionEnElPadron;
 import kamayuk.rentas.contribuyentes.aplicacion.AcreditacionJdbc;
 import kamayuk.rentas.contribuyentes.infraestructura.ContribuyenteRepositoryJdbc;
 import kamayuk.rentas.cuentacorriente.ConsultaDeDeudaPublica;
+import kamayuk.rentas.cuentacorriente.ObligacionPublica;
 import kamayuk.rentas.cuentacorriente.aplicacion.ConsultaDeDeudaCuentaCorriente;
 import kamayuk.rentas.cuentacorriente.aplicacion.ConsultarDeuda;
 import kamayuk.rentas.cuentacorriente.aplicacion.RegistrarAsiento;
@@ -280,6 +281,30 @@ class SituacionDelCiudadanoJdbcTest {
             assertThat(totalEn(situacion, "270104")).isEqualTo(Dinero.de("700.00"));
             // Y el consolidado es la suma de las dos, hecha por el servidor (RNF-083).
             assertThat(situacion.totalConsolidado()).contains(Dinero.de("1000.00"));
+        }
+
+        /**
+         * #401 — la siembra que distingue: una obligacion que debe y una pagada. El portal le
+         * listaba al ciudadano, como «obligaciones con saldo», las que ya habia pagado.
+         */
+        @Test
+        @DisplayName("#401 — una obligacion pagada no sale entre las obligaciones con saldo")
+        void laPagadaNoTieneSaldo() {
+            DocumentoIdentidad quien = preguntaPor(documentoDePrueba());
+            long enSullana = crearContribuyente(sullana, "CIU-A-401", quien);
+            cargar(sullana, enSullana, "PREDIAL", "300.00");
+            cargar(sullana, enSullana, "ARBITRIO", "400.00");
+            abonar(sullana, enSullana, "ARBITRIO", "400.00");
+
+            RamaDelCiudadano.Situacion enSullanaHoy =
+                    municipalidad(consulta.situacion(HOY), "270601").situacion();
+
+            assertThat(enSullanaHoy.obligaciones())
+                    .as("el arbitrio pagado esta en el libro en 0,00, y no tiene saldo")
+                    .extracting(ObligacionPublica::tributo)
+                    .containsExactly("PREDIAL");
+            assertThat(enSullanaHoy.resumen().estadoDeLaConsulta())
+                    .isEqualTo("1 obligacion con saldo al " + HOY);
         }
 
         @Test
@@ -593,6 +618,34 @@ class SituacionDelCiudadanoJdbcTest {
                             HOY.minusMonths(1),
                             "SIEMBRA-" + CONTADOR.incrementAndGet()),
                     Observacion.de("Siembra de la prueba del portal del ciudadano"));
+        } finally {
+            TenantContext.limpiar();
+        }
+    }
+
+    /**
+     * El cobro que salda la obligacion, imputado como lo imputa el buzon: un ABONO contra la parte
+     * que paga —el insoluto—, que es lo que {@code CalculoDeDeuda} netea.
+     */
+    private static void abonar(long muni, long contribuyenteId, String tributo, String importe) {
+        TenantContext.fijar(new MunicipalidadId(muni));
+        try {
+            registrarAsiento.asentar(
+                    Asiento.nuevo(
+                            EJERCICIO,
+                            contribuyenteId,
+                            tributo,
+                            Concepto.INSOLUTO,
+                            TipoAsiento.ABONO,
+                            Fase.ORDINARIA,
+                            null,
+                            null,
+                            null,
+                            null,
+                            Dinero.de(importe),
+                            HOY.minusDays(3),
+                            "RECIBO-" + CONTADOR.incrementAndGet()),
+                    Observacion.de("Cobro de la prueba del portal del ciudadano"));
         } finally {
             TenantContext.limpiar();
         }

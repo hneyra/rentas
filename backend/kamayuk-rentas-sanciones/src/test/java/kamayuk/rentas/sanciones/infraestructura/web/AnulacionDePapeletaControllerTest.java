@@ -455,8 +455,7 @@ class AnulacionDePapeletaControllerTest {
         }
 
         @Override
-        public List<ObligacionPublica> deTodoElContribuyente(
-                long contribuyenteId, LocalDate fecha) {
+        public List<ObligacionPublica> todasDe(long contribuyenteId, LocalDate fecha) {
             this.preguntadaA = fecha;
             Dinero total = porObligado.get(contribuyenteId);
             if (total == null) {

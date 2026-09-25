@@ -9,7 +9,13 @@ import kamayuk.rentas.cuentacorriente.dominio.ObligacionConDeuda;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Implementa {@link ConsultaDeDeudaPublica} sobre {@link ConsultarDeuda} (#25). */
+/**
+ * Implementa {@link ConsultaDeDeudaPublica} sobre {@link ConsultarDeuda} (#25).
+ *
+ * <p>Filtrar aqui, o en {@code ConsultarDeuda#todasLasObligacionesDe}, dejaria sin sus filas en
+ * 0,00 a la constancia de no adeudo, que las imprime como «Cancelado»: {@link #todasDe} las
+ * devuelve todas, y {@link #pendientesDe} las filtra con la regla del puerto (#401).
+ */
 @Service
 public class ConsultaDeDeudaCuentaCorriente implements ConsultaDeDeudaPublica {
 
@@ -21,10 +27,26 @@ public class ConsultaDeDeudaCuentaCorriente implements ConsultaDeDeudaPublica {
 
     @Override
     @Transactional(readOnly = true)
-    public List<ObligacionPublica> deTodoElContribuyente(long contribuyenteId, LocalDate fecha) {
+    public List<ObligacionPublica> todasDe(long contribuyenteId, LocalDate fecha) {
         return consulta.todasLasObligacionesDe(contribuyenteId, fecha).stream()
                 .map(ConsultaDeDeudaCuentaCorriente::aPublica)
                 .toList();
+    }
+
+    /**
+     * La regla es la del puerto; lo unico que se anade aqui es la transaccion (#401).
+     *
+     * <p>Sin esta redefinicion, {@code pendientesDe} llegaba al proxy como el metodo por omision de
+     * la interfaz, sin {@code @Transactional}, y su llamada interna a {@link #todasDe} no pasaba
+     * por el proxy: sin transaccion no hay {@code SET LOCAL} y RLS contesta «unrecognized
+     * configuration parameter "app.municipalidad_id"». Medido con {@code
+     * ConsultaDeDeudaCuentaCorrienteTest}; y {@code EmitirOrdenDeCobro}, que no abre transaccion a
+     * proposito, habria fallado asi en cada emision.
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public List<ObligacionPublica> pendientesDe(long contribuyenteId, LocalDate fecha) {
+        return ConsultaDeDeudaPublica.super.pendientesDe(contribuyenteId, fecha);
     }
 
     private static ObligacionPublica aPublica(ObligacionConDeuda obligacion) {

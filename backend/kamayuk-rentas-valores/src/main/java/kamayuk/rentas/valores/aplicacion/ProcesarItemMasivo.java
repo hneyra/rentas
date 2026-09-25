@@ -67,13 +67,12 @@ public class ProcesarItemMasivo {
     public Resultado procesar(ValorMasivo corrida, ValorMasivoItem item, Observacion observacion) {
         long itemId = Objects.requireNonNull(item.id(), "Un item leido de la base ya tiene su id");
         List<ObligacionPublica> disponibles =
-                deuda.deTodoElContribuyente(item.contribuyenteId(), corrida.fechaCriterio());
+                deuda.pendientesDe(item.contribuyenteId(), corrida.fechaCriterio());
 
         List<SelectorDeObligacion> obligaciones = new ArrayList<>();
         for (ObligacionPublica obligacion : disponibles) {
             if (corrida.coincideTributo(obligacion.tributo())
-                    && corrida.coincideEjercicio(obligacion.ejercicio())
-                    && obligacion.total().esPositivo()) {
+                    && corrida.coincideEjercicio(obligacion.ejercicio())) {
                 obligaciones.add(
                         new SelectorDeObligacion(
                                 obligacion.tributo(),

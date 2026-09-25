@@ -75,7 +75,9 @@ public class EstadoDeCuentaDeFiscalizacion {
             return new EstadoDeCuenta(contribuyenteId, aLaFecha, false, List.of());
         }
 
-        List<ObligacionPublica> enElLibro = deuda.deTodoElContribuyente(contribuyenteId, aLaFecha);
+        // TODAS, tambien las saldadas, y a sabiendas (#401): una liquidacion ya cobrada tiene que
+        // salir «asentada» en 0,00, y no como si nunca hubiera llegado al libro (`asentada` nula).
+        List<ObligacionPublica> enElLibro = deuda.todasDe(contribuyenteId, aLaFecha);
 
         List<LineaDelEstadoDeCuenta> lineas = new ArrayList<>();
         Set<String> yaContadas = new HashSet<>();

@@ -298,8 +298,7 @@ class ConsultaUnificadaControllerTest {
     private static final class DeudaDePrueba implements ConsultaDeDeudaPublica {
 
         @Override
-        public List<ObligacionPublica> deTodoElContribuyente(
-                long contribuyenteId, LocalDate fecha) {
+        public List<ObligacionPublica> todasDe(long contribuyenteId, LocalDate fecha) {
             return List.of(
                     new ObligacionPublica(
                             "PREDIAL",

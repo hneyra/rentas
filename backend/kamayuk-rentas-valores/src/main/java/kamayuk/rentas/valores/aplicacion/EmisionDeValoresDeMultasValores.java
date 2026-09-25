@@ -3,9 +3,9 @@ package kamayuk.rentas.valores.aplicacion;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Objects;
+import kamayuk.rentas.cuentacorriente.ClaveDeObligacionPublica;
 import kamayuk.rentas.cuentacorriente.ConsultaDeDeudaPublica;
 import kamayuk.rentas.cuentacorriente.ObligacionCompartida;
-import kamayuk.rentas.cuentacorriente.ObligacionPublica;
 import kamayuk.rentas.cuentacorriente.OrigenDeLaObligacion;
 import kamayuk.rentas.cuentacorriente.SeleccionDeObligacion;
 import kamayuk.rentas.dominio.Ejercicio;
@@ -89,12 +89,20 @@ public class EmisionDeValoresDeMultasValores implements EmisionDeValoresDeMultas
         Objects.requireNonNull(fecha, "La emision necesita su fecha (regla 9)");
         Objects.requireNonNull(observacion, "Sin observacion no se emite (regla 10, RNF-052)");
 
-        // La comprobacion que el puerto promete, y que hay que hacer AQUI porque
-        // RegistrarValor no la hace: `emitir` acepta una obligacion con total cero -la
-        // encuentra entre las disponibles y no mueve su fase porque no hay nada que mover-,
-        // y emitiria una resolucion de multa de 0,00 por una papeleta ya pagada. Se
-        // descubrio ejecutando: la prueba de #53 esperaba SIN_DEUDA y recibio GENERADO.
-        if (!tieneDeuda(contribuyenteId, tributo, ejercicio, predioId, vehiculoId, fecha)) {
+        SeleccionDeObligacion obligacion =
+                new SeleccionDeObligacion(tributo, ejercicio, predioId, vehiculoId);
+
+        // Hasta #401 esto era un parche: RegistrarValor aceptaba una obligacion en 0,00 y
+        // emitia una resolucion de multa de 0,00 por una papeleta ya pagada, asi que aqui se
+        // reescribia a mano que es «tener deuda». Desde #401 RegistrarValor solo formaliza lo
+        // que `pendientesDe` devuelve, y la regla vive en `ObligacionPublica#estaPendiente`.
+        // La pregunta se sigue haciendo AQUI, y ANTES, por dos motivos que no son el parche:
+        // una papeleta pagada tiene que salir SIN_DEUDA y no tropezar antes con la contencion
+        // de #371 de abajo; y el rechazo de RegistrarValor cruza su proxy transaccional, que
+        // marca rollback-only la transaccion en la que quien llama anota SIN_DEUDA. Medido al
+        // quitar esta pregunta: `ValoresMasivosYReportesJdbcTest` «sin deuda que formalizar»
+        // sale con UnexpectedRollbackException.
+        if (!estaPendiente(contribuyenteId, obligacion, fecha)) {
             throw new SinDeudaQueFormalizar(
                     "La obligacion de "
                             + tributo
@@ -109,8 +117,6 @@ public class EmisionDeValoresDeMultasValores implements EmisionDeValoresDeMultas
         // del obligado en ese tributo, ejercicio y unidad. Si otra papeleta tiene deuda en ella,
         // una RM la formalizaria tambien; y si ya salio de ORDINARIA, un valor ya la formalizo y
         // `moverAValor` volveria a abonar una ORDINARIA que no debe nada.
-        SeleccionDeObligacion obligacion =
-                new SeleccionDeObligacion(tributo, ejercicio, predioId, vehiculoId);
         origen.exigirQueSoloLaOrigine(contribuyenteId, obligacion, referenciaDelOrigen);
         if (!origen.sigueEnOrdinaria(contribuyenteId, obligacion)) {
             throw new ObligacionYaFormalizada(
@@ -147,26 +153,20 @@ public class EmisionDeValoresDeMultasValores implements EmisionDeValoresDeMultas
         }
     }
 
-    /** Si esa obligacion concreta debe algo a esa fecha. */
-    private boolean tieneDeuda(
-            long contribuyenteId,
-            String tributo,
-            Ejercicio ejercicio,
-            @Nullable Long predioId,
-            @Nullable Long vehiculoId,
-            LocalDate fecha) {
-
-        for (ObligacionPublica obligacion : deuda.deTodoElContribuyente(contribuyenteId, fecha)) {
-            boolean esLaMisma =
-                    obligacion.tributo().equals(tributo)
-                            && obligacion.ejercicio().equals(ejercicio)
-                            && java.util.Objects.equals(obligacion.predioId(), predioId)
-                            && java.util.Objects.equals(obligacion.vehiculoId(), vehiculoId);
-            if (esLaMisma && obligacion.total().esPositivo()) {
-                return true;
-            }
-        }
-        return false;
+    /**
+     * Si esa obligacion concreta debe algo a esa fecha: si esta entre las {@link
+     * ConsultaDeDeudaPublica#pendientesDe pendientes}, cruzada por la clave del libro (#401, #407).
+     */
+    private boolean estaPendiente(
+            long contribuyenteId, SeleccionDeObligacion obligacion, LocalDate fecha) {
+        ClaveDeObligacionPublica buscada =
+                new ClaveDeObligacionPublica(
+                        obligacion.tributo(),
+                        obligacion.ejercicio(),
+                        obligacion.predioId(),
+                        obligacion.vehiculoId());
+        return deuda.pendientesDe(contribuyenteId, fecha).stream()
+                .anyMatch(o -> o.clave().equals(buscada));
     }
 
     private static String mensajeDe(RuntimeException fallo) {

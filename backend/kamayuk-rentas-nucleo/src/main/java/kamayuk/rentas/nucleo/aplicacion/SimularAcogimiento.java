@@ -113,8 +113,9 @@ public class SimularAcogimiento {
                                                         + criterio.codigoContribuyente()
                                                         + " en esta municipalidad"));
 
-        List<ObligacionPublica> todas =
-                deuda.deTodoElContribuyente(contribuyente.id(), criterio.aLaFecha());
+        // Las que deben (#401): una obligacion pagada no se acoge a nada, y contarla inflaba
+        // `registrosAcogidos` con filas en 0,00.
+        List<ObligacionPublica> todas = deuda.pendientesDe(contribuyente.id(), criterio.aLaFecha());
 
         // «Deuda total» es TODA la del contribuyente; «acogida» es la que la consulta selecciono.
         // Que sean dos cifras y no una es el punto de la pantalla: se ve cuanto se deja fuera al
@@ -231,10 +232,10 @@ public class SimularAcogimiento {
      * Recorta la lista ya ordenada a la pagina pedida.
      *
      * <p>En memoria y no en SQL, igual que {@link ConsultaUnificada}: {@link
-     * ConsultaDeDeudaPublica#deTodoElContribuyente} devuelve la lista completa —para un
-     * contribuyente nunca es larga— y la simulacion necesita <b>todas</b> las obligaciones
-     * seleccionadas para sumar. Sumar sobre la pagina devuelta daria un ahorro que cambia al pasar
-     * de pagina, que es el defecto que #25 documenta en su resumen de saldos.
+     * ConsultaDeDeudaPublica#pendientesDe} devuelve la lista completa —para un contribuyente nunca
+     * es larga— y la simulacion necesita <b>todas</b> las obligaciones seleccionadas para sumar.
+     * Sumar sobre la pagina devuelta daria un ahorro que cambia al pasar de pagina, que es el
+     * defecto que #25 documenta en su resumen de saldos.
      */
     private static <T> Pagina<T> pagina(List<T> todas, Paginacion paginacion) {
         int desde = Math.min(paginacion.desplazamiento(), todas.size());

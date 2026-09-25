@@ -9,9 +9,9 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>Quien pide el valor —la pantalla de generacion individual— ya sabe que predio o vehiculo le
  * interesa: este selector es lo que {@code RegistrarValor} cruza contra {@code
- * ConsultaDeDeudaPublica.deTodoElContribuyente} para decidir que congelar. No es {@link
- * ValorDetalle}: no trae importe, porque el importe lo decide la consulta de deuda, no quien pide
- * el valor (regla 5: ninguna cifra tributaria nace en una peticion).
+ * ConsultaDeDeudaPublica.todasDe} para decidir que congelar. No es {@link ValorDetalle}: no trae
+ * importe, porque el importe lo decide la consulta de deuda, no quien pide el valor (regla 5:
+ * ninguna cifra tributaria nace en una peticion).
  *
  * @param tributo el tributo de la obligacion
  * @param ejercicio el ejercicio de la obligacion

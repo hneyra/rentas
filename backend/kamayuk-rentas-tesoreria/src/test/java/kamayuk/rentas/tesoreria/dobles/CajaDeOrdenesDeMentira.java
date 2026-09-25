@@ -36,6 +36,14 @@ public final class CajaDeOrdenesDeMentira implements OrdenesDeCobro {
             throw new CajaInalcanzable("la caja de mentira esta apagada", null);
         }
         recibidas.add(peticion);
+        // Lo que hace la de verdad (`OrdenDeCobro` del repositorio `caja`): un importe que no es
+        // positivo se rechaza, y `ClienteHttpDeCaja.publicar` convierte cualquier respuesta que
+        // no sea 200 o 201 en CajaInalcanzable. Sin esto el doble aceptaba una orden de 0,00 que
+        // la caja nunca crearia, y #401 no se podia ver aqui.
+        if (!peticion.importe().esPositivo()) {
+            throw new CajaInalcanzable(
+                    "la caja de mentira rechaza un importe de " + peticion.importe(), null);
+        }
         String referencia = peticion.referencia().texto();
         Long yaEstaba = porReferencia.get(referencia);
         if (yaEstaba != null) {

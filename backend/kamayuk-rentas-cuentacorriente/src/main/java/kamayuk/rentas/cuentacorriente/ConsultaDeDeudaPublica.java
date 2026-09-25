@@ -23,11 +23,38 @@ import java.util.List;
 public interface ConsultaDeDeudaPublica {
 
     /**
-     * Todas las obligaciones con deuda del contribuyente, a la fecha, sin paginar.
+     * Todas las obligaciones del contribuyente en el libro, a la fecha, sin paginar: <b>tambien las
+     * saldadas</b>.
      *
-     * <p>Sin filtro de tributo ni de unidad: quien consulta —{@code rentas}, hoy— ya sabe que
-     * predio o vehiculo le interesa y filtra sobre esta lista, que para un contribuyente nunca es
-     * larga. Vacia si el contribuyente no tiene ninguna obligacion asentada.
+     * <p>Una obligacion cobrada, dada de baja o prescrita sigue aqui con sus cuatro partes en 0,00:
+     * {@code ConsultarDeuda} netea los cargos contra los abonos y no descarta el grupo. Es lo que
+     * necesita quien tiene que distinguir «saldada» de «nunca asentada» —el estado de cuenta de
+     * fiscalizacion, la composicion de un expediente, la liquidacion de costas—, o quien solo suma.
+     * Quien lee la lista como «lo que debe» pide {@link #pendientesDe}.
+     *
+     * <p>Hasta #401 se llamaba {@code deTodoElContribuyente} y su javadoc prometia «todas las
+     * obligaciones con deuda»; devolvia estas, y cada consumidor lo creia o no por su cuenta. El
+     * nombre nuevo obliga a elegir.
+     *
+     * <p>Sin filtro de tributo ni de unidad: quien consulta ya sabe que predio o vehiculo le
+     * interesa y filtra sobre esta lista, que para un contribuyente nunca es larga. Vacia si el
+     * contribuyente no tiene ninguna obligacion asentada.
      */
-    List<ObligacionPublica> deTodoElContribuyente(long contribuyenteId, LocalDate fecha);
+    List<ObligacionPublica> todasDe(long contribuyenteId, LocalDate fecha);
+
+    /**
+     * Las obligaciones del contribuyente que <b>deben algo</b> a la fecha: las de {@link #todasDe}
+     * que {@link ObligacionPublica#estaPendiente()} (#401).
+     *
+     * <p>Es lo que se formaliza en un valor, lo que se manda a la caja y lo que una ficha cuenta
+     * como «obligaciones con saldo». Metodo por omision y no una segunda consulta: la regla es una
+     * sola y vive en el Value Object, y los dobles de prueba la heredan tal cual. Quien lo redefina
+     * —la implementacion lo hace solo para abrir su transaccion— delega aqui, y no escribe otro
+     * filtro.
+     */
+    default List<ObligacionPublica> pendientesDe(long contribuyenteId, LocalDate fecha) {
+        return todasDe(contribuyenteId, fecha).stream()
+                .filter(ObligacionPublica::estaPendiente)
+                .toList();
+    }
 }

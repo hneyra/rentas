@@ -266,7 +266,7 @@ public class AnularPapeleta {
      */
     private void exigirQueNoSigaDebiendo(Papeleta papeleta, LocalDate hoy) {
         ObligacionPublica deuda = ObligacionDeLaPapeleta.deudaDe(papeleta, deudas, hoy);
-        if (deuda != null && deuda.total().esPositivo()) {
+        if (deuda != null && deuda.estaPendiente()) {
             throw new AnulacionQueNoDaDeBaja(papeleta, deuda);
         }
     }
