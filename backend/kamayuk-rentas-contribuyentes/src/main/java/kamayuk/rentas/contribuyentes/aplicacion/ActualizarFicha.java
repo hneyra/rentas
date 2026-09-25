@@ -43,6 +43,17 @@ public class ActualizarFicha {
      *
      * <p>El anterior se cierra <b>el dia antes</b> de que empiece el nuevo, no el mismo dia: si los
      * dos rigieran la misma fecha, preguntar «donde vivia ese dia» tendria dos respuestas.
+     *
+     * <p><b>El anterior es el tramo abierto, no el que rige en {@code vigenciaDesde}</b> (#420).
+     * Hasta #420 se buscaba el que regia en esa fecha, y con una fecha anterior al tramo abierto la
+     * mudanza se estrellaba: si no regia ninguno no cerraba nada y el segundo FISCAL abierto
+     * chocaba con el indice (500); si regia uno ya cerrado, {@link Domicilio#cerradoEl} lanzaba
+     * (500); y en el PROCESAL, sin indice, quedaban dos abiertos. Ahora una mudanza solo se anade
+     * al final, y lo que no lo hace se rechaza con un mensaje que lo dice ({@link
+     * Domicilio#cerradoAntesDe}).
+     *
+     * @throws IllegalArgumentException si {@code vigenciaDesde} no es posterior al inicio del tramo
+     *     abierto del mismo tipo
      */
     @Transactional
     public Domicilio mudar(Domicilio nuevo, Observacion observacion) {
@@ -51,13 +62,12 @@ public class ActualizarFicha {
                     "Mudar abre un domicilio nuevo; el que llega ya tiene identificador");
         }
 
-        Optional<Domicilio> anterior =
-                repositorio.domicilioVigenteA(
-                        nuevo.contribuyenteId(), nuevo.tipo(), nuevo.vigenciaDesde());
+        Optional<Domicilio> abierto =
+                repositorio.tramoAbierto(nuevo.contribuyenteId(), nuevo.tipo());
 
-        anterior.ifPresent(
+        abierto.ifPresent(
                 previo -> {
-                    Domicilio cerrado = previo.cerradoEl(nuevo.vigenciaDesde().minusDays(1));
+                    Domicilio cerrado = previo.cerradoAntesDe(nuevo);
                     repositorio.guardar(cerrado);
                     auditar(
                             "domicilio",

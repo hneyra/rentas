@@ -18,6 +18,7 @@ import kamayuk.rentas.contribuyentes.dominio.ResponsableSolidario;
 import kamayuk.rentas.contribuyentes.dominio.TipoContacto;
 import kamayuk.rentas.contribuyentes.dominio.TipoDomicilio;
 import kamayuk.rentas.contribuyentes.dominio.Vinculo;
+import kamayuk.rentas.contribuyentes.infraestructura.FichaRepositoryJdbc.DomicilioNoVigente;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.dominio.Porcentaje;
 import kamayuk.rentas.web.CodigoDeError;
@@ -113,6 +114,11 @@ public class FichaDelContribuyenteController {
      * <p>{@code vigenciaDesde} ausente es hoy. El indice parcial {@code
      * domicilio_fiscal_vigente_uq} impide que queden dos vigentes aunque el codigo se equivoque; lo
      * que no puede exigir es que quede uno, y de eso se encarga la transaccion del caso de uso.
+     *
+     * <p><b>Solo se anade al final del historial</b> (#420): una {@code vigenciaDesde} que no es
+     * posterior al inicio del tramo abierto es {@code 422} con un mensaje que lo dice. Y dos
+     * mudanzas simultaneas del mismo contribuyente son {@code 409}, que es lo que son: la segunda
+     * encuentra cerrado el tramo que leyo abierto.
      */
     @PostMapping("/domicilios")
     @ResponseStatus(HttpStatus.CREATED)
@@ -139,8 +145,12 @@ public class FichaDelContribuyenteController {
                                         null,
                                         exigir(peticion.documentoOrigen(), "documentoOrigen")));
 
+        // Sin deValor alrededor, a proposito: la regla del final del historial lanza
+        // IllegalArgumentException, que el manejador ya contesta 422; envolverla aqui convertiria
+        // tambien en 422 cualquier IllegalStateException de dentro del caso de uso, que seria un
+        // defecto y tiene que salir como incidencia.
         return FichaDelContribuyenteResource.DomicilioResource.de(
-                actualizar.mudar(nuevo, observacion));
+                mudanzaSinCarrera(() -> actualizar.mudar(nuevo, observacion)));
     }
 
     /** Alta de un telefono, un correo o un gestor (RF-015). */
@@ -358,6 +368,26 @@ public class FichaDelContribuyenteController {
         } catch (DuplicateKeyException repetido) {
             throw new ProblemaDeNegocio(
                     CodigoDeError.CONFLICTO, "Ese dato ya esta registrado para este contribuyente");
+        }
+    }
+
+    /**
+     * El sobre de {@link #conflictoSiChoca}, para la mudanza (#420).
+     *
+     * <p>Dos mudanzas simultaneas leen el mismo tramo abierto: la que llega segunda al {@code
+     * UPDATE} lo encuentra cerrado y el repositorio lanza {@link DomicilioNoVigente}; si no habia
+     * ninguno abierto, las dos insertan y la segunda choca con el indice del FISCAL. Las dos son la
+     * misma carrera y se contestan igual: {@code 409}, sin incidencia, y un mensaje que dice que
+     * hacer. El de {@link #conflictoSiChoca} —«ese dato ya esta registrado»— no lo diria.
+     */
+    private static <T> T mudanzaSinCarrera(java.util.function.Supplier<T> mudar) {
+        try {
+            return mudar.get();
+        } catch (DomicilioNoVigente | DuplicateKeyException carrera) {
+            throw new ProblemaDeNegocio(
+                    CodigoDeError.CONFLICTO,
+                    "Otra mudanza de este contribuyente se registro mientras tanto: vuelve a"
+                            + " leer su ficha antes de mudarlo");
         }
     }
 

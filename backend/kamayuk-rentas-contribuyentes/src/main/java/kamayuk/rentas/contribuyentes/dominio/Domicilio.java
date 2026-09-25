@@ -107,6 +107,41 @@ public record Domicilio(
         return vigenciaHasta == null || !fecha.isAfter(vigenciaHasta);
     }
 
+    /**
+     * El tramo abierto, cerrado el dia antes de que empiece el que lo sucede (#420).
+     *
+     * <p><b>Una mudanza solo se anade al final del historial.</b> El siguiente tiene que empezar
+     * despues de que empezara este: con la misma fecha, o con una anterior, cerrarlo el dia antes
+     * lo dejaria terminando antes de empezar; y abrir el nuevo sin cerrar este dejaria dos tramos
+     * abiertos del mismo tipo. Insertar un tramo en medio del historial —partir el que regia— no es
+     * una mudanza sino reescribir el historial, que es lo que {@link #cerradoEl} ya se niega a
+     * hacer.
+     *
+     * <p>La regla ya estaba implicita en {@link #cerradoEl}, pero su mensaje —«no se puede cerrar
+     * el 2026-02-28 un domicilio que empezo a regir el 2026-06-01»— no le dice a quien registra que
+     * ha hecho mal. Este si.
+     *
+     * @throws IllegalArgumentException si el siguiente no es del mismo contribuyente y tipo, o no
+     *     empieza despues que este
+     */
+    public Domicilio cerradoAntesDe(Domicilio siguiente) {
+        Objects.requireNonNull(siguiente, "Cerrar un tramo para abrir otro exige el otro");
+        if (siguiente.contribuyenteId != contribuyenteId || siguiente.tipo != tipo) {
+            throw new IllegalArgumentException(
+                    "Un domicilio solo lo sucede otro del mismo contribuyente y del mismo tipo");
+        }
+        if (!siguiente.vigenciaDesde.isAfter(vigenciaDesde)) {
+            throw new IllegalArgumentException(
+                    "Una mudanza solo se anade al final del historial: el domicilio "
+                            + tipo
+                            + " abierto rige desde el "
+                            + vigenciaDesde
+                            + ", y el nuevo tiene que empezar despues de esa fecha, no el "
+                            + siguiente.vigenciaDesde);
+        }
+        return cerradoEl(siguiente.vigenciaDesde.minusDays(1));
+    }
+
     /** Lo cierra en esa fecha. No lo borra ni lo sustituye. */
     public Domicilio cerradoEl(LocalDate fecha) {
         Objects.requireNonNull(fecha, "Cerrar un domicilio exige la fecha");

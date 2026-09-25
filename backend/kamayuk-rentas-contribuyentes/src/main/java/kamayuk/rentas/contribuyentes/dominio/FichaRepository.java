@@ -22,6 +22,19 @@ public interface FichaRepository {
     Optional<Domicilio> domicilioVigenteA(
             long contribuyenteId, TipoDomicilio tipo, LocalDate fecha);
 
+    /**
+     * El tramo abierto del tipo pedido: el ultimo del historial, el que una mudanza cierra (#420).
+     *
+     * <p><b>No es «el domicilio de hoy»</b>, y por eso no contradice lo de arriba: un tramo abierto
+     * puede empezar en el futuro —una mudanza registrada con fecha de mes que viene— y entonces hoy
+     * no rige. Para notificar se pregunta {@link #domicilioVigenteA} con la fecha; esto solo sirve
+     * para anadir un tramo <b>al final</b> de la linea de tiempo.
+     *
+     * <p>Si hubiera mas de uno —el PROCESAL no tiene indice parcial, y antes de #420 una mudanza
+     * hacia atras dejaba dos—, gana el que empezo despues.
+     */
+    Optional<Domicilio> tramoAbierto(long contribuyenteId, TipoDomicilio tipo);
+
     /** Todo el historial, del mas reciente al mas antiguo. Nunca se pierde nada. */
     List<Domicilio> historialDeDomicilios(long contribuyenteId);
 

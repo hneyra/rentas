@@ -80,6 +80,27 @@ public class FichaRepositoryJdbc extends RepositorioJdbc implements FichaReposit
                 .optional();
     }
 
+    /**
+     * Para el FISCAL la sirve el indice parcial {@code domicilio_fiscal_vigente_uq}, que es
+     * justamente el de los abiertos. El orden es por si hay dos, que en el PROCESAL puede pasar.
+     */
+    @Override
+    public Optional<Domicilio> tramoAbierto(long contribuyenteId, TipoDomicilio tipo) {
+        return jdbc().sql(
+                        "SELECT "
+                                + COLUMNAS_DOMICILIO
+                                + " FROM domicilio"
+                                + " WHERE contribuyente_id = :contribuyente"
+                                + "   AND tipo = :tipo"
+                                + "   AND vigencia_hasta IS NULL"
+                                + " ORDER BY vigencia_desde DESC, id DESC"
+                                + " LIMIT 1")
+                .param("contribuyente", contribuyenteId)
+                .param("tipo", tipo.name())
+                .query(FichaRepositoryJdbc::mapearDomicilio)
+                .optional();
+    }
+
     @Override
     public List<Domicilio> historialDeDomicilios(long contribuyenteId) {
         return jdbc().sql(
@@ -357,7 +378,13 @@ public class FichaRepositoryJdbc extends RepositorioJdbc implements FichaReposit
         return fecha == null ? null : fecha.toLocalDate();
     }
 
-    /** Se intento cerrar un domicilio que ya estaba cerrado, o que no existe aqui. */
+    /**
+     * Se intento cerrar un domicilio que ya estaba cerrado, o que no existe aqui.
+     *
+     * <p>Desde #420 la mudanza cierra el tramo que acaba de leer abierto, asi que esto solo sale
+     * cuando otra mudanza lo cerro entre la lectura y el {@code UPDATE}: una carrera, que el
+     * controlador contesta {@code 409}.
+     */
     public static final class DomicilioNoVigente extends RuntimeException {
         @java.io.Serial private static final long serialVersionUID = 1L;
 
