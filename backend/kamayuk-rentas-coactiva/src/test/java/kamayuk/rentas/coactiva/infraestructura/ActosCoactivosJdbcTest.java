@@ -655,6 +655,57 @@ class ActosCoactivosJdbcTest {
                     .as("y la del valor sigue siendo la suya")
                     .hasSize(1);
         }
+
+        /**
+         * <b>La diligencia de un acto de tipo largo cabe</b> (#408).
+         *
+         * <p>El numero de la diligencia es el del acto, una barra y el intento, y el del acto lleva
+         * el tipo: {@code MEDIDA_CAUTELAR-2026-000001/1} tiene 29 caracteres, y hasta #408 el
+         * dominio y la columna topaban en 20. Todas las demas pruebas notifican la REC-1, cuyo
+         * numero mide 18: la muestra uniforme es la que lo escondia. Se notifican los dos que el
+         * issue nombra —el mas largo, y uno de los que se dictan con la cobranza ya terminada— y se
+         * relee de la base, que era el segundo tope.
+         */
+        @Test
+        @DisplayName(
+                "#408 — la diligencia de una MEDIDA_CAUTELAR (29) y la de una CONCLUSION (24) se"
+                        + " registran: el numero lleva el tipo del acto")
+        void laDiligenciaDeUnActoDeTipoLargoCabe() {
+            String expediente = expedienteConDeuda("N-0408");
+            dictarActo(expediente, TipoDeActoCoactivo.REC1, REC1, null);
+
+            ActoCoactivo medida =
+                    dictarActo(expediente, TipoDeActoCoactivo.MEDIDA_CAUTELAR, REC1, null).acto();
+            NotificarActoCoactivo.Diligencia deLaMedida =
+                    notificarActo(
+                            medida.numero(), DILIGENCIA_REC1, ResultadoDeNotificacion.NOTIFICADO);
+
+            ActoCoactivo conclusion =
+                    dictarActo(expediente, TipoDeActoCoactivo.CONCLUSION, DILIGENCIA_REC1, null)
+                            .acto();
+            NotificarActoCoactivo.Diligencia deLaConclusion =
+                    notificarActo(
+                            conclusion.numero(),
+                            DILIGENCIA_REC1.plusDays(1),
+                            ResultadoDeNotificacion.NOTIFICADO);
+
+            assertThat(deLaMedida.notificacion().numero())
+                    .as("el numero que imprime el cargo: el del acto, la barra y el intento")
+                    .isEqualTo(medida.numero() + "/1")
+                    .startsWith("MEDIDA_CAUTELAR-2026-")
+                    .hasSize(29);
+            assertThat(deLaConclusion.notificacion().numero())
+                    .isEqualTo(conclusion.numero() + "/1")
+                    .startsWith("CONCLUSION-2026-")
+                    .hasSize(24);
+            assertThat(enTransaccion(() -> diligencias.deActo(medida.identificador())))
+                    .as("y la columna lo guarda entero: no basta con que el dominio lo admita")
+                    .extracting(NotificacionCoactiva::numero)
+                    .containsExactly(medida.numero() + "/1");
+            assertThat(enTransaccion(() -> diligencias.deActo(conclusion.identificador())))
+                    .extracting(NotificacionCoactiva::numero)
+                    .containsExactly(conclusion.numero() + "/1");
+        }
     }
 
     @Nested

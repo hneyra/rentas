@@ -81,13 +81,42 @@ class CorridaDeEmisionTest {
         assertThat(sinCobrar.conjuntoId()).isEqualTo(31L);
     }
 
+    /**
+     * <b>El dominio topa con la misma cifra que la columna</b> (#408): {@code
+     * corrida_predial.sector varchar(20)} y {@code corrida_predial_observado.nombre varchar(240)}
+     * desde V29. En el borde justo se construye; uno mas, no.
+     */
+    @Test
+    @DisplayName("#408 — el sector topa en 20 y el nombre del observado en 240, como sus columnas")
+    void elSectorYElNombreTopanComoSusColumnas() {
+        assertThat(corridaDelSector("S".repeat(20)).sector()).hasSize(20);
+        assertThatThrownBy(() -> corridaDelSector("S".repeat(21)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("20");
+
+        assertThat(new CorridaDeEmision.Observado("C-1", "N".repeat(240), "motivo").nombre())
+                .hasSize(240);
+        assertThatThrownBy(() -> new CorridaDeEmision.Observado("C-1", "N".repeat(241), "motivo"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("240");
+    }
+
     private static CorridaDeEmision corrida(
             @Nullable Long conjuntoId, @Nullable Dinero derechoDeEmision) {
+        return conSector(null, conjuntoId, derechoDeEmision);
+    }
+
+    private static CorridaDeEmision corridaDelSector(String sector) {
+        return conSector(sector, null, null);
+    }
+
+    private static CorridaDeEmision conSector(
+            @Nullable String sector, @Nullable Long conjuntoId, @Nullable Dinero derechoDeEmision) {
         return new CorridaDeEmision(
                 7L,
                 new Ejercicio(2026),
-                "TODOS",
-                null,
+                sector == null ? "TODOS" : "SECTOR",
+                sector,
                 null,
                 null,
                 "TRIMESTRAL",

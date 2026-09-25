@@ -57,6 +57,13 @@ class CorridaDeEmisionJdbcTest {
     /** El derecho de emision que esa corrida aplico a cada cuenta, en soles. */
     private static final String DERECHO_SELLADO = "4.50";
 
+    /**
+     * Una «SUCESION INDIVISA …» de 215 caracteres: los herederos van en el nombre, y el padron
+     * admite hasta 240 ({@code nombre_razon_social}).
+     */
+    private static final String SUCESION_DE_215 =
+            "SUCESION INDIVISA DE MEDINA MEDINA, RUFINA DEL CARMEN Y" + " HEREDEROS".repeat(16);
+
     private static final Clock RELOJ =
             Clock.fixed(Instant.parse("2026-01-28T07:14:00Z"), ZoneId.of("America/Lima"));
 
@@ -359,6 +366,73 @@ class CorridaDeEmisionJdbcTest {
                         () -> ejecutarComoApp("UPDATE corrida_predial_observado SET motivo = 'x'"))
                 .as("el motivo de un observado tampoco se reescribe")
                 .hasMessageContaining("permission denied");
+    }
+
+    /**
+     * <b>El observado de nombre largo y el sector de 20 no se pierden</b> (#408).
+     *
+     * <p>El nombre se copia entero de {@code nombre_razon_social}, que admite 240 caracteres, y una
+     * «SUCESION INDIVISA …» los usa; el sector se compara con {@code predio_ref.sector_codigo
+     * varchar(20)}. Hasta #408 la corrida los guardaba en {@code varchar(200)} y {@code
+     * varchar(10)}: el rastro reventaba con 22001 al final, con la emision ya hecha, y la lista de
+     * observados —lo unico que no se puede recomponer— se perdia. {@link #observadosDePrueba()} era
+     * de nombres cortos: la muestra uniforme es la que lo escondio.
+     */
+    @Test
+    @DisplayName(
+            "#408 — un observado de 215 caracteres de nombre y un sector de 20 se guardan y se"
+                    + " releen enteros")
+    void elNombreLargoYElSectorAnchoSeGuardanEnteros() {
+        TenantContext.fijar(new MunicipalidadId(municipalidadA));
+        String sucesion = SUCESION_DE_215;
+        assertThat(sucesion).hasSize(215);
+        String sector = "SECTOR-URB-0000-0408";
+        assertThat(sector).hasSize(20);
+
+        CorridaDeEmision guardada =
+                transaccion.execute(
+                        estado ->
+                                repositorio.guardar(
+                                        new CorridaDeEmision(
+                                                null,
+                                                new Ejercicio(2018),
+                                                "SECTOR",
+                                                sector,
+                                                null,
+                                                null,
+                                                "TRIMESTRAL",
+                                                true,
+                                                "",
+                                                null,
+                                                null,
+                                                1,
+                                                0,
+                                                Dinero.CERO,
+                                                LocalDate.of(2026, 1, 28),
+                                                List.of(
+                                                        new CorridaDeEmision.Observado(
+                                                                "C-000408",
+                                                                sucesion,
+                                                                "Uno de sus predios esta sin"
+                                                                        + " arancel"))),
+                                        Observacion.de("Simulacion del sector")));
+
+        Optional<CorridaDeEmision> ultima =
+                transaccion.execute(estado -> repositorio.ultimaDe(new Ejercicio(2018)));
+        assertThat(ultima).isPresent();
+        assertThat(ultima.get().sector()).isEqualTo(sector);
+
+        Pagina<CorridaDeEmision.Observado> observados =
+                transaccion.execute(
+                        estado ->
+                                repositorio.observadosDe(
+                                        requireId(guardada),
+                                        new Paginacion(
+                                                0, 20, "id", Paginacion.Sentido.ASCENDENTE)));
+        assertThat(observados.contenido())
+                .extracting(CorridaDeEmision.Observado::nombre)
+                .as("el nombre entero: recortarlo seria otro contribuyente en el informe")
+                .containsExactly(sucesion);
     }
 
     // ------------------------------------------------------------ ayudantes

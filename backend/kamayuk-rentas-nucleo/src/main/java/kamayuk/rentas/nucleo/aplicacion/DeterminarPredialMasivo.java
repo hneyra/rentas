@@ -23,6 +23,9 @@ import kamayuk.rentas.nucleo.dominio.predial.MinimoImponible;
 import kamayuk.rentas.nucleo.dominio.predial.ModalidadDelPredial;
 import kamayuk.rentas.parametros.ParametrosSellados;
 import org.jspecify.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 
 /**
@@ -150,6 +153,20 @@ public class DeterminarPredialMasivo {
      */
     public static final List<String> ALCANCES =
             List.of(ALCANCE_TODOS, ALCANCE_SECTOR, ALCANCE_RANGO_DE_CODIGO, ALCANCE_OBSERVADOS);
+
+    /**
+     * Lo que la respuesta dice cuando la corrida se hizo y su rastro no se pudo escribir (#408).
+     *
+     * <p>Dice las dos cosas que quien lo lee tiene que saber: que la emision SI se hizo, y que
+     * repetirla para recuperar los observados no es inocuo.
+     */
+    public static final String AVISO_SIN_RASTRO =
+            "La corrida se hizo, pero su rastro no se pudo guardar: esta respuesta es la unica copia"
+                    + " de sus observados, y no se volveran a ver en «Ver observados». No la repitas"
+                    + " para recuperarlos: una corrida que asienta crea otra determinacion por"
+                    + " contribuyente (ADR-0007). El detalle quedo en el registro del servidor.";
+
+    private static final Logger log = LoggerFactory.getLogger(DeterminarPredialMasivo.class);
 
     private final PadronPredialDelEjercicio padron;
     private final DeterminarPredial individual;
@@ -327,36 +344,63 @@ public class DeterminarPredialMasivo {
         esto la corrida moria con la respuesta, y con ella la lista de
         observados —que es lo unico que NO se puede recomponer leyendo el
         padron: un observado es, por definicion, el que no tiene
-        determinacion—. */
-        CorridaDeEmision guardada =
-                rastro.registrar(
-                        new CorridaDeEmision(
-                                null,
-                                corrida.ejercicio(),
-                                corrida.alcance(),
-                                peticion.sector(),
-                                peticion.codigoDesde(),
-                                peticion.codigoHasta(),
-                                peticion.modalidad().name(),
-                                corrida.simulacion(),
-                                corrida.nombreDelConjunto(),
-                                conjuntoId,
-                                derechoDeEmision,
-                                corrida.leidos(),
-                                corrida.determinados(),
-                                corrida.montoEmitido(),
-                                corrida.fechaCalculo(),
-                                corrida.observados().stream()
-                                        .map(
-                                                observado ->
-                                                        new CorridaDeEmision.Observado(
-                                                                observado.codContribuyente(),
-                                                                observado.nombre(),
-                                                                observado.motivo()))
-                                        .toList()),
-                        observacion);
+        determinacion—.
 
-        return corrida.conRastro(guardada.id());
+        **Y si falla, se contesta la corrida igual** (#408). Hasta #408 esa
+        promesa no se cumplia: un 22001 al escribir el rastro subia hasta el
+        borde y la corrida contestaba 500 con la emision HECHA. Eso invita a
+        repetirla, lo que crea otra determinacion por contribuyente (ADR-0007),
+        y el alcance OBSERVADOS de la siguiente leeria los de la corrida
+        ANTERIOR. Ahora la respuesta sale con el resumen, los observados y un
+        aviso, y sin identificador de rastro. Se atrapa tambien la
+        `IllegalArgumentException` de componer el rastro: es la misma perdida
+        —la del resumen— y no puede anular una emision ya confirmada. */
+        try {
+            CorridaDeEmision guardada =
+                    rastro.registrar(
+                            rastroDe(corrida, peticion, conjuntoId, derechoDeEmision), observacion);
+            return corrida.conRastro(guardada.id());
+        } catch (DataAccessException | IllegalArgumentException sinRastro) {
+            log.error(
+                    "La corrida predial del ejercicio {} ({} determinados, {} observados) se hizo y"
+                            + " su rastro no se pudo escribir",
+                    corrida.ejercicio(),
+                    corrida.determinados(),
+                    corrida.observados().size(),
+                    sinRastro);
+            return corrida.sinRastro(AVISO_SIN_RASTRO);
+        }
+    }
+
+    private static CorridaDeEmision rastroDe(
+            Corrida corrida,
+            Peticion peticion,
+            @Nullable Long conjuntoId,
+            @Nullable Dinero derechoDeEmision) {
+        return new CorridaDeEmision(
+                null,
+                corrida.ejercicio(),
+                corrida.alcance(),
+                peticion.sector(),
+                peticion.codigoDesde(),
+                peticion.codigoHasta(),
+                peticion.modalidad().name(),
+                corrida.simulacion(),
+                corrida.nombreDelConjunto(),
+                conjuntoId,
+                derechoDeEmision,
+                corrida.leidos(),
+                corrida.determinados(),
+                corrida.montoEmitido(),
+                corrida.fechaCalculo(),
+                corrida.observados().stream()
+                        .map(
+                                observado ->
+                                        new CorridaDeEmision.Observado(
+                                                observado.codContribuyente(),
+                                                observado.nombre(),
+                                                observado.motivo()))
+                        .toList());
     }
 
     /**
@@ -483,6 +527,17 @@ public class DeterminarPredialMasivo {
                                 + String.join(", ", ALCANCES));
             }
             sector = sector == null || sector.isBlank() ? null : sector.strip();
+            // Topado ANTES de determinar a nadie (#408). Hasta #408 solo se recortaba: uno mas
+            // largo que la columna llegaba al rastro, al final, con la emision ya hecha. La cifra
+            // es la de la columna y la de `predio_ref.sector_codigo`, con la que se compara.
+            if (sector != null && sector.length() > CorridaDeEmision.SECTOR_MAXIMO) {
+                throw new IllegalArgumentException(
+                        "El sector '"
+                                + sector
+                                + "' excede los "
+                                + CorridaDeEmision.SECTOR_MAXIMO
+                                + " caracteres del codigo de sector: ningun predio lo tiene");
+            }
             codigoDesde = codigoDesde == null || codigoDesde.isBlank() ? null : codigoDesde.strip();
             codigoHasta = codigoHasta == null || codigoHasta.isBlank() ? null : codigoHasta.strip();
             if (ALCANCE_SECTOR.equals(alcance) && sector == null) {
@@ -530,6 +585,8 @@ public class DeterminarPredialMasivo {
      * @param montoEmitido la suma de lo determinado, impuesto mas derecho de emision
      * @param observados los que quedaron fuera, cada uno con su motivo
      * @param fechaCalculo el dia al que corresponde la corrida (regla 9)
+     * @param id el identificador de su rastro; nulo mientras no se escribe, o si no se pudo
+     * @param aviso por que la corrida se contesta sin rastro (#408); nulo si lo dejo
      */
     public record Corrida(
             Ejercicio ejercicio,
@@ -540,7 +597,8 @@ public class DeterminarPredialMasivo {
             Dinero montoEmitido,
             List<Observado> observados,
             LocalDate fechaCalculo,
-            @Nullable Long id) {
+            @Nullable Long id,
+            @Nullable String aviso) {
 
         /**
          * La corrida recien compuesta, todavia sin rastro en la base.
@@ -567,6 +625,7 @@ public class DeterminarPredialMasivo {
                     montoEmitido,
                     observados,
                     fechaCalculo,
+                    null,
                     null);
         }
 
@@ -604,7 +663,29 @@ public class DeterminarPredialMasivo {
                     montoEmitido,
                     observados,
                     fechaCalculo,
-                    id);
+                    id,
+                    null);
+        }
+
+        /**
+         * La misma corrida, contestada sin rastro porque no se pudo escribir (#408).
+         *
+         * <p>Lo que se pierde es el resumen guardado, no la emision: sus determinaciones ya estan
+         * confirmadas, y contestarla como fallida invitaria a repetirla. Sin identificador, porque
+         * no hay fila a la que referirse, y con el aviso que lo explica.
+         */
+        public Corrida sinRastro(String aviso) {
+            return new Corrida(
+                    ejercicio,
+                    alcance,
+                    simulacion,
+                    nombreDelConjunto,
+                    determinados,
+                    montoEmitido,
+                    observados,
+                    fechaCalculo,
+                    null,
+                    Objects.requireNonNull(aviso, "Sin rastro, la respuesta dice por que"));
         }
     }
 

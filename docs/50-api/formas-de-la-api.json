@@ -4290,7 +4290,8 @@
         "nombre": "texto",
         "motivo": "texto"
       }
-    ]
+    ],
+    "aviso": "texto"
   },
   "POST /rentas/transferencias/predio": {
     "id": "entero",

@@ -81,7 +81,30 @@ public record NotificacionCoactiva(
     /** El valor de {@code notificacion.objeto} para un acto coactivo (V3). */
     public static final String OBJETO = "ACTO_COACTIVO";
 
-    private static final int NUMERO_MAXIMO = 20;
+    /**
+     * Cuantos digitos de intento caben detras de la barra: hasta la diligencia 9999.
+     *
+     * <p>Mas que de sobra —una diligencia no hallada se reintenta, y nadie reintenta diez mil
+     * veces— y es lo que fija el ancho de la columna junto con el del acto.
+     */
+    public static final int DIGITOS_DEL_INTENTO = 4;
+
+    /**
+     * {@code notificacion.numero varchar(45)} desde V29 (#408): el numero del acto, la barra y el
+     * intento.
+     *
+     * <p>Se <b>deriva</b> del ancho del numero del acto y no se escribe como literal. Hasta #408
+     * era un 20 escrito a mano, igual que la columna, mientras el numero del acto lleva el tipo y
+     * mide hasta 40: {@code MEDIDA_CAUTELAR-2026-000001/1} tiene 29 caracteres, y seis de los diez
+     * tipos de acto no se podian notificar nunca. Con la cifra derivada, ensanchar el acto obliga a
+     * ensanchar la diligencia en el mismo cambio.
+     *
+     * <p>Numerar la diligencia sin el tipo se descarto: el numero es lo que imprime el cargo, y
+     * {@code EMBARGO-2026-000001/1} se lee.
+     */
+    public static final int NUMERO_MAXIMO =
+            ActoCoactivo.NUMERO_MAXIMO + "/".length() + DIGITOS_DEL_INTENTO;
+
     private static final int NOTIFICADOR_MAXIMO = 60;
     private static final int DIRECCION_MAXIMA = 300;
     private static final int RECEPTOR_MAXIMO = 120;

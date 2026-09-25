@@ -472,6 +472,83 @@ class LicenciaDeEdificacionJdbcTest {
                     .hasMessageContaining("10");
         }
 
+        /**
+         * <b>Un codigo catastral real cabe, se cierre D-10 como se cierre</b> (#408).
+         *
+         * <p>D-10 duda entre las 21 posiciones del prototipo y las 23 del manual, y hasta #408 la
+         * columna era {@code varchar(20)}: las dos reventaban con 22001 y el borde contestaba 500.
+         * Se completa la seccion dos veces —21 y 23 digitos, dos versiones— y se relee de la base.
+         */
+        @Test
+        @DisplayName(
+                "#408 — un codigo catastral de 21 digitos y uno de 23 se guardan y se releen"
+                        + " enteros")
+        void unCodigoCatastralRealCabe() {
+            String expediente =
+                    presentarFue(TipoDeTramiteDeEdificacion.LICENCIA_DE_OBRA, null, HOY);
+
+            enContexto(
+                    () ->
+                            completar.completarTerreno(
+                                    expediente, terreno("A", "3", CODIGO_DEL_PROTOTIPO), PORQUE));
+            enContexto(
+                    () ->
+                            completar.completarTerreno(
+                                    expediente, terreno("A", "3", CODIGO_DEL_MANUAL), PORQUE));
+
+            long id = identificadorDe(expediente);
+            assertThat(
+                            filas(
+                                    "SELECT count(*) FROM edificacion_terreno WHERE fue_id = ?"
+                                            + " AND cod_catastral IN (?, ?)",
+                                    id,
+                                    CODIGO_DEL_PROTOTIPO,
+                                    CODIGO_DEL_MANUAL))
+                    .as("las dos versiones, cada una con su codigo entero")
+                    .isEqualTo(2);
+            ConsultaDeFue.FichaDelFue ficha =
+                    enContexto(() -> consulta.porExpediente(expediente, HOY).orElseThrow());
+            assertThat(ficha.terreno()).isNotNull();
+            assertThat(ficha.terreno().codigoCatastral()).isEqualTo(CODIGO_DEL_MANUAL);
+        }
+
+        /**
+         * <b>Un codigo mal escrito se rechaza en el dominio, con el patron del dominio de la
+         * base</b> (#408): de 18 a 25 digitos, el {@code CHECK} de {@code cod_catastral}. Rechazado
+         * aqui sale 422 por el controlador; rechazado por la base saldria 500.
+         */
+        @Test
+        @DisplayName(
+                "#408 — un codigo catastral con letras, de 17 digitos o de 26 se rechaza antes"
+                        + " de la base")
+        void unCodigoCatastralMalEscritoSeRechaza() {
+            String expediente =
+                    presentarFue(TipoDeTramiteDeEdificacion.LICENCIA_DE_OBRA, null, HOY);
+
+            for (String malo :
+                    List.of(
+                            "20060101015001010100A",
+                            "20060101015001010",
+                            "20060101015001010100123456")) {
+                assertThatThrownBy(
+                                () ->
+                                        enContexto(
+                                                () ->
+                                                        completar.completarTerreno(
+                                                                expediente,
+                                                                terreno("A", "3", malo),
+                                                                PORQUE)))
+                        .as(malo)
+                        .isInstanceOf(IllegalArgumentException.class)
+                        .hasMessageContaining("codigo catastral");
+            }
+            assertThat(
+                            filas(
+                                    "SELECT count(*) FROM edificacion_terreno WHERE fue_id = ?",
+                                    identificadorDe(expediente)))
+                    .isZero();
+        }
+
         private PresentarFue.Solicitud conExpedienteAnterior(
                 PresentarFue.Solicitud base, String expedienteAnterior) {
             return new PresentarFue.Solicitud(
@@ -1550,9 +1627,26 @@ class LicenciaDeEdificacionJdbcTest {
                                 PORQUE));
     }
 
+    /**
+     * El codigo de referencia catastral con que el prototipo llena este mismo campo: 21 digitos
+     * ({@code docs/50-api/prototipo/sgtm-data-3.js}).
+     *
+     * <p>Hasta #408 el fixture pasaba {@code null}, y con el ninguna prueba llegaba a la columna,
+     * que era {@code varchar(20)}: ningun codigo real cabia, y nadie lo veia.
+     */
+    private static final String CODIGO_DEL_PROTOTIPO = "200601010150010101001";
+
+    /** El de 23 posiciones que dibuja el manual: la otra lectura de D-10. */
+    private static final String CODIGO_DEL_MANUAL = "20060101015001010100123";
+
     private static CompletarSeccionDelFue.Terreno terreno(String manzana, String lote) {
+        return terreno(manzana, lote, CODIGO_DEL_PROTOTIPO);
+    }
+
+    private static CompletarSeccionDelFue.Terreno terreno(
+            String manzana, String lote, String codigoCatastral) {
         return new CompletarSeccionDelFue.Terreno(
-                null,
+                codigoCatastral,
                 "AV. LOS ALGARROBOS 450",
                 manzana,
                 lote,
