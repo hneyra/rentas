@@ -9,6 +9,7 @@ import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.dominio.ResultadoDeNotificacion;
 import kamayuk.rentas.parametros.FaltaPublicar;
 import kamayuk.rentas.parametros.LectorDeParametros;
+import kamayuk.rentas.sanciones.aplicacion.AnularPapeleta;
 import kamayuk.rentas.sanciones.aplicacion.NotificarResolucionDeGerencia;
 import kamayuk.rentas.sanciones.aplicacion.ObligacionCompartidaConOtraPapeleta;
 import kamayuk.rentas.sanciones.aplicacion.PlazosDeSancionesParametrizados;
@@ -174,9 +175,11 @@ public class ResolucionesDeGerenciaController {
                 | ResolverConResolucionDeGerencia.OrdinariaSinDictar
                 | ResolverConResolucionDeGerencia.OrdinariaSinNotificar
                 | ResolverConResolucionDeGerencia.PlazoDeLaOrdinariaEnCurso
-                | ObligacionCompartidaConOtraPapeleta conflicto) {
+                | ObligacionCompartidaConOtraPapeleta
+                | AnularPapeleta.PapeletaConResolucionDeMulta conflicto) {
             // 409 y no 422: la peticion esta bien formada; lo que no se cumple es un requisito del
-            // estado del procedimiento, y quien opera lo arregla notificando o esperando.
+            // estado del procedimiento, y quien opera lo arregla notificando, esperando o —con un
+            // valor vivo encima (#495)— dejando primero sin efecto ese valor.
             throw new ProblemaDeNegocio(
                     CodigoDeError.CONFLICTO, PeticionesDeSanciones.mensajeDe(conflicto));
         } catch (PlazosDeSancionesParametrizados.PlazoSinParametrizar

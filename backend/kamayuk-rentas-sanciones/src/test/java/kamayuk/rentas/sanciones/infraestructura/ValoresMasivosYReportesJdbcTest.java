@@ -124,9 +124,11 @@ import kamayuk.rentas.sanciones.infraestructura.web.PeticionDeReporteDeTransito;
 import kamayuk.rentas.sanciones.infraestructura.web.RecaudacionDeMultasResource;
 import kamayuk.rentas.sanciones.infraestructura.web.ReporteDeTransitoResource;
 import kamayuk.rentas.sanciones.infraestructura.web.ReportesDeTransitoController;
+import kamayuk.rentas.sanciones.infraestructura.web.ResolucionesDeGerenciaController;
 import kamayuk.rentas.sanciones.infraestructura.web.ResumenDePapeletasResource;
 import kamayuk.rentas.sanciones.infraestructura.web.ResumenesDeTransitoController;
 import kamayuk.rentas.valores.EmisionDeValoresDeMultas;
+import kamayuk.rentas.valores.ValoresSobreUnaObligacion;
 import kamayuk.rentas.valores.aplicacion.EmisionDeValoresDeMultasValores;
 import kamayuk.rentas.valores.aplicacion.RegistrarValor;
 import kamayuk.rentas.valores.aplicacion.ValoresSobreUnaObligacionValores;
@@ -251,6 +253,7 @@ class ValoresMasivosYReportesJdbcTest {
     private static GenerarCorridaDeValores generar;
     private static AnularPapeleta anularPapeleta;
     private static AnulacionDePapeletaController anulacion;
+    private static ResolucionesDeGerenciaController resolucionesPorLaApi;
     private static EmitirConstanciaLibre emitirConstancia;
     private static ConsultaDePadronesDeSanciones consultaDePadrones;
     private static ConsultaDeResumenesDeSanciones consultaDeResumenes;
@@ -371,6 +374,8 @@ class ValoresMasivosYReportesJdbcTest {
                                                 asientos, saldos))));
 
         registrarPapeleta = envolver(new RegistrarPapeleta(papeletas, codigos, cargos, auditoria));
+        ValoresSobreUnaObligacion valoresVivos =
+                envolver(new ValoresSobreUnaObligacionValores(repositorioDeValores));
         resolver =
                 envolver(
                         new ResolverConResolucionDeGerencia(
@@ -379,6 +384,7 @@ class ValoresMasivosYReportesJdbcTest {
                                 resoluciones,
                                 diligencias,
                                 directorio,
+                                valoresVivos,
                                 deudas,
                                 extincion,
                                 plazos,
@@ -394,6 +400,7 @@ class ValoresMasivosYReportesJdbcTest {
                                 directorio,
                                 plazos,
                                 auditoria));
+        resolucionesPorLaApi = new ResolucionesDeGerenciaController(resolver, notificar);
         iniciar =
                 envolver(
                         new IniciarCorridaDeValores(papeletas, padron, corridas, auditoria, RELOJ));
@@ -402,13 +409,7 @@ class ValoresMasivosYReportesJdbcTest {
                         new ProcesarPapeletaDeLaCorrida(
                                 papeletas, resoluciones, diligencias, emision, corridas));
         anularPapeleta =
-                envolver(
-                        new AnularPapeleta(
-                                papeletas,
-                                envolver(
-                                        new ValoresSobreUnaObligacionValores(repositorioDeValores)),
-                                extincion,
-                                auditoria));
+                envolver(new AnularPapeleta(papeletas, valoresVivos, extincion, auditoria));
         anulacion = new AnulacionDePapeletaController(anularPapeleta);
         generar =
                 new GenerarCorridaDeValores(
@@ -2014,23 +2015,6 @@ class ValoresMasivosYReportesJdbcTest {
                     .isEqualTo(EstadoDePapeleta.ANULADA.name());
         }
 
-        /** El camino de {@code POST /api/v1/valores}: sin corrida y sin tocar sanciones. */
-        private Valor emitirRmIndividual(long obligado) {
-            return enTransaccion(
-                    () ->
-                            registrarValor.emitir(
-                                    TipoValor.RESOLUCION_DE_MULTA,
-                                    obligado,
-                                    List.of(
-                                            new SelectorDeObligacion(
-                                                    "MULTA_TRANSITO",
-                                                    new Ejercicio(2026),
-                                                    null,
-                                                    null)),
-                                    PORQUE,
-                                    EXIGIBLE_DESDE));
-        }
-
         /** {@code POST /api/v1/transito/papeletas/{numero}/anulacion}, con su traduccion a 409. */
         private AnulacionDePapeletaController.PapeletaAnuladaResource anularPorLaApi(
                 Papeleta papeleta) {
@@ -2046,8 +2030,148 @@ class ValoresMasivosYReportesJdbcTest {
     }
 
     // ==================================================================
+    //  #495 — la resolucion que deja la multa sin efecto, con un valor vivo encima
+    // ==================================================================
+
+    /**
+     * <b>El hermano de #372 (#495).</b> Anular la papeleta ya preguntaba a {@code valores} si un
+     * valor vivo formaliza su multa; la resolucion de gerencia que la deja sin efecto no, y llegaba
+     * al mismo estado final: la obligacion extinguida en el libro y la RM viva, cobrable en
+     * coactiva sobre una deuda que ya no existe.
+     *
+     * <p>La siembra es la de {@link ElValorVivoFueraDeLaCorrida}: la RM sale de la emision
+     * individual y no de la corrida, que es el camino que ninguna copia propia de {@code sanciones}
+     * ve. Y lleva su gemela con la RM ya {@code ANULADA}: una guarda que preguntara «hubo alguna
+     * vez un valor» pasaria la primera y bloquearia para siempre una resolucion fundada legitima.
+     */
+    @Nested
+    @DisplayName("#495 — la resolucion que deja la multa sin efecto con un valor vivo encima")
+    class LaResolucionContraElValorVivo {
+
+        @Test
+        @DisplayName("una RM viva sobre su obligacion: 409 nombrando la RM, y la deuda intacta")
+        void laRmVivaImpideDejarLaMultaSinEfecto() {
+            long obligado = crearContribuyente("sev1");
+            Papeleta papeleta = papeletaDeTransito("sev1-t", obligado, MULTA);
+            String rm = emitirRmIndividual(obligado).numero();
+            SeleccionDeObligacion obligacion =
+                    new SeleccionDeObligacion(
+                            "MULTA_TRANSITO", new Ejercicio(2026), null, papeleta.vehiculoId());
+            Dinero antes = loQueDebeAlDia(obligado, obligacion);
+            assertThat(antes.esPositivo())
+                    .as("la siembra tiene que deber algo, o «intacta» no distinguiria nada")
+                    .isTrue();
+
+            Throwable rechazo = catchThrowable(() -> dejarSinEfectoPorLaApi(papeleta, "EXP-SEV1"));
+
+            assertThat(rechazo)
+                    .as(
+                            "dejarla sin efecto extinguiria los %s que %s formaliza, y %s seguiria"
+                                    + " cobrandolos en coactiva",
+                            MULTA, rm, rm)
+                    .isInstanceOfSatisfying(
+                            ProblemaDeNegocio.class,
+                            problema -> {
+                                assertThat(problema.codigo()).isEqualTo(CodigoDeError.CONFLICTO);
+                                assertThat(problema.codigo().estado().value()).isEqualTo(409);
+                                assertThat(problema.getMessage()).contains(rm);
+                            });
+            assertThat(loQueDebeAlDia(obligado, obligacion))
+                    .as("y la deuda intacta: ni un asiento de baja")
+                    .isEqualTo(antes);
+            assertThat(resolucionesDe(papeleta))
+                    .as(
+                            "ni una resolucion que dice «sin efecto» sobre una multa que se sigue debiendo")
+                    .isZero();
+        }
+
+        @Test
+        @DisplayName("la misma RM ya ANULADA no la sostiene: la resolucion se dicta y da de baja")
+        void laRmAnuladaNoImpideDejarLaMultaSinEfecto() {
+            long obligado = crearContribuyente("sev2");
+            Papeleta papeleta = papeletaDeTransito("sev2-t", obligado, MULTA);
+            Valor rm = emitirRmIndividual(obligado);
+            enTransaccion(
+                    () ->
+                            repositorioDeValores.cambiarEstado(
+                                    java.util.Objects.requireNonNull(rm.id()),
+                                    EstadoDeValor.ANULADO));
+
+            ResolucionesDeGerenciaController.ResolucionResource dictada =
+                    dejarSinEfectoPorLaApi(papeleta, "EXP-SEV2");
+
+            assertThat(dictada.efectoSobreLaMulta())
+                    .as("existio un valor, pero ya no hay ninguno vivo que la sostenga")
+                    .isEqualTo("SE_DEJA_SIN_EFECTO");
+            assertThat(dictada.asientosDeBaja())
+                    .as("y la baja se asienta: la guarda no puede decir que no a todo")
+                    .isPositive();
+        }
+
+        /** {@code POST /api/v1/transito/resoluciones/ordinaria}, fundada y con su traduccion. */
+        private ResolucionesDeGerenciaController.ResolucionResource dejarSinEfectoPorLaApi(
+                Papeleta papeleta, String expediente) {
+            enTransaccion(
+                    () ->
+                            registrarDescargo.registrar(
+                                    Familia.TRANSITO,
+                                    papeleta.numero(),
+                                    new RegistrarDescargo.Peticion(
+                                            expediente,
+                                            INFRACCION.plusDays(2),
+                                            TipoDeRecurso.DESCARGO,
+                                            "El vehiculo estaba en el taller"),
+                                    PORQUE),
+                    "mesa.partes");
+            return enTransaccion(
+                    () ->
+                            resolucionesPorLaApi.ordinaria(
+                                    new ResolucionesDeGerenciaController.PeticionDeResolucion(
+                                            "Se declara fundado el descargo",
+                                            papeleta.numero(),
+                                            ORDINARIA.toString(),
+                                            expediente,
+                                            "FUNDADO",
+                                            "SE_DEJA_SIN_EFECTO",
+                                            null,
+                                            "Sustento de la prueba",
+                                            null,
+                                            null)),
+                    "gerente");
+        }
+
+        private long resolucionesDe(Papeleta papeleta) {
+            return enTransaccion(
+                    () ->
+                            jdbc.sql(
+                                            "SELECT count(*) FROM resolucion_gerencia WHERE"
+                                                    + " papeleta_id = :papeleta")
+                                    .param("papeleta", papeleta.identificador())
+                                    .query(Long.class)
+                                    .single());
+        }
+    }
+
+    // ==================================================================
     //  Ayudas
     // ==================================================================
+
+    /**
+     * Una RM por el camino de {@code POST /api/v1/valores}: sin corrida y sin tocar sanciones
+     * (#372, #495).
+     */
+    private static Valor emitirRmIndividual(long obligado) {
+        return enTransaccion(
+                () ->
+                        registrarValor.emitir(
+                                TipoValor.RESOLUCION_DE_MULTA,
+                                obligado,
+                                List.of(
+                                        new SelectorDeObligacion(
+                                                "MULTA_TRANSITO", new Ejercicio(2026), null, null)),
+                                PORQUE,
+                                EXIGIBLE_DESDE));
+    }
 
     private static EmitirConstanciaLibre.Peticion peticionDe(String placa, LocalDate verificadaAl) {
         return new EmitirConstanciaLibre.Peticion(

@@ -110,6 +110,7 @@ import kamayuk.rentas.sanciones.infraestructura.web.ConstanciasLibresController;
 import kamayuk.rentas.sanciones.infraestructura.web.DescargosController;
 import kamayuk.rentas.sanciones.infraestructura.web.InternamientosController;
 import kamayuk.rentas.sanciones.infraestructura.web.NotificacionAdministrativaController;
+import kamayuk.rentas.valores.ValoresSobreUnaObligacion;
 import kamayuk.rentas.valores.aplicacion.ValoresSobreUnaObligacionValores;
 import kamayuk.rentas.valores.infraestructura.ValorRepositoryJdbc;
 import kamayuk.rentas.web.ManejadorDeErrores;
@@ -352,15 +353,10 @@ class SancionesJdbcTest {
         registrarPapeleta = envolver(new RegistrarPapeleta(papeletas, codigos, cargos, auditoria));
         registrarDescargo =
                 envolver(new RegistrarDescargo(papeletas, descargos, plazos, auditoria, RELOJ));
+        ValoresSobreUnaObligacion valoresVivos =
+                envolver(new ValoresSobreUnaObligacionValores(new ValorRepositoryJdbc(jdbc)));
         anularPapeleta =
-                envolver(
-                        new AnularPapeleta(
-                                papeletas,
-                                envolver(
-                                        new ValoresSobreUnaObligacionValores(
-                                                new ValorRepositoryJdbc(jdbc))),
-                                extincion,
-                                auditoria));
+                envolver(new AnularPapeleta(papeletas, valoresVivos, extincion, auditoria));
         resolver =
                 envolver(
                         new ResolverConResolucionDeGerencia(
@@ -369,6 +365,7 @@ class SancionesJdbcTest {
                                 resoluciones,
                                 diligencias,
                                 padron,
+                                valoresVivos,
                                 deudas,
                                 extincion,
                                 plazos,
