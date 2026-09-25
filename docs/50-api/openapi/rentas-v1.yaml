@@ -4421,8 +4421,10 @@ paths:
         Registra el criterio de una generación masiva de valores por papeletas de tránsito, por
         selección de números o por rango de fechas (#53, RF-066, RF-073). Devuelve la corrida y
         sus candidatos; **no emite ningún valor**: la generación corre después, en el perfil
-        batch. El número de cada resolución de multa lo pone `valor_correlativo` (#37) y **no
-        entra por el cuerpo**.
+        batch, cuando el `CronJob` `kamayuk-rentas-corridas` lanza
+        `CorrerLasCorridasDePapeletas` en la ventana de lote (#400). Hasta #400 ningún proceso
+        la corría y los candidatos se quedaban `PENDIENTE` para siempre. El número de cada
+        resolución de multa lo pone `valor_correlativo` (#37) y **no entra por el cuerpo**.
       tags: ["Tránsito"]
       parameters:
         - name: codigoDescripcionDelCriterio
@@ -7429,7 +7431,16 @@ paths:
     post:
       operationId: valores_masivo
       summary: "Generación masiva de valores"
-      description: "Emite órdenes de pago en bloque para toda la deuda vencida que cumpla el filtro, respetando el monto mínimo de emisión fijado por ordenanza."
+      description: >-
+        Registra el criterio de una generación masiva de órdenes de pago o resoluciones de
+        determinación (#38, RF-091): tipo, tributo, ejercicios, fecha de criterio y los
+        contribuyentes candidatos, elegidos a mano o importados de una hoja de cálculo. Devuelve
+        **201** con la corrida y su total de candidatos; **no emite ningún valor**. La generación
+        corre después, en el perfil batch, cuando el `CronJob` `kamayuk-rentas-corridas` lanza
+        `CorrerLasCorridasDeValores` en la ventana de lote (#400): cada candidato sale
+        `GENERADO` con su valor o `SIN_DEUDA`, y el que falla se reintenta en la ventana
+        siguiente. Hasta #400 ningún proceso la corría y los candidatos se quedaban `PENDIENTE`
+        para siempre. La impresión en lote de lo emitido no tiene ruta.
       tags: ["Valores"]
       requestBody:
         required: true

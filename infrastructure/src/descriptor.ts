@@ -794,13 +794,17 @@ export const rentas: DescriptorDeSistema = {
    * ## Por que se quita, y no se convierte en `CronJob` ni se le da algo que lo mantenga vivo
    *
    * Porque el trabajo del perfil `batch` **ya tiene su forma, y son dos**: `implantacion()` —un
-   * `Job`, que corre una vez— y `lotes()` —el `CronJob` del ingestor, que corre en su ventana—.
-   * Los dos crean su pod cuando hay trabajo y lo dejan morir al acabar. Un `Deployment` dice
-   * «esto tiene que estar corriendo siempre», y aqui no hay nada que lo este.
+   * `Job`, que corre una vez— y `lotes()` —los `CronJob` que corren en su ventana—. Los dos
+   * crean su pod cuando hay trabajo y lo dejan morir al acabar. Un `Deployment` dice «esto tiene
+   * que estar corriendo siempre», y aqui no hay nada que lo este.
    *
-   * Un `CronJob` mas tampoco: un `CronJob` necesita una ventana y algo que correr en ella, y este
-   * sistema ya tiene el suyo. Anadir un segundo con la misma imagen y ningun runner que invocar
-   * seria el mismo vacio con horario.
+   * Un `CronJob` mas **solo si trae un runner que invocar**: un `CronJob` necesita una ventana y
+   * algo que correr en ella, y uno con la misma imagen y ningun runner seria el mismo vacio con
+   * horario. Esta frase decia «ningun runner que invocar» sin mas, y con eso tapaba un hueco
+   * (#400): la generacion masiva de valores y la de papeletas SI tenian trabajo de lote —sus
+   * etapas escritas y reanudables, y sus rutas contestando 201— y ningun runner las invocaba.
+   * Desde #400 lo tienen, `CorrerLasCorridasDeValores` y `CorrerLasCorridasDePapeletas`, y su
+   * `CronJob` es el tercero de `lotes()`.
    *
    * ## Lo que costaba tenerlo, que es mas que un pod en rojo
    *
@@ -942,6 +946,9 @@ export const rentas: DescriptorDeSistema = {
    *
    * Lo que se declara aqui sigue siendo **la ventana, los limites y la configuracion entera**, que
    * es lo que C-8 §huecos 2 decia que faltaba.
+   *
+   * **Y las corridas de la generacion masiva** (#400), que es el tercero: el runner de las de
+   * valores y el de las de papeletas, en el mismo proceso. Ver su comentario abajo.
    */
   lotes(e): Manifiesto[] {
     const nombre = `kamayuk-${SISTEMA}-ingestor`;
@@ -1083,7 +1090,68 @@ export const rentas: DescriptorDeSistema = {
         },
       },
     };
-    return [ingestor, consumidor];
+    // Las corridas de la generacion masiva (#400): `CorrerLasCorridasDeValores` (RF-091) y
+    // `CorrerLasCorridasDePapeletas` (RF-066, RF-073), los dos en este proceso. Hasta #400
+    // `POST /valores/masivo` y las dos `…/valores/generacion-masiva` contestaban 201 y sus
+    // candidatos se quedaban `PENDIENTE` para siempre: las etapas estaban escritas y ningun
+    // runner las invocaba.
+    //
+    // En la ventana de lote y no cada pocos minutos, por lo mismo que ADR-0003 las saca del
+    // proceso web: una corrida de miles de candidatos tarda minutos y no tiene por que competir
+    // con la ventanilla. `Forbid`, como los otros dos: dos pasadas a la vez sobre la misma
+    // corrida se disputarian los mismos candidatos, y lo que las separa es `exigirUnaFila`, que
+    // convertiria la segunda en fallos. `backoffLimit: 1`: lo que no avanzo lo reintenta la
+    // ventana siguiente, que es donde la etapa lo vuelve a buscar.
+    //
+    // Sin variables propias salvo la que enciende a los dos runners: leen y escriben con
+    // `kamayuk_app` como la ventanilla, y recorren TODAS las municipalidades activas del
+    // registro, una a una (ADR-0020), asi que no llevan la de la implantacion. La propiedad es la
+    // que el `@ConditionalOnProperty` de los dos pide; sin ella el proceso arranca, no genera
+    // nada y sale con 0, que es exactamente el defecto que esto arregla.
+    //
+    // Lo que cuesta en el nodo, MEDIDO y no estimado: un `RECURSOS_DE_ARRANQUE` en el pico, que
+    // `infrastructure` cuenta aunque su ventana sea la del ingestor. Con este `CronJob` el pico de
+    // los cinco sistemas pasa de 1550m / 6656Mi a 1600m / 6912Mi y el hueco de memoria de `prod`
+    // —que ya no cabia (`infrastructure`#199)— de 77Mi a 333Mi; `stg` sigue cabiendo. Las seis
+    // cifras que eso mueve alli las remide `infrastructure`#217, que se mezcla DESPUES de este.
+    const corridas = `kamayuk-${SISTEMA}-corridas`;
+    const deLasCorridas: CronJob = {
+      apiVersion: "batch/v1",
+      kind: "CronJob",
+      metadata: { name: corridas, namespace: e.namespace, labels: etiquetas },
+      spec: {
+        schedule: VENTANA_DE_LOTE,
+        concurrencyPolicy: "Forbid",
+        successfulJobsHistoryLimit: 3,
+        failedJobsHistoryLimit: 3,
+        jobTemplate: {
+          spec: {
+            backoffLimit: 1,
+            template: {
+              metadata: { labels: { ...etiquetas, app: corridas } },
+              spec: {
+                restartPolicy: "Never",
+                priorityClassName: e.prioridadDe("lote"),
+                containers: [
+                  {
+                    name: "corridas",
+                    image: e.imagenDe(SISTEMA),
+                    env: [
+                      { name: "SPRING_PROFILES_ACTIVE", value: "batch" },
+                      ...credencialesDeLaAplicacion(e),
+                      { name: "KAMAYUK_RENTAS_CORRIDAS_GENERAR", value: "true" },
+                    ],
+                    resources: RECURSOS_DE_ARRANQUE,
+                    securityContext: SEGURIDAD,
+                  },
+                ],
+              },
+            },
+          },
+        },
+      },
+    };
+    return [ingestor, consumidor, deLasCorridas];
   },
 
   /**

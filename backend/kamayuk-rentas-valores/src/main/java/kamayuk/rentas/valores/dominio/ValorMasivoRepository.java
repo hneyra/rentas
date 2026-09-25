@@ -39,6 +39,17 @@ public interface ValorMasivoRepository {
     /** Todos los items {@link EstadoDeItemMasivo#GENERADO} de la corrida, para la impresion. */
     List<ValorMasivoItem> itemsGenerados(long corridaId);
 
+    /**
+     * Las corridas de esta municipalidad que todavia tienen algun item {@link
+     * EstadoDeItemMasivo#PENDIENTE}, por identificador ascendente (#400).
+     *
+     * <p>Es la pregunta con que el proceso batch decide a que corridas llamar: no "las de hoy" ni
+     * "las que no se terminaron de generar", sino las que tienen algo por resolver. Una corrida
+     * cortada a mitad, o con un candidato que fallo, vuelve a salir aqui en la siguiente ventana;
+     * una resuelta entera no vuelve a salir nunca.
+     */
+    List<Long> corridasConPendientes();
+
     /** Cuantos items quedan {@link EstadoDeItemMasivo#PENDIENTE} en la corrida. */
     long contarPendientes(long corridaId);
 

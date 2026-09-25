@@ -32,8 +32,12 @@ import org.springframework.stereotype.Service;
  *
  * <h2>Corre en el perfil batch (ADR-0003)</h2>
  *
- * <p>Lo invoca el proceso batch, nunca la petición web que registró el criterio: una corrida de
- * miles de papeletas puede tardar minutos y esa espera no tiene por qué competir con la caja.
+ * <p>Lo invoca {@link CorrerLasCorridasDePapeletas}, el {@code ApplicationRunner} del perfil {@code
+ * batch} que el {@code CronJob} {@code kamayuk-rentas-corridas} lanza en la ventana de lote (#400),
+ * y nunca la petición web que registró el criterio: una corrida de miles de papeletas puede tardar
+ * minutos y esa espera no tiene por qué competir con la caja. Hasta #400 esta frase decía «lo
+ * invoca el proceso batch» y no lo invocaba nadie: ninguna papeleta podía recibir su resolución de
+ * multa por este camino, que es el único que escribe {@code papeleta_masivo_item.valor_id}.
  */
 @Service
 public class GenerarCorridaDeValores {
@@ -116,7 +120,20 @@ public class GenerarCorridaDeValores {
      * @param fallidos cuántos reventaron y siguen pendientes para la próxima pasada
      */
     public record Informe(
-            long corridaId, int generados, int sinDeuda, int noProceden, int fallidos) {}
+            long corridaId, int generados, int sinDeuda, int noProceden, int fallidos) {
+
+        /**
+         * Si esta pasada no resolvió <b>ningún</b> candidato y alguno falló (#400).
+         *
+         * <p>Es la condición con que el proceso batch sale distinto de cero. {@code NO_PROCEDE} sí
+         * cuenta como avance: el candidato quedó resuelto, diciendo por qué. Uno que falla junto a
+         * otros que se resuelven no la cumple; si en la ventana siguiente es lo único que queda y
+         * vuelve a fallar, sí.
+         */
+        public boolean sinAvance() {
+            return generados == 0 && sinDeuda == 0 && noProceden == 0 && fallidos > 0;
+        }
+    }
 
     /** No hay ninguna corrida con ese identificador en esta municipalidad. */
     public static final class CorridaNoEncontrada extends RuntimeException {

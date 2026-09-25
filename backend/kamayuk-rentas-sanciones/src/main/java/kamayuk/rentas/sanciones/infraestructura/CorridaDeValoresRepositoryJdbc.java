@@ -131,6 +131,16 @@ public class CorridaDeValoresRepositoryJdbc extends RepositorioJdbc
     }
 
     @Override
+    public List<Long> corridasConPendientes() {
+        return jdbc().sql(
+                        "SELECT DISTINCT corrida_id FROM papeleta_masivo_item"
+                                + " WHERE estado = 'PENDIENTE'"
+                                + " ORDER BY corrida_id")
+                .query((fila, numero) -> fila.getLong("corrida_id"))
+                .list();
+    }
+
+    @Override
     public List<ItemDeCorrida> items(long corridaId, long despuesDe, int cuantos) {
         if (cuantos < 1) {
             throw new IllegalArgumentException("Un lote trae al menos un candidato: " + cuantos);

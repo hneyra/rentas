@@ -36,7 +36,9 @@ import org.springframework.web.bind.annotation.RestController;
  * <p>Devuelve <b>201</b> con la corrida y sus candidatos. La emisión corre después, en el perfil
  * batch (ADR-0003): una corrida de miles de papeletas puede tardar minutos, y esa espera no tiene
  * por qué competir con la ventanilla por el mismo proceso. Es el mismo reparto que {@code POST
- * /valores/masivo} (#38).
+ * /valores/masivo} (#38). La corre {@code CorrerLasCorridasDePapeletas}, en el {@code CronJob}
+ * {@code kamayuk-rentas-corridas} (#400); hasta #400 esta frase lo afirmaba y ningún proceso la
+ * corría, así que el 201 anunciaba una emisión que no iba a ocurrir.
  *
  * <h2>El número no entra por aquí</h2>
  *

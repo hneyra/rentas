@@ -5,7 +5,6 @@ import java.util.Objects;
 import kamayuk.rentas.valores.aplicacion.ProcesarItemMasivo.Resultado;
 import kamayuk.rentas.valores.dominio.ValorMasivo;
 import kamayuk.rentas.valores.dominio.ValorMasivoItem;
-import kamayuk.rentas.valores.dominio.ValorMasivoRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessException;
@@ -33,12 +32,19 @@ import org.springframework.stereotype.Service;
  * transaccion y una obligacion que revienta una restriccion se llevaria consigo a los candidatos ya
  * resueltos antes que ella.
  *
+ * <p>Y por eso mismo <b>no lee del repositorio</b>, sino de {@link ConsultaDeLaCorridaMasiva}, que
+ * abre una transaccion corta por lectura (#400): sin ella no hay {@code SET LOCAL}, y la politica
+ * RLS de {@code valor_masivo} hace fallar la primera lectura antes de procesar un candidato. Con
+ * dobles en memoria eso no se ve nunca; lo mide {@code GeneracionMasivaJdbcTest}.
+ *
  * <h2>Corre en el perfil batch (ADR-0003)</h2>
  *
- * <p>Este servicio es el que invoca el proceso batch -analogo a {@code
- * catastro.CargarCatalogoVial}-, nunca la peticion web que registra el criterio: una corrida de
- * miles de contribuyentes puede tardar minutos, y esa espera no tiene que competir con la caja por
- * el mismo proceso.
+ * <p>Lo invoca {@link CorrerLasCorridasDeValores}, el {@code ApplicationRunner} del perfil {@code
+ * batch} que el {@code CronJob} {@code kamayuk-rentas-corridas} lanza en la ventana de lote (#400),
+ * y nunca la peticion web que registra el criterio: una corrida de miles de contribuyentes puede
+ * tardar minutos, y esa espera no tiene que competir con la caja por el mismo proceso. Hasta #400
+ * esta frase lo afirmaba y nadie lo llamaba: la corrida se aceptaba con 201 y sus candidatos se
+ * quedaban {@code PENDIENTE} para siempre.
  */
 @Service
 public class GenerarCorridaMasiva {
@@ -52,11 +58,11 @@ public class GenerarCorridaMasiva {
      */
     private static final int TAMANO_DE_LOTE = 200;
 
-    private final ValorMasivoRepository repositorio;
+    private final ConsultaDeLaCorridaMasiva lectura;
     private final ProcesarItemMasivo procesar;
 
-    public GenerarCorridaMasiva(ValorMasivoRepository repositorio, ProcesarItemMasivo procesar) {
-        this.repositorio = repositorio;
+    public GenerarCorridaMasiva(ConsultaDeLaCorridaMasiva lectura, ProcesarItemMasivo procesar) {
+        this.lectura = lectura;
         this.procesar = procesar;
     }
 
@@ -68,7 +74,7 @@ public class GenerarCorridaMasiva {
      */
     public Informe generar(long corridaId) {
         ValorMasivo corrida =
-                repositorio.porId(corridaId).orElseThrow(() -> new CorridaNoEncontrada(corridaId));
+                lectura.porId(corridaId).orElseThrow(() -> new CorridaNoEncontrada(corridaId));
 
         int generados = 0;
         int sinDeuda = 0;
@@ -81,7 +87,7 @@ public class GenerarCorridaMasiva {
         // corrida del batch- es la que lo vuelve a intentar.
         long cursor = 0;
         List<ValorMasivoItem> lote;
-        while (!(lote = repositorio.itemsPendientes(corridaId, cursor, TAMANO_DE_LOTE)).isEmpty()) {
+        while (!(lote = lectura.itemsPendientes(corridaId, cursor, TAMANO_DE_LOTE)).isEmpty()) {
             for (ValorMasivoItem item : lote) {
                 try {
                     Resultado resultado = procesar.procesar(corrida, item, corrida.observacion());
@@ -112,7 +118,20 @@ public class GenerarCorridaMasiva {
     }
 
     /** El resultado de una llamada a {@link #generar}. */
-    public record Informe(long corridaId, int generados, int sinDeuda, int fallidos) {}
+    public record Informe(long corridaId, int generados, int sinDeuda, int fallidos) {
+
+        /**
+         * Si esta pasada no resolvio <b>ningun</b> candidato y alguno fallo (#400).
+         *
+         * <p>Es la condicion con que el proceso batch sale distinto de cero. Un candidato que falla
+         * junto a otros que se resuelven no la cumple: la corrida avanzo, y el que fallo se vuelve
+         * a intentar en la ventana siguiente. Si en esa ventana ya es lo unico que queda y vuelve a
+         * fallar, la corrida no avanza, y eso ya no se puede tomar por transitorio.
+         */
+        public boolean sinAvance() {
+            return generados == 0 && sinDeuda == 0 && fallidos > 0;
+        }
+    }
 
     /** No hay ninguna corrida con ese identificador en esta municipalidad. */
     public static final class CorridaNoEncontrada extends RuntimeException {

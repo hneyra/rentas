@@ -9,7 +9,6 @@ import kamayuk.rentas.documentos.EmitirDocumento;
 import kamayuk.rentas.documentos.FormatoDeDocumento;
 import kamayuk.rentas.documentos.ModeloDeDocumento;
 import kamayuk.rentas.valores.dominio.ValorMasivoItem;
-import kamayuk.rentas.valores.dominio.ValorMasivoRepository;
 import org.springframework.stereotype.Service;
 
 /**
@@ -31,19 +30,26 @@ import org.springframework.stereotype.Service;
  * item. Repetir una impresion interrumpida no arriesga duplicar nada -es exactamente lo que ya hace
  * {@code EmitirDocumento#reimprimir} para un valor individual-, asi que esta etapa no necesita su
  * propia marca de progreso: si se corta, se vuelve a llamar sobre la misma corrida y listo.
+ *
+ * <h2>Lee por {@link ConsultaDeLaCorridaMasiva}, como la generacion (#400)</h2>
+ *
+ * <p>Por el mismo motivo: quien la llame desde un proceso sin peticion —fuera de transaccion— no
+ * tendria {@code SET LOCAL}, y la politica RLS de {@code valor_masivo_item} haria fallar la
+ * lectura. <b>Hoy nadie la llama</b>: no hay ruta que imprima una corrida en lote, y publicarla lo
+ * decide la pantalla, no #400.
  */
 @Service
 public class ImprimirCorridaMasiva {
 
-    private final ValorMasivoRepository repositorioMasivo;
+    private final ConsultaDeLaCorridaMasiva lectura;
     private final ConstruirModeloDeValor construirModelo;
     private final EmitirDocumento emitirDocumento;
 
     public ImprimirCorridaMasiva(
-            ValorMasivoRepository repositorioMasivo,
+            ConsultaDeLaCorridaMasiva lectura,
             ConstruirModeloDeValor construirModelo,
             EmitirDocumento emitirDocumento) {
-        this.repositorioMasivo = repositorioMasivo;
+        this.lectura = lectura;
         this.construirModelo = construirModelo;
         this.emitirDocumento = emitirDocumento;
     }
@@ -61,7 +67,7 @@ public class ImprimirCorridaMasiva {
             FormatoDeDocumento formato,
             Function<ModeloDeDocumento, OutputStream> destino) {
 
-        List<ValorMasivoItem> generados = repositorioMasivo.itemsGenerados(corridaId);
+        List<ValorMasivoItem> generados = lectura.itemsGenerados(corridaId);
         return emitirDocumento.emitirEnLote(modelosDe(generados), formato, destino);
     }
 

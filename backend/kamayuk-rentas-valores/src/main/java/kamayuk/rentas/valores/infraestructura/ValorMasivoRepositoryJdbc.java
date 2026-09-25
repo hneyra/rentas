@@ -134,6 +134,16 @@ public class ValorMasivoRepositoryJdbc extends RepositorioJdbc implements ValorM
     }
 
     @Override
+    public List<Long> corridasConPendientes() {
+        return jdbc().sql(
+                        "SELECT DISTINCT corrida_id FROM valor_masivo_item"
+                                + " WHERE estado = 'PENDIENTE'"
+                                + " ORDER BY corrida_id")
+                .query((fila, numero) -> fila.getLong("corrida_id"))
+                .list();
+    }
+
+    @Override
     public long contarPendientes(long corridaId) {
         return jdbc().sql(
                         "SELECT count(*) FROM valor_masivo_item"

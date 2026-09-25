@@ -65,7 +65,11 @@ import org.springframework.web.bind.annotation.RestController;
  * <p>{@link #generarMasivo} solo registra la etapa "criterio" (#38): la generacion en si -leer la
  * deuda de cada candidato y emitir su valor- corre en el perfil batch (ADR-0003), aparte de esta
  * peticion web, para que una corrida de miles de contribuyentes no compita con la caja por el mismo
- * proceso.
+ * proceso. Quien la corre es {@code CorrerLasCorridasDeValores}, que el {@code CronJob} {@code
+ * kamayuk-rentas-corridas} lanza en la ventana de lote (#400): hasta #400 esta frase lo afirmaba y
+ * no habia ningun proceso que lo hiciera, asi que la corrida se aceptaba con 201 y sus candidatos
+ * se quedaban {@code PENDIENTE} para siempre. La etapa "impresion" sigue sin ruta: publicarla lo
+ * decide la pantalla.
  *
  * <h2>Que devuelve 422, y por que no 500 (#562)</h2>
  *
