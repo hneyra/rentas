@@ -17,6 +17,7 @@ import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.fiscalizacion.aplicacion.ConsultaDeResoluciones;
 import kamayuk.rentas.fiscalizacion.aplicacion.LiquidarFiscalizacion;
 import kamayuk.rentas.fiscalizacion.aplicacion.TransferirARentas;
+import kamayuk.rentas.fiscalizacion.dominio.ActaFiscalizacion;
 import kamayuk.rentas.fiscalizacion.dominio.CriterioDeResoluciones;
 import kamayuk.rentas.fiscalizacion.dominio.ResolucionDeDeterminacionRepository;
 import kamayuk.rentas.fiscalizacion.dominio.ResolucionEnLaRelacion;
@@ -131,7 +132,10 @@ public class ResolucionController {
                 | LiquidarFiscalizacion.ActaInexistente noExiste) {
             throw new ProblemaDeNegocio(CodigoDeError.NO_ENCONTRADO, mensajeDe(noExiste));
         } catch (ResolucionDeDeterminacionRepository.LiquidacionYaTransferida
-                | TransferirARentas.LiquidacionSustituida enConflicto) {
+                | TransferirARentas.LiquidacionSustituida
+                | ActaFiscalizacion.ActaAnulada enConflicto) {
+            // La visita anulada (#339) es 409 como las otras dos: la peticion esta bien, lo que
+            // no la admite es la situacion, y reintentarla no sirve de nada.
             throw new ProblemaDeNegocio(CodigoDeError.CONFLICTO, mensajeDe(enConflicto));
         } catch (TransferirARentas.SinSustentoDocumental
                 | TransferenciaDeFiscalizacion.SinFichaQueVersionar

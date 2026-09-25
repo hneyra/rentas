@@ -276,6 +276,12 @@ class RegistrarActaFiscalizacionTest {
             throw new UnsupportedOperationException("no lo usa esta prueba");
         }
 
+        /** #339 tampoco: la lectura con bloqueo es de liquidar y anular. */
+        @Override
+        public java.util.Optional<ActaFiscalizacion> findByIdParaActualizar(long id) {
+            throw new UnsupportedOperationException("no lo usa esta prueba");
+        }
+
         /**
          * El embudo (#196) no se mide contra un doble: lo mide el repositorio contra PostgreSQL.
          */

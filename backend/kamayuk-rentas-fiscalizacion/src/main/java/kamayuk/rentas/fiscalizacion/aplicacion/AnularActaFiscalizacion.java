@@ -57,6 +57,14 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>Se comprueba sobre la <b>última</b> versión, que es la que está en pie: una reliquidación
  * anterior anulada no revive nada.
  *
+ * <h2>Y lo que no deja anular tampoco nace mientras se anula (#339)</h2>
+ *
+ * <p>La otra mitad de la regla vive en el acta ({@code ActaFiscalizacion#exigirViva}): sobre una
+ * visita anulada no se liquida, no se reliquida y no se transfiere. Pero las dos mitades se leen en
+ * transacciones distintas, y en READ COMMITTED anular y liquidar a la vez leian las dos «ABIERTA,
+ * sin liquidacion» y confirmaban las dos. Por eso el acta se lee aqui con su fila bloqueada, igual
+ * que al liquidar y al reliquidar: quien llega segundo espera y ve lo que dejo el primero.
+ *
  * <h2>No borra nada</h2>
  *
  * <p>Regla 4: el acta no se borra ni se edita. Sigue leyéndose entera —quién fue, qué día, qué
@@ -100,8 +108,10 @@ public class AnularActaFiscalizacion {
      */
     @Transactional
     public ActaConLoDeclarado anular(long actaId, LocalDate fecha, Observacion observacion) {
+        // Con la fila bloqueada (#339): lo que `exigirQueNadaLaSostenga` lee a continuacion tiene
+        // que incluir la liquidacion que otra transaccion este emitiendo ahora mismo.
         ActaFiscalizacion antes =
-                actas.findById(actaId)
+                actas.findByIdParaActualizar(actaId)
                         .orElseThrow(() -> new LiquidarFiscalizacion.ActaInexistente(actaId));
 
         exigirQueNadaLaSostenga(actaId);

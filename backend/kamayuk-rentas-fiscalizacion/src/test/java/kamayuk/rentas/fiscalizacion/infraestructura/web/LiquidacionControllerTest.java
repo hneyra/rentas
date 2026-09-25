@@ -61,6 +61,7 @@ class LiquidacionControllerTest {
     private static final long FICHA_DECLARADA = 700L;
     private static final long FICHA_VIGENTE = 900L;
 
+    private ActasEnMemoria actas;
     private LiquidacionesEnMemoria liquidaciones;
     private ResolucionesEnMemoria resoluciones;
     private MockMvc mvc;
@@ -68,7 +69,7 @@ class LiquidacionControllerTest {
 
     @BeforeEach
     void armar() {
-        ActasEnMemoria actas = new ActasEnMemoria();
+        actas = new ActasEnMemoria();
         liquidaciones = new LiquidacionesEnMemoria();
         resoluciones = new ResolucionesEnMemoria();
         MovimientosDeLiquidacionEnMemoria movimientos = new MovimientosDeLiquidacionEnMemoria();
@@ -129,7 +130,7 @@ class LiquidacionControllerTest {
                 MockMvcBuilders.standaloneSetup(
                                 new LiquidacionController(
                                         liquidar,
-                                        new ReliquidarFiscalizacion(liquidaciones, liquidar),
+                                        new ReliquidarFiscalizacion(actas, liquidaciones, liquidar),
                                         new CambiarEstadoDeLaLiquidacion(
                                                 liquidaciones, movimientos, resoluciones),
                                         consulta,
@@ -360,6 +361,51 @@ class LiquidacionControllerTest {
 
         assertThat(resultado.getResponse().getStatus()).isEqualTo(409);
         assertThat(resultado.getResponse().getContentAsString()).contains("RDF-2026-000004");
+    }
+
+    @Test
+    @DisplayName("#339 — liquidar un acta ANULADA es 409, y el mensaje dice que procede otra acta")
+    void liquidarUnActaAnulada409() throws Exception {
+        actas.anular(actaId);
+
+        MvcResult resultado = liquidar();
+
+        assertThat(resultado.getResponse().getStatus())
+                .as("la peticion esta bien; lo que no la admite es el estado de la visita")
+                .isEqualTo(409);
+        assertThat(resultado.getResponse().getContentAsString())
+                .contains("CONFLICTO")
+                .contains("El acta " + actaId + " esta anulada")
+                .contains("levantar otra acta");
+        assertThat(liquidaciones.versionesDeActa(actaId)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("#339 — reliquidar sobre un acta ANULADA es 409, y no nace la version 2")
+    void reliquidarSobreUnActaAnulada409() throws Exception {
+        liquidar();
+        String numero = liquidaciones.versionesDeActa(actaId).get(0).numero();
+        assertThat(moverA(numero, "ANULADA").getResponse().getStatus()).isEqualTo(200);
+        actas.anular(actaId);
+
+        MvcResult resultado =
+                mvc.perform(
+                                post("/rentas/api/v1/fiscalizacion/liquidaciones/"
+                                                + numero
+                                                + "/reliquidaciones")
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(
+                                                "{\"observacion\":\"Se corrige la anulada\","
+                                                        + "\"periodoDesde\":\"2024\","
+                                                        + "\"periodoHasta\":\"2024\","
+                                                        + "\"tipoDeFiscalizacion\":\"CIERTA\","
+                                                        + "\"motivoDeterminante\":\"correccion\"}"))
+                        .andReturn();
+
+        assertThat(resultado.getResponse().getStatus()).isEqualTo(409);
+        assertThat(resultado.getResponse().getContentAsString())
+                .contains("El acta " + actaId + " esta anulada");
+        assertThat(liquidaciones.versionesDeActa(actaId)).hasSize(1);
     }
 
     // ------------------------------------------------------------------

@@ -52,7 +52,9 @@ public enum EstadoDeActa {
      *
      * <p>Es el predicado en su forma de objeto del {@code estado <> 'ANULADA'} que escriben las
      * tres consultas, para que el caso de uso y el SQL no puedan discrepar. Mismo criterio que
-     * {@code EstadoDeDeclaracion#esVigente} en {@code rentas}.
+     * {@code EstadoDeDeclaracion#esVigente} en {@code rentas}. Hasta #339 no lo llamaba nadie en
+     * {@code src/main}; desde entonces lo llama {@link ActaFiscalizacion#exigirViva()}, que es la
+     * puerta por la que pasan liquidar, reliquidar y transferir.
      */
     public boolean estaViva() {
         return this == ABIERTA;

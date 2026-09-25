@@ -16,12 +16,15 @@ import kamayuk.rentas.fiscalizacion.dobles.LiquidacionesEnMemoria;
 import kamayuk.rentas.fiscalizacion.dobles.MovimientosDeLiquidacionEnMemoria;
 import kamayuk.rentas.fiscalizacion.dobles.PadronDeMentira;
 import kamayuk.rentas.fiscalizacion.dobles.ParametrosDeMentira;
+import kamayuk.rentas.fiscalizacion.dobles.ResolucionesEnMemoria;
 import kamayuk.rentas.fiscalizacion.dominio.ActaFiscalizacion;
 import kamayuk.rentas.fiscalizacion.dominio.CondicionFiscalizada;
+import kamayuk.rentas.fiscalizacion.dominio.EstadoDeActa;
 import kamayuk.rentas.fiscalizacion.dominio.EstadoDeLiquidacion;
 import kamayuk.rentas.fiscalizacion.dominio.Hallazgo;
 import kamayuk.rentas.fiscalizacion.dominio.LineaDeLiquidacion;
 import kamayuk.rentas.fiscalizacion.dominio.Liquidacion;
+import kamayuk.rentas.fiscalizacion.dominio.MovimientoDeLiquidacion;
 import kamayuk.rentas.fiscalizacion.dominio.TipoDeFiscalizacion;
 import kamayuk.rentas.nucleo.DeclaracionDelEjercicio;
 import kamayuk.rentas.parametros.LectorDeParametros;
@@ -101,7 +104,7 @@ class LiquidarYReliquidarTest {
                         rentas,
                         registro -> {},
                         Clock.fixed(HOY.atStartOfDay(ZoneOffset.UTC).toInstant(), ZoneOffset.UTC));
-        reliquidar = new ReliquidarFiscalizacion(liquidaciones, liquidar);
+        reliquidar = new ReliquidarFiscalizacion(actas, liquidaciones, liquidar);
         consulta = new ConsultaDeLiquidaciones(liquidaciones, movimientos);
 
         actaId =
@@ -516,6 +519,101 @@ class LiquidarYReliquidarTest {
                                             OBSERVACION))
                     .isInstanceOf(ReliquidarFiscalizacion.EjercicioSinLineaAnterior.class)
                     .hasMessageContaining("2025");
+        }
+    }
+
+    @Nested
+    @DisplayName("#339 — una visita anulada no sostiene ninguna liquidacion")
+    class UnActaAnuladaNoSeLiquida {
+
+        @Test
+        @DisplayName("un acta ANULADA sin liquidacion no se liquida: ActaAnulada, y nada escrito")
+        void unActaAnuladaNoSeLiquida() {
+            // Camino 1 del issue: nada la sostenia, asi que `exigirQueNadaLaSostenga` la dejo
+            // anular. Hasta #339 liquidar solo miraba que no tuviera ya una liquidacion.
+            anularLaVisita();
+
+            assertThatThrownBy(() -> liquidarDe(E2024, E2024))
+                    .as("liquidar una visita que la administracion declaro invalida")
+                    .isInstanceOf(ActaFiscalizacion.ActaAnulada.class)
+                    .hasMessageContaining("El acta " + actaId + " esta anulada")
+                    .hasMessageContaining("levantar otra acta");
+
+            assertThat(liquidaciones.versionesDeActa(actaId))
+                    .as("y no deja ninguna liquidacion escrita")
+                    .isEmpty();
+        }
+
+        @Test
+        @DisplayName(
+                "una liquidacion ANULADA cuya acta se anulo despues no se reliquida: ActaAnulada")
+        void unaLiquidacionAnuladaConElActaAnuladaNoSeReliquida() {
+            // Camino 2 del issue, en el orden que `AnularActaFiscalizacion` prescribe: primero la
+            // liquidacion, despues la visita. Y despues el consejo de
+            // `CambiarEstadoDeLaLiquidacion` —«corregir una anulada es reliquidar»—, que hasta
+            // #339 hacia nacer una v2 ABIERTA sobre una visita muerta.
+            Liquidacion primera = liquidarDe(E2024, E2024);
+            anularLaLiquidacion(primera);
+            anularLaVisita();
+
+            assertThatThrownBy(() -> reliquidarSinCorregir(primera))
+                    .isInstanceOf(ActaFiscalizacion.ActaAnulada.class)
+                    .hasMessageContaining("El acta " + actaId + " esta anulada");
+
+            assertThat(liquidaciones.versionesDeActa(actaId))
+                    .as("no nace ninguna version 2")
+                    .hasSize(1);
+        }
+
+        @Test
+        @DisplayName(
+                "el control: la misma acta ABIERTA se liquida, y su liquidacion anulada se"
+                        + " reliquida")
+        void conElActaAbiertaSeLiquidaYSeReliquida() {
+            // La MISMA siembra que las dos de arriba menos la anulacion de la visita: lo que
+            // separa el rojo del verde es el estado del acta y nada mas.
+            Liquidacion primera = liquidarDe(E2024, E2024);
+            anularLaLiquidacion(primera);
+
+            ReliquidarFiscalizacion.Resultado resultado = reliquidarSinCorregir(primera);
+
+            assertThat(resultado.liquidacion().version()).isEqualTo(2);
+            assertThat(liquidaciones.versionesDeActa(actaId)).hasSize(2);
+        }
+
+        private void anularLaVisita() {
+            new AnularActaFiscalizacion(
+                            actas,
+                            liquidaciones,
+                            movimientos,
+                            new ResolucionesEnMemoria(),
+                            registro -> {})
+                    .anular(actaId, HOY, OBSERVACION);
+            assertThat(actas.findById(actaId).orElseThrow().estado())
+                    .as("la siembra: la visita quedo anulada")
+                    .isEqualTo(EstadoDeActa.ANULADA);
+        }
+
+        private void anularLaLiquidacion(Liquidacion liquidacion) {
+            movimientos.insertar(
+                    MovimientoDeLiquidacion.cambioDeEstado(
+                            liquidacion.identificador(),
+                            EstadoDeLiquidacion.ANULADA,
+                            HOY,
+                            "Se deja sin efecto",
+                            OBSERVACION));
+        }
+
+        private ReliquidarFiscalizacion.Resultado reliquidarSinCorregir(Liquidacion anterior) {
+            return reliquidar.reliquidar(
+                    anterior.numero(),
+                    E2024,
+                    E2024,
+                    TipoDeFiscalizacion.CIERTA,
+                    "Se corrige la liquidacion anulada",
+                    List.of(),
+                    HOY,
+                    OBSERVACION);
         }
     }
 

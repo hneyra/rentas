@@ -173,6 +173,7 @@ public class TransferirARentas {
      * @throws LiquidacionSustituida si una reliquidacion posterior la dejo sin efecto
      * @throws ResolucionDeDeterminacionRepository.LiquidacionYaTransferida si ya se transfirio
      * @throws TransferenciaDeFiscalizacion.SinFichaQueVersionar si el predio no tiene ficha vigente
+     * @throws ActaFiscalizacion.ActaAnulada si la visita que sustenta la liquidacion esta anulada
      */
     @Transactional
     public Transferencia transferir(
@@ -204,6 +205,10 @@ public class TransferirARentas {
                                 () ->
                                         new LiquidarFiscalizacion.ActaInexistente(
                                                 liquidacion.actaId()));
+        // Hasta #339 el acta se leia solo para sacar la unidad, el contribuyente y el area, y la
+        // resolucion salia aunque la visita que la sustenta estuviera anulada. Va ANTES del
+        // padron: es el primer paso que escribe fuera de fiscalizacion.
+        acta.exigirViva();
         List<LineaDeLiquidacion> lineas = liquidaciones.lineasDe(liquidacionId);
 
         // 1. El padron. Unico camino de escritura hacia catastro, y va primero para que el papel

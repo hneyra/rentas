@@ -9,6 +9,8 @@ import java.util.Objects;
 import kamayuk.rentas.dominio.AreaM2;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.Observacion;
+import kamayuk.rentas.fiscalizacion.dominio.ActaFiscalizacion;
+import kamayuk.rentas.fiscalizacion.dominio.ActaFiscalizacionRepository;
 import kamayuk.rentas.fiscalizacion.dominio.ComparacionHalladoDeclarado;
 import kamayuk.rentas.fiscalizacion.dominio.DiferenciaEntreLiquidaciones;
 import kamayuk.rentas.fiscalizacion.dominio.LineaDeLiquidacion;
@@ -54,11 +56,20 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class ReliquidarFiscalizacion {
 
+    /**
+     * Solo para leer el acta (#339): la reliquidacion no la escribe, pero una version nueva sobre
+     * una visita anulada es la misma determinacion sin sustento que liquidarla.
+     */
+    private final ActaFiscalizacionRepository actas;
+
     private final LiquidacionRepository liquidaciones;
     private final LiquidarFiscalizacion liquidar;
 
     public ReliquidarFiscalizacion(
-            LiquidacionRepository liquidaciones, LiquidarFiscalizacion liquidar) {
+            ActaFiscalizacionRepository actas,
+            LiquidacionRepository liquidaciones,
+            LiquidarFiscalizacion liquidar) {
+        this.actas = actas;
         this.liquidaciones = liquidaciones;
         this.liquidar = liquidar;
     }
@@ -71,6 +82,7 @@ public class ReliquidarFiscalizacion {
      *     se nombran se copian tal cual de la versión anterior: reliquidar un ejercicio no borra
      *     los demás
      * @param observacion por qué se reliquida (regla 10)
+     * @throws ActaFiscalizacion.ActaAnulada si la visita que la sustenta esta anulada (#339)
      */
     @Transactional
     public Resultado reliquidar(
@@ -87,6 +99,17 @@ public class ReliquidarFiscalizacion {
                 liquidaciones
                         .porNumero(numeroAnterior)
                         .orElseThrow(() -> new LiquidacionInexistente(numeroAnterior));
+
+        // Hasta #339 este camino ni leia el acta: recomponia las lineas desde la version anterior,
+        // y el consejo de `CambiarEstadoDeLaLiquidacion` —«corregir una anulada es reliquidar»—
+        // hacia nacer una v2 ABIERTA sobre una visita ya anulada. Se lee con la fila bloqueada
+        // por lo mismo que al liquidar: una anulacion simultanea leeria «ultima version ANULADA»
+        // mientras esta v2 todavia no esta confirmada.
+        ActaFiscalizacion acta =
+                actas.findByIdParaActualizar(anterior.actaId())
+                        .orElseThrow(
+                                () -> new LiquidarFiscalizacion.ActaInexistente(anterior.actaId()));
+        acta.exigirViva();
 
         List<Liquidacion> versiones = liquidaciones.versionesDeActa(anterior.actaId());
         Liquidacion ultima = versiones.get(versiones.size() - 1);

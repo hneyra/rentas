@@ -136,6 +136,9 @@ public class LiquidarFiscalizacion {
      * @param motivoDeterminante por qué se fiscalizó
      * @param fecha el día de la liquidación
      * @param observacion por qué se registra (regla 10)
+     * @throws ActaInexistente si no hay ninguna acta con ese identificador
+     * @throws ActaFiscalizacion.ActaAnulada si la visita esta anulada (#339)
+     * @throws ActaYaLiquidada si ya tiene liquidacion
      */
     @Transactional
     public Liquidacion liquidar(
@@ -147,8 +150,12 @@ public class LiquidarFiscalizacion {
             LocalDate fecha,
             Observacion observacion) {
 
+        // Con la fila bloqueada (#339): una anulacion en curso termina antes de que se lea el
+        // estado, y una que llegue despues espera a ver esta liquidacion confirmada. Con
+        // `findById` a secas las dos leian «ABIERTA, sin liquidacion» y confirmaban las dos.
         ActaFiscalizacion acta =
-                actas.findById(actaId).orElseThrow(() -> new ActaInexistente(actaId));
+                actas.findByIdParaActualizar(actaId).orElseThrow(() -> new ActaInexistente(actaId));
+        acta.exigirViva();
         liquidaciones
                 .ultimaVersionDeActa(actaId)
                 .ifPresent(

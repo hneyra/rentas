@@ -17,6 +17,7 @@ import kamayuk.rentas.fiscalizacion.aplicacion.CambiarEstadoDeLaLiquidacion;
 import kamayuk.rentas.fiscalizacion.aplicacion.ConsultaDeLiquidaciones;
 import kamayuk.rentas.fiscalizacion.aplicacion.LiquidarFiscalizacion;
 import kamayuk.rentas.fiscalizacion.aplicacion.ReliquidarFiscalizacion;
+import kamayuk.rentas.fiscalizacion.dominio.ActaFiscalizacion;
 import kamayuk.rentas.fiscalizacion.dominio.CondicionFiscalizada;
 import kamayuk.rentas.fiscalizacion.dominio.CriterioDeLiquidaciones;
 import kamayuk.rentas.fiscalizacion.dominio.EstadoDeLiquidacion;
@@ -195,7 +196,10 @@ public class LiquidacionController {
                             observacion);
         } catch (LiquidarFiscalizacion.ActaInexistente noExiste) {
             throw new ProblemaDeNegocio(CodigoDeError.NO_ENCONTRADO, mensajeDe(noExiste));
-        } catch (LiquidarFiscalizacion.ActaYaLiquidada enConflicto) {
+        } catch (LiquidarFiscalizacion.ActaYaLiquidada
+                | ActaFiscalizacion.ActaAnulada enConflicto) {
+            // 409 y no 422 (#339): la peticion esta bien, lo que no la admite es el estado de la
+            // visita, y el mensaje dice lo que procede —levantar otra acta—.
             throw new ProblemaDeNegocio(CodigoDeError.CONFLICTO, mensajeDe(enConflicto));
         } catch (LectorDeParametros.EjercicioSinSellar sinSellar) {
             // 422 y no 500: la peticion esta bien formada; lo que falta es que alguien selle el
@@ -250,7 +254,8 @@ public class LiquidacionController {
                             observacion);
         } catch (ReliquidarFiscalizacion.LiquidacionInexistente noExiste) {
             throw new ProblemaDeNegocio(CodigoDeError.NO_ENCONTRADO, mensajeDe(noExiste));
-        } catch (ReliquidarFiscalizacion.NoEsLaUltimaVersion enConflicto) {
+        } catch (ReliquidarFiscalizacion.NoEsLaUltimaVersion
+                | ActaFiscalizacion.ActaAnulada enConflicto) {
             throw new ProblemaDeNegocio(CodigoDeError.CONFLICTO, mensajeDe(enConflicto));
         } catch (ReliquidarFiscalizacion.EjercicioSinLineaAnterior
                 | IllegalArgumentException invalido) {

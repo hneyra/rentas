@@ -53,6 +53,12 @@ class ActaPredialControllerTest {
                             throw new UnsupportedOperationException("no lo usa esta prueba");
                         }
 
+                        /** #339 tampoco: la lectura con bloqueo es de liquidar y anular. */
+                        @Override
+                        public Optional<ActaFiscalizacion> findByIdParaActualizar(long id) {
+                            throw new UnsupportedOperationException("no lo usa esta prueba");
+                        }
+
                         /** El embudo (#196) lo mide el repositorio contra PostgreSQL. */
                         @Override
                         public int unidadesConActaViva(long programaId) {
