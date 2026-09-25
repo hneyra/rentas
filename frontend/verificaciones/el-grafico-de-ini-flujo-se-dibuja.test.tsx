@@ -32,7 +32,7 @@ import type { IndicadorDeRecaudacion } from '../src/datos/lecturas.ts';
  * simplemente no dibuja nada, porque su ancho se queda en el `-1` inicial. O sea que sin este doble
  * la prueba no mediria «el grafico no sale» sino «jsdom no mide cajas».
  *
- * El doble va **en este archivo y no en `vitest.setup.ts`**: las otras 62 pruebas se montan hoy sin
+ * El doble va **en este archivo y no en `vitest.setup.ts`**: las demas pruebas se montan sin
  * ResizeObserver, y darselo a todas cambiaria lo que miden sin que nadie lo pidiera. En particular
  * `todo-el-texto-se-traduce` monta las cuarenta pantallas SIN datos, donde el grafico no tiene
  * serie que dibujar y no llega a pedir su caja.

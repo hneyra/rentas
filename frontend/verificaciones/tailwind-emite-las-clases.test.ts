@@ -137,13 +137,13 @@ describe('Tailwind emite lo que las piezas piden', () => {
     // abajo pasando en verde sobre la nada. Ya paso en este repositorio con el artboard (#78).
     //
     // **Y se pregunta RAIZ POR RAIZ, y no por el total** (#295). Un umbral sobre la suma contesta
-    // «¿hay bastantes?», y hoy son **43 fuentes: 40 de la libreria y UNA de cada uno de los tres
-    // directorios de aqui**. O sea que las tres de este arbol podian quedarse a cero a la vez y
+    // «¿hay bastantes?», y cuando #295 lo midio eran **43 fuentes: 40 de la libreria y UNA de cada
+    // uno de los tres directorios de aqui**. O sea que las tres de este arbol podian quedarse a cero a la vez y
     // 40 >= 15 seguiria en verde — justo las tres que estrenan utilidades que ninguna otra usa:
     // `accent-azul` de `src/preferencias` (#111) y los `fill-*` del grafico de `src/piezas`
     // (#288). Preguntando raiz por raiz, la que se quede vacia sale nombrada.
     //
-    // Lo que NO se hace es escribir los 43 nombres, y no por pereza: 40 de ellos viven en
+    // Lo que NO se hace es escribir los nombres, y no por pereza: casi todos viven en
     // `kamayuk-lib`, que este repositorio no gobierna. Medido sobre su `git log` el 2026-09-20:
     // **10 de sus 101 commits** anaden o borran un `.tsx` de `paquetes/ui` —49 altas y bajas de
     // archivo en trece dias—, o sea que una lista literal saldria roja AQUI, y bloqueando, una de

@@ -45,14 +45,15 @@ import { fuentesDeLosConectores } from './los-conectores-del-arbol.ts';
  *
  * Porque **el contrato no publica ningun tipo de dinero**: `docs/50-api/formas-de-la-api.json`
  * reduce cada hoja a `texto`, `entero`, `fecha`, `booleano`, `instante`, `objeto` o `archivo`, y
- * los 3 250 campos tipados no traen ni uno «importe» —un `BigDecimal` sale como `texto`, igual que
- * un nombre—. Del lado de TypeScript pasa lo mismo: `baseImponible` es `string`, y tambien lo es
+ * los `MEDIDO: 3 280 campos tipados de formas-de-la-api.json` no traen ni uno «importe» —un
+ * `BigDecimal` sale como `texto`, igual que un nombre—. Del lado de TypeScript pasa lo mismo: `baseImponible` es `string`, y tambien lo es
  * `sujeto`. Asi que el nombre es la unica senal que hay, y se declara como lo que es: una
  * heuristica.
  *
  * <h2>Lo que la heuristica caza de mas, y por que NO lleva lista de excepciones</h2>
  *
- * Sobre los 624 campos, el patron atrapa **dos** que no son cifras: `baseLegal` —la norma que
+ * Medido en #309, sobre los 640 campos que `lecturas.ts` tenia entonces, el patron atrapa **dos**
+ * que no son cifras: `baseLegal` —la norma que
  * ampara un beneficio o una resolucion— y `arancelFuente` —de donde salio el arancel de una
  * costa—. Se escribio la lista de excepciones y luego **se midio si cambiaba la respuesta: no la
  * cambia**, ni una entrada, con lista y sin ella son los mismos 9 candidatos, porque las tres
@@ -68,9 +69,9 @@ import { fuentesDeLosConectores } from './los-conectores-del-arbol.ts';
  *
  * <h2>Y «es una fecha» tampoco puede salir del tipo del contrato</h2>
  *
- * Medido sobre las 167 operaciones: de las **213** apariciones de un campo cuyo nombre dice fecha,
- * **79 estan tipadas `texto`** y no `fecha` —`fechaCalculo` sale `texto` siete veces y `fecha`
- * dos—, y hay **19** nombres tipados `fecha`/`instante` que no dicen «fecha» (`actualizadoA`,
+ * Medido en #309, sobre las 168 operaciones que el contrato tenia entonces: de las **214**
+ * apariciones de un campo cuyo nombre dice fecha, **78 estan tipadas `texto`** y no `fecha`
+ * —`fechaCalculo` sale `texto` siete veces y `fecha` dos—, y hay **21** nombres tipados `fecha`/`instante` que no dicen «fecha» (`actualizadoA`,
  * `deudaAlDia`, `exigibleDesde`, `vencimiento`…). Un solo criterio se equivoca en las dos
  * direcciones; por eso el cruce con el contrato de abajo acepta **las dos senales** —el nombre o
  * el tipo—, que es lo prudente cuando lo que se busca es «aparecio una fecha».
@@ -79,9 +80,9 @@ import { fuentesDeLosConectores } from './los-conectores-del-arbol.ts';
  *
  * Porque la fecha de una fila vive en su envoltorio: `TramoAplicado` no lleva ninguna y no le hace
  * falta, porque `DeterminacionIndividual` publica `fechaCalculo` para toda la memoria del calculo.
- * Eximir «lo anidado» sin mas seria firmar en blanco **ocho** tipos, asi que no se exime: el
+ * Eximir «lo anidado» sin mas seria firmar en blanco todos esos tipos, asi que no se exime: el
  * segundo centinela exige que **cada** envoltorio de un anidado sin fecha o bien traiga la suya o
- * bien este el mismo en la lista. Medido hoy: 8 anidados, 10 pares hijo-envoltorio, **cero
+ * bien este el mismo en la lista. Medido en #309: 8 anidados, 10 pares hijo-envoltorio, **cero
  * huerfanos** — y los dos que se apoyan en la lista son los hijos de `DeterminacionGuardada`, que
  * es justamente la entrada que dice por que se dibuja sin fecha. Con una sola entrada en la lista,
  * ese apoyo es todo lo que la sostiene: si `DeterminacionGuardada` se retirara, sus dos hijos
@@ -89,10 +90,20 @@ import { fuentesDeLosConectores } from './los-conectores-del-arbol.ts';
  *
  * <h2>El tamano de la lista, medido antes de escribirla</h2>
  *
- * Sobre las **78** interfaces y **624** campos de `lecturas.ts`: **9** traen un importe y ninguna
- * fecha, de las cuales **1 es suelta** —la unica entrada de abajo— y **8 anidadas**. Nacieron 11 y
- * 3: las dos que faltan ganaron su fecha en #276. Si el criterio hubiera dado cuarenta, la lista
+ * Medido en #309, sobre las **80** interfaces y **640** campos que `lecturas.ts` tenia entonces:
+ * **9** traen un importe y ninguna fecha, de las cuales **1 es suelta** —la unica entrada de
+ * abajo— y **8 anidadas**. Nacieron 11 y 3: las dos que faltan ganaron su fecha en #276. Si el criterio hubiera dado cuarenta, la lista
  * seria ruido y esta guarda no se habria escrito.
+ *
+ * <h2>Las cifras de este comentario llevan su issue, o su marca (#309)</h2>
+ *
+ * Este javadoc decia «167 operaciones» y «3 250 campos tipados» en presente, y el contrato ya traia
+ * 168 operaciones y mas de 3 250 campos: las regeneraciones los movieron y nada se puso rojo. Desde #309 una cifra de aqui
+ * es de dos clases. La que dice el tamano de HOY lleva su marca `MEDIDO:`, y la recalcula
+ * `LasCifrasMedidasCuadranConElDiscoTest` en el backend, que corre en todo PR —tambien en el que
+ * regenera el contrato, que no toca `frontend/`—. La que salio de medir la heuristica de esta guarda
+ * no se puede recalcular sin la heuristica, asi que dice **de que issue es**: es la medida con que
+ * se decidio, y quien venga a ensanchar o retirar la guarda sabe que tiene que volver a medir.
  */
 
 const AQUI = dirname(fileURLToPath(import.meta.url));

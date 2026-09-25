@@ -1578,7 +1578,7 @@ class ParametrosDeLaConsultaTest {
      * Lo que el metodo lee de la consulta: sus {@code @RequestParam} y lo que Spring le enlaza.
      *
      * <p>Los dos, y no solo el primero: un parametro <b>sin anotar</b> cuyo tipo es un record —
-     * {@link kamayuk.rentas.web.ParametrosDePaginacion} en las 100 lecturas paginadas— lo compone
+     * {@link kamayuk.rentas.web.ParametrosDePaginacion} en las lecturas paginadas— lo compone
      * Spring de la consulta, componente a componente. Contarlo solo por su anotacion diria que
      * ningun controlador lee {@code pagina}, y el contrato la declara en todas.
      */

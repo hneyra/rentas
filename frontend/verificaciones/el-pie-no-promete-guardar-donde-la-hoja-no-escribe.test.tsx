@@ -30,7 +30,7 @@ import { laHojaEscribe, type Hoja } from '../src/pantallas/tipos.ts';
  * tablero.
  *
  * Desde #291 la pregunta la contesta `laHojaEscribe()` con el **verbo** que la hoja declara en
- * `arbol.ts`: **15 de 40**, y los diez paneles fuera. El porque de ese dato y no otro —con las
+ * `arbol.ts`: con #291 quedaron **15 de 40**, y los diez paneles fuera. El porque de ese dato y no otro —con las
  * parejas que demuestran que el tipo del campo no separa un filtro de un dato que se guarda— vive
  * en `pantallas/tipos.ts`.
  *
@@ -47,9 +47,9 @@ import { laHojaEscribe, type Hoja } from '../src/pantallas/tipos.ts';
  *
  * Porque es la mitad que se gana, y sin comprobarla el arreglo se puede deshacer sin ponerse rojo.
  * El unico acto que este sistema atiende es `imprimir`, y `imprimir` solo se ofrece en la rama de
- * consulta: antes de #291 llegaba a **una** de las cuarenta pantallas —`seg-panel`—, y ahora llega
- * a **25**. Si alguien quita `imprimir` de `ACCIONES`, esas 25 vuelven a tener dos botones muertos
- * y esto lo dice.
+ * consulta: antes de #291 llegaba a **una** de las cuarenta pantallas —`seg-panel`—, y con #291
+ * paso a **25**. Si alguien quita `imprimir` de `ACCIONES`, esas pantallas vuelven a tener dos
+ * botones muertos y esto lo dice.
  */
 
 /** La hoja del arbol de cada destino, por su clave. */

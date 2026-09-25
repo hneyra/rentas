@@ -146,8 +146,8 @@ class ArranqueDeLaAplicacionTest {
                 .as("el puerto que el guardia pide en cada peticion")
                 .isNotEmpty();
 
-        // #316: el reloj que llega a los 126 `LocalDate.now(reloj)` es el del contexto VIVO, y
-        // solo aqui se ve si otro bean lo sustituye. Uno y con la zona del producto.
+        // #316: el reloj que llega a los `LocalDate.now(reloj)` de produccion es el del contexto
+        // VIVO, y solo aqui se ve si otro bean lo sustituye. Uno y con la zona del producto.
         assertThat(contexto.getBeansOfType(java.time.Clock.class).values())
                 .as("un solo reloj en el contexto, y con ZonaHoraria.DEL_PRODUCTO")
                 .singleElement()

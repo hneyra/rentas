@@ -40,7 +40,8 @@ import { RAIZ } from './artboards.ts';
  *
  * <table>
  *   <tr><td>el artboard</td><td>las celdas que `RentasV8.dc.html` escribe en cada columna de
- *     insignia: **17 cadenas** en **22 columnas**. Es el vocabulario del diseno</td></tr>
+ *     insignia —cuantas, lo dice y lo fija el centinela de abajo (#309)—. Es el vocabulario del
+ *     diseno</td></tr>
  *   <tr><td>el backend de este repositorio</td><td>las cuatro frases del enumerado
  *     `FrenteDeTrabajo`, leidas del Java. Es lo que la operacion publica de verdad</td></tr>
  * </table>
