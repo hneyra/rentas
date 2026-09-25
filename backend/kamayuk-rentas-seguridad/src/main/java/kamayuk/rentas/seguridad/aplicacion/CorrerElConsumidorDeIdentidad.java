@@ -1,7 +1,6 @@
 package kamayuk.rentas.seguridad.aplicacion;
 
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import kamayuk.rentas.autorizacion.ClienteDeServicio;
 import kamayuk.rentas.compartido.TenantContext;
 import kamayuk.rentas.dominio.MunicipalidadId;
 import kamayuk.rentas.plataforma.RecorridoPorMunicipalidades;
@@ -71,9 +70,8 @@ public class CorrerElConsumidorDeIdentidad implements ApplicationRunner {
 
     private static final Logger log = LoggerFactory.getLogger(CorrerElConsumidorDeIdentidad.class);
 
-    /** La forma del cliente de servicio, la misma que `identidad` lee del `azp` del token. */
-    private static final Pattern CLIENTE_DE_SERVICIO =
-            Pattern.compile("^kamayuk-rentas-servicio-([0-9]{6})$");
+    /** El sistema cuyo cliente de servicio lee el buzon: este. */
+    private static final String ESTE_SISTEMA = "rentas";
 
     private final PasadaDelConsumidorDeIdentidad pasada;
     private final RecorridoPorMunicipalidades registro;
@@ -117,16 +115,19 @@ public class CorrerElConsumidorDeIdentidad implements ApplicationRunner {
      *     implantada aqui: sin fila en {@code municipalidad} no hay copia que escribir
      */
     static long municipalidadDe(String clienteDeServicio, RecorridoPorMunicipalidades registro) {
-        Matcher forma = CLIENTE_DE_SERVICIO.matcher(clienteDeServicio.strip());
-        if (!forma.matches()) {
-            throw new IllegalStateException(
-                    "kamayuk.identidad.cliente vale «"
-                            + clienteDeServicio
-                            + "» y tiene que ser `kamayuk-rentas-servicio-<ubigeo>`: de ahi sale"
-                            + " de que municipalidad es el buzon que se va a leer, y es lo mismo"
-                            + " que `identidad` lee del token");
+        // La forma es la de `ClienteDeServicio`, la misma que el guardia lee del `azp` (#429):
+        // hasta entonces esta clase tenia su propia expresion, y con dos copias de una forma la que
+        // se queda vieja es la que nadie compara.
+        ClienteDeServicio cliente;
+        try {
+            cliente = ClienteDeServicio.desdeAzp(clienteDeServicio);
+        } catch (ClienteDeServicio.NoEsUnClienteDeServicio sinLaForma) {
+            throw new IllegalStateException(sinLaForma(clienteDeServicio), sinLaForma);
         }
-        String ubigeo = forma.group(1);
+        if (!cliente.esDe(ESTE_SISTEMA)) {
+            throw new IllegalStateException(sinLaForma(clienteDeServicio));
+        }
+        String ubigeo = cliente.ubigeo();
         for (RecorridoPorMunicipalidades.Municipalidad municipalidad : registro.activas()) {
             if (ubigeo.equals(municipalidad.ubigeo())) {
                 return municipalidad.id();
@@ -137,5 +138,13 @@ public class CorrerElConsumidorDeIdentidad implements ApplicationRunner {
                         + ubigeo
                         + " y esa municipalidad no esta implantada en `rentas`: no hay copia"
                         + " local que escribir. Primero la implantacion (ImplantarMunicipalidad)");
+    }
+
+    private static String sinLaForma(String clienteDeServicio) {
+        return "kamayuk.identidad.cliente vale «"
+                + clienteDeServicio
+                + "» y tiene que ser `kamayuk-rentas-servicio-<ubigeo>`: de ahi sale de que"
+                + " municipalidad es el buzon que se va a leer, y es lo mismo que `identidad` lee"
+                + " del token";
     }
 }
