@@ -110,6 +110,68 @@ class EstadoYAdmisionTest {
         }
     }
 
+    /**
+     * #409 — La politica de avance: la linea del procedimiento y los dos estados que estan fuera.
+     *
+     * <p>Se recorren los <b>cuarenta y nueve</b> pares, no una muestra: la muestra uniforme —«de
+     * REC1_EMITIDA a REC1_NOTIFICADA avanza»— es la que dejaba pasar la condicion de dos igualdades
+     * que #409 retiro.
+     */
+    @Nested
+    @DisplayName("#409 — Avanzar es ir hacia adelante por la linea, y solo por ella")
+    class Avance {
+
+        private static final List<EstadoDelExpediente> LINEA =
+                List.of(
+                        EstadoDelExpediente.INICIADO,
+                        EstadoDelExpediente.REC1_EMITIDA,
+                        EstadoDelExpediente.REC1_NOTIFICADA,
+                        EstadoDelExpediente.REC2_EMITIDA,
+                        EstadoDelExpediente.MEDIDA_CAUTELAR);
+
+        @Test
+        @DisplayName("dentro de la linea, avanza solo el destino que va despues")
+        void dentroDeLaLinea() {
+            for (int i = 0; i < LINEA.size(); i++) {
+                for (int j = 0; j < LINEA.size(); j++) {
+                    assertThat(LINEA.get(i).avanzaHacia(LINEA.get(j)))
+                            .as(LINEA.get(i) + " -> " + LINEA.get(j))
+                            .isEqualTo(j > i);
+                }
+            }
+        }
+
+        @Test
+        @DisplayName("SUSPENDIDO y CONCLUIDO no se abandonan ni se alcanzan por avance")
+        void fueraDeLaLinea() {
+            for (EstadoDelExpediente fuera :
+                    List.of(EstadoDelExpediente.SUSPENDIDO, EstadoDelExpediente.CONCLUIDO)) {
+                for (EstadoDelExpediente otro : EstadoDelExpediente.values()) {
+                    assertThat(fuera.avanzaHacia(otro))
+                            .as("un evento automatico no saca a " + fuera + " hacia " + otro)
+                            .isFalse();
+                    assertThat(otro.avanzaHacia(fuera))
+                            .as(
+                                    otro
+                                            + " no llega a "
+                                            + fuera
+                                            + " avanzando: lo dicta una resolucion")
+                            .isFalse();
+                }
+            }
+        }
+
+        @Test
+        @DisplayName(
+                "la diligencia de la REC-1 mueve desde INICIADO y REC1_EMITIDA, y desde nada mas")
+        void losQueLaDiligenciaMueve() {
+            assertThat(EstadoDelExpediente.values())
+                    .filteredOn(e -> e.avanzaHacia(EstadoDelExpediente.REC1_NOTIFICADA))
+                    .containsExactly(
+                            EstadoDelExpediente.INICIADO, EstadoDelExpediente.REC1_EMITIDA);
+        }
+    }
+
     @Nested
     @DisplayName("Que valores admite el expediente, y por que rechaza los demas")
     class Admision {
@@ -292,6 +354,34 @@ class EstadoYAdmisionTest {
                                             PORQUE))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("INICIADO");
+        }
+
+        /**
+         * #409 — el reves de la de arriba. Se rechaza en el movimiento y no en {@code porNombre},
+         * que tambien sirve al filtro de la grilla y tiene que seguir aceptandolo.
+         */
+        @Test
+        @DisplayName("#409 — a INICIADO no se vuelve: un cambio de estado no lo lleva")
+        void unCambioDeEstadoNoVuelveAIniciado() {
+            assertThatThrownBy(
+                            () ->
+                                    MovimientoDelExpediente.cambioDeEstado(
+                                            1,
+                                            EstadoDelExpediente.INICIADO,
+                                            DIA,
+                                            "motivo",
+                                            null,
+                                            null,
+                                            AHORA,
+                                            PORQUE))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("INICIADO");
+            assertThat(EstadoDelExpediente.porNombre("INICIADO"))
+                    .as("y el filtro «INICIADO» de coactiva_expedientes sigue resolviendose")
+                    .isEqualTo(EstadoDelExpediente.INICIADO);
+            assertThat(apertura().estado())
+                    .as("la apertura sigue naciendo INICIADO")
+                    .isEqualTo(EstadoDelExpediente.INICIADO);
         }
 
         @Test

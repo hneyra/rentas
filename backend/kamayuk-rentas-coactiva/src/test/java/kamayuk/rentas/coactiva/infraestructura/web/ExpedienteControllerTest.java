@@ -320,6 +320,52 @@ class ExpedienteControllerTest {
     }
 
     /**
+     * #409 — {@code INICIADO} no se elige: es con lo que nace el expediente. Hasta #409 el {@code
+     * PATCH} lo aceptaba con 200, y el expediente con su REC-1 dictada pasaba a contar como «sin
+     * REC-1» en el panel de trabajo parado y en el resumen de cartera, sin que nadie pudiera
+     * dictarsela ({@code acto_rec1_uq}). Se pide por el nombre y por el codigo del manual, que son
+     * las dos formas en que {@code porNombre} lo reconoce.
+     */
+    @Test
+    @DisplayName("#409 — PATCH del estado a INICIADO (o 000), 422: no se vuelve al nacimiento")
+    void elPatchAIniciadoRechaza() throws Exception {
+        importar(cuerpoDeImportacion("Se importa la cartera vencida"));
+        MvcResult notificada = patchDeEstado("012 — REC 01 NOTIFICADA");
+        assertThat(notificada.getResponse().getStatus()).isEqualTo(200);
+        int antes = movimientos.cuantos();
+
+        for (String iniciado : List.of("INICIADO", "000")) {
+            MvcResult resultado = patchDeEstado(iniciado);
+
+            assertThat(resultado.getResponse().getStatus())
+                    .as(
+                            "«"
+                                    + iniciado
+                                    + "» contestaba 200: "
+                                    + resultado.getResponse().getContentAsString())
+                    .isEqualTo(422);
+            assertThat(resultado.getResponse().getContentAsString()).contains("INICIADO");
+        }
+        assertThat(movimientos.cuantos())
+                .as("el historial no gana la fila que lo devolvia a INICIADO")
+                .isEqualTo(antes);
+    }
+
+    private MvcResult patchDeEstado(String nuevoEstado) throws Exception {
+        return mvc.perform(
+                        MockMvcRequestBuilders.patch(
+                                        "/rentas/api/v1/coactiva/expedientes/{numero}/estados",
+                                        "EXP-2026-000001")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        "{\"nuevoEstado\":\""
+                                                + nuevoEstado
+                                                + "\",\"motivo\":\"x\","
+                                                + "\"observacion\":\"Se corrige el estado\"}"))
+                .andReturn();
+    }
+
+    /**
      * #423 — las otras dos rutas de este controlador con {@code {numero}} leen el numero con la
      * misma plantilla que el {@code PATCH} de estados. La prueba de arriba solo cubria ese; sin
      * estas, quitar {@code comoSeImprime} de la deuda o de la direccion volvia a dar 404 sin que

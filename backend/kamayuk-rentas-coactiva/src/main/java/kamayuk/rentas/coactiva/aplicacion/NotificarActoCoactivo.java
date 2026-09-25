@@ -191,7 +191,14 @@ public class NotificarActoCoactivo {
 
     /**
      * Deja el expediente en {@link EstadoDelExpediente#REC1_NOTIFICADA} si lo que se acaba de
-     * notificar con efecto es su REC-1.
+     * notificar con efecto es su REC-1 <b>y eso es avanzar</b>.
+     *
+     * <p>Una diligencia no es un acto del ejecutor: no suspende, no traba ni levanta nada. Por eso
+     * solo mueve el expediente hacia adelante por la linea del procedimiento, y la pregunta es de
+     * {@link EstadoDelExpediente#avanzaHacia} y no de una lista de excepciones escrita aqui (#409):
+     * el cargo de un intento que vuelve despues de dictada la suspension, o el personal que llega
+     * con la medida ya trabada, se registran —y abren el plazo si es el primero que surte efecto—,
+     * pero el expediente se queda donde el ultimo acto lo dejo.
      */
     private EstadoDelExpediente avanzar(
             ExpedienteCoactivo expediente,
@@ -204,9 +211,7 @@ public class NotificarActoCoactivo {
                 EstadoDelExpediente.delHistorial(movimientos.deExpediente(acto.expedienteId()));
         boolean laRec1SurtioEfecto =
                 acto.tipo() == TipoDeActoCoactivo.REC1 && diligencia.surtioEfecto();
-        if (!laRec1SurtioEfecto
-                || actual == EstadoDelExpediente.REC1_NOTIFICADA
-                || actual.estaConcluido()) {
+        if (!laRec1SurtioEfecto || !actual.avanzaHacia(EstadoDelExpediente.REC1_NOTIFICADA)) {
             return actual;
         }
         movimientos.registrar(
