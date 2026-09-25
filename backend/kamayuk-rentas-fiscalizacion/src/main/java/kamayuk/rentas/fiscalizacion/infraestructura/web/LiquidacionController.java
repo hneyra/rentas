@@ -19,6 +19,7 @@ import kamayuk.rentas.fiscalizacion.aplicacion.LiquidarFiscalizacion;
 import kamayuk.rentas.fiscalizacion.aplicacion.ReliquidarFiscalizacion;
 import kamayuk.rentas.fiscalizacion.dominio.ActaFiscalizacion;
 import kamayuk.rentas.fiscalizacion.dominio.CondicionFiscalizada;
+import kamayuk.rentas.fiscalizacion.dominio.CorreccionDeLinea;
 import kamayuk.rentas.fiscalizacion.dominio.CriterioDeLiquidaciones;
 import kamayuk.rentas.fiscalizacion.dominio.EstadoDeLiquidacion;
 import kamayuk.rentas.fiscalizacion.dominio.Liquidacion;
@@ -226,13 +227,13 @@ public class LiquidacionController {
         Observacion observacion = observacionDe(peticion.observacion());
         LocalDate fecha = fechaOpcional(peticion.fecha(), "fecha", LocalDate.now(reloj));
 
-        List<ReliquidarFiscalizacion.CorreccionDeLinea> correcciones = new ArrayList<>();
+        List<CorreccionDeLinea> correcciones = new ArrayList<>();
         for (CorreccionEnLaPeticion correccion :
                 peticion.correcciones() == null
                         ? List.<CorreccionEnLaPeticion>of()
                         : peticion.correcciones()) {
             correcciones.add(
-                    new ReliquidarFiscalizacion.CorreccionDeLinea(
+                    new CorreccionDeLinea(
                             ejercicioDe(correccion.ejercicio(), "ejercicio"),
                             areaOpcional(correccion.areaDeclarada(), "areaDeclarada"),
                             areaOpcional(correccion.areaHallada(), "areaHallada"),

@@ -407,7 +407,95 @@ class LiquidacionControllerTest {
         assertThat(liquidaciones.versionesDeActa(actaId)).hasSize(1);
     }
 
+    @Test
+    @DisplayName(
+            "#340 — un vehiculo CONFORME reliquidado con una fila de cadenas vacias sigue CONFORME")
+    void unVehiculoConformeReliquidadoSinCamposSigueConforme() throws Exception {
+        // El escenario 1 del issue, por HTTP y con la forma que manda un formulario: una fila por
+        // ejercicio con los campos vacios. `vacioAnulo`/`areaOpcional` la dejan todo-nulo, y hasta
+        // #340 eso bastaba para recalcular la condicion desde `nada()`: OMISO.
+        String numero = liquidarVehiculo(Hallazgo.CONFORME);
+
+        MvcResult resultado =
+                reliquidarCon(
+                        numero,
+                        "{\"ejercicio\":\"2024\",\"areaDeclarada\":\"\",\"areaHallada\":\"\","
+                                + "\"usoDeclarado\":\"\",\"usoHallado\":\"\"}");
+
+        assertThat(resultado.getResponse().getStatus()).isEqualTo(201);
+        assertThat(resultado.getResponse().getContentAsString())
+                .contains("\"condicion\":\"CONFORME\"")
+                .doesNotContain("OMISO");
+    }
+
+    @Test
+    @DisplayName("#340 — corregir el area de una linea vehicular es 422, y no nace la version 2")
+    void corregirElAreaDeUnaLineaVehicularEs422() throws Exception {
+        String numero = liquidarVehiculo(Hallazgo.CONFORME);
+
+        MvcResult resultado =
+                reliquidarCon(numero, "{\"ejercicio\":\"2024\",\"areaHallada\":\"150\"}");
+
+        assertThat(resultado.getResponse().getStatus()).isEqualTo(422);
+        assertThat(resultado.getResponse().getContentAsString()).contains("areaHallada");
+        assertThat(liquidaciones.versionesDeActa(actaVehicular)).hasSize(1);
+    }
+
     // ------------------------------------------------------------------
+
+    private long actaVehicular;
+
+    private String liquidarVehiculo(Hallazgo hallazgo) throws Exception {
+        actaVehicular =
+                actas.sembrar(
+                        ActaFiscalizacion.nuevaVehicular(
+                                1L,
+                                1,
+                                CONTRIBUYENTE,
+                                55L,
+                                LocalDate.of(2026, 3, 1),
+                                "J. Perez",
+                                hallazgo,
+                                null,
+                                OBSERVACION));
+        liquidaciones.actaDe(actaVehicular, CONTRIBUYENTE);
+        MvcResult liquidada =
+                mvc.perform(
+                                post("/rentas/api/v1/fiscalizacion/liquidaciones")
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(
+                                                "{\"observacion\":\"Se liquida el vehiculo\","
+                                                        + "\"actaId\":\""
+                                                        + actaVehicular
+                                                        + "\",\"periodoDesde\":\"2024\","
+                                                        + "\"periodoHasta\":\"2024\","
+                                                        + "\"tipoDeFiscalizacion\":\"CIERTA\","
+                                                        + "\"motivoDeterminante\":\"Hallazgo\"}"))
+                        .andReturn();
+        assertThat(liquidada.getResponse().getStatus()).isEqualTo(201);
+        assertThat(liquidada.getResponse().getContentAsString())
+                .as("la siembra: la linea vehicular nace con el hallazgo del acta")
+                .contains("\"condicion\":\"" + hallazgo.name() + "\"");
+        return liquidaciones.versionesDeActa(actaVehicular).get(0).numero();
+    }
+
+    private MvcResult reliquidarCon(String numero, String correccion) throws Exception {
+        return mvc.perform(
+                        post("/rentas/api/v1/fiscalizacion/liquidaciones/"
+                                        + numero
+                                        + "/reliquidaciones")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        "{\"observacion\":\"Reinspeccion\","
+                                                + "\"periodoDesde\":\"2024\","
+                                                + "\"periodoHasta\":\"2024\","
+                                                + "\"tipoDeFiscalizacion\":\"CIERTA\","
+                                                + "\"motivoDeterminante\":\"correccion\","
+                                                + "\"correcciones\":["
+                                                + correccion
+                                                + "]}"))
+                .andReturn();
+    }
 
     private MvcResult moverA(String numero, String estado) throws Exception {
         return mvc.perform(
