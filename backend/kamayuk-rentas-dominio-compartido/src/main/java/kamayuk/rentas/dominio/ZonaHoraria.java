@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.Objects;
 
 /**
@@ -108,5 +109,30 @@ public final class ZonaHoraria {
     public static OffsetDateTime conSuDesfase(Instant instante) {
         Objects.requireNonNull(instante, "No hay hora publicada sin instante");
         return instante.atZone(DEL_PRODUCTO).toOffsetDateTime();
+    }
+
+    /**
+     * El mismo instante, escrito como texto con el desfase de la zona del producto: {@code
+     * 2026-03-04T20:00:00-05:00}.
+     *
+     * <p>Es lo que se imprime cuando la hora no viaja en un JSON sino <b>en un documento</b> —el
+     * acta de internamiento que se entrega al conductor ({@code rentas}#327)—. Hasta entonces el
+     * acta la escribia con {@code Instant.toString()}, que es UTC: un ingreso de las 20:00 del 4
+     * constaba como {@code 2026-03-05T01:00:00Z}, un dia despues del «Datos al 2026-03-04» que el
+     * mismo papel dice arriba.
+     *
+     * <p><b>Por que el formato ISO y no {@code 04/03/2026 20:00}.</b> Es el que ya imprimen las
+     * demas fechas de los documentos —{@code LocalDate.toString()}— y <b>el mismo texto</b> que
+     * Jackson escribe para {@link #conSuDesfase(Instant)} en la API, segundos incluidos: la hora
+     * que consta en el papel y la que ensena la pantalla se comparan caracter a caracter. Un
+     * formato de presentacion distinto es una decision de la interfaz del documento, no de la zona.
+     *
+     * <p><b>Por que vive aqui.</b> Porque es el unico sitio de produccion donde una hora se
+     * convierte en texto: {@code NingunaHoraSePublicaSinSuDesfaseTest} prohibe el {@code
+     * toString()} de {@link Instant}, {@link OffsetDateTime}, {@code ZonedDateTime} y {@code
+     * LocalDateTime} en todo {@code backend/*&#47;src/main}, y esta llamada no lo usa.
+     */
+    public static String textoConSuDesfase(Instant instante) {
+        return DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(conSuDesfase(instante));
     }
 }

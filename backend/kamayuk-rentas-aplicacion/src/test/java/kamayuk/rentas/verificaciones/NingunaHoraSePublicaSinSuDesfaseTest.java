@@ -2,6 +2,8 @@ package kamayuk.rentas.verificaciones;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.tngtech.archunit.core.domain.JavaClass;
+import com.tngtech.archunit.core.domain.JavaMethodCall;
 import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.RecordComponent;
@@ -12,12 +14,14 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import kamayuk.comun.verificaciones.ReglasDeArquitectura;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -68,6 +72,18 @@ class NingunaHoraSePublicaSinSuDesfaseTest {
      * frontera en este arbol —la regla de ArchUnit de la libreria comun ya los mantiene fuera de
      * {@code dominio}—, y anadir a una lista tipos que nadie puede escribir no protege nada.
      */
+    /**
+     * Los tipos cuyo {@code toString()} escribe una hora con la zona que traiga el valor (#327).
+     *
+     * <p>Por nombre y no por {@code Class}: es con lo que ArchUnit nombra el dueno de la llamada.
+     */
+    private static final Set<String> HORAS_QUE_NO_SE_ESCRIBEN_A_MANO =
+            Set.of(
+                    Instant.class.getName(),
+                    OffsetDateTime.class.getName(),
+                    ZonedDateTime.class.getName(),
+                    LocalDateTime.class.getName());
+
     private static final Map<Class<?>, String> PROHIBIDOS =
             Map.of(
                     Instant.class,
@@ -119,10 +135,100 @@ class NingunaHoraSePublicaSinSuDesfaseTest {
 
         assertThat(conDesfase)
                 .as(
-                        "las siete horas que #188 convirtio, en sus cinco operaciones. Si esta"
-                                + " lista se vacia, el recorrido dejo de entrar en los Resource y"
-                                + " la prueba de arriba esta saliendo verde sin mirar nada")
-                .hasSize(7);
+                        "las siete horas que #188 convirtio, en sus cinco operaciones, y las tres"
+                                + " que salian como texto en UTC y #327 convirtio: «recibidoEn» y"
+                                + " «aplicadoEn» de POST /pagos y «historialDePlacas[].fecha» de"
+                                + " GET /rentas/vehiculos/{placa}. Si esta lista se vacia, el"
+                                + " recorrido dejo de entrar en los Resource y la prueba de arriba"
+                                + " esta saliendo verde sin mirar nada")
+                .hasSize(10);
+    }
+
+    /**
+     * Ninguna hora se escribe como texto fuera de {@link kamayuk.rentas.dominio.ZonaHoraria}
+     * (#327).
+     *
+     * <h2>El camino que las dos pruebas de arriba no miran</h2>
+     *
+     * <p>Las dos de arriba miran el <b>tipo</b> de lo que se publica. Un campo {@code String} les
+     * es invisible, y por ahi salieron tres horas en UTC —{@code pago.recibidoEn().toString()},
+     * {@code cambio.fecha().toString()}— que {@code formas-de-la-api.json} tipaba {@code «texto»} y
+     * la interfaz, que exige el desfase, habria rechazado. Y por el mismo camino salia la «Fecha de
+     * ingreso» del acta de internamiento, que no es una respuesta JSON sino <b>un documento que se
+     * entrega</b>: {@code 2026-03-05T01:00:00Z} para un ingreso de las 20:00 del dia 4. Ninguna de
+     * las cuatro tenia una prueba que la viera.
+     *
+     * <p>Asi que esto no mira nombres ni tipos de campo, sino <b>el bytecode</b>: una llamada a
+     * {@code toString()} sobre un {@link Instant}, un {@link OffsetDateTime}, un {@link
+     * ZonedDateTime} o un {@link LocalDateTime} en el codigo de produccion. El tipo del receptor
+     * esta en la instruccion, asi que no hay que adivinarlo leyendo texto. Medido antes de
+     * escribirla, en todo {@code backend/*&#47;src/main}: <b>cinco</b> llamadas, y las cinco eran
+     * los cuatro sitios de #327 (el acta tiene dos, la de ingreso y la de movimiento).
+     *
+     * <p><b>Por que no por el nombre del campo.</b> Es la otra forma que proponia el issue —todo
+     * {@code String} que acabe en {@code En} o empiece por {@code fecha}—, y medida da mas de cien
+     * campos, casi todos un {@code LocalDate} escrito como texto, que es un dia y no una hora: la
+     * lista de excepciones seria mas larga que lo que vigila, y un campo nuevo mal nombrado pasaria
+     * igual.
+     *
+     * <p><b>Lo que deja pasar, y por que.</b> {@link LocalTime#toString()}: la {@code
+     * horaInfraccion} de una papeleta es la hora que el inspector escribio en ella, en el reloj de
+     * la calle, y no un instante que haya que situar en una zona — no hay nada que convertir, y
+     * publicarla tal cual es lo correcto. Y lo que no deja huella de su tipo en el bytecode —{@code
+     * String.valueOf(instante)}, {@code "" + instante}— no lo ve: hoy no hay ninguno, y el remedio
+     * es el mismo, {@link kamayuk.rentas.dominio.ZonaHoraria#textoConSuDesfase(Instant)}.
+     */
+    @Test
+    @DisplayName("#327 — y ninguna hora se escribe como texto sin pasar por ZonaHoraria")
+    void ningunaHoraSeEscribeComoTexto() {
+        List<String> encontradas = new ArrayList<>();
+        for (JavaClass clase : ReglasDeArquitectura.clasesDeProduccion()) {
+            for (JavaMethodCall llamada : clase.getMethodCallsFromSelf()) {
+                String dueno = llamada.getTargetOwner().getName();
+                if (HORAS_QUE_NO_SE_ESCRIBEN_A_MANO.contains(dueno)
+                        && "toString".equals(llamada.getName())) {
+                    encontradas.add(
+                            llamada.getOrigin().getFullName()
+                                    + ":"
+                                    + llamada.getLineNumber()
+                                    + " llama a "
+                                    + llamada.getTargetOwner().getSimpleName()
+                                    + ".toString()");
+                }
+            }
+        }
+
+        assertThat(encontradas)
+                .as(
+                        "una hora escrita con toString() sale en la zona que traiga el valor"
+                                + " —en UTC, «…Z», si viene de un Instant o de pgjdbc—. En un"
+                                + " Resource, declara el campo OffsetDateTime y usa"
+                                + " ZonaHoraria.conSuDesfase(instante); en un documento, usa"
+                                + " ZonaHoraria.textoConSuDesfase(instante)")
+                .isEmpty();
+    }
+
+    @Test
+    @DisplayName("y ese recorrido ve las llamadas: sin verlas, la de arriba no diria nada")
+    void elRecorridoDelBytecodeVeLasLlamadas() {
+        // La de arriba sale verde tambien si no recorre nada. Estas son las llamadas que TIENEN
+        // que estar —los Resource de #188 y #327 publican asi—, y si el recorrido dejara de
+        // encontrarlas, la de arriba estaria saliendo verde a ciegas.
+        List<String> alaZonaDelProducto = new ArrayList<>();
+        for (JavaClass clase : ReglasDeArquitectura.clasesDeProduccion()) {
+            for (JavaMethodCall llamada : clase.getMethodCallsFromSelf()) {
+                if ("kamayuk.rentas.dominio.ZonaHoraria".equals(llamada.getTargetOwner().getName())
+                        && "conSuDesfase".equals(llamada.getName())) {
+                    alaZonaDelProducto.add(llamada.getOrigin().getFullName());
+                }
+            }
+        }
+
+        assertThat(alaZonaDelProducto)
+                .as("las llamadas a ZonaHoraria.conSuDesfase desde el codigo de produccion")
+                .anySatisfy(origen -> assertThat(origen).contains("PagoResource"))
+                .anySatisfy(origen -> assertThat(origen).contains("CambioDePlacaResource"))
+                .anySatisfy(origen -> assertThat(origen).contains("AuditoriaResource"));
     }
 
     // ------------------------------------------------------------------

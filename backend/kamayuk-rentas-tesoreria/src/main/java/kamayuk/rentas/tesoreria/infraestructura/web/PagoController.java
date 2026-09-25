@@ -1,7 +1,9 @@
 package kamayuk.rentas.tesoreria.infraestructura.web;
 
 import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
@@ -10,6 +12,7 @@ import java.util.UUID;
 import kamayuk.rentas.autorizacion.Privilegio;
 import kamayuk.rentas.autorizacion.RequiereAcceso;
 import kamayuk.rentas.dominio.Dinero;
+import kamayuk.rentas.dominio.ZonaHoraria;
 import kamayuk.rentas.tesoreria.pagos.ConciliacionDePagos;
 import kamayuk.rentas.tesoreria.pagos.PagoRecibido;
 import kamayuk.rentas.tesoreria.pagos.PagoRecibidoRepository;
@@ -215,24 +218,30 @@ public class PagoController {
     /**
      * @param nuevo si este pago llego por primera vez. Va en el cuerpo ADEMAS de en el codigo de
      *     estado: un cliente que solo mire el cuerpo tiene que poder distinguirlo igual
+     * @param recibidoEn cuando llego, con el desfase de la zona del producto —{@code
+     *     2026-03-15T19:00:00-05:00}—. Hasta {@code rentas}#327 era un {@code String} escrito con
+     *     {@code Instant.toString()}, o sea UTC con una {@code Z}: el contrato lo tipaba «texto» y
+     *     la guarda de #188, que mira el tipo, no lo veia
+     * @param aplicadoEn cuando se aplico, igual; nulo mientras no se aplique
      */
     public record PagoResource(
             String pagoId,
             String estado,
             int asientos,
             @Nullable String motivo,
-            String recibidoEn,
-            @Nullable String aplicadoEn,
+            OffsetDateTime recibidoEn,
+            @Nullable OffsetDateTime aplicadoEn,
             boolean nuevo) {
 
         static PagoResource de(PagoRecibido pago, boolean nuevo) {
+            Instant aplicadoEn = pago.aplicadoEn();
             return new PagoResource(
                     pago.pagoId().toString(),
                     pago.estado().name(),
                     pago.asientos(),
                     pago.motivo(),
-                    pago.recibidoEn().toString(),
-                    pago.aplicadoEn() == null ? null : pago.aplicadoEn().toString(),
+                    ZonaHoraria.conSuDesfase(pago.recibidoEn()),
+                    aplicadoEn == null ? null : ZonaHoraria.conSuDesfase(aplicadoEn),
                     nuevo);
         }
     }
