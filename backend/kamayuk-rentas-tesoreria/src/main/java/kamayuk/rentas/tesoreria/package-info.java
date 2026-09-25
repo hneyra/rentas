@@ -19,6 +19,12 @@
  *       {@link kamayuk.rentas.tesoreria.AnulacionesDeRecibo}— y el cliente HTTP que los implementa.
  * </ul>
  *
+ * <p><b>Y desde #383, la constancia de que un recibo se gasto</b>: {@link
+ * kamayuk.rentas.tesoreria.AplicacionDeRecibos} anota en {@code recibo_aplicado} (V28) que acto
+ * pago que recibo, porque eso solo lo sabe quien emite los actos y {@code caja} no tiene por que
+ * aprenderlo. No es un camino a la caja: no cobra, no anula y no toca un recibo. Es un puerto para
+ * que el dia que {@code caja} ofrezca consumir el recibo cambie el adaptador y no sus llamadores.
+ *
  * <p><b>El modulo NO se renombra</b>, y es deliberado: renombrarlo obligaria a tocar el paquete de
  * las 33 clases del convenio, sus {@code import} en {@code rentas} y en {@code coactiva}, y el
  * artefacto de Gradle — un diff enorme en el que un cambio de verdad no se veria, justo en la etapa

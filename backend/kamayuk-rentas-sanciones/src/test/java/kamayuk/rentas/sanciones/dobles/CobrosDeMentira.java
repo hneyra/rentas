@@ -39,9 +39,29 @@ public final class CobrosDeMentira implements CobrosDeTasas {
     /** Siembra un cobro acreditable: numero de recibo, concepto, importe y fecha. */
     public CobrosDeMentira con(
             String numeroDeRecibo, String codigoDeTasa, Dinero importe, LocalDate fecha) {
+        return con(numeroDeRecibo, codigoDeTasa, importe, fecha, 1);
+    }
+
+    /**
+     * Siembra un cobro de <b>varias unidades</b>: en la custodia, los dias que el recibo pago
+     * (#383).
+     *
+     * <p>Hasta #383 este doble sembraba siempre {@code cantidad = 1}, y con esa muestra uniforme
+     * ninguna prueba podia distinguir un dia de custodia de cuarenta y dos.
+     */
+    public CobrosDeMentira con(
+            String numeroDeRecibo,
+            String codigoDeTasa,
+            Dinero importe,
+            LocalDate fecha,
+            int cantidad) {
         cobros.add(
                 new TasaCobrada(
-                        numeroDeRecibo, codigoDeTasa.toUpperCase(Locale.ROOT), 1, importe, fecha));
+                        numeroDeRecibo,
+                        codigoDeTasa.toUpperCase(Locale.ROOT),
+                        cantidad,
+                        importe,
+                        fecha));
         return this;
     }
 

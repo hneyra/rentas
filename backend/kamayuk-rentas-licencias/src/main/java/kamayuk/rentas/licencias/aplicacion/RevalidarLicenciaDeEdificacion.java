@@ -24,6 +24,7 @@ import kamayuk.rentas.licencias.dominio.MovimientoDeEdificacion;
 import kamayuk.rentas.licencias.dominio.MovimientoDeEdificacionRepository;
 import kamayuk.rentas.licencias.dominio.TipoDeMovimientoDeEdificacion;
 import kamayuk.rentas.licencias.dominio.VigenciaDeLaLicencia;
+import kamayuk.rentas.tesoreria.AplicacionDeRecibos;
 import kamayuk.rentas.tesoreria.ReciboDeTramite;
 import kamayuk.rentas.tesoreria.RecibosDeTramite;
 import org.springframework.stereotype.Service;
@@ -64,6 +65,7 @@ public class RevalidarLicenciaDeEdificacion {
     private final FueRepository expedientes;
     private final MovimientoDeEdificacionRepository movimientos;
     private final RecibosDeTramite recibos;
+    private final AplicacionDeRecibos aplicaciones;
     private final DirectorioDeContribuyentes contribuyentes;
     private final DerechosDeTramiteParametrizados derechos;
     private final EmitirDocumento documentos;
@@ -74,6 +76,7 @@ public class RevalidarLicenciaDeEdificacion {
             FueRepository expedientes,
             MovimientoDeEdificacionRepository movimientos,
             RecibosDeTramite recibos,
+            AplicacionDeRecibos aplicaciones,
             DirectorioDeContribuyentes contribuyentes,
             DerechosDeTramiteParametrizados derechos,
             EmitirDocumento documentos,
@@ -82,6 +85,7 @@ public class RevalidarLicenciaDeEdificacion {
         this.expedientes = expedientes;
         this.movimientos = movimientos;
         this.recibos = recibos;
+        this.aplicaciones = aplicaciones;
         this.contribuyentes = contribuyentes;
         this.derechos = derechos;
         this.documentos = documentos;
@@ -232,6 +236,16 @@ public class RevalidarLicenciaDeEdificacion {
                                 emision.registro().numero(),
                                 ahora,
                                 observacion));
+
+        // EL RECIBO SE GASTA AQUI (#383). Hasta ese issue, con un solo recibo se prorrogaba la
+        // vigencia de la misma obra una y otra vez, con un FUE de revalidacion nuevo en cada
+        // tramo: las cinco comprobaciones del derecho pasaban todas las veces.
+        GastoDelDerecho.gastar(
+                aplicaciones,
+                recibo,
+                concepto,
+                "edificacion_movimiento",
+                registrado.identificador());
 
         VigenciaDeLaLicencia concedida =
                 movimientos.conceder(

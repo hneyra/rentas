@@ -33,6 +33,7 @@ import kamayuk.rentas.licencias.dominio.SeccionDelFue;
 import kamayuk.rentas.licencias.dominio.TerrenoDelFue;
 import kamayuk.rentas.licencias.dominio.TipoDeProfesional;
 import kamayuk.rentas.licencias.dominio.VigenciaDeLaLicencia;
+import kamayuk.rentas.tesoreria.AplicacionDeRecibos;
 import kamayuk.rentas.tesoreria.ReciboDeTramite;
 import kamayuk.rentas.tesoreria.RecibosDeTramite;
 import org.springframework.stereotype.Service;
@@ -78,6 +79,7 @@ public class EmitirLicenciaDeEdificacion {
     private final FueRepository expedientes;
     private final MovimientoDeEdificacionRepository movimientos;
     private final RecibosDeTramite recibos;
+    private final AplicacionDeRecibos aplicaciones;
     private final DirectorioDeContribuyentes contribuyentes;
     private final DerechosDeTramiteParametrizados derechos;
     private final ValorizacionDelFue valorizaciones;
@@ -90,6 +92,7 @@ public class EmitirLicenciaDeEdificacion {
             FueRepository expedientes,
             MovimientoDeEdificacionRepository movimientos,
             RecibosDeTramite recibos,
+            AplicacionDeRecibos aplicaciones,
             DirectorioDeContribuyentes contribuyentes,
             DerechosDeTramiteParametrizados derechos,
             ValorizacionDelFue valorizaciones,
@@ -100,6 +103,7 @@ public class EmitirLicenciaDeEdificacion {
         this.expedientes = expedientes;
         this.movimientos = movimientos;
         this.recibos = recibos;
+        this.aplicaciones = aplicaciones;
         this.contribuyentes = contribuyentes;
         this.derechos = derechos;
         this.valorizaciones = valorizaciones;
@@ -128,6 +132,7 @@ public class EmitirLicenciaDeEdificacion {
      *     posterior a hoy (#402)
      * @throws SeccionesIncompletas si falta alguna seccion obligatoria (AC 1)
      * @throws ComprobacionDelDerecho.DerechoNoPagado si el recibo no respalda el derecho (AC 5)
+     * @throws kamayuk.rentas.tesoreria.ReciboYaAplicado si el recibo ya pago otro acto (#383)
      * @throws DerechosDeTramiteParametrizados.DerechoSinParametrizar si el conjunto sellado no dice
      *     que concepto del TUPA cobra el derecho
      */
@@ -232,6 +237,14 @@ public class EmitirLicenciaDeEdificacion {
                                 emision.registro().numero(),
                                 ahora,
                                 observacion));
+
+        // EL RECIBO SE GASTA AQUI (#383), con el movimiento de emision ya escrito.
+        GastoDelDerecho.gastar(
+                aplicaciones,
+                recibo,
+                concepto,
+                "edificacion_movimiento",
+                registrado.identificador());
 
         VigenciaDeLaLicencia vigencia =
                 movimientos.conceder(fue.identificador(), registrado.identificador(), primerTramo);

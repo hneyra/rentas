@@ -114,6 +114,7 @@ import kamayuk.rentas.sanciones.infraestructura.web.ConstanciasLibresController;
 import kamayuk.rentas.sanciones.infraestructura.web.DescargosController;
 import kamayuk.rentas.sanciones.infraestructura.web.InternamientosController;
 import kamayuk.rentas.sanciones.infraestructura.web.NotificacionAdministrativaController;
+import kamayuk.rentas.tesoreria.infraestructura.AplicacionDeRecibosJdbc;
 import kamayuk.rentas.valores.ValoresSobreUnaObligacion;
 import kamayuk.rentas.valores.aplicacion.ValoresSobreUnaObligacionValores;
 import kamayuk.rentas.valores.infraestructura.ValorRepositoryJdbc;
@@ -417,7 +418,15 @@ class SancionesJdbcTest {
         liberar =
                 envolver(
                         new LiberarVehiculoInternado(
-                                internamientos, papeletas, cobros, documentos, auditoria, RELOJ));
+                                internamientos,
+                                papeletas,
+                                cobros,
+                                // #383: el recibo se gasta contra `recibo_aplicado` de verdad, y
+                                // el 409 lo da su indice unico, no un doble.
+                                new AplicacionDeRecibosJdbc(jdbc, RELOJ),
+                                documentos,
+                                auditoria,
+                                RELOJ));
         consultaDeDeposito = envolver(new ConsultaDeInternamientos(internamientos));
         consultaDeActos =
                 envolver(
@@ -1097,6 +1106,152 @@ class SancionesJdbcTest {
 
             assertThatThrownBy(() -> internarVehiculo(papeleta, "T2G-406"))
                     .isInstanceOf(RegistrarInternamiento.VehiculoYaInternado.class);
+        }
+    }
+
+    /**
+     * #383 — La custodia se cuenta por dias, y un recibo no libera dos vehiculos.
+     *
+     * <p>El escenario del issue, letra por letra: el vehiculo entra el 4 de marzo y se libera el 15
+     * de abril, <b>42 dias</b>. Hasta #383 {@code LiberarVehiculoInternado} pedia a la caja que
+     * acreditara el recibo y nunca comparaba {@code TasaCobrada.cantidad} —«en la custodia, los
+     * dias»— con los dias que el vehiculo llevaba; y el mismo recibo, que ya habia liberado uno,
+     * liberaba el siguiente, porque sigue vigente y sigue siendo del concepto.
+     *
+     * <p>Por HTTP y contra PostgreSQL: el rechazo tiene que salir con su codigo —422 si el recibo
+     * no alcanza, 409 si ya se gasto— y el segundo lo da {@code recibo_aplicado_uq}, que solo
+     * existe en la base.
+     */
+    @Nested
+    @DisplayName("#383 — la custodia se cuenta por dias, y un recibo no libera dos vehiculos")
+    class LaCustodiaSeCuentaPorDias {
+
+        private static final String INTERNAMIENTOS = "/rentas/api/v1/transito/internamientos";
+
+        /** Del 4 de marzo, dia del ingreso, al 15 de abril. */
+        private static final String LIBERACION = "2026-04-15";
+
+        private static final int DIAS = 42;
+
+        @Test
+        @DisplayName("42 dias en deposito con un recibo de UN dia: 422, y dice los dos numeros")
+        void unReciboDeUnDiaNoPagaCuarentaYDos() throws Exception {
+            Papeleta papeleta = papeletaDeTransito("K01");
+            internarVehiculo(papeleta, "ABC-111");
+            String recibo = cobrarCustodia(papeleta.obligadoId(), 1);
+
+            Rechazo liberacion = liberarPorHttp("ABC-111", recibo);
+
+            assertThat(liberacion.estado())
+                    .as(
+                            "con 201 sale un vehiculo de 42 dias con la custodia de uno, y el acta"
+                                    + " imprime «Dias en deposito 42» junto al importe de un dia: "
+                                    + liberacion.cuerpo())
+                    .isEqualTo(422);
+            assertThat(liberacion.cuerpo())
+                    .contains("VALIDACION")
+                    .contains(recibo)
+                    .contains("1 dia")
+                    .contains("42 dias");
+            assertThat(liberacion.errores()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("con un recibo de 42 dias sale; y ese recibo no libera otra placa: 409")
+        void elMismoReciboNoLiberaDosVehiculos() throws Exception {
+            Papeleta primera = papeletaDeTransito("K02");
+            internarVehiculo(primera, "ABC-112");
+            Papeleta segunda = papeletaDeTransito("K03");
+            internarVehiculo(segunda, "XYZ-222");
+            String recibo = cobrarCustodia(primera.obligadoId(), DIAS);
+
+            Rechazo sale = liberarPorHttp("ABC-112", recibo);
+            assertThat(sale.estado()).as(sale.cuerpo()).isEqualTo(201);
+
+            Rechazo otra = liberarPorHttp("XYZ-222", recibo);
+
+            assertThat(otra.estado())
+                    .as(
+                            "con 201 el recibo que en marzo ya libero ABC-112 libera XYZ-222: "
+                                    + otra.cuerpo())
+                    .isEqualTo(409);
+            assertThat(otra.cuerpo()).contains("CONFLICTO").contains(recibo);
+            assertThat(otra.errores()).isEmpty();
+            assertThat(
+                            contar(
+                                    "SELECT count(*) FROM internamiento_movimiento"
+                                            + " WHERE recibo_custodia = '"
+                                            + recibo
+                                            + "'"))
+                    .as("y la segunda liberacion no deja fila: la transaccion entera se deshace")
+                    .isEqualTo(1);
+        }
+
+        /**
+         * El recibo se gasta ENTERO, no por los dias del vehiculo que libera (#383, revision del PR
+         * #521). Las dos pruebas de arriba siembran un recibo de tantos dias como el vehiculo
+         * lleva, y con esa muestra uniforme «gastar la cantidad del recibo» y «gastar los dias» son
+         * la misma cifra: {@code Math.max(1, dias)} en lugar de {@code custodia.cantidad()}
+         * sobreviviria a las dos. Aqui el recibo cobra 50 y el primer vehiculo lleva 42: si solo se
+         * gastan los 42, quedan 8 que liberan un segundo vehiculo de 6 dias.
+         */
+        @Test
+        @DisplayName(
+                "un recibo de 50 dias libera un vehiculo de 42 y se gasta entero: otro de 6 dias,"
+                        + " 409")
+        void elReciboSeGastaEnteroAunqueSobrenDias() throws Exception {
+            Papeleta primera = papeletaDeTransito("K04");
+            internarVehiculo(primera, "ABC-113");
+            Papeleta segunda = papeletaDeTransito("K05");
+            internarVehiculo(segunda, "XYZ-223");
+            String recibo = cobrarCustodia(primera.obligadoId(), RECIBO_QUE_SOBRA);
+
+            Rechazo sale = liberarPorHttp("ABC-113", recibo);
+            assertThat(sale.estado()).as(sale.cuerpo()).isEqualTo(201);
+            assertThat(sale.cuerpo()).contains("\"dias\":" + DIAS);
+
+            Rechazo otra = liberarPorHttp("XYZ-223", recibo, LIBERACION_A_LOS_SEIS_DIAS);
+
+            assertThat(otra.estado())
+                    .as(
+                            "con 201 el recibo solo gasto los 42 dias de ABC-113 y los 8 que le"
+                                    + " sobraron sacan a XYZ-223: "
+                                    + otra.cuerpo())
+                    .isEqualTo(409);
+            assertThat(otra.cuerpo()).contains("CONFLICTO").contains(recibo);
+            assertThat(
+                            contar(
+                                    "SELECT coalesce(sum(unidades), 0)::bigint FROM"
+                                            + " recibo_aplicado WHERE numero_recibo = '"
+                                            + recibo
+                                            + "'"))
+                    .as("la primera liberacion gasta las 50 unidades del recibo, no sus 42 dias")
+                    .isEqualTo(RECIBO_QUE_SOBRA);
+        }
+
+        /** Un recibo que cobra mas dias de los que el primer vehiculo lleva. */
+        private static final int RECIBO_QUE_SOBRA = 50;
+
+        /** Del 4 de marzo al 10: seis dias, que caben en los 8 que el recibo no gastaria. */
+        private static final String LIBERACION_A_LOS_SEIS_DIAS = "2026-03-10";
+
+        private Rechazo liberarPorHttp(String placa, String recibo) throws Exception {
+            return liberarPorHttp(placa, recibo, LIBERACION);
+        }
+
+        private Rechazo liberarPorHttp(String placa, String recibo, String fecha) throws Exception {
+            return rechazo(
+                    () ->
+                            enviar(
+                                    post(INTERNAMIENTOS + "/" + placa + "/liberacion"),
+                                    "{\"observacion\":\"El titular retira el vehiculo\","
+                                            + "\"fechaDeLiberacion\":\""
+                                            + fecha
+                                            + "\",\"reciboDeCustodia\":\""
+                                            + recibo
+                                            + "\",\"personaQueRetira\":\"DORIS\","
+                                            + "\"documentoDeQuienRetira\":\"DNI 44218937\","
+                                            + "\"soatVigenteAcreditado\":true}"));
         }
     }
 
@@ -2770,7 +2925,24 @@ class SancionesJdbcTest {
      * eso es lo que el doble siembra.
      */
     private static String cobrarCustodia(long contribuyenteId) {
-        return cobrarTasa(contribuyenteId, "CUSTODIA", CUSTODIA);
+        return cobrarCustodia(contribuyenteId, DIAS_HASTA_LA_ORDINARIA);
+    }
+
+    /**
+     * Los dias que cubre la custodia de {@link #cobrarCustodia(long)}: del 4 de marzo, dia del
+     * ingreso, al 1 de abril, que es el dia en que {@link #liberarVehiculo(String, String)} libera.
+     *
+     * <p>Hasta #383 la custodia sembrada era siempre de UN dia y el vehiculo salia igual con 28: la
+     * liberacion no comparaba la cantidad del recibo con los dias. Desde #383 los compara, y la
+     * siembra tiene que pagar lo que el vehiculo lleva.
+     */
+    private static final int DIAS_HASTA_LA_ORDINARIA = 28;
+
+    /** La custodia de {@code dias} dias en un solo recibo: {@code TasaCobrada.cantidad} (#383). */
+    private static String cobrarCustodia(long contribuyenteId, int dias) {
+        String numero = String.format("001-%07d", SIGUIENTE_RECIBO.incrementAndGet());
+        cobros.con(numero, "CUSTODIA", CUSTODIA, ORDINARIA, dias);
+        return numero;
     }
 
     private static String cobrarTasa(long contribuyenteId, String codigo, Dinero importe) {

@@ -908,6 +908,18 @@ public final class DatosDePrueba {
                 CIEN,
                 "{\"pagoId\":\"sembrado\",\"sufijo\":\"" + sufijo + "\"}");
 
+        // Y la constancia de que un acto GASTO un recibo (#383, `V28`). No hay clave foranea al
+        // acto —la tabla nombra la suya con texto— asi que basta con un identificador: lo que se
+        // mide aqui es que la fila de B no se vea con el contexto de A.
+        ejecutar(
+                app,
+                "INSERT INTO recibo_aplicado (municipalidad_id, numero_recibo, concepto, orden,"
+                        + " unidades, tabla, acto_id, usuario_registro, fecha_registro)"
+                        + " VALUES (?, ?, 'CUSTODIA', 1, 1, 'internamiento_movimiento', 1,"
+                        + "         'prueba', now())",
+                muni,
+                "001-" + sufijo);
+
         // Un convenio de fraccionamiento (V31, #35), con su correlativo, su cronograma, la
         // deuda que acogio y su formalizacion.
         //

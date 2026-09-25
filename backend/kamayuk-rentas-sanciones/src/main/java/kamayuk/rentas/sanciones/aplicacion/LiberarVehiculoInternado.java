@@ -20,6 +20,7 @@ import kamayuk.rentas.sanciones.dominio.MovimientoDeInternamiento;
 import kamayuk.rentas.sanciones.dominio.Papeleta;
 import kamayuk.rentas.sanciones.dominio.PapeletaRepository;
 import kamayuk.rentas.sanciones.dominio.TipoDeMovimientoDeInternamiento;
+import kamayuk.rentas.tesoreria.AplicacionDeRecibos;
 import kamayuk.rentas.tesoreria.CobrosDeTasas;
 import kamayuk.rentas.tesoreria.TasaCobrada;
 import org.jspecify.annotations.Nullable;
@@ -37,6 +38,18 @@ import org.springframework.transaction.annotation.Transactional;
  * pública</b> ({@link CobrosDeTasas}), que acredite que ese recibo existe, sigue vigente —no
  * anulado— y cobró el concepto del TUPA con el que este internamiento devenga custodia. Si no lo
  * acredita, el vehículo no sale.
+ *
+ * <h2>Y cubre los días que el vehículo lleva, una sola vez (#383)</h2>
+ *
+ * <p>Acreditar no bastaba. {@link TasaCobrada#cantidad} dice cuántos días cobró el recibo, y hasta
+ * #383 nadie la comparaba con los que el vehículo llevaba en el depósito: salía un vehículo de 42
+ * días con la custodia de uno, y el acta imprimía «Dias en deposito 42» al lado del importe de un
+ * día. Y el mismo recibo, que ya había liberado un vehículo, liberaba el siguiente, porque seguía
+ * vigente y seguía siendo del concepto. Ahora el recibo tiene que cubrir los días —contados como
+ * los cuenta la grilla del depósito, {@code InternamientoRepositoryJdbc}— y se <b>gasta entero</b>
+ * al liberar, por {@link AplicacionDeRecibos}. Si el día de ingreso cuenta, o si la unidad de la
+ * tarifa deja de ser el día, lo dice la ordenanza (D-02b): cambia la cota, no el sitio donde se
+ * compara.
  *
  * <p>La otra mitad de la guarda está en la base: {@code internamiento_liberacion_ck} (V41) exige
  * que la fila de tipo {@code LIBERACION} traiga el recibo, los días, quién retira y su documento.
@@ -59,6 +72,7 @@ public class LiberarVehiculoInternado {
     private final InternamientoRepository internamientos;
     private final PapeletaRepository papeletas;
     private final CobrosDeTasas cobros;
+    private final AplicacionDeRecibos aplicaciones;
     private final EmitirDocumento documentos;
     private final Auditoria auditoria;
     private final Clock reloj;
@@ -67,12 +81,14 @@ public class LiberarVehiculoInternado {
             InternamientoRepository internamientos,
             PapeletaRepository papeletas,
             CobrosDeTasas cobros,
+            AplicacionDeRecibos aplicaciones,
             EmitirDocumento documentos,
             Auditoria auditoria,
             Clock reloj) {
         this.internamientos = internamientos;
         this.papeletas = papeletas;
         this.cobros = cobros;
+        this.aplicaciones = aplicaciones;
         this.documentos = documentos;
         this.auditoria = auditoria;
         this.reloj = reloj;
@@ -86,6 +102,8 @@ public class LiberarVehiculoInternado {
      * @param observacion por qué se libera (regla 10, RNF-052)
      * @throws VehiculoNoInternado si la placa no tiene ningún internamiento vigente
      * @throws CustodiaSinPagar si el recibo no acredita el pago del concepto de custodia
+     * @throws CustodiaInsuficiente si el recibo cobró menos días de los que el vehículo lleva
+     * @throws kamayuk.rentas.tesoreria.ReciboYaAplicado si el recibo ya liberó otro vehículo
      * @throws LiberacionAnteriorAlIngreso si la fecha de salida es anterior a la de entrada
      */
     @Transactional
@@ -115,6 +133,12 @@ public class LiberarVehiculoInternado {
                                                 internamiento, peticion.reciboCustodia()));
 
         int dias = (int) Math.max(0, ChronoUnit.DAYS.between(ingreso, peticion.fecha()));
+        // Y QUE CUBRA LOS DIAS (#383), antes de dibujar el acta. `cantidad` es «en la custodia,
+        // los dias» (`TasaCobrada`), y hasta #383 no se miraba: un recibo de un dia sacaba un
+        // vehiculo de cuarenta y dos.
+        if (custodia.cantidad() < dias) {
+            throw new CustodiaInsuficiente(internamiento, custodia, dias);
+        }
         Papeleta papeleta = papeletaDe(internamiento);
 
         EmitirDocumento.Emision emision =
@@ -154,6 +178,20 @@ public class LiberarVehiculoInternado {
                                 peticion.soatAcreditado(),
                                 reloj.instant(),
                                 observacion));
+
+        // EL RECIBO SE GASTA ENTERO (#383), con la liberacion ya escrita y en su transaccion:
+        // los dias que cobro son los de ESTE internamiento. Hasta #383 el recibo que en marzo
+        // libero un vehiculo liberaba otro en abril.
+        aplicaciones.aplicar(
+                custodia.numeroDeRecibo(),
+                custodia.codigoDeTasa(),
+                custodia.cantidad(),
+                custodia.cantidad(),
+                new AplicacionDeRecibos.Acto(
+                        TABLA_AUDITADA,
+                        Objects.requireNonNull(
+                                guardado.id(),
+                                "Un movimiento recien registrado vuelve con su identificador")));
 
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe(
@@ -275,6 +313,32 @@ public class LiberarVehiculoInternado {
                             + " placa "
                             + internamiento.placa()
                             + " no sale del deposito sin la custodia cancelada");
+        }
+    }
+
+    /**
+     * El recibo acredita la custodia, pero de menos días de los que el vehículo lleva (#383).
+     *
+     * <p>Dice las dos cifras porque son las dos que quien atiende necesita para cobrar la
+     * diferencia: cuántos días cobró el recibo y cuántos lleva el vehículo a la fecha de la
+     * liberación.
+     */
+    public static final class CustodiaInsuficiente extends RuntimeException {
+
+        @java.io.Serial private static final long serialVersionUID = 1L;
+
+        CustodiaInsuficiente(Internamiento internamiento, TasaCobrada custodia, int dias) {
+            super(
+                    "El recibo "
+                            + custodia.numeroDeRecibo()
+                            + " cobro la custodia de "
+                            + custodia.cantidad()
+                            + (custodia.cantidad() == 1 ? " dia" : " dias")
+                            + ", y el vehiculo de placa "
+                            + internamiento.placa()
+                            + " lleva "
+                            + dias
+                            + " dias en el deposito. No sale sin la custodia de todos sus dias");
         }
     }
 

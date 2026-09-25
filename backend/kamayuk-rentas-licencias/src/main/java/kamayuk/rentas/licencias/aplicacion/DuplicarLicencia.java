@@ -23,6 +23,7 @@ import kamayuk.rentas.licencias.dominio.LicenciaDeFuncionamiento;
 import kamayuk.rentas.licencias.dominio.LicenciaRepository;
 import kamayuk.rentas.licencias.dominio.MovimientoDeLicencia;
 import kamayuk.rentas.licencias.dominio.MovimientoDeLicenciaRepository;
+import kamayuk.rentas.tesoreria.AplicacionDeRecibos;
 import kamayuk.rentas.tesoreria.ReciboDeTramite;
 import kamayuk.rentas.tesoreria.RecibosDeTramite;
 import org.springframework.stereotype.Service;
@@ -74,6 +75,7 @@ public class DuplicarLicencia {
     private final MovimientoDeLicenciaRepository movimientos;
     private final DuplicadoDeLicenciaRepository duplicados;
     private final RecibosDeTramite recibos;
+    private final AplicacionDeRecibos aplicaciones;
     private final DirectorioDeContribuyentes contribuyentes;
     private final DerechosDeTramiteParametrizados derechos;
     private final EmitirDocumento documentos;
@@ -85,6 +87,7 @@ public class DuplicarLicencia {
             MovimientoDeLicenciaRepository movimientos,
             DuplicadoDeLicenciaRepository duplicados,
             RecibosDeTramite recibos,
+            AplicacionDeRecibos aplicaciones,
             DirectorioDeContribuyentes contribuyentes,
             DerechosDeTramiteParametrizados derechos,
             EmitirDocumento documentos,
@@ -94,6 +97,7 @@ public class DuplicarLicencia {
         this.movimientos = movimientos;
         this.duplicados = duplicados;
         this.recibos = recibos;
+        this.aplicaciones = aplicaciones;
         this.contribuyentes = contribuyentes;
         this.derechos = derechos;
         this.documentos = documentos;
@@ -113,6 +117,7 @@ public class DuplicarLicencia {
      * @throws CancelarLicencia.LicenciaInexistente si no hay licencia con ese numero
      * @throws LicenciaCancelada si la licencia esta cancelada
      * @throws ComprobacionDelDerecho.DerechoNoPagado si el recibo no respalda el derecho
+     * @throws kamayuk.rentas.tesoreria.ReciboYaAplicado si el recibo ya pago otro acto (#383)
      */
     @Transactional
     public Duplicado duplicar(
@@ -203,6 +208,11 @@ public class DuplicarLicencia {
 
         DuplicadoDeLicencia registrado =
                 duplicados.registrar(conDocumento(sinGuardar, documentoId));
+
+        // EL RECIBO SE GASTA AQUI (#383): un duplicado paga su derecho, y el mismo papel no
+        // autoriza el siguiente.
+        GastoDelDerecho.gastar(
+                aplicaciones, recibo, concepto, "licencia_duplicado", registrado.identificador());
 
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe(

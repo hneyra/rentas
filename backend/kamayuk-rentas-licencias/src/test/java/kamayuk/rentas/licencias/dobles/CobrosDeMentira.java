@@ -31,7 +31,25 @@ public final class CobrosDeMentira implements CobrosDeTasas {
     /** Siembra un cobro acreditable: numero de recibo, concepto, importe y fecha. */
     public CobrosDeMentira con(
             String numeroDeRecibo, String codigoDeTasa, String importe, LocalDate fecha) {
-        cobros.add(new TasaCobrada(numeroDeRecibo, codigoDeTasa, 1, Dinero.de(importe), fecha));
+        return con(numeroDeRecibo, codigoDeTasa, importe, fecha, 1);
+    }
+
+    /**
+     * Siembra un cobro de <b>varias unidades</b> del mismo concepto (#383).
+     *
+     * <p>Hasta #383 este doble sembraba siempre {@code cantidad = 1}, y con esa muestra uniforme
+     * ninguna prueba podia distinguir «contar contra la cantidad cobrada» de «un recibo, un acto»:
+     * las dos implementaciones dan lo mismo. Un recibo que cobro dos certificados es lo que las
+     * separa.
+     */
+    public CobrosDeMentira con(
+            String numeroDeRecibo,
+            String codigoDeTasa,
+            String importe,
+            LocalDate fecha,
+            int cantidad) {
+        cobros.add(
+                new TasaCobrada(numeroDeRecibo, codigoDeTasa, cantidad, Dinero.de(importe), fecha));
         return this;
     }
 
