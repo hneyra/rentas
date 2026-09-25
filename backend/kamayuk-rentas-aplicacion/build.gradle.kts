@@ -140,6 +140,18 @@ tasks.test {
             })
         .withPathSensitivity(PathSensitivity.RELATIVE)
 
+    // Y las FUENTES de produccion de todos los modulos, que `ExigirNumeroSoloConLlavesDeclaradasTest`
+    // lee del disco (#376). Estan en el classpath, pero COMPILADAS, y ahi no se ven: una constante
+    // `static final String` se pliega en el literal, asi que `exigirNumero(LlavesDelConjunto.X, ...)`
+    // y `exigirNumero("X", ...)` dan el mismo bytecode. Medido: con esa mutacion en
+    // `RegistrarAlcabala`, sin esta declaracion la tarea salia FROM-CACHE en verde, sin correr.
+    inputs
+        .files(
+            rootProject.layout.projectDirectory.asFileTree.matching {
+                include("*/src/main/java/**/*.java")
+            })
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+
     // EL CONTRATO DEL CONSUMIDOR VIVE EN OTRO CLON, y sin declararlo esta tarea se queda
     // UP-TO-DATE cuando cambia. `ContratoConCajaTest` lee
     // `../../caja/docs/50-api/contratos-que-consume/rentas.json` —lo que `caja` espera de este

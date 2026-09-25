@@ -34,12 +34,23 @@ import org.springframework.web.bind.annotation.RestController;
  * <h2>Lo que falta publicar se dice, y no es un 500 (#540)</h2>
  *
  * <p>El registro lee del conjunto sellado del ejercicio del evento la {@code
- * ALICUOTA_ESPECTACULO:‹TIPO›} del artículo 57. Que el ejercicio no tenga ningún conjunto sellado
- * ({@code EjercicioSinSellar}) o que el conjunto no traiga la alícuota de ese tipo ({@code
+ * ESPECTACULO_ALICUOTA:‹CLASE›} del artículo 57. Que el ejercicio no tenga ningún conjunto sellado
+ * ({@code EjercicioSinSellar}) o que el conjunto no traiga la alícuota de esa clase ({@code
  * ParametroAusente}) salía como <b>500 {@code ERROR_INTERNO} con identificador de incidencia</b>, y
  * ninguna de las dos lo es: falta publicar una cifra, y decir cuál es lo único que separa «no hay
  * ordenanza» de un impuesto calculado con una alícuota inventada. Ahora es <b>422 nombrando la
  * llave</b>, como en {@code PredialController} (#395) y {@code VehicularController} (#399).
+ *
+ * <h2>{@code tipo} es una clase del art. 57, no texto libre (#376)</h2>
+ *
+ * <p>El campo conserva su nombre —los cuerpos del contrato se declaran {@code type: object}, y
+ * renombrarlo no ganaba nada—, pero su vocabulario es cerrado: {@code ClaseDeEspectaculo
+ * .declarables()}, sin distinguir mayúsculas. Hasta #376 el texto tecleado era la clave de la
+ * alícuota, y ninguno de los que se tecleaban —{@code CINE}, {@code TEATRO}— es una clave del art.
+ * 57. Lo que no es una clase es un <b>422 de la petición</b>, sin {@code parametroQueFalta}: no
+ * falta publicar nada, hay que corregir lo que se envió. El taurino se declara {@code TAURINO}, y
+ * cuál de sus dos alícuotas rige lo decide {@code valorEntrada} frente a la UIT; sin {@code
+ * valorEntrada} es el mismo 422.
  *
  * <h2>La respuesta dice a qué fecha está calculada (#276)</h2>
  *

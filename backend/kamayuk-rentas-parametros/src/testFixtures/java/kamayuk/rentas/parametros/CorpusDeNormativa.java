@@ -16,6 +16,12 @@ import java.nio.file.Path;
  * el dentro, {@code verificar-publicacion.mjs} pasa en verde —la cifra esta en la norma y las
  * firmas son las del corpus— y la operacion sigue fallando con el sintoma de «no esta cargado».
  *
+ * <p>Esas tres comparaban llaves <b>escritas a mano</b>, y ninguna era de la alcabala ni de los
+ * espectaculos, que pidieron {@code ALICUOTA_ALCABALA} y {@code ALICUOTA_ESPECTACULO} contra las
+ * {@code ALCABALA_ALICUOTA} y {@code ESPECTACULO_ALICUOTA} publicadas sin que nada lo viera (#376).
+ * Desde #376 el nucleo reune sus llaves en {@code LlavesDelConjunto} y {@code
+ * LlavesDelConjuntoContraElDerivadoTest} las recorre <b>todas</b> contra este mismo archivo.
+ *
  * <p>Antes de P5B las dos mitades estaban en el mismo repositorio y el compilador y el sistema de
  * archivos las sujetaban. Ahora no: el CSV es de {@code normativa} y el consumidor es de {@code
  * rentas}. <b>Que la comprobacion sobreviva al corte es justamente lo que ADR-0030 §4 pide</b> —una

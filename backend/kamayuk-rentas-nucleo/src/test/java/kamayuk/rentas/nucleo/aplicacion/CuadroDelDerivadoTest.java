@@ -50,8 +50,8 @@ class CuadroDelDerivadoTest {
                 .as(
                         "el derivado publica %s tramos; si el cuadro no los encuentra, estan"
                                 + " cargados con otro nombre y la determinacion falla igual",
-                        contar(publicados, CuadroPredialParametrizado.TIPO_TRAMO))
-                .hasSize(contar(publicados, CuadroPredialParametrizado.TIPO_TRAMO));
+                        contar(publicados, LlavesDelConjunto.TRAMO_PREDIAL))
+                .hasSize(contar(publicados, LlavesDelConjunto.TRAMO_PREDIAL));
         assertThat(tramos.get(tramos.size() - 1).tieneTope())
                 .as("el ultimo tramo del articulo 13 es «mas de 60 UIT», sin tope")
                 .isFalse();
@@ -74,14 +74,13 @@ class CuadroDelDerivadoTest {
         Dinero uit = vigente.uit();
         assertThat(uit)
                 .as("la UIT del cuadro es la que el derivado publica, no una escrita aqui")
-                .isEqualTo(Dinero.de(publicados.get(CuadroPredialParametrizado.TIPO_UIT + "|")));
+                .isEqualTo(Dinero.de(publicados.get(LlavesDelConjunto.UIT + "|")));
         assertThat(vigente.minimoImponible())
                 .isEqualTo(
                         uit.por(
                                 new BigDecimal(
                                                 publicados.get(
-                                                        CuadroPredialParametrizado.TIPO_MINIMO
-                                                                + "|"))
+                                                        LlavesDelConjunto.PREDIAL_MINIMO + "|"))
                                         .movePointLeft(2)));
     }
 
@@ -95,8 +94,7 @@ class CuadroDelDerivadoTest {
         // nacional. Que falten es la razon por la que la determinacion responde 422 nombrando la
         // llave en vez de emitir con una cifra inventada, y esta prueba lo deja escrito para que el
         // dia que se publiquen alguien venga aqui a borrarla.
-        assertThat(publicados)
-                .doesNotContainKey(CuadroPredialParametrizado.TIPO_DERECHO_EMISION + "|");
+        assertThat(publicados).doesNotContainKey(LlavesDelConjunto.DERECHO_EMISION_PREDIAL + "|");
         assertThat(publicados.keySet())
                 .noneMatch(
                         llave ->

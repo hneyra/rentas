@@ -109,9 +109,13 @@ public class DeterminarArbitrios {
             if (excluidoPorBeneficio(predioId, servicio, fecha)) {
                 continue;
             }
-            String tipoParametro = "TASA_" + servicio.name();
-            Dinero monto = new Dinero(sellados.exigirNumero(tipoParametro, claveDeTasa).valor());
-            String parametroAplicado = tipoParametro + ":" + claveDeTasa;
+            Dinero monto =
+                    new Dinero(
+                            sellados.exigirNumero(
+                                            LlavesDelConjunto.tasaDeArbitrio(servicio), claveDeTasa)
+                                    .valor());
+            String parametroAplicado =
+                    LlavesDelConjunto.tasaDeArbitrio(servicio) + ":" + claveDeTasa;
 
             for (int periodo = PRIMER_PERIODO; periodo <= ULTIMO_PERIODO; periodo++) {
                 if (cuotas.existe(predioId, servicio, ejercicio, periodo)) {

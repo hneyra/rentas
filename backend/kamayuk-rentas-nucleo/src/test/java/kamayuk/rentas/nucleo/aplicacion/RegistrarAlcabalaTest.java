@@ -27,6 +27,7 @@ import kamayuk.rentas.nucleo.dominio.Transferencia;
 import kamayuk.rentas.nucleo.dominio.TransferenciaRepository;
 import kamayuk.rentas.nucleo.dominio.predial.Determinacion;
 import kamayuk.rentas.nucleo.infraestructura.TransferenciaRepositoryJdbc;
+import kamayuk.rentas.nucleo.parametros.DerivadoPublicado;
 import kamayuk.rentas.parametros.LectorDeParametros;
 import kamayuk.rentas.parametros.aplicacion.AdministrarParametros;
 import kamayuk.rentas.parametros.aplicacion.LectorDeParametrosSellados;
@@ -52,6 +53,11 @@ import org.springframework.transaction.interceptor.TransactionInterceptor;
  * <p>Verifica que la elección de base —el mayor entre el valor de transferencia y el autovalúo
  * ajustado— gobierna el monto determinado, y que una transferencia que no grava alcabala (un
  * vehículo, o un tipo que no la afecta) se rechaza sin determinar nada.
+ *
+ * <p><b>El conjunto sellado es el del derivado que {@code normativa} despliega</b> (#376): cada
+ * fila numérica que rige 2026, con su llave, y ninguna escrita aquí. Hasta #376 se sembraban a mano
+ * una UIT ficticia y {@code ALICUOTA_ALCABALA} —la llave que el código pedía y nadie publica—, y la
+ * prueba pasaba en verde mientras la operación real contestaba siempre 422.
  */
 @DisplayName("#32 — Registrar la alcabala")
 class RegistrarAlcabalaTest {
@@ -104,7 +110,7 @@ class RegistrarAlcabalaTest {
         // aqui, y BeforeEach los vuelve a fijar antes de cada prueba sin que eso sea un problema.
         TenantContext.fijar(new MunicipalidadId(municipalidad));
         OrigenContext.fijar(new Origen("jefe.rentas", null, null));
-        sellarConUitYAlicuota(base, administrarParametros, "3.0");
+        sellarElDerivado(base, administrarParametros);
 
         registrar =
                 envolver(
@@ -162,10 +168,10 @@ class RegistrarAlcabalaTest {
                             Dinero.de("100000.00"),
                             Observacion.de("El autovaluo ajustado es mayor"));
 
-            // Base 100000, tramo inafecto 10 UIT (con UIT ficticia de 4600) = 46000.
-            // (100000 - 46000) * 3% = 1620.00
+            // Base 100000; el derivado publica para 2026 la UIT de 5500, el tramo inafecto de
+            // 10 UIT (55000) y la alicuota del 3 %: (100000 - 55000) * 3 % = 1350.00.
             assertThat(determinacion.baseImponible()).isEqualTo(Dinero.de("100000.00"));
-            assertThat(determinacion.montoDeterminado()).isEqualTo(Dinero.de("1620.00"));
+            assertThat(determinacion.montoDeterminado()).isEqualTo(Dinero.de("1350.00"));
         }
 
         @Test
@@ -292,20 +298,27 @@ class RegistrarAlcabalaTest {
         }
     }
 
-    private static long sellarConUitYAlicuota(
-            BaseDeDatosDePrueba base, AdministrarParametros administrarParametros, String alicuota)
+    /**
+     * Sella 2026 con <b>todo</b> lo que el derivado publica para ese ejercicio (#376).
+     *
+     * <p>No se elige que filas entran: si la alcabala pidiera una llave que el derivado no trae, lo
+     * que tiene que salir es el 422 que la nombra, igual que en una instalacion real.
+     */
+    private static long sellarElDerivado(
+            BaseDeDatosDePrueba base, AdministrarParametros administrarParametros)
             throws SQLException {
         ConjuntoDeParametros conjunto =
                 administrarParametros.abrirVersion(
-                        ejercicio2026(), Observacion.de("Conjunto de prueba para alcabala"));
-        administrarParametros.agregarParametro(
-                conjunto.id(),
-                parametro(base, "UIT", null, "4600.00"),
-                Observacion.de("UIT ficticia de prueba"));
-        administrarParametros.agregarParametro(
-                conjunto.id(),
-                parametro(base, "ALICUOTA_ALCABALA", null, alicuota),
-                Observacion.de("Alicuota de alcabala ficticia"));
+                        ejercicio2026(), Observacion.de("Conjunto 2026 del derivado de normativa"));
+        for (java.util.Map.Entry<String, String> fila :
+                DerivadoPublicado.numerosVigentesEn(2026).entrySet()) {
+            String[] llave = fila.getKey().split("\\|", -1);
+            administrarParametros.agregarParametro(
+                    conjunto.id(),
+                    parametro(
+                            base, llave[0], llave[1].isEmpty() ? null : llave[1], fila.getValue()),
+                    Observacion.de("Fila del derivado publicable"));
+        }
         ConjuntoDeParametros sellado =
                 administrarParametros.sellar(conjunto.id(), Observacion.de("Sellado de prueba"));
         return sellado.id();
@@ -323,9 +336,9 @@ class RegistrarAlcabalaTest {
                                 "INSERT INTO parametro_tributario_de_prueba (municipalidad_id, tipo, clave,"
                                         + " valor_numerico, vigencia_desde, documento_fuente,"
                                         + " usuario_carga, usuario_aprueba)"
-                                        + " VALUES (NULL, ?, ?, ?, DATE '2026-01-01', 'ficticio de"
-                                        + " prueba, no representa ninguna norma', 'carga',"
-                                        + " 'aprueba') RETURNING id")) {
+                                        + " VALUES (NULL, ?, ?, ?, DATE '2026-01-01', 'derivado"
+                                        + " publicable de normativa', 'carga', 'aprueba')"
+                                        + " RETURNING id")) {
             sentencia.setString(1, tipo);
             sentencia.setString(2, clave);
             sentencia.setBigDecimal(3, new java.math.BigDecimal(valor));

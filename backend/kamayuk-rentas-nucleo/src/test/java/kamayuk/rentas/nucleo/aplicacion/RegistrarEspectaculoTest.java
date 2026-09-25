@@ -24,6 +24,7 @@ import kamayuk.rentas.esquema.ContextoDeTenant;
 import kamayuk.rentas.nucleo.dominio.predial.Determinacion;
 import kamayuk.rentas.nucleo.infraestructura.DeterminacionRepositoryJdbc;
 import kamayuk.rentas.nucleo.infraestructura.EspectaculoPublicoRepositoryJdbc;
+import kamayuk.rentas.nucleo.parametros.DerivadoPublicado;
 import kamayuk.rentas.parametros.LectorDeParametros;
 import kamayuk.rentas.parametros.aplicacion.AdministrarParametros;
 import kamayuk.rentas.parametros.aplicacion.LectorDeParametrosSellados;
@@ -46,8 +47,14 @@ import org.springframework.transaction.interceptor.TransactionInterceptor;
  * {@code RegistrarEspectaculo} contra PostgreSQL real (#32).
  *
  * <p>Verifica que registrar el evento y determinar el impuesto es un solo acto, y que la alícuota
- * se busca <b>por tipo de espectáculo</b> —dos tipos distintos, dos alícuotas distintas, mismo
- * conjunto sellado—, igual que {@code RT001ValorDeTerreno} busca el arancel por vía.
+ * se busca <b>por clase de espectáculo del art. 57</b> —dos clases distintas, dos alícuotas
+ * distintas, mismo conjunto sellado—, igual que {@code RT001ValorDeTerreno} busca el arancel por
+ * vía.
+ *
+ * <p><b>El conjunto sellado es el del derivado que {@code normativa} despliega</b> (#376). Hasta
+ * #376 se sembraban a mano {@code ALICUOTA_ESPECTACULO:CONCIERTO} y {@code :TEATRO}: ni el prefijo
+ * ni las claves son los que se publican, y la prueba pasaba en verde mientras la operación real
+ * contestaba siempre 422.
  */
 @DisplayName("#32 — Registrar un espectaculo publico")
 class RegistrarEspectaculoTest {
@@ -89,7 +96,7 @@ class RegistrarEspectaculoTest {
         // aqui, y BeforeEach los vuelve a fijar antes de cada prueba sin que eso sea un problema.
         TenantContext.fijar(new MunicipalidadId(municipalidad));
         OrigenContext.fijar(new Origen("jefe.rentas", null, null));
-        sellarConDosAlicuotas(administrarParametros);
+        sellarElDerivado(administrarParametros);
 
         registrar =
                 envolver(
@@ -138,13 +145,13 @@ class RegistrarEspectaculoTest {
     }
 
     @Test
-    @DisplayName("registra el evento y determina el impuesto con la alicuota de su tipo")
+    @DisplayName("registra el evento y determina el impuesto con la alicuota de su clase")
     void registraElEventoYDeterminaElImpuestoConLaAlicuotaDeSuTipo() {
-        Determinacion concierto =
+        Determinacion cine =
                 registrar.registrar(
                         organizador,
-                        "Festival de la Ciudad",
-                        "CONCIERTO",
+                        "Festival de Cine de la Ciudad",
+                        "CINEMATOGRAFICO",
                         "Estadio Municipal",
                         LocalDate.of(2026, 12, 15),
                         null,
@@ -152,25 +159,66 @@ class RegistrarEspectaculoTest {
                         Dinero.de("10000.00"),
                         Observacion.de("Registro de prueba"));
 
-        Determinacion teatro =
+        Determinacion carreras =
                 registrar.registrar(
                         organizador,
-                        "Obra de Fin de Ano",
-                        "TEATRO",
-                        "Teatro Municipal",
+                        "Clasico de Fin de Ano",
+                        "CARRERAS-CABALLOS",
+                        "Hipodromo Municipal",
                         LocalDate.of(2026, 12, 20),
                         null,
                         null,
                         Dinero.de("10000.00"),
                         Observacion.de("Registro de prueba"));
 
-        assertThat(concierto.montoDeterminado())
+        assertThat(cine.montoDeterminado())
                 .as("10% de 10000 = 1000.00")
                 .isEqualTo(Dinero.de("1000.00"));
-        assertThat(teatro.montoDeterminado())
-                .as("2% de 10000 = 200.00: mismo ingreso, otra alicuota por el tipo")
-                .isEqualTo(Dinero.de("200.00"));
-        assertThat(concierto.montoDeterminado()).isNotEqualTo(teatro.montoDeterminado());
+        assertThat(carreras.montoDeterminado())
+                .as("15% de 10000 = 1500.00: mismo ingreso, otra alicuota por la clase")
+                .isEqualTo(Dinero.de("1500.00"));
+        assertThat(cine.montoDeterminado()).isNotEqualTo(carreras.montoDeterminado());
+    }
+
+    /**
+     * El taurino a los dos lados del umbral, contra la UIT que el derivado publica para 2026
+     * (#376).
+     *
+     * <p>5 500 × 0,5 % = 27,50: una entrada de 27,51 lo supera y paga el 10 %; una de 27,50 lo
+     * iguala, «no es superior», y paga el 5 %.
+     */
+    @Test
+    @DisplayName("#376 — el taurino paga el 10 % con la entrada a 27,51 y el 5 % a 27,50")
+    void elTaurinoALosDosLadosDelUmbral() {
+        Determinacion porEncima =
+                registrar.registrar(
+                        organizador,
+                        "Corrida de la Feria",
+                        "TAURINO",
+                        "Plaza de Toros",
+                        LocalDate.of(2026, 10, 3),
+                        2000,
+                        Dinero.de("27.51"),
+                        Dinero.de("10000.00"),
+                        Observacion.de("Registro de prueba"));
+        Determinacion enElUmbral =
+                registrar.registrar(
+                        organizador,
+                        "Novillada de la Feria",
+                        "taurino",
+                        "Plaza de Toros",
+                        LocalDate.of(2026, 10, 4),
+                        2000,
+                        Dinero.de("27.50"),
+                        Dinero.de("10000.00"),
+                        Observacion.de("Registro de prueba"));
+
+        assertThat(porEncima.montoDeterminado()).isEqualTo(Dinero.de("1000.00"));
+        assertThat(porEncima.reglasAplicadas())
+                .containsExactly("ESPECTACULO_ALICUOTA:TAURINO-SUPERIOR-0.5-UIT");
+        assertThat(enElUmbral.montoDeterminado()).isEqualTo(Dinero.de("500.00"));
+        assertThat(enElUmbral.reglasAplicadas())
+                .containsExactly("ESPECTACULO_ALICUOTA:TAURINO-RESTO");
     }
 
     @Test
@@ -179,7 +227,7 @@ class RegistrarEspectaculoTest {
         registrar.registrar(
                 organizador,
                 "Otro Festival",
-                "CONCIERTO",
+                "MUSICA-GENERAL",
                 "Coliseo",
                 LocalDate.of(2026, 11, 1),
                 500,
@@ -206,20 +254,21 @@ class RegistrarEspectaculoTest {
         }
     }
 
-    private static void sellarConDosAlicuotas(AdministrarParametros administrarParametros)
+    /** Sella 2026 con todo lo que el derivado publica para ese ejercicio, sin elegir (#376). */
+    private static void sellarElDerivado(AdministrarParametros administrarParametros)
             throws SQLException {
         ConjuntoDeParametros conjunto =
                 administrarParametros.abrirVersion(
                         new Ejercicio(2026),
-                        Observacion.de("Conjunto de prueba para espectaculos"));
-        administrarParametros.agregarParametro(
-                conjunto.id(),
-                parametro("ALICUOTA_ESPECTACULO", "CONCIERTO", "10.0"),
-                Observacion.de("Alicuota de concierto ficticia"));
-        administrarParametros.agregarParametro(
-                conjunto.id(),
-                parametro("ALICUOTA_ESPECTACULO", "TEATRO", "2.0"),
-                Observacion.de("Alicuota de teatro ficticia"));
+                        Observacion.de("Conjunto 2026 del derivado de normativa"));
+        for (java.util.Map.Entry<String, String> fila :
+                DerivadoPublicado.numerosVigentesEn(2026).entrySet()) {
+            String[] llave = fila.getKey().split("\\|", -1);
+            administrarParametros.agregarParametro(
+                    conjunto.id(),
+                    parametro(llave[0], llave[1].isEmpty() ? null : llave[1], fila.getValue()),
+                    Observacion.de("Fila del derivado publicable"));
+        }
         administrarParametros.sellar(conjunto.id(), Observacion.de("Sellado de prueba"));
     }
 
@@ -230,9 +279,9 @@ class RegistrarEspectaculoTest {
                                 "INSERT INTO parametro_tributario_de_prueba (municipalidad_id, tipo, clave,"
                                         + " valor_numerico, vigencia_desde, documento_fuente,"
                                         + " usuario_carga, usuario_aprueba)"
-                                        + " VALUES (NULL, ?, ?, ?, DATE '2026-01-01', 'ficticio de"
-                                        + " prueba, no representa ninguna norma', 'carga',"
-                                        + " 'aprueba') RETURNING id")) {
+                                        + " VALUES (NULL, ?, ?, ?, DATE '2026-01-01', 'derivado"
+                                        + " publicable de normativa', 'carga', 'aprueba')"
+                                        + " RETURNING id")) {
             sentencia.setString(1, tipo);
             sentencia.setString(2, clave);
             sentencia.setBigDecimal(3, new java.math.BigDecimal(valor));

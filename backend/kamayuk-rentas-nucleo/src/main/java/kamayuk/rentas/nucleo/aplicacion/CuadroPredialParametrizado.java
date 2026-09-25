@@ -71,20 +71,8 @@ import org.springframework.stereotype.Service;
 @Service
 public class CuadroPredialParametrizado {
 
-    /** La UIT del ejercicio, en soles. Sin clave: el tipo tiene un solo valor. */
-    static final String TIPO_UIT = "UIT";
-
-    /** La alicuota de cada tramo del articulo 13. Clave: el ordinal del tramo. */
-    static final String TIPO_TRAMO = "TRAMO_PREDIAL";
-
-    /** Hasta cuantas UIT llega cada tramo. Clave: el ordinal del tramo. */
-    static final String TIPO_LIMITE = "TRAMO_PREDIAL_LIMITE";
-
-    /** El minimo imponible, expresado como porcentaje de la UIT (articulo 13, ultimo parrafo). */
-    static final String TIPO_MINIMO = "PREDIAL_MINIMO";
-
-    /** El derecho de emision mecanizada, en soles (ordenanza local, D-02b). */
-    static final String TIPO_DERECHO_EMISION = "DERECHO_EMISION_PREDIAL";
+    // Las llaves numericas del cuadro —UIT, tramos, limites, minimo y derecho de emision— viven en
+    // LlavesDelConjunto desde #376: una sola fuente por modulo, comprobada contra el derivado.
 
     /**
      * El dia en que vence cada cuota. Clave: {@link #CLAVE_CONTADO} para el pago al contado, y el
@@ -168,7 +156,8 @@ public class CuadroPredialParametrizado {
 
         /** La UIT del ejercicio, en soles. */
         public Dinero uit() {
-            return Dinero.de(sellados.exigirNumero(TIPO_UIT, null).valor().toPlainString());
+            return Dinero.de(
+                    sellados.exigirNumero(LlavesDelConjunto.UIT, null).valor().toPlainString());
         }
 
         /**
@@ -180,11 +169,11 @@ public class CuadroPredialParametrizado {
          * la ley pone.
          */
         public List<Tramo> tramos() {
-            SortedSet<String> claves = sellados.clavesDe(TIPO_TRAMO);
+            SortedSet<String> claves = sellados.clavesDe(LlavesDelConjunto.TRAMO_PREDIAL);
             if (claves.isEmpty()) {
                 throw new ParametroDelPredialAusente(
                         ejercicio,
-                        TIPO_TRAMO + ":1",
+                        LlavesDelConjunto.TRAMO_PREDIAL + ":1",
                         "Sin el cuadro de tramos del articulo 13 no hay impuesto que calcular");
             }
             Dinero uit = uit();
@@ -194,15 +183,18 @@ public class CuadroPredialParametrizado {
                 String clave = ordenadas.get(i);
                 Alicuota alicuota =
                         Alicuota.de(
-                                sellados.exigirNumero(TIPO_TRAMO, clave).valor().toPlainString());
+                                sellados.exigirNumero(LlavesDelConjunto.TRAMO_PREDIAL, clave)
+                                        .valor()
+                                        .toPlainString());
                 Optional<BigDecimal> limiteEnUit =
-                        sellados.numero(TIPO_LIMITE, clave).map(valor -> valor.valor());
+                        sellados.numero(LlavesDelConjunto.TRAMO_PREDIAL_LIMITE, clave)
+                                .map(valor -> valor.valor());
                 boolean esElUltimo = i == ordenadas.size() - 1;
                 if (limiteEnUit.isEmpty()) {
                     if (!esElUltimo) {
                         throw new ParametroDelPredialAusente(
                                 ejercicio,
-                                TIPO_LIMITE + ":" + clave,
+                                LlavesDelConjunto.TRAMO_PREDIAL_LIMITE + ":" + clave,
                                 "Solo el ultimo tramo del cuadro puede ir sin tope; el tramo "
                                         + clave
                                         + " tiene "
@@ -224,14 +216,17 @@ public class CuadroPredialParametrizado {
          * publicado; la conversion a soles se hace con la UIT del mismo conjunto.
          */
         public Dinero minimoImponible() {
-            BigDecimal porcentaje = sellados.exigirNumero(TIPO_MINIMO, null).valor();
+            BigDecimal porcentaje =
+                    sellados.exigirNumero(LlavesDelConjunto.PREDIAL_MINIMO, null).valor();
             return uit().por(porcentaje.movePointLeft(2));
         }
 
         /** El derecho de emision mecanizada del ejercicio, en soles. */
         public Dinero derechoDeEmision() {
             return Dinero.de(
-                    sellados.exigirNumero(TIPO_DERECHO_EMISION, null).valor().toPlainString());
+                    sellados.exigirNumero(LlavesDelConjunto.DERECHO_EMISION_PREDIAL, null)
+                            .valor()
+                            .toPlainString());
         }
 
         /**
@@ -313,7 +308,7 @@ public class CuadroPredialParametrizado {
                                 } catch (NumberFormatException noEsOrdinal) {
                                     throw new IllegalStateException(
                                             "Las claves de "
-                                                    + TIPO_TRAMO
+                                                    + LlavesDelConjunto.TRAMO_PREDIAL
                                                     + " y "
                                                     + TIPO_VENCIMIENTO
                                                     + " son ordinales: '"

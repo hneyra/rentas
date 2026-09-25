@@ -71,7 +71,7 @@ class DeterminacionTest {
                         3L,
                         Dinero.de("50000"),
                         Dinero.de("120"),
-                        List.of("ALICUOTA_ALCABALA"));
+                        List.of("ALCABALA_ALICUOTA"));
 
         assertThat(alcabala.tributo()).isEqualTo("ALCABALA");
         assertThat(alcabala.predioId()).isEqualTo(5L);
@@ -88,7 +88,7 @@ class DeterminacionTest {
                         3L,
                         Dinero.de("10000"),
                         Dinero.de("1000"),
-                        List.of("ALICUOTA_ESPECTACULO:CONCIERTO"));
+                        List.of("ESPECTACULO_ALICUOTA:CINEMATOGRAFICO"));
 
         assertThat(espectaculos.tributo()).isEqualTo("ESPECTACULOS");
         assertThat(espectaculos.predioId()).isNull();
