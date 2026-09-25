@@ -24,6 +24,7 @@ import kamayuk.rentas.contribuyentes.ResumenDeContribuyente;
 import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.Observacion;
+import kamayuk.rentas.dominio.PoliticasDeRedondeo;
 import kamayuk.rentas.dominio.Porcentaje;
 import kamayuk.rentas.dominio.ValorNormativo;
 import kamayuk.rentas.nucleo.BeneficioRegistrado;
@@ -981,6 +982,162 @@ class DeterminarPredialTest {
                                     false),
                             PORQUE);
         }
+    }
+
+    /**
+     * <b>Lo que puede faltar se resuelve ANTES de asentar</b> (#359).
+     *
+     * <p>El derecho de emision, los vencimientos de la modalidad pedida y el punto de redondeo
+     * {@code CUOTA} son las tres piezas del conjunto que hoy no publica nadie (D-02b, D-03c), y las
+     * tres se resolvian <b>despues</b> de {@code registrar}: la fila y su {@code ALTA} ya estaban
+     * confirmados cuando la peticion contestaba 422, y cada reintento dejaba otra.
+     *
+     * <h2>La siembra que distingue es {@code simulacion = false}</h2>
+     *
+     * <p>Las pruebas que habia de la cifra ausente —{@link #sinDerechoDeEmisionNoSeDetermina()} y
+     * las de {@code PredialControllerTest}— simulaban todas, y simulando {@code registrar} no
+     * escribe: ninguna podia ver la fila. Aqui se asienta, y lo que se cuenta son las dos
+     * escrituras que el defecto dejaba —la fila en el doble del repositorio y el registro en el de
+     * la auditoria—, no solo la excepcion, que salia igual con el defecto dentro.
+     */
+    @Nested
+    @DisplayName("#359 — sin una pieza del conjunto no se asienta nada: ni la fila ni su ALTA")
+    class LoQueFaltaSeResuelveAntesDeAsentar {
+
+        @Test
+        @DisplayName("sin DERECHO_EMISION_PREDIAL: ParametroAusente, cero filas y cero ALTA")
+        void sinDerechoDeEmisionNoQuedaFila() {
+            predios.con(11L, "10001", "AV. GRAU 100", Porcentaje.total());
+
+            assertThatThrownBy(
+                            () ->
+                                    asentarCon(
+                                            conjuntoSin(LoQueFalta.DERECHO_DE_EMISION),
+                                            ModalidadDelPredial.TRIMESTRAL))
+                    .isInstanceOf(ParametrosSellados.ParametroAusente.class)
+                    .hasMessageContaining("DERECHO_EMISION_PREDIAL");
+
+            assertThat(determinaciones.insertadas)
+                    .as("el 422 que el usuario ve no puede dejar una determinacion confirmada")
+                    .isZero();
+            assertThat(auditoria.registros)
+                    .as("ni el ALTA de una determinacion que nadie llego a tener")
+                    .isEmpty();
+        }
+
+        @Test
+        @DisplayName("TRIMESTRAL con solo el CONTADO publicado: 422, cero filas y cero ALTA")
+        void sinLasCuotasDeLaModalidadNoQuedaFila() {
+            predios.con(11L, "10001", "AV. GRAU 100", Porcentaje.total());
+
+            assertThatThrownBy(
+                            () ->
+                                    asentarCon(
+                                            conjuntoSin(LoQueFalta.CUOTAS_DEL_FRACCIONADO),
+                                            ModalidadDelPredial.TRIMESTRAL))
+                    .isInstanceOf(CuadroPredialParametrizado.ParametroDelPredialAusente.class)
+                    .hasMessageContaining("TRIMESTRAL");
+
+            assertThat(determinaciones.insertadas)
+                    .as(
+                            "la fila diria modalidad TRIMESTRAL (V21) y seria «la ultima» de un"
+                                    + " cronograma que no existe")
+                    .isZero();
+            assertThat(auditoria.registros).isEmpty();
+        }
+
+        @Test
+        @DisplayName("y el mismo conjunto SI asienta al CONTADO: lo que falta es de la modalidad")
+        void elMismoConjuntoAsientaAlContado() {
+            predios.con(11L, "10001", "AV. GRAU 100", Porcentaje.total());
+
+            DeterminacionPredialCalculada alContado =
+                    asentarCon(
+                            conjuntoSin(LoQueFalta.CUOTAS_DEL_FRACCIONADO),
+                            ModalidadDelPredial.CONTADO);
+
+            assertThat(alContado.cabecera().id())
+                    .as("sin este contraste, «no asienta nunca» pasaria las pruebas de arriba")
+                    .isNotNull();
+            assertThat(determinaciones.insertadas).isEqualTo(1);
+            assertThat(auditoria.registros).hasSize(1);
+        }
+
+        @Test
+        @DisplayName("sin el punto de redondeo CUOTA: PuntoSinPolitica, cero filas y cero ALTA")
+        void sinElPuntoDeLaCuotaNoQuedaFila() {
+            predios.con(11L, "10001", "AV. GRAU 100", Porcentaje.total());
+
+            assertThatThrownBy(
+                            () ->
+                                    asentarCon(
+                                            conjuntoSin(LoQueFalta.PUNTO_CUOTA),
+                                            ModalidadDelPredial.TRIMESTRAL))
+                    .isInstanceOf(PoliticasDeRedondeo.PuntoSinPolitica.class)
+                    .hasMessageContaining("CUOTA");
+
+            assertThat(determinaciones.insertadas).isZero();
+            assertThat(auditoria.registros).isEmpty();
+        }
+
+        private DeterminacionPredialCalculada asentarCon(
+                ParametrosSellados sellados, ModalidadDelPredial modalidad) {
+            return servicioCon(sellados)
+                    .determinar(
+                            new DeterminarPredial.Peticion(
+                                    EJERCICIO,
+                                    "C-001",
+                                    List.of(declarado(11L, "100000.00")),
+                                    modalidad,
+                                    false),
+                            PORQUE);
+        }
+    }
+
+    /** Cual de las tres piezas de #359 le falta al conjunto. */
+    private enum LoQueFalta {
+        DERECHO_DE_EMISION,
+        CUOTAS_DEL_FRACCIONADO,
+        PUNTO_CUOTA
+    }
+
+    /**
+     * El conjunto completo <b>menos una</b> de las tres piezas de #359, y con todo lo demas que el
+     * calculo atraviesa: si faltara tambien otra, la prueba podria salir roja por la que no mide.
+     * El contado queda siempre publicado, que es la variante del issue —la ordenanza publica el
+     * contado y todavia no las cuotas—.
+     */
+    private static ParametrosSellados conjuntoSin(LoQueFalta falta) {
+        ParametrosSellados.Constructor conjunto =
+                ParametrosSellados.de(EJERCICIO, 1)
+                        .numero("UIT", null, ValorNormativo.de("5500.00"))
+                        .numero("TRAMO_PREDIAL", "1", ValorNormativo.de("0.2"))
+                        .numero("TRAMO_PREDIAL_LIMITE", "1", ValorNormativo.de("15"))
+                        .numero("TRAMO_PREDIAL", "2", ValorNormativo.de("0.6"))
+                        .numero("TRAMO_PREDIAL_LIMITE", "2", ValorNormativo.de("60"))
+                        .numero("TRAMO_PREDIAL", "3", ValorNormativo.de("1.0"))
+                        .numero("PREDIAL_MINIMO", null, ValorNormativo.de("0.6"))
+                        .texto("PREDIAL_VENCIMIENTO", "CONTADO", "2026-02-27")
+                        .numero("REDONDEO", "IMPUESTO_POR_TRAMO", ValorNormativo.de("2"))
+                        .texto("REDONDEO", "IMPUESTO_POR_TRAMO", "HALF_UP")
+                        .numero("REDONDEO", "BASE_DEL_CONTRIBUYENTE", ValorNormativo.de("2"))
+                        .texto("REDONDEO", "BASE_DEL_CONTRIBUYENTE", "HALF_UP")
+                        .numero("REDONDEO", "BASE_IMPONIBLE_DEL_PREDIO", ValorNormativo.de("2"))
+                        .texto("REDONDEO", "BASE_IMPONIBLE_DEL_PREDIO", "HALF_UP");
+        if (falta != LoQueFalta.DERECHO_DE_EMISION) {
+            conjunto.numero("DERECHO_EMISION_PREDIAL", null, ValorNormativo.de("4.50"));
+        }
+        if (falta != LoQueFalta.CUOTAS_DEL_FRACCIONADO) {
+            conjunto.texto("PREDIAL_VENCIMIENTO", "1", "2026-02-27")
+                    .texto("PREDIAL_VENCIMIENTO", "2", "2026-05-29")
+                    .texto("PREDIAL_VENCIMIENTO", "3", "2026-08-31")
+                    .texto("PREDIAL_VENCIMIENTO", "4", "2026-11-30");
+        }
+        if (falta != LoQueFalta.PUNTO_CUOTA) {
+            conjunto.numero("REDONDEO", "CUOTA", ValorNormativo.de("2"))
+                    .texto("REDONDEO", "CUOTA", "HALF_UP");
+        }
+        return conjunto.construir();
     }
 
     private DeterminacionPredialCalculada determinar(

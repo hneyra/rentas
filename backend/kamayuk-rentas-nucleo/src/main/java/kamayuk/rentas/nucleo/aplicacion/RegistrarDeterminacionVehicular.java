@@ -1,9 +1,11 @@
 package kamayuk.rentas.nucleo.aplicacion;
 
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import kamayuk.rentas.auditoria.Auditoria;
 import kamayuk.rentas.auditoria.Operacion;
@@ -165,13 +167,59 @@ public class RegistrarDeterminacionVehicular {
                                 LlavesDelConjunto.VEHICULAR_MINIMO_UIT));
 
         String conjunto = sellados.ejercicio() + " v" + sellados.version();
+        Calculo calculado = new Calculo(nueva, conjunto, alicuota, minimoImponible, base.origen());
         if (simulacion) {
-            return new Calculo(nueva, conjunto, alicuota, minimoImponible, base.origen());
+            return calculado;
         }
+        return asentarUno(calculado, observacion);
+    }
 
+    /**
+     * Asienta <b>juntos</b> los calculos de un lote —los vehiculos de un contribuyente— que ya se
+     * hicieron con {@code simulacion = true}: o quedan todos, o no queda ninguno (#359).
+     *
+     * <p>Hasta #359 el controlador recorria los vehiculos llamando a {@link #calcular} con {@code
+     * simulacion = false}, una transaccion por vehiculo: si el k-esimo no tenia valor referencial,
+     * la respuesta era 422 con los k−1 anteriores ya asentados y auditados, y el 422 no los
+     * nombraba. Ahora el lote se calcula entero sin escribir y, solo si ninguno fallo, se asienta
+     * aqui en <b>una</b> transaccion.
+     *
+     * <p>No se envuelve el bucle de calculo en ella: ese bucle atrapa {@link VehiculoNoAfecto} para
+     * excluir en silencio al vehiculo fuera de plazo, y una excepcion atrapada dentro de una
+     * transaccion la deja <i>rollback-only</i> (#328, #54, #72). Aqui no se atrapa nada: lo que
+     * falla al insertar deshace el lote entero, que es lo que se quiere.
+     *
+     * @param calculados los calculos simulados del lote, en el orden en que se devuelven
+     * @param observacion por que se asientan (regla 10); la misma para todo el lote
+     * @return los mismos calculos, cada uno con su determinacion ya guardada
+     */
+    @Transactional
+    public List<Calculo> asentar(List<Calculo> calculados, Observacion observacion) {
+        Objects.requireNonNull(calculados, "El lote es una lista, vacia si no hay nada");
+        Objects.requireNonNull(observacion, "Toda modificacion exige la observacion (regla 10)");
+        List<Calculo> asentados = new ArrayList<>();
+        for (Calculo calculado : calculados) {
+            asentados.add(asentarUno(calculado, observacion));
+        }
+        return List.copyOf(asentados);
+    }
+
+    private Calculo asentarUno(Calculo calculado, Observacion observacion) {
+        Determinacion nueva = calculado.determinacion();
+        if (!nueva.esNueva()) {
+            throw new IllegalArgumentException(
+                    "La determinacion "
+                            + nueva.id()
+                            + " ya esta asentada: recalcular es otra fila (ADR-0007)");
+        }
         Determinacion guardada = determinaciones.insertar(nueva);
         auditar(guardada, observacion);
-        return new Calculo(guardada, conjunto, alicuota, minimoImponible, base.origen());
+        return new Calculo(
+                guardada,
+                calculado.conjunto(),
+                calculado.alicuota(),
+                calculado.minimoImponible(),
+                calculado.origenDeLaBase());
     }
 
     /**

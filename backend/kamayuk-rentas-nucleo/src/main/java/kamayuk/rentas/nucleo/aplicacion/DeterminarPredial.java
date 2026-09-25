@@ -186,17 +186,27 @@ public class DeterminarPredial {
      * Determina —o simula— el predial de un contribuyente.
      *
      * <p>No abre transaccion propia, y no la abre nadie por ella: <b>la escritura</b> abre la suya
-     * en {@link RegistrarDeterminacionPredial#registrar}, y <b>cada lectura previa trae la
-     * propia</b> —el directorio, el conjunto sellado, los beneficios, el padron ya declarado y la
-     * valuacion sellada ({@code ValuacionRecibidaJdbc}, desde #358)—. Envolver esto en una del
-     * anfitrion es la trampa que #54 y #72 documentan: una excepcion capturada dentro de la del
-     * anfitrion la deja marcada como <i>rollback-only</i> y revienta al confirmarla.
+     * en {@link RegistrarDeterminacionPredial#asentar}, y <b>cada lectura previa trae la propia</b>
+     * —el directorio, el conjunto sellado, los beneficios, el padron ya declarado y la valuacion
+     * sellada ({@code ValuacionRecibidaJdbc}, desde #358)—. Envolver esto en una del anfitrion es
+     * la trampa que #54 y #72 documentan: una excepcion capturada dentro de la del anfitrion la
+     * deja marcada como <i>rollback-only</i> y revienta al confirmarla.
      *
      * <p>Hasta #358 este parrafo decia que la transaccion «la abre {@code registrar}», y dejo de
      * ser cierto con #52: la precedencia de la valuacion sellada anadio una lectura de {@code
      * valuacion_predio} <b>antes</b> de {@code registrar}, que corria en autocommit y sin {@code
      * SET LOCAL}, y la politica de RLS la hacia fallar con un 500. Un colaborador nuevo que lea la
      * base tiene que traer su transaccion: aqui no hay ninguna a la que unirse.
+     *
+     * <h2>Se asienta al final (#359)</h2>
+     *
+     * <p>Primero se compone la determinacion entera —la cabecera calculada, el derecho de emision,
+     * los vencimientos de la modalidad pedida y las cuotas con su redondeo— y solo despues se
+     * asienta. Hasta #359 el orden era el contrario: {@code registrar} calculaba y confirmaba la
+     * fila con su {@code ALTA}, y lo que faltaba del conjunto se descubria despues, con un 422 que
+     * el usuario leia como «no se determino» y una fila que decia lo contrario. Cada reintento
+     * escribia otra, y esa pasaba a ser «la ultima» del ejercicio para la corrida masiva y para la
+     * consulta.
      *
      * @param peticion que se determina y con que autovaluos
      * @param observacion por que (regla 10); se exige tambien al simular
@@ -225,49 +235,57 @@ public class DeterminarPredial {
         List<DetalleDeterminacionPredio> detalle =
                 enLaBase.stream().map(PredioEnLaBase::comoDetalle).toList();
 
-        Determinacion cabecera =
-                registro.registrar(
+        // Lo que la determinacion necesita para EMITIRSE, resuelto ANTES de asentar (#359, ARQ-09
+        // §4: «¿parametros completos? → no → DETENER», antes de la determinacion). Son las
+        // piezas que hoy no publica nadie —el derecho y los vencimientos son de ordenanza local
+        // (D-02b)—, y hasta #359 se resolvian despues de `registrar`: el 422 salia con la fila y
+        // su ALTA ya confirmados. La modalidad es la de la peticion, que es la misma que
+        // `calcular` pone en la cabecera y `asentar` escribe (#234): el cronograma y la fila no
+        // pueden hablar de modalidades distintas.
+        Dinero derechoDeEmision = vigente.derechoDeEmision();
+        List<LocalDate> vencimientos = vigente.vencimientos(peticion.modalidad());
+
+        Determinacion calculada =
+                registro.calcular(
                         peticion.ejercicio(),
                         contribuyente.id(),
                         detalle,
                         tramos,
                         minimo,
-                        peticion.modalidad(),
-                        peticion.simulacion(),
-                        observacion);
+                        peticion.modalidad());
 
         List<AporteDeTramo> aportes =
-                TramosProgresivosAcumulativos.desglosar(cabecera.baseImponible(), tramos);
-        Dinero derechoDeEmision = vigente.derechoDeEmision();
-        // La modalidad sale de la CABECERA y no de la peticion: es la que quedo escrita en la
-        // fila, y es la unica que despues se puede volver a leer (#234). Resolver el cronograma
-        // con la de la peticion y guardar otra dejaria la respuesta y la fila diciendo cosas
-        // distintas sobre el mismo hecho.
-        ModalidadDelPredial modalidad =
-                Objects.requireNonNull(
-                        cabecera.modalidad(),
-                        "La cabecera de una determinacion predial nueva siempre trae su modalidad:"
-                                + " Determinacion.nuevaPredial la exige (#234)");
+                TramosProgresivosAcumulativos.desglosar(calculada.baseImponible(), tramos);
+        // Reparte con el redondeo del punto CUOTA, que tambien puede faltar (D-03c): falla aqui,
+        // con nada escrito todavia.
         List<CuotaDelPredial> cuotas =
-                CronogramaDelPredial.repartir(
-                        cabecera.montoDeterminado(), vigente.vencimientos(modalidad), redondeo);
+                CronogramaDelPredial.repartir(calculada.montoDeterminado(), vencimientos, redondeo);
 
-        return new DeterminacionPredialCalculada(
-                cabecera,
-                enLaBase,
-                sumar(enLaBase, PredioEnLaBase::autovaluo),
-                sumar(enLaBase, PredioEnLaBase::valuoExonerado),
-                sumar(enLaBase, PredioEnLaBase::valuoAfecto),
-                vigente.uit(),
-                aportes,
-                minimo,
-                cabecera.montoDeterminado(),
-                derechoDeEmision,
-                cuotas,
-                vigente.nombreDelConjunto(),
-                contribuyente.codigo(),
-                contribuyente.nombre(),
-                fechaDeCalculo);
+        // La determinacion ENTERA, validada por su record, antes de escribir nada.
+        DeterminacionPredialCalculada determinada =
+                new DeterminacionPredialCalculada(
+                        calculada,
+                        enLaBase,
+                        sumar(enLaBase, PredioEnLaBase::autovaluo),
+                        sumar(enLaBase, PredioEnLaBase::valuoExonerado),
+                        sumar(enLaBase, PredioEnLaBase::valuoAfecto),
+                        vigente.uit(),
+                        aportes,
+                        minimo,
+                        calculada.montoDeterminado(),
+                        derechoDeEmision,
+                        cuotas,
+                        vigente.nombreDelConjunto(),
+                        contribuyente.codigo(),
+                        contribuyente.nombre(),
+                        fechaDeCalculo);
+
+        // Simular es no asentar. Y asentar es lo ULTIMO: despues de esta linea no queda nada que
+        // pueda faltar.
+        if (peticion.simulacion()) {
+            return determinada;
+        }
+        return determinada.asentadaComo(registro.asentar(calculada, detalle, observacion));
     }
 
     /**

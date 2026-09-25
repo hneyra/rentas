@@ -442,9 +442,8 @@ public class PredialController {
      * pantalla sin poder ensenar el calculo antes de asentarlo, que es justo lo que su boton
      * «Simular» existe para hacer. La que se pasa entonces la <b>compone el sistema</b>, como en
      * las filas de {@code ACCESO} de {@code ConsultaDeTitulares}, y {@link
-     * kamayuk.rentas.nucleo.aplicacion.RegistrarDeterminacionPredial} la sigue recibiendo: la regla
-     * de ArchUnit no se relaja, lo que cambia es quien la escribe cuando no hay nada que
-     * justificar.
+     * kamayuk.rentas.nucleo.aplicacion.DeterminarPredial} la sigue recibiendo: la regla de ArchUnit
+     * no se relaja, lo que cambia es quien la escribe cuando no hay nada que justificar.
      *
      * <p>Con {@code simulacion = false} vuelve a ser obligatoria del usuario, porque ahi si hay una
      * determinacion nueva que alguien tendra que explicar.

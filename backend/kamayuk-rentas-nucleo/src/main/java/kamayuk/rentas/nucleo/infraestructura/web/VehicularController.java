@@ -110,6 +110,13 @@ import org.springframework.web.bind.annotation.RestController;
  * {@code PredialController}: antes, una petición que no lo dijera asentaba la determinación, que es
  * la peor de las dos suposiciones posibles. Un cuerpo sin la marca se rechaza en vez de elegir por
  * quien atiende.
+ *
+ * <h2>Por contribuyente se asienta el lote entero, o nada (#359)</h2>
+ *
+ * <p>Los vehiculos se calculan <b>todos</b> sin escribir y, solo si ninguno falla, se asientan
+ * juntos con {@link RegistrarDeterminacionVehicular#asentar}. Hasta #359 cada uno se asentaba al
+ * calcularlo: un vehiculo sin valor referencial a mitad de la lista contestaba 422 con los
+ * anteriores ya escritos, y la respuesta no los nombraba.
  */
 @RestController
 @RequestMapping(Api.RAIZ + "/rentas/vehicular/calculo")
@@ -155,16 +162,20 @@ public class VehicularController {
                         simulacion);
         LocalDate fechaCalculo = LocalDate.now(reloj);
 
-        List<DeterminacionVehicularResource> resultado = new ArrayList<>();
-        RegistrarDeterminacionVehicular.@Nullable Calculo ultimo = null;
+        // Dos fases (#359): primero se CALCULA el lote entero sin escribir nada y, solo si ningun
+        // vehiculo fallo, se ASIENTA de una vez. Hasta #359 cada vehiculo se asentaba al
+        // calcularlo, y si el k-esimo no tenia valor referencial el 422 salia con los k−1
+        // anteriores ya escritos y auditados, sin nombrarlos. No con un @Transactional alrededor
+        // de este bucle: `VehiculoNoAfecto` se atrapa dentro, y la dejaria rollback-only (#328).
+        List<Vehiculo> calculados = new ArrayList<>();
+        List<RegistrarDeterminacionVehicular.Calculo> calculos = new ArrayList<>();
         try {
             for (Vehiculo vehiculo : resolverVehiculos(objetivo, delCalculo)) {
                 try {
-                    RegistrarDeterminacionVehicular.Calculo calculo =
+                    calculos.add(
                             servicio.calcular(
-                                    exigirId(vehiculo.id()), delCalculo, simulacion, observacion);
-                    ultimo = calculo;
-                    resultado.add(DeterminacionVehicularResource.de(calculo, vehiculo));
+                                    exigirId(vehiculo.id()), delCalculo, true, observacion));
+                    calculados.add(vehiculo);
                 } catch (RegistrarDeterminacionVehicular.VehiculoNoAfecto fueraDePlazo) {
                     if (objetivo.esPuntual()) {
                         throw new ProblemaDeNegocio(
@@ -192,9 +203,18 @@ public class VehicularController {
             // categoria del vehiculo en el padron, que ni siquiera es un dato normativo.
             throw new ProblemaDeNegocio(CodigoDeError.VALIDACION, mensajeDe(sinValor));
         }
-        return ultimo == null
+
+        List<RegistrarDeterminacionVehicular.Calculo> devueltos =
+                simulacion || calculos.isEmpty()
+                        ? calculos
+                        : servicio.asentar(calculos, observacion);
+        List<DeterminacionVehicularResource> resultado = new ArrayList<>();
+        for (int i = 0; i < devueltos.size(); i++) {
+            resultado.add(DeterminacionVehicularResource.de(devueltos.get(i), calculados.get(i)));
+        }
+        return devueltos.isEmpty()
                 ? CalculoVehicularResource.sinDeterminaciones(fechaCalculo)
-                : CalculoVehicularResource.de(fechaCalculo, ultimo, resultado);
+                : CalculoVehicularResource.de(fechaCalculo, devueltos.getLast(), resultado);
     }
 
     // ------------------------------------------------------------------

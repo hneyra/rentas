@@ -80,63 +80,43 @@ public class RegistrarDeterminacionPredial {
     }
 
     /**
-     * Determina el predial: agrega la base del contribuyente, aplica los tramos y el minimo, y
-     * guarda la cabecera con su detalle por predio. Siempre inserta una fila nueva —{@link
-     * DeterminacionRepository} no tiene {@code actualizar}—: recalcular con otro conjunto sellado
-     * es otra determinacion, nunca una edicion de la anterior (AC2/AC3, ADR-0007).
+     * Calcula el predial <b>sin escribir nada</b>: agrega la base del contribuyente, aplica los
+     * tramos y el minimo, y devuelve la cabecera <b>sin identificador</b> —{@link
+     * Determinacion#esNueva()}—.
+     *
+     * <h2>Por que calcular y asentar son dos metodos (#359)</h2>
+     *
+     * <p>Hasta #359 esto era {@code registrar}, que calculaba <b>y</b> asentaba en la misma
+     * transaccion. {@link DeterminarPredial} necesita el monto para repartir las cuotas, y la unica
+     * forma que tenia de obtenerlo era escribir: la fila y su {@code ALTA} quedaban confirmados
+     * <b>antes</b> de resolver el derecho de emision, los vencimientos de la modalidad y el punto
+     * {@code CUOTA}, y si faltaba cualquiera de los tres el usuario veia un 422 con la
+     * determinacion ya escrita. Cada reintento dejaba otra, y la del intento fallido pasaba a ser
+     * «la ultima» del ejercicio.
+     *
+     * <p>Eran dos motivos de cambio en una clase: el <b>calculo</b> —RT-011, RT-013, RT-014— y el
+     * <b>asiento</b> —insertar, auditar, transaccion—. Partidos, quien compone la determinacion
+     * entera la calcula aqui, resuelve lo demas y llama a {@link #asentar} <b>al final</b>, que es
+     * el orden de ARQ-09 §4 («¿parametros completos? → no → DETENER» antes de la determinacion); y
+     * simular se reduce a no llamar a {@link #asentar}.
+     *
+     * <p>No abre transaccion: no escribe, y el conjunto sellado lo lee el {@link
+     * LectorDeParametros}, que trae la suya.
      *
      * @param predios el aporte de cada predio del contribuyente, ya declarado (autovaluo, %
      *     propiedad y base ya ponderada); nunca vacio (NEG-05 §1: sin predios no hay base)
      * @param tramos el cuadro progresivo vigente, resuelto por quien conoce la ordenanza (D-02b)
      * @param minimoImponible el minimo del ejercicio (D-02b)
-     * @param modalidad bajo que cronograma del articulo 15 se emite; se GUARDA en la fila (#234)
-     * @param observacion por que se registra (regla 10)
+     * @param modalidad bajo que cronograma del articulo 15 se emite; viaja en la cabecera y {@link
+     *     #asentar} la GUARDA (#234)
      */
-    @Transactional
-    public Determinacion registrar(
+    public Determinacion calcular(
             Ejercicio ejercicio,
             long contribuyenteId,
             List<DetalleDeterminacionPredio> predios,
             List<Tramo> tramos,
             Dinero minimoImponible,
-            ModalidadDelPredial modalidad,
-            Observacion observacion) {
-        return registrar(
-                ejercicio,
-                contribuyenteId,
-                predios,
-                tramos,
-                minimoImponible,
-                modalidad,
-                false,
-                observacion);
-    }
-
-    /**
-     * Lo mismo, pero pudiendo <b>no</b> guardar: con {@code simulacion = true} calcula y devuelve
-     * la cabecera sin insertar ninguna fila y sin auditarla, igual que {@code
-     * RegistrarDeterminacionVehicular#calcular} desde #32.
-     *
-     * <p>Es lo que permite que la pantalla tenga un boton «Simular» y otro «Calcular» contra la
-     * <b>misma</b> operacion del contrato sin que pulsar el primero emita deuda (#395): la
-     * diferencia esta en el cuerpo de la peticion, no en la ruta. La determinacion simulada se
-     * reconoce por {@link Determinacion#esNueva()} —no tiene identificador, porque no hay fila que
-     * lo lleve—.
-     *
-     * <p>La observacion se exige igual en los dos caminos: quien simula tambien deja rastro de por
-     * que lo hizo cuando el calculo se asienta, y bifurcar el requisito abriria la puerta a que un
-     * cliente mandara {@code simulacion = true} para saltarse la regla 10.
-     */
-    @Transactional
-    public Determinacion registrar(
-            Ejercicio ejercicio,
-            long contribuyenteId,
-            List<DetalleDeterminacionPredio> predios,
-            List<Tramo> tramos,
-            Dinero minimoImponible,
-            ModalidadDelPredial modalidad,
-            boolean simulacion,
-            Observacion observacion) {
+            ModalidadDelPredial modalidad) {
         Objects.requireNonNull(ejercicio, "La determinacion necesita su ejercicio");
         Objects.requireNonNull(predios, "La lista de predios es vacia, no nula");
         if (predios.isEmpty()) {
@@ -164,21 +144,52 @@ public class RegistrarDeterminacionPredial {
                 MinimoImponible.aplicarSobreBase(
                         impuestoPorTramos, baseContribuyente, minimoImponible);
 
-        Determinacion nueva =
-                Determinacion.nuevaPredial(
-                        ejercicio,
-                        contribuyenteId,
-                        conjuntoId,
-                        baseContribuyente,
-                        montoDeterminado,
-                        List.of(rt011.identificador().valor(), "RT-013", "RT-014"),
-                        modalidad);
+        return Determinacion.nuevaPredial(
+                ejercicio,
+                contribuyenteId,
+                conjuntoId,
+                baseContribuyente,
+                montoDeterminado,
+                List.of(rt011.identificador().valor(), "RT-013", "RT-014"),
+                modalidad);
+    }
 
-        if (simulacion) {
-            return nueva;
+    /**
+     * Asienta una determinacion ya calculada con {@link #calcular}: inserta la cabecera con su
+     * detalle por predio y la audita con la observacion del usuario (regla 10). Es lo unico de esta
+     * clase que escribe, y lo unico que abre transaccion.
+     *
+     * <p>Siempre inserta una fila nueva —{@link DeterminacionRepository} no tiene {@code
+     * actualizar}—: recalcular con otro conjunto sellado es otra determinacion, nunca una edicion
+     * de la anterior (AC2/AC3, ADR-0007). Por eso se niega a asentar una cabecera que ya tiene
+     * identificador: seria la misma determinacion escrita dos veces.
+     *
+     * <p><b>Quien la llama, la llama al final</b> (#359): con todo lo que la determinacion necesita
+     * para emitirse ya resuelto. Lo que falle despues de esta linea ya no deshace la fila.
+     *
+     * @param calculada la cabecera que devolvio {@link #calcular}, sin identificador
+     * @param predios el mismo detalle con que se calculo
+     * @param observacion por que se registra (regla 10)
+     */
+    @Transactional
+    public Determinacion asentar(
+            Determinacion calculada,
+            List<DetalleDeterminacionPredio> predios,
+            Observacion observacion) {
+        Objects.requireNonNull(calculada, "Se asienta una determinacion ya calculada");
+        Objects.requireNonNull(observacion, "Toda modificacion exige la observacion (regla 10)");
+        Objects.requireNonNull(predios, "La lista de predios es vacia, no nula");
+        if (!calculada.esNueva()) {
+            throw new IllegalArgumentException(
+                    "La determinacion "
+                            + calculada.id()
+                            + " ya esta asentada: recalcular es otra fila, nunca la misma escrita"
+                            + " dos veces (ADR-0007)");
         }
-
-        Determinacion guardada = repositorio.insertar(nueva, predios);
+        if (predios.isEmpty()) {
+            throw new SinPrediosDeclarados();
+        }
+        Determinacion guardada = repositorio.insertar(calculada, predios);
         auditar(guardada, observacion);
         return guardada;
     }

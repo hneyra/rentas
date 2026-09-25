@@ -1014,6 +1014,53 @@ class PredialControllerTest {
                 .doesNotContain("incidencia");
     }
 
+    /**
+     * <b>La corrida que ASIENTA sin derecho de emision no deja a nadie determinado</b> (#359).
+     *
+     * <p>Dos contribuyentes con el mismo conjunto, y asentando: con uno solo, «el primero queda
+     * confirmado antes del 422» y «nadie queda confirmado» se confunden si el unico es el que
+     * falla. Hasta #359 el primero del padron quedaba asentado y auditado dentro de {@code
+     * individual.determinar}, la corrida contestaba 422 y no escribia ninguna {@code
+     * corrida_predial}: una determinacion suelta que ningun informe explica.
+     *
+     * <p>El cuadro es el completo menos el derecho —con las cuotas y el punto {@code CUOTA}
+     * publicados—, para que el rojo no pueda salir de otra pieza que la que se mide.
+     */
+    @Test
+    @DisplayName(
+            "#359 — la corrida que asienta sin derecho de emision: 422, cero filas y sin rastro")
+    void laCorridaQueAsientaSinDerechoNoDejaANadieDeterminado() throws Exception {
+        sembrarDosContribuyentes();
+        mvc = montar(cuadroCompletoMenosElDerecho());
+
+        MvcResult resultado =
+                mvc.perform(
+                                post("/rentas/api/v1/rentas/predial/calculo-masivo")
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(
+                                                "{\"modalidad\":\"TRIMESTRAL\",\"simulacion\":false,"
+                                                        + "\"ejercicio\":\"2026\","
+                                                        + "\"recalculaYaEmitidos\":true,"
+                                                        + "\"observacion\":\"Emision anual del"
+                                                        + " ejercicio\"}"))
+                        .andReturn();
+
+        assertThat(resultado.getResponse().getStatus()).isEqualTo(422);
+        assertThat(resultado.getResponse().getContentAsString())
+                .contains("DERECHO_EMISION_PREDIAL");
+        assertThat(determinaciones.determinados)
+                .as("ni el primero del padron: la falta es del conjunto y le pasa a los dos")
+                .isEmpty();
+        assertThat(auditoria.registros).as("ni su ALTA").isEmpty();
+        assertThat(
+                        mvc.perform(get("/rentas/api/v1/rentas/predial/corridas/ultima"))
+                                .andReturn()
+                                .getResponse()
+                                .getStatus())
+                .as("la corrida cortada no deja rastro, y ahora tampoco deja nada que explicar")
+                .isEqualTo(204);
+    }
+
     // ------------------------------------------- y el 422 dice CUAL de las dos cosas (#691)
 
     @Test
@@ -1891,6 +1938,29 @@ class PredialControllerTest {
                 .texto("REDONDEO", "BASE_IMPONIBLE_DEL_PREDIO", "HALF_UP")
                 .numero("REDONDEO", "CUOTA", ValorNormativo.de("2.000000"))
                 .texto("REDONDEO", "CUOTA", "HALF_UP")
+                .construir();
+    }
+
+    /**
+     * {@link #cuadroCompleto()} sin {@code DERECHO_EMISION_PREDIAL} y con todo lo demas (#359): las
+     * cuotas trimestrales y el punto {@code CUOTA} siguen publicados. {@link
+     * #cuadroSinDerechoDeEmision()} no sirve para eso: tampoco trae los vencimientos.
+     */
+    private static ParametrosSellados cuadroCompletoMenosElDerecho() {
+        return conRedondeo(
+                        ParametrosSellados.de(EJERCICIO, 1)
+                                .numero("UIT", null, ValorNormativo.de("5500.00"))
+                                .numero("TRAMO_PREDIAL", "1", ValorNormativo.de("0.2"))
+                                .numero("TRAMO_PREDIAL_LIMITE", "1", ValorNormativo.de("15"))
+                                .numero("TRAMO_PREDIAL", "2", ValorNormativo.de("0.6"))
+                                .numero("TRAMO_PREDIAL_LIMITE", "2", ValorNormativo.de("60"))
+                                .numero("TRAMO_PREDIAL", "3", ValorNormativo.de("1.0"))
+                                .numero("PREDIAL_MINIMO", null, ValorNormativo.de("0.6"))
+                                .texto("PREDIAL_VENCIMIENTO", "1", "2026-02-27")
+                                .texto("PREDIAL_VENCIMIENTO", "2", "2026-05-29")
+                                .texto("PREDIAL_VENCIMIENTO", "3", "2026-08-31")
+                                .texto("PREDIAL_VENCIMIENTO", "4", "2026-11-30")
+                                .texto("PREDIAL_VENCIMIENTO", "CONTADO", "2026-02-27"))
                 .construir();
     }
 
