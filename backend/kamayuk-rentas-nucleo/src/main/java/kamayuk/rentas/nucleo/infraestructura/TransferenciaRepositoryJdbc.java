@@ -6,6 +6,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import kamayuk.rentas.auditoria.OrigenContext;
+import kamayuk.rentas.dominio.CodigoContribuyente;
 import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.dominio.Porcentaje;
@@ -148,10 +149,11 @@ public class TransferenciaRepositoryJdbc extends RepositorioJdbc
                 .list();
     }
 
+    /** En la forma de {@link CodigoContribuyente#formaDeBusqueda}, como el libro (#423). */
     @Override
     public Optional<Long> contribuyentePorCodigo(String codigo) {
         return jdbc().sql("SELECT c.id FROM contribuyente c WHERE c.codigo_contribuyente = :codigo")
-                .param("codigo", codigo)
+                .param("codigo", CodigoContribuyente.formaDeBusqueda(codigo))
                 .query((fila, numeroDeFila) -> fila.getLong("id"))
                 .optional();
     }

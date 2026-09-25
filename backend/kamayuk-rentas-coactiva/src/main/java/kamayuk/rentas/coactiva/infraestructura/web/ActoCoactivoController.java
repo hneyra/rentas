@@ -18,6 +18,7 @@ import kamayuk.rentas.coactiva.aplicacion.PlazosCoactivosParametrizados;
 import kamayuk.rentas.coactiva.aplicacion.RegistrarActoCoactivo;
 import kamayuk.rentas.coactiva.aplicacion.ReimprimirActoCoactivo;
 import kamayuk.rentas.coactiva.dominio.ActoCoactivoRepository;
+import kamayuk.rentas.coactiva.dominio.PlantillaDeNumeroDeExpediente;
 import kamayuk.rentas.coactiva.dominio.TipoDeActoCoactivo;
 import kamayuk.rentas.coactiva.dominio.TipoDeMedidaCautelar;
 import kamayuk.rentas.contribuyentes.DirectorioDeContribuyentes;
@@ -219,8 +220,9 @@ public class ActoCoactivoController {
     @GetMapping("/expedientes/{numero}/proceso")
     @RequiereAcceso(acceso = ACCESO_PROCESO, privilegio = Privilegio.LECTURA)
     public ProcesoResource verProceso(
-            @PathVariable String numero,
+            @PathVariable("numero") String escrito,
             @RequestParam(required = false) @Nullable String proyectarInteresAl) {
+        String numero = PlantillaDeNumeroDeExpediente.POR_OMISION.comoSeImprime(escrito);
 
         LocalDate aLaFecha =
                 fechaOpcional(proyectarInteresAl, "proyectarInteresAl", LocalDate.now(reloj));
@@ -241,7 +243,8 @@ public class ActoCoactivoController {
     @PostMapping("/expedientes/{numero}/actos")
     @RequiereAcceso(acceso = ACCESO_ACTOS, privilegio = Privilegio.REGISTRO)
     public ResponseEntity<ActoDictadoResource> registrarActo(
-            @PathVariable String numero, @RequestBody PeticionDeActoCoactivo peticion) {
+            @PathVariable("numero") String escrito, @RequestBody PeticionDeActoCoactivo peticion) {
+        String numero = PlantillaDeNumeroDeExpediente.POR_OMISION.comoSeImprime(escrito);
 
         Observacion observacion = observacionDe(peticion.observacion());
         FormatoDeDocumento formato = formatoDe(peticion.formato());

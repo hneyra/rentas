@@ -14,6 +14,7 @@ import kamayuk.rentas.compartido.Paginacion;
 import kamayuk.rentas.dominio.Alicuota;
 import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.dominio.Observacion;
+import kamayuk.rentas.dominio.Placa;
 import kamayuk.rentas.persistencia.OrdenSeguro;
 import kamayuk.rentas.persistencia.RepositorioJdbc;
 import kamayuk.rentas.sanciones.dominio.CriterioDePapeleta;
@@ -163,8 +164,9 @@ public class PapeletaRepositoryJdbc extends RepositorioJdbc implements PapeletaR
             parametros.put("numero", criterio.numero());
         }
         if (criterio.placa() != null) {
-            condiciones.add("p.placa = :placa");
-            parametros.put("placa", criterio.placa());
+            // #423: sin guion ni espacios, como `vigenteDePlaca` de InternamientoRepositoryJdbc.
+            condiciones.add("p.placa_busqueda = :placa");
+            parametros.put("placa", Placa.formaDeBusqueda(criterio.placa()));
         }
         if (criterio.documentoInfractor() != null) {
             desde = desde + " JOIN contribuyente ci ON ci.id = p.infractor_id";

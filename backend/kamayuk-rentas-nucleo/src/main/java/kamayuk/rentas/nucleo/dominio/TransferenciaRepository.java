@@ -59,6 +59,9 @@ public interface TransferenciaRepository {
      * <p>Vive aqui por el mismo motivo que en {@code AsientoRepository.contribuyentePorCodigo}: se
      * resuelve en SQL contra una tabla con la que {@code transferencia} ya tiene clave foranea, sin
      * conocer ningun tipo del contexto {@code contribuyentes} (ARQ-01 §4 regla 2).
+     *
+     * <p>Y por el mismo motivo compara en la forma de {@code CodigoContribuyente.formaDeBusqueda}
+     * (#423): el calculo vehicular por contribuyente la llama con el codigo tal como se tecleo.
      */
     Optional<Long> contribuyentePorCodigo(String codigo);
 }

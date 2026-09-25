@@ -46,4 +46,20 @@ class PlacaTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("longitud");
     }
+
+    @Test
+    @DisplayName("#423 — la forma de busqueda: sin espacios ni guion, y sin validar")
+    void laFormaDeBusqueda() {
+        assertThat(Placa.formaDeBusqueda(" zlg-701 ")).isEqualTo("ZLG701");
+        assertThat(Placa.formaDeBusqueda("ZLG 701")).isEqualTo("ZLG701");
+        assertThat(Placa.formaDeBusqueda("ZLG701")).isEqualTo("ZLG701");
+        assertThat(Placa.formaDeBusqueda("a-1"))
+                .as(
+                        "sanciones admite placas cargadas de 1 caracter que Placa no aceptaria:"
+                                + " buscarlas no puede lanzar")
+                .isEqualTo("A1");
+        assertThat(Placa.de("ZLG-701").sinSeparador())
+                .as("y la de una placa valida es un caso de la misma regla")
+                .isEqualTo(Placa.formaDeBusqueda("zlg 701"));
+    }
 }

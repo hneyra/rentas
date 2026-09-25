@@ -448,6 +448,35 @@ class EscrituraDeDeclaracionJuradaJdbcTest {
         }
 
         @Test
+        @DisplayName("#423 — el numero de la DJ en minusculas encuentra la misma declaracion")
+        void elNumeroEnMinusculasLaEncuentra() throws Exception {
+            String codigo = nuevoCodigoCatastral();
+            long predio = crearPredioConFicha(municipalidad, codigo);
+            String contribuyente = nuevoContribuyente(municipalidad);
+            PrediosDeLaHoja.del(
+                    idDeContribuyente(contribuyente), predio, codigo, "CALLE EN MINUSCULAS 423");
+            String numero = numeroDe(presentar(contribuyente, predio));
+
+            MvcResult resultado =
+                    mvc.perform(
+                                    org.springframework.test.web.servlet.request
+                                            .MockMvcRequestBuilders.get(
+                                                    "/rentas/api/v1/rentas/declaraciones/{djNro}/hoja",
+                                                    numero.toLowerCase(java.util.Locale.ROOT))
+                                            .param("ano", "2026"))
+                            .andReturn();
+
+            assertThat(resultado.getResponse().getStatus())
+                    .as(
+                            "`DeclaracionJurada` guarda el numero en mayusculas y `porNumero` lo"
+                                    + " buscaba tal como llegaba por la ruta: 404 sobre una DJ que"
+                                    + " existe")
+                    .isEqualTo(200);
+            assertThat(resultado.getResponse().getContentAsString())
+                    .contains("\"codigo\":\"" + contribuyente + "\"");
+        }
+
+        @Test
         @DisplayName("una DJ que no existe es 404, no una hoja vacia")
         void unaDeclaracionQueNoExisteEs404() throws Exception {
             MvcResult resultado =

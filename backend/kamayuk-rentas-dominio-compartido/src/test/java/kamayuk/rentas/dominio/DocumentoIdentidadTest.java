@@ -67,4 +67,12 @@ class DocumentoIdentidadTest {
         assertThatThrownBy(() -> new DocumentoIdentidad(TipoDocumento.DNI, null))
                 .isInstanceOf(NullPointerException.class);
     }
+
+    @Test
+    @DisplayName("#423 — la forma de busqueda del numero es la de guardarlo")
+    void laFormaDeBusqueda() {
+        assertThat(DocumentoIdentidad.formaDeBusqueda(" ab123456 "))
+                .isEqualTo(new DocumentoIdentidad(TipoDocumento.PASAPORTE, "ab123456").numero())
+                .isEqualTo("AB123456");
+    }
 }

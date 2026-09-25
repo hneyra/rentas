@@ -12,6 +12,7 @@ import java.util.Optional;
 import kamayuk.rentas.compartido.Pagina;
 import kamayuk.rentas.compartido.Paginacion;
 import kamayuk.rentas.dominio.Observacion;
+import kamayuk.rentas.dominio.Placa;
 import kamayuk.rentas.persistencia.OrdenSeguro;
 import kamayuk.rentas.persistencia.RepositorioJdbc;
 import kamayuk.rentas.sanciones.dominio.ConstanciaLibre;
@@ -118,8 +119,9 @@ public class ConstanciaLibreRepositoryJdbc extends RepositorioJdbc
             parametros.put("usuario", criterio.usuarioQueEmitio());
         }
         if (criterio.placa() != null) {
-            condiciones.add("c.placa = :placa");
-            parametros.put("placa", criterio.placa());
+            // #423: sin guion ni espacios, como `vigenteDePlaca` de InternamientoRepositoryJdbc.
+            condiciones.add("c.placa_busqueda = :placa");
+            parametros.put("placa", Placa.formaDeBusqueda(criterio.placa()));
         }
 
         String donde = condiciones.isEmpty() ? "" : " WHERE " + String.join(" AND ", condiciones);

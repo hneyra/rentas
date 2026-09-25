@@ -34,7 +34,7 @@ public record Placa(String valor) implements Comparable<Placa> {
 
     public Placa {
         Objects.requireNonNull(valor, "La placa es obligatoria");
-        valor = valor.strip().toUpperCase(Locale.ROOT).replace(" ", "");
+        valor = escrita(valor);
         if (valor.length() < LARGO_MINIMO || valor.length() > LARGO_MAXIMO) {
             throw new IllegalArgumentException(
                     "Placa de longitud invalida: '"
@@ -60,9 +60,33 @@ public record Placa(String valor) implements Comparable<Placa> {
         return new Placa(texto);
     }
 
+    /**
+     * La forma con la que se compara y se busca <b>cualquier</b> texto de placa: recortado, en
+     * mayusculas, sin espacios y sin guion (#423). Es la unica copia de esa regla.
+     *
+     * <p><b>No valida</b>, y es a proposito. {@code Papeleta} e {@code Internamiento} admiten
+     * placas de 1 a 10 caracteres y esta clase exige de 5 a 10 con letra y digito, asi que
+     * construir una {@code Placa} con lo que llega a una consulta —o con lo que ya esta guardado—
+     * convertiria en error una fila cargada que hoy existe. Quien busca necesita la forma, no la
+     * garantia.
+     *
+     * <p>La columna {@code placa} no cambia: conserva el guion porque es lo que el papel imprime.
+     * Del lado de la base, la misma forma la calcula {@code sanciones} en su columna generada
+     * {@code placa_busqueda} (V27), y {@code nucleo} con {@code replace(placa, '-', '')}.
+     */
+    public static String formaDeBusqueda(String texto) {
+        Objects.requireNonNull(texto, "No hay placa que buscar");
+        return escrita(texto).replace("-", "");
+    }
+
     /** La placa sin su guion. Es la forma con la que se compara y se busca. */
     public String sinSeparador() {
-        return valor.replace("-", "");
+        return formaDeBusqueda(valor);
+    }
+
+    /** Como se guarda: recortada, en mayusculas y sin espacios. El guion se queda. */
+    private static String escrita(String texto) {
+        return texto.strip().toUpperCase(Locale.ROOT).replace(" ", "");
     }
 
     /** Dos placas son la misma aunque una lleve guion y la otra no: el separador es de lectura. */

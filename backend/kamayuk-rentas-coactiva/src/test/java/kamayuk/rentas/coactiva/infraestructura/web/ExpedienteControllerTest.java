@@ -263,6 +263,60 @@ class ExpedienteControllerTest {
     }
 
     @Test
+    @DisplayName("#423 — el numero de la ruta en minusculas es el mismo expediente: 200")
+    void elNumeroEnMinusculasEsElMismoExpediente() throws Exception {
+        importar(cuerpoDeImportacion("Se importa la cartera vencida"));
+
+        MvcResult resultado =
+                mvc.perform(
+                                MockMvcRequestBuilders.patch(
+                                                "/rentas/api/v1/coactiva/expedientes/{numero}/estados",
+                                                "exp-2026-000001")
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(
+                                                "{\"nuevoEstado\":\"011 — REC 01 EMITIDO\","
+                                                        + "\"motivo\":\"se emite la REC 01\","
+                                                        + "\"observacion\":\"Se inicia la ejecucion\"}"))
+                        .andReturn();
+
+        assertThat(resultado.getResponse().getStatus())
+                .as(
+                        "la grilla lo encuentra con `?nroDeExpediente=exp-2026-000001`, y el PATCH"
+                                + " sobre la misma cadena contestaba 404: "
+                                + resultado.getResponse().getContentAsString())
+                .isEqualTo(200);
+        assertThat(resultado.getResponse().getContentAsString())
+                .contains("\"numero\":\"EXP-2026-000001\"")
+                .contains("\"estado\":\"REC 01 EMITIDO\"");
+    }
+
+    @Test
+    @DisplayName("#423 — un numero que la plantilla no compone es 422, y dice como se escribe")
+    void unNumeroIlegibleEs422() throws Exception {
+        importar(cuerpoDeImportacion("Se importa la cartera vencida"));
+        int antes = movimientos.cuantos();
+
+        MvcResult resultado =
+                mvc.perform(
+                                MockMvcRequestBuilders.patch(
+                                                "/rentas/api/v1/coactiva/expedientes/{numero}/estados",
+                                                "2026-000001")
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(
+                                                "{\"nuevoEstado\":\"041\",\"motivo\":\"m\","
+                                                        + "\"observacion\":\"Se suspende\"}"))
+                        .andReturn();
+
+        assertThat(resultado.getResponse().getStatus())
+                .as(
+                        "no es «no existe»: es un numero mal escrito, y quien lo escribio lo"
+                                + " corrige")
+                .isEqualTo(422);
+        assertThat(resultado.getResponse().getContentAsString()).contains("EXP-2026-000001");
+        assertThat(movimientos.cuantos()).isEqualTo(antes);
+    }
+
+    @Test
     @DisplayName("un expediente que no existe, 404")
     void expedienteInexistenteDevuelve404() throws Exception {
         MvcResult resultado =

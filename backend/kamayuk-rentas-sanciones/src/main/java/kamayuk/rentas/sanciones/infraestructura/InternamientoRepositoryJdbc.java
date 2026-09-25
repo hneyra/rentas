@@ -8,13 +8,13 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import kamayuk.rentas.compartido.Pagina;
 import kamayuk.rentas.compartido.Paginacion;
 import kamayuk.rentas.dominio.Observacion;
+import kamayuk.rentas.dominio.Placa;
 import kamayuk.rentas.dominio.ZonaHoraria;
 import kamayuk.rentas.persistencia.OrdenSeguro;
 import kamayuk.rentas.persistencia.RepositorioJdbc;
@@ -122,16 +122,27 @@ public class InternamientoRepositoryJdbc extends RepositorioJdbc
                 .optional();
     }
 
+    /**
+     * Por la placa <b>sin guion ni espacios</b>, a los dos lados (#423).
+     *
+     * <p>Hasta #423 comparaba el texto crudo, y un vehiculo internado como {@code "ZLG-701"} no
+     * estaba internado para quien lo pedia como {@code "ZLG701"}: se internaba otra vez —dos
+     * custodias corriendo sobre el mismo vehiculo— y su liberacion daba 404. El parametro sale de
+     * {@link Placa#formaDeBusqueda}, que es la unica copia de la regla; la columna, de {@code
+     * placa_busqueda}, que {@code V27} genera con la misma regla. No se compara contra {@code
+     * replace(i.placa, '-', '')}: {@code replace} no es <i>leakproof</i>, y bajo RLS esa condicion
+     * no llega a ningun indice (medido en {@code V27}).
+     */
     @Override
     public Optional<Internamiento> vigenteDePlaca(String placa) {
         return jdbc().sql(
                         "SELECT "
                                 + COLUMNAS
                                 + " FROM internamiento i"
-                                + " WHERE i.placa = :placa AND NOT "
+                                + " WHERE i.placa_busqueda = :placa AND NOT "
                                 + LIBERADO
                                 + " ORDER BY i.fecha_ingreso DESC, i.id DESC LIMIT 1")
-                .param("placa", placa.strip().toUpperCase(Locale.ROOT))
+                .param("placa", Placa.formaDeBusqueda(placa))
                 .query(InternamientoRepositoryJdbc::mapear)
                 .optional();
     }
@@ -228,8 +239,9 @@ public class InternamientoRepositoryJdbc extends RepositorioJdbc
         parametros.put("aLaFecha", aLaFecha);
 
         if (criterio.placa() != null) {
-            condiciones.add("i.placa = :placa");
-            parametros.put("placa", criterio.placa());
+            // #423: sin guion ni espacios, como `vigenteDePlaca` de InternamientoRepositoryJdbc.
+            condiciones.add("i.placa_busqueda = :placa");
+            parametros.put("placa", Placa.formaDeBusqueda(criterio.placa()));
         }
         if (criterio.deposito() != null) {
             condiciones.add("i.deposito = :deposito");

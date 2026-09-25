@@ -1,6 +1,7 @@
 package kamayuk.rentas.contribuyentes.dominio;
 
 import java.util.Optional;
+import kamayuk.rentas.dominio.DocumentoIdentidad;
 import kamayuk.rentas.dominio.TipoDocumento;
 import org.jspecify.annotations.Nullable;
 
@@ -36,7 +37,7 @@ public record CriterioDeBusqueda(
     public CriterioDeBusqueda {
         codigoQueEmpiezaPor = limpiar(codigoQueEmpiezaPor);
         nombreAproximado = limpiar(nombreAproximado);
-        numeroDocumento = limpiar(numeroDocumento);
+        numeroDocumento = numeroComoSeGuarda(limpiar(numeroDocumento));
         if (tipoDocumento != null && numeroDocumento == null) {
             throw new IllegalArgumentException(
                     "Buscar por tipo de documento sin numero devolveria el padron entero de ese"
@@ -95,6 +96,18 @@ public record CriterioDeBusqueda(
                 && nombreAproximado == null
                 && numeroDocumento == null
                 && !soloActivos;
+    }
+
+    /**
+     * El numero en la forma con que {@link DocumentoIdentidad} lo guarda —en mayusculas— (#423).
+     *
+     * <p>Un pasaporte o un carne de extranjeria llevan letras, y la columna los tiene en
+     * mayusculas. Hasta #423 este criterio solo recortaba: {@code ab123456} no encontraba el
+     * pasaporte {@code AB123456}, quien atendia lo daba de alta, y el alta contestaba 409 «ya hay
+     * otro contribuyente con ese PASAPORTE» — justo lo que #35 queria evitar.
+     */
+    private static @Nullable String numeroComoSeGuarda(@Nullable String numero) {
+        return numero == null ? null : DocumentoIdentidad.formaDeBusqueda(numero);
     }
 
     private static @Nullable String limpiar(@Nullable String texto) {

@@ -29,6 +29,7 @@ import kamayuk.rentas.cuentacorriente.dominio.PendienteAgregado;
 import kamayuk.rentas.cuentacorriente.dominio.RecaudacionAgregada;
 import kamayuk.rentas.cuentacorriente.dominio.SentidoDelMovimiento;
 import kamayuk.rentas.cuentacorriente.dominio.TipoAsiento;
+import kamayuk.rentas.dominio.CodigoContribuyente;
 import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.persistencia.OrdenSeguro;
@@ -635,12 +636,19 @@ public class AsientoRepositoryJdbc extends RepositorioJdbc implements AsientoRep
                 fila.getLong("abonos"));
     }
 
+    /**
+     * Normaliza aqui, en el adaptador, y no en cada llamador (#423): la columna guarda lo que
+     * {@link CodigoContribuyente} guarda, y el parametro se lleva a esa misma forma con {@link
+     * CodigoContribuyente#formaDeBusqueda}. Hasta #423 comparaba el texto tal como llegaba, y
+     * {@code /consultas/deuda}, {@code /altas-bajas} y {@code /pagos} contestaban 404 «no esta en
+     * el padron» a {@code c-000007} —sus controladores solo recortan—.
+     */
     @Override
     public Optional<Long> contribuyentePorCodigo(String codigo) {
         return jdbc().sql(
                         "SELECT c.id FROM contribuyente c"
                                 + " WHERE c.codigo_contribuyente = :codigo")
-                .param("codigo", codigo)
+                .param("codigo", CodigoContribuyente.formaDeBusqueda(codigo))
                 .query((fila, numeroDeFila) -> fila.getLong("id"))
                 .optional();
     }
