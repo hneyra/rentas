@@ -187,6 +187,23 @@ describe('y las otras ramas NO ofrecen reintentar: no arreglaria nada', () => {
     expect(document.querySelector('[data-slot="catalogo-sin-privilegio"]')).toBeNull();
   });
 
+  it('401 SIN puerta —origen no seguro, sin `crypto.subtle`—: no se ofrece un boton que revienta', async () => {
+    // Fuera de un origen seguro el navegador no expone `crypto.subtle` y no hay S256: `entrar()`
+    // pasaria la sonda, escribiria sus llaves y reventaria al calcular el reto. Ofrecer ese boton
+    // es ofrecer un fallo seguro; la condicion `hayPuerta()` de `useCatalogoPermitido` es la que lo
+    // quita, y esta es la siembra que la distingue: con la puerta de jsdom, que si tiene
+    // `crypto.subtle`, quitarla no cambia nada (#355, ronda 1).
+    vi.stubGlobal('crypto', {
+      getRandomValues: crypto.getRandomValues.bind(crypto),
+      randomUUID: crypto.randomUUID.bind(crypto),
+    });
+    contestan = { ...BIEN, modulos: { estado: 401, codigo: 'NO_AUTENTICADO' }, accesos: { estado: 401 } };
+    await montarYEsperarElPorQue();
+
+    expect(screen.getByText(/Vuelva a entrar/)).toBeTruthy();
+    expect(elBotonDeVolver(), 'sin puerta se ofrece volver a identificarse').toBeNull();
+  });
+
   it('500: la rama generica, sin boton y sin nombrar opciones', async () => {
     contestan = { ...BIEN, modulos: { estado: 500 } };
     await montarYEsperarElPorQue();

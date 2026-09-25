@@ -221,7 +221,12 @@ describe('AC1 — el canje deja el token EN MEMORIA y en ningun almacenamiento',
 
     // El estado es lo unico que distingue nuestra vuelta de un codigo que alguien nos hizo
     // llegar. Sin comprobarlo, la puerta acepta cualquier codigo.
-    expect(vuelta).toMatchObject({ estado: 'fallo', motivo: 'La vuelta no cuadra con la ida' });
+    // Y lo explica este sistema, no el emisor: `delEmisor` va vacio (#355, ronda 1).
+    expect(vuelta).toMatchObject({
+      estado: 'fallo',
+      motivo: 'La vuelta no cuadra con la ida',
+      delEmisor: null,
+    });
     expect(espia).not.toHaveBeenCalled();
     expect(token()).toBeNull();
   });
@@ -231,10 +236,25 @@ describe('AC1 — el canje deja el token EN MEMORIA y en ningun almacenamiento',
 
     const vuelta = await canjearSiVuelve();
 
-    expect(vuelta).toMatchObject({
+    expect(vuelta).toEqual({
       estado: 'fallo',
       motivo: 'No se completo la entrada',
-      detalle: 'lo cancelo',
+      explicacion: 'El emisor devolvio el codigo de error «{{codigo}}».',
+      valores: { codigo: 'access_denied' },
+      delEmisor: 'lo cancelo',
+    });
+  });
+
+  it('y sin `error_description` no se le atribuye al emisor nada que no escribio (#355, ronda 1)', async () => {
+    ubicacion('http://localhost:5173/?error=server_error');
+
+    const vuelta = await canjearSiVuelve();
+
+    expect(vuelta).toMatchObject({
+      estado: 'fallo',
+      motivo: 'El emisor tuvo un problema',
+      valores: { codigo: 'server_error' },
+      delEmisor: null,
     });
   });
 

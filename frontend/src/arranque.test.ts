@@ -192,7 +192,7 @@ describe('la puerta de identidad, en el arranque', () => {
  * `volverAIdentificarse.test.tsx`; aqui, que se guarde solo la que FALLO y solo en su pasada.
  */
 describe('#355 — la vuelta fallida del emisor llega a la aplicacion', () => {
-  it('un ?error= del emisor con el tope agotado: monta, y la vuelta dice su motivo y su detalle', async () => {
+  it('un ?error= del emisor con el tope agotado: monta, y la vuelta dice su motivo y lo que escribio el emisor', async () => {
     fijarToken(null);
     sessionStorage.setItem('kamayuk.pkce.idas', '3');
     ubicacion('http://localhost:5173/rentas/?error=invalid_client&error_description=Cliente%20desconocido');
@@ -202,7 +202,9 @@ describe('#355 — la vuelta fallida del emisor llega a la aplicacion', () => {
     expect(vueltaFallida()).toEqual({
       estado: 'fallo',
       motivo: 'El emisor no reconoce a este cliente',
-      detalle: 'Cliente desconocido',
+      explicacion: 'El emisor devolvio el codigo de error «{{codigo}}».',
+      valores: { codigo: 'invalid_client' },
+      delEmisor: 'Cliente desconocido',
     });
   });
 

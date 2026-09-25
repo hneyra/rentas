@@ -15,6 +15,8 @@ import { RAIZ } from './artboards.ts';
 
 import { MandoDeTema } from '../src/preferencias/MandoDeTema.tsx';
 import { Aplicacion, CONSULTAS } from '../src/aplicacion.tsx';
+import { fijarToken } from '../src/api/identidad.ts';
+import { arrancar } from '../src/arranque.ts';
 import { CATALOGO } from '../src/catalogo.ts';
 import {
   ACCESOS_MEDIDOS,
@@ -484,6 +486,119 @@ describe('y el marco tampoco: las treinta y dos palabras del armazon (#133)', ()
       'La paleta de mando dibuja texto que no paso por «t()»:\n' +
         `${escapadas.map((e) => `  «${e}»`).join('\n')}`,
     ).toEqual([]);
+  });
+});
+
+/**
+ * **Y lo que este sistema dice cuando el emisor no dejo terminar la entrada** (#355, ronda 1).
+ *
+ * <h2>Por que la guarda de arriba no lo veia</h2>
+ *
+ * El marcador envuelve la cadena que sale de `t()` **despues** de interpolar, asi que una frase
+ * nuestra metida como VALOR de otra —el motivo de una vuelta fallida dentro de «…no dejo terminar
+ * la entrada: {{motivo}}.»— sale dentro de las marcas de la de fuera y `sinTraducir` la da por
+ * buena. Era castellano fijo sin clave: un segundo idioma habria traducido el marco de la frase y
+ * dejado el motivo en castellano. Por eso aqui, ademas de que no se escape nada, se exige que el
+ * motivo y la explicacion salgan **marcados por su cuenta**: es lo que solo pasa si cada uno es
+ * su propia clave.
+ *
+ * <h2>Por que se pasa por `arrancar`</h2>
+ *
+ * Porque la vuelta la guarda el arranque y la lee la aplicacion: montada a secas no hay vuelta que
+ * ensenar. Se siembra el tope agotado para que monte en vez de volver a la puerta.
+ *
+ * Las dos vueltas son de familias distintas: una que trae palabras del EMISOR —que son dato y no
+ * se marcan por separado, porque no son nuestras— y otra escrita entera por este sistema.
+ */
+describe('y la pantalla de volver a identificarse, con la vuelta fallida del emisor (#355)', () => {
+  beforeAll(() => {
+    Element.prototype.scrollIntoView = () => {};
+    Element.prototype.hasPointerCapture = () => false;
+    Element.prototype.releasePointerCapture = () => {};
+    globalThis.matchMedia ??= ((consulta: string) => ({
+      matches: false,
+      media: consulta,
+      onchange: null,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      addListener: () => {},
+      removeListener: () => {},
+      dispatchEvent: () => false,
+    })) as typeof matchMedia;
+  });
+
+  beforeEach(() => {
+    CONSULTAS.clear();
+    sessionStorage.clear();
+    fijarToken(null);
+    // El tope agotado: sin esto el arranque vuelve a la puerta y no monta nada que mirar.
+    sessionStorage.setItem('kamayuk.pkce.idas', '3');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<typeof fetch>((entrada) =>
+        String(entrada).includes('/.well-known/openid-configuration')
+          ? Promise.resolve(new Response(null, { status: 200 }))
+          : Promise.resolve(
+              new Response(JSON.stringify({ status: 401, codigo: 'NO_AUTENTICADO' }), {
+                status: 401,
+                headers: { 'content-type': 'application/problem+json' },
+              }),
+            ),
+      ),
+    );
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    sessionStorage.clear();
+  });
+
+  const VUELTAS = [
+    {
+      como: 'un ?error= del emisor con su explicacion',
+      url:
+        'http://localhost:5173/rentas/?error=access_denied&error_description=' +
+        encodeURIComponent('Usuario cancelo'),
+      motivo: 'No se completo la entrada',
+    },
+    {
+      como: 'un codigo que no cuadra con la ida',
+      url: 'http://localhost:5173/rentas/?code=ajeno&state=otro',
+      motivo: 'La vuelta no cuadra con la ida',
+      explicacion: 'El codigo llego sin el estado que se guardo al salir.',
+    },
+  ] as const;
+
+  it.each(VUELTAS)('$como: el motivo es su propia clave, y nada se escapa de `t()`', async (vuelta) => {
+    const url = new URL(vuelta.url);
+    vi.stubGlobal('location', {
+      origin: url.origin,
+      href: url.href,
+      pathname: url.pathname,
+      search: url.search,
+      hash: url.hash,
+      assign: vi.fn(),
+      reload: vi.fn(),
+    });
+
+    await arrancar(() => {
+      render(<Aplicacion />);
+    });
+    const zona = await waitFor(() => {
+      const hallada = document.querySelector<HTMLElement>('[data-slot="hay-que-volver-a-identificarse"]');
+      expect(hallada, 'no se llego a la pantalla de volver a identificarse').not.toBeNull();
+      return hallada as HTMLElement;
+    });
+
+    expect(zona.textContent, 'el motivo no paso por `t()` como clave propia').toContain(
+      `${ABRE}${vuelta.motivo}${CIERRA}`,
+    );
+    if ('explicacion' in vuelta) {
+      expect(zona.textContent, 'la explicacion no paso por `t()` como clave propia').toContain(
+        `${ABRE}${vuelta.explicacion}`,
+      );
+    }
+    expect(sinTraducir(zona)).toEqual([]);
   });
 });
 

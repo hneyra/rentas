@@ -1,6 +1,7 @@
 import type { Ausencia, DefinicionDePantalla, PiezaDeLaPantalla } from '@kamayuk/ui';
 
 import { ErrorDeLaApi } from '../api/cliente.ts';
+import { EXPLICACIONES_DE_LA_VUELTA, MOTIVOS_DE_LA_VUELTA } from '../api/identidad.ts';
 import { peldanoDe } from '../api/escalera.ts';
 import { ARBOL } from '../pantallas/arbol.ts';
 import { bloquesDe } from '../pantallas/bloques.ts';
@@ -240,6 +241,18 @@ function delMarco(): readonly string[] {
   return salida;
 }
 
+/**
+ * **Por que no se pudo terminar la entrada, y su explicacion** (#355, ronda 1).
+ *
+ * La pantalla de volver a identificarse las dibuja con `t(vuelta.motivo)` y
+ * `t(vuelta.explicacion, …)` —una variable, que `i18next-cli` no sigue—, asi que se derivan de las
+ * dos tablas de `api/identidad.ts`, que son el UNICO sitio de donde una vuelta fallida puede
+ * sacarlas: el tipo de la vuelta no admite otra cadena.
+ */
+function deLaVuelta(): readonly string[] {
+  return [...Object.values(MOTIVOS_DE_LA_VUELTA), ...Object.values(EXPLICACIONES_DE_LA_VUELTA)];
+}
+
 /** El catalogo entero, sin repetidos y en orden. */
 export function catalogoDeClaves(): readonly string[] {
   const todas = new Set([
@@ -248,6 +261,7 @@ export function catalogoDeClaves(): readonly string[] {
     ...deLasAusencias(),
     ...deLosPeldanos(),
     ...delMarco(),
+    ...deLaVuelta(),
   ]);
   return [...todas].filter((c) => c.trim() !== '').sort((a, b) => a.localeCompare(b, 'es'));
 }

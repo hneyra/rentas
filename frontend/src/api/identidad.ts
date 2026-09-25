@@ -264,11 +264,71 @@ export async function entrar(): Promise<FallaDeLaPuerta | null> {
   return null;
 }
 
+/**
+ * **Por que no se pudo terminar la entrada, en palabras de ESTE sistema** (#355, ronda 1).
+ *
+ * Son claves de `t()`: la aplicacion las traduce al dibujarlas, y `i18n/catalogo-de-claves.ts` las
+ * deriva de aqui para el locale, asi que un motivo nuevo no hay que acordarse de listarlo. Hasta la
+ * ronda 1 de #355 viajaban como cadenas sueltas y llegaban al DOM como VALOR interpolado de otra
+ * frase, que el marcador de #103 no distingue de una clave: un segundo idioma habria traducido la
+ * frase de fuera y dejado el motivo en castellano.
+ */
+export const MOTIVOS_DE_LA_VUELTA = {
+  cancelada: 'No se completo la entrada',
+  alcance: 'El alcance que se pide no existe en el emisor',
+  cliente: 'El emisor no reconoce a este cliente',
+  averia: 'El emisor tuvo un problema',
+  rechazada: 'El emisor no dejo entrar',
+  noCuadra: 'La vuelta no cuadra con la ida',
+  sinRespuesta: 'El emisor no contesto',
+  canjeRechazado: 'El emisor rechazo el canje',
+  sinToken: 'El emisor no devolvio ningun token',
+} as const;
+
+export type MotivoDeLaVuelta = (typeof MOTIVOS_DE_LA_VUELTA)[keyof typeof MOTIVOS_DE_LA_VUELTA];
+
+/**
+ * **Lo que este sistema explica de cada motivo**, tambien claves de `t()` (#355, ronda 1).
+ *
+ * Lo que va entre llaves es dato —el codigo de error del emisor, el estado HTTP del canje— y lo
+ * rellena `valores`. Van aparte de `delEmisor` a proposito: hasta la ronda 1 las dos cosas viajaban
+ * en un solo `detalle` y la pantalla lo presentaba todo como «lo que contesto» el emisor, tambien
+ * cuando lo habia escrito este sistema.
+ */
+export const EXPLICACIONES_DE_LA_VUELTA = {
+  codigoDelEmisor: 'El emisor devolvio el codigo de error «{{codigo}}».',
+  noCuadra:
+    'El codigo llego sin el estado que se guardo al salir. Suele pasar al abrir un enlace ' +
+    'de vuelta antiguo o en otra pestana; tambien es lo que se ve si alguien intenta colar ' +
+    'un codigo ajeno.',
+  sinRespuesta:
+    'La peticion del canje no llego a completarse. El emisor puede estar apagado o no ser ' +
+    'alcanzable desde este puesto.',
+  canjeRechazado:
+    'La peticion del canje volvio con {{estado}}. Suele ser la URI de retorno o el cliente.',
+  sinToken: 'La respuesta del canje no trae «access_token».',
+} as const;
+
+export type ExplicacionDeLaVuelta =
+  (typeof EXPLICACIONES_DE_LA_VUELTA)[keyof typeof EXPLICACIONES_DE_LA_VUELTA];
+
 /** Lo que paso al volver de Keycloak. */
 export type Vuelta =
   | { readonly estado: 'sin-vuelta' }
   | { readonly estado: 'canjeado' }
-  | { readonly estado: 'fallo'; readonly motivo: string; readonly detalle: string };
+  | {
+      readonly estado: 'fallo';
+      /** Por que, en una frase: clave de `t()`. */
+      readonly motivo: MotivoDeLaVuelta;
+      /** Lo que este sistema explica: clave de `t()`, con `valores` para lo que interpola. */
+      readonly explicacion: ExplicacionDeLaVuelta;
+      readonly valores: Readonly<Record<string, string>>;
+      /**
+       * Lo que ESCRIBIO el emisor (`error_description`), o `null`. Es dato y no se traduce: es la
+       * unica parte que se le atribuye a el.
+       */
+      readonly delEmisor: string | null;
+    };
 
 /** La vuelta que no se pudo canjear: la unica que tiene algo que contar (#355). */
 export type VueltaFallida = Extract<Vuelta, { readonly estado: 'fallo' }>;
@@ -306,7 +366,9 @@ export async function canjearSiVuelve(): Promise<Vuelta> {
     return {
       estado: 'fallo',
       motivo: motivoDelEmisor(fallo),
-      detalle: url.searchParams.get('error_description') ?? `El emisor contesto «${fallo}».`,
+      explicacion: EXPLICACIONES_DE_LA_VUELTA.codigoDelEmisor,
+      valores: { codigo: fallo },
+      delEmisor: url.searchParams.get('error_description'),
     };
   }
 
@@ -314,14 +376,7 @@ export async function canjearSiVuelve(): Promise<Vuelta> {
   // llegar. Sin comprobarlo, la puerta acepta cualquier codigo.
   if (codigo === null || verificador === null || esperado === null || url.searchParams.get('state') !== esperado) {
     limpiar();
-    return {
-      estado: 'fallo',
-      motivo: 'La vuelta no cuadra con la ida',
-      detalle:
-        'El codigo llego sin el estado que se guardo al salir. Suele pasar al abrir un enlace ' +
-        'de vuelta antiguo o en otra pestana; tambien es lo que se ve si alguien intenta colar ' +
-        'un codigo ajeno.',
-    };
+    return falloNuestro(MOTIVOS_DE_LA_VUELTA.noCuadra, EXPLICACIONES_DE_LA_VUELTA.noCuadra);
   }
 
   let respuesta: Response;
@@ -342,24 +397,16 @@ export async function canjearSiVuelve(): Promise<Vuelta> {
     });
   } catch {
     limpiar();
-    return {
-      estado: 'fallo',
-      motivo: 'El emisor no contesto',
-      detalle:
-        'La peticion del canje no llego a completarse. El emisor puede estar apagado o no ser ' +
-        'alcanzable desde este puesto.',
-    };
+    return falloNuestro(MOTIVOS_DE_LA_VUELTA.sinRespuesta, EXPLICACIONES_DE_LA_VUELTA.sinRespuesta);
   }
 
   limpiar();
   if (!respuesta.ok) {
-    return {
-      estado: 'fallo',
-      motivo: 'El emisor rechazo el canje',
-      detalle:
-        `La peticion del canje volvio con ${String(respuesta.status)}. Suele ser la URI de ` +
-        'retorno o el cliente.',
-    };
+    return falloNuestro(
+      MOTIVOS_DE_LA_VUELTA.canjeRechazado,
+      EXPLICACIONES_DE_LA_VUELTA.canjeRechazado,
+      { estado: String(respuesta.status) },
+    );
   }
 
   const cuerpo = (await respuesta.json().catch(() => ({}))) as {
@@ -367,11 +414,7 @@ export async function canjearSiVuelve(): Promise<Vuelta> {
     id_token?: string;
   };
   if (cuerpo.access_token === undefined) {
-    return {
-      estado: 'fallo',
-      motivo: 'El emisor no devolvio ningun token',
-      detalle: 'La respuesta del canje no trae «access_token».',
-    };
+    return falloNuestro(MOTIVOS_DE_LA_VUELTA.sinToken, EXPLICACIONES_DE_LA_VUELTA.sinToken);
   }
 
   fijarToken(cuerpo.access_token, cuerpo.id_token ?? null);
@@ -489,20 +532,29 @@ export function abrirLaCuenta(pagina: PaginaDeLaCuenta): void {
   otra.opener = null;
 }
 
-function motivoDelEmisor(error: string): string {
+/** Una vuelta fallida que escribio entera este sistema: sin palabras del emisor. */
+function falloNuestro(
+  motivo: MotivoDeLaVuelta,
+  explicacion: ExplicacionDeLaVuelta,
+  valores: Readonly<Record<string, string>> = {},
+): VueltaFallida {
+  return { estado: 'fallo', motivo, explicacion, valores, delEmisor: null };
+}
+
+function motivoDelEmisor(error: string): MotivoDeLaVuelta {
   switch (error) {
     case 'access_denied':
-      return 'No se completo la entrada';
+      return MOTIVOS_DE_LA_VUELTA.cancelada;
     case 'invalid_scope':
-      return 'El alcance que se pide no existe en el emisor';
+      return MOTIVOS_DE_LA_VUELTA.alcance;
     case 'unauthorized_client':
     case 'invalid_client':
-      return 'El emisor no reconoce a este cliente';
+      return MOTIVOS_DE_LA_VUELTA.cliente;
     case 'temporarily_unavailable':
     case 'server_error':
-      return 'El emisor tuvo un problema';
+      return MOTIVOS_DE_LA_VUELTA.averia;
     default:
-      return 'El emisor no dejo entrar';
+      return MOTIVOS_DE_LA_VUELTA.rechazada;
   }
 }
 

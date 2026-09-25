@@ -413,15 +413,29 @@ function FaltanOpcionesParaLeerElCatalogo({ sesion }: { readonly sesion: Catalog
  *
  * Con el tope de idas agotado el 401 es consecuencia, no causa: lo que paso es que el emisor
  * rechazo la vuelta —un `redirect_uri` mal declarado, un codigo ya usado, «La vuelta no cuadra con
- * la ida»—. Su `motivo` y su `detalle` **sustituyen** a la frase generica: con las dos, la que se
- * lee primero es la que no dice nada de lo que paso. Es el unico diagnostico de una configuracion
- * equivocada, y hasta #355 se tiraba en el arranque.
+ * la ida»—. Su `motivo` y su `explicacion` **sustituyen** a la frase generica: con las dos, la que
+ * se lee primero es la que no dice nada de lo que paso. Es el unico diagnostico de una
+ * configuracion equivocada, y hasta #355 se tiraba en el arranque.
+ *
+ * **Cada frase es su propia clave de `t()`** (ronda 1): el motivo es el titulo y la explicacion el
+ * cuerpo, y **solo** lo que escribio el emisor (`delEmisor`) se le atribuye a el. La primera
+ * version metia el motivo como valor de «…no dejo terminar la entrada: {{motivo}}.» —que el
+ * marcador de #103 no ve, y que con «No se completo la entrada» decia dos veces lo mismo— y
+ * presentaba cualquier detalle como «Lo que contesto», tambien los que escribia este sistema.
  *
  * <h2>Y si al pulsar el emisor no contesta, se explica como desde #112</h2>
  *
  * `entrar()` pregunta primero si el emisor esta; si no, devuelve la falla y no navega. Un boton
  * que en ese caso no hiciera nada seria el `al: () => {}` de #115 con otra forma, asi que la falla
  * se ensena con la misma pantalla que ensena el arranque.
+ *
+ * <h2>Y si la ida REVIENTA, el boton vuelve (ronda 1)</h2>
+ *
+ * `entrar()` tambien puede rechazar: escribe en el almacenamiento de la pestana —que lanza lleno
+ * o bloqueado— y calcula el reto con `crypto.subtle`. El boton se deshabilita al pulsar, y sin
+ * atender el rechazo se quedaba deshabilitado para siempre: otra vez una pestana sin nada que
+ * pulsar, que es lo que #355 cierra. Se vuelve a habilitar y se dice lo que dijo el navegador, en
+ * sus palabras.
  */
 function HayQueVolverAIdentificarse({
   porQue,
@@ -436,6 +450,8 @@ function HayQueVolverAIdentificarse({
   const [falla, setFalla] = useState<FallaDeLaPuerta | null>(null);
   // La sonda puede tardar hasta ocho segundos: mientras, el boton no se ofrece otra vez.
   const [yendo, setYendo] = useState(false);
+  // Lo que dijo el navegador si la ida revento antes de salir. Ver el javadoc.
+  const [reventon, setReventon] = useState<string | null>(null);
 
   if (falla !== null) return <LaPuertaNoContesto falla={falla} />;
 
@@ -447,14 +463,21 @@ function HayQueVolverAIdentificarse({
             <p className="m-0">{porQue}</p>
           </Alerta>
         ) : (
-          <Alerta
-            tono="atencion"
-            titulo={t('El emisor de identidad no dejo terminar la entrada: {{motivo}}.', {
-              motivo: vuelta.motivo,
-            })}
-          >
+          <Alerta tono="atencion" titulo={t(vuelta.motivo)}>
+            <p className="m-0 break-words">{t(vuelta.explicacion, vuelta.valores)}</p>
+            {vuelta.delEmisor === null ? null : (
+              <p className="mt-[6px] mb-0 break-words">
+                {t('Lo que dijo el emisor: «{{texto}}»', { texto: vuelta.delEmisor })}
+              </p>
+            )}
+          </Alerta>
+        )}
+        {reventon === null ? null : (
+          <Alerta tono="mal" className="mt-[14px]">
             <p className="m-0 break-words">
-              {t('Lo que contesto: {{detalle}}', { detalle: vuelta.detalle })}
+              {t('No se pudo salir hacia el emisor de identidad. El navegador dijo: «{{motivo}}».', {
+                motivo: reventon,
+              })}
             </p>
           </Alerta>
         )}
@@ -464,13 +487,20 @@ function HayQueVolverAIdentificarse({
           disabled={yendo}
           onClick={() => {
             setYendo(true);
-            void volverAEntrar().then((otra) => {
-              // `null` es que el navegador se va: no hay nada que volver a dibujar.
-              if (otra !== null) {
-                setFalla(otra);
+            setReventon(null);
+            void volverAEntrar().then(
+              (otra) => {
+                // `null` es que el navegador se va: no hay nada que volver a dibujar.
+                if (otra !== null) {
+                  setFalla(otra);
+                  setYendo(false);
+                }
+              },
+              (error: unknown) => {
+                setReventon(enPalabrasDelNavegador(error));
                 setYendo(false);
-              }
-            });
+              },
+            );
           }}
         >
           {t('Volver a identificarse')}
@@ -478,6 +508,20 @@ function HayQueVolverAIdentificarse({
       </div>
     </div>
   );
+}
+
+/**
+ * Lo que dijo el navegador al rechazar la ida, tal cual: son las palabras que se pueden buscar y
+ * las que salen en su consola. `DOMException` no siempre hereda de `Error`, por eso se mira la
+ * forma y no la clase.
+ */
+function enPalabrasDelNavegador(error: unknown): string {
+  if (typeof error === 'object' && error !== null) {
+    const { message, name } = error as { readonly message?: unknown; readonly name?: unknown };
+    if (typeof message === 'string' && message !== '') return message;
+    if (typeof name === 'string' && name !== '') return name;
+  }
+  return String(error);
 }
 
 /**

@@ -100,6 +100,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
   fijarToken(null);
   sessionStorage.clear();
@@ -172,15 +173,25 @@ describe('(b) el emisor rechazo la entrada: se dice su motivo, y se puede volver
     '&error_description=' +
     encodeURIComponent('El usuario cancelo el formulario de identificacion');
 
-  it('con el tope agotado monta, y dice el motivo y el detalle del emisor', async () => {
+  it('con el tope agotado monta, y dice el motivo y lo que escribio el emisor', async () => {
     const asignar = ubicacion(VUELTA);
     sessionStorage.setItem(IDAS, '3');
 
     expect(await arrancarYMontar(), 'no monto con el tope agotado').toBe(true);
     expect(asignar).not.toHaveBeenCalled();
 
-    await screen.findByText(/No se completo la entrada/, undefined, ESPERAR);
-    expect(screen.getByText(/El usuario cancelo el formulario de identificacion/)).toBeTruthy();
+    // El motivo es el titulo, solo: «…no dejo terminar la entrada: No se completo la entrada.»
+    // decia dos veces lo mismo (ronda 1).
+    expect((await screen.findByText(/No se completo la entrada/, undefined, ESPERAR)).textContent).toBe(
+      'No se completo la entrada',
+    );
+    expect(screen.getByText(/access_denied/).textContent).toBe(
+      'El emisor devolvio el codigo de error «access_denied».',
+    );
+    // Y solo lo que escribio el emisor se le atribuye.
+    expect(screen.getByText(/El usuario cancelo el formulario de identificacion/).textContent).toBe(
+      'Lo que dijo el emisor: «El usuario cancelo el formulario de identificacion»',
+    );
     // El motivo SUSTITUYE a la frase generica: con las dos, lo que se lee primero es la que no dice
     // nada de lo que paso.
     expect(screen.queryByText(/La sesion no vale para saber/)).toBeNull();
@@ -200,5 +211,47 @@ describe('(b) el emisor rechazo la entrada: se dice su motivo, y se puede volver
       expect(asignar).toHaveBeenCalled();
     }, ESPERAR);
     expect(sessionStorage.getItem(IDAS)).toBe('1');
+  });
+});
+
+/**
+ * **Si la ida revienta antes de salir, el boton vuelve y se dice por que** (#355, ronda 1).
+ *
+ * `entrar()` puede RECHAZAR, y no solo devolver una falla: escribe cuatro llaves en
+ * `sessionStorage` —que lanza si esta lleno o bloqueado— y calcula el reto con `crypto.subtle`. El
+ * boton se deshabilita al pulsar para no lanzar dos idas a la vez, y sin atender el rechazo se
+ * quedaba asi **para siempre**: la pestana volvia a no tener nada que pulsar, que es justo el
+ * defecto que #355 cierra, y el rechazo salia sin atender a la consola.
+ *
+ * Se siembra `setItem` lanzando solo sobre las llaves de la puerta, y DESPUES de montar: el resto
+ * de la aplicacion sigue escribiendo, y lo unico que falla es la ida.
+ */
+describe('(c) si la ida revienta antes de salir, el boton vuelve y se dice por que', () => {
+  it('con el almacenamiento lleno: el boton se puede pulsar otra vez y la pantalla dice lo que paso', async () => {
+    const asignar = ubicacion();
+    sessionStorage.setItem(SALIDA, '1');
+    await arrancarYMontar();
+    const escribir = Storage.prototype.setItem;
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (
+      this: Storage,
+      clave: string,
+      valor: string,
+    ) {
+      if (clave.startsWith('kamayuk.pkce.')) {
+        throw new DOMException('Se lleno el almacenamiento de la pestana', 'QuotaExceededError');
+      }
+      escribir.call(this, clave, valor);
+    });
+
+    fireEvent.click(await elBotonDeVolver());
+
+    await waitFor(() => {
+      expect(
+        (screen.getByRole('button', { name: 'Volver a identificarse' }) as HTMLButtonElement).disabled,
+        'el boton se quedo deshabilitado: la pestana otra vez sin nada que pulsar',
+      ).toBe(false);
+    }, ESPERAR);
+    expect(screen.getByText(/Se lleno el almacenamiento de la pestana/)).toBeTruthy();
+    expect(asignar).not.toHaveBeenCalled();
   });
 });
