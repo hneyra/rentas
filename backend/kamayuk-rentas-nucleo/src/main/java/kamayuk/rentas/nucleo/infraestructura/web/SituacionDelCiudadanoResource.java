@@ -52,7 +52,9 @@ import org.jspecify.annotations.Nullable;
  * @param municipalidadesRecorridas cuantas municipalidades activas se visitaron
  * @param totalConsolidado la suma de los totales de todas, o {@code null} si falto alguna
  * @param notaDelTotal por que no hay total, redactado por el servidor; {@code null} si lo hay
- * @param sinRegistros si esta persona no figura en ninguna municipalidad del sistema
+ * @param sinRegistros si esta persona no figura en ninguna municipalidad del sistema. {@code false}
+ *     tambien cuando alguna municipalidad no se pudo leer: entonces no se puede afirmar (#440), y
+ *     {@code notaDelTotal} dice cual falta
  * @param municipalidades una por cada municipalidad donde figura
  */
 public record SituacionDelCiudadanoResource(

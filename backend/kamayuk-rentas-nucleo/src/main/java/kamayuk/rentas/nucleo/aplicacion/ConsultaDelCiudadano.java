@@ -154,9 +154,23 @@ public class ConsultaDelCiudadano {
             return Optional.of(total);
         }
 
-        /** Si esta persona no figura en ninguna municipalidad activa del sistema. */
+        /**
+         * Si esta persona no figura en ninguna municipalidad activa del sistema, <b>y eso se pudo
+         * comprobar</b>.
+         *
+         * <p>{@code false} tambien cuando alguna municipalidad no se pudo leer: entonces no se
+         * puede afirmar (#440). Una rama que lanza no entra en {@code municipalidades}, asi que sin
+         * la guarda de {@code noLeidas} «aqui no figura» y «aqui no se pudo mirar» darian lo mismo,
+         * y la respuesta diria a la vez que la persona no esta en ningun padron y que no se pudo
+         * consultar el suyo. Es el mismo motivo por el que {@link #totalConsolidado()} es un {@link
+         * Optional}: ADR-0020 §3, aplicado a la otra afirmacion de la misma respuesta.
+         *
+         * <p>«¿Figura?» tiene tres respuestas —si, no, no se sabe— y un {@code boolean} solo cabe
+         * dos: aqui «no se sabe» cae del lado que no afirma nada. El tri-estado explicito cambia el
+         * tipo del campo publicado y se acuerda aparte con {@code ciudadano}.
+         */
         public boolean sinRegistros() {
-            return municipalidades.isEmpty();
+            return municipalidades.isEmpty() && noLeidas.isEmpty();
         }
     }
 
