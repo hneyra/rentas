@@ -11,6 +11,7 @@ import java.util.Map;
 import kamayuk.rentas.compartido.Pagina;
 import kamayuk.rentas.compartido.Paginacion;
 import kamayuk.rentas.dominio.Dinero;
+import kamayuk.rentas.dominio.Placa;
 import kamayuk.rentas.persistencia.OrdenSeguro;
 import kamayuk.rentas.persistencia.RangoDePrefijo;
 import kamayuk.rentas.persistencia.RepositorioJdbc;
@@ -303,8 +304,9 @@ public class PadronDePapeletasRepositoryJdbc extends RepositorioJdbc
             parametros.put("codigoInfraccion", criterio.codigoInfraccion());
         }
         if (criterio.placa() != null) {
-            condiciones.add("p.placa = :placa");
-            parametros.put("placa", criterio.placa());
+            // #423: sin guion ni espacios, como `vigenteDePlaca` de InternamientoRepositoryJdbc.
+            condiciones.add("p.placa_busqueda = :placa");
+            parametros.put("placa", Placa.formaDeBusqueda(criterio.placa()));
         }
         if (criterio.licenciaConducir() != null) {
             condiciones.add("p.licencia_conducir = :licencia");

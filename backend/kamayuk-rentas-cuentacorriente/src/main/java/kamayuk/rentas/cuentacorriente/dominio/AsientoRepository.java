@@ -120,6 +120,10 @@ public interface AsientoRepository {
      * cruce de {@link #buscar}: se resuelve en SQL contra una tabla con la que ya hay clave
      * foranea, sin conocer ningun tipo de ese contexto (ARQ-01 §4 regla 2). Las dos tablas
      * comparten politica RLS, asi que la busqueda no se sale del tenant.
+     *
+     * <p>El codigo llega <b>tal como se tecleo</b>, y quien implementa el puerto lo compara en la
+     * forma de {@code CodigoContribuyente.formaDeBusqueda} —recortado y en mayusculas— (#423).
+     * Normalizar no es cosa de cada llamador: tres controladores lo olvidaron a la vez.
      */
     Optional<Long> contribuyentePorCodigo(String codigo);
 

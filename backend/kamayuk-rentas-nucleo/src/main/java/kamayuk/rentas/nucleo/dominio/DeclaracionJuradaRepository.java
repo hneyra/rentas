@@ -18,7 +18,14 @@ public interface DeclaracionJuradaRepository {
 
     Optional<DeclaracionJurada> findById(long id);
 
-    /** Por numero y ejercicio, que es como la busca quien atiende (contrato de {@code djNro}). */
+    /**
+     * Por numero y ejercicio, que es como la busca quien atiende (contrato de {@code djNro}).
+     *
+     * <p>El numero se compara en la forma de {@link DeclaracionJurada#formaDeBusqueda} —recortado y
+     * en mayusculas, la misma con que se guardo—, y la aplica el adaptador y no quien llama (#423):
+     * el {@code {djNro}} llega por la ruta tal como se tecleo, y {@code dj-2026-000001} es la
+     * declaracion {@code DJ-2026-000001}. Hasta #423 se comparaba en crudo y contestaba 404.
+     */
     Optional<DeclaracionJurada> porNumero(String numero, Ejercicio ejercicio);
 
     /**

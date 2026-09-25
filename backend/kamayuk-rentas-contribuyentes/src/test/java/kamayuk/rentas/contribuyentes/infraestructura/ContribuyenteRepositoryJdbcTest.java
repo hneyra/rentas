@@ -53,6 +53,9 @@ class ContribuyenteRepositoryJdbcTest {
     /** Donde escriben las pruebas de escritura, para no mover los totales que las otras cuentan. */
     private static long municipalidadC;
 
+    /** La del pasaporte de #423: un padron propio, para no mover las cuentas de los otros. */
+    private static long municipalidadD;
+
     private static TransactionTemplate transaccion;
     private static ContribuyenteRepositoryJdbc repositorio;
     private static JdbcClient jdbc;
@@ -64,6 +67,7 @@ class ContribuyenteRepositoryJdbcTest {
         municipalidadA = crearMunicipalidad("210101", "Municipalidad del padron A");
         municipalidadB = crearMunicipalidad("210102", "Municipalidad del padron B");
         municipalidadC = crearMunicipalidad("210103", "Municipalidad del padron C");
+        municipalidadD = crearMunicipalidad("210104", "Municipalidad del padron D");
 
         // El mismo codigo en dos municipalidades: no es un choque, son dos padrones.
         sembrar(
@@ -92,6 +96,16 @@ class ContribuyenteRepositoryJdbcTest {
                 TipoDocumento.DNI,
                 "40123456",
                 "OTRO PADRON, PERSONA DISTINTA");
+
+        // #423: un documento con letras, guardado como lo guarda `DocumentoIdentidad`, en
+        // mayusculas. Los DNI y RUC de arriba son solo digitos, y con solo digitos la busqueda
+        // que no sube a mayusculas pasa igual.
+        sembrar(
+                municipalidadD,
+                "00001",
+                TipoDocumento.PASAPORTE,
+                "AB123456",
+                "VIAJERA EXTRANJERA, ANNE");
 
         DriverManagerDataSource pool = new DriverManagerDataSource();
         pool.setUrl(base.url());
@@ -276,6 +290,37 @@ class ContribuyenteRepositoryJdbcTest {
                     .as("quien atiende teclea el numero del carne, no lo clasifica")
                     .singleElement()
                     .satisfies(c -> assertThat(c.tipoPersona()).isEqualTo(TipoPersona.JURIDICA));
+        }
+
+        @Test
+        @DisplayName("#423 — el pasaporte «AB123456» se encuentra tecleando «ab123456»")
+        void elDocumentoEnMinusculasSeEncuentra() {
+            TenantContext.fijar(new MunicipalidadId(municipalidadD));
+
+            for (CriterioDeBusqueda criterio :
+                    List.of(
+                            CriterioDeBusqueda.porNumeroDeDocumento("ab123456"),
+                            CriterioDeBusqueda.porDocumento(
+                                    TipoDocumento.PASAPORTE, " ab123456 "))) {
+                Pagina<Contribuyente> pagina =
+                        transaccion.execute(
+                                estado ->
+                                        repositorio.buscar(
+                                                criterio,
+                                                Paginacion.de(0, 20, "codigo_contribuyente")));
+
+                assertThat(pagina).isNotNull();
+                assertThat(pagina.contenido())
+                        .as(
+                                "con cero filas quien atiende da el alta, y el alta contesta 409"
+                                        + " «ya hay otro contribuyente con ese PASAPORTE»: "
+                                        + criterio)
+                        .singleElement()
+                        .satisfies(
+                                c ->
+                                        assertThat(c.nombreRazonSocial())
+                                                .startsWith("VIAJERA EXTRANJERA"));
+            }
         }
 
         @Test

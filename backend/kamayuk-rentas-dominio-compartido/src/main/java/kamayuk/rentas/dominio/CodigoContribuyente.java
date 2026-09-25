@@ -32,7 +32,7 @@ public record CodigoContribuyente(String valor) implements Comparable<CodigoCont
 
     public CodigoContribuyente {
         Objects.requireNonNull(valor, "El codigo de contribuyente es obligatorio");
-        valor = valor.strip().toUpperCase(Locale.ROOT);
+        valor = formaDeBusqueda(valor);
         if (valor.length() > MAXIMO) {
             throw new IllegalArgumentException(
                     "El codigo de contribuyente excede " + MAXIMO + " caracteres: " + valor);
@@ -47,6 +47,20 @@ public record CodigoContribuyente(String valor) implements Comparable<CodigoCont
 
     public static CodigoContribuyente de(String texto) {
         return new CodigoContribuyente(texto);
+    }
+
+    /**
+     * La forma con la que se guarda y se compara un codigo: recortado y en mayusculas (#423). Es la
+     * unica copia de esa regla.
+     *
+     * <p><b>No valida</b>: sirve para <i>buscar</i>, y una busqueda con un caracter que un codigo
+     * nuevo no admitiria —o con uno que el padron cargado trae— no es una peticion mal formada sino
+     * un codigo que no esta. Construir el objeto de valor en una consulta convertiria ese «no esta»
+     * en un 422.
+     */
+    public static String formaDeBusqueda(String texto) {
+        Objects.requireNonNull(texto, "No hay codigo de contribuyente que buscar");
+        return texto.strip().toUpperCase(Locale.ROOT);
     }
 
     @Override

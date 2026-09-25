@@ -46,4 +46,33 @@ class PlacaTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("longitud");
     }
+
+    @Test
+    @DisplayName("#423 — la forma de busqueda: sin espacios ni guion, y sin validar")
+    void laFormaDeBusqueda() {
+        assertThat(Placa.formaDeBusqueda(" zlg-701 ")).isEqualTo("ZLG701");
+        assertThat(Placa.formaDeBusqueda("ZLG 701")).isEqualTo("ZLG701");
+        assertThat(Placa.formaDeBusqueda("ZLG701")).isEqualTo("ZLG701");
+        assertThat(Placa.formaDeBusqueda("a-1"))
+                .as(
+                        "sanciones admite placas cargadas de 1 caracter que Placa no aceptaria:"
+                                + " buscarlas no puede lanzar")
+                .isEqualTo("A1");
+        assertThat(Placa.de("ZLG-701").sinSeparador())
+                .as("y la de una placa valida es un caso de la misma regla")
+                .isEqualTo(Placa.formaDeBusqueda("zlg 701"));
+    }
+
+    @Test
+    @DisplayName("#423 — la forma escrita: sin espacios, el guion se queda, y sin validar")
+    void laFormaEscrita() {
+        assertThat(Placa.formaEscrita(" zlg 701 ")).isEqualTo("ZLG701");
+        assertThat(Placa.formaEscrita("zlg-701")).isEqualTo("ZLG-701");
+        assertThat(Placa.formaEscrita("a"))
+                .as("una placa cargada de 1 caracter se escribe; el largo lo exige quien la guarda")
+                .isEqualTo("A");
+        assertThat(Placa.de(" zlg 701 ").valor())
+                .as("y la de una placa valida es la misma regla")
+                .isEqualTo(Placa.formaEscrita(" zlg 701 "));
+    }
 }

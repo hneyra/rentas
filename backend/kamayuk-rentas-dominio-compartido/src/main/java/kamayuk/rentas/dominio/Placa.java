@@ -34,7 +34,7 @@ public record Placa(String valor) implements Comparable<Placa> {
 
     public Placa {
         Objects.requireNonNull(valor, "La placa es obligatoria");
-        valor = valor.strip().toUpperCase(Locale.ROOT).replace(" ", "");
+        valor = formaEscrita(valor);
         if (valor.length() < LARGO_MINIMO || valor.length() > LARGO_MAXIMO) {
             throw new IllegalArgumentException(
                     "Placa de longitud invalida: '"
@@ -60,9 +60,44 @@ public record Placa(String valor) implements Comparable<Placa> {
         return new Placa(texto);
     }
 
+    /**
+     * La forma con la que se compara y se busca <b>cualquier</b> texto de placa: recortado, en
+     * mayusculas, sin espacios y sin guion (#423). Es la unica copia de esa regla.
+     *
+     * <p><b>No valida</b>, y es a proposito. {@code Papeleta} e {@code Internamiento} admiten
+     * placas de 1 a 10 caracteres y esta clase exige de 5 a 10 con letra y digito, asi que
+     * construir una {@code Placa} con lo que llega a una consulta —o con lo que ya esta guardado—
+     * convertiria en error una fila cargada que hoy existe. Quien busca necesita la forma, no la
+     * garantia.
+     *
+     * <p>La columna {@code placa} no cambia: conserva el guion porque es lo que el papel imprime.
+     * Del lado de la base, la misma forma la calcula {@code sanciones} en su columna generada
+     * {@code placa_busqueda} (V27), y {@code nucleo} con {@code replace(placa, '-', '')}.
+     */
+    public static String formaDeBusqueda(String texto) {
+        Objects.requireNonNull(texto, "No hay placa que buscar");
+        return formaEscrita(texto).replace("-", "");
+    }
+
     /** La placa sin su guion. Es la forma con la que se compara y se busca. */
     public String sinSeparador() {
-        return valor.replace("-", "");
+        return formaDeBusqueda(valor);
+    }
+
+    /**
+     * Como se guarda y se imprime <b>cualquier</b> texto de placa: recortado, en mayusculas y sin
+     * espacios. El guion se queda. Es la unica copia de esa regla (#423).
+     *
+     * <p>Tampoco valida, por lo mismo que {@link #formaDeBusqueda}: {@code Papeleta}, {@code
+     * Internamiento} y {@code ConstanciaLibre} admiten de 1 a 10 caracteres, y lo que exigen del
+     * largo lo comprueban ellos sobre esta forma. Hasta la ronda de correccion de #423 cada uno la
+     * escribia con una copia suya —{@code strip().toUpperCase(ROOT)}— que conservaba el espacio de
+     * en medio: {@code " zlg 701 "} quedaba {@code "ZLG 701"} en la papeleta y {@code "ZLG701"} en
+     * el vehiculo del padron.
+     */
+    public static String formaEscrita(String texto) {
+        Objects.requireNonNull(texto, "No hay placa que escribir");
+        return texto.strip().toUpperCase(Locale.ROOT).replace(" ", "");
     }
 
     /** Dos placas son la misma aunque una lleve guion y la otra no: el separador es de lectura. */

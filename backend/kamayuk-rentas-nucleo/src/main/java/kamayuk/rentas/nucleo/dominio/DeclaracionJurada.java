@@ -57,7 +57,7 @@ public record DeclaracionJurada(
 
     public DeclaracionJurada {
         Objects.requireNonNull(numero, "La declaracion jurada necesita su numero");
-        numero = numero.strip().toUpperCase(Locale.ROOT);
+        numero = formaDeBusqueda(numero);
         if (numero.isEmpty() || numero.length() > NUMERO_MAXIMO) {
             throw new IllegalArgumentException(
                     "El numero va de 1 a " + NUMERO_MAXIMO + " caracteres: '" + numero + "'");
@@ -89,6 +89,17 @@ public record DeclaracionJurada(
         Objects.requireNonNull(estado, "La declaracion jurada necesita su estado");
         Objects.requireNonNull(
                 observacion, "Sin observacion no se guarda una declaracion jurada (regla 10)");
+    }
+
+    /**
+     * La forma con que se guarda y se compara el numero de una declaracion: recortado y en
+     * mayusculas (#423). Es la unica copia de esa regla, y la usa tambien quien <b>busca</b> una DJ
+     * por el numero que llego por la ruta. No valida el largo: buscar un numero imposible no es una
+     * peticion mal formada, es una DJ que no esta.
+     */
+    public static String formaDeBusqueda(String numero) {
+        Objects.requireNonNull(numero, "No hay numero de declaracion que buscar");
+        return numero.strip().toUpperCase(Locale.ROOT);
     }
 
     /** Un formulario nuevo, todavia sin guardar. */

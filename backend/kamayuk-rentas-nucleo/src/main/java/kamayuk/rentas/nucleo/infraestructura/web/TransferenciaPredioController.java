@@ -78,7 +78,7 @@ public class TransferenciaPredioController {
 
     private long contribuyenteDe(@Nullable String codigo, String campo) {
         return consultas
-                .contribuyentePorCodigo(exigir(codigo, campo).toUpperCase(java.util.Locale.ROOT))
+                .contribuyentePorCodigo(exigir(codigo, campo))
                 .orElseThrow(
                         () ->
                                 new ProblemaDeNegocio(

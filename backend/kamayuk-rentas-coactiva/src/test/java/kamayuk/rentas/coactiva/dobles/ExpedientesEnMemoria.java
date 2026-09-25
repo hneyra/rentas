@@ -69,10 +69,19 @@ public final class ExpedientesEnMemoria implements ExpedienteRepository {
         return correlativos.merge(ejercicio.valor(), 1L, Long::sum);
     }
 
+    /**
+     * Compara como compara {@code ExpedienteRepositoryJdbc}: recortado y <b>sin</b> ignorar las
+     * mayusculas (#423).
+     *
+     * <p>Hasta #423 este doble comparaba con {@code equalsIgnoreCase}, y la base no: el {@code
+     * PATCH} con el numero en minusculas pasaba aqui y daba 404 en produccion. Un doble mas
+     * tolerante que el adaptador que imita es justo lo que esconde que la normalizacion falta en el
+     * borde.
+     */
     @Override
     public Optional<ExpedienteCoactivo> porNumero(String numero) {
         return guardados.values().stream()
-                .filter(e -> e.numero().equalsIgnoreCase(numero.strip()))
+                .filter(e -> e.numero().equals(numero.strip()))
                 .findFirst();
     }
 

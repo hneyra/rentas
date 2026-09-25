@@ -41,4 +41,17 @@ class CodigoContribuyenteTest {
     void seOrdena() {
         assertThat(CodigoContribuyente.de("A1")).isLessThan(CodigoContribuyente.de("A2"));
     }
+
+    @Test
+    @DisplayName("#423 — la forma de busqueda es la de guardar, y no valida")
+    void laFormaDeBusqueda() {
+        assertThat(CodigoContribuyente.formaDeBusqueda(" c-000007 "))
+                .isEqualTo(CodigoContribuyente.de("c-000007").valor())
+                .isEqualTo("C-000007");
+        assertThat(CodigoContribuyente.formaDeBusqueda("c/7"))
+                .as(
+                        "un caracter que un codigo nuevo no admite no es una consulta mal formada:"
+                                + " es un codigo que no esta, y no puede convertirse en 422")
+                .isEqualTo("C/7");
+    }
 }

@@ -109,6 +109,20 @@ class PlantillaDeNumeroDeExpedienteTest {
         }
     }
 
+    @Test
+    @DisplayName("#423 — como se imprime lo que llego escrito por la ruta")
+    void comoSeImprimeLoQueLlegoEscrito() {
+        PlantillaDeNumeroDeExpediente plantilla = PlantillaDeNumeroDeExpediente.POR_OMISION;
+
+        assertThat(plantilla.comoSeImprime(" exp-2026-000001 ")).isEqualTo("EXP-2026-000001");
+        assertThat(plantilla.comoSeImprime("EXP-2026-1"))
+                .as("el correlativo sin rellenar es el mismo expediente")
+                .isEqualTo("EXP-2026-000001");
+        assertThatThrownBy(() -> plantilla.comoSeImprime("2026-000001"))
+                .isInstanceOf(PlantillaDeNumeroDeExpediente.NumeroIlegible.class)
+                .hasMessageContaining("EXP-2026-000001");
+    }
+
     @Nested
     @DisplayName("Una plantilla que no numera no es una plantilla")
     class PlantillasInvalidas {

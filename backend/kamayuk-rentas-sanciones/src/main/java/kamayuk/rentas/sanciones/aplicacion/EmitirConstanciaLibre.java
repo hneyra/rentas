@@ -13,6 +13,7 @@ import kamayuk.rentas.documentos.EmitirDocumento;
 import kamayuk.rentas.documentos.FormatoDeDocumento;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.Observacion;
+import kamayuk.rentas.dominio.Placa;
 import kamayuk.rentas.nucleo.PadronVehicular;
 import kamayuk.rentas.sanciones.dominio.ConstanciaLibre;
 import kamayuk.rentas.sanciones.dominio.ConstanciaLibreRepository;
@@ -237,7 +238,7 @@ public class EmitirConstanciaLibre {
                     verificadaAl,
                     "Falta a que dia se acredita: «no tiene papeletas pendientes» es cierto o falso"
                             + " segun el dia (regla 9, RNF-075)");
-            placa = placa.strip().toUpperCase(java.util.Locale.ROOT);
+            placa = Placa.formaEscrita(placa);
             if (placa.isEmpty()) {
                 throw new IllegalArgumentException("La placa no puede estar en blanco");
             }

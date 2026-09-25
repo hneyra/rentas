@@ -91,7 +91,10 @@ import kamayuk.rentas.sanciones.aplicacion.ResolverConResolucionDeGerencia;
 import kamayuk.rentas.sanciones.dobles.CobrosDeMentira;
 import kamayuk.rentas.sanciones.dominio.ActoDeLaPapeleta;
 import kamayuk.rentas.sanciones.dominio.AcuseDelActo;
+import kamayuk.rentas.sanciones.dominio.ConstanciaLibre;
+import kamayuk.rentas.sanciones.dominio.CriterioDeConstancias;
 import kamayuk.rentas.sanciones.dominio.CriterioDeInternamiento;
+import kamayuk.rentas.sanciones.dominio.CriterioDePapeleta;
 import kamayuk.rentas.sanciones.dominio.Descargo;
 import kamayuk.rentas.sanciones.dominio.EfectoSobreLaMulta;
 import kamayuk.rentas.sanciones.dominio.EstadoDeInternamiento;
@@ -1962,6 +1965,177 @@ class SancionesJdbcTest {
         }
     }
 
+    // ==================================================================
+
+    /**
+     * #423 — la placa se compara <b>sin su guion</b>, como la compara {@code Placa} y como la
+     * compara {@code nucleo}.
+     *
+     * <p>La siembra es la que faltaba: <b>una grafia al guardar y la otra al pedir</b>. Hasta #423
+     * las pruebas de este modulo escribian {@code "ABC-123"} a los dos lados, y con la misma grafia
+     * a los dos lados un {@code p.placa = :placa} pasa aunque compare el texto crudo. Cada prueba
+     * usa su placa, para que ninguna encuentre lo que sembro otra.
+     */
+    @Nested
+    @DisplayName("#423 — la placa con y sin guion es el mismo vehiculo")
+    class LaPlacaConYSinGuion {
+
+        private static final String INTERNAMIENTOS = "/rentas/api/v1/transito/internamientos";
+        private static final String CONSTANCIAS = "/rentas/api/v1/transito/constancias-libres";
+
+        @Test
+        @DisplayName("internado como «ZLG-701», volver a internarlo como «ZLG701» es 409")
+        void noSeInternaDosVecesConOtraGrafia() throws Exception {
+            internarVehiculo(papeletaDeTransito("P01"), "ZLG-701");
+
+            Rechazo segundo = rechazo(() -> enviar(post(INTERNAMIENTOS), ingreso("ZLG701", "P02")));
+
+            assertThat(segundo.estado())
+                    .as(
+                            "con 201 quedarian dos internamientos abiertos del mismo vehiculo,"
+                                    + " cada uno acumulando su custodia: "
+                                    + segundo.cuerpo())
+                    .isEqualTo(409);
+            assertThat(segundo.cuerpo()).contains("CONFLICTO").contains("ZLG-701");
+            assertThat(
+                            contar(
+                                    "SELECT count(*) FROM internamiento"
+                                            + " WHERE replace(placa, '-', '') = 'ZLG701'"))
+                    .isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("internado como «ZLG-702», se libera pidiendolo como «zlg702»")
+        void seLiberaConOtraGrafia() throws Exception {
+            Papeleta papeleta = papeletaDeTransito("P03");
+            internarVehiculo(papeleta, "ZLG-702");
+            String recibo = cobrarCustodia(papeleta.obligadoId());
+
+            Rechazo liberacion =
+                    rechazo(
+                            () ->
+                                    enviar(
+                                            post(INTERNAMIENTOS + "/zlg702/liberacion"),
+                                            "{\"observacion\":\"El titular retira el vehiculo\","
+                                                    + "\"fechaDeLiberacion\":\"2026-04-01\","
+                                                    + "\"reciboDeCustodia\":\""
+                                                    + recibo
+                                                    + "\",\"personaQueRetira\":\"DORIS\","
+                                                    + "\"documentoDeQuienRetira\":\"DNI 44218937\","
+                                                    + "\"soatVigenteAcreditado\":true}"));
+
+            assertThat(liberacion.estado())
+                    .as(
+                            "con 404 «no esta internado» se bloquea una liberacion legitima: "
+                                    + liberacion.cuerpo())
+                    .isEqualTo(201);
+        }
+
+        @Test
+        @DisplayName("con una papeleta pendiente de «ZLG-703», la constancia de «ZLG703» es 409")
+        void laConstanciaVeLaPapeletaConOtraGrafia() throws Exception {
+            papeletaDeTransitoDe("P04", "ZLG-703");
+            long documentosAntes = contar("SELECT count(*) FROM documento_emitido");
+
+            Rechazo constancia = rechazo(() -> enviar(post(CONSTANCIAS), constanciaDe("ZLG703")));
+
+            assertThat(constancia.estado())
+                    .as(
+                            "con 201 la constancia acreditaria que el vehiculo no tiene papeletas"
+                                    + " pendientes, y tiene una")
+                    .isEqualTo(409);
+            assertThat(constancia.cuerpo()).contains("PT-P04");
+            assertThat(contar("SELECT count(*) FROM documento_emitido"))
+                    .as("ningun papel sale")
+                    .isEqualTo(documentosAntes);
+        }
+
+        @Test
+        @DisplayName("la grilla del deposito encuentra «ZLG-704» pidiendo «zlg 704»")
+        void laGrillaDelDepositoLaEncuentra() {
+            internarVehiculo(papeletaDeTransito("P05"), "ZLG-704");
+
+            Pagina<InternamientoEnConsulta> grilla =
+                    enTransaccion(
+                            () ->
+                                    consultaDeDeposito.listar(
+                                            new CriterioDeInternamiento("zlg 704", null, null),
+                                            SANCIONADORA_DESDE,
+                                            Paginacion.de(0, 20, "fechaIngreso")));
+
+            assertThat(grilla.contenido())
+                    .extracting(InternamientoEnConsulta::placa)
+                    .as("el guion y el espacio son de lectura, no del dato")
+                    .containsExactly("ZLG-704");
+        }
+
+        @Test
+        @DisplayName("la busqueda de papeletas encuentra «ZLG-705» pidiendo «ZLG705»")
+        void laBusquedaDePapeletasLaEncuentra() {
+            papeletaDeTransitoDe("P06", "ZLG-705");
+
+            Pagina<Papeleta> encontradas =
+                    enTransaccion(
+                            () ->
+                                    papeletas.buscar(
+                                            new CriterioDePapeleta(
+                                                    Familia.TRANSITO,
+                                                    null,
+                                                    "ZLG705",
+                                                    null,
+                                                    null,
+                                                    null,
+                                                    null,
+                                                    null,
+                                                    null,
+                                                    null,
+                                                    false),
+                                            Paginacion.de(0, 20, "numero")));
+
+            assertThat(encontradas.contenido())
+                    .extracting(Papeleta::numero)
+                    .containsExactly("PT-P06");
+        }
+
+        @Test
+        @DisplayName("la grilla de constancias encuentra «ZLG-706» pidiendo «zlg706»")
+        void laGrillaDeConstanciasLaEncuentra() throws Exception {
+            Rechazo emitida = rechazo(() -> enviar(post(CONSTANCIAS), constanciaDe("ZLG-706")));
+            assertThat(emitida.estado()).as(emitida.cuerpo()).isEqualTo(201);
+
+            Pagina<ConstanciaLibre> grilla =
+                    enTransaccion(
+                            () ->
+                                    new ConstanciaLibreRepositoryJdbc(jdbc)
+                                            .buscar(
+                                                    new CriterioDeConstancias(
+                                                            null, null, null, null, "zlg706"),
+                                                    Paginacion.de(0, 20, "numero")));
+
+            assertThat(grilla.contenido())
+                    .extracting(ConstanciaLibre::placa)
+                    .containsExactly("ZLG-706");
+        }
+
+        private String ingreso(String placa, String sufijoDeLaPapeleta) {
+            Papeleta papeleta = papeletaDeTransito(sufijoDeLaPapeleta);
+            return "{\"observacion\":\"Se interna para la prueba\",\"placa\":\""
+                    + placa
+                    + "\",\"papeleta\":\""
+                    + papeleta.numero()
+                    + "\",\"deposito\":\"DEPOSITO SULLANA NORTE\","
+                    + "\"fechaDeIngreso\":\"2026-03-04T15:00:00Z\","
+                    + "\"tasaDeCustodia\":\"CUSTODIA\","
+                    + "\"motivo\":\"Conducir sin licencia vigente\"}";
+        }
+
+        private String constanciaDe(String placa) {
+            return "{\"observacion\":\"Constancia pedida en ventanilla\",\"placa\":\""
+                    + placa
+                    + "\",\"verificadaAl\":\"2026-04-20\"}";
+        }
+    }
+
     /** Lo que un rechazo contesta, y las lineas ERROR que dejo en el registro del manejador. */
     private record Rechazo(int estado, String cuerpo, List<String> errores) {}
 
@@ -2038,6 +2212,36 @@ class SancionesJdbcTest {
     /** Una papeleta de tránsito con su cargo ya asentado en el libro. */
     private static Papeleta papeletaDeTransito(String sufijo) {
         return papeletaDeTransito(sufijo, crearContribuyente(sufijo), MULTA);
+    }
+
+    /**
+     * Una papeleta de tránsito con <b>la placa que se pida</b> (#423): la de {@link
+     * #papeletaDeTransito(String)} sale del sufijo, y lo que #423 mide es una grafia concreta.
+     */
+    private static Papeleta papeletaDeTransitoDe(String sufijo, String placa) {
+        long obligado = crearContribuyente(sufijo);
+        crearCodigo("G-" + sufijo);
+        return enTransaccion(
+                () ->
+                        registrarPapeleta.registrarTransito(
+                                "PT-" + sufijo,
+                                "G-" + sufijo,
+                                INFRACCION,
+                                null,
+                                "Av. Grau",
+                                placa,
+                                null,
+                                null,
+                                null,
+                                obligado,
+                                obligado,
+                                Dinero.de("5350.00"),
+                                Alicuota.de("8"),
+                                MULTA,
+                                Alicuota.de("100"),
+                                MULTA,
+                                null,
+                                PORQUE));
     }
 
     /**

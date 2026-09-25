@@ -3,6 +3,7 @@ package kamayuk.rentas.sanciones.dominio;
 import java.time.LocalDate;
 import java.util.Locale;
 import java.util.Objects;
+import kamayuk.rentas.dominio.Placa;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -57,7 +58,7 @@ public record CriterioDePadron(
     public CriterioDePadron {
         Objects.requireNonNull(familia, "El criterio necesita su familia");
         codigoInfraccion = limpiar(codigoInfraccion);
-        placa = limpiar(placa);
+        placa = placaEscrita(placa);
         prefijoDePlaca = limpiar(prefijoDePlaca);
         licenciaConducir = limpiar(licenciaConducir);
         documentoInfractor = limpiar(documentoInfractor);
@@ -94,6 +95,11 @@ public record CriterioDePadron(
                 null,
                 Boolean.FALSE,
                 true);
+    }
+
+    /** La placa la escribe {@link Placa}, y no una copia de aqui (#423). En blanco no filtra. */
+    private static @Nullable String placaEscrita(@Nullable String valor) {
+        return valor == null || valor.isBlank() ? null : Placa.formaEscrita(valor);
     }
 
     private static @Nullable String limpiar(@Nullable String valor) {

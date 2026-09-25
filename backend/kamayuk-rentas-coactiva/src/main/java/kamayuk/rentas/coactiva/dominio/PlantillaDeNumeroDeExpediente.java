@@ -141,6 +141,22 @@ public record PlantillaDeNumeroDeExpediente(String plantilla) {
     }
 
     /**
+     * El numero tal como esta plantilla lo <b>imprime</b>, a partir de como llego escrito (#423).
+     *
+     * <p>Es lo que el borde HTTP hace con el {@code {numero}} de cada ruta de un expediente antes
+     * de buscarlo: {@code exp-2026-000001} y {@code EXP-2026-1} son el expediente {@code
+     * EXP-2026-000001}, y lo que la plantilla no sabe leer es un numero mal escrito —un 422 que
+     * dice como se escribe—, no un expediente que no existe. Hasta #423 {@link #analizar} no tenia
+     * ni un llamador fuera de las pruebas: la ruta se buscaba recortada y nada mas, y el {@code
+     * PATCH} en minusculas contestaba 404 sobre el expediente que la grilla si encontraba.
+     *
+     * @throws NumeroIlegible si el texto no tiene la forma que esta plantilla compone
+     */
+    public String comoSeImprime(String escrito) {
+        return analizar(escrito).impreso(this);
+    }
+
+    /**
      * La expresion regular equivalente a la plantilla, <b>con el numero de grupo de cada marca</b>.
      *
      * <p>Se deriva de la plantilla en lugar de escribirse aparte: si se escribiera aparte, cambiar

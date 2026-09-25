@@ -23,7 +23,7 @@ public record DocumentoIdentidad(TipoDocumento tipo, String numero) {
     public DocumentoIdentidad {
         Objects.requireNonNull(tipo, "El tipo de documento es obligatorio");
         Objects.requireNonNull(numero, "El numero de documento es obligatorio");
-        numero = numero.strip().toUpperCase(Locale.ROOT);
+        numero = formaDeBusqueda(numero);
         if (numero.length() < tipo.longitudMinima() || numero.length() > tipo.longitudMaxima()) {
             throw new IllegalArgumentException(
                     "Un "
@@ -44,6 +44,18 @@ public record DocumentoIdentidad(TipoDocumento tipo, String numero) {
         if (numero.isBlank()) {
             throw new IllegalArgumentException("El numero de documento no puede estar en blanco");
         }
+    }
+
+    /**
+     * La forma con la que se guarda y se compara el numero de un documento: recortado y en
+     * mayusculas (#423). Es la unica copia de esa regla.
+     *
+     * <p>Un pasaporte o un carne de extranjeria llevan letras, y quien atiende las teclea como
+     * vienen. <b>No valida</b> contra el tipo: una busqueda sin tipo no tiene contra que validar.
+     */
+    public static String formaDeBusqueda(String numero) {
+        Objects.requireNonNull(numero, "No hay numero de documento que buscar");
+        return numero.strip().toUpperCase(Locale.ROOT);
     }
 
     public static DocumentoIdentidad dni(String numero) {

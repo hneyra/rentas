@@ -61,6 +61,10 @@ import org.springframework.web.bind.annotation.RestController;
  *
  * <p>{@code {numero}} es el numero <b>impreso</b> del expediente, tal como esta en su caratula. Ni
  * el identificador interno ni el ejercicio y el correlativo por separado.
+ *
+ * <p>Y se lee con la plantilla que lo imprime —{@link PlantillaDeNumeroDeExpediente#comoSeImprime}—
+ * antes de buscarlo (#423): {@code exp-2026-000001} es el expediente {@code EXP-2026-000001}, como
+ * ya lo era para la grilla, y lo que la plantilla no sabe leer es un 422 que dice como se escribe.
  */
 @RestController
 @RequestMapping(Api.RAIZ + "/coactiva")
@@ -179,8 +183,9 @@ public class ExpedienteController {
     @GetMapping("/expedientes/{numero}/deuda")
     @RequiereAcceso(acceso = ACCESO_FRACCIONAMIENTO, privilegio = Privilegio.LECTURA)
     public DeudaPorObligacionResource deudaDelExpediente(
-            @PathVariable String numero,
+            @PathVariable("numero") String escrito,
             @RequestParam(required = false) @Nullable String fechaDeCalculo) {
+        String numero = PlantillaDeNumeroDeExpediente.POR_OMISION.comoSeImprime(escrito);
 
         LocalDate aLaFecha = fechaOpcional(fechaDeCalculo, "fechaDeCalculo", LocalDate.now(reloj));
         ConsultaDeExpedientes.DeudaPorObligacion deuda =
@@ -275,7 +280,9 @@ public class ExpedienteController {
     @PatchMapping("/expedientes/{numero}/estados")
     @RequiereAcceso(acceso = ACCESO_HISTORIAL, privilegio = Privilegio.MODIFICACION)
     public ExpedienteResource cambiarEstado(
-            @PathVariable String numero, @RequestBody PeticionDeEstadoDelExpediente peticion) {
+            @PathVariable("numero") String escrito,
+            @RequestBody PeticionDeEstadoDelExpediente peticion) {
+        String numero = PlantillaDeNumeroDeExpediente.POR_OMISION.comoSeImprime(escrito);
 
         Observacion observacion = observacionDe(peticion.observacion());
         LocalDate hoy = LocalDate.now(reloj);
@@ -312,7 +319,9 @@ public class ExpedienteController {
     @PatchMapping("/expedientes/{numero}/direccion-referencial")
     @RequiereAcceso(acceso = ACCESO_DIRECCION, privilegio = Privilegio.MODIFICACION)
     public ExpedienteResource cambiarDireccion(
-            @PathVariable String numero, @RequestBody PeticionDeDireccionReferencial peticion) {
+            @PathVariable("numero") String escrito,
+            @RequestBody PeticionDeDireccionReferencial peticion) {
+        String numero = PlantillaDeNumeroDeExpediente.POR_OMISION.comoSeImprime(escrito);
 
         Observacion observacion = observacionDe(peticion.observacion());
         LocalDate hoy = LocalDate.now(reloj);

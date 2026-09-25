@@ -314,6 +314,23 @@ class CalculoVehicularPorContribuyenteFronteraTest {
                 .isEqualTo(compradorEnEnero);
     }
 
+    @Test
+    @DisplayName("#423 — el codigo tecleado en minusculas es el mismo contribuyente")
+    void elCodigoEnMinusculasEsElMismoContribuyente() throws Exception {
+        MvcResult resultado = calcularPara("c-vend-329", "2026");
+
+        assertThat(resultado.getResponse().getStatus())
+                .as(
+                        "`TransferenciaRepository.contribuyentePorCodigo` comparaba el texto"
+                                + " crudo, y «c-vend-329» no era nadie: 404 «no tenia ningun"
+                                + " vehiculo» sobre quien si lo tenia. "
+                                + resultado.getResponse().getContentAsString())
+                .isEqualTo(201);
+        JsonNode determinacion = unicaDeterminacion(resultado);
+        assertThat(determinacion.path("placa").asString()).isEqualTo(PLACA);
+        assertThat(determinacion.path("contribuyenteId").asLong()).isEqualTo(vendedor);
+    }
+
     // ------------------------------------------------------------------
 
     private static MvcResult calcularPara(String codContribuyente, String ejercicio)

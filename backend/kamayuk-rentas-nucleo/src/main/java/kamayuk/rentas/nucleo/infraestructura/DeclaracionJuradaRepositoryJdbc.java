@@ -49,6 +49,11 @@ public class DeclaracionJuradaRepositoryJdbc extends RepositorioJdbc
                 .optional();
     }
 
+    /**
+     * El numero en la forma con que {@link DeclaracionJurada} lo guarda (#423): llega por la ruta
+     * HTTP —{@code /declaraciones/{djNro}}— tal como se tecleo, y hasta #423 se comparaba asi, de
+     * modo que {@code dj-2026-000001} era un 404 sobre una DJ que existe.
+     */
     @Override
     public Optional<DeclaracionJurada> porNumero(String numero, Ejercicio ejercicio) {
         return jdbc().sql(
@@ -56,7 +61,7 @@ public class DeclaracionJuradaRepositoryJdbc extends RepositorioJdbc
                                 + COLUMNAS
                                 + DESDE
                                 + " WHERE d.numero = :numero AND d.ejercicio = :ejercicio")
-                .param("numero", numero)
+                .param("numero", DeclaracionJurada.formaDeBusqueda(numero))
                 .param("ejercicio", ejercicio.valor())
                 .query(DeclaracionJuradaRepositoryJdbc::mapear)
                 .optional();
