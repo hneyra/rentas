@@ -76,7 +76,10 @@ class ImprimirCorridaMasivaTest {
                 new ConstruirModeloDeValor(repositorioValor, contribuyentes);
         EmitirDocumento emitirDocumento = emitirDocumentoDeVerdad();
         ImprimirCorridaMasiva servicio =
-                new ImprimirCorridaMasiva(repositorioMasivo, construirModelo, emitirDocumento);
+                new ImprimirCorridaMasiva(
+                        new ConsultaDeLaCorridaMasiva(repositorioMasivo),
+                        construirModelo,
+                        emitirDocumento);
 
         Map<String, ByteArrayOutputStream> salidas = new HashMap<>();
         long impresos =
@@ -248,6 +251,11 @@ class ImprimirCorridaMasivaTest {
                 }
             }
             return generados;
+        }
+
+        @Override
+        public List<Long> corridasConPendientes() {
+            throw new UnsupportedOperationException();
         }
 
         @Override

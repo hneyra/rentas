@@ -32,6 +32,16 @@ public interface CorridaDeValoresRepository {
     List<ItemDeCorrida> pendientes(long corridaId, long despuesDe, int cuantos);
 
     /**
+     * Las corridas de esta municipalidad que todavía tienen algún candidato {@code PENDIENTE}, por
+     * identificador ascendente (#400).
+     *
+     * <p>Es la pregunta con que el proceso batch decide a qué corridas llamar: las que tienen algo
+     * por resolver. Una corrida cortada a mitad, o con una papeleta que falló, vuelve a salir aquí
+     * en la ventana siguiente; una resuelta entera no vuelve a salir nunca.
+     */
+    List<Long> corridasConPendientes();
+
+    /**
      * Los candidatos de la corrida, en el orden en que entraron, por lote acotado.
      *
      * <p>Con cursor y con tope, como {@link #pendientes}, y no un {@code List} entero: una corrida

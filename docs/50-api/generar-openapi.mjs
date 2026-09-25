@@ -1011,8 +1011,10 @@ const DESCRIPCIONES = {
     Registra el criterio de una generación masiva de valores por papeletas de tránsito, por
     selección de números o por rango de fechas (#53, RF-066, RF-073). Devuelve la corrida y
     sus candidatos; **no emite ningún valor**: la generación corre después, en el perfil
-    batch. El número de cada resolución de multa lo pone \`valor_correlativo\` (#37) y **no
-    entra por el cuerpo**.
+    batch, cuando el \`CronJob\` \`kamayuk-rentas-corridas\` lanza
+    \`CorrerLasCorridasDePapeletas\` en la ventana de lote (#400). Hasta #400 ningún proceso
+    la corría y los candidatos se quedaban \`PENDIENTE\` para siempre. El número de cada
+    resolución de multa lo pone \`valor_correlativo\` (#37) y **no entra por el cuerpo**.
   `),
   transito_record_conductor: bloque(`
     Historial de infracciones de un conductor, por licencia de conducir o por documento del
@@ -1092,6 +1094,21 @@ const DESCRIPCIONES = {
     El mismo resumen agrupado por las dos letras iniciales de la placa (#53, RF-073). El
     filtro por iniciales se resuelve como rango y no como \`LIKE\`: bajo RLS un \`LIKE 'AB%'\` no
     llega nunca al índice.
+  `),
+  // Valores (#38, #400). El prototipo decia «emite ordenes de pago en bloque para toda la
+  // deuda vencida que cumpla el filtro, respetando el monto minimo de emision fijado por
+  // ordenanza», y las tres cosas eran falsas: esta peticion no emite nada, los candidatos
+  // se eligen uno a uno y ningun monto minimo se aplica.
+  valores_masivo: bloque(`
+    Registra el criterio de una generación masiva de órdenes de pago o resoluciones de
+    determinación (#38, RF-091): tipo, tributo, ejercicios, fecha de criterio y los
+    contribuyentes candidatos, elegidos a mano o importados de una hoja de cálculo. Devuelve
+    **201** con la corrida y su total de candidatos; **no emite ningún valor**. La generación
+    corre después, en el perfil batch, cuando el \`CronJob\` \`kamayuk-rentas-corridas\` lanza
+    \`CorrerLasCorridasDeValores\` en la ventana de lote (#400): cada candidato sale
+    \`GENERADO\` con su valor o \`SIN_DEUDA\`, y el que falla se reintenta en la ventana
+    siguiente. Hasta #400 ningún proceso la corría y los candidatos se quedaban \`PENDIENTE\`
+    para siempre. La impresión en lote de lo emitido no tiene ruta.
   `),
   // Infracciones administrativas (#53)
   adm_valores: bloque(`

@@ -184,13 +184,13 @@ describe("el descriptor de rentas", () => {
     expect(JSON.stringify(interfaz[0])).not.toContain("secretKeyRef");
   });
 
-  /** Y el perfil `batch` sigue existiendo donde le toca: en un Job y en un CronJob. */
-  it("el perfil `batch` corre donde hay trabajo: la implantacion, el ingestor y el consumidor", () => {
+  /** Y el perfil `batch` sigue existiendo donde le toca: en un Job y en sus CronJob. */
+  it("el perfil `batch` corre donde hay trabajo: la implantacion, el ingestor, el consumidor y las corridas", () => {
     const enPerfilBatch = [...rentas.implantacion(ENTORNO), ...rentas.lotes(ENTORNO)];
     const perfiles = contenedoresDe(enPerfilBatch).map(
       (c) => (c.env ?? []).find((v) => v.name === "SPRING_PROFILES_ACTIVE")?.value,
     );
-    expect(perfiles).toEqual(["batch", "batch", "batch"]);
+    expect(perfiles).toEqual(["batch", "batch", "batch", "batch"]);
   });
 });
 
@@ -352,6 +352,7 @@ describe("C-14 §3 — el ingestor de catastro, declarado entero y CORRIENDO (#2
     expect(crones.map((m) => m.metadata.name)).toEqual([
       "kamayuk-rentas-ingestor",
       "kamayuk-rentas-consumidor-de-identidad",
+      "kamayuk-rentas-corridas",
     ]);
     const cron = crones.find((m) => m.metadata.name === "kamayuk-rentas-ingestor")!;
     // `undefined` es lo que Kubernetes lee como «no suspendido». Se afirma que NO es `true` y no
@@ -686,5 +687,66 @@ describe("ADR-0039 etapa 4 — el consumidor del buzon de identidad, declarado e
       "kamayuk-identidad-stg",
     );
     expect(reglas[0]!.ports).toEqual([{ protocol: "TCP", port: 8080 }]);
+  });
+});
+
+describe("#400 — las corridas de la generacion masiva tienen quien las corra", () => {
+  const cronDeLasCorridas = () =>
+    rentas
+      .lotes(ENTORNO)
+      .filter((m) => m.kind === "CronJob")
+      .find((m) => m.metadata.name === "kamayuk-rentas-corridas")!;
+
+  /**
+   * Hasta #400 las tres rutas que registran una corrida contestaban 201 y ningun proceso la
+   * generaba: el descriptor no declaraba ningun `CronJob` para ella y ningun runner la tocaba.
+   * Sin `suspend`, en la ventana de lote y sin solaparse, como el ingestor.
+   */
+  it("en la ventana de lote, sin solaparse, y NO nace suspendido", () => {
+    const cron = cronDeLasCorridas();
+    expect(cron, "no hay CronJob que corra las corridas: vuelven a quedarse PENDIENTE").toBeDefined();
+    expect(cron.spec.schedule).toBe("0 7 * * *");
+    expect(cron.spec.concurrencyPolicy).toBe("Forbid");
+    expect(cron.spec.jobTemplate.spec.backoffLimit).toBe(1);
+    expect(cron.spec.suspend).not.toBe(true);
+  });
+
+  /**
+   * `KAMAYUK_RENTAS_CORRIDAS_GENERAR` es la propiedad que el `@ConditionalOnProperty` de
+   * `CorrerLasCorridasDeValores` y de `CorrerLasCorridasDePapeletas` pide
+   * (`kamayuk.rentas.corridas.generar`). Sin ella los dos runners **no se registran**, el proceso
+   * arranca en `batch`, no genera nada y sale con 0: el `CronJob` en verde y las corridas paradas,
+   * que es el defecto de #400 con horario.
+   */
+  it("enciende los dos runners, en `batch` y con la credencial de `kamayuk_app`", () => {
+    const c = cronDeLasCorridas().spec.jobTemplate.spec.template.spec.containers[0]!;
+    expect(c.image).toBe(ENTORNO.imagenDe("rentas"));
+    expect(valorDe(c, "SPRING_PROFILES_ACTIVE")).toBe("batch");
+    expect(valorDe(c, "KAMAYUK_RENTAS_CORRIDAS_GENERAR")).toBe("true");
+    expect(valorDe(c, "KAMAYUK_DB_USUARIO")).toBe("kamayuk_app");
+    // Recorre TODAS las municipalidades del registro (ADR-0020): no lleva la de ninguna.
+    expect(declara(c, "KAMAYUK_RENTAS_INGESTOR_MUNICIPALIDAD")).toBe(false);
+    expect(declara(c, "KAMAYUK_IMPLANTACION_UBIGEO")).toBe(false);
+  });
+
+  /**
+   * Y la propiedad SOLO la lleva ese `CronJob`. Las demas cargas corren la misma imagen en el
+   * mismo perfil: si la implantacion o el consumidor de `identidad` —cada cinco minutos— la
+   * llevaran, generarian corridas fuera de su ventana, y su fallo pondria en rojo un trabajo que
+   * no es el suyo.
+   */
+  it("ninguna otra carga enciende las corridas", () => {
+    const otras = contenedoresDe([
+      ...rentas.despliegue(ENTORNO),
+      ...rentas.migracion(ENTORNO),
+      ...rentas.implantacion(ENTORNO),
+      ...rentas
+        .lotes(ENTORNO)
+        .filter((m) => m.metadata.name !== "kamayuk-rentas-corridas"),
+    ]);
+    expect(otras.length).toBeGreaterThan(0);
+    for (const c of otras) {
+      expect(declara(c, "KAMAYUK_RENTAS_CORRIDAS_GENERAR"), c.name).toBe(false);
+    }
   });
 });

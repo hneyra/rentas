@@ -94,7 +94,9 @@ class GenerarCorridaMasivaTest {
                         (RegistroDeAuditoria registro) -> {},
                         java.time.Clock.systemUTC());
         ProcesarItemMasivo procesar = new ProcesarItemMasivo(deuda, registrar, repositorioMasivo);
-        servicio = new GenerarCorridaMasiva(repositorioMasivo, procesar);
+        servicio =
+                new GenerarCorridaMasiva(
+                        new ConsultaDeLaCorridaMasiva(repositorioMasivo), procesar);
     }
 
     @Test
@@ -412,6 +414,16 @@ class GenerarCorridaMasivaTest {
                     .filter(i -> i.corridaId() == corridaId)
                     .filter(i -> i.estado() == EstadoDeItemMasivo.GENERADO)
                     .sorted((a, b) -> Long.compare(a.id(), b.id()))
+                    .collect(Collectors.toList());
+        }
+
+        @Override
+        public List<Long> corridasConPendientes() {
+            return items.values().stream()
+                    .filter(i -> i.estado() == EstadoDeItemMasivo.PENDIENTE)
+                    .map(ValorMasivoItem::corridaId)
+                    .distinct()
+                    .sorted()
                     .collect(Collectors.toList());
         }
 

@@ -946,6 +946,11 @@ class ValoresControllerTest {
         }
 
         @Override
+        public List<Long> corridasConPendientes() {
+            return List.of();
+        }
+
+        @Override
         public long contarPendientes(long corridaId) {
             return 0;
         }
