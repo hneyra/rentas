@@ -13,6 +13,7 @@ import kamayuk.rentas.compartido.Pagina;
 import kamayuk.rentas.compartido.Paginacion;
 import kamayuk.rentas.fiscalizacion.aplicacion.RegistrarActaFiscalizacion;
 import kamayuk.rentas.fiscalizacion.dobles.ContribuyentesDeMentira;
+import kamayuk.rentas.fiscalizacion.dobles.PadronVehicularDeMentira;
 import kamayuk.rentas.fiscalizacion.dominio.ActaFiscalizacion;
 import kamayuk.rentas.fiscalizacion.dominio.ActaFiscalizacionRepository;
 import kamayuk.rentas.fiscalizacion.dominio.CriterioDeProgramas;
@@ -167,6 +168,8 @@ class ActaPredialControllerTest {
                             return Optional.of(kamayuk.rentas.dominio.AreaM2.de("120.00"));
                         }
                     },
+                    PADRON,
+                    new PadronVehicularDeMentira(),
                     (RegistroDeAuditoria registro) -> {});
 
     /**

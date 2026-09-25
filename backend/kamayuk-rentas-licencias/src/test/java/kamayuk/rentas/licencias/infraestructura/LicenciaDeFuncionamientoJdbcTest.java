@@ -300,6 +300,63 @@ class LicenciaDeFuncionamientoJdbcTest {
         OrigenContext.limpiar();
     }
 
+    /**
+     * #422 — Lo que no cabe en su columna se rechaza como dato, no como el 22001 del motor.
+     *
+     * <p>El ancho de la columna es de la base; hasta #422 nada en Java lo miraba, asi que un texto
+     * de mas llegaba al {@code INSERT}, el motor lo rechazaba con {@code value too long} y el borde
+     * contestaba 500 con incidencia ERROR. La siembra es la que la muestra de siempre no usa: el
+     * ancho de la columna <b>+ 1</b>. Y el rechazo tiene que llegar <b>antes</b> del papel: en las
+     * emisiones, el documento se dibujaba para tirarlo.
+     */
+    @Nested
+    @DisplayName("#422 — lo que no cabe en su columna se rechaza como dato")
+    class LoQueNoCabe {
+
+        @Test
+        @DisplayName("un expediente de 21 caracteres se rechaza antes de dibujar la licencia")
+        void unExpedienteMasAnchoQueSuColumna() {
+            giroDelCatalogo("47399", "OTROS ARTICULOS");
+            long titular = crearContribuyente();
+            String recibo = cobrar(titular, DERECHO_LICENCIA);
+            EmitirLicenciaDeFuncionamiento.Solicitud base = solicitud(titular, recibo, "47399");
+            String expediente = "EXP-2026-LF-000000421";
+            assertThat(expediente).as("varchar(20) + 1").hasSize(21);
+            long documentosAntes = filas("SELECT count(*) FROM documento_emitido");
+
+            assertThatThrownBy(
+                            () ->
+                                    enContexto(
+                                            () ->
+                                                    emitir.emitir(
+                                                            new EmitirLicenciaDeFuncionamiento
+                                                                    .Solicitud(
+                                                                    base.codigoContribuyente(),
+                                                                    base.predioId(),
+                                                                    base.nombreComercial(),
+                                                                    base.direccion(),
+                                                                    base.areaSolicitada(),
+                                                                    base.tipoLicencia(),
+                                                                    base.zonificacion(),
+                                                                    base.aforo(),
+                                                                    base.fechaEmision(),
+                                                                    base.vigenciaHasta(),
+                                                                    base.numeroDeRecibo(),
+                                                                    base.girosCiiu(),
+                                                                    base.giroPrincipal(),
+                                                                    expediente,
+                                                                    base.fechaExpediente(),
+                                                                    base
+                                                                            .autorizacionDelTerritorio()),
+                                                            FormatoDeDocumento.PDF,
+                                                            PORQUE)))
+                    .as("un rechazo del dato que el borde contesta 422, no el 22001 del motor")
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("20");
+            assertThat(filas("SELECT count(*) FROM documento_emitido")).isEqualTo(documentosAntes);
+        }
+    }
+
     // ==================================================================
 
     @Nested

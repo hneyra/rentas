@@ -23,6 +23,16 @@ public record RepresentanteLegal(
         String partidaRegistral,
         @Nullable LocalDate vigenciaDelPoder) {
 
+    /**
+     * {@code licencia_edificacion.representante_documento varchar(20)} (V1).
+     *
+     * <p>El ancho de la columna, topado aqui y no en la base (#422): hasta entonces un texto de mas
+     * llegaba al {@code INSERT}, el motor lo rechazaba con 22001 y el borde contestaba 500 con
+     * incidencia ERROR. La {@code IllegalArgumentException} sale 422 con su mensaje, que nombra el
+     * campo y no la tabla. Aqui se topa lo que llega; no se ensancha la base.
+     */
+    public static final int DOCUMENTO_MAXIMO = 20;
+
     public RepresentanteLegal {
         Objects.requireNonNull(documento, "El representante se identifica con su documento");
         Objects.requireNonNull(nombre, "El representante tiene nombre");
@@ -39,6 +49,14 @@ public record RepresentanteLegal(
                     "El representante legal va entero —documento, nombre y partida registral del"
                             + " poder— o no va: un nombre sin partida no acredita nada, y una"
                             + " partida sin nombre no dice de quien");
+        }
+        if (documento.length() > DOCUMENTO_MAXIMO) {
+            throw new IllegalArgumentException(
+                    "El documento del representante '"
+                            + documento
+                            + "' excede los "
+                            + DOCUMENTO_MAXIMO
+                            + " caracteres");
         }
     }
 }

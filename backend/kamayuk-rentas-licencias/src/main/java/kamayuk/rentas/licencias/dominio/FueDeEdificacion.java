@@ -63,7 +63,10 @@ public record FueDeEdificacion(
         @Nullable String usuarioRegistro,
         Observacion observacion) {
 
-    /** {@code licencia_edificacion.expediente varchar(20)} (V43). */
+    /**
+     * {@code licencia_edificacion.expediente varchar(20)} (V43), y tambien el ancho de {@code
+     * expediente_anterior} (#422).
+     */
     public static final int EXPEDIENTE_MAXIMO = 20;
 
     public FueDeEdificacion {
@@ -88,6 +91,16 @@ public record FueDeEdificacion(
                             + "' excede los "
                             + EXPEDIENTE_MAXIMO
                             + " caracteres de licencia_edificacion.expediente");
+        }
+        // #422: el anterior va en una columna del mismo ancho —expediente_anterior varchar(20)—
+        // y no se topaba, asi que un anterior de mas salia como el 22001 del motor: un 500.
+        if (expedienteAnterior != null && expedienteAnterior.length() > EXPEDIENTE_MAXIMO) {
+            throw new IllegalArgumentException(
+                    "El expediente anterior '"
+                            + expedienteAnterior
+                            + "' excede los "
+                            + EXPEDIENTE_MAXIMO
+                            + " caracteres");
         }
         if (contribuyenteId <= 0) {
             throw new IllegalArgumentException("El FUE lo presenta un solicitante concreto");

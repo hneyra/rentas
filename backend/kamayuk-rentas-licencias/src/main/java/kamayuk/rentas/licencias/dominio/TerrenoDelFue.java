@@ -47,6 +47,19 @@ public record TerrenoDelFue(
         @Nullable String usuarioRegistro,
         Observacion observacion) {
 
+    /**
+     * {@code edificacion_terreno.manzana varchar(10)} (V1).
+     *
+     * <p>El ancho de la columna, topado aqui y no en la base (#422): hasta entonces un texto de mas
+     * llegaba al {@code INSERT}, el motor lo rechazaba con 22001 y el borde contestaba 500 con
+     * incidencia ERROR. La {@code IllegalArgumentException} sale 422 con su mensaje, que nombra el
+     * campo y no la tabla. Aqui se topa lo que llega; no se ensancha la base.
+     */
+    public static final int MANZANA_MAXIMA = 10;
+
+    /** {@code edificacion_terreno.lote varchar(10)} (V1). Ver {@link #MANZANA_MAXIMA} (#422). */
+    public static final int LOTE_MAXIMO = 10;
+
     public TerrenoDelFue {
         Objects.requireNonNull(direccion, "El terreno necesita su direccion");
         Objects.requireNonNull(areaTerreno, "El terreno necesita su area");
@@ -56,6 +69,14 @@ public record TerrenoDelFue(
         direccion = direccion.strip();
         if (direccion.isEmpty()) {
             throw new IllegalArgumentException("La direccion del terreno no puede estar vacia");
+        }
+        if (manzana != null && manzana.length() > MANZANA_MAXIMA) {
+            throw new IllegalArgumentException(
+                    "La manzana '" + manzana + "' excede los " + MANZANA_MAXIMA + " caracteres");
+        }
+        if (lote != null && lote.length() > LOTE_MAXIMO) {
+            throw new IllegalArgumentException(
+                    "El lote '" + lote + "' excede los " + LOTE_MAXIMO + " caracteres");
         }
         if (version < 1) {
             throw new IllegalArgumentException(

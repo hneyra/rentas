@@ -3,6 +3,8 @@ package kamayuk.rentas.sanciones.infraestructura;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.catchThrowable;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
 import java.io.IOException;
 import java.math.RoundingMode;
@@ -68,16 +70,22 @@ import kamayuk.rentas.dominio.PoliticaDeRedondeo;
 import kamayuk.rentas.dominio.ResultadoDeNotificacion;
 import kamayuk.rentas.esquema.BaseDeDatosDePrueba;
 import kamayuk.rentas.esquema.ContextoDeTenant;
+import kamayuk.rentas.nucleo.PadronVehicular;
+import kamayuk.rentas.nucleo.aplicacion.PadronVehicularRentas;
+import kamayuk.rentas.nucleo.infraestructura.VehiculoRepositoryJdbc;
 import kamayuk.rentas.plataforma.tenant.TenantTransactionManager;
 import kamayuk.rentas.sanciones.aplicacion.AnularPapeleta;
+import kamayuk.rentas.sanciones.aplicacion.CambiarNumeroDePapeleta;
 import kamayuk.rentas.sanciones.aplicacion.ConsultaDeActosDeLaPapeleta;
 import kamayuk.rentas.sanciones.aplicacion.ConsultaDeInternamientos;
+import kamayuk.rentas.sanciones.aplicacion.EmitirConstanciaLibre;
 import kamayuk.rentas.sanciones.aplicacion.LiberarVehiculoInternado;
 import kamayuk.rentas.sanciones.aplicacion.NotificarResolucionDeGerencia;
 import kamayuk.rentas.sanciones.aplicacion.ObligacionCompartidaConOtraPapeleta;
 import kamayuk.rentas.sanciones.aplicacion.PlazosDeSancionesParametrizados;
 import kamayuk.rentas.sanciones.aplicacion.RegistrarDescargo;
 import kamayuk.rentas.sanciones.aplicacion.RegistrarInternamiento;
+import kamayuk.rentas.sanciones.aplicacion.RegistrarNotificacionAdministrativa;
 import kamayuk.rentas.sanciones.aplicacion.RegistrarPapeleta;
 import kamayuk.rentas.sanciones.aplicacion.ResolverConResolucionDeGerencia;
 import kamayuk.rentas.sanciones.dobles.CobrosDeMentira;
@@ -97,6 +105,12 @@ import kamayuk.rentas.sanciones.dominio.ResolucionDeGerenciaRepository;
 import kamayuk.rentas.sanciones.dominio.SentidoDelFallo;
 import kamayuk.rentas.sanciones.dominio.TipoDeRecurso;
 import kamayuk.rentas.sanciones.dominio.TipoDeResolucionDeGerencia;
+import kamayuk.rentas.sanciones.infraestructura.web.CambioDeNumeroController;
+import kamayuk.rentas.sanciones.infraestructura.web.ConstanciasLibresController;
+import kamayuk.rentas.sanciones.infraestructura.web.DescargosController;
+import kamayuk.rentas.sanciones.infraestructura.web.InternamientosController;
+import kamayuk.rentas.sanciones.infraestructura.web.NotificacionAdministrativaController;
+import kamayuk.rentas.web.ManejadorDeErrores;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -106,8 +120,14 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.aop.framework.ProxyFactory;
+import org.springframework.http.MediaType;
+import org.springframework.http.converter.json.JacksonJsonHttpMessageConverter;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.annotation.AnnotationTransactionAttributeSource;
 import org.springframework.transaction.interceptor.TransactionInterceptor;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -243,6 +263,9 @@ class SancionesJdbcTest {
     private static ConsultaDeActosDeLaPapeleta consultaDeActos;
     private static ConsultaDeDeudaPublica deudas;
 
+    /** Los cinco controladores de #422, sobre los mismos casos de uso y la misma base. */
+    private static MockMvc mvc;
+
     @BeforeAll
     static void provisionar() throws SQLException, IOException {
         base = BaseDeDatosDePrueba.provisionar();
@@ -320,6 +343,9 @@ class SancionesJdbcTest {
                                                 .ParametrosRepositoryJdbc(jdbc))));
 
         DirectorioDeContribuyentes padron = new PadronDeLaPrueba();
+        // #422: el padron vehicular de verdad, el de `nucleo`, contra esta misma base y su RLS.
+        PadronVehicular vehiculos =
+                envolver(new PadronVehicularRentas(new VehiculoRepositoryJdbc(jdbc)));
 
         registrarPapeleta = envolver(new RegistrarPapeleta(papeletas, codigos, cargos, auditoria));
         registrarDescargo =
@@ -352,7 +378,12 @@ class SancionesJdbcTest {
         internar =
                 envolver(
                         new RegistrarInternamiento(
-                                internamientos, papeletas, documentos, auditoria, RELOJ));
+                                internamientos,
+                                papeletas,
+                                documentos,
+                                vehiculos,
+                                auditoria,
+                                RELOJ));
         liberar =
                 envolver(
                         new LiberarVehiculoInternado(
@@ -362,6 +393,47 @@ class SancionesJdbcTest {
                 envolver(
                         new ConsultaDeActosDeLaPapeleta(
                                 papeletas, resoluciones, diligencias, internamientos, descargos));
+
+        // #422: HTTP hasta PostgreSQL, con los mismos casos de uso de arriba. Lo que se mide son
+        // rechazos que solo la base sabia dar —un indice unico, una clave foranea—, asi que un
+        // doble del repositorio los habria dejado pasar con 201.
+        mvc =
+                MockMvcBuilders.standaloneSetup(
+                                new DescargosController(registrarDescargo),
+                                new InternamientosController(
+                                        consultaDeDeposito, internar, liberar, RELOJ),
+                                new ConstanciasLibresController(
+                                        envolver(
+                                                new EmitirConstanciaLibre(
+                                                        new PadronDePapeletasRepositoryJdbc(jdbc),
+                                                        new ConstanciaLibreRepositoryJdbc(jdbc),
+                                                        documentos,
+                                                        vehiculos,
+                                                        padron,
+                                                        auditoria,
+                                                        RELOJ)),
+                                        RELOJ),
+                                new CambioDeNumeroController(
+                                        envolver(
+                                                new CambiarNumeroDePapeleta(papeletas, auditoria))),
+                                new NotificacionAdministrativaController(
+                                        envolver(
+                                                new RegistrarNotificacionAdministrativa(
+                                                        new NotificacionAdministrativaRepositoryJdbc(
+                                                                jdbc),
+                                                        padron,
+                                                        auditoria))))
+                        .setControllerAdvice(new ManejadorDeErrores())
+                        .setMessageConverters(
+                                new JacksonJsonHttpMessageConverter(
+                                        JsonMapper.builder()
+                                                .addModule(
+                                                        new kamayuk.rentas.web.ConfiguracionDeJson()
+                                                                .moduloDeObjetosDeValor())
+                                                .build()),
+                                new org.springframework.http.converter
+                                        .ByteArrayHttpMessageConverter())
+                        .build();
     }
 
     @AfterAll
@@ -1629,6 +1701,270 @@ class SancionesJdbcTest {
                     .isEqualTo(T001);
             assertThat(deudaDe(sola, ORDINARIA)).isEqualTo(Dinero.CERO);
         }
+    }
+
+    /**
+     * #422 — Lo que la base rechaza no sale como averia: de HTTP a PostgreSQL.
+     *
+     * <p>Cada prueba usa la siembra que la muestra de siempre no usa —el numero que <b>ya
+     * existe</b>, el identificador 999999— y afirma dos cosas: el 4xx que el contrato promete, y
+     * que <b>no se escribio ninguna linea ERROR</b>. Hasta #422 las seis contestaban 500 {@code
+     * ERROR_INTERNO} con su incidencia, y en las dos emisiones despues de haber dibujado el papel.
+     */
+    @Nested
+    @DisplayName("#422 — lo que la base rechaza sale como 404 o 409, sin incidencia")
+    class LoQueLaBaseRechaza {
+
+        private static final long INEXISTENTE = 999_999L;
+
+        @Test
+        @DisplayName("el mismo descargo dos veces es 409, y nombra el expediente")
+        void elMismoDescargoDosVecesEs409() throws Exception {
+            Papeleta papeleta = papeletaDeTransito("R01");
+            String cuerpo =
+                    "{\"observacion\":\"Descargo presentado en mesa de partes\","
+                            + "\"papeleta\":\""
+                            + papeleta.numero()
+                            + "\",\"nDeExpediente\":\"EXP-R01\","
+                            + "\"fechaDePresentacion\":\"2026-03-06\","
+                            + "\"tipoDeRecurso\":\"DESCARGO\","
+                            + "\"fundamento\":\"El vehiculo estaba en el taller\"}";
+            Rechazo primero =
+                    rechazo(() -> enviar(post("/rentas/api/v1/transito/descargos"), cuerpo));
+            assertThat(primero.estado()).as(primero.cuerpo()).isEqualTo(201);
+
+            Rechazo doble =
+                    rechazo(() -> enviar(post("/rentas/api/v1/transito/descargos"), cuerpo));
+
+            assertThat(doble.estado())
+                    .as("el doble envio del mismo expediente: descargo_numero_uq")
+                    .isEqualTo(409);
+            assertThat(doble.cuerpo())
+                    .contains("CONFLICTO")
+                    .contains("EXP-R01")
+                    .doesNotContain("descargo_numero_uq")
+                    .doesNotContain("incidencia");
+            assertThat(doble.errores())
+                    .as("un rechazo del usuario no es una incidencia del servidor")
+                    .isEmpty();
+            assertThat(contar("SELECT count(*) FROM descargo WHERE numero_expediente = 'EXP-R01'"))
+                    .isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("cambiar una papeleta a un numero que ya usa otra es 409, y lo nombra")
+        void elNumeroEnUsoEs409() throws Exception {
+            Papeleta que = papeletaDeTransito("R10");
+            Papeleta otra = papeletaDeTransito("R11");
+
+            Rechazo rechazo =
+                    rechazo(
+                            () ->
+                                    enviar(
+                                            patch(
+                                                    "/rentas/api/v1/transito/papeletas/"
+                                                            + que.numero()
+                                                            + "/codigo"),
+                                            "{\"observacion\":\"Error del operador al registrarla\","
+                                                    + "\"numeroNuevo\":\""
+                                                    + otra.numero()
+                                                    + "\"}"));
+
+            assertThat(rechazo.estado())
+                    .as("reintentar un 500 no arreglaria nunca un numero que ya es de otra")
+                    .isEqualTo(409);
+            assertThat(rechazo.cuerpo())
+                    .contains("CONFLICTO")
+                    .contains(otra.numero())
+                    .doesNotContain("papeleta_numero_uq")
+                    .doesNotContain("incidencia");
+            assertThat(rechazo.errores()).isEmpty();
+            assertThat(
+                            contar(
+                                    "SELECT count(*) FROM papeleta WHERE numero = '"
+                                            + que.numero()
+                                            + "'"))
+                    .as("y la papeleta conserva su numero")
+                    .isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("la misma notificacion administrativa dos veces es 409, y nombra el numero")
+        void laMismaNotificacionDosVecesEs409() throws Exception {
+            String cuerpo = notificacion("NA-R01", null);
+            Rechazo primera = rechazo(() -> enviar(post(NOTIFICACIONES), cuerpo));
+            assertThat(primera.estado()).as(primera.cuerpo()).isEqualTo(201);
+
+            Rechazo doble = rechazo(() -> enviar(post(NOTIFICACIONES), cuerpo));
+
+            assertThat(doble.estado()).as("notif_adm_numero_uq").isEqualTo(409);
+            assertThat(doble.cuerpo())
+                    .contains("CONFLICTO")
+                    .contains("NA-R01")
+                    .doesNotContain("notif_adm_numero_uq")
+                    .doesNotContain("incidencia");
+            assertThat(doble.errores()).isEmpty();
+            assertThat(
+                            contar(
+                                    "SELECT count(*) FROM notificacion_administrativa WHERE numero = 'NA-R01'"))
+                    .isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("una notificacion a un contribuyente que no existe es 404, y no se guarda")
+        void laNotificacionAUnContribuyenteInexistenteEs404() throws Exception {
+            Rechazo rechazo =
+                    rechazo(
+                            () ->
+                                    enviar(
+                                            post(NOTIFICACIONES),
+                                            notificacion("NA-R02", INEXISTENTE)));
+
+            assertThat(rechazo.estado()).as("notif_adm_contribuyente_fk").isEqualTo(404);
+            assertThat(rechazo.cuerpo())
+                    .contains("NO_ENCONTRADO")
+                    .contains(String.valueOf(INEXISTENTE))
+                    .doesNotContain("notif_adm_contribuyente_fk")
+                    .doesNotContain("incidencia");
+            assertThat(rechazo.errores()).isEmpty();
+            assertThat(
+                            contar(
+                                    "SELECT count(*) FROM notificacion_administrativa WHERE numero = 'NA-R02'"))
+                    .isZero();
+        }
+
+        @Test
+        @DisplayName("una constancia de un vehiculo que no existe es 404, sin papel ni incidencia")
+        void laConstanciaDeUnVehiculoInexistenteEs404() throws Exception {
+            long documentosAntes = contar("SELECT count(*) FROM documento_emitido");
+
+            Rechazo rechazo =
+                    rechazo(
+                            () ->
+                                    enviar(
+                                            post(CONSTANCIAS),
+                                            constancia("ZZZ-422", INEXISTENTE, null)));
+
+            assertThat(rechazo.estado()).as("constancia_libre_vehiculo_fk").isEqualTo(404);
+            assertThat(rechazo.cuerpo())
+                    .contains("NO_ENCONTRADO")
+                    .contains(String.valueOf(INEXISTENTE))
+                    .doesNotContain("constancia_libre_vehiculo_fk")
+                    .doesNotContain("incidencia");
+            assertThat(rechazo.errores()).isEmpty();
+            assertThat(contar("SELECT count(*) FROM documento_emitido"))
+                    .as("ningun papel se queda en la base")
+                    .isEqualTo(documentosAntes);
+        }
+
+        @Test
+        @DisplayName("una constancia pedida por un solicitante que no existe es 404")
+        void laConstanciaDeUnSolicitanteInexistenteEs404() throws Exception {
+            Rechazo rechazo =
+                    rechazo(
+                            () ->
+                                    enviar(
+                                            post(CONSTANCIAS),
+                                            constancia("ZZZ-423", null, INEXISTENTE)));
+
+            assertThat(rechazo.estado()).as("constancia_libre_solicitante_fk").isEqualTo(404);
+            assertThat(rechazo.cuerpo())
+                    .contains(String.valueOf(INEXISTENTE))
+                    .doesNotContain("constancia_libre_solicitante_fk");
+            assertThat(rechazo.errores()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("internar un vehiculo que no esta en el padron es 404, sin acta ni incidencia")
+        void internarUnVehiculoInexistenteEs404() throws Exception {
+            Papeleta papeleta = papeletaDeTransito("R20");
+
+            Rechazo rechazo =
+                    rechazo(
+                            () ->
+                                    enviar(
+                                            post("/rentas/api/v1/transito/internamientos"),
+                                            "{\"observacion\":\"Se interna para la prueba\","
+                                                    + "\"placa\":\"ZZZ-424\",\"vehiculoId\":"
+                                                    + INEXISTENTE
+                                                    + ",\"papeleta\":\""
+                                                    + papeleta.numero()
+                                                    + "\",\"deposito\":\"DEPOSITO SULLANA NORTE\","
+                                                    + "\"fechaDeIngreso\":\"2026-03-04T15:00:00Z\","
+                                                    + "\"tasaDeCustodia\":\"CUSTODIA\","
+                                                    + "\"motivo\":\"Conducir sin licencia vigente\"}"));
+
+            assertThat(rechazo.estado()).as("internamiento_vehiculo_fk").isEqualTo(404);
+            assertThat(rechazo.cuerpo())
+                    .contains("NO_ENCONTRADO")
+                    .contains(String.valueOf(INEXISTENTE))
+                    .doesNotContain("internamiento_vehiculo_fk")
+                    .doesNotContain("incidencia");
+            assertThat(rechazo.errores()).isEmpty();
+            assertThat(contar("SELECT count(*) FROM internamiento WHERE placa = 'ZZZ-424'"))
+                    .isZero();
+        }
+
+        private static final String NOTIFICACIONES =
+                "/rentas/api/v1/infracciones/administrativas/notificaciones";
+        private static final String CONSTANCIAS = "/rentas/api/v1/transito/constancias-libres";
+
+        private String notificacion(String numero, @Nullable Long contribuyenteId) {
+            return "{\"observacion\":\"Notificacion previa de la prueba\",\"numero\":\""
+                    + numero
+                    + "\",\"fecha\":\"2026-03-10\","
+                    + (contribuyenteId == null
+                            ? ""
+                            : "\"contribuyenteId\":" + contribuyenteId + ",")
+                    + "\"direccion\":\"Av. Grau 100\",\"motivo\":\"Construccion sin licencia\"}";
+        }
+
+        private String constancia(
+                String placa, @Nullable Long vehiculoId, @Nullable Long solicitanteId) {
+            return "{\"observacion\":\"Constancia pedida en ventanilla\",\"placa\":\""
+                    + placa
+                    + "\""
+                    + (vehiculoId == null ? "" : ",\"vehiculoId\":" + vehiculoId)
+                    + (solicitanteId == null ? "" : ",\"solicitanteId\":" + solicitanteId)
+                    + ",\"verificadaAl\":\"2026-04-20\"}";
+        }
+    }
+
+    /** Lo que un rechazo contesta, y las lineas ERROR que dejo en el registro del manejador. */
+    private record Rechazo(int estado, String cuerpo, List<String> errores) {}
+
+    private static Rechazo rechazo(Callable<MvcResult> peticion) throws Exception {
+        ch.qos.logback.classic.Logger registro =
+                (ch.qos.logback.classic.Logger)
+                        org.slf4j.LoggerFactory.getLogger(ManejadorDeErrores.class);
+        ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent> anotados =
+                new ch.qos.logback.core.read.ListAppender<>();
+        anotados.start();
+        registro.addAppender(anotados);
+        MvcResult resultado;
+        try {
+            resultado = peticion.call();
+        } finally {
+            registro.detachAppender(anotados);
+        }
+        return new Rechazo(
+                resultado.getResponse().getStatus(),
+                resultado.getResponse().getContentAsString(),
+                anotados.list.stream()
+                        .filter(e -> e.getLevel() == ch.qos.logback.classic.Level.ERROR)
+                        .map(ch.qos.logback.classic.spi.ILoggingEvent::getFormattedMessage)
+                        .toList());
+    }
+
+    private static MvcResult enviar(MockHttpServletRequestBuilder peticion, String cuerpo)
+            throws Exception {
+        return mvc.perform(peticion.contentType(MediaType.APPLICATION_JSON).content(cuerpo))
+                .andReturn();
+    }
+
+    private static long contar(String consulta) {
+        Long cuantas = enTransaccion(() -> jdbc.sql(consulta).query(Long.class).single());
+        return cuantas == null ? 0 : cuantas;
     }
 
     // ==================================================================

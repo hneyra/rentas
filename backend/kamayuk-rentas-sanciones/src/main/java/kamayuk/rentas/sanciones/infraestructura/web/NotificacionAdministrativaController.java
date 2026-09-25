@@ -6,6 +6,7 @@ import kamayuk.rentas.autorizacion.Privilegio;
 import kamayuk.rentas.autorizacion.RequiereAcceso;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.sanciones.aplicacion.RegistrarNotificacionAdministrativa;
+import kamayuk.rentas.sanciones.dominio.NotificacionAdministrativaRepository;
 import kamayuk.rentas.web.Api;
 import kamayuk.rentas.web.CodigoDeError;
 import kamayuk.rentas.web.FiltroDeLaConsulta;
@@ -62,6 +63,13 @@ public class NotificacionAdministrativaController {
                             exigir(peticion.motivo(), "motivo"),
                             plazoDe(peticion.plazoDias()),
                             observacion));
+        } catch (RegistrarNotificacionAdministrativa.ContribuyenteInexistente noEsta) {
+            // #422: hasta aqui era el 500 de notif_adm_contribuyente_fk.
+            throw new ProblemaDeNegocio(CodigoDeError.NO_ENCONTRADO, mensajeDe(noEsta));
+        } catch (NotificacionAdministrativaRepository.NotificacionRepetida repetida) {
+            // #422: 409 y no 422 —la peticion esta bien escrita, lo que no la admite es que ese
+            // numero ya lo tiene otra notificacion—. Hasta aqui era el 500 del indice unico.
+            throw new ProblemaDeNegocio(CodigoDeError.CONFLICTO, mensajeDe(repetida));
         } catch (IllegalArgumentException invalido) {
             throw new ProblemaDeNegocio(CodigoDeError.VALIDACION, mensajeDe(invalido));
         }

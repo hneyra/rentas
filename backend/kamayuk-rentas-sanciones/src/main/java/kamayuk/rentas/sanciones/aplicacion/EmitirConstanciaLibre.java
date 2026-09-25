@@ -4,13 +4,16 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import kamayuk.rentas.auditoria.Auditoria;
 import kamayuk.rentas.auditoria.Operacion;
 import kamayuk.rentas.auditoria.RegistroDeAuditoria;
+import kamayuk.rentas.contribuyentes.DirectorioDeContribuyentes;
 import kamayuk.rentas.documentos.EmitirDocumento;
 import kamayuk.rentas.documentos.FormatoDeDocumento;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.Observacion;
+import kamayuk.rentas.nucleo.PadronVehicular;
 import kamayuk.rentas.sanciones.dominio.ConstanciaLibre;
 import kamayuk.rentas.sanciones.dominio.ConstanciaLibreRepository;
 import kamayuk.rentas.sanciones.dominio.CriterioDePadron;
@@ -48,6 +51,15 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>El número de la constancia <b>es</b> el del documento emitido, como en {@code
  * resolucion_gerencia} (V41 §3) y {@code acto_coactivo} (V34). No hay correlativo propio: dos
  * numeraciones para el mismo papel divergen.
+ *
+ * <h2>Lo que cita por identificador existe, y se pregunta antes de dibujar (#422)</h2>
+ *
+ * <p>El vehiculo y el solicitante son opcionales, y cuando vienen la tabla los ata con dos claves
+ * foraneas. Hasta #422 se comprobaban solas, en el {@code INSERT}: <b>despues</b> de dibujar el
+ * papel e insertar {@code documento_emitido}, de modo que un identificador que no existe
+ * renderizaba una constancia para tirarla y salia como un 500 con incidencia. Ahora se pregunta
+ * primero a los dos puertos publicos —{@link PadronVehicular} y {@link DirectorioDeContribuyentes}—
+ * y el borde contesta 404 sin haber dibujado nada.
  */
 @Service
 public class EmitirConstanciaLibre {
@@ -68,6 +80,8 @@ public class EmitirConstanciaLibre {
     private final PadronDePapeletasRepository padron;
     private final ConstanciaLibreRepository constancias;
     private final EmitirDocumento documentos;
+    private final PadronVehicular vehiculos;
+    private final DirectorioDeContribuyentes contribuyentes;
     private final Auditoria auditoria;
     private final Clock reloj;
 
@@ -75,11 +89,15 @@ public class EmitirConstanciaLibre {
             PadronDePapeletasRepository padron,
             ConstanciaLibreRepository constancias,
             EmitirDocumento documentos,
+            PadronVehicular vehiculos,
+            DirectorioDeContribuyentes contribuyentes,
             Auditoria auditoria,
             Clock reloj) {
         this.padron = padron;
         this.constancias = constancias;
         this.documentos = documentos;
+        this.vehiculos = vehiculos;
+        this.contribuyentes = contribuyentes;
         this.auditoria = auditoria;
         this.reloj = reloj;
     }
@@ -91,6 +109,8 @@ public class EmitirConstanciaLibre {
      * @param formato en qué formato sale el papel (RF-132)
      * @param observacion por qué se emite (regla 10, RNF-052)
      * @throws HayPapeletasPendientes si el vehículo debe alguna a esa fecha
+     * @throws VehiculoFueraDelPadron si cita un vehiculo que no esta en el padron (#422)
+     * @throws SolicitanteInexistente si cita un solicitante que no esta en el padron (#422)
      */
     @Transactional
     public Emitida emitir(Peticion peticion, FormatoDeDocumento formato, Observacion observacion) {
@@ -98,6 +118,16 @@ public class EmitirConstanciaLibre {
         Objects.requireNonNull(peticion, "No hay constancia que emitir");
         Objects.requireNonNull(formato, "La constancia sale en un formato");
         Objects.requireNonNull(observacion, "Sin observacion no se guarda (regla 10, RNF-052)");
+
+        Long vehiculoId = peticion.vehiculoId();
+        if (vehiculoId != null && !vehiculos.estaEnElPadron(vehiculoId)) {
+            throw new VehiculoFueraDelPadron(vehiculoId);
+        }
+        Long solicitanteId = peticion.solicitanteId();
+        if (solicitanteId != null
+                && !contribuyentes.porIds(Set.of(solicitanteId)).containsKey(solicitanteId)) {
+            throw new SolicitanteInexistente(solicitanteId);
+        }
 
         LocalDate verificadaAl = peticion.verificadaAl();
         List<PapeletaDelPadron> pendientes = pendientesDe(peticion.placa(), verificadaAl);
@@ -216,6 +246,19 @@ public class EmitirConstanciaLibre {
 
     /** La constancia guardada y los bytes que se entregan. */
     public record Emitida(ConstanciaLibre constancia, EmitirDocumento.Emision emision) {}
+
+    /** Quien pide la constancia no esta en el padron de esta municipalidad (#422). */
+    public static final class SolicitanteInexistente extends RuntimeException {
+
+        @java.io.Serial private static final long serialVersionUID = 1L;
+
+        SolicitanteInexistente(long id) {
+            super(
+                    "No hay ningun contribuyente con identificador "
+                            + id
+                            + " en esta municipalidad: no puede constar como solicitante");
+        }
+    }
 
     /** El vehículo debe papeletas a esa fecha: no se le puede acreditar lo contrario. */
     public static final class HayPapeletasPendientes extends RuntimeException {

@@ -43,6 +43,16 @@ public record ProgramaFiscalizacion(
     private static final int DESCRIPCION_MAXIMA = 300;
     private static final int FISCALIZADOR_MAXIMO = 60;
 
+    /**
+     * {@code programa_fiscalizacion.sector_codigo varchar(10)} (V1).
+     *
+     * <p>Hasta #422 el codigo y el fiscalizador tenian su tope y el sector no: un sector de once
+     * caracteres llegaba al {@code INSERT} y el motor lo rechazaba con 22001, que salia como un 500
+     * con incidencia. El tope es el ancho de la columna y no una regla de negocio: aqui se topa lo
+     * que llega, no se ensancha la base.
+     */
+    public static final int SECTOR_MAXIMO = 10;
+
     public ProgramaFiscalizacion {
         Objects.requireNonNull(codigo, "El programa de fiscalizacion necesita su codigo");
         codigo = codigo.strip().toUpperCase(Locale.ROOT);
@@ -65,6 +75,10 @@ public record ProgramaFiscalizacion(
         }
         Objects.requireNonNull(estado, "El programa de fiscalizacion necesita su estado");
         sectorCodigo = enBlancoEsNulo(sectorCodigo);
+        if (sectorCodigo != null && sectorCodigo.length() > SECTOR_MAXIMO) {
+            throw new IllegalArgumentException(
+                    "El sector va hasta " + SECTOR_MAXIMO + " caracteres: '" + sectorCodigo + "'");
+        }
         fiscalizador = enBlancoEsNulo(fiscalizador);
         if (fiscalizador != null && fiscalizador.length() > FISCALIZADOR_MAXIMO) {
             throw new IllegalArgumentException(

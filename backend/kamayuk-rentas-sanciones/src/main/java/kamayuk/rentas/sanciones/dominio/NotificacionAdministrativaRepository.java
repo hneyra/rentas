@@ -13,6 +13,13 @@ import kamayuk.rentas.compartido.Paginacion;
  */
 public interface NotificacionAdministrativaRepository {
 
+    /**
+     * Guarda una notificacion nueva.
+     *
+     * @throws NotificacionRepetida si ya hay otra con ese numero en la municipalidad. Lo detecta la
+     *     base con {@code notif_adm_numero_uq}: dos peticiones simultaneas pasan las dos por
+     *     cualquier comprobacion en Java (#422)
+     */
     NotificacionAdministrativa insertar(NotificacionAdministrativa notificacion);
 
     Optional<NotificacionAdministrativa> porNumero(String numero);
@@ -35,4 +42,22 @@ public interface NotificacionAdministrativaRepository {
      * plazo (#47 AC2)—; este método solo guarda la transición.
      */
     NotificacionAdministrativa subsanar(long notificacionId);
+
+    /**
+     * Ya hay una notificacion administrativa con ese numero en esta municipalidad (#422).
+     *
+     * <p>El mensaje nombra el numero que el usuario escribio y nada del esquema. Hasta #422 el
+     * choque salia como el 500 del indice unico, con incidencia ERROR.
+     */
+    final class NotificacionRepetida extends RuntimeException {
+
+        @java.io.Serial private static final long serialVersionUID = 1L;
+
+        public NotificacionRepetida(String numero) {
+            super(
+                    "Ya hay una notificacion administrativa con el numero '"
+                            + numero
+                            + "' en esta municipalidad");
+        }
+    }
 }

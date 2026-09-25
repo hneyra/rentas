@@ -269,6 +269,37 @@ class CertificadosYReportesControllerTest {
     @DisplayName("POST /licencias/certificados")
     class Emitir {
 
+        /**
+         * #422 — Un parametro urbanistico mas ancho que su columna es 422, antes del papel.
+         *
+         * <p>Es el ejemplo de #422 letra por letra: el retiro municipal escrito como lo transcribe
+         * quien lee el plano, 45 caracteres en un {@code varchar(40)}. Contra PostgreSQL el
+         * certificado se dibujaba, el {@code INSERT} fallaba con 22001 y la respuesta era 500
+         * ({@code CertificadosYPadronesJdbcTest.LoQueNoCabe}). Aqui el doble no tiene ancho: salia
+         * 201.
+         */
+        @Test
+        @DisplayName("#422 — un retiro municipal de 45 caracteres es 422, sin papel ni incidencia")
+        void unRetiroMasAnchoQueSuColumna() throws Exception {
+            Rechazo rechazo =
+                    rechazo(
+                            mvc,
+                            "/rentas/api/v1/licencias/certificados",
+                            cuerpoDeEmision(RECIBO)
+                                    .replace(
+                                            "\"alturaMaximaPermitida\":\"3 pisos\",",
+                                            "\"alturaMaximaPermitida\":\"3 pisos\","
+                                                    + "\"retiroMunicipal\":\"Av.: 3.00 ml;"
+                                                    + " Calle: 2.00 ml; Pasaje: 0.00 ml\","));
+
+            assertThat(rechazo.estado()).as(rechazo.cuerpo()).isEqualTo(422);
+            assertThat(rechazo.cuerpo()).contains("VALIDACION").contains("40");
+            assertThat(rechazo.errores()).isEmpty();
+            assertThat(certificados.porNumero("CN-2026-000001"))
+                    .as("y no se guardo ningun certificado")
+                    .isEmpty();
+        }
+
         @Test
         @DisplayName("emite: 201 con el numero, su vigencia y el derecho con su fecha")
         void emite() throws Exception {
@@ -667,5 +698,37 @@ class CertificadosYReportesControllerTest {
                 "observacion":"Se emite para la prueba"}
                """
                 .formatted(CODIGO_PREDIAL, recibo);
+    }
+
+    /** Lo que un rechazo contesta, y las lineas ERROR que dejo en el registro del manejador. */
+    private record Rechazo(int estado, String cuerpo, java.util.List<String> errores) {}
+
+    /** El {@code POST}, midiendo tambien si escribio una incidencia ERROR (#422). */
+    private Rechazo rechazo(MockMvc cual, String ruta, String cuerpo) throws Exception {
+        ch.qos.logback.classic.Logger registro =
+                (ch.qos.logback.classic.Logger)
+                        org.slf4j.LoggerFactory.getLogger(ManejadorDeErrores.class);
+        ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent> anotados =
+                new ch.qos.logback.core.read.ListAppender<>();
+        anotados.start();
+        registro.addAppender(anotados);
+        MvcResult resultado;
+        try {
+            resultado =
+                    cual.perform(
+                                    MockMvcRequestBuilders.post(ruta)
+                                            .contentType(MediaType.APPLICATION_JSON)
+                                            .content(cuerpo))
+                            .andReturn();
+        } finally {
+            registro.detachAppender(anotados);
+        }
+        return new Rechazo(
+                resultado.getResponse().getStatus(),
+                resultado.getResponse().getContentAsString(),
+                anotados.list.stream()
+                        .filter(e -> e.getLevel() == ch.qos.logback.classic.Level.ERROR)
+                        .map(ch.qos.logback.classic.spi.ILoggingEvent::getFormattedMessage)
+                        .toList());
     }
 }

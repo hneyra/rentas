@@ -80,6 +80,9 @@ public class EspectaculoController {
                             dineroOpcionalDe(peticion.valorEntrada()),
                             dineroDe(peticion.ingresoDeclarado(), "ingresoDeclarado"),
                             observacion));
+        } catch (RegistrarEspectaculo.OrganizadorInexistente noEsta) {
+            // #422: hasta aqui era el 500 de espectaculo_contribuyente_fk.
+            throw new ProblemaDeNegocio(CodigoDeError.NO_ENCONTRADO, mensajeDe(noEsta));
         } catch (ParametrosSellados.ParametroAusente
                 | LectorDeParametros.EjercicioSinSellar falta) {
             // Falta publicar una cifra normativa, no un campo de la peticion: el 422 sale con

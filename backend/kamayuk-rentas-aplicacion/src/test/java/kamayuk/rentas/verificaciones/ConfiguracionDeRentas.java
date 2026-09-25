@@ -444,6 +444,10 @@ public final class ConfiguracionDeRentas implements ConfiguracionDeLasVerificaci
                 // Si un predio declaro en un ejercicio, por lote (RF-055).
                 ".nucleo.DeclaracionesDelEjercicio",
                 ".nucleo.DeclaracionDelEjercicio",
+                // Si un vehiculo esta en el padron (#422): el acta vehicular lo pregunta antes de
+                // escribir, en vez de dejar que acta_fisc_vehiculo_fk lo rechace como un 500.
+                // Contesta un boolean: ni un metodo que escriba.
+                ".nucleo.PadronVehicular",
                 // Cuanto se debe a una fecha, para el estado de cuenta de fiscalizacion (RF-056).
                 // Arista al reves de las otras: la excepcion de ARQ-01 §4 regla 2.
                 ".cuentacorriente.ConsultaDeDeudaPublica",

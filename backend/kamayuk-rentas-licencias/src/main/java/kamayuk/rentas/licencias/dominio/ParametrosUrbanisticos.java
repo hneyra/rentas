@@ -37,12 +37,31 @@ public record ParametrosUrbanisticos(
         @Nullable String retiroMunicipal,
         @Nullable String coeficienteEdificacion) {
 
+    /**
+     * {@code certificado.zonificacion varchar(60)} (V1).
+     *
+     * <p>Texto libre, y por eso mismo sin tope hasta #422: lo que el operador transcribia de mas
+     * llegaba al {@code INSERT} <b>despues</b> de dibujar el certificado, el motor lo rechazaba con
+     * 22001 y el borde contestaba 500 con incidencia ERROR. Este record se construye en el borde,
+     * antes de que el caso de uso toque nada, asi que el rechazo llega sin papel. No se ensancha la
+     * base: se dice cuanto cabe.
+     */
+    public static final int ZONIFICACION_MAXIMA = 60;
+
+    /**
+     * {@code certificado.altura_maxima}, {@code area_libre_minima}, {@code retiro_municipal} y
+     * {@code coeficiente_edificacion}: las cuatro {@code varchar(40)} (V1). Ver {@link
+     * #ZONIFICACION_MAXIMA}: «Av.: 3.00 ml; Calle: 2.00 ml; Pasaje: 0.00 ml» son 45 (#422).
+     */
+    public static final int PARAMETRO_MAXIMO = 40;
+
     public ParametrosUrbanisticos {
-        zonificacion = limpiar(zonificacion);
-        alturaMaxima = limpiar(alturaMaxima);
-        areaLibreMinima = limpiar(areaLibreMinima);
-        retiroMunicipal = limpiar(retiroMunicipal);
-        coeficienteEdificacion = limpiar(coeficienteEdificacion);
+        zonificacion = limpiar(zonificacion, "La zonificacion", ZONIFICACION_MAXIMA);
+        alturaMaxima = limpiar(alturaMaxima, "La altura maxima", PARAMETRO_MAXIMO);
+        areaLibreMinima = limpiar(areaLibreMinima, "El area libre minima", PARAMETRO_MAXIMO);
+        retiroMunicipal = limpiar(retiroMunicipal, "El retiro municipal", PARAMETRO_MAXIMO);
+        coeficienteEdificacion =
+                limpiar(coeficienteEdificacion, "El coeficiente de edificacion", PARAMETRO_MAXIMO);
     }
 
     /** Ninguno declarado: lo normal en un certificado de numeracion o de jurisdiccion. */
@@ -59,11 +78,21 @@ public record ParametrosUrbanisticos(
                 && coeficienteEdificacion == null;
     }
 
-    private static @Nullable String limpiar(@Nullable String texto) {
+    private static @Nullable String limpiar(@Nullable String texto, String campo, int maximo) {
         if (texto == null) {
             return null;
         }
         String limpio = texto.strip();
+        if (limpio.length() > maximo) {
+            throw new IllegalArgumentException(
+                    campo
+                            + " '"
+                            + limpio
+                            + "' tiene "
+                            + limpio.length()
+                            + " caracteres y el certificado admite "
+                            + maximo);
+        }
         return limpio.isEmpty() ? null : limpio;
     }
 }

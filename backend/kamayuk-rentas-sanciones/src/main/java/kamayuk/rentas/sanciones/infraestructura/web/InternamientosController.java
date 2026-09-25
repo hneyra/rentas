@@ -13,6 +13,7 @@ import kamayuk.rentas.sanciones.aplicacion.ConsultaDeInternamientos;
 import kamayuk.rentas.sanciones.aplicacion.LiberarVehiculoInternado;
 import kamayuk.rentas.sanciones.aplicacion.RegistrarDescargo;
 import kamayuk.rentas.sanciones.aplicacion.RegistrarInternamiento;
+import kamayuk.rentas.sanciones.aplicacion.VehiculoFueraDelPadron;
 import kamayuk.rentas.sanciones.dominio.CriterioDeInternamiento;
 import kamayuk.rentas.sanciones.dominio.EstadoDeInternamiento;
 import kamayuk.rentas.sanciones.dominio.InternamientoEnConsulta;
@@ -121,6 +122,10 @@ public class InternamientosController {
         } catch (RegistrarDescargo.PapeletaInexistente noExiste) {
             throw new ProblemaDeNegocio(
                     CodigoDeError.NO_ENCONTRADO, PeticionesDeSanciones.mensajeDe(noExiste));
+        } catch (VehiculoFueraDelPadron noEsta) {
+            // #422: hasta aqui era el 500 de internamiento_vehiculo_fk, con el acta ya dibujada.
+            throw new ProblemaDeNegocio(
+                    CodigoDeError.NO_ENCONTRADO, PeticionesDeSanciones.mensajeDe(noEsta));
         } catch (RegistrarInternamiento.VehiculoYaInternado yaEstaba) {
             throw new ProblemaDeNegocio(
                     CodigoDeError.CONFLICTO, PeticionesDeSanciones.mensajeDe(yaEstaba));

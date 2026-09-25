@@ -381,6 +381,49 @@ class EscrituraDelPadronControllerTest {
             assertThat(resultado.getResponse().getContentAsString()).contains("conyuge");
         }
 
+        /**
+         * #422 — Un conyuge que no esta en el padron es 404, y no el 500 de la clave foranea.
+         *
+         * <p>Hasta #422 {@code conyugeDe} solo rechazaba el propio identificador: cualquier otro
+         * numero llegaba al {@code UPDATE} y {@code contribuyente_conyuge_fk} lo rechazaba, que el
+         * manejador contesta como averia del servidor con su incidencia ERROR. Las dos siembras que
+         * la muestra de siempre no usa: un identificador que no existe en ninguna parte, y el de un
+         * contribuyente que <b>si</b> existe pero en la municipalidad vecina — la clave es {@code
+         * (municipalidad_id, conyuge_id)}, asi que para esta municipalidad tampoco existe.
+         */
+        @Test
+        @DisplayName("#422 — un conyuge que no esta en el padron es 404, sin incidencia ERROR")
+        void unConyugeQueNoEstaEnElPadronEs404() throws Exception {
+            long id = altaDe("C-0215", "40100215", "SIN CONYUGE, ALGUIEN");
+
+            for (long conyuge : new long[] {999_999L, ajeno}) {
+                Rechazo rechazo =
+                        rechazo(
+                                () ->
+                                        enviar(
+                                                put("/rentas/api/v1/rentas/contribuyentes/" + id),
+                                                """
+                                                {"observacion":"Declara su sociedad conyugal",
+                                                 "conyugeId":"""
+                                                        + conyuge
+                                                        + "}"));
+
+                assertThat(rechazo.estado())
+                        .as("el conyuge %s no esta en el padron de esta municipalidad", conyuge)
+                        .isEqualTo(404);
+                assertThat(rechazo.cuerpo())
+                        .contains(String.valueOf(conyuge))
+                        .doesNotContain("contribuyente_conyuge_fk")
+                        .doesNotContain("incidencia");
+                assertThat(rechazo.errores())
+                        .as("un rechazo del usuario no es una incidencia del servidor")
+                        .isEmpty();
+            }
+            assertThat(fichaDe(id))
+                    .as("y la ficha sigue sin conyuge: no se guardo nada")
+                    .contains("\"conyugeId\":null");
+        }
+
         @Test
         @DisplayName("la cadena vacia borra el estado civil; la ausencia lo conserva")
         void laCadenaVaciaBorraYLaAusenciaConserva() throws Exception {
@@ -903,6 +946,39 @@ class EscrituraDelPadronControllerTest {
             throws Exception {
         return mvc.perform(peticion.contentType(MediaType.APPLICATION_JSON).content(cuerpo))
                 .andReturn();
+    }
+
+    /** Lo que un rechazo contesta, y las lineas ERROR que dejo en el registro del manejador. */
+    private record Rechazo(int estado, String cuerpo, List<String> errores) {}
+
+    /**
+     * La peticion, con las lineas ERROR que deja en el registro del manejador (#422).
+     *
+     * <p>Es la otra mitad de un rechazo bien contestado: un error del usuario que sale como
+     * incidencia entierra las averias de verdad aunque el estado HTTP ya fuera el correcto.
+     */
+    private static Rechazo rechazo(java.util.concurrent.Callable<MvcResult> peticion)
+            throws Exception {
+        ch.qos.logback.classic.Logger registro =
+                (ch.qos.logback.classic.Logger)
+                        org.slf4j.LoggerFactory.getLogger(ManejadorDeErrores.class);
+        ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent> anotados =
+                new ch.qos.logback.core.read.ListAppender<>();
+        anotados.start();
+        registro.addAppender(anotados);
+        MvcResult resultado;
+        try {
+            resultado = peticion.call();
+        } finally {
+            registro.detachAppender(anotados);
+        }
+        return new Rechazo(
+                resultado.getResponse().getStatus(),
+                resultado.getResponse().getContentAsString(),
+                anotados.list.stream()
+                        .filter(e -> e.getLevel() == ch.qos.logback.classic.Level.ERROR)
+                        .map(ch.qos.logback.classic.spi.ILoggingEvent::getFormattedMessage)
+                        .toList());
     }
 
     /**

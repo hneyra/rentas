@@ -11,7 +11,9 @@ import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.persistencia.RepositorioJdbc;
 import kamayuk.rentas.sanciones.dominio.Descargo;
 import kamayuk.rentas.sanciones.dominio.DescargoRepository;
+import kamayuk.rentas.sanciones.dominio.DescargoRepository.DescargoRepetido;
 import kamayuk.rentas.sanciones.dominio.TipoDeRecurso;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 
@@ -42,32 +44,38 @@ public class DescargoRepositoryJdbc extends RepositorioJdbc implements DescargoR
                             + " resolverlo con una resolucion de gerencia");
         }
 
-        Long id =
-                jdbc().sql(
-                                "INSERT INTO descargo"
-                                        + " (municipalidad_id, papeleta_id, numero_expediente,"
-                                        + "  fecha, tipo_recurso, sustento, presentado_hasta,"
-                                        + "  conjunto_id, en_plazo, fecha_registro,"
-                                        + "  usuario_registro, observacion)"
-                                        + " VALUES ("
-                                        + MUNICIPALIDAD_ACTUAL
-                                        + ", :papeleta, :numero, :fecha, :tipo, :sustento,"
-                                        + "  :hasta, :conjunto, :enPlazo, :registrado, :usuario,"
-                                        + "  :observacion)"
-                                        + " RETURNING id")
-                        .param("papeleta", descargo.papeletaId())
-                        .param("numero", descargo.numeroExpediente())
-                        .param("fecha", descargo.fecha())
-                        .param("tipo", descargo.tipoRecurso().name())
-                        .param("sustento", descargo.sustento())
-                        .param("hasta", descargo.presentadoHasta())
-                        .param("conjunto", descargo.conjuntoId())
-                        .param("enPlazo", descargo.enPlazo())
-                        .param("registrado", Timestamp.from(descargo.registradoEn()))
-                        .param("usuario", UsuarioDeLaSesion.actual())
-                        .param("observacion", descargo.observacion().texto())
-                        .query(Long.class)
-                        .single();
+        Long id;
+        try {
+            id =
+                    jdbc().sql(
+                                    "INSERT INTO descargo"
+                                            + " (municipalidad_id, papeleta_id, numero_expediente,"
+                                            + "  fecha, tipo_recurso, sustento, presentado_hasta,"
+                                            + "  conjunto_id, en_plazo, fecha_registro,"
+                                            + "  usuario_registro, observacion)"
+                                            + " VALUES ("
+                                            + MUNICIPALIDAD_ACTUAL
+                                            + ", :papeleta, :numero, :fecha, :tipo, :sustento,"
+                                            + "  :hasta, :conjunto, :enPlazo, :registrado, :usuario,"
+                                            + "  :observacion)"
+                                            + " RETURNING id")
+                            .param("papeleta", descargo.papeletaId())
+                            .param("numero", descargo.numeroExpediente())
+                            .param("fecha", descargo.fecha())
+                            .param("tipo", descargo.tipoRecurso().name())
+                            .param("sustento", descargo.sustento())
+                            .param("hasta", descargo.presentadoHasta())
+                            .param("conjunto", descargo.conjuntoId())
+                            .param("enPlazo", descargo.enPlazo())
+                            .param("registrado", Timestamp.from(descargo.registradoEn()))
+                            .param("usuario", UsuarioDeLaSesion.actual())
+                            .param("observacion", descargo.observacion().texto())
+                            .query(Long.class)
+                            .single();
+        } catch (DuplicateKeyException repetido) {
+            // `descargo_numero_uq`, la unica restriccion unica de la tabla (#422).
+            throw new DescargoRepetido(descargo.numeroExpediente());
+        }
 
         return porId(Objects.requireNonNull(id))
                 .orElseThrow(

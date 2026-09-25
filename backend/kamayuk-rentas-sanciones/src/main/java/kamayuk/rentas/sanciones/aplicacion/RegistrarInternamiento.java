@@ -12,6 +12,7 @@ import kamayuk.rentas.documentos.FormatoDeDocumento;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.dominio.ZonaHoraria;
+import kamayuk.rentas.nucleo.PadronVehicular;
 import kamayuk.rentas.sanciones.dominio.Familia;
 import kamayuk.rentas.sanciones.dominio.Internamiento;
 import kamayuk.rentas.sanciones.dominio.InternamientoRepository;
@@ -44,6 +45,13 @@ import org.springframework.transaction.annotation.Transactional;
  * diaria. La tarifa vive en {@code tasa} con su vigencia (regla 5, ADR-0007) y la pone la caja al
  * cobrar; copiarla aquí la pondría en dos sitios y uno de los dos mentiría el día que la ordenanza
  * la cambie.
+ *
+ * <h2>El vehículo que cita existe, y se pregunta antes de emitir el acta (#422)</h2>
+ *
+ * <p>{@code vehiculoId} es opcional —se interna lo que se interna, esté o no inscrito—, pero si
+ * viene lo ata {@code internamiento_vehiculo_fk}. Hasta #422 esa clave era la única que miraba, y
+ * miraba en el {@code INSERT}: con el acta ya dibujada y su documento ya insertado. Ahora se
+ * pregunta primero al {@link PadronVehicular} y el borde contesta 404 sin papel.
  */
 @Service
 public class RegistrarInternamiento {
@@ -56,6 +64,7 @@ public class RegistrarInternamiento {
     private final InternamientoRepository internamientos;
     private final PapeletaRepository papeletas;
     private final EmitirDocumento documentos;
+    private final PadronVehicular vehiculos;
     private final Auditoria auditoria;
     private final Clock reloj;
 
@@ -63,11 +72,13 @@ public class RegistrarInternamiento {
             InternamientoRepository internamientos,
             PapeletaRepository papeletas,
             EmitirDocumento documentos,
+            PadronVehicular vehiculos,
             Auditoria auditoria,
             Clock reloj) {
         this.internamientos = internamientos;
         this.papeletas = papeletas;
         this.documentos = documentos;
+        this.vehiculos = vehiculos;
         this.auditoria = auditoria;
         this.reloj = reloj;
     }
@@ -91,6 +102,11 @@ public class RegistrarInternamiento {
                         abierto -> {
                             throw new VehiculoYaInternado(abierto);
                         });
+
+        Long vehiculoId = peticion.vehiculoId();
+        if (vehiculoId != null && !vehiculos.estaEnElPadron(vehiculoId)) {
+            throw new VehiculoFueraDelPadron(vehiculoId);
+        }
 
         Papeleta papeleta = papeletaDe(peticion);
         // El dia que el acta imprime, en la zona del producto y no en UTC (#273): un ingreso

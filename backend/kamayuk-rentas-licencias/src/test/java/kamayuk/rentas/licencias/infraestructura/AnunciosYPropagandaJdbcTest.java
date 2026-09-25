@@ -261,6 +261,59 @@ class AnunciosYPropagandaJdbcTest {
         OrigenContext.limpiar();
     }
 
+    /**
+     * #422 — Lo que no cabe en su columna se rechaza como dato, no como el 22001 del motor.
+     *
+     * <p>El ancho de la columna es de la base; hasta #422 nada en Java lo miraba, asi que un texto
+     * de mas llegaba al {@code INSERT}, el motor lo rechazaba con {@code value too long} y el borde
+     * contestaba 500 con incidencia ERROR. La siembra es la que la muestra de siempre no usa: el
+     * ancho de la columna <b>+ 1</b>. Y el rechazo tiene que llegar <b>antes</b> del papel: en las
+     * emisiones, el documento se dibujaba para tirarlo.
+     */
+    @Nested
+    @DisplayName("#422 — lo que no cabe en su columna se rechaza como dato")
+    class LoQueNoCabe {
+
+        @Test
+        @DisplayName("un expediente de 21 caracteres se rechaza, y no queda anuncio")
+        void unExpedienteMasAnchoQueSuColumna() {
+            long titular = crearContribuyente();
+            RegistrarAnuncio.Solicitud base = solicitud(titular);
+            String expediente = "EXP-2026-AN-000000421";
+            assertThat(expediente).as("varchar(20) + 1").hasSize(21);
+            long anunciosAntes = filas("SELECT count(*) FROM anuncio");
+
+            assertThatThrownBy(
+                            () ->
+                                    enContexto(
+                                            () ->
+                                                    registrar.registrar(
+                                                            new RegistrarAnuncio.Solicitud(
+                                                                    base.codigoContribuyente(),
+                                                                    base.numeroDeLicencia(),
+                                                                    base.predioId(),
+                                                                    base.clase(),
+                                                                    base.tipo(),
+                                                                    base.emplazamiento(),
+                                                                    base.forma(),
+                                                                    base.denominacion(),
+                                                                    base.ubicacion(),
+                                                                    base.area(),
+                                                                    base.lados(),
+                                                                    base.cantidad(),
+                                                                    base.fechaAutorizacion(),
+                                                                    base.vigenciaHasta(),
+                                                                    expediente,
+                                                                    base.fechaExpediente()),
+                                                            null,
+                                                            PORQUE)))
+                    .as("un rechazo del dato que el borde contesta 422, no el 22001 del motor")
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("20");
+            assertThat(filas("SELECT count(*) FROM anuncio")).isEqualTo(anunciosAntes);
+        }
+    }
+
     // ==================================================================
 
     @Nested

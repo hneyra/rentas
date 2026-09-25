@@ -8,6 +8,7 @@ import kamayuk.rentas.auditoria.RegistroDeAuditoria;
 import kamayuk.rentas.compartido.Pagina;
 import kamayuk.rentas.compartido.Paginacion;
 import kamayuk.rentas.sanciones.aplicacion.RegistrarNotificacionAdministrativa;
+import kamayuk.rentas.sanciones.dobles.PadronDeMentira;
 import kamayuk.rentas.sanciones.dominio.CriterioDeNotificacion;
 import kamayuk.rentas.sanciones.dominio.EstadoDeNotificacion;
 import kamayuk.rentas.sanciones.dominio.NotificacionAdministrativa;
@@ -28,7 +29,8 @@ class NotificacionAdministrativaControllerTest {
 
     private final RepositorioDeMentira repositorio = new RepositorioDeMentira();
     private final RegistrarNotificacionAdministrativa servicio =
-            new RegistrarNotificacionAdministrativa(repositorio, (RegistroDeAuditoria r) -> {});
+            new RegistrarNotificacionAdministrativa(
+                    repositorio, new PadronDeMentira(), (RegistroDeAuditoria r) -> {});
 
     private final MockMvc mvc =
             MockMvcBuilders.standaloneSetup(new NotificacionAdministrativaController(servicio))

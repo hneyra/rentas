@@ -60,6 +60,9 @@ public class ReporteCodigosAdministrativosController {
      * ella, el reporte es el vigente hoy: es lo que se imprime.
      */
     private LocalDate fechaDe(@Nullable String fecha) {
-        return fecha == null || fecha.isBlank() ? LocalDate.now(reloj) : LocalDate.parse(fecha);
+        // Por PeticionesDeSanciones y no con LocalDate.parse suelto (#422): una fecha con barras
+        // era una DateTimeParseException, que ningun manejador reconoce, y salia como 500.
+        LocalDate leida = PeticionesDeSanciones.fechaSiViene(fecha, "fecha");
+        return leida == null ? LocalDate.now(reloj) : leida;
     }
 }

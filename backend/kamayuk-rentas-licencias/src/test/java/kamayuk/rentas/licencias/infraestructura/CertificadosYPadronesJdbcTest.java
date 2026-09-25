@@ -356,6 +356,91 @@ class CertificadosYPadronesJdbcTest {
         OrigenContext.limpiar();
     }
 
+    /**
+     * #422 — Lo que no cabe en su columna se rechaza como dato, no como el 22001 del motor.
+     *
+     * <p>El ancho de la columna es de la base; hasta #422 nada en Java lo miraba, asi que un texto
+     * de mas llegaba al {@code INSERT}, el motor lo rechazaba con {@code value too long} y el borde
+     * contestaba 500 con incidencia ERROR. La siembra es la que la muestra de siempre no usa: el
+     * ancho de la columna <b>+ 1</b>. Y el rechazo tiene que llegar <b>antes</b> del papel: en las
+     * emisiones, el documento se dibujaba para tirarlo.
+     */
+    @Nested
+    @DisplayName("#422 — lo que no cabe en su columna se rechaza antes del papel")
+    class LoQueNoCabe {
+
+        @Test
+        @DisplayName(
+                "un retiro municipal de 45 caracteres se rechaza antes de dibujar el certificado")
+        void unRetiroMasAnchoQueSuColumna() {
+            // El ejemplo de #422, tal como lo escribe quien transcribe del plano:
+            // ParametrosUrbanisticos
+            // dice que cada municipalidad los escribe a su manera, y la columna es varchar(40).
+            String retiro = "Av.: 3.00 ml; Calle: 2.00 ml; Pasaje: 0.00 ml";
+            assertThat(retiro).hasSize(45);
+
+            assertThat(rechazoAlEmitir(retiro, "RDM", "EXP-C54-422"))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("40");
+        }
+
+        @Test
+        @DisplayName("una zonificacion de 61 caracteres se rechaza antes de dibujar el certificado")
+        void unaZonificacionMasAnchaQueSuColumna() {
+            String zona = "Z".repeat(61);
+
+            assertThat(rechazoAlEmitir("3 m", zona, "EXP-C54-423"))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("60");
+        }
+
+        @Test
+        @DisplayName("un expediente de 21 caracteres se rechaza antes de dibujar el certificado")
+        void unExpedienteMasAnchoQueSuColumna() {
+            String expediente = "EXP-2026-CE-000000421";
+            assertThat(expediente).hasSize(21);
+
+            assertThat(rechazoAlEmitir("3 m", "RDM", expediente))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("20");
+        }
+
+        /** Lo que lanza emitir con esos tres datos, comprobando que no quedo ningun papel. */
+        private Throwable rechazoAlEmitir(String retiro, String zonificacion, String expediente) {
+            long titular = crearContribuyente();
+            long predio = crearPredioDe(titular);
+            String recibo = cobrar(titular, DERECHO_NUMERACION);
+            EmitirCertificado.Solicitud base =
+                    solicitud(TipoDeCertificado.NUMERACION, titular, predio, recibo);
+            long documentosAntes = filas("SELECT count(*) FROM documento_emitido");
+
+            Throwable rechazo =
+                    org.assertj.core.api.Assertions.catchThrowable(
+                            () ->
+                                    enContexto(
+                                            () ->
+                                                    emitirCertificado.emitir(
+                                                            new EmitirCertificado.Solicitud(
+                                                                    base.tipo(),
+                                                                    base.codigoContribuyente(),
+                                                                    base.codigoPredial(),
+                                                                    expediente,
+                                                                    base.fechaEmision(),
+                                                                    base.numeroDeRecibo(),
+                                                                    new ParametrosUrbanisticos(
+                                                                            zonificacion,
+                                                                            "3 pisos",
+                                                                            "30 %",
+                                                                            retiro,
+                                                                            "1.5 (a+r)")),
+                                                            null,
+                                                            FormatoDeDocumento.PDF,
+                                                            PORQUE)));
+            assertThat(filas("SELECT count(*) FROM documento_emitido")).isEqualTo(documentosAntes);
+            return rechazo;
+        }
+    }
+
     // ==================================================================
 
     @Nested
