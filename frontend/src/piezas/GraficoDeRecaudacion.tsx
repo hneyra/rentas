@@ -1,8 +1,7 @@
 import type { PropsDeUnaPiezaDelConsumidor } from '@kamayuk/ui';
 import { Tarjeta, TarjetaCabecera, TarjetaPie } from '@kamayuk/ui';
+import { lazy, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Bar, BarChart, CartesianGrid, LabelList, ResponsiveContainer, XAxis, YAxis } from 'recharts';
-import type { BarShapeProps } from 'recharts';
 
 import { FRASES_DEL_GRAFICO } from '../i18n/textosDelMarco.ts';
 import { serieDelAvance } from './serieDeAvance.ts';
@@ -44,71 +43,61 @@ import { serieDelAvance } from './serieDeAvance.ts';
  * Y es la misma decision que ya tomo la hoja de al lado: la pieza declarada de `ini-panel` es un
  * `Progress` «de avance por tributo», o sea la misma magnitud.
  *
- * <h2>Ni un color propio (AC-4)</h2>
+ * <h2>Y el lienzo llega tarde, a proposito (#298)</h2>
  *
- * Todo lo que pinta sale de los tokens de `@kamayuk/ui`: los que recharts recibe como `prop` van
- * como `var(--color-x)` —que es como `@kamayuk/ui` alimenta a `sonner` en `shadcn/avisos.tsx`— y
- * los rectangulos que este archivo dibuja van con la utilidad de Tailwind, que resuelve al mismo
- * token. El radio es `var(--radius)`, los 3 px del artboard, y entra por CSS —`rx`— porque el
- * `radius` de recharts es un numero y un numero escrito aqui seria el radio de este grafico y no el
- * del producto.
+ * Lo que dibuja las barras —`LienzoDeRecaudacion.tsx`, el unico archivo que importa recharts— se
+ * pide con un `import()` dinamico y **solo cuando hay una serie que dibujar**. Medido en #298:
+ * recharts y lo que arrastra eran **+324,74 kB de JS (+35,6 %)** en el trozo de entrada, que
+ * pagaban las cuarenta pantallas para que lo usara una.
  *
- * Lo vigila `verificaciones/el-grafico-sale-de-los-tokens.test.ts`, sobre el CSS compilado.
+ * El `lazy()` va AQUI y no sobre la pieza entera en `index.ts`, y es una decision:
+ *
+ *   · **lo que la pantalla tiene que poder leer no espera a nadie** — el titulo, la palabra del
+ *     hueco cuando no hay serie y cuantos tributos no se pudieron medir se dibujan en el primer
+ *     pase, como antes; con la tarjeta entera diferida, la guarda de traduccion —que monta las
+ *     cuarenta sin datos y de un tiron— habria dejado de ver el texto del grafico sin ponerse roja;
+ *   · **sin serie no se pide nada** — la hoja caida o sin tributos dice su hueco sin bajarse
+ *     325 kB para no dibujarlos;
+ *   · **y el sitio se reserva** — mientras el trozo llega, en el hueco del lienzo hay un esqueleto
+ *     del MISMO alto, de modo que la tabla de debajo no salta cuando las barras aparecen.
+ *
+ * Si el trozo no llega a cargarse, el `import()` rechaza y el error sube a la frontera de la hoja
+ * (`src/pantallas/FronteraDeLaHoja.tsx`, #354): se ve, y no se queda un esqueleto para siempre.
+ * Lo que si se quedaria para siempre es un `import()` que no contesta nunca, y eso lo ve el arnes:
+ * `e2e/el-grafico-no-viaja-en-la-entrada.spec.ts` abre `ini-flujo` con serie y exige las barras.
+ *
+ * Los colores —ni uno propio, AC-4 de #288— estan en el lienzo, que es donde se pinta.
  */
-
-/** Los colores que recharts recibe como `prop`. Ni uno propio: todos son tokens del artboard. */
-const COLORES = {
-  /** Las lineas verticales de la rejilla. */
-  rejilla: 'var(--color-linea-2)',
-  /** La linea de cada eje. */
-  eje: 'var(--color-linea)',
-  /** Los rotulos de los ejes. */
-  rotulo: 'var(--color-tinta-3)',
-  /** La cifra en la punta de cada barra. */
-  cifra: 'var(--color-tinta-2)',
-} as const;
 
 /** Lo alto de cada fila y del eje, en pixeles. Geometria, no paleta: aqui no hay token que leer. */
 const ALTO_DE_UNA_FILA = 34;
 const ALTO_DEL_EJE = 34;
-/** Lo ancho de la columna de rotulos. Cabe «Patrimonio vehicular», que es el tributo mas largo. */
-const ANCHO_DE_LOS_ROTULOS = 150;
-/** Las marcas del eje: el avance va de 0 a 100 y no se escala a lo que haya llegado. */
-const MARCAS = [0, 25, 50, 75, 100];
 
 /** Una fila de la serie, ya con el rotulo de su punta redactado. */
-interface FilaDelGrafico {
+export interface FilaDelGrafico {
   readonly tributo: string;
   readonly avance: number;
   readonly rotulo: string;
 }
 
 /**
- * Un rectangulo del grafico, con su color y su radio de un token.
- *
- * Es un `<rect>` y no el `Rectangle` de recharts porque aquel emite un `<path>`, y un `path` no
- * tiene `rx`: el radio solo podria entrar como el numero que recharts pide, y entonces dejaria de
- * ser el del producto. `width` se recorta a cero porque una barra de ancho negativo desaparece sin
- * decir nada, y aqui no puede pasar —el avance no es negativo— pero el dia que la serie cambie es
- * mejor ver una barra vacia que un hueco.
+ * El lienzo, pedido cuando hace falta. **Esta linea es la unica puerta a recharts**: ver el javadoc
+ * de `LienzoDeRecaudacion.tsx` antes de importar de alli cualquier otra cosa que un tipo.
  */
-function rectangulo(clase: string) {
-  return function Rectangulo({ x, y, width, height }: BarShapeProps) {
-    return <rect x={x} y={y} width={Math.max(width, 0)} height={height} className={clase} />;
-  };
-}
-
-/** La barra: lo recaudado de ese tributo. */
-const BarraDelTributo = rectangulo('fill-azul [rx:var(--radius)]');
+const LienzoDeRecaudacion = lazy(() =>
+  import('./LienzoDeRecaudacion.tsx').then((modulo) => ({ default: modulo.LienzoDeRecaudacion })),
+);
 
 /**
- * La pista de detras: lo emitido, que es el 100 % del eje.
+ * Lo que ocupa el sitio del lienzo mientras llega: su mismo alto, del color del esqueleto.
  *
- * Es lo que hace que la barra se lea como «emitido CONTRA recaudado» y no como una cifra sola, y no
- * es un dato inventado: es el largo del eje, que va de 0 a 100 por declaracion y no por lo que haya
- * llegado.
+ * Sin texto, y a proposito: una espera de un instante no tiene nada que decir que la tarjeta no
+ * diga ya con su titulo, y una palabra aqui seria una que parpadea. Lo que la figura significa lo
+ * dice el `aria-label` de fuera, que ya esta puesto.
  */
-const PistaDelTributo = rectangulo('fill-esqueleto [rx:var(--radius)]');
+function EsperandoElLienzo({ alto }: { readonly alto: number }) {
+  return <div data-esperando-el-lienzo className="rounded-[var(--radius)] bg-esqueleto" style={{ height: alto }} />;
+}
 
 /**
  * La pieza, tal como la monta el interprete.
@@ -125,6 +114,7 @@ export function GraficoDeRecaudacion({ clave, datos, traducir }: PropsDeUnaPieza
     ...barra,
     rotulo: tantoPorCiento(barra.avance),
   }));
+  const alto = filas.length * ALTO_DE_UNA_FILA + ALTO_DEL_EJE;
 
   return (
     <Tarjeta data-grafico={clave}>
@@ -142,40 +132,9 @@ export function GraficoDeRecaudacion({ clave, datos, traducir }: PropsDeUnaPieza
           aria-label={traducir(FRASES_DEL_GRAFICO.rotulo)}
           className="px-[15px] pt-[15px] pb-[10px]"
         >
-          <ResponsiveContainer width="100%" height={filas.length * ALTO_DE_UNA_FILA + ALTO_DEL_EJE}>
-            <BarChart data={[...filas]} layout="vertical" margin={{ top: 0, right: 46, bottom: 0, left: 0 }}>
-              <CartesianGrid horizontal={false} stroke={COLORES.rejilla} />
-              <XAxis
-                type="number"
-                domain={[0, 100]}
-                ticks={MARCAS}
-                tickFormatter={tantoPorCiento}
-                stroke={COLORES.eje}
-                tick={{ fill: COLORES.rotulo, fontSize: 11.5 }}
-              />
-              <YAxis
-                type="category"
-                dataKey="tributo"
-                width={ANCHO_DE_LOS_ROTULOS}
-                stroke={COLORES.eje}
-                tick={{ fill: COLORES.rotulo, fontSize: 12 }}
-              />
-              {/* Sin animacion: un panel que se abre al entrar no tiene que moverse para decir una
-                  cifra, y una barra creciendo desde cero ensena durante medio segundo un avance
-                  que no es el que llego. */}
-              <Bar
-                dataKey="avance"
-                shape={BarraDelTributo}
-                background={PistaDelTributo}
-                isAnimationActive={false}
-              >
-                {/* El `fill` va como `prop` y no como clase: recharts pone SU gris como atributo
-                    del `<text>`, y aunque una clase le gana en la cascada, dejarle el atributo
-                    puesto deja un color que nadie eligio escrito en el DOM. */}
-                <LabelList dataKey="rotulo" position="right" fill={COLORES.cifra} fontSize={11.5} />
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
+          <Suspense fallback={<EsperandoElLienzo alto={alto} />}>
+            <LienzoDeRecaudacion filas={filas} alto={alto} tantoPorCiento={tantoPorCiento} />
+          </Suspense>
         </div>
       )}
       {sinMedir === 0 ? null : <TarjetaPie>{t(FRASES_DEL_GRAFICO.sinMedir, { count: sinMedir })}</TarjetaPie>}
