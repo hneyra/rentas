@@ -11,6 +11,7 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutionException;
@@ -24,7 +25,9 @@ import kamayuk.rentas.compartido.TenantContext;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.MunicipalidadId;
 import kamayuk.rentas.esquema.BaseDeDatosDePrueba;
+import kamayuk.rentas.parametros.aplicacion.CopiaLocalDeNormativa;
 import kamayuk.rentas.parametros.aplicacion.DescargaDeNormativa;
+import kamayuk.rentas.parametros.dominio.CacheDeSnapshots;
 import kamayuk.rentas.parametros.dominio.PublicadorDeNormativa;
 import kamayuk.rentas.parametros.dominio.SnapshotDeNormativa;
 import kamayuk.rentas.plataforma.tenant.TenantTransactionManager;
@@ -45,19 +48,28 @@ import org.springframework.transaction.interceptor.TransactionInterceptor;
  *
  * <h2>Por que la barrera, y por que sin ella la prueba no mide nada</h2>
  *
- * <p>El {@code descargar} del doble espera en un {@link CyclicBarrier} de dos. Eso obliga a que
- * <b>los dos</b> hilos hayan pasado ya la comprobacion de {@link
- * DescargaDeNormativa#asegurarDescargado} —en produccion va detras de otra igual, la de {@code
- * LectorDeParametrosCacheados}, y las dos estan antes del candado— antes de que ninguno llegue a
- * {@code guardar}: los dos vieron «no esta». Sin la barrera los hilos se serializan por casualidad
- * —el primero confirma antes de que el segundo mire— y la prueba sale verde con el defecto puesto.
- * Es la comprobacion que va <b>despues</b> del candado la unica que puede cerrar la carrera, y esta
- * siembra es la que la distingue.
+ * <p>El {@code guardar} de la cache espera en un {@link CyclicBarrier} de dos <b>antes</b> de
+ * entrar en el de {@link CacheDeSnapshotsJdbc}, que es el que toma el candado. Eso obliga a que
+ * <b>los dos</b> hilos hayan pasado ya todas las comprobaciones de antes del candado —la de {@link
+ * DescargaDeNormativa#asegurarDescargado}, la de {@link CopiaLocalDeNormativa#guardarSiNoEsta} y,
+ * en produccion, la de {@code LectorDeParametrosCacheados}— antes de que ninguno escriba: los dos
+ * vieron «no esta». Sin la barrera los hilos se serializan por casualidad —el primero confirma
+ * antes de que el segundo mire— y la prueba sale verde con el defecto puesto. Es la comprobacion
+ * que va <b>despues</b> del candado la unica que puede cerrar la carrera, y esta siembra es la que
+ * la distingue.
  *
- * <p>Las piezas son las de produccion —{@link CacheDeSnapshotsJdbc}, {@link DescargaDeNormativa}
- * con su {@code REQUIRES_NEW} de verdad por {@link TransactionInterceptor}, {@link
- * TenantTransactionManager} fijando la municipalidad con {@code SET LOCAL}— contra PostgreSQL real,
- * y cada hilo con su propia conexion. Lo unico fabricado es {@code normativa}.
+ * <p>Hasta #450 la barrera estaba en el {@code descargar} del doble, y bastaba: la transaccion
+ * nueva se abria antes de descargar y la comprobacion de dentro iba antes de la descarga. Desde
+ * #450 la descarga va sin transaccion y {@code guardarSiNoEsta} vuelve a mirar <b>despues</b> de
+ * ella, asi que una barrera en {@code descargar} dejaba a un hilo mirar cuando el otro ya habia
+ * confirmado: medido, con la comprobacion de despues del candado quitada, dos corridas de cuatro
+ * salieron verdes. Con la barrera en {@code guardar}, las cuatro rojas.
+ *
+ * <p>Las piezas son las de produccion —{@link CacheDeSnapshotsJdbc}, {@link DescargaDeNormativa} y
+ * {@link CopiaLocalDeNormativa} con su {@code REQUIRES_NEW} de verdad por {@link
+ * TransactionInterceptor} (desde #450 la transaccion nueva la abre la copia, despues de descargar),
+ * {@link TenantTransactionManager} fijando la municipalidad con {@code SET LOCAL}— contra
+ * PostgreSQL real, y cada hilo con su propia conexion. Lo unico fabricado es {@code normativa}.
  *
  * <p>El snapshot lleva una fila de {@code normativa_valor_unitario}, y no por completar: esa tabla
  * <b>no tiene clave</b>, asi que un arreglo que solo esquivara el choque de la identidad —un {@code
@@ -149,8 +161,17 @@ class DescargaSimultaneaDelMismoConjuntoTest {
                     + " contenido")
     void lasDosDescargasTerminanYElConjuntoQuedaUnaVez() throws Exception {
         CyclicBarrier losDosVieronQueNoEsta = new CyclicBarrier(2);
-        NormativaQueEsperaALaOtra normativa = new NormativaQueEsperaALaOtra(losDosVieronQueNoEsta);
-        DescargaDeNormativa descarga = envolver(new DescargaDeNormativa(cache, normativa));
+        NormativaQueCuenta normativa = new NormativaQueCuenta();
+        // Desde #450 la descarga no abre transaccion: la abre la copia local, y solo para guardar.
+        // Las dos van envueltas, como las monta el contenedor.
+        DescargaDeNormativa descarga =
+                envolver(
+                        new DescargaDeNormativa(
+                                envolver(
+                                        new CopiaLocalDeNormativa(
+                                                new CacheQueEsperaALaOtra(
+                                                        cache, losDosVieronQueNoEsta))),
+                                normativa));
 
         ExecutorService cajeros = Executors.newFixedThreadPool(2);
         try {
@@ -176,8 +197,8 @@ class DescargaSimultaneaDelMismoConjuntoTest {
 
         assertThat(normativa.descargas())
                 .as(
-                        "la barrera se cruzo: los dos hilos pasaron la comprobacion de antes del"
-                                + " candado, y sin eso la prueba no distinguiria nada")
+                        "los dos hilos vieron «no esta» y descargaron: la barrera los junto antes"
+                                + " del candado, y sin eso la prueba no distinguiria nada")
                 .isEqualTo(2);
         assertThat(filas("normativa_conjunto"))
                 .as("la identidad del conjunto, una vez")
@@ -212,18 +233,10 @@ class DescargaSimultaneaDelMismoConjuntoTest {
     // Siembra y utilidades
     // ------------------------------------------------------------------
 
-    /**
-     * {@code normativa} fabricado: entrega siempre el mismo snapshot, pero no antes de que el otro
-     * hilo tambien haya llegado a pedirlo.
-     */
-    private static final class NormativaQueEsperaALaOtra implements PublicadorDeNormativa {
+    /** {@code normativa} fabricado: entrega siempre el mismo snapshot, y cuenta las descargas. */
+    private static final class NormativaQueCuenta implements PublicadorDeNormativa {
 
-        private final CyclicBarrier barrera;
         private final AtomicInteger descargas = new AtomicInteger();
-
-        NormativaQueEsperaALaOtra(CyclicBarrier barrera) {
-            this.barrera = barrera;
-        }
 
         @Override
         public long conjuntoVigenteEn(Ejercicio ejercicio) {
@@ -233,6 +246,50 @@ class DescargaSimultaneaDelMismoConjuntoTest {
         @Override
         public SnapshotDeNormativa descargar(long conjuntoId, String ambito) {
             descargas.incrementAndGet();
+            return SNAPSHOT;
+        }
+
+        int descargas() {
+            return descargas.get();
+        }
+    }
+
+    /**
+     * La cache de produccion, con un {@code guardar} que no entra en el suyo —el del candado— hasta
+     * que el otro hilo tambien ha llegado: los dos han pasado ya todas las comprobaciones de antes.
+     */
+    private static final class CacheQueEsperaALaOtra implements CacheDeSnapshots {
+
+        private final CacheDeSnapshots cache;
+        private final CyclicBarrier barrera;
+
+        CacheQueEsperaALaOtra(CacheDeSnapshots cache, CyclicBarrier barrera) {
+            this.cache = cache;
+            this.barrera = barrera;
+        }
+
+        @Override
+        public boolean tiene(long conjuntoId, String ambito) {
+            return cache.tiene(conjuntoId, ambito);
+        }
+
+        @Override
+        public Optional<Long> conjuntoCacheadoDe(Ejercicio ejercicio) {
+            return cache.conjuntoCacheadoDe(ejercicio);
+        }
+
+        @Override
+        public Optional<IdentidadDelConjunto> identidadDe(long conjuntoId) {
+            return cache.identidadDe(conjuntoId);
+        }
+
+        @Override
+        public List<SnapshotDeNormativa.Parametro> parametrosDe(long conjuntoId) {
+            return cache.parametrosDe(conjuntoId);
+        }
+
+        @Override
+        public void guardar(SnapshotDeNormativa snapshot) {
             try {
                 barrera.await(ESPERA_SEGUNDOS, TimeUnit.SECONDS);
             } catch (InterruptedException interrumpido) {
@@ -240,14 +297,10 @@ class DescargaSimultaneaDelMismoConjuntoTest {
                 throw new IllegalStateException(interrumpido);
             } catch (BrokenBarrierException | TimeoutException sinLaOtra) {
                 throw new IllegalStateException(
-                        "El otro hilo no llego a descargar: la prueba no pudo montar la carrera",
+                        "El otro hilo no llego a guardar: la prueba no pudo montar la carrera",
                         sinLaOtra);
             }
-            return SNAPSHOT;
-        }
-
-        int descargas() {
-            return descargas.get();
+            cache.guardar(snapshot);
         }
     }
 
