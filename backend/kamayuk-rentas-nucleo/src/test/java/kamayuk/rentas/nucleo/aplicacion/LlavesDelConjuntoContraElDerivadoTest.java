@@ -18,6 +18,7 @@ import kamayuk.rentas.nucleo.dominio.arbitrios.Servicio;
 import kamayuk.rentas.nucleo.dominio.espectaculos.ClaseDeEspectaculo;
 import kamayuk.rentas.nucleo.dominio.predial.RT001ValorDeTerreno;
 import kamayuk.rentas.nucleo.parametros.DerivadoPublicado;
+import kamayuk.rentas.nucleo.parametros.ElVehicularQuePlaneaNormativa;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -54,14 +55,17 @@ import org.junit.jupiter.params.provider.MethodSource;
  * </ul>
  *
  * <p>La primera direccion sola <b>no basta</b>, y la revision de #376 lo midio: una llave de {@link
- * #SIN_PUBLICAR} solo comprobaba que el derivado no publicara <b>su</b> nombre. El vehicular pide
+ * #SIN_PUBLICAR} solo comprobaba que el derivado no publicara <b>su</b> nombre. El vehicular pedia
  * {@code ALICUOTA_VEHICULAR} y {@code VEHICULAR_MINIMO}, y {@code normativa} planea publicar {@code
  * VEHICULAR_ALICUOTA} y {@code VEHICULAR_MINIMO_UIT} ({@code
  * vehicular-valores-referenciales-2026.md} §2): el dia que lo hiciera, la prueba seguia verde y el
- * vehicular daba el mismo 422 que la alcabala. Con la segunda direccion ese dia sale rojo —{@code
- * VEHICULAR_ALICUOTA} no lo pide nadie—, y con el nombre planeado dentro de {@link #SIN_PUBLICAR}
- * el rojo dice ademas que llave hay que renombrar. {@link #siNormativaPublicaraElVehicular()} lo
- * demuestra sobre una muestra, sin tocar {@code normativa}.
+ * vehicular daba el mismo 422 que la alcabala. Con la segunda direccion ese dia salia rojo.
+ *
+ * <p><b>Desde #499 el vehicular pide ya los nombres que planea {@code normativa}</b>, y {@link
+ * #siNormativaPublicaraElVehicular()} lo fija sobre una muestra, sin tocar {@code normativa}: si
+ * publicara las dos filas, ninguna quedaria sin quien la pida, y lo unico rojo seria la declaracion
+ * de {@link #SIN_PUBLICAR}, que ese dia sobra. Los nombres de la muestra no se escriben aqui: salen
+ * de {@link ElVehicularQuePlaneaNormativa}, que los compara con el archivo del corpus.
  */
 @DisplayName("#376 — Cada llave del nucleo, contra el derivado que normativa despliega")
 class LlavesDelConjuntoContraElDerivadoTest {
@@ -139,17 +143,19 @@ class LlavesDelConjuntoContraElDerivadoTest {
                                 + " transcribe norma nacional",
                         null));
         motivos.put(
-                LlavesDelConjunto.ALICUOTA_VEHICULAR,
+                LlavesDelConjunto.VEHICULAR_ALICUOTA,
                 new SinPublicar(
-                        "el vehicular no esta transcrito todavia, y normativa planea publicarlo"
-                                + " con OTRO nombre (vehicular-valores-referenciales-2026.md §2)",
-                        "VEHICULAR_ALICUOTA"));
+                        "el corpus la transcribe y la planea con este nombre"
+                                + " (vehicular-valores-referenciales-2026.md §2, #499), pero el"
+                                + " derivado todavia no trae su fila",
+                        null));
         motivos.put(
-                LlavesDelConjunto.VEHICULAR_MINIMO,
+                LlavesDelConjunto.VEHICULAR_MINIMO_UIT,
                 new SinPublicar(
-                        "el vehicular no esta transcrito todavia, y normativa planea publicarlo"
-                                + " con OTRO nombre (vehicular-valores-referenciales-2026.md §2)",
-                        "VEHICULAR_MINIMO_UIT"));
+                        "el corpus lo transcribe y lo planea con este nombre"
+                                + " (vehicular-valores-referenciales-2026.md §2, #499), pero el"
+                                + " derivado todavia no trae su fila",
+                        null));
         motivos.put(
                 RT001ValorDeTerreno.ARANCEL,
                 new SinPublicar(
@@ -252,17 +258,21 @@ class LlavesDelConjuntoContraElDerivadoTest {
 
     @Test
     @DisplayName(
-            "si normativa publicara el vehicular con el nombre que planea, esta prueba sale roja"
-                    + " por los dos lados")
+            "#499 — si normativa publicara el vehicular con el nombre que planea, el nucleo ya lo"
+                    + " pide: solo sobraria su declaracion sin publicar")
     void siNormativaPublicaraElVehicular() {
+        Set<String> planeados = ElVehicularQuePlaneaNormativa.FILAS.keySet();
         Set<String> conElVehicular =
                 new TreeSet<>(tiposDe(DerivadoPublicado.numerosVigentesEn(EJERCICIO)));
-        conElVehicular.add("VEHICULAR_ALICUOTA");
-        conElVehicular.add("VEHICULAR_MINIMO_UIT");
+        conElVehicular.addAll(planeados);
 
         assertThat(tiposSinQuienLosPida(conElVehicular))
-                .as("del derivado a la llave: los dos nombres nuevos no los pide nadie")
-                .containsExactlyInAnyOrder("VEHICULAR_ALICUOTA", "VEHICULAR_MINIMO_UIT");
+                .as(
+                        "del derivado a la llave: los nombres que normativa planea para el"
+                                + " vehicular los pide una llave del nucleo. Hasta #499 salian los"
+                                + " dos aqui, y el vehicular contestaba 422 «falta publicar» sobre"
+                                + " cifras publicadas")
+                .isEmpty();
         assertThat(
                         SIN_PUBLICAR.entrySet().stream()
                                 .filter(
@@ -274,9 +284,10 @@ class LlavesDelConjuntoContraElDerivadoTest {
                                                         .isPresent())
                                 .map(Map.Entry::getKey)
                                 .toList())
-                .as("de la llave al derivado: las dos llaves que hay que renombrar")
-                .containsExactlyInAnyOrder(
-                        LlavesDelConjunto.ALICUOTA_VEHICULAR, LlavesDelConjunto.VEHICULAR_MINIMO);
+                .as(
+                        "de la llave al derivado: lo que ese dia se pone rojo es la declaracion sin"
+                                + " publicar de las dos, que ya no exime a nadie")
+                .containsExactlyInAnyOrderElementsOf(planeados);
     }
 
     @ParameterizedTest(name = "{0}")

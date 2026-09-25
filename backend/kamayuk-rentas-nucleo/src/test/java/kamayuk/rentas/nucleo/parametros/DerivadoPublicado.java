@@ -85,6 +85,21 @@ public final class DerivadoPublicado {
         return new DelDerivado(ejercicio, elegidos);
     }
 
+    /**
+     * Un lector de un conjunto compuesto con todo lo que el derivado publica <b>mas</b> esas filas,
+     * indexadas por {@code tipo|clave}; lo publicado gana a lo añadido.
+     *
+     * <p>Solo lo usa {@link ElVehicularQuePlaneaNormativa} (#499): es la forma de probar hoy el
+     * conjunto que {@code normativa} sellara el dia que publique el vehicular, sin escribir en
+     * {@code normativa} y sin sembrar a mano el resto del conjunto.
+     */
+    static LectorDeParametros conjuntoDelEjercicioMas(
+            Ejercicio ejercicio, Map<String, String> filas) {
+        Map<String, String> compuesto = new LinkedHashMap<>(numerosVigentesEn(ejercicio.valor()));
+        filas.forEach(compuesto::putIfAbsent);
+        return new DelDerivado(ejercicio, compuesto);
+    }
+
     /** Un conjunto sellado compuesto con lo que el derivado publica, y nada mas. */
     private record DelDerivado(Ejercicio ejercicio, Map<String, String> publicados)
             implements LectorDeParametros {

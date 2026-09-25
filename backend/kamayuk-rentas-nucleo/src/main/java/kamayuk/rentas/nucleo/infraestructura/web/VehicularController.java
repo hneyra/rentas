@@ -69,9 +69,9 @@ import org.springframework.web.bind.annotation.RestController;
  * <h2>Lo que NO viaja: el mínimo imponible</h2>
  *
  * <p>{@code minimoImponible} llegaba en el cuerpo, o sea <b>del cliente</b>. Es una cifra normativa
- * —el artículo 34 del TUO de la LTM lo escribe como porcentaje de la UIT— y sale del conjunto de
+ * —el artículo 33 del TUO de la LTM lo escribe como porcentaje de la UIT— y sale del conjunto de
  * parámetros sellado del ejercicio (regla 5, ARQ-09 §3). Ya no se acepta: {@link
- * RegistrarDeterminacionVehicular} lo lee de {@code VEHICULAR_MINIMO} y {@code UIT}, y si el
+ * RegistrarDeterminacionVehicular} lo lee de {@code VEHICULAR_MINIMO_UIT} y {@code UIT}, y si el
  * conjunto no las trae la operación responde <b>422 nombrando la llave</b> —mismo trato que {@code
  * TRAMO_PREDIAL_LIMITE:2} en #395, {@code TASA_ANUNCIO:‹CLASE›} en #51 y {@code
  * BENEFICIO:‹CAMPANIA›} en #72—. No hay valor por omisión: el cero que se usaba antes no falla,
@@ -79,12 +79,14 @@ import org.springframework.web.bind.annotation.RestController;
  * mínimo existe para cubrir.
  *
  * <p><b>Hoy faltan las dos llaves</b>, y eso es lo que esta operación contesta: ni {@code
- * ALICUOTA_VEHICULAR} —que ya se leía del conjunto desde #32— ni {@code VEHICULAR_MINIMO} están en
- * {@code docs/10-negocio/valores-normativos/publicacion/parametros-2026.csv}, así que contra un
- * conjunto sellado de verdad la respuesta es un 422 que las nombra. Publicarlas es el circuito de
- * #188 —transcripción del artículo 34 al corpus, con sus dos firmas, y {@code publicar-parametros}—
- * y no cabe aquí: lo que sí cabe es que la operación lo diga en vez de calcular con un valor
- * inventado.
+ * VEHICULAR_ALICUOTA} ni {@code VEHICULAR_MINIMO_UIT} están todavía en {@code
+ * docs/10-negocio/valores-normativos/publicacion/parametros-2026.csv}, así que contra un conjunto
+ * sellado de verdad la respuesta es un 422 que las nombra. Son los nombres con que {@code
+ * normativa} las planea ({@code vehicular-valores-referenciales-2026.md} §2): hasta #499 se pedían
+ * como {@code ALICUOTA_VEHICULAR} y {@code VEHICULAR_MINIMO}, y el 422 no se habría ido al
+ * publicarlas. Publicarlas es el circuito de #188 —la fila del derivado, con las dos firmas del
+ * corpus, y {@code publicar-parametros}— y no cabe aquí: lo que sí cabe es que la operación lo diga
+ * en vez de calcular con un valor inventado.
  *
  * <p><b>Y con la llave que falta va lo que la contiene</b> (#540): que el ejercicio no tenga ningún
  * conjunto sellado ({@code EjercicioSinSellar}) y que el vehículo no figure en la tabla de valores

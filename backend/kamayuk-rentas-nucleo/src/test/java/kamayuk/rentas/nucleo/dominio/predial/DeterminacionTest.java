@@ -27,7 +27,7 @@ class DeterminacionTest {
                         3L,
                         Dinero.de("1000"),
                         Dinero.de("10"),
-                        List.of("ALICUOTA_VEHICULAR"));
+                        List.of("VEHICULAR_ALICUOTA"));
 
         assertThat(vehicular.tributo()).isEqualTo("VEHICULAR");
         assertThat(vehicular.vehiculoId()).isEqualTo(2L);
@@ -51,7 +51,7 @@ class DeterminacionTest {
                                         3L,
                                         Dinero.de("1000"),
                                         Dinero.de("10"),
-                                        List.of("ALICUOTA_VEHICULAR"),
+                                        List.of("VEHICULAR_ALICUOTA"),
                                         OrigenDeDeterminacion.ORDINARIA,
                                         EstadoDeDeterminacion.BORRADOR,
                                         null,
@@ -108,9 +108,9 @@ class DeterminacionTest {
                         3L,
                         Dinero.de("1000"),
                         Dinero.de("10"),
-                        List.of("ALICUOTA_VEHICULAR"));
+                        List.of("VEHICULAR_ALICUOTA"));
 
-        assertThat(vehicular.reglasAplicadas()).containsExactly("ALICUOTA_VEHICULAR");
+        assertThat(vehicular.reglasAplicadas()).containsExactly("VEHICULAR_ALICUOTA");
     }
 
     @Test
@@ -181,7 +181,7 @@ class DeterminacionTest {
                                         3L,
                                         Dinero.de("1000"),
                                         Dinero.de("10"),
-                                        List.of("ALICUOTA_VEHICULAR"),
+                                        List.of("VEHICULAR_ALICUOTA"),
                                         OrigenDeDeterminacion.ORDINARIA,
                                         EstadoDeDeterminacion.BORRADOR,
                                         null,

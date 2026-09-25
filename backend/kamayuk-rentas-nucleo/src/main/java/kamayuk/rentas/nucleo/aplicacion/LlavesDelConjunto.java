@@ -28,9 +28,10 @@ import kamayuk.rentas.nucleo.dominio.arbitrios.Servicio;
  *       con este mismo nombre, y la que no se publica todavia lo declara con su motivo.
  *   <li>Y al reves: todo tipo que el derivado publica lo pide una constante de aqui o esta
  *       declarado en esa prueba con quien lo lee. Es lo que hace rojo el dia que {@code normativa}
- *       publique un valor que se pide aqui con otro nombre —el vehicular, que se pide como {@code
- *       ALICUOTA_VEHICULAR} y se planea publicar como {@code VEHICULAR_ALICUOTA}—: mirar solo desde
- *       la llave no lo veria, porque el nombre de la llave seguiria sin publicarse.
+ *       publique un valor que se pide aqui con otro nombre —el vehicular, que se pedia como {@code
+ *       ALICUOTA_VEHICULAR} y se planea publicar como {@code VEHICULAR_ALICUOTA}, hasta #499—:
+ *       mirar solo desde la llave no lo veria, porque el nombre de la llave seguiria sin
+ *       publicarse.
  * </ul>
  *
  * <p>Son <b>nombres</b>, no cifras (regla 5): ningun valor vive aqui.
@@ -52,11 +53,28 @@ public final class LlavesDelConjunto {
     /** El derecho de emision mecanizada del predial, en soles (ordenanza local, D-02b). */
     public static final String DERECHO_EMISION_PREDIAL = "DERECHO_EMISION_PREDIAL";
 
-    /** La alicuota del impuesto vehicular; una sola por ejercicio (TUO LTM art. 33). */
-    public static final String ALICUOTA_VEHICULAR = "ALICUOTA_VEHICULAR";
+    /**
+     * La alicuota del impuesto vehicular, en tanto por ciento; una sola por ejercicio (TUO LTM art.
+     * 33). Sin clave.
+     *
+     * <p>Hasta #499 se pedia como {@code ALICUOTA_VEHICULAR}, y {@code normativa} la planea con
+     * este nombre ({@code vehicular-valores-referenciales-2026.md} §2): el dia que la publicara, el
+     * vehicular habria contestado 422 «falta publicar» sobre una cifra publicada, como la alcabala
+     * hasta #376.
+     */
+    public static final String VEHICULAR_ALICUOTA = "VEHICULAR_ALICUOTA";
 
-    /** El minimo imponible del vehicular, como porcentaje de la UIT (TUO LTM art. 34; #399). */
-    public static final String VEHICULAR_MINIMO = "VEHICULAR_MINIMO";
+    /**
+     * El minimo del impuesto vehicular, como <b>porcentaje</b> de la UIT del ejercicio (TUO LTM
+     * art. 33, segundo parrafo: «no puede ser inferior al 1.5% de la UIT»; #399). Sin clave.
+     *
+     * <p>Hasta #499 se pedia como {@code VEHICULAR_MINIMO}; este es el nombre que planea {@code
+     * normativa}. El {@code _UIT} dice contra que se mide, no la unidad de la cifra: el derivado
+     * publica el numero que imprime la norma y no lo convierte —{@code 1.5}, igual que {@code
+     * PREDIAL_MINIMO} es {@code 0.6} de «0.6% de la UIT»—, y {@code
+     * RegistrarDeterminacionVehicular} lo pasa a soles con la {@link #UIT} del mismo conjunto.
+     */
+    public static final String VEHICULAR_MINIMO_UIT = "VEHICULAR_MINIMO_UIT";
 
     /** La alicuota de la alcabala, en tanto por ciento (TUO LTM art. 25). Sin clave. */
     public static final String ALCABALA_ALICUOTA = "ALCABALA_ALICUOTA";

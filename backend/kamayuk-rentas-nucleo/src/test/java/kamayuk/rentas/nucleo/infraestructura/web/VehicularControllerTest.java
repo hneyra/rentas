@@ -3,6 +3,7 @@ package kamayuk.rentas.nucleo.infraestructura.web;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -39,6 +40,7 @@ import kamayuk.rentas.nucleo.dominio.VehiculoRepository;
 import kamayuk.rentas.nucleo.dominio.predial.DetalleDeterminacionPredio;
 import kamayuk.rentas.nucleo.dominio.predial.Determinacion;
 import kamayuk.rentas.nucleo.dominio.predial.DeterminacionRepository;
+import kamayuk.rentas.nucleo.parametros.ElVehicularQuePlaneaNormativa;
 import kamayuk.rentas.parametros.IdentificadorDeConjunto;
 import kamayuk.rentas.parametros.LectorDeParametros;
 import kamayuk.rentas.parametros.ParametrosSellados;
@@ -54,6 +56,7 @@ import org.springframework.http.converter.json.JacksonJsonHttpMessageConverter;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
@@ -80,6 +83,8 @@ class VehicularControllerTest {
             Clock.fixed(Instant.parse("2026-08-29T10:00:00Z"), ZoneId.of("America/Lima"));
 
     private static final Ejercicio EJERCICIO = new Ejercicio(2026);
+
+    private static final JsonMapper LECTOR = JsonMapper.builder().build();
 
     /** El vehiculo de las pruebas: inscrito en 2025, afecto de 2026 a 2028. */
     private static final Vehiculo EL_VEHICULO =
@@ -304,7 +309,7 @@ class VehicularControllerTest {
     }
 
     @Test
-    @DisplayName("sin VEHICULAR_MINIMO en el conjunto es 422, y el mensaje dice la llave")
+    @DisplayName("sin VEHICULAR_MINIMO_UIT en el conjunto es 422, y el mensaje dice la llave")
     void sinLaLlaveDelMinimoEs422() throws Exception {
         mvc = montar(conjuntoSinMinimo());
 
@@ -318,11 +323,11 @@ class VehicularControllerTest {
                         .andReturn();
 
         assertThat(resultado.getResponse().getStatus()).isEqualTo(422);
-        assertThat(resultado.getResponse().getContentAsString()).contains("VEHICULAR_MINIMO");
+        assertThat(resultado.getResponse().getContentAsString()).contains("VEHICULAR_MINIMO_UIT");
         assertThat(resultado.getResponse().getContentAsString())
                 .as("#691 — y la llave viaja legible por programa, no solo dentro del mensaje")
                 .contains(
-                        "\"parametroQueFalta\":{\"ejercicio\":2026,\"llave\":\"VEHICULAR_MINIMO\"}");
+                        "\"parametroQueFalta\":{\"ejercicio\":2026,\"llave\":\"VEHICULAR_MINIMO_UIT\"}");
         assertThat(determinaciones.insertadas).isZero();
     }
 
@@ -361,6 +366,69 @@ class VehicularControllerTest {
         // 1 000.00 × 1 % = 10.00, por debajo del minimo de 82.50: manda el minimo
         assertThat(resultado.getResponse().getContentAsString())
                 .contains("\"montoDeterminado\":\"82.50000\"");
+    }
+
+    // ------------------------------------------------- el conjunto que normativa va a sellar
+
+    @Test
+    @DisplayName(
+            "#499 — con el conjunto que normativa sellara —su derivado y el vehicular con el nombre"
+                    + " que planea— calcula, y no contesta 422 «falta publicar»")
+    void conElConjuntoQueNormativaSellaraCalcula() throws Exception {
+        mvc = montarCon(ElVehicularQuePlaneaNormativa.conjuntoDelEjercicio(EJERCICIO));
+
+        MvcResult resultado =
+                mvc.perform(
+                                post("/rentas/api/v1/rentas/vehicular/calculo")
+                                        .param("placa", "V1H-882")
+                                        .param("ejercicio", "2026")
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content("{\"simulacion\":true}"))
+                        .andReturn();
+
+        assertThat(resultado.getResponse().getStatus())
+                .as(
+                        "hasta #499 el vehicular pedia ALICUOTA_VEHICULAR y VEHICULAR_MINIMO, y"
+                                + " normativa las publicara como VEHICULAR_ALICUOTA y"
+                                + " VEHICULAR_MINIMO_UIT: con el conjunto real, 422 siempre."
+                                + " Respuesta: %s",
+                        resultado.getResponse().getContentAsString())
+                .isEqualTo(201);
+        JsonNode json = LECTOR.readTree(resultado.getResponse().getContentAsString());
+        // 112 800.00 x 1 % = 1 128.00, por encima del minimo: la alicuota es la del art. 33
+        assertThat(new BigDecimal(json.findValue("alicuota").asString())).isEqualByComparingTo("1");
+        assertThat(new BigDecimal(json.findValue("montoDeterminado").asString()))
+                .isEqualByComparingTo("1128.00");
+    }
+
+    @Test
+    @DisplayName(
+            "#499 — y el minimo de ese conjunto es el 1.5 % de la UIT sellada, no 1.5 UIT: eleva"
+                    + " el vehiculo barato a 82.50")
+    void elMinimoDelConjuntoQueNormativaSellaraEsUnPorcentajeDeLaUit() throws Exception {
+        mvc = montarCon(ElVehicularQuePlaneaNormativa.conjuntoDelEjercicio(EJERCICIO));
+        vehiculos.valorReferencial = Dinero.de("1000.00");
+
+        MvcResult resultado =
+                mvc.perform(
+                                post("/rentas/api/v1/rentas/vehicular/calculo")
+                                        .param("placa", "V1H-882")
+                                        .param("ejercicio", "2026")
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content("{\"simulacion\":true}"))
+                        .andReturn();
+
+        assertThat(resultado.getResponse().getStatus())
+                .as("respuesta: %s", resultado.getResponse().getContentAsString())
+                .isEqualTo(201);
+        JsonNode json = LECTOR.readTree(resultado.getResponse().getContentAsString());
+        // 1 000.00 x 1 % = 10.00, por debajo del minimo. El minimo es 1.5 % de la UIT 2026 del
+        // derivado (5 500.00) = 82.50; leido como «1.5 UIT» por el sufijo del nombre seria
+        // 8 250.00, un piso cien veces mayor que el de la ley.
+        assertThat(new BigDecimal(json.findValue("minimoImponible").asString()))
+                .isEqualByComparingTo("82.50");
+        assertThat(new BigDecimal(json.findValue("montoDeterminado").asString()))
+                .isEqualByComparingTo("82.50");
     }
 
     // ------------------------------------------------------------------ simular y asentar
@@ -676,23 +744,23 @@ class VehicularControllerTest {
 
     private static ParametrosSellados conjuntoCompleto() {
         return ParametrosSellados.de(EJERCICIO, 1)
-                .numero("ALICUOTA_VEHICULAR", null, ValorNormativo.de("1.0"))
-                .numero("VEHICULAR_MINIMO", null, ValorNormativo.de("1.5"))
+                .numero("VEHICULAR_ALICUOTA", null, ValorNormativo.de("1.0"))
+                .numero("VEHICULAR_MINIMO_UIT", null, ValorNormativo.de("1.5"))
                 .numero("UIT", null, ValorNormativo.de("5500.00"))
                 .construir();
     }
 
     private static ParametrosSellados conjuntoSinMinimo() {
         return ParametrosSellados.de(EJERCICIO, 1)
-                .numero("ALICUOTA_VEHICULAR", null, ValorNormativo.de("1.0"))
+                .numero("VEHICULAR_ALICUOTA", null, ValorNormativo.de("1.0"))
                 .numero("UIT", null, ValorNormativo.de("5500.00"))
                 .construir();
     }
 
     private static ParametrosSellados conjuntoSinUit() {
         return ParametrosSellados.de(EJERCICIO, 1)
-                .numero("ALICUOTA_VEHICULAR", null, ValorNormativo.de("1.0"))
-                .numero("VEHICULAR_MINIMO", null, ValorNormativo.de("1.5"))
+                .numero("VEHICULAR_ALICUOTA", null, ValorNormativo.de("1.0"))
+                .numero("VEHICULAR_MINIMO_UIT", null, ValorNormativo.de("1.5"))
                 .construir();
     }
 
