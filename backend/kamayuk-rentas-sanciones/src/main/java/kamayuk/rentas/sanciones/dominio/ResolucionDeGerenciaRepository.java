@@ -16,9 +16,17 @@ public interface ResolucionDeGerenciaRepository {
     /**
      * Inserta la resolución.
      *
-     * @throws ResolucionDuplicada si la papeleta ya tiene una resolución de ese tipo, o si el
-     *     descargo ya está resuelto. La garantía son los índices únicos parciales de V41, no un
-     *     {@code if}: dos peticiones simultáneas pasan las dos por cualquier comprobación en Java
+     * <p><b>Una por papeleta solo para la ordinaria y la sancionadora</b> (#384). Son las dos que
+     * tienen índice único ({@code resolucion_gerencia_ordinaria_uq} y {@code ..._sancionadora_uq});
+     * la {@link TipoDeResolucionDeGerencia#ADMINISTRATIVA} no lo tiene, y no es un olvido: la RIS y
+     * la resolución que resuelve cada recurso contra ella son del mismo tipo y conviven. Lo que sí
+     * es único para todas es el recurso resuelto ({@code ..._descargo_uq}). Hasta #384 este
+     * contrato prometía «una de ese tipo» para las tres, y la corrida lo creyó.
+     *
+     * @throws ResolucionDuplicada si la papeleta ya tiene su ordinaria o su sancionadora y se
+     *     registra otra, o si el descargo ya está resuelto. La garantía son los índices únicos
+     *     parciales de V41, no un {@code if}: dos peticiones simultáneas pasan las dos por
+     *     cualquier comprobación en Java
      */
     ResolucionDeGerencia registrar(ResolucionDeGerencia resolucion);
 
@@ -26,7 +34,15 @@ public interface ResolucionDeGerenciaRepository {
 
     Optional<ResolucionDeGerencia> porId(long id);
 
-    /** La resolución de ese tipo dictada sobre la papeleta, si la hay. */
+    /**
+     * La resolución de ese tipo dictada sobre la papeleta, si la hay.
+     *
+     * <p><b>Solo para un tipo que el índice hace único</b>: la ordinaria o la sancionadora (#384).
+     * Con la {@link TipoDeResolucionDeGerencia#ADMINISTRATIVA} puede haber varias, y entonces lanza
+     * {@code IncorrectResultSizeDataAccessException}, que ningún reintento arregla. Quien necesita
+     * la administrativa lee {@link #dePapeleta(long)} y le pregunta a la política que decide cuál
+     * vale —{@link CorridaDeValores#laQueOrdenaLaCobranza} para la cobranza—.
+     */
     Optional<ResolucionDeGerencia> dePapeleta(long papeletaId, TipoDeResolucionDeGerencia tipo);
 
     /** Todas las resoluciones de una papeleta, de la más antigua a la más reciente. */
@@ -35,7 +51,7 @@ public interface ResolucionDeGerenciaRepository {
     /** La resolución que resolvió ese descargo, si ya se dictó. */
     Optional<ResolucionDeGerencia> queResuelve(long descargoId);
 
-    /** La papeleta ya tiene una resolución de ese tipo, o el descargo ya está resuelto. */
+    /** La papeleta ya tiene su ordinaria o su sancionadora, o el descargo ya está resuelto. */
     final class ResolucionDuplicada extends RuntimeException {
 
         @java.io.Serial private static final long serialVersionUID = 1L;

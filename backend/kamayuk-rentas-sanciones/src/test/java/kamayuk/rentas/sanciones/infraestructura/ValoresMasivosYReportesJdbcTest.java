@@ -146,7 +146,10 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.aop.framework.ProxyFactory;
+import org.springframework.dao.IncorrectResultSizeDataAccessException;
+import org.springframework.dao.TransientDataAccessResourceException;
 import org.springframework.http.ResponseEntity;
+import org.springframework.jdbc.BadSqlGrammarException;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.transaction.annotation.AnnotationTransactionAttributeSource;
@@ -275,6 +278,15 @@ class ValoresMasivosYReportesJdbcTest {
     private static ValorRepositoryJdbc repositorioDeValores;
     private static GeneradorDeDocumentos generadorDeDocumentos;
 
+    /**
+     * Lo que {@link ProcesarQueRevienta} necesita para ser un {@link ProcesarPapeletaDeLaCorrida}
+     * de verdad salvo en el candidato que se le diga (#384).
+     */
+    private static ResolucionDeGerenciaRepositoryJdbc repositorioDeResoluciones;
+
+    private static NotificacionDeResolucionRepositoryJdbc repositorioDeDiligencias;
+    private static EmisionDeValoresDeMultas emisionDeMultas;
+
     @BeforeAll
     static void provisionar() throws SQLException, IOException {
         base = BaseDeDatosDePrueba.provisionar();
@@ -376,6 +388,9 @@ class ValoresMasivosYReportesJdbcTest {
                                 envolver(
                                         new OrigenDeLaObligacionCuentaCorriente(
                                                 asientos, saldos))));
+        repositorioDeResoluciones = resoluciones;
+        repositorioDeDiligencias = diligencias;
+        emisionDeMultas = emision;
 
         registrarPapeleta = envolver(new RegistrarPapeleta(papeletas, codigos, cargos, auditoria));
         ValoresSobreUnaObligacion valoresVivos =
@@ -2186,6 +2201,410 @@ class ValoresMasivosYReportesJdbcTest {
     }
 
     // ==================================================================
+    //  #384 — el bucle distingue un error de datos de uno pasajero
+    // ==================================================================
+
+    /**
+     * #384, su tercer paso — Lo que el bucle hace con una excepción de persistencia.
+     *
+     * <p>Hasta #384 toda {@code DataAccessException} contaba como «fallido»: el candidato se
+     * quedaba {@code PENDIENTE} para el próximo relanzamiento. Para un corte de conexión es lo
+     * correcto; para {@code IncorrectResultSizeDataAccessException} no, porque sale de los datos de
+     * <b>esa</b> papeleta y ningún reintento la arregla. Esa sale {@code NO_PROCEDE} con su
+     * mensaje; la pasajera sigue contando como fallida; y un error del programa —una consulta mal
+     * escrita, un permiso que falta— también, porque lo arregla un despliegue y no los datos, y
+     * cerrarlo como «no procede» apagaría la alarma del proceso batch sobre todos los candidatos.
+     *
+     * <p>Los tres fallos se provocan con {@link ProcesarQueRevienta}: el defecto de datos que los
+     * producía de verdad lo cierra la política de la corrida, así que ya no hay siembra que lo haga
+     * salir.
+     */
+    @Nested
+    @DisplayName("#384 — el bucle distingue un error de datos de uno pasajero")
+    class ElErrorDeDatosNoSeReintenta {
+
+        @Test
+        @DisplayName(
+                "el de datos sale NO_PROCEDE con su mensaje; el pasajero y el del programa, no")
+        void elDeDatosNoProcedeYElPasajeroSigue() {
+            Papeleta deDatos = papeletaExigible("err384a");
+            Papeleta pasajero = papeletaExigible("err384b");
+            Papeleta delPrograma = papeletaExigible("err384c");
+            Papeleta sana = papeletaExigible("err384d");
+            CorridaDeValores corrida = corridaDe(deDatos, pasajero, delPrograma, sana);
+
+            GenerarCorridaDeValores conFallos =
+                    new GenerarCorridaDeValores(
+                            envolver(new ConsultaDeLaCorridaDeValores(corridas)),
+                            envolver(
+                                    new ProcesarQueRevienta(
+                                            Map.of(
+                                                    deDatos.identificador(),
+                                                    new IncorrectResultSizeDataAccessException(
+                                                            1, 2),
+                                                    pasajero.identificador(),
+                                                    new TransientDataAccessResourceException(
+                                                            "La conexion se corto a mitad"),
+                                                    delPrograma.identificador(),
+                                                    new BadSqlGrammarException(
+                                                            "leer la papeleta",
+                                                            "SELECT columna_que_no_existe",
+                                                            new SQLException(
+                                                                    "column does not exist",
+                                                                    "42703"))))));
+            GenerarCorridaDeValores.Informe informe = conFallos.generar(corrida.identificador());
+
+            ItemDeCorrida itemDeDatos = itemDe(corrida, deDatos);
+            assertThat(itemDeDatos.estado())
+                    .as(
+                            "reintentar una lectura que devuelve dos filas donde espera una no la arregla")
+                    .isEqualTo(EstadoDeItemDeCorrida.NO_PROCEDE);
+            assertThat(itemDeDatos.motivo())
+                    .contains("Incorrect result size: expected 1, actual 2");
+            assertThat(itemDe(corrida, pasajero).estado())
+                    .as("un corte de conexion si lo arregla el relanzamiento")
+                    .isEqualTo(EstadoDeItemDeCorrida.PENDIENTE);
+            assertThat(itemDe(corrida, delPrograma).estado())
+                    .as(
+                            "una consulta mal escrita la arregla un despliegue, no los datos de esta papeleta")
+                    .isEqualTo(EstadoDeItemDeCorrida.PENDIENTE);
+            assertThat(itemDe(corrida, sana).estado()).isEqualTo(EstadoDeItemDeCorrida.GENERADO);
+            assertThat(informe)
+                    .as("generados, sin deuda, no proceden, fallidos")
+                    .extracting(
+                            GenerarCorridaDeValores.Informe::generados,
+                            GenerarCorridaDeValores.Informe::sinDeuda,
+                            GenerarCorridaDeValores.Informe::noProceden,
+                            GenerarCorridaDeValores.Informe::fallidos)
+                    .containsExactly(1, 0, 1, 2);
+        }
+    }
+
+    /**
+     * Un {@link ProcesarPapeletaDeLaCorrida} de verdad salvo en las papeletas que se le digan, que
+     * revientan con el fallo dado antes de tocar nada (#384).
+     *
+     * <p>No es {@code final} ni privada: el proxy transaccional de la prueba es una subclase.
+     */
+    static class ProcesarQueRevienta extends ProcesarPapeletaDeLaCorrida {
+
+        private final Map<Long, RuntimeException> fallos;
+
+        ProcesarQueRevienta(Map<Long, RuntimeException> fallos) {
+            super(
+                    papeletas,
+                    repositorioDeResoluciones,
+                    repositorioDeDiligencias,
+                    emisionDeMultas,
+                    corridas);
+            this.fallos = fallos;
+        }
+
+        @Override
+        public Resultado procesar(
+                CorridaDeValores corrida, ItemDeCorrida item, Observacion observacion) {
+            RuntimeException fallo = fallos.get(item.papeletaId());
+            if (fallo != null) {
+                throw fallo;
+            }
+            return super.procesar(corrida, item, observacion);
+        }
+    }
+
+    // ==================================================================
+    //  #384 — varias resoluciones ADMINISTRATIVA sobre la misma papeleta
+    // ==================================================================
+
+    /**
+     * #384 — La corrida administrativa sobre una papeleta con <b>dos</b> resoluciones {@code
+     * ADMINISTRATIVA}.
+     *
+     * <p>Hasta #384 la corrida pedía «la» resolución del tipo que ordena la cobranza con una
+     * consulta sin orden ni límite, y el esquema no garantiza una sola administrativa: la RIS y la
+     * que resuelve su reconsideración son del mismo tipo, y un doble clic en «Emitir RIS» deja dos.
+     * Con dos filas la lectura lanzaba {@code IncorrectResultSizeDataAccessException}, el bucle la
+     * contaba como un fallo pasajero y el candidato se quedaba {@code PENDIENTE} en cada
+     * relanzamiento.
+     *
+     * <h2>La siembra que distingue</h2>
+     *
+     * <p>La papeleta con <b>una sola</b> RIS —la única siembra que había— da verde con el código de
+     * antes y con el de ahora: está como contraprueba, y no basta. Las fechas están escritas a mano
+     * y no recalculadas con el código que se verifica: la RIS es firme el 1 de abril y la
+     * resolución que resuelve la reconsideración el 15, así que una corrida al 14 separa «la
+     * última» de «la primera».
+     */
+    @Nested
+    @DisplayName("#384 — una papeleta administrativa con dos resoluciones ADMINISTRATIVA")
+    class VariasResolucionesAdministrativas {
+
+        /** El día de la RIS: jueves 5 de marzo. */
+        private static final LocalDate RIS_DICTADA = LocalDate.of(2026, 3, 5);
+
+        /** El día en que se diligencia la RIS: lunes 9 de marzo. */
+        private static final LocalDate RIS_DILIGENCIADA = LocalDate.of(2026, 3, 9);
+
+        /**
+         * Desde cuándo es firme la RIS, con los quince días hábiles del recurso.
+         *
+         * <p>La diligencia es el lunes 9; surte efecto el martes 10; los quince días hábiles son
+         * 11, 12, 13, 16, 17, 18, 19, 20, 23, 24, 25, 26, 27, 30 y 31; el plazo para impugnar vence
+         * el martes 31 y la RIS es exigible el <b>miércoles 1 de abril</b>.
+         */
+        private static final LocalDate RIS_FIRME = LocalDate.of(2026, 4, 1);
+
+        /** El día en que se presenta la reconsideración: martes 10 de marzo. */
+        private static final LocalDate RECONSIDERACION = LocalDate.of(2026, 3, 10);
+
+        /** El día en que se resuelve: lunes 16 de marzo. */
+        private static final LocalDate RECONSIDERACION_RESUELTA = LocalDate.of(2026, 3, 16);
+
+        /** El día en que se diligencia lo resuelto: lunes 23 de marzo. */
+        private static final LocalDate RESUELTA_DILIGENCIADA = LocalDate.of(2026, 3, 23);
+
+        /**
+         * Desde cuándo es firme lo resuelto, con los mismos quince días.
+         *
+         * <p>La diligencia es el lunes 23; surte efecto el martes 24; los quince días hábiles son
+         * 25, 26, 27, 30, 31, 1, 2, 3, 6, 7, 8, 9, 10, 13 y 14; el plazo vence el martes 14 de
+         * abril y es exigible el <b>miércoles 15</b>, que es {@link #EXIGIBLE_DESDE}.
+         */
+        private static final LocalDate RESUELTA_FIRME = LocalDate.of(2026, 4, 15);
+
+        @Test
+        @DisplayName("la RIS y su reconsideracion INFUNDADA: GENERADO, y ningun fallido")
+        void laReconsideracionInfundadaNoRevientaLaCorrida() {
+            Papeleta papeleta = papeletaAdministrativa("adm384a");
+            risNotificada(papeleta);
+            reconsideracionResuelta(
+                    papeleta,
+                    "EXP-384A",
+                    SentidoDelFallo.INFUNDADO,
+                    EfectoSobreLaMulta.SE_MANTIENE);
+
+            CorridaDeValores corrida = corridaAdministrativa(papeleta, RESUELTA_FIRME);
+            GenerarCorridaDeValores.Informe informe = generar.generar(corrida.identificador());
+
+            assertThat(informe.fallidos())
+                    .as(
+                            "dos ADMINISTRATIVA sobre la papeleta no son un fallo pasajero: con"
+                                    + " la lectura de «la» resolucion del tipo, cada relanzamiento"
+                                    + " reventaba igual")
+                    .isZero();
+            assertThat(itemsDe(corrida).get(0).estado())
+                    .as("la multa firme recibe su resolucion de multa")
+                    .isEqualTo(EstadoDeItemDeCorrida.GENERADO);
+        }
+
+        @Test
+        @DisplayName("el plazo lo abre la notificacion de la ultima: al 14 de abril todavia corre")
+        void elPlazoLoAbreLaNotificacionDeLaUltima() {
+            Papeleta papeleta = papeletaAdministrativa("adm384b");
+            risNotificada(papeleta);
+            String resuelta =
+                    reconsideracionResuelta(
+                            papeleta,
+                            "EXP-384B",
+                            SentidoDelFallo.INFUNDADO,
+                            EfectoSobreLaMulta.SE_MANTIENE);
+
+            // La RIS es firme desde el 1 de abril; lo que resuelve la reconsideracion, desde el 15.
+            CorridaDeValores corrida = corridaAdministrativa(papeleta, RESUELTA_FIRME.minusDays(1));
+            GenerarCorridaDeValores.Informe informe = generar.generar(corrida.identificador());
+
+            assertThat(informe.fallidos()).isZero();
+            ItemDeCorrida item = itemsDe(corrida).get(0);
+            assertThat(item.estado())
+                    .as(
+                            "con la RIS —la primera— la multa ya se habria formalizado, con el"
+                                    + " plazo para apelar lo resuelto todavia abierto")
+                    .isEqualTo(EstadoDeItemDeCorrida.NO_PROCEDE);
+            assertThat(item.motivo()).contains(resuelta).contains(RESUELTA_FIRME.toString());
+        }
+
+        @Test
+        @DisplayName("si la ultima deja la multa sin efecto no se formaliza, y el motivo la nombra")
+        void laQueLaDejaSinEfectoNoSeFormaliza() {
+            Papeleta papeleta = papeletaAdministrativa("adm384c");
+            risNotificada(papeleta);
+            String fundada =
+                    reconsideracionResuelta(
+                            papeleta,
+                            "EXP-384C",
+                            SentidoDelFallo.FUNDADO,
+                            EfectoSobreLaMulta.SE_DEJA_SIN_EFECTO);
+
+            CorridaDeValores corrida = corridaAdministrativa(papeleta, RESUELTA_FIRME);
+            GenerarCorridaDeValores.Informe informe = generar.generar(corrida.identificador());
+
+            assertThat(informe.fallidos()).isZero();
+            ItemDeCorrida item = itemsDe(corrida).get(0);
+            assertThat(item.estado())
+                    .as(
+                            "no hay acto que ordene la cobranza: NO_PROCEDE diciendolo, y no un"
+                                    + " SIN_DEUDA que solo cuenta que el libro esta en cero")
+                    .isEqualTo(EstadoDeItemDeCorrida.NO_PROCEDE);
+            assertThat(item.motivo()).contains(fundada).contains("sin efecto");
+            assertThat(item.valorId()).isNull();
+        }
+
+        @Test
+        @DisplayName(
+                "el doble clic en «Emitir RIS»: dos RIS del mismo dia, y la corrida no revienta")
+        void elDobleClicNoRevientaLaCorrida() {
+            Papeleta papeleta = papeletaAdministrativa("adm384d");
+            risNotificada(papeleta);
+            risNotificada(papeleta);
+
+            CorridaDeValores corrida = corridaAdministrativa(papeleta, RESUELTA_FIRME);
+            GenerarCorridaDeValores.Informe informe = generar.generar(corrida.identificador());
+
+            assertThat(informe.fallidos()).isZero();
+            assertThat(itemsDe(corrida).get(0).estado()).isEqualTo(EstadoDeItemDeCorrida.GENERADO);
+        }
+
+        @Test
+        @DisplayName("contraprueba: con UNA sola RIS se formaliza, antes y despues de #384")
+        void conUnaSolaRisSeFormaliza() {
+            Papeleta papeleta = papeletaAdministrativa("adm384e");
+            risNotificada(papeleta);
+
+            CorridaDeValores corrida = corridaAdministrativa(papeleta, RIS_FIRME);
+            GenerarCorridaDeValores.Informe informe = generar.generar(corrida.identificador());
+
+            assertThat(informe.fallidos()).isZero();
+            assertThat(itemsDe(corrida).get(0).estado()).isEqualTo(EstadoDeItemDeCorrida.GENERADO);
+        }
+
+        /** La RIS de la papeleta, dictada y notificada; devuelve su número. */
+        private String risNotificada(Papeleta papeleta) {
+            String numero =
+                    dictarAdministrativa(papeleta, RIS_DICTADA, null, null, null)
+                            .resolucion()
+                            .numero();
+            exigirFirmeza(numero, RIS_DILIGENCIADA, RIS_FIRME);
+            return numero;
+        }
+
+        /**
+         * La reconsideración contra la RIS, resuelta con ese fallo y notificada; devuelve el número
+         * de la resolución que la resuelve.
+         */
+        private String reconsideracionResuelta(
+                Papeleta papeleta,
+                String expediente,
+                SentidoDelFallo sentido,
+                EfectoSobreLaMulta efecto) {
+            enTransaccion(
+                    () ->
+                            registrarDescargo.registrar(
+                                    Familia.ADMINISTRATIVA,
+                                    papeleta.numero(),
+                                    new RegistrarDescargo.Peticion(
+                                            expediente,
+                                            RECONSIDERACION,
+                                            TipoDeRecurso.RECONSIDERACION,
+                                            "La infraccion no se cometio en mi predio"),
+                                    PORQUE),
+                    "mesa.partes");
+            String numero =
+                    dictarAdministrativa(
+                                    papeleta, RECONSIDERACION_RESUELTA, expediente, sentido, efecto)
+                            .resolucion()
+                            .numero();
+            exigirFirmeza(numero, RESUELTA_DILIGENCIADA, RESUELTA_FIRME);
+            return numero;
+        }
+
+        private ResolverConResolucionDeGerencia.ResolucionDictada dictarAdministrativa(
+                Papeleta papeleta,
+                LocalDate fecha,
+                String expediente,
+                SentidoDelFallo sentido,
+                EfectoSobreLaMulta efecto) {
+            return enTransaccion(
+                    () ->
+                            resolver.dictar(
+                                    new ResolverConResolucionDeGerencia.Peticion(
+                                            Familia.ADMINISTRATIVA,
+                                            papeleta.numero(),
+                                            TipoDeResolucionDeGerencia.ADMINISTRATIVA,
+                                            fecha,
+                                            expediente,
+                                            sentido,
+                                            efecto,
+                                            null,
+                                            "Sustento de la prueba",
+                                            null),
+                                    FormatoDeDocumento.PDF,
+                                    PORQUE),
+                    "gerente");
+        }
+
+        /**
+         * Notifica la resolución y comprueba, contra la fecha escrita a mano, desde cuándo es
+         * firme.
+         */
+        private void exigirFirmeza(String numero, LocalDate diligencia, LocalDate firme) {
+            NotificarResolucionDeGerencia.Diligencia registrada =
+                    enTransaccion(
+                            () ->
+                                    notificar.registrar(
+                                            numero,
+                                            new NotificarResolucionDeGerencia.Peticion(
+                                                    diligencia,
+                                                    ModalidadDeNotificacion.PERSONAL,
+                                                    ResultadoDeNotificacion.NOTIFICADO,
+                                                    "V. RETO SANTOS",
+                                                    "AV. JOSE DE LAMA 1180 - SULLANA",
+                                                    "RUIZ INGA, FERNANDO",
+                                                    "DNI 10027723",
+                                                    "REPRESENTANTE",
+                                                    "CARGO-RIS"),
+                                            PORQUE),
+                            "notificador");
+            assertThat(registrada.notificacion().exigibleDesde())
+                    .as("la siembra cuenta los quince dias habiles de RG_RECURSO a mano")
+                    .isEqualTo(firme);
+        }
+
+        private CorridaDeValores corridaAdministrativa(Papeleta papeleta, LocalDate fechaCriterio) {
+            return enTransaccion(
+                    () ->
+                            iniciar.porSeleccion(
+                                    Familia.ADMINISTRATIVA,
+                                    List.of(papeleta.numero()),
+                                    fechaCriterio,
+                                    PORQUE));
+        }
+
+        private Papeleta papeletaAdministrativa(String sufijo) {
+            String codigo = ("A-" + sufijo).toUpperCase(java.util.Locale.ROOT);
+            crearCodigo(Familia.ADMINISTRATIVA, codigo);
+            long obligado = crearContribuyente(sufijo);
+            return enTransaccion(
+                    () ->
+                            registrarPapeleta.registrarAdministrativa(
+                                    ("PA-" + sufijo).toUpperCase(java.util.Locale.ROOT),
+                                    codigo,
+                                    INFRACCION,
+                                    null,
+                                    "Av. Grau",
+                                    obligado,
+                                    null,
+                                    null,
+                                    obligado,
+                                    Dinero.de("5350.00"),
+                                    Alicuota.de("8"),
+                                    MULTA,
+                                    Alicuota.de("100"),
+                                    MULTA,
+                                    null,
+                                    PORQUE));
+        }
+    }
+
+    // ==================================================================
     //  Ayudas
     // ==================================================================
 
@@ -2682,12 +3101,13 @@ class ValoresMasivosYReportesJdbcTest {
     }
 
     /**
-     * El conjunto sellado de 2026 con los dos plazos que este archivo necesita.
+     * El conjunto sellado de 2026 con los tres plazos que este archivo necesita.
      *
      * <p>Los días entran como <b>dato</b>, no como constante del programa (regla 5). Que esta
      * prueba tenga que sembrarlos es la demostración: sin el de la ordinaria, notificar la
      * resolución falla; sin el del descargo (#662), no se puede registrar el recurso que la
-     * resolución que deja la multa sin efecto tiene que resolver.
+     * resolución que deja la multa sin efecto tiene que resolver; sin el del recurso (#384), la RIS
+     * de una papeleta administrativa no se puede dictar ni notificar.
      */
     private static void crearConjuntoConElPlazo(long municipalidadId) throws SQLException {
         long ordinaria =
@@ -2700,6 +3120,14 @@ class ValoresMasivosYReportesJdbcTest {
                         "DESCARGO_PAPELETA",
                         "5 DIAS_HABILES",
                         "TUO del Codigo Tributario, D.S. 133-2013-EF");
+        // #384: lo que la RIS —y la resolucion que resuelve su reconsideracion— conceden para
+        // impugnarlas. Con una cifra DISTINTA de la de la ordinaria, para que contar con la
+        // llave equivocada de una fecha distinta y la prueba lo vea.
+        long recurso =
+                cargarParametro(
+                        "RG_RECURSO",
+                        "15 DIAS_HABILES",
+                        "TUO de la Ley 27444, art. 218.2: plazo para interponer el recurso");
 
         try (Connection app = base.conexion(BaseDeDatosDePrueba.APP)) {
             ContextoDeTenant.fijar(app, municipalidadId);
@@ -2718,7 +3146,7 @@ class ValoresMasivosYReportesJdbcTest {
                     app.prepareStatement(
                             "INSERT INTO conjunto_parametro_detalle_de_prueba (municipalidad_id, conjunto_id,"
                                     + " parametro_id) VALUES (?, ?, ?)")) {
-                for (long parametro : new long[] {ordinaria, descargo}) {
+                for (long parametro : new long[] {ordinaria, descargo, recurso}) {
                     sentencia.setLong(1, municipalidadId);
                     sentencia.setLong(2, conjunto);
                     sentencia.setLong(3, parametro);
@@ -2775,11 +3203,17 @@ class ValoresMasivosYReportesJdbcTest {
     }
 
     private static void crearCodigo(String codigo) {
+        crearCodigo(Familia.TRANSITO, codigo);
+    }
+
+    private static void crearCodigo(Familia familia, String codigo) {
         insertar(
                 "INSERT INTO codigo_infraccion (municipalidad_id, familia, codigo, descripcion,"
                         + " porcentaje_uit, base_legal, vigencia_desde) VALUES ("
                         + municipalidad
-                        + ", 'TRANSITO', '"
+                        + ", '"
+                        + familia.name()
+                        + "', '"
                         + codigo
                         + "', 'Infraccion de la prueba', 8.0000, 'D.S. 016-2009-MTC',"
                         + " DATE '2026-01-01') RETURNING id");
