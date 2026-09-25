@@ -7,6 +7,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import kamayuk.rentas.auditoria.Origen;
 import kamayuk.rentas.auditoria.OrigenContext;
 import kamayuk.rentas.compartido.Pagina;
@@ -23,6 +24,7 @@ import kamayuk.rentas.valores.dominio.ClaseDeHecho;
 import kamayuk.rentas.valores.dominio.ComputoDeEjercicio;
 import kamayuk.rentas.valores.dominio.CriterioDePrescripciones;
 import kamayuk.rentas.valores.dominio.HechoDelComputo;
+import kamayuk.rentas.valores.dominio.ObligacionPrescrita;
 import kamayuk.rentas.valores.dominio.Prescripcion;
 import kamayuk.rentas.valores.dominio.PrescripcionEnLista;
 import kamayuk.rentas.valores.dominio.PrescripcionRepository;
@@ -219,6 +221,32 @@ public class PrescripcionRepositoryJdbc extends RepositorioJdbc implements Presc
                         hechosDe(id),
                         datos.usuarioRegistro(),
                         datos.observacion()));
+    }
+
+    /**
+     * Los pares prescritos del contribuyente, de todas sus resoluciones (#337).
+     *
+     * <p>Solo los ejercicios con {@code prescrita}: una resolucion {@code PROCEDE_EN_PARTE} guarda
+     * tambien el computo de los que no prescribieron, y esos siguen siendo deuda exigible. No
+     * filtra por {@code municipalidad_id}: lo hace la politica RLS, en las dos tablas.
+     */
+    @Override
+    public Set<ObligacionPrescrita> obligacionesPrescritasDe(long contribuyenteId) {
+        return Set.copyOf(
+                jdbc().sql(
+                                "SELECT DISTINCT p.tributo, e.ejercicio"
+                                        + " FROM prescripcion p"
+                                        + " JOIN prescripcion_ejercicio e"
+                                        + "   ON e.prescripcion_id = p.id"
+                                        + " WHERE p.contribuyente_id = :contribuyenteId"
+                                        + "   AND e.prescrita")
+                        .param("contribuyenteId", contribuyenteId)
+                        .query(
+                                (ResultSet fila, int numero) ->
+                                        new ObligacionPrescrita(
+                                                fila.getString("tributo"),
+                                                new Ejercicio(fila.getInt("ejercicio"))))
+                        .list());
     }
 
     /**

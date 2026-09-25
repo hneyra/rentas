@@ -18,12 +18,12 @@ import kamayuk.rentas.parametros.LectorDeParametros;
 import kamayuk.rentas.valores.aplicacion.ConsultaDePrescripciones;
 import kamayuk.rentas.valores.aplicacion.DeclararPrescripcion;
 import kamayuk.rentas.valores.aplicacion.PlazosParametrizados;
+import kamayuk.rentas.valores.aplicacion.PrescripcionDeclarada;
 import kamayuk.rentas.valores.dominio.AlcanceDelHecho;
 import kamayuk.rentas.valores.dominio.CausalDePrescripcion;
 import kamayuk.rentas.valores.dominio.ClaseDeHecho;
 import kamayuk.rentas.valores.dominio.CriterioDePrescripciones;
 import kamayuk.rentas.valores.dominio.HechoDelComputo;
-import kamayuk.rentas.valores.dominio.Prescripcion;
 import kamayuk.rentas.valores.dominio.ResultadoDeLaSolicitud;
 import kamayuk.rentas.web.Api;
 import kamayuk.rentas.web.CodigoDeError;
@@ -168,7 +168,7 @@ public class PrescripcionController {
         Observacion observacion = observacionDe(peticion.observacion());
 
         try {
-            Prescripcion guardada =
+            PrescripcionDeclarada guardada =
                     declarar.declarar(
                             contribuyente.id(),
                             tributo,

@@ -22,8 +22,8 @@ import kamayuk.rentas.valores.dominio.ValorRepository;
  * Un {@link ValorRepository} en memoria, para las pruebas de los casos de uso de #39.
  *
  * <p>Existe como clase aparte y no como doble anonimo dentro de cada prueba porque los tres casos
- * de uso de #39 lo necesitan igual, y porque {@link #cobrablesDe} tiene reglas propias -filtra por
- * estado- que conviene escribir una vez.
+ * de uso de #39 lo necesitan igual, y porque {@link #cobrablesConAlgunaLineaEn} tiene reglas
+ * propias -filtra por estado- que conviene escribir una vez.
  *
  * <p>Lo que este doble <b>no</b> puede verificar es lo que solo hace la base: la unicidad del
  * intento, el {@code ON CONFLICT} del pase o la ausencia del privilegio de {@code UPDATE}. Eso vive
@@ -147,8 +147,14 @@ public final class ValoresEnMemoria implements ValorRepository {
                 .totalElementos();
     }
 
+    /**
+     * Los mismos candidatos que la consulta (#337): <b>alguna</b> linea en lo pedido. Que se
+     * marquen o no ya no lo decide esto, sino {@code CoberturaDeLaPrescripcion}; por eso este doble
+     * puede seguir diciendo «alguna» sin esconder el defecto.
+     */
     @Override
-    public List<Valor> cobrablesDe(long contribuyenteId, String tributo, Ejercicio ejercicio) {
+    public List<Valor> cobrablesConAlgunaLineaEn(
+            long contribuyenteId, String tributo, List<Ejercicio> ejercicios) {
         List<Valor> encontrados = new ArrayList<>();
         for (Valor valor : porId.values()) {
             if (valor.contribuyenteId() != contribuyenteId || !esCobrable(valor.estado())) {
@@ -159,11 +165,12 @@ public final class ValoresEnMemoria implements ValorRepository {
                             .anyMatch(
                                     d ->
                                             d.tributo().equalsIgnoreCase(tributo)
-                                                    && d.ejercicio().equals(ejercicio));
+                                                    && ejercicios.contains(d.ejercicio()));
             if (coincide) {
                 encontrados.add(valor);
             }
         }
+        encontrados.sort(java.util.Comparator.comparing(ValoresEnMemoria::idDe));
         return encontrados;
     }
 

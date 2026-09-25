@@ -273,7 +273,8 @@ class RegistrarValorTest {
         }
 
         @Override
-        public List<Valor> cobrablesDe(long contribuyenteId, String tributo, Ejercicio ejercicio) {
+        public List<Valor> cobrablesConAlgunaLineaEn(
+                long contribuyenteId, String tributo, List<Ejercicio> ejercicios) {
             throw new UnsupportedOperationException();
         }
 

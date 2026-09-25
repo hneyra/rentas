@@ -514,17 +514,17 @@ class NotificacionYPaseJdbcTest {
         }
 
         @Test
-        @DisplayName("cobrablesDe no devuelve lo ya prescrito, pagado ni anulado")
-        void cobrablesDeFiltraPorEstado() {
+        @DisplayName("los candidatos a prescribir no incluyen lo ya prescrito, pagado ni anulado")
+        void losCandidatosFiltranPorEstado() {
             Valor valor = emitir("PR-0003", "OP-2026-PR0003");
 
             assertThat(
                             enTransaccion(
                                     () ->
-                                            valores.cobrablesDe(
+                                            valores.cobrablesConAlgunaLineaEn(
                                                     valor.contribuyenteId(),
                                                     "predial",
-                                                    new Ejercicio(2026))))
+                                                    List.of(new Ejercicio(2026)))))
                     .extracting(Valor::numero)
                     .contains("OP-2026-PR0003");
 
@@ -533,10 +533,10 @@ class NotificacionYPaseJdbcTest {
             assertThat(
                             enTransaccion(
                                     () ->
-                                            valores.cobrablesDe(
+                                            valores.cobrablesConAlgunaLineaEn(
                                                     valor.contribuyenteId(),
                                                     "PREDIAL",
-                                                    new Ejercicio(2026))))
+                                                    List.of(new Ejercicio(2026)))))
                     .isEmpty();
         }
 

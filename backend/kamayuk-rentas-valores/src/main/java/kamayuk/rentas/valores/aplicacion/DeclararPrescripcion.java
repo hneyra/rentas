@@ -3,6 +3,8 @@ package kamayuk.rentas.valores.aplicacion;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 import kamayuk.rentas.auditoria.Auditoria;
 import kamayuk.rentas.auditoria.Operacion;
 import kamayuk.rentas.auditoria.RegistroDeAuditoria;
@@ -11,10 +13,12 @@ import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.dominio.Plazo;
 import kamayuk.rentas.valores.dominio.AlcanceDelHecho;
 import kamayuk.rentas.valores.dominio.CausalDePrescripcion;
+import kamayuk.rentas.valores.dominio.CoberturaDeLaPrescripcion;
 import kamayuk.rentas.valores.dominio.ComputoDeEjercicio;
 import kamayuk.rentas.valores.dominio.ComputoDePrescripcion;
 import kamayuk.rentas.valores.dominio.EstadoDeValor;
 import kamayuk.rentas.valores.dominio.HechoDelComputo;
+import kamayuk.rentas.valores.dominio.ObligacionPrescrita;
 import kamayuk.rentas.valores.dominio.Prescripcion;
 import kamayuk.rentas.valores.dominio.PrescripcionRepository;
 import kamayuk.rentas.valores.dominio.ResultadoDeLaSolicitud;
@@ -31,9 +35,10 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>No hay una sola sentencia contra {@code cuenta_corriente_asiento} en este camino, ni un {@code
  * DELETE} en ninguna parte (regla 4). Lo que queda es el acto —la fila de {@code prescripcion} con
- * su computo y sus hechos— y el estado {@link EstadoDeValor#PRESCRITO} en los valores alcanzados.
- * El libro conserva sus asientos: el dia que alguien pregunte por que dejo de cobrarse, la
- * respuesta es esta fila, y la deuda sigue estando donde estaba.
+ * su computo y sus hechos— y el estado {@link EstadoDeValor#PRESCRITO} en los valores cuya deuda
+ * prescribio <b>entera</b> (#337, abajo). El libro conserva sus asientos: el dia que alguien
+ * pregunte por que dejo de cobrarse, la respuesta es esta fila, y la deuda sigue estando donde
+ * estaba.
  *
  * <h2>Y esa deuda SIGUE siendo cartera pendiente y emision del ejercicio (#674)</h2>
  *
@@ -102,6 +107,20 @@ import org.springframework.transaction.annotation.Transactional;
  * redondear hacia el contribuyente —extinguiendo deuda viva— o hacia la municipalidad —cobrando lo
  * prescrito—.
  *
+ * <h2>Y el valor, por sus lineas (#337)</h2>
+ *
+ * <p>Lo mismo vale un nivel mas abajo. Un valor formaliza varias obligaciones —{@code POST
+ * /valores} con N selectores, la emision masiva con todo el rango—, y hasta #337 bastaba con que
+ * una linea coincidiera con un ejercicio prescrito para marcarlo entero: el PREDIAL 2022 que no
+ * prescribio y los ARBITRIOS 2021 que nadie pidio acababan dentro de un titulo {@code PRESCRITO},
+ * del que no sale nada —coactiva lo rechaza como no cobrable y no hay acto que lo revierta—. Ahora
+ * lo decide {@link CoberturaDeLaPrescripcion}: solo {@code TOTAL} marca, con el conjunto prescrito
+ * <b>acumulado</b> del contribuyente; {@code PARCIAL} se deja como estaba y se informa en la
+ * respuesta y en la auditoria. En esa direccion y no en la otra porque {@code PRESCRITO} es
+ * irreversible y {@code EMITIDO} no, y porque #674 ya dijo que la prescripcion la opone quien la
+ * gano sobre el rango que gano. Que coactiva cobre un valor {@code PARCIAL} por sus lineas vivas es
+ * el paso siguiente, y exige que el expediente importe lineas y no valores enteros.
+ *
  * <h2>Cada hecho, en el computo de su ejercicio (#334)</h2>
  *
  * <p>Los arts. 45 y 46 interrumpen o suspenden el plazo de una deuda concreta, no el de todo el
@@ -157,9 +176,10 @@ public class DeclararPrescripcion {
      *     alcance, salvo en un rango de un solo ejercicio (#334)
      * @param resolucion el numero de la resolucion, si ya se emitio
      * @param observacion por que se declara (regla 10)
+     * @return el acto, con los valores que marco y los que dejo porque formalizan deuda viva
      */
     @Transactional
-    public Prescripcion declarar(
+    public PrescripcionDeclarada declarar(
             long contribuyenteId,
             String tributo,
             Ejercicio ejercicioDesde,
@@ -215,9 +235,9 @@ public class DeclararPrescripcion {
                                 null,
                                 observacion));
 
-        marcarLosValoresAlcanzados(guardada);
-        auditar(guardada, observacion);
-        return guardada;
+        PrescripcionDeclarada declarada = marcarLosValoresCubiertos(guardada);
+        auditar(declarada, observacion);
+        return declarada;
     }
 
     // ------------------------------------------------------------------
@@ -268,25 +288,53 @@ public class DeclararPrescripcion {
     }
 
     /**
-     * Marca {@code PRESCRITO} lo que la declaracion alcanza.
+     * Marca {@code PRESCRITO} los valores que la declaracion deja cubiertos del todo (#337).
      *
      * <p>Solo los valores cobrables: uno ya pagado o anulado no tiene accion de cobro que
-     * prescriba, y sobreescribir su estado borraria el dato de que se pago.
+     * prescriba, y sobreescribir su estado borraria el dato de que se pago. Y de esos, solo los que
+     * tocan lo que <b>esta</b> resolucion prescribio: los demas no cambian por ella.
+     *
+     * <p>El conjunto se lee <b>despues</b> de insertar, asi que ya incluye esta resolucion. Por eso
+     * un candidato no puede salir {@link CoberturaDeLaPrescripcion#NINGUNA}: tiene una linea en lo
+     * que se acaba de prescribir. Si sale, el conjunto y la consulta no dicen lo mismo, y marcar o
+     * callar sobre esa base seria decidir a ciegas: se aborta la transaccion.
      */
-    private void marcarLosValoresAlcanzados(Prescripcion prescripcion) {
-        for (Ejercicio ejercicio : prescripcion.ejerciciosPrescritos()) {
-            for (Valor valor :
-                    valores.cobrablesDe(
-                            prescripcion.contribuyenteId(), prescripcion.tributo(), ejercicio)) {
-                Long id = valor.id();
-                if (id != null) {
-                    valores.cambiarEstado(id, EstadoDeValor.PRESCRITO);
-                }
+    private PrescripcionDeclarada marcarLosValoresCubiertos(Prescripcion prescripcion) {
+        List<Valor> prescritos = new ArrayList<>();
+        List<Valor> enParte = new ArrayList<>();
+        List<Valor> candidatos =
+                valores.cobrablesConAlgunaLineaEn(
+                        prescripcion.contribuyenteId(),
+                        prescripcion.tributo(),
+                        prescripcion.ejerciciosPrescritos());
+        if (candidatos.isEmpty()) {
+            return new PrescripcionDeclarada(prescripcion, prescritos, enParte);
+        }
+        Set<ObligacionPrescrita> acumuladas =
+                repositorio.obligacionesPrescritasDe(prescripcion.contribuyenteId());
+        for (Valor valor : candidatos) {
+            long id = Objects.requireNonNull(valor.id(), "Un valor leido de la base tiene id");
+            CoberturaDeLaPrescripcion cobertura =
+                    CoberturaDeLaPrescripcion.de(valores.detalleDe(id), acumuladas);
+            if (cobertura == CoberturaDeLaPrescripcion.TOTAL) {
+                prescritos.add(valores.cambiarEstado(id, EstadoDeValor.PRESCRITO));
+            } else if (cobertura == CoberturaDeLaPrescripcion.PARCIAL) {
+                enParte.add(valor);
+            } else {
+                throw new IllegalStateException(
+                        "El valor "
+                                + valor.numero()
+                                + " toca lo que la prescripcion "
+                                + prescripcion.id()
+                                + " acaba de declarar, y el conjunto prescrito no lo cubre en"
+                                + " nada");
             }
         }
+        return new PrescripcionDeclarada(prescripcion, prescritos, enParte);
     }
 
-    private void auditar(Prescripcion prescripcion, Observacion observacion) {
+    private void auditar(PrescripcionDeclarada declarada, Observacion observacion) {
+        Prescripcion prescripcion = declarada.prescripcion();
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe(
                                 prescripcion.fechaPresentacion(),
@@ -294,11 +342,18 @@ public class DeclararPrescripcion {
                                 String.valueOf(prescripcion.id()),
                                 Operacion.ALTA,
                                 observacion)
-                        .con(null, descripcion(prescripcion)));
+                        .con(null, descripcion(declarada)));
     }
 
-    /** Sin datos personales: esto acaba en la columna JSON de la auditoria. */
-    private static String descripcion(Prescripcion prescripcion) {
+    /**
+     * Sin datos personales: esto acaba en la columna JSON de la auditoria.
+     *
+     * <p>Con los numeros de los valores de los dos grupos (#337): los que marco y, sobre todo, los
+     * que no marco porque formalizan deuda viva, que es lo que la administracion tiene que poder
+     * encontrar despues. Un numero de valor no es un dato personal.
+     */
+    private static String descripcion(PrescripcionDeclarada declarada) {
+        Prescripcion prescripcion = declarada.prescripcion();
         return "{\"tributo\":\""
                 + prescripcion.tributo()
                 + "\",\"desde\":"
@@ -313,7 +368,22 @@ public class DeclararPrescripcion {
                 + prescripcion.resultado()
                 + "\",\"prescritos\":"
                 + prescripcion.ejerciciosPrescritos().size()
+                + ",\"valoresPrescritos\":"
+                + numerosDe(declarada.valoresPrescritos())
+                + ",\"valoresCubiertosEnParte\":"
+                + numerosDe(declarada.valoresCubiertosEnParte())
                 + "}";
+    }
+
+    private static String numerosDe(List<Valor> valores) {
+        StringBuilder texto = new StringBuilder("[");
+        for (Valor valor : valores) {
+            if (texto.length() > 1) {
+                texto.append(',');
+            }
+            texto.append('"').append(valor.numero()).append('"');
+        }
+        return texto.append(']').toString();
     }
 
     /**

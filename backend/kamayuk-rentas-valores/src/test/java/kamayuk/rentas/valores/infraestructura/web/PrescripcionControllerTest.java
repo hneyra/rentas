@@ -10,6 +10,9 @@ import java.time.LocalDate;
 import java.time.ZoneOffset;
 import kamayuk.rentas.auditoria.RegistroDeAuditoria;
 import kamayuk.rentas.contribuyentes.ResumenDeContribuyente;
+import kamayuk.rentas.dominio.Dinero;
+import kamayuk.rentas.dominio.Ejercicio;
+import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.valores.aplicacion.ConsultaDePrescripciones;
 import kamayuk.rentas.valores.aplicacion.DeclararPrescripcion;
 import kamayuk.rentas.valores.aplicacion.PlazosParametrizados;
@@ -17,6 +20,10 @@ import kamayuk.rentas.valores.dobles.ContribuyentesDeMentira;
 import kamayuk.rentas.valores.dobles.ParametrosDeMentira;
 import kamayuk.rentas.valores.dobles.PrescripcionesEnMemoria;
 import kamayuk.rentas.valores.dobles.ValoresEnMemoria;
+import kamayuk.rentas.valores.dominio.EstadoDeValor;
+import kamayuk.rentas.valores.dominio.TipoValor;
+import kamayuk.rentas.valores.dominio.Valor;
+import kamayuk.rentas.valores.dominio.ValorDetalle;
 import kamayuk.rentas.web.ConfiguracionDeJson;
 import kamayuk.rentas.web.ManejadorDeErrores;
 import org.junit.jupiter.api.DisplayName;
@@ -49,10 +56,11 @@ class PrescripcionControllerTest {
             new ParametrosDeMentira()
                     .con("PLAZO", "PRESCRIPCION-DECLARACION_PRESENTADA", "4 ANIOS")
                     .con("PLAZO", "PRESCRIPCION_INICIO-PREDIAL", "1 ANIOS");
+    private final ValoresEnMemoria valores = new ValoresEnMemoria();
     private final DeclararPrescripcion declarar =
             new DeclararPrescripcion(
                     prescripciones,
-                    new ValoresEnMemoria(),
+                    valores,
                     new PlazosParametrizados(parametros),
                     (RegistroDeAuditoria registro) -> {});
 
@@ -99,6 +107,37 @@ class PrescripcionControllerTest {
         // La resolucion tiene que poder sustentarse: sale el computo de los tres ejercicios.
         assertThat(cuerpo).contains("\"ejercicio\":2020").contains("\"ejercicio\":2022");
         assertThat(cuerpo).contains("\"inicioDelComputo\":\"2021-01-01\"");
+    }
+
+    @Test
+    @DisplayName("#337 — dice que valores marco y cuales dejo porque formalizan deuda viva")
+    void diceQueHizoConLosValores() throws Exception {
+        valores.con(
+                valorDe("OP-2026-000031", EstadoDeValor.EMITIDO),
+                lineaDe("PREDIAL", 2020),
+                lineaDe("PREDIAL", 2021));
+        valores.con(
+                valorDe("OP-2026-000032", EstadoDeValor.NOTIFICADO),
+                lineaDe("PREDIAL", 2021),
+                lineaDe("PREDIAL", 2022));
+
+        MvcResult resultado =
+                declararRango(
+                        """
+                        {"codContribuyente":"C-0007","tributo":"PREDIAL",
+                         "ejercicioDesde":2020,"ejercicioHasta":2022,
+                         "fechaDePresentacion":"2026-06-01",
+                         "plazoAplicable":"DECLARACION_PRESENTADA",
+                         "observacion":"Se resuelve la solicitud"}
+                        """);
+
+        assertThat(resultado.getResponse().getStatus()).isEqualTo(201);
+        String cuerpo = resultado.getResponse().getContentAsString();
+        // 2020 y 2021 prescriben; 2022 no. El primero queda entero dentro, el segundo no.
+        assertThat(cuerpo).contains("\"valoresPrescritos\":[\"OP-2026-000031\"]");
+        assertThat(cuerpo)
+                .as("el que formaliza el PREDIAL 2022, que no prescribio, se nombra y no se marca")
+                .contains("\"valoresCubiertosEnParte\":[\"OP-2026-000032\"]");
     }
 
     @Test
@@ -342,6 +381,40 @@ class PrescripcionControllerTest {
     }
 
     // ------------------------------------------------------------------
+
+    private static Valor valorDe(String numero, EstadoDeValor estado) {
+        LocalDate emision = LocalDate.of(2024, 3, 1);
+        return new Valor(
+                null,
+                TipoValor.ORDEN_DE_PAGO,
+                numero,
+                new Ejercicio(2024),
+                7L,
+                TipoValor.ORDEN_DE_PAGO.baseLegal(),
+                Dinero.de("200.00"),
+                Dinero.CERO,
+                Dinero.CERO,
+                Dinero.CERO,
+                emision,
+                estado,
+                emision,
+                null,
+                Observacion.de("Emitido para la prueba"));
+    }
+
+    private static ValorDetalle lineaDe(String tributo, int ejercicio) {
+        return ValorDetalle.nuevo(
+                tributo,
+                new Ejercicio(ejercicio),
+                null,
+                null,
+                null,
+                null,
+                Dinero.de("100.00"),
+                Dinero.CERO,
+                Dinero.CERO,
+                Dinero.CERO);
+    }
 
     /** El mismo borde con otro lector de parametros detras del computo. */
     private MvcResult declararCon(ParametrosDeMentira lector) throws Exception {
