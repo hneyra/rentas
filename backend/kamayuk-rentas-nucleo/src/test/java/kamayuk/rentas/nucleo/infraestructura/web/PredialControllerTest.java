@@ -2642,6 +2642,12 @@ class PredialControllerTest {
         }
 
         @Override
+        public java.util.Optional<kamayuk.rentas.nucleo.dominio.CorridaDeEmision> ultimaEmisionDe(
+                kamayuk.rentas.dominio.Ejercicio ejercicio) {
+            return java.util.Optional.empty();
+        }
+
+        @Override
         public java.util.List<kamayuk.rentas.nucleo.dominio.CorridaDeEmision> ultimas(int cuantas) {
             return java.util.List.of();
         }
