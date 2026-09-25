@@ -34,7 +34,7 @@ public record Placa(String valor) implements Comparable<Placa> {
 
     public Placa {
         Objects.requireNonNull(valor, "La placa es obligatoria");
-        valor = escrita(valor);
+        valor = formaEscrita(valor);
         if (valor.length() < LARGO_MINIMO || valor.length() > LARGO_MAXIMO) {
             throw new IllegalArgumentException(
                     "Placa de longitud invalida: '"
@@ -76,7 +76,7 @@ public record Placa(String valor) implements Comparable<Placa> {
      */
     public static String formaDeBusqueda(String texto) {
         Objects.requireNonNull(texto, "No hay placa que buscar");
-        return escrita(texto).replace("-", "");
+        return formaEscrita(texto).replace("-", "");
     }
 
     /** La placa sin su guion. Es la forma con la que se compara y se busca. */
@@ -84,8 +84,19 @@ public record Placa(String valor) implements Comparable<Placa> {
         return formaDeBusqueda(valor);
     }
 
-    /** Como se guarda: recortada, en mayusculas y sin espacios. El guion se queda. */
-    private static String escrita(String texto) {
+    /**
+     * Como se guarda y se imprime <b>cualquier</b> texto de placa: recortado, en mayusculas y sin
+     * espacios. El guion se queda. Es la unica copia de esa regla (#423).
+     *
+     * <p>Tampoco valida, por lo mismo que {@link #formaDeBusqueda}: {@code Papeleta}, {@code
+     * Internamiento} y {@code ConstanciaLibre} admiten de 1 a 10 caracteres, y lo que exigen del
+     * largo lo comprueban ellos sobre esta forma. Hasta la ronda de correccion de #423 cada uno la
+     * escribia con una copia suya —{@code strip().toUpperCase(ROOT)}— que conservaba el espacio de
+     * en medio: {@code " zlg 701 "} quedaba {@code "ZLG 701"} en la papeleta y {@code "ZLG701"} en
+     * el vehiculo del padron.
+     */
+    public static String formaEscrita(String texto) {
+        Objects.requireNonNull(texto, "No hay placa que escribir");
         return texto.strip().toUpperCase(Locale.ROOT).replace(" ", "");
     }
 

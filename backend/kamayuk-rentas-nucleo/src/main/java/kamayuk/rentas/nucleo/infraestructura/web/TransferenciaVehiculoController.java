@@ -3,7 +3,6 @@ package kamayuk.rentas.nucleo.infraestructura.web;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
-import java.util.Locale;
 import java.util.Objects;
 import kamayuk.rentas.autorizacion.Privilegio;
 import kamayuk.rentas.autorizacion.RequiereAcceso;
@@ -98,7 +97,7 @@ public class TransferenciaVehiculoController {
 
     private long contribuyenteDe(@Nullable String codigo) {
         return consultas
-                .contribuyentePorCodigo(exigir(codigo, "codAdquiriente").toUpperCase(Locale.ROOT))
+                .contribuyentePorCodigo(exigir(codigo, "codAdquiriente"))
                 .orElseThrow(
                         () ->
                                 new ProblemaDeNegocio(

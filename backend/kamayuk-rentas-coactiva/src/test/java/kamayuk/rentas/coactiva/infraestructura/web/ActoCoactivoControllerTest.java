@@ -529,6 +529,63 @@ class ActoCoactivoControllerTest {
         }
     }
 
+    /**
+     * #423 — las dos rutas de este controlador con {@code {numero}} leen el numero con la plantilla
+     * que lo imprime, como el {@code PATCH} de estados de {@code ExpedienteController}. El doble de
+     * expedientes compara exacto, como el adaptador: si el borde deja de normalizar, contesta 404.
+     */
+    @Nested
+    @DisplayName("#423 — el numero de la ruta, tal como se teclea")
+    class ElNumeroComoSeTeclea {
+
+        @Test
+        @DisplayName("GET /proceso con el numero en minusculas: 200, y es el mismo expediente")
+        void elProcesoEnMinusculas() throws Exception {
+            emitirRec("REC1", null, null);
+
+            MvcResult resultado =
+                    mvc.perform(
+                                    MockMvcRequestBuilders.get(
+                                            "/rentas/api/v1/coactiva/expedientes/{numero}/proceso",
+                                            "exp-2026-000001"))
+                            .andReturn();
+
+            assertThat(resultado.getResponse().getStatus())
+                    .as(resultado.getResponse().getContentAsString())
+                    .isEqualTo(200);
+            assertThat(resultado.getResponse().getContentAsString())
+                    .contains("\"numero\":\"EXP-2026-000001\"");
+        }
+
+        @Test
+        @DisplayName("POST /actos con el numero en minusculas: 201 sobre el mismo expediente")
+        void elActoEnMinusculas() throws Exception {
+            emitirRec("REC1", null, null);
+            notificar("REC1-2026-000001", DILIGENCIA, "NOTIFICADO");
+
+            MvcResult resultado =
+                    mvc.perform(
+                                    MockMvcRequestBuilders.post(
+                                                    "/rentas/api/v1/coactiva/expedientes/{numero}/actos",
+                                                    "exp-2026-000001")
+                                            .contentType(MediaType.APPLICATION_JSON)
+                                            .content(
+                                                    "{\"tipo\":\"REC2\",\"fecha\":\""
+                                                            + REC2_DESDE
+                                                            + "\",\"glosa\":\"medida cautelar\","
+                                                            + "\"medida\":\"RETENCION\","
+                                                            + "\"observacion\":\"Se traba la"
+                                                            + " medida\"}"))
+                            .andReturn();
+
+            assertThat(resultado.getResponse().getStatus())
+                    .as(resultado.getResponse().getContentAsString())
+                    .isEqualTo(201);
+            assertThat(resultado.getResponse().getContentAsString())
+                    .contains("\"estadoDelExpediente\":\"REC 02 EMITIDA\"");
+        }
+    }
+
     @Nested
     @DisplayName("GET /coactiva/expedientes/{numero}/proceso")
     class Proceso {

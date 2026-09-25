@@ -2,6 +2,7 @@ package kamayuk.rentas.sanciones.dominio;
 
 import java.time.LocalDate;
 import java.util.Locale;
+import kamayuk.rentas.dominio.Placa;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -25,10 +26,15 @@ public record CriterioDeConstancias(
     public CriterioDeConstancias {
         numero = limpiar(numero);
         usuarioQueEmitio = limpiar(usuarioQueEmitio);
-        placa = limpiar(placa);
+        placa = placaEscrita(placa);
         if (desde != null && hasta != null && hasta.isBefore(desde)) {
             throw new IllegalArgumentException("«hasta» no puede ser anterior a «desde»");
         }
+    }
+
+    /** La placa la escribe {@link Placa}, y no una copia de aqui (#423). En blanco no filtra. */
+    private static @Nullable String placaEscrita(@Nullable String valor) {
+        return valor == null || valor.isBlank() ? null : Placa.formaEscrita(valor);
     }
 
     private static @Nullable String limpiar(@Nullable String valor) {

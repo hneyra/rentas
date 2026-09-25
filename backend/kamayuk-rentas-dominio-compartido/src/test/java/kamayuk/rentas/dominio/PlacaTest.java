@@ -62,4 +62,17 @@ class PlacaTest {
                 .as("y la de una placa valida es un caso de la misma regla")
                 .isEqualTo(Placa.formaDeBusqueda("zlg 701"));
     }
+
+    @Test
+    @DisplayName("#423 — la forma escrita: sin espacios, el guion se queda, y sin validar")
+    void laFormaEscrita() {
+        assertThat(Placa.formaEscrita(" zlg 701 ")).isEqualTo("ZLG701");
+        assertThat(Placa.formaEscrita("zlg-701")).isEqualTo("ZLG-701");
+        assertThat(Placa.formaEscrita("a"))
+                .as("una placa cargada de 1 caracter se escribe; el largo lo exige quien la guarda")
+                .isEqualTo("A");
+        assertThat(Placa.de(" zlg 701 ").valor())
+                .as("y la de una placa valida es la misma regla")
+                .isEqualTo(Placa.formaEscrita(" zlg 701 "));
+    }
 }

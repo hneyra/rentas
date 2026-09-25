@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.Locale;
 import java.util.Objects;
 import kamayuk.rentas.dominio.Observacion;
+import kamayuk.rentas.dominio.Placa;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -63,7 +64,7 @@ public record Internamiento(
 
     public Internamiento {
         Objects.requireNonNull(placa, "Un internamiento es de un vehiculo con placa");
-        placa = placa.strip().toUpperCase(Locale.ROOT);
+        placa = Placa.formaEscrita(placa);
         if (placa.isEmpty() || placa.length() > PLACA_MAXIMA) {
             throw new IllegalArgumentException(
                     "La placa va de 1 a " + PLACA_MAXIMA + " caracteres: '" + placa + "'");

@@ -113,8 +113,7 @@ public class ConsultaPrediosController {
                     "Hay que decir de quien son los predios: falta «codContribuyente» (o su otro"
                             + " nombre, «contribuyente»)");
         }
-        Optional<Long> contribuyenteId =
-                consulta.contribuyentePorCodigo(codigo.toUpperCase(Locale.ROOT));
+        Optional<Long> contribuyenteId = consulta.contribuyentePorCodigo(codigo);
         if (contribuyenteId.isEmpty()) {
             throw noEstaEnElPadron(codigo);
         }

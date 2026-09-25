@@ -316,6 +316,48 @@ class ExpedienteControllerTest {
         assertThat(movimientos.cuantos()).isEqualTo(antes);
     }
 
+    /**
+     * #423 — las otras dos rutas de este controlador con {@code {numero}} leen el numero con la
+     * misma plantilla que el {@code PATCH} de estados. La prueba de arriba solo cubria ese; sin
+     * estas, quitar {@code comoSeImprime} de la deuda o de la direccion volvia a dar 404 sin que
+     * nada lo dijera. El doble compara como el adaptador —exacto, sin {@code equalsIgnoreCase}—,
+     * asi que lo que normaliza es el borde y no la prueba.
+     */
+    @Test
+    @DisplayName("#423 — la deuda del expediente con el numero en minusculas: 200")
+    void laDeudaConElNumeroEnMinusculas() throws Exception {
+        importar(cuerpoDeImportacion("Se importa la cartera vencida"));
+
+        MvcResult resultado =
+                mvc.perform(
+                                MockMvcRequestBuilders.get(
+                                        "/rentas/api/v1/coactiva/expedientes/{numero}/deuda",
+                                        "exp-2026-000001"))
+                        .andReturn();
+
+        assertThat(resultado.getResponse().getStatus())
+                .as(resultado.getResponse().getContentAsString())
+                .isEqualTo(200);
+        assertThat(resultado.getResponse().getContentAsString())
+                .contains("\"expediente\":\"EXP-2026-000001\"");
+    }
+
+    @Test
+    @DisplayName("#423 — la direccion referencial con el numero en minusculas: 200")
+    void laDireccionConElNumeroEnMinusculas() throws Exception {
+        importar(cuerpoDeImportacion("Se importa la cartera vencida"));
+
+        MvcResult resultado =
+                cambiarDireccion("exp-2026-000001", "JR. NUEVO 250", "no ubicado", "Se corrige");
+
+        assertThat(resultado.getResponse().getStatus())
+                .as(resultado.getResponse().getContentAsString())
+                .isEqualTo(200);
+        assertThat(resultado.getResponse().getContentAsString())
+                .contains("\"numero\":\"EXP-2026-000001\"")
+                .contains("\"direccionReferencial\":\"JR. NUEVO 250\"");
+    }
+
     @Test
     @DisplayName("un expediente que no existe, 404")
     void expedienteInexistenteDevuelve404() throws Exception {
@@ -470,10 +512,15 @@ class ExpedienteControllerTest {
 
     private MvcResult cambiarDireccion(String nueva, String motivo, String observacion)
             throws Exception {
+        return cambiarDireccion("EXP-2026-000001", nueva, motivo, observacion);
+    }
+
+    private MvcResult cambiarDireccion(
+            String numero, String nueva, String motivo, String observacion) throws Exception {
         return mvc.perform(
                         MockMvcRequestBuilders.patch(
                                         "/rentas/api/v1/coactiva/expedientes/{numero}/direccion-referencial",
-                                        "EXP-2026-000001")
+                                        numero)
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(
                                         "{\"nuevaDireccionReferencial\":\""

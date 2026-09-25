@@ -7,6 +7,7 @@ import java.util.Objects;
 import kamayuk.rentas.dominio.Alicuota;
 import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.dominio.Observacion;
+import kamayuk.rentas.dominio.Placa;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -117,7 +118,7 @@ public record Papeleta(
         if (familia == Familia.TRANSITO) {
             Objects.requireNonNull(
                     placa, "Una papeleta de transito necesita la placa (papeleta_familia_ck)");
-            placa = placa.strip().toUpperCase(Locale.ROOT);
+            placa = Placa.formaEscrita(placa);
             if (placa.isEmpty() || placa.length() > PLACA_MAXIMA) {
                 throw new IllegalArgumentException(
                         "La placa va de 1 a " + PLACA_MAXIMA + " caracteres: '" + placa + "'");
@@ -129,7 +130,7 @@ public record Papeleta(
                                 + " (papeleta_familia_ck)");
             }
             if (placa != null) {
-                placa = placa.strip().toUpperCase(Locale.ROOT);
+                placa = Placa.formaEscrita(placa);
                 if (placa.isEmpty()) {
                     placa = null;
                 } else if (placa.length() > PLACA_MAXIMA) {

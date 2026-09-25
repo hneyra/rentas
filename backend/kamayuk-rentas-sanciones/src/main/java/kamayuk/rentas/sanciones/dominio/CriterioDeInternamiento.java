@@ -1,6 +1,6 @@
 package kamayuk.rentas.sanciones.dominio;
 
-import java.util.Locale;
+import kamayuk.rentas.dominio.Placa;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -19,18 +19,20 @@ public record CriterioDeInternamiento(
         @Nullable String placa, @Nullable String deposito, @Nullable EstadoDeInternamiento estado) {
 
     public CriterioDeInternamiento {
-        placa = limpiar(placa, true);
-        deposito = limpiar(deposito, false);
+        placa = placaEscrita(placa);
+        deposito = limpiar(deposito);
     }
 
-    private static @Nullable String limpiar(@Nullable String valor, boolean mayusculas) {
+    /** La placa la escribe {@link Placa}, y no una copia de aqui (#423). En blanco no filtra. */
+    private static @Nullable String placaEscrita(@Nullable String valor) {
+        return valor == null || valor.isBlank() ? null : Placa.formaEscrita(valor);
+    }
+
+    private static @Nullable String limpiar(@Nullable String valor) {
         if (valor == null) {
             return null;
         }
         String limpio = valor.strip();
-        if (limpio.isEmpty()) {
-            return null;
-        }
-        return mayusculas ? limpio.toUpperCase(Locale.ROOT) : limpio;
+        return limpio.isEmpty() ? null : limpio;
     }
 }

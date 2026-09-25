@@ -374,7 +374,7 @@ public class MovimientosDeDeudaController {
     }
 
     private long contribuyenteDe(String codigo) {
-        return consulta.contribuyentePorCodigo(codigo.strip().toUpperCase(Locale.ROOT))
+        return consulta.contribuyentePorCodigo(codigo)
                 .orElseThrow(
                         () ->
                                 new ProblemaDeNegocio(

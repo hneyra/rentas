@@ -312,6 +312,43 @@ class TransferenciasFronteraTest {
     }
 
     // ------------------------------------------------------------------
+    //  #423 — el codigo del contribuyente, tal como se teclea
+    // ------------------------------------------------------------------
+
+    /**
+     * Los dos controladores ya no suben el codigo a mayusculas: hasta la ronda de correccion de
+     * #423 cada uno lo hacia con una copia suya de la regla de {@code CodigoContribuyente}. Ahora
+     * la unica que queda es la del adaptador ({@code TransferenciaRepositoryJdbc}), y esta prueba
+     * es la que dice que basta: con la copia del borde quitada, un adaptador que comparara en crudo
+     * devolveria 404 «no hay ningun contribuyente».
+     */
+    @Test
+    @DisplayName("#423 — la transferencia de predio con los dos codigos en minusculas: 201")
+    void elPredioConLosCodigosEnMinusculas() throws Exception {
+        long predio = crearPredio("000000000000000423");
+        sembrarTitularidad(predio, transferente);
+
+        MvcResult resultado = transferirPredio(predio, "COMPRA_VENTA", " tt-0001 ", "tt-0002");
+
+        assertThat(resultado.getResponse().getStatus())
+                .as(resultado.getResponse().getContentAsString())
+                .isEqualTo(201);
+    }
+
+    @Test
+    @DisplayName("#423 — la del vehiculo con el adquiriente en minusculas: 201")
+    void elVehiculoConElAdquirienteEnMinusculas() throws Exception {
+        crearVehiculo("ZZT-423", transferente);
+
+        MvcResult resultado =
+                transferirVehiculo("ZZT-423", "COMPRA_VENTA", " tt-0002 ", "2026-03-01");
+
+        assertThat(resultado.getResponse().getStatus())
+                .as(resultado.getResponse().getContentAsString())
+                .isEqualTo(201);
+    }
+
+    // ------------------------------------------------------------------
     //  La guarda de la base, medida sola
     // ------------------------------------------------------------------
 
@@ -333,12 +370,18 @@ class TransferenciasFronteraTest {
     // ------------------------------------------------------------------
 
     private static MvcResult transferirPredio(long predioId, String tipo) throws Exception {
+        return transferirPredio(predioId, tipo, "TT-0001", "TT-0002");
+    }
+
+    private static MvcResult transferirPredio(
+            long predioId, String tipo, String codTransferente, String codAdquiriente)
+            throws Exception {
         String cuerpo =
                 """
                 {"observacion":"Se registra la transferencia para la prueba",
                  "predioId":%d,
-                 "codTransferente":"TT-0001",
-                 "codAdquiriente":"TT-0002",
+                 "codTransferente":"%s",
+                 "codAdquiriente":"%s",
                  "tipoTransferencia":"%s",
                  "fechaTransferencia":"2026-03-01",
                  "valorTransferencia":"120000.00",
@@ -346,7 +389,7 @@ class TransferenciasFronteraTest {
                  "afectaAlcabala":true,
                  "documentoOrigen":"ESC-%d"}
                 """
-                        .formatted(predioId, tipo, predioId);
+                        .formatted(predioId, codTransferente, codAdquiriente, tipo, predioId);
         return mvc.perform(
                         post("/rentas/api/v1/rentas/transferencias/predio")
                                 .contentType(MediaType.APPLICATION_JSON)
