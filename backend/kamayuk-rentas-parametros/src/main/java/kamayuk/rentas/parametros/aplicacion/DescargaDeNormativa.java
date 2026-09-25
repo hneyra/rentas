@@ -44,10 +44,16 @@ public class DescargaDeNormativa {
     /**
      * Descarga el conjunto si no esta ya.
      *
-     * <p>La comprobacion se repite <b>dentro</b> de la transaccion nueva y no solo fuera: entre el
-     * «no esta» de quien llama y el {@code INSERT} de aqui cabe otra peticion que lo descargue, y
-     * las dos escribirian la misma clave. El candado de {@link CacheDeSnapshots#guardar} cierra la
-     * carrera; esta comprobacion evita la espera en el caso normal.
+     * <p>Lo que cierra la carrera de dos primeras lecturas simultaneas <b>no</b> es la comprobacion
+     * de aqui: esta va antes del candado, igual que la de quien llama, y las dos peticiones pueden
+     * ver «no esta» a la vez. La cierra {@link CacheDeSnapshots#guardar}, que toma el candado y
+     * <b>vuelve a mirar despues</b>: quien llega segundo espera, encuentra lo que el primero
+     * confirmo y no escribe nada (#353). Esta comprobacion es solo un atajo: ahorra la descarga
+     * cuando otra peticion ya confirmo entre el «no esta» de quien llama y la transaccion nueva.
+     *
+     * <p>Lo que no ahorra es la <b>segunda descarga</b> en la carrera: las dos peticiones se bajan
+     * el snapshot y una lo tira. Tomar el candado antes de descargar lo evitaria, pero lo tendria
+     * abierto durante la peticion HTTP; se dejo fuera de #353 a proposito.
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void asegurarDescargado(long conjuntoId, String ambito) {

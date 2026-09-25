@@ -42,6 +42,11 @@ public interface CacheDeSnapshots {
      * dos descargas simultaneas —una de cada ambito— los meterian dos veces. El candado es de
      * transaccion y no de sesion, porque una sesion que se lo lleva al pool contamina la peticion
      * de otra municipalidad, que es la regla 3 aplicada a los candados.
+     *
+     * <p><b>Es idempotente</b>: si al tener el candado ese conjunto y ese ambito ya estan, no
+     * escribe nada y vuelve (#353). Es lo que hace que dos descargas simultaneas del <b>mismo</b>
+     * ambito terminen las dos bien: la segunda espera en el candado y encuentra lo que la primera
+     * confirmo. Ninguna comprobacion hecha antes del candado puede garantizarlo.
      */
     void guardar(SnapshotDeNormativa snapshot);
 
