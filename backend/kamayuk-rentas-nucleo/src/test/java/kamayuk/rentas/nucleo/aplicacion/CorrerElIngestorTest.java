@@ -85,7 +85,7 @@ class CorrerElIngestorTest {
                 .isInstanceOf(CorrerElIngestor.ColaBloqueada.class)
                 .hasMessageContaining("COLA BLOQUEADA")
                 .hasMessageContaining("desde la secuencia 10")
-                .hasMessageContaining("5 detras");
+                .hasMessageContaining(", y tiene 5 detras que");
         assertThat(buzon.vueltas.get()).as("y no da mas vueltas sobre lo mismo").isEqualTo(1);
     }
 
@@ -149,8 +149,9 @@ class CorrerElIngestorTest {
         private final List<UUID> acusados = new ArrayList<>();
 
         /**
-         * @param detras cuantos dice el emisor que tiene DETRAS de este hecho mientras no se acuse:
-         *     es lo que separa una cola al dia de una bloqueada (#377)
+         * @param detras cuantos tiene el emisor DETRAS de este hecho mientras no se acuse: es lo
+         *     que separa una cola al dia de una bloqueada (#377). El lote dice {@code 1 + detras},
+         *     porque el emisor cuenta todo lo pendiente, la pagina servida incluida
          */
         private BuzonDeMentira(HechoRecibido hecho, long detras) {
             this.hecho = hecho;
@@ -162,7 +163,7 @@ class CorrerElIngestorTest {
             vueltas.incrementAndGet();
             return acusados.contains(hecho.eventoId())
                     ? new Lote(List.of(), 0)
-                    : new Lote(List.of(hecho), detras);
+                    : new Lote(List.of(hecho), 1 + detras);
         }
 
         @Override

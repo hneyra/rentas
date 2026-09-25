@@ -264,9 +264,10 @@ public class IngestarHechosDeCatastro {
      *     estan en la cola de muertos y acusados
      * @param ignorados los de un tipo que no se sabe aplicar que la politica decidio ESPERAR: ni
      *     aplicados ni acusados, y el emisor los vuelve a servir
-     * @param quedan cuantos le quedaban al emisor tras servir este lote, SIN contarlo (el puerto lo
-     *     declara asi). Es lo que permite decir «faltan 9 000» en vez de «faltan», y lo que separa
-     *     una cola al dia de una BLOQUEADA
+     * @param quedan cuantos tenia pendientes el emisor al servir este lote, CONTANDO el lote: es lo
+     *     que {@code catastro} cuenta ({@code count(*) WHERE estado = 'PENDIENTE'}, antes de ningun
+     *     acuse). Lo que espera DETRAS del lote es {@link #detras()}, y es eso —no {@code quedan}—
+     *     lo que separa una cola al dia de una BLOQUEADA
      * @param cabeza la secuencia del primer hecho que se quedo sin acusar, o {@code -1} si no hubo
      */
     public record Vuelta(
@@ -305,9 +306,24 @@ public class IngestarHechosDeCatastro {
             return resueltos() == 0;
         }
 
+        /**
+         * Cuantos esperan en el emisor DETRAS de este lote, sin contarlo.
+         *
+         * <p><b>No es {@code quedan}</b> (#377, ronda 1). El emisor cuenta todo lo que tiene sin
+         * acusar, y lo cuenta al servir, asi que la pagina esta dentro de la cifra —igual que en
+         * {@code identidad}, donde el consumidor ya la restaba—. Tomar {@code quedan} por «lo de
+         * detras» ponia BLOQUEADA la cola de #54 —cinco manzanas y nada mas—, con la corrida en
+         * rojo y un «tiene 5 detras» que eran los mismos cinco de la cabeza. El {@code max} es
+         * porque la cifra y la pagina no salen de la misma lectura: entre las dos pudo acusarse
+         * algo, y lo de detras no baja de cero.
+         */
+        public long detras() {
+            return Math.max(0, quedan - leidos);
+        }
+
         /** Vacia, al dia, o BLOQUEADA en su cabeza con lo que espera detras (#377). */
         public EstadoDeLaCola estado() {
-            return EstadoDeLaCola.alTerminarLaVuelta(leidos, resueltos(), quedan, cabeza);
+            return EstadoDeLaCola.alTerminarLaVuelta(leidos, resueltos(), detras(), cabeza);
         }
 
         @Override
@@ -325,9 +341,11 @@ public class IngestarHechosDeCatastro {
                     + sinCapacidad
                     + " apartados por tipo que este sistema no sabe aplicar, "
                     + ignorados
-                    + " ignorados sin acusar; quedan "
+                    + " ignorados sin acusar; el emisor tenia "
                     + quedan
-                    + " en el buzon del emisor detras de este lote; la cola esta "
+                    + " pendientes contando este lote, "
+                    + detras()
+                    + " detras de el; la cola esta "
                     + estado();
         }
     }

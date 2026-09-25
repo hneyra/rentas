@@ -768,7 +768,7 @@ class IngestionDeCatastroJdbcTest {
                 .hasMessageContaining("COLA BLOQUEADA")
                 .hasMessageContaining("desde la secuencia 1")
                 .hasMessageContaining("200 hecho(s) que no avanzan")
-                .hasMessageContaining("1 detras");
+                .hasMessageContaining(", y tiene 1 detras que");
         assertThat(PAGINAS_SERVIDAS.get())
                 .as("una sola pagina: la segunda traeria las mismas 200")
                 .isEqualTo(1);
@@ -1169,8 +1169,13 @@ class IngestionDeCatastroJdbcTest {
      * emisor de verdad sirve {@code ORDER BY secuencia LIMIT :limite}; aqui el orden es el de
      * {@link #APORTAR}, y quien siembra una cola larga la aporta por secuencia.
      *
-     * <p>{@code pendientesQueQuedan} es lo que queda DESPUES de esta pagina, que es lo que el
-     * puerto declara ({@code FuenteDeHechosDeCatastro.Lote}).
+     * <p>{@code pendientesQueQuedan} es lo que el emisor tiene sin acusar CONTANDO esta pagina, que
+     * es lo que el emisor de verdad cuenta: {@code SELECT count(*) FROM catastro_evento WHERE
+     * estado = 'PENDIENTE'} ({@code catastro}, {@code BuzonDeSalidaJdbc.pendientesQueQuedan}),
+     * leido al servir y antes de ningun acuse. <b>Hasta la ronda 1 de #377 este doble restaba la
+     * pagina</b> —fiel al javadoc que el puerto heredo, no al emisor— y por eso una {@code Vuelta}
+     * que tomaba {@code quedan} por «lo de detras» pasaba el contraste de cinco manzanas con nada
+     * detras, que con el emisor real saldria BLOQUEADA.
      */
     private static String servirElBuzon(String ruta, String peticion) {
         if (ruta.contains("/acuse")) {
@@ -1190,7 +1195,7 @@ class IngestionDeCatastroJdbcTest {
         return "{\"eventos\":["
                 + String.join(",", pagina)
                 + "],\"pendientesQueQuedan\":"
-                + (sinAcusar.size() - pagina.size())
+                + sinAcusar.size()
                 + ",\"aLaFecha\":\"2026-03-02T09:00:00Z\"}";
     }
 
