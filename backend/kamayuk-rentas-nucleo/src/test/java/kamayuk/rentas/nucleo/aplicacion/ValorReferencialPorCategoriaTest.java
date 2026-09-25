@@ -56,6 +56,10 @@ import org.springframework.transaction.interceptor.TransactionInterceptor;
 class ValorReferencialPorCategoriaTest {
 
     private static final Ejercicio EJERCICIO = new Ejercicio(2026);
+
+    /** Un ejercicio cuyo conjunto sellado no trae ni una fila del cuadro vehicular. */
+    private static final Ejercicio SIN_CUADRO = new Ejercicio(2027);
+
     private static final Ejercicio FABRICACION = new Ejercicio(2024);
 
     /** Publicado en A1 y en A2 con cifras distintas: la siembra que distingue. */
@@ -78,7 +82,8 @@ class ValorReferencialPorCategoriaTest {
     static void provisionar() throws SQLException, IOException {
         base = BaseDeDatosDePrueba.provisionar();
         municipalidad = crearMunicipalidad();
-        sellarConjunto();
+        sellarConjunto(EJERCICIO, publicarEdicion());
+        sellarConjunto(SIN_CUADRO, publicarEdicionVacia());
 
         DriverManagerDataSource pool = new DriverManagerDataSource();
         pool.setUrl(base.url());
@@ -189,6 +194,19 @@ class ValorReferencialPorCategoriaTest {
                 .hasMessageContaining("(A1, A2, A3)");
     }
 
+    @Test
+    @DisplayName(
+            "un conjunto sellado sin cuadro vehicular es «sin valor», no «corrija la categoria»")
+    void unConjuntoSinCuadroNoCulpaALaCategoria() {
+        assertThat(valores.de(vehiculo(MODELO_QUE_CRUZA, "A2"), SIN_CUADRO))
+                .as(
+                        "sin ni una fila en el cuadro no hay vocabulario contra el que comparar: lo"
+                                + " que falta es la tabla, y culpar a la categoria —con la lista"
+                                + " vacia «()»— mandaria a corregir en el padron un dato que esta"
+                                + " bien")
+                .isEmpty();
+    }
+
     // ---------------------------------------------------------------- utilidades
 
     private static BigDecimal valorDe(Vehiculo vehiculo) {
@@ -220,8 +238,7 @@ class ValorReferencialPorCategoriaTest {
     }
 
     /** Un conjunto sellado que compone la edicion del cuadro: abierto, compuesto y sellado. */
-    private static void sellarConjunto() throws SQLException {
-        long edicion = publicarEdicion();
+    private static void sellarConjunto(Ejercicio ejercicio, long edicion) throws SQLException {
         try (Connection app = base.conexion(BaseDeDatosDePrueba.APP)) {
             ContextoDeTenant.fijar(app, municipalidad);
             long conjunto;
@@ -230,7 +247,7 @@ class ValorReferencialPorCategoriaTest {
                             "INSERT INTO conjunto_parametros_de_prueba (municipalidad_id, ejercicio,"
                                     + " version) VALUES (?, ?, 1) RETURNING id")) {
                 sentencia.setLong(1, municipalidad);
-                sentencia.setInt(2, EJERCICIO.valor());
+                sentencia.setInt(2, ejercicio.valor());
                 try (ResultSet fila = sentencia.executeQuery()) {
                     fila.next();
                     conjunto = fila.getLong(1);
@@ -287,6 +304,30 @@ class ValorReferencialPorCategoriaTest {
             fila(carga, edicion, "A3", "CAPTIVA", new BigDecimal("2500.00"));
             carga.commit();
             return edicion;
+        }
+    }
+
+    /**
+     * Una edicion sin ni una fila del cuadro: lo que compone el conjunto de un ejercicio sellado
+     * sin tabla vehicular (#360, ronda 1).
+     */
+    private static long publicarEdicionVacia() throws SQLException {
+        try (Connection carga = base.conexion(BaseDeDatosDePrueba.CARGA_PARAMETROS);
+                PreparedStatement sentencia =
+                        carga.prepareStatement(
+                                "INSERT INTO parametro_tributario_de_prueba (municipalidad_id, tipo,"
+                                        + " clave, valor_texto, vigencia_desde, documento_fuente,"
+                                        + " usuario_carga, usuario_aprueba) VALUES (NULL,"
+                                        + " 'TABLA_DE_LA_PRUEBA', 'sin-cuadro', 'tabla de la prueba,"
+                                        + " sin valor normativo', DATE '2027-01-01', 'tabla de la"
+                                        + " prueba, sin valor normativo', 'quien transcribe',"
+                                        + " 'quien verifica') RETURNING id")) {
+            try (ResultSet fila = sentencia.executeQuery()) {
+                fila.next();
+                long edicion = fila.getLong(1);
+                carga.commit();
+                return edicion;
+            }
         }
     }
 

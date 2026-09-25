@@ -48,11 +48,16 @@ public class ValoresReferenciales {
      * CategoriaFueraDelCuadro} nombrando las categorias que si publica.
      *
      * <p>El vocabulario se pregunta solo cuando no hubo fila: si la hubo, la categoria es del anexo
-     * por construccion, y el calculo por contribuyente no paga una consulta mas por vehiculo.
+     * por construccion, y el calculo por contribuyente no paga una consulta mas por vehiculo. Y si
+     * el conjunto sellado no trae <b>ni una fila</b> del cuadro, no hay vocabulario contra el que
+     * comparar: lo que falta es la tabla, no la categoria, y se deja caer a «sin valor
+     * referencial». Culpar a la categoria con la lista vacia —«(): corrija la categoria en el
+     * padron»— mandaria a corregir un dato que esta bien (#360, ronda 1).
      *
      * @throws ValorReferencialRepository.ValorReferencialAmbiguo si el vehiculo no tiene categoria
      *     y el anexo publica su modelo en varias con cifras distintas
-     * @throws CategoriaFueraDelCuadro si la categoria del vehiculo no es una de las del anexo
+     * @throws CategoriaFueraDelCuadro si la categoria del vehiculo no es una de las del anexo, y el
+     *     anexo del conjunto publica alguna
      */
     @Transactional(readOnly = true)
     public Optional<ValorReferencial> de(Vehiculo vehiculo, Ejercicio ejercicio) {
@@ -67,7 +72,7 @@ public class ValoresReferenciales {
                         categoria);
         if (valor.isEmpty() && categoria != null) {
             List<String> delCuadro = repositorio.categorias(conjunto);
-            if (!delCuadro.contains(categoria)) {
+            if (!delCuadro.isEmpty() && !delCuadro.contains(categoria)) {
                 throw new CategoriaFueraDelCuadro(vehiculo, categoria, ejercicio, delCuadro);
             }
         }
