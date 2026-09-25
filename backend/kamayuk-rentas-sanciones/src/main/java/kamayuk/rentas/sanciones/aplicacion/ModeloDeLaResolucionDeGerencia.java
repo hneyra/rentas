@@ -9,7 +9,6 @@ import kamayuk.rentas.documentos.ModeloDeDocumento;
 import kamayuk.rentas.documentos.PuntoDeFirma;
 import kamayuk.rentas.documentos.Tabla;
 import kamayuk.rentas.dominio.Dinero;
-import kamayuk.rentas.dominio.Plazo;
 import kamayuk.rentas.sanciones.dominio.Descargo;
 import kamayuk.rentas.sanciones.dominio.EfectoSobreLaMulta;
 import kamayuk.rentas.sanciones.dominio.Papeleta;
@@ -56,7 +55,8 @@ final class ModeloDeLaResolucionDeGerencia {
      * @param sentido con qué sentido lo resuelve
      * @param efecto qué le pasa a la multa
      * @param sancionAccesoria la sanción no pecuniaria que se deriva, si la hay
-     * @param plazo el plazo que la ordinaria concede, leído del conjunto sellado; nulo en las demás
+     * @param plazo el plazo que la resolución concede, con el rótulo de su tipo, leído del conjunto
+     *     sellado (#410)
      * @param deuda cuánto se debe, con el día al que está (regla 9); nulo si ya no debe nada
      * @param aLaFecha el día al que se leyó la deuda
      * @param sustento el fundamento de la resolución
@@ -72,7 +72,7 @@ final class ModeloDeLaResolucionDeGerencia {
             @Nullable SentidoDelFallo sentido,
             @Nullable EfectoSobreLaMulta efecto,
             @Nullable String sancionAccesoria,
-            @Nullable Plazo plazo,
+            PlazosDeSancionesParametrizados.PlazoConcedido plazo,
             @Nullable ObligacionPublica deuda,
             LocalDate aLaFecha,
             String sustento) {
@@ -109,12 +109,12 @@ final class ModeloDeLaResolucionDeGerencia {
         if (sancionAccesoria != null) {
             cabecera.add(Campo.de("Sancion accesoria", sancionAccesoria));
         }
-        if (plazo != null) {
-            // El plazo se IMPRIME tal como el parametro sellado lo dice ("7 DIAS_HABILES"), no
-            // como una frase compuesta aqui: si manana la norma lo cambia, cambia el parametro y
-            // el papel sale con la cifra nueva sin tocar una linea (regla 5).
-            cabecera.add(Campo.de("Plazo de pago", plazo.toString()));
-        }
+        // El plazo se IMPRIME tal como el parametro sellado lo dice ("7 DIAS_HABILES"), no como
+        // una frase compuesta aqui: si manana la norma lo cambia, cambia el parametro y el papel
+        // sale con la cifra nueva sin tocar una linea (regla 5). Y sale SIEMPRE, con el rotulo de
+        // su tipo (#410): hasta entonces la RIS no imprimia ningun plazo y su diligencia contaba
+        // siete dias habiles.
+        cabecera.add(Campo.de(plazo.rotulo(), plazo.plazo().toString()));
         cabecera.add(Campo.de("Sustento", sustento));
 
         List<Tabla> tablas = List.of(tablaDeLaDeuda(deuda, aLaFecha));

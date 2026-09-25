@@ -3006,11 +3006,14 @@ class SancionesJdbcTest {
     }
 
     /**
-     * El conjunto sellado de 2026 <b>con los dos plazos dentro</b>.
+     * El conjunto sellado de 2026 <b>con los tres plazos dentro</b>.
      *
-     * <p>Los cinco días del descargo y los siete de la resolución ordinaria entran como
-     * <b>dato</b>, no como constantes del programa (regla 5). Que esta prueba tenga que sembrarlos
-     * es la demostración: sin ellos, registrar un descargo o notificar una resolución falla.
+     * <p>Los cinco días del descargo, los siete de la resolución ordinaria y los quince del recurso
+     * contra la sancionadora entran como <b>dato</b>, no como constantes del programa (regla 5).
+     * Que esta prueba tenga que sembrarlos es la demostración: sin ellos, registrar un descargo o
+     * notificar una resolución falla; y desde #410 la sancionadora imprime el plazo para
+     * impugnarla, así que sin el tercero tampoco se dicta. La cifra del recurso es distinta de la
+     * de la ordinaria a propósito: con la misma, leer una por otra no se notaría.
      */
     private static long crearConjuntoConLosPlazos(long municipalidadId) throws SQLException {
         long descargo =
@@ -3023,6 +3026,8 @@ class SancionesJdbcTest {
                         "RG_ORDINARIA_CUMPLIMIENTO",
                         "7 DIAS_HABILES",
                         "TUO del Codigo Tributario, D.S. 133-2013-EF");
+        long recurso =
+                cargarParametro("RG_RECURSO", "15 DIAS_HABILES", "TUO de la Ley 27444, art. 218.2");
 
         try (Connection app = base.conexion(BaseDeDatosDePrueba.APP)) {
             ContextoDeTenant.fijar(app, municipalidadId);
@@ -3037,7 +3042,7 @@ class SancionesJdbcTest {
                     conjunto = resultado.getLong(1);
                 }
             }
-            for (long parametro : new long[] {descargo, ordinaria}) {
+            for (long parametro : new long[] {descargo, ordinaria, recurso}) {
                 try (PreparedStatement sentencia =
                         app.prepareStatement(
                                 "INSERT INTO conjunto_parametro_detalle_de_prueba (municipalidad_id,"

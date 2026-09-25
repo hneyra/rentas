@@ -4,6 +4,7 @@ import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.LinkedHashSet;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import kamayuk.rentas.dominio.CalendarioHabil;
@@ -12,13 +13,14 @@ import kamayuk.rentas.dominio.Plazo;
 import kamayuk.rentas.parametros.LectorDeParametros;
 import kamayuk.rentas.parametros.ParametroSinPublicar;
 import kamayuk.rentas.parametros.ParametrosSellados;
+import kamayuk.rentas.sanciones.dominio.TipoDeResolucionDeGerencia;
 import org.springframework.stereotype.Service;
 
 /**
  * De dónde salen los plazos de sanciones: del conjunto sellado que rige a la fecha del hecho (#50,
  * RF-064, RF-074).
  *
- * <h2>Dos plazos, ninguno compilado</h2>
+ * <h2>Tres plazos, ninguno compilado</h2>
  *
  * <ul>
  *   <li>{@code DESCARGO_PAPELETA} — lo que el administrado tiene para descargar. La pantalla {@code
@@ -26,10 +28,23 @@ import org.springframework.stereotype.Service;
  *   <li>{@code RG_ORDINARIA_CUMPLIMIENTO} — lo que la resolución ordinaria concede para pagar antes
  *       de que la gerencia pueda dictar la sancionadora. La pantalla {@code transito_rg_ordinaria}
  *       lo imprime como «Plazo de pago: 7 días hábiles».
+ *   <li>{@code RG_RECURSO} — lo que la sancionadora y la RIS conceden para impugnarlas antes de
+ *       quedar firmes (art. 218.2 del TUO de la Ley 27444). Es de #410, y la cifra la sella {@code
+ *       normativa}, como todas: aquí se nombra la llave y se pide.
  * </ul>
  *
- * <p>Las dos cifras están en una norma, y eso es exactamente lo que las hace <b>dato</b>: la regla
- * 5 prohíbe el literal porque las normas cambian, y un plazo compilado obligaría a recompilar para
+ * <h2>Qué plazo abre la notificación de una resolución: una sola respuesta (#410)</h2>
+ *
+ * <p>Es una propiedad <b>del tipo de acto</b> notificado, y la responde {@link
+ * Vigentes#queConcede}. Hasta #410 estaba cableada en un método que solo conocía a la ordinaria, y
+ * tres sitios la decidían por separado: el dictado solo resolvía el plazo de la ordinaria, el papel
+ * solo lo imprimía si llegaba, y la diligencia contaba <b>el de la ordinaria para cualquier
+ * resolución</b>. Así la RIS salía sin ningún plazo impreso, su notificación contestaba 422 por una
+ * cifra de tránsito y, el día que esa cifra se sellara, la corrida administrativa habría emitido el
+ * RM mientras la RIS todavía se podía recurrir. Ahora los tres leen de aquí.
+ *
+ * <p>Las cifras están en una norma, y eso es exactamente lo que las hace <b>dato</b>: la regla 5
+ * prohíbe el literal porque las normas cambian, y un plazo compilado obligaría a recompilar para
  * seguirlas —y, peor, recalcularía con el número de hoy los expedientes de ayer—. Es el mismo
  * camino que {@code valores.PlazosParametrizados} abrió en #39 y {@code
  * coactiva.PlazosCoactivosParametrizados} en #41, con el mismo tipo de parámetro, que es el que el
@@ -54,6 +69,9 @@ public class PlazosDeSancionesParametrizados {
 
     /** Lo que la resolución ordinaria concede para pagar antes de la sancionadora. */
     private static final String CLAVE_ORDINARIA = "RG_ORDINARIA_CUMPLIMIENTO";
+
+    /** Lo que la sancionadora y la RIS conceden para impugnarlas (art. 218.2, Ley 27444; #410). */
+    private static final String CLAVE_RECURSO = "RG_RECURSO";
 
     private final LectorDeParametros parametros;
 
@@ -99,9 +117,35 @@ public class PlazosDeSancionesParametrizados {
             return leer(CLAVE_DESCARGO);
         }
 
-        /** Cuánto concede la resolución ordinaria antes de que quepa la sancionadora. */
-        public Plazo paraCumplirLaOrdinaria() {
-            return leer(CLAVE_ORDINARIA);
+        /**
+         * El plazo que la resolución de ese tipo concede al administrado desde que su notificación
+         * surte efecto, con el rótulo con que su papel lo imprime (#410).
+         *
+         * <p>Es la <b>única</b> fuente de esa respuesta: el dictado la imprime, y la diligencia
+         * cuenta con ella el día desde el que la resolución es exigible. Así lo que el papel dice
+         * es lo que la diligencia cuenta.
+         *
+         * <ul>
+         *   <li>{@link TipoDeResolucionDeGerencia#ORDINARIA} concede el plazo de <b>pago</b>:
+         *       vencido, cabe la sancionadora.
+         *   <li>{@link TipoDeResolucionDeGerencia#SANCIONADORA} y {@link
+         *       TipoDeResolucionDeGerencia#ADMINISTRATIVA} conceden el plazo para
+         *       <b>impugnarlas</b>: vencido sin recurso, quedan firmes, y solo un acto firme se
+         *       formaliza en un valor camino de la coactiva (art. 9.1 del TUO de la Ley 26979).
+         * </ul>
+         *
+         * <p>El {@code switch} no tiene rama por omisión a propósito: el día que exista un cuarto
+         * tipo, el compilador obliga a decidir qué concede en vez de heredar el plazo de otro acto,
+         * que es exactamente el defecto de #410.
+         *
+         * @throws PlazoSinParametrizar si el conjunto no trae la llave de ese tipo
+         */
+        public PlazoConcedido queConcede(TipoDeResolucionDeGerencia tipo) {
+            return switch (tipo) {
+                case ORDINARIA -> new PlazoConcedido("Plazo de pago", leer(CLAVE_ORDINARIA));
+                case SANCIONADORA, ADMINISTRATIVA ->
+                        new PlazoConcedido("Plazo para impugnar", leer(CLAVE_RECURSO));
+            };
         }
 
         /**
@@ -159,6 +203,24 @@ public class PlazosDeSancionesParametrizados {
                 }
             }
             return fechas;
+        }
+    }
+
+    /**
+     * Lo que una resolución concede, con el rótulo con que su papel lo dice (#410).
+     *
+     * <p>El rótulo viaja <b>con</b> el plazo, y no se decide aparte en el modelo del documento: dos
+     * {@code switch} sobre el mismo tipo —uno para la llave y otro para el texto— podrían envejecer
+     * por separado y dejar un papel que dice «Plazo de pago» sobre la cifra del recurso.
+     *
+     * @param rotulo cómo lo imprime el papel: «Plazo de pago» o «Plazo para impugnar»
+     * @param plazo la cifra, tal como la dice el parámetro sellado
+     */
+    public record PlazoConcedido(String rotulo, Plazo plazo) {
+
+        public PlazoConcedido {
+            Objects.requireNonNull(rotulo, "Un plazo impreso lleva su rotulo");
+            Objects.requireNonNull(plazo, "Un plazo concedido lleva su cifra");
         }
     }
 

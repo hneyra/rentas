@@ -77,9 +77,10 @@ jobs:
       # al correr, y esto lo pide Gradle al CONFIGURAR la tarea, asi que sin el archivo el fallo
       # no es una asercion sino «Input file does not exist» y no llega a ejecutarse nada.
       #
-      #   normativa/docs/.../publicacion/parametros-2026.csv   lo declaran `valores`, `coactiva`
-      #       y `nucleo` (#192, ADR-0025 §5): las pruebas del derivado publicable lo leen, y sin
-      #       declararlo `test` se queda UP-TO-DATE y una rotura pasa en verde rancio.
+      #   normativa/docs/.../publicacion/parametros-2026.csv   lo declaran `valores`, `coactiva`,
+      #       `nucleo` y `sanciones` (#192, #410, ADR-0025 §5): las pruebas del derivado
+      #       publicable lo leen, y sin declararlo `test` se queda UP-TO-DATE y una rotura pasa en
+      #       verde rancio.
       #   catastro/docs/50-api/eventos/lote-de-eventos.json    lo declara `nucleo`, y lo lee
       #       `IngestionDeCatastroJdbcTest`.
       #
