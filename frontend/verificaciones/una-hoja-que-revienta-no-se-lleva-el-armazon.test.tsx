@@ -107,6 +107,28 @@ const CON_DOS_DECIMALES: DeterminacionGuardada = {
 /** La frase del componente por omision de react-router. Es lo que NO puede volver a salir. */
 const LA_PANTALLA_DE_REACT_ROUTER = 'Unexpected Application Error!';
 
+/**
+ * **Se espera al hecho, no al reloj** (#504).
+ *
+ * `waitFor` sin opciones se rinde al segundo, y lo que aqui se espera no es un paso sino una
+ * cadena entera: el `hashchange`, la navegacion de react-router, el reinicio de la frontera, la
+ * consulta nueva, su respuesta y el render del interprete. Sola, la prueba del reinicio lo hacia en
+ * poco mas de un segundo; con `yarn verificar` corriendo las ochenta suites a la vez, se quedaba
+ * sin plazo con la frontera ya reiniciada y la respuesta en camino, y salia roja con «Unable to
+ * find an element with the text: S/ 5,500.00» —medido, y sobre `main`—. Un rojo que depende de la
+ * carga del puesto tumba la CI de cualquier PR de frontend sin decir nada del codigo.
+ *
+ * Diez segundos no son un plazo que se espere: `waitFor` vuelve en cuanto el hecho se cumple, asi
+ * que en verde cuesta lo mismo que antes. Solo pesan cuando el hecho NO llega, y entonces el rojo
+ * es el mismo, diez segundos despues. Y la prueba entera lleva el suyo, holgado por encima
+ * —`PLAZO_DE_LA_PRUEBA`—: con los cinco de Vitest por omision, dos esperas seguidas volverian a
+ * dejar la prueba en manos del reloj, solo que un nivel mas arriba.
+ */
+const ESPERAR = { timeout: 10_000 };
+
+/** Por encima de la suma de las esperas de una prueba: ver `ESPERAR`. */
+const PLAZO_DE_LA_PRUEBA = { timeout: 60_000 };
+
 beforeAll(() => {
   // Lo que jsdom no trae y las piezas del armazon piden. Sus motivos, en `@kamayuk/shell`.
   Element.prototype.scrollIntoView = () => {};
@@ -174,11 +196,11 @@ async function abrir(ruta: string) {
   render(<Aplicacion />);
   await waitFor(() => {
     expect(document.querySelector('[data-slot="barra-global"], header, nav')).not.toBeNull();
-  });
+  }, ESPERAR);
 }
 
 describe('una hoja que no se puede dibujar no se lleva el armazon (#354)', () => {
-  it('con la forma de la cache, la barra y el arbol siguen, y el cuerpo dice «fallo» con su motivo', async () => {
+  it('con la forma de la cache, la barra y el arbol siguen, y el cuerpo dice «fallo» con su motivo', PLAZO_DE_LA_PRUEBA, async () => {
     // React avisa por consola de lo que una frontera recoge, y eso es lo que tiene que pasar: se
     // silencia para que el volcado no parezca un rojo, y se comprueba abajo que hubo aviso.
     const consola = vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -189,7 +211,7 @@ describe('una hoja que no se puede dibujar no se lleva el armazon (#354)', () =>
       // escribio nombrando el valor. Sin motivo, «fallo» mandaria a mirar la red.
       await waitFor(() => {
         expect(document.body.textContent).toContain('5500.000000');
-      });
+      }, ESPERAR);
       expect(screen.getAllByText('fallo').length).toBeGreaterThan(0);
       // Y el armazon sigue en pie: el titulo de la hoja, y el carril con OTRO modulo que abrir.
       expect(screen.getByRole('heading', { level: 1, name: 'Determinación' })).toBeTruthy();
@@ -203,13 +225,13 @@ describe('una hoja que no se puede dibujar no se lleva el armazon (#354)', () =>
     }
   });
 
-  it('y se REINICIA al cambiar de ruta: otro contribuyente de la misma hoja se dibuja', async () => {
+  it('y se REINICIA al cambiar de ruta: otro contribuyente de la misma hoja se dibuja', PLAZO_DE_LA_PRUEBA, async () => {
     const consola = vi.spyOn(console, 'error').mockImplementation(() => {});
     try {
       await abrir('territorio/00000025673');
       await waitFor(() => {
         expect(document.body.textContent).toContain('5500.000000');
-      });
+      }, ESPERAR);
 
       // La misma hoja con otro sujeto: el marco NO desmonta la pantalla —su `key` es el destino—,
       // asi que sin reinicio la frontera se quedaria en su fallo para siempre.
@@ -217,7 +239,7 @@ describe('una hoja que no se puede dibujar no se lleva el armazon (#354)', () =>
 
       await waitFor(() => {
         expect(screen.getByText('S/ 5,500.00')).toBeInTheDocument();
-      });
+      }, ESPERAR);
       expect(screen.getByText('S/ 33.00')).toBeInTheDocument();
       expect(document.body.textContent).not.toContain('5500.000000');
     } finally {
