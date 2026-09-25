@@ -22,6 +22,7 @@ import kamayuk.rentas.cuentacorriente.AbonoAsentado;
 import kamayuk.rentas.cuentacorriente.AcogimientoAConvenio;
 import kamayuk.rentas.cuentacorriente.DeudaAcogida;
 import kamayuk.rentas.cuentacorriente.MovimientoAsentado;
+import kamayuk.rentas.cuentacorriente.ObligacionDelDeudor;
 import kamayuk.rentas.cuentacorriente.RegistroDeAbonos;
 import kamayuk.rentas.cuentacorriente.SeleccionDeObligacion;
 import kamayuk.rentas.cuentacorriente.aplicacion.AcogimientoAConvenioCuentaCorriente;
@@ -185,8 +186,7 @@ class CobranzaYConvenioDesdeSuFechaJdbcTest {
         // 1. P2, con fecha de pago 03-10: extingue C. Sin nada posterior en el libro, lo que
         //    se debia al 03-10 y lo que queda por extinguir desde el 03-10 son la misma cifra.
         abonos.abonarPagoIntegro(
-                titular,
-                List.of(laObligacion()),
+                List.of(new ObligacionDelDeudor(titular, laObligacion())),
                 CUOTA_C,
                 DIA_DEL_ABONO_POSTERIOR,
                 "RECIBO 002-0000471",
@@ -199,8 +199,7 @@ class CobranzaYConvenioDesdeSuFechaJdbcTest {
         assertThatThrownBy(
                         () ->
                                 abonos.abonarPagoIntegro(
-                                        titular,
-                                        List.of(laObligacion()),
+                                        List.of(new ObligacionDelDeudor(titular, laObligacion())),
                                         CUOTA_C,
                                         DIA_ANTERIOR,
                                         "RECIBO 001-0000471",
@@ -232,8 +231,7 @@ class CobranzaYConvenioDesdeSuFechaJdbcTest {
         assertThatThrownBy(
                         () ->
                                 abonos.abonarPagoIntegro(
-                                        titular,
-                                        List.of(laObligacion()),
+                                        List.of(new ObligacionDelDeudor(titular, laObligacion())),
                                         CUOTA_C,
                                         DIA_ANTERIOR,
                                         "RECIBO 001-0000472",
@@ -250,8 +248,7 @@ class CobranzaYConvenioDesdeSuFechaJdbcTest {
         // «no cuadra» contra 148,30, y la caja veia rechazado un pago correcto.
         List<AbonoAsentado> abonado =
                 abonos.abonarPagoIntegro(
-                        titular,
-                        List.of(laObligacion()),
+                        List.of(new ObligacionDelDeudor(titular, laObligacion())),
                         Dinero.de("48.30"),
                         DIA_ANTERIOR,
                         "RECIBO 001-0000473",

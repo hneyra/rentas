@@ -111,6 +111,10 @@ public class EmitirOrdenDeCobro {
                 new ReferenciaDeObligacion(
                         obligacion.tributo(),
                         obligacion.ejercicio(),
+                        // El deudor, dentro de la referencia (#431): la idempotencia de la caja
+                        // es por referencia, y sin el dos condominos del mismo predio que emiten
+                        // el mismo dia recibian la MISMA orden —la del primero, con su importe—.
+                        peticion.contribuyenteId(),
                         obligacion.predioId(),
                         obligacion.vehiculoId(),
                         // La fecha de la referencia es la que el LIBRO devolvio, no la que se

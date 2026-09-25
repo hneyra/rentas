@@ -40,6 +40,7 @@ import kamayuk.rentas.cuentacorriente.ConsultaDeDeudaPublica;
 import kamayuk.rentas.cuentacorriente.ExtincionDeDeuda;
 import kamayuk.rentas.cuentacorriente.GeneradorDeCargos;
 import kamayuk.rentas.cuentacorriente.MovimientoDeFase;
+import kamayuk.rentas.cuentacorriente.ObligacionDelDeudor;
 import kamayuk.rentas.cuentacorriente.ObligacionPublica;
 import kamayuk.rentas.cuentacorriente.RecaudacionDelLibro;
 import kamayuk.rentas.cuentacorriente.RecaudadoEnElLibro;
@@ -2006,8 +2007,7 @@ class ValoresMasivosYReportesJdbcTest {
         enTransaccion(
                 () ->
                         abonos.abonarPagoIntegro(
-                                papeleta.obligadoId(),
-                                List.of(obligacion),
+                                List.of(new ObligacionDelDeudor(papeleta.obligadoId(), obligacion)),
                                 cobrado,
                                 EXIGIBLE_DESDE,
                                 documento,

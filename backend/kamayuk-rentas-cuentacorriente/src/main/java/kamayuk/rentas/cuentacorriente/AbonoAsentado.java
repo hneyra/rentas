@@ -16,7 +16,9 @@ import kamayuk.rentas.dominio.Dinero;
  * importe siempre (regla 9, RNF-075). Sin ella, el duplicado de un recibo de marzo no podria
  * explicar por que su interes no es el de hoy.
  *
- * @param obligacion cual de las marcadas es
+ * @param obligacion cual de las marcadas es, <b>con su deudor</b>: dos condominos del mismo predio
+ *     cobrados en un recibo son dos abonos con la misma seleccion, y sin el deudor no se sabria
+ *     cual es cual (#431)
  * @param fecha la fecha a la que se releyo la deuda y se imputaron los asientos
  * @param insoluto el tributo abonado, sin reajuste ni interes
  * @param reajuste el reajuste abonado
@@ -24,7 +26,7 @@ import kamayuk.rentas.dominio.Dinero;
  * @param gasto los gastos abonados
  */
 public record AbonoAsentado(
-        SeleccionDeObligacion obligacion,
+        ObligacionDelDeudor obligacion,
         LocalDate fecha,
         Dinero insoluto,
         Dinero reajuste,

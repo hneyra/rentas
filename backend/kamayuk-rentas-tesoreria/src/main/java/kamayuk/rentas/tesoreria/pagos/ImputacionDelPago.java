@@ -7,10 +7,11 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import kamayuk.rentas.cuentacorriente.AbonoAsentado;
+import kamayuk.rentas.cuentacorriente.ObligacionDelDeudor;
 import kamayuk.rentas.cuentacorriente.RegistroDeAbonos;
 import kamayuk.rentas.cuentacorriente.ReversionDeAbonos;
-import kamayuk.rentas.cuentacorriente.SeleccionDeObligacion;
 import kamayuk.rentas.dominio.Observacion;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,10 +36,10 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <h2>La imputacion es de este sistema, y esto es lo unico que hace falta para que lo sea</h2>
  *
- * <p>Se le pasa la lista de obligaciones a {@link RegistroDeAbonos}, que es exactamente lo que
- * hacia la ventanilla cuando el cobro era una sola transaccion. <b>Ni una regla de calculo cambio
- * de sitio con la separacion</b>: el orden del art. 31 del Codigo Tributario sigue viviendo donde
- * vivia.
+ * <p>Se le pasa la lista de obligaciones a {@link RegistroDeAbonos}, <b>cada una con su deudor</b>
+ * (#431), que es lo que hacia la ventanilla cuando el cobro era una sola transaccion. <b>Ni una
+ * regla de calculo cambio de sitio con la separacion</b>: el orden del art. 31 del Codigo
+ * Tributario sigue viviendo donde vivia.
  */
 @Service
 public class ImputacionDelPago {
@@ -132,6 +133,15 @@ public class ImputacionDelPago {
      *
      * <p>Se busca por {@code pago_original_id}, que es la clave que {@code V8} puso para esto y que
      * {@code V24} indexa; no por el numero del papel.
+     *
+     * <h2>El deudor de cada linea es el de su referencia, no el pagador (#431)</h2>
+     *
+     * <p>La caja junta en un recibo ordenes de deudores distintos y publica <b>un</b> pagador —el
+     * de la primera orden—. Hasta #431 ese pagador era el deudor de todas las lineas: el libro
+     * buscaba la obligacion de B bajo A, no encontraba saldo, lo cobrado no cuadraba y el pago
+     * entero quedaba {@code RECHAZADO}. Desde #431 la referencia lleva al deudor y es ese el que se
+     * usa. El pagador solo decide en una referencia de cinco partes —la de una orden emitida antes
+     * de #431 y cobrada despues—, que no trae otro.
      */
     private int imputar(PagoRecibido pago) {
         Optional<PagoRecibido> anulacion = buzon.anulacionDe(pago.pagoId());
@@ -148,18 +158,11 @@ public class ImputacionDelPago {
                             + "). La caja devolvio ese dinero, asi que imputarlo extinguiria"
                             + " deuda sin cobro; no se toca el libro");
         }
-        Long contribuyenteId = pago.contribuyenteId();
-        if (contribuyenteId == null) {
-            throw new RegistroDeAbonos.SinDeudaQueAbonar(
-                    "El pago "
-                            + pago.pagoId()
-                            + " no dice a que contribuyente de este padron se le cobro. La caja"
-                            + " admite un pagador anonimo —cobra tasas al contado, y manana un"
-                            + " puesto de mercado— pero un abono del libro es de alguien");
-        }
-        List<SeleccionDeObligacion> obligaciones = new ArrayList<>(pago.obligaciones().size());
+        List<ObligacionDelDeudor> obligaciones = new ArrayList<>(pago.obligaciones().size());
         for (ReferenciaDeObligacion referencia : pago.obligaciones()) {
-            obligaciones.add(referencia.comoSeleccion());
+            obligaciones.add(
+                    new ObligacionDelDeudor(
+                            deudorDe(referencia, pago), referencia.comoSeleccion()));
         }
         if (obligaciones.isEmpty()) {
             throw new RegistroDeAbonos.SinDeudaQueAbonar(
@@ -171,7 +174,6 @@ public class ImputacionDelPago {
         }
         List<AbonoAsentado> abonado =
                 abonos.abonarPagoIntegro(
-                        contribuyenteId,
                         obligaciones,
                         // Lo que la caja cobro DE VERDAD (#39). Hasta este issue no viajaba —
                         // `grep -n "total" ImputacionDelPago.java` no devolvia ni una linea— y el
@@ -182,6 +184,32 @@ public class ImputacionDelPago {
                         pago.documentoDeOrigen(),
                         porElPago(pago));
         return abonado.size();
+    }
+
+    /**
+     * De quien es la deuda de esa linea: el deudor que la referencia lleva (#431).
+     *
+     * <p>Solo una referencia de cinco partes —emitida antes de #431— no lo lleva, y entonces sale
+     * del pagador, como salia para todas. Si tampoco hay pagador, no hay a nombre de quien asentar.
+     */
+    private static long deudorDe(ReferenciaDeObligacion referencia, PagoRecibido pago) {
+        @Nullable Long deudor = referencia.contribuyenteId();
+        if (deudor != null) {
+            return deudor;
+        }
+        @Nullable Long pagador = pago.contribuyenteId();
+        if (pagador == null) {
+            throw new RegistroDeAbonos.SinDeudaQueAbonar(
+                    "El pago "
+                            + pago.pagoId()
+                            + " cobra '"
+                            + referencia.texto()
+                            + "', que no lleva deudor —es de antes de #431—, y no dice a que"
+                            + " contribuyente de este padron se le cobro. La caja admite un"
+                            + " pagador anonimo —cobra tasas al contado, y manana un puesto de"
+                            + " mercado— pero un abono del libro es de alguien");
+        }
+        return pagador;
     }
 
     /**
