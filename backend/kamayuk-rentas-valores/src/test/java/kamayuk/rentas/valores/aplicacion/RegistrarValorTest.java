@@ -324,7 +324,16 @@ class RegistrarValorTest {
             Dinero interes,
             Dinero gasto) {
         return new ObligacionPublica(
-                tributo, ejercicio, predioId, vehiculoId, HOY, insoluto, reajuste, interes, gasto);
+                tributo,
+                ejercicio,
+                predioId,
+                vehiculoId,
+                HOY,
+                insoluto,
+                reajuste,
+                interes,
+                gasto,
+                "ORDINARIA");
     }
 
     // ------------------------------------------------------------------

@@ -394,6 +394,7 @@ public class ActoCoactivoController {
             throw new ProblemaDeNegocio(CodigoDeError.NO_ENCONTRADO, motivoDe(noExiste));
         } catch (CambiarEstadoDelExpediente.ExpedienteConcluido
                 | RegistrarActoCoactivo.DeudaExtinguida
+                | RegistrarActoCoactivo.DeudaAcogidaAConvenio
                 | RegistrarActoCoactivo.Rec1SinDictar
                 | RegistrarActoCoactivo.Rec1SinNotificar
                 | RegistrarActoCoactivo.PlazoDeLaRec1EnCurso

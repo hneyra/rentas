@@ -102,7 +102,8 @@ class ActoCoactivoControllerTest {
                                     Dinero.de("500.00"),
                                     Dinero.de("10.00"),
                                     Dinero.de("25.50"),
-                                    Dinero.CERO));
+                                    Dinero.CERO,
+                                    "COACTIVA"));
 
     private final LibroDeMentira libroPagado = new LibroDeMentira();
 

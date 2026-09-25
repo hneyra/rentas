@@ -28,6 +28,7 @@ import kamayuk.rentas.contribuyentes.ResumenDeContribuyente;
 import kamayuk.rentas.documentos.EmitirDocumento;
 import kamayuk.rentas.documentos.FormatoDeDocumento;
 import kamayuk.rentas.documentos.ModeloDeDocumento;
+import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.dominio.Plazo;
 import kamayuk.rentas.valores.ValorParaCoactiva;
@@ -69,6 +70,13 @@ import org.springframework.transaction.annotation.Transactional;
  * quien ya pago. Los tres actos que <b>reconocen</b> ese hecho —conclusion, suspension y
  * levantamiento— quedan exentos: si no lo estuvieran, un expediente pagado no se podria concluir
  * nunca ({@link TipoDeActoCoactivo#exigeDeudaViva()}).
+ *
+ * <p><b>Lo acogido a un convenio no abre la puerta</b> (#403). La deuda que se mira es la exigible,
+ * y la acogida no lo es: la cobra el cronograma del convenio. Un expediente cuya unica deuda esta
+ * fraccionada no admite una REC-2 ni un embargo, y el rechazo lo dice con su causa —{@link
+ * DeudaAcogidaAConvenio}— y no con {@link DeudaExtinguida}, que afirma un pago que no hubo. Si el
+ * fraccionamiento suspende o concluye el procedimiento sigue abierto a proposito ({@link
+ * FraccionarEnCoactiva}); que la deuda acogida no se ejecuta, no.
  *
  * <h2>El acto y su papel nacen juntos</h2>
  *
@@ -128,6 +136,8 @@ public class RegistrarActoCoactivo {
      *     numero
      * @throws CambiarEstadoDelExpediente.ExpedienteConcluido si el procedimiento ya termino
      * @throws DeudaExtinguida si no queda nada que cobrar y el acto exige deuda viva
+     * @throws DeudaAcogidaAConvenio si lo unico que queda esta acogido a un convenio y el acto
+     *     exige deuda viva (#403)
      * @throws Rec1SinNotificar si se pide la REC-2 y la REC-1 no esta notificada
      * @throws PlazoDeLaRec1EnCurso si se pide la REC-2 y el plazo todavia corre
      */
@@ -158,6 +168,13 @@ public class RegistrarActoCoactivo {
         LocalDate proyeccion = pedida == null ? fecha : pedida;
         DeudaDelExpediente deuda = consulta.deudaDe(expediente, proyeccion);
         if (peticion.tipo().exigeDeudaViva() && !deuda.total().esPositivo()) {
+            // Dos razones distintas para lo mismo, y cada una con su nombre (#403): sin deuda el
+            // obligado pago; con deuda solo acogida a un convenio, NO pago, y DeudaExtinguida
+            // afirmaria un pago que no hubo.
+            if (deuda.soloQuedaDeudaEnConvenio()) {
+                throw new DeudaAcogidaAConvenio(
+                        expediente.numero(), peticion.tipo(), proyeccion, deuda.enConvenio());
+            }
             throw new DeudaExtinguida(expediente.numero(), peticion.tipo(), proyeccion);
         }
 
@@ -440,6 +457,34 @@ public class RegistrarActoCoactivo {
                             + tipo.titulo()
                             + " sobre quien ya pago es lo que produce embargos indebidos. Lo que"
                             + " corresponde es concluir el procedimiento");
+        }
+    }
+
+    /**
+     * El expediente no tiene deuda exigible porque la que tiene esta acogida a un convenio (#403).
+     *
+     * <p>No es {@link DeudaExtinguida}: el obligado no pago, fracciono. Lo que corresponde tampoco
+     * es lo mismo —no hay nada que concluir por pago—, y quien opera tiene que poder distinguirlo
+     * sin abrir el libro. Si el convenio se quiebra, la deuda vuelve a coactiva y el acto vuelve a
+     * proceder.
+     */
+    public static final class DeudaAcogidaAConvenio extends RuntimeException {
+
+        @java.io.Serial private static final long serialVersionUID = 1L;
+
+        DeudaAcogidaAConvenio(
+                String numero, TipoDeActoCoactivo tipo, LocalDate fecha, Dinero enConvenio) {
+            super(
+                    "El expediente "
+                            + numero
+                            + " no tiene deuda coactiva exigible al "
+                            + fecha
+                            + ": lo que debe ("
+                            + enConvenio.valor().toPlainString()
+                            + ") esta acogido a un convenio de fraccionamiento, y dictar "
+                            + tipo.titulo()
+                            + " sobre deuda fraccionada es ejecutar lo que el convenio ya cobra en"
+                            + " cuotas. Si el convenio se quiebra, la deuda vuelve a coactiva");
         }
     }
 

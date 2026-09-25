@@ -24,6 +24,7 @@ import kamayuk.rentas.cuentacorriente.dominio.CriterioDeDeudaPorContribuyente;
 import kamayuk.rentas.cuentacorriente.dominio.DeudaActualizada;
 import kamayuk.rentas.cuentacorriente.dominio.Fase;
 import kamayuk.rentas.cuentacorriente.dominio.ObligacionConDeuda;
+import kamayuk.rentas.cuentacorriente.dominio.ProyeccionDelSaldo;
 import kamayuk.rentas.cuentacorriente.dominio.SaldoProyectado;
 import kamayuk.rentas.cuentacorriente.dominio.SaldoRepository;
 import kamayuk.rentas.dominio.OrdenDeLosActos;
@@ -238,7 +239,13 @@ public class ConsultarDeuda {
                     delGrupo.stream().mapToInt(ConsultarDeuda::periodoDe).min().orElseThrow();
             int periodoHasta =
                     delGrupo.stream().mapToInt(ConsultarDeuda::periodoDe).max().orElseThrow();
-            Fase fase = delGrupo.stream().map(Asiento::fase).max(FASE_MAS_AVANZADA).orElseThrow();
+            // La fase de cada PERIODO es la de su ultimo asiento -la definicion de
+            // ProyeccionDelSaldo, la misma que `porContribuyente` lee de la proyeccion- y la de la
+            // fila, la mas avanzada entre periodos. Hasta #403 era la maxima entre ASIENTOS: un
+            // convenio quebrado deja sus asientos en CONVENIO en el libro, y la obligacion salia
+            // acogida para siempre. Nadie la leia; desde que ObligacionPublica la publica, coactiva
+            // la lee para separar lo exigible de lo acogido.
+            Fase fase = faseMasAvanzadaDe(ProyeccionDelSaldo.de(delGrupo, reloj.instant()));
             DeudaActualizada deuda = calculo.deudaActualizadaA(delGrupo, fecha, redondeo);
             obligaciones.add(
                     new ObligacionConDeuda(

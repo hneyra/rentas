@@ -22,6 +22,11 @@ import org.jspecify.annotations.Nullable;
  * numero JSON pasa por coma flotante en cualquier cliente, y un centimo perdido en el transporte es
  * una liquidacion que no cuadra (regla 1, RNF-055).
  *
+ * <p><b>{@code deudaEnConvenio} viaja aparte, y aunque sea cero</b> (#403). Es la deuda del
+ * expediente acogida a un convenio: sigue debiendose, pero la cobra el cronograma y no coactiva.
+ * Sumarla a {@code totalExigible} fue lo que dejaba dictar una REC-2 sobre deuda fraccionada;
+ * esconderla dejaria a la ficha diciendo «nada que cobrar» de quien sigue pagando cuotas.
+ *
  * <p><b>{@code costas} viaja aunque sea cero.</b> Es #42: el sumando existe desde ahora para que la
  * pantalla no tenga que cambiar de forma cuando lo llene, y ningun importe se inventa aqui.
  *
@@ -44,7 +49,9 @@ import org.jspecify.annotations.Nullable;
  * @param deudaMateriaDeCobranza la suma de las cuatro, sin costas
  * @param costas las costas y gastos del procedimiento; cero hasta #42
  * @param totalExigible la deuda materia de cobranza mas las costas
- * @param deudaAlDia a que dia estan las siete cifras anteriores (regla 9, RNF-075)
+ * @param deudaEnConvenio lo acogido a un convenio de fraccionamiento, que <b>no</b> es exigible y
+ *     no esta en {@code totalExigible} (#403); cero si no hay convenio formalizado
+ * @param deudaAlDia a que dia estan las ocho cifras anteriores (regla 9, RNF-075)
  * @param valoresImportados los valores que agrupa, con el dia en que entraron
  * @param historial la traza del expediente, del primero al ultimo
  */
@@ -68,6 +75,7 @@ public record ExpedienteResource(
         String deudaMateriaDeCobranza,
         String costas,
         String totalExigible,
+        String deudaEnConvenio,
         LocalDate deudaAlDia,
         List<ValorImportadoResource> valoresImportados,
         List<MovimientoResource> historial) {
@@ -148,6 +156,7 @@ public record ExpedienteResource(
                 deuda.materiaDeCobranza().valor().toPlainString(),
                 deuda.costas().valor().toPlainString(),
                 deuda.total().valor().toPlainString(),
+                deuda.enConvenio().valor().toPlainString(),
                 deuda.actualizadaA(),
                 List.copyOf(valoresImportados),
                 List.copyOf(traza));

@@ -293,7 +293,8 @@ class DeudasConBeneficioControllerTest {
                             Dinero.de("800.00"),
                             Dinero.de("20.00"),
                             Dinero.de("160.00"),
-                            Dinero.de("20.00")),
+                            Dinero.de("20.00"),
+                            "ORDINARIA"),
                     new ObligacionPublica(
                             "MULTA_TRANSITO",
                             new Ejercicio(2026),
@@ -303,7 +304,8 @@ class DeudasConBeneficioControllerTest {
                             Dinero.de("100.00"),
                             Dinero.de("5.00"),
                             Dinero.de("40.00"),
-                            Dinero.de("5.00")));
+                            Dinero.de("5.00"),
+                            "ORDINARIA"));
         }
     }
 

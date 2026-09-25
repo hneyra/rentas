@@ -38,6 +38,9 @@ public class ConsultaDeDeudaCuentaCorriente implements ConsultaDeDeudaPublica {
                 deuda.insoluto(),
                 deuda.reajuste(),
                 deuda.interes(),
-                deuda.gasto());
+                deuda.gasto(),
+                // La fase ya estaba calculada y se descartaba aqui (#403): sin ella, coactiva
+                // sumaba la deuda acogida a un convenio como si fuera exigible.
+                obligacion.fase().name());
     }
 }

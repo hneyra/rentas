@@ -52,8 +52,11 @@ import org.springframework.web.bind.annotation.RestController;
  *   <li><b>{@code estado = FRACCIONADO}</b> no es un estado del procedimiento: los seis del manual
  *       —011 a 051— son los que ofrece {@code expediente_historial}, y «FRACCIONADO» no esta entre
  *       ellos. Suscribir un convenio no mueve el expediente (vease {@code FraccionarEnCoactiva}):
- *       lo que ocurre es que su deuda pasa a fase {@code CONVENIO} en el libro y el expediente deja
- *       de tener deuda coactiva exigible, que es un hecho y no una etiqueta.
+ *       lo que ocurre, al formalizarse, es que su deuda pasa a fase {@code CONVENIO} en el libro y
+ *       deja de contarse como deuda coactiva exigible, que es un hecho y no una etiqueta. Hasta
+ *       #403 este parrafo y el 422 lo afirmaban sin que fuera cierto: la deuda del expediente
+ *       sumaba lo acogido como exigible. Desde #403 {@code ConsultaDeExpedientes} lo separa por la
+ *       fase.
  * </ul>
  *
  * <h2>La fecha de calculo es de quien consulta</h2>
@@ -278,9 +281,10 @@ public class DeudaCoactivaController {
                     CodigoDeError.VALIDACION,
                     "«FRACCIONADO» no es un estado del procedimiento coactivo: los del manual son"
                             + " 011 REC 01 EMITIDO, 012 REC 01 NOTIFICADA, 021 REC 02 EMITIDA, 031"
-                            + " MEDIDA CAUTELAR, 041 SUSPENDIDO y 051 CONCLUIDO. Suscribir un"
-                            + " convenio no mueve el expediente: mueve su deuda a fase CONVENIO en"
-                            + " el libro, y el expediente deja de tener deuda coactiva exigible");
+                            + " MEDIDA CAUTELAR, 041 SUSPENDIDO y 051 CONCLUIDO. Un convenio no"
+                            + " mueve el expediente: al formalizarse mueve su deuda a fase"
+                            + " CONVENIO en el libro, y esa deuda deja de contarse como deuda"
+                            + " coactiva exigible");
         }
         try {
             return EstadoDelExpediente.porNombre(valor);

@@ -129,7 +129,8 @@ class LaCostaCaeEnSuActoTest {
                                     Dinero.de("500.00"),
                                     Dinero.CERO,
                                     Dinero.CERO,
-                                    Dinero.CERO));
+                                    Dinero.CERO,
+                                    "COACTIVA"));
 
     private final ContribuyentesDeMentira contribuyentes =
             new ContribuyentesDeMentira()

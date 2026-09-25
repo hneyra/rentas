@@ -369,7 +369,8 @@ class VehiculosDelContribuyenteControllerTest {
                             Dinero.de("120.00"),
                             Dinero.CERO,
                             Dinero.CERO,
-                            Dinero.CERO),
+                            Dinero.CERO,
+                            "ORDINARIA"),
                     new ObligacionPublica(
                             "PREDIAL",
                             new Ejercicio(2026),
@@ -379,7 +380,8 @@ class VehiculosDelContribuyenteControllerTest {
                             Dinero.de("900.00"),
                             Dinero.CERO,
                             Dinero.CERO,
-                            Dinero.CERO));
+                            Dinero.CERO,
+                            "ORDINARIA"));
         }
     }
 

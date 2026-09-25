@@ -566,7 +566,8 @@ class ValorRepositoryJdbcTest {
                                                 Dinero.de("100.00"),
                                                 Dinero.CERO,
                                                 Dinero.CERO,
-                                                Dinero.CERO));
+                                                Dinero.CERO,
+                                                "ORDINARIA"));
                             },
                             new MovimientoDeFase() {
                                 @Override
