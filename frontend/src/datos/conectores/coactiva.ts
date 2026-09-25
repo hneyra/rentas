@@ -6,6 +6,7 @@ import { formatearFecha, formatearImporte } from '../../dominio/formato.ts';
 import type {
   ActoDelExpediente,
   LiquidacionDeCostas,
+  Paginado,
   PrescripcionDeclarada,
   ProcesoDelExpediente,
   ResumenDeLaCarteraCoactiva,
@@ -368,24 +369,71 @@ async function costasDe(numero: string, senal: AbortSignal): Promise<CostasDelEx
   }
 }
 
-/** Lo que `coa-cost` necesita de sus dos operaciones, ya pedido. */
+/** Lo que `coa-cost` necesita de sus tres operaciones, ya pedido. */
 interface CostasYPrescripcion {
   readonly liquidacion: LiquidacionDeCostas;
-  /** La primera declaracion sobre el tributo de la liquidacion, o `null` si no hay ninguna. */
-  readonly prescripcion: PrescripcionDeclarada | null;
+  /**
+   * El codigo del obligado del expediente de la liquidacion, leido del proceso (#386). Es el sujeto
+   * de la segunda lectura, y `repartir` lo vuelve a mirar: ver `plazoDelObligado`.
+   */
+  readonly obligado: string;
+  /** Las declaraciones de ese obligado sobre el tributo de la liquidacion, tal como llegaron. */
+  readonly declaradas: Paginado<PrescripcionDeclarada>;
+}
+
+/**
+ * **El plazo del art. 43 del OBLIGADO, o `null` si no hay uno solo que decir** (#386).
+ *
+ * El plazo es del deudor y no del tributo: lo elige la causal de cada declaracion —cuatro anios si
+ * declaro, seis si no, diez para el agente de retencion—. Por eso `null` en tres casos, y los tres
+ * acaban en «no publicado» y nunca en un plazo ajeno:
+ *
+ * <ul>
+ *   <li><b>Una fila que no es del obligado.</b> Es la defensa en profundidad: la ruta ya pide
+ *       `?codContribuyente=`, y si aun asi llega una declaracion de otro es que el filtro no se
+ *       aplico —y entonces la pagina tampoco es la relacion completa del obligado—. No se filtra
+ *       aqui para quedarse con las suyas: se desconfia de la respuesta entera.</li>
+ *   <li><b>Plazos distintos.</b> Un mismo obligado puede tener varias declaraciones sobre el
+ *       tributo con causales distintas, y el campo no elige una: elegir la primera pondria un plazo
+ *       plausible donde hay dos.</li>
+ *   <li><b>`hayMas`.</b> Lo que no llego puede ser la declaracion que difiere.</li>
+ * </ul>
+ *
+ * Y `null` tambien cuando el obligado no declaro nada, que es lo que el campo decia ya.
+ */
+function plazoDelObligado(
+  obligado: string,
+  declaradas: Paginado<PrescripcionDeclarada>,
+): string | null {
+  if (declaradas.hayMas) return null;
+  if (declaradas.contenido.some((declaracion) => declaracion.codContribuyente !== obligado)) {
+    return null;
+  }
+  const plazos = new Set(declaradas.contenido.map((declaracion) => declaracion.plazo));
+  const [unico] = plazos;
+  return plazos.size === 1 && unico !== undefined ? unico : null;
 }
 
 /**
  * `coa-cost` — la liquidacion de costas y el plazo de prescripcion.
  *
- * <h2>Dos operaciones, y la segunda se acota con lo que trae la primera</h2>
+ * <h2>Tres operaciones, y el sujeto de la ultima es el OBLIGADO (#386)</h2>
  *
- * `GET /coactiva/liquidaciones-costas` trae la liquidacion con su detalle **linea por acto**, y
- * `GET /coactiva/prescripcion?tributo=` la relacion de declaraciones sobre **ese mismo tributo**.
- * El tributo es la unica llave que las dos comparten: `LiquidacionResource` no publica el
- * contribuyente, asi que `?codContribuyente=` no tiene de donde salir. Sin acotar, lo que llegaria
- * seria la primera declaracion de la relacion entera —de cualquiera— y al lado de una liquidacion
- * se leeria como suya.
+ * `GET /coactiva/liquidaciones-costas` trae la liquidacion con su detalle **linea por acto**;
+ * `GET /coactiva/expedientes/{numero}/proceso`, pedido con su `expedCoact`, trae el expediente y
+ * con el `codContribuyente` del obligado; y `GET /coactiva/prescripcion?codContribuyente=&tributo=`
+ * trae las declaraciones de **ese obligado** sobre el tributo de la liquidacion.
+ *
+ * Hasta #386 la tercera se acotaba solo por el tributo, con la premisa escrita de que
+ * «`LiquidacionResource` no publica el contribuyente, asi que `?codContribuyente=` no tiene de
+ * donde salir». La premisa era falsa —el expediente lo publica, y la liquidacion publica el
+ * expediente— y acotar por tributo no evitaba lo que queria evitar: llegaba la declaracion mas
+ * antigua **de cualquiera** sobre ese tributo, y al lado de un expediente «6 ANIOS» se leia como
+ * del obligado cuando el suyo eran cuatro. El plazo del art. 43 es lo que mira el ejecutor para
+ * saber si la accion de cobro sigue viva.
+ *
+ * La peticion de mas es el coste de no tocar el contrato: que `LiquidacionResource` publicara el
+ * `codContribuyente` la ahorraria, pero es un cambio de API.
  *
  * <h2>Campo a campo: tres con dato y TRES «no publicado», y los tres motivos son distintos</h2>
  *
@@ -395,7 +443,8 @@ interface CostasYPrescripcion {
  *       <b>liquidado</b>, y una liquidacion puede cubrir un subconjunto —`LiquidarCostas` recibe
  *       los actos que se liquidan—. Contar sus lineas daria un numero exacto y falso: los actos
  *       dictados en el expediente los publica `GET /coactiva/expedientes/{numero}/proceso`, que
- *       esta pantalla no pide.</li>
+ *       desde #386 esta pantalla pide —por el obligado— sin contar todavia sus `actuaciones[]`:
+ *       encender este campo es una decision aparte, y #386 no la toma.</li>
  *   <li><b>Costas tasadas</b> ← `totalS`, con `fecha`. El backend lo dice en su propio javadoc:
  *       `totalS` es «lo liquidado, congelado a `fecha`», que es exactamente la suma de la tabla de
  *       abajo — y por eso <b>no se suma aqui</b>: se pide.</li>
@@ -406,11 +455,12 @@ interface CostasYPrescripcion {
  *       artboard lo escribe como tasadas + gastos; con los gastos sin publicar, escribir aqui
  *       `totalS` seria afirmar que los gastos son cero. Un cero calculado mal no es informacion:
  *       es una mentira con formato.</li>
- *   <li><b>Reloj de prescripcion</b> ← `plazo` de la declaracion, «4 ANIOS»: el plazo del art. 43
+ *   <li><b>Reloj de prescripcion</b> ← `plazo` de las declaraciones del obligado, «4 ANIOS»: el plazo del art. 43
  *       leido del conjunto sellado. <b>No es la fecha en que prescribe</b>, y no se calcula: la
  *       relacion no la publica —sale del computo ejercicio por ejercicio de `POST
  *       /coactiva/prescripcion`— y el propio backend advierte que «no es el inicio mas el plazo».
- *       Sin ninguna declaracion sobre ese tributo, el campo dice «no publicado».</li>
+ *       Sin ninguna declaracion del obligado sobre ese tributo, o con dos que no dicen el mismo
+ *       plazo, el campo dice «no publicado» — y nunca el plazo de otro (ver `plazoDelObligado`).</li>
  * </ul>
  *
  * <h2>La tabla: tres columnas de cuatro</h2>
@@ -427,46 +477,56 @@ const COA_COST: Conector = {
     const relacion = await pedirPagina<LiquidacionDeCostas>(RUTAS.liquidacionesDeCostas, senal);
     const liquidacion = relacion.contenido[0];
     if (liquidacion === undefined) return null;
-    const declaradas = await pedirPagina<PrescripcionDeclarada>(
-      RUTAS.prescripcionesDe(liquidacion.tributo),
+    // El obligado sale del expediente de la liquidacion (#386): es el sujeto de la lectura de
+    // abajo, y no el tributo.
+    const { expediente } = await pedirUno<ProcesoDelExpediente>(
+      RUTAS.procesoDelExpediente(liquidacion.expedCoact),
       senal,
     );
-    return { liquidacion, prescripcion: declaradas.contenido[0] ?? null };
+    const declaradas = await pedirPagina<PrescripcionDeclarada>(
+      RUTAS.prescripcionesDe({
+        codContribuyente: expediente.codContribuyente,
+        tributo: liquidacion.tributo,
+      }),
+      senal,
+    );
+    return { liquidacion, obligado: expediente.codContribuyente, declaradas };
   },
-  repartir: ({ liquidacion, prescripcion }: CostasYPrescripcion): Reparto => ({
-    valores: new Map([
-      [coordenada(0, 0), liquidacion.expedCoact],
-      [coordenada(0, 2), importeConSuFecha(liquidacion.totalS, liquidacion.fecha)],
-      ...(prescripcion === null
-        ? []
-        : ([[coordenada(0, 5), prescripcion.plazo]] as const)),
-    ]),
-    filas: new Map(),
-    tablas: new Map([
-      [
-        'costas-por-acto',
-        {
-          filas: liquidacion.costas.map((costa) => ({
-            clave: String(costa.actoId),
-            celdas: [
-              costa.descripcion,
-              costa.arancelFuente,
-              // Desde #195 la celda dice POR QUE, y no solo que no hay: el arancel tarifa el acto
-              // una vez, asi que una cantidad no significaria nada aqui.
-              sinDato(SIN_CANTIDAD),
-              costa.montoS,
-            ],
-          })),
-        },
-      ],
-    ]),
-    noPublicados: new Map([
-      [coordenada(0, 1), NO_PUBLICADO],
-      [coordenada(0, 3), NO_PUBLICADO],
-      [coordenada(0, 4), NO_PUBLICADO],
-      ...(prescripcion === null ? ([[coordenada(0, 5), NO_PUBLICADO]] as const) : []),
-    ]),
-  }),
+  repartir: ({ liquidacion, obligado, declaradas }: CostasYPrescripcion): Reparto => {
+    const plazo = plazoDelObligado(obligado, declaradas);
+    return {
+      valores: new Map([
+        [coordenada(0, 0), liquidacion.expedCoact],
+        [coordenada(0, 2), importeConSuFecha(liquidacion.totalS, liquidacion.fecha)],
+        ...(plazo === null ? [] : ([[coordenada(0, 5), plazo]] as const)),
+      ]),
+      filas: new Map(),
+      tablas: new Map([
+        [
+          'costas-por-acto',
+          {
+            filas: liquidacion.costas.map((costa) => ({
+              clave: String(costa.actoId),
+              celdas: [
+                costa.descripcion,
+                costa.arancelFuente,
+                // Desde #195 la celda dice POR QUE, y no solo que no hay: el arancel tarifa el acto
+                // una vez, asi que una cantidad no significaria nada aqui.
+                sinDato(SIN_CANTIDAD),
+                costa.montoS,
+              ],
+            })),
+          },
+        ],
+      ]),
+      noPublicados: new Map([
+        [coordenada(0, 1), NO_PUBLICADO],
+        [coordenada(0, 3), NO_PUBLICADO],
+        [coordenada(0, 4), NO_PUBLICADO],
+        ...(plazo === null ? ([[coordenada(0, 5), NO_PUBLICADO]] as const) : []),
+      ]),
+    };
+  },
 };
 
 /**
@@ -501,6 +561,7 @@ export {
   costaDelActo,
   costasPorActo,
   importeConSuFecha,
+  plazoDelObligado,
   sinDato,
 };
 export type { CostasDelExpediente, CostasYPrescripcion, ProcesoYSusCostas };

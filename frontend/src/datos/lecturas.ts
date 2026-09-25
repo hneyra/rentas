@@ -1972,25 +1972,49 @@ export const RUTAS = {
   liquidacionesDelExpediente: (numero: string) =>
     `/coactiva/liquidaciones-costas?nroExpedCoact=${encodeURIComponent(numero)}&tamano=100`,
   /**
-   * Las prescripciones declaradas **sobre un tributo**.
+   * Las prescripciones declaradas **por UN obligado sobre un tributo** (#386).
    *
-   * `?tributo=` es el unico parametro que las dos operaciones de `coa-cost` comparten: la
-   * liquidacion publica su `tributo` y la relacion de prescripciones lo admite como filtro. Sin
-   * el, lo que llegaria seria la primera declaracion de la relacion entera —de cualquier
-   * contribuyente y de cualquier tributo—, que al lado de una liquidacion se leeria como suya.
+   * El plazo del art. 43 **es del deudor, no del tributo**: lo elige la causal de cada declaracion
+   * —`DECLARACION_PRESENTADA`, `SIN_DECLARACION` o `AGENTE_RETENCION`, cuatro, seis o diez
+   * anios—. Hasta #386 esta ruta se acotaba solo por `?tributo=`, con una premisa escrita que era
+   * falsa —«`LiquidacionResource` no publica el contribuyente, asi que `?codContribuyente=` no
+   * tiene de donde salir»—, y lo que llegaba era la declaracion mas antigua **de cualquiera** sobre
+   * ese tributo: el backend ordena por `fechaPresentacion` en sentido ascendente. `coa-cost` la
+   * pintaba al lado de un expediente como si fuera del obligado.
    *
-   * Lo que NO se puede acotar es el contribuyente: `LiquidacionResource` no publica ninguno, asi
-   * que `?codContribuyente=` —que el contrato si declara— no tiene de donde salir aqui.
+   * El codigo si tiene de donde salir: la liquidacion publica `expedCoact`, y
+   * `procesoDelExpediente` publica `expediente.codContribuyente`. Es `coa-cost` quien encadena las
+   * tres lecturas; aqui solo se escribe la ruta con los dos filtros, que el contrato publica
+   * (`docs/50-api/parametros-de-la-api.json`). Un codigo que no esta en el padron contesta 404.
+   *
+   * Los dos filtros van **con nombre** y no por posicion: son dos textos, y cruzarlos daria una
+   * ruta valida que pide otra cosa.
+   *
+   * <h2>`?tamano=100`, y no `1` ni `2`</h2>
+   *
+   * Un mismo obligado puede tener varias declaraciones sobre el tributo con causales distintas, y
+   * entonces el campo no debe elegir una. Con `?tamano=1` no se veria la segunda; con `?tamano=2`
+   * no se veria la tercera, que puede ser la que difiere. Lo que se pide es **la relacion entera
+   * del obligado**, holgada como la de `liquidacionesDelExpediente` —cien declaraciones de
+   * prescripcion de un obligado sobre un tributo no existen— y **el conector comprueba `hayMas`**:
+   * si alguna vez no cupieran, el campo dice «no publicado» en vez de afirmar un plazo.
    */
-  prescripcionesDe: (tributo: string) =>
-    `/coactiva/prescripcion?tributo=${encodeURIComponent(tributo)}&tamano=1`,
+  prescripcionesDe: ({
+    codContribuyente,
+    tributo,
+  }: {
+    readonly codContribuyente: string;
+    readonly tributo: string;
+  }) =>
+    `/coactiva/prescripcion?codContribuyente=${encodeURIComponent(codContribuyente)}` +
+    `&tributo=${encodeURIComponent(tributo)}&tamano=100`,
   /**
    * **La bitacora entera de declaraciones de prescripcion**, sin filtrar (#230).
    *
-   * No lleva `?tributo=` —al reves que `prescripcionesDe`, que es de `coa-cost` y acota a la
-   * liquidacion que dibuja al lado—: `val-tip` ensena la bitacora, y acotarla a un tributo
-   * elegido aqui seria elegir por quien mira. Los tres desplegables de la pantalla todavia no
-   * llegan al conector, y eso es #172.
+   * No lleva `?tributo=` —al reves que `prescripcionesDe`, que es de `coa-cost` y acota al
+   * obligado y al tributo de la liquidacion que dibuja al lado (#386)—: `val-tip` ensena la
+   * bitacora, y acotarla a un tributo elegido aqui seria elegir por quien mira. Los tres
+   * desplegables de la pantalla todavia no llegan al conector, y eso es #172.
    *
    * **`?tamano=20` y no la relacion entera**, que es lo que el backend daria por omision. Lo que
    * se dibuja son los ejercicios de esas veinte declaraciones, asi que la tabla ensena una

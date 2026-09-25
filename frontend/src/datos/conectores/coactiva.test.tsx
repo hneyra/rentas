@@ -26,6 +26,7 @@ import {
   SIN_CANTIDAD,
   SIN_MEDIDA,
   costasPorActo,
+  plazoDelObligado,
   sinDato,
 } from './coactiva.ts';
 
@@ -323,7 +324,8 @@ describe('`coa-exp` — el expediente, sus actos y la costa de cada uno', () => 
 describe('`coa-cost` — las costas liquidadas y el plazo de prescripcion', () => {
   const reparto = COA_COST.repartir({
     liquidacion: LIQUIDACION,
-    prescripcion: PRESCRIPCION,
+    obligado: EXPEDIENTE.codContribuyente,
+    declaradas: envolver([PRESCRIPCION]),
   } as never);
 
   it('el expediente y las costas tasadas salen de la liquidacion, con su fecha', () => {
@@ -332,18 +334,32 @@ describe('`coa-cost` — las costas liquidadas y el plazo de prescripcion', () =
     expect(reparto.valores.get(coordenada(0, 2))).toBe('S/ 96.00 · 06/09/2026');
   });
 
-  it('el reloj sale de la prescripcion declarada sobre el MISMO tributo', () => {
+  it('el reloj sale de la prescripcion declarada por el OBLIGADO sobre el mismo tributo', () => {
     expect(reparto.valores.get(coordenada(0, 5))).toBe('4 ANIOS');
   });
 
-  it('sin ninguna declaracion sobre ese tributo, el reloj dice «no publicado»', () => {
+  it('sin ninguna declaracion del obligado sobre ese tributo, el reloj dice «no publicado»', () => {
     const sinDeclarar = COA_COST.repartir({
       liquidacion: LIQUIDACION,
-      prescripcion: null,
+      obligado: EXPEDIENTE.codContribuyente,
+      declaradas: envolver([]),
     } as never);
 
     expect(sinDeclarar.valores.has(coordenada(0, 5))).toBe(false);
     expect(sinDeclarar.noPublicados.get(coordenada(0, 5))).toBe(NO_PUBLICADO);
+  });
+
+  it('LA DEFENSA DE #386: una declaracion de OTRO obligado no se escribe, aunque llegue', () => {
+    // La ruta ya pide `?codContribuyente=`. Si aun asi llega la de otro, el filtro no se aplico,
+    // y al lado de un expediente su plazo se leeria como del obligado.
+    const deOtro = COA_COST.repartir({
+      liquidacion: LIQUIDACION,
+      obligado: EXPEDIENTE.codContribuyente,
+      declaradas: envolver([{ ...PRESCRIPCION, codContribuyente: '00000000031', plazo: '6 ANIOS' }]),
+    } as never);
+
+    expect(deOtro.valores.has(coordenada(0, 5))).toBe(false);
+    expect(deOtro.noPublicados.get(coordenada(0, 5))).toBe(NO_PUBLICADO);
   });
 
   it('y los TRES que no se publican lo dicen, en vez de sumarse sobre la pagina', () => {
@@ -376,6 +392,36 @@ describe('`coa-cost` — las costas liquidadas y el plazo de prescripcion', () =
       '18.00',
     ]);
     expect(bloquesDe(pantallaDe('coa-cost'))[0]?.tabla?.columnas).toHaveLength(4);
+  });
+});
+
+describe('`plazoDelObligado` — un plazo, y solo si es uno y del obligado (#386)', () => {
+  const OBLIGADO = EXPEDIENTE.codContribuyente;
+
+  it('varias declaraciones del obligado con el MISMO plazo lo dicen', () => {
+    expect(plazoDelObligado(OBLIGADO, envolver([PRESCRIPCION, { ...PRESCRIPCION, id: 8 }]))).toBe(
+      '4 ANIOS',
+    );
+  });
+
+  it('con plazos distintos no elige ninguno', () => {
+    const dos = envolver([PRESCRIPCION, { ...PRESCRIPCION, id: 8, plazo: '6 ANIOS' }]);
+    expect(plazoDelObligado(OBLIGADO, dos)).toBeNull();
+  });
+
+  it('con `hayMas` tampoco: lo que no llego puede ser la declaracion que difiere', () => {
+    expect(plazoDelObligado(OBLIGADO, { ...envolver([PRESCRIPCION]), hayMas: true })).toBeNull();
+  });
+
+  it('una sola fila de otro obligado tumba la respuesta entera, aunque las demas sean suyas', () => {
+    const mezcladas = envolver([PRESCRIPCION, { ...PRESCRIPCION, codContribuyente: '00000000031' }]);
+    expect(plazoDelObligado(OBLIGADO, mezcladas)).toBeNull();
+  });
+
+  it('y una declaracion sin contribuyente no es del obligado', () => {
+    expect(
+      plazoDelObligado(OBLIGADO, envolver([{ ...PRESCRIPCION, codContribuyente: null }])),
+    ).toBeNull();
   });
 });
 
@@ -454,6 +500,8 @@ interface Instalacion {
   readonly liquidaciones: readonly LiquidacionDeCostas[];
   readonly prescripciones: readonly PrescripcionDeclarada[];
   readonly resumen: ResumenDeLaCarteraCoactiva;
+  /** El backend descuidado: filtra las prescripciones por tributo y NO por obligado (#386). */
+  readonly ignoraElObligado?: boolean;
 }
 
 const COMO_LLEGA: Instalacion = {
@@ -463,6 +511,38 @@ const COMO_LLEGA: Instalacion = {
   prescripciones: [PRESCRIPCION],
   resumen: RESUMEN,
 };
+
+/**
+ * **La relacion de prescripciones como la contesta el backend, y no la misma lista a todo** (#386).
+ *
+ * Hasta #386 el doble contestaba `instalacion.prescripciones` a cualquier `/coactiva/prescripcion`,
+ * y con una sola declaracion de muestra —del mismo obligado que el expediente— la prueba no podia
+ * distinguir una lectura acotada por el obligado de una acotada por el tributo: las dos recibian la
+ * misma fila. Aqui se hace lo que hace `PrescripcionController`: filtrar por `?codContribuyente=`
+ * y `?tributo=` **leidos de la URL**, ordenar por fecha de presentacion en sentido ascendente —el
+ * orden por omision de `ParametrosDePaginacion`— y cortar por `?tamano=`, diciendo `hayMas`.
+ *
+ * `ignoraElObligado` es el backend descuidado: filtra por tributo y no por obligado. Es lo que
+ * ejerce la defensa en profundidad de `repartir`.
+ */
+function relacionDePrescripciones(url: string, instalacion: Instalacion) {
+  const consulta = new URL(url, 'http://doble').searchParams;
+  const obligado = instalacion.ignoraElObligado ? null : consulta.get('codContribuyente');
+  const tributo = consulta.get('tributo');
+  const tamano = Number(consulta.get('tamano') ?? '20');
+  const filtradas = instalacion.prescripciones
+    .filter((d) => obligado === null || d.codContribuyente === obligado)
+    .filter((d) => tributo === null || d.tributo === tributo)
+    .sort((a, b) => a.fechaDePresentacion.localeCompare(b.fechaDePresentacion));
+  return {
+    contenido: filtradas.slice(0, tamano),
+    pagina: 0,
+    tamano,
+    totalElementos: filtradas.length,
+    totalPaginas: Math.max(1, Math.ceil(filtradas.length / tamano)),
+    hayMas: filtradas.length > tamano,
+  };
+}
 
 /** Las URL que se pidieron, en orden. Es lo que dice si la segunda lectura se acoto bien. */
 let pedidas: string[] = [];
@@ -490,7 +570,9 @@ function contesta(instalacion: Instalacion) {
       if (url.includes('/coactiva/liquidaciones-costas')) {
         return json(envolver(instalacion.liquidaciones));
       }
-      if (url.includes('/coactiva/prescripcion')) return json(envolver(instalacion.prescripciones));
+      if (url.includes('/coactiva/prescripcion')) {
+        return json(relacionDePrescripciones(url, instalacion));
+      }
       return Promise.resolve(new Response('{}', { status: 404 }));
     }),
   );
@@ -572,11 +654,13 @@ describe('`coa-cost` dibujada: cada una de sus dos lecturas mueve lo suyo', () =
     expect(screen.getByText('S/ 96.00 · 06/09/2026')).toBeInTheDocument();
     expect(screen.getByText('4 ANIOS')).toBeInTheDocument();
     expect(screen.getByText('ARANCEL_COSTA:REC1 (Ord. 012-2025)')).toBeInTheDocument();
-    // La prescripcion se pidio ACOTADA al tributo de la liquidacion, que es la unica llave que
-    // las dos comparten. Sin acotar, la declaracion de cualquiera se leeria como suya.
-    expect(pedidas.some((url) => url.includes('/coactiva/prescripcion?tributo=PREDIAL'))).toBe(
-      true,
-    );
+    // La prescripcion se pidio ACOTADA al obligado del expediente y al tributo de la liquidacion
+    // (#386). Acotada solo por tributo, la declaracion de cualquiera se leeria como suya.
+    expect(
+      pedidas.some((url) =>
+        url.includes('/coactiva/prescripcion?codContribuyente=00000000008&tributo=PREDIAL'),
+      ),
+    ).toBe(true);
   });
 
   it('LA ROTURA: cambia la liquidacion y cambian las costas, no el reloj', async () => {
@@ -605,6 +689,107 @@ describe('`coa-cost` dibujada: cada una de sus dos lecturas mueve lo suyo', () =
     expect(screen.getByText('6 ANIOS')).toBeInTheDocument();
     expect(screen.queryByText('4 ANIOS')).toBeNull();
     expect(screen.getByText('S/ 96.00 · 06/09/2026')).toBeInTheDocument();
+  });
+});
+
+/**
+ * **La declaracion de OTRO obligado sobre el mismo tributo, y mas antigua** (#386).
+ *
+ * Es la siembra que distingue. El obligado del expediente `2026-0418` es `00000000008`, que
+ * DECLARO el predial: su plazo es «4 ANIOS». Esta es de `00000000031`, que no declaro —«6 ANIOS»—,
+ * y se presento el 10/02/2025, antes que la del 008: en el orden por omision del backend es la
+ * PRIMERA de la relacion de PREDIAL. Una lectura acotada por tributo la recibe a ella.
+ */
+const DE_OTRO_OBLIGADO: PrescripcionDeclarada = {
+  ...PRESCRIPCION,
+  id: 3,
+  codContribuyente: '00000000031',
+  contribuyente: 'GARCIA NUNEZ-ROSA ELENA',
+  fechaDePresentacion: '2025-02-10',
+  plazoAplicable: 'SIN_DECLARACION',
+  plazo: '6 ANIOS',
+  nDeResolucion: 'RES-0007-2025',
+};
+
+describe('`coa-cost` dibujada: el reloj es el del OBLIGADO del expediente, no el del tributo (#386)', () => {
+  it('con una declaracion de otro sobre el mismo tributo, pinta la del obligado: 4 ANIOS', async () => {
+    await dibujar('coa-cost', {
+      ...COMO_LLEGA,
+      prescripciones: [DE_OTRO_OBLIGADO, PRESCRIPCION],
+    });
+
+    expect(screen.getByText('4 ANIOS')).toBeInTheDocument();
+    expect(screen.queryByText('6 ANIOS')).toBeNull();
+    // El sujeto de la segunda lectura sale de la primera: el proceso del expediente de la
+    // liquidacion, y de el el obligado.
+    expect(pedidas.some((url) => url.includes('/coactiva/expedientes/2026-0418/proceso'))).toBe(
+      true,
+    );
+    expect(
+      pedidas.some(
+        (url) =>
+          url.includes('/coactiva/prescripcion?') && url.includes('codContribuyente=00000000008'),
+      ),
+    ).toBe(true);
+  });
+
+  it('si el obligado no declaro nada, el reloj dice «no publicado» y NUNCA el plazo de otro', async () => {
+    await dibujar('coa-cost', { ...COMO_LLEGA, prescripciones: [DE_OTRO_OBLIGADO] });
+
+    expect(screen.queryByText('6 ANIOS')).toBeNull();
+    expect(screen.queryByText('4 ANIOS')).toBeNull();
+    // Los tres de siempre y el reloj.
+    expect(screen.getAllByText('no publicado')).toHaveLength(4);
+  });
+
+  it('si el obligado tiene dos declaraciones con plazos distintos, no se elige una: «no publicado»', async () => {
+    await dibujar('coa-cost', {
+      ...COMO_LLEGA,
+      prescripciones: [
+        PRESCRIPCION,
+        {
+          ...PRESCRIPCION,
+          id: 9,
+          fechaDePresentacion: '2026-05-20',
+          plazoAplicable: 'SIN_DECLARACION',
+          plazo: '6 ANIOS',
+        },
+      ],
+    });
+
+    expect(screen.queryByText('4 ANIOS')).toBeNull();
+    expect(screen.queryByText('6 ANIOS')).toBeNull();
+    expect(screen.getAllByText('no publicado')).toHaveLength(4);
+  });
+
+  it('y si todas las del obligado dicen el MISMO plazo, lo pinta: se pide su relacion, no una fila', async () => {
+    // Con `?tamano=1` —o `2`— llegaria una pagina con `hayMas`, y el campo diria «no publicado»
+    // aunque las tres declaraciones digan lo mismo. La otra, la del 031, no cuenta.
+    await dibujar('coa-cost', {
+      ...COMO_LLEGA,
+      prescripciones: [
+        DE_OTRO_OBLIGADO,
+        PRESCRIPCION,
+        { ...PRESCRIPCION, id: 10, fechaDePresentacion: '2026-04-15' },
+        { ...PRESCRIPCION, id: 11, fechaDePresentacion: '2026-06-30' },
+      ],
+    });
+
+    expect(screen.getByText('4 ANIOS')).toBeInTheDocument();
+    expect(screen.queryByText('6 ANIOS')).toBeNull();
+  });
+
+  it('y si el backend no filtrara por obligado, la defensa de `repartir` no pinta el de otro', async () => {
+    // Solo la del 031: sin la defensa, un backend que no filtra por obligado entregaria UNA
+    // declaracion con UN plazo, y nada mas la distinguiria de la del obligado.
+    await dibujar('coa-cost', {
+      ...COMO_LLEGA,
+      prescripciones: [DE_OTRO_OBLIGADO],
+      ignoraElObligado: true,
+    });
+
+    expect(screen.queryByText('6 ANIOS')).toBeNull();
+    expect(screen.getAllByText('no publicado')).toHaveLength(4);
   });
 });
 
