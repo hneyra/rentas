@@ -185,10 +185,18 @@ public class DeterminarPredial {
     /**
      * Determina —o simula— el predial de un contribuyente.
      *
-     * <p>No abre transaccion propia: la abre {@link RegistrarDeterminacionPredial#registrar}, que
-     * es quien escribe. Envolver esto en una del anfitrion es la trampa que #54 y #72 documentan:
-     * los colaboradores ajenos traen la suya, y una excepcion capturada dentro de la del anfitrion
-     * la deja marcada como <i>rollback-only</i> y revienta al confirmarla.
+     * <p>No abre transaccion propia, y no la abre nadie por ella: <b>la escritura</b> abre la suya
+     * en {@link RegistrarDeterminacionPredial#registrar}, y <b>cada lectura previa trae la
+     * propia</b> —el directorio, el conjunto sellado, los beneficios, el padron ya declarado y la
+     * valuacion sellada ({@code ValuacionRecibidaJdbc}, desde #358)—. Envolver esto en una del
+     * anfitrion es la trampa que #54 y #72 documentan: una excepcion capturada dentro de la del
+     * anfitrion la deja marcada como <i>rollback-only</i> y revienta al confirmarla.
+     *
+     * <p>Hasta #358 este parrafo decia que la transaccion «la abre {@code registrar}», y dejo de
+     * ser cierto con #52: la precedencia de la valuacion sellada anadio una lectura de {@code
+     * valuacion_predio} <b>antes</b> de {@code registrar}, que corria en autocommit y sin {@code
+     * SET LOCAL}, y la politica de RLS la hacia fallar con un 500. Un colaborador nuevo que lea la
+     * base tiene que traer su transaccion: aqui no hay ninguna a la que unirse.
      *
      * @param peticion que se determina y con que autovaluos
      * @param observacion por que (regla 10); se exige tambien al simular

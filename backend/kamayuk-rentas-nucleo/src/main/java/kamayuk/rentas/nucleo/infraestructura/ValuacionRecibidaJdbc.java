@@ -13,6 +13,7 @@ import kamayuk.rentas.persistencia.RepositorioJdbc;
 import org.jspecify.annotations.Nullable;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Lee lo que la proyeccion de valuacion tiene (P5C, `V5`).
@@ -20,6 +21,27 @@ import org.springframework.stereotype.Repository;
  * <p>Ni un `INSERT`: quien escribe estas dos tablas es `rol_ingestor_catastro`, y a `kamayuk_app`
  * `V5` no le da mas que `SELECT`. Eso no es disciplina de esta clase — es un privilegio, y
  * `ProyeccionDeSoloLecturaTest` lo comprueba contra el catalogo.
+ *
+ * <h2>Los cinco metodos llevan {@code @Transactional}, y no es decorativo (#358)</h2>
+ *
+ * <p>Es la excepcion declarada a la convencion de {@link RepositorioJdbc} —«no abre transacciones:
+ * las abre {@code @Transactional} sobre el caso de uso»—, y vale para una <b>proyeccion de solo
+ * lectura</b> como esta: no hay escritura que esa convencion tenga que proteger, y en cambio la
+ * lectura si necesita su transaccion. {@code valuacion_predio} y {@code valuacion_corrida} tienen
+ * RLS forzada con la forma estricta de {@code current_setting}, y el {@code SET LOCAL} que la
+ * politica lee lo emite {@code TenantTransactionManager} <b>al abrir una transaccion</b>: sin ella,
+ * PostgreSQL no devuelve cero filas, falla — 42704 «unrecognized configuration parameter» en una
+ * conexion nueva, 22P02 en una que ya sirvio otra transaccion —.
+ *
+ * <p>Y hay un llamador que no puede ponerla: {@code DeterminarPredial#determinar} no es
+ * transaccional a proposito —una excepcion capturada dentro de la transaccion del anfitrion la deja
+ * <i>rollback-only</i> (#54, #72)— y desde #52 lee {@link #deLosPredios} antes de escribir. Hasta
+ * #358 esa lectura corria en autocommit y toda determinacion predial, individual, masiva o
+ * simulada, contestaba 500 en cuanto el conjunto trajera los puntos {@code REDONDEO}. Con
+ * propagacion {@code REQUIRED}, cada metodo se une a la transaccion de {@code CandadoDeEmision}
+ * cuando la hay y abre la suya cuando no: la frontera de una lectura bajo RLS la pone quien lee, no
+ * quien se acuerde. Es la misma doctrina de {@code LecturaDeLaCopiaLocalJdbc}, y la vigila {@code
+ * DeterminarPredialContraLaValuacionDeLaBaseTest}, que llama sin envolver.
  */
 @Repository
 public class ValuacionRecibidaJdbc extends RepositorioJdbc implements ValuacionRecibida {
@@ -29,6 +51,7 @@ public class ValuacionRecibidaJdbc extends RepositorioJdbc implements ValuacionR
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Optional<CierreDeCorrida> cierreDe(Ejercicio ejercicio) {
         return jdbc().sql(
                         """
@@ -61,6 +84,7 @@ public class ValuacionRecibidaJdbc extends RepositorioJdbc implements ValuacionR
             """;
 
     @Override
+    @Transactional(readOnly = true)
     public Optional<ValuacionSellada> delPredio(Ejercicio ejercicio, long predioId) {
         return jdbc().sql(COLUMNAS_DE_LA_VALUACION + "   AND predio_id = :predio")
                 .param("ejercicio", ejercicio.valor())
@@ -70,6 +94,7 @@ public class ValuacionRecibidaJdbc extends RepositorioJdbc implements ValuacionR
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Map<Long, ValuacionSellada> deLosPredios(Ejercicio ejercicio, List<Long> predioIds) {
         Map<Long, ValuacionSellada> porPredio = new LinkedHashMap<>();
         if (predioIds.isEmpty()) {
@@ -116,6 +141,7 @@ public class ValuacionRecibidaJdbc extends RepositorioJdbc implements ValuacionR
     }
 
     @Override
+    @Transactional(readOnly = true)
     public long valuacionesRecibidasDe(Ejercicio ejercicio) {
         return jdbc().sql("SELECT count(*) FROM valuacion_predio WHERE ejercicio = :ejercicio")
                 .param("ejercicio", ejercicio.valor())
@@ -124,6 +150,7 @@ public class ValuacionRecibidaJdbc extends RepositorioJdbc implements ValuacionR
     }
 
     @Override
+    @Transactional(readOnly = true)
     public String huellaDeLoRecibido(Ejercicio ejercicio) {
         // La huella de las huellas, en un orden TOTAL y declarado. Sin `ORDER BY` el agregado
         // depende del plan, y entonces la misma proyeccion daria huellas distintas segun por
