@@ -47,25 +47,38 @@ public class VehiculoRepositoryJdbc extends RepositorioJdbc implements VehiculoR
                     + " v.estado, v.valor_adquisicion, v.fecha_adquisicion, c.nombre_razon_social,"
                     + " c.codigo_contribuyente";
 
+    /**
+     * La placa, por su columna generada {@code placa_busqueda} ({@code V32}, #511): la placa sin
+     * guion, que es la forma con que {@code Placa} compara.
+     *
+     * <p>No se escribe {@code replace(placa, '-', '') = :placa}, aunque diga lo mismo: {@code
+     * replace} no es <i>leakproof</i>, asi que bajo RLS PostgreSQL no evalua esa condicion antes de
+     * la politica y no la lleva a ningun indice —ni al construido sobre esa misma expresion, que es
+     * lo que V1 tenia—. Cada busqueda leia el padron entero del inquilino: 29 999 filas descartadas
+     * de 30 000 en {@code LaPlacaDelVehiculoEnElPlanTest}. La igualdad sobre una columna si es
+     * <i>leakproof</i>, y entra en el {@code Index Cond} de {@code vehiculo_placa_uq} junto a la
+     * politica. Es el quinto hallazgo de DAT-01 §0, y la misma salida que {@code V27} tomo en
+     * {@code sanciones}.
+     */
+    static final String POR_PLACA =
+            "SELECT " + COLUMNAS + " FROM vehiculo WHERE placa_busqueda = :placa";
+
+    /** El filtro de placa de {@link #buscar}, por la misma columna que {@link #POR_PLACA}. */
+    static final String CONDICION_DE_PLACA = "v.placa_busqueda = :placa";
+
     public VehiculoRepositoryJdbc(JdbcClient jdbc) {
         super(jdbc);
     }
 
     /**
      * Busca comparando la placa <b>sin su guion</b>, igual que la compara {@code Placa} y que la
-     * exige el indice unico de V17.
-     *
-     * <p>{@code replace(placa,'-','')} sobre la columna es exactamente la expresion del indice, asi
-     * que el planificador puede usarlo. Escrito de cualquier otra forma equivalente —un {@code
-     * translate}, un {@code LIKE}— el indice deja de servir y la busqueda por placa, que es la mas
-     * frecuente en ventanilla, pasa a recorrer el padron entero.
+     * exige el indice unico {@code vehiculo_placa_uq}: los dos sobre {@code placa_busqueda} desde
+     * {@code V32} (#511). Ver {@link #POR_PLACA}: la busqueda por placa es la mas frecuente en
+     * ventanilla, y escrita sobre una funcion de la columna recorre el padron entero.
      */
     @Override
     public Optional<Vehiculo> findByPlaca(Placa placa) {
-        return jdbc().sql(
-                        "SELECT "
-                                + COLUMNAS
-                                + " FROM vehiculo WHERE replace(placa, '-', '') = :placa")
+        return jdbc().sql(POR_PLACA)
                 .param("placa", placa.sinSeparador())
                 .query(VehiculoRepositoryJdbc::mapear)
                 .optional();
@@ -82,9 +95,10 @@ public class VehiculoRepositoryJdbc extends RepositorioJdbc implements VehiculoR
     /**
      * El padron con el titular resuelto en el mismo {@code JOIN} (#25).
      *
-     * <p>{@code placa} es por igualdad —sin el guion, como {@link #findByPlaca}— y no por prefijo:
-     * un {@code LIKE} bajo RLS no llega nunca al indice (ver {@code FichaCatastralRepositoryJdbc}),
-     * y la placa completa es lo que trae ventanilla cuando busca un vehiculo concreto.
+     * <p>{@code placa} es por igualdad —sin el guion y por {@code placa_busqueda}, como {@link
+     * #findByPlaca}— y no por prefijo: un {@code LIKE} bajo RLS no llega nunca al indice (ver
+     * {@code FichaCatastralRepositoryJdbc}), y la placa completa es lo que trae ventanilla cuando
+     * busca un vehiculo concreto.
      */
     @Override
     public Pagina<VehiculoEncontrado> buscar(CriterioDeVehiculo criterio, Paginacion paginacion) {
@@ -92,8 +106,8 @@ public class VehiculoRepositoryJdbc extends RepositorioJdbc implements VehiculoR
         Map<String, Object> parametros = new HashMap<>();
 
         if (criterio.placa() != null) {
-            condiciones.add("replace(v.placa, '-', '') = :placa");
-            parametros.put("placa", criterio.placa().replace("-", ""));
+            condiciones.add(CONDICION_DE_PLACA);
+            parametros.put("placa", Placa.formaDeBusqueda(criterio.placa()));
         }
         if (criterio.nroMotor() != null) {
             condiciones.add("v.numero_motor = :nroMotor");
