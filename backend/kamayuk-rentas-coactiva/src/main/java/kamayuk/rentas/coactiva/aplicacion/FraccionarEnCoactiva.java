@@ -121,26 +121,28 @@ public class FraccionarEnCoactiva {
      * que se vea en el punto donde se escribe, y ArchUnit la comprueba mirando los parametros del
      * metodo transaccional.
      *
+     * <p><b>Es la unica puerta, y la transaccion va en ella (#406).</b> Hasta #406 habia dos
+     * sobrecargas: la de dos argumentos llevaba {@code @Transactional} y llamaba a esta, que no la
+     * llevaba — y el controlador llama a esta. El proxy mira el atributo transaccional del metodo
+     * que se <b>invoca</b>, asi que por el borde la lectura del expediente corria en autocommit,
+     * sin {@code SET LOCAL}, y la politica de {@code expediente_coactivo} la rechazaba: 500 en cada
+     * registro, incluso para un expediente que no existe. Las pruebas no lo veian porque entraban
+     * por la otra puerta. Con una sola, lo que se prueba es lo que el borde usa.
+     *
+     * <p>Y la transaccion es <b>una</b> para las tres cosas —leer el expediente, simular para la
+     * guarda de fase y registrar—: envolver solo la lectura dejaria la guarda y la escritura en
+     * transacciones distintas.
+     *
+     * @param claveDeIdempotencia la cabecera {@code Idempotency-Key} (#606); con {@code null} cada
+     *     envio es un intento distinto
      * @throws CambiarEstadoDelExpediente.ExpedienteInexistente si no hay expediente con ese numero
      * @throws CambiarEstadoDelExpediente.ExpedienteConcluido si el procedimiento ya termino
      * @throws DeudaAjenaAlProcedimiento si alguna cuota no viene de la fase coactiva
      * @throws FraccionamientoCoactivo.SinDeudaCoactivaQueFraccionar si no hay deuda a esa fecha
      */
     @Transactional
-    public ConvenioCoactivo fraccionar(Peticion peticion, Observacion observacion) {
-        return fraccionar(peticion, null, observacion);
-    }
-
-    /**
-     * El mismo acto, con la clave de idempotencia del intento (#606).
-     *
-     * <p>La sobrecarga de arriba conserva la firma que ya usaban las pruebas y quien no manda
-     * cabecera; con {@code null} cada envio es un intento distinto, que es lo que era antes.
-     */
     public ConvenioCoactivo fraccionar(
-            Peticion peticion,
-            @org.jspecify.annotations.Nullable String claveDeIdempotencia,
-            Observacion observacion) {
+            Peticion peticion, @Nullable String claveDeIdempotencia, Observacion observacion) {
         Objects.requireNonNull(peticion, "No se fracciona sin peticion");
         Objects.requireNonNull(observacion, "Sin observacion no se guarda (regla 10, RNF-052)");
 
