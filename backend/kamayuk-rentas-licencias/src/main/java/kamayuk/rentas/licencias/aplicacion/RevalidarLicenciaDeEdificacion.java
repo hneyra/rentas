@@ -80,6 +80,9 @@ public class RevalidarLicenciaDeEdificacion {
      * @param numeroDeRecibo el recibo de caja de tasas del derecho
      * @throws kamayuk.rentas.dominio.ActoFueraDeOrden si la fecha es anterior a la declaracion o a
      *     la emision de la licencia original, o posterior a hoy (#402)
+     * @throws kamayuk.rentas.licencias.dominio.TramosDeVigencia.ProrrogaQueNoLlegaAlActo si el
+     *     tramo nuevo termina antes del dia en que empezaria (#451): con la licencia vencida, antes
+     *     del dia del acto. Sale de {@code preparar}, antes de preguntarle nada a {@code caja}
      */
     public Revalidacion revalidar(
             String expedienteDeRevalidacion,

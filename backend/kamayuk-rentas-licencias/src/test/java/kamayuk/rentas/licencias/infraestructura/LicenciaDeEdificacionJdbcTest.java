@@ -73,6 +73,7 @@ import kamayuk.rentas.licencias.dominio.SeccionDelFue;
 import kamayuk.rentas.licencias.dominio.TipoDeObra;
 import kamayuk.rentas.licencias.dominio.TipoDeProfesional;
 import kamayuk.rentas.licencias.dominio.TipoDeTramiteDeEdificacion;
+import kamayuk.rentas.licencias.dominio.TramosDeVigencia;
 import kamayuk.rentas.licencias.dominio.VigenciaDeLaLicencia;
 import kamayuk.rentas.parametros.infraestructura.ParametrosRepositoryJdbc;
 import kamayuk.rentas.plataforma.tenant.TenantTransactionManager;
@@ -354,6 +355,9 @@ class LicenciaDeEdificacionJdbcTest {
         crearConjunto(municipalidad, 2026, true);
         crearConjunto(municipalidad, 2027, false);
         crearConjunto(otraMunicipalidad, 2026, false);
+        // #451: la licencia que se revalida VENCIDA se emite tres anios antes de HOY, y el derecho
+        // de esa emision se busca en el conjunto de su ejercicio. Sin cuadro: no se valoriza nada.
+        crearConjunto(municipalidad, HOY.minusYears(3).getYear(), false);
         // Y la tercera se queda SIN NINGUN conjunto: es lo unico que hace que
         // `LectorDeParametrosSellados` lance de verdad, dentro de su propia transaccion (#569).
         contribuyenteRecienImplantada =
@@ -947,6 +951,129 @@ class LicenciaDeEdificacionJdbcTest {
                                                             FormatoDeDocumento.PDF,
                                                             PORQUE)))
                     .isInstanceOf(RevalidarLicenciaDeEdificacion.ProrrogaQueNoProrroga.class);
+        }
+
+        /**
+         * #451 — La siembra que la de arriba no es: la licencia se revalida <b>vencida</b>.
+         *
+         * <p>Las pruebas de la revalidacion emitian y revalidaban el mismo dia, con el primer tramo
+         * todavia en curso: ahi «el dia siguiente al ultimo tramo» y «el dia del acto, si es
+         * posterior» dan lo mismo. Aqui el primer tramo termino seis meses antes del acto, y hasta
+         * #451 el segundo empezaba al dia siguiente de aquel vencimiento: la licencia quedaba
+         * VIGENTE, hacia atras, en un semestre en que estuvo vencida.
+         */
+        @Test
+        @DisplayName("#451: revalidar una vencida no la vuelve vigente hacia atras")
+        void revalidarUnaVencidaNoLaVuelveVigenteHaciaAtras() {
+            LocalDate emitida = HOY.minusYears(3);
+            LocalDate vencio = HOY.minusMonths(6);
+            String original = expedienteCompleto(emitida);
+            EmitirLicenciaDeEdificacion.LicenciaEmitida primera =
+                    emitirLicencia(original, emitida, vencio);
+            long originalId = identificadorDe(original);
+            LocalDate enElHueco = HOY.minusMonths(3);
+
+            assertThat(
+                            enContexto(() -> consulta.porExpediente(original, enElHueco))
+                                    .orElseThrow()
+                                    .fila()
+                                    .estado())
+                    .as("antes de revalidarse, en el hueco estaba vencida")
+                    .isEqualTo(EstadoDelFue.VENCIDA);
+
+            String tramite =
+                    presentarFue(
+                            TipoDeTramiteDeEdificacion.REVALIDACION_DE_LICENCIA,
+                            primera.numeroDeLicencia(),
+                            HOY);
+            String recibo = cobrar(DERECHO_REVALIDACION);
+            RevalidarLicenciaDeEdificacion.Revalidacion revalidacion =
+                    enContexto(
+                            () ->
+                                    revalidar.revalidar(
+                                            tramite,
+                                            HOY,
+                                            HOY.plusYears(3),
+                                            recibo,
+                                            FormatoDeDocumento.PDF,
+                                            PORQUE));
+
+            assertThat(revalidacion.vigencia().desde())
+                    .as(
+                            "el tramo nuevo empieza el dia del acto que lo concede, no el dia"
+                                    + " siguiente al vencimiento de hace seis meses")
+                    .isEqualTo(HOY);
+
+            List<VigenciaDeLaLicencia> vigencias =
+                    enContexto(() -> transaccion.execute(e -> movimientos.vigenciasDe(originalId)));
+            assertThat(vigencias)
+                    .extracting(VigenciaDeLaLicencia::desde, VigenciaDeLaLicencia::hasta)
+                    .as("lo que queda en edificacion_vigencia, que solo admite INSERT (regla 4)")
+                    .containsExactly(
+                            org.assertj.core.groups.Tuple.tuple(emitida, vencio),
+                            org.assertj.core.groups.Tuple.tuple(HOY, HOY.plusYears(3)));
+
+            assertThat(
+                            enContexto(() -> consulta.porExpediente(original, enElHueco))
+                                    .orElseThrow()
+                                    .fila()
+                                    .estado())
+                    .as(
+                            "el reporte con fecha de corte en el hueco, reimpreso despues de la"
+                                    + " revalidacion, sigue diciendo VENCIDA")
+                    .isEqualTo(EstadoDelFue.VENCIDA);
+            assertThat(
+                            enContexto(() -> consulta.porExpediente(original, HOY))
+                                    .orElseThrow()
+                                    .fila()
+                                    .estado())
+                    .as("y el dia del acto ya esta vigente")
+                    .isEqualTo(EstadoDelFue.VIGENTE);
+        }
+
+        /**
+         * #451, la variante — Una revalidacion cuyo tramo termina antes del acto que la concede.
+         *
+         * <p>Pasaba la unica comprobacion que habia —que el tramo nuevo termine despues del
+         * anterior— y salia con 201: el administrado pagaba un derecho por una licencia que el
+         * mismo dia de la resolucion ya estaba vencida. Se rechaza en {@code preparar}, antes de
+         * preguntarle nada a {@code caja}, y no deja ni tramo ni movimiento.
+         */
+        @Test
+        @DisplayName("#451: una revalidacion que no llega al dia del acto no se concede")
+        void unaRevalidacionQueNoLlegaAlActo() {
+            LocalDate emitida = HOY.minusYears(3);
+            LocalDate vencio = HOY.minusMonths(6);
+            String original = expedienteCompleto(emitida);
+            EmitirLicenciaDeEdificacion.LicenciaEmitida primera =
+                    emitirLicencia(original, emitida, vencio);
+            long originalId = identificadorDe(original);
+
+            String tramite =
+                    presentarFue(
+                            TipoDeTramiteDeEdificacion.REVALIDACION_DE_LICENCIA,
+                            primera.numeroDeLicencia(),
+                            HOY);
+            String recibo = cobrar(DERECHO_REVALIDACION);
+
+            assertThatThrownBy(
+                            () ->
+                                    enContexto(
+                                            () ->
+                                                    revalidar.revalidar(
+                                                            tramite,
+                                                            HOY,
+                                                            HOY.minusMonths(1),
+                                                            recibo,
+                                                            FormatoDeDocumento.PDF,
+                                                            PORQUE)))
+                    .isInstanceOf(TramosDeVigencia.ProrrogaQueNoLlegaAlActo.class)
+                    .hasMessageContaining(HOY.toString())
+                    .hasMessageContaining(HOY.minusMonths(1).toString());
+
+            List<VigenciaDeLaLicencia> vigencias =
+                    enContexto(() -> transaccion.execute(e -> movimientos.vigenciasDe(originalId)));
+            assertThat(vigencias).as("la licencia se queda con su unico tramo").hasSize(1);
         }
 
         @Test
@@ -1867,13 +1994,19 @@ class LicenciaDeEdificacionJdbcTest {
 
     private static EmitirLicenciaDeEdificacion.LicenciaEmitida emitirLicencia(
             String expediente, LocalDate fecha) {
+        return emitirLicencia(expediente, fecha, fecha.plusMonths(36));
+    }
+
+    /** Con la vigencia que se le diga: #451 necesita una que ya haya vencido. */
+    private static EmitirLicenciaDeEdificacion.LicenciaEmitida emitirLicencia(
+            String expediente, LocalDate fecha, LocalDate vigenciaHasta) {
         String recibo = cobrar(DERECHO_EDIFICACION);
         return enContexto(
                 () ->
                         emitir.emitir(
                                 expediente,
                                 fecha,
-                                fecha.plusMonths(36),
+                                vigenciaHasta,
                                 recibo,
                                 FormatoDeDocumento.PDF,
                                 PORQUE));
@@ -2044,16 +2177,21 @@ class LicenciaDeEdificacionJdbcTest {
      */
     private static void crearConjunto(long municipalidadId, int ejercicio, boolean conCuadro)
             throws SQLException {
+        // Los conceptos rigen desde el 1 de enero de 2026, como siempre; y desde el de su propio
+        // ejercicio si es anterior, que es lo que pide la licencia emitida en 2023 de #451.
+        LocalDate vigentesDesde = LocalDate.of(Math.min(ejercicio, 2026), 1, 1);
         long deLaLicencia =
                 parametroDelTupa(
                         "DERECHO_LICENCIA_EDIFICACION_" + municipalidadId + "_" + ejercicio,
                         "DERECHO_LICENCIA_EDIFICACION",
-                        DERECHO_EDIFICACION);
+                        DERECHO_EDIFICACION,
+                        vigentesDesde);
         long deLaRevalidacion =
                 parametroDelTupa(
                         "DERECHO_REVALIDACION_EDIFICACION_" + municipalidadId + "_" + ejercicio,
                         "DERECHO_REVALIDACION_EDIFICACION",
-                        DERECHO_REVALIDACION);
+                        DERECHO_REVALIDACION,
+                        vigentesDesde);
 
         try (Connection app = base.conexion(BaseDeDatosDePrueba.APP)) {
             ContextoDeTenant.fijar(app, municipalidadId);
@@ -2160,7 +2298,8 @@ class LicenciaDeEdificacionJdbcTest {
         }
     }
 
-    private static long parametroDelTupa(String sufijo, String clave, String codigo)
+    private static long parametroDelTupa(
+            String sufijo, String clave, String codigo, LocalDate vigenteDesde)
             throws SQLException {
         try (Connection carga = base.conexion(BaseDeDatosDePrueba.CARGA_PARAMETROS);
                 PreparedStatement sentencia =
@@ -2168,10 +2307,11 @@ class LicenciaDeEdificacionJdbcTest {
                                 "INSERT INTO parametro_tributario_de_prueba (municipalidad_id, tipo, clave,"
                                         + " valor_texto, vigencia_desde, documento_fuente, sellado,"
                                         + " usuario_carga) VALUES (NULL, 'TUPA', ?, ?,"
-                                        + " DATE '2026-01-01', ?, true, 'siembra') RETURNING id")) {
+                                        + " ?, ?, true, 'siembra') RETURNING id")) {
             sentencia.setString(1, clave);
             sentencia.setString(2, codigo);
-            sentencia.setString(3, "TUPA de la prueba " + sufijo);
+            sentencia.setObject(3, vigenteDesde);
+            sentencia.setString(4, "TUPA de la prueba " + sufijo);
             try (ResultSet resultado = sentencia.executeQuery()) {
                 resultado.next();
                 long id = resultado.getLong(1);

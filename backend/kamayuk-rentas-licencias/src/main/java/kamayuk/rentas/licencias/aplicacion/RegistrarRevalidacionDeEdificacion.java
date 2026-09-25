@@ -22,6 +22,7 @@ import kamayuk.rentas.licencias.dominio.FueDeEdificacion;
 import kamayuk.rentas.licencias.dominio.FueRepository;
 import kamayuk.rentas.licencias.dominio.MovimientoDeEdificacion;
 import kamayuk.rentas.licencias.dominio.MovimientoDeEdificacionRepository;
+import kamayuk.rentas.licencias.dominio.TramosDeVigencia;
 import kamayuk.rentas.licencias.dominio.VigenciaDeLaLicencia;
 import kamayuk.rentas.tesoreria.AplicacionDeRecibos;
 import kamayuk.rentas.tesoreria.ReciboDeTramite;
@@ -70,7 +71,8 @@ public class RegistrarRevalidacionDeEdificacion {
 
     /**
      * La revalidacion, comprobada: es una revalidacion, su licencia original existe y esta
-     * otorgada, la fecha no se sale del orden de los actos y el tramo nuevo prorroga algo.
+     * otorgada, la fecha no se sale del orden de los actos, el tramo nuevo prorroga algo y llega al
+     * dia del acto que lo concede (#451).
      *
      * @throws EmitirLicenciaDeEdificacion.ExpedienteInexistente si no hay ningun expediente con ese
      *     numero
@@ -79,6 +81,8 @@ public class RegistrarRevalidacionDeEdificacion {
      * @throws kamayuk.rentas.dominio.ActoFueraDeOrden si la fecha es anterior a la declaracion o a
      *     la emision de la licencia original, o posterior a hoy (#402)
      * @throws RevalidarLicenciaDeEdificacion.ProrrogaQueNoProrroga si el tramo no pasa del anterior
+     * @throws TramosDeVigencia.ProrrogaQueNoLlegaAlActo si el tramo termina antes del dia en que
+     *     empezaria, que con la licencia vencida es el del acto (#451)
      */
     @Transactional(readOnly = true)
     public RevalidacionLista preparar(
@@ -113,22 +117,16 @@ public class RegistrarRevalidacionDeEdificacion {
         FueDeEdificacion original = lista.original();
         long originalId = original.identificador();
         String numeroDeLicencia = lista.numeroDeLicencia();
-        List<VigenciaDeLaLicencia> anteriores = lista.anteriores();
         ReciboDeTramite recibo = derecho.recibo();
 
-        // El tramo nuevo empieza el dia siguiente al ultimo que ya estaba: si empezara el dia del
-        // acto, dos tramos se solaparian y la licencia diria estar vigente dos veces el mismo dia.
-        LocalDate ultimoDia =
-                anteriores.stream()
-                        .map(VigenciaDeLaLicencia::hasta)
-                        .max(LocalDate::compareTo)
-                        .orElse(fecha);
-        LocalDate desde = ultimoDia.plusDays(1);
+        // Donde empieza el tramo nuevo lo decide el dominio (#451): hasta ese issue se calculaba
+        // aqui en linea, siempre el dia siguiente al ultimo tramo, y con la licencia vencida eso
+        // la volvia vigente hacia atras. Se calculo —y se comprobo— en `leerYComprobar`, con los
+        // tramos releidos dentro de esta transaccion.
+        TramosDeVigencia.TramoSiguiente tramo = lista.tramoNuevo();
 
-        List<VigenciaDeLaLicencia> conLaNueva = new ArrayList<>(anteriores);
-        conLaNueva.add(
-                new VigenciaDeLaLicencia(
-                        null, originalId, 0L, anteriores.size() + 1, desde, nuevaVigenciaHasta));
+        List<VigenciaDeLaLicencia> conLaNueva = new ArrayList<>(lista.anteriores());
+        conLaNueva.add(tramo.concedidoPor(originalId, 0L));
 
         EmitirDocumento.Emision emision =
                 documentos.emitir(
@@ -176,13 +174,7 @@ public class RegistrarRevalidacionDeEdificacion {
                 movimientos.conceder(
                         originalId,
                         registrado.identificador(),
-                        new VigenciaDeLaLicencia(
-                                null,
-                                originalId,
-                                registrado.identificador(),
-                                anteriores.size() + 1,
-                                desde,
-                                nuevaVigenciaHasta));
+                        tramo.concedidoPor(originalId, registrado.identificador()));
 
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe(
@@ -278,8 +270,18 @@ public class RegistrarRevalidacionDeEdificacion {
             }
         }
 
+        // #451: y ademas tiene que llegar al dia del acto. Se comprueba aqui, en `preparar`, antes
+        // de preguntarle nada a `caja`: una revalidacion que solo autoriza el pasado no se cobra.
+        TramosDeVigencia.TramoSiguiente tramoNuevo =
+                TramosDeVigencia.siguienteTramo(anteriores, fecha, nuevaVigenciaHasta);
+
         return new RevalidacionLista(
-                revalidacion, original, numeroDeLicencia, anteriores, solicitanteDe(revalidacion));
+                revalidacion,
+                original,
+                numeroDeLicencia,
+                anteriores,
+                tramoNuevo,
+                solicitanteDe(revalidacion));
     }
 
     private ResumenDeContribuyente solicitanteDe(FueDeEdificacion fue) {
@@ -304,6 +306,7 @@ public class RegistrarRevalidacionDeEdificacion {
      * @param original el expediente de la licencia que se prorroga
      * @param numeroDeLicencia el numero de la licencia; no cambia
      * @param anteriores los tramos que ya tenia, en orden
+     * @param tramoNuevo el que la revalidacion concede, con el dia en que empieza (#451)
      * @param solicitante el resumen del padron: su identificador es el que el recibo tiene que
      *     traer
      */
@@ -312,6 +315,7 @@ public class RegistrarRevalidacionDeEdificacion {
             FueDeEdificacion original,
             String numeroDeLicencia,
             List<VigenciaDeLaLicencia> anteriores,
+            TramosDeVigencia.TramoSiguiente tramoNuevo,
             ResumenDeContribuyente solicitante) {
 
         public RevalidacionLista {

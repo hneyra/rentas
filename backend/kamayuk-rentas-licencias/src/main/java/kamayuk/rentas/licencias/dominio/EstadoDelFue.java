@@ -42,7 +42,9 @@ public enum EstadoDelFue {
      * consecuencias son distintas —una vencida se revalida, una anulada no—.
      *
      * <p>Un tramo de vigencia <b>posterior</b> a la fecha preguntada no cuenta: la licencia
-     * revalidada en junio no estaba vigente en abril por haberlo sido despues.
+     * revalidada en junio no estaba vigente en abril por haberlo sido despues. Aqui no se puede
+     * comprobar —el tramo no guarda la fecha del acto que lo concedio—: lo sostiene {@link
+     * TramosDeVigencia}, que no deja empezar ningun tramo antes de su acto (#451).
      *
      * @param movimientos los del expediente, en cualquier orden
      * @param vigencias los tramos de la licencia, en cualquier orden
