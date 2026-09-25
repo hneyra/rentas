@@ -27,6 +27,7 @@ import kamayuk.rentas.esquema.BaseDeDatosDePrueba;
 import kamayuk.rentas.parametros.IdentificadorDeConjunto;
 import kamayuk.rentas.parametros.LectorDeParametros;
 import kamayuk.rentas.parametros.ParametrosSellados;
+import kamayuk.rentas.parametros.aplicacion.CopiaLocalDeNormativa;
 import kamayuk.rentas.parametros.aplicacion.DescargaDeNormativa;
 import kamayuk.rentas.parametros.aplicacion.LectorDeParametrosCacheados;
 import kamayuk.rentas.parametros.dominio.PublicadorDeNormativa;
@@ -113,10 +114,7 @@ class SinNormativaFronteraTest {
                 new ClienteHttpDeNormativa(
                         new JsonMapper(), "http://127.0.0.1:" + puertoMuerto + "/normativa/api/v1");
 
-        conNormativaApagada =
-                envolver(
-                        new LectorDeParametrosCacheados(
-                                cache, apagada, envolver(new DescargaDeNormativa(cache, apagada))));
+        conNormativaApagada = lectorContra(apagada);
     }
 
     /**
@@ -268,12 +266,7 @@ class SinNormativaFronteraTest {
             try (ServidorDeMentira servidor = ServidorDeMentira.con(cuerpo, huella)) {
                 PublicadorDeNormativa cliente =
                         new ClienteHttpDeNormativa(new JsonMapper(), servidor.raiz());
-                conNormativaViva =
-                        envolver(
-                                new LectorDeParametrosCacheados(
-                                        cache,
-                                        cliente,
-                                        envolver(new DescargaDeNormativa(cache, cliente))));
+                conNormativaViva = lectorContra(cliente);
 
                 assertThat(
                                 conNormativaViva
@@ -294,6 +287,306 @@ class SinNormativaFronteraTest {
                                     .valor())
                     .as("con `normativa` apagado, el mismo conjunto se sigue leyendo igual")
                     .isEqualByComparingTo(new BigDecimal("5500.000000"));
+        }
+    }
+
+    /**
+     * #450 — Una {@code normativa} lenta no retiene el pool de {@code rentas}.
+     *
+     * <p>Hasta #450 las dos preguntas a {@code normativa} compartian la espera de lectura de 5
+     * minutos, que se penso para el snapshot de 54 000 filas: {@code /conjuntos}, que devuelve tres
+     * numeros, esperaba lo mismo antes de replegarse a la cache, y lo esperaba dentro de la
+     * transaccion de quien calculaba. Y cuando el conjunto no estaba, la descarga abria una
+     * transaccion {@code REQUIRES_NEW} —una SEGUNDA conexion— y descargaba dentro de ella.
+     *
+     * <p>La siembra que distingue es <b>el vecino lento</b>: un {@code normativa} que acepta la
+     * conexion y no contesta. El de siempre —un puerto que nadie escucha— se rechaza al instante, y
+     * con el cualquier espera pasa.
+     */
+    @Nested
+    @DisplayName("#450 — con `normativa` lenta")
+    class ConNormativaLenta {
+
+        @Test
+        @DisplayName("resolver «lo vigente» se repliega a la cache en segundos, no en minutos")
+        void loVigenteSeRepliegaEnSegundos() throws Exception {
+            sembrarConjuntoEnLaCache();
+            try (ServidorQueNoContesta lenta = ServidorQueNoContesta.abrir()) {
+                LectorDeParametros conNormativaLenta =
+                        lectorContra(new ClienteHttpDeNormativa(new JsonMapper(), lenta.raiz()));
+
+                IdentificadorDeConjunto conjunto =
+                        org.junit.jupiter.api.Assertions.assertTimeoutPreemptively(
+                                java.time.Duration.ofSeconds(10),
+                                () -> {
+                                    // Corre en otro hilo —es lo que permite cortarla—, y el
+                                    // contexto de municipalidad es del hilo.
+                                    TenantContext.fijar(new MunicipalidadId(municipalidad));
+                                    try {
+                                        return conNormativaLenta.conjuntoVigenteEn(EJERCICIO);
+                                    } finally {
+                                        TenantContext.limpiar();
+                                    }
+                                },
+                                "con la espera del snapshot —5 minutos— para una pregunta que"
+                                        + " devuelve tres numeros, el repliegue a la cache llega"
+                                        + " cuando ya no sirve");
+
+                assertThat(conjunto.valor())
+                        .as("y se repliega al conjunto que ya estaba en la cache")
+                        .isEqualTo(CONJUNTO);
+                assertThat(lenta.peticiones())
+                        .as("se le pregunto, que es lo que hace falta para medir la espera")
+                        .isEqualTo(1);
+            }
+        }
+
+        @Test
+        @DisplayName("descargar un conjunto nuevo no abre una segunda conexion")
+        void laDescargaNoAbreUnaSegundaConexion() {
+            ConexionesContadas contadas = new ConexionesContadas(poolDeLaApp());
+            TenantTransactionManager gestorContado = new TenantTransactionManager(contadas);
+            NormativaQueAnota normativa = new NormativaQueAnota(7_450L, contadas);
+            LectorDeParametros lector = lectorContado(contadas, gestorContado, normativa);
+
+            ParametrosSellados sellados =
+                    new org.springframework.transaction.support.TransactionTemplate(gestorContado)
+                            .execute(
+                                    estado ->
+                                            lector.porConjunto(IdentificadorDeConjunto.de(7_450L)));
+
+            assertThat(sellados.exigirNumero("UIT", null).valor())
+                    .isEqualByComparingTo(new BigDecimal("5500.000000"));
+            assertThat(normativa.conexionesAlDescargar())
+                    .as(
+                            "mientras se descargaba habia UNA conexion abierta —la de quien calcula—"
+                                    + " y no dos: la descarga no abre otra transaccion para esperar"
+                                    + " a la red, solo para guardar")
+                    .containsExactly(1);
+        }
+
+        @Test
+        @DisplayName("y sin transaccion alrededor, descarga sin ninguna conexion tomada")
+        void sinTransaccionAlrededorDescargaSinConexion() {
+            ConexionesContadas contadas = new ConexionesContadas(poolDeLaApp());
+            TenantTransactionManager gestorContado = new TenantTransactionManager(contadas);
+            NormativaQueAnota normativa = new NormativaQueAnota(7_451L, contadas);
+            LectorDeParametros lector = lectorContado(contadas, gestorContado, normativa);
+
+            ParametrosSellados sellados = lector.porConjunto(IdentificadorDeConjunto.de(7_451L));
+
+            assertThat(sellados.exigirNumero("UIT", null).valor())
+                    .isEqualByComparingTo(new BigDecimal("5500.000000"));
+            assertThat(normativa.conexionesAlDescargar())
+                    .as("la red se espera sin ninguna conexion del pool tomada")
+                    .containsExactly(0);
+            assertThat(contadas.abiertas()).as("y al terminar no queda ninguna abierta").isZero();
+        }
+
+        private static LectorDeParametros lectorContado(
+                ConexionesContadas contadas,
+                TenantTransactionManager gestorContado,
+                PublicadorDeNormativa normativa) {
+            return lectorSobre(
+                    gestorContado,
+                    new CacheDeSnapshotsJdbc(JdbcClient.create(contadas), RELOJ),
+                    normativa);
+        }
+    }
+
+    private static LectorDeParametros lectorContra(PublicadorDeNormativa normativa) {
+        return lectorSobre(gestor, cache, normativa);
+    }
+
+    /**
+     * El lector de produccion con sus tres piezas envueltas, como en el contenedor.
+     *
+     * <p>Las TRES, y no solo la copia que es la que declara transacciones: envolver tambien el
+     * lector y la descarga es lo que hace que la mutacion de #450 —devolverle un
+     * {@code @Transactional} a cualquiera de los dos— se aplique y salga roja, en vez de pasar en
+     * verde porque nadie proxia el objeto anotado (la leccion de #430 con {@code ImportarCajas}).
+     */
+    private static LectorDeParametros lectorSobre(
+            org.springframework.transaction.PlatformTransactionManager conQue,
+            CacheDeSnapshotsJdbc copiaLocal,
+            PublicadorDeNormativa normativa) {
+        CopiaLocalDeNormativa copia = envolverCon(conQue, new CopiaLocalDeNormativa(copiaLocal));
+        return envolverCon(
+                conQue,
+                new LectorDeParametrosCacheados(
+                        copia,
+                        normativa,
+                        envolverCon(conQue, new DescargaDeNormativa(copia, normativa))));
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <T> T envolverCon(
+            org.springframework.transaction.PlatformTransactionManager otro, T objetivo) {
+        ProxyFactory fabrica = new ProxyFactory(objetivo);
+        fabrica.setProxyTargetClass(true);
+        fabrica.addAdvice(
+                new TransactionInterceptor(otro, new AnnotationTransactionAttributeSource()));
+        return (T) fabrica.getProxy();
+    }
+
+    private static DriverManagerDataSource poolDeLaApp() {
+        DriverManagerDataSource pool = new DriverManagerDataSource();
+        pool.setUrl(base.url());
+        pool.setUsername(BaseDeDatosDePrueba.APP);
+        pool.setPassword(base.clave(BaseDeDatosDePrueba.APP));
+        return pool;
+    }
+
+    /**
+     * Un origen de datos que cuenta cuantas conexiones hay abiertas en cada momento (#450).
+     *
+     * <p>Es la medida que el issue pide —cuantas conexiones retiene la espera a la red— sin
+     * depender de un pool concreto: cada {@code getConnection} suma y cada {@code close} resta.
+     */
+    private static final class ConexionesContadas
+            extends org.springframework.jdbc.datasource.DelegatingDataSource {
+
+        private final java.util.concurrent.atomic.AtomicInteger abiertas =
+                new java.util.concurrent.atomic.AtomicInteger();
+
+        ConexionesContadas(javax.sql.DataSource destino) {
+            super(destino);
+        }
+
+        int abiertas() {
+            return abiertas.get();
+        }
+
+        @Override
+        public Connection getConnection() throws SQLException {
+            return contada(super.getConnection());
+        }
+
+        @Override
+        public Connection getConnection(String usuario, String clave) throws SQLException {
+            return contada(super.getConnection(usuario, clave));
+        }
+
+        private Connection contada(Connection real) {
+            abiertas.incrementAndGet();
+            java.util.concurrent.atomic.AtomicBoolean cerrada =
+                    new java.util.concurrent.atomic.AtomicBoolean();
+            return (Connection)
+                    java.lang.reflect.Proxy.newProxyInstance(
+                            Connection.class.getClassLoader(),
+                            new Class<?>[] {Connection.class},
+                            (proxy, metodo, argumentos) -> {
+                                if ("close".equals(metodo.getName())
+                                        && cerrada.compareAndSet(false, true)) {
+                                    abiertas.decrementAndGet();
+                                }
+                                try {
+                                    return metodo.invoke(real, argumentos);
+                                } catch (java.lang.reflect.InvocationTargetException lanzada) {
+                                    throw lanzada.getCause();
+                                }
+                            });
+        }
+    }
+
+    /** Un {@code normativa} en memoria que anota cuantas conexiones habia abiertas al descargar. */
+    private static final class NormativaQueAnota implements PublicadorDeNormativa {
+
+        private final long conjunto;
+        private final ConexionesContadas conexiones;
+        private final java.util.List<Integer> conexionesAlDescargar = new java.util.ArrayList<>();
+
+        NormativaQueAnota(long conjunto, ConexionesContadas conexiones) {
+            this.conjunto = conjunto;
+            this.conexiones = conexiones;
+        }
+
+        java.util.List<Integer> conexionesAlDescargar() {
+            return conexionesAlDescargar;
+        }
+
+        @Override
+        public long conjuntoVigenteEn(Ejercicio ejercicio) {
+            return conjunto;
+        }
+
+        @Override
+        public kamayuk.rentas.parametros.dominio.SnapshotDeNormativa descargar(
+                long conjuntoId, String ambito) {
+            conexionesAlDescargar.add(conexiones.abiertas());
+            // Otro ejercicio que el de la siembra de siempre: la cache es de la base y no de la
+            // prueba, y un conjunto de 2026 con mayor identificador pasaria a ser «el ultimo que
+            // teniamos» para las pruebas del repliegue.
+            return new kamayuk.rentas.parametros.dominio.SnapshotDeNormativa(
+                    conjuntoId,
+                    new Ejercicio(2031),
+                    1,
+                    ambito,
+                    "0".repeat(64),
+                    "siembra de #450",
+                    java.util.List.of(parametro("UIT", "5500.000000", "2026-01-01", null)),
+                    java.util.List.of(),
+                    java.util.List.of(),
+                    java.util.List.of());
+        }
+    }
+
+    /**
+     * `normativa` lento: acepta la conexion, lee la peticion y no contesta hasta que lo cierran.
+     *
+     * <p>Es el modo de fallo que el puerto muerto de {@link #unPuertoQueNadieEscucha} no puede
+     * reproducir: ahi la conexion se rechaza al instante y la espera de lectura nunca empieza.
+     */
+    private static final class ServidorQueNoContesta implements AutoCloseable {
+
+        private final ServerSocket socket;
+        private final java.util.List<Socket> abiertos =
+                java.util.Collections.synchronizedList(new java.util.ArrayList<>());
+        private volatile int peticiones;
+
+        private ServidorQueNoContesta(ServerSocket socket) {
+            this.socket = socket;
+            Thread hilo =
+                    new Thread(
+                            () -> {
+                                while (!socket.isClosed()) {
+                                    try {
+                                        Socket cliente = socket.accept();
+                                        abiertos.add(cliente);
+                                        peticiones++;
+                                        ServidorDeMentira.leerPeticion(cliente);
+                                        // Y no contesta: la conexion queda abierta hasta close().
+                                    } catch (IOException cerrado) {
+                                        return;
+                                    }
+                                }
+                            },
+                            "normativa-lenta");
+            hilo.setDaemon(true);
+            hilo.start();
+        }
+
+        static ServidorQueNoContesta abrir() throws IOException {
+            return new ServidorQueNoContesta(
+                    new ServerSocket(0, 0, java.net.InetAddress.getLoopbackAddress()));
+        }
+
+        String raiz() {
+            return "http://127.0.0.1:" + socket.getLocalPort() + "/normativa/api/v1";
+        }
+
+        int peticiones() {
+            return peticiones;
+        }
+
+        @Override
+        public void close() throws IOException {
+            socket.close();
+            synchronized (abiertos) {
+                for (Socket cliente : abiertos) {
+                    cliente.close();
+                }
+            }
         }
     }
 

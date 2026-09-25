@@ -287,46 +287,55 @@ class LicenciaDeEdificacionJdbcTest {
         emitir =
                 envolver(
                         new EmitirLicenciaDeEdificacion(
-                                expedientes,
-                                movimientos,
+                                envolver(
+                                        new kamayuk.rentas.licencias.aplicacion
+                                                .RegistrarLicenciaDeEdificacion(
+                                                expedientes,
+                                                movimientos,
+                                                aplicaciones,
+                                                padron,
+                                                documentos,
+                                                PlantillaDeNumeroDeEdificacion.POR_OMISION,
+                                                auditoria,
+                                                RELOJ_DE_LOS_ACTOS)),
                                 recibos,
-                                aplicaciones,
-                                padron,
                                 derechos,
-                                valorizaciones,
-                                documentos,
-                                PlantillaDeNumeroDeEdificacion.POR_OMISION,
-                                auditoria,
-                                RELOJ_DE_LOS_ACTOS));
+                                valorizaciones));
         // El mismo caso de uso, con un conjunto sellado que NO tiene el concepto del TUPA. Es la
         // demostracion de la regla 5: sin el dato, la operacion falla nombrando la llave, en vez
         // de admitir cualquier recibo.
         emitirSinParametro =
                 envolver(
                         new EmitirLicenciaDeEdificacion(
-                                expedientes,
-                                movimientos,
+                                envolver(
+                                        new kamayuk.rentas.licencias.aplicacion
+                                                .RegistrarLicenciaDeEdificacion(
+                                                expedientes,
+                                                movimientos,
+                                                aplicaciones,
+                                                padron,
+                                                documentos,
+                                                PlantillaDeNumeroDeEdificacion.POR_OMISION,
+                                                auditoria,
+                                                RELOJ_DE_LOS_ACTOS)),
                                 recibos,
-                                aplicaciones,
-                                padron,
                                 new DerechosDeTramiteParametrizados(new SinDerechosSellados()),
-                                valorizaciones,
-                                documentos,
-                                PlantillaDeNumeroDeEdificacion.POR_OMISION,
-                                auditoria,
-                                RELOJ_DE_LOS_ACTOS));
+                                valorizaciones));
         revalidar =
                 envolver(
                         new RevalidarLicenciaDeEdificacion(
-                                expedientes,
-                                movimientos,
+                                envolver(
+                                        new kamayuk.rentas.licencias.aplicacion
+                                                .RegistrarRevalidacionDeEdificacion(
+                                                expedientes,
+                                                movimientos,
+                                                aplicaciones,
+                                                padron,
+                                                documentos,
+                                                auditoria,
+                                                RELOJ_DE_LOS_ACTOS)),
                                 recibos,
-                                aplicaciones,
-                                padron,
-                                derechos,
-                                documentos,
-                                auditoria,
-                                RELOJ_DE_LOS_ACTOS));
+                                derechos));
         // Las DOS van envueltas, como en el contenedor: `envolver` usa
         // `AnnotationTransactionAttributeSource`, asi que OBEDECE a la anotacion y sobre
         // `ConsultaDeFue` —que no declara ninguna— no abre nada. Envolver solo `LecturaDelFue`
@@ -1467,6 +1476,249 @@ class LicenciaDeEdificacionJdbcTest {
                     null,
                     corte,
                     Paginacion.de(0, 50, "expediente"));
+        }
+    }
+
+    // ==================================================================
+
+    /**
+     * #450 — Ni la emision ni la revalidacion esperan a un vecino con una conexion de la base o el
+     * candado del correlativo tomados.
+     *
+     * <p>Hasta #450 las dos eran {@code @Transactional} enteras: {@code normativa} y {@code caja}
+     * se preguntaban con la conexion de la peticion tomada, y en la emision la valorizacion —el
+     * cuadro de valores unitarios, que es {@code catastro}— salia <b>despues</b> de {@code
+     * siguienteCorrelativo}, con la fila de {@code edificacion_correlativo} bloqueada hasta el
+     * commit. La siembra que distingue es <b>el vecino lento</b>: con los dobles de siempre, que
+     * contestan al instante, cualquier frontera y cualquier orden pasan.
+     */
+    @Nested
+    @DisplayName("#450 — los vecinos se preguntan sin conexion y sin candado tomados")
+    class LosVecinosSinConexionTomada {
+
+        /** Lo que tarda el cuadro de `catastro` en esta siembra. */
+        private static final java.time.Duration LO_QUE_TARDA_CATASTRO =
+                java.time.Duration.ofSeconds(3);
+
+        @Test
+        @DisplayName(
+                "dos emisiones con `catastro` lento no se ponen en fila detras del correlativo")
+        void dosEmisionesNoSeEncolanDetrasDelCorrelativo() throws Exception {
+            VecinosQueAnotan vecinos = new VecinosQueAnotan(LO_QUE_TARDA_CATASTRO);
+            EmitirLicenciaDeEdificacion conCatastroLento = emisionCon(vecinos);
+
+            // Una primero, sin medir: el primer papel de la JVM carga los renderizadores.
+            emitirLicencia(expedienteCompleto(HOY), HOY);
+
+            List<String> expedientesAEmitir =
+                    List.of(expedienteCompleto(HOY), expedienteCompleto(HOY));
+            List<String> recibosDelDerecho =
+                    List.of(cobrar(DERECHO_EDIFICACION), cobrar(DERECHO_EDIFICACION));
+            List<java.time.Instant> finales =
+                    java.util.Collections.synchronizedList(new ArrayList<>());
+            java.util.concurrent.CountDownLatch salida = new java.util.concurrent.CountDownLatch(1);
+            try (java.util.concurrent.ExecutorService hilos =
+                    java.util.concurrent.Executors.newFixedThreadPool(2)) {
+                List<java.util.concurrent.Future<?>> emisiones = new ArrayList<>();
+                for (int i = 0; i < 2; i++) {
+                    String expediente = expedientesAEmitir.get(i);
+                    String recibo = recibosDelDerecho.get(i);
+                    emisiones.add(
+                            hilos.submit(
+                                    () -> {
+                                        salida.await(10, java.util.concurrent.TimeUnit.SECONDS);
+                                        try {
+                                            enContexto(
+                                                    () ->
+                                                            conCatastroLento.emitir(
+                                                                    expediente,
+                                                                    HOY,
+                                                                    HOY.plusMonths(36),
+                                                                    recibo,
+                                                                    FormatoDeDocumento.PDF,
+                                                                    PORQUE));
+                                            finales.add(java.time.Instant.now());
+                                        } finally {
+                                            TenantContext.limpiar();
+                                            OrigenContext.limpiar();
+                                        }
+                                        return null;
+                                    }));
+                }
+                salida.countDown();
+                for (java.util.concurrent.Future<?> emision : emisiones) {
+                    emision.get(60, java.util.concurrent.TimeUnit.SECONDS);
+                }
+            }
+
+            assertThat(finales).hasSize(2);
+            java.time.Duration entreLasDos =
+                    java.time.Duration.between(finales.get(0), finales.get(1)).abs();
+            assertThat(entreLasDos)
+                    .as(
+                            "con la valorizacion pedida DESPUES de numerar, la segunda emision"
+                                    + " esperaba el candado de edificacion_correlativo mientras la"
+                                    + " primera esperaba a `catastro`, y terminaba %s o mas despues;"
+                                    + " pedida antes, las dos esperas se solapan",
+                            LO_QUE_TARDA_CATASTRO)
+                    .isLessThan(LO_QUE_TARDA_CATASTRO.minusSeconds(1));
+        }
+
+        @Test
+        @DisplayName("la emision pregunta a `caja` y a `catastro` sin ninguna transaccion abierta")
+        void laEmisionPreguntaFueraDeLaTransaccion() {
+            VecinosQueAnotan vecinos = new VecinosQueAnotan(java.time.Duration.ZERO);
+            String expediente = expedienteCompleto(HOY);
+            String recibo = cobrar(DERECHO_EDIFICACION);
+
+            EmitirLicenciaDeEdificacion.LicenciaEmitida emitida =
+                    enContexto(
+                            () ->
+                                    emisionCon(vecinos)
+                                            .emitir(
+                                                    expediente,
+                                                    HOY,
+                                                    HOY.plusMonths(36),
+                                                    recibo,
+                                                    FormatoDeDocumento.PDF,
+                                                    PORQUE));
+
+            assertThat(emitida.valorizacion().estaDisponible())
+                    .as("el cuadro que `catastro` contesto valoriza la obra del papel")
+                    .isTrue();
+            assertThat(vecinos.preguntas())
+                    .as(
+                            "el recibo a `caja` y el cuadro a `catastro`, y en ninguna de las dos"
+                                    + " habia una transaccion —o sea una conexion del pool— tomada")
+                    .containsExactly("caja: sin transaccion", "cuadro: sin transaccion");
+        }
+
+        @Test
+        @DisplayName("y la revalidacion pregunta a `caja` sin ninguna transaccion abierta")
+        void laRevalidacionPreguntaFueraDeLaTransaccion() {
+            String original = expedienteCompleto(HOY);
+            EmitirLicenciaDeEdificacion.LicenciaEmitida primera = emitirLicencia(original, HOY);
+            String tramite =
+                    presentarFue(
+                            TipoDeTramiteDeEdificacion.REVALIDACION_DE_LICENCIA,
+                            primera.numeroDeLicencia(),
+                            HOY);
+            String recibo = cobrar(DERECHO_REVALIDACION);
+            VecinosQueAnotan vecinos = new VecinosQueAnotan(java.time.Duration.ZERO);
+
+            RevalidarLicenciaDeEdificacion.Revalidacion revalidacion =
+                    enContexto(
+                            () ->
+                                    revalidacionCon(vecinos)
+                                            .revalidar(
+                                                    tramite,
+                                                    HOY,
+                                                    primera.vigencia().hasta().plusMonths(12),
+                                                    recibo,
+                                                    FormatoDeDocumento.PDF,
+                                                    PORQUE));
+
+            assertThat(revalidacion.vigencia().orden()).isEqualTo(2);
+            assertThat(vecinos.preguntas())
+                    .as("el recibo se pide a `caja` sin una conexion del pool tomada")
+                    .containsExactly("caja: sin transaccion");
+        }
+
+        private EmitirLicenciaDeEdificacion emisionCon(VecinosQueAnotan vecinos) {
+            return envolver(
+                    new EmitirLicenciaDeEdificacion(
+                            envolver(
+                                    new kamayuk.rentas.licencias.aplicacion
+                                            .RegistrarLicenciaDeEdificacion(
+                                            expedientes,
+                                            movimientos,
+                                            aplicaciones,
+                                            new PadronDeLaPrueba(),
+                                            documentos,
+                                            PlantillaDeNumeroDeEdificacion.POR_OMISION,
+                                            new AuditoriaJdbc(jdbc, RELOJ),
+                                            RELOJ_DE_LOS_ACTOS)),
+                            vecinos.recibos(caja),
+                            derechos(),
+                            new ValorizacionDelFue(vecinos.cuadro())));
+        }
+
+        private RevalidarLicenciaDeEdificacion revalidacionCon(VecinosQueAnotan vecinos) {
+            return envolver(
+                    new RevalidarLicenciaDeEdificacion(
+                            envolver(
+                                    new kamayuk.rentas.licencias.aplicacion
+                                            .RegistrarRevalidacionDeEdificacion(
+                                            expedientes,
+                                            movimientos,
+                                            aplicaciones,
+                                            new PadronDeLaPrueba(),
+                                            documentos,
+                                            new AuditoriaJdbc(jdbc, RELOJ),
+                                            RELOJ_DE_LOS_ACTOS)),
+                            vecinos.recibos(caja),
+                            derechos()));
+        }
+
+        private static DerechosDeTramiteParametrizados derechos() {
+            return new DerechosDeTramiteParametrizados(
+                    envolver(
+                            new kamayuk.rentas.parametros.aplicacion.LectorDeParametrosSellados(
+                                    new ParametrosRepositoryJdbc(jdbc))));
+        }
+    }
+
+    /**
+     * Los vecinos de la emision, que anotan si al preguntarles habia una transaccion abierta y —el
+     * cuadro— tardan lo que se les diga (#450).
+     */
+    private static final class VecinosQueAnotan {
+
+        private final java.time.Duration loQueTardaElCuadro;
+        private final List<String> preguntas =
+                java.util.Collections.synchronizedList(new ArrayList<>());
+        private final LectorDeValoresUnitarios cuadro =
+                new CuadroDeValoresUnitariosEnMemoria()
+                        .en(municipalidad)
+                        .conCelda(EJERCICIO_CON_CUADRO, "MUROS", 'A', "120.000000")
+                        .conCelda(EJERCICIO_CON_CUADRO, "TECHOS", 'B', "80.000000");
+
+        VecinosQueAnotan(java.time.Duration loQueTardaElCuadro) {
+            this.loQueTardaElCuadro = loQueTardaElCuadro;
+        }
+
+        List<String> preguntas() {
+            return List.copyOf(preguntas);
+        }
+
+        private void anotar(String vecino) {
+            preguntas.add(
+                    vecino
+                            + (org.springframework.transaction.support
+                                            .TransactionSynchronizationManager
+                                            .isActualTransactionActive()
+                                    ? ": CON transaccion"
+                                    : ": sin transaccion"));
+        }
+
+        RecibosDeTramite recibos(RecibosDeTramite caja) {
+            return numero -> {
+                anotar("caja");
+                return caja.porNumeroImpreso(numero);
+            };
+        }
+
+        LectorDeValoresUnitarios cuadro() {
+            return ejercicio -> {
+                anotar("cuadro");
+                try {
+                    Thread.sleep(loQueTardaElCuadro);
+                } catch (InterruptedException interrumpido) {
+                    Thread.currentThread().interrupt();
+                    throw new IllegalStateException(interrumpido);
+                }
+                return cuadro.valoresUnitariosVigentesEn(ejercicio);
+            };
         }
     }
 

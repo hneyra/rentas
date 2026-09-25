@@ -52,7 +52,8 @@ class PanelDeRecaudacionTest {
 
     private final CajaDeMentira caja = new CajaDeMentira().con("310.00", "10.00");
 
-    private final PanelDeRecaudacion panel = new PanelDeRecaudacion(libro, libro, caja);
+    private final PanelDeRecaudacion panel =
+            new PanelDeRecaudacion(new LecturaDelLibroParaElPanel(libro, libro), caja);
 
     private AvanceDeRecaudacion panel() {
         return panel.del(EJERCICIO, HOY, AHORA);
@@ -208,7 +209,9 @@ class PanelDeRecaudacionTest {
         void unTributoSinCargosNoLlevaAvance() {
             LibroDeMentira sinCargos =
                     new LibroDeMentira().conRecaudado("MULTA_TRANSITO", EJERCICIO, 4, "150.00", 2);
-            PanelDeRecaudacion otro = new PanelDeRecaudacion(sinCargos, sinCargos, caja);
+            PanelDeRecaudacion otro =
+                    new PanelDeRecaudacion(
+                            new LecturaDelLibroParaElPanel(sinCargos, sinCargos), caja);
 
             LineaDeCartera multa =
                     fila(otro.del(EJERCICIO, HOY, AHORA).carteras().get(0), "MULTA_TRANSITO");
@@ -255,7 +258,9 @@ class PanelDeRecaudacionTest {
         void unaMunicipalidadRecienImplantada() {
             LibroDeMentira vacio = new LibroDeMentira();
             AvanceDeRecaudacion avance =
-                    new PanelDeRecaudacion(vacio, vacio, new CajaDeMentira())
+                    new PanelDeRecaudacion(
+                                    new LecturaDelLibroParaElPanel(vacio, vacio),
+                                    new CajaDeMentira())
                             .del(EJERCICIO, HOY, AHORA);
 
             assertThat(indicador(avance, "Recaudado 2026").cifra()).isEqualTo("S/ 0.00");
@@ -313,7 +318,9 @@ class PanelDeRecaudacionTest {
             // puede afirmar —el libro no tiene ni un cargo—, no un hueco como el avance.
             LibroDeMentira vacio = new LibroDeMentira();
             AvanceDeRecaudacion avance =
-                    new PanelDeRecaudacion(vacio, vacio, new CajaDeMentira())
+                    new PanelDeRecaudacion(
+                                    new LecturaDelLibroParaElPanel(vacio, vacio),
+                                    new CajaDeMentira())
                             .del(EJERCICIO, HOY, AHORA);
 
             assertThat(indicador(avance, "Avance de cobranza").nota())
@@ -359,7 +366,9 @@ class PanelDeRecaudacionTest {
         void unTributoSinCargosLlevaCeroCargado() {
             LibroDeMentira sinCargos =
                     new LibroDeMentira().conRecaudado("MULTA_TRANSITO", EJERCICIO, 4, "150.00", 2);
-            PanelDeRecaudacion otro = new PanelDeRecaudacion(sinCargos, sinCargos, caja);
+            PanelDeRecaudacion otro =
+                    new PanelDeRecaudacion(
+                            new LecturaDelLibroParaElPanel(sinCargos, sinCargos), caja);
 
             LineaDeCartera multa =
                     fila(otro.del(EJERCICIO, HOY, AHORA).carteras().get(0), "MULTA_TRANSITO");
@@ -409,7 +418,9 @@ class PanelDeRecaudacionTest {
     class SinCaja {
 
         private AvanceDeRecaudacion sinCaja(MotivoDeInalcanzable motivo) {
-            return new PanelDeRecaudacion(libro, libro, new CajaDeMentira().apagar(motivo))
+            return new PanelDeRecaudacion(
+                            new LecturaDelLibroParaElPanel(libro, libro),
+                            new CajaDeMentira().apagar(motivo))
                     .del(EJERCICIO, HOY, AHORA);
         }
 

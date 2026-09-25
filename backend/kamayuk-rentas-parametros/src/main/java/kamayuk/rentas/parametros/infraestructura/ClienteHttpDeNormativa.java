@@ -37,7 +37,7 @@ import tools.jackson.databind.json.JsonMapper;
  * un objeto, no los bytes con que se calculo la huella. Con un {@code String} en la mano, verificar
  * es una linea.
  *
- * <h2>Las dos esperas, y por que hay dos</h2>
+ * <h2>Las tres esperas, y por que hay tres</h2>
  *
  * <p>Se llaman ESPERA y no PLAZO, y no es cosmetico: el escaner de la regla 5 marca toda constante
  * que empiece por una palabra de valor normativo y lleve una cifra dentro, y `PLAZO` es una de
@@ -47,10 +47,17 @@ import tools.jackson.databind.json.JsonMapper;
  * seria pedirle que entienda el dominio; renombrar cuesta una linea.
  *
  * <p>La de <b>conexion</b> es corta: si {@code normativa} no esta, conviene saberlo pronto para
- * replegarse a la cache. La de <b>lectura</b> es larga, porque el snapshot con el anexo vehicular
+ * replegarse a la cache. La de <b>descarga</b> es larga, porque el snapshot con el anexo vehicular
  * son 54 000 filas y unos cuantos megabytes — y una descarga que se corta a la mitad por un plazo
  * pensado para una lectura pequena se lee como «normativa no contesta», que manda a buscar donde no
  * es.
+ *
+ * <p>Y la de <b>resolucion</b> es la de {@code /conjuntos}, que devuelve tres numeros (#450). Hasta
+ * #450 compartia la de la descarga: con {@code normativa} aceptando la conexion y sin contestar,
+ * cada liquidador esperaba <b>5 minutos</b> antes de replegarse a la cache, y lo esperaba con su
+ * conexion de la base tomada. Diez a la vez dejaban a rentas sin pool durante minutos por una
+ * pregunta de tres numeros. Con la suya propia el repliegue llega en segundos, que es cuando
+ * todavia sirve.
  *
  * <h2>Lo que este cliente NO tiene</h2>
  *
@@ -71,7 +78,12 @@ import tools.jackson.databind.json.JsonMapper;
 public class ClienteHttpDeNormativa implements PublicadorDeNormativa {
 
     private static final Duration ESPERA_DE_CONEXION = Duration.ofSeconds(5);
-    private static final Duration ESPERA_DE_LECTURA = Duration.ofMinutes(5);
+
+    /** La de {@code /conjuntos}: tres numeros, y el repliegue a la cache detras (#450). */
+    static final Duration ESPERA_DE_RESOLUCION = Duration.ofSeconds(3);
+
+    /** La del snapshot: 54 000 filas con el anexo vehicular. */
+    private static final Duration ESPERA_DE_DESCARGA = Duration.ofMinutes(5);
 
     private final HttpClient cliente;
     private final JsonMapper json;
@@ -86,8 +98,11 @@ public class ClienteHttpDeNormativa implements PublicadorDeNormativa {
 
     @Override
     public long conjuntoVigenteEn(Ejercicio ejercicio) {
-        String url = raiz + "/conjuntos?ejercicio=" + ejercicio.valor();
-        HttpResponse<String> respuesta = pedir(url, "resolver el conjunto de " + ejercicio);
+        HttpResponse<String> respuesta =
+                pedir(
+                        "/conjuntos?ejercicio=" + ejercicio.valor(),
+                        "resolver el conjunto de " + ejercicio,
+                        ESPERA_DE_RESOLUCION);
         // El 404 de `normativa` para esta ruta significa UNA cosa: ese ejercicio no tiene conjunto
         // sellado. Se traduce al tipo que los doce sitios que calculan ya saben cazar, porque
         // dejarlo salir como «normativa no contesta» mandaria a levantar un despliegue que esta
@@ -109,8 +124,10 @@ public class ClienteHttpDeNormativa implements PublicadorDeNormativa {
 
     @Override
     public SnapshotDeNormativa descargar(long conjuntoId, String ambito) {
-        String url = raiz + "/conjuntos/" + conjuntoId + "/snapshot?ambito=" + ambito;
-        HttpResponse<String> respuesta = pedir(url, "descargar el conjunto " + conjuntoId);
+        String ruta = "/conjuntos/" + conjuntoId + "/snapshot?ambito=" + ambito;
+        String url = raiz + ruta;
+        HttpResponse<String> respuesta =
+                pedir(ruta, "descargar el conjunto " + conjuntoId, ESPERA_DE_DESCARGA);
         // Igual que arriba: 404 aqui es «ese conjunto no existe o no esta sellado», que es un
         // hecho del dominio y no una caida.
         if (respuesta.statusCode() == 404) {
@@ -148,17 +165,27 @@ public class ClienteHttpDeNormativa implements PublicadorDeNormativa {
                 valoresReferenciales(raiz.get("valoresReferenciales")));
     }
 
-    private HttpResponse<String> pedir(String url, String que) {
+    /**
+     * Lo unico de este cliente que habla por la red.
+     *
+     * <p>La guarda de #450 va aqui y no un escalon mas arriba porque aqui no lo hay: los dobles de
+     * {@code normativa} implementan el puerto entero, asi que ninguna prueba con doble pasa por
+     * este metodo. La ejercen las que montan el cliente de verdad contra un servidor fabricado.
+     *
+     * @param espera cuanto se espera la respuesta; cada pregunta trae la suya (ver la cabecera)
+     */
+    private HttpResponse<String> pedir(String ruta, String que, Duration espera) {
         if (raiz.isBlank()) {
             throw new PublicadorDeNormativa.NormativaInalcanzable(
                     MotivoDeInalcanzable.SIN_CONFIGURAR,
                     que + ": `kamayuk.normativa.url` no esta configurada",
                     null);
         }
+        kamayuk.rentas.plataforma.ViajeDeRed.antesDeSalir("normativa", ruta, que);
         try {
             HttpRequest.Builder peticion =
-                    HttpRequest.newBuilder(URI.create(url))
-                            .timeout(ESPERA_DE_LECTURA)
+                    HttpRequest.newBuilder(URI.create(raiz + ruta))
+                            .timeout(espera)
                             .header("Accept", "application/json")
                             .GET();
             token().ifPresent(t -> peticion.header("Authorization", t));

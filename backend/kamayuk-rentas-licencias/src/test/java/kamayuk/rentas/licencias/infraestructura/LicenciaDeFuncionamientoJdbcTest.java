@@ -235,40 +235,17 @@ class LicenciaDeFuncionamientoJdbcTest {
                                         new ParametrosRepositoryJdbc(jdbc))));
 
         mantenerCatalogo = envolver(new MantenerCatalogoCiiu(catalogo, auditoria, RELOJ));
-        emitir =
-                envolver(
-                        new EmitirLicenciaDeFuncionamiento(
-                                licencias,
-                                movimientos,
-                                catalogo,
-                                recibos,
-                                aplicaciones,
-                                padron,
-                                fichas,
-                                TERRITORIO_EN_REGLA,
-                                derechos,
-                                documentos,
-                                PlantillaDeNumeroDeLicencia.POR_OMISION,
-                                auditoria,
-                                RELOJ));
+        emitir = emisionCon(recibos, padron, fichas, TERRITORIO_EN_REGLA, derechos, auditoria);
         // El mismo caso de uso, con un conjunto sellado que NO tiene el concepto del TUPA. Es la
         // demostracion de la regla 5: sin el dato, la operacion falla nombrando la llave.
         emitirSinParametro =
-                envolver(
-                        new EmitirLicenciaDeFuncionamiento(
-                                licencias,
-                                movimientos,
-                                catalogo,
-                                recibos,
-                                aplicaciones,
-                                padron,
-                                fichas,
-                                TERRITORIO_EN_REGLA,
-                                new DerechosDeTramiteParametrizados(new SinDerechosSellados()),
-                                documentos,
-                                PlantillaDeNumeroDeLicencia.POR_OMISION,
-                                auditoria,
-                                RELOJ));
+                emisionCon(
+                        recibos,
+                        padron,
+                        fichas,
+                        TERRITORIO_EN_REGLA,
+                        new DerechosDeTramiteParametrizados(new SinDerechosSellados()),
+                        auditoria);
         cancelar =
                 envolver(
                         new CancelarLicencia(
@@ -870,8 +847,295 @@ class LicenciaDeFuncionamientoJdbcTest {
     }
 
     // ==================================================================
+
+    /**
+     * #450 — Ningun viaje a un vecino con una conexion de la base o el candado del correlativo
+     * tomados.
+     *
+     * <p>Hasta #450 la emision entera era {@code @Transactional}, y dentro hacia seis viajes de red
+     * —{@code normativa}, {@code caja} y cuatro a {@code catastro}— con la conexion de la peticion
+     * tomada. Y el ultimo, la ficha economica, salia <b>despues</b> de {@code
+     * siguienteCorrelativo}, o sea con la fila de {@code licencia_correlativo} bloqueada hasta el
+     * commit: dos emisiones de la misma municipalidad y el mismo ano se ponian en fila detras de la
+     * latencia de {@code catastro}.
+     *
+     * <p>La siembra que distingue es <b>el vecino lento</b>. Con los dobles de siempre, que
+     * contestan al instante, cualquier frontera de transaccion y cualquier orden pasan.
+     */
+    @Nested
+    @DisplayName("#450 — los vecinos se preguntan sin conexion y sin candado tomados")
+    class LosVecinosSinConexionTomada {
+
+        /** Lo que tarda la ficha de `catastro` en esta siembra. */
+        private static final java.time.Duration LO_QUE_TARDA_CATASTRO =
+                java.time.Duration.ofSeconds(3);
+
+        @Test
+        @DisplayName(
+                "dos emisiones con `catastro` lento no se ponen en fila detras del correlativo")
+        void dosEmisionesNoSeEncolanDetrasDelCorrelativo() throws Exception {
+            giroDelCatalogo("47450", "COMERCIO DE #450");
+            long titular = crearContribuyente();
+            VecinosQueAnotan vecinos = new VecinosQueAnotan(LO_QUE_TARDA_CATASTRO);
+            EmitirLicenciaDeFuncionamiento conCatastroLento = emisionCon(vecinos);
+
+            // Una primero, sin medir: el primer papel de la JVM carga los renderizadores, y esa
+            // carga no es lo que se mide.
+            enContexto(
+                    () ->
+                            emitir.emitir(
+                                    solicitud(titular, cobrar(titular, DERECHO_LICENCIA), "47450"),
+                                    FormatoDeDocumento.PDF,
+                                    PORQUE));
+
+            String reciboA = cobrar(titular, DERECHO_LICENCIA);
+            String reciboB = cobrar(titular, DERECHO_LICENCIA);
+            List<java.time.Instant> finales =
+                    java.util.Collections.synchronizedList(new ArrayList<>());
+            CountDownLatch salida = new CountDownLatch(1);
+            try (ExecutorService hilos = Executors.newFixedThreadPool(2)) {
+                List<Future<?>> emisiones = new ArrayList<>();
+                for (String recibo : List.of(reciboA, reciboB)) {
+                    emisiones.add(
+                            hilos.submit(
+                                    () -> {
+                                        salida.await(10, TimeUnit.SECONDS);
+                                        try {
+                                            enContexto(
+                                                    () ->
+                                                            conCatastroLento.emitir(
+                                                                    conPredio(
+                                                                            solicitud(
+                                                                                    titular, recibo,
+                                                                                    "47450")),
+                                                                    FormatoDeDocumento.PDF,
+                                                                    PORQUE));
+                                            finales.add(java.time.Instant.now());
+                                        } finally {
+                                            TenantContext.limpiar();
+                                            OrigenContext.limpiar();
+                                        }
+                                        return null;
+                                    }));
+                }
+                salida.countDown();
+                for (Future<?> emision : emisiones) {
+                    emision.get(60, TimeUnit.SECONDS);
+                }
+            }
+
+            assertThat(finales).hasSize(2);
+            java.time.Duration entreLasDos =
+                    java.time.Duration.between(finales.get(0), finales.get(1)).abs();
+            assertThat(entreLasDos)
+                    .as(
+                            "con la ficha pedida DESPUES de numerar, la segunda emision esperaba el"
+                                    + " candado de licencia_correlativo mientras la primera esperaba"
+                                    + " a `catastro`, y terminaba %s o mas despues; pedida antes,"
+                                    + " las dos esperas se solapan",
+                            LO_QUE_TARDA_CATASTRO)
+                    .isLessThan(LO_QUE_TARDA_CATASTRO.minusSeconds(1));
+        }
+
+        @Test
+        @DisplayName("`caja` y `catastro` se preguntan sin ninguna transaccion abierta")
+        void losVecinosSePreguntanFueraDeLaTransaccion() {
+            giroDelCatalogo("47451", "OTRO COMERCIO DE #450");
+            long titular = crearContribuyente();
+            VecinosQueAnotan vecinos = new VecinosQueAnotan(java.time.Duration.ZERO);
+
+            EmitirLicenciaDeFuncionamiento.LicenciaEmitida emitida =
+                    enContexto(
+                            () ->
+                                    emisionCon(vecinos)
+                                            .emitir(
+                                                    conPredio(
+                                                            solicitud(
+                                                                    titular,
+                                                                    cobrar(
+                                                                            titular,
+                                                                            DERECHO_LICENCIA),
+                                                                    "47451")),
+                                                    FormatoDeDocumento.PDF,
+                                                    PORQUE));
+
+            assertThat(emitida.licencia().fichaId())
+                    .as("la ficha que `catastro` contesto llega a la fila")
+                    .isEqualTo(VecinosQueAnotan.FICHA);
+            assertThat(vecinos.preguntas())
+                    .as(
+                            "el recibo a `caja`; la zona, el riesgo, el ITSE y la ficha a"
+                                    + " `catastro`: cinco preguntas, y en ninguna habia una"
+                                    + " transaccion —o sea una conexion del pool— tomada")
+                    .containsExactly(
+                            "caja: sin transaccion",
+                            "zona: sin transaccion",
+                            "riesgo: sin transaccion",
+                            "itse: sin transaccion",
+                            "ficha: sin transaccion");
+        }
+
+        private EmitirLicenciaDeFuncionamiento emisionCon(VecinosQueAnotan vecinos) {
+            return LicenciaDeFuncionamientoJdbcTest.emisionCon(
+                    vecinos.recibos(recibos),
+                    new PadronDeLaPrueba(),
+                    vecinos.fichas(),
+                    vecinos.territorio(),
+                    new DerechosDeTramiteParametrizados(
+                            envolver(
+                                    new kamayuk.rentas.parametros.aplicacion
+                                            .LectorDeParametrosSellados(
+                                            new ParametrosRepositoryJdbc(jdbc)))),
+                    new AuditoriaJdbc(jdbc, RELOJ));
+        }
+
+        private static EmitirLicenciaDeFuncionamiento.Solicitud conPredio(
+                EmitirLicenciaDeFuncionamiento.Solicitud base) {
+            return new EmitirLicenciaDeFuncionamiento.Solicitud(
+                    base.codigoContribuyente(),
+                    VecinosQueAnotan.PREDIO,
+                    base.nombreComercial(),
+                    base.direccion(),
+                    base.areaSolicitada(),
+                    base.tipoLicencia(),
+                    base.zonificacion(),
+                    base.aforo(),
+                    base.fechaEmision(),
+                    base.vigenciaHasta(),
+                    base.numeroDeRecibo(),
+                    base.girosCiiu(),
+                    base.giroPrincipal(),
+                    base.expediente(),
+                    base.fechaExpediente(),
+                    base.autorizacionDelTerritorio());
+        }
+    }
+
+    /**
+     * Los vecinos de la emision, que anotan si al preguntarles habia una transaccion abierta y —la
+     * ficha— tardan lo que se les diga (#450).
+     */
+    private static final class VecinosQueAnotan {
+
+        static final long PREDIO = 450_001L;
+        static final long FICHA = 450_002L;
+
+        private final java.time.Duration loQueTardaLaFicha;
+        private final List<String> preguntas =
+                java.util.Collections.synchronizedList(new ArrayList<>());
+
+        VecinosQueAnotan(java.time.Duration loQueTardaLaFicha) {
+            this.loQueTardaLaFicha = loQueTardaLaFicha;
+        }
+
+        List<String> preguntas() {
+            return List.copyOf(preguntas);
+        }
+
+        private void anotar(String vecino) {
+            preguntas.add(
+                    vecino
+                            + (org.springframework.transaction.support
+                                            .TransactionSynchronizationManager
+                                            .isActualTransactionActive()
+                                    ? ": CON transaccion"
+                                    : ": sin transaccion"));
+        }
+
+        RecibosDeTramite recibos(RecibosDeTramite caja) {
+            return numero -> {
+                anotar("caja");
+                return caja.porNumeroImpreso(numero);
+            };
+        }
+
+        LectorDeFichasEconomicas fichas() {
+            return (predioId, fecha) -> {
+                anotar("ficha");
+                try {
+                    Thread.sleep(loQueTardaLaFicha);
+                } catch (InterruptedException interrumpido) {
+                    Thread.currentThread().interrupt();
+                    throw new IllegalStateException(interrumpido);
+                }
+                return java.util.Optional.of(FICHA);
+            };
+        }
+
+        kamayuk.rentas.licencias.aplicacion.ComprobarElTerritorio territorio() {
+            return new kamayuk.rentas.licencias.aplicacion.ComprobarElTerritorio(
+                    (predioId, aLaFecha) -> {
+                        anotar("zona");
+                        return new kamayuk.rentas.catastro.ZonaDelPredio(
+                                aLaFecha,
+                                "CZ",
+                                "Zona CZ",
+                                "PDU-DEMO",
+                                "ORD-2024-DEMO",
+                                LocalDate.of(2020, 1, 1),
+                                null,
+                                List.of());
+                    },
+                    new kamayuk.rentas.catastro.RiesgoYItseDelPredio() {
+                        @Override
+                        public kamayuk.rentas.catastro.RiesgoDelPredio riesgoDe(
+                                long predioId, LocalDate aLaFecha) {
+                            anotar("riesgo");
+                            return new kamayuk.rentas.catastro.RiesgoDelPredio(
+                                    predioId, aLaFecha, false, List.of(), List.of());
+                        }
+
+                        @Override
+                        public kamayuk.rentas.catastro.ItseDelPredio itseVigenteEn(
+                                long predioId, LocalDate aLaFecha) {
+                            anotar("itse");
+                            return new kamayuk.rentas.catastro.ItseDelPredio(
+                                    predioId, aLaFecha, List.of());
+                        }
+                    });
+        }
+    }
+
+    // ==================================================================
     // Ayudas
     // ==================================================================
+
+    /**
+     * La emision como la monta el contenedor: el orquestador, la lectura del catalogo y el escritor
+     * (#450), <b>los tres envueltos</b>.
+     *
+     * <p>Tambien el orquestador, que no declara ninguna transaccion: envolverlo es lo que hace que
+     * la mutacion de #450 —devolverle el {@code @Transactional}— se aplique y salga roja, en vez de
+     * pasar en verde porque nadie proxia el objeto anotado (la leccion de #430).
+     */
+    private static EmitirLicenciaDeFuncionamiento emisionCon(
+            RecibosDeTramite conQueRecibos,
+            DirectorioDeContribuyentes padron,
+            LectorDeFichasEconomicas fichas,
+            kamayuk.rentas.licencias.aplicacion.ComprobarElTerritorio territorio,
+            DerechosDeTramiteParametrizados derechos,
+            Auditoria auditoria) {
+        return envolver(
+                new EmitirLicenciaDeFuncionamiento(
+                        padron,
+                        derechos,
+                        conQueRecibos,
+                        envolver(
+                                new kamayuk.rentas.licencias.aplicacion.GirosDeLaSolicitud(
+                                        catalogo)),
+                        territorio,
+                        fichas,
+                        envolver(
+                                new kamayuk.rentas.licencias.aplicacion
+                                        .RegistrarLicenciaDeFuncionamiento(
+                                        licencias,
+                                        movimientos,
+                                        aplicaciones,
+                                        documentos,
+                                        PlantillaDeNumeroDeLicencia.POR_OMISION,
+                                        auditoria,
+                                        RELOJ))));
+    }
 
     @SuppressWarnings("unchecked")
     private static <T> T envolver(T objetivo) {

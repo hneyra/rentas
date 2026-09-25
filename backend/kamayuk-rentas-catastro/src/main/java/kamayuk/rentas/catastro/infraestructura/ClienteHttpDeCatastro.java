@@ -335,6 +335,20 @@ public class ClienteHttpDeCatastro {
      */
     record RespuestaDeCatastro(int estado, String cuerpo) {}
 
+    /**
+     * La guarda de #450, y despues {@link #enviar}.
+     *
+     * <p>Va <b>encima</b> de {@link #enviar} y no dentro, a proposito: {@link #enviar} es lo que
+     * sustituye {@code CatastroQueNoContesta}, y dentro de el la guarda se la saltaria cada prueba
+     * que monta un adaptador sobre ese doble. Aqui la ejercen todas, y un llamador que pregunte a
+     * {@code catastro} con su transaccion abierta sale rojo en la prueba que lo ejerce (ver {@link
+     * kamayuk.rentas.plataforma.ViajeDeRed}).
+     */
+    private RespuestaDeCatastro enviarSinConexionTomada(String ruta, String que) {
+        kamayuk.rentas.plataforma.ViajeDeRed.antesDeSalir("catastro", ruta, que);
+        return enviar(ruta, que);
+    }
+
     /** Manda la peticion y devuelve lo que llego. Es lo unico que toca la red. */
     RespuestaDeCatastro enviar(String ruta, String que) {
         if (raiz.isBlank()) {
@@ -372,7 +386,7 @@ public class ClienteHttpDeCatastro {
      * ValoresUnitariosHttp}).
      */
     JsonNode pedir(String ruta, String que) {
-        RespuestaDeCatastro respuesta = enviar(ruta, que);
+        RespuestaDeCatastro respuesta = enviarSinConexionTomada(ruta, que);
         if (respuesta.estado() != 200) {
             throw new CatastroInalcanzable(que + " (contesto " + respuesta.estado() + ")", null);
         }
@@ -407,7 +421,7 @@ public class ClienteHttpDeCatastro {
      */
     JsonNode pedirTraduciendoLosHechos(
             String ruta, String que, Function<HechoContestado, RuntimeException> traduccion) {
-        RespuestaDeCatastro respuesta = enviar(ruta, que);
+        RespuestaDeCatastro respuesta = enviarSinConexionTomada(ruta, que);
         if (respuesta.estado() == 200) {
             return leer(respuesta.cuerpo(), que);
         }

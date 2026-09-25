@@ -322,19 +322,24 @@ class CertificadosYPadronesJdbcTest {
         emitirLicencia =
                 envolver(
                         new EmitirLicenciaDeFuncionamiento(
-                                licencias,
-                                movimientos,
-                                catalogo,
-                                recibos,
-                                aplicaciones,
                                 padron,
-                                (predioId, fecha) -> Optional.empty(),
-                                TERRITORIO_EN_REGLA,
                                 derechos,
-                                documentos,
-                                PlantillaDeNumeroDeLicencia.POR_OMISION,
-                                auditoria,
-                                RELOJ));
+                                recibos,
+                                envolver(
+                                        new kamayuk.rentas.licencias.aplicacion.GirosDeLaSolicitud(
+                                                catalogo)),
+                                TERRITORIO_EN_REGLA,
+                                (predioId, fecha) -> Optional.empty(),
+                                envolver(
+                                        new kamayuk.rentas.licencias.aplicacion
+                                                .RegistrarLicenciaDeFuncionamiento(
+                                                licencias,
+                                                movimientos,
+                                                aplicaciones,
+                                                documentos,
+                                                PlantillaDeNumeroDeLicencia.POR_OMISION,
+                                                auditoria,
+                                                RELOJ))));
         cancelarLicencia =
                 envolver(
                         // #402: la cancelacion se fecha en agosto, despues del dia de la

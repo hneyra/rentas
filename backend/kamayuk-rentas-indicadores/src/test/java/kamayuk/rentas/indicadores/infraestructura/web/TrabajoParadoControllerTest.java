@@ -15,6 +15,7 @@ import kamayuk.rentas.autorizacion.ComprobadorDeAcceso;
 import kamayuk.rentas.autorizacion.GuardiaDeAcceso;
 import kamayuk.rentas.autorizacion.Privilegio;
 import kamayuk.rentas.indicadores.aplicacion.ConsultaDeTrabajoParado;
+import kamayuk.rentas.indicadores.aplicacion.LecturaDelLibroParaElPanel;
 import kamayuk.rentas.indicadores.aplicacion.PanelDeRecaudacion;
 import kamayuk.rentas.indicadores.dobles.CajaDeMentira;
 import kamayuk.rentas.indicadores.dobles.LibroDeMentira;
@@ -80,7 +81,9 @@ class TrabajoParadoControllerTest {
     private final MockMvc mvc =
             MockMvcBuilders.standaloneSetup(
                             new IndicadoresController(
-                                    new PanelDeRecaudacion(libro, libro, new CajaDeMentira()),
+                                    new PanelDeRecaudacion(
+                                            new LecturaDelLibroParaElPanel(libro, libro),
+                                            new CajaDeMentira()),
                                     new ConsultaDeTrabajoParado(modulos, modulos, modulos, modulos),
                                     comprobador,
                                     RELOJ))
