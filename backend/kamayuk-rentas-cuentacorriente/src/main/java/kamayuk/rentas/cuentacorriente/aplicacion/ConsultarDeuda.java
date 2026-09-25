@@ -216,10 +216,10 @@ public class ConsultarDeuda {
      * debe en total» no tiene pagina, la tiene una grilla.
      *
      * <p>A diferencia de {@link #filaDe} —que resuelve cada obligacion con su propia consulta a
-     * {@link AsientoRepository#paraDeuda}—, agrupa <b>en memoria</b> los asientos de una sola
-     * llamada a {@link AsientoRepository#deContribuyente}: no hay pagina que acote cuantos grupos
-     * se resuelven, asi que una consulta por obligacion aqui podria ser cualquier numero de ellas.
-     * {@link CalculoDeDeuda#deudaActualizadaA} filtra el corte por su cuenta (ve {@code
+     * {@link AsientoRepository#deTodosLosPeriodosDe}—, agrupa <b>en memoria</b> los asientos de una
+     * sola llamada a {@link AsientoRepository#deContribuyente}: no hay pagina que acote cuantos
+     * grupos se resuelven, asi que una consulta por obligacion aqui podria ser cualquier numero de
+     * ellas. {@link CalculoDeDeuda#deudaActualizadaA} filtra el corte por su cuenta (ve {@code
      * fechaValor}), asi que agrupar sin filtrar por fecha primero es seguro.
      */
     @Transactional(readOnly = true)
@@ -385,25 +385,21 @@ public class ConsultarDeuda {
                     : calculo.deudaActualizadaA(List.of(), criterio.fecha(), redondeo);
         }
 
-        ClaveDeObligacion clave = renglon.obligacion();
-        // periodo=null trae los asientos de TODOS los periodos de la obligacion (ver
-        // AsientoRepositoryJdbc#paraDeuda): es lo que permite agregar arbitrios de enero a
-        // diciembre en una sola fila. fase=null a proposito: filtrar aqui dejaria fuera los
-        // asientos de los periodos que todavia no llegaron a esa fase, y la fila subestimaria
-        // la deuda de la obligacion.
-        CriterioDeDeuda criterioDeLaObligacion =
-                new CriterioDeDeuda(
-                        criterio.codigoContribuyente(),
-                        clave.tributo(),
-                        clave.ejercicio(),
-                        null,
-                        clave.predioId(),
-                        clave.vehiculoId(),
-                        null,
-                        null,
-                        criterio.fecha());
+        // Los asientos de TODOS los periodos de la obligacion -lo que permite agregar arbitrios
+        // de enero a diciembre en una sola fila-, de todas sus fases -filtrar dejaria fuera los
+        // periodos que todavia no llegaron a una y la fila subestimaria la deuda- y sin corte:
+        // el corte lo hace `CalculoDeDeuda#deudaActualizadaA`, que descarta lo posterior.
+        //
+        // Por `deTodosLosPeriodosDe` y no por un `CriterioDeDeuda` a `paraDeuda` (#446): para un
+        // criterio, la unidad nula es «no filtrar», y la fila de la papeleta sin vehiculo se
+        // llevaba tambien los asientos de la del vehiculo 5 del mismo tributo y ejercicio. En la
+        // clave de una obligacion la unidad nula es OTRA obligacion, la que no tiene unidad, y
+        // asi la lee esta consulta, con `COALESCE(unidad, 0)`. Es la misma que ya leen la vista
+        // por periodo de aqui arriba y el reparto de una baja (#598): en toda la consulta, los
+        // asientos de una obligacion salen de un solo sitio, y la pantalla no puede publicar una
+        // cifra que el acto luego rechace.
         return calculo.deudaActualizadaA(
-                repositorio.paraDeuda(criterioDeLaObligacion), criterio.fecha(), redondeo);
+                repositorio.deTodosLosPeriodosDe(renglon.obligacion()), criterio.fecha(), redondeo);
     }
 
     private static Fase faseMasAvanzadaDe(List<SaldoProyectado> saldos) {
