@@ -1,5 +1,6 @@
 package kamayuk.rentas.valores.aplicacion;
 
+import java.time.Clock;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -10,6 +11,7 @@ import kamayuk.rentas.auditoria.Operacion;
 import kamayuk.rentas.auditoria.RegistroDeAuditoria;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.Observacion;
+import kamayuk.rentas.dominio.OrdenDeLosActos;
 import kamayuk.rentas.dominio.Plazo;
 import kamayuk.rentas.valores.dominio.AlcanceDelHecho;
 import kamayuk.rentas.valores.dominio.CausalDePrescripcion;
@@ -150,16 +152,19 @@ public class DeclararPrescripcion {
     private final ValorRepository valores;
     private final PlazosParametrizados plazos;
     private final Auditoria auditoria;
+    private final Clock reloj;
 
     public DeclararPrescripcion(
             PrescripcionRepository repositorio,
             ValorRepository valores,
             PlazosParametrizados plazos,
-            Auditoria auditoria) {
+            Auditoria auditoria,
+            Clock reloj) {
         this.repositorio = repositorio;
         this.valores = valores;
         this.plazos = plazos;
         this.auditoria = auditoria;
+        this.reloj = reloj;
     }
 
     /**
@@ -177,6 +182,7 @@ public class DeclararPrescripcion {
      * @param resolucion el numero de la resolucion, si ya se emitio
      * @param observacion por que se declara (regla 10)
      * @return el acto, con los valores que marco y los que dejo porque formalizan deuda viva
+     * @throws kamayuk.rentas.dominio.ActoFueraDeOrden si la presentacion es posterior a hoy (#402)
      */
     @Transactional
     public PrescripcionDeclarada declarar(
@@ -193,6 +199,14 @@ public class DeclararPrescripcion {
         if (ejercicioDesde.compareTo(ejercicioHasta) > 0) {
             throw new RangoInvertido(ejercicioDesde, ejercicioHasta);
         }
+
+        // #402: el computo se resuelve a la fecha de presentacion, y lo que prescribe se marca
+        // PRESCRITO hoy. Una presentacion fechada despues de hoy declaraba prescrito lo que todavia
+        // no lo esta, en una tabla que no admite correccion.
+        OrdenDeLosActos.exigir(
+                "la presentacion de la solicitud de prescripcion",
+                fechaPresentacion,
+                LocalDate.now(reloj));
 
         List<HechoDelComputo> conAlcance = conSuAlcance(hechos, ejercicioDesde, ejercicioHasta);
 

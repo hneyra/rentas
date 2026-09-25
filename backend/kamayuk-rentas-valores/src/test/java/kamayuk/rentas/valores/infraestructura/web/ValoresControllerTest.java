@@ -58,6 +58,17 @@ import tools.jackson.databind.json.JsonMapper;
 class ValoresControllerTest {
 
     private static final LocalDate HOY = LocalDate.of(2026, 3, 15);
+
+    /**
+     * El dia en que se registran la diligencia y el pase, despues del ultimo que estas pruebas
+     * fechan (el pase del 10 de junio). Hasta #402 los dos corrian con {@link #HOY}, el dia de la
+     * emision, y fechaban sus actos en el futuro sin que nadie lo notara.
+     */
+    private static final Clock RELOJ_DE_LOS_ACTOS =
+            Clock.fixed(
+                    LocalDate.of(2026, 6, 10).atStartOfDay(ZoneOffset.UTC).toInstant(),
+                    ZoneOffset.UTC);
+
     private static final Ejercicio EJERCICIO_DEUDA = new Ejercicio(2025);
 
     private final ValoresEnMemoria repositorio = new ValoresEnMemoria();
@@ -122,14 +133,15 @@ class ValoresControllerTest {
                     notificaciones,
                     contribuyentes,
                     new PlazosParametrizados(parametros),
-                    (RegistroDeAuditoria registro) -> {});
+                    (RegistroDeAuditoria registro) -> {},
+                    RELOJ_DE_LOS_ACTOS);
     private final PasarACoactiva pasarACoactiva =
             new PasarACoactiva(
                     repositorio,
                     notificaciones,
                     movimientos,
                     (RegistroDeAuditoria registro) -> {},
-                    Clock.fixed(HOY.atStartOfDay(ZoneOffset.UTC).toInstant(), ZoneOffset.UTC));
+                    RELOJ_DE_LOS_ACTOS);
 
     private final MockMvc mvc =
             MockMvcBuilders.standaloneSetup(
@@ -786,7 +798,8 @@ class ValoresControllerTest {
                                                 notificaciones,
                                                 contribuyentes,
                                                 new PlazosParametrizados(lector),
-                                                (RegistroDeAuditoria registro) -> {}),
+                                                (RegistroDeAuditoria registro) -> {},
+                                                RELOJ_DE_LOS_ACTOS),
                                         pasarACoactiva))
                         .setControllerAdvice(new ManejadorDeErrores())
                         .setMessageConverters(

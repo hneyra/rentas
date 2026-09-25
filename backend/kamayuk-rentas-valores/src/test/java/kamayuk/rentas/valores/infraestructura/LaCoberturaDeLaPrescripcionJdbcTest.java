@@ -7,7 +7,9 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.Clock;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.Arrays;
 import java.util.List;
 import java.util.function.Supplier;
@@ -121,7 +123,9 @@ class LaCoberturaDeLaPrescripcionJdbcTest {
                         prescripciones,
                         valores,
                         new PlazosParametrizados(new ParametrosDelConjuntoSembrado()),
-                        (RegistroDeAuditoria registro) -> {});
+                        (RegistroDeAuditoria registro) -> {},
+                        Clock.fixed(
+                                SEGUNDA.atStartOfDay(ZoneOffset.UTC).toInstant(), ZoneOffset.UTC));
 
         TenantContext.fijar(new MunicipalidadId(municipalidad));
         OrigenContext.fijar(new Origen("prueba.337", "equipo-de-prueba", "127.0.0.1"));

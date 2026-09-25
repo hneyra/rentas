@@ -84,6 +84,7 @@ public class AnulacionDePapeletaController {
             throw new ProblemaDeNegocio(
                     CodigoDeError.NO_ENCONTRADO, PeticionesDeSanciones.mensajeDe(noExiste));
         } catch (AnularPapeleta.PapeletaConResolucionDeMulta
+                | AnularPapeleta.AnulacionQueNoDaDeBaja
                 | ObligacionCompartidaConOtraPapeleta
                 | Papeleta.TransicionIlegal conflicto) {
             // 409 y no 422: la peticion es correcta, lo que no admite el acto es la situacion en

@@ -1,14 +1,19 @@
 package kamayuk.rentas.sanciones.aplicacion;
 
+import java.time.Clock;
 import java.time.LocalDate;
 import kamayuk.rentas.auditoria.Auditoria;
 import kamayuk.rentas.auditoria.Operacion;
 import kamayuk.rentas.auditoria.RegistroDeAuditoria;
 import kamayuk.rentas.cuentacorriente.CausalDeBaja;
+import kamayuk.rentas.cuentacorriente.ConsultaDeDeudaPublica;
 import kamayuk.rentas.cuentacorriente.ExtincionDeDeuda;
 import kamayuk.rentas.cuentacorriente.MovimientoAsentado;
 import kamayuk.rentas.cuentacorriente.ObligacionCompartida;
+import kamayuk.rentas.cuentacorriente.ObligacionPublica;
+import kamayuk.rentas.dominio.ActoFueraDeOrden;
 import kamayuk.rentas.dominio.Observacion;
+import kamayuk.rentas.dominio.OrdenDeLosActos;
 import kamayuk.rentas.sanciones.dominio.Familia;
 import kamayuk.rentas.sanciones.dominio.Papeleta;
 import kamayuk.rentas.sanciones.dominio.PapeletaRepository;
@@ -118,6 +123,23 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>Y si la multa ya estaba cobrada no se llega hasta aquí: {@link Papeleta#anulada} lo rechaza
  * antes, porque una {@code PAGADA} ya no se debe. Lo que corresponde con lo cobrado de más es una
  * devolución, que es otro procedimiento.
+ *
+ * <h2>Y la fecha, ni antes de la infracción ni después de hoy (#402)</h2>
+ *
+ * <p>La fecha del acto es la de corte y la <b>fecha valor</b> de la baja, y el cargo de la papeleta
+ * nace con fecha valor la de la infracción ({@code RegistrarPapeleta}). Hasta #402 nadie la
+ * acotaba, y medido: una infracción del 4 de marzo anulada «el 1 de marzo» —un 1 tecleado por un 4—
+ * releía la deuda a esa fecha, no veía el cargo, escribía <b>cero</b> asientos y confirmaba. La
+ * papeleta quedaba {@code ANULADA} con 428,00 en el libro, y sin vuelta atrás: otra anulación choca
+ * con {@link Papeleta.TransicionIlegal}. Y una fechada después de hoy asentaba una baja con fecha
+ * valor futura: toda consulta «a hoy» seguía viendo la deuda hasta ese día. {@link OrdenDeLosActos}
+ * rechaza las dos antes de tocar nada.
+ *
+ * <p><b>Y detrás, una defensa donde el daño no tiene marcha atrás.</b> Si la baja no asienta nada y
+ * la obligación sigue debiendo a hoy, se rechaza con {@link AnulacionQueNoDaDeBaja} y la
+ * transacción se deshace entera. Con la fecha acotada no debería pasar —el cargo nace el día de la
+ * infracción—, y por eso es defensa y no regla: si mañana un cargo de la papeleta naciera con otra
+ * fecha valor, el síntoma sería éste, y lo que queda es un 409 y no una papeleta anulada debiendo.
  */
 @Service
 public class AnularPapeleta {
@@ -127,17 +149,23 @@ public class AnularPapeleta {
     private final PapeletaRepository papeletas;
     private final ValoresSobreUnaObligacion valores;
     private final ExtincionDeDeuda extincion;
+    private final ConsultaDeDeudaPublica deudas;
     private final Auditoria auditoria;
+    private final Clock reloj;
 
     public AnularPapeleta(
             PapeletaRepository papeletas,
             ValoresSobreUnaObligacion valores,
             ExtincionDeDeuda extincion,
-            Auditoria auditoria) {
+            ConsultaDeDeudaPublica deudas,
+            Auditoria auditoria,
+            Clock reloj) {
         this.papeletas = papeletas;
         this.valores = valores;
         this.extincion = extincion;
+        this.deudas = deudas;
         this.auditoria = auditoria;
+        this.reloj = reloj;
     }
 
     /**
@@ -153,6 +181,9 @@ public class AnularPapeleta {
      * @throws Papeleta.TransicionIlegal si en ese estado ya no se debe nada
      * @throws ObligacionCompartidaConOtraPapeleta si su obligacion del libro tiene tambien la multa
      *     de otra papeleta (#371): anularla extinguiria las dos
+     * @throws ActoFueraDeOrden si la fecha es anterior a la infraccion o posterior a hoy (#402)
+     * @throws AnulacionQueNoDaDeBaja si la baja no asienta nada y la obligacion sigue debiendo a
+     *     hoy (#402)
      */
     @Transactional
     public Anulada anular(
@@ -163,6 +194,10 @@ public class AnularPapeleta {
                         .porNumero(familia, numero)
                         .orElseThrow(
                                 () -> new RegistrarDescargo.PapeletaInexistente(familia, numero));
+
+        LocalDate hoy = LocalDate.now(reloj);
+        OrdenDeLosActos.exigir(
+                "la anulacion de la papeleta " + antes.numero(), fecha, hoy, antes.laInfraccion());
 
         exigirQueNadaLaSostenga(antes);
 
@@ -192,6 +227,10 @@ public class AnularPapeleta {
             throw ObligacionDeLaPapeleta.compartida(antes, compartida, papeletas, "anularla");
         }
 
+        if (baja.asientos() == 0) {
+            exigirQueNoSigaDebiendo(antes, hoy);
+        }
+
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe(
                                 TABLA_AUDITADA,
@@ -216,6 +255,22 @@ public class AnularPapeleta {
                 papeleta, valores, "la papeleta");
     }
 
+    /**
+     * La defensa de #402: la baja no asentó nada, y la obligación <b>no puede</b> seguir debiendo a
+     * hoy. Si debe, la anulación dejaría exactamente «una papeleta anulada que sigue debiendo», y
+     * sin vuelta atrás; se rechaza y la transacción se deshace, con el estado de la papeleta.
+     *
+     * <p>Se pregunta a hoy y no a la fecha del acto, porque lo que se protege es lo que la
+     * ventanilla cobraría mañana. Y se pregunta por la obligación que {@link
+     * ObligacionDeLaPapeleta} compone, la misma que la baja acaba de intentar extinguir.
+     */
+    private void exigirQueNoSigaDebiendo(Papeleta papeleta, LocalDate hoy) {
+        ObligacionPublica deuda = ObligacionDeLaPapeleta.deudaDe(papeleta, deudas, hoy);
+        if (deuda != null && deuda.total().esPositivo()) {
+            throw new AnulacionQueNoDaDeBaja(papeleta, deuda);
+        }
+    }
+
     /** Sin datos personales: esto acaba en la columna JSON de la auditoría. */
     private static String descripcion(Papeleta papeleta) {
         return "{\"estado\":\"" + papeleta.estado() + "\"}";
@@ -228,6 +283,30 @@ public class AnularPapeleta {
      * @param baja los asientos de la baja; vacía si a esa fecha no se debía nada
      */
     public record Anulada(Papeleta papeleta, MovimientoAsentado baja) {}
+
+    /**
+     * La baja no extinguió nada y la obligación sigue debiendo a hoy (#402): anular dejaría una
+     * papeleta {@code ANULADA} que el libro sigue cobrando, y sin vuelta atrás.
+     *
+     * <p>Sale {@code 409} y no {@code 422}: la fecha ya pasó {@link OrdenDeLosActos}, así que lo
+     * que no admite el acto es la situación del libro, no un campo de la petición.
+     */
+    public static final class AnulacionQueNoDaDeBaja extends RuntimeException {
+
+        @java.io.Serial private static final long serialVersionUID = 1L;
+
+        AnulacionQueNoDaDeBaja(Papeleta papeleta, ObligacionPublica deuda) {
+            super(
+                    "La anulacion de la papeleta "
+                            + papeleta.numero()
+                            + " no dio de baja nada y su obligacion sigue debiendo "
+                            + deuda.total().valor().toPlainString()
+                            + " al "
+                            + deuda.fecha()
+                            + ": anularla dejaria una papeleta anulada que el libro sigue"
+                            + " cobrando");
+        }
+    }
 
     /**
      * La multa de esa papeleta ya se formalizó en un valor que sigue vivo: anularla dejaría ese

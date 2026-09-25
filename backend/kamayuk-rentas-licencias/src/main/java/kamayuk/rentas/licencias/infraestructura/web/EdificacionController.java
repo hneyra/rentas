@@ -356,8 +356,7 @@ public class EdificacionController {
                 | MovimientoDeEdificacionRepository.NumeroDeLicenciaDuplicado carrera) {
             throw new ProblemaDeNegocio(CodigoDeError.CONFLICTO, mensajeDe(carrera));
         } catch (EmitirLicenciaDeEdificacion.SeccionesIncompletas
-                | EmitirLicenciaDeEdificacion.TramiteQueNoOtorgaLicencia
-                | EmitirLicenciaDeEdificacion.AnteriorALaDeclaracion invalida) {
+                | EmitirLicenciaDeEdificacion.TramiteQueNoOtorgaLicencia invalida) {
             throw new ProblemaDeNegocio(CodigoDeError.VALIDACION, mensajeDe(invalida));
         } catch (ComprobacionDelDerecho.DerechoNoPagado sinPagar) {
             throw new ProblemaDeNegocio(CodigoDeError.VALIDACION, mensajeDe(sinPagar));

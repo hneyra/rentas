@@ -62,7 +62,8 @@ class PrescripcionControllerTest {
                     prescripciones,
                     valores,
                     new PlazosParametrizados(parametros),
-                    (RegistroDeAuditoria registro) -> {});
+                    (RegistroDeAuditoria registro) -> {},
+                    Clock.fixed(HOY.atStartOfDay(ZoneOffset.UTC).toInstant(), ZoneOffset.UTC));
 
     private final ConsultaDePrescripciones consulta =
             new ConsultaDePrescripciones(prescripciones, contribuyentes);
@@ -425,7 +426,11 @@ class PrescripcionControllerTest {
                                                 prescripciones,
                                                 new ValoresEnMemoria(),
                                                 new PlazosParametrizados(lector),
-                                                (RegistroDeAuditoria registro) -> {}),
+                                                (RegistroDeAuditoria registro) -> {},
+                                                Clock.fixed(
+                                                        HOY.atStartOfDay(ZoneOffset.UTC)
+                                                                .toInstant(),
+                                                        ZoneOffset.UTC)),
                                         consulta,
                                         contribuyentes,
                                         Clock.fixed(

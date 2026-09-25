@@ -325,8 +325,15 @@ class CertificadosYPadronesJdbcTest {
                                 RELOJ));
         cancelarLicencia =
                 envolver(
+                        // #402: la cancelacion se fecha en agosto, despues del dia de la
+                        // emision; con el reloj de la emision seria posterior a hoy.
                         new CancelarLicencia(
-                                licencias, movimientos, padron, documentos, auditoria, RELOJ));
+                                licencias,
+                                movimientos,
+                                padron,
+                                documentos,
+                                auditoria,
+                                RELOJ_DE_2027));
         consultaDeLicencias =
                 envolver(new ConsultaDeLicencias(licencias, movimientos, duplicados, padron));
         // SIN envolver: el resumen anual no abre transaccion propia a proposito. Ver su javadoc —y

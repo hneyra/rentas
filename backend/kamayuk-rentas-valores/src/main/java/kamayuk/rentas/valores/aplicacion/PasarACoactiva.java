@@ -7,6 +7,7 @@ import kamayuk.rentas.auditoria.Auditoria;
 import kamayuk.rentas.auditoria.Operacion;
 import kamayuk.rentas.auditoria.RegistroDeAuditoria;
 import kamayuk.rentas.dominio.Observacion;
+import kamayuk.rentas.dominio.OrdenDeLosActos;
 import kamayuk.rentas.valores.dominio.EstadoDeValor;
 import kamayuk.rentas.valores.dominio.MovimientoDeValor;
 import kamayuk.rentas.valores.dominio.MovimientoDeValorRepository;
@@ -77,6 +78,7 @@ public class PasarACoactiva {
      * @throws ValorInexistente si no hay ningun valor con ese numero
      * @throws ValorSinNotificar si ninguna diligencia del valor surtio efecto
      * @throws PlazoVigente si a esa fecha la deuda todavia no era exigible
+     * @throws kamayuk.rentas.dominio.ActoFueraDeOrden si la fecha es posterior a hoy (#402)
      */
     @Transactional
     public MovimientoDeValor pasar(
@@ -86,6 +88,15 @@ public class PasarACoactiva {
                 valores.porNumero(numeroDeValor.strip().toUpperCase(Locale.ROOT))
                         .orElseThrow(() -> new ValorInexistente(numeroDeValor));
         long valorId = requireId(valor);
+
+        // #402: `PlazoVigente` solo mira `fecha >= exigibleDesde`, y el pase fechado el mismo dia
+        // en que la deuda sera exigible —si ese dia todavia no llego— dejaba el valor HOY en
+        // COACTIVA, cuando el deudor todavia puede reclamar. La fecha explicita existe para
+        // registrar lo que una resolucion ya dispuso: una fecha pasada, no una futura.
+        OrdenDeLosActos.exigir(
+                "el pase a coactiva del valor " + valor.numero(),
+                fechaDelMovimiento,
+                LocalDate.now(reloj));
 
         Notificacion notificacion =
                 notificaciones

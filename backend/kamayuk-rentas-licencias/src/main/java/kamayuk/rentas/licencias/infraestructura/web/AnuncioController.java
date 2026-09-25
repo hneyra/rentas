@@ -265,7 +265,7 @@ public class AnuncioController {
             // de las dos cosas —«corrige el formulario» o «hay que publicar una cifra»— y acaba
             // enumerando las dos, que es peor que no decir nada.
             throw FaltaPublicar.problema(sinTarifa);
-        } catch (RenovarAnuncio.AnteriorALaAutorizacion | RenovarAnuncio.VigenciaHaciaAtras mal) {
+        } catch (RenovarAnuncio.VigenciaHaciaAtras mal) {
             throw new ProblemaDeNegocio(CodigoDeError.VALIDACION, mensajeDe(mal));
         }
 
@@ -350,9 +350,7 @@ public class AnuncioController {
             throw new ProblemaDeNegocio(CodigoDeError.CONFLICTO, mensajeDe(yaEstaba));
         } catch (MovimientoDeAnuncioRepository.ActoRepetido carrera) {
             throw new ProblemaDeNegocio(CodigoDeError.CONFLICTO, mensajeDe(carrera));
-        } catch (CesarAnuncio.SinCesePrevio
-                | CesarAnuncio.SinMotivo
-                | RenovarAnuncio.AnteriorALaAutorizacion invalida) {
+        } catch (CesarAnuncio.SinCesePrevio | CesarAnuncio.SinMotivo invalida) {
             throw new ProblemaDeNegocio(CodigoDeError.VALIDACION, mensajeDe(invalida));
         }
 

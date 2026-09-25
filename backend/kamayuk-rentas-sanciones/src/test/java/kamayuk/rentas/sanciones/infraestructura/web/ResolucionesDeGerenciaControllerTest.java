@@ -446,7 +446,8 @@ class ResolucionesDeGerenciaControllerTest {
                                         papeletas,
                                         padron,
                                         plazos,
-                                        (RegistroDeAuditoria registro) -> {})))
+                                        (RegistroDeAuditoria registro) -> {},
+                                        RELOJ)))
                 .setControllerAdvice(new ManejadorDeErrores())
                 .setMessageConverters(
                         new JacksonJsonHttpMessageConverter(

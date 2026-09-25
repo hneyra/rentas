@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.List;
 import kamayuk.rentas.auditoria.RegistroDeAuditoria;
 import kamayuk.rentas.contribuyentes.ResumenDeContribuyente;
+import kamayuk.rentas.dominio.ActoFueraDeOrden;
 import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.ModalidadDeNotificacion;
@@ -77,7 +78,12 @@ class NotificacionYPaseACoactivaTest {
         PlazosParametrizados plazos = new PlazosParametrizados(parametros);
         notificar =
                 new RegistrarNotificacion(
-                        valores, notificaciones, contribuyentes, plazos, auditados::add);
+                        valores,
+                        notificaciones,
+                        contribuyentes,
+                        plazos,
+                        auditados::add,
+                        Clock.fixed(HOY.atStartOfDay(ZoneOffset.UTC).toInstant(), ZoneOffset.UTC));
         pasar =
                 new PasarACoactiva(
                         valores,
@@ -128,7 +134,9 @@ class NotificacionYPaseACoactivaTest {
                             notificaciones,
                             contribuyentes,
                             new PlazosParametrizados(vacios),
-                            auditados::add);
+                            auditados::add,
+                            Clock.fixed(
+                                    HOY.atStartOfDay(ZoneOffset.UTC).toInstant(), ZoneOffset.UTC));
 
             assertThatThrownBy(
                             () ->
@@ -248,7 +256,7 @@ class NotificacionYPaseACoactivaTest {
         @DisplayName("no se puede notificar antes de emitir")
         void noSePuedeNotificarAntesDeEmitir() {
             assertThatThrownBy(() -> notificarEl(EMISION.minusDays(1)))
-                    .isInstanceOf(RegistrarNotificacion.DiligenciaAnteriorALaEmision.class);
+                    .isInstanceOf(ActoFueraDeOrden.class);
         }
     }
 
@@ -305,7 +313,9 @@ class NotificacionYPaseACoactivaTest {
             notificarEl(LocalDate.of(2026, 4, 3));
 
             MovimientoDeValor primero = pasar.pasar("OP-2026-000001", HOY, OBSERVACION);
-            MovimientoDeValor segundo = pasar.pasar("OP-2026-000001", HOY.plusDays(3), OBSERVACION);
+            // Otra fecha, y anterior: desde #402 una posterior a hoy ya no llega al registro.
+            MovimientoDeValor segundo =
+                    pasar.pasar("OP-2026-000001", HOY.minusDays(3), OBSERVACION);
 
             assertThat(segundo.id()).isEqualTo(primero.id());
             assertThat(segundo.fecha()).isEqualTo(primero.fecha());
@@ -322,6 +332,100 @@ class NotificacionYPaseACoactivaTest {
             assertThat(pase.notificacionId()).isEqualTo(notificacion.id());
             assertThat(pase.exigibleDesde()).isEqualTo(notificacion.exigibleDesde());
             assertThat(valorPorNumero("OP-2026-000001").estado()).isEqualTo(EstadoDeValor.COACTIVA);
+        }
+    }
+
+    /**
+     * #402 — Valores: la notificacion y el pase no se fechan despues de hoy.
+     *
+     * <p>El escenario del issue: el reloj en el 23 de setiembre, una RD notificada el 1 de
+     * setiembre y exigible desde el 30 —veinte dias habiles despues—, y un pase fechado el mismo
+     * dia en que es exigible. Hasta #402 pasaba {@code PlazoVigente} —solo mira {@code fecha >=
+     * exigibleDesde}— y el valor quedaba HOY en {@code COACTIVA}, cuando todavia se puede reclamar.
+     * Y una diligencia fechada un mes despues de hoy dejaba el valor notificado y exigible desde
+     * noviembre sin que ninguna diligencia posterior lo pudiera corregir: {@code queSurtioEfecto}
+     * toma la primera.
+     */
+    @Nested
+    @DisplayName("#402 — ni la notificacion ni el pase se fechan despues de hoy")
+    class LaFechaDelActoDeValores {
+
+        private static final LocalDate DEL_23 = LocalDate.of(2026, 9, 23);
+
+        private RegistrarNotificacion notificarEl23;
+        private PasarACoactiva pasarEl23;
+
+        @BeforeEach
+        void preparar() {
+            notificarEl23 =
+                    new RegistrarNotificacion(
+                            valores,
+                            notificaciones,
+                            contribuyentes,
+                            new PlazosParametrizados(parametros),
+                            auditados::add,
+                            Clock.fixed(
+                                    DEL_23.atStartOfDay(ZoneOffset.UTC).toInstant(),
+                                    ZoneOffset.UTC));
+            pasarEl23 =
+                    new PasarACoactiva(
+                            valores,
+                            notificaciones,
+                            movimientos,
+                            auditados::add,
+                            Clock.fixed(
+                                    DEL_23.atStartOfDay(ZoneOffset.UTC).toInstant(),
+                                    ZoneOffset.UTC));
+        }
+
+        @Test
+        @DisplayName("una diligencia fechada un mes despues de hoy no se registra")
+        void diligenciaPosteriorAHoy() {
+            assertThatThrownBy(() -> diligenciar(LocalDate.of(2026, 10, 23)))
+                    .isInstanceOf(ActoFueraDeOrden.class)
+                    .hasMessageContaining("posterior a hoy");
+            assertThat(notificaciones.todas()).isEmpty();
+            assertThat(valorPorNumero("OP-2026-000001").estado()).isEqualTo(EstadoDeValor.EMITIDO);
+        }
+
+        @Test
+        @DisplayName("la diligencia anterior a la emision, con la misma excepcion")
+        void diligenciaAnteriorALaEmision() {
+            assertThatThrownBy(() -> diligenciar(EMISION.minusDays(1)))
+                    .isInstanceOf(ActoFueraDeOrden.class)
+                    .hasMessageContaining(EMISION.toString());
+        }
+
+        @Test
+        @DisplayName("un pase el dia en que la deuda es exigible, si ese dia es futuro: rechazo")
+        void paseFechadoEnElFuturo() {
+            Notificacion notificacion = diligenciar(LocalDate.of(2026, 9, 1));
+            LocalDate exigible = notificacion.exigibleDesde();
+            assertThat(exigible).as("la siembra: exigible despues de hoy").isAfter(DEL_23);
+
+            assertThatThrownBy(() -> pasarEl23.pasar("OP-2026-000001", exigible, OBSERVACION))
+                    .as("PlazoVigente no lo ve: la fecha no es anterior a la exigibilidad")
+                    .isInstanceOf(ActoFueraDeOrden.class)
+                    .hasMessageContaining("posterior a hoy");
+            assertThat(movimientos.cuantos()).isZero();
+            assertThat(valorPorNumero("OP-2026-000001").estado())
+                    .as("y el valor no queda en COACTIVA mientras todavia se puede reclamar")
+                    .isEqualTo(EstadoDeValor.NOTIFICADO);
+        }
+
+        private Notificacion diligenciar(LocalDate fecha) {
+            return notificarEl23.registrar(
+                    "OP-2026-000001",
+                    fecha,
+                    ModalidadDeNotificacion.PERSONAL,
+                    ResultadoDeNotificacion.NOTIFICADO,
+                    "J. RUIZ PALACIOS",
+                    null,
+                    "TITULAR",
+                    "DNI 12345678",
+                    "TITULAR",
+                    "CARGO-1",
+                    OBSERVACION);
         }
     }
 

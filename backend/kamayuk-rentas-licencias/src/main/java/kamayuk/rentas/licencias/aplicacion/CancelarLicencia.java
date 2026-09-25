@@ -3,6 +3,8 @@ package kamayuk.rentas.licencias.aplicacion;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -16,6 +18,7 @@ import kamayuk.rentas.documentos.EmitirDocumento;
 import kamayuk.rentas.documentos.FormatoDeDocumento;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.Observacion;
+import kamayuk.rentas.dominio.OrdenDeLosActos;
 import kamayuk.rentas.licencias.dominio.EstadoDeLicencia;
 import kamayuk.rentas.licencias.dominio.LicenciaDeFuncionamiento;
 import kamayuk.rentas.licencias.dominio.LicenciaRepository;
@@ -94,6 +97,8 @@ public class CancelarLicencia {
      * @param observacion por que se registra (regla 10, RNF-052)
      * @throws LicenciaInexistente si no hay ninguna licencia con ese numero
      * @throws YaEstabaCancelada si la licencia ya estaba cancelada
+     * @throws kamayuk.rentas.dominio.ActoFueraDeOrden si la fecha es anterior al ultimo movimiento
+     *     registrado o posterior a hoy (#402)
      */
     @Transactional
     public Cancelacion cancelar(
@@ -118,13 +123,12 @@ public class CancelarLicencia {
                         .orElseThrow(() -> new LicenciaInexistente(numeroDeLicencia));
 
         List<MovimientoDeLicencia> historial = movimientos.deLicencia(licencia.identificador());
+        exigirEnOrden(licencia, historial, fecha);
+
         EstadoDeLicencia actual =
                 EstadoDeLicencia.derivarDe(historial, licencia.vigenciaHasta(), fecha);
         if (actual == EstadoDeLicencia.CANCELADA) {
             throw new YaEstabaCancelada(licencia.numero());
-        }
-        if (fecha.isBefore(licencia.fechaEmision())) {
-            throw new AnteriorALaEmision(licencia.numero(), licencia.fechaEmision(), fecha);
         }
 
         ResumenDeContribuyente titular = titularDe(licencia);
@@ -165,6 +169,37 @@ public class CancelarLicencia {
                         .con(null, descripcion(licencia, registrado)));
 
         return new Cancelacion(licencia, registrado, emision);
+    }
+
+    /**
+     * #402: la cancelacion no se fecha antes del <b>ultimo</b> movimiento registrado ni despues de
+     * hoy. Es el mismo patron que el cese de un anuncio: el estado se deriva a la fecha del acto y
+     * se salta lo posterior, asi que compararla solo con la emision —lo unico que se miraba hasta
+     * #402, con una excepcion propia que se retira— deja pasar una resolucion fechada antes de un
+     * acto que ya consta. La emision va tambien, por si una licencia migrada no trae su movimiento.
+     */
+    private void exigirEnOrden(
+            LicenciaDeFuncionamiento licencia,
+            List<MovimientoDeLicencia> historial,
+            LocalDate fecha) {
+        List<OrdenDeLosActos.ActoPrevio> previos = new ArrayList<>();
+        previos.add(
+                new OrdenDeLosActos.ActoPrevio(
+                        "la emision de la licencia " + licencia.numero(), licencia.fechaEmision()));
+        historial.stream()
+                .max(Comparator.comparing(MovimientoDeLicencia::fecha))
+                .ifPresent(
+                        ultimo ->
+                                previos.add(
+                                        new OrdenDeLosActos.ActoPrevio(
+                                                "el ultimo movimiento de "
+                                                        + licencia.numero()
+                                                        + " ("
+                                                        + ultimo.tipo().titulo()
+                                                        + ")",
+                                                ultimo.fecha())));
+        OrdenDeLosActos.exigir(
+                "la cancelacion de " + licencia.numero(), fecha, LocalDate.now(reloj), previos);
     }
 
     private ResumenDeContribuyente titularDe(LicenciaDeFuncionamiento licencia) {
@@ -232,23 +267,6 @@ public class CancelarLicencia {
             super(
                     "La resolucion de cancelacion lleva el motivo por el que la licencia queda sin"
                             + " efecto; sin el, el administrado no puede impugnarla");
-        }
-    }
-
-    /** La cancelacion no puede ser anterior a la licencia que cancela. */
-    public static final class AnteriorALaEmision extends RuntimeException {
-
-        @java.io.Serial private static final long serialVersionUID = 1L;
-
-        AnteriorALaEmision(String numero, LocalDate emision, LocalDate cancelacion) {
-            super(
-                    "La licencia "
-                            + numero
-                            + " se emitio el "
-                            + emision
-                            + " y no puede cancelarse el "
-                            + cancelacion
-                            + ": un acto no deja sin efecto a otro que todavia no existia");
         }
     }
 }

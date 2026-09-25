@@ -11,6 +11,7 @@ import kamayuk.rentas.auditoria.Auditoria;
 import kamayuk.rentas.auditoria.Operacion;
 import kamayuk.rentas.auditoria.RegistroDeAuditoria;
 import kamayuk.rentas.dominio.Observacion;
+import kamayuk.rentas.dominio.OrdenDeLosActos;
 import kamayuk.rentas.sanciones.dominio.CorridaDeValores;
 import kamayuk.rentas.sanciones.dominio.CorridaDeValoresRepository;
 import kamayuk.rentas.sanciones.dominio.CriterioDePadron;
@@ -80,6 +81,8 @@ public class IniciarCorridaDeValores {
      *
      * @throws CandidatosInvalidos si alguno de los números no es una papeleta de esa familia
      * @throws SinCandidatos si la lista queda vacía
+     * @throws kamayuk.rentas.dominio.ActoFueraDeOrden si la fecha de criterio es posterior a hoy
+     *     (#402)
      */
     @Transactional
     public CorridaDeValores porSeleccion(
@@ -92,6 +95,7 @@ public class IniciarCorridaDeValores {
         Objects.requireNonNull(numeros, "La lista es vacia, no nula");
         Objects.requireNonNull(fechaCriterio, "La corrida congela su fecha de criterio (regla 9)");
         Objects.requireNonNull(observacion, "Sin observacion no se guarda (regla 10, RNF-052)");
+        exigirQueNoSeaFutura(fechaCriterio);
 
         List<Long> candidatos = new ArrayList<>();
         List<String> desconocidos = new ArrayList<>();
@@ -140,6 +144,8 @@ public class IniciarCorridaDeValores {
      * tienen valor</b> y siguen debiéndose.
      *
      * @throws SinCandidatos si en ese rango no queda ninguna por formalizar
+     * @throws kamayuk.rentas.dominio.ActoFueraDeOrden si la fecha de criterio es posterior a hoy
+     *     (#402)
      */
     @Transactional
     public CorridaDeValores porRango(
@@ -152,6 +158,7 @@ public class IniciarCorridaDeValores {
         Objects.requireNonNull(familia, "La corrida necesita su familia");
         Objects.requireNonNull(fechaCriterio, "La corrida congela su fecha de criterio (regla 9)");
         Objects.requireNonNull(observacion, "Sin observacion no se guarda (regla 10, RNF-052)");
+        exigirQueNoSeaFutura(fechaCriterio);
 
         CriterioDePadron criterio = CriterioDePadron.candidatos(familia, desde, hasta);
         List<Long> candidatos = new ArrayList<>();
@@ -188,6 +195,17 @@ public class IniciarCorridaDeValores {
     }
 
     // ------------------------------------------------------------------
+
+    /**
+     * #402: la fecha de criterio no es posterior a hoy. Es la fecha de emision y de corte de la
+     * deuda de cada RM, y {@code ProcesarPapeletaDeLaCorrida} compara la exigibilidad con ella y no
+     * con hoy: una fecha futura formalizaria papeletas cuyo plazo todavia corre. Cuanto puede ir
+     * hacia atras es otra pregunta, y no se contesta aqui.
+     */
+    private void exigirQueNoSeaFutura(LocalDate fechaCriterio) {
+        OrdenDeLosActos.exigir(
+                "la fecha de criterio de la corrida", fechaCriterio, LocalDate.now(reloj));
+    }
 
     private CorridaDeValores registrar(CorridaDeValores corrida, List<Long> candidatos) {
         CorridaDeValores guardada = corridas.iniciar(corrida, candidatos);

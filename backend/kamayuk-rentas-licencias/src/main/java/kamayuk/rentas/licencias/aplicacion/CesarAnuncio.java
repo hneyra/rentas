@@ -3,12 +3,15 @@ package kamayuk.rentas.licencias.aplicacion;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import kamayuk.rentas.auditoria.Auditoria;
 import kamayuk.rentas.auditoria.Operacion;
 import kamayuk.rentas.auditoria.RegistroDeAuditoria;
 import kamayuk.rentas.dominio.Observacion;
+import kamayuk.rentas.dominio.OrdenDeLosActos;
 import kamayuk.rentas.licencias.dominio.Anuncio;
 import kamayuk.rentas.licencias.dominio.AnuncioRepository;
 import kamayuk.rentas.licencias.dominio.EstadoDelAnuncio;
@@ -80,6 +83,8 @@ public class CesarAnuncio {
      * @throws RenovarAnuncio.AnuncioInexistente si no hay ninguna autorizacion con ese numero
      * @throws YaEstabaCesado si ya estaba cesada o retirada
      * @throws SinMotivo si no se dice por que
+     * @throws kamayuk.rentas.dominio.ActoFueraDeOrden si la fecha es anterior al ultimo movimiento
+     *     registrado o posterior a hoy (#402)
      */
     @Transactional
     public Acto cesar(
@@ -121,6 +126,8 @@ public class CesarAnuncio {
                                 () -> new RenovarAnuncio.AnuncioInexistente(numeroDeAutorizacion));
 
         List<MovimientoDeAnuncio> historial = movimientos.deAnuncio(anuncio.identificador());
+        exigirEnOrden(anuncio, historial, fecha, esRetiro);
+
         EstadoDelAnuncio actual =
                 EstadoDelAnuncio.derivarDe(
                         historial, EstadoDelAnuncio.vigenciaSegun(historial, fecha), fecha);
@@ -134,11 +141,6 @@ public class CesarAnuncio {
             }
         } else if (actual == EstadoDelAnuncio.CESADO || actual == EstadoDelAnuncio.RETIRADO) {
             throw new YaEstabaCesado(anuncio.numero(), actual, false);
-        }
-
-        if (fecha.isBefore(anuncio.fechaAutorizacion())) {
-            throw new RenovarAnuncio.AnteriorALaAutorizacion(
-                    anuncio.numero(), anuncio.fechaAutorizacion(), fecha);
         }
 
         Instant ahora = reloj.instant();
@@ -163,6 +165,46 @@ public class CesarAnuncio {
                         .con(null, descripcion(anuncio, registrado)));
 
         return new Acto(anuncio, registrado);
+    }
+
+    /**
+     * #402: el cese —y el retiro— no se fechan antes del <b>ultimo</b> movimiento registrado ni
+     * despues de hoy.
+     *
+     * <p>El estado se deriva a la fecha del acto, y {@link EstadoDelAnuncio#derivarDe} se salta los
+     * movimientos posteriores: un cese fechado el 31 de diciembre y registrado en febrero, despues
+     * de una renovacion del 15 de enero, se aceptaba, y el anuncio figuraba cesado desde antes de
+     * una renovacion que devengo. Compararlo solo con la autorizacion —lo unico que se miraba hasta
+     * #402— no lo ve. La autorizacion va tambien, por si un anuncio migrado no trae su movimiento.
+     *
+     * <p>Que hacer con la tasa que devengo esa renovacion no se decide aqui: cesar no es condonar.
+     */
+    private void exigirEnOrden(
+            Anuncio anuncio,
+            List<MovimientoDeAnuncio> historial,
+            LocalDate fecha,
+            boolean esRetiro) {
+        List<OrdenDeLosActos.ActoPrevio> previos = new ArrayList<>();
+        previos.add(
+                new OrdenDeLosActos.ActoPrevio(
+                        "la autorizacion " + anuncio.numero(), anuncio.fechaAutorizacion()));
+        historial.stream()
+                .max(Comparator.comparing(MovimientoDeAnuncio::fecha))
+                .ifPresent(
+                        ultimo ->
+                                previos.add(
+                                        new OrdenDeLosActos.ActoPrevio(
+                                                "el ultimo movimiento de "
+                                                        + anuncio.numero()
+                                                        + " ("
+                                                        + ultimo.tipo().titulo()
+                                                        + ")",
+                                                ultimo.fecha())));
+        OrdenDeLosActos.exigir(
+                (esRetiro ? "el retiro de " : "el cese de ") + anuncio.numero(),
+                fecha,
+                LocalDate.now(reloj),
+                previos);
     }
 
     private static String descripcion(Anuncio anuncio, MovimientoDeAnuncio movimiento) {

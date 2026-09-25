@@ -3,10 +3,13 @@ package kamayuk.rentas.valores.aplicacion;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.time.Clock;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import kamayuk.rentas.auditoria.RegistroDeAuditoria;
+import kamayuk.rentas.dominio.ActoFueraDeOrden;
 import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.Observacion;
@@ -40,6 +43,15 @@ class DeclararPrescripcionTest {
     private static final LocalDate PRESENTACION = LocalDate.of(2026, 6, 1);
     private static final Observacion OBSERVACION = Observacion.de("Se resuelve para la prueba");
 
+    /**
+     * El dia de la ultima solicitud que estas pruebas presentan (la segunda de #337): ninguna es
+     * posterior a hoy (#402).
+     */
+    private static final Clock RELOJ =
+            Clock.fixed(
+                    LocalDate.of(2027, 2, 1).atStartOfDay(ZoneOffset.UTC).toInstant(),
+                    ZoneOffset.UTC);
+
     private ValoresEnMemoria valores;
     private PrescripcionesEnMemoria prescripciones;
     private List<RegistroDeAuditoria> auditados;
@@ -60,7 +72,8 @@ class DeclararPrescripcionTest {
                         prescripciones,
                         valores,
                         new PlazosParametrizados(parametros),
-                        auditados::add);
+                        auditados::add,
+                        RELOJ);
     }
 
     @Test
@@ -160,7 +173,8 @@ class DeclararPrescripcionTest {
                         prescripciones,
                         valores,
                         new PlazosParametrizados(new ParametrosDeMentira()),
-                        auditados::add);
+                        auditados::add,
+                        RELOJ);
 
         assertThatThrownBy(
                         () ->
@@ -548,6 +562,89 @@ class DeclararPrescripcionTest {
                         null,
                         OBSERVACION)
                 .prescripcion();
+    }
+
+    /**
+     * #402 — El escenario del issue, con fechas que distinguen: PREDIAL 2021, interrumpido el
+     * 2022-10-15, prescribe el 2026-10-16. El 23 de setiembre se presenta la solicitud fechada el
+     * 20 de octubre: hasta #402 salia {@code PROCEDE} —el computo se resuelve a la fecha de
+     * presentacion— y el valor pasaba HOY a {@code PRESCRITO}, en una tabla que no admite
+     * correccion. La muestra de siempre ({@link #PRESENTACION}) no podia verlo: nunca era futura.
+     */
+    @Nested
+    @DisplayName("#402 — la presentacion no se fecha despues de hoy")
+    class LaFechaDePresentacion {
+
+        private static final LocalDate HOY = LocalDate.of(2026, 9, 23);
+        private static final HechoDelComputo INTERRUPCION =
+                HechoDelComputo.interrupcion(
+                        "pago parcial del predial 2021", LocalDate.of(2022, 10, 15));
+
+        private DeclararPrescripcion del23DeSetiembre;
+        private Valor del2021;
+
+        @BeforeEach
+        void preparar() {
+            del23DeSetiembre =
+                    new DeclararPrescripcion(
+                            prescripciones,
+                            valores,
+                            new PlazosParametrizados(
+                                    new ParametrosDeMentira()
+                                            .con(
+                                                    "PLAZO",
+                                                    "PRESCRIPCION-DECLARACION_PRESENTADA",
+                                                    "4 ANIOS")
+                                            .con(
+                                                    "PLAZO",
+                                                    "PRESCRIPCION_INICIO-PREDIAL",
+                                                    "1 ANIOS")),
+                            auditados::add,
+                            Clock.fixed(
+                                    HOY.atStartOfDay(ZoneOffset.UTC).toInstant(), ZoneOffset.UTC));
+            del2021 = cobrable("OP-2026-000021", 2021);
+        }
+
+        @Test
+        @DisplayName(
+                "presentada el 2026-10-20 con el reloj en el 2026-09-23: rechazo, y nada prescribe")
+        void posteriorAHoy() {
+            assertThatThrownBy(() -> presentarEl(LocalDate.of(2026, 10, 20)))
+                    .isInstanceOf(ActoFueraDeOrden.class)
+                    .hasMessageContaining("posterior a hoy");
+
+            assertThat(valores.porId(del2021.id()).orElseThrow().estado())
+                    .as("el valor sigue cobrable: prescribiria el 16 de octubre, no hoy")
+                    .isEqualTo(EstadoDeValor.EMITIDO);
+            assertThat(prescripciones.porId(1L)).as("y no queda ningun acto").isEmpty();
+        }
+
+        @Test
+        @DisplayName("presentada hoy: se resuelve a hoy, y no procede")
+        void presentadaHoy() {
+            Prescripcion declarada = presentarEl(HOY);
+
+            assertThat(declarada.resultado()).isEqualTo(ResultadoDeLaSolicitud.NO_PROCEDE);
+            assertThat(declarada.ejercicios().get(0).fechaPrescripcion())
+                    .isEqualTo(LocalDate.of(2026, 10, 16));
+            assertThat(valores.porId(del2021.id()).orElseThrow().estado())
+                    .isEqualTo(EstadoDeValor.EMITIDO);
+        }
+
+        private Prescripcion presentarEl(LocalDate presentacion) {
+            return del23DeSetiembre
+                    .declarar(
+                            CONTRIBUYENTE,
+                            "PREDIAL",
+                            new Ejercicio(2021),
+                            new Ejercicio(2021),
+                            presentacion,
+                            CausalDePrescripcion.DECLARACION_PRESENTADA,
+                            List.of(INTERRUPCION),
+                            null,
+                            OBSERVACION)
+                    .prescripcion();
+        }
     }
 
     // ------------------------------------------------------------------

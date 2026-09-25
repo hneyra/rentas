@@ -175,7 +175,8 @@ class RelacionDePrescripcionesFronteraTest {
                         prescripciones,
                         new ValorRepositoryJdbc(jdbc),
                         new PlazosParametrizados(new ParametrosDeMentira()),
-                        registro -> {});
+                        registro -> {},
+                        RELOJ);
 
         mvc =
                 MockMvcBuilders.standaloneSetup(

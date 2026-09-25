@@ -501,6 +501,34 @@ class LicenciaControllerTest {
                     422);
         }
 
+        /**
+         * #402 — La cancelacion tenia su cota inferior ({@code AnteriorALaEmision}, que se retira)
+         * y no miraba hoy. El reloj esta en el dia de la emision: el 15 es anterior y el 17 es
+         * futuro, y ninguno de los dos rechazos deja una resolucion.
+         */
+        @Test
+        @DisplayName("#402 — cancelar antes de la emision o despues de hoy es 422")
+        void cancelarFueraDeOrden() throws Exception {
+            emitir(mvc, 201);
+
+            assertThat(cancelarEl("2026-03-15", 422)).contains("VALIDACION").contains("2026-03-16");
+            assertThat(cancelarEl("2026-03-17", 422)).contains("posterior a hoy");
+            assertThat(cancelarEl("2026-03-16", 201))
+                    .as("la frontera, y la primera resolucion: los rechazos no la numeraron")
+                    .contains("RES_CANCELACION_LICENCIA-2026-000001");
+        }
+
+        private String cancelarEl(String fecha, int esperado) throws Exception {
+            return envio(
+                    mvc,
+                    "/rentas/api/v1/licencias/funcionamiento/LF-2026-000001/cancelacion",
+                    """
+                    {"fecha":"%s","motivo":"Cese de actividades","observacion":"Se cancela"}
+                    """
+                            .formatted(fecha),
+                    esperado);
+        }
+
         @Test
         @DisplayName("cancelar una licencia que no existe es 404")
         void licenciaInexistente() throws Exception {

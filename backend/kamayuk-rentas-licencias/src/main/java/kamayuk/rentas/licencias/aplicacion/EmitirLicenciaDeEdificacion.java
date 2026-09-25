@@ -19,6 +19,7 @@ import kamayuk.rentas.documentos.EmitirDocumento;
 import kamayuk.rentas.documentos.FormatoDeDocumento;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.Observacion;
+import kamayuk.rentas.dominio.OrdenDeLosActos;
 import kamayuk.rentas.licencias.dominio.EstructuraDelProyecto;
 import kamayuk.rentas.licencias.dominio.FueDeEdificacion;
 import kamayuk.rentas.licencias.dominio.FueRepository;
@@ -123,6 +124,8 @@ public class EmitirLicenciaDeEdificacion {
      * @param numeroDeRecibo el recibo de caja de tasas del derecho, como esta en el papel
      * @throws ExpedienteInexistente si no hay ningun expediente con ese numero
      * @throws TramiteQueNoOtorgaLicencia si el tramite no produce licencia
+     * @throws kamayuk.rentas.dominio.ActoFueraDeOrden si la fecha es anterior a la declaracion o
+     *     posterior a hoy (#402)
      * @throws SeccionesIncompletas si falta alguna seccion obligatoria (AC 1)
      * @throws ComprobacionDelDerecho.DerechoNoPagado si el recibo no respalda el derecho (AC 5)
      * @throws DerechosDeTramiteParametrizados.DerechoSinParametrizar si el conjunto sellado no dice
@@ -154,10 +157,15 @@ public class EmitirLicenciaDeEdificacion {
         if (movimientos.emisionDe(fue.identificador()).isPresent()) {
             throw new YaEstabaEmitida(fue.expediente());
         }
-        if (fechaDeEmision.isBefore(fue.fechaDeclaracion())) {
-            throw new AnteriorALaDeclaracion(
-                    fue.expediente(), fue.fechaDeclaracion(), fechaDeEmision);
-        }
+        // #402: una de las cinco copias de la regla, con su excepcion propia y sin mirar hoy. La
+        // regla es una sola y vive en `OrdenDeLosActos`.
+        OrdenDeLosActos.exigir(
+                "la emision de la licencia del expediente " + fue.expediente(),
+                fechaDeEmision,
+                LocalDate.now(reloj),
+                new OrdenDeLosActos.ActoPrevio(
+                        "la declaracion del expediente " + fue.expediente(),
+                        fue.fechaDeclaracion()));
 
         SeccionesDelExpediente secciones = leerSecciones(fue);
         secciones.exigirCompletas(fue.expediente());
@@ -413,23 +421,6 @@ public class EmitirLicenciaDeEdificacion {
                             + expediente
                             + " ya tiene su licencia otorgada: una segunda emision le daria dos"
                             + " numeros a la misma obra");
-        }
-    }
-
-    /** La emision no puede ser anterior a la declaracion que la sustenta. */
-    public static final class AnteriorALaDeclaracion extends RuntimeException {
-
-        @java.io.Serial private static final long serialVersionUID = 1L;
-
-        AnteriorALaDeclaracion(String expediente, LocalDate declaracion, LocalDate emision) {
-            super(
-                    "El expediente "
-                            + expediente
-                            + " se declaro el "
-                            + declaracion
-                            + " y no se puede emitir el "
-                            + emision
-                            + ": un acto no autoriza lo que todavia no se habia solicitado");
         }
     }
 

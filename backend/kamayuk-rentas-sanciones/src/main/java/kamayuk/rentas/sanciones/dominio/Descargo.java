@@ -5,6 +5,7 @@ import java.time.LocalDate;
 import java.util.Locale;
 import java.util.Objects;
 import kamayuk.rentas.dominio.Observacion;
+import kamayuk.rentas.dominio.OrdenDeLosActos;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -147,5 +148,14 @@ public record Descargo(
     /** El identificador, exigiendo que ya se haya guardado. */
     public long identificador() {
         return Objects.requireNonNull(id, "El descargo todavia no se ha guardado");
+    }
+
+    /**
+     * La presentacion del recurso, como el acto previo que la resolucion de gerencia resuelve
+     * (#402): la resolucion no se fecha antes del escrito que la motiva.
+     */
+    public OrdenDeLosActos.ActoPrevio laPresentacion() {
+        return new OrdenDeLosActos.ActoPrevio(
+                "la presentacion del recurso " + numeroExpediente, fecha);
     }
 }

@@ -8,7 +8,9 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.Clock;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.function.Supplier;
 import kamayuk.rentas.auditoria.Origen;
@@ -126,7 +128,10 @@ class PrescripcionYLaCarteraJdbcTest {
                         new PrescripcionRepositoryJdbc(jdbc),
                         new ValorRepositoryJdbc(jdbc),
                         new PlazosParametrizados(new ParametrosDelConjuntoSembrado()),
-                        (RegistroDeAuditoria registro) -> {});
+                        (RegistroDeAuditoria registro) -> {},
+                        Clock.fixed(
+                                PRESENTACION.atStartOfDay(ZoneOffset.UTC).toInstant(),
+                                ZoneOffset.UTC));
 
         // La deuda viva del ejercicio: dos obligaciones, 500,00 y 200,00.
         asentarCargo(predioUno, new BigDecimal("500.00"));

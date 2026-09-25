@@ -1,5 +1,6 @@
 package kamayuk.rentas.valores.aplicacion;
 
+import java.time.Clock;
 import java.time.LocalDate;
 import java.util.Locale;
 import kamayuk.rentas.auditoria.Auditoria;
@@ -9,6 +10,7 @@ import kamayuk.rentas.contribuyentes.DirectorioDeContribuyentes;
 import kamayuk.rentas.dominio.Exigibilidad;
 import kamayuk.rentas.dominio.ModalidadDeNotificacion;
 import kamayuk.rentas.dominio.Observacion;
+import kamayuk.rentas.dominio.OrdenDeLosActos;
 import kamayuk.rentas.dominio.Plazo;
 import kamayuk.rentas.dominio.ResultadoDeNotificacion;
 import kamayuk.rentas.valores.dominio.EstadoDeValor;
@@ -53,18 +55,21 @@ public class RegistrarNotificacion {
     private final DirectorioDeContribuyentes contribuyentes;
     private final PlazosParametrizados plazos;
     private final Auditoria auditoria;
+    private final Clock reloj;
 
     public RegistrarNotificacion(
             ValorRepository valores,
             NotificacionRepository notificaciones,
             DirectorioDeContribuyentes contribuyentes,
             PlazosParametrizados plazos,
-            Auditoria auditoria) {
+            Auditoria auditoria,
+            Clock reloj) {
         this.valores = valores;
         this.notificaciones = notificaciones;
         this.contribuyentes = contribuyentes;
         this.plazos = plazos;
         this.auditoria = auditoria;
+        this.reloj = reloj;
     }
 
     /**
@@ -85,6 +90,8 @@ public class RegistrarNotificacion {
      * @param observacion por que se registra (regla 10)
      * @throws ValorInexistente si no hay ningun valor con ese numero
      * @throws SinDomicilio si no se dio direccion y el contribuyente no tiene domicilio a esa fecha
+     * @throws kamayuk.rentas.dominio.ActoFueraDeOrden si la diligencia es anterior a la emision o
+     *     posterior a hoy (#402)
      */
     @Transactional
     public Notificacion registrar(
@@ -101,9 +108,15 @@ public class RegistrarNotificacion {
             Observacion observacion) {
 
         Valor valor = valorDe(numeroDeValor);
-        if (fechaDeLaDiligencia.isBefore(valor.fechaEmision())) {
-            throw new DiligenciaAnteriorALaEmision(valor, fechaDeLaDiligencia);
-        }
+        // #402: la cota inferior ya estaba (una de las cinco copias de la regla); faltaba la de
+        // hoy. Una diligencia futura que surte efecto deja el valor notificado y exigible desde
+        // una fecha que nadie puede corregir: `queSurtioEfecto` toma la PRIMERA.
+        OrdenDeLosActos.exigir(
+                "la diligencia del valor " + valor.numero(),
+                fechaDeLaDiligencia,
+                LocalDate.now(reloj),
+                new OrdenDeLosActos.ActoPrevio(
+                        "la emision del valor " + valor.numero(), valor.fechaEmision()));
 
         int intento = notificaciones.intentosDe(requireId(valor)) + 1;
 
@@ -218,22 +231,6 @@ public class RegistrarNotificacion {
 
         ValorInexistente(String numero) {
             super("No hay ningun valor con el numero '" + numero + "'");
-        }
-    }
-
-    /** Se diligencio antes de emitir el valor: no puede ser. */
-    public static final class DiligenciaAnteriorALaEmision extends RuntimeException {
-
-        @java.io.Serial private static final long serialVersionUID = 1L;
-
-        DiligenciaAnteriorALaEmision(Valor valor, LocalDate fecha) {
-            super(
-                    "El valor "
-                            + valor.numero()
-                            + " se emitio el "
-                            + valor.fechaEmision()
-                            + ": no se pudo notificar el "
-                            + fecha);
         }
     }
 

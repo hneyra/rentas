@@ -17,6 +17,7 @@ import kamayuk.rentas.documentos.EmitirDocumento;
 import kamayuk.rentas.documentos.FormatoDeDocumento;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.Observacion;
+import kamayuk.rentas.dominio.OrdenDeLosActos;
 import kamayuk.rentas.licencias.dominio.FueDeEdificacion;
 import kamayuk.rentas.licencias.dominio.FueRepository;
 import kamayuk.rentas.licencias.dominio.MovimientoDeEdificacion;
@@ -97,6 +98,8 @@ public class RevalidarLicenciaDeEdificacion {
      *     plazo de la prorroga lo fija la Ley 29090 con una cifra, y ninguna cifra normativa se
      *     compila (regla 5)
      * @param numeroDeRecibo el recibo de caja de tasas del derecho
+     * @throws kamayuk.rentas.dominio.ActoFueraDeOrden si la fecha es anterior a la declaracion o a
+     *     la emision de la licencia original, o posterior a hoy (#402)
      */
     @Transactional
     public Revalidacion revalidar(
@@ -150,6 +153,20 @@ public class RevalidarLicenciaDeEdificacion {
         String numeroDeLicencia =
                 Objects.requireNonNull(
                         emisionOriginal.numeroLicencia(), "Una emision siempre numera la licencia");
+
+        // #402: de los cinco actos que resuelven sobre uno previo, era el unico que no comparaba
+        // la fecha con nada, y la fecha se imprime en la resolucion («Fecha de la revalidacion»)
+        // y queda en un movimiento de solo insercion. No se fecha antes de la declaracion que la
+        // pide ni de la licencia que prorroga, ni despues de hoy.
+        OrdenDeLosActos.exigir(
+                "la revalidacion del expediente " + revalidacion.expediente(),
+                fecha,
+                LocalDate.now(reloj),
+                new OrdenDeLosActos.ActoPrevio(
+                        "la declaracion del expediente " + revalidacion.expediente(),
+                        revalidacion.fechaDeclaracion()),
+                new OrdenDeLosActos.ActoPrevio(
+                        "la emision de la licencia " + numeroDeLicencia, emisionOriginal.fecha()));
 
         List<VigenciaDeLaLicencia> anteriores = movimientos.vigenciasDe(originalId);
         for (VigenciaDeLaLicencia tramo : anteriores) {
