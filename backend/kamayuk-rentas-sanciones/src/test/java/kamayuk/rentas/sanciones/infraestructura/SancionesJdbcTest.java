@@ -1187,14 +1187,66 @@ class SancionesJdbcTest {
                     .isEqualTo(1);
         }
 
+        /**
+         * El recibo se gasta ENTERO, no por los dias del vehiculo que libera (#383, revision del PR
+         * #521). Las dos pruebas de arriba siembran un recibo de tantos dias como el vehiculo
+         * lleva, y con esa muestra uniforme «gastar la cantidad del recibo» y «gastar los dias» son
+         * la misma cifra: {@code Math.max(1, dias)} en lugar de {@code custodia.cantidad()}
+         * sobreviviria a las dos. Aqui el recibo cobra 50 y el primer vehiculo lleva 42: si solo se
+         * gastan los 42, quedan 8 que liberan un segundo vehiculo de 6 dias.
+         */
+        @Test
+        @DisplayName(
+                "un recibo de 50 dias libera un vehiculo de 42 y se gasta entero: otro de 6 dias,"
+                        + " 409")
+        void elReciboSeGastaEnteroAunqueSobrenDias() throws Exception {
+            Papeleta primera = papeletaDeTransito("K04");
+            internarVehiculo(primera, "ABC-113");
+            Papeleta segunda = papeletaDeTransito("K05");
+            internarVehiculo(segunda, "XYZ-223");
+            String recibo = cobrarCustodia(primera.obligadoId(), RECIBO_QUE_SOBRA);
+
+            Rechazo sale = liberarPorHttp("ABC-113", recibo);
+            assertThat(sale.estado()).as(sale.cuerpo()).isEqualTo(201);
+            assertThat(sale.cuerpo()).contains("\"dias\":" + DIAS);
+
+            Rechazo otra = liberarPorHttp("XYZ-223", recibo, LIBERACION_A_LOS_SEIS_DIAS);
+
+            assertThat(otra.estado())
+                    .as(
+                            "con 201 el recibo solo gasto los 42 dias de ABC-113 y los 8 que le"
+                                    + " sobraron sacan a XYZ-223: "
+                                    + otra.cuerpo())
+                    .isEqualTo(409);
+            assertThat(otra.cuerpo()).contains("CONFLICTO").contains(recibo);
+            assertThat(
+                            contar(
+                                    "SELECT coalesce(sum(unidades), 0)::bigint FROM"
+                                            + " recibo_aplicado WHERE numero_recibo = '"
+                                            + recibo
+                                            + "'"))
+                    .as("la primera liberacion gasta las 50 unidades del recibo, no sus 42 dias")
+                    .isEqualTo(RECIBO_QUE_SOBRA);
+        }
+
+        /** Un recibo que cobra mas dias de los que el primer vehiculo lleva. */
+        private static final int RECIBO_QUE_SOBRA = 50;
+
+        /** Del 4 de marzo al 10: seis dias, que caben en los 8 que el recibo no gastaria. */
+        private static final String LIBERACION_A_LOS_SEIS_DIAS = "2026-03-10";
+
         private Rechazo liberarPorHttp(String placa, String recibo) throws Exception {
+            return liberarPorHttp(placa, recibo, LIBERACION);
+        }
+
+        private Rechazo liberarPorHttp(String placa, String recibo, String fecha) throws Exception {
             return rechazo(
                     () ->
                             enviar(
                                     post(INTERNAMIENTOS + "/" + placa + "/liberacion"),
                                     "{\"observacion\":\"El titular retira el vehiculo\","
                                             + "\"fechaDeLiberacion\":\""
-                                            + LIBERACION
+                                            + fecha
                                             + "\",\"reciboDeCustodia\":\""
                                             + recibo
                                             + "\",\"personaQueRetira\":\"DORIS\","
