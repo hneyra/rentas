@@ -92,7 +92,6 @@ class ExpedienteControllerTest {
                                             expedientes,
                                             movimientos,
                                             valores,
-                                            libro,
                                             new FasesDeMentira(),
                                             (RegistroDeAuditoria registro) -> {},
                                             RELOJ),

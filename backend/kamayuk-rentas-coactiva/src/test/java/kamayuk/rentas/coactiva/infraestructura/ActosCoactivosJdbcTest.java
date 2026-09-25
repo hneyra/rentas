@@ -241,8 +241,13 @@ class ActosCoactivosJdbcTest {
                                 expedientes,
                                 movimientos,
                                 puerto,
-                                deuda,
-                                envolver(new MovimientoDeFaseCuentaCorriente(registrarAsiento)),
+                                envolver(
+                                        new MovimientoDeFaseCuentaCorriente(
+                                                registrarAsiento,
+                                                asientos,
+                                                saldos,
+                                                calculo,
+                                                redondeo)),
                                 auditoria,
                                 RELOJ));
         consulta =

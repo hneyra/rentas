@@ -315,7 +315,10 @@ class ValoresMasivosYReportesJdbcTest {
                                 envolver(
                                         new ConsultarDeuda(
                                                 asientos, saldos, calculo, redondeo, RELOJ))));
-        MovimientoDeFase fases = envolver(new MovimientoDeFaseCuentaCorriente(registrarAsiento));
+        MovimientoDeFase fases =
+                envolver(
+                        new MovimientoDeFaseCuentaCorriente(
+                                registrarAsiento, asientos, saldos, calculo, redondeo));
         ExtincionDeDeuda extincion =
                 envolver(
                         new ExtincionDeDeudaCuentaCorriente(

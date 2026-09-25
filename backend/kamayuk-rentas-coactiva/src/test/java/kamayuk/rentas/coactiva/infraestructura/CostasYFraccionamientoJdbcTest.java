@@ -213,6 +213,16 @@ class CostasYFraccionamientoJdbcTest {
     private static final LocalDate FECHA_DEL_PAGO_PARCIAL = LocalDate.of(2026, 5, 20);
 
     /**
+     * Un cargo ORDINARIO de la misma obligacion asentado <b>despues</b> de la OP (#407, ronda 1):
+     * una rectificacion que ningun valor formaliza. Es la siembra que distingue lo pendiente en
+     * VALOR de lo pendiente en todas las fases.
+     */
+    private static final Dinero CARGO_POSTERIOR_A_LA_OP = Dinero.de("100.00");
+
+    /** Despues de la emision (2 de marzo) y antes del pase (1 de junio). */
+    private static final LocalDate FECHA_DEL_CARGO_POSTERIOR = LocalDate.of(2026, 4, 10);
+
+    /**
      * El arancel sembrado para la REC-1 y para la REC-2.
      *
      * <p>Son datos <b>de la prueba</b>, no del programa: se cargan en {@code parametro_tributario}
@@ -327,7 +337,13 @@ class CostasYFraccionamientoJdbcTest {
                         new RegistrarValor(
                                 valores,
                                 deuda,
-                                envolver(new MovimientoDeFaseCuentaCorriente(registrarAsiento)),
+                                envolver(
+                                        new MovimientoDeFaseCuentaCorriente(
+                                                registrarAsiento,
+                                                asientos,
+                                                saldos,
+                                                calculo,
+                                                redondeo)),
                                 auditoria,
                                 RELOJ));
 
@@ -337,8 +353,13 @@ class CostasYFraccionamientoJdbcTest {
                                 expedientes,
                                 movimientos,
                                 puerto,
-                                deuda,
-                                envolver(new MovimientoDeFaseCuentaCorriente(registrarAsiento)),
+                                envolver(
+                                        new MovimientoDeFaseCuentaCorriente(
+                                                registrarAsiento,
+                                                asientos,
+                                                saldos,
+                                                calculo,
+                                                redondeo)),
                                 auditoria,
                                 RELOJ));
         consulta =
@@ -1295,6 +1316,103 @@ class CostasYFraccionamientoJdbcTest {
     }
 
     /**
+     * #407, ronda 1 — Lo que entra en COACTIVA es lo que el libro tiene en VALOR, y nada mas.
+     *
+     * <p>La primera version movia {@code deTodoElContribuyente(...).total()}: lo pendiente de la
+     * obligacion <b>en todas sus fases</b>. La prueba del camino de produccion no lo distinguia
+     * porque toda su deuda estaba en VALOR. Estas tres siembras si: un cargo ordinario que ningun
+     * valor formaliza, una obligacion que dos valores traen en dos importaciones distintas, y un
+     * abono que el libro asento fuera de VALOR. En las tres, mover «lo pendiente» deja una fase en
+     * negativo o cuenta en COACTIVA deuda que no le toca.
+     */
+    @Nested
+    @DisplayName(
+            "#407 — La importacion mueve lo que hay en VALOR, no lo pendiente en todas las fases")
+    class DeLaImportacion {
+
+        @Test
+        @DisplayName(
+                "un cargo ordinario asentado despues de la OP se queda en ORDINARIA: ningun valor"
+                        + " lo formaliza")
+        void unCargoOrdinarioPosteriorALaOpSeQuedaEnOrdinaria() {
+            long titular = crearContribuyente("IMP-1");
+            asentarCargo(titular, "PREDIAL", PREDIAL, Fase.ORDINARIA);
+            Valor op =
+                    registrarValor.emitir(
+                            TipoValor.ORDEN_DE_PAGO,
+                            titular,
+                            List.of(new SelectorDeObligacion("PREDIAL", EJERCICIO, null, null)),
+                            Observacion.de("Se emite la OP de la prueba de #407"),
+                            EMISION);
+            asentar(
+                    titular,
+                    TipoAsiento.CARGO,
+                    Fase.ORDINARIA,
+                    CARGO_POSTERIOR_A_LA_OP,
+                    FECHA_DEL_CARGO_POSTERIOR,
+                    "RECTIFICACION DE LA PRUEBA");
+            pasarACoactiva(op);
+
+            importarElValor(titular, op);
+
+            assertThat(netoPorFase(titular, "PREDIAL"))
+                    .as(
+                            "la OP formalizo 500 y eso es lo que entra en coactiva; los 100 de la"
+                                    + " rectificacion no los formaliza ningun valor y siguen en"
+                                    + " ORDINARIA. Mover lo pendiente (600) dejaria VALOR en -100")
+                    .containsExactlyInAnyOrderEntriesOf(
+                            Map.of(
+                                    "ORDINARIA", CARGO_POSTERIOR_A_LA_OP,
+                                    "COACTIVA", PREDIAL));
+        }
+
+        @Test
+        @DisplayName(
+                "una obligacion que dos valores traen en dos importaciones entra en COACTIVA una"
+                        + " vez: la segunda ya no encuentra nada en VALOR")
+        void dosImportacionesDeLaMismaObligacionLaMuevenUnaVez() {
+            long titular = contribuyenteConDeuda("IMP-2");
+            expedienteDe(titular, "IMP-2-A");
+
+            expedienteDe(titular, "IMP-2-B");
+
+            assertThat(netoPorFase(titular, "PREDIAL"))
+                    .as(
+                            "la deduplicacion de la importacion vale dentro de una llamada; entre"
+                                    + " dos, la cuenta la lleva el libro. Mover lo pendiente otra"
+                                    + " vez dejaria VALOR en -500 y COACTIVA en 1000")
+                    .containsExactly(Map.entry("COACTIVA", PREDIAL));
+        }
+
+        @Test
+        @DisplayName(
+                "nunca entra en COACTIVA mas de lo que se debe, aunque VALOR tenga mas porque un"
+                        + " abono se asento en otra fase")
+        void nuncaEntraEnCoactivaMasDeLoQueSeDebe() {
+            long titular = contribuyenteConDeuda("IMP-3");
+            asentar(
+                    titular,
+                    TipoAsiento.ABONO,
+                    Fase.ORDINARIA,
+                    PAGO_PARCIAL,
+                    FECHA_DEL_PAGO_PARCIAL,
+                    "PAGO EN OTRA FASE DE LA PRUEBA");
+
+            expedienteDe(titular, "IMP-3");
+
+            Map<String, Dinero> neto = netoPorFase(titular, "PREDIAL");
+            assertThat(neto.get("COACTIVA"))
+                    .as(
+                            "se deben 300: VALOR tiene 500 porque el pago se asento en ORDINARIA,"
+                                    + " pero COACTIVA no puede contar mas de lo que se debe")
+                    .isEqualTo(PREDIAL.menos(PAGO_PARCIAL));
+            assertThat(neto.values().stream().reduce(Dinero.CERO, Dinero::mas))
+                    .as("y el par no cambia el total: lo que se debe es lo que se debia")
+                    .isEqualTo(PREDIAL.menos(PAGO_PARCIAL));
+        }
+    }
+
+    /**
      * #406 — La puerta por la que entra el borde, contra RLS de verdad.
      *
      * <p>{@code ConvenioCoactivoController} llama a la sobrecarga de <b>tres</b> argumentos —la que
@@ -1945,6 +2063,34 @@ class CostasYFraccionamientoJdbcTest {
                                         FECHA_DEL_CARGO,
                                         "DETERMINACION DE LA PRUEBA " + tributo),
                                 Observacion.de("Se asienta la deuda de la prueba")));
+    }
+
+    /** Un asiento de predial, de insoluto, en la fase y con la fecha que la prueba pide. */
+    private static void asentar(
+            long titular,
+            TipoAsiento tipo,
+            Fase fase,
+            Dinero monto,
+            LocalDate fecha,
+            String documento) {
+        enTransaccion(
+                () ->
+                        registrarAsiento.asentar(
+                                Asiento.nuevo(
+                                        EJERCICIO,
+                                        titular,
+                                        "PREDIAL",
+                                        Concepto.INSOLUTO,
+                                        tipo,
+                                        fase,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        monto,
+                                        fecha,
+                                        documento),
+                                Observacion.de("Se asienta para la prueba de #407")));
     }
 
     /** Un pago parcial asentado donde el libro tiene la obligacion: en la fase de valor. */

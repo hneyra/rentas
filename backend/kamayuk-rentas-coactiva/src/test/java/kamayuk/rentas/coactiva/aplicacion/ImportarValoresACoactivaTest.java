@@ -9,12 +9,10 @@ import java.util.List;
 import kamayuk.rentas.auditoria.RegistroDeAuditoria;
 import kamayuk.rentas.coactiva.dobles.ExpedientesEnMemoria;
 import kamayuk.rentas.coactiva.dobles.FasesDeMentira;
-import kamayuk.rentas.coactiva.dobles.LibroDeMentira;
 import kamayuk.rentas.coactiva.dobles.MovimientosDelExpedienteEnMemoria;
 import kamayuk.rentas.coactiva.dobles.ValoresDeMentira;
 import kamayuk.rentas.coactiva.dominio.InformeDeImportacion;
 import kamayuk.rentas.coactiva.dominio.PlantillaDeNumeroDeExpediente;
-import kamayuk.rentas.cuentacorriente.ObligacionPublica;
 import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.Observacion;
@@ -24,14 +22,16 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * #407 — Importar un valor pasa su deuda de VALOR a COACTIVA, y cuanto pasa.
+ * #407 — Importar un valor pide al libro que pase su deuda de VALOR a COACTIVA, una vez por
+ * obligacion.
  *
- * <p>Contra PostgreSQL, {@code CostasYFraccionamientoJdbcTest} mide el camino entero —la OP, el
- * pago parcial, el pase, la importacion y el fraccionamiento—. Aqui, sin base, las dos decisiones
- * de la importacion que aquella no ejerce: una obligacion que formalizan dos valores se mueve una
- * sola vez, y una sin deuda a la fecha no se mueve.
+ * <p>Cuanto se mueve lo decide {@code cuentacorriente} leyendo lo que la obligacion tiene en VALOR,
+ * y contra PostgreSQL lo mide {@code CostasYFraccionamientoJdbcTest} —la OP, el pago parcial, el
+ * cargo ordinario posterior, las dos importaciones—. Aqui, sin base, lo que si decide la
+ * importacion: a que obligaciones se lo pide, y que no se lo pide dos veces para la misma aunque
+ * los valores la escriban distinto.
  */
-@DisplayName("#407 — La importacion pasa la deuda del valor a COACTIVA")
+@DisplayName("#407 — La importacion pide el paso a COACTIVA una vez por obligacion")
 class ImportarValoresACoactivaTest {
 
     private static final Ejercicio EJERCICIO = new Ejercicio(2025);
@@ -47,64 +47,57 @@ class ImportarValoresACoactivaTest {
 
     @Test
     @DisplayName(
-            "una obligacion que formalizan dos valores del expediente se mueve una vez, por lo"
-                    + " pendiente y no por lo congelado")
-    void dosValoresDeLaMismaObligacionLaMuevenUnaVez() {
+            "una obligacion que formalizan dos valores de la importacion se pide una vez, aunque"
+                    + " uno la escriba «predial» y el otro «PREDIAL»")
+    void dosValoresDeLaMismaObligacionLaPidenUnaVez() {
         ValoresDeMentira valores =
                 new ValoresDeMentira()
-                        .con(valor(1L, "OP-2026-000001", predial()))
-                        .con(valor(2L, "RD-2026-000001", predial()));
-        LibroDeMentira libro = new LibroDeMentira().con(pendiente("PREDIAL", "300.00"));
+                        .con(valor(1L, "OP-2026-000001", obligacion("PREDIAL")))
+                        .con(valor(2L, "RD-2026-000001", obligacion("predial")));
 
-        InformeDeImportacion informe = importar(valores, libro);
+        InformeDeImportacion informe = importar(valores);
 
         assertThat(informe.importados()).hasSize(2);
         assertThat(fases.aCoactiva())
                 .as(
-                        "el par no cambia lo pendiente: moverla dos veces pondria en COACTIVA el"
-                                + " doble de lo que se debe")
+                        "la deduplicacion usa la clave del libro, no el record crudo: el libro no"
+                                + " distingue mayusculas, y la busqueda de la deuda tampoco")
                 .containsExactly(
                         new FasesDeMentira.Movido(
-                                "PREDIAL",
-                                EJERCICIO,
-                                Dinero.de("300.00"),
-                                informe.expedienteAbierto().numero()));
+                                "PREDIAL", EJERCICIO, informe.expedienteAbierto().numero()));
     }
 
     @Test
-    @DisplayName(
-            "una obligacion sin deuda a la fecha de la importacion no se mueve: un par por cero no"
-                    + " mueve nada y deja un asiento que nadie puede explicar")
-    void sinDeudaNoSeMueve() {
+    @DisplayName("cada obligacion distinta del valor se pide, con el expediente como origen")
+    void cadaObligacionDistintaSePide() {
         ValoresDeMentira valores =
                 new ValoresDeMentira()
                         .con(
                                 valor(
                                         1L,
                                         "OP-2026-000001",
-                                        predial(),
-                                        new ObligacionDelValor("ARBITRIO", EJERCICIO, null, null)));
-        LibroDeMentira libro =
-                new LibroDeMentira()
-                        .con(pendiente("PREDIAL", "120.00"))
-                        .con(pendiente("ARBITRIO", "0.00"));
+                                        obligacion("PREDIAL"),
+                                        obligacion("ARBITRIO")));
 
-        importar(valores, libro);
+        InformeDeImportacion informe = importar(valores);
 
         assertThat(fases.aCoactiva())
-                .as("el arbitrio se pago entero antes del pase: no hay nada que cobrar en coactiva")
-                .extracting(FasesDeMentira.Movido::tributo)
-                .containsExactly("PREDIAL");
+                .as("una por obligacion: lo que cada una tenga en VALOR lo sabe el libro")
+                .extracting(FasesDeMentira.Movido::tributo, FasesDeMentira.Movido::expediente)
+                .containsExactly(
+                        org.assertj.core.groups.Tuple.tuple(
+                                "PREDIAL", informe.expedienteAbierto().numero()),
+                        org.assertj.core.groups.Tuple.tuple(
+                                "ARBITRIO", informe.expedienteAbierto().numero()));
     }
 
     // ------------------------------------------------------------------
 
-    private InformeDeImportacion importar(ValoresDeMentira valores, LibroDeMentira libro) {
+    private InformeDeImportacion importar(ValoresDeMentira valores) {
         return new ImportarValoresACoactiva(
                         expedientes,
                         movimientos,
                         valores,
-                        libro,
                         fases,
                         (RegistroDeAuditoria registro) -> {},
                         RELOJ)
@@ -116,21 +109,8 @@ class ImportarValoresACoactivaTest {
                         Observacion.de("Se importa para la prueba de #407"));
     }
 
-    private static ObligacionDelValor predial() {
-        return new ObligacionDelValor("PREDIAL", EJERCICIO, null, null);
-    }
-
-    private static ObligacionPublica pendiente(String tributo, String total) {
-        return new ObligacionPublica(
-                tributo,
-                EJERCICIO,
-                null,
-                null,
-                HOY,
-                Dinero.de(total),
-                Dinero.CERO,
-                Dinero.CERO,
-                Dinero.CERO);
+    private static ObligacionDelValor obligacion(String tributo) {
+        return new ObligacionDelValor(tributo, EJERCICIO, null, null);
     }
 
     /** Un valor ya pasado a coactiva, congelado en 500 al emitirse. */

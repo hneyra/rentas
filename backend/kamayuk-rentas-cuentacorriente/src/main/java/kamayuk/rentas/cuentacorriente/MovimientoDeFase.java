@@ -61,41 +61,45 @@ public interface MovimientoDeFase {
             Observacion observacion);
 
     /**
-     * Mueve exactamente {@code monto} de la fase {@link
-     * kamayuk.rentas.cuentacorriente.dominio.Fase#VALOR} a la fase {@link
-     * kamayuk.rentas.cuentacorriente.dominio.Fase#COACTIVA} de una obligacion (#407).
+     * Pasa a la fase {@link kamayuk.rentas.cuentacorriente.dominio.Fase#COACTIVA} lo que una
+     * obligacion tiene en la fase {@link kamayuk.rentas.cuentacorriente.dominio.Fase#VALOR} (#407).
      *
-     * <p>Es el espejo de {@link #moverAValor}: un abono en fase valor y un cargo por el mismo
-     * importe en fase coactiva, atomicamente. El total que debe el contribuyente no cambia, solo la
-     * fase en la que el libro lo cuenta, y por eso un convenio coactivo que se quiebre la devuelve
-     * a COACTIVA y no a VALOR.
+     * <p>Es el espejo de {@link #moverAValor} en el par —un abono en fase valor y un cargo por el
+     * mismo importe en fase coactiva, atomicamente—, y el total que debe el contribuyente no
+     * cambia. Un convenio coactivo que se quiebre la devuelve a COACTIVA y no a VALOR.
      *
-     * <p>El monto lo decide quien llama, igual que en {@link #moverAValor}, y no es el congelado en
-     * el valor sino <b>lo pendiente a la fecha del movimiento</b>: si el obligado pago una parte
-     * entre la emision y la importacion, mover lo congelado dejaria la fase VALOR en negativo.
+     * <p><b>Pero el monto no lo decide quien llama, y es a proposito.</b> Lo que entra en coactiva
+     * es lo que la OP o la RD formalizaron y sigue en VALOR, y eso solo lo sabe el libro. La
+     * primera version de #407 lo decidia coactiva con lo pendiente de la obligacion <b>en todas sus
+     * fases</b>, y eso fallaba de dos maneras: un cargo ordinario asentado despues de la OP —que
+     * ningun valor formaliza— se sacaba de VALOR y dejaba esa fase en negativo; y una obligacion
+     * que dos valores traen en dos importaciones distintas se movia dos veces. Leido aqui, lo que
+     * se mueve es:
      *
-     * @param ejercicio el ejercicio de la obligacion que se mueve
+     * <ul>
+     *   <li>el neto de la obligacion en VALOR —cargos menos abonos, todas sus cuotas—, porque eso
+     *       es lo que la fase tiene; una segunda importacion ya no encuentra nada;
+     *   <li>y nunca mas de lo que se debe desde {@code fechaValor}, porque un abono que el libro
+     *       asento en otra fase deja en VALOR mas de lo que se debe, y COACTIVA no puede contar
+     *       deuda que no existe.
+     * </ul>
+     *
+     * <p>El par va, como el de {@link #moverAValor}, en la fila anual (periodo nulo).
+     *
      * @param contribuyenteId a quien se le cobra
-     * @param tributo el tributo de la obligacion, tal como lo nombra quien pide el movimiento
-     * @param periodo la cuota o el mes, si el tributo se divide; {@code null} si no aplica
-     * @param predioId la unidad, si la obligacion es predial o de arbitrios
-     * @param vehiculoId la unidad, si la obligacion es vehicular
+     * @param obligacion que obligacion entra en coactiva
      * @param referenciaExterna como entra el valor que origina el movimiento, sin clave foranea
      *     (ARQ-01 §4 regla 2)
-     * @param monto siempre positivo; el mismo en el abono y en el cargo
      * @param fechaValor fecha a la que se imputan los dos asientos
      * @param documentoOrigen el expediente en el que la deuda entra a coactiva
      * @param observacion por que se mueve (regla 10)
+     * @return lo que se paso a COACTIVA; cero si la obligacion no tenia nada en VALOR, y entonces
+     *     no se asienta nada: un par por cero no mueve nada y deja un asiento que nadie explica
      */
-    void moverACoactiva(
-            Ejercicio ejercicio,
+    Dinero moverACoactiva(
             long contribuyenteId,
-            String tributo,
-            @Nullable Integer periodo,
-            @Nullable Long predioId,
-            @Nullable Long vehiculoId,
+            ClaveDeObligacionPublica obligacion,
             String referenciaExterna,
-            Dinero monto,
             LocalDate fechaValor,
             String documentoOrigen,
             Observacion observacion);

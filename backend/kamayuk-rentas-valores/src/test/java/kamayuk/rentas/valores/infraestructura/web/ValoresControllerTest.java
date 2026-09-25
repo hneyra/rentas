@@ -88,15 +88,10 @@ class ValoresControllerTest {
                                 Observacion observacion) {}
 
                         @Override
-                        public void moverACoactiva(
-                                Ejercicio ejercicio,
+                        public Dinero moverACoactiva(
                                 long contribuyenteId,
-                                String tributo,
-                                @Nullable Integer periodo,
-                                @Nullable Long predioId,
-                                @Nullable Long vehiculoId,
+                                kamayuk.rentas.cuentacorriente.ClaveDeObligacionPublica obligacion,
                                 String referenciaExterna,
-                                Dinero monto,
                                 LocalDate fechaValor,
                                 String documentoOrigen,
                                 Observacion observacion) {

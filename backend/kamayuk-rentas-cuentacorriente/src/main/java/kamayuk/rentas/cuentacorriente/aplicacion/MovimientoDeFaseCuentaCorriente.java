@@ -1,14 +1,21 @@
 package kamayuk.rentas.cuentacorriente.aplicacion;
 
 import java.time.LocalDate;
+import java.util.List;
+import kamayuk.rentas.cuentacorriente.ClaveDeObligacionPublica;
 import kamayuk.rentas.cuentacorriente.MovimientoDeFase;
 import kamayuk.rentas.cuentacorriente.dominio.Asiento;
+import kamayuk.rentas.cuentacorriente.dominio.AsientoRepository;
+import kamayuk.rentas.cuentacorriente.dominio.CalculoDeDeuda;
+import kamayuk.rentas.cuentacorriente.dominio.ClaveDeObligacion;
 import kamayuk.rentas.cuentacorriente.dominio.Concepto;
 import kamayuk.rentas.cuentacorriente.dominio.Fase;
+import kamayuk.rentas.cuentacorriente.dominio.SaldoRepository;
 import kamayuk.rentas.cuentacorriente.dominio.TipoAsiento;
 import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.Observacion;
+import kamayuk.rentas.dominio.PoliticaDeRedondeo;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,7 +28,9 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>Dos pares, y un solo motor: ORDINARIA→VALOR al emitir un valor (#37) y VALOR→COACTIVA al
  * importarlo a un expediente (#407). Son la misma operacion con otras fases, y escribirlas por
- * separado dejaria dos copias del par que la primera modificacion volveria asimetricas.
+ * separado dejaria dos copias del par que la primera modificacion volveria asimetricas. Lo que
+ * difiere es <b>cuanto</b>: el paso a VALOR asienta el monto que el valor congelo, y el paso a
+ * COACTIVA el que el libro tiene en VALOR (ver {@link MovimientoDeFase#moverACoactiva}).
  *
  * <p>Las dos escrituras van en la misma transaccion: si la segunda fallara, la primera se revierte
  * con ella. Un abono sin su cargo dejaria una obligacion con menos deuda de la que en realidad
@@ -31,9 +40,22 @@ import org.springframework.transaction.annotation.Transactional;
 public class MovimientoDeFaseCuentaCorriente implements MovimientoDeFase {
 
     private final RegistrarAsiento registrar;
+    private final AsientoRepository asientos;
+    private final SaldoRepository saldos;
+    private final CalculoDeDeuda calculo;
+    private final PoliticaDeRedondeo redondeo;
 
-    public MovimientoDeFaseCuentaCorriente(RegistrarAsiento registrar) {
+    public MovimientoDeFaseCuentaCorriente(
+            RegistrarAsiento registrar,
+            AsientoRepository asientos,
+            SaldoRepository saldos,
+            CalculoDeDeuda calculo,
+            PoliticaDeRedondeo redondeo) {
         this.registrar = registrar;
+        this.asientos = asientos;
+        this.saldos = saldos;
+        this.calculo = calculo;
+        this.redondeo = redondeo;
     }
 
     @Override
@@ -66,34 +88,75 @@ public class MovimientoDeFaseCuentaCorriente implements MovimientoDeFase {
                 observacion);
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Bloquea la obligacion antes de leerla, como el acogimiento a convenio: dos importaciones
+     * simultaneas de valores de la misma obligacion leerian las dos el mismo neto en VALOR y lo
+     * moverian dos veces.
+     */
     @Override
     @Transactional
-    public void moverACoactiva(
-            Ejercicio ejercicio,
+    public Dinero moverACoactiva(
             long contribuyenteId,
-            String tributo,
-            @Nullable Integer periodo,
-            @Nullable Long predioId,
-            @Nullable Long vehiculoId,
+            ClaveDeObligacionPublica obligacion,
             String referenciaExterna,
-            Dinero monto,
             LocalDate fechaValor,
             String documentoOrigen,
             Observacion observacion) {
+        ClaveDeObligacion clave =
+                new ClaveDeObligacion(
+                        contribuyenteId,
+                        obligacion.tributo(),
+                        obligacion.ejercicio(),
+                        obligacion.predioId(),
+                        obligacion.vehiculoId());
+        saldos.bloquear(clave);
+        List<Asiento> delLibro = asientos.deTodosLosPeriodosDe(clave);
+
+        Dinero enValor = netoEn(Fase.VALOR, delLibro);
+        Dinero seDebe = calculo.extinguibleDesde(delLibro, fechaValor, redondeo).total();
+        Dinero monto = enValor.esMayorQue(seDebe) ? seDebe : enValor;
+        if (!monto.esPositivo()) {
+            return Dinero.CERO;
+        }
         mover(
                 Fase.VALOR,
                 Fase.COACTIVA,
-                ejercicio,
+                obligacion.ejercicio(),
                 contribuyenteId,
-                tributo,
-                periodo,
-                predioId,
-                vehiculoId,
+                obligacion.tributo(),
+                null,
+                obligacion.predioId(),
+                obligacion.vehiculoId(),
                 referenciaExterna,
                 monto,
                 fechaValor,
                 documentoOrigen,
                 observacion);
+        return monto;
+    }
+
+    /**
+     * Lo que el libro cuenta en una fase: cargos menos abonos, de todos los conceptos.
+     *
+     * <p>Todos, y no las cuatro partes que {@code deudaActualizadaA} netea: el par de un movimiento
+     * de fase lleva {@link Concepto#AJUSTE} o {@code FRACCIONAMIENTO}, y es justo lo que dice que
+     * la deuda salio de una fase y entro en otra. Sumados sobre todas las fases, los pares se
+     * anulan y queda lo que se debe.
+     */
+    private static Dinero netoEn(Fase fase, List<Asiento> delLibro) {
+        Dinero neto = Dinero.CERO;
+        for (Asiento asiento : delLibro) {
+            if (asiento.fase() != fase) {
+                continue;
+            }
+            neto =
+                    asiento.tipo() == TipoAsiento.CARGO
+                            ? neto.mas(asiento.monto())
+                            : neto.menos(asiento.monto());
+        }
+        return neto;
     }
 
     // ------------------------------------------------------------------
