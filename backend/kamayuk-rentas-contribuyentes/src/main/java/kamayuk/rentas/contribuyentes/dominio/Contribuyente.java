@@ -98,6 +98,48 @@ public record Contribuyente(
     }
 
     /**
+     * El contribuyente como lo guarda la auditoria, en {@code datos_anteriores} y {@code
+     * datos_nuevos} (#421).
+     *
+     * <p><b>Es la unica fuente de lo que se audita, y vive aqui a proposito</b>: junto a los
+     * componentes del registro, un campo nuevo no se puede anadir sin decidir si se audita — y lo
+     * exige {@code LoQueSeAuditaTest}, que falla con cualquier componente que no este ni aqui ni en
+     * su lista de excluidos. Hasta #421 la descripcion vivia en el caso de uso y llevaba cuatro
+     * campos: la correccion cambiaba la condicion especial, la fecha de nacimiento, el estado civil
+     * y el conyuge, y la auditoria no decia que habian cambiado ni que habia antes.
+     *
+     * <p>Fuera se quedan dos: {@code id}, que ya es la {@code clave} de la fila de auditoria, y
+     * {@code documento}, que ninguna escritura corrige —es la identidad, ver {@code
+     * ContribuyenteController.modificar}— y que no hace falta repetir en cada asiento.
+     *
+     * <p><b>Lleva datos personales</b> —el nombre, la fecha de nacimiento, el estado civil— y es a
+     * sabiendas (RNF-090, Ley 29733, documento propio pendiente): el manual pide conservar el
+     * registro original (DAT-02 §1), y el original de un nombre es un nombre. La lectura de la
+     * auditoria esta restringida: {@code GET /seguridad/auditoria} exige el acceso {@code
+     * auditoria} con {@code LECTURA} —la pantalla {@code seg-aud}—, y la aplicacion no tiene sobre
+     * la tabla mas que {@code SELECT} e {@code INSERT} (DAT-02 §2.4 y §2.6).
+     */
+    public String paraLaAuditoria() {
+        return "{\"codigo\":"
+                + JsonDeAuditoria.texto(codigo)
+                + ",\"tipoPersona\":"
+                + JsonDeAuditoria.texto(tipoPersona)
+                + ",\"nombreRazonSocial\":"
+                + JsonDeAuditoria.texto(nombreRazonSocial)
+                + ",\"condicionEspecial\":"
+                + JsonDeAuditoria.texto(condicionEspecial)
+                + ",\"fechaNacimiento\":"
+                + JsonDeAuditoria.texto(fechaNacimiento)
+                + ",\"estadoCivil\":"
+                + JsonDeAuditoria.texto(estadoCivil)
+                + ",\"conyugeId\":"
+                + JsonDeAuditoria.numero(conyugeId)
+                + ",\"activo\":"
+                + activo
+                + "}";
+    }
+
+    /**
      * Dar de baja, nunca borrar (RNF-051): su codigo aparece en recibos ya emitidos y en asientos
      * del libro que no se tocan.
      */

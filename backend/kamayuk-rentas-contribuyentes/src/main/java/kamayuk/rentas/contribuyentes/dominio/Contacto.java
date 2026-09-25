@@ -65,6 +65,40 @@ public record Contacto(
         return id == null;
     }
 
+    /**
+     * El contacto como lo guarda la auditoria, en {@code datos_anteriores} y {@code datos_nuevos}
+     * (#421).
+     *
+     * <p><b>Es la unica fuente de lo que se audita</b>, junto a los componentes por la misma razon
+     * que {@link Contribuyente#paraLaAuditoria}. Hasta #421 el alta y la correccion guardaban
+     * {@code {tipo, vigente}} y nada mas, y como el {@code UPDATE} pisa la fila, corregir el correo
+     * de un gestor perdia el correo al que ya se le habia notificado.
+     *
+     * <p>Lleva todo lo que la correccion puede cambiar: el tipo, el valor, el nombre, el documento,
+     * la nota —que es {@code observacion} aqui y {@code nota} en la API, y se audita con el nombre
+     * de la API para no confundirla con la observacion del asiento— y la vigencia. Fuera se quedan
+     * {@code id}, que es la {@code clave} del asiento, y {@code contribuyenteId}, que ninguna
+     * escritura cambia.
+     *
+     * <p><b>Lleva datos personales</b> —un telefono, un correo, el nombre y el documento de un
+     * tercero— con la misma restriccion de lectura que el contribuyente (RNF-090; DAT-02 §2.6).
+     */
+    public String paraLaAuditoria() {
+        return "{\"tipo\":"
+                + JsonDeAuditoria.texto(tipo)
+                + ",\"valor\":"
+                + JsonDeAuditoria.texto(valor)
+                + ",\"nombre\":"
+                + JsonDeAuditoria.texto(nombre)
+                + ",\"documento\":"
+                + JsonDeAuditoria.texto(documento)
+                + ",\"nota\":"
+                + JsonDeAuditoria.texto(observacion)
+                + ",\"vigente\":"
+                + vigente
+                + "}";
+    }
+
     /** Deja de usarse. No se borra: aparece en notificaciones ya hechas. */
     public Contacto dadoDeBaja() {
         return new Contacto(

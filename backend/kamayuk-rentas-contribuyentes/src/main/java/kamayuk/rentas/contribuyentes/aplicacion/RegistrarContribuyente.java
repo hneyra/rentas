@@ -1,5 +1,6 @@
 package kamayuk.rentas.contribuyentes.aplicacion;
 
+import java.util.Objects;
 import java.util.Optional;
 import kamayuk.rentas.auditoria.Auditoria;
 import kamayuk.rentas.auditoria.Operacion;
@@ -34,19 +35,76 @@ public class RegistrarContribuyente {
         this.auditoria = auditoria;
     }
 
+    /**
+     * Alta de un contribuyente que todavia no esta en el padron.
+     *
+     * <p><b>Solo el alta</b> (#421). Hasta #421 este metodo tambien corregia —decidia cual de las
+     * dos cosas hacer por {@code esNuevo()}— y la correccion salia auditada como un alta: sin el
+     * antes, porque este metodo no lo recibia. La correccion es {@link #modificar}.
+     *
+     * @throws IllegalArgumentException si el que llega ya tiene identificador
+     */
     @Transactional
-    public Contribuyente registrar(Contribuyente contribuyente, Observacion observacion) {
-        rechazarDuplicados(contribuyente);
+    public Contribuyente registrar(Contribuyente nuevo, Observacion observacion) {
+        if (!nuevo.esNuevo()) {
+            throw new IllegalArgumentException(
+                    "Registrar da de alta; el contribuyente "
+                            + nuevo.id()
+                            + " ya esta en el padron y se corrige con modificar, que audita lo que"
+                            + " habia");
+        }
+        rechazarDuplicados(nuevo);
 
-        Contribuyente guardado = repositorio.save(contribuyente);
+        Contribuyente guardado = repositorio.save(nuevo);
 
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe(
                                 "contribuyente",
                                 String.valueOf(guardado.id()),
-                                contribuyente.esNuevo() ? Operacion.ALTA : Operacion.MODIFICACION,
+                                Operacion.ALTA,
                                 observacion)
-                        .con(null, descripcion(guardado)));
+                        .con(null, guardado.paraLaAuditoria()));
+
+        return guardado;
+    }
+
+    /**
+     * Correccion de un contribuyente que ya esta en el padron, auditando <b>lo que habia y lo que
+     * queda</b> (#421).
+     *
+     * <p>El {@code UPDATE} sobrescribe la fila entera y {@code contribuyente} no tiene tabla
+     * historica, asi que la fila de auditoria es el unico sitio donde el valor anterior sobrevive
+     * (DAT-02 §1: «ante una modificacion se guarda el registro original»). Por eso el antes es un
+     * argumento y no algo que este metodo pueda omitir: quien corrige ya lo tiene en la mano,
+     * porque lo leyo para saber que conservar de lo que no vino.
+     *
+     * @param antes la fila tal como se leyo antes de corregirla
+     * @param despues la misma fila corregida: mismo identificador
+     * @throws IllegalArgumentException si {@code antes} no esta en el padron o {@code despues} es
+     *     otra fila
+     */
+    @Transactional
+    public Contribuyente modificar(
+            Contribuyente antes, Contribuyente despues, Observacion observacion) {
+        if (antes.esNuevo() || !Objects.equals(antes.id(), despues.id())) {
+            throw new IllegalArgumentException(
+                    "Modificar corrige una fila del padron: el antes ("
+                            + antes.id()
+                            + ") y el despues ("
+                            + despues.id()
+                            + ") tienen que ser el mismo contribuyente");
+        }
+        rechazarDuplicados(despues);
+
+        Contribuyente guardado = repositorio.save(despues);
+
+        auditoria.registrar(
+                RegistroDeAuditoria.enLaFechaDe(
+                                "contribuyente",
+                                String.valueOf(guardado.id()),
+                                Operacion.MODIFICACION,
+                                observacion)
+                        .con(antes.paraLaAuditoria(), guardado.paraLaAuditoria()));
 
         return guardado;
     }
@@ -65,7 +123,7 @@ public class RegistrarContribuyente {
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe(
                                 "contribuyente", String.valueOf(id), Operacion.BAJA, observacion)
-                        .con(descripcion(existente), descripcion(baja)));
+                        .con(existente.paraLaAuditoria(), baja.paraLaAuditoria()));
 
         return baja;
     }
@@ -94,18 +152,6 @@ public class RegistrarContribuyente {
         }
         Long idHallado = hallado.get().id();
         return idHallado != null && !idHallado.equals(contribuyente.id());
-    }
-
-    private static String descripcion(Contribuyente contribuyente) {
-        return "{\"codigo\":\""
-                + contribuyente.codigo()
-                + "\",\"tipoPersona\":\""
-                + contribuyente.tipoPersona()
-                + "\",\"nombreRazonSocial\":\""
-                + contribuyente.nombreRazonSocial().replace("\"", "\\\"")
-                + "\",\"activo\":"
-                + contribuyente.activo()
-                + "}";
     }
 
     /** Ya hay otro contribuyente con ese codigo en esta municipalidad. */

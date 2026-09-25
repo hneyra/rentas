@@ -62,6 +62,15 @@ Dos mecanismos, según el caso:
   que el manual llama «Histórico de Fiscalización Predial».
 - **Libro de asientos**: no hay «registro original» que copiar, porque nada se modifica
   (ADR-0006).
+- **Contribuyente y contacto** ([#421](https://github.com/hneyra/rentas/issues/421)): no tienen
+  versión ni tabla histórica —el `UPDATE` sobrescribe la fila—, así que el registro original vive
+  en la auditoría. Su corrección es un caso de uso propio (`RegistrarContribuyente.modificar`,
+  `ActualizarFicha.corregirContacto`) que recibe el antes y lo escribe en `datos_anteriores`, y lo
+  que se describe lo dice **una sola fuente**: `Contribuyente.paraLaAuditoria()` y
+  `Contacto.paraLaAuditoria()`, junto a los componentes del registro. `LoQueSeAuditaTest` sale rojo
+  con cualquier componente que no esté ni ahí ni en su lista de excluidos. Hasta #421 la
+  corrección se auditaba como un alta —`datos_anteriores` nulo y sin los campos cambiados— y lo
+  corregido antes de esa fecha no se puede recuperar.
 
 ### 2.4 La auditoría no se puede alterar
 
@@ -77,6 +86,17 @@ El revisor de código fuente falla el build si aparece un `UPDATE auditoria … 
 Esto **no** lo pide el manual; se añade (ADR-0008 §5). La operación `PERMISO` de
 `auditoria.operacion` registra los cambios sobre `permiso`, `miembro`, `grupo` y `usuario`. Sin
 ello, el administrador del sistema es el único usuario que puede alterar su propia pista.
+
+### 2.6 La auditoría guarda datos personales, y su lectura está restringida
+
+Desde #421 `datos_anteriores` y `datos_nuevos` del contribuyente llevan su nombre, su fecha de
+nacimiento, su estado civil y su cónyuge; los del contacto, el teléfono o el correo y el nombre y el
+documento de un tercero. Es a sabiendas: el original de un nombre es un nombre, y §1 pide
+conservarlo. **RNF-090** (Ley 29733) tiene su documento propio pendiente; hasta que exista, lo que
+lo acota es que **la lectura de la auditoría está restringida**: `GET /seguridad/auditoria` exige
+el acceso `auditoria` con `LECTURA` —la pantalla `seg-aud`—, y la aplicación no tiene sobre la
+tabla más que `SELECT` e `INSERT` (§2.4). El documento de RNF-090 decidirá si hace falta algo más
+—cifrar o seudonimizar estos campos, o acortar su retención (D-08)—.
 
 ## 3. Volumen y retención
 

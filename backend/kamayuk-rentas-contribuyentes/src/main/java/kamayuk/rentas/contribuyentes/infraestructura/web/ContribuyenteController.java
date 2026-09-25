@@ -303,7 +303,7 @@ public class ContribuyenteController {
                                 : conyugeDe(peticion.conyugeId(), id),
                         peticion.activo() == null ? existente.activo() : peticion.activo());
 
-        return ContribuyenteResource.de(registrar.registrar(cambiado, observacion));
+        return ContribuyenteResource.de(registrar.modificar(existente, cambiado, observacion));
     }
 
     // ------------------------------------------------------------------
