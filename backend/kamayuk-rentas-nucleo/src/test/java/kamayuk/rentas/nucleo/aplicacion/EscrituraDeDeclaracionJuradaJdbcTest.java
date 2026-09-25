@@ -666,6 +666,205 @@ class EscrituraDeDeclaracionJuradaJdbcTest {
                     .contains("2025-12-31");
         }
 
+        /**
+         * <b>La compra a mitad de año</b> (#472): B compra P el 15 de marzo y presenta su DJ de P
+         * en abril. No hay determinacion de B para 2026, asi que las filas salen del padron al 1 de
+         * enero, y ahi P todavia era de A: la hoja de la DJ de B salia <b>sin el predio que la DJ
+         * declara</b>.
+         *
+         * <p>La siembra distingue: B tiene otro predio desde 2019, de modo que la hoja no sale
+         * vacia por otro motivo, y el vendedor A tiene P hasta el 14 de marzo, de modo que P si
+         * esta en el padron —de otro— al 1 de enero. Y B lo vuelve a vender el 31 de julio: la hoja
+         * se pide en agosto, de modo que leer el predio declarado al dia en que se pide —y no al
+         * dia en que se presento la DJ— tampoco lo encuentra.
+         */
+        @Test
+        @DisplayName("#472 — la compra a mitad de año: la hoja trae el predio declarado, marcado")
+        void laCompraAMitadDeAnoTraeElPredioDeclarado() throws Exception {
+            String codigoDeSiempre = nuevoCodigoCatastral();
+            long deSiempre = crearPredioConFicha(municipalidad, codigoDeSiempre);
+            String codigoComprado = nuevoCodigoCatastral();
+            long comprado = crearPredioConFicha(municipalidad, codigoComprado);
+            long vendedor = idDeContribuyente(nuevoContribuyente(municipalidad));
+            String comprador = nuevoContribuyente(municipalidad);
+            long compradorId = idDeContribuyente(comprador);
+            PrediosDeLaHoja.delEntre(
+                    compradorId,
+                    deSiempre,
+                    codigoDeSiempre,
+                    "CALLE DE SIEMPRE 11",
+                    "2019-06-01",
+                    null);
+            PrediosDeLaHoja.delEntre(
+                    vendedor,
+                    comprado,
+                    codigoComprado,
+                    "CALLE COMPRADA 12",
+                    "2019-06-01",
+                    "2026-03-14");
+            PrediosDeLaHoja.delEntre(
+                    compradorId,
+                    comprado,
+                    codigoComprado,
+                    "CALLE COMPRADA 12",
+                    "2026-03-15",
+                    "2026-07-31");
+            String numero = numeroDe(presentar(comprador, comprado, "2026-04-10"));
+
+            JsonNode hoja = JSON.readTree(hojaDe(numero));
+
+            assertThat(codigosDe(hoja))
+                    .as(
+                            "la hoja de una DJ tiene que traer el predio que la DJ declara, aunque"
+                                    + " no sea de la base del ejercicio")
+                    .containsExactlyInAnyOrder(codigoDeSiempre, codigoComprado);
+            JsonNode declarado = filaDe(hoja, codigoComprado);
+            assertThat(declarado.get("condicion").asString())
+                    .as("y marcado: el adquirente asume desde el 1 de enero siguiente (art. 10)")
+                    .isEqualTo("DECLARADO_AFECTA_AL_EJERCICIO_SIGUIENTE");
+            assertThat(declarado.get("direccion").asString())
+                    .as("su codigo y su direccion, del padron al dia en que se presento la DJ")
+                    .isEqualTo("CALLE COMPRADA 12");
+            assertThat(declarado.get("valuoAfecto").isNull())
+                    .as("sin cifras: no forma parte de lo que se cobra en 2026")
+                    .isTrue();
+            assertThat(filaDe(hoja, codigoDeSiempre).get("condicion").asString())
+                    .isEqualTo("BASE_DEL_EJERCICIO");
+            assertThat(hoja.get("valuoAfectoTotal").isNull())
+                    .as(
+                            "sin determinacion los totales siguen sin cifra (#563): el predio"
+                                    + " declarado no les suma nada, ni un cero")
+                    .isTrue();
+            assertThat(hoja.get("impuestoInsoluto").isNull()).isTrue();
+        }
+
+        /**
+         * La misma compra, con B ya determinado por su otro predio: el total es el de la
+         * determinacion y la suma de las filas <b>de la base</b>; la fila declarada no suma.
+         */
+        @Test
+        @DisplayName("#472 — con determinacion, el predio declarado sale y no suma a los totales")
+        void conDeterminacionElDeclaradoNoSuma() throws Exception {
+            String codigoDeSiempre = nuevoCodigoCatastral();
+            long deSiempre = crearPredioConFicha(municipalidad, codigoDeSiempre);
+            String codigoComprado = nuevoCodigoCatastral();
+            long comprado = crearPredioConFicha(municipalidad, codigoComprado);
+            String comprador = nuevoContribuyente(municipalidad);
+            long compradorId = idDeContribuyente(comprador);
+            PrediosDeLaHoja.delEntre(
+                    compradorId,
+                    deSiempre,
+                    codigoDeSiempre,
+                    "CALLE DE SIEMPRE 13",
+                    "2019-06-01",
+                    null);
+            PrediosDeLaHoja.delEntre(
+                    compradorId, comprado, codigoComprado, "CALLE COMPRADA 14", "2026-03-15", null);
+            determinar(compradorId, deSiempre, "100000.00", "400.00");
+            String numero = numeroDe(presentar(comprador, comprado, "2026-04-10"));
+
+            JsonNode hoja = JSON.readTree(hojaDe(numero));
+
+            assertThat(codigosDe(hoja)).containsExactlyInAnyOrder(codigoDeSiempre, codigoComprado);
+            assertThat(filaDe(hoja, codigoComprado).get("condicion").asString())
+                    .isEqualTo("DECLARADO_AFECTA_AL_EJERCICIO_SIGUIENTE");
+            assertThat(filaDe(hoja, codigoComprado).get("autovaluo").isNull()).isTrue();
+            assertThat(sumaDeValuoAfectoDeLaBase(hoja))
+                    .as(
+                            "el total es la suma de las filas de la base, y el declarado no esta en ella")
+                    .isEqualByComparingTo(hoja.get("valuoAfectoTotal").asString())
+                    .isEqualByComparingTo("100000.00");
+            assertThat(hoja.get("impuestoInsoluto").asString()).isEqualTo("400.00");
+        }
+
+        /**
+         * El predio declarado SI es del declarante al 1 de enero, pero la determinacion del
+         * ejercicio se hizo sin el: la fila sale marcada y la hoja dice que hay que volver a
+         * determinar, en vez de callarlo.
+         */
+        @Test
+        @DisplayName("#472 — declarado del ejercicio y fuera de la determinacion: sale y se dice")
+        void declaradoFueraDeLaDeterminacion() throws Exception {
+            String codigoDeterminado = nuevoCodigoCatastral();
+            long determinado = crearPredioConFicha(municipalidad, codigoDeterminado);
+            String codigoOlvidado = nuevoCodigoCatastral();
+            long olvidado = crearPredioConFicha(municipalidad, codigoOlvidado);
+            String contribuyente = nuevoContribuyente(municipalidad);
+            long contribuyenteId = idDeContribuyente(contribuyente);
+            PrediosDeLaHoja.del(contribuyenteId, determinado, codigoDeterminado, "CALLE 15");
+            PrediosDeLaHoja.del(contribuyenteId, olvidado, codigoOlvidado, "CALLE OLVIDADA 16");
+            determinar(contribuyenteId, determinado, "100000.00", "400.00");
+            String numero = numeroDe(presentar(contribuyente, olvidado));
+
+            JsonNode hoja = JSON.readTree(hojaDe(numero));
+
+            assertThat(filaDe(hoja, codigoOlvidado).get("condicion").asString())
+                    .isEqualTo("DECLARADO_FUERA_DE_LA_DETERMINACION");
+            assertThat(sumaDeValuoAfectoDeLaBase(hoja))
+                    .isEqualByComparingTo(hoja.get("valuoAfectoTotal").asString())
+                    .isEqualByComparingTo("100000.00");
+            assertThat(hoja.get("faltan").toString())
+                    .as("y dice cual es y que hay que hacer")
+                    .contains("predio declarado " + olvidado)
+                    .contains("volver a determinar");
+        }
+
+        /**
+         * El predio declarado no consta a nombre del declarante ni al 1 de enero ni el dia en que
+         * presento: la fila sale igual —la DJ lo declara—, sin codigo, direccion ni porcentaje que
+         * leer, y la hoja lo dice.
+         */
+        @Test
+        @DisplayName("#472 — declarado sin titularidad en el padron: sale sin inventar, y se dice")
+        void declaradoSinTitularidad() throws Exception {
+            String codigoDeSiempre = nuevoCodigoCatastral();
+            long deSiempre = crearPredioConFicha(municipalidad, codigoDeSiempre);
+            long ajeno = crearPredioConFicha(municipalidad, nuevoCodigoCatastral());
+            String contribuyente = nuevoContribuyente(municipalidad);
+            long contribuyenteId = idDeContribuyente(contribuyente);
+            PrediosDeLaHoja.del(contribuyenteId, deSiempre, codigoDeSiempre, "CALLE 17");
+            String numero = numeroDe(presentar(contribuyente, ajeno, "2026-04-10"));
+
+            JsonNode hoja = JSON.readTree(hojaDe(numero));
+
+            JsonNode declarado = null;
+            for (JsonNode fila : hoja.get("predios")) {
+                if (fila.get("predioId").asLong() == ajeno) {
+                    declarado = fila;
+                }
+            }
+            assertThat(declarado).as("la DJ lo declara, y la hoja lo trae").isNotNull();
+            assertThat(declarado.get("condicion").asString())
+                    .isEqualTo("DECLARADO_SIN_TITULARIDAD");
+            assertThat(declarado.get("codRefCatastral").isNull()).isTrue();
+            assertThat(declarado.get("porcentajePropiedad").isNull())
+                    .as("un porcentaje que el padron no da no se inventa")
+                    .isTrue();
+            assertThat(hoja.get("faltan").toString())
+                    .contains("predio declarado " + ajeno)
+                    .contains("2026-04-10");
+        }
+
+        private static JsonNode filaDe(JsonNode hoja, String codigo) {
+            for (JsonNode fila : hoja.get("predios")) {
+                if (codigo.equals(fila.get("codRefCatastral").asString())) {
+                    return fila;
+                }
+            }
+            throw new AssertionError("la hoja no trae el predio " + codigo + ": " + hoja);
+        }
+
+        /** La suma de las filas de la base del ejercicio: las declaradas fuera no cuentan. */
+        private static BigDecimal sumaDeValuoAfectoDeLaBase(JsonNode hoja) {
+            BigDecimal suma = BigDecimal.ZERO;
+            for (JsonNode fila : hoja.get("predios")) {
+                if ("BASE_DEL_EJERCICIO".equals(fila.get("condicion").asString())) {
+                    suma = suma.add(new BigDecimal(fila.get("valuoAfecto").asString()));
+                }
+            }
+            return suma;
+        }
+
         private static List<String> codigosDe(JsonNode hoja) {
             List<String> codigos = new ArrayList<>();
             for (JsonNode fila : hoja.get("predios")) {
@@ -959,6 +1158,11 @@ class EscrituraDeDeclaracionJuradaJdbcTest {
     // ------------------------------------------------------------------
 
     private static MvcResult presentar(String contribuyente, long predioId) throws Exception {
+        return presentar(contribuyente, predioId, "2026-03-01");
+    }
+
+    private static MvcResult presentar(String contribuyente, long predioId, String fecha)
+            throws Exception {
         return mvc.perform(
                         post("/rentas/api/v1/rentas/declaraciones")
                                 .contentType(MediaType.APPLICATION_JSON)
@@ -968,7 +1172,9 @@ class EscrituraDeDeclaracionJuradaJdbcTest {
                                                 + contribuyente
                                                 + "\",\"tipo\":\"HR\",\"predioId\":"
                                                 + predioId
-                                                + ",\"fechaPresentacion\":\"2026-03-01\"}"))
+                                                + ",\"fechaPresentacion\":\""
+                                                + fecha
+                                                + "\"}"))
                 .andReturn();
     }
 

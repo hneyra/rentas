@@ -18,7 +18,9 @@ import org.jspecify.annotations.Nullable;
  * enteras, sin determinacion— del padron al 1 de enero antes de las transferencias de ese dia
  * ({@code Ejercicio.fechaDeLaTitularidad()}), que no depende de cuando se pida. {@code aLaFecha} es
  * la fecha de corte a la que se resuelve <b>solo el domicilio fiscal</b> del declarante (regla 9):
- * reimprimir la hoja otro dia puede cambiar el domicilio, y nada mas.
+ * reimprimir la hoja otro dia puede cambiar el domicilio, y nada mas. El predio que la DJ declara,
+ * si no es de la base del ejercicio, se lee al dia en que se presento la DJ, que tampoco se mueve
+ * (#472).
  *
  * <p><b>Un campo nulo es un campo que no hay, y por eso {@code faltan} viene lleno.</b> Sin
  * determinacion del ejercicio no hay autovaluo, ni valuo afecto, ni impuesto: publicar cero seria
@@ -71,16 +73,24 @@ public record HojaDeDeclaracionResource(
      * predio que la determinacion cobro y que el padron al 1 de enero del ejercicio no pone a
      * nombre del declarante; {@code faltan} lo dice (#328). La linea sale igual: sin ella, {@code
      * valuoAfectoTotal} deja de ser la suma de la tabla.
+     *
+     * <p>{@code condicion} dice si la linea es de la base del ejercicio ({@code
+     * BASE_DEL_EJERCICIO}) o el predio que la DJ declara fuera de ella (#472): {@code
+     * DECLARADO_AFECTA_AL_EJERCICIO_SIGUIENTE}, {@code DECLARADO_FUERA_DE_LA_DETERMINACION} o
+     * {@code DECLARADO_SIN_TITULARIDAD}. Esas lineas no llevan cifras y no suman: los totales son
+     * la suma de las de la base. En la ultima tampoco hay codigo, direccion, tipo ni {@code
+     * porcentajePropiedad}, y {@code faltan} lo dice.
      */
     public record PredioDeLaHojaResource(
             long predioId,
             @Nullable String codRefCatastral,
             @Nullable String direccion,
             @Nullable String tipo,
-            String porcentajePropiedad,
+            @Nullable String porcentajePropiedad,
             @Nullable String autovaluo,
             @Nullable String valuoExonerado,
-            @Nullable String valuoAfecto) {
+            @Nullable String valuoAfecto,
+            String condicion) {
 
         static PredioDeLaHojaResource de(ConsultaDeLaHojaDeDeclaracion.FilaDePredio fila) {
             return new PredioDeLaHojaResource(
@@ -88,10 +98,13 @@ public record HojaDeDeclaracionResource(
                     fila.codigoReferenciaCatastral(),
                     fila.direccion(),
                     fila.tipo(),
-                    fila.porcentajePropiedad().toString(),
+                    fila.porcentajePropiedad() == null
+                            ? null
+                            : fila.porcentajePropiedad().toString(),
                     fila.autovaluo() == null ? null : fila.autovaluo().toString(),
                     fila.valuoExonerado() == null ? null : fila.valuoExonerado().toString(),
-                    fila.valuoAfecto() == null ? null : fila.valuoAfecto().toString());
+                    fila.valuoAfecto() == null ? null : fila.valuoAfecto().toString(),
+                    fila.condicion().name());
         }
     }
 }

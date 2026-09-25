@@ -2044,7 +2044,8 @@
         "porcentajePropiedad": "texto",
         "autovaluo": "texto",
         "valuoExonerado": "texto",
-        "valuoAfecto": "texto"
+        "valuoAfecto": "texto",
+        "condicion": "texto"
       }
     ],
     "valuoAfectoTotal": "texto",

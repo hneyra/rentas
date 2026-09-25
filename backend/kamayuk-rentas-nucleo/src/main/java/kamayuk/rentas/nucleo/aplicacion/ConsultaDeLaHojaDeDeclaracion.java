@@ -56,7 +56,19 @@ import org.springframework.transaction.annotation.Transactional;
  *       determinacion, los del padron <b>al 1 de enero del ejercicio, antes de las transferencias
  *       de ese dia</b> ({@link Ejercicio#fechaDeLaTitularidad()}). De catastro —{@code
  *       PrediosDelContribuyente} a esa misma fecha— salen solo el codigo, la direccion y el tipo.
+ *   <li><b>El predio que la DJ declara</b> ({@link DeclaracionJurada#predioId()}) sale
+ *       <b>siempre</b>, aunque no sea de la base del ejercicio (#472). Si no lo es, va en una fila
+ *       aparte, marcada con su {@link Condicion} y sin cifras: no suma a los totales.
  * </ul>
+ *
+ * <h2>Por que el predio declarado sale aunque no sea del ejercicio (#472)</h2>
+ *
+ * <p>B compra P el 15 de marzo y presenta su DJ de P en abril. El padron del ejercicio es el del 1
+ * de enero, y ahi P todavia era de A: hasta #472 la hoja de la DJ de B <b>no traia el predio que la
+ * DJ declara</b>. Es correcto para lo que se cobra —el adquirente asume a partir del 1 de enero del
+ * año siguiente, TUO LTM art. 10—, y por eso la fila no lleva cifras ni suma; pero un papel que se
+ * firma bajo juramento declarando P tiene que decir P. El codigo y la direccion salen del padron al
+ * dia en que se <b>presento</b> la DJ, que es fijo: reimprimirla otro dia da la misma hoja.
  *
  * <h2>Por que el padron del ejercicio y no el del dia que se pide (#328)</h2>
  *
@@ -158,6 +170,10 @@ public class ConsultaDeLaHojaDeDeclaracion {
                 filas.add(FilaDePredio.sinCifras(predio));
             }
         }
+        Long declarado = declaracion.predioId();
+        if (declarado != null && filas.stream().noneMatch(fila -> fila.predioId() == declarado)) {
+            filas.add(filaDelDeclarado(declaracion, declarado, delEjercicio, faltan));
+        }
         faltan.addAll(loQueFalta(determinacion.isPresent(), ejercicio));
 
         return Optional.of(
@@ -170,6 +186,47 @@ public class ConsultaDeLaHojaDeDeclaracion {
                         determinacion.map(Determinacion::baseImponible).orElse(null),
                         determinacion.map(Determinacion::montoDeterminado).orElse(null),
                         List.copyOf(faltan)));
+    }
+
+    /**
+     * La fila del predio que la DJ declara cuando no esta entre las de la base del ejercicio
+     * (#472), con la {@link Condicion} que dice por que. Nunca lleva cifras: lo que se cobra en el
+     * ejercicio son las otras filas, y de ellas salen los totales.
+     */
+    private FilaDePredio filaDelDeclarado(
+            DeclaracionJurada declaracion,
+            long declarado,
+            Map<Long, PredioDelContribuyente> delEjercicio,
+            List<String> faltan) {
+        PredioDelContribuyente delPrimeroDeEnero = delEjercicio.get(declarado);
+        if (delPrimeroDeEnero != null) {
+            // Es suyo al 1 de enero y no esta en las filas: solo cabe con determinacion, y es
+            // que se determino sin el.
+            faltan.add(
+                    "El predio declarado "
+                            + declarado
+                            + " es del declarante en el ejercicio y la determinacion no lo"
+                            + " incluye: la hoja no tiene cifras que consignarle. Hay que volver a"
+                            + " determinar el ejercicio");
+            return FilaDePredio.declarada(
+                    delPrimeroDeEnero, Condicion.DECLARADO_FUERA_DE_LA_DETERMINACION);
+        }
+        LocalDate presentada = declaracion.fechaPresentacion();
+        for (PredioDelContribuyente predio :
+                predios.de(declaracion.contribuyenteId(), presentada)) {
+            if (predio.predioId() == declarado) {
+                return FilaDePredio.declarada(
+                        predio, Condicion.DECLARADO_AFECTA_AL_EJERCICIO_SIGUIENTE);
+            }
+        }
+        faltan.add(
+                "El predio declarado "
+                        + declarado
+                        + " no consta a nombre del declarante ni al 1 de enero del ejercicio ni al "
+                        + presentada
+                        + ", el dia en que presento la declaracion: la fila no tiene codigo,"
+                        + " direccion ni porcentaje que leer del padron");
+        return FilaDePredio.sinTitularidad(declarado);
     }
 
     /**
@@ -239,6 +296,26 @@ public class ConsultaDeLaHojaDeDeclaracion {
             List<String> faltan) {}
 
     /**
+     * Que es una fila respecto de lo que se cobra en el ejercicio (#472).
+     *
+     * <p>Solo las {@link #BASE_DEL_EJERCICIO} llevan cifras y suman a los totales. Las otras son el
+     * predio que la DJ declara cuando no esta en esa base, y dicen por que.
+     */
+    public enum Condicion {
+        /** De lo que se cobra: el detalle de la determinacion, o el padron al 1 de enero. */
+        BASE_DEL_EJERCICIO,
+        /**
+         * El declarante no era titular al 1 de enero y si el dia en que presento: lo adquirio en el
+         * año, y como adquirente asume a partir del 1 de enero siguiente (TUO LTM art. 10).
+         */
+        DECLARADO_AFECTA_AL_EJERCICIO_SIGUIENTE,
+        /** Es suyo al 1 de enero, pero la determinacion del ejercicio se hizo sin el. */
+        DECLARADO_FUERA_DE_LA_DETERMINACION,
+        /** El padron no lo pone a su nombre ni al 1 de enero ni el dia en que presento. */
+        DECLARADO_SIN_TITULARIDAD
+    }
+
+    /**
      * Un predio de la hoja.
      *
      * <p>El {@code porcentajePropiedad} sale de la determinacion cuando la hay —es el que se uso
@@ -247,17 +324,29 @@ public class ConsultaDeLaHojaDeDeclaracion {
      *
      * @param codigoReferenciaCatastral nulo, igual que {@code direccion} y {@code tipo}, solo en la
      *     fila de un predio cobrado que el padron al 1 de enero no pone a nombre del declarante: la
-     *     hoja lo dice en {@code faltan} (#328)
+     *     hoja lo dice en {@code faltan} (#328), y en la del predio declarado que el padron no pone
+     *     a su nombre (#472)
+     * @param porcentajePropiedad nulo solo en esa ultima: no hay cuota que leer
+     * @param condicion si la fila es de la base del ejercicio o el predio declarado fuera de ella
      */
     public record FilaDePredio(
             long predioId,
             @Nullable String codigoReferenciaCatastral,
             @Nullable String direccion,
             @Nullable String tipo,
-            Porcentaje porcentajePropiedad,
+            @Nullable Porcentaje porcentajePropiedad,
             @Nullable Dinero autovaluo,
             @Nullable Dinero valuoExonerado,
-            @Nullable Dinero valuoAfecto) {
+            @Nullable Dinero valuoAfecto,
+            Condicion condicion) {
+
+        public FilaDePredio {
+            Objects.requireNonNull(condicion, "Toda fila dice si es de la base del ejercicio");
+            if (condicion != Condicion.BASE_DEL_EJERCICIO && valuoAfecto != null) {
+                throw new IllegalArgumentException(
+                        "El predio declarado fuera de la base no lleva cifras: no suma (#472)");
+            }
+        }
 
         /** La fila de lo que se cobro: las cifras y el % del detalle; del padron, el nombre. */
         static FilaDePredio cobrada(
@@ -270,7 +359,8 @@ public class ConsultaDeLaHojaDeDeclaracion {
                     detalle.porcentajePropiedad(),
                     detalle.autovaluo(),
                     detalle.valuoExonerado(),
-                    detalle.baseImponiblePredio());
+                    detalle.baseImponiblePredio(),
+                    Condicion.BASE_DEL_EJERCICIO);
         }
 
         /** La fila de un predio del ejercicio sin determinacion: nada que consignar como cifra. */
@@ -283,7 +373,36 @@ public class ConsultaDeLaHojaDeDeclaracion {
                     predio.porcentajeTitularidad(),
                     null,
                     null,
-                    null);
+                    null,
+                    Condicion.BASE_DEL_EJERCICIO);
+        }
+
+        /** El predio declarado fuera de la base, con lo que el padron dice de el y sin cifras. */
+        static FilaDePredio declarada(PredioDelContribuyente predio, Condicion condicion) {
+            return new FilaDePredio(
+                    predio.predioId(),
+                    predio.codigoReferenciaCatastral(),
+                    predio.direccion(),
+                    predio.tipo(),
+                    predio.porcentajeTitularidad(),
+                    null,
+                    null,
+                    null,
+                    condicion);
+        }
+
+        /** El predio declarado que el padron no pone a su nombre: solo su identificador. */
+        static FilaDePredio sinTitularidad(long predioId) {
+            return new FilaDePredio(
+                    predioId,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    Condicion.DECLARADO_SIN_TITULARIDAD);
         }
     }
 }
