@@ -12,6 +12,8 @@ import {
   SIN_CRONOGRAMA,
   TODAVIA_SIN_DETERMINAR,
   TODAVIA_SIN_EMITIR,
+  TODOS_LOS_EJERCICIOS,
+  ejercicioDeLaRespuesta,
 } from './conectores.ts';
 import { CONSTANCIA_NEGADA, FICHA, SIN_CAMPANIA } from './conectores/consultasDeMuestra.ts';
 import {
@@ -736,6 +738,93 @@ describe('los conectores', () => {
   });
 });
 
+/**
+ * **Las ramas que la muestra de cada hoja no recorre**, para la guarda de los desplegables (#390).
+ *
+ * Una muestra por hoja es una rama por hoja: la de `fis-panel` trae un programa CON ejercicio, y la
+ * rama que escribia `NO_PUBLICADO` sobre su desplegable no corria nunca en la guarda. Aqui van las
+ * respuestas cuyo `ejercicio` es nulo o no es el de la muestra.
+ */
+const VARIANTES: Readonly<Partial<Record<ClaveDeHoja, readonly unknown[]>>> = {
+  panel: [{ ...CORRIDA, ejercicio: '2025' }, CORRIDA_ANTERIOR_AL_SELLO],
+  'coa-panel': [{ ...RESUMEN_DE_CARTERA, ejercicio: 2025 }],
+  'fis-panel': [{ ...EMBUDO, ejercicio: null }],
+};
+
+/** Los campos de una pantalla que el interprete dibuja con su palabra de hueco: solo los `r`. */
+function queDibujanSuHuecoDe(clave: ClaveDeHoja): ReadonlySet<string> {
+  return new Set(soloLecturaDe(clave));
+}
+
+describe('`ejercicioDeLaRespuesta` — la regla de los cinco paneles, en un solo sitio (#390)', () => {
+  it('un ano sale como llego, sea texto o numero: el contrato publica las dos formas', () => {
+    expect(ejercicioDeLaRespuesta('2025')).toBe('2025');
+    expect(ejercicioDeLaRespuesta(2025)).toBe('2025');
+    // Uno que no esta entre las opciones tambien: el control se queda en blanco, y no miente.
+    expect(ejercicioDeLaRespuesta(2027)).toBe('2027');
+  });
+
+  it('`null` es la respuesta que no se acota a un ano, y se dice con «Todos»', () => {
+    expect(ejercicioDeLaRespuesta(null)).toBe(TODOS_LOS_EJERCICIOS);
+    expect(TODOS_LOS_EJERCICIOS).toBe('Todos');
+  });
+
+  it('los cinco paneles escriben lo que la regla dice, y ninguno la primera opcion', () => {
+    // Cada uno con una respuesta de 2025, que no es la primera opcion de ninguno: con 2026 la
+    // prueba no distinguiria «lo leyo» de «lo dejo por omision».
+    const de2025: Readonly<Record<string, unknown>> = {
+      panel: { ...CORRIDA, ejercicio: '2025' },
+      'coa-panel': { ...RESUMEN_DE_CARTERA, ejercicio: 2025 },
+      'fis-panel': { ...EMBUDO, ejercicio: 2025 },
+      'ini-panel': [{ ...RECAUDACION_MEDIDA, ejercicio: 2025 }, CORRIDA],
+      'tra-panel': { ...RESUMEN_DE_PAPELETAS, desde: '2025-01-01', hasta: '2025-12-31' },
+    };
+    for (const [clave, respuesta] of Object.entries(de2025)) {
+      const conector = CONECTORES[clave as ClaveDeHoja];
+      expect(conector?.repartir(respuesta as never).valores.get(coordenada(0, 0)), clave).toBe(
+        '2025',
+      );
+    }
+  });
+});
+
+describe('ninguna palabra de hueco cae donde nadie la ve (#390)', () => {
+  /**
+   * El interprete de `@kamayuk/ui` dibuja la palabra del hueco SOLO en un campo de solo lectura
+   * (`CampoDelBloque`, `case 'r'`). En un desplegable, un `noPublicados` se pierde sin decir nada y
+   * el control ensena su primera opcion: `fis-panel` registraba `NO_PUBLICADO` en su «Ejercicio» y
+   * la pantalla decia «2026». Mientras la libreria no sepa dibujar la ausencia en un desplegable
+   * —trabajo de `kamayuk-lib`—, una palabra ahi es una afirmacion que nadie lee, y se prohibe.
+   */
+  it('todo `noPublicados` cae en un campo de solo lectura, en la muestra y en sus variantes', () => {
+    const mudos: string[] = [];
+    for (const [clave, conector] of Object.entries(CONECTORES)) {
+      if (conector === undefined) continue;
+      const hoja = clave as ClaveDeHoja;
+      const dibujan = queDibujanSuHuecoDe(hoja);
+      const respuestas = [MUESTRAS[hoja], ...(VARIANTES[hoja] ?? [])];
+      for (const respuesta of respuestas) {
+        const reparto = conector.repartir(respuesta as never);
+        for (const coord of reparto.noPublicados.keys()) {
+          if (!dibujan.has(coord)) mudos.push(`  ${clave} · ${coord}`);
+        }
+      }
+    }
+    expect(
+      mudos,
+      'Hay palabras de hueco sobre campos que no son de solo lectura. El interprete no las dibuja,\n' +
+        `y un desplegable ensena su primera opcion en su lugar:\n${mudos.join('\n')}`,
+    ).toEqual([]);
+  });
+
+  it('y la guarda muerde: la rama nula de `fis-panel` tiene variante, y es un desplegable', () => {
+    // Sin esta variante la guarda no veria la rama que la motivo.
+    expect(VARIANTES['fis-panel']).toHaveLength(1);
+    expect(PANTALLAS['fis-panel'].bloques[0]?.campos[0]?.tipo).toBe('s');
+    expect(queDibujanSuHuecoDe('fis-panel').has(coordenada(0, 0))).toBe(false);
+  });
+});
+
 afterEach(() => {
   vi.unstubAllGlobals();
 });
@@ -1091,6 +1180,21 @@ describe('`panel` — la ultima corrida', () => {
    * #239— y sobre todo no es `S/ 0.00`: el derecho de aquella corrida se cobro y esta sumado
    * dentro de `montoEmitido`.
    */
+  /**
+   * **El «Ejercicio» es el de la corrida** (#390). La muestra de arriba es de 2026, que es justo la
+   * primera opcion del desplegable, y por eso no podia distinguir «lo leyo» de «lo dejo por
+   * omision». La de aqui es de 2025.
+   */
+  it('el desplegable «Ejercicio» lleva el ejercicio de la CORRIDA, no la primera opcion (#390)', () => {
+    const de2025 = conector.repartir({ ...CORRIDA, ejercicio: '2025' } as never);
+
+    expect(de2025.valores.get(coordenada(0, 0))).toBe('2025');
+    // Y uno que no esta entre las opciones se escribe igual: el control se queda en blanco en vez
+    // de ensenar «2026» sobre la emision de 2027.
+    const de2027 = conector.repartir({ ...CORRIDA, ejercicio: '2027' } as never);
+    expect(de2027.valores.get(coordenada(0, 0))).toBe('2027');
+  });
+
   it('una corrida ANTERIOR al sello dice «no consta», ni «no publicado» ni cero', () => {
     const anterior = conector.repartir(CORRIDA_ANTERIOR_AL_SELLO as never);
 

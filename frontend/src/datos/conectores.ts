@@ -504,6 +504,46 @@ const TODAVIA_SIN_EMITIR: Ausencia = {
 };
 
 /**
+ * La opcion de «Ejercicio» que dice «no acotado a un ano»: la que `val-tip` ya tenia y `coa-panel`
+ * recibe con #390. Es la cadena de la definicion y del artboard, letra a letra: el desplegable la
+ * encuentra por su VALOR, y con otra grafia se quedaria en blanco.
+ */
+const TODOS_LOS_EJERCICIOS = 'Todos';
+
+/**
+ * **El ejercicio que un panel afirma es el de su respuesta, nunca el de la opcion por omision**
+ * (#390).
+ *
+ * <h2>La regla, y por que tiene un solo sitio</h2>
+ *
+ * Un desplegable sin valor ensena su primera opcion (`CampoDelBloque`, `case 's'`), y en los
+ * paneles esa opcion es un ano. Si el conector no escribe el ejercicio, las cifras de debajo salen
+ * bajo un ano que nadie dijo: `coa-panel` ensenaba la cartera ENTERA bajo «2026», y `panel` pide la
+ * ultima emision sin ejercicio —el backend la resuelve con el ano del reloj— y en enero de 2027
+ * habria dibujado la emision de 2027 bajo «2026». `ini-panel` ya lo hacia bien y lo decia: dejar la
+ * opcion «que toco por omision seria afirmarlo sin saberlo».
+ *
+ * Los cinco paneles escribian el ejercicio cada uno a su manera —`String()`, `slice(0, 4)`, una
+ * condicion o nada—. Ahora pasan todos por aqui:
+ *
+ * <ul>
+ *   <li><b>Un ano</b> —`'2025'` o `2025`, que el contrato publica de las dos formas— sale como
+ *       texto. Si no esta entre las opciones (2027 frente a `2026 · 2025 · 2024`), Radix deja el
+ *       control en blanco: no explica nada, pero no miente. Anadir el ano a las opciones es trabajo
+ *       de la definicion y del artboard.</li>
+ *   <li><b>`null`</b> es una respuesta que no se acota a un ejercicio —«Sin `ejercicio`, la cartera
+ *       entera»—, y se dice con «Todos». Donde la definicion no tiene esa opcion el control se queda
+ *       en blanco, por lo mismo que con un ano ausente: nunca la primera opcion.</li>
+ * </ul>
+ *
+ * Lo que NO hace es poner una palabra de hueco en el desplegable: el interprete no la dibuja ahi y
+ * se perderia sin decir nada. Lo vigila la guarda de `conectores.test.ts`.
+ */
+function ejercicioDeLaRespuesta(ejercicio: string | number | null): string {
+  return ejercicio === null ? TODOS_LOS_EJERCICIOS : String(ejercicio);
+}
+
+/**
  * `panel` — el estado de la ultima corrida del padron.
  *
  * De `CorridaDelPredial` salen la fecha, los observados y **las cinco columnas de la tabla, que
@@ -572,6 +612,9 @@ const PANEL: Conector = {
     const noEsLaEmision = porQueNoEsLaEmisionDelEjercicio(corrida);
     return {
     valores: new Map([
+      // El ejercicio de la CORRIDA, no la primera opcion del desplegable (#390): se pide sin
+      // ejercicio y el backend lo resuelve con el ano del reloj, asi que solo la respuesta lo sabe.
+      [coordenada(0, 0), ejercicioDeLaRespuesta(corrida.ejercicio)],
       [coordenada(0, 1), corrida.fechaCalculo],
       // Los dos conteos con `formatearEntero` y no con `String`: el artboard escribe «61,350» con
       // millares, y una emision anual los tiene. Con `String` los observados salian sin agrupar
@@ -900,4 +943,6 @@ export {
   SIN_CRONOGRAMA,
   TODAVIA_SIN_DETERMINAR,
   TODAVIA_SIN_EMITIR,
+  TODOS_LOS_EJERCICIOS,
+  ejercicioDeLaRespuesta,
 };

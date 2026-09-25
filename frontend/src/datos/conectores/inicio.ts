@@ -2,7 +2,7 @@ import { coordenada, type Coordenada, type DatoConNombre } from '@kamayuk/ui';
 
 import { formatearImporte } from '../../dominio/formato.ts';
 import { nombreDelAvance, nombreDelTributo } from '../../piezas/serieDeAvance.ts';
-import type { Conector, Reparto } from '../conectores.ts';
+import { ejercicioDeLaRespuesta, type Conector, type Reparto } from '../conectores.ts';
 import { NO_PUBLICADO, SIN_EMISION_DEL_EJERCICIO, type PalabraDeHueco } from '../palabrasDeHueco.ts';
 import { porQueNoEsLaEmisionDelEjercicio } from './laEmision.ts';
 import type {
@@ -154,7 +154,8 @@ function cuadreDelTributo(fila: FilaDeAvance): readonly string[] {
  * El desplegable de ejercicio se rellena con el `ejercicio` de la respuesta y no se deja en su
  * primera opcion: es el ejercicio del que son las cifras que estan debajo, y afirmarlo con la
  * opcion que toco por omision seria afirmarlo sin saberlo. Lo tecleado gana sobre esto, como en
- * cualquier campo.
+ * cualquier campo. Desde #390 la regla vive en `ejercicioDeLaRespuesta`, y la siguen los cinco
+ * paneles.
  *
  * <h2>Y la corrida puede no existir todavia, que no es lo mismo que fallar (#354)</h2>
  *
@@ -196,7 +197,7 @@ const INI_PANEL: Conector = {
       else valores.set(coord, valor);
     };
 
-    poner(coordenada(0, 0), String(recaudacion.ejercicio));
+    poner(coordenada(0, 0), ejercicioDeLaRespuesta(recaudacion.ejercicio));
     poner(coordenada(0, 1), formatearImporte(recaudacion.cargado.importe));
     // «Recaudado <ejercicio>» y no «Recaudado hoy en caja», que tambien empieza por «Recaudado»:
     // el ejercicio de la propia respuesta es lo que los distingue sin lugar a duda.
@@ -250,7 +251,7 @@ const INI_FLUJO: Conector = {
   repartir: (recaudacion: IndicadorDeRecaudacion): Reparto => {
     const porTributo = panelPorTributo(recaudacion);
     return {
-      valores: new Map([[coordenada(0, 0), String(recaudacion.ejercicio)]]),
+      valores: new Map([[coordenada(0, 0), ejercicioDeLaRespuesta(recaudacion.ejercicio)]]),
       // Sin el bloque por tributo no hay filas que poner, y la tabla dice su ausencia. Una tabla
       // vacia afirmaria que no hay ni un tributo con movimiento.
       filas:

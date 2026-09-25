@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { coordenada } from '@kamayuk/ui';
 
 import type { Reparto } from '../conectores.ts';
-import { NO_PUBLICADO } from '../conectores.ts';
+import { NO_PUBLICADO, TODOS_LOS_EJERCICIOS } from '../conectores.ts';
 import type {
   LiquidacionDeCostas,
   Paginado,
@@ -17,7 +17,7 @@ import type {
 import { useDatosDeLaHoja } from '../useDatosDeLaHoja.ts';
 import type { ClaveDeHoja } from '../../pantallas/arbol.ts';
 import { bloquesDe } from '../../pantallas/bloques.ts';
-import { pantallaDe } from '../../pantallas/definiciones/index.ts';
+import { PANTALLAS, pantallaDe } from '../../pantallas/definiciones/index.ts';
 import { PantallaDeRentas } from '../../pantallas/PantallaDeRentas.tsx';
 import {
   COA_COST,
@@ -487,7 +487,53 @@ describe('`coa-panel` — cuatro de sus cinco, y el rotulo que #272 corrigio', (
     // numero indistinguible de uno real, que es justo lo que `conectores.ts` prohibe.
     expect(reparto.noPublicados.get(coordenada(0, 5))).toBe(NO_PUBLICADO);
     expect(reparto.noPublicados.size).toBe(1);
-    expect(reparto.valores.size).toBe(4);
+    // Cinco y no cuatro desde #390: las cuatro cifras y el ejercicio que la respuesta dice.
+    expect(reparto.valores.size).toBe(5);
+  });
+});
+
+/**
+ * **«Ejercicio» dice de que ejercicio es la cartera, y la cartera es de TODOS** (#390).
+ *
+ * La operacion se pide sin `ejercicio` y el backend contesta la cartera entera —«Sin `ejercicio`,
+ * la cartera entera», `DeudaCoactivaController`— con `ejercicio: null`. Hasta #390 el conector no
+ * escribia `0|0`, el desplegable ensenaba su primera opcion y «37 abiertos» salia bajo «2026», que
+ * se lee como la carga de un ano y es el stock entero.
+ *
+ * La muestra de siempre ya traia `ejercicio: null`, y aun asi no se veia: ninguna prueba miraba
+ * `0|0`. Aqui se miran las dos ramas —nulo y un ano—, y el ano es **2025**, que no es la primera
+ * opcion: con 2026 no se distinguiria haberlo leido de haberlo dejado por omision.
+ */
+describe('`coa-panel` — el ejercicio que se afirma es el de la respuesta (#390)', () => {
+  it('con `ejercicio: null` dice «Todos», y no la primera opcion', () => {
+    const reparto = COA_PANEL.repartir(RESUMEN as never);
+
+    expect(reparto.valores.get(coordenada(0, 0))).toBe('Todos');
+    expect(reparto.valores.get(coordenada(0, 0))).toBe(TODOS_LOS_EJERCICIOS);
+  });
+
+  it('con un ano, ese ano', () => {
+    const reparto = COA_PANEL.repartir({ ...RESUMEN, ejercicio: 2025 } as never);
+
+    expect(reparto.valores.get(coordenada(0, 0))).toBe('2025');
+  });
+
+  it('y «Todos» es una opcion de la definicion, la PRIMERA: el control puede decirlo', () => {
+    // Con el valor fuera de las opciones Radix deja el control en blanco, que no miente pero
+    // tampoco dice nada. «Todos» existe porque la respuesta sin ejercicio es una afirmacion: toda
+    // la cartera. Es la misma opcion que `val-tip` tiene para no mandar el parametro.
+    const ejercicio = PANTALLAS['coa-panel'].bloques[0]?.campos[0];
+
+    expect(ejercicio?.etiqueta).toBe('Ejercicio');
+    expect(ejercicio !== undefined && 'opciones' in ejercicio ? ejercicio.opciones?.[0] : undefined).toBe(
+      TODOS_LOS_EJERCICIOS,
+    );
+  });
+
+  it('la hoja dice DE CUANDO es la cartera: `aLaFecha` viaja en el reparto (regla 9)', () => {
+    // `aLaFecha` es el dia de la lectura: el estado sale del ultimo movimiento y el backend no
+    // sabe reconstruirlo a un dia pasado. Llegaba y no se usaba.
+    expect(COA_PANEL.repartir(RESUMEN as never).aLaFecha).toBe('2026-09-20');
   });
 });
 
@@ -840,5 +886,30 @@ describe('`coa-panel` dibujada: ensena lo que llego, y no las cifras del artboar
 
     expect(pedidas.some((url) => url.includes('/coactiva/cartera/resumen'))).toBe(true);
     expect(pedidas.some((url) => url.includes('/coactiva/deudas'))).toBe(false);
+  });
+
+  it('«Ejercicio» dice «Todos» con la cartera entera, y el ano con un ano (#390)', async () => {
+    const unmount = await dibujar('coa-panel', COMO_LLEGA);
+    await waitFor(() => {
+      expect(screen.getByText('37')).toBeInTheDocument();
+    });
+    expect(screen.getByRole('combobox', { name: 'Ejercicio' })).toHaveTextContent('Todos');
+    expect(screen.getByRole('combobox', { name: 'Ejercicio' })).not.toHaveTextContent('2026');
+    unmount();
+
+    await dibujar('coa-panel', { ...COMO_LLEGA, resumen: { ...RESUMEN, ejercicio: 2025 } });
+    await waitFor(() => {
+      expect(screen.getByText('37')).toBeInTheDocument();
+    });
+    expect(screen.getByRole('combobox', { name: 'Ejercicio' })).toHaveTextContent('2025');
+  });
+
+  it('y dice de que dia es: la fecha de la lectura se escribe arriba (#390, regla 9)', async () => {
+    await dibujar('coa-panel', COMO_LLEGA);
+    await waitFor(() => {
+      expect(screen.getByText('37')).toBeInTheDocument();
+    });
+
+    expect(document.body.textContent).toContain('20/09/2026');
   });
 });
