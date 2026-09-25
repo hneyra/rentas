@@ -6,6 +6,7 @@ import {
   MODULOS_MEDIDOS,
   PERMISOS_MEDIDOS,
 } from '../src/datos/seguridadMedida.ts';
+import { MUNICIPALIDAD_MEDIDA, SESION_MEDIDA } from '../src/datos/sesionMedida.ts';
 
 /**
  * **Lo que el navegador contesta en vez del backend.**
@@ -24,7 +25,8 @@ import {
  * <h2>Lo que se contesta son RESPUESTAS MEDIDAS</h2>
  *
  * `seguridadMedida.ts` son respuestas de `curl` a la instalacion de verdad: doce modulos, 134
- * accesos y la matriz entera. Inventarlas aqui haria que el arnes midiera contra una fantasia — y
+ * accesos y la matriz entera; y `sesionMedida.ts`, la cuenta y la municipalidad de esa misma
+ * instalacion, que desde #356 son lo que dice la barra. Inventarlas aqui haria que el arnes midiera contra una fantasia — y
  * la primera vez que el backend cambiara de forma, seguiria en verde.
  *
  * <h2>Y lo que NO se contesta devuelve 404 a proposito</h2>
@@ -87,6 +89,13 @@ export async function conLaSeguridadContestada(pagina: Page): Promise<void> {
     if (url.includes('/seguridad/modulos')) return json(JSON.stringify(paginaDe(MODULOS_MEDIDOS)));
     if (url.includes('/seguridad/accesos')) return json(JSON.stringify(paginaDe(ACCESOS_MEDIDOS)));
     if (url.includes('/seguridad/sesion/permisos')) return json(JSON.stringify(PERMISOS_MEDIDOS));
+    // Las dos de la barra (#356): quien ha entrado y de que municipalidad, de la misma captura. Por
+    // el FINAL de la ruta: `/seguridad/sesion` es prefijo de las otras dos.
+    const camino = new URL(url).pathname;
+    if (camino.endsWith('/seguridad/sesion/municipalidad')) {
+      return json(JSON.stringify(MUNICIPALIDAD_MEDIDA));
+    }
+    if (camino.endsWith('/seguridad/sesion')) return json(JSON.stringify(SESION_MEDIDA));
     // Ver el javadoc: lo demas no se inventa.
     return ruta.fulfill({ status: 404, contentType: 'application/json', body: '{}' });
   });

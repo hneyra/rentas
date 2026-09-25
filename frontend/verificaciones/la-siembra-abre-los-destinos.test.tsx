@@ -4,6 +4,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 import { sembrarElCatalogo } from '../desarrollo/sembrarElCatalogo.ts';
 import { Aplicacion, CONSULTAS } from '../src/aplicacion.tsx';
 import { CATALOGO } from '../src/catalogo.ts';
+import { MUNICIPALIDAD_MEDIDA, SESION_MEDIDA } from '../src/datos/sesionMedida.ts';
 import type { ClaveDeHoja } from '../src/pantallas/arbol.ts';
 import { bloquesDe } from '../src/pantallas/bloques.ts';
 import { pantallaDe } from '../src/pantallas/definiciones/index.ts';
@@ -141,7 +142,7 @@ describe('con el catalogo sembrado, la interfaz se recorre sin backend', () => {
     }
   });
 
-  it('NO se pide ni una de las tres de seguridad: sembrado es sembrado', async () => {
+  it('NO se pide ni una de las de seguridad —las tres del catalogo y las dos de la barra—: sembrado es sembrado', async () => {
     sembrarElCatalogo();
     await abrir('ini-panel');
 
@@ -151,6 +152,19 @@ describe('con el catalogo sembrado, la interfaz se recorre sin backend', () => {
       'La siembra dejo el dato rancio: las consultas salieron a refrescarlo, y sin backend eso\n' +
         'las pone en error aunque conserven el dato — o sea el mensaje que #114 vino a quitar.',
     ).toEqual([]);
+  });
+
+  it('y la barra dice la cuenta y la municipalidad de la captura, sin salir a pedirlas (#356)', async () => {
+    // Las dos de la sesion se siembran desde #356: la barra las lee siempre, y sin sembrar saldria
+    // a la red a preguntar quien esta dentro. Que no salga lo mide la prueba de arriba; esta mide
+    // que lo que dice sea la captura —la misma cuenta cuya matriz de permisos se sembro— y no el
+    // «no se pudo saber» de una lectura que fallo.
+    sembrarElCatalogo();
+    await abrir('ini-panel');
+
+    const barra = document.querySelector<HTMLElement>('[data-slot="barra-global"]');
+    expect(barra?.textContent).toContain(SESION_MEDIDA.nombre);
+    expect(barra?.textContent).toContain(MUNICIPALIDAD_MEDIDA.nombre);
   });
 
   it('pero las pantallas que SI piden datos siguen pidiendo, y fallando de verdad', async () => {

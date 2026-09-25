@@ -5,12 +5,18 @@ import type { MunicipalidadDeLaSesion, SesionDeLaVentanilla } from '../datos/lec
  *
  * <h2>Para que existe</h2>
  *
- * Desde I-1 el marco no se puede montar sin decir quien esta dentro: `MarcoProps` exige `sesion`
- * y `municipalidad` sin respaldo, que es lo que impide que vuelva a colarse un «J. Cárdenas
- * Vega» por omision. Eso deja a las pruebas del marco —que son del MARCO y no de la identidad—
- * teniendo que decirlo cuarenta y cuatro veces. Con cuarenta y cuatro literales sueltos, el dia
- * que `GET /seguridad/sesion` cambie de forma habria cuarenta y cuatro sitios que corregir y
+ * Desde I-1 la barra dice quien esta dentro leyendolo de la sesion, y las pruebas que la montan
+ * tienen que contestar esas dos lecturas. Con un literal suelto en cada una, el dia que
+ * `GET /seguridad/sesion` cambie de forma habria tantos sitios que corregir como pruebas, y
  * ninguno que lo dijera.
+ *
+ * **Lo que impide que vuelva un «J. Cárdenas Vega» ya no es `MarcoProps`** (#356). Esa premisa
+ * estuvo escrita aqui cuando ya era falsa: `MarcoProps` era de la V6, y #90 monto la barra con
+ * `Armazon` y dos literales del artboard sin que nada lo parase. Hoy lo impiden dos guardas:
+ * `verificaciones/la-cabecera-no-se-escribe-a-mano.test.ts`, que parsea `aplicacion.tsx` y
+ * rechaza un literal en la entidad o en la cuenta, y
+ * `verificaciones/la-cabecera-es-la-de-la-sesion.test.tsx`, que monta la aplicacion con una
+ * municipalidad que NO es esta —con esta, Catacaos, la constante saldria verde—.
  *
  * <h2>Por que es una captura y no una invencion</h2>
  *
@@ -32,9 +38,10 @@ import type { MunicipalidadDeLaSesion, SesionDeLaVentanilla } from '../datos/lec
  * <h2>No lo importa ningun modulo de produccion, y se comprueba</h2>
  *
  * `verificaciones/camino-a-la-api.test.ts` recorre `src/` y exige que solo lo importen archivos
- * de prueba. Sin esa guarda, esto acabaria siendo el respaldo que `MarcoProps` existe para
- * prohibir: un `sesion ?? SESION_MEDIDA` en cualquier sitio devolveria la cabecera constante que
- * I-1 vino a quitar, y esta vez con una constante que ademas parece medida.
+ * de prueba. Sin esa guarda, esto acabaria siendo un respaldo: un `sesion ?? SESION_MEDIDA` en
+ * cualquier sitio devolveria la cabecera constante que I-1 vino a quitar —y #356 otra vez—, y esta
+ * vez con una constante que ademas parece medida. Fuera de `src/` lo importa tambien la siembra de
+ * desarrollo de #114 —desde #356, para la barra de `yarn dev`—, que no viaja al paquete.
  */
 export const SESION_MEDIDA: SesionDeLaVentanilla = {
   usuarioId: 2,

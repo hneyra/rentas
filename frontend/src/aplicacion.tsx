@@ -2,10 +2,10 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Armazon, useHoja, type AccionesDelSistema } from '@kamayuk/shell';
-import { Alerta, Boton, ProveedorDeTema, type ConfiguracionDeTema } from '@kamayuk/ui';
+import { Alerta, Boton, Icono, ProveedorDeTema, type ConfiguracionDeTema } from '@kamayuk/ui';
 
-import escudo from '../diseno/escudo-catacaos.png';
 import { MandoDeTema } from './preferencias/MandoDeTema.tsx';
+import { useCabeceraDeLaSesion } from './datos/useCabeceraDeLaSesion.ts';
 import { useCatalogoPermitido, type CatalogoDeLaSesion } from './datos/useCatalogoPermitido.ts';
 import { traducirCatalogo } from './catalogo.ts';
 import { PantallaDeRentas } from './pantallas/PantallaDeRentas.tsx';
@@ -66,9 +66,24 @@ import { useTextosDelMarco } from './i18n/textosDelMarco.ts';
  * su propia pagina de cuenta. Dibujar aqui esos dos formularios seria prometer una escritura que
  * ningun backend de este repositorio puede atender — y por eso el issue lo deja fuera por escrito.
  * A donde llevan, y con que se midio, esta en `api/identidad.ts`.
+ *
+ * <h2>La entidad y la cuenta de la barra son de la SESION, no del artboard (#356)</h2>
+ *
+ * Aqui estuvieron escritas a mano —`const ENTIDAD = 'Municipalidad Distrital de Catacaos'` y
+ * `{ nombre: 'J. Cardenas Vega', iniciales: 'JC' }`— desde #90, que retiro sin declararlo las dos
+ * lecturas con que I-1 las habia quitado. Cualquier cuenta de cualquier municipalidad veia a
+ * Catacaos y a una persona que no existe encima de las cifras de su propio padron. Hoy se
+ * **inyectan**: las da `datos/useCabeceraDeLaSesion.ts` desde `GET /seguridad/sesion` y
+ * `GET /seguridad/sesion/municipalidad`, y mientras no contestan dice que no lo sabe, sin poner
+ * ningun nombre. Que no vuelva un literal lo vigila
+ * `verificaciones/la-cabecera-no-se-escribe-a-mano.test.ts`.
+ *
+ * **El escudo es el neutro de la libreria**, y es lo unico que queda sin leer de la sesion: ninguna
+ * operacion publica el escudo de una municipalidad —`MunicipalidadDeLaSesion` trae `id`, `ubigeo`,
+ * `nombre` y `tipo`— y publicarlo pediria ensanchar el contrato, que #356 deja fuera. Entre ensenar
+ * el de Catacaos a todas y ensenar uno que no es de ninguna, el segundo no afirma nada falso. El
+ * archivo `diseno/escudo-catacaos.png` se queda donde esta: es del artboard, no de la interfaz.
  */
-
-const ENTIDAD = 'Municipalidad Distrital de Catacaos';
 
 /**
  * **El tema de este servicio** (#111).
@@ -225,6 +240,9 @@ function ArmazonDelSistema({ vuelta }: { readonly vuelta: VueltaFallida | null }
   // traducido y el marco en castellano. Ver `i18n/textosDelMarco.ts`.
   const textos = useTextosDelMarco();
   const sesion = useCatalogoPermitido();
+  // Quien ha entrado y de que municipalidad (#356). Se pide aqui, junto al catalogo y no despues:
+  // son lecturas independientes, y encadenarlas retrasaria la barra una ida mas.
+  const cabecera = useCabeceraDeLaSesion();
   const catalogo = traducirCatalogo(sesion.catalogo, t);
   // El cajon de preferencias: lo abre la opcion del menu de sesion y nada mas. Vive aqui —y no
   // dentro del `<Armazon>`— porque el armazon no sabe que existe un tema: lo suyo es ofrecer la
@@ -289,10 +307,10 @@ function ArmazonDelSistema({ vuelta }: { readonly vuelta: VueltaFallida | null }
       <Armazon
         textos={textos}
         titulo={t('Rentas')}
-        entidad={t(ENTIDAD)}
-        escudo={<img src={escudo} alt="" width={28} height={28} />}
+        entidad={cabecera.entidad}
+        escudo={<Icono nombre="escudo" tamano={28} />}
         catalogo={catalogo}
-        cuenta={{ nombre: 'J. Cardenas Vega', iniciales: 'JC', nota: t(ENTIDAD) }}
+        cuenta={cabecera.cuenta}
         opcionesDeSesion={[
           {
             rotulo: t('Mi perfil'),

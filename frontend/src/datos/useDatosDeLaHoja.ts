@@ -277,14 +277,14 @@ export function useDatosDeLaHoja(
   /*
    * **El ejercicio de trabajo, y solo para quien lo exige** (#181).
    *
-   * `enabled` acotado a `exigeEjercicio` es lo que hace que las otras 39 hojas sigan sin pedir la
-   * sesion: sin eso, abrir cualquier destino sumaria una ida a `/seguridad/sesion` — y la siembra
-   * de #114, que afirma **cero peticiones a `/seguridad/`** con el catalogo sembrado, saldria roja
-   * por una lectura que esa pantalla no necesita.
+   * `enabled` acotado a `exigeEjercicio` es lo que hace que ESTE gancho no pida la sesion para las
+   * otras 39 hojas: no la necesitan. Desde #356 la aplicacion montada la pide de todos modos —la
+   * barra dice quien ha entrado, `useCabeceraDeLaSesion`—, y por eso la siembra de #114 la siembra:
+   * sin eso, su **cero peticiones a `/seguridad/`** saldria rojo.
    *
    * Va por `useQuery` y no por una lectura suelta porque asi **se comparte**: la llave es de la
-   * rama `seguridad`, o sea que dos hojas que exijan ejercicio piden la sesion una sola vez, y el
-   * dia que la barra global lea quien esta trabajando lee de la misma.
+   * rama `seguridad`, o sea que la barra y cualquier hoja que exija ejercicio leen **la misma
+   * respuesta**, pedida una sola vez.
    */
   const pideLaSesion = conector?.exigeEjercicio === true;
   const sesion = useQuery({
@@ -336,8 +336,14 @@ export function useDatosDeLaHoja(
    * Al reves, mientras la sesion viaja `ejercicio` es `null` y la pantalla diria «falta el
    * ejercicio» un instante antes de pintarse — o para siempre, si la sesion falla: un 401 se
    * leeria como «fije usted el ejercicio», que manda a arreglar lo que no esta roto.
+   *
+   * **Y el fallo de la sesion solo cuenta para quien la pide** (#356). `enabled` no basta: la
+   * consulta es de la llave `LLAVES.sesion`, y desde #356 la pide tambien la barra en todas las
+   * pantallas, asi que su error llega a este observador aunque ESTE no la haya pedido. Sin acotarlo,
+   * una sesion que no contesta tumbaba las 39 hojas que no la necesitan — medido: `con-panel`, con
+   * su ficha contestada, decia «No se encontro lo solicitado (404)» por el 404 de la sesion.
    */
-  if (sesion.isError) return { ausencia: alFallar(sesion.error, t) };
+  if (pideLaSesion && sesion.isError) return { ausencia: alFallar(sesion.error, t) };
   if (pideLaSesion && sesion.isPending) return { ausencia: CARGANDO };
   if (faltaElEjercicio) return { ausencia: SIN_EJERCICIO };
 

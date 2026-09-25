@@ -28,7 +28,7 @@ import { catalogoDeClaves } from '../src/i18n/catalogo-de-claves.ts';
  *
  * <h2>Y por que el locale se REGENERA en vez de escribirse</h2>
  *
- * Porque son `MEDIDO: 957 entradas de es.json`, y salen del dato: a mano se quedan viejas a la
+ * Porque son `MEDIDO: 960 entradas de es.json`, y salen del dato: a mano se quedan viejas a la
  * primera pantalla nueva. `KAMAYUK_REGENERAR=1 yarn vitest run verificaciones/el-locale-esta-completo` lo
  * vuelve a escribir, que es el mismo trato que `kamayuk-lib` da a su archivo de temas.
  */
@@ -56,7 +56,14 @@ const LITERALES = [
   '{{count}} tributo no dibuja barra porque su avance no esta medido; su fila esta en la tabla._many',
   '{{count}} tributo no dibuja barra porque su avance no esta medido; su fila esta en la tabla._other',
   'Rentas',
-  'Municipalidad Distrital de Catacaos',
+  // «Municipalidad Distrital de Catacaos» salio de aqui en #356: era la entidad de la barra escrita
+  // a mano, y hoy la entidad es un DATO de `GET /seguridad/sesion/municipalidad`, que no se
+  // traduce. Lo que si se traduce son las cuatro frases con que la barra dice que todavia no lo sabe,
+  // o que no lo pudo saber (`datos/useCabeceraDeLaSesion.ts`).
+  'Averiguando la municipalidad de esta sesion',
+  'No se pudo saber de que municipalidad es esta sesion',
+  'Averiguando quien ha entrado',
+  'No se pudo saber quien ha entrado',
   'Mi perfil',
   'Cambiar la contrasena',
   'Preferencias',

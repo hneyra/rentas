@@ -58,19 +58,29 @@ export const LLAVES = {
   accesos: [RAMA, 'accesos'],
   permisos: [RAMA, 'permisos'],
   /**
-   * **Quien esta trabajando, y con que ejercicio** (#181).
+   * **Quien esta trabajando, y con que ejercicio** (#181, #356).
    *
-   * No la pide este gancho: la pide `useDatosDeLaHoja`, y **solo** cuando la hoja abierta declara
-   * `exigeEjercicio`. Vive aqui con las otras tres porque es de la misma rama —`seguridad`— y
-   * porque las llaves de esa rama se escriben en un sitio: la siembra de desarrollo (#114) fija
+   * No la pide este gancho. La piden dos: `useCabeceraDeLaSesion`, **siempre**, para que la barra
+   * diga quien ha entrado (#356); y `useDatosDeLaHoja`, solo cuando la hoja abierta declara
+   * `exigeEjercicio`. Con la misma llave las dos leen **la misma respuesta**, y la sesion se pide
+   * una vez. Vive aqui con las otras tres porque es de la misma rama —`seguridad`— y porque las
+   * llaves de esa rama se escriben en un sitio: la siembra de desarrollo (#114) fija
    * `staleTime: Infinity` sobre `LLAVES.rama` entera, y una llave suelta en otro archivo quedaria
    * fuera de ese trato sin que nada lo dijera.
    *
-   * **La siembra NO la siembra**, y es correcto: sembrarla pondria un ejercicio de trabajo
-   * inventado en un puesto sin plataforma, que es justo lo que #181 prohibe. Sin sembrar, `seg-aud`
-   * sale a la red, no encuentra a nadie y ensena su estado de error — como `panel` y `coa-panel`.
+   * **La siembra la siembra desde #356, y con la captura**: `SESION_MEDIDA` trae
+   * `ejercicioDeTrabajo: null`, o sea que **no pone ningun ejercicio**, que es lo que #181 prohibe
+   * inventar. Hasta #356 no se sembraba y `seg-aud` salia a la red y ensenaba su error; hoy dice que
+   * la sesion no tiene ejercicio, que es lo que contesta la instalacion con esa cuenta. Sin
+   * sembrarla, la barra de `yarn dev` saldria a pedir quien esta dentro y la siembra dejaria de ser
+   * «cero peticiones a `/seguridad/`».
    */
   sesion: [RAMA, 'sesion'],
+  /**
+   * **De que municipalidad es la sesion** (#356). La lee `useCabeceraDeLaSesion` para la entidad
+   * de la barra, y la siembra de desarrollo la cubre con `MUNICIPALIDAD_MEDIDA`.
+   */
+  municipalidad: [RAMA, 'municipalidad'],
 } as const;
 
 /**
