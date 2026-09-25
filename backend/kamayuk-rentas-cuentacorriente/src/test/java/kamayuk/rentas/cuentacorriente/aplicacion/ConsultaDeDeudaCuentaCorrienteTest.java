@@ -167,7 +167,7 @@ class ConsultaDeDeudaCuentaCorrienteTest {
         cargar(otro, "ARBITRIO", Fase.CONVENIO, Dinero.de("120.00"));
 
         assertThat(ObligacionPublica.FASE_DE_CONVENIO).isEqualTo(Fase.CONVENIO.name());
-        assertThat(puerto.deTodoElContribuyente(otro, LocalDate.of(2026, 6, 1)))
+        assertThat(puerto.todasDe(otro, LocalDate.of(2026, 6, 1)))
                 .hasSize(2)
                 .allSatisfy(
                         o -> {
@@ -200,13 +200,13 @@ class ConsultaDeDeudaCuentaCorrienteTest {
         cargar(otro, "PREDIAL", Fase.COACTIVA, total);
         // El acogimiento: abono en COACTIVA y cargo en CONVENIO, con FRACCIONAMIENTO.
         mover(otro, Fase.COACTIVA, Fase.CONVENIO, total, LocalDate.of(2026, 4, 1));
-        assertThat(puerto.deTodoElContribuyente(otro, LocalDate.of(2026, 6, 1)))
+        assertThat(puerto.todasDe(otro, LocalDate.of(2026, 6, 1)))
                 .singleElement()
                 .satisfies(o -> assertThat(o.fase()).isEqualTo("CONVENIO"));
 
         // El quiebre: el par al reves.
         mover(otro, Fase.CONVENIO, Fase.COACTIVA, total, LocalDate.of(2026, 5, 1));
-        assertThat(puerto.deTodoElContribuyente(otro, LocalDate.of(2026, 6, 1)))
+        assertThat(puerto.todasDe(otro, LocalDate.of(2026, 6, 1)))
                 .singleElement()
                 .satisfies(
                         o -> {
