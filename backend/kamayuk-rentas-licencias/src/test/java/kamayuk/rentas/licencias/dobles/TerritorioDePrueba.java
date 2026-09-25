@@ -7,6 +7,7 @@ import kamayuk.rentas.catastro.RiesgoDelPredio;
 import kamayuk.rentas.catastro.RiesgoYItseDelPredio;
 import kamayuk.rentas.catastro.ZonaDelPredio;
 import kamayuk.rentas.catastro.ZonificacionDelPredio;
+import kamayuk.rentas.catastro.prueba.TerritorioEnMemoria;
 import kamayuk.rentas.licencias.aplicacion.ComprobarElTerritorio;
 
 /**
@@ -49,7 +50,12 @@ public final class TerritorioDePrueba {
 
                     @Override
                     public ItseDelPredio itseVigenteEn(long predioId, LocalDate aLaFecha) {
-                        return new ItseDelPredio(predioId, aLaFecha, List.of());
+                        // Con un certificado vigente, y no con cero (#416): «en regla» con cero
+                        // ITSE solo pasaba porque el ITSE no decidia nada.
+                        return new ItseDelPredio(
+                                predioId,
+                                aLaFecha,
+                                List.of(TerritorioEnMemoria.certificadoVigente(predioId)));
                     }
                 };
         return new ComprobarElTerritorio(zonificacion, riesgoYItse);

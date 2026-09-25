@@ -11,6 +11,7 @@ import kamayuk.rentas.catastro.ZonificacionDelPredio;
 import kamayuk.rentas.licencias.dominio.CompatibilidadConLaZona;
 import kamayuk.rentas.licencias.dominio.ComprobacionDelTerritorio;
 import kamayuk.rentas.licencias.dominio.RespuestaDelTerritorio;
+import kamayuk.rentas.licencias.dominio.RiesgoItse;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 
@@ -23,6 +24,10 @@ import org.springframework.stereotype.Service;
  * valga, y si lo esta sobre riesgo mitigable el certificado es justo lo que decide (#9). Repartir
  * las preguntas entre quien emite y quien renueva dejaria que una de las dos autorizara sobre media
  * respuesta, que es la forma de fallo que {@link RiesgoYItseDelPredio} existe para impedir.
+ *
+ * <p>Hasta #416 esa premisa era falsa: el ITSE se preguntaba y no decidia nada. Ahora el nivel de
+ * riesgo ITSE del giro principal entra con la pregunta —igual que sus zonas compatibles—, y {@link
+ * ComprobacionDelTerritorio#faltaLaItsePrevia()} lo compara con los certificados vigentes.
  *
  * <h2>Y por que la ausencia NO se traduce a un valor</h2>
  *
@@ -65,9 +70,14 @@ public class ComprobarElTerritorio {
      *     a las tres rutas: un plan se sustituye por otro y un certificado vence
      * @param zonasCompatiblesDelGiro el texto libre de {@code ciiu.zonificacion_compatible} del
      *     giro PRINCIPAL, que es el que decide (ver {@code LicenciaDeFuncionamiento})
+     * @param riesgoItseDelGiro {@code ciiu.riesgo_itse} del mismo giro principal; {@code null} si
+     *     la municipalidad no lo clasifico, y entonces no decide y se anota (#416)
      */
     public ComprobacionDelTerritorio de(
-            @Nullable Long predioId, LocalDate aLaFecha, @Nullable String zonasCompatiblesDelGiro) {
+            @Nullable Long predioId,
+            LocalDate aLaFecha,
+            @Nullable String zonasCompatiblesDelGiro,
+            @Nullable RiesgoItse riesgoItseDelGiro) {
 
         if (predioId == null) {
             return ComprobacionDelTerritorio.sinPredio(aLaFecha);
@@ -111,6 +121,12 @@ public class ComprobarElTerritorio {
             ItseDelPredio itse = riesgoYItse.itseVigenteEn(predioId, aLaFecha);
             queDijoElItse = RespuestaDelTerritorio.RESPONDIO;
             vigentes = itse.vigentes().size();
+            if (vigentes == 0) {
+                // Se anota SIEMPRE que conteste vacio, decida o no (#416): con un giro BAJO no se
+                // opone, pero dentro de dos anos la licencia tiene que poder decir que ese dia no
+                // habia ningun certificado. Sin esta linea el motivo iba nulo y no quedaba nada.
+                anotar(motivo, "ITSE: 0 vigentes");
+            }
         } catch (HechoDelTerritorioQueNoConsta noConsta) {
             queDijoElItse = RespuestaDelTerritorio.NO_CONSTA;
             anotar(motivo, "ITSE: no consta (" + noConsta.codigo() + ")");
@@ -133,6 +149,12 @@ public class ComprobarElTerritorio {
         if (noMitigable) {
             anotar(motivo, "el lote cruza una zona de riesgo NO MITIGABLE");
         }
+        if (riesgoItseDelGiro == null) {
+            anotar(
+                    motivo,
+                    "el giro principal no declara su nivel de riesgo ITSE en el catalogo CIIU, asi"
+                            + " que no se decide si la ITSE es previa");
+        }
 
         return new ComprobacionDelTerritorio(
                 aLaFecha,
@@ -144,6 +166,7 @@ public class ComprobarElTerritorio {
                 queDijoElItse,
                 vigentes,
                 compatibilidad,
+                riesgoItseDelGiro,
                 motivo.isEmpty() ? null : motivo.toString());
     }
 
