@@ -15,6 +15,7 @@ import java.sql.SQLException;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.Optional;
 import kamayuk.rentas.auditoria.Auditoria;
 import kamayuk.rentas.auditoria.AuditoriaJdbc;
@@ -28,6 +29,7 @@ import kamayuk.rentas.compartido.Paginacion;
 import kamayuk.rentas.compartido.TenantContext;
 import kamayuk.rentas.contribuyentes.ResumenDeContribuyente;
 import kamayuk.rentas.cuentacorriente.AcogimientoAConvenio;
+import kamayuk.rentas.cuentacorriente.ClaveDeObligacionPublica;
 import kamayuk.rentas.cuentacorriente.aplicacion.AcogimientoAConvenioCuentaCorriente;
 import kamayuk.rentas.cuentacorriente.aplicacion.RegistrarAsiento;
 import kamayuk.rentas.cuentacorriente.dominio.Asiento;
@@ -1114,6 +1116,12 @@ class ConveniosFronteraTest {
         public Pagina<ConvenioEnConsulta> buscar(
                 CriterioDeConvenios criterio, Paginacion paginacion) {
             return real.buscar(criterio, paginacion);
+        }
+
+        @Override
+        public List<Convenio> queAcogen(
+                long contribuyenteId, ClaveDeObligacionPublica obligacion, int periodo) {
+            return real.queAcogen(contribuyenteId, obligacion, periodo);
         }
     }
 

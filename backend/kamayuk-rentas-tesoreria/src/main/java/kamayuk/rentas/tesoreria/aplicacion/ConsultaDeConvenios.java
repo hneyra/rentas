@@ -7,6 +7,7 @@ import java.util.Objects;
 import java.util.Optional;
 import kamayuk.rentas.compartido.Pagina;
 import kamayuk.rentas.compartido.Paginacion;
+import kamayuk.rentas.cuentacorriente.ClaveDeObligacionPublica;
 import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.tesoreria.dominio.Convenio;
 import kamayuk.rentas.tesoreria.dominio.ConvenioEnConsulta;
@@ -84,6 +85,36 @@ public class ConsultaDeConvenios {
                                     historia,
                                     LocalDate.now(reloj));
                         });
+    }
+
+    /**
+     * El convenio <b>vigente</b> que tiene acogida esa cuota, si lo hay (#442).
+     *
+     * <p>Es lo que convierte «esa cuota ya esta acogida» —que es todo lo que {@code
+     * cuentacorriente} sabe— en una respuesta que se puede atender: el numero del convenio que hay
+     * que reformular. La cuota puede figurar en varios convenios —el reformulado y el que lo
+     * sustituye, preconvenios que nadie formalizo—, y el que la tiene de verdad en fase de convenio
+     * es el que esta vigente. El estado se deriva con {@link EstadoDeConvenio#deLosMovimientos}, el
+     * mismo sitio que usa la ficha, y no con una segunda derivacion en SQL.
+     *
+     * @param contribuyenteId el titular
+     * @param obligacion el tributo, el ejercicio y la unidad de la cuota
+     * @param periodo la cuota o el mes; 0 es «anual»
+     * @return el numero del convenio vigente; vacio si ninguno lo esta
+     */
+    @Transactional(readOnly = true)
+    public Optional<NumeroDeConvenio> vigenteQueAcoge(
+            long contribuyenteId, ClaveDeObligacionPublica obligacion, int periodo) {
+        Objects.requireNonNull(obligacion, "Se busca el convenio de una cuota concreta");
+        for (Convenio convenio : convenios.queAcogen(contribuyenteId, obligacion, periodo)) {
+            EstadoDeConvenio estado =
+                    EstadoDeConvenio.deLosMovimientos(
+                            movimientos.deConvenio(convenio.idGuardado()));
+            if (estado == EstadoDeConvenio.VIGENTE) {
+                return Optional.of(convenio.numero());
+            }
+        }
+        return Optional.empty();
     }
 
     /**

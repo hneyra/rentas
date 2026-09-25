@@ -27,6 +27,8 @@ import kamayuk.rentas.coactiva.dominio.ActoCoactivo;
 import kamayuk.rentas.coactiva.dominio.ExpedienteCoactivo;
 import kamayuk.rentas.coactiva.dominio.TipoDeActoCoactivo;
 import kamayuk.rentas.contribuyentes.ResumenDeContribuyente;
+import kamayuk.rentas.cuentacorriente.AcogimientoAConvenio;
+import kamayuk.rentas.cuentacorriente.ClaveDeObligacionPublica;
 import kamayuk.rentas.cuentacorriente.DeudaAcogida;
 import kamayuk.rentas.cuentacorriente.GeneradorDeCargos;
 import kamayuk.rentas.cuentacorriente.ObligacionPublica;
@@ -594,6 +596,27 @@ class CostasYConveniosControllerTest {
     }
 
     @Test
+    @DisplayName("#442 — la deuda que ya esta en un convenio: 409 en las dos ramas, no 500")
+    void laDeudaYaAcogidaEs409() throws Exception {
+        String expediente = expedienteConRec1();
+        convenios.yaAcogida = true;
+
+        MvcResult simulacion = fraccionar(expediente, true, null);
+        MvcResult registro = fraccionar(expediente, false, "Se registra el convenio coactivo");
+
+        // Antes de #442 esta deuda llegaba con faseOrigen = CONVENIO y la guarda de fase de
+        // FraccionarEnCoactiva la rechazaba con 422. Desde que cuentacorriente lanza, la
+        // excepcion le llega a esta ruta sin traducir, y sin este `catch` seria un 500.
+        assertThat(simulacion.getResponse().getStatus()).isEqualTo(409);
+        assertThat(registro.getResponse().getStatus()).isEqualTo(409);
+        assertThat(registro.getResponse().getContentAsString())
+                .contains("\"codigo\":\"CONFLICTO\"")
+                .contains("ya esta acogida a un convenio")
+                .doesNotContain("incidencia");
+        assertThat(convenios.registrados).isZero();
+    }
+
+    @Test
     @DisplayName("lo que SI es un fallo del servidor sigue siendo 500 con su incidencia")
     void loQueSiEsInternoNoSeDisfraza() throws Exception {
         String expediente = expedienteConRec1();
@@ -966,6 +989,12 @@ class CostasYConveniosControllerTest {
         /** Un defecto de verdad del servidor, para el contraste. */
         private boolean revienta;
 
+        /**
+         * Lo que {@code cuentacorriente} lanza desde #442 si la cuota ya esta en fase CONVENIO. Le
+         * llega a coactiva sin traducir: vive en el paquete raiz de {@code cuentacorriente}.
+         */
+        private boolean yaAcogida;
+
         @Override
         public ConvenioCoactivo simular(SolicitudDeConvenioCoactivo solicitud) {
             fallarSiToca();
@@ -992,6 +1021,10 @@ class CostasYConveniosControllerTest {
         private void fallarSiToca() {
             if (revienta) {
                 throw new IllegalStateException("un defecto de verdad, con su rastro");
+            }
+            if (yaAcogida) {
+                throw new AcogimientoAConvenio.CuotaYaAcogida(
+                        new ClaveDeObligacionPublica("PREDIAL", EJERCICIO, null, null), 0);
             }
             if (faltaPublicar != null) {
                 throw new CondicionesSinPublicar(
