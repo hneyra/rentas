@@ -148,6 +148,26 @@ public class CorridaDeEmisionRepositoryJdbc extends RepositorioJdbc
                 .optional();
     }
 
+    /**
+     * La misma lectura que {@link #ultimaDe} con un filtro mas, y no otra (#357): la especificacion
+     * que ya existia no cambia —la pantalla del calculo masivo la necesita con las simulaciones
+     * dentro— y esta es la que faltaba.
+     */
+    @Override
+    public Optional<CorridaDeEmision> ultimaEmisionDe(Ejercicio ejercicio) {
+        return jdbc().sql(
+                        "SELECT "
+                                + COLUMNAS
+                                + " FROM corrida_predial"
+                                + " WHERE ejercicio = :ejercicio"
+                                + " AND NOT simulacion"
+                                + " ORDER BY id DESC"
+                                + " LIMIT 1")
+                .param("ejercicio", ejercicio.valor())
+                .query(CorridaDeEmisionRepositoryJdbc::mapear)
+                .optional();
+    }
+
     @Override
     public List<CorridaDeEmision> ultimas(int cuantas) {
         return jdbc().sql("SELECT " + COLUMNAS + " FROM corrida_predial ORDER BY id DESC LIMIT :n")

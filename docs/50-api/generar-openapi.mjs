@@ -2824,6 +2824,16 @@ const OPERACIONES_ADICIONALES = {
           nombre: 'ejercicio',
           descripcion: 'El ejercicio cuya ultima corrida se pide. Ausente, el del reloj.',
         },
+        {
+          nombre: 'simulacion',
+          esquema: '{ type: string, enum: [false] }',
+          descripcion: bloque(`
+            Con «false», la última EMISIÓN del ejercicio: las simulaciones no cuentan, y sin
+            ninguna emisión contesta 204 aunque haya simulaciones (#357). Ausente, la última
+            corrida, simulaciones incluidas. «true» es 422: «la última simulación» no es una
+            lectura que esta ruta publique.
+          `),
+        },
       ],
       descripcion: bloque(`
         Lo que hizo la última corrida de emisión anual del predial (#523): sus etapas, cuántos
@@ -2838,6 +2848,12 @@ const OPERACIONES_ADICIONALES = {
         Devuelve también las **simulaciones**, y lo dice: el campo «simulacion» distingue las dos.
         Esconderlas haría que «ver los observados antes de emitir» —que es lo que hay que hacer
         antes de una emisión— no dejara nada que mirar después.
+
+        **Con «?simulacion=false», la última emisión** (#357). «La última corrida» y «la última
+        emisión» son dos preguntas: la pantalla del cálculo masivo necesita la primera y el estado
+        de la emisión la segunda. Con una sola lectura, una simulación de un sector corrida
+        después de emitir el padrón escribía sus cifras bajo «Cuentas emitidas» y la emisión de
+        verdad dejaba de verse.
 
         Sin corridas del ejercicio contesta **204**, no una cabecera de ceros: «todavía no se ha
         corrido» y «se corrió y no emitió nada» son dos cosas distintas.

@@ -223,13 +223,36 @@ public class PredialController {
      * <p>Sin corridas del ejercicio contesta <b>204</b> y no una corrida vacia de ceros: «todavia
      * no se ha corrido» y «se corrio y no emitio nada» son dos cosas distintas, y una cabecera de
      * ceros las dice igual.
+     *
+     * <h2>Y con {@code ?simulacion=false}, la ultima EMISION (#357)</h2>
+     *
+     * <p>«La ultima corrida» y «la ultima emision» son dos preguntas, y hasta #357 esta ruta solo
+     * sabia contestar la primera. El bloque «Estado de la emision» del panel necesita la segunda:
+     * con la primera, una simulacion del sector 04 corrida despues de emitir el padron escribia sus
+     * 120 cuentas bajo «Cuentas emitidas» y la emision de verdad dejaba de verse. Sin el parametro
+     * la ruta contesta exactamente lo que contestaba; con el, la misma lectura con un filtro mas, y
+     * <b>204</b> si el ejercicio no tiene ninguna emision aunque tenga simulaciones.
+     *
+     * <p>{@code ?simulacion=true} se <b>rechaza</b> en vez de ignorarse: «la ultima simulacion» no
+     * es ninguna de las dos preguntas que esta ruta contesta, e ignorarlo le devolveria una emision
+     * a quien pidio un ensayo.
      */
     @GetMapping("/corridas/ultima")
     @RequiereAcceso(acceso = "predial_masivo", privilegio = Privilegio.LECTURA)
     public ResponseEntity<CorridaGuardadaResource> ultimaCorrida(
-            @RequestParam(required = false) @Nullable String ejercicio) {
+            @RequestParam(required = false) @Nullable String ejercicio,
+            @RequestParam(required = false) @Nullable Boolean simulacion) {
+        if (Boolean.TRUE.equals(simulacion)) {
+            throw new ProblemaDeNegocio(
+                    CodigoDeError.VALIDACION,
+                    "«simulacion» solo admite «false», que pide la ultima emision del ejercicio."
+                            + " Sin el parametro se lee la ultima corrida, simulaciones incluidas;"
+                            + " «la ultima simulacion» no es una lectura que esta ruta publique");
+        }
         Ejercicio elEjercicio = ejercicioDeLaCorrida(ejercicio, true);
-        return corridas.ultimaDe(elEjercicio)
+        return (simulacion == null
+                        ? corridas.ultimaDe(elEjercicio)
+                        : corridas.ultimaEmisionDe(elEjercicio))
                 .map(corrida -> ResponseEntity.ok(CorridaGuardadaResource.de(corrida)))
                 .orElseGet(() -> ResponseEntity.noContent().build());
     }
