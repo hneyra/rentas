@@ -66,7 +66,8 @@ function contesta(cuerpo: unknown, estado = 200) {
 const CORRIDA: CorridaDelPredial = {
   id: 1,
   ejercicio: '2026',
-  alcance: 'PADRON',
+  // `TODOS`, que es un alcance que el backend contesta: `PADRON` no es ninguno (#357).
+  alcance: 'TODOS',
   sector: null,
   simulacion: false,
   conjunto: 'V3',

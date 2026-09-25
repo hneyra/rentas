@@ -121,7 +121,9 @@ const FRENTES: readonly FrenteParado[] = [
 const CORRIDA: CorridaDelPredial = {
   id: 1,
   ejercicio: '2026',
-  alcance: 'PADRON',
+  // `TODOS`, que es un alcance que el backend contesta: `PADRON` no es ninguno, y desde #357 el
+  // conector lee el alcance.
+  alcance: 'TODOS',
   sector: null,
   simulacion: false,
   conjunto: 'V3',

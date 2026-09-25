@@ -11,8 +11,14 @@ import {
   NO_CONSTA_EN_LA_CORRIDA,
   SIN_CRONOGRAMA,
   TODAVIA_SIN_DETERMINAR,
+  TODAVIA_SIN_EMITIR,
 } from './conectores.ts';
 import { CONSTANCIA_NEGADA, FICHA, SIN_CAMPANIA } from './conectores/consultasDeMuestra.ts';
+import {
+  DE_UNA_PARTE_DEL_PADRON,
+  LA_ULTIMA_FUE_UNA_SIMULACION,
+  SIN_EMISION_DEL_EJERCICIO,
+} from './palabrasDeHueco.ts';
 import { RUTAS } from './lecturas.ts';
 import {
   ACTA_CON_USO,
@@ -50,7 +56,10 @@ import type {
 const CORRIDA: CorridaDelPredial = {
   id: 1,
   ejercicio: '2026',
-  alcance: 'PADRON',
+  // `TODOS` y no `PADRON`, que no es ninguno de los cuatro alcances del backend
+  // (`DeterminarPredialMasivo.ALCANCES`): desde #357 el conector LEE el alcance, y una muestra con
+  // un valor que la instalacion no contesta nunca probaria una rama que no existe.
+  alcance: 'TODOS',
   sector: null,
   simulacion: false,
   conjunto: 'V3',
@@ -1094,5 +1103,72 @@ describe('`panel` — la ultima corrida', () => {
     expect([...anterior.valores.values()]).not.toContain('S/ 4.50');
     // Lo demas de la corrida se sigue dibujando: lo que falta es el sello, no la corrida entera.
     expect(anterior.valores.get(coordenada(0, 2))).toBe('58,412');
+  });
+
+  /**
+   * **Un ensayo no escribe bajo «Cuentas emitidas» ni «Monto determinado»** (#357).
+   *
+   * La red de seguridad del conector, para el dia que llegue una simulacion aunque la ruta pida
+   * `?simulacion=false`. La muestra es la del escenario del issue —la simulacion del sector 04 con
+   * 120 cuentas y S/ 18,400.00— y no la uniforme de arriba, que lleva `simulacion: false` y deja
+   * en verde a un conector que no mira el campo.
+   */
+  it('una SIMULACION no escribe sus cifras bajo «Cuentas emitidas» ni «Monto determinado» (#357)', () => {
+    const ensayo = conector.repartir({
+      ...CORRIDA,
+      simulacion: true,
+      determinados: 120,
+      montoEmitido: '18400.00',
+    } as never);
+
+    expect(ensayo.valores.get(coordenada(0, 2))).not.toBe('120');
+    expect(ensayo.valores.get(coordenada(0, 4))).not.toBe('S/ 18,400.00');
+    expect([...ensayo.valores.values()]).not.toContain('120');
+    expect([...ensayo.valores.values()]).not.toContain('S/ 18,400.00');
+    // Y los dos huecos dicen POR QUE: no es «no publicado» —la operacion los publica— sino que
+    // la corrida que llego fue un ensayo.
+    expect(ensayo.noPublicados.get(coordenada(0, 2))).toBe(LA_ULTIMA_FUE_UNA_SIMULACION);
+    expect(ensayo.noPublicados.get(coordenada(0, 4))).toBe(LA_ULTIMA_FUE_UNA_SIMULACION);
+  });
+
+  /**
+   * **Las cifras de una emision por sector no son las del ejercicio** (#357).
+   *
+   * «Cuentas emitidas 120» de una emision del sector 04 se lee como el padron entero. Sumar las
+   * emisiones parciales del ejercicio es otra pregunta que el issue deja fuera; lo que aqui se
+   * exige es que el campo no lo afirme y diga que es de una parte del padron.
+   */
+  it('una emision de UNA PARTE del padron no pasa por la del ejercicio (#357)', () => {
+    const delSector = conector.repartir({
+      ...CORRIDA,
+      alcance: 'SECTOR',
+      sector: '04',
+      determinados: 120,
+      montoEmitido: '18400.00',
+    } as never);
+
+    expect([...delSector.valores.values()]).not.toContain('120');
+    expect([...delSector.valores.values()]).not.toContain('S/ 18,400.00');
+    expect(delSector.noPublicados.get(coordenada(0, 2))).toBe(DE_UNA_PARTE_DEL_PADRON);
+    expect(delSector.noPublicados.get(coordenada(0, 4))).toBe(DE_UNA_PARTE_DEL_PADRON);
+  });
+
+  it('la emision del padron ENTERO sigue escribiendo sus dos cifras (#357)', () => {
+    // La otra mitad: la red no puede tapar tambien lo que si es una emision del ejercicio.
+    expect(reparto.valores.get(coordenada(0, 2))).toBe('58,412');
+    expect(reparto.valores.get(coordenada(0, 4))).toBe('S/ 8,772,431.05');
+    expect(reparto.noPublicados.has(coordenada(0, 2))).toBe(false);
+    expect(reparto.noPublicados.has(coordenada(0, 4))).toBe(false);
+  });
+
+  it('pide la ultima EMISION, no la ultima corrida (#357)', () => {
+    expect(RUTAS.ultimaEmision).toBe('/rentas/predial/corridas/ultima?simulacion=false');
+  });
+
+  it('sin emision del ejercicio dice «todavia sin emitir», con la palabra de `ini-panel` (#357)', () => {
+    // Las dos hojas dicen el mismo hecho del mismo ejercicio; con dos palabras distintas se
+    // leerian como dos estados.
+    expect(conector.sinDato).toBe(TODAVIA_SIN_EMITIR);
+    expect(TODAVIA_SIN_EMITIR.enElCampo).toBe(SIN_EMISION_DEL_EJERCICIO);
   });
 });

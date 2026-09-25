@@ -286,6 +286,18 @@ describe('AC7 — lo que se declara servido tiene que publicarlo el backend', ()
     expect(RUTAS.actosDeLaPapeleta('00/41')).toBe('/transito/papeletas/00%2F41/actos');
   });
 
+  it('`panel` e `ini-panel` piden la ultima EMISION con un parametro que el contrato declara (#357)', () => {
+    // Sin el parametro la ruta devuelve la ultima corrida, simulaciones incluidas, y las dos hojas
+    // escriben lo que llega bajo «Cuentas emitidas». Un nombre que la firma del controlador no
+    // declara, Spring lo IGNORA sin avisar: la hoja volveria a pintar un ensayo y en verde.
+    const parametros = JSON.parse(readFileSync(PARAMETROS, 'utf8')) as Record<
+      string,
+      { readonly obligatorios: readonly string[]; readonly opcionales: readonly string[] }
+    >;
+    expect(parametros['GET /rentas/predial/corridas/ultima']?.opcionales).toContain('simulacion');
+    expect(RUTAS.ultimaEmision).toBe('/rentas/predial/corridas/ultima?simulacion=false');
+  });
+
   it('y `constancias/no-adeudo` se enciende SIN `?formato`: el JSON, no el archivo', () => {
     // El mismo controlador publica las dos. Con `?formato=PDF|XLS|RTF` contesta un `byte[]` con su
     // `Content-Disposition`, que no es lo que una pantalla pinta; el contrato solo declara la

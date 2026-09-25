@@ -3,7 +3,8 @@ import { coordenada, type Coordenada, type DatoConNombre } from '@kamayuk/ui';
 import { formatearImporte } from '../../dominio/formato.ts';
 import { nombreDelAvance, nombreDelTributo } from '../../piezas/serieDeAvance.ts';
 import type { Conector, Reparto } from '../conectores.ts';
-import { NO_PUBLICADO, SIN_CORRIDA_DEL_EJERCICIO, type PalabraDeHueco } from '../palabrasDeHueco.ts';
+import { NO_PUBLICADO, SIN_EMISION_DEL_EJERCICIO, type PalabraDeHueco } from '../palabrasDeHueco.ts';
+import { porQueNoEsLaEmisionDelEjercicio } from './laEmision.ts';
 import type {
   CorridaDelPredial,
   FilaDeAvance,
@@ -22,7 +23,7 @@ import { RUTAS, pedirUno, pedirUnoOVacio } from '../lecturas.ts';
  *
  * <table>
  *   <tr><td>`ini-panel`</td><td>`GET /indicadores/recaudacion` <b>y</b>
- *     `GET /rentas/predial/corridas/ultima`</td></tr>
+ *     `GET /rentas/predial/corridas/ultima?simulacion=false`</td></tr>
  *   <tr><td>`ini-flujo`</td><td>`GET /indicadores/recaudacion`</td></tr>
  *   <tr><td>`ini-parado`</td><td>`GET /indicadores/trabajo-parado`</td></tr>
  * </table>
@@ -167,13 +168,22 @@ function cuadreDelTributo(fila: FilaDeAvance): readonly string[] {
  *
  * Hasta #354 la pedia `pedirUno`, que con el 204 devolvia un `null` que su tipo no declaraba, y
  * `corrida.observados` lanzaba en el render: la aplicacion entera caia por un campo de seis.
+ *
+ * <h2>Y desde #357 pide la ultima EMISION, no la ultima corrida</h2>
+ *
+ * El campo es «Observados sin emision» del ejercicio, y la ruta sin parametro devuelve la ultima
+ * corrida **simulaciones incluidas**: tras una emision con 534 observados, la simulacion de un
+ * sector con 3 lo dejaba en 3. Ahora se pide `?simulacion=false` —con la misma `pedirUnoOVacio`,
+ * porque el 204 es ahora «todavia sin emitir» y llega tambien si ya se simulo— y el reparto lleva la
+ * misma red que `panel`: si la corrida que llega es un ensayo o de una parte del padron, el campo no
+ * la escribe y dice por que (`porQueNoEsLaEmisionDelEjercicio`).
  */
 const INI_PANEL: Conector = {
-  clave: ['ini-panel', 'recaudacion', 'ultima-corrida'],
+  clave: ['ini-panel', 'recaudacion', 'ultima-emision'],
   pedir: ({ senal }) =>
     Promise.all([
       pedirUno<IndicadorDeRecaudacion>(RUTAS.recaudacion, senal),
-      pedirUnoOVacio<CorridaDelPredial>(RUTAS.ultimaCorrida, senal),
+      pedirUnoOVacio<CorridaDelPredial>(RUTAS.ultimaEmision, senal),
     ]),
   repartir: ([recaudacion, corrida]: readonly [
     IndicadorDeRecaudacion,
@@ -202,10 +212,12 @@ const INI_PANEL: Conector = {
     poner(coordenada(0, 3), kpiLlamado(recaudacion, 'Avance de cobranza')?.value);
     // «Contribuyentes activos»: ver el javadoc de arriba. No lo publica ninguna de las dos.
     poner(coordenada(0, 4), undefined);
-    // «Observados sin emision» sale de la corrida, y sin corrida del ejercicio no hay resultado
-    // que contar: ni «no publicado» —la operacion SI lo publica— ni un cero, que es lo que da una
-    // corrida limpia.
-    if (corrida === null) noPublicados.set(coordenada(0, 5), SIN_CORRIDA_DEL_EJERCICIO);
+    // «Observados sin emision» sale de la ultima emision, y sin emision del ejercicio no hay
+    // resultado que contar: ni «no publicado» —la operacion SI lo publica— ni un cero, que es lo
+    // que da una emision limpia. Y de un ensayo o de una parte del padron tampoco (#357).
+    const noEsLaEmision = corrida === null ? null : porQueNoEsLaEmisionDelEjercicio(corrida);
+    if (corrida === null) noPublicados.set(coordenada(0, 5), SIN_EMISION_DEL_EJERCICIO);
+    else if (noEsLaEmision !== null) noPublicados.set(coordenada(0, 5), noEsLaEmision);
     else poner(coordenada(0, 5), String(corrida.observados));
 
     return { valores, filas: new Map(), noPublicados };

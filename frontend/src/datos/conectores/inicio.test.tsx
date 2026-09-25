@@ -6,7 +6,11 @@ import type { ClaveDeHoja } from '../../pantallas/arbol.ts';
 import { pantallaDe } from '../../pantallas/definiciones/index.ts';
 import { PantallaDeRentas } from '../../pantallas/PantallaDeRentas.tsx';
 import type { CorridaDelPredial, IndicadorDeRecaudacion, TrabajoParado } from '../lecturas.ts';
-import { SIN_CORRIDA_DEL_EJERCICIO } from '../palabrasDeHueco.ts';
+import {
+  DE_UNA_PARTE_DEL_PADRON,
+  LA_ULTIMA_FUE_UNA_SIMULACION,
+  SIN_EMISION_DEL_EJERCICIO,
+} from '../palabrasDeHueco.ts';
 import { useDatosDeLaHoja } from '../useDatosDeLaHoja.ts';
 
 /**
@@ -147,7 +151,8 @@ function corrida(observados: number): CorridaDelPredial {
   return {
     id: 1,
     ejercicio: '2026',
-    alcance: 'PADRON',
+    // `TODOS`, que es un alcance que el backend contesta: `PADRON` no es ninguno (#357).
+    alcance: 'TODOS',
     sector: null,
     simulacion: false,
     conjunto: 'V3',
@@ -182,7 +187,10 @@ function trabajoParado(cuantos: number, importe: string | null): TrabajoParado {
 
 const RECAUDACION = '/indicadores/recaudacion';
 const PARADO = '/indicadores/trabajo-parado';
-const CORRIDA = '/rentas/predial/corridas/ultima';
+// Con el parametro, y es lo que se prueba: el doble contesta 404 a la ruta sin el, asi que una
+// hoja que pidiera la ultima CORRIDA —simulaciones incluidas— saldria roja en vez de ensenar un
+// ensayo bajo «Observados sin emision» (#357).
+const CORRIDA = '/rentas/predial/corridas/ultima?simulacion=false';
 
 describe('`ini-panel` — el avance del ejercicio', () => {
   it('ensena lo que llega de LAS DOS operaciones, campo a campo', async () => {
@@ -285,8 +293,58 @@ describe('`ini-panel` sin corrida del ejercicio (#354)', () => {
     // La palabra de «todavia no se ha corrido», en el campo que la corrida llenaria. No es
     // «no publicado» —la operacion SI lo publica— ni un cero: cero observados es un resultado, y
     // aqui no hay resultado todavia.
-    expect(screen.getByText(SIN_CORRIDA_DEL_EJERCICIO)).toBeInTheDocument();
+    expect(screen.getByText(SIN_EMISION_DEL_EJERCICIO)).toBeInTheDocument();
     expect(screen.queryByText('0')).toBeNull();
+  });
+});
+
+/**
+ * **Un ensayo no pasa por emision en «Observados sin emision»** (#357).
+ *
+ * El escenario del issue: la emision del padron dejo 534 observados, y despues se simulo un sector
+ * con 3. La ruta ya pide `?simulacion=false`, asi que la simulacion no deberia llegar; esto es la
+ * red de seguridad del conector para el dia que llegue. La muestra es la simulacion —la uniforme
+ * de arriba lleva `simulacion: false` y dejaria en verde a un conector que no mira el campo—.
+ */
+describe('`ini-panel` con una simulacion (#357)', () => {
+  it('los observados de un ENSAYO no se escriben como los del ejercicio', async () => {
+    contesta({
+      [RECAUDACION]: recaudacion(2026, '23725394.80', '18424251.20', '77 %', {
+        nombre: 'Impuesto predial',
+        cargado: '9418204.60',
+        cobrado: '8420118.40',
+        pendiente: '998086.20',
+        pct: 89,
+      }),
+      [CORRIDA]: { ...corrida(3), alcance: 'SECTOR', sector: '04', simulacion: true },
+    });
+    arnes()('ini-panel');
+
+    await waitFor(() => {
+      expect(screen.getByText('S/ 23,725,394.80')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('3')).toBeNull();
+    expect(screen.getByText(LA_ULTIMA_FUE_UNA_SIMULACION)).toBeInTheDocument();
+  });
+
+  it('los de una emision de UN SECTOR tampoco: no son los del ejercicio', async () => {
+    contesta({
+      [RECAUDACION]: recaudacion(2026, '23725394.80', '18424251.20', '77 %', {
+        nombre: 'Impuesto predial',
+        cargado: '9418204.60',
+        cobrado: '8420118.40',
+        pendiente: '998086.20',
+        pct: 89,
+      }),
+      [CORRIDA]: { ...corrida(3), alcance: 'SECTOR', sector: '04' },
+    });
+    arnes()('ini-panel');
+
+    await waitFor(() => {
+      expect(screen.getByText('S/ 23,725,394.80')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('3')).toBeNull();
+    expect(screen.getByText(DE_UNA_PARTE_DEL_PADRON)).toBeInTheDocument();
   });
 });
 

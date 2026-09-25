@@ -80,16 +80,42 @@ trimestrales supuestas serian unos vencimientos que el contribuyente puede no ha
 const NO_CONSTA_EN_LA_CORRIDA = 'no consta en la corrida';
 
 /**
- * **Lo que va donde un campo sale de la ultima corrida y el ejercicio todavia no tiene ninguna**
- * (#354).
+ * **Lo que va donde un campo sale de la ultima emision y el ejercicio todavia no tiene ninguna**
+ * (#354, #357).
  *
- * `GET /rentas/predial/corridas/ultima` contesta **204** cuando no hay corrida ni simulacion del
- * ejercicio (#523), y eso es el estado normal de cualquier municipalidad entre el 1 de enero y su
- * primera corrida, o recien implantada. No es `NO_PUBLICADO` —la operacion SI publica el campo— ni
- * `NO_CONSTA_EN_LA_CORRIDA` —no hay corrida de la que no conste—, y sobre todo no es un cero: «cero
- * observados» es el resultado de una corrida limpia, y aqui no hay resultado todavia.
+ * `GET /rentas/predial/corridas/ultima?simulacion=false` contesta **204** cuando el ejercicio no
+ * tiene ninguna emision (#357), y eso es el estado normal de cualquier municipalidad entre el 1 de
+ * enero y su primera emision, o recien implantada. No es `NO_PUBLICADO` —la operacion SI publica el
+ * campo— ni `NO_CONSTA_EN_LA_CORRIDA` —no hay emision de la que no conste—, y sobre todo no es un
+ * cero: «cero observados» es el resultado de una emision limpia, y aqui no hay resultado todavia.
+ *
+ * <h2>Decia «todavia sin corrida» hasta #357, y ya no seria verdad</h2>
+ *
+ * La ruta sin el parametro contesta 204 solo sin corrida NI simulacion. Con el parametro, el 204
+ * llega tambien cuando ya se simulo —que es justo lo que hay que hacer antes de emitir—, y
+ * entonces «sin corrida» negaria una corrida que existe. Lo que falta es la emision.
  */
-const SIN_CORRIDA_DEL_EJERCICIO = 'todavia sin corrida';
+const SIN_EMISION_DEL_EJERCICIO = 'todavia sin emitir';
+
+/**
+ * **Lo que va donde un campo afirma la emision y la corrida que llego fue un ENSAYO** (#357).
+ *
+ * «Cuentas emitidas» y «Monto determinado» con las cifras de una simulacion afirman una deuda
+ * asentada que no existe —o tapan la que si—. La ruta ya pide `?simulacion=false`, asi que esto
+ * es la red de seguridad del conector: si una simulacion llega igual, sus cifras no se escriben
+ * como emitidas y el hueco dice por que.
+ */
+const LA_ULTIMA_FUE_UNA_SIMULACION = 'fue una simulacion';
+
+/**
+ * **Lo que va donde un campo es del EJERCICIO y la emision fue de una parte del padron** (#357).
+ *
+ * Una emision por sector, por rango de codigo o solo de los observados es de verdad —asienta
+ * deuda—, pero sus cifras son las de esa parte: «Cuentas emitidas 120» de una emision del sector
+ * 04 se lee como el padron entero. Sumar las emisiones parciales del ejercicio es otra pregunta
+ * (#357 la deja fuera), asi que el campo no afirma nada y dice de donde es lo que no escribe.
+ */
+const DE_UNA_PARTE_DEL_PADRON = 'de una parte del padron';
 
 /**
  * **Lo que va donde un campo es del internamiento VIGENTE y el ultimo de la placa ya salio** (#387).
@@ -118,7 +144,9 @@ export const PALABRAS_DE_HUECO = {
   NO_PUBLICADO,
   SIN_CIFRAR,
   NO_CONSTA_EN_LA_CORRIDA,
-  SIN_CORRIDA_DEL_EJERCICIO,
+  SIN_EMISION_DEL_EJERCICIO,
+  LA_ULTIMA_FUE_UNA_SIMULACION,
+  DE_UNA_PARTE_DEL_PADRON,
   SIN_CRONOGRAMA,
   SIN_PARAMETROS_DEL_SORTEO,
   FUERA_DEL_DEPOSITO,
@@ -158,7 +186,9 @@ export {
   NO_PUBLICADO,
   SIN_CIFRAR,
   NO_CONSTA_EN_LA_CORRIDA,
-  SIN_CORRIDA_DEL_EJERCICIO,
+  SIN_EMISION_DEL_EJERCICIO,
+  LA_ULTIMA_FUE_UNA_SIMULACION,
+  DE_UNA_PARTE_DEL_PADRON,
   SIN_CRONOGRAMA,
   SIN_PARAMETROS_DEL_SORTEO,
   FUERA_DEL_DEPOSITO,

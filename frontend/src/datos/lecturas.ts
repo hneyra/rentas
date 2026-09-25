@@ -2130,7 +2130,20 @@ export const RUTAS = {
    */
   resolucionDeDeterminacion: (numero: string) =>
     `/fiscalizacion/resoluciones/${encodeURIComponent(numero)}`,
-  ultimaCorrida: '/rentas/predial/corridas/ultima',
+  /**
+   * **La ultima EMISION del ejercicio, y no la ultima corrida** (#357).
+   *
+   * Sin el parametro, la ruta devuelve la ultima corrida **simulaciones incluidas**, que es lo que
+   * necesita la pantalla del calculo masivo. Las dos hojas que la piden aqui —`panel` e
+   * `ini-panel`— escriben lo que llega bajo «Cuentas emitidas», «Monto determinado» y «Observados
+   * sin emision», y con la ultima corrida una simulacion del sector 04 corrida despues de emitir
+   * tapaba la emision de verdad. Con `?simulacion=false` el backend contesta la ultima que emitio,
+   * y **204** si el ejercicio no tiene ninguna aunque tenga simulaciones.
+   *
+   * `false` y no `true`: `true` es 422, porque «la ultima simulacion» no es una lectura que la
+   * ruta publique. Lo declara `parametros-de-la-api.json`.
+   */
+  ultimaEmision: '/rentas/predial/corridas/ultima?simulacion=false',
   /**
    * La ultima determinacion predial GUARDADA de un contribuyente, de un ejercicio (#207, #237).
    *
