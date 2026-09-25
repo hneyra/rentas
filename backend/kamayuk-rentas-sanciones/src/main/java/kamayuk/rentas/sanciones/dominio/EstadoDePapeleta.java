@@ -102,7 +102,8 @@ import java.util.stream.Collectors;
  * <ol>
  *   <li>Su firma —{@code declarar(contribuyenteId, tributo, ejercicioDesde, ejercicioHasta, …)}—
  *       <b>no nombra ninguna papeleta</b>, ni su cuerpo tampoco: resuelve ejercicio por ejercicio y
- *       marca {@code PRESCRITO} los valores que {@code ValorRepository.cobrablesDe} devuelve.
+ *       marca {@code PRESCRITO} los valores cuyas lineas prescribieron todas ({@code
+ *       CoberturaDeLaPrescripcion}, #337).
  *   <li>Volver del valor a la papeleta —{@code valor} → {@code papeleta_masivo_item.valor_id} →
  *       {@code papeleta}— es un cruce que vive en {@code sanciones}, y {@code valores} no lo puede
  *       hacer: no hay ningún puerto de {@code sanciones} que lo publique.

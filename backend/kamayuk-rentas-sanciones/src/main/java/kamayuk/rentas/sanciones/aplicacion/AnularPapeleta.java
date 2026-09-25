@@ -43,8 +43,9 @@ import org.springframework.transaction.annotation.Transactional;
  * <ol>
  *   <li>{@code DeclararPrescripcion.declarar(contribuyenteId, tributo, ejercicioDesde,
  *       ejercicioHasta, …)} <b>no nombra ninguna papeleta</b>, ni en su firma ni en su cuerpo:
- *       resuelve ejercicio por ejercicio y marca {@code PRESCRITO} los valores que {@code
- *       ValorRepository.cobrablesDe(contribuyente, tributo, ejercicio)} devuelve.
+ *       resuelve ejercicio por ejercicio y marca {@code PRESCRITO} los valores cuyas lineas
+ *       prescribieron todas —lo decide {@code CoberturaDeLaPrescripcion} desde #337; antes bastaba
+ *       con que {@code ValorRepository.cobrablesDe} devolviera el valor—.
  *   <li>Para escribir {@code PRESCRITA} en la papeleta habría que volver del valor a la papeleta
  *       —{@code valor} → {@code papeleta_masivo_item.valor_id} → {@code papeleta}—, y ese cruce
  *       vive en {@code sanciones}. {@code valores} no lo puede hacer: no existe ningún puerto de

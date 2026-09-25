@@ -409,24 +409,34 @@ public class ValorRepositoryJdbc extends RepositorioJdbc implements ValorReposit
         };
     }
 
+    /**
+     * Un solo {@code = ANY(:ejercicios)} y no una consulta por ejercicio: el mismo valor saldria
+     * una vez por cada ejercicio prescrito que toque. {@code EXISTS} y no {@code JOIN}, por lo
+     * mismo con las lineas: un valor puede tener varias del mismo tributo y ejercicio, una por
+     * predio. El tributo y el ejercicio viven en el detalle congelado, no en la cabecera.
+     */
     @Override
-    public List<Valor> cobrablesDe(long contribuyenteId, String tributo, Ejercicio ejercicio) {
-        // El tributo y el ejercicio viven en el detalle congelado, no en la cabecera: un valor
-        // puede formalizar varias obligaciones. DISTINCT porque un mismo valor puede tener mas de
-        // una fila de detalle del mismo tributo y ejercicio -una por predio-.
+    public List<Valor> cobrablesConAlgunaLineaEn(
+            long contribuyenteId, String tributo, List<Ejercicio> ejercicios) {
+        if (ejercicios.isEmpty()) {
+            return List.of();
+        }
         return jdbc().sql(
-                        "SELECT DISTINCT "
+                        "SELECT "
                                 + COLUMNAS_VALOR_CON_PREFIJO
                                 + " FROM valor v"
-                                + " JOIN valor_detalle d ON d.valor_id = v.id"
                                 + " WHERE v.contribuyente_id = :contribuyenteId"
-                                + "   AND upper(d.tributo) = upper(:tributo)"
-                                + "   AND d.ejercicio = :ejercicio"
                                 + "   AND v.estado IN ('EMITIDO', 'NOTIFICADO', 'COACTIVA')"
+                                + "   AND EXISTS (SELECT 1 FROM valor_detalle d"
+                                + "                WHERE d.valor_id = v.id"
+                                + "                  AND upper(d.tributo) = upper(:tributo)"
+                                + "                  AND d.ejercicio = ANY(:ejercicios))"
                                 + " ORDER BY v.id")
                 .param("contribuyenteId", contribuyenteId)
                 .param("tributo", tributo)
-                .param("ejercicio", ejercicio.valor())
+                .param(
+                        "ejercicios",
+                        ejercicios.stream().map(Ejercicio::valor).toArray(Integer[]::new))
                 .query(this::mapearValor)
                 .list();
     }

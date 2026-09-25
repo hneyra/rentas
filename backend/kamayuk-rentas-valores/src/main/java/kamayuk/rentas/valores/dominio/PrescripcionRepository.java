@@ -1,6 +1,7 @@
 package kamayuk.rentas.valores.dominio;
 
 import java.util.Optional;
+import java.util.Set;
 import kamayuk.rentas.compartido.Pagina;
 import kamayuk.rentas.compartido.Paginacion;
 
@@ -30,4 +31,16 @@ public interface PrescripcionRepository {
      * por fila y pertenecen a la resolucion, no al listado.
      */
     Pagina<PrescripcionEnLista> buscar(CriterioDePrescripciones criterio, Paginacion paginacion);
+
+    /**
+     * Los pares (tributo, ejercicio) que alguna resolucion declaro prescritos para ese
+     * contribuyente, sumando todas las que tiene (#337).
+     *
+     * <p>Es el conjunto contra el que {@link CoberturaDeLaPrescripcion} mide un valor. Acumulado y
+     * no de una sola resolucion, porque la cobertura se completa entre varias: el PREDIAL 2021 de
+     * una y el 2022 de la siguiente cubren entre las dos el valor que formaliza los dos. Sale de lo
+     * que ya se guarda —{@code prescripcion} y {@code prescripcion_ejercicio} con {@code
+     * prescrita}—, sin migracion; un ejercicio que la resolucion computo y NO prescribio no entra.
+     */
+    Set<ObligacionPrescrita> obligacionesPrescritasDe(long contribuyenteId);
 }

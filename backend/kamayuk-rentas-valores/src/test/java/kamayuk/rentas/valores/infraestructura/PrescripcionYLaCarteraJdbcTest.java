@@ -219,15 +219,16 @@ class PrescripcionYLaCarteraJdbcTest {
         return enTransaccion(
                 () ->
                         declarar.declarar(
-                                contribuyente,
-                                TRIBUTO,
-                                EJERCICIO,
-                                EJERCICIO,
-                                PRESENTACION,
-                                CausalDePrescripcion.DECLARACION_PRESENTADA,
-                                List.of(),
-                                "RES-674-2033",
-                                Observacion.de("Se declara la prescripcion solicitada")));
+                                        contribuyente,
+                                        TRIBUTO,
+                                        EJERCICIO,
+                                        EJERCICIO,
+                                        PRESENTACION,
+                                        CausalDePrescripcion.DECLARACION_PRESENTADA,
+                                        List.of(),
+                                        "RES-674-2033",
+                                        Observacion.de("Se declara la prescripcion solicitada"))
+                                .prescripcion());
     }
 
     private static Dinero cargado() {

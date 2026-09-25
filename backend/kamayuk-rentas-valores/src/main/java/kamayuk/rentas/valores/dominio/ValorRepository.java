@@ -77,15 +77,22 @@ public interface ValorRepository {
     long contar(CriterioDeConsultaDeValores criterio);
 
     /**
-     * Los valores del contribuyente que formalizan ese tributo y ese ejercicio, y que todavia se
-     * pueden cobrar.
+     * Los valores todavia cobrables del contribuyente con <b>alguna</b> linea de ese tributo en
+     * alguno de esos ejercicios: los candidatos de una prescripcion recien declarada (#39, #337).
      *
-     * <p>Existe para la prescripcion (#39): la solicitud se presenta por contribuyente, tributo y
-     * rango de ejercicios, y hay que saber que valores alcanza. Los que ya estan {@code PAGADO},
-     * {@code ANULADO} o {@code PRESCRITO} no se devuelven: sobre ellos no hay accion de cobro que
-     * prescriba.
+     * <p><b>Candidatos, no los que se marcan.</b> Hasta #337 este metodo se llamaba {@code
+     * cobrablesDe} y todo lo que devolvia pasaba a {@code PRESCRITO}; como un valor formaliza
+     * varias obligaciones, eso prescribia con el valor el PREDIAL 2022 que no prescribio y los
+     * ARBITRIOS 2021 que nadie pidio. Lo que se marca lo decide {@link CoberturaDeLaPrescripcion}
+     * con todas las lineas del valor, y esta consulta solo acota a quien preguntarselo: a los que
+     * tocan lo que la resolucion acaba de prescribir. Un valor que no toca nada de eso no cambia
+     * por esta resolucion, aunque alguna anterior lo cubriera.
+     *
+     * <p>Cobrables son {@code EMITIDO}, {@code NOTIFICADO} y {@code COACTIVA}: sobre uno ya {@code
+     * PAGADO}, {@code ANULADO} o {@code PRESCRITO} no hay accion de cobro que prescriba.
      */
-    List<Valor> cobrablesDe(long contribuyenteId, String tributo, Ejercicio ejercicio);
+    List<Valor> cobrablesConAlgunaLineaEn(
+            long contribuyenteId, String tributo, List<Ejercicio> ejercicios);
 
     /**
      * El primer valor <b>vivo</b> de ese contribuyente que formaliza esa obligacion, si lo hay
@@ -93,9 +100,9 @@ public interface ValorRepository {
      *
      * <p>Vivo es que no este {@code PAGADO}, {@code ANULADO} ni {@code PRESCRITO}: {@code COACTIVA}
      * cuenta. La obligacion se compara con sus <b>cuatro</b> campos —tributo, ejercicio, predio y
-     * vehiculo, con el nulo igual al nulo—, y no con dos como {@link #cobrablesDe}: la multa de un
-     * vehiculo del padron y la de uno que no lo es son obligaciones distintas del libro, y un valor
-     * sobre una no formaliza la otra.
+     * vehiculo, con el nulo igual al nulo—, y no con dos como {@link #cobrablesConAlgunaLineaEn}:
+     * la multa de un vehiculo del padron y la de uno que no lo es son obligaciones distintas del
+     * libro, y un valor sobre una no formaliza la otra.
      *
      * <p>Lee {@code valor_detalle}, que escriben todos los caminos de emision —individual, masiva y
      * la corrida de papeletas—, y por eso es completo donde {@code papeleta_masivo_item} no lo era.

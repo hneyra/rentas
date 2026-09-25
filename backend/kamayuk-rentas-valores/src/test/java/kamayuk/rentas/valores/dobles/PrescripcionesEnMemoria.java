@@ -3,9 +3,12 @@ package kamayuk.rentas.valores.dobles;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 import kamayuk.rentas.compartido.Pagina;
 import kamayuk.rentas.compartido.Paginacion;
 import kamayuk.rentas.valores.dominio.CriterioDePrescripciones;
+import kamayuk.rentas.valores.dominio.ObligacionPrescrita;
 import kamayuk.rentas.valores.dominio.Prescripcion;
 import kamayuk.rentas.valores.dominio.PrescripcionEnLista;
 import kamayuk.rentas.valores.dominio.PrescripcionRepository;
@@ -61,6 +64,18 @@ public final class PrescripcionesEnMemoria implements PrescripcionRepository {
                         .map(PrescripcionesEnMemoria::aFila)
                         .toList();
         return Pagina.de(filas, paginacion, filas.size());
+    }
+
+    /** Lo mismo que el SQL: los ejercicios con {@code prescrita} de todas sus resoluciones. */
+    @Override
+    public Set<ObligacionPrescrita> obligacionesPrescritasDe(long contribuyenteId) {
+        return guardadas.stream()
+                .filter(p -> p.contribuyenteId() == contribuyenteId)
+                .flatMap(
+                        p ->
+                                p.ejerciciosPrescritos().stream()
+                                        .map(e -> new ObligacionPrescrita(p.tributo(), e)))
+                .collect(Collectors.toUnmodifiableSet());
     }
 
     private static boolean cumple(Prescripcion prescripcion, CriterioDePrescripciones criterio) {

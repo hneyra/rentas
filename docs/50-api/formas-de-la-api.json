@@ -3284,6 +3284,12 @@
         ]
       }
     ],
+    "valoresPrescritos": [
+      "texto"
+    ],
+    "valoresCubiertosEnParte": [
+      "texto"
+    ],
     "observacion": "texto"
   },
   "POST /coactiva/rec/impresion": {

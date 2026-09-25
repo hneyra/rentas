@@ -107,15 +107,16 @@ class DeclararPrescripcionTest {
 
         Prescripcion declarada =
                 servicio.declarar(
-                        CONTRIBUYENTE,
-                        "PREDIAL",
-                        new Ejercicio(2020),
-                        new Ejercicio(2020),
-                        PRESENTACION,
-                        CausalDePrescripcion.DECLARACION_PRESENTADA,
-                        List.of(pago),
-                        "RES-001",
-                        OBSERVACION);
+                                CONTRIBUYENTE,
+                                "PREDIAL",
+                                new Ejercicio(2020),
+                                new Ejercicio(2020),
+                                PRESENTACION,
+                                CausalDePrescripcion.DECLARACION_PRESENTADA,
+                                List.of(pago),
+                                "RES-001",
+                                OBSERVACION)
+                        .prescripcion();
 
         assertThat(declarada.resultado()).isEqualTo(ResultadoDeLaSolicitud.NO_PROCEDE);
         assertThat(declarada.ejercicios().get(0).inicioVigente())
@@ -398,33 +399,171 @@ class DeclararPrescripcionTest {
         }
     }
 
+    /**
+     * #337 — Un valor formaliza varias obligaciones, y la prescripcion es de cada una.
+     *
+     * <p>Es la siembra que faltaba: {@link #marcaLosValoresAlcanzados} usa valores de <b>una</b>
+     * linea, y con esa muestra «alguna linea coincide» y «ninguna linea queda fuera» dan lo mismo.
+     * Aqui el mismo contribuyente tiene cuatro valores:
+     *
+     * <ul>
+     *   <li>A, solo con PREDIAL 2021;
+     *   <li>B, con PREDIAL 2021 y PREDIAL 2022;
+     *   <li>C, con PREDIAL 2021 y ARBITRIOS 2021 —un tributo que la solicitud ni pide—;
+     *   <li>D, igual que C pero ya en {@code COACTIVA}, porque el defecto tambien lo alcanzaba.
+     * </ul>
+     *
+     * <p>Con la solicitud de PREDIAL 2021–2022 del 2026-03-01 prescribe 2021 (el 2026-01-01) y no
+     * 2022 (el 2027-01-01): solo A queda entero dentro de lo prescrito. La del PREDIAL 2022 del
+     * 2027-02-01 completa B —la cobertura se acumula entre resoluciones— y a C y D no les llega
+     * nunca: los ARBITRIOS 2021 no los prescribio nadie.
+     */
+    @Nested
+    @DisplayName("#337 — PRESCRITO solo el valor cuyas lineas prescribieron todas")
+    class LaCoberturaDeLaPrescripcion {
+
+        private static final LocalDate PRIMERA = LocalDate.of(2026, 3, 1);
+        private static final LocalDate SEGUNDA = LocalDate.of(2027, 2, 1);
+
+        private Valor a;
+        private Valor b;
+        private Valor c;
+        private Valor d;
+
+        @BeforeEach
+        void sembrar() {
+            a =
+                    valores.con(
+                            valor("OP-2026-000011", 2021, EstadoDeValor.EMITIDO),
+                            linea("PREDIAL", 2021));
+            b =
+                    valores.con(
+                            valor("OP-2026-000012", 2021, EstadoDeValor.EMITIDO),
+                            linea("PREDIAL", 2021),
+                            linea("PREDIAL", 2022));
+            c =
+                    valores.con(
+                            valor("OP-2026-000013", 2021, EstadoDeValor.EMITIDO),
+                            linea("PREDIAL", 2021),
+                            linea("ARBITRIOS", 2021));
+            d =
+                    valores.con(
+                            valor("OP-2026-000014", 2021, EstadoDeValor.COACTIVA),
+                            linea("PREDIAL", 2021),
+                            linea("ARBITRIOS", 2021));
+        }
+
+        @Test
+        @DisplayName("la solicitud de 2021–2022 marca A y deja B, C y D como estaban")
+        void laPrimeraSoloMarcaA() {
+            PrescripcionDeclarada declarada = declararPredial(2021, 2022, PRIMERA);
+
+            assertThat(declarada.prescripcion().resultado())
+                    .isEqualTo(ResultadoDeLaSolicitud.PROCEDE_EN_PARTE);
+            assertThat(declarada.prescripcion().ejerciciosPrescritos())
+                    .containsExactly(new Ejercicio(2021));
+            assertThat(estadoDe(a)).isEqualTo(EstadoDeValor.PRESCRITO);
+            assertThat(estadoDe(b))
+                    .as("B formaliza el PREDIAL 2022, que no prescribio")
+                    .isEqualTo(EstadoDeValor.EMITIDO);
+            assertThat(estadoDe(c))
+                    .as("C formaliza los ARBITRIOS 2021, que la solicitud ni pidio")
+                    .isEqualTo(EstadoDeValor.EMITIDO);
+            assertThat(estadoDe(d))
+                    .as("y D sigue en coactiva: su deuda viva se puede seguir exigiendo")
+                    .isEqualTo(EstadoDeValor.COACTIVA);
+        }
+
+        @Test
+        @DisplayName("la respuesta y la auditoria nombran los marcados y los que se dejaron")
+        void seInformanLosDosGrupos() {
+            PrescripcionDeclarada declarada = declararPredial(2021, 2022, PRIMERA);
+
+            assertThat(declarada.valoresPrescritos())
+                    .extracting(Valor::numero)
+                    .containsExactly("OP-2026-000011");
+            assertThat(declarada.valoresCubiertosEnParte())
+                    .as("los que tocan el PREDIAL 2021 y formalizan ademas deuda viva")
+                    .extracting(Valor::numero)
+                    .containsExactly("OP-2026-000012", "OP-2026-000013", "OP-2026-000014");
+            assertThat(auditados).hasSize(1);
+            assertThat(auditados.get(0).datosNuevos())
+                    .contains("\"valoresPrescritos\":[\"OP-2026-000011\"]")
+                    .contains(
+                            "\"valoresCubiertosEnParte\":[\"OP-2026-000012\",\"OP-2026-000013\","
+                                    + "\"OP-2026-000014\"]");
+        }
+
+        @Test
+        @DisplayName("la del 2022 completa B, porque la cobertura se acumula, y C y D siguen vivos")
+        void laSegundaCompletaB() {
+            declararPredial(2021, 2022, PRIMERA);
+            PrescripcionDeclarada segunda = declararPredial(2022, 2022, SEGUNDA);
+
+            assertThat(segunda.prescripcion().resultado())
+                    .isEqualTo(ResultadoDeLaSolicitud.PROCEDE);
+            assertThat(segunda.valoresPrescritos())
+                    .extracting(Valor::numero)
+                    .containsExactly("OP-2026-000012");
+            assertThat(segunda.valoresCubiertosEnParte())
+                    .as("C y D no tocan el PREDIAL 2022: esta resolucion no va con ellos")
+                    .isEmpty();
+            assertThat(estadoDe(a)).isEqualTo(EstadoDeValor.PRESCRITO);
+            assertThat(estadoDe(b))
+                    .as("el PREDIAL 2021 lo prescribio la primera y el 2022 la segunda")
+                    .isEqualTo(EstadoDeValor.PRESCRITO);
+            assertThat(estadoDe(c)).isEqualTo(EstadoDeValor.EMITIDO);
+            assertThat(estadoDe(d)).isEqualTo(EstadoDeValor.COACTIVA);
+        }
+
+        private PrescripcionDeclarada declararPredial(
+                int desde, int hasta, LocalDate presentacion) {
+            return servicio.declarar(
+                    CONTRIBUYENTE,
+                    "PREDIAL",
+                    new Ejercicio(desde),
+                    new Ejercicio(hasta),
+                    presentacion,
+                    CausalDePrescripcion.DECLARACION_PRESENTADA,
+                    List.of(),
+                    null,
+                    OBSERVACION);
+        }
+
+        private EstadoDeValor estadoDe(Valor valor) {
+            return valores.porId(valor.id()).orElseThrow().estado();
+        }
+    }
+
     private Prescripcion declararConHechos(
             int desde, int hasta, LocalDate presentacion, HechoDelComputo... hechos) {
         return servicio.declarar(
-                CONTRIBUYENTE,
-                "PREDIAL",
-                new Ejercicio(desde),
-                new Ejercicio(hasta),
-                presentacion,
-                CausalDePrescripcion.DECLARACION_PRESENTADA,
-                List.of(hechos),
-                null,
-                OBSERVACION);
+                        CONTRIBUYENTE,
+                        "PREDIAL",
+                        new Ejercicio(desde),
+                        new Ejercicio(hasta),
+                        presentacion,
+                        CausalDePrescripcion.DECLARACION_PRESENTADA,
+                        List.of(hechos),
+                        null,
+                        OBSERVACION)
+                .prescripcion();
     }
 
     // ------------------------------------------------------------------
 
     private Prescripcion declarar(int desde, int hasta, CausalDePrescripcion causal) {
         return servicio.declarar(
-                CONTRIBUYENTE,
-                "PREDIAL",
-                new Ejercicio(desde),
-                new Ejercicio(hasta),
-                PRESENTACION,
-                causal,
-                List.of(),
-                null,
-                OBSERVACION);
+                        CONTRIBUYENTE,
+                        "PREDIAL",
+                        new Ejercicio(desde),
+                        new Ejercicio(hasta),
+                        PRESENTACION,
+                        causal,
+                        List.of(),
+                        null,
+                        OBSERVACION)
+                .prescripcion();
     }
 
     private Valor cobrable(String numero, int ejercicio) {
@@ -432,8 +571,12 @@ class DeclararPrescripcionTest {
     }
 
     private static ValorDetalle detalle(int ejercicio) {
+        return linea("PREDIAL", ejercicio);
+    }
+
+    private static ValorDetalle linea(String tributo, int ejercicio) {
         return ValorDetalle.nuevo(
-                "PREDIAL",
+                tributo,
                 new Ejercicio(ejercicio),
                 null,
                 null,
