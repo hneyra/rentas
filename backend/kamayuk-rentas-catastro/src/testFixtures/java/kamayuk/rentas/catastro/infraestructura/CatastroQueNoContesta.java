@@ -18,6 +18,16 @@ import tools.jackson.databind.json.JsonMapper;
  * <p>Vive en el paquete del adaptador porque {@code enviar(...)} es de paquete: se prefiere un
  * doble dentro a abrir un metodo de produccion para poder probarlo.
  *
+ * <h2>Es un FIXTURE publicado, desde #350</h2>
+ *
+ * <p>Hasta #350 vivia en las pruebas de {@code kamayuk-rentas-aplicacion}, y por eso nadie mas
+ * podia montar el adaptador de verdad: las pruebas de {@code licencias} valorizaban con dobles del
+ * puerto que lanzaban {@code EjercicioSinSellar} por su cuenta, mientras {@code
+ * ValoresUnitariosHttp} dejaba salir el 404 de {@code catastro} como averia — y la ficha del FUE
+ * contestaba 500 sin que ninguna prueba lo viera. Publicado aqui, la prueba de contrato del puerto
+ * y la capa web del FUE montan el adaptador real sobre la misma respuesta cruda. Solo son publicos
+ * la clase y {@link #queContesta}: lo demas sigue siendo del paquete, como {@code enviar}.
+ *
  * <h2>Sustituye {@code enviar} y no {@code pedir}, desde #9</h2>
  *
  * <p>Antes sustituia {@code pedir}, y eso dejaba fuera de toda prueba lo que {@code pedir} decide:
@@ -26,7 +36,7 @@ import tools.jackson.databind.json.JsonMapper;
  * mas abajo, esas ramas son codigo de produccion bajo prueba y las dos mitades de la ida y vuelta
  * siguen midiendo lo mismo.
  */
-class CatastroQueNoContesta extends ClienteHttpDeCatastro {
+public class CatastroQueNoContesta extends ClienteHttpDeCatastro {
 
     private static final JsonMapper JSON = new JsonMapper();
 
@@ -54,7 +64,7 @@ class CatastroQueNoContesta extends ClienteHttpDeCatastro {
      * <p>Hace falta para lo que un {@code JsonNode} no puede expresar: un 422 con el {@code
      * ProblemDetail} de catastro dentro, y un 404 cuyo cuerpo ni siquiera es JSON.
      */
-    static CatastroQueNoContesta queContesta(int estado, String cuerpo) {
+    public static CatastroQueNoContesta queContesta(int estado, String cuerpo) {
         CatastroQueNoContesta doble = new CatastroQueNoContesta(ruta -> JSON.createObjectNode());
         doble.cruda = new RespuestaDeCatastro(estado, cuerpo);
         return doble;

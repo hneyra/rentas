@@ -9,6 +9,9 @@ import java.util.List;
 import kamayuk.rentas.auditoria.Origen;
 import kamayuk.rentas.auditoria.OrigenContext;
 import kamayuk.rentas.auditoria.RegistroDeAuditoria;
+import kamayuk.rentas.catastro.LectorDeValoresUnitarios;
+import kamayuk.rentas.catastro.infraestructura.CatastroQueNoContesta;
+import kamayuk.rentas.catastro.infraestructura.ValoresUnitariosHttp;
 import kamayuk.rentas.contribuyentes.ResumenDeContribuyente;
 import kamayuk.rentas.documentos.EmitirDocumento;
 import kamayuk.rentas.documentos.GeneradorDeDocumentos;
@@ -123,14 +126,14 @@ class EdificacionControllerTest {
                             .conEdificacion(DERECHO_EDIFICACION, DERECHO_REVALIDACION)
                             .sinSellar());
 
-    private MockMvc montar(CuadroDeMentira cuadro) {
+    private MockMvc montar(LectorDeValoresUnitarios cuadro) {
         return montar(
                 cuadro,
                 new DerechosDeMentira(null, null)
                         .conEdificacion(DERECHO_EDIFICACION, DERECHO_REVALIDACION));
     }
 
-    private MockMvc montar(CuadroDeMentira cuadro, DerechosDeMentira derechosDelTupa) {
+    private MockMvc montar(LectorDeValoresUnitarios cuadro, DerechosDeMentira derechosDelTupa) {
         DerechosDeTramiteParametrizados derechos =
                 new DerechosDeTramiteParametrizados(derechosDelTupa);
         ValorizacionDelFue valorizaciones = new ValorizacionDelFue(cuadro);
@@ -624,6 +627,214 @@ class EdificacionControllerTest {
     }
 
     // ==================================================================
+
+    /**
+     * #350 — un ejercicio sin cuadro sellado, con el ADAPTADOR DE VERDAD delante.
+     *
+     * <p>Hasta #350 esta capa solo se montaba con {@link CuadroDeMentira}, que lanza {@code
+     * EjercicioSinSellar} por su cuenta: las pruebas veian la ficha degradar a «—» y en produccion
+     * {@code ValoresUnitariosHttp} dejaba salir el 404 de {@code catastro} como averia, y la ficha
+     * contestaba 500 — tambien la respuesta de una seccion que SI se habia guardado. Aqui el cuadro
+     * lo lee {@link ValoresUnitariosHttp} sobre la respuesta cruda de {@code catastro}, que es la
+     * unica forma de que esta prueba vea lo que vera quien atiende.
+     */
+    @Nested
+    @DisplayName("#350 — sin cuadro sellado, con el adaptador de catastro de verdad")
+    class SinCuadroConElAdaptador {
+
+        private static final String DEL_2025 = "EXP-2025-0350";
+
+        /** `catastro` contesta lo que contesta a un ejercicio sin conjunto sellado. */
+        private final MockMvc sinSellar =
+                montar(
+                        new ValoresUnitariosHttp(
+                                CatastroQueNoContesta.queContesta(
+                                        404,
+                                        """
+                                        {"type":"about:blank","status":404,"codigo":"NO_ENCONTRADO",
+                                         "detail":"El ejercicio no tiene conjunto sellado"}
+                                        """)));
+
+        /** `catastro` no contesta: lo que llega es la pagina de error de un proxy. */
+        private final MockMvc caido =
+                montar(
+                        new ValoresUnitariosHttp(
+                                CatastroQueNoContesta.queContesta(
+                                        503, "<html><body>503 Service Unavailable</body></html>")));
+
+        @Test
+        @DisplayName(
+                "la seccion VALORIZACION de un FUE de 2025 se guarda y la respuesta es 201 con «—»,"
+                        + " no 500")
+        void completarLaValorizacionDe2025() throws Exception {
+            presentarEl(sinSellar, DEL_2025, "2025-11-20");
+
+            String cuerpo =
+                    envio(
+                            sinSellar,
+                            "/rentas/api/v1/licencias/edificacion/" + DEL_2025 + "/secciones",
+                            VALORIZACION,
+                            201);
+
+            assertThat(cuerpo)
+                    .as(
+                            "la escritura se confirmo: un 500 aqui la reporta como fallida y quien"
+                                    + " atiende la repite")
+                    .contains("\"valorDeObra\":null")
+                    .as(
+                            "el motivo nombra el ejercicio del ACTO, 2025, con su propio texto: el"
+                                    + " expediente y la fecha tambien llevan «2025», asi que buscar"
+                                    + " el anio suelto no distingue nada")
+                    .contains(MOTIVO_SIN_SELLAR_2025);
+        }
+
+        @Test
+        @DisplayName("el GET de la ficha de un FUE de 2025 contesta 200, sin cifra y con el motivo")
+        void laFichaDe2025() throws Exception {
+            presentarEl(sinSellar, DEL_2025, "2025-11-20");
+            envio(
+                    sinSellar,
+                    "/rentas/api/v1/licencias/edificacion/" + DEL_2025 + "/secciones",
+                    VALORIZACION,
+                    201);
+
+            String ficha =
+                    obtener(
+                            sinSellar,
+                            "/rentas/api/v1/licencias/edificacion?nroExpediente=" + DEL_2025);
+
+            assertThat(ficha)
+                    .contains("\"valorDeObra\":null")
+                    .as("el motivo nombra el ejercicio de la declaracion, no otro")
+                    .contains(MOTIVO_SIN_SELLAR_2025);
+        }
+
+        @Test
+        @DisplayName("el reporte general con corte el 4 de enero de 2027, sin cuadro 2027: 200")
+        void elReporteDelCuatroDeEnero() throws Exception {
+            presentarEl(sinSellar, DEL_2025, "2025-11-20");
+
+            String reporte =
+                    obtener(
+                            sinSellar,
+                            "/rentas/api/v1/licencias/edificacion/reportes/general?hasta=2027-01-04");
+
+            assertThat(reporte)
+                    .as("el 1 de enero de cada anio es una fecha cierta en que el reporte caeria")
+                    .contains("\"expediente\":\"" + DEL_2025 + "\"")
+                    .contains("\"valorDeObraS\":null")
+                    .as("el reporte valoriza al corte, y el corte cae en 2027")
+                    .contains(
+                            "\"valorDeObraNoDisponible\":\"No hay ningun conjunto de parametros"
+                                    + " sellado para el ejercicio 2027:");
+        }
+
+        @Test
+        @DisplayName(
+                "con el derecho sellado y el cuadro no, la licencia se emite igual: 201 con «—»")
+        void laEmisionSinCuadro() throws Exception {
+            expedienteCompleto();
+
+            String cuerpo = emitir(sinSellar, 201);
+
+            assertThat(cuerpo)
+                    .as("«la licencia se emite igual» (EmitirLicenciaDeEdificacion, #48 vs #197)")
+                    .contains("\"nroLicencia\":\"LE-2026-000001\"")
+                    .contains("\"valorDeObraNoDisponible\":\"No hay ningun conjunto");
+        }
+
+        @Test
+        @DisplayName("con catastro caido, la ficha contesta 200 diciendo que no se pudo preguntar")
+        void laFichaConCatastroCaido() throws Exception {
+            presentarEl(sinSellar, DEL_2025, "2025-11-20");
+            envio(
+                    caido,
+                    "/rentas/api/v1/licencias/edificacion/" + DEL_2025 + "/secciones",
+                    VALORIZACION,
+                    201);
+
+            String ficha =
+                    obtener(
+                            caido,
+                            "/rentas/api/v1/licencias/edificacion?nroExpediente=" + DEL_2025);
+
+            assertThat(ficha)
+                    .as(
+                            "una lectura no deja la pantalla inservible porque el vecino no"
+                                    + " contesto; y no dice «falta sellar», que mandaria a publicar"
+                                    + " una cifra que quiza ya esta publicada")
+                    .contains("\"valorDeObra\":null")
+                    .contains("No se pudo preguntar a `catastro`")
+                    .doesNotContain("No hay ningun conjunto");
+        }
+
+        @Test
+        @DisplayName("con catastro caido, el reporte general contesta 200 con el mismo motivo")
+        void elReporteConCatastroCaido() throws Exception {
+            presentarEl(sinSellar, DEL_2025, "2025-11-20");
+
+            String reporte =
+                    obtener(caido, "/rentas/api/v1/licencias/edificacion/reportes/general");
+
+            assertThat(reporte)
+                    .contains("\"valorDeObraS\":null")
+                    .contains("No se pudo preguntar a `catastro`");
+        }
+
+        @Test
+        @DisplayName("con catastro caido, la emision NO degrada: no se emite un papel sin cifra")
+        void laEmisionConCatastroCaidoNoDegrada() throws Exception {
+            expedienteCompleto();
+
+            MvcResult resultado =
+                    caido.perform(
+                                    MockMvcRequestBuilders.post(
+                                                    "/rentas/api/v1/licencias/edificacion/"
+                                                            + EXPEDIENTE
+                                                            + "/licencia")
+                                            .contentType(MediaType.APPLICATION_JSON)
+                                            .content(
+                                                    """
+                                                    {"fechaDeEmision":"2026-03-16",
+                                                     "vigenciaHasta":"2029-03-16",
+                                                     "nDeRecibo":"%s",
+                                                     "observacion":"Se otorga la licencia"}
+                                                    """
+                                                            .formatted(RECIBO)))
+                            .andReturn();
+
+            assertThat(resultado.getResponse().getStatus())
+                    .as(
+                            "el papel es permanente: imprimir «—» porque el vecino estaba caido"
+                                    + " dejaria sin cifra una licencia cuya cifra si existia")
+                    .isNotEqualTo(201);
+            assertThat(
+                            obtener(
+                                    mvc,
+                                    "/rentas/api/v1/licencias/edificacion?nroExpediente="
+                                            + EXPEDIENTE))
+                    .as("y no queda ninguna licencia emitida a medias")
+                    .contains("\"nroLicencia\":null");
+        }
+
+        /**
+         * El motivo EXACTO con que la ficha dice que 2025 no tiene cuadro, con la coma que lo
+         * cierra. Buscar {@code "2025"} a secas no podia fallar: {@code EXP-2025-0350} y {@code
+         * 2025-11-20} van en la misma respuesta, y el doble contesta 404 a cualquier ejercicio.
+         */
+        private static final String MOTIVO_SIN_SELLAR_2025 =
+                "\"valorDeObraNoDisponible\":\"No hay ningun conjunto de parametros sellado para el"
+                        + " ejercicio 2025,";
+
+        private static final String VALORIZACION =
+                """
+                {"seccion":"VALORIZACION","valorizacion":[
+                   {"piso":1,"partida":"MUROS","categoria":"A","areaM":"40.00"}],
+                 "observacion":"Se registra la valorizacion"}
+                """;
+    }
+
+    // ==================================================================
     // Ayudas
     // ==================================================================
 
@@ -736,9 +947,32 @@ class EdificacionControllerTest {
     }
 
     private String obtener(String ruta) throws Exception {
-        MvcResult resultado = mvc.perform(MockMvcRequestBuilders.get(ruta)).andReturn();
-        assertThat(resultado.getResponse().getStatus()).isEqualTo(200);
+        return obtener(mvc, ruta);
+    }
+
+    private String obtener(MockMvc destino, String ruta) throws Exception {
+        MvcResult resultado = destino.perform(MockMvcRequestBuilders.get(ruta)).andReturn();
+        assertThat(resultado.getResponse().getStatus())
+                .as("%s -> %s", ruta, resultado.getResponse().getContentAsString())
+                .isEqualTo(200);
         return resultado.getResponse().getContentAsString();
+    }
+
+    /** Presenta un FUE con SU fecha de declaracion: la del acto, con la que se valoriza. */
+    private void presentarEl(MockMvc destino, String expediente, String fechaDeclaracion)
+            throws Exception {
+        envio(
+                destino,
+                "/rentas/api/v1/licencias/edificacion",
+                """
+                {"nroExpediente":"%s","fechaDeclaracion":"%s",
+                 "codContribuyente":"C-0007","tipoTramite":"LICENCIA_DE_OBRA",
+                 "obra":"EDIFICACION_NUEVA","modalidadAprobacion":"B",
+                 "revision":"REVISORES_URBANOS","solicitanteEsPropietario":true,
+                 "observacion":"Se presenta el FUE de regularizacion"}
+                """
+                        .formatted(expediente, fechaDeclaracion),
+                201);
     }
 
     private static kamayuk.rentas.tesoreria.ReciboDeTramite recibo(

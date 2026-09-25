@@ -6,6 +6,7 @@ import kamayuk.rentas.catastro.LectorDeValoresUnitarios;
 import kamayuk.rentas.catastro.ValorUnitarioPublicado;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.ValorNormativo;
+import kamayuk.rentas.parametros.LectorDeParametros;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 
@@ -29,13 +30,32 @@ import tools.jackson.databind.JsonNode;
  * valores unitarios—, asi que cambiarla por una de ellas las separaria. Quien supuso un sobre que
  * nunca estuvo fue este adaptador.
  *
- * <p>Un ejercicio sin conjunto sellado NO devuelve una lista vacia: `catastro` contesta 404 y este
- * cliente lo deja salir como {@code CatastroInalcanzable}. Es lo que el javadoc del puerto ya
- * exigia —«no devuelve vacio y no devuelve ceros»—, porque una lista vacia se leeria como «este
- * ejercicio no tiene cuadro» y la obra saldria valorizada en 0,00 (#48).
+ * <h2>Un ejercicio sin cuadro sellado es {@code EjercicioSinSellar}, no una averia (#350)</h2>
+ *
+ * <p>Un ejercicio sin conjunto sellado NO devuelve una lista vacia —una lista vacia se leeria como
+ * «este ejercicio no tiene cuadro» y la obra saldria valorizada en 0,00 (#48)—: `catastro` contesta
+ * <b>404 con su {@code codigo}</b>, y este adaptador lo traduce a {@link
+ * LectorDeParametros.EjercicioSinSellar}, que es lo que el javadoc del puerto exige.
+ *
+ * <p>Hasta #350 lo dejaba salir como {@code CatastroInalcanzable}, y este mismo javadoc decia que
+ * eso era lo que el puerto pedia. No lo era: {@code ValorizacionDelFue} solo sabe convertir en «—»
+ * el {@code EjercicioSinSellar}, asi que en un anio sin cuadro la ficha del FUE, el reporte general
+ * y la respuesta de «completar seccion» —una escritura que SI se habia confirmado— contestaban 500.
+ * Las pruebas no lo veian porque el doble del puerto lanzaba {@code EjercicioSinSellar} por su
+ * cuenta; desde #350 los dos pasan por la misma prueba de contrato ({@code
+ * ContratoDelLectorDeValoresUnitarios}).
+ *
+ * <p>Es lo mismo que {@code ClienteHttpDeNormativa} ya hacia con el 404 de su vecino. Y solo el 404
+ * <b>con codigo</b>: uno sin el —el HTML de un proxy— no es una respuesta de `catastro`, y un
+ * codigo con otro estado tampoco dice «ese ejercicio no tiene cuadro». Los dos siguen siendo
+ * averia; que cuenta como respuesta lo decide {@link ClienteHttpDeCatastro#hechoContestado}, y no
+ * este adaptador.
  */
 @Component
 public class ValoresUnitariosHttp implements LectorDeValoresUnitarios {
+
+    /** Lo que `catastro` contesta en esta ruta cuando el ejercicio no tiene conjunto sellado. */
+    private static final int NO_HAY_CONJUNTO_SELLADO = 404;
 
     private final ClienteHttpDeCatastro catastro;
 
@@ -45,10 +65,15 @@ public class ValoresUnitariosHttp implements LectorDeValoresUnitarios {
 
     @Override
     public List<ValorUnitarioPublicado> valoresUnitariosVigentesEn(Ejercicio ejercicio) {
+        String que = "leer el cuadro de valores unitarios de " + ejercicio;
         JsonNode cuerpo =
-                catastro.pedir(
+                catastro.pedirTraduciendoLosHechos(
                         "/catastro/tablas/valores-unitarios?ejercicio=" + ejercicio.valor(),
-                        "leer el cuadro de valores unitarios de " + ejercicio);
+                        que,
+                        hecho ->
+                                hecho.estado() == NO_HAY_CONJUNTO_SELLADO
+                                        ? new LectorDeParametros.EjercicioSinSellar(ejercicio)
+                                        : hecho.comoAveria(que));
         List<ValorUnitarioPublicado> filas = new ArrayList<>();
         if (!cuerpo.isArray()) {
             // No es una comodidad: si `catastro` cambiara la forma, iterar un nodo que no es

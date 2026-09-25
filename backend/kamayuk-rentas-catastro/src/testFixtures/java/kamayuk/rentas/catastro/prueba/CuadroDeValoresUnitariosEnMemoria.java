@@ -22,9 +22,15 @@ import kamayuk.rentas.dominio.ValorNormativo;
  * <h2>Un ejercicio sin cuadro NO devuelve una lista vacia</h2>
  *
  * <p>Lanza {@code EjercicioSinSellar}, que es lo que el javadoc del puerto exige —«no devuelve
- * vacio y no devuelve ceros»— y lo que el cliente HTTP hara con el 404 de `catastro`. Una lista
- * vacia dejaria la obra valorizada en 0,00 y ese cero es indistinguible de uno correcto cuando
- * llega al papel que se exhibe en la obra (#48).
+ * vacio y no devuelve ceros»—. Una lista vacia dejaria la obra valorizada en 0,00 y ese cero es
+ * indistinguible de uno correcto cuando llega al papel que se exhibe en la obra (#48).
+ *
+ * <p><b>Hasta #350 esto era una premisa y no un hecho</b>: este doble decia hacer «lo que el
+ * cliente HTTP hara con el 404 de `catastro`», y el cliente no lo hacia —lo dejaba salir como
+ * averia, y la ficha del FUE contestaba 500 mientras las pruebas de {@code licencias}, montadas
+ * sobre este doble, la veian degradar a «—»—. Desde #350 los dos pasan por la misma prueba de
+ * contrato, {@code ContratoDelLectorDeValoresUnitarios}: si uno de los dos deja de lanzar esto,
+ * sale roja la suya.
  */
 public final class CuadroDeValoresUnitariosEnMemoria implements LectorDeValoresUnitarios {
 
