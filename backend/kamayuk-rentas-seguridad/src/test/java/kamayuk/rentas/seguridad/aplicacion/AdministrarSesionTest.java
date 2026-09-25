@@ -15,6 +15,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Locale;
+import java.util.TimeZone;
 import kamayuk.rentas.auditoria.AuditoriaJdbc;
 import kamayuk.rentas.auditoria.Operacion;
 import kamayuk.rentas.auditoria.Origen;
@@ -374,6 +375,70 @@ class AdministrarSesionTest {
                     .as("y al reves: pidiendo marzo no sale lo de agosto")
                     .contains(marca + "-otro-dia")
                     .doesNotContain(marca + "-patron");
+        }
+
+        /**
+         * El dia del filtro es el de la municipalidad, y no el del servidor (#327).
+         *
+         * <p>{@code desde} y {@code hasta} llegan como dias y se comparan con {@code
+         * auditoria.fecha}, un {@code timestamptz}. Hasta #327 se pasaban como {@code
+         * LocalDateTime} —la medianoche sin zona—, que PostgreSQL resuelve con la zona de la
+         * <b>sesion</b>, y pgjdbc la toma de la JVM. Con la JVM en UTC —la de casi todo
+         * contenedor—, pedir el 18 filtraba de las 19:00 del 17 a las 19:00 del 18, hora del Peru:
+         * traia un recibo anulado a las 20:00 del 17, que la misma bitacora publica como {@code
+         * 2026-08-17T20:00-05:00} desde #188, y omitia lo del 18 despues de las 19:00.
+         *
+         * <p><b>Por que a las 20:00 y no a mediodia.</b> Una siembra a mediodia cae dentro del dia
+         * con las dos lecturas y sale verde con el defecto dentro —la muestra uniforme de #273—.
+         * Las dos de aqui estan en la franja de las 19:00 a la medianoche, que es donde el dia UTC
+         * y el local discrepan, y cada una se equivoca en un sentido distinto: la de la vispera
+         * entraba sin deber, y la de la noche faltaba debiendo estar.
+         *
+         * <p><b>Por que con la JVM en UTC.</b> Porque el defecto dependia de la zona del proceso:
+         * en un puesto que ya estuviera en la del producto, la prueba saldria verde sin arreglar
+         * nada. La conexion de esta clase se abre en cada consulta, asi que toma la zona que la JVM
+         * tenga en ese momento.
+         */
+        @Test
+        @DisplayName("#327 — el dia del filtro es el de la municipalidad, con la JVM en UTC")
+        void elDiaDelFiltroEsElDeLaMunicipalidad() {
+            String marca = "327-" + System.nanoTime();
+            // Las 20:00 del 17 y las 20:00 del 18 de agosto en el Peru, escritas en UTC: en UTC
+            // las dos ya son del dia siguiente, y esa es la trampa.
+            sembrar(
+                    Clock.fixed(Instant.parse("2026-08-18T01:00:00Z"), ZoneId.of("America/Lima")),
+                    "operador.a",
+                    "recibo",
+                    marca + "-la-vispera",
+                    Operacion.ANULACION);
+            sembrar(
+                    Clock.fixed(Instant.parse("2026-08-19T01:00:00Z"), ZoneId.of("America/Lima")),
+                    "operador.a",
+                    "recibo",
+                    marca + "-la-noche",
+                    Operacion.ANULACION);
+
+            LocalDate elDieciocho = LocalDate.of(2026, 8, 18);
+            TimeZone zonaDeLaJvm = TimeZone.getDefault();
+            List<String> delDieciocho;
+            try {
+                TimeZone.setDefault(TimeZone.getTimeZone("UTC"));
+                delDieciocho =
+                        clavesDe(
+                                new ConsultaDeAuditoria(
+                                        EJERCICIO, null, null, null, elDieciocho, elDieciocho));
+            } finally {
+                TimeZone.setDefault(zonaDeLaJvm);
+            }
+
+            assertThat(delDieciocho)
+                    .as(
+                            "pidiendo el 18 sale lo de las 20:00 del 18, hora del Peru, y NO lo de"
+                                    + " las 20:00 del 17: con la medianoche resuelta en la zona de"
+                                    + " la sesion, el filtro iba de las 19:00 del 17 a las 19:00"
+                                    + " del 18")
+                    .contains(marca + "-la-noche")
+                    .doesNotContain(marca + "-la-vispera");
         }
 
         /**

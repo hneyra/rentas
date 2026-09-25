@@ -185,4 +185,37 @@ class ZonaHorariaTest {
                     .hasMessage("No hay hora publicada sin instante");
         }
     }
+
+    @Nested
+    @DisplayName("textoConSuDesfase: la hora que un documento imprime (#327)")
+    class LaHoraQueSeImprime {
+
+        @Test
+        @DisplayName("las 20:00 del 4 se escriben el 4 a las 20:00 con -05:00, segundos incluidos")
+        void seEscribeConSuDesfase() {
+            // Con los segundos aunque sean cero: es el texto que Jackson escribe en la API para
+            // `conSuDesfase` (`FormaSegunJacksonTest`), y el papel y la pantalla tienen que
+            // compararse caracter a caracter. `OffsetDateTime.toString()` los omitiria.
+            assertThat(ZonaHoraria.textoConSuDesfase(LAS_OCHO_DE_LA_NOCHE))
+                    .isEqualTo("2026-03-04T20:00:00-05:00");
+            assertThat(LAS_OCHO_DE_LA_NOCHE.toString())
+                    .as("y asi salia en el acta antes de #327: el dia 5 y a la 01:00")
+                    .isEqualTo("2026-03-05T01:00:00Z");
+        }
+
+        @Test
+        @DisplayName("y el desfase sale de la zona: en 1990 es -04:00")
+        void elDesfaseSaleDeLaZona() {
+            assertThat(ZonaHoraria.textoConSuDesfase(Instant.parse("1990-01-16T04:30:00Z")))
+                    .isEqualTo("1990-01-16T00:30:00-04:00");
+        }
+
+        @Test
+        @DisplayName("sin instante no hay hora impresa")
+        void sinInstanteNoHayTexto() {
+            assertThatThrownBy(() -> ZonaHoraria.textoConSuDesfase(null))
+                    .isInstanceOf(NullPointerException.class)
+                    .hasMessage("No hay hora publicada sin instante");
+        }
+    }
 }

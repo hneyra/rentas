@@ -2204,7 +2204,7 @@
         "anterior": "texto",
         "nueva": "texto",
         "usuario": "texto",
-        "fecha": "texto",
+        "fecha": "instante",
         "observacion": "texto"
       }
     ]
@@ -4027,8 +4027,8 @@
     "estado": "texto",
     "asientos": "entero",
     "motivo": "texto",
-    "recibidoEn": "texto",
-    "aplicadoEn": "texto",
+    "recibidoEn": "instante",
+    "aplicadoEn": "instante",
     "nuevo": "booleano"
   },
   "POST /rentas/alcabala": {

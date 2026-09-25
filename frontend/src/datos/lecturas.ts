@@ -1267,6 +1267,7 @@ export interface CambioDePlaca {
   readonly anterior: string;
   readonly nueva: string;
   readonly usuario: string;
+  /** Instante **con su desfase**, `2026-03-04T20:00:00-05:00` (#327). Hasta entonces salia en UTC, con una `Z`. */
   readonly fecha: string;
   readonly observacion: string;
 }

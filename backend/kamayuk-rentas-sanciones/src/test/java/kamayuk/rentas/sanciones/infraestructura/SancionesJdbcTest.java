@@ -1182,6 +1182,37 @@ class SancionesJdbcTest {
                     .as("el expediente ensena el mismo dia que el acta imprimio: el 4, no el 5")
                     .isEqualTo(DIA_DEL_INGRESO);
         }
+
+        /**
+         * La «Fecha de ingreso» que las dos actas imprimen es la hora del Peru (#327).
+         *
+         * <p>La prueba de arriba mira «Datos al», que #273 arreglo; la «Fecha de ingreso» del mismo
+         * documento se imprimia con {@code Instant.toString()}, o sea en UTC: un vehiculo que entra
+         * a las 20:00 del 4 salia en el acta que se entrega al conductor con {@code
+         * 2026-03-05T01:00:00Z}, junto a un «Datos al 2026-03-04». Y el acta de liberacion la
+         * repite, leida de la base: son dos sitios, y cada uno se mira aparte.
+         */
+        @Test
+        @DisplayName("#327 — y las dos actas imprimen la hora de ingreso del Peru, no la de UTC")
+        void laFechaDeIngresoDeLasActasEsLaDelPeru() {
+            Papeleta papeleta = papeletaDeTransito("Z05");
+            RegistrarInternamiento.Internado internado =
+                    internarVehiculo(papeleta, "T2G-705", null, INGRESO_NOCTURNO);
+            String recibo = cobrarCustodia(papeleta.obligadoId());
+            LiberarVehiculoInternado.Liberado liberado =
+                    liberarVehiculo("T2G-705", recibo, DIA_DEL_INGRESO);
+
+            assertThat(new String(internado.acta().contenido(), StandardCharsets.ISO_8859_1))
+                    .as(
+                            "el acta de ingreso: las 20:00 del 4 con su desfase, no la 01:00 del 5"
+                                    + " en UTC")
+                    .contains("2026-03-04T20:00:00-05:00")
+                    .doesNotContain("2026-03-05T01:00");
+            assertThat(new String(liberado.acta().contenido(), StandardCharsets.ISO_8859_1))
+                    .as("y el acta de liberacion, que la lee de la base: la misma hora")
+                    .contains("2026-03-04T20:00:00-05:00")
+                    .doesNotContain("2026-03-05T01:00");
+        }
     }
 
     @Nested

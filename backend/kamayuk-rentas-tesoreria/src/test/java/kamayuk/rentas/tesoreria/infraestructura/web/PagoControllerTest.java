@@ -28,6 +28,7 @@ import org.springframework.http.converter.json.JacksonJsonHttpMessageConverter;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
@@ -101,6 +102,32 @@ class PagoControllerTest {
         assertThat(resultado.getResponse().getStatus()).isEqualTo(201);
         assertThat(resultado.getResponse().getContentAsString())
                 .contains("\"estado\":\"APLICADO\"");
+    }
+
+    /**
+     * Las dos horas del acuse salen con el desfase de la zona del producto (#327).
+     *
+     * <p>El reloj de esta clase marca la medianoche UTC del 16 de marzo, que en el Peru son <b>las
+     * 19:00 del 15</b>: la franja en que el dia de UTC y el local discrepan, asi que un fallo aqui
+     * no cambia solo la hora, cambia la fecha. Hasta #327 los dos campos eran {@code String}
+     * escritos con {@code Instant.toString()} y salian {@code 2026-03-16T00:00:00Z}: el contrato
+     * los tipaba «texto» y la guarda de #188, que mira el tipo, no los veia.
+     */
+    @Test
+    @DisplayName("#327 — recibidoEn y aplicadoEn salen con -05:00, no con una Z")
+    void lasHorasDelAcuseLlevanSuDesfase() throws Exception {
+        caso.todaviaNo = false;
+
+        MvcResult resultado = entregar(anulacion());
+
+        assertThat(resultado.getResponse().getStatus()).isEqualTo(201);
+        JsonNode acuse = JSON.readTree(resultado.getResponse().getContentAsString());
+        assertThat(acuse.get("recibidoEn").asString())
+                .as("las 19:00 del 15 en el Peru, que en UTC ya son las 00:00 del 16")
+                .isEqualTo("2026-03-15T19:00:00-05:00");
+        assertThat(acuse.get("aplicadoEn").asString())
+                .as("y la hora de aplicacion, igual: el mismo instante, con su desfase encima")
+                .isEqualTo("2026-03-15T19:00:00-05:00");
     }
 
     // ------------------------------------------------------------------

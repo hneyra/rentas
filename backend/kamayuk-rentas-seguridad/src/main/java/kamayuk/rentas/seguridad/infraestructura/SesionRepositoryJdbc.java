@@ -2,7 +2,9 @@ package kamayuk.rentas.seguridad.infraestructura;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -12,6 +14,7 @@ import kamayuk.rentas.auditoria.OrigenContext;
 import kamayuk.rentas.compartido.Pagina;
 import kamayuk.rentas.compartido.Paginacion;
 import kamayuk.rentas.dominio.Ejercicio;
+import kamayuk.rentas.dominio.ZonaHoraria;
 import kamayuk.rentas.persistencia.OrdenSeguro;
 import kamayuk.rentas.persistencia.RepositorioJdbc;
 import kamayuk.rentas.seguridad.dominio.ConsultaDeAuditoria;
@@ -129,15 +132,24 @@ public class SesionRepositoryJdbc extends RepositorioJdbc implements SesionRepos
             donde.append(" AND operacion = :operacion");
             parametros.put("operacion", operacion.name());
         }
-        if (consulta.desde() != null) {
+        // Los dos extremos son el comienzo de un dia DE LA MUNICIPALIDAD, ya resuelto a instante
+        // (#327). Hasta entonces eran `LocalDateTime` —la medianoche sin zona— comparados con
+        // `auditoria.fecha timestamptz`, y PostgreSQL los resuelve con la zona de la SESION, que
+        // pgjdbc toma de la JVM: con la JVM en UTC, pedir el 18 filtraba de las 19:00 del 17 a
+        // las 19:00 del 18, y traia un recibo anulado a las 20:00 del 17 que esta misma bitacora
+        // publica como `2026-08-17T20:00-05:00`. Un `Timestamp` lleva el instante y no depende
+        // de la zona de nadie.
+        LocalDate desde = consulta.desde();
+        if (desde != null) {
             donde.append(" AND fecha >= :desde");
-            parametros.put("desde", consulta.desde().atStartOfDay());
+            parametros.put("desde", Timestamp.from(ZonaHoraria.comienzoDelDia(desde)));
         }
-        if (consulta.hasta() != null) {
+        LocalDate hasta = consulta.hasta();
+        if (hasta != null) {
             // El rango es inclusivo por los dos extremos: quien filtra «del 1 al 31»
             // espera ver lo del 31, y un `< hasta` sobre timestamptz lo dejaria fuera.
             donde.append(" AND fecha < :hasta");
-            parametros.put("hasta", consulta.hasta().plusDays(1).atStartOfDay());
+            parametros.put("hasta", Timestamp.from(ZonaHoraria.comienzoDelDia(hasta.plusDays(1))));
         }
 
         return paginar(

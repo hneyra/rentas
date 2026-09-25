@@ -8,6 +8,7 @@ import kamayuk.rentas.documentos.Campo;
 import kamayuk.rentas.documentos.ModeloDeDocumento;
 import kamayuk.rentas.documentos.PuntoDeFirma;
 import kamayuk.rentas.documentos.Tabla;
+import kamayuk.rentas.dominio.ZonaHoraria;
 import kamayuk.rentas.sanciones.dominio.Internamiento;
 import kamayuk.rentas.sanciones.dominio.TipoDeMovimientoDeInternamiento;
 import kamayuk.rentas.tesoreria.TasaCobrada;
@@ -55,7 +56,9 @@ final class ModeloDelActaDeInternamiento {
         List<Campo> cabecera = new ArrayList<>();
         cabecera.add(Campo.de("Placa", placa));
         cabecera.add(Campo.de("Deposito", deposito));
-        cabecera.add(Campo.de("Fecha de ingreso", fechaIngreso.toString()));
+        // La hora del Peru con su desfase, no la de UTC (#327): un ingreso de las 20:00 del 4
+        // se imprimia `2026-03-05T01:00:00Z`, debajo de un «Datos al 2026-03-04».
+        cabecera.add(Campo.de("Fecha de ingreso", ZonaHoraria.textoConSuDesfase(fechaIngreso)));
         cabecera.add(Campo.de("Papeleta", numeroDePapeleta == null ? "" : numeroDePapeleta));
         cabecera.add(Campo.de("Concepto de custodia", tasaCustodia));
         cabecera.add(Campo.de("Motivo del internamiento", motivo));
@@ -99,7 +102,10 @@ final class ModeloDelActaDeInternamiento {
         cabecera.add(Campo.de("Acta de ingreso", internamiento.acta()));
         cabecera.add(Campo.de("Placa", internamiento.placa()));
         cabecera.add(Campo.de("Deposito", internamiento.deposito()));
-        cabecera.add(Campo.de("Fecha de ingreso", internamiento.fechaIngreso().toString()));
+        cabecera.add(
+                Campo.de(
+                        "Fecha de ingreso",
+                        ZonaHoraria.textoConSuDesfase(internamiento.fechaIngreso())));
         cabecera.add(Campo.de("Papeleta", numeroDePapeleta == null ? "" : numeroDePapeleta));
         cabecera.add(Campo.de("Fecha del acto", fecha.toString()));
         cabecera.add(Campo.de("Dias en deposito", String.valueOf(dias)));
