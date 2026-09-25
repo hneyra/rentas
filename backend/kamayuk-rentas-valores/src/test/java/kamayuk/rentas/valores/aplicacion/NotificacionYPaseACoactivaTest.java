@@ -11,11 +11,17 @@ import java.util.List;
 import kamayuk.rentas.auditoria.RegistroDeAuditoria;
 import kamayuk.rentas.contribuyentes.ResumenDeContribuyente;
 import kamayuk.rentas.dominio.ActoFueraDeOrden;
+import kamayuk.rentas.dominio.CalendarioHabil;
 import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.dominio.Ejercicio;
+import kamayuk.rentas.dominio.Exigibilidad;
 import kamayuk.rentas.dominio.ModalidadDeNotificacion;
 import kamayuk.rentas.dominio.Observacion;
+import kamayuk.rentas.dominio.Plazo;
 import kamayuk.rentas.dominio.ResultadoDeNotificacion;
+import kamayuk.rentas.parametros.IdentificadorDeConjunto;
+import kamayuk.rentas.parametros.NormativaQueCambiaEntreLlamadas;
+import kamayuk.rentas.parametros.ParametrosSellados;
 import kamayuk.rentas.valores.dobles.ContribuyentesDeMentira;
 import kamayuk.rentas.valores.dobles.MovimientosEnMemoria;
 import kamayuk.rentas.valores.dobles.NotificacionesEnMemoria;
@@ -426,6 +432,85 @@ class NotificacionYPaseACoactivaTest {
                     "TITULAR",
                     "CARGO-1",
                     OBSERVACION);
+        }
+    }
+
+    /**
+     * #361 — El plazo para reclamar sale del conjunto que la notificacion guarda.
+     *
+     * <p>Hasta #361 {@code PlazosParametrizados.aLaFechaDe} resolvia el conjunto dos veces —los
+     * parametros por un lado, el identificador por otro—, y {@code RegistrarNotificacion} calculaba
+     * {@code exigibleDesde} con el plazo de la primera y guardaba el {@code conjunto_id} de la
+     * segunda. Con el doble de siempre, que contesta el mismo conjunto a cualquier pregunta, no se
+     * ve: hace falta uno que cambie entre llamadas, con el plazo distinto en cada version.
+     */
+    @Nested
+    @DisplayName("#361 — el plazo y el conjunto guardado salen de una sola resolucion")
+    class UnaSolaResolucionDelConjunto {
+
+        @Test
+        @DisplayName("exigibleDesde sale del plazo del conjunto que la notificacion guarda")
+        void elPlazoEsElDelConjuntoGuardado() {
+            NormativaQueCambiaEntreLlamadas normativa =
+                    new NormativaQueCambiaEntreLlamadas(
+                            IdentificadorDeConjunto.de(1L),
+                            conPlazo(1, "20 DIAS_HABILES"),
+                            IdentificadorDeConjunto.de(2L),
+                            conPlazo(2, "5 DIAS_HABILES"));
+            RegistrarNotificacion conLaNormativaQueCambia =
+                    new RegistrarNotificacion(
+                            valores,
+                            notificaciones,
+                            contribuyentes,
+                            new PlazosParametrizados(normativa),
+                            auditados::add,
+                            Clock.fixed(
+                                    HOY.atStartOfDay(ZoneOffset.UTC).toInstant(), ZoneOffset.UTC));
+            LocalDate diligencia = LocalDate.of(2026, 4, 3);
+
+            Notificacion guardada =
+                    conLaNormativaQueCambia.registrar(
+                            "OP-2026-000001",
+                            diligencia,
+                            ModalidadDeNotificacion.PERSONAL,
+                            ResultadoDeNotificacion.NOTIFICADO,
+                            "J. RUIZ PALACIOS",
+                            null,
+                            "TITULAR",
+                            "DNI 12345678",
+                            "TITULAR",
+                            "CARGO-1",
+                            OBSERVACION);
+
+            int resoluciones = normativa.resoluciones();
+            ParametrosSellados delGuardado =
+                    normativa.porConjunto(
+                            IdentificadorDeConjunto.de(
+                                    java.util.Objects.requireNonNull(guardada.conjuntoId())));
+            Plazo plazoDelGuardado =
+                    Plazo.de(delGuardado.texto("PLAZO", "NOTIFICACION_VALOR-OP").orElseThrow());
+            LocalDate conElPlazoDelGuardado =
+                    Exigibilidad.derivarDe(
+                                    diligencia, plazoDelGuardado, CalendarioHabil.sinFeriados())
+                            .exigibleDesde();
+            org.assertj.core.api.SoftAssertions.assertSoftly(
+                    blando -> {
+                        blando.assertThat(resoluciones)
+                                .as("una notificacion resuelve el conjunto UNA vez")
+                                .isEqualTo(1);
+                        blando.assertThat(guardada.exigibleDesde())
+                                .as(
+                                        "el plazo para reclamar tiene que quedar explicado por el"
+                                                + " conjunto que la fila guarda (ARQ-09 §3): con"
+                                                + " otro, revisar el expediente da otra fecha")
+                                .isEqualTo(conElPlazoDelGuardado);
+                    });
+        }
+
+        private ParametrosSellados conPlazo(int version, String plazo) {
+            return ParametrosSellados.de(new Ejercicio(2026), version)
+                    .texto("PLAZO", "NOTIFICACION_VALOR-OP", plazo)
+                    .construir();
         }
     }
 

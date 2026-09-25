@@ -8,6 +8,7 @@ import java.util.Set;
 import kamayuk.rentas.dominio.CalendarioHabil;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.Plazo;
+import kamayuk.rentas.parametros.ConjuntoVigente;
 import kamayuk.rentas.parametros.LectorDeParametros;
 import kamayuk.rentas.parametros.ParametroSinPublicar;
 import kamayuk.rentas.parametros.ParametrosSellados;
@@ -56,13 +57,19 @@ public class PlazosParametrizados {
         this.parametros = parametros;
     }
 
-    /** Los plazos que rigen a esa fecha, resueltos una sola vez. */
+    /**
+     * Los plazos que rigen a esa fecha, resueltos una sola vez.
+     *
+     * <p>«Una sola vez» es literal desde #361: hasta entonces eran dos resoluciones —los parametros
+     * con {@code vigenteEn} y el identificador con {@code conjuntoVigenteEn}—, y {@code
+     * RegistrarNotificacion} calculaba {@code exigibleDesde} con el plazo de la primera y guardaba
+     * el {@code conjunto_id} de la segunda. Ahora las dos cosas salen del mismo {@link
+     * ConjuntoVigente}.
+     */
     public Vigentes aLaFechaDe(LocalDate fechaDelHecho) {
         Ejercicio ejercicio = Ejercicio.de(fechaDelHecho);
-        return new Vigentes(
-                ejercicio,
-                parametros.vigenteEn(ejercicio),
-                parametros.conjuntoVigenteEn(ejercicio).valor());
+        ConjuntoVigente conjunto = parametros.vigenteConSuConjunto(ejercicio);
+        return new Vigentes(ejercicio, conjunto.parametros(), conjunto.id());
     }
 
     /**

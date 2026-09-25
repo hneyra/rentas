@@ -54,14 +54,24 @@ public class ValoresReferenciales {
      * referencial». Culpar a la categoria con la lista vacia —«(): corrija la categoria en el
      * padron»— mandaria a corregir un dato que esta bien (#360, ronda 1).
      *
+     * <p><b>El conjunto llega resuelto, y no se resuelve aqui</b> (#361). Hasta #361 este metodo
+     * preguntaba {@code conjuntoVigenteEn} por su cuenta, y quien lo llamaba —{@link
+     * RegistrarDeterminacionVehicular#calcular}— volvia a resolver para la alicuota, el minimo y el
+     * {@code conjunto_id} que guarda: la base podia salir de la tabla de un conjunto y la fila
+     * guardar otro. Es lo que {@link ValorReferencialRepository} ya pedia —«quien traduce el
+     * ejercicio a un conjunto es {@code LectorDeParametros}, y una sola vez»—, y ahora lo hace
+     * quien calcula, una vez para todo el calculo.
+     *
+     * @param ejercicio solo para el mensaje de {@link CategoriaFueraDelCuadro}
+     * @param conjunto el conjunto sellado que el calculo ya resolvio, y que guardara
      * @throws ValorReferencialRepository.ValorReferencialAmbiguo si el vehiculo no tiene categoria
      *     y el anexo publica su modelo en varias con cifras distintas
      * @throws CategoriaFueraDelCuadro si la categoria del vehiculo no es una de las del anexo, y el
      *     anexo del conjunto publica alguna
      */
     @Transactional(readOnly = true)
-    public Optional<ValorReferencial> de(Vehiculo vehiculo, Ejercicio ejercicio) {
-        IdentificadorDeConjunto conjunto = parametros.conjuntoVigenteEn(ejercicio);
+    public Optional<ValorReferencial> de(
+            Vehiculo vehiculo, Ejercicio ejercicio, IdentificadorDeConjunto conjunto) {
         String categoria = vehiculo.categoria();
         Optional<ValorReferencial> valor =
                 repositorio.buscar(

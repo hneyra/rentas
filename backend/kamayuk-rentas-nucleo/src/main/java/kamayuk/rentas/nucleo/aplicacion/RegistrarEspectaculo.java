@@ -17,6 +17,7 @@ import kamayuk.rentas.nucleo.dominio.espectaculos.EspectaculoPublicoRepository;
 import kamayuk.rentas.nucleo.dominio.espectaculos.ImpuestoDeEspectaculo;
 import kamayuk.rentas.nucleo.dominio.predial.Determinacion;
 import kamayuk.rentas.nucleo.dominio.predial.DeterminacionRepository;
+import kamayuk.rentas.parametros.ConjuntoVigente;
 import kamayuk.rentas.parametros.LectorDeParametros;
 import kamayuk.rentas.parametros.ParametrosSellados;
 import org.jspecify.annotations.Nullable;
@@ -102,8 +103,10 @@ public class RegistrarEspectaculo {
         // con el (#376): la del taurino depende de la UIT, y un evento cuya clase no se puede
         // decidir no se registra.
         Ejercicio ejercicio = Ejercicio.de(fechaEvento);
-        ParametrosSellados sellados = parametros.vigenteEn(ejercicio);
-        long conjuntoId = parametros.conjuntoVigenteEn(ejercicio).valor();
+        // Una resolucion, no dos (#361): los parametros y el id del mismo conjunto.
+        ConjuntoVigente conjunto = parametros.vigenteConSuConjunto(ejercicio);
+        ParametrosSellados sellados = conjunto.parametros();
+        long conjuntoId = conjunto.id();
         @Nullable Dinero uit =
                 ClaseDeEspectaculo.declaraUnTaurino(tipo)
                         ? new Dinero(sellados.exigirNumero(LlavesDelConjunto.UIT, null).valor())

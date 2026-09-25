@@ -14,6 +14,8 @@ import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.PoliticasDeRedondeo;
 import kamayuk.rentas.nucleo.dominio.predial.ModalidadDelPredial;
 import kamayuk.rentas.nucleo.dominio.predial.Tramo;
+import kamayuk.rentas.parametros.ConjuntoVigente;
+import kamayuk.rentas.parametros.IdentificadorDeConjunto;
 import kamayuk.rentas.parametros.LectorDeParametros;
 import kamayuk.rentas.parametros.ParametroSinPublicar;
 import kamayuk.rentas.parametros.ParametrosSellados;
@@ -67,6 +69,13 @@ import org.springframework.stereotype.Service;
  * conjunto, resuelto una vez, y su identificador queda escrito en la determinacion que lo uso. Dos
  * lecturas sueltas dejarian la puerta abierta a que un sellado ocurrido entre ambas produjera un
  * impuesto calculado con dos versiones del cuadro (ARQ-09 §3).
+ *
+ * <p><b>Hasta #361 este parrafo no era cierto.</b> {@link #vigenteEn} pedia los parametros con
+ * {@code vigenteEn} y el identificador con {@code conjuntoVigenteEn}: dos resoluciones, cada una
+ * con su pregunta por red a {@code normativa} y su repliegue, y el cuadro salia de una y el
+ * identificador de la otra. Ahora sale un {@link ConjuntoVigente} de una sola, y {@link
+ * RegistrarDeterminacionPredial#calcular} lo recibe dentro del {@link Vigente} en vez de volver a
+ * preguntar.
  */
 @Service
 public class CuadroPredialParametrizado {
@@ -104,10 +113,9 @@ public class CuadroPredialParametrizado {
      * conjunto_id} que aquella guardo (ARQ-09 §3).
      */
     public Vigente vigenteEn(Ejercicio ejercicio) {
-        return new Vigente(
-                ejercicio,
-                parametros.vigenteEn(ejercicio),
-                parametros.conjuntoVigenteEn(ejercicio).valor());
+        // UNA resolucion (#361): hasta aqui eran dos —`vigenteEn` y `conjuntoVigenteEn`—, y cada
+        // una puede contestar otro conjunto. El cuadro salia de la primera y el id de la segunda.
+        return new Vigente(ejercicio, parametros.vigenteConSuConjunto(ejercicio));
     }
 
     /**
@@ -115,29 +123,43 @@ public class CuadroPredialParametrizado {
      * al centimo diez anios despues.
      */
     public Vigente delConjunto(Ejercicio ejercicio, long conjuntoId) {
+        IdentificadorDeConjunto identificador = IdentificadorDeConjunto.de(conjuntoId);
         return new Vigente(
                 ejercicio,
-                parametros.porConjunto(
-                        kamayuk.rentas.parametros.IdentificadorDeConjunto.de(conjuntoId)),
-                conjuntoId);
+                new ConjuntoVigente(identificador, parametros.porConjunto(identificador)));
     }
 
-    /** El cuadro del predial de un ejercicio, ya resuelto. */
+    /**
+     * El cuadro del predial de un ejercicio, ya resuelto.
+     *
+     * <p>Envuelve un {@link ConjuntoVigente}, y no un par suelto de parametros e identificador: las
+     * dos cosas salen de la misma resolucion por construccion (#361), y quien calcula con este
+     * cuadro —{@link RegistrarDeterminacionPredial#calcular}— guarda el identificador de
+     * <b>este</b> conjunto sin volver a preguntar.
+     */
     public static final class Vigente {
 
         private final Ejercicio ejercicio;
+        private final ConjuntoVigente conjunto;
         private final ParametrosSellados sellados;
-        private final long conjuntoId;
 
-        private Vigente(Ejercicio ejercicio, ParametrosSellados sellados, long conjuntoId) {
+        private Vigente(Ejercicio ejercicio, ConjuntoVigente conjunto) {
             this.ejercicio = ejercicio;
-            this.sellados = sellados;
-            this.conjuntoId = conjuntoId;
+            this.conjunto = conjunto;
+            this.sellados = conjunto.parametros();
         }
 
         /** El conjunto del que salio todo; queda escrito en la determinacion que lo uso. */
         public long conjuntoId() {
-            return conjuntoId;
+            return conjunto.id();
+        }
+
+        /**
+         * Los parametros sellados de ese conjunto, para las reglas que los leen por su cuenta
+         * —RT-011 recibe el juego entero en sus {@code InsumosDeLaAgregacion}—.
+         */
+        ParametrosSellados sellados() {
+            return sellados;
         }
 
         /** Como se nombra ese conjunto donde lo lee una persona: «2026 v1». */

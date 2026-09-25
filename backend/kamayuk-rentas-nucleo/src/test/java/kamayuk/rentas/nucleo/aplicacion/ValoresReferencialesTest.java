@@ -141,7 +141,7 @@ class ValoresReferencialesTest {
     @Test
     @DisplayName("la consulta por ejercicio usa el vigente, que es lo correcto para una emision")
     void laConsultaPorEjercicioUsaElVigente() {
-        assertThat(valores.de(vehiculo(), EJERCICIO))
+        assertThat(valores.de(vehiculo(), EJERCICIO, lector.conjuntoVigenteEn(EJERCICIO)))
                 .get()
                 .extracting(valor -> valor.valor().valor())
                 .isEqualTo(DE_LA_V2);

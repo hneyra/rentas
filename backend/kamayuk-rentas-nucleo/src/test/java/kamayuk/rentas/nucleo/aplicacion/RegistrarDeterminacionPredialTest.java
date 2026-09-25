@@ -99,6 +99,7 @@ class RegistrarDeterminacionPredialTest {
     private static TransactionTemplate transaccion;
     private static DeterminacionRepositoryJdbc repositorio;
     private static RegistrarDeterminacionPredial registrar;
+    private static CuadroPredialParametrizado cuadro;
     private static AdministrarParametros administrarParametros;
 
     @BeforeAll
@@ -127,7 +128,8 @@ class RegistrarDeterminacionPredialTest {
         registrar =
                 envolver(
                         new RegistrarDeterminacionPredial(
-                                repositorio, parametros, new AuditoriaJdbc(jdbc, RELOJ)));
+                                repositorio, new AuditoriaJdbc(jdbc, RELOJ)));
+        cuadro = new CuadroPredialParametrizado(parametros);
     }
 
     @SuppressWarnings("unchecked")
@@ -154,7 +156,12 @@ class RegistrarDeterminacionPredialTest {
             Observacion observacion) {
         return registrar.asentar(
                 registrar.calcular(
-                        ejercicio, contribuyenteId, predios, tramos, minimoImponible, modalidad),
+                        cuadro.vigenteEn(ejercicio),
+                        contribuyenteId,
+                        predios,
+                        tramos,
+                        minimoImponible,
+                        modalidad),
                 predios,
                 observacion);
     }

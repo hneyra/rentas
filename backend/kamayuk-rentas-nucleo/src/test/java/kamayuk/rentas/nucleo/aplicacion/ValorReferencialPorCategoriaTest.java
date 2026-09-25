@@ -19,6 +19,7 @@ import kamayuk.rentas.nucleo.dominio.ValorReferencial;
 import kamayuk.rentas.nucleo.dominio.ValorReferencialRepository;
 import kamayuk.rentas.nucleo.dominio.Vehiculo;
 import kamayuk.rentas.nucleo.infraestructura.ValorReferencialRepositoryJdbc;
+import kamayuk.rentas.parametros.LectorDeParametros;
 import kamayuk.rentas.parametros.aplicacion.LectorDeParametrosSellados;
 import kamayuk.rentas.parametros.infraestructura.ParametrosRepositoryJdbc;
 import kamayuk.rentas.plataforma.tenant.TenantTransactionManager;
@@ -77,6 +78,7 @@ class ValorReferencialPorCategoriaTest {
     private static BaseDeDatosDePrueba base;
     private static long municipalidad;
     private static ValoresReferenciales valores;
+    private static LectorDeParametros lector;
 
     @BeforeAll
     static void provisionar() throws SQLException, IOException {
@@ -91,14 +93,10 @@ class ValorReferencialPorCategoriaTest {
         pool.setPassword(base.clave(BaseDeDatosDePrueba.APP));
 
         JdbcClient jdbc = JdbcClient.create(pool);
+        lector = envolver(new LectorDeParametrosSellados(new ParametrosRepositoryJdbc(jdbc)), pool);
         valores =
                 envolver(
-                        new ValoresReferenciales(
-                                new ValorReferencialRepositoryJdbc(jdbc),
-                                envolver(
-                                        new LectorDeParametrosSellados(
-                                                new ParametrosRepositoryJdbc(jdbc)),
-                                        pool)),
+                        new ValoresReferenciales(new ValorReferencialRepositoryJdbc(jdbc), lector),
                         pool);
     }
 
@@ -149,7 +147,12 @@ class ValorReferencialPorCategoriaTest {
     @Test
     @DisplayName("sin categoria y con cifras distintas, se para y nombra las dos categorias")
     void sinCategoriaYConCifrasDistintasSeNombranLasCategorias() {
-        assertThatThrownBy(() -> valores.de(vehiculo(MODELO_QUE_CRUZA, null), EJERCICIO))
+        assertThatThrownBy(
+                        () ->
+                                valores.de(
+                                        vehiculo(MODELO_QUE_CRUZA, null),
+                                        EJERCICIO,
+                                        lector.conjuntoVigenteEn(EJERCICIO)))
                 .as(
                         "elegir una sin saber la categoria daria otra base imponible sin ningun"
                                 + " error; y la ventanilla tiene que saber que completar en el"
@@ -173,7 +176,11 @@ class ValorReferencialPorCategoriaTest {
     @Test
     @DisplayName("una categoria del anexo que no publica ese modelo es «sin valor», no otra cifra")
     void unaCategoriaDelAnexoQueNoPublicaElModeloNoTomaLaDeOtra() {
-        assertThat(valores.de(vehiculo(MODELO_QUE_CRUZA, "A3"), EJERCICIO))
+        assertThat(
+                        valores.de(
+                                vehiculo(MODELO_QUE_CRUZA, "A3"),
+                                EJERCICIO,
+                                lector.conjuntoVigenteEn(EJERCICIO)))
                 .as(
                         "A3 es del anexo —otro modelo la usa— pero el SPARK no esta en ella:"
                                 + " tomar la cifra de A1 o A2 seria valorizarlo con la de otra"
@@ -184,7 +191,12 @@ class ValorReferencialPorCategoriaTest {
     @Test
     @DisplayName("una categoria que el anexo no conoce es su propio rechazo, no «sin valor»")
     void unaCategoriaQueElAnexoNoConoceSeNombra() {
-        assertThatThrownBy(() -> valores.de(vehiculo(MODELO_QUE_CRUZA, "M1"), EJERCICIO))
+        assertThatThrownBy(
+                        () ->
+                                valores.de(
+                                        vehiculo(MODELO_QUE_CRUZA, "M1"),
+                                        EJERCICIO,
+                                        lector.conjuntoVigenteEn(EJERCICIO)))
                 .as(
                         "M1 es la clase del reglamento de vehiculos, no una categoria del anexo:"
                                 + " leerlo como «el cuadro no trae el vehiculo» mandaria a buscar"
@@ -198,7 +210,11 @@ class ValorReferencialPorCategoriaTest {
     @DisplayName(
             "un conjunto sellado sin cuadro vehicular es «sin valor», no «corrija la categoria»")
     void unConjuntoSinCuadroNoCulpaALaCategoria() {
-        assertThat(valores.de(vehiculo(MODELO_QUE_CRUZA, "A2"), SIN_CUADRO))
+        assertThat(
+                        valores.de(
+                                vehiculo(MODELO_QUE_CRUZA, "A2"),
+                                SIN_CUADRO,
+                                lector.conjuntoVigenteEn(SIN_CUADRO)))
                 .as(
                         "sin ni una fila en el cuadro no hay vocabulario contra el que comparar: lo"
                                 + " que falta es la tabla, y culpar a la categoria —con la lista"
@@ -210,7 +226,7 @@ class ValorReferencialPorCategoriaTest {
     // ---------------------------------------------------------------- utilidades
 
     private static BigDecimal valorDe(Vehiculo vehiculo) {
-        return valores.de(vehiculo, EJERCICIO)
+        return valores.de(vehiculo, EJERCICIO, lector.conjuntoVigenteEn(EJERCICIO))
                 .map(ValorReferencial::valor)
                 .orElseThrow(() -> new AssertionError("El cuadro no devolvio ningun valor"))
                 .valor();

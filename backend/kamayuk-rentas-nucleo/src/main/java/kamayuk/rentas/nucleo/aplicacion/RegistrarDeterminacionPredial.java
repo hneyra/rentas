@@ -20,9 +20,7 @@ import kamayuk.rentas.nucleo.dominio.predial.RT011BaseImponibleDelContribuyente;
 import kamayuk.rentas.nucleo.dominio.predial.Tramo;
 import kamayuk.rentas.nucleo.dominio.predial.TramosProgresivosAcumulativos;
 import kamayuk.rentas.parametros.InsumosDeLaAgregacion;
-import kamayuk.rentas.parametros.LectorDeParametros;
 import kamayuk.rentas.parametros.ParametrosSellados;
-import kamayuk.rentas.parametros.PoliticasDeRedondeoSelladas;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -46,10 +44,11 @@ import org.springframework.transaction.annotation.Transactional;
  *       (RT-014-c02/c03) y hasta #332 este servicio cobraba el minimo sin decirlo.
  * </ol>
  *
- * <p><b>El redondeo se lee del conjunto sellado</b>, con {@link PoliticasDeRedondeoSelladas}: es el
- * tercer entregable de E-7 (#203). La respuesta de D-03c —en que puntos se redondea, con que escala
- * y que modo— entra como dato con su documento fuente, no como codigo, y este servicio no la
- * construye ni la recibe.
+ * <p><b>El redondeo se lee del conjunto sellado</b>, con {@link
+ * kamayuk.rentas.parametros.PoliticasDeRedondeoSelladas}: es el tercer entregable de E-7 (#203). La
+ * respuesta de D-03c —en que puntos se redondea, con que escala y que modo— entra como dato con su
+ * documento fuente, no como codigo, y este servicio no la construye: la lee del conjunto que llega
+ * resuelto en el {@link CuadroPredialParametrizado.Vigente} (#361), el mismo de los tramos.
  *
  * <p>{@code tramos} y {@code minimoImponible}, en cambio, siguen llegando como argumento, y la
  * diferencia no es un descuido: de D-03c ya esta decidido el <b>formato</b> —una fila {@code
@@ -67,15 +66,15 @@ import org.springframework.transaction.annotation.Transactional;
 public class RegistrarDeterminacionPredial {
 
     private final DeterminacionRepository repositorio;
-    private final LectorDeParametros parametros;
     private final Auditoria auditoria;
 
-    public RegistrarDeterminacionPredial(
-            DeterminacionRepository repositorio,
-            LectorDeParametros parametros,
-            Auditoria auditoria) {
+    /**
+     * Sin {@code LectorDeParametros} desde #361, y es a proposito: el conjunto llega ya resuelto en
+     * el {@link CuadroPredialParametrizado.Vigente} que recibe {@link #calcular}. Con el lector a
+     * mano, volver a preguntar «que conjunto rige» era una linea, y esa linea es el defecto.
+     */
+    public RegistrarDeterminacionPredial(DeterminacionRepository repositorio, Auditoria auditoria) {
         this.repositorio = repositorio;
-        this.parametros = parametros;
         this.auditoria = auditoria;
     }
 
@@ -100,9 +99,22 @@ public class RegistrarDeterminacionPredial {
      * el orden de ARQ-09 §4 («¿parametros completos? → no → DETENER» antes de la determinacion); y
      * simular se reduce a no llamar a {@link #asentar}.
      *
-     * <p>No abre transaccion: no escribe, y el conjunto sellado lo lee el {@link
-     * LectorDeParametros}, que trae la suya.
+     * <p>No abre transaccion: no escribe, y no lee nada —el conjunto sellado llega resuelto—.
      *
+     * <h2>El conjunto llega resuelto, y no se vuelve a preguntar (#361)</h2>
+     *
+     * <p>Hasta #361 este metodo recibia el ejercicio y preguntaba al lector dos veces: {@code
+     * vigenteEn} para el redondeo y {@code conjuntoVigenteEn} para el {@code conjunto_id} que se
+     * guarda. Quien lo llama ya habia resuelto el cuadro —de ahi salian los tramos y el minimo—,
+     * asi que una determinacion resolvia el conjunto <b>cuatro</b> veces, y en produccion cada una
+     * es una pregunta por red a {@code normativa} con su propio repliegue. Si {@code normativa}
+     * sellaba «2026 v2» entre la primera y la cuarta, o contestaba en una y no en otra, la fila
+     * guardaba v2 con el impuesto de los tramos de v1: recalcular con el {@code conjunto_id}
+     * guardado daba otra cifra (ARQ-09 §3, regla 6). Ahora el redondeo, los parametros de RT-011 y
+     * el identificador salen del {@code vigente} que llega, el mismo del que salieron los tramos.
+     *
+     * @param vigente el cuadro ya resuelto, de UNA resolucion: de el salen el ejercicio, el
+     *     redondeo y el {@code conjunto_id} que se guarda
      * @param predios el aporte de cada predio del contribuyente, ya declarado (autovaluo, %
      *     propiedad y base ya ponderada); nunca vacio (NEG-05 §1: sin predios no hay base)
      * @param tramos el cuadro progresivo vigente, resuelto por quien conoce la ordenanza (D-02b)
@@ -111,21 +123,22 @@ public class RegistrarDeterminacionPredial {
      *     #asentar} la GUARDA (#234)
      */
     public Determinacion calcular(
-            Ejercicio ejercicio,
+            CuadroPredialParametrizado.Vigente vigente,
             long contribuyenteId,
             List<DetalleDeterminacionPredio> predios,
             List<Tramo> tramos,
             Dinero minimoImponible,
             ModalidadDelPredial modalidad) {
-        Objects.requireNonNull(ejercicio, "La determinacion necesita su ejercicio");
+        Objects.requireNonNull(vigente, "La determinacion necesita el cuadro ya resuelto");
         Objects.requireNonNull(predios, "La lista de predios es vacia, no nula");
         if (predios.isEmpty()) {
             throw new SinPrediosDeclarados();
         }
 
-        ParametrosSellados sellados = parametros.vigenteEn(ejercicio);
-        long conjuntoId = parametros.conjuntoVigenteEn(ejercicio).valor();
-        PoliticasDeRedondeo redondeo = PoliticasDeRedondeoSelladas.de(sellados);
+        Ejercicio ejercicio = vigente.ejercicio();
+        ParametrosSellados sellados = vigente.sellados();
+        long conjuntoId = vigente.conjuntoId();
+        PoliticasDeRedondeo redondeo = vigente.redondeo();
         InsumosDeLaAgregacion insumos = new InsumosDeLaAgregacion(ejercicio, sellados, redondeo);
 
         List<Dinero> aportes = new ArrayList<>();

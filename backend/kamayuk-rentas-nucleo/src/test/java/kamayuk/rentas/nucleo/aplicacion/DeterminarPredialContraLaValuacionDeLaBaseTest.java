@@ -136,7 +136,6 @@ class DeterminarPredialContraLaValuacionDeLaBaseTest {
                         comoLoMontaSpring(
                                 new RegistrarDeterminacionPredial(
                                         determinaciones,
-                                        lector,
                                         registro -> {
                                             throw new AssertionError(
                                                     "Simular no audita: " + registro);

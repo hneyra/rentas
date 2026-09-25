@@ -17,6 +17,7 @@ import kamayuk.rentas.nucleo.dominio.alcabala.EleccionDeBase;
 import kamayuk.rentas.nucleo.dominio.alcabala.ImpuestoDeAlcabala;
 import kamayuk.rentas.nucleo.dominio.predial.Determinacion;
 import kamayuk.rentas.nucleo.dominio.predial.DeterminacionRepository;
+import kamayuk.rentas.parametros.ConjuntoVigente;
 import kamayuk.rentas.parametros.LectorDeParametros;
 import kamayuk.rentas.parametros.ParametrosSellados;
 import org.springframework.stereotype.Service;
@@ -90,8 +91,10 @@ public class RegistrarAlcabala {
         }
 
         Ejercicio ejercicio = Ejercicio.de(transferencia.fechaTransferencia());
-        ParametrosSellados sellados = parametros.vigenteEn(ejercicio);
-        long conjuntoId = parametros.conjuntoVigenteEn(ejercicio).valor();
+        // Una resolucion, no dos (#361): los parametros y el id del mismo conjunto.
+        ConjuntoVigente conjunto = parametros.vigenteConSuConjunto(ejercicio);
+        ParametrosSellados sellados = conjunto.parametros();
+        long conjuntoId = conjunto.id();
 
         EleccionDeBase eleccion =
                 BaseImponibleDeAlcabala.elegir(
