@@ -1108,6 +1108,12 @@ export const rentas: DescriptorDeSistema = {
     // registro, una a una (ADR-0020), asi que no llevan la de la implantacion. La propiedad es la
     // que el `@ConditionalOnProperty` de los dos pide; sin ella el proceso arranca, no genera
     // nada y sale con 0, que es exactamente el defecto que esto arregla.
+    //
+    // Lo que cuesta en el nodo, MEDIDO y no estimado: un `RECURSOS_DE_ARRANQUE` en el pico, que
+    // `infrastructure` cuenta aunque su ventana sea la del ingestor. Con este `CronJob` el pico de
+    // los cinco sistemas pasa de 1550m / 6656Mi a 1600m / 6912Mi y el hueco de memoria de `prod`
+    // —que ya no cabia (`infrastructure`#199)— de 77Mi a 333Mi; `stg` sigue cabiendo. Las seis
+    // cifras que eso mueve alli las remide `infrastructure`#217, que se mezcla DESPUES de este.
     const corridas = `kamayuk-${SISTEMA}-corridas`;
     const deLasCorridas: CronJob = {
       apiVersion: "batch/v1",
