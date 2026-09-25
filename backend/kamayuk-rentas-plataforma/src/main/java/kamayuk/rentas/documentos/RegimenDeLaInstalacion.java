@@ -13,8 +13,11 @@ package kamayuk.rentas.documentos;
  *
  * <p>Porque lo unico que la capa de documentos necesita saber es si marca o no marca. No hay {@code
  * activar}, ni {@code desactivar}: quitar la marca es un {@code UPDATE} de {@code kamayuk_owner}
- * sobre {@code municipalidad.es_demostracion}, la misma escritura que da de alta la municipalidad.
- * Un metodo aqui seria un camino desde una pantalla hasta un documento sin marcar.
+ * sobre {@code municipalidad.es_demostracion}, hecho a mano y seguido de un reinicio —por la cache
+ * de {@link RegimenDeLaInstalacionJdbc}—. <b>No</b> lo hace el alta: con la fila ya puesta,
+ * relanzar la implantacion no toca la marca (#122), y si lo que pide es el otro valor lo dice con
+ * un {@code ERROR} en lugar de afirmarlo (#348). Un metodo aqui seria un camino desde una pantalla
+ * hasta un documento sin marcar.
  *
  * <p>Y no recibe la municipalidad, como ningun metodo de dominio (regla 2): sale del contexto de
  * tenant, que es lo que impide que un llamador pregunte por la instalacion de otro.

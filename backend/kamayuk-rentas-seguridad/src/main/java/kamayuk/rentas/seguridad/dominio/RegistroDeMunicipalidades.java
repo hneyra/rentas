@@ -15,7 +15,8 @@ package kamayuk.rentas.seguridad.dominio;
 public interface RegistroDeMunicipalidades {
 
     /**
-     * Da de alta la municipalidad si no existe, y devuelve su identificador.
+     * Da de alta la municipalidad si no existe, y devuelve lo que la fila dice despues: su
+     * identificador y su regimen <b>tal como quedo</b>, que no tiene por que ser el pedido (#348).
      *
      * <p>Idempotente por {@code ubigeo}: repetirlo no crea una segunda fila ni falla. Si ya existe,
      * <b>no</b> actualiza nada — ni el nombre, ni el tipo, ni la marca de demostracion—. Un
@@ -24,8 +25,15 @@ public interface RegistroDeMunicipalidades {
      *
      * <p>Que tampoco toque {@code esDemostracion} es lo que hace que la marca sea dificil de
      * quitar, que es su proposito (#122): una instalacion no deja de ser de demostracion porque
-     * alguien relance el despliegue con una variable distinta. Se quita con un {@code UPDATE}
-     * deliberado de {@code kamayuk_owner}, y eso deja rastro de quien lo hizo.
+     * alguien relance el despliegue con una variable distinta. Se cambia con un {@code UPDATE}
+     * deliberado de {@code kamayuk_owner}, a mano y fuera de esta aplicacion, seguido de un
+     * reinicio de sus procesos —{@code RegimenDeLaInstalacionJdbc} guarda el regimen en cache—.
+     * <b>Ese {@code UPDATE} no deja rastro en la base</b>: ninguna migracion le pone auditoria a
+     * {@code municipalidad}, que solo tiene sus dos politicas.
+     *
+     * <p>Por eso lo que devuelve es la fila y no un eco de la peticion: si difieren, quien llama
+     * tiene que poder decirlo, y no afirmar el regimen que pidio (#348).
      */
-    long darDeAltaSiFalta(String ubigeo, String nombre, String tipo, boolean esDemostracion);
+    MunicipalidadImplantada darDeAltaSiFalta(
+            String ubigeo, String nombre, String tipo, boolean esDemostracion);
 }
