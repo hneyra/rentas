@@ -278,6 +278,39 @@ class TransferenciasFronteraTest {
         assertThat(tipoGuardadoDeVehiculo(vehiculo)).isEqualTo("HERENCIA");
     }
 
+    /**
+     * La retroactiva, por el borde (#473): el 422 es el mismo que el de un tipo desconocido —{@code
+     * CodigoDeError.VALIDACION}— y nombra las dos fechas, para que quien la escribio sepa contra
+     * que fecha choca sin tener que abrir el historico.
+     */
+    @Test
+    @DisplayName(
+            "una transferencia de vehiculo fechada antes de la ultima: 422 nombrando las dos fechas,"
+                    + " y cero filas (#473)")
+    void unaTransferenciaRetroactivaDeVehiculoEsUn422() throws Exception {
+        crearVehiculo("ZZT-473", transferente);
+
+        MvcResult primera = transferirVehiculo("ZZT-473", "COMPRA_VENTA", "TT-0002", "2026-06-10");
+        assertThat(primera.getResponse().getStatus()).isEqualTo(201);
+        int antes = cuantasTransferencias();
+
+        MvcResult retroactiva =
+                transferirVehiculo("ZZT-473", "COMPRA_VENTA", "TT-0001", "2026-03-01");
+
+        assertThat(retroactiva.getResponse().getStatus())
+                .as(
+                        "hasta #473 esto contestaba 201 y dejaba TT-0002 -> TT-0001 el 2026-03-01,"
+                                + " cuando TT-0002 no tenia el vehiculo ese dia")
+                .isEqualTo(422);
+        String cuerpo = retroactiva.getResponse().getContentAsString();
+        assertThat(cuerpo).contains("\"codigo\":\"VALIDACION\"");
+        assertThat(cuerpo).contains("2026-03-01").contains("2026-06-10");
+        assertThat(cuerpo)
+                .as("el mensaje no filtra esquema (RNF-033)")
+                .doesNotContain("fecha_transferencia");
+        assertThat(cuantasTransferencias()).isEqualTo(antes);
+    }
+
     // ------------------------------------------------------------------
     //  La guarda de la base, medida sola
     // ------------------------------------------------------------------
@@ -322,18 +355,23 @@ class TransferenciasFronteraTest {
     }
 
     private static MvcResult transferirVehiculo(String placa, String tipo) throws Exception {
+        return transferirVehiculo(placa, tipo, "TT-0002", "2026-03-01");
+    }
+
+    private static MvcResult transferirVehiculo(
+            String placa, String tipo, String codAdquiriente, String fecha) throws Exception {
         String cuerpo =
                 """
                 {"observacion":"Se registra la transferencia del vehiculo para la prueba",
                  "placa":"%s",
-                 "codAdquiriente":"TT-0002",
+                 "codAdquiriente":"%s",
                  "tipoTransferencia":"%s",
-                 "fechaTransferencia":"2026-03-01",
+                 "fechaTransferencia":"%s",
                  "valorTransferencia":"15000.00",
                  "afectaAlcabala":false,
                  "documentoOrigen":"CT-%s"}
                 """
-                        .formatted(placa, tipo, placa);
+                        .formatted(placa, codAdquiriente, tipo, fecha, placa);
         return mvc.perform(
                         post("/rentas/api/v1/rentas/transferencias/vehiculo")
                                 .contentType(MediaType.APPLICATION_JSON)

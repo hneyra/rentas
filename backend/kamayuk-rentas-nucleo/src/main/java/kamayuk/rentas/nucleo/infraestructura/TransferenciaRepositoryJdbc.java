@@ -28,6 +28,33 @@ public class TransferenciaRepositoryJdbc extends RepositorioJdbc
                     + " t.porcentaje_transferido, t.afecta_alcabala, t.documento_origen,"
                     + " t.observacion, t.usuario_registro";
 
+    /**
+     * La cadena de un vehiculo, de la mas antigua a la mas reciente (#329).
+     *
+     * <p>Es una constante, y no una cadena dentro del metodo, para que {@code
+     * HistoricoDeTransferenciasEnElPlanTest} mida <b>esta</b> consulta y no una copia suya: la
+     * responde {@code transferencia_vehiculo_fecha_ix} ({@code V26}, #473).
+     */
+    static final String HISTORICO_DE_VEHICULO =
+            "SELECT "
+                    + COLUMNAS
+                    + " FROM transferencia t"
+                    + " WHERE t.vehiculo_id = :vehiculo"
+                    + " ORDER BY t.fecha_transferencia, t.id";
+
+    /**
+     * Los vehiculos que un contribuyente transfirio desde una fecha, esa incluida (#329).
+     *
+     * <p>Constante por el mismo motivo que {@link #HISTORICO_DE_VEHICULO}; la responde {@code
+     * transferencia_transferente_fecha_ix} ({@code V26}, #473).
+     */
+    static final String VEHICULOS_QUE_TRANSFIRIO_DESDE =
+            "SELECT DISTINCT t.vehiculo_id FROM transferencia t"
+                    + " WHERE t.transferente_id = :transferente"
+                    + " AND t.vehiculo_id IS NOT NULL"
+                    + " AND t.fecha_transferencia >= :fecha"
+                    + " ORDER BY t.vehiculo_id";
+
     public TransferenciaRepositoryJdbc(JdbcClient jdbc) {
         super(jdbc);
     }
@@ -106,12 +133,7 @@ public class TransferenciaRepositoryJdbc extends RepositorioJdbc
 
     @Override
     public List<Transferencia> historicoDeVehiculo(long vehiculoId) {
-        return jdbc().sql(
-                        "SELECT "
-                                + COLUMNAS
-                                + " FROM transferencia t"
-                                + " WHERE t.vehiculo_id = :vehiculo"
-                                + " ORDER BY t.fecha_transferencia, t.id")
+        return jdbc().sql(HISTORICO_DE_VEHICULO)
                 .param("vehiculo", vehiculoId)
                 .query(TransferenciaRepositoryJdbc::mapear)
                 .list();
@@ -119,12 +141,7 @@ public class TransferenciaRepositoryJdbc extends RepositorioJdbc
 
     @Override
     public List<Long> vehiculosQueTransfirioDesde(long transferenteId, LocalDate fecha) {
-        return jdbc().sql(
-                        "SELECT DISTINCT t.vehiculo_id FROM transferencia t"
-                                + " WHERE t.transferente_id = :transferente"
-                                + " AND t.vehiculo_id IS NOT NULL"
-                                + " AND t.fecha_transferencia >= :fecha"
-                                + " ORDER BY t.vehiculo_id")
+        return jdbc().sql(VEHICULOS_QUE_TRANSFIRIO_DESDE)
                 .param("transferente", transferenteId)
                 .param("fecha", fecha)
                 .query((fila, numeroDeFila) -> fila.getLong("vehiculo_id"))

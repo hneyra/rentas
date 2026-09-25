@@ -14,6 +14,7 @@ import kamayuk.rentas.nucleo.dominio.Transferencia;
 import kamayuk.rentas.nucleo.dominio.TransferenciaRepository;
 import kamayuk.rentas.nucleo.dominio.Vehiculo;
 import kamayuk.rentas.nucleo.dominio.VehiculoRepository;
+import kamayuk.rentas.nucleo.dominio.vehicular.CadenaDelVehiculo;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -109,6 +110,15 @@ public class RegistrarTransferencia {
     /**
      * Transfiere un vehiculo: el transferente es quien figura hoy como titular, no un dato que
      * llegue en la peticion.
+     *
+     * <p>Y por eso la fecha no puede ir antes de la ultima transferencia del vehiculo (#473): el
+     * titular de hoy es quien lo tiene <b>despues</b> de ella, y una retroactiva lo haria
+     * transferir un dia en que no lo tenia. Lo decide {@link CadenaDelVehiculo}, sobre el mismo
+     * historico que despues lee {@code PropietarioAlPrimeroDeEnero}; la misma fecha que la ultima
+     * si entra.
+     *
+     * @throws CadenaDelVehiculo.TransferenciaAnteriorALaUltima si la fecha es anterior a la de la
+     *     ultima transferencia del vehiculo
      */
     @Transactional
     public Transferencia transferirVehiculo(
@@ -130,6 +140,8 @@ public class RegistrarTransferencia {
             throw new IllegalArgumentException(
                     "El vehiculo " + vehiculoId + " ya es del contribuyente " + adquirienteId);
         }
+        CadenaDelVehiculo.exigirQueSigaALaUltima(
+                repositorio.historicoDeVehiculo(vehiculoId), fecha);
         vehiculos.save(actual.conTitular(adquirienteId));
 
         Transferencia guardada =
