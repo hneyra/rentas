@@ -186,7 +186,8 @@ class ValoresReferencialesTest {
                                                 IdentificadorDeConjunto.de(conjunto),
                                                 "TOYOTA",
                                                 "YARIS",
-                                                FABRICACION.valor())
+                                                FABRICACION.valor(),
+                                                "A2")
                                         .orElse(null));
         if (valor == null) {
             throw new AssertionError("El conjunto " + conjunto + " no trae el valor");
@@ -196,7 +197,7 @@ class ValoresReferencialesTest {
 
     private static Vehiculo vehiculo() {
         return Vehiculo.nuevo(
-                Placa.de("V1A-111"), 1, "TOYOTA", "YARIS", "M1", FABRICACION, new Ejercicio(2021));
+                Placa.de("V1A-111"), 1, "TOYOTA", "YARIS", "A2", FABRICACION, new Ejercicio(2021));
     }
 
     private static long crearMunicipalidad() throws SQLException {

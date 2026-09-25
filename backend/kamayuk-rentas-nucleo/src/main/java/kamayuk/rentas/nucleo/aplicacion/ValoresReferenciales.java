@@ -39,17 +39,77 @@ public class ValoresReferenciales {
 
     /**
      * El valor referencial que le corresponde al vehiculo en ese ejercicio, si la tabla lo trae.
+     *
+     * <p><b>Se acota por la categoria del vehiculo</b> (#360), que es parte de la identidad de la
+     * fila del anexo. Y como el filtro es por igualdad, una categoria que el anexo no conoce —el
+     * padron escrito con otro vocabulario, «M1» del reglamento de vehiculos en vez de «A1» del
+     * anexo— no casaria con ninguna fila y saldria como «el cuadro no trae el vehiculo». No lo es:
+     * lo que falta corregir esta en el padron, no en la tabla del MEF, y por eso se para con {@link
+     * CategoriaFueraDelCuadro} nombrando las categorias que si publica.
+     *
+     * <p>El vocabulario se pregunta solo cuando no hubo fila: si la hubo, la categoria es del anexo
+     * por construccion, y el calculo por contribuyente no paga una consulta mas por vehiculo. Y si
+     * el conjunto sellado no trae <b>ni una fila</b> del cuadro, no hay vocabulario contra el que
+     * comparar: lo que falta es la tabla, no la categoria, y se deja caer a «sin valor
+     * referencial». Culpar a la categoria con la lista vacia —«(): corrija la categoria en el
+     * padron»— mandaria a corregir un dato que esta bien (#360, ronda 1).
+     *
+     * @throws ValorReferencialRepository.ValorReferencialAmbiguo si el vehiculo no tiene categoria
+     *     y el anexo publica su modelo en varias con cifras distintas
+     * @throws CategoriaFueraDelCuadro si la categoria del vehiculo no es una de las del anexo, y el
+     *     anexo del conjunto publica alguna
      */
     @Transactional(readOnly = true)
     public Optional<ValorReferencial> de(Vehiculo vehiculo, Ejercicio ejercicio) {
         IdentificadorDeConjunto conjunto = parametros.conjuntoVigenteEn(ejercicio);
-        return repositorio.buscar(
-                conjunto, vehiculo.marca(), vehiculo.modelo(), vehiculo.anioFabricacion().valor());
+        String categoria = vehiculo.categoria();
+        Optional<ValorReferencial> valor =
+                repositorio.buscar(
+                        conjunto,
+                        vehiculo.marca(),
+                        vehiculo.modelo(),
+                        vehiculo.anioFabricacion().valor(),
+                        categoria);
+        if (valor.isEmpty() && categoria != null) {
+            List<String> delCuadro = repositorio.categorias(conjunto);
+            if (!delCuadro.isEmpty() && !delCuadro.contains(categoria)) {
+                throw new CategoriaFueraDelCuadro(vehiculo, categoria, ejercicio, delCuadro);
+            }
+        }
+        return valor;
     }
 
     /** Marcas y modelos del ejercicio: el catalogo que la pantalla ofrece para elegir. */
     @Transactional(readOnly = true)
     public List<MarcaYModelo> catalogoDe(Ejercicio ejercicio) {
         return repositorio.catalogo(parametros.conjuntoVigenteEn(ejercicio));
+    }
+
+    /**
+     * La categoria del vehiculo en el padron no es una de las que publica el cuadro del ejercicio
+     * (#360).
+     *
+     * <p>Es su propio rechazo y no {@code SinValorReferencial}: aquel dice que la tabla del MEF no
+     * trae el vehiculo, y este que el padron lo describe con otro vocabulario. Confundirlos manda a
+     * buscar en el sitio equivocado.
+     */
+    public static final class CategoriaFueraDelCuadro extends RuntimeException {
+        @java.io.Serial private static final long serialVersionUID = 1L;
+
+        CategoriaFueraDelCuadro(
+                Vehiculo vehiculo, String categoria, Ejercicio ejercicio, List<String> delCuadro) {
+            super(
+                    "La categoria '"
+                            + categoria
+                            + "' del vehiculo "
+                            + vehiculo.placa()
+                            + " no es una de las que publica el cuadro de valores referenciales"
+                            + " del ejercicio "
+                            + ejercicio
+                            + " ("
+                            + String.join(", ", delCuadro)
+                            + "): corrija la categoria en el padron. Sin ella no se puede elegir"
+                            + " la fila del anexo");
+        }
     }
 }

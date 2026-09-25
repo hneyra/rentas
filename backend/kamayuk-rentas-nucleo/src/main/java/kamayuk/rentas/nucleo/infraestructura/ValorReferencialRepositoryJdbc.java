@@ -9,8 +9,10 @@ import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.nucleo.dominio.MarcaYModelo;
 import kamayuk.rentas.nucleo.dominio.ValorReferencial;
 import kamayuk.rentas.nucleo.dominio.ValorReferencialRepository;
+import kamayuk.rentas.nucleo.dominio.ValorReferencialRepository.ValorReferencialAmbiguo;
 import kamayuk.rentas.parametros.IdentificadorDeConjunto;
 import kamayuk.rentas.persistencia.RepositorioJdbc;
+import org.jspecify.annotations.Nullable;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 
@@ -22,10 +24,10 @@ import org.springframework.stereotype.Repository;
  * que uso la determinacion.
  *
  * <p>La tabla es nacional (D-13, ADR-0017): la aprueba el MEF y se carga una vez para todas las
- * municipalidades. Desde P5B vive en {@code normativa}, y lo que estas dos consultas leen es {@code
+ * municipalidades. Desde P5B vive en {@code normativa}, y lo que estas consultas leen es {@code
  * normativa_valor_referencial} —la copia local del conjunto SELLADO, descargada una vez y
- * verificada por su sha256 (ADR-0025 §1)—. <b>La firma de los metodos no cambia</b>, y eso es lo
- * importante: quien lee sigue teniendo que decir de que conjunto habla.
+ * verificada por su sha256 (ADR-0025 §1)—. <b>La firma de los metodos no cambio con P5B</b>, y eso
+ * es lo importante: quien lee sigue teniendo que decir de que conjunto habla.
  *
  * <p>Desaparece el {@code JOIN} con {@code conjunto_parametro_detalle}, que servia para ver solo la
  * edicion que el conjunto compuso: la copia local YA ES esa edicion. Y el aislamiento se mantiene
@@ -41,73 +43,95 @@ public class ValorReferencialRepositoryJdbc extends RepositorioJdbc
     }
 
     /**
-     * El valor referencial de un vehiculo, si el cuadro sellado lo trae.
+     * El valor referencial de un vehiculo, si el cuadro sellado lo trae: el contrato esta en el
+     * puerto.
      *
-     * <p><b>Puede fallar en vez de devolver uno de dos.</b> El anexo del MEF publica «OTROS
-     * MODELOS» dentro de cada categoria —A1, CAMIONES, CAMIONETAS…— con un valor distinto en cada
-     * una, asi que {@code (marca, modelo, ano)} no siempre identifica una sola fila. Cuando no la
-     * identifica, esto lanza en vez de quedarse con la primera: un camion valorizado con la cifra
-     * de una camioneta no produce ningun error, produce otra base imponible (ARQ-09 §2.5).
+     * <p><b>Acota por la categoria cuando el vehiculo la tiene</b> (#360). Hasta entonces la
+     * consulta filtraba por conjunto, marca, modelo y ano, y el javadoc decia que acotar por {@code
+     * vehiculo.categoria} «espera a D-02a»; D-02a se cerro el 2026-08-25 y la premisa vencio. Sin
+     * el filtro, un CHEVROLET SPARK registrado en A1 daba dos candidatos —A1 y A2— y la operacion
+     * contestaba 500, aunque el padron dijera cual era.
      *
-     * <p>Resolverlo es acotar por {@code vehiculo.categoria}, que V2 ya tiene y hoy es nulable; esa
-     * es la regla vehicular y espera a D-02a. Hasta entonces, esta consulta se para y dice cual es
-     * la ambiguedad.
+     * <p>Lo que queda sin resolver —un vehiculo sin categoria cuyo modelo el anexo publica en
+     * varias con cifras distintas— se para con {@link ValorReferencialAmbiguo}, que nombra las
+     * categorias. Si todas traen la misma cifra, se devuelve esa: la base no depende de cual sea.
      */
     @Override
     public Optional<ValorReferencial> buscar(
-            IdentificadorDeConjunto conjunto, String marca, String modelo, int anioFabricacion) {
-        List<ValorReferencial> candidatos = candidatos(conjunto, marca, modelo, anioFabricacion);
-        if (candidatos.size() > 1) {
-            throw new ValorReferencialAmbiguo(marca, modelo, anioFabricacion, candidatos.size());
+            IdentificadorDeConjunto conjunto,
+            String marca,
+            String modelo,
+            int anioFabricacion,
+            @Nullable String categoria) {
+        List<Candidato> candidatos =
+                candidatos(conjunto, marca, modelo, anioFabricacion, categoria);
+        if (candidatos.isEmpty()) {
+            return Optional.empty();
         }
-        return candidatos.stream().findFirst();
+        ValorReferencial primero = candidatos.getFirst().valor();
+        boolean unaSolaCifra =
+                candidatos.stream()
+                        .allMatch(candidato -> candidato.valor().valor().equals(primero.valor()));
+        if (!unaSolaCifra) {
+            throw new ValorReferencialAmbiguo(
+                    marca,
+                    modelo,
+                    anioFabricacion,
+                    categoria,
+                    candidatos.stream().map(Candidato::categoria).distinct().toList());
+        }
+        return Optional.of(primero);
     }
 
-    /** El cuadro publica «OTROS MODELOS» por categoria: aqui pueden salir varios. */
-    private List<ValorReferencial> candidatos(
-            IdentificadorDeConjunto conjunto, String marca, String modelo, int anioFabricacion) {
+    /**
+     * El cuadro publica un mismo modelo en varias categorias: sin la del vehiculo pueden salir
+     * varios. El orden por categoria no elige nada —solo se devuelve el primero cuando todos valen
+     * lo mismo— pero hace que el mensaje de la ambiguedad salga siempre igual.
+     */
+    private List<Candidato> candidatos(
+            IdentificadorDeConjunto conjunto,
+            String marca,
+            String modelo,
+            int anioFabricacion,
+            @Nullable String categoria) {
         return jdbc().sql(
                         """
-                        SELECT v.ejercicio, v.marca, v.modelo, v.anio_fabricacion, v.valor,
-                               v.documento_fuente
+                        SELECT v.ejercicio, v.categoria, v.marca, v.modelo, v.anio_fabricacion,
+                               v.valor, v.documento_fuente
                           FROM normativa_valor_referencial v
                          WHERE v.conjunto_id = :conjunto
                            AND v.marca = :marca
                            AND v.modelo = :modelo
                            AND v.anio_fabricacion = :anio
+                           AND (CAST(:categoria AS varchar) IS NULL OR v.categoria = :categoria)
+                         ORDER BY v.categoria
                         """)
                 .param("conjunto", conjunto.valor())
                 .param("marca", marca)
                 .param("modelo", modelo)
                 .param("anio", anioFabricacion)
-                .query(ValorReferencialRepositoryJdbc::mapear)
+                .param("categoria", categoria)
+                .query(
+                        (ResultSet fila, int numero) ->
+                                new Candidato(fila.getString("categoria"), mapear(fila, numero)))
                 .list();
     }
 
-    /**
-     * El cuadro trae mas de una fila para ese vehiculo y falta la categoria para elegir.
-     *
-     * <p>No es un fallo del dato: es como la norma lo publica. Lo que falta es el otro lado, la
-     * categoria del vehiculo del padron.
-     */
-    public static final class ValorReferencialAmbiguo extends RuntimeException {
-        @java.io.Serial private static final long serialVersionUID = 1L;
+    /** Una fila del cuadro con la categoria con que el anexo la publica. */
+    private record Candidato(String categoria, ValorReferencial valor) {}
 
-        public ValorReferencialAmbiguo(
-                String marca, String modelo, int anioFabricacion, int candidatos) {
-            super(
-                    "El cuadro sellado trae "
-                            + candidatos
-                            + " valores para "
-                            + marca
-                            + " "
-                            + modelo
-                            + " del "
-                            + anioFabricacion
-                            + ", uno por categoria del anexo. Elegir uno sin saber la categoria del"
-                            + " vehiculo daria otra base imponible sin ningun error de por medio"
-                            + " (ARQ-09 §2.5)");
-        }
+    @Override
+    public List<String> categorias(IdentificadorDeConjunto conjunto) {
+        return jdbc().sql(
+                        """
+                        SELECT DISTINCT v.categoria
+                          FROM normativa_valor_referencial v
+                         WHERE v.conjunto_id = :conjunto
+                         ORDER BY v.categoria
+                        """)
+                .param("conjunto", conjunto.valor())
+                .query((ResultSet fila, int numero) -> fila.getString("categoria"))
+                .list();
     }
 
     @Override

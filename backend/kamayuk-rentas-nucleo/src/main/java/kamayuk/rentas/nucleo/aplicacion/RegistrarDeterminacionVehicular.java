@@ -344,6 +344,9 @@ public class RegistrarDeterminacionVehicular {
 
     /**
      * El vehículo no tiene valor referencial en la tabla del ejercicio: no hay base para calcular.
+     *
+     * <p>Con la categoría registrada, es «no lo trae <b>en esa categoría</b>» (#360): la cifra de
+     * otra categoría del anexo sería otra base imponible, así que no se toma.
      */
     public static final class SinValorReferencial extends RuntimeException {
         @java.io.Serial private static final long serialVersionUID = 1L;
@@ -358,6 +361,9 @@ public class RegistrarDeterminacionVehicular {
                             + vehiculo.modelo()
                             + " "
                             + vehiculo.anioFabricacion()
+                            + (vehiculo.categoria() == null
+                                    ? ""
+                                    : ", categoria " + vehiculo.categoria())
                             + ") no tiene valor referencial en la tabla del ejercicio "
                             + ejercicio);
         }
