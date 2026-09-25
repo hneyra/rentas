@@ -319,7 +319,8 @@ function internado(campos: Partial<InternamientoEnDeposito> = {}): Internamiento
     fechaDeSalida: null,
     dias: 54,
     calculadoA: '2026-09-10',
-    estado: 'EN_DEPOSITO',
+    // Un estado que el backend produce (#387): `EN_DEPOSITO` no existe.
+    estado: 'INTERNADO',
     // El CONCEPTO del TUPA, no una tarifa. Ver `conectores/transito.ts`.
     tasaDeCustodia: 'TUPA-2.14 CUSTODIA DIARIA',
     acta: 'ACTA-2026-0311',

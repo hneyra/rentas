@@ -2247,9 +2247,22 @@ export const RUTAS = {
    * lecturas de esta hoja: la de arriba llena la tabla del deposito y esta dice cuantos dias lleva
    * dentro el vehiculo que nombra la direccion. Buscar esa fila **dentro** de la pagina de arriba
    * seria decir «no publicado» cada vez que el vehiculo no cayera entre las veinte primeras.
+   *
+   * <h2>El ULTIMO de la placa, y no el primero (#387)</h2>
+   *
+   * Una placa tiene **tantos internamientos como veces entro**: `RegistrarInternamiento` solo impide
+   * dos abiertos a la vez, y los anteriores se quedan. El orden por omision de la operacion es
+   * `fechaIngreso` **ascendente**, asi que con `tamano=1` y sin mas llegaba **el mas antiguo** —un
+   * internamiento de 2025 ya liberado, con su papeleta y sus dias— para un vehiculo que habia vuelto
+   * a entrar anteayer. El reincidente es el caso normal de un deposito.
+   *
+   * Se pide por eso el orden que usa el propio backend para decir cual es el vigente
+   * —`vigenteDePlaca`: `ORDER BY i.fecha_ingreso DESC`—, y los dos parametros los publica el
+   * contrato. Que el ultimo **siga dentro** no lo garantiza el orden: lo comprueba el conector
+   * (`conectores/transito.ts`) antes de escribir nada con el.
    */
   internamientosDe: (placa: string) =>
-    `/transito/internamientos?placa=${encodeURIComponent(placa)}&tamano=1`,
+    `/transito/internamientos?placa=${encodeURIComponent(placa)}&ordenarPor=fechaIngreso&sentido=DESCENDENTE&tamano=1`,
   /**
    * La ficha de UN vehiculo, por su placa (#180).
    *

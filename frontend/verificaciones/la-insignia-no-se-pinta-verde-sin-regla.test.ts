@@ -233,7 +233,7 @@ const CONECTADAS: readonly {
     hoja: 'tra-veh',
     bloque: 0,
     leLlega:
-      '`contenido[].estado` del internamiento — EN_DEPOSITO, ENTREGADO, REMATADO. Ninguno es un ' +
+      '`contenido[].estado` del internamiento — INTERNADO, EN_ABANDONO, LIBERADO. Ninguno es un ' +
       'juicio de la administracion sobre el vehiculo: dicen donde esta, no si esta conforme',
   },
   // `territorio` entra con #237, DESPUES de escribirse esta guarda — la cuarta vez que pasa, y la
