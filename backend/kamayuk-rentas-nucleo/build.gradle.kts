@@ -83,6 +83,14 @@ tasks.test {
         .file(rootProject.file("../../normativa/docs/10-negocio/valores-normativos/publicacion/parametros-2026.csv"))
         .withPathSensitivity(PathSensitivity.RELATIVE)
 
+    // Y la tabla del corpus contra la que `ElVehicularQuePlaneaNormativaTest` compara las llaves y
+    // las cifras del vehicular planeado (#499). La ruta se arma relativa al derivado, asi que sin
+    // declararla aqui `ClonesHermanosDelWorkflowTest` no la ve, el sparse-checkout no la trae y la
+    // prueba solo cae en CI con `NoSuchFileException`: medido en #524.
+    inputs
+        .file(rootProject.file("../../normativa/docs/10-negocio/valores-normativos/vehicular-valores-referenciales-2026.md"))
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+
     // Y el lote de hechos que publica `catastro` (C-8): `IngestionDeCatastroJdbcTest` lo lee para
     // medir el camino entero. Sin declararlo, cambiar la forma del evento —o el algoritmo de la
     // huella agregada— deja `test` en UP-TO-DATE y la rotura pasa en VERDE RANCIO en local.

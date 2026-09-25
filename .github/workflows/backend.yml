@@ -95,7 +95,11 @@ jobs:
           repository: hneyra/normativa
           path: normativa
           token: ${{ secrets.GH_CLONE_KEY || github.token }}
-          sparse-checkout: docs/10-negocio/valores-normativos/publicacion
+          # La tabla del vehicular la lee `ElVehicularQuePlaneaNormativaTest` (#499): faltaba, y
+          # el `Build completo` caia con `NoSuchFileException` sobre un archivo que en local esta.
+          sparse-checkout: |
+            docs/10-negocio/valores-normativos/publicacion
+            docs/10-negocio/valores-normativos/vehicular-valores-referenciales-2026.md
           sparse-checkout-cone-mode: false
 
       - name: Traer lo que este repositorio declara de «catastro»
