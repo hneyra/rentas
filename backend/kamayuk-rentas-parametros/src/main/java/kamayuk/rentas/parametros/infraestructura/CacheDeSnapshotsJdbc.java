@@ -124,6 +124,17 @@ public class CacheDeSnapshotsJdbc extends RepositorioJdbc implements CacheDeSnap
                 .query(Long.class)
                 .single();
 
+        // La comprobacion que cierra la carrera es ESTA, la de despues del candado, y no las de
+        // antes (#353): dos primeras lecturas simultaneas ven las dos «no esta» fuera, descargan
+        // las dos, y la segunda espera aqui a que la primera confirme. Con READ COMMITTED —ni
+        // TenantTransactionManager ni este modulo lo cambian— la sentencia siguiente al candado ya
+        // ve lo confirmado, y quien llega tarde no escribe nada: ni la identidad, que chocaria con
+        // `normativa_conjunto_pk` y saldria como 500, ni el contenido, cuyas tablas no tienen clave
+        // y lo dejarian duplicado en silencio.
+        if (tiene(snapshot.conjuntoId(), snapshot.ambito())) {
+            return;
+        }
+
         insertarIdentidad(snapshot);
         if (!tieneParametros(snapshot.conjuntoId())) {
             insertarParametros(snapshot);
