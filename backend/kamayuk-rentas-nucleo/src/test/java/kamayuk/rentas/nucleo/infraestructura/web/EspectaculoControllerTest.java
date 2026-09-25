@@ -24,6 +24,7 @@ import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.ValorNormativo;
 import kamayuk.rentas.nucleo.aplicacion.RegistrarEspectaculo;
+import kamayuk.rentas.nucleo.dobles.PadronDeMentira;
 import kamayuk.rentas.nucleo.dominio.espectaculos.EspectaculoPublico;
 import kamayuk.rentas.nucleo.dominio.espectaculos.EspectaculoPublicoRepository;
 import kamayuk.rentas.nucleo.dominio.predial.DetalleDeterminacionPredio;
@@ -72,6 +73,7 @@ class EspectaculoControllerTest {
     private final AuditoriaDePrueba auditoria = new AuditoriaDePrueba();
     private final ComprobadorDePrueba comprobador = new ComprobadorDePrueba();
     private final DeterminacionesEnMemoria determinaciones = new DeterminacionesEnMemoria();
+    private final EventosEnMemoria eventos = new EventosEnMemoria();
 
     private MockMvc mvc = montar(lector(conjuntoCompleto()));
 
@@ -133,6 +135,50 @@ class EspectaculoControllerTest {
         assertThat(cuerpo)
                 .as("#691 — sin conjunto sellado no hay llave: viaja el ejercicio solo")
                 .contains("\"parametroQueFalta\":{\"ejercicio\":2026}");
+        assertThat(determinaciones.insertadas).isZero();
+    }
+
+    /**
+     * #422 — Los parametros se leen <b>antes</b> de guardar el evento.
+     *
+     * <p>Hasta #422 {@code RegistrarEspectaculo} insertaba el espectaculo lo primero, y leia el
+     * conjunto sellado despues: sin conjunto, el 422 salia con el evento ya escrito. Contra
+     * PostgreSQL la transaccion lo revierte; este doble no tiene transaccion, y por eso es el que
+     * ve el orden.
+     */
+    @Test
+    @DisplayName("#422 — sin conjunto sellado el evento no llega a guardarse")
+    void sinConjuntoNoSeGuardaElEvento() throws Exception {
+        mvc = montar(lectorSinSellar());
+
+        MvcResult resultado = mvc.perform(registrar()).andReturn();
+
+        assertThat(resultado.getResponse().getStatus()).isEqualTo(422);
+        assertThat(eventos.guardados).as("se lee lo que falta antes de escribir nada").isEmpty();
+    }
+
+    /**
+     * #422 — Un organizador que no esta en el padron es 404, y el evento no se guarda.
+     *
+     * <p>Contra PostgreSQL era {@code espectaculo_contribuyente_fk}: 500 con incidencia ERROR. Este
+     * doble no tiene claves foraneas, asi que aqui el defecto se veia distinto —201 y un evento de
+     * nadie— y el recorrido hasta la base lo mide {@code EspectaculoFronteraTest}.
+     */
+    @Test
+    @DisplayName("#422 — un organizador que no esta en el padron es 404, y no se guarda nada")
+    void unOrganizadorInexistenteEs404() throws Exception {
+        MvcResult resultado =
+                mvc.perform(
+                                post("/rentas/api/v1/rentas/espectaculos")
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(CUERPO.replace("501", "999999")))
+                        .andReturn();
+
+        assertThat(resultado.getResponse().getStatus()).isEqualTo(404);
+        assertThat(resultado.getResponse().getContentAsString())
+                .contains("NO_ENCONTRADO")
+                .contains("999999");
+        assertThat(eventos.guardados).isEmpty();
         assertThat(determinaciones.insertadas).isZero();
     }
 
@@ -203,7 +249,12 @@ class EspectaculoControllerTest {
     private MockMvc montar(LectorDeParametros parametros) {
         RegistrarEspectaculo servicio =
                 new RegistrarEspectaculo(
-                        new EventosEnMemoria(), determinaciones, parametros, auditoria, RELOJ);
+                        eventos,
+                        determinaciones,
+                        parametros,
+                        new PadronDeMentira().con(501L),
+                        auditoria,
+                        RELOJ);
         return MockMvcBuilders.standaloneSetup(new EspectaculoController(servicio, RELOJ))
                 .addInterceptors(new GuardiaDeAcceso(comprobador, RELOJ))
                 .setControllerAdvice(new ManejadorDeErrores())

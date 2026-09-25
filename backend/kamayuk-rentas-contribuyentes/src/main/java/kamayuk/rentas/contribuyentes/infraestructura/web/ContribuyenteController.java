@@ -329,13 +329,20 @@ public class ContribuyenteController {
     }
 
     /**
-     * El conyuge, comprobando que no sea el propio contribuyente.
+     * El conyuge, comprobando que no sea el propio contribuyente y que este en el padron.
      *
      * <p>{@code 0} borra el enlace, como la cadena vacia en los campos de texto. Y nadie es su
      * propio conyuge: dejarlo pasar produciria una sociedad conyugal de una sola persona, que
      * ninguna consulta sabria deshacer.
+     *
+     * <p><b>Que exista se pregunta aqui, antes de escribir</b> (#422). Hasta entonces cualquier
+     * identificador distinto del propio llegaba al {@code UPDATE}, y {@code
+     * contribuyente_conyuge_fk} lo rechazaba como un 500 con incidencia ERROR: el patron de {@code
+     * FichaDelContribuyenteController.exigirQueExista}, que el alta de al lado ya seguia y esta
+     * correccion no. La clave foranea sigue siendo la que lo impide; la pregunta es la que dice
+     * que.
      */
-    private static @Nullable Long conyugeDe(long conyugeId, long propio) {
+    private @Nullable Long conyugeDe(long conyugeId, long propio) {
         if (conyugeId == 0L) {
             return null;
         }
@@ -344,6 +351,13 @@ public class ContribuyenteController {
                     CodigoDeError.VALIDACION,
                     "Nadie es su propio conyuge: el identificador del conyuge no puede ser el del"
                             + " contribuyente que se corrige");
+        }
+        if (consulta.porId(conyugeId).isEmpty()) {
+            throw new ProblemaDeNegocio(
+                    CodigoDeError.NO_ENCONTRADO,
+                    "No hay ningun contribuyente con identificador "
+                            + conyugeId
+                            + " en esta municipalidad: no se le puede declarar conyuge");
         }
         return conyugeId;
     }

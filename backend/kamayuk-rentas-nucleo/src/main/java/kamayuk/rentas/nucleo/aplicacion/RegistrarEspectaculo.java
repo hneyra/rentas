@@ -3,9 +3,11 @@ package kamayuk.rentas.nucleo.aplicacion;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Set;
 import kamayuk.rentas.auditoria.Auditoria;
 import kamayuk.rentas.auditoria.Operacion;
 import kamayuk.rentas.auditoria.RegistroDeAuditoria;
+import kamayuk.rentas.contribuyentes.DirectorioDeContribuyentes;
 import kamayuk.rentas.dominio.Alicuota;
 import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.dominio.Ejercicio;
@@ -33,6 +35,15 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>La alícuota se lee del conjunto sellado, con la <b>clave compuesta por tipo de espectáculo</b>
  * —igual que {@code RT001ValorDeTerreno} busca el arancel por vía—: teatro, cine, concierto y
  * taurino no pagan la misma alícuota (TUO LTM art. 56).
+ *
+ * <h2>Primero lo que puede faltar, después la escritura (#422)</h2>
+ *
+ * <p>Hasta #422 lo primero que hacía era insertar el espectáculo, y después leía el conjunto
+ * sellado: sin conjunto, o con un organizador que no está en el padrón, el rechazo llegaba con la
+ * fila ya escrita —y en el segundo caso ni siquiera llegaba: {@code espectaculo_contribuyente_fk}
+ * rechazaba el {@code INSERT} y salía como un 500 con incidencia ERROR—. Ahora se leen los
+ * parámetros y se resuelve al organizador por {@link DirectorioDeContribuyentes} <b>antes</b> de
+ * escribir nada, y el borde contesta 422 o 404 según lo que falte.
  */
 @Service
 public class RegistrarEspectaculo {
@@ -45,6 +56,7 @@ public class RegistrarEspectaculo {
     private final EspectaculoPublicoRepository eventos;
     private final DeterminacionRepository determinaciones;
     private final LectorDeParametros parametros;
+    private final DirectorioDeContribuyentes padron;
     private final Auditoria auditoria;
     private final Clock reloj;
 
@@ -52,11 +64,13 @@ public class RegistrarEspectaculo {
             EspectaculoPublicoRepository eventos,
             DeterminacionRepository determinaciones,
             LectorDeParametros parametros,
+            DirectorioDeContribuyentes padron,
             Auditoria auditoria,
             Clock reloj) {
         this.eventos = eventos;
         this.determinaciones = determinaciones;
         this.parametros = parametros;
+        this.padron = padron;
         this.auditoria = auditoria;
         this.reloj = reloj;
     }
@@ -65,6 +79,7 @@ public class RegistrarEspectaculo {
      * Registra el evento y determina su impuesto.
      *
      * @param ingresoDeclarado la base imponible que declara el organizador
+     * @throws OrganizadorInexistente si el organizador no esta en el padron (#422)
      */
     @Transactional
     public Determinacion registrar(
@@ -78,17 +93,6 @@ public class RegistrarEspectaculo {
             Dinero ingresoDeclarado,
             Observacion observacion) {
 
-        EspectaculoPublico guardado =
-                eventos.insertar(
-                        EspectaculoPublico.nuevo(
-                                organizadorId,
-                                denominacion,
-                                tipo,
-                                lugar,
-                                fechaEvento,
-                                aforo,
-                                valorEntrada));
-
         Ejercicio ejercicio = Ejercicio.de(fechaEvento);
         ParametrosSellados sellados = parametros.vigenteEn(ejercicio);
         long conjuntoId = parametros.conjuntoVigenteEn(ejercicio).valor();
@@ -99,7 +103,22 @@ public class RegistrarEspectaculo {
                                 .valor()
                                 .toPlainString());
 
+        if (!padron.porIds(Set.of(organizadorId)).containsKey(organizadorId)) {
+            throw new OrganizadorInexistente(organizadorId);
+        }
+
         Dinero montoDeterminado = ImpuestoDeEspectaculo.calcular(ingresoDeclarado, alicuota);
+
+        EspectaculoPublico guardado =
+                eventos.insertar(
+                        EspectaculoPublico.nuevo(
+                                organizadorId,
+                                denominacion,
+                                tipo,
+                                lugar,
+                                fechaEvento,
+                                aforo,
+                                valorEntrada));
 
         eventos.liquidar(requerirId(guardado), ingresoDeclarado);
 
@@ -115,6 +134,19 @@ public class RegistrarEspectaculo {
         Determinacion determinada = determinaciones.insertar(nueva);
         auditar(determinada, observacion);
         return determinada;
+    }
+
+    /** El organizador no esta en el padron de esta municipalidad (#422). */
+    public static final class OrganizadorInexistente extends RuntimeException {
+
+        @java.io.Serial private static final long serialVersionUID = 1L;
+
+        OrganizadorInexistente(long id) {
+            super(
+                    "No hay ningun contribuyente con identificador "
+                            + id
+                            + " en esta municipalidad: no puede organizar el espectaculo");
+        }
     }
 
     private static long requerirId(EspectaculoPublico evento) {

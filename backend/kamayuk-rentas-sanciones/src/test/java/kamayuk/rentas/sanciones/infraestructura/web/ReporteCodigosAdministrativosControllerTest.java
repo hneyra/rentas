@@ -67,6 +67,50 @@ class ReporteCodigosAdministrativosControllerTest {
         assertThat(ultimoCriterio.vigenteA()).isEqualTo(LocalDate.of(2026, 6, 15));
     }
 
+    /**
+     * #422 — Una fecha con barras es 422 que nombra el parametro, y no el 500 de {@code
+     * DateTimeParseException}.
+     *
+     * <p>{@code DateTimeParseException} no es una {@code IllegalArgumentException}, asi que hasta
+     * #422 ningun manejador la reconocia y caia en el de «cualquier otra»: 500 con incidencia ERROR
+     * por una fecha tecleada como la escribe cualquiera en el Peru.
+     */
+    @Test
+    @DisplayName("#422 — una fecha dd/MM/aaaa es 422, no consulta nada y no deja incidencia")
+    void unaFechaConBarrasEs422() throws Exception {
+        ch.qos.logback.classic.Logger registro =
+                (ch.qos.logback.classic.Logger)
+                        org.slf4j.LoggerFactory.getLogger(ManejadorDeErrores.class);
+        ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent> anotados =
+                new ch.qos.logback.core.read.ListAppender<>();
+        anotados.start();
+        registro.addAppender(anotados);
+        org.springframework.test.web.servlet.MvcResult resultado;
+        try {
+            resultado =
+                    mvc.perform(
+                                    get("/rentas/api/v1/infracciones/administrativas/codigos/reporte")
+                                            .param("fecha", "14/08/2026"))
+                            .andReturn();
+        } finally {
+            registro.detachAppender(anotados);
+        }
+
+        assertThat(resultado.getResponse().getStatus()).isEqualTo(422);
+        assertThat(resultado.getResponse().getContentAsString())
+                .contains("VALIDACION")
+                .contains("fecha")
+                .contains("14/08/2026")
+                .doesNotContain("incidencia");
+        assertThat(
+                        anotados.list.stream()
+                                .filter(e -> e.getLevel() == ch.qos.logback.classic.Level.ERROR)
+                                .toList())
+                .as("un rechazo del usuario no es una incidencia del servidor")
+                .isEmpty();
+        assertThat(ultimoCriterio).as("y no se llego a consultar").isNull();
+    }
+
     private CodigoInfraccionRepository repositorioDeMentira() {
         return new CodigoInfraccionRepository() {
             @Override

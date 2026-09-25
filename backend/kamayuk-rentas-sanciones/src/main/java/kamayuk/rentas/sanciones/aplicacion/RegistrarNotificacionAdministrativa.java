@@ -1,9 +1,11 @@
 package kamayuk.rentas.sanciones.aplicacion;
 
 import java.time.LocalDate;
+import java.util.Set;
 import kamayuk.rentas.auditoria.Auditoria;
 import kamayuk.rentas.auditoria.Operacion;
 import kamayuk.rentas.auditoria.RegistroDeAuditoria;
+import kamayuk.rentas.contribuyentes.DirectorioDeContribuyentes;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.sanciones.dominio.NotificacionAdministrativa;
 import kamayuk.rentas.sanciones.dominio.NotificacionAdministrativaRepository;
@@ -22,6 +24,12 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>La tabla no lleva columna {@code observacion} (ver {@link NotificacionAdministrativa}); esta
  * clase igual la exige como argumento para poder auditar el alta (regla 10, ADR-0008).
+ *
+ * <p><b>El contribuyente, si viene, tiene que estar en el padron</b> (#422). No es obligatorio
+ * identificarlo; lo que no se admite es nombrar a uno que no existe. Hasta #422 ese identificador
+ * llegaba al {@code INSERT} y {@code notif_adm_contribuyente_fk} lo rechazaba como un 500 con
+ * incidencia ERROR; ahora se pregunta antes al {@link DirectorioDeContribuyentes}, el puerto que
+ * este contexto ya usa, y el borde contesta 404.
  */
 @Service
 public class RegistrarNotificacionAdministrativa {
@@ -29,11 +37,15 @@ public class RegistrarNotificacionAdministrativa {
     private static final String TABLA_AUDITADA = "notificacion_administrativa";
 
     private final NotificacionAdministrativaRepository notificaciones;
+    private final DirectorioDeContribuyentes contribuyentes;
     private final Auditoria auditoria;
 
     public RegistrarNotificacionAdministrativa(
-            NotificacionAdministrativaRepository notificaciones, Auditoria auditoria) {
+            NotificacionAdministrativaRepository notificaciones,
+            DirectorioDeContribuyentes contribuyentes,
+            Auditoria auditoria) {
         this.notificaciones = notificaciones;
+        this.contribuyentes = contribuyentes;
         this.auditoria = auditoria;
     }
 
@@ -47,6 +59,11 @@ public class RegistrarNotificacionAdministrativa {
             String motivo,
             @Nullable Short plazoDias,
             Observacion observacion) {
+
+        if (contribuyenteId != null
+                && !contribuyentes.porIds(Set.of(contribuyenteId)).containsKey(contribuyenteId)) {
+            throw new ContribuyenteInexistente(contribuyenteId);
+        }
 
         NotificacionAdministrativa guardada =
                 notificaciones.insertar(
@@ -69,6 +86,19 @@ public class RegistrarNotificacionAdministrativa {
                         .con(null, descripcion(guardada)));
 
         return guardada;
+    }
+
+    /** El contribuyente notificado no esta en el padron de esta municipalidad (#422). */
+    public static final class ContribuyenteInexistente extends RuntimeException {
+
+        @java.io.Serial private static final long serialVersionUID = 1L;
+
+        ContribuyenteInexistente(long id) {
+            super(
+                    "No hay ningun contribuyente con identificador "
+                            + id
+                            + " en esta municipalidad: no se le puede notificar");
+        }
     }
 
     private static String descripcion(NotificacionAdministrativa notificacion) {

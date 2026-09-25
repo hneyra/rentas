@@ -15,9 +15,11 @@ import kamayuk.rentas.fiscalizacion.dominio.CriterioDeProgramas;
 import kamayuk.rentas.fiscalizacion.dominio.EstadoDePrograma;
 import kamayuk.rentas.fiscalizacion.dominio.ProgramaFiscalizacion;
 import kamayuk.rentas.fiscalizacion.dominio.ProgramaFiscalizacionRepository;
+import kamayuk.rentas.fiscalizacion.dominio.ProgramaFiscalizacionRepository.ProgramaRepetido;
 import kamayuk.rentas.fiscalizacion.dominio.TipoDePrograma;
 import kamayuk.rentas.persistencia.OrdenSeguro;
 import kamayuk.rentas.persistencia.RepositorioJdbc;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 
@@ -58,21 +60,29 @@ public class ProgramaFiscalizacionRepositoryJdbc extends RepositorioJdbc
         campos.put("criterio", programa.criterio() == null ? null : programa.criterio().name());
         campos.put("fiscalizador", programa.fiscalizador());
 
-        Long id =
-                jdbc().sql(
-                                "INSERT INTO programa_fiscalizacion"
-                                        + " (municipalidad_id, codigo, descripcion, tipo, fecha_inicio,"
-                                        + "  fecha_fin, estado, ejercicio, sector_codigo, criterio,"
-                                        + "  fiscalizador)"
-                                        + " VALUES ("
-                                        + MUNICIPALIDAD_ACTUAL
-                                        + ", :codigo, :descripcion, :tipo, :fechaInicio, :fechaFin,"
-                                        + "  :estado, :ejercicio, :sectorCodigo, :criterio,"
-                                        + "  :fiscalizador)"
-                                        + " RETURNING id")
-                        .params(campos)
-                        .query(Long.class)
-                        .single();
+        Long id;
+        try {
+            id =
+                    jdbc().sql(
+                                    "INSERT INTO programa_fiscalizacion"
+                                            + " (municipalidad_id, codigo, descripcion, tipo, fecha_inicio,"
+                                            + "  fecha_fin, estado, ejercicio, sector_codigo, criterio,"
+                                            + "  fiscalizador)"
+                                            + " VALUES ("
+                                            + MUNICIPALIDAD_ACTUAL
+                                            + ", :codigo, :descripcion, :tipo, :fechaInicio, :fechaFin,"
+                                            + "  :estado, :ejercicio, :sectorCodigo, :criterio,"
+                                            + "  :fiscalizador)"
+                                            + " RETURNING id")
+                            .params(campos)
+                            .query(Long.class)
+                            .single();
+        } catch (DuplicateKeyException repetido) {
+            // `programa_codigo_uq`, la unica restriccion unica de la tabla. Se traduce aqui y no
+            // se comprueba antes en Java: dos peticiones simultaneas pasan las dos por cualquier
+            // `if`, y la base es la unica que puede impedirlo (#422).
+            throw new ProgramaRepetido(programa.codigo());
+        }
 
         return new ProgramaFiscalizacion(
                 id,

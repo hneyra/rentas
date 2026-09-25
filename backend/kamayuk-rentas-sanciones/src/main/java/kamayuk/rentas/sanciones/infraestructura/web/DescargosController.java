@@ -9,6 +9,7 @@ import kamayuk.rentas.parametros.LectorDeParametros;
 import kamayuk.rentas.sanciones.aplicacion.PlazosDeSancionesParametrizados;
 import kamayuk.rentas.sanciones.aplicacion.RegistrarDescargo;
 import kamayuk.rentas.sanciones.dominio.Descargo;
+import kamayuk.rentas.sanciones.dominio.DescargoRepository;
 import kamayuk.rentas.sanciones.dominio.Familia;
 import kamayuk.rentas.sanciones.dominio.TipoDeRecurso;
 import kamayuk.rentas.web.Api;
@@ -107,6 +108,11 @@ public class DescargosController {
                                             peticion.fundamento(), "fundamento")),
                             observacion);
             return DescargoResource.de(registrado);
+        } catch (DescargoRepository.DescargoRepetido repetido) {
+            // #422: el doble envio del mismo expediente. 409 nombrando el expediente, y no el 500
+            // del indice unico con su incidencia.
+            throw new ProblemaDeNegocio(
+                    CodigoDeError.CONFLICTO, PeticionesDeSanciones.mensajeDe(repetido));
         } catch (RegistrarDescargo.PapeletaInexistente noExiste) {
             throw new ProblemaDeNegocio(
                     CodigoDeError.NO_ENCONTRADO, PeticionesDeSanciones.mensajeDe(noExiste));

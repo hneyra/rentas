@@ -97,6 +97,13 @@ class RegistrarEspectaculoTest {
                                 new EspectaculoPublicoRepositoryJdbc(jdbc),
                                 new DeterminacionRepositoryJdbc(jdbc),
                                 parametros,
+                                envolver(
+                                        new kamayuk.rentas.contribuyentes.aplicacion.DirectorioJdbc(
+                                                new kamayuk.rentas.contribuyentes.infraestructura
+                                                        .ContribuyenteRepositoryJdbc(jdbc),
+                                                new kamayuk.rentas.contribuyentes.infraestructura
+                                                        .FichaRepositoryJdbc(jdbc)),
+                                        gestor),
                                 new AuditoriaJdbc(jdbc, RELOJ),
                                 RELOJ),
                         gestor);

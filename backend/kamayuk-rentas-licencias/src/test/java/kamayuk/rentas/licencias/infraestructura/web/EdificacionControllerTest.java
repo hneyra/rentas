@@ -213,6 +213,76 @@ class EdificacionControllerTest {
             assertThat(cuerpo).contains("\"completo\":false");
         }
 
+        /**
+         * #422 — Lo que no cabe en {@code licencia_edificacion} es 422 al presentar, no 500.
+         *
+         * <p>El FUE topaba su {@code expediente} y no el anterior, que va en una columna del mismo
+         * ancho; ni el documento del representante. Contra PostgreSQL eran 500 con incidencia
+         * ({@code LicenciaDeEdificacionJdbcTest.LoQueNoCabe}); contra el doble, 201. Que no se
+         * guardo nada lo dice la presentacion correcta de despues, que no choca con ningun
+         * expediente repetido.
+         */
+        @Test
+        @DisplayName("#422 — un expediente anterior o un DNI de 21 caracteres son 422 al presentar")
+        void loQueNoCabeAlPresentarEs422() throws Exception {
+            String base =
+                    """
+                    {"nroExpediente":"%s","fechaDeclaracion":"2026-03-16",
+                     "codContribuyente":"C-0007","tipoTramite":"LICENCIA_DE_OBRA",
+                     "obra":"EDIFICACION_NUEVA","modalidadAprobacion":"B",
+                     "revision":"REVISORES_URBANOS","solicitanteEsPropietario":true,%s
+                     "observacion":"Se presenta el FUE"}
+                    """;
+
+            Rechazo anterior =
+                    rechazo(
+                            mvc,
+                            "/rentas/api/v1/licencias/edificacion",
+                            base.formatted(
+                                    EXPEDIENTE,
+                                    "\"nroExpedienteAnterior\":\"EXP-2026-FU-000000421\","));
+            Rechazo representante =
+                    rechazo(
+                            mvc,
+                            "/rentas/api/v1/licencias/edificacion",
+                            base.formatted(
+                                    EXPEDIENTE,
+                                    "\"representanteDni\":\"CE-000000000000000421\","
+                                            + "\"representanteNombre\":\"TORRES, ANA\","
+                                            + "\"representantePartidaRegistral\":\"P-11223\","));
+
+            for (Rechazo rechazo : java.util.List.of(anterior, representante)) {
+                assertThat(rechazo.estado()).as(rechazo.cuerpo()).isEqualTo(422);
+                assertThat(rechazo.cuerpo()).contains("VALIDACION").contains("20");
+                assertThat(rechazo.errores()).isEmpty();
+            }
+            presentar(EXPEDIENTE, "LICENCIA_DE_OBRA", null, 201);
+        }
+
+        @Test
+        @DisplayName(
+                "#422 — una manzana o un lote de 11 caracteres son 422 al completar el terreno")
+        void loQueNoCabeEnElTerrenoEs422() throws Exception {
+            presentar(EXPEDIENTE, "LICENCIA_DE_OBRA", null, 201);
+
+            for (String cuerpo :
+                    java.util.List.of(
+                            cuerpoDeTerreno().replace("\"mz\":\"A\"", "\"mz\":\"MZ-00000422\""),
+                            cuerpoDeTerreno().replace("\"lt\":\"3\"", "\"lt\":\"LT-00000422\""))) {
+                Rechazo rechazo =
+                        rechazo(
+                                mvc,
+                                "/rentas/api/v1/licencias/edificacion/" + EXPEDIENTE + "/secciones",
+                                cuerpo);
+                assertThat(rechazo.estado()).as(rechazo.cuerpo()).isEqualTo(422);
+                assertThat(rechazo.cuerpo()).contains("VALIDACION").contains("10");
+                assertThat(rechazo.errores()).isEmpty();
+            }
+            assertThat(completarTerreno(201))
+                    .as("ninguno de los dos se guardo: el terreno correcto es la version 1")
+                    .contains("\"version\":1");
+        }
+
         @Test
         @DisplayName("sin observacion no se presenta: 422 (regla 10)")
         void sinObservacion() throws Exception {
@@ -675,5 +745,37 @@ class EdificacionControllerTest {
             long id, String numero, List<String> conceptos) {
         return new kamayuk.rentas.tesoreria.ReciboDeTramite(
                 id, numero, HOY, 7L, true, false, conceptos, Dinero.de("350.00"), HOY);
+    }
+
+    /** Lo que un rechazo contesta, y las lineas ERROR que dejo en el registro del manejador. */
+    private record Rechazo(int estado, String cuerpo, java.util.List<String> errores) {}
+
+    /** El {@code POST}, midiendo tambien si escribio una incidencia ERROR (#422). */
+    private Rechazo rechazo(MockMvc cual, String ruta, String cuerpo) throws Exception {
+        ch.qos.logback.classic.Logger registro =
+                (ch.qos.logback.classic.Logger)
+                        org.slf4j.LoggerFactory.getLogger(ManejadorDeErrores.class);
+        ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent> anotados =
+                new ch.qos.logback.core.read.ListAppender<>();
+        anotados.start();
+        registro.addAppender(anotados);
+        MvcResult resultado;
+        try {
+            resultado =
+                    cual.perform(
+                                    MockMvcRequestBuilders.post(ruta)
+                                            .contentType(MediaType.APPLICATION_JSON)
+                                            .content(cuerpo))
+                            .andReturn();
+        } finally {
+            registro.detachAppender(anotados);
+        }
+        return new Rechazo(
+                resultado.getResponse().getStatus(),
+                resultado.getResponse().getContentAsString(),
+                anotados.list.stream()
+                        .filter(e -> e.getLevel() == ch.qos.logback.classic.Level.ERROR)
+                        .map(ch.qos.logback.classic.spi.ILoggingEvent::getFormattedMessage)
+                        .toList());
     }
 }

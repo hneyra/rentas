@@ -2,10 +2,12 @@ package kamayuk.rentas.fiscalizacion.aplicacion;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Set;
 import kamayuk.rentas.auditoria.Auditoria;
 import kamayuk.rentas.auditoria.Operacion;
 import kamayuk.rentas.auditoria.RegistroDeAuditoria;
 import kamayuk.rentas.catastro.LectorDeFichas;
+import kamayuk.rentas.contribuyentes.DirectorioDeContribuyentes;
 import kamayuk.rentas.dominio.AreaM2;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.fiscalizacion.dominio.ActaConLoDeclarado;
@@ -15,6 +17,7 @@ import kamayuk.rentas.fiscalizacion.dominio.Hallazgo;
 import kamayuk.rentas.fiscalizacion.dominio.ProgramaFiscalizacion;
 import kamayuk.rentas.fiscalizacion.dominio.ProgramaFiscalizacionRepository;
 import kamayuk.rentas.fiscalizacion.dominio.TipoDePrograma;
+import kamayuk.rentas.nucleo.PadronVehicular;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,6 +40,16 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>La versión —la visita número N sobre este contribuyente dentro del mismo programa— sale de
  * {@link ActaFiscalizacionRepository#siguienteVersion}: refiscalizar no reemplaza el acta anterior,
  * agrega una versión (V4: {@code acta_fisc_version_uq}).
+ *
+ * <h2>A quién se fiscaliza se pregunta antes de escribir (#422)</h2>
+ *
+ * <p>El contribuyente y el vehículo se citan por identificador, y la tabla los ata con dos claves
+ * foráneas: {@code acta_fisc_contribuyente_fk} y {@code acta_fisc_vehiculo_fk} —esta {@code NOT
+ * VALID}, que no revisa las filas viejas pero sí obliga a las nuevas—. Hasta #422 nadie preguntaba
+ * antes, así que un identificador que no está en el padrón llegaba al {@code INSERT} y salía como
+ * un 500 con incidencia ERROR. Ahora se pregunta a los dos puertos públicos que ya existen —{@link
+ * DirectorioDeContribuyentes} y {@link PadronVehicular}— y el borde lo contesta 404. Las claves
+ * siguen siendo las que lo impiden; la pregunta es la que dice qué.
  */
 @Service
 public class RegistrarActaFiscalizacion {
@@ -46,16 +59,22 @@ public class RegistrarActaFiscalizacion {
     private final ActaFiscalizacionRepository actas;
     private final ProgramaFiscalizacionRepository programas;
     private final LectorDeFichas fichas;
+    private final DirectorioDeContribuyentes contribuyentes;
+    private final PadronVehicular vehiculos;
     private final Auditoria auditoria;
 
     public RegistrarActaFiscalizacion(
             ActaFiscalizacionRepository actas,
             ProgramaFiscalizacionRepository programas,
             LectorDeFichas fichas,
+            DirectorioDeContribuyentes contribuyentes,
+            PadronVehicular vehiculos,
             Auditoria auditoria) {
         this.actas = actas;
         this.programas = programas;
         this.fichas = fichas;
+        this.contribuyentes = contribuyentes;
+        this.vehiculos = vehiculos;
         this.auditoria = auditoria;
     }
 
@@ -74,6 +93,7 @@ public class RegistrarActaFiscalizacion {
 
         exigirPrograma(programaId, TipoDePrograma.PREDIAL);
         exigirHallazgo(hallazgo);
+        exigirContribuyente(contribuyenteId);
         Long fichaId = fichas.fichaVigenteEn(predioId, fechaVisita).orElse(null);
 
         return guardar(
@@ -105,6 +125,8 @@ public class RegistrarActaFiscalizacion {
 
         exigirPrograma(programaId, TipoDePrograma.VEHICULAR);
         exigirHallazgo(hallazgo);
+        exigirContribuyente(contribuyenteId);
+        exigirVehiculo(vehiculoId);
 
         return guardar(
                 ActaFiscalizacion.nuevaVehicular(
@@ -154,6 +176,20 @@ public class RegistrarActaFiscalizacion {
                         .orElseThrow(() -> new ProgramaInexistente(programaId));
         if (programa.tipo() != tipoEsperado) {
             throw new ProgramaDeOtroTipo(programa, tipoEsperado);
+        }
+    }
+
+    /** El fiscalizado esta en el padron de esta municipalidad, o el acta no se escribe (#422). */
+    private void exigirContribuyente(long contribuyenteId) {
+        if (!contribuyentes.porIds(Set.of(contribuyenteId)).containsKey(contribuyenteId)) {
+            throw new ContribuyenteInexistente(contribuyenteId);
+        }
+    }
+
+    /** El vehiculo inspeccionado esta en el padron vehicular, o el acta no se escribe (#422). */
+    private void exigirVehiculo(long vehiculoId) {
+        if (!vehiculos.estaEnElPadron(vehiculoId)) {
+            throw new VehiculoInexistente(vehiculoId);
         }
     }
 
@@ -209,6 +245,32 @@ public class RegistrarActaFiscalizacion {
 
         ProgramaInexistente(long id) {
             super("No hay ningun programa de fiscalizacion con identificador " + id);
+        }
+    }
+
+    /** No hay ningun contribuyente con ese identificador en el padron de esta municipalidad. */
+    public static final class ContribuyenteInexistente extends RuntimeException {
+        @java.io.Serial private static final long serialVersionUID = 1L;
+
+        ContribuyenteInexistente(long id) {
+            super(
+                    "No hay ningun contribuyente con identificador "
+                            + id
+                            + " en esta municipalidad: no se le puede levantar un acta");
+        }
+    }
+
+    /**
+     * No hay ningun vehiculo con ese identificador en el padron vehicular de esta municipalidad.
+     */
+    public static final class VehiculoInexistente extends RuntimeException {
+        @java.io.Serial private static final long serialVersionUID = 1L;
+
+        VehiculoInexistente(long id) {
+            super(
+                    "No hay ningun vehiculo con identificador "
+                            + id
+                            + " en el padron vehicular de esta municipalidad");
         }
     }
 

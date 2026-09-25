@@ -212,7 +212,7 @@ class SancionesWebTest {
         // sobrevive a su propia ida y vuelta y el acta imprime el dia ANTERIOR.
         AtomicReference<java.time.Instant> capturado = new AtomicReference<>();
         RegistrarInternamiento registrar =
-                new RegistrarInternamiento(null, null, null, null, RELOJ) {
+                new RegistrarInternamiento(null, null, null, null, null, RELOJ) {
                     @Override
                     public Internado internar(
                             Peticion peticion,

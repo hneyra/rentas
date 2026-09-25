@@ -33,6 +33,9 @@ public interface PapeletaRepository {
      * sigue intacto. El usuario que hace el cambio no es un parámetro: lo resuelve la
      * implementación desde {@link kamayuk.rentas.auditoria.OrigenContext}, igual que {@code
      * usuario_registro} en {@link #insertar}.
+     *
+     * @throws NumeroDePapeletaEnUso si otra papeleta de la misma familia ya tiene ese numero. Lo
+     *     detecta la base con {@code papeleta_numero_uq}, no una comprobacion en Java (#422)
      */
     Papeleta cambiarNumero(long papeletaId, String numeroNuevo, String motivo);
 
@@ -52,4 +55,24 @@ public interface PapeletaRepository {
      * @throws Papeleta.TransicionIlegal si en ese estado ya no se debe nada
      */
     Papeleta anular(long papeletaId);
+
+    /**
+     * El numero nuevo ya lo tiene otra papeleta de la misma familia en esta municipalidad (#422).
+     *
+     * <p>Hasta #422 salia como el 500 del indice unico, que invita a reintentar algo que no va a
+     * funcionar nunca: el numero es de otra papeleta, y lo que hay que corregir es el que se
+     * escribio.
+     */
+    final class NumeroDePapeletaEnUso extends RuntimeException {
+
+        @java.io.Serial private static final long serialVersionUID = 1L;
+
+        public NumeroDePapeletaEnUso(String numero) {
+            super(
+                    "El numero '"
+                            + numero
+                            + "' ya lo tiene otra papeleta en esta municipalidad: una papeleta no"
+                            + " puede tomar el numero de otra");
+        }
+    }
 }

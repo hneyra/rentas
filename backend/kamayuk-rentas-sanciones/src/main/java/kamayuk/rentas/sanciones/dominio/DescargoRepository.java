@@ -14,6 +14,13 @@ import java.util.Optional;
  */
 public interface DescargoRepository {
 
+    /**
+     * Guarda un descargo nuevo.
+     *
+     * @throws DescargoRepetido si ya hay otro con ese numero de expediente en la municipalidad. Lo
+     *     detecta la base con {@code descargo_numero_uq}: el doble envio del mismo formulario pasa
+     *     dos veces por cualquier comprobacion en Java (#422)
+     */
     Descargo insertar(Descargo descargo);
 
     /** El descargo con ese número de expediente, si existe en esta municipalidad. */
@@ -23,4 +30,22 @@ public interface DescargoRepository {
 
     /** Los descargos presentados contra una papeleta, del más antiguo al más reciente. */
     List<Descargo> dePapeleta(long papeletaId);
+
+    /**
+     * Ya hay un descargo con ese numero de expediente en esta municipalidad (#422).
+     *
+     * <p>El numero de expediente es el de mesa de partes, y lo teclea quien atiende: un doble envio
+     * o un expediente ya usado salian como el 500 del indice unico, con incidencia ERROR.
+     */
+    final class DescargoRepetido extends RuntimeException {
+
+        @java.io.Serial private static final long serialVersionUID = 1L;
+
+        public DescargoRepetido(String numeroExpediente) {
+            super(
+                    "Ya hay un descargo registrado con el expediente '"
+                            + numeroExpediente
+                            + "' en esta municipalidad");
+        }
+    }
 }

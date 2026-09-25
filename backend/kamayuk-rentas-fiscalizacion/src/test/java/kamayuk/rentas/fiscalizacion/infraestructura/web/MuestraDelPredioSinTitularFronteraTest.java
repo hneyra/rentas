@@ -165,7 +165,15 @@ class MuestraDelPredioSinTitularFronteraTest {
         RegistrarActaFiscalizacion registroDeActas =
                 envolver(
                         new RegistrarActaFiscalizacion(
-                                actas, programas, new FichasDelEscenario(jdbc), registro -> {}),
+                                actas,
+                                programas,
+                                new FichasDelEscenario(jdbc),
+                                new PadronDeLaPrueba(),
+                                vehiculoId -> {
+                                    throw new UnsupportedOperationException(
+                                            "esta prueba solo levanta actas prediales");
+                                },
+                                registro -> {}),
                         gestor);
 
         mvc =

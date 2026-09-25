@@ -21,6 +21,7 @@ import kamayuk.rentas.sanciones.dominio.EstadoDePapeleta;
 import kamayuk.rentas.sanciones.dominio.Familia;
 import kamayuk.rentas.sanciones.dominio.Papeleta;
 import kamayuk.rentas.sanciones.dominio.PapeletaRepository;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 
@@ -231,10 +232,17 @@ public class PapeletaRepositoryJdbc extends RepositorioJdbc implements PapeletaR
                                                         + papeletaId
                                                         + " en esta municipalidad"));
 
-        jdbc().sql("UPDATE papeleta SET numero = :numeroNuevo WHERE id = :id")
-                .param("numeroNuevo", nuevoLimpio)
-                .param("id", papeletaId)
-                .update();
+        try {
+            jdbc().sql("UPDATE papeleta SET numero = :numeroNuevo WHERE id = :id")
+                    .param("numeroNuevo", nuevoLimpio)
+                    .param("id", papeletaId)
+                    .update();
+        } catch (DuplicateKeyException enUso) {
+            // `papeleta_numero_uq` (municipalidad, familia, numero): el numero nuevo ya es de otra
+            // papeleta (#422). Solo este UPDATE puede chocar con ella; el INSERT de la traza de
+            // abajo no tiene mas unicidad que su identificador.
+            throw new PapeletaRepository.NumeroDePapeletaEnUso(nuevoLimpio);
+        }
 
         jdbc().sql(
                         "INSERT INTO papeleta_cambio_numero"

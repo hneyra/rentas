@@ -74,6 +74,18 @@ public record LicenciaDeFuncionamiento(
         List<GiroDeLaLicencia> giros,
         TerritorioDeLaLicencia territorio) {
 
+    /**
+     * {@code licencia_funcionamiento.expediente varchar(20)} (V1).
+     *
+     * <p>El ancho de la columna, topado aqui y no en la base (#422): hasta entonces un texto de mas
+     * llegaba al {@code INSERT}, el motor lo rechazaba con 22001 y el borde contestaba 500 con
+     * incidencia ERROR —y en la emision, con el papel ya dibujado: este constructor corre antes de
+     * {@code documentos.emitir}, asi que el tope tambien lo evita—. La {@code
+     * IllegalArgumentException} sale 422 con su mensaje, que nombra el campo y no la tabla. Aqui se
+     * topa lo que llega; no se ensancha la base.
+     */
+    public static final int EXPEDIENTE_MAXIMO = 20;
+
     public LicenciaDeFuncionamiento {
         Objects.requireNonNull(numero, "Una licencia sin numero no es una licencia");
         Objects.requireNonNull(nombreComercial, "La licencia necesita su denominacion comercial");
@@ -104,6 +116,14 @@ public record LicenciaDeFuncionamiento(
         }
         if (contribuyenteId <= 0) {
             throw new IllegalArgumentException("La licencia es de un titular concreto");
+        }
+        if (expediente != null && expediente.length() > EXPEDIENTE_MAXIMO) {
+            throw new IllegalArgumentException(
+                    "El expediente '"
+                            + expediente
+                            + "' excede los "
+                            + EXPEDIENTE_MAXIMO
+                            + " caracteres que admite");
         }
         if (aforo != null && aforo <= 0) {
             throw new IllegalArgumentException("Un aforo de cero personas no autoriza nada");

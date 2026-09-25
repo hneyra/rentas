@@ -14,6 +14,8 @@ import kamayuk.rentas.catastro.LectorDeFichas;
 import kamayuk.rentas.compartido.Pagina;
 import kamayuk.rentas.compartido.Paginacion;
 import kamayuk.rentas.dominio.Observacion;
+import kamayuk.rentas.fiscalizacion.dobles.ContribuyentesDeMentira;
+import kamayuk.rentas.fiscalizacion.dobles.PadronVehicularDeMentira;
 import kamayuk.rentas.fiscalizacion.dominio.ActaConLoDeclarado;
 import kamayuk.rentas.fiscalizacion.dominio.ActaFiscalizacion;
 import kamayuk.rentas.fiscalizacion.dominio.ActaFiscalizacionRepository;
@@ -101,7 +103,14 @@ class RegistrarActaFiscalizacionTest {
                         return Optional.of(kamayuk.rentas.dominio.AreaM2.de("120.00"));
                     }
                 };
-        servicio = new RegistrarActaFiscalizacion(actas, programas, fichas, auditados::add);
+        servicio =
+                new RegistrarActaFiscalizacion(
+                        actas,
+                        programas,
+                        fichas,
+                        new ContribuyentesDeMentira().con(1L, "00000001", "PEREZ, JUAN", "Jr. 1"),
+                        new PadronVehicularDeMentira().con(500L),
+                        auditados::add);
     }
 
     @Test
@@ -176,6 +185,55 @@ class RegistrarActaFiscalizacionTest {
                                         null,
                                         OBSERVACION))
                 .isInstanceOf(RegistrarActaFiscalizacion.ProgramaInexistente.class);
+    }
+
+    /**
+     * #422 — A quien se fiscaliza se pregunta antes de escribir.
+     *
+     * <p>Sin la pregunta, el doble de actas guarda la fila sin rechistar —no tiene claves foraneas—
+     * y contra PostgreSQL la rechazaba {@code acta_fisc_contribuyente_fk} como un 500. El recorrido
+     * entero por HTTP y hasta la base lo mide {@code RechazosDeLaBaseFronteraTest}.
+     */
+    @Test
+    @DisplayName("#422 — un contribuyente que no esta en el padron no se fiscaliza, ni se guarda")
+    void unContribuyenteInexistenteNoSeFiscaliza() {
+        assertThatThrownBy(
+                        () ->
+                                servicio.registrarPredial(
+                                        PROGRAMA_PREDIAL,
+                                        999_999L,
+                                        100L,
+                                        VISITA,
+                                        "J. Perez",
+                                        Hallazgo.CONFORME,
+                                        null,
+                                        null,
+                                        null,
+                                        OBSERVACION))
+                .isInstanceOf(RegistrarActaFiscalizacion.ContribuyenteInexistente.class)
+                .hasMessageContaining("999999");
+        assertThat(actas.filas).isEmpty();
+        assertThat(auditados).isEmpty();
+    }
+
+    @Test
+    @DisplayName("#422 — un vehiculo que no esta en el padron no se inspecciona, ni se guarda")
+    void unVehiculoInexistenteNoSeInspecciona() {
+        assertThatThrownBy(
+                        () ->
+                                servicio.registrarVehicular(
+                                        PROGRAMA_VEHICULAR,
+                                        1L,
+                                        999_999L,
+                                        VISITA,
+                                        "J. Perez",
+                                        Hallazgo.OMISO,
+                                        null,
+                                        OBSERVACION))
+                .isInstanceOf(RegistrarActaFiscalizacion.VehiculoInexistente.class)
+                .hasMessageContaining("999999");
+        assertThat(actas.filas).isEmpty();
+        assertThat(auditados).isEmpty();
     }
 
     @Test

@@ -754,6 +754,180 @@ class EscrituraDeDeclaracionJuradaJdbcTest {
         }
     }
 
+    /**
+     * #422 — Dos actos sobre la misma DJ <b>a la vez</b>: el segundo es 409, no un 500.
+     *
+     * <p>En secuencia el segundo acto ya salia 409 por {@code TransicionIlegal}: el caso de uso lee
+     * el estado y el dominio lo rechaza. Lo que no cubria nadie es la carrera, donde las dos
+     * peticiones leen la DJ en pie antes de que ninguna confirme, y quien la rechaza es la base: el
+     * disparador {@code declaracion_jurada_estado_es_terminal} ({@code restrict_violation}) o el
+     * indice {@code dj_rectifica_uq} ({@code unique_violation}). Los dos salian como 500 con
+     * incidencia ERROR.
+     *
+     * <p>La carrera se provoca de verdad y sin dormir a ciegas: una transaccion de la prueba toma
+     * la fila (o el hueco del indice) y <b>no confirma</b>; la peticion HTTP corre en otro hilo,
+     * lee la DJ en pie y se queda esperando el candado; la prueba espera a verla esperando en
+     * {@code pg_stat_activity}, confirma, y la peticion choca.
+     */
+    @Nested
+    @DisplayName("#422 — dos actos a la vez sobre la misma DJ: el segundo es 409, no 500")
+    class LaCarrera {
+
+        @Test
+        @DisplayName("anular una DJ que otra ventanilla anula a la vez es 409, sin incidencia")
+        void anularALaVezEs409() throws Exception {
+            String numero =
+                    numeroDe(
+                            presentar(
+                                    nuevoContribuyente(municipalidad),
+                                    crearPredioConFicha(municipalidad, nuevoCodigoCatastral())));
+
+            Carrera carrera =
+                    enCarrera(
+                            "UPDATE declaracion_jurada SET estado = 'ANULADA' WHERE numero = ?",
+                            numero,
+                            () -> acto(numero, "anulacion", "Se anula desde esta ventanilla"));
+
+            assertThat(carrera.estado())
+                    .as("el disparador del estado terminal: restrict_violation")
+                    .isEqualTo(409);
+            assertThat(carrera.cuerpo())
+                    .contains("CONFLICTO")
+                    .doesNotContain("declaracion_jurada_estado_es_terminal")
+                    .doesNotContain("incidencia");
+            assertThat(carrera.errores())
+                    .as("una carrera entre dos ventanillas no es una averia del servidor")
+                    .isEmpty();
+        }
+
+        @Test
+        @DisplayName("rectificar una DJ que otra ventanilla rectifica a la vez es 409")
+        void rectificarALaVezEs409() throws Exception {
+            long predio = crearPredioConFicha(municipalidad, nuevoCodigoCatastral());
+            String numero = numeroDe(presentar(nuevoContribuyente(municipalidad), predio));
+
+            Carrera carrera =
+                    enCarrera(
+                            "INSERT INTO declaracion_jurada (municipalidad_id, numero, ejercicio,"
+                                    + " contribuyente_id, tipo, predio_id, fecha_presentacion,"
+                                    + " fecha_limite, usuario_registro, observacion,"
+                                    + " dj_rectifica_id)"
+                                    + " SELECT municipalidad_id, 'DJ-CARRERA-' || id, ejercicio,"
+                                    + " contribuyente_id, 'RECTIFICATORIA', predio_id,"
+                                    + " DATE '2026-05-20', fecha_limite, 'otra.ventanilla',"
+                                    + " 'La rectifica la otra ventanilla', id"
+                                    + " FROM declaracion_jurada WHERE numero = ?",
+                            numero,
+                            () ->
+                                    mvc.perform(
+                                                    post(
+                                                                    "/rentas/api/v1/rentas/declaraciones/{djNro}/rectificacion",
+                                                                    numero)
+                                                            .param("ano", "2026")
+                                                            .contentType(MediaType.APPLICATION_JSON)
+                                                            .content(
+                                                                    "{\"observacion\":\"La rectifica"
+                                                                            + " esta ventanilla\","
+                                                                            + "\"predioId\":"
+                                                                            + predio
+                                                                            + ",\"fechaPresentacion\":"
+                                                                            + "\"2026-05-20\"}"))
+                                            .andReturn());
+
+            assertThat(carrera.estado())
+                    .as("el indice de una sola rectificatoria viva: unique_violation")
+                    .isEqualTo(409);
+            assertThat(carrera.cuerpo())
+                    .contains("CONFLICTO")
+                    .doesNotContain("dj_rectifica_uq")
+                    .doesNotContain("incidencia");
+            assertThat(carrera.errores()).isEmpty();
+        }
+    }
+
+    /** Lo que contesto la peticion que perdio la carrera, y las lineas ERROR que dejo. */
+    private record Carrera(int estado, String cuerpo, List<String> errores) {}
+
+    /**
+     * Corre {@code peticion} mientras otra transaccion tiene tomada la DJ con {@code sentencia}, y
+     * confirma esa transaccion solo cuando la peticion ya esta esperando su candado.
+     */
+    private static Carrera enCarrera(
+            String sentencia, String numero, java.util.concurrent.Callable<MvcResult> peticion)
+            throws Exception {
+        ch.qos.logback.classic.Logger registro =
+                (ch.qos.logback.classic.Logger)
+                        org.slf4j.LoggerFactory.getLogger(ManejadorDeErrores.class);
+        ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent> anotados =
+                new ch.qos.logback.core.read.ListAppender<>();
+        anotados.start();
+        registro.addAppender(anotados);
+        java.util.concurrent.ExecutorService hilo =
+                java.util.concurrent.Executors.newSingleThreadExecutor();
+        try (Connection otraVentanilla = base.conexion(BaseDeDatosDePrueba.APP)) {
+            ContextoDeTenant.fijar(otraVentanilla, municipalidad);
+            try (PreparedStatement toma = otraVentanilla.prepareStatement(sentencia)) {
+                toma.setString(1, numero);
+                assertThat(toma.executeUpdate()).as("la otra ventanilla toma la DJ").isEqualTo(1);
+            }
+
+            java.util.concurrent.Future<MvcResult> enCurso =
+                    hilo.submit(
+                            () -> {
+                                TenantContext.fijar(new MunicipalidadId(municipalidad));
+                                OrigenContext.fijar(
+                                        new Origen("cajero.rentas", "PC-07", "10.0.0.7"));
+                                try {
+                                    return peticion.call();
+                                } finally {
+                                    TenantContext.limpiar();
+                                    OrigenContext.limpiar();
+                                }
+                            });
+            esperarAQueEspereUnCandado(enCurso);
+            otraVentanilla.commit();
+
+            MvcResult resultado = enCurso.get(30, java.util.concurrent.TimeUnit.SECONDS);
+            return new Carrera(
+                    resultado.getResponse().getStatus(),
+                    resultado.getResponse().getContentAsString(),
+                    anotados.list.stream()
+                            .filter(e -> e.getLevel() == ch.qos.logback.classic.Level.ERROR)
+                            .map(ch.qos.logback.classic.spi.ILoggingEvent::getFormattedMessage)
+                            .toList());
+        } finally {
+            hilo.shutdownNow();
+            registro.detachAppender(anotados);
+        }
+    }
+
+    /** Hasta que la peticion aparece esperando un candado; sin eso no hay carrera que medir. */
+    private static void esperarAQueEspereUnCandado(java.util.concurrent.Future<MvcResult> enCurso)
+            throws Exception {
+        long hasta = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(20);
+        try (Connection admin = base.conexionAdmin();
+                PreparedStatement esperando =
+                        admin.prepareStatement(
+                                "SELECT count(*) FROM pg_stat_activity"
+                                        + " WHERE datname = current_database()"
+                                        + " AND wait_event_type = 'Lock'")) {
+            while (System.nanoTime() < hasta) {
+                assertThat(enCurso.isDone())
+                        .as("la peticion termino sin esperar: no hubo carrera")
+                        .isFalse();
+                try (ResultSet resultado = esperando.executeQuery()) {
+                    resultado.next();
+                    if (resultado.getLong(1) > 0) {
+                        return;
+                    }
+                }
+                java.util.concurrent.locks.LockSupport.parkNanos(20_000_000L);
+            }
+        }
+        throw new AssertionError(
+                "la peticion nunca llego a esperar el candado de la otra ventanilla");
+    }
+
     // ------------------------------------------------------------------
 
     private static MvcResult presentar(String contribuyente, long predioId) throws Exception {

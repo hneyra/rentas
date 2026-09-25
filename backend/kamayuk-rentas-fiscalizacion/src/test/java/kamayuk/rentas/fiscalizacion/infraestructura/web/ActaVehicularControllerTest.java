@@ -13,6 +13,7 @@ import kamayuk.rentas.compartido.Pagina;
 import kamayuk.rentas.compartido.Paginacion;
 import kamayuk.rentas.fiscalizacion.aplicacion.RegistrarActaFiscalizacion;
 import kamayuk.rentas.fiscalizacion.dobles.ContribuyentesDeMentira;
+import kamayuk.rentas.fiscalizacion.dobles.PadronVehicularDeMentira;
 import kamayuk.rentas.fiscalizacion.dominio.ActaFiscalizacion;
 import kamayuk.rentas.fiscalizacion.dominio.ActaFiscalizacionRepository;
 import kamayuk.rentas.fiscalizacion.dominio.CriterioDeProgramas;
@@ -168,6 +169,8 @@ class ActaVehicularControllerTest {
                             return Optional.empty();
                         }
                     },
+                    PADRON,
+                    new PadronVehicularDeMentira().con(30L),
                     (RegistroDeAuditoria registro) -> {});
 
     /**

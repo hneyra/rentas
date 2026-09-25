@@ -10,6 +10,7 @@ import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.fiscalizacion.aplicacion.ConsultaDeProgramas;
 import kamayuk.rentas.fiscalizacion.aplicacion.RegistrarPrograma;
 import kamayuk.rentas.fiscalizacion.dominio.CriterioDeProgramas;
+import kamayuk.rentas.fiscalizacion.dominio.ProgramaFiscalizacionRepository;
 import kamayuk.rentas.fiscalizacion.dominio.TipoDePrograma;
 import kamayuk.rentas.web.Api;
 import kamayuk.rentas.web.CodigoDeError;
@@ -119,6 +120,10 @@ public class ProgramasController {
                             FiltroDeLaDeteccion.criterioDelPrograma(peticion.criterio()),
                             vacioAnulo(peticion.fiscalizador()),
                             observacion));
+        } catch (ProgramaFiscalizacionRepository.ProgramaRepetido repetido) {
+            // 409 y no 422: la peticion esta bien escrita, lo que no la admite es que ese codigo ya
+            // lo tiene otro programa. Hasta #422 era el 500 del indice unico, con su incidencia.
+            throw new ProblemaDeNegocio(CodigoDeError.CONFLICTO, mensajeDe(repetido));
         } catch (IllegalArgumentException invalido) {
             throw new ProblemaDeNegocio(CodigoDeError.VALIDACION, mensajeDe(invalido));
         }

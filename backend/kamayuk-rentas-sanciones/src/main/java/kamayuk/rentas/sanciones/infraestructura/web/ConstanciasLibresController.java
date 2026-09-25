@@ -7,6 +7,7 @@ import kamayuk.rentas.autorizacion.RequiereAcceso;
 import kamayuk.rentas.documentos.FormatoDeDocumento;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.sanciones.aplicacion.EmitirConstanciaLibre;
+import kamayuk.rentas.sanciones.aplicacion.VehiculoFueraDelPadron;
 import kamayuk.rentas.web.Api;
 import kamayuk.rentas.web.CodigoDeError;
 import kamayuk.rentas.web.ProblemaDeNegocio;
@@ -78,6 +79,10 @@ public class ConstanciasLibresController {
                                     verificadaAl),
                             formato,
                             observacion);
+        } catch (VehiculoFueraDelPadron | EmitirConstanciaLibre.SolicitanteInexistente noEsta) {
+            // #422: hasta aqui era el 500 de la clave foranea, con el papel ya dibujado.
+            throw new ProblemaDeNegocio(
+                    CodigoDeError.NO_ENCONTRADO, PeticionesDeSanciones.mensajeDe(noEsta));
         } catch (EmitirConstanciaLibre.HayPapeletasPendientes pendientes) {
             throw new ProblemaDeNegocio(
                     CodigoDeError.CONFLICTO,

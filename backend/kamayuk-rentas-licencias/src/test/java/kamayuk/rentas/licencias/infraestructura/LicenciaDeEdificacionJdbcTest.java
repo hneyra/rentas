@@ -357,6 +357,133 @@ class LicenciaDeEdificacionJdbcTest {
         OrigenContext.limpiar();
     }
 
+    /**
+     * #422 — Lo que no cabe en su columna se rechaza como dato, no como el 22001 del motor.
+     *
+     * <p>El ancho de la columna es de la base; hasta #422 nada en Java lo miraba, asi que un texto
+     * de mas llegaba al {@code INSERT}, el motor lo rechazaba con {@code value too long} y el borde
+     * contestaba 500 con incidencia ERROR. La siembra es la que la muestra de siempre no usa: el
+     * ancho de la columna <b>+ 1</b>. Y el rechazo tiene que llegar <b>antes</b> del papel: en las
+     * emisiones, el documento se dibujaba para tirarlo.
+     */
+    @Nested
+    @DisplayName("#422 — lo que no cabe en su columna se rechaza como dato")
+    class LoQueNoCabe {
+
+        @Test
+        @DisplayName("un expediente anterior de 21 caracteres se rechaza al presentar el FUE")
+        void unExpedienteAnteriorMasAnchoQueSuColumna() {
+            PresentarFue.Solicitud base =
+                    solicitud(
+                            "EXP-48-422A",
+                            TipoDeTramiteDeEdificacion.LICENCIA_DE_OBRA,
+                            null,
+                            HOY,
+                            "C-" + contribuyente());
+
+            assertThatThrownBy(
+                            () ->
+                                    enContexto(
+                                            () ->
+                                                    presentar.presentar(
+                                                            conExpedienteAnterior(
+                                                                    base, "EXP-2026-FU-000000421"),
+                                                            PORQUE)))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("20");
+        }
+
+        @Test
+        @DisplayName("el documento de un representante de 21 caracteres se rechaza al presentar")
+        void unDocumentoDelRepresentanteMasAnchoQueSuColumna() {
+            PresentarFue.Solicitud base =
+                    solicitud(
+                            "EXP-48-422B",
+                            TipoDeTramiteDeEdificacion.LICENCIA_DE_OBRA,
+                            null,
+                            HOY,
+                            "C-" + contribuyente());
+
+            assertThatThrownBy(
+                            () ->
+                                    enContexto(
+                                            () ->
+                                                    presentar.presentar(
+                                                            conRepresentante(
+                                                                    base,
+                                                                    new RepresentanteLegal(
+                                                                            "CE-000000000000000421",
+                                                                            "TORRES, ANA",
+                                                                            "P-11223",
+                                                                            null)),
+                                                            PORQUE)))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("20");
+        }
+
+        @Test
+        @DisplayName("una manzana o un lote de 11 caracteres se rechazan al completar el terreno")
+        void unaManzanaOUnLoteMasAnchosQueSuColumna() {
+            String expediente =
+                    presentarFue(TipoDeTramiteDeEdificacion.LICENCIA_DE_OBRA, null, HOY);
+
+            assertThatThrownBy(
+                            () ->
+                                    enContexto(
+                                            () ->
+                                                    completar.completarTerreno(
+                                                            expediente,
+                                                            terreno("MZ-00000422", "3"),
+                                                            PORQUE)))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("10");
+            assertThatThrownBy(
+                            () ->
+                                    enContexto(
+                                            () ->
+                                                    completar.completarTerreno(
+                                                            expediente,
+                                                            terreno("A", "LT-00000422"),
+                                                            PORQUE)))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("10");
+        }
+
+        private PresentarFue.Solicitud conExpedienteAnterior(
+                PresentarFue.Solicitud base, String expedienteAnterior) {
+            return new PresentarFue.Solicitud(
+                    base.expediente(),
+                    base.fechaDeclaracion(),
+                    base.codigoContribuyente(),
+                    base.predioId(),
+                    base.tipoTramite(),
+                    base.tipoObra(),
+                    base.modalidad(),
+                    base.revision(),
+                    expedienteAnterior,
+                    base.numeroLicenciaAnterior(),
+                    base.solicitantePropietario(),
+                    base.representante());
+        }
+
+        private PresentarFue.Solicitud conRepresentante(
+                PresentarFue.Solicitud base, RepresentanteLegal representante) {
+            return new PresentarFue.Solicitud(
+                    base.expediente(),
+                    base.fechaDeclaracion(),
+                    base.codigoContribuyente(),
+                    base.predioId(),
+                    base.tipoTramite(),
+                    base.tipoObra(),
+                    base.modalidad(),
+                    base.revision(),
+                    base.expedienteAnterior(),
+                    base.numeroLicenciaAnterior(),
+                    base.solicitantePropietario(),
+                    representante);
+        }
+    }
+
     // ==================================================================
 
     @Nested

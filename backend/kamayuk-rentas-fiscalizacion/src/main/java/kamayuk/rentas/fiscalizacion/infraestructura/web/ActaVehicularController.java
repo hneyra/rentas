@@ -86,6 +86,10 @@ public class ActaVehicularController {
                                             peticion.hallazgo(), hallazgo)),
                             peticion.detalle(),
                             observacion));
+        } catch (RegistrarActaFiscalizacion.ContribuyenteInexistente
+                | RegistrarActaFiscalizacion.VehiculoInexistente noEsta) {
+            // #422: hasta aqui era el 500 de la clave foranea, con su incidencia ERROR.
+            throw new ProblemaDeNegocio(CodigoDeError.NO_ENCONTRADO, mensajeDe(noEsta));
         } catch (RegistrarActaFiscalizacion.ProgramaInexistente
                 | RegistrarActaFiscalizacion.ProgramaDeOtroTipo problema) {
             throw new ProblemaDeNegocio(CodigoDeError.VALIDACION, mensajeDe(problema));

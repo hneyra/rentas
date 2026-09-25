@@ -1,5 +1,6 @@
 package kamayuk.rentas.nucleo.infraestructura.web;
 
+import java.sql.SQLException;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.Locale;
@@ -18,6 +19,8 @@ import kamayuk.rentas.web.Api;
 import kamayuk.rentas.web.CodigoDeError;
 import kamayuk.rentas.web.ProblemaDeNegocio;
 import org.jspecify.annotations.Nullable;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -239,6 +242,17 @@ public class DeclaracionJuradaController {
      *
      * <p>Los cuatro actos fallan por las mismas cuatro razones, y escribir el {@code catch} cuatro
      * veces garantizaria que el cuarto acabara devolviendo otro codigo que los tres primeros.
+     *
+     * <h2>Y la quinta: dos actos a la vez (#422)</h2>
+     *
+     * <p>En secuencia, el segundo acto sobre una DJ ya anulada o sustituida lo rechaza el dominio
+     * con {@link DeclaracionJurada.TransicionIlegal}. En una carrera no: las dos peticiones leen la
+     * DJ en pie antes de que ninguna confirme, y quien rechaza la segunda es la base —el disparador
+     * {@code declaracion_jurada_estado_es_terminal}, con {@code restrict_violation}, o el indice
+     * {@code dj_rectifica_uq} de una sola rectificatoria viva—. Hasta #422 las dos salian como el
+     * 500 del motor, con incidencia ERROR, por algo que es exactamente el mismo conflicto que el
+     * 409 de la transicion ilegal. Se traducen <b>solo esas dos</b>: cualquier otra violacion de
+     * integridad sigue siendo una averia y sigue saliendo como tal.
      */
     private DeclaracionJuradaResource traduciendoErrores(Acto acto) {
         try {
@@ -252,6 +266,16 @@ public class DeclaracionJuradaController {
             // esta la declaracion. La interfaz distingue las dos cosas para saber si reintentar
             // tiene sentido.
             throw new ProblemaDeNegocio(CodigoDeError.CONFLICTO, mensajeDe(ilegal));
+        } catch (DuplicateKeyException simultaneo) {
+            // #422: la carrera que perdio contra otra rectificatoria (dj_rectifica_uq). Mensaje
+            // fijo: el del motor nombra la restriccion y la tabla, y eso no sale de aqui.
+            throw new ProblemaDeNegocio(CodigoDeError.CONFLICTO, ACTO_SIMULTANEO);
+        } catch (DataIntegrityViolationException rechazo) {
+            if (!esElEstadoTerminal(rechazo)) {
+                throw rechazo;
+            }
+            // #422: la carrera que perdio contra otro acto que ya dejo la DJ anulada o sustituida.
+            throw new ProblemaDeNegocio(CodigoDeError.CONFLICTO, ACTO_SIMULTANEO);
         } catch (RegistrarDeclaracionJurada.PlazoSinParametrizar
                 | LectorDeParametros.EjercicioSinSellar falta) {
             // Falta publicar una cifra normativa, no un campo de la peticion: el 422 sale con
@@ -262,6 +286,37 @@ public class DeclaracionJuradaController {
         } catch (IllegalArgumentException invalido) {
             throw new ProblemaDeNegocio(CodigoDeError.VALIDACION, mensajeDe(invalido));
         }
+    }
+
+    /**
+     * El mensaje de la carrera perdida (#422). Fijo, y sin una palabra del esquema: dice que paso y
+     * que hacer, que es consultar la DJ otra vez antes de repetir nada.
+     */
+    static final String ACTO_SIMULTANEO =
+            "Otra peticion cambio esta declaracion jurada al mismo tiempo: consultela de nuevo antes"
+                    + " de repetir el acto";
+
+    /**
+     * {@code restrict_violation}, el {@code SQLSTATE} con que el disparador {@code
+     * declaracion_jurada_estado_es_terminal} rechaza un acto sobre una DJ anulada o sustituida.
+     */
+    private static final String RESTRICT_VIOLATION = "23001";
+
+    /**
+     * Si el rechazo es el del disparador del estado terminal, y no otra violacion de integridad.
+     *
+     * <p>Spring lo entrega como {@link DataIntegrityViolationException} generica —el {@code
+     * SQLSTATE} {@code 23001} no tiene traduccion propia—, asi que se mira la causa. Una clave
+     * foranea o un {@code CHECK} violados por un defecto del codigo tambien son de esa clase, y
+     * convertirlos en 409 esconderia una averia: por eso la pregunta es tan estrecha.
+     */
+    private static boolean esElEstadoTerminal(DataIntegrityViolationException rechazo) {
+        for (Throwable causa = rechazo; causa != null; causa = causa.getCause()) {
+            if (causa instanceof SQLException sql && RESTRICT_VIOLATION.equals(sql.getSQLState())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** Lo que hace cada uno de los cuatro verbos, para poder envolverlos igual. */

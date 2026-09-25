@@ -64,10 +64,17 @@ public class NotificacionesVencidasController {
                 NotificacionAdministrativaResource::de);
     }
 
+    /**
+     * La fecha de corte, o hoy si no viene.
+     *
+     * <p>Por {@link PeticionesDeSanciones#fechaSiViene} y no con {@code LocalDate.parse} suelto
+     * (#422): {@code DateTimeParseException} no es una {@code IllegalArgumentException}, y una
+     * fecha tecleada {@code 14/08/2026} salia como un 500 con incidencia ERROR en vez del 422 que
+     * nombra el parametro.
+     */
     private LocalDate fechaDe(@Nullable String texto) {
-        return texto == null || texto.isBlank()
-                ? LocalDate.now(reloj)
-                : LocalDate.parse(texto.strip());
+        LocalDate fecha = PeticionesDeSanciones.fechaSiViene(texto, "vencidasAl");
+        return fecha == null ? LocalDate.now(reloj) : fecha;
     }
 
     private static @Nullable Boolean conPapeletaDe(@Nullable String texto) {

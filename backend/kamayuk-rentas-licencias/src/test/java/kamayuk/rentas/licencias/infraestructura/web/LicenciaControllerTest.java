@@ -246,6 +246,33 @@ class LicenciaControllerTest {
                     .containsOnlyOnce("\"principal\":true");
         }
 
+        /**
+         * #422 — Un expediente mas ancho que {@code licencia_funcionamiento.expediente varchar(20)}
+         * es 422, y se rechaza <b>antes</b> de dibujar el papel.
+         *
+         * <p>Contra PostgreSQL era un 500 con incidencia ERROR, con el papel ya dibujado y tirado
+         * ({@code LicenciaDeFuncionamientoJdbcTest.LoQueNoCabe} lo mide con la base). Aqui el doble
+         * no tiene ancho de columna y lo que salia era un 201; que no se dibujo ningun papel lo
+         * dice la emision siguiente, que tiene que tomar el documento 000001.
+         */
+        @Test
+        @DisplayName("#422 — un expediente de 21 caracteres es 422, sin papel ni incidencia")
+        void unExpedienteMasAnchoQueSuColumna() throws Exception {
+            Rechazo rechazo =
+                    rechazo(
+                            mvc,
+                            "/rentas/api/v1/licencias/funcionamiento",
+                            cuerpoDeEmision(RECIBO, "Se emite en la prueba")
+                                    .replace("EXP-2026-0001", "EXP-2026-LF-000000421"));
+
+            assertThat(rechazo.estado()).as(rechazo.cuerpo()).isEqualTo(422);
+            assertThat(rechazo.cuerpo()).contains("VALIDACION").contains("20");
+            assertThat(rechazo.errores()).isEmpty();
+            assertThat(emitir(mvc, 201))
+                    .as("el rechazo no dibujo ningun papel: el siguiente es el primero")
+                    .contains("LICENCIA_FUNCIONAMIENTO-2026-000001");
+        }
+
         @Test
         @DisplayName("la segunda licencia toma el correlativo siguiente")
         void laSegundaTomaElSiguiente() throws Exception {
@@ -876,5 +903,37 @@ class LicenciaControllerTest {
                 Instant.parse("2026-01-02T10:00:00Z"),
                 null,
                 Observacion.de("Siembra de la prueba"));
+    }
+
+    /** Lo que un rechazo contesta, y las lineas ERROR que dejo en el registro del manejador. */
+    private record Rechazo(int estado, String cuerpo, java.util.List<String> errores) {}
+
+    /** El {@code POST}, midiendo tambien si escribio una incidencia ERROR (#422). */
+    private Rechazo rechazo(MockMvc cual, String ruta, String cuerpo) throws Exception {
+        ch.qos.logback.classic.Logger registro =
+                (ch.qos.logback.classic.Logger)
+                        org.slf4j.LoggerFactory.getLogger(ManejadorDeErrores.class);
+        ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent> anotados =
+                new ch.qos.logback.core.read.ListAppender<>();
+        anotados.start();
+        registro.addAppender(anotados);
+        MvcResult resultado;
+        try {
+            resultado =
+                    cual.perform(
+                                    MockMvcRequestBuilders.post(ruta)
+                                            .contentType(MediaType.APPLICATION_JSON)
+                                            .content(cuerpo))
+                            .andReturn();
+        } finally {
+            registro.detachAppender(anotados);
+        }
+        return new Rechazo(
+                resultado.getResponse().getStatus(),
+                resultado.getResponse().getContentAsString(),
+                anotados.list.stream()
+                        .filter(e -> e.getLevel() == ch.qos.logback.classic.Level.ERROR)
+                        .map(ch.qos.logback.classic.spi.ILoggingEvent::getFormattedMessage)
+                        .toList());
     }
 }

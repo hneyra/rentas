@@ -4,6 +4,7 @@ import kamayuk.rentas.autorizacion.Privilegio;
 import kamayuk.rentas.autorizacion.RequiereAcceso;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.sanciones.aplicacion.CambiarNumeroDePapeleta;
+import kamayuk.rentas.sanciones.dominio.PapeletaRepository;
 import kamayuk.rentas.web.Api;
 import kamayuk.rentas.web.CodigoDeError;
 import kamayuk.rentas.web.ProblemaDeNegocio;
@@ -42,6 +43,10 @@ public class CambioDeNumeroController {
             return PapeletaResource.de(servicio.cambiar(numero, numeroNuevo, observacion));
         } catch (CambiarNumeroDePapeleta.PapeletaInexistente inexistente) {
             throw new ProblemaDeNegocio(CodigoDeError.NO_ENCONTRADO, mensajeDe(inexistente));
+        } catch (PapeletaRepository.NumeroDePapeletaEnUso enUso) {
+            // #422: el numero es de otra papeleta. Un 500 invitaba a reintentar algo que no va a
+            // funcionar nunca; el 409 dice que lo que hay que corregir es el numero escrito.
+            throw new ProblemaDeNegocio(CodigoDeError.CONFLICTO, mensajeDe(enUso));
         } catch (IllegalArgumentException invalido) {
             throw new ProblemaDeNegocio(CodigoDeError.VALIDACION, mensajeDe(invalido));
         }

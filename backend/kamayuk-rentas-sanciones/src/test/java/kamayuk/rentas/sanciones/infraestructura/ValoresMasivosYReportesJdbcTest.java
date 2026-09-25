@@ -400,7 +400,16 @@ class ValoresMasivosYReportesJdbcTest {
         emitirConstancia =
                 envolver(
                         new EmitirConstanciaLibre(
-                                padron, constancias, documentos, auditoria, RELOJ));
+                                padron,
+                                constancias,
+                                documentos,
+                                envolver(
+                                        new kamayuk.rentas.nucleo.aplicacion.PadronVehicularRentas(
+                                                new kamayuk.rentas.nucleo.infraestructura
+                                                        .VehiculoRepositoryJdbc(jdbc))),
+                                directorio,
+                                auditoria,
+                                RELOJ));
         consultaDePadrones =
                 envolver(
                         new ConsultaDePadronesDeSanciones(

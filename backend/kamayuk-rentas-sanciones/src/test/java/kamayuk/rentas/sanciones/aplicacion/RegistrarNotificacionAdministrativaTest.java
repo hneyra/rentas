@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Optional;
 import kamayuk.rentas.auditoria.RegistroDeAuditoria;
 import kamayuk.rentas.dominio.Observacion;
+import kamayuk.rentas.sanciones.dobles.PadronDeMentira;
 import kamayuk.rentas.sanciones.dominio.CriterioDeNotificacion;
 import kamayuk.rentas.sanciones.dominio.EstadoDeNotificacion;
 import kamayuk.rentas.sanciones.dominio.NotificacionAdministrativa;
@@ -30,7 +31,9 @@ class RegistrarNotificacionAdministrativaTest {
     void preparar() {
         notificaciones = new NotificacionesDeMentira();
         auditados = new ArrayList<>();
-        servicio = new RegistrarNotificacionAdministrativa(notificaciones, auditados::add);
+        servicio =
+                new RegistrarNotificacionAdministrativa(
+                        notificaciones, new PadronDeMentira().con(10L), auditados::add);
     }
 
     @Test
@@ -50,6 +53,33 @@ class RegistrarNotificacionAdministrativaTest {
         assertThat(guardada.id()).isNotNull();
         assertThat(guardada.estado()).isEqualTo(EstadoDeNotificacion.EMITIDA);
         assertThat(auditados).hasSize(1);
+    }
+
+    /**
+     * #422 — El contribuyente es opcional, pero si viene tiene que estar en el padron.
+     *
+     * <p>El doble del repositorio no tiene claves foraneas y guardaria la fila; contra PostgreSQL
+     * la rechazaba {@code notif_adm_contribuyente_fk} como un 500. El recorrido por HTTP y hasta la
+     * base lo mide {@code SancionesJdbcTest.LoQueLaBaseRechaza}.
+     */
+    @Test
+    @DisplayName("#422 — un contribuyente que no esta en el padron no se notifica, ni se guarda")
+    void unContribuyenteInexistenteNoSeNotifica() {
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                        () ->
+                                servicio.registrar(
+                                        "NA-0003",
+                                        FECHA,
+                                        999_999L,
+                                        null,
+                                        "Av. Grau 123",
+                                        "Falta administrativa",
+                                        null,
+                                        OBSERVACION))
+                .isInstanceOf(RegistrarNotificacionAdministrativa.ContribuyenteInexistente.class)
+                .hasMessageContaining("999999");
+        assertThat(notificaciones.porNumero("NA-0003")).isEmpty();
+        assertThat(auditados).isEmpty();
     }
 
     @Test

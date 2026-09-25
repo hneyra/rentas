@@ -18,7 +18,9 @@ import kamayuk.rentas.sanciones.dominio.EstadoDeNotificacion;
 import kamayuk.rentas.sanciones.dominio.EstadoDePapeleta;
 import kamayuk.rentas.sanciones.dominio.NotificacionAdministrativa;
 import kamayuk.rentas.sanciones.dominio.NotificacionAdministrativaRepository;
+import kamayuk.rentas.sanciones.dominio.NotificacionAdministrativaRepository.NotificacionRepetida;
 import kamayuk.rentas.sanciones.dominio.NotificacionDelPadron;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 
@@ -56,20 +58,27 @@ public class NotificacionAdministrativaRepositoryJdbc extends RepositorioJdbc
         String usuario = kamayuk.rentas.auditoria.OrigenContext.actual().usuario();
         campos.put("usuario", usuario);
 
-        Long id =
-                jdbc().sql(
-                                "INSERT INTO notificacion_administrativa"
-                                        + " (municipalidad_id, numero, fecha, contribuyente_id,"
-                                        + "  predio_id, direccion, motivo, plazo_dias, estado,"
-                                        + "  usuario_registro)"
-                                        + " VALUES ("
-                                        + MUNICIPALIDAD_ACTUAL
-                                        + ", :numero, :fecha, :contribuyenteId, :predioId,"
-                                        + "  :direccion, :motivo, :plazoDias, :estado, :usuario)"
-                                        + " RETURNING id")
-                        .params(campos)
-                        .query(Long.class)
-                        .single();
+        Long id;
+        try {
+            id =
+                    jdbc().sql(
+                                    "INSERT INTO notificacion_administrativa"
+                                            + " (municipalidad_id, numero, fecha, contribuyente_id,"
+                                            + "  predio_id, direccion, motivo, plazo_dias, estado,"
+                                            + "  usuario_registro)"
+                                            + " VALUES ("
+                                            + MUNICIPALIDAD_ACTUAL
+                                            + ", :numero, :fecha, :contribuyenteId, :predioId,"
+                                            + "  :direccion, :motivo, :plazoDias, :estado, :usuario)"
+                                            + " RETURNING id")
+                            .params(campos)
+                            .query(Long.class)
+                            .single();
+        } catch (DuplicateKeyException repetida) {
+            // `notif_adm_numero_uq`, la unica restriccion unica de la tabla (#422): la base es la
+            // unica que puede impedir el doble envio, y aqui se dice con el numero y no con ella.
+            throw new NotificacionRepetida(notificacion.numero());
+        }
 
         return conId(notificacion, id, usuario);
     }

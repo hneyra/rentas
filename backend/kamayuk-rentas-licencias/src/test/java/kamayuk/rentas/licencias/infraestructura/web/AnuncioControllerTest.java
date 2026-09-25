@@ -186,6 +186,31 @@ class AnuncioControllerTest {
     @DisplayName("Registrar")
     class Registrar {
 
+        /**
+         * #422 — Un expediente mas ancho que {@code anuncio.expediente varchar(20)} es 422.
+         *
+         * <p>Contra PostgreSQL era un 500 con incidencia ERROR ({@code
+         * AnunciosYPropagandaJdbcTest.LoQueNoCabe}); contra este doble, que no tiene ancho de
+         * columna, un 201 con el anuncio guardado.
+         */
+        @Test
+        @DisplayName("#422 — un expediente de 21 caracteres es 422, y no se guarda nada")
+        void unExpedienteMasAnchoQueSuColumna() throws Exception {
+            Rechazo rechazo =
+                    rechazo(
+                            mvc,
+                            "/rentas/api/v1/autorizaciones/anuncios",
+                            cuerpoDeRegistro(ClaseDeAnuncio.PANEL, null, "Se autoriza")
+                                    .replace("EXP-2026-0051", "EXP-2026-AN-000000421"));
+
+            assertThat(rechazo.estado()).as(rechazo.cuerpo()).isEqualTo(422);
+            assertThat(rechazo.cuerpo()).contains("VALIDACION").contains("20");
+            assertThat(rechazo.errores()).isEmpty();
+            assertThat(anuncios.porNumero("AN-2026-000001"))
+                    .as("el rechazo no guardo ningun anuncio")
+                    .isEmpty();
+        }
+
         @Test
         @DisplayName("numera desde el correlativo, responde 201 y pide UN cargo")
         void registraYGeneraLaDeuda() throws Exception {
@@ -720,5 +745,37 @@ class AnuncioControllerTest {
                 .as("%s -> %s", ruta, resultado.getResponse().getContentAsString())
                 .isEqualTo(200);
         return resultado.getResponse().getContentAsString();
+    }
+
+    /** Lo que un rechazo contesta, y las lineas ERROR que dejo en el registro del manejador. */
+    private record Rechazo(int estado, String cuerpo, java.util.List<String> errores) {}
+
+    /** El {@code POST}, midiendo tambien si escribio una incidencia ERROR (#422). */
+    private Rechazo rechazo(MockMvc cual, String ruta, String cuerpo) throws Exception {
+        ch.qos.logback.classic.Logger registro =
+                (ch.qos.logback.classic.Logger)
+                        org.slf4j.LoggerFactory.getLogger(ManejadorDeErrores.class);
+        ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent> anotados =
+                new ch.qos.logback.core.read.ListAppender<>();
+        anotados.start();
+        registro.addAppender(anotados);
+        MvcResult resultado;
+        try {
+            resultado =
+                    cual.perform(
+                                    MockMvcRequestBuilders.post(ruta)
+                                            .contentType(MediaType.APPLICATION_JSON)
+                                            .content(cuerpo))
+                            .andReturn();
+        } finally {
+            registro.detachAppender(anotados);
+        }
+        return new Rechazo(
+                resultado.getResponse().getStatus(),
+                resultado.getResponse().getContentAsString(),
+                anotados.list.stream()
+                        .filter(e -> e.getLevel() == ch.qos.logback.classic.Level.ERROR)
+                        .map(ch.qos.logback.classic.spi.ILoggingEvent::getFormattedMessage)
+                        .toList());
     }
 }

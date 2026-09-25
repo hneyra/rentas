@@ -39,6 +39,15 @@ dependencies {
     // sentido y nunca al reves: `valores` no sabe que existe una papeleta.
     implementation(project(":kamayuk-rentas-valores"))
 
+    // Con #422, una mas: nucleo.PadronVehicular. La constancia de no adeudo y el
+    // acta de internamiento citan un vehiculo del padron por su identificador, y
+    // `vehiculo` es de `nucleo`. Hasta #422 nadie preguntaba si existia: la clave
+    // foranea lo rechazaba en el INSERT, despues de dibujar el papel, como un 500.
+    // Se pregunta por el puerto publico y no por SQL: la tabla no es de este
+    // contexto (el mismo motivo que `nucleo.DeclaracionesDelEjercicio`). No abre
+    // ningun ciclo: `nucleo` no depende de `sanciones`.
+    implementation(project(":kamayuk-rentas-nucleo"))
+
     // La prueba del repositorio corre contra PostgreSQL de verdad: provisiona la
     // base como un ambiente real y se conecta como kamayuk_app, no como el
     // superusuario que entrega Testcontainers (CAL-01 §3.2).
