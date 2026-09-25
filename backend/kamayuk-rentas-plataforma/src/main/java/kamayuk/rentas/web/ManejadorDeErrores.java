@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import kamayuk.rentas.dominio.ActoFueraDeOrden;
 import kamayuk.rentas.dominio.OperacionTodaviaNoCompletable;
 import kamayuk.rentas.persistencia.OrdenSeguro;
 import org.jspecify.annotations.Nullable;
@@ -99,6 +100,26 @@ public class ManejadorDeErrores {
      */
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ProblemDetail> validacion(IllegalArgumentException error) {
+        return respuesta(
+                CodigoDeError.VALIDACION, mensajeDe(error, CodigoDeError.VALIDACION), List.of());
+    }
+
+    /**
+     * Un acto fechado antes del acto que resuelve, o despues de hoy (#402): {@code 422}.
+     *
+     * <p><b>Un solo {@code catch} para los once casos de uso</b> que llaman a {@code
+     * OrdenDeLosActos}, y no uno por controlador. Hasta #402 la regla tenia cinco excepciones y
+     * cada controlador traducia las suyas; la que un controlador olvidara saldria 500 con su
+     * incidencia —un servidor roto— por una fecha mal tecleada. Como {@link
+     * OperacionTodaviaNoCompletable}, el tipo vive en el dominio compartido para que este
+     * manejador, que no depende de ningun contexto, lo pueda nombrar.
+     *
+     * <p>El mensaje SI se devuelve: lo escribe {@code ActoFueraDeOrden} y dice el acto, la fecha
+     * tecleada y el acto previo con la suya —o «posterior a hoy»—, que es lo que quien opera
+     * necesita para corregirla. No nombra ni una tabla ni una columna.
+     */
+    @ExceptionHandler(ActoFueraDeOrden.class)
+    public ResponseEntity<ProblemDetail> actoFueraDeOrden(ActoFueraDeOrden error) {
         return respuesta(
                 CodigoDeError.VALIDACION, mensajeDe(error, CodigoDeError.VALIDACION), List.of());
     }

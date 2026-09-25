@@ -264,9 +264,7 @@ public class ValoresController {
             // de las dos cosas —«corrige el formulario» o «hay que publicar una cifra»— y acaba
             // enumerando las dos, que es peor que no decir nada.
             throw FaltaPublicar.problema(falta);
-        } catch (RegistrarNotificacion.DiligenciaAnteriorALaEmision
-                | RegistrarNotificacion.SinDomicilio
-                | IllegalArgumentException invalido) {
+        } catch (RegistrarNotificacion.SinDomicilio | IllegalArgumentException invalido) {
             throw new ProblemaDeNegocio(CodigoDeError.VALIDACION, mensajeDe(invalido));
         }
     }

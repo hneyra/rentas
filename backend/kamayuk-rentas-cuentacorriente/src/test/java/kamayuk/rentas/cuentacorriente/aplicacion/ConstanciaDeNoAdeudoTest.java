@@ -37,6 +37,7 @@ import kamayuk.rentas.documentos.RegimenDeLaInstalacion;
 import kamayuk.rentas.documentos.RenderizadorPdf;
 import kamayuk.rentas.documentos.RenderizadorRtf;
 import kamayuk.rentas.documentos.RenderizadorXls;
+import kamayuk.rentas.dominio.ActoFueraDeOrden;
 import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.MunicipalidadId;
@@ -150,6 +151,24 @@ class ConstanciaDeNoAdeudoTest {
 
         assertThat(constancia.seNiega()).isFalse();
         assertThat(constancia.obligaciones()).isEmpty();
+    }
+
+    /**
+     * #402 — Una constancia a una fecha de corte futura no se emite. El papel imprime esa fecha
+     * como «Fecha de corte» y a la vez afirma que la informacion corresponde al registro a la fecha
+     * de emision: a una fecha en que el contribuyente deba la cuota que el libro todavia no tiene,
+     * certificaria que no debe nada. La frontera es hoy, que vale.
+     */
+    @Test
+    @DisplayName("#402 — a una fecha de corte posterior a hoy no se emite; a hoy si")
+    void aUnaFechaFuturaNoSeEmite() {
+        String codigo = crearContribuyenteConCodigo("K-0402", "80500402");
+
+        assertThatThrownBy(() -> consulta.constanciaDeNoAdeudo(codigo, LocalDate.of(2027, 6, 30)))
+                .isInstanceOf(ActoFueraDeOrden.class)
+                .hasMessageContaining("posterior a hoy");
+        assertThat(consulta.constanciaDeNoAdeudo(codigo, LocalDate.of(2026, 6, 1)).seNiega())
+                .isFalse();
     }
 
     @Test

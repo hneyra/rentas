@@ -61,6 +61,7 @@ import kamayuk.rentas.documentos.RegimenDeLaInstalacion;
 import kamayuk.rentas.documentos.RenderizadorPdf;
 import kamayuk.rentas.documentos.RenderizadorRtf;
 import kamayuk.rentas.documentos.RenderizadorXls;
+import kamayuk.rentas.dominio.ActoFueraDeOrden;
 import kamayuk.rentas.dominio.Alicuota;
 import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.dominio.ModalidadDeNotificacion;
@@ -261,6 +262,13 @@ class SancionesJdbcTest {
     private static RegistrarPapeleta registrarPapeleta;
     private static RegistrarDescargo registrarDescargo;
     private static AnularPapeleta anularPapeleta;
+
+    /** #402: el dia en que se mide, con la infraccion del 4 de marzo muy atras. */
+    private static final LocalDate HOY_DEL_402 = LocalDate.of(2026, 9, 23);
+
+    /** #402: la misma anulacion con el reloj en {@link #HOY_DEL_402}. */
+    private static AnularPapeleta anularAl23DeSetiembre;
+
     private static ResolverConResolucionDeGerencia resolver;
     private static NotificarResolucionDeGerencia notificar;
     private static RegistrarInternamiento internar;
@@ -359,7 +367,19 @@ class SancionesJdbcTest {
         ValoresSobreUnaObligacion valoresVivos =
                 envolver(new ValoresSobreUnaObligacionValores(new ValorRepositoryJdbc(jdbc)));
         anularPapeleta =
-                envolver(new AnularPapeleta(papeletas, valoresVivos, extincion, auditoria));
+                envolver(
+                        new AnularPapeleta(
+                                papeletas, valoresVivos, extincion, deudas, auditoria, RELOJ));
+        anularAl23DeSetiembre =
+                envolver(
+                        new AnularPapeleta(
+                                papeletas,
+                                valoresVivos,
+                                extincion,
+                                deudas,
+                                auditoria,
+                                Clock.fixed(
+                                        Instant.parse("2026-09-23T17:00:00Z"), ZoneOffset.UTC)));
         resolver =
                 envolver(
                         new ResolverConResolucionDeGerencia(
@@ -378,7 +398,13 @@ class SancionesJdbcTest {
         notificar =
                 envolver(
                         new NotificarResolucionDeGerencia(
-                                resoluciones, diligencias, papeletas, padron, plazos, auditoria));
+                                resoluciones,
+                                diligencias,
+                                papeletas,
+                                padron,
+                                plazos,
+                                auditoria,
+                                RELOJ));
         internar =
                 envolver(
                         new RegistrarInternamiento(
@@ -1633,6 +1659,225 @@ class SancionesJdbcTest {
     }
 
     // ==================================================================
+    //  #402 — la anulacion no se fecha antes de la infraccion ni despues de hoy
+    // ==================================================================
+
+    /**
+     * <b>La siembra que distingue (#402).</b> Hasta aqui toda anulacion de esta clase se fechaba en
+     * {@link #ORDINARIA}, que esta entre la infraccion y el reloj por construccion: con esa
+     * muestra, una anulacion que no comparara la fecha con nada pasaba igual. Aqui la infraccion es
+     * del 4 de marzo, hoy es el 23 de setiembre, y se anula el 1 de marzo —un 1 tecleado en vez del
+     * 4—, el mismo 4 de marzo —la frontera, que vale— y el 24 de setiembre.
+     *
+     * <p>Lo que se afirma de los rechazos no es solo la excepcion: es que <b>el libro sigue
+     * debiendo lo mismo y la papeleta sigue sin anular</b>. Hasta #402 la anulacion al 1 de marzo
+     * confirmaba con cero asientos —la baja releia la deuda a esa fecha, antes del cargo— y dejaba
+     * una papeleta {@code ANULADA} que el libro seguia cobrando, sin vuelta atras: otra anulacion
+     * choca con {@code TransicionIlegal}.
+     */
+    @Nested
+    @DisplayName("#402 — la anulacion no se fecha antes de la infraccion ni despues de hoy")
+    class LaFechaDeLaAnulacion {
+
+        /** Despues de la baja fechada en el futuro, que es donde se veria su efecto. */
+        private static final LocalDate FIN_DE_ANIO = LocalDate.of(2026, 12, 31);
+
+        @Test
+        @DisplayName("anular el 2026-03-01 una infraccion del 2026-03-04: rechazo, libro intacto")
+        void anteriorALaInfraccion() {
+            Papeleta papeleta = papeletaDeTransito("402A");
+            assertThat(papeleta.fechaInfraccion()).isEqualTo(INFRACCION);
+
+            Throwable rechazo = catchThrowable(() -> anularEl(papeleta, LocalDate.of(2026, 3, 1)));
+
+            assertThat(rechazo)
+                    .as("la fecha es anterior a la infraccion que la anulacion resuelve")
+                    .isInstanceOf(ActoFueraDeOrden.class)
+                    .hasMessageContaining("2026-03-04");
+            assertThat(estadoDe(papeleta))
+                    .as("la papeleta no queda ANULADA: si quedara, ya no se podria corregir")
+                    .isEqualTo(EstadoDePapeleta.IMPUESTA);
+            assertThat(deudaDe(papeleta, HOY_DEL_402))
+                    .as("y el libro sigue debiendo lo mismo")
+                    .isEqualTo(MULTA);
+            assertThat(cuantosAbonos(papeleta)).isZero();
+        }
+
+        @Test
+        @DisplayName("anular el mismo dia de la infraccion vale, y da de baja lo cargado")
+        void elMismoDiaDeLaInfraccion() {
+            Papeleta papeleta = papeletaDeTransito("402B");
+
+            AnularPapeleta.Anulada anulada = anularEl(papeleta, INFRACCION);
+
+            assertThat(anulada.papeleta().estado()).isEqualTo(EstadoDePapeleta.ANULADA);
+            assertThat(anulada.baja().asientos())
+                    .as("la frontera: el cargo nace con fecha valor = la de la infraccion")
+                    .isEqualTo(1);
+            assertThat(anulada.baja().importe()).isEqualTo(MULTA);
+            assertThat(deudaDe(papeleta, HOY_DEL_402)).isEqualTo(Dinero.CERO);
+        }
+
+        @Test
+        @DisplayName("anular el 2026-09-24 con el reloj en el 2026-09-23: rechazo, libro intacto")
+        void posteriorAHoy() {
+            Papeleta papeleta = papeletaDeTransito("402C");
+
+            Throwable rechazo = catchThrowable(() -> anularEl(papeleta, HOY_DEL_402.plusDays(1)));
+
+            assertThat(rechazo)
+                    .as("una baja con fecha valor futura deja la deuda a la vista hasta ese dia")
+                    .isInstanceOf(ActoFueraDeOrden.class)
+                    .hasMessageContaining("posterior a hoy");
+            assertThat(estadoDe(papeleta)).isEqualTo(EstadoDePapeleta.IMPUESTA);
+            assertThat(deudaDe(papeleta, FIN_DE_ANIO))
+                    .as("ni siquiera a fin de anio hay una baja que la extinga")
+                    .isEqualTo(MULTA);
+            assertThat(cuantosAbonos(papeleta)).isZero();
+        }
+    }
+
+    /**
+     * #402 — El descargo resuelve sobre la infraccion, y la resolucion sobre el descargo.
+     *
+     * <p>Las dos siembras son las del issue: un descargo del 20 de febrero contra una infraccion
+     * del 4 de marzo —hasta #402 entraba con {@code enPlazo = true}, porque la fila solo exige que
+     * {@code enPlazo} cuadre con {@code presentadoHasta}— y una resolucion del 5 de marzo que deja
+     * sin efecto un recurso presentado el 10. El reloj de esta clase esta en el 20 de abril, y
+     * «despues de hoy» es el 21.
+     */
+    @Nested
+    @DisplayName("#402 — el descargo y la resolucion se fechan en orden")
+    class LaFechaDelDescargoYDeLaResolucion {
+
+        @Test
+        @DisplayName("un descargo anterior a la infraccion no se registra")
+        void descargoAnteriorALaInfraccion() {
+            Papeleta papeleta = papeletaDeTransito("402D");
+
+            Throwable rechazo =
+                    catchThrowable(
+                            () -> descargar(papeleta, "EXP-402D", LocalDate.of(2026, 2, 20)));
+
+            assertThat(rechazo)
+                    .isInstanceOf(ActoFueraDeOrden.class)
+                    .hasMessageContaining("2026-03-04");
+            assertThat(cuantosDescargos(papeleta)).isZero();
+        }
+
+        @Test
+        @DisplayName("un descargo fechado despues de hoy no se registra; el de hoy si")
+        void descargoPosteriorAHoy() {
+            Papeleta papeleta = papeletaDeTransito("402E");
+
+            Throwable rechazo =
+                    catchThrowable(
+                            () -> descargar(papeleta, "EXP-402E", LocalDate.of(2026, 4, 21)));
+
+            assertThat(rechazo)
+                    .isInstanceOf(ActoFueraDeOrden.class)
+                    .hasMessageContaining("posterior a hoy");
+            assertThat(cuantosDescargos(papeleta)).isZero();
+            assertThat(descargar(papeleta, "EXP-402E-B", LocalDate.of(2026, 4, 20)))
+                    .as("la frontera: el mismo dia del reloj vale")
+                    .isNotNull();
+        }
+
+        @Test
+        @DisplayName("una resolucion anterior al descargo que resuelve no se dicta, ni da de baja")
+        void resolucionAnteriorAlDescargo() {
+            Papeleta papeleta = papeletaDeTransito("402F");
+            descargar(papeleta, "EXP-402F", LocalDate.of(2026, 3, 10));
+
+            Throwable rechazo =
+                    catchThrowable(
+                            () ->
+                                    dictar(
+                                            papeleta,
+                                            TipoDeResolucionDeGerencia.ORDINARIA,
+                                            LocalDate.of(2026, 3, 5),
+                                            "EXP-402F",
+                                            SentidoDelFallo.FUNDADO,
+                                            EfectoSobreLaMulta.SE_DEJA_SIN_EFECTO));
+
+            assertThat(rechazo)
+                    .as("la fecha de la resolucion es la fecha valor de la baja")
+                    .isInstanceOf(ActoFueraDeOrden.class)
+                    .hasMessageContaining("EXP-402F")
+                    .hasMessageContaining("2026-03-10");
+            assertThat(cuantasResoluciones(papeleta, "ORDINARIA")).isZero();
+            assertThat(deudaDe(papeleta, ORDINARIA)).isEqualTo(MULTA);
+        }
+
+        @Test
+        @DisplayName("una resolucion fechada despues de hoy no se dicta")
+        void resolucionPosteriorAHoy() {
+            Papeleta papeleta = papeletaDeTransito("402G");
+            descargar(papeleta, "EXP-402G", LocalDate.of(2026, 3, 10));
+
+            Throwable rechazo =
+                    catchThrowable(
+                            () ->
+                                    dictar(
+                                            papeleta,
+                                            TipoDeResolucionDeGerencia.ORDINARIA,
+                                            LocalDate.of(2026, 4, 21),
+                                            "EXP-402G",
+                                            SentidoDelFallo.FUNDADO,
+                                            EfectoSobreLaMulta.SE_DEJA_SIN_EFECTO));
+
+            assertThat(rechazo)
+                    .isInstanceOf(ActoFueraDeOrden.class)
+                    .hasMessageContaining("posterior a hoy");
+            assertThat(cuantasResoluciones(papeleta, "ORDINARIA")).isZero();
+            assertThat(deudaDe(papeleta, LocalDate.of(2026, 12, 31))).isEqualTo(MULTA);
+        }
+
+        /**
+         * La diligencia ya tenia su cota inferior —{@code DiligenciaAnteriorALaResolucion}, una de
+         * las cinco excepciones que #402 retira— y ahora tiene tambien la de hoy. Una diligencia
+         * futura que surte efecto abre un plazo que todavia no corre, y de ahi sale el dia desde el
+         * que cabe la sancionadora.
+         */
+        @Test
+        @DisplayName("la diligencia: ni antes de la resolucion ni despues de hoy")
+        void laDiligenciaDeLaResolucion() {
+            Papeleta papeleta = papeletaDeTransito("402H");
+            String numero =
+                    dictar(
+                                    papeleta,
+                                    TipoDeResolucionDeGerencia.ORDINARIA,
+                                    ORDINARIA,
+                                    null,
+                                    null,
+                                    null)
+                            .resolucion()
+                            .numero();
+
+            assertThat(
+                            catchThrowable(
+                                    () ->
+                                            notificarResolucion(
+                                                    numero,
+                                                    ORDINARIA.minusDays(1),
+                                                    ResultadoDeNotificacion.NOTIFICADO)))
+                    .as("antes de la resolucion, con la misma excepcion que todas las demas")
+                    .isInstanceOf(ActoFueraDeOrden.class)
+                    .hasMessageContaining(numero);
+            assertThat(
+                            catchThrowable(
+                                    () ->
+                                            notificarResolucion(
+                                                    numero,
+                                                    LocalDate.of(2026, 4, 21),
+                                                    ResultadoDeNotificacion.NOTIFICADO)))
+                    .as("y despues de hoy")
+                    .isInstanceOf(ActoFueraDeOrden.class)
+                    .hasMessageContaining("posterior a hoy");
+        }
+    }
+
+    // ==================================================================
     //  #371 — dos papeletas del mismo obligado, del mismo ejercicio y sin vehiculo del padron
     // ==================================================================
 
@@ -2279,6 +2524,59 @@ class SancionesJdbcTest {
                         anularPapeleta.anular(
                                 papeleta.familia(), papeleta.numero(), ORDINARIA, PORQUE),
                 "gerente");
+    }
+
+    /** #402: un descargo de la papeleta, presentado el dia que se pida. */
+    private static RegistrarDescargo.Registrado descargar(
+            Papeleta papeleta, String expediente, LocalDate presentado) {
+        return enTransaccion(
+                () ->
+                        registrarDescargo.registrar(
+                                Familia.TRANSITO,
+                                papeleta.numero(),
+                                new RegistrarDescargo.Peticion(
+                                        expediente,
+                                        presentado,
+                                        TipoDeRecurso.DESCARGO,
+                                        "El vehiculo estaba en el taller"),
+                                PORQUE),
+                "mesa.partes");
+    }
+
+    private static long cuantosDescargos(Papeleta papeleta) {
+        return enTransaccion(
+                () ->
+                        jdbc.sql("SELECT count(*) FROM descargo WHERE papeleta_id = :papeleta")
+                                .param("papeleta", papeleta.identificador())
+                                .query(Long.class)
+                                .single());
+    }
+
+    /** #402: anula con el reloj del 23 de setiembre y a la fecha que se pida. */
+    private static AnularPapeleta.Anulada anularEl(Papeleta papeleta, LocalDate fecha) {
+        return enTransaccion(
+                () ->
+                        anularAl23DeSetiembre.anular(
+                                papeleta.familia(), papeleta.numero(), fecha, PORQUE),
+                "gerente");
+    }
+
+    private static EstadoDePapeleta estadoDe(Papeleta papeleta) {
+        return enTransaccion(() -> papeletas.porId(papeleta.identificador()))
+                .orElseThrow()
+                .estado();
+    }
+
+    private static long cuantosAbonos(Papeleta papeleta) {
+        return enTransaccion(
+                () ->
+                        jdbc.sql(
+                                        "SELECT count(*) FROM cuenta_corriente_asiento"
+                                                + " WHERE contribuyente_id = :contribuyente"
+                                                + "   AND tipo = 'ABONO'")
+                                .param("contribuyente", papeleta.obligadoId())
+                                .query(Long.class)
+                                .single());
     }
 
     private static ResolverConResolucionDeGerencia.ResolucionDictada dictar(

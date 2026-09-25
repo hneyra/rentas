@@ -326,7 +326,7 @@ public class LicenciaController {
             throw new ProblemaDeNegocio(CodigoDeError.CONFLICTO, mensajeDe(yaEstaba));
         } catch (MovimientoDeLicenciaRepository.LicenciaYaCancelada carrera) {
             throw new ProblemaDeNegocio(CodigoDeError.CONFLICTO, mensajeDe(carrera));
-        } catch (CancelarLicencia.SinMotivo | CancelarLicencia.AnteriorALaEmision invalida) {
+        } catch (CancelarLicencia.SinMotivo invalida) {
             throw new ProblemaDeNegocio(CodigoDeError.VALIDACION, mensajeDe(invalida));
         }
 

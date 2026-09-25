@@ -134,6 +134,14 @@ class LicenciaDeEdificacionJdbcTest {
     private static final Clock RELOJ =
             Clock.fixed(HOY.atStartOfDay(ZoneOffset.UTC).toInstant(), ZoneOffset.UTC);
 
+    /**
+     * El dia en que se emiten y revalidan las licencias: el de la ultima que estas pruebas fechan
+     * ({@link #SIN_CUADRO}). Hasta #402 corrian con {@link #RELOJ} y la de 2027 se fechaba un anio
+     * en el futuro sin que nada lo impidiera; desde #402 un acto posterior a hoy no se registra.
+     */
+    private static final Clock RELOJ_DE_LOS_ACTOS =
+            Clock.fixed(SIN_CUADRO.atStartOfDay(ZoneOffset.UTC).toInstant(), ZoneOffset.UTC);
+
     private static final String USUARIO = "licencias.obras";
     private static final String CAJERO = "cajero.tasas";
     private static final String CAJA = "C-48";
@@ -279,7 +287,7 @@ class LicenciaDeEdificacionJdbcTest {
                                 documentos,
                                 PlantillaDeNumeroDeEdificacion.POR_OMISION,
                                 auditoria,
-                                RELOJ));
+                                RELOJ_DE_LOS_ACTOS));
         // El mismo caso de uso, con un conjunto sellado que NO tiene el concepto del TUPA. Es la
         // demostracion de la regla 5: sin el dato, la operacion falla nombrando la llave, en vez
         // de admitir cualquier recibo.
@@ -295,7 +303,7 @@ class LicenciaDeEdificacionJdbcTest {
                                 documentos,
                                 PlantillaDeNumeroDeEdificacion.POR_OMISION,
                                 auditoria,
-                                RELOJ));
+                                RELOJ_DE_LOS_ACTOS));
         revalidar =
                 envolver(
                         new RevalidarLicenciaDeEdificacion(
@@ -306,7 +314,7 @@ class LicenciaDeEdificacionJdbcTest {
                                 derechos,
                                 documentos,
                                 auditoria,
-                                RELOJ));
+                                RELOJ_DE_LOS_ACTOS));
         // Las DOS van envueltas, como en el contenedor: `envolver` usa
         // `AnnotationTransactionAttributeSource`, asi que OBEDECE a la anotacion y sobre
         // `ConsultaDeFue` —que no declara ninguna— no abre nada. Envolver solo `LecturaDelFue`

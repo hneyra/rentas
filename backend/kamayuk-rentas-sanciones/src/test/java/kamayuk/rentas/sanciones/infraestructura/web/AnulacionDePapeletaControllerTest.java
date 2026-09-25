@@ -3,7 +3,10 @@ package kamayuk.rentas.sanciones.infraestructura.web;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -13,13 +16,16 @@ import kamayuk.rentas.auditoria.RegistroDeAuditoria;
 import kamayuk.rentas.compartido.Pagina;
 import kamayuk.rentas.compartido.Paginacion;
 import kamayuk.rentas.cuentacorriente.CausalDeBaja;
+import kamayuk.rentas.cuentacorriente.ConsultaDeDeudaPublica;
 import kamayuk.rentas.cuentacorriente.DeudaAcogida;
 import kamayuk.rentas.cuentacorriente.ExtincionDeDeuda;
 import kamayuk.rentas.cuentacorriente.MovimientoAsentado;
 import kamayuk.rentas.cuentacorriente.ObligacionCompartida;
+import kamayuk.rentas.cuentacorriente.ObligacionPublica;
 import kamayuk.rentas.cuentacorriente.SeleccionDeObligacion;
 import kamayuk.rentas.dominio.Alicuota;
 import kamayuk.rentas.dominio.Dinero;
+import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.sanciones.aplicacion.AnularPapeleta;
 import kamayuk.rentas.sanciones.dominio.CriterioDePapeleta;
@@ -54,9 +60,20 @@ class AnulacionDePapeletaControllerTest {
     private final ValoresDeMentira valores = new ValoresDeMentira();
     private final ExtincionDeMentira extincion = new ExtincionDeMentira();
 
+    private final DeudasDeMentira deudas = new DeudasDeMentira();
+
+    /** Hoy es el 23 de setiembre; las papeletas de la prueba son del 1 de marzo. */
+    private static final Clock RELOJ =
+            Clock.fixed(Instant.parse("2026-09-23T17:00:00Z"), ZoneOffset.UTC);
+
     private final AnularPapeleta servicio =
             new AnularPapeleta(
-                    repositorio, valores, extincion, (RegistroDeAuditoria registro) -> {});
+                    repositorio,
+                    valores,
+                    extincion,
+                    deudas,
+                    (RegistroDeAuditoria registro) -> {},
+                    RELOJ);
 
     private final MockMvc mvc =
             MockMvcBuilders.standaloneSetup(new AnulacionDePapeletaController(servicio))
@@ -96,6 +113,70 @@ class AnulacionDePapeletaControllerTest {
         assertThat(extincion.fecha)
                 .as("la fecha valor es la del acto, no la del dia en que alguien teclea")
                 .isEqualTo(LocalDate.of(2026, 4, 1));
+    }
+
+    /**
+     * #402 — La papeleta de la prueba es del 1 de marzo. Anularla el 28 de febrero es 422 —un dato
+     * de la peticion que, corregido, pasa— y no toca ni la fila ni el libro: hasta #402 contestaba
+     * 201 y la baja se fechaba antes del cargo que tenia que extinguir.
+     */
+    @Test
+    @DisplayName("#402 — con fecha anterior a la infraccion, 422 y nada se escribe")
+    void anteriorALaInfraccionEs422() throws Exception {
+        repositorio.crear("PT-0402", EstadoDePapeleta.IMPUESTA);
+
+        MvcResult resultado =
+                anular("PT-0402", "{\"observacion\":\"un 1 por un 4\",\"fecha\":\"2026-02-28\"}");
+
+        assertThat(resultado.getResponse().getStatus()).isEqualTo(422);
+        assertThat(resultado.getResponse().getContentAsString())
+                .contains("VALIDACION")
+                .contains("PT-0402")
+                .contains("2026-03-01");
+        assertThat(repositorio.porNumero("PT-0402"))
+                .get()
+                .extracting(Papeleta::estado)
+                .isEqualTo(EstadoDePapeleta.IMPUESTA);
+        assertThat(extincion.fecha).as("ni se pidio la baja").isNull();
+    }
+
+    /**
+     * #402 — La defensa donde el daño no tiene marcha atras. La fecha esta en orden, pero la baja
+     * no asienta nada —aqui lo fuerza el doble; en el libro seria un cargo con otra fecha valor— y
+     * la obligacion sigue debiendo 440 a hoy. Sin la defensa esto era 201 con {@code
+     * asientosDeBaja: 0}, igual que si no se debiera nada, y la papeleta quedaba ANULADA.
+     */
+    @Test
+    @DisplayName("#402 — si la baja no asienta nada y se sigue debiendo a hoy, 409 y no se anula")
+    void sinBajaYDebiendoEs409() throws Exception {
+        repositorio.crear("PT-0403", EstadoDePapeleta.IMPUESTA);
+        extincion.sinAsentarNada();
+        deudas.debe(RepositorioDeMentira.OBLIGADO, Dinero.de("440"));
+
+        MvcResult resultado =
+                anular("PT-0403", "{\"observacion\":\"error material\",\"fecha\":\"2026-04-01\"}");
+
+        assertThat(resultado.getResponse().getStatus()).isEqualTo(409);
+        assertThat(resultado.getResponse().getContentAsString())
+                .contains("PT-0403")
+                .contains("440");
+        assertThat(deudas.preguntadaA)
+                .as("la deuda se pregunta a hoy, que es lo que la ventanilla cobraria")
+                .isEqualTo(LocalDate.of(2026, 9, 23));
+    }
+
+    /** El control de la defensa: sin asientos y sin deuda a hoy, la anulacion procede. */
+    @Test
+    @DisplayName("#402 — si la baja no asienta nada porque no se debe nada, 201")
+    void sinBajaYSinDeudaEs201() throws Exception {
+        repositorio.crear("PT-0404", EstadoDePapeleta.IMPUESTA);
+        extincion.sinAsentarNada();
+
+        MvcResult resultado =
+                anular("PT-0404", "{\"observacion\":\"error material\",\"fecha\":\"2026-04-01\"}");
+
+        assertThat(resultado.getResponse().getStatus()).isEqualTo(201);
+        assertThat(resultado.getResponse().getContentAsString()).contains("\"asientosDeBaja\":0");
     }
 
     @Test
@@ -360,11 +441,52 @@ class AnulacionDePapeletaControllerTest {
         }
     }
 
+    /**
+     * Lo que el libro debe a una fecha, por obligado (#402). Vacio salvo que la prueba diga lo
+     * contrario: la anulacion corriente no llega a preguntar, porque su baja asienta.
+     */
+    private static final class DeudasDeMentira implements ConsultaDeDeudaPublica {
+
+        private final Map<Long, Dinero> porObligado = new HashMap<>();
+        private @Nullable LocalDate preguntadaA;
+
+        void debe(long obligado, Dinero total) {
+            porObligado.put(obligado, total);
+        }
+
+        @Override
+        public List<ObligacionPublica> deTodoElContribuyente(
+                long contribuyenteId, LocalDate fecha) {
+            this.preguntadaA = fecha;
+            Dinero total = porObligado.get(contribuyenteId);
+            if (total == null) {
+                return List.of();
+            }
+            return List.of(
+                    new ObligacionPublica(
+                            "MULTA_TRANSITO",
+                            new Ejercicio(2026),
+                            null,
+                            null,
+                            fecha,
+                            total,
+                            Dinero.CERO,
+                            Dinero.CERO,
+                            Dinero.CERO));
+        }
+    }
+
     private static final class ExtincionDeMentira implements ExtincionDeDeuda {
 
         private @Nullable CausalDeBaja causal;
         private @Nullable LocalDate fecha;
         private @Nullable String compartidaCon;
+        private boolean sinAsentar;
+
+        /** Como si a la fecha del acto el libro no tuviera nada que extinguir (#402). */
+        void sinAsentarNada() {
+            this.sinAsentar = true;
+        }
 
         /** Como si el libro tuviera en la misma obligacion la multa de ese otro origen (#371). */
         void compartidaCon(String otroOrigen) {
@@ -386,6 +508,9 @@ class AnulacionDePapeletaControllerTest {
             }
             this.causal = causal;
             this.fecha = fecha;
+            if (sinAsentar) {
+                return new MovimientoAsentado(List.of(), 0, fecha);
+            }
             return new MovimientoAsentado(
                     List.of(
                             new DeudaAcogida(

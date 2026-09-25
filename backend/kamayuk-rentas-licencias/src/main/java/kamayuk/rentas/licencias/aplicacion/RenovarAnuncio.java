@@ -12,6 +12,7 @@ import kamayuk.rentas.cuentacorriente.GeneradorDeCargos;
 import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.Observacion;
+import kamayuk.rentas.dominio.OrdenDeLosActos;
 import kamayuk.rentas.licencias.dominio.Anuncio;
 import kamayuk.rentas.licencias.dominio.AnuncioRepository;
 import kamayuk.rentas.licencias.dominio.EstadoDelAnuncio;
@@ -82,6 +83,8 @@ public class RenovarAnuncio {
      * @param observacion por que se registra (regla 10, RNF-052)
      * @throws AnuncioInexistente si no hay ninguna autorizacion con ese numero
      * @throws NoSeRenueva si el anuncio esta cesado o retirado a esa fecha
+     * @throws kamayuk.rentas.dominio.ActoFueraDeOrden si la fecha es anterior a la autorizacion o
+     *     posterior a hoy (#402)
      * @throws TasaDeAnunciosParametrizada.TasaSinParametrizar si la ordenanza sellada del ejercicio
      *     que se renueva no tarifa esa clase (regla 5, D-02b, #199)
      */
@@ -106,9 +109,14 @@ public class RenovarAnuncio {
         if (!actual.admiteRenovacion()) {
             throw new NoSeRenueva(anuncio.numero(), actual, fecha);
         }
-        if (fecha.isBefore(anuncio.fechaAutorizacion())) {
-            throw new AnteriorALaAutorizacion(anuncio.numero(), anuncio.fechaAutorizacion(), fecha);
-        }
+        // #402: la regla es una sola y vive en `OrdenDeLosActos`; aqui se retiro la excepcion
+        // propia, que era una de sus cinco copias y no miraba hoy.
+        OrdenDeLosActos.exigir(
+                "la renovacion de " + anuncio.numero(),
+                fecha,
+                LocalDate.now(reloj),
+                new OrdenDeLosActos.ActoPrevio(
+                        "la autorizacion " + anuncio.numero(), anuncio.fechaAutorizacion()));
         if (vigenciaHasta != null && vigenciaHasta.isBefore(fecha)) {
             throw new VigenciaHaciaAtras(anuncio.numero(), fecha, vigenciaHasta);
         }
@@ -204,23 +212,6 @@ public class RenovarAnuncio {
                             + fecha
                             + ": un anuncio cesado no se renueva, y por tanto no devenga mas tasa."
                             + " La ya devengada no se toca (regla 4, RNF-051)");
-        }
-    }
-
-    /** La renovacion no puede ser anterior a la autorizacion que prorroga. */
-    public static final class AnteriorALaAutorizacion extends RuntimeException {
-
-        @java.io.Serial private static final long serialVersionUID = 1L;
-
-        AnteriorALaAutorizacion(String numero, LocalDate autorizacion, LocalDate renovacion) {
-            super(
-                    "La autorizacion "
-                            + numero
-                            + " se emitio el "
-                            + autorizacion
-                            + " y no puede renovarse el "
-                            + renovacion
-                            + ": un acto no prorroga a otro que todavia no existia");
         }
     }
 

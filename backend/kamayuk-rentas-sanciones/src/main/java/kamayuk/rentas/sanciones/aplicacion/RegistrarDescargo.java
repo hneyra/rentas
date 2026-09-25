@@ -7,6 +7,7 @@ import kamayuk.rentas.auditoria.Operacion;
 import kamayuk.rentas.auditoria.RegistroDeAuditoria;
 import kamayuk.rentas.dominio.CalendarioHabil;
 import kamayuk.rentas.dominio.Observacion;
+import kamayuk.rentas.dominio.OrdenDeLosActos;
 import kamayuk.rentas.dominio.Plazo;
 import kamayuk.rentas.sanciones.dominio.Descargo;
 import kamayuk.rentas.sanciones.dominio.DescargoRepository;
@@ -82,6 +83,8 @@ public class RegistrarDescargo {
      * @param observacion por qué se registra (regla 10, RNF-052)
      * @throws PapeletaInexistente si no hay ninguna papeleta con ese número en esa familia
      * @throws PapeletaSinNadaQueImpugnar si la papeleta está anulada o prescrita
+     * @throws kamayuk.rentas.dominio.ActoFueraDeOrden si se presentó antes de la infracción o
+     *     después de hoy (#402)
      */
     @Transactional
     public Registrado registrar(
@@ -96,6 +99,14 @@ public class RegistrarDescargo {
                 || papeleta.estado() == EstadoDePapeleta.PRESCRITA) {
             throw new PapeletaSinNadaQueImpugnar(papeleta);
         }
+
+        // #402: `Descargo` solo exige que `enPlazo` cuadre con `presentadoHasta`, asi que un
+        // escrito del 20 de febrero contra una infraccion del 4 de marzo entraba «en plazo».
+        OrdenDeLosActos.exigir(
+                "la presentacion del recurso " + peticion.numeroExpediente(),
+                peticion.fechaPresentacion(),
+                LocalDate.now(reloj),
+                papeleta.laInfraccion());
 
         PlazosDeSancionesParametrizados.Vigentes vigentes =
                 plazos.aLaFechaDe(papeleta.fechaInfraccion());

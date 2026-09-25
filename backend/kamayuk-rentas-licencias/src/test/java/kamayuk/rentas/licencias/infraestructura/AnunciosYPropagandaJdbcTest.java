@@ -119,6 +119,15 @@ class AnunciosYPropagandaJdbcTest {
     private static final Clock RELOJ =
             Clock.fixed(HOY.atStartOfDay(ZoneOffset.UTC).toInstant(), ZoneOffset.UTC);
 
+    /**
+     * El dia en que se registran la renovacion, el cese y el retiro: despues del ultimo que estas
+     * pruebas fechan (el retiro del 15 de julio de 2027). Hasta #402 corrian con {@link #RELOJ}, el
+     * dia de la autorizacion, y fechaban sus actos un anio en el futuro sin que nada lo impidiera;
+     * desde #402 un acto posterior a hoy no se registra.
+     */
+    private static final Clock RELOJ_DE_LOS_ACTOS =
+            Clock.fixed(FIN_DE_2027.atStartOfDay(ZoneOffset.UTC).toInstant(), ZoneOffset.UTC);
+
     private static final String USUARIO = "licencias.anuncios";
     private static final Observacion PORQUE = Observacion.de("Se registra para la prueba");
 
@@ -232,8 +241,14 @@ class AnunciosYPropagandaJdbcTest {
                                 RELOJ));
         renovar =
                 envolver(
-                        new RenovarAnuncio(anuncios, movimientos, tasas, cargos, auditoria, RELOJ));
-        cesar = envolver(new CesarAnuncio(anuncios, movimientos, auditoria, RELOJ));
+                        new RenovarAnuncio(
+                                anuncios,
+                                movimientos,
+                                tasas,
+                                cargos,
+                                auditoria,
+                                RELOJ_DE_LOS_ACTOS));
+        cesar = envolver(new CesarAnuncio(anuncios, movimientos, auditoria, RELOJ_DE_LOS_ACTOS));
         consulta = envolver(new ConsultaDeAnuncios(anuncios, movimientos, padron));
 
         predioDelLocal = crearPredio();

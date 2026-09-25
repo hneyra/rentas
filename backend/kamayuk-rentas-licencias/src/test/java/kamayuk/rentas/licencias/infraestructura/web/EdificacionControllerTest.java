@@ -134,6 +134,11 @@ class EdificacionControllerTest {
     }
 
     private MockMvc montar(LectorDeValoresUnitarios cuadro, DerechosDeMentira derechosDelTupa) {
+        return montar(cuadro, derechosDelTupa, RELOJ);
+    }
+
+    private MockMvc montar(
+            LectorDeValoresUnitarios cuadro, DerechosDeMentira derechosDelTupa, Clock reloj) {
         DerechosDeTramiteParametrizados derechos =
                 new DerechosDeTramiteParametrizados(derechosDelTupa);
         ValorizacionDelFue valorizaciones = new ValorizacionDelFue(cuadro);
@@ -146,12 +151,12 @@ class EdificacionControllerTest {
                                         expedientes,
                                         padron,
                                         (RegistroDeAuditoria registro) -> {},
-                                        RELOJ),
+                                        reloj),
                                 new CompletarSeccionDelFue(
                                         expedientes,
                                         movimientos,
                                         (RegistroDeAuditoria registro) -> {},
-                                        RELOJ),
+                                        reloj),
                                 new EmitirLicenciaDeEdificacion(
                                         expedientes,
                                         movimientos,
@@ -162,7 +167,7 @@ class EdificacionControllerTest {
                                         documentos,
                                         PlantillaDeNumeroDeEdificacion.POR_OMISION,
                                         (RegistroDeAuditoria registro) -> {},
-                                        RELOJ),
+                                        reloj),
                                 new RevalidarLicenciaDeEdificacion(
                                         expedientes,
                                         movimientos,
@@ -171,8 +176,8 @@ class EdificacionControllerTest {
                                         derechos,
                                         documentos,
                                         (RegistroDeAuditoria registro) -> {},
-                                        RELOJ),
-                                RELOJ))
+                                        reloj),
+                                reloj))
                 .setControllerAdvice(new ManejadorDeErrores())
                 .setMessageConverters(
                         new JacksonJsonHttpMessageConverter(
@@ -583,6 +588,133 @@ class EdificacionControllerTest {
                                     .formatted(RECIBO_REVALIDACION),
                             422);
             assertThat(cuerpo).contains("no una revalidacion");
+        }
+    }
+
+    /**
+     * #402 — La revalidacion no se fecha antes de lo que resuelve ni despues de hoy.
+     *
+     * <p>De los cinco actos que resuelven sobre uno previo, era el unico que no comparaba la fecha
+     * con nada, y la muestra de siempre no lo podia ver: {@code fechaOhoy} daba el dia del reloj,
+     * que es el mismo de la declaracion y de la emision. Aqui la licencia original se emite el 16
+     * de marzo, el expediente de revalidacion se declara el 1 de setiembre y el reloj esta en el
+     * 23: tres fechas distintas, y cada rechazo nombra la que incumple.
+     */
+    @Nested
+    @DisplayName("#402 — la revalidacion, en orden")
+    class LaFechaDeLaRevalidacion {
+
+        private static final String REVALIDACION = "EXP-2026-0200";
+
+        private final MockMvc del23DeSetiembre =
+                montar(
+                        new CuadroDeMentira()
+                                .con("MUROS", 'A', "120.000000")
+                                .con("TECHOS", 'B', "80.000000"),
+                        new DerechosDeMentira(null, null)
+                                .conEdificacion(DERECHO_EDIFICACION, DERECHO_REVALIDACION),
+                        Clock.fixed(
+                                LocalDate.of(2026, 9, 23).atStartOfDay(ZoneOffset.UTC).toInstant(),
+                                ZoneOffset.UTC));
+
+        @BeforeEach
+        void licenciaYSuRevalidacion() throws Exception {
+            expedienteCompleto();
+            emitir(mvc, 201);
+            envio(
+                    del23DeSetiembre,
+                    "/rentas/api/v1/licencias/edificacion",
+                    """
+                    {"nroExpediente":"%s","fechaDeclaracion":"2026-09-01",
+                     "codContribuyente":"C-0007","tipoTramite":"REVALIDACION_DE_LICENCIA",
+                     "obra":"EDIFICACION_NUEVA","modalidadAprobacion":"B",
+                     "revision":"REVISORES_URBANOS","solicitanteEsPropietario":true,
+                     "nroLicenciaAnterior":"LE-2026-000001",
+                     "observacion":"Se presenta la revalidacion"}
+                    """
+                            .formatted(REVALIDACION),
+                    201);
+        }
+
+        @Test
+        @DisplayName("antes de la licencia que prorroga: 422, y nombra la declaracion")
+        void anteriorALaEmision() throws Exception {
+            String cuerpo = revalidarEl("2026-02-01", 422);
+
+            assertThat(cuerpo)
+                    .as("anterior a las dos; se nombra la mas reciente, la declaracion")
+                    .contains("VALIDACION")
+                    .contains(REVALIDACION)
+                    .contains("2026-09-01");
+        }
+
+        @Test
+        @DisplayName("despues de la emision y antes de la declaracion: 422")
+        void anteriorALaDeclaracion() throws Exception {
+            assertThat(revalidarEl("2026-08-31", 422)).contains("2026-09-01");
+        }
+
+        @Test
+        @DisplayName("despues de hoy: 422")
+        void posteriorAHoy() throws Exception {
+            assertThat(revalidarEl("2026-09-24", 422)).contains("posterior a hoy");
+        }
+
+        @Test
+        @DisplayName("el mismo dia de la declaracion: 201")
+        void elMismoDiaDeLaDeclaracion() throws Exception {
+            assertThat(revalidarEl("2026-09-01", 201)).contains("\"acto\":\"REVALIDACION\"");
+        }
+
+        private String revalidarEl(String fecha, int esperado) throws Exception {
+            return envio(
+                    del23DeSetiembre,
+                    "/rentas/api/v1/licencias/edificacion/" + REVALIDACION + "/revalidacion",
+                    """
+                    {"fecha":"%s","nuevaVigenciaHasta":"2030-03-16","nDeRecibo":"%s",
+                     "observacion":"Se revalida por solicitud del administrado"}
+                    """
+                            .formatted(fecha, RECIBO_REVALIDACION),
+                    esperado);
+        }
+    }
+
+    /**
+     * #402 — La emision tenia su cota inferior ({@code AnteriorALaDeclaracion}, que se retira) y no
+     * miraba hoy. El reloj de esta clase esta en el 16 de marzo, que es tambien el dia de la
+     * declaracion: el 15 es anterior y el 17 es futuro.
+     */
+    @Nested
+    @DisplayName("#402 — la emision, en orden")
+    class LaFechaDeLaEmision {
+
+        @Test
+        @DisplayName(
+                "antes de la declaracion o despues de hoy: 422, y el expediente sigue sin licencia")
+        void niAntesNiDespues() throws Exception {
+            expedienteCompleto();
+
+            assertThat(emitirEl("2026-03-15", 422))
+                    .contains("VALIDACION")
+                    .contains(EXPEDIENTE)
+                    .contains("2026-03-16");
+            assertThat(emitirEl("2026-03-17", 422)).contains("posterior a hoy");
+            assertThat(movimientos.emisionDe(1L))
+                    .as("ninguno de los dos rechazos numero una licencia")
+                    .isEmpty();
+            assertThat(emitirEl("2026-03-16", 201)).contains("LE-2026-000001");
+        }
+
+        private String emitirEl(String fecha, int esperado) throws Exception {
+            return envio(
+                    mvc,
+                    "/rentas/api/v1/licencias/edificacion/" + EXPEDIENTE + "/licencia",
+                    """
+                    {"fechaDeEmision":"%s","vigenciaHasta":"2029-03-16","nDeRecibo":"%s",
+                     "observacion":"Se otorga la licencia de edificacion"}
+                    """
+                            .formatted(fecha, RECIBO),
+                    esperado);
         }
     }
 

@@ -239,9 +239,7 @@ public class ResolucionesDeGerenciaController {
             // de las dos cosas —«corrige el formulario» o «hay que publicar una cifra»— y acaba
             // enumerando las dos, que es peor que no decir nada.
             throw FaltaPublicar.problema(falta);
-        } catch (NotificarResolucionDeGerencia.DiligenciaAnteriorALaResolucion
-                | NotificarResolucionDeGerencia.SinDireccion
-                | IllegalArgumentException invalido) {
+        } catch (NotificarResolucionDeGerencia.SinDireccion | IllegalArgumentException invalido) {
             throw PeticionesDeSanciones.invalido(invalido);
         }
     }

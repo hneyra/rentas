@@ -7,6 +7,7 @@ import java.util.Objects;
 import kamayuk.rentas.dominio.Alicuota;
 import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.dominio.Observacion;
+import kamayuk.rentas.dominio.OrdenDeLosActos;
 import kamayuk.rentas.dominio.Placa;
 import org.jspecify.annotations.Nullable;
 
@@ -268,6 +269,15 @@ public record Papeleta(
     /** El identificador, exigiendo que ya se haya guardado. */
     public long identificador() {
         return Objects.requireNonNull(id, "La papeleta todavia no se ha guardado");
+    }
+
+    /**
+     * La infraccion, como el acto previo que la anulacion, el descargo y la resolucion resuelven
+     * (#402): ninguno de los tres se fecha antes de ella.
+     */
+    public OrdenDeLosActos.ActoPrevio laInfraccion() {
+        return new OrdenDeLosActos.ActoPrevio(
+                "la infraccion de la papeleta " + numero, fechaInfraccion);
     }
 
     /**

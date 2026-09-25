@@ -70,6 +70,7 @@ import kamayuk.rentas.documentos.RegimenDeLaInstalacion;
 import kamayuk.rentas.documentos.RenderizadorPdf;
 import kamayuk.rentas.documentos.RenderizadorRtf;
 import kamayuk.rentas.documentos.RenderizadorXls;
+import kamayuk.rentas.dominio.ActoFueraDeOrden;
 import kamayuk.rentas.dominio.Alicuota;
 import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.dominio.Ejercicio;
@@ -402,7 +403,8 @@ class ValoresMasivosYReportesJdbcTest {
                                 papeletas,
                                 directorio,
                                 plazos,
-                                auditoria));
+                                auditoria,
+                                RELOJ));
         resolucionesPorLaApi = new ResolucionesDeGerenciaController(resolver, notificar);
         iniciar =
                 envolver(
@@ -412,7 +414,9 @@ class ValoresMasivosYReportesJdbcTest {
                         new ProcesarPapeletaDeLaCorrida(
                                 papeletas, resoluciones, diligencias, emision, corridas));
         anularPapeleta =
-                envolver(new AnularPapeleta(papeletas, valoresVivos, extincion, auditoria));
+                envolver(
+                        new AnularPapeleta(
+                                papeletas, valoresVivos, extincion, deudas, auditoria, RELOJ));
         anulacion = new AnulacionDePapeletaController(anularPapeleta);
         generar =
                 new GenerarCorridaDeValores(
@@ -599,6 +603,32 @@ class ValoresMasivosYReportesJdbcTest {
             assertThat(item.motivo())
                     .as("dice cuando vence, que es lo unico que quien opera puede hacer: esperar")
                     .contains(EXIGIBLE_DESDE.toString());
+        }
+
+        /**
+         * #402 — La fecha de criterio no se fecha despues de hoy. Es la fecha de emision y de corte
+         * de la deuda de cada RM de la corrida, y {@code ProcesarPapeletaDeLaCorrida} compara la
+         * exigibilidad con ella y no con hoy: con una fecha futura, una papeleta cuyo plazo todavia
+         * corre saldria formalizada. Cuanto puede ir hacia atras es otro issue.
+         */
+        @Test
+        @DisplayName("#402 — con la fecha de criterio despues de hoy la corrida no se inicia")
+        void conLaFechaDeCriterioDespuesDeHoy() {
+            Papeleta papeleta = papeletaExigible("np5");
+            long antes = cuantasCorridas();
+
+            assertThatThrownBy(
+                            () ->
+                                    enTransaccion(
+                                            () ->
+                                                    iniciar.porSeleccion(
+                                                            Familia.TRANSITO,
+                                                            List.of(papeleta.numero()),
+                                                            LocalDate.of(2026, 4, 21),
+                                                            PORQUE)))
+                    .isInstanceOf(ActoFueraDeOrden.class)
+                    .hasMessageContaining("posterior a hoy");
+            assertThat(cuantasCorridas()).isEqualTo(antes);
         }
 
         @Test
@@ -2287,6 +2317,11 @@ class ValoresMasivosYReportesJdbcTest {
                                                 publica.vehiculoId(), obligacion.vehiculoId()))
                 .map(ObligacionPublica::total)
                 .reduce(Dinero.CERO, Dinero::mas);
+    }
+
+    private static long cuantasCorridas() {
+        return enTransaccion(
+                () -> jdbc.sql("SELECT count(*) FROM papeleta_masivo").query(Long.class).single());
     }
 
     private static CorridaDeValores corridaDe(Papeleta papeleta) {

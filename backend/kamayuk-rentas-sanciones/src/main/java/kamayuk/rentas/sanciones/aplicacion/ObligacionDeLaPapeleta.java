@@ -1,9 +1,12 @@
 package kamayuk.rentas.sanciones.aplicacion;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import kamayuk.rentas.cuentacorriente.ConsultaDeDeudaPublica;
 import kamayuk.rentas.cuentacorriente.ObligacionCompartida;
+import kamayuk.rentas.cuentacorriente.ObligacionPublica;
 import kamayuk.rentas.cuentacorriente.SeleccionDeObligacion;
 import kamayuk.rentas.cuentacorriente.TributoDelLibro;
 import kamayuk.rentas.dominio.Ejercicio;
@@ -11,6 +14,7 @@ import kamayuk.rentas.sanciones.dominio.Familia;
 import kamayuk.rentas.sanciones.dominio.Papeleta;
 import kamayuk.rentas.sanciones.dominio.PapeletaRepository;
 import kamayuk.rentas.valores.ValoresSobreUnaObligacion;
+import org.jspecify.annotations.Nullable;
 
 /**
  * La obligación del libro que una papeleta origina (#46, #47, #50).
@@ -100,6 +104,30 @@ final class ObligacionDeLaPapeleta {
                             throw new AnularPapeleta.PapeletaConResolucionDeMulta(
                                     papeleta.numero(), valor, loQueSigue);
                         });
+    }
+
+    /**
+     * Lo que la obligación de esa papeleta debe a una fecha, o nulo si el libro no tiene nada en
+     * ella.
+     *
+     * <p>Lo preguntan la resolución de gerencia —para imprimir la deuda proyectada— y la anulación
+     * —para no dejar una papeleta anulada que sigue debiendo (#402)—, y es la misma obligación que
+     * {@link #de} compone: preguntarla por separado sería la segunda escritura de la misma
+     * correspondencia que esta clase existe para evitar.
+     */
+    static @Nullable ObligacionPublica deudaDe(
+            Papeleta papeleta, ConsultaDeDeudaPublica deudas, LocalDate fecha) {
+        SeleccionDeObligacion obligacion = de(papeleta);
+        for (ObligacionPublica publica :
+                deudas.deTodoElContribuyente(papeleta.obligadoId(), fecha)) {
+            if (publica.tributo().equals(obligacion.tributo())
+                    && publica.ejercicio().equals(obligacion.ejercicio())
+                    && Objects.equals(publica.predioId(), obligacion.predioId())
+                    && Objects.equals(publica.vehiculoId(), obligacion.vehiculoId())) {
+                return publica;
+            }
+        }
+        return null;
     }
 
     /**

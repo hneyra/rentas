@@ -26,6 +26,7 @@ import kamayuk.rentas.cuentacorriente.dominio.Fase;
 import kamayuk.rentas.cuentacorriente.dominio.ObligacionConDeuda;
 import kamayuk.rentas.cuentacorriente.dominio.SaldoProyectado;
 import kamayuk.rentas.cuentacorriente.dominio.SaldoRepository;
+import kamayuk.rentas.dominio.OrdenDeLosActos;
 import kamayuk.rentas.dominio.PoliticaDeRedondeo;
 import kamayuk.rentas.web.CodigoDeError;
 import kamayuk.rentas.web.ProblemaDeNegocio;
@@ -170,11 +171,20 @@ public class ConsultarDeuda {
      * debe nada» seria una afirmacion falsa sobre alguien que no esta en el padron de esta
      * municipalidad.
      *
+     * <p><b>Y la fecha de corte no es posterior a hoy (#402).</b> El papel imprime la fecha pedida
+     * como «Fecha de corte» y a la vez afirma que la informacion corresponde al registro a la fecha
+     * de emision; a una fecha futura certificaria que no se debe nada cuando la cuota que vence
+     * entretanto todavia no esta en el libro. Proyectar la deuda de una obligacion a una fecha
+     * futura sigue siendo admisible —las consultas por objeto lo hacen—; certificar que no la hay,
+     * no.
+     *
      * @throws ProblemaDeNegocio {@code NO_ENCONTRADO} si el codigo no identifica a ningun
      *     contribuyente de la municipalidad activa
+     * @throws kamayuk.rentas.dominio.ActoFueraDeOrden si la fecha de corte es posterior a hoy
      */
     @Transactional(readOnly = true)
     public ConstanciaDeNoAdeudo constanciaDeNoAdeudo(String codigoContribuyente, LocalDate fecha) {
+        OrdenDeLosActos.exigir("la constancia de no adeudo", fecha, hoy());
         CriterioDeDeudaPorContribuyente criterio =
                 new CriterioDeDeudaPorContribuyente(
                         codigoContribuyente, fecha, null, Agregacion.POR_OBLIGACION);

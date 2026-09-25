@@ -1,5 +1,6 @@
 package kamayuk.rentas.sanciones.aplicacion;
 
+import java.time.Clock;
 import java.time.LocalDate;
 import java.util.Objects;
 import kamayuk.rentas.auditoria.Auditoria;
@@ -10,6 +11,7 @@ import kamayuk.rentas.dominio.CalendarioHabil;
 import kamayuk.rentas.dominio.Exigibilidad;
 import kamayuk.rentas.dominio.ModalidadDeNotificacion;
 import kamayuk.rentas.dominio.Observacion;
+import kamayuk.rentas.dominio.OrdenDeLosActos;
 import kamayuk.rentas.dominio.Plazo;
 import kamayuk.rentas.dominio.ResultadoDeNotificacion;
 import kamayuk.rentas.sanciones.dominio.NotificacionDeResolucion;
@@ -61,6 +63,7 @@ public class NotificarResolucionDeGerencia {
     private final DirectorioDeContribuyentes contribuyentes;
     private final PlazosDeSancionesParametrizados plazos;
     private final Auditoria auditoria;
+    private final Clock reloj;
 
     public NotificarResolucionDeGerencia(
             ResolucionDeGerenciaRepository resoluciones,
@@ -68,13 +71,15 @@ public class NotificarResolucionDeGerencia {
             PapeletaRepository papeletas,
             DirectorioDeContribuyentes contribuyentes,
             PlazosDeSancionesParametrizados plazos,
-            Auditoria auditoria) {
+            Auditoria auditoria,
+            Clock reloj) {
         this.resoluciones = resoluciones;
         this.notificaciones = notificaciones;
         this.papeletas = papeletas;
         this.contribuyentes = contribuyentes;
         this.plazos = plazos;
         this.auditoria = auditoria;
+        this.reloj = reloj;
     }
 
     /**
@@ -84,7 +89,8 @@ public class NotificarResolucionDeGerencia {
      * @param peticion los datos de la diligencia
      * @param observacion por qué se registra (regla 10, RNF-052)
      * @throws ResolucionInexistente si no hay ninguna resolución con ese número
-     * @throws DiligenciaAnteriorALaResolucion si la diligencia es anterior a la resolución
+     * @throws kamayuk.rentas.dominio.ActoFueraDeOrden si la diligencia es anterior a la resolución
+     *     o posterior a hoy (#402)
      * @throws SinDireccion si ni el padrón ni la petición dicen dónde notificar
      */
     @Transactional
@@ -96,9 +102,12 @@ public class NotificarResolucionDeGerencia {
                         .porNumero(numeroDeResolucion.strip())
                         .orElseThrow(() -> new ResolucionInexistente(numeroDeResolucion));
 
-        if (peticion.fechaDeLaDiligencia().isBefore(resolucion.fecha())) {
-            throw new DiligenciaAnteriorALaResolucion(resolucion, peticion.fechaDeLaDiligencia());
-        }
+        OrdenDeLosActos.exigir(
+                "la diligencia de la resolucion " + resolucion.numero(),
+                peticion.fechaDeLaDiligencia(),
+                LocalDate.now(reloj),
+                new OrdenDeLosActos.ActoPrevio(
+                        "la resolucion " + resolucion.numero(), resolucion.fecha()));
 
         int intento = notificaciones.intentosDe(resolucion.identificador()) + 1;
 
@@ -250,22 +259,6 @@ public class NotificarResolucionDeGerencia {
 
         ResolucionInexistente(String numero) {
             super("No hay ninguna resolucion de gerencia con el numero '" + numero + "'");
-        }
-    }
-
-    /** Se diligenció antes de dictar la resolución: no puede ser. */
-    public static final class DiligenciaAnteriorALaResolucion extends RuntimeException {
-
-        @java.io.Serial private static final long serialVersionUID = 1L;
-
-        DiligenciaAnteriorALaResolucion(ResolucionDeGerencia resolucion, LocalDate fecha) {
-            super(
-                    "La resolucion "
-                            + resolucion.numero()
-                            + " se dicto el "
-                            + resolucion.fecha()
-                            + ": no se pudo notificar el "
-                            + fecha);
         }
     }
 

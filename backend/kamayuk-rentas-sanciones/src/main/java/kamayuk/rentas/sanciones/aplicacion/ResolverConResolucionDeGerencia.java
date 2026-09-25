@@ -3,6 +3,7 @@ package kamayuk.rentas.sanciones.aplicacion;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import kamayuk.rentas.auditoria.Auditoria;
@@ -22,6 +23,7 @@ import kamayuk.rentas.documentos.FormatoDeDocumento;
 import kamayuk.rentas.documentos.ModeloDeDocumento;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.Observacion;
+import kamayuk.rentas.dominio.OrdenDeLosActos;
 import kamayuk.rentas.dominio.Plazo;
 import kamayuk.rentas.sanciones.dominio.Descargo;
 import kamayuk.rentas.sanciones.dominio.DescargoRepository;
@@ -159,6 +161,8 @@ public class ResolverConResolucionDeGerencia {
      *     vivo formaliza su obligación (#495)
      * @throws ObligacionCompartidaConOtraPapeleta si deja la multa sin efecto y su obligación del
      *     libro tiene también la multa de otra papeleta (#371)
+     * @throws kamayuk.rentas.dominio.ActoFueraDeOrden si la fecha es anterior a la infraccion o al
+     *     recurso que resuelve, o posterior a hoy (#402)
      */
     @Transactional
     public ResolucionDictada dictar(
@@ -177,6 +181,16 @@ public class ResolverConResolucionDeGerencia {
         }
 
         Descargo recurso = recursoDe(papeleta, peticion);
+        // #402: la fecha de la resolucion es la fecha valor de la baja, y hasta aqui una del 5 de
+        // marzo dejaba sin efecto un recurso presentado el 10. No se fecha antes de la infraccion
+        // ni del escrito que resuelve, ni despues de hoy.
+        OrdenDeLosActos.exigir(
+                "la resolucion " + peticion.tipo() + " de la papeleta " + papeleta.numero(),
+                peticion.fecha(),
+                LocalDate.now(reloj),
+                recurso == null
+                        ? List.of(papeleta.laInfraccion())
+                        : List.of(papeleta.laInfraccion(), recurso.laPresentacion()));
         Sustento sustento = sustentoDe(papeleta, peticion.tipo(), peticion.fecha());
 
         if (peticion.efecto() != null && peticion.efecto().extingueLaDeuda()) {
@@ -193,7 +207,7 @@ public class ResolverConResolucionDeGerencia {
                         ? peticion.fecha()
                         : peticion.proyectarDeudaAl();
         SeleccionDeObligacion obligacion = ObligacionDeLaPapeleta.de(papeleta);
-        ObligacionPublica deuda = deudaDe(papeleta, obligacion, proyeccion);
+        ObligacionPublica deuda = ObligacionDeLaPapeleta.deudaDe(papeleta, deudas, proyeccion);
 
         ResumenDeContribuyente obligado = obligadoDe(papeleta);
         Plazo plazo =
@@ -366,20 +380,6 @@ public class ResolverConResolucionDeGerencia {
      * debe <b>hoy</b>, con su fecha (regla 9). Devolver {@code null} cuando ya no debe nada es la
      * respuesta correcta: la resolución sale igual, con el cuadro en cero.
      */
-    private @Nullable ObligacionPublica deudaDe(
-            Papeleta papeleta, SeleccionDeObligacion obligacion, LocalDate fecha) {
-        for (ObligacionPublica publica :
-                deudas.deTodoElContribuyente(papeleta.obligadoId(), fecha)) {
-            if (publica.tributo().equals(obligacion.tributo())
-                    && publica.ejercicio().equals(obligacion.ejercicio())
-                    && Objects.equals(publica.predioId(), obligacion.predioId())
-                    && Objects.equals(publica.vehiculoId(), obligacion.vehiculoId())) {
-                return publica;
-            }
-        }
-        return null;
-    }
-
     private ResumenDeContribuyente obligadoDe(Papeleta papeleta) {
         ResumenDeContribuyente enElPadron =
                 contribuyentes.porIds(Set.of(papeleta.obligadoId())).get(papeleta.obligadoId());

@@ -106,7 +106,27 @@ class AnuncioControllerTest {
                             .con(ClaseDeAnuncio.LETRERO, "45.00")
                             .sinSellar());
 
+    /**
+     * El dia en que se registran la renovacion y el cese: despues del ultimo que estas pruebas
+     * fechan (la segunda renovacion, del 20 de marzo de 2027). Hasta #402 corrian con {@link
+     * #RELOJ}, el dia de la autorizacion, y fechaban sus actos en el futuro sin que nada lo
+     * impidiera. La consulta y el registro siguen en {@link #RELOJ}: «el estado es el de HOY» lo
+     * mide asi.
+     */
+    private static final Clock RELOJ_DE_LOS_ACTOS =
+            Clock.fixed(
+                    LocalDate.of(2027, 3, 31).atStartOfDay(ZoneOffset.UTC).toInstant(),
+                    ZoneOffset.UTC);
+
     private MockMvc montar(TarifasDeMentira tarifas) {
+        return montar(tarifas, RELOJ, RELOJ_DE_LOS_ACTOS);
+    }
+
+    private MockMvc montar(TarifasDeMentira tarifas, Clock reloj) {
+        return montar(tarifas, reloj, reloj);
+    }
+
+    private MockMvc montar(TarifasDeMentira tarifas, Clock reloj, Clock relojDeLosActos) {
         TasaDeAnunciosParametrizada tasas = new TasaDeAnunciosParametrizada(tarifas);
         return MockMvcBuilders.standaloneSetup(
                         new AnuncioController(
@@ -120,20 +140,20 @@ class AnuncioControllerTest {
                                         libro,
                                         PlantillaDeNumeroDeAnuncio.POR_OMISION,
                                         (RegistroDeAuditoria registro) -> {},
-                                        RELOJ),
+                                        reloj),
                                 new RenovarAnuncio(
                                         anuncios,
                                         movimientos,
                                         tasas,
                                         libro,
                                         (RegistroDeAuditoria registro) -> {},
-                                        RELOJ),
+                                        relojDeLosActos),
                                 new CesarAnuncio(
                                         anuncios,
                                         movimientos,
                                         (RegistroDeAuditoria registro) -> {},
-                                        RELOJ),
-                                RELOJ))
+                                        relojDeLosActos),
+                                reloj))
                 .setControllerAdvice(new ManejadorDeErrores())
                 .setMessageConverters(
                         new JacksonJsonHttpMessageConverter(
@@ -658,6 +678,98 @@ class AnuncioControllerTest {
                                     null,
                                     422))
                     .contains("termina antes de empezar");
+        }
+    }
+
+    /**
+     * #402 — El escenario del issue: AN-2026-000001 se autoriza el 16 de marzo de 2026, se renueva
+     * el 15 de enero de 2027 con su cargo 2027, y el 10 de febrero se registra un cese fechado el
+     * 31 de diciembre. Hasta #402 se aceptaba —el estado se derivaba a la fecha del cese, que se
+     * salta los movimientos posteriores— y el anuncio figuraba cesado desde antes de una renovacion
+     * que devengo. El cese se compara con el ULTIMO movimiento registrado.
+     */
+    @Nested
+    @DisplayName("#402 — el cese, en orden")
+    class LaFechaDelCese {
+
+        private final MockMvc del10DeFebrero =
+                montar(
+                        new TarifasDeMentira()
+                                .con(ClaseDeAnuncio.PANEL, "90.00")
+                                .con(ClaseDeAnuncio.LETRERO, "45.00"),
+                        Clock.fixed(
+                                LocalDate.of(2027, 2, 10).atStartOfDay(ZoneOffset.UTC).toInstant(),
+                                ZoneOffset.UTC));
+
+        @BeforeEach
+        void autorizadoYRenovado() throws Exception {
+            registrar(del10DeFebrero, null, 201);
+            envio(
+                    del10DeFebrero,
+                    "/rentas/api/v1/autorizaciones/anuncios/AN-2026-000001/renovacion",
+                    "{\"fecha\":\"2027-01-15\",\"fecVenc\":\"2027-12-31\","
+                            + "\"observacion\":\"Se renueva\"}",
+                    null,
+                    201);
+        }
+
+        @Test
+        @DisplayName(
+                "un cese anterior a la renovacion ya registrada: 422, y el anuncio sigue vigente")
+        void anteriorALaRenovacion() throws Exception {
+            String cuerpo = cesarEl("2026-12-31", 422);
+
+            assertThat(cuerpo)
+                    .as("nombra el ultimo movimiento, con su fecha")
+                    .contains("VALIDACION")
+                    .contains("2027-01-15");
+            assertThat(movimientos.deAnuncio(1L)).as("no se agrego el cese").hasSize(2);
+        }
+
+        @Test
+        @DisplayName("un cese posterior a hoy: 422")
+        void posteriorAHoy() throws Exception {
+            assertThat(cesarEl("2027-02-11", 422)).contains("posterior a hoy");
+        }
+
+        /**
+         * La renovacion ya tenia su cota inferior ({@code AnteriorALaAutorizacion}, que se retira)
+         * y no miraba hoy: una renovacion futura devengaba hoy la tasa de un ejercicio que no ha
+         * empezado.
+         */
+        @Test
+        @DisplayName("una renovacion posterior a hoy: 422, y ningun cargo mas")
+        void renovacionPosteriorAHoy() throws Exception {
+            String cuerpo =
+                    envio(
+                            del10DeFebrero,
+                            "/rentas/api/v1/autorizaciones/anuncios/AN-2026-000001/renovacion",
+                            "{\"fecha\":\"2028-01-15\",\"fecVenc\":\"2028-12-31\","
+                                    + "\"observacion\":\"Se renueva\"}",
+                            null,
+                            422);
+
+            assertThat(cuerpo).contains("posterior a hoy");
+            assertThat(libro.cuantos()).as("la autorizacion y la renovacion de 2027").isEqualTo(2);
+        }
+
+        @Test
+        @DisplayName("un cese el mismo dia de la renovacion: 201")
+        void elMismoDiaDeLaRenovacion() throws Exception {
+            assertThat(cesarEl("2027-01-15", 201)).contains("CESE");
+        }
+
+        private String cesarEl(String fecha, int esperado) throws Exception {
+            return envio(
+                    del10DeFebrero,
+                    "/rentas/api/v1/autorizaciones/anuncios/AN-2026-000001/cese",
+                    """
+                    {"fecha":"%s","motivo":"Cese de giro",
+                     "observacion":"Se cesa por solicitud del titular"}
+                    """
+                            .formatted(fecha),
+                    null,
+                    esperado);
         }
     }
 
