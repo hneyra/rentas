@@ -1,6 +1,5 @@
 package kamayuk.rentas.sanciones.aplicacion;
 
-import java.time.Clock;
 import java.time.LocalDate;
 import kamayuk.rentas.auditoria.Auditoria;
 import kamayuk.rentas.auditoria.Operacion;
@@ -25,13 +24,11 @@ public class MantenerCatalogoDeInfracciones {
 
     private final CodigoInfraccionRepository repositorio;
     private final Auditoria auditoria;
-    private final Clock reloj;
 
     public MantenerCatalogoDeInfracciones(
-            CodigoInfraccionRepository repositorio, Auditoria auditoria, Clock reloj) {
+            CodigoInfraccionRepository repositorio, Auditoria auditoria) {
         this.repositorio = repositorio;
         this.auditoria = auditoria;
-        this.reloj = reloj;
     }
 
     /** Un código nuevo del catálogo, sin versión previa. */
@@ -75,10 +72,6 @@ public class MantenerCatalogoDeInfracciones {
     private void auditar(CodigoInfraccion codigo, Operacion operacion, Observacion observacion) {
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe(
-                        LocalDate.now(reloj),
-                        "codigo_infraccion",
-                        String.valueOf(codigo.id()),
-                        operacion,
-                        observacion));
+                        "codigo_infraccion", String.valueOf(codigo.id()), operacion, observacion));
     }
 }

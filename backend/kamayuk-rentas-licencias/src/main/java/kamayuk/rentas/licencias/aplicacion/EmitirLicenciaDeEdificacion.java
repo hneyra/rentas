@@ -230,7 +230,6 @@ public class EmitirLicenciaDeEdificacion {
 
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe(
-                                fechaDeEmision,
                                 "edificacion_movimiento",
                                 String.valueOf(registrado.identificador()),
                                 Operacion.ALTA,

@@ -3,10 +3,7 @@ package kamayuk.rentas.nucleo.aplicacion;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.StringReader;
-import java.time.Clock;
-import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import kamayuk.rentas.auditoria.Auditoria;
@@ -44,9 +41,6 @@ import org.junit.jupiter.api.Test;
 @DisplayName("Siembra de la municipalidad de demostracion")
 class SiembraDeDemostracionTest {
 
-    private static final Clock RELOJ =
-            Clock.fixed(Instant.parse("2026-08-29T10:00:00Z"), ZoneId.of("America/Lima"));
-
     private static final Observacion PORQUE = Observacion.de("Siembra de la demostracion");
 
     private PadronDeLaSiembraEnMemoria padron;
@@ -79,8 +73,7 @@ class SiembraDeDemostracionTest {
         @BeforeEach
         void preparar() {
             importar =
-                    new ImportarVehiculos(
-                            new RegistrarVehiculo(padron, auditoria(), RELOJ), referencias);
+                    new ImportarVehiculos(new RegistrarVehiculo(padron, auditoria()), referencias);
         }
 
         @Test

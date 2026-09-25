@@ -156,7 +156,6 @@ public class CesarAnuncio {
 
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe(
-                                fecha,
                                 TABLA_AUDITADA,
                                 String.valueOf(registrado.identificador()),
                                 Operacion.BAJA,

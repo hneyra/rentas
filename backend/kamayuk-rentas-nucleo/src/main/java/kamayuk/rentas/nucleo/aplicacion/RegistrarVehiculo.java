@@ -1,7 +1,5 @@
 package kamayuk.rentas.nucleo.aplicacion;
 
-import java.time.Clock;
-import java.time.LocalDate;
 import kamayuk.rentas.auditoria.Auditoria;
 import kamayuk.rentas.auditoria.Operacion;
 import kamayuk.rentas.auditoria.RegistroDeAuditoria;
@@ -22,12 +20,10 @@ public class RegistrarVehiculo {
 
     private final VehiculoRepository repositorio;
     private final Auditoria auditoria;
-    private final Clock reloj;
 
-    public RegistrarVehiculo(VehiculoRepository repositorio, Auditoria auditoria, Clock reloj) {
+    public RegistrarVehiculo(VehiculoRepository repositorio, Auditoria auditoria) {
         this.repositorio = repositorio;
         this.auditoria = auditoria;
-        this.reloj = reloj;
     }
 
     @Transactional
@@ -37,7 +33,6 @@ public class RegistrarVehiculo {
 
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe(
-                                LocalDate.now(reloj),
                                 "vehiculo",
                                 String.valueOf(guardado.id()),
                                 esAlta ? Operacion.ALTA : Operacion.MODIFICACION,

@@ -216,11 +216,7 @@ public class RegistrarValor {
     private void auditar(Valor valor, Observacion observacion) {
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe(
-                                valor.fechaEmision(),
-                                "valor",
-                                String.valueOf(valor.id()),
-                                Operacion.ALTA,
-                                observacion)
+                                "valor", String.valueOf(valor.id()), Operacion.ALTA, observacion)
                         .con(null, descripcion(valor)));
     }
 

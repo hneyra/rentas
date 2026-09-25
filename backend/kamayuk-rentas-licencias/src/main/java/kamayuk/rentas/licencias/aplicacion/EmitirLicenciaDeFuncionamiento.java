@@ -288,7 +288,6 @@ public class EmitirLicenciaDeFuncionamiento {
 
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe(
-                                solicitud.fechaEmision(),
                                 "licencia_funcionamiento",
                                 String.valueOf(guardada.identificador()),
                                 Operacion.ALTA,

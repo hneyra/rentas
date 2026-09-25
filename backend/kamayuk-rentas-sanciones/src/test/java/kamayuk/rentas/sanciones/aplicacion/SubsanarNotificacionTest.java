@@ -48,6 +48,11 @@ class SubsanarNotificacionTest {
 
         assertThat(subsanada.estado()).isEqualTo(EstadoDeNotificacion.SUBSANADA);
         assertThat(auditados).hasSize(1);
+        assertThat(auditados.get(0).datosNuevos())
+                .as(
+                        "#398: la fecha de la subsanacion es del acto y no de la fila de"
+                                + " auditoria; la notificacion no la guarda, asi que viaja aqui")
+                .contains("\"fechaSubsanacion\":\"" + FECHA.plusDays(5) + "\"");
     }
 
     @Test

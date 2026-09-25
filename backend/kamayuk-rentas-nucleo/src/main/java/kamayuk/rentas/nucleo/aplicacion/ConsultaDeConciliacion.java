@@ -1,6 +1,5 @@
 package kamayuk.rentas.nucleo.aplicacion;
 
-import java.time.Clock;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -77,19 +76,16 @@ public class ConsultaDeConciliacion {
     private final DeclaracionJuradaRepository declaraciones;
     private final ConciliacionRepository recuento;
     private final Auditoria auditoria;
-    private final Clock reloj;
 
     public ConsultaDeConciliacion(
             FichasDelPadron fichas,
             DeclaracionJuradaRepository declaraciones,
             ConciliacionRepository recuento,
-            Auditoria auditoria,
-            Clock reloj) {
+            Auditoria auditoria) {
         this.fichas = fichas;
         this.declaraciones = declaraciones;
         this.recuento = recuento;
         this.auditoria = auditoria;
-        this.reloj = reloj;
     }
 
     /**
@@ -173,10 +169,6 @@ public class ConsultaDeConciliacion {
 
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe(
-                                // Del reloj inyectado, no de aLaFecha: la particion de la
-                                // bitacora es el ejercicio del ACTO, y consultar en 2026 el
-                                // padron de 2024 es un acto de 2026.
-                                LocalDate.now(reloj),
                                 TABLA_AUDITADA,
                                 "conciliacion=NO;ejercicio=" + ejercicio.valor(),
                                 Operacion.ACCESO,

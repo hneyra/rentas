@@ -101,8 +101,7 @@ class EspectaculoFronteraTest {
                                                 new ContribuyenteRepositoryJdbc(jdbc),
                                                 new FichaRepositoryJdbc(jdbc)),
                                         gestor),
-                                (RegistroDeAuditoria registro) -> {},
-                                RELOJ),
+                                (RegistroDeAuditoria registro) -> {}),
                         gestor);
 
         mvc =

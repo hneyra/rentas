@@ -119,8 +119,7 @@ class RegistrarAlcabalaTest {
                                 new kamayuk.rentas.nucleo.infraestructura
                                         .DeterminacionRepositoryJdbc(jdbc),
                                 parametros,
-                                new AuditoriaJdbc(jdbc, RELOJ),
-                                RELOJ),
+                                new AuditoriaJdbc(jdbc, RELOJ)),
                         gestor);
     }
 

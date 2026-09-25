@@ -215,7 +215,6 @@ public class EmitirDocumento {
     private void auditar(DocumentoEmitido documento, Operacion operacion, Observacion observacion) {
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe(
-                                LocalDate.now(reloj),
                                 "documento_emitido",
                                 String.valueOf(documento.id()),
                                 operacion,

@@ -156,7 +156,6 @@ public class RegistrarInternamiento {
 
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe(
-                                dia,
                                 TABLA_AUDITADA,
                                 String.valueOf(guardado.id()),
                                 Operacion.ALTA,

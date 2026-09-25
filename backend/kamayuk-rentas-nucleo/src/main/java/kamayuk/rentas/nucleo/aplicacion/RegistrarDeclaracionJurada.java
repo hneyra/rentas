@@ -179,7 +179,6 @@ public class RegistrarDeclaracionJurada {
 
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe(
-                                fechaPresentacion,
                                 "declaracion_jurada",
                                 String.valueOf(idDe(anterior)),
                                 Operacion.MODIFICACION,
@@ -288,7 +287,6 @@ public class RegistrarDeclaracionJurada {
             @Nullable String antes) {
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe(
-                                guardada.fechaPresentacion(),
                                 "declaracion_jurada",
                                 String.valueOf(idDe(guardada)),
                                 operacion,
@@ -296,6 +294,14 @@ public class RegistrarDeclaracionJurada {
                         .con(antes, descripcion(guardada)));
     }
 
+    /**
+     * El estado de la DJ que queda en la auditoria.
+     *
+     * <p>Lleva {@code fechaPresentacion} porque es la fecha de negocio, y desde #398 ya no es la de
+     * la fila: la fila de auditoria se fecha y se particiona con el dia del ACTO —observar o anular
+     * en enero una DJ de marzo del año anterior es un acto de enero—, y la fecha en que el
+     * contribuyente declaro se conserva aqui, donde quien lea la bitacora la encuentra.
+     */
     private static String descripcion(DeclaracionJurada declaracion) {
         return "{\"contribuyenteId\":"
                 + declaracion.contribuyenteId()
@@ -303,6 +309,8 @@ public class RegistrarDeclaracionJurada {
                 + declaracion.tipo()
                 + "\",\"numero\":\""
                 + declaracion.numero()
+                + "\",\"fechaPresentacion\":\""
+                + declaracion.fechaPresentacion()
                 + "\",\"estado\":\""
                 + declaracion.estado()
                 + "\",\"fueraDePlazo\":"

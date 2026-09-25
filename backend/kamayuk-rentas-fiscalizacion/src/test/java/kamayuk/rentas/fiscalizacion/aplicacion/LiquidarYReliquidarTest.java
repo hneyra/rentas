@@ -3,9 +3,7 @@ package kamayuk.rentas.fiscalizacion.aplicacion;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import java.time.Clock;
 import java.time.LocalDate;
-import java.time.ZoneOffset;
 import java.util.List;
 import kamayuk.rentas.dominio.AreaM2;
 import kamayuk.rentas.dominio.Ejercicio;
@@ -102,8 +100,7 @@ class LiquidarYReliquidarTest {
                         catastro,
                         catastro,
                         rentas,
-                        registro -> {},
-                        Clock.fixed(HOY.atStartOfDay(ZoneOffset.UTC).toInstant(), ZoneOffset.UTC));
+                        registro -> {});
         reliquidar = new ReliquidarFiscalizacion(actas, liquidaciones, liquidar);
         consulta = new ConsultaDeLiquidaciones(liquidaciones, movimientos);
 

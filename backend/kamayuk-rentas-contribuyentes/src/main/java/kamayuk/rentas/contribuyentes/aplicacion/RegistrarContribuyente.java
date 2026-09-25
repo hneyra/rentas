@@ -1,7 +1,5 @@
 package kamayuk.rentas.contribuyentes.aplicacion;
 
-import java.time.Clock;
-import java.time.LocalDate;
 import java.util.Optional;
 import kamayuk.rentas.auditoria.Auditoria;
 import kamayuk.rentas.auditoria.Operacion;
@@ -16,8 +14,9 @@ import org.springframework.transaction.annotation.Transactional;
  * Alta y mantenimiento del contribuyente.
  *
  * <p>Sigue la plantilla de {@code RegistrarVia}: la {@link Observacion} esta en la firma, la
- * auditoria va en la misma transaccion y el reloj se inyecta. Ningun argumento es la municipalidad
- * (regla 2).
+ * auditoria va en la misma transaccion. Ningun argumento es la municipalidad (regla 2), y tampoco
+ * el reloj: la fecha de la fila de auditoria la pone {@code AuditoriaJdbc}, que es quien decide su
+ * ejercicio (#398).
  *
  * <p>Lo propio de este caso de uso es la <b>comprobacion de duplicados antes de escribir</b>. La
  * tabla ya tiene las dos restricciones de unicidad, y son la barrera de verdad; esto se hace de
@@ -29,13 +28,10 @@ public class RegistrarContribuyente {
 
     private final ContribuyenteRepository repositorio;
     private final Auditoria auditoria;
-    private final Clock reloj;
 
-    public RegistrarContribuyente(
-            ContribuyenteRepository repositorio, Auditoria auditoria, Clock reloj) {
+    public RegistrarContribuyente(ContribuyenteRepository repositorio, Auditoria auditoria) {
         this.repositorio = repositorio;
         this.auditoria = auditoria;
-        this.reloj = reloj;
     }
 
     @Transactional
@@ -46,7 +42,6 @@ public class RegistrarContribuyente {
 
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe(
-                                LocalDate.now(reloj),
                                 "contribuyente",
                                 String.valueOf(guardado.id()),
                                 contribuyente.esNuevo() ? Operacion.ALTA : Operacion.MODIFICACION,
@@ -69,11 +64,7 @@ public class RegistrarContribuyente {
 
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe(
-                                LocalDate.now(reloj),
-                                "contribuyente",
-                                String.valueOf(id),
-                                Operacion.BAJA,
-                                observacion)
+                                "contribuyente", String.valueOf(id), Operacion.BAJA, observacion)
                         .con(descripcion(existente), descripcion(baja)));
 
         return baja;

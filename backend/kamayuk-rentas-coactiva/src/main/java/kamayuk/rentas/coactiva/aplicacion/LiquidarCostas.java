@@ -191,7 +191,6 @@ public class LiquidarCostas {
 
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe(
-                                guardada.fecha(),
                                 "liquidacion_costas",
                                 String.valueOf(guardada.id()),
                                 Operacion.ALTA,

@@ -7,10 +7,7 @@ import java.io.Reader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.Clock;
-import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneId;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -285,8 +282,7 @@ class ArchivosDeEjemploDeRentasTest {
     }
 
     private ImportarVehiculos importarVehiculos() {
-        return new ImportarVehiculos(
-                new RegistrarVehiculo(padron, auditoria(), reloj()), referencias);
+        return new ImportarVehiculos(new RegistrarVehiculo(padron, auditoria()), referencias);
     }
 
     private ImportarTransferencias importarTransferencias() {
@@ -298,10 +294,6 @@ class ArchivosDeEjemploDeRentasTest {
 
     private static Auditoria auditoria() {
         return registro -> {};
-    }
-
-    private static Clock reloj() {
-        return Clock.fixed(Instant.parse("2026-08-29T10:00:00Z"), ZoneId.of("America/Lima"));
     }
 
     private static Reader abrir(String nombre) throws IOException {

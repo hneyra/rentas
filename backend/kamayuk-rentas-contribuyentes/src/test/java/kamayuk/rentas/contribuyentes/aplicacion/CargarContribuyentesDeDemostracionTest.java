@@ -10,9 +10,6 @@ import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.Clock;
-import java.time.Instant;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import kamayuk.rentas.auditoria.Auditoria;
@@ -62,8 +59,7 @@ class CargarContribuyentesDeDemostracionTest {
         padron = new PadronEnMemoria();
         asientos = new ArrayList<>();
         Auditoria auditoria = asientos::add;
-        Clock reloj = Clock.fixed(Instant.parse("2026-08-28T10:00:00Z"), ZoneId.of("America/Lima"));
-        importar = new ImportarContribuyentes(new RegistrarContribuyente(padron, auditoria, reloj));
+        importar = new ImportarContribuyentes(new RegistrarContribuyente(padron, auditoria));
     }
 
     @AfterEach

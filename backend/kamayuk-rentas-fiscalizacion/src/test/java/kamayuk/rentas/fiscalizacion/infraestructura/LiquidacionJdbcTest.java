@@ -8,9 +8,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.time.Clock;
 import java.time.LocalDate;
-import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -963,8 +961,7 @@ class LiquidacionJdbcTest {
                         catastro,
                         catastro,
                         new DeclaracionesDeMentira(),
-                        registro -> {},
-                        Clock.fixed(HOY.atStartOfDay(ZoneOffset.UTC).toInstant(), ZoneOffset.UTC));
+                        registro -> {});
         return new CasosDeUso(
                 envolver(liquidar),
                 envolver(new ReliquidarFiscalizacion(actas, liquidaciones, liquidar)),

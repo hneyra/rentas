@@ -659,8 +659,7 @@ class VehicularControllerTest {
                         new ValoresReferenciales(vehiculos, lector),
                         determinaciones,
                         lector,
-                        auditoria,
-                        RELOJ);
+                        auditoria);
         return MockMvcBuilders.standaloneSetup(
                         new VehicularController(
                                 servicio, new ConsultaDeVehiculos(vehiculos, null), RELOJ))

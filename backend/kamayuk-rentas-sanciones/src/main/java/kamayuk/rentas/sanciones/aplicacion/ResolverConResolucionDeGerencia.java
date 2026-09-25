@@ -296,7 +296,6 @@ public class ResolverConResolucionDeGerencia {
 
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe(
-                                peticion.fecha(),
                                 TABLA_AUDITADA,
                                 String.valueOf(registrada.id()),
                                 Operacion.ALTA,

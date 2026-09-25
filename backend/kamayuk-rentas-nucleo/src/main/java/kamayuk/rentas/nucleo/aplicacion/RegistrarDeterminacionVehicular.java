@@ -1,7 +1,5 @@
 package kamayuk.rentas.nucleo.aplicacion;
 
-import java.time.Clock;
-import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -84,7 +82,6 @@ public class RegistrarDeterminacionVehicular {
     private final DeterminacionRepository determinaciones;
     private final LectorDeParametros parametros;
     private final Auditoria auditoria;
-    private final Clock reloj;
 
     public RegistrarDeterminacionVehicular(
             VehiculoRepository vehiculos,
@@ -92,15 +89,13 @@ public class RegistrarDeterminacionVehicular {
             ValoresReferenciales valoresReferenciales,
             DeterminacionRepository determinaciones,
             LectorDeParametros parametros,
-            Auditoria auditoria,
-            Clock reloj) {
+            Auditoria auditoria) {
         this.vehiculos = vehiculos;
         this.transferencias = transferencias;
         this.valoresReferenciales = valoresReferenciales;
         this.determinaciones = determinaciones;
         this.parametros = parametros;
         this.auditoria = auditoria;
-        this.reloj = reloj;
     }
 
     /**
@@ -289,7 +284,6 @@ public class RegistrarDeterminacionVehicular {
     private void auditar(Determinacion guardada, Observacion observacion) {
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe(
-                                LocalDate.now(reloj),
                                 TABLA_AUDITADA,
                                 String.valueOf(guardada.id()),
                                 Operacion.ALTA,

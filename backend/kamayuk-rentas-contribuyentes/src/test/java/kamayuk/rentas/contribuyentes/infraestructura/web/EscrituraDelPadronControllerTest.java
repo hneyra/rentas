@@ -119,8 +119,7 @@ class EscrituraDelPadronControllerTest {
                                 new ContribuyenteController(
                                         envolver(new ConsultaDelPadron(padron), gestor),
                                         envolver(
-                                                new RegistrarContribuyente(
-                                                        padron, auditoria, RELOJ),
+                                                new RegistrarContribuyente(padron, auditoria),
                                                 gestor),
                                         comprobador,
                                         RELOJ),
@@ -129,9 +128,7 @@ class EscrituraDelPadronControllerTest {
                                                 new ConsultaDeLaFichaDelContribuyente(
                                                         padron, fichas),
                                                 gestor),
-                                        envolver(
-                                                new ActualizarFicha(fichas, auditoria, RELOJ),
-                                                gestor),
+                                        envolver(new ActualizarFicha(fichas, auditoria), gestor),
                                         comprobador,
                                         RELOJ))
                         .setControllerAdvice(new ManejadorDeErrores())

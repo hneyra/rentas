@@ -158,7 +158,6 @@ public class CancelarLicencia {
 
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe(
-                                fecha,
                                 "licencia_movimiento",
                                 String.valueOf(registrado.identificador()),
                                 Operacion.BAJA,

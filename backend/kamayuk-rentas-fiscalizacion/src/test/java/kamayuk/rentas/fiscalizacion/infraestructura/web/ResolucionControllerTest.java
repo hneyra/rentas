@@ -166,8 +166,7 @@ class ResolucionControllerTest {
                         new CargosEnMemoria(),
                         directorio,
                         emisor,
-                        registro -> {},
-                        reloj);
+                        registro -> {});
 
         mvc =
                 MockMvcBuilders.standaloneSetup(

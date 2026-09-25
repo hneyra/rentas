@@ -210,7 +210,6 @@ public class RegistrarActaFiscalizacion {
 
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe(
-                                guardada.fechaVisita(),
                                 TABLA_AUDITADA,
                                 String.valueOf(guardada.id()),
                                 Operacion.ALTA,

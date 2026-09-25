@@ -141,7 +141,6 @@ public class PasarACoactiva {
     private void auditar(Valor valor, MovimientoDeValor pase, Observacion observacion) {
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe(
-                                pase.fecha(),
                                 "valor_movimiento",
                                 String.valueOf(pase.id()),
                                 Operacion.ALTA,

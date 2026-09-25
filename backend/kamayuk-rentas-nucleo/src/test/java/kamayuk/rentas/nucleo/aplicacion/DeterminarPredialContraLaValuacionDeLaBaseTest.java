@@ -140,8 +140,7 @@ class DeterminarPredialContraLaValuacionDeLaBaseTest {
                                         registro -> {
                                             throw new AssertionError(
                                                     "Simular no audita: " + registro);
-                                        },
-                                        RELOJ),
+                                        }),
                                 gestor),
                         RELOJ);
     }

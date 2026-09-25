@@ -147,7 +147,7 @@ class IdentidadDeLaSesionFronteraTest {
         TransactionTemplate transaccion = new TransactionTemplate(gestor);
         AdministrarSesion administrar =
                 conLaTransaccionQueDiceLaAnotacion(
-                        new AdministrarSesion(sesiones, administracion, auditoria, RELOJ), gestor);
+                        new AdministrarSesion(sesiones, administracion, auditoria), gestor);
         IdentidadDeLaSesion identidad =
                 conLaTransaccionQueDiceLaAnotacion(
                         new IdentidadDeLaSesion(administracion, sesiones), gestor);

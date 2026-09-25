@@ -176,7 +176,7 @@ class SituacionDelCiudadanoJdbcTest {
         acreditacion = envolver(new AcreditacionJdbc(new ContribuyenteRepositoryJdbc(jdbc)));
         predios = new PrediosDelEscenario(jdbc);
 
-        rama = envolver(new RamaDelCiudadano(acreditacion, deuda, predios, auditoria, RELOJ));
+        rama = envolver(new RamaDelCiudadano(acreditacion, deuda, predios, auditoria));
         recorrido = new RecorridoPorMunicipalidades(jdbc, gestor);
         consulta = new ConsultaDelCiudadano(recorrido, rama, RELOJ);
     }
@@ -554,8 +554,7 @@ class SituacionDelCiudadanoJdbcTest {
                 },
                 deuda,
                 predios,
-                auditoria,
-                RELOJ);
+                auditoria);
     }
 
     private static ConsultaDelCiudadano.EnMunicipalidad municipalidad(

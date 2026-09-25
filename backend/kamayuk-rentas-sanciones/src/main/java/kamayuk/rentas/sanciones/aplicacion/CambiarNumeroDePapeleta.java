@@ -47,7 +47,6 @@ public class CambiarNumeroDePapeleta {
 
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe(
-                                anterior.fechaInfraccion(),
                                 TABLA_AUDITADA,
                                 String.valueOf(anterior.id()),
                                 Operacion.MODIFICACION,

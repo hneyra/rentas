@@ -157,7 +157,6 @@ public class LiberarVehiculoInternado {
 
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe(
-                                peticion.fecha(),
                                 TABLA_AUDITADA,
                                 String.valueOf(guardado.id()),
                                 Operacion.ALTA,

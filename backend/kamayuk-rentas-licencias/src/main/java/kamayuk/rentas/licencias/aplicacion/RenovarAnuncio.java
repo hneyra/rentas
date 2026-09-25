@@ -147,7 +147,6 @@ public class RenovarAnuncio {
 
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe(
-                                fecha,
                                 TABLA_AUDITADA,
                                 String.valueOf(renovacion.identificador()),
                                 Operacion.ALTA,

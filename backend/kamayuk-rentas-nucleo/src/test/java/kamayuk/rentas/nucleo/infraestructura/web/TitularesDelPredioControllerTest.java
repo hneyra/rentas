@@ -80,8 +80,7 @@ class TitularesDelPredioControllerTest {
                                     new ConsultaDeTitulares(
                                             new TitularidadDePrueba(),
                                             new PadronDePrueba(),
-                                            auditoria,
-                                            RELOJ),
+                                            auditoria),
                                     RELOJ))
                     .addInterceptors(new GuardiaDeAcceso(comprobador, RELOJ))
                     .setControllerAdvice(new ManejadorDeErrores())

@@ -206,7 +206,6 @@ public class DuplicarLicencia {
 
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe(
-                                fecha,
                                 "licencia_duplicado",
                                 String.valueOf(registrado.identificador()),
                                 Operacion.ALTA,

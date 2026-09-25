@@ -245,8 +245,7 @@ class TransferenciaJdbcTest {
                 new DirectorioJdbc(
                         new ContribuyenteRepositoryJdbc(jdbc), new FichaRepositoryJdbc(jdbc)),
                 documentos,
-                auditoria,
-                RELOJ);
+                auditoria);
     }
 
     /**

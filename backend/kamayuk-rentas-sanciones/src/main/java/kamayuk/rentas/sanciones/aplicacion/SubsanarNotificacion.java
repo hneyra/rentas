@@ -64,14 +64,20 @@ public class SubsanarNotificacion {
 
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe(
-                                fechaSubsanacion,
                                 TABLA_AUDITADA,
                                 String.valueOf(subsanada.id()),
                                 Operacion.MODIFICACION,
                                 observacion)
                         .con(
                                 "{\"estado\":\"" + notificacion.estado() + "\"}",
-                                "{\"estado\":\"" + subsanada.estado() + "\"}"));
+                                // La fecha de la subsanacion es la del acto, y desde #398 no es
+                                // la de la fila de auditoria: sin ella aqui no quedaria en ningun
+                                // sitio, porque la notificacion solo guarda su estado.
+                                "{\"estado\":\""
+                                        + subsanada.estado()
+                                        + "\",\"fechaSubsanacion\":\""
+                                        + fechaSubsanacion
+                                        + "\"}"));
 
         return subsanada;
     }

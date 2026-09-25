@@ -3,10 +3,7 @@ package kamayuk.rentas.seguridad.infraestructura.web;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 
-import java.time.Clock;
-import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import kamayuk.rentas.auditoria.Operacion;
@@ -46,16 +43,12 @@ import tools.jackson.databind.json.JsonMapper;
 @DisplayName("Capa web — GET /api/v1/seguridad/auditoria (#544)")
 class SesionControllerTest {
 
-    private static final Clock RELOJ =
-            Clock.fixed(Instant.parse("2026-08-18T10:00:00Z"), ZoneOffset.UTC);
-
     private @Nullable ConsultaDeAuditoria ultimaConsulta;
 
     private final MockMvc mvc =
             MockMvcBuilders.standaloneSetup(
                             new SesionController(
-                                    new AdministrarSesion(
-                                            repositorioDeMentira(), null, null, RELOJ),
+                                    new AdministrarSesion(repositorioDeMentira(), null, null),
                                     null,
                                     null,
                                     null))

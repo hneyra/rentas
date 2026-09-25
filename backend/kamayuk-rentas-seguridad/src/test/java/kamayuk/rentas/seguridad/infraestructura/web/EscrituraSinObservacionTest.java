@@ -3,9 +3,6 @@ package kamayuk.rentas.seguridad.infraestructura.web;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
-import java.time.Clock;
-import java.time.Instant;
-import java.time.ZoneOffset;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.seguridad.aplicacion.AdministrarSesion;
@@ -49,12 +46,9 @@ import tools.jackson.databind.json.JsonMapper;
 @DisplayName("#30 — una escritura sin observacion es 422 y nombra el campo")
 class EscrituraSinObservacionTest {
 
-    private static final Clock RELOJ =
-            Clock.fixed(Instant.parse("2026-09-07T10:00:00Z"), ZoneOffset.UTC);
-
     /** Si esto se llama, la escritura ocurrio sin observacion: es la regla 10 rota. */
     private final AdministrarSesion nadieEscribe =
-            new AdministrarSesion(null, null, null, RELOJ) {
+            new AdministrarSesion(null, null, null) {
                 @Override
                 public Sesion cambiarEjercicioDeTrabajo(
                         Ejercicio ejercicio, Observacion observacion) {

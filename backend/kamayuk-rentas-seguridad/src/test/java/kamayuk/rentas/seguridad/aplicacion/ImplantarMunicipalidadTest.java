@@ -129,9 +129,7 @@ class ImplantarMunicipalidadTest {
         transaccion = new TransactionTemplate(gestor);
         comprobador = envolver(new ComprobadorDeAccesoJdbc(jdbc), gestor);
         sembrador =
-                envolver(
-                        new SembradorDelCatalogo(jdbc, new AuditoriaJdbc(jdbc, RELOJ), RELOJ),
-                        gestor);
+                envolver(new SembradorDelCatalogo(jdbc, new AuditoriaJdbc(jdbc, RELOJ)), gestor);
         copiaLocal = envolver(new LecturaDeLaCopiaLocalJdbc(jdbc), gestor);
         aplicador =
                 envolver(

@@ -103,8 +103,7 @@ class LiquidacionControllerTest {
                         catastro,
                         catastro,
                         rentas,
-                        registro -> {},
-                        reloj);
+                        registro -> {});
         ConsultaDeLiquidaciones consulta = new ConsultaDeLiquidaciones(liquidaciones, movimientos);
 
         actaId =

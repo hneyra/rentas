@@ -178,7 +178,6 @@ public class NotificarActoCoactivo {
 
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe(
-                                fechaDeLaDiligencia,
                                 "notificacion",
                                 String.valueOf(guardada.id()),
                                 Operacion.ALTA,

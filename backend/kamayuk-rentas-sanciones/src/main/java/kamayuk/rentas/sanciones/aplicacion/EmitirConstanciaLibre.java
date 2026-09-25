@@ -167,7 +167,6 @@ public class EmitirConstanciaLibre {
 
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe(
-                                hoy,
                                 TABLA_AUDITADA,
                                 String.valueOf(guardada.identificador()),
                                 Operacion.ALTA,

@@ -241,7 +241,6 @@ public class RegistrarAnuncio {
 
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe(
-                                solicitud.fechaAutorizacion(),
                                 TABLA_AUDITADA,
                                 String.valueOf(guardado.identificador()),
                                 Operacion.ALTA,

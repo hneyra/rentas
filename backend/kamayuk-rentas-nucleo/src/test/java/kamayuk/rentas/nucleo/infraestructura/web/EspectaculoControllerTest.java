@@ -375,8 +375,7 @@ class EspectaculoControllerTest {
                         determinaciones,
                         parametros,
                         new PadronDeMentira().con(501L),
-                        auditoria,
-                        RELOJ);
+                        auditoria);
         return MockMvcBuilders.standaloneSetup(new EspectaculoController(servicio, RELOJ))
                 .addInterceptors(new GuardiaDeAcceso(comprobador, RELOJ))
                 .setControllerAdvice(new ManejadorDeErrores())

@@ -256,7 +256,6 @@ public class EmitirCertificado {
 
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe(
-                                solicitud.fechaEmision(),
                                 "certificado",
                                 String.valueOf(guardado.identificador()),
                                 Operacion.ALTA,
@@ -302,11 +301,6 @@ public class EmitirCertificado {
 
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe(
-                                // La fecha de la fila de auditoria es la de HOY —la reimpresion
-                                // ocurre hoy—, y sale del reloj inyectado para que caiga en la
-                                // particion del ejercicio correcto. Lo que NO sale del reloj es la
-                                // fecha impresa en el papel: esa es la de la emision, guardada.
-                                LocalDate.now(reloj),
                                 "certificado",
                                 String.valueOf(certificado.identificador()),
                                 Operacion.MODIFICACION,

@@ -120,7 +120,6 @@ public class RegistrarDescargo {
 
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe(
-                                peticion.fechaPresentacion(),
                                 TABLA_AUDITADA,
                                 String.valueOf(guardado.id()),
                                 Operacion.ALTA,

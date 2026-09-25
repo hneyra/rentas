@@ -221,7 +221,6 @@ public class RegistrarActoCoactivo {
 
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe(
-                                fecha,
                                 "acto_coactivo",
                                 String.valueOf(registrado.id()),
                                 Operacion.ALTA,

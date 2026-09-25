@@ -194,7 +194,6 @@ public class IniciarCorridaDeValores {
 
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe(
-                                LocalDate.now(reloj),
                                 TABLA_AUDITADA,
                                 String.valueOf(guardada.identificador()),
                                 Operacion.ALTA,
