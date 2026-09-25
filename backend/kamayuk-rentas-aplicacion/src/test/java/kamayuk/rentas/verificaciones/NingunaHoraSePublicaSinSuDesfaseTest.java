@@ -21,6 +21,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 import kamayuk.comun.verificaciones.ReglasDeArquitectura;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -61,6 +62,15 @@ import org.junit.jupiter.api.Test;
  * {@code ValorMasivoRepositoryJdbc}. Ninguno sale por HTTP —tres son parametros de un {@code
  * INSERT} y el cuarto mapea una columna a un record de dominio que ningun controlador devuelve—, y
  * por eso esta guarda no los ve: mira lo que se publica, no lo que se escribe.
+ *
+ * <h2>Y el tipo no basta (#317)</h2>
+ *
+ * <p>{@code registro.fecha().atOffset(ZoneOffset.UTC)} en lugar de {@code
+ * ZonaHoraria.conSuDesfase(registro.fecha())} deja el campo como {@code OffsetDateTime} —el tipo
+ * correcto— y lo publica con {@code Z}. Las dos primeras pruebas no lo ven, porque miran el tipo.
+ * Lo mira {@link #ningunaHoraPublicadaEligeSuDesfaseAMano()}, que lee el <b>bytecode</b> de lo que
+ * se publica, y lo miran, campo por campo, las pruebas de cada {@code Resource} que afirman el
+ * {@code -05:00} con una hora de entre las 19:00 y la medianoche.
  */
 @DisplayName("#188 — Ninguna hora se publica sin su desfase")
 class NingunaHoraSePublicaSinSuDesfaseTest {
@@ -231,6 +241,170 @@ class NingunaHoraSePublicaSinSuDesfaseTest {
                 .anySatisfy(origen -> assertThat(origen).contains("AuditoriaResource"));
     }
 
+    /**
+     * Lo que se publica no le pone a una hora un desfase elegido a mano (#317).
+     *
+     * <h2>El hueco entre las dos pruebas de tipo y la de {@code toString()}</h2>
+     *
+     * <p>Las dos primeras pruebas miran el <b>tipo</b> de cada campo publicado. Un {@code Resource}
+     * que escriba {@code registro.fecha().atOffset(ZoneOffset.UTC)} —porque es lo que compila— deja
+     * el tipo bien puesto, {@code OffsetDateTime}, y publica {@code …Z}. Medido en #317 con esa
+     * mutacion en {@code SesionResource.de}: {@code :kamayuk-rentas-seguridad:test} y esta clase
+     * salian <b>verdes</b>, 142 y 4 pruebas, 0 fallos. (La misma mutacion en {@code
+     * AuditoriaResource}, la que el issue midio, ya caia desde #327, pero por casualidad: {@link
+     * #elRecorridoDelBytecodeVeLasLlamadas()} nombra a ese {@code Resource} entre los que tienen
+     * que llamar a {@code ZonaHoraria}, y a los otros cuatro no.)
+     *
+     * <h2>Que prohibe, y donde</h2>
+     *
+     * <p>Toda llamada a un metodo de {@code java.time} que <b>devuelva un {@code
+     * OffsetDateTime}</b> —{@code Instant.atOffset}, {@code OffsetDateTime.ofInstant}, {@code
+     * withOffsetSameInstant}, {@code ZonedDateTime.toOffsetDateTime}, {@code OffsetDateTime.now}…—
+     * desde el codigo de <b>lo que se publica</b>: los controladores y cada record al que llega el
+     * tipo de retorno de una operacion, que es donde se construye lo que viaja. El unico camino que
+     * queda para poner un {@code OffsetDateTime} en un campo publicado es {@link
+     * kamayuk.rentas.dominio.ZonaHoraria#conSuDesfase(Instant)}, cuyo dueno no es {@code
+     * java.time}. Por el tipo de retorno y no por el nombre del metodo: la lista de las formas de
+     * fabricar un desfase se escribe entera sin tener que enumerarla.
+     *
+     * <h2>Por que ahi y no en todo el arbol</h2>
+     *
+     * <p>Medido antes de escribirla, en todo {@code backend/*&#47;src/main}: la llamada aparece en
+     * {@code ZonaHoraria} (la suya), en los cuatro {@code atOffset(ZoneOffset.UTC)} inocuos de #273
+     * —tres parametros de un {@code INSERT} en {@code AplicarUnEventoDeIdentidad} y el mapeo de una
+     * columna en {@code ValorMasivoRepositoryJdbc}—, en tres {@code OffsetDateTime.now(reloj)} que
+     * son parametros JDBC ({@code AuditoriaJdbc}, {@code CorridaDeEmisionRepositoryJdbc}, {@code
+     * CacheDeSnapshotsJdbc}) y en un {@code OffsetDateTime.of} de {@code DatosDePrueba}, la siembra
+     * del esquema: <b>nueve</b>, y <b>ninguna</b> dentro de lo que se publica (274 clases). Barrer
+     * el arbol entero seria ruido: ocho excepciones para vigilar cero casos, y cada parametro JDBC
+     * nuevo una mas. Lo que las separa no es el texto de la llamada sino <b>si sale por HTTP</b>, y
+     * eso es exactamente el alcance de abajo — lo comprueba {@link
+     * #lasHorasQueNoSalenPorHttpQuedanFuera()}.
+     *
+     * <p><b>Lo que no ve.</b> Un {@code OffsetDateTime} que llegue ya hecho —el de pgjdbc, que
+     * viene en UTC— y se publique tal cual no deja llamada que leer. Ese es el caso del historial
+     * de placas, y lo cubre su prueba de campo ({@code VehiculoResourceTest}), como cubren las
+     * suyas las otras nueve horas: la guarda dice que <b>ningun sitio se aparta</b>, y las de
+     * campo, cual.
+     */
+    @Test
+    @DisplayName("#317 — y lo que se publica no le elige a mano el desfase a ninguna hora")
+    void ningunaHoraPublicadaEligeSuDesfaseAMano() {
+        Set<String> publicadas = clasesQueSePublican();
+
+        List<String> encontradas =
+                desfasesElegidosAMano().stream()
+                        .filter(llamada -> publicadas.contains(llamada.getOriginOwner().getName()))
+                        .map(NingunaHoraSePublicaSinSuDesfaseTest::describir)
+                        .toList();
+
+        assertThat(encontradas)
+                .as(
+                        "una hora publicada lleva el desfase de la zona del producto, no el que"
+                                + " se escriba a mano: atOffset(ZoneOffset.UTC) compila, deja el"
+                                + " campo como OffsetDateTime y lo publica con «Z». Usa"
+                                + " ZonaHoraria.conSuDesfase(instante)")
+                .isEmpty();
+    }
+
+    @Test
+    @DisplayName("#317 — y los desfases que no salen por HTTP quedan fuera, pero se ven")
+    void lasHorasQueNoSalenPorHttpQuedanFuera() {
+        // La de arriba sale verde tambien si el detector no ve ninguna llamada o si el alcance no
+        // contiene ningun Resource. Estas son las dos cosas que TIENEN que estar: los cuatro
+        // `atOffset(ZoneOffset.UTC)` de #273 los ve el detector —y el alcance los deja fuera—, y
+        // los Resource que publican las diez horas estan dentro del alcance.
+        Set<String> publicadas = clasesQueSePublican();
+        List<JavaMethodCall> todas = desfasesElegidosAMano();
+
+        assertThat(todas)
+                .as(
+                        "el detector, sobre todo el codigo de produccion, ve los cuatro inocuos de #273")
+                .extracting(
+                        llamada ->
+                                llamada.getOriginOwner().getSimpleName()
+                                        + "."
+                                        + llamada.getOrigin().getName()
+                                        + " → "
+                                        + llamada.getName())
+                .contains(
+                        "AplicarUnEventoDeIdentidad.apartar → atOffset",
+                        "AplicarUnEventoDeIdentidad.marcarComoAplicado → atOffset",
+                        "AplicarUnEventoDeIdentidad.miembro → atOffset",
+                        "ValorMasivoRepositoryJdbc.aOffset → atOffset");
+
+        assertThat(publicadas)
+                .as("el alcance: los controladores y los records que publican")
+                .contains(
+                        "kamayuk.rentas.seguridad.infraestructura.web.SesionController",
+                        "kamayuk.rentas.seguridad.infraestructura.web.SesionController$SesionResource",
+                        "kamayuk.rentas.seguridad.infraestructura.web.SesionController$AuditoriaResource",
+                        "kamayuk.rentas.seguridad.infraestructura.web.SesionController$RespaldoResource",
+                        "kamayuk.rentas.tesoreria.infraestructura.web.PagoController$PagoResource",
+                        "kamayuk.rentas.nucleo.infraestructura.web.VehiculoResource$CambioDePlacaResource",
+                        "kamayuk.rentas.indicadores.infraestructura.web.PanelResource",
+                        "kamayuk.rentas.indicadores.infraestructura.web.TrabajoParadoResource")
+                .doesNotContain(
+                        "kamayuk.rentas.seguridad.aplicacion.AplicarUnEventoDeIdentidad",
+                        "kamayuk.rentas.valores.infraestructura.ValorMasivoRepositoryJdbc");
+    }
+
+    /**
+     * Cada llamada de produccion a un metodo de {@code java.time} que devuelve un {@link
+     * OffsetDateTime}: la forma de elegirle el desfase a una hora sin pasar por {@code
+     * ZonaHoraria}.
+     */
+    private static List<JavaMethodCall> desfasesElegidosAMano() {
+        List<JavaMethodCall> llamadas = new ArrayList<>();
+        for (JavaClass clase : ReglasDeArquitectura.clasesDeProduccion()) {
+            for (JavaMethodCall llamada : clase.getMethodCallsFromSelf()) {
+                if (llamada.getTargetOwner().getPackageName().equals("java.time")
+                        && OffsetDateTime.class
+                                .getName()
+                                .equals(llamada.getTarget().getRawReturnType().getName())) {
+                    llamadas.add(llamada);
+                }
+            }
+        }
+        return llamadas;
+    }
+
+    /**
+     * Las clases cuyo codigo construye lo que viaja: cada controlador que publica una operacion y
+     * cada record al que llega su tipo de retorno. Con el mismo recorrido que las pruebas de tipo,
+     * por lo que dice {@link #recorrer(Type, String, String, Set, List, Class, Set)}.
+     */
+    private static Set<String> clasesQueSePublican() {
+        Set<Class<?>> records = new LinkedHashSet<>();
+        Set<String> nombres = new TreeSet<>();
+        for (Map.Entry<String, Method> endpoint : EndpointsPublicados.porOperacion().entrySet()) {
+            nombres.add(endpoint.getValue().getDeclaringClass().getName());
+            recorrer(
+                    endpoint.getValue().getGenericReturnType(),
+                    endpoint.getKey(),
+                    "",
+                    new LinkedHashSet<>(),
+                    new ArrayList<>(),
+                    null,
+                    records);
+        }
+        for (Class<?> record : records) {
+            nombres.add(record.getName());
+        }
+        return nombres;
+    }
+
+    private static String describir(JavaMethodCall llamada) {
+        return llamada.getOrigin().getFullName()
+                + ":"
+                + llamada.getLineNumber()
+                + " llama a "
+                + llamada.getTargetOwner().getSimpleName()
+                + "."
+                + llamada.getName()
+                + "(), que le elige el desfase a mano";
+    }
+
     // ------------------------------------------------------------------
 
     private static void recorrer(
@@ -239,16 +413,9 @@ class NingunaHoraSePublicaSinSuDesfaseTest {
             String camino,
             Set<Class<?>> enCurso,
             List<String> hallazgos) {
-        recorrer(tipo, operacion, camino, enCurso, hallazgos, null);
+        recorrer(tipo, operacion, camino, enCurso, hallazgos, null, new LinkedHashSet<>());
     }
 
-    /**
-     * Baja por el tipo de retorno anotando cada hoja que interese.
-     *
-     * <p>Con {@code buscado} nulo anota las prohibidas; con un tipo, anota las de ese tipo. Es el
-     * mismo recorrido para las dos preguntas a proposito: dos recorridos escritos aparte acaban
-     * discrepando en el caso raro, que es justo donde se esconderia el campo que no se mira.
-     */
     private static void recorrer(
             Type tipo,
             String operacion,
@@ -256,6 +423,26 @@ class NingunaHoraSePublicaSinSuDesfaseTest {
             Set<Class<?>> enCurso,
             List<String> hallazgos,
             Class<?> buscado) {
+        recorrer(tipo, operacion, camino, enCurso, hallazgos, buscado, new LinkedHashSet<>());
+    }
+
+    /**
+     * Baja por el tipo de retorno anotando cada hoja que interese.
+     *
+     * <p>Con {@code buscado} nulo anota las prohibidas; con un tipo, anota las de ese tipo. Es el
+     * mismo recorrido para las dos preguntas a proposito: dos recorridos escritos aparte acaban
+     * discrepando en el caso raro, que es justo donde se esconderia el campo que no se mira. Y por
+     * lo mismo es el que dice, en {@code records}, en que records entra: es el alcance de la guarda
+     * del desfase (#317).
+     */
+    private static void recorrer(
+            Type tipo,
+            String operacion,
+            String camino,
+            Set<Class<?>> enCurso,
+            List<String> hallazgos,
+            Class<?> buscado,
+            Set<Class<?>> records) {
 
         if (tipo instanceof TypeVariable<?> || tipo instanceof WildcardType) {
             // Sin el argumento real no hay nada que mirar; `FormaDeLaRespuesta` lo resuelve
@@ -264,11 +451,11 @@ class NingunaHoraSePublicaSinSuDesfaseTest {
         }
         if (tipo instanceof ParameterizedType parametrizado) {
             for (Type argumento : parametrizado.getActualTypeArguments()) {
-                recorrer(argumento, operacion, camino, enCurso, hallazgos, buscado);
+                recorrer(argumento, operacion, camino, enCurso, hallazgos, buscado, records);
             }
             Class<?> crudo = (Class<?>) parametrizado.getRawType();
             if (!Collection.class.isAssignableFrom(crudo) && !Map.class.isAssignableFrom(crudo)) {
-                recorrer(crudo, operacion, camino, enCurso, hallazgos, buscado);
+                recorrer(crudo, operacion, camino, enCurso, hallazgos, buscado, records);
             }
             return;
         }
@@ -292,6 +479,7 @@ class NingunaHoraSePublicaSinSuDesfaseTest {
         if (!clase.isRecord() || enCurso.contains(clase)) {
             return;
         }
+        records.add(clase);
         Set<Class<?>> siguiente = new LinkedHashSet<>(enCurso);
         siguiente.add(clase);
         for (RecordComponent componente : clase.getRecordComponents()) {
@@ -301,7 +489,8 @@ class NingunaHoraSePublicaSinSuDesfaseTest {
                     camino + "." + componente.getName(),
                     siguiente,
                     hallazgos,
-                    buscado);
+                    buscado,
+                    records);
         }
     }
 }
