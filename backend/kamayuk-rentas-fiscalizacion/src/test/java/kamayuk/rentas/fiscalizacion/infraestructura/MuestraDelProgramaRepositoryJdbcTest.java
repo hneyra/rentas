@@ -8,8 +8,10 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -24,6 +26,7 @@ import kamayuk.rentas.dominio.MunicipalidadId;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.esquema.BaseDeDatosDePrueba;
 import kamayuk.rentas.esquema.ContextoDeTenant;
+import kamayuk.rentas.fiscalizacion.aplicacion.CerrarProgramaFiscalizacion;
 import kamayuk.rentas.fiscalizacion.dominio.CondicionFiscalizada;
 import kamayuk.rentas.fiscalizacion.dominio.MuestraDelPrograma;
 import kamayuk.rentas.plataforma.tenant.TenantTransactionManager;
@@ -59,6 +62,10 @@ class MuestraDelProgramaRepositoryJdbcTest {
     private static long municipalidadB;
     private static TransactionTemplate transaccion;
     private static MuestraDelProgramaRepositoryJdbc repositorio;
+    private static CerrarProgramaFiscalizacion cierre;
+
+    private static final Observacion OBSERVACION_DEL_CIERRE =
+            Observacion.de("Se cierra: el programa termino su campana");
 
     @BeforeAll
     static void provisionar() throws SQLException, IOException {
@@ -73,6 +80,11 @@ class MuestraDelProgramaRepositoryJdbcTest {
 
         transaccion = new TransactionTemplate(new TenantTransactionManager(pool));
         repositorio = new MuestraDelProgramaRepositoryJdbc(JdbcClient.create(pool));
+        cierre =
+                new CerrarProgramaFiscalizacion(
+                        new ProgramaFiscalizacionRepositoryJdbc(JdbcClient.create(pool)),
+                        registro -> {},
+                        Clock.fixed(Instant.parse("2026-03-16T09:00:00Z"), ZoneOffset.UTC));
     }
 
     @AfterAll
@@ -470,22 +482,21 @@ class MuestraDelProgramaRepositoryJdbcTest {
                 LocalDate.of(2026, 1, 1));
     }
 
+    /**
+     * Cierra el programa <b>por la ruta de producción</b> (#341): el caso de uso, su repositorio y
+     * la conexión de {@code kamayuk_app}, en la municipalidad del contexto.
+     *
+     * <p>Hasta #341 esto era un {@code UPDATE ... SET estado = 'CERRADO'} escrito a mano y
+     * conectado como el dueño, con un comentario que decía que {@code kamayuk_app} no tenía {@code
+     * UPDATE} sobre la tabla. Era falso —{@code V1} se lo concedía entero— y además tapaba lo que
+     * sí era cierto: que <b>ningún camino de la aplicación</b> cerraba un programa, así que la
+     * prueba demostraba una salvedad que en producción no apartaba nada. Desde {@code V30} el
+     * privilegio es el de la columna {@code estado}, y lo que la escribe es {@link
+     * CerrarProgramaFiscalizacion}.
+     */
     private static void cerrarPrograma(long municipalidadId, long programaId) {
-        try (Connection owner = base.conexion(BaseDeDatosDePrueba.OWNER)) {
-            // Lo cierra el owner: `kamayuk_app` no tiene UPDATE sobre `programa_fiscalizacion`, que
-            // es
-            // otra tabla que solo se agrega (V7). Aqui solo hace falta el estado sembrado.
-            ContextoDeTenant.fijar(owner, municipalidadId);
-            try (PreparedStatement sentencia =
-                    owner.prepareStatement(
-                            "UPDATE programa_fiscalizacion SET estado = 'CERRADO' WHERE id = ?")) {
-                sentencia.setLong(1, programaId);
-                sentencia.executeUpdate();
-                owner.commit();
-            }
-        } catch (SQLException excepcion) {
-            throw new IllegalStateException(excepcion);
-        }
+        TenantContext.fijar(new MunicipalidadId(municipalidadId));
+        transaccion.execute(estado -> cierre.cerrar(programaId, SORTEO, OBSERVACION_DEL_CIERRE));
     }
 
     private static final AtomicInteger SIGUIENTE_CATASTRAL = new AtomicInteger(5000);

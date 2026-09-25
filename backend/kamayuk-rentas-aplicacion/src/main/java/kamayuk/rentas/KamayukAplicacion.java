@@ -79,7 +79,7 @@ public class KamayukAplicacion {
      *
      * <p><b>Lleva la zona del producto, y no la del servidor</b> ({@code rentas}#316). {@code
      * LocalDate.now(reloj)} trunca con la zona <i>del reloj</i>, y en {@code src/main} hay {@code
-     * MEDIDO: 117 LocalDate.now(reloj) en el codigo de src/main} que deciden que dia es:
+     * MEDIDO: 118 LocalDate.now(reloj) en el codigo de src/main} que deciden que dia es:
      * vencimientos, plazos, cuentas de dias, la fecha que consta en un acto. Con {@code
      * Clock.systemDefaultZone()} ese dia era el del sistema operativo que sirviera la peticion, y
      * con la JVM en UTC todo lo que ocurriera entre las 19:00 y la medianoche de Catacaos se

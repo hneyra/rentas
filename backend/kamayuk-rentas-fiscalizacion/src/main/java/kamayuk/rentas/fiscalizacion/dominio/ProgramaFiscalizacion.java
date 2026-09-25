@@ -10,9 +10,19 @@ import org.jspecify.annotations.Nullable;
  * La selección de qué predios o vehículos entran a un proceso de fiscalización, con su fiscalizador
  * y su plazo (RF-050).
  *
- * <p><b>Reprogramar no borra el programa anterior</b> (AC de #45): no hay método que lo module ni
- * lo cierre. Un programa nuevo es siempre una fila nueva, con su propio código; el anterior queda
- * intacto, se haya usado o no.
+ * <p><b>Reprogramar no borra el programa anterior</b> (AC de #45): no hay método que lo module. Un
+ * programa nuevo es siempre una fila nueva, con su propio código; el anterior queda intacto, se
+ * haya usado o no.
+ *
+ * <p><b>Pero un programa sí termina</b> (#341): {@link #cerrado()} es su única transición. Hasta
+ * #341 esta misma frase decía «ni lo cierre», y se leía como si reprogramar y cerrar fueran lo
+ * mismo: el programa nacía {@code ABIERTO}, nada movía su estado, y la exclusión de #481 —que sólo
+ * aparta los predios de programas {@code ABIERTO} o {@code EN_PROCESO}— retenía para siempre a todo
+ * predio sorteado una vez. Cerrar no edita lo que el programa sorteó ni con qué parámetros: mueve
+ * el estado y nada más, y desde {@code V30} el privilegio no permite otra cosa.
+ *
+ * <p>{@code EN_PROCESO} no se escribe. Si algún día hace falta, se deriva de un hecho —«tiene acta
+ * levantada»— y no se guarda, por lo mismo que {@code V19} decidió con el acta.
  *
  * @param id nulo mientras no se ha guardado; lo asigna la base
  * @param codigo identifica el programa, único por municipalidad
@@ -149,11 +159,45 @@ public record ProgramaFiscalizacion(
 
     /**
      * Está abierto para la exclusión de #481: un predio que un programa {@code ABIERTO} o {@code
-     * EN_PROCESO} ya se llevó no vuelve a sortearse. Un programa {@code CERRADO} de 2021 no puede
-     * bloquear el padrón para siempre.
+     * EN_PROCESO} ya se llevó no vuelve a sortearse. Un programa {@code CERRADO} de 2021 no bloquea
+     * el padrón para siempre — y desde #341 eso es cierto, porque {@link #cerrado()} existe y lo
+     * publica {@code POST /fiscalizacion/programas/{id}/cierre}. Hasta entonces ningún programa
+     * llegaba a {@code CERRADO} por la aplicación.
      */
     public boolean admiteVisitas() {
         return estado == EstadoDePrograma.ABIERTO || estado == EstadoDePrograma.EN_PROCESO;
+    }
+
+    /**
+     * El mismo programa, {@code CERRADO} (#341): la única transición que este sistema escribe.
+     *
+     * <p>Es un acto de la administración y no la consecuencia de otro hecho —ninguna fila dice que
+     * un programa terminó—, igual que la anulación del acta (#214) y la de la papeleta (#267). Por
+     * eso lo lleva un caso de uso con su observación, su fecha y su auditoría, y no se deriva.
+     *
+     * <p>Pura (regla 6): no mira el reloj ni la base. La fecha del acto no es un dato del programa
+     * —la columna no existe, y {@code fecha_fin} es el plazo que se programó, no el día en que se
+     * cerró—, así que viaja a la auditoría.
+     *
+     * @throws TransicionIlegal si ya estaba cerrado: un programa cerrado no se reabre, y seguir
+     *     fiscalizando es registrar otro
+     */
+    public ProgramaFiscalizacion cerrado() {
+        if (estado == EstadoDePrograma.CERRADO) {
+            throw new TransicionIlegal(id, codigo, estado, EstadoDePrograma.CERRADO);
+        }
+        return new ProgramaFiscalizacion(
+                id,
+                codigo,
+                descripcion,
+                tipo,
+                fechaInicio,
+                fechaFin,
+                EstadoDePrograma.CERRADO,
+                ejercicio,
+                sectorCodigo,
+                criterio,
+                fiscalizador);
     }
 
     /**
@@ -173,6 +217,29 @@ public record ProgramaFiscalizacion(
             return java.util.Optional.of("fiscalizador");
         }
         return java.util.Optional.empty();
+    }
+
+    /**
+     * El programa no admite esa transición (#341). Hoy sólo hay una —cerrar— y sólo la impide que
+     * ya estuviera cerrado.
+     */
+    public static final class TransicionIlegal extends RuntimeException {
+        @java.io.Serial private static final long serialVersionUID = 1L;
+
+        TransicionIlegal(
+                @Nullable Long id, String codigo, EstadoDePrograma desde, EstadoDePrograma hasta) {
+            super(
+                    "El programa de fiscalizacion "
+                            + codigo
+                            + " ("
+                            + id
+                            + ") esta "
+                            + desde
+                            + " y no puede pasar a "
+                            + hasta
+                            + ": un programa cerrado no se reabre, y seguir fiscalizando es"
+                            + " registrar otro programa");
+        }
     }
 
     private static @Nullable String enBlancoEsNulo(@Nullable String valor) {

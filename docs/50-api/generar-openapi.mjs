@@ -3327,6 +3327,37 @@ const OPERACIONES_ADICIONALES = {
         ' distinguiría «otro programa se lo llevó» de «ya se fiscalizó», que se arreglan de' +
         ' maneras distintas (#586).',
     },
+    // #341 — cerrar el programa, que es la UNICA transicion que este sistema
+    // escribe sobre el. Hasta aqui el programa nacia ABIERTO y ahi se quedaba:
+    // ninguna ruta lo movia, y la exclusion de #481 —que solo aparta los predios
+    // de programas ABIERTO o EN_PROCESO— retenia para siempre a todo predio
+    // sorteado una vez. EN_PROCESO no se escribe: si hace falta, se deriva.
+    {
+      operationId: 'fisc_programa_cerrar',
+      metodo: 'post',
+      ruta: '/api/v1/fiscalizacion/programas/{id}/cierre',
+      parametros: [
+        {
+          nombre: 'id',
+          en: 'path',
+          descripcion: 'El programa que se cierra',
+        },
+      ],
+      titulo: 'Cierre del programa de fiscalización',
+      descripcion:
+        'Cierra el programa: la **única** transición que mueve su estado. Desde ese día sus' +
+        ' predios dejan de estar retenidos, y el siguiente programa que los detecte los sortea' +
+        ' —hasta #341 ningún programa salía de ABIERTO, y un omiso sorteado una vez salía en' +
+        ' `excluidosPorOtroPrograma` de todo programa futuro—. No borra ni edita nada: la muestra' +
+        ' se sigue leyendo entera, las actas levantadas sobre ella siguen valiendo, y lo que el' +
+        ' programa declaró —código, ejercicio, sector, criterio, fiscalizador— no se toca;' +
+        ' seguir fiscalizando es registrar otro programa. Un programa ya cerrado responde' +
+        ' **409**: no se reabre. Un `id` que no existe en esta municipalidad es **404**. El' +
+        ' cuerpo lleva la observación del usuario, obligatoria (RNF-052), y la fecha del acto,' +
+        ' que es la del día en que se cierra y no la de su registro: ni anterior al inicio del' +
+        ' programa ni posterior a hoy, o **422**. Devuelve el programa ya CERRADO. Exige' +
+        ' MODIFICACION sobre `fisc_programa`.',
+    },
   ],
   // `fisc_estado_cuenta` es la pantalla del PANEL de Fiscalizacion, y lo que
   // dibuja son cuatro cifras de un embudo —detectados por cruce, programados,

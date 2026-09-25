@@ -25,8 +25,14 @@ import org.springframework.stereotype.Repository;
 
 /**
  * Los programas de fiscalización contra PostgreSQL. Ninguna consulta filtra por {@code
- * municipalidad_id} —lo hace la política RLS— y no hay ningún {@code UPDATE} ni {@code DELETE}: un
- * programa nunca se edita en el sitio (regla 4).
+ * municipalidad_id} —lo hace la política RLS— y no hay ningún {@code DELETE}: un programa nunca se
+ * borra (regla 4).
+ *
+ * <p>Hay <b>un</b> {@code UPDATE}, y sólo desde #341: {@link #cerrar}, que mueve la columna {@code
+ * estado} y ninguna otra. Lo que lo acota no es esta clase sino el privilegio: desde {@code V30}
+ * {@code kamayuk_app} tiene {@code UPDATE (estado)} y no {@code UPDATE} sobre la tabla, el mismo
+ * trato que {@code V19} le dio al acta. Lo que el programa declaró —código, ejercicio, sector,
+ * criterio— no se reescribe: reprogramar es registrar otro (#45).
  */
 @Repository
 public class ProgramaFiscalizacionRepositoryJdbc extends RepositorioJdbc
@@ -104,6 +110,42 @@ public class ProgramaFiscalizacionRepositoryJdbc extends RepositorioJdbc
                 .param("id", id)
                 .query(ProgramaFiscalizacionRepositoryJdbc::mapear)
                 .optional();
+    }
+
+    /**
+     * Cierra el programa (#341): el único {@code UPDATE} de esta clase, y sobre una sola columna.
+     *
+     * <p>Se lee con {@code FOR UPDATE} y la transición la calcula el dominio sobre esa lectura, así
+     * que un segundo cierre simultáneo espera al primero y choca con {@link
+     * ProgramaFiscalizacion.TransicionIlegal} en vez de confirmar y auditar un cierre que no cerró
+     * nada.
+     */
+    @Override
+    public ProgramaFiscalizacion cerrar(long id) {
+        ProgramaFiscalizacion anterior =
+                jdbc().sql("SELECT " + COLUMNAS + DESDE + " WHERE id = :id FOR UPDATE")
+                        .param("id", id)
+                        .query(ProgramaFiscalizacionRepositoryJdbc::mapear)
+                        .optional()
+                        .orElseThrow(() -> inexistente(id));
+        ProgramaFiscalizacion cerrado = anterior.cerrado();
+
+        int filas =
+                jdbc().sql("UPDATE programa_fiscalizacion SET estado = :estado WHERE id = :id")
+                        .param("estado", cerrado.estado().name())
+                        .param("id", id)
+                        .update();
+        if (filas == 0) {
+            throw inexistente(id);
+        }
+        return cerrado;
+    }
+
+    private static IllegalStateException inexistente(long id) {
+        return new IllegalStateException(
+                "No hay ningun programa de fiscalizacion con identificador "
+                        + id
+                        + " en esta municipalidad");
     }
 
     /**

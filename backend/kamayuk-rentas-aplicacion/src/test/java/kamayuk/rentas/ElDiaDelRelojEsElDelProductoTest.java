@@ -21,7 +21,7 @@ import org.junit.jupiter.params.provider.CsvSource;
  *
  * <h2>Que se mide</h2>
  *
- * <p>{@code backend/*&#47;src/main} tiene {@code MEDIDO: 117 LocalDate.now(reloj) en el codigo de
+ * <p>{@code backend/*&#47;src/main} tiene {@code MEDIDO: 118 LocalDate.now(reloj) en el codigo de
  * src/main} —vencimientos, plazos, cuentas de dias, la fecha que consta en un acto—, y todos leen
  * el {@link Clock} de {@link KamayukAplicacion#reloj()}. {@code LocalDate.now(Clock)} trunca con la
  * zona <b>del reloj</b>, asi que el dia de esos sitios es el que diga la zona de ese bean. Esta

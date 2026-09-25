@@ -807,6 +807,13 @@
     "opcionales": ["ejercicio", "tipo"],
     "enElCuerpo": []
   },
+  "POST /fiscalizacion/programas/{id}/cierre": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
   "POST /fiscalizacion/programas/{id}/muestra": {
     "obligatorios": [],
     "algunoDeEstos": [],

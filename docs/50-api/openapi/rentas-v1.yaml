@@ -3367,6 +3367,37 @@ paths:
           $ref: "#/components/responses/SinMunicipalidad"
         "422":
           $ref: "#/components/responses/ErrorDeValidacion"
+  "/fiscalizacion/programas/{id}/cierre":
+    post:
+      operationId: fisc_programa_cerrar
+      summary: "Cierre del programa de fiscalización"
+      description: "Cierra el programa: la **única** transición que mueve su estado. Desde ese día sus predios dejan de estar retenidos, y el siguiente programa que los detecte los sortea —hasta #341 ningún programa salía de ABIERTO, y un omiso sorteado una vez salía en `excluidosPorOtroPrograma` de todo programa futuro—. No borra ni edita nada: la muestra se sigue leyendo entera, las actas levantadas sobre ella siguen valiendo, y lo que el programa declaró —código, ejercicio, sector, criterio, fiscalizador— no se toca; seguir fiscalizando es registrar otro programa. Un programa ya cerrado responde **409**: no se reabre. Un `id` que no existe en esta municipalidad es **404**. El cuerpo lleva la observación del usuario, obligatoria (RNF-052), y la fecha del acto, que es la del día en que se cierra y no la de su registro: ni anterior al inicio del programa ni posterior a hoy, o **422**. Devuelve el programa ya CERRADO. Exige MODIFICACION sobre `fisc_programa`."
+      tags: ["Fiscalización"]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        201:
+          description: Operacion realizada
+          content:
+            application/json:
+              schema: { type: object }
+        "404":
+          description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "403":
+          $ref: "#/components/responses/SinMunicipalidad"
+        "422":
+          $ref: "#/components/responses/ErrorDeValidacion"
   "/fiscalizacion/predial/actas":
     post:
       operationId: fisc_predial

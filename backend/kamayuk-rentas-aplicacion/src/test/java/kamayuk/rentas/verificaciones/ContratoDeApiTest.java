@@ -221,6 +221,12 @@ class ContratoDeApiTest {
                     // ni filtros ni tabla, asi que solo se puede abrir desde una fila ya resuelta.
                     "GET /fiscalizacion/programas/{id}/muestra",
                     "POST /fiscalizacion/programas/{id}/muestra",
+                    // #341: cerrar el programa, la UNICA transicion que este sistema escribe
+                    // sobre el. Sin ella ningun programa salia de ABIERTO y la exclusion de #481
+                    // retenia para siempre a todo predio sorteado una vez. Es una ruta que la
+                    // pantalla no declara —declara su POST— y entra por OPERACIONES_ADICIONALES
+                    // del generador del contrato.
+                    "POST /fiscalizacion/programas/{id}/cierre",
                     "POST /fiscalizacion/predial/actas",
                     "POST /fiscalizacion/vehicular",
                     // #599: la lectura de actas, que faltaba. Hasta que el acta tuvo donde
