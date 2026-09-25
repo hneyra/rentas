@@ -33,6 +33,7 @@ import kamayuk.rentas.licencias.dominio.SeccionDelFue;
 import kamayuk.rentas.licencias.dominio.TipoDeObra;
 import kamayuk.rentas.licencias.dominio.TipoDeProfesional;
 import kamayuk.rentas.licencias.dominio.TipoDeTramiteDeEdificacion;
+import kamayuk.rentas.licencias.dominio.TramosDeVigencia;
 import kamayuk.rentas.parametros.FaltaPublicar;
 import kamayuk.rentas.parametros.LectorDeParametros;
 import kamayuk.rentas.tesoreria.ReciboYaAplicado;
@@ -408,7 +409,8 @@ public class EdificacionController {
             throw new ProblemaDeNegocio(CodigoDeError.NO_ENCONTRADO, mensajeDe(noEsta));
         } catch (RevalidarLicenciaDeEdificacion.NoEsUnaRevalidacion
                 | RevalidarLicenciaDeEdificacion.OriginalSinLicencia
-                | RevalidarLicenciaDeEdificacion.ProrrogaQueNoProrroga invalida) {
+                | RevalidarLicenciaDeEdificacion.ProrrogaQueNoProrroga
+                | TramosDeVigencia.ProrrogaQueNoLlegaAlActo invalida) {
             throw new ProblemaDeNegocio(CodigoDeError.VALIDACION, mensajeDe(invalida));
         } catch (ComprobacionDelDerecho.DerechoNoPagado sinPagar) {
             throw new ProblemaDeNegocio(CodigoDeError.VALIDACION, mensajeDe(sinPagar));

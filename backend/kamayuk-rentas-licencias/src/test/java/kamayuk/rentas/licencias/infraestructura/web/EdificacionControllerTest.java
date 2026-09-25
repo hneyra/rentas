@@ -742,6 +742,96 @@ class EdificacionControllerTest {
     }
 
     /**
+     * #451 — La revalidacion de una licencia <b>vencida</b>, por la ruta.
+     *
+     * <p>La muestra de {@code Revalidar} emite hasta 2029 y revalida el mismo dia: con la licencia
+     * vigente, el tramo nuevo empieza el dia siguiente al anterior y da igual como se calcule. Aqui
+     * la licencia se emite el 16 de marzo con vigencia hasta el 31, la revalidacion se declara el 1
+     * de setiembre y se resuelve el 23, con el reloj en el 23: el hueco de abril a setiembre es el
+     * que distingue.
+     */
+    @Nested
+    @DisplayName("#451 — la revalidacion de una licencia vencida")
+    class LaRevalidacionDeUnaVencida {
+
+        private static final String REVALIDACION = "EXP-2026-0200";
+
+        private final MockMvc del23DeSetiembre =
+                montar(
+                        new CuadroDeMentira()
+                                .con("MUROS", 'A', "120.000000")
+                                .con("TECHOS", 'B', "80.000000"),
+                        new DerechosDeMentira(null, null)
+                                .conEdificacion(DERECHO_EDIFICACION, DERECHO_REVALIDACION),
+                        Clock.fixed(
+                                LocalDate.of(2026, 9, 23).atStartOfDay(ZoneOffset.UTC).toInstant(),
+                                ZoneOffset.UTC));
+
+        @BeforeEach
+        void vencidaYSuRevalidacion() throws Exception {
+            expedienteCompleto();
+            envio(
+                    mvc,
+                    "/rentas/api/v1/licencias/edificacion/" + EXPEDIENTE + "/licencia",
+                    """
+                    {"fechaDeEmision":"2026-03-16","vigenciaHasta":"2026-03-31","nDeRecibo":"%s",
+                     "observacion":"Se otorga la licencia de edificacion"}
+                    """
+                            .formatted(RECIBO),
+                    201);
+            envio(
+                    del23DeSetiembre,
+                    "/rentas/api/v1/licencias/edificacion",
+                    """
+                    {"nroExpediente":"%s","fechaDeclaracion":"2026-09-01",
+                     "codContribuyente":"C-0007","tipoTramite":"REVALIDACION_DE_LICENCIA",
+                     "obra":"EDIFICACION_NUEVA","modalidadAprobacion":"B",
+                     "revision":"REVISORES_URBANOS","solicitanteEsPropietario":true,
+                     "nroLicenciaAnterior":"LE-2026-000001",
+                     "observacion":"Se presenta la revalidacion"}
+                    """
+                            .formatted(REVALIDACION),
+                    201);
+        }
+
+        @Test
+        @DisplayName("201: el tramo nuevo empieza el dia del acto, no el 1 de abril")
+        void elTramoEmpiezaElDiaDelActo() throws Exception {
+            assertThat(revalidarHasta("2029-09-22", 201))
+                    .contains("{\"tramo\":1,\"desde\":\"2026-03-16\",\"hasta\":\"2026-03-31\"}")
+                    .contains("{\"tramo\":2,\"desde\":\"2026-09-23\",\"hasta\":\"2029-09-22\"}");
+        }
+
+        @Test
+        @DisplayName("422 si el tramo termina antes del acto, y la licencia se queda con uno")
+        void noLlegaAlActo() throws Exception {
+            String cuerpo = revalidarHasta("2026-08-31", 422);
+
+            assertThat(cuerpo)
+                    .as("es un dato de la peticion, no un fallo del servidor")
+                    .contains("VALIDACION")
+                    .contains("2026-09-23")
+                    .contains("2026-08-31")
+                    .doesNotContain("incidencia");
+            assertThat(movimientos.vigenciasDe(1L))
+                    .as("el rechazo no concedio ningun tramo")
+                    .hasSize(1);
+        }
+
+        private String revalidarHasta(String hasta, int esperado) throws Exception {
+            return envio(
+                    del23DeSetiembre,
+                    "/rentas/api/v1/licencias/edificacion/" + REVALIDACION + "/revalidacion",
+                    """
+                    {"fecha":"2026-09-23","nuevaVigenciaHasta":"%s","nDeRecibo":"%s",
+                     "observacion":"Se revalida por solicitud del administrado"}
+                    """
+                            .formatted(hasta, RECIBO_REVALIDACION),
+                    esperado);
+        }
+    }
+
+    /**
      * #402 — La emision tenia su cota inferior ({@code AnteriorALaDeclaracion}, que se retira) y no
      * miraba hoy. El reloj de esta clase esta en el 16 de marzo, que es tambien el dia de la
      * declaracion: el 15 es anterior y el 17 es futuro.
