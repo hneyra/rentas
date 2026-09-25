@@ -681,8 +681,11 @@ class EdificacionControllerTest {
                             "la escritura se confirmo: un 500 aqui la reporta como fallida y quien"
                                     + " atiende la repite")
                     .contains("\"valorDeObra\":null")
-                    .contains("\"valorDeObraNoDisponible\":\"No hay ningun conjunto");
-            assertThat(cuerpo).as("el motivo nombra el ejercicio que falta").contains("2025");
+                    .as(
+                            "el motivo nombra el ejercicio del ACTO, 2025, con su propio texto: el"
+                                    + " expediente y la fecha tambien llevan «2025», asi que buscar"
+                                    + " el anio suelto no distingue nada")
+                    .contains(MOTIVO_SIN_SELLAR_2025);
         }
 
         @Test
@@ -702,8 +705,8 @@ class EdificacionControllerTest {
 
             assertThat(ficha)
                     .contains("\"valorDeObra\":null")
-                    .contains("\"valorDeObraNoDisponible\":\"No hay ningun conjunto")
-                    .contains("2025");
+                    .as("el motivo nombra el ejercicio de la declaracion, no otro")
+                    .contains(MOTIVO_SIN_SELLAR_2025);
         }
 
         @Test
@@ -720,7 +723,10 @@ class EdificacionControllerTest {
                     .as("el 1 de enero de cada anio es una fecha cierta en que el reporte caeria")
                     .contains("\"expediente\":\"" + DEL_2025 + "\"")
                     .contains("\"valorDeObraS\":null")
-                    .contains("\"valorDeObraNoDisponible\":\"No hay ningun conjunto");
+                    .as("el reporte valoriza al corte, y el corte cae en 2027")
+                    .contains(
+                            "\"valorDeObraNoDisponible\":\"No hay ningun conjunto de parametros"
+                                    + " sellado para el ejercicio 2027:");
         }
 
         @Test
@@ -810,6 +816,15 @@ class EdificacionControllerTest {
                     .as("y no queda ninguna licencia emitida a medias")
                     .contains("\"nroLicencia\":null");
         }
+
+        /**
+         * El motivo EXACTO con que la ficha dice que 2025 no tiene cuadro, con la coma que lo
+         * cierra. Buscar {@code "2025"} a secas no podia fallar: {@code EXP-2025-0350} y {@code
+         * 2025-11-20} van en la misma respuesta, y el doble contesta 404 a cualquier ejercicio.
+         */
+        private static final String MOTIVO_SIN_SELLAR_2025 =
+                "\"valorDeObraNoDisponible\":\"No hay ningun conjunto de parametros sellado para el"
+                        + " ejercicio 2025,";
 
         private static final String VALORIZACION =
                 """
