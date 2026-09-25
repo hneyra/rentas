@@ -19,6 +19,9 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -45,7 +48,8 @@ class GuardiaDeAccesoTest {
                             new ControladorSinDeclarar(),
                             new ControladorDeSesionPropia(),
                             new ControladorDelCiudadano(),
-                            new ControladorDeDosOpciones())
+                            new ControladorDeDosOpciones(),
+                            new ControladorDeServicio())
                     .addInterceptors(new GuardiaDeAcceso(comprobador, RELOJ))
                     .setControllerAdvice(new ManejadorDeErrores())
                     .build();
@@ -58,6 +62,7 @@ class GuardiaDeAccesoTest {
     @AfterEach
     void limpiarOrigen() {
         OrigenContext.limpiar();
+        SecurityContextHolder.clearContext();
     }
 
     @Test
@@ -226,6 +231,64 @@ class GuardiaDeAccesoTest {
         assertThat(comprobador.preguntas).as("ni siquiera llego a preguntar").isEmpty();
     }
 
+    @Test
+    @DisplayName(
+            "#429 — una operacion de servicio: el cajero con el permiso es 403"
+                    + " SIN_IDENTIDAD_DE_SERVICIO, y la matriz ni se consulta")
+    void laIdentidadDeServicioVaAntesDelPermiso() throws Exception {
+        comprobador.autoriza = true;
+        conToken("kamayuk-backoffice");
+
+        MvcResult resultado = mvc.perform(get("/rentas/api/v1/prueba/servicio")).andReturn();
+
+        assertThat(resultado.getResponse().getStatus()).isEqualTo(403);
+        assertThat(resultado.getResponse().getContentAsString())
+                .contains("\"codigo\":\"SIN_IDENTIDAD_DE_SERVICIO\"")
+                .contains("kamayuk-backoffice");
+        assertThat(comprobador.preguntas)
+                .as("quien, antes que que: un 403 por el permiso diria lo que no le falta")
+                .isEmpty();
+    }
+
+    @Test
+    @DisplayName("#429 — y sin token de ningun tipo, tampoco: no hay `azp` que leer")
+    void sinTokenNoHayIdentidad() throws Exception {
+        comprobador.autoriza = true;
+
+        MvcResult resultado = mvc.perform(get("/rentas/api/v1/prueba/servicio")).andReturn();
+
+        assertThat(resultado.getResponse().getStatus()).isEqualTo(403);
+        assertThat(resultado.getResponse().getContentAsString())
+                .contains("\"codigo\":\"SIN_IDENTIDAD_DE_SERVICIO\"");
+    }
+
+    @Test
+    @DisplayName(
+            "#429 — la cuenta de servicio del sistema declarado pasa, y despues se pregunta el"
+                    + " permiso")
+    void laCuentaDelSistemaPasaYSePreguntaElPermiso() throws Exception {
+        comprobador.autoriza = true;
+        conToken("kamayuk-caja-servicio-200601");
+
+        MvcResult resultado = mvc.perform(get("/rentas/api/v1/prueba/servicio")).andReturn();
+
+        assertThat(resultado.getResponse().getStatus()).isEqualTo(200);
+        assertThat(comprobador.preguntas)
+                .as("el permiso sigue siendo la segunda condicion")
+                .containsExactly("jperez|caja_de_prueba|REGISTRO|2026-08-18");
+    }
+
+    @Test
+    @DisplayName("#429 — y una operacion que no la declara no mira el `azp`")
+    void sinDeclararlaNoSeMiraElAzp() throws Exception {
+        comprobador.autoriza = true;
+        conToken("kamayuk-backoffice");
+
+        MvcResult resultado = mvc.perform(get("/rentas/api/v1/prueba/consulta")).andReturn();
+
+        assertThat(resultado.getResponse().getStatus()).isEqualTo(200);
+    }
+
     /** Controlador de prueba: no vale nada montar el sistema entero para verificar un filtro. */
     @RestController
     @RequiereAcceso(acceso = "consulta_de_prueba", privilegio = Privilegio.LECTURA)
@@ -300,6 +363,36 @@ class GuardiaDeAccesoTest {
         String situacion() {
             return "ok";
         }
+    }
+
+    /**
+     * Declara {@link RequiereIdentidadDeServicio} en la CLASE, como puede hacerlo un controlador
+     * entero de servicio (#429): el guardia la busca en el metodo y, si no esta, en la clase.
+     */
+    @RestController
+    @RequiereIdentidadDeServicio(sistema = "caja")
+    @RequiereAcceso(acceso = "caja_de_prueba", privilegio = Privilegio.REGISTRO)
+    static class ControladorDeServicio {
+
+        @GetMapping("/rentas/api/v1/prueba/servicio")
+        String recibir() {
+            return "ok";
+        }
+    }
+
+    /** El token ya validado, como lo deja Spring Security, con el cliente que lo pidio. */
+    private static void conToken(String azp) {
+        Jwt token =
+                Jwt.withTokenValue("prueba")
+                        .header("alg", "none")
+                        .claim("azp", azp)
+                        .claim("preferred_username", "jperez")
+                        .build();
+        // Con la lista de autoridades, aunque este vacia: es el constructor que marca la
+        // autenticacion como hecha, que es lo que deja el conversor de Spring Security. Sin ella
+        // el guardia ve un token sin autenticar y no lee su `azp`.
+        SecurityContextHolder.getContext()
+                .setAuthentication(new JwtAuthenticationToken(token, List.of()));
     }
 
     private static final class ComprobadorDeAccesoDeMentira implements ComprobadorDeAcceso {

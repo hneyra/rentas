@@ -39,6 +39,21 @@ public enum CodigoDeError {
     /** El usuario no tiene el privilegio que la operacion exige (RF-121). */
     SIN_PRIVILEGIO(HttpStatus.FORBIDDEN, "No tiene el privilegio necesario para esta operacion"),
 
+    /**
+     * La operacion la llama un sistema con su cuenta de servicio, y el token no es el de ese
+     * sistema (#429).
+     *
+     * <p>Es el mismo codigo, con el mismo nombre, que {@code identidad} contesta en su buzon. Y es
+     * un codigo propio y no {@link #SIN_PRIVILEGIO} porque los dos se arreglan de maneras opuestas:
+     * «no tiene el privilegio» se arregla <b>concediendoselo</b> a esa cuenta, y esto se arregla
+     * <b>pidiendo otro token</b> —el del cliente confidencial {@code
+     * kamayuk-<sistema>-servicio-<ubigeo>} (ADR-0028 §2)—. Con el mismo codigo, un cajero que
+     * probara el buzon de pagos desde la interfaz recibiria «no tiene el privilegio» teniendolo, y
+     * un administrador se lo volveria a conceder: no le falta un permiso, le falta ser la caja.
+     */
+    SIN_IDENTIDAD_DE_SERVICIO(
+            HttpStatus.FORBIDDEN, "El token no identifica una cuenta de servicio de un sistema"),
+
     /** La peticion no cumple una regla de validacion o de negocio. */
     VALIDACION(HttpStatus.UNPROCESSABLE_ENTITY, "La peticion no cumple una regla de validacion"),
 

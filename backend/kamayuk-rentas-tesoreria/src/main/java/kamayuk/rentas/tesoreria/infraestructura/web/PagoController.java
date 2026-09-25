@@ -11,6 +11,7 @@ import java.util.Objects;
 import java.util.UUID;
 import kamayuk.rentas.autorizacion.Privilegio;
 import kamayuk.rentas.autorizacion.RequiereAcceso;
+import kamayuk.rentas.autorizacion.RequiereIdentidadDeServicio;
 import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.dominio.ZonaHoraria;
 import kamayuk.rentas.tesoreria.pagos.ConciliacionDePagos;
@@ -42,6 +43,11 @@ import tools.jackson.databind.json.JsonMapper;
  * delante y no lo va a haber: esto es el otro extremo del outbox, y la unica pantalla relacionada
  * es la que muestra los pagos en transito dentro de la consulta de deuda.
  *
+ * <p>Y desde #429 no es solo una descripcion: las dos operaciones exigen la cuenta de servicio de
+ * la caja ({@code @RequiereIdentidadDeServicio}), y un token de usuario —aunque tenga {@code
+ * caja_tributaria} con los siete privilegios— recibe 403 {@code SIN_IDENTIDAD_DE_SERVICIO} antes de
+ * que se lea el cuerpo.
+ *
  * <h2>El codigo de estado dice si el pago era nuevo, y eso importa</h2>
  *
  * <p><b>201</b> cuando se recibio por primera vez, <b>409</b> cuando ya estaba. El 409 no es un
@@ -57,13 +63,27 @@ import tools.jackson.databind.json.JsonMapper;
 public class PagoController {
 
     /**
-     * El acceso con el que se recibe un pago.
+     * El acceso con el que se recibe un pago, que es la <b>segunda</b> condicion y no la primera.
      *
-     * <p>Es {@code caja_tributaria} con {@code REGISTRO}: lo que este endpoint hace es exactamente
-     * lo que la ventanilla hacia cuando el cobro era una sola transaccion —asentar el abono—, y
-     * darle un permiso propio crearia una opcion de menu que nadie abre y que nadie administra.
+     * <p>Es {@code caja_tributaria}, y no un acceso propio: un permiso nuevo seria una opcion de
+     * menu que nadie abre, y {@code identidad} la concederia a quien el administrador decidiera,
+     * persona incluida. Pero el permiso <b>no basta</b>, y hasta #429 era lo unico que se pedia. La
+     * premisa de entonces —«este endpoint hace lo que la ventanilla hacia: asentar el abono»— era
+     * falsa: en la ventanilla el abono nacia en la misma transaccion que el recibo, con su
+     * correlativo y dentro del arqueo; aqui nace de la palabra de quien llama —el numero del
+     * recibo, su fecha, el total y las ordenes vienen en el cuerpo—. Con solo el permiso, un cajero
+     * con {@code caja_tributaria} podia extinguir deuda sin dinero, eligiendo una fecha anterior al
+     * vencimiento para que saliera sin interes, o anular un cobro real y revivir la deuda.
+     *
+     * <p>Por eso la primera condicion es {@link #SISTEMA}: quien llama tiene que ser la caja.
      */
     private static final String ACCESO = "caja_tributaria";
+
+    /**
+     * El unico sistema que llama a este borde, con su cuenta de servicio {@code
+     * kamayuk-caja-servicio-<ubigeo>} por {@code client_credentials} (#429, ADR-0028 §2).
+     */
+    private static final String SISTEMA = "caja";
 
     private final RecibirPago recibir;
     private final ConciliacionDePagos conciliacion;
@@ -89,6 +109,7 @@ public class PagoController {
      * por muerta con alerta, que deja el caso a la vista en vez de cerrado en falso.
      */
     @PostMapping
+    @RequiereIdentidadDeServicio(sistema = SISTEMA)
     @RequiereAcceso(acceso = ACCESO, privilegio = Privilegio.REGISTRO)
     public ResponseEntity<PagoResource> recibir(@RequestBody PeticionDePago peticion) {
         PagoRecibido pago = leer(peticion);
@@ -111,6 +132,7 @@ public class PagoController {
      * igual.
      */
     @GetMapping("/conciliacion")
+    @RequiereIdentidadDeServicio(sistema = SISTEMA)
     @RequiereAcceso(acceso = ACCESO, privilegio = Privilegio.LECTURA)
     public ConciliacionResource conciliacion(@RequestParam String fecha) {
         LocalDate dia;

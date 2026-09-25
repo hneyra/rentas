@@ -11,7 +11,11 @@ import kamayuk.rentas.auditoria.OrigenContext;
 import kamayuk.rentas.compartido.CiudadanoContext;
 import kamayuk.rentas.web.CodigoDeError;
 import kamayuk.rentas.web.ProblemaDeNegocio;
+import org.jspecify.annotations.Nullable;
 import org.springframework.core.annotation.AnnotatedElementUtils;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.HandlerInterceptor;
 
@@ -39,6 +43,13 @@ import org.springframework.web.servlet.HandlerInterceptor;
  * autoriza (#548). Se pregunta primero por el acceso propio y solo si niega por las alternativas,
  * asi que el caso normal sigue costando una consulta. Lo que <b>no</b> hace es relajar el
  * privilegio: {@code LECTURA} sobre la alternativa, nunca «cualquier privilegio».
+ *
+ * <h2>Quien llama, antes que que puede hacer (#429)</h2>
+ *
+ * <p>Una operacion que declara {@link RequiereIdentidadDeServicio} contesta solo a la cuenta de
+ * servicio de ese sistema, y eso se comprueba <b>antes</b> del privilegio: un cajero con {@code
+ * caja_tributaria} tiene el permiso del buzon de pagos y no es la caja. El privilegio sigue siendo
+ * la segunda condicion.
  *
  * <p>Y se exceptuan, <b>declarandolos</b>, los dos centinelas:
  *
@@ -83,6 +94,11 @@ public class GuardiaDeAcceso implements HandlerInterceptor {
                     "La operacion no declara que acceso exige, asi que no se autoriza");
         }
 
+        // Quien, antes que que (#429): una operacion de servicio contesta a su sistema y a nadie
+        // mas, y solo despues se pregunta por el privilegio. En este orden, un cajero con el
+        // permiso no llega a la matriz, y el 403 que recibe dice lo que de verdad le falta.
+        exigirLaIdentidadDeServicio(metodo);
+
         if (RequiereAcceso.CIUDADANO.equals(requisito.acceso())) {
             // El ciudadano no tiene fila en `usuario` y no hay privilegio que comprobar
             // (ADR-0020). Lo que SI se comprueba es que la peticion venga de verdad de la
@@ -123,6 +139,62 @@ public class GuardiaDeAcceso implements HandlerInterceptor {
                         + requisito.privilegio()
                         + " sobre "
                         + String.join(" ni sobre ", opciones(requisito)));
+    }
+
+    /**
+     * Si la operacion declara {@link RequiereIdentidadDeServicio}, que el token sea el de la cuenta
+     * de servicio de ese sistema (#429).
+     *
+     * <p>El {@code azp} se lee del token que Spring Security ya valido, y no de la peticion: es la
+     * misma regla con que {@code TenantContextFilter} saca la municipalidad (ADR-0005). Y se lee
+     * aqui y no desde un contexto de hilo que un filtro poblara en cada peticion: solo tiene
+     * sentido en las operaciones que lo exigen, y un dato disponible para cualquier controlador es
+     * un dato del que cualquier controlador acabaria fiandose.
+     */
+    private static void exigirLaIdentidadDeServicio(HandlerMethod metodo) {
+        RequiereIdentidadDeServicio exigida =
+                AnnotatedElementUtils.findMergedAnnotation(
+                        metodo.getMethod(), RequiereIdentidadDeServicio.class);
+        if (exigida == null) {
+            exigida =
+                    AnnotatedElementUtils.findMergedAnnotation(
+                            metodo.getBeanType(), RequiereIdentidadDeServicio.class);
+        }
+        if (exigida == null) {
+            return;
+        }
+        ClienteDeServicio cliente;
+        try {
+            cliente = ClienteDeServicio.desdeAzp(azpDelToken());
+        } catch (ClienteDeServicio.NoEsUnClienteDeServicio noEsUnSistema) {
+            throw new ProblemaDeNegocio(
+                    CodigoDeError.SIN_IDENTIDAD_DE_SERVICIO,
+                    "Esta operacion la llama `"
+                            + exigida.sistema()
+                            + "`. "
+                            + noEsUnSistema.motivo());
+        }
+        if (!cliente.esDe(exigida.sistema())) {
+            throw new ProblemaDeNegocio(
+                    CodigoDeError.SIN_IDENTIDAD_DE_SERVICIO,
+                    "Esta operacion la llama `"
+                            + exigida.sistema()
+                            + "` con su cuenta de servicio, y el token es de «"
+                            + cliente.azp()
+                            + "», que es de `"
+                            + cliente.sistema()
+                            + "`");
+        }
+    }
+
+    private static @Nullable String azpDelToken() {
+        Authentication autenticacion = SecurityContextHolder.getContext().getAuthentication();
+        if (autenticacion == null
+                || !autenticacion.isAuthenticated()
+                || !(autenticacion.getPrincipal() instanceof Jwt token)) {
+            return null;
+        }
+        return token.getClaimAsString("azp");
     }
 
     /**

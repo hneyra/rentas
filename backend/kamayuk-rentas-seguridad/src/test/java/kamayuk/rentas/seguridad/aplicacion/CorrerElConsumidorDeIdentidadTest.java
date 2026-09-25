@@ -69,6 +69,20 @@ class CorrerElConsumidorDeIdentidadTest {
     }
 
     @Test
+    @DisplayName(
+            "#429 — la cuenta de servicio de OTRO sistema tiene la forma y tampoco vale: el buzon"
+                    + " que se lee es el de rentas")
+    void laCuentaDeOtroSistema() {
+        assertThatThrownBy(
+                        () ->
+                                CorrerElConsumidorDeIdentidad.municipalidadDe(
+                                        "kamayuk-caja-servicio-200105",
+                                        registroCon("200105", CATACAOS)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("kamayuk-rentas-servicio-<ubigeo>");
+    }
+
+    @Test
     @DisplayName("y una municipalidad no implantada aqui tampoco tiene copia que escribir")
     void unaMunicipalidadNoImplantada() {
         assertThatThrownBy(
