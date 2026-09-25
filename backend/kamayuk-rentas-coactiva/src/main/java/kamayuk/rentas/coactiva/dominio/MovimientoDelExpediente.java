@@ -98,6 +98,20 @@ public record MovimientoDelExpediente(
             throw new IllegalArgumentException(
                     "Un expediente nace INICIADO: el estado de su apertura no se elige");
         }
+        // #409: y por lo mismo, a INICIADO no se vuelve. Se rechaza aqui y no en
+        // `EstadoDelExpediente.porNombre`, que tambien sirve al filtro de la grilla, y ese SI tiene
+        // que aceptarlo. Un expediente devuelto a INICIADO con su REC-1 dictada contaria como «sin
+        // REC-1» en el panel de trabajo parado y en el resumen de cartera, y `acto_rec1_uq` impide
+        // dictarle otra: quedaria contado como pendiente sin que nadie pudiera atenderlo. La base
+        // dice lo mismo con `expediente_movimiento_iniciado_ck`, en
+        // `V31__a_iniciado_no_se_vuelve.sql`.
+        if (tipo == TipoDeMovimientoDelExpediente.ESTADO
+                && estado == EstadoDelExpediente.INICIADO) {
+            throw new IllegalArgumentException(
+                    "INICIADO no se elige: es con lo que nace el expediente, y un cambio de estado"
+                            + " no lo devuelve ahi. Con la REC-1 dictada contaria como «sin REC-1»"
+                            + " sin que nadie pudiera dictarsela");
+        }
         if ((documentoFecha == null) != (documentoNumero == null)) {
             throw new IllegalArgumentException(
                     "El documento de respaldo va entero o no va: fecha y numero juntos");

@@ -1,5 +1,6 @@
 package kamayuk.rentas.coactiva.dominio;
 
+import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 
@@ -53,6 +54,14 @@ public enum EstadoDelExpediente {
 
     /** Como lo llama la pantalla {@code coactiva_expedientes} en su filtro «Estado». */
     private static final String CON_MEDIDA_CAUTELAR = "CON MEDIDA CAUTELAR";
+
+    /**
+     * La linea del procedimiento, en su orden (#409). Es una lista y no el orden de declaracion del
+     * enumerado porque {@link #SUSPENDIDO} y {@link #CONCLUIDO} estan declarados despues de {@link
+     * #MEDIDA_CAUTELAR} y no van despues de ella: estan fuera de la linea.
+     */
+    private static final List<EstadoDelExpediente> LINEA_DEL_PROCEDIMIENTO =
+            List.of(INICIADO, REC1_EMITIDA, REC1_NOTIFICADA, REC2_EMITIDA, MEDIDA_CAUTELAR);
 
     private final String codigo;
     private final String etiqueta;
@@ -131,5 +140,34 @@ public enum EstadoDelExpediente {
     /** Si el procedimiento ya termino: sobre un expediente concluido no hay actos que registrar. */
     public boolean estaConcluido() {
         return this == CONCLUIDO;
+    }
+
+    /**
+     * Si pasar de este estado a {@code destino} es <b>avanzar</b> por la linea del procedimiento
+     * (#409).
+     *
+     * <p>La linea es la del procedimiento ordinario: {@code INICIADO < REC1_EMITIDA <
+     * REC1_NOTIFICADA < REC2_EMITIDA < MEDIDA_CAUTELAR}. Es verdadero solo si <b>los dos</b> estan
+     * en ella y el destino va despues. {@link #SUSPENDIDO} y {@link #CONCLUIDO} quedan fuera a
+     * proposito: a los dos se llega por una resolucion, y de los dos se sale —si se sale— por otra.
+     * Un evento automatico nunca los abandona.
+     *
+     * <p>Es la politica que consulta quien mueve el expediente <b>sin que el ejecutor dicte
+     * nada</b> —hoy, la diligencia de la REC-1—, en vez de enumerar los estados en que no debe
+     * hacerlo. Hasta #409 esa enumeracion decia «salvo que ya este en {@code REC1_NOTIFICADA} o
+     * concluido», y el cargo de un intento que volvia dias despues de dictada la suspension o
+     * trabada la medida devolvia el expediente a la REC-1: el estado es el del <b>ultimo</b>
+     * movimiento ({@link #delHistorial}), y ese movimiento lo agregaba la diligencia.
+     *
+     * <p>No gobierna el cambio de estado manual: que el operador pueda retroceder entre los seis
+     * estados del desplegable es una decision de negocio que #409 deja fuera.
+     *
+     * @param destino el estado al que se moveria
+     */
+    public boolean avanzaHacia(EstadoDelExpediente destino) {
+        Objects.requireNonNull(destino, "Falta el estado de destino");
+        int desde = LINEA_DEL_PROCEDIMIENTO.indexOf(this);
+        int hasta = LINEA_DEL_PROCEDIMIENTO.indexOf(destino);
+        return desde >= 0 && hasta >= 0 && hasta > desde;
     }
 }

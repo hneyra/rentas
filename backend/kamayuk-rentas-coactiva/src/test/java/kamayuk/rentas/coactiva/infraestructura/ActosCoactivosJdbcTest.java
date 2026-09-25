@@ -38,6 +38,7 @@ import kamayuk.rentas.coactiva.aplicacion.ReimprimirActoCoactivo;
 import kamayuk.rentas.coactiva.dominio.ActoCoactivo;
 import kamayuk.rentas.coactiva.dominio.ActoCoactivoRepository;
 import kamayuk.rentas.coactiva.dominio.EstadoDelExpediente;
+import kamayuk.rentas.coactiva.dominio.MovimientoDelExpediente;
 import kamayuk.rentas.coactiva.dominio.NotificacionCoactiva;
 import kamayuk.rentas.coactiva.dominio.PlantillaDeNumeroDeExpediente;
 import kamayuk.rentas.coactiva.dominio.TipoDeActoCoactivo;
@@ -188,6 +189,7 @@ class ActosCoactivosJdbcTest {
     private static ConsultaDeExpedientes consulta;
     private static RegistrarActoCoactivo dictar;
     private static NotificarActoCoactivo notificar;
+    private static CambiarEstadoDelExpediente cambiarEstado;
     private static ReimprimirActoCoactivo reimprimir;
     private static ConsultaDelProcesoCoactivo proceso;
 
@@ -324,6 +326,9 @@ class ActosCoactivosJdbcTest {
                                 plazos,
                                 auditoria,
                                 RELOJ));
+        cambiarEstado =
+                envolver(
+                        new CambiarEstadoDelExpediente(expedientes, movimientos, auditoria, RELOJ));
         reimprimir = envolver(new ReimprimirActoCoactivo(actos, expedientes, documentos));
         proceso = envolver(new ConsultaDelProcesoCoactivo(consulta, actos, diligencias));
     }
@@ -705,6 +710,187 @@ class ActosCoactivosJdbcTest {
             assertThat(enTransaccion(() -> diligencias.deActo(conclusion.identificador())))
                     .extracting(NotificacionCoactiva::numero)
                     .containsExactly(conclusion.numero() + "/1");
+        }
+    }
+
+    /**
+     * #409 — El estado del expediente no retrocede por una diligencia, ni vuelve a {@code INICIADO}
+     * por el cambio de estado.
+     *
+     * <p><b>La siembra que distingue</b> es una diligencia <b>fallida</b> —o ya eficaz—, luego un
+     * acto que mueve el expediente, luego la diligencia eficaz. Dos {@code NOTIFICADO} seguidas —lo
+     * que {@code elPlazoSeCuentaDesdeLaPrimeraQueSurtioEfecto} registra— dejan {@code
+     * REC1_NOTIFICADA} con el codigo bueno y con el malo: sin un acto entre las dos, no hay nada a
+     * lo que retroceder.
+     */
+    @Nested
+    @DisplayName("#409 — El estado no retrocede")
+    class ElEstadoNoRetrocede {
+
+        @Test
+        @DisplayName(
+                "A1 — el cargo de la 2.a diligencia llega despues de la suspension: el expediente"
+                        + " sigue SUSPENDIDO")
+        void laDiligenciaTardiaNoLevantaLaSuspension() {
+            String expediente = expedienteConDeuda("E-4091");
+            ActoCoactivo rec1 = dictarActo(expediente, TipoDeActoCoactivo.REC1, REC1, null).acto();
+            notificarActo(rec1.numero(), DILIGENCIA_REC1, ResultadoDeNotificacion.NO_UBICADO);
+            RegistrarActoCoactivo.ActoDictado suspension =
+                    dictarActo(
+                            expediente,
+                            TipoDeActoCoactivo.SUSPENSION,
+                            DILIGENCIA_REC1.plusDays(5),
+                            null);
+            assertThat(suspension.estado()).isEqualTo(EstadoDelExpediente.SUSPENDIDO);
+            int antes = historialDe(expediente).size();
+
+            // El cargo vuelve DESPUES de dictada la suspension, con fecha ANTERIOR a ella.
+            NotificarActoCoactivo.Diligencia tardia =
+                    notificarActo(
+                            rec1.numero(),
+                            DILIGENCIA_REC1.plusDays(2),
+                            ResultadoDeNotificacion.NOTIFICADO);
+
+            assertThat(tardia.estado())
+                    .as(
+                            "un hecho que no es un acto del ejecutor no deshace la suspension:"
+                                    + " la diligencia no la dicto nadie")
+                    .isEqualTo(EstadoDelExpediente.SUSPENDIDO);
+            assertThat(EstadoDelExpediente.delHistorial(historialDe(expediente)))
+                    .as("y el derivado —grilla, filtro, resumen de cartera— dice lo mismo")
+                    .isEqualTo(EstadoDelExpediente.SUSPENDIDO);
+            assertThat(historialDe(expediente))
+                    .as("el historial no gana ninguna fila: no hubo acto del procedimiento")
+                    .hasSize(antes);
+            assertThat(tardia.notificacion().exigibleDesde())
+                    .as("la diligencia si surtio efecto, y se registra con su exigibilidad")
+                    .isNotNull();
+        }
+
+        @Test
+        @DisplayName(
+                "A2 — otra diligencia eficaz de la REC-1 con la medida trabada: el expediente"
+                        + " sigue en MEDIDA_CAUTELAR")
+        void laDiligenciaTardiaNoDestrabaLaMedida() {
+            String expediente = expedienteConDeuda("E-4092");
+            ActoCoactivo rec1 = dictarActo(expediente, TipoDeActoCoactivo.REC1, REC1, null).acto();
+            notificarActo(rec1.numero(), DILIGENCIA_REC1, ResultadoDeNotificacion.RECHAZADO);
+            dictarActo(
+                    expediente,
+                    TipoDeActoCoactivo.REC2,
+                    REC2_DESDE,
+                    TipoDeMedidaCautelar.RETENCION);
+            RegistrarActoCoactivo.ActoDictado embargo =
+                    dictarActo(
+                            expediente, TipoDeActoCoactivo.EMBARGO, REC2_DESDE.plusDays(2), null);
+            assertThat(embargo.estado()).isEqualTo(EstadoDelExpediente.MEDIDA_CAUTELAR);
+            int antes = historialDe(expediente).size();
+
+            // El cargo personal que llega despues de la certificacion de la negativa.
+            NotificarActoCoactivo.Diligencia personal =
+                    notificarActo(
+                            rec1.numero(),
+                            REC2_DESDE.plusDays(3),
+                            ResultadoDeNotificacion.NOTIFICADO);
+
+            assertThat(personal.estado())
+                    .as("la medida sigue trabada: el procedimiento no vuelve a la REC-1")
+                    .isEqualTo(EstadoDelExpediente.MEDIDA_CAUTELAR);
+            assertThat(EstadoDelExpediente.delHistorial(historialDe(expediente)))
+                    .isEqualTo(EstadoDelExpediente.MEDIDA_CAUTELAR);
+            assertThat(historialDe(expediente)).hasSize(antes);
+        }
+
+        @Test
+        @DisplayName(
+                "la fallida y luego la eficaz, sin acto entre ellas, SI avanzan a REC1_NOTIFICADA")
+        void laEficazTrasLaFallidaAvanza() {
+            String expediente = expedienteConDeuda("E-4093");
+            ActoCoactivo rec1 = dictarActo(expediente, TipoDeActoCoactivo.REC1, REC1, null).acto();
+            notificarActo(rec1.numero(), DILIGENCIA_REC1, ResultadoDeNotificacion.NO_UBICADO);
+
+            NotificarActoCoactivo.Diligencia eficaz =
+                    notificarActo(
+                            rec1.numero(),
+                            DILIGENCIA_REC1.plusDays(7),
+                            ResultadoDeNotificacion.NOTIFICADO);
+
+            assertThat(eficaz.estado())
+                    .as("la politica no congela el avance: solo impide el retroceso")
+                    .isEqualTo(EstadoDelExpediente.REC1_NOTIFICADA);
+            assertThat(historialDe(expediente))
+                    .extracting(MovimientoDelExpediente::estado)
+                    .containsExactly(
+                            EstadoDelExpediente.INICIADO,
+                            EstadoDelExpediente.REC1_EMITIDA,
+                            EstadoDelExpediente.REC1_NOTIFICADA);
+        }
+
+        @Test
+        @DisplayName(
+                "B — volver a INICIADO por el cambio de estado se rechaza: nadie podria dictarle"
+                        + " otra REC-1")
+        void elCambioAIniciadoSeRechaza() {
+            String expediente = expedienteConDeuda("E-4094");
+            ActoCoactivo rec1 = dictarActo(expediente, TipoDeActoCoactivo.REC1, REC1, null).acto();
+            notificarActo(rec1.numero(), DILIGENCIA_REC1, ResultadoDeNotificacion.NOTIFICADO);
+            int antes = historialDe(expediente).size();
+
+            assertThatThrownBy(
+                            () ->
+                                    cambiarEstado.cambiar(
+                                            expediente,
+                                            EstadoDelExpediente.INICIADO,
+                                            DILIGENCIA_REC1.plusDays(1),
+                                            "x",
+                                            null,
+                                            null,
+                                            PORQUE))
+                    .as(
+                            "IllegalArgumentException es la que el controlador traduce a 422;"
+                                    + " sin la guarda del movimiento la rechazaria la base, y el"
+                                    + " PATCH saldria 500")
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("INICIADO");
+            assertThat(historialDe(expediente)).hasSize(antes);
+            assertThat(EstadoDelExpediente.delHistorial(historialDe(expediente)))
+                    .isEqualTo(EstadoDelExpediente.REC1_NOTIFICADA);
+        }
+
+        @Test
+        @DisplayName("B — y un movimiento ESTADO a INICIADO tampoco entra por SQL directo")
+        void elMovimientoAIniciadoNoEntraPorSql() {
+            String expediente = expedienteConDeuda("E-4095");
+            dictarActo(expediente, TipoDeActoCoactivo.REC1, REC1, null);
+            long expedienteId = idDelExpediente(expediente);
+
+            assertThat(
+                            estadoSqlDelFallo(
+                                    () ->
+                                            ejecutarComoApp(
+                                                    "INSERT INTO expediente_movimiento"
+                                                            + " (municipalidad_id, expediente_id,"
+                                                            + " tipo, estado, fecha, motivo,"
+                                                            + " usuario_registro, fecha_registro,"
+                                                            + " observacion) VALUES ("
+                                                            + municipalidad
+                                                            + ", "
+                                                            + expedienteId
+                                                            + ", 'ESTADO', 'INICIADO', DATE '"
+                                                            + REC1.plusDays(1)
+                                                            + "', 'x', 'intruso', now(), 'sin"
+                                                            + " pasar por el codigo')")))
+                    .as(
+                            "23514 es «viola una restriccion CHECK»:"
+                                    + " expediente_movimiento_iniciado_ck")
+                    .isEqualTo("23514");
+            assertThat(EstadoDelExpediente.delHistorial(historialDe(expediente)))
+                    .isEqualTo(EstadoDelExpediente.REC1_EMITIDA);
+        }
+
+        private List<MovimientoDelExpediente> historialDe(String expediente) {
+            long id = idDelExpediente(expediente);
+            return enTransaccion(() -> movimientos.deExpediente(id));
         }
     }
 
@@ -1146,7 +1332,7 @@ class ActosCoactivosJdbcTest {
     private static EstadoDelExpediente cambiarAConcluido(String expediente) {
         long id = idDelExpediente(expediente);
         movimientos.registrar(
-                kamayuk.rentas.coactiva.dominio.MovimientoDelExpediente.cambioDeEstado(
+                MovimientoDelExpediente.cambioDeEstado(
                         id,
                         EstadoDelExpediente.CONCLUIDO,
                         REC1.plusDays(1),
