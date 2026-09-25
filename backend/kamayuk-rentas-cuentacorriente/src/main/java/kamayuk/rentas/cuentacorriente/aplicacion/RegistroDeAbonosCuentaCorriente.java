@@ -380,8 +380,12 @@ public class RegistroDeAbonosCuentaCorriente implements RegistroDeAbonos {
      *
      * <p>El deudor va al final, como desempate (#431): hasta que un cobro pudo llevar lineas de
      * varios deudores todas compartian el suyo y no hacia falta. Sin el, dos condominos del mismo
-     * predio empataban y su orden quedaba al de la llegada; y al final, y no al principio, para que
-     * las claves de un solo deudor se pidan en el mismo orden que antes —el que el convenio usa—.
+     * predio empataban y su orden quedaba al de la llegada: dos cobranzas que los marcaran al reves
+     * pedirian los mismos candados al reves. Lo muerde {@code OrdenDeLosCandadosDelCobroTest}.
+     *
+     * <p>Que vaya al final no es lo que evita el abrazo con el convenio: el convenio bloquea claves
+     * de un solo deudor, y en ellas cualquier posicion del deudor da el mismo orden. Va al final
+     * porque solo desempata.
      */
     private static final Comparator<ClaveDeObligacion> ORDEN_ESTABLE =
             Comparator.comparing(ClaveDeObligacion::tributo)

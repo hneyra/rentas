@@ -47,6 +47,7 @@ import kamayuk.rentas.esquema.ContextoDeTenant;
 import kamayuk.rentas.plataforma.tenant.TenantTransactionManager;
 import kamayuk.rentas.tesoreria.dobles.CajaDeOrdenesDeMentira;
 import kamayuk.rentas.tesoreria.infraestructura.PagoRecibidoRepositoryJdbc;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -307,6 +308,70 @@ class ReciboConDosDeudoresTest {
         }
     }
 
+    @Nested
+    @DisplayName("Con el pagador ANONIMO —la caja no dice a que contribuyente le cobro—")
+    class ElPagadorAnonimo {
+
+        @Test
+        @DisplayName(
+                "si las referencias traen al deudor, el pago se imputa a cada uno: el pagador no"
+                        + " hace falta")
+        void conSeisPartesSeImputaACadaDeudor() {
+            long madre = sembrarContribuyente();
+            long hija = sembrarContribuyente();
+            cargarDeuda(madre, PREDIO_DE_A, "300.00");
+            cargarDeuda(hija, PREDIO_DE_B, "200.00");
+
+            ReferenciaDeObligacion deA = emitir(madre, PREDIO_DE_A);
+            ReferenciaDeObligacion deB = emitir(hija, PREDIO_DE_B);
+            String documento = "RECIBO 001-431-E";
+
+            PagoRecibido pago =
+                    recibir.recibir(pago(null, "500.00", documento, List.of(deA, deB))).pago();
+
+            assertThat(pago.estado())
+                    .as(
+                            "hasta #431 un pago sin pagador quedaba RECHAZADO siempre, porque el"
+                                    + " pagador era el deudor de todas las lineas. Desde #431 el"
+                                    + " deudor viaja en cada referencia, y el pagador solo decide"
+                                    + " en una de cinco partes. Motivo: %s",
+                            pago.motivo())
+                    .isEqualTo(EstadoDelPagoRecibido.APLICADO);
+            assertThat(abonosDe(documento))
+                    .containsExactlyInAnyOrder(
+                            new Abono(madre, PREDIO_DE_A, Dinero.de("300.00")),
+                            new Abono(hija, PREDIO_DE_B, Dinero.de("200.00")));
+        }
+
+        @Test
+        @DisplayName(
+                "con una referencia de cinco partes no hay a nombre de quien asentar: RECHAZADO,"
+                        + " y el libro intacto")
+        void conCincoPartesQuedaRechazado() {
+            long titular = sembrarContribuyente();
+            cargarDeuda(titular, PREDIO_DE_A, "300.00");
+            String documento = "RECIBO 001-431-F";
+
+            // La referencia de antes de #431: sin deudor. Y sin pagador, el respaldo tampoco lo da.
+            ReferenciaDeObligacion enVuelo =
+                    ReferenciaDeObligacion.leer("PREDIAL|2026|" + PREDIO_DE_A + "||" + HOY);
+
+            PagoRecibido pago =
+                    recibir.recibir(pago(null, "300.00", documento, List.of(enVuelo))).pago();
+
+            assertThat(pago.estado())
+                    .as(
+                            "sin deudor en la referencia y sin pagador no hay de quien sea el"
+                                    + " abono: SinDeudaQueAbonar, que RecibirPago deja RECHAZADO"
+                                    + " con su motivo. Motivo: %s",
+                            pago.motivo())
+                    .isEqualTo(EstadoDelPagoRecibido.RECHAZADO);
+            assertThat(pago.motivo()).contains("no lleva deudor").contains("pagador anonimo");
+            assertThat(abonosDe(documento)).as("el libro no se toca").isEmpty();
+            assertThat(deudaDe(titular, PREDIO_DE_A)).isEqualTo(Dinero.de("300.00"));
+        }
+    }
+
     // ------------------------------------------------------------------
 
     /** Un abono del libro, reducido a lo que el issue pregunta: de quien, de que, y cuanto. */
@@ -338,7 +403,7 @@ class ReciboConDosDeudoresTest {
      * orden. El buzon relee las referencias del cuerpo congelado, asi que van en el cuerpo.
      */
     private static PagoRecibido pago(
-            long pagador,
+            @Nullable Long pagador,
             String total,
             String documento,
             List<ReferenciaDeObligacion> referencias) {

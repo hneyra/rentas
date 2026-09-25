@@ -62,9 +62,13 @@ public record PeticionDePago(
     /**
      * Quien pago, como la caja lo conoce.
      *
-     * <p>{@code idExterno} es el {@code contribuyente_id} de ESTE padron: es lo unico que permite
-     * imputar sin volver a resolver a nadie. Anulable, porque la caja admite un pagador anonimo — y
-     * un pago anonimo no se puede imputar, asi que queda RECHAZADO con su motivo.
+     * <p>{@code idExterno} es el {@code contribuyente_id} de ESTE padron, y es el de <b>quien
+     * pago</b>, no el de quien debe: la caja toma el de la primera orden marcada. Desde #431 el
+     * deudor de cada linea viaja en su referencia, asi que el pagador ya no decide a nombre de
+     * quien se abona; solo lo hace en una referencia de cinco partes —emitida antes de #431—, que
+     * no trae otro. Anulable, porque la caja admite un pagador anonimo: con referencias de seis
+     * partes ese pago se imputa igual, y solo si alguna linea es de cinco partes queda RECHAZADO
+     * con su motivo, porque entonces no hay a nombre de quien asentar.
      */
     public record DatosDelPagador(
             @Nullable String documento, @Nullable String nombre, @Nullable Long idExterno) {}
@@ -73,9 +77,13 @@ public record PeticionDePago(
      * Una orden cobrada.
      *
      * <p>{@code referenciaExterna} es <b>opaca para la caja</b> y la compuso este sistema: es
-     * {@code TRIBUTO|EJERCICIO|PREDIO|VEHICULO|FECHA}, y la lee {@code ReferenciaDeObligacion}. La
-     * fecha va dentro porque es la regla 9 aplicada a la identidad de la orden: el mismo predial a
-     * dos fechas distintas son dos importes y son dos ordenes.
+     * {@code TRIBUTO|EJERCICIO|CONTRIBUYENTE|PREDIO|VEHICULO|FECHA}, y la lee {@code
+     * ReferenciaDeObligacion}, que acepta tambien la de cinco partes, sin {@code CONTRIBUYENTE}, de
+     * los pagos que estaban en vuelo cuando cambio el formato (#431). El deudor va dentro porque en
+     * el libro la identidad de una obligacion lo incluye: dos condominos del mismo predio son dos
+     * ordenes, y un recibo que junta ordenes de dos deudores abona a cada uno lo suyo. La fecha va
+     * dentro porque es la regla 9 aplicada a la identidad de la orden: el mismo predial a dos
+     * fechas distintas son dos importes y son dos ordenes.
      */
     public record LineaDeOrden(
             @Nullable Long ordenId,
