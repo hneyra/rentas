@@ -3,6 +3,10 @@ package kamayuk.rentas.seguridad.aplicacion;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowable;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -49,6 +53,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 import org.springframework.aop.framework.ProxyFactory;
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.NoSuchBeanDefinitionException;
@@ -517,6 +522,134 @@ class ImplantarMunicipalidadTest {
                 implantacion("270402", false, hay(pasadaContra(buzon, alerta))).run(null);
                 assertThat(esDemostracion("270402")).isFalse();
             }
+        }
+
+        /**
+         * #348: el registro dice el regimen que QUEDO en la fila, no el que se pidio.
+         *
+         * <p>La siembra que distingue es pedir lo CONTRARIO de lo que hay en la fila: con la
+         * peticion igual a la fila —el primer alta, o {@code 270402}— leer {@code
+         * datos.esDemostracion()} y leer la fila dan la misma palabra, y la implementacion
+         * equivocada pasa en verde.
+         */
+        @Test
+        @DisplayName(
+                "relanzada con false sobre una fila de demostracion, la linea dice DEMOSTRACION y"
+                        + " avisa de la discrepancia con los dos valores (#348)")
+        void elRegistroDiceLaFilaYNoLaPeticion() throws IOException {
+            AlertaQueAnota alerta = new AlertaQueAnota();
+            List<ILoggingEvent> primera;
+            List<ILoggingEvent> segunda;
+            try (BuzonDeMentira buzon =
+                    BuzonDeMentira.arranca(CorrienteDeIdentidad.deUnaImplantacion())) {
+                primera =
+                        anotado(
+                                () ->
+                                        implantacion(
+                                                        "270403",
+                                                        true,
+                                                        hay(pasadaContra(buzon, alerta)))
+                                                .run(null));
+                segunda =
+                        anotado(
+                                () ->
+                                        implantacion(
+                                                        "270403",
+                                                        false,
+                                                        hay(pasadaContra(buzon, alerta)))
+                                                .run(null));
+            }
+            assertThat(esDemostracion("270403"))
+                    .as("#122 no se toca: la fila sigue marcada")
+                    .isTrue();
+
+            assertThat(lineaDelRegimen(primera)).contains("(DEMOSTRACION)");
+            assertThat(errores(primera))
+                    .as("con la peticion igual a la fila no hay nada de que avisar")
+                    .isEmpty();
+
+            assertThat(lineaDelRegimen(segunda))
+                    .as(
+                            "[la fila dice demostracion y los papeles salen marcados: la linea que"
+                                    + " existe para comprobar el regimen sin mirar un papel tiene que"
+                                    + " decir lo mismo que ellos, y no lo que pidio el descriptor]")
+                    .contains("(DEMOSTRACION)")
+                    .doesNotContain("instalacion real");
+            assertThat(errores(segunda))
+                    .as("la discrepancia se dice, con los dos valores y con como se cambia")
+                    .singleElement()
+                    .asString()
+                    .contains("270403")
+                    .contains("es_demostracion = true")
+                    .contains("pidio es_demostracion = false")
+                    .contains("UPDATE municipalidad SET es_demostracion");
+        }
+
+        @Test
+        @DisplayName(
+                "y el caso inverso, al pasar a produccion: relanzada con true sobre una fila real, la"
+                        + " linea dice «instalacion real» y avisa (#348)")
+        void elCasoInverso() throws IOException {
+            AlertaQueAnota alerta = new AlertaQueAnota();
+            List<ILoggingEvent> segunda;
+            try (BuzonDeMentira buzon =
+                    BuzonDeMentira.arranca(CorrienteDeIdentidad.deUnaImplantacion())) {
+                implantacion("270404", false, hay(pasadaContra(buzon, alerta))).run(null);
+                segunda =
+                        anotado(
+                                () ->
+                                        implantacion(
+                                                        "270404",
+                                                        true,
+                                                        hay(pasadaContra(buzon, alerta)))
+                                                .run(null));
+            }
+            assertThat(esDemostracion("270404")).as("relanzar no pone la marca (#122)").isFalse();
+
+            assertThat(lineaDelRegimen(segunda))
+                    .as(
+                            "[la fila es real y los papeles salen SIN marca: si la linea dijera"
+                                    + " DEMOSTRACION, quien la lea se queda tranquilo con parametros"
+                                    + " que nadie ha firmado impresos sin aviso]")
+                    .contains("(instalacion real)")
+                    .doesNotContain("DEMOSTRACION");
+            assertThat(errores(segunda))
+                    .singleElement()
+                    .asString()
+                    .contains("270404")
+                    .contains("es_demostracion = false")
+                    .contains("pidio es_demostracion = true");
+        }
+
+        private static List<ILoggingEvent> anotado(Runnable implantar) {
+            Logger registro = (Logger) LoggerFactory.getLogger(ImplantarMunicipalidad.class);
+            ListAppender<ILoggingEvent> anotadas = new ListAppender<>();
+            anotadas.start();
+            registro.addAppender(anotadas);
+            try {
+                implantar.run();
+            } finally {
+                registro.detachAppender(anotadas);
+            }
+            return List.copyOf(anotadas.list);
+        }
+
+        /** La linea que existe para decir el regimen, y tiene que haber UNA por implantacion. */
+        private static String lineaDelRegimen(List<ILoggingEvent> anotadas) {
+            List<String> lineas =
+                    anotadas.stream()
+                            .map(ILoggingEvent::getFormattedMessage)
+                            .filter(m -> m.startsWith("Catalogo de rentas sembrado"))
+                            .toList();
+            assertThat(lineas).as("una linea del regimen por implantacion").hasSize(1);
+            return lineas.get(0);
+        }
+
+        private static List<String> errores(List<ILoggingEvent> anotadas) {
+            return anotadas.stream()
+                    .filter(e -> e.getLevel() == Level.ERROR)
+                    .map(ILoggingEvent::getFormattedMessage)
+                    .toList();
         }
     }
 

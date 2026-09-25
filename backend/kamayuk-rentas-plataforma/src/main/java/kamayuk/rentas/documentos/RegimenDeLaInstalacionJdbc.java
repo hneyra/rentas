@@ -53,9 +53,11 @@ import org.springframework.transaction.support.TransactionTemplate;
  * del padron llevaria su propia consulta.
  *
  * <p>Se puede porque el valor no cambia en caliente: quitarle la marca a una instalacion es un
- * {@code UPDATE} de {@code kamayuk_owner}, una operacion de implantacion, y las de implantacion
- * reinician el proceso. No hay ninguna pantalla que lo cambie, y ese es justamente el punto de que
- * el hecho viva en la base y no en configuracion.
+ * {@code UPDATE} de {@code kamayuk_owner} hecho a mano, una operacion de implantacion, y quien lo
+ * hace <b>tiene que reiniciar el proceso</b> —el {@code UPDATE} solo no lo reinicia, y hasta
+ * entonces esta cache sigue diciendo el valor de antes; el aviso de la implantacion lo recuerda
+ * (#348)—. No hay ninguna pantalla que lo cambie, y ese es justamente el punto de que el hecho viva
+ * en la base y no en configuracion.
  *
  * <p>La cache es por municipalidad y no global: una sola instalacion atiende a muchas, y una cache
  * de un solo valor haria que la primera que emitiera decidiera por todas. Ese fallo no se ve

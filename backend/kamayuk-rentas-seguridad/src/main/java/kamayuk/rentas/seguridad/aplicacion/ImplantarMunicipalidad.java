@@ -7,6 +7,7 @@ import kamayuk.rentas.dominio.MunicipalidadId;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.seguridad.dominio.FuenteDeEventosDeIdentidad;
 import kamayuk.rentas.seguridad.dominio.LecturaDeLaCopiaLocal;
+import kamayuk.rentas.seguridad.dominio.MunicipalidadImplantada;
 import kamayuk.rentas.seguridad.dominio.RegistroDeMunicipalidades;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -126,14 +127,15 @@ public class ImplantarMunicipalidad implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments argumentos) {
-        long municipalidadId =
+        MunicipalidadImplantada implantada =
                 registro.darDeAltaSiFalta(
                         datos.ubigeo(), datos.nombre(), datos.tipo(), datos.esDemostracion());
+        avisarSiElRegimenNoEsElPedido(implantada);
 
         // El perfil batch no tiene filtros HTTP, asi que los dos contextos que en una peticion
         // salen del token se fijan aqui a mano. `Origen.deProceso` existe para esto: una escritura
         // sin peticion detras, que aun asi tiene que decir quien.
-        TenantContext.fijar(new MunicipalidadId(municipalidadId));
+        TenantContext.fijar(new MunicipalidadId(implantada.id()));
         OrigenContext.fijar(Origen.deProceso(datos.usuarioDelProceso()));
         try {
             int nuevos =
@@ -146,12 +148,14 @@ public class ImplantarMunicipalidad implements ApplicationRunner {
             // El regimen se registra aunque sea una sola palabra: es lo unico del resultado que no
             // se puede comprobar mirando pantallas. Una instalacion que se creia de demostracion y
             // salio real emite papeles sin marca, y quien lo descubre es quien recibe uno (#122).
+            // Y se registra el de la FILA, no el pedido: relanzar no cambia la marca, asi que el
+            // pedido puede ser el contrario de lo que sale en los papeles (#348).
             log.info(
                     "Catalogo de rentas sembrado para la municipalidad {} ({}): id {}, {} accesos"
                             + " nuevos",
                     datos.ubigeo(),
-                    datos.esDemostracion() ? "DEMOSTRACION" : "instalacion real",
-                    municipalidadId,
+                    implantada.regimen(),
+                    implantada.id(),
                     nuevos);
 
             traerLaAutorizacion();
@@ -159,6 +163,47 @@ public class ImplantarMunicipalidad implements ApplicationRunner {
             OrigenContext.limpiar();
             TenantContext.limpiar();
         }
+    }
+
+    /**
+     * El despliegue pidio un regimen y la fila tiene el otro (#348): se dice, con los dos valores y
+     * con como se cambia.
+     *
+     * <p>Pasa al relanzar con la variable cambiada: el alta no toca una fila que ya existe, y eso
+     * es a proposito (#122) —una instalacion no deja de ser de demostracion porque alguien relance
+     * el despliegue con otra variable—. Lo que no puede pasar es que el registro afirme el regimen
+     * pedido: la linea del regimen es el unico sitio donde se comprueba sin mirar un papel.
+     *
+     * <p><b>Un {@code ERROR} y no un fallo del {@code Job}</b>, y es una eleccion: la discrepancia
+     * no deja a la municipalidad a medias —la fila es coherente y los papeles salen segun ella— y
+     * no la arregla este proceso, que no cambia la marca. Hacer fallar el {@code Job} dejaria cada
+     * despliegue siguiente de `rentas` en rojo, sin sembrar las pantallas nuevas del catalogo ni
+     * traer la autorizacion, hasta que alguien con {@code kamayuk_owner} decidiera cual de los dos
+     * tiene razon. Es el mismo criterio que {@link #avisarSiFaltaElAdministradorDeclarado()}: lo
+     * declarado no cuadra con lo que hay, se dice fuerte, y lo que hay manda.
+     */
+    private void avisarSiElRegimenNoEsElPedido(MunicipalidadImplantada implantada) {
+        if (implantada.esDemostracion() == datos.esDemostracion()) {
+            return;
+        }
+        log.error(
+                "La municipalidad {} ya estaba dada de alta con es_demostracion = {} y este"
+                        + " despliegue pidio es_demostracion = {}"
+                        + " (KAMAYUK_IMPLANTACION_ESDEMOSTRACION). Relanzar la implantacion NO"
+                        + " cambia la marca (#122): todo documento que emita sigue saliendo {}. Si"
+                        + " la que tiene razon es la fila, se corrige la variable del descriptor."
+                        + " Si es el descriptor, se cambia a mano como kamayuk_owner —UPDATE"
+                        + " municipalidad SET es_demostracion = {} WHERE ubigeo = '{}'— y se"
+                        + " reinician los procesos de rentas, porque RegimenDeLaInstalacionJdbc"
+                        + " guarda el regimen en cache",
+                datos.ubigeo(),
+                implantada.esDemostracion(),
+                datos.esDemostracion(),
+                implantada.esDemostracion()
+                        ? "MARCADO como de demostracion"
+                        : "SIN la marca de demostracion",
+                datos.esDemostracion(),
+                datos.ubigeo());
     }
 
     /**

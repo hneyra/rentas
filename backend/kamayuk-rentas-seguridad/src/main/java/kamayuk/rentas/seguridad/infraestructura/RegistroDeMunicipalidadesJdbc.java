@@ -5,6 +5,7 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import kamayuk.rentas.seguridad.dominio.MunicipalidadImplantada;
 import kamayuk.rentas.seguridad.dominio.RegistroDeMunicipalidades;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -54,11 +55,11 @@ public class RegistroDeMunicipalidadesJdbc implements RegistroDeMunicipalidades 
     }
 
     @Override
-    public long darDeAltaSiFalta(
+    public MunicipalidadImplantada darDeAltaSiFalta(
             String ubigeo, String nombre, String tipo, boolean esDemostracion) {
         try (Connection conexion = DriverManager.getConnection(url, usuario, clave)) {
             insertarSiFalta(conexion, ubigeo, nombre, tipo, esDemostracion);
-            return identificador(conexion, ubigeo);
+            return laFila(conexion, ubigeo);
         } catch (SQLException e) {
             // Sin el ubigeo, el mensaje de PostgreSQL no dice de que municipalidad habla.
             throw new IllegalStateException("No se pudo dar de alta la municipalidad " + ubigeo, e);
@@ -88,16 +89,26 @@ public class RegistroDeMunicipalidadesJdbc implements RegistroDeMunicipalidades 
         }
     }
 
-    private static long identificador(Connection conexion, String ubigeo) throws SQLException {
+    /**
+     * La fila tal como quedo, en la misma conexion que la dio de alta.
+     *
+     * <p>El regimen se lee de aqui y no se devuelve el pedido (#348): con la fila ya puesta, el
+     * {@code INSERT} de arriba no escribe nada, y el {@code es_demostracion} que manda sobre los
+     * documentos es el de la base.
+     */
+    private static MunicipalidadImplantada laFila(Connection conexion, String ubigeo)
+            throws SQLException {
         try (PreparedStatement consulta =
-                conexion.prepareStatement("SELECT id FROM municipalidad WHERE ubigeo = ?")) {
+                conexion.prepareStatement(
+                        "SELECT id, es_demostracion FROM municipalidad WHERE ubigeo = ?")) {
             consulta.setString(1, ubigeo);
             try (ResultSet fila = consulta.executeQuery()) {
                 if (!fila.next()) {
                     throw new IllegalStateException(
                             "La municipalidad " + ubigeo + " no quedo dada de alta");
                 }
-                return fila.getLong("id");
+                return new MunicipalidadImplantada(
+                        fila.getLong("id"), fila.getBoolean("es_demostracion"));
             }
         }
     }
