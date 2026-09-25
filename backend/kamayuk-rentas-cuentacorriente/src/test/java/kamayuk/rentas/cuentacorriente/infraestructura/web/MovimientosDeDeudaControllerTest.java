@@ -405,7 +405,18 @@ class MovimientosDeDeudaControllerTest {
         private @Nullable Observacion ultimaObservacion;
 
         MovimientosEspiados() {
-            super(null, null, null, null, null, null, null);
+            // El calculo no puede ser nulo desde #365: con el se construye la cristalizacion del
+            // devengo, que no admite un calculo nulo. Los demas no se usan: este espia no llega
+            // al caso de uso.
+            super(
+                    null,
+                    null,
+                    null,
+                    new kamayuk.rentas.cuentacorriente.dominio.CalculoDeDeuda(
+                            new kamayuk.rentas.cuentacorriente.infraestructura.SinAcumulacion()),
+                    null,
+                    null,
+                    null);
         }
 
         private @Nullable ComprobacionDeUnidad ultimaComprobacion;

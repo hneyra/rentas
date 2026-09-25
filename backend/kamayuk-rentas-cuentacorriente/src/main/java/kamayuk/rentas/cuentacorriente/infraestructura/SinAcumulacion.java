@@ -19,6 +19,15 @@ import org.springframework.stereotype.Component;
  * <p>Cuando D-02 y D-03 cierren, esta clase se sustituye por la implementacion real —o deja de ser
  * el unico bean de {@link PoliticaDeMora}—, y ningun llamador de {@code deudaActualizadaA} cambia:
  * es exactamente para eso que la politica se recibe como argumento (regla 6, ARQ-09).
+ *
+ * <p><b>Lo que hace cierta esa promesa no es esta clase, sino que todo camino que escribe en el
+ * libro cristalice antes el devengo</b>, y hasta #365 era falsa: cuatro de los seis —la extincion,
+ * la baja manual, el pase a valor y la reversion— escribian sin cargarlo, y con una mora que
+ * devengue habrian dejado interes negativo y condonaciones sin acto. Hoy los seis llaman a {@link
+ * kamayuk.rentas.cuentacorriente.dominio.CristalizacionDelDevengo}, y {@code
+ * ElDevengoSeCristalizaAntesDeEscribirJdbcTest} los recorre con una mora que si devenga. Un septimo
+ * escritor tiene que llamarla tambien; mientras esta clase devuelva cero, olvidarlo no se ve en
+ * ninguna cifra.
  */
 @Component
 public class SinAcumulacion implements PoliticaDeMora {

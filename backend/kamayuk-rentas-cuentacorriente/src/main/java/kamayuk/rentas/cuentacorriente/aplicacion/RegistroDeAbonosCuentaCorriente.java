@@ -5,7 +5,9 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import kamayuk.rentas.cuentacorriente.AbonoAsentado;
 import kamayuk.rentas.cuentacorriente.ObligacionDelDeudor;
 import kamayuk.rentas.cuentacorriente.RegistroDeAbonos;
@@ -17,6 +19,7 @@ import kamayuk.rentas.cuentacorriente.dominio.CalculoDeDeuda;
 import kamayuk.rentas.cuentacorriente.dominio.ClaveDeObligacion;
 import kamayuk.rentas.cuentacorriente.dominio.ClaveDeSaldo;
 import kamayuk.rentas.cuentacorriente.dominio.Concepto;
+import kamayuk.rentas.cuentacorriente.dominio.CristalizacionDelDevengo;
 import kamayuk.rentas.cuentacorriente.dominio.DeudaActualizada;
 import kamayuk.rentas.cuentacorriente.dominio.Fase;
 import kamayuk.rentas.cuentacorriente.dominio.SaldoProyectado;
@@ -48,6 +51,11 @@ import org.springframework.transaction.annotation.Transactional;
  * devengo deja de ser una proyeccion y pasa a ser un hecho del libro; por eso el cargo se asienta
  * con la misma fecha valor que el abono y con el mismo documento de origen: el recibo explica las
  * dos filas.
+ *
+ * <p>Desde #365 esa diferencia la mide {@link
+ * kamayuk.rentas.cuentacorriente.dominio.CristalizacionDelDevengo}, y no un bucle de aqui: la
+ * invariante es del libro, no de este llamador, y la cumplen los seis caminos que escriben en el
+ * con una sola cuenta.
  *
  * <h2>Primero se planifica, despues se compara, y solo entonces se escribe (#39)</h2>
  *
@@ -99,6 +107,7 @@ public class RegistroDeAbonosCuentaCorriente implements RegistroDeAbonos {
     private final SaldoRepository saldos;
     private final RegistrarAsiento registrar;
     private final CalculoDeDeuda calculo;
+    private final CristalizacionDelDevengo cristalizacion;
     private final PoliticaDeRedondeo redondeo;
 
     public RegistroDeAbonosCuentaCorriente(
@@ -111,6 +120,7 @@ public class RegistroDeAbonosCuentaCorriente implements RegistroDeAbonos {
         this.saldos = saldos;
         this.registrar = registrar;
         this.calculo = calculo;
+        this.cristalizacion = new CristalizacionDelDevengo(calculo);
         this.redondeo = redondeo;
     }
 
@@ -204,6 +214,24 @@ public class RegistroDeAbonosCuentaCorriente implements RegistroDeAbonos {
      *
      * <p>{@link RegistrarAsiento#reversar} reproyecta el saldo de cada obligacion tocada, en esta
      * misma transaccion. O vuelven la deuda y su proyeccion, o no vuelve ninguna de las dos.
+     *
+     * <h2>Y antes, el devengo de lo que vuelve a deberse (#365)</h2>
+     *
+     * <p>Los reversos se asientan con la fecha de la anulacion, y esa fecha pasa a ser el ultimo
+     * movimiento de la cuota: desde ahi acumula {@link CalculoDeDeuda#deudaActualizadaA}. Si no se
+     * hiciera nada mas, el interes del insoluto que vuelve a deberse entre el cobro anulado y la
+     * anulacion se perderia entero —el cargo que el cobro cristalizo se reversa con el, y nadie lo
+     * vuelve a devengar—.
+     *
+     * <p>Anular un cobro es decir que no ocurrio. Por eso lo que se cristaliza, antes de reversar,
+     * es el devengo del libro <b>sin</b> los asientos de ese documento, a la fecha de la anulacion:
+     * lo que el libro tendria si ese cobro no se hubiera asentado nunca. La cuenta es la de {@link
+     * CristalizacionDelDevengo}, la misma de los otros cinco caminos; lo unico propio de este es
+     * sobre que asientos se pregunta.
+     *
+     * <p>Las obligaciones se bloquean antes de leerlas, en el mismo orden que la cobranza: la
+     * cuenta lee el libro y luego escribe, y otro acto que se colara en medio cristalizaria el
+     * mismo devengo dos veces.
      */
     @Override
     @Transactional
@@ -229,6 +257,9 @@ public class RegistroDeAbonosCuentaCorriente implements RegistroDeAbonos {
                             + " abonos ya se reversaron");
         }
 
+        int cristalizados =
+                cristalizarSinElDocumento(delDocumento, fecha, documentoDeLaReversion, observacion);
+
         Dinero abonado = Dinero.CERO;
         for (Asiento original : delDocumento) {
             registrar.reversar(
@@ -240,7 +271,64 @@ public class RegistroDeAbonosCuentaCorriente implements RegistroDeAbonos {
                 abonado = abonado.mas(original.monto());
             }
         }
-        return new ReversionDeAbonos(delDocumento.size(), abonado, fecha);
+        return new ReversionDeAbonos(delDocumento.size() + cristalizados, abonado, fecha);
+    }
+
+    /**
+     * El devengo que el libro tendria a {@code fecha} si el documento no se hubiera asentado nunca,
+     * cuota por cuota, asentado como cargo con el documento de la reversion (#365).
+     *
+     * <p>El cargo va en la fase del asiento reversado de esa cuota, que es la fase en la que la
+     * cobranza abono: asi la reversion y su devengo quedan en la misma fase y la cuota no cambia de
+     * fase por cristalizar.
+     *
+     * @return cuantos cargos se asentaron
+     */
+    private int cristalizarSinElDocumento(
+            List<Asiento> delDocumento,
+            LocalDate fecha,
+            String documentoDeLaReversion,
+            Observacion observacion) {
+
+        Set<Long> delCobro = new java.util.HashSet<>();
+        Map<ClaveDeSaldo, Fase> cuotas = new java.util.LinkedHashMap<>();
+        for (Asiento asiento : delDocumento) {
+            delCobro.add(java.util.Objects.requireNonNull(asiento.id()));
+            cuotas.putIfAbsent(ClaveDeSaldo.de(asiento), asiento.fase());
+        }
+
+        List<ClaveDeObligacion> aBloquear =
+                cuotas.keySet().stream()
+                        .map(ClaveDeObligacion::de)
+                        .distinct()
+                        .sorted(ORDEN_ESTABLE)
+                        .toList();
+        for (ClaveDeObligacion clave : aBloquear) {
+            saldos.bloquear(clave);
+        }
+
+        int cristalizados = 0;
+        for (Map.Entry<ClaveDeSaldo, Fase> cuota : cuotas.entrySet()) {
+            List<Asiento> sinElDocumento =
+                    asientos.deLaObligacion(cuota.getKey()).stream()
+                            .filter(asiento -> !delCobro.contains(asiento.id()))
+                            .toList();
+            for (CristalizacionDelDevengo.Devengo devengo :
+                    cristalizacion.sinAsentar(sinElDocumento, fecha, redondeo)) {
+                asentar(
+                        new AsientoPlaneado(
+                                cuota.getKey(),
+                                cuota.getValue(),
+                                devengo.parte(),
+                                TipoAsiento.CARGO,
+                                devengo.monto()),
+                        fecha,
+                        documentoDeLaReversion,
+                        observacion);
+                cristalizados++;
+            }
+        }
+        return cristalizados;
     }
 
     // ------------------------------------------------------------------
@@ -285,29 +373,33 @@ public class RegistroDeAbonosCuentaCorriente implements RegistroDeAbonos {
             // y medido a su fecha ese abono posterior queda fuera del corte y la cuota se
             // abonaria dos veces. La guarda de #39 no lo para, porque compara con esta misma cifra.
             DeudaActualizada cobrable = calculo.extinguibleDesde(delLibro, fechaDePago, redondeo);
-            DeudaActualizada yaAsentado = calculo.asentadoA(delLibro, fechaDePago);
 
             if (!cobrable.total().esPositivo()) {
                 continue;
             }
 
+            // El cargo de lo devengado antes que el abono de cada parte: lo mide la
+            // cristalizacion (#365), que es la misma cuenta para los seis caminos que escriben.
+            // Aqui solo se planifica; se escribe despues de la comprobacion de #39.
+            Map<Concepto, Dinero> devengado =
+                    cristalizacion.sinAsentar(delLibro, fechaDePago, redondeo).stream()
+                            .collect(
+                                    Collectors.toMap(
+                                            CristalizacionDelDevengo.Devengo::parte,
+                                            CristalizacionDelDevengo.Devengo::monto));
             for (Concepto parte : PARTES) {
-                Dinero aCobrar = parteDe(cobrable, parte);
-                if (!aCobrar.esPositivo()) {
-                    continue;
-                }
-                Dinero devengadoSinAsentar = aCobrar.menos(parteDe(yaAsentado, parte));
-                if (devengadoSinAsentar.esPositivo()) {
+                Dinero sinAsentar = devengado.get(parte);
+                if (sinAsentar != null) {
                     planeados.add(
                             new AsientoPlaneado(
-                                    cuota,
-                                    fila.fase(),
-                                    parte,
-                                    TipoAsiento.CARGO,
-                                    devengadoSinAsentar));
+                                    cuota, fila.fase(), parte, TipoAsiento.CARGO, sinAsentar));
                 }
-                planeados.add(
-                        new AsientoPlaneado(cuota, fila.fase(), parte, TipoAsiento.ABONO, aCobrar));
+                Dinero aCobrar = parteDe(cobrable, parte);
+                if (aCobrar.esPositivo()) {
+                    planeados.add(
+                            new AsientoPlaneado(
+                                    cuota, fila.fase(), parte, TipoAsiento.ABONO, aCobrar));
+                }
             }
 
             insoluto = insoluto.mas(cobrable.insoluto());

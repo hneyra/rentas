@@ -34,6 +34,10 @@ public interface MovimientoDeFase {
      * lo cuenta. El monto es el que quien llama ya congelo —no se relee la deuda aqui—, porque este
      * contexto no sabe congelar nada, solo asentar lo que le piden (regla 2).
      *
+     * <p>Antes del par carga, en cada cuota de la obligacion, el reajuste y el interes devengados
+     * que el libro todavia no tenia (#365): el par adelanta el ultimo movimiento, y sin ese cargo
+     * el libro perderia al dia siguiente el interes que la OP acaba de congelar.
+     *
      * @param ejercicio el ejercicio de la obligacion que se mueve
      * @param contribuyenteId a quien se le cobra
      * @param tributo el tributo de la obligacion, tal como lo nombra quien pide el movimiento

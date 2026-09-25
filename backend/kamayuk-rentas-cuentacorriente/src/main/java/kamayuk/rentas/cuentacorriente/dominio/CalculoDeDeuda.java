@@ -152,8 +152,10 @@ public final class CalculoDeDeuda {
      *
      * <p><b>Lo que esta funcion no resuelve</b> es el reajuste y el interes todavia no asentados:
      * {@code deudaActualizadaA} los proyecta hasta cada punto, y aqui se toman como la baja los
-     * tomaba antes. Que una baja abone interes proyectado sin cargarlo antes es otro hallazgo —el
-     * del devengo no cristalizado—, y va aparte.
+     * tomaba antes. Que el acto los cargue antes de abonarlos lo resuelve {@link
+     * CristalizacionDelDevengo} (#365), que esta construida sobre esta funcion: el cargo que
+     * cristaliza es lo extinguible menos lo asentado, asi que un abono que no pase de lo
+     * extinguible no deja ninguna parte en negativo.
      *
      * <p>Es una funcion pura (regla 6), como las demas de esta clase: los tres sitios que preguntan
      * cuanto se puede extinguir —la baja, su reparto y la extincion— la llaman a ella, y ninguno lo
@@ -251,10 +253,11 @@ public final class CalculoDeDeuda {
      * interes dejaria {@code netear(INTERES)} en negativo para siempre y la obligacion quedaria con
      * deuda negativa.
      *
-     * <p>La diferencia entre las dos funciones es exactamente lo que hay que cristalizar. Que sean
-     * dos metodos de la misma clase pura, sobre los mismos asientos, es lo que garantiza que se
-     * netee igual en los dos: calcular una en el dominio y la otra en un {@code SUM} de SQL seria
-     * volver a tener dos definiciones de lo mismo.
+     * <p>La diferencia entre las dos funciones es exactamente lo que hay que cristalizar, y desde
+     * #365 la calcula {@link CristalizacionDelDevengo} para todo camino que escribe. Que sean dos
+     * metodos de la misma clase pura, sobre los mismos asientos, es lo que garantiza que se netee
+     * igual en los dos: calcular una en el dominio y la otra en un {@code SUM} de SQL seria volver
+     * a tener dos definiciones de lo mismo.
      *
      * @param asientos los de <b>una</b> obligacion
      * @param fecha la fecha de corte; ningun asiento posterior entra

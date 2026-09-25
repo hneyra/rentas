@@ -17,6 +17,7 @@ import kamayuk.rentas.cuentacorriente.dominio.CalculoDeDeuda;
 import kamayuk.rentas.cuentacorriente.dominio.ClaveDeObligacion;
 import kamayuk.rentas.cuentacorriente.dominio.ClaveDeSaldo;
 import kamayuk.rentas.cuentacorriente.dominio.Concepto;
+import kamayuk.rentas.cuentacorriente.dominio.CristalizacionDelDevengo;
 import kamayuk.rentas.cuentacorriente.dominio.DeudaActualizada;
 import kamayuk.rentas.cuentacorriente.dominio.Fase;
 import kamayuk.rentas.cuentacorriente.dominio.SaldoProyectado;
@@ -57,6 +58,10 @@ import org.springframework.transaction.annotation.Transactional;
  * cero, porque la unica {@code PoliticaDeMora} implementada es la que no acumula nada (D-02a); el
  * dia que deje de serlo, esto es lo que evita una condonacion silenciosa en todo el padron.
  *
+ * <p>Desde #365 la cuenta no se escribe aqui: la hace {@link
+ * kamayuk.rentas.cuentacorriente.dominio.CristalizacionDelDevengo}, la misma para los seis caminos
+ * que escriben en el libro. Este era uno de los dos que la tenian copiada.
+ *
  * <h2>Lo pendiente se mide desde la fecha, no a ella (#471)</h2>
  *
  * <p>Lo que se acoge —y lo que {@link #deudaAcogible} ofrece congelar— es {@link
@@ -78,14 +83,11 @@ public class AcogimientoAConvenioCuentaCorriente implements AcogimientoAConvenio
     /** La fase a la que se acoge, y de la que se devuelve. */
     private static final Fase FASE_DEL_CONVENIO = Fase.CONVENIO;
 
-    /** Las cuatro partes del desglose, en el orden en que se leen y se cristalizan. */
-    private static final List<Concepto> PARTES =
-            List.of(Concepto.INSOLUTO, Concepto.REAJUSTE, Concepto.INTERES, Concepto.GASTO);
-
     private final AsientoRepository asientos;
     private final SaldoRepository saldos;
     private final RegistrarAsiento registrar;
     private final CalculoDeDeuda calculo;
+    private final CristalizacionDelDevengo cristalizacion;
     private final PoliticaDeRedondeo redondeo;
 
     public AcogimientoAConvenioCuentaCorriente(
@@ -98,6 +100,7 @@ public class AcogimientoAConvenioCuentaCorriente implements AcogimientoAConvenio
         this.saldos = saldos;
         this.registrar = registrar;
         this.calculo = calculo;
+        this.cristalizacion = new CristalizacionDelDevengo(calculo);
         this.redondeo = redondeo;
     }
 
@@ -215,28 +218,27 @@ public class AcogimientoAConvenioCuentaCorriente implements AcogimientoAConvenio
             if (!pendiente.total().esPositivo()) {
                 continue;
             }
-            DeudaActualizada yaAsentado = calculo.asentadoA(delLibro, fecha);
 
             Fase salida = haciaElConvenio ? Fase.valueOf(cuota.faseOrigen()) : FASE_DEL_CONVENIO;
             Fase entrada = haciaElConvenio ? FASE_DEL_CONVENIO : Fase.valueOf(cuota.faseOrigen());
 
             // 1. El devengo que todavia no estaba en el libro, cristalizado en la fase
             //    de la que se sale. Sin esto, el asiento del par mueve el «ultimo
-            //    movimiento» hacia adelante y el interes acumulado hasta hoy se pierde.
-            for (Concepto parte : PARTES) {
-                Dinero sinAsentar = parteDe(pendiente, parte).menos(parteDe(yaAsentado, parte));
-                if (sinAsentar.esPositivo()) {
-                    asentar(
-                            clave,
-                            salida,
-                            parte,
-                            TipoAsiento.CARGO,
-                            sinAsentar,
-                            fecha,
-                            documentoOrigen,
-                            observacion);
-                    escritos++;
-                }
+            //    movimiento» hacia adelante y el interes acumulado hasta hoy se pierde. La
+            //    cuenta es la de CristalizacionDelDevengo, la misma de todo camino que escribe
+            //    en el libro (#365).
+            for (CristalizacionDelDevengo.Devengo devengo :
+                    cristalizacion.sinAsentar(delLibro, fecha, redondeo)) {
+                asentar(
+                        clave,
+                        salida,
+                        devengo.parte(),
+                        TipoAsiento.CARGO,
+                        devengo.monto(),
+                        fecha,
+                        documentoOrigen,
+                        observacion);
+                escritos++;
             }
 
             // 2. El par que mueve la fase. El total no cambia: FRACCIONAMIENTO no es
@@ -343,20 +345,6 @@ public class AcogimientoAConvenioCuentaCorriente implements AcogimientoAConvenio
                 deuda.reajuste(),
                 deuda.interes(),
                 deuda.gasto());
-    }
-
-    private static Dinero parteDe(DeudaActualizada deuda, Concepto concepto) {
-        return switch (concepto) {
-            case INSOLUTO -> deuda.insoluto();
-            case REAJUSTE -> deuda.reajuste();
-            case INTERES -> deuda.interes();
-            case GASTO -> deuda.gasto();
-            default ->
-                    throw new IllegalArgumentException(
-                            "El desglose de la deuda tiene cuatro partes, y "
-                                    + concepto
-                                    + " no es una de ellas");
-        };
     }
 
     /**

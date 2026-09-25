@@ -9,7 +9,9 @@ import kamayuk.rentas.cuentacorriente.dominio.AsientoRepository;
 import kamayuk.rentas.cuentacorriente.dominio.CalculoDeDeuda;
 import kamayuk.rentas.cuentacorriente.dominio.ClaveDeObligacion;
 import kamayuk.rentas.cuentacorriente.dominio.Concepto;
+import kamayuk.rentas.cuentacorriente.dominio.CristalizacionDelDevengo;
 import kamayuk.rentas.cuentacorriente.dominio.Fase;
+import kamayuk.rentas.cuentacorriente.dominio.SaldoProyectado;
 import kamayuk.rentas.cuentacorriente.dominio.SaldoRepository;
 import kamayuk.rentas.cuentacorriente.dominio.TipoAsiento;
 import kamayuk.rentas.dominio.Dinero;
@@ -35,6 +37,25 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>Las dos escrituras van en la misma transaccion: si la segunda fallara, la primera se revierte
  * con ella. Un abono sin su cargo dejaria una obligacion con menos deuda de la que en realidad
  * tiene, y eso es peor que no mover nada.
+ *
+ * <h2>Antes del par, el devengo de cada cuota (#365)</h2>
+ *
+ * <p>El par no cambia el total —{@code AJUSTE} no es ninguna de las cuatro partes que {@code
+ * deudaActualizadaA} netea—, pero su fecha valor pasa a ser el ultimo movimiento de la cuota, y
+ * desde ahi acumula la mora. Sin mas, el pase a valor se llevaba el interes devengado hasta la
+ * emision: la OP congela un interes que el libro, del que leen caja y coactiva, ya no tenia al dia
+ * siguiente.
+ *
+ * <p>Por eso {@link #moverAValor} carga primero lo devengado y no asentado en <b>cada cuota</b> de
+ * la obligacion —{@link CristalizacionDelDevengo}, la cuenta de todo camino que escribe en el
+ * libro—, y despues escribe el par. En cada cuota y no solo en la del par, como el convenio, porque
+ * es la obligacion entera la que cambia de fase. El cargo cae en la fase ordinaria, donde esta la
+ * deuda, y el par saca de ahi el monto que la OP congelo, que ya lo incluye.
+ *
+ * <p><b>El paso a coactiva no lo hace todavia</b>, y no por olvido: alli el monto lo decide el
+ * libro —el neto en VALOR, acotado por lo que se debe—, y cristalizar antes cambiaria cuanto entra
+ * en coactiva. Que el interes devengado despues de la OP se mueva con ella o se quede en VALOR es
+ * una decision de cobranza que #365 no toma; queda dicho en su PR.
  */
 @Service
 public class MovimientoDeFaseCuentaCorriente implements MovimientoDeFase {
@@ -43,6 +64,7 @@ public class MovimientoDeFaseCuentaCorriente implements MovimientoDeFase {
     private final AsientoRepository asientos;
     private final SaldoRepository saldos;
     private final CalculoDeDeuda calculo;
+    private final CristalizacionDelDevengo cristalizacion;
     private final PoliticaDeRedondeo redondeo;
 
     public MovimientoDeFaseCuentaCorriente(
@@ -55,9 +77,17 @@ public class MovimientoDeFaseCuentaCorriente implements MovimientoDeFase {
         this.asientos = asientos;
         this.saldos = saldos;
         this.calculo = calculo;
+        this.cristalizacion = new CristalizacionDelDevengo(calculo);
         this.redondeo = redondeo;
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Bloquea la obligacion antes de leerla (#365): cristalizar el devengo es leer el libro y
+     * escribir lo que falta, y una cobranza que se colara en medio cristalizaria el mismo interes
+     * otra vez. Es el candado que el paso a coactiva ya pedia.
+     */
     @Override
     @Transactional
     public void moverAValor(
@@ -72,6 +102,10 @@ public class MovimientoDeFaseCuentaCorriente implements MovimientoDeFase {
             LocalDate fechaValor,
             String documentoOrigen,
             Observacion observacion) {
+        ClaveDeObligacion obligacion =
+                new ClaveDeObligacion(contribuyenteId, tributo, ejercicio, predioId, vehiculoId);
+        saldos.bloquear(obligacion);
+        cristalizarElDevengo(obligacion, fechaValor, documentoOrigen, observacion);
         mover(
                 Fase.ORDINARIA,
                 Fase.VALOR,
@@ -215,5 +249,40 @@ public class MovimientoDeFaseCuentaCorriente implements MovimientoDeFase {
                         documentoOrigen,
                         observacion.texto());
         registrar.asentar(cargoEnLaEntrada, observacion);
+    }
+
+    /**
+     * El cargo de lo devengado y no asentado en cada cuota de la obligacion, en la fase en la que
+     * esta, antes de que el par adelante el ultimo movimiento (#365). La obligacion ya esta
+     * bloqueada: lo hace quien llama.
+     */
+    private void cristalizarElDevengo(
+            ClaveDeObligacion obligacion,
+            LocalDate fechaValor,
+            String documentoOrigen,
+            Observacion observacion) {
+        for (SaldoProyectado fila : saldos.deLaObligacion(obligacion)) {
+            for (CristalizacionDelDevengo.Devengo devengo :
+                    cristalizacion.sinAsentar(
+                            asientos.deLaObligacion(fila.clave()), fechaValor, redondeo)) {
+                registrar.asentar(
+                        Asiento.nuevo(
+                                fila.clave().ejercicio(),
+                                fila.clave().contribuyenteId(),
+                                fila.clave().tributo(),
+                                devengo.parte(),
+                                TipoAsiento.CARGO,
+                                fila.fase(),
+                                // 0 en la proyeccion es «anual», y en el asiento eso es nulo.
+                                fila.clave().periodo() == 0 ? null : fila.clave().periodo(),
+                                fila.clave().predioId(),
+                                fila.clave().vehiculoId(),
+                                null,
+                                devengo.monto(),
+                                fechaValor,
+                                documentoOrigen),
+                        observacion);
+            }
+        }
     }
 }

@@ -9,11 +9,13 @@ import kamayuk.rentas.cuentacorriente.dominio.AsientoRepository;
 import kamayuk.rentas.cuentacorriente.dominio.CalculoDeDeuda;
 import kamayuk.rentas.cuentacorriente.dominio.ClaveDeObligacion;
 import kamayuk.rentas.cuentacorriente.dominio.ClaveDeSaldo;
+import kamayuk.rentas.cuentacorriente.dominio.CristalizacionDelDevengo;
 import kamayuk.rentas.cuentacorriente.dominio.DeudaActualizada;
 import kamayuk.rentas.cuentacorriente.dominio.MovimientoDeDeuda;
 import kamayuk.rentas.cuentacorriente.dominio.RangoDeCuotas;
 import kamayuk.rentas.cuentacorriente.dominio.SaldoRepository;
 import kamayuk.rentas.cuentacorriente.dominio.SentidoDelMovimiento;
+import kamayuk.rentas.cuentacorriente.dominio.TipoAsiento;
 import kamayuk.rentas.documentos.EmitirDocumento;
 import kamayuk.rentas.documentos.FormatoDeDocumento;
 import kamayuk.rentas.dominio.Dinero;
@@ -47,6 +49,28 @@ import org.springframework.transaction.annotation.Transactional;
  * dejaba en negativo: el cobro y la baja extinguian dos veces la misma deuda.
  *
  * <p>Un alta no tiene ese limite: incorporar deuda que no estaba es exactamente para lo que existe.
+ *
+ * <h2>Y antes de asentar, el devengo (#365)</h2>
+ *
+ * <p>{@link CalculoDeDeuda#deudaActualizadaA} acumula la mora desde el ultimo movimiento de la
+ * cuota, y el asiento del acto —alta o baja— pasa a serlo. Sin mas, el interes devengado hasta la
+ * fecha valor dejaba de existir: una baja parcial de insoluto condonaba en silencio todo el interes
+ * de la cuota. Y la baja de interes era peor: la comprobacion de arriba cuenta el devengo, asi que
+ * pasaba, y el abono dejaba {@code netear(INTERES)} en negativo.
+ *
+ * <p>Por eso, por cada cuota y antes de sus asientos, se carga lo devengado y no asentado con
+ * {@link CristalizacionDelDevengo}, la misma cuenta que la cobranza y el convenio. La comprobacion
+ * y la cristalizacion miden lo mismo —{@link CalculoDeDeuda#extinguibleDesde}, sobre el mismo libro
+ * y con la obligacion bloqueada—, asi que lo que la baja puede extinguir es exactamente lo que el
+ * libro tiene asentado despues del cargo: un abono que pasa la comprobacion no deja ninguna parte
+ * en negativo. El cargo se escribe <b>despues</b> de comprobar y no antes, por lo mismo que la
+ * cobranza planifica antes de escribir (#39): una baja rechazada no escribe ninguna fila para que
+ * la transaccion la deshaga.
+ *
+ * <p>El cargo lleva el documento de origen del acto pero <b>no</b> su acto ni su causal —no es un
+ * alta ni una baja: es la fila que la cobranza escribe al cristalizar— y no entra en el formato
+ * impreso ni en {@link Registro#asientos}: la nota de cargo sumaria su importe al de la baja y
+ * diria que se extinguio mas de lo que se extinguio.
  *
  * <h2>Y la comprobacion se hace con la obligacion bloqueada (#445)</h2>
  *
@@ -93,6 +117,7 @@ public class RegistrarMovimientoDeDeuda {
     private final SaldoRepository saldos;
     private final RegistrarAsiento registrarAsiento;
     private final CalculoDeDeuda calculo;
+    private final CristalizacionDelDevengo cristalizacion;
     private final PoliticaDeRedondeo redondeo;
     private final EmitirDocumento documentos;
     private final TitularesDeLaUnidad titulares;
@@ -109,6 +134,7 @@ public class RegistrarMovimientoDeDeuda {
         this.saldos = saldos;
         this.registrarAsiento = registrarAsiento;
         this.calculo = calculo;
+        this.cristalizacion = new CristalizacionDelDevengo(calculo);
         this.redondeo = redondeo;
         this.documentos = documentos;
         this.titulares = titulares;
@@ -307,6 +333,7 @@ public class RegistrarMovimientoDeDeuda {
 
         List<Asiento> guardados = new ArrayList<>();
         for (MovimientoDeDeuda deLaCuota : porCuota) {
+            cristalizarElDevengo(deLaCuota, observacion);
             for (Asiento asiento : deLaCuota.enAsientos(deTitularAnterior)) {
                 guardados.add(registrarAsiento.asentar(asiento, observacion));
             }
@@ -324,6 +351,36 @@ public class RegistrarMovimientoDeDeuda {
                         observacion);
 
         return new Registro(asentados, emision.registro().numero());
+    }
+
+    /**
+     * El cargo de lo devengado y no asentado en la cuota del acto, a su fecha valor (#365). Ver el
+     * javadoc de la clase: se asienta y no se devuelve, porque no es parte del movimiento.
+     */
+    private void cristalizarElDevengo(MovimientoDeDeuda deLaCuota, Observacion observacion) {
+        ClaveDeSaldo cuota = deLaCuota.clave();
+        for (CristalizacionDelDevengo.Devengo devengo :
+                cristalizacion.sinAsentar(
+                        asientos.deLaObligacion(cuota), deLaCuota.fechaValor(), redondeo)) {
+            registrarAsiento.asentar(
+                    Asiento.nuevo(
+                            cuota.ejercicio(),
+                            cuota.contribuyenteId(),
+                            cuota.tributo(),
+                            devengo.parte(),
+                            TipoAsiento.CARGO,
+                            deLaCuota.fase(),
+                            // 0 en la clave es «anual», y en el asiento eso es nulo: la traduccion
+                            // inversa de ClaveDeSaldo.de(Asiento).
+                            cuota.periodo() == 0 ? null : cuota.periodo(),
+                            cuota.predioId(),
+                            cuota.vehiculoId(),
+                            null,
+                            devengo.monto(),
+                            deLaCuota.fechaValor(),
+                            deLaCuota.documentoOrigen()),
+                    observacion);
+        }
     }
 
     /**
