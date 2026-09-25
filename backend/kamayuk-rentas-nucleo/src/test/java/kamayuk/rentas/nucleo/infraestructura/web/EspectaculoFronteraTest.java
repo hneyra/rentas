@@ -23,14 +23,11 @@ import kamayuk.rentas.contribuyentes.infraestructura.ContribuyenteRepositoryJdbc
 import kamayuk.rentas.contribuyentes.infraestructura.FichaRepositoryJdbc;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.MunicipalidadId;
-import kamayuk.rentas.dominio.ValorNormativo;
 import kamayuk.rentas.esquema.BaseDeDatosDePrueba;
 import kamayuk.rentas.nucleo.aplicacion.RegistrarEspectaculo;
 import kamayuk.rentas.nucleo.infraestructura.DeterminacionRepositoryJdbc;
 import kamayuk.rentas.nucleo.infraestructura.EspectaculoPublicoRepositoryJdbc;
-import kamayuk.rentas.parametros.IdentificadorDeConjunto;
-import kamayuk.rentas.parametros.LectorDeParametros;
-import kamayuk.rentas.parametros.ParametrosSellados;
+import kamayuk.rentas.nucleo.parametros.DerivadoPublicado;
 import kamayuk.rentas.plataforma.tenant.TenantTransactionManager;
 import kamayuk.rentas.web.ConfiguracionDeJson;
 import kamayuk.rentas.web.ManejadorDeErrores;
@@ -62,8 +59,11 @@ import tools.jackson.databind.json.JsonMapper;
  * rechazaba el {@code INSERT} —que ademas era lo primero que hacia el caso de uso, antes de leer
  * los parametros—. Esta prueba mide lo que veia el cliente.
  *
- * <p>Lo que no es de la frontera se dobla: el conjunto sellado, porque la llave del articulo 57 que
- * haria falta publicar no es lo que se mide aqui. La conexion es la de {@code kamayuk_app}.
+ * <p>Lo que no es de la frontera se dobla: el conjunto sellado, que es el que {@code normativa}
+ * publica ({@link DerivadoPublicado}) y no uno sembrado a mano. Hasta #376 este doble sembraba
+ * {@code ALICUOTA_ESPECTACULO:CINE} y el cuerpo decia {@code "tipo":"cine"}: una llave que nadie
+ * publica y un tipo que no es del articulo 57 —con el codigo de #376 ese cuerpo es un 422 de
+ * validacion antes de llegar al padron—. La conexion es la de {@code kamayuk_app}.
  */
 @DisplayName("#422 — Un espectaculo de un organizador que no existe es 404, no 500")
 class EspectaculoFronteraTest {
@@ -95,7 +95,7 @@ class EspectaculoFronteraTest {
                         new RegistrarEspectaculo(
                                 new EspectaculoPublicoRepositoryJdbc(jdbc),
                                 new DeterminacionRepositoryJdbc(jdbc),
-                                new ConElCine(),
+                                DerivadoPublicado.conjuntoDelEjercicio(EJERCICIO),
                                 envolver(
                                         new DirectorioJdbc(
                                                 new ContribuyenteRepositoryJdbc(jdbc),
@@ -155,7 +155,7 @@ class EspectaculoFronteraTest {
                                             .content(
                                                     "{\"organizadorId\":999999,"
                                                             + "\"denominacion\":\"FUNCION DE"
-                                                            + " ESTRENO\",\"tipo\":\"cine\","
+                                                            + " ESTRENO\",\"tipo\":\"CINEMATOGRAFICO\","
                                                             + "\"lugar\":\"CINE CENTRAL\","
                                                             + "\"fechaEvento\":\"2026-09-12\","
                                                             + "\"aforo\":300,"
@@ -220,30 +220,6 @@ class EspectaculoFronteraTest {
                 owner.commit();
                 return id;
             }
-        }
-    }
-
-    /** El conjunto sellado con la alicuota del cine: lo que falte publicar no se mide aqui. */
-    private static final class ConElCine implements LectorDeParametros {
-
-        private static final ParametrosSellados SELLADOS =
-                ParametrosSellados.de(EJERCICIO, 1)
-                        .numero("ALICUOTA_ESPECTACULO", "CINE", ValorNormativo.de("10"))
-                        .construir();
-
-        @Override
-        public ParametrosSellados vigenteEn(Ejercicio ejercicio) {
-            return SELLADOS;
-        }
-
-        @Override
-        public ParametrosSellados porConjunto(IdentificadorDeConjunto identificador) {
-            return SELLADOS;
-        }
-
-        @Override
-        public IdentificadorDeConjunto conjuntoVigenteEn(Ejercicio ejercicio) {
-            return IdentificadorDeConjunto.de(77L);
         }
     }
 }

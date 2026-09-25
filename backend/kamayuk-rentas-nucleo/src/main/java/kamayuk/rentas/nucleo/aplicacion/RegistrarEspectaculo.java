@@ -12,6 +12,7 @@ import kamayuk.rentas.dominio.Alicuota;
 import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.Observacion;
+import kamayuk.rentas.nucleo.dominio.espectaculos.ClaseDeEspectaculo;
 import kamayuk.rentas.nucleo.dominio.espectaculos.EspectaculoPublico;
 import kamayuk.rentas.nucleo.dominio.espectaculos.EspectaculoPublicoRepository;
 import kamayuk.rentas.nucleo.dominio.espectaculos.ImpuestoDeEspectaculo;
@@ -32,9 +33,15 @@ import org.springframework.transaction.annotation.Transactional;
  * #liquidar}— al fijar la base imponible, en la misma transacción en que crea la {@link
  * Determinacion} con el monto (#32).
  *
- * <p>La alícuota se lee del conjunto sellado, con la <b>clave compuesta por tipo de espectáculo</b>
- * —igual que {@code RT001ValorDeTerreno} busca el arancel por vía—: teatro, cine, concierto y
- * taurino no pagan la misma alícuota (TUO LTM art. 56).
+ * <p>La alícuota se lee del conjunto sellado con la llave que {@code normativa} publica, {@link
+ * LlavesDelConjunto#ESPECTACULO_ALICUOTA}{@code :‹clase›}, y la clase es una de las siete del art.
+ * 57 —{@link ClaseDeEspectaculo}—, no el texto que se teclea (#376). Hasta #376 la llave era {@code
+ * ALICUOTA_ESPECTACULO:‹tipo tecleado›}, que nadie publica: con el conjunto real la operación
+ * contestaba siempre 422 «falta publicar».
+ *
+ * <p>El taurino declara solo eso, {@link ClaseDeEspectaculo#TAURINO}: cuál de sus dos alícuotas
+ * rige lo decide {@link ClaseDeEspectaculo#delTaurino} con el valor de la entrada y la UIT del
+ * <b>mismo</b> conjunto sellado.
  *
  * <h2>Primero lo que puede faltar, después la escritura (#422)</h2>
  *
@@ -42,14 +49,12 @@ import org.springframework.transaction.annotation.Transactional;
  * sellado: sin conjunto, o con un organizador que no está en el padrón, el rechazo llegaba con la
  * fila ya escrita —y en el segundo caso ni siquiera llegaba: {@code espectaculo_contribuyente_fk}
  * rechazaba el {@code INSERT} y salía como un 500 con incidencia ERROR—. Ahora se leen los
- * parámetros y se resuelve al organizador por {@link DirectorioDeContribuyentes} <b>antes</b> de
- * escribir nada, y el borde contesta 422 o 404 según lo que falte.
+ * parámetros, se decide la clase del art. 57 (#376) y se resuelve al organizador por {@link
+ * DirectorioDeContribuyentes} <b>antes</b> de escribir nada, y el borde contesta 422 o 404 según lo
+ * que falte.
  */
 @Service
 public class RegistrarEspectaculo {
-
-    /** El tipo del parámetro que trae la alícuota; la clave es el tipo de espectáculo. */
-    public static final String ALICUOTA_ESPECTACULO = "ALICUOTA_ESPECTACULO";
 
     private static final String TABLA_AUDITADA = "determinacion";
 
@@ -78,7 +83,11 @@ public class RegistrarEspectaculo {
     /**
      * Registra el evento y determina su impuesto.
      *
+     * @param tipo la clase del art. 57 que declara el organizador, o {@link
+     *     ClaseDeEspectaculo#TAURINO}; ver {@link ClaseDeEspectaculo#declarada}
      * @param ingresoDeclarado la base imponible que declara el organizador
+     * @throws IllegalArgumentException si lo declarado no es una clase del art. 57, o es un taurino
+     *     sin valor de entrada
      * @throws OrganizadorInexistente si el organizador no esta en el padron (#422)
      */
     @Transactional
@@ -93,13 +102,20 @@ public class RegistrarEspectaculo {
             Dinero ingresoDeclarado,
             Observacion observacion) {
 
+        // El conjunto se lee ANTES de guardar el evento (#422), y la clase del art. 57 se decide
+        // con el (#376): la del taurino depende de la UIT, y un evento cuya clase no se puede
+        // decidir no se registra.
         Ejercicio ejercicio = Ejercicio.de(fechaEvento);
         ParametrosSellados sellados = parametros.vigenteEn(ejercicio);
         long conjuntoId = parametros.conjuntoVigenteEn(ejercicio).valor();
-        String tipoNormalizado = tipo.strip().toUpperCase(java.util.Locale.ROOT);
+        @Nullable Dinero uit =
+                ClaseDeEspectaculo.declaraUnTaurino(tipo)
+                        ? new Dinero(sellados.exigirNumero(LlavesDelConjunto.UIT, null).valor())
+                        : null;
+        ClaseDeEspectaculo clase = ClaseDeEspectaculo.declarada(tipo, valorEntrada, uit);
         Alicuota alicuota =
                 Alicuota.de(
-                        sellados.exigirNumero(ALICUOTA_ESPECTACULO, tipoNormalizado)
+                        sellados.exigirNumero(LlavesDelConjunto.ESPECTACULO_ALICUOTA, clase.clave())
                                 .valor()
                                 .toPlainString());
 
@@ -129,7 +145,7 @@ public class RegistrarEspectaculo {
                         conjuntoId,
                         ingresoDeclarado,
                         montoDeterminado,
-                        List.of(ALICUOTA_ESPECTACULO + ":" + tipoNormalizado));
+                        List.of(LlavesDelConjunto.ESPECTACULO_ALICUOTA + ":" + clase.clave()));
 
         Determinacion determinada = determinaciones.insertar(nueva);
         auditar(determinada, observacion);

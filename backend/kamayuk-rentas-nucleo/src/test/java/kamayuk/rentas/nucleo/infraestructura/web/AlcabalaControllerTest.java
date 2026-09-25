@@ -33,6 +33,7 @@ import kamayuk.rentas.nucleo.dominio.TransferenciaRepository;
 import kamayuk.rentas.nucleo.dominio.predial.DetalleDeterminacionPredio;
 import kamayuk.rentas.nucleo.dominio.predial.Determinacion;
 import kamayuk.rentas.nucleo.dominio.predial.DeterminacionRepository;
+import kamayuk.rentas.nucleo.parametros.DerivadoPublicado;
 import kamayuk.rentas.parametros.IdentificadorDeConjunto;
 import kamayuk.rentas.parametros.LectorDeParametros;
 import kamayuk.rentas.parametros.ParametrosSellados;
@@ -57,8 +58,18 @@ import tools.jackson.databind.json.JsonMapper;
  * quedado fuera del patron del <b>422 que nombra la llave</b>: {@code PredialController} (#395) y
  * {@code VehicularController} (#399) ya traducian {@code ParametroAusente}, y aqui salia como 500
  * {@code ERROR_INTERNO} con identificador de incidencia. Ninguna de las dos cosas que faltan —el
- * conjunto sellado del ejercicio, o la {@code ALICUOTA_ALCABALA} dentro de el— es un fallo del
+ * conjunto sellado del ejercicio, o la {@code ALCABALA_ALICUOTA} dentro de el— es un fallo del
  * servidor.
+ *
+ * <h2>Y el conjunto de las pruebas es el que {@code normativa} sella, no uno escrito aqui (#376)
+ * </h2>
+ *
+ * <p>Hasta #376 esta prueba sembraba a mano {@code ALICUOTA_ALCABALA}, que es la llave que el
+ * codigo pedia y no la que {@code normativa} publica —{@code ALCABALA_ALICUOTA}—, y daba por bueno
+ * el 422 que la nombraba. Con el conjunto real la operacion contestaba <b>siempre</b> 422 «falta
+ * publicar» sobre una cifra publicada, firmada y sellada, y aqui todo estaba verde. Ahora el
+ * conjunto por omision se compone con {@link DerivadoPublicado}, leyendo el archivo que se
+ * despliega: una llave que no casa sale roja aqui y no en ventanilla.
  */
 @DisplayName("Capa web — POST /api/v1/rentas/alcabala")
 class AlcabalaControllerTest {
@@ -76,7 +87,7 @@ class AlcabalaControllerTest {
     private final ComprobadorDePrueba comprobador = new ComprobadorDePrueba();
     private final DeterminacionesEnMemoria determinaciones = new DeterminacionesEnMemoria();
 
-    private MockMvc mvc = montar(lector(conjuntoCompleto()));
+    private MockMvc mvc = montar(DerivadoPublicado.conjuntoDelEjercicio(EJERCICIO));
 
     @BeforeEach
     void fijarOrigen() {
@@ -108,9 +119,65 @@ class AlcabalaControllerTest {
                 .containsExactly("observacion", "transferenciaId", "autovaluoAjustado");
     }
 
+    /**
+     * <b>Con el conjunto que {@code normativa} sella, la alcabala se determina</b> (#376).
+     *
+     * <p>La venta de la prueba vale 180 000 y el autovaluo ajustado 200 000: la base es el mayor.
+     * El derivado publica para 2026 la UIT de 5 500, el tramo inafecto de 10 UIT y la alicuota del
+     * 3 % (TUO LTM art. 25), asi que el impuesto es {@code (200 000 - 55 000) × 3 % = 4 350}. Hasta
+     * #376 esto contestaba 422 nombrando {@code ALICUOTA_ALCABALA}, una llave que nadie publica.
+     */
     @Test
-    @DisplayName("con el conjunto sellado completo determina y devuelve la cifra")
-    void determinaConElConjuntoCompleto() throws Exception {
+    @DisplayName(
+            "#376 — con el conjunto que normativa sella determina, y la cifra es la del art. 25")
+    void determinaConElConjuntoQueNormativaSella() throws Exception {
+        MvcResult resultado =
+                mvc.perform(
+                                post("/rentas/api/v1/rentas/alcabala")
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(CUERPO))
+                        .andReturn();
+
+        assertThat(resultado.getResponse().getStatus())
+                .as(
+                        "el 3 %% esta sellado bajo ALCABALA_ALICUOTA: un 422 aqui es la llave del"
+                                + " codigo que no casa con la del derivado. Cuerpo: %s",
+                        resultado.getResponse().getContentAsString())
+                .isEqualTo(201);
+        assertThat(determinaciones.insertadas).isEqualTo(1);
+        assertThat(auditoria.registros).hasSize(1);
+        assertThat(determinaciones.ultima.montoDeterminado())
+                .as("(200 000 - 10 UIT de 5 500) × 3 %")
+                .isEqualTo(Dinero.de("4350.00"));
+        assertThat(determinaciones.ultima.reglasAplicadas())
+                .as("la determinacion guarda la llave con que se leyo la alicuota, que es la buena")
+                .contains("ALCABALA_ALICUOTA");
+    }
+
+    /**
+     * <b>El tramo inafecto es dato, no codigo</b> (#376, regla 5).
+     *
+     * <p>Hasta #376 las «10 UIT» del art. 25 estaban escritas en {@code RegistrarAlcabala} como
+     * {@code BigDecimal.TEN}, y {@code normativa} las publica como {@code
+     * ALCABALA_TRAMO_INAFECTO_UIT}. Hoy las dos cifras coinciden, y por eso el derivado real no
+     * distingue una implementacion de la otra: esta prueba siembra un tramo de 20 UIT que ninguna
+     * norma dice, solo para que leerlo y no leerlo den importes distintos.
+     */
+    @Test
+    @DisplayName("#376 — el tramo inafecto se lee del conjunto: con 20 UIT el impuesto cambia")
+    void elTramoInafectoSeLeeDelConjunto() throws Exception {
+        mvc =
+                montar(
+                        lector(
+                                ParametrosSellados.de(EJERCICIO, 1)
+                                        .numero("UIT", null, ValorNormativo.de("5500.00"))
+                                        .numero("ALCABALA_ALICUOTA", null, ValorNormativo.de("3"))
+                                        .numero(
+                                                "ALCABALA_TRAMO_INAFECTO_UIT",
+                                                null,
+                                                ValorNormativo.de("20"))
+                                        .construir()));
+
         MvcResult resultado =
                 mvc.perform(
                                 post("/rentas/api/v1/rentas/alcabala")
@@ -119,8 +186,35 @@ class AlcabalaControllerTest {
                         .andReturn();
 
         assertThat(resultado.getResponse().getStatus()).isEqualTo(201);
-        assertThat(determinaciones.insertadas).isEqualTo(1);
-        assertThat(auditoria.registros).hasSize(1);
+        assertThat(determinaciones.ultima.montoDeterminado())
+                .as("(200 000 - 20 UIT de 5 500) × 3 % = 2 700; con el 10 escrito saldria 4 350")
+                .isEqualTo(Dinero.de("2700.00"));
+    }
+
+    @Test
+    @DisplayName("#376 — sin el tramo inafecto en el conjunto es 422 y lo nombra")
+    void sinElTramoInafectoSeNombra() throws Exception {
+        mvc =
+                montar(
+                        lector(
+                                ParametrosSellados.de(EJERCICIO, 1)
+                                        .numero("UIT", null, ValorNormativo.de("5500.00"))
+                                        .numero("ALCABALA_ALICUOTA", null, ValorNormativo.de("3"))
+                                        .construir()));
+
+        MvcResult resultado =
+                mvc.perform(
+                                post("/rentas/api/v1/rentas/alcabala")
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(CUERPO))
+                        .andReturn();
+
+        assertThat(resultado.getResponse().getStatus()).isEqualTo(422);
+        assertThat(resultado.getResponse().getContentAsString())
+                .contains(
+                        "\"parametroQueFalta\":{\"ejercicio\":2026,"
+                                + "\"llave\":\"ALCABALA_TRAMO_INAFECTO_UIT\"}");
+        assertThat(determinaciones.insertadas).isZero();
     }
 
     /**
@@ -179,7 +273,7 @@ class AlcabalaControllerTest {
     }
 
     @Test
-    @DisplayName("una llave que el conjunto no trae es 422 y dice cual: ALICUOTA_ALCABALA")
+    @DisplayName("una llave que el conjunto no trae es 422 y dice cual: ALCABALA_ALICUOTA")
     void laLlaveQueFaltaSeNombra() throws Exception {
         mvc = montar(lector(conjuntoSinAlicuota()));
 
@@ -192,14 +286,14 @@ class AlcabalaControllerTest {
 
         assertThat(resultado.getResponse().getStatus()).isEqualTo(422);
         assertThat(resultado.getResponse().getContentAsString())
-                .contains("ALICUOTA_ALCABALA")
+                .contains("ALCABALA_ALICUOTA")
                 .doesNotContain("incidencia");
         assertThat(resultado.getResponse().getContentAsString())
                 .as(
                         "#691 — la llave viaja legible por programa, no solo dentro del texto: el"
                                 + " texto se reescribe en cuanto alguien lo lee en voz alta")
                 .contains(
-                        "\"parametroQueFalta\":{\"ejercicio\":2026,\"llave\":\"ALICUOTA_ALCABALA\"}");
+                        "\"parametroQueFalta\":{\"ejercicio\":2026,\"llave\":\"ALCABALA_ALICUOTA\"}");
     }
 
     @Test
@@ -292,16 +386,11 @@ class AlcabalaControllerTest {
                 .build();
     }
 
-    private static ParametrosSellados conjuntoCompleto() {
-        return ParametrosSellados.de(EJERCICIO, 1)
-                .numero("UIT", null, ValorNormativo.de("5500.00"))
-                .numero("ALICUOTA_ALCABALA", null, ValorNormativo.de("3"))
-                .construir();
-    }
-
+    /** El conjunto real sin la alicuota: todo lo demas que la alcabala lee, esta. */
     private static ParametrosSellados conjuntoSinAlicuota() {
         return ParametrosSellados.de(EJERCICIO, 1)
                 .numero("UIT", null, ValorNormativo.de("5500.00"))
+                .numero("ALCABALA_TRAMO_INAFECTO_UIT", null, ValorNormativo.de("10"))
                 .construir();
     }
 
@@ -403,6 +492,9 @@ class AlcabalaControllerTest {
         /** Un defecto de verdad del servidor, para el contraste de #540. */
         private boolean revienta;
 
+        /** La ultima determinacion que llego a guardarse, con su monto (#376). */
+        private Determinacion ultima;
+
         @Override
         public Optional<Determinacion> findById(long id) {
             return Optional.empty();
@@ -435,6 +527,7 @@ class AlcabalaControllerTest {
                 throw new IllegalStateException("un defecto de verdad, con su rastro");
             }
             insertadas++;
+            ultima = determinacion;
             return new Determinacion(
                     900L + insertadas,
                     determinacion.ejercicio(),

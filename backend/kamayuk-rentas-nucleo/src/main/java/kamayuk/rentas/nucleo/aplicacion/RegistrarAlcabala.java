@@ -1,6 +1,5 @@
 package kamayuk.rentas.nucleo.aplicacion;
 
-import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
@@ -36,19 +35,16 @@ import org.springframework.transaction.annotation.Transactional;
  * <p><b>No calcula el ajuste del autovalúo por el IPM</b>: llega como argumento, ya resuelto —ver
  * el javadoc de {@link BaseImponibleDeAlcabala}—.
  *
- * <p>El tramo inafecto son <b>10 UIT</b> (TUO LTM art. 25): el «10» es estructura —la ley lo fija,
- * no una ordenanza—, igual que {@code Vehiculo.EJERCICIOS_AFECTOS}; la UIT en sí se lee del
- * conjunto sellado (regla 5). La alícuota (3 %) también se lee del conjunto sellado, como la
- * alícuota vehicular de {@link RegistrarDeterminacionVehicular}.
+ * <p><b>Las tres cifras salen del conjunto sellado</b> (regla 5), con las llaves con que {@code
+ * normativa} las publica (#376): la {@link LlavesDelConjunto#UIT}, cuántas UIT forman el tramo
+ * inafecto —{@link LlavesDelConjunto#ALCABALA_TRAMO_INAFECTO_UIT}, las 10 del art. 25— y la
+ * alícuota —{@link LlavesDelConjunto#ALCABALA_ALICUOTA}, el 3 %—. Hasta #376 la alícuota se pedía
+ * como {@code ALICUOTA_ALCABALA}, que nadie publica, y la operación contestaba siempre 422 «falta
+ * publicar» con el conjunto real; y el «10» estaba escrito aquí como estructura de la ley, cuando
+ * {@code normativa} lo publica como cifra.
  */
 @Service
 public class RegistrarAlcabala {
-
-    public static final String ALICUOTA_ALCABALA = "ALICUOTA_ALCABALA";
-    public static final String TIPO_UIT = "UIT";
-
-    /** TUO LTM art. 25: el tramo inafecto son las primeras 10 UIT. Estructura, no una cifra. */
-    private static final BigDecimal UIT_DEL_TRAMO_INAFECTO = BigDecimal.TEN;
 
     private static final String TABLA_AUDITADA = "determinacion";
 
@@ -106,10 +102,16 @@ public class RegistrarAlcabala {
                 BaseImponibleDeAlcabala.elegir(
                         transferencia.valorTransferencia(), autovaluoAjustado);
 
-        Dinero uit = new Dinero(sellados.exigirNumero(TIPO_UIT, null).valor());
-        Dinero tramoInafecto = uit.por(UIT_DEL_TRAMO_INAFECTO);
+        Dinero uit = new Dinero(sellados.exigirNumero(LlavesDelConjunto.UIT, null).valor());
+        Dinero tramoInafecto =
+                uit.por(
+                        sellados.exigirNumero(LlavesDelConjunto.ALCABALA_TRAMO_INAFECTO_UIT, null)
+                                .valor());
         Alicuota alicuota =
-                Alicuota.de(sellados.exigirNumero(ALICUOTA_ALCABALA, null).valor().toPlainString());
+                Alicuota.de(
+                        sellados.exigirNumero(LlavesDelConjunto.ALCABALA_ALICUOTA, null)
+                                .valor()
+                                .toPlainString());
 
         Dinero montoDeterminado =
                 ImpuestoDeAlcabala.calcular(eleccion.base(), tramoInafecto, alicuota);
@@ -122,7 +124,9 @@ public class RegistrarAlcabala {
                         conjuntoId,
                         eleccion.base(),
                         montoDeterminado,
-                        List.of(ALICUOTA_ALCABALA));
+                        List.of(
+                                LlavesDelConjunto.ALCABALA_TRAMO_INAFECTO_UIT,
+                                LlavesDelConjunto.ALCABALA_ALICUOTA));
 
         Determinacion guardada = determinaciones.insertar(nueva);
         auditar(guardada, eleccion, observacion);

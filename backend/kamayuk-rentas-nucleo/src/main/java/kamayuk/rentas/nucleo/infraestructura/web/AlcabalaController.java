@@ -44,15 +44,18 @@ import org.springframework.web.bind.annotation.RestController;
  *
  * <h2>Lo que falta publicar se dice, y no es un 500 (#540)</h2>
  *
- * <p>La determinación lee del conjunto sellado del ejercicio de la transferencia la {@code UIT} y
- * la {@code ALICUOTA_ALCABALA}. Que el ejercicio no tenga ningún conjunto sellado ({@code
- * EjercicioSinSellar}) o que el conjunto no traiga una de las dos ({@code ParametroAusente}) salía
- * como <b>500 {@code ERROR_INTERNO} con identificador de incidencia</b>: la operación se leía como
- * «el servidor está roto» cuando lo que pasa es que falta publicar una cifra, y cada intento dejaba
- * una incidencia ERROR en el registro por lo que hoy es el estado normal del sistema (D-02a
- * abierta). Ahora es <b>422 nombrando la llave</b>, como en {@code PredialController} (#395) y
- * {@code VehicularController} (#399), que ya lo hacían para {@code ParametroAusente}: esta pantalla
- * y la de espectáculos eran las dos de Rentas que se habían quedado fuera.
+ * <p>La determinación lee del conjunto sellado del ejercicio de la transferencia la {@code UIT}, el
+ * {@code ALCABALA_TRAMO_INAFECTO_UIT} y la {@code ALCABALA_ALICUOTA} —las llaves con que {@code
+ * normativa} las publica; hasta #376 la alícuota se pedía como {@code ALICUOTA_ALCABALA}, que nadie
+ * publica—. Que el ejercicio no tenga ningún conjunto sellado ({@code EjercicioSinSellar}) o que el
+ * conjunto no traiga una de las tres ({@code ParametroAusente}) salía como <b>500 {@code
+ * ERROR_INTERNO} con identificador de incidencia</b>: la operación se leía como «el servidor está
+ * roto» cuando lo que pasa es que falta publicar una cifra, y cada intento dejaba una incidencia
+ * ERROR en el registro por lo que entonces era el estado normal del sistema (D-02a abierta; para la
+ * alícuota y el tramo ya no lo es: {@code normativa} los publica, vigentes desde 2004). Ahora es
+ * <b>422 nombrando la llave</b>, como en {@code PredialController} (#395) y {@code
+ * VehicularController} (#399), que ya lo hacían para {@code ParametroAusente}: esta pantalla y la
+ * de espectáculos eran las dos de Rentas que se habían quedado fuera.
  *
  * <h2>La respuesta dice a qué fecha está calculada (#276)</h2>
  *

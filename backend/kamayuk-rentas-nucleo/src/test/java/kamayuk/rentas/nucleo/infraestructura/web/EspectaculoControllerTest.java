@@ -30,6 +30,7 @@ import kamayuk.rentas.nucleo.dominio.espectaculos.EspectaculoPublicoRepository;
 import kamayuk.rentas.nucleo.dominio.predial.DetalleDeterminacionPredio;
 import kamayuk.rentas.nucleo.dominio.predial.Determinacion;
 import kamayuk.rentas.nucleo.dominio.predial.DeterminacionRepository;
+import kamayuk.rentas.nucleo.parametros.DerivadoPublicado;
 import kamayuk.rentas.parametros.IdentificadorDeConjunto;
 import kamayuk.rentas.parametros.LectorDeParametros;
 import kamayuk.rentas.parametros.ParametrosSellados;
@@ -52,9 +53,18 @@ import tools.jackson.databind.json.JsonMapper;
  *
  * <p>Mismo caso que {@code AlcabalaControllerTest}: el conjunto sellado que falta y la llave que
  * falta dentro de el salian como 500 {@code ERROR_INTERNO} con identificador de incidencia, y
- * ninguna de las dos es un fallo del servidor. Aqui la llave lleva ademas el tipo del evento
- * —{@code ALICUOTA_ESPECTACULO:CINE}—, que es justo lo que quien atiende necesita para pedir la
- * ordenanza que le falta.
+ * ninguna de las dos es un fallo del servidor. Aqui la llave lleva ademas la clase del evento
+ * —{@code ESPECTACULO_ALICUOTA:CINEMATOGRAFICO}—, que es justo lo que quien atiende necesita para
+ * pedir la cifra que le falta.
+ *
+ * <h2>El conjunto es el que {@code normativa} sella, y la clase no la elige quien teclea (#376)
+ * </h2>
+ *
+ * <p>Hasta #376 esta prueba sembraba a mano {@code ALICUOTA_ESPECTACULO:CINE}: ni el prefijo es el
+ * que {@code normativa} publica —{@code ESPECTACULO_ALICUOTA}— ni {@code CINE} es una clave del
+ * art. 57. Con el conjunto real <b>ningun</b> texto llegaba a determinar. Ahora el conjunto por
+ * omision se compone con {@link DerivadoPublicado}, y el taurino se prueba a los dos lados del
+ * umbral: una muestra con solo {@code CINEMATOGRAFICO} no distingue la eleccion buena de la mala.
  */
 @DisplayName("Capa web — POST /api/v1/rentas/espectaculos")
 class EspectaculoControllerTest {
@@ -64,18 +74,14 @@ class EspectaculoControllerTest {
 
     private static final Ejercicio EJERCICIO = new Ejercicio(2026);
 
-    private static final String CUERPO =
-            "{\"organizadorId\":501,\"denominacion\":\"FUNCION DE ESTRENO\",\"tipo\":\"cine\","
-                    + "\"lugar\":\"CINE CENTRAL\",\"fechaEvento\":\"2026-09-12\",\"aforo\":300,"
-                    + "\"ingresoDeclarado\":\"9000.00\",\"observacion\":"
-                    + "\"Registro del evento presentado en mesa de partes\"}";
+    private static final String CUERPO = cuerpo("cinematografico", null, "9000.00");
 
     private final AuditoriaDePrueba auditoria = new AuditoriaDePrueba();
     private final ComprobadorDePrueba comprobador = new ComprobadorDePrueba();
     private final DeterminacionesEnMemoria determinaciones = new DeterminacionesEnMemoria();
     private final EventosEnMemoria eventos = new EventosEnMemoria();
 
-    private MockMvc mvc = montar(lector(conjuntoCompleto()));
+    private MockMvc mvc = montar(DerivadoPublicado.conjuntoDelEjercicio(EJERCICIO));
 
     @BeforeEach
     void fijarOrigen() {
@@ -87,14 +93,115 @@ class EspectaculoControllerTest {
         OrigenContext.limpiar();
     }
 
+    /**
+     * <b>Con el conjunto que {@code normativa} sella, el espectaculo se determina</b> (#376).
+     *
+     * <p>El cine paga el 10 % (TUO LTM art. 57): {@code 9 000 × 10 % = 900}. Hasta #376 esto
+     * contestaba 422 nombrando {@code ALICUOTA_ESPECTACULO:CINEMATOGRAFICO}, un prefijo que nadie
+     * publica. Y la clase llega en minusculas a proposito: la clave del art. 57 no depende de como
+     * se escriba.
+     */
     @Test
-    @DisplayName("con la alicuota publicada registra el evento y determina")
-    void registraConLaAlicuotaPublicada() throws Exception {
+    @DisplayName("#376 — con el conjunto que normativa sella determina el cine al 10 %")
+    void registraConElConjuntoQueNormativaSella() throws Exception {
         MvcResult resultado = mvc.perform(registrar()).andReturn();
 
-        assertThat(resultado.getResponse().getStatus()).isEqualTo(201);
+        assertThat(resultado.getResponse().getStatus())
+                .as(
+                        "el 10 %% esta sellado bajo ESPECTACULO_ALICUOTA:CINEMATOGRAFICO. Cuerpo: %s",
+                        resultado.getResponse().getContentAsString())
+                .isEqualTo(201);
         assertThat(determinaciones.insertadas).isEqualTo(1);
         assertThat(auditoria.registros).hasSize(1);
+        assertThat(determinaciones.ultima.montoDeterminado()).isEqualTo(Dinero.de("900.00"));
+        assertThat(determinaciones.ultima.reglasAplicadas())
+                .containsExactly("ESPECTACULO_ALICUOTA:CINEMATOGRAFICO");
+    }
+
+    /**
+     * <b>El taurino, a los dos lados del umbral</b> (#376; TUO LTM art. 57, texto de la Ley 29168).
+     *
+     * <p>Paga el 10 % si el valor de la entrada es <b>superior</b> al 0,5 % de la UIT, y el 5 % en
+     * los demas casos. Con la UIT de 2026 —5 500— el umbral es 27,50: una entrada de 27,51 esta por
+     * encima, y una de 27,50 no lo esta («no superior»). Las dos muestras juntas son las que
+     * distinguen {@code >} de {@code >=}; cualquiera de las dos sola, no.
+     */
+    @Test
+    @DisplayName("#376 — el taurino con la entrada a 27,51 paga el 10 %: supera el 0,5 % de la UIT")
+    void elTaurinoPorEncimaDelUmbral() throws Exception {
+        MvcResult resultado =
+                mvc.perform(registrar(cuerpo("TAURINO", "27.51", "10000.00"))).andReturn();
+
+        assertThat(resultado.getResponse().getStatus())
+                .as("cuerpo: %s", resultado.getResponse().getContentAsString())
+                .isEqualTo(201);
+        assertThat(determinaciones.ultima.montoDeterminado())
+                .as("10 000 × 10 %")
+                .isEqualTo(Dinero.de("1000.00"));
+        assertThat(determinaciones.ultima.reglasAplicadas())
+                .containsExactly("ESPECTACULO_ALICUOTA:TAURINO-SUPERIOR-0.5-UIT");
+    }
+
+    @Test
+    @DisplayName("#376 — y con la entrada a 27,50 paga el 5 %: igualar el umbral no es superarlo")
+    void elTaurinoEnElUmbral() throws Exception {
+        MvcResult resultado =
+                mvc.perform(registrar(cuerpo("TAURINO", "27.50", "10000.00"))).andReturn();
+
+        assertThat(resultado.getResponse().getStatus())
+                .as("cuerpo: %s", resultado.getResponse().getContentAsString())
+                .isEqualTo(201);
+        assertThat(determinaciones.ultima.montoDeterminado())
+                .as("10 000 × 5 %: 27,50 es exactamente el 0,5 % de 5 500, y no lo supera")
+                .isEqualTo(Dinero.de("500.00"));
+        assertThat(determinaciones.ultima.reglasAplicadas())
+                .containsExactly("ESPECTACULO_ALICUOTA:TAURINO-RESTO");
+    }
+
+    @Test
+    @DisplayName("#376 — cual de las dos alicuotas del taurino rige no lo elige quien teclea")
+    void laAlicuotaDelTaurinoNoSeTeclea() throws Exception {
+        MvcResult resultado =
+                mvc.perform(registrar(cuerpo("TAURINO-RESTO", "100.00", "10000.00"))).andReturn();
+
+        assertThat(resultado.getResponse().getStatus()).isEqualTo(422);
+        assertThat(resultado.getResponse().getContentAsString())
+                .as(
+                        "con una entrada de 100 rige el 10 %: aceptar TAURINO-RESTO tecleado"
+                                + " cobraria la mitad. Y no es una cifra sin publicar")
+                .contains("VALIDACION")
+                .contains("TAURINO")
+                .doesNotContain("parametroQueFalta");
+        assertThat(determinaciones.insertadas).isZero();
+    }
+
+    @Test
+    @DisplayName("#376 — el taurino sin valor de entrada no se determina: sin el no hay umbral")
+    void elTaurinoSinValorDeEntrada() throws Exception {
+        MvcResult resultado =
+                mvc.perform(registrar(cuerpo("TAURINO", null, "10000.00"))).andReturn();
+
+        assertThat(resultado.getResponse().getStatus()).isEqualTo(422);
+        assertThat(resultado.getResponse().getContentAsString())
+                .contains("valorEntrada")
+                .doesNotContain("parametroQueFalta");
+        assertThat(determinaciones.insertadas).isZero();
+    }
+
+    @Test
+    @DisplayName(
+            "#376 — una clase que no es del art. 57 es 422 de la peticion, no «falta publicar»")
+    void unaClaseFueraDelArticulo57() throws Exception {
+        MvcResult resultado = mvc.perform(registrar(cuerpo("CINE", null, "9000.00"))).andReturn();
+
+        assertThat(resultado.getResponse().getStatus()).isEqualTo(422);
+        assertThat(resultado.getResponse().getContentAsString())
+                .as(
+                        "«CINE» no es una clave del art. 57: lo que hay que corregir es la"
+                                + " peticion, y el mensaje dice cuales hay")
+                .contains("CINEMATOGRAFICO")
+                .doesNotContain("parametroQueFalta");
+        assertThat(determinaciones.insertadas).isZero();
     }
 
     /**
@@ -183,7 +290,7 @@ class EspectaculoControllerTest {
     }
 
     @Test
-    @DisplayName("la alicuota del tipo que el conjunto no trae es 422, y la nombra con su tipo")
+    @DisplayName("la alicuota de la clase que el conjunto no trae es 422, y la nombra con su clase")
     void laLlaveQueFaltaSeNombraConSuTipo() throws Exception {
         mvc = montar(lector(conjuntoSinLaAlicuotaDelCine()));
 
@@ -192,12 +299,13 @@ class EspectaculoControllerTest {
         assertThat(resultado.getResponse().getStatus()).isEqualTo(422);
         assertThat(resultado.getResponse().getContentAsString())
                 .as("sin el tipo, quien atiende no sabe que ordenanza pedir")
-                .contains("ALICUOTA_ESPECTACULO:CINE")
+                .contains("ESPECTACULO_ALICUOTA:CINEMATOGRAFICO")
                 .doesNotContain("incidencia");
         assertThat(resultado.getResponse().getContentAsString())
                 .as("#691 — y la misma llave, legible por programa")
                 .contains(
-                        "\"parametroQueFalta\":{\"ejercicio\":2026,\"llave\":\"ALICUOTA_ESPECTACULO:CINE\"}");
+                        "\"parametroQueFalta\":{\"ejercicio\":2026,"
+                                + "\"llave\":\"ESPECTACULO_ALICUOTA:CINEMATOGRAFICO\"}");
     }
 
     @Test
@@ -241,9 +349,23 @@ class EspectaculoControllerTest {
     // ---------------------------------------------------------------- utilidades
 
     private static org.springframework.test.web.servlet.RequestBuilder registrar() {
+        return registrar(CUERPO);
+    }
+
+    private static org.springframework.test.web.servlet.RequestBuilder registrar(String cuerpo) {
         return post("/rentas/api/v1/rentas/espectaculos")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(CUERPO);
+                .content(cuerpo);
+    }
+
+    private static String cuerpo(String tipo, String valorEntrada, String ingresoDeclarado) {
+        return "{\"organizadorId\":501,\"denominacion\":\"FUNCION DE ESTRENO\",\"tipo\":\""
+                + tipo
+                + "\",\"lugar\":\"CINE CENTRAL\",\"fechaEvento\":\"2026-09-12\",\"aforo\":300,"
+                + (valorEntrada == null ? "" : "\"valorEntrada\":\"" + valorEntrada + "\",")
+                + "\"ingresoDeclarado\":\""
+                + ingresoDeclarado
+                + "\",\"observacion\":\"Registro del evento presentado en mesa de partes\"}";
     }
 
     private MockMvc montar(LectorDeParametros parametros) {
@@ -267,15 +389,11 @@ class EspectaculoControllerTest {
                 .build();
     }
 
-    private static ParametrosSellados conjuntoCompleto() {
-        return ParametrosSellados.de(EJERCICIO, 1)
-                .numero("ALICUOTA_ESPECTACULO", "CINE", ValorNormativo.de("10"))
-                .construir();
-    }
-
+    /** Un conjunto con la UIT y otra clase del art. 57, pero no la del cine. */
     private static ParametrosSellados conjuntoSinLaAlicuotaDelCine() {
         return ParametrosSellados.de(EJERCICIO, 1)
-                .numero("ALICUOTA_ESPECTACULO", "TEATRO", ValorNormativo.de("10"))
+                .numero("UIT", null, ValorNormativo.de("5500.00"))
+                .numero("ESPECTACULO_ALICUOTA", "OTROS", ValorNormativo.de("10"))
                 .construir();
     }
 
@@ -387,6 +505,9 @@ class EspectaculoControllerTest {
         /** Un defecto de verdad del servidor, para el contraste de #540. */
         private boolean revienta;
 
+        /** La ultima determinacion que llego a guardarse, con su monto (#376). */
+        private Determinacion ultima;
+
         @Override
         public Optional<Determinacion> findById(long id) {
             return Optional.empty();
@@ -419,6 +540,7 @@ class EspectaculoControllerTest {
                 throw new IllegalStateException("un defecto de verdad, con su rastro");
             }
             insertadas++;
+            ultima = determinacion;
             return new Determinacion(
                     900L + insertadas,
                     determinacion.ejercicio(),
