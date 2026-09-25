@@ -63,6 +63,7 @@ class ResolucionControllerTest {
     private static final long PREDIO = 20L;
     private static final long CONTRIBUYENTE = 10L;
 
+    private ActasEnMemoria actas;
     private DocumentosEnMemoria documentos;
     private LiquidacionesEnMemoria liquidaciones;
     private MovimientosDeLiquidacionEnMemoria movimientos;
@@ -73,7 +74,7 @@ class ResolucionControllerTest {
 
     @BeforeEach
     void armar() {
-        ActasEnMemoria actas = new ActasEnMemoria();
+        actas = new ActasEnMemoria();
         liquidaciones = new LiquidacionesEnMemoria();
         movimientos = new MovimientosDeLiquidacionEnMemoria();
         resoluciones = new ResolucionesEnMemoria();
@@ -258,6 +259,24 @@ class ResolucionControllerTest {
                         """);
 
         assertThat(resultado.getResponse().getStatus()).isEqualTo(404);
+    }
+
+    @Test
+    @DisplayName(
+            "#339 — con el acta ANULADA la transferencia es 409, nombra el acta y no toca el"
+                    + " padron")
+    void conElActaAnulada409() throws Exception {
+        actas.anular(liquidacion.actaId());
+
+        MvcResult resultado = transferir(cuerpoCompleto());
+
+        assertThat(resultado.getResponse().getStatus()).isEqualTo(409);
+        assertThat(resultado.getResponse().getContentAsString())
+                .contains("CONFLICTO")
+                .contains("El acta " + liquidacion.actaId() + " esta anulada")
+                .contains("levantar otra acta");
+        assertThat(padron.escrituras()).isZero();
+        assertThat(resoluciones.cuantas()).isZero();
     }
 
     @Test

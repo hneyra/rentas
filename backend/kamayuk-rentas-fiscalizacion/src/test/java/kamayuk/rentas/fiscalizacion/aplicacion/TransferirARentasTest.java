@@ -443,6 +443,46 @@ class TransferirARentasTest {
         }
     }
 
+    @Nested
+    @DisplayName("#339 — Una visita anulada no sostiene ninguna resolucion de determinacion")
+    class DeLaVisitaAnulada {
+
+        @Test
+        @DisplayName(
+                "una liquidacion LIQUIDADA cuya acta esta ANULADA no se transfiere: ActaAnulada, y"
+                        + " ni padron, ni papel, ni cargo")
+        void conElActaAnuladaNoSeTransfiere() {
+            // La liquidacion esta en el estado que la transferencia exige —LIQUIDADA, con su
+            // papel de sustento—, asi que lo unico que la separa del control de abajo es la
+            // visita. Hasta #339 la transferencia leia el acta solo para sacar la unidad, el
+            // contribuyente y el area, y emitia la RDF sobre una visita invalida.
+            Liquidacion liquidacion = liquidacionLista(conCifras());
+            actas.anular(liquidacion.actaId());
+
+            assertThatThrownBy(() -> transferir(liquidacion))
+                    .isInstanceOf(ActaFiscalizacion.ActaAnulada.class)
+                    .hasMessageContaining("El acta " + liquidacion.actaId() + " esta anulada")
+                    .hasMessageContaining("levantar otra acta");
+
+            assertThat(padron.escrituras()).as("el padron no se toco").isZero();
+            assertThat(documentos.cuantos()).as("no salio ningun papel").isZero();
+            assertThat(cargos.asentados()).as("ni se asento ningun cargo").isEmpty();
+            assertThat(resoluciones.cuantas()).as("ni se registro la resolucion").isZero();
+        }
+
+        @Test
+        @DisplayName("el control: la misma liquidacion con el acta ABIERTA si se transfiere")
+        void conElActaAbiertaSiSeTransfiere() {
+            Liquidacion liquidacion = liquidacionLista(conCifras());
+
+            TransferirARentas.Transferencia hecha = transferir(liquidacion);
+
+            assertThat(hecha.resolucion().numero()).startsWith("RDF-2026-");
+            assertThat(padron.escrituras()).isEqualTo(1);
+            assertThat(cargos.asentados()).isNotEmpty();
+        }
+    }
+
     // ------------------------------------------------------------------
 
     private TransferirARentas.Transferencia transferir(Liquidacion liquidacion) {

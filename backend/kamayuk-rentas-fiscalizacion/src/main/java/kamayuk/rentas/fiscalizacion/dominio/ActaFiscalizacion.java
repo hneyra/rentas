@@ -245,6 +245,46 @@ public record ActaFiscalizacion(
                 observacion);
     }
 
+    /**
+     * Exige que la visita cuente: la regla que sostiene todo lo que parte de un acta (#339).
+     *
+     * <p>#214 hizo alcanzable {@code ANULADA}, y de los casos de uso que parten de un acta solo el
+     * que la anula miraba su estado: liquidar, reliquidar y transferir seguian adelante sobre una
+     * visita que la administracion ya habia declarado invalida, hasta emitir una resolucion de
+     * determinacion sustentada en ella. La invariante vive <b>aqui</b> y no en tres {@code if}
+     * sueltos por lo mismo que {@link #anulada}: un camino nuevo que parta de un acta pasa por esta
+     * puerta sin tener que reescribir la regla.
+     *
+     * <p>Se decide con {@link EstadoDeActa#estaViva()}, que es el predicado en su forma de objeto
+     * del {@code estado <> 'ANULADA'} que escriben las tres consultas del repositorio: el caso de
+     * uso y el SQL no pueden discrepar sobre que visita cuenta.
+     *
+     * @throws ActaAnulada si la visita ya no vale
+     */
+    public void exigirViva() {
+        if (!estado.estaViva()) {
+            throw new ActaAnulada(id);
+        }
+    }
+
+    /**
+     * El acta esta anulada, y una visita anulada no sostiene ninguna liquidacion ni ninguna
+     * resolucion de determinacion (#339). No hay nada que corregir en ella: lo que procede es
+     * levantar otra acta —otra version sobre la misma unidad— y liquidar esa.
+     */
+    public static final class ActaAnulada extends RuntimeException {
+        @java.io.Serial private static final long serialVersionUID = 1L;
+
+        ActaAnulada(@Nullable Long id) {
+            super(
+                    "El acta "
+                            + id
+                            + " esta anulada: una visita que no vale no sostiene ninguna"
+                            + " liquidacion ni resolucion de determinacion. Lo que procede es"
+                            + " levantar otra acta sobre la misma unidad y liquidar esa");
+        }
+    }
+
     /** El acta no admite ese acto en el estado en que esta. */
     public static final class TransicionIlegal extends RuntimeException {
         @java.io.Serial private static final long serialVersionUID = 1L;

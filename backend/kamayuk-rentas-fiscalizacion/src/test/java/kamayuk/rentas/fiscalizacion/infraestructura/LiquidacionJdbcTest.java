@@ -8,7 +8,9 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.Clock;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -27,6 +29,13 @@ import kamayuk.rentas.dominio.MunicipalidadId;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.esquema.BaseDeDatosDePrueba;
 import kamayuk.rentas.esquema.ContextoDeTenant;
+import kamayuk.rentas.fiscalizacion.aplicacion.AnularActaFiscalizacion;
+import kamayuk.rentas.fiscalizacion.aplicacion.LiquidarFiscalizacion;
+import kamayuk.rentas.fiscalizacion.aplicacion.ReliquidarFiscalizacion;
+import kamayuk.rentas.fiscalizacion.dobles.DeclaracionesDeMentira;
+import kamayuk.rentas.fiscalizacion.dobles.PadronDeMentira;
+import kamayuk.rentas.fiscalizacion.dobles.ParametrosDeMentira;
+import kamayuk.rentas.fiscalizacion.dominio.ActaFiscalizacion;
 import kamayuk.rentas.fiscalizacion.dominio.CondicionFiscalizada;
 import kamayuk.rentas.fiscalizacion.dominio.CriterioDeLiquidaciones;
 import kamayuk.rentas.fiscalizacion.dominio.EstadoDeLiquidacion;
@@ -43,8 +52,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.springframework.aop.framework.ProxyFactory;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
+import org.springframework.transaction.annotation.AnnotationTransactionAttributeSource;
+import org.springframework.transaction.interceptor.TransactionInterceptor;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
@@ -67,6 +79,8 @@ class LiquidacionJdbcTest {
     private static BaseDeDatosDePrueba base;
     private static long municipalidadA;
     private static long municipalidadB;
+    private static long municipalidadC;
+    private static TenantTransactionManager gestor;
     private static TransactionTemplate transaccion;
     private static LiquidacionRepositoryJdbc liquidaciones;
     private static MovimientoDeLiquidacionRepositoryJdbc movimientos;
@@ -82,6 +96,9 @@ class LiquidacionJdbcTest {
         base = BaseDeDatosDePrueba.provisionar();
         municipalidadA = crearMunicipalidad("250901", "Municipalidad de liquidacion A");
         municipalidadB = crearMunicipalidad("250902", "Municipalidad de liquidacion B");
+        // La de la carrera (#339): los casos de uso numeran con el correlativo real, y en A
+        // chocarian con los numeros que `primera` compone a mano.
+        municipalidadC = crearMunicipalidad("250903", "Municipalidad de liquidacion C");
 
         pool = new DriverManagerDataSource();
         pool.setUrl(base.url());
@@ -89,7 +106,8 @@ class LiquidacionJdbcTest {
         pool.setPassword(base.clave(BaseDeDatosDePrueba.APP));
 
         jdbc = JdbcClient.create(pool);
-        transaccion = new TransactionTemplate(new TenantTransactionManager(pool));
+        gestor = new TenantTransactionManager(pool);
+        transaccion = new TransactionTemplate(gestor);
         liquidaciones = new LiquidacionRepositoryJdbc(jdbc);
         movimientos = new MovimientoDeLiquidacionRepositoryJdbc(jdbc);
     }
@@ -709,6 +727,264 @@ class LiquidacionJdbcTest {
                                     .contenido())
                     .isEmpty();
         }
+    }
+
+    /**
+     * #339, camino 3: anular la visita y liquidarla a la vez.
+     *
+     * <p>En READ COMMITTED las dos transacciones leian «sin liquidacion» y «ABIERTA», y las dos
+     * confirmaban: ni el {@code UPDATE (estado)} de la anulacion ni la foranea de la liquidacion se
+     * estorban —el primero toma {@code FOR NO KEY UPDATE} y la segunda {@code FOR KEY SHARE}, que
+     * son compatibles—. Lo que las ordena es el {@code SELECT … FOR UPDATE} sobre la fila del acta
+     * al principio de cada caso de uso.
+     *
+     * <p>Cada prueba abre una transaccion que <b>se queda con el acta</b> —con el caso de uso de
+     * produccion dentro, sin confirmar—, lanza el otro caso de uso en otra conexion, espera a verlo
+     * bloqueado en {@code pg_locks} y solo entonces confirma. Lo que se afirma es el desenlace: el
+     * que llego segundo tiene que ver lo que el primero dejo.
+     */
+    @Nested
+    @DisplayName("#339 — la carrera entre anular la visita y liquidarla")
+    class LaCarreraConLaAnulacion {
+
+        private static final LocalDate DIA = LocalDate.of(2026, 3, 16);
+
+        @Test
+        @DisplayName("se anula primero: la liquidacion espera, ve el acta ANULADA y no nace")
+        void seAnulaPrimeroYLaLiquidacionNoNace() throws Exception {
+            TenantContext.fijar(new MunicipalidadId(municipalidadC));
+            Escenario escenario = sembrar(municipalidadC);
+            CasosDeUso casos = casosDeUso(escenario);
+
+            RuntimeException desenlace =
+                    mientrasOtraTransaccionLaTiene(
+                            () -> casos.anular().anular(escenario.actaId, DIA, OBSERVACION),
+                            () -> casos.liquidar(escenario));
+
+            assertThat(desenlace)
+                    .as(
+                            "sin el FOR UPDATE de la liquidacion, lee ABIERTA sin esperar y emite"
+                                    + " una liquidacion sobre una visita anulada")
+                    .isInstanceOf(ActaFiscalizacion.ActaAnulada.class);
+            assertThat(versionesDe(escenario)).isZero();
+        }
+
+        @Test
+        @DisplayName("se liquida primero: la anulacion espera, ve la liquidacion y no anula")
+        void seLiquidaPrimeroYLaVisitaNoSeAnula() throws Exception {
+            TenantContext.fijar(new MunicipalidadId(municipalidadC));
+            Escenario escenario = sembrar(municipalidadC);
+            CasosDeUso casos = casosDeUso(escenario);
+
+            RuntimeException desenlace =
+                    mientrasOtraTransaccionLaTiene(
+                            () -> casos.liquidar(escenario),
+                            () -> casos.anular().anular(escenario.actaId, DIA, OBSERVACION));
+
+            assertThat(desenlace)
+                    .as(
+                            "sin el FOR UPDATE de la anulacion, no ve la liquidacion todavia sin"
+                                    + " confirmar y deja la visita anulada sosteniendola")
+                    .isInstanceOf(AnularActaFiscalizacion.ActaConLiquidacionViva.class);
+            assertThat(versionesDe(escenario)).isEqualTo(1);
+            assertThat(estadoDelActa(escenario)).isEqualTo("ABIERTA");
+        }
+
+        @Test
+        @DisplayName(
+                "se anula primero con la liquidacion ya anulada: la reliquidacion espera y no nace"
+                        + " la version 2")
+        void seAnulaPrimeroYLaReliquidacionNoNace() throws Exception {
+            TenantContext.fijar(new MunicipalidadId(municipalidadC));
+            Escenario escenario = sembrar(municipalidadC);
+            CasosDeUso casos = casosDeUso(escenario);
+            // Camino 2 del issue: la liquidacion se anula primero, que es lo que habilita anular
+            // la visita. Lo que queda en carrera es reliquidarla contra esa anulacion.
+            Liquidacion primera = casos.liquidar(escenario);
+            transaccion.execute(
+                    estado ->
+                            movimientos.insertar(
+                                    MovimientoDeLiquidacion.cambioDeEstado(
+                                            primera.identificador(),
+                                            EstadoDeLiquidacion.ANULADA,
+                                            DIA,
+                                            "Se deja sin efecto",
+                                            OBSERVACION)));
+
+            RuntimeException desenlace =
+                    mientrasOtraTransaccionLaTiene(
+                            () -> casos.anular().anular(escenario.actaId, DIA, OBSERVACION),
+                            () ->
+                                    casos.reliquidar()
+                                            .reliquidar(
+                                                    primera.numero(),
+                                                    E2024,
+                                                    E2024,
+                                                    TipoDeFiscalizacion.CIERTA,
+                                                    "Se corrige la liquidacion anulada",
+                                                    List.of(),
+                                                    DIA,
+                                                    OBSERVACION));
+
+            assertThat(desenlace)
+                    .as(
+                            "sin el FOR UPDATE de la reliquidacion, nace una v2 ABIERTA sobre una"
+                                    + " visita anulada")
+                    .isInstanceOf(ActaFiscalizacion.ActaAnulada.class);
+            assertThat(versionesDe(escenario)).isEqualTo(1);
+        }
+
+        /**
+         * Corre {@code primero} en una transaccion que no confirma hasta ver a {@code segundo}
+         * esperando un bloqueo —o terminado, que es lo que pasa sin el {@code FOR UPDATE}—, y
+         * devuelve con que salio {@code segundo}: {@code null} si salio bien.
+         */
+        @SuppressWarnings("checkstyle:IllegalCatch")
+        private RuntimeException mientrasOtraTransaccionLaTiene(
+                Runnable primero, java.util.function.Supplier<?> segundo) throws Exception {
+            ExecutorService otroHilo = Executors.newSingleThreadExecutor();
+            try {
+                Future<RuntimeException> desenlace =
+                        transaccion.execute(
+                                estado -> {
+                                    primero.run();
+                                    Future<RuntimeException> enCurso =
+                                            otroHilo.submit(
+                                                    () -> {
+                                                        TenantContext.fijar(
+                                                                new MunicipalidadId(
+                                                                        municipalidadC));
+                                                        OrigenContext.fijar(
+                                                                new Origen(
+                                                                        "fiscalizador.campo",
+                                                                        null,
+                                                                        null));
+                                                        try {
+                                                            segundo.get();
+                                                            return null;
+                                                        } catch (RuntimeException rechazo) {
+                                                            return rechazo;
+                                                        } finally {
+                                                            TenantContext.limpiar();
+                                                            OrigenContext.limpiar();
+                                                        }
+                                                    });
+                                    esperarBloqueadoOTerminado(enCurso);
+                                    return enCurso;
+                                });
+                return desenlace.get(30, TimeUnit.SECONDS);
+            } finally {
+                otroHilo.shutdownNow();
+            }
+        }
+
+        /**
+         * Hasta diez segundos para que el segundo quede esperando un bloqueo, o termine.
+         *
+         * <p>Se mira {@code pg_locks} y no un reloj: confirmar antes de que el segundo llegue a
+         * pedir la fila lo dejaria leer el acta ya confirmada, y la prueba pasaria sin carrera.
+         */
+        private void esperarBloqueadoOTerminado(Future<?> enCurso) {
+            long limite = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+            while (System.nanoTime() < limite) {
+                if (enCurso.isDone() || hayUnBloqueoEnEspera()) {
+                    return;
+                }
+                try {
+                    Thread.sleep(20);
+                } catch (InterruptedException interrumpido) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+            }
+            throw new IllegalStateException(
+                    "El segundo caso de uso ni termino ni quedo esperando en diez segundos");
+        }
+
+        private boolean hayUnBloqueoEnEspera() {
+            try (Connection app = base.conexion(BaseDeDatosDePrueba.APP);
+                    PreparedStatement sentencia =
+                            app.prepareStatement(
+                                    "SELECT count(*) FROM pg_locks WHERE NOT granted");
+                    ResultSet resultado = sentencia.executeQuery()) {
+                resultado.next();
+                return resultado.getLong(1) > 0;
+            } catch (SQLException excepcion) {
+                throw new IllegalStateException(excepcion);
+            }
+        }
+
+        private long versionesDe(Escenario escenario) {
+            return transaccion.execute(
+                    estado -> (long) liquidaciones.versionesDeActa(escenario.actaId).size());
+        }
+
+        private String estadoDelActa(Escenario escenario) {
+            return transaccion.execute(
+                    estado ->
+                            jdbc.sql("SELECT estado FROM acta_fiscalizacion WHERE id = :id")
+                                    .param("id", escenario.actaId)
+                                    .query(String.class)
+                                    .single());
+        }
+    }
+
+    /**
+     * Los tres casos de uso de produccion contra los repositorios reales, cada uno con su
+     * {@code @Transactional} de verdad (mismo criterio que {@code TransferenciaJdbcTest}). Catastro
+     * y rentas son dobles de lectura: la carrera es sobre la fila del acta, no sobre el contraste.
+     */
+    private record CasosDeUso(
+            LiquidarFiscalizacion liquidarFiscalizacion,
+            ReliquidarFiscalizacion reliquidar,
+            AnularActaFiscalizacion anular) {
+
+        Liquidacion liquidar(Escenario escenario) {
+            return liquidarFiscalizacion.liquidar(
+                    escenario.actaId,
+                    E2024,
+                    E2024,
+                    TipoDeFiscalizacion.CIERTA,
+                    "Ampliacion detectada en inspeccion",
+                    HOY,
+                    OBSERVACION);
+        }
+    }
+
+    private static CasosDeUso casosDeUso(Escenario escenario) {
+        ActaFiscalizacionRepositoryJdbc actas = new ActaFiscalizacionRepositoryJdbc(jdbc);
+        PadronDeMentira catastro = new PadronDeMentira();
+        LiquidarFiscalizacion liquidar =
+                new LiquidarFiscalizacion(
+                        actas,
+                        liquidaciones,
+                        movimientos,
+                        new ParametrosDeMentira().sellar(2024, escenario.conjunto2024, 1),
+                        catastro,
+                        catastro,
+                        new DeclaracionesDeMentira(),
+                        registro -> {},
+                        Clock.fixed(HOY.atStartOfDay(ZoneOffset.UTC).toInstant(), ZoneOffset.UTC));
+        return new CasosDeUso(
+                envolver(liquidar),
+                envolver(new ReliquidarFiscalizacion(actas, liquidaciones, liquidar)),
+                envolver(
+                        new AnularActaFiscalizacion(
+                                actas,
+                                liquidaciones,
+                                movimientos,
+                                new ResolucionDeDeterminacionRepositoryJdbc(jdbc),
+                                registro -> {})));
+    }
+
+    /** Un proxy transaccional de verdad: la anotacion que se mide es la de produccion. */
+    @SuppressWarnings("unchecked")
+    private static <T> T envolver(T objetivo) {
+        ProxyFactory fabrica = new ProxyFactory(objetivo);
+        fabrica.setProxyTargetClass(true);
+        fabrica.addAdvice(
+                new TransactionInterceptor(gestor, new AnnotationTransactionAttributeSource()));
+        return (T) fabrica.getProxy();
     }
 
     // ------------------------------------------------------------------

@@ -14,6 +14,20 @@ public interface ActaFiscalizacionRepository {
     java.util.Optional<ActaFiscalizacion> findById(long id);
 
     /**
+     * El acta, <b>bloqueando su fila</b> hasta el final de la transaccion (#339).
+     *
+     * <p>Es la lectura de los casos de uso que deciden sobre la visita —anularla, o liquidar y
+     * reliquidar sobre ella—. Con {@link #findById} a secas, en READ COMMITTED, anular y liquidar
+     * la misma acta a la vez leian las dos «ABIERTA, sin liquidacion» y confirmaban las dos: una
+     * liquidacion viva sobre una visita anulada. Bloqueando la fila, la segunda espera a que la
+     * primera confirme y lee lo que dejo.
+     *
+     * <p>Exige una transaccion abierta: fuera de ella el bloqueo se soltaria en la misma sentencia
+     * y no ordenaria nada.
+     */
+    java.util.Optional<ActaFiscalizacion> findByIdParaActualizar(long id);
+
+    /**
      * Anula el acta: la unica escritura que mueve su estado (#214).
      *
      * <p>Mueve <b>una columna</b> y ninguna mas, y no es una convencion: desde V19 {@code

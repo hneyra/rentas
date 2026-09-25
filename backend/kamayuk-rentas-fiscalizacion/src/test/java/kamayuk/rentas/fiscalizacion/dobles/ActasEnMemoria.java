@@ -60,6 +60,15 @@ public final class ActasEnMemoria implements ActaFiscalizacionRepository {
         return guardadas.stream().filter(acta -> acta.id() != null && acta.id() == id).findFirst();
     }
 
+    /**
+     * En memoria no hay carrera que ordenar: es la misma lectura. El bloqueo de la fila (#339) se
+     * mide contra PostgreSQL, con dos conexiones, en {@code LiquidacionJdbcTest}.
+     */
+    @Override
+    public Optional<ActaFiscalizacion> findByIdParaActualizar(long id) {
+        return findById(id);
+    }
+
     @Override
     public int siguienteVersion(
             long programaId,

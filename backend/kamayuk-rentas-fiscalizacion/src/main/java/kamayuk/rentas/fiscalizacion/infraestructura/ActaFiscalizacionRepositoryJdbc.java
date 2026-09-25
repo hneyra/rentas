@@ -21,6 +21,9 @@ import org.springframework.stereotype.Repository;
  * estado} y ninguna otra. Es la única transición del acta, y lo que la acota no es esta clase sino
  * el privilegio: desde V19 {@code kamayuk_app} tiene {@code UPDATE (estado)} y no {@code UPDATE}
  * sobre la tabla.
+ *
+ * <p>Y hay <b>un</b> {@code SELECT … FOR UPDATE}, desde #339: {@link #findByIdParaActualizar}, que
+ * ordena a quien anula la visita y a quien liquida sobre ella.
  */
 @Repository
 public class ActaFiscalizacionRepositoryJdbc extends RepositorioJdbc
@@ -121,6 +124,27 @@ public class ActaFiscalizacionRepositoryJdbc extends RepositorioJdbc
     @Override
     public java.util.Optional<ActaFiscalizacion> findById(long id) {
         return jdbc().sql("SELECT " + COLUMNAS + DESDE + " WHERE id = :id")
+                .param("id", id)
+                .query(ActaFiscalizacionRepositoryJdbc::mapear)
+                .optional();
+    }
+
+    /**
+     * El acta con su fila bloqueada hasta el final de la transaccion (#339).
+     *
+     * <p>{@code FOR UPDATE} y no {@code FOR NO KEY UPDATE}, porque es lo que el issue fija y porque
+     * el coste es nulo: lo unico que ademas excluye es a quien quiera {@code FOR KEY SHARE} sobre
+     * esta acta —insertar una fila hija que la referencie—, y eso solo lo hace liquidarla, que
+     * tiene que esperar de todos modos. PostgreSQL exige {@code UPDATE} sobre alguna columna para
+     * bloquear la fila, y {@code kamayuk_app} lo tiene sobre {@code estado} desde V19.
+     *
+     * <p>En READ COMMITTED quien espera no se queda con la foto vieja: cuando el otro confirma, la
+     * sentencia relee la version nueva de la fila. Por eso la liquidacion que llega segunda ve el
+     * acta ya {@code ANULADA}.
+     */
+    @Override
+    public java.util.Optional<ActaFiscalizacion> findByIdParaActualizar(long id) {
+        return jdbc().sql("SELECT " + COLUMNAS + DESDE + " WHERE id = :id FOR UPDATE")
                 .param("id", id)
                 .query(ActaFiscalizacionRepositoryJdbc::mapear)
                 .optional();
