@@ -461,6 +461,119 @@ class RegistrarTransferenciaTest {
                     .isEqualTo(1L);
         }
 
+        /**
+         * La cadena de un vehiculo solo crece hacia adelante (#473).
+         *
+         * <p>La siembra que distingue es la del issue: A→B el 10/06 y despues una fechada el 01/03.
+         * El transferente sale del titular de HOY —B—, asi que la retroactiva quedaba B→C el 01/03,
+         * y la cadena ordenada por fecha empezaba el ejercicio 2026 en B: {@code
+         * PropietarioAlPrimeroDeEnero} le daba a B un ejercicio que era de A. Una transferencia en
+         * la MISMA fecha que la ultima si entra —dos actos el mismo dia se ordenan por registro, y
+         * el comparador de la regla ya lo sabe—: es el borde que separa «anterior» de «no
+         * posterior».
+         */
+        @Test
+        @DisplayName(
+                "una transferencia fechada antes de la ultima del vehiculo se rechaza nombrando"
+                        + " las dos fechas, y el ejercicio sigue siendo de quien lo tenia (#473)")
+        void unaTransferenciaAnteriorALaUltimaSeRechaza() throws SQLException {
+            long a = crearContribuyente("TR-0030", "80300030");
+            long b = crearContribuyente("TR-0031", "80300031");
+            long c = crearContribuyente("TR-0032", "80300032");
+            long vehiculoId = crearVehiculo("V4A-473", a);
+
+            registrar.transferirVehiculo(
+                    vehiculoId,
+                    b,
+                    TipoTransferencia.COMPRA_VENTA,
+                    LocalDate.of(2026, 6, 10),
+                    Dinero.de("15000.00"),
+                    false,
+                    "Tarjeta de propiedad A-B",
+                    Observacion.de("A le vende a B a mitad de anio"));
+
+            assertThatThrownBy(
+                            () ->
+                                    registrar.transferirVehiculo(
+                                            vehiculoId,
+                                            c,
+                                            TipoTransferencia.COMPRA_VENTA,
+                                            LocalDate.of(2026, 3, 1),
+                                            Dinero.de("14000.00"),
+                                            false,
+                                            "Tarjeta de propiedad B-C",
+                                            Observacion.de("Una venta fechada antes de la ultima")))
+                    .as(
+                            "hasta #473 esto entraba como B->C el 2026-03-01: B no tenia el"
+                                    + " vehiculo ese dia")
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("2026-03-01")
+                    .hasMessageContaining("2026-06-10");
+
+            List<Transferencia> historia =
+                    transaccion.execute(
+                            estado -> transferenciaRepositorio.historicoDeVehiculo(vehiculoId));
+            assertThat(historia)
+                    .as("la retroactiva no deja fila: la cadena sigue siendo solo A->B")
+                    .extracting(Transferencia::transferenteId, Transferencia::adquirienteId)
+                    .containsExactly(org.assertj.core.groups.Tuple.tuple(a, b));
+            assertThat(titularDe(vehiculoId))
+                    .as("y el titular de hoy sigue siendo B, no C")
+                    .isEqualTo(b);
+            assertThat(
+                            kamayuk.rentas.nucleo.dominio.vehicular.PropietarioAlPrimeroDeEnero.de(
+                                    titularDe(vehiculoId),
+                                    java.util.Objects.requireNonNull(historia),
+                                    new Ejercicio(2026)))
+                    .as("el 2026 es de A, que lo tenia el 1 de enero")
+                    .isEqualTo(a);
+
+            Transferencia delMismoDia =
+                    registrar.transferirVehiculo(
+                            vehiculoId,
+                            c,
+                            TipoTransferencia.COMPRA_VENTA,
+                            LocalDate.of(2026, 6, 10),
+                            Dinero.de("15500.00"),
+                            false,
+                            "Tarjeta de propiedad B-C",
+                            Observacion.de("B le vende a C el mismo dia que compro"));
+            assertThat(delMismoDia.transferenteId())
+                    .as(
+                            "la misma fecha que la ultima NO es anterior: entra, y se ordena detras"
+                                    + " por su registro")
+                    .isEqualTo(b);
+            assertThat(titularDe(vehiculoId)).isEqualTo(c);
+        }
+
+        private long crearVehiculo(String placa, long titular) {
+            Vehiculo vehiculo =
+                    transaccion.execute(
+                            estado ->
+                                    vehiculoRepositorio.save(
+                                            Vehiculo.nuevo(
+                                                    Placa.de(placa),
+                                                    titular,
+                                                    "TOYOTA",
+                                                    "YARIS",
+                                                    "M1",
+                                                    new Ejercicio(2024),
+                                                    new Ejercicio(2025))));
+            return java.util.Objects.requireNonNull(
+                    java.util.Objects.requireNonNull(vehiculo).id());
+        }
+
+        private long titularDe(long vehiculoId) {
+            Long titular =
+                    transaccion.execute(
+                            estado ->
+                                    jdbc.sql("SELECT contribuyente_id FROM vehiculo WHERE id = :id")
+                                            .param("id", vehiculoId)
+                                            .query(Long.class)
+                                            .single());
+            return java.util.Objects.requireNonNull(titular);
+        }
+
         @Test
         @DisplayName("transferir un vehiculo inexistente falla")
         void transferirUnVehiculoInexistenteFalla() {

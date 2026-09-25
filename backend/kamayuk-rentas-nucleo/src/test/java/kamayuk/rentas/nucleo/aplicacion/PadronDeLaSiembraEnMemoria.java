@@ -169,12 +169,17 @@ final class PadronDeLaSiembraEnMemoria
                         .toList();
             }
 
+            /**
+             * «Igual o posterior», como el puerto y el {@code >=} del JDBC: hasta #473 el doble
+             * filtraba con {@code isAfter} y perdia la transferencia del mismo 1 de enero ({@code
+             * PadronDeLaSiembraEnMemoriaTest}).
+             */
             @Override
             public List<Long> vehiculosQueTransfirioDesde(long transferenteId, LocalDate fecha) {
                 return transferencias.stream()
                         .filter(t -> t.vehiculoId() != null)
                         .filter(t -> t.transferenteId() == transferenteId)
-                        .filter(t -> t.fechaTransferencia().isAfter(fecha))
+                        .filter(t -> !t.fechaTransferencia().isBefore(fecha))
                         .map(Transferencia::vehiculoId)
                         .distinct()
                         .toList();
