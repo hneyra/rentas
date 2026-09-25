@@ -2,9 +2,11 @@ package kamayuk.rentas.catastro.prueba;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import kamayuk.rentas.catastro.CertificadoItse;
 import kamayuk.rentas.catastro.ItseDelPredio;
 import kamayuk.rentas.catastro.RiesgoDelPredio;
@@ -32,6 +34,7 @@ public final class TerritorioEnMemoria implements ZonificacionDelPredio, RiesgoY
     private final Map<Long, ZonaDelPredio> zonas = new LinkedHashMap<>();
     private final Map<Long, Boolean> riesgoNoMitigable = new LinkedHashMap<>();
     private final Map<Long, List<CertificadoItse>> certificados = new LinkedHashMap<>();
+    private final Set<Long> itseCaido = new HashSet<>();
     private boolean catastroCaido;
 
     /** El predio cae en esa zona, aprobada por esa ordenanza. */
@@ -62,9 +65,29 @@ public final class TerritorioEnMemoria implements ZonificacionDelPredio, RiesgoY
         return this;
     }
 
-    /** Un predio con las tres cosas contestadas y ninguna que se oponga. */
+    /**
+     * Un predio con las tres cosas contestadas y ninguna que se oponga.
+     *
+     * <p>Y eso incluye un certificado ITSE vigente: hasta #416 «en regla» era un predio con CERO
+     * ITSE, que solo pasaba porque el ITSE no decidia nada. Un giro de riesgo ALTO sobre este
+     * predio tiene que poder emitirse, y sin certificado no puede.
+     */
     public TerritorioEnMemoria conTodoEnRegla(long predioId, String zona, String ordenanza) {
-        return conZona(predioId, zona, ordenanza).conRiesgo(predioId, false).conItse(predioId);
+        return conZona(predioId, zona, ordenanza)
+                .conRiesgo(predioId, false)
+                .conItse(predioId, certificadoVigente(predioId));
+    }
+
+    /** Un certificado ITSE en pie, del nivel mas alto, que cubre cualquier fecha de prueba. */
+    public static CertificadoItse certificadoVigente(long predioId) {
+        return new CertificadoItse(
+                predioId,
+                "ITSE-DEMO-" + predioId,
+                "MUY ALTO",
+                "PREVIA",
+                LocalDate.of(2020, 1, 1),
+                LocalDate.of(2099, 12, 31),
+                null);
     }
 
     /**
@@ -75,6 +98,18 @@ public final class TerritorioEnMemoria implements ZonificacionDelPredio, RiesgoY
      */
     public TerritorioEnMemoria caido() {
         this.catastroCaido = true;
+        return this;
+    }
+
+    /**
+     * Solo {@code /grd/itse} deja de contestar para ese predio; la zona y el riesgo siguen.
+     *
+     * <p>Es la muestra que {@link #caido()} no da, porque tumba las tres consultas a la vez: con
+     * ella, que el ITSE caido decida algo por si solo no se podia medir, y durante un despliegue es
+     * justo lo que pasa — una llamada que vence y dos que contestan (#416).
+     */
+    public TerritorioEnMemoria itseCaido(long predioId) {
+        itseCaido.add(predioId);
         return this;
     }
 
@@ -120,6 +155,11 @@ public final class TerritorioEnMemoria implements ZonificacionDelPredio, RiesgoY
     @Override
     public ItseDelPredio itseVigenteEn(long predioId, LocalDate aLaFecha) {
         exigirQueConteste("leer el ITSE del predio " + predioId);
+        if (itseCaido.contains(predioId)) {
+            throw new ClienteHttpDeCatastro.CatastroInalcanzable(
+                    "No se puede leer el ITSE del predio " + predioId + ": `/grd/itse` no contesta",
+                    null);
+        }
         List<CertificadoItse> vigentes = certificados.get(predioId);
         if (vigentes == null) {
             throw new ClienteHttpDeCatastro.NoConstaEnCatastro(

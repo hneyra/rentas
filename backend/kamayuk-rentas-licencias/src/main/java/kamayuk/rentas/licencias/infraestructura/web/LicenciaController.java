@@ -277,8 +277,9 @@ public class LicenciaController {
             // que quien atiende no lo lea como una averia (#43).
             throw new ProblemaDeNegocio(CodigoDeError.VALIDACION, mensajeDe(enRiesgo));
         } catch (EmitirLicenciaDeFuncionamiento.TerritorioSinAutorizar sinAutorizar) {
-            // Tambien 422, y el mensaje distingue las TRES: no consta el predio, no se pudo
-            // preguntar, o el giro no cabe en la zona. Se arreglan de tres maneras distintas y
+            // Tambien 422, y el mensaje distingue cuales: no consta el predio, no se pudo
+            // preguntar, el giro no cabe en la zona, o falta la ITSE previa (#416). Se arreglan de
+            // tres maneras distintas y
             // colapsarlas manda a quien atiende a mirar donde no es (AC-5).
             throw new ProblemaDeNegocio(CodigoDeError.VALIDACION, mensajeDe(sinAutorizar));
         } catch (ComprobacionDelDerecho.DerechoNoPagado sinPagar) {

@@ -10,7 +10,9 @@ import kamayuk.rentas.licencias.dominio.CompatibilidadConLaZona;
 import kamayuk.rentas.licencias.dominio.ComprobacionDelTerritorio;
 import kamayuk.rentas.licencias.dominio.OrigenDeLaZona;
 import kamayuk.rentas.licencias.dominio.RespuestaDelTerritorio;
+import kamayuk.rentas.licencias.dominio.RiesgoItse;
 import kamayuk.rentas.licencias.dominio.TerritorioDeLaLicencia;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -135,6 +137,29 @@ class ElTerritorioDecideLaLicenciaTest {
         }
 
         @Test
+        @DisplayName("#416 — y si SOLO el ITSE no contesta, tampoco es favorable")
+        void soloElItseNoContesta() {
+            ComprobacionDelTerritorio comprobacion =
+                    comprobar(
+                            new TerritorioEnMemoria()
+                                    .conZona(PREDIO, "CZ", "ORD-2024-01")
+                                    .conRiesgo(PREDIO, false)
+                                    .itseCaido(PREDIO),
+                            "CZ, RDM");
+
+            assertThat(comprobacion.zona()).isEqualTo(RespuestaDelTerritorio.RESPONDIO);
+            assertThat(comprobacion.riesgo()).isEqualTo(RespuestaDelTerritorio.RESPONDIO);
+            assertThat(comprobacion.compatibilidad()).isEqualTo(CompatibilidadConLaZona.COMPATIBLE);
+            assertThat(comprobacion.itse()).isEqualTo(RespuestaDelTerritorio.NO_SE_PUDO_PREGUNTAR);
+            assertThat(comprobacion.todoComprobadoYFavorable())
+                    .as(
+                            "la zona y el riesgo contestaron y el ITSE no: hasta #416 esto daba"
+                                    + " `true`, y la licencia salia sin autorizacion expresa")
+                    .isFalse();
+            assertThat(comprobacion.motivo()).contains("ITSE: no se pudo preguntar");
+        }
+
+        @Test
         @DisplayName("y «no consta» y «no se pudo preguntar» NO dicen lo mismo")
         void lasDosAusenciasSeDistinguen() {
             ComprobacionDelTerritorio noConsta = comprobar(new TerritorioEnMemoria(), "CZ");
@@ -153,10 +178,76 @@ class ElTerritorioDecideLaLicenciaTest {
         void sinPredioNoSePregunta() {
             ComprobacionDelTerritorio comprobacion =
                     new ComprobarElTerritorio(new TerritorioEnMemoria(), new TerritorioEnMemoria())
-                            .de(null, HOY, "CZ");
+                            .de(null, HOY, "CZ", RiesgoItse.BAJO);
 
             assertThat(comprobacion.zona()).isEqualTo(RespuestaDelTerritorio.NO_SE_PREGUNTO);
             assertThat(comprobacion.motivo()).contains("no declara predio");
+        }
+    }
+
+    @Nested
+    @DisplayName("#416 — La ITSE previa: el giro dice si un ITSE vacio se opone")
+    class LaItsePrevia {
+
+        @Test
+        @DisplayName("giro ALTO y ningun certificado vigente: falta la ITSE previa")
+        void altoSinCertificado() {
+            ComprobacionDelTerritorio comprobacion = conItseVacio(RiesgoItse.ALTO);
+
+            assertThat(comprobacion.faltaLaItsePrevia()).isTrue();
+            assertThat(comprobacion.todoComprobadoYFavorable()).isFalse();
+            assertThat(comprobacion.motivo()).isEqualTo("ITSE: 0 vigentes");
+        }
+
+        @Test
+        @DisplayName("y MUY ALTO igual; BAJO y MEDIO no, porque su ITSE es posterior")
+        void soloAltoYMuyAltoExigenLaPrevia() {
+            assertThat(conItseVacio(RiesgoItse.MUY_ALTO).faltaLaItsePrevia()).isTrue();
+            assertThat(conItseVacio(RiesgoItse.MEDIO).faltaLaItsePrevia()).isFalse();
+            assertThat(conItseVacio(RiesgoItse.BAJO).faltaLaItsePrevia()).isFalse();
+            assertThat(conItseVacio(RiesgoItse.BAJO).todoComprobadoYFavorable())
+                    .as("el contraste: el mismo ITSE vacio con un giro BAJO es favorable")
+                    .isTrue();
+        }
+
+        @Test
+        @DisplayName("con un certificado vigente, el giro ALTO no pide nada")
+        void altoConCertificado() {
+            ComprobacionDelTerritorio comprobacion =
+                    new ComprobarElTerritorio(
+                                    new TerritorioEnMemoria()
+                                            .conTodoEnRegla(PREDIO, "CZ", "ORD-2024-01"),
+                                    new TerritorioEnMemoria()
+                                            .conTodoEnRegla(PREDIO, "CZ", "ORD-2024-01"))
+                            .de(PREDIO, HOY, "CZ", RiesgoItse.ALTO);
+
+            assertThat(comprobacion.faltaLaItsePrevia()).isFalse();
+            assertThat(comprobacion.todoComprobadoYFavorable()).isTrue();
+            assertThat(comprobacion.motivo()).isNull();
+        }
+
+        @Test
+        @DisplayName("y el giro sin clasificar no decide, pero queda dicho")
+        void sinClasificar() {
+            ComprobacionDelTerritorio comprobacion = conItseVacio(null);
+
+            assertThat(comprobacion.faltaLaItsePrevia())
+                    .as("que nadie lo clasificara no es «es de riesgo alto»")
+                    .isFalse();
+            assertThat(comprobacion.todoComprobadoYFavorable()).isTrue();
+            assertThat(comprobacion.motivo())
+                    .contains("ITSE: 0 vigentes")
+                    .contains("no declara su nivel de riesgo ITSE");
+        }
+
+        private ComprobacionDelTerritorio conItseVacio(@Nullable RiesgoItse riesgoDelGiro) {
+            TerritorioEnMemoria territorio =
+                    new TerritorioEnMemoria()
+                            .conZona(PREDIO, "CZ", "ORD-2024-01")
+                            .conRiesgo(PREDIO, false)
+                            .conItse(PREDIO);
+            return new ComprobarElTerritorio(territorio, territorio)
+                    .de(PREDIO, HOY, "CZ, RDM", riesgoDelGiro);
         }
     }
 
@@ -224,6 +315,7 @@ class ElTerritorioDecideLaLicenciaTest {
                                             RespuestaDelTerritorio.NO_CONSTA,
                                             0,
                                             CompatibilidadConLaZona.NO_SE_PUEDE_DECIDIR,
+                                            null,
                                             null))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("lo que no se pudo preguntar no se sabe");
@@ -244,6 +336,7 @@ class ElTerritorioDecideLaLicenciaTest {
                                             RespuestaDelTerritorio.RESPONDIO,
                                             0,
                                             CompatibilidadConLaZona.COMPATIBLE,
+                                            RiesgoItse.BAJO,
                                             null))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("no puede sostener una licencia");
@@ -264,6 +357,7 @@ class ElTerritorioDecideLaLicenciaTest {
                                             RespuestaDelTerritorio.RESPONDIO,
                                             2,
                                             CompatibilidadConLaZona.COMPATIBLE,
+                                            RiesgoItse.BAJO,
                                             null))
                     .as("sin esto, las dos de arriba pasarian con un tipo que no admitiera nada")
                     .doesNotThrowAnyException();
@@ -274,6 +368,7 @@ class ElTerritorioDecideLaLicenciaTest {
 
     private static ComprobacionDelTerritorio comprobar(
             TerritorioEnMemoria territorio, String zonasDelGiro) {
-        return new ComprobarElTerritorio(territorio, territorio).de(PREDIO, HOY, zonasDelGiro);
+        return new ComprobarElTerritorio(territorio, territorio)
+                .de(PREDIO, HOY, zonasDelGiro, RiesgoItse.BAJO);
     }
 }

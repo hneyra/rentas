@@ -33,6 +33,9 @@ import org.jspecify.annotations.Nullable;
  * @param certificadosVigentes cuantos ITSE estaban vigentes ese dia; solo significa algo cuando
  *     {@link #itse()} es {@code RESPONDIO}
  * @param compatibilidad el veredicto de {@link CompatibilidadConLaZona} para el giro principal
+ * @param riesgoItseDelGiro el nivel de riesgo ITSE del giro PRINCIPAL, tal como lo clasifico la
+ *     municipalidad en {@code ciiu.riesgo_itse}; {@code null} si no lo clasifico, y entonces no
+ *     decide nada (#416)
  * @param motivo lo que hay que decirle a quien opera cuando algo no se pudo comprobar
  */
 public record ComprobacionDelTerritorio(
@@ -45,6 +48,7 @@ public record ComprobacionDelTerritorio(
         RespuestaDelTerritorio itse,
         int certificadosVigentes,
         CompatibilidadConLaZona compatibilidad,
+        @Nullable RiesgoItse riesgoItseDelGiro,
         @Nullable String motivo) {
 
     /** {@code licencia_funcionamiento.comprobacion_territorio varchar(400)} (V14). */
@@ -94,22 +98,52 @@ public record ComprobacionDelTerritorio(
                 RespuestaDelTerritorio.NO_SE_PREGUNTO,
                 0,
                 CompatibilidadConLaZona.NO_SE_PUEDE_DECIDIR,
+                null,
                 "La solicitud no declara predio, asi que no hay territorio que consultar. Hay"
                         + " giros sin predio empadronado");
     }
 
     /**
-     * Si las tres consultas contestaron y ninguna se opone: no hay riesgo no mitigable y el giro
-     * cabe en la zona.
+     * Si las tres consultas contestaron y ninguna se opone: no hay riesgo no mitigable, el giro
+     * cabe en la zona, y no falta la ITSE previa que su nivel de riesgo exige.
      *
      * <p>Lo que NO es: «no salio nada malo». Una consulta que no contesto no cuenta como favorable,
-     * y por eso se exige {@link RespuestaDelTerritorio#RESPONDIO} en las dos que deciden.
+     * y por eso se exige {@link RespuestaDelTerritorio#RESPONDIO} en <b>las tres</b>.
+     *
+     * <p>Hasta #416 eran dos: el ITSE se preguntaba y no decidia nada, asi que con {@code
+     * /grd/itse} caido —y la zona y el riesgo contestando— la licencia salia sin la autorizacion
+     * expresa que #43 exige para lo que no se pudo comprobar, y un giro de riesgo ALTO salia sin
+     * ningun certificado vigente. Es el unico sitio donde se decide «el territorio lo permite»
+     * (<i>Specification</i>), y por eso el ITSE entra aqui y no como otra condicion en quien emite.
      */
     public boolean todoComprobadoYFavorable() {
         return riesgo == RespuestaDelTerritorio.RESPONDIO
                 && !hayRiesgoNoMitigable
                 && zona == RespuestaDelTerritorio.RESPONDIO
-                && compatibilidad == CompatibilidadConLaZona.COMPATIBLE;
+                && compatibilidad == CompatibilidadConLaZona.COMPATIBLE
+                && itse == RespuestaDelTerritorio.RESPONDIO
+                && !faltaLaItsePrevia();
+    }
+
+    /**
+     * El giro principal exige la ITSE <b>previa</b> y el ITSE contesto que ese dia no habia ningun
+     * certificado vigente (#416).
+     *
+     * <p>Es un hecho adverso <b>comprobado</b>, y con el modelo de #43 exige la misma autorizacion
+     * expresa que lo que no se pudo comprobar. No es un rechazo sin salida como el riesgo no
+     * mitigable: si un giro ALTO sin ITSE vigente se niega en seco es una decision que queda por
+     * escribir, y hasta entonces lo que no puede pasar es que salga sin que nadie lo asuma.
+     *
+     * <p>Solo cuenta si el ITSE {@link RespuestaDelTerritorio#RESPONDIO}: un ITSE que no contesto
+     * ya no es favorable por si solo, y {@code certificadosVigentes} no significa nada. Y un giro
+     * sin clasificar ({@link #riesgoItseDelGiro()} nulo) no decide: que la municipalidad no lo haya
+     * clasificado no es «es de riesgo alto», y queda anotado en el {@link #motivo()}.
+     */
+    public boolean faltaLaItsePrevia() {
+        return riesgoItseDelGiro != null
+                && riesgoItseDelGiro.exigeItsePrevia()
+                && itse == RespuestaDelTerritorio.RESPONDIO
+                && certificadosVigentes == 0;
     }
 
     /** El hecho que niega la licencia sin salida posible: medido, adverso y no opinable. */

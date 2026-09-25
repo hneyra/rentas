@@ -87,19 +87,24 @@ import org.springframework.transaction.annotation.Transactional;
  *       libre</b> —el indice de usos es ordenanza local, D-02b— y el vocabulario de los dos lados
  *       no esta normalizado: negar sobre una comparacion de cadenas denegaria licencias que la
  *       ordenanza permite. Lo que no puede seguir es no preguntar.
+ *   <li><b>El giro exige la ITSE previa y no hay ningun certificado vigente ⇒ la misma autorizacion
+ *       explicita</b> (#416). El TUPA tramita la licencia de riesgo ALTO y MUY ALTO «Con ITSE
+ *       previa». No se rechaza en seco porque rechazarla es una decision que nadie ha escrito
+ *       todavia; lo que no puede seguir es que salga sin que nadie lo asuma, y sin rastro.
  *   <li><b>Alguna consulta no contesto ⇒ hace falta la misma autorizacion explicita.</b> «No se
- *       pudo preguntar» NO es «no hay riesgo» (AC-4). Y no se rechaza en seco por una razon medida:
- *       hoy <b>no hay ni un poligono cargado en ninguna instalacion</b>, asi que rechazar dejaria
- *       el modulo de licencias sin poder emitir una sola — y un sistema que no se puede usar se
- *       acaba desactivando, que es como se pierden las guardas.
+ *       pudo preguntar» NO es «no hay riesgo» (AC-4) — y eso vale tambien para el ITSE solo, que
+ *       hasta #416 no contaba. Y no se rechaza en seco por una razon medida: hoy <b>no hay ni un
+ *       poligono cargado en ninguna instalacion</b>, asi que rechazar dejaria el modulo de
+ *       licencias sin poder emitir una sola — y un sistema que no se puede usar se acaba
+ *       desactivando, que es como se pierden las guardas.
  *   <li><b>Todo comprobado y favorable ⇒ se emite</b> sin pedirle nada mas a nadie.
  * </ul>
  *
- * <p>Las tres razones por las que puede hacer falta la autorizacion <b>se distinguen en el
- * mensaje</b> y llegan a quien opera como tres cosas distintas (AC-5): no consta el predio, no se
- * pudo preguntar, o el giro no cabe. Se arreglan de tres maneras —dar de alta el predio o cargar el
- * plano, levantar el despliegue, y revisar el indice de usos— y decir la equivocada manda a quien
- * atiende a buscar donde no es.
+ * <p>Las razones por las que puede hacer falta la autorizacion <b>se distinguen en el mensaje</b> y
+ * llegan a quien opera como cosas distintas (AC-5): no consta el predio, no se pudo preguntar, el
+ * giro no cabe, o falta la ITSE previa (#416). Se arreglan de maneras distintas —dar de alta el
+ * predio o cargar el plano, levantar el despliegue, revisar el indice de usos, obtener el
+ * certificado— y decir la equivocada manda a quien atiende a buscar donde no es.
  *
  * <p>Y <b>las dos zonas se guardan</b>: la declarada en {@code zonificacion} y la del territorio en
  * {@code zona_del_territorio}, con {@code zona_origen} diciendo cual sostiene el acto (V14).
@@ -179,7 +184,8 @@ public class EmitirLicenciaDeFuncionamiento {
      *     que concepto del TUPA cobra el derecho
      * @throws RiesgoNoMitigable si el lote cruza una zona de riesgo no mitigable comprobada (#43)
      * @throws TerritorioSinAutorizar si algo del territorio no se pudo comprobar —o el giro no cabe
-     *     en la zona— y la solicitud no trae la autorizacion explicita que lo asume
+     *     en la zona, o exige la ITSE previa y no hay ningun certificado vigente (#416)— y la
+     *     solicitud no trae la autorizacion explicita que lo asume
      */
     @Transactional
     public LicenciaEmitida emitir(
@@ -218,7 +224,8 @@ public class EmitirLicenciaDeFuncionamiento {
                 territorio.de(
                         solicitud.predioId(),
                         solicitud.fechaEmision(),
-                        principal.zonificacionCompatible());
+                        principal.zonificacionCompatible(),
+                        principal.riesgoItse());
         exigirQueElTerritorioLoPermita(solicitud, comprobacion, principal);
 
         Ejercicio ejercicio = Ejercicio.de(solicitud.fechaEmision());
@@ -409,12 +416,13 @@ public class EmitirLicenciaDeFuncionamiento {
     }
 
     /**
-     * Que tiene que hacer quien atiende, segun cual de las tres cosas paso.
+     * Que tiene que hacer quien atiende, segun cual de las cosas paso.
      *
-     * <p>Las tres se arreglan de maneras distintas —dar de alta el predio o cargar el plano,
-     * levantar el despliegue, revisar el indice de usos— y colapsarlas en «no se pudo comprobar el
-     * territorio» manda a mirar donde no es. Es la distincion que {@code catastro} construyo a
-     * proposito y que #9 transporto hasta aqui; borrarla en la ultima capa la desperdicia entera.
+     * <p>Se arreglan de maneras distintas —dar de alta el predio o cargar el plano, levantar el
+     * despliegue, revisar el indice de usos, obtener el certificado ITSE (#416)— y colapsarlas en
+     * «no se pudo comprobar el territorio» manda a mirar donde no es. Es la distincion que {@code
+     * catastro} construyo a proposito y que #9 transporto hasta aqui; borrarla en la ultima capa la
+     * desperdicia entera.
      */
     private static String queHayQueHacer(ComprobacionDelTerritorio comprobacion) {
         if (comprobacion.zona() == RespuestaDelTerritorio.NO_SE_PUDO_PREGUNTAR
@@ -424,8 +432,12 @@ public class EmitirLicenciaDeFuncionamiento {
                     + " sabe. Se arregla levantando el despliegue de `catastro`, y hasta entonces"
                     + " emitir exige que una persona lo asuma por escrito";
         }
+        // El ITSE entra en las dos primeras desde #416: hasta entonces un ITSE caido o que no
+        // constaba no llegaba aqui solo, y cuando por fin llega tiene que decir lo que es y no caer
+        // en la ultima frase, que manda a revisar el catalogo CIIU (AC-5).
         if (comprobacion.zona() == RespuestaDelTerritorio.NO_CONSTA
-                || comprobacion.riesgo() == RespuestaDelTerritorio.NO_CONSTA) {
+                || comprobacion.riesgo() == RespuestaDelTerritorio.NO_CONSTA
+                || comprobacion.itse() == RespuestaDelTerritorio.NO_CONSTA) {
             return "El predio no consta en el territorio: no esta en el padron de `catastro`, no"
                     + " tiene poligono levantado, o ningun plan de zonificacion vigente lo cubre."
                     + " Hoy es el caso normal, porque no hay cartografia cargada. Se arregla dando"
@@ -436,6 +448,13 @@ public class EmitirLicenciaDeFuncionamiento {
                     + comprobacion.zonaDelTerritorio()
                     + " segun el indice de usos del catalogo CIIU. Se revisa el catalogo, o se"
                     + " autoriza por excepcion diciendo por que";
+        }
+        if (comprobacion.faltaLaItsePrevia()) {
+            return "El giro principal es de riesgo ITSE "
+                    + comprobacion.riesgoItseDelGiro()
+                    + " y el predio no tenia ningun certificado ITSE vigente ese dia: el TUPA"
+                    + " tramita esa licencia «Con ITSE previa». Se arregla obteniendo el"
+                    + " certificado antes de emitir, o se autoriza por escrito diciendo por que";
         }
         return "El giro principal no declara en que zonas cabe (`ciiu.zonificacion_compatible` esta"
                 + " vacio, D-02b), asi que no hay con que decidir la compatibilidad. Se rellena el"
@@ -578,9 +597,9 @@ public class EmitirLicenciaDeFuncionamiento {
     /**
      * El territorio no respalda la emision y nadie la ha asumido por escrito.
      *
-     * <p>Tres cosas distintas llegan aqui —no consta el predio, no se pudo preguntar, o el giro no
-     * cabe en la zona— y el mensaje <b>dice cual</b> y que hacer con ella. Colapsarlas borraria la
-     * distincion que {@code catastro} construyo a proposito (AC-5).
+     * <p>Cuatro cosas distintas llegan aqui —no consta el predio, no se pudo preguntar, el giro no
+     * cabe en la zona, o falta la ITSE previa (#416)— y el mensaje <b>dice cual</b> y que hacer con
+     * ella. Colapsarlas borraria la distincion que {@code catastro} construyo a proposito (AC-5).
      */
     public static final class TerritorioSinAutorizar extends RuntimeException {
 
