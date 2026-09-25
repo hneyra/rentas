@@ -20,7 +20,9 @@ import kamayuk.rentas.parametros.LectorDeParametros;
  * reales las espera #197.
  *
  * <p>Sin ninguna celda sembrada, {@link #vacio()} finge el ejercicio sin sellar, que es el estado
- * real de una instalacion recien implantada.
+ * real de una instalacion recien implantada. Lanza lo mismo que el adaptador de produccion ante el
+ * 404 de {@code catastro} —desde #350; antes el adaptador no lo hacia—, y la capa web del FUE lo
+ * comprueba tambien con el adaptador de verdad delante.
  */
 public final class CuadroDeMentira implements LectorDeValoresUnitarios {
 

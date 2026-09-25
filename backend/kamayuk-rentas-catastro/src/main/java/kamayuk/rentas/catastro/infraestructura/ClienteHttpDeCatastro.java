@@ -10,6 +10,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.util.Optional;
+import java.util.function.Function;
 import kamayuk.rentas.catastro.FichaDelPadron;
 import kamayuk.rentas.dominio.AreaM2;
 import kamayuk.rentas.dominio.MotivoDeInalcanzable;
@@ -365,6 +366,10 @@ public class ClienteHttpDeCatastro {
      *
      * <p>Es lo que corresponde a las nueve operaciones de P5C y C-5: se disenaron para que la
      * ausencia viajara <b>como campo</b>, asi que ahi un 404 no es «no hay», es que algo esta mal.
+     *
+     * <p><b>El cuadro de valores unitarios salio de aqui en #350</b>: su ausencia no viaja como
+     * campo sino como 404 con codigo, y ese 404 es {@code EjercicioSinSellar} (ver {@link
+     * ValoresUnitariosHttp}).
      */
     JsonNode pedir(String ruta, String que) {
         RespuestaDeCatastro respuesta = enviar(ruta, que);
@@ -383,16 +388,79 @@ public class ClienteHttpDeCatastro {
      * consta» se trague tambien los fallos de verdad.
      */
     JsonNode pedirHechoDelTerritorio(String ruta, String que) {
+        return pedirTraduciendoLosHechos(
+                ruta, que, hecho -> new NoConstaEnCatastro(que, hecho.codigo(), hecho.detalle()));
+    }
+
+    /**
+     * Una lectura cuyo adaptador sabe que hecho del dominio es cada respuesta de {@code catastro}
+     * distinta de 200 (#350).
+     *
+     * <p>Lo que decide <b>si</b> una respuesta es un hecho y no una averia es {@link
+     * #hechoContestado}, y solo el; lo que el adaptador decide es <b>que</b> hecho es —el 404 del
+     * cuadro de valores unitarios es {@code EjercicioSinSellar}, el de la zonificacion es «no
+     * consta»—. Lo que no es un hecho sale como {@link CatastroInalcanzable} sin pasar por la
+     * traduccion, asi que ningun adaptador puede convertir una caida en un dato.
+     *
+     * @param traduccion el hecho que {@code catastro} contesto, convertido en la excepcion del
+     *     puerto; la que devuelve se lanza
+     */
+    JsonNode pedirTraduciendoLosHechos(
+            String ruta, String que, Function<HechoContestado, RuntimeException> traduccion) {
         RespuestaDeCatastro respuesta = enviar(ruta, que);
         if (respuesta.estado() == 200) {
             return leer(respuesta.cuerpo(), que);
         }
-        String codigo = leerSiSePuede(respuesta.cuerpo()).path("codigo").asString("");
+        HechoContestado hecho =
+                hechoContestado(respuesta)
+                        .orElseThrow(
+                                () ->
+                                        new CatastroInalcanzable(
+                                                que + " (contesto " + respuesta.estado() + ")",
+                                                null));
+        throw traduccion.apply(hecho);
+    }
+
+    /**
+     * El criterio, en UN solo sitio, de que respuesta distinta de 200 es un hecho del dominio y no
+     * una averia (#350).
+     *
+     * <p>Hoy lo es la que trae el {@code codigo} del catalogo de errores de {@code catastro}: un
+     * cuerpo sin el —la pagina de un proxy, una ruta que no existe— no es una respuesta de ese
+     * sistema. Hasta #350 este criterio vivia dentro de {@link #pedirHechoDelTerritorio} y el
+     * cuadro de valores unitarios no lo usaba: cualquier cosa distinta de 200 era averia, y el 404
+     * de un ejercicio sin sellar llegaba a la ficha del FUE como 500. Tenerlo aqui es lo que deja
+     * afinarlo una vez para todas las lecturas que lo usan (relacionado con #352: que un codigo con
+     * un estado de averia no cuente como hecho).
+     */
+    Optional<HechoContestado> hechoContestado(RespuestaDeCatastro respuesta) {
+        JsonNode cuerpo = leerSiSePuede(respuesta.cuerpo());
+        String codigo = cuerpo.path("codigo").asString("");
         if (codigo.isBlank()) {
-            throw new CatastroInalcanzable(que + " (contesto " + respuesta.estado() + ")", null);
+            return Optional.empty();
         }
-        throw new NoConstaEnCatastro(
-                que, codigo, leerSiSePuede(respuesta.cuerpo()).path("detail").asString(""));
+        return Optional.of(
+                new HechoContestado(
+                        respuesta.estado(), codigo, cuerpo.path("detail").asString("")));
+    }
+
+    /**
+     * Lo que {@code catastro} contesto cuando lo que contesta es un hecho: su estado, su codigo y
+     * su detalle.
+     *
+     * <p>Viaja el estado porque el mismo codigo no dice lo mismo en todas las rutas: el adaptador
+     * que lo traduce es el que sabe que significa un 404 en la suya.
+     */
+    record HechoContestado(int estado, String codigo, String detalle) {
+
+        /**
+         * El hecho, cuando el adaptador no tiene ninguna traduccion para el: una averia que lo
+         * nombra entero, para que quien opera sepa que contesto {@code catastro}.
+         */
+        CatastroInalcanzable comoAveria(String que) {
+            return new CatastroInalcanzable(
+                    que + " (contesto " + estado + " «" + codigo + "»: " + detalle + ")", null);
+        }
     }
 
     private JsonNode leer(String cuerpo, String que) {

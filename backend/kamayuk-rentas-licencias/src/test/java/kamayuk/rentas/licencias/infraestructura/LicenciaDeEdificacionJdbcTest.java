@@ -252,7 +252,10 @@ class LicenciaDeEdificacionJdbcTest {
         // con `V6`—, asi que aqui lo sustituye el cuadro en memoria. Lo que esta clase mide sigue
         // siendo lo suyo: que la licencia salga valorizada, y que SIN cuadro salga con su motivo
         // en vez de con un cero. El fixture lanza `EjercicioSinSellar` por eso, que es lo mismo
-        // que el cliente hara con el 404 de `catastro`.
+        // que el cliente hace con el 404 de `catastro` — desde #350, y no antes: hasta entonces
+        // era una premisa que el cliente no cumplia. Que el doble y el cliente no puedan volver a
+        // divergir lo vigila `ContratoDelLectorDeValoresUnitarios`, y la capa web del FUE lo mide
+        // con el adaptador de verdad (`EdificacionControllerTest`, #350).
         LectorDeValoresUnitarios cuadro =
                 new CuadroDeValoresUnitariosEnMemoria()
                         .en(municipalidad)

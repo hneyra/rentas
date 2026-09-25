@@ -1,12 +1,15 @@
 package kamayuk.rentas.licencias.aplicacion;
 
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import kamayuk.rentas.catastro.TerritorioInalcanzable;
 import kamayuk.rentas.compartido.Pagina;
 import kamayuk.rentas.compartido.Paginacion;
 import kamayuk.rentas.contribuyentes.ResumenDeContribuyente;
+import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.licencias.dominio.CriterioDeFue;
 import kamayuk.rentas.licencias.dominio.EstadoDelFue;
 import kamayuk.rentas.licencias.dominio.EstructuraDelProyecto;
@@ -110,7 +113,7 @@ public class ConsultaDeFue {
         }
 
         Map<Long, ValorizacionDelFue.Resultado> valorizadas =
-                valorizaciones.valorizarVarias(datos.estructuras(), aLaFecha);
+                valorizadasParaLeer(datos.estructuras(), aLaFecha);
 
         return datos.filas()
                 .mapear(
@@ -160,7 +163,57 @@ public class ConsultaDeFue {
                 datos.historial(),
                 datos.vigencias(),
                 datos.seccionesFaltantes(),
-                valorizaciones.valorizar(datos.estructuras(), datos.fechaDelActo()));
+                valorizadaParaLeer(datos.estructuras(), datos.fechaDelActo()));
+    }
+
+    /**
+     * La valorizacion de una LECTURA: si {@code catastro} no contesta, sin cifra y diciendo por
+     * que, en vez de un 500 (#350).
+     *
+     * <p>La ficha, el reporte y la respuesta de «completar seccion» son pantallas: que el vecino
+     * este caido no puede dejarlas inservibles, y en la de «completar seccion» un 500 reportaria
+     * como fallida una escritura que ya se confirmo —y quien atiende la repetiria—. Se dice «no se
+     * pudo preguntar» y no «falta sellar el cuadro», que mandaria a publicar una cifra que quiza ya
+     * esta publicada.
+     *
+     * <p><b>La emision no pasa por aqui, y a proposito</b>: {@link EmitirLicenciaDeEdificacion}
+     * llama a {@link ValorizacionDelFue#valorizar} sin esta red. Imprimir «—» porque el vecino
+     * estaba caido dejaria un papel permanente sin una cifra que si existia; ahi basta con que no
+     * se emita.
+     */
+    private ValorizacionDelFue.Resultado valorizadaParaLeer(
+            List<EstructuraDelProyecto> estructuras, LocalDate fechaDelActo) {
+        try {
+            return valorizaciones.valorizar(estructuras, fechaDelActo);
+        } catch (TerritorioInalcanzable caido) {
+            return sinPoderPreguntar(fechaDelActo, caido);
+        }
+    }
+
+    /** Lo mismo para una pagina entera del reporte: una sola lectura del cuadro, o ninguna. */
+    private Map<Long, ValorizacionDelFue.Resultado> valorizadasParaLeer(
+            Map<Long, List<EstructuraDelProyecto>> porExpediente, LocalDate aLaFecha) {
+        try {
+            return valorizaciones.valorizarVarias(porExpediente, aLaFecha);
+        } catch (TerritorioInalcanzable caido) {
+            ValorizacionDelFue.Resultado sinCatastro = sinPoderPreguntar(aLaFecha, caido);
+            Map<Long, ValorizacionDelFue.Resultado> todas = new LinkedHashMap<>();
+            for (Long fueId : porExpediente.keySet()) {
+                todas.put(fueId, sinCatastro);
+            }
+            return Map.copyOf(todas);
+        }
+    }
+
+    private static ValorizacionDelFue.Resultado sinPoderPreguntar(
+            LocalDate fechaDelActo, TerritorioInalcanzable caido) {
+        return ValorizacionDelFue.Resultado.noDisponible(
+                Ejercicio.de(fechaDelActo),
+                "No se pudo preguntar a `catastro` por el cuadro de valores unitarios: "
+                        + caido.getMessage()
+                        + ". La cifra existe o no segun lo que alli este sellado; vuelva a"
+                        + " consultar cuando `catastro` conteste",
+                null);
     }
 
     // ------------------------------------------------------------------

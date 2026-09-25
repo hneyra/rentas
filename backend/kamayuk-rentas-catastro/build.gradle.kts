@@ -25,6 +25,14 @@ dependencies {
     implementation("org.springframework:spring-web")
     implementation("tools.jackson.core:jackson-databind")
 
+    // `ValoresUnitariosHttp` traduce el 404 de un ejercicio sin cuadro sellado a
+    // `LectorDeParametros.EjercicioSinSellar` (#350): es lo que el javadoc de su puerto promete y
+    // el unico tipo que `ValorizacionDelFue` sabe convertir en «—». Sin esto el adaptador no
+    // podia cumplirlo, y lo dejaba salir como averia. Es la misma traduccion que
+    // `ClienteHttpDeNormativa` hace con el 404 de su vecino; no hay ciclo, porque
+    // `kamayuk-rentas-parametros` no conoce este modulo.
+    implementation(project(":kamayuk-rentas-parametros"))
+
     // Los dobles en memoria de los nueve puertos, para las pruebas de los otros modulos. Viven
     // aqui y no en cada uno porque son la misma premisa —«este predio tiene este titular»— y
     // repetirla en cuatro modulos es repetir la que un dia se corrige a medias.
@@ -39,4 +47,8 @@ dependencies {
     // FIXTURE: el modulo de produccion no tiene ni una consulta, y eso lo comprueba el escaner de
     // frontera, que solo recorre .
     testFixturesImplementation("org.springframework.boot:spring-boot-starter-jdbc")
+    // `CatastroQueNoContesta` (#350): el catastro que contesta un estado y un cuerpo crudos, para
+    // montar el adaptador REAL en las pruebas de otros modulos. Fabrica sus cuerpos con Jackson,
+    // igual que el cliente los lee.
+    testFixturesImplementation("tools.jackson.core:jackson-databind")
 }
