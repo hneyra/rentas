@@ -35,8 +35,10 @@ import org.springframework.transaction.annotation.Transactional;
  * <p><b>Y la quinta, {@link #vigenteConSuConjunto} (#361), tambien se sobrescribe aunque solo llame
  * al metodo por omision del puerto</b>: el proxy solo ve el metodo que se invoca, y las dos
  * lecturas que el metodo por omision hace por dentro —{@code conjuntoVigenteEn} y {@code
- * porConjunto}— van al objeto y no al proxy. Sin la anotacion aqui, corrian sin transaccion y RLS
- * las rechazaba.
+ * porConjunto}— van al objeto y no al proxy. Sin la anotacion aqui corren sin transaccion, sin
+ * {@code SET LOCAL}, y RLS no rechaza nada: <b>esconde</b> las filas, y la lectura contesta {@code
+ * EjercicioSinSellar} sobre un ejercicio que si esta sellado. Medido al quitarla: 6 de las 8 de
+ * {@code RegistrarDeterminacionPredialTest} en rojo con ese mensaje.
  */
 public class LectorDeParametrosSellados extends LectorDeParametrosCacheados {
 

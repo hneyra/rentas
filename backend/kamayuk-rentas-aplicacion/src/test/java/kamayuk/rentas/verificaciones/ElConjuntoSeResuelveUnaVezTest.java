@@ -13,7 +13,6 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import kamayuk.rentas.parametros.LectorDeParametros;
 import kamayuk.rentas.verificaciones.muestras.aplicacion.MuestrasDeDosResoluciones;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -56,11 +55,22 @@ class ElConjuntoSeResuelveUnaVezTest {
     private static final String CONJUNTO_VIGENTE_EN = "conjuntoVigenteEn";
     private static final String VIGENTE_CON_SU_CONJUNTO = "vigenteConSuConjunto";
 
-    private static JavaClasses produccion;
-
-    @BeforeAll
-    static void importar() {
-        produccion =
+    /**
+     * La regla y su sujeto, en una sola prueba y sobre una importacion <b>local</b>.
+     *
+     * <p>No es descuido que no haya un {@code static JavaClasses} con {@code @BeforeAll}, como en
+     * las guardas de al lado: importar {@code kamayuk.rentas} entero pesa, y un campo estatico lo
+     * retiene hasta que termina la JVM. Con una tercera copia retenida, {@code
+     * verificarArquitectura} se quedo sin memoria (medido: {@code OutOfMemoryError: Java heap
+     * space} en el importador de ArchUnit, con el tenedor de 512 MB). Local, se libera al salir del
+     * metodo.
+     */
+    @Test
+    @DisplayName(
+            "ningun metodo de produccion llama a vigenteEn y a conjuntoVigenteEn, y hay a quien"
+                    + " mirar")
+    void ningunMetodoPideLasDosCosasPorSeparado() {
+        JavaClasses produccion =
                 new ClassFileImporter()
                         .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
                         .withImportOption(
@@ -68,22 +78,14 @@ class ElConjuntoSeResuelveUnaVezTest {
                                         !ubicacion.contains("testFixtures")
                                                 && !ubicacion.contains("test-fixtures"))
                         .importPackages("kamayuk.rentas");
-    }
 
-    @Test
-    @DisplayName("ningun metodo de produccion llama a vigenteEn y a conjuntoVigenteEn")
-    void ningunMetodoPideLasDosCosasPorSeparado() {
         assertThat(conElParSuelto(produccion))
                 .as(
                         "los parametros y el identificador se piden juntos, con"
                                 + " vigenteConSuConjunto: dos preguntas son dos resoluciones, y la"
                                 + " segunda puede contestar otro conjunto (#361)")
                 .isEmpty();
-    }
 
-    @Test
-    @DisplayName("y hay a quien mirar: los que piden las dos cosas lo hacen con una sola llamada")
-    void hayUsosDeLaLecturaConjunta() {
         long conjuntas =
                 unidades(produccion)
                         .filter(
