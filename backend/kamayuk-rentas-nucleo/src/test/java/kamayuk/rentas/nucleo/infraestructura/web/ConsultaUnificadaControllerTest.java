@@ -310,7 +310,8 @@ class ConsultaUnificadaControllerTest {
                             Dinero.de("800.00"),
                             Dinero.CERO,
                             Dinero.CERO,
-                            Dinero.CERO),
+                            Dinero.CERO,
+                            "ORDINARIA"),
                     new ObligacionPublica(
                             "ARBITRIO",
                             new Ejercicio(2026),
@@ -320,7 +321,8 @@ class ConsultaUnificadaControllerTest {
                             Dinero.de("300.00"),
                             Dinero.CERO,
                             Dinero.CERO,
-                            Dinero.CERO));
+                            Dinero.CERO,
+                            "ORDINARIA"));
         }
     }
 

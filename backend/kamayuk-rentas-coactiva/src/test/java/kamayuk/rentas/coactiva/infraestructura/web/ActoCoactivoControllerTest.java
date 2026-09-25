@@ -102,9 +102,30 @@ class ActoCoactivoControllerTest {
                                     Dinero.de("500.00"),
                                     Dinero.de("10.00"),
                                     Dinero.de("25.50"),
-                                    Dinero.CERO));
+                                    Dinero.CERO,
+                                    "COACTIVA"));
 
     private final LibroDeMentira libroPagado = new LibroDeMentira();
+
+    /**
+     * #403 — La misma deuda del predial, pero acogida a un convenio: el total sigue ahi y la fase
+     * dice que no es exigible. Es la hermana de {@link #libroPagado}: las dos dejan el expediente
+     * sin deuda coactiva, y cada una tiene que salir con su propio motivo y su propio 409.
+     */
+    private final LibroDeMentira libroEnConvenio =
+            new LibroDeMentira()
+                    .con(
+                            new ObligacionPublica(
+                                    "PREDIAL",
+                                    EJERCICIO,
+                                    null,
+                                    null,
+                                    HOY,
+                                    Dinero.de("500.00"),
+                                    Dinero.de("10.00"),
+                                    Dinero.de("25.50"),
+                                    Dinero.CERO,
+                                    ObligacionPublica.FASE_DE_CONVENIO));
 
     private final ContribuyentesDeMentira contribuyentes =
             new ContribuyentesDeMentira()
@@ -117,6 +138,10 @@ class ActoCoactivoControllerTest {
     private final ConsultaDeExpedientes consultaSinDeuda =
             new ConsultaDeExpedientes(
                     expedientes, movimientos, valores, libroPagado, new CostasEnMemoria());
+
+    private final ConsultaDeExpedientes consultaEnConvenio =
+            new ConsultaDeExpedientes(
+                    expedientes, movimientos, valores, libroEnConvenio, new CostasEnMemoria());
 
     /**
      * El repositorio de documentos, como campo y no anonimo: #425 necesita <b>leer</b> el modelo
@@ -142,6 +167,8 @@ class ActoCoactivoControllerTest {
     private final MockMvc mvc = montar(consulta);
 
     private final MockMvc mvcPagado = montar(consultaSinDeuda);
+
+    private final MockMvc mvcEnConvenio = montar(consultaEnConvenio);
 
     private MockMvc montar(ConsultaDeExpedientes cual) {
         return montar(cual, plazos);
@@ -391,6 +418,80 @@ class ActoCoactivoControllerTest {
 
             assertThat(resultado.getResponse().getStatus()).isEqualTo(422);
             assertThat(resultado.getResponse().getContentAsString()).contains("art. 33");
+        }
+    }
+
+    /**
+     * #403 — La guarda ya rechaza el acto sobre deuda acogida a un convenio; lo que se prueba aqui
+     * es que el <b>borde</b> sepa traducir esa causa. {@code DeudaAcogidaAConvenio} no es un {@code
+     * ProblemaDeNegocio}: si {@code conErroresTraducidos} no la nombra, sube al manejador central
+     * como 500, y en la impresion por lote tumba la corrida entera en vez de rechazar un expediente
+     * —el mismo modo de fallo que dejo #442—.
+     */
+    @Nested
+    @DisplayName("#403 — la deuda acogida a un convenio no se ejecuta, y el borde lo dice")
+    class DeLaDeudaAcogida {
+
+        @Test
+        @DisplayName("dictar la REC-2 sobre deuda solo en convenio, 409 y nombra el convenio")
+        void elActoSueltoDa409() throws Exception {
+            MvcResult resultado =
+                    mvcEnConvenio
+                            .perform(
+                                    MockMvcRequestBuilders.post(
+                                                    "/rentas/api/v1/coactiva/expedientes/EXP-2026-000001"
+                                                            + "/actos")
+                                            .contentType(MediaType.APPLICATION_JSON)
+                                            .content(
+                                                    "{\"tipo\":\"REC2\",\"fecha\":\""
+                                                            + REC2_DESDE
+                                                            + "\",\"glosa\":\"medida cautelar\","
+                                                            + "\"medida\":\"RETENCION\","
+                                                            + "\"observacion\":\"Se traba la"
+                                                            + " medida\"}"))
+                            .andReturn();
+
+            assertThat(resultado.getResponse().getStatus())
+                    .as(
+                            "la peticion esta bien formada: lo que no la admite es el convenio,"
+                                    + " y un 500 diria que el servidor esta roto")
+                    .isEqualTo(409);
+            String cuerpo = resultado.getResponse().getContentAsString();
+            assertThat(cuerpo)
+                    .as("la causa propia, no DeudaExtinguida: nadie pago")
+                    .contains("acogido a un convenio")
+                    .doesNotContain("ya pago")
+                    .doesNotContain("incidencia");
+        }
+
+        @Test
+        @DisplayName("en la impresion por lote, 200 y el expediente sale rechazado con su motivo")
+        void elLoteNoCae() throws Exception {
+            MvcResult resultado =
+                    mvcEnConvenio
+                            .perform(
+                                    MockMvcRequestBuilders.post(
+                                                    "/rentas/api/v1/coactiva/rec/impresion")
+                                            .contentType(MediaType.APPLICATION_JSON)
+                                            .content(
+                                                    "{\"expedientes\":[\"EXP-2026-000001\"],"
+                                                            + "\"rec\":\"REC2\","
+                                                            + "\"medida\":\"RETENCION\","
+                                                            + "\"fecha\":\""
+                                                            + REC2_DESDE
+                                                            + "\",\"observacion\":\"Se"
+                                                            + " emite la REC\"}"))
+                            .andReturn();
+
+            assertThat(resultado.getResponse().getStatus())
+                    .as("no salio ninguna, pero la corrida no se cae: se rechaza el expediente")
+                    .isEqualTo(200);
+            String cuerpo = resultado.getResponse().getContentAsString();
+            assertThat(cuerpo).contains("\"emitidas\":[]");
+            assertThat(cuerpo)
+                    .as("expediente por expediente, con la causa del convenio")
+                    .contains("EXP-2026-000001")
+                    .contains("acogido a un convenio");
         }
     }
 

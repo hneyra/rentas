@@ -75,7 +75,8 @@ public final class LibroDeDeudaDeMentira implements ConsultaDeDeudaPublica {
                             fila.insoluto,
                             fila.reajuste,
                             fila.interes,
-                            fila.gasto));
+                            fila.gasto,
+                            "ORDINARIA"));
         }
         return deuda;
     }

@@ -85,6 +85,12 @@ import org.springframework.transaction.annotation.Transactional;
  * CONVENIO} en el libro cuando la caja cobra la inicial, de modo que deja de contarse como deuda
  * coactiva exigible y el expediente aparece sin deuda que ejecutar. Eso es un hecho del libro, no
  * una etiqueta.
+ *
+ * <p>Hasta #403 este parrafo describia una intencion y no el codigo: {@code ObligacionPublica} no
+ * publicaba la fase y {@code ConsultaDeExpedientes} sumaba lo acogido como exigible, asi que la
+ * guarda de {@code RegistrarActoCoactivo} dejaba dictar una REC-2 sobre deuda fraccionada. Desde
+ * #403 la fase cruza la frontera, lo acogido va a {@code DeudaDelExpediente.enConvenio} y el acto
+ * se rechaza con {@code DeudaAcogidaAConvenio}.
  */
 @Service
 public class FraccionarEnCoactiva {

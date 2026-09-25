@@ -60,6 +60,15 @@ import org.springframework.transaction.annotation.Transactional;
  * <b>misma</b> fecha que las otras cuatro cifras. No hay ninguna columna de costas en el expediente
  * y ningun importe recompuesto aqui: si la hubiera, la grilla y la ventanilla podrian discrepar.
  *
+ * <h2>Lo acogido a un convenio no es exigible (#403)</h2>
+ *
+ * <p>Una obligacion del expediente que el libro tiene en fase {@code CONVENIO} no suma a la deuda
+ * del expediente: va a {@link DeudaDelExpediente#enConvenio()}, aparte. Acogerse no cambia el total
+ * del libro, asi que sin mirar la fase —que {@link ObligacionPublica#acogidaAConvenio()} publica
+ * desde #403— la deuda fraccionada salia como materia de cobranza, la guarda de los actos la veia
+ * viva y la REC-2 la imprimia como «total exigible». La fase la decide {@code cuentacorriente}, que
+ * es quien la sabe; aqui solo se pregunta.
+ *
  * <p>Por {@code @Transactional(readOnly = true)}: sin transaccion no hay {@code SET LOCAL}, y sin
  * el la politica RLS falla en vez de devolver filas.
  */
@@ -153,6 +162,10 @@ public class ConsultaDeExpedientes {
      * predioId}/{@code vehiculoId} por fila, y una suma no los tiene. Sale de la <b>misma</b>
      * composición que {@link #deudaDe} y a la misma fecha, así que la grilla y el total no pueden
      * discrepar: el total se calcula sumando exactamente estas filas.
+     *
+     * <p>Las obligaciones acogidas a un convenio <b>no</b> son filas (#403): no son exigibles ni se
+     * pueden volver a acoger, y la pantalla que lee esta grilla es la que elige que fraccionar.
+     * Estan en {@code total().enConvenio()}, fuera de la suma de las filas.
      *
      * @return vacío si no hay ningún expediente con ese número
      */
@@ -268,15 +281,24 @@ public class ConsultaDeExpedientes {
             if (!contadas.add(clave)) {
                 continue;
             }
-            if (deCostas.contains(clave)) {
+            boolean esCosta = deCostas.contains(clave);
+            if (!esCosta && !claves.contains(clave)) {
+                continue;
+            }
+            if (obligacion.acogidaAConvenio()) {
+                // Acogida a un convenio no es exigible (#403): la cobra el cronograma, y un
+                // embargo sobre ella cobraria dos veces lo mismo. Va a su propia cifra -ni a las
+                // cuatro partes ni a las costas- y no es una linea que se pueda volver a acoger.
+                // Vale igual para una costa fraccionada: tambien la cobra el convenio.
+                acumulada = acumulada.masEnConvenio(obligacion.total());
+                continue;
+            }
+            if (esCosta) {
                 // Las costas se cuentan aparte y ENTERAS -las cuatro partes de su obligacion-,
                 // porque el cargo se asento con concepto GASTO y no devenga insoluto ni interes.
                 // Contarlas ademas en `gasto` las sumaria dos veces al total.
                 delProcedimiento = delProcedimiento.mas(obligacion.total());
                 lineas.add(lineaDe(obligacion, true, aLaFecha));
-                continue;
-            }
-            if (!claves.contains(clave)) {
                 continue;
             }
             acumulada =

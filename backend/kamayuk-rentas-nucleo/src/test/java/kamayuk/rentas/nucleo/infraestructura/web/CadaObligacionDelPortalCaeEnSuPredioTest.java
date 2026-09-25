@@ -286,7 +286,8 @@ class CadaObligacionDelPortalCaeEnSuPredioTest {
                 Dinero.de(insoluto),
                 Dinero.CERO,
                 Dinero.CERO,
-                Dinero.CERO);
+                Dinero.CERO,
+                "ORDINARIA");
     }
 
     /**

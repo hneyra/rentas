@@ -2,6 +2,7 @@ package kamayuk.rentas.coactiva.infraestructura;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowable;
 
 import java.io.IOException;
 import java.math.RoundingMode;
@@ -1316,6 +1317,132 @@ class CostasYFraccionamientoJdbcTest {
     }
 
     /**
+     * #403 — La deuda acogida a un convenio no es deuda coactiva exigible.
+     *
+     * <p>La siembra de las demas pruebas tiene toda la deuda del expediente en {@code COACTIVA}, y
+     * con ella «sumar lo exigible» y «sumar todo lo del libro» dan la misma cifra. Estas dos no: el
+     * predial se acoge y se formaliza aqui mismo —el acogimiento de verdad, por {@link
+     * FormalizarConvenio}, que es lo unico que escribe la fase {@code CONVENIO}— y el arbitrio del
+     * mismo valor se queda en coactiva por 120,00. Acogerse no cambia el total del libro (el par
+     * {@code FRACCIONAMIENTO} no es ninguna de las cuatro partes), asi que lo unico que separa una
+     * cifra de la otra es la fase.
+     */
+    @Nested
+    @DisplayName("#403 — La deuda acogida a un convenio no es deuda coactiva exigible")
+    class DeLaDeudaAcogida {
+
+        private final Dinero arbitrio = Dinero.de("120.00");
+
+        @Test
+        @DisplayName(
+                "con el predial acogido y el arbitrio en coactiva, lo exigible es el arbitrio: y es"
+                        + " lo que la REC-2 imprime")
+        void loAcogidoNoSumaALoExigible() {
+            long titular = crearContribuyente("ACOG-1");
+            asentarCargo(titular, "PREDIAL", PREDIAL, Fase.VALOR);
+            asentarCargo(titular, "ARBITRIO", arbitrio, Fase.VALOR);
+            Valor op = emitirConArbitrio(titular, "OP-ACOG-1", arbitrio);
+            pasarACoactiva(op);
+            String expediente = importarElValor(titular, op);
+            dictarActo(expediente, TipoDeActoCoactivo.REC1, REC1, null);
+            notificarLaRec1(expediente);
+
+            acogerYFormalizar(expediente, "PREDIAL");
+
+            assertThat(faseDe(titular, "PREDIAL")).isEqualTo(Fase.CONVENIO);
+            assertThat(faseDe(titular, "ARBITRIO")).isEqualTo(Fase.COACTIVA);
+
+            DeudaDelExpediente deuda = deudaDe(expediente, LIQUIDACION);
+            assertThat(deuda.materiaDeCobranza())
+                    .as(
+                            "lo exigible es lo que sigue en COACTIVA: el predial acogido no se"
+                                    + " cobra por coactiva mientras el convenio viva")
+                    .isEqualTo(arbitrio);
+            assertThat(deuda.total()).isEqualTo(arbitrio);
+            assertThat(deuda.enConvenio())
+                    .as("y lo acogido no se esconde: viaja aparte, fuera de lo exigible")
+                    .isEqualTo(PREDIAL);
+
+            RegistrarActoCoactivo.ActoDictado rec2 =
+                    dictarActo(
+                            expediente,
+                            TipoDeActoCoactivo.REC2,
+                            REC2_DESDE,
+                            TipoDeMedidaCautelar.RETENCION);
+            assertThat(rec2.deuda().total())
+                    .as("la cifra que la REC-2 imprime como exigible es la misma")
+                    .isEqualTo(arbitrio);
+        }
+
+        @Test
+        @DisplayName(
+                "con toda la deuda acogida, la REC-2 no se dicta y la consulta de deudas no lista"
+                        + " el expediente")
+        void soloConDeudaAcogidaNoHayMedidaCautelar() {
+            long titular = contribuyenteConDeuda("ACOG-2");
+            String expediente = expedienteDe(titular, "ACOG-2");
+            dictarActo(expediente, TipoDeActoCoactivo.REC1, REC1, null);
+            notificarLaRec1(expediente);
+
+            acogerYFormalizar(expediente, "PREDIAL");
+            assertThat(faseDe(titular, "PREDIAL")).isEqualTo(Fase.CONVENIO);
+
+            Throwable fallo =
+                    catchThrowable(
+                            () ->
+                                    dictarActo(
+                                            expediente,
+                                            TipoDeActoCoactivo.REC2,
+                                            REC2_DESDE,
+                                            TipoDeMedidaCautelar.RETENCION));
+            assertThat(fallo)
+                    .as(
+                            "una medida cautelar sobre deuda fraccionada no se dicta, y el rechazo"
+                                    + " dice por que: no es DeudaExtinguida, que afirma un pago que"
+                                    + " no hubo")
+                    .isInstanceOf(RegistrarActoCoactivo.DeudaAcogidaAConvenio.class)
+                    .hasMessageContaining("convenio")
+                    .hasMessageContaining("500.00");
+            assertThat(deudaDe(expediente, REC2_DESDE))
+                    .satisfies(
+                            deuda -> {
+                                assertThat(deuda.total()).isEqualTo(Dinero.de("0.00"));
+                                assertThat(deuda.enConvenio()).isEqualTo(PREDIAL);
+                            });
+            assertThat(estadoDe(expediente))
+                    .as("y el expediente no avanza a REC-2")
+                    .isEqualTo(EstadoDelExpediente.REC1_NOTIFICADA);
+
+            ConsultaDeDeudasCoactivas.PaginaDeDeudas<ConsultaDeDeudasCoactivas.DeudaEnCoactiva>
+                    pagina =
+                            enTransaccion(
+                                    () ->
+                                            consultaDeDeudas.deudas(
+                                                    new CriterioDeExpedientes(
+                                                            expediente, null, null, null, null),
+                                                    LIQUIDACION,
+                                                    Paginacion.de(0, 20, "numero")));
+            assertThat(pagina.contenido())
+                    .as("«consulta de deudas en coactiva»: la deuda acogida no es deuda coactiva")
+                    .isEmpty();
+        }
+
+        /** Suscribe el convenio sobre esa obligacion y lo formaliza cobrando la inicial. */
+        private void acogerYFormalizar(String expediente, String tributo) {
+            ConvenioCoactivo convenio =
+                    fraccionar.fraccionar(
+                            peticionDe(
+                                    expediente,
+                                    List.of(
+                                            new SeleccionDeObligacion(
+                                                    tributo, EJERCICIO, null, null))),
+                            null,
+                            PORQUE);
+            formalizarLaInicial(porNumero(convenio.numero()));
+        }
+    }
+
+    /**
      * #407, ronda 1 — Lo que entra en COACTIVA es lo que el libro tiene en VALOR, y nada mas.
      *
      * <p>La primera version movia {@code deTodoElContribuyente(...).total()}: lo pendiente de la
@@ -2251,6 +2378,56 @@ class CostasYFraccionamientoJdbcTest {
                                                 null,
                                                 null,
                                                 PREDIAL,
+                                                Dinero.CERO,
+                                                Dinero.CERO,
+                                                Dinero.CERO))));
+    }
+
+    /**
+     * Una OP que formaliza <b>dos</b> obligaciones del mismo ejercicio —el predial y el arbitrio—
+     * (#403): la siembra que permite acoger una a un convenio y dejar la otra en coactiva dentro
+     * del mismo expediente.
+     */
+    private static Valor emitirConArbitrio(long contribuyenteId, String numero, Dinero arbitrio) {
+        return enTransaccion(
+                () ->
+                        valores.insertar(
+                                new Valor(
+                                        null,
+                                        TipoValor.ORDEN_DE_PAGO,
+                                        numero,
+                                        EJERCICIO,
+                                        contribuyenteId,
+                                        TipoValor.ORDEN_DE_PAGO.baseLegal(),
+                                        PREDIAL.mas(arbitrio),
+                                        Dinero.CERO,
+                                        Dinero.CERO,
+                                        Dinero.CERO,
+                                        EMISION,
+                                        EstadoDeValor.EMITIDO,
+                                        EMISION,
+                                        null,
+                                        Observacion.de("Se emite para la prueba de #403")),
+                                List.of(
+                                        ValorDetalle.nuevo(
+                                                "PREDIAL",
+                                                EJERCICIO,
+                                                null,
+                                                null,
+                                                null,
+                                                null,
+                                                PREDIAL,
+                                                Dinero.CERO,
+                                                Dinero.CERO,
+                                                Dinero.CERO),
+                                        ValorDetalle.nuevo(
+                                                "ARBITRIO",
+                                                EJERCICIO,
+                                                null,
+                                                null,
+                                                null,
+                                                null,
+                                                arbitrio,
                                                 Dinero.CERO,
                                                 Dinero.CERO,
                                                 Dinero.CERO))));

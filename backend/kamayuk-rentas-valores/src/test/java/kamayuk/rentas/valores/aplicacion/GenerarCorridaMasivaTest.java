@@ -198,7 +198,8 @@ class GenerarCorridaMasivaTest {
                 insoluto,
                 Dinero.CERO,
                 Dinero.CERO,
-                Dinero.CERO);
+                Dinero.CERO,
+                "ORDINARIA");
     }
 
     // ------------------------------------------------------------------

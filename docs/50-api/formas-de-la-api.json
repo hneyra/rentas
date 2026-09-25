@@ -217,6 +217,7 @@
         "deudaMateriaDeCobranza": "texto",
         "costas": "texto",
         "totalExigible": "texto",
+        "deudaEnConvenio": "texto",
         "deudaAlDia": "fecha",
         "valoresImportados": [
           {
@@ -292,6 +293,7 @@
       "deudaMateriaDeCobranza": "texto",
       "costas": "texto",
       "totalExigible": "texto",
+      "deudaEnConvenio": "texto",
       "deudaAlDia": "fecha",
       "valoresImportados": [
         {
@@ -2829,6 +2831,7 @@
     "deudaMateriaDeCobranza": "texto",
     "costas": "texto",
     "totalExigible": "texto",
+    "deudaEnConvenio": "texto",
     "deudaAlDia": "fecha",
     "valoresImportados": [
       {
@@ -2872,6 +2875,7 @@
     "deudaMateriaDeCobranza": "texto",
     "costas": "texto",
     "totalExigible": "texto",
+    "deudaEnConvenio": "texto",
     "deudaAlDia": "fecha",
     "valoresImportados": [
       {
@@ -3123,6 +3127,7 @@
       "deudaMateriaDeCobranza": "texto",
       "costas": "texto",
       "totalExigible": "texto",
+      "deudaEnConvenio": "texto",
       "deudaAlDia": "fecha",
       "valoresImportados": [
         {

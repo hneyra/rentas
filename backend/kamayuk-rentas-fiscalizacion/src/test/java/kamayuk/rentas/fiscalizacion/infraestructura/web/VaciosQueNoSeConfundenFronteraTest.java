@@ -447,7 +447,8 @@ class VaciosQueNoSeConfundenFronteraTest {
                             kamayuk.rentas.dominio.Dinero.CERO,
                             kamayuk.rentas.dominio.Dinero.CERO,
                             kamayuk.rentas.dominio.Dinero.CERO,
-                            kamayuk.rentas.dominio.Dinero.CERO));
+                            kamayuk.rentas.dominio.Dinero.CERO,
+                            "ORDINARIA"));
         }
     }
 

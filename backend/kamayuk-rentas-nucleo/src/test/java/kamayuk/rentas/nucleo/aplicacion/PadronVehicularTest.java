@@ -455,7 +455,8 @@ class PadronVehicularTest {
                     total,
                     Dinero.CERO,
                     Dinero.CERO,
-                    Dinero.CERO);
+                    Dinero.CERO,
+                    "ORDINARIA");
         }
     }
 

@@ -472,7 +472,8 @@ class AnulacionDePapeletaControllerTest {
                             total,
                             Dinero.CERO,
                             Dinero.CERO,
-                            Dinero.CERO));
+                            Dinero.CERO,
+                            "ORDINARIA"));
         }
     }
 

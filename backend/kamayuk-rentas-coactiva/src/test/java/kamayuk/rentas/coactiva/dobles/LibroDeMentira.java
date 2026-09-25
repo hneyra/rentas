@@ -36,7 +36,8 @@ public final class LibroDeMentira implements ConsultaDeDeudaPublica {
                                         obligacion.insoluto(),
                                         obligacion.reajuste(),
                                         obligacion.interes(),
-                                        obligacion.gasto()))
+                                        obligacion.gasto(),
+                                        obligacion.fase()))
                 .toList();
     }
 }

@@ -152,6 +152,75 @@ class ConsultaDeDeudaCuentaCorrienteTest {
                         });
     }
 
+    /**
+     * #403 — La fase cruza la frontera, y es la de cada obligacion.
+     *
+     * <p>Dos obligaciones del mismo titular en dos fases distintas: si {@code aPublica} publicara
+     * una constante, o la fase de otra fila, una de las dos saldria mal. Y el literal con que los
+     * consumidores preguntan —{@link ObligacionPublica#FASE_DE_CONVENIO}— tiene que ser el nombre
+     * del enum que el libro escribe, o {@code acogidaAConvenio} contestaria que no a todo.
+     */
+    @Test
+    @DisplayName("#403 — la fase de cada obligacion cruza la frontera como texto, sin trastocarse")
+    void laFaseCruzaLaFrontera() throws SQLException {
+        long otro = crearContribuyente("D-PORT-3", "80500003");
+        cargar(otro, "PREDIAL", Fase.COACTIVA, Dinero.de("500.00"));
+        cargar(otro, "ARBITRIO", Fase.CONVENIO, Dinero.de("120.00"));
+
+        assertThat(ObligacionPublica.FASE_DE_CONVENIO).isEqualTo(Fase.CONVENIO.name());
+        assertThat(puerto.deTodoElContribuyente(otro, LocalDate.of(2026, 6, 1)))
+                .hasSize(2)
+                .allSatisfy(
+                        o -> {
+                            if ("PREDIAL".equals(o.tributo())) {
+                                assertThat(o.fase()).isEqualTo("COACTIVA");
+                                assertThat(o.acogidaAConvenio()).isFalse();
+                            } else {
+                                assertThat(o.tributo()).isEqualTo("ARBITRIO");
+                                assertThat(o.fase()).isEqualTo("CONVENIO");
+                                assertThat(o.acogidaAConvenio()).isTrue();
+                            }
+                        });
+    }
+
+    /**
+     * #403 — La fase publicada es la de <b>hoy</b>, no la mas avanzada que la obligacion tuvo.
+     *
+     * <p>Un convenio que se quiebra deja en el libro sus asientos en {@code CONVENIO}: el par que
+     * la acogio y el que la devolvio. Tomar la maxima fase entre los <b>asientos</b> —que es lo que
+     * {@code todasLasObligacionesDe} hacia, y que nadie leia hasta que {@code aPublica} la publico—
+     * dejaria a la obligacion «acogida» para siempre, y coactiva no podria volver a cobrar lo que
+     * el quiebre le devolvio. La fase de un periodo es la de su ultimo asiento, que es la
+     * definicion de {@code ProyeccionDelSaldo}.
+     */
+    @Test
+    @DisplayName("#403 — tras el quiebre la fase vuelve a ser COACTIVA: la de hoy, no la maxima")
+    void trasElQuiebreLaFaseEsLaDeHoy() throws SQLException {
+        long otro = crearContribuyente("D-PORT-4", "80500004");
+        Dinero total = Dinero.de("500.00");
+        cargar(otro, "PREDIAL", Fase.COACTIVA, total);
+        // El acogimiento: abono en COACTIVA y cargo en CONVENIO, con FRACCIONAMIENTO.
+        mover(otro, Fase.COACTIVA, Fase.CONVENIO, total, LocalDate.of(2026, 4, 1));
+        assertThat(puerto.deTodoElContribuyente(otro, LocalDate.of(2026, 6, 1)))
+                .singleElement()
+                .satisfies(o -> assertThat(o.fase()).isEqualTo("CONVENIO"));
+
+        // El quiebre: el par al reves.
+        mover(otro, Fase.CONVENIO, Fase.COACTIVA, total, LocalDate.of(2026, 5, 1));
+        assertThat(puerto.deTodoElContribuyente(otro, LocalDate.of(2026, 6, 1)))
+                .singleElement()
+                .satisfies(
+                        o -> {
+                            assertThat(o.fase())
+                                    .as(
+                                            "la de su ultimo asiento: los de CONVENIO siguen en el"
+                                                    + " libro, pero ya no dicen donde esta")
+                                    .isEqualTo("COACTIVA");
+                            assertThat(o.acogidaAConvenio()).isFalse();
+                            assertThat(o.total()).isEqualTo(total);
+                        });
+    }
+
     @Test
     @DisplayName("un contribuyente sin asientos da una lista vacia por el puerto tambien")
     void sinAsientosListaVacia() {
@@ -177,6 +246,50 @@ class ConsultaDeDeudaCuentaCorrienteTest {
                         LocalDate.of(2026, 3, 1),
                         "RES-PRUEBA-0001");
         registrarAsiento.asentar(asiento, OBSERVACION);
+    }
+
+    private void cargar(long contribuyente, String tributo, Fase fase, Dinero monto) {
+        registrarAsiento.asentar(
+                Asiento.nuevo(
+                        new Ejercicio(2026),
+                        contribuyente,
+                        tributo,
+                        Concepto.INSOLUTO,
+                        TipoAsiento.CARGO,
+                        fase,
+                        null,
+                        null,
+                        null,
+                        null,
+                        monto,
+                        LocalDate.of(2026, 3, 1),
+                        "RES-PRUEBA-0403"),
+                OBSERVACION);
+    }
+
+    /**
+     * El par de un movimiento de fase, como lo asienta el acogimiento (#35): el total no cambia.
+     */
+    private void mover(
+            long contribuyente, Fase salida, Fase entrada, Dinero monto, LocalDate fecha) {
+        for (Fase fase : List.of(salida, entrada)) {
+            registrarAsiento.asentar(
+                    Asiento.nuevo(
+                            new Ejercicio(2026),
+                            contribuyente,
+                            "PREDIAL",
+                            Concepto.FRACCIONAMIENTO,
+                            fase == salida ? TipoAsiento.ABONO : TipoAsiento.CARGO,
+                            fase,
+                            null,
+                            null,
+                            null,
+                            null,
+                            monto,
+                            fecha,
+                            "CONV-PRUEBA-0403"),
+                    OBSERVACION);
+        }
     }
 
     private static long crearMunicipalidad() throws SQLException {

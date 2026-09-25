@@ -177,7 +177,8 @@ class ValoresControllerTest {
                         Dinero.de(100),
                         Dinero.CERO,
                         Dinero.CERO,
-                        Dinero.CERO));
+                        Dinero.CERO,
+                        "ORDINARIA"));
 
         String cuerpo =
                 """
@@ -212,7 +213,8 @@ class ValoresControllerTest {
                         Dinero.de(100),
                         Dinero.CERO,
                         Dinero.CERO,
-                        Dinero.CERO));
+                        Dinero.CERO,
+                        "ORDINARIA"));
 
         String cuerpo =
                 """
@@ -679,7 +681,8 @@ class ValoresControllerTest {
                             Dinero.de("800.00"),
                             Dinero.CERO,
                             Dinero.CERO,
-                            Dinero.CERO));
+                            Dinero.CERO,
+                            "ORDINARIA"));
             deuda.con(
                     new ObligacionPublica(
                             "ARBITRIOS",
@@ -690,7 +693,8 @@ class ValoresControllerTest {
                             Dinero.de("120.00"),
                             Dinero.CERO,
                             Dinero.CERO,
-                            Dinero.CERO));
+                            Dinero.CERO,
+                            "ORDINARIA"));
         }
 
         @Test
@@ -840,7 +844,8 @@ class ValoresControllerTest {
                         Dinero.de(100),
                         Dinero.CERO,
                         Dinero.CERO,
-                        Dinero.CERO));
+                        Dinero.CERO,
+                        "ORDINARIA"));
         mvc.perform(
                         MockMvcRequestBuilders.post("/rentas/api/v1/valores")
                                 .contentType(MediaType.APPLICATION_JSON)
