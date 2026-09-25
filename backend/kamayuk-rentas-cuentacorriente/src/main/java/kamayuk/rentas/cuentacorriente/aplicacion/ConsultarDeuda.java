@@ -23,9 +23,9 @@ import kamayuk.rentas.cuentacorriente.dominio.CriterioDeDeuda;
 import kamayuk.rentas.cuentacorriente.dominio.CriterioDeDeudaPorContribuyente;
 import kamayuk.rentas.cuentacorriente.dominio.DeudaActualizada;
 import kamayuk.rentas.cuentacorriente.dominio.Fase;
+import kamayuk.rentas.cuentacorriente.dominio.FaseDeLaObligacion;
 import kamayuk.rentas.cuentacorriente.dominio.LoOriginadoPor;
 import kamayuk.rentas.cuentacorriente.dominio.ObligacionConDeuda;
-import kamayuk.rentas.cuentacorriente.dominio.ProyeccionDelSaldo;
 import kamayuk.rentas.cuentacorriente.dominio.SaldoProyectado;
 import kamayuk.rentas.cuentacorriente.dominio.SaldoRepository;
 import kamayuk.rentas.dominio.OrdenDeLosActos;
@@ -221,7 +221,9 @@ public class ConsultarDeuda {
      * sola llamada a {@link AsientoRepository#deContribuyente}: no hay pagina que acote cuantos
      * grupos se resuelven, asi que una consulta por obligacion aqui podria ser cualquier numero de
      * ellas. {@link CalculoDeDeuda#deudaActualizadaA} filtra el corte por su cuenta (ve {@code
-     * fechaValor}), asi que agrupar sin filtrar por fecha primero es seguro.
+     * fechaValor}), y {@link FaseDeLaObligacion#a} tambien: asi que agrupar sin filtrar por fecha
+     * primero es seguro <b>para las dos</b>. Hasta #363 lo era solo para el importe, y la fase de
+     * una constancia a una fecha pasada salia con asientos posteriores al corte.
      */
     @Transactional(readOnly = true)
     public List<ObligacionConDeuda> todasLasObligacionesDe(long contribuyenteId, LocalDate fecha) {
@@ -246,7 +248,11 @@ public class ConsultarDeuda {
             // convenio quebrado deja sus asientos en CONVENIO en el libro, y la obligacion salia
             // acogida para siempre. Nadie la leia; desde que ObligacionPublica la publica, coactiva
             // la lee para separar lo exigible de lo acogido.
-            Fase fase = faseMasAvanzadaDe(ProyeccionDelSaldo.de(delGrupo, reloj.instant()));
+            //
+            // Y A LA FECHA DE CORTE (#363): la proyeccion es de hoy, y una constancia al 15 de mayo
+            // decia VALOR por una OP del 1 de junio. La fase no pasa por CalculoDeDeuda, que es
+            // quien corta el importe: la corta FaseDeLaObligacion, que es la regla una sola vez.
+            Fase fase = FaseDeLaObligacion.a(delGrupo, fecha);
             DeudaActualizada deuda = calculo.deudaActualizadaA(delGrupo, fecha, redondeo);
             obligaciones.add(
                     new ObligacionConDeuda(
