@@ -359,6 +359,45 @@ class ActualizarFichaTest {
                     .hasSize(1);
             assertThat(vigentes).isEmpty();
         }
+
+        @Test
+        @DisplayName(
+                "#421 — un contacto que ya existe no entra por el alta, ni se corrige con otro")
+        void elAltaNoCorrige() throws SQLException {
+            long contribuyente = crearContribuyente("C-0003", "40300003", "GESTOR, CORREGIDO");
+            Contacto correo =
+                    actualizar.registrarContacto(
+                            Contacto.nuevo(contribuyente, TipoContacto.EMAIL, "a@x.pe"),
+                            Observacion.de("Correo para la notificacion electronica"));
+            Contacto otro =
+                    actualizar.registrarContacto(
+                            Contacto.nuevo(contribuyente, TipoContacto.EMAIL, "c@x.pe"),
+                            Observacion.de("Segundo correo para la notificacion"));
+            Contacto corregido =
+                    new Contacto(
+                            correo.id(),
+                            contribuyente,
+                            TipoContacto.EMAIL,
+                            "b@x.pe",
+                            null,
+                            null,
+                            null,
+                            true);
+
+            assertThatThrownBy(
+                            () ->
+                                    actualizar.registrarContacto(
+                                            corregido, Observacion.de("Corrige el correo")))
+                    .as("por el alta la correccion se auditaba sin el antes: el correo se perdia")
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("corregirContacto");
+            assertThatThrownBy(
+                            () ->
+                                    actualizar.corregirContacto(
+                                            otro, corregido, Observacion.de("Corrige el correo")))
+                    .as("el antes de otro contacto dejaria en la auditoria un valor que no era")
+                    .isInstanceOf(IllegalArgumentException.class);
+        }
     }
 
     @Nested

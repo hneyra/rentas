@@ -1092,6 +1092,192 @@ class EscrituraDelPadronControllerTest {
         }
     }
 
+    // ── #421: la correccion deja el antes ──────────────────────────────
+
+    /**
+     * Una correccion deja en la auditoria lo que habia <b>y</b> lo que queda (#421, DAT-02).
+     *
+     * <p>Hasta #421 las dos escrituras auditaban la MODIFICACION como un alta: {@code
+     * datos_anteriores} en nulo y un {@code datos_nuevos} que no llevaba lo que la escritura
+     * acababa de cambiar. Como el {@code UPDATE} pisa la fila y no hay tabla historica, el valor
+     * original no quedaba en ninguna parte.
+     *
+     * <p><b>La siembra distingue</b>: cada correccion cambia un solo campo, y justo uno que la
+     * descripcion de antes no llevaba —la condicion especial, el valor del contacto—. Con la de
+     * antes, {@code datos_nuevos} salia identico al de cualquier otra modificacion y la prueba no
+     * podria decir si el campo cambio.
+     *
+     * <p>Que una clave <b>este</b> en el JSON se pregunta con {@code jsonb_exists} y no con el
+     * operador {@code ?}, que el controlador JDBC tomaria por un parametro.
+     */
+    @Nested
+    @DisplayName("#421 — La correccion deja en la auditoria lo que habia y lo que queda")
+    class LaCorreccionDejaElAntes {
+
+        @Test
+        @DisplayName("cambiar SOLO la condicion especial deja el antes (sin ella) y el despues")
+        void laCondicionEspecial() throws Exception {
+            long id = altaDe("C-0600", "40100600", "SIN CONDICION, JUAN");
+
+            MvcResult corregido =
+                    enviar(
+                            put("/rentas/api/v1/rentas/contribuyentes/" + id),
+                            """
+                            {"observacion":"Acredita la condicion de pensionista con su resolucion",
+                             "condicionEspecial":"PENSIONISTA"}
+                            """);
+            assertThat(corregido.getResponse().getStatus())
+                    .as("respuesta: %s", corregido.getResponse().getContentAsString())
+                    .isEqualTo(200);
+
+            assertThat(auditado("contribuyente", id, "datos_anteriores IS NOT NULL"))
+                    .as("una correccion tiene un antes: sin el, el valor original se pierde")
+                    .isEqualTo("true");
+            assertThat(
+                            auditado(
+                                    "contribuyente",
+                                    id,
+                                    "jsonb_exists(datos_anteriores, 'condicionEspecial')"))
+                    .as("el antes nombra la condicion aunque no la hubiera: su ausencia es el dato")
+                    .isEqualTo("true");
+            assertThat(auditado("contribuyente", id, "datos_anteriores->>'condicionEspecial'"))
+                    .as("no tenia ninguna")
+                    .isNull();
+            assertThat(auditado("contribuyente", id, "datos_nuevos->>'condicionEspecial'"))
+                    .as(
+                            "es la que dara derecho a la deduccion: el dia que se aplique hay que"
+                                    + " poder decir quien la concedio y que habia antes")
+                    .isEqualTo("PENSIONISTA");
+        }
+
+        @Test
+        @DisplayName("corregir el nombre deja el nombre anterior en la auditoria")
+        void elNombre() throws Exception {
+            long id = altaDe("C-0601", "40100601", "PEREZ GARCIA, JUAN");
+
+            enviar(
+                    put("/rentas/api/v1/rentas/contribuyentes/" + id),
+                    """
+                    {"observacion":"Correccion segun DNI","nombreRazonSocial":"PEREZ GARCIA, JUANA"}
+                    """);
+
+            assertThat(auditado("contribuyente", id, "datos_anteriores->>'nombreRazonSocial'"))
+                    .as("el nombre anterior no quedaba en ninguna tabla")
+                    .isEqualTo("PEREZ GARCIA, JUAN");
+            assertThat(auditado("contribuyente", id, "datos_nuevos->>'nombreRazonSocial'"))
+                    .isEqualTo("PEREZ GARCIA, JUANA");
+        }
+
+        @Test
+        @DisplayName("los cuatro datos que la correccion puede cambiar van en la auditoria")
+        void losDatosPersonales() throws Exception {
+            long conyuge = altaDe("C-0602", "40100602", "CONYUGE, AUDITADA");
+            long id = altaDe("C-0603", "40100603", "CASADO, AUDITADO");
+
+            enviar(
+                    put("/rentas/api/v1/rentas/contribuyentes/" + id),
+                    """
+                    {"observacion":"Corrige los datos personales segun DNI",
+                     "condicionEspecial":"ADULTO_MAYOR","fechaNacimiento":"1950-02-01",
+                     "estadoCivil":"CASADO","conyugeId":"""
+                            + conyuge
+                            + "}");
+
+            assertThat(auditado("contribuyente", id, "datos_nuevos->>'condicionEspecial'"))
+                    .isEqualTo("ADULTO_MAYOR");
+            assertThat(auditado("contribuyente", id, "datos_nuevos->>'fechaNacimiento'"))
+                    .isEqualTo("1950-02-01");
+            assertThat(auditado("contribuyente", id, "datos_nuevos->>'estadoCivil'"))
+                    .isEqualTo("CASADO");
+            assertThat(auditado("contribuyente", id, "datos_nuevos->>'conyugeId'"))
+                    .isEqualTo(String.valueOf(conyuge));
+            assertThat(auditado("contribuyente", id, "datos_anteriores->>'fechaNacimiento'"))
+                    .as("y el antes los nombra, vacios")
+                    .isNull();
+            assertThat(auditado("contribuyente", id, "jsonb_exists(datos_anteriores, 'conyugeId')"))
+                    .isEqualTo("true");
+        }
+
+        @Test
+        @DisplayName("corregir el valor de un contacto deja el valor al que se notifico")
+        void elValorDelContacto() throws Exception {
+            long id = altaDe("C-0604", "40100604", "CON GESTOR, PERSONA");
+            MvcResult creado =
+                    enviar(
+                            post("/rentas/api/v1/rentas/contribuyentes/" + id + "/contactos"),
+                            """
+                            {"observacion":"Correo del gestor para la notificacion",
+                             "tipo":"EMAIL","valor":"a@x.pe"}
+                            """);
+            long contactoId = idDe(creado);
+
+            MvcResult corregido =
+                    enviar(
+                            put(
+                                    "/rentas/api/v1/rentas/contribuyentes/"
+                                            + id
+                                            + "/contactos/"
+                                            + contactoId),
+                            """
+                            {"observacion":"El gestor corrige su correo","valor":"b@x.pe"}
+                            """);
+            assertThat(corregido.getResponse().getStatus())
+                    .as("respuesta: %s", corregido.getResponse().getContentAsString())
+                    .isEqualTo(200);
+
+            assertThat(auditado("contacto", contactoId, "datos_anteriores IS NOT NULL"))
+                    .isEqualTo("true");
+            assertThat(auditado("contacto", contactoId, "datos_anteriores->>'valor'"))
+                    .as(
+                            "el UPDATE pisa el valor: si la auditoria no lo guarda, el correo al"
+                                    + " que se notifico se pierde")
+                    .isEqualTo("a@x.pe");
+            assertThat(auditado("contacto", contactoId, "datos_nuevos->>'valor'"))
+                    .isEqualTo("b@x.pe");
+        }
+
+        @Test
+        @DisplayName("el nombre y el documento del contacto tambien se auditan")
+        void elNombreYElDocumentoDelContacto() throws Exception {
+            long id = altaDe("C-0605", "40100605", "CON TERCERO, PERSONA");
+            MvcResult creado =
+                    enviar(
+                            post("/rentas/api/v1/rentas/contribuyentes/" + id + "/contactos"),
+                            """
+                            {"observacion":"Gestor designado en ventanilla","tipo":"GESTOR",
+                             "valor":"969000605","nombre":"GESTOR, EL","documento":"40999605"}
+                            """);
+            long contactoId = idDe(creado);
+
+            enviar(
+                    put("/rentas/api/v1/rentas/contribuyentes/" + id + "/contactos/" + contactoId),
+                    """
+                    {"observacion":"El gestor corrige sus datos","nombre":"GESTOR, OTRO",
+                     "documento":"40999606"}
+                    """);
+
+            assertThat(auditado("contacto", contactoId, "datos_anteriores->>'nombre'"))
+                    .isEqualTo("GESTOR, EL");
+            assertThat(auditado("contacto", contactoId, "datos_anteriores->>'documento'"))
+                    .isEqualTo("40999605");
+            assertThat(auditado("contacto", contactoId, "datos_nuevos->>'nombre'"))
+                    .isEqualTo("GESTOR, OTRO");
+            assertThat(auditado("contacto", contactoId, "datos_nuevos->>'documento'"))
+                    .isEqualTo("40999606");
+        }
+
+        @Test
+        @DisplayName("el alta sigue sin antes: no habia nada")
+        void elAltaNoTieneAntes() throws Exception {
+            long id = altaDe("C-0606", "40100606", "RECIEN LLEGADO, ALGUIEN");
+
+            assertThat(auditadoEn("contribuyente", id, "ALTA", "datos_anteriores IS NULL"))
+                    .isEqualTo("true");
+            assertThat(auditadoEn("contribuyente", id, "ALTA", "datos_nuevos->>'codigo'"))
+                    .isEqualTo("C-0606");
+        }
+    }
+
     // ── Aislamiento ────────────────────────────────────────────────────
 
     @Nested
@@ -1274,6 +1460,42 @@ class EscrituraDelPadronControllerTest {
         return contar(
                 "SELECT count(*) FROM domicilio WHERE contribuyente_id = " + contribuyenteId,
                 municipalidadA);
+    }
+
+    /** Una expresion sobre la ultima MODIFICACION auditada de esa fila, como texto (#421). */
+    private static @org.jspecify.annotations.Nullable String auditado(
+            String tabla, long clave, String expresion) throws SQLException {
+        return auditadoEn(tabla, clave, "MODIFICACION", expresion);
+    }
+
+    /**
+     * Una expresion sobre la ultima fila de auditoria de esa operacion, como texto.
+     *
+     * <p>Se pregunta a la base con {@code kamayuk_app}, que tiene {@code SELECT} sobre {@code
+     * auditoria}: es lo que quedo escrito lo que importa, no lo que el caso de uso creyo escribir.
+     * Que no haya ninguna fila es un fallo, no un nulo: un nulo es justo lo que se mide.
+     */
+    private static @org.jspecify.annotations.Nullable String auditadoEn(
+            String tabla, long clave, String operacion, String expresion) throws SQLException {
+        try (Connection app = base.conexion(BaseDeDatosDePrueba.APP)) {
+            ContextoDeTenant.fijar(app, municipalidadA);
+            try (PreparedStatement sentencia =
+                    app.prepareStatement(
+                            "SELECT ("
+                                    + expresion
+                                    + ")::text FROM auditoria WHERE tabla = ? AND clave = ?"
+                                    + " AND operacion = ? ORDER BY id DESC LIMIT 1")) {
+                sentencia.setString(1, tabla);
+                sentencia.setString(2, String.valueOf(clave));
+                sentencia.setString(3, operacion);
+                try (ResultSet resultado = sentencia.executeQuery()) {
+                    assertThat(resultado.next())
+                            .as("hay una fila %s de %s %d en la auditoria", operacion, tabla, clave)
+                            .isTrue();
+                    return resultado.getString(1);
+                }
+            }
+        }
     }
 
     private static long contactosDe(long contribuyenteId) throws SQLException {

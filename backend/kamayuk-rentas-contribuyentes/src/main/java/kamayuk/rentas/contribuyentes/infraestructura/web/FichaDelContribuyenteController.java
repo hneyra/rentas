@@ -245,7 +245,8 @@ public class FichaDelContribuyenteController {
                                                 : peticion.vigente()));
 
         return FichaDelContribuyenteResource.ContactoResource.de(
-                conflictoSiChoca(() -> actualizar.registrarContacto(cambiado, observacion)));
+                conflictoSiChoca(
+                        () -> actualizar.corregirContacto(existente, cambiado, observacion)));
     }
 
     /**

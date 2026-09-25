@@ -1,6 +1,7 @@
 package kamayuk.rentas.contribuyentes.aplicacion;
 
 import java.time.LocalDate;
+import java.util.Objects;
 import java.util.Optional;
 import kamayuk.rentas.auditoria.Auditoria;
 import kamayuk.rentas.auditoria.Operacion;
@@ -90,22 +91,78 @@ public class ActualizarFicha {
         return guardado;
     }
 
+    /**
+     * Alta de un contacto.
+     *
+     * <p><b>Solo el alta</b> (#421): hasta #421 tambien corregia, decidiendo por {@code esNuevo()},
+     * y la correccion salia sin el antes. La correccion es {@link #corregirContacto}.
+     *
+     * @throws IllegalArgumentException si el que llega ya tiene identificador
+     */
     @Transactional
-    public Contacto registrarContacto(Contacto contacto, Observacion observacion) {
-        Contacto guardado = repositorio.guardar(contacto);
+    public Contacto registrarContacto(Contacto nuevo, Observacion observacion) {
+        if (!nuevo.esNuevo()) {
+            throw new IllegalArgumentException(
+                    "Registrar un contacto es darlo de alta; el "
+                            + nuevo.id()
+                            + " ya existe y se corrige con corregirContacto, que audita lo que"
+                            + " habia");
+        }
+        Contacto guardado = repositorio.guardar(nuevo);
         auditar(
                 "contacto",
                 guardado.id(),
-                contacto.esNuevo() ? Operacion.ALTA : Operacion.MODIFICACION,
+                Operacion.ALTA,
                 observacion,
                 null,
-                "{\"tipo\":\"" + guardado.tipo() + "\",\"vigente\":" + guardado.vigente() + "}");
+                guardado.paraLaAuditoria());
+        return guardado;
+    }
+
+    /**
+     * Correccion de un contacto, auditando <b>lo que habia y lo que queda</b> (#421).
+     *
+     * <p>El {@code UPDATE} pisa el valor, el nombre y el documento, y {@code contacto} no tiene
+     * tabla historica: si la auditoria no guarda el antes, el correo al que ya se le notifico a un
+     * gestor se pierde con la primera correccion. Versionar el contacto como el domicilio —cerrar
+     * uno y abrir otro— tambien lo conservaria, pero cambiaria su identidad y la de las
+     * notificaciones que lo citan; eso no es este paso.
+     *
+     * @param antes el contacto tal como se leyo antes de corregirlo
+     * @param despues el mismo contacto corregido: mismo identificador y mismo contribuyente
+     * @throws IllegalArgumentException si {@code antes} no existe o {@code despues} es otro
+     *     contacto
+     */
+    @Transactional
+    public Contacto corregirContacto(Contacto antes, Contacto despues, Observacion observacion) {
+        if (antes.esNuevo()
+                || !Objects.equals(antes.id(), despues.id())
+                || antes.contribuyenteId() != despues.contribuyenteId()) {
+            throw new IllegalArgumentException(
+                    "Corregir un contacto es corregir el mismo: el antes ("
+                            + antes.id()
+                            + ") y el despues ("
+                            + despues.id()
+                            + ") tienen que ser el mismo contacto del mismo contribuyente");
+        }
+        Contacto guardado = repositorio.guardar(despues);
+        auditar(
+                "contacto",
+                guardado.id(),
+                Operacion.MODIFICACION,
+                observacion,
+                antes.paraLaAuditoria(),
+                guardado.paraLaAuditoria());
         return guardado;
     }
 
     /**
      * Da de baja un contacto. No lo borra: un gestor que ya no lo es aparece en notificaciones
      * anteriores, y explicar por que se le notifico exige que su ficha siga ahi.
+     *
+     * <p>Audita con la misma descripcion que el alta y la correccion (#421): hasta entonces
+     * guardaba {@code {vigente:true}} y {@code {vigente:false}}, una segunda fuente de lo que se
+     * audita que no decia de que contacto se trataba.
      */
     @Transactional
     public Contacto darDeBajaContacto(Contacto contacto, Observacion observacion) {
@@ -115,8 +172,8 @@ public class ActualizarFicha {
                 baja.id(),
                 Operacion.BAJA,
                 observacion,
-                "{\"vigente\":true}",
-                "{\"vigente\":false}");
+                contacto.paraLaAuditoria(),
+                baja.paraLaAuditoria());
         return baja;
     }
 
