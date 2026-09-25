@@ -48,6 +48,7 @@ import kamayuk.rentas.compartido.TenantContext;
 import kamayuk.rentas.cuentacorriente.ConsultaDeDeudaPublica;
 import kamayuk.rentas.cuentacorriente.aplicacion.ConsultaDeDeudaCuentaCorriente;
 import kamayuk.rentas.cuentacorriente.aplicacion.ConsultarDeuda;
+import kamayuk.rentas.cuentacorriente.aplicacion.MovimientoDeFaseCuentaCorriente;
 import kamayuk.rentas.cuentacorriente.aplicacion.RegistrarAsiento;
 import kamayuk.rentas.cuentacorriente.dominio.Asiento;
 import kamayuk.rentas.cuentacorriente.dominio.CalculoDeDeuda;
@@ -196,7 +197,18 @@ class ExpedienteCoactivoJdbcTest {
         importar =
                 envolver(
                         new ImportarValoresACoactiva(
-                                expedientes, movimientos, puerto, auditoria, RELOJ));
+                                expedientes,
+                                movimientos,
+                                puerto,
+                                envolver(
+                                        new MovimientoDeFaseCuentaCorriente(
+                                                registrarAsiento,
+                                                asientos,
+                                                saldos,
+                                                calculo,
+                                                redondeo)),
+                                auditoria,
+                                RELOJ));
         cambiarEstado =
                 envolver(
                         new CambiarEstadoDelExpediente(expedientes, movimientos, auditoria, RELOJ));

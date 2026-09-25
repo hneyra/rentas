@@ -49,6 +49,12 @@ import org.springframework.transaction.annotation.Transactional;
  *       coactiva podria fraccionar deuda ordinaria —que tiene su propia pantalla, su propio
  *       privilegio y su propia autoridad— y el quiebre la devolveria a ordinaria sin que nadie
  *       hubiera decidido meterla ahi.
+ *       <p>La deuda del expediente <b>esta</b> en esa fase porque la importacion la puso ahi:
+ *       {@code ImportarValoresACoactiva} la pasa de VALOR a COACTIVA al meter el valor en el
+ *       expediente (#407). Hasta #407 nadie la movia, la unica escritura de COACTIVA eran las
+ *       costas, y esta guarda rechazaba justo la deuda que el expediente cobra. Lo que se arreglo
+ *       fue esa premisa, no la guarda: aceptar VALOR aqui habria hecho que el quiebre la devolviera
+ *       a VALOR.
  * </ol>
  *
  * <p>La comprobacion se hace sobre la simulacion y el registro <b>relee</b>: entre las dos, una

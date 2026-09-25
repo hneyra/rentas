@@ -24,6 +24,7 @@ import kamayuk.rentas.coactiva.dominio.ResumenDeLaCartera;
 import kamayuk.rentas.coactiva.dominio.ValorDelExpediente;
 import kamayuk.rentas.compartido.Pagina;
 import kamayuk.rentas.compartido.Paginacion;
+import kamayuk.rentas.cuentacorriente.ClaveDeObligacionPublica;
 import kamayuk.rentas.cuentacorriente.ConsultaDeDeudaPublica;
 import kamayuk.rentas.cuentacorriente.ObligacionPublica;
 import kamayuk.rentas.dominio.Dinero;
@@ -227,7 +228,7 @@ public class ConsultaDeExpedientes {
             delExpediente.add(valor.valorId());
         }
 
-        Set<ClaveDeObligacion> claves = new HashSet<>();
+        Set<ClaveDeObligacionPublica> claves = new HashSet<>();
         if (!delExpediente.isEmpty()) {
             List<ValorParaCoactiva> susValores =
                     valoresPorContribuyente.computeIfAbsent(
@@ -237,7 +238,7 @@ public class ConsultaDeExpedientes {
                     continue;
                 }
                 for (ObligacionDelValor obligacion : valor.obligaciones()) {
-                    claves.add(ClaveDeObligacion.de(obligacion));
+                    claves.add(obligacion.clave());
                 }
             }
         }
@@ -245,9 +246,9 @@ public class ConsultaDeExpedientes {
         // Las obligaciones en las que viven las costas DE ESTE expediente (#42, V35). No las del
         // contribuyente: `costa_obligacion` es lo que las distingue, porque la clave del libro no
         // incluye el expediente.
-        Set<ClaveDeObligacion> deCostas = new HashSet<>();
+        Set<ClaveDeObligacionPublica> deCostas = new HashSet<>();
         for (ObligacionDeCostas obligacion : costas.obligacionesDe(expediente.identificador())) {
-            deCostas.add(ClaveDeObligacion.de(obligacion));
+            deCostas.add(claveDe(obligacion));
         }
 
         if (claves.isEmpty() && deCostas.isEmpty()) {
@@ -261,9 +262,9 @@ public class ConsultaDeExpedientes {
         List<ObligacionDelExpediente> lineas = new ArrayList<>();
         DeudaDelExpediente acumulada = DeudaDelExpediente.ninguna(aLaFecha);
         Dinero delProcedimiento = Dinero.de("0.00");
-        Set<ClaveDeObligacion> contadas = new HashSet<>();
+        Set<ClaveDeObligacionPublica> contadas = new HashSet<>();
         for (ObligacionPublica obligacion : obligaciones) {
-            ClaveDeObligacion clave = ClaveDeObligacion.de(obligacion);
+            ClaveDeObligacionPublica clave = obligacion.clave();
             if (!contadas.add(clave)) {
                 continue;
             }
@@ -304,47 +305,18 @@ public class ConsultaDeExpedientes {
                 aLaFecha);
     }
 
+    /**
+     * La clave de una obligacion de costas (#42): sin unidad, porque una costa no es de un predio
+     * ni de un vehiculo sino del procedimiento. Las demas llegan con la suya ({@link
+     * ClaveDeObligacionPublica}, #407).
+     */
+    private static ClaveDeObligacionPublica claveDe(ObligacionDeCostas obligacion) {
+        return new ClaveDeObligacionPublica(
+                obligacion.tributo(), obligacion.ejercicio(), null, null);
+    }
+
     /** Las filas del expediente y su suma, compuestas de una vez. */
     private record Composicion(List<ObligacionDelExpediente> lineas, DeudaDelExpediente total) {}
-
-    /**
-     * La clave con la que se cruzan las obligaciones que un valor formaliza y las que el libro
-     * tiene.
-     *
-     * <p>Son los cuatro campos que {@code cuentacorriente} usa para agrupar sus asientos. El
-     * tributo se compara en mayusculas porque los dos lados lo normalizan asi, pero por si acaso.
-     */
-    private record ClaveDeObligacion(
-            String tributo, int ejercicio, @Nullable Long predioId, @Nullable Long vehiculoId) {
-
-        static ClaveDeObligacion de(ObligacionDelValor obligacion) {
-            return new ClaveDeObligacion(
-                    obligacion.tributo().toUpperCase(java.util.Locale.ROOT),
-                    obligacion.ejercicio().valor(),
-                    obligacion.predioId(),
-                    obligacion.vehiculoId());
-        }
-
-        static ClaveDeObligacion de(ObligacionPublica obligacion) {
-            return new ClaveDeObligacion(
-                    obligacion.tributo().toUpperCase(java.util.Locale.ROOT),
-                    obligacion.ejercicio().valor(),
-                    obligacion.predioId(),
-                    obligacion.vehiculoId());
-        }
-
-        /**
-         * La clave de una obligacion de costas (#42): sin unidad, porque una costa no es de un
-         * predio ni de un vehiculo sino del procedimiento.
-         */
-        static ClaveDeObligacion de(ObligacionDeCostas obligacion) {
-            return new ClaveDeObligacion(
-                    obligacion.tributo().toUpperCase(java.util.Locale.ROOT),
-                    obligacion.ejercicio().valor(),
-                    null,
-                    null);
-        }
-    }
 
     /**
      * La deuda de un expediente, obligación por obligación y con su suma (#426).

@@ -1,6 +1,7 @@
 package kamayuk.rentas.valores;
 
 import java.util.Objects;
+import kamayuk.rentas.cuentacorriente.ClaveDeObligacionPublica;
 import kamayuk.rentas.dominio.Ejercicio;
 import org.jspecify.annotations.Nullable;
 
@@ -28,5 +29,15 @@ public record ObligacionDelValor(
     public ObligacionDelValor {
         Objects.requireNonNull(tributo, "La obligacion necesita su tributo");
         Objects.requireNonNull(ejercicio, "La obligacion necesita su ejercicio");
+    }
+
+    /**
+     * La clave con que esta obligacion se cruza con el libro, y con la que se deduplica (#407).
+     *
+     * <p>El record crudo no sirve para ninguna de las dos cosas: su {@code equals} distingue
+     * «predial» de «PREDIAL», y el libro no.
+     */
+    public ClaveDeObligacionPublica clave() {
+        return new ClaveDeObligacionPublica(tributo, ejercicio, predioId, vehiculoId);
     }
 }

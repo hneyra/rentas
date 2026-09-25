@@ -11,6 +11,7 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 import kamayuk.rentas.auditoria.RegistroDeAuditoria;
 import kamayuk.rentas.cuentacorriente.ConsultaDeDeudaPublica;
+import kamayuk.rentas.cuentacorriente.MovimientoDeFase;
 import kamayuk.rentas.cuentacorriente.ObligacionPublica;
 import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.dominio.Ejercicio;
@@ -61,17 +62,35 @@ class GenerarCorridaMasivaTest {
                 new RegistrarValor(
                         repositorioValor,
                         deuda,
-                        (ejercicio,
-                                contribuyenteId,
-                                tributo,
-                                periodo,
-                                predioId,
-                                vehiculoId,
-                                referenciaExterna,
-                                monto,
-                                fechaValor,
-                                documentoOrigen,
-                                observacion) -> {},
+                        new MovimientoDeFase() {
+                            @Override
+                            public void moverAValor(
+                                    Ejercicio ejercicio,
+                                    long contribuyenteId,
+                                    String tributo,
+                                    @Nullable Integer periodo,
+                                    @Nullable Long predioId,
+                                    @Nullable Long vehiculoId,
+                                    String referenciaExterna,
+                                    Dinero monto,
+                                    LocalDate fechaValor,
+                                    String documentoOrigen,
+                                    Observacion observacion) {}
+
+                            @Override
+                            public Dinero moverACoactiva(
+                                    long contribuyenteId,
+                                    kamayuk.rentas.cuentacorriente.ClaveDeObligacionPublica
+                                            obligacion,
+                                    String referenciaExterna,
+                                    LocalDate fechaValor,
+                                    String documentoOrigen,
+                                    Observacion observacion) {
+                                throw new AssertionError(
+                                        "la generacion masiva emite valores: pasa la deuda a VALOR,"
+                                                + " no a COACTIVA (#407)");
+                            }
+                        },
                         (RegistroDeAuditoria registro) -> {},
                         java.time.Clock.systemUTC());
         ProcesarItemMasivo procesar = new ProcesarItemMasivo(deuda, registrar, repositorioMasivo);

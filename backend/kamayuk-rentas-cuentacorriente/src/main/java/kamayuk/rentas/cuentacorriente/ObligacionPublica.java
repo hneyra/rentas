@@ -52,4 +52,9 @@ public record ObligacionPublica(
     public Dinero total() {
         return insoluto.mas(reajuste).mas(interes).mas(gasto);
     }
+
+    /** Con que clave se cruza esta fila con las obligaciones de otro contexto (#407). */
+    public ClaveDeObligacionPublica clave() {
+        return new ClaveDeObligacionPublica(tributo, ejercicio, predioId, vehiculoId);
+    }
 }

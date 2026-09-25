@@ -4,6 +4,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -23,8 +24,11 @@ import kamayuk.rentas.coactiva.dominio.MovimientoDelExpedienteRepository;
 import kamayuk.rentas.coactiva.dominio.PlantillaDeNumeroDeExpediente;
 import kamayuk.rentas.coactiva.dominio.ValorDelExpediente;
 import kamayuk.rentas.coactiva.dominio.ValorRechazado;
+import kamayuk.rentas.cuentacorriente.ClaveDeObligacionPublica;
+import kamayuk.rentas.cuentacorriente.MovimientoDeFase;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.Observacion;
+import kamayuk.rentas.valores.ObligacionDelValor;
 import kamayuk.rentas.valores.ValorParaCoactiva;
 import kamayuk.rentas.valores.ValoresEnCoactiva;
 import org.jspecify.annotations.Nullable;
@@ -61,6 +65,24 @@ import org.springframework.transaction.annotation.Transactional;
  * expedientes: la segunda choca contra {@code expediente_valor_unico_uq} y <b>se deshace
  * entera</b>, correlativo incluido. Reintentar entonces devuelve el rechazo explicado, porque la
  * primera ya dejo el valor dentro.
+ *
+ * <h2>Aqui es donde la deuda entra en coactiva, y el libro lo dice (#407)</h2>
+ *
+ * <p>La OP paso la deuda de ORDINARIA a VALOR; importarla a un expediente la pasa de VALOR a
+ * COACTIVA, con {@link MovimientoDeFase#moverACoactiva}, en el mismo bucle y la misma transaccion
+ * que la registra en el expediente y escribe el ACO. Hasta #407 la importacion no tocaba el libro,
+ * la deuda del expediente seguia en VALOR, y {@code FraccionarEnCoactiva} —que solo acoge deuda de
+ * la fase COACTIVA— la rechazaba: lo unico fraccionable en coactiva eran las costas. Una sola
+ * fuente de verdad: la fase la dice el libro, y no una tabla cruzada con los valores del
+ * expediente.
+ *
+ * <p><b>Se mueve lo que el libro tiene en VALOR, no lo congelado en el valor ni lo pendiente en
+ * todas las fases.</b> Lo congelado es de la emision: si entre la OP y el pase el obligado pago una
+ * parte, moverlo dejaria VALOR en negativo. Lo pendiente de la obligacion —lo que esta clase movia
+ * en la primera version— cuenta tambien lo que esta en otras fases: un cargo ordinario asentado
+ * despues de la OP, que ningun valor formaliza, acababa en COACTIVA. Por eso el monto no lo decide
+ * esta clase sino {@link MovimientoDeFase#moverACoactiva}, que lee el libro: una obligacion sin
+ * nada en VALOR no se mueve, y una que otra importacion ya movio tampoco.
  */
 @Service
 public class ImportarValoresACoactiva {
@@ -68,6 +90,7 @@ public class ImportarValoresACoactiva {
     private final ExpedienteRepository expedientes;
     private final MovimientoDelExpedienteRepository movimientos;
     private final ValoresEnCoactiva valores;
+    private final MovimientoDeFase fases;
     private final Auditoria auditoria;
     private final Clock reloj;
 
@@ -75,11 +98,13 @@ public class ImportarValoresACoactiva {
             ExpedienteRepository expedientes,
             MovimientoDelExpedienteRepository movimientos,
             ValoresEnCoactiva valores,
+            MovimientoDeFase fases,
             Auditoria auditoria,
             Clock reloj) {
         this.expedientes = expedientes;
         this.movimientos = movimientos;
         this.valores = valores;
+        this.fases = fases;
         this.auditoria = auditoria;
         this.reloj = reloj;
     }
@@ -184,12 +209,34 @@ public class ImportarValoresACoactiva {
                         ahora,
                         observacion));
 
+        // Una obligacion que formalizan dos valores de esta importacion se pide una vez (#407), y
+        // con la clave del libro: el record crudo distingue «predial» de «PREDIAL». Entre dos
+        // importaciones no hace falta nada mas: la segunda encuentra VALOR vacio.
+        Set<ClaveDeObligacionPublica> yaMovidas = new HashSet<>();
+
         List<ValorDelExpediente> importados = new ArrayList<>();
         for (ValorParaCoactiva valor : admitidos) {
             importados.add(expedientes.importar(abierto.identificador(), valor.id(), fecha));
             // La respuesta que #39 dejo anunciada: ACO cierra el ciclo que PCO abrio, y lo escribe
             // coactiva porque es coactiva quien ahora tiene el expediente que responde.
             valores.aceptarEnCoactiva(valor.id(), fecha, observacion);
+            // Y el libro deja de contarla en VALOR: desde aqui es deuda coactiva (#407).
+            for (ObligacionDelValor obligacion : valor.obligaciones()) {
+                ClaveDeObligacionPublica clave = obligacion.clave();
+                if (yaMovidas.add(clave)) {
+                    // El documento de origen es el expediente —es donde la deuda entra a
+                    // coactiva— y la referencia, el valor que la trae, con la forma que
+                    // RegistrarValor le dio al pase a VALOR: el libro dice de donde vino y a
+                    // donde fue. Cuanto se mueve lo decide el libro, no esta clase.
+                    fases.moverACoactiva(
+                            abierto.contribuyenteId(),
+                            clave,
+                            "VALOR-" + valor.numero(),
+                            fecha,
+                            abierto.numero(),
+                            observacion);
+                }
+            }
         }
 
         auditar(abierto, admitidos, rechazados, fecha, observacion);

@@ -86,6 +86,18 @@ class ValoresControllerTest {
                                 LocalDate fechaValor,
                                 String documentoOrigen,
                                 Observacion observacion) {}
+
+                        @Override
+                        public Dinero moverACoactiva(
+                                long contribuyenteId,
+                                kamayuk.rentas.cuentacorriente.ClaveDeObligacionPublica obligacion,
+                                String referenciaExterna,
+                                LocalDate fechaValor,
+                                String documentoOrigen,
+                                Observacion observacion) {
+                            throw new AssertionError(
+                                    "emitir un valor pasa la deuda a VALOR, no a COACTIVA (#407)");
+                        }
                     },
                     (RegistroDeAuditoria registro) -> {},
                     Clock.fixed(HOY.atStartOfDay(ZoneOffset.UTC).toInstant(), ZoneOffset.UTC));

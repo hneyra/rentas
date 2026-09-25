@@ -9,6 +9,7 @@ import java.util.Optional;
 import kamayuk.rentas.auditoria.Auditoria;
 import kamayuk.rentas.auditoria.Operacion;
 import kamayuk.rentas.auditoria.RegistroDeAuditoria;
+import kamayuk.rentas.cuentacorriente.ClaveDeObligacionPublica;
 import kamayuk.rentas.cuentacorriente.ConsultaDeDeudaPublica;
 import kamayuk.rentas.cuentacorriente.MovimientoDeFase;
 import kamayuk.rentas.cuentacorriente.ObligacionPublica;
@@ -196,14 +197,20 @@ public class RegistrarValor {
         return guardado;
     }
 
+    /**
+     * La obligacion con deuda que el selector nombra, cruzada con la clave del libro (#407): la
+     * misma {@link ClaveDeObligacionPublica} con que coactiva compone y deduplica la deuda del
+     * expediente, y no un filtro de cuatro campos propio.
+     */
     private static Optional<ObligacionPublica> buscar(
             List<ObligacionPublica> disponibles, SelectorDeObligacion selector) {
-        return disponibles.stream()
-                .filter(o -> o.tributo().equalsIgnoreCase(selector.tributo()))
-                .filter(o -> o.ejercicio().equals(selector.ejercicio()))
-                .filter(o -> java.util.Objects.equals(o.predioId(), selector.predioId()))
-                .filter(o -> java.util.Objects.equals(o.vehiculoId(), selector.vehiculoId()))
-                .findFirst();
+        ClaveDeObligacionPublica buscada =
+                new ClaveDeObligacionPublica(
+                        selector.tributo(),
+                        selector.ejercicio(),
+                        selector.predioId(),
+                        selector.vehiculoId());
+        return disponibles.stream().filter(o -> o.clave().equals(buscada)).findFirst();
     }
 
     private void auditar(Valor valor, Observacion observacion) {

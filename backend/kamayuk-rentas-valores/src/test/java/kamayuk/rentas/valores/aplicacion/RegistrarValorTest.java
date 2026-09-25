@@ -366,6 +366,19 @@ class RegistrarValorTest {
             movimientos.add(new Movimiento(referenciaExterna, monto, documentoOrigen));
         }
 
+        /** Emitir no pasa nada a coactiva: eso lo hace la importacion al expediente (#407). */
+        @Override
+        public Dinero moverACoactiva(
+                long contribuyenteId,
+                kamayuk.rentas.cuentacorriente.ClaveDeObligacionPublica obligacion,
+                String referenciaExterna,
+                LocalDate fechaValor,
+                String documentoOrigen,
+                Observacion observacion) {
+            throw new AssertionError(
+                    "RegistrarValor pasa la deuda a VALOR; a COACTIVA la pasa la importacion");
+        }
+
         private record Movimiento(String referenciaExterna, Dinero monto, String documentoOrigen) {}
     }
 }
