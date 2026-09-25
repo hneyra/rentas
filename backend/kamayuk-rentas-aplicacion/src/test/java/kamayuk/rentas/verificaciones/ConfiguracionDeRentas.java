@@ -485,8 +485,12 @@ public final class ConfiguracionDeRentas implements ConfiguracionDeLasVerificaci
                 // ningun «por que» que dar: la copia es identica a la fuente por construccion, y si
                 // no lo fuera no se guardaria. Exigir una observacion aqui produciria la cadena
                 // fija que el javadoc de la regla advierte.
-                ".parametros.aplicacion.DescargaDeNormativa.asegurarDescargado("
-                        + "long, java.lang.String)",
+                //
+                // Desde #450 la escritura es de `CopiaLocalDeNormativa` y no de la descarga: se
+                // descarga SIN transaccion y se abre la nueva despues, solo para guardar. Mismo
+                // dato, mismo motivo; lo que cambio es que la red ya no se espera con ella abierta.
+                ".parametros.aplicacion.CopiaLocalDeNormativa.guardarSiNoEsta("
+                        + "kamayuk.rentas.parametros.dominio.SnapshotDeNormativa)",
                 // El ingestor de hechos de `catastro` (C-8, ADR-0027). Las dos escrituras son de
                 // la misma clase y por el mismo motivo que la de arriba, que es el caso mas
                 // parecido de esta lista: lo que escriben es una COPIA de un dato que este sistema

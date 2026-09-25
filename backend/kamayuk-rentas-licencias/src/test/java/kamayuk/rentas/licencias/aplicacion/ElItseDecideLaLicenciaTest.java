@@ -283,11 +283,17 @@ class ElItseDecideLaLicenciaTest {
                         null,
                         Observacion.de("Siembra de la prueba")));
 
+        // Desde #450 la emision es un orquestador sin transaccion que pregunta a los vecinos, la
+        // lectura del catalogo y el escritor que numera y guarda: los tres con los dobles de
+        // siempre, porque lo que se mide aqui es la decision y no la frontera de la transaccion.
         EmitirLicenciaDeFuncionamiento emision =
                 new EmitirLicenciaDeFuncionamiento(
-                        new LicenciasEnMemoria(),
-                        new MovimientosDeLicenciaEnMemoria(),
-                        catalogo,
+                        new PadronDeMentira()
+                                .con(
+                                        new ResumenDeContribuyente(
+                                                7L, "C-0007", "PENA GARCIA, LUIS", "DNI 1234")),
+                        new DerechosDeTramiteParametrizados(
+                                new DerechosDeMentira(DERECHO_LICENCIA, "LF-009")),
                         new CajaDeMentira()
                                 .con(
                                         new ReciboDeTramite(
@@ -300,28 +306,26 @@ class ElItseDecideLaLicenciaTest {
                                                 List.of(DERECHO_LICENCIA),
                                                 Dinero.de("50.00"),
                                                 HOY)),
-                        new AplicacionesEnMemoria(),
-                        new PadronDeMentira()
-                                .con(
-                                        new ResumenDeContribuyente(
-                                                7L, "C-0007", "PENA GARCIA, LUIS", "DNI 1234")),
-                        (predioId, fecha) -> java.util.Optional.empty(),
+                        new GirosDeLaSolicitud(catalogo),
                         new ComprobarElTerritorio(territorio, territorio),
-                        new DerechosDeTramiteParametrizados(
-                                new DerechosDeMentira(DERECHO_LICENCIA, "LF-009")),
-                        new EmitirDocumento(
-                                new DocumentosEnMemoria(),
-                                new GeneradorDeDocumentos(
-                                        List.of(
-                                                new RenderizadorPdf(),
-                                                new RenderizadorXls(),
-                                                new RenderizadorRtf()),
-                                        RegimenDeLaInstalacion.REAL),
+                        (predioId, fecha) -> java.util.Optional.empty(),
+                        new RegistrarLicenciaDeFuncionamiento(
+                                new LicenciasEnMemoria(),
+                                new MovimientosDeLicenciaEnMemoria(),
+                                new AplicacionesEnMemoria(),
+                                new EmitirDocumento(
+                                        new DocumentosEnMemoria(),
+                                        new GeneradorDeDocumentos(
+                                                List.of(
+                                                        new RenderizadorPdf(),
+                                                        new RenderizadorXls(),
+                                                        new RenderizadorRtf()),
+                                                RegimenDeLaInstalacion.REAL),
+                                        (RegistroDeAuditoria registro) -> {},
+                                        RELOJ),
+                                PlantillaDeNumeroDeLicencia.POR_OMISION,
                                 (RegistroDeAuditoria registro) -> {},
-                                RELOJ),
-                        PlantillaDeNumeroDeLicencia.POR_OMISION,
-                        (RegistroDeAuditoria registro) -> {},
-                        RELOJ);
+                                RELOJ));
 
         return emision.emitir(
                 new EmitirLicenciaDeFuncionamiento.Solicitud(

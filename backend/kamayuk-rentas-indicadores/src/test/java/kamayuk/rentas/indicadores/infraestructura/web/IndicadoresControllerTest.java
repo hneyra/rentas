@@ -8,6 +8,7 @@ import java.time.ZoneOffset;
 import kamayuk.rentas.autorizacion.ComprobadorDeAcceso;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.indicadores.aplicacion.ConsultaDeTrabajoParado;
+import kamayuk.rentas.indicadores.aplicacion.LecturaDelLibroParaElPanel;
 import kamayuk.rentas.indicadores.aplicacion.PanelDeRecaudacion;
 import kamayuk.rentas.indicadores.dobles.CajaDeMentira;
 import kamayuk.rentas.indicadores.dobles.LibroDeMentira;
@@ -68,8 +69,7 @@ class IndicadoresControllerTest {
             MockMvcBuilders.standaloneSetup(
                             new IndicadoresController(
                                     new PanelDeRecaudacion(
-                                            libro,
-                                            libro,
+                                            new LecturaDelLibroParaElPanel(libro, libro),
                                             new CajaDeMentira().con("310.00", "10.00")),
                                     SIN_TRABAJO_PARADO,
                                     NIEGA_TODO,
@@ -151,7 +151,9 @@ class IndicadoresControllerTest {
                 MockMvcBuilders.standaloneSetup(
                                 new IndicadoresController(
                                         new PanelDeRecaudacion(
-                                                sinCargos, sinCargos, new CajaDeMentira()),
+                                                new LecturaDelLibroParaElPanel(
+                                                        sinCargos, sinCargos),
+                                                new CajaDeMentira()),
                                         SIN_TRABAJO_PARADO,
                                         NIEGA_TODO,
                                         RELOJ))

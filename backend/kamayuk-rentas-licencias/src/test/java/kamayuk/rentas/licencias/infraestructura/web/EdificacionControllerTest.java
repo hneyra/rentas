@@ -162,27 +162,31 @@ class EdificacionControllerTest {
                                         (RegistroDeAuditoria registro) -> {},
                                         reloj),
                                 new EmitirLicenciaDeEdificacion(
-                                        expedientes,
-                                        movimientos,
+                                        new kamayuk.rentas.licencias.aplicacion
+                                                .RegistrarLicenciaDeEdificacion(
+                                                expedientes,
+                                                movimientos,
+                                                aplicaciones,
+                                                padron,
+                                                documentos,
+                                                PlantillaDeNumeroDeEdificacion.POR_OMISION,
+                                                (RegistroDeAuditoria registro) -> {},
+                                                reloj),
                                         caja,
-                                        aplicaciones,
-                                        padron,
                                         derechos,
-                                        valorizaciones,
-                                        documentos,
-                                        PlantillaDeNumeroDeEdificacion.POR_OMISION,
-                                        (RegistroDeAuditoria registro) -> {},
-                                        reloj),
+                                        valorizaciones),
                                 new RevalidarLicenciaDeEdificacion(
-                                        expedientes,
-                                        movimientos,
+                                        new kamayuk.rentas.licencias.aplicacion
+                                                .RegistrarRevalidacionDeEdificacion(
+                                                expedientes,
+                                                movimientos,
+                                                aplicaciones,
+                                                padron,
+                                                documentos,
+                                                (RegistroDeAuditoria registro) -> {},
+                                                reloj),
                                         caja,
-                                        aplicaciones,
-                                        padron,
-                                        derechos,
-                                        documentos,
-                                        (RegistroDeAuditoria registro) -> {},
-                                        reloj),
+                                        derechos),
                                 reloj))
                 .setControllerAdvice(new ManejadorDeErrores())
                 .setMessageConverters(

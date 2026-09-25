@@ -49,6 +49,12 @@ import org.springframework.stereotype.Service;
  * dentro de la transaccion que despues escribe la licencia dejaria una conexion de la base abierta
  * durante tres viajes de red, y una de ellas que fallara marcaria la transaccion del anfitrion como
  * <i>rollback-only</i> (la leccion de #54 y #72).
+ *
+ * <p><b>Hasta #450 esa frase era cierta de esta clase y falsa del sistema</b>: esta no abria
+ * transaccion, pero su unico llamador —{@code EmitirLicenciaDeFuncionamiento.emitir}— la abria
+ * entera, asi que las tres lecturas esperaban a {@code catastro} con la conexion de la peticion
+ * tomada. Desde #450 el llamador tampoco la abre: pregunta, y la escritura la hace {@link
+ * RegistrarLicenciaDeFuncionamiento} con lo que aqui se contesto.
  */
 @Service
 public class ComprobarElTerritorio {

@@ -15,7 +15,6 @@ import kamayuk.rentas.parametros.dominio.SnapshotDeNormativa;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 /**
  * La misma puerta de siempre a los valores normativos, con {@code normativa} detras (ADR-0025 §1).
@@ -54,6 +53,21 @@ import org.springframework.transaction.annotation.Transactional;
  * vez de con {@code EjercicioSinSellar}. Las dos cosas se arreglan de manera distinta —una
  * levantando un despliegue, otra sellando un ejercicio— y decir la segunda cuando pasa la primera
  * manda a quien atiende a buscar donde no es.
+ *
+ * <h2>Ningun metodo de esta clase abre transaccion, y hace falta que no la abra (#450)</h2>
+ *
+ * <p>Hasta #450 las cuatro lecturas eran {@code @Transactional(readOnly = true)}, y dentro de
+ * {@link #conjuntoVigenteEn} se preguntaba a {@code normativa} por red: la conexion de la base se
+ * quedaba tomada mientras {@code normativa} contestaba, con la espera de 5 minutos que se penso
+ * para el snapshot. Ahora la pregunta sale sin transaccion —con la espera corta de {@code
+ * /conjuntos}—, y lo que si necesita una —leer la copia local, que esta bajo RLS— la abre {@link
+ * CopiaLocalDeNormativa}, que es otra clase a proposito: una llamada dentro de esta no pasaria por
+ * el proxy.
+ *
+ * <p><b>Anadir aqui un {@code @Transactional} lo rompe</b>, y no devolviendo otra cosa: dejando
+ * otra vez la conexion tomada durante la pregunta. Lo vigilan {@code SinNormativaFronteraTest} (la
+ * espera y la segunda conexion) y {@link kamayuk.rentas.plataforma.ViajeDeRed} (la transaccion
+ * abierta).
  */
 @Service
 public class LectorDeParametrosCacheados implements LectorDeParametros {
@@ -71,25 +85,25 @@ public class LectorDeParametrosCacheados implements LectorDeParametros {
      */
     static final String AMBITO = "OBLIGACION";
 
-    private final CacheDeSnapshots cache;
+    private final CopiaLocalDeNormativa copia;
     private final PublicadorDeNormativa normativa;
     private final DescargaDeNormativa descarga;
 
     public LectorDeParametrosCacheados(
-            CacheDeSnapshots cache, PublicadorDeNormativa normativa, DescargaDeNormativa descarga) {
-        this.cache = cache;
+            CopiaLocalDeNormativa copia,
+            PublicadorDeNormativa normativa,
+            DescargaDeNormativa descarga) {
+        this.copia = copia;
         this.normativa = normativa;
         this.descarga = descarga;
     }
 
     @Override
-    @Transactional(readOnly = true)
     public ParametrosSellados vigenteEn(Ejercicio ejercicio) {
         return porConjunto(conjuntoVigenteEn(ejercicio));
     }
 
     @Override
-    @Transactional(readOnly = true)
     public IdentificadorDeConjunto conjuntoVigenteEn(Ejercicio ejercicio) {
         long conjunto;
         try {
@@ -97,7 +111,7 @@ public class LectorDeParametrosCacheados implements LectorDeParametros {
         } catch (PublicadorDeNormativa.NormativaInalcanzable inalcanzable) {
             conjunto = elUltimoQueTeniamos(ejercicio, inalcanzable);
         }
-        asegurarDescargado(conjunto);
+        descarga.asegurarDescargado(conjunto, AMBITO);
         return IdentificadorDeConjunto.de(conjunto);
     }
 
@@ -109,55 +123,31 @@ public class LectorDeParametrosCacheados implements LectorDeParametros {
      * error dice que no se pudo hablar con el, no que el conjunto no exista.
      */
     @Override
-    @Transactional(readOnly = true)
     public ParametrosSellados porConjunto(IdentificadorDeConjunto identificador) {
         long conjunto = identificador.valor();
-        asegurarDescargado(conjunto);
-        CacheDeSnapshots.IdentidadDelConjunto identidad =
-                cache.identidadDe(conjunto).orElseThrow(() -> new ConjuntoNoSellado(identificador));
-        return armar(identidad, cache.parametrosDe(conjunto));
+        descarga.asegurarDescargado(conjunto, AMBITO);
+        CopiaLocalDeNormativa.ConjuntoCopiado copiado =
+                copia.leer(conjunto).orElseThrow(() -> new ConjuntoNoSellado(identificador));
+        return armar(copiado.identidad(), copiado.parametros());
     }
 
     /**
      * Lo que ya esta descargado para el ejercicio, sin tocar la red (#25, AC-3).
      *
-     * <p>Dos {@code SELECT} sobre {@code normativa_conjunto} y ninguna llamada: el primero da el
-     * conjunto de mayor version que esta en la copia local, el segundo su ejercicio y su version.
-     * <b>No pasa por {@link #asegurarDescargado(long)}</b>, y esa es toda la diferencia: quien
-     * pregunta por las senias no necesita el snapshot, asi que exigirle que este completo
-     * convertiria una lectura que se puede contestar en una que va a la red y falla.
+     * <p>Dos {@code SELECT} sobre {@code normativa_conjunto} y ninguna llamada: ver {@link
+     * CopiaLocalDeNormativa#loQueYaEstaDescargado}. <b>No pasa por {@link
+     * DescargaDeNormativa#asegurarDescargado}</b>, y esa es toda la diferencia: quien pregunta por
+     * las senias no necesita el snapshot, asi que exigirle que este completo convertiria una
+     * lectura que se puede contestar en una que va a la red y falla.
      */
     @Override
-    @Transactional(readOnly = true)
     public Optional<ConjuntoYaDescargado> loQueYaEstaDescargado(Ejercicio ejercicio) {
-        return cache.conjuntoCacheadoDe(ejercicio)
-                .flatMap(
-                        conjunto ->
-                                cache.identidadDe(conjunto)
-                                        .map(
-                                                identidad ->
-                                                        new ConjuntoYaDescargado(
-                                                                conjunto,
-                                                                identidad.ejercicio(),
-                                                                identidad.version())));
-    }
-
-    /**
-     * Deja el conjunto en la cache si no estaba.
-     *
-     * <p>Se delega, y no se hace aqui, porque descargar ESCRIBE y esto casi siempre corre dentro de
-     * una lectura: el motivo entero esta en {@link DescargaDeNormativa}.
-     */
-    private void asegurarDescargado(long conjunto) {
-        if (cache.tiene(conjunto, AMBITO)) {
-            return;
-        }
-        descarga.asegurarDescargado(conjunto, AMBITO);
+        return copia.loQueYaEstaDescargado(ejercicio);
     }
 
     private long elUltimoQueTeniamos(
             Ejercicio ejercicio, PublicadorDeNormativa.NormativaInalcanzable inalcanzable) {
-        Optional<Long> cacheado = cache.conjuntoCacheadoDe(ejercicio);
+        Optional<Long> cacheado = copia.conjuntoCacheadoDe(ejercicio);
         if (cacheado.isEmpty()) {
             throw inalcanzable;
         }

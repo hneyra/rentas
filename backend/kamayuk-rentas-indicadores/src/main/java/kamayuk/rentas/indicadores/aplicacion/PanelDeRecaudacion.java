@@ -10,11 +10,9 @@ import java.util.Objects;
 import java.util.OptionalInt;
 import java.util.TreeSet;
 import kamayuk.rentas.cuentacorriente.CargadoEnElLibro;
-import kamayuk.rentas.cuentacorriente.CarteraDelLibro;
 import kamayuk.rentas.cuentacorriente.CarteraPendiente;
 import kamayuk.rentas.cuentacorriente.PendienteDeUnTributo;
 import kamayuk.rentas.cuentacorriente.RecaudacionDeUnTributo;
-import kamayuk.rentas.cuentacorriente.RecaudacionDelLibro;
 import kamayuk.rentas.cuentacorriente.RecaudadoEnElLibro;
 import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.dominio.Ejercicio;
@@ -31,7 +29,6 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Compone el panel de recaudacion del ejercicio (#56, RF-130).
@@ -45,17 +42,19 @@ import org.springframework.transaction.annotation.Transactional;
  * el esquema: si lo hiciera, la pantalla de inicio podria decir una cifra y la de recaudacion otra,
  * y no habria forma de saber cual esta mal.
  *
- * <h2>Una sola transaccion, una sola foto</h2>
+ * <h2>Este servicio NO abre transaccion, y hace falta que no la abra (#450)</h2>
  *
- * <p>{@code @Transactional(readOnly = true)} en el metodo, y las cuatro lecturas se unen a ella
- * —{@code REQUIRED} es la propagacion por omision—. Con cuatro transacciones separadas, cada cifra
- * saldria de un instante distinto y el panel podria mostrar una cartera que ya recogio un pago que
- * lo recaudado todavia no cuenta. Ademas, sin transaccion no hay {@code SET LOCAL} y la politica
- * RLS no puede evaluar {@code app.municipalidad_id}: la consulta <b>falla</b>.
+ * <p>Las tres cifras del libro se leen en una sola foto, y esa foto la abre {@link
+ * LecturaDelLibroParaElPanel}. La cuarta —el avance del dia— se le pide a {@code caja} <b>despues y
+ * fuera</b> de ella. Hasta #450 este metodo era {@code @Transactional(readOnly = true)} entero, y
+ * esperaba a {@code caja} —30 s de espera de lectura— con la conexion de la base tomada: con {@code
+ * caja} lenta, diez aperturas de Inicio se quedaban con las diez conexiones del pool y la undecima
+ * peticion de rentas, fuera cual fuera, salia con 500. El {@code catch} de {@code CajaInalcanzable}
+ * cubria que {@code caja} se cayera; no que tardara.
  *
- * <p><b>Sin bloquear nada.</b> Ninguna de las cuatro pide {@code FOR UPDATE}. El panel se mira
- * mientras la ventanilla cobra, y una lectura que tomara la fila del turno pondria la cola a
- * esperar por la pantalla de inicio.
+ * <p><b>Anadir aqui una lectura suelta de un repositorio lo rompe</b>, y no devolviendo vacio:
+ * fallando, porque sin transaccion no hay {@code SET LOCAL} y RLS no se puede evaluar (#486). Toda
+ * lectura del libro va a {@link LecturaDelLibroParaElPanel}.
  *
  * <h2>Lo que el panel NO dice</h2>
  *
@@ -80,14 +79,11 @@ public class PanelDeRecaudacion {
     /** El texto que acompaña a una cifra que no se puede dar. */
     private static final String SIN_BASE = "sin cargos asentados en el ejercicio";
 
-    private final RecaudacionDelLibro recaudacion;
-    private final CarteraDelLibro cartera;
+    private final LecturaDelLibroParaElPanel libro;
     private final AvanceDeCaja caja;
 
-    public PanelDeRecaudacion(
-            RecaudacionDelLibro recaudacion, CarteraDelLibro cartera, AvanceDeCaja caja) {
-        this.recaudacion = recaudacion;
-        this.cartera = cartera;
+    public PanelDeRecaudacion(LecturaDelLibroParaElPanel libro, AvanceDeCaja caja) {
+        this.libro = libro;
         this.caja = caja;
     }
 
@@ -99,18 +95,16 @@ public class PanelDeRecaudacion {
      * consulta el reloj es el controlador, una sola vez, y las dos marcas describen la misma
      * lectura.
      */
-    @Transactional(readOnly = true)
     public AvanceDeRecaudacion del(Ejercicio ejercicio, LocalDate aLaFecha, Instant leidoEn) {
         Objects.requireNonNull(ejercicio, "El panel siempre es de un ejercicio");
         Objects.requireNonNull(aLaFecha, "Toda cifra indica su fecha (RNF-075, regla 9)");
         Objects.requireNonNull(leidoEn, "El panel dice tambien a que hora se leyo");
 
-        LocalDate primerDia = LocalDate.of(ejercicio.valor(), 1, 1);
-        LocalDate ultimoDia = LocalDate.of(ejercicio.valor(), 12, 31);
-
-        RecaudadoEnElLibro recaudado = recaudacion.recaudadoDeTodos(primerDia, ultimoDia, aLaFecha);
-        CargadoEnElLibro cargado = cartera.cargadoPorTributo(ejercicio, aLaFecha);
-        CarteraPendiente pendiente = cartera.pendientePorTributo(ejercicio, aLaFecha);
+        // La foto del libro primero, en su transaccion; `caja` despues, sin ninguna (#450).
+        LecturaDelLibroParaElPanel.LoQueDiceElLibro delLibro = libro.leer(ejercicio, aLaFecha);
+        RecaudadoEnElLibro recaudado = delLibro.recaudado();
+        CargadoEnElLibro cargado = delLibro.cargado();
+        CarteraPendiente pendiente = delLibro.pendiente();
         RecaudadoEnCaja hoy = avanceDelDiaSiSePuede(aLaFecha);
 
         return new AvanceDeRecaudacion(

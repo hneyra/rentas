@@ -51,7 +51,9 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>Sobre las clases de produccion, ya con #406 arreglado: <b>118 metodos</b> publicos que reciben
  * una {@code Observacion} en <b>82</b> {@code @Service} de {@code ..aplicacion..}, y <b>9</b> sin
  * transaccion —10 antes de #406—. Los nueve son deliberados y cada uno lo dice en su propio
- * javadoc: van en {@link #SIN_TRANSACCION_PROPIA} con su motivo. Ninguna clase fuera de
+ * javadoc: van en {@link #SIN_TRANSACCION_PROPIA} con su motivo. <b>#450 anadio tres</b>: las dos
+ * emisiones de licencia y la revalidacion, que preguntan a los vecinos sin transaccion y delegan la
+ * escritura en su {@code Registrar...}, que es donde se abre. Ninguna clase fuera de
  * {@code @Service} tenia un metodo asi.
  *
  * <p>Vive aqui y no en {@code comun-verificaciones} porque las exenciones son metodos de este
@@ -75,58 +77,98 @@ class TodaPuertaConObservacionAbreSuTransaccionTest {
      * puerta abierta para el siguiente que se llame igual.
      */
     static final Map<String, String> SIN_TRANSACCION_PROPIA =
-            Map.of(
-                    RAIZ + "contribuyentes.aplicacion.ImportarContribuyentes.importar" + EN_EL_SUYO,
-                    "cada fila abre la suya al llamar a RegistrarContribuyente: envolver el bucle"
-                            + " haria que una fila rechazada deshiciera las buenas",
-                    RAIZ + "nucleo.aplicacion.ImportarVehiculos.importar" + EN_EL_SUYO,
-                    "cada fila abre la suya al llamar a RegistrarVehiculo, el mismo reparto",
-                    RAIZ + "nucleo.aplicacion.ImportarDeudaDeDemostracion.importar" + EN_EL_SUYO,
-                    "el mismo reparto por fila que ImportarVias",
-                    RAIZ + "nucleo.aplicacion.ImportarTransferencias.importar" + EN_EL_SUYO,
-                    "el mismo reparto por fila que ImportarVias",
-                    RAIZ
-                            + "nucleo.aplicacion.DeterminarPredialMasivo.ejecutar(kamayuk.rentas"
-                            + ".nucleo.aplicacion.DeterminarPredialMasivo$Peticion, "
-                            + OBSERVACION
-                            + ")",
-                    "una transaccion por determinacion (#328, #247 §2): la fila rechazada no"
-                            + " puede marcar como rollback-only a las demas",
-                    RAIZ
-                            + "nucleo.aplicacion.DeterminarPredial.determinar(kamayuk.rentas"
-                            + ".nucleo.aplicacion.DeterminarPredial$Peticion, "
-                            + OBSERVACION
-                            + ")",
-                    "la abre RegistrarDeterminacionPredial.asentar, que es quien escribe (#54, #72, #359): los"
-                            + " colaboradores ajenos traen la suya",
-                    RAIZ
-                            + "cuentacorriente.aplicacion.GeneradorDeCargosCuentaCorriente"
-                            + ".generarCargo(kamayuk.rentas.dominio.Ejercicio, long,"
-                            + " java.lang.String, java.lang.Integer, java.lang.Long,"
-                            + " java.lang.Long, java.lang.String, kamayuk.rentas.dominio.Dinero,"
-                            + " java.time.LocalDate, java.lang.String, "
-                            + OBSERVACION
-                            + ")",
-                    "adaptador de puerto: arma el asiento sin leer nada y delega en"
-                            + " RegistrarAsiento.asentar, que es @Transactional",
-                    RAIZ
-                            + "cuentacorriente.aplicacion.GeneradorDeCargosCuentaCorriente"
-                            + ".generarGastoDelProcedimiento(kamayuk.rentas.dominio.Ejercicio,"
-                            + " long, java.lang.String, java.lang.String,"
-                            + " kamayuk.rentas.dominio.Dinero, java.time.LocalDate,"
-                            + " java.lang.String, "
-                            + OBSERVACION
-                            + ")",
-                    "el mismo adaptador, y la misma delegacion en RegistrarAsiento.asentar",
-                    RAIZ
-                            + "tesoreria.aplicacion.FraccionamientoCoactivoTesoreria.registrar("
-                            + "kamayuk.rentas.tesoreria.SolicitudDeConvenioCoactivo,"
-                            + " java.lang.String, "
-                            + OBSERVACION
-                            + ")",
-                    "adaptador de puerto: delega en RegistrarPreconvenio.registrar, que es"
-                            + " @Transactional; y quien lo llama, FraccionarEnCoactiva, ya abrio"
-                            + " la suya (#406)");
+            Map.ofEntries(
+                    Map.entry(
+                            RAIZ
+                                    + "contribuyentes.aplicacion.ImportarContribuyentes.importar"
+                                    + EN_EL_SUYO,
+                            "cada fila abre la suya al llamar a RegistrarContribuyente: envolver el bucle"
+                                    + " haria que una fila rechazada deshiciera las buenas"),
+                    Map.entry(
+                            RAIZ + "nucleo.aplicacion.ImportarVehiculos.importar" + EN_EL_SUYO,
+                            "cada fila abre la suya al llamar a RegistrarVehiculo, el mismo reparto"),
+                    Map.entry(
+                            RAIZ
+                                    + "nucleo.aplicacion.ImportarDeudaDeDemostracion.importar"
+                                    + EN_EL_SUYO,
+                            "el mismo reparto por fila que ImportarVias"),
+                    Map.entry(
+                            RAIZ + "nucleo.aplicacion.ImportarTransferencias.importar" + EN_EL_SUYO,
+                            "el mismo reparto por fila que ImportarVias"),
+                    Map.entry(
+                            RAIZ
+                                    + "nucleo.aplicacion.DeterminarPredialMasivo.ejecutar(kamayuk.rentas"
+                                    + ".nucleo.aplicacion.DeterminarPredialMasivo$Peticion, "
+                                    + OBSERVACION
+                                    + ")",
+                            "una transaccion por determinacion (#328, #247 §2): la fila rechazada no"
+                                    + " puede marcar como rollback-only a las demas"),
+                    Map.entry(
+                            RAIZ
+                                    + "nucleo.aplicacion.DeterminarPredial.determinar(kamayuk.rentas"
+                                    + ".nucleo.aplicacion.DeterminarPredial$Peticion, "
+                                    + OBSERVACION
+                                    + ")",
+                            "la abre RegistrarDeterminacionPredial.asentar, que es quien escribe (#54, #72, #359): los"
+                                    + " colaboradores ajenos traen la suya"),
+                    Map.entry(
+                            RAIZ
+                                    + "cuentacorriente.aplicacion.GeneradorDeCargosCuentaCorriente"
+                                    + ".generarCargo(kamayuk.rentas.dominio.Ejercicio, long,"
+                                    + " java.lang.String, java.lang.Integer, java.lang.Long,"
+                                    + " java.lang.Long, java.lang.String, kamayuk.rentas.dominio.Dinero,"
+                                    + " java.time.LocalDate, java.lang.String, "
+                                    + OBSERVACION
+                                    + ")",
+                            "adaptador de puerto: arma el asiento sin leer nada y delega en"
+                                    + " RegistrarAsiento.asentar, que es @Transactional"),
+                    Map.entry(
+                            RAIZ
+                                    + "cuentacorriente.aplicacion.GeneradorDeCargosCuentaCorriente"
+                                    + ".generarGastoDelProcedimiento(kamayuk.rentas.dominio.Ejercicio,"
+                                    + " long, java.lang.String, java.lang.String,"
+                                    + " kamayuk.rentas.dominio.Dinero, java.time.LocalDate,"
+                                    + " java.lang.String, "
+                                    + OBSERVACION
+                                    + ")",
+                            "el mismo adaptador, y la misma delegacion en RegistrarAsiento.asentar"),
+                    Map.entry(
+                            RAIZ
+                                    + "tesoreria.aplicacion.FraccionamientoCoactivoTesoreria.registrar("
+                                    + "kamayuk.rentas.tesoreria.SolicitudDeConvenioCoactivo,"
+                                    + " java.lang.String, "
+                                    + OBSERVACION
+                                    + ")",
+                            "adaptador de puerto: delega en RegistrarPreconvenio.registrar, que es"
+                                    + " @Transactional; y quien lo llama, FraccionarEnCoactiva, ya abrio"
+                                    + " la suya (#406)"),
+                    Map.entry(
+                            RAIZ
+                                    + "licencias.aplicacion.EmitirLicenciaDeFuncionamiento.emitir(kamayuk.rentas"
+                                    + ".licencias.aplicacion.EmitirLicenciaDeFuncionamiento$Solicitud,"
+                                    + " kamayuk.rentas.documentos.FormatoDeDocumento, "
+                                    + OBSERVACION
+                                    + ")",
+                            "la abre RegistrarLicenciaDeFuncionamiento.registrar, que es quien escribe (#450):"
+                                    + " aqui se pregunta a caja y a catastro, y con una transaccion abierta cada"
+                                    + " pregunta retendria una conexion del pool mientras el vecino contesta"),
+                    Map.entry(
+                            RAIZ
+                                    + "licencias.aplicacion.EmitirLicenciaDeEdificacion.emitir(java.lang.String,"
+                                    + " java.time.LocalDate, java.time.LocalDate, java.lang.String,"
+                                    + " kamayuk.rentas.documentos.FormatoDeDocumento, "
+                                    + OBSERVACION
+                                    + ")",
+                            "la abre RegistrarLicenciaDeEdificacion.registrar (#450), por lo mismo: el cuadro"
+                                    + " de catastro y el recibo de caja se piden fuera de la transaccion"),
+                    Map.entry(
+                            RAIZ
+                                    + "licencias.aplicacion.RevalidarLicenciaDeEdificacion.revalidar(java.lang.String,"
+                                    + " java.time.LocalDate, java.time.LocalDate, java.lang.String,"
+                                    + " kamayuk.rentas.documentos.FormatoDeDocumento, "
+                                    + OBSERVACION
+                                    + ")",
+                            "la abre RegistrarRevalidacionDeEdificacion.registrar (#450), por lo mismo"));
 
     static final ArchRule TODA_PUERTA_CON_OBSERVACION_ABRE_SU_TRANSACCION =
             classes()

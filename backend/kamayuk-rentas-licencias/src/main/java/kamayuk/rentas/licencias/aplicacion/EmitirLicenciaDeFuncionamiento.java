@@ -1,43 +1,26 @@
 package kamayuk.rentas.licencias.aplicacion;
 
-import java.time.Clock;
-import java.time.Instant;
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
-import java.util.Set;
-import kamayuk.rentas.auditoria.Auditoria;
-import kamayuk.rentas.auditoria.Operacion;
-import kamayuk.rentas.auditoria.RegistroDeAuditoria;
 import kamayuk.rentas.catastro.LectorDeFichasEconomicas;
 import kamayuk.rentas.contribuyentes.DirectorioDeContribuyentes;
 import kamayuk.rentas.contribuyentes.ResumenDeContribuyente;
 import kamayuk.rentas.documentos.EmitirDocumento;
 import kamayuk.rentas.documentos.FormatoDeDocumento;
 import kamayuk.rentas.dominio.AreaM2;
-import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.licencias.dominio.Ciiu;
-import kamayuk.rentas.licencias.dominio.CiiuRepository;
 import kamayuk.rentas.licencias.dominio.CompatibilidadConLaZona;
 import kamayuk.rentas.licencias.dominio.ComprobacionDelTerritorio;
-import kamayuk.rentas.licencias.dominio.GiroDeLaLicencia;
 import kamayuk.rentas.licencias.dominio.LicenciaDeFuncionamiento;
-import kamayuk.rentas.licencias.dominio.LicenciaRepository;
 import kamayuk.rentas.licencias.dominio.MovimientoDeLicencia;
-import kamayuk.rentas.licencias.dominio.MovimientoDeLicenciaRepository;
-import kamayuk.rentas.licencias.dominio.PlantillaDeNumeroDeLicencia;
 import kamayuk.rentas.licencias.dominio.RespuestaDelTerritorio;
-import kamayuk.rentas.licencias.dominio.TerritorioDeLaLicencia;
 import kamayuk.rentas.licencias.dominio.TipoDeLicencia;
-import kamayuk.rentas.tesoreria.AplicacionDeRecibos;
 import kamayuk.rentas.tesoreria.ReciboDeTramite;
 import kamayuk.rentas.tesoreria.RecibosDeTramite;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Emite una licencia de funcionamiento con sus giros CIIU, su papel y su movimiento de emision
@@ -63,11 +46,25 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <h2>La licencia y su papel nacen juntos</h2>
  *
- * <p>El documento se emite en la <b>misma transaccion</b>, con {@link EmitirDocumento}, y guarda
- * los datos con que se dibujo mas el SHA-256 de lo que salio. Es lo que hace que un duplicado
- * pedido en 2034 sea el <b>mismo</b> papel (RF-132) y no uno nuevo con el mismo numero. Una
- * licencia sin documento no se puede entregar; un documento sin licencia no tiene acto que lo
- * explique.
+ * <p>El documento se emite en la <b>misma transaccion</b> que la fila, con {@link EmitirDocumento}:
+ * la de {@link RegistrarLicenciaDeFuncionamiento}, que tiene el motivo entero.
+ *
+ * <h2>Esta clase pregunta; la que escribe es otra (#450)</h2>
+ *
+ * <p>Hasta #450 este metodo era {@code @Transactional} entero y dentro hacia seis viajes de red
+ * —{@code normativa}, {@code caja} y cuatro a {@code catastro}— con la conexion de la peticion
+ * tomada. {@link ComprobarElTerritorio} lo decia al reves: «no abre transaccion», y era cierto,
+ * pero su unico llamador ya la tenia abierta. Y la ficha economica salia <b>despues</b> de numerar,
+ * con el candado de {@code licencia_correlativo} tomado: con {@code catastro} lento, la ventanilla
+ * de la municipalidad entera se ponia en fila detras de el.
+ *
+ * <p>Ahora el reparto es el de {@link ConsultaDeFue} y {@link ResumenAnualDeLicencias}, por otro
+ * motivo —alli era el <i>rollback-only</i>, aqui el pool—: esta clase <b>no abre transaccion</b>,
+ * pregunta a los vecinos y reune lo que contestan en una {@link
+ * RegistrarLicenciaDeFuncionamiento.EmisionComprobada}; {@link RegistrarLicenciaDeFuncionamiento}
+ * la recibe y solo escribe. <b>Anadir aqui una lectura suelta de un repositorio la rompe</b>, y no
+ * devolviendo vacio: sin transaccion no hay {@code SET LOCAL} y la politica RLS no se puede evaluar
+ * (#486). Las lecturas de la base van a {@link GirosDeLaSolicitud} o al escritor.
  *
  * <h2>El territorio se pregunta ANTES de autorizar, y la ausencia no autoriza (#43)</h2>
  *
@@ -126,55 +123,40 @@ public class EmitirLicenciaDeFuncionamiento {
     /** El {@code tipo} con que se guarda el papel de la licencia en {@code documento_emitido}. */
     public static final String TIPO_DE_DOCUMENTO = "LICENCIA_FUNCIONAMIENTO";
 
-    private final LicenciaRepository licencias;
-    private final MovimientoDeLicenciaRepository movimientos;
-    private final CiiuRepository catalogo;
-    private final RecibosDeTramite recibos;
-    private final AplicacionDeRecibos aplicaciones;
     private final DirectorioDeContribuyentes contribuyentes;
-    private final LectorDeFichasEconomicas fichas;
-    private final ComprobarElTerritorio territorio;
     private final DerechosDeTramiteParametrizados derechos;
-    private final EmitirDocumento documentos;
-    private final PlantillaDeNumeroDeLicencia plantilla;
-    private final Auditoria auditoria;
-    private final Clock reloj;
+    private final RecibosDeTramite recibos;
+    private final GirosDeLaSolicitud giros;
+    private final ComprobarElTerritorio territorio;
+    private final LectorDeFichasEconomicas fichas;
+    private final RegistrarLicenciaDeFuncionamiento registro;
 
     public EmitirLicenciaDeFuncionamiento(
-            LicenciaRepository licencias,
-            MovimientoDeLicenciaRepository movimientos,
-            CiiuRepository catalogo,
-            RecibosDeTramite recibos,
-            AplicacionDeRecibos aplicaciones,
             DirectorioDeContribuyentes contribuyentes,
-            LectorDeFichasEconomicas fichas,
-            ComprobarElTerritorio territorio,
             DerechosDeTramiteParametrizados derechos,
-            EmitirDocumento documentos,
-            PlantillaDeNumeroDeLicencia plantilla,
-            Auditoria auditoria,
-            Clock reloj) {
-        this.licencias = licencias;
-        this.movimientos = movimientos;
-        this.catalogo = catalogo;
-        this.recibos = recibos;
-        this.aplicaciones = aplicaciones;
+            RecibosDeTramite recibos,
+            GirosDeLaSolicitud giros,
+            ComprobarElTerritorio territorio,
+            LectorDeFichasEconomicas fichas,
+            RegistrarLicenciaDeFuncionamiento registro) {
         this.contribuyentes = contribuyentes;
-        this.fichas = fichas;
-        this.territorio = territorio;
         this.derechos = derechos;
-        this.documentos = documentos;
-        this.plantilla = plantilla;
-        this.auditoria = auditoria;
-        this.reloj = reloj;
+        this.recibos = recibos;
+        this.giros = giros;
+        this.territorio = territorio;
+        this.fichas = fichas;
+        this.registro = registro;
     }
 
     /**
      * Emite la licencia.
      *
-     * <p>La {@link Observacion} va en la firma y no dentro de {@link Solicitud}: la regla 10 exige
-     * que se vea en el punto donde se escribe, y ArchUnit la comprueba mirando los parametros del
-     * metodo transaccional.
+     * <p><b>Sin {@code @Transactional}, y hace falta que no lo tenga</b> (#450): aqui se pregunta a
+     * los vecinos, y cada pregunta con una transaccion abierta es una conexion del pool esperando a
+     * la red. Las lecturas de esta base traen la suya —el padron y {@link GirosDeLaSolicitud}—, y
+     * la escritura la abre {@link RegistrarLicenciaDeFuncionamiento}, que recibe lo comprobado y
+     * solo escribe. Por eso la {@link Observacion} viaja hasta alli: la regla 10 la busca en los
+     * parametros del metodo transaccional.
      *
      * @throws TitularDesconocido si el codigo de contribuyente no esta en el padron
      * @throws GiroDesconocido si algun giro no esta en el catalogo CIIU
@@ -187,7 +169,6 @@ public class EmitirLicenciaDeFuncionamiento {
      *     en la zona, o exige la ITSE previa y no hay ningun certificado vigente (#416)— y la
      *     solicitud no trae la autorizacion explicita que lo asume
      */
-    @Transactional
     public LicenciaEmitida emitir(
             Solicitud solicitud, FormatoDeDocumento formato, Observacion observacion) {
 
@@ -209,7 +190,7 @@ public class EmitirLicenciaDeFuncionamiento {
                         concepto,
                         "registro de licencia de funcionamiento");
 
-        List<GiroDeLaLicencia> giros = resolverGiros(solicitud);
+        GirosDeLaSolicitud.Resueltos resueltos = giros.resolver(solicitud);
 
         // EL TERRITORIO SE PREGUNTA AQUI, antes de numerar y antes de dibujar el papel. Despues
         // seria descubrirlo con el documento ya emitido y su huella ya calculada, y una licencia
@@ -219,20 +200,20 @@ public class EmitirLicenciaDeFuncionamiento {
         // dice `LicenciaDeFuncionamiento` con todas las letras —«la actividad principal es la que
         // decide el riesgo de la ITSE y la compatibilidad con la zonificacion»— y tomar la union
         // dejaria que un giro secundario compatible autorizara al principal que no lo es.
-        Ciiu principal = catalogo.porCodigo(solicitud.giroPrincipal()).orElseThrow();
         ComprobacionDelTerritorio comprobacion =
                 territorio.de(
                         solicitud.predioId(),
                         solicitud.fechaEmision(),
-                        principal.zonificacionCompatible(),
-                        principal.riesgoItse());
-        exigirQueElTerritorioLoPermita(solicitud, comprobacion, principal);
-
-        Ejercicio ejercicio = Ejercicio.de(solicitud.fechaEmision());
-        String numero = plantilla.componer(ejercicio, licencias.siguienteCorrelativo(ejercicio));
+                        resueltos.principal().zonificacionCompatible(),
+                        resueltos.principal().riesgoItse());
+        exigirQueElTerritorioLoPermita(solicitud, comprobacion, resueltos.principal());
 
         // La ficha economica se pide a `catastro` por su puerto publico, con la fecha de emision:
         // la licencia queda enlazada a la version que regia ese dia, no a «la ultima» (regla 9).
+        //
+        // Y se pide AQUI, antes de numerar (#450). Hasta #450 salia despues de
+        // `siguienteCorrelativo`, con la fila de `licencia_correlativo` bloqueada hasta el commit:
+        // una emision esperaba el candado mientras otra esperaba a `catastro`.
         Long fichaId =
                 solicitud.predioId() == null
                         ? null
@@ -240,149 +221,15 @@ public class EmitirLicenciaDeFuncionamiento {
                                         solicitud.predioId(), solicitud.fechaEmision())
                                 .orElse(null);
 
-        Instant ahora = reloj.instant();
-        LicenciaDeFuncionamiento sinGuardar =
-                new LicenciaDeFuncionamiento(
-                        null,
-                        numero,
-                        titular.id(),
-                        solicitud.predioId(),
-                        fichaId,
-                        solicitud.nombreComercial(),
-                        solicitud.direccion(),
-                        solicitud.areaSolicitada(),
-                        solicitud.tipoLicencia(),
-                        solicitud.zonificacion(),
-                        solicitud.aforo(),
-                        solicitud.fechaEmision(),
-                        solicitud.vigenciaHasta(),
-                        recibo.reciboId(),
-                        // Se rellena abajo con el documento recien emitido: el papel se dibuja con
-                        // los datos de la licencia, asi que la licencia tiene que existir como
-                        // objeto antes que el, y el identificador del documento antes que la fila.
-                        0L,
-                        solicitud.expediente(),
-                        solicitud.fechaExpediente(),
-                        ahora,
-                        null,
-                        observacion,
-                        giros,
-                        TerritorioDeLaLicencia.de(comprobacion));
-
-        EmitirDocumento.Emision emision =
-                documentos.emitir(
-                        TIPO_DE_DOCUMENTO,
-                        ejercicio,
-                        numero,
-                        ModeloDeLaLicencia.de(
-                                sinGuardar,
-                                titular.nombre(),
-                                titular.codigo(),
-                                titular.documento(),
-                                recibo.numero(),
-                                giros),
-                        formato,
-                        observacion);
-
-        long documentoId =
-                Objects.requireNonNull(
-                        emision.registro().id(),
-                        "Un documento recien emitido siempre vuelve con su identificador");
-
-        LicenciaDeFuncionamiento guardada = licencias.emitir(conDocumento(sinGuardar, documentoId));
-
-        // EL RECIBO SE GASTA AQUI (#383), en la misma transaccion y con la licencia ya escrita:
-        // la constancia nombra el acto que pago. Hasta #383 el mismo papel respaldaba la
-        // licencia del local A y la del local B, porque nadie anotaba que ya se habia usado.
-        GastoDelDerecho.gastar(
-                aplicaciones,
-                recibo,
-                concepto,
-                "licencia_funcionamiento",
-                guardada.identificador());
-
-        MovimientoDeLicencia emisionRegistrada =
-                movimientos.registrar(
-                        MovimientoDeLicencia.emision(
-                                guardada.identificador(),
-                                solicitud.fechaEmision(),
-                                documentoId,
-                                emision.registro().numero(),
-                                ahora,
-                                observacion));
-
-        auditoria.registrar(
-                RegistroDeAuditoria.enLaFechaDe(
-                                "licencia_funcionamiento",
-                                String.valueOf(guardada.identificador()),
-                                Operacion.ALTA,
-                                observacion)
-                        .con(null, descripcion(guardada, recibo, giros)));
-
-        return new LicenciaEmitida(guardada, emisionRegistrada, emision, titular);
+        return registro.registrar(
+                solicitud,
+                new RegistrarLicenciaDeFuncionamiento.EmisionComprobada(
+                        titular, resueltos.giros(), concepto, recibo, comprobacion, fichaId),
+                formato,
+                observacion);
     }
 
     // ------------------------------------------------------------------
-
-    /**
-     * Los giros pedidos, resueltos contra el catalogo.
-     *
-     * <p>Se leen <b>todos de una vez</b> y se comprueban aqui, antes de escribir nada: un giro que
-     * no existe tiene que producir «ese giro no esta en el catalogo» y no un fallo de clave foranea
-     * a mitad de la insercion, que no dice cual de los tres era.
-     */
-    private List<GiroDeLaLicencia> resolverGiros(Solicitud solicitud) {
-        Set<String> codigos = new LinkedHashSet<>();
-        for (String codigo : solicitud.girosCiiu()) {
-            codigos.add(codigo.strip().toUpperCase(java.util.Locale.ROOT));
-        }
-        if (!codigos.contains(solicitud.giroPrincipal())) {
-            codigos.add(solicitud.giroPrincipal());
-        }
-
-        List<GiroDeLaLicencia> giros = new ArrayList<>(codigos.size());
-        for (String codigo : codigos) {
-            Ciiu giro = catalogo.porCodigo(codigo).orElseThrow(() -> new GiroDesconocido(codigo));
-            if (!giro.activo()) {
-                throw new GiroDesconocido(codigo);
-            }
-            giros.add(
-                    new GiroDeLaLicencia(
-                            giro.identificador(),
-                            giro.codigo(),
-                            giro.descripcion(),
-                            codigo.equals(solicitud.giroPrincipal()),
-                            true));
-        }
-        return giros;
-    }
-
-    private static LicenciaDeFuncionamiento conDocumento(
-            LicenciaDeFuncionamiento licencia, long documentoId) {
-        return new LicenciaDeFuncionamiento(
-                licencia.id(),
-                licencia.numero(),
-                licencia.contribuyenteId(),
-                licencia.predioId(),
-                licencia.fichaId(),
-                licencia.nombreComercial(),
-                licencia.direccion(),
-                licencia.areaSolicitada(),
-                licencia.tipoLicencia(),
-                licencia.zonificacion(),
-                licencia.aforo(),
-                licencia.fechaEmision(),
-                licencia.vigenciaHasta(),
-                licencia.reciboId(),
-                documentoId,
-                licencia.expediente(),
-                licencia.fechaExpediente(),
-                licencia.registradoEn(),
-                licencia.usuarioRegistro(),
-                licencia.observacion(),
-                licencia.giros(),
-                licencia.territorio());
-    }
 
     /**
      * Se niega, exige que alguien lo asuma por escrito, o deja pasar (#43, AC-2, AC-4 y AC-5).
@@ -459,24 +306,6 @@ public class EmitirLicenciaDeFuncionamiento {
         return "El giro principal no declara en que zonas cabe (`ciiu.zonificacion_compatible` esta"
                 + " vacio, D-02b), asi que no hay con que decidir la compatibilidad. Se rellena el"
                 + " catalogo, o se autoriza diciendo por que";
-    }
-
-    /** Sin datos personales: esto acaba en la columna JSON de la auditoria. */
-    private static String descripcion(
-            LicenciaDeFuncionamiento licencia,
-            ReciboDeTramite recibo,
-            List<GiroDeLaLicencia> giros) {
-        return "{\"numero\":\""
-                + licencia.numero()
-                + "\",\"tipo\":\""
-                + licencia.tipoLicencia()
-                + "\",\"recibo\":\""
-                + recibo.numero()
-                + "\",\"giros\":"
-                + giros.size()
-                + ",\"fichaEconomica\":"
-                + (licencia.fichaId() == null ? "null" : licencia.fichaId())
-                + "}";
     }
 
     // ------------------------------------------------------------------

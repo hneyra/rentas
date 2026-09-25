@@ -18,3 +18,11 @@ dependencies {
     "testImplementation"(libs.findLibrary("assertj").get())
     "testRuntimeOnly"(libs.findLibrary("junit-platform-launcher").get())
 }
+
+// #450: en las pruebas, un viaje de red con una transaccion abierta NO SALE — lanza. En
+// produccion `ViajeDeRed` solo avisa, porque un llamador que nadie enumero no puede dejar de
+// atender por un defecto de rendimiento; aqui tiene que salir rojo en la prueba que lo ejerce, o
+// la guarda solo cazaria lo que ya se sabe. La lee `ViajeDeRedTest`, que falla si esto se quita.
+tasks.withType<Test>().configureEach {
+    systemProperty("kamayuk.red.con-transaccion", "fallar")
+}

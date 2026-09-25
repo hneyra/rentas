@@ -1,20 +1,30 @@
 package kamayuk.rentas.parametros.aplicacion;
 
-import kamayuk.rentas.parametros.dominio.CacheDeSnapshots;
 import kamayuk.rentas.parametros.dominio.PublicadorDeNormativa;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Trae un conjunto sellado de {@code normativa} y lo deja en la cache local, <b>en su propia
- * transaccion</b>.
+ * Trae un conjunto sellado de {@code normativa} y lo deja en la copia local: <b>primero descarga,
+ * despues abre la transaccion, y solo para guardar</b> (#450).
  *
- * <h2>Por que `REQUIRES_NEW`, y por que esto NO es el defecto de #52</h2>
+ * <h2>Por que el orden importa</h2>
+ *
+ * <p>Hasta #450 este metodo era {@code @Transactional(propagation = REQUIRES_NEW)} y descargaba
+ * <b>dentro</b>: la primera peticion despues de sellarse un conjunto nuevo retenia <b>dos</b>
+ * conexiones —la de quien calculaba y la nueva— durante la descarga, que tiene 5 minutos de espera
+ * porque el snapshot con el anexo vehicular son 54 000 filas. Y el javadoc decia que ante una
+ * huella que no cuadraba «la transaccion nueva ni se abre», que no era cierto: la descarga corria
+ * dentro del metodo que ya la habia abierto.
+ *
+ * <p>Ahora la descarga no abre nada, y la transaccion nueva la abre {@link
+ * CopiaLocalDeNormativa#guardarSiNoEsta} cuando ya hay algo verificado que guardar. Con una {@link
+ * PublicadorDeNormativa.HuellaQueNoCuadra}, <b>ahora si</b>, la transaccion nueva ni se abre.
+ *
+ * <h2>Por que la escritura sigue siendo `REQUIRES_NEW`, y por que NO es el defecto de #52</h2>
  *
  * <p>Porque quien pide un valor normativo casi siempre esta dentro de una lectura:
  * {@code @Transactional(readOnly = true)}. En esa transaccion PostgreSQL rechaza todo {@code
- * INSERT} —«cannot execute INSERT in a read-only transaction»—, asi que descargar dentro de ella es
+ * INSERT} —«cannot execute INSERT in a read-only transaction»—, asi que guardar dentro de ella es
  * imposible; y quitarle el {@code readOnly} a las doce lecturas que calculan seria abrirlas a
  * escritura para poder cachear.
  *
@@ -25,41 +35,42 @@ import org.springframework.transaction.annotation.Transactional;
  * Que sobreviva al fallo de lo que venia despues no deja nada a medias — deja exactamente lo mismo
  * que dejaria volver a descargarlo, byte a byte, porque {@code normativa} no puede servir otra cosa
  * bajo ese identificador (el disparador de `V9` lo vuelve inmutable al sellarse).
- *
- * <p>Lo que si seria un defecto es cachear algo que no se pudo verificar, y eso lo impide {@link
- * PublicadorDeNormativa.HuellaQueNoCuadra}: la excepcion sale <b>antes</b> de llegar aqui, asi que
- * la transaccion nueva ni se abre.
  */
 @Service
 public class DescargaDeNormativa {
 
-    private final CacheDeSnapshots cache;
+    private final CopiaLocalDeNormativa copia;
     private final PublicadorDeNormativa normativa;
 
-    public DescargaDeNormativa(CacheDeSnapshots cache, PublicadorDeNormativa normativa) {
-        this.cache = cache;
+    public DescargaDeNormativa(CopiaLocalDeNormativa copia, PublicadorDeNormativa normativa) {
+        this.copia = copia;
         this.normativa = normativa;
     }
 
     /**
      * Descarga el conjunto si no esta ya.
      *
+     * <p>Sin {@code @Transactional}, y es todo el arreglo de #450: la pregunta «esta?» abre y
+     * cierra la suya, la descarga no tiene ninguna, y guardar abre otra al final. Si quien llama ya
+     * tenia una, la espera a la red la paga esa —y {@link kamayuk.rentas.plataforma.ViajeDeRed} lo
+     * avisa nombrandolo—, pero ya no hay una segunda conexion esperando con ella.
+     *
      * <p>Lo que cierra la carrera de dos primeras lecturas simultaneas <b>no</b> es la comprobacion
      * de aqui: esta va antes del candado, igual que la de quien llama, y las dos peticiones pueden
-     * ver «no esta» a la vez. La cierra {@link CacheDeSnapshots#guardar}, que toma el candado y
+     * ver «no esta» a la vez. La cierra {@code CacheDeSnapshots.guardar}, que toma el candado y
      * <b>vuelve a mirar despues</b>: quien llega segundo espera, encuentra lo que el primero
      * confirmo y no escribe nada (#353). Esta comprobacion es solo un atajo: ahorra la descarga
-     * cuando otra peticion ya confirmo entre el «no esta» de quien llama y la transaccion nueva.
+     * cuando otra peticion ya confirmo entre el «no esta» de quien llama y esta.
      *
      * <p>Lo que no ahorra es la <b>segunda descarga</b> en la carrera: las dos peticiones se bajan
      * el snapshot y una lo tira. Tomar el candado antes de descargar lo evitaria, pero lo tendria
-     * abierto durante la peticion HTTP; se dejo fuera de #353 a proposito.
+     * abierto durante la peticion HTTP —justo lo que #450 quita—; se dejo fuera de #353 a
+     * proposito.
      */
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void asegurarDescargado(long conjuntoId, String ambito) {
-        if (cache.tiene(conjuntoId, ambito)) {
+        if (copia.tiene(conjuntoId, ambito)) {
             return;
         }
-        cache.guardar(normativa.descargar(conjuntoId, ambito));
+        copia.guardarSiNoEsta(normativa.descargar(conjuntoId, ambito));
     }
 }

@@ -11,6 +11,7 @@ import kamayuk.rentas.coactiva.ExpedientesSinRec;
 import kamayuk.rentas.cuentacorriente.CarteraDelLibro;
 import kamayuk.rentas.cuentacorriente.RecaudacionDelLibro;
 import kamayuk.rentas.indicadores.aplicacion.ConsultaDeTrabajoParado;
+import kamayuk.rentas.indicadores.aplicacion.LecturaDelLibroParaElPanel;
 import kamayuk.rentas.indicadores.aplicacion.PanelDeRecaudacion;
 import kamayuk.rentas.nucleo.PrediosSinConciliar;
 import kamayuk.rentas.sanciones.PapeletasSinNotificar;
@@ -61,15 +62,33 @@ class PanelSinRecorrerElLibroTest {
                     PrediosSinConciliar.class);
 
     /**
-     * Las dos lecturas del panel. Las dos se revisan igual, y por lo mismo.
+     * Las lecturas del panel. Todas se revisan igual, y por lo mismo.
      *
      * <p>{@code ConsultaDeTrabajoParado} entro con #549 y es la segunda lectura de la misma
      * pantalla de aterrizaje: cuatro consultas mas a cuatro modulos mas. Si esta prueba solo mirara
      * {@code PanelDeRecaudacion}, la mitad del coste de la pantalla que todo el mundo abre al
      * entrar no la vigilaria nadie.
+     *
+     * <p>{@code LecturaDelLibroParaElPanel} entro con #450: es la foto de las tres cifras del
+     * libro, que antes leia {@code PanelDeRecaudacion} dentro de su propia transaccion —la misma en
+     * la que despues esperaba a {@code caja}—. Se revisa como las otras: lo que inyecta, que sean
+     * puertos publicos, y lo que devuelven, que venga agregado.
      */
     private static final List<Class<?>> LECTURAS_DEL_PANEL =
-            List.of(PanelDeRecaudacion.class, ConsultaDeTrabajoParado.class);
+            List.of(
+                    LecturaDelLibroParaElPanel.class,
+                    PanelDeRecaudacion.class,
+                    ConsultaDeTrabajoParado.class);
+
+    /**
+     * Lo que una lectura del panel puede inyectar: los puertos enumerados, o <b>otra lectura del
+     * panel</b> —que esta prueba revisa a su vez—. Es lo que deja a {@code PanelDeRecaudacion}
+     * recibir la foto del libro de {@link LecturaDelLibroParaElPanel} sin abrirle la puerta a un
+     * repositorio (#450).
+     */
+    private static final List<Class<?>> LO_QUE_PUEDE_INYECTAR =
+            java.util.stream.Stream.concat(PUERTOS_DEL_PANEL.stream(), LECTURAS_DEL_PANEL.stream())
+                    .toList();
 
     /**
      * Los tipos que son <b>una fila del padron</b>: tantos como obligaciones o asientos hay.
@@ -115,7 +134,7 @@ class PanelSinRecorrerElLibroTest {
                                     + " un DataSource aqui serian el panel leyendo tablas ajenas"
                                     + " (AC 3)",
                             lectura.getSimpleName())
-                    .isSubsetOf(PUERTOS_DEL_PANEL);
+                    .isSubsetOf(LO_QUE_PUEDE_INYECTAR);
         }
     }
 
@@ -146,14 +165,11 @@ class PanelSinRecorrerElLibroTest {
     }
 
     @Test
-    @DisplayName("las dos lecturas del panel son transaccionales y de solo lectura")
+    @DisplayName("las lecturas de la base del panel son transaccionales y de solo lectura")
     void laLecturaEsTransaccionalYDeSoloLectura() throws Exception {
         exigirLecturaTransaccional(
-                PanelDeRecaudacion.class.getMethod(
-                        "del",
-                        kamayuk.rentas.dominio.Ejercicio.class,
-                        java.time.LocalDate.class,
-                        java.time.Instant.class));
+                LecturaDelLibroParaElPanel.class.getMethod(
+                        "leer", kamayuk.rentas.dominio.Ejercicio.class, java.time.LocalDate.class));
         exigirLecturaTransaccional(
                 ConsultaDeTrabajoParado.class.getMethod(
                         "del",
@@ -163,15 +179,34 @@ class PanelSinRecorrerElLibroTest {
                         Set.class));
     }
 
+    @Test
+    @DisplayName("y el panel de recaudacion NO abre transaccion: pregunta a `caja` fuera (#450)")
+    void elPanelNoAbreTransaccion() throws Exception {
+        Method del =
+                PanelDeRecaudacion.class.getMethod(
+                        "del",
+                        kamayuk.rentas.dominio.Ejercicio.class,
+                        java.time.LocalDate.class,
+                        java.time.Instant.class);
+
+        assertThat(del.getAnnotation(Transactional.class))
+                .as(
+                        "la cuarta cifra es un GET a `caja` con 30 s de espera: con la transaccion"
+                                + " abierta, cada apertura de Inicio retiene una conexion del pool"
+                                + " mientras `caja` contesta. La foto del libro la abre"
+                                + " LecturaDelLibroParaElPanel")
+                .isNull();
+        assertThat(PanelDeRecaudacion.class.getAnnotation(Transactional.class)).isNull();
+    }
+
     private static void exigirLecturaTransaccional(Method del) {
         Transactional transaccional = del.getAnnotation(Transactional.class);
 
         assertThat(transaccional)
                 .as(
                         "sin transaccion no hay SET LOCAL, y sin el la politica RLS no puede evaluar"
-                                + " app.municipalidad_id: la consulta falla. Y con cuatro"
-                                + " transacciones separadas, cada cifra saldria de un instante"
-                                + " distinto")
+                                + " app.municipalidad_id: la consulta falla. Y con una transaccion"
+                                + " por cifra, cada una saldria de un instante distinto")
                 .isNotNull();
         assertThat(transaccional.readOnly())
                 .as("un panel no escribe, y declararlo lo dice tambien al motor")

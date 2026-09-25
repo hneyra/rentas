@@ -238,19 +238,22 @@ class CertificadosYReportesControllerTest {
                         new LicenciaController(
                                 consulta,
                                 new EmitirLicenciaDeFuncionamiento(
-                                        licencias,
-                                        movimientos,
-                                        catalogo,
-                                        caja,
-                                        aplicaciones,
                                         padron,
-                                        (predioId, fecha) -> java.util.Optional.empty(),
-                                        TERRITORIO_EN_REGLA,
                                         derechos,
-                                        documentos,
-                                        PlantillaDeNumeroDeLicencia.POR_OMISION,
-                                        (RegistroDeAuditoria registro) -> {},
-                                        RELOJ),
+                                        caja,
+                                        new kamayuk.rentas.licencias.aplicacion.GirosDeLaSolicitud(
+                                                catalogo),
+                                        TERRITORIO_EN_REGLA,
+                                        (predioId, fecha) -> java.util.Optional.empty(),
+                                        new kamayuk.rentas.licencias.aplicacion
+                                                .RegistrarLicenciaDeFuncionamiento(
+                                                licencias,
+                                                movimientos,
+                                                aplicaciones,
+                                                documentos,
+                                                PlantillaDeNumeroDeLicencia.POR_OMISION,
+                                                (RegistroDeAuditoria registro) -> {},
+                                                RELOJ)),
                                 new CancelarLicencia(
                                         licencias,
                                         movimientos,

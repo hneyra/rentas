@@ -1,43 +1,19 @@
 package kamayuk.rentas.licencias.aplicacion;
 
-import java.time.Clock;
-import java.time.Instant;
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.EnumSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
-import java.util.Set;
-import kamayuk.rentas.auditoria.Auditoria;
-import kamayuk.rentas.auditoria.Operacion;
-import kamayuk.rentas.auditoria.RegistroDeAuditoria;
-import kamayuk.rentas.contribuyentes.DirectorioDeContribuyentes;
 import kamayuk.rentas.contribuyentes.ResumenDeContribuyente;
 import kamayuk.rentas.documentos.EmitirDocumento;
 import kamayuk.rentas.documentos.FormatoDeDocumento;
-import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.Observacion;
-import kamayuk.rentas.dominio.OrdenDeLosActos;
-import kamayuk.rentas.licencias.dominio.EstructuraDelProyecto;
 import kamayuk.rentas.licencias.dominio.FueDeEdificacion;
-import kamayuk.rentas.licencias.dominio.FueRepository;
 import kamayuk.rentas.licencias.dominio.MovimientoDeEdificacion;
-import kamayuk.rentas.licencias.dominio.MovimientoDeEdificacionRepository;
-import kamayuk.rentas.licencias.dominio.PlantillaDeNumeroDeEdificacion;
-import kamayuk.rentas.licencias.dominio.ProfesionalDelFue;
-import kamayuk.rentas.licencias.dominio.ProyectoDelFue;
-import kamayuk.rentas.licencias.dominio.RequisitoDelFue;
 import kamayuk.rentas.licencias.dominio.SeccionDelFue;
-import kamayuk.rentas.licencias.dominio.TerrenoDelFue;
-import kamayuk.rentas.licencias.dominio.TipoDeProfesional;
 import kamayuk.rentas.licencias.dominio.VigenciaDeLaLicencia;
-import kamayuk.rentas.tesoreria.AplicacionDeRecibos;
 import kamayuk.rentas.tesoreria.ReciboDeTramite;
 import kamayuk.rentas.tesoreria.RecibosDeTramite;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Otorga la licencia de edificacion de un FUE ya completo (#48 AC 1 y AC 5, RF-113).
@@ -69,6 +45,16 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>Una ampliacion es <b>este</b> expediente: numera su propia licencia y recibe su propia
  * vigencia. La original ni se lee para escribirla ni se podria escribir —V43 le retira el {@code
  * UPDATE} a {@code licencia_edificacion}—.
+ *
+ * <h2>Esta clase pregunta; la que lee y escribe la base es otra (#450)</h2>
+ *
+ * <p>Hasta #450 este metodo era {@code @Transactional} entero: {@code normativa} y {@code caja} se
+ * preguntaban con la conexion de la peticion tomada, y la valorizacion —que pide el cuadro a {@code
+ * catastro}— salia <b>despues</b> de numerar, con el candado de {@code edificacion_correlativo}
+ * tomado. Ahora esta clase <b>no abre transaccion</b>: pide a {@link
+ * RegistrarLicenciaDeEdificacion} el expediente comprobado, pregunta a los tres vecinos, y le
+ * devuelve lo que contestaron para que escriba. Es el reparto de {@link ConsultaDeFue}, que ya
+ * pedia el cuadro fuera de la transaccion por el <i>rollback-only</i>; aqui el motivo es el pool.
  */
 @Service
 public class EmitirLicenciaDeEdificacion {
@@ -76,49 +62,28 @@ public class EmitirLicenciaDeEdificacion {
     /** El {@code tipo} con que se guarda el papel en {@code documento_emitido}. */
     public static final String TIPO_DE_DOCUMENTO = "LICENCIA_EDIFICACION";
 
-    private final FueRepository expedientes;
-    private final MovimientoDeEdificacionRepository movimientos;
+    private final RegistrarLicenciaDeEdificacion registro;
     private final RecibosDeTramite recibos;
-    private final AplicacionDeRecibos aplicaciones;
-    private final DirectorioDeContribuyentes contribuyentes;
     private final DerechosDeTramiteParametrizados derechos;
     private final ValorizacionDelFue valorizaciones;
-    private final EmitirDocumento documentos;
-    private final PlantillaDeNumeroDeEdificacion plantilla;
-    private final Auditoria auditoria;
-    private final Clock reloj;
 
     public EmitirLicenciaDeEdificacion(
-            FueRepository expedientes,
-            MovimientoDeEdificacionRepository movimientos,
+            RegistrarLicenciaDeEdificacion registro,
             RecibosDeTramite recibos,
-            AplicacionDeRecibos aplicaciones,
-            DirectorioDeContribuyentes contribuyentes,
             DerechosDeTramiteParametrizados derechos,
-            ValorizacionDelFue valorizaciones,
-            EmitirDocumento documentos,
-            PlantillaDeNumeroDeEdificacion plantilla,
-            Auditoria auditoria,
-            Clock reloj) {
-        this.expedientes = expedientes;
-        this.movimientos = movimientos;
+            ValorizacionDelFue valorizaciones) {
+        this.registro = registro;
         this.recibos = recibos;
-        this.aplicaciones = aplicaciones;
-        this.contribuyentes = contribuyentes;
         this.derechos = derechos;
         this.valorizaciones = valorizaciones;
-        this.documentos = documentos;
-        this.plantilla = plantilla;
-        this.auditoria = auditoria;
-        this.reloj = reloj;
     }
 
     /**
      * Emite la licencia.
      *
-     * <p>La {@link Observacion} va en la firma y no dentro de la solicitud: la regla 10 exige que
-     * se vea en el punto donde se escribe, y ArchUnit la comprueba mirando los parametros del
-     * metodo transaccional.
+     * <p><b>Sin {@code @Transactional}, y hace falta que no lo tenga</b> (#450): aqui se pregunta a
+     * los vecinos. La {@link Observacion} viaja hasta {@link RegistrarLicenciaDeEdificacion}, que
+     * es donde se escribe: la regla 10 la busca en los parametros del metodo transaccional.
      *
      * @param expediente el numero del expediente del FUE
      * @param fechaDeEmision el dia del acto; entra como argumento (regla 6)
@@ -136,7 +101,6 @@ public class EmitirLicenciaDeEdificacion {
      * @throws DerechosDeTramiteParametrizados.DerechoSinParametrizar si el conjunto sellado no dice
      *     que concepto del TUPA cobra el derecho
      */
-    @Transactional
     public LicenciaEmitida emitir(
             String expediente,
             LocalDate fechaDeEmision,
@@ -151,221 +115,40 @@ public class EmitirLicenciaDeEdificacion {
         Objects.requireNonNull(formato, "Hay que decir en que formato sale el papel");
         Objects.requireNonNull(observacion, "Sin observacion no se guarda (regla 10, RNF-052)");
 
-        FueDeEdificacion fue =
-                expedientes
-                        .porExpediente(expediente == null ? "" : expediente.strip())
-                        .orElseThrow(() -> new ExpedienteInexistente(expediente));
-
-        if (!fue.tipoTramite().emiteLicencia()) {
-            throw new TramiteQueNoOtorgaLicencia(fue);
-        }
-        if (movimientos.emisionDe(fue.identificador()).isPresent()) {
-            throw new YaEstabaEmitida(fue.expediente());
-        }
-        // #402: una de las cinco copias de la regla, con su excepcion propia y sin mirar hoy. La
-        // regla es una sola y vive en `OrdenDeLosActos`.
-        OrdenDeLosActos.exigir(
-                "la emision de la licencia del expediente " + fue.expediente(),
-                fechaDeEmision,
-                LocalDate.now(reloj),
-                new OrdenDeLosActos.ActoPrevio(
-                        "la declaracion del expediente " + fue.expediente(),
-                        fue.fechaDeclaracion()));
-
-        SeccionesDelExpediente secciones = leerSecciones(fue);
-        secciones.exigirCompletas(fue.expediente());
-
-        ResumenDeContribuyente solicitante = solicitanteDe(fue);
+        // Primero la base, en su transaccion de solo lectura: si al expediente le faltan
+        // secciones, no hay recibo que comprobar ni obra que valorizar.
+        RegistrarLicenciaDeEdificacion.ExpedienteListo listo =
+                registro.preparar(expediente, fechaDeEmision);
 
         String concepto = derechos.aLaFechaDe(fechaDeEmision).paraLaEdificacion();
         ReciboDeTramite recibo =
                 ComprobacionDelDerecho.exigir(
                         recibos,
                         numeroDeRecibo,
-                        solicitante.id(),
+                        listo.solicitante().id(),
                         concepto,
                         "otorgamiento de licencia de edificacion");
-
-        Ejercicio ejercicio = Ejercicio.de(fechaDeEmision);
-        String numero = plantilla.componer(ejercicio, expedientes.siguienteCorrelativo(ejercicio));
 
         // La valorizacion se calcula AQUI, con la fecha del acto, y se imprime en el papel. Si el
         // cuadro sellado no la permite, el resultado trae el motivo y el papel imprime «—»: la
         // licencia se emite igual, porque su estructura no depende de ninguna cifra (#48 vs #197).
+        //
+        // Y AQUI quiere decir antes de numerar (#450): hasta #450 se pedia el cuadro a `catastro`
+        // con el candado de `edificacion_correlativo` ya tomado.
         ValorizacionDelFue.Resultado valorizacion =
-                valorizaciones.valorizar(secciones.estructuras(), fechaDeEmision);
+                valorizaciones.valorizar(listo.secciones().estructuras(), fechaDeEmision);
 
-        VigenciaDeLaLicencia primerTramo =
-                new VigenciaDeLaLicencia(
-                        null, fue.identificador(), 0L, 1, fechaDeEmision, vigenciaHasta);
-
-        EmitirDocumento.Emision emision =
-                documentos.emitir(
-                        TIPO_DE_DOCUMENTO,
-                        ejercicio,
-                        numero,
-                        ModeloDelFue.deLaLicencia(
-                                fue,
-                                numero,
-                                fechaDeEmision,
-                                primerTramo,
-                                solicitante.nombre(),
-                                solicitante.codigo(),
-                                secciones.terreno(),
-                                secciones.proyecto(),
-                                secciones.profesionales(),
-                                secciones.estructuras(),
-                                valorizacion,
-                                recibo.numero()),
-                        formato,
-                        observacion);
-
-        long documentoId =
-                Objects.requireNonNull(
-                        emision.registro().id(),
-                        "Un documento recien emitido siempre vuelve con su identificador");
-
-        Instant ahora = reloj.instant();
-        MovimientoDeEdificacion registrado =
-                movimientos.registrar(
-                        MovimientoDeEdificacion.emision(
-                                fue.identificador(),
-                                fechaDeEmision,
-                                numero,
-                                recibo.reciboId(),
-                                documentoId,
-                                emision.registro().numero(),
-                                ahora,
-                                observacion));
-
-        // EL RECIBO SE GASTA AQUI (#383), con el movimiento de emision ya escrito.
-        GastoDelDerecho.gastar(
-                aplicaciones,
-                recibo,
-                concepto,
-                "edificacion_movimiento",
-                registrado.identificador());
-
-        VigenciaDeLaLicencia vigencia =
-                movimientos.conceder(fue.identificador(), registrado.identificador(), primerTramo);
-
-        auditoria.registrar(
-                RegistroDeAuditoria.enLaFechaDe(
-                                "edificacion_movimiento",
-                                String.valueOf(registrado.identificador()),
-                                Operacion.ALTA,
-                                observacion)
-                        .con(null, descripcion(fue, numero, recibo, valorizacion)));
-
-        return new LicenciaEmitida(fue, registrado, vigencia, emision, solicitante, valorizacion);
+        return registro.registrar(
+                expediente,
+                fechaDeEmision,
+                vigenciaHasta,
+                new RegistrarLicenciaDeEdificacion.EmisionComprobada(
+                        concepto, recibo, valorizacion),
+                formato,
+                observacion);
     }
 
     // ------------------------------------------------------------------
-
-    private SeccionesDelExpediente leerSecciones(FueDeEdificacion fue) {
-        long id = fue.identificador();
-        return new SeccionesDelExpediente(
-                expedientes.terrenoVigente(id),
-                expedientes.proyectoVigente(id),
-                expedientes.valorizacionVigente(id),
-                expedientes.profesionalesVigentes(id),
-                expedientes.requisitosVigentes(id));
-    }
-
-    private ResumenDeContribuyente solicitanteDe(FueDeEdificacion fue) {
-        Map<Long, ResumenDeContribuyente> padron =
-                contribuyentes.porIds(Set.of(fue.contribuyenteId()));
-        ResumenDeContribuyente solicitante = padron.get(fue.contribuyenteId());
-        if (solicitante == null) {
-            throw new IllegalStateException(
-                    "El expediente "
-                            + fue.expediente()
-                            + " es de un contribuyente que el padron ya no tiene");
-        }
-        return solicitante;
-    }
-
-    /** Sin datos personales: esto acaba en la columna JSON de la auditoria. */
-    private static String descripcion(
-            FueDeEdificacion fue,
-            String numero,
-            ReciboDeTramite recibo,
-            ValorizacionDelFue.Resultado valorizacion) {
-        return "{\"expediente\":\""
-                + fue.expediente()
-                + "\",\"licencia\":\""
-                + numero
-                + "\",\"recibo\":\""
-                + recibo.numero()
-                + "\",\"valorizada\":"
-                + valorizacion.estaDisponible()
-                + "}";
-    }
-
-    // ------------------------------------------------------------------
-
-    /**
-     * Las cinco secciones leidas de una vez, con la comprobacion del AC 1 dentro.
-     *
-     * <p>Se leen las cinco antes de comprobar ninguna, a proposito: comprobar sobre la marcha
-     * dejaria el error diciendo solo la primera que falta.
-     */
-    record SeccionesDelExpediente(
-            Optional<TerrenoDelFue> terrenoOpcional,
-            Optional<ProyectoDelFue> proyectoOpcional,
-            List<EstructuraDelProyecto> estructuras,
-            List<ProfesionalDelFue> profesionales,
-            List<RequisitoDelFue> requisitos) {
-
-        void exigirCompletas(String expediente) {
-            List<SeccionDelFue> faltan = new ArrayList<>();
-            if (terrenoOpcional.isEmpty()) {
-                faltan.add(SeccionDelFue.TERRENO);
-            }
-            if (proyectoOpcional.isEmpty()) {
-                faltan.add(SeccionDelFue.PROYECTO);
-            }
-            if (estructuras.isEmpty()) {
-                faltan.add(SeccionDelFue.VALORIZACION);
-            }
-            if (!tieneLosProfesionalesQueFirman()) {
-                faltan.add(SeccionDelFue.PROFESIONALES);
-            }
-            if (requisitos.stream().noneMatch(RequisitoDelFue::presentado)) {
-                faltan.add(SeccionDelFue.DOCUMENTOS);
-            }
-            if (!faltan.isEmpty()) {
-                throw new SeccionesIncompletas(expediente, faltan);
-            }
-        }
-
-        /**
-         * Que esten el proyectista de arquitectura y el responsable de obra.
-         *
-         * <p>Son los dos que el issue nombra como secciones propias del FUE, y los dos que
-         * responden por la obra: sin proyectista no hay quien responda por el proyecto, y sin
-         * responsable de obra no hay a quien reclamar durante la ejecucion. Los otros dos
-         * proyectistas —estructuras e instalaciones— no se exigen aqui: cuando hacen falta lo dice
-         * el reglamento segun la modalidad, y eso son cifras y supuestos que este repositorio no
-         * tiene verificados.
-         */
-        private boolean tieneLosProfesionalesQueFirman() {
-            Set<TipoDeProfesional> presentes = EnumSet.noneOf(TipoDeProfesional.class);
-            for (ProfesionalDelFue profesional : profesionales) {
-                presentes.add(profesional.tipo());
-            }
-            return presentes.contains(TipoDeProfesional.PROYECTISTA_ARQUITECTURA)
-                    && presentes.contains(TipoDeProfesional.RESPONSABLE_OBRA);
-        }
-
-        TerrenoDelFue terreno() {
-            return terrenoOpcional.orElseThrow();
-        }
-
-        ProyectoDelFue proyecto() {
-            return proyectoOpcional.orElseThrow();
-        }
-    }
 
     /**
      * La licencia recien otorgada.

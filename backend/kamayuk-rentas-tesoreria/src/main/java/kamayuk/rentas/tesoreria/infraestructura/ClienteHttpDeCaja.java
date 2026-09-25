@@ -402,6 +402,11 @@ public class ClienteHttpDeCaja {
      * vacio se leeria como un dato.
      */
     Optional<JsonNode> pedirSiExiste(String ruta, String que) {
+        // #450: la guarda va AQUI, encima de `enviar`, que es lo que sustituye el doble de las
+        // pruebas: dentro de el se la saltaria cada prueba que monta un adaptador sobre ese
+        // doble. Las tres lecturas de este cliente pasan por aqui; la escritura —`publicar`— no,
+        // y es a proposito: ver el javadoc de `publicar`.
+        kamayuk.rentas.plataforma.ViajeDeRed.antesDeSalir("caja", ruta, que);
         RespuestaDeCaja respuesta = enviar(ruta, que);
         if (respuesta.estado() == 404) {
             return Optional.empty();
@@ -428,6 +433,13 @@ public class ClienteHttpDeCaja {
      * otra cosa sale como {@link CajaInalcanzable} — incluido un 4xx, y a proposito: una orden que
      * la caja rechaza es un defecto de este sistema al componerla, y devolver un identificador
      * inventado dejaria al contribuyente delante de una ventanilla que no encuentra su deuda.
+     *
+     * <p><b>No pasa por la guarda de #450, y no es un olvido.</b> {@code OrdenesDeCobroHttp} la
+     * llama dentro de la transaccion que registra la orden, y eso SI retiene una conexion mientras
+     * {@code caja} contesta. Pero lo que esa llamada rompe primero es la atomicidad del camino del
+     * dinero —la orden publicada en {@code caja} y la fila de este lado no confirman juntas—, y eso
+     * no se arregla sacandola de la transaccion: se arregla con el protocolo que las hace confirmar
+     * juntas, que va en su propio issue. Vigilarla aqui obligaria a moverla sin ese protocolo.
      */
     JsonNode publicar(String ruta, String cuerpo, String que) {
         RespuestaDeCaja respuesta = enviarCuerpo(ruta, cuerpo, que);
