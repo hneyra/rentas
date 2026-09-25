@@ -28,6 +28,7 @@ import kamayuk.rentas.licencias.aplicacion.LecturaDelFue;
 import kamayuk.rentas.licencias.aplicacion.PresentarFue;
 import kamayuk.rentas.licencias.aplicacion.RevalidarLicenciaDeEdificacion;
 import kamayuk.rentas.licencias.aplicacion.ValorizacionDelFue;
+import kamayuk.rentas.licencias.dobles.AplicacionesEnMemoria;
 import kamayuk.rentas.licencias.dobles.CajaDeMentira;
 import kamayuk.rentas.licencias.dobles.CuadroDeMentira;
 import kamayuk.rentas.licencias.dobles.DerechosDeMentira;
@@ -85,6 +86,9 @@ class EdificacionControllerTest {
     private final PadronDeMentira padron =
             new PadronDeMentira()
                     .con(new ResumenDeContribuyente(7L, "C-0007", "TORRES DIAZ, MARIO", "DNI 1"));
+
+    /** Lo que ya se gasto de cada recibo (#383). En memoria: aqui se mide el codigo HTTP. */
+    private final AplicacionesEnMemoria aplicaciones = new AplicacionesEnMemoria();
 
     private final CajaDeMentira caja =
             new CajaDeMentira()
@@ -161,6 +165,7 @@ class EdificacionControllerTest {
                                         expedientes,
                                         movimientos,
                                         caja,
+                                        aplicaciones,
                                         padron,
                                         derechos,
                                         valorizaciones,
@@ -172,6 +177,7 @@ class EdificacionControllerTest {
                                         expedientes,
                                         movimientos,
                                         caja,
+                                        aplicaciones,
                                         padron,
                                         derechos,
                                         documentos,
@@ -523,6 +529,25 @@ class EdificacionControllerTest {
             assertThat(emitir(mvc, 409)).contains("CONFLICTO");
         }
 
+        /**
+         * #383 — El recibo que pago la licencia de una obra no paga la de otra.
+         *
+         * <p>Son dos expedientes distintos, del mismo solicitante, con el mismo papel. {@code
+         * YaEstabaEmitida} no los separa —es por expediente—, y las cinco comprobaciones del
+         * derecho pasan las dos veces.
+         */
+        @Test
+        @DisplayName("#383 — el mismo recibo no otorga la licencia de otra obra: 409")
+        void elMismoReciboNoPagaDosObras() throws Exception {
+            expedienteCompleto();
+            emitir(mvc, 201);
+            expedienteCompleto("EXP-2026-0002");
+
+            String cuerpo = emitir(mvc, "EXP-2026-0002", 409);
+
+            assertThat(cuerpo).contains("CONFLICTO").contains(RECIBO).contains(DERECHO_EDIFICACION);
+        }
+
         @Test
         @DisplayName(
                 "AC 2: sin cuadro sellado la licencia sale igual, diciendo por que no hay cifra")
@@ -570,6 +595,39 @@ class EdificacionControllerTest {
                     .as("los dos tramos, y el primero intacto")
                     .contains("{\"tramo\":1,\"desde\":\"2026-03-16\",\"hasta\":\"2029-03-16\"}")
                     .contains("{\"tramo\":2,\"desde\":\"2029-03-17\",\"hasta\":\"2030-03-16\"}");
+        }
+
+        /**
+         * #383 — Con un solo recibo se prorrogaba la vigencia de la misma obra una y otra vez, con
+         * un FUE de revalidacion nuevo en cada tramo. El segundo tramo pide su propio pago.
+         */
+        @Test
+        @DisplayName("#383 — el recibo de una revalidacion no paga la siguiente: 409")
+        void elMismoReciboNoRevalidaDosVeces() throws Exception {
+            expedienteCompleto();
+            emitir(mvc, 201);
+            presentar("EXP-2026-0090", "REVALIDACION_DE_LICENCIA", "LE-2026-000001", 201);
+            revalidar("EXP-2026-0090", "2030-03-16", 201);
+            presentar("EXP-2026-0091", "REVALIDACION_DE_LICENCIA", "LE-2026-000001", 201);
+
+            String cuerpo = revalidar("EXP-2026-0091", "2031-03-16", 409);
+
+            assertThat(cuerpo)
+                    .contains("CONFLICTO")
+                    .contains(RECIBO_REVALIDACION)
+                    .contains(DERECHO_REVALIDACION);
+        }
+
+        private String revalidar(String expediente, String hasta, int esperado) throws Exception {
+            return envio(
+                    mvc,
+                    "/rentas/api/v1/licencias/edificacion/" + expediente + "/revalidacion",
+                    """
+                    {"nuevaVigenciaHasta":"%s","nDeRecibo":"%s",
+                     "observacion":"Se revalida por solicitud del administrado"}
+                    """
+                            .formatted(hasta, RECIBO_REVALIDACION),
+                    esperado);
         }
 
         @Test
@@ -1012,15 +1070,26 @@ class EdificacionControllerTest {
 
     /** El expediente con las cinco secciones completadas y listo para emitir. */
     private void expedienteCompleto() throws Exception {
-        presentar(EXPEDIENTE, "LICENCIA_DE_OBRA", null, 201);
-        completarTerreno(201);
+        expedienteCompleto(EXPEDIENTE);
+    }
+
+    /** Otro expediente completo, con su numero: el de la segunda obra de #383. */
+    private void expedienteCompleto(String expediente) throws Exception {
+        presentar(expediente, "LICENCIA_DE_OBRA", null, 201);
+        envio(
+                mvc,
+                "/rentas/api/v1/licencias/edificacion/" + expediente + "/secciones",
+                cuerpoDeTerreno(),
+                201);
         seccion(
+                expediente,
                 """
                 {"seccion":"PROYECTO","usoDeLaEdificacion":"VIVIENDA UNIFAMILIAR","nDePisos":2,
                  "areaTechadaTotalM":"160.00","areaLibreM":"40.00","nDeEstacionamientos":1,
                  "plazoDeEjecucionMeses":12,"observacion":"Se registra el proyecto"}
                 """);
         seccion(
+                expediente,
                 """
                 {"seccion":"VALORIZACION","valorizacion":[
                    {"piso":1,"partida":"MUROS","categoria":"A","areaM":"40.00"},
@@ -1028,6 +1097,7 @@ class EdificacionControllerTest {
                  "observacion":"Se registra la valorizacion"}
                 """);
         seccion(
+                expediente,
                 """
                 {"seccion":"PROFESIONALES","profesionales":[
                    {"tipo":"PROYECTISTA_ARQUITECTURA","nombre":"QUISPE, MARIA","colegio":"CAP",
@@ -1037,6 +1107,7 @@ class EdificacionControllerTest {
                  "observacion":"Se registran los profesionales"}
                 """);
         seccion(
+                expediente,
                 """
                 {"seccion":"DOCUMENTOS","documentos":[
                    {"requisito":"FUE FIRMADO POR EL SOLICITANTE","presentado":true,"folios":2}],
@@ -1044,18 +1115,22 @@ class EdificacionControllerTest {
                 """);
     }
 
-    private void seccion(String cuerpo) throws Exception {
+    private void seccion(String expediente, String cuerpo) throws Exception {
         envio(
                 mvc,
-                "/rentas/api/v1/licencias/edificacion/" + EXPEDIENTE + "/secciones",
+                "/rentas/api/v1/licencias/edificacion/" + expediente + "/secciones",
                 cuerpo,
                 201);
     }
 
     private String emitir(MockMvc destino, int esperado) throws Exception {
+        return emitir(destino, EXPEDIENTE, esperado);
+    }
+
+    private String emitir(MockMvc destino, String expediente, int esperado) throws Exception {
         return envio(
                 destino,
-                "/rentas/api/v1/licencias/edificacion/" + EXPEDIENTE + "/licencia",
+                "/rentas/api/v1/licencias/edificacion/" + expediente + "/licencia",
                 """
                 {"fechaDeEmision":"2026-03-16","vigenciaHasta":"2029-03-16","nDeRecibo":"%s",
                  "observacion":"Se otorga la licencia de edificacion"}

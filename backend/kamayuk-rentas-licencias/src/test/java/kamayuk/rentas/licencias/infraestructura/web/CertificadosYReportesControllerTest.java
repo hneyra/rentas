@@ -25,6 +25,7 @@ import kamayuk.rentas.licencias.aplicacion.DuplicarLicencia;
 import kamayuk.rentas.licencias.aplicacion.EmitirCertificado;
 import kamayuk.rentas.licencias.aplicacion.EmitirLicenciaDeFuncionamiento;
 import kamayuk.rentas.licencias.aplicacion.ResumenAnualDeLicencias;
+import kamayuk.rentas.licencias.dobles.AplicacionesEnMemoria;
 import kamayuk.rentas.licencias.dobles.CajaDeMentira;
 import kamayuk.rentas.licencias.dobles.CatalogoEnMemoria;
 import kamayuk.rentas.licencias.dobles.CertificadosEnMemoria;
@@ -93,6 +94,17 @@ class CertificadosYReportesControllerTest {
     private static final String RECIBO = "001-0000123";
     private static final String RECIBO_DE_OTRA_COSA = "001-0000555";
 
+    /**
+     * Un recibo que cobro <b>dos</b> certificados de numeracion (#383): {@code cantidad = 2}. Es la
+     * siembra que distingue «contar contra la cantidad cobrada» de «un recibo, un acto».
+     */
+    private static final String RECIBO_DE_DOS = "001-0000300";
+
+    /** Los otros dos predios del mismo titular, para pedirle un certificado de cada uno (#383). */
+    private static final String SEGUNDO_PREDIO = "200601010150010101000002";
+
+    private static final String TERCER_PREDIO = "200601010150010101000003";
+
     private static final String CODIGO_PREDIAL = "200601010150010101000001";
 
     private final CertificadosEnMemoria certificados = new CertificadosEnMemoria();
@@ -106,7 +118,13 @@ class CertificadosYReportesControllerTest {
                     .con(new ResumenDeContribuyente(7L, "C-0007", "PEÑA GARCÍA, LUIS", "DNI 1234"));
 
     private final PrediosDeMentira predios =
-            new PrediosDeMentira().con(7L, 31L, CODIGO_PREDIAL, "AV. PEÑA GARCÍA 100");
+            new PrediosDeMentira()
+                    .con(7L, 31L, CODIGO_PREDIAL, "AV. PEÑA GARCÍA 100")
+                    .con(7L, 32L, SEGUNDO_PREDIO, "AV. PEÑA GARCÍA 102")
+                    .con(7L, 33L, TERCER_PREDIO, "AV. PEÑA GARCÍA 104");
+
+    /** Lo que ya se gasto de cada recibo (#383). En memoria: aqui se mide el codigo HTTP. */
+    private final AplicacionesEnMemoria aplicaciones = new AplicacionesEnMemoria();
 
     private final CajaDeMentira caja =
             new CajaDeMentira()
@@ -123,6 +141,17 @@ class CertificadosYReportesControllerTest {
                                     HOY))
                     .con(
                             new kamayuk.rentas.tesoreria.ReciboDeTramite(
+                                    13L,
+                                    RECIBO_DE_DOS,
+                                    HOY,
+                                    7L,
+                                    true,
+                                    false,
+                                    List.of(DERECHO_NUMERACION),
+                                    Dinero.de("50.00"),
+                                    HOY))
+                    .con(
+                            new kamayuk.rentas.tesoreria.ReciboDeTramite(
                                     12L,
                                     RECIBO_DE_OTRA_COSA,
                                     HOY,
@@ -136,6 +165,7 @@ class CertificadosYReportesControllerTest {
     private final CobrosDeMentira cobros =
             new CobrosDeMentira()
                     .con(RECIBO, DERECHO_NUMERACION, "25.00", HOY)
+                    .con(RECIBO_DE_DOS, DERECHO_NUMERACION, "50.00", HOY, 2)
                     .recaudadoEn(DERECHO_LICENCIA, 2026, "480.00");
 
     private final EmitirDocumento documentos =
@@ -198,6 +228,7 @@ class CertificadosYReportesControllerTest {
                                         predios,
                                         caja,
                                         cobros,
+                                        aplicaciones,
                                         derechos,
                                         documentos,
                                         PlantillaDeNumeroDeCertificado.POR_OMISION,
@@ -211,6 +242,7 @@ class CertificadosYReportesControllerTest {
                                         movimientos,
                                         catalogo,
                                         caja,
+                                        aplicaciones,
                                         padron,
                                         (predioId, fecha) -> java.util.Optional.empty(),
                                         TERRITORIO_EN_REGLA,
@@ -231,6 +263,7 @@ class CertificadosYReportesControllerTest {
                                         movimientos,
                                         duplicados,
                                         caja,
+                                        aplicaciones,
                                         padron,
                                         derechos,
                                         documentos,
@@ -268,6 +301,8 @@ class CertificadosYReportesControllerTest {
     @Nested
     @DisplayName("POST /licencias/certificados")
     class Emitir {
+
+        private static final String CERTIFICADOS = "/rentas/api/v1/licencias/certificados";
 
         /**
          * #422 — Un parametro urbanistico mas ancho que su columna es 422, antes del papel.
@@ -354,6 +389,46 @@ class CertificadosYReportesControllerTest {
             assertThat(json)
                     .as("y no se dibuja ni se marca ningun papel nuevo")
                     .contains("\"documento\":null");
+        }
+
+        /**
+         * #383 — Un recibo que cobro dos certificados respalda dos, y el tercero es 409.
+         *
+         * <p>Con {@code cantidad = 1}, que era la muestra uniforme de los dos dobles, «contar
+         * contra lo cobrado» y «un recibo, un acto» dan lo mismo. Aqui no: un indice unico sobre
+         * {@code certificado.recibo_id} rechazaria el segundo, que es legitimo, y no contar dejaria
+         * pasar el tercero, que no lo es. Hasta #383 salia el tercero con 201, y la suma de
+         * «Derecho S/» del padron era mayor que lo que la caja cobro.
+         */
+        @Test
+        @DisplayName("#383 — un recibo de DOS certificados emite dos y rechaza el tercero con 409")
+        void unReciboDeDosEmiteDos() throws Exception {
+            assertThat(rechazo(mvc, CERTIFICADOS, cuerpoDeEmision(RECIBO_DE_DOS)).estado())
+                    .isEqualTo(201);
+            assertThat(
+                            rechazo(
+                                            mvc,
+                                            CERTIFICADOS,
+                                            cuerpoDeEmision(RECIBO_DE_DOS)
+                                                    .replace(CODIGO_PREDIAL, SEGUNDO_PREDIO))
+                                    .estado())
+                    .as("el segundo es legitimo: el recibo cobro dos")
+                    .isEqualTo(201);
+
+            Rechazo tercero =
+                    rechazo(
+                            mvc,
+                            CERTIFICADOS,
+                            cuerpoDeEmision(RECIBO_DE_DOS).replace(CODIGO_PREDIAL, TERCER_PREDIO));
+
+            assertThat(tercero.estado())
+                    .as("el tercero no lo pago nadie: " + tercero.cuerpo())
+                    .isEqualTo(409);
+            assertThat(tercero.cuerpo())
+                    .contains("CONFLICTO")
+                    .contains(RECIBO_DE_DOS)
+                    .contains(DERECHO_NUMERACION);
+            assertThat(tercero.errores()).as("un 409 de negocio no es una incidencia").isEmpty();
         }
 
         @Test

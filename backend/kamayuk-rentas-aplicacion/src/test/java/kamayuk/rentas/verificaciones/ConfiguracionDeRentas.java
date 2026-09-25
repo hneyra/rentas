@@ -164,6 +164,9 @@ public final class ConfiguracionDeRentas implements ConfiguracionDeLasVerificaci
                     "prescripcion_hecho",
                     "programa_fiscalizacion",
                     "programa_muestra",
+                    // #383, V28: que acto gasto que recibo. El recibo es de `caja`; la constancia
+                    // de que se gasto es de quien emite los actos, y por eso esta aqui.
+                    "recibo_aplicado",
                     "resolucion_determinacion",
                     "resolucion_gerencia",
                     "responsable_solidario",

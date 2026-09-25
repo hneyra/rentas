@@ -174,6 +174,11 @@ final class TablasDeRentas {
                     // el
                     // UPDATE sobre `estado` y sobre ninguna otra.
                     "declaracion_jurada",
+                    // Con #383: la constancia de que un acto GASTO un recibo de caja de tasas.
+                    // Borrar una fila devolveria saldo a un recibo que ya pago un acto, y el
+                    // mismo papel volveria a sacar una licencia o un vehiculo del deposito. Anular
+                    // el acto no la borra: tampoco devuelve el dinero.
+                    "recibo_aplicado",
                     "auditoria");
 
     /**
@@ -398,5 +403,9 @@ final class TablasDeRentas {
                     // seria poder alargar un certificado ya entregado sin que nada lo delate, y
                     // esa fecha es la que decide si una obra se autoriza con los parametros de hoy
                     // o con los de hace diez anios.
-                    "certificado");
+                    "certificado",
+                    // Y con #383, la constancia de que un acto gasto un recibo. V28 la crea sin
+                    // UPDATE: corregir las unidades en el sitio seria devolverle saldo a un pago
+                    // que ya respaldo un acto, sin que nada lo delate.
+                    "recibo_aplicado");
 }

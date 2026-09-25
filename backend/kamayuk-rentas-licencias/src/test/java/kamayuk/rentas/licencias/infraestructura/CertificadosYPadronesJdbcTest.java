@@ -77,8 +77,10 @@ import kamayuk.rentas.licencias.dominio.TipoDeCertificado;
 import kamayuk.rentas.licencias.dominio.TipoDeLicencia;
 import kamayuk.rentas.parametros.infraestructura.ParametrosRepositoryJdbc;
 import kamayuk.rentas.plataforma.tenant.TenantTransactionManager;
+import kamayuk.rentas.tesoreria.AplicacionDeRecibos;
 import kamayuk.rentas.tesoreria.CobrosDeTasas;
 import kamayuk.rentas.tesoreria.RecibosDeTramite;
+import kamayuk.rentas.tesoreria.infraestructura.AplicacionDeRecibosJdbc;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -200,6 +202,12 @@ class CertificadosYPadronesJdbcTest {
      */
     private static CajaDeMentira caja;
 
+    /**
+     * La constancia de que recibo pago que acto, la de verdad (#383): contra {@code
+     * recibo_aplicado} y su indice unico, no contra un doble.
+     */
+    private static AplicacionDeRecibos aplicaciones;
+
     private static CobrosDeMentira cobrosDeTasas;
     private static EmitirDocumento documentos;
     private static GeneradorDeDocumentos generador;
@@ -244,6 +252,7 @@ class CertificadosYPadronesJdbcTest {
         caja = new CajaDeMentira();
         cobrosDeTasas = new CobrosDeMentira();
         RecibosDeTramite recibos = caja;
+        aplicaciones = new AplicacionDeRecibosJdbc(jdbc, RELOJ);
         CobrosDeTasas cobros = cobrosDeTasas;
 
         generador =
@@ -279,6 +288,7 @@ class CertificadosYPadronesJdbcTest {
                                 PREDIOS,
                                 recibos,
                                 cobros,
+                                aplicaciones,
                                 derechos,
                                 documentos,
                                 PlantillaDeNumeroDeCertificado.POR_OMISION,
@@ -295,6 +305,7 @@ class CertificadosYPadronesJdbcTest {
                                 PREDIOS,
                                 recibos,
                                 cobros,
+                                aplicaciones,
                                 derechos,
                                 envolver(
                                         new EmitirDocumento(
@@ -315,6 +326,7 @@ class CertificadosYPadronesJdbcTest {
                                 movimientos,
                                 catalogo,
                                 recibos,
+                                aplicaciones,
                                 padron,
                                 (predioId, fecha) -> Optional.empty(),
                                 TERRITORIO_EN_REGLA,

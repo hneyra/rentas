@@ -32,6 +32,7 @@ import kamayuk.rentas.licencias.dominio.PlantillaDeNumeroDeLicencia;
 import kamayuk.rentas.licencias.dominio.RespuestaDelTerritorio;
 import kamayuk.rentas.licencias.dominio.TerritorioDeLaLicencia;
 import kamayuk.rentas.licencias.dominio.TipoDeLicencia;
+import kamayuk.rentas.tesoreria.AplicacionDeRecibos;
 import kamayuk.rentas.tesoreria.ReciboDeTramite;
 import kamayuk.rentas.tesoreria.RecibosDeTramite;
 import org.jspecify.annotations.Nullable;
@@ -55,6 +56,9 @@ import org.springframework.transaction.annotation.Transactional;
  *       cubra el concepto del TUPA que el conjunto sellado nombra —eso exige un {@code JOIN} contra
  *       otro contexto, y un {@code CHECK} no puede hacerlo—; y que los giros existan en el
  *       catalogo.
+ *   <li><b>Las dos juntas</b> (#383): que el recibo no haya pagado ya otro acto. Lo anota {@link
+ *       GastoDelDerecho} en {@code recibo_aplicado}, y dos emisiones simultaneas con el mismo papel
+ *       las separa {@code recibo_aplicado_uq}, no un {@code if}.
  * </ul>
  *
  * <h2>La licencia y su papel nacen juntos</h2>
@@ -121,6 +125,7 @@ public class EmitirLicenciaDeFuncionamiento {
     private final MovimientoDeLicenciaRepository movimientos;
     private final CiiuRepository catalogo;
     private final RecibosDeTramite recibos;
+    private final AplicacionDeRecibos aplicaciones;
     private final DirectorioDeContribuyentes contribuyentes;
     private final LectorDeFichasEconomicas fichas;
     private final ComprobarElTerritorio territorio;
@@ -135,6 +140,7 @@ public class EmitirLicenciaDeFuncionamiento {
             MovimientoDeLicenciaRepository movimientos,
             CiiuRepository catalogo,
             RecibosDeTramite recibos,
+            AplicacionDeRecibos aplicaciones,
             DirectorioDeContribuyentes contribuyentes,
             LectorDeFichasEconomicas fichas,
             ComprobarElTerritorio territorio,
@@ -147,6 +153,7 @@ public class EmitirLicenciaDeFuncionamiento {
         this.movimientos = movimientos;
         this.catalogo = catalogo;
         this.recibos = recibos;
+        this.aplicaciones = aplicaciones;
         this.contribuyentes = contribuyentes;
         this.fichas = fichas;
         this.territorio = territorio;
@@ -167,6 +174,7 @@ public class EmitirLicenciaDeFuncionamiento {
      * @throws TitularDesconocido si el codigo de contribuyente no esta en el padron
      * @throws GiroDesconocido si algun giro no esta en el catalogo CIIU
      * @throws ComprobacionDelDerecho.DerechoNoPagado si el recibo no respalda el derecho (RF-110)
+     * @throws kamayuk.rentas.tesoreria.ReciboYaAplicado si el recibo ya pago otro acto (#383)
      * @throws DerechosDeTramiteParametrizados.DerechoSinParametrizar si el conjunto sellado no dice
      *     que concepto del TUPA cobra el derecho
      * @throws RiesgoNoMitigable si el lote cruza una zona de riesgo no mitigable comprobada (#43)
@@ -275,6 +283,16 @@ public class EmitirLicenciaDeFuncionamiento {
                         "Un documento recien emitido siempre vuelve con su identificador");
 
         LicenciaDeFuncionamiento guardada = licencias.emitir(conDocumento(sinGuardar, documentoId));
+
+        // EL RECIBO SE GASTA AQUI (#383), en la misma transaccion y con la licencia ya escrita:
+        // la constancia nombra el acto que pago. Hasta #383 el mismo papel respaldaba la
+        // licencia del local A y la del local B, porque nadie anotaba que ya se habia usado.
+        GastoDelDerecho.gastar(
+                aplicaciones,
+                recibo,
+                concepto,
+                "licencia_funcionamiento",
+                guardada.identificador());
 
         MovimientoDeLicencia emisionRegistrada =
                 movimientos.registrar(

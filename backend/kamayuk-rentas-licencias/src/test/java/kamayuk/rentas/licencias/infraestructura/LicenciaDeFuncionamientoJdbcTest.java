@@ -65,7 +65,9 @@ import kamayuk.rentas.licencias.dominio.RiesgoItse;
 import kamayuk.rentas.licencias.dominio.TipoDeLicencia;
 import kamayuk.rentas.parametros.infraestructura.ParametrosRepositoryJdbc;
 import kamayuk.rentas.plataforma.tenant.TenantTransactionManager;
+import kamayuk.rentas.tesoreria.AplicacionDeRecibos;
 import kamayuk.rentas.tesoreria.RecibosDeTramite;
+import kamayuk.rentas.tesoreria.infraestructura.AplicacionDeRecibosJdbc;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -163,6 +165,12 @@ class LicenciaDeFuncionamientoJdbcTest {
 
     private static RecibosDeTramite recibos;
 
+    /**
+     * La constancia de que recibo pago que acto, la de verdad (#383): contra {@code
+     * recibo_aplicado} y su indice unico, no contra un doble.
+     */
+    private static AplicacionDeRecibos aplicaciones;
+
     private static EmitirDocumento documentos;
     private static MantenerCatalogoCiiu mantenerCatalogo;
     private static EmitirLicenciaDeFuncionamiento emitir;
@@ -196,6 +204,7 @@ class LicenciaDeFuncionamientoJdbcTest {
 
         caja = new CajaDeMentira();
         recibos = caja;
+        aplicaciones = new AplicacionDeRecibosJdbc(jdbc, RELOJ);
 
         documentos =
                 envolver(
@@ -233,6 +242,7 @@ class LicenciaDeFuncionamientoJdbcTest {
                                 movimientos,
                                 catalogo,
                                 recibos,
+                                aplicaciones,
                                 padron,
                                 fichas,
                                 TERRITORIO_EN_REGLA,
@@ -250,6 +260,7 @@ class LicenciaDeFuncionamientoJdbcTest {
                                 movimientos,
                                 catalogo,
                                 recibos,
+                                aplicaciones,
                                 padron,
                                 fichas,
                                 TERRITORIO_EN_REGLA,
@@ -269,6 +280,7 @@ class LicenciaDeFuncionamientoJdbcTest {
                                 movimientos,
                                 duplicados,
                                 recibos,
+                                aplicaciones,
                                 padron,
                                 derechos,
                                 documentos,

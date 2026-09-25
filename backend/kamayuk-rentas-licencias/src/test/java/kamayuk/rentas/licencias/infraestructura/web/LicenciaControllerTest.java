@@ -26,6 +26,7 @@ import kamayuk.rentas.licencias.aplicacion.DuplicarLicencia;
 import kamayuk.rentas.licencias.aplicacion.EmitirLicenciaDeFuncionamiento;
 import kamayuk.rentas.licencias.aplicacion.MantenerCatalogoCiiu;
 import kamayuk.rentas.licencias.aplicacion.ResumenAnualDeLicencias;
+import kamayuk.rentas.licencias.dobles.AplicacionesEnMemoria;
 import kamayuk.rentas.licencias.dobles.CajaDeMentira;
 import kamayuk.rentas.licencias.dobles.CatalogoEnMemoria;
 import kamayuk.rentas.licencias.dobles.CobrosDeMentira;
@@ -82,7 +83,15 @@ class LicenciaControllerTest {
     private static final String DERECHO_DUPLICADO = "LF-009";
 
     private static final String RECIBO = "001-0000123";
+
+    /** Otro pago del mismo derecho y del mismo titular: el de la segunda licencia (#383). */
+    private static final String RECIBO_DE_LA_SEGUNDA = "001-0000124";
+
     private static final String RECIBO_DEL_DUPLICADO = "001-0000200";
+
+    /** El derecho del SEGUNDO duplicado, pagado aparte (#383). */
+    private static final String RECIBO_DEL_SEGUNDO_DUPLICADO = "001-0000201";
+
     private static final String RECIBO_ANULADO = "001-0000999";
     private static final String RECIBO_DE_COBRANZA = "001-0000777";
     private static final String RECIBO_DE_OTRO = "001-0000888";
@@ -98,13 +107,32 @@ class LicenciaControllerTest {
                     .con(new ResumenDeContribuyente(7L, "C-0007", "PENA GARCIA, LUIS", "DNI 1234"))
                     .con(new ResumenDeContribuyente(9L, "C-0009", "OTRO TITULAR", "DNI 9999"));
 
+    /** Lo que ya se gasto de cada recibo (#383). En memoria: aqui se mide el codigo HTTP. */
+    private final AplicacionesEnMemoria aplicaciones = new AplicacionesEnMemoria();
+
     private final CajaDeMentira caja =
             new CajaDeMentira()
                     .con(recibo(11L, RECIBO, 7L, true, false, List.of(DERECHO_LICENCIA)))
                     .con(
                             recibo(
+                                    17L,
+                                    RECIBO_DE_LA_SEGUNDA,
+                                    7L,
+                                    true,
+                                    false,
+                                    List.of(DERECHO_LICENCIA)))
+                    .con(
+                            recibo(
                                     12L,
                                     RECIBO_DEL_DUPLICADO,
+                                    7L,
+                                    true,
+                                    false,
+                                    List.of(DERECHO_DUPLICADO)))
+                    .con(
+                            recibo(
+                                    18L,
+                                    RECIBO_DEL_SEGUNDO_DUPLICADO,
                                     7L,
                                     true,
                                     false,
@@ -149,6 +177,7 @@ class LicenciaControllerTest {
                                         movimientos,
                                         catalogo,
                                         caja,
+                                        aplicaciones,
                                         padron,
                                         // Sin ficha economica: el predio de la prueba no la tiene,
                                         // y eso NO impide emitir (V37, columna opcional).
@@ -171,6 +200,7 @@ class LicenciaControllerTest {
                                         movimientos,
                                         duplicados,
                                         caja,
+                                        aplicaciones,
                                         padron,
                                         derechos,
                                         documentos,
@@ -277,7 +307,28 @@ class LicenciaControllerTest {
         @DisplayName("la segunda licencia toma el correlativo siguiente")
         void laSegundaTomaElSiguiente() throws Exception {
             emitir(mvc, 201);
-            assertThat(emitir(mvc, 201)).contains("\"nroLicencia\":\"LF-2026-000002\"");
+            // CON OTRO RECIBO desde #383: la segunda licencia paga su propio derecho. Hasta ese
+            // issue esta prueba emitia las dos con el mismo papel y esperaba 201 las dos veces,
+            // o sea que la suite recorria en verde el defecto que #383 describe.
+            assertThat(emitirCon(mvc, RECIBO_DE_LA_SEGUNDA, 201))
+                    .contains("\"nroLicencia\":\"LF-2026-000002\"");
+        }
+
+        /**
+         * #383 — Un recibo paga UN derecho: el mismo papel no respalda una segunda licencia.
+         *
+         * <p>Las cinco comprobaciones de {@code ComprobacionDelDerecho} pasan las dos veces —el
+         * recibo existe, es de tasas, no esta anulado, es del titular y cubre el concepto—, y
+         * ninguna pregunta si ya se uso. Eso solo lo sabe quien emite el acto.
+         */
+        @Test
+        @DisplayName("#383 — la segunda licencia con el MISMO recibo es 409 y nombra el recibo")
+        void elMismoReciboNoPagaDosLicencias() throws Exception {
+            emitir(mvc, 201);
+
+            String cuerpo = emitirCon(mvc, RECIBO, 409);
+
+            assertThat(cuerpo).contains("CONFLICTO").contains(RECIBO).contains(DERECHO_LICENCIA);
         }
 
         @Test
@@ -578,11 +629,26 @@ class LicenciaControllerTest {
         void elSegundoEsElDos() throws Exception {
             emitir(mvc, 201);
             duplicar(201);
-            String segundo = duplicar(201);
+            // Con su propio recibo desde #383: cada duplicado paga su derecho.
+            String segundo = duplicarCon(RECIBO_DEL_SEGUNDO_DUPLICADO, 201);
 
             assertThat(segundo).contains("\"numeroDeDuplicado\":2");
             assertThat(segundo).contains("\"nroLicencia\":\"LF-2026-000001\"");
             assertThat(segundo).contains("\"reimpresiones\":2");
+        }
+
+        @Test
+        @DisplayName("#383 — el recibo que pago un duplicado no paga el segundo: 409")
+        void elMismoReciboNoPagaDosDuplicados() throws Exception {
+            emitir(mvc, 201);
+            duplicar(201);
+
+            String cuerpo = duplicar(409);
+
+            assertThat(cuerpo)
+                    .contains("CONFLICTO")
+                    .contains(RECIBO_DEL_DUPLICADO)
+                    .contains(DERECHO_DUPLICADO);
         }
 
         @Test
@@ -847,6 +913,10 @@ class LicenciaControllerTest {
     }
 
     private String duplicar(int esperado) throws Exception {
+        return duplicarCon(RECIBO_DEL_DUPLICADO, esperado);
+    }
+
+    private String duplicarCon(String recibo, int esperado) throws Exception {
         return envio(
                 mvc,
                 "/rentas/api/v1/licencias/funcionamiento/LF-2026-000001/duplicado",
@@ -854,7 +924,7 @@ class LicenciaControllerTest {
                 {"motivo":"Extravio del original","nDeRecibo":"%s",
                  "observacion":"Se autoriza el duplicado"}
                 """
-                        .formatted(RECIBO_DEL_DUPLICADO),
+                        .formatted(recibo),
                 esperado);
     }
 

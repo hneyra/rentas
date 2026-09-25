@@ -76,7 +76,9 @@ import kamayuk.rentas.licencias.dominio.TipoDeTramiteDeEdificacion;
 import kamayuk.rentas.licencias.dominio.VigenciaDeLaLicencia;
 import kamayuk.rentas.parametros.infraestructura.ParametrosRepositoryJdbc;
 import kamayuk.rentas.plataforma.tenant.TenantTransactionManager;
+import kamayuk.rentas.tesoreria.AplicacionDeRecibos;
 import kamayuk.rentas.tesoreria.RecibosDeTramite;
+import kamayuk.rentas.tesoreria.infraestructura.AplicacionDeRecibosJdbc;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -192,6 +194,12 @@ class LicenciaDeEdificacionJdbcTest {
      */
     private static CajaDeMentira caja;
 
+    /**
+     * La constancia de que recibo pago que acto, la de verdad (#383): contra {@code
+     * recibo_aplicado} y su indice unico, no contra un doble.
+     */
+    private static AplicacionDeRecibos aplicaciones;
+
     private static EmitirDocumento documentos;
 
     private static PresentarFue presentar;
@@ -225,6 +233,7 @@ class LicenciaDeEdificacionJdbcTest {
 
         caja = new CajaDeMentira();
         RecibosDeTramite recibos = caja;
+        aplicaciones = new AplicacionDeRecibosJdbc(jdbc, RELOJ);
 
         documentos =
                 envolver(
@@ -281,6 +290,7 @@ class LicenciaDeEdificacionJdbcTest {
                                 expedientes,
                                 movimientos,
                                 recibos,
+                                aplicaciones,
                                 padron,
                                 derechos,
                                 valorizaciones,
@@ -297,6 +307,7 @@ class LicenciaDeEdificacionJdbcTest {
                                 expedientes,
                                 movimientos,
                                 recibos,
+                                aplicaciones,
                                 padron,
                                 new DerechosDeTramiteParametrizados(new SinDerechosSellados()),
                                 valorizaciones,
@@ -310,6 +321,7 @@ class LicenciaDeEdificacionJdbcTest {
                                 expedientes,
                                 movimientos,
                                 recibos,
+                                aplicaciones,
                                 padron,
                                 derechos,
                                 documentos,

@@ -21,6 +21,7 @@ import kamayuk.rentas.licencias.dominio.CertificadoRepository;
 import kamayuk.rentas.licencias.dominio.ParametrosUrbanisticos;
 import kamayuk.rentas.licencias.dominio.PlantillaDeNumeroDeCertificado;
 import kamayuk.rentas.licencias.dominio.TipoDeCertificado;
+import kamayuk.rentas.tesoreria.AplicacionDeRecibos;
 import kamayuk.rentas.tesoreria.CobrosDeTasas;
 import kamayuk.rentas.tesoreria.ReciboDeTramite;
 import kamayuk.rentas.tesoreria.RecibosDeTramite;
@@ -91,6 +92,7 @@ public class EmitirCertificado {
     private final PrediosDelContribuyente predios;
     private final RecibosDeTramite recibos;
     private final CobrosDeTasas cobros;
+    private final AplicacionDeRecibos aplicaciones;
     private final DerechosDeTramiteParametrizados derechos;
     private final EmitirDocumento documentos;
     private final PlantillaDeNumeroDeCertificado plantilla;
@@ -103,6 +105,7 @@ public class EmitirCertificado {
             PrediosDelContribuyente predios,
             RecibosDeTramite recibos,
             CobrosDeTasas cobros,
+            AplicacionDeRecibos aplicaciones,
             DerechosDeTramiteParametrizados derechos,
             EmitirDocumento documentos,
             PlantillaDeNumeroDeCertificado plantilla,
@@ -113,6 +116,7 @@ public class EmitirCertificado {
         this.predios = predios;
         this.recibos = recibos;
         this.cobros = cobros;
+        this.aplicaciones = aplicaciones;
         this.derechos = derechos;
         this.documentos = documentos;
         this.plantilla = plantilla;
@@ -131,6 +135,8 @@ public class EmitirCertificado {
      * @throws SolicitanteDesconocido si el codigo de contribuyente no esta en el padron
      * @throws PredioAjeno si el predio no existe o no es del solicitante a esa fecha
      * @throws ComprobacionDelDerecho.DerechoNoPagado si el recibo no respalda el derecho
+     * @throws kamayuk.rentas.tesoreria.ReciboYaAplicado si el recibo ya pago todos los certificados
+     *     que cobro (#383)
      * @throws DerechosDeTramiteParametrizados.DerechoSinParametrizar si el conjunto sellado no dice
      *     que concepto cobra el derecho o cuantos meses vale el certificado
      */
@@ -253,6 +259,17 @@ public class EmitirCertificado {
 
         Certificado guardado =
                 certificados.emitir(conPapel(sinGuardar, documentoId, papel.registro().numero()));
+
+        // EL RECIBO SE GASTA AQUI (#383), una unidad de las que la caja dice que cobro. Contra
+        // la CANTIDAD y no «un recibo, un certificado»: un recibo que cobro dos certificados
+        // respalda dos, y el tercero no lo pago nadie. Hasta #383 salian N certificados de un
+        // pago, y la suma de «Derecho S/» del padron era N veces lo que la caja recaudo.
+        aplicaciones.aplicar(
+                cobrado.numeroDeRecibo(),
+                concepto,
+                1,
+                cobrado.cantidad(),
+                new AplicacionDeRecibos.Acto("certificado", guardado.identificador()));
 
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe(

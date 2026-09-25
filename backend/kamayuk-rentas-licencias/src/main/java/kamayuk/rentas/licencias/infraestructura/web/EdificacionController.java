@@ -35,6 +35,7 @@ import kamayuk.rentas.licencias.dominio.TipoDeProfesional;
 import kamayuk.rentas.licencias.dominio.TipoDeTramiteDeEdificacion;
 import kamayuk.rentas.parametros.FaltaPublicar;
 import kamayuk.rentas.parametros.LectorDeParametros;
+import kamayuk.rentas.tesoreria.ReciboYaAplicado;
 import kamayuk.rentas.web.Api;
 import kamayuk.rentas.web.CodigoDeError;
 import kamayuk.rentas.web.ParametrosDePaginacion;
@@ -360,6 +361,10 @@ public class EdificacionController {
             throw new ProblemaDeNegocio(CodigoDeError.VALIDACION, mensajeDe(invalida));
         } catch (ComprobacionDelDerecho.DerechoNoPagado sinPagar) {
             throw new ProblemaDeNegocio(CodigoDeError.VALIDACION, mensajeDe(sinPagar));
+        } catch (ReciboYaAplicado gastado) {
+            // 409 y no 422 (#383): el recibo es bueno —las cinco comprobaciones pasan—, y lo que
+            // no admite la peticion es que ya pago otro acto. Se arregla con otro recibo.
+            throw new ProblemaDeNegocio(CodigoDeError.CONFLICTO, mensajeDe(gastado));
         } catch (DerechosDeTramiteParametrizados.DerechoSinParametrizar
                 | LectorDeParametros.EjercicioSinSellar sinParametro) {
             // 422 y no 500: la peticion esta bien y el sistema tampoco esta roto. Lo que falta es
@@ -407,6 +412,10 @@ public class EdificacionController {
             throw new ProblemaDeNegocio(CodigoDeError.VALIDACION, mensajeDe(invalida));
         } catch (ComprobacionDelDerecho.DerechoNoPagado sinPagar) {
             throw new ProblemaDeNegocio(CodigoDeError.VALIDACION, mensajeDe(sinPagar));
+        } catch (ReciboYaAplicado gastado) {
+            // 409 y no 422 (#383): el recibo es bueno —las cinco comprobaciones pasan—, y lo que
+            // no admite la peticion es que ya pago otro acto. Se arregla con otro recibo.
+            throw new ProblemaDeNegocio(CodigoDeError.CONFLICTO, mensajeDe(gastado));
         } catch (DerechosDeTramiteParametrizados.DerechoSinParametrizar
                 | LectorDeParametros.EjercicioSinSellar sinParametro) {
             // Falta publicar una cifra normativa, no un campo de la peticion: el 422 sale con

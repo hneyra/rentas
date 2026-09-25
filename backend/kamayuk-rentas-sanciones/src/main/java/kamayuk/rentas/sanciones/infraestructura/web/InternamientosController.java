@@ -17,6 +17,7 @@ import kamayuk.rentas.sanciones.aplicacion.VehiculoFueraDelPadron;
 import kamayuk.rentas.sanciones.dominio.CriterioDeInternamiento;
 import kamayuk.rentas.sanciones.dominio.EstadoDeInternamiento;
 import kamayuk.rentas.sanciones.dominio.InternamientoEnConsulta;
+import kamayuk.rentas.tesoreria.ReciboYaAplicado;
 import kamayuk.rentas.web.Api;
 import kamayuk.rentas.web.CodigoDeError;
 import kamayuk.rentas.web.ParametrosDePaginacion;
@@ -169,6 +170,16 @@ public class InternamientosController {
             // no corrigiendo el cuerpo.
             throw new ProblemaDeNegocio(
                     CodigoDeError.CONFLICTO, PeticionesDeSanciones.mensajeDe(sinPagar));
+        } catch (ReciboYaAplicado gastado) {
+            // 409 (#383): el recibo acredita la custodia, y ya libero otro vehiculo. Se arregla
+            // cobrando la custodia de este.
+            throw new ProblemaDeNegocio(
+                    CodigoDeError.CONFLICTO, PeticionesDeSanciones.mensajeDe(gastado));
+        } catch (LiberarVehiculoInternado.CustodiaInsuficiente pocosDias) {
+            // 422 (#383), y el mensaje dice las dos cifras: cuantos dias cobro el recibo y
+            // cuantos lleva el vehiculo. Es lo que quien atiende necesita para cobrar la
+            // diferencia.
+            throw PeticionesDeSanciones.invalido(pocosDias);
         } catch (LiberarVehiculoInternado.LiberacionAnteriorAlIngreso
                 | IllegalArgumentException invalido) {
             throw PeticionesDeSanciones.invalido(invalido);
