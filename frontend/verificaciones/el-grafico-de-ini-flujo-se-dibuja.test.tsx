@@ -50,6 +50,25 @@ const CAJA = { width: 720, height: 240 };
 /** El `ResizeObserver` de antes, para devolverlo: `globalThis` lo comparten los archivos. */
 const ANTES = Reflect.get(globalThis, 'ResizeObserver') as unknown;
 
+/**
+ * **El lienzo se trae ANTES de la primera prueba, y no es para esconder la espera** (#298).
+ *
+ * Desde #298 las barras llegan por un `lazy()`: `LienzoDeRecaudacion.tsx` es el unico archivo que
+ * importa recharts, y la tarjeta lo pide con un `import()` dinamico. En el navegador eso es un
+ * trozo ya construido; aqui es **transformar recharts y todo lo que arrastra la primera vez que se
+ * pide**, y medido, eso pasa del segundo que `waitFor` espera por omision: la PRIMERA prueba que
+ * dibuja barras salia roja —`toHaveLength(2)` con cero barras— y las demas, con el modulo ya en la
+ * cache, en verde. Un rojo que depende del orden no mide el grafico: mide a vitest.
+ *
+ * Traerlo aqui no le quita nada a lo que la guarda vigila. Las pruebas siguen montando la tarjeta,
+ * que sigue pasando por su `Suspense`, y siguen esperando las barras con `waitFor`: una carga
+ * perezosa que no se resuelve nunca —un `import()` que no contesta— se queda con el esqueleto y
+ * sale roja igual, porque lo que se calienta es el modulo y no la promesa que la tarjeta espera.
+ */
+beforeAll(async () => {
+  await import('../src/piezas/LienzoDeRecaudacion.tsx');
+});
+
 beforeAll(() => {
   class ResizeObserverDeMentira {
     private readonly avisar: ResizeObserverCallback;
