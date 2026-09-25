@@ -49,6 +49,28 @@ import { RUTAS, pedirPagina } from '../lecturas.ts';
  * <p>Por eso la fila pasa a ser <b>el ejercicio de una declaracion</b>, y entra la columna
  * «Contribuyente»: una fecha de prescripcion sin decir de quien es no dice nada.
  *
+ * <h2>La situacion es la del dia de la solicitud, y la fila lo dice (#388)</h2>
+ *
+ * `ejercicios[].prescrita` vale lo que valia <b>a `fechaDePresentacion`</b>, no a hoy
+ * (`PrescripcionEnListaResource`; `ComputoDePrescripcion` lo resuelve como «la fecha de la
+ * resolucion no es anterior al vencimiento», y `RelojDelEjercicio` no lo recalcula al leer). Hasta
+ * #388 la fila de la tabla escribia esa situacion <b>sin su fecha</b> y en el verde de conforme:
+ * una solicitud presentada el 15/06/2025 sobre 2020 salia hoy como «31/12/2025 · Vigente», en
+ * verde, junto a una fecha que ya paso. Dos cambios, y ninguno calcula nada:
+ *
+ * <ul>
+ *   <li><b>Entra «Presentada el»</b>, con `fechaDePresentacion` formateada, y «Situacion» pasa a
+ *       llamarse «Situacion al presentar». La regla 9 pide que toda cifra diga su fecha, y un
+ *       estado tambien.</li>
+ *   <li><b>El tono lo decide la columna</b> (`columna.insignia` en la definicion): «Prescrito» es
+ *       `mal` y «Vigente» es `info`, el tono de «no se». No se saca «vigente» de la lista de
+ *       conforme de `tono.ts`, porque el `VIGENTE` del padron de licencias SI es conforme.</li>
+ * </ul>
+ *
+ * <p>La situacion «a hoy» no se deduce restando `prescribeEl` de hoy: depende de las
+ * interrupciones del art. 45 posteriores a la solicitud, que es una regla y no un dato (#230). Si
+ * alguna vez hace falta, le toca al backend, con una lectura que recalcule a una fecha.
+ *
  * <h2>Sin mando de pagina, y el motivo NO es que falte (#228)</h2>
  *
  * La operacion pagina **declaraciones** y esta tabla dibuja **ejercicios**: veinte declaraciones de
@@ -96,10 +118,18 @@ const VAL_TIP: Conector = {
                 String(reloj.ejercicio),
                 // La fecha que el backend publica, formateada y no calculada.
                 formatearFecha(reloj.prescribeEl),
-                // Dos valores, y son los dos que el dato admite: `prescrita` es booleano. «Por
-                // prescribir» —que el desplegable «Estado» ofrecia hasta #244— exigiria un umbral
-                // que el corpus no publica, y no se inventa (regla 5). Ese mando pregunta ahora
-                // por el resultado de la solicitud, que es lo que `?resultado=` admite.
+                // «Presentada el» (#388): el dia al que vale la celda de al lado. `prescrita` es lo
+                // que la resolucion resolvio A ESA FECHA y no a hoy (`PrescripcionEnListaResource`),
+                // y hasta #388 la fecha llegaba en cada declaracion y ninguna celda la escribia: la
+                // fila decia «31/12/2025 · Vigente» sin decir de que dia es ese «Vigente» (regla 9).
+                formatearFecha(declaracion.fechaDePresentacion),
+                // «Situacion al presentar». Dos valores, y son los dos que el dato admite:
+                // `prescrita` es booleano. «Por prescribir» —que el desplegable «Estado» ofrecia
+                // hasta #244— exigiria un umbral que el corpus no publica, y no se inventa (regla
+                // 5). Su TONO no lo decide esta palabra sino la regla de la columna (#388): ver la
+                // definicion de `val-tip`. Y la situacion «a hoy» no se calcula aqui restando
+                // `prescribeEl` de hoy: dependeria de interrupciones del art. 45 posteriores a la
+                // solicitud, que esta fila no conoce.
                 reloj.prescrita ? 'Prescrito' : 'Vigente',
               ],
             })),

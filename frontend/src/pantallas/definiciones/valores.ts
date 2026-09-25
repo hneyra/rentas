@@ -1,5 +1,6 @@
 import type { ClaveDeHoja } from '../arbol.ts';
 import type { DefinicionDePantalla as Pantalla } from '@kamayuk/ui';
+import { TONO_SIN_RECONOCER } from '../tono.ts';
 
 /**
  * Las cuatro pantallas de **Valores** (UI-5, #85, AC2).
@@ -230,7 +231,7 @@ export const VALORES = {
           clave: 'reloj-de-prescripcion',
           sinDato: { texto: '—', nota: 'Ninguna operacion publica este dato.' },
           titulo: 'Reloj de prescripción',
-          // **Cuatro columnas, y hasta #230 eran cinco.** El artboard dibujaba un reloj agregado
+          // **Cinco columnas: hasta #230 eran cinco, #230 las dejo en cuatro y #388 anade una.** El artboard dibujaba un reloj agregado
           // POR EJERCICIO —«Ejercicio · Valores · Importe S/ · Prescribe el · Situación»— sobre una
           // operacion que publica la bitacora de DECLARACIONES. Lo que cambia, y por que:
           //
@@ -245,19 +246,39 @@ export const VALORES = {
           //     de la solicitud, con el plazo del conjunto sellado de entonces—, y no se resta aqui.
           //   · **«Contribuyente» entra**: la fila ya no es un tramo del padron sino el ejercicio de
           //     la declaracion de alguien, y una fecha de prescripcion sin decir de quien no dice nada.
+          //   · **«Presentada el» entra con #388**, y «Situación» pasa a llamarse «Situación al
+          //     presentar». `prescrita` vale lo que valia a `fechaDePresentacion`, no a hoy, y la
+          //     fila la escribia sin su fecha: una solicitud del 15/06/2025 sobre 2020 salia hoy
+          //     como «31/12/2025 · Vigente» junto a un «Prescribe el» que ya paso (regla 9).
           columnas: [
             { rotulo: 'Contribuyente', alineadoDerecha: false },
             { rotulo: 'Ejercicio', alineadoDerecha: false },
             { rotulo: 'Prescribe el', alineadoDerecha: false },
-            { rotulo: 'Situación', alineadoDerecha: false },
+            { rotulo: 'Presentada el', alineadoDerecha: false },
+            {
+              rotulo: 'Situación al presentar',
+              alineadoDerecha: false,
+              // **El tono lo decide ESTA columna, y no el vocabulario global** (#388). `tonoDe`
+              // pinta «Vigente» de verde porque el `VIGENTE` del padron de licencias SI es
+              // conforme, y eso no se toca. Aqui «Vigente» es lo que se resolvio el dia de la
+              // solicitud: si hoy sigue vivo depende de interrupciones posteriores que la fila no
+              // conoce, asi que no se afirma en verde — sale con el tono de «no se». «Prescrito»
+              // sigue siendo `mal`: es deuda cuyo cobro ya no tenia accion el dia que se resolvio.
+              // Sin `texto` en los casos: la celda se pinta tal cual llega, que es dato.
+              insignia: {
+                casos: { Prescrito: { tono: 'mal' }, Vigente: { tono: TONO_SIN_RECONOCER } },
+                otro: { tono: TONO_SIN_RECONOCER },
+              },
+            },
           ],
           // Sigue siendo de insignia, y ahora se puede encender: le llega `prescrita`, un booleano
           // que el backend publica, no una frase. Dos valores y no tres — «Por prescribir» exigiria
           // un umbral que el corpus no publica (regla 5), y es lo que #218 tuvo que retirar en
           // `ini-parado` por no tenerlo. **Desde #244 tampoco esta en el mando de arriba**: el
           // desplegable que la ofrecia era «Estado», y ahora pregunta por el resultado de la
-          // solicitud, que si tiene tres valores publicados.
-          columnaDeInsignia: 3,
+          // solicitud, que si tiene tres valores publicados. El indice es el del artboard (`i`), y
+          // desde #388 el tono no lo pone `tonoDeLaInsignia` sino la regla de la columna de arriba.
+          columnaDeInsignia: 4,
           nota: 'Declarar la prescripción es un acto: se hace de oficio o a pedido, y queda en la bitácora.',
         },
       },

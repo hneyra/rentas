@@ -1,9 +1,14 @@
-import { describe, expect, it } from 'vitest';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { render, screen, waitFor } from '@testing-library/react';
+import type { ReactNode } from 'react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { coordenada } from '@kamayuk/ui';
+import { coordenada, resolverInsignia } from '@kamayuk/ui';
 
-import { PANTALLAS } from '../../pantallas/definiciones/index.ts';
-import { tonoDe } from '../../pantallas/tono.ts';
+import { PantallaDeRentas } from '../../pantallas/PantallaDeRentas.tsx';
+import { PANTALLAS, pantallaDe } from '../../pantallas/definiciones/index.ts';
+import { TONO_SIN_RECONOCER, tonoDe } from '../../pantallas/tono.ts';
+import { useDatosDeLaHoja } from '../useDatosDeLaHoja.ts';
 import type { Paginado, PrescripcionDeclarada } from '../lecturas.ts';
 import { RUTAS } from '../lecturas.ts';
 import { VAL_TIP } from './valores.ts';
@@ -55,6 +60,40 @@ function bitacora(
   };
 }
 
+/**
+ * La segunda declaracion de la prueba del aplanado. Hasta #388 decia `prescribeEl: '2026-12-31'`
+ * con `prescrita: true` y la presentacion del 02/03/2026: un estado imposible, porque
+ * `ComputoDePrescripcion` resuelve `prescrita` como «la presentacion no es anterior al
+ * vencimiento». Con `prescrita`, `prescribeEl` va ANTES de la presentacion.
+ */
+const SERNAQUE_2020 = declaracion({
+  id: 42,
+  contribuyente: 'SERNAQUE CORREA, LUIS',
+  ejercicioDesde: 2020,
+  ejercicioHasta: 2020,
+  ejerciciosPrescritos: [2020],
+  ejercicios: [{ ejercicio: 2020, prescribeEl: '2024-12-31', prescrita: true }],
+});
+
+/**
+ * **El escenario del issue**: una solicitud presentada el 15/06/2025 sobre 2020 y 2021, las dos
+ * resueltas como no prescritas A ESA FECHA. El reloj de 2020 vencia el 31/12/2025 —antes de hoy—,
+ * y el de 2021 el 31/12/2027. Es la siembra que distingue: presentacion < `prescribeEl` < hoy.
+ */
+const PRESENTADA_ANTES_DE_VENCER = declaracion({
+  id: 77,
+  contribuyente: 'YARLEQUE NIZAMA, ROSA',
+  ejercicioDesde: 2020,
+  ejercicioHasta: 2021,
+  fechaDePresentacion: '2025-06-15',
+  resultado: 'NO_PROCEDE',
+  ejerciciosPrescritos: [],
+  ejercicios: [
+    { ejercicio: 2020, prescribeEl: '2025-12-31', prescrita: false },
+    { ejercicio: 2021, prescribeEl: '2027-12-31', prescrita: false },
+  ],
+});
+
 const repartoDe = (respuesta: Paginado<PrescripcionDeclarada>) =>
   VAL_TIP.repartir(respuesta as never);
 
@@ -75,21 +114,14 @@ describe('`val-tip` — el reloj de prescripcion', () => {
     const filas = filasDe(
       bitacora(
         declaracion(),
-        declaracion({
-          id: 42,
-          contribuyente: 'SERNAQUE CORREA, LUIS',
-          ejercicioDesde: 2020,
-          ejercicioHasta: 2020,
-          ejerciciosPrescritos: [2020],
-          ejercicios: [{ ejercicio: 2020, prescribeEl: '2026-12-31', prescrita: true }],
-        }),
+        SERNAQUE_2020,
       ),
     );
 
     expect(filas, 'dos declaraciones de dos y un ejercicio dan TRES filas').toHaveLength(3);
-    expect(filas[0]).toEqual(['CHAVEZ IPANAQUE, MARIA', '2021', '31/12/2025', 'Prescrito']);
-    expect(filas[1]).toEqual(['CHAVEZ IPANAQUE, MARIA', '2022', '31/12/2026', 'Vigente']);
-    expect(filas[2]).toEqual(['SERNAQUE CORREA, LUIS', '2020', '31/12/2026', 'Prescrito']);
+    expect(filas[0]).toEqual(['CHAVEZ IPANAQUE, MARIA', '2021', '31/12/2025', '02/03/2026', 'Prescrito']);
+    expect(filas[1]).toEqual(['CHAVEZ IPANAQUE, MARIA', '2022', '31/12/2026', '02/03/2026', 'Vigente']);
+    expect(filas[2]).toEqual(['SERNAQUE CORREA, LUIS', '2020', '31/12/2024', '02/03/2026', 'Prescrito']);
   });
 
   it('«Prescribe el» sale de `prescribeEl` y no de `plazo`, que es un TEXTO', () => {
@@ -109,13 +141,41 @@ describe('`val-tip` — el reloj de prescripcion', () => {
     );
   });
 
-  it('«Situacion» tiene DOS valores, y los dos se los reconoce una regla de insignia', () => {
+  it('«Situacion al presentar» tiene DOS valores, y el tono lo decide la regla de SU columna (#388)', () => {
     // Es lo contrario de #218, donde la insignia sobraba porque le llegaba una frase. Aqui llega
-    // un booleano publicado, y las dos palabras que produce estan en las listas de `tono.ts`.
-    expect(tonoDe('Prescrito'), 'un ejercicio prescrito es deuda que ya no se puede exigir').toBe(
-      'mal',
+    // un booleano publicado. Hasta #388 el tono salia de las listas de `tono.ts`, y «Vigente» —que
+    // alli es CONFORME por el padron de licencias— se pintaba de verde sobre una situacion que es
+    // la del dia de la solicitud, no la de hoy. Ahora lo decide la columna.
+    const columna = PANTALLAS['val-tip'].bloques[0]?.tabla?.columnas[4];
+    const regla = columna?.insignia;
+    expect(regla, 'la columna de la situacion perdio su regla de insignia').toBeDefined();
+    if (regla === undefined) return;
+    const tono = (texto: string) => resolverInsignia(regla, texto, undefined, (t) => t)?.tono;
+
+    expect(tono('Prescrito'), 'un ejercicio prescrito es deuda que ya no se puede exigir').toBe('mal');
+    expect(tono('Vigente'), 'a la fecha de la solicitud, no hoy: el tono de «no se»').toBe(
+      TONO_SIN_RECONOCER,
     );
+    // Y el vocabulario global NO se toco: el `VIGENTE` del padron de licencias sigue siendo verde.
     expect(tonoDe('Vigente')).toBe('ok');
+  });
+
+  it('las muestras de este archivo guardan la relacion que el backend impone entre las tres cifras', () => {
+    // `ComputoDePrescripcion`: `prescrita = !fechaDeResolucion.isBefore(vencimiento)`. Una
+    // muestra que la viole —la de 2020 hasta #388— prueba un estado que el sistema no produce.
+    const muestras = [
+      declaracion(),
+      PRESENTADA_ANTES_DE_VENCER,
+      SERNAQUE_2020,
+    ];
+    for (const muestra of muestras) {
+      for (const reloj of muestra.ejercicios) {
+        expect(
+          reloj.prescrita,
+          `${String(muestra.id)} · ${String(reloj.ejercicio)}: presentada ${muestra.fechaDePresentacion}, prescribe ${reloj.prescribeEl}`,
+        ).toBe(muestra.fechaDePresentacion >= reloj.prescribeEl);
+      }
+    }
   });
 
   it('sin nombre en el padron se escribe el CODIGO, y sin ninguno de los dos una raya', () => {
@@ -167,5 +227,105 @@ describe('`val-tip` — el reloj de prescripcion', () => {
 
     expect(reparto.tablas?.get('reloj-de-prescripcion')?.filas).toEqual([]);
     expect(reparto.valores.get(coordenada(0, 3))).toBe('0');
+  });
+});
+
+/* ── #388: la situacion es la del dia de la solicitud, y la fila tiene que decirlo ─────────── */
+
+/** La hoja tal como la monta la aplicacion, con un cliente de consultas propio por montaje. */
+function arnes() {
+  const cliente = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return ({ children }: { readonly children: ReactNode }) => (
+    <QueryClientProvider client={cliente}>{children}</QueryClientProvider>
+  );
+}
+
+function ValTipConectada() {
+  return <PantallaDeRentas definicion={pantallaDe('val-tip')} datos={useDatosDeLaHoja('val-tip')} />;
+}
+
+/** Monta `val-tip` con esa bitacora como respuesta de `fetch`, y espera a que deje de pedir. */
+async function pintar(respuesta: Paginado<PrescripcionDeclarada>) {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn<typeof fetch>(() =>
+      Promise.resolve(
+        new Response(JSON.stringify(respuesta), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }),
+      ),
+    ),
+  );
+  const { container } = render(<ValTipConectada />, { wrapper: arnes() });
+  await waitFor(() => {
+    expect(screen.queryByText(/pidiendo/i)).toBeNull();
+  });
+  return container;
+}
+
+/** El tono con que el interprete PINTO una insignia, leido de sus clases: lo que se ve. */
+function tonoPintado(insignia: Element | null | undefined): string | undefined {
+  const clase = insignia?.getAttribute('class') ?? '';
+  return /\bbg-(ok|atencion|mal|info)-fondo\b/.exec(clase)?.[1];
+}
+
+describe('`val-tip` — la situacion es la de la PRESENTACION, y lo dice (#388)', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('la fila lleva la fecha de la solicitud: «Presentada el», junto a «Situacion al presentar»', () => {
+    // `prescrita` vale lo que valia a `fechaDePresentacion` (`PrescripcionEnListaResource`), y
+    // hasta #388 esa fecha llegaba en cada declaracion y ninguna celda la escribia: la fila de
+    // 2020 decia «31/12/2025 · Vigente» sin decir de que dia es ese «Vigente» (regla 9).
+    expect(PANTALLAS['val-tip'].bloques[0]?.tabla?.columnas.map((c) => c.rotulo)).toEqual([
+      'Contribuyente',
+      'Ejercicio',
+      'Prescribe el',
+      'Presentada el',
+      'Situación al presentar',
+    ]);
+    const filas = filasDe(bitacora(PRESENTADA_ANTES_DE_VENCER));
+    expect(filas).toEqual([
+      ['YARLEQUE NIZAMA, ROSA', '2020', '31/12/2025', '15/06/2025', 'Vigente'],
+      ['YARLEQUE NIZAMA, ROSA', '2021', '31/12/2027', '15/06/2025', 'Vigente'],
+    ]);
+  });
+
+  /** La fila de 2020 tal como se DIBUJO: la localiza su «Prescribe el», que es unico. */
+  async function filaDe2020() {
+    const container = await pintar(bitacora(PRESENTADA_ANTES_DE_VENCER));
+    const fila = [...container.querySelectorAll('tr')].find((tr) =>
+      tr.textContent.includes('31/12/2025'),
+    );
+    expect(fila, 'la fila de 2020 no se dibujo').toBeDefined();
+    return fila;
+  }
+
+  it('LO QUE SE VE (1): la fila de 2020 dice de que dia es su situacion — 15/06/2025', async () => {
+    const fila = await filaDe2020();
+    expect(fila?.textContent, 'la fila no dice de que dia es su situacion').toContain('15/06/2025');
+  });
+
+  it('LO QUE SE VE (2): su «Vigente» NO sale en el verde de conforme', async () => {
+    const fila = await filaDe2020();
+    const insignia = [...(fila?.querySelectorAll('span') ?? [])].find(
+      (span) => span.textContent === 'Vigente',
+    );
+    expect(tonoPintado(insignia), 'la insignia de «Vigente» no se pinto').toBeDefined();
+    expect(
+      tonoPintado(insignia),
+      '«Vigente» es lo que se resolvio el 15/06/2025, no hoy: el verde de conforme sobre un\n' +
+        '  ejercicio cuyo «Prescribe el» ya paso invita a seguir cobrando una deuda sin accion.',
+    ).not.toBe('ok');
+  });
+
+  it('y un «Prescrito» se sigue pintando de rojo: la regla de la columna no apaga el juicio', async () => {
+    const container = await pintar(bitacora(declaracion()));
+    const insignia = [...container.querySelectorAll('span')].find(
+      (span) => span.textContent === 'Prescrito',
+    );
+    expect(tonoPintado(insignia)).toBe('mal');
   });
 });

@@ -7,6 +7,8 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
+import { type ReglaDeLaInsignia, resolverInsignia } from '@kamayuk/ui';
+
 import { CONECTORES } from '../src/datos/conectores.ts';
 import type { ClaveDeHoja } from '../src/pantallas/arbol.ts';
 import { bloquesDe } from '../src/pantallas/bloques.ts';
@@ -68,7 +70,31 @@ interface CeldaDeInsignia {
   readonly columna: number;
   readonly rotulo: string;
   readonly texto: string;
+  /**
+   * La regla de insignia de SU columna, si la declara (#388). Con ella el interprete no llama a
+   * `tonoDeLaInsignia`: el tono lo dice la columna, y es ese el que esta guarda tiene que medir.
+   */
+  readonly regla?: ReglaDeLaInsignia;
 }
+
+/**
+ * **El tono con que se PINTA una celda**: el de la regla de su columna si la declara, y si no el
+ * de `tono.ts` —que es lo que el interprete hace—.
+ *
+ * Hasta #388 esta guarda media siempre `tonoDe(texto)`, porque ninguna columna declaraba regla.
+ * `val-tip` es la primera: su «Vigente» es la situacion a la fecha de la solicitud y no a hoy, y
+ * sale con el tono de «no se» aunque `tonoDe('Vigente')` siga siendo `ok` por el padron de
+ * licencias. Medir `tonoDe` aqui contaria como verde una celda que la pantalla no pinta verde.
+ */
+function tonoPintado(celda: CeldaDeInsignia): string | undefined {
+  return celda.regla === undefined
+    ? tonoDe(celda.texto)
+    : resolverInsignia(celda.regla, celda.texto, undefined, (texto) => texto)?.tono;
+}
+
+/** Si el tono de la celda es un JUICIO declarado: por la regla de su columna, o por `tono.ts`. */
+const juzgada = (celda: CeldaDeInsignia): boolean =>
+  celda.regla !== undefined || reconocido(celda.texto);
 
 /** Las columnas de insignia de las 40 definiciones, con las celdas que el artboard les escribe. */
 function celdasDeInsignia(): readonly CeldaDeInsignia[] {
@@ -93,6 +119,9 @@ function celdasDeInsignia(): readonly CeldaDeInsignia[] {
                 columna,
                 rotulo: tabla.columnas[columna]?.rotulo ?? String(columna),
                 texto,
+                ...(tabla.columnas[columna]?.insignia === undefined
+                  ? {}
+                  : { regla: tabla.columnas[columna].insignia }),
               },
             ];
       });
@@ -263,11 +292,13 @@ const CONECTADAS: readonly {
     bloque: 0,
     leLlega:
       'derivado de `ejercicios[].prescrita`, un booleano que la operacion publica: «Prescrito» o ' +
-      '«Vigente». Los dos son un JUICIO y los dos tienen regla — «Vigente» estaba en CONFORME ' +
-      'desde #175 y «Prescrito» entra en MAL con #230, porque un ejercicio prescrito es deuda que ' +
-      'ya no se puede exigir. **No hay tercer valor**: «Por prescribir», que el desplegable ' +
-      '«Estado» ofrecio hasta #244, exigiria un umbral que el corpus de `normativa` no publica ' +
-      '(regla 5) — y por eso ese mando pregunta ahora por el resultado de la solicitud',
+      '«Vigente», y vale lo que valia A LA FECHA DE LA SOLICITUD, no a hoy. Desde #388 el tono lo ' +
+      'decide la regla de SU columna y no `tono.ts`: «Prescrito» es `mal` —deuda que ya no se ' +
+      'podia exigir— y «Vigente» es el tono de «no se», porque si hoy sigue vivo depende de ' +
+      'interrupciones posteriores que la fila no conoce; `tonoDe(«Vigente»)` sigue en CONFORME ' +
+      'por el padron de licencias. La fila escribe ademas «Presentada el». **No hay tercer ' +
+      'valor**: «Por prescribir», que el desplegable «Estado» ofrecio hasta #244, exigiria un ' +
+      'umbral que el corpus de `normativa` no publica (regla 5)',
   },
 ];
 
@@ -293,6 +324,10 @@ describe('ninguna insignia se pinta de verde sin que una regla la reconozca', ()
     // —las escriben otras hojas, que es lo mismo que #218 midio— y las dos que entran son nuevas:
     // 17 -> 19. Su columna no se retira ni se anade: cambia de indice —4 a 3, porque «Valores» e
     // «Importe S/» salen— y sigue contando una.
+    //
+    // **#388 tampoco mueve las cifras**: entra «Presentada el» delante de la situacion, asi que la
+    // columna de insignia pasa del indice 3 al 4, y sus textos siguen siendo «Prescrito» y
+    // «Vigente». Lo que cambia es su TONO, y eso lo cuenta la prueba del reparto.
     expect(columnasDeInsignia()).toHaveLength(21);
     const textos = new Set(celdasDeInsignia().map((c) => c.texto));
     expect(textos.size, 'el artboard no escribe ni un texto en una columna de insignia').toBe(19);
@@ -302,7 +337,7 @@ describe('ninguna insignia se pinta de verde sin que una regla la reconozca', ()
 
   it('EL VERDE SE GANA: ninguna celda del artboard llega a `ok` sin una regla que la nombre', () => {
     const regaladas = celdasDeInsignia().filter(
-      (celda) => tonoDe(celda.texto) === 'ok' && !reconocido(celda.texto),
+      (celda) => tonoPintado(celda) === 'ok' && !juzgada(celda),
     );
     expect(
       regaladas.map((c) => `  ${c.hoja} · bloque ${String(c.bloque)} · «${c.rotulo}» · «${c.texto}»`),
@@ -314,12 +349,12 @@ describe('ninguna insignia se pinta de verde sin que una regla la reconozca', ()
   });
 
   it('y lo que ninguna regla reconoce sale con el tono de «no se», el mismo para todas', () => {
-    const desconocidas = celdasDeInsignia().filter((celda) => !reconocido(celda.texto));
+    const desconocidas = celdasDeInsignia().filter((celda) => !juzgada(celda));
     // Seis de las diecisiete: «Alto», «Con diferencia», «En deposito», «Medio», «Pendiente» y
     // «Programado». Las seis salian VERDES hasta #175.
     expect(new Set(desconocidas.map((c) => c.texto)).size).toBe(6);
     for (const celda of desconocidas) {
-      expect(tonoDe(celda.texto), `${celda.hoja} · «${celda.texto}»`).toBe(TONO_SIN_RECONOCER);
+      expect(tonoPintado(celda), `${celda.hoja} · «${celda.texto}»`).toBe(TONO_SIN_RECONOCER);
     }
   });
 
@@ -329,7 +364,7 @@ describe('ninguna insignia se pinta de verde sin que una regla la reconozca', ()
     const cuenta = (tono: string) =>
       new Set(
         celdasDeInsignia()
-          .filter((c) => tonoDe(c.texto) === tono)
+          .filter((c) => tonoPintado(c) === tono)
           .map((c) => c.texto),
       ).size;
     // **6/3/2/6 hasta #230, y 7/4/2/6 desde el.** Los dos textos nuevos de `val-tip` reparten uno
@@ -337,8 +372,12 @@ describe('ninguna insignia se pinta de verde sin que una regla la reconozca', ()
     // #175 —lo escribe el padron de licencias— y ahora ademas lo escribe el artboard; «Prescrito»
     // entra en MAL con este issue, porque un ejercicio prescrito es deuda que ya no se puede
     // exigir. Recalculado midiendo, no a ojo.
+    //
+    // **Y 6/4/2/7 desde #388**: «Vigente» —que en el artboard solo lo escribe `val-tip`— deja el
+    // verde por el tono de «no se», porque lo decide la regla de SU columna y no `tono.ts`. Es la
+    // situacion a la fecha de la solicitud, no la de hoy. «Prescrito» sigue en `mal`.
     expect({ ok: cuenta('ok'), mal: cuenta('mal'), atencion: cuenta('atencion'), info: cuenta('info') }).toEqual(
-      { ok: 7, mal: 4, atencion: 2, info: 6 },
+      { ok: 6, mal: 4, atencion: 2, info: 7 },
     );
   });
 

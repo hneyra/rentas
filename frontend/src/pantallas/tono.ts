@@ -132,6 +132,13 @@ const ATENCION = /con deuda|por vencer|en tramite|en trámite/;
  * de larga pinta de rojo lo que esta bien, y se ve; una de BUENOS que se pase de larga pinta de
  * verde lo que esta mal, y no se ve. Sin el ancla, `\bbajo\b` casaria dentro de «tra**bajo**».
  */
+/*
+ * **«vigente» se queda aqui, y `val-tip` no la pinta de verde** (#388). El `VIGENTE` del padron de
+ * licencias SI es conforme; el «Vigente» de `val-tip` es la situacion del ejercicio A LA FECHA DE
+ * LA SOLICITUD, no a hoy, y no se puede afirmar en verde junto a un «Prescribe el» que ya paso.
+ * La salida no fue sacar la palabra de esta lista sino darle a esa columna su propia regla de
+ * insignia (`columna.insignia`, en su definicion): con ella, el interprete no llama a este archivo.
+ */
 const CONFORME =
   /\bconforme\b|\bvigente\b|\bactiv[ao]\b|\bal d[ií]a\b|\bcancelad[ao]\b|\bpagad[ao]\b|\binspeccionad[ao]\b|\bbajo\b/;
 

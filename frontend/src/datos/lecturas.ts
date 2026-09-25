@@ -973,7 +973,9 @@ export interface LiquidacionDeCostas {
  * cambiara, y la resolucion ya emitida dice lo que dice (regla 9, ARQ-09 §3).
  *
  * `prescrita` vale lo que valia **a `fechaDePresentacion`**, no a hoy. Es lo que la resolucion
- * resolvio, y por eso la fila que lo lleva lleva tambien esa fecha.
+ * resolvio, y por eso la fila que lo lleva lleva tambien esa fecha. **Y desde #388 tambien la fila
+ * de la tabla**: hasta entonces era verdad de la fila de la API —la declaracion— y falso de la que
+ * `val-tip` dibuja, que escribia la situacion sin «Presentada el».
  */
 export interface RelojDeUnEjercicio {
   readonly ejercicio: number;

@@ -28,7 +28,7 @@ import { catalogoDeClaves } from '../src/i18n/catalogo-de-claves.ts';
  *
  * <h2>Y por que el locale se REGENERA en vez de escribirse</h2>
  *
- * Porque son `MEDIDO: 961 entradas de es.json`, y salen del dato: a mano se quedan viejas a la
+ * Porque son `MEDIDO: 963 entradas de es.json`, y salen del dato: a mano se quedan viejas a la
  * primera pantalla nueva. `KAMAYUK_REGENERAR=1 yarn vitest run verificaciones/el-locale-esta-completo` lo
  * vuelve a escribir, que es el mismo trato que `kamayuk-lib` da a su archivo de temas.
  */
