@@ -113,4 +113,59 @@ public record DeterminacionPredialCalculada(
     public boolean esSimulacion() {
         return cabecera.esNueva();
     }
+
+    /**
+     * La misma determinacion, ahora con la cabecera que quedo <b>asentada</b> (#359).
+     *
+     * <p>Existe para que el orden lo imponga la forma y no la memoria de quien escribe el caso de
+     * uso: la determinacion se compone <b>entera</b> —cabecera calculada, derecho de emision,
+     * cuotas, y las validaciones de este record— antes de escribir nada, y solo despues se asienta
+     * y se cambia la cabecera sin identificador por la guardada. Lo que puede faltar ya fallo, y lo
+     * unico que queda despues del asiento es esta copia.
+     *
+     * <p>Se niega a cambiar una cabecera por otra que no es la misma determinacion: las cuotas y el
+     * desglose se calcularon con la base, el monto, la modalidad y el conjunto de la calculada, y
+     * con otra cabecera la respuesta diria una cifra y la fila otra.
+     *
+     * @param asentada la cabecera que devolvio el asiento, con su identificador
+     */
+    public DeterminacionPredialCalculada asentadaComo(Determinacion asentada) {
+        Objects.requireNonNull(asentada, "Se cambia por la cabecera asentada");
+        if (!cabecera.esNueva()) {
+            throw new IllegalStateException(
+                    "Esta determinacion ya esta asentada con el id " + cabecera.id());
+        }
+        if (asentada.esNueva()) {
+            throw new IllegalArgumentException(
+                    "La cabecera asentada trae su identificador: sin el no hay fila que la lleve");
+        }
+        if (!asentada.baseImponible().equals(cabecera.baseImponible())
+                || !asentada.montoDeterminado().equals(cabecera.montoDeterminado())
+                || asentada.conjuntoId() != cabecera.conjuntoId()
+                || asentada.contribuyenteId() != cabecera.contribuyenteId()
+                || !asentada.ejercicio().equals(cabecera.ejercicio())
+                || asentada.modalidad() != cabecera.modalidad()) {
+            throw new IllegalArgumentException(
+                    "La cabecera asentada no es la que se calculo: "
+                            + asentada
+                            + " frente a "
+                            + cabecera);
+        }
+        return new DeterminacionPredialCalculada(
+                asentada,
+                predios,
+                valuoTotal,
+                valuoExonerado,
+                valuoAfecto,
+                uit,
+                tramos,
+                minimoImponible,
+                impuestoInsoluto,
+                derechoDeEmision,
+                cuotas,
+                nombreDelConjunto,
+                codContribuyente,
+                sujeto,
+                fechaCalculo);
+    }
 }

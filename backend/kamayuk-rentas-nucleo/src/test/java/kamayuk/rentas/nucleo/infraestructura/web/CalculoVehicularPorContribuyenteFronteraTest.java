@@ -93,6 +93,20 @@ class CalculoVehicularPorContribuyenteFronteraTest {
     private static final String VENDEDOR_EN_ENERO = "C-VEN1-329";
     private static final String COMPRADOR_EN_ENERO = "C-COM1-329";
     private static final String PLACA_DE_ENERO = "E1N-329";
+
+    /**
+     * #359: un contribuyente con DOS vehiculos, y el segundo —en el orden de la placa, que es el
+     * del bucle— sin fila en el cuadro de valores referenciales del ejercicio.
+     */
+    private static final String DEL_LOTE_A_MEDIAS = "C-LOTE-359";
+
+    private static final String PLACA_CON_VALOR = "L1A-359";
+    private static final String PLACA_SIN_VALOR = "L2B-359";
+
+    /** Y su contraste: dos vehiculos, los dos con valor. Sin el, «no asienta nunca» pasa. */
+    private static final String DEL_LOTE_ENTERO = "C-ENTE-359";
+
+    private static final String MODELO_SIN_VALOR = "MODELO-SIN-FILA";
     private static final String MARCA = "TOYOTA";
     private static final String MODELO = "ETIOS";
     private static final Ejercicio FABRICACION = new Ejercicio(2023);
@@ -103,6 +117,9 @@ class CalculoVehicularPorContribuyenteFronteraTest {
     private static long comprador;
     private static long vendedorEnEnero;
     private static long compradorEnEnero;
+    private static long delLoteAMedias;
+    private static long delLoteEntero;
+    private static JdbcClient jdbc;
     private static TenantTransactionManager gestor;
     private static AdministrarParametros administrarParametros;
     private static MockMvc mvc;
@@ -117,13 +134,16 @@ class CalculoVehicularPorContribuyenteFronteraTest {
                 crearContribuyente(VENDEDOR_EN_ENERO, "32900003", "VENDEDOR, EL 1 DE ENERO");
         compradorEnEnero =
                 crearContribuyente(COMPRADOR_EN_ENERO, "32900004", "COMPRADOR, EL 1 DE ENERO");
+        delLoteAMedias =
+                crearContribuyente(DEL_LOTE_A_MEDIAS, "35900001", "LOTE, CON UNO SIN VALOR");
+        delLoteEntero = crearContribuyente(DEL_LOTE_ENTERO, "35900002", "LOTE, LOS DOS CON VALOR");
 
         DriverManagerDataSource pool = new DriverManagerDataSource();
         pool.setUrl(base.url());
         pool.setUsername(BaseDeDatosDePrueba.APP);
         pool.setPassword(base.clave(BaseDeDatosDePrueba.APP));
 
-        JdbcClient jdbc = JdbcClient.create(pool);
+        jdbc = JdbcClient.create(pool);
         gestor = new TenantTransactionManager(pool);
 
         VehiculoRepositoryJdbc vehiculos = new VehiculoRepositoryJdbc(jdbc);
@@ -225,6 +245,49 @@ class CalculoVehicularPorContribuyenteFronteraTest {
                     false,
                     "Tarjeta de propiedad",
                     Observacion.de("Compraventa del vehiculo el primer dia del ejercicio"));
+
+            // #359: el lote a medias —el primero con valor, el segundo sin fila en el cuadro— y
+            // el lote entero, con los dos en el cuadro.
+            TransactionTemplate enUna = new TransactionTemplate(gestor);
+            enUna.executeWithoutResult(
+                    estado -> {
+                        vehiculos.save(
+                                Vehiculo.nuevo(
+                                        Placa.de(PLACA_CON_VALOR),
+                                        delLoteAMedias,
+                                        MARCA,
+                                        MODELO,
+                                        "M1",
+                                        FABRICACION,
+                                        new Ejercicio(2024)));
+                        vehiculos.save(
+                                Vehiculo.nuevo(
+                                        Placa.de(PLACA_SIN_VALOR),
+                                        delLoteAMedias,
+                                        MARCA,
+                                        MODELO_SIN_VALOR,
+                                        "M1",
+                                        FABRICACION,
+                                        new Ejercicio(2024)));
+                        vehiculos.save(
+                                Vehiculo.nuevo(
+                                        Placa.de("N1A-359"),
+                                        delLoteEntero,
+                                        MARCA,
+                                        MODELO,
+                                        "M1",
+                                        FABRICACION,
+                                        new Ejercicio(2024)));
+                        vehiculos.save(
+                                Vehiculo.nuevo(
+                                        Placa.de("N2B-359"),
+                                        delLoteEntero,
+                                        MARCA,
+                                        MODELO,
+                                        "M1",
+                                        FABRICACION,
+                                        new Ejercicio(2024)));
+                    });
         } finally {
             TenantContext.limpiar();
             OrigenContext.limpiar();
@@ -330,7 +393,96 @@ class CalculoVehicularPorContribuyenteFronteraTest {
         assertThat(determinacion.path("contribuyenteId").asLong()).isEqualTo(vendedor);
     }
 
+    /**
+     * <b>El calculo por contribuyente se asienta entero o no se asienta</b> (#359).
+     *
+     * <p>Cada {@code calcular} era su propia transaccion y el controlador los recorria de uno en
+     * uno: si el vehiculo k no tenia valor referencial, la respuesta era 422 con los k−1 anteriores
+     * ya asentados y auditados, y la respuesta no los nombraba. Se mide contra PostgreSQL, que es
+     * donde queda —o no— la fila, y asentando: simulando no se escribe nada y el defecto no se ve.
+     */
+    @Test
+    @DisplayName("#359 — el segundo vehiculo sin valor referencial: 422 y ninguna determinacion")
+    void elLoteConUnVehiculoSinValorNoAsientaNinguno() throws Exception {
+        long altasAntes = altasDeDeterminacion();
+
+        MvcResult resultado = asentarPara(DEL_LOTE_A_MEDIAS);
+
+        assertThat(resultado.getResponse().getStatus()).isEqualTo(422);
+        assertThat(resultado.getResponse().getContentAsString()).contains(PLACA_SIN_VALOR);
+        assertThat(determinacionesDe(delLoteAMedias))
+                .as(
+                        "hasta #359 el %s quedaba asentado antes de que el %s fallara, y el 422 no"
+                                + " lo decia",
+                        PLACA_CON_VALOR, PLACA_SIN_VALOR)
+                .isZero();
+        assertThat(altasDeDeterminacion()).as("ni su ALTA en auditoria").isEqualTo(altasAntes);
+    }
+
+    @Test
+    @DisplayName("#359 — y con los dos vehiculos en el cuadro se asientan los dos, y se auditan")
+    void elLoteEnteroSeAsientaEntero() throws Exception {
+        long altasAntes = altasDeDeterminacion();
+
+        MvcResult resultado = asentarPara(DEL_LOTE_ENTERO);
+
+        assertThat(resultado.getResponse().getStatus())
+                .as(resultado.getResponse().getContentAsString())
+                .isEqualTo(201);
+        assertThat(determinacionesDe(delLoteEntero)).isEqualTo(2L);
+        assertThat(altasDeDeterminacion() - altasAntes).isEqualTo(2L);
+        JsonNode determinaciones =
+                JSON.readTree(resultado.getResponse().getContentAsString()).path("determinaciones");
+        assertThat(determinaciones.size()).isEqualTo(2);
+        for (JsonNode determinacion : determinaciones) {
+            assertThat(determinacion.path("id").asLong())
+                    .as("la respuesta trae las determinaciones ASENTADAS, con su identificador")
+                    .isPositive();
+            assertThat(determinacion.path("simulacion").asBoolean()).isFalse();
+        }
+    }
+
     // ------------------------------------------------------------------
+
+    private static MvcResult asentarPara(String codContribuyente) throws Exception {
+        return mvc.perform(
+                        post("/rentas/api/v1/rentas/vehicular/calculo")
+                                .param("codContribuyente", codContribuyente)
+                                .param("ejercicio", "2026")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        "{\"simulacion\":false,\"observacion\":\"Determinacion"
+                                                + " anual del impuesto vehicular\"}"))
+                .andReturn();
+    }
+
+    private static long determinacionesDe(long contribuyenteId) {
+        Long filas =
+                new TransactionTemplate(gestor)
+                        .execute(
+                                estado ->
+                                        jdbc.sql(
+                                                        "SELECT count(*) FROM determinacion"
+                                                                + " WHERE contribuyente_id = :id")
+                                                .param("id", contribuyenteId)
+                                                .query(Long.class)
+                                                .single());
+        return filas == null ? -1L : filas;
+    }
+
+    private static long altasDeDeterminacion() {
+        Long filas =
+                new TransactionTemplate(gestor)
+                        .execute(
+                                estado ->
+                                        jdbc.sql(
+                                                        "SELECT count(*) FROM auditoria"
+                                                                + " WHERE tabla = 'determinacion'"
+                                                                + "   AND operacion = 'ALTA'")
+                                                .query(Long.class)
+                                                .single());
+        return filas == null ? -1L : filas;
+    }
 
     private static MvcResult calcularPara(String codContribuyente, String ejercicio)
             throws Exception {

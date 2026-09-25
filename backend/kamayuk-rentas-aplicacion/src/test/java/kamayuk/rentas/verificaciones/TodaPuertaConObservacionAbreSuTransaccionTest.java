@@ -97,7 +97,7 @@ class TodaPuertaConObservacionAbreSuTransaccionTest {
                             + ".nucleo.aplicacion.DeterminarPredial$Peticion, "
                             + OBSERVACION
                             + ")",
-                    "la abre RegistrarDeterminacionPredial, que es quien escribe (#54, #72): los"
+                    "la abre RegistrarDeterminacionPredial.asentar, que es quien escribe (#54, #72, #359): los"
                             + " colaboradores ajenos traen la suya",
                     RAIZ
                             + "cuentacorriente.aplicacion.GeneradorDeCargosCuentaCorriente"

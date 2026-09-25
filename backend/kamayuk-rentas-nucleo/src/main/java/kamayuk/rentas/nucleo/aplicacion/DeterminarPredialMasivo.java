@@ -88,6 +88,16 @@ import org.springframework.stereotype.Service;
  * revienta con {@code ParametroAusente} nombrando la llave. Sellarlo hace que, el dia que el valor
  * exista, la corrida lo <b>conserve</b> en vez de aplicarlo y olvidarlo.
  *
+ * <p><b>Y la corrida que no termina no deja a nadie a medias</b> (#359). Hasta #359 el primer
+ * contribuyente del bucle quedaba asentado y auditado dentro de {@link DeterminarPredial} antes de
+ * que faltara el derecho, las cuotas de la modalidad o el punto {@code CUOTA}: la corrida
+ * contestaba 422, no escribia su {@code corrida_predial} y dejaba una determinacion suelta que
+ * ningun informe explicaba. Ahora {@link DeterminarPredial} asienta al final, con todo resuelto, y
+ * lo que es del conjunto falla en el primero <b>sin haber escrito nada</b>. Validar el conjunto una
+ * sola vez antes del bucle ahorraria recorrer hasta el primero que se determina, pero va con #361
+ * —el conjunto que cada determinacion resuelve por su cuenta—: aqui no hace falta para que el 422
+ * salga limpio.
+ *
  * <h2>Una transaccion por contribuyente</h2>
  *
  * <p>Esta clase <b>no</b> abre transaccion. Cada determinacion abre la suya al entrar en {@link
@@ -284,12 +294,16 @@ public class DeterminarPredialMasivo {
                 // llama «contribuyentes observados que quedan fuera de la emision». Y el que tiene
                 // un beneficio del predial sin RT-012 (#331): queda fuera hasta #464, a la vista.
                 // Y el de base afecta cero (#332): NEG-05 no dice si paga el minimo o nada, y
-                // RegistrarDeterminacionPredial ya deshizo su transaccion sin escribir la fila.
+                // RegistrarDeterminacionPredial.calcular lo rechaza antes de que haya fila (#359).
                 observados.add(new Observado(codigo, nombre, String.valueOf(motivo.getMessage())));
             } catch (CuadroPredialParametrizado.ParametroDelPredialAusente falta) {
                 // Esta le pasa a TODOS por igual —es del conjunto, no del contribuyente—, asi que
                 // no se observa uno por uno: se corta la corrida. Observar 30 000 veces la misma
-                // ordenanza que falta esconde el unico dato util del informe.
+                // ordenanza que falta esconde el unico dato util del informe. Y cortar ya no deja
+                // a nadie asentado (#359): `individual.determinar` resuelve lo que falta antes de
+                // asentar, asi que este contribuyente no escribio nada, y los anteriores tampoco
+                // porque les habria faltado lo mismo. Lo mismo vale para `PuntoSinPolitica`, que
+                // no se atrapa aqui y sube igual.
                 throw falta;
             } catch (ParametrosSellados.ParametroAusente falta) {
                 throw falta;

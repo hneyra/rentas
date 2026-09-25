@@ -139,6 +139,26 @@ class RegistrarDeterminacionPredialTest {
         return (T) fabrica.getProxy();
     }
 
+    /**
+     * Calcula y asienta de una vez, que es lo que {@code registrar} hacia hasta #359. Aqui se
+     * prueba la regla y el asiento contra la base, y no el orden: el orden —asentar al final— lo
+     * prueba {@code DeterminarPredialTest}.
+     */
+    private static Determinacion calcularYAsentar(
+            Ejercicio ejercicio,
+            long contribuyenteId,
+            List<DetalleDeterminacionPredio> predios,
+            List<Tramo> tramos,
+            Dinero minimoImponible,
+            ModalidadDelPredial modalidad,
+            Observacion observacion) {
+        return registrar.asentar(
+                registrar.calcular(
+                        ejercicio, contribuyenteId, predios, tramos, minimoImponible, modalidad),
+                predios,
+                observacion);
+    }
+
     @AfterAll
     static void cerrar() {
         if (base != null) {
@@ -173,7 +193,7 @@ class RegistrarDeterminacionPredialTest {
             long conjuntoV1 = sellarConjunto(EJERCICIO, "Version 1 para la primera determinacion");
 
             Determinacion primera =
-                    registrar.registrar(
+                    calcularYAsentar(
                             EJERCICIO,
                             titular,
                             prediosDeclarados(predioA, predioB),
@@ -193,7 +213,7 @@ class RegistrarDeterminacionPredialTest {
             assertThat(conjuntoV2).isNotEqualTo(conjuntoV1);
 
             Determinacion segunda =
-                    registrar.registrar(
+                    calcularYAsentar(
                             EJERCICIO,
                             titular,
                             prediosDeclarados(predioA, predioB),
@@ -265,7 +285,7 @@ class RegistrarDeterminacionPredialTest {
         void sinPrediosNoHayDeterminacion() {
             assertThatThrownBy(
                             () ->
-                                    registrar.registrar(
+                                    calcularYAsentar(
                                             EJERCICIO,
                                             999_999L,
                                             List.of(),
@@ -292,7 +312,7 @@ class RegistrarDeterminacionPredialTest {
 
             sellarConRedondeo(ejercicio, 4, "HALF_UP", "Redondeo ficticio a cuatro decimales");
             Determinacion conCuatro =
-                    registrar.registrar(
+                    calcularYAsentar(
                             ejercicio,
                             titular,
                             List.of(aporte(predio, "1234.5678")),
@@ -303,7 +323,7 @@ class RegistrarDeterminacionPredialTest {
 
             sellarConRedondeo(ejercicio, 0, "DOWN", "Redondeo ficticio a cero decimales");
             Determinacion conCero =
-                    registrar.registrar(
+                    calcularYAsentar(
                             ejercicio,
                             titular,
                             List.of(aporte(predio, "1234.5678")),
@@ -328,7 +348,7 @@ class RegistrarDeterminacionPredialTest {
 
             assertThatThrownBy(
                             () ->
-                                    registrar.registrar(
+                                    calcularYAsentar(
                                             ejercicio,
                                             titular,
                                             List.of(aporte(predio, "1000.00")),
@@ -365,7 +385,7 @@ class RegistrarDeterminacionPredialTest {
 
             assertThatThrownBy(
                             () ->
-                                    registrar.registrar(
+                                    calcularYAsentar(
                                             EJERCICIO,
                                             titular,
                                             List.of(
@@ -395,7 +415,7 @@ class RegistrarDeterminacionPredialTest {
             sellarConjunto(EJERCICIO, "Conjunto para el predio casi exonerado");
 
             Determinacion determinada =
-                    registrar.registrar(
+                    calcularYAsentar(
                             EJERCICIO,
                             titular,
                             List.of(
