@@ -169,6 +169,42 @@ tasks.test {
         .optional()
         .withPathSensitivity(PathSensitivity.NONE)
 
+    // Y LO QUE `LasCifrasMedidasCuadranConElDiscoTest` LEE FUERA DE `backend/` (#309). La guarda
+    // recalcula las marcas `MEDIDO:` de los comentarios, y dos cosas que lee no estaban en ninguna
+    // entrada: el locale —la medida «entradas de es.json» cuenta las hojas de
+    // `frontend/src/i18n/locales/es.json`— y los fuentes de `frontend/` e `infrastructure/`, donde
+    // viven dos de sus cinco marcas. **Medido en la revision de #309**: con una entrada mas en
+    // `es.json` y nada mas tocado, la tarea salia UP-TO-DATE dos veces seguidas y, tras
+    // `cleanTest`, FROM-CACHE —en verde, sin correr, con la marca diciendo una cifra que ya no era—.
+    // Y `backend.yml` no filtra rutas, asi que un PR solo de interfaz que regenera el locale corre
+    // esta tarea; sin estas lineas, contra la cache de `main`. Es la leccion de #192 punto 2 otra
+    // vez, en el tercer arbol.
+    inputs
+        .file(rootProject.file("../frontend/src/i18n/locales/es.json"))
+        .withPropertyName("cifrasMedidas.locale")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+
+    // Los arboles que la guarda barre, con el MISMO filtro que su `fuentes(raiz)`: las mismas
+    // extensiones (`FUENTE`) y los mismos directorios fuera (`DIRECTORIOS_FUERA`). Si una de las
+    // dos listas cambia, la otra tambien: un directorio que aqui se excluye y la guarda lee vuelve
+    // a dejar la tarea UP-TO-DATE sobre una marca que se movio. `backend/` va entero, y no solo los
+    // `src/{main,test}/java` de arriba, porque la guarda lee tambien los `.kts`. Y excluir
+    // `node_modules` no es solo por tiempo: son dependencias, y su huella cambiaria con cada
+    // `yarn install` sin que ninguna marca se moviera.
+    val fuentesDeLasCifras = listOf("java", "kts", "ts", "tsx", "mjs", "js")
+    val fueraDeLasCifras =
+        listOf("node_modules", "build", "dist", "out", "bin", ".gradle", ".git", "test-results", "playwright-report", "coverage")
+    for (arbol in listOf("backend", "frontend", "infrastructure")) {
+        inputs
+            .files(
+                fileTree(rootProject.file("../$arbol")) {
+                    fuentesDeLasCifras.forEach { include("**/*.$it") }
+                    fueraDeLasCifras.forEach { exclude("**/$it/**") }
+                })
+            .withPropertyName("cifrasMedidas.$arbol")
+            .withPathSensitivity(PathSensitivity.RELATIVE)
+    }
+
     // Gradle no propaga las propiedades de sistema del build al proceso de prueba
     // (lo mismo que hace `kamayuk.pruebas-postgres` con las suyas). Sin esto,
     // `-Dkamayuk.formas.regenerar=true` no llega y el archivo no se puede regenerar.

@@ -96,7 +96,11 @@ import tools.jackson.databind.json.JsonMapper;
  * backend. {@code frontend.yml} solo corre con {@code frontend/**}: una guarda en {@code
  * verificaciones/} no se habria enterado de la regeneracion que deja la cifra vieja, y el rojo le
  * habria caido al siguiente PR de interfaz, que no la toco. {@code backend.yml} no filtra rutas, y
- * esta clase corre en {@code verificarArquitectura}.
+ * esta clase corre en {@code verificarArquitectura}. Pero que corra no basta con que el flujo se
+ * dispare: lo que lee fuera de {@code backend/} —el locale, y los fuentes de {@code frontend/} e
+ * {@code infrastructure/}— esta declarado como entrada de la tarea en {@code build.gradle.kts}, y
+ * sin eso un PR solo de interfaz la dejaba UP-TO-DATE, o FROM-CACHE contra la cache de {@code
+ * main}.
  *
  * <h2>Lo que esto NO comprueba, y se dice</h2>
  *
@@ -140,7 +144,15 @@ class LasCifrasMedidasCuadranConElDiscoTest {
                             "LocalDate.now(reloj) en el codigo de src/main",
                             LasCifrasMedidasCuadranConElDiscoTest::lecturasDelDiaEnProduccion));
 
-    /** Los arboles que se barren. {@code docs/} no: sus cifras las renueva quien las mide. */
+    /**
+     * Los arboles que se barren. {@code docs/} no: sus cifras las renueva quien las mide.
+     *
+     * <p>Esta lista, {@link #DIRECTORIOS_FUERA} y {@link #FUENTE} estan <b>repetidas</b> como
+     * entradas de {@code tasks.test} en {@code build.gradle.kts}, y tienen que decir lo mismo: lo
+     * que la guarda lee y Gradle no declara deja la tarea UP-TO-DATE —o FROM-CACHE— cuando cambia,
+     * con la marca vieja en verde. Medido en la revision de #309 con una entrada mas en {@code
+     * es.json}.
+     */
     private static final List<String> ARBOLES = List.of("backend", "frontend", "infrastructure");
 
     /** Lo que no es fuente de nadie: dependencias, salidas de build y del arnes. */
