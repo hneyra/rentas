@@ -30,13 +30,23 @@ import kamayuk.rentas.dominio.Plazo;
  *   <li><b>Interrupcion</b> (art. 45): el plazo "se cuenta de nuevo desde el dia siguiente al
  *       acaecimiento del acto interruptorio". El reloj vuelve a cero, y con el se van las
  *       suspensiones anteriores —ya no prorrogan nada, porque el plazo que prorrogaban no existe—.
- *       Si el acto es <b>anterior</b> al inicio vigente no hace nada: no interrumpe un plazo que
- *       todavia no corria, y aplicarlo dejaria el inicio vigente antes del inicio del computo, que
- *       {@link ComputoDeEjercicio} rechaza —asi es como una solicitud legitima salia 422—.
+ *       <b>Tambien la parte de una suspension que sigue en curso despues del acto</b>, y eso no es
+ *       una conclusion sino una lectura sin escribir: el art. 46 dice que el plazo «se suspende
+ *       durante» la tramitacion, y leido al pie de la letra alcanzaria tambien al plazo reiniciado.
+ *       Esa regla no esta en {@code prescripcion-y-plazos.md} de {@code normativa} ni en NEG-19,
+ *       que no existe, y aqui no se rediseña una regla tributaria: se conserva lo de antes, y
+ *       {@code ComputoDePrescripcionTest.InterrupcionDentroDeUnaSuspension} lo fija (#335). Si el
+ *       acto es <b>anterior</b> al inicio vigente no hace nada: no interrumpe un plazo que todavia
+ *       no corria, y aplicarlo dejaria el inicio vigente antes del inicio del computo, que {@link
+ *       ComputoDeEjercicio} rechaza —asi es como una solicitud legitima salia 422—.
  *   <li><b>Suspension</b> (art. 46): el plazo se detiene mientras dura, asi que el vencimiento se
  *       corre tantos dias como duro el intervalo <b>dentro del tramo</b> ({@link
  *       IntervaloSuspendido#interseccion}). De una reclamacion que termino antes del inicio no
- *       cuenta ningun dia; de una que lo cruza, solo los que caen desde el inicio.
+ *       cuenta ningun dia; de una que lo cruza, solo los que caen desde el inicio. Los dias se
+ *       cuentan con los dos extremos, y <b>una vez cada uno</b>: el vencimiento del tramo es el
+ *       nominal mas los dias de la {@link IntervalosSuspendidos#unir union} de sus suspensiones, no
+ *       la suma en bruto —una reclamacion y un fraccionamiento simultaneos detienen el plazo una
+ *       vez— (#335).
  * </ul>
  *
  * <p><b>A que ejercicio pertenece cada hecho no lo decide esta funcion.</b> Recibe los hechos de UN
@@ -77,7 +87,11 @@ public final class ComputoDePrescripcion {
         // El calendario solo lo usa DIAS_HABILES; un plazo de prescripcion es en anios. Se pasa
         // igualmente porque el tipo lo pide, y porque nada impide parametrizar un plazo en dias.
         CalendarioHabil calendario = CalendarioHabil.sinFeriados();
-        LocalDate vencimiento = plazo.vencimientoDesde(inicioVigente, calendario);
+        LocalDate nominal = plazo.vencimientoDesde(inicioVigente, calendario);
+        LocalDate vencimiento = nominal;
+        // Las suspensiones del tramo vigente, tal como caen dentro de el. No se suman una a una:
+        // el vencimiento sale de su union, para que un dia suspendido dos veces cuente una (#335).
+        List<IntervaloSuspendido> suspendidosDelTramo = new ArrayList<>();
         List<HechoDelComputo> aplicados = new ArrayList<>();
 
         for (HechoDelComputo hecho : ordenados) {
@@ -93,7 +107,10 @@ public final class ComputoDePrescripcion {
                     }
                     aplicados.add(hecho);
                     inicioVigente = hecho.desde().plusDays(1);
-                    vencimiento = plazo.vencimientoDesde(inicioVigente, calendario);
+                    nominal = plazo.vencimientoDesde(inicioVigente, calendario);
+                    // El tramo nuevo empieza sin suspensiones: ver la cabecera y #335.
+                    suspendidosDelTramo.clear();
+                    vencimiento = nominal;
                 }
                 case SUSPENSION -> {
                     Optional<IntervaloSuspendido> dentro =
@@ -103,7 +120,10 @@ public final class ComputoDePrescripcion {
                         continue;
                     }
                     aplicados.add(hecho);
-                    vencimiento = vencimiento.plusDays(dentro.get().dias());
+                    suspendidosDelTramo.add(dentro.get());
+                    vencimiento =
+                            nominal.plusDays(
+                                    IntervalosSuspendidos.unir(suspendidosDelTramo).dias());
                 }
                 default ->
                         throw new IllegalStateException(
@@ -125,7 +145,7 @@ public final class ComputoDePrescripcion {
      * ultimo dia (art. 46: «se suspende durante» la tramitacion), asi que cortarla en el
      * vencimiento de antes de sumarla descontaria de menos. La que empieza despues del vencimiento
      * ya la descarto el recorrido —«un acto posterior a la prescripcion no la deshace»—. Cuando
-     * haya varias suspensiones que se solapen, unirlas antes de sumar es de #335.
+     * haya varias que se solapen, el recorrido las une antes de contar (#335).
      */
     private static Optional<IntervaloSuspendido> dentroDelTramo(
             IntervaloSuspendido suspension, LocalDate inicioVigente) {

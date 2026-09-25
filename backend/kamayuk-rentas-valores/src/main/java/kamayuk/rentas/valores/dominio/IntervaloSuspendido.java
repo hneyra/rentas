@@ -16,11 +16,14 @@ import java.util.Optional;
  * caiga antes del inicio, porque ahi no habia plazo que detener. Lo que cuenta es su {@link
  * #interseccion} con el tramo en que el plazo corre.
  *
- * <p><b>Cuantos dias suma, y por que la cuenta es la de antes.</b> {@link #dias()} conserva la
- * aritmetica que el computo usaba antes de #334 —{@code DAYS.between(desde, hasta)}, que no cuenta
- * el ultimo dia—. Que ese ultimo dia se cuente, y que dos suspensiones solapadas no sumen dos veces
- * los mismos dias, es de #335, que comparte este tipo: lo que se hizo aqui es que la convencion
- * viva en <b>un</b> sitio, para que ese cambio sea una linea y no una busqueda.
+ * <p><b>Inclusivo por los dos lados, y escrito aqui y en ningun otro sitio (#335).</b> {@code
+ * hasta} es «el ultimo dia del intervalo suspendido» ({@link HechoDelComputo}, y el contrato de la
+ * API dice lo mismo), asi que ese dia tambien estuvo suspendido: {@link #dias()} es {@code
+ * DAYS.between(desde, hasta) + 1}. Antes de #335 era {@code DAYS.between} a secas, que excluye
+ * {@code hasta}: una suspension del 2017-01-01 al 2017-07-01 corria 181 dias y no 182, y una de un
+ * solo dia —{@code desde == hasta}, que el tipo y {@code prescripcion_hecho_fechas_ck} admiten— no
+ * corria ninguno. Que dos suspensiones solapadas no sumen dos veces los mismos dias no es de este
+ * tipo sino de {@link IntervalosSuspendidos#unir}.
  *
  * @param desde el primer dia suspendido
  * @param hasta el ultimo dia suspendido; puede ser el mismo que {@code desde}
@@ -36,9 +39,9 @@ public record IntervaloSuspendido(LocalDate desde, LocalDate hasta) {
         }
     }
 
-    /** Cuantos dias corre el vencimiento. La convencion de hoy: ver la cabecera y #335. */
+    /** Cuantos dias estuvo suspendido el plazo, contados los dos extremos (#335). */
     public long dias() {
-        return ChronoUnit.DAYS.between(desde, hasta);
+        return ChronoUnit.DAYS.between(desde, hasta) + 1;
     }
 
     /**

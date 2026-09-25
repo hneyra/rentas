@@ -137,7 +137,9 @@ class ComputoDePrescripcionTest {
     class ConSuspension {
 
         @Test
-        @DisplayName("el vencimiento se corre tantos dias como duro el intervalo")
+        @DisplayName(
+                "#335 — el vencimiento se corre tantos dias como duro el intervalo, contado el"
+                        + " ultimo")
         void elVencimientoSeCorre() {
             HechoDelComputo reclamacion =
                     HechoDelComputo.suspension(
@@ -147,12 +149,34 @@ class ComputoDePrescripcionTest {
 
             ComputoDePrescripcion.Computo computo =
                     ComputoDePrescripcion.resolver(
-                            INICIO, CUATRO_ANIOS, List.of(reclamacion), LocalDate.of(2020, 1, 2));
+                            INICIO, CUATRO_ANIOS, List.of(reclamacion), LocalDate.of(2020, 6, 30));
 
-            // 181 dias entre el 1 de enero y el 1 de julio de 2017.
-            assertThat(computo.fechaDePrescripcion()).isEqualTo(LocalDate.of(2020, 6, 30));
+            // Del 1 de enero al 1 de julio de 2017, los dos incluidos: 182 dias. `hasta` es «el
+            // ultimo dia del intervalo suspendido» (HechoDelComputo), asi que ese dia tambien
+            // estuvo suspendido. Antes de #335 se contaban 181 y vencia el 2020-06-30.
+            assertThat(computo.fechaDePrescripcion()).isEqualTo(LocalDate.of(2020, 7, 1));
             // El inicio NO se mueve: una suspension detiene, no reinicia.
             assertThat(computo.inicioVigente()).isEqualTo(INICIO);
+            // La solicitud del 2020-06-30 llega un dia antes: no procede.
+            assertThat(computo.prescrita()).isFalse();
+        }
+
+        @Test
+        @DisplayName("#335 — una suspension de un solo dia corre el plazo un dia")
+        void unaSuspensionDeUnDiaCorreUnDia() {
+            // desde == hasta es legitimo: HechoDelComputo solo rechaza hasta < desde, igual que
+            // prescripcion_hecho_fechas_ck. Con la cuenta exclusiva sumaba cero.
+            HechoDelComputo unDia =
+                    HechoDelComputo.suspension(
+                            "lapso de no habido",
+                            LocalDate.of(2018, 5, 10),
+                            LocalDate.of(2018, 5, 10));
+
+            ComputoDePrescripcion.Computo computo =
+                    ComputoDePrescripcion.resolver(
+                            INICIO, CUATRO_ANIOS, List.of(unDia), LocalDate.of(2020, 1, 1));
+
+            assertThat(computo.fechaDePrescripcion()).isEqualTo(LocalDate.of(2020, 1, 2));
             assertThat(computo.prescrita()).isFalse();
         }
 
@@ -236,9 +260,9 @@ class ComputoDePrescripcionTest {
         @Test
         @DisplayName("de una suspension que cruza el inicio solo cuentan los dias desde el inicio")
         void deLaQueCruzaSoloCuentaLoQueCaeDentro() {
-            // Del 2015-07-01 al 2016-07-01: 366 dias en bruto, pero el plazo solo corria desde el
-            // 2016-01-01, asi que se detiene 182 —con la misma cuenta que `elVencimientoSeCorre`,
-            // que es la de hoy: el ultimo dia es de #335—.
+            // Del 2015-07-01 al 2016-07-01, pero el plazo solo corria desde el 2016-01-01: del
+            // 2016-01-01 al 2016-07-01, los dos incluidos, son 183 dias (2016 es bisiesto), con la
+            // misma cuenta que `elVencimientoSeCorre` (#335).
             HechoDelComputo reclamacion =
                     HechoDelComputo.suspension(
                             "reclamacion contra la determinacion",
@@ -249,9 +273,168 @@ class ComputoDePrescripcionTest {
                     ComputoDePrescripcion.resolver(
                             INICIO, CUATRO_ANIOS, List.of(reclamacion), resolucion);
 
-            assertThat(computo.fechaDePrescripcion()).isEqualTo(LocalDate.of(2020, 7, 1));
+            assertThat(computo.fechaDePrescripcion()).isEqualTo(LocalDate.of(2020, 7, 2));
             assertThat(computo.inicioVigente()).isEqualTo(INICIO);
             assertThat(computo.hechosAplicados()).containsExactly(reclamacion);
+        }
+    }
+
+    /**
+     * #335 — Dos suspensiones a la vez no detienen el plazo dos veces.
+     *
+     * <p>Un dia esta suspendido o no lo esta: si una reclamacion en tramite y un fraccionamiento
+     * vigente coinciden —las causales a) y d) del art. 46 para exigir el pago—, los dias que se
+     * solapan se descuentan una vez. Las muestras de encima tienen <b>una</b> suspension, y con esa
+     * siembra pasan la implementacion que une y la que suma en bruto; la que distingue es el
+     * solape. Y el par disjunto es la guarda del otro lado: la union no se come los intervalos que
+     * no se tocan.
+     *
+     * <p>Los solapes no se rechazan: dos causales simultaneas son hechos legitimos, y rechazarlas
+     * obligaria a quien registra a inventarse intervalos.
+     */
+    @Nested
+    @DisplayName("#335 — Suspensiones que se solapan: cada dia suspendido cuenta una vez")
+    class SuspensionesSolapadas {
+
+        @Test
+        @DisplayName("una reclamacion y un fraccionamiento que se solapan corren la union")
+        void elSolapeCuentaUnaVez() {
+            List<HechoDelComputo> hechos =
+                    List.of(
+                            HechoDelComputo.suspension(
+                                    "tramitacion del procedimiento contencioso tributario",
+                                    LocalDate.of(2017, 1, 1),
+                                    LocalDate.of(2017, 12, 31)),
+                            HechoDelComputo.suspension(
+                                    "vigencia del fraccionamiento de la deuda",
+                                    LocalDate.of(2017, 6, 1),
+                                    LocalDate.of(2018, 6, 1)));
+
+            ComputoDePrescripcion.Computo computo =
+                    ComputoDePrescripcion.resolver(
+                            INICIO, CUATRO_ANIOS, hechos, LocalDate.of(2021, 9, 1));
+
+            // La union va del 2017-01-01 al 2018-06-01: 517 dias contando el ultimo. Sumando en
+            // bruto eran 365 + 366 y vencia el 2022-01-01 —el 2021-12-30 con la cuenta exclusiva—,
+            // y la solicitud del 2021-09-01 salia NO_PROCEDE.
+            assertThat(computo.fechaDePrescripcion()).isEqualTo(LocalDate.of(2021, 6, 1));
+            assertThat(computo.prescrita()).isTrue();
+            // Las dos entraron al computo: cada una es una causal que la resolucion sustenta.
+            assertThat(computo.hechosAplicados()).hasSize(2);
+        }
+
+        @Test
+        @DisplayName("una suspension contenida en otra no suma nada")
+        void laContenidaNoSuma() {
+            HechoDelComputo reclamacion =
+                    HechoDelComputo.suspension(
+                            "tramitacion del procedimiento contencioso tributario",
+                            LocalDate.of(2017, 1, 1),
+                            LocalDate.of(2017, 7, 1));
+            HechoDelComputo dentro =
+                    HechoDelComputo.suspension(
+                            "vigencia del fraccionamiento de la deuda",
+                            LocalDate.of(2017, 3, 1),
+                            LocalDate.of(2017, 4, 30));
+
+            ComputoDePrescripcion.Computo sola =
+                    ComputoDePrescripcion.resolver(
+                            INICIO, CUATRO_ANIOS, List.of(reclamacion), LocalDate.of(2020, 1, 1));
+            ComputoDePrescripcion.Computo juntas =
+                    ComputoDePrescripcion.resolver(
+                            INICIO,
+                            CUATRO_ANIOS,
+                            List.of(dentro, reclamacion),
+                            LocalDate.of(2020, 1, 1));
+
+            assertThat(juntas.fechaDePrescripcion())
+                    .isEqualTo(sola.fechaDePrescripcion())
+                    .isEqualTo(LocalDate.of(2020, 7, 1));
+        }
+
+        @Test
+        @DisplayName("un par disjunto suma lo mismo con la union que sin ella")
+        void elParDisjuntoSumaLoMismo() {
+            HechoDelComputo primera =
+                    HechoDelComputo.suspension(
+                            "tramitacion del procedimiento contencioso tributario",
+                            LocalDate.of(2017, 1, 1),
+                            LocalDate.of(2017, 3, 31));
+            HechoDelComputo segunda =
+                    HechoDelComputo.suspension(
+                            "vigencia del fraccionamiento de la deuda",
+                            LocalDate.of(2017, 6, 1),
+                            LocalDate.of(2017, 6, 30));
+
+            ComputoDePrescripcion.Computo computo =
+                    ComputoDePrescripcion.resolver(
+                            INICIO,
+                            CUATRO_ANIOS,
+                            List.of(primera, segunda),
+                            LocalDate.of(2020, 1, 1));
+
+            // 90 + 30 dias, los dos intervalos enteros: del 2020-01-01, 120 dias despues.
+            assertThat(computo.fechaDePrescripcion()).isEqualTo(LocalDate.of(2020, 4, 30));
+            assertThat(computo.hechosAplicados()).containsExactly(primera, segunda);
+        }
+
+        @Test
+        @DisplayName("dos suspensiones que se tocan cuentan cada dia una vez, sin hueco")
+        void lasQueSeTocanNoDejanHueco() {
+            List<HechoDelComputo> hechos =
+                    List.of(
+                            HechoDelComputo.suspension(
+                                    "tramitacion del procedimiento contencioso tributario",
+                                    LocalDate.of(2017, 1, 1),
+                                    LocalDate.of(2017, 1, 31)),
+                            HechoDelComputo.suspension(
+                                    "tramitacion de la demanda contencioso-administrativa",
+                                    LocalDate.of(2017, 2, 1),
+                                    LocalDate.of(2017, 2, 28)));
+
+            ComputoDePrescripcion.Computo computo =
+                    ComputoDePrescripcion.resolver(
+                            INICIO, CUATRO_ANIOS, hechos, LocalDate.of(2020, 1, 1));
+
+            // 31 + 28 = 59 dias: del 2020-01-01 (2020 es bisiesto), el 2020-02-29.
+            assertThat(computo.fechaDePrescripcion()).isEqualTo(LocalDate.of(2020, 2, 29));
+        }
+    }
+
+    /**
+     * #335 — El caso C del issue: una interrupcion <b>dentro</b> de una suspension que sigue en
+     * curso. <b>Sin decidir, y fijado a proposito tal como esta.</b>
+     *
+     * <p>Una lectura del art. 46 al pie de la letra dice que el plazo nuevo nace suspendido y corre
+     * cuando la tramitacion termina (2022-07-01 en esta siembra). Esa lectura no esta escrita donde
+     * se busca: ni {@code prescripcion-y-plazos.md} de {@code normativa} la trae, ni existe NEG-19
+     * —planificado en {@code srtm/docs/00-plan-documental.md}—. Y aqui no se rediseña una regla
+     * tributaria. Asi que se conserva lo de antes —la interrupcion reinicia y descarta tambien la
+     * parte en curso— y esta prueba lo dice en voz alta: quien cambie la regla la vera roja, y
+     * tendra que cambiarla sabiendo que cambia.
+     */
+    @Nested
+    @DisplayName("#335 — Interrupcion dentro de una suspension en curso: sin regla escrita")
+    class InterrupcionDentroDeUnaSuspension {
+
+        @Test
+        @DisplayName("hoy la interrupcion descarta tambien la parte de la suspension que sigue")
+        void laInterrupcionDescartaLaParteEnCurso() {
+            List<HechoDelComputo> hechos =
+                    List.of(
+                            HechoDelComputo.suspension(
+                                    "tramitacion del procedimiento contencioso tributario",
+                                    LocalDate.of(2017, 1, 1),
+                                    LocalDate.of(2018, 6, 30)),
+                            HechoDelComputo.interrupcion(
+                                    "notificacion de la orden de pago", LocalDate.of(2017, 6, 1)));
+
+            ComputoDePrescripcion.Computo computo =
+                    ComputoDePrescripcion.resolver(
+                            INICIO, CUATRO_ANIOS, hechos, LocalDate.of(2021, 12, 1));
+
+            assertThat(computo.inicioVigente()).isEqualTo(LocalDate.of(2017, 6, 2));
+            assertThat(computo.fechaDePrescripcion()).isEqualTo(LocalDate.of(2021, 6, 2));
         }
     }
 
