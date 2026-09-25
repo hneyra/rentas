@@ -278,6 +278,11 @@ class RegistrarValorTest {
         }
 
         @Override
+        public Optional<Valor> vivoSobre(long contribuyenteId, SelectorDeObligacion obligacion) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
         public Valor cambiarEstado(long valorId, EstadoDeValor nuevo) {
             throw new UnsupportedOperationException();
         }

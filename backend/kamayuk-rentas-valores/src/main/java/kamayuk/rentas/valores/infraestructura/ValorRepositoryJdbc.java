@@ -20,6 +20,7 @@ import kamayuk.rentas.persistencia.RepositorioJdbc;
 import kamayuk.rentas.valores.dominio.CriterioDeConsultaDeValores;
 import kamayuk.rentas.valores.dominio.CriterioDeValor;
 import kamayuk.rentas.valores.dominio.EstadoDeValor;
+import kamayuk.rentas.valores.dominio.SelectorDeObligacion;
 import kamayuk.rentas.valores.dominio.SituacionDelValor;
 import kamayuk.rentas.valores.dominio.TipoValor;
 import kamayuk.rentas.valores.dominio.Valor;
@@ -428,6 +429,41 @@ public class ValorRepositoryJdbc extends RepositorioJdbc implements ValorReposit
                 .param("ejercicio", ejercicio.valor())
                 .query(this::mapearValor)
                 .list();
+    }
+
+    /**
+     * {@link #NO_TERMINAL} es la misma frontera que la grilla usa para «ya no describe una cobranza
+     * en curso»: si «vivo» se escribiera aparte, un estado nuevo entraria en una y no en la otra.
+     * {@code IS NOT DISTINCT FROM} y no {@code =} en la unidad, porque la multa sin vehiculo del
+     * padron deja las dos en nulo y con la igualdad no se encontraria nunca.
+     */
+    @Override
+    public Optional<Valor> vivoSobre(long contribuyenteId, SelectorDeObligacion obligacion) {
+        Map<String, Object> parametros = new LinkedHashMap<>();
+        parametros.put("contribuyenteId", contribuyenteId);
+        parametros.put("tributo", obligacion.tributo());
+        parametros.put("ejercicio", obligacion.ejercicio().valor());
+        parametros.put("predioId", obligacion.predioId());
+        parametros.put("vehiculoId", obligacion.vehiculoId());
+        return jdbc().sql(
+                        "SELECT "
+                                + COLUMNAS_VALOR_CON_PREFIJO
+                                + " FROM valor v"
+                                + " WHERE v.contribuyente_id = :contribuyenteId"
+                                + "   AND "
+                                + NO_TERMINAL
+                                + "   AND EXISTS (SELECT 1 FROM valor_detalle d"
+                                + "                WHERE d.valor_id = v.id"
+                                + "                  AND upper(d.tributo) = upper(:tributo)"
+                                + "                  AND d.ejercicio = :ejercicio"
+                                + "                  AND d.predio_id IS NOT DISTINCT FROM :predioId"
+                                + "                  AND d.vehiculo_id IS NOT DISTINCT FROM"
+                                + " :vehiculoId)"
+                                + " ORDER BY v.id"
+                                + " LIMIT 1")
+                .params(parametros)
+                .query(this::mapearValor)
+                .optional();
     }
 
     @Override

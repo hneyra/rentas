@@ -88,6 +88,21 @@ public interface ValorRepository {
     List<Valor> cobrablesDe(long contribuyenteId, String tributo, Ejercicio ejercicio);
 
     /**
+     * El primer valor <b>vivo</b> de ese contribuyente que formaliza esa obligacion, si lo hay
+     * (#372).
+     *
+     * <p>Vivo es que no este {@code PAGADO}, {@code ANULADO} ni {@code PRESCRITO}: {@code COACTIVA}
+     * cuenta. La obligacion se compara con sus <b>cuatro</b> campos —tributo, ejercicio, predio y
+     * vehiculo, con el nulo igual al nulo—, y no con dos como {@link #cobrablesDe}: la multa de un
+     * vehiculo del padron y la de uno que no lo es son obligaciones distintas del libro, y un valor
+     * sobre una no formaliza la otra.
+     *
+     * <p>Lee {@code valor_detalle}, que escriben todos los caminos de emision —individual, masiva y
+     * la corrida de papeletas—, y por eso es completo donde {@code papeleta_masivo_item} no lo era.
+     */
+    Optional<Valor> vivoSobre(long contribuyenteId, SelectorDeObligacion obligacion);
+
+    /**
      * Mueve el estado de un valor ya emitido, sin tocar su desglose congelado.
      *
      * <p>Es el unico {@code UPDATE} que {@code valor} admite, y solo sobre {@code estado}: lo que

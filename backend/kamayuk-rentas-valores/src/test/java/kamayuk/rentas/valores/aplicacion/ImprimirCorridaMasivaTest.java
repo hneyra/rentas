@@ -32,6 +32,7 @@ import kamayuk.rentas.valores.dominio.CriterioDeConsultaDeValores;
 import kamayuk.rentas.valores.dominio.CriterioDeValor;
 import kamayuk.rentas.valores.dominio.EstadoDeItemMasivo;
 import kamayuk.rentas.valores.dominio.EstadoDeValor;
+import kamayuk.rentas.valores.dominio.SelectorDeObligacion;
 import kamayuk.rentas.valores.dominio.TipoValor;
 import kamayuk.rentas.valores.dominio.Valor;
 import kamayuk.rentas.valores.dominio.ValorDetalle;
@@ -157,6 +158,11 @@ class ImprimirCorridaMasivaTest {
 
         @Override
         public List<Valor> cobrablesDe(long contribuyenteId, String tributo, Ejercicio ejercicio) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Optional<Valor> vivoSobre(long contribuyenteId, SelectorDeObligacion obligacion) {
             throw new UnsupportedOperationException();
         }
 

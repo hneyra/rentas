@@ -2,6 +2,7 @@ package kamayuk.rentas.sanciones.infraestructura;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowable;
 
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -115,6 +116,7 @@ import kamayuk.rentas.sanciones.dominio.ResumenDePapeletas;
 import kamayuk.rentas.sanciones.dominio.SentidoDelFallo;
 import kamayuk.rentas.sanciones.dominio.TipoDeRecurso;
 import kamayuk.rentas.sanciones.dominio.TipoDeResolucionDeGerencia;
+import kamayuk.rentas.sanciones.infraestructura.web.AnulacionDePapeletaController;
 import kamayuk.rentas.sanciones.infraestructura.web.HojaDePapeletaController;
 import kamayuk.rentas.sanciones.infraestructura.web.HojaInformativaResource;
 import kamayuk.rentas.sanciones.infraestructura.web.PapeletaDelPadronResource;
@@ -127,6 +129,11 @@ import kamayuk.rentas.sanciones.infraestructura.web.ResumenesDeTransitoControlle
 import kamayuk.rentas.valores.EmisionDeValoresDeMultas;
 import kamayuk.rentas.valores.aplicacion.EmisionDeValoresDeMultasValores;
 import kamayuk.rentas.valores.aplicacion.RegistrarValor;
+import kamayuk.rentas.valores.aplicacion.ValoresSobreUnaObligacionValores;
+import kamayuk.rentas.valores.dominio.EstadoDeValor;
+import kamayuk.rentas.valores.dominio.SelectorDeObligacion;
+import kamayuk.rentas.valores.dominio.TipoValor;
+import kamayuk.rentas.valores.dominio.Valor;
 import kamayuk.rentas.valores.infraestructura.ValorRepositoryJdbc;
 import kamayuk.rentas.web.CodigoDeError;
 import kamayuk.rentas.web.ProblemaDeNegocio;
@@ -243,6 +250,7 @@ class ValoresMasivosYReportesJdbcTest {
     private static ProcesarPapeletaDeLaCorrida procesar;
     private static GenerarCorridaDeValores generar;
     private static AnularPapeleta anularPapeleta;
+    private static AnulacionDePapeletaController anulacion;
     private static EmitirConstanciaLibre emitirConstancia;
     private static ConsultaDePadronesDeSanciones consultaDePadrones;
     private static ConsultaDeResumenesDeSanciones consultaDeResumenes;
@@ -260,6 +268,7 @@ class ValoresMasivosYReportesJdbcTest {
     private static ConsultaDeDeudaPublica deudas;
 
     private static RegistrarValor registrarValor;
+    private static ValorRepositoryJdbc repositorioDeValores;
     private static GeneradorDeDocumentos generadorDeDocumentos;
 
     @BeforeAll
@@ -349,10 +358,9 @@ class ValoresMasivosYReportesJdbcTest {
                         new RegistrarDescargo(
                                 papeletas, repositorioDeDescargos, plazos, auditoria, RELOJ));
 
+        repositorioDeValores = new ValorRepositoryJdbc(jdbc);
         registrarValor =
-                envolver(
-                        new RegistrarValor(
-                                new ValorRepositoryJdbc(jdbc), deudas, fases, auditoria, RELOJ));
+                envolver(new RegistrarValor(repositorioDeValores, deudas, fases, auditoria, RELOJ));
         EmisionDeValoresDeMultas emision =
                 envolver(
                         new EmisionDeValoresDeMultasValores(
@@ -393,7 +401,15 @@ class ValoresMasivosYReportesJdbcTest {
                 envolver(
                         new ProcesarPapeletaDeLaCorrida(
                                 papeletas, resoluciones, diligencias, emision, corridas));
-        anularPapeleta = envolver(new AnularPapeleta(papeletas, corridas, extincion, auditoria));
+        anularPapeleta =
+                envolver(
+                        new AnularPapeleta(
+                                papeletas,
+                                envolver(
+                                        new ValoresSobreUnaObligacionValores(repositorioDeValores)),
+                                extincion,
+                                auditoria));
+        anulacion = new AnulacionDePapeletaController(anularPapeleta);
         generar =
                 new GenerarCorridaDeValores(
                         envolver(new ConsultaDeLaCorridaDeValores(corridas)), procesar);
@@ -1924,6 +1940,108 @@ class ValoresMasivosYReportesJdbcTest {
                                         .isEqualTo(EstadoDeItemDeCorrida.NO_PROCEDE);
                                 assertThat(item.motivo()).contains("ORDINARIA");
                             });
+        }
+    }
+
+    // ==================================================================
+    //  #372 — el valor vivo que sostiene la papeleta, lo emita quien lo emita
+    // ==================================================================
+
+    /**
+     * <b>La siembra que distingue (#372).</b> Las pruebas de {@code LaAnulacionContraLaCorrida}
+     * emiten la resolucion de multa <b>por la corrida</b>, que es el unico camino que deja la fila
+     * {@code GENERADO} de {@code papeleta_masivo_item}: con esa muestra, «la corrida dejo un valor»
+     * y «hay un valor vivo sobre la obligacion» son lo mismo. Aqui la RM sale de la emision
+     * individual —{@code RegistrarValor.emitir}, el camino de {@code POST /api/v1/valores}— sobre
+     * la obligacion de T-005 y <b>sin corrida</b>, que es exactamente el escenario del issue.
+     *
+     * <p>Y la gemela, con la misma RM ya {@code ANULADA}: sin ella, una guarda que preguntara «hubo
+     * alguna vez un valor» pasaria la primera prueba y bloquearia para siempre una anulacion
+     * legitima.
+     */
+    @Nested
+    @DisplayName("#372 — la RM de la emision individual tambien impide anular la papeleta")
+    class ElValorVivoFueraDeLaCorrida {
+
+        private static final Dinero T005 = Dinero.de("440.00");
+
+        @Test
+        @DisplayName("una RM individual viva sobre su obligacion: 409 nombrando la RM")
+        void laRmIndividualVivaImpideAnular() {
+            long obligado = crearContribuyente("vv1");
+            Papeleta t005 = papeletaDeTransito("vv1-t005", obligado, T005);
+            String rm = emitirRmIndividual(obligado).numero();
+
+            assertThat(cuantosValoresGeneradosDe(t005))
+                    .as("la emision individual no deja fila en papeleta_masivo_item: sin corrida")
+                    .isZero();
+
+            Throwable rechazo = catchThrowable(() -> anularPorLaApi(t005));
+            assertThat(rechazo)
+                    .as(
+                            "anular dejaria %s EMITIDA cobrando una sancion que ya no existe, y la"
+                                    + " baja se llevaria los 440 que esa RM formaliza",
+                            rm)
+                    .isInstanceOfSatisfying(
+                            ProblemaDeNegocio.class,
+                            problema -> {
+                                assertThat(problema.codigo()).isEqualTo(CodigoDeError.CONFLICTO);
+                                assertThat(problema.codigo().estado().value()).isEqualTo(409);
+                                assertThat(problema.getMessage()).contains(rm);
+                            });
+
+            assertThat(enTransaccion(() -> papeletas.porId(t005.identificador())))
+                    .as("y no escribe nada: la papeleta se queda como estaba")
+                    .get()
+                    .extracting(Papeleta::estado)
+                    .isEqualTo(EstadoDePapeleta.IMPUESTA);
+        }
+
+        @Test
+        @DisplayName("la misma RM ya ANULADA no la sostiene: la papeleta se anula")
+        void laRmAnuladaNoImpideAnular() {
+            long obligado = crearContribuyente("vv2");
+            Papeleta t005 = papeletaDeTransito("vv2-t005", obligado, T005);
+            Valor rm = emitirRmIndividual(obligado);
+            enTransaccion(
+                    () ->
+                            repositorioDeValores.cambiarEstado(
+                                    java.util.Objects.requireNonNull(rm.id()),
+                                    EstadoDeValor.ANULADO));
+
+            assertThat(anularPorLaApi(t005).papeleta().estado())
+                    .as("existio un valor, pero ya no hay ninguno vivo que la sostenga")
+                    .isEqualTo(EstadoDePapeleta.ANULADA.name());
+        }
+
+        /** El camino de {@code POST /api/v1/valores}: sin corrida y sin tocar sanciones. */
+        private Valor emitirRmIndividual(long obligado) {
+            return enTransaccion(
+                    () ->
+                            registrarValor.emitir(
+                                    TipoValor.RESOLUCION_DE_MULTA,
+                                    obligado,
+                                    List.of(
+                                            new SelectorDeObligacion(
+                                                    "MULTA_TRANSITO",
+                                                    new Ejercicio(2026),
+                                                    null,
+                                                    null)),
+                                    PORQUE,
+                                    EXIGIBLE_DESDE));
+        }
+
+        /** {@code POST /api/v1/transito/papeletas/{numero}/anulacion}, con su traduccion a 409. */
+        private AnulacionDePapeletaController.PapeletaAnuladaResource anularPorLaApi(
+                Papeleta papeleta) {
+            return enTransaccion(
+                    () ->
+                            anulacion.anular(
+                                    papeleta.numero(),
+                                    new AnulacionDePapeletaController.PeticionDeAnulacion(
+                                            "Error material en la placa",
+                                            EXIGIBLE_DESDE.toString(),
+                                            null)));
         }
     }
 

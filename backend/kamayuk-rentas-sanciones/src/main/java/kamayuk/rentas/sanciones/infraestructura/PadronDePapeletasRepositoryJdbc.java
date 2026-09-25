@@ -136,10 +136,17 @@ public class PadronDePapeletasRepositoryJdbc extends RepositorioJdbc
      * tabla de {@code valores}: {@code sanciones} ve de los valores lo que {@code
      * EmisionDeValoresDeMultas} publica, y sus tablas no.
      *
-     * <p><b>Es completo</b>, medido: el unico sitio de {@code src/main} que llama a {@code
-     * emitirPorMulta} es {@code ProcesarPapeletaDeLaCorrida}, y esa es tambien la unica escritura
-     * de {@code papeleta_masivo_item}. No hay camino por el que una papeleta reciba su resolucion
-     * de multa sin dejar esa fila.
+     * <p><b>No es completo</b> (#372), y hasta #372 aqui se afirmaba lo contrario. Es cierto que el
+     * unico sitio de {@code src/main} que llama a {@code emitirPorMulta} es {@code
+     * ProcesarPapeletaDeLaCorrida}, y que es la unica escritura de {@code papeleta_masivo_item};
+     * pero de ahi no se sigue que no haya otro camino. La emision individual ({@code POST
+     * /api/v1/valores}) y la masiva de valores formalizan la deuda de la papeleta sin pasar por
+     * {@code emitirPorMulta} y sin dejar esta fila, y esa papeleta no sale en este padron. Lo que
+     * se lee aqui es «con resolucion de multa <b>de la corrida</b>». Una corrida posterior la
+     * propondria como candidata ({@code it.valor_id IS NULL}), pero no le emite una segunda: desde
+     * #371 {@code emitirPorMulta} rechaza la obligacion que ya salio de {@code ORDINARIA}. Y la
+     * anulacion ya no se apoya en esta fila: pregunta a {@code valores} (ver {@code
+     * AnularPapeleta}).
      *
      * <p><b>Y es lo que este sistema llama «enviada a coactiva»</b>: el padron {@code
      * transito_padron_coactiva} se define con este mismo predicado —{@code

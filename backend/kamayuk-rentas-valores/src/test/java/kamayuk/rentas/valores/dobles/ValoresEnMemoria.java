@@ -11,6 +11,7 @@ import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.valores.dominio.CriterioDeConsultaDeValores;
 import kamayuk.rentas.valores.dominio.CriterioDeValor;
 import kamayuk.rentas.valores.dominio.EstadoDeValor;
+import kamayuk.rentas.valores.dominio.SelectorDeObligacion;
 import kamayuk.rentas.valores.dominio.TipoValor;
 import kamayuk.rentas.valores.dominio.Valor;
 import kamayuk.rentas.valores.dominio.ValorDetalle;
@@ -164,6 +165,32 @@ public final class ValoresEnMemoria implements ValorRepository {
             }
         }
         return encontrados;
+    }
+
+    /** Los cuatro campos de la obligacion y los mismos estados vivos que la consulta (#372). */
+    @Override
+    public Optional<Valor> vivoSobre(long contribuyenteId, SelectorDeObligacion obligacion) {
+        return porId.values().stream()
+                .filter(valor -> valor.contribuyenteId() == contribuyenteId)
+                .filter(valor -> esCobrable(valor.estado()))
+                .filter(valor -> formaliza(valor, obligacion))
+                .min(java.util.Comparator.comparing(ValoresEnMemoria::idDe));
+    }
+
+    private boolean formaliza(Valor valor, SelectorDeObligacion obligacion) {
+        for (ValorDetalle d : detalleDe(idDe(valor))) {
+            if (d.tributo().equalsIgnoreCase(obligacion.tributo())
+                    && d.ejercicio().equals(obligacion.ejercicio())
+                    && java.util.Objects.equals(d.predioId(), obligacion.predioId())
+                    && java.util.Objects.equals(d.vehiculoId(), obligacion.vehiculoId())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static long idDe(Valor valor) {
+        return valor.id() == null ? 0 : valor.id();
     }
 
     @Override

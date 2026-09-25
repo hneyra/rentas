@@ -9,10 +9,10 @@ import kamayuk.rentas.cuentacorriente.ExtincionDeDeuda;
 import kamayuk.rentas.cuentacorriente.MovimientoAsentado;
 import kamayuk.rentas.cuentacorriente.ObligacionCompartida;
 import kamayuk.rentas.dominio.Observacion;
-import kamayuk.rentas.sanciones.dominio.CorridaDeValoresRepository;
 import kamayuk.rentas.sanciones.dominio.Familia;
 import kamayuk.rentas.sanciones.dominio.Papeleta;
 import kamayuk.rentas.sanciones.dominio.PapeletaRepository;
+import kamayuk.rentas.valores.ValoresSobreUnaObligacion;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -49,12 +49,14 @@ import org.springframework.transaction.annotation.Transactional;
  *       —{@code valor} → {@code papeleta_masivo_item.valor_id} → {@code papeleta}—, y ese cruce
  *       vive en {@code sanciones}. {@code valores} no lo puede hacer: no existe ningún puerto de
  *       {@code sanciones} que lo publique, y un {@code JOIN} cruzaría el límite del módulo.
- *   <li>Y <b>no sería completo</b>. Una papeleta sólo tiene valor si pasó la corrida masiva, que
+ *   <li>Y <b>no sería completo</b>. Ese cruce sólo conoce los valores de la corrida masiva, que
  *       exige resolución de multa dictada <b>y</b> notificada ({@code
- *       ProcesarPapeletaDeLaCorrida.impedimentoDe}). Una papeleta que nunca llegó ahí no recibiría
- *       {@code PRESCRITA} jamás, mientras que la deuda que originó —asentada por {@code
- *       RegistrarPapeleta} con tributo {@code MULTA_TRANSITO} o {@code MULTA_ADMINISTRATIVA}—
- *       prescribe igual. Dos verdades que discrepan, que es lo que #234 y #259 evitaron.
+ *       ProcesarPapeletaDeLaCorrida.impedimentoDe}); los que salen de la emisión individual o de la
+ *       masiva de valores no dejan fila en {@code papeleta_masivo_item} (#372). Una papeleta que
+ *       nunca pasó la corrida no recibiría {@code PRESCRITA} jamás, mientras que la deuda que
+ *       originó —asentada por {@code RegistrarPapeleta} con tributo {@code MULTA_TRANSITO} o {@code
+ *       MULTA_ADMINISTRATIVA}— prescribe igual. Dos verdades que discrepan, que es lo que #234 y
+ *       #259 evitaron.
  *   <li>Y hay un tercer sitio que ya existe: #674 decidió que declarar la prescripción <b>no toca
  *       el libro</b>, y que su huella son la fila de {@code prescripcion} y el estado del valor.
  *       Añadir la columna de la papeleta sería el tercero.
@@ -64,14 +66,28 @@ import org.springframework.transaction.annotation.Transactional;
  * un padrón migrado trae, que el enumerado tiene que poder <b>leer</b> (#259) y que este sistema no
  * escribe.
  *
- * <h2>Una papeleta con resolución de multa emitida no se anula</h2>
+ * <h2>Una papeleta cuya multa sostiene un valor vivo no se anula</h2>
  *
  * <p>Es lo que hace que esto sea de carga y no prosa, y es el mismo trato que {@code
  * AnularActaFiscalizacion} le da a una liquidación viva: anular la papeleta cuya multa ya se
- * formalizó en una resolución de multa dejaría ese valor —y quizá su expediente coactivo— cobrando
- * una sanción que no existe, con el papel ya en manos del administrado. Quien anula el valor es
- * {@code valores}, y {@code sanciones} no tiene ningún puerto para hacerlo: por eso aquí se rechaza
- * diciendo qué valor lo impide en vez de dejar las dos mitades en desacuerdo.
+ * formalizó en un valor dejaría ese valor —y quizá su expediente coactivo, que admite por valor y
+ * no por obligación— cobrando una sanción que no existe, con el papel ya en manos del administrado.
+ * Quien anula el valor es {@code valores}, y {@code sanciones} no tiene ningún puerto para hacerlo:
+ * por eso aquí se rechaza diciendo qué valor lo impide en vez de dejar las dos mitades en
+ * desacuerdo.
+ *
+ * <p><b>La pregunta se le hace a {@code valores}, y no a una copia propia (#372).</b> Hasta #372 se
+ * leía la fila {@code GENERADO} de {@code papeleta_masivo_item}, que sólo deja la corrida por
+ * papeletas; una RM —o una OP, o una RD— emitida desde la ventanilla de valores ({@code POST
+ * /api/v1/valores}) sobre la misma deuda no dejaba esa fila, la anulación contestaba 201 y la baja
+ * se llevaba lo que ese valor estaba cobrando. Saber si un valor <b>vivo</b> formaliza una
+ * obligación es un hecho de {@code valores}, que ve todos los caminos por los que nace uno: {@link
+ * ValoresSobreUnaObligacion}. Vivo, y no «que existió»: una RM ya anulada no sostiene nada.
+ *
+ * <p>Y se pregunta <b>por la obligación del libro</b>, que es lo que un valor formaliza. Mientras
+ * dos papeletas del mismo obligado compartan obligación (#465), un valor vivo de la otra también
+ * impide anular ésta. Es el lado conservador y es el correcto: la baja de más abajo extinguiría la
+ * deuda que ese valor cobra.
  *
  * <h2>No borra: da de baja lo que la papeleta cargó</h2>
  *
@@ -108,17 +124,17 @@ public class AnularPapeleta {
     private static final String TABLA_AUDITADA = "papeleta";
 
     private final PapeletaRepository papeletas;
-    private final CorridaDeValoresRepository corridas;
+    private final ValoresSobreUnaObligacion valores;
     private final ExtincionDeDeuda extincion;
     private final Auditoria auditoria;
 
     public AnularPapeleta(
             PapeletaRepository papeletas,
-            CorridaDeValoresRepository corridas,
+            ValoresSobreUnaObligacion valores,
             ExtincionDeDeuda extincion,
             Auditoria auditoria) {
         this.papeletas = papeletas;
-        this.corridas = corridas;
+        this.valores = valores;
         this.extincion = extincion;
         this.auditoria = auditoria;
     }
@@ -131,7 +147,8 @@ public class AnularPapeleta {
      * @param fecha el día del acto, no el de su registro (regla 9)
      * @param observacion por qué se anula (regla 10, RNF-052)
      * @throws RegistrarDescargo.PapeletaInexistente si no hay ninguna con ese número en esa familia
-     * @throws PapeletaConResolucionDeMulta si su multa ya se formalizó en una resolución de multa
+     * @throws PapeletaConResolucionDeMulta si un valor vivo formaliza su obligación, lo emitiera
+     *     quien lo emitiera (#372)
      * @throws Papeleta.TransicionIlegal si en ese estado ya no se debe nada
      * @throws ObligacionCompartidaConOtraPapeleta si su obligacion del libro tiene tambien la multa
      *     de otra papeleta (#371): anularla extinguiria las dos
@@ -188,8 +205,12 @@ public class AnularPapeleta {
 
     // ------------------------------------------------------------------
 
+    /**
+     * Pregunta a {@code valores}, no a {@code papeleta_masivo_item} (#372): la corrida es uno de
+     * los tres caminos por los que nace un valor sobre esta deuda, y el único que deja esa fila.
+     */
     private void exigirQueNadaLaSostenga(Papeleta papeleta) {
-        corridas.valorEmitidoDe(papeleta.identificador())
+        valores.vivoSobre(papeleta.obligadoId(), ObligacionDeLaPapeleta.de(papeleta))
                 .ifPresent(
                         valor -> {
                             throw new PapeletaConResolucionDeMulta(papeleta.numero(), valor);
@@ -210,8 +231,12 @@ public class AnularPapeleta {
     public record Anulada(Papeleta papeleta, MovimientoAsentado baja) {}
 
     /**
-     * La multa de esa papeleta ya se formalizó en una resolución de multa: anularla dejaría ese
+     * La multa de esa papeleta ya se formalizó en un valor que sigue vivo: anularla dejaría ese
      * valor cobrando una sanción que no existe.
+     *
+     * <p>Se llama así por el caso de siempre —la resolución de multa de la corrida—, pero desde
+     * #372 la levanta cualquier valor vivo sobre su obligación: también una OP o una RD emitidas
+     * desde la ventanilla de valores. Por eso el mensaje dice «valor» y no «resolución de multa».
      */
     public static final class PapeletaConResolucionDeMulta extends RuntimeException {
 
@@ -219,12 +244,13 @@ public class AnularPapeleta {
 
         PapeletaConResolucionDeMulta(String numeroDePapeleta, String numeroDelValor) {
             super(
-                    "La papeleta "
+                    "La multa de la papeleta "
                             + numeroDePapeleta
-                            + " ya tiene emitida la resolucion de multa "
+                            + " la formaliza el valor "
                             + numeroDelValor
-                            + ": primero se deja sin efecto ese valor y despues la papeleta, o"
-                            + " quedaria un valor cobrando una sancion que ya no existe");
+                            + ", que sigue vivo: primero se deja sin efecto ese valor y despues la"
+                            + " papeleta, o quedaria un valor cobrando una sancion que ya no"
+                            + " existe");
         }
     }
 }
