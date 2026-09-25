@@ -1,7 +1,7 @@
 import { coordenada, type CeldaDeLaTabla } from '@kamayuk/ui';
 
 import type { Conector, Reparto } from '../conectores.ts';
-import { NO_PUBLICADO } from '../conectores.ts';
+import { NO_PUBLICADO, ejercicioDeLaRespuesta } from '../conectores.ts';
 import { formatearFecha, formatearImporte } from '../../dominio/formato.ts';
 import type {
   ActoDelExpediente,
@@ -108,21 +108,38 @@ function importeConSuFecha(importe: string, fecha: string): string {
  * segura, porque dos expedientes del mismo obligado pueden formalizar la misma obligacion por dos
  * valores distintos y la suma la contaria dos veces. Un importe casi correcto en un panel es peor
  * que un hueco: nadie lo comprueba porque se parece al bueno.
+ *
+ * <h2>Y el «Ejercicio» es el de la respuesta: la cartera es de TODOS (#390)</h2>
+ *
+ * La operacion se pide sin `ejercicio`, y sin el contesta la cartera entera con `ejercicio: null`.
+ * Hasta #390 este conector no escribia `0|0`, y el desplegable ensenaba su primera opcion: «37
+ * abiertos» salia bajo «2026», que se lee como la carga de un ano y es el stock de todos. No habia
+ * ninguna opcion que dijera la verdad, asi que «Todos» entro como primera opcion en la definicion y
+ * en el artboard a la vez, y aqui se escribe por `ejercicioDeLaRespuesta`. Y `aLaFecha`, que
+ * llegaba y no se usaba, viaja por el `Reparto` como en `fis-panel`: la hoja dice de que dia es.
  */
 const COA_PANEL: Conector = {
   clave: ['coa-panel', 'resumenDeLaCarteraCoactiva'],
   pedir: ({ senal }) =>
     pedirUno<ResumenDeLaCarteraCoactiva>(RUTAS.resumenDeLaCarteraCoactiva, senal),
   repartir: (resumen: ResumenDeLaCarteraCoactiva): Reparto => ({
-    // `0|0` es el desplegable de ejercicio, no un campo de solo lectura: las coordenadas son las
-    // del bloque entero y no las de los campos `r`. Lo cazo la guarda de este archivo.
     valores: new Map([
+      // `0|0` es el desplegable de ejercicio, no un campo de solo lectura: las coordenadas son las
+      // del bloque entero y no las de los campos `r`. Lo cazo la guarda de este archivo.
+      //
+      // Y desde #390 se ESCRIBE: sin ejercicio la operacion contesta la cartera entera con
+      // `ejercicio: null`, y el desplegable ensenaba su primera opcion —«2026»— sobre el stock de
+      // todos los anos. Ahora dice «Todos», o el ano cuando llega uno.
+      [coordenada(0, 0), ejercicioDeLaRespuesta(resumen.ejercicio)],
       [coordenada(0, 1), String(resumen.abiertos)],
       [coordenada(0, 2), String(resumen.conRecNotificada)],
       [coordenada(0, 3), String(resumen.conMedidaCautelar)],
       [coordenada(0, 4), String(resumen.sinRec)],
     ]),
     filas: new Map(),
+    // El dia de la lectura, y no una fecha de corte: el estado es el del ultimo movimiento y el
+    // backend no sabe reconstruirlo a un dia pasado (#390, regla 9). Llegaba y no se usaba.
+    aLaFecha: resumen.aLaFecha,
     noPublicados: new Map([[coordenada(0, 5), NO_PUBLICADO]]),
   }),
 };

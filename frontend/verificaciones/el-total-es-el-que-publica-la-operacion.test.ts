@@ -272,7 +272,10 @@ describe('y medido sobre el reparto, no solo sobre el texto', () => {
     expect(reparto?.valores.get('0|1')).toBe('37');
     expect(reparto?.valores.get('0|1')).not.toBe('41');
     expect(reparto?.valores.get('0|1')).not.toBe('26');
-    expect(reparto?.valores.size).toBe(4);
+    // Cuatro recuentos y el ejercicio: desde #390 el reparto escribe tambien `0|0`, que no es una
+    // cifra sino el ejercicio que la respuesta dice —aqui, nulo: la cartera entera, «Todos»—.
+    expect(reparto?.valores.get('0|0')).toBe('Todos');
+    expect(reparto?.valores.size).toBe(5);
     // «Deuda en cartera» es el unico que queda, y ninguna operacion del contrato lo publica.
     expect(reparto?.noPublicados.size).toBe(1);
   });

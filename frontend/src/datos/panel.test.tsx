@@ -211,6 +211,45 @@ describe('`panel` — el estado de la emision', () => {
     expect(container.textContent).not.toContain('S/ 0.00');
     expect(container.textContent).not.toContain('S/ 3.70');
   });
+
+  /**
+   * **El desplegable «Ejercicio» dice el de la corrida, y no su primera opcion** (#390).
+   *
+   * La operacion se pide sin ejercicio y el backend la resuelve con el ano del reloj
+   * (`PredialController.ejercicioDeLaCorrida`), asi que el ejercicio de las cifras lo sabe la
+   * respuesta y nadie mas. Un desplegable sin valor ensena su primera opcion —`2026`—, y con la
+   * muestra de siempre, que es de 2026, eso no se distingue de haberlo leido: es la muestra
+   * uniforme. Por eso la corrida de aqui es de **2025**, que esta entre las opciones y no es la
+   * primera.
+   */
+  it('«Ejercicio» dice el ejercicio de la CORRIDA, no la primera opcion (#390)', async () => {
+    contesta(corrida({ ejercicio: '2025' }));
+    arnes()();
+
+    await waitFor(() => {
+      expect(screen.getByText('58,412')).toBeInTheDocument();
+    });
+    expect(screen.getByRole('combobox', { name: 'Ejercicio' })).toHaveTextContent('2025');
+    expect(screen.getByRole('combobox', { name: 'Ejercicio' })).not.toHaveTextContent('2026');
+  });
+
+  /**
+   * **Y con un ejercicio que no esta entre las opciones, el control se queda en blanco** (#390).
+   *
+   * Es enero de 2027 tras la primera emision del ano: el backend contesta la corrida de 2027 y las
+   * opciones siguen siendo `2026 · 2025 · 2024`. En blanco no explica nada, pero no afirma un ano
+   * que no es el de las cifras; anadir el ano a las opciones es trabajo de la definicion y del
+   * artboard.
+   */
+  it('una corrida de 2027 NO sale bajo «2026»: el control se queda en blanco', async () => {
+    contesta(corrida({ ejercicio: '2027', fechaCalculo: '15/01/2027 03:10' }));
+    arnes()();
+
+    await waitFor(() => {
+      expect(screen.getByText('15/01/2027 03:10')).toBeInTheDocument();
+    });
+    expect(screen.getByRole('combobox', { name: 'Ejercicio' })).not.toHaveTextContent('2026');
+  });
 });
 
 /**

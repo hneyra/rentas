@@ -10,7 +10,7 @@ import type {
   VehiculoServido,
 } from '../lecturas.ts';
 import { RUTAS, pedirPagina, pedirUno } from '../lecturas.ts';
-import type { Conector, Reparto } from '../conectores.ts';
+import { ejercicioDeLaRespuesta, type Conector, type Reparto } from '../conectores.ts';
 import { FUERA_DEL_DEPOSITO, NO_PUBLICADO, type PalabraDeHueco } from '../palabrasDeHueco.ts';
 import { laVentanaDe, laVentanaQueSePide, loQueDijoElServidor } from '../laVentana.ts';
 
@@ -310,8 +310,10 @@ const TRA_PANEL: Conector = {
     // rotulos que hablan del ejercicio entero.
     const delEjercicio = resumen.lineas.length === 1 ? resumen.lineas[0] : undefined;
     const valores = new Map<Coordenada, string>([
-      // El ejercicio que la respuesta dice haber contado, y no el que toco por omision.
-      [coordenada(0, 0), resumen.desde.slice(0, 4)],
+      // El ejercicio que la respuesta dice haber contado, y no el que toco por omision (#390). El
+      // ano sale del principio del rango —`desde`, ISO— porque esta operacion cuenta un rango y no
+      // publica un `ejercicio`; lo que se afirma con el pasa por la regla de todos los paneles.
+      [coordenada(0, 0), ejercicioDeLaRespuesta(resumen.desde.slice(0, 4))],
       // El total, calculado en el servidor. No se suman las lineas aqui.
       [coordenada(0, 1), String(resumen.papeletas)],
     ]);

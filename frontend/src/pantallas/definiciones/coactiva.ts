@@ -21,7 +21,11 @@ export const COACTIVA = {
         titulo: 'Cartera coactiva',
         nota: 'Por etapa, con lo que está parado y por qué.',
         campos: [
-          { etiqueta: 'Ejercicio', tipo: 's', opciones: ['2026', '2025'] },
+          // «Todos» la PRIMERA desde #390, en la definicion y en el artboard a la vez: la operacion
+          // se pide sin ejercicio y contesta la cartera entera con `ejercicio: null`, y no habia
+          // ninguna opcion que lo dijera —el control ensenaba «2026» sobre el stock de todos los
+          // anos—. Es la misma opcion que `val-tip` tiene para no mandar el parametro.
+          { etiqueta: 'Ejercicio', tipo: 's', opciones: ['Todos', '2026', '2025'] },
           { etiqueta: 'Expedientes abiertos', tipo: 'r' },
           { etiqueta: 'Con REC notificada', tipo: 'r' },
           { etiqueta: 'Con medida cautelar', tipo: 'r' },

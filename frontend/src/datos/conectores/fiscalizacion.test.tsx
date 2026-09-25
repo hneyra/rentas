@@ -284,6 +284,44 @@ describe('`fis-panel` — el embudo del programa (#196)', () => {
     expect(container.textContent).toContain('sin datos');
   });
 
+  /**
+   * **Un programa sin ejercicio NO sale bajo «2026»** (#390).
+   *
+   * Un programa anterior a `V60` no declara ejercicio. Hasta #390 la rama nula registraba
+   * `NO_PUBLICADO` en `0|0`, y el interprete no dibuja la ausencia en un desplegable —solo en un
+   * campo `r`—, asi que la palabra se perdia y el control ensenaba su primera opcion, que **es** un
+   * ano. El comentario decia lo contrario: que se quedaba en su primera opcion «en vez de afirmar
+   * un ano que nadie dijo».
+   */
+  it('sin ejercicio en el programa, el desplegable NO dice «2026» ni guarda una palabra muda', async () => {
+    const sinEjercicio = { ...EMBUDO, ejercicio: null };
+    const reparto = FIS_PANEL.repartir(sinEjercicio as never);
+
+    // Ninguna palabra de hueco sobre un desplegable: nadie la ve (ver la guarda de `conectores`).
+    expect(reparto.noPublicados.has(coordenada(0, 0))).toBe(false);
+    expect(reparto.valores.get(coordenada(0, 0))).not.toBe('2026');
+
+    await pintar('fis-panel', {
+      '/fiscalizacion/programas/14/embudo': sinEjercicio,
+      '/fiscalizacion/programas?': PROGRAMAS,
+    });
+    await waitFor(() => {
+      expect(screen.getByText('3418')).toBeInTheDocument();
+    });
+    expect(screen.getByRole('combobox', { name: 'Ejercicio' })).not.toHaveTextContent('2026');
+  });
+
+  it('con ejercicio, el del programa: 2025 no es la primera opcion (#390)', async () => {
+    await pintar('fis-panel', {
+      '/fiscalizacion/programas/14/embudo': { ...EMBUDO, ejercicio: 2025 },
+      '/fiscalizacion/programas?': PROGRAMAS,
+    });
+    await waitFor(() => {
+      expect(screen.getByText('3418')).toBeInTheDocument();
+    });
+    expect(screen.getByRole('combobox', { name: 'Ejercicio' })).toHaveTextContent('2025');
+  });
+
   it('LA ROTURA DEL AC3: con otro embudo, la pantalla ensena otras cifras', async () => {
     const { container } = await pintar('fis-panel', RUTAS_DE_PANEL);
     expect(container.textContent).toContain('3418');

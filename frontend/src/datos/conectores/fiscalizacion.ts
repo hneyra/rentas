@@ -12,7 +12,7 @@ import type {
   ResolucionEnLaRelacion,
 } from '../lecturas.ts';
 import { RUTAS, pedirPagina, pedirUno } from '../lecturas.ts';
-import type { Conector, Reparto } from '../conectores.ts';
+import { ejercicioDeLaRespuesta, type Conector, type Reparto } from '../conectores.ts';
 import {
   NO_PUBLICADO,
   SIN_CIFRAR,
@@ -700,10 +700,12 @@ const FIS_PANEL: Conector = {
     ]);
     const noPublicados = new Map<Coordenada, PalabraDeHueco>();
 
-    // El ejercicio del programa, cuando lo declara. Uno anterior a `V60` no lo lleva, y entonces el
-    // desplegable se queda en su primera opcion en vez de afirmar un ano que nadie dijo.
-    if (embudo.ejercicio !== null) valores.set(coordenada(0, 0), String(embudo.ejercicio));
-    else noPublicados.set(coordenada(0, 0), NO_PUBLICADO);
+    // El ejercicio del programa, por la regla de todos los paneles (#390). Uno anterior a `V60` no
+    // lo lleva, y entonces se escribe «Todos», que no es una opcion de esta hoja: el control se
+    // queda EN BLANCO. Hasta #390 esta rama registraba `NO_PUBLICADO` aqui y decia que el
+    // desplegable «se queda en su primera opcion en vez de afirmar un ano que nadie dijo»; pero el
+    // interprete no dibuja la palabra en un desplegable, y su primera opcion ES un ano — «2026».
+    valores.set(coordenada(0, 0), ejercicioDeLaRespuesta(embudo.ejercicio));
 
     if (embudo.detectadosPorCruce !== null) {
       valores.set(coordenada(0, 2), String(embudo.detectadosPorCruce));
