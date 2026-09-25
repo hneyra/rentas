@@ -48,6 +48,7 @@ import kamayuk.rentas.contribuyentes.ResumenDeContribuyente;
 import kamayuk.rentas.cuentacorriente.ConsultaDeDeudaPublica;
 import kamayuk.rentas.cuentacorriente.aplicacion.ConsultaDeDeudaCuentaCorriente;
 import kamayuk.rentas.cuentacorriente.aplicacion.ConsultarDeuda;
+import kamayuk.rentas.cuentacorriente.aplicacion.MovimientoDeFaseCuentaCorriente;
 import kamayuk.rentas.cuentacorriente.aplicacion.RegistrarAsiento;
 import kamayuk.rentas.cuentacorriente.dominio.Asiento;
 import kamayuk.rentas.cuentacorriente.dominio.CalculoDeDeuda;
@@ -237,7 +238,13 @@ class ActosCoactivosJdbcTest {
         importar =
                 envolver(
                         new ImportarValoresACoactiva(
-                                expedientes, movimientos, puerto, auditoria, RELOJ));
+                                expedientes,
+                                movimientos,
+                                puerto,
+                                deuda,
+                                envolver(new MovimientoDeFaseCuentaCorriente(registrarAsiento)),
+                                auditoria,
+                                RELOJ));
         consulta =
                 envolver(
                         new ConsultaDeExpedientes(expedientes, movimientos, puerto, deuda, costas));

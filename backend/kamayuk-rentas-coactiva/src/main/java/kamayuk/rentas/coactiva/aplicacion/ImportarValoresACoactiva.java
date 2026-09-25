@@ -4,6 +4,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -23,8 +24,12 @@ import kamayuk.rentas.coactiva.dominio.MovimientoDelExpedienteRepository;
 import kamayuk.rentas.coactiva.dominio.PlantillaDeNumeroDeExpediente;
 import kamayuk.rentas.coactiva.dominio.ValorDelExpediente;
 import kamayuk.rentas.coactiva.dominio.ValorRechazado;
+import kamayuk.rentas.cuentacorriente.ConsultaDeDeudaPublica;
+import kamayuk.rentas.cuentacorriente.MovimientoDeFase;
+import kamayuk.rentas.cuentacorriente.ObligacionPublica;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.Observacion;
+import kamayuk.rentas.valores.ObligacionDelValor;
 import kamayuk.rentas.valores.ValorParaCoactiva;
 import kamayuk.rentas.valores.ValoresEnCoactiva;
 import org.jspecify.annotations.Nullable;
@@ -61,6 +66,25 @@ import org.springframework.transaction.annotation.Transactional;
  * expedientes: la segunda choca contra {@code expediente_valor_unico_uq} y <b>se deshace
  * entera</b>, correlativo incluido. Reintentar entonces devuelve el rechazo explicado, porque la
  * primera ya dejo el valor dentro.
+ *
+ * <h2>Aqui es donde la deuda entra en coactiva, y el libro lo dice (#407)</h2>
+ *
+ * <p>La OP paso la deuda de ORDINARIA a VALOR; importarla a un expediente la pasa de VALOR a
+ * COACTIVA, con {@link MovimientoDeFase#moverACoactiva}, en el mismo bucle y la misma transaccion
+ * que la registra en el expediente y escribe el ACO. Hasta #407 la importacion no tocaba el libro,
+ * la deuda del expediente seguia en VALOR, y {@code FraccionarEnCoactiva} —que solo acoge deuda de
+ * la fase COACTIVA— la rechazaba: lo unico fraccionable en coactiva eran las costas. Una sola
+ * fuente de verdad: la fase la dice el libro, y no una tabla cruzada con los valores del
+ * expediente.
+ *
+ * <p><b>Se mueve lo pendiente a la fecha de la importacion, no lo congelado en el valor.</b> El
+ * desglose del valor es de su emision; si entre la OP y el pase el obligado pago una parte, mover
+ * lo congelado sacaria de VALOR mas de lo que queda ahi y dejaria esa fase en negativo. Lo
+ * pendiente sale de {@link ConsultaDeDeudaPublica}, la misma fuente con la que {@code
+ * RegistrarValor} decidio cuanto pasaba a VALOR. Una obligacion sin deuda a esa fecha no se mueve:
+ * no hay nada que cobrar en coactiva. Y una obligacion que formalizan dos valores del mismo
+ * expediente se mueve <b>una</b> vez: el par no cambia lo pendiente, y moverla dos veces contaria
+ * en COACTIVA el doble de lo que se debe.
  */
 @Service
 public class ImportarValoresACoactiva {
@@ -68,6 +92,8 @@ public class ImportarValoresACoactiva {
     private final ExpedienteRepository expedientes;
     private final MovimientoDelExpedienteRepository movimientos;
     private final ValoresEnCoactiva valores;
+    private final ConsultaDeDeudaPublica deuda;
+    private final MovimientoDeFase fases;
     private final Auditoria auditoria;
     private final Clock reloj;
 
@@ -75,11 +101,15 @@ public class ImportarValoresACoactiva {
             ExpedienteRepository expedientes,
             MovimientoDelExpedienteRepository movimientos,
             ValoresEnCoactiva valores,
+            ConsultaDeDeudaPublica deuda,
+            MovimientoDeFase fases,
             Auditoria auditoria,
             Clock reloj) {
         this.expedientes = expedientes;
         this.movimientos = movimientos;
         this.valores = valores;
+        this.deuda = deuda;
+        this.fases = fases;
         this.auditoria = auditoria;
         this.reloj = reloj;
     }
@@ -184,12 +214,25 @@ public class ImportarValoresACoactiva {
                         ahora,
                         observacion));
 
+        // Lo pendiente de cada obligacion a la fecha de la importacion (#407). Se lee una vez:
+        // el par de un movimiento de fase no cambia lo que se debe, asi que mover una obligacion
+        // no altera lo que las siguientes tienen pendiente.
+        List<ObligacionPublica> pendientes =
+                deuda.deTodoElContribuyente(peticion.contribuyenteId(), fecha);
+        Set<ObligacionDelValor> yaMovidas = new HashSet<>();
+
         List<ValorDelExpediente> importados = new ArrayList<>();
         for (ValorParaCoactiva valor : admitidos) {
             importados.add(expedientes.importar(abierto.identificador(), valor.id(), fecha));
             // La respuesta que #39 dejo anunciada: ACO cierra el ciclo que PCO abrio, y lo escribe
             // coactiva porque es coactiva quien ahora tiene el expediente que responde.
             valores.aceptarEnCoactiva(valor.id(), fecha, observacion);
+            // Y el libro deja de contarla en VALOR: desde aqui es deuda coactiva (#407).
+            for (ObligacionDelValor obligacion : valor.obligaciones()) {
+                if (yaMovidas.add(obligacion)) {
+                    moverACoactiva(abierto, valor, obligacion, pendientes, fecha, observacion);
+                }
+            }
         }
 
         auditar(abierto, admitidos, rechazados, fecha, observacion);
@@ -197,6 +240,47 @@ public class ImportarValoresACoactiva {
     }
 
     // ------------------------------------------------------------------
+
+    /**
+     * Pasa una obligacion del valor de VALOR a COACTIVA por lo que tiene pendiente a {@code fecha}.
+     *
+     * <p>El documento de origen es el expediente —es donde la deuda entra a coactiva— y la
+     * referencia es el valor que la trae, con la misma forma que {@code RegistrarValor} le dio al
+     * pase a VALOR: en el libro se lee de donde vino y a donde fue.
+     */
+    private void moverACoactiva(
+            ExpedienteCoactivo expediente,
+            ValorParaCoactiva valor,
+            ObligacionDelValor obligacion,
+            List<ObligacionPublica> pendientes,
+            LocalDate fecha,
+            Observacion observacion) {
+        Optional<ObligacionPublica> pendiente =
+                pendientes.stream()
+                        .filter(o -> o.tributo().equalsIgnoreCase(obligacion.tributo()))
+                        .filter(o -> o.ejercicio().equals(obligacion.ejercicio()))
+                        .filter(o -> java.util.Objects.equals(o.predioId(), obligacion.predioId()))
+                        .filter(
+                                o ->
+                                        java.util.Objects.equals(
+                                                o.vehiculoId(), obligacion.vehiculoId()))
+                        .findFirst();
+        if (pendiente.isEmpty() || !pendiente.get().total().esPositivo()) {
+            return;
+        }
+        fases.moverACoactiva(
+                obligacion.ejercicio(),
+                expediente.contribuyenteId(),
+                obligacion.tributo(),
+                null,
+                obligacion.predioId(),
+                obligacion.vehiculoId(),
+                "VALOR-" + valor.numero(),
+                pendiente.get().total(),
+                fecha,
+                expediente.numero(),
+                observacion);
+    }
 
     /**
      * Que valores se van a examinar.

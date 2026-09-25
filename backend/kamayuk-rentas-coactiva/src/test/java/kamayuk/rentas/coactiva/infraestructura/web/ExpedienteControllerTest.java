@@ -16,6 +16,7 @@ import kamayuk.rentas.coactiva.aplicacion.ImportarValoresACoactiva;
 import kamayuk.rentas.coactiva.dobles.ContribuyentesDeMentira;
 import kamayuk.rentas.coactiva.dobles.CostasEnMemoria;
 import kamayuk.rentas.coactiva.dobles.ExpedientesEnMemoria;
+import kamayuk.rentas.coactiva.dobles.FasesDeMentira;
 import kamayuk.rentas.coactiva.dobles.LibroDeMentira;
 import kamayuk.rentas.coactiva.dobles.MovimientosDelExpedienteEnMemoria;
 import kamayuk.rentas.coactiva.dobles.ValoresDeMentira;
@@ -91,6 +92,8 @@ class ExpedienteControllerTest {
                                             expedientes,
                                             movimientos,
                                             valores,
+                                            libro,
+                                            new FasesDeMentira(),
                                             (RegistroDeAuditoria registro) -> {},
                                             RELOJ),
                                     new CambiarEstadoDelExpediente(

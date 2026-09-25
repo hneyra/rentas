@@ -22,6 +22,7 @@ import kamayuk.rentas.coactiva.dobles.CostasEnMemoria;
 import kamayuk.rentas.coactiva.dobles.DiligenciasEnMemoria;
 import kamayuk.rentas.coactiva.dobles.DocumentosEnMemoria;
 import kamayuk.rentas.coactiva.dobles.ExpedientesEnMemoria;
+import kamayuk.rentas.coactiva.dobles.FasesDeMentira;
 import kamayuk.rentas.coactiva.dobles.LibroDeMentira;
 import kamayuk.rentas.coactiva.dobles.MovimientosDelExpedienteEnMemoria;
 import kamayuk.rentas.coactiva.dobles.PlazosDeMentira;
@@ -197,6 +198,8 @@ class ActoCoactivoControllerTest {
                         expedientes,
                         movimientos,
                         valores,
+                        libro,
+                        new FasesDeMentira(),
                         (RegistroDeAuditoria registro) -> {},
                         RELOJ)
                 .importar(
