@@ -289,10 +289,10 @@ class DeclararPrescripcionTest {
             assertThat(declarada.resultado()).isEqualTo(ResultadoDeLaSolicitud.PROCEDE);
             assertThat(computoDe(declarada, e2021).fechaPrescripcion())
                     .isEqualTo(LocalDate.of(2026, 1, 1));
-            // Y la del 2019 si corre el 2019, que es de quien es: 318 dias desde el 2024-01-01,
-            // que es bisiesto.
+            // Y la del 2019 si corre el 2019, que es de quien es: 319 dias contando el ultimo
+            // (#335) desde el 2024-01-01, que es bisiesto.
             assertThat(computoDe(declarada, e2019).fechaPrescripcion())
-                    .isEqualTo(LocalDate.of(2024, 11, 14));
+                    .isEqualTo(LocalDate.of(2024, 11, 15));
         }
 
         @Test
