@@ -213,7 +213,8 @@ public class CorridaDeValoresRepositoryJdbc extends RepositorioJdbc
     }
 
     /**
-     * La resolución de multa que ya formaliza esa papeleta (#267).
+     * La resolución de multa que la corrida emitió para esa papeleta (#267); no si hay un valor
+     * vivo sobre su multa, que es de {@code valores} (#372).
      *
      * <p>Un solo {@code SELECT} sobre {@code papeleta_masivo_item} y ninguna tabla de {@code
      * valores}: el número impreso está aquí porque {@code marcarGenerado} lo copió, que es lo mismo

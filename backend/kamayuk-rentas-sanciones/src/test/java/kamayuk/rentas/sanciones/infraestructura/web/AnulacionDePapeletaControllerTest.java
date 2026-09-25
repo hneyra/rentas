@@ -20,14 +20,12 @@ import kamayuk.rentas.dominio.Alicuota;
 import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.sanciones.aplicacion.AnularPapeleta;
-import kamayuk.rentas.sanciones.dominio.CorridaDeValores;
-import kamayuk.rentas.sanciones.dominio.CorridaDeValoresRepository;
 import kamayuk.rentas.sanciones.dominio.CriterioDePapeleta;
 import kamayuk.rentas.sanciones.dominio.EstadoDePapeleta;
 import kamayuk.rentas.sanciones.dominio.Familia;
-import kamayuk.rentas.sanciones.dominio.ItemDeCorrida;
 import kamayuk.rentas.sanciones.dominio.Papeleta;
 import kamayuk.rentas.sanciones.dominio.PapeletaRepository;
+import kamayuk.rentas.valores.ValoresSobreUnaObligacion;
 import kamayuk.rentas.web.ConfiguracionDeJson;
 import kamayuk.rentas.web.ManejadorDeErrores;
 import org.jspecify.annotations.Nullable;
@@ -51,12 +49,12 @@ class AnulacionDePapeletaControllerTest {
     private static final String RUTA = "/rentas/api/v1/transito/papeletas/";
 
     private final RepositorioDeMentira repositorio = new RepositorioDeMentira();
-    private final CorridasDeMentira corridas = new CorridasDeMentira();
+    private final ValoresDeMentira valores = new ValoresDeMentira();
     private final ExtincionDeMentira extincion = new ExtincionDeMentira();
 
     private final AnularPapeleta servicio =
             new AnularPapeleta(
-                    repositorio, corridas, extincion, (RegistroDeAuditoria registro) -> {});
+                    repositorio, valores, extincion, (RegistroDeAuditoria registro) -> {});
 
     private final MockMvc mvc =
             MockMvcBuilders.standaloneSetup(new AnulacionDePapeletaController(servicio))
@@ -159,16 +157,20 @@ class AnulacionDePapeletaControllerTest {
     }
 
     @Test
-    @DisplayName("con resolucion de multa emitida, 409 nombrando el valor")
-    void conResolucionDeMultaEs409() throws Exception {
+    @DisplayName("con un valor vivo sobre su obligacion, 409 nombrando el valor")
+    void conValorVivoEs409() throws Exception {
         repositorio.crear("PT-0004", EstadoDePapeleta.IMPUESTA);
-        corridas.conValor(1L, "RM-2026-000123");
+        valores.conValorVivo("RM-2026-000123");
 
         MvcResult resultado =
                 anular("PT-0004", "{\"observacion\":\"error material\",\"fecha\":\"2026-04-01\"}");
 
         assertThat(resultado.getResponse().getStatus()).isEqualTo(409);
         assertThat(resultado.getResponse().getContentAsString()).contains("RM-2026-000123");
+        assertThat(valores.preguntada)
+                .as("se pregunta por la obligacion del libro que la papeleta cargo (#372)")
+                .extracting(SeleccionDeObligacion::tributo)
+                .isEqualTo("MULTA_TRANSITO");
     }
 
     /**
@@ -298,52 +300,20 @@ class AnulacionDePapeletaControllerTest {
         }
     }
 
-    private static final class CorridasDeMentira implements CorridaDeValoresRepository {
+    /** Lo que {@code valores} contesta: un valor vivo sobre la obligacion, o ninguno (#372). */
+    private static final class ValoresDeMentira implements ValoresSobreUnaObligacion {
 
-        private final java.util.Map<Long, String> valores = new java.util.HashMap<>();
+        private @Nullable String vivo;
+        private @Nullable SeleccionDeObligacion preguntada;
 
-        void conValor(long papeletaId, String numeroDelValor) {
-            valores.put(papeletaId, numeroDelValor);
+        void conValorVivo(String numeroDelValor) {
+            this.vivo = numeroDelValor;
         }
 
         @Override
-        public Optional<String> valorEmitidoDe(long papeletaId) {
-            return Optional.ofNullable(valores.get(papeletaId));
-        }
-
-        @Override
-        public CorridaDeValores iniciar(CorridaDeValores corrida, List<Long> papeletaIds) {
-            throw new UnsupportedOperationException("esta prueba no inicia corridas");
-        }
-
-        @Override
-        public Optional<CorridaDeValores> porId(long corridaId) {
-            return Optional.empty();
-        }
-
-        @Override
-        public List<ItemDeCorrida> pendientes(long corridaId, long despuesDe, int cuantos) {
-            return List.of();
-        }
-
-        @Override
-        public List<ItemDeCorrida> items(long corridaId, long despuesDe, int cuantos) {
-            return List.of();
-        }
-
-        @Override
-        public ItemDeCorrida marcarGenerado(long itemId, long valorId, String valorNumero) {
-            throw new UnsupportedOperationException("esta prueba no genera valores");
-        }
-
-        @Override
-        public ItemDeCorrida marcarSinDeuda(long itemId) {
-            throw new UnsupportedOperationException("esta prueba no genera valores");
-        }
-
-        @Override
-        public ItemDeCorrida marcarNoProcede(long itemId, String motivo) {
-            throw new UnsupportedOperationException("esta prueba no genera valores");
+        public Optional<String> vivoSobre(long contribuyenteId, SeleccionDeObligacion obligacion) {
+            this.preguntada = obligacion;
+            return Optional.ofNullable(vivo);
         }
     }
 

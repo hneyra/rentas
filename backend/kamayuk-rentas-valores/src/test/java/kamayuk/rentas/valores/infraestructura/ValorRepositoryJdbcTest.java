@@ -35,6 +35,7 @@ import kamayuk.rentas.esquema.ContextoDeTenant;
 import kamayuk.rentas.plataforma.tenant.TenantTransactionManager;
 import kamayuk.rentas.valores.dominio.CriterioDeValor;
 import kamayuk.rentas.valores.dominio.EstadoDeValor;
+import kamayuk.rentas.valores.dominio.SelectorDeObligacion;
 import kamayuk.rentas.valores.dominio.TipoValor;
 import kamayuk.rentas.valores.dominio.Valor;
 import kamayuk.rentas.valores.dominio.ValorDetalle;
@@ -335,6 +336,122 @@ class ValorRepositoryJdbcTest {
             assertThat(primeroDeA).isEqualTo(1L);
             assertThat(primeroDeB).isEqualTo(1L);
             assertThat(segundoDeA).isEqualTo(2L);
+        }
+    }
+
+    /**
+     * #372 — el valor vivo sobre una obligacion, con la siembra que distingue.
+     *
+     * <p>Una muestra con un solo valor EMITIDO pasaria con cualquier consulta que encontrara «algun
+     * valor del contribuyente». Aqui cada valor que NO debe contestar difiere de la obligacion
+     * preguntada en <b>una sola</b> cosa —la unidad, el ejercicio, el tributo, el obligado o el
+     * estado—, de modo que un filtro olvidado se ve como un numero equivocado.
+     */
+    @Nested
+    @DisplayName("#372 — el valor vivo sobre una obligacion")
+    class ElValorVivoSobreUnaObligacion {
+
+        private static final Ejercicio EJERCICIO = new Ejercicio(2026);
+        private static final SelectorDeObligacion LA_MULTA =
+                new SelectorDeObligacion("MULTA_TRANSITO", EJERCICIO, null, null);
+
+        @Test
+        @DisplayName("solo contesta el vivo del mismo obligado y de la misma obligacion")
+        void soloElVivoDeLaMismaObligacion() {
+            TenantContext.fijar(new MunicipalidadId(municipalidadA));
+            long obligado = crearContribuyente(municipalidadA, "V-0372", "50203721");
+            long vecino = crearContribuyente(municipalidadA, "V-0373", "50203722");
+
+            enA(
+                    () -> {
+                        // Una cosa distinta cada uno.
+                        emitir(obligado, "OP-2026-037201", "MULTA_TRANSITO", 2026, 77L);
+                        emitir(obligado, "OP-2026-037202", "MULTA_TRANSITO", 2025, null);
+                        emitir(obligado, "OP-2026-037203", "MULTA_ADMINISTRATIVA", 2026, null);
+                        emitir(vecino, "OP-2026-037204", "MULTA_TRANSITO", 2026, null);
+                        // La misma obligacion, pero ya sin cobranza en curso.
+                        for (EstadoDeValor terminal :
+                                List.of(
+                                        EstadoDeValor.ANULADO,
+                                        EstadoDeValor.PRESCRITO,
+                                        EstadoDeValor.PAGADO)) {
+                            Valor muerto =
+                                    emitir(
+                                            obligado,
+                                            "OP-2026-03721" + terminal.ordinal(),
+                                            "MULTA_TRANSITO",
+                                            2026,
+                                            null);
+                            repositorio.cambiarEstado(idDe(muerto), terminal);
+                        }
+                        return null;
+                    });
+
+            assertThat(enA(() -> repositorio.vivoSobre(obligado, LA_MULTA)))
+                    .as("ninguno de los siete formaliza, vivo, la multa sin vehiculo de 2026")
+                    .isEmpty();
+            assertThat(
+                            enA(
+                                    () ->
+                                            repositorio.vivoSobre(
+                                                    obligado,
+                                                    new SelectorDeObligacion(
+                                                            "multa_transito",
+                                                            EJERCICIO,
+                                                            null,
+                                                            77L))))
+                    .as("la del vehiculo 77 si tiene el suyo: la unidad cuenta")
+                    .get()
+                    .extracting(Valor::numero)
+                    .isEqualTo("OP-2026-037201");
+
+            enA(
+                    () -> {
+                        Valor enCoactiva =
+                                emitir(obligado, "OP-2026-037220", "MULTA_TRANSITO", 2026, null);
+                        repositorio.cambiarEstado(idDe(enCoactiva), EstadoDeValor.COACTIVA);
+                        return null;
+                    });
+
+            assertThat(enA(() -> repositorio.vivoSobre(obligado, LA_MULTA)))
+                    .as("en COACTIVA sigue vivo: es justo el que mas pesa")
+                    .get()
+                    .extracting(Valor::numero)
+                    .isEqualTo("OP-2026-037220");
+        }
+
+        private Valor emitir(
+                long contribuyente,
+                String numero,
+                String tributo,
+                int ejercicio,
+                @org.jspecify.annotations.Nullable Long vehiculoId) {
+            return repositorio.insertar(
+                    valorDe(contribuyente, numero, Dinero.de("440.00")),
+                    List.of(
+                            ValorDetalle.nuevo(
+                                    tributo,
+                                    new Ejercicio(ejercicio),
+                                    null,
+                                    null,
+                                    vehiculoId,
+                                    null,
+                                    Dinero.de("440.00"),
+                                    Dinero.CERO,
+                                    Dinero.CERO,
+                                    Dinero.CERO)));
+        }
+
+        private static long idDe(Valor valor) {
+            return java.util.Objects.requireNonNull(valor.id());
+        }
+
+        private <T> T enA(java.util.function.Supplier<T> accion) {
+            return transaccion.execute(
+                    estado -> {
+                        TenantContext.fijar(new MunicipalidadId(municipalidadA));
+                        return accion.get();
+                    });
         }
     }
 

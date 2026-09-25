@@ -110,6 +110,8 @@ import kamayuk.rentas.sanciones.infraestructura.web.ConstanciasLibresController;
 import kamayuk.rentas.sanciones.infraestructura.web.DescargosController;
 import kamayuk.rentas.sanciones.infraestructura.web.InternamientosController;
 import kamayuk.rentas.sanciones.infraestructura.web.NotificacionAdministrativaController;
+import kamayuk.rentas.valores.aplicacion.ValoresSobreUnaObligacionValores;
+import kamayuk.rentas.valores.infraestructura.ValorRepositoryJdbc;
 import kamayuk.rentas.web.ManejadorDeErrores;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterAll;
@@ -354,7 +356,9 @@ class SancionesJdbcTest {
                 envolver(
                         new AnularPapeleta(
                                 papeletas,
-                                new CorridaDeValoresRepositoryJdbc(jdbc),
+                                envolver(
+                                        new ValoresSobreUnaObligacionValores(
+                                                new ValorRepositoryJdbc(jdbc))),
                                 extincion,
                                 auditoria));
         resolver =

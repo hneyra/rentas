@@ -53,20 +53,22 @@ public interface CorridaDeValoresRepository {
     ItemDeCorrida marcarSinDeuda(long itemId);
 
     /**
-     * El número de la resolución de multa que ya formaliza esa papeleta, si la hay (#267).
+     * El número de la resolución de multa que <b>la corrida</b> emitió para esa papeleta, si la hay
+     * (#267).
      *
      * <p>Es la fila {@code GENERADO} de {@code papeleta_masivo_item}, que {@code
-     * papeleta_valor_unico_uq} garantiza única, y <b>es completo</b> por lo que {@code
-     * PadronDePapeletasRepositoryJdbc} ya tenía medido: el único sitio de {@code src/main} que
-     * llama a {@code emitirPorMulta} es {@code ProcesarPapeletaDeLaCorrida}, y esa es también la
-     * única escritura de esta tabla. No hay camino por el que una papeleta reciba su resolución de
-     * multa sin dejar esa fila.
+     * papeleta_valor_unico_uq} garantiza única. Contesta eso y nada más: qué valor dejó la corrida.
      *
-     * <p>Se pregunta desde {@code AnularPapeleta}, y no toca ni una tabla de {@code valores}:
-     * {@code sanciones} ve de los valores lo que {@code EmisionDeValoresDeMultas} publica, y sus
-     * tablas no.
+     * <p><b>No es completo, y no contesta «¿hay un valor vivo sobre esta multa?»</b> (#372). Hasta
+     * #372 aquí se afirmaba lo contrario —que ninguna papeleta recibía su resolución de multa sin
+     * dejar esta fila— y la premisa era falsa: la emisión individual ({@code POST /api/v1/valores},
+     * que admite OP, RD o RM sobre cualquier tributo) y la masiva de valores formalizan la misma
+     * deuda sin pasar por {@code emitirPorMulta} y sin escribir aquí. Y aun sobre lo que sí
+     * registra, la fila no sabe si ese valor se anuló o prescribió después. Esa pregunta es de
+     * {@code valores} y se le hace a {@code valores.ValoresSobreUnaObligacion}, que es a quien
+     * pregunta {@code AnularPapeleta}.
      *
-     * @return el número impreso del valor, o vacío si esa papeleta no tiene ninguno
+     * @return el número impreso del valor, o vacío si la corrida no le emitió ninguno
      */
     Optional<String> valorEmitidoDe(long papeletaId);
 
