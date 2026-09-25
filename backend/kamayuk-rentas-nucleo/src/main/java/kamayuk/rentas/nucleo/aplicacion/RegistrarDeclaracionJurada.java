@@ -144,7 +144,10 @@ public class RegistrarDeclaracionJurada {
      *
      * <p><b>Puede cambiar de predio</b>, y la conciliacion lo contempla: el predio que se declaro
      * por error deja de conciliar por esta cadena y el que la rectificatoria declara pasa a
-     * hacerlo, sin que ninguno de los dos cuente dos veces (ADR-0015 §1, #344).
+     * hacerlo, sin que ninguno de los dos cuente dos veces (ADR-0015 §1, #344). <b>Y de vehiculo,
+     * con el mismo criterio</b>; lo que no puede cambiar es la <b>naturaleza</b>: la rectificatoria
+     * de una DJ vehicular declara un vehiculo, y la de una predial no declara ninguno (#399). Lo
+     * decide {@link DeclaracionJurada#rectificadaPor}, que es por donde pasa cualquier camino.
      *
      * <p>Solo se rectifica una declaracion <b>vigente</b>. Una anulada no revive rectificandola, y
      * una sustituida ya tiene quien la sustituya: rectificarla otra vez dejaria dos rectificatorias

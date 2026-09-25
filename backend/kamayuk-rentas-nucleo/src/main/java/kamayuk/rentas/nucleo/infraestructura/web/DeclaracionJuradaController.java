@@ -180,7 +180,9 @@ public class DeclaracionJuradaController {
      * (regla 4).
      *
      * <p><b>Puede cambiar de predio</b>: el que se declaro por error deja de conciliar por esta
-     * cadena y el que la rectificatoria declara pasa a hacerlo (ADR-0015 §1).
+     * cadena y el que la rectificatoria declara pasa a hacerlo (ADR-0015 §1). Y de vehiculo, pero
+     * no de naturaleza: la de una vehicular trae {@code vehiculoId} y no {@code predioId}, y la de
+     * una predial no trae {@code vehiculoId}; si no, 422 (#399).
      */
     @PostMapping("/{djNro}/rectificacion")
     @ResponseStatus(HttpStatus.CREATED)

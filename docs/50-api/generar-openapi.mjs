@@ -2520,7 +2520,9 @@ const OPERACIONES_ADICIONALES = {
         tocarle una columna (regla 4): las dos filas quedan en la base y la nueva referencia a la
         que sustituye. **Puede cambiar de predio**, y la conciliación lo contempla — el predio
         que se declaró por error deja de conciliar por esa cadena y el que la rectificatoria
-        declara pasa a hacerlo, sin que ninguno cuente dos veces.
+        declara pasa a hacerlo, sin que ninguno cuente dos veces. **Y de vehículo, pero no de
+        naturaleza** (#399): la rectificatoria de una declaración vehicular trae vehiculoId y no
+        predioId, y la de una predial no trae vehiculoId; si no, responde 422.
 
         Solo se rectifica una declaración en pie: sobre una ANULADA o una ya SUSTITUIDA responde
         409. El número de la rectificatoria lo pone el sistema, como el de cualquier otra.
