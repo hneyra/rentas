@@ -23,6 +23,8 @@ import {
   MODULOS_MEDIDOS,
   PERMISOS_MEDIDOS,
 } from '../src/datos/seguridadMedida.ts';
+import { MUNICIPALIDAD_MEDIDA, SESION_MEDIDA } from '../src/datos/sesionMedida.ts';
+import { inicialesDe } from '../src/dominio/iniciales.ts';
 import i18n, { ABRE, CIERRA, IDIOMA_MARCADO, IDIOMA_POR_OMISION } from '../src/i18n/i18n.ts';
 import {
   FRASES_DEL_INTERPRETE,
@@ -68,10 +70,13 @@ import { hojaDe } from '../src/pantallas/arbol.ts';
  * exencion hacia era taparlo. Hoy la pasa `PantallaDeRentas` —desde #153, en el saco `textos` del
  * interprete— y sale marcada como cualquier otra.
  *
- * Los dos nombres son DATOS de una persona, no frases: traducir «J. Cardenas Vega» seria falso.
- * Salen del marco —la cuenta de la barra— y por eso solo hacen falta al montar la aplicacion.
+ * **Y «J. Cardenas Vega» y «JC» salieron en #356**, por lo mismo que «(opcional)»: la exencion
+ * los daba por datos de una persona, y eran literales del artboard escritos en `aplicacion.tsx` —
+ * la cabecera que cualquier cuenta de cualquier municipalidad veia—. Lo que la barra dice hoy es
+ * dato de verdad, llega de `GET /seguridad/sesion{,/municipalidad}`, y se exime como se eximen los
+ * rotulos de los modulos: derivado de lo que contesta el doble (`DATOS_DE_LA_SESION`), no escrito.
  */
-const NO_ES_TEXTO = new Set(['—', '/', '·', ':', 'J. Cardenas Vega', 'JC']);
+const NO_ES_TEXTO = new Set(['—', '/', '·', ':']);
 
 beforeAll(async () => {
   await i18n.changeLanguage(IDIOMA_MARCADO);
@@ -246,6 +251,21 @@ describe('ninguna cadena llega al DOM sin pasar por `t()`', () => {
  */
 const ROTULOS_DEL_BACKEND: ReadonlySet<string> = new Set(MODULOS_MEDIDOS.map((m) => m.nombre));
 
+/**
+ * **Lo que la barra dice de la sesion, que tampoco es nuestro** (#356).
+ *
+ * La entidad, el nombre de la cuenta y sus iniciales llegan de `GET /seguridad/sesion` y
+ * `/seguridad/sesion/municipalidad`: traducir «Administrador del Sistema» seria tan falso como
+ * traducir un rotulo de modulo. Se derivan de lo que contesta el doble, y las iniciales, de la
+ * misma funcion que las dibuja.
+ */
+const DATOS_DE_LA_SESION: ReadonlySet<string> = new Set([
+  ...ROTULOS_DEL_BACKEND,
+  SESION_MEDIDA.nombre,
+  MUNICIPALIDAD_MEDIDA.nombre,
+  inicialesDe(SESION_MEDIDA.nombre),
+]);
+
 /** Con que se llaman las cuatro entradas que llevan un dato dentro. */
 const MUESTRAS: Readonly<Record<string, readonly unknown[]>> = {
   avisosSinLeer: [3],
@@ -326,6 +346,9 @@ describe('y el marco tampoco: las treinta y dos palabras del armazon (#133)', ()
         if (url.includes('/seguridad/modulos')) return pagina(MODULOS_MEDIDOS);
         if (url.includes('/seguridad/accesos')) return pagina(ACCESOS_MEDIDOS);
         if (url.includes('/seguridad/sesion/permisos')) return json(PERMISOS_MEDIDOS);
+        // Las dos de la barra (#356), por la ruta EXACTA: `/seguridad/sesion` es prefijo de las otras.
+        if (url.endsWith('/seguridad/sesion/municipalidad')) return json(MUNICIPALIDAD_MEDIDA);
+        if (url.endsWith('/seguridad/sesion')) return json(SESION_MEDIDA);
         return Promise.resolve(new Response('{}', { status: 404 }));
       }),
     );
@@ -459,8 +482,13 @@ describe('y el marco tampoco: las treinta y dos palabras del armazon (#133)', ()
     await waitFor(() => {
       expect(document.querySelector('[data-slot="barra-global"], header, nav')).not.toBeNull();
     });
+    // Se espera a que la barra diga quien ha entrado (#356): antes de eso lo que dice son las
+    // frases de espera, que si pasan por `t()`, y la exencion de los datos no se estaria midiendo.
+    await waitFor(() => {
+      expect(screen.getByText(SESION_MEDIDA.nombre)).toBeTruthy();
+    });
 
-    const escapadas = sinTraducir(document.body, ROTULOS_DEL_BACKEND);
+    const escapadas = sinTraducir(document.body, DATOS_DE_LA_SESION);
     expect(
       escapadas,
       'La aplicacion montada dibuja texto que no paso por «t()»:\n' +
@@ -480,7 +508,7 @@ describe('y el marco tampoco: las treinta y dos palabras del armazon (#133)', ()
       expect(screen.getByRole('dialog')).toBeTruthy();
     });
 
-    const escapadas = sinTraducir(document.body, ROTULOS_DEL_BACKEND);
+    const escapadas = sinTraducir(document.body, DATOS_DE_LA_SESION);
     expect(
       escapadas,
       'La paleta de mando dibuja texto que no paso por «t()»:\n' +

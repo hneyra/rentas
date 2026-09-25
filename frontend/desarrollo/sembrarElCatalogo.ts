@@ -14,7 +14,8 @@
  * <h2>Se siembra EL CATALOGO, y nada mas</h2>
  *
  * Lo que se pone en la cache son las tres respuestas de seguridad, o sea **que pantallas
- * existen**. No se siembra ni un dato de pantalla: las dos que piden de verdad —`panel` y
+ * existen**, y desde #356 las dos de la sesion, o sea **quien ha entrado y de que municipalidad**
+ * —lo que dice la barra—. No se siembra ni un dato de pantalla: las dos que piden de verdad —`panel` y
  * `coa-panel`— salen a la red, no encuentran a nadie y **ensenan su estado de error**, que es la
  * verdad y es un estado que hay que poder mirar. Contestarles algo inventado seria devolver el
  * proxy de datos que #90 saco del arbol, y ese se fue con su motivo: se quedo sin nada que
@@ -48,6 +49,7 @@ import {
   MODULOS_MEDIDOS,
   PERMISOS_MEDIDOS,
 } from '../src/datos/seguridadMedida.ts';
+import { MUNICIPALIDAD_MEDIDA, SESION_MEDIDA } from '../src/datos/sesionMedida.ts';
 import { LLAVES } from '../src/datos/useCatalogoPermitido.ts';
 
 /**
@@ -71,7 +73,7 @@ function comoPagina<T>(contenido: readonly T[]): Paginado<T> {
 }
 
 /**
- * Pone las tres respuestas de seguridad en la cache, ya contestadas.
+ * Pone las tres respuestas de seguridad en la cache, ya contestadas, y las dos de la sesion (#356).
  *
  * <h2>Por que hace falta `staleTime` y no basta con `setQueryData`</h2>
  *
@@ -93,6 +95,12 @@ export function sembrarElCatalogo(): void {
   CONSULTAS.setQueryData(LLAVES.modulos, MODULOS_MEDIDOS);
   CONSULTAS.setQueryData(LLAVES.accesos, comoPagina(ACCESOS_MEDIDOS));
   CONSULTAS.setQueryData(LLAVES.permisos, PERMISOS_MEDIDOS);
+  // Y quien ha entrado, para la barra (#356). Es la MISMA cuenta de la captura de arriba —la matriz
+  // de permisos es la suya—, y su `ejercicioDeTrabajo` es `null`: no se siembra ningun ejercicio,
+  // que es lo que #181 prohibe inventar. Sin estas dos la barra saldria a la red a preguntarlo, y
+  // «sembrado» dejaria de ser «cero peticiones a `/seguridad/`».
+  CONSULTAS.setQueryData(LLAVES.sesion, SESION_MEDIDA);
+  CONSULTAS.setQueryData(LLAVES.municipalidad, MUNICIPALIDAD_MEDIDA);
 
   // Y se dice, porque una interfaz que se ve entera sin que nada este levantado es exactamente lo
   // que alguien puede confundir con «el backend contesto». Va por `warn` y no por `log`: la
@@ -100,7 +108,8 @@ export function sembrarElCatalogo(): void {
   console.warn(
     'rentas-web: EL CATALOGO ESTA SEMBRADO, no pedido (VITE_KAMAYUK_SIN_PLATAFORMA=true).\n' +
       'Los doce modulos, los 134 accesos y la matriz de permisos salen de la captura de\n' +
-      '`seguridadMedida.ts`, y no se fue a Keycloak. Las pantallas que piden datos —las que\n' +
+      '`seguridadMedida.ts`, y la cuenta y la municipalidad de la barra, de `sesionMedida.ts`:\n' +
+      'no se fue a Keycloak. Las pantallas que piden datos —las que\n' +
       'tienen conector en `datos/conectores.ts`— van a fallar, que es la verdad cuando no hay\n' +
       'backend.\n' +
       'Para trabajar contra la plataforma levantada: `yarn dev:con-plataforma`.',

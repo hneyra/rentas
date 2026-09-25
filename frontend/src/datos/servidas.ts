@@ -23,7 +23,9 @@
  * Y son las dos que hacian **mentir a la barra global**: hasta I-1 el nombre de la entidad y el
  * del usuario eran constantes del artboard —«Municipalidad Distrital de Catacaos» y «J. Cárdenas
  * Vega»—, o sea que la cabecera de todas las pantallas afirmaba de quien son unas cifras sin
- * haberselo preguntado a nadie.
+ * haberselo preguntado a nadie. **Y volvieron a serlo**: #90 monto la barra con `Armazon` y dos
+ * literales, y las dos lecturas se quedaron sin consumidor hasta #356, que las devolvio a la barra
+ * (`useCabeceraDeLaSesion`).
  *
  * <h2>Lo que hizo falta antes, en el orden en que se dijo</h2>
  *
