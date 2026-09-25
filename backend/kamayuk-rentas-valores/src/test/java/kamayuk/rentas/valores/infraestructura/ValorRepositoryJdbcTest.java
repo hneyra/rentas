@@ -26,6 +26,8 @@ import kamayuk.rentas.auditoria.OrigenContext;
 import kamayuk.rentas.compartido.Pagina;
 import kamayuk.rentas.compartido.Paginacion;
 import kamayuk.rentas.compartido.TenantContext;
+import kamayuk.rentas.cuentacorriente.ClaveDeObligacionPublica;
+import kamayuk.rentas.cuentacorriente.MovimientoDeFase;
 import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.MunicipalidadId;
@@ -39,6 +41,7 @@ import kamayuk.rentas.valores.dominio.SelectorDeObligacion;
 import kamayuk.rentas.valores.dominio.TipoValor;
 import kamayuk.rentas.valores.dominio.Valor;
 import kamayuk.rentas.valores.dominio.ValorDetalle;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -565,17 +568,35 @@ class ValorRepositoryJdbcTest {
                                                 Dinero.CERO,
                                                 Dinero.CERO));
                             },
-                            (ejercicio,
-                                    contribuyenteId,
-                                    tributo,
-                                    periodo,
-                                    predioId,
-                                    vehiculoId,
-                                    referenciaExterna,
-                                    monto,
-                                    fechaValor,
-                                    documentoOrigen,
-                                    observacion) -> pares.add(referenciaExterna),
+                            new MovimientoDeFase() {
+                                @Override
+                                public void moverAValor(
+                                        Ejercicio ejercicio,
+                                        long contribuyenteId,
+                                        String tributo,
+                                        @Nullable Integer periodo,
+                                        @Nullable Long predioId,
+                                        @Nullable Long vehiculoId,
+                                        String referenciaExterna,
+                                        Dinero monto,
+                                        LocalDate fechaValor,
+                                        String documentoOrigen,
+                                        Observacion observacion) {
+                                    pares.add(referenciaExterna);
+                                }
+
+                                @Override
+                                public Dinero moverACoactiva(
+                                        long contribuyenteId,
+                                        ClaveDeObligacionPublica obligacion,
+                                        String referenciaExterna,
+                                        LocalDate fechaValor,
+                                        String documentoOrigen,
+                                        Observacion observacion) {
+                                    throw new AssertionError(
+                                            "emitir un valor pasa la deuda a VALOR, no a COACTIVA");
+                                }
+                            },
                             registro -> {},
                             java.time.Clock.systemUTC());
 
