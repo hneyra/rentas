@@ -2062,6 +2062,13 @@ paths:
         El índice parcial `domicilio_fiscal_vigente_uq` impide que queden dos vigentes aunque
         el código se equivoque; lo que no puede exigir es que quede uno, y de eso se encarga la
         transacción. `vigenciaDesde` ausente es hoy.
+
+        **Una mudanza sólo se añade al final del historial** (#420): una `vigenciaDesde` que no
+        es posterior al inicio del tramo abierto del mismo tipo —la misma fecha, o una anterior—
+        es 422, y el mensaje nombra la fecha desde la que rige ese tramo. Vale igual para el
+        FISCAL y para el PROCESAL. Y dos mudanzas simultáneas del mismo contribuyente contestan
+        **409** a la que llega segunda: encuentra cerrado el tramo que leyó abierto, y lo que
+        toca es volver a leer la ficha.
       tags: ["Rentas · Registro"]
       parameters:
         - name: id

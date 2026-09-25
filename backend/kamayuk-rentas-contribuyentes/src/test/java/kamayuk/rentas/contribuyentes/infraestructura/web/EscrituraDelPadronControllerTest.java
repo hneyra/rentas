@@ -25,6 +25,7 @@ import kamayuk.rentas.contribuyentes.aplicacion.ActualizarFicha;
 import kamayuk.rentas.contribuyentes.aplicacion.ConsultaDeLaFichaDelContribuyente;
 import kamayuk.rentas.contribuyentes.aplicacion.ConsultaDelPadron;
 import kamayuk.rentas.contribuyentes.aplicacion.RegistrarContribuyente;
+import kamayuk.rentas.contribuyentes.dominio.Domicilio;
 import kamayuk.rentas.contribuyentes.infraestructura.ContribuyenteRepositoryJdbc;
 import kamayuk.rentas.contribuyentes.infraestructura.FichaRepositoryJdbc;
 import kamayuk.rentas.dominio.MunicipalidadId;
@@ -86,6 +87,8 @@ class EscrituraDelPadronControllerTest {
     private static long municipalidadA;
     private static long municipalidadB;
     private static MockMvc mvc;
+    private static JdbcClient jdbc;
+    private static TenantTransactionManager gestor;
 
     /** Lo que el comprobador concede. Se cambia por prueba para medir el 403. */
     private static final List<Privilegio> CONCEDIDOS = new ArrayList<>();
@@ -105,41 +108,45 @@ class EscrituraDelPadronControllerTest {
         pool.setUsername(BaseDeDatosDePrueba.APP);
         pool.setPassword(base.clave(BaseDeDatosDePrueba.APP));
 
-        JdbcClient jdbc = JdbcClient.create(pool);
-        TenantTransactionManager gestor = new TenantTransactionManager(pool);
+        jdbc = JdbcClient.create(pool);
+        gestor = new TenantTransactionManager(pool);
+        mvc = montar(new FichaRepositoryJdbc(jdbc));
+    }
+
+    /**
+     * Los dos controladores sobre la base de verdad, con el repositorio de la ficha que se pida.
+     *
+     * <p>Es un parametro por una sola prueba, la de la carrera de #420: necesita un repositorio que
+     * deje ganar a otra mudanza entre la lectura del tramo abierto y su cierre.
+     */
+    private static MockMvc montar(FichaRepositoryJdbc fichas) {
         AuditoriaJdbc auditoria = new AuditoriaJdbc(jdbc, RELOJ);
         ContribuyenteRepositoryJdbc padron = new ContribuyenteRepositoryJdbc(jdbc);
-        FichaRepositoryJdbc fichas = new FichaRepositoryJdbc(jdbc);
 
         ComprobadorDeAcceso comprobador =
                 (usuario, acceso, privilegio, fecha) -> CONCEDIDOS.contains(privilegio);
 
-        mvc =
-                MockMvcBuilders.standaloneSetup(
-                                new ContribuyenteController(
-                                        envolver(new ConsultaDelPadron(padron), gestor),
-                                        envolver(
-                                                new RegistrarContribuyente(padron, auditoria),
-                                                gestor),
-                                        comprobador,
-                                        RELOJ),
-                                new FichaDelContribuyenteController(
-                                        envolver(
-                                                new ConsultaDeLaFichaDelContribuyente(
-                                                        padron, fichas),
-                                                gestor),
-                                        envolver(new ActualizarFicha(fichas, auditoria), gestor),
-                                        comprobador,
-                                        RELOJ))
-                        .setControllerAdvice(new ManejadorDeErrores())
-                        .setMessageConverters(
-                                new JacksonJsonHttpMessageConverter(
-                                        JsonMapper.builder()
-                                                .addModule(
-                                                        new ConfiguracionDeJson()
-                                                                .moduloDeObjetosDeValor())
-                                                .build()))
-                        .build();
+        return MockMvcBuilders.standaloneSetup(
+                        new ContribuyenteController(
+                                envolver(new ConsultaDelPadron(padron), gestor),
+                                envolver(new RegistrarContribuyente(padron, auditoria), gestor),
+                                comprobador,
+                                RELOJ),
+                        new FichaDelContribuyenteController(
+                                envolver(
+                                        new ConsultaDeLaFichaDelContribuyente(padron, fichas),
+                                        gestor),
+                                envolver(new ActualizarFicha(fichas, auditoria), gestor),
+                                comprobador,
+                                RELOJ))
+                .setControllerAdvice(new ManejadorDeErrores())
+                .setMessageConverters(
+                        new JacksonJsonHttpMessageConverter(
+                                JsonMapper.builder()
+                                        .addModule(
+                                                new ConfiguracionDeJson().moduloDeObjetosDeValor())
+                                        .build()))
+                .build();
     }
 
     @AfterAll
@@ -640,6 +647,237 @@ class EscrituraDelPadronControllerTest {
         }
     }
 
+    // ── La mudanza fuera de orden (#420) ───────────────────────────────
+
+    /**
+     * #420 — Una mudanza solo se anade al final del historial.
+     *
+     * <p>Todas las pruebas de arriba mudan con fechas crecientes —enero y despues julio—, que es
+     * justo la muestra en la que el defecto no se ve. La mudanza buscaba el domicilio que <b>rige
+     * en</b> {@code vigenciaDesde}, no el que esta abierto, y con una fecha anterior al tramo
+     * abierto se estrellaba: contra {@code domicilio_fiscal_vigente_uq} si no regia ninguno (500),
+     * contra {@code Domicilio.cerradoEl} si regia uno ya cerrado (500), y en el PROCESAL, que no
+     * tiene indice, contestaba 201 y dejaba dos tramos abiertos.
+     *
+     * <p>Las siembras son las tres que distinguen: un tramo abierto y una fecha anterior a el; un
+     * historial A cerrado y B abierto con la fecha dentro de A; y el mismo caso del primero en el
+     * PROCESAL. En las tres se mira el estado, que el registro no tenga ninguna linea ERROR y
+     * <b>cuantos tramos abiertos quedan en la base</b>, por tipo.
+     */
+    @Nested
+    @DisplayName("#420 — La mudanza solo se anade al final del historial")
+    class MudanzaFueraDeOrden {
+
+        @Test
+        @DisplayName("FISCAL abierto desde junio y mudanza a marzo: 422, y sigue uno abierto")
+        void unFiscalAnteriorAlAbiertoEs422() throws Exception {
+            long id = altaDe("C-0310", "40100310", "MUDA HACIA ATRAS, FISCAL");
+            enviar(
+                    post("/rentas/api/v1/rentas/contribuyentes/" + id + "/domicilios"),
+                    domicilio("AV. JUNIO 600", "2026-06-01"));
+
+            Rechazo rechazo =
+                    rechazo(
+                            () ->
+                                    enviar(
+                                            post(
+                                                    "/rentas/api/v1/rentas/contribuyentes/"
+                                                            + id
+                                                            + "/domicilios"),
+                                            domicilio("AV. MARZO 300", "2026-03-01")));
+
+            assertThat(rechazo.estado())
+                    .as(
+                            "no rige ninguno en marzo, asi que no se cerraba nada y el segundo"
+                                    + " FISCAL abierto chocaba con domicilio_fiscal_vigente_uq: 500")
+                    .isEqualTo(422);
+            assertThat(rechazo.cuerpo())
+                    .as("el mensaje dice la regla y el tramo que la pone")
+                    .contains("solo se anade al final")
+                    .contains("2026-06-01")
+                    .doesNotContain("domicilio_fiscal_vigente_uq")
+                    .doesNotContain("incidencia");
+            assertThat(rechazo.errores())
+                    .as("un rechazo del usuario no es una incidencia del servidor")
+                    .isEmpty();
+            assertThat(abiertos(id, "FISCAL")).isEqualTo(1);
+            assertThat(tramos(id)).as("y no se escribio nada").isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("A cerrado, B abierto y mudanza dentro de A: 422, y el historial no cambia")
+        void unaFechaDentroDeUnTramoCerradoEs422() throws Exception {
+            long id = altaDe("C-0311", "40100311", "MUDA DENTRO DE A, FISCAL");
+            enviar(
+                    post("/rentas/api/v1/rentas/contribuyentes/" + id + "/domicilios"),
+                    domicilio("CALLE A 1", "2020-01-01"));
+            enviar(
+                    post("/rentas/api/v1/rentas/contribuyentes/" + id + "/domicilios"),
+                    domicilio("CALLE B 2", "2026-06-01"));
+            assertThat(vigenciaHastaDe(id, "CALLE A 1"))
+                    .as("la siembra: A cerrado el dia antes de B")
+                    .isEqualTo(LocalDate.of(2026, 5, 31));
+
+            Rechazo rechazo =
+                    rechazo(
+                            () ->
+                                    enviar(
+                                            post(
+                                                    "/rentas/api/v1/rentas/contribuyentes/"
+                                                            + id
+                                                            + "/domicilios"),
+                                            domicilio("CALLE C 3", "2026-03-01")));
+
+            assertThat(rechazo.estado())
+                    .as(
+                            "en marzo rige A, que ya esta cerrado: cerradoEl lanzaba"
+                                    + " IllegalStateException y nadie la traducia (500)")
+                    .isEqualTo(422);
+            assertThat(rechazo.cuerpo())
+                    .as("el limite es el tramo ABIERTO, B, y no el que rige en la fecha pedida")
+                    .contains("solo se anade al final")
+                    .contains("2026-06-01")
+                    .doesNotContain("incidencia");
+            assertThat(rechazo.errores()).isEmpty();
+            assertThat(abiertos(id, "FISCAL")).isEqualTo(1);
+            assertThat(vigenciaHastaDe(id, "CALLE A 1"))
+                    .as("A no se reescribe")
+                    .isEqualTo(LocalDate.of(2026, 5, 31));
+            assertThat(tramos(id)).isEqualTo(2);
+        }
+
+        @Test
+        @DisplayName("PROCESAL abierto desde junio y mudanza a marzo: 422, y no dos abiertos")
+        void unProcesalAnteriorAlAbiertoEs422() throws Exception {
+            long id = altaDe("C-0312", "40100312", "MUDA HACIA ATRAS, PROCESAL");
+            enviar(
+                    post("/rentas/api/v1/rentas/contribuyentes/" + id + "/domicilios"),
+                    domicilio("PROCESAL", "JR. JUNIO 600", "2026-06-01"));
+
+            Rechazo rechazo =
+                    rechazo(
+                            () ->
+                                    enviar(
+                                            post(
+                                                    "/rentas/api/v1/rentas/contribuyentes/"
+                                                            + id
+                                                            + "/domicilios"),
+                                            domicilio("PROCESAL", "JR. MARZO 300", "2026-03-01")));
+
+            assertThat(rechazo.estado())
+                    .as(
+                            "el PROCESAL no tiene indice parcial: sin la regla contestaba 201 y"
+                                    + " dejaba el de marzo abierto y solapado con el de junio")
+                    .isEqualTo(422);
+            assertThat(rechazo.cuerpo()).contains("solo se anade al final").contains("2026-06-01");
+            assertThat(rechazo.errores()).isEmpty();
+            assertThat(abiertos(id, "PROCESAL"))
+                    .as("un tramo abierto por tipo, que el resto del modulo da por hecho")
+                    .isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("la misma fecha que el tramo abierto (el doble clic) es 422 y lo dice")
+        void laMismaFechaEs422() throws Exception {
+            long id = altaDe("C-0313", "40100313", "DOBLE CLIC, PERSONA");
+            enviar(
+                    post("/rentas/api/v1/rentas/contribuyentes/" + id + "/domicilios"),
+                    domicilio("AV. PRIMERA 1", "2026-01-01"));
+            enviar(
+                    post("/rentas/api/v1/rentas/contribuyentes/" + id + "/domicilios"),
+                    domicilio("AV. SEGUNDA 2", "2026-07-01"));
+
+            Rechazo rechazo =
+                    rechazo(
+                            () ->
+                                    enviar(
+                                            post(
+                                                    "/rentas/api/v1/rentas/contribuyentes/"
+                                                            + id
+                                                            + "/domicilios"),
+                                            domicilio("AV. SEGUNDA 2", "2026-07-01")));
+
+            assertThat(rechazo.estado()).isEqualTo(422);
+            assertThat(rechazo.cuerpo())
+                    .as(
+                            "salia 422, pero con «No se puede cerrar el 2026-06-30 un domicilio que"
+                                    + " empezo a regir el 2026-07-01», que no explica nada")
+                    .contains("solo se anade al final")
+                    .contains("2026-07-01");
+            assertThat(abiertos(id, "FISCAL")).isEqualTo(1);
+            assertThat(tramos(id)).isEqualTo(2);
+        }
+
+        @Test
+        @DisplayName("una fecha posterior al tramo abierto sigue mudando, en los dos tipos")
+        void unaFechaPosteriorSigueMudando() throws Exception {
+            long id = altaDe("C-0314", "40100314", "MUDA HACIA ADELANTE, PERSONA");
+            for (String tipo : new String[] {"FISCAL", "PROCESAL"}) {
+                enviar(
+                        post("/rentas/api/v1/rentas/contribuyentes/" + id + "/domicilios"),
+                        domicilio(tipo, "PRIMERO " + tipo, "2026-06-01"));
+                MvcResult siguiente =
+                        enviar(
+                                post("/rentas/api/v1/rentas/contribuyentes/" + id + "/domicilios"),
+                                domicilio(tipo, "SEGUNDO " + tipo, "2026-06-02"));
+
+                assertThat(siguiente.getResponse().getStatus())
+                        .as("el dia siguiente al inicio del abierto es el primero que se admite")
+                        .isEqualTo(201);
+                assertThat(abiertos(id, tipo)).isEqualTo(1);
+                assertThat(vigenciaHastaDe(id, "PRIMERO " + tipo))
+                        .isEqualTo(LocalDate.of(2026, 6, 1));
+            }
+        }
+
+        /**
+         * La carrera: otra mudanza cierra el tramo abierto entre la lectura de esta y su {@code
+         * UPDATE}, que toca cero filas y lanza {@code DomicilioNoVigente}.
+         *
+         * <p>Dos hilos no la reproducen a voluntad; un repositorio que deja ganar a la otra justo
+         * antes del cierre, si. La otra mudanza escribe por su propia conexion y confirma, que es
+         * lo que habria hecho la peticion que gano.
+         */
+        @Test
+        @DisplayName("si otra mudanza gana la carrera, la que pierde es 409 y no 500")
+        void laCarreraEs409() throws Exception {
+            long id = altaDe("C-0315", "40100315", "CARRERA, PERSONA");
+            enviar(
+                    post("/rentas/api/v1/rentas/contribuyentes/" + id + "/domicilios"),
+                    domicilio("AV. ORIGEN 1", "2026-01-01"));
+
+            MockMvc conCarrera = montar(new OtraMudanzaSeAdelanta(jdbc));
+            Rechazo rechazo =
+                    rechazo(
+                            () ->
+                                    conCarrera
+                                            .perform(
+                                                    post("/rentas/api/v1/rentas/contribuyentes/"
+                                                                    + id
+                                                                    + "/domicilios")
+                                                            .contentType(MediaType.APPLICATION_JSON)
+                                                            .content(
+                                                                    domicilio(
+                                                                            "AV. PERDEDORA 2",
+                                                                            "2026-07-01")))
+                                            .andReturn());
+
+            assertThat(rechazo.estado())
+                    .as(
+                            "DomicilioNoVigente es una RuntimeException que nadie traducia: 500 con"
+                                    + " incidencia, que el cliente reintenta")
+                    .isEqualTo(409);
+            assertThat(rechazo.cuerpo())
+                    .contains("CONFLICTO")
+                    .contains("Otra mudanza")
+                    .doesNotContain("incidencia");
+            assertThat(rechazo.errores()).isEmpty();
+            assertThat(abiertos(id, "FISCAL"))
+                    .as("la perdedora no escribio nada: la transaccion revirtio")
+                    .isZero();
+        }
+    }
+
     // ── Contactos y responsables ───────────────────────────────────────
 
     @Nested
@@ -913,11 +1151,15 @@ class EscrituraDelPadronControllerTest {
     }
 
     private static String domicilio(String direccion, String desde) {
+        return domicilio("FISCAL", direccion, desde);
+    }
+
+    private static String domicilio(String tipo, String direccion, String desde) {
         return """
-               {"observacion":"Muda segun declaracion jurada presentada","tipo":"FISCAL",
+               {"observacion":"Muda segun declaracion jurada presentada","tipo":"%s",
                 "direccion":"%s","vigenciaDesde":"%s","documentoOrigen":"DJ-2026-1"}
                """
-                .formatted(direccion, desde);
+                .formatted(tipo, direccion, desde);
     }
 
     private static long altaDe(String codigo, String documento, String nombre) throws Exception {
@@ -1013,6 +1255,24 @@ class EscrituraDelPadronControllerTest {
                 "SELECT count(*) FROM domicilio WHERE contribuyente_id = "
                         + contribuyenteId
                         + " AND vigencia_hasta IS NULL",
+                municipalidadA);
+    }
+
+    /** Los tramos abiertos de un tipo: el resto del modulo da por hecho que es uno (#420). */
+    private static long abiertos(long contribuyenteId, String tipo) throws SQLException {
+        return contar(
+                "SELECT count(*) FROM domicilio WHERE contribuyente_id = "
+                        + contribuyenteId
+                        + " AND tipo = '"
+                        + tipo
+                        + "' AND vigencia_hasta IS NULL",
+                municipalidadA);
+    }
+
+    /** Todos los tramos, abiertos y cerrados: un rechazo no escribe ninguno. */
+    private static long tramos(long contribuyenteId) throws SQLException {
+        return contar(
+                "SELECT count(*) FROM domicilio WHERE contribuyente_id = " + contribuyenteId,
                 municipalidadA);
     }
 
@@ -1129,6 +1389,41 @@ class EscrituraDelPadronControllerTest {
                     return id;
                 }
             }
+        }
+    }
+
+    /**
+     * Otra mudanza gana la carrera (#420): justo antes de que esta cierre el tramo, la otra lo
+     * cierra por su propia conexion y confirma. El {@code UPDATE ... WHERE vigencia_hasta IS NULL}
+     * de esta toca entonces cero filas, que es lo que pasa con dos peticiones simultaneas.
+     */
+    private static final class OtraMudanzaSeAdelanta extends FichaRepositoryJdbc {
+
+        OtraMudanzaSeAdelanta(JdbcClient jdbc) {
+            super(jdbc);
+        }
+
+        @Override
+        public Domicilio guardar(Domicilio domicilio) {
+            if (!domicilio.esNuevo()) {
+                try (Connection otra = base.conexion(BaseDeDatosDePrueba.APP)) {
+                    ContextoDeTenant.fijar(otra, municipalidadA);
+                    try (PreparedStatement cierre =
+                            otra.prepareStatement(
+                                    "UPDATE domicilio SET vigencia_hasta = ?"
+                                            + " WHERE id = ? AND vigencia_hasta IS NULL")) {
+                        cierre.setObject(1, domicilio.vigenciaHasta());
+                        cierre.setLong(2, java.util.Objects.requireNonNull(domicilio.id()));
+                        assertThat(cierre.executeUpdate())
+                                .as("la otra mudanza cierra el tramo de verdad")
+                                .isEqualTo(1);
+                    }
+                    otra.commit();
+                } catch (SQLException fallo) {
+                    throw new IllegalStateException(fallo);
+                }
+            }
+            return super.guardar(domicilio);
         }
     }
 
