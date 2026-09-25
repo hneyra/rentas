@@ -28,13 +28,18 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Registra la diligencia de notificación de una resolución de gerencia, con su acuse (#50, RF-065).
  *
- * <h2>De aquí sale el derecho a la sancionadora</h2>
+ * <h2>De aquí sale el derecho a la sancionadora, y la firmeza de las demás</h2>
  *
  * <p>La resolución ordinaria concede un plazo de pago; solo vencido ese plazo cabe la sancionadora
  * (pantalla {@code transito_rg_sancionadora}: «segunda resolución, emitida luego de la ordinaria»).
  * Esa cuenta se resuelve aquí, una vez, y su resultado queda escrito en {@code
  * notificacion.exigible_desde} junto con el conjunto sellado del que salió el plazo. La
  * sancionadora lo <b>copia</b> de ahí; no lo recalcula.
+ *
+ * <p>Y el plazo que se cuenta es el <b>del acto notificado</b> ({@link
+ * PlazosDeSancionesParametrizados.Vigentes#queConcede}, #410): la sancionadora y la RIS conceden el
+ * de impugnarlas, y ese es el día que la corrida masiva lee como «ya es firme». Hasta #410 aquí se
+ * contaba el de la ordinaria para cualquier resolución.
  *
  * <p>El plazo entra por {@link PlazosDeSancionesParametrizados}, nunca como constante: un «7»
  * compilado obligaría a desplegar para seguir a la norma, y recalcularía con la cifra de hoy los
@@ -116,7 +121,10 @@ public class NotificarResolucionDeGerencia {
         if (peticion.resultado().surteEfecto()) {
             PlazosDeSancionesParametrizados.Vigentes vigentes =
                     plazos.aLaFechaDe(peticion.fechaDeLaDiligencia());
-            Plazo plazo = vigentes.paraCumplirLaOrdinaria();
+            // El plazo del acto NOTIFICADO, y no el de la ordinaria para cualquiera (#410): la RIS
+            // concede el de impugnarla, y contar el de pago de transito la daba por firme ocho dias
+            // habiles despues, con el recurso todavia abierto.
+            Plazo plazo = vigentes.queConcede(resolucion.tipo()).plazo();
             CalendarioHabil calendario = vigentes.calendario();
             exigibleDesde =
                     Exigibilidad.derivarDe(peticion.fechaDeLaDiligencia(), plazo, calendario)

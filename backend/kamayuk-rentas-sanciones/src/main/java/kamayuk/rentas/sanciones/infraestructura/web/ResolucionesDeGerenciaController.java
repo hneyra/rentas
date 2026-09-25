@@ -57,22 +57,25 @@ import org.springframework.web.bind.annotation.RestController;
  *
  * <h2>Qué devuelve 422, y por qué no 500 (#562)</h2>
  *
- * <p>El plazo de cumplimiento de la resolución ordinaria sale del <b>conjunto sellado</b> que rige
- * a la fecha del acto —o de la diligencia— ({@link PlazosDeSancionesParametrizados}, regla 5). Ni
- * que falte el conjunto entero ({@code EjercicioSinSellar}) ni que falte la llave dentro de él
- * ({@code PlazoSinParametrizar}) estaban traducidas: las dos salían como <b>500 {@code
- * ERROR_INTERNO} con identificador de incidencia</b>, y con D-02a abierta ese es el estado
- * <i>normal</i> de todas las municipalidades — con lo que dictar la ordinaria y notificar cualquier
- * resolución eran inalcanzables, y cada intento ensuciaba el registro de errores del servidor.
+ * <p>El plazo que cada resolución concede sale del <b>conjunto sellado</b> que rige a la fecha del
+ * acto —o de la diligencia— ({@link PlazosDeSancionesParametrizados}, regla 5). Ni que falte el
+ * conjunto entero ({@code EjercicioSinSellar}) ni que falte la llave dentro de él ({@code
+ * PlazoSinParametrizar}) estaban traducidas: las dos salían como <b>500 {@code ERROR_INTERNO} con
+ * identificador de incidencia</b>, y con D-02a abierta ese es el estado <i>normal</i> de todas las
+ * municipalidades — con lo que dictar la ordinaria y notificar cualquier resolución eran
+ * inalcanzables, y cada intento ensuciaba el registro de errores del servidor.
  *
- * <p><b>La sancionadora y la administrativa no leen el plazo</b> —{@code
- * ResolverConResolucionDeGerencia} solo lo resuelve cuando el tipo es {@code ORDINARIA}— y la
- * diligencia solo lo lee cuando el resultado <b>surte efecto</b>: por esas ramas no se alcanzaba
- * ninguna de las dos, y siguen igual.
+ * <p><b>Desde #410 las tres resoluciones leen su plazo</b>, y cada una el suyo: la ordinaria el de
+ * pago ({@code PLAZO:RG_ORDINARIA_CUMPLIMIENTO}), la sancionadora y la administrativa el de
+ * impugnarlas ({@code PLAZO:RG_RECURSO}). Hasta entonces el dictado solo lo resolvía para la
+ * ordinaria, y la diligencia de <b>cualquier</b> resolución contaba el de la ordinaria: notificar
+ * la RIS contestaba este 422 por una cifra de tránsito que su procedimiento no concede. La
+ * diligencia sigue leyéndolo solo cuando el resultado <b>surte efecto</b>.
  *
  * <p>El mensaje es el de la propia excepción: nombra la llave —{@code
- * PLAZO:RG_ORDINARIA_CUMPLIMIENTO}— o, cuando lo que falta es el conjunto entero y no hay llave que
- * nombrar, el <b>ejercicio</b>. Un fallo de verdad del servidor sigue siendo 500 con su incidencia.
+ * PLAZO:RG_ORDINARIA_CUMPLIMIENTO} o {@code PLAZO:RG_RECURSO}— o, cuando lo que falta es el
+ * conjunto entero y no hay llave que nombrar, el <b>ejercicio</b>. Un fallo de verdad del servidor
+ * sigue siendo 500 con su incidencia.
  */
 @RestController
 @RequestMapping(Api.RAIZ)
@@ -232,8 +235,8 @@ public class ResolucionesDeGerenciaController {
                     CodigoDeError.NO_ENCONTRADO, PeticionesDeSanciones.mensajeDe(noExiste));
         } catch (PlazosDeSancionesParametrizados.PlazoSinParametrizar
                 | LectorDeParametros.EjercicioSinSellar falta) {
-            // Igual que en `dictar`: el plazo de cumplimiento de la ordinaria sale del conjunto
-            // sellado, y que falte no es un fallo del servidor. Ver la cabecera de la clase.
+            // Igual que en `dictar`: el plazo que concede la resolucion notificada sale del
+            // conjunto sellado, y que falte no es un fallo del servidor. Ver la cabecera.
             // Falta publicar una cifra normativa, no un campo de la peticion: el 422 sale con
             // el miembro `parametroQueFalta` (#604, #691). Sin el, la interfaz no puede decir UNA
             // de las dos cosas —«corrige el formulario» o «hay que publicar una cifra»— y acaba

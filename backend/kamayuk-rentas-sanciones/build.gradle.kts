@@ -63,3 +63,14 @@ dependencies {
     testImplementation("org.springframework:spring-test")
     testRuntimeOnly(libs.postgresql)
 }
+
+// `PlazosDeSancionesContraElDerivadoTest` (#410) lee el CSV de `normativa`, el repositorio
+// hermano, igual que las pruebas del derivado de `valores`, `coactiva` y `nucleo` (#192). Sin
+// declararlo como entrada, editar el CSV deja a `test` en UP-TO-DATE y la llave que se publica
+// con otro nombre pasa en verde rancio en local; y sin declararlo, `ClonesHermanosDelWorkflowTest`
+// (C-22) no ve que CI tiene que traerlo.
+tasks.test {
+    inputs
+        .file(rootProject.file("../../normativa/docs/10-negocio/valores-normativos/publicacion/parametros-2026.csv"))
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+}

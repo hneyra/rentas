@@ -24,7 +24,6 @@ import kamayuk.rentas.documentos.ModeloDeDocumento;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.dominio.OrdenDeLosActos;
-import kamayuk.rentas.dominio.Plazo;
 import kamayuk.rentas.sanciones.dominio.Descargo;
 import kamayuk.rentas.sanciones.dominio.DescargoRepository;
 import kamayuk.rentas.sanciones.dominio.EfectoSobreLaMulta;
@@ -210,10 +209,12 @@ public class ResolverConResolucionDeGerencia {
         ObligacionPublica deuda = ObligacionDeLaPapeleta.deudaDe(papeleta, deudas, proyeccion);
 
         ResumenDeContribuyente obligado = obligadoDe(papeleta);
-        Plazo plazo =
-                peticion.tipo() == TipoDeResolucionDeGerencia.ORDINARIA
-                        ? plazos.aLaFechaDe(peticion.fecha()).paraCumplirLaOrdinaria()
-                        : null;
+        // Todas conceden un plazo, y el papel lo imprime siempre con el rotulo de su tipo (#410):
+        // es
+        // la misma respuesta con la que la diligencia contara la exigibilidad, asi que lo que el
+        // administrado lee es lo que se le cuenta.
+        PlazosDeSancionesParametrizados.PlazoConcedido plazo =
+                plazos.aLaFechaDe(peticion.fecha()).queConcede(peticion.tipo());
 
         ModeloDeDocumento modelo =
                 ModeloDeLaResolucionDeGerencia.de(
