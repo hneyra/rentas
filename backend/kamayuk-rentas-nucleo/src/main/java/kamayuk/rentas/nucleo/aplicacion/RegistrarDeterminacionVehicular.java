@@ -48,12 +48,13 @@ import org.springframework.transaction.annotation.Transactional;
  * <p><b>La alícuota y el mínimo imponible salen del conjunto sellado del ejercicio</b>, igual que
  * {@code RT001ValorDeTerreno} lee el arancel: parametrizados, nunca un literal (regla 5). El mínimo
  * llegaba como argumento hasta #399 —y el argumento venía del <b>cuerpo de la petición</b>, o sea
- * del cliente—: el artículo 34 del TUO de la LTM lo escribe como un porcentaje de la UIT, así que
- * es una cifra normativa y no un dato de la operación. Se lee aquí con las mismas dos llaves con
- * que lo lee {@link CuadroPredialParametrizado}: {@link LlavesDelConjunto#UIT} y {@link
- * LlavesDelConjunto#VEHICULAR_MINIMO}. Sin ellas la determinación <b>falla nombrando la llave</b> y
- * no calcula con cero, que es lo que hacía antes: un mínimo en cero no falla, deja el impuesto en
- * su importe bruto y solo se nota en los vehículos baratos —los que el mínimo existe para cubrir—.
+ * del cliente—: el artículo 33 del TUO de la LTM lo escribe como un porcentaje de la UIT, así que
+ * es una cifra normativa y no un dato de la operación. Se lee aquí con dos llaves, igual que {@link
+ * CuadroPredialParametrizado} lee el del predial: {@link LlavesDelConjunto#UIT} y {@link
+ * LlavesDelConjunto#VEHICULAR_MINIMO_UIT}. Sin ellas la determinación <b>falla nombrando la
+ * llave</b> y no calcula con cero, que es lo que hacía antes: un mínimo en cero no falla, deja el
+ * impuesto en su importe bruto y solo se nota en los vehículos baratos —los que el mínimo existe
+ * para cubrir—.
  *
  * <p><b>El ejercicio se determina a quien era propietario al 1 de enero</b> (TUO LTM art. 31;
  * #329), no a quien figura hoy como titular. Hasta #329 se asentaba a {@code
@@ -129,7 +130,7 @@ public class RegistrarDeterminacionVehicular {
         long conjuntoId = parametros.conjuntoVigenteEn(ejercicio).valor();
         Alicuota alicuota =
                 Alicuota.de(
-                        sellados.exigirNumero(LlavesDelConjunto.ALICUOTA_VEHICULAR, null)
+                        sellados.exigirNumero(LlavesDelConjunto.VEHICULAR_ALICUOTA, null)
                                 .valor()
                                 .toPlainString());
         Dinero minimoImponible = minimoImponibleDe(sellados);
@@ -160,8 +161,8 @@ public class RegistrarDeterminacionVehicular {
                         base.valor(),
                         montoDeterminado,
                         java.util.List.of(
-                                LlavesDelConjunto.ALICUOTA_VEHICULAR,
-                                LlavesDelConjunto.VEHICULAR_MINIMO));
+                                LlavesDelConjunto.VEHICULAR_ALICUOTA,
+                                LlavesDelConjunto.VEHICULAR_MINIMO_UIT));
 
         String conjunto = sellados.ejercicio() + " v" + sellados.version();
         if (simulacion) {
@@ -250,15 +251,17 @@ public class RegistrarDeterminacionVehicular {
     /**
      * El mínimo imponible del ejercicio, en soles, leído del mismo conjunto que la alícuota.
      *
-     * <p>El artículo 34 lo escribe como porcentaje de la UIT —«no menor al 1.5 % de la UIT»— y así
-     * se publica; la conversión a soles se hace aquí, con la UIT del mismo conjunto sellado. Si
-     * falta cualquiera de las dos llaves, {@link ParametrosSellados#exigirNumero} lanza nombrando
-     * cuál: no hay valor por omisión, porque un mínimo inventado no produce ningún error —produce
-     * un piso que ninguna norma puso, cobrado a todo vehículo barato del padrón—.
+     * <p>El artículo 33 lo escribe como porcentaje de la UIT —«no puede ser inferior al 1.5% de la
+     * UIT»— y así se publica, con el número que imprime la norma: {@code VEHICULAR_MINIMO_UIT} vale
+     * {@code 1.5}, no {@code 0.015} (#499). La conversión a soles se hace aquí, con la UIT del
+     * mismo conjunto sellado. Si falta cualquiera de las dos llaves, {@link
+     * ParametrosSellados#exigirNumero} lanza nombrando cuál: no hay valor por omisión, porque un
+     * mínimo inventado no produce ningún error —produce un piso que ninguna norma puso, cobrado a
+     * todo vehículo barato del padrón—.
      */
     private static Dinero minimoImponibleDe(ParametrosSellados sellados) {
         java.math.BigDecimal porcentaje =
-                sellados.exigirNumero(LlavesDelConjunto.VEHICULAR_MINIMO, null).valor();
+                sellados.exigirNumero(LlavesDelConjunto.VEHICULAR_MINIMO_UIT, null).valor();
         Dinero uit =
                 Dinero.de(
                         sellados.exigirNumero(LlavesDelConjunto.UIT, null).valor().toPlainString());

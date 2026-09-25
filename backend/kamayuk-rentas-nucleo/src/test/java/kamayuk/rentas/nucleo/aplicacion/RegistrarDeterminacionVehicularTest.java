@@ -550,14 +550,14 @@ class RegistrarDeterminacionVehicularTest {
                 administrarParametros.abrirVersion(ejercicio, Observacion.de("Conjunto de prueba"));
         administrarParametros.agregarParametro(
                 conjunto.id(),
-                parametroNumerico("ALICUOTA_VEHICULAR", alicuota),
+                parametroNumerico("VEHICULAR_ALICUOTA", alicuota),
                 Observacion.de("Alicuota vehicular ficticia"));
         // El minimo imponible del art. 34 y la UIT con que se convierte: desde #399 salen del
         // conjunto sellado y no del cuerpo de la peticion, asi que sin ellos no hay determinacion
         // que calcular. Las dos cifras son ficticias, como la alicuota de arriba.
         administrarParametros.agregarParametro(
                 conjunto.id(),
-                parametroNumerico("VEHICULAR_MINIMO", new BigDecimal("1.5")),
+                parametroNumerico("VEHICULAR_MINIMO_UIT", new BigDecimal("1.5")),
                 Observacion.de("Minimo imponible vehicular ficticio"));
         administrarParametros.agregarParametro(
                 conjunto.id(),

@@ -369,11 +369,11 @@ class CalculoVehicularPorContribuyenteFronteraTest {
                 administrarParametros.abrirVersion(ejercicio, Observacion.de("Conjunto de prueba"));
         administrarParametros.agregarParametro(
                 conjunto.id(),
-                parametroNumerico("ALICUOTA_VEHICULAR", new BigDecimal("1.0")),
+                parametroNumerico("VEHICULAR_ALICUOTA", new BigDecimal("1.0")),
                 Observacion.de("Alicuota vehicular ficticia"));
         administrarParametros.agregarParametro(
                 conjunto.id(),
-                parametroNumerico("VEHICULAR_MINIMO", new BigDecimal("1.5")),
+                parametroNumerico("VEHICULAR_MINIMO_UIT", new BigDecimal("1.5")),
                 Observacion.de("Minimo imponible vehicular ficticio"));
         administrarParametros.agregarParametro(
                 conjunto.id(),
