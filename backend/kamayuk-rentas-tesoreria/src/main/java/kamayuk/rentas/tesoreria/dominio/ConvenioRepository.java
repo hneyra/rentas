@@ -1,8 +1,10 @@
 package kamayuk.rentas.tesoreria.dominio;
 
+import java.util.List;
 import java.util.Optional;
 import kamayuk.rentas.compartido.Pagina;
 import kamayuk.rentas.compartido.Paginacion;
+import kamayuk.rentas.cuentacorriente.ClaveDeObligacionPublica;
 import kamayuk.rentas.dominio.Ejercicio;
 import org.jspecify.annotations.Nullable;
 
@@ -59,6 +61,23 @@ public interface ConvenioRepository {
 
     /** Los convenios que pide el criterio, paginados (RF-084). */
     Pagina<ConvenioEnConsulta> buscar(CriterioDeConvenios criterio, Paginacion paginacion);
+
+    /**
+     * Los convenios de ese titular cuya deuda acogida incluye esa cuota, <b>en cualquier
+     * estado</b>, del mas antiguo al mas reciente (#442).
+     *
+     * <p>Es la fila de {@code convenio_deuda} por la clave de la cuota. Una misma cuota puede estar
+     * en varios: el reformulado y el que lo sustituye, o dos preconvenios que nadie formalizo. Cual
+     * de ellos esta vigente no lo decide esta lectura sino {@link
+     * EstadoDeConvenio#deLosMovimientos}, que es el unico sitio donde el estado se deriva en Java;
+     * filtrarlo aqui seria una segunda derivacion que podria dejar de coincidir con la primera.
+     *
+     * @param contribuyenteId el titular; un convenio es de uno solo
+     * @param obligacion el tributo, el ejercicio y la unidad de la cuota
+     * @param periodo la cuota o el mes; 0 es «anual»
+     */
+    List<Convenio> queAcogen(
+            long contribuyenteId, ClaveDeObligacionPublica obligacion, int periodo);
 
     /**
      * Ese convenio ya tiene su cronograma o su deuda acogida.

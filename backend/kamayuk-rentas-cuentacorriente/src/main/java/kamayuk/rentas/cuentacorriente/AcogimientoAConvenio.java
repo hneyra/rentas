@@ -59,6 +59,7 @@ public interface AcogimientoAConvenio {
      * @param obligaciones las marcadas en la pantalla; sin repetidas
      * @param fechaDeCorte la fecha a la que se lee la deuda (regla 9)
      * @return una fila por cuota con deuda, en orden estable; vacia si ninguna la tiene
+     * @throws CuotaYaAcogida si alguna cuota con deuda ya esta en fase de convenio (#442)
      */
     List<DeudaAcogida> deudaAcogible(
             long contribuyenteId, List<SeleccionDeObligacion> obligaciones, LocalDate fechaDeCorte);
@@ -107,4 +108,74 @@ public interface AcogimientoAConvenio {
             LocalDate fecha,
             String documentoOrigen,
             Observacion observacion);
+
+    /**
+     * Esa cuota ya esta en fase de convenio: acogerla otra vez la dejaria en dos cronogramas
+     * (#442).
+     *
+     * <h2>Por que la regla vive aqui y no en tesoreria</h2>
+     *
+     * <p>{@link DeudaAcogida#faseOrigen} es opaca a proposito: tesoreria la guarda y la devuelve
+     * sin interpretarla. «Esta cuota ya esta en un convenio» es interpretar una fase, y las fases
+     * son de este contexto. Por eso lo dice {@link #deudaAcogible}, que es quien la lee.
+     *
+     * <h2>Por que se lanza en vez de saltar la cuota</h2>
+     *
+     * <p>Saltarla en silencio daria una de dos respuestas falsas: «no tiene deuda que fraccionar»,
+     * si era la unica marcada —y la deuda existe—, o un cronograma sobre <b>una parte</b> de lo
+     * marcado, que quien atiende firmaria creyendo que es el todo.
+     *
+     * <h2>Lo que habia antes</h2>
+     *
+     * <p>Hasta #442 la fila salia con {@code faseOrigen = "CONVENIO"}: la simulacion imprimia un
+     * plan que no se podia firmar y el registro reventaba contra {@code
+     * convenio_deuda_fase_origen_check} con un 500. Ese {@code CHECK} impedia el doble acogimiento
+     * <b>por casualidad</b> —se escribio para decir a que fase se devuelve la deuda—, y el dia que
+     * alguien le anadiera CONVENIO el doble acogimiento pasaria en silencio.
+     *
+     * <p>Quien la recibe sabe lo que este contexto no: en que convenio esta la cuota. Con eso
+     * contesta 409 y remite a reformular ese convenio.
+     */
+    final class CuotaYaAcogida extends RuntimeException {
+
+        @java.io.Serial private static final long serialVersionUID = 1L;
+
+        private final ClaveDeObligacionPublica obligacion;
+        private final int periodo;
+
+        /**
+         * @param obligacion el tributo, el ejercicio y la unidad de la cuota
+         * @param periodo la cuota o el mes; 0 es «anual», igual que en {@link DeudaAcogida}
+         */
+        public CuotaYaAcogida(ClaveDeObligacionPublica obligacion, int periodo) {
+            super(
+                    "La cuota "
+                            + descripcion(obligacion, periodo)
+                            + " ya esta acogida a un convenio: fraccionarla otra vez la dejaria en"
+                            + " dos cronogramas");
+            this.obligacion = obligacion;
+            this.periodo = periodo;
+        }
+
+        /** El tributo, el ejercicio y la unidad de la cuota ya acogida. */
+        public ClaveDeObligacionPublica obligacion() {
+            return obligacion;
+        }
+
+        /** La cuota o el mes; 0 es «anual». */
+        public int periodo() {
+            return periodo;
+        }
+
+        private static String descripcion(ClaveDeObligacionPublica obligacion, int periodo) {
+            return obligacion.tributo()
+                    + " "
+                    + obligacion.ejercicio().valor()
+                    + (periodo == 0 ? " (anual)" : " periodo " + periodo)
+                    + (obligacion.predioId() == null ? "" : " del predio " + obligacion.predioId())
+                    + (obligacion.vehiculoId() == null
+                            ? ""
+                            : " del vehiculo " + obligacion.vehiculoId());
+        }
+    }
 }

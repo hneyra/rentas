@@ -12,6 +12,7 @@ import java.util.Objects;
 import java.util.Optional;
 import kamayuk.rentas.compartido.Pagina;
 import kamayuk.rentas.compartido.Paginacion;
+import kamayuk.rentas.cuentacorriente.ClaveDeObligacionPublica;
 import kamayuk.rentas.cuentacorriente.DeudaAcogida;
 import kamayuk.rentas.dominio.Alicuota;
 import kamayuk.rentas.dominio.Dinero;
@@ -212,6 +213,43 @@ public class ConvenioRepositoryJdbc extends RepositorioJdbc implements ConvenioR
                         .optional()
                         .orElse(null);
         return id == null ? Optional.empty() : leerPorId(id);
+    }
+
+    @Override
+    public List<Convenio> queAcogen(
+            long contribuyenteId, ClaveDeObligacionPublica obligacion, int periodo) {
+        // La clave de la cuota es la de `convenio_deuda_uq` sin el convenio, con los nulos de
+        // la unidad comparados como ese indice los compara: COALESCE a 0. Sin JOIN, por lo
+        // mismo que el listado: una subconsulta no puede volver ambigua ninguna columna.
+        List<Long> ids =
+                jdbc().sql(
+                                "SELECT c.id FROM convenio c"
+                                        + " WHERE c.contribuyente_id = :contribuyente"
+                                        + "   AND EXISTS (SELECT 1 FROM convenio_deuda d"
+                                        + "     WHERE d.convenio_id = c.id"
+                                        + "       AND d.tributo = :tributo"
+                                        + "       AND d.ejercicio = :ejercicio"
+                                        + "       AND d.periodo = :periodo"
+                                        + "       AND COALESCE(d.predio_id, 0)"
+                                        + "           = COALESCE(CAST(:predio AS bigint), 0)"
+                                        + "       AND COALESCE(d.vehiculo_id, 0)"
+                                        + "           = COALESCE(CAST(:vehiculo AS bigint), 0))"
+                                        + " ORDER BY c.id")
+                        .param("contribuyente", contribuyenteId)
+                        .param("tributo", obligacion.tributo())
+                        .param("ejercicio", obligacion.ejercicio().valor())
+                        .param("periodo", periodo)
+                        .param("predio", obligacion.predioId())
+                        .param("vehiculo", obligacion.vehiculoId())
+                        // Mapeo explicito y no query(Long.class): `id` es NOT NULL, y el atajo
+                        // devuelve List<@Nullable Long>, que NullAway rechaza con razon.
+                        .query((fila, numeroDeFila) -> fila.getLong("id"))
+                        .list();
+        List<Convenio> encontrados = new ArrayList<>(ids.size());
+        for (Long id : ids) {
+            leerPorId(id).ifPresent(encontrados::add);
+        }
+        return List.copyOf(encontrados);
     }
 
     @Override

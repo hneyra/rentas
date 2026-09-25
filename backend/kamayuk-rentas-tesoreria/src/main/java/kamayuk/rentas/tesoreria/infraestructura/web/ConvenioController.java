@@ -14,6 +14,7 @@ import kamayuk.rentas.autorizacion.RequiereAcceso;
 import kamayuk.rentas.compartido.Pagina;
 import kamayuk.rentas.contribuyentes.DirectorioDeContribuyentes;
 import kamayuk.rentas.contribuyentes.ResumenDeContribuyente;
+import kamayuk.rentas.cuentacorriente.AcogimientoAConvenio;
 import kamayuk.rentas.cuentacorriente.SeleccionDeObligacion;
 import kamayuk.rentas.dominio.Alicuota;
 import kamayuk.rentas.dominio.Ejercicio;
@@ -223,6 +224,10 @@ public class ConvenioController {
                     | PoliticasDeRedondeoSelladas.EscalaNoEntera
                     | PoliticasDeRedondeoSelladas.ModoDesconocido falta) {
                 throw FaltaPublicar.problema(falta);
+            } catch (AcogimientoAConvenio.CuotaYaAcogida yaAcogida) {
+                // Hasta #442 esto contestaba 200 con un cronograma sobre deuda ya fraccionada: un
+                // plan que no se puede firmar. Las dos ramas dicen lo mismo, con el mismo codigo.
+                throw yaFraccionada(yaAcogida, contribuyente.id());
             } catch (RegistrarPreconvenio.SinDeudaQueFraccionar
                     | CondicionesDelConvenio.DemasiadasCuotas
                     | Cronograma.NadaQueFraccionar
@@ -250,6 +255,10 @@ public class ConvenioController {
             // 409: la peticion esta bien formada; lo que no admite la operacion es el
             // estado actual del convenio.
             throw new ProblemaDeNegocio(CodigoDeError.CONFLICTO, mensajeDe(yaTeniaCronograma));
+        } catch (AcogimientoAConvenio.CuotaYaAcogida yaAcogida) {
+            // Hasta #442 esto llegaba hasta el INSERT de `convenio_deuda`, que lo rechazaba con
+            // un 23514, y salia 500 ERROR_INTERNO con su incidencia.
+            throw yaFraccionada(yaAcogida, contribuyente.id());
         } catch (CondicionesParametrizadas.CondicionSinParametrizar
                 | LectorDeParametros.EjercicioSinSellar
                 | PoliticasDeRedondeoSelladas.SinPuntosObservados
@@ -382,6 +391,12 @@ public class ConvenioController {
             throw new ProblemaDeNegocio(CodigoDeError.CONFLICTO, mensajeDe(claveEnConflicto));
         } catch (FormalizarConvenio.ConvenioInexistente noExiste) {
             throw new ProblemaDeNegocio(CodigoDeError.NO_ENCONTRADO, mensajeDe(noExiste));
+        } catch (AcogimientoAConvenio.CuotaYaAcogida yaAcogida) {
+            // La reformulacion registra su preconvenio por el mismo `RegistrarPreconvenio`: si
+            // marca una cuota que esta en OTRO convenio vigente, el cierre entero se revierte y
+            // se dice igual que en /fraccionamientos (#442). Solo la reformulacion llega aqui.
+            throw yaFraccionada(
+                    yaAcogida, reformulacion == null ? 0L : reformulacion.contribuyenteId());
         } catch (MovimientoDeConvenioRepository.ConvenioYaCerrado
                 | MovimientoDeConvenioRepository.ConvenioYaFormalizado
                 | CerrarConvenio.ReciboDeLaInicialVigente
@@ -672,6 +687,38 @@ public class ConvenioController {
 
     private static @Nullable String vacioAnulo(@Nullable String texto) {
         return (texto == null || texto.isBlank()) ? null : texto.strip();
+    }
+
+    /**
+     * El 409 de la deuda que ya esta en un convenio, con el convenio y lo que hay que hacer (#442).
+     *
+     * <p>{@code cuentacorriente} sabe que la cuota esta en fase CONVENIO; en que convenio, lo sabe
+     * tesoreria, y es lo que convierte el rechazo en algo que se puede atender: reformular ese
+     * convenio, que devuelve la deuda a su fase de origen antes de acogerla otra vez.
+     *
+     * <p>La lectura corre <b>despues</b> de que la transaccion del intento se revirtiera, en la
+     * suya de solo lectura: en la reformulacion, el convenio que se estaba cerrando vuelve a estar
+     * vigente, y es el estado que la respuesta tiene que describir.
+     */
+    private ProblemaDeNegocio yaFraccionada(
+            AcogimientoAConvenio.CuotaYaAcogida yaAcogida, long contribuyenteId) {
+        String queHacer =
+                consulta.vigenteQueAcoge(
+                                contribuyenteId, yaAcogida.obligacion(), yaAcogida.periodo())
+                        .map(
+                                numero ->
+                                        ". Esta en el convenio "
+                                                + numero.impreso()
+                                                + ", vigente: para fraccionarla de otra manera,"
+                                                + " reformule ese convenio (POST "
+                                                + Api.RAIZ
+                                                + "/tesoreria/convenios/"
+                                                + numero.impreso()
+                                                + "/anulacion con accion REFORMULACION)")
+                        .orElse(
+                                ". Ningun convenio vigente del contribuyente la tiene acogida:"
+                                        + " revise sus convenios antes de volver a fraccionarla");
+        return new ProblemaDeNegocio(CodigoDeError.CONFLICTO, mensajeDe(yaAcogida) + queHacer);
     }
 
     private static String mensajeDe(RuntimeException excepcion) {

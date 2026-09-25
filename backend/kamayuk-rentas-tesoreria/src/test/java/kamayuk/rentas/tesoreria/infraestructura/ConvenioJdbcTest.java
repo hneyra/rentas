@@ -16,6 +16,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
@@ -30,6 +31,7 @@ import kamayuk.rentas.auditoria.Origen;
 import kamayuk.rentas.auditoria.OrigenContext;
 import kamayuk.rentas.compartido.TenantContext;
 import kamayuk.rentas.cuentacorriente.AcogimientoAConvenio;
+import kamayuk.rentas.cuentacorriente.ClaveDeObligacionPublica;
 import kamayuk.rentas.cuentacorriente.SeleccionDeObligacion;
 import kamayuk.rentas.cuentacorriente.aplicacion.AcogimientoAConvenioCuentaCorriente;
 import kamayuk.rentas.cuentacorriente.aplicacion.ConsultarDeuda;
@@ -654,6 +656,148 @@ class ConvenioJdbcTest {
         }
     }
 
+    /**
+     * #442 — Fraccionar lo que ya esta en un convenio vigente.
+     *
+     * <p>La siembra deja <b>una</b> de las dos obligaciones marcadas en fase CONVENIO y la otra en
+     * coactiva, con deuda. Es lo que separa las tres respuestas posibles: con el control, las dos
+     * ramas lanzan {@link AcogimientoAConvenio.CuotaYaAcogida}; sin el, la simulacion devuelve un
+     * cronograma sobre las dos y el registro revienta contra {@code
+     * convenio_deuda_fase_origen_check}; y un control que <b>saltara</b> la cuota en vez de lanzar
+     * devolveria un cronograma sobre la coactiva sola —un plan sobre una parte—, que con una sola
+     * obligacion marcada no se distinguiria de «no tiene deuda».
+     */
+    @Nested
+    @DisplayName("#442 — La deuda que ya esta en un convenio no se fracciona otra vez")
+    class DeLaDeudaYaAcogida {
+
+        private final ClaveDeObligacionPublica predial =
+                new ClaveDeObligacionPublica("PREDIAL", EJERCICIO, null, null);
+
+        @Test
+        @DisplayName("simular sobre ella lanza CuotaYaAcogida, y no imprime un plan imposible")
+        void simularLanza() {
+            long titular = contribuyenteConDeuda("442-SIM");
+            formalizadoSobre(titular, List.of(LO_PREDIAL));
+
+            assertThatThrownBy(
+                            () ->
+                                    preconvenios.simular(
+                                            peticionSobre(
+                                                    titular, List.of(LO_COACTIVO, LO_PREDIAL))))
+                    .as(
+                            "hasta #442 esto devolvia un cronograma sobre 500: 300 que ya estan en"
+                                    + " un convenio vigente mas 200 de coactiva")
+                    .isInstanceOfSatisfying(
+                            AcogimientoAConvenio.CuotaYaAcogida.class,
+                            ya -> {
+                                assertThat(ya.obligacion())
+                                        .as("nombra la cuota que ya esta acogida, no la coactiva")
+                                        .isEqualTo(predial);
+                                assertThat(ya.periodo()).isZero();
+                            });
+        }
+
+        @Test
+        @DisplayName("registrar lanza lo mismo, y no un 23514 de la base: no queda nada escrito")
+        void registrarLanza() {
+            long titular = contribuyenteConDeuda("442-REG");
+            formalizadoSobre(titular, List.of(LO_PREDIAL));
+            long antes = conveniosDe(titular);
+
+            assertThatThrownBy(
+                            () ->
+                                    preconvenios.registrar(
+                                            peticionSobre(
+                                                    titular, List.of(LO_COACTIVO, LO_PREDIAL)),
+                                            null,
+                                            Observacion.de(
+                                                    "Se fracciona otra vez, prueba de #442")))
+                    .as(
+                            "hasta #442 esto era DataIntegrityViolationException contra"
+                                    + " convenio_deuda_fase_origen_check, y el controlador lo"
+                                    + " contestaba 500 ERROR_INTERNO")
+                    .isInstanceOf(AcogimientoAConvenio.CuotaYaAcogida.class);
+            assertThat(conveniosDe(titular))
+                    .as("y ningun preconvenio a medias: ni su numero ni su deuda congelada")
+                    .isEqualTo(antes);
+        }
+
+        @Test
+        @DisplayName("la reformulacion no se rompe: devuelve la deuda antes de volver a acogerla")
+        void laReformulacionSigueAbriendo() {
+            long titular = contribuyenteConDeuda("442-REF");
+            Convenio original = formalizadoSobre(titular, List.of(LO_PREDIAL));
+
+            CerrarConvenio.Cerrado cerrado =
+                    reformularSobre(original, peticionSobre(titular, List.of(LO_PREDIAL)));
+
+            assertThat(cerrado.reformulado())
+                    .as(
+                            "CerrarConvenio devuelve la deuda a ORDINARIA antes de registrar el"
+                                    + " preconvenio nuevo, asi que deudaAcogible ya no la ve en"
+                                    + " CONVENIO")
+                    .isNotNull();
+            assertThat(estadoDe(original)).isEqualTo(EstadoDeConvenio.REFORMULADO);
+        }
+
+        @Test
+        @DisplayName("la lectura nombra el convenio VIGENTE, no el reformulado ni el preconvenio")
+        void laLecturaNombraElVigente() {
+            long titular = contribuyenteConDeuda("442-LEE");
+            // La misma cuota en tres convenios del mismo titular, en tres estados distintos, y en
+            // uno vigente de OTRO titular: una lectura que devolviera el primero, el ultimo o
+            // cualquiera que acoja la cuota nombraria el convenio equivocado.
+            Convenio reformulado = formalizadoSobre(titular, List.of(LO_PREDIAL));
+            Convenio sustituto =
+                    Objects.requireNonNull(
+                            reformularSobre(
+                                            reformulado,
+                                            peticionSobre(titular, List.of(LO_PREDIAL)))
+                                    .reformulado());
+            Convenio preconvenio = registrarSobre(titular, List.of(LO_PREDIAL));
+            formalizarLaInicial(sustituto);
+            long otro = contribuyenteConDeuda("442-OTRO");
+            Convenio delOtro = formalizadoSobre(otro, List.of(LO_PREDIAL));
+
+            assertThat(estadoDe(reformulado)).isEqualTo(EstadoDeConvenio.REFORMULADO);
+            assertThat(estadoDe(sustituto)).isEqualTo(EstadoDeConvenio.VIGENTE);
+            assertThat(estadoDe(preconvenio)).isEqualTo(EstadoDeConvenio.PRECONVENIO);
+            assertThat(enTransaccion(() -> consulta.vigenteQueAcoge(titular, predial, 0)))
+                    .as("es el convenio que hay que reformular, y el unico que tiene la cuota")
+                    .contains(sustituto.numero());
+            assertThat(enTransaccion(() -> consulta.vigenteQueAcoge(otro, predial, 0)))
+                    .as("un convenio es de un titular: el del vecino no se cruza")
+                    .contains(delOtro.numero());
+            assertThat(
+                            enTransaccion(
+                                    () ->
+                                            consulta.vigenteQueAcoge(
+                                                    titular,
+                                                    new ClaveDeObligacionPublica(
+                                                            "ARBITRIO", EJERCICIO, null, null),
+                                                    0)))
+                    .as("la coactiva no esta en ningun convenio: no hay nada que nombrar")
+                    .isEmpty();
+        }
+
+        @Test
+        @DisplayName("CONTRASTE: la cuota en CONVENIO ya pagada no se nombra, no hay deuda")
+        void laCuotaPagadaNoSeNombra() {
+            long titular = contribuyenteConDeuda("442-PAG");
+            formalizadoSobre(titular, List.of(LO_PREDIAL));
+            // Se paga entera dentro del convenio: el ultimo asiento sigue en CONVENIO, pero ya no
+            // hay nada que acoger. Llamarla «ya acogida» remitiria a reformular un convenio por
+            // una deuda que no existe; lo cierto es lo que ya se decia antes de #442.
+            asentarAbonoEnConvenio(titular, "PREDIAL", PREDIAL);
+            assertThat(faseDe(titular, "PREDIAL")).isEqualTo(Fase.CONVENIO);
+
+            assertThatThrownBy(
+                            () -> preconvenios.simular(peticionSobre(titular, List.of(LO_PREDIAL))))
+                    .isInstanceOf(RegistrarPreconvenio.SinDeudaQueFraccionar.class);
+        }
+    }
+
     @Nested
     @DisplayName("Lo que la base impide por si sola")
     class DeLaBase {
@@ -1171,6 +1315,53 @@ class ConvenioJdbcTest {
                 Observacion.de("Acogimiento a fraccionamiento, prueba de #35"));
     }
 
+    /** Un preconvenio sobre esas obligaciones, sin formalizar (#442). */
+    private static Convenio registrarSobre(long titular, List<SeleccionDeObligacion> marcadas) {
+        return preconvenios.registrar(
+                peticionSobre(titular, marcadas),
+                null,
+                Observacion.de("Acogimiento a fraccionamiento, prueba de #442"));
+    }
+
+    /** Un convenio vigente sobre esas obligaciones: su deuda queda en fase CONVENIO (#442). */
+    private static Convenio formalizadoSobre(long titular, List<SeleccionDeObligacion> marcadas) {
+        Convenio convenio = registrarSobre(titular, marcadas);
+        formalizarLaInicial(convenio);
+        return convenio;
+    }
+
+    private static CerrarConvenio.Cerrado reformularSobre(
+            Convenio original, RegistrarPreconvenio.Peticion sustituto) {
+        return cerrar.cerrar(
+                new CerrarConvenio.Cierre(
+                        original.numero(),
+                        TipoDeMovimientoDeConvenio.REFORMULACION,
+                        HOY,
+                        "REFORMULADO A PEDIDO DEL CONTRIBUYENTE",
+                        null,
+                        null,
+                        sustituto),
+                null,
+                Observacion.de("Se reformula el convenio, prueba de #442"));
+    }
+
+    private static RegistrarPreconvenio.Peticion peticionSobre(
+            long titular, List<SeleccionDeObligacion> marcadas) {
+        return new RegistrarPreconvenio.Peticion(
+                titular,
+                marcadas,
+                TipoDeConvenio.ORDINARIO,
+                HOY,
+                HOY,
+                6,
+                Alicuota.de("20"),
+                HOY.plusMonths(1),
+                TipoDeGarantia.NO_REQUIERE,
+                null,
+                null,
+                null);
+    }
+
     private static RegistrarPreconvenio.Peticion peticionDe(
             long titular, int cuotas, String inicial) {
         return new RegistrarPreconvenio.Peticion(
@@ -1660,6 +1851,28 @@ class ConvenioJdbcTest {
                                         LocalDate.of(2026, 1, 2),
                                         "DETERMINACION DE LA PRUEBA"),
                                 Observacion.de("Se asienta la deuda de la prueba")));
+    }
+
+    /** Un cobro del insoluto entero, asentado en fase CONVENIO con la fecha de la prueba. */
+    private static void asentarAbonoEnConvenio(long contribuyenteId, String tributo, Dinero monto) {
+        enTransaccion(
+                () ->
+                        registrarAsiento.asentar(
+                                Asiento.nuevo(
+                                        EJERCICIO,
+                                        contribuyenteId,
+                                        tributo,
+                                        Concepto.INSOLUTO,
+                                        TipoAsiento.ABONO,
+                                        Fase.CONVENIO,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        monto,
+                                        HOY,
+                                        "COBRO DE LA PRUEBA"),
+                                Observacion.de("Se paga la deuda acogida, prueba de #442")));
     }
 
     private static String codigoDe(long contribuyenteId) {

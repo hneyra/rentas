@@ -7,6 +7,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import kamayuk.rentas.cuentacorriente.AcogimientoAConvenio;
+import kamayuk.rentas.cuentacorriente.ClaveDeObligacionPublica;
 import kamayuk.rentas.cuentacorriente.DeudaAcogida;
 import kamayuk.rentas.cuentacorriente.MovimientoAsentado;
 import kamayuk.rentas.cuentacorriente.SeleccionDeObligacion;
@@ -127,6 +128,12 @@ public class AcogimientoAConvenioCuentaCorriente implements AcogimientoAConvenio
                         pendienteDesde(asientos.deLaObligacion(fila.clave()), fechaDeCorte);
                 if (!deuda.total().esPositivo()) {
                     continue;
+                }
+                if (fila.fase() == FASE_DEL_CONVENIO) {
+                    // Despues de la deuda y no antes: una cuota pagada dentro del convenio sigue
+                    // en CONVENIO —es la fase de su ultimo asiento— y no tiene nada que acoger.
+                    // Llamarla «ya acogida» mandaria a reformular por una deuda que no existe.
+                    throw yaAcogida(fila.clave());
                 }
                 acogibles.add(filaDe(fila.clave(), fila.fase().name(), fechaDeCorte, deuda));
             }
@@ -306,6 +313,20 @@ public class AcogimientoAConvenioCuentaCorriente implements AcogimientoAConvenio
                         fecha,
                         documentoOrigen),
                 observacion);
+    }
+
+    /**
+     * La cuota ya esta en un convenio (#442): lo dice quien sabe que es una fase.
+     *
+     * <p>Tesoreria trata {@link DeudaAcogida#faseOrigen} como texto opaco a proposito, asi que la
+     * regla no puede vivir alli. Hasta #442 la fila salia con fase de origen CONVENIO y quien la
+     * paraba era {@code convenio_deuda_fase_origen_check}, por casualidad y con un 500.
+     */
+    private static AcogimientoAConvenio.CuotaYaAcogida yaAcogida(ClaveDeSaldo clave) {
+        return new AcogimientoAConvenio.CuotaYaAcogida(
+                new ClaveDeObligacionPublica(
+                        clave.tributo(), clave.ejercicio(), clave.predioId(), clave.vehiculoId()),
+                clave.periodo());
     }
 
     private static DeudaAcogida filaDe(

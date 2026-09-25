@@ -9,6 +9,7 @@ import kamayuk.rentas.autorizacion.Privilegio;
 import kamayuk.rentas.autorizacion.RequiereAcceso;
 import kamayuk.rentas.coactiva.aplicacion.CambiarEstadoDelExpediente;
 import kamayuk.rentas.coactiva.aplicacion.FraccionarEnCoactiva;
+import kamayuk.rentas.cuentacorriente.AcogimientoAConvenio;
 import kamayuk.rentas.cuentacorriente.SeleccionDeObligacion;
 import kamayuk.rentas.dominio.Alicuota;
 import kamayuk.rentas.dominio.Ejercicio;
@@ -136,6 +137,11 @@ public class ConvenioCoactivoController {
             // 409: la peticion esta bien formada; lo que no admite la operacion es el estado del
             // expediente.
             throw new ProblemaDeNegocio(CodigoDeError.CONFLICTO, mensajeDe(enConflicto));
+        } catch (AcogimientoAConvenio.CuotaYaAcogida yaAcogida) {
+            // 409 por lo mismo: la cuota ya esta en un convenio (#442). Antes de #442 llegaba con
+            // fase de origen CONVENIO y la guarda de fase la rechazaba con 422; desde que la
+            // rechaza `cuentacorriente`, sin este `catch` saldria 500 con su incidencia.
+            throw new ProblemaDeNegocio(CodigoDeError.CONFLICTO, mensajeDe(yaAcogida));
         } catch (FraccionamientoCoactivo.CondicionesSinPublicar falta) {
             // `CondicionesSinPublicar` no es un fallo del servidor: es que nadie ha publicado
             // todavia el interes, el maximo de cuotas o la politica de redondeo del ejercicio

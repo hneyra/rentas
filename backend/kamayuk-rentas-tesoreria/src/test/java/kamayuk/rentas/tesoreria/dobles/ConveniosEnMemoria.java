@@ -4,9 +4,12 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import kamayuk.rentas.compartido.Pagina;
 import kamayuk.rentas.compartido.Paginacion;
+import kamayuk.rentas.cuentacorriente.ClaveDeObligacionPublica;
+import kamayuk.rentas.cuentacorriente.DeudaAcogida;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.tesoreria.dominio.Convenio;
 import kamayuk.rentas.tesoreria.dominio.ConvenioEnConsulta;
@@ -96,6 +99,27 @@ public final class ConveniosEnMemoria implements ConvenioRepository {
     @Override
     public Optional<Convenio> porId(long id) {
         return Optional.ofNullable(guardados.get(id));
+    }
+
+    @Override
+    public List<Convenio> queAcogen(
+            long contribuyenteId, ClaveDeObligacionPublica obligacion, int periodo) {
+        return guardados.values().stream()
+                .filter(convenio -> convenio.contribuyenteId() == contribuyenteId)
+                .filter(
+                        convenio ->
+                                convenio.acogida().stream()
+                                        .anyMatch(cuota -> esLaCuota(cuota, obligacion, periodo)))
+                .toList();
+    }
+
+    private static boolean esLaCuota(
+            DeudaAcogida cuota, ClaveDeObligacionPublica obligacion, int periodo) {
+        return cuota.tributo().equals(obligacion.tributo())
+                && cuota.ejercicio().equals(obligacion.ejercicio())
+                && cuota.periodo() == periodo
+                && Objects.equals(cuota.predioId(), obligacion.predioId())
+                && Objects.equals(cuota.vehiculoId(), obligacion.vehiculoId());
     }
 
     @Override

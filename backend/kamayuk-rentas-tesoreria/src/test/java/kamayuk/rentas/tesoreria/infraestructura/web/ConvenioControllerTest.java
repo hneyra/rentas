@@ -19,6 +19,7 @@ import kamayuk.rentas.autorizacion.GuardiaDeAcceso;
 import kamayuk.rentas.autorizacion.Privilegio;
 import kamayuk.rentas.contribuyentes.ResumenDeContribuyente;
 import kamayuk.rentas.cuentacorriente.AcogimientoAConvenio;
+import kamayuk.rentas.cuentacorriente.ClaveDeObligacionPublica;
 import kamayuk.rentas.cuentacorriente.DeudaAcogida;
 import kamayuk.rentas.cuentacorriente.MovimientoAsentado;
 import kamayuk.rentas.cuentacorriente.SeleccionDeObligacion;
@@ -454,6 +455,113 @@ class ConvenioControllerTest {
     }
 
     // ------------------------------------------------------------------
+    //  #442 — fraccionar lo que ya esta en un convenio vigente
+    // ------------------------------------------------------------------
+
+    /*
+     * La siembra que distingue: el convenio que se nombra tiene que ser el VIGENTE. Con uno solo,
+     * cualquier lectura que devolviera «el convenio que acoge la cuota» acertaria por casualidad.
+     * Aqui la cuota esta en dos: F-2026-000001, ya reformulado, y F-2026-000002, que lo sustituye
+     * y se formalizo despues.
+     */
+
+    @Test
+    @DisplayName("#442 — simular sobre deuda ya acogida es 409 y nombra el convenio vigente")
+    void simularLoYaFraccionadoEs409() throws Exception {
+        String vigente = sustitutoVigente();
+        acogimiento.yaAcogida = true;
+
+        MvcResult respuesta = fraccionar(true);
+
+        assertThat(respuesta.getResponse().getStatus())
+                .as(
+                        "hasta #442 la simulacion contestaba 200 con un cronograma sobre deuda que"
+                                + " ya estaba en un convenio: un plan que no se puede firmar")
+                .isEqualTo(409);
+        loQueDiceElConflicto(respuesta, vigente);
+    }
+
+    @Test
+    @DisplayName("#442 — y registrar tambien es 409, no 500 ERROR_INTERNO: no se escribe nada")
+    void registrarLoYaFraccionadoEs409() throws Exception {
+        String vigente = sustitutoVigente();
+        acogimiento.yaAcogida = true;
+
+        MvcResult respuesta = fraccionar(false);
+
+        assertThat(respuesta.getResponse().getStatus())
+                .as(
+                        "hasta #442 era 500 con su incidencia: el 23514 de"
+                                + " convenio_deuda_fase_origen_check caia en `interno`")
+                .isEqualTo(409);
+        loQueDiceElConflicto(respuesta, vigente);
+        assertThat(convenios.registrados())
+                .as("el reformulado y su sustituto, ninguno mas")
+                .hasSize(2);
+    }
+
+    @Test
+    @DisplayName("#442 — la reformulacion que acoge una cuota de otro convenio vigente, 409")
+    void reformularSobreDeudaAcogidaEs409() throws Exception {
+        // La reformulacion registra su preconvenio por el mismo `RegistrarPreconvenio`, asi que
+        // llega la misma excepcion: si la cuota que marca esta en OTRO convenio vigente, el
+        // cierre entero se revierte y la ruta tiene que decirlo igual que /fraccionamientos.
+        String numero = convenioVigente();
+        acogimiento.yaAcogida = true;
+
+        MvcResult respuesta = reformular(numero, SELLADO.valor());
+
+        assertThat(respuesta.getResponse().getStatus()).isEqualTo(409);
+        assertThat(respuesta.getResponse().getContentAsString())
+                .contains("\"codigo\":\"CONFLICTO\"")
+                .contains("ya esta acogida a un convenio")
+                .doesNotContain("incidencia");
+    }
+
+    /** F-2026-000001 reformulado y F-2026-000002 formalizado: la cuota esta en los dos. */
+    private String sustitutoVigente() throws Exception {
+        String original = convenioVigente();
+        assertThat(reformular(original, SELLADO.valor()).getResponse().getStatus())
+                .as("si esto no es 201, lo que falla no es lo que la prueba mide")
+                .isEqualTo(201);
+        Convenio sustituto = convenios.registrados().get(1);
+        formalizar.formalizar(
+                sustituto.numero(),
+                1000L,
+                sustituto.cuotaInicial(),
+                HOY,
+                Observacion.de("Cuota inicial del sustituto cobrada en ventanilla"));
+        assertThat(sustituto.numero().impreso()).isNotEqualTo(original);
+        return sustituto.numero().impreso();
+    }
+
+    private static void loQueDiceElConflicto(MvcResult respuesta, String vigente) throws Exception {
+        assertThat(respuesta.getResponse().getContentAsString())
+                .contains("\"codigo\":\"CONFLICTO\"")
+                .as("la cuota que ya esta acogida, con su tributo y su ejercicio")
+                .contains("PREDIAL 2026")
+                .as("el convenio VIGENTE, que es el que hay que reformular")
+                .contains(vigente)
+                .doesNotContain("F-2026-000001")
+                .as("y que hacer: reformularlo, por la ruta que lo hace")
+                .contains("/tesoreria/convenios/" + vigente + "/anulacion")
+                .contains("REFORMULACION")
+                .doesNotContain("incidencia");
+    }
+
+    private MvcResult fraccionar(boolean simular) throws Exception {
+        return mvc.perform(
+                        post("/rentas/api/v1/tesoreria/fraccionamientos")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        cuerpoDelConvenio(SELLADO.valor())
+                                                .replace(
+                                                        "\"simular\":false",
+                                                        "\"simular\":" + simular)))
+                .andReturn();
+    }
+
+    // ------------------------------------------------------------------
     //  #40 — anular un convenio formalizado, y las cuatro respuestas que ahora se distinguen
     // ------------------------------------------------------------------
 
@@ -767,6 +875,13 @@ class ConvenioControllerTest {
         private final AcogimientoAConvenio real;
         private boolean revienta;
 
+        /**
+         * Lo que {@code cuentacorriente} contesta desde #442 cuando la cuota ya esta en fase
+         * CONVENIO. Es un interruptor y no el libro de verdad porque lo que aqui se mide es la
+         * <b>traduccion</b>; que el libro lo lance lo mide {@code ConvenioJdbcTest}.
+         */
+        private boolean yaAcogida;
+
         private AcogimientoQuePuedeReventar(AcogimientoAConvenio real) {
             this.real = real;
         }
@@ -776,6 +891,10 @@ class ConvenioControllerTest {
                 long contribuyenteId,
                 List<SeleccionDeObligacion> obligaciones,
                 LocalDate fechaDeCorte) {
+            if (yaAcogida) {
+                throw new AcogimientoAConvenio.CuotaYaAcogida(
+                        new ClaveDeObligacionPublica("PREDIAL", SELLADO, null, null), 0);
+            }
             return real.deudaAcogible(contribuyenteId, obligaciones, fechaDeCorte);
         }
 

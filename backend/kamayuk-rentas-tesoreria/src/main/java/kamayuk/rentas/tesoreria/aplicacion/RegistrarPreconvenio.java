@@ -103,6 +103,9 @@ public class RegistrarPreconvenio {
      * de {@link #registrar}— es lo que impide que una simulacion consuma un correlativo.
      *
      * @throws Cronograma.NadaQueFraccionar si la seleccion no tiene deuda a esa fecha
+     * @throws AcogimientoAConvenio.CuotaYaAcogida si alguna cuota marcada ya esta en un convenio
+     *     (#442). La decide {@code cuentacorriente}, que es quien sabe que es una fase; aqui no se
+     *     mira, y como {@link #registrar} simula antes de escribir, un solo control cubre las dos
      */
     @Transactional(readOnly = true)
     public Simulacion simular(Peticion peticion) {
@@ -145,6 +148,8 @@ public class RegistrarPreconvenio {
      *
      * @param claveDeIdempotencia la cabecera {@code Idempotency-Key}; opcional
      * @throws SinDeudaQueFraccionar si la seleccion no tiene deuda a la fecha de corte
+     * @throws AcogimientoAConvenio.CuotaYaAcogida si alguna cuota marcada ya esta en un convenio,
+     *     antes de numerar ni escribir nada (#442)
      * @throws CondicionesDelConvenio.DemasiadasCuotas si se piden mas de las que admite la
      *     ordenanza
      * @throws CondicionesParametrizadas.CondicionSinParametrizar si falta el interes o el maximo
