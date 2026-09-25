@@ -630,6 +630,11 @@ export const ARBOL = [
           { verbo: 'POST', ruta: '/coactiva/liquidaciones-costas', nota: 'Liquida las costas' },
           {
             verbo: 'GET',
+            ruta: '/coactiva/expedientes/{numero}/proceso',
+            nota: 'El obligado del expediente',
+          },
+          {
+            verbo: 'GET',
             ruta: '/coactiva/prescripcion',
             nota: 'PrescripcionController, en el módulo de valores',
           },

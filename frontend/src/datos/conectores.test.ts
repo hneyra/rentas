@@ -131,7 +131,7 @@ const PROCESO = {
   ],
 } as unknown as ProcesoDelExpediente;
 
-/** Lo que `coa-cost` recibe: su liquidacion y la prescripcion del mismo tributo. */
+/** Lo que `coa-cost` recibe: su liquidacion, su obligado y lo que el declaro sobre el tributo. */
 const COSTAS = {
   liquidacion: {
     expedCoact: '2026-0418',
@@ -147,10 +147,15 @@ const COSTAS = {
       },
     ],
   },
-  prescripcion: { plazo: '4 ANIOS' },
+  obligado: '00000000008',
+  declaradas: {
+    contenido: [{ codContribuyente: '00000000008', plazo: '4 ANIOS' }],
+    hayMas: false,
+  },
 } as unknown as {
   readonly liquidacion: LiquidacionDeCostas;
-  readonly prescripcion: PrescripcionDeclarada;
+  readonly obligado: string;
+  readonly declaradas: Paginado<PrescripcionDeclarada>;
 };
 
 /**
