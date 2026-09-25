@@ -17,6 +17,20 @@ public interface ProgramaFiscalizacionRepository {
 
     Optional<ProgramaFiscalizacion> findById(long id);
 
+    /**
+     * Cierra el programa (#341): mueve {@code estado} a {@code CERRADO} y ninguna otra columna.
+     *
+     * <p>La transición la calcula {@link ProgramaFiscalizacion#cerrado()} sobre la fila leída
+     * <b>bloqueada</b>, en la misma transacción que la escribe: dos cierres simultáneos no leen los
+     * dos {@code ABIERTO} y confirman los dos, sino que el segundo espera y ve {@code CERRADO}.
+     *
+     * @return el programa ya cerrado
+     * @throws ProgramaFiscalizacion.TransicionIlegal si ya estaba cerrado
+     * @throws IllegalStateException si no hay ningún programa con ese identificador en esta
+     *     municipalidad: quien llama lo comprobó antes, así que es un defecto y no una respuesta
+     */
+    ProgramaFiscalizacion cerrar(long id);
+
     /** La grilla de programas de la pantalla {@code fisc_programa} (RF-050, #431). */
     Pagina<ProgramaFiscalizacion> consultar(CriterioDeProgramas criterio, Paginacion paginacion);
 

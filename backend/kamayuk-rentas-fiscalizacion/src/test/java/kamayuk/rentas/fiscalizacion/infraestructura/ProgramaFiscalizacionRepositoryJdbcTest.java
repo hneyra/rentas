@@ -18,6 +18,7 @@ import kamayuk.rentas.compartido.Paginacion;
 import kamayuk.rentas.compartido.TenantContext;
 import kamayuk.rentas.dominio.MunicipalidadId;
 import kamayuk.rentas.esquema.BaseDeDatosDePrueba;
+import kamayuk.rentas.esquema.ContextoDeTenant;
 import kamayuk.rentas.fiscalizacion.aplicacion.ConsultaDeProgramas;
 import kamayuk.rentas.fiscalizacion.dominio.CriterioDeProgramas;
 import kamayuk.rentas.fiscalizacion.dominio.EstadoDePrograma;
@@ -310,7 +311,120 @@ class ProgramaFiscalizacionRepositoryJdbcTest {
         assertThat(pagina.contenido().get(0).codigo()).isEqualTo("PF-970");
     }
 
+    /**
+     * Del programa sólo se mueve el estado, y lo que lo acota es el privilegio (#341, {@code V30}).
+     *
+     * <p>Hasta #341 {@code V1} le concedía a {@code kamayuk_app} {@code UPDATE} sobre la tabla
+     * entera, y la prueba de la exclusión decía lo contrario en su comentario: el estado era
+     * inalcanzable por la aplicación, no por el privilegio. Desde que existe el cierre, la columna
+     * que la aplicación escribe es una, y el privilegio es el de esa columna: el código, el
+     * ejercicio, el sector o el criterio con que un programa sorteó no se reescriben después.
+     */
+    @Test
+    @DisplayName("del programa solo se mueve el estado: el resto lo niega el privilegio (V30)")
+    void soloSeMueveElEstado() throws SQLException {
+        TenantContext.fijar(new MunicipalidadId(municipalidadA));
+        ProgramaFiscalizacion guardado =
+                insertar(
+                        "PF-341-PRV",
+                        "El privilegio de columna",
+                        TipoDePrograma.PREDIAL,
+                        LocalDate.of(2026, 3, 1),
+                        null);
+
+        assertThatThrownBy(
+                        () ->
+                                porSqlComoApp(
+                                        "UPDATE programa_fiscalizacion SET criterio = 'SUBVALUADOR'"
+                                                + " WHERE id = "
+                                                + guardado.id()))
+                .as(
+                        "el criterio con que el programa sorteo su muestra no se cambia despues:"
+                                + " reprogramar es registrar otro programa (#45)")
+                .isInstanceOf(SQLException.class)
+                .satisfies(
+                        error ->
+                                assertThat(((SQLException) error).getSQLState())
+                                        .as("42501 es «privilegio insuficiente»")
+                                        .isEqualTo("42501"));
+
+        assertThat(
+                        porSqlComoApp(
+                                "UPDATE programa_fiscalizacion SET estado = estado WHERE id = "
+                                        + guardado.id()))
+                .as("y el estado si: es la columna que el cierre escribe")
+                .isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("#341 — cerrar mueve el estado de la FILA a CERRADO, y un segundo cierre choca")
+    void cerrarMueveLaFila() {
+        TenantContext.fijar(new MunicipalidadId(municipalidadA));
+        ProgramaFiscalizacion guardado =
+                insertar(
+                        "PF-341-CER",
+                        "Se cierra",
+                        TipoDePrograma.PREDIAL,
+                        LocalDate.of(2026, 3, 1),
+                        null);
+
+        ProgramaFiscalizacion cerrado =
+                transaccion.execute(estado -> repositorio.cerrar(guardado.id()));
+
+        assertThat(cerrado.estado()).isEqualTo(EstadoDePrograma.CERRADO);
+        assertThat(
+                        transaccion
+                                .execute(estado -> repositorio.findById(guardado.id()))
+                                .orElseThrow()
+                                .estado())
+                .as("releido de la base, no lo que devolvio el metodo")
+                .isEqualTo(EstadoDePrograma.CERRADO);
+        assertThatThrownBy(() -> transaccion.execute(estado -> repositorio.cerrar(guardado.id())))
+                .as("la transicion se calcula sobre la fila leida, no sobre lo que se crea")
+                .isInstanceOf(ProgramaFiscalizacion.TransicionIlegal.class);
+    }
+
+    @Test
+    @DisplayName("#341 — no se cierra el programa de otra municipalidad")
+    void noSeCierraElDeOtraMunicipalidad() {
+        TenantContext.fijar(new MunicipalidadId(municipalidadB));
+        ProgramaFiscalizacion deB =
+                insertar(
+                        "PF-341-DEB",
+                        "De la vecina",
+                        TipoDePrograma.PREDIAL,
+                        LocalDate.of(2026, 3, 1),
+                        null);
+        TenantContext.limpiar();
+
+        TenantContext.fijar(new MunicipalidadId(municipalidadA));
+        assertThatThrownBy(() -> transaccion.execute(estado -> repositorio.cerrar(deB.id())))
+                .as("RLS no la deja ver, y sin fila no hay nada que cerrar")
+                .isInstanceOf(IllegalStateException.class);
+        TenantContext.limpiar();
+
+        TenantContext.fijar(new MunicipalidadId(municipalidadB));
+        assertThat(
+                        transaccion
+                                .execute(estado -> repositorio.findById(deB.id()))
+                                .orElseThrow()
+                                .estado())
+                .isEqualTo(EstadoDePrograma.ABIERTO);
+    }
+
     // ------------------------------------------------------------------
+
+    /** Una sentencia suelta como {@code kamayuk_app}, para medir el privilegio. */
+    private static int porSqlComoApp(String sentencia) throws SQLException {
+        try (Connection app = base.conexion(BaseDeDatosDePrueba.APP)) {
+            ContextoDeTenant.fijar(app, municipalidadA);
+            try (PreparedStatement orden = app.prepareStatement(sentencia)) {
+                int filas = orden.executeUpdate();
+                app.commit();
+                return filas;
+            }
+        }
+    }
 
     /** Envuelve el objetivo en un proxy transaccional de verdad. */
     @SuppressWarnings("unchecked")

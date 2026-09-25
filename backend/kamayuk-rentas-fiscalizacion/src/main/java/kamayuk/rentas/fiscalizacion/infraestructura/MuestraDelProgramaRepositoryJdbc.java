@@ -152,7 +152,9 @@ public class MuestraDelProgramaRepositoryJdbc extends RepositorioJdbc
      * Los predios que otro programa <b>que admite visitas</b> ya se llevó.
      *
      * <p>El estado se lee de {@code programa_fiscalizacion} y no se copia en la fila: un programa
-     * que se cierra deja de excluir el mismo día, y una copia diría lo de antes.
+     * que se cierra deja de excluir el mismo día, y una copia diría lo de antes. Que un programa se
+     * cierre es cierto desde #341 —{@code CerrarProgramaFiscalizacion}—; hasta entonces ninguno
+     * salía de {@code ABIERTO} y esta consulta retenía a todo predio sorteado una vez.
      */
     @Override
     public Set<Long> prediosEnProgramasAbiertos(long programaPropio, Set<Long> predios) {

@@ -108,6 +108,7 @@
   "POST /fiscalizacion/liquidaciones/{numero}/reliquidaciones": ["404"],
   "POST /fiscalizacion/predial/actas": ["404"],
   "POST /fiscalizacion/programas": [],
+  "POST /fiscalizacion/programas/{id}/cierre": ["404"],
   "POST /fiscalizacion/programas/{id}/muestra": ["404"],
   "POST /fiscalizacion/transferencias": ["404"],
   "POST /fiscalizacion/vehicular": ["404"],

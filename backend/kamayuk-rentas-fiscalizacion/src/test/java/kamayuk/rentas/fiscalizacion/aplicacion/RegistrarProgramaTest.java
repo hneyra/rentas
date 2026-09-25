@@ -51,6 +51,12 @@ class RegistrarProgramaTest {
                     }
 
                     @Override
+                    public ProgramaFiscalizacion cerrar(long id) {
+                        throw new UnsupportedOperationException(
+                                "esta prueba no cierra programas (#341)");
+                    }
+
+                    @Override
                     public Pagina<ProgramaFiscalizacion> consultar(
                             CriterioDeProgramas criterio, Paginacion paginacion) {
                         throw new UnsupportedOperationException(

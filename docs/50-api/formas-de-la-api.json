@@ -3493,6 +3493,19 @@
     "criterio": "texto",
     "fiscalizador": "texto"
   },
+  "POST /fiscalizacion/programas/{id}/cierre": {
+    "id": "entero",
+    "codigo": "texto",
+    "descripcion": "texto",
+    "tipo": "texto",
+    "fechaInicio": "texto",
+    "fechaFin": "texto",
+    "estado": "texto",
+    "ejercicio": "texto",
+    "sector": "texto",
+    "criterio": "texto",
+    "fiscalizador": "texto"
+  },
   "POST /fiscalizacion/programas/{id}/muestra": {
     "programaId": "entero",
     "predios": "entero",

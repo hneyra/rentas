@@ -44,7 +44,9 @@ public interface MuestraDelProgramaRepository {
      * ({@code ABIERTO} o {@code EN_PROCESO}): la primera mitad de la exclusión de #481.
      *
      * <p>Un programa {@code CERRADO} no excluye: si lo hiciera, un programa de 2021 bloquearía el
-     * padrón para siempre.
+     * padrón para siempre. Y desde #341 un programa <b>llega</b> a {@code CERRADO}: lo cierra
+     * {@code CerrarProgramaFiscalizacion}. Hasta entonces ninguno llegaba, y esta salvedad no
+     * apartaba nada.
      */
     Set<Long> prediosEnProgramasAbiertos(long programaPropio, Set<Long> predios);
 }
