@@ -25,8 +25,12 @@ import kamayuk.rentas.nucleo.dominio.arbitrios.Servicio;
  *       una constante o una funcion de esta clase, o el build sale rojo nombrando la llamada.
  *   <li>{@code LlavesDelConjuntoContraElDerivadoTest} recorre <b>todas</b> las constantes de esta
  *       clase contra el derivado que {@code normativa} despliega: la que se publica tiene que estar
- *       con este mismo nombre, y la que no se publica todavia lo declara con su motivo —y se pone
- *       roja el dia que se publique, para que alguien venga a comprobar que el nombre casa—.
+ *       con este mismo nombre, y la que no se publica todavia lo declara con su motivo.
+ *   <li>Y al reves: todo tipo que el derivado publica lo pide una constante de aqui o esta
+ *       declarado en esa prueba con quien lo lee. Es lo que hace rojo el dia que {@code normativa}
+ *       publique un valor que se pide aqui con otro nombre —el vehicular, que se pide como {@code
+ *       ALICUOTA_VEHICULAR} y se planea publicar como {@code VEHICULAR_ALICUOTA}—: mirar solo desde
+ *       la llave no lo veria, porque el nombre de la llave seguiria sin publicarse.
  * </ul>
  *
  * <p>Son <b>nombres</b>, no cifras (regla 5): ningun valor vive aqui.

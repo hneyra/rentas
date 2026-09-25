@@ -1,17 +1,9 @@
 package kamayuk.rentas.nucleo.parametros;
 
-import java.io.IOException;
-import java.io.Reader;
-import java.io.UncheckedIOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import kamayuk.rentas.carga.LectorDeFilasCsv;
-import kamayuk.rentas.carga.LectorDeFilasCsv.FilaCsv;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.ValorNormativo;
 import kamayuk.rentas.parametros.CorpusDeNormativa;
@@ -46,28 +38,12 @@ public final class DerivadoPublicado {
      * <p>La clave vacia es la forma del tipo con un solo valor —la UIT—, y se conserva como cadena
      * vacia a proposito: es la misma distincion que {@code IS NOT DISTINCT FROM} sostiene en la
      * base, y confundirla con «no esta» es el defecto que #247 §2 destapo.
+     *
+     * <p>Desde #376 la lectura vive en {@link CorpusDeNormativa#numerosVigentesEn(int)}, porque
+     * tambien la necesita {@code fiscalizacion}: aqui solo se delega.
      */
     public static Map<String, String> numerosVigentesEn(int ejercicio) {
-        Map<String, String> publicados = new LinkedHashMap<>();
-        String primerDia = ejercicio + "-01-01";
-        String ultimoDia = ejercicio + "-12-31";
-        try (Reader archivo = Files.newBufferedReader(ARCHIVO, StandardCharsets.UTF_8)) {
-            for (FilaCsv fila : LectorDeFilasCsv.leer(archivo)) {
-                List<String> campos = fila.campos();
-                String desde = campos.get(2);
-                String hasta = campos.get(3);
-                boolean rige =
-                        desde.compareTo(ultimoDia) <= 0
-                                && (hasta.isEmpty() || hasta.compareTo(primerDia) >= 0);
-                if (!rige || campos.get(4).isEmpty()) {
-                    continue;
-                }
-                publicados.put(campos.get(0) + "|" + campos.get(1), campos.get(4));
-            }
-        } catch (IOException e) {
-            throw new UncheckedIOException("No se pudo leer el derivado publicable", e);
-        }
-        return publicados;
+        return CorpusDeNormativa.numerosVigentesEn(ejercicio);
     }
 
     /** Un lector de un conjunto compuesto con <b>todo</b> lo que el derivado publica. */

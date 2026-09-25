@@ -59,14 +59,17 @@ class ExigirNumeroSoloConLlavesDeclaradasTest {
                     "kamayuk-rentas-parametros/src/main/java/kamayuk/rentas/parametros/"
                             + "InsumosDeLaRegla.java",
                     "es el puerto por el que una regla del motor pide su parametro: la llave la"
-                            + " escribe la regla (ARQ-09), y aqui solo se pasa",
+                            + " escribe la regla (ARQ-09), y aqui solo se pasa. La unica regla que"
+                            + " lee uno, RT001ValorDeTerreno.ARANCEL, la compara"
+                            + " LlavesDelConjuntoContraElDerivadoTest",
                     "kamayuk-rentas-parametros/src/main/java/kamayuk/rentas/parametros/"
                             + "InsumosDeLaAgregacion.java",
                     "el mismo puerto, para una regla de agregacion",
                     "kamayuk-rentas-fiscalizacion/src/main/java/kamayuk/rentas/fiscalizacion/"
                             + "aplicacion/InsumosNormativosDeLaLiquidacion.java",
-                    "ya reune sus llaves en LLAVES_QUE_ESPERAN_A_D02A y recorre esa lista; son de"
-                            + " D-02a y, salvo la UIT, el derivado no publica ninguna todavia");
+                    "ya reune sus llaves en LLAVES_QUE_ESPERAN_A_D02A y recorre esa lista, y"
+                            + " LlavesDeLaLiquidacionContraElDerivadoTest compara la lista entera"
+                            + " con el derivado");
 
     @Test
     @DisplayName("ninguna llamada de produccion pasa una llave que no sea de una clase Llaves*")

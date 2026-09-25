@@ -1,7 +1,16 @@
 package kamayuk.rentas.parametros;
 
+import java.io.IOException;
+import java.io.Reader;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import kamayuk.rentas.carga.LectorDeFilasCsv;
+import kamayuk.rentas.carga.LectorDeFilasCsv.FilaCsv;
 
 /**
  * Donde esta el derivado publicable de {@code normativa}, ahora que el corpus se fue (ADR-0025 §5).
@@ -20,7 +29,11 @@ import java.nio.file.Path;
  * espectaculos, que pidieron {@code ALICUOTA_ALCABALA} y {@code ALICUOTA_ESPECTACULO} contra las
  * {@code ALCABALA_ALICUOTA} y {@code ESPECTACULO_ALICUOTA} publicadas sin que nada lo viera (#376).
  * Desde #376 el nucleo reune sus llaves en {@code LlavesDelConjunto} y {@code
- * LlavesDelConjuntoContraElDerivadoTest} las recorre <b>todas</b> contra este mismo archivo.
+ * LlavesDelConjuntoContraElDerivadoTest} las recorre <b>todas</b> contra este mismo archivo —y al
+ * reves: todo tipo que el archivo publica lo pide una llave o esta declarado—, y {@code
+ * LlavesDeLaLiquidacionContraElDerivadoTest} hace lo mismo con las de la liquidacion de {@code
+ * fiscalizacion}. Las dos leen el archivo con {@link #numerosVigentesEn(int)}, y no cada una a su
+ * manera.
  *
  * <p>Antes de P5B las dos mitades estaban en el mismo repositorio y el compilador y el sistema de
  * archivos las sujetaban. Ahora no: el CSV es de {@code normativa} y el consumidor es de {@code
@@ -54,6 +67,43 @@ public final class CorpusDeNormativa {
     public static Path derivadoPublicable() {
         return exigir(
                 RAIZ.resolve("docs/10-negocio/valores-normativos/publicacion/parametros-2026.csv"));
+    }
+
+    /**
+     * Las filas numericas del derivado que rigen ese ejercicio, indexadas por {@code tipo|clave}.
+     *
+     * <p>Se lee por <b>posicion</b>, igual que {@code FilaPublicable} y que {@code
+     * ImportarParametrosDelConjunto}: {@code tipo, clave, vigencia_desde, vigencia_hasta,
+     * valor_numerico}. La clave vacia es la forma del tipo con un solo valor —la UIT— y se conserva
+     * como cadena vacia a proposito: es la misma distincion que {@code IS NOT DISTINCT FROM}
+     * sostiene en la base, y confundirla con «no esta» es el defecto que #247 §2 destapo.
+     *
+     * <p>Vive aqui, y no en cada prueba que la necesita, para que todas lean el archivo <b>de la
+     * misma manera</b> (#376): con una copia en cada modulo, el dia que el formato cambiara una
+     * seguiria verde leyendo mal.
+     */
+    public static Map<String, String> numerosVigentesEn(int ejercicio) {
+        Map<String, String> publicados = new LinkedHashMap<>();
+        String primerDia = ejercicio + "-01-01";
+        String ultimoDia = ejercicio + "-12-31";
+        try (Reader archivo =
+                Files.newBufferedReader(derivadoPublicable(), StandardCharsets.UTF_8)) {
+            for (FilaCsv fila : LectorDeFilasCsv.leer(archivo)) {
+                List<String> campos = fila.campos();
+                String desde = campos.get(2);
+                String hasta = campos.get(3);
+                boolean rige =
+                        desde.compareTo(ultimoDia) <= 0
+                                && (hasta.isEmpty() || hasta.compareTo(primerDia) >= 0);
+                if (!rige || campos.get(4).isEmpty()) {
+                    continue;
+                }
+                publicados.put(campos.get(0) + "|" + campos.get(1), campos.get(4));
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException("No se pudo leer el derivado publicable", e);
+        }
+        return publicados;
     }
 
     private static Path exigir(Path ruta) {

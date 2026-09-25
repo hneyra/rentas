@@ -72,4 +72,12 @@ tasks.test {
     inputs
         .file(rootProject.file("../docs/50-api/openapi/rentas-v1.yaml"))
         .withPathSensitivity(PathSensitivity.RELATIVE)
+
+    // Y el derivado publicable de `normativa`, el repositorio hermano: desde #376
+    // `LlavesDeLaLiquidacionContraElDerivadoTest` compara con el las llaves de la
+    // liquidacion. Sin declararlo, el dia que normativa publique la multa del
+    // art. 176 esta tarea seguiria en UP-TO-DATE y la guarda en verde rancio.
+    inputs
+        .file(rootProject.file("../../normativa/docs/10-negocio/valores-normativos/publicacion/parametros-2026.csv"))
+        .withPathSensitivity(PathSensitivity.RELATIVE)
 }
