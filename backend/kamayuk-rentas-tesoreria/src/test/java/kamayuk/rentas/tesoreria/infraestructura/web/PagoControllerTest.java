@@ -76,10 +76,10 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-import tools.jackson.databind.JsonNode;
 import org.springframework.transaction.annotation.AnnotationTransactionAttributeSource;
 import org.springframework.transaction.interceptor.TransactionInterceptor;
 import org.springframework.transaction.support.TransactionTemplate;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
@@ -411,6 +411,45 @@ class PagoControllerTest {
                     .isEqualTo(403);
             assertThat(filasDelBuzonCon(anulacion)).isZero();
             assertThat(reversionesDe(contribuyente)).isZero();
+        }
+
+        /**
+         * El contraste del «cero reversiones» de arriba: la misma anulacion, de un cobro igual, la
+         * entrega la caja y el libro si se mueve.
+         *
+         * <p>Sin esta prueba, {@code reversionesDe(...) == 0} no mordia por si misma: con la
+         * consulta de {@link #reversionesDe} rota para no casar nunca, la clase entera seguia
+         * verde, porque ninguna prueba veia contar mas de cero. Lo que aqui se cuenta es
+         * exactamente lo que la otra prueba dice que no hubo.
+         */
+        @Test
+        @DisplayName(
+                "el contraste: la caja si anula su cobro, 201, y el libro cuenta sus reversiones")
+        void laCajaSiAnulaSuCobro() throws Exception {
+            long contribuyente = sembrarContribuyenteConDeuda();
+            UUID cobro = UUID.randomUUID();
+            como(AZP_DE_LA_CAJA, CUENTA_DE_LA_CAJA);
+            assertThat(
+                            entregar(buzonDePagos, cobro(cobro, contribuyente, "REV"))
+                                    .getResponse()
+                                    .getStatus())
+                    .isEqualTo(201);
+            UUID anulacion = UUID.randomUUID();
+
+            MvcResult resultado =
+                    entregar(buzonDePagos, anulacionDe(anulacion, cobro, contribuyente, "REV"));
+
+            assertThat(resultado.getResponse().getStatus())
+                    .as("la cuenta de servicio de la caja anula un cobro que ella misma entrego")
+                    .isEqualTo(201);
+            assertThat(resultado.getResponse().getContentAsString())
+                    .contains("\"estado\":\"" + EstadoDelPagoRecibido.APLICADO + "\"");
+            assertThat(filasDelBuzonCon(anulacion)).isEqualTo(1);
+            assertThat(reversionesDe(contribuyente))
+                    .as(
+                            "la anulacion de la caja reversa el abono del cobro: si esto fuera"
+                                    + " cero, el cero del cajero no probaria nada")
+                    .isPositive();
         }
 
         @Test
