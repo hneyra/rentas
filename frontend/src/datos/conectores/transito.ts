@@ -11,7 +11,7 @@ import type {
 } from '../lecturas.ts';
 import { RUTAS, pedirPagina, pedirUno } from '../lecturas.ts';
 import type { Conector, Reparto } from '../conectores.ts';
-import { NO_PUBLICADO, type PalabraDeHueco } from '../palabrasDeHueco.ts';
+import { FUERA_DEL_DEPOSITO, NO_PUBLICADO, type PalabraDeHueco } from '../palabrasDeHueco.ts';
 import { laVentanaDe, laVentanaQueSePide, loQueDijoElServidor } from '../laVentana.ts';
 
 /**
@@ -472,13 +472,29 @@ type LoDeTraVeh = readonly [
  *       depende de la suerte es peor que un hueco.</li>
  * </ol>
  *
+ * <h2>Y de esa tercera, el ULTIMO internamiento, y solo si sigue dentro (#387)</h2>
+ *
+ * Una placa acumula un internamiento por cada vez que entro. Hasta #387 la lectura no decia orden
+ * y el de omision es `fechaIngreso` ascendente, asi que `tamano=1` traia **el mas antiguo**: un
+ * reincidente que llevaba 3 dias dentro salia con la papeleta, la fecha y los 7 dias de su estancia
+ * de 2025, y con la fecha de hoy al lado. Ahora se pide `sentido=DESCENDENTE`, el orden de
+ * `vigenteDePlaca`, y aun asi el ultimo puede ser uno **ya liberado** —el vehiculo salio y no
+ * volvio—: entonces «Nº de papeleta» y «Fecha de internamiento» se quedan en blanco y «Dias de
+ * custodia» dice `FUERA_DEL_DEPOSITO`. Los dos primeros son controles del formulario de alta, no
+ * campos de solo lectura, y el interprete no escribe palabra de hueco en un control: en blanco es
+ * lo que un formulario de alta tiene que ensenar para un vehiculo que no esta dentro.
+ *
+ * El guion de la placa ya no separa las dos lecturas: desde #423 la grilla del deposito compara
+ * `placa_busqueda`, la misma forma que la ficha, asi que `T2G418` encuentra el internamiento
+ * guardado como `T2G-418`.
+ *
  * <h2>Campo a campo: cuatro con dato, dos huecos y tres que no se rellenan</h2>
  *
  * <ul>
  *   <li><b>`0|0` Placa</b> ← `vehiculo.placa`, ya normalizada por el backend. Es lo primero que
  *       hay que poder leer: de quien son las cifras de debajo.</li>
- *   <li><b>`0|1` Nº de papeleta</b> ← `papeleta` del internamiento de esta placa, la que dispuso la
- *       medida preventiva. Llega nulo cuando no hubo ninguna —el internamiento pudo disponerlo otra
+ *   <li><b>`0|1` Nº de papeleta</b> ← `papeleta` del internamiento **vigente** de esta placa, la que
+ *       dispuso la medida preventiva. Llega nulo cuando no hubo ninguna —el internamiento pudo disponerlo otra
  *       cosa—, y entonces el campo se queda sin escribir.</li>
  *   <li><b>`0|2` Fecha de internamiento</b> ← `fechaDeIngreso` del mismo.</li>
  *   <li><b>`0|5` Marca y modelo</b> ← `marca` y `modelo`, que la ficha publica por separado y el
@@ -487,7 +503,7 @@ type LoDeTraVeh = readonly [
  *       los dias en deposito de hoy no son los de manana, y el backend cuenta a una fecha y la
  *       publica al lado justamente para que no se lea como un numero fijo. Sin ningun internamiento
  *       de esta placa dice «no publicado» — que es lo que la operacion contesto, no una decision
- *       de aqui.</li>
+ *       de aqui—; con el ultimo ya liberado dice `FUERA_DEL_DEPOSITO` (#387).</li>
  *   <li><b>`0|7` Tasa diaria</b> y <b>`0|8` Total de custodia</b> → <b>«no publicado»</b>, los dos.
  *       Ver el javadoc de este archivo: `tasaDeCustodia` es el concepto del TUPA y no una tarifa, y
  *       la tarifa de verdad espera a <b>D-02b</b>. Estos dos huecos son los que nombran esa
@@ -530,12 +546,25 @@ type LoDeTraVeh = readonly [
  * toda la pagina —es el corte con que se pidio— y repetirla en cada fila seria ruido. La fecha se
  * lee una vez, en «Dias de custodia».
  */
+/**
+ * **Si ese internamiento ya termino** (#387): el vehiculo salio del deposito.
+ *
+ * Se miran las dos cosas que la operacion publica de la salida, y basta una: `estado` es la
+ * situacion que el dominio deriva de los movimientos (`EstadoDeInternamiento.delHistorial`) y
+ * `fechaDeSalida` sale de la misma liberacion. Mirar solo el estado dejaria pasar como vigente un
+ * internamiento con su salida registrada el dia que el vocabulario cambiara; mirar solo la fecha,
+ * al reves. `EN_ABANDONO` **no** es salir: el vehiculo sigue ocupando el deposito.
+ */
+function yaSalioDelDeposito(internamiento: InternamientoEnDeposito): boolean {
+  return internamiento.estado === 'LIBERADO' || internamiento.fechaDeSalida !== null;
+}
+
 const TRA_VEH: Conector = {
   clave: ['tra-veh', 'deposito'],
   exigeSujeto: true,
   sinSujeto: SIN_PLACA,
   // La ventana de la tabla del deposito. La tercera lectura —la de ESTA placa— no pagina: es una
-  // fila, y se pide con `?tamano=1`.
+  // fila, la ULTIMA que entro, y se pide con `?sentido=DESCENDENTE&tamano=1` (#387).
   parametros: laVentanaDe('GET /transito/internamientos'),
   pedir: ({ senal, sujeto, enLaRuta }) => {
     // `useDatosDeLaHoja` no llama a `pedir` sin sujeto cuando `exigeSujeto` esta puesto; el `??`
@@ -551,7 +580,11 @@ const TRA_VEH: Conector = {
     ]);
   },
   repartir: ([vehiculo, deposito, suyos]: LoDeTraVeh): Reparto => {
-    const suyo = suyos.contenido[0];
+    const ultimo = suyos.contenido[0];
+    // El ultimo de la placa solo es de AHORA si sigue dentro (#387). Uno ya liberado es historia:
+    // su papeleta, su fecha y sus dias —contados hasta la salida— no dicen nada del vehiculo de hoy.
+    const salio = ultimo !== undefined && yaSalioDelDeposito(ultimo);
+    const suyo = salio ? undefined : ultimo;
     const papeleta = suyo?.papeleta;
     return {
       valores: new Map([
@@ -609,7 +642,13 @@ const TRA_VEH: Conector = {
       // `hayMas` y `totalPaginas`, dichos por el SERVIDOR (#187).
       nombrados: loQueDijoElServidor('vehiculos-internados', deposito),
       noPublicados: new Map([
-        ...(suyo === undefined ? ([[coordenada(0, 6), NO_PUBLICADO]] as const) : []),
+        // Sin ningun internamiento, la operacion no tiene de donde sacar los dias; con el ultimo
+        // ya liberado, SI los publico, y son los de otra estancia. Dos motivos, dos palabras.
+        ...(salio
+          ? ([[coordenada(0, 6), FUERA_DEL_DEPOSITO]] as const)
+          : suyo === undefined
+            ? ([[coordenada(0, 6), NO_PUBLICADO]] as const)
+            : []),
         [coordenada(0, 7), NO_PUBLICADO],
         [coordenada(0, 8), NO_PUBLICADO],
       ]),

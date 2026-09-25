@@ -9,6 +9,7 @@ import type { ClaveDeHoja } from '../../pantallas/arbol.ts';
 import { PantallaDeRentas } from '../../pantallas/PantallaDeRentas.tsx';
 import { useDatosDeLaHoja } from '../useDatosDeLaHoja.ts';
 import { NO_PUBLICADO } from '../conectores.ts';
+import { FUERA_DEL_DEPOSITO } from '../palabrasDeHueco.ts';
 import type {
   ExpedienteDeLaPapeleta,
   InternamientoEnDeposito,
@@ -60,7 +61,10 @@ function internado(campos: Partial<InternamientoEnDeposito> = {}): Internamiento
     fechaDeSalida: null,
     dias: 54,
     calculadoA: '2026-09-10',
-    estado: 'EN_DEPOSITO',
+    // Un estado que el backend PRODUCE: `EstadoDeInternamiento` es `INTERNADO`, `LIBERADO` o
+    // `EN_ABANDONO`. Hasta #387 esto decia `EN_DEPOSITO`, que no existe — y con un estado que no
+    // existe no hay forma de sembrar el caso que distingue, el vehiculo ya liberado.
+    estado: 'INTERNADO',
     // El CONCEPTO del TUPA, no una tarifa. Ver `conectores/transito.ts`.
     tasaDeCustodia: 'TUPA-2.14 CUSTODIA DIARIA',
     acta: 'ACTA-2026-0311',
@@ -228,15 +232,27 @@ function PantallaConectada({
   return <PantallaDeRentas definicion={pantallaDe(clave)} datos={useDatosDeLaHoja(clave, { sujeto, parametros: {} })} />;
 }
 
+/**
+ * Lo que el doble contesta a una ruta: un cuerpo fijo, o uno que **depende de la peticion**.
+ *
+ * El segundo existe por #387: un doble que contesta lo mismo pida lo que pida no puede distinguir
+ * «el primero» de «el vigente», porque para el `?sentido=` no significa nada.
+ */
+type Contestacion = unknown;
+type ContestaSegunLaPeticion = (url: string) => unknown;
+
 /** Sustituye `fetch` por un doble que contesta segun la RUTA, y dice a que se llamo. */
-function contesta(porRuta: readonly (readonly [string, unknown])[]) {
+function contesta(porRuta: readonly (readonly [string, Contestacion | ContestaSegunLaPeticion])[]) {
   const pedidas: string[] = [];
   const doble = vi.fn<typeof fetch>((entrada) => {
     const url = String(entrada);
     pedidas.push(url);
     const casa = porRuta.find(([trozo]) => url.includes(trozo));
+    const respuesta = casa?.[1];
+    const cuerpo: unknown =
+      typeof respuesta === 'function' ? (respuesta as ContestaSegunLaPeticion)(url) : respuesta;
     return Promise.resolve(
-      new Response(JSON.stringify(casa?.[1] ?? {}), {
+      new Response(JSON.stringify(cuerpo ?? {}), {
         status: casa === undefined ? 404 : 200,
         headers: { 'content-type': 'application/json' },
       }),
@@ -249,7 +265,7 @@ function contesta(porRuta: readonly (readonly [string, unknown])[]) {
 /** Monta la hoja con esas respuestas y espera a que deje de pedir. */
 async function pintar(
   clave: ClaveDeHoja,
-  porRuta: readonly (readonly [string, unknown])[],
+  porRuta: readonly (readonly [string, Contestacion | ContestaSegunLaPeticion])[],
   sujeto: string | null = null,
 ) {
   const pedidas = contesta(porRuta);
@@ -282,11 +298,40 @@ function comoTraVeh(
   suyos: readonly InternamientoEnDeposito[],
 ) {
   return [
-    // El acotado va primero: `includes('/transito/internamientos')` casa con los dos.
-    ['/transito/internamientos?placa=', pagina(suyos, suyos.length)],
+    // El acotado va primero: `includes('/transito/internamientos')` casa con los dos. Y contesta
+    // como el backend —ordenado y cortado segun lo que se pidio—, no una lista fija (#387).
+    ['/transito/internamientos?placa=', losDeLaPlaca(suyos)],
     ['/transito/internamientos', pagina(deposito, 188)],
     ['/rentas/vehiculos/', ficha],
   ] as const;
+}
+
+/**
+ * **El doble de `GET /transito/internamientos?placa=` que respeta el orden que se le pide** (#387).
+ *
+ * Hace lo que hace el backend y nada mas: ordena por `ordenarPor` —el unico que esta lectura usa,
+ * `fechaIngreso`, que es ademas el `ORDEN_POR_OMISION` de `InternamientosController`— en el
+ * `sentido` pedido, **ascendente si no se pide ninguno** (`ParametrosDePaginacion`), y corta en
+ * `tamano`. Con una lista fija, «el primero» y «el vigente» son la misma fila por construccion y
+ * ninguna prueba puede separarlos: era el caso de todas las muestras hasta #387, que sembraban UN
+ * internamiento por placa.
+ *
+ * Da igual en que orden lleguen `internamientos`: los ordena el doble, igual que la base.
+ */
+function losDeLaPlaca(internamientos: readonly InternamientoEnDeposito[]): ContestaSegunLaPeticion {
+  return (url) => {
+    const pedido = new URL(url, 'http://doble.invalid').searchParams;
+    const campo = pedido.get('ordenarPor') ?? 'fechaIngreso';
+    if (campo !== 'fechaIngreso') {
+      throw new Error(`El doble solo sabe ordenar por fechaIngreso, y se pidio «${campo}»`);
+    }
+    const signo = (pedido.get('sentido') ?? 'ASCENDENTE') === 'DESCENDENTE' ? -1 : 1;
+    const ordenados = [...internamientos].sort(
+      (a, b) => signo * a.fechaDeIngreso.localeCompare(b.fechaDeIngreso),
+    );
+    const tamano = Number(pedido.get('tamano') ?? '20');
+    return pagina(ordenados.slice(0, tamano), internamientos.length);
+  };
 }
 
 /** Lo que llevan dentro los campos que se escriben: un `<input>` no pone su valor en el DOM. */
@@ -602,7 +647,7 @@ describe('`tra-veh` — el deposito y el vehiculo de la direccion', () => {
     expect(filas[1]?.celdas[0]).toBe('V1H-882');
     expect(filas[1]?.celdas[2]).toBe('18/07/2026');
     expect(filas[1]?.celdas[3]).toBe('39');
-    expect(filas[1]?.celdas[5]).toBe('EN_DEPOSITO');
+    expect(filas[1]?.celdas[5]).toBe('INTERNADO');
     // «Clase» ← `clase`, desde #185. Y cada fila la SUYA: una sola clase repetida diria que el
     // deposito entero es de una.
     expect(filas[0]?.celdas[1]).toBe('AUTOMOVIL');
@@ -627,6 +672,115 @@ describe('`tra-veh` — el deposito y el vehiculo de la direccion', () => {
     // justo cuando la hay. Por eso los dos salen del envoltorio.
     expect(reparto.nombrados?.get('vehiculos-internados.hayMas')).toBe(true);
     expect(reparto.nombrados?.get('vehiculos-internados.paginas')).toBe('10');
+  });
+});
+
+describe('#387 — la ficha del vehiculo es la del internamiento VIGENTE, no la del mas antiguo', () => {
+  // El escenario del issue, tal cual. `T2G-418` entro el 03/03/2025 con la papeleta 0039001 y
+  // salio el 10/03/2025: 7 dias. Volvio a entrar el 20/09/2026 con la 0041182 y sigue dentro.
+  // Hoy es 23/09/2026. Las dos filas NO comparten ni fecha, ni papeleta, ni dias: si la pantalla
+  // ensena una sola cifra de la de 2025, es que se quedo con la que no era.
+  const DE_2025 = internado({
+    id: 11,
+    papeleta: '0039001',
+    fechaDeIngreso: '2025-03-03',
+    fechaDeSalida: '2025-03-10',
+    dias: 7,
+    calculadoA: '2026-09-23',
+    estado: 'LIBERADO',
+  });
+  const DE_2026 = internado({
+    id: 12,
+    papeleta: '0041182',
+    fechaDeIngreso: '2026-09-20',
+    fechaDeSalida: null,
+    dias: 3,
+    calculadoA: '2026-09-23',
+    estado: 'INTERNADO',
+  });
+  // El deposito es OTRO vehiculo con otras fechas: la tabla no puede prestarle a los campos una
+  // cifra que los haga pasar.
+  const DEPOSITO = [
+    internado({ id: 3, placa: 'AAA-111', papeleta: '0040001', fechaDeIngreso: '2026-08-01', dias: 53 }),
+  ];
+
+  it('con dos internamientos de la placa, ensena el de 2026 y ni una cifra del de 2025', async () => {
+    // El doble ORDENA como el backend: da igual en que orden se le pasen.
+    const { container, pedidas } = await pintar(
+      'tra-veh',
+      comoTraVeh(vehiculo(), DEPOSITO, [DE_2025, DE_2026]),
+      'T2G-418',
+    );
+
+    expect(
+      pedidas.some((url) => url.includes('/transito/internamientos?placa=T2G-418')),
+      'no se pidieron los internamientos de la placa',
+    ).toBe(true);
+    // «Fecha de internamiento» es un disparador de calendario y su valor SI esta en el texto.
+    expect(
+      container.textContent,
+      'la fecha es la del internamiento de 2025: se pidio el primero de la placa y no el vigente',
+    ).not.toContain('03/03/2025');
+    expect(container.textContent).toContain('20/09/2026');
+    // «Dias de custodia»: los 3 que lleva, con su fecha. Los 7 de 2025 «a hoy» son el defecto.
+    expect(container.textContent).not.toContain('7 · 23/09/2026');
+    expect(container.textContent).toContain('3 · 23/09/2026');
+    // «Nº de papeleta» es un `<input>`: su valor no esta en `textContent`.
+    expect(valoresEscritos(container)).not.toContain('0039001');
+    expect(valoresEscritos(container)).toContain('0041182');
+  });
+
+  it('con un unico internamiento YA LIBERADO, sus datos no se presentan como de ahora', async () => {
+    const { container } = await pintar(
+      'tra-veh',
+      comoTraVeh(vehiculo(), DEPOSITO, [DE_2025]),
+      'T2G-418',
+    );
+
+    expect(container.textContent).not.toContain('03/03/2025');
+    expect(container.textContent).not.toContain('7 · 23/09/2026');
+    expect(valoresEscritos(container)).not.toContain('0039001');
+    // Y el campo de solo lectura lo DICE con su palabra, en vez de quedarse en blanco o de decir
+    // «no publicado», que culparia al backend de algo que si publico.
+    expect(container.textContent).toContain(`Días de custodia${FUERA_DEL_DEPOSITO}`);
+  });
+
+  it('el reparto: liberado es no escribir 0|1, 0|2 ni 0|6, y 0|6 dice por que', () => {
+    const liberado = TRA_VEH.repartir([vehiculo(), pagina(DEPOSITO, 1), pagina([DE_2025], 1)] as never);
+
+    for (const campo of [1, 2, 6]) {
+      expect(liberado.valores.has(coordenada(0, campo)), `0|${String(campo)} se escribio`).toBe(false);
+    }
+    expect(liberado.noPublicados.get(coordenada(0, 6))).toBe(FUERA_DEL_DEPOSITO);
+    // La placa y la ficha siguen: el vehiculo existe, lo que no hay es internamiento vigente.
+    expect(liberado.valores.get(coordenada(0, 0))).toBe('T2G-418');
+    expect(liberado.valores.get(coordenada(0, 5))).toBe('TOYOTA YARIS');
+  });
+
+  it('basta la FECHA DE SALIDA para saber que salio, aunque el estado no lo diga', () => {
+    // Las dos salen de la misma liberacion en el backend; se miran las dos para que un estado
+    // que no se reconozca no deje pasar una salida que si consta.
+    const conSalida = TRA_VEH.repartir([
+      vehiculo(),
+      pagina(DEPOSITO, 1),
+      pagina([internado({ ...DE_2025, estado: 'OTRO' })], 1),
+    ] as never);
+
+    expect(conSalida.valores.has(coordenada(0, 6))).toBe(false);
+    expect(conSalida.noPublicados.get(coordenada(0, 6))).toBe(FUERA_DEL_DEPOSITO);
+  });
+
+  it('EN_ABANDONO sigue en el deposito: sus dias se ensenan', () => {
+    // El abandono no saca al vehiculo: sigue ocupando el deposito y su custodia sigue corriendo.
+    const abandonado = TRA_VEH.repartir([
+      vehiculo(),
+      pagina(DEPOSITO, 1),
+      pagina([internado({ ...DE_2026, estado: 'EN_ABANDONO' })], 1),
+    ] as never);
+
+    expect(abandonado.valores.get(coordenada(0, 2))).toBe('20/09/2026');
+    expect(abandonado.valores.get(coordenada(0, 6))).toBe('3 · 23/09/2026');
+    expect(abandonado.noPublicados.has(coordenada(0, 6))).toBe(false);
   });
 });
 

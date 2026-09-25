@@ -91,6 +91,16 @@ const NO_CONSTA_EN_LA_CORRIDA = 'no consta en la corrida';
  */
 const SIN_CORRIDA_DEL_EJERCICIO = 'todavia sin corrida';
 
+/**
+ * **Lo que va donde un campo es del internamiento VIGENTE y el ultimo de la placa ya salio** (#387).
+ *
+ * «Dias de custodia» de `tra-veh`. No es `NO_PUBLICADO` —la operacion SI publico el internamiento,
+ * con sus dias— ni un cero: es que el vehiculo **no esta en el deposito**, y los dias que llegan son
+ * los que estuvo la ultima vez, contados hasta su salida. Escribirlos con la fecha de hoy al lado,
+ * que es lo que la ficha hacia, los leia como la custodia que corre ahora.
+ */
+const FUERA_DEL_DEPOSITO = 'no esta en el deposito';
+
 /** «Detectados por cruce» de un programa que no declara sus parametros de sorteo (#196). */
 const SIN_PARAMETROS_DEL_SORTEO = `El cruce no se pudo resolver: este programa no declara los \
 parametros con que se sortea, y el embudo dice cual falta en «parametroQueFalta». No es cero — \
@@ -111,6 +121,7 @@ export const PALABRAS_DE_HUECO = {
   SIN_CORRIDA_DEL_EJERCICIO,
   SIN_CRONOGRAMA,
   SIN_PARAMETROS_DEL_SORTEO,
+  FUERA_DEL_DEPOSITO,
 } as const;
 
 /**
@@ -150,4 +161,5 @@ export {
   SIN_CORRIDA_DEL_EJERCICIO,
   SIN_CRONOGRAMA,
   SIN_PARAMETROS_DEL_SORTEO,
+  FUERA_DEL_DEPOSITO,
 };

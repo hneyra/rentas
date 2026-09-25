@@ -266,6 +266,9 @@ describe('AC7 — lo que se declara servido tiene que publicarlo el backend', ()
     expect(declara('GET /transito/papeletas', 'tamano')).toBe(true);
     expect(declara('GET /transito/internamientos', 'tamano')).toBe(true);
     expect(declara('GET /transito/internamientos', 'placa')).toBe(true);
+    // El orden de la lectura de UNA placa (#387): el ultimo que entro, no el primero.
+    expect(declara('GET /transito/internamientos', 'ordenarPor')).toBe(true);
+    expect(declara('GET /transito/internamientos', 'sentido')).toBe(true);
     // Y la ficha del vehiculo lleva la placa EN LA RUTA: no admite ni un parametro.
     expect(parametros['GET /rentas/vehiculos/{placa}']?.obligatorios).toEqual([]);
 
@@ -277,7 +280,7 @@ describe('AC7 — lo que se declara servido tiene que publicarlo el backend', ()
       '/transito/internamientos?tamano=20&pagina=2',
     );
     expect(RUTAS.internamientosDe('T2G/418')).toBe(
-      '/transito/internamientos?placa=T2G%2F418&tamano=1',
+      '/transito/internamientos?placa=T2G%2F418&ordenarPor=fechaIngreso&sentido=DESCENDENTE&tamano=1',
     );
     expect(RUTAS.vehiculoDe('T2G/418')).toBe('/rentas/vehiculos/T2G%2F418');
     expect(RUTAS.actosDeLaPapeleta('00/41')).toBe('/transito/papeletas/00%2F41/actos');
