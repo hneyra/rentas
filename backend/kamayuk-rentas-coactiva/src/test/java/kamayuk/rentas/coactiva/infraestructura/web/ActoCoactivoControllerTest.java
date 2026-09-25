@@ -52,6 +52,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.converter.json.JacksonJsonHttpMessageConverter;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import tools.jackson.databind.json.JsonMapper;
@@ -169,6 +170,36 @@ class ActoCoactivoControllerTest {
     private final MockMvc mvcPagado = montar(consultaSinDeuda);
 
     private final MockMvc mvcEnConvenio = montar(consultaEnConvenio);
+
+    /**
+     * #404 — La misma deuda del predial, <b>pagada por el integro el 10 de setiembre</b>. Es la
+     * siembra que distingue: hasta el 9 el libro trae 535,50 y desde el 10 no trae nada, asi que
+     * una guarda que lea la proyeccion y una que lea el dia del acto dan respuestas distintas.
+     */
+    private final LibroDeMentira libroPagadoEnSetiembre =
+            new LibroDeMentira()
+                    .con(
+                            new ObligacionPublica(
+                                    "PREDIAL",
+                                    EJERCICIO,
+                                    null,
+                                    null,
+                                    HOY,
+                                    Dinero.de("500.00"),
+                                    Dinero.de("10.00"),
+                                    Dinero.de("25.50"),
+                                    Dinero.CERO,
+                                    "COACTIVA"))
+                    .pagadoEl(LocalDate.of(2026, 9, 10));
+
+    private final MockMvc mvcPagadoEnSetiembre =
+            montar(
+                    new ConsultaDeExpedientes(
+                            expedientes,
+                            movimientos,
+                            valores,
+                            libroPagadoEnSetiembre,
+                            new CostasEnMemoria()));
 
     private MockMvc montar(ConsultaDeExpedientes cual) {
         return montar(cual, plazos);
@@ -418,6 +449,140 @@ class ActoCoactivoControllerTest {
 
             assertThat(resultado.getResponse().getStatus()).isEqualTo(422);
             assertThat(resultado.getResponse().getContentAsString()).contains("art. 33");
+        }
+    }
+
+    /**
+     * #404 — «Proyectar interes al» no puede ir antes del dia del acto.
+     *
+     * <p>La cifra que decide si queda deuda es la que se imprime (#425), asi que una proyeccion
+     * hacia atras llevaba la guarda de deuda viva a un dia en que el pago todavia no existia. La
+     * siembra que lo distingue es {@link #libroPagadoEnSetiembre}: 535,50 hasta el 9 de setiembre y
+     * nada desde el 10, con el acto el 20.
+     *
+     * <p>El rechazo es un <b>422 de toda la peticion</b>, y no una «rechazada» por expediente: la
+     * fecha no es de un expediente sino del formulario, y con veinte marcados el informe diria
+     * veinte veces lo mismo.
+     */
+    @Nested
+    @DisplayName("#404 — la proyeccion no va antes del dia del acto")
+    class LaProyeccionNoVaHaciaAtras {
+
+        private static final String ACTO = "2026-09-20";
+
+        @Test
+        @DisplayName("proyectar al 1 de setiembre con el acto el 20: 422 y no sale ninguna REC")
+        void haciaAtras422() throws Exception {
+            MvcResult resultado = emitirConProyeccion("REC1", "2026-09-01");
+
+            assertThat(resultado.getResponse().getStatus())
+                    .as(
+                            "la deuda al 1 de setiembre no ve el pago del 10: dictar la REC ese"
+                                    + " dia seria ejecutar a quien ya pago")
+                    .isEqualTo(422);
+            String cuerpo = resultado.getResponse().getContentAsString();
+            assertThat(cuerpo).contains("\"codigo\":\"VALIDACION\"");
+            assertThat(cuerpo)
+                    .as("dice que fecha falla y contra cual")
+                    .contains("2026-09-01")
+                    .contains(ACTO);
+            assertThat(papeles.porNumero("REC1", EJERCICIO, "REC1-2026-000001"))
+                    .as("y no se emitio ningun papel")
+                    .isEmpty();
+        }
+
+        @Test
+        @DisplayName("la REC-2 tambien, y el 422 sale antes de mirar ningun expediente")
+        void laRec2Tambien422() throws Exception {
+            MvcResult resultado = emitirConProyeccion("REC2", "2026-09-01");
+
+            assertThat(resultado.getResponse().getStatus()).isEqualTo(422);
+            assertThat(resultado.getResponse().getContentAsString())
+                    .as("no es la falta de REC-1 lo que la para: es la fecha de la peticion")
+                    .doesNotContain("no tiene REC-1");
+        }
+
+        @Test
+        @DisplayName(
+                "sin proyeccion, la guarda lee el dia del acto: rechazada por deuda extinguida")
+        void sinProyeccionDeudaExtinguida() throws Exception {
+            MvcResult resultado = emitirConProyeccion("REC1", null);
+
+            assertThat(resultado.getResponse().getStatus()).isEqualTo(200);
+            assertThat(resultado.getResponse().getContentAsString())
+                    .contains("\"emitidas\":[]")
+                    .contains("no tiene deuda al " + ACTO);
+        }
+
+        @Test
+        @DisplayName("hacia adelante sigue decidiendo la cifra impresa: rechazada al 30")
+        void haciaAdelanteDeudaExtinguida() throws Exception {
+            MvcResult resultado = emitirConProyeccion("REC1", "2026-09-30");
+
+            assertThat(resultado.getResponse().getStatus()).isEqualTo(200);
+            assertThat(resultado.getResponse().getContentAsString())
+                    .contains("\"emitidas\":[]")
+                    .contains("no tiene deuda al 2026-09-30");
+        }
+
+        @Test
+        @DisplayName("el mismo dia del acto es la proyeccion por omision, y se admite")
+        void elMismoDiaSeAdmite() throws Exception {
+            MvcResult resultado =
+                    mvc.perform(
+                                    MockMvcRequestBuilders.post(
+                                                    "/rentas/api/v1/coactiva/rec/impresion")
+                                            .param("proyectarInteresAl", HOY.toString())
+                                            .contentType(MediaType.APPLICATION_JSON)
+                                            .content(
+                                                    "{\"expedientes\":[\"EXP-2026-000001\"],"
+                                                            + "\"rec\":\"REC1\",\"observacion\":\"Se"
+                                                            + " emite la REC\"}"))
+                            .andReturn();
+
+            assertThat(resultado.getResponse().getStatus()).isEqualTo(201);
+            assertThat(fechaDeLaDeudaImpresa("REC1-2026-000001")).isEqualTo(HOY);
+        }
+
+        @Test
+        @DisplayName("reimprimir no proyecta nada, y por eso la fecha no lo detiene")
+        void laReimpresionNoSeDetiene() throws Exception {
+            assertThat(emitirRec("REC1", null, null).getResponse().getStatus()).isEqualTo(201);
+
+            MvcResult resultado =
+                    mvc.perform(
+                                    MockMvcRequestBuilders.post(
+                                                    "/rentas/api/v1/coactiva/rec/impresion")
+                                            .param("proyectarInteresAl", "2026-06-01")
+                                            .contentType(MediaType.APPLICATION_JSON)
+                                            .content(
+                                                    "{\"expedientes\":[\"EXP-2026-000001\"],"
+                                                            + "\"rec\":\"REC1\",\"reimprimir\":true,"
+                                                            + "\"observacion\":\"Se reimprime la"
+                                                            + " REC\"}"))
+                            .andReturn();
+
+            assertThat(resultado.getResponse().getStatus())
+                    .as(
+                            "la reimpresion vuelve a dibujar el papel guardado con su cifra; la"
+                                    + " proyeccion del formulario no entra en ella")
+                    .isEqualTo(201);
+        }
+
+        private MvcResult emitirConProyeccion(String rec, String proyeccion) throws Exception {
+            MockHttpServletRequestBuilder peticion =
+                    MockMvcRequestBuilders.post("/rentas/api/v1/coactiva/rec/impresion")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(
+                                    "{\"expedientes\":[\"EXP-2026-000001\"],\"rec\":\""
+                                            + rec
+                                            + "\",\"medida\":\"RETENCION\",\"fecha\":\""
+                                            + ACTO
+                                            + "\",\"observacion\":\"Se emite la REC\"}");
+            if (proyeccion != null) {
+                peticion = peticion.param("proyectarInteresAl", proyeccion);
+            }
+            return mvcPagadoEnSetiembre.perform(peticion).andReturn();
         }
     }
 

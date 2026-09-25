@@ -141,8 +141,14 @@ public class ActoCoactivoController {
      * dejaba a la pantalla emitiendo la REC con la deuda de hoy en vez de la del dia elegido. Se
      * sigue aceptando en el cuerpo, y ahi gana: ver {@link FiltroDeLaConsulta}.
      *
+     * <p><b>Y no puede ser anterior al dia del acto</b> (#404): esa cifra es tambien la que decide
+     * si queda deuda, y proyectada hacia atras deja fuera un pago asentado antes del acto. Se
+     * rechaza con un <b>422 de toda la peticion</b>, antes de recorrer el lote y no como una
+     * «rechazada» por expediente: la fecha es del formulario, no de ningun expediente. La
+     * reimpresion no se detiene: vuelve a dibujar el papel guardado y no proyecta nada.
+     *
      * @param proyectarInteresAl a que dia se proyecta la deuda que se imprime; si falta, la fecha
-     *     del acto
+     *     del acto; nunca antes de ella
      */
     @PostMapping("/rec/impresion")
     @RequiereAcceso(acceso = ACCESO_REC, privilegio = Privilegio.REGISTRO)
@@ -171,6 +177,9 @@ public class ActoCoactivoController {
         boolean soloReimprimir = Boolean.TRUE.equals(peticion.reimprimir());
         TipoDeMedidaCautelar medida = medidaOpcional(peticion.medida());
         String glosa = vacioAnulo(peticion.glosa());
+        if (!soloReimprimir) {
+            proyeccionNoAnteriorAlActo(fecha, proyeccion);
+        }
 
         List<ImpresionDeRecResource.RecEmitidaResource> emitidas = new ArrayList<>();
         List<ImpresionDeRecResource.RecRechazadaResource> rechazadas = new ArrayList<>();
@@ -413,6 +422,19 @@ public class ActoCoactivoController {
             throw FaltaPublicar.problema(falta);
         } catch (NotificarActoCoactivo.SinDireccion | IllegalArgumentException invalido) {
             throw new ProblemaDeNegocio(CodigoDeError.VALIDACION, motivoDe(invalido));
+        }
+    }
+
+    /**
+     * La comparacion de {@link RegistrarActoCoactivo.Peticion#exigirProyeccionNoAnterior}, como 422
+     * de la peticion entera (#404). No se escribe otra vez aqui: la regla vive en un solo sitio, y
+     * el borde solo decide <b>cuando</b> preguntarla —antes del lote— y como contestar.
+     */
+    private static void proyeccionNoAnteriorAlActo(LocalDate fecha, LocalDate proyeccion) {
+        try {
+            RegistrarActoCoactivo.Peticion.exigirProyeccionNoAnterior(fecha, proyeccion);
+        } catch (IllegalArgumentException anterior) {
+            throw new ProblemaDeNegocio(CodigoDeError.VALIDACION, motivoDe(anterior));
         }
     }
 

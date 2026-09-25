@@ -1233,6 +1233,102 @@ class ActosCoactivosJdbcTest {
         }
     }
 
+    /**
+     * #404 — La guarda de deuda viva mira el dia del acto, y la proyeccion no puede ir hacia atras.
+     *
+     * <p>La siembra que distingue es un <b>pago entre las dos fechas</b>: cargo en enero, abono por
+     * el integro el {@link #PAGO}, y la REC-2 el {@link #ACTO}. Sin el pago en medio, proyectar al
+     * 1 de setiembre o al 20 da la misma cifra y la prueba no ve nada —que es lo que tenia la
+     * muestra de antes, con proyecciones solo hacia el futuro—. Con el pago, la deuda al 1 de
+     * setiembre es 500,00 y al 20 es cero: una guarda que lea la proyeccion dicta la medida
+     * cautelar contra quien ya pago, y una que lea el dia del acto la rechaza.
+     */
+    @Nested
+    @DisplayName("#404 — la proyeccion no lleva la guarda de deuda viva a antes del acto")
+    class LaProyeccionNoVaHaciaAtras {
+
+        /** El obligado paga el integro: el abono se asienta con esta fecha valor. */
+        private static final LocalDate PAGO = LocalDate.of(2026, 9, 10);
+
+        /** El dia de la REC-2: diez dias despues del pago, y con el plazo de la REC-1 vencido. */
+        private static final LocalDate ACTO = LocalDate.of(2026, 9, 20);
+
+        @Test
+        @DisplayName("proyectar al 1 de setiembre, antes del pago y del acto, no dicta la REC-2")
+        void haciaAtrasNoSeDicta() {
+            String expediente = expedientePagadoConLaRec1Vencida("G-4041");
+
+            assertThatThrownBy(
+                            () ->
+                                    dictarProyectando(
+                                            expediente,
+                                            TipoDeActoCoactivo.REC2,
+                                            ACTO,
+                                            TipoDeMedidaCautelar.RETENCION,
+                                            LocalDate.of(2026, 9, 1)))
+                    .as(
+                            "la deuda al 1 de setiembre no ve el abono del 10: si la guarda la"
+                                    + " leyera, se trabaria la retencion sobre quien ya pago")
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("2026-09-01")
+                    .hasMessageContaining(ACTO.toString());
+
+            assertThat(cuantosActos(expediente, "REC2"))
+                    .as("y no queda ninguna REC-2 dictada")
+                    .isZero();
+        }
+
+        @Test
+        @DisplayName("sin proyeccion, la guarda lee el dia del acto: DeudaExtinguida")
+        void sinProyeccionDeudaExtinguida() {
+            String expediente = expedientePagadoConLaRec1Vencida("G-4042");
+
+            assertThatThrownBy(
+                            () ->
+                                    dictarProyectando(
+                                            expediente,
+                                            TipoDeActoCoactivo.REC2,
+                                            ACTO,
+                                            TipoDeMedidaCautelar.RETENCION,
+                                            null))
+                    .isInstanceOf(RegistrarActoCoactivo.DeudaExtinguida.class)
+                    .hasMessageContaining("no tiene deuda al " + ACTO);
+            assertThat(cuantosActos(expediente, "REC2")).isZero();
+        }
+
+        @Test
+        @DisplayName(
+                "proyectar hacia adelante sigue decidiendo con la cifra impresa: DeudaExtinguida")
+        void haciaAdelanteDeudaExtinguida() {
+            String expediente = expedientePagadoConLaRec1Vencida("G-4043");
+            LocalDate finDeMes = LocalDate.of(2026, 9, 30);
+
+            assertThatThrownBy(
+                            () ->
+                                    dictarProyectando(
+                                            expediente,
+                                            TipoDeActoCoactivo.REC2,
+                                            ACTO,
+                                            TipoDeMedidaCautelar.RETENCION,
+                                            finDeMes))
+                    .as(
+                            "hacia el futuro la decision de que decida la cifra impresa se"
+                                    + " mantiene: el pago ya esta dentro de las dos fechas")
+                    .isInstanceOf(RegistrarActoCoactivo.DeudaExtinguida.class)
+                    .hasMessageContaining("no tiene deuda al " + finDeMes);
+            assertThat(cuantosActos(expediente, "REC2")).isZero();
+        }
+
+        /** REC-1 dictada y notificada, plazo vencido, y el integro pagado el {@link #PAGO}. */
+        private String expedientePagadoConLaRec1Vencida(String sufijo) {
+            String expediente = expedienteConDeuda(sufijo);
+            ActoCoactivo rec1 = dictarActo(expediente, TipoDeActoCoactivo.REC1, REC1, null).acto();
+            notificarActo(rec1.numero(), DILIGENCIA_REC1, ResultadoDeNotificacion.NOTIFICADO);
+            pagarTodo(expediente, PAGO);
+            return expediente;
+        }
+    }
+
     // ==================================================================
     //  Utilidades
     // ==================================================================
@@ -1273,6 +1369,27 @@ class ActosCoactivosJdbcTest {
         return dictar.dictar(
                 new RegistrarActoCoactivo.Peticion(
                         expediente, tipo, fecha, tipo.titulo() + " de la prueba", medida, null),
+                FormatoDeDocumento.PDF,
+                PORQUE);
+    }
+
+    /** Como {@link #dictarActo}, con la fecha a la que se proyecta la deuda impresa (#404). */
+    private static RegistrarActoCoactivo.ActoDictado dictarProyectando(
+            String expediente,
+            TipoDeActoCoactivo tipo,
+            LocalDate fecha,
+            TipoDeMedidaCautelar medida,
+            LocalDate proyectarDeudaAl) {
+        TenantContext.fijar(new MunicipalidadId(municipalidad));
+        OrigenContext.fijar(new Origen("ejecutor.coactivo", null, null));
+        return dictar.dictar(
+                new RegistrarActoCoactivo.Peticion(
+                        expediente,
+                        tipo,
+                        fecha,
+                        tipo.titulo() + " de la prueba",
+                        medida,
+                        proyectarDeudaAl),
                 FormatoDeDocumento.PDF,
                 PORQUE);
     }
