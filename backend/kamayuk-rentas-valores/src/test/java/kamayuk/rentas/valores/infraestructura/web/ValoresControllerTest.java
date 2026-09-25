@@ -40,6 +40,7 @@ import kamayuk.rentas.web.ConfiguracionDeJson;
 import kamayuk.rentas.web.ManejadorDeErrores;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.http.converter.json.JacksonJsonHttpMessageConverter;
@@ -68,6 +69,13 @@ class ValoresControllerTest {
                     repositorioMasivo,
                     contribuyentes,
                     Clock.fixed(HOY.atStartOfDay(ZoneOffset.UTC).toInstant(), ZoneOffset.UTC));
+
+    /**
+     * La referencia de cada par AJUSTE que {@code RegistrarValor} pidio: #366 cuenta cuantos, y el
+     * doble anterior los tiraba.
+     */
+    private final List<String> paresDeAjuste = new ArrayList<>();
+
     private final RegistrarValor registrar =
             new RegistrarValor(
                     repositorio,
@@ -85,7 +93,9 @@ class ValoresControllerTest {
                                 Dinero monto,
                                 LocalDate fechaValor,
                                 String documentoOrigen,
-                                Observacion observacion) {}
+                                Observacion observacion) {
+                            paresDeAjuste.add(referenciaExterna);
+                        }
 
                         @Override
                         public Dinero moverACoactiva(
@@ -624,6 +634,134 @@ class ValoresControllerTest {
                                 + " sellado que no se puede leer es un dato que hay que investigar")
                 .isEqualTo(500);
         assertThat(resultado.getResponse().getContentAsString()).contains("incidencia");
+    }
+
+    /**
+     * #366 — {@code RegistrarValor} formalizaba la misma obligacion mas de una vez.
+     *
+     * <p>La siembra distingue: la deuda del contribuyente trae <b>dos</b> obligaciones —PREDIAL
+     * 2025 del predio 7 por 800,00 y ARBITRIOS 2025 del mismo predio por 120,00—, y cada caso pide
+     * una combinacion distinta de ellas. La muestra uniforme —solo obligaciones distintas, una vez
+     * cada una— pasaba con el codigo de antes: es (d), y se queda aqui como contraste.
+     */
+    @Nested
+    @DisplayName("#366 — una obligacion se formaliza una vez por tipo")
+    class UnaObligacionSeFormalizaUnaVez {
+
+        private static final String PREDIAL =
+                "{\"tributo\":\"PREDIAL\",\"ejercicio\":2025,\"predioId\":7}";
+        private static final String ARBITRIOS =
+                "{\"tributo\":\"ARBITRIOS\",\"ejercicio\":2025,\"predioId\":7}";
+
+        @org.junit.jupiter.api.BeforeEach
+        void sembrar() {
+            contribuyentes.con(
+                    new ResumenDeContribuyente(7L, "C-0007", "TITULAR, PRUEBA", "DNI 12345678"));
+            deuda.con(
+                    new ObligacionPublica(
+                            "PREDIAL",
+                            EJERCICIO_DEUDA,
+                            7L,
+                            null,
+                            HOY,
+                            Dinero.de("800.00"),
+                            Dinero.CERO,
+                            Dinero.CERO,
+                            Dinero.CERO));
+            deuda.con(
+                    new ObligacionPublica(
+                            "ARBITRIOS",
+                            EJERCICIO_DEUDA,
+                            7L,
+                            null,
+                            HOY,
+                            Dinero.de("120.00"),
+                            Dinero.CERO,
+                            Dinero.CERO,
+                            Dinero.CERO));
+        }
+
+        @Test
+        @DisplayName("(a) el mismo selector dos veces en la peticion: 422 y ningun valor")
+        void elMismoSelectorDosVecesEs422() throws Exception {
+            MvcResult resultado = emitir("OP", PREDIAL + "," + PREDIAL);
+
+            assertThat(resultado.getResponse().getStatus())
+                    .as("dos lineas de 800,00 harian un acto de 1 600,00 sobre una deuda de 800,00")
+                    .isEqualTo(422);
+            assertThat(valoresEmitidos()).isEmpty();
+            assertThat(paresDeAjuste).isEmpty();
+        }
+
+        @Test
+        @DisplayName("(b) una segunda OP con la primera viva: 409, un solo valor y un solo par")
+        void segundaOpConLaPrimeraVivaEs409() throws Exception {
+            MvcResult primera = emitir("OP", PREDIAL);
+            assertThat(primera.getResponse().getStatus()).isEqualTo(201);
+
+            MvcResult segunda = emitir("OP", PREDIAL);
+
+            assertThat(segunda.getResponse().getStatus())
+                    .as("el doble envio de la misma OP es un segundo titulo por la misma deuda")
+                    .isEqualTo(409);
+            assertThat(segunda.getResponse().getContentAsString())
+                    .as("el 409 nombra el valor que ya la formaliza")
+                    .contains("OP-2026-000001");
+            assertThat(valoresEmitidos()).hasSize(1);
+            assertThat(paresDeAjuste).containsExactly("VALOR-OP-2026-000001");
+        }
+
+        @Test
+        @DisplayName("(c) una RD con una OP viva sobre la misma obligacion: 201 y ningun par nuevo")
+        void unaRdConUnaOpVivaNoVuelveAMoverLaFase() throws Exception {
+            assertThat(emitir("OP", PREDIAL).getResponse().getStatus()).isEqualTo(201);
+
+            MvcResult rd = emitir("RD", PREDIAL);
+
+            assertThat(rd.getResponse().getStatus())
+                    .as("una RD posterior a una OP sobre el mismo predial es legitima")
+                    .isEqualTo(201);
+            assertThat(valoresEmitidos()).hasSize(2);
+            assertThat(paresDeAjuste)
+                    .as("la deuda ya esta en VALOR: la RD no vuelve a sacarla de ORDINARIA")
+                    .containsExactly("VALOR-OP-2026-000001");
+        }
+
+        @Test
+        @DisplayName("(d) dos obligaciones distintas en una peticion: 201 con dos lineas")
+        void dosObligacionesDistintasSonDosLineas() throws Exception {
+            MvcResult resultado = emitir("OP", PREDIAL + "," + ARBITRIOS);
+
+            assertThat(resultado.getResponse().getStatus()).isEqualTo(201);
+            List<kamayuk.rentas.valores.dominio.Valor> emitidos = valoresEmitidos();
+            assertThat(emitidos).hasSize(1);
+            long id = java.util.Objects.requireNonNull(emitidos.get(0).id());
+            assertThat(repositorio.detalleDe(id)).hasSize(2);
+            assertThat(emitidos.get(0).total()).isEqualTo(Dinero.de("920.00"));
+            assertThat(paresDeAjuste).hasSize(2);
+        }
+
+        private MvcResult emitir(String tipo, String obligaciones) throws Exception {
+            return mvc.perform(
+                            MockMvcRequestBuilders.post("/rentas/api/v1/valores")
+                                    .contentType(MediaType.APPLICATION_JSON)
+                                    .content(
+                                            """
+                                            {"tipo":"%s","codContribuyente":"C-0007",
+                                             "obligaciones":[%s],
+                                             "observacion":"Se emite para la prueba"}
+                                            """
+                                                    .formatted(tipo, obligaciones)))
+                    .andReturn();
+        }
+
+        private List<kamayuk.rentas.valores.dominio.Valor> valoresEmitidos() {
+            return repositorio
+                    .buscar(
+                            new CriterioDeValor(null, null, null, null),
+                            Paginacion.de(1, 20, "numero"))
+                    .contenido();
+        }
     }
 
     // ------------------------------------------------------------------

@@ -176,13 +176,22 @@ public final class ValoresEnMemoria implements ValorRepository {
 
     /** Los cuatro campos de la obligacion y los mismos estados vivos que la consulta (#372). */
     @Override
-    public Optional<Valor> vivoSobre(long contribuyenteId, SelectorDeObligacion obligacion) {
+    public List<Valor> vivosSobre(long contribuyenteId, SelectorDeObligacion obligacion) {
         return porId.values().stream()
                 .filter(valor -> valor.contribuyenteId() == contribuyenteId)
                 .filter(valor -> esCobrable(valor.estado()))
                 .filter(valor -> formaliza(valor, obligacion))
-                .min(java.util.Comparator.comparing(ValoresEnMemoria::idDe));
+                .sorted(java.util.Comparator.comparing(ValoresEnMemoria::idDe))
+                .toList();
     }
+
+    /**
+     * Sin nada que bloquear: este doble no tiene transacciones ni hilos. Que el candado serialice
+     * de verdad lo mide {@code ValorRepositoryJdbcTest}, contra PostgreSQL (#366).
+     */
+    @Override
+    public void bloquearLasObligaciones(
+            long contribuyenteId, java.util.Collection<SelectorDeObligacion> obligaciones) {}
 
     private boolean formaliza(Valor valor, SelectorDeObligacion obligacion) {
         for (ValorDetalle d : detalleDe(idDe(valor))) {

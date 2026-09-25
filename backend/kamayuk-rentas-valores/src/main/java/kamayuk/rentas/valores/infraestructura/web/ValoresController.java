@@ -138,8 +138,14 @@ public class ValoresController {
             Valor guardado = registrar.emitir(tipo, contribuyente.id(), obligaciones, observacion);
             return ResponseEntity.status(HttpStatus.CREATED)
                     .body(ValorResource.de(guardado, contribuyente));
-        } catch (RegistrarValor.SinObligaciones | RegistrarValor.ObligacionSinDeuda invalido) {
+        } catch (RegistrarValor.SinObligaciones
+                | RegistrarValor.ObligacionRepetida
+                | RegistrarValor.ObligacionSinDeuda invalido) {
             throw new ProblemaDeNegocio(CodigoDeError.VALIDACION, mensajeDe(invalido));
+        } catch (RegistrarValor.YaFormalizada yaFormalizada) {
+            // 409 y no 422 (#366): la peticion esta bien formada; lo que no la admite es que la
+            // deuda ya tenga un titulo vivo de ese tipo, y el mensaje lo nombra.
+            throw new ProblemaDeNegocio(CodigoDeError.CONFLICTO, mensajeDe(yaFormalizada));
         }
     }
 

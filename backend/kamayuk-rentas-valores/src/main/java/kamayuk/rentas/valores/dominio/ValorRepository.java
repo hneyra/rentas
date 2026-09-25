@@ -1,5 +1,6 @@
 package kamayuk.rentas.valores.dominio;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import kamayuk.rentas.compartido.Pagina;
@@ -95,8 +96,8 @@ public interface ValorRepository {
             long contribuyenteId, String tributo, List<Ejercicio> ejercicios);
 
     /**
-     * El primer valor <b>vivo</b> de ese contribuyente que formaliza esa obligacion, si lo hay
-     * (#372).
+     * Los valores <b>vivos</b> de ese contribuyente que formalizan esa obligacion, del primero que
+     * se emitio al ultimo (#372, #366).
      *
      * <p>Vivo es que no este {@code PAGADO}, {@code ANULADO} ni {@code PRESCRITO}: {@code COACTIVA}
      * cuenta. La obligacion se compara con sus <b>cuatro</b> campos —tributo, ejercicio, predio y
@@ -106,8 +107,37 @@ public interface ValorRepository {
      *
      * <p>Lee {@code valor_detalle}, que escriben todos los caminos de emision —individual, masiva y
      * la corrida de papeletas—, y por eso es completo donde {@code papeleta_masivo_item} no lo era.
+     *
+     * <p><b>Todos, y no el primero</b> (#366): la regla {@link ObligacionYaFormalizada} pregunta
+     * por el del <b>mismo tipo</b>, y una RD legitima posterior a una OP deja dos vivos sobre la
+     * misma obligacion. Con solo el primero, una segunda RD pasaria porque el primero es la OP.
      */
-    Optional<Valor> vivoSobre(long contribuyenteId, SelectorDeObligacion obligacion);
+    List<Valor> vivosSobre(long contribuyenteId, SelectorDeObligacion obligacion);
+
+    /**
+     * El primero de {@link #vivosSobre}, si lo hay (#372): quien solo pregunta «¿hay un titulo
+     * cobrando esta deuda?» no necesita saber cuantos.
+     */
+    default Optional<Valor> vivoSobre(long contribuyenteId, SelectorDeObligacion obligacion) {
+        return vivosSobre(contribuyenteId, obligacion).stream().findFirst();
+    }
+
+    /**
+     * Toma, hasta que termine la transaccion, un candado sobre cada una de esas obligaciones de ese
+     * contribuyente (#366).
+     *
+     * <p>Es lo que hace que la regla {@link ObligacionYaFormalizada} sea una garantia y no una
+     * probabilidad. Dos emisiones simultaneas de la misma obligacion —un reintento tras un timeout,
+     * dos operadores— preguntan las dos antes de que ninguna haya confirmado su valor, y las dos
+     * oyen «no hay ninguno». Con el candado, la segunda se queda esperando en la base hasta que la
+     * primera confirma, y cuando pregunta ya lee su valor.
+     *
+     * <p>Se toman <b>todos en la misma sentencia y en un orden fijo</b>: dos emisiones que se
+     * cruzan en dos obligaciones, cada una pidiendolas en el orden de su peticion, se esperarian la
+     * una a la otra para siempre.
+     */
+    void bloquearLasObligaciones(
+            long contribuyenteId, Collection<SelectorDeObligacion> obligaciones);
 
     /**
      * Mueve el estado de un valor ya emitido, sin tocar su desglose congelado.

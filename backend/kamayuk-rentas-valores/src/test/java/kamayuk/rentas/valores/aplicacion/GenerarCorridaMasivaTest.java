@@ -224,6 +224,7 @@ class GenerarCorridaMasivaTest {
 
         private long siguienteId = 1;
         private final List<Valor> guardados = new ArrayList<>();
+        private final java.util.Map<Long, List<ValorDetalle>> detalles = new java.util.HashMap<>();
 
         @Override
         public long contar(CriterioDeConsultaDeValores criterio) {
@@ -250,6 +251,7 @@ class GenerarCorridaMasivaTest {
                             "prueba",
                             valor.observacion());
             guardados.add(conId);
+            detalles.put(conId.id(), List.copyOf(detalle));
             return conId;
         }
 
@@ -265,9 +267,41 @@ class GenerarCorridaMasivaTest {
         }
 
         @Override
-        public Optional<Valor> vivoSobre(long contribuyenteId, SelectorDeObligacion obligacion) {
-            throw new UnsupportedOperationException();
+        public List<Valor> vivosSobre(long contribuyenteId, SelectorDeObligacion obligacion) {
+            return guardados.stream()
+                    .filter(v -> v.contribuyenteId() == contribuyenteId)
+                    .filter(
+                            v ->
+                                    v.estado() != EstadoDeValor.PAGADO
+                                            && v.estado() != EstadoDeValor.ANULADO
+                                            && v.estado() != EstadoDeValor.PRESCRITO)
+                    .filter(
+                            v ->
+                                    detalles.getOrDefault(v.id(), List.of()).stream()
+                                            .anyMatch(
+                                                    d ->
+                                                            d.tributo()
+                                                                            .equalsIgnoreCase(
+                                                                                    obligacion
+                                                                                            .tributo())
+                                                                    && d.ejercicio()
+                                                                            .equals(
+                                                                                    obligacion
+                                                                                            .ejercicio())
+                                                                    && java.util.Objects.equals(
+                                                                            d.predioId(),
+                                                                            obligacion.predioId())
+                                                                    && java.util.Objects.equals(
+                                                                            d.vehiculoId(),
+                                                                            obligacion
+                                                                                    .vehiculoId())))
+                    .toList();
         }
+
+        /** Sin transacciones ni hilos no hay nada que bloquear; lo mide la prueba JDBC (#366). */
+        @Override
+        public void bloquearLasObligaciones(
+                long contribuyenteId, java.util.Collection<SelectorDeObligacion> obligaciones) {}
 
         @Override
         public Valor cambiarEstado(long valorId, EstadoDeValor nuevo) {

@@ -134,7 +134,13 @@ class ConstruirModeloDeValorTest {
         }
 
         @Override
-        public Optional<Valor> vivoSobre(long contribuyenteId, SelectorDeObligacion obligacion) {
+        public List<Valor> vivosSobre(long contribuyenteId, SelectorDeObligacion obligacion) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void bloquearLasObligaciones(
+                long contribuyenteId, java.util.Collection<SelectorDeObligacion> obligaciones) {
             throw new UnsupportedOperationException();
         }
 

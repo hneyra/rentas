@@ -4,6 +4,7 @@ import java.sql.Date;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -448,7 +449,7 @@ public class ValorRepositoryJdbc extends RepositorioJdbc implements ValorReposit
      * padron deja las dos en nulo y con la igualdad no se encontraria nunca.
      */
     @Override
-    public Optional<Valor> vivoSobre(long contribuyenteId, SelectorDeObligacion obligacion) {
+    public List<Valor> vivosSobre(long contribuyenteId, SelectorDeObligacion obligacion) {
         Map<String, Object> parametros = new LinkedHashMap<>();
         parametros.put("contribuyenteId", contribuyenteId);
         parametros.put("tributo", obligacion.tributo());
@@ -469,11 +470,63 @@ public class ValorRepositoryJdbc extends RepositorioJdbc implements ValorReposit
                                 + "                  AND d.predio_id IS NOT DISTINCT FROM :predioId"
                                 + "                  AND d.vehiculo_id IS NOT DISTINCT FROM"
                                 + " :vehiculoId)"
-                                + " ORDER BY v.id"
-                                + " LIMIT 1")
+                                + " ORDER BY v.id")
                 .params(parametros)
                 .query(this::mapearValor)
-                .optional();
+                .list();
+    }
+
+    /**
+     * Un candado <b>de transaccion</b>, nunca de sesion: uno de sesion sobrevive a la devolucion de
+     * la conexion al pool y bloquearia la peticion de otra municipalidad (la regla 3 aplicada a los
+     * candados, como en {@code CacheDeSnapshotsJdbc}).
+     *
+     * <p>La clave es la de la obligacion en el libro —municipalidad, contribuyente, tributo,
+     * ejercicio, predio y vehiculo— reducida a un {@code bigint} con {@code hashtextextended}. La
+     * municipalidad sale del contexto que fijo {@code SET LOCAL}, no de un argumento (regla 2). La
+     * forma de un solo {@code bigint} no comparte espacio de claves con la de dos enteros que usa
+     * la cache de normativa, asi que las dos no se pueden pisar. Dos obligaciones distintas con la
+     * misma huella solo se esperarian de mas; nunca se dejarian pasar.
+     *
+     * <p>El {@code ORDER BY} va en la subconsulta, que PostgreSQL no aplana si ordena: los candados
+     * se piden en ese orden, y dos emisiones que comparten obligaciones las piden en el mismo, sea
+     * cual sea el de sus peticiones. El {@code count(*)} de fuera es porque la funcion devuelve
+     * {@code void}, que no se puede mapear.
+     */
+    @Override
+    public void bloquearLasObligaciones(
+            long contribuyenteId, Collection<SelectorDeObligacion> obligaciones) {
+        if (obligaciones.isEmpty()) {
+            return;
+        }
+        String[] claves =
+                obligaciones.stream()
+                        .map(obligacion -> claveDelCandado(contribuyenteId, obligacion))
+                        .distinct()
+                        .toArray(String[]::new);
+        jdbc().sql(
+                        "SELECT count(*) FROM ("
+                                + "SELECT pg_advisory_xact_lock(clave) FROM ("
+                                + "SELECT DISTINCT hashtextextended('valor|' || "
+                                + MUNICIPALIDAD_ACTUAL
+                                + " || '|' || c, 0) AS clave"
+                                + " FROM unnest(CAST(:claves AS text[])) AS c"
+                                + " ORDER BY clave) AS ordenadas) AS candados")
+                .param("claves", claves)
+                .query(Long.class)
+                .single();
+    }
+
+    private static String claveDelCandado(long contribuyenteId, SelectorDeObligacion obligacion) {
+        return contribuyenteId
+                + "|"
+                + obligacion.tributo()
+                + "|"
+                + obligacion.ejercicio().valor()
+                + "|"
+                + (obligacion.predioId() == null ? "" : obligacion.predioId())
+                + "|"
+                + (obligacion.vehiculoId() == null ? "" : obligacion.vehiculoId());
     }
 
     @Override
