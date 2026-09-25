@@ -449,6 +449,41 @@ class SituacionDelCiudadanoJdbcTest {
         }
 
         @Test
+        @DisplayName(
+                "#440 — si la unica donde figura no se pudo leer, **no se afirma que no figure**")
+        void sinLaQueLaTieneNoSeAfirmaQueNoFigure() {
+            /* La siembra que distingue, y la que `sinTodasLasRamasNoHayTotal` no tiene:
+            alli la persona esta en las DOS y la rota es una, asi que `municipalidades`
+            nunca queda vacia y `sinRegistros` sale `false` con el defecto y con el
+            arreglo. Aqui figura en UNA sola y la rama revienta justo en esa, mientras
+            las otras dos se leen y dicen, con razon, que ahi no esta. Lo leido queda
+            vacio por una averia y no porque no figure: «no se sabe» no es «no».
+            Es ADR-0020 §3 aplicado a la otra afirmacion de la misma respuesta. */
+            DocumentoIdentidad quien = preguntaPor(documentoDePrueba());
+            long enSullana = crearContribuyente(sullana, "CIU-A-11", quien);
+            cargar(sullana, enSullana, "PREDIAL", "400.00");
+
+            ConsultaDelCiudadano conSullanaRota =
+                    new ConsultaDelCiudadano(recorrido, ramaQueFallaEn(sullana), RELOJ);
+            ConsultaDelCiudadano.Situacion situacion = conSullanaRota.situacion(HOY);
+
+            assertThat(situacion.noLeidas())
+                    .as("la que falta es justo donde figura")
+                    .containsExactly("Municipalidad de Sullana, prueba");
+            assertThat(situacion.municipalidades())
+                    .as("no se pudo leer donde figura, y en las otras no esta")
+                    .isEmpty();
+            assertThat(situacion.totalConsolidado())
+                    .as("sin todas las ramas no hay total")
+                    .isEmpty();
+            assertThat(situacion.sinRegistros())
+                    .as(
+                            "no se pudo mirar Sullana: afirmar que no figura en ningun padron"
+                                    + " dejaria fuera una deuda real de 400,00")
+                    .isFalse();
+        }
+
+        @Test
         @DisplayName("**el contexto se limpia entre ramas**, aunque la rama lance")
         void elContextoSeLimpiaEntreRamas() {
             // Sin la limpieza, la rama siguiente correria con el contexto de la
@@ -573,6 +608,26 @@ class SituacionDelCiudadanoJdbcTest {
         return new RamaDelCiudadano(
                 documento -> {
                     if (vueltas.incrementAndGet() == 1) {
+                        throw new IllegalStateException("esta municipalidad no se puede leer");
+                    }
+                    return acreditacion.de(documento);
+                },
+                deuda,
+                predios,
+                auditoria);
+    }
+
+    /**
+     * La rama de produccion, rota en <b>esa</b> municipalidad y solo en esa (#440).
+     *
+     * <p>A diferencia de {@link #ramaQueFallaEnLaPrimera()}, no depende del orden del recorrido:
+     * lanza cuando el contexto que el recorrido fijo es el de {@code municipalidad}, que es lo que
+     * permite romper justo aquella donde la persona figura.
+     */
+    private static RamaDelCiudadano ramaQueFallaEn(long municipalidad) {
+        return new RamaDelCiudadano(
+                documento -> {
+                    if (TenantContext.actual().equals(new MunicipalidadId(municipalidad))) {
                         throw new IllegalStateException("esta municipalidad no se puede leer");
                     }
                     return acreditacion.de(documento);
