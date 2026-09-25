@@ -71,6 +71,12 @@ import org.springframework.transaction.annotation.Transactional;
  * levantamiento— quedan exentos: si no lo estuvieran, un expediente pagado no se podria concluir
  * nunca ({@link TipoDeActoCoactivo#exigeDeudaViva()}).
  *
+ * <p><b>La proyeccion no lleva ese dia hacia atras</b> (#404). Si la pantalla pide «Proyectar
+ * interes al», la guarda lee la cifra proyectada, que es la que se imprime; por eso la proyeccion
+ * no puede ser anterior al acto —lo exige {@link Peticion}—. Hasta #404 lo era, y proyectar al 1 de
+ * setiembre un acto del 20 dejaba fuera un pago del 10: la REC-2 se dictaba contra quien ya habia
+ * pagado.
+ *
  * <p><b>Lo acogido a un convenio no abre la puerta</b> (#403). La deuda que se mira es la exigible,
  * y la acogida no lo es: la cobra el cronograma del convenio. Un expediente cuya unica deuda esta
  * fraccionada no admite una REC-2 ni un embargo, y el rechazo lo dice con su causa —{@link
@@ -164,6 +170,8 @@ public class RegistrarActoCoactivo {
         // La cifra que decide y la cifra que se imprime son LA MISMA. Dos fechas distintas -una
         // para la guarda y otra para el papel- dejarian que la resolucion dijera 535,50 mientras
         // la guarda leia cero, o al reves; y la que el obligado tiene en la mano es la impresa.
+        // Eso vale porque la proyeccion nunca es anterior al dia del acto: lo exige Peticion
+        // (#404), y asi un pago asentado antes del acto siempre queda dentro de la cifra.
         LocalDate pedida = peticion.proyectarDeudaAl();
         LocalDate proyeccion = pedida == null ? fecha : pedida;
         DeudaDelExpediente deuda = consulta.deudaDe(expediente, proyeccion);
@@ -410,7 +418,8 @@ public class RegistrarActoCoactivo {
      * @param proyectarDeudaAl a que dia se proyecta la deuda que se imprime —«Proyectar interes al»
      *     de la pantalla {@code rec_impresion}—; nulo significa el dia del acto. Es tambien la
      *     fecha con la que se comprueba que quede algo que cobrar: la cifra que decide y la que se
-     *     imprime tienen que ser la misma
+     *     imprime tienen que ser la misma. <b>Nunca anterior a {@code fecha}</b> (#404): ver {@link
+     *     #exigirProyeccionNoAnterior}
      */
     public record Peticion(
             String numeroDeExpediente,
@@ -425,6 +434,43 @@ public class RegistrarActoCoactivo {
             java.util.Objects.requireNonNull(tipo, "Falta el tipo de acto");
             java.util.Objects.requireNonNull(fecha, "Falta la fecha del acto");
             java.util.Objects.requireNonNull(descripcion, "Falta la glosa del acto");
+            exigirProyeccionNoAnterior(fecha, proyectarDeudaAl);
+        }
+
+        /**
+         * La deuda no se proyecta a un dia anterior al del acto (#404).
+         *
+         * <p>La guarda de deuda viva lee la cifra proyectada, porque la que decide y la que se
+         * imprime son la misma. Hacia adelante eso es inocuo: todo lo asentado hasta el dia del
+         * acto sigue dentro. Hacia atras no: {@code cuentacorriente} descarta los asientos con
+         * fecha valor posterior al corte, y un pago entre la proyeccion y el acto no existiria para
+         * la guarda — la REC-2 se dictaria contra quien ya pago, que es el embargo indebido que la
+         * guarda existe para impedir. Rechazar la proyeccion, y no evaluar la guarda con una fecha
+         * e imprimir con otra, conserva una sola cifra.
+         *
+         * <p>Es publico porque el borde lo comprueba <b>antes</b> de recorrer el lote: la fecha es
+         * de la peticion y no de un expediente, y un solo 422 la explica mejor que veinte rechazos
+         * iguales. Que viva aqui, y que el constructor lo llame, hace que la comparacion este
+         * escrita una sola vez y que la herede cualquier llamador futuro.
+         *
+         * @param fecha el dia del acto
+         * @param proyectarDeudaAl el dia al que se proyecta la deuda; nulo es el dia del acto
+         * @throws IllegalArgumentException si la proyeccion es anterior al dia del acto
+         */
+        public static void exigirProyeccionNoAnterior(
+                LocalDate fecha, @Nullable LocalDate proyectarDeudaAl) {
+            if (proyectarDeudaAl != null && proyectarDeudaAl.isBefore(fecha)) {
+                throw new IllegalArgumentException(
+                        "La deuda no se puede proyectar al "
+                                + proyectarDeudaAl
+                                + ", antes del dia del acto ("
+                                + fecha
+                                + "): la cifra que decide si queda deuda es la que se imprime, y"
+                                + " un pago asentado entre las dos fechas no contaria: se"
+                                + " dictaria el acto contra quien ya pago. Proyecte al "
+                                + fecha
+                                + " o despues");
+            }
         }
     }
 
