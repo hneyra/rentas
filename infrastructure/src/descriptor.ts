@@ -987,8 +987,8 @@ export const rentas: DescriptorDeSistema = {
                         value: String(e.implantacion.municipalidadId),
                       },
                       // A quien se avisa cuando un hecho no se puede aplicar. Del AMBIENTE, y
-                      // `ResponsableDeLaProyeccion` exige que el canal sea entregable: un hecho
-                      // apartado bloquea la cola detras de el (C-8 §4.2).
+                      // `ResponsableDeOperacion` exige nombre y canal —un correo vale (#70, #377)—:
+                      // un hecho apartado bloquea la cola detras de el (C-8 §4.2).
                       {
                         name: "KAMAYUK_RENTAS_INGESTOR_RESPONSABLE",
                         value: e.operacion.responsable,

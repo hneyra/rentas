@@ -2,6 +2,7 @@ package kamayuk.rentas.seguridad.infraestructura;
 
 import java.time.Clock;
 import kamayuk.rentas.plataforma.CredencialDeServicio;
+import kamayuk.rentas.plataforma.ResponsableDeOperacion;
 import kamayuk.rentas.plataforma.TokenDeServicioDeKeycloak;
 import kamayuk.rentas.seguridad.aplicacion.AplicarUnEventoDeIdentidad;
 import kamayuk.rentas.seguridad.aplicacion.ConsumirEventosDeIdentidad;
@@ -48,19 +49,33 @@ public class ConfiguracionDelConsumidorDeIdentidad {
 
     /**
      * Quien recibe el aviso. Las dos propiedades son obligatorias y el canal NO tiene que ser
-     * http(s): el motivo, medido, esta en {@link ResponsableDelConsumidor}.
+     * http(s): el motivo, medido, esta en {@link ResponsableDeOperacion}, que desde #377 es la
+     * misma clase para los dos consumidores de buzon.
+     *
+     * <p>No se publica como bean, por lo mismo que el proveedor del token: {@code
+     * ConfiguracionDelIngestor} construye el suyo en el mismo perfil, y dos beans del mismo tipo
+     * obligarian a cada alerta a nombrar el suyo — la forma mas facil de avisar al responsable
+     * equivocado sin que nada lo diga.
      */
-    @Bean
-    ResponsableDelConsumidor responsableDelConsumidorDeIdentidad(
-            @Value("${kamayuk.identidad.responsable:}") String responsable,
-            @Value("${kamayuk.identidad.canal:}") String canal) {
-        return new ResponsableDelConsumidor(responsable, canal);
+    static ResponsableDeOperacion responsableDelConsumidor(String responsable, String canal) {
+        return new ResponsableDeOperacion(
+                responsable,
+                canal,
+                "Faltan kamayuk.identidad.responsable y/o kamayuk.identidad.canal. No son"
+                        + " opcionales: ADR-0026 §4 exige que un evento que no se pudo aplicar"
+                        + " avise A UNA PERSONA CON NOMBRE. Mientras ese evento este sin"
+                        + " aplicar, la copia local de la autorizacion dice algo que"
+                        + " `identidad` ya no dice y ninguna pantalla lo delata: el consumidor"
+                        + " no arranca hasta que alguien diga quien lo recibe");
     }
 
     @Bean
     AlertaDeEventosSinAplicar alertaDeEventosSinAplicar(
-            JsonMapper json, ResponsableDelConsumidor responsable) {
-        return new AlertaAlResponsableDeLaCopiaLocal(json, responsable);
+            JsonMapper json,
+            @Value("${kamayuk.identidad.responsable:}") String responsable,
+            @Value("${kamayuk.identidad.canal:}") String canal) {
+        return new AlertaAlResponsableDeLaCopiaLocal(
+                json, responsableDelConsumidor(responsable, canal));
     }
 
     /**
@@ -82,7 +97,11 @@ public class ConfiguracionDelConsumidorDeIdentidad {
     ConsumirEventosDeIdentidad consumirEventosDeIdentidad(
             FuenteDeEventosDeIdentidad fuente,
             AplicarUnEventoDeIdentidad aplicador,
-            AlertaDeEventosSinAplicar alerta) {
-        return new ConsumirEventosDeIdentidad(fuente, aplicador, alerta);
+            AlertaDeEventosSinAplicar alerta,
+            Clock reloj) {
+        // Un `TodaviaNo` se espera hasta quince minutos y pasado eso se aparta (#377): sin tope,
+        // 200 en la cabeza paraban todo lo de detras.
+        return new ConsumirEventosDeIdentidad(
+                fuente, aplicador, alerta, PasadaDelConsumidorDeIdentidad.POLITICA, reloj);
     }
 }

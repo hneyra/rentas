@@ -41,8 +41,12 @@ public interface FuenteDeHechosDeCatastro {
     /**
      * Un lote de hechos pendientes.
      *
-     * @param quedan cuantos le quedan al emisor DESPUES de este lote. Es lo que permite decir
-     *     «faltan 9 000» en vez de «faltan», y decidir si hay que dar otra vuelta
+     * @param quedan cuantos tiene pendientes el emisor al servir este lote, <b>CONTANDO el
+     *     lote</b>: {@code catastro} lo cuenta con {@code count(*) WHERE estado = 'PENDIENTE'}
+     *     antes de ningun acuse ({@code EventosController}, {@code BuzonDeSalidaJdbc}). Hasta la
+     *     ronda 1 de #377 aqui decia «DESPUES de este lote», que no es lo que el emisor manda: lo
+     *     de detras es {@code quedan - hechos.size()}, y confundirlos ponia BLOQUEADA una cola que
+     *     solo tenia lo servido. Es lo que permite decir «faltan 9 000» en vez de «faltan»
      */
     record Lote(List<HechoRecibido> hechos, long quedan) {}
 

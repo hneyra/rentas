@@ -12,8 +12,14 @@ import kamayuk.rentas.nucleo.dominio.proyeccion.HechoRecibido;
  * un descuadre de dinero y aqui es un contribuyente al que se le emite sobre un predio que ya no
  * tiene.
  *
- * <p>Que el destinatario tenga nombre lo sostiene {@code ResponsableDeLaProyeccion}, que se lee de
- * la configuracion y <b>no admite estar en blanco</b>: sin el, el ingestor no arranca.
+ * <p>Que el destinatario tenga nombre lo sostiene {@code ResponsableDeOperacion} de {@code
+ * plataforma}, que se lee de la configuracion y <b>no admite estar en blanco</b>: sin el, el
+ * ingestor no arranca.
+ *
+ * <p><b>Lo que NO llega aqui es un hecho de un tipo que este sistema no sabe aplicar</b> (#377): se
+ * aparta a la cola de muertos con {@code SIN_CAPACIDAD:<tipo>} y se acusa, pero «la proyeccion del
+ * padron esta incompleta» es falso de una manzana, y un aviso que grita en lo normal es el que se
+ * apaga.
  */
 public interface AlertaDeHechosSinAplicar {
 

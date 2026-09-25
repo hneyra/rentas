@@ -1,6 +1,7 @@
 package kamayuk.rentas.nucleo.aplicacion;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -13,6 +14,7 @@ import kamayuk.rentas.nucleo.dominio.proyeccion.FuenteDeHechosDeCatastro;
 import kamayuk.rentas.nucleo.dominio.proyeccion.HechoRecibido;
 import kamayuk.rentas.nucleo.dominio.proyeccion.ProyeccionDeCatastro;
 import kamayuk.rentas.nucleo.dominio.proyeccion.TipoDeHechoDeCatastro;
+import kamayuk.rentas.plataforma.PoliticaDeLoQueNoAvanza;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -36,11 +38,13 @@ class CorrerElIngestorTest {
     private static final Instant AHORA = Instant.parse("2026-03-02T09:00:00Z");
 
     @Test
-    @DisplayName("con el buzon lleno de tipos que no se saben aplicar, se da UNA vuelta y no 50")
+    @DisplayName(
+            "con una politica que espera y el buzon lleno de tipos que no se saben aplicar, se da"
+                    + " UNA vuelta y no 50")
     void conSoloTiposQueNoSeSabenAplicarSeDaUnaVuelta() {
-        BuzonDeMentira buzon = new BuzonDeMentira(hecho("UN_TIPO_QUE_CATASTRO_INVENTARA"));
+        BuzonDeMentira buzon = new BuzonDeMentira(hecho("UN_TIPO_QUE_CATASTRO_INVENTARA"), 0);
 
-        correr(buzon);
+        correr(buzon, PoliticaDeLoQueNoAvanza.esperarSiempre());
 
         assertThat(buzon.vueltas.get())
                 .as(
@@ -56,9 +60,10 @@ class CorrerElIngestorTest {
     void mientrasHayaQueAplicarSeSigue() {
         // Sin esto, un runner que se parara SIEMPRE en la primera vuelta pasaria la prueba de
         // arriba y dejaria el buzon a medias en cada corrida.
-        BuzonDeMentira buzon = new BuzonDeMentira(hecho(TipoDeHechoDeCatastro.PREDIO_PROYECTADO));
+        BuzonDeMentira buzon =
+                new BuzonDeMentira(hecho(TipoDeHechoDeCatastro.PREDIO_PROYECTADO), 0);
 
-        correr(buzon);
+        correr(buzon, PoliticaDeLoQueNoAvanza.esperarSiempre());
 
         assertThat(buzon.vueltas.get())
                 .as("la primera aplica y acusa; la segunda ya viene vacia y para")
@@ -66,17 +71,61 @@ class CorrerElIngestorTest {
         assertThat(buzon.acusados).hasSize(1);
     }
 
+    @Test
+    @DisplayName(
+            "#377: si lo que espera llena la pagina y hay MAS DETRAS, la cola esta BLOQUEADA y la"
+                    + " corrida sale distinto de cero nombrando la cabeza")
+    void conLaCabezaOcupadaYAlgoDetrasSaleEnRojo() {
+        // «Sin progreso» no es «nada que hacer». Aqui el emisor dice que tiene 5 detras de este
+        // hecho, y el hecho no se acusa: la vuelta siguiente —de esta corrida y de todas— traeria
+        // el mismo, y los 5 no se leerian nunca. Hasta #377 esto salia con codigo 0.
+        BuzonDeMentira buzon = new BuzonDeMentira(hecho("MANZANA_PUBLICADA"), 5);
+
+        assertThatThrownBy(() -> correr(buzon, PoliticaDeLoQueNoAvanza.esperarSiempre()))
+                .isInstanceOf(CorrerElIngestor.ColaBloqueada.class)
+                .hasMessageContaining("COLA BLOQUEADA")
+                .hasMessageContaining("desde la secuencia 10")
+                .hasMessageContaining(", y tiene 5 detras que");
+        assertThat(buzon.vueltas.get()).as("y no da mas vueltas sobre lo mismo").isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName(
+            "#377: con la politica de produccion, lo que no se sabe aplicar se APARTA y se acusa, y"
+                    + " la corrida sigue")
+    void conLaPoliticaDeProduccionSeApartaYSeAcusa() {
+        BuzonDeMentira buzon = new BuzonDeMentira(hecho("MANZANA_PUBLICADA"), 5);
+        ProyeccionQueSiempreAplica proyeccion = new ProyeccionQueSiempreAplica();
+
+        correr(buzon, PoliticaDeLoQueNoAvanza.apartarLoQueNoSeSabeAplicar(), proyeccion);
+
+        assertThat(proyeccion.apartados)
+                .as("a la cola de muertos con su tipo en el motivo")
+                .containsExactly("SIN_CAPACIDAD:MANZANA_PUBLICADA");
+        assertThat(buzon.acusados).as("y acusado: deja la cabeza").hasSize(1);
+        assertThat(buzon.vueltas.get()).as("la segunda viene vacia y para").isEqualTo(2);
+    }
+
     // ------------------------------------------------------------------
 
-    private static void correr(BuzonDeMentira buzon) {
+    private static void correr(BuzonDeMentira buzon, PoliticaDeLoQueNoAvanza politica) {
+        correr(buzon, politica, new ProyeccionQueSiempreAplica());
+    }
+
+    private static void correr(
+            BuzonDeMentira buzon,
+            PoliticaDeLoQueNoAvanza politica,
+            ProyeccionQueSiempreAplica proyeccion) {
         new CorrerElIngestor(
                         new IngestarHechosDeCatastro(
                                 buzon,
-                                new AplicarUnHecho(new ProyeccionQueSiempreAplica()),
+                                new AplicarUnHecho(proyeccion),
                                 (hecho, motivo, muertos) -> {
                                     throw new IllegalStateException(
-                                            "no se avisa a nadie por un tipo que se ignora");
+                                            "no se avisa a nadie por un tipo que no se sabe"
+                                                    + " aplicar");
                                 },
+                                politica,
                                 Clock.fixed(AHORA, ZoneOffset.UTC)),
                         1L)
                 .run(null);
@@ -95,11 +144,18 @@ class CorrerElIngestorTest {
     private static final class BuzonDeMentira implements FuenteDeHechosDeCatastro {
 
         private final HechoRecibido hecho;
+        private final long detras;
         private final AtomicInteger vueltas = new AtomicInteger();
         private final List<UUID> acusados = new ArrayList<>();
 
-        private BuzonDeMentira(HechoRecibido hecho) {
+        /**
+         * @param detras cuantos tiene el emisor DETRAS de este hecho mientras no se acuse: es lo
+         *     que separa una cola al dia de una bloqueada (#377). El lote dice {@code 1 + detras},
+         *     porque el emisor cuenta todo lo pendiente, la pagina servida incluida
+         */
+        private BuzonDeMentira(HechoRecibido hecho, long detras) {
             this.hecho = hecho;
+            this.detras = detras;
         }
 
         @Override
@@ -107,7 +163,7 @@ class CorrerElIngestorTest {
             vueltas.incrementAndGet();
             return acusados.contains(hecho.eventoId())
                     ? new Lote(List.of(), 0)
-                    : new Lote(List.of(hecho), 0);
+                    : new Lote(List.of(hecho), 1 + detras);
         }
 
         @Override
@@ -119,6 +175,8 @@ class CorrerElIngestorTest {
     /** Escribe lo que le den, para que lo que se mida sean las vueltas y no la proyeccion. */
     private static final class ProyeccionQueSiempreAplica implements ProyeccionDeCatastro {
 
+        private final List<String> apartados = new ArrayList<>();
+
         @Override
         public Aplicacion aplicar(HechoRecibido hecho, Instant cuando) {
             return Aplicacion.APLICADO;
@@ -126,7 +184,7 @@ class CorrerElIngestorTest {
 
         @Override
         public void matar(HechoRecibido hecho, String motivo, Instant cuando) {
-            throw new IllegalStateException("no se aparta un hecho que se ignora");
+            apartados.add(motivo);
         }
 
         @Override

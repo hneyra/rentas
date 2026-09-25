@@ -363,7 +363,7 @@ describe("C-14 §3 — el ingestor de catastro, declarado entero y CORRIENDO (#2
     expect(valorDe(c, "KAMAYUK_RENTAS_INGESTOR_USUARIO")).toBe("rol_ingestor_catastro");
     expect(declara(c, "KAMAYUK_RENTAS_INGESTOR_CLAVE")).toBe(true);
     expect(valorDe(c, "KAMAYUK_RENTAS_INGESTOR_MUNICIPALIDAD")).toBe("1");
-    // `ResponsableDeLaProyeccion` exige las dos: un hecho apartado bloquea la cola detras de el,
+    // `ResponsableDeOperacion` exige las dos: un hecho apartado bloquea la cola detras de el,
     // y avisar a nadie es no avisar (C-8 §4.2).
     expect(valorDe(c, "KAMAYUK_RENTAS_INGESTOR_RESPONSABLE")).toBe("Guardia de plataforma");
     expect(valorDe(c, "KAMAYUK_RENTAS_INGESTOR_CANAL")).toBe("guardia@example.pe");

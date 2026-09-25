@@ -54,8 +54,12 @@ import tools.jackson.databind.json.JsonMapper;
  *
  * <p>Ahora el hecho se lee con su nombre de tipo <b>tal como el emisor lo escribio</b> y quien
  * decide es {@link kamayuk.rentas.nucleo.aplicacion.IngestarHechosDeCatastro}, hecho a hecho: lo
- * que no se sabe aplicar se ignora con un aviso {@code WARN} que lo nombra, sin acusarlo, y la
- * vuelta sigue.
+ * que no se sabe aplicar se aparta con {@code SIN_CAPACIDAD:<tipo>} y se acusa (#377), y la vuelta
+ * sigue.
+ *
+ * <p><b>Y el buzon entero NO viene en una pagina</b>, que es lo que #54 dio por hecho y #377 midio
+ * falso: se pide como mucho {@code ?limite=}, y el emisor sirve lo no acusado por orden. Por eso
+ * nada que no se acuse puede quedarse en la cabeza para siempre.
  *
  * <p>Lo que sigue siendo un fallo de transporte es un hecho <b>sin tipo</b>: eso no es una
  * capacidad que falte sino una respuesta que no tiene la forma de un hecho, y se arregla mirando el

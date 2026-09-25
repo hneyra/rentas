@@ -119,7 +119,11 @@ class CorrerElConsumidorDeIdentidadTest {
                 new CorrerElConsumidorDeIdentidad(
                         new PasadaDelConsumidorDeIdentidad(
                                 new ConsumirEventosDeIdentidad(
-                                        buzon, aplicador, new AlertaQueAnota()),
+                                        buzon,
+                                        aplicador,
+                                        new AlertaQueAnota(),
+                                        PasadaDelConsumidorDeIdentidad.POLITICA,
+                                        RELOJ),
                                 new AlertaQueAnota(),
                                 RELOJ),
                         registroCon("200105", CATACAOS),
@@ -200,7 +204,11 @@ class CorrerElConsumidorDeIdentidadTest {
         PasadaQueCuenta() {
             super(
                     new ConsumirEventosDeIdentidad(
-                            new BuzonDeMentira(0), new AplicadorQueCuenta(), new AlertaQueAnota()),
+                            new BuzonDeMentira(0),
+                            new AplicadorQueCuenta(),
+                            new AlertaQueAnota(),
+                            PasadaDelConsumidorDeIdentidad.POLITICA,
+                            RELOJ),
                     new AlertaQueAnota(),
                     RELOJ);
         }
@@ -259,6 +267,14 @@ class CorrerElConsumidorDeIdentidadTest {
         @Override
         public void hayPospuestosQueNoAvanzan(
                 List<EventoPospuesto> lista, Instant ahora, Duration umbral) {
+            // Lo mide PasadaDelConsumidorDeIdentidadTest; aqui no es el sujeto.
+        }
+
+        @Override
+        public void laColaEstaBloqueada(
+                kamayuk.rentas.plataforma.EstadoDeLaCola.Bloqueada bloqueada,
+                List<EventoPospuesto> enLaCabeza,
+                java.time.Duration umbral) {
             // Lo mide PasadaDelConsumidorDeIdentidadTest; aqui no es el sujeto.
         }
     }

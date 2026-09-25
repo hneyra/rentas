@@ -1,13 +1,9 @@
 package kamayuk.rentas.nucleo.infraestructura.ingestor;
 
-import java.io.IOException;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.time.Duration;
 import kamayuk.rentas.nucleo.aplicacion.AlertaDeHechosSinAplicar;
 import kamayuk.rentas.nucleo.dominio.proyeccion.HechoRecibido;
+import kamayuk.rentas.plataforma.CanalDeAvisos;
+import kamayuk.rentas.plataforma.ResponsableDeOperacion;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import tools.jackson.databind.json.JsonMapper;
@@ -18,38 +14,32 @@ import tools.jackson.databind.json.JsonMapper;
  * <h2>Las dos cosas, y las dos hacen falta</h2>
  *
  * <ul>
- *   <li><b>Se entrega</b> con un {@code POST} al canal configurado. Es lo que hace que «avisa a una
- *       persona con nombre» se pueda comprobar ejecutandolo, que es exactamente lo que P5D dejo sin
- *       poder comprobar: su alerta «escribe en el registro, no manda un correo… esta construido y
- *       no esta medido».
+ *   <li><b>Se entrega</b> con un {@code POST} al canal configurado, cuando es http(s). Es lo que
+ *       hace que «avisa a una persona con nombre» se pueda comprobar ejecutandolo, que es
+ *       exactamente lo que P5D dejo sin poder comprobar: su alerta «escribe en el registro, no
+ *       manda un correo… esta construido y no esta medido».
  *   <li><b>Y se registra</b> con nivel ERROR, con el responsable y su canal dentro. No es
- *       redundante: si el canal esta caido, la unica constancia de que hubo un aviso es esa linea —
- *       y la observabilidad del proyecto (INF-11) alerta sobre ERROR con receptor ya comprobado.
+ *       redundante: si el canal esta caido —o es un correo—, la unica constancia de que hubo un
+ *       aviso es esa linea, y la observabilidad del proyecto (INF-11) alerta sobre ERROR con
+ *       receptor ya comprobado.
  * </ul>
  *
- * <h2>Un canal que no contesta NO tumba la vuelta</h2>
- *
- * <p>Y eso es una decision, no un descuido: el hecho ya esta apartado y acusado, o sea que la cola
- * sigue corriendo. Dejar que un webhook caido lanzara desde aqui pararia la ingestion entera por no
- * poder avisar de <b>un</b> hecho, que es cambiar un problema pequeño por uno grande. Lo que se
- * hace es registrar el fallo de entrega, tambien con nivel ERROR, para que se vea que hubo un aviso
- * que no llego.
+ * <p><b>El texto y la linea de ERROR son de aqui; la entrega, de {@link CanalDeAvisos}</b> (#377),
+ * que es la misma para los dos consumidores de buzon: hasta #377 este {@code entregar} y el de
+ * {@code AlertaAlResponsableDeLaCopiaLocal} eran iguales byte a byte salvo el {@code record}, y un
+ * canal que no contesta sigue sin tumbar la vuelta — el porque esta alli.
  */
 public class AlertaAlCanalDelResponsable implements AlertaDeHechosSinAplicar {
 
     private static final Logger REGISTRO =
             LoggerFactory.getLogger(AlertaAlCanalDelResponsable.class);
 
-    private static final Duration ESPERA = Duration.ofSeconds(10);
+    private final ResponsableDeOperacion responsable;
+    private final CanalDeAvisos canal;
 
-    private final HttpClient cliente;
-    private final JsonMapper json;
-    private final ResponsableDeLaProyeccion responsable;
-
-    public AlertaAlCanalDelResponsable(JsonMapper json, ResponsableDeLaProyeccion responsable) {
-        this.json = json;
+    public AlertaAlCanalDelResponsable(JsonMapper json, ResponsableDeOperacion responsable) {
         this.responsable = responsable;
-        this.cliente = HttpClient.newBuilder().connectTimeout(ESPERA).build();
+        this.canal = new CanalDeAvisos(json, responsable);
     }
 
     @Override
@@ -73,55 +63,13 @@ public class AlertaAlCanalDelResponsable implements AlertaDeHechosSinAplicar {
                         + " padron algo que `catastro` ya no dice, y ninguna cifra lo delata"
                         + " (ADR-0026 §4).";
         REGISTRO.error("{} Responsable: {}", texto, responsable);
-        if (responsable.seLeEntrega()) {
-            entregar(
-                    new Aviso(
-                            responsable.nombre(),
-                            hecho.eventoId().toString(),
-                            motivo,
-                            muertosSinExplicar,
-                            texto));
-        }
-    }
-
-    /**
-     * Entrega el aviso, y si no se puede lo dice.
-     *
-     * <p>Se atrapa {@code RuntimeException} a proposito —y Checkstyle lo prohibe con razon casi
-     * siempre—: lo que se atrapa aqui no es un defecto sino <b>un canal que no contesta</b>, y la
-     * alternativa es que un webhook caido pare la ingestion entera por no poder avisar de un solo
-     * hecho. No se traga: se registra con nivel ERROR, que es lo unico honesto que queda.
-     */
-    @SuppressWarnings("checkstyle:IllegalCatch")
-    private void entregar(Aviso aviso) {
-        try {
-            HttpRequest peticion =
-                    HttpRequest.newBuilder(URI.create(responsable.canal()))
-                            .timeout(ESPERA)
-                            .header("Content-Type", "application/json")
-                            .POST(
-                                    HttpRequest.BodyPublishers.ofString(
-                                            json.writeValueAsString(aviso)))
-                            .build();
-            HttpResponse<String> respuesta =
-                    cliente.send(peticion, HttpResponse.BodyHandlers.ofString());
-            if (respuesta.statusCode() >= 300) {
-                REGISTRO.error(
-                        "El canal {} contesto {} al aviso: el responsable NO se ha enterado por"
-                                + " ahi, y la unica constancia es la linea de arriba",
-                        responsable.canal(),
-                        respuesta.statusCode());
-            }
-        } catch (IOException | RuntimeException noSePudo) {
-            REGISTRO.error(
-                    "Y el aviso NO se pudo entregar en {}: {}. La unica constancia es la linea de"
-                            + " arriba",
-                    responsable.canal(),
-                    noSePudo.toString());
-        } catch (InterruptedException interrumpido) {
-            Thread.currentThread().interrupt();
-            REGISTRO.error("Se interrumpio al entregar el aviso en {}", responsable.canal());
-        }
+        canal.entregar(
+                new Aviso(
+                        responsable.nombre(),
+                        hecho.eventoId().toString(),
+                        motivo,
+                        muertosSinExplicar,
+                        texto));
     }
 
     /** Lo que se manda al canal. */

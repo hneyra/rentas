@@ -22,17 +22,18 @@ import org.jspecify.annotations.Nullable;
  * siguiente traia lo mismo y volvia a morir: <b>la ingestion del padron quedaba parada y no se
  * destrancaba sola</b>.
  *
- * <p>La direccion decidio la salida: <b>un tipo que este sistema no sabe aplicar se IGNORA, se
- * registra un aviso {@code WARN} que lo nombra, y la vuelta sigue con los demas</b>. No se aplica a
- * medias —eso dejaria la proyeccion diciendo algo que nadie escribio—, no se acusa —acusarlo sin
- * aplicarlo lo perderia, y el emisor no lo vuelve a servir— y no se aparta a la cola de muertos,
- * que es para lo que <b>no se podra</b> aplicar nunca. Aqui no es que el hecho este mal: es que la
- * capacidad todavia no existe, y el hecho <b>sigue pendiente en el buzon del emisor</b> esperando
- * al dia que exista.
+ * <p>La direccion decidio entonces que <b>un tipo que este sistema no sabe aplicar se IGNORA, se
+ * registra un aviso {@code WARN} que lo nombra, y la vuelta sigue con los demas</b>, sin acusarlo:
+ * el hecho «sigue pendiente en el buzon del emisor esperando al dia que exista» quien lo aplique.
  *
- * <p>Lo que cuesta, dicho: mientras la capacidad no exista, cada vuelta vuelve a leerlos y a
- * avisar. Es ruido a proposito — un tipo que no se aplica y no deja rastro es indistinguible de uno
- * que se perdio.
+ * <p><b>#377 revirtio la mitad de «no se acusa», porque su premisa era falsa.</b> El buzon entero
+ * NO viene en una pagina: el emisor sirve lo no acusado por orden y como mucho 200, y la carga del
+ * territorio va antes que el padron. Con 200 hechos de estos en la cabeza, la pagina entera eran
+ * ellos y el padron de detras no se leia nunca, con la corrida en verde. Ahora lo que decide es
+ * {@code PoliticaDeLoQueNoAvanza}, y la de produccion lo <b>aparta a la cola de muertos con el
+ * motivo {@code SIN_CAPACIDAD:<tipo>} y lo acusa</b>: no se pierde —el cuerpo entero queda alli
+ * para reinyectarlo el dia que exista quien lo aplique— y deja de ocupar la cabeza. Lo que no
+ * cambia: no se aplica a medias, y no se avisa al responsable, porque no hay nada roto.
  *
  * <p><b>Anadir un valor aqui NO basta para aplicarlo</b>: hace falta ademas su rama en {@code
  * ProyeccionDeCatastroJdbc.aplicar}, y si falta, el {@code default} de ese {@code switch} lo dice
