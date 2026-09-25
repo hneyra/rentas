@@ -1,8 +1,12 @@
 package kamayuk.rentas.seguridad.aplicacion;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import kamayuk.rentas.plataforma.EstadoDeLaCola;
+import kamayuk.rentas.plataforma.PoliticaDeLoQueNoAvanza;
 import kamayuk.rentas.seguridad.dominio.AlertaDeEventosSinAplicar;
 import kamayuk.rentas.seguridad.dominio.EventoDeIdentidadRecibido;
 import kamayuk.rentas.seguridad.dominio.EventoPospuesto;
@@ -22,6 +26,23 @@ import org.slf4j.LoggerFactory;
  * perderia el evento cuyo commit falle (AC-7 #1): el buzon dejaria de servirlo y la copia local no
  * lo tendria. Acusar solo lo que se aplico, se ignoro por ajeno o se aparto es lo que hace que un
  * evento pendiente por su dependencia vuelva en la vuelta siguiente.
+ *
+ * <h2>Un pendiente no puede ocupar la cabeza PARA SIEMPRE (#377)</h2>
+ *
+ * <p>Hasta #377 un {@code TodaviaNo} no se acusaba nunca, y eso no tenia tope. {@code identidad}
+ * sirve lo no acusado por orden y como mucho {@value #POR_VUELTA}: con 200 {@code PERMISO_FIJADO}
+ * pospuestos en la cabeza —dos guardados de la matriz sobre un sujeto cuya alta se aparto, o un
+ * acceso que el catalogo local no tiene— la pagina entera eran ellos, la pasada terminaba «sin
+ * progreso» en verde y <b>el evento de detras no se leia nunca</b>. Medido: la baja de un empleado
+ * cesado se quedaba sin aplicar y {@code GuardiaDeAcceso} lo seguia autorizando con la copia vieja.
+ * Y {@code TodaviaNo} sale siempre que un {@code INSERT … SELECT} escribe 0 filas, que en esos dos
+ * casos esperar no arregla.
+ *
+ * <p>Asi que un {@code TodaviaNo} le pregunta a la {@link PoliticaDeLoQueNoAvanza}: la de
+ * produccion espera mientras el evento tenga como mucho {@code
+ * PasadaDelConsumidorDeIdentidad.MINUTOS_QUE_SE_TOLERAN} y pasado eso lo <b>aparta a la cola de
+ * muertos y lo acusa</b>. No se avisa aqui, evento a evento: los apartados por no avanzar vuelven
+ * en la {@link Vuelta} y la pasada los junta en UN aviso.
  */
 public class ConsumirEventosDeIdentidad {
 
@@ -32,17 +53,24 @@ public class ConsumirEventosDeIdentidad {
     private final FuenteDeEventosDeIdentidad fuente;
     private final AplicarUnEventoDeIdentidad aplicador;
     private final AlertaDeEventosSinAplicar alerta;
+    private final PoliticaDeLoQueNoAvanza politica;
+    private final Clock reloj;
 
     public ConsumirEventosDeIdentidad(
             FuenteDeEventosDeIdentidad fuente,
             AplicarUnEventoDeIdentidad aplicador,
-            AlertaDeEventosSinAplicar alerta) {
+            AlertaDeEventosSinAplicar alerta,
+            PoliticaDeLoQueNoAvanza politica,
+            Clock reloj) {
         this.fuente = fuente;
         this.aplicador = aplicador;
         this.alerta = alerta;
+        this.politica = politica;
+        this.reloj = reloj;
     }
 
     public Vuelta consumir() {
+        Instant ahora = reloj.instant();
         FuenteDeEventosDeIdentidad.Lote lote = fuente.pendientes(POR_VUELTA);
         List<UUID> resueltos = new ArrayList<>();
         int aplicados = 0;
@@ -50,6 +78,7 @@ public class ConsumirEventosDeIdentidad {
         int ajenos = 0;
         int apartados = 0;
         List<EventoPospuesto> pospuestos = new ArrayList<>();
+        List<EventoPospuesto> apartadosPorNoAvanzar = new ArrayList<>();
 
         for (EventoDeIdentidadRecibido evento : lote.eventos()) {
             try {
@@ -80,10 +109,25 @@ public class ConsumirEventosDeIdentidad {
                 resueltos.add(evento.eventoId());
                 alerta.hayUnEventoSinAplicar(evento, motivo, aplicador.apartados());
             } catch (AplicarUnEventoDeIdentidad.TodaviaNo todaviaNo) {
+                PoliticaDeLoQueNoAvanza.Decision decision =
+                        politica.decidir(
+                                new PoliticaDeLoQueNoAvanza.LoQueNoAvanza(
+                                        evento.tipoPublicado(),
+                                        evento.creadoEn(),
+                                        motivoDe(todaviaNo)),
+                                ahora);
+                if (decision.aparta()) {
+                    // Lleva demasiado esperando: su dependencia ya no esta en camino, y
+                    // esperandolo paraba todo lo de detras (#377). A la cola de muertos y SE
+                    // ACUSA. El aviso lo da la pasada, UNO por corrida con todos juntos.
+                    aplicador.apartar(evento, decision.motivo());
+                    apartadosPorNoAvanzar.add(new EventoPospuesto(evento, decision.motivo()));
+                    resueltos.add(evento.eventoId());
+                    continue;
+                }
                 // NO se acusa y NO se aparta: su dependencia esta en camino. Un fallo que se
-                // arregla solo no puede matar un evento (AC-7 #3). Se guardan enteros —no solo
-                // contados— porque quien decide si esto ya no es «esta en camino» es la corrida,
-                // mirando cuanto llevan esperando.
+                // arregla solo no puede matar un evento (AC-7 #3), y la politica dice cuanto se
+                // le consiente antes de dejar de creerlo.
                 pospuestos.add(new EventoPospuesto(evento, motivoDe(todaviaNo)));
                 log.warn(
                         "Evento {} ({}, secuencia {}) TODAVIA no se puede aplicar y se deja"
@@ -136,6 +180,7 @@ public class ConsumirEventosDeIdentidad {
                 ajenos,
                 apartados,
                 List.copyOf(pospuestos),
+                List.copyOf(apartadosPorNoAvanzar),
                 quedan,
                 acuseRechazado);
     }
@@ -145,7 +190,15 @@ public class ConsumirEventosDeIdentidad {
         return mensaje == null ? noSePudo.getClass().getSimpleName() : mensaje;
     }
 
-    /** Lo que una vuelta hizo, para el registro y para decidir si se sigue. */
+    /**
+     * Lo que una vuelta hizo, para el registro y para decidir si se sigue.
+     *
+     * @param pospuestos los que la politica decidio seguir esperando: sin acusar
+     * @param apartadosPorNoAvanzar los que la politica aparto por llevar demasiado esperando: en la
+     *     cola de muertos y acusados (#377)
+     * @param quedan lo pendiente en el buzon CONTANDO lo que esta vuelta no acuso, que es lo que
+     *     {@code identidad} contesta
+     */
     public record Vuelta(
             int leidos,
             int aplicados,
@@ -153,12 +206,25 @@ public class ConsumirEventosDeIdentidad {
             int ajenos,
             int apartados,
             List<EventoPospuesto> pospuestos,
+            List<EventoPospuesto> apartadosPorNoAvanzar,
             long quedan,
             boolean acuseRechazado) {
 
         /** Cuantos se dejaron para la vuelta siguiente. */
         public int pendientes() {
             return pospuestos.size();
+        }
+
+        /**
+         * Vacia, al dia, o BLOQUEADA en su cabeza con lo que espera detras (#377).
+         *
+         * <p>{@code quedan} cuenta tambien los pospuestos de esta pagina —siguen pendientes en el
+         * buzon—, asi que lo que hay DETRAS de ella es lo que queda menos ellos.
+         */
+        public EstadoDeLaCola estado() {
+            long cabeza = pospuestos.isEmpty() ? -1 : pospuestos.getFirst().evento().secuencia();
+            return EstadoDeLaCola.alTerminarLaVuelta(
+                    leidos, leidos - pendientes(), Math.max(0, quedan - pendientes()), cabeza);
         }
 
         /**
@@ -183,7 +249,9 @@ public class ConsumirEventosDeIdentidad {
                     + apartados
                     + " apartados sin poder aplicarse, "
                     + pendientes()
-                    + " pendientes por su dependencia; quedan "
+                    + " pendientes por su dependencia, "
+                    + apartadosPorNoAvanzar.size()
+                    + " apartados por llevar demasiado esperando; quedan "
                     + quedan
                     + " en el buzon de `identidad` DESPUES de acusar"
                     + (acuseRechazado ? "; y el acuse fue RECHAZADO" : "");

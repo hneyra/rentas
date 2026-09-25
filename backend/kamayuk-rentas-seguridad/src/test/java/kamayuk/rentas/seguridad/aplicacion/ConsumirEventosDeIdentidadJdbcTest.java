@@ -364,6 +364,58 @@ class ConsumirEventosDeIdentidadJdbcTest {
     }
 
     @Test
+    @DisplayName(
+            "#377: 200 permisos que no avanzan DELANTE no dejan sin leer la baja de DETRAS: el"
+                    + " cesado queda inhabilitado")
+    void doscientosPospuestosDelanteNoParanLaBajaDeDetras() throws SQLException {
+        // LA SIEMBRA QUE DISTINGUE. Un empleado habilitado en la copia; despues, 200
+        // `PERMISO_FIJADO`
+        // sobre una cuenta que esta copia no conoce —su alta se aparto, o nunca llego— emitidos
+        // hace veinte minutos; y DETRAS, la baja del empleado. El buzon sirve 200 por pagina y en
+        // orden, asi que la primera son los 200 permisos. Hasta #377 los 200 se posponian sin
+        // acusarse, la vuelta contaba «sin progreso», la pasada terminaba en verde y la pagina de
+        // la corrida siguiente eran LOS MISMOS 200: la baja no se leia nunca y `GuardiaDeAcceso`
+        // seguia autorizando al cesado con la copia vieja.
+        //
+        // En SU municipalidad: aparta 200 eventos, y las demas pruebas de la clase cuentan los
+        // apartados de la suya.
+        long propia = crearMunicipalidad("299913", "Municipalidad del cesado");
+        TenantContext.fijar(new MunicipalidadId(propia));
+        BuzonQueRespetaElLimite cola = new BuzonQueRespetaElLimite();
+        cola.encola(
+                eventoDe(
+                        1,
+                        "USUARIO_DADO_DE_ALTA",
+                        usuario("cesado.377", true),
+                        AHORA.minus(java.time.Duration.ofHours(1))));
+        for (int i = 0; i < 200; i++) {
+            cola.encola(
+                    eventoDe(
+                            2 + i,
+                            "PERMISO_FIJADO",
+                            permisoDeUsuario("fantasma.377"),
+                            AHORA.minus(java.time.Duration.ofMinutes(20))));
+        }
+        cola.encola(eventoDe(202, "USUARIO_MODIFICADO", usuario("cesado.377", false), AHORA));
+
+        pasadaSobre(cola).hastaAgotar();
+
+        assertThat(habilitado(propia, "cesado.377"))
+                .as(
+                        "la baja de DETRAS de los 200 pospuestos se aplico: una revocacion que no"
+                                + " llega es un empleado cesado que sigue entrando")
+                .isFalse();
+        assertThat(cola.pendientes())
+                .as("y el buzon queda vacio: nada ocupa la cabeza para siempre")
+                .isEmpty();
+        assertThat(alerta.avisos)
+                .as(
+                        "los 200 se apartaron, y se dice UNA vez con todos dentro: no 200 avisos,"
+                                + " ni ninguno")
+                .containsExactly("POSPUESTOS: 200");
+    }
+
+    @Test
     @DisplayName("y con el buzon vacio no se acusa nada y no hay progreso")
     void conElBuzonVacio() {
         ConsumirEventosDeIdentidad.Vuelta vuelta = consumidor.consumir();
@@ -382,7 +434,13 @@ class ConsumirEventosDeIdentidadJdbcTest {
     }
 
     private ConsumirEventosDeIdentidad consumidorCon(AplicarUnEventoDeIdentidad aplicador) {
-        return envolver(new ConsumirEventosDeIdentidad(buzon, aplicador, alerta));
+        return envolver(
+                new ConsumirEventosDeIdentidad(
+                        buzon,
+                        aplicador,
+                        alerta,
+                        PasadaDelConsumidorDeIdentidad.POLITICA,
+                        Clock.fixed(AHORA, ZoneOffset.UTC)));
     }
 
     @SuppressWarnings("unchecked")
@@ -437,6 +495,102 @@ class ConsumirEventosDeIdentidadJdbcTest {
                 fila.next();
                 return fila.getLong(1);
             }
+        }
+    }
+
+    private PasadaDelConsumidorDeIdentidad pasadaSobre(FuenteDeEventosDeIdentidad fuente) {
+        return new PasadaDelConsumidorDeIdentidad(
+                envolver(
+                        new ConsumirEventosDeIdentidad(
+                                fuente,
+                                aplicadorDeVerdad(),
+                                alerta,
+                                PasadaDelConsumidorDeIdentidad.POLITICA,
+                                Clock.fixed(AHORA, ZoneOffset.UTC))),
+                alerta,
+                Clock.fixed(AHORA, ZoneOffset.UTC));
+    }
+
+    private static EventoDeIdentidadRecibido eventoDe(
+            long secuencia, String tipo, String cuerpo, Instant creadoEn) {
+        return new EventoDeIdentidadRecibido(
+                UUID.randomUUID(), secuencia, tipo, 1L, cuerpo, HUELLA, creadoEn);
+    }
+
+    private static String usuario(String cuenta, boolean habilitado) {
+        return "{\"usuarioId\":77,\"cuenta\":\""
+                + cuenta
+                + "\",\"nombre\":\"Empleado Cesado\",\"correo\":null,\"habilitado\":"
+                + habilitado
+                + ",\"vigenciaDesde\":null,\"vigenciaHasta\":null}";
+    }
+
+    /**
+     * Un permiso de `rentas` sobre una CUENTA: si la copia no la conoce, es un {@code TodaviaNo}.
+     */
+    private static String permisoDeUsuario(String cuenta) {
+        return "{\"sujeto\":\"USUARIO\",\"sujetoId\":99,\"sujetoNombre\":\""
+                + cuenta
+                + "\",\"sistema\":\"rentas\",\"codigo\":\"permisos\",\"privilegios\":{"
+                + "\"ejecucion\":false,\"lectura\":true,\"registro\":false,"
+                + "\"modificacion\":false,\"eliminacion\":false,\"impresion\":false,"
+                + "\"especial\":false},\"usuarioRegistro\":\"admin\"}";
+    }
+
+    private static boolean habilitado(long enLaMunicipalidad, String cuenta) throws SQLException {
+        try (Connection admin = base.conexionAdmin();
+                PreparedStatement sentencia =
+                        admin.prepareStatement(
+                                "SELECT habilitado FROM usuario WHERE municipalidad_id = ? AND"
+                                        + " cuenta = ?")) {
+            sentencia.setLong(1, enLaMunicipalidad);
+            sentencia.setString(2, cuenta);
+            try (ResultSet fila = sentencia.executeQuery()) {
+                if (!fila.next()) {
+                    throw new AssertionError("la cuenta «" + cuenta + "» no esta en la copia");
+                }
+                return fila.getBoolean(1);
+            }
+        }
+    }
+
+    /**
+     * El buzon como lo sirve {@code identidad}: lo no acusado, por secuencia, y NI UNO MAS que el
+     * {@code limite} (#377).
+     *
+     * <p>{@link BuzonDeMentira} sirve la cola entera y la vacia, y esa es la muestra uniforme que
+     * tapaba el defecto: con un buzon que siempre cabe en una pagina, la cabeza no puede atascarse.
+     * {@code quedan} es lo pendiente CONTANDO la pagina, que es lo que {@code identidad} contesta
+     * ({@code BuzonDeIdentidadJdbc}: {@code ORDER BY e.id LIMIT :limite}).
+     */
+    private static final class BuzonQueRespetaElLimite implements FuenteDeEventosDeIdentidad {
+        private final List<EventoDeIdentidadRecibido> cola = new ArrayList<>();
+        private int paginas;
+
+        void encola(EventoDeIdentidadRecibido evento) {
+            cola.add(evento);
+        }
+
+        List<EventoDeIdentidadRecibido> pendientes() {
+            return List.copyOf(cola);
+        }
+
+        int paginas() {
+            return paginas;
+        }
+
+        @Override
+        public Lote pendientes(int limite) {
+            paginas++;
+            return new Lote(
+                    List.copyOf(cola.subList(0, Math.min(limite, cola.size()))), cola.size());
+        }
+
+        @Override
+        public Acuse acusar(List<UUID> eventoIds) {
+            int antes = cola.size();
+            cola.removeIf(evento -> eventoIds.contains(evento.eventoId()));
+            return new Acuse(eventoIds.size(), antes - cola.size(), cola.size());
         }
     }
 
@@ -497,6 +651,14 @@ class ConsumirEventosDeIdentidadJdbcTest {
                 java.time.Instant ahora,
                 java.time.Duration umbral) {
             avisos.add("POSPUESTOS: " + pospuestos.size());
+        }
+
+        @Override
+        public void laColaEstaBloqueada(
+                kamayuk.rentas.plataforma.EstadoDeLaCola.Bloqueada bloqueada,
+                List<kamayuk.rentas.seguridad.dominio.EventoPospuesto> enLaCabeza,
+                java.time.Duration umbral) {
+            avisos.add("COLA BLOQUEADA: " + bloqueada);
         }
     }
 }

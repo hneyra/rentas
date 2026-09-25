@@ -10,6 +10,7 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import kamayuk.rentas.plataforma.EstadoDeLaCola;
 import kamayuk.rentas.seguridad.dominio.AlertaDeEventosSinAplicar;
 import kamayuk.rentas.seguridad.dominio.EventoDeIdentidadRecibido;
 import kamayuk.rentas.seguridad.dominio.EventoPospuesto;
@@ -38,10 +39,7 @@ class PasadaDelConsumidorDeIdentidadTest {
 
         int aplicados =
                 new PasadaDelConsumidorDeIdentidad(
-                                new ConsumirEventosDeIdentidad(
-                                        buzon, new AplicadorQueAplica(), alerta),
-                                alerta,
-                                RELOJ)
+                                consumidor(buzon, new AplicadorQueAplica(), alerta), alerta, RELOJ)
                         .hastaAgotar();
 
         assertThat(buzon.lecturas)
@@ -72,8 +70,7 @@ class PasadaDelConsumidorDeIdentidadTest {
         assertThatThrownBy(
                         () ->
                                 new PasadaDelConsumidorDeIdentidad(
-                                                new ConsumirEventosDeIdentidad(
-                                                        caido, new AplicadorQueAplica(), alerta),
+                                                consumidor(caido, new AplicadorQueAplica(), alerta),
                                                 alerta,
                                                 RELOJ)
                                         .hastaAgotar())
@@ -84,20 +81,31 @@ class PasadaDelConsumidorDeIdentidadTest {
 
     @Test
     @DisplayName(
-            "un pospuesto que lleva mas de quince minutos esperando SE AVISA, y la pasada termina"
-                    + " bien")
-    void unPospuestoViejoSeAvisa() {
+            "#377: un pospuesto que lleva mas de quince minutos esperando SE APARTA, se acusa y se"
+                    + " avisa UNA vez, y la pasada termina bien")
+    void unPospuestoViejoSeApartaYSeAvisa() {
         AlertaQueAnota alerta = new AlertaQueAnota();
+        BuzonQuePospone buzon = new BuzonQuePospone(AHORA.minus(Duration.ofMinutes(20)), 1, 0);
+        AplicadorQuePospone aplicador = new AplicadorQuePospone();
 
-        pasadaQuePospone(AHORA.minus(Duration.ofMinutes(20)), alerta).hastaAgotar();
+        new PasadaDelConsumidorDeIdentidad(consumidor(buzon, aplicador, alerta), alerta, RELOJ)
+                .hastaAgotar();
 
+        assertThat(aplicador.apartados)
+                .as(
+                        "[hasta #377 se avisaba y se quedaba en el buzon: con 200 asi en la cabeza,"
+                                + " lo de detras no se leia nunca. Ahora se aparta a la cola de"
+                                + " muertos, con el motivo de la politica y el que le falta]")
+                .singleElement(org.assertj.core.api.InstanceOfAssertFactories.STRING)
+                .startsWith("NO_AVANZA: lleva 20 minuto(s)")
+                .contains("Mesa de Partes");
+        assertThat(buzon.acusados).as("y se ACUSA: deja la cabeza").hasSize(1);
         assertThat(alerta.pospuestos)
                 .as(
                         "[medido con las cinco aplicaciones levantadas: cuatro permisos quedaron"
                                 + " pospuestos corrida tras corrida, con su WARN por vuelta y CERO"
-                                + " avisos al responsable. Un pospuesto no es un fallo mientras su"
-                                + " dependencia este en camino; pasado ese tiempo ya no lo esta, y"
-                                + " sin este aviso no se entera nadie]")
+                                + " avisos al responsable. Sin este aviso, que se aparten no lo"
+                                + " sabe nadie]")
                 .singleElement()
                 .satisfies(
                         aviso -> {
@@ -113,34 +121,76 @@ class PasadaDelConsumidorDeIdentidadTest {
                             assertThat(aviso.ahora()).isEqualTo(AHORA);
                         });
         assertThat(alerta.apartados)
-                .as("y NO se aparta: el pospuesto sigue en el buzon, que es lo correcto")
+                .as("y NO por el aviso de «no se podra aplicar nunca», uno por evento")
                 .isEmpty();
     }
 
     @Test
     @DisplayName("y uno de dos minutos NO: su dependencia todavia puede estar en camino")
-    void unPospuestoRecienteNoSeAvisa() {
+    void unPospuestoRecienteNoSeApartaNiSeAvisa() {
         AlertaQueAnota alerta = new AlertaQueAnota();
+        BuzonQuePospone buzon = new BuzonQuePospone(AHORA.minus(Duration.ofMinutes(2)), 1, 0);
+        AplicadorQuePospone aplicador = new AplicadorQuePospone();
 
-        pasadaQuePospone(AHORA.minus(Duration.ofMinutes(2)), alerta).hastaAgotar();
+        new PasadaDelConsumidorDeIdentidad(consumidor(buzon, aplicador, alerta), alerta, RELOJ)
+                .hastaAgotar();
 
-        assertThat(alerta.pospuestos)
+        assertThat(aplicador.apartados)
                 .as(
-                        "[el contraste: avisar del pospuesto normal —la afiliacion que llega junto"
-                                + " a su grupo— seria un aviso por corrida que nadie leeria, y con"
-                                + " el se perderia el que importa]")
+                        "[el contraste: apartar el pospuesto normal —la afiliacion que llega junto"
+                                + " a su grupo— lo mataria por un motivo que se arregla solo]")
                 .isEmpty();
+        assertThat(buzon.acusados).as("sigue en el buzon").isEmpty();
+        assertThat(alerta.pospuestos).isEmpty();
+        assertThat(alerta.bloqueadas)
+                .as("y no hay nada DETRAS: esperar no para a nadie, no es una cola bloqueada")
+                .isEmpty();
+    }
+
+    @Test
+    @DisplayName(
+            "#377: si los que esperan LLENAN la pagina y hay mas detras, se avisa COLA BLOQUEADA con"
+                    + " cuantos esperan, y la pasada termina bien")
+    void laCabezaLlenaDePospuestosConAlgoDetrasSeAvisaComoColaBloqueada() {
+        // Dos minutos: todavia dentro de la tolerancia, asi que ninguno se aparta. Es la ventana en
+        // la que la cola esta parada DE VERDAD —la pagina son ellos y lo de detras no se lee— y el
+        // aviso de los pospuestos no lo decia.
+        AlertaQueAnota alerta = new AlertaQueAnota();
+        BuzonQuePospone buzon =
+                new BuzonQuePospone(
+                        AHORA.minus(Duration.ofMinutes(2)),
+                        ConsumirEventosDeIdentidad.POR_VUELTA,
+                        1);
+
+        new PasadaDelConsumidorDeIdentidad(
+                        consumidor(buzon, new AplicadorQuePospone(), alerta), alerta, RELOJ)
+                .hastaAgotar();
+
+        assertThat(alerta.bloqueadas)
+                .as(
+                        "[hasta #377 la pasada acababa «sin progreso» en verde, sin decir que detras"
+                                + " de los pospuestos habia algo —una baja— que no se iba a leer]")
+                .singleElement()
+                .satisfies(
+                        bloqueada -> {
+                            assertThat(bloqueada.secuenciaDeCabeza()).isEqualTo(42);
+                            assertThat(bloqueada.enLaCabeza())
+                                    .isEqualTo(ConsumirEventosDeIdentidad.POR_VUELTA);
+                            assertThat(bloqueada.detras()).isEqualTo(1);
+                        });
+        assertThat(buzon.lecturas)
+                .as("una sola pagina: la segunda traeria las mismas")
+                .isEqualTo(1);
     }
 
     // ------------------------------------------------------------------
 
-    private static PasadaDelConsumidorDeIdentidad pasadaQuePospone(
-            Instant creadoEn, AlertaQueAnota alerta) {
-        return new PasadaDelConsumidorDeIdentidad(
-                new ConsumirEventosDeIdentidad(
-                        new BuzonQuePospone(creadoEn), new AplicadorQuePospone(), alerta),
-                alerta,
-                RELOJ);
+    private static ConsumirEventosDeIdentidad consumidor(
+            FuenteDeEventosDeIdentidad buzon,
+            AplicarUnEventoDeIdentidad aplicador,
+            AlertaDeEventosSinAplicar alerta) {
+        return new ConsumirEventosDeIdentidad(
+                buzon, aplicador, alerta, PasadaDelConsumidorDeIdentidad.POLITICA, RELOJ);
     }
 
     private static final class BuzonDeMentira implements FuenteDeEventosDeIdentidad {
@@ -177,32 +227,41 @@ class PasadaDelConsumidorDeIdentidadTest {
         }
     }
 
-    /** Un buzon que sirve siempre el mismo evento: el que nadie puede aplicar todavia. */
+    /**
+     * Un buzon con {@code cuantos} eventos que nadie puede aplicar todavia en la cabeza y {@code
+     * detras} mas detras, que respeta el {@code limite} y quita lo que se acusa (#377).
+     */
     private static final class BuzonQuePospone implements FuenteDeEventosDeIdentidad {
-        private final Instant creadoEn;
+        private final List<EventoDeIdentidadRecibido> cola = new ArrayList<>();
+        private final List<UUID> acusados = new ArrayList<>();
+        private int lecturas;
 
-        BuzonQuePospone(Instant creadoEn) {
-            this.creadoEn = creadoEn;
+        BuzonQuePospone(Instant creadoEn, int cuantos, int detras) {
+            for (int i = 0; i < cuantos + detras; i++) {
+                cola.add(
+                        new EventoDeIdentidadRecibido(
+                                UUID.randomUUID(),
+                                42 + i,
+                                "MIEMBRO_AFILIADO",
+                                9,
+                                "{}",
+                                "b".repeat(64),
+                                creadoEn));
+            }
         }
 
         @Override
         public Lote pendientes(int limite) {
+            lecturas++;
             return new Lote(
-                    List.of(
-                            new EventoDeIdentidadRecibido(
-                                    UUID.fromString("11111111-1111-4111-8111-111111111111"),
-                                    42,
-                                    "MIEMBRO_AFILIADO",
-                                    9,
-                                    "{}",
-                                    "b".repeat(64),
-                                    creadoEn)),
-                    1);
+                    List.copyOf(cola.subList(0, Math.min(limite, cola.size()))), cola.size());
         }
 
         @Override
         public Acuse acusar(List<UUID> eventoIds) {
-            throw new IllegalStateException("un pospuesto no se acusa: no habria que llamar aqui");
+            acusados.addAll(eventoIds);
+            cola.removeIf(evento -> eventoIds.contains(evento.eventoId()));
+            return new Acuse(eventoIds.size(), eventoIds.size(), cola.size());
         }
     }
 
@@ -222,6 +281,8 @@ class PasadaDelConsumidorDeIdentidadTest {
 
     /** El aplicador que siempre dice «todavia no»: la dependencia no esta en esta copia. */
     private static final class AplicadorQuePospone extends AplicarUnEventoDeIdentidad {
+        private final List<String> apartados = new ArrayList<>();
+
         AplicadorQuePospone() {
             super(
                     JdbcClient.create(new DriverManagerDataSource()),
@@ -235,12 +296,18 @@ class PasadaDelConsumidorDeIdentidadTest {
                     "El evento de `miembro` nombra el grupo «Mesa de Partes» y la cuenta"
                             + " «jperez», y esta copia no conoce a los dos todavia");
         }
+
+        @Override
+        public void apartar(EventoDeIdentidadRecibido evento, String motivo) {
+            apartados.add(motivo);
+        }
     }
 
-    /** Anota los dos avisos por separado: son dos hechos distintos. */
+    /** Anota los tres avisos por separado: son tres hechos distintos. */
     private static final class AlertaQueAnota implements AlertaDeEventosSinAplicar {
         private final List<String> apartados = new ArrayList<>();
         private final List<AvisoDePospuestos> pospuestos = new ArrayList<>();
+        private final List<EstadoDeLaCola.Bloqueada> bloqueadas = new ArrayList<>();
 
         @Override
         public void hayUnEventoSinAplicar(
@@ -252,6 +319,14 @@ class PasadaDelConsumidorDeIdentidadTest {
         public void hayPospuestosQueNoAvanzan(
                 List<EventoPospuesto> lista, Instant ahora, Duration umbral) {
             pospuestos.add(new AvisoDePospuestos(lista, ahora, umbral));
+        }
+
+        @Override
+        public void laColaEstaBloqueada(
+                EstadoDeLaCola.Bloqueada bloqueada,
+                List<EventoPospuesto> enLaCabeza,
+                Duration umbral) {
+            bloqueadas.add(bloqueada);
         }
     }
 

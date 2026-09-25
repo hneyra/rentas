@@ -7,7 +7,9 @@ import java.util.Optional;
 import kamayuk.rentas.nucleo.dominio.proyeccion.HechoRecibido;
 import kamayuk.rentas.nucleo.dominio.proyeccion.ProyeccionDeCatastro;
 import kamayuk.rentas.nucleo.dominio.proyeccion.TipoDeHechoDeCatastro;
+import kamayuk.rentas.plataforma.PoliticaDeLoQueNoAvanza;
 import org.jspecify.annotations.Nullable;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
 /**
@@ -27,7 +29,7 @@ import org.springframework.jdbc.core.simple.JdbcClient;
  * de cada {@code INSERT}. Sin contexto, el {@code INSERT} <b>falla</b> en lugar de plantar una fila
  * con la municipalidad equivocada.
  *
- * <h2>Las tres decisiones que este archivo toma, y por que</h2>
+ * <h2>Las cuatro decisiones que este archivo toma, y por que</h2>
  *
  * <ol>
  *   <li><b>El buzon se escribe PRIMERO y con {@code ON CONFLICT DO NOTHING}.</b> Es la
@@ -40,6 +42,10 @@ import org.springframework.jdbc.core.simple.JdbcClient;
  *       ingestor sobre {@code valuacion_predio} a proposito: es un hecho sellado. Un segundo hecho
  *       para el mismo (ejercicio, predio) sale como {@link ProyeccionDeCatastro.NoSePuedeAplicar}
  *       nombrandolo, que es un hueco declarado de C-8 y no un fallo de esta clase.
+ *   <li><b>Lo que la base rechaza tambien es un {@link ProyeccionDeCatastro.NoSePuedeAplicar}</b>,
+ *       con el mensaje de PostgreSQL —y el nombre de la restriccion— dentro (#377). Sin eso, una
+ *       clave unica que el {@code ON CONFLICT} no cubre salia de la vuelta antes del acuse, sin
+ *       cola de muertos y sin aviso, y volvia a la cabeza en cada corrida.
  * </ol>
  */
 public class ProyeccionDeCatastroJdbc implements ProyeccionDeCatastro {
@@ -65,34 +71,56 @@ public class ProyeccionDeCatastroJdbc implements ProyeccionDeCatastro {
         TipoDeHechoDeCatastro tipo = hecho.tipo();
         if (tipo == null) {
             // ESTE CAMINO NO LO ALCANZA EL INGESTOR, y aun asi no puede ser un `switch` sobre
-            // null. Quien filtra los tipos que este sistema no sabe aplicar es
-            // `IngestarHechosDeCatastro`, que los IGNORA con un aviso y sin acusarlos (#54); lo
-            // que llega aqui con un tipo desconocido es una llamada directa al aplicador, y el
-            // unico desenlace honesto es decirlo en vez de reventar con un NullPointerException.
+            // null. Quien decide que hacer con los tipos que este sistema no sabe aplicar es
+            // `IngestarHechosDeCatastro`, con su `PoliticaDeLoQueNoAvanza` (#54, #377); lo que
+            // llega aqui con un tipo desconocido es una llamada directa al aplicador, y el unico
+            // desenlace honesto es decirlo en vez de reventar con un NullPointerException.
             throw new NoSePuedeAplicar(
                     "El hecho es de tipo «"
                             + hecho.tipoPublicado()
-                            + "», que este sistema no sabe aplicar. La ingestion lo ignora antes"
+                            + "», que este sistema no sabe aplicar. La ingestion lo decide antes"
                             + " de llegar aqui (ver IngestarHechosDeCatastro y el javadoc de"
                             + " TipoDeHechoDeCatastro)");
         }
-        if (!anotarEnElBuzon(hecho, cuando)) {
-            return Aplicacion.YA_APLICADO;
+        try {
+            if (!anotarEnElBuzon(hecho, cuando)) {
+                return Aplicacion.YA_APLICADO;
+            }
+            // El `default` esta por Checkstyle y no sobra: el enumerado es una COPIA del de
+            // `catastro` (ver `TipoDeHechoDeCatastro`), y el dia que alguien le anada un valor sin
+            // escribir su rama aqui, esto tiene que fallar en vez de no escribir nada y devolver
+            // «aplicado».
+            return switch (tipo) {
+                case PREDIO_PROYECTADO -> aplicarPredio(hecho, cuando);
+                case VALUACION_PUBLICADA -> aplicarValuacion(hecho, cuando);
+                case CORRIDA_CERRADA -> aplicarCorrida(hecho, cuando);
+                default ->
+                        throw new NoSePuedeAplicar(
+                                "El hecho es de tipo «"
+                                        + tipo
+                                        + "» y esta proyeccion no sabe que escribir con el");
+            };
+        } catch (DataIntegrityViolationException rechazo) {
+            // LO QUE LA BASE RECHAZA ES UN «NO SE PUEDE APLICAR» (#377), y la traduccion va AQUI
+            // porque el adaptador es donde el error SQL se convierte en el vocabulario del puerto.
+            // Hasta #377 salia tal cual: la vuelta moria antes del acuse, sin cola de muertos y
+            // sin aviso, y la corrida siguiente volvia a servir primero ESE hecho — la cabeza
+            // atascada, esta vez en rojo. Lo que la cubre: `predio_ref_codigo_uq` (que el
+            // `ON CONFLICT (predio_id)` no cubre), el dominio `cod_catastral`, los `varchar` de
+            // `V4` y el `CHECK` de `V5`. Ya paso una vez con un `varchar(300)`, y el remedio se
+            // aplico solo a esa columna (ver `recortarMotivoDeValuacion`).
+            //
+            // Se relanza EN EL ACTO: `aplicar` corre en `REQUIRES_NEW` (`AplicarUnHecho`), asi
+            // que la transaccion abortada no ejecuta nada mas y se deshace entera —el anotado en
+            // `catastro_evento_aplicado` incluido—. Lo transitorio (`TransientDataAccessException`)
+            // NO es esto y sigue subiendo: reintentarlo si lo arregla.
+            throw new NoSePuedeAplicar(
+                    "La base de datos RECHAZO el hecho: "
+                            + enUnaLinea(rechazo.getMostSpecificCause().getMessage())
+                            + ". Reintentarlo da el mismo rechazo: hay que mirar por que `catastro`"
+                            + " publico algo que esta proyeccion no admite",
+                    rechazo);
         }
-        // El `default` esta por Checkstyle y no sobra: el enumerado es una COPIA del de
-        // `catastro` (ver `TipoDeHechoDeCatastro`), y el dia que alguien le anada un valor sin
-        // escribir su rama aqui, esto tiene que fallar en vez de no escribir nada y devolver
-        // «aplicado».
-        return switch (tipo) {
-            case PREDIO_PROYECTADO -> aplicarPredio(hecho, cuando);
-            case VALUACION_PUBLICADA -> aplicarValuacion(hecho, cuando);
-            case CORRIDA_CERRADA -> aplicarCorrida(hecho, cuando);
-            default ->
-                    throw new NoSePuedeAplicar(
-                            "El hecho es de tipo «"
-                                    + tipo
-                                    + "» y esta proyeccion no sabe que escribir con el");
-        };
     }
 
     @Override
@@ -109,7 +137,9 @@ public class ProyeccionDeCatastroJdbc implements ProyeccionDeCatastro {
                                 .formatted(MUNICIPALIDAD_ACTUAL))
                 .param("evento", hecho.eventoId())
                 .param("secuencia", hecho.secuencia())
-                .param("tipo", hecho.tipoPublicado())
+                // Recortado a `varchar(40)`: lo que se aparta por no saber aplicarlo es,
+                // justamente, un tipo que este sistema no conoce, y su nombre lo pone el emisor.
+                .param("tipo", recortarA(hecho.tipoPublicado(), LARGO_DEL_TIPO))
                 .param("predio", hecho.predioId())
                 .param("ejercicio", hecho.ejercicio())
                 .param("cuerpo", hecho.cuerpo())
@@ -124,7 +154,12 @@ public class ProyeccionDeCatastroJdbc implements ProyeccionDeCatastro {
         Long cuantos =
                 jdbc.sql(
                                 "SELECT count(*) FROM catastro_evento_muerto"
-                                        + " WHERE explicacion IS NULL")
+                                        + " WHERE explicacion IS NULL AND motivo NOT LIKE"
+                                        + " :sinCapacidad")
+                        // Lo apartado por no saber aplicarlo no se cuenta (#377): la cifra va en
+                        // el aviso «la proyeccion del padron esta incompleta», y una manzana no la
+                        // deja incompleta. Siguen en la tabla, con su motivo, para reinyectarlos.
+                        .param("sinCapacidad", PoliticaDeLoQueNoAvanza.SIN_CAPACIDAD + "%")
                         .query(Long.class)
                         .single();
         return cuantos == null ? 0 : cuantos;
@@ -296,10 +331,12 @@ public class ProyeccionDeCatastroJdbc implements ProyeccionDeCatastro {
                         .param("ejercicio", valuacion.ejercicio())
                         .param("predio", valuacion.predioId())
                         .param("corte", valuacion.fechaDeCorte())
-                        .param("terreno", importe(valuacion.valorTerreno()))
-                        .param("construccion", importe(valuacion.valorConstruccion()))
-                        .param("obras", importe(valuacion.valorObras()))
-                        .param("total", importe(valuacion.valorDelPredio()))
+                        .param("terreno", importe(valuacion.valorTerreno(), "valorTerreno"))
+                        .param(
+                                "construccion",
+                                importe(valuacion.valorConstruccion(), "valorConstruccion"))
+                        .param("obras", importe(valuacion.valorObras(), "valorObras"))
+                        .param("total", importe(valuacion.valorDelPredio(), "valorDelPredio"))
                         .param("motivo", recortarMotivoDeValuacion(valuacion.motivo()))
                         .param("llave", valuacion.llaveQueFalta())
                         .param("ficha", valuacion.fichaCatastralId())
@@ -383,14 +420,43 @@ public class ProyeccionDeCatastroJdbc implements ProyeccionDeCatastro {
      *
      * <p>Regla 1 y RNF-055. El emisor lo manda como cadena por lo mismo, y este es el unico sitio
      * donde los bytes se convierten.
+     *
+     * @throws NoSePuedeAplicar si la cadena no es un numero (#377): un {@code
+     *     NumberFormatException} suelto salia de la vuelta antes del acuse, igual que un rechazo de
+     *     la base, y el hecho se quedaba en la cabeza para siempre
      */
-    private static @Nullable BigDecimal importe(@Nullable String texto) {
-        return texto == null || texto.isBlank() ? null : new BigDecimal(texto);
+    private static @Nullable BigDecimal importe(@Nullable String texto, String campo) {
+        if (texto == null || texto.isBlank()) {
+            return null;
+        }
+        try {
+            return new BigDecimal(texto);
+        } catch (NumberFormatException noEsNumero) {
+            throw new NoSePuedeAplicar(
+                    "El importe «" + campo + "» vale «" + texto + "», que no es un numero",
+                    noEsNumero);
+        }
     }
+
+    /** El largo de {@code catastro_evento_muerto.tipo} (`V12`). */
+    private static final int LARGO_DEL_TIPO = 40;
 
     /** El largo de {@code catastro_evento_muerto.motivo}. */
     private static String recortar(String motivo) {
-        return motivo.length() <= 400 ? motivo : motivo.substring(0, 400);
+        return recortarA(motivo, 400);
+    }
+
+    private static String recortarA(String texto, int largo) {
+        return texto.length() <= largo ? texto : texto.substring(0, largo);
+    }
+
+    /**
+     * El mensaje de PostgreSQL en una sola linea: trae su {@code Detail} en otra, y el motivo va a
+     * una columna y a una linea de registro. Lo que importa —el nombre de la restriccion— va
+     * delante, asi que sobrevive al recorte a 400.
+     */
+    private static String enUnaLinea(@Nullable String mensaje) {
+        return mensaje == null ? "sin mensaje" : mensaje.strip().replaceAll("\\s+", " ");
     }
 
     /** El largo de {@code valuacion_predio.motivo} (`V5__valuacion_recibida.sql`). */

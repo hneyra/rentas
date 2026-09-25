@@ -58,7 +58,8 @@ public record HechoRecibido(
      * <p>Se deriva y no se guarda: {@link #tipoPublicado()} es la unica fuente. Un {@code null}
      * aqui <b>no</b> es un fallo — es un tipo del territorio, o el octavo que {@code catastro}
      * publique manana—, y lo que la ingestion hace con el lo dice el javadoc de {@link
-     * TipoDeHechoDeCatastro}: se ignora, se avisa nombrandolo y la vuelta sigue (#54).
+     * TipoDeHechoDeCatastro}: lo decide {@code PoliticaDeLoQueNoAvanza}, y la de produccion lo
+     * aparta con {@code SIN_CAPACIDAD:<tipo>} y lo acusa (#54, #377).
      */
     public @Nullable TipoDeHechoDeCatastro tipo() {
         return TipoDeHechoDeCatastro.declarado(tipoPublicado);

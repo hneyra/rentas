@@ -198,7 +198,10 @@ class ImplantarMunicipalidadTest {
                         buzon.raiz(),
                         CredencialDeServicio.fija("Bearer el-token-de-servicio"));
         return new PasadaDelConsumidorDeIdentidad(
-                new ConsumirEventosDeIdentidad(cliente, aplicador, alerta), alerta, RELOJ);
+                new ConsumirEventosDeIdentidad(
+                        cliente, aplicador, alerta, PasadaDelConsumidorDeIdentidad.POLITICA, RELOJ),
+                alerta,
+                RELOJ);
     }
 
     private static ObjectProvider<PasadaDelConsumidorDeIdentidad> hay(
@@ -967,6 +970,14 @@ class ImplantarMunicipalidadTest {
         public void hayPospuestosQueNoAvanzan(
                 List<EventoPospuesto> lista, Instant ahora, java.time.Duration umbral) {
             pospuestos.add(lista.size() + " pospuestos");
+        }
+
+        @Override
+        public void laColaEstaBloqueada(
+                kamayuk.rentas.plataforma.EstadoDeLaCola.Bloqueada bloqueada,
+                List<EventoPospuesto> enLaCabeza,
+                java.time.Duration umbral) {
+            pospuestos.add("COLA BLOQUEADA: " + bloqueada);
         }
     }
 }

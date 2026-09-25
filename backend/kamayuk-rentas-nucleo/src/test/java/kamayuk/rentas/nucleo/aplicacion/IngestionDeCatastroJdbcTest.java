@@ -40,8 +40,10 @@ import kamayuk.rentas.nucleo.infraestructura.ingestor.AlertaAlCanalDelResponsabl
 import kamayuk.rentas.nucleo.infraestructura.ingestor.ClienteHttpDelBuzonDeCatastro;
 import kamayuk.rentas.nucleo.infraestructura.ingestor.CuerpoDelHecho;
 import kamayuk.rentas.nucleo.infraestructura.ingestor.ProyeccionDeCatastroJdbc;
-import kamayuk.rentas.nucleo.infraestructura.ingestor.ResponsableDeLaProyeccion;
 import kamayuk.rentas.plataforma.CredencialDeServicio;
+import kamayuk.rentas.plataforma.EstadoDeLaCola;
+import kamayuk.rentas.plataforma.PoliticaDeLoQueNoAvanza;
+import kamayuk.rentas.plataforma.ResponsableDeOperacion;
 import kamayuk.rentas.plataforma.tenant.TenantTransactionManager;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -134,6 +136,9 @@ class IngestionDeCatastroJdbcTest {
     /** Lo que el consumidor acuso. */
     private static final Set<String> ACUSADOS = Collections.synchronizedSet(new HashSet<>());
 
+    /** Cuantas paginas sirvio el buzon: es lo que dice cuantas vueltas dio el runner (#377). */
+    private static final AtomicInteger PAGINAS_SERVIDAS = new AtomicInteger();
+
     private static List<String> hechosDeCatastro;
     private static TenantTransactionManager gestorDelIngestor;
     private static TenantTransactionManager gestorDeLaAplicacion;
@@ -194,17 +199,27 @@ class IngestionDeCatastroJdbcTest {
                                 new ValuacionRecibidaJdbc(JdbcClient.create(poolDeLaAplicacion))),
                         gestorDeLaAplicacion);
 
-        ingestor =
-                new IngestarHechosDeCatastro(
-                        new ClienteHttpDelBuzonDeCatastro(
-                                json, buzonDeCatastro.raiz(), CredencialDeServicio.fija("")),
-                        aplicador,
-                        new AlertaAlCanalDelResponsable(
-                                json,
-                                new ResponsableDeLaProyeccion(
-                                        "Responsable de Catastro (padron y valuacion)",
-                                        canalDelResponsable.raiz() + "/aviso")),
-                        Clock.fixed(AHORA, ZoneOffset.UTC));
+        ingestor = ingestorCon(PoliticaDeLoQueNoAvanza.apartarLoQueNoSeSabeAplicar());
+    }
+
+    /**
+     * El ingestor de la prueba con ESTA politica. La de produccion es la que aparta en el acto
+     * ({@code ConfiguracionDelIngestor}); la que espera siempre es la que habia antes de #377, y es
+     * la unica con la que se puede ver una cola BLOQUEADA.
+     */
+    private static IngestarHechosDeCatastro ingestorCon(PoliticaDeLoQueNoAvanza politica) {
+        return new IngestarHechosDeCatastro(
+                new ClienteHttpDelBuzonDeCatastro(
+                        json, buzonDeCatastro.raiz(), CredencialDeServicio.fija("")),
+                aplicador,
+                new AlertaAlCanalDelResponsable(
+                        json,
+                        new ResponsableDeOperacion(
+                                "Responsable de Catastro (padron y valuacion)",
+                                canalDelResponsable.raiz() + "/aviso",
+                                "falta el responsable")),
+                politica,
+                Clock.fixed(AHORA, ZoneOffset.UTC));
     }
 
     @AfterAll
@@ -228,6 +243,7 @@ class IngestionDeCatastroJdbcTest {
         APORTAR.clear();
         ACUSADOS.clear();
         AVISOS.clear();
+        PAGINAS_SERVIDAS.set(0);
         ANOTADOS.list.clear();
         municipalidad =
                 DatosDePrueba.crearMunicipalidad(
@@ -539,49 +555,38 @@ class IngestionDeCatastroJdbcTest {
     }
 
     /**
-     * Lo que le pasa a la ingestion con lo que {@code catastro} publica de verdad (#54).
+     * Lo que le pasa a la ingestion con lo que {@code catastro} publica de verdad (#54, #377).
      *
-     * <h2>Esta prueba se PUSO ROJA, que es lo que se le pedia, y esta es su otra mitad</h2>
+     * <h2>Esta prueba se ha invertido DOS veces, y esta es la segunda</h2>
      *
-     * <p><b>Las cuatro cifras que afirmaba son las mismas, y las cuatro estan invertidas.</b> La
-     * version que #51 dejo escrita fijaba el defecto para que el dia que #54 se cerrase saliera
-     * roja y se leyera; ese dia es este, y su enunciado —«un tipo que este sistema no sabe aplicar
-     * PARA la ingestion entera, sin avisar»— describe lo que este PR retira. No se borra en
-     * silencio: se conserva aqui lo que media, cifra a cifra, con lo que hoy afirma cada una.
+     * <p>#51 la dejo fijando el defecto —un tipo que no se sabe aplicar PARABA la ingestion entera—
+     * y #54 la invirtio: se ignoraba con un {@code WARN}, <b>sin acusarse</b>, y la cola de muertos
+     * se quedaba en cero porque «es para lo que no se podra aplicar nunca». Esa decision se razono
+     * con una premisa, «el buzon entero viene en una pagina», que #377 midio falsa: el emisor sirve
+     * como mucho 200, y 200 hechos del territorio en la cabeza dejaban fuera al padron de detras
+     * para siempre ({@link #conDoscientosDelTerritorioDelanteElPredioLlega}).
+     *
+     * <p>Lo que cambia, cifra a cifra, con lo que hoy afirma cada una:
      *
      * <ul>
-     *   <li>{@code aplicados = 0} —se perdia la pagina entera, con los hechos del padron que iban
-     *       DELANTE dentro— es hoy <b>{@code aplicados = 2}</b>, y se mide sobre las FILAS ({@code
-     *       predio_ref} y {@code ficha_ref}) y no sobre el codigo de salida.
-     *   <li>{@code acusados = 0} —la vuelta siguiente traia lo mismo y volvia a morir— es hoy
-     *       <b>los dos predios y solo ellos</b>: el hecho que no se sabe aplicar <b>sigue sin
-     *       acusarse</b>, y eso deja de ser el defecto para ser la decision — el emisor lo conserva
-     *       para el dia que exista quien lo aplique.
-     *   <li>{@code muertos = 0} sigue siendo cero, y ha cambiado de significado: ya no es «se queda
-     *       bloqueando la cola sin apartarse» sino «no se aparta PORQUE no procede». La cola de
-     *       {@code unHechoImposibleSeApartaYAvisa} es para lo que no se podra aplicar <i>nunca</i>;
-     *       aqui el hecho esta bien y lo que falta es la capacidad.
-     *   <li>{@code avisos = 0} sigue siendo cero por el canal de {@code AlertaDeHechosSinAplicar}
-     *       —ese avisa de hechos APARTADOS, y «la proyeccion del padron esta incompleta» es falso
-     *       de un hecho del territorio— y pasa a haber un <b>{@code WARN} por hecho que lo
-     *       nombra</b>. Es lo unico que separa «se ignora» de «se pierde sin que nadie se entere»,
-     *       y sin el todo lo demas de esta prueba sigue en verde: medido en la rotura R2.
+     *   <li>{@code aplicados = 2} y las FILAS de {@code predio_ref} y {@code ficha_ref}: <b>no
+     *       cambian</b>. El padron de la misma pagina entra, que es lo que #54 cerro.
+     *   <li>{@code acusados}: eran los dos predios y solo ellos; ahora son <b>todos</b>. Lo que no
+     *       se sabe aplicar deja de ocupar la cabeza.
+     *   <li>{@code muertos}: los apartados por capacidad van a la cola con {@code
+     *       SIN_CAPACIDAD:<tipo>} —no se pierden: el cuerpo queda entero alli para reinyectarlo—, y
+     *       se cuentan aparte ({@code sinCapacidad}), no como {@code muertos}.
+     *   <li>{@code avisos = 0} al responsable <b>sigue</b> siendo cero: su aviso dice que el padron
+     *       esta incompleto, y de una manzana es falso. Lo que hay es UNA linea {@code WARN} por
+     *       vuelta que dice cuantos y de que tipos: sin ella, «se aparto» y «se perdio» no se
+     *       distinguen.
      * </ul>
-     *
-     * <p>La decision —ignorar con aviso, de las tres salidas del issue— es de la direccion, y su
-     * porque esta en el javadoc de {@link IngestarHechosDeCatastro} y en el de {@link
-     * kamayuk.rentas.nucleo.dominio.proyeccion.TipoDeHechoDeCatastro}.
      */
     @Test
     @DisplayName(
-            "#54: un tipo que no se sabe aplicar se IGNORA con su aviso, y el padron de la MISMA"
-                    + " pagina ENTRA")
-    void loQueNoSeSabeAplicarSeIgnoraYElPadronDeLaMismaPaginaEntra() throws SQLException {
-        // ESTA ES LA MEDIDA DEL ISSUE, INVERTIDA. Antes de #54 el rechazo ocurria al ARMAR el lote
-        // —dentro de `pendientes()`— y con `POR_VUELTA = 200` el buzon entero viene en una pagina,
-        // asi que un solo hecho del territorio mataba la vuelta ENTERA: aplicados 0, acusados 0,
-        // muertos 0 y avisos 0, con los DOS predios que iban delante dentro.
-        //
+            "#377: un tipo que no se sabe aplicar se APARTA con SIN_CAPACIDAD y se acusa, y el"
+                    + " padron de la MISMA pagina ENTRA")
+    void loQueNoSeSabeAplicarSeApartaYElPadronDeLaMismaPaginaEntra() throws SQLException {
         // Y LO QUE SE MIDE SON LAS FILAS, no el codigo de salida: «la ingestion no revienta» pasa
         // en verde con la cola entera descartada en silencio.
         List<String> ajenos = tiposQueCatastroPublicaYAquiNoSeAplican();
@@ -592,88 +597,81 @@ class IngestionDeCatastroJdbcTest {
                                 + " nada: entonces lo que sobra es ella, no la guarda")
                 .isNotEmpty();
 
-        // El orden importa: los del padron DELANTE, que es lo que el issue midio perdiendose.
+        // El orden importa: los del padron DELANTE, que es lo que #54 midio perdiendose.
         APORTAR.addAll(deTipo("PREDIO_PROYECTADO"));
         APORTAR.addAll(ajenos);
 
         IngestarHechosDeCatastro.Vuelta vuelta = ingestor.ingerir();
 
         assertThat(vuelta.leidos()).isEqualTo(2 + ajenos.size());
-        assertThat(vuelta.ignorados())
-                .as(
-                        "se IGNORAN: ni se aplican, ni se apartan a la cola de muertos, ni paran la"
-                                + " vuelta. La cola de muertos es para lo que no se podra aplicar"
-                                + " NUNCA; aqui el hecho esta bien y falta la capacidad")
+        assertThat(vuelta.sinCapacidad())
+                .as("se APARTAN: ni se aplican, ni paran la vuelta, ni se quedan en la cabeza")
                 .isEqualTo(ajenos.size());
+        assertThat(vuelta.ignorados()).as("y ninguno se queda sin acusar").isZero();
+        assertThat(vuelta.muertos())
+                .as("no son «no se podra aplicar nunca»: se cuentan aparte")
+                .isZero();
         assertThat(vuelta.aplicados())
-                .as("los dos predios que iban en la misma pagina, que antes se iban con ella")
+                .as(
+                        "los dos predios que iban en la misma pagina, que antes de #54 se iban con ella")
                 .isEqualTo(2);
         assertThat(contar("predio_ref")).as("y estan ESCRITOS, no contados").isEqualTo(2);
         assertThat(contar("ficha_ref")).isEqualTo(5);
-
-        // NI SE APLICAN NI SE APARTAN. La cola de muertos es para lo que no se podra aplicar
-        // NUNCA; aqui el hecho esta bien y lo que falta es la capacidad.
-        assertThat(vuelta.muertos()).isZero();
-        assertThat(contar("catastro_evento_muerto")).isZero();
         assertThat(contar("catastro_evento_aplicado"))
-                .as("solo los dos predios: un hecho ignorado no se anota como aplicado")
+                .as("solo los dos predios: un hecho apartado no se anota como aplicado")
                 .isEqualTo(2);
+
+        // EN LA COLA DE MUERTOS, cada uno con su tipo en el motivo: es lo que permite
+        // reinyectarlos el dia que exista quien los aplique, y separarlos de lo imposible.
+        assertThat(motivosDeLosMuertos())
+                .as("uno por hecho, con SIN_CAPACIDAD:<tipo>")
+                .hasSize(ajenos.size())
+                .allMatch(motivo -> motivo.startsWith(PoliticaDeLoQueNoAvanza.SIN_CAPACIDAD));
+        for (String tipo : tiposDeLosHechos(ajenos)) {
+            assertThat(motivosDeLosMuertos())
+                    .contains(PoliticaDeLoQueNoAvanza.SIN_CAPACIDAD + tipo);
+        }
+        assertThat(aplicador.muertosSinExplicar())
+                .as(
+                        "y no cuentan como «la proyeccion del padron esta incompleta»: esa cifra va"
+                                + " en el aviso al responsable, y una manzana no la deja incompleta")
+                .isZero();
         assertThat(AVISOS).as("no se avisa al responsable: no hay nada roto que atender").isEmpty();
 
-        // Y NO SE ACUSA, que es lo que deja el hecho pendiente en el buzon del emisor para el dia
-        // que exista quien lo aplique.
-        assertThat(ACUSADOS)
-                .as("solo los dos predios")
-                .containsExactlyInAnyOrderElementsOf(identidadesDe(deTipo("PREDIO_PROYECTADO")));
+        // SE ACUSAN TODOS: lo que no se sabe aplicar deja de ocupar la cabeza del buzon.
+        List<String> todos = new ArrayList<>(deTipo("PREDIO_PROYECTADO"));
+        todos.addAll(ajenos);
+        assertThat(ACUSADOS).containsExactlyInAnyOrderElementsOf(identidadesDe(todos));
 
-        // LA OTRA MITAD, sin la cual «se ignora» y «se pierde sin que nadie se entere» son
-        // indistinguibles: cada uno deja su WARN, y el WARN lo NOMBRA.
-        List<String> ignorados = avisosDeIgnorados();
-        assertThat(ignorados)
-                .as(
-                        "sin el aviso, «se ignora» y «se pierde sin que nadie se entere» son"
-                                + " indistinguibles: todo lo de arriba —las filas que entran, lo que no"
-                                + " se acusa, lo que no se aparta— sigue siendo cierto con la cola"
-                                + " descartada en silencio")
-                .hasSize(ajenos.size());
+        // LA OTRA MITAD: UNA linea por vuelta, que dice cuantos y de que tipos.
+        List<String> apartados = avisosDeApartadosSinCapacidad();
+        assertThat(apartados)
+                .as("una linea por vuelta, no una por hecho: la carga del territorio son miles")
+                .hasSize(1);
         for (String tipo : tiposDeLosHechos(ajenos)) {
-            assertThat(ignorados)
-                    .as("el aviso nombra el tipo concreto, o no sirve para implementarlo despues")
-                    .anyMatch(aviso -> aviso.contains("«" + tipo + "»"));
+            assertThat(apartados.getFirst())
+                    .as("la linea nombra el tipo concreto, o no sirve para implementarlo despues")
+                    .contains(tipo);
         }
-        for (String aviso : ignorados) {
-            assertThat(aviso)
-                    .contains("IGNORADO")
-                    .contains("no sabe aplicarlo")
-                    .contains("NO es un fallo")
-                    .as("dice donde esta escrito el contrato de tipos")
-                    .contains("TipoDeHechoDeCatastro");
-        }
+        assertThat(apartados.getFirst())
+                .contains("NO es un fallo")
+                .contains("catastro_evento_muerto");
 
-        // Y LA VUELTA SIGUIENTE NO PROGRESA, que es lo que impide que el runner de las cincuenta
-        // vueltas sobre los mismos hechos: se vuelven a leer —no se acusaron— y no se resuelve
-        // ninguno.
+        // Y LA VUELTA SIGUIENTE VIENE VACIA: nada se quedo en la cabeza.
         IngestarHechosDeCatastro.Vuelta otra = ingestor.ingerir();
-        assertThat(otra.leidos()).isEqualTo(ajenos.size());
-        assertThat(otra.aplicados()).isZero();
-        assertThat(otra.sinProgreso())
-                .as(
-                        "sin esto el runner daria sus 50 vueltas sobre los mismos hechos, avisando"
-                                + " 50 veces de lo mismo: «el lote vino vacio» NO se cumple nunca"
-                                + " cuando lo que queda no se acusa")
-                .isTrue();
+        assertThat(otra.leidos()).isZero();
+        assertThat(otra.estado()).isEqualTo(EstadoDeLaCola.VACIA);
     }
 
     @Test
     @DisplayName(
-            "#54: y lo que va DETRAS del ignorado tambien ENTRA — se ignora UN hecho, no el resto"
-                    + " de la pagina")
-    void loQueVaDetrasDelIgnoradoTambienEntra() throws SQLException {
-        // LA OTRA DIRECCION, y sin ella un `break` donde hay un `continue` pasa en VERDE: las
-        // otras dos pruebas de #54 ponen los tipos que no se saben aplicar AL FINAL de la pagina
-        // —que es como llegan hoy en el lote del emisor—, asi que ahi «se ignora y la vuelta
-        // sigue» y «se ignora y se corta la vuelta» dan exactamente el mismo resultado. Aqui el
-        // ignorado va PRIMERO y lo que se mide es lo que hay detras de el.
+            "#54: y lo que va DETRAS del que no se sabe aplicar tambien ENTRA — se aparta UN hecho,"
+                    + " no el resto de la pagina")
+    void loQueVaDetrasDelQueNoSeSabeAplicarTambienEntra() throws SQLException {
+        // LA OTRA DIRECCION, y sin ella un `break` donde hay un `continue` pasa en VERDE: la prueba
+        // de arriba pone los tipos que no se saben aplicar AL FINAL de la pagina —que es como
+        // llegan hoy en el lote del emisor—, asi que ahi «sigue» y «se corta la vuelta» dan
+        // exactamente el mismo resultado. Aqui va PRIMERO y lo que se mide es lo que hay detras.
         List<String> ajenos = tiposQueCatastroPublicaYAquiNoSeAplican();
         assertThat(ajenos)
                 .as(
@@ -686,14 +684,16 @@ class IngestionDeCatastroJdbcTest {
 
         IngestarHechosDeCatastro.Vuelta vuelta = ingestor.ingerir();
 
-        assertThat(vuelta.ignorados()).isEqualTo(1);
+        assertThat(vuelta.sinCapacidad()).isEqualTo(1);
         assertThat(vuelta.aplicados())
-                .as("los dos predios van DETRAS del ignorado, y entran igual")
+                .as("los dos predios van DETRAS del apartado, y entran igual")
                 .isEqualTo(2);
         assertThat(contar("predio_ref")).as("y estan ESCRITOS, no contados").isEqualTo(2);
+        List<String> todos = new ArrayList<>(List.of(ajenos.get(0)));
+        todos.addAll(deTipo("PREDIO_PROYECTADO"));
         assertThat(ACUSADOS)
-                .as("los de detras se acusan; el ignorado no")
-                .containsExactlyInAnyOrderElementsOf(identidadesDe(deTipo("PREDIO_PROYECTADO")));
+                .as("los tres: el apartado tambien")
+                .containsExactlyInAnyOrderElementsOf(identidadesDe(todos));
     }
 
     @Test
@@ -711,8 +711,10 @@ class IngestionDeCatastroJdbcTest {
                         "LAS FILAS, y no el codigo de salida: un ingestor que ignorara la cola"
                                 + " ENTERA en silencio no reventaria, y aqui entrarian cero")
                 .isEqualTo(4);
+        assertThat(vuelta.sinCapacidad()).isZero();
         assertThat(vuelta.ignorados()).isZero();
         assertThat(contar("predio_ref")).isEqualTo(2);
+        assertThat(contar("catastro_evento_muerto")).isZero();
         assertThat(ANOTADOS.list)
                 .as("ni un aviso de ninguna clase cuando todo lo que llega se sabe aplicar")
                 .isEmpty();
@@ -720,8 +722,8 @@ class IngestionDeCatastroJdbcTest {
     }
 
     @Test
-    @DisplayName("#54: y el tipo que `catastro` invente MANANA se ignora igual, con su nombre")
-    void unTipoQueCatastroInventeManianaSeIgnoraIgual() throws SQLException {
+    @DisplayName("#54: y el tipo que `catastro` invente MANANA se aparta igual, con su nombre")
+    void unTipoQueCatastroInventeManianaSeApartaIgual() throws SQLException {
         // La propiedad, y no la lista de cuatro: lo que decide no es que tipos hay hoy en el lote
         // sino que este sistema no sabe aplicarlos. El octavo tampoco puede parar la ingestion.
         String inventado = "UN_TIPO_QUE_CATASTRO_INVENTARA";
@@ -731,14 +733,66 @@ class IngestionDeCatastroJdbcTest {
         IngestarHechosDeCatastro.Vuelta vuelta = ingestor.ingerir();
 
         assertThat(vuelta.aplicados()).isEqualTo(2);
-        assertThat(vuelta.ignorados()).isEqualTo(1);
+        assertThat(vuelta.sinCapacidad()).isEqualTo(1);
         assertThat(contar("predio_ref")).isEqualTo(2);
-        assertThat(avisosDeIgnorados())
-                .as("ignorarlo en silencio no se distingue de perderlo")
-                .singleElement(org.assertj.core.api.InstanceOfAssertFactories.STRING)
+        assertThat(motivoDelMuerto())
                 .as("con su nombre TAL COMO LLEGO: es lo unico con lo que se puede implementar")
-                .contains("«" + inventado + "»")
-                .contains("IGNORADO");
+                .isEqualTo(PoliticaDeLoQueNoAvanza.SIN_CAPACIDAD + inventado);
+        assertThat(avisosDeApartadosSinCapacidad())
+                .as("apartarlo en silencio no se distingue de perderlo")
+                .singleElement(org.assertj.core.api.InstanceOfAssertFactories.STRING)
+                .contains(inventado);
+    }
+
+    @Test
+    @DisplayName(
+            "#377: con una politica que ESPERA y 200 en la cabeza, la cola esta BLOQUEADA y la"
+                    + " corrida sale distinto de cero nombrando la cabeza")
+    void conUnaPoliticaQueEsperaLaColaBloqueadaSaleEnRojo() throws SQLException {
+        // La que habia antes de #377, puesta a proposito: con la de produccion lo que no se sabe
+        // aplicar se aparta y la cabeza no se llena nunca. Esta prueba es la que dice que, si algun
+        // dia vuelve una salida que no acusa, la corrida NO sale en verde con el padron parado.
+        for (int secuencia = 1; secuencia <= 200; secuencia++) {
+            APORTAR.add(manzana(secuencia));
+        }
+        APORTAR.add(conSecuencia(deTipo("PREDIO_PROYECTADO").get(0), 201));
+        CorrerElIngestor runner =
+                new CorrerElIngestor(
+                        ingestorCon(PoliticaDeLoQueNoAvanza.esperarSiempre()), municipalidad);
+
+        assertThatThrownBy(() -> runner.run(null))
+                .as(
+                        "hasta #377 esto salia con codigo 0: 200 ignorados, «sin progreso», y el"
+                                + " predio de detras sin leer en esta corrida y en todas")
+                .isInstanceOf(CorrerElIngestor.ColaBloqueada.class)
+                .hasMessageContaining("COLA BLOQUEADA")
+                .hasMessageContaining("desde la secuencia 1")
+                .hasMessageContaining("200 hecho(s) que no avanzan")
+                .hasMessageContaining("1 detras");
+        assertThat(PAGINAS_SERVIDAS.get())
+                .as("una sola pagina: la segunda traeria las mismas 200")
+                .isEqualTo(1);
+        assertThat(contar("predio_ref")).as("el predio sigue sin llegar, y ahora se DICE").isZero();
+    }
+
+    @Test
+    @DisplayName(
+            "#377, EL CONTRASTE: con la misma politica y NADA detras, no esta bloqueada y sale bien")
+    void conUnaPoliticaQueEsperaYNadaDetrasNoEstaBloqueada() throws SQLException {
+        // Sin esto, un runner que lanzara SIEMPRE que la vuelta no progresa pasaria la prueba de
+        // arriba — y convertiria en rojo el caso de #54: lo que queda sin resolver es todo lo que
+        // hay, y esperar no para a nadie.
+        for (int secuencia = 1; secuencia <= 5; secuencia++) {
+            APORTAR.add(manzana(secuencia));
+        }
+        CorrerElIngestor runner =
+                new CorrerElIngestor(
+                        ingestorCon(PoliticaDeLoQueNoAvanza.esperarSiempre()), municipalidad);
+
+        runner.run(null);
+
+        assertThat(ACUSADOS).as("la politica espera: no se acusa ninguno").isEmpty();
+        assertThat(avisosDeIgnorados()).as("y cada uno deja su WARN, como en #54").hasSize(5);
     }
 
     @Test
@@ -759,6 +813,158 @@ class IngestionDeCatastroJdbcTest {
                 .isInstanceOf(FuenteDeHechosDeCatastro.CatastroNoContesta.class)
                 .hasMessageContaining("no tiene la forma de un hecho");
         assertThat(ACUSADOS).as("no se acusa nada: la vuelta siguiente lo reintenta").isEmpty();
+    }
+
+    // ------------------------------------------------------------------
+    // #377: la cabeza de la cola
+
+    @Test
+    @DisplayName(
+            "#377: con 200 hechos del territorio DELANTE, el predio de detras LLEGA — y la corrida"
+                    + " no sale en verde con la proyeccion parada")
+    void conDoscientosDelTerritorioDelanteElPredioLlega() throws SQLException {
+        // LA SIEMBRA QUE DISTINGUE. `catastro` publica la carga del territorio antes que el padron:
+        // 200 `MANZANA_PUBLICADA` (secuencias 1 a 200) y, DETRAS, un `PREDIO_PROYECTADO`. El buzon
+        // sirve 200 por pagina, asi que la primera pagina son las 200 manzanas y nada mas. Hasta
+        // #377 se ignoraban sin acusarse, la vuelta contaba «sin progreso», el runner salia con
+        // codigo 0 y la pagina siguiente —la de todas las corridas siguientes— eran LAS MISMAS
+        // 200: el predio no llegaba nunca, y nada lo decia.
+        for (int secuencia = 1; secuencia <= 200; secuencia++) {
+            APORTAR.add(manzana(secuencia));
+        }
+        String predio = conSecuencia(deTipo("PREDIO_PROYECTADO").get(0), 201);
+        APORTAR.add(predio);
+
+        new CorrerElIngestor(ingestor, municipalidad).run(null);
+
+        assertThat(contar("predio_ref"))
+                .as(
+                        "el predio de DETRAS de las 200 manzanas esta escrito: sin eso la proyeccion"
+                                + " del padron queda congelada con el CronJob en verde")
+                .isEqualTo(1);
+        assertThat(ACUSADOS)
+                .as("las 200 manzanas y el predio: nada ocupa la cabeza para siempre")
+                .hasSize(201)
+                .contains(json.readTree(predio).path("eventoId").asString());
+    }
+
+    @Test
+    @DisplayName("#377, EL CONTROL: con 199 delante el predio cabe en la primera pagina y entra")
+    void conCientoNoventaYNueveDelanteElPredioEntra() throws SQLException {
+        // Sin este control, la prueba de arriba no distingue «la cabeza se atasca» de «el predio
+        // no se aplica nunca»: con 199 el predio viaja en la PRIMERA pagina, y entra hoy y antes.
+        for (int secuencia = 1; secuencia <= 199; secuencia++) {
+            APORTAR.add(manzana(secuencia));
+        }
+        APORTAR.add(conSecuencia(deTipo("PREDIO_PROYECTADO").get(0), 200));
+
+        new CorrerElIngestor(ingestor, municipalidad).run(null);
+
+        assertThat(contar("predio_ref")).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName(
+            "#377: lo que la BASE rechaza va a la cola de muertos nombrando la restriccion, se acusa,"
+                    + " se avisa, y el hecho de detras SE APLICA")
+    void loQueLaBaseRechazaSeAparta() throws Exception {
+        // `catastro` da al predio nuevo el codigo catastral de OTRO predio que sigue en
+        // `predio_ref`.
+        // El `ON CONFLICT (municipalidad_id, predio_id)` no cubre `predio_ref_codigo_uq`, asi que
+        // sale un `DuplicateKeyException` que hasta #377 no era `NoSePuedeAplicar`: la vuelta moria
+        // sin acusar nada, sin cola de muertos y sin aviso, y la siguiente volvia a servir primero
+        // ese mismo hecho.
+        List<String> predios = deTipo("PREDIO_PROYECTADO");
+        String primero = predios.get(0);
+        String segundo = conCodigoCatastral(predios.get(1), codigoCatastralDe(primero));
+        String detras = deTipo("CORRIDA_CERRADA").get(0);
+        APORTAR.add(primero);
+        APORTAR.add(segundo);
+        APORTAR.add(detras);
+
+        IngestarHechosDeCatastro.Vuelta vuelta = ingestor.ingerir();
+
+        assertThat(vuelta.aplicados()).as("el primer predio y el cierre de detras").isEqualTo(2);
+        assertThat(vuelta.muertos()).isEqualTo(1);
+        assertThat(contar("predio_ref")).isEqualTo(1);
+        assertThat(contar("valuacion_corrida"))
+                .as("el hecho de DETRAS se aplica: el rechazado ya no bloquea la cola")
+                .isEqualTo(1);
+        assertThat(contar("catastro_evento_muerto")).isEqualTo(1);
+        assertThat(motivoDelMuerto())
+                .as("el motivo NOMBRA la restriccion: es lo que dice donde mirar")
+                .contains("predio_ref_codigo_uq");
+        assertThat(ACUSADOS)
+                .as("los tres: el apartado tambien, que es lo que lo saca de la cabeza")
+                .containsExactlyInAnyOrderElementsOf(
+                        identidadesDe(List.of(primero, segundo, detras)));
+        assertThat(esperaUnAviso())
+                .contains("LA PROYECCION DEL PADRON ESTA INCOMPLETA")
+                .contains("predio_ref_codigo_uq");
+    }
+
+    /** Un hecho del territorio: `catastro` lo publica y este sistema no sabe aplicarlo. */
+    private static String manzana(long secuencia) {
+        return """
+                {"eventoId": "%s", "secuencia": %d, "tipo": "MANZANA_PUBLICADA",
+                 "predioId": null, "ejercicio": null, "cuerpo": "{}",
+                 "huella": "%s", "emitidoEn": "2026-03-01T10:00:00Z"}
+                """
+                .formatted(UUID.randomUUID(), secuencia, "f".repeat(64));
+    }
+
+    /** El mismo hecho, con otra secuencia: la cola del emisor esta ordenada por ella. */
+    private static String conSecuencia(String hecho, long secuencia) {
+        ObjectNode evento = (ObjectNode) json.readTree(hecho);
+        evento.put("secuencia", secuencia);
+        return json.writeValueAsString(evento);
+    }
+
+    private static String codigoCatastralDe(String hecho) {
+        return json.readTree(json.readTree(hecho).path("cuerpo").asString())
+                .path("codigoRefCatastral")
+                .asString();
+    }
+
+    /**
+     * El mismo predio con el codigo catastral de OTRO. Con Jackson, por lo de {@link #conMotivo}.
+     */
+    private static String conCodigoCatastral(String hecho, String codigo) {
+        ObjectNode evento = (ObjectNode) json.readTree(hecho);
+        ObjectNode cuerpo = (ObjectNode) json.readTree(evento.path("cuerpo").asString());
+        cuerpo.put("codigoRefCatastral", codigo);
+        evento.put("cuerpo", json.writeValueAsString(cuerpo));
+        return json.writeValueAsString(evento);
+    }
+
+    /** La linea de resumen de los apartados por capacidad, ya interpolada (#377). */
+    private static List<String> avisosDeApartadosSinCapacidad() {
+        List<String> avisos = new ArrayList<>();
+        for (var anotado : ANOTADOS.list) {
+            if (anotado.getLevel() == ch.qos.logback.classic.Level.WARN
+                    && anotado.getFormattedMessage().contains("APARTADOS")) {
+                avisos.add(anotado.getFormattedMessage());
+            }
+        }
+        return avisos;
+    }
+
+    /** Los motivos de la cola de muertos de esta municipalidad. */
+    private static List<String> motivosDeLosMuertos() throws SQLException {
+        List<String> motivos = new ArrayList<>();
+        try (Connection admin = base.conexionAdmin();
+                PreparedStatement sentencia =
+                        admin.prepareStatement(
+                                "SELECT motivo FROM catastro_evento_muerto WHERE municipalidad_id"
+                                        + " = ? ORDER BY secuencia")) {
+            sentencia.setLong(1, municipalidad);
+            try (ResultSet filas = sentencia.executeQuery()) {
+                while (filas.next()) {
+                    motivos.add(filas.getString(1));
+                }
+            }
+        }
+        return motivos;
     }
 
     /** Los avisos de tipo ignorado que el ingestor escribio, ya interpolados. */
@@ -953,8 +1159,21 @@ class IngestionDeCatastroJdbcTest {
         }
     }
 
+    /**
+     * El buzon de `catastro`: lo no acusado, en el orden en que se aporto, y NI UNO MAS que el
+     * {@code ?limite=} que pide el cliente (#377).
+     *
+     * <p><b>Hasta #377 servia la cola ENTERA sin mirar el limite</b>, y esa era la muestra uniforme
+     * que tapaba el defecto: con un buzon que siempre cabe en una pagina, la cabeza no puede
+     * atascarse, y «200 hechos del territorio delante» se leian junto con el predio de detras. El
+     * emisor de verdad sirve {@code ORDER BY secuencia LIMIT :limite}; aqui el orden es el de
+     * {@link #APORTAR}, y quien siembra una cola larga la aporta por secuencia.
+     *
+     * <p>{@code pendientesQueQuedan} es lo que queda DESPUES de esta pagina, que es lo que el
+     * puerto declara ({@code FuenteDeHechosDeCatastro.Lote}).
+     */
     private static String servirElBuzon(String ruta, String peticion) {
-        if (ruta.endsWith("/acuse")) {
+        if (ruta.contains("/acuse")) {
             for (var id : json.readTree(peticion).path("eventoIds")) {
                 ACUSADOS.add(id.asString());
             }
@@ -966,9 +1185,24 @@ class IngestionDeCatastroJdbcTest {
                 sinAcusar.add(hecho);
             }
         }
+        List<String> pagina = sinAcusar.subList(0, Math.min(limiteDe(ruta), sinAcusar.size()));
+        PAGINAS_SERVIDAS.incrementAndGet();
         return "{\"eventos\":["
-                + String.join(",", sinAcusar)
-                + "],\"pendientesQueQuedan\":0,\"aLaFecha\":\"2026-03-02T09:00:00Z\"}";
+                + String.join(",", pagina)
+                + "],\"pendientesQueQuedan\":"
+                + (sinAcusar.size() - pagina.size())
+                + ",\"aLaFecha\":\"2026-03-02T09:00:00Z\"}";
+    }
+
+    /** El {@code ?limite=} de la peticion. Sin el, el buzon no sirve nada: nadie lo pide asi. */
+    private static int limiteDe(String ruta) {
+        java.util.regex.Matcher limite =
+                java.util.regex.Pattern.compile("[?&]limite=(\\d+)").matcher(ruta);
+        if (!limite.find()) {
+            throw new IllegalStateException(
+                    "El cliente pidio el buzon sin ?limite= («" + ruta + "»)");
+        }
+        return Integer.parseInt(limite.group(1));
     }
 
     private static HechoRecibido leer(String evento) {

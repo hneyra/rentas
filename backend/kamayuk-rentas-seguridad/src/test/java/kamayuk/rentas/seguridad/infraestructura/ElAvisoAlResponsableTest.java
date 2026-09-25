@@ -20,6 +20,8 @@ import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import kamayuk.rentas.plataforma.EstadoDeLaCola;
+import kamayuk.rentas.plataforma.ResponsableDeOperacion;
 import kamayuk.rentas.seguridad.dominio.EventoDeIdentidadRecibido;
 import kamayuk.rentas.seguridad.dominio.EventoPospuesto;
 import org.junit.jupiter.api.AfterEach;
@@ -60,8 +62,9 @@ class ElAvisoAlResponsableTest {
     @Test
     @DisplayName("un CORREO es un canal valido: es el que declaran el .env.ejemplo y los stacks")
     void unCorreoEsUnCanalValido() {
-        ResponsableDelConsumidor responsable =
-                new ResponsableDelConsumidor("Guardia de plataforma", CANAL_DEL_AMBIENTE);
+        ResponsableDeOperacion responsable =
+                ConfiguracionDelConsumidorDeIdentidad.responsableDelConsumidor(
+                        "Guardia de plataforma", CANAL_DEL_AMBIENTE);
 
         assertThat(responsable.canal()).isEqualTo(CANAL_DEL_AMBIENTE);
         assertThat(responsable.seLeEntrega())
@@ -122,14 +125,40 @@ class ElAvisoAlResponsableTest {
     }
 
     @Test
+    @DisplayName(
+            "#377: la COLA BLOQUEADA va por el mismo canal, con la cabeza y cuantos esperan detras")
+    void laColaBloqueadaVaPorElMismoCanal() {
+        alertaCon(canal.raiz())
+                .laColaEstaBloqueada(
+                        new EstadoDeLaCola.Bloqueada(7, 200, 3),
+                        List.of(new EventoPospuesto(evento(), "no conoce la cuenta «fantasma»")),
+                        Duration.ofMinutes(15));
+
+        assertThat(canal.esperaElAviso())
+                .contains("COLA BLOQUEADA")
+                .contains("desde la secuencia 7")
+                .as("lo que el aviso de los pospuestos no decia: cuantos esperan DETRAS")
+                .contains("DETRAS esperan 3 evento(s)")
+                .contains("no conoce la cuenta «fantasma»")
+                .endsWith("}");
+        assertThat(canal.recibidos()).as("y no llego un segundo aviso").isEmpty();
+    }
+
+    @Test
     @DisplayName("sin nombre o sin canal el consumidor no arranca, y el mensaje dice las dos")
     void sinResponsableNoArranca() {
-        assertThatThrownBy(() -> new ResponsableDelConsumidor("", CANAL_DEL_AMBIENTE))
+        assertThatThrownBy(
+                        () ->
+                                ConfiguracionDelConsumidorDeIdentidad.responsableDelConsumidor(
+                                        "", CANAL_DEL_AMBIENTE))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("kamayuk.identidad.responsable")
                 .hasMessageContaining("kamayuk.identidad.canal")
                 .hasMessageContaining("A UNA PERSONA CON NOMBRE");
-        assertThatThrownBy(() -> new ResponsableDelConsumidor("Guardia de plataforma", "  "))
+        assertThatThrownBy(
+                        () ->
+                                ConfiguracionDelConsumidorDeIdentidad.responsableDelConsumidor(
+                                        "Guardia de plataforma", "  "))
                 .isInstanceOf(IllegalStateException.class);
     }
 
@@ -138,7 +167,8 @@ class ElAvisoAlResponsableTest {
     private static AlertaAlResponsableDeLaCopiaLocal alertaCon(String canal) {
         return new AlertaAlResponsableDeLaCopiaLocal(
                 JsonMapper.builder().build(),
-                new ResponsableDelConsumidor("Guardia de plataforma", canal));
+                ConfiguracionDelConsumidorDeIdentidad.responsableDelConsumidor(
+                        "Guardia de plataforma", canal));
     }
 
     private static EventoDeIdentidadRecibido evento() {

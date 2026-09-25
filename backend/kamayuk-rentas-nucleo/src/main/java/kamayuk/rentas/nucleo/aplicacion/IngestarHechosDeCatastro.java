@@ -4,11 +4,15 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.TreeMap;
 import java.util.UUID;
 import kamayuk.rentas.nucleo.dominio.proyeccion.FuenteDeHechosDeCatastro;
 import kamayuk.rentas.nucleo.dominio.proyeccion.HechoRecibido;
 import kamayuk.rentas.nucleo.dominio.proyeccion.ProyeccionDeCatastro;
+import kamayuk.rentas.plataforma.EstadoDeLaCola;
+import kamayuk.rentas.plataforma.PoliticaDeLoQueNoAvanza;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -27,7 +31,7 @@ import org.slf4j.LoggerFactory;
  * menos una vez y quien deduplica es el receptor</b>. Acusar antes de confirmar seria lo contrario
  * —el hecho dejaria de servirse sin estar aplicado— y nada lo diria.
  *
- * <h2>Los TRES desenlaces que no son «aplicado» no se tratan igual</h2>
+ * <h2>Los desenlaces que no son «aplicado» no se tratan igual</h2>
  *
  * <table>
  *   <tr><th>Que paso</th><th>Que se hace</th><th>Por que</th></tr>
@@ -36,34 +40,50 @@ import org.slf4j.LoggerFactory;
  *   <tr><td>El hecho no se puede aplicar</td><td>se aparta, SE ACUSA y se avisa a una persona</td>
  *       <td>Reintentarlo no lo arregla y <b>bloquea la cola detras de el</b>: la proyeccion se
  *           quedaria congelada sin un solo error visible</td></tr>
+ *   <tr><td>La base rechaza el hecho —una clave unica, un dominio, un largo, un {@code CHECK}—</td>
+ *       <td>lo mismo: la proyeccion lo traduce a «no se puede aplicar» nombrando la restriccion
+ *       (#377)</td>
+ *       <td>Es un fallo permanente con otra cara: reintentarlo da el mismo rechazo</td></tr>
  *   <tr><td>El tipo del hecho no se sabe aplicar</td>
- *       <td>SE IGNORA con un aviso {@code WARN} que lo nombra, <b>sin acusarlo</b>, y la vuelta
- *           sigue con los demas</td>
- *       <td>No es un fallo del hecho: es una capacidad que todavia no existe (#54)</td></tr>
+ *       <td>lo decide la {@link PoliticaDeLoQueNoAvanza}: la de produccion lo APARTA en el acto
+ *           con {@code SIN_CAPACIDAD:<tipo>} y lo acusa, sin avisar a nadie; una que esperase lo
+ *           dejaria sin acusar</td>
+ *       <td>No es un fallo del hecho: es una capacidad que todavia no existe. Y esperarla no la
+ *           trae: llega con un despliegue, no por el buzon (#377)</td></tr>
  * </table>
  *
- * <h2>El tipo que no se sabe aplicar se IGNORA, y esa fue una decision (#54)</h2>
+ * <h2>El tipo que no se sabe aplicar se APARTA, y eso revierte una decision (#54 → #377)</h2>
  *
  * <p>Hasta #54 ese caso ni siquiera llegaba aqui: el cliente HTTP lanzaba al armar el lote, asi que
- * un solo hecho del territorio mataba la vuelta ENTERA —cero aplicados, con los hechos del padron
- * que iban delante dentro, y cero acusados, de modo que la vuelta siguiente traia lo mismo—. <b>La
- * ingestion del padron quedaba parada y no se destrancaba sola.</b>
+ * un solo hecho del territorio mataba la vuelta ENTERA. #54 decidio ignorarlo <b>sin acusarlo</b>
+ * —«sigue pendiente en el buzon de {@code catastro} y se aplicara el dia que exista quien lo
+ * aplique»— y lo razono con una premisa: «con {@code POR_VUELTA = 200} el buzon entero viene en una
+ * pagina».
  *
- * <p>Ahora se ignora, y las tres partes de eso son deliberadas:
+ * <p><b>Esa premisa era falsa, y #377 lo midio.</b> El emisor sirve lo no acusado por orden y como
+ * mucho {@value #POR_VUELTA}: con 200 hechos del territorio en la cabeza —la carga de las manzanas
+ * va antes que el padron— la pagina entera eran ellos, la vuelta no resolvia nada, el runner paraba
+ * «sin progreso» con codigo 0 y la corrida siguiente traia <b>los mismos 200</b>. Ningun {@code
+ * PREDIO_PROYECTADO}, {@code VALUACION_PUBLICADA} ni {@code CORRIDA_CERRADA} de detras volvia a
+ * aplicarse, y lo unico visible eran avisos {@code WARN}. Antes de llegar a 200 la caida era
+ * gradual: con 150 en la cabeza cada vuelta traia 50 utiles.
+ *
+ * <p>Asi que ahora se <b>aparta a la cola de muertos y se acusa</b>, y las partes de eso tambien
+ * son deliberadas:
  *
  * <ul>
  *   <li><b>No se aplica nada.</b> Aplicarlo a medias dejaria la proyeccion diciendo algo que nadie
- *       escribio.
- *   <li><b>No se acusa.</b> Acusar sin aplicar lo perderia: el emisor no lo vuelve a servir. Sin
- *       acusar, el hecho <b>sigue pendiente en el buzon de {@code catastro}</b> y se aplicara el
- *       dia que exista quien lo aplique.
- *   <li><b>No se aparta a la cola de muertos.</b> Esa es para lo que no se podra aplicar
- *       <i>nunca</i>; aqui el hecho esta bien y lo que falta es la capacidad.
+ *       escribio. Eso no cambia.
+ *   <li><b>Se acusa, y NO se pierde</b>: {@code catastro_evento_muerto} guarda el hecho entero —el
+ *       cuerpo tal como llego, su huella y su secuencia— con el motivo {@code
+ *       SIN_CAPACIDAD:<tipo>}, que lo separa de lo que no se podra aplicar nunca. El dia que exista
+ *       quien lo aplique se reinyecta desde ahi, no desde el emisor.
+ *   <li><b>No se avisa al responsable.</b> Su aviso dice «la proyeccion del padron esta
+ *       incompleta», y de una manzana eso es falso: no hay nada roto que atender. Por la misma
+ *       razon {@code muertosSinExplicar} no los cuenta. Lo que queda es UNA linea {@code WARN} por
+ *       vuelta que dice cuantos y de que tipos, para que «se aparto» no sea indistinguible de «se
+ *       perdio».
  * </ul>
- *
- * <p><b>Y se avisa en {@code WARN}, no en silencio y no como error.</b> Un tipo que se ignora sin
- * dejar rastro es indistinguible de uno que se perdio, que es justo lo que #54 existe para separar.
- * El precio esta dicho: mientras la capacidad no exista, cada vuelta los vuelve a leer y a avisar.
  *
  * <p>Cuales son los tipos que este sistema sabe aplicar esta escrito en el javadoc de {@link
  * kamayuk.rentas.nucleo.dominio.proyeccion.TipoDeHechoDeCatastro}; cuales publica el emisor, en su
@@ -79,21 +99,24 @@ public class IngestarHechosDeCatastro {
     private static final Logger log = LoggerFactory.getLogger(IngestarHechosDeCatastro.class);
 
     /** Cuantos se piden por vuelta. Un lote y no la cola entera: una vuelta tiene que acabar. */
-    private static final int POR_VUELTA = 200;
+    static final int POR_VUELTA = 200;
 
     private final FuenteDeHechosDeCatastro fuente;
     private final AplicarUnHecho aplicador;
     private final AlertaDeHechosSinAplicar alerta;
+    private final PoliticaDeLoQueNoAvanza politica;
     private final Clock reloj;
 
     public IngestarHechosDeCatastro(
             FuenteDeHechosDeCatastro fuente,
             AplicarUnHecho aplicador,
             AlertaDeHechosSinAplicar alerta,
+            PoliticaDeLoQueNoAvanza politica,
             Clock reloj) {
         this.fuente = fuente;
         this.aplicador = aplicador;
         this.alerta = alerta;
+        this.politica = politica;
         this.reloj = reloj;
     }
 
@@ -112,23 +135,45 @@ public class IngestarHechosDeCatastro {
         int descartados = 0;
         int muertos = 0;
         int ignorados = 0;
+        long cabeza = -1;
+        // Por tipo y ordenado, para que la linea de resumen salga igual en dos corridas iguales.
+        Map<String, Integer> sinCapacidad = new TreeMap<>();
 
         for (HechoRecibido hecho : lote.hechos()) {
             if (hecho.tipo() == null) {
+                PoliticaDeLoQueNoAvanza.Decision decision =
+                        politica.decidir(
+                                new PoliticaDeLoQueNoAvanza.LoQueNoAvanza(
+                                        hecho.tipoPublicado(),
+                                        hecho.emitidoEn(),
+                                        "este sistema no sabe aplicar el tipo «"
+                                                + hecho.tipoPublicado()
+                                                + "»"),
+                                cuando);
+                if (decision.aparta()) {
+                    // A la cola de muertos y SE ACUSA: es lo que impide que 200 hechos del
+                    // territorio ocupen la cabeza para siempre (#377). No se avisa a nadie: no
+                    // hay nada roto, y el aviso del responsable diria que el padron esta
+                    // incompleto, que es falso de una manzana.
+                    aplicador.matar(hecho, decision.motivo(), cuando);
+                    sinCapacidad.merge(hecho.tipoPublicado(), 1, Integer::sum);
+                    resueltos.add(hecho.eventoId());
+                    continue;
+                }
                 ignorados++;
+                if (cabeza < 0) {
+                    cabeza = hecho.secuencia();
+                }
                 // WARN, y no ERROR: no hay nada roto que atender. Y no en silencio: un hecho que
-                // se ignora sin dejar rastro es indistinguible de uno que se perdio.
-                //
-                // NO se acusa —el hecho sigue pendiente en el buzon del emisor— y la vuelta SIGUE
-                // con los demas, que es lo unico que #54 tenia que cerrar.
+                // se ignora sin dejar rastro es indistinguible de uno que se perdio. NO se acusa
+                // —la politica decidio esperar— y la vuelta SIGUE con los demas.
                 log.warn(
                         "Hecho {} IGNORADO: `catastro` publica el tipo «{}» (secuencia {}, predio"
-                                + " {}, ejercicio {}) y este sistema todavia no sabe aplicarlo. NO"
-                                + " es un fallo: es una capacidad que no existe. No se aplica nada,"
-                                + " no se acusa —el hecho sigue pendiente en el buzon del emisor,"
-                                + " asi que se aplicara el dia que exista quien lo aplique— y esta"
-                                + " vuelta sigue con los demas. Que tipos sabe aplicar este sistema"
-                                + " esta en el javadoc de TipoDeHechoDeCatastro; cuales publica el"
+                                + " {}, ejercicio {}) y este sistema todavia no sabe aplicarlo, y"
+                                + " la politica decidio esperar. NO es un fallo: es una capacidad"
+                                + " que no existe. No se aplica nada, no se acusa y esta vuelta"
+                                + " sigue con los demas. Que tipos sabe aplicar este sistema esta"
+                                + " en el javadoc de TipoDeHechoDeCatastro; cuales publica el"
                                 + " emisor, en el buzon de `catastro`",
                         hecho.eventoId(),
                         hecho.tipoPublicado(),
@@ -179,6 +224,21 @@ public class IngestarHechosDeCatastro {
             }
         }
 
+        if (!sinCapacidad.isEmpty()) {
+            // UNA linea por vuelta y no una por hecho: la carga del territorio son miles de
+            // manzanas, y un registro que grita en lo normal es el que nadie lee el dia que dice
+            // algo (la leccion de H6 en el consumidor de identidad).
+            log.warn(
+                    "{} hecho(s) de tipos que este sistema todavia no sabe aplicar APARTADOS a la"
+                            + " cola de muertos con motivo {}<tipo> y acusados en esta vuelta: {}."
+                            + " NO es un fallo y no se pierden: el cuerpo entero queda en"
+                            + " catastro_evento_muerto para reinyectarlo el dia que exista quien"
+                            + " lo aplique (#377)",
+                    sinCapacidad.values().stream().mapToInt(Integer::intValue).sum(),
+                    PoliticaDeLoQueNoAvanza.SIN_CAPACIDAD,
+                    sinCapacidad);
+        }
+
         fuente.acusar(List.copyOf(resueltos));
         return new Vuelta(
                 lote.hechos().size(),
@@ -186,8 +246,10 @@ public class IngestarHechosDeCatastro {
                 yaEstaban,
                 descartados,
                 muertos,
+                sinCapacidad.values().stream().mapToInt(Integer::intValue).sum(),
                 ignorados,
-                lote.quedan());
+                lote.quedan(),
+                cabeza);
     }
 
     private static String motivoDe(RuntimeException noSePudo) {
@@ -198,8 +260,14 @@ public class IngestarHechosDeCatastro {
     /**
      * Lo que hizo una vuelta.
      *
-     * @param quedan cuantos le quedaban al emisor tras servir este lote. Es lo que permite decir
-     *     «faltan 9 000» en vez de «faltan», y decidir si hay que dar otra vuelta
+     * @param sinCapacidad los de un tipo que este sistema no sabe aplicar que la politica aparto:
+     *     estan en la cola de muertos y acusados
+     * @param ignorados los de un tipo que no se sabe aplicar que la politica decidio ESPERAR: ni
+     *     aplicados ni acusados, y el emisor los vuelve a servir
+     * @param quedan cuantos le quedaban al emisor tras servir este lote, SIN contarlo (el puerto lo
+     *     declara asi). Es lo que permite decir «faltan 9 000» en vez de «faltan», y lo que separa
+     *     una cola al dia de una BLOQUEADA
+     * @param cabeza la secuencia del primer hecho que se quedo sin acusar, o {@code -1} si no hubo
      */
     public record Vuelta(
             int leidos,
@@ -207,11 +275,18 @@ public class IngestarHechosDeCatastro {
             int yaEstaban,
             int descartados,
             int muertos,
+            int sinCapacidad,
             int ignorados,
-            long quedan) {
+            long quedan,
+            long cabeza) {
 
         public Vuelta {
             Objects.requireNonNull(Integer.valueOf(leidos), "la vuelta cuenta lo que leyo");
+        }
+
+        /** Cuantos se acusaron: todo lo leido menos lo que la politica decidio esperar. */
+        public int resueltos() {
+            return leidos - ignorados;
         }
 
         /**
@@ -219,13 +294,20 @@ public class IngestarHechosDeCatastro {
          *
          * <p><b>No es «no leyo nada», y la diferencia la introdujo #54.</b> Un hecho ignorado se
          * lee y <b>no se acusa</b>, asi que el emisor lo vuelve a servir en la vuelta siguiente:
-         * con un buzon donde solo quedan tipos que este sistema no sabe aplicar, «leidos == 0» no
-         * se cumple <b>nunca</b> y quien de vueltas hasta vaciarlo daria las cincuenta, avisando
-         * cincuenta veces de lo mismo y acabando con «se agotaron las vueltas» sobre un buzon del
-         * que ya se ha traido todo lo que se sabe aplicar.
+         * con un buzon donde solo queda eso, «leidos == 0» no se cumple <b>nunca</b> y quien de
+         * vueltas hasta vaciarlo daria las cincuenta, avisando cincuenta veces de lo mismo.
+         *
+         * <p><b>Y «sin progreso» no es «nada que hacer»: eso lo dice {@link #estado()}</b> (#377).
+         * Si la pagina vino llena de ignorados y el emisor tiene mas detras, lo de detras no se lee
+         * nunca.
          */
         public boolean sinProgreso() {
-            return leidos == ignorados;
+            return resueltos() == 0;
+        }
+
+        /** Vacia, al dia, o BLOQUEADA en su cabeza con lo que espera detras (#377). */
+        public EstadoDeLaCola estado() {
+            return EstadoDeLaCola.alTerminarLaVuelta(leidos, resueltos(), quedan, cabeza);
         }
 
         @Override
@@ -240,10 +322,13 @@ public class IngestarHechosDeCatastro {
                     + " descartados por viejos, "
                     + muertos
                     + " sin poder aplicar, "
+                    + sinCapacidad
+                    + " apartados por tipo que este sistema no sabe aplicar, "
                     + ignorados
-                    + " ignorados por tipo que este sistema no sabe aplicar; quedan "
+                    + " ignorados sin acusar; quedan "
                     + quedan
-                    + " en el buzon del emisor";
+                    + " en el buzon del emisor detras de este lote; la cola esta "
+                    + estado();
         }
     }
 }

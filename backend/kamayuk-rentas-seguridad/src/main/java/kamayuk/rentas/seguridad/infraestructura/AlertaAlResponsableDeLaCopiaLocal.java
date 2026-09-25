@@ -1,16 +1,15 @@
 package kamayuk.rentas.seguridad.infraestructura;
 
-import java.io.IOException;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import kamayuk.rentas.plataforma.CanalDeAvisos;
+import kamayuk.rentas.plataforma.EstadoDeLaCola;
+import kamayuk.rentas.plataforma.ResponsableDeOperacion;
 import kamayuk.rentas.seguridad.dominio.AlertaDeEventosSinAplicar;
 import kamayuk.rentas.seguridad.dominio.EventoDeIdentidadRecibido;
 import kamayuk.rentas.seguridad.dominio.EventoPospuesto;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import tools.jackson.databind.json.JsonMapper;
@@ -21,27 +20,23 @@ import tools.jackson.databind.json.JsonMapper;
  * http(s) (ADR-0026 §4, ADR-0039 etapa 4).
  *
  * <p>El porque de esas dos mitades —y de que el canal no tenga que ser http— esta en {@link
- * ResponsableDelConsumidor}, con la medida que lo decidio.
+ * ResponsableDeOperacion}, con la medida que lo decidio.
  *
- * <p><b>Un canal que no contesta NO tumba la corrida</b>: el evento ya esta apartado y acusado, o
- * sea que la cola sigue. Lo que se hace es registrar el fallo de entrega, tambien con ERROR.
+ * <p><b>El texto y la linea de ERROR son de aqui; la entrega, de {@link CanalDeAvisos}</b> (#377),
+ * que es la misma para los dos consumidores de buzon. Un canal que no contesta sigue sin tumbar la
+ * corrida —el evento ya esta apartado y acusado, o sea que la cola sigue—: el porque esta alli.
  */
 public class AlertaAlResponsableDeLaCopiaLocal implements AlertaDeEventosSinAplicar {
 
     private static final Logger REGISTRO =
             LoggerFactory.getLogger(AlertaAlResponsableDeLaCopiaLocal.class);
 
-    private static final Duration ESPERA = Duration.ofSeconds(10);
+    private final ResponsableDeOperacion responsable;
+    private final CanalDeAvisos canal;
 
-    private final HttpClient cliente;
-    private final JsonMapper json;
-    private final ResponsableDelConsumidor responsable;
-
-    public AlertaAlResponsableDeLaCopiaLocal(
-            JsonMapper json, ResponsableDelConsumidor responsable) {
-        this.json = json;
+    public AlertaAlResponsableDeLaCopiaLocal(JsonMapper json, ResponsableDeOperacion responsable) {
         this.responsable = responsable;
-        this.cliente = HttpClient.newBuilder().connectTimeout(ESPERA).build();
+        this.canal = new CanalDeAvisos(json, responsable);
     }
 
     @Override
@@ -70,31 +65,46 @@ public class AlertaAlResponsableDeLaCopiaLocal implements AlertaDeEventosSinApli
     @Override
     public void hayPospuestosQueNoAvanzan(
             List<EventoPospuesto> pospuestos, Instant ahora, Duration umbral) {
-        StringBuilder lista = new StringBuilder();
-        for (EventoPospuesto pospuesto : pospuestos) {
-            lista.append("\n  - ")
-                    .append(pospuesto.evento().tipoPublicado())
-                    .append(" sujeto ")
-                    .append(pospuesto.evento().sujetoId())
-                    .append(", secuencia ")
-                    .append(pospuesto.evento().secuencia())
-                    .append(", esperando desde hace ")
-                    .append(enMinutos(pospuesto.edad(ahora)))
-                    .append(": ")
-                    .append(pospuesto.motivo());
-        }
         String texto =
-                "LA COPIA LOCAL DE LA AUTORIZACION NO AVANZA: al terminar la corrida quedan "
+                "LA COPIA LOCAL DE LA AUTORIZACION NO AVANZA: en esta corrida se APARTARON a la"
+                        + " cola de muertos "
                         + pospuestos.size()
-                        + " evento(s) de `identidad` que llevan mas de "
+                        + " evento(s) de `identidad` que llevaban mas de "
                         + enMinutos(umbral)
-                        + " sin poder aplicarse porque esta copia no conoce todavia aquello de lo"
-                        + " que dependen. Un pospuesto no es un fallo mientras su dependencia este"
-                        + " en camino; pasado ese tiempo ya no lo esta, y el buzon se los va a"
-                        + " seguir sirviendo a esta copia en cada corrida sin que nada cambie"
-                        + " (ADR-0039 etapa 4, ADR-0026 §4):"
-                        + lista;
-        avisar(new Aviso(responsable.nombre(), "POSPUESTO", "no avanza", pospuestos.size(), texto));
+                        + " sin poder aplicarse porque esta copia no conoce aquello de lo que"
+                        + " dependen. Un pospuesto no es un fallo mientras su dependencia este en"
+                        + " camino; pasado ese tiempo ya no lo esta, y esperandolo se paraba todo lo"
+                        + " que el buzon sirve detras (#377). Se acusaron: para aplicarlos hay que"
+                        + " resolver en `identidad` o en el catalogo lo que les falta y volver a"
+                        + " emitirlos (ADR-0039 etapa 4, ADR-0026 §4):"
+                        + lista(pospuestos, ahora);
+        avisar(new Aviso(responsable.nombre(), "NO_AVANZA", "no avanza", pospuestos.size(), texto));
+    }
+
+    @Override
+    public void laColaEstaBloqueada(
+            EstadoDeLaCola.Bloqueada bloqueada, List<EventoPospuesto> enLaCabeza, Duration umbral) {
+        String texto =
+                "COLA BLOQUEADA — LA COPIA LOCAL DE LA AUTORIZACION ESTA PARADA: el buzon de"
+                        + " `identidad` sirve en su cabeza "
+                        + bloqueada.enLaCabeza()
+                        + " evento(s) que todavia no se pueden aplicar, desde la secuencia "
+                        + bloqueada.secuenciaDeCabeza()
+                        + ", y DETRAS esperan "
+                        + bloqueada.detras()
+                        + " evento(s) que esta corrida no puede leer. Si entre ellos hay una baja o"
+                        + " una revocacion, NO rige aqui: el guardia sigue autorizando con la copia"
+                        + " vieja. Los de la cabeza se apartaran solos cuando pasen de "
+                        + enMinutos(umbral)
+                        + " (#377, ADR-0026 §4):"
+                        + lista(enLaCabeza, null);
+        avisar(
+                new Aviso(
+                        responsable.nombre(),
+                        "COLA_BLOQUEADA",
+                        "cola bloqueada",
+                        bloqueada.detras(),
+                        texto));
     }
 
     // ------------------------------------------------------------------
@@ -102,52 +112,28 @@ public class AlertaAlResponsableDeLaCopiaLocal implements AlertaDeEventosSinApli
     /** Siempre al registro; y ademas al canal, si es de los que reciben. */
     private void avisar(Aviso aviso) {
         REGISTRO.error("{} Responsable: {}", aviso.texto(), responsable);
-        if (responsable.seLeEntrega()) {
-            entregar(aviso);
+        canal.entregar(aviso);
+    }
+
+    private static String lista(List<EventoPospuesto> eventos, @Nullable Instant ahora) {
+        StringBuilder lista = new StringBuilder();
+        for (EventoPospuesto pospuesto : eventos) {
+            lista.append("\n  - ")
+                    .append(pospuesto.evento().tipoPublicado())
+                    .append(" sujeto ")
+                    .append(pospuesto.evento().sujetoId())
+                    .append(", secuencia ")
+                    .append(pospuesto.evento().secuencia());
+            if (ahora != null) {
+                lista.append(", esperando desde hace ").append(enMinutos(pospuesto.edad(ahora)));
+            }
+            lista.append(": ").append(pospuesto.motivo());
         }
+        return lista.toString();
     }
 
     private static String enMinutos(Duration duracion) {
         return duracion.toMinutes() + " minuto(s)";
-    }
-
-    /**
-     * Entrega el aviso, y si no se puede lo dice.
-     *
-     * <p>Se atrapa {@code RuntimeException} a proposito: lo que se atrapa no es un defecto sino un
-     * canal que no contesta, y la alternativa es que un webhook caido pare el consumidor entero por
-     * no poder avisar de un solo evento. No se traga: se registra con ERROR.
-     */
-    @SuppressWarnings("checkstyle:IllegalCatch")
-    private void entregar(Aviso aviso) {
-        try {
-            HttpRequest peticion =
-                    HttpRequest.newBuilder(URI.create(responsable.canal()))
-                            .timeout(ESPERA)
-                            .header("Content-Type", "application/json")
-                            .POST(
-                                    HttpRequest.BodyPublishers.ofString(
-                                            json.writeValueAsString(aviso)))
-                            .build();
-            HttpResponse<String> respuesta =
-                    cliente.send(peticion, HttpResponse.BodyHandlers.ofString());
-            if (respuesta.statusCode() >= 300) {
-                REGISTRO.error(
-                        "El canal {} contesto {} al aviso: el responsable NO se ha enterado por"
-                                + " ahi, y la unica constancia es la linea de arriba",
-                        responsable.canal(),
-                        respuesta.statusCode());
-            }
-        } catch (IOException | RuntimeException noSePudo) {
-            REGISTRO.error(
-                    "Y el aviso NO se pudo entregar en {}: {}. La unica constancia es la linea de"
-                            + " arriba",
-                    responsable.canal(),
-                    noSePudo.toString());
-        } catch (InterruptedException interrumpido) {
-            Thread.currentThread().interrupt();
-            REGISTRO.error("Se interrumpio al entregar el aviso en {}", responsable.canal());
-        }
     }
 
     /** Lo que se manda al canal. */

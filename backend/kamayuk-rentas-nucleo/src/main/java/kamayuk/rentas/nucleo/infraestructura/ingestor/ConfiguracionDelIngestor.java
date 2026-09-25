@@ -8,7 +8,9 @@ import kamayuk.rentas.nucleo.aplicacion.IngestarHechosDeCatastro;
 import kamayuk.rentas.nucleo.dominio.proyeccion.FuenteDeHechosDeCatastro;
 import kamayuk.rentas.nucleo.dominio.proyeccion.ProyeccionDeCatastro;
 import kamayuk.rentas.plataforma.CredencialDeServicio;
+import kamayuk.rentas.plataforma.PoliticaDeLoQueNoAvanza;
 import kamayuk.rentas.plataforma.PoolDeUnRol;
+import kamayuk.rentas.plataforma.ResponsableDeOperacion;
 import kamayuk.rentas.plataforma.TokenDeServicioDeKeycloak;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
@@ -107,17 +109,33 @@ public class ConfiguracionDelIngestor {
         return new AplicarUnHecho(proyeccion);
     }
 
-    @Bean
-    ResponsableDeLaProyeccion responsableDeLaProyeccion(
-            @Value("${kamayuk.rentas.ingestor.responsable:}") String nombre,
-            @Value("${kamayuk.rentas.ingestor.canal:}") String canal) {
-        return new ResponsableDeLaProyeccion(nombre, canal);
+    /**
+     * Quien recibe el aviso. Las dos propiedades son obligatorias y el canal NO tiene que ser
+     * http(s): el motivo, medido (#70), esta en {@link ResponsableDeOperacion}, que desde #377 es
+     * la misma clase para los dos consumidores de buzon.
+     *
+     * <p>No se publica como bean: el consumidor de {@code identidad} construye el suyo en el mismo
+     * perfil, y dos beans del mismo tipo obligarian a cada alerta a nombrar el suyo — la forma mas
+     * facil de avisar al responsable equivocado sin que nada lo diga.
+     */
+    static ResponsableDeOperacion responsableDeLaProyeccion(String nombre, String canal) {
+        return new ResponsableDeOperacion(
+                nombre,
+                canal,
+                "Faltan kamayuk.rentas.ingestor.responsable y/o .canal. No son opcionales:"
+                        + " ADR-0026 §4 exige que un hecho que no se pudo aplicar avise A UNA"
+                        + " PERSONA CON NOMBRE. Mientras ese hecho este sin aplicar, la"
+                        + " proyeccion del padron dice algo que `catastro` ya no dice y ninguna"
+                        + " cifra lo delata: el ingestor no arranca hasta que alguien diga quien"
+                        + " lo recibe");
     }
 
     @Bean
     AlertaDeHechosSinAplicar alertaDeHechosSinAplicar(
-            JsonMapper json, ResponsableDeLaProyeccion responsable) {
-        return new AlertaAlCanalDelResponsable(json, responsable);
+            JsonMapper json,
+            @Value("${kamayuk.rentas.ingestor.responsable:}") String nombre,
+            @Value("${kamayuk.rentas.ingestor.canal:}") String canal) {
+        return new AlertaAlCanalDelResponsable(json, responsableDeLaProyeccion(nombre, canal));
     }
 
     /**
@@ -158,6 +176,13 @@ public class ConfiguracionDelIngestor {
             AplicarUnHecho aplicador,
             AlertaDeHechosSinAplicar alerta,
             Clock reloj) {
-        return new IngestarHechosDeCatastro(fuente, aplicador, alerta, reloj);
+        // Lo que no se sabe aplicar se APARTA en el acto con `SIN_CAPACIDAD:<tipo>` (#377):
+        // esperarlo no lo trae, y ocupando la cabeza paraba todo el padron de detras.
+        return new IngestarHechosDeCatastro(
+                fuente,
+                aplicador,
+                alerta,
+                PoliticaDeLoQueNoAvanza.apartarLoQueNoSeSabeAplicar(),
+                reloj);
     }
 }
