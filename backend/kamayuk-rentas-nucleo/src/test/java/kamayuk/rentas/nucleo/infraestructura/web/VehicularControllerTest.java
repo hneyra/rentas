@@ -44,6 +44,7 @@ import kamayuk.rentas.parametros.LectorDeParametros;
 import kamayuk.rentas.parametros.ParametrosSellados;
 import kamayuk.rentas.web.ConfiguracionDeJson;
 import kamayuk.rentas.web.ManejadorDeErrores;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -526,6 +527,67 @@ class VehicularControllerTest {
     }
 
     @Test
+    @DisplayName("#360 — dos candidatos con cifras distintas y sin categoria: 422 que las nombra")
+    void elValorAmbiguoEs422YNombraLasCategorias() throws Exception {
+        vehiculos.ambiguo = true;
+
+        MvcResult resultado =
+                mvc.perform(
+                                post("/rentas/api/v1/rentas/vehicular/calculo")
+                                        .param("placa", "V1H-882")
+                                        .param("ejercicio", "2026")
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content("{\"simulacion\":true}"))
+                        .andReturn();
+
+        assertThat(resultado.getResponse().getStatus())
+                .as(
+                        "hasta #360 la ambiguedad caia en el manejador generico: 500 con"
+                                + " incidencia, y el cliente reintentaba para obtener lo mismo")
+                .isEqualTo(422);
+        String cuerpo = resultado.getResponse().getContentAsString();
+        assertThat(cuerpo)
+                .as("la ventanilla tiene que saber que categoria completar en el padron")
+                .contains("VALIDACION")
+                .contains("A1")
+                .contains("A2")
+                .doesNotContain("incidencia");
+        assertThat(cuerpo)
+                .as(
+                        "como SinValorReferencial: lo que falta no es una fila del conjunto"
+                                + " sellado sino la categoria del vehiculo en el padron")
+                .doesNotContain("parametroQueFalta");
+        assertThat(determinaciones.insertadas).isZero();
+    }
+
+    @Test
+    @DisplayName("#360 — una categoria que el cuadro no publica es 422 y nombra las que si")
+    void laCategoriaFueraDelCuadroEs422() throws Exception {
+        vehiculos.sinValorReferencial = true;
+        vehiculos.categoriasDelCuadro = List.of("A1", "A2");
+
+        MvcResult resultado =
+                mvc.perform(
+                                post("/rentas/api/v1/rentas/vehicular/calculo")
+                                        .param("placa", "V1H-882")
+                                        .param("ejercicio", "2026")
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content("{\"simulacion\":true}"))
+                        .andReturn();
+
+        assertThat(resultado.getResponse().getStatus()).isEqualTo(422);
+        assertThat(resultado.getResponse().getContentAsString())
+                .as(
+                        "no es «el cuadro no trae el vehiculo»: es el padron escrito con otro"
+                                + " vocabulario, y el mensaje dice cual y cuales valen")
+                .contains("'M1'")
+                .contains("A1, A2")
+                .doesNotContain("no tiene valor referencial")
+                .doesNotContain("incidencia")
+                .doesNotContain("parametroQueFalta");
+    }
+
+    @Test
     @DisplayName("y ninguna de las dos escribe una incidencia en el registro de errores")
     void loQueFaltaPublicarNoEnsuciaElRegistro() throws Exception {
         ch.qos.logback.classic.Logger registro =
@@ -666,6 +728,12 @@ class VehicularControllerTest {
         /** La tabla del ejercicio no trae la fila de este vehiculo (#540). */
         private boolean sinValorReferencial;
 
+        /** El cuadro publica el modelo en A1 y en A2 con cifras distintas (#360). */
+        private boolean ambiguo;
+
+        /** El vocabulario del cuadro: por omision trae la categoria de {@link #EL_VEHICULO}. */
+        private List<String> categoriasDelCuadro = List.of("A1", "A2", "M1");
+
         @Override
         public Optional<Vehiculo> findByPlaca(Placa placa) {
             return EL_VEHICULO.placa().equals(placa) ? Optional.of(EL_VEHICULO) : Optional.empty();
@@ -698,9 +766,20 @@ class VehicularControllerTest {
 
         @Override
         public Optional<ValorReferencial> buscar(
-                IdentificadorDeConjunto conjunto, String marca, String modelo, int anio) {
+                IdentificadorDeConjunto conjunto,
+                String marca,
+                String modelo,
+                int anio,
+                @Nullable String categoria) {
             if (sinValorReferencial) {
                 return Optional.empty();
+            }
+            if (ambiguo) {
+                // Lo que contesta el cuadro a un vehiculo SIN categoria: el doble no la mira, y
+                // lo que se prueba aqui es el codigo de estado, no el filtro (eso va contra la
+                // base en ValorReferencialPorCategoriaTest).
+                throw new ValorReferencialRepository.ValorReferencialAmbiguo(
+                        marca, modelo, anio, null, List.of("A1", "A2"));
             }
             return Optional.of(
                     new ValorReferencial(
@@ -710,6 +789,11 @@ class VehicularControllerTest {
                             new Ejercicio(anio),
                             valorReferencial,
                             "ficticio de prueba"));
+        }
+
+        @Override
+        public List<String> categorias(IdentificadorDeConjunto conjunto) {
+            return categoriasDelCuadro;
         }
 
         @Override

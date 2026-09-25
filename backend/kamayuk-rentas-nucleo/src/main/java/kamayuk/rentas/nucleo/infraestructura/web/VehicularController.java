@@ -11,6 +11,8 @@ import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.dominio.Placa;
 import kamayuk.rentas.nucleo.aplicacion.ConsultaDeVehiculos;
 import kamayuk.rentas.nucleo.aplicacion.RegistrarDeterminacionVehicular;
+import kamayuk.rentas.nucleo.aplicacion.ValoresReferenciales;
+import kamayuk.rentas.nucleo.dominio.ValorReferencialRepository;
 import kamayuk.rentas.nucleo.dominio.Vehiculo;
 import kamayuk.rentas.parametros.FaltaPublicar;
 import kamayuk.rentas.parametros.LectorDeParametros;
@@ -92,6 +94,11 @@ import org.springframework.web.bind.annotation.RestController;
  * reintentar no lo va a arreglar nunca; además cada intento dejaba una incidencia ERROR en el
  * registro por lo que hoy es el estado normal del sistema (D-02a abierta).
  *
+ * <p><b>Y la ambigüedad del cuadro</b> (#360): el anexo del MEF publica un mismo modelo en varias
+ * categorías —466 pares en la TVR 2026—, y un vehículo sin categoría en el padrón cuyo modelo trae
+ * cifras distintas en ellas salía como 500, igual que una categoría escrita con otro vocabulario.
+ * Las dos son un dato del padrón por completar, no una avería: 422 que nombra las categorías.
+ *
  * <p>Lo que <b>no</b> cambia: un fallo de verdad del servidor sigue siendo 500 con su incidencia.
  *
  * <h2>Simular y determinar, en la misma operación</h2>
@@ -172,11 +179,15 @@ public class VehicularController {
             // de las dos cosas —«corrige el formulario» o «hay que publicar una cifra»— y acaba
             // enumerando las dos, que es peor que no decir nada.
             throw FaltaPublicar.problema(falta);
-        } catch (RegistrarDeterminacionVehicular.SinValorReferencial sinValor) {
+        } catch (RegistrarDeterminacionVehicular.SinValorReferencial
+                | ValorReferencialRepository.ValorReferencialAmbiguo
+                | ValoresReferenciales.CategoriaFueraDelCuadro sinValor) {
             // Esta NO lleva el discriminador, y esa es la mitad del criterio: el valor
             // referencial de un vehiculo no es una fila del conjunto sellado sino del cuadro que
-            // publica el MEF por marca, modelo y ano (D-13, ADR-0017). Lo que falta se busca en
-            // otro sitio, asi que darle el mismo miembro diria por contrato que no.
+            // publica el MEF por categoria, marca, modelo y ano (D-13, ADR-0017). Lo que falta se
+            // busca en otro sitio, asi que darle el mismo miembro diria por contrato que no. Las
+            // dos de #360 van con ella por el mismo motivo, y mas aun: lo que les falta es la
+            // categoria del vehiculo en el padron, que ni siquiera es un dato normativo.
             throw new ProblemaDeNegocio(CodigoDeError.VALIDACION, mensajeDe(sinValor));
         }
         return ultimo == null
