@@ -4,9 +4,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
 import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -52,9 +54,12 @@ import kamayuk.rentas.sanciones.dominio.Papeleta;
 import kamayuk.rentas.sanciones.dominio.PapeletaRepository;
 import kamayuk.rentas.sanciones.dominio.ResolucionDeGerencia;
 import kamayuk.rentas.sanciones.dominio.ResolucionDeGerenciaRepository;
+import kamayuk.rentas.sanciones.dominio.TipoDeRecurso;
 import kamayuk.rentas.sanciones.dominio.TipoDeResolucionDeGerencia;
+import kamayuk.rentas.valores.ValoresSobreUnaObligacion;
 import kamayuk.rentas.web.ConfiguracionDeJson;
 import kamayuk.rentas.web.ManejadorDeErrores;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -125,13 +130,17 @@ class ResolucionesDeGerenciaControllerTest {
                     + "\"direccion\":\"AV. GRAU 100\","
                     + "\"observacion\":\"Se registra la diligencia\"}";
 
+    /** El recurso de la papeleta, para las resoluciones que declaran un fallo (#495). */
+    private static final String EXPEDIENTE = "EXP-0001";
+
     private final PapeletasDeMentira papeletas = new PapeletasDeMentira().con(1L, PAPELETA);
-    private final SinDescargos descargos = new SinDescargos();
+    private final DescargosEnMemoria descargos = new DescargosEnMemoria();
     private final ResolucionesEnMemoria resoluciones = new ResolucionesEnMemoria();
     private final DiligenciasEnMemoria diligencias = new DiligenciasEnMemoria();
     private final PadronDeMentira padron = new PadronDeMentira();
+    private final ValoresDeMentira valores = new ValoresDeMentira();
     private final LibroSinDeuda libro = new LibroSinDeuda();
-    private final SinExtincion extincion = new SinExtincion();
+    private final ExtincionQueAnota extincion = new ExtincionQueAnota();
     private final DocumentosEnMemoria papeles = new DocumentosEnMemoria();
 
     // ---------------------------------------- dictar: la ordinaria
@@ -293,7 +302,95 @@ class ResolucionesDeGerenciaControllerTest {
                 .doesNotContain("incidencia");
     }
 
+    // ---------------------------------------- #495: el valor vivo encima de la multa
+
+    /**
+     * #495, el hermano de #372: la resolucion que deja la multa sin efecto extinguia la obligacion
+     * aunque un valor vivo la formalizara, y el valor seguia cobrable en coactiva sobre una deuda
+     * que ya no existia.
+     */
+    @Test
+    @DisplayName("#495 — con una RM viva, dejar la multa sin efecto es 409 nombrandola, sin baja")
+    void conUnValorVivoDejarlaSinEfectoEs409() throws Exception {
+        descargos.conElRecurso(EXPEDIENTE, 1L);
+        valores.conValorVivo(PadronDeMentira.OBLIGADO.id(), "RM-2026-000123");
+
+        MvcResult resultado = dictarConFallo("FUNDADO", "SE_DEJA_SIN_EFECTO");
+
+        assertThat(resultado.getResponse().getStatus())
+                .as(
+                        "la peticion esta bien formada; lo que no admite el acto es que un valor"
+                                + " vivo siga cobrando la deuda que extinguiria")
+                .isEqualTo(409);
+        assertThat(resultado.getResponse().getContentAsString())
+                .contains("CONFLICTO")
+                .contains("RM-2026-000123");
+        assertThat(extincion.llamadas)
+                .as("y la deuda intacta: no se pide ni una baja al libro")
+                .isZero();
+        assertThat(resoluciones.registradas)
+                .as("ni queda una resolucion que dice «sin efecto» sobre lo que se sigue debiendo")
+                .isEmpty();
+        assertThat(valores.preguntada)
+                .as("se pregunta por la obligacion del libro que la papeleta cargo (#372)")
+                .extracting(SeleccionDeObligacion::tributo)
+                .isEqualTo("MULTA_TRANSITO");
+    }
+
+    /**
+     * La gemela sin el valor: una guarda que dijera que no a todo pasaria la de arriba en verde. Y
+     * el fallo es el mismo —fundado, sin efecto—, asi que lo unico que cambia es la RM.
+     */
+    @Test
+    @DisplayName("#495 — sin valor vivo, la misma resolucion se dicta y da de baja: 201")
+    void sinValorVivoSeDejaSinEfecto() throws Exception {
+        descargos.conElRecurso(EXPEDIENTE, 1L);
+
+        MvcResult resultado = dictarConFallo("FUNDADO", "SE_DEJA_SIN_EFECTO");
+
+        assertThat(resultado.getResponse().getStatus()).isEqualTo(201);
+        assertThat(extincion.llamadas).as("la baja se pide una vez").isOne();
+        assertThat(extincion.causal).isEqualTo(CausalDeBaja.RESOLUCION_QUE_DEJA_SIN_EFECTO);
+    }
+
+    /**
+     * Y la guarda es de la resolucion que <b>extingue</b>, no de cualquiera: con la misma RM viva y
+     * el mismo recurso, una resolucion que mantiene la multa no toca el libro y no tiene nada que
+     * preguntar. Si la guarda mirara solo el valor, esta saldria 409.
+     */
+    @Test
+    @DisplayName("#495 — con la misma RM viva, la que mantiene la multa se dicta: 201")
+    void conUnValorVivoLaQueMantieneLaMultaSeDicta() throws Exception {
+        descargos.conElRecurso(EXPEDIENTE, 1L);
+        valores.conValorVivo(PadronDeMentira.OBLIGADO.id(), "RM-2026-000123");
+
+        MvcResult resultado = dictarConFallo("INFUNDADO", "SE_MANTIENE");
+
+        assertThat(resultado.getResponse().getStatus()).isEqualTo(201);
+        assertThat(extincion.llamadas).isZero();
+    }
+
     // ------------------------------------------------------------------
+
+    private MvcResult dictarConFallo(String sentido, String efecto) throws Exception {
+        return borde(new ParametrosDeMentira())
+                .perform(
+                        post(RUTA_ORDINARIA)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        "{\"papeleta\":\""
+                                                + PAPELETA
+                                                + "\",\"fecha\":\"2026-03-06\","
+                                                + "\"nDeExpediente\":\""
+                                                + EXPEDIENTE
+                                                + "\",\"sentidoDelFallo\":\""
+                                                + sentido
+                                                + "\",\"efectoSobreLaMulta\":\""
+                                                + efecto
+                                                + "\",\"sustento\":\"Se resuelve el descargo\","
+                                                + "\"observacion\":\"Se dicta la resolucion\"}"))
+                .andReturn();
+    }
 
     private MvcResult dictarLaOrdinariaCon(ParametrosDeMentira lector) throws Exception {
         return borde(lector)
@@ -336,6 +433,7 @@ class ResolucionesDeGerenciaControllerTest {
                                         resoluciones,
                                         diligencias,
                                         padron,
+                                        valores,
                                         libro,
                                         extincion,
                                         plazos,
@@ -438,10 +536,31 @@ class ResolucionesDeGerenciaControllerTest {
     }
 
     /**
-     * Ninguna resolucion de estas resuelve un recurso: el cuerpo no manda {@code nDeExpediente}, de
-     * modo que {@code recursoDe} devuelve nulo sin preguntar nada.
+     * Los recursos, en memoria. Las pruebas de #562 no mandan {@code nDeExpediente}, de modo que
+     * {@code recursoDe} devuelve nulo sin preguntar nada; las de #495 siembran uno, porque sin
+     * recurso no hay fallo y sin fallo no hay nada que dejar sin efecto.
      */
-    private static final class SinDescargos implements DescargoRepository {
+    private static final class DescargosEnMemoria implements DescargoRepository {
+
+        private final List<Descargo> filas = new ArrayList<>();
+
+        /** El recurso de esa papeleta, presentado en plazo. */
+        void conElRecurso(String expediente, long papeletaId) {
+            filas.add(
+                    new Descargo(
+                            (long) filas.size() + 1,
+                            papeletaId,
+                            expediente,
+                            LocalDate.of(2026, 3, 3),
+                            TipoDeRecurso.DESCARGO,
+                            "El vehiculo estaba en el taller",
+                            LocalDate.of(2026, 3, 9),
+                            77L,
+                            true,
+                            Instant.parse("2026-03-03T15:00:00Z"),
+                            "prueba",
+                            Observacion.de("Recurso sembrado para la prueba")));
+        }
 
         @Override
         public Descargo insertar(Descargo descargo) {
@@ -450,17 +569,39 @@ class ResolucionesDeGerenciaControllerTest {
 
         @Override
         public Optional<Descargo> porNumeroDeExpediente(String numeroExpediente) {
-            return Optional.empty();
+            return filas.stream()
+                    .filter(d -> d.numeroExpediente().equals(numeroExpediente))
+                    .findFirst();
         }
 
         @Override
         public Optional<Descargo> porId(long id) {
-            return Optional.empty();
+            return filas.stream().filter(d -> d.id() != null && d.id() == id).findFirst();
         }
 
         @Override
         public List<Descargo> dePapeleta(long papeletaId) {
-            return List.of();
+            return filas.stream().filter(d -> d.papeletaId() == papeletaId).toList();
+        }
+    }
+
+    /**
+     * Lo que {@code valores} contesta (#372, #495): un valor vivo sobre la obligacion, o ninguno.
+     * Por contribuyente, como el puerto de verdad.
+     */
+    private static final class ValoresDeMentira implements ValoresSobreUnaObligacion {
+
+        private final Map<Long, String> vivoPorContribuyente = new HashMap<>();
+        private @Nullable SeleccionDeObligacion preguntada;
+
+        void conValorVivo(long contribuyenteId, String numeroDelValor) {
+            vivoPorContribuyente.put(contribuyenteId, numeroDelValor);
+        }
+
+        @Override
+        public Optional<String> vivoSobre(long contribuyenteId, SeleccionDeObligacion obligacion) {
+            this.preguntada = obligacion;
+            return Optional.ofNullable(vivoPorContribuyente.get(contribuyenteId));
         }
     }
 
@@ -604,7 +745,7 @@ class ResolucionesDeGerenciaControllerTest {
      */
     private static final class PadronDeMentira implements DirectorioDeContribuyentes {
 
-        private static final ResumenDeContribuyente OBLIGADO =
+        static final ResumenDeContribuyente OBLIGADO =
                 new ResumenDeContribuyente(7L, "C-0007", "INFRACTOR, PRUEBA", "DNI 12345678");
 
         @Override
@@ -643,8 +784,15 @@ class ResolucionesDeGerenciaControllerTest {
         }
     }
 
-    /** Ninguna de estas resoluciones deja la multa sin efecto: nadie llama aqui. */
-    private static final class SinExtincion implements ExtincionDeDeuda {
+    /**
+     * El libro que da de baja, y anota cuantas veces se le pidio (#495). Las pruebas de #562 no
+     * dejan la multa sin efecto y nadie llama aqui; las de #495 miden justo eso: que con un valor
+     * vivo encima no se pida la baja.
+     */
+    private static final class ExtincionQueAnota implements ExtincionDeDeuda {
+
+        private int llamadas;
+        private @Nullable CausalDeBaja causal;
 
         @Override
         public MovimientoAsentado extinguirLoOriginadoPor(
@@ -655,8 +803,9 @@ class ResolucionesDeGerenciaControllerTest {
                 String referenciaExterna,
                 CausalDeBaja causal,
                 Observacion observacion) {
-            throw new UnsupportedOperationException(
-                    "sin fallo no hay baja: ninguna resolucion de esta prueba extingue deuda");
+            this.llamadas++;
+            this.causal = causal;
+            return MovimientoAsentado.nada(fecha);
         }
     }
 

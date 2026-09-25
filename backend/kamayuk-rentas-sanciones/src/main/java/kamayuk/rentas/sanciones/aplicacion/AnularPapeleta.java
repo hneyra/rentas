@@ -207,14 +207,13 @@ public class AnularPapeleta {
 
     /**
      * Pregunta a {@code valores}, no a {@code papeleta_masivo_item} (#372): la corrida es uno de
-     * los tres caminos por los que nace un valor sobre esta deuda, y el único que deja esa fila.
+     * los tres caminos por los que nace un valor sobre esta deuda, y el único que deja esa fila. La
+     * pregunta es la misma que hace {@link ResolverConResolucionDeGerencia} (#495), y por eso vive
+     * en {@link ObligacionDeLaPapeleta}.
      */
     private void exigirQueNadaLaSostenga(Papeleta papeleta) {
-        valores.vivoSobre(papeleta.obligadoId(), ObligacionDeLaPapeleta.de(papeleta))
-                .ifPresent(
-                        valor -> {
-                            throw new PapeletaConResolucionDeMulta(papeleta.numero(), valor);
-                        });
+        ObligacionDeLaPapeleta.exigirQueNingunValorVivoLaFormalice(
+                papeleta, valores, "la papeleta");
     }
 
     /** Sin datos personales: esto acaba en la columna JSON de la auditoría. */
@@ -237,20 +236,24 @@ public class AnularPapeleta {
      * <p>Se llama así por el caso de siempre —la resolución de multa de la corrida—, pero desde
      * #372 la levanta cualquier valor vivo sobre su obligación: también una OP o una RD emitidas
      * desde la ventanilla de valores. Por eso el mensaje dice «valor» y no «resolución de multa».
+     *
+     * <p>Y desde #495 la levanta también {@link ResolverConResolucionDeGerencia} cuando la
+     * resolución deja la multa sin efecto: es el mismo estado final, y el mismo rechazo.
      */
     public static final class PapeletaConResolucionDeMulta extends RuntimeException {
 
         @java.io.Serial private static final long serialVersionUID = 1L;
 
-        PapeletaConResolucionDeMulta(String numeroDePapeleta, String numeroDelValor) {
+        PapeletaConResolucionDeMulta(
+                String numeroDePapeleta, String numeroDelValor, String loQueSigue) {
             super(
                     "La multa de la papeleta "
                             + numeroDePapeleta
                             + " la formaliza el valor "
                             + numeroDelValor
-                            + ", que sigue vivo: primero se deja sin efecto ese valor y despues la"
-                            + " papeleta, o quedaria un valor cobrando una sancion que ya no"
-                            + " existe");
+                            + ", que sigue vivo: primero se deja sin efecto ese valor y despues "
+                            + loQueSigue
+                            + ", o quedaria un valor cobrando una sancion que ya no existe");
         }
     }
 }

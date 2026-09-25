@@ -36,6 +36,7 @@ import kamayuk.rentas.sanciones.dominio.ResolucionDeGerencia;
 import kamayuk.rentas.sanciones.dominio.ResolucionDeGerenciaRepository;
 import kamayuk.rentas.sanciones.dominio.SentidoDelFallo;
 import kamayuk.rentas.sanciones.dominio.TipoDeResolucionDeGerencia;
+import kamayuk.rentas.valores.ValoresSobreUnaObligacion;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -79,6 +80,15 @@ import org.springframework.transaction.annotation.Transactional;
  * tiene y del libro: escribirla en la columna dejaría dos verdades, y la de la columna es la que
  * nadie vuelve a mirar.
  *
+ * <h2>Y no si un valor vivo la formaliza (#495)</h2>
+ *
+ * <p>Antes de dictar nada, la resolución que deja la multa sin efecto pregunta a {@code valores}
+ * —con {@link ValoresSobreUnaObligacion}, la misma pregunta que {@link AnularPapeleta} hace desde
+ * #372— si un valor vivo (RM, OP o RD, lo emitiera quien lo emitiera) formaliza su obligación. Si
+ * lo hay, se rechaza nombrándolo: extinguir la deuda dejaría ese valor cobrable en coactiva sobre
+ * algo que el libro ya no tiene. El orden es primero el valor y después la multa, y dejar sin
+ * efecto el valor es un acto de {@code valores}, no de éste.
+ *
  * <h2>La resolución y su papel nacen juntos</h2>
  *
  * <p>El documento se emite en la <b>misma transacción</b>, con {@link EmitirDocumento}: el número
@@ -97,6 +107,7 @@ public class ResolverConResolucionDeGerencia {
     private final ResolucionDeGerenciaRepository resoluciones;
     private final NotificacionDeResolucionRepository notificaciones;
     private final DirectorioDeContribuyentes contribuyentes;
+    private final ValoresSobreUnaObligacion valores;
     private final ConsultaDeDeudaPublica deudas;
     private final ExtincionDeDeuda extincion;
     private final PlazosDeSancionesParametrizados plazos;
@@ -110,6 +121,7 @@ public class ResolverConResolucionDeGerencia {
             ResolucionDeGerenciaRepository resoluciones,
             NotificacionDeResolucionRepository notificaciones,
             DirectorioDeContribuyentes contribuyentes,
+            ValoresSobreUnaObligacion valores,
             ConsultaDeDeudaPublica deudas,
             ExtincionDeDeuda extincion,
             PlazosDeSancionesParametrizados plazos,
@@ -121,6 +133,7 @@ public class ResolverConResolucionDeGerencia {
         this.resoluciones = resoluciones;
         this.notificaciones = notificaciones;
         this.contribuyentes = contribuyentes;
+        this.valores = valores;
         this.deudas = deudas;
         this.extincion = extincion;
         this.plazos = plazos;
@@ -142,6 +155,8 @@ public class ResolverConResolucionDeGerencia {
      * @throws OrdinariaSinDictar si se pide la sancionadora y no hay ordinaria
      * @throws OrdinariaSinNotificar si la ordinaria no está notificada
      * @throws PlazoDeLaOrdinariaEnCurso si el plazo de la ordinaria todavía corre
+     * @throws AnularPapeleta.PapeletaConResolucionDeMulta si deja la multa sin efecto y un valor
+     *     vivo formaliza su obligación (#495)
      * @throws ObligacionCompartidaConOtraPapeleta si deja la multa sin efecto y su obligación del
      *     libro tiene también la multa de otra papeleta (#371)
      */
@@ -163,6 +178,15 @@ public class ResolverConResolucionDeGerencia {
 
         Descargo recurso = recursoDe(papeleta, peticion);
         Sustento sustento = sustentoDe(papeleta, peticion.tipo(), peticion.fecha());
+
+        if (peticion.efecto() != null && peticion.efecto().extingueLaDeuda()) {
+            // Antes de emitir el papel (#495): con un valor vivo encima, la baja de mas abajo
+            // dejaria ese valor cobrando en coactiva una deuda que el libro ya no tiene. Es el
+            // mismo predicado que `dejaLaMultaSinEfecto()`, leido de la peticion porque la
+            // resolucion todavia no existe; y la misma pregunta que la anulacion (#372).
+            ObligacionDeLaPapeleta.exigirQueNingunValorVivoLaFormalice(
+                    papeleta, valores, "la multa");
+        }
 
         LocalDate proyeccion =
                 peticion.proyectarDeudaAl() == null

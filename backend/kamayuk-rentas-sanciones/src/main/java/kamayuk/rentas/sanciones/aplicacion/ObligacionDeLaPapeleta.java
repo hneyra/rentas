@@ -10,6 +10,7 @@ import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.sanciones.dominio.Familia;
 import kamayuk.rentas.sanciones.dominio.Papeleta;
 import kamayuk.rentas.sanciones.dominio.PapeletaRepository;
+import kamayuk.rentas.valores.ValoresSobreUnaObligacion;
 
 /**
  * La obligación del libro que una papeleta origina (#46, #47, #50).
@@ -71,6 +72,34 @@ final class ObligacionDeLaPapeleta {
      */
     static String referenciaDe(Papeleta papeleta) {
         return PREFIJO + papeleta.identificador();
+    }
+
+    /**
+     * Rechaza el acto si un valor <b>vivo</b> formaliza la obligación de esa papeleta (#372, #495).
+     *
+     * <p>Los dos actos que extinguen la multa —anular la papeleta y la resolución de gerencia que
+     * la deja sin efecto— dejarían ese valor, y quizá su expediente coactivo, cobrando una deuda
+     * que el libro ya no tiene. Quien anula el valor es {@code valores}, y {@code sanciones} no
+     * tiene ningún puerto para hacerlo: por eso se rechaza nombrando el valor, y no se dejan las
+     * dos mitades en desacuerdo.
+     *
+     * <p>Está aquí, y no en cada caso de uso, por lo que #495 midió: la pregunta se escribió en
+     * {@link AnularPapeleta} (#372) y la resolución, que llega al mismo estado final, no la hacía.
+     * La pregunta es una —a {@link ValoresSobreUnaObligacion}, por el <b>obligado</b> y la
+     * obligación que {@link #de} compone— y el sitio donde se hace, también.
+     *
+     * @param loQueSigue lo que se podrá hacer después de dejar sin efecto el valor: «la papeleta» o
+     *     «la multa»
+     * @throws AnularPapeleta.PapeletaConResolucionDeMulta si un valor vivo la formaliza
+     */
+    static void exigirQueNingunValorVivoLaFormalice(
+            Papeleta papeleta, ValoresSobreUnaObligacion valores, String loQueSigue) {
+        valores.vivoSobre(papeleta.obligadoId(), de(papeleta))
+                .ifPresent(
+                        valor -> {
+                            throw new AnularPapeleta.PapeletaConResolucionDeMulta(
+                                    papeleta.numero(), valor, loQueSigue);
+                        });
     }
 
     /**
