@@ -28,9 +28,11 @@ import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.esquema.BaseDeDatosDePrueba;
 import kamayuk.rentas.esquema.ContextoDeTenant;
 import kamayuk.rentas.fiscalizacion.aplicacion.AnularActaFiscalizacion;
+import kamayuk.rentas.fiscalizacion.aplicacion.EstadoDeCuentaDeFiscalizacion;
 import kamayuk.rentas.fiscalizacion.aplicacion.LiquidarFiscalizacion;
 import kamayuk.rentas.fiscalizacion.aplicacion.ReliquidarFiscalizacion;
 import kamayuk.rentas.fiscalizacion.dobles.DeclaracionesDeMentira;
+import kamayuk.rentas.fiscalizacion.dobles.LibroEnMemoria;
 import kamayuk.rentas.fiscalizacion.dobles.PadronDeMentira;
 import kamayuk.rentas.fiscalizacion.dobles.ParametrosDeMentira;
 import kamayuk.rentas.fiscalizacion.dominio.ActaFiscalizacion;
@@ -353,6 +355,102 @@ class LiquidacionJdbcTest {
                     AreaM2.de("300.00"),
                     "CASA_HABITACION",
                     "CASA_HABITACION");
+        }
+    }
+
+    @Nested
+    @DisplayName("#342 — El estado de cuenta muestra la liquidacion del acta mas reciente")
+    class ElActaMasReciente {
+
+        /**
+         * Dos actas sobre la misma unidad y el mismo ejercicio: la segunda visita. El estado de
+         * cuenta conserva una linea por {@code ejercicio|unidad} y se queda con la primera que le
+         * llega, asi que el orden de {@code deContribuyente} decide que condicion se ve.
+         *
+         * <p>La siembra distingue: las dos actas tienen condiciones <b>distintas</b> y la mas
+         * antigua es la que se inserta primero, que es el orden en que {@code ORDER BY l.acta_id}
+         * las devolvia. Con una sola acta, o con la misma condicion en las dos, el orden al reves
+         * saldria en verde.
+         */
+        @Test
+        @DisplayName("con dos actas sobre la misma unidad, sale la condicion de la mas reciente")
+        void saleLaCondicionDeLaMasReciente() {
+            TenantContext.fijar(new MunicipalidadId(municipalidadA));
+            Escenario primeraVisita = sembrar(municipalidadA);
+            transaccion.execute(
+                    estado ->
+                            liquidaciones.insertar(
+                                    primera(primeraVisita),
+                                    List.of(
+                                            linea(
+                                                    primeraVisita,
+                                                    CondicionFiscalizada.SUBVALUADOR))));
+            long segundaActa = segundaVisitaA(primeraVisita);
+            Escenario segundaVisita =
+                    new Escenario(
+                            segundaActa,
+                            primeraVisita.predioId(),
+                            primeraVisita.contribuyenteId(),
+                            primeraVisita.conjunto2024(),
+                            primeraVisita.programaId());
+            transaccion.execute(
+                    estado ->
+                            liquidaciones.insertar(
+                                    primera(segundaVisita),
+                                    List.of(linea(segundaVisita, CondicionFiscalizada.OMISO))));
+
+            EstadoDeCuentaDeFiscalizacion.EstadoDeCuenta estadoDeCuenta =
+                    transaccion.execute(
+                            estado ->
+                                    new EstadoDeCuentaDeFiscalizacion(
+                                                    liquidaciones,
+                                                    new ResolucionDeDeterminacionRepositoryJdbc(
+                                                            jdbc),
+                                                    new LibroEnMemoria())
+                                            .de(primeraVisita.contribuyenteId(), HOY));
+            assertThat(estadoDeCuenta.lineas())
+                    .as(
+                            "una linea por ejercicio y unidad, y es la de la segunda visita: con"
+                                    + " ORDER BY l.acta_id salia la SUBVALUADOR de la primera")
+                    .singleElement()
+                    .extracting(EstadoDeCuentaDeFiscalizacion.LineaDelEstadoDeCuenta::condicion)
+                    .isEqualTo("OMISO");
+
+            List<Liquidacion> suyas =
+                    transaccion.execute(
+                            estado ->
+                                    liquidaciones.deContribuyente(primeraVisita.contribuyenteId()));
+            assertThat(suyas)
+                    .as(
+                            "de la mas reciente a la mas antigua: primero la del acta de la segunda visita")
+                    .extracting(Liquidacion::actaId)
+                    .containsExactly(segundaActa, primeraVisita.actaId());
+        }
+
+        /** Otra visita a la misma unidad del mismo contribuyente, en otro programa y despues. */
+        private long segundaVisitaA(Escenario escenario) {
+            long programa =
+                    ejecutarComoApp(
+                            municipalidadA,
+                            "INSERT INTO programa_fiscalizacion (municipalidad_id, codigo,"
+                                    + " descripcion, tipo, fecha_inicio)"
+                                    + " VALUES (?, ?, 'Segunda visita', 'PREDIAL', ?) RETURNING id",
+                            municipalidadA,
+                            "PF-L2-" + SIGUIENTE.getAndIncrement(),
+                            LocalDate.of(2026, 5, 1));
+            return ejecutarComoApp(
+                    municipalidadA,
+                    "INSERT INTO acta_fiscalizacion (municipalidad_id, programa_id, version,"
+                            + " contribuyente_id, predio_id, ficha_id, fecha_visita,"
+                            + " fiscalizador, hallazgo, area_hallada, estado, observacion,"
+                            + " usuario_registro)"
+                            + " SELECT municipalidad_id, ?, 1, contribuyente_id, predio_id,"
+                            + "        ficha_id, ?, 'J. Perez', 'OMISO', 300.00, 'ABIERTA',"
+                            + "        'segunda visita', 'siembra'"
+                            + " FROM acta_fiscalizacion WHERE id = ? RETURNING id",
+                    programa,
+                    LocalDate.of(2026, 6, 1),
+                    escenario.actaId());
         }
     }
 

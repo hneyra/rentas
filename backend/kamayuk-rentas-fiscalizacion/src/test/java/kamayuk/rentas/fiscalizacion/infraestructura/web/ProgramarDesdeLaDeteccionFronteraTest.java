@@ -37,7 +37,9 @@ import kamayuk.rentas.fiscalizacion.aplicacion.DeteccionDeOmisos;
 import kamayuk.rentas.fiscalizacion.aplicacion.EstadoDeCuentaDeFiscalizacion;
 import kamayuk.rentas.fiscalizacion.aplicacion.GenerarMuestra;
 import kamayuk.rentas.fiscalizacion.aplicacion.RegistrarPrograma;
+import kamayuk.rentas.fiscalizacion.dobles.LibroEnMemoria;
 import kamayuk.rentas.fiscalizacion.dobles.LiquidacionesEnMemoria;
+import kamayuk.rentas.fiscalizacion.dobles.ResolucionesEnMemoria;
 import kamayuk.rentas.fiscalizacion.dobles.TitularesDeMentira;
 import kamayuk.rentas.fiscalizacion.infraestructura.ActaFiscalizacionRepositoryJdbc;
 import kamayuk.rentas.fiscalizacion.infraestructura.DeteccionRepositoryJdbc;
@@ -198,7 +200,8 @@ class ProgramarDesdeLaDeteccionFronteraTest {
                                         envolver(
                                                 new EstadoDeCuentaDeFiscalizacion(
                                                         new LiquidacionesEnMemoria(),
-                                                        (contribuyenteId, fecha) -> List.of()),
+                                                        new ResolucionesEnMemoria(),
+                                                        new LibroEnMemoria()),
                                                 gestor),
                                         new PadronVacio(),
                                         RELOJ),

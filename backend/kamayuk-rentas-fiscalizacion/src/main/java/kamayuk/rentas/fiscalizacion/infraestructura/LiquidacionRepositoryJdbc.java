@@ -340,7 +340,7 @@ public class LiquidacionRepositoryJdbc extends RepositorioJdbc implements Liquid
                                 + COLUMNAS
                                 + CON_ACTA
                                 + " WHERE a.contribuyente_id = :contribuyente"
-                                + " ORDER BY l.acta_id, l.version DESC")
+                                + " ORDER BY l.acta_id DESC, l.version DESC")
                 .param("contribuyente", contribuyenteId)
                 .query(LiquidacionRepositoryJdbc::mapear)
                 .list();

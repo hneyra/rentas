@@ -66,7 +66,14 @@ public final class CargosDeUnSoloOrigen {
         return List.copyOf(otros);
     }
 
-    private static boolean esCargoDeOrigen(Asiento asiento) {
+    /**
+     * Si el asiento es un cargo que <b>origina</b> deuda: la definicion del javadoc de la clase.
+     *
+     * <p>Visible en el paquete porque {@link LoOriginadoPor} pregunta lo mismo con otra llave —el
+     * documento de origen y no la referencia externa— (#342), y dos copias de «que cargo origina
+     * deuda» son dos sitios donde se puede corregir uno solo.
+     */
+    static boolean esCargoDeOrigen(Asiento asiento) {
         return asiento.tipo() == TipoAsiento.CARGO
                 && asiento.concepto() == Concepto.INSOLUTO
                 && asiento.asientoReversadoId() == null;
