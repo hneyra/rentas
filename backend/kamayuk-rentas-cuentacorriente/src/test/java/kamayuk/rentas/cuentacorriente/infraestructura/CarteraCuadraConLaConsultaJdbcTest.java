@@ -128,7 +128,7 @@ class CarteraCuadraConLaConsultaJdbcTest {
 
     /** Los codigos del padron sembrado, en el orden en que se siembran. */
     private static final List<String> PADRON =
-            List.of("C-0001", "C-0002", "C-0003", "C-0009", "C-0010");
+            List.of("C-0001", "C-0002", "C-0003", "C-0009", "C-0010", "C-0011");
 
     @BeforeAll
     static void provisionar() throws SQLException, IOException {
@@ -199,7 +199,7 @@ class CarteraCuadraConLaConsultaJdbcTest {
                             "cartera del panel %s vs suma de consulta_deuda %s (diferencia %s)",
                             delPanel, deLaConsulta, delPanel.menos(deLaConsulta))
                     .isEqualTo(deLaConsulta);
-            assertThat(delPanel).isEqualTo(Dinero.de("1099.90"));
+            assertThat(delPanel).isEqualTo(Dinero.de("1649.90"));
         }
 
         @Test
@@ -228,6 +228,7 @@ class CarteraCuadraConLaConsultaJdbcTest {
             assertThat(delPanel)
                     .containsExactly(
                             Map.entry("ARBITRIO", Dinero.de("73.00")),
+                            Map.entry("MULTA_TRANSITO", Dinero.de("550.00")),
                             Map.entry("PREDIAL", Dinero.de("644.90")),
                             Map.entry("VEHICULAR", Dinero.de("382.00")));
         }
@@ -243,7 +244,7 @@ class CarteraCuadraConLaConsultaJdbcTest {
             // algo que la cifra no era.
             assertThat(carteraDe(EJERCICIO, CORTE).obligaciones())
                     .isEqualTo(obligacionesConDeudaDelPadron(EJERCICIO, CORTE));
-            assertThat(carteraDe(EJERCICIO, CORTE).obligaciones()).isEqualTo(4);
+            assertThat(carteraDe(EJERCICIO, CORTE).obligaciones()).isEqualTo(6);
         }
 
         @Test
@@ -384,7 +385,7 @@ class CarteraCuadraConLaConsultaJdbcTest {
             }
 
             assertThat(claves).doesNotHaveDuplicates();
-            assertThat(claves).hasSize(6);
+            assertThat(claves).hasSize(8);
         }
     }
 
@@ -451,7 +452,32 @@ class CarteraCuadraConLaConsultaJdbcTest {
                             "la cartera no baja por el saldo a favor de C-0010, y tampoco sube:"
                                     + " agrupada por CUOTA contaria los 40,00 de la segunda y dejaria"
                                     + " fuera los −50,00 de la primera")
-                    .isEqualTo(Dinero.de("1099.90"));
+                    .isEqualTo(Dinero.de("1649.90"));
+        }
+    }
+
+    @Nested
+    @DisplayName("#446 — la unidad nula es una obligacion, no «cualquier unidad»")
+    class LaUnidadNulaEsUnaObligacion {
+
+        @Test
+        @DisplayName("la multa sin vehiculo cuadra sola, sin la del vehiculo del mismo ejercicio")
+        void laMultaSinVehiculoCuadraSola() {
+            TenantContext.fijar(new MunicipalidadId(municipalidadA));
+
+            // La cartera agrupa por `predio_id, vehiculo_id`, y en un GROUP BY los nulos van
+            // juntos y aparte: dice 550,00. Si la fila por obligacion de la consulta volviera a
+            // leer la unidad nula como «no filtrar», la fila de la papeleta B traeria tambien la
+            // A y la consulta sumaria 880,00 —el AC 1 la caza en el total, y esta la nombra—.
+            assertThat(pendienteDe("MULTA_TRANSITO", EJERCICIO, CORTE))
+                    .isEqualTo(Dinero.de("550.00"));
+            assertThat(sumaDeLaConsultaDe("C-0011", EJERCICIO, CORTE))
+                    .isEqualTo(Dinero.de("550.00"));
+            assertThat(obligacionesDe("C-0011", CORTE))
+                    .extracting(ObligacionConDeuda::vehiculoId, o -> o.deuda().insoluto())
+                    .containsExactlyInAnyOrder(
+                            org.assertj.core.groups.Tuple.tuple(5L, Dinero.de("330.00")),
+                            org.assertj.core.groups.Tuple.tuple(null, Dinero.de("220.00")));
         }
     }
 
@@ -472,11 +498,11 @@ class CarteraCuadraConLaConsultaJdbcTest {
             TenantContext.fijar(new MunicipalidadId(municipalidadB));
             Dinero deB = carteraDe(EJERCICIO, CORTE).total();
 
-            assertThat(deA).isEqualTo(Dinero.de("1099.90"));
-            assertThat(deB).isEqualTo(Dinero.de("1099.90"));
+            assertThat(deA).isEqualTo(Dinero.de("1649.90"));
+            assertThat(deB).isEqualTo(Dinero.de("1649.90"));
             assertThat(deA.mas(deB))
-                    .as("las dos juntas son 2199,80: cada panel ve 1099,90, no el doble")
-                    .isEqualTo(Dinero.de("2199.80"));
+                    .as("las dos juntas son 3299,80: cada panel ve 1649,90, no el doble")
+                    .isEqualTo(Dinero.de("3299.80"));
         }
 
         @Test
@@ -635,7 +661,8 @@ class CarteraCuadraConLaConsultaJdbcTest {
      * <p>La forma sale de {@code infra/carga-de-datos/ejemplos/deuda.csv}, que es lo que el issue
      * midio: el PREDIAL en cuatro cuotas trimestrales con la ultima venciendo el 30 de noviembre,
      * los arbitrios por predio, el vehicular como obligacion anual sin periodo. A eso se le suman
-     * los dos casos que el AC 4 pide y el pago en exceso.
+     * los dos casos que el AC 4 pide, el pago en exceso y el par de papeletas de #446 —una con
+     * vehiculo y otra sin el, del mismo tributo y ejercicio—.
      */
     private static void sembrar(long municipalidadId, ReconstruirSaldo reconstruir) {
         TenantContext.fijar(new MunicipalidadId(municipalidadId));
@@ -645,6 +672,7 @@ class CarteraCuadraConLaConsultaJdbcTest {
         long c3 = crearContribuyente(municipalidadId, "C-0003", "50211003", true);
         long c9 = crearContribuyente(municipalidadId, "C-0009", "50211009", false);
         long c10 = crearContribuyente(municipalidadId, "C-0010", "50211010", true);
+        long c11 = crearContribuyente(municipalidadId, "C-0011", "50211011", true);
 
         transaccion.executeWithoutResult(
                 estado -> {
@@ -722,11 +750,43 @@ class CarteraCuadraConLaConsultaJdbcTest {
                                     null,
                                     "150.00",
                                     LocalDate.of(2026, 3, 31)));
+
+                    // C-0011: dos papeletas de transito de 2026 (#446), la A con el vehiculo 5
+                    // y la B sin vehiculo identificado. Son dos obligaciones del MISMO tributo y
+                    // ejercicio, y es la unica forma de que esta guarda vea como lee la consulta
+                    // una unidad nula: con una sola de las dos, «cualquier unidad» y «ninguna
+                    // unidad» dan la misma cifra.
+                    asientos.registrar(
+                            asiento(
+                                    c11,
+                                    EJERCICIO,
+                                    "MULTA_TRANSITO",
+                                    Concepto.INSOLUTO,
+                                    TipoAsiento.CARGO,
+                                    Fase.ORDINARIA,
+                                    null,
+                                    null,
+                                    5L,
+                                    "330.00",
+                                    LocalDate.of(2026, 4, 15)));
+                    asientos.registrar(
+                            asiento(
+                                    c11,
+                                    EJERCICIO,
+                                    "MULTA_TRANSITO",
+                                    Concepto.INSOLUTO,
+                                    TipoAsiento.CARGO,
+                                    Fase.ORDINARIA,
+                                    null,
+                                    null,
+                                    null,
+                                    "220.00",
+                                    LocalDate.of(2026, 5, 20)));
                 });
 
         // La proyeccion se rehace con el codigo de produccion: `consulta_deuda` la usa como
         // indice para descubrir que obligaciones tiene el contribuyente (#23).
-        for (long titular : new long[] {c1, c2, c3, c9, c10}) {
+        for (long titular : new long[] {c1, c2, c3, c9, c10, c11}) {
             transaccion.executeWithoutResult(estado -> reconstruir.deContribuyente(titular));
         }
         TenantContext.limpiar();

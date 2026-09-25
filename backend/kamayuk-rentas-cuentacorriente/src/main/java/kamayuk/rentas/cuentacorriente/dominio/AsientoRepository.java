@@ -28,11 +28,16 @@ public interface AsientoRepository {
     Pagina<Asiento> buscar(CriterioDeConsulta criterio, Paginacion paginacion);
 
     /**
-     * Los asientos de <b>una</b> obligacion, hasta la fecha de corte del criterio (RF-041, RF-042).
+     * Los asientos que pide el criterio, hasta su fecha de corte (RF-041, RF-042).
      *
-     * <p>Sin paginar: una obligacion tiene pocos asientos —no el libro completo de un
-     * contribuyente—, y {@link CalculoDeDeuda#deudaActualizadaA} necesita verlos todos para netear
+     * <p>Sin paginar: {@link CalculoDeDeuda#deudaActualizadaA} necesita verlos todos para netear
      * cargos contra abonos, no una pagina de ellos.
+     *
+     * <p><b>No son necesariamente los de una obligacion (#446).</b> Es un criterio, y en un
+     * criterio un campo nulo es «no filtrar» —tambien el predio y el vehiculo—: con los dos nulos
+     * trae la obligacion sin unidad <b>y</b> las de todas las unidades del mismo tributo y
+     * ejercicio. Los asientos de una obligacion, con su unidad nula como obligacion propia, son los
+     * de {@link #deTodosLosPeriodosDe}.
      */
     List<Asiento> paraDeuda(CriterioDeDeuda criterio);
 

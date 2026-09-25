@@ -308,6 +308,74 @@ class ConsultarDeudaTest {
                                         .isEqualTo(Dinero.de(1000)));
     }
 
+    @Test
+    @DisplayName(
+            "#446 — la fila sin vehiculo no suma los asientos de la del vehiculo del mismo tributo y"
+                    + " ejercicio")
+    void laFilaSinVehiculoNoSumaLaDelVehiculo() {
+        String codigo = crearContribuyenteConCodigo("D-0008", "80400008");
+        long titular = idDe(codigo);
+
+        // Las dos papeletas de transito de 2026 del escenario del issue: la A con el vehiculo 5
+        // y la B sin vehiculo identificado, que `RegistrarPapeleta.registrarTransito` admite.
+        // Son DOS obligaciones -la unidad es parte de la clave- y la siembra que distingue es
+        // tenerlas juntas: con una sola, leer la unidad nula como «cualquiera» o como «ninguna»
+        // da lo mismo, que es por lo que ninguna siembra anterior lo vio.
+        cargarUnaUnidad(titular, "MULTA_TRANSITO", null, 5L, Dinero.de("330.00"));
+        cargarUnaUnidad(titular, "MULTA_TRANSITO", null, null, Dinero.de("220.00"));
+
+        List<ObligacionConDeuda> filas =
+                consultar(codigo, LocalDate.of(2026, 6, 1), null, 0, 20).contenido();
+
+        assertThat(filas)
+                .extracting(ObligacionConDeuda::vehiculoId, o -> o.deuda().insoluto())
+                .as("la fila sin unidad es la papeleta B, y no la A mas la B (550,00)")
+                .containsExactlyInAnyOrder(
+                        org.assertj.core.groups.Tuple.tuple(5L, Dinero.de("330.00")),
+                        org.assertj.core.groups.Tuple.tuple(null, Dinero.de("220.00")));
+        assertThat(sumaDelInsoluto(filas))
+                .as("quien suma las filas lee lo que se debe, no 880,00")
+                .isEqualTo(Dinero.de("550.00"));
+        assertThat(filas)
+                .as(
+                        "y cada fila dice lo mismo que la constancia y la orden de caja"
+                                + " (todasLasObligacionesDe)")
+                .containsExactlyInAnyOrderElementsOf(
+                        consulta.todasLasObligacionesDe(titular, LocalDate.of(2026, 6, 1)));
+        assertThat(consultarPorPeriodo(codigo, LocalDate.of(2026, 6, 1)))
+                .extracting(ObligacionConDeuda::vehiculoId, o -> o.deuda().insoluto())
+                .as("y que la vista por periodo, que lee lo mismo que el reparto de una baja")
+                .containsExactlyInAnyOrder(
+                        org.assertj.core.groups.Tuple.tuple(5L, Dinero.de("330.00")),
+                        org.assertj.core.groups.Tuple.tuple(null, Dinero.de("220.00")));
+    }
+
+    @Test
+    @DisplayName(
+            "#446 — y la fila sin predio no suma los asientos de la del predio: la multa"
+                    + " administrativa")
+    void laFilaSinPredioNoSumaLaDelPredio() {
+        String codigo = crearContribuyenteConCodigo("D-0009", "80400009");
+        long titular = idDe(codigo);
+
+        // El mismo defecto por la otra columna de la unidad: `registrarAdministrativa` recibe
+        // un `@Nullable Long predioId`, y dos multas del mismo año, una con predio y otra sin
+        // el, son dos obligaciones del mismo tributo y ejercicio.
+        cargarUnaUnidad(titular, "MULTA_ADMINISTRATIVA", 101L, null, Dinero.de("400.00"));
+        cargarUnaUnidad(titular, "MULTA_ADMINISTRATIVA", null, null, Dinero.de("150.00"));
+
+        List<ObligacionConDeuda> filas =
+                consultar(codigo, LocalDate.of(2026, 6, 1), null, 0, 20).contenido();
+
+        assertThat(filas)
+                .extracting(ObligacionConDeuda::predioId, o -> o.deuda().insoluto())
+                .as("la fila sin predio es la multa sin predio, y no las dos (550,00)")
+                .containsExactlyInAnyOrder(
+                        org.assertj.core.groups.Tuple.tuple(101L, Dinero.de("400.00")),
+                        org.assertj.core.groups.Tuple.tuple(null, Dinero.de("150.00")));
+        assertThat(sumaDelInsoluto(filas)).isEqualTo(Dinero.de("550.00"));
+    }
+
     // ------------------------------------------------------------------
 
     private static Pagina<ObligacionConDeuda> consultar(
@@ -317,6 +385,47 @@ class ConsultarDeudaTest {
         return consulta.porContribuyente(
                 criterio,
                 new Paginacion(pagina, tamano, "ejercicio", Paginacion.Sentido.ASCENDENTE));
+    }
+
+    /** Las filas por cuota (#551): la vista que lee con {@code deTodosLosPeriodosDe}. */
+    private static List<ObligacionConDeuda> consultarPorPeriodo(String codigo, LocalDate fecha) {
+        CriterioDeDeudaPorContribuyente criterio =
+                new CriterioDeDeudaPorContribuyente(codigo, fecha, null, Agregacion.POR_PERIODO);
+        return consulta.porContribuyente(
+                        criterio, new Paginacion(0, 20, "ejercicio", Paginacion.Sentido.ASCENDENTE))
+                .contenido();
+    }
+
+    private static Dinero sumaDelInsoluto(List<ObligacionConDeuda> filas) {
+        return filas.stream().map(o -> o.deuda().insoluto()).reduce(Dinero.CERO, Dinero::mas);
+    }
+
+    /**
+     * Un cargo anual de 2026 —{@code periodo} nulo, como lo asienta {@code RegistrarPapeleta}— con
+     * la unidad que se le pase, nulos incluidos (#446).
+     */
+    private void cargarUnaUnidad(
+            long titular,
+            String tributo,
+            @Nullable Long predioId,
+            @Nullable Long vehiculoId,
+            Dinero insoluto) {
+        registrarAsiento.asentar(
+                Asiento.nuevo(
+                        new Ejercicio(2026),
+                        titular,
+                        tributo,
+                        Concepto.INSOLUTO,
+                        TipoAsiento.CARGO,
+                        Fase.ORDINARIA,
+                        null,
+                        predioId,
+                        vehiculoId,
+                        null,
+                        insoluto,
+                        LocalDate.of(2026, 3, 1),
+                        "PAPELETA-PRUEBA-" + (vehiculoId != null ? vehiculoId : predioId)),
+                OBSERVACION);
     }
 
     private void cargar(
