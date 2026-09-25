@@ -13,9 +13,9 @@ import type { ClaveDeHoja } from './pantallas/arbol.ts';
 import { pantallaDe } from './pantallas/definiciones/index.ts';
 import { alNoPoderDibujarla, useDatosDeLaHoja } from './datos/useDatosDeLaHoja.ts';
 import { FronteraDeLaHoja } from './pantallas/FronteraDeLaHoja.tsx';
-import type { FallaDeLaPuerta } from './api/identidad.ts';
+import type { FallaDeLaPuerta, VueltaFallida } from './api/identidad.ts';
 import { abrirLaCuenta, salir } from './api/identidad.ts';
-import { fallaDeLaPuerta } from './arranque.ts';
+import { fallaDeLaPuerta, vueltaFallida } from './arranque.ts';
 import { useTextosDelMarco } from './i18n/textosDelMarco.ts';
 
 /**
@@ -218,7 +218,7 @@ function HojaConFrontera({ clave }: { readonly clave: ClaveDeHoja }) {
  * reventaba con «No QueryClient set, use QueryClientProvider to set one» — en las cuarenta pruebas
  * del recorrido a la vez.
  */
-function ArmazonDelSistema() {
+function ArmazonDelSistema({ vuelta }: { readonly vuelta: VueltaFallida | null }) {
   const { t } = useTranslation();
   // Las treinta y dos palabras que el marco dice por su cuenta, en el idioma de la sesion (#133).
   // Sin esto el armazon usa las suyas por omision y la pantalla sale a medias: el cuerpo
@@ -260,6 +260,18 @@ function ArmazonDelSistema() {
    */
   if (sesion.estado === 'sin-privilegio') {
     return <FaltanOpcionesParaLeerElCatalogo sesion={sesion} />;
+  }
+
+  // El 401 con su remedio (#355). Antes de la rama generica de abajo, que era donde caia: un
+  // parrafo suelto sin nada que pulsar, y la pestana sin forma de volver a entrar.
+  if (sesion.volverAEntrar !== null) {
+    return (
+      <HayQueVolverAIdentificarse
+        porQue={sesion.porQue}
+        volverAEntrar={sesion.volverAEntrar}
+        vuelta={vuelta}
+      />
+    );
   }
 
   if (sesion.estado !== 'compuesto') {
@@ -386,6 +398,133 @@ function FaltanOpcionesParaLeerElCatalogo({ sesion }: { readonly sesion: Catalog
 }
 
 /**
+ * **La sesion no vale, y se ofrece volver a identificarse** (#355).
+ *
+ * <h2>De que defecto viene</h2>
+ *
+ * Tras «Cerrar sesion» la marca de salida impide que el arranque vuelva a entrar solo —y es
+ * correcto—, asi que se monta, las tres lecturas del catalogo contestan 401 y hasta #355 lo que se
+ * dibujaba era un parrafo que decia «Vuelva a entrar.» **sin nada que pulsar**. F5 repetia lo mismo,
+ * porque la marca vive lo que la pestana: cada cambio de turno dejaba la pestana inservible. El
+ * boton que la levantaba se fue con `Puerta.tsx` en #90; vuelve aqui, con el remedio decidido en
+ * `useCatalogoPermitido` y no en este archivo.
+ *
+ * <h2>Si lo que freno fue un canje fallido, se dice el motivo del emisor</h2>
+ *
+ * Con el tope de idas agotado el 401 es consecuencia, no causa: lo que paso es que el emisor
+ * rechazo la vuelta —un `redirect_uri` mal declarado, un codigo ya usado, «La vuelta no cuadra con
+ * la ida»—. Su `motivo` y su `explicacion` **sustituyen** a la frase generica: con las dos, la que
+ * se lee primero es la que no dice nada de lo que paso. Es el unico diagnostico de una
+ * configuracion equivocada, y hasta #355 se tiraba en el arranque.
+ *
+ * **Cada frase es su propia clave de `t()`** (ronda 1): el motivo es el titulo y la explicacion el
+ * cuerpo, y **solo** lo que escribio el emisor (`delEmisor`) se le atribuye a el. La primera
+ * version metia el motivo como valor de «…no dejo terminar la entrada: {{motivo}}.» —que el
+ * marcador de #103 no ve, y que con «No se completo la entrada» decia dos veces lo mismo— y
+ * presentaba cualquier detalle como «Lo que contesto», tambien los que escribia este sistema.
+ *
+ * <h2>Y si al pulsar el emisor no contesta, se explica como desde #112</h2>
+ *
+ * `entrar()` pregunta primero si el emisor esta; si no, devuelve la falla y no navega. Un boton
+ * que en ese caso no hiciera nada seria el `al: () => {}` de #115 con otra forma, asi que la falla
+ * se ensena con la misma pantalla que ensena el arranque.
+ *
+ * <h2>Y si la ida REVIENTA, el boton vuelve (ronda 1)</h2>
+ *
+ * `entrar()` tambien puede rechazar: escribe en el almacenamiento de la pestana —que lanza lleno
+ * o bloqueado— y calcula el reto con `crypto.subtle`. El boton se deshabilita al pulsar, y sin
+ * atender el rechazo se quedaba deshabilitado para siempre: otra vez una pestana sin nada que
+ * pulsar, que es lo que #355 cierra. Se vuelve a habilitar y se dice lo que dijo el navegador, en
+ * sus palabras.
+ */
+function HayQueVolverAIdentificarse({
+  porQue,
+  volverAEntrar,
+  vuelta,
+}: {
+  readonly porQue: string;
+  readonly volverAEntrar: () => Promise<FallaDeLaPuerta | null>;
+  readonly vuelta: VueltaFallida | null;
+}) {
+  const { t } = useTranslation();
+  const [falla, setFalla] = useState<FallaDeLaPuerta | null>(null);
+  // La sonda puede tardar hasta ocho segundos: mientras, el boton no se ofrece otra vez.
+  const [yendo, setYendo] = useState(false);
+  // Lo que dijo el navegador si la ida revento antes de salir. Ver el javadoc.
+  const [reventon, setReventon] = useState<string | null>(null);
+
+  if (falla !== null) return <LaPuertaNoContesto falla={falla} />;
+
+  return (
+    <div className="grid min-h-screen place-items-center p-[30px] bg-fondo">
+      <div data-slot="hay-que-volver-a-identificarse" className="max-w-[64ch]">
+        {vuelta === null ? (
+          <Alerta tono="info">
+            <p className="m-0">{porQue}</p>
+          </Alerta>
+        ) : (
+          <Alerta tono="atencion" titulo={t(vuelta.motivo)}>
+            <p className="m-0 break-words">{t(vuelta.explicacion, vuelta.valores)}</p>
+            {vuelta.delEmisor === null ? null : (
+              <p className="mt-[6px] mb-0 break-words">
+                {t('Lo que dijo el emisor: «{{texto}}»', { texto: vuelta.delEmisor })}
+              </p>
+            )}
+          </Alerta>
+        )}
+        {reventon === null ? null : (
+          <Alerta tono="mal" className="mt-[14px]">
+            <p className="m-0 break-words">
+              {t('No se pudo salir hacia el emisor de identidad. El navegador dijo: «{{motivo}}».', {
+                motivo: reventon,
+              })}
+            </p>
+          </Alerta>
+        )}
+        <Boton
+          variante="primario"
+          className="mt-[14px]"
+          disabled={yendo}
+          onClick={() => {
+            setYendo(true);
+            setReventon(null);
+            void volverAEntrar().then(
+              (otra) => {
+                // `null` es que el navegador se va: no hay nada que volver a dibujar.
+                if (otra !== null) {
+                  setFalla(otra);
+                  setYendo(false);
+                }
+              },
+              (error: unknown) => {
+                setReventon(enPalabrasDelNavegador(error));
+                setYendo(false);
+              },
+            );
+          }}
+        >
+          {t('Volver a identificarse')}
+        </Boton>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Lo que dijo el navegador al rechazar la ida, tal cual: son las palabras que se pueden buscar y
+ * las que salen en su consola. `DOMException` no siempre hereda de `Error`, por eso se mira la
+ * forma y no la clase.
+ */
+function enPalabrasDelNavegador(error: unknown): string {
+  if (typeof error === 'object' && error !== null) {
+    const { message, name } = error as { readonly message?: unknown; readonly name?: unknown };
+    if (typeof message === 'string' && message !== '') return message;
+    if (typeof name === 'string' && name !== '') return name;
+  }
+  return String(error);
+}
+
+/**
  * **Cuando no se pudo ni llegar al emisor de identidad** (#112).
  *
  * <h2>Por que esto se dibuja ANTES que nada, y no como un estado mas del catalogo</h2>
@@ -443,6 +582,8 @@ export function Aplicacion() {
   // Se lee aqui y no en `main.tsx` porque el montaje no lleva argumentos a proposito: ver
   // `arranque.ts`. Al llegar aqui la pasada de arranque ya termino, asi que el valor esta fijo.
   const falla = fallaDeLaPuerta();
+  // Y por lo mismo la vuelta fallida del emisor (#355): la dice la rama del 401, si se llega a ella.
+  const vuelta = vueltaFallida();
 
   return (
     <ProveedorDeTema configuracion={TEMA}>
@@ -450,7 +591,7 @@ export function Aplicacion() {
         <LaPuertaNoContesto falla={falla} />
       ) : (
         <QueryClientProvider client={CONSULTAS}>
-          <ArmazonDelSistema />
+          <ArmazonDelSistema vuelta={vuelta} />
         </QueryClientProvider>
       )}
     </ProveedorDeTema>

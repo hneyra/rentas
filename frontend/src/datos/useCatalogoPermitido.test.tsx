@@ -125,6 +125,15 @@ function elBotonDeReintentar() {
   return screen.queryByRole('button', { name: 'Reintentar' });
 }
 
+/**
+ * El remedio del 401 (#355). Se mira en TODAS las ramas, y no solo en la suya: una pantalla que lo
+ * pusiera en cualquier error saldria verde si solo se probara el 401 — y en un 500 o en un 403
+ * volver a identificarse no arregla nada, solo manda de paseo a Keycloak.
+ */
+function elBotonDeVolver() {
+  return screen.queryByRole('button', { name: 'Volver a identificarse' });
+}
+
 describe('el 403 SIN_PRIVILEGIO sobre el catalogo (#311)', () => {
   it('nombra las DOS opciones por su nombre del catalogo, no por su codigo, y ofrece reintentar', async () => {
     contestan = { ...BIEN, modulos: SIN_PRIVILEGIO, accesos: SIN_PRIVILEGIO };
@@ -135,6 +144,7 @@ describe('el 403 SIN_PRIVILEGIO sobre el catalogo (#311)', () => {
     const faltan = [...(aviso?.querySelectorAll('li') ?? [])].map((li) => li.textContent);
     expect(faltan).toEqual(['Módulos del sistema', 'Accesos y políticas']);
     expect(elBotonDeReintentar(), 'el 403 no ofrece reintentar').not.toBeNull();
+    expect(elBotonDeVolver(), 'el 403 manda a identificarse otra vez').toBeNull();
     expect(elArmazon()).toBeNull();
   });
 
@@ -172,7 +182,26 @@ describe('y las otras ramas NO ofrecen reintentar: no arreglaria nada', () => {
 
     expect(screen.getByText(/Vuelva a entrar/)).toBeTruthy();
     expect(elBotonDeReintentar(), 'un 401 ofrece reintentar').toBeNull();
+    // Pero SI ofrece volver a identificarse, que es lo que arregla un 401 (#355).
+    expect(elBotonDeVolver(), 'el 401 no trae su remedio').not.toBeNull();
     expect(document.querySelector('[data-slot="catalogo-sin-privilegio"]')).toBeNull();
+  });
+
+  it('401 SIN puerta —origen no seguro, sin `crypto.subtle`—: no se ofrece un boton que revienta', async () => {
+    // Fuera de un origen seguro el navegador no expone `crypto.subtle` y no hay S256: `entrar()`
+    // pasaria la sonda, escribiria sus llaves y reventaria al calcular el reto. Ofrecer ese boton
+    // es ofrecer un fallo seguro; la condicion `hayPuerta()` de `useCatalogoPermitido` es la que lo
+    // quita, y esta es la siembra que la distingue: con la puerta de jsdom, que si tiene
+    // `crypto.subtle`, quitarla no cambia nada (#355, ronda 1).
+    vi.stubGlobal('crypto', {
+      getRandomValues: crypto.getRandomValues.bind(crypto),
+      randomUUID: crypto.randomUUID.bind(crypto),
+    });
+    contestan = { ...BIEN, modulos: { estado: 401, codigo: 'NO_AUTENTICADO' }, accesos: { estado: 401 } };
+    await montarYEsperarElPorQue();
+
+    expect(screen.getByText(/Vuelva a entrar/)).toBeTruthy();
+    expect(elBotonDeVolver(), 'sin puerta se ofrece volver a identificarse').toBeNull();
   });
 
   it('500: la rama generica, sin boton y sin nombrar opciones', async () => {
@@ -181,6 +210,7 @@ describe('y las otras ramas NO ofrecen reintentar: no arreglaria nada', () => {
 
     expect(screen.getByText(/No se pudo saber que modulos puede abrir esta cuenta/)).toBeTruthy();
     expect(elBotonDeReintentar(), 'un 500 ofrece reintentar').toBeNull();
+    expect(elBotonDeVolver(), 'un 500 manda a identificarse otra vez').toBeNull();
     expect(screen.queryByText('Módulos del sistema')).toBeNull();
   });
 
@@ -194,6 +224,7 @@ describe('y las otras ramas NO ofrecen reintentar: no arreglaria nada', () => {
 
     expect(document.querySelector('[data-slot="catalogo-sin-privilegio"]')).toBeNull();
     expect(elBotonDeReintentar(), 'un SIN_MUNICIPALIDAD ofrece reintentar').toBeNull();
+    expect(elBotonDeVolver(), 'un SIN_MUNICIPALIDAD manda a identificarse otra vez').toBeNull();
   });
 
   it('un 403 SIN_PRIVILEGIO junto a un 500 no se hace pasar por falta de permiso', async () => {

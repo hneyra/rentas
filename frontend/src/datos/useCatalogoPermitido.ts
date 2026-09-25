@@ -4,6 +4,8 @@ import { useTranslation } from 'react-i18next';
 import { useMemo } from 'react';
 
 import { ErrorDeLaApi } from '../api/cliente.ts';
+import type { FallaDeLaPuerta } from '../api/identidad.ts';
+import { entrar, hayPuerta, olvidarLaParada } from '../api/identidad.ts';
 import { CATALOGO, CODIGO_POR_CLAVE } from '../catalogo.ts';
 import type { CatalogoCompuesto } from '../permisos.ts';
 import { componer } from '../permisos.ts';
@@ -19,7 +21,9 @@ import { RUTAS, pedirLista, pedirPagina, pedirUno } from './lecturas.ts';
  *   ensenar durante un segundo justo lo que este issue existe para esconder, y un segundo basta
  *   para pulsar.
  * · **Error** — no se sabe que puede la cuenta, asi que **no se ofrece nada** y se dice. Ofrecerlo
- *   todo ante un fallo convierte un problema de red en un agujero de autorizacion.
+ *   todo ante un fallo convierte un problema de red en un agujero de autorizacion. **Si el error es
+ *   un 401** (#355), trae su remedio —**volver a identificarse**, ver `volverAEntrar`—: es la otra
+ *   rama, junto al 403, que ofrece algo que pulsar.
  * · **Sin privilegio para leer el catalogo** (#311) — `GET /seguridad/{modulos,accesos}` contesto
  *   403 `SIN_PRIVILEGIO`. Tampoco es un error: el sistema contesto lo que tenia que contestar, y
  *   se arregla dando una opcion. Por eso es la unica rama que **nombra lo que falta** y la unica
@@ -125,10 +129,43 @@ export interface CatalogoDeLaSesion extends CatalogoCompuesto {
   readonly reintentar: (() => void) | null;
   /** Si hay una vuelta en curso. Para no ofrecer pulsar otra vez mientras. */
   readonly reintentando: boolean;
+  /**
+   * **Volver a identificarse: el remedio del 401, y solo del 401** (#355).
+   *
+   * La premisa de `reintentar` —«en un 401 reintentar trae el mismo 401»— es cierta para
+   * reintentar y falsa para esto: volver a identificarse **si** arregla un 401, porque trae un
+   * token nuevo. Y es la unica salida de la pestana cuando el arranque freno —la marca de salida
+   * tras «Cerrar sesion», o el tope de idas tras tres canjes fallidos—: F5 repite la parada,
+   * porque las dos marcas viven lo que la pestana. Hasta #355 este estado no traia ningun remedio
+   * y la pestana quedaba inservible.
+   *
+   * Devuelve lo que devuelve `entrar()`: `null` cuando el navegador se va, y **la falla cuando el
+   * emisor no contesto** (#112), para que quien dibuja el boton la ensene en vez de quedarse muda.
+   *
+   * `null` fuera del 401, y tambien en el 401 **sin puerta** (`hayPuerta()`): sin `crypto.subtle`
+   * no hay S256, y un boton que revienta al pulsarlo es peor que no tenerlo.
+   */
+  readonly volverAEntrar: (() => Promise<FallaDeLaPuerta | null>) | null;
 }
 
-/** Lo que no cambia fuera de `sin-privilegio`. */
-const SIN_REMEDIO = { faltan: [], reintentar: null, reintentando: false } as const;
+/** Lo que no cambia fuera de `sin-privilegio` y del 401. */
+const SIN_REMEDIO = {
+  faltan: [],
+  reintentar: null,
+  reintentando: false,
+  volverAEntrar: null,
+} as const;
+
+/**
+ * **Olvidar la parada va ANTES de entrar**, y es el motivo que la V6 dejo escrito (#355): el tope
+ * de tres idas existe para cortar un bucle AUTOMATICO, y esto es una persona pulsando un boton. Sin
+ * olvidarla, la ida de quien pulsa se contaria como la cuarta de una racha que ya termino, y la
+ * marca de salida seguiria diciendo «recien salido» a una pestana que acaba de pedir entrar.
+ */
+function volverAEntrar(): Promise<FallaDeLaPuerta | null> {
+  olvidarLaParada();
+  return entrar();
+}
 
 /** El 403 `SIN_PRIVILEGIO`, y solo ese: el `SIN_MUNICIPALIDAD` no se arregla dando una opcion. */
 function esSinPrivilegio(error: unknown): boolean {
@@ -228,6 +265,7 @@ export function useCatalogoPermitido(): CatalogoDeLaSesion {
           void Promise.all([modulos.refetch(), accesos.refetch(), permisos.refetch()]);
         },
         reintentando: modulos.isFetching || accesos.isFetching || permisos.isFetching,
+        volverAEntrar: null,
       };
     }
 
@@ -235,6 +273,9 @@ export function useCatalogoPermitido(): CatalogoDeLaSesion {
       ...VACIO,
       ...SIN_REMEDIO,
       estado: 'error',
+      // El remedio viaja con el estado, como `reintentar` en el 403 (#311): aqui se decide, en un
+      // solo sitio, que arregla cada cosa, y quien dibuja solo pinta el boton si lo hay.
+      volverAEntrar: es401 && hayPuerta() ? volverAEntrar : null,
       porQue: es401
         ? t('La sesion no vale para saber que puede abrir esta cuenta. Vuelva a entrar.')
         : t(
