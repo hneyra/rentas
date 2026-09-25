@@ -17,6 +17,7 @@ import kamayuk.rentas.fiscalizacion.dobles.ParametrosDeMentira;
 import kamayuk.rentas.fiscalizacion.dobles.ResolucionesEnMemoria;
 import kamayuk.rentas.fiscalizacion.dominio.ActaFiscalizacion;
 import kamayuk.rentas.fiscalizacion.dominio.CondicionFiscalizada;
+import kamayuk.rentas.fiscalizacion.dominio.CorreccionDeLinea;
 import kamayuk.rentas.fiscalizacion.dominio.EstadoDeActa;
 import kamayuk.rentas.fiscalizacion.dominio.EstadoDeLiquidacion;
 import kamayuk.rentas.fiscalizacion.dominio.Hallazgo;
@@ -26,10 +27,13 @@ import kamayuk.rentas.fiscalizacion.dominio.MovimientoDeLiquidacion;
 import kamayuk.rentas.fiscalizacion.dominio.TipoDeFiscalizacion;
 import kamayuk.rentas.nucleo.DeclaracionDelEjercicio;
 import kamayuk.rentas.parametros.LectorDeParametros;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 /**
  * Liquidar y reliquidar (#49, AC 1, AC 2, AC 4 y AC 5).
@@ -360,7 +364,7 @@ class LiquidarYReliquidarTest {
                             TipoDeFiscalizacion.CIERTA,
                             "Reinspeccion: el area medida era la del lote, no la construida",
                             List.of(
-                                    new ReliquidarFiscalizacion.CorreccionDeLinea(
+                                    new CorreccionDeLinea(
                                             E2024, null, AreaM2.de("180.00"), null, null)),
                             HOY,
                             OBSERVACION);
@@ -395,7 +399,7 @@ class LiquidarYReliquidarTest {
                             TipoDeFiscalizacion.CIERTA,
                             "Area corregida",
                             List.of(
-                                    new ReliquidarFiscalizacion.CorreccionDeLinea(
+                                    new CorreccionDeLinea(
                                             E2024, null, AreaM2.de("180.00"), null, null)),
                             HOY,
                             OBSERVACION);
@@ -424,7 +428,7 @@ class LiquidarYReliquidarTest {
                             TipoDeFiscalizacion.CIERTA,
                             "El area hallada era la declarada",
                             List.of(
-                                    new ReliquidarFiscalizacion.CorreccionDeLinea(
+                                    new CorreccionDeLinea(
                                             E2024, null, AreaM2.de("120.00"), null, null)),
                             HOY,
                             OBSERVACION);
@@ -476,9 +480,7 @@ class LiquidarYReliquidarTest {
                     E2024,
                     TipoDeFiscalizacion.CIERTA,
                     "Area corregida",
-                    List.of(
-                            new ReliquidarFiscalizacion.CorreccionDeLinea(
-                                    E2024, null, AreaM2.de("180.00"), null, null)),
+                    List.of(new CorreccionDeLinea(E2024, null, AreaM2.de("180.00"), null, null)),
                     HOY,
                     OBSERVACION);
 
@@ -611,6 +613,267 @@ class LiquidarYReliquidarTest {
                     List.of(),
                     HOY,
                     OBSERVACION);
+        }
+    }
+
+    @Nested
+    @DisplayName("#340 — reliquidar parte de los lados que la base implica, no de sus nulos")
+    class LaCorreccionParteDeLaBase {
+
+        // La siembra que hasta #340 no existia: `laCondicionSeRecalcula` reliquida una linea
+        // predial con las DOS areas presentes, que es justo la muestra en la que «presento
+        // declaracion», «ubicado» y «es un vehiculo» no importan. Cada caso de aqui es una de las
+        // tres entradas que la linea no guarda y que el recalculo reinventaba.
+
+        private static final long VEHICULO = 55L;
+        private static final long PREDIO_SIN_FICHA = 21L;
+        private static final long FICHA_FUERA_DE_LA_PROYECCION = 999L;
+
+        @ParameterizedTest(name = "vehiculo {0}")
+        @EnumSource(
+                value = Hallazgo.class,
+                names = {"CONFORME", "SUBVALUADOR", "NO_UBICADO", "OMISO"})
+        @DisplayName("una linea vehicular corregida sin ningun campo conserva su condicion")
+        void unaLineaVehicularSinCamposConservaSuCondicion(Hallazgo hallazgo) {
+            // OMISO es el control: es lo que el recalculo de antes devolvia para CUALQUIER
+            // vehiculo, asi que con el sale verde antes y despues.
+            long vehicular = sembrarVehicular(hallazgo);
+            Liquidacion primera = liquidarActa(vehicular, E2024);
+            CondicionFiscalizada antes =
+                    liquidaciones.lineasDe(primera.identificador()).get(0).condicion();
+            assertThat(antes)
+                    .as("la siembra: la linea nace con el hallazgo del acta")
+                    .isEqualTo(CondicionFiscalizada.porNombre(hallazgo.name()));
+
+            Liquidacion segunda =
+                    reliquidarCon(primera, E2024, correccion(E2024, null, null, null, null));
+
+            assertThat(liquidaciones.lineasDe(segunda.identificador()).get(0).condicion())
+                    .as(
+                            "un vehiculo no tiene area ni uso: una correccion vacia no puede"
+                                    + " convertirlo en OMISO")
+                    .isEqualTo(antes);
+        }
+
+        @Test
+        @DisplayName("una linea vehicular corregida con un area se rechaza, y no nace la v2")
+        void unaLineaVehicularConAreaSeRechaza() {
+            long vehicular = sembrarVehicular(Hallazgo.CONFORME);
+            Liquidacion primera = liquidarActa(vehicular, E2024);
+
+            assertThatThrownBy(
+                            () ->
+                                    reliquidarCon(
+                                            primera,
+                                            E2024,
+                                            correccion(
+                                                    E2024, null, AreaM2.de("150.00"), null, null)))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("vehicul")
+                    .hasMessageContaining("areaHallada");
+            assertThat(liquidaciones.versionesDeActa(vehicular)).hasSize(1);
+        }
+
+        @Test
+        @DisplayName("un predio NO_UBICADO sin DJ, corregido sin campos, sigue NO_UBICADO")
+        void noUbicadoSinDeclaracionSigueNoUbicado() {
+            long noUbicada = sembrarPredial(PREDIO, Hallazgo.NO_UBICADO, null);
+            // 2025 no tiene DJ: la linea nace sin areas ni usos.
+            Liquidacion primera = liquidarActa(noUbicada, E2025);
+            LineaDeLiquidacion base = liquidaciones.lineasDe(primera.identificador()).get(0);
+            assertThat(base.condicion()).isEqualTo(CondicionFiscalizada.NO_UBICADO);
+            assertThat(base.areaDeclarada()).isNull();
+            assertThat(base.usoDeclarado()).isNull();
+
+            Liquidacion segunda =
+                    reliquidarCon(primera, E2025, correccion(E2025, null, null, null, null));
+
+            assertThat(liquidaciones.lineasDe(segunda.identificador()).get(0).condicion())
+                    .as("nadie encontro el predio: no se le puede tratar como omiso")
+                    .isEqualTo(CondicionFiscalizada.NO_UBICADO);
+        }
+
+        @Test
+        @DisplayName("un predio NO_UBICADO con DJ, corregido sin campos, sigue NO_UBICADO")
+        void noUbicadoConDeclaracionSigueNoUbicado() {
+            long noUbicada = sembrarPredial(PREDIO, Hallazgo.NO_UBICADO, null);
+            // 2024 tiene DJ con ficha y uso: la linea nace con lo declarado y nada hallado.
+            Liquidacion primera = liquidarActa(noUbicada, E2024);
+            LineaDeLiquidacion base = liquidaciones.lineasDe(primera.identificador()).get(0);
+            assertThat(base.condicion()).isEqualTo(CondicionFiscalizada.NO_UBICADO);
+            assertThat(base.areaDeclarada()).isEqualTo(AreaM2.de("120.00"));
+
+            Liquidacion segunda =
+                    reliquidarCon(primera, E2024, correccion(E2024, null, null, null, null));
+
+            assertThat(liquidaciones.lineasDe(segunda.identificador()).get(0).condicion())
+                    .as("CONFORME diria que se ubico y se midio, y no se hizo ninguna de las dos")
+                    .isEqualTo(CondicionFiscalizada.NO_UBICADO);
+        }
+
+        @Test
+        @DisplayName("corregir lo hallado de un predio NO_UBICADO se rechaza: es otra visita")
+        void corregirLoHalladoDeUnNoUbicadoSeRechaza() {
+            long noUbicada = sembrarPredial(PREDIO, Hallazgo.NO_UBICADO, null);
+            Liquidacion primera = liquidarActa(noUbicada, E2024);
+
+            assertThatThrownBy(
+                            () ->
+                                    reliquidarCon(
+                                            primera,
+                                            E2024,
+                                            correccion(
+                                                    E2024, null, AreaM2.de("150.00"), null, null)))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("NO_UBICADO")
+                    .hasMessageContaining("otra visita");
+            assertThat(liquidaciones.versionesDeActa(noUbicada)).hasSize(1);
+        }
+
+        @Test
+        @DisplayName(
+                "quien declaro sin area ni uso resolubles, corregido con un area hallada, sigue"
+                        + " CONFORME")
+        void declaranteSinAreaResolubleSigueConforme() {
+            // La DJ 2024 esta presentada, pero su ficha no esta en la proyeccion de catastro y el
+            // predio no tiene caracteristicas: declaro y no hay nada que comparar (#166).
+            rentas.con(
+                    PREDIO_SIN_FICHA,
+                    new DeclaracionDelEjercicio(
+                            2L,
+                            "DJ-0002",
+                            E2024,
+                            CONTRIBUYENTE,
+                            LocalDate.of(2024, 2, 21),
+                            false,
+                            FICHA_FUERA_DE_LA_PROYECCION));
+            long declarante = sembrarPredial(PREDIO_SIN_FICHA, Hallazgo.CONFORME, null);
+            Liquidacion primera = liquidarActa(declarante, E2024);
+            LineaDeLiquidacion base = liquidaciones.lineasDe(primera.identificador()).get(0);
+            assertThat(base.condicion()).isEqualTo(CondicionFiscalizada.CONFORME);
+            assertThat(base.areaDeclarada()).isNull();
+            assertThat(base.usoDeclarado()).isNull();
+
+            Liquidacion segunda =
+                    reliquidarCon(
+                            primera,
+                            E2024,
+                            correccion(E2024, null, AreaM2.de("150.00"), null, null));
+
+            LineaDeLiquidacion corregida = liquidaciones.lineasDe(segunda.identificador()).get(0);
+            assertThat(corregida.areaHallada()).isEqualTo(AreaM2.de("150.00"));
+            assertThat(corregida.condicion())
+                    .as(
+                            "el AC 3 de #49: tratar como omiso a quien declaro produce una"
+                                    + " determinacion que se anula en reclamacion")
+                    .isEqualTo(CondicionFiscalizada.CONFORME);
+        }
+
+        @Test
+        @DisplayName("el control: un OMISO corregido con lo declarado SI se compara")
+        void unOmisoCorregidoConLoDeclaradoSeCompara() {
+            // La otra mitad de «presento declaracion»: lo que la corrección trae explicitamente
+            // tambien cuenta. El acta de `armar()` midio 300 m2 y 2025 no tiene DJ.
+            Liquidacion primera = liquidarDe(E2025, E2025);
+            assertThat(liquidaciones.lineasDe(primera.identificador()).get(0).condicion())
+                    .isEqualTo(CondicionFiscalizada.OMISO);
+
+            Liquidacion segunda =
+                    reliquidarCon(
+                            primera,
+                            E2025,
+                            correccion(E2025, AreaM2.de("120.00"), null, null, null));
+
+            assertThat(liquidaciones.lineasDe(segunda.identificador()).get(0).condicion())
+                    .isEqualTo(CondicionFiscalizada.SUBVALUADOR);
+        }
+
+        @Test
+        @DisplayName("y un OMISO corregido solo en lo hallado sigue OMISO")
+        void unOmisoCorregidoEnLoHalladoSigueOmiso() {
+            Liquidacion primera = liquidarDe(E2025, E2025);
+
+            Liquidacion segunda =
+                    reliquidarCon(
+                            primera,
+                            E2025,
+                            correccion(E2025, null, AreaM2.de("180.00"), null, null));
+
+            assertThat(liquidaciones.lineasDe(segunda.identificador()).get(0).condicion())
+                    .isEqualTo(CondicionFiscalizada.OMISO);
+        }
+
+        private long sembrarVehicular(Hallazgo hallazgo) {
+            long id =
+                    actas.sembrar(
+                            ActaFiscalizacion.nuevaVehicular(
+                                    1L,
+                                    1,
+                                    CONTRIBUYENTE,
+                                    VEHICULO,
+                                    LocalDate.of(2026, 3, 1),
+                                    "J. Perez",
+                                    hallazgo,
+                                    null,
+                                    OBSERVACION));
+            liquidaciones.actaDe(id, CONTRIBUYENTE);
+            return id;
+        }
+
+        private long sembrarPredial(long predio, Hallazgo hallazgo, @Nullable AreaM2 areaHallada) {
+            long id =
+                    actas.sembrar(
+                            ActaFiscalizacion.nuevaPredial(
+                                    1L,
+                                    2,
+                                    CONTRIBUYENTE,
+                                    predio,
+                                    null,
+                                    LocalDate.of(2026, 3, 1),
+                                    "J. Perez",
+                                    hallazgo,
+                                    areaHallada,
+                                    null,
+                                    null,
+                                    OBSERVACION));
+            liquidaciones.actaDe(id, CONTRIBUYENTE);
+            return id;
+        }
+
+        private Liquidacion liquidarActa(long id, Ejercicio ejercicio) {
+            return liquidar.liquidar(
+                    id,
+                    ejercicio,
+                    ejercicio,
+                    TipoDeFiscalizacion.CIERTA,
+                    "Hallazgo de la visita",
+                    HOY,
+                    OBSERVACION);
+        }
+
+        private Liquidacion reliquidarCon(
+                Liquidacion anterior, Ejercicio ejercicio, CorreccionDeLinea correccion) {
+            return reliquidar
+                    .reliquidar(
+                            anterior.numero(),
+                            ejercicio,
+                            ejercicio,
+                            TipoDeFiscalizacion.CIERTA,
+                            "Correccion de la prueba",
+                            List.of(correccion),
+                            HOY,
+                            OBSERVACION)
+                    .liquidacion();
+        }
+
+        private CorreccionDeLinea correccion(
+                Ejercicio ejercicio,
+                @Nullable AreaM2 areaDeclarada,
+                @Nullable AreaM2 areaHallada,
+                @Nullable String usoDeclarado,
+                @Nullable String usoHallado) {
+            return new CorreccionDeLinea(
+                    ejercicio, areaDeclarada, areaHallada, usoDeclarado, usoHallado);
         }
     }
 

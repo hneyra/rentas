@@ -1,5 +1,6 @@
 package kamayuk.rentas.fiscalizacion.dominio;
 
+import java.util.List;
 import java.util.Objects;
 import kamayuk.rentas.dominio.AreaM2;
 import kamayuk.rentas.dominio.Dinero;
@@ -188,6 +189,111 @@ public record LineaDeLiquidacion(
                 baseHallada,
                 insolutoOmitido,
                 multaTributaria);
+    }
+
+    /**
+     * Esta línea con la corrección aplicada, el conjunto sellado <b>de esta</b> y la condición
+     * recalculada (#340).
+     *
+     * <p>La condición se recalcula y no se recibe: si llegara del cliente, una reliquidación podría
+     * declarar {@code CONFORME} un predio con quinientos metros de diferencia.
+     *
+     * <h2>Los lados salen de lo que la base implica, no de sus nulos</h2>
+     *
+     * <p>{@link ComparacionHalladoDeclarado#condicion} decide con siete entradas y la línea guarda
+     * cuatro —áreas y usos— más la <b>salida</b>. Las otras tres —si se presentó declaración, si se
+     * presentó fuera de plazo y si el predio se ubicó— no viajan con ella, y hasta #340 {@code
+     * ReliquidarFiscalizacion} las reinventaba: «presentó» era «hay área o uso declarados», {@code
+     * fueraDePlazo} era {@code false} y {@code ubicado} era siempre {@code true}. Así un vehículo
+     * CONFORME salía OMISO con una corrección vacía, un predio NO_UBICADO salía OMISO o CONFORME, y
+     * quien declaró sin ficha resoluble salía OMISO, que es lo que prohíbe el AC 3 de #49.
+     *
+     * <p>Ahora se derivan de la condición guardada, que es la salida de la misma función con las
+     * entradas completas:
+     *
+     * <ul>
+     *   <li><b>Una línea vehicular</b> no tiene área ni uso que corregir: si la corrección trae
+     *       alguno, se rechaza nombrándolo; si no trae ninguno, la línea se conserva tal cual. Su
+     *       condición es el hallazgo del acta, no una comparación.
+     *   <li><b>{@code ubicado}</b> es {@code condicion != NO_UBICADO}. Corregir lo hallado de un
+     *       NO_UBICADO se rechaza: ubicar el predio es otra visita, que es la regla de {@link
+     *       ActaFiscalizacion#anulada()} —«la corrección de una visita es otra visita»—.
+     *   <li><b>{@code presentoDeclaracion}</b> es {@code condicion != OMISO}, o que la corrección
+     *       traiga lo declarado. No se deduce de que haya área o uso.
+     *   <li><b>{@code fueraDePlazo}</b> no decide la condición (AC 3) y no se inventa: se pasa
+     *       {@code false} porque el tipo lo exige, el comparador no lo lee y no sale de este
+     *       método, porque la línea no lo guarda. Persistirlo es cosa de la multa del art. 176
+     *       (D-02c).
+     * </ul>
+     *
+     * <p>Una corrección sin ningún campo sobre una línea predial reproduce la condición guardada:
+     * con las entradas derivadas así, la función devuelve lo que devolvió al liquidar.
+     *
+     * @throws IllegalArgumentException si la corrección es de otro ejercicio, si corrige área o uso
+     *     de una línea vehicular, o si corrige lo hallado de un predio NO_UBICADO
+     */
+    public LineaDeLiquidacion corregidaCon(CorreccionDeLinea correccion) {
+        Objects.requireNonNull(correccion, "Corregir una linea necesita la correccion");
+        if (!correccion.ejercicio().equals(ejercicio)) {
+            throw new IllegalArgumentException(
+                    "La correccion del ejercicio "
+                            + correccion.ejercicio()
+                            + " no es de la linea del ejercicio "
+                            + ejercicio);
+        }
+
+        if (vehiculoId != null) {
+            List<String> campos = correccion.camposQueCorrige();
+            if (!campos.isEmpty()) {
+                throw new IllegalArgumentException(
+                        "Una linea vehicular no tiene area ni uso que corregir, y la correccion del"
+                                + " ejercicio "
+                                + ejercicio
+                                + " trae "
+                                + String.join(", ", campos)
+                                + ": su condicion es el hallazgo del acta (#340)");
+            }
+            return this;
+        }
+
+        boolean ubicado = condicion != CondicionFiscalizada.NO_UBICADO;
+        if (!ubicado && correccion.corrigeLoHallado()) {
+            throw new IllegalArgumentException(
+                    "El predio del ejercicio "
+                            + ejercicio
+                            + " quedo NO_UBICADO: corregir lo hallado ("
+                            + String.join(", ", correccion.camposQueCorrige())
+                            + ") es ubicarlo, y eso es otra visita, no una reliquidacion (#340)");
+        }
+
+        AreaM2 declarada = conservar(correccion.areaDeclarada(), areaDeclarada);
+        AreaM2 hallada = conservar(correccion.areaHallada(), areaHallada);
+        String elUsoDeclarado = conservar(correccion.usoDeclarado(), usoDeclarado);
+        String elUsoHallado = conservar(correccion.usoHallado(), usoHallado);
+
+        boolean presentoDeclaracion =
+                condicion != CondicionFiscalizada.OMISO || correccion.corrigeLoDeclarado();
+        ComparacionHalladoDeclarado.LoDeclarado loDeclarado =
+                new ComparacionHalladoDeclarado.LoDeclarado(
+                        presentoDeclaracion, false, declarada, elUsoDeclarado);
+        ComparacionHalladoDeclarado.LoHallado loHallado =
+                ubicado
+                        ? ComparacionHalladoDeclarado.LoHallado.de(hallada, elUsoHallado)
+                        : ComparacionHalladoDeclarado.LoHallado.noUbicado();
+
+        return predialSinCifras(
+                ejercicio,
+                conjuntoId,
+                Objects.requireNonNull(predioId),
+                ComparacionHalladoDeclarado.condicion(loDeclarado, loHallado),
+                declarada,
+                hallada,
+                elUsoDeclarado,
+                elUsoHallado);
+    }
+
+    private static <T> @Nullable T conservar(@Nullable T corregido, @Nullable T anterior) {
+        return corregido == null ? anterior : corregido;
     }
 
     /**

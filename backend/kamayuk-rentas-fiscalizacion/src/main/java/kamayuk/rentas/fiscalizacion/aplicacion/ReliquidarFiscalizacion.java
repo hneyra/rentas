@@ -6,19 +6,17 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import kamayuk.rentas.dominio.AreaM2;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.fiscalizacion.dominio.ActaFiscalizacion;
 import kamayuk.rentas.fiscalizacion.dominio.ActaFiscalizacionRepository;
-import kamayuk.rentas.fiscalizacion.dominio.ComparacionHalladoDeclarado;
+import kamayuk.rentas.fiscalizacion.dominio.CorreccionDeLinea;
 import kamayuk.rentas.fiscalizacion.dominio.DiferenciaEntreLiquidaciones;
 import kamayuk.rentas.fiscalizacion.dominio.LineaDeLiquidacion;
 import kamayuk.rentas.fiscalizacion.dominio.Liquidacion;
 import kamayuk.rentas.fiscalizacion.dominio.LiquidacionRepository;
 import kamayuk.rentas.fiscalizacion.dominio.PlantillaDeNumeroDeLiquidacion;
 import kamayuk.rentas.fiscalizacion.dominio.TipoDeFiscalizacion;
-import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -183,78 +181,13 @@ public class ReliquidarFiscalizacion {
                 throw new EjercicioSinLineaAnterior(ejercicio);
             }
             CorreccionDeLinea correccion = corregidas.get(ejercicio.valor());
-            nuevas.add(correccion == null ? base : aplicar(base, correccion));
+            // La linea se corrige a si misma (#340): hasta entonces este caso de uso recalculaba la
+            // condicion reinventando los lados de la comparacion a partir de los nulos de la
+            // linea, y un vehiculo CONFORME salia OMISO. Lo que la condicion necesita y la linea
+            // no guarda lo deriva `corregidaCon` de la condicion guardada.
+            nuevas.add(correccion == null ? base : base.corregidaCon(correccion));
         }
         return nuevas;
-    }
-
-    /**
-     * La línea corregida, con el conjunto sellado <b>de la anterior</b> y la condición recalculada
-     * sobre los datos nuevos.
-     *
-     * <p>La condición se recalcula y no se recibe: si llegara del cliente, una reliquidación podría
-     * declarar {@code CONFORME} un predio con quinientos metros de diferencia.
-     */
-    private static LineaDeLiquidacion aplicar(
-            LineaDeLiquidacion base, CorreccionDeLinea correccion) {
-
-        AreaM2 declarada =
-                correccion.areaDeclarada() == null
-                        ? base.areaDeclarada()
-                        : correccion.areaDeclarada();
-        AreaM2 hallada =
-                correccion.areaHallada() == null ? base.areaHallada() : correccion.areaHallada();
-        String usoDeclarado =
-                correccion.usoDeclarado() == null ? base.usoDeclarado() : correccion.usoDeclarado();
-        String usoHallado =
-                correccion.usoHallado() == null ? base.usoHallado() : correccion.usoHallado();
-
-        ComparacionHalladoDeclarado.LoDeclarado loDeclarado =
-                declarada == null && usoDeclarado == null
-                        ? ComparacionHalladoDeclarado.LoDeclarado.nada()
-                        : new ComparacionHalladoDeclarado.LoDeclarado(
-                                true, false, declarada, usoDeclarado);
-        ComparacionHalladoDeclarado.LoHallado loHallado =
-                ComparacionHalladoDeclarado.LoHallado.de(hallada, usoHallado);
-
-        if (base.predioId() != null) {
-            return LineaDeLiquidacion.predialSinCifras(
-                    base.ejercicio(),
-                    base.conjuntoId(),
-                    base.predioId(),
-                    ComparacionHalladoDeclarado.condicion(loDeclarado, loHallado),
-                    declarada,
-                    hallada,
-                    usoDeclarado,
-                    usoHallado);
-        }
-        return LineaDeLiquidacion.vehicularSinCifras(
-                base.ejercicio(),
-                base.conjuntoId(),
-                Objects.requireNonNull(base.vehiculoId()),
-                ComparacionHalladoDeclarado.condicion(loDeclarado, loHallado));
-    }
-
-    /**
-     * Lo que se corrige de una línea. Lo que llega {@code null} se conserva de la versión anterior:
-     * una corrección parcial no borra lo que no nombra.
-     *
-     * @param ejercicio qué línea se corrige
-     * @param areaDeclarada la superficie declarada corregida
-     * @param areaHallada la superficie hallada corregida
-     * @param usoDeclarado el uso declarado corregido
-     * @param usoHallado el uso hallado corregido
-     */
-    public record CorreccionDeLinea(
-            Ejercicio ejercicio,
-            @Nullable AreaM2 areaDeclarada,
-            @Nullable AreaM2 areaHallada,
-            @Nullable String usoDeclarado,
-            @Nullable String usoHallado) {
-
-        public CorreccionDeLinea {
-            Objects.requireNonNull(ejercicio, "Una correccion dice que ejercicio corrige");
-        }
     }
 
     /**

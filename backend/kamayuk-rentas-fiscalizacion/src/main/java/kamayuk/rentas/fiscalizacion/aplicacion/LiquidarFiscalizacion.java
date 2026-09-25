@@ -75,10 +75,10 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>Hasta que {@code acta_fiscalizacion} tuvo su columna {@code uso_hallado} (V76), el uso
  * observado llegaba como <b>argumento de este método</b>: lo tecleaba quien liquidaba, no quien
  * visitó. Ahora se lee del acta, y con eso el hecho tiene un solo sitio donde vive. Corregirlo
- * sigue siendo <b>reliquidar</b> —{@link ReliquidarFiscalizacion.CorreccionDeLinea} ya lo admitía—,
- * que es otra versión que referencia a la anterior y explica la diferencia: mantener además el
- * argumento habría dejado dos verdades sobre lo mismo, que es lo que #397 y #481 evitaron derivando
- * en vez de guardar dos veces.
+ * sigue siendo <b>reliquidar</b> —{@link kamayuk.rentas.fiscalizacion.dominio.CorreccionDeLinea} ya
+ * lo admitía—, que es otra versión que referencia a la anterior y explica la diferencia: mantener
+ * además el argumento habría dejado dos verdades sobre lo mismo, que es lo que #397 y #481 evitaron
+ * derivando en vez de guardar dos veces.
  *
  * <h2>Ni un importe</h2>
  *
