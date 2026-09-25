@@ -28,6 +28,8 @@ import kamayuk.rentas.fiscalizacion.dominio.LiquidacionRepository;
 import kamayuk.rentas.fiscalizacion.dominio.MovimientoDeLiquidacionRepository;
 import kamayuk.rentas.fiscalizacion.dominio.ResolucionDeDeterminacion;
 import kamayuk.rentas.fiscalizacion.dominio.ResolucionDeDeterminacionRepository;
+import kamayuk.rentas.fiscalizacion.dominio.ResolucionEnLaRelacion;
+import kamayuk.rentas.fiscalizacion.dominio.UnidadYaDeterminada;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -168,6 +170,8 @@ public class TransferirARentas {
      * @throws SinSustentoDocumental si el contraste todavia no es definitivo o falta el papel
      * @throws LiquidacionSustituida si una reliquidacion posterior la dejo sin efecto
      * @throws ResolucionDeDeterminacionRepository.LiquidacionYaTransferida si ya se transfirio
+     * @throws YaDeterminadaDeOficio si otra resolucion viva ya determina esa unidad en alguno de
+     *     esos ejercicios (#462)
      * @throws TransferenciaDeFiscalizacion.SinFichaQueVersionar si el predio no tiene ficha vigente
      * @throws ActaFiscalizacion.ActaAnulada si la visita que sustenta la liquidacion esta anulada
      */
@@ -184,17 +188,6 @@ public class TransferirARentas {
 
         exigirSustento(liquidacion, peticion);
 
-        // La comprobacion previa ahorra el trabajo y da un mensaje util; la que lo IMPIDE es
-        // `resolucion_determinacion_liquidacion_uq` (V49), porque dos peticiones simultaneas
-        // pasan las dos por este `if` (AC 6).
-        resoluciones
-                .deLiquidacion(liquidacionId)
-                .ifPresent(
-                        yaEsta -> {
-                            throw new ResolucionDeDeterminacionRepository.LiquidacionYaTransferida(
-                                    liquidacionId);
-                        });
-
         ActaFiscalizacion acta =
                 actas.findById(liquidacion.actaId())
                         .orElseThrow(
@@ -205,6 +198,9 @@ public class TransferirARentas {
         // resolucion salia aunque la visita que la sustenta estuviera anulada. Va ANTES del
         // padron: es el primer paso que escribe fuera de fiscalizacion.
         acta.exigirViva();
+
+        exigirQueNadieLaHayaDeterminado(liquidacion, acta);
+
         List<LineaDeLiquidacion> lineas = liquidaciones.lineasDe(liquidacionId);
 
         // 1. El padron. Unico camino de escritura hacia catastro, y va primero para que el papel
@@ -333,6 +329,53 @@ public class TransferirARentas {
                 .ifPresent(
                         ultima -> {
                             throw new LiquidacionSustituida(liquidacion.numero(), ultima.numero());
+                        });
+    }
+
+    /**
+     * Una determinacion de oficio viva por unidad y ejercicio (#462).
+     *
+     * <p>Hasta #462 solo se miraba si <b>esta</b> liquidacion ya tenia resolucion, y la unica
+     * barrera del motor era {@code resolucion_determinacion_liquidacion_uq}, tambien por
+     * liquidacion. Pero a la misma unidad y los mismos ejercicios se llega con otra: la v2 que
+     * reliquida una ya transferida, o la liquidacion de la segunda visita al mismo vehiculo. Las
+     * dos se transferian, y quedaban dos RDF vigentes sobre la misma obligacion, cada una con su
+     * plazo de reclamacion y —el dia que las lineas traigan cifras— con sus cargos en el libro.
+     *
+     * <p>Las dos comprobaciones van <b>despues del candado</b> de la unidad, en la misma
+     * transaccion que las escrituras: sin el, dos transferencias simultaneas de dos liquidaciones
+     * distintas pasan las dos por estos {@code if}, porque ninguna ve la resolucion de la otra
+     * hasta que confirma, y no chocan en ningun indice. La de la misma liquidacion va primero
+     * porque su mensaje es mas preciso; la que la impide de verdad, para la misma liquidacion,
+     * sigue siendo el indice unico de V49.
+     *
+     * <p>Se comprueba aqui y no al liquidar ni al reliquidar porque este es el unico sitio que
+     * escribe fuera de fiscalizacion ({@code
+     * SOLO_LA_TRANSFERENCIA_ESCRIBE_FUERA_DE_FISCALIZACION}): una liquidacion mas es un borrador
+     * que se puede anular, una resolucion mas es un acto notificado.
+     */
+    private void exigirQueNadieLaHayaDeterminado(Liquidacion liquidacion, ActaFiscalizacion acta) {
+        resoluciones.bloquearLaUnidad(acta.predioId(), acta.vehiculoId());
+
+        long liquidacionId = liquidacion.identificador();
+        resoluciones
+                .deLiquidacion(liquidacionId)
+                .ifPresent(
+                        yaEsta -> {
+                            throw new ResolucionDeDeterminacionRepository.LiquidacionYaTransferida(
+                                    liquidacionId);
+                        });
+
+        UnidadYaDeterminada regla = UnidadYaDeterminada.para(acta, liquidacion);
+        regla.laQueYaDetermina(
+                        resoluciones.vigentesSobreLaUnidad(acta.predioId(), acta.vehiculoId()))
+                .ifPresent(
+                        anterior -> {
+                            throw new YaDeterminadaDeOficio(
+                                    liquidacion.numero(),
+                                    referenciaDeLaUnidad(acta),
+                                    regla,
+                                    anterior);
                         });
     }
 
@@ -517,6 +560,47 @@ public class TransferirARentas {
 
         SinSustentoDocumental(String numero, String motivo) {
             super("La liquidacion " + numero + " no se puede transferir: " + motivo);
+        }
+    }
+
+    /**
+     * Otra resolucion viva ya determina esa unidad en alguno de esos ejercicios (#462): emitir otra
+     * seria un segundo acto de determinacion sobre la misma obligacion.
+     *
+     * <p>El mensaje nombra la resolucion anterior y lo que procede, porque «no se puede» a secas
+     * deja a quien opera sin saber que papel ya esta en la calle. Lo que procede —dejarla sin
+     * efecto y revertir sus cargos— es un acto que todavia no existe, y se dice igual.
+     */
+    public static final class YaDeterminadaDeOficio extends RuntimeException {
+
+        @java.io.Serial private static final long serialVersionUID = 1L;
+
+        YaDeterminadaDeOficio(
+                String numero,
+                String unidad,
+                UnidadYaDeterminada regla,
+                ResolucionEnLaRelacion anterior) {
+            super(
+                    "La liquidacion "
+                            + numero
+                            + " no se puede transferir: el "
+                            + unidad.toLowerCase(java.util.Locale.ROOT)
+                            + " ya tiene la resolucion de determinacion "
+                            + anterior.numero()
+                            + " (liquidacion "
+                            + anterior.numeroDeLiquidacion()
+                            + ", ejercicios "
+                            + anterior.periodoDesde()
+                            + " a "
+                            + anterior.periodoHasta()
+                            + "), y otra sobre los ejercicios "
+                            + regla.desde()
+                            + " a "
+                            + regla.hasta()
+                            + " seria un segundo acto sobre la misma obligacion, con su propio"
+                            + " plazo de reclamacion y sus cargos por duplicado: primero hay que"
+                            + " dejar sin efecto la "
+                            + anterior.numero());
         }
     }
 

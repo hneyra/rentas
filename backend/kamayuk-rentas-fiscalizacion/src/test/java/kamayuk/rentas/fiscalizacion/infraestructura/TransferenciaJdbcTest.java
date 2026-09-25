@@ -67,6 +67,7 @@ import kamayuk.rentas.fiscalizacion.dominio.ResolucionDeDeterminacionRepository;
 import kamayuk.rentas.fiscalizacion.dominio.ResolucionEnLaRelacion;
 import kamayuk.rentas.fiscalizacion.dominio.TipoDeFiscalizacion;
 import kamayuk.rentas.plataforma.tenant.TenantTransactionManager;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -573,6 +574,150 @@ class TransferenciaJdbcTest {
     }
 
     @Nested
+    @DisplayName("#462 — Una determinacion de oficio viva por unidad y ejercicio")
+    class UnaDeterminacionPorUnidadYEjercicio {
+
+        @Test
+        @DisplayName(
+                "la segunda visita al mismo predio y ejercicio no se transfiere: una RDF y un cargo")
+        void laSegundaVisitaNoSeTransfiere() {
+            // Contra la base: lo que se mide aqui ademas de la regla es la LECTURA —que la fila
+            // de la unidad traiga el periodo de su liquidacion por el JOIN, y que filtre por la
+            // columna de la unidad—, que el doble en memoria solo imita.
+            Escenario primera = sembrar(municipalidadA, Dinero.de("450.00"));
+            TransferirARentas.Transferencia hecha = transferir(primera);
+            Escenario segunda = otraVisitaA(primera, Dinero.de("450.00"));
+
+            assertThatThrownBy(() -> transferir(segunda))
+                    .isInstanceOf(TransferirARentas.YaDeterminadaDeOficio.class)
+                    .hasMessageContaining(hecha.resolucion().numero())
+                    .hasMessageContaining("primero hay que dejar sin efecto");
+
+            assertThat(contarDonde("resolucion_determinacion", "predio_id = " + primera.predioId()))
+                    .isEqualTo(1);
+            assertThat(
+                            contarDonde(
+                                    "cuenta_corriente_asiento",
+                                    "contribuyente_id = " + primera.contribuyenteId()))
+                    .as("un cargo: la misma obligacion no se carga dos veces")
+                    .isEqualTo(1);
+        }
+
+        @Test
+        // Se captura RuntimeException a proposito: el hilo B puede salir por la regla, que es lo
+        // esperado, o por cualquier otro rechazo si alguien la rompe; lo que se mide es el total.
+        @SuppressWarnings("checkstyle:IllegalCatch")
+        @DisplayName(
+                "dos transferencias simultaneas de dos liquidaciones del mismo predio: la segunda"
+                        + " espera el candado y ve la primera")
+        void dosSimultaneasSobreLaMismaUnidad() throws Exception {
+            // Lo que el indice de V49 no puede impedir: son dos liquidaciones distintas, y la
+            // regla en Java la pasan las dos si ninguna ve la resolucion de la otra. Para que el
+            // rojo sea el de la regla y no otro, se esquivan las dos serializaciones que lo
+            // disimularian: B se fecha en 2027, asi que su RDF no compite con la de A por el
+            // numero en `documento_numero_uq`, y las lineas van sin cifra, asi que ninguna toca
+            // el libro.
+            Escenario deA = sembrar(municipalidadA, null);
+            Escenario deB = otraVisitaA(deA, null);
+            CountDownLatch registrada = new CountDownLatch(1);
+            CountDownLatch soltar = new CountDownLatch(1);
+            TransferirARentas queEspera =
+                    envolver(
+                            armar(
+                                    new ResolucionQueEsperaTrasRegistrar(
+                                            resoluciones, registrada, soltar)));
+            ExecutorService piscina = Executors.newFixedThreadPool(2);
+
+            try {
+                Future<Boolean> hiloA =
+                        piscina.submit(
+                                () ->
+                                        comoFiscalizador(
+                                                () ->
+                                                        queEspera.transferir(
+                                                                peticion(deA),
+                                                                FormatoDeDocumento.PDF,
+                                                                PORQUE)));
+                assertThat(registrada.await(60, TimeUnit.SECONDS))
+                        .as("A registro su resolucion y retiene la transaccion abierta")
+                        .isTrue();
+
+                Future<Boolean> hiloB =
+                        piscina.submit(
+                                () ->
+                                        comoFiscalizador(
+                                                () ->
+                                                        transferir.transferir(
+                                                                peticionEn(
+                                                                        deB,
+                                                                        LocalDate.of(2027, 1, 15)),
+                                                                FormatoDeDocumento.PDF,
+                                                                PORQUE)));
+                boolean esperoElCandado = esperarAQueAlguienEspereUnCandado(hiloB);
+                soltar.countDown();
+
+                assertThat(hiloA.get(60, TimeUnit.SECONDS)).as("A entra").isTrue();
+                boolean entroB = hiloB.get(60, TimeUnit.SECONDS);
+                assertThat(contarDonde("resolucion_determinacion", "predio_id = " + deA.predioId()))
+                        .as(
+                                "una resolucion sobre el predio y el ejercicio, no dos: sin el"
+                                        + " candado B no ve la de A y emite la suya")
+                        .isEqualTo(1);
+                assertThat(entroB).as("B se rechaza").isFalse();
+                assertThat(esperoElCandado)
+                        .as("y se rechaza porque espero el candado de la unidad, no por otra cosa")
+                        .isTrue();
+            } finally {
+                soltar.countDown();
+                piscina.shutdownNow();
+            }
+        }
+
+        /**
+         * Si mientras A retiene la transaccion alguna sesion de esta base queda esperando un
+         * candado consultivo. Deja de mirar si B termina antes: sin candado, no espera nada.
+         */
+        private boolean esperarAQueAlguienEspereUnCandado(Future<Boolean> hiloB)
+                throws InterruptedException {
+            long hasta = System.nanoTime() + TimeUnit.SECONDS.toNanos(20);
+            while (System.nanoTime() < hasta && !hiloB.isDone()) {
+                long esperando =
+                        transaccion.execute(
+                                estado ->
+                                        jdbc.sql(
+                                                        "SELECT count(*) FROM pg_locks"
+                                                                + " WHERE locktype = 'advisory'"
+                                                                + " AND NOT granted"
+                                                                + " AND database = (SELECT oid"
+                                                                + " FROM pg_database WHERE"
+                                                                + " datname = current_database())")
+                                                .query(Long.class)
+                                                .single());
+                if (esperando > 0) {
+                    return true;
+                }
+                Thread.sleep(50);
+            }
+            return false;
+        }
+
+        @SuppressWarnings("checkstyle:IllegalCatch")
+        private boolean comoFiscalizador(Runnable transferencia) {
+            TenantContext.fijar(new MunicipalidadId(municipalidadA));
+            OrigenContext.fijar(new Origen("fiscalizador.campo", null, null));
+            try {
+                transferencia.run();
+                return true;
+            } catch (RuntimeException rechazada) {
+                return false;
+            } finally {
+                TenantContext.limpiar();
+                OrigenContext.limpiar();
+            }
+        }
+    }
+
+    @Nested
     @DisplayName("Solo se agrega, y solo se ve lo propio")
     class DeLaInmutabilidadYElAislamiento {
 
@@ -767,9 +912,13 @@ class TransferenciaJdbcTest {
     }
 
     private static TransferirARentas.Peticion peticion(Escenario escenario) {
+        return peticionEn(escenario, HOY);
+    }
+
+    private static TransferirARentas.Peticion peticionEn(Escenario escenario, LocalDate fecha) {
         return new TransferirARentas.Peticion(
                 escenario.numeroDeLiquidacion,
-                HOY,
+                fecha,
                 "ACTA-2026-" + escenario.liquidacionId,
                 "Ampliacion no declarada, verificada en inspeccion",
                 "TUO del Codigo Tributario, arts. 76 y 77");
@@ -828,7 +977,7 @@ class TransferenciaJdbcTest {
      * mecanismo de la transferencia no depende de D-02a, y sin importes no habria cargo que
      * comprobar (#198).
      */
-    private static Escenario sembrar(long municipalidadId, Dinero insoluto) {
+    private static Escenario sembrar(long municipalidadId, @Nullable Dinero insoluto) {
         String sufijo = String.valueOf(SIGUIENTE.getAndIncrement());
         long contribuyente =
                 ejecutarComoApp(
@@ -861,6 +1010,32 @@ class TransferenciaJdbcTest {
                         municipalidadId,
                         predio,
                         VIGENCIA_ORIGINAL);
+        return visitaLiquidada(municipalidadId, contribuyente, predio, ficha, insoluto);
+    }
+
+    /**
+     * La visita de otro programa al MISMO predio, con su liquidacion LIQUIDADA del mismo ejercicio
+     * (#462): «refiscalizar no reemplaza el acta anterior, agrega una version».
+     */
+    private static Escenario otraVisitaA(Escenario primera, @Nullable Dinero insoluto) {
+        return visitaLiquidada(
+                municipalidadA,
+                primera.contribuyenteId(),
+                primera.predioId(),
+                primera.fichaId(),
+                insoluto);
+    }
+
+    /**
+     * Un programa, su acta sobre ese predio y una liquidacion LIQUIDADA de {@link #FISCALIZADO}.
+     */
+    private static Escenario visitaLiquidada(
+            long municipalidadId,
+            long contribuyente,
+            long predio,
+            long ficha,
+            @Nullable Dinero insoluto) {
+        String sufijo = String.valueOf(SIGUIENTE.getAndIncrement());
         long programa =
                 ejecutarComoApp(
                         municipalidadId,
@@ -1068,6 +1243,76 @@ class TransferenciaJdbcTest {
         @Override
         public List<ResolucionDeDeterminacion> deContribuyente(long contribuyenteId) {
             return real.deContribuyente(contribuyenteId);
+        }
+
+        @Override
+        public List<ResolucionEnLaRelacion> vigentesSobreLaUnidad(
+                @Nullable Long predioId, @Nullable Long vehiculoId) {
+            return real.vigentesSobreLaUnidad(predioId, vehiculoId);
+        }
+
+        @Override
+        public void bloquearLaUnidad(@Nullable Long predioId, @Nullable Long vehiculoId) {
+            real.bloquearLaUnidad(predioId, vehiculoId);
+        }
+    }
+
+    /**
+     * El repositorio real, que tras registrar la resolucion avisa y retiene la transaccion abierta
+     * hasta que la prueba lo suelta (#462): es el instante en que otra transferencia de la misma
+     * unidad no puede ver todavia la resolucion, que es el que la regla sola no cubre.
+     */
+    private record ResolucionQueEsperaTrasRegistrar(
+            ResolucionDeDeterminacionRepository real,
+            CountDownLatch registrada,
+            CountDownLatch soltar)
+            implements ResolucionDeDeterminacionRepository {
+
+        @Override
+        public ResolucionDeDeterminacion registrar(ResolucionDeDeterminacion resolucion) {
+            ResolucionDeDeterminacion hecha = real.registrar(resolucion);
+            registrada.countDown();
+            try {
+                if (!soltar.await(60, TimeUnit.SECONDS)) {
+                    throw new IllegalStateException("Nadie solto la transaccion de A");
+                }
+            } catch (InterruptedException interrumpida) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException(interrumpida);
+            }
+            return hecha;
+        }
+
+        @Override
+        public Optional<ResolucionDeDeterminacion> porNumero(String numero) {
+            return real.porNumero(numero);
+        }
+
+        @Override
+        public kamayuk.rentas.compartido.Pagina<ResolucionEnLaRelacion> consultar(
+                CriterioDeResoluciones criterio, kamayuk.rentas.compartido.Paginacion paginacion) {
+            return real.consultar(criterio, paginacion);
+        }
+
+        @Override
+        public Optional<ResolucionDeDeterminacion> deLiquidacion(long liquidacionId) {
+            return real.deLiquidacion(liquidacionId);
+        }
+
+        @Override
+        public List<ResolucionDeDeterminacion> deContribuyente(long contribuyenteId) {
+            return real.deContribuyente(contribuyenteId);
+        }
+
+        @Override
+        public List<ResolucionEnLaRelacion> vigentesSobreLaUnidad(
+                @Nullable Long predioId, @Nullable Long vehiculoId) {
+            return real.vigentesSobreLaUnidad(predioId, vehiculoId);
+        }
+
+        @Override
+        public void bloquearLaUnidad(@Nullable Long predioId, @Nullable Long vehiculoId) {
+            real.bloquearLaUnidad(predioId, vehiculoId);
         }
     }
 

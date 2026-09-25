@@ -73,7 +73,10 @@ import org.springframework.web.bind.annotation.RestController;
  * numeracion y el periodo que fiscaliza, y no son el mismo.
  *
  * <p>No hay {@code PUT} ni {@code PATCH}, y no es un olvido: {@code resolucion_determinacion} no
- * admite {@code UPDATE} desde V49. Una resolucion equivocada se deja sin efecto con otro acto.
+ * admite {@code UPDATE} desde V49. Una resolucion equivocada se deja sin efecto con otro acto, y
+ * ese acto —con la reversion de sus cargos— <b>todavia no existe</b> (#462): mientras tanto la
+ * transferencia se niega a emitir una segunda resolucion sobre la misma unidad y ejercicio, y la
+ * reliquidacion a corregir una liquidacion ya transferida.
  */
 @RestController
 @RequestMapping(Api.RAIZ + "/fiscalizacion")
@@ -132,10 +135,12 @@ public class ResolucionController {
                 | LiquidarFiscalizacion.ActaInexistente noExiste) {
             throw new ProblemaDeNegocio(CodigoDeError.NO_ENCONTRADO, mensajeDe(noExiste));
         } catch (ResolucionDeDeterminacionRepository.LiquidacionYaTransferida
+                | TransferirARentas.YaDeterminadaDeOficio
                 | TransferirARentas.LiquidacionSustituida
                 | ActaFiscalizacion.ActaAnulada enConflicto) {
             // La visita anulada (#339) es 409 como las otras dos: la peticion esta bien, lo que
-            // no la admite es la situacion, y reintentarla no sirve de nada.
+            // no la admite es la situacion, y reintentarla no sirve de nada. La unidad ya
+            // determinada por otra RDF (#462) tambien, y sin esta linea saldria como 500.
             throw new ProblemaDeNegocio(CodigoDeError.CONFLICTO, mensajeDe(enConflicto));
         } catch (TransferirARentas.SinSustentoDocumental
                 | TransferenciaDeFiscalizacion.SinFichaQueVersionar

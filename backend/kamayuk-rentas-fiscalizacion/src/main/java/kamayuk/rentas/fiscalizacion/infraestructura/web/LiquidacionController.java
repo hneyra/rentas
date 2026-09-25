@@ -256,7 +256,10 @@ public class LiquidacionController {
         } catch (ReliquidarFiscalizacion.LiquidacionInexistente noExiste) {
             throw new ProblemaDeNegocio(CodigoDeError.NO_ENCONTRADO, mensajeDe(noExiste));
         } catch (ReliquidarFiscalizacion.NoEsLaUltimaVersion
+                | ReliquidarFiscalizacion.LiquidacionConResolucion
                 | ActaFiscalizacion.ActaAnulada enConflicto) {
+            // Con su RDF (#462) es 409 y no 500: la peticion esta bien, lo que no la admite es
+            // la resolucion notificada, y el mensaje la nombra.
             throw new ProblemaDeNegocio(CodigoDeError.CONFLICTO, mensajeDe(enConflicto));
         } catch (ReliquidarFiscalizacion.EjercicioSinLineaAnterior
                 | IllegalArgumentException invalido) {
