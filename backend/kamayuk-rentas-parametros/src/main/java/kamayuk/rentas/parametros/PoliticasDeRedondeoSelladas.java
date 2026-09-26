@@ -138,18 +138,9 @@ public final class PoliticasDeRedondeoSelladas {
     }
 
     /** Un punto con la escala pero sin el modo, o al reves. Ver el javadoc de la clase. */
-    public static final class MediaPolitica extends RuntimeException
-            implements ParametroSinPublicar {
+    public static final class MediaPolitica extends CifraSinPublicar {
 
         @java.io.Serial private static final long serialVersionUID = 1L;
-
-        // El aviso [serial] no aplica: `Ejercicio` es un record del dominio que no
-        // implementa Serializable, y una excepcion de negocio nunca se serializa —se
-        // lanza, se traduce a problem+json y muere ahi (ManejadorDeErrores)—.
-        @SuppressWarnings("serial")
-        private final Ejercicio ejercicio;
-
-        private final PuntoDeRedondeo punto;
 
         MediaPolitica(Ejercicio ejercicio, PuntoDeRedondeo punto, boolean tieneEscala) {
             super(
@@ -160,35 +151,16 @@ public final class PoliticasDeRedondeoSelladas {
                             + " en el conjunto sellado. Media politica no es una politica: la"
                             + " fila de REDONDEO:"
                             + punto
-                            + " lleva valor_numerico y valor_texto, los dos");
-            this.ejercicio = ejercicio;
-            this.punto = punto;
-        }
-
-        @Override
-        public Ejercicio ejercicio() {
-            return ejercicio;
-        }
-
-        @Override
-        public Optional<String> llave() {
-            return Optional.of(llaveDe(punto));
+                            + " lleva valor_numerico y valor_texto, los dos",
+                    ejercicio,
+                    llaveDe(punto));
         }
     }
 
     /** La escala llego con decimales: «redondear a 2,5 decimales» no significa nada. */
-    public static final class EscalaNoEntera extends RuntimeException
-            implements ParametroSinPublicar {
+    public static final class EscalaNoEntera extends CifraSinPublicar {
 
         @java.io.Serial private static final long serialVersionUID = 1L;
-
-        // El aviso [serial] no aplica: `Ejercicio` es un record del dominio que no
-        // implementa Serializable, y una excepcion de negocio nunca se serializa —se
-        // lanza, se traduce a problem+json y muere ahi (ManejadorDeErrores)—.
-        @SuppressWarnings("serial")
-        private final Ejercicio ejercicio;
-
-        private final PuntoDeRedondeo punto;
 
         EscalaNoEntera(Ejercicio ejercicio, PuntoDeRedondeo punto, ValorNormativo valor) {
             super(
@@ -196,35 +168,16 @@ public final class PoliticasDeRedondeoSelladas {
                             + punto
                             + " es "
                             + valor
-                            + ", y una escala es un numero de decimales, no un decimal");
-            this.ejercicio = ejercicio;
-            this.punto = punto;
-        }
-
-        @Override
-        public Ejercicio ejercicio() {
-            return ejercicio;
-        }
-
-        @Override
-        public Optional<String> llave() {
-            return Optional.of(llaveDe(punto));
+                            + ", y una escala es un numero de decimales, no un decimal",
+                    ejercicio,
+                    llaveDe(punto));
         }
     }
 
     /** El modo no es ninguno de {@link RoundingMode}. */
-    public static final class ModoDesconocido extends RuntimeException
-            implements ParametroSinPublicar {
+    public static final class ModoDesconocido extends CifraSinPublicar {
 
         @java.io.Serial private static final long serialVersionUID = 1L;
-
-        // El aviso [serial] no aplica: `Ejercicio` es un record del dominio que no
-        // implementa Serializable, y una excepcion de negocio nunca se serializa —se
-        // lanza, se traduce a problem+json y muere ahi (ManejadorDeErrores)—.
-        @SuppressWarnings("serial")
-        private final Ejercicio ejercicio;
-
-        private final PuntoDeRedondeo punto;
 
         ModoDesconocido(Ejercicio ejercicio, PuntoDeRedondeo punto, String texto) {
             super(
@@ -233,19 +186,9 @@ public final class PoliticasDeRedondeoSelladas {
                             + " es '"
                             + texto
                             + "', que no es un RoundingMode. Los admitidos son "
-                            + java.util.Arrays.toString(RoundingMode.values()));
-            this.ejercicio = ejercicio;
-            this.punto = punto;
-        }
-
-        @Override
-        public Ejercicio ejercicio() {
-            return ejercicio;
-        }
-
-        @Override
-        public Optional<String> llave() {
-            return Optional.of(llaveDe(punto));
+                            + java.util.Arrays.toString(RoundingMode.values()),
+                    ejercicio,
+                    llaveDe(punto));
         }
     }
 
@@ -257,16 +200,9 @@ public final class PoliticasDeRedondeoSelladas {
      * queria el que llamo. Nombrar {@code REDONDEO:CUOTA} porque es el que el convenio usa seria
      * una afirmacion verosimil y equivocada dicha desde el lector generico.
      */
-    public static final class SinPuntosObservados extends RuntimeException
-            implements ParametroSinPublicar {
+    public static final class SinPuntosObservados extends CifraSinPublicar {
 
         @java.io.Serial private static final long serialVersionUID = 1L;
-
-        // El aviso [serial] no aplica: `Ejercicio` es un record del dominio que no
-        // implementa Serializable, y una excepcion de negocio nunca se serializa —se
-        // lanza, se traduce a problem+json y muere ahi (ManejadorDeErrores)—.
-        @SuppressWarnings("serial")
-        private final Ejercicio ejercicio;
 
         SinPuntosObservados(ParametrosSellados sellados) {
             super(
@@ -277,18 +213,9 @@ public final class PoliticasDeRedondeoSelladas {
                             + ") no tiene ninguna fila REDONDEO:‹punto›. Mientras D-03c siga"
                             + " abierta eso significa que todavia no se ha observado ningun punto"
                             + " del SRTM del MEF (#203); calcular sin ellas no da un importe sin"
-                            + " redondear, da un fallo por cada punto y lejos de aqui");
-            this.ejercicio = sellados.ejercicio();
-        }
-
-        @Override
-        public Ejercicio ejercicio() {
-            return ejercicio;
-        }
-
-        @Override
-        public Optional<String> llave() {
-            return Optional.of(TIPO);
+                            + " redondear, da un fallo por cada punto y lejos de aqui",
+                    sellados.ejercicio(),
+                    TIPO);
         }
     }
 
@@ -309,18 +236,9 @@ public final class PoliticasDeRedondeoSelladas {
      * <p>El mensaje conserva el de {@code PuntoSinPolitica} entero, con los puntos que si estan:
      * saber cuales hay es la mitad del trabajo de quien va a publicar el que falta.
      */
-    public static final class PuntoSinObservar extends RuntimeException
-            implements ParametroSinPublicar {
+    public static final class PuntoSinObservar extends CifraSinPublicar {
 
         @java.io.Serial private static final long serialVersionUID = 1L;
-
-        // El aviso [serial] no aplica: `Ejercicio` es un record del dominio que no
-        // implementa Serializable, y una excepcion de negocio nunca se serializa —se
-        // lanza, se traduce a problem+json y muere ahi (ManejadorDeErrores)—.
-        @SuppressWarnings("serial")
-        private final Ejercicio ejercicio;
-
-        private final PuntoDeRedondeo punto;
 
         PuntoSinObservar(
                 Ejercicio ejercicio,
@@ -333,19 +251,9 @@ public final class PoliticasDeRedondeoSelladas {
                             + llaveDe(punto)
                             + ". "
                             + causa.getMessage(),
+                    ejercicio,
+                    llaveDe(punto),
                     causa);
-            this.ejercicio = ejercicio;
-            this.punto = punto;
-        }
-
-        @Override
-        public Ejercicio ejercicio() {
-            return ejercicio;
-        }
-
-        @Override
-        public Optional<String> llave() {
-            return Optional.of(llaveDe(punto));
         }
     }
 

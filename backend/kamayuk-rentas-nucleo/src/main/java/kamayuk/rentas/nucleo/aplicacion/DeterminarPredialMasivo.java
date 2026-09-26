@@ -20,7 +20,7 @@ import kamayuk.rentas.nucleo.dominio.predial.DetalleDeterminacionPredio;
 import kamayuk.rentas.nucleo.dominio.predial.DeterminacionPredialCalculada;
 import kamayuk.rentas.nucleo.dominio.predial.MinimoImponible;
 import kamayuk.rentas.nucleo.dominio.predial.ModalidadDelPredial;
-import kamayuk.rentas.parametros.ParametrosSellados;
+import kamayuk.rentas.parametros.CifraSinPublicar;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -302,7 +302,7 @@ public class DeterminarPredialMasivo {
                 // Y desde #375 no es una lista a mano: cualquier `RechazoDelContribuyente` —entre
                 // ellos el exonerado declarado mayor que la valuacion sellada— se observa.
                 observados.add(new Observado(codigo, nombre, String.valueOf(motivo.getMessage())));
-            } catch (CuadroPredialParametrizado.ParametroDelPredialAusente falta) {
+            } catch (CifraSinPublicar falta) {
                 // Esta le pasa a TODOS por igual —es del conjunto, no del contribuyente—, asi que
                 // no se observa uno por uno: se corta la corrida. Observar 30 000 veces la misma
                 // ordenanza que falta esconde el unico dato util del informe. Y cortar ya no deja
@@ -310,8 +310,6 @@ public class DeterminarPredialMasivo {
                 // asentar, asi que este contribuyente no escribio nada, y los anteriores tampoco
                 // porque les habria faltado lo mismo. Lo mismo vale para `PuntoSinPolitica`, que
                 // no se atrapa aqui y sube igual.
-                throw falta;
-            } catch (ParametrosSellados.ParametroAusente falta) {
                 throw falta;
             }
         }

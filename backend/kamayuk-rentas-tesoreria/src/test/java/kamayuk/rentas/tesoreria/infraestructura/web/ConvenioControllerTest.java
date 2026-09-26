@@ -33,6 +33,7 @@ import kamayuk.rentas.parametros.IdentificadorDeConjunto;
 import kamayuk.rentas.parametros.LectorDeParametros;
 import kamayuk.rentas.parametros.ParametrosSellados;
 import kamayuk.rentas.parametros.PoliticasDeRedondeoSelladas;
+import kamayuk.rentas.parametros.infraestructura.web.ManejadorDeLoQueFaltaPublicar;
 import kamayuk.rentas.tesoreria.AnulacionesDeRecibo;
 import kamayuk.rentas.tesoreria.aplicacion.CerrarConvenio;
 import kamayuk.rentas.tesoreria.aplicacion.CondicionesParametrizadas;
@@ -189,7 +190,9 @@ class ConvenioControllerTest {
                                                             "DNI 40547001")),
                                     RELOJ))
                     .addInterceptors(new GuardiaDeAcceso(new TodoAutorizado(), RELOJ))
-                    .setControllerAdvice(new ManejadorDeErrores())
+                    .setControllerAdvice(
+                            new ManejadorDeErrores(),
+                            new ManejadorDeLoQueFaltaPublicar(new ManejadorDeErrores()))
                     .setMessageConverters(
                             new JacksonJsonHttpMessageConverter(
                                     JsonMapper.builder()

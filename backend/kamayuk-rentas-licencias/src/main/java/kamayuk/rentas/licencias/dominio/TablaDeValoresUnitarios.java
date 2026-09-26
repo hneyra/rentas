@@ -5,9 +5,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.ValorNormativo;
+import kamayuk.rentas.parametros.CifraSinPublicar;
 import kamayuk.rentas.parametros.ParametroSinPublicar;
 
 /**
@@ -174,16 +174,9 @@ public final class TablaDeValoresUnitarios {
      * TIPO:CLAVE} y sin el tipo la cadena no dice <b>que cuadro</b> hay que publicar; {@code MUROS}
      * no es ningun tipo de parametro. No divergen: la segunda se compone de la primera.
      */
-    public static final class ValorUnitarioSinParametrizar extends RuntimeException
-            implements ParametroSinPublicar {
+    public static final class ValorUnitarioSinParametrizar extends CifraSinPublicar {
 
         @java.io.Serial private static final long serialVersionUID = 1L;
-
-        // El aviso [serial] no aplica: `Ejercicio` es un record del dominio que no
-        // implementa Serializable, y una excepcion de negocio nunca se serializa —se
-        // lanza, se traduce y muere ahi.
-        @SuppressWarnings("serial")
-        private final Ejercicio ejercicio;
 
         private final String celda;
 
@@ -192,35 +185,32 @@ public final class TablaDeValoresUnitarios {
                 char categoria,
                 Ejercicio ejercicio,
                 int anioDeConstruccion) {
+            this(
+                    partida.name() + ":" + Character.toUpperCase(categoria),
+                    ejercicio,
+                    anioDeConstruccion);
+        }
+
+        /**
+         * La llave que hay que publicar es {@code TIPO:CLAVE} con el tipo del cuadro delante, y se
+         * compone de la celda: nunca vacia, porque aqui falta una celda concreta y no el conjunto.
+         */
+        private ValorUnitarioSinParametrizar(
+                String celda, Ejercicio ejercicio, int anioDeConstruccion) {
             super(
                     String.format(
                             Locale.ROOT,
                             "El cuadro de valores unitarios sellado del ejercicio %s no tiene la"
-                                    + " celda %s:%s para una edificacion de %d. Sin ella no se puede"
+                                    + " celda %s para una edificacion de %d. Sin ella no se puede"
                                     + " valorizar la obra, y poner cero daria una valorizacion que"
                                     + " nadie distingue de una correcta (regla 5, AC 2 de #48; las"
                                     + " cifras las espera #197)",
                             ejercicio,
-                            partida.name(),
-                            Character.toUpperCase(categoria),
-                            anioDeConstruccion));
-            this.ejercicio = ejercicio;
-            this.celda = partida.name() + ":" + Character.toUpperCase(categoria);
-        }
-
-        /** El ejercicio de cuyo conjunto sellado salio el cuadro incompleto. */
-        @Override
-        public Ejercicio ejercicio() {
-            return ejercicio;
-        }
-
-        /**
-         * La llave que hay que publicar, {@code TIPO:CLAVE} con el tipo del cuadro delante. Nunca
-         * vacia: aqui falta una celda concreta, no el conjunto entero.
-         */
-        @Override
-        public Optional<String> llave() {
-            return Optional.of(TIPO_NORMATIVO + ":" + celda);
+                            celda,
+                            anioDeConstruccion),
+                    ejercicio,
+                    TIPO_NORMATIVO + ":" + celda);
+            this.celda = celda;
         }
 
         /** La celda que falta dentro del cuadro, {@code partida:categoria}. */

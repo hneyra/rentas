@@ -24,8 +24,6 @@ import kamayuk.rentas.fiscalizacion.dominio.CriterioDeLiquidaciones;
 import kamayuk.rentas.fiscalizacion.dominio.EstadoDeLiquidacion;
 import kamayuk.rentas.fiscalizacion.dominio.Liquidacion;
 import kamayuk.rentas.fiscalizacion.dominio.TipoDeFiscalizacion;
-import kamayuk.rentas.parametros.FaltaPublicar;
-import kamayuk.rentas.parametros.LectorDeParametros;
 import kamayuk.rentas.web.Api;
 import kamayuk.rentas.web.CodigoDeError;
 import kamayuk.rentas.web.EntradaNumerica;
@@ -203,14 +201,6 @@ public class LiquidacionController {
             // 409 y no 422 (#339): la peticion esta bien, lo que no la admite es el estado de la
             // visita, y el mensaje dice lo que procede —levantar otra acta—.
             throw new ProblemaDeNegocio(CodigoDeError.CONFLICTO, mensajeDe(enConflicto));
-        } catch (LectorDeParametros.EjercicioSinSellar sinSellar) {
-            // 422 y no 500: la peticion esta bien formada; lo que falta es que alguien selle el
-            // conjunto de ese ejercicio, y el mensaje lo nombra.
-            // Falta publicar una cifra normativa, no un campo de la peticion: el 422 sale con
-            // el miembro `parametroQueFalta` (#604, #691). Sin el, la interfaz no puede decir UNA
-            // de las dos cosas —«corrige el formulario» o «hay que publicar una cifra»— y acaba
-            // enumerando las dos, que es peor que no decir nada.
-            throw FaltaPublicar.problema(sinSellar);
         } catch (IllegalArgumentException invalido) {
             throw new ProblemaDeNegocio(CodigoDeError.VALIDACION, mensajeDe(invalido));
         }

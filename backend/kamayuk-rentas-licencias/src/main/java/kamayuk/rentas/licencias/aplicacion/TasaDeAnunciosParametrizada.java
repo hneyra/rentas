@@ -1,13 +1,12 @@
 package kamayuk.rentas.licencias.aplicacion;
 
 import java.time.LocalDate;
-import java.util.Optional;
 import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.ValorNormativo;
 import kamayuk.rentas.licencias.dominio.ClaseDeAnuncio;
+import kamayuk.rentas.parametros.CifraSinPublicar;
 import kamayuk.rentas.parametros.LectorDeParametros;
-import kamayuk.rentas.parametros.ParametroSinPublicar;
 import kamayuk.rentas.parametros.ParametrosSellados;
 import org.springframework.stereotype.Service;
 
@@ -146,18 +145,9 @@ public class TasaDeAnunciosParametrizada {
      * con una cifra inventada —que es un cobro sin sustento normativo repetido en todo el padron de
      * publicidad—.
      */
-    public static final class TasaSinParametrizar extends RuntimeException
-            implements ParametroSinPublicar {
+    public static final class TasaSinParametrizar extends CifraSinPublicar {
 
         @java.io.Serial private static final long serialVersionUID = 1L;
-
-        // El aviso [serial] no aplica: `Ejercicio` es un record del dominio que no
-        // implementa Serializable, y una excepcion de negocio nunca se serializa —se
-        // lanza, se traduce a problem+json y muere ahi (ManejadorDeErrores)—.
-        @SuppressWarnings("serial")
-        private final Ejercicio ejercicio;
-
-        private final String llave;
 
         TasaSinParametrizar(Ejercicio ejercicio, ClaseDeAnuncio clase) {
             super(
@@ -170,20 +160,9 @@ public class TasaDeAnunciosParametrizada {
                             + ". Sin el no hay tarifa que aplicar a un anuncio de clase "
                             + clase.etiqueta()
                             + ", y una tasa inventada es un cobro que ninguna ordenanza respalda"
-                            + " (regla 5, D-02b, #199)");
-            this.ejercicio = ejercicio;
-            this.llave = TIPO_TASA + ":" + clase.claveDeLaTasa();
-        }
-
-        @Override
-        public Ejercicio ejercicio() {
-            return ejercicio;
-        }
-
-        /** La llave que falta, {@code tipo:clave}, legible por programa. */
-        @Override
-        public Optional<String> llave() {
-            return Optional.of(llave);
+                            + " (regla 5, D-02b, #199)",
+                    ejercicio,
+                    TIPO_TASA + ":" + clase.claveDeLaTasa());
         }
     }
 }

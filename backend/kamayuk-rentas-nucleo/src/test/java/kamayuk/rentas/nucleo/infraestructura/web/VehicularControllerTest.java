@@ -45,6 +45,7 @@ import kamayuk.rentas.nucleo.parametros.ElVehicularQuePlaneaNormativa;
 import kamayuk.rentas.parametros.IdentificadorDeConjunto;
 import kamayuk.rentas.parametros.LectorDeParametros;
 import kamayuk.rentas.parametros.ParametrosSellados;
+import kamayuk.rentas.parametros.infraestructura.web.ManejadorDeLoQueFaltaPublicar;
 import kamayuk.rentas.web.ConfiguracionDeJson;
 import kamayuk.rentas.web.ManejadorDeErrores;
 import org.jspecify.annotations.Nullable;
@@ -820,7 +821,9 @@ class VehicularControllerTest {
                         new VehicularController(
                                 servicio, new ConsultaDeVehiculos(vehiculos, null), RELOJ))
                 .addInterceptors(new GuardiaDeAcceso(comprobador, RELOJ))
-                .setControllerAdvice(new ManejadorDeErrores())
+                .setControllerAdvice(
+                        new ManejadorDeErrores(),
+                        new ManejadorDeLoQueFaltaPublicar(new ManejadorDeErrores()))
                 .setMessageConverters(
                         new JacksonJsonHttpMessageConverter(
                                 JsonMapper.builder()

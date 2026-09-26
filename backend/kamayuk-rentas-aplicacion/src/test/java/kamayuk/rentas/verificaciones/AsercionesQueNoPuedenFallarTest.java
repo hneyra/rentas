@@ -30,15 +30,18 @@ class AsercionesQueNoPuedenFallarTest extends AsercionesQueNoPuedenFallarTestBas
         // `TablaDeValoresUnitarios.ValorUnitarioSinParametrizar`, que declaraba `llave()` como
         // String; #723 le hizo declarar `ParametroSinPublicar` y esta prueba se puso roja al
         // mezclar. La conclusion no cambio —`llave` sigue siendo ambiguo— y el ejemplo si, que es
-        // exactamente para lo que sirve afirmarlo contra el arbol y no contra un comentario.
+        // exactamente para lo que sirve afirmarlo contra el arbol y no contra un comentario. Y
+        // otra: desde #435 las veintiuna ya no lo declaran cada una, sino su base.
         Censo censo = censarDelDisco(fuentesJava(raizDelBackend()));
 
         assertThat(censo.nombresInequivocos())
                 .as("`llave` es ambiguo por nombre; por eso hizo falta el censo por clase")
                 .doesNotContain("llave");
         assertThat(censo.clasesConOptional("llave"))
-                .as("las de la familia `ParametroSinPublicar` lo declaran Optional")
-                .contains("ParametroAusente", "DerechoSinParametrizar")
+                .as(
+                        "la familia `ParametroSinPublicar` lo declara Optional, y desde #435 lo"
+                                + " implementa una sola vez su base")
+                .contains("ParametroSinPublicar", "CifraSinPublicar")
                 .as(
                         "y `ParametroQueFalta` —la proyeccion HTTP del mismo discriminador— lo"
                                 + " lleva como componente String anulable, que es el otro lado")

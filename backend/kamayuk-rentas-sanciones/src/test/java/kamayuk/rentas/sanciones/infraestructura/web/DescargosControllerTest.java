@@ -19,6 +19,7 @@ import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.parametros.IdentificadorDeConjunto;
 import kamayuk.rentas.parametros.LectorDeParametros;
 import kamayuk.rentas.parametros.ParametrosSellados;
+import kamayuk.rentas.parametros.infraestructura.web.ManejadorDeLoQueFaltaPublicar;
 import kamayuk.rentas.sanciones.aplicacion.PlazosDeSancionesParametrizados;
 import kamayuk.rentas.sanciones.aplicacion.RegistrarDescargo;
 import kamayuk.rentas.sanciones.dominio.CriterioDePapeleta;
@@ -73,7 +74,9 @@ class DescargosControllerTest {
                                                     new ParametrosDeMentira()),
                                             (RegistroDeAuditoria registro) -> {},
                                             RELOJ)))
-                    .setControllerAdvice(new ManejadorDeErrores())
+                    .setControllerAdvice(
+                            new ManejadorDeErrores(),
+                            new ManejadorDeLoQueFaltaPublicar(new ManejadorDeErrores()))
                     .setMessageConverters(
                             new JacksonJsonHttpMessageConverter(
                                     JsonMapper.builder()
@@ -283,7 +286,9 @@ class DescargosControllerTest {
                                                 new PlazosDeSancionesParametrizados(lector),
                                                 (RegistroDeAuditoria registro) -> {},
                                                 RELOJ)))
-                        .setControllerAdvice(new ManejadorDeErrores())
+                        .setControllerAdvice(
+                                new ManejadorDeErrores(),
+                                new ManejadorDeLoQueFaltaPublicar(new ManejadorDeErrores()))
                         .setMessageConverters(
                                 new JacksonJsonHttpMessageConverter(
                                         JsonMapper.builder()

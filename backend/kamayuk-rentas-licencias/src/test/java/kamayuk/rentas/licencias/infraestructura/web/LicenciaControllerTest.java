@@ -39,6 +39,7 @@ import kamayuk.rentas.licencias.dobles.PadronDeMentira;
 import kamayuk.rentas.licencias.dominio.Ciiu;
 import kamayuk.rentas.licencias.dominio.PlantillaDeNumeroDeLicencia;
 import kamayuk.rentas.licencias.dominio.RiesgoItse;
+import kamayuk.rentas.parametros.infraestructura.web.ManejadorDeLoQueFaltaPublicar;
 import kamayuk.rentas.web.ConfiguracionDeJson;
 import kamayuk.rentas.web.ManejadorDeErrores;
 import org.junit.jupiter.api.AfterEach;
@@ -229,7 +230,9 @@ class LicenciaControllerTest {
                         new CiiuController(
                                 new MantenerCatalogoCiiu(
                                         catalogo, (RegistroDeAuditoria registro) -> {}, RELOJ)))
-                .setControllerAdvice(new ManejadorDeErrores())
+                .setControllerAdvice(
+                        new ManejadorDeErrores(),
+                        new ManejadorDeLoQueFaltaPublicar(new ManejadorDeErrores()))
                 .setMessageConverters(
                         new JacksonJsonHttpMessageConverter(
                                 JsonMapper.builder()

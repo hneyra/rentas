@@ -39,6 +39,7 @@ import kamayuk.rentas.licencias.dobles.FuesEnMemoria;
 import kamayuk.rentas.licencias.dobles.MovimientosDeEdificacionEnMemoria;
 import kamayuk.rentas.licencias.dobles.PadronDeMentira;
 import kamayuk.rentas.licencias.dominio.PlantillaDeNumeroDeEdificacion;
+import kamayuk.rentas.parametros.infraestructura.web.ManejadorDeLoQueFaltaPublicar;
 import kamayuk.rentas.web.ConfiguracionDeJson;
 import kamayuk.rentas.web.ManejadorDeErrores;
 import org.junit.jupiter.api.AfterEach;
@@ -194,7 +195,9 @@ class EdificacionControllerTest {
                                         caja,
                                         derechos),
                                 reloj))
-                .setControllerAdvice(new ManejadorDeErrores())
+                .setControllerAdvice(
+                        new ManejadorDeErrores(),
+                        new ManejadorDeLoQueFaltaPublicar(new ManejadorDeErrores()))
                 .setMessageConverters(
                         new JacksonJsonHttpMessageConverter(
                                 JsonMapper.builder()

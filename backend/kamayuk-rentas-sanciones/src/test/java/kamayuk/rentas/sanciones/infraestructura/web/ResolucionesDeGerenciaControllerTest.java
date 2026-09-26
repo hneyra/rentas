@@ -40,6 +40,7 @@ import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.parametros.IdentificadorDeConjunto;
 import kamayuk.rentas.parametros.LectorDeParametros;
 import kamayuk.rentas.parametros.ParametrosSellados;
+import kamayuk.rentas.parametros.infraestructura.web.ManejadorDeLoQueFaltaPublicar;
 import kamayuk.rentas.sanciones.aplicacion.NotificarResolucionDeGerencia;
 import kamayuk.rentas.sanciones.aplicacion.PlazosDeSancionesParametrizados;
 import kamayuk.rentas.sanciones.aplicacion.ResolverConResolucionDeGerencia;
@@ -512,7 +513,9 @@ class ResolucionesDeGerenciaControllerTest {
                                         plazos,
                                         (RegistroDeAuditoria registro) -> {},
                                         RELOJ)))
-                .setControllerAdvice(new ManejadorDeErrores())
+                .setControllerAdvice(
+                        new ManejadorDeErrores(),
+                        new ManejadorDeLoQueFaltaPublicar(new ManejadorDeErrores()))
                 .setMessageConverters(
                         new JacksonJsonHttpMessageConverter(
                                 JsonMapper.builder()

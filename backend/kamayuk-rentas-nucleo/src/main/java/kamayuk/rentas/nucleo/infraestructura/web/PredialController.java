@@ -12,15 +12,12 @@ import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.dominio.PoliticasDeRedondeo;
 import kamayuk.rentas.nucleo.aplicacion.CandadoDeEmision;
 import kamayuk.rentas.nucleo.aplicacion.ConsultaDeLaDeterminacionPredial;
-import kamayuk.rentas.nucleo.aplicacion.CuadroPredialParametrizado;
 import kamayuk.rentas.nucleo.aplicacion.DeterminarPredial;
 import kamayuk.rentas.nucleo.aplicacion.DeterminarPredialMasivo;
 import kamayuk.rentas.nucleo.aplicacion.RegistrarCorridaDeEmision;
 import kamayuk.rentas.nucleo.dominio.predial.MinimoImponible;
 import kamayuk.rentas.nucleo.dominio.predial.ModalidadDelPredial;
 import kamayuk.rentas.parametros.FaltaPublicar;
-import kamayuk.rentas.parametros.LectorDeParametros;
-import kamayuk.rentas.parametros.ParametrosSellados;
 import kamayuk.rentas.parametros.PoliticasDeRedondeoSelladas;
 import kamayuk.rentas.web.Api;
 import kamayuk.rentas.web.CodigoDeError;
@@ -198,13 +195,6 @@ public class PredialController {
                     .orElseGet(() -> ResponseEntity.noContent().build());
         } catch (DeterminarPredial.ContribuyenteInexistente noEsta) {
             throw new ProblemaDeNegocio(CodigoDeError.NO_ENCONTRADO, mensajeDe(noEsta));
-        } catch (CuadroPredialParametrizado.ParametroDelPredialAusente
-                | ParametrosSellados.ParametroAusente
-                | LectorDeParametros.EjercicioSinSellar falta) {
-            // El conjunto que la determinacion fijo ya no publica una de sus cifras. No es un
-            // campo de la peticion: es que reproducir aquella determinacion exige un valor que
-            // falta, y el 422 sale nombrando la llave (#604, #691).
-            throw FaltaPublicar.problema(falta);
         }
     }
 
@@ -346,18 +336,6 @@ public class PredialController {
                 | DeterminarPredial.PredioRepetido
                 | MinimoImponible.BaseAfectaCero mal) {
             throw new ProblemaDeNegocio(CodigoDeError.VALIDACION, mensajeDe(mal));
-        } catch (CuadroPredialParametrizado.ParametroDelPredialAusente
-                | ParametrosSellados.ParametroAusente
-                | LectorDeParametros.EjercicioSinSellar
-                | PoliticasDeRedondeoSelladas.SinPuntosObservados
-                | PoliticasDeRedondeoSelladas.MediaPolitica
-                | PoliticasDeRedondeoSelladas.EscalaNoEntera
-                | PoliticasDeRedondeoSelladas.ModoDesconocido falta) {
-            // Falta publicar una cifra normativa, no un campo de la peticion: el 422 sale con
-            // el miembro `parametroQueFalta` (#604, #691). Sin el, la interfaz no puede decir UNA
-            // de las dos cosas —«corrige el formulario» o «hay que publicar una cifra»— y acaba
-            // enumerando las dos, que es peor que no decir nada.
-            throw FaltaPublicar.problema(falta);
         } catch (PoliticasDeRedondeo.PuntoSinPolitica sinPolitica) {
             // La unica que no puede publicar su ejercicio: vive en el dominio puro y no sabe de
             // que conjunto salieron sus politicas (regla 7). El ejercicio lo pone quien lo pidio,
@@ -408,18 +386,6 @@ public class PredialController {
             // reescribiendo el formulario. El mensaje del candado dice cual de las tres es y
             // cuantas valuaciones faltan.
             throw new ProblemaDeNegocio(CodigoDeError.CONFLICTO, mensajeDe(faltaLaValuacion));
-        } catch (CuadroPredialParametrizado.ParametroDelPredialAusente
-                | ParametrosSellados.ParametroAusente
-                | LectorDeParametros.EjercicioSinSellar
-                | PoliticasDeRedondeoSelladas.SinPuntosObservados
-                | PoliticasDeRedondeoSelladas.MediaPolitica
-                | PoliticasDeRedondeoSelladas.EscalaNoEntera
-                | PoliticasDeRedondeoSelladas.ModoDesconocido falta) {
-            // Falta publicar una cifra normativa, no un campo de la peticion: el 422 sale con
-            // el miembro `parametroQueFalta` (#604, #691). Sin el, la interfaz no puede decir UNA
-            // de las dos cosas —«corrige el formulario» o «hay que publicar una cifra»— y acaba
-            // enumerando las dos, que es peor que no decir nada.
-            throw FaltaPublicar.problema(falta);
         } catch (PoliticasDeRedondeo.PuntoSinPolitica sinPolitica) {
             // La unica que no puede publicar su ejercicio: vive en el dominio puro y no sabe de
             // que conjunto salieron sus politicas (regla 7). El ejercicio lo pone quien lo pidio,

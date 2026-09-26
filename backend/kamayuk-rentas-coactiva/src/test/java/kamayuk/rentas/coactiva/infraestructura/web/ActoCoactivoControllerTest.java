@@ -39,6 +39,7 @@ import kamayuk.rentas.documentos.RenderizadorXls;
 import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.Observacion;
+import kamayuk.rentas.parametros.infraestructura.web.ManejadorDeLoQueFaltaPublicar;
 import kamayuk.rentas.valores.ObligacionDelValor;
 import kamayuk.rentas.valores.ValorParaCoactiva;
 import kamayuk.rentas.web.ConfiguracionDeJson;
@@ -238,7 +239,9 @@ class ActoCoactivoControllerTest {
                                 new ConsultaDelProcesoCoactivo(cual, actos, diligencias),
                                 contribuyentes,
                                 RELOJ))
-                .setControllerAdvice(new ManejadorDeErrores())
+                .setControllerAdvice(
+                        new ManejadorDeErrores(),
+                        new ManejadorDeLoQueFaltaPublicar(new ManejadorDeErrores()))
                 .setMessageConverters(
                         new JacksonJsonHttpMessageConverter(
                                 JsonMapper.builder()

@@ -31,6 +31,7 @@ import kamayuk.rentas.licencias.dominio.GiroDeLaLicencia;
 import kamayuk.rentas.licencias.dominio.LicenciaDeFuncionamiento;
 import kamayuk.rentas.licencias.dominio.PlantillaDeNumeroDeAnuncio;
 import kamayuk.rentas.licencias.dominio.TipoDeLicencia;
+import kamayuk.rentas.parametros.infraestructura.web.ManejadorDeLoQueFaltaPublicar;
 import kamayuk.rentas.web.ConfiguracionDeJson;
 import kamayuk.rentas.web.ManejadorDeErrores;
 import org.junit.jupiter.api.AfterEach;
@@ -155,7 +156,9 @@ class AnuncioControllerTest {
                                         (RegistroDeAuditoria registro) -> {},
                                         relojDeLosActos),
                                 reloj))
-                .setControllerAdvice(new ManejadorDeErrores())
+                .setControllerAdvice(
+                        new ManejadorDeErrores(),
+                        new ManejadorDeLoQueFaltaPublicar(new ManejadorDeErrores()))
                 .setMessageConverters(
                         new JacksonJsonHttpMessageConverter(
                                 JsonMapper.builder()

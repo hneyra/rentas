@@ -4,7 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Supplier;
 import kamayuk.rentas.dominio.Observacion;
-import kamayuk.rentas.parametros.LectorDeParametros;
+import kamayuk.rentas.parametros.CifraSinPublicar;
 import kamayuk.rentas.parametros.PoliticasDeRedondeoSelladas;
 import kamayuk.rentas.tesoreria.ConvenioCoactivo;
 import kamayuk.rentas.tesoreria.CuotaDelConvenio;
@@ -137,13 +137,7 @@ public class FraccionamientoCoactivoTesoreria implements FraccionamientoCoactivo
             return accion.get();
         } catch (RegistrarPreconvenio.SinDeudaQueFraccionar sinDeuda) {
             throw new SinDeudaCoactivaQueFraccionar(mensajeDe(sinDeuda), sinDeuda);
-        } catch (CondicionesParametrizadas.CondicionSinParametrizar
-                | LectorDeParametros.EjercicioSinSellar
-                | PoliticasDeRedondeoSelladas.SinPuntosObservados
-                | PoliticasDeRedondeoSelladas.MediaPolitica
-                | PoliticasDeRedondeoSelladas.EscalaNoEntera
-                | PoliticasDeRedondeoSelladas.ModoDesconocido
-                | PoliticasDeRedondeoSelladas.PuntoSinObservar falta) {
+        } catch (CifraSinPublicar falta) {
             throw new CondicionesSinPublicar(mensajeDeLoQueFalta(falta), falta);
         } catch (CondicionesDelConvenio.DemasiadasCuotas
                 | Cronograma.NadaQueFraccionar inadmisible) {

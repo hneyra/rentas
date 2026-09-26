@@ -28,8 +28,8 @@ import kamayuk.rentas.documentos.FormatoDeDocumento;
 import kamayuk.rentas.dominio.ModalidadDeNotificacion;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.dominio.ResultadoDeNotificacion;
+import kamayuk.rentas.parametros.CifraSinPublicar;
 import kamayuk.rentas.parametros.FaltaPublicar;
-import kamayuk.rentas.parametros.LectorDeParametros;
 import kamayuk.rentas.web.Api;
 import kamayuk.rentas.web.CodigoDeError;
 import kamayuk.rentas.web.FiltroDeLaConsulta;
@@ -412,14 +412,12 @@ public class ActoCoactivoController {
                 | NotificarActoCoactivo.DiligenciaAnteriorAlActo
                 | EmitirDocumento.LaReimpresionNoCoincide enConflicto) {
             throw new ProblemaDeNegocio(CodigoDeError.CONFLICTO, motivoDe(enConflicto));
-        } catch (PlazosCoactivosParametrizados.PlazoSinParametrizar
-                | LectorDeParametros.EjercicioSinSellar falta) {
-            // `EjercicioSinSellar` no es un fallo del servidor: es que nadie ha sellado todavia el
-            // conjunto del ejercicio del acto (D-02a). Ver la cabecera de la clase (#562).
-            // Falta publicar una cifra normativa, no un campo de la peticion: el 422 sale con
-            // el miembro `parametroQueFalta` (#604, #691). Sin el, la interfaz no puede decir UNA
-            // de las dos cosas —«corrige el formulario» o «hay que publicar una cifra»— y acaba
-            // enumerando las dos, que es peor que no decir nada.
+        } catch (CifraSinPublicar falta) {
+            // Esta SI se queda aunque ManejadorDeLoQueFaltaPublicar traduzca la familia (#435):
+            // `emitirRec` recorre un lote y convierte en «rechazada» cada ProblemaDeNegocio, asi
+            // que
+            // la cifra que falta tiene que salir de aqui ya traducida —con su `parametroQueFalta`—
+            // y no subir entera, llevandose por delante los otros diecinueve expedientes.
             throw FaltaPublicar.problema(falta);
         } catch (NotificarActoCoactivo.SinDireccion | IllegalArgumentException invalido) {
             throw new ProblemaDeNegocio(CodigoDeError.VALIDACION, motivoDe(invalido));

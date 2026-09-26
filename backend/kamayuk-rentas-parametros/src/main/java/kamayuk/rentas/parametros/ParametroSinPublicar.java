@@ -46,11 +46,10 @@ import kamayuk.rentas.dominio.Ejercicio;
  * de beneficio, la fila que falta de {@link ParametrosSellados} y el envoltorio de frontera de
  * {@code FraccionamientoCoactivo}.
  *
- * <p>Declararla no es documentacion: es lo que hace a la excepcion <b>traducible</b>. {@code
- * FaltaPublicar} acota su parametro a {@code RuntimeException & ParametroSinPublicar} —el tipo que
- * da un {@code catch} multiple—, asi que una excepcion que no la declare no se puede pasar por ahi,
- * y una guarda del codigo fuente exige que todo {@code catch} que la nombre y conteste 422 pase por
- * ahi ({@code DiscriminadorDeLoQueFaltaPublicarTest}).
+ * <p>Desde #435 no se declara a mano: se extiende {@link CifraSinPublicar}, que la implementa una
+ * vez. Es lo que hace a la excepcion <b>traducible</b>: {@code ManejadorDeLoQueFaltaPublicar}
+ * captura la base y contesta el 422 con su discriminador, la nombre un {@code catch} o no, y {@code
+ * LaFamiliaFaltaPublicarEsUnTipoTest} exige que ninguna implemente la interfaz sin extenderla.
  *
  * <p>La <b>unica</b> excepcion de esa familia que no puede declararla es {@code
  * PoliticasDeRedondeo.PuntoSinPolitica}: vive en {@code kamayuk-rentas-dominio-compartido}, que

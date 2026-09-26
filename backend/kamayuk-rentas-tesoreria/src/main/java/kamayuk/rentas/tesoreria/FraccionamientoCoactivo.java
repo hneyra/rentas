@@ -1,10 +1,7 @@
 package kamayuk.rentas.tesoreria;
 
-import java.util.Optional;
-import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.Observacion;
-import kamayuk.rentas.parametros.ParametroSinPublicar;
-import org.jspecify.annotations.Nullable;
+import kamayuk.rentas.parametros.CifraSinPublicar;
 
 /**
  * Suscribe un convenio de fraccionamiento <b>coactivo</b>, publicado para {@code coactiva} (ARQ-01
@@ -153,43 +150,19 @@ public interface FraccionamientoCoactivo {
      * INTERES_FRACCIONAMIENTO:ORDINARIO}, {@code REDONDEO:CUOTA}— o, cuando lo que falta es el
      * conjunto entero y no hay llave que nombrar, el <b>ejercicio</b>.
      */
-    final class CondicionesSinPublicar extends RuntimeException implements ParametroSinPublicar {
+    final class CondicionesSinPublicar extends CifraSinPublicar {
 
         @java.io.Serial private static final long serialVersionUID = 1L;
 
-        // El aviso [serial] no aplica: `Ejercicio` es un record del dominio que no
-        // implementa Serializable, y una excepcion de negocio nunca se serializa —se
-        // lanza, se traduce a problem+json y muere ahi (ManejadorDeErrores)—.
-        @SuppressWarnings("serial")
-        private final Ejercicio ejercicio;
-
-        private final @Nullable String llave;
-
         /**
-         * La causa esta acotada a los dos limites a la vez (#691).
-         *
-         * <p>{@code RuntimeException} para poder encadenarla y {@link ParametroSinPublicar} para
-         * poder <b>copiarle</b> el ejercicio y la llave, que es lo que este envoltorio tenia que
-         * dejar de perder: hasta #691 solo conservaba el mensaje, asi que el 422 de {@code POST
-         * /coactiva/convenios} salia sin discriminador aunque la excepcion original lo supiera
-         * todo. Con este limite, meter en la lista del {@code catch} una excepcion que no publique
-         * su ejercicio <b>no compila</b>.
+         * La causa es de la familia (#691, #435): de ella se <b>copian</b> el ejercicio y la llave,
+         * que es lo que este envoltorio tenia que dejar de perder —hasta #691 solo conservaba el
+         * mensaje, asi que el 422 de {@code POST /coactiva/convenios} salia sin discriminador
+         * aunque la excepcion original lo supiera todo—. Con el tipo de la base, envolver una
+         * excepcion que no publique su ejercicio <b>no compila</b>.
          */
-        public <E extends RuntimeException & ParametroSinPublicar> CondicionesSinPublicar(
-                String mensaje, E causa) {
-            super(mensaje, causa);
-            this.ejercicio = causa.ejercicio();
-            this.llave = causa.llave().orElse(null);
-        }
-
-        @Override
-        public Ejercicio ejercicio() {
-            return ejercicio;
-        }
-
-        @Override
-        public Optional<String> llave() {
-            return Optional.ofNullable(llave);
+        public CondicionesSinPublicar(String mensaje, CifraSinPublicar causa) {
+            super(mensaje, causa.ejercicio(), causa.llave().orElse(null), causa);
         }
     }
 }

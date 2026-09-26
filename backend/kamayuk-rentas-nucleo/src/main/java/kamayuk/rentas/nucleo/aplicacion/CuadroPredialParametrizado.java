@@ -14,10 +14,10 @@ import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.PoliticasDeRedondeo;
 import kamayuk.rentas.nucleo.dominio.predial.ModalidadDelPredial;
 import kamayuk.rentas.nucleo.dominio.predial.Tramo;
+import kamayuk.rentas.parametros.CifraSinPublicar;
 import kamayuk.rentas.parametros.ConjuntoVigente;
 import kamayuk.rentas.parametros.IdentificadorDeConjunto;
 import kamayuk.rentas.parametros.LectorDeParametros;
-import kamayuk.rentas.parametros.ParametroSinPublicar;
 import kamayuk.rentas.parametros.ParametrosSellados;
 import kamayuk.rentas.parametros.PoliticasDeRedondeoSelladas;
 import org.springframework.stereotype.Service;
@@ -351,18 +351,9 @@ public class CuadroPredialParametrizado {
      * TRAMO_PREDIAL_LIMITE:2}. La capa web la traduce a 422 —la peticion esta bien y el sistema
      * tampoco esta roto: lo que falta es la ordenanza o la publicacion—.
      */
-    public static final class ParametroDelPredialAusente extends RuntimeException
-            implements ParametroSinPublicar {
+    public static final class ParametroDelPredialAusente extends CifraSinPublicar {
 
         @java.io.Serial private static final long serialVersionUID = 1L;
-
-        // El aviso [serial] no aplica: `Ejercicio` es un record del dominio que no
-        // implementa Serializable, y una excepcion de negocio nunca se serializa —se
-        // lanza, se traduce a problem+json y muere ahi (ManejadorDeErrores)—.
-        @SuppressWarnings("serial")
-        private final Ejercicio ejercicio;
-
-        private final String llave;
 
         ParametroDelPredialAusente(Ejercicio ejercicio, String llave, String consecuencia) {
             super(
@@ -373,20 +364,9 @@ public class CuadroPredialParametrizado {
                             + ". "
                             + consecuencia
                             + ", y una cifra inventada no se distingue de la correcta cuando llega"
-                            + " al papel que se cobra (regla 5)");
-            this.ejercicio = ejercicio;
-            this.llave = llave;
-        }
-
-        @Override
-        public Ejercicio ejercicio() {
-            return ejercicio;
-        }
-
-        /** La llave que falta, legible por programa y no solo por quien lee el mensaje. */
-        @Override
-        public Optional<String> llave() {
-            return Optional.of(llave);
+                            + " al papel que se cobra (regla 5)",
+                    ejercicio,
+                    llave);
         }
     }
 }

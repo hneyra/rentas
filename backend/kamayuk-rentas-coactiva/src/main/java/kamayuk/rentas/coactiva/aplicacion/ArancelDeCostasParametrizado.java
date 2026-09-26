@@ -2,14 +2,13 @@ package kamayuk.rentas.coactiva.aplicacion;
 
 import java.time.LocalDate;
 import java.util.Locale;
-import java.util.Optional;
 import kamayuk.rentas.coactiva.dominio.TipoDeActoCoactivo;
 import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.ValorNormativo;
+import kamayuk.rentas.parametros.CifraSinPublicar;
 import kamayuk.rentas.parametros.ConjuntoVigente;
 import kamayuk.rentas.parametros.LectorDeParametros;
-import kamayuk.rentas.parametros.ParametroSinPublicar;
 import kamayuk.rentas.parametros.ParametrosSellados;
 import org.springframework.stereotype.Service;
 
@@ -174,18 +173,9 @@ public class ArancelDeCostasParametrizado {
      * con una cifra inventada —que es un cobro sin sustento normativo repetido en toda la cartera
      * coactiva—.
      */
-    public static final class ArancelSinParametrizar extends RuntimeException
-            implements ParametroSinPublicar {
+    public static final class ArancelSinParametrizar extends CifraSinPublicar {
 
         @java.io.Serial private static final long serialVersionUID = 1L;
-
-        // El aviso [serial] no aplica: `Ejercicio` es un record del dominio que no
-        // implementa Serializable, y una excepcion de negocio nunca se serializa —se
-        // lanza, se traduce a problem+json y muere ahi (ManejadorDeErrores)—.
-        @SuppressWarnings("serial")
-        private final Ejercicio ejercicio;
-
-        private final String llave;
 
         ArancelSinParametrizar(Ejercicio ejercicio, TipoDeActoCoactivo tipo) {
             super(
@@ -198,20 +188,9 @@ public class ArancelDeCostasParametrizado {
                             + ". Sin el no hay arancel que aplicar a "
                             + tipo.titulo()
                             + ", y una costa inventada es un cobro que ninguna ordenanza respalda"
-                            + " (regla 5, D-02c, #193)");
-            this.ejercicio = ejercicio;
-            this.llave = TIPO_ARANCEL + ":" + tipo.name();
-        }
-
-        @Override
-        public Ejercicio ejercicio() {
-            return ejercicio;
-        }
-
-        /** La llave que falta, {@code tipo:clave}, legible por programa. */
-        @Override
-        public Optional<String> llave() {
-            return Optional.of(llave);
+                            + " (regla 5, D-02c, #193)",
+                    ejercicio,
+                    TIPO_ARANCEL + ":" + tipo.name());
         }
     }
 }

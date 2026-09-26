@@ -4,14 +4,13 @@ import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.LinkedHashSet;
 import java.util.Locale;
-import java.util.Optional;
 import java.util.Set;
 import kamayuk.rentas.dominio.CalendarioHabil;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.Plazo;
+import kamayuk.rentas.parametros.CifraSinPublicar;
 import kamayuk.rentas.parametros.ConjuntoVigente;
 import kamayuk.rentas.parametros.LectorDeParametros;
-import kamayuk.rentas.parametros.ParametroSinPublicar;
 import kamayuk.rentas.parametros.ParametrosSellados;
 import org.springframework.stereotype.Service;
 
@@ -161,18 +160,9 @@ public class PlazosCoactivosParametrizados {
      * conjunto se sello sin ella. Que falle aqui, nombrando la llave, es preferible a que la
      * operacion siga con un numero inventado y produzca una medida cautelar nula.
      */
-    public static final class PlazoSinParametrizar extends RuntimeException
-            implements ParametroSinPublicar {
+    public static final class PlazoSinParametrizar extends CifraSinPublicar {
 
         @java.io.Serial private static final long serialVersionUID = 1L;
-
-        // El aviso [serial] no aplica: `Ejercicio` es un record del dominio que no
-        // implementa Serializable, y una excepcion de negocio nunca se serializa —se
-        // lanza, se traduce a problem+json y muere ahi (ManejadorDeErrores)—.
-        @SuppressWarnings("serial")
-        private final Ejercicio ejercicio;
-
-        private final String llave;
 
         PlazoSinParametrizar(Ejercicio ejercicio, String clave) {
             super(
@@ -184,20 +174,9 @@ public class PlazosCoactivosParametrizados {
                                     + " la Ley 26979)",
                             ejercicio,
                             TIPO_PLAZO,
-                            clave));
-            this.ejercicio = ejercicio;
-            this.llave = TIPO_PLAZO + ":" + clave;
-        }
-
-        @Override
-        public Ejercicio ejercicio() {
-            return ejercicio;
-        }
-
-        /** La llave que falta, {@code tipo:clave}, legible por programa. */
-        @Override
-        public Optional<String> llave() {
-            return Optional.of(llave);
+                            clave),
+                    ejercicio,
+                    TIPO_PLAZO + ":" + clave);
         }
     }
 }

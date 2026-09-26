@@ -40,6 +40,7 @@ import kamayuk.rentas.licencias.dobles.PrediosDeMentira;
 import kamayuk.rentas.licencias.dominio.PlantillaDeNumeroDeCertificado;
 import kamayuk.rentas.licencias.dominio.PlantillaDeNumeroDeLicencia;
 import kamayuk.rentas.licencias.dominio.TipoDeCertificado;
+import kamayuk.rentas.parametros.infraestructura.web.ManejadorDeLoQueFaltaPublicar;
 import kamayuk.rentas.web.ConfiguracionDeJson;
 import kamayuk.rentas.web.ManejadorDeErrores;
 import org.junit.jupiter.api.AfterEach;
@@ -275,7 +276,9 @@ class CertificadosYReportesControllerTest {
                                 new ResumenAnualDeLicencias(consulta, cobros, derechos),
                                 generador,
                                 RELOJ))
-                .setControllerAdvice(new ManejadorDeErrores())
+                .setControllerAdvice(
+                        new ManejadorDeErrores(),
+                        new ManejadorDeLoQueFaltaPublicar(new ManejadorDeErrores()))
                 .setMessageConverters(
                         // El de bytes hace falta y no es un detalle del montaje: las tres rutas de
                         // exportacion devuelven `ResponseEntity<byte[]>` (RF-132), y con solo el

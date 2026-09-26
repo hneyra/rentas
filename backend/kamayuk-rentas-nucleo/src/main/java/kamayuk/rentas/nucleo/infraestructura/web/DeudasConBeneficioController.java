@@ -8,7 +8,6 @@ import kamayuk.rentas.compartido.Paginacion;
 import kamayuk.rentas.cuentacorriente.TributoDelLibro;
 import kamayuk.rentas.nucleo.aplicacion.CampaniasDeBeneficioParametrizadas;
 import kamayuk.rentas.nucleo.aplicacion.SimularAcogimiento;
-import kamayuk.rentas.parametros.FaltaPublicar;
 import kamayuk.rentas.web.Api;
 import kamayuk.rentas.web.CodigoDeError;
 import kamayuk.rentas.web.ParametrosDePaginacion;
@@ -114,17 +113,6 @@ public class DeudasConBeneficioController {
 
         try {
             return DeudasConBeneficioResource.de(simulacion.de(criterio, paginacionDe(parametros)));
-        } catch (CampaniasDeBeneficioParametrizadas.CampaniaSinParametrizar
-                | CampaniasDeBeneficioParametrizadas.CampaniaIncompleta
-                | CampaniasDeBeneficioParametrizadas.BaseDesconocida falta) {
-            // 422 y no 500: la peticion esta bien y el sistema tampoco esta roto. Lo que falta es
-            // un dato de configuracion —la ordenanza de D-02b/D-02c— y quien opera tiene que
-            // enterarse de cual para poder pedirlo. Mismo trato que TASA_ANUNCIO:<CLASE> en #51.
-            // Falta publicar una cifra normativa, no un campo de la peticion: el 422 sale con
-            // el miembro `parametroQueFalta` (#604, #691). Sin el, la interfaz no puede decir UNA
-            // de las dos cosas —«corrige el formulario» o «hay que publicar una cifra»— y acaba
-            // enumerando las dos, que es peor que no decir nada.
-            throw FaltaPublicar.problema(falta);
         } catch (CampaniasDeBeneficioParametrizadas.CampaniaFueraDeVigencia fueraDeVigencia) {
             // #379 — 422 tambien, pero SIN `parametroQueFalta`: la campana esta publicada y no
             // rige hoy, asi que no hay ninguna cifra que publicar. Lo que no vale es la peticion

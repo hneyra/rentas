@@ -35,6 +35,7 @@ import kamayuk.rentas.nucleo.infraestructura.DeterminacionRepositoryJdbc;
 import kamayuk.rentas.nucleo.infraestructura.EspectaculoPublicoRepositoryJdbc;
 import kamayuk.rentas.nucleo.parametros.DerivadoPublicado;
 import kamayuk.rentas.parametros.LectorDeParametros;
+import kamayuk.rentas.parametros.infraestructura.web.ManejadorDeLoQueFaltaPublicar;
 import kamayuk.rentas.plataforma.tenant.TenantTransactionManager;
 import kamayuk.rentas.web.ConfiguracionDeJson;
 import kamayuk.rentas.web.ManejadorDeErrores;
@@ -267,7 +268,9 @@ class ElImporteDelEspectaculoEsUnoSoloFronteraTest {
                                 auditados::add),
                         gestor);
         return MockMvcBuilders.standaloneSetup(new EspectaculoController(servicio, RELOJ))
-                .setControllerAdvice(new ManejadorDeErrores())
+                .setControllerAdvice(
+                        new ManejadorDeErrores(),
+                        new ManejadorDeLoQueFaltaPublicar(new ManejadorDeErrores()))
                 .setMessageConverters(
                         new JacksonJsonHttpMessageConverter(
                                 JsonMapper.builder()
