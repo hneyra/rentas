@@ -46,7 +46,7 @@ class SancionesWebTest {
                             // El reloj SI entra: la grilla resuelve «a que fecha» antes de mirar
                             // ningun filtro, porque los dias en deposito no significan nada sin
                             // su fecha (regla 9, RNF-075).
-                            new InternamientosController(null, null, null, RELOJ),
+                            new InternamientosController(null, null, null, null, RELOJ),
                             new ResolucionesDeGerenciaController(null, null),
                             new ActosDeLaPapeletaController(null))
                     .setControllerAdvice(new ManejadorDeErrores())
@@ -228,7 +228,7 @@ class SancionesWebTest {
 
         MockMvc soloElIngreso =
                 MockMvcBuilders.standaloneSetup(
-                                new InternamientosController(null, registrar, null, RELOJ))
+                                new InternamientosController(null, registrar, null, null, RELOJ))
                         .setControllerAdvice(new ManejadorDeErrores())
                         .setMessageConverters(
                                 new JacksonJsonHttpMessageConverter(

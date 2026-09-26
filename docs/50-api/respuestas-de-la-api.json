@@ -153,6 +153,7 @@
   "POST /transito/constancias-libres": ["404"],
   "POST /transito/descargos": ["404"],
   "POST /transito/internamientos": ["404"],
+  "POST /transito/internamientos/{placa}/abandono": ["404"],
   "POST /transito/internamientos/{placa}/liberacion": ["404"],
   "POST /transito/papeletas/{numero}/anulacion": ["404"],
   "POST /transito/reportes": [],

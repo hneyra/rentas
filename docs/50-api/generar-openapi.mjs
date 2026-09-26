@@ -2065,6 +2065,18 @@ const OPERACIONES_ADICIONALES = {
         vehículo—.
       `),
     },
+    {
+      operationId: 'declarar_abandono_internamiento',
+      metodo: 'post',
+      ruta: '/api/v1/transito/internamientos/{placa}/abandono',
+      titulo: 'Declaración de abandono del vehículo internado',
+      descripcion: bloque(`
+        Declara el abandono del vehículo internado y emite el acta (#454, RF-064). El estado
+        \`EN_ABANDONO\` de la grilla existía y ningún acto lo producía: este es ese acto, con
+        la observación del usuario, obligatoria (RNF-052). Un segundo abandono del mismo
+        internamiento contesta 409; la liberación posterior sigue siendo posible, y gana.
+      `),
+    },
   ],
   // `transito_rg_ordinaria` declara «POST /transito/resoluciones/ordinaria»
   // —dictarla—; notificarla necesita ruta propia. Infracciones administrativas

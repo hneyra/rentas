@@ -10,6 +10,7 @@ import kamayuk.rentas.documentos.FormatoDeDocumento;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.dominio.ZonaHoraria;
 import kamayuk.rentas.sanciones.aplicacion.ConsultaDeInternamientos;
+import kamayuk.rentas.sanciones.aplicacion.DeclararAbandonoDeVehiculo;
 import kamayuk.rentas.sanciones.aplicacion.LiberarVehiculoInternado;
 import kamayuk.rentas.sanciones.aplicacion.RegistrarDescargo;
 import kamayuk.rentas.sanciones.aplicacion.RegistrarInternamiento;
@@ -62,16 +63,19 @@ public class InternamientosController {
     private final ConsultaDeInternamientos consulta;
     private final RegistrarInternamiento registrar;
     private final LiberarVehiculoInternado liberar;
+    private final DeclararAbandonoDeVehiculo abandonar;
     private final Clock reloj;
 
     public InternamientosController(
             ConsultaDeInternamientos consulta,
             RegistrarInternamiento registrar,
             LiberarVehiculoInternado liberar,
+            DeclararAbandonoDeVehiculo abandonar,
             Clock reloj) {
         this.consulta = consulta;
         this.registrar = registrar;
         this.liberar = liberar;
+        this.abandonar = abandonar;
         this.reloj = reloj;
     }
 
@@ -186,6 +190,37 @@ public class InternamientosController {
         }
     }
 
+    /**
+     * Declara el abandono del vehículo y emite el acta (#454). Hasta #454 no había verbo: el filtro
+     * {@code estado=EN_ABANDONO} de la grilla existía y ningún acto lo producía.
+     */
+    @PostMapping("/{placa}/abandono")
+    @ResponseStatus(HttpStatus.CREATED)
+    @RequiereAcceso(acceso = ACCESO, privilegio = Privilegio.REGISTRO)
+    public AbandonoResource declararAbandono(
+            @PathVariable String placa, @RequestBody PeticionDeAbandono peticion) {
+
+        Observacion observacion = PeticionesDeSanciones.observacionDe(peticion.observacion());
+        try {
+            return AbandonoResource.de(
+                    abandonar.declarar(
+                            placa,
+                            PeticionesDeSanciones.fechaDe(
+                                    peticion.fechaDeAbandono(), "fechaDeAbandono"),
+                            formatoDe(peticion.formato()),
+                            observacion));
+        } catch (LiberarVehiculoInternado.VehiculoNoInternado noEsta) {
+            throw new ProblemaDeNegocio(
+                    CodigoDeError.NO_ENCONTRADO, PeticionesDeSanciones.mensajeDe(noEsta));
+        } catch (DeclararAbandonoDeVehiculo.YaEnAbandono yaEsta) {
+            throw new ProblemaDeNegocio(
+                    CodigoDeError.CONFLICTO, PeticionesDeSanciones.mensajeDe(yaEsta));
+        } catch (DeclararAbandonoDeVehiculo.AbandonoAnteriorAlIngreso
+                | IllegalArgumentException invalido) {
+            throw PeticionesDeSanciones.invalido(invalido);
+        }
+    }
+
     // ------------------------------------------------------------------
 
     private LocalDate fechaOHoy(@Nullable String texto) {
@@ -261,6 +296,35 @@ public class InternamientosController {
      * @param soatVigenteAcreditado si se acreditó el SOAT vigente
      * @param formato en qué formato sale el acta; por omisión PDF
      */
+    /** Lo que la pantalla manda para declarar el abandono (#454). */
+    public record PeticionDeAbandono(
+            @Nullable String observacion,
+            @Nullable String fechaDeAbandono,
+            @Nullable String formato) {}
+
+    /** El abandono declarado: el estado en que queda y el acta que salió. */
+    public record AbandonoResource(
+            String placa,
+            LocalDate fecha,
+            int dias,
+            String estado,
+            String acta,
+            String formato,
+            String resumen) {
+
+        static AbandonoResource de(DeclararAbandonoDeVehiculo.Declarado declarado) {
+            Integer dias = declarado.movimiento().diasCustodia();
+            return new AbandonoResource(
+                    declarado.internamiento().placa(),
+                    declarado.movimiento().fecha(),
+                    dias == null ? 0 : dias,
+                    declarado.estado().name(),
+                    declarado.movimiento().acta(),
+                    declarado.acta().registro().formato().name(),
+                    declarado.acta().registro().resumen());
+        }
+    }
+
     public record PeticionDeLiberacion(
             @Nullable String observacion,
             @Nullable String fechaDeLiberacion,

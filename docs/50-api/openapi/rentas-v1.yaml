@@ -4411,6 +4411,41 @@ paths:
           $ref: "#/components/responses/SinMunicipalidad"
         "422":
           $ref: "#/components/responses/ErrorDeValidacion"
+  "/transito/internamientos/{placa}/abandono":
+    post:
+      operationId: declarar_abandono_internamiento
+      summary: "Declaración de abandono del vehículo internado"
+      description: >-
+        Declara el abandono del vehículo internado y emite el acta (#454, RF-064). El estado
+        `EN_ABANDONO` de la grilla existía y ningún acto lo producía: este es ese acto, con
+        la observación del usuario, obligatoria (RNF-052). Un segundo abandono del mismo
+        internamiento contesta 409; la liberación posterior sigue siendo posible, y gana.
+      tags: ["Tránsito"]
+      parameters:
+        - name: placa
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        201:
+          description: Operacion realizada
+          content:
+            application/json:
+              schema: { type: object }
+        "404":
+          description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "403":
+          $ref: "#/components/responses/SinMunicipalidad"
+        "422":
+          $ref: "#/components/responses/ErrorDeValidacion"
   "/transito/papeletas/{numero}/actos":
     get:
       operationId: transito_documentos

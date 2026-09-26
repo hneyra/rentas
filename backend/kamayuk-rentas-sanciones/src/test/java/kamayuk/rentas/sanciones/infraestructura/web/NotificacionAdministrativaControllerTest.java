@@ -63,6 +63,53 @@ class NotificacionAdministrativaControllerTest {
         assertThat(resultado.getResponse().getContentAsString()).contains("\"numero\":\"NA-0001\"");
     }
 
+    /**
+     * #454 — El plazo se comprueba antes de convertirlo a {@code smallint}.
+     *
+     * <p>{@code Integer.shortValue()} no lanza: se queda con los 16 bits bajos. La siembra que
+     * separa lo bueno de lo de hoy es la que se enrolla a un POSITIVO —65 566 son 30 dias—, que hoy
+     * contesta 201 y guarda otro plazo; 32 768 se enrolla a negativo y ya salia 422, con el mensaje
+     * equivocado.
+     */
+    @Test
+    @DisplayName("#454 — un plazo que no cabe en smallint es 422 con el rango, y no se guarda")
+    void elPlazoQueNoCabeNoSeRecorta() throws Exception {
+        assertThat(registrarConPlazo("NA-0454", 32767)).isEqualTo(201);
+        String ultimo = repositorio.ultimoNumero;
+
+        MvcResult enrollado = registrarConPlazoResultado("NA-0455", 65566);
+        MvcResult justoFuera = registrarConPlazoResultado("NA-0456", 32768);
+
+        assertThat(enrollado.getResponse().getStatus())
+                .as("65 566 dias no son 30: guardarlo recortado da otro plazo")
+                .isEqualTo(422);
+        assertThat(repositorio.ultimoNumero).as("y no se guarda nada").isEqualTo(ultimo);
+        assertThat(justoFuera.getResponse().getStatus()).isEqualTo(422);
+        assertThat(justoFuera.getResponse().getContentAsString())
+                .as("con el rango en el mensaje, no con el de un plazo negativo")
+                .contains("32767");
+    }
+
+    private int registrarConPlazo(String numero, int plazo) throws Exception {
+        return registrarConPlazoResultado(numero, plazo).getResponse().getStatus();
+    }
+
+    private MvcResult registrarConPlazoResultado(String numero, int plazo) throws Exception {
+        return mvc.perform(
+                        post("/rentas/api/v1/infracciones/administrativas/notificaciones")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        "{\"observacion\":\"prueba\",\"numero\":\""
+                                                + numero
+                                                + "\",\"fecha\":\"2026-03-01\","
+                                                + "\"direccion\":\"Av. Grau 123\","
+                                                + "\"motivo\":\"Falta administrativa\","
+                                                + "\"plazoDias\":"
+                                                + plazo
+                                                + "}"))
+                .andReturn();
+    }
+
     @Test
     @DisplayName("sin observacion, 422")
     void sinObservacion422() throws Exception {

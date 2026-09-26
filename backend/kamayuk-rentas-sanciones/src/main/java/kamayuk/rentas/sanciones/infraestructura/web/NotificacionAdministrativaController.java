@@ -99,16 +99,27 @@ public class NotificacionAdministrativaController {
         }
     }
 
+    /**
+     * El plazo, comprobado ANTES de convertirlo a {@code smallint} (#454).
+     *
+     * <p>{@code Integer.shortValue()} es un estrechamiento: se queda con los 16 bits bajos y nunca
+     * lanza, asi que el {@code catch} que habia aqui era codigo muerto y 65 566 dias se guardaban
+     * como 30, con un 201. La cota es la de la columna, {@code plazo_dias smallint}.
+     */
     private static @Nullable Short plazoDe(@Nullable Integer plazoDias) {
         if (plazoDias == null) {
             return null;
         }
-        try {
-            return plazoDias.shortValue();
-        } catch (ArithmeticException fueraDeRango) {
+        if (plazoDias < 1 || plazoDias > Short.MAX_VALUE) {
             throw new ProblemaDeNegocio(
-                    CodigoDeError.VALIDACION, "El plazo en dias es demasiado grande: " + plazoDias);
+                    CodigoDeError.VALIDACION,
+                    "El plazo en dias va de 1 a "
+                            + Short.MAX_VALUE
+                            + ": "
+                            + plazoDias
+                            + " no cabe, y guardarlo recortado daria otro plazo");
         }
+        return plazoDias.shortValue();
     }
 
     private static String exigir(@Nullable String valor, String campo) {

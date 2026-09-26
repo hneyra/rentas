@@ -80,6 +80,7 @@ import kamayuk.rentas.sanciones.aplicacion.AnularPapeleta;
 import kamayuk.rentas.sanciones.aplicacion.CambiarNumeroDePapeleta;
 import kamayuk.rentas.sanciones.aplicacion.ConsultaDeActosDeLaPapeleta;
 import kamayuk.rentas.sanciones.aplicacion.ConsultaDeInternamientos;
+import kamayuk.rentas.sanciones.aplicacion.DeclararAbandonoDeVehiculo;
 import kamayuk.rentas.sanciones.aplicacion.EmitirConstanciaLibre;
 import kamayuk.rentas.sanciones.aplicacion.LiberarVehiculoInternado;
 import kamayuk.rentas.sanciones.aplicacion.NotificarResolucionDeGerencia;
@@ -283,6 +284,7 @@ class SancionesJdbcTest {
     private static NotificarResolucionDeGerencia notificar;
     private static RegistrarInternamiento internar;
     private static LiberarVehiculoInternado liberar;
+    private static DeclararAbandonoDeVehiculo abandonar;
     private static ConsultaDeInternamientos consultaDeDeposito;
     private static ConsultaDeActosDeLaPapeleta consultaDeActos;
     private static ConsultaDeDeudaPublica deudas;
@@ -436,6 +438,10 @@ class SancionesJdbcTest {
                                 documentos,
                                 auditoria,
                                 RELOJ));
+        abandonar =
+                envolver(
+                        new DeclararAbandonoDeVehiculo(
+                                internamientos, papeletas, documentos, auditoria, RELOJ));
         consultaDeDeposito = envolver(new ConsultaDeInternamientos(internamientos));
         consultaDeActos =
                 envolver(
@@ -449,7 +455,7 @@ class SancionesJdbcTest {
                 MockMvcBuilders.standaloneSetup(
                                 new DescargosController(registrarDescargo),
                                 new InternamientosController(
-                                        consultaDeDeposito, internar, liberar, RELOJ),
+                                        consultaDeDeposito, internar, liberar, abandonar, RELOJ),
                                 new ConstanciasLibresController(
                                         envolver(
                                                 new EmitirConstanciaLibre(
@@ -1261,6 +1267,133 @@ class SancionesJdbcTest {
                                             + "\",\"personaQueRetira\":\"DORIS\","
                                             + "\"documentoDeQuienRetira\":\"DNI 44218937\","
                                             + "\"soatVigenteAcreditado\":true}"));
+        }
+    }
+
+    /**
+     * #454 — El abandono de un vehiculo internado tiene su acto, y la grilla lo encuentra.
+     *
+     * <p>Hasta #454 {@code ?estado=EN_ABANDONO} contestaba siempre una pagina vacia: nadie escribia
+     * la fila. La siembra no es uniforme: uno sin movimientos, uno declarado en abandono y uno en
+     * abandono y despues liberado —la liberacion gana—. Con solo internados, el filtro da vacio con
+     * el acto y sin el, y no distingue nada.
+     */
+    @Nested
+    @DisplayName("#454 — El abandono se declara, y el filtro de la grilla lo encuentra")
+    class ElAbandono {
+
+        private static final LocalDate DECLARADO = LocalDate.of(2026, 3, 20);
+
+        private static final String DEPOSITO = "/rentas/api/v1/transito/internamientos";
+
+        @Test
+        @DisplayName(
+                "internado, abandonado y abandonado-despues-liberado: cada estado trae el suyo")
+        void cadaEstadoTraeElSuyo() throws Exception {
+            internarVehiculo(papeletaDeTransito("AB1"), "ABN-101");
+            internarVehiculo(papeletaDeTransito("AB2"), "ABN-102");
+            Papeleta tercera = papeletaDeTransito("AB3");
+            internarVehiculo(tercera, "ABN-103");
+
+            Rechazo declarado = abandonarPorHttp("ABN-102");
+            assertThat(declarado.estado()).as(declarado.cuerpo()).isEqualTo(201);
+            assertThat(declarado.cuerpo()).contains("\"estado\":\"EN_ABANDONO\"");
+            assertThat(abandonarPorHttp("ABN-103").estado()).isEqualTo(201);
+            liberarVehiculo("ABN-103", cobrarCustodia(tercera.obligadoId()));
+
+            assertThat(
+                            List.of(
+                                    placasEn(EstadoDeInternamiento.INTERNADO),
+                                    placasEn(EstadoDeInternamiento.EN_ABANDONO),
+                                    placasEn(EstadoDeInternamiento.LIBERADO)))
+                    .as("la liberacion gana sobre el abandono (EstadoDeInternamiento)")
+                    .containsExactly(List.of("ABN-101"), List.of("ABN-102"), List.of("ABN-103"));
+        }
+
+        @Test
+        @DisplayName("una segunda declaracion del mismo internamiento es 409, y no deja fila")
+        void unaSegundaDeclaracionEs409() throws Exception {
+            internarVehiculo(papeletaDeTransito("AB4"), "ABN-104");
+            assertThat(abandonarPorHttp("ABN-104").estado()).isEqualTo(201);
+
+            Rechazo otra = abandonarPorHttp("ABN-104");
+
+            assertThat(otra.estado()).as(otra.cuerpo()).isEqualTo(409);
+            assertThat(
+                            contar(
+                                    "SELECT count(*) FROM internamiento_movimiento m"
+                                            + " JOIN internamiento i ON i.id = m.internamiento_id"
+                                            + " WHERE i.placa = 'ABN-104' AND m.tipo = 'ABANDONO'"))
+                    .isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("y por SQL directo la base tampoco admite un segundo abandono")
+        void laBaseTampocoAdmiteUnSegundoAbandono() throws Exception {
+            internarVehiculo(papeletaDeTransito("AB5"), "ABN-105");
+            assertThat(abandonarPorHttp("ABN-105").estado()).isEqualTo(201);
+
+            // La comprobacion del caso de uso no cubre la carrera ni el SQL directo: lo hace
+            // `internamiento_abandono_uq` (V40), como `internamiento_liberacion_uq`.
+            assertThatThrownBy(
+                            () ->
+                                    enTransaccion(
+                                            () ->
+                                                    jdbc.sql(
+                                                                    "INSERT INTO"
+                                                                            + " internamiento_movimiento"
+                                                                            + " (municipalidad_id,"
+                                                                            + " internamiento_id, tipo,"
+                                                                            + " fecha, acta,"
+                                                                            + " documento_id,"
+                                                                            + " dias_custodia,"
+                                                                            + " soat_acreditado,"
+                                                                            + " fecha_registro,"
+                                                                            + " usuario_registro,"
+                                                                            + " observacion)"
+                                                                            + " SELECT m.municipalidad_id,"
+                                                                            + " m.internamiento_id,"
+                                                                            + " m.tipo, m.fecha,"
+                                                                            + " m.acta || '-B',"
+                                                                            + " i.documento_id,"
+                                                                            + " m.dias_custodia,"
+                                                                            + " m.soat_acreditado,"
+                                                                            + " m.fecha_registro,"
+                                                                            + " m.usuario_registro,"
+                                                                            + " m.observacion"
+                                                                            + " FROM internamiento_movimiento m"
+                                                                            + " JOIN internamiento i"
+                                                                            + " ON i.id = m.internamiento_id"
+                                                                            + " WHERE i.placa = 'ABN-105'"
+                                                                            + " AND m.tipo = 'ABANDONO'")
+                                                            .update()))
+                    .hasStackTraceContaining("internamiento_abandono_uq");
+        }
+
+        private List<String> placasEn(EstadoDeInternamiento estado) {
+            return enTransaccion(
+                            () ->
+                                    consultaDeDeposito.listar(
+                                            new CriterioDeInternamiento(null, null, estado),
+                                            LocalDate.of(2026, 4, 15),
+                                            Paginacion.de(0, 200, "fechaIngreso")))
+                    .contenido()
+                    .stream()
+                    .map(InternamientoEnConsulta::placa)
+                    .filter(List.of("ABN-101", "ABN-102", "ABN-103")::contains)
+                    .sorted()
+                    .toList();
+        }
+
+        private Rechazo abandonarPorHttp(String placa) throws Exception {
+            return rechazo(
+                    () ->
+                            enviar(
+                                    post(DEPOSITO + "/" + placa + "/abandono"),
+                                    "{\"observacion\":\"Nadie lo reclama desde marzo\","
+                                            + "\"fechaDeAbandono\":\""
+                                            + DECLARADO
+                                            + "\"}"));
         }
     }
 

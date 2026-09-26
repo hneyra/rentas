@@ -1123,6 +1123,13 @@
     "opcionales": [],
     "enElCuerpo": []
   },
+  "POST /transito/internamientos/{placa}/abandono": {
+    "obligatorios": [],
+    "algunoDeEstos": [],
+    "condicionales": [],
+    "opcionales": [],
+    "enElCuerpo": []
+  },
   "POST /transito/internamientos/{placa}/liberacion": {
     "obligatorios": [],
     "algunoDeEstos": [],
