@@ -39,6 +39,8 @@ import org.jspecify.annotations.Nullable;
  * @param obligadoNombre su nombre
  * @param infractorNombre quién conducía, si se identificó
  * @param estado en qué punto está la papeleta
+ * @param seDebe si sigue debiéndose, tal como lo contestó la consulta con {@link
+ *     EstadoDePapeleta#SE_DEBE}; ver {@link #estaPendiente()}
  * @param importeAPagar lo que el acta dice que corresponde pagar
  * @param valorNumero el número de la resolución de multa emitida, si ya se emitió
  * @param valorId su identificador, para preguntar por su pase a coactiva
@@ -58,6 +60,7 @@ public record PapeletaDelPadron(
         @Nullable String obligadoNombre,
         @Nullable String infractorNombre,
         EstadoDePapeleta estado,
+        boolean seDebe,
         Dinero importeAPagar,
         @Nullable String valorNumero,
         @Nullable Long valorId) {
@@ -74,14 +77,19 @@ public record PapeletaDelPadron(
     }
 
     /**
-     * Si esta papeleta sigue debiéndose: ni pagada, ni anulada, ni prescrita.
+     * Si esta papeleta sigue debiéndose: ni pagada, ni anulada, ni prescrita, ni dejada sin efecto
+     * por una resolución de gerencia.
      *
-     * <p>Lo contesta el propio estado (#259). Hasta entonces esta expresión repetía en Java la
-     * lista que el {@code WHERE} de {@code soloPendientes} lleva en SQL, y es <b>esta</b> la que la
-     * API publica como {@code pendiente}: divergir habría hecho que la grilla marcara pendiente una
-     * fila que el filtro de pendientes no devuelve.
+     * <p><b>Lo contesta la consulta, no este record</b> (#385). Hasta #259 esta expresión repetía
+     * en Java la lista que el {@code WHERE} de {@code soloPendientes} lleva en SQL; #259 la pasó a
+     * {@code estado.seDebe()}, y eso dejó de bastar: la multa que una resolución deja sin efecto
+     * sigue {@code IMPUESTA} —el estado no se toca, ver {@code ResolverConResolucionDeGerencia}— y
+     * sólo las resoluciones saben que ya no se debe. Es <b>esta</b> la que la API publica como
+     * {@code pendiente}, así que ahora es la columna {@code se_debe} que el padrón proyecta con
+     * {@link EstadoDePapeleta#SE_DEBE}, el mismo predicado que filtra y que resume: no hay una
+     * segunda versión que pueda divergir.
      */
     public boolean estaPendiente() {
-        return estado.seDebe();
+        return seDebe;
     }
 }

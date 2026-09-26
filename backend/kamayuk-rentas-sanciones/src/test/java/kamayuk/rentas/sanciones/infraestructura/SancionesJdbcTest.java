@@ -75,6 +75,7 @@ import kamayuk.rentas.nucleo.PadronVehicular;
 import kamayuk.rentas.nucleo.aplicacion.PadronVehicularRentas;
 import kamayuk.rentas.nucleo.infraestructura.VehiculoRepositoryJdbc;
 import kamayuk.rentas.plataforma.tenant.TenantTransactionManager;
+import kamayuk.rentas.sanciones.PapeletasSinNotificar;
 import kamayuk.rentas.sanciones.aplicacion.AnularPapeleta;
 import kamayuk.rentas.sanciones.aplicacion.CambiarNumeroDePapeleta;
 import kamayuk.rentas.sanciones.aplicacion.ConsultaDeActosDeLaPapeleta;
@@ -83,6 +84,7 @@ import kamayuk.rentas.sanciones.aplicacion.EmitirConstanciaLibre;
 import kamayuk.rentas.sanciones.aplicacion.LiberarVehiculoInternado;
 import kamayuk.rentas.sanciones.aplicacion.NotificarResolucionDeGerencia;
 import kamayuk.rentas.sanciones.aplicacion.ObligacionCompartidaConOtraPapeleta;
+import kamayuk.rentas.sanciones.aplicacion.PapeletasSinNotificarSanciones;
 import kamayuk.rentas.sanciones.aplicacion.PlazosDeSancionesParametrizados;
 import kamayuk.rentas.sanciones.aplicacion.RegistrarDescargo;
 import kamayuk.rentas.sanciones.aplicacion.RegistrarInternamiento;
@@ -92,18 +94,25 @@ import kamayuk.rentas.sanciones.aplicacion.ResolverConResolucionDeGerencia;
 import kamayuk.rentas.sanciones.dobles.CobrosDeMentira;
 import kamayuk.rentas.sanciones.dominio.ActoDeLaPapeleta;
 import kamayuk.rentas.sanciones.dominio.AcuseDelActo;
+import kamayuk.rentas.sanciones.dominio.AgrupacionDelResumen;
 import kamayuk.rentas.sanciones.dominio.ConstanciaLibre;
 import kamayuk.rentas.sanciones.dominio.CriterioDeConstancias;
 import kamayuk.rentas.sanciones.dominio.CriterioDeInternamiento;
+import kamayuk.rentas.sanciones.dominio.CriterioDePadron;
 import kamayuk.rentas.sanciones.dominio.CriterioDePapeleta;
+import kamayuk.rentas.sanciones.dominio.CriterioDelProcedimiento;
 import kamayuk.rentas.sanciones.dominio.Descargo;
 import kamayuk.rentas.sanciones.dominio.EfectoSobreLaMulta;
 import kamayuk.rentas.sanciones.dominio.EstadoDeInternamiento;
 import kamayuk.rentas.sanciones.dominio.EstadoDePapeleta;
 import kamayuk.rentas.sanciones.dominio.EstadoDelActoDeLaPapeleta;
 import kamayuk.rentas.sanciones.dominio.Familia;
+import kamayuk.rentas.sanciones.dominio.FaseDelProcedimiento;
 import kamayuk.rentas.sanciones.dominio.InternamientoEnConsulta;
+import kamayuk.rentas.sanciones.dominio.LineaDelResumen;
 import kamayuk.rentas.sanciones.dominio.Papeleta;
+import kamayuk.rentas.sanciones.dominio.PapeletaDelPadron;
+import kamayuk.rentas.sanciones.dominio.ProcedimientoSancionador;
 import kamayuk.rentas.sanciones.dominio.ResolucionDeGerencia;
 import kamayuk.rentas.sanciones.dominio.ResolucionDeGerenciaRepository;
 import kamayuk.rentas.sanciones.dominio.SentidoDelFallo;
@@ -2527,6 +2536,387 @@ class SancionesJdbcTest {
                     + "\"fechaDeIngreso\":\"2026-03-04T15:00:00Z\","
                     + "\"tasaDeCustodia\":\"CUSTODIA\","
                     + "\"motivo\":\"Conducir sin licencia vigente\"}";
+        }
+
+        private String constanciaDe(String placa) {
+            return "{\"observacion\":\"Constancia pedida en ventanilla\",\"placa\":\""
+                    + placa
+                    + "\",\"verificadaAl\":\"2026-04-20\"}";
+        }
+    }
+
+    // ==================================================================
+    //  #385 — la multa dejada sin efecto: la situacion se deriva, y alguien la deriva
+    // ==================================================================
+
+    /**
+     * {@code ResolverConResolucionDeGerencia} dice que el estado de la papeleta <b>no se toca</b>
+     * cuando la resolución la deja sin efecto, porque «su situación se deriva de las resoluciones».
+     * Hasta #385 ningún lector la derivaba: la fase miraba sólo si había una {@code
+     * ADMINISTRATIVA}, y lo pendiente salía entero de {@code p.estado}, que se queda en {@code
+     * IMPUESTA}.
+     *
+     * <p><b>La siembra que distingue son dos papeletas por familia, las dos con su descargo
+     * resuelto</b>: una FUNDADO / {@code SE_DEJA_SIN_EFECTO} y otra INFUNDADO / {@code
+     * SE_MANTIENE}. La segunda es la que separa «mira el efecto» de «cualquier resolución con
+     * descargo»: un arreglo que excluyera por {@code descargo_id IS NOT NULL} pasaría la primera y
+     * se pondría rojo aquí. Los importes son distintos a propósito, para que una suma que contara
+     * la equivocada no cuadre por casualidad.
+     *
+     * <p>Y todo corre por los casos de uso de verdad —el descargo con su plazo parametrizado, la
+     * resolución con su baja en el libro— y no por un {@code INSERT} en {@code
+     * resolucion_gerencia}: lo que #385 mide es que lo que la resolución dicta llegue a la grilla.
+     */
+    @Nested
+    @DisplayName(
+            "#385 — la multa dejada sin efecto no tiene fase, no esta pendiente y no se impugna")
+    class LaMultaDejadaSinEfecto {
+
+        /** ACT-20 del issue: la que se deja sin efecto. */
+        private static final Dinero ACT_20 = Dinero.de("2675.00");
+
+        /**
+         * ACT-21 del issue: la que se mantiene. Otro importe, para que ninguna suma cuadre sola.
+         */
+        private static final Dinero ACT_21 = Dinero.de("1070.00");
+
+        private static final String CONSTANCIAS = "/rentas/api/v1/transito/constancias-libres";
+
+        @Test
+        @DisplayName("la fase de la dejada sin efecto es nula y el filtro SANCIONADA no la trae")
+        void laFaseDeLaDejadaSinEfectoEsNula() {
+            DosActas actas = dosActasResueltas("F");
+
+            assertThat(faseDe(actas.sinEfecto()))
+                    .as(
+                            "una multa dejada sin efecto termino sin palabra del manual: con"
+                                    + " SANCIONADA la grilla dibuja una fase plausible y equivocada")
+                    .isNull();
+            assertThat(faseDe(actas.mantenida()))
+                    .as(
+                            "la que se mantiene sigue SANCIONADA: la fase mira el EFECTO, no el descargo")
+                    .isEqualTo(FaseDelProcedimiento.SANCIONADA);
+
+            Pagina<ProcedimientoSancionador> sancionadas =
+                    enTransaccion(
+                            () ->
+                                    new ProcedimientoSancionadorRepositoryJdbc(jdbc)
+                                            .buscar(
+                                                    new CriterioDelProcedimiento(
+                                                            null,
+                                                            null,
+                                                            actas.codigo(),
+                                                            FaseDelProcedimiento.SANCIONADA,
+                                                            RESUELTA_EL),
+                                                    Paginacion.de(0, 20, "numero")));
+            assertThat(sancionadas.contenido())
+                    .extracting(ProcedimientoSancionador::numeroActa)
+                    .as("el WHERE usa la misma expresion que el SELECT")
+                    .containsExactly(actas.mantenida().numero());
+        }
+
+        @Test
+        @DisplayName(
+                "la dejada sin efecto no esta pendiente: ni en el padron, ni en su filtro,"
+                        + " ni en el resumen")
+        void laDejadaSinEfectoNoEstaPendiente() {
+            DosActas actas = dosActasResueltas("P");
+            CriterioDePadron todas = padronDe(Familia.ADMINISTRATIVA, actas.codigo(), null, false);
+            CriterioDePadron pendientes =
+                    padronDe(Familia.ADMINISTRATIVA, actas.codigo(), null, true);
+
+            Map<String, Boolean> pendientePorNumero =
+                    enTransaccion(
+                                    () ->
+                                            new PadronDePapeletasRepositoryJdbc(jdbc)
+                                                    .buscar(todas, Paginacion.de(0, 20, "numero")))
+                            .contenido()
+                            .stream()
+                            .collect(
+                                    java.util.stream.Collectors.toMap(
+                                            PapeletaDelPadron::numero,
+                                            PapeletaDelPadron::estaPendiente));
+            assertThat(pendientePorNumero)
+                    .as("lo que la API publica como `pendiente`, fila a fila")
+                    .containsExactlyInAnyOrderEntriesOf(
+                            Map.of(
+                                    actas.sinEfecto().numero(), false,
+                                    actas.mantenida().numero(), true));
+
+            assertThat(
+                            enTransaccion(
+                                            () ->
+                                                    new PadronDePapeletasRepositoryJdbc(jdbc)
+                                                            .buscar(
+                                                                    pendientes,
+                                                                    Paginacion.de(0, 20, "numero")))
+                                    .contenido())
+                    .extracting(PapeletaDelPadron::numero)
+                    .as("el filtro de pendientes dice lo mismo que la columna")
+                    .containsExactly(actas.mantenida().numero());
+
+            List<LineaDelResumen> resumen =
+                    enTransaccion(
+                            () ->
+                                    new PadronDePapeletasRepositoryJdbc(jdbc)
+                                            .resumir(todas, AgrupacionDelResumen.CODIGO));
+            assertThat(resumen).hasSize(1);
+            assertThat(resumen.get(0).cantidad()).isEqualTo(2);
+            assertThat(resumen.get(0).pendientes())
+                    .as(
+                            "el resumen de recaudacion no cuenta como pendiente la que se dejo sin efecto")
+                    .isEqualTo(1);
+            assertThat(resumen.get(0).importeDeLasPendientes())
+                    .as("y su importe es el de ACT-21, no la suma de las dos")
+                    .isEqualTo(ACT_21);
+        }
+
+        @Test
+        @DisplayName(
+                "en transito, la dejada sin efecto sale del estado de cuenta y del panel, y la"
+                        + " constancia se emite")
+        void enTransitoLaConstanciaSeEmite() throws Exception {
+            PapeletasSinNotificarSanciones panel =
+                    envolver(
+                            new PapeletasSinNotificarSanciones(
+                                    new PadronDePapeletasRepositoryJdbc(jdbc)));
+
+            Papeleta sinEfecto = papeletaDeTransitoDe("T010", "ZSE-010");
+            Papeleta mantenida = papeletaDeTransitoDe("T011", "ZSE-011");
+            PapeletasSinNotificar.PapeletasImpuestas antes = panel.sinNotificar();
+
+            resolverConDescargo(
+                    sinEfecto,
+                    TipoDeResolucionDeGerencia.ORDINARIA,
+                    SentidoDelFallo.FUNDADO,
+                    EfectoSobreLaMulta.SE_DEJA_SIN_EFECTO);
+            resolverConDescargo(
+                    mantenida,
+                    TipoDeResolucionDeGerencia.ORDINARIA,
+                    SentidoDelFallo.INFUNDADO,
+                    EfectoSobreLaMulta.SE_MANTIENE);
+
+            assertThat(deudaDe(sinEfecto, ORDINARIA))
+                    .as("el libro ya dice que no debe nada; la prueba mira si alguien lo lee")
+                    .isEqualTo(Dinero.CERO);
+
+            PapeletasSinNotificar.PapeletasImpuestas despues = panel.sinNotificar();
+            assertThat(despues.cuantas())
+                    .as("el frente «sin notificar» del panel deja de contarla")
+                    .isEqualTo(antes.cuantas() - 1);
+            assertThat(despues.importe()).isEqualTo(antes.importe().menos(MULTA));
+
+            assertThat(pendienteEnElPadron("ZSE-010")).isFalse();
+            assertThat(pendienteEnElPadron("ZSE-011")).isTrue();
+
+            assertThat(enElEstadoDeCuenta("ZSE-010"))
+                    .as("el estado de cuenta de transito no lista la multa que se dejo sin efecto")
+                    .isEmpty();
+            assertThat(enElEstadoDeCuenta("ZSE-011")).containsExactly(mantenida.numero());
+
+            Rechazo libre = rechazo(() -> enviar(post(CONSTANCIAS), constanciaDe("ZSE-010")));
+            assertThat(libre.estado())
+                    .as(
+                            "al administrado al que se le dio la razon no se le niega la constancia:"
+                                    + " "
+                                    + libre.cuerpo())
+                    .isEqualTo(201);
+            Rechazo negada = rechazo(() -> enviar(post(CONSTANCIAS), constanciaDe("ZSE-011")));
+            assertThat(negada.estado()).as(negada.cuerpo()).isEqualTo(409);
+            assertThat(negada.cuerpo()).contains(mantenida.numero());
+        }
+
+        @Test
+        @DisplayName("sobre la dejada sin efecto no se registra otro descargo ni se dicta otra RIS")
+        void noSeImpugnaNiSeResuelveOtraVez() {
+            DosActas actas = dosActasResueltas("G");
+
+            assertThatThrownBy(() -> descargarLa(actas.sinEfecto(), "EXP-G-2"))
+                    .as("un recurso contra una multa que ya no existe no tiene objeto")
+                    .isInstanceOf(RegistrarDescargo.PapeletaSinNadaQueImpugnar.class)
+                    .hasMessageContaining(actas.sinEfecto().numero())
+                    .hasMessageContaining("sin efecto");
+            assertThatThrownBy(
+                            () ->
+                                    dictar(
+                                            actas.sinEfecto(),
+                                            TipoDeResolucionDeGerencia.ADMINISTRATIVA,
+                                            RESUELTA_EL,
+                                            null,
+                                            null,
+                                            null))
+                    .isInstanceOf(RegistrarDescargo.PapeletaSinNadaQueImpugnar.class);
+
+            assertThat(descargarLa(actas.mantenida(), "EXP-G-3").descargo().numeroExpediente())
+                    .as("la que se mantiene sigue admitiendo recurso: la guarda mira el efecto")
+                    .isEqualTo("EXP-G-3");
+        }
+
+        // -------------------------------------------------------------- la siembra
+
+        /**
+         * El día de las dos resoluciones: el de la ordinaria de la clase, con el plazo cumplido.
+         */
+        private static final LocalDate RESUELTA_EL = ORDINARIA;
+
+        private record DosActas(Papeleta sinEfecto, Papeleta mantenida, String codigo) {}
+
+        /**
+         * ACT-20 y ACT-21, del mismo código y de <b>dos obligados distintos</b>: con el mismo, la
+         * baja de ACT-20 chocaría con la obligación que comparte con ACT-21 (#371), que es otro
+         * issue y no este.
+         */
+        private DosActas dosActasResueltas(String sufijo) {
+            String codigo = "ADM-385" + sufijo;
+            insertar(
+                    "INSERT INTO codigo_infraccion (municipalidad_id, familia, codigo, descripcion,"
+                            + " porcentaje_uit, base_legal, vigencia_desde) VALUES ("
+                            + municipalidad
+                            + ", 'ADMINISTRATIVA', '"
+                            + codigo
+                            + "', 'Infraccion de la prueba', 8.0000, 'Ordenanza de la prueba',"
+                            + " DATE '2026-01-01') RETURNING id");
+            Papeleta sinEfecto = acta("ACT-20" + sufijo, codigo, ACT_20, "50");
+            Papeleta mantenida = acta("ACT-21" + sufijo, codigo, ACT_21, "20");
+
+            resolverConDescargo(
+                    sinEfecto,
+                    TipoDeResolucionDeGerencia.ADMINISTRATIVA,
+                    SentidoDelFallo.FUNDADO,
+                    EfectoSobreLaMulta.SE_DEJA_SIN_EFECTO);
+            resolverConDescargo(
+                    mantenida,
+                    TipoDeResolucionDeGerencia.ADMINISTRATIVA,
+                    SentidoDelFallo.INFUNDADO,
+                    EfectoSobreLaMulta.SE_MANTIENE);
+            return new DosActas(sinEfecto, mantenida, codigo);
+        }
+
+        private Papeleta acta(String numero, String codigo, Dinero multa, String porcentaje) {
+            long obligado = crearContribuyente(numero);
+            return enTransaccion(
+                    () ->
+                            registrarPapeleta.registrarAdministrativa(
+                                    numero,
+                                    codigo,
+                                    INFRACCION,
+                                    null,
+                                    "Av. Grau",
+                                    obligado,
+                                    null,
+                                    null,
+                                    obligado,
+                                    Dinero.de("5350.00"),
+                                    Alicuota.de(porcentaje),
+                                    multa,
+                                    Alicuota.de("100"),
+                                    multa,
+                                    null,
+                                    PORQUE));
+        }
+
+        private void resolverConDescargo(
+                Papeleta papeleta,
+                TipoDeResolucionDeGerencia tipo,
+                SentidoDelFallo sentido,
+                EfectoSobreLaMulta efecto) {
+            String expediente = "EXP-" + papeleta.numero();
+            descargarLa(papeleta, expediente);
+            dictar(papeleta, tipo, RESUELTA_EL, expediente, sentido, efecto);
+        }
+
+        private RegistrarDescargo.Registrado descargarLa(Papeleta papeleta, String expediente) {
+            return enTransaccion(
+                    () ->
+                            registrarDescargo.registrar(
+                                    papeleta.familia(),
+                                    papeleta.numero(),
+                                    new RegistrarDescargo.Peticion(
+                                            expediente,
+                                            INFRACCION.plusDays(2),
+                                            TipoDeRecurso.DESCARGO,
+                                            "El administrado acredita que no cometio la infraccion"),
+                                    PORQUE),
+                    "mesa.partes");
+        }
+
+        // -------------------------------------------------------------- las lecturas
+
+        private @Nullable FaseDelProcedimiento faseDe(Papeleta acta) {
+            List<ProcedimientoSancionador> filas =
+                    enTransaccion(
+                                    () ->
+                                            new ProcedimientoSancionadorRepositoryJdbc(jdbc)
+                                                    .buscar(
+                                                            new CriterioDelProcedimiento(
+                                                                    acta.numero(),
+                                                                    null,
+                                                                    null,
+                                                                    null,
+                                                                    RESUELTA_EL),
+                                                            Paginacion.de(0, 20, "numero")))
+                            .contenido();
+            assertThat(filas).hasSize(1);
+            return filas.get(0).fase();
+        }
+
+        private boolean pendienteEnElPadron(String placa) {
+            List<PapeletaDelPadron> filas =
+                    enTransaccion(
+                                    () ->
+                                            new PadronDePapeletasRepositoryJdbc(jdbc)
+                                                    .buscar(
+                                                            padronDe(
+                                                                    Familia.TRANSITO,
+                                                                    null,
+                                                                    placa,
+                                                                    false),
+                                                            Paginacion.de(0, 20, "numero")))
+                            .contenido();
+            assertThat(filas).hasSize(1);
+            return filas.get(0).estaPendiente();
+        }
+
+        private List<String> enElEstadoDeCuenta(String placa) {
+            return enTransaccion(
+                            () ->
+                                    papeletas.buscar(
+                                            new CriterioDePapeleta(
+                                                    Familia.TRANSITO,
+                                                    null,
+                                                    placa,
+                                                    null,
+                                                    null,
+                                                    null,
+                                                    null,
+                                                    null,
+                                                    null,
+                                                    null,
+                                                    true),
+                                            Paginacion.de(0, 20, "numero")))
+                    .contenido()
+                    .stream()
+                    .map(Papeleta::numero)
+                    .toList();
+        }
+
+        private CriterioDePadron padronDe(
+                Familia familia,
+                @Nullable String codigo,
+                @Nullable String placa,
+                boolean soloPendientes) {
+            return new CriterioDePadron(
+                    familia,
+                    null,
+                    null,
+                    null,
+                    codigo,
+                    placa,
+                    null,
+                    null,
+                    null,
+                    null,
+                    soloPendientes);
         }
 
         private String constanciaDe(String placa) {

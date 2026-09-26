@@ -57,6 +57,19 @@ public interface PapeletaRepository {
     Papeleta anular(long papeletaId);
 
     /**
+     * Si una resolución de gerencia dejó sin efecto la multa de esta papeleta (#385).
+     *
+     * <p>Lo contesta la base con {@link EstadoDePapeleta#DEJADA_SIN_EFECTO}, <b>el mismo
+     * predicado</b> con que la fase la deja sin palabra y los padrones la dejan de contar como
+     * pendiente. Es lo que preguntan las guardas de {@code RegistrarDescargo} y {@code
+     * ResolverConResolucionDeGerencia}: el estado no lo dice —sigue {@code IMPUESTA}, porque la
+     * resolución no lo toca— y una segunda copia del predicado en Java es la que divergiría.
+     *
+     * @return {@code false} también si la papeleta no existe en esta municipalidad
+     */
+    boolean dejadaSinEfecto(long papeletaId);
+
+    /**
      * El numero nuevo ya lo tiene otra papeleta de la misma familia en esta municipalidad (#422).
      *
      * <p>Hasta #422 salia como el 500 del indice unico, que invita a reintentar algo que no va a

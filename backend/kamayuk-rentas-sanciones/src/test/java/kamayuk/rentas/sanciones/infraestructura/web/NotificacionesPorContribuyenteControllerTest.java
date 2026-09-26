@@ -135,6 +135,11 @@ class NotificacionesPorContribuyenteControllerTest {
         }
 
         @Override
+        public boolean dejadaSinEfecto(long papeletaId) {
+            throw new UnsupportedOperationException("esta prueba no resuelve papeletas");
+        }
+
+        @Override
         public Papeleta anular(long papeletaId) {
             throw new UnsupportedOperationException("esta prueba no anula papeletas");
         }

@@ -69,7 +69,9 @@ public class PadronDePapeletasRepositoryJdbc extends RepositorioJdbc
                     + " ob.codigo_contribuyente AS obligado_codigo,"
                     + " ob.nombre_razon_social AS obligado_nombre,"
                     + " inf.nombre_razon_social AS infractor_nombre,"
-                    + " p.estado AS estado, p.importe_a_pagar AS importe_a_pagar,"
+                    + " p.estado AS estado, "
+                    + EstadoDePapeleta.SE_DEBE
+                    + " AS se_debe, p.importe_a_pagar AS importe_a_pagar,"
                     + " it.valor_numero AS valor_numero, it.valor_id AS valor_id";
 
     /**
@@ -93,15 +95,17 @@ public class PadronDePapeletasRepositoryJdbc extends RepositorioJdbc
             OrdenSeguro.sobre("fecha_infraccion", "numero", "placa", "estado", "id");
 
     /**
-     * Los estados en los que una papeleta ya no se debe.
+     * Que la papeleta siga debiéndose.
      *
-     * <p><b>Ahora sí es uno solo y en un solo sitio</b> (#259). Este docblock decía eso mismo
+     * <p><b>Ahora sí es uno solo y en un solo sitio</b> (#259, #385). Este docblock decía eso mismo
      * cuando la lista estaba <b>tres</b> veces: aquí, escrita a mano otra vez en {@code
      * PapeletaRepositoryJdbc} y una tercera en Java en {@code PapeletaDelPadron.estaPendiente()},
-     * que es la que la API publica como {@code pendiente}. Las tres se derivan ahora de {@code
-     * EstadoDePapeleta.seDebe()}, así que no hay dónde escribir la cuarta ni cómo divergir.
+     * que es la que la API publica como {@code pendiente}. #259 las derivó del estado, y #385
+     * encontró que el estado no basta —la multa que una resolución deja sin efecto sigue {@code
+     * IMPUESTA}—, así que las tres leen ahora {@code EstadoDePapeleta.SE_DEBE}: el {@code WHERE} de
+     * {@code soloPendientes}, los {@code FILTER} del resumen y la columna {@code se_debe}.
      */
-    private static final String NO_SE_DEBE = EstadoDePapeleta.NO_SE_DEBE;
+    private static final String SE_DEBE = EstadoDePapeleta.SE_DEBE;
 
     /**
      * Que a esta papeleta se le haya notificado alguna resolucion de gerencia (#222).
@@ -252,12 +256,12 @@ public class PadronDePapeletasRepositoryJdbc extends RepositorioJdbc
                                 + " coalesce(sum(p.importe_a_pagar)"
                                 + "          FILTER (WHERE p.estado = 'PAGADA'), 0)"
                                 + "     AS importe_pagadas,"
-                                + " count(*) FILTER (WHERE p.estado NOT IN "
-                                + NO_SE_DEBE
+                                + " count(*) FILTER (WHERE "
+                                + SE_DEBE
                                 + ") AS pendientes,"
                                 + " coalesce(sum(p.importe_a_pagar)"
-                                + "          FILTER (WHERE p.estado NOT IN "
-                                + NO_SE_DEBE
+                                + "          FILTER (WHERE "
+                                + SE_DEBE
                                 + "), 0) AS importe_pendientes,"
                                 + " count(*) FILTER (WHERE p.estado = 'COACTIVA') AS en_coactiva,"
                                 + " coalesce(sum(p.importe_a_pagar)"
@@ -321,7 +325,7 @@ public class PadronDePapeletasRepositoryJdbc extends RepositorioJdbc
                     criterio.conValorEmitido() ? "it.valor_id IS NOT NULL" : "it.valor_id IS NULL");
         }
         if (criterio.soloPendientes()) {
-            condiciones.add("p.estado NOT IN " + NO_SE_DEBE);
+            condiciones.add(SE_DEBE);
         }
 
         StringBuilder donde = new StringBuilder(" WHERE " + String.join(" AND ", condiciones));
@@ -353,6 +357,7 @@ public class PadronDePapeletasRepositoryJdbc extends RepositorioJdbc
                 fila.getString("obligado_nombre"),
                 fila.getString("infractor_nombre"),
                 EstadoDePapeleta.valueOf(fila.getString("estado")),
+                fila.getBoolean("se_debe"),
                 new Dinero(fila.getBigDecimal("importe_a_pagar")),
                 fila.getString("valor_numero"),
                 valorId);
