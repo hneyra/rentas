@@ -72,7 +72,7 @@ public record Placa(String valor) implements Comparable<Placa> {
      *
      * <p>La columna {@code placa} no cambia: conserva el guion porque es lo que el papel imprime.
      * Del lado de la base, la misma forma la calcula {@code sanciones} en su columna generada
-     * {@code placa_busqueda} (V27), y {@code nucleo} con {@code replace(placa, '-', '')}.
+     * {@code placa_busqueda} (V27), y {@code nucleo} en la suya del {@code vehiculo} (V32, #511).
      */
     public static String formaDeBusqueda(String texto) {
         Objects.requireNonNull(texto, "No hay placa que buscar");
