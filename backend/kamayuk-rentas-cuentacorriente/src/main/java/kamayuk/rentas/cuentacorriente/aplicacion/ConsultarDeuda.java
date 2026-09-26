@@ -299,8 +299,7 @@ public class ConsultarDeuda {
                                     clave.vehiculoId(),
                                     clave.periodo(),
                                     clave.periodo(),
-                                    faseMasAvanzadaDe(
-                                            ProyeccionDelSaldo.de(delGrupo, reloj.instant())),
+                                    FaseDeLaObligacion.a(delGrupo, fecha),
                                     calculo.deudaActualizadaA(delGrupo, fecha, redondeo)),
                             grupo.getValue().documentos()));
         }
