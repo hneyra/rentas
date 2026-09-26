@@ -19,7 +19,15 @@ package kamayuk.rentas.sanciones.dominio;
 public enum TipoDeResolucionDeGerencia {
     ORDINARIA("Resolucion de gerencia ordinaria", "RGO"),
     SANCIONADORA("Resolucion de gerencia sancionadora", "RGS"),
-    ADMINISTRATIVA("Resolucion de gerencia", "RGA");
+    ADMINISTRATIVA("Resolucion de gerencia", "RGA"),
+    /**
+     * La que resuelve un RECURSO (#412): fundado, infundado o improcedente, contra la papeleta de
+     * cualquier familia. No ordena ninguna cobranza, y por eso no ocupa el cupo de la ordinaria ni
+     * el de la sancionadora —los dos indices unicos por papeleta—: en transito solo habia esas dos
+     * rutas que dictaban, y un recurso presentado despues de las dos se quedaba sin resolver para
+     * siempre. Una por recurso: lo sostiene {@code resolucion_gerencia_descargo_uq}.
+     */
+    RECURSO("Resolucion de gerencia que resuelve un recurso", "RGR");
 
     private final String titulo;
     private final String tipoDeDocumento;

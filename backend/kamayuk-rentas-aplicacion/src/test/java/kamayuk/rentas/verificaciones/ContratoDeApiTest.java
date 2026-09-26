@@ -349,6 +349,8 @@ class ContratoDeApiTest {
                     // -sin ella la sancionadora no se puede dictar nunca, porque su plazo se
                     // cuenta desde que la ordinaria surte efecto-.
                     "POST /transito/descargos",
+                    // #412 — resolver un recurso con su propia resolucion: la accion «Resolver».
+                    "POST /transito/descargos/{nDeExpediente}/resolucion",
                     "GET /transito/internamientos",
                     "POST /transito/internamientos",
                     "POST /transito/internamientos/{placa}/liberacion",

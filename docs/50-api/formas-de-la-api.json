@@ -4459,6 +4459,29 @@
     "plazo": "texto",
     "observacion": "texto"
   },
+  "POST /transito/descargos/{nDeExpediente}/resolucion": {
+    "id": "entero",
+    "numero": "texto",
+    "tipo": "texto",
+    "papeleta": "texto",
+    "fecha": "fecha",
+    "nDeExpediente": "texto",
+    "sentidoDelFallo": "texto",
+    "efectoSobreLaMulta": "texto",
+    "sancionAccesoria": "texto",
+    "deuda": {
+      "importe": "texto",
+      "actualizadoA": "fecha"
+    },
+    "dadoDeBaja": {
+      "importe": "texto",
+      "actualizadoA": "fecha"
+    },
+    "asientosDeBaja": "entero",
+    "formato": "texto",
+    "resumen": "texto",
+    "nombreDeArchivo": "texto"
+  },
   "POST /transito/internamientos": {
     "id": "entero",
     "placa": "texto",

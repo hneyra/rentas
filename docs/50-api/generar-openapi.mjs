@@ -2061,6 +2061,29 @@ const OPERACIONES_ADICIONALES = {
   // `internamiento` declara «GET /transito/internamientos» como su endpoint —la
   // grilla del deposito—; sus dos acciones, «Registrar ingreso» y «Liberar
   // vehiculo», necesitan verbo propio (#50, RF-064).
+  // #412 — la accion «Resolver» de `transito_descargos`: resolver un recurso con su
+  // propia resolucion, de tipo RECURSO. Hasta #412 el unico camino era dictar la ordinaria o la
+  // sancionadora con `nDeExpediente`, y un recurso presentado despues de las dos no tenia ninguna
+  // ruta: las dos son unicas por papeleta.
+  transito_descargos: [
+    {
+      operationId: 'resolver_recurso',
+      metodo: 'post',
+      ruta: '/api/v1/transito/descargos/{nDeExpediente}/resolucion',
+      titulo: 'Resolución de un recurso',
+      descripcionesDeRuta: {
+        nDeExpediente: 'El recurso, por el número de expediente con que se registró',
+      },
+      descripcion: bloque(`
+        Resuelve un recurso —descargo, reconsideración o apelación— con su propia resolución de
+        gerencia, de tipo \`RECURSO\` (#412), para las dos familias: la papeleta sale del recurso.
+        No ocupa el lugar de la ordinaria ni el de la sancionadora, así que un recurso presentado
+        después de las dos se resuelve aquí. El fallo es obligatorio; con \`SE_DEJA_SIN_EFECTO\` la
+        multa se da de baja en el libro por el mismo camino que siempre. Un segundo fallo sobre el
+        mismo recurso contesta 409.
+      `),
+    },
+  ],
   internamiento: [
     {
       operationId: 'registrar_internamiento',
