@@ -280,6 +280,10 @@ public final class ConfiguracionDeRentas implements ConfiguracionDeLasVerificaci
                     "auditoria",
                     "auditoria_2026",
                     "auditoria_2027",
+                    // #427, V39: el contador de `documento_emitido` va donde va la tabla que
+                    // numera. Cada sistema emite sus documentos con el modulo `documentos` de su
+                    // plataforma, y el numero se reparte en su propia base.
+                    "documento_correlativo",
                     "documento_emitido",
                     "grupo",
                     "identidad_evento_aplicado",

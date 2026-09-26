@@ -331,8 +331,10 @@ class AltaDeDeudaRepetidaFronteraTest {
      * degradado a indice normal esta prueba se pone roja igual, con 10 altas donde debe haber 1. El
      * motivo es el orden del acto —los asientos se escriben <b>antes</b> del documento— y que
      * emitir el PDF cuesta lo suyo, asi que los diez hilos llegan escalonados a {@code
-     * DocumentoRepositoryJdbc.siguienteCorrelativo} y su {@code count(*) + 1} devuelve numeros
-     * distintos: {@code documento_numero_uq} (V15) no rechaza a nadie y no serializa nada.
+     * DocumentoRepositoryJdbc.siguienteCorrelativo} —que hasta #427 era un {@code count(*) + 1}—
+     * cuando los asientos ya estan escritos. Desde #427 el correlativo es una fila contador que
+     * serializa las emisiones, pero tambien llega despues de los asientos: lo que decide aqui sigue
+     * siendo el indice.
      *
      * <p>Aun asi la garantia la mide {@link #diezHilosInsertandoLaMismaFilaDejanUnAsiento} y no
      * esta: que aqui muerda depende de una carrera entre dos indices y del coste de renderizar un

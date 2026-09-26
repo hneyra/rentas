@@ -24,10 +24,19 @@ public interface DocumentoRepository {
     DocumentoEmitido registrarReimpresion(DocumentoEmitido documento);
 
     /**
-     * El siguiente correlativo para ese tipo y ejercicio.
+     * El siguiente correlativo para ese tipo y ejercicio, <b>reservado</b> hasta el fin de la
+     * transaccion.
      *
-     * <p>D-09 decide el formato del numero —con que ceros, si se reinicia—; lo que aqui se
-     * garantiza es que no se repita, y lo garantiza la restriccion unica, no este metodo.
+     * <p>Lo que se garantiza desde #427: dos emisiones simultaneas del mismo tipo y ejercicio salen
+     * con numeros <b>distintos y consecutivos</b>, y ninguna choca. La segunda <b>espera</b> a que
+     * la primera confirme o se deshaga —el candado de la fila contador dura hasta el {@code
+     * COMMIT}, renderizado incluido—; es lo que exige un numero correlativo. Si la transaccion se
+     * deshace, el numero vuelve con ella y no queda hueco. La primera emision de cada tipo y
+     * ejercicio arranca por encima del mayor numero ya emitido. {@code documento_numero_uq} sigue
+     * ahi, pero ya no decide: si alguna vez salta, es un defecto y no una carrera.
+     *
+     * <p>D-09 decide el formato del numero —con que ceros, si se reinicia—; este metodo reparte el
+     * entero.
      */
     long siguienteCorrelativo(String tipo, Ejercicio ejercicio);
 }

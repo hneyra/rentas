@@ -716,11 +716,12 @@ class LicenciaDeFuncionamientoJdbcTest {
             // que esta prueba mida lo que dice medir.
             //
             // Con el caso de uso entero en los diez hilos, la carrera nunca llega a
-            // `licencia_duplicado_uq`: `DocumentoRepositoryJdbc.siguienteCorrelativo` es un
-            // `count(*) + 1` y `documento_numero_uq` rechaza a los nueve que calculan el mismo
-            // numero de resolucion, asi que solo uno pasa y el ordinal jamas se repite. La prueba
-            // pasaba en verde con el indice degradado a normal, que es exactamente el defecto que
-            // #33 documento con el candado del turno: la comprobacion la serializaba otra cosa.
+            // `licencia_duplicado_uq`. Hasta #427, `DocumentoRepositoryJdbc.siguienteCorrelativo`
+            // era un `count(*) + 1` y `documento_numero_uq` rechazaba a los nueve que calculaban el
+            // mismo numero de resolucion; desde #427 es la fila de `documento_correlativo`, que los
+            // pone en fila hasta el COMMIT. Las dos cosas serializan, y con cualquiera el ordinal
+            // jamas se repite: la prueba pasaba en verde con el indice degradado a normal, que es
+            // exactamente el defecto que #33 documento con el candado del turno.
             List<Long> papeles = new ArrayList<>();
             for (int i = 0; i < 10; i++) {
                 papeles.add(documentoDeAdorno("CARRERA-" + licenciaId + "-" + i));

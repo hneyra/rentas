@@ -107,9 +107,12 @@ public class MovimientoDeEdificacionRepositoryJdbc extends RepositorioJdbc
     @Override
     public VigenciaDeLaLicencia conceder(
             long licenciaId, long movimientoId, VigenciaDeLaLicencia tramo) {
-        // El orden lo calcula el SQL dentro del propio INSERT, por lo mismo que la version de una
-        // seccion: dos revalidaciones simultaneas que lo calcularan en Java elegirian el mismo, y
-        // `edificacion_vigencia_uq` las rechazaria a las dos.
+        // El orden es un `max(orden) + 1` dentro del propio INSERT, y eso SOLO no serializa nada
+        // (#427): en READ COMMITTED la subconsulta no ve la fila sin confirmar de otra
+        // transaccion, asi que dos revalidaciones simultaneas elegirian el mismo y la segunda
+        // chocaria en `edificacion_vigencia_uq` al confirmar la primera. Lo que las ordena es el
+        // candado de la licencia (`FueRepository.bloquear`), que quien concede toma ANTES de leer
+        // los tramos en que se apoya el nuevo; el indice queda detras, por si alguien lo olvida.
         Long id =
                 jdbc().sql(
                                 "INSERT INTO edificacion_vigencia"

@@ -1223,6 +1223,88 @@ class ActosCoactivosJdbcTest {
             assertThat(cuantosActos(expediente, "REC1")).isEqualTo(1);
         }
 
+        /**
+         * #427 — El intento de una diligencia se numera con el candado del acto tomado.
+         *
+         * <p>Hasta #427, {@code intentosDe} leia {@code max(intento)} en una sentencia aparte y sin
+         * candado: las diligencias simultaneas sobre el mismo acto calculaban el mismo intento y
+         * todas menos una chocaban en {@code notificacion_intento_uq} con una {@code
+         * DuplicateKeyException} —un 500 con incidencia en el borde—. Con el candado entran todas,
+         * una detras de otra, con intentos consecutivos. Que un doble clic registre dos diligencias
+         * es lo que ya pasa con un reenvio secuencial: la idempotencia es otra decision.
+         */
+        @Test
+        @DisplayName("seis diligencias simultaneas del mismo acto entran las seis, intentos 1 a 6")
+        void seisDiligenciasSimultaneasEntranTodas() throws Exception {
+            String expediente = expedienteConDeuda("B-0427");
+            ActoCoactivo rec1 = dictarActo(expediente, TipoDeActoCoactivo.REC1, REC1, null).acto();
+
+            int hilos = 6;
+            CountDownLatch salida = new CountDownLatch(1);
+            List<String> rechazos = java.util.Collections.synchronizedList(new ArrayList<>());
+            List<Callable<Boolean>> intentos = new ArrayList<>();
+            for (int i = 0; i < hilos; i++) {
+                intentos.add(
+                        () -> {
+                            salida.await(5, TimeUnit.SECONDS);
+                            try {
+                                notificarActo(
+                                        rec1.numero(),
+                                        DILIGENCIA_REC1,
+                                        ResultadoDeNotificacion.NO_UBICADO);
+                                return true;
+                            } catch (org.springframework.dao.DataAccessException choque) {
+                                rechazos.add(choque.getClass().getSimpleName());
+                                return false;
+                            } finally {
+                                TenantContext.limpiar();
+                                OrigenContext.limpiar();
+                            }
+                        });
+            }
+
+            ExecutorService piscina = Executors.newFixedThreadPool(hilos);
+            try {
+                List<Future<Boolean>> futuros = new ArrayList<>();
+                for (Callable<Boolean> intento : intentos) {
+                    futuros.add(piscina.submit(intento));
+                }
+                salida.countDown();
+                int registradas = 0;
+                for (Future<Boolean> futuro : futuros) {
+                    if (Boolean.TRUE.equals(futuro.get(30, TimeUnit.SECONDS))) {
+                        registradas++;
+                    }
+                }
+                assertThat(registradas)
+                        .as(
+                                "cada diligencia es un hecho del notificador: ninguna puede salir"
+                                        + " con 500 porque otra se registraba a la vez (rechazos:"
+                                        + " %s)",
+                                rechazos)
+                        .isEqualTo(hilos);
+            } finally {
+                piscina.shutdownNow();
+            }
+
+            List<NotificacionCoactiva> traza =
+                    enTransaccion(() -> diligencias.deActo(rec1.identificador()));
+            assertThat(traza)
+                    .extracting(NotificacionCoactiva::intento)
+                    .as("consecutivos, sin huecos y sin repetir")
+                    .containsExactly(1, 2, 3, 4, 5, 6);
+            assertThat(traza)
+                    .extracting(NotificacionCoactiva::numero)
+                    .as("y el numero de cada diligencia es el del acto con su intento")
+                    .containsExactly(
+                            rec1.numero() + "/1",
+                            rec1.numero() + "/2",
+                            rec1.numero() + "/3",
+                            rec1.numero() + "/4",
+                            rec1.numero() + "/5",
+                            rec1.numero() + "/6");
+        }
+
         @Test
         @DisplayName("una REC-2 fechada antes del plazo la rechaza el CHECK, no la aplicacion")
         void laRec2PrematuraLaRechazaElCheck() {

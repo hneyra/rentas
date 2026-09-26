@@ -39,6 +39,19 @@ public interface FueRepository {
     /** El expediente por su identificador interno; lo necesita la ampliacion para su original. */
     Optional<FueDeEdificacion> porId(long fueId);
 
+    /**
+     * Toma el candado del expediente hasta el fin de la transaccion (#427).
+     *
+     * <p>Es la frontera de consistencia de los dos numeros que dependen de el: la {@code version}
+     * de una seccion y el {@code orden} del tramo de vigencia que una revalidacion le concede. Se
+     * toma <b>antes de la primera lectura en que se apoya la decision</b> —si ya esta emitido, que
+     * tramos tiene—, no justo antes del {@code INSERT}: la segunda peticion tiene que decidir con
+     * lo que la primera dejo, no solo numerar despues de ella. No es un {@code FOR UPDATE}: V43 le
+     * retiro a {@code kamayuk_app} el {@code UPDATE} sobre {@code licencia_edificacion}, y
+     * PostgreSQL lo exige para bloquear una fila.
+     */
+    void bloquear(long fueId);
+
     /** El expediente cuya emision otorgo ese numero de licencia. */
     Optional<FueDeEdificacion> porNumeroDeLicencia(String numeroDeLicencia);
 
@@ -59,9 +72,9 @@ public interface FueRepository {
     /**
      * Guarda la siguiente version de una seccion.
      *
-     * <p>La version la calcula el repositorio: {@code ultima + 1}. Que la calcule quien llama seria
-     * dejar que dos peticiones simultaneas eligieran la misma, y {@code edificacion_*_uq} las
-     * rechazaria a las dos con un error que no dice que paso.
+     * <p>La version la calcula el repositorio: {@code ultima + 1}. Y quien llama tiene que haber
+     * tomado antes {@link #bloquear}: sin el, dos peticiones simultaneas elegirian la misma y la
+     * segunda chocaria en {@code edificacion_*_uq} con un error que no dice que paso (#427).
      */
     TerrenoDelFue guardarTerreno(TerrenoDelFue terreno);
 

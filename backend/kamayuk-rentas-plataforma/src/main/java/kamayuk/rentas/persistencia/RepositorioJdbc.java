@@ -63,6 +63,42 @@ public abstract class RepositorioJdbc {
     }
 
     /**
+     * Toma el candado de un agregado hasta el fin de la transaccion (#427).
+     *
+     * <p>Es la frontera de consistencia de un numero <b>por entidad</b> —el intento de una
+     * diligencia, el orden de un tramo de vigencia, la version de una seccion—: quien lo calcula lo
+     * toma <b>antes de la primera lectura en que se apoya la decision</b>, y la segunda peticion
+     * sobre el mismo agregado espera a que la primera confirme y lee despues lo que dejo. Un {@code
+     * max() + 1} dentro del {@code INSERT} no basta: en {@code READ COMMITTED} la subconsulta no ve
+     * la fila sin confirmar de la otra transaccion.
+     *
+     * <p>No es un {@code SELECT … FOR UPDATE} porque no puede serlo: PostgreSQL exige el privilegio
+     * de {@code UPDATE} para bloquear una fila, y las cabeceras de estos agregados son de solo
+     * insercion ({@code acto_coactivo}, {@code licencia_edificacion}). Devolverles el {@code
+     * UPDATE} solo para poder bloquear dejaria su inmutabilidad en manos del escaner de fuentes,
+     * como pasa con {@code cierre_caja}. Es un candado consultivo <b>de transaccion</b>, nunca de
+     * sesion —uno de sesion sobrevive a la devolucion de la conexion al pool: la regla 3 aplicada a
+     * los candados—, con la forma de {@code ResolucionDeDeterminacionRepositoryJdbc}: la clave es
+     * el agregado dentro de la municipalidad —que sale del contexto que fijo {@code SET LOCAL}, no
+     * de un argumento (regla 2)— reducida a un {@code bigint} con {@code hashtextextended}. Dos
+     * agregados con la misma huella solo se esperarian de mas; nunca se dejarian pasar.
+     *
+     * @param agregado el nombre de la tabla raiz, que separa el espacio de claves de cada agregado
+     * @param identificador el de la fila raiz
+     */
+    protected final void bloquearElAgregado(String agregado, long identificador) {
+        jdbc.sql(
+                        "SELECT count(*) FROM (SELECT pg_advisory_xact_lock(hashtextextended("
+                                + ":agregado || '|' || "
+                                + MUNICIPALIDAD_ACTUAL
+                                + " || '|' || :identificador, 0))) AS candado")
+                .param("agregado", agregado)
+                .param("identificador", identificador)
+                .query(Long.class)
+                .single();
+    }
+
+    /**
      * Ejecuta una consulta paginada y su conteo.
      *
      * @param seleccion el {@code SELECT ... FROM ... WHERE ...} <b>sin</b> orden ni limite

@@ -69,4 +69,11 @@ public final class ActosEnMemoria implements ActoCoactivoRepository {
     public Optional<ActoCoactivo> porNumero(String numero) {
         return guardados.stream().filter(a -> a.numero().equalsIgnoreCase(numero)).findFirst();
     }
+
+    /**
+     * En memoria no hay concurrencia que ordenar: la carrera la mide {@code
+     * ActosCoactivosJdbcTest}.
+     */
+    @Override
+    public void bloquear(long actoId) {}
 }
