@@ -28,11 +28,25 @@ public final class TarifasDeMentira implements LectorDeParametros {
 
     private final Map<ClaseDeAnuncio, String> tarifas = new LinkedHashMap<>();
 
+    /** Las que un ejercicio concreto tarifa distinto; pisan a las de {@link #tarifas}. */
+    private final Map<Integer, Map<ClaseDeAnuncio, String>> porEjercicio = new LinkedHashMap<>();
+
     private boolean sinSellar;
 
     /** Declara la tarifa de una clase. Sin llamadas, el conjunto no tarifa nada. */
     public TarifasDeMentira con(ClaseDeAnuncio clase, String importe) {
         tarifas.put(clase, importe);
+        return this;
+    }
+
+    /**
+     * Declara la tarifa de una clase <b>solo en ese ejercicio</b> (#417).
+     *
+     * <p>Sin esto la ordenanza de la prueba vale lo mismo todos los años, y una renovacion que
+     * cobrara la tarifa de otro ejercicio pasaria en verde: es la muestra uniforme de siempre.
+     */
+    public TarifasDeMentira conEnElEjercicio(int ejercicio, ClaseDeAnuncio clase, String importe) {
+        porEjercicio.computeIfAbsent(ejercicio, e -> new LinkedHashMap<>()).put(clase, importe);
         return this;
     }
 
@@ -55,7 +69,9 @@ public final class TarifasDeMentira implements LectorDeParametros {
             throw new EjercicioSinSellar(ejercicio);
         }
         ParametrosSellados.Constructor constructor = ParametrosSellados.de(ejercicio, 1);
-        for (Map.Entry<ClaseDeAnuncio, String> tarifa : tarifas.entrySet()) {
+        Map<ClaseDeAnuncio, String> delEjercicio = new LinkedHashMap<>(tarifas);
+        delEjercicio.putAll(porEjercicio.getOrDefault(ejercicio.valor(), Map.of()));
+        for (Map.Entry<ClaseDeAnuncio, String> tarifa : delEjercicio.entrySet()) {
             constructor.numero(
                     TIPO, tarifa.getKey().claveDeLaTasa(), ValorNormativo.de(tarifa.getValue()));
         }

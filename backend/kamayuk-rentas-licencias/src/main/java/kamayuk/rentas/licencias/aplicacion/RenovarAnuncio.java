@@ -77,6 +77,18 @@ public class RenovarAnuncio {
     /**
      * Renueva la autorizacion y genera el cargo del ejercicio que se renueva.
      *
+     * <p><b>Que ejercicio se renueva</b> (#417) lo decide {@link
+     * MovimientoDeAnuncio#ejercicioQueRenueva}: el de {@code vigenciaHasta}, que es hasta donde
+     * llega la prorroga, y solo si la renovacion no trae plazo el del dia del acto. La referencia
+     * del cargo lleva ese ejercicio y la tarifa sale de su conjunto sellado, leido al 1 de enero.
+     * Es lo que deja renovar en diciembre para el año siguiente un anuncio todavia VIGENTE —antes
+     * chocaba con la referencia de la autorizacion y salia 409— y lo que asienta la deuda en el año
+     * que la vigencia cubre y no en el del acto.
+     *
+     * <p>Una renovacion devenga <b>un</b> ejercicio. La prorroga que abarque mas de uno —contando
+     * desde el dia siguiente a la vigencia actual, o desde el acto si ya vencio— no se cobra hasta
+     * que se decida como: devengar uno por año es una decision de negocio.
+     *
      * @param numeroDeAutorizacion el numero impreso de la autorizacion
      * @param fecha el dia de la renovacion; entra como argumento (regla 6)
      * @param vigenciaHasta hasta cuando queda prorrogada
@@ -87,6 +99,10 @@ public class RenovarAnuncio {
      *     posterior a hoy (#402)
      * @throws TasaDeAnunciosParametrizada.TasaSinParametrizar si la ordenanza sellada del ejercicio
      *     que se renueva no tarifa esa clase (regla 5, D-02b, #199)
+     * @throws kamayuk.rentas.parametros.LectorDeParametros.EjercicioSinSellar si el ejercicio que
+     *     se renueva todavia no tiene conjunto sellado
+     * @throws MovimientoDeAnuncio.ProrrogaDeVariosEjercicios si la prorroga cubre mas de un
+     *     ejercicio (#417)
      */
     @Transactional
     public Renovacion renovar(
@@ -103,9 +119,8 @@ public class RenovarAnuncio {
                         .orElseThrow(() -> new AnuncioInexistente(numeroDeAutorizacion));
 
         List<MovimientoDeAnuncio> historial = movimientos.deAnuncio(anuncio.identificador());
-        EstadoDelAnuncio actual =
-                EstadoDelAnuncio.derivarDe(
-                        historial, EstadoDelAnuncio.vigenciaSegun(historial, fecha), fecha);
+        @Nullable LocalDate vigenciaActual = EstadoDelAnuncio.vigenciaSegun(historial, fecha);
+        EstadoDelAnuncio actual = EstadoDelAnuncio.derivarDe(historial, vigenciaActual, fecha);
         if (!actual.admiteRenovacion()) {
             throw new NoSeRenueva(anuncio.numero(), actual, fecha);
         }
@@ -121,8 +136,12 @@ public class RenovarAnuncio {
             throw new VigenciaHaciaAtras(anuncio.numero(), fecha, vigenciaHasta);
         }
 
-        Ejercicio ejercicio = Ejercicio.de(fecha);
-        Dinero tasa = tasas.aLaFechaDe(fecha).paraLaClase(anuncio.clase());
+        // #417: el ejercicio que se RENUEVA, no el del dia del acto; y la tarifa, la de ese
+        // ejercicio. Si su conjunto todavia no esta sellado sale 422 nombrandolo, y es lo correcto:
+        // 2027 no se cobra con la ordenanza de 2026.
+        Ejercicio ejercicio =
+                MovimientoDeAnuncio.ejercicioQueRenueva(vigenciaActual, vigenciaHasta, fecha);
+        Dinero tasa = tasas.aLaFechaDe(ejercicio.primerDia()).paraLaClase(anuncio.clase());
         String referencia = MovimientoDeAnuncio.referenciaDelCargo(anuncio.numero(), ejercicio);
 
         // Mismo orden que en el registro y por el mismo motivo: el indice unico del movimiento

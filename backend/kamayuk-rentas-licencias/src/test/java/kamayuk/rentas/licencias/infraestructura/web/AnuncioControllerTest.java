@@ -13,6 +13,7 @@ import kamayuk.rentas.auditoria.OrigenContext;
 import kamayuk.rentas.auditoria.RegistroDeAuditoria;
 import kamayuk.rentas.contribuyentes.ResumenDeContribuyente;
 import kamayuk.rentas.dominio.AreaM2;
+import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.licencias.aplicacion.CesarAnuncio;
 import kamayuk.rentas.licencias.aplicacion.ConsultaDeAnuncios;
@@ -768,6 +769,76 @@ class AnuncioControllerTest {
                      "observacion":"Se cesa por solicitud del titular"}
                     """
                             .formatted(fecha),
+                    null,
+                    esperado);
+        }
+    }
+
+    // ==================================================================
+
+    /**
+     * #417 — La renovacion devenga el ejercicio que <b>renueva</b>, no el de la fecha del acto.
+     *
+     * <p>Hasta #417 {@code RenovarAnuncio} tomaba {@code Ejercicio.de(fecha)}: renovar en diciembre
+     * un anuncio autorizado ese mismo año componia la referencia de la autorizacion y salia 409, y
+     * la unica salida era dejarlo caer en VENCIDO. Todas las pruebas de encima renuevan en enero,
+     * donde los dos ejercicios coinciden; aqui se renueva en <b>diciembre</b> y la ordenanza tarifa
+     * <b>distinto</b> cada año —120,00 en 2026 y 135,00 en 2027—, porque con la misma tarifa un año
+     * equivocado pasa en verde.
+     */
+    @Nested
+    @DisplayName("#417 — la renovacion devenga el ejercicio que renueva")
+    class ElEjercicioQueRenueva {
+
+        private final MockMvc conDosTarifas =
+                montar(
+                        new TarifasDeMentira()
+                                .con(ClaseDeAnuncio.PANEL, "120.00")
+                                .conEnElEjercicio(2027, ClaseDeAnuncio.PANEL, "135.00"));
+
+        @Test
+        @DisplayName("renovar en diciembre para el año siguiente: 201, referencia 2027 y 135,00")
+        void laRenovacionAnticipada() throws Exception {
+            registrar(conDosTarifas, null, 201);
+
+            String cuerpo = renovarAnticipado("2027-12-31", 201);
+
+            assertThat(cuerpo)
+                    .as("el anuncio esta VIGENTE el 15 de diciembre y la renovacion es de 2027")
+                    .contains("\"referenciaDelCargo\":\"ANUNCIO-AN-2026-000001-2027\"")
+                    .contains("\"importe\":\"135.00\"");
+            assertThat(libro.cuantos()).isEqualTo(2);
+            LibroDeMentira.CargoPedido cargo = libro.pedidos().get(1);
+            assertThat(cargo.ejercicio()).isEqualTo(new Ejercicio(2027));
+            assertThat(cargo.monto().valor())
+                    .as("la tarifa sellada de 2027, no la de 2026 que rige el dia del acto")
+                    .isEqualByComparingTo(new BigDecimal("135.00"));
+        }
+
+        @Test
+        @DisplayName("una prorroga que abarca 2027 y 2028: 422 y ningun cargo mas")
+        void unaProrrogaDeDosEjercicios() throws Exception {
+            registrar(conDosTarifas, null, 201);
+
+            String cuerpo = renovarAnticipado("2028-12-31", 422);
+
+            assertThat(cuerpo)
+                    .as("devengar uno por año es una decision de negocio que no esta tomada")
+                    .contains("VALIDACION")
+                    .contains("2027")
+                    .contains("2028");
+            assertThat(libro.cuantos()).as("solo la autorizacion").isEqualTo(1);
+        }
+
+        private String renovarAnticipado(String hasta, int esperado) throws Exception {
+            return envio(
+                    conDosTarifas,
+                    "/rentas/api/v1/autorizaciones/anuncios/AN-2026-000001/renovacion",
+                    """
+                    {"fecha":"2026-12-15","fecVenc":"%s",
+                     "observacion":"Se renueva antes de que venza"}
+                    """
+                            .formatted(hasta),
                     null,
                     esperado);
         }
