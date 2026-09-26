@@ -13,6 +13,8 @@ import kamayuk.rentas.compartido.Pagina;
 import kamayuk.rentas.compartido.Paginacion;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.licencias.dominio.CriterioDeFue;
+import kamayuk.rentas.licencias.dominio.EstadoALaFecha;
+import kamayuk.rentas.licencias.dominio.EstadoDelFue;
 import kamayuk.rentas.licencias.dominio.EstructuraDelProyecto;
 import kamayuk.rentas.licencias.dominio.FueDeEdificacion;
 import kamayuk.rentas.licencias.dominio.FueRepository;
@@ -20,6 +22,7 @@ import kamayuk.rentas.licencias.dominio.ProfesionalDelFue;
 import kamayuk.rentas.licencias.dominio.ProyectoDelFue;
 import kamayuk.rentas.licencias.dominio.RequisitoDelFue;
 import kamayuk.rentas.licencias.dominio.TerrenoDelFue;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Los expedientes del FUE en memoria, para la prueba del borde HTTP (#48).
@@ -96,7 +99,8 @@ public final class FuesEnMemoria implements FueRepository {
     }
 
     @Override
-    public Pagina<FueDeEdificacion> buscar(CriterioDeFue criterio, Paginacion paginacion) {
+    public Pagina<FueDeEdificacion> buscar(
+            CriterioDeFue criterio, @Nullable EstadoALaFecha estado, Paginacion paginacion) {
         List<FueDeEdificacion> encontrados =
                 expedientes.values().stream()
                         .filter(
@@ -127,6 +131,16 @@ public final class FuesEnMemoria implements FueRepository {
                                         criterio.contribuyentes() == null
                                                 || criterio.contribuyentes()
                                                         .contains(fue.contribuyenteId()))
+                        .filter(
+                                fue ->
+                                        estado == null
+                                                || EstadoDelFue.derivarDe(
+                                                                movimientos.deExpediente(
+                                                                        fue.identificador()),
+                                                                movimientos.vigenciasDe(
+                                                                        fue.identificador()),
+                                                                estado.aLaFecha())
+                                                        == estado.estado())
                         .sorted(Comparator.comparing(FueDeEdificacion::expediente))
                         .toList();
         return Pagina.de(encontrados, paginacion, encontrados.size());

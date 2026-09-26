@@ -7,6 +7,7 @@ import java.util.Set;
 import kamayuk.rentas.compartido.Pagina;
 import kamayuk.rentas.compartido.Paginacion;
 import kamayuk.rentas.dominio.Ejercicio;
+import org.jspecify.annotations.Nullable;
 
 /**
  * El expediente del FUE y sus cinco secciones (#48, RF-113). Ningun metodo recibe la municipalidad
@@ -41,8 +42,17 @@ public interface FueRepository {
     /** El expediente cuya emision otorgo ese numero de licencia. */
     Optional<FueDeEdificacion> porNumeroDeLicencia(String numeroDeLicencia);
 
-    /** La grilla, paginada. El estado no se filtra aqui: se deriva despues (V43 §1). */
-    Pagina<FueDeEdificacion> buscar(CriterioDeFue criterio, Paginacion paginacion);
+    /**
+     * La grilla, paginada; con {@code estado}, solo los FUE que a esa fecha estan en ese estado.
+     *
+     * <p>El estado se filtra <b>aqui</b>, antes de paginar, con la misma tabla con que {@link
+     * EstadoDelFue#derivarDe} lo deriva (#425). Filtrarlo despues sobre la pagina ya cortada daba
+     * una pagina corta y un total que no era el de la relacion.
+     *
+     * @param estado el estado y su fecha; {@code null} si no se filtra por estado
+     */
+    Pagina<FueDeEdificacion> buscar(
+            CriterioDeFue criterio, @Nullable EstadoALaFecha estado, Paginacion paginacion);
 
     // ---------- Secciones ----------
 

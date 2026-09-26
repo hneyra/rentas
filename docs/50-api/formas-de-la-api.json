@@ -378,7 +378,7 @@
     ],
     "pagina": "entero",
     "tamano": "entero",
-    "totalElementos": "entero",
+    "liquidacionesDelCriterio": "entero",
     "totalPaginas": "entero",
     "hayMas": "booleano"
   },

@@ -10,8 +10,8 @@ import org.jspecify.annotations.Nullable;
  * <p>Son los seis filtros que declara la pantalla {@code fue_edificacion} —expediente, numero de
  * licencia, nombre del contribuyente, manzana, lote y tipo de tramite— y los cuatro de {@code
  * edificacion_reporte} —desde, hasta, modalidad y estado—. El estado no esta aqui: <b>se deriva</b>
- * y se filtra despues de derivarlo, porque no es una columna que se pueda meter en un {@code
- * WHERE}.
+ * a una fecha, y viaja aparte como {@link EstadoALaFecha} para que no pueda llegar sin ella. Se
+ * filtra en el motor, antes de paginar (#425).
  *
  * <h2>Nulo y vacio no significan lo mismo en {@link #contribuyentes}</h2>
  *

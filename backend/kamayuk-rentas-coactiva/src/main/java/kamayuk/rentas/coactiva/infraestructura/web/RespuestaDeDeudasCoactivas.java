@@ -2,7 +2,7 @@ package kamayuk.rentas.coactiva.infraestructura.web;
 
 import java.util.List;
 import java.util.function.Function;
-import kamayuk.rentas.coactiva.aplicacion.ConsultaDeDeudasCoactivas.PaginaDeDeudas;
+import kamayuk.rentas.coactiva.aplicacion.PaginaDescartadaTrasPaginar;
 
 /**
  * La forma en que salen las <b>dos</b> consultas de deuda coactiva, y no es {@code
@@ -36,10 +36,10 @@ import kamayuk.rentas.coactiva.aplicacion.ConsultaDeDeudasCoactivas.PaginaDeDeud
  * que se reparte en paginas son los expedientes del criterio. Derivarlos de las filas devueltas
  * diria «no hay pagina siguiente» justo cuando la hay.
  *
- * <p>Por que no se ajusta el recuento a las filas —que habria sido mejor— esta medido en {@link
- * PaginaDeDeudas}: en SQL exigiria nombrar tablas de otros dos contextos y transcribir {@code
- * CalculoDeDeuda} a un {@code WHERE}; en Java, una lectura del libro por expediente de la cartera
- * entera y en cada pagina que alguien mire.
+ * <p>Por que no se ajusta el recuento a las filas —que habria sido mejor— esta medido en {@code
+ * ConsultaDeDeudasCoactivas.deudas}: en SQL exigiria nombrar tablas de otros dos contextos y
+ * transcribir {@code CalculoDeDeuda} a un {@code WHERE}; en Java, una lectura del libro por
+ * expediente de la cartera entera y en cada pagina que alguien mire.
  *
  * @param contenido las filas de esta pagina, ya sin las que no tenian nada que cobrar
  * @param pagina cual es, contada desde 0
@@ -59,13 +59,13 @@ public record RespuestaDeDeudasCoactivas<T>(
 
     /** Traduce el contenido del modelo a su DTO sin recalcular la paginacion. */
     public static <T, R> RespuestaDeDeudasCoactivas<R> de(
-            PaginaDeDeudas<T> pagina, Function<? super T, ? extends R> aDto) {
-        PaginaDeDeudas<R> traducida = pagina.mapear(aDto);
+            PaginaDescartadaTrasPaginar<T> pagina, Function<? super T, ? extends R> aDto) {
+        PaginaDescartadaTrasPaginar<R> traducida = pagina.mapear(aDto);
         return new RespuestaDeDeudasCoactivas<>(
                 traducida.contenido(),
                 traducida.pagina(),
                 traducida.tamano(),
-                traducida.expedientesDelCriterio(),
+                traducida.delCriterio(),
                 traducida.totalPaginas(),
                 traducida.hayMas());
     }

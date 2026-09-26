@@ -11,6 +11,7 @@ import kamayuk.rentas.autorizacion.Privilegio;
 import kamayuk.rentas.autorizacion.RequiereAcceso;
 import kamayuk.rentas.coactiva.aplicacion.ConsultaDeDeudasCoactivas;
 import kamayuk.rentas.coactiva.aplicacion.ConsultaDeExpedientes;
+import kamayuk.rentas.coactiva.aplicacion.PaginaDescartadaTrasPaginar;
 import kamayuk.rentas.coactiva.dominio.CriterioDeExpedientes;
 import kamayuk.rentas.coactiva.dominio.EstadoDelExpediente;
 import kamayuk.rentas.coactiva.dominio.ResumenDeLaCartera;
@@ -119,7 +120,7 @@ public class DeudaCoactivaController {
         exigirTipoTributario(tipoDeDeuda);
         LocalDate aLaFecha = LocalDate.now(reloj);
 
-        ConsultaDeDeudasCoactivas.PaginaDeDeudas<ConsultaDeDeudasCoactivas.DeudaEnCoactiva> pagina =
+        PaginaDescartadaTrasPaginar<ConsultaDeDeudasCoactivas.DeudaEnCoactiva> pagina =
                 consulta.deudas(
                         criterioDe(nExpediente, contribuyente, estado),
                         aLaFecha,
@@ -160,12 +161,11 @@ public class DeudaCoactivaController {
         exigirQueNoSePidaUnBeneficioConcreto(benefAplicable);
         LocalDate aLaFecha = fechaOpcional(fechaDeCalculo, "fechaDeCalculo", LocalDate.now(reloj));
 
-        ConsultaDeDeudasCoactivas.PaginaDeDeudas<ConsultaDeDeudasCoactivas.DeudaConBeneficio>
-                pagina =
-                        consulta.enBeneficio(
-                                criterioDe(null, contribuyente, null),
-                                aLaFecha,
-                                paginacion.aPaginacion(ORDEN_POR_OMISION));
+        PaginaDescartadaTrasPaginar<ConsultaDeDeudasCoactivas.DeudaConBeneficio> pagina =
+                consulta.enBeneficio(
+                        criterioDe(null, contribuyente, null),
+                        aLaFecha,
+                        paginacion.aPaginacion(ORDEN_POR_OMISION));
 
         Map<Long, ResumenDeContribuyente> padron =
                 padronDe(

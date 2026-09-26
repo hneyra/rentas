@@ -20,6 +20,8 @@ import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.Medida;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.licencias.dominio.CriterioDeFue;
+import kamayuk.rentas.licencias.dominio.EstadoALaFecha;
+import kamayuk.rentas.licencias.dominio.EstadoDelFue;
 import kamayuk.rentas.licencias.dominio.EstructuraDelProyecto;
 import kamayuk.rentas.licencias.dominio.FueDeEdificacion;
 import kamayuk.rentas.licencias.dominio.FueRepository;
@@ -209,10 +211,59 @@ public class FueRepositoryJdbc extends RepositorioJdbc implements FueRepository 
                 .optional();
     }
 
+    /**
+     * «Anulada a la fecha», en SQL: la primera rama de {@link EstadoDelFue#derivarDe}, que gana
+     * sobre todo lo demas. Un movimiento con fecha posterior al corte no cuenta (#425).
+     */
+    private static final String ANULADA =
+            "EXISTS (SELECT 1 FROM edificacion_movimiento m"
+                    + "  WHERE m.municipalidad_id = e.municipalidad_id AND m.fue_id = e.id"
+                    + "    AND m.tipo = 'ANULACION' AND m.fecha <= :estadoALaFecha)";
+
+    /** «Emitida a la fecha»: la segunda rama; sin emision, el FUE sigue en tramite. */
+    private static final String EMITIDA =
+            "EXISTS (SELECT 1 FROM edificacion_movimiento m"
+                    + "  WHERE m.municipalidad_id = e.municipalidad_id AND m.fue_id = e.id"
+                    + "    AND m.tipo = 'EMISION' AND m.fecha <= :estadoALaFecha)";
+
+    /**
+     * «Algun tramo la cubre»: {@code VigenciaDeLaLicencia.cubre}, con los dos extremos dentro. El
+     * tramo que termina el mismo dia del corte todavia la cubre.
+     */
+    private static final String CUBIERTA =
+            "EXISTS (SELECT 1 FROM edificacion_vigencia v"
+                    + "  WHERE v.municipalidad_id = e.municipalidad_id AND v.licencia_id = e.id"
+                    + "    AND v.desde <= :estadoALaFecha AND v.hasta >= :estadoALaFecha)";
+
+    /**
+     * El estado, como condicion del {@code WHERE}: la traduccion literal de {@link
+     * EstadoDelFue#derivarDe}, en su mismo orden (#425). Es la forma que {@code
+     * LicenciaRepositoryJdbc.estadoEnSql} ya tiene para la licencia de funcionamiento, y la fecha
+     * entra como parametro, nunca como {@code current_date}: el reporte de marzo dice lo que decia
+     * en marzo. {@code LicenciaDeEdificacionJdbcTest} compara, FUE por FUE, este SQL con el
+     * dominio.
+     */
+    private static String estadoEnSql(EstadoDelFue estado) {
+        return switch (estado) {
+            case ANULADA -> ANULADA;
+            case EN_TRAMITE -> "NOT " + ANULADA + " AND NOT " + EMITIDA;
+            case VIGENTE -> "NOT " + ANULADA + " AND " + EMITIDA + " AND " + CUBIERTA;
+            case VENCIDA -> "NOT " + ANULADA + " AND " + EMITIDA + " AND NOT " + CUBIERTA;
+        };
+    }
+
     @Override
-    public Pagina<FueDeEdificacion> buscar(CriterioDeFue criterio, Paginacion paginacion) {
+    public Pagina<FueDeEdificacion> buscar(
+            CriterioDeFue criterio, @Nullable EstadoALaFecha estado, Paginacion paginacion) {
         StringBuilder donde = new StringBuilder(" WHERE 1 = 1");
         Map<String, Object> parametros = new HashMap<>();
+
+        if (estado != null) {
+            // En el WHERE que comparten el SELECT y el count(*): la pagina y su total salen de la
+            // misma relacion, ya filtrada.
+            donde.append(" AND ").append(estadoEnSql(estado.estado()));
+            parametros.put("estadoALaFecha", estado.aLaFecha());
+        }
 
         if (criterio.expediente() != null) {
             donde.append(" AND expediente = :expediente");
