@@ -180,7 +180,8 @@ public class ConvenioCoactivoController {
                     corte,
                     cuotas,
                     porcentajeDe(peticion.cuotaInicial()),
-                    fechaOpcional(peticion.primeraCuotaVence(), "primeraCuotaVence", fecha),
+                    // Sin plazo por omision (#459), como el fraccionamiento de tesoreria.
+                    fechaRequerida(peticion.primeraCuotaVence(), "primeraCuotaVence"),
                     vacioAnulo(peticion.resolucion()));
         } catch (IllegalArgumentException invalido) {
             throw new ProblemaDeNegocio(CodigoDeError.VALIDACION, mensajeDe(invalido));
@@ -248,6 +249,11 @@ public class ConvenioCoactivoController {
                     CodigoDeError.VALIDACION,
                     "El campo '" + campo + "' va en formato ISO (2026-03-16): '" + texto + "'");
         }
+    }
+
+    /** Una fecha que la peticion tiene que traer: sin ella, 422 nombrando el campo. */
+    private static LocalDate fechaRequerida(@Nullable String texto, String campo) {
+        return fechaOpcional(exigir(texto, campo), campo, LocalDate.MIN);
     }
 
     private static Observacion observacionDe(@Nullable String texto) {

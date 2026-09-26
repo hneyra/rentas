@@ -21,6 +21,7 @@ import kamayuk.rentas.tesoreria.dominio.ConvenioRepository;
 import kamayuk.rentas.tesoreria.dominio.Cronograma;
 import kamayuk.rentas.tesoreria.dominio.CuotaDeConvenio;
 import kamayuk.rentas.tesoreria.dominio.NumeroDeConvenio;
+import kamayuk.rentas.tesoreria.dominio.PlazosDelConvenio;
 import kamayuk.rentas.tesoreria.dominio.TipoDeConvenio;
 import kamayuk.rentas.tesoreria.dominio.TipoDeGarantia;
 import org.jspecify.annotations.Nullable;
@@ -127,7 +128,7 @@ public class RegistrarPreconvenio {
                         total,
                         condicionesDelConvenio,
                         peticion.cuotas(),
-                        peticion.primeraCuotaVence(),
+                        peticion.plazos(),
                         vigentes.redondeoDeLaCuota());
         return new Simulacion(
                 acogible, cronograma, condicionesDelConvenio, total, peticion.fechaDeCorte());
@@ -301,13 +302,13 @@ public class RegistrarPreconvenio {
             if (contribuyenteId <= 0) {
                 throw new IllegalArgumentException("El convenio es de un contribuyente concreto");
             }
-            if (primeraCuotaVence.isBefore(fecha)) {
-                throw new IllegalArgumentException(
-                        "La primera cuota no puede vencer antes de firmarse el convenio: "
-                                + primeraCuotaVence
-                                + " es anterior a "
-                                + fecha);
-            }
+            // La invariante de las dos fechas es de los plazos, y se comprueba al construirlos.
+            new PlazosDelConvenio(fecha, primeraCuotaVence);
+        }
+
+        /** El dia del convenio y el de la cuota 1, juntos y sin poder cruzarse (#459). */
+        public PlazosDelConvenio plazos() {
+            return new PlazosDelConvenio(fecha, primeraCuotaVence);
         }
 
         /**

@@ -798,12 +798,13 @@ class ConvenioControllerTest {
 
     private static String cuerpoDelConvenio(int ejercicio) {
         return """
-               {"codContribuyente":"%s","fecha":"%d-03-16","nroDeCuotas":6,
+               {"codContribuyente":"%s","fecha":"%d-03-16","primeraCuotaVence":"%d-04-16",
+                "nroDeCuotas":6,
                 "cuotaInicial":"20","simular":false,
                 "observacion":"Fraccionamiento pedido en ventanilla",
                 "obligaciones":[{"tributo":"PREDIAL","ejercicio":2026}]}
                """
-                .formatted(CODIGO, ejercicio);
+                .formatted(CODIGO, ejercicio, ejercicio);
     }
 
     // ---------------------------------------------------------------- dobles
