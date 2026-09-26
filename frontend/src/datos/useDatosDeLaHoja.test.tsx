@@ -567,6 +567,85 @@ describe('una pantalla que es de un ejercicio de la sesion', () => {
 });
 
 /**
+ * **La sesion es de quien la pide, tambien en la cache** (#392).
+ *
+ * Hay UNA cache para toda la aplicacion (`CONSULTAS` en `aplicacion.tsx`), y las pruebas de arriba
+ * crean un cliente por prueba: ninguna navega de una hoja que exige ejercicio a otra que no. Aqui
+ * se monta lo que hace quien atiende —`seg-aud` y despues `panel`— sobre EL MISMO cliente. La
+ * siembra que distingue es mixta: la sesion falla y la lectura de `panel` contesta. Con todo en 200,
+ * o todo en 500, el defecto no se ve.
+ */
+describe('dos hojas sobre la misma cache (#392)', () => {
+  function contestaConLaSesionEn(estado: number, ejercicio: number | null): void {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<typeof fetch>((entrada) => {
+        const url = String(entrada);
+        const esLaSesion = url.includes('/seguridad/sesion');
+        const cuerpo = esLaSesion
+          ? estado === 200
+            ? { ...SIN_EJERCICIO_FIJADO, ejercicioDeTrabajo: ejercicio }
+            : { codigo: 'ERROR_INTERNO' }
+          : url.includes('/seguridad/auditoria')
+            ? BITACORA
+            : CORRIDA;
+        return Promise.resolve(
+          new Response(JSON.stringify(cuerpo), {
+            status: esLaSesion ? estado : 200,
+            headers: { 'content-type': 'application/json' },
+          }),
+        );
+      }),
+    );
+  }
+
+  it('una sesion que fallo en `seg-aud` NO pone «fallo» en `panel`', async () => {
+    contestaConLaSesionEn(500, null);
+    const { wrapper } = arnes();
+
+    const auditoria = renderHook(() => useDatosDeLaHoja('seg-aud'), { wrapper });
+    await waitFor(() => {
+      expect(auditoria.result.current.ausencia.enElCampo).toContain('fallo');
+    });
+    auditoria.unmount();
+
+    // `panel` no pide la sesion: su lectura contesta 200, y es lo que tiene que repartir.
+    const panel = renderHook(() => useDatosDeLaHoja('panel'), { wrapper });
+    await waitFor(() => {
+      expect(panel.result.current.valores?.size ?? 0).toBeGreaterThan(0);
+    });
+  });
+
+  it('y el ejercicio de la sesion NO entra en la llave de `panel`', async () => {
+    contestaConLaSesionEn(200, 2026);
+    const { cliente, wrapper } = arnes();
+
+    const auditoria = renderHook(() => useDatosDeLaHoja('seg-aud'), { wrapper });
+    await waitFor(() => {
+      expect(auditoria.result.current.tablas?.get('movimientos')?.filas).toHaveLength(1);
+    });
+    auditoria.unmount();
+
+    const panel = renderHook(() => useDatosDeLaHoja('panel'), { wrapper });
+    await waitFor(() => {
+      expect(panel.result.current.valores?.size ?? 0).toBeGreaterThan(0);
+    });
+    const deOtrasHojas = cliente
+      .getQueryCache()
+      .getAll()
+      .map((consulta) => consulta.queryKey)
+      .filter((llave) => llave[0] !== 'seguridad' && llave[0] !== 'seg-aud');
+    expect(deOtrasHojas.length).toBeGreaterThan(0);
+    for (const llave of deOtrasHojas) {
+      // `Conector.exigeEjercicio`: «a las demas les llega `null`», que en la llave va como `''`.
+      // Con 2026 dentro, volver a `panel` no encuentra su cache y cambiar el ejercicio invalida
+      // hojas que no dependen de el.
+      expect(llave).not.toContain(2026);
+    }
+  });
+});
+
+/**
  * **Los DOS vacios de la determinacion predial, que no son el mismo** (#237, #207).
  *
  * El backend los publica distintos porque #546 midio el dano de confundirlos: **404** es «ese
