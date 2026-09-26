@@ -88,7 +88,8 @@ import org.springframework.stereotype.Service;
  * <p><b>Manda la valuacion que {@code catastro} sello</b> cuando existe y trae cifra; si no, manda
  * la declarada. Y las dos quedan escritas: {@code determinacion_predio_detalle} guarda desde V14 de
  * cual de las dos salio cada predio, y —cuando salio de una valuacion— con que {@code conjuntoId} y
- * con que huella se calculo.
+ * con que huella se calculo; desde V32, <b>ademas</b> la declarada que no mando (#362). Hasta #362
+ * esa ultima frase era falsa: la declarada solo vivia en memoria.
  *
  * <p><b>Las tres opciones se enumeraron con su coste antes de elegir</b>, que es lo que AC-2 pide:
  *
@@ -397,7 +398,9 @@ public class DeterminarPredial {
                 huellaDeLaValuacion = laSellada.huella();
                 // La declarada NO desaparece cuando manda la sellada: se guarda al lado para que
                 // la discrepancia se pueda ver, en vez de descubrirse en ventanilla con el papel
-                // ya notificado (#38, AC-3).
+                // ya notificado (#38, AC-3). «Se guarda» desde #362: `comoDetalle` la pasa a
+                // `autovaluo_declarado` (V32) y las dos respuestas la publican; hasta entonces
+                // este comentario lo afirmaba y la cifra se quedaba en este objeto.
                 autovaluoDeclarado = declarado == null ? null : declarado.autovaluo();
             } else {
                 autovaluo = Objects.requireNonNull(declarado).autovaluo();
@@ -442,20 +445,20 @@ public class DeterminarPredial {
      *
      * <p>Si no hay ninguno de los dos, no se inventa: cada predio sin autovaluo se nombra al
      * componer la base.
+     *
+     * <p><b>Lo ya declarado es lo que declaro el contribuyente, no el autovaluo guardado</b>
+     * (#362). Tras una determinacion en que mando la sellada, el autovaluo guardado es el sellado;
+     * leerlo como declarado —lo que se hacia hasta #362— convertia 100 000 declarados y 180 000
+     * sellados en 180 000 y 180 000 al primer recalculo. La regla la dice {@link
+     * PredioDeclarado#delDetalle}, la misma que usa la corrida masiva.
      */
     private List<PredioDeclarado> autovaluosDe(
             ResumenDeContribuyente contribuyente, Peticion peticion) {
         if (!peticion.predios().isEmpty()) {
             return peticion.predios();
         }
-        List<PredioDeclarado> delEjercicio = new ArrayList<>();
-        for (DetalleDeterminacionPredio detalle :
-                yaDeclarados.autovaluosDeclaradosDe(peticion.ejercicio(), contribuyente.id())) {
-            delEjercicio.add(
-                    new PredioDeclarado(
-                            detalle.predioId(), detalle.autovaluo(), detalle.valuoExonerado()));
-        }
-        return List.copyOf(delEjercicio);
+        return PredioDeclarado.deLoGuardado(
+                yaDeclarados.autovaluosDeclaradosDe(peticion.ejercicio(), contribuyente.id()));
     }
 
     private static Dinero sumar(
@@ -523,6 +526,43 @@ public class DeterminarPredial {
             if (autovaluo.esNegativo()) {
                 throw new IllegalArgumentException("El autovaluo no puede ser negativo");
             }
+        }
+
+        /**
+         * Lo que el contribuyente declaro de un predio en una determinacion ya guardada, o vacio si
+         * no declaro nada (#362).
+         *
+         * <p>El autovaluo es {@link DetalleDeterminacionPredio#autovaluoDeclaradoSegunElOrigen()} y
+         * no {@code autovaluo()}: tras una determinacion SELLADO, el segundo es la cifra de {@code
+         * catastro}. La parte exonerada si es {@code valuoExonerado()} en los dos origenes: es un
+         * dato declarado aunque el autovaluo venga sellado ({@code catastro} no sabe que parte esta
+         * inafecta, ADR-0024).
+         *
+         * <p>Vacio —mando la sellada y nadie habia declarado, o la fila es anterior a V32— deja el
+         * predio sin declarada: si la sellada sigue, manda ella; si no, el predio sale sin
+         * autovaluo y se dice ({@link PredioSinAutovaluo}), en vez de tomar como declarada una
+         * cifra que sello otro.
+         */
+        public static Optional<PredioDeclarado> delDetalle(DetalleDeterminacionPredio detalle) {
+            return detalle.autovaluoDeclaradoSegunElOrigen()
+                    .map(
+                            declarado ->
+                                    new PredioDeclarado(
+                                            detalle.predioId(),
+                                            declarado,
+                                            detalle.valuoExonerado()));
+        }
+
+        /**
+         * Lo declarado de todos los predios de una determinacion guardada: la lectura que usan el
+         * recalculo individual y la corrida masiva, y por eso una sola.
+         */
+        public static List<PredioDeclarado> deLoGuardado(List<DetalleDeterminacionPredio> detalle) {
+            List<PredioDeclarado> declarados = new ArrayList<>();
+            for (DetalleDeterminacionPredio predio : detalle) {
+                delDetalle(predio).ifPresent(declarados::add);
+            }
+            return List.copyOf(declarados);
         }
     }
 

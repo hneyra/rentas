@@ -397,7 +397,63 @@ class DeterminacionPredialJdbcTest {
         insertarCabeceraPorSql("VEHICULAR", vehiculo, titular, null);
     }
 
+    @Test
+    @DisplayName(
+            "#362 — V32: la declarada solo va al lado de un autovaluo SELLADO, tambien por SQL")
+    void laDeclaradaSoloVaAlLadoDeLaSellada() throws SQLException {
+        enA();
+        long titular = crearContribuyente(municipalidadA, "DET-3011", "80300311");
+        long predio = crearPredio(municipalidadA, "000000000000000311");
+        // Uno por fila: `det_predio_detalle_uq` no deja repetir el predio en una determinacion.
+        long otro = crearPredio(municipalidadA, "000000000000000312");
+        long unoMas = crearPredio(municipalidadA, "000000000000000313");
+        Determinacion guardada =
+                transaccion.execute(
+                        estado ->
+                                repositorio.insertar(
+                                        cabecera(titular, Dinero.de("1000.00")),
+                                        List.of(detalleDe(predio, "1000.00"))));
+
+        assertThatThrownBy(
+                        () ->
+                                insertarDeclaradaPorSql(
+                                        guardada.id(), otro, "'DECLARADO', NULL, NULL"))
+                .as(
+                        "en DECLARADO la declarada ES el autovaluo: dos copias de la misma cifra"
+                                + " acaban difiriendo")
+                .isInstanceOf(SQLException.class)
+                .hasMessageContaining("determinacion_detalle_declarado_ck");
+
+        // El contraste: la misma fila, SELLADO con su conjunto y su huella, entra. Sin el, la
+        // guarda de arriba podria estar roja por cualquier otra columna.
+        insertarDeclaradaPorSql(guardada.id(), unoMas, "'SELLADO', 77, repeat('a', 64)");
+    }
+
     // ---------------------------------------------------------------- utilidades
+
+    /** Un detalle con {@code autovaluo_declarado = 800}, escrito saltandose el dominio. */
+    private static void insertarDeclaradaPorSql(long determinacionId, long predio, String origen)
+            throws SQLException {
+        try (Connection app = base.conexion(BaseDeDatosDePrueba.APP)) {
+            ContextoDeTenant.fijar(app, municipalidadA);
+            try (PreparedStatement sentencia =
+                    app.prepareStatement(
+                            "INSERT INTO determinacion_predio_detalle (municipalidad_id, ejercicio,"
+                                    + " determinacion_id, predio_id, autovaluo, valuo_exonerado,"
+                                    + " porcentaje_propiedad, base_imponible_predio,"
+                                    + " autovaluo_origen, valuacion_conjunto_id, valuacion_huella,"
+                                    + " autovaluo_declarado)"
+                                    + " VALUES (?, 2026, ?, ?, 1000, 0, 100, 1000, "
+                                    + origen
+                                    + ", 800)")) {
+                sentencia.setLong(1, municipalidadA);
+                sentencia.setLong(2, determinacionId);
+                sentencia.setLong(3, predio);
+                sentencia.executeUpdate();
+                app.commit();
+            }
+        }
+    }
 
     private static void enA() {
         TenantContext.fijar(new MunicipalidadId(municipalidadA));

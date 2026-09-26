@@ -2110,7 +2110,8 @@
         "baseImponible": "texto",
         "origenDelAutovaluo": "texto",
         "valuacionConjuntoId": "entero",
-        "valuacionHuella": "texto"
+        "valuacionHuella": "texto",
+        "autovaluoDeclarado": "texto"
       }
     ],
     "valuoTotal": "texto",
@@ -4250,7 +4251,8 @@
         "valuoAfecto": "texto",
         "baseImponible": "texto",
         "porcentajeRegistradoDelPredio": "texto",
-        "titularidadCompleta": "booleano"
+        "titularidadCompleta": "booleano",
+        "autovaluoDeclarado": "texto"
       }
     ],
     "valuoTotal": "texto",

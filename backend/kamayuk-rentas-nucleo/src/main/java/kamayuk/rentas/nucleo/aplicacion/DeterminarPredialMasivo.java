@@ -277,12 +277,11 @@ public class DeterminarPredialMasivo {
                 continue;
             }
 
-            List<DeterminarPredial.PredioDeclarado> autovaluos = new ArrayList<>();
-            for (DetalleDeterminacionPredio detalle : fila.detalle()) {
-                autovaluos.add(
-                        new DeterminarPredial.PredioDeclarado(
-                                detalle.predioId(), detalle.autovaluo(), detalle.valuoExonerado()));
-            }
+            // Lo que el contribuyente DECLARO, no el autovaluo guardado: tras una determinacion
+            // en que mando la sellada, aquel es la cifra de `catastro` (#362). La regla es la del
+            // recalculo individual, y vive en un solo sitio.
+            List<DeterminarPredial.PredioDeclarado> autovaluos =
+                    DeterminarPredial.PredioDeclarado.deLoGuardado(fila.detalle());
 
             try {
                 DeterminacionPredialCalculada calculada =
