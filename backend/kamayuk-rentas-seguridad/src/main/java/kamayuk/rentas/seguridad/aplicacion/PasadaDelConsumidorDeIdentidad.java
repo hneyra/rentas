@@ -11,6 +11,7 @@ import kamayuk.rentas.plataforma.EstadoDeLaCola;
 import kamayuk.rentas.plataforma.PoliticaDeLoQueNoAvanza;
 import kamayuk.rentas.seguridad.dominio.AlertaDeEventosSinAplicar;
 import kamayuk.rentas.seguridad.dominio.EventoPospuesto;
+import kamayuk.rentas.seguridad.dominio.FuenteDeEventosDeIdentidad;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -137,6 +138,19 @@ public class PasadaDelConsumidorDeIdentidad {
         } finally {
             avisarDeLosApartados(apartados.values());
         }
+    }
+
+    /**
+     * La pasada no pudo leer el buzon y quien la llamo decidio que la copia se queda como estaba
+     * (#453): se le dice al responsable por el mismo canal que los apartados.
+     *
+     * <p>Lo decide {@link ImplantarMunicipalidad} y no esta clase, porque la decision depende de
+     * algo que la pasada no mira —si la copia tiene cuentas—; lo que es de aqui es el canal, que es
+     * el mismo por el que ya salen los otros avisos de la copia local.
+     */
+    public void avisarQueLaCopiaSeQuedaComoEstaba(
+            FuenteDeEventosDeIdentidad.IdentidadNoContesta causa, long cuentas) {
+        alerta.laCopiaSeQuedaComoEstaba(String.valueOf(causa.getMessage()), cuentas);
     }
 
     /**

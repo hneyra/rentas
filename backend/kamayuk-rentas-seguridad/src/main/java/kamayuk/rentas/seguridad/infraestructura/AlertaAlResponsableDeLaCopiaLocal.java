@@ -107,6 +107,29 @@ public class AlertaAlResponsableDeLaCopiaLocal implements AlertaDeEventosSinApli
                         texto));
     }
 
+    @Override
+    public void laCopiaSeQuedaComoEstaba(String causa, long cuentas) {
+        String texto =
+                "LA COPIA LOCAL DE LA AUTORIZACION NO SE PUSO AL DIA AL IMPLANTAR: no se pudo leer"
+                        + " el buzon de `identidad` —"
+                        + causa
+                        + "—. La copia se queda como estaba, con "
+                        + cuentas
+                        + " cuenta(s), y `rentas` sigue autorizando con ella; lo que `identidad`"
+                        + " haya cambiado desde la ultima pasada —un alta, una baja, una"
+                        + " revocacion— NO rige aqui hasta que el CronJob del consumidor la ponga"
+                        + " al dia, que lo intenta cada cinco minutos. Si la causa es la credencial"
+                        + " o la afiliacion de la cuenta de servicio (un 401 o un 403), eso no se"
+                        + " cura solo: se arregla en el despliegue (#453, ADR-0026 §4).";
+        avisar(
+                new Aviso(
+                        responsable.nombre(),
+                        "SIN_LEER_AL_IMPLANTAR",
+                        "el buzon no contesto",
+                        cuentas,
+                        texto));
+    }
+
     // ------------------------------------------------------------------
 
     /** Siempre al registro; y ademas al canal, si es de los que reciben. */

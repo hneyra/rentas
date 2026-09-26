@@ -660,5 +660,10 @@ class ConsumirEventosDeIdentidadJdbcTest {
                 java.time.Duration umbral) {
             avisos.add("COLA BLOQUEADA: " + bloqueada);
         }
+
+        @Override
+        public void laCopiaSeQuedaComoEstaba(String causa, long cuentas) {
+            // Lo mide ImplantarMunicipalidadTest; aqui no es el sujeto.
+        }
     }
 }

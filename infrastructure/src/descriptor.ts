@@ -904,11 +904,14 @@ export const rentas: DescriptorDeSistema = {
                   // La MISMA imagen que la aplicacion, con el perfil `batch` (ADR-0003: un
                   // artefacto, dos perfiles). No abre puerto ninguno.
                   image: e.imagenDe(SISTEMA),
-                  // Y las del consumidor de `identidad` (ADR-0039 etapa 4): la implantacion
-                  // TERMINA con una pasada suya —`CorrerElConsumidorDeIdentidad` corre detras
-                  // de `ImplantarMunicipalidad` en el mismo proceso— y trae lo que `identidad`
-                  // ya diga de esta municipalidad. Sin ellas la implantacion no falla: siembra
-                  // y avisa de que nadie va a actualizar la copia.
+                  // Y las del consumidor de `identidad` (ADR-0039 etapa 5):
+                  // `ImplantarMunicipalidad` corre EN LINEA una pasada del buzon
+                  // —`CorrerElConsumidorDeIdentidad` se aparta en este Job— y trae lo que
+                  // `identidad` ya diga de esta municipalidad. Sin ellas la implantacion FALLA:
+                  // desde la etapa 5 nadie mas siembra el administrador.
+                  // Si estan y el buzon no contesta, decide la copia (`rentas`#453): vacia —la
+                  // primera implantacion— falla; con cuentas —un redespliegue— se queda como
+                  // estaba, avisa al responsable y termina, y la pone al dia el CronJob.
                   env: [...variablesDeImplantacion(e), ...variablesDelConsumidorDeIdentidad(e)],
                   resources: RECURSOS_DE_ARRANQUE,
                   securityContext: SEGURIDAD,
