@@ -31,6 +31,14 @@ import org.jspecify.annotations.Nullable;
  * acta_fiscalizacion} (#45); qué cambió entre las dos lo explica {@link
  * DiferenciaEntreLiquidaciones}.
  *
+ * <h2>Ni el «Nº Notificación» (#368)</h2>
+ *
+ * <p>Hasta #368 esta cabecera lo llevaba, y nacía nulo para siempre: las dos fábricas lo dejaban en
+ * {@code null} y la tabla no admite {@code UPDATE}. El número nace con el acto de notificar, así
+ * que vive en el movimiento NOTIFICADA ({@link MovimientoDeLiquidacion#notificada}) y se lee de ahí
+ * con {@link MovimientoDeLiquidacion#numeroDeNotificacionDe}. La columna {@code
+ * liquidacion_fiscalizacion.numero_notificacion} se queda como vestigio documentado (V34).
+ *
  * <h2>Ni un importe</h2>
  *
  * <p>Esta cabecera no tiene ninguna cifra, y no es un olvido: el total de la liquidación es la suma
@@ -50,7 +58,6 @@ import org.jspecify.annotations.Nullable;
  * @param tipo cómo se determinó lo hallado
  * @param motivoDeterminante por qué se fiscalizó, en el vocabulario del expediente
  * @param fecha el día de la liquidación, no el de su registro
- * @param numeroNotificacion el «Nº Notificación», cuando ya se notificó
  * @param usuarioRegistro quién la registró; nulo mientras no se ha guardado
  * @param observacion por qué se registra (regla 10)
  */
@@ -67,7 +74,6 @@ public record Liquidacion(
         TipoDeFiscalizacion tipo,
         String motivoDeterminante,
         LocalDate fecha,
-        @Nullable String numeroNotificacion,
         @Nullable String usuarioRegistro,
         Observacion observacion) {
 
@@ -114,13 +120,6 @@ public record Liquidacion(
                     "El motivo determinante va de 1 a " + MOTIVO_MAXIMO + " caracteres");
         }
         Objects.requireNonNull(fecha, "La liquidacion necesita su fecha");
-        if (numeroNotificacion != null) {
-            numeroNotificacion = numeroNotificacion.strip().toUpperCase(Locale.ROOT);
-            if (numeroNotificacion.isEmpty() || numeroNotificacion.length() > NUMERO_MAXIMO) {
-                throw new IllegalArgumentException(
-                        "El numero de notificacion va de 1 a " + NUMERO_MAXIMO + " caracteres");
-            }
-        }
         Objects.requireNonNull(
                 observacion, "Sin observacion no se guarda una liquidacion (regla 10)");
     }
@@ -150,7 +149,6 @@ public record Liquidacion(
                 tipo,
                 motivoDeterminante,
                 fecha,
-                null,
                 null,
                 observacion);
     }
@@ -193,7 +191,6 @@ public record Liquidacion(
                 nuevoTipo,
                 nuevoMotivo,
                 nuevaFecha,
-                null,
                 null,
                 nuevaObservacion);
     }

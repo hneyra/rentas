@@ -17,6 +17,7 @@ import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.fiscalizacion.dominio.CondicionFiscalizada;
 import kamayuk.rentas.fiscalizacion.dominio.CriterioDeLiquidaciones;
 import kamayuk.rentas.fiscalizacion.dominio.EstadoDeActa;
+import kamayuk.rentas.fiscalizacion.dominio.EstadoDeLiquidacion;
 import kamayuk.rentas.fiscalizacion.dominio.LineaDeLiquidacion;
 import kamayuk.rentas.fiscalizacion.dominio.Liquidacion;
 import kamayuk.rentas.fiscalizacion.dominio.LiquidacionRepository;
@@ -42,7 +43,7 @@ public class LiquidacionRepositoryJdbc extends RepositorioJdbc implements Liquid
             "l.id, l.numero, l.ejercicio, l.correlativo, l.acta_id, l.version,"
                     + " l.liquidacion_anterior_id, l.ejercicio_desde, l.ejercicio_hasta,"
                     + " l.tipo_fiscalizacion, l.motivo_determinante, l.fecha,"
-                    + " l.numero_notificacion, l.usuario_registro, l.observacion";
+                    + " l.usuario_registro, l.observacion";
 
     private static final String DESDE = " FROM liquidacion_fiscalizacion l";
 
@@ -94,23 +95,24 @@ public class LiquidacionRepositoryJdbc extends RepositorioJdbc implements Liquid
         campos.put("tipo", liquidacion.tipo().name());
         campos.put("motivo", liquidacion.motivoDeterminante());
         campos.put("fecha", liquidacion.fecha());
-        campos.put("notificacion", liquidacion.numeroNotificacion());
         campos.put("usuario", usuario);
         campos.put("observacion", liquidacion.observacion().texto());
 
+        // Sin `numero_notificacion` (#368): la columna es un vestigio. El numero nace con el
+        // movimiento NOTIFICADA, y de ahi lo leen la ficha y el filtro.
         Long id =
                 jdbc().sql(
                                 "INSERT INTO liquidacion_fiscalizacion"
                                         + " (municipalidad_id, numero, ejercicio, correlativo,"
                                         + "  acta_id, version, liquidacion_anterior_id,"
                                         + "  ejercicio_desde, ejercicio_hasta, tipo_fiscalizacion,"
-                                        + "  motivo_determinante, fecha, numero_notificacion,"
-                                        + "  usuario_registro, fecha_registro, observacion)"
+                                        + "  motivo_determinante, fecha, usuario_registro,"
+                                        + "  fecha_registro, observacion)"
                                         + " VALUES ("
                                         + MUNICIPALIDAD_ACTUAL
                                         + ", :numero, :ejercicio, :correlativo, :actaId, :version,"
                                         + "  :anterior, :desde, :hasta, :tipo, :motivo, :fecha,"
-                                        + "  :notificacion, :usuario, now(), :observacion)"
+                                        + "  :usuario, now(), :observacion)"
                                         + " RETURNING id")
                         .params(campos)
                         .query(Long.class)
@@ -205,6 +207,12 @@ public class LiquidacionRepositoryJdbc extends RepositorioJdbc implements Liquid
      * no en Java: filtrar después de paginar devolvería páginas de tamaño variable y un total que
      * no corresponde a lo que se ve. El estado es el del <b>último</b> movimiento, que es la misma
      * definición que {@code EstadoDeLiquidacion.delHistorial} aplica sobre la lista.
+     *
+     * <p>El «Nº Notificación» tampoco es una columna de la cabecera (#368): es el del <b>último
+     * movimiento NOTIFICADA</b>, con la misma forma de subconsulta que el estado y la misma
+     * definición que {@code MovimientoDeLiquidacion.numeroDeNotificacionDe} aplica sobre la lista.
+     * Hasta #368 se comparaba con {@code l.numero_notificacion}, que nadie escribía: el filtro
+     * contestaba cero filas con cualquier valor.
      */
     @Override
     public Pagina<Liquidacion> consultar(CriterioDeLiquidaciones criterio, Paginacion paginacion) {
@@ -225,7 +233,14 @@ public class LiquidacionRepositoryJdbc extends RepositorioJdbc implements Liquid
             parametros.put("contribuyente", criterio.contribuyenteId());
         }
         if (criterio.numeroNotificacion() != null) {
-            donde.append(" AND l.numero_notificacion = :notificacion");
+            donde.append(
+                    " AND (SELECT m.numero_notificacion FROM liquidacion_movimiento m"
+                            + "        WHERE m.municipalidad_id = l.municipalidad_id"
+                            + "          AND m.liquidacion_id = l.id"
+                            + "          AND m.estado = '"
+                            + EstadoDeLiquidacion.NOTIFICADA.name()
+                            + "'"
+                            + "        ORDER BY m.id DESC LIMIT 1) = :notificacion");
             parametros.put(
                     "notificacion",
                     criterio.numeroNotificacion().strip().toUpperCase(java.util.Locale.ROOT));
@@ -420,7 +435,6 @@ public class LiquidacionRepositoryJdbc extends RepositorioJdbc implements Liquid
                 TipoDeFiscalizacion.valueOf(fila.getString("tipo_fiscalizacion")),
                 fila.getString("motivo_determinante"),
                 fila.getDate("fecha").toLocalDate(),
-                fila.getString("numero_notificacion"),
                 fila.getString("usuario_registro"),
                 Observacion.de(fila.getString("observacion")));
     }

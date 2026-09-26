@@ -28,7 +28,8 @@ public class MovimientoDeLiquidacionRepositoryJdbc extends RepositorioJdbc
         implements MovimientoDeLiquidacionRepository {
 
     private static final String COLUMNAS =
-            "id, liquidacion_id, tipo, estado, fecha, motivo, usuario_registro, observacion";
+            "id, liquidacion_id, tipo, estado, fecha, motivo, numero_notificacion,"
+                    + " usuario_registro, observacion";
 
     public MovimientoDeLiquidacionRepositoryJdbc(JdbcClient jdbc) {
         super(jdbc);
@@ -42,6 +43,9 @@ public class MovimientoDeLiquidacionRepositoryJdbc extends RepositorioJdbc
         campos.put("estado", movimiento.estado().name());
         campos.put("fecha", movimiento.fecha());
         campos.put("motivo", movimiento.motivo());
+        // El numero del cargo, solo en NOTIFICADA (#368). Es su unica fuente de verdad:
+        // `liquidacion_movimiento_notificacion_ck` (V34) rechaza un NOTIFICADA sin el.
+        campos.put("notificacion", movimiento.numeroNotificacion());
         campos.put("usuario", OrigenContext.actual().usuario());
         campos.put("observacion", movimiento.observacion().texto());
 
@@ -51,12 +55,12 @@ public class MovimientoDeLiquidacionRepositoryJdbc extends RepositorioJdbc
                     jdbc().sql(
                                     "INSERT INTO liquidacion_movimiento"
                                             + " (municipalidad_id, liquidacion_id, tipo, estado,"
-                                            + "  fecha, motivo, usuario_registro, fecha_registro,"
-                                            + "  observacion)"
+                                            + "  fecha, motivo, numero_notificacion,"
+                                            + "  usuario_registro, fecha_registro, observacion)"
                                             + " VALUES ("
                                             + MUNICIPALIDAD_ACTUAL
                                             + ", :liquidacion, :tipo, :estado, :fecha, :motivo,"
-                                            + "  :usuario, now(), :observacion)"
+                                            + "  :notificacion, :usuario, now(), :observacion)"
                                             + " RETURNING id")
                             .params(campos)
                             .query(Long.class)
@@ -74,6 +78,7 @@ public class MovimientoDeLiquidacionRepositoryJdbc extends RepositorioJdbc
                 movimiento.estado(),
                 movimiento.fecha(),
                 movimiento.motivo(),
+                movimiento.numeroNotificacion(),
                 OrigenContext.actual().usuario(),
                 movimiento.observacion());
     }
@@ -100,6 +105,7 @@ public class MovimientoDeLiquidacionRepositoryJdbc extends RepositorioJdbc
                 EstadoDeLiquidacion.valueOf(fila.getString("estado")),
                 fila.getDate("fecha").toLocalDate(),
                 fila.getString("motivo"),
+                fila.getString("numero_notificacion"),
                 fila.getString("usuario_registro"),
                 Observacion.de(fila.getString("observacion")));
     }

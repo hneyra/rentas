@@ -292,6 +292,7 @@ public class LiquidacionController {
                     estadoDe(peticion.nuevoEstado()),
                     fechaOpcional(peticion.fecha(), "fecha", LocalDate.now(reloj)),
                     exigir(peticion.motivo(), "motivo"),
+                    vacioAnulo(peticion.numeroNotificacion()),
                     observacion);
         } catch (CambiarEstadoDeLaLiquidacion.LiquidacionInexistente noExiste) {
             throw new ProblemaDeNegocio(CodigoDeError.NO_ENCONTRADO, mensajeDe(noExiste));
@@ -488,10 +489,17 @@ public class LiquidacionController {
             @Nullable String usoDeclarado,
             @Nullable String usoHallado) {}
 
-    /** El cuerpo de un cambio de estado. <b>Lista blanca</b>. */
+    /**
+     * El cuerpo de un cambio de estado. <b>Lista blanca</b>.
+     *
+     * <p>{@code numeroNotificacion} es el «Nº Notificación» del cargo (#368): obligatorio con
+     * NOTIFICADA —422 sin él— y rechazado con cualquier otro estado. Es lo que el filtro {@code
+     * nNotificacion} del histórico busca.
+     */
     public record PeticionDeEstadoDeLiquidacion(
             @Nullable String observacion,
             @Nullable String nuevoEstado,
             @Nullable String motivo,
+            @Nullable String numeroNotificacion,
             @Nullable String fecha) {}
 }

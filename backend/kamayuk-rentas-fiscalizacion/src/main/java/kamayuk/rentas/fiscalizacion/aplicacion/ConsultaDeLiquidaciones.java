@@ -121,6 +121,14 @@ public class ConsultaDeLiquidaciones {
             return lineas.stream().filter(LineaDeLiquidacion::justificaDeterminar).count();
         }
 
+        /**
+         * El «Nº Notificación»: el del último movimiento NOTIFICADA del historial, o {@code null}
+         * si nunca se notificó (#368). Se deriva, como el estado: la cabecera no lo tiene.
+         */
+        public @Nullable String numeroNotificacion() {
+            return MovimientoDeLiquidacion.numeroDeNotificacionDe(historial);
+        }
+
         /** Si alguna línea sigue esperando sus cifras (D-02a, #198). */
         public boolean esperaSusCifras() {
             return lineas.stream().anyMatch(LineaDeLiquidacion::esperaSusCifras);

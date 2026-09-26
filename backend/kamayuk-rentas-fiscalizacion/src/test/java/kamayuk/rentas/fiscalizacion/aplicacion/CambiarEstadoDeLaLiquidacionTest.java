@@ -21,6 +21,7 @@ import kamayuk.rentas.fiscalizacion.dominio.Liquidacion;
 import kamayuk.rentas.fiscalizacion.dominio.MovimientoDeLiquidacion;
 import kamayuk.rentas.fiscalizacion.dominio.ResolucionDeDeterminacion;
 import kamayuk.rentas.fiscalizacion.dominio.TipoDeFiscalizacion;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -129,7 +130,8 @@ class CambiarEstadoDeLaLiquidacionTest {
         String numero = liquidacion.numero();
 
         if (desenlace == Desenlace.ADMITIDO) {
-            assertThat(cambiar.cambiar(numero, hacia, HOY, "motivo", OBSERVACION)).isEqualTo(hacia);
+            assertThat(cambiar.cambiar(numero, hacia, HOY, "motivo", cargoPara(hacia), OBSERVACION))
+                    .isEqualTo(hacia);
             assertThat(estadoDe(liquidacion)).isEqualTo(hacia);
             return;
         }
@@ -141,11 +143,27 @@ class CambiarEstadoDeLaLiquidacionTest {
                     case ILEGAL -> CambiarEstadoDeLaLiquidacion.TransicionIlegal.class;
                     case ADMITIDO -> throw new AssertionError("ya se atendio arriba");
                 };
-        assertThatThrownBy(() -> cambiar.cambiar(numero, hacia, HOY, "motivo", OBSERVACION))
+        assertThatThrownBy(
+                        () ->
+                                cambiar.cambiar(
+                                        numero,
+                                        hacia,
+                                        HOY,
+                                        "motivo",
+                                        cargoPara(hacia),
+                                        OBSERVACION))
                 .isInstanceOf(esperada)
                 .hasMessageContaining(numero);
         if (desenlace == Desenlace.ILEGAL) {
-            assertThatThrownBy(() -> cambiar.cambiar(numero, hacia, HOY, "motivo", OBSERVACION))
+            assertThatThrownBy(
+                            () ->
+                                    cambiar.cambiar(
+                                            numero,
+                                            hacia,
+                                            HOY,
+                                            "motivo",
+                                            cargoPara(hacia),
+                                            OBSERVACION))
                     .hasMessageContaining(desde.etiqueta())
                     .hasMessageContaining(hacia.etiqueta());
         }
@@ -167,6 +185,7 @@ class CambiarEstadoDeLaLiquidacionTest {
                                         ANULADA,
                                         HOY,
                                         "Se deja sin efecto",
+                                        null,
                                         OBSERVACION))
                 .isInstanceOf(CambiarEstadoDeLaLiquidacion.LiquidacionConResolucion.class)
                 .hasMessageContaining("RDF-2026-000004")
@@ -190,6 +209,7 @@ class CambiarEstadoDeLaLiquidacionTest {
                                         ANULADA,
                                         HOY,
                                         "Se deja sin efecto",
+                                        null,
                                         OBSERVACION))
                 .isInstanceOf(CambiarEstadoDeLaLiquidacion.LiquidacionConResolucion.class);
         assertThat(estadoDe(liquidacion)).isEqualTo(NOTIFICADA);
@@ -206,6 +226,7 @@ class CambiarEstadoDeLaLiquidacionTest {
                                 ANULADA,
                                 HOY,
                                 "Se deja sin efecto",
+                                null,
                                 OBSERVACION))
                 .isEqualTo(ANULADA);
         assertThat(estadoDe(liquidacion)).isEqualTo(ANULADA);
@@ -220,7 +241,12 @@ class CambiarEstadoDeLaLiquidacionTest {
 
         assertThat(
                         cambiar.cambiar(
-                                estaOtra.numero(), ANULADA, HOY, "Se deja sin efecto", OBSERVACION))
+                                estaOtra.numero(),
+                                ANULADA,
+                                HOY,
+                                "Se deja sin efecto",
+                                null,
+                                OBSERVACION))
                 .as("la comprobacion es de ESTA liquidacion, no de que exista alguna resolucion")
                 .isEqualTo(ANULADA);
     }
@@ -231,8 +257,76 @@ class CambiarEstadoDeLaLiquidacionTest {
         Liquidacion liquidacion = sembrarEn(LIQUIDADA);
         transferir(liquidacion, "RDF-2026-000007");
 
-        assertThat(cambiar.cambiar(liquidacion.numero(), NOTIFICADA, HOY, "motivo", OBSERVACION))
+        assertThat(
+                        cambiar.cambiar(
+                                liquidacion.numero(),
+                                NOTIFICADA,
+                                HOY,
+                                "motivo",
+                                "N-2026-0007",
+                                OBSERVACION))
                 .isEqualTo(NOTIFICADA);
+    }
+
+    // ── #368: notificar lleva el numero del cargo ─────────────────────
+
+    @Test
+    @DisplayName("#368 — notificar guarda el numero en el movimiento, normalizado")
+    void notificarGuardaElNumeroEnElMovimiento() {
+        Liquidacion liquidacion = sembrarEn(LIQUIDADA);
+
+        cambiar.cambiar(
+                liquidacion.numero(),
+                NOTIFICADA,
+                HOY,
+                "Cargo entregado",
+                " n-2026-0001 ",
+                OBSERVACION);
+
+        assertThat(
+                        MovimientoDeLiquidacion.numeroDeNotificacionDe(
+                                movimientos.deLiquidacion(liquidacion.identificador())))
+                .as("el numero vive en el movimiento NOTIFICADA, que es su unica fuente")
+                .isEqualTo("N-2026-0001");
+    }
+
+    @Test
+    @DisplayName("#368 — notificar sin numero se rechaza y no deja movimiento")
+    void notificarSinNumeroSeRechaza() {
+        Liquidacion liquidacion = sembrarEn(LIQUIDADA);
+
+        assertThatThrownBy(
+                        () ->
+                                cambiar.cambiar(
+                                        liquidacion.numero(),
+                                        NOTIFICADA,
+                                        HOY,
+                                        "Cargo entregado",
+                                        null,
+                                        OBSERVACION))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("numeroNotificacion");
+        assertThat(estadoDe(liquidacion)).isEqualTo(LIQUIDADA);
+    }
+
+    @Test
+    @DisplayName("#368 — un numero de notificacion con otro estado se rechaza y no deja movimiento")
+    void unNumeroConOtroEstadoSeRechaza() {
+        Liquidacion liquidacion = sembrarEn(ABIERTA);
+
+        assertThatThrownBy(
+                        () ->
+                                cambiar.cambiar(
+                                        liquidacion.numero(),
+                                        LIQUIDADA,
+                                        HOY,
+                                        "Se cierra",
+                                        "N-2026-0002",
+                                        OBSERVACION))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("numeroNotificacion")
+                .hasMessageContaining("LIQUIDADA");
+        assertThat(estadoDe(liquidacion)).isEqualTo(ABIERTA);
     }
 
     // ------------------------------------------------------------------
@@ -262,13 +356,26 @@ class CambiarEstadoDeLaLiquidacionTest {
         movimientos.insertar(
                 MovimientoDeLiquidacion.apertura(
                         liquidacion.identificador(), HOY, "Apertura", OBSERVACION));
-        if (estado != ABIERTA) {
+        if (estado == NOTIFICADA) {
+            movimientos.insertar(
+                    MovimientoDeLiquidacion.notificada(
+                            liquidacion.identificador(),
+                            HOY,
+                            "Siembra",
+                            "N-SIEMBRA-" + liquidacion.identificador(),
+                            OBSERVACION));
+        } else if (estado != ABIERTA) {
             movimientos.insertar(
                     MovimientoDeLiquidacion.cambioDeEstado(
                             liquidacion.identificador(), estado, HOY, "Siembra", OBSERVACION));
         }
         assertThat(estadoDe(liquidacion)).isEqualTo(estado);
         return liquidacion;
+    }
+
+    /** El numero del cargo cuando se notifica, y ninguno con cualquier otro estado (#368). */
+    private static @Nullable String cargoPara(EstadoDeLiquidacion hacia) {
+        return hacia == NOTIFICADA ? "N-2026-0001" : null;
     }
 
     private void transferir(Liquidacion liquidacion, String numeroDeResolucion) {

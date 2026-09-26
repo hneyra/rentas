@@ -34,7 +34,8 @@ import org.jspecify.annotations.Nullable;
  * @param tipoDeFiscalizacion cómo se determinó lo hallado
  * @param motivoDeterminante por qué se fiscalizó
  * @param fecha el día de la liquidación
- * @param numeroNotificacion el «Nº Notificación», cuando ya se notificó
+ * @param numeroNotificacion el «Nº Notificación», cuando ya se notificó: el del último movimiento
+ *     NOTIFICADA del historial, que es su única fuente (#368)
  * @param estado el derivado del historial
  * @param esperaSusCifras si alguna línea sigue sin importes (D-02a)
  * @param lineas el contraste, una por unidad y ejercicio
@@ -76,7 +77,7 @@ public record LiquidacionResource(
                 liquidacion.tipo().name(),
                 liquidacion.motivoDeterminante(),
                 liquidacion.fecha().toString(),
-                liquidacion.numeroNotificacion(),
+                consultada.numeroNotificacion(),
                 consultada.estado().name(),
                 consultada.esperaSusCifras(),
                 List.copyOf(lineas),
