@@ -266,8 +266,8 @@ public class ImportarValoresACoactiva {
         }
 
         List<Candidato> candidatos = new ArrayList<>();
-        for (String pedido : peticion.numerosDeValor()) {
-            String numero = pedido.strip().toUpperCase(Locale.ROOT);
+        // Ya normalizados y sin repetir: lo hace `Peticion` (#426).
+        for (String numero : peticion.numerosDeValor()) {
             ValorParaCoactiva suyo = porNumero.get(numero);
             if (suyo != null) {
                 candidatos.add(Candidato.de(suyo));
@@ -341,8 +341,19 @@ public class ImportarValoresACoactiva {
             @Nullable String asunto,
             @Nullable String direccionReferencial) {
 
+        /**
+         * Los numeros pedidos son un <b>conjunto</b>: normalizados y sin repetir, en el orden en
+         * que llegaron (#426). Hasta #426 se copiaba la lista tal cual, y el mismo valor pedido dos
+         * veces —dos casillas sobre la misma fila, o el numero tecleado otra vez en minusculas o
+         * con espacios— entraba dos veces: el segundo {@code importar} chocaba con el indice unico,
+         * salia 409 «ya esta en un expediente» y se deshacia la importacion entera.
+         */
         public Peticion {
-            numerosDeValor = List.copyOf(numerosDeValor);
+            numerosDeValor =
+                    numerosDeValor.stream()
+                            .map(numero -> numero.strip().toUpperCase(Locale.ROOT))
+                            .distinct()
+                            .toList();
         }
     }
 

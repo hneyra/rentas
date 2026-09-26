@@ -168,6 +168,24 @@ class ExpedienteControllerTest {
     }
 
     @Test
+    @DisplayName("#426 — el mismo numero dos veces, y en minusculas: 201, no un 409 falso")
+    void unNumeroRepetidoNoEs409() throws Exception {
+        MvcResult resultado =
+                importar(
+                        "{\"codContribuyente\":\"C-0007\",\"valores\":[\"OP-2026-000001\","
+                                + "\"op-2026-000001 \",\"OP-2026-000002\"],\"ejecutor\":\""
+                                + EJECUTOR
+                                + "\",\"observacion\":\"Se importa la cartera vencida\"}");
+
+        assertThat(resultado.getResponse().getStatus())
+                .as("hasta #426: 409 «ya esta en un expediente coactivo», y nada importado")
+                .isEqualTo(201);
+        assertThat(resultado.getResponse().getContentAsString())
+                .contains("\"importados\":1")
+                .contains("\"motivo\":\"PLAZO_VIGENTE\"");
+    }
+
+    @Test
     @DisplayName("sin observacion, 422: no se importa nada (regla 10)")
     void sinObservacionRechaza() throws Exception {
         MvcResult resultado = importar(cuerpoDeImportacion(""));
