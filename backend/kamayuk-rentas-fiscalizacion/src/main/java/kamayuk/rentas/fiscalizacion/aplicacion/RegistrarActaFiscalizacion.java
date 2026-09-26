@@ -2,6 +2,7 @@ package kamayuk.rentas.fiscalizacion.aplicacion;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Optional;
 import java.util.Set;
 import kamayuk.rentas.auditoria.Auditoria;
 import kamayuk.rentas.auditoria.Operacion;
@@ -78,8 +79,12 @@ public class RegistrarActaFiscalizacion {
         this.auditoria = auditoria;
     }
 
+    /**
+     * @param claveDeIdempotencia la cabecera {@code Idempotency-Key} (#347); con la misma clave, el
+     *     reintento devuelve el acta de la primera vez y no escribe una version nueva
+     */
     @Transactional
-    public ActaConLoDeclarado registrarPredial(
+    public Registrada registrarPredial(
             long programaId,
             long contribuyenteId,
             long predioId,
@@ -89,7 +94,14 @@ public class RegistrarActaFiscalizacion {
             @Nullable BigDecimal areaHallada,
             @Nullable String usoHallado,
             @Nullable String detalle,
+            @Nullable String claveDeIdempotencia,
             Observacion observacion) {
+
+        String clave = claveDe(claveDeIdempotencia);
+        Optional<Registrada> yaRegistrada = yaRegistradaCon(clave);
+        if (yaRegistrada.isPresent()) {
+            return yaRegistrada.get();
+        }
 
         exigirPrograma(programaId, TipoDePrograma.PREDIAL);
         exigirHallazgo(hallazgo);
@@ -109,11 +121,15 @@ public class RegistrarActaFiscalizacion {
                         areaHallada == null ? null : new AreaM2(areaHallada),
                         usoHallado,
                         detalle,
-                        observacion));
+                        observacion),
+                clave);
     }
 
+    /**
+     * @param claveDeIdempotencia la cabecera {@code Idempotency-Key} (#347), como en la predial
+     */
     @Transactional
-    public ActaConLoDeclarado registrarVehicular(
+    public Registrada registrarVehicular(
             long programaId,
             long contribuyenteId,
             long vehiculoId,
@@ -121,7 +137,14 @@ public class RegistrarActaFiscalizacion {
             String fiscalizador,
             @Nullable Hallazgo hallazgo,
             @Nullable String detalle,
+            @Nullable String claveDeIdempotencia,
             Observacion observacion) {
+
+        String clave = claveDe(claveDeIdempotencia);
+        Optional<Registrada> yaRegistrada = yaRegistradaCon(clave);
+        if (yaRegistrada.isPresent()) {
+            return yaRegistrada.get();
+        }
 
         exigirPrograma(programaId, TipoDePrograma.VEHICULAR);
         exigirHallazgo(hallazgo);
@@ -138,10 +161,41 @@ public class RegistrarActaFiscalizacion {
                         fiscalizador,
                         hallazgo,
                         detalle,
-                        observacion));
+                        observacion),
+                clave);
     }
 
+    /**
+     * El acta registrada, y si ya lo estaba con esa clave (#347).
+     *
+     * @param acta el acta con las dos mitades de su contraste
+     * @param yaExistia {@code true} si la clave de idempotencia correspondia a un acta ya
+     *     registrada: el reintento no escribio nada, y la ruta contesta 200 y no 201
+     */
+    public record Registrada(ActaConLoDeclarado acta, boolean yaExistia) {}
+
     // ------------------------------------------------------------------
+
+    /** La clave sin blancos, o nula: una cabecera vacia es no haberla mandado. */
+    private static @Nullable String claveDe(@Nullable String claveDeIdempotencia) {
+        return claveDeIdempotencia == null || claveDeIdempotencia.isBlank()
+                ? null
+                : claveDeIdempotencia.strip();
+    }
+
+    /**
+     * El reintento del cliente, atendido ANTES de preguntar a catastro y antes de calcular la
+     * version (#347): con la misma clave, el acta es la de la primera vez. La garantia sigue siendo
+     * {@code acta_fisc_idempotencia_uq} (V42): entre esta lectura y el {@code INSERT} cabe otra
+     * peticion, y por eso el indice esta ademas de la lectura.
+     */
+    private Optional<Registrada> yaRegistradaCon(@Nullable String clave) {
+        if (clave == null) {
+            return Optional.empty();
+        }
+        return actas.porClaveDeIdempotencia(clave)
+                .map(anterior -> new Registrada(conLoDeclarado(anterior), true));
+    }
 
     /**
      * Un acta sin hallazgo no se registra, y esto es lo que hacía daño hoy (D-16, #481).
@@ -205,8 +259,8 @@ public class RegistrarActaFiscalizacion {
      * <p>Un acta vehicular no referencia ninguna versión de ficha, así que no hay nada que leer y
      * su contraste sale sin lado declarado. Es lo correcto: un vehículo no declara área ni uso.
      */
-    private ActaConLoDeclarado guardar(ActaFiscalizacion nueva) {
-        ActaFiscalizacion guardada = actas.insertar(nueva);
+    private Registrada guardar(ActaFiscalizacion nueva, @Nullable String clave) {
+        ActaFiscalizacion guardada = actas.insertar(nueva, clave);
 
         auditoria.registrar(
                 RegistroDeAuditoria.enLaFechaDe(
@@ -216,11 +270,16 @@ public class RegistrarActaFiscalizacion {
                                 guardada.observacion())
                         .con(null, descripcion(guardada)));
 
+        return new Registrada(conLoDeclarado(guardada), false);
+    }
+
+    /** El acta con lo que consta declarado en el ejercicio de su programa (#191, #344). */
+    private ActaConLoDeclarado conLoDeclarado(ActaFiscalizacion acta) {
         long actaId =
                 java.util.Objects.requireNonNull(
-                        guardada.id(), "Un acta recien insertada vuelve con su identificador");
+                        acta.id(), "Un acta guardada lleva su identificador");
         return ActaConLoDeclarado.de(
-                guardada, actas.loDeclaradoDeLasActas(java.util.Set.of(actaId)).get(actaId));
+                acta, actas.loDeclaradoDeLasActas(java.util.Set.of(actaId)).get(actaId));
     }
 
     private static String descripcion(ActaFiscalizacion acta) {

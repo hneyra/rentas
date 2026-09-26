@@ -13,10 +13,17 @@ public final class ActasEnMemoria implements ActaFiscalizacionRepository {
     private long siguiente = 1;
 
     @Override
-    public ActaFiscalizacion insertar(ActaFiscalizacion acta) {
+    public ActaFiscalizacion insertar(
+            ActaFiscalizacion acta, @org.jspecify.annotations.Nullable String claveDeIdempotencia) {
         ActaFiscalizacion guardada = conIdentificador(acta, siguiente++);
         guardadas.add(guardada);
         return guardada;
+    }
+
+    /** Las pruebas que siembran actas aqui no registran con clave: eso es #347, y va aparte. */
+    @Override
+    public java.util.Optional<ActaFiscalizacion> porClaveDeIdempotencia(String clave) {
+        return java.util.Optional.empty();
     }
 
     /**

@@ -18,6 +18,7 @@ import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.esquema.BaseDeDatosDePrueba;
 import kamayuk.rentas.esquema.ContextoDeTenant;
 import kamayuk.rentas.fiscalizacion.dominio.ActaFiscalizacion;
+import kamayuk.rentas.fiscalizacion.dominio.ActaFiscalizacionRepository;
 import kamayuk.rentas.fiscalizacion.dominio.EstadoDeActa;
 import kamayuk.rentas.fiscalizacion.dominio.Hallazgo;
 import kamayuk.rentas.plataforma.tenant.TenantTransactionManager;
@@ -297,6 +298,9 @@ class ActaFiscalizacionRepositoryJdbcTest {
                     .as(
                             "un acta vehicular deja predio_id en NULL: sin NULLS NOT DISTINCT la"
                                     + " unicidad no protegeria nada en el caso que ocurre siempre")
+                    // Desde #347 el repositorio lo traduce, y el indice sigue siendo el que choca.
+                    .isInstanceOf(ActaFiscalizacionRepository.VersionConcurrente.class)
+                    .cause()
                     .hasMessageContaining("acta_fisc_version_uq");
         }
     }

@@ -12,16 +12,18 @@ import kamayuk.rentas.contribuyentes.ResumenDeContribuyente;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.fiscalizacion.aplicacion.RegistrarActaFiscalizacion;
 import kamayuk.rentas.fiscalizacion.dominio.ActaConLoDeclarado;
+import kamayuk.rentas.fiscalizacion.dominio.ActaFiscalizacionRepository;
 import kamayuk.rentas.fiscalizacion.dominio.Hallazgo;
 import kamayuk.rentas.web.Api;
 import kamayuk.rentas.web.CodigoDeError;
 import kamayuk.rentas.web.ProblemaDeNegocio;
 import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -93,12 +95,13 @@ public class ActaPredialController {
     }
 
     @PostMapping
-    @ResponseStatus(HttpStatus.CREATED)
-    public ActaFiscalizacionResource registrar(@RequestBody PeticionDeActaPredial peticion) {
+    public ResponseEntity<ActaFiscalizacionResource> registrar(
+            @RequestBody PeticionDeActaPredial peticion,
+            @RequestHeader(name = "Idempotency-Key", required = false) @Nullable String clave) {
         Observacion observacion = observacionDe(peticion.observacion());
 
         try {
-            return conSuObligado(
+            RegistrarActaFiscalizacion.Registrada registrada =
                     actas.registrarPredial(
                             exigirId(peticion.programaId(), "programaId"),
                             exigirId(peticion.contribuyenteId(), "contribuyenteId"),
@@ -109,7 +112,16 @@ public class ActaPredialController {
                             areaDe(peticion.areaHallada()),
                             vacioAnulo(peticion.usoHallado()),
                             peticion.detalle(),
-                            observacion));
+                            clave,
+                            observacion);
+            // 200 y no 201 cuando la clave ya estaba (#347): el reintento no creo nada.
+            return ResponseEntity.status(
+                            registrada.yaExistia() ? HttpStatus.OK : HttpStatus.CREATED)
+                    .body(conSuObligado(registrada.acta()));
+        } catch (ActaFiscalizacionRepository.ClaveRepetida
+                | ActaFiscalizacionRepository.VersionConcurrente carrera) {
+            // #347: hasta aqui era el 500 de la clave unica, con su incidencia ERROR.
+            throw new ProblemaDeNegocio(CodigoDeError.CONFLICTO, mensajeDe(carrera));
         } catch (RegistrarActaFiscalizacion.ContribuyenteInexistente noEsta) {
             // #422: hasta aqui era el 500 de la clave foranea, con su incidencia ERROR.
             throw new ProblemaDeNegocio(CodigoDeError.NO_ENCONTRADO, mensajeDe(noEsta));
