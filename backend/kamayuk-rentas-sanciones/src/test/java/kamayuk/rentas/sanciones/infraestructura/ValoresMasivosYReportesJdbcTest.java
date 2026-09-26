@@ -3105,6 +3105,9 @@ class ValoresMasivosYReportesJdbcTest {
                 () ->
                         notificar.registrar(
                                 dictada.resolucion().numero(),
+                                java.util.EnumSet.allOf(
+                                        kamayuk.rentas.sanciones.dominio.TipoDeResolucionDeGerencia
+                                                .class),
                                 new NotificarResolucionDeGerencia.Peticion(
                                         DILIGENCIA,
                                         ModalidadDeNotificacion.PERSONAL,
