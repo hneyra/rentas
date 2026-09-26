@@ -405,6 +405,7 @@ public class ActoCoactivoController {
                 | RegistrarActoCoactivo.DeudaExtinguida
                 | RegistrarActoCoactivo.DeudaAcogidaAConvenio
                 | RegistrarActoCoactivo.Rec1SinDictar
+                | RegistrarActoCoactivo.ActoPrevioSinDictar
                 | RegistrarActoCoactivo.Rec1SinNotificar
                 | RegistrarActoCoactivo.PlazoDeLaRec1EnCurso
                 | ActoCoactivoRepository.Rec1Duplicada
