@@ -2958,6 +2958,44 @@ class SancionesJdbcTest {
                 .andReturn();
     }
 
+    @Nested
+    @DisplayName("#413 — el papel de la resolucion que deja la multa sin efecto")
+    class ElPapelDeLaQueExtingue {
+
+        @Test
+        @DisplayName("el documento guardado no dice «TOTAL EXIGIBLE» ni concede plazo de pago")
+        void elDocumentoGuardadoNoLaDeclaraExigible() {
+            Papeleta papeleta = papeletaDeTransito("413A");
+            descargar(papeleta, "EXP-413A", LocalDate.of(2026, 3, 10));
+
+            ResolverConResolucionDeGerencia.ResolucionDictada dictada =
+                    dictar(
+                            papeleta,
+                            TipoDeResolucionDeGerencia.ORDINARIA,
+                            LocalDate.of(2026, 4, 1),
+                            "EXP-413A",
+                            SentidoDelFallo.FUNDADO,
+                            EfectoSobreLaMulta.SE_DEJA_SIN_EFECTO);
+            String papel =
+                    enTransaccion(
+                            () ->
+                                    jdbc.sql(
+                                                    "SELECT datos::text FROM documento_emitido"
+                                                            + " WHERE numero = :numero")
+                                            .param("numero", dictada.resolucion().numero())
+                                            .query(String.class)
+                                            .single());
+
+            assertThat(papel)
+                    .as("lo que se sella y se reimprime diez años despues")
+                    .doesNotContain("TOTAL EXIGIBLE")
+                    .contains("TOTAL QUE SE DEJA SIN EFECTO")
+                    .contains("SALDO EXIGIBLE TRAS ESTA RESOLUCION")
+                    .doesNotContain("Plazo de pago");
+            assertThat(dictada.baja()).as("y en la misma transaccion, la baja").isNotNull();
+        }
+    }
+
     private static long contar(String consulta) {
         Long cuantas = enTransaccion(() -> jdbc.sql(consulta).query(Long.class).single());
         return cuantas == null ? 0 : cuantas;

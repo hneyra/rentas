@@ -208,8 +208,12 @@ public class ResolverConResolucionDeGerencia {
                     papeleta, valores, "la multa");
         }
 
+        // La que extingue lee la deuda a la fecha de la baja, que es la suya: proyectar a otro dia
+        // una deuda que se extingue hoy no significa nada (#413).
         LocalDate proyeccion =
                 peticion.proyectarDeudaAl() == null
+                                || (peticion.efecto() != null
+                                        && peticion.efecto().extingueLaDeuda())
                         ? peticion.fecha()
                         : peticion.proyectarDeudaAl();
         SeleccionDeObligacion obligacion = ObligacionDeLaPapeleta.de(papeleta);
