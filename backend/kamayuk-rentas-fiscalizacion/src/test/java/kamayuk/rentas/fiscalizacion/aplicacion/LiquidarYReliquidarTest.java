@@ -261,7 +261,7 @@ class LiquidarYReliquidarTest {
                                     + " «existe y no lo reclama nadie». Lee, no escribe")
                     .containsExactlyInAnyOrder("de", "deVarios", "estaEnElPadron");
             assertThat(metodosDe(kamayuk.rentas.catastro.LectorDeFichas.class))
-                    .containsExactlyInAnyOrder("fichaVigenteEn", "areaDeLaVersion");
+                    .containsExactlyInAnyOrder("fichaVigenteEn", "areaDeLaVersion", "inscripcionEn");
             assertThat(metodosDe(kamayuk.rentas.catastro.LectorDeCaracteristicas.class))
                     .containsExactly("de");
             assertThat(metodosDe(kamayuk.rentas.nucleo.DeclaracionesDelEjercicio.class))

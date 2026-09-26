@@ -127,7 +127,8 @@ public class ActaPredialController {
             // #422: hasta aqui era el 500 de la clave foranea, con su incidencia ERROR.
             throw new ProblemaDeNegocio(CodigoDeError.NO_ENCONTRADO, mensajeDe(noEsta));
         } catch (RegistrarActaFiscalizacion.ProgramaInexistente
-                | RegistrarActaFiscalizacion.ProgramaDeOtroTipo problema) {
+                | RegistrarActaFiscalizacion.ProgramaDeOtroTipo
+                | RegistrarActaFiscalizacion.PredioFueraDeLaMuestra problema) {
             throw new ProblemaDeNegocio(CodigoDeError.VALIDACION, mensajeDe(problema));
         } catch (IllegalArgumentException invalido) {
             throw new ProblemaDeNegocio(CodigoDeError.VALIDACION, mensajeDe(invalido));

@@ -17,6 +17,7 @@ import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.fiscalizacion.dominio.CondicionFiscalizada;
 import kamayuk.rentas.fiscalizacion.dominio.MuestraDelPrograma;
 import kamayuk.rentas.fiscalizacion.dominio.MuestraDelProgramaRepository;
+import kamayuk.rentas.fiscalizacion.dominio.PertenenciaALaMuestra;
 import kamayuk.rentas.fiscalizacion.dominio.ResultadoDelSorteo;
 import kamayuk.rentas.persistencia.OrdenSeguro;
 import kamayuk.rentas.persistencia.RepositorioJdbc;
@@ -32,7 +33,7 @@ import org.springframework.stereotype.Repository;
  */
 @Repository
 public class MuestraDelProgramaRepositoryJdbc extends RepositorioJdbc
-        implements MuestraDelProgramaRepository {
+        implements MuestraDelProgramaRepository, PertenenciaALaMuestra {
 
     private static final String COLUMNAS =
             "id, programa_id, predio_id, cod_ref_catastral, contribuyente_id, condicion,"
@@ -100,6 +101,21 @@ public class MuestraDelProgramaRepositoryJdbc extends RepositorioJdbc
                             .update();
         }
         return escritas;
+    }
+
+    /** Una fila de la muestra de ese programa con ese predio (#397). */
+    @Override
+    public boolean contiene(long programaId, long predioId) {
+        return Boolean.TRUE.equals(
+                jdbc().sql(
+                                "SELECT EXISTS (SELECT 1"
+                                        + DESDE
+                                        + " WHERE programa_id = :programaId"
+                                        + "   AND predio_id = :predioId)")
+                        .param("programaId", programaId)
+                        .param("predioId", predioId)
+                        .query(Boolean.class)
+                        .single());
     }
 
     /**

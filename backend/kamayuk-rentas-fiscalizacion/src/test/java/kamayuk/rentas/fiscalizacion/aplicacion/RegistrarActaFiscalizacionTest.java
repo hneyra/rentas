@@ -44,6 +44,10 @@ class RegistrarActaFiscalizacionTest {
 
     private ActasDeMentira actas;
     private RegistrarActaFiscalizacion servicio;
+
+    /** Los predios que el programa NO sorteo; todo lo demas esta en la muestra (#397). */
+    private final java.util.Set<Long> fueraDeLaMuestra = new java.util.HashSet<>();
+
     private List<RegistroDeAuditoria> auditados;
 
     @BeforeEach
@@ -109,9 +113,12 @@ class RegistrarActaFiscalizacionTest {
                         return Optional.of(kamayuk.rentas.dominio.AreaM2.de("120.00"));
                     }
                 };
+        kamayuk.rentas.fiscalizacion.dominio.PertenenciaALaMuestra muestra =
+                (programa, predio) -> !fueraDeLaMuestra.contains(predio);
         servicio =
                 new RegistrarActaFiscalizacion(
                         actas,
+                        muestra,
                         programas,
                         fichas,
                         new ContribuyentesDeMentira().con(1L, "00000001", "PEREZ, JUAN", "Jr. 1"),
@@ -139,6 +146,34 @@ class RegistrarActaFiscalizacionTest {
 
         assertThat(guardada.acta().fichaId()).isEqualTo(900L);
         assertThat(auditados).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("#397 — un predio que el programa no sorteo no se fiscaliza: 422 y ni una fila")
+    void unPredioFueraDeLaMuestraNoSeFiscaliza() {
+        // Desde V6 ninguna clave foranea ata el acta al predio: un `predioId` tecleado —que no
+        // existe, o que el programa no eligio— daba 201, y el embudo pasaba a tener mas actas que
+        // programados.
+        fueraDeLaMuestra.add(777L);
+
+        assertThatThrownBy(
+                        () ->
+                                servicio.registrarPredial(
+                                        PROGRAMA_PREDIAL,
+                                        1L,
+                                        777L,
+                                        VISITA,
+                                        "J. Perez",
+                                        Hallazgo.OMISO,
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        OBSERVACION))
+                .isInstanceOf(RegistrarActaFiscalizacion.PredioFueraDeLaMuestra.class)
+                .hasMessageContaining("777");
+        assertThat(actas.filas).isEmpty();
+        assertThat(auditados).isEmpty();
     }
 
     @Test

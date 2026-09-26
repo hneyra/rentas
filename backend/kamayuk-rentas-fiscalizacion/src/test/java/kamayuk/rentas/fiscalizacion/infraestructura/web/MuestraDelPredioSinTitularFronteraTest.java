@@ -166,6 +166,7 @@ class MuestraDelPredioSinTitularFronteraTest {
                 envolver(
                         new RegistrarActaFiscalizacion(
                                 actas,
+                                muestras,
                                 programas,
                                 new FichasDelEscenario(jdbc),
                                 new PadronDeLaPrueba(),
@@ -284,6 +285,34 @@ class MuestraDelPredioSinTitularFronteraTest {
     @DisplayName("el que se llevo otro programa abierto no esta, y por eso se contaba aparte")
     void elDeOtroProgramaNoEsta() throws Exception {
         assertThat(muestraDe(predioDeOtroPrograma)).contains("\"totalElementos\":0");
+    }
+
+    @Test
+    @Order(6)
+    @DisplayName("#397 — y contra un predio que ESTE programa no sorteo, no: 422 y ni una fila")
+    void elActaContraUnPredioNoSorteadoEs422() throws Exception {
+        // `predioDeOtroPrograma` existe y esta sorteado —por OTRO programa abierto—: la siembra que
+        // distingue «el predio existe» de «el programa lo eligio». Hasta #397 esto era 201, y el
+        // embudo de este programa contaba un acta mas que programados.
+        MvcResult resultado =
+                mvc.perform(
+                                post("/rentas/api/v1/fiscalizacion/predial/actas")
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(
+                                                "{\"observacion\":\"Visita de campo\","
+                                                        + "\"programaId\":"
+                                                        + programaId
+                                                        + ",\"contribuyenteId\":"
+                                                        + ocupanteHallado
+                                                        + ",\"predioId\":"
+                                                        + predioDeOtroPrograma
+                                                        + ",\"fechaVisita\":\"2026-03-20\","
+                                                        + "\"fiscalizador\":\"R. MENDOZA CRUZ\","
+                                                        + "\"hallazgo\":\"OMISO\"}"))
+                        .andReturn();
+
+        assertThat(resultado.getResponse().getStatus()).isEqualTo(422);
+        assertThat(resultado.getResponse().getContentAsString()).contains("no esta en la muestra");
     }
 
     @Test

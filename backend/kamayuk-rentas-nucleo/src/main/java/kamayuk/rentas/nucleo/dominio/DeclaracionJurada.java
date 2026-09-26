@@ -74,6 +74,16 @@ public record DeclaracionJurada(
         if (tipo == TipoDeDeclaracion.VEHICULAR && predioId != null) {
             throw new IllegalArgumentException("Una declaracion VEHICULAR no lleva predio");
         }
+        // Lo que el javadoc de cada tipo dice que lleva, exigido (#397): una PU o una PR sin
+        // predio, o una VEHICULAR sin vehiculo, se registraba y no conciliaba nada.
+        if ((tipo == TipoDeDeclaracion.PU || tipo == TipoDeDeclaracion.PR) && predioId == null) {
+            throw new IllegalArgumentException(
+                    "Una declaracion " + tipo + " declara un predio: falta el predio");
+        }
+        if (tipo == TipoDeDeclaracion.VEHICULAR && vehiculoId == null) {
+            throw new IllegalArgumentException(
+                    "Una declaracion VEHICULAR declara un vehiculo: falta el vehiculo");
+        }
         // La rectificatoria de una VEHICULAR tambien lleva vehiculo (#399): RECTIFICATORIA es un
         // formulario, no un objeto, y declara lo mismo que la DJ que sustituye —un predio o un
         // vehiculo—. Que sea la misma clase de objeto que la anterior lo exige rectificadaPor;

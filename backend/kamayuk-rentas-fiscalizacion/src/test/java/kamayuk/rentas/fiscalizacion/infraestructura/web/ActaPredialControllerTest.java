@@ -141,6 +141,8 @@ class ActaPredialControllerTest {
                             return java.util.Set.of();
                         }
                     },
+                    // Este doble no sortea: todo predio esta en la muestra (#397).
+                    (programa, predio) -> true,
                     new ProgramaFiscalizacionRepository() {
                         @Override
                         public ProgramaFiscalizacion insertar(ProgramaFiscalizacion programa) {

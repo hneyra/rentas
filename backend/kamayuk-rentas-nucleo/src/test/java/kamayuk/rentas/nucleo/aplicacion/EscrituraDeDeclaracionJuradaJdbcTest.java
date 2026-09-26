@@ -156,6 +156,10 @@ class EscrituraDeDeclaracionJuradaJdbcTest {
                                                 new ParametrosRepositoryJdbc(jdbc))),
                                 new FichasDeLaBase(),
                                 padron,
+                                envolver(
+                                        new kamayuk.rentas.nucleo.aplicacion.PadronVehicularRentas(
+                                                new kamayuk.rentas.nucleo.infraestructura
+                                                        .VehiculoRepositoryJdbc(jdbc))),
                                 new AuditoriaJdbc(jdbc, RELOJ)));
 
         mvc =

@@ -15,6 +15,7 @@ import kamayuk.rentas.fiscalizacion.dominio.ActaConLoDeclarado;
 import kamayuk.rentas.fiscalizacion.dominio.ActaFiscalizacion;
 import kamayuk.rentas.fiscalizacion.dominio.ActaFiscalizacionRepository;
 import kamayuk.rentas.fiscalizacion.dominio.Hallazgo;
+import kamayuk.rentas.fiscalizacion.dominio.PertenenciaALaMuestra;
 import kamayuk.rentas.fiscalizacion.dominio.ProgramaFiscalizacion;
 import kamayuk.rentas.fiscalizacion.dominio.ProgramaFiscalizacionRepository;
 import kamayuk.rentas.fiscalizacion.dominio.TipoDePrograma;
@@ -58,6 +59,7 @@ public class RegistrarActaFiscalizacion {
     private static final String TABLA_AUDITADA = "acta_fiscalizacion";
 
     private final ActaFiscalizacionRepository actas;
+    private final PertenenciaALaMuestra muestra;
     private final ProgramaFiscalizacionRepository programas;
     private final LectorDeFichas fichas;
     private final DirectorioDeContribuyentes contribuyentes;
@@ -66,12 +68,14 @@ public class RegistrarActaFiscalizacion {
 
     public RegistrarActaFiscalizacion(
             ActaFiscalizacionRepository actas,
+            PertenenciaALaMuestra muestra,
             ProgramaFiscalizacionRepository programas,
             LectorDeFichas fichas,
             DirectorioDeContribuyentes contribuyentes,
             PadronVehicular vehiculos,
             Auditoria auditoria) {
         this.actas = actas;
+        this.muestra = muestra;
         this.programas = programas;
         this.fichas = fichas;
         this.contribuyentes = contribuyentes;
@@ -106,6 +110,7 @@ public class RegistrarActaFiscalizacion {
         exigirPrograma(programaId, TipoDePrograma.PREDIAL);
         exigirHallazgo(hallazgo);
         exigirContribuyente(contribuyenteId);
+        exigirQueEsteEnLaMuestra(programaId, predioId);
         Long fichaId = fichas.fichaVigenteEn(predioId, fechaVisita).orElse(null);
 
         return guardar(
@@ -233,6 +238,21 @@ public class RegistrarActaFiscalizacion {
         }
     }
 
+    /**
+     * El predio esta en la muestra que el programa sorteo, o el acta no se escribe (#397).
+     *
+     * <p>Desde {@code V6} ninguna clave foranea ata el acta al predio (D-18), y hasta #397 un
+     * {@code predioId} tecleado —que no existe, o que el programa no sorteo— daba 201: el embudo
+     * pasaba a tener mas actas que programados, y al liquidar, sin DJ, salia OMISO en todos los
+     * ejercicios. Va despues del contribuyente para que el 404 de quien no esta en el padron (#422)
+     * siga siendo el que se contesta cuando las dos cosas fallan.
+     */
+    private void exigirQueEsteEnLaMuestra(long programaId, long predioId) {
+        if (!muestra.contiene(programaId, predioId)) {
+            throw new PredioFueraDeLaMuestra(programaId, predioId);
+        }
+    }
+
     /** El fiscalizado esta en el padron de esta municipalidad, o el acta no se escribe (#422). */
     private void exigirContribuyente(long contribuyenteId) {
         if (!contribuyentes.porIds(Set.of(contribuyenteId)).containsKey(contribuyenteId)) {
@@ -328,6 +348,25 @@ public class RegistrarActaFiscalizacion {
                     "No hay ningun vehiculo con identificador "
                             + id
                             + " en el padron vehicular de esta municipalidad");
+        }
+    }
+
+    /**
+     * El predio no esta en la muestra sorteada del programa (#397): o no existe, o el programa no
+     * lo eligio. Un programa sin muestra no admite actas prediales (ADR-0023).
+     */
+    public static final class PredioFueraDeLaMuestra extends RuntimeException {
+        @java.io.Serial private static final long serialVersionUID = 1L;
+
+        PredioFueraDeLaMuestra(long programaId, long predioId) {
+            super(
+                    "El predio "
+                            + predioId
+                            + " no esta en la muestra que sorteo el programa "
+                            + programaId
+                            + ": un acta se levanta sobre un predio sorteado, y no sobre uno"
+                            + " tecleado (ADR-0023). Si el programa todavia no sorteo su muestra,"
+                            + " hay que sortearla antes de visitar");
         }
     }
 

@@ -41,4 +41,17 @@ public interface LectorDeFichas {
      * <p>Vacio si esa version no existe o es de otra municipalidad.
      */
     Optional<kamayuk.rentas.dominio.AreaM2> areaDeLaVersion(long fichaId);
+
+    /**
+     * Si el predio esta en el padron a esa fecha, y con que ficha (#397).
+     *
+     * <p>Por omision se deriva de {@link #fichaVigenteEn}, que no distingue «no esta» de «no tiene
+     * ficha»: un doble que solo sabe de fichas contesta {@code SinFicha} y nunca rechaza. El
+     * adaptador de verdad la sobrescribe con la respuesta entera de {@code catastro}.
+     */
+    default InscripcionDelPredio inscripcionEn(long predioId, java.time.LocalDate fecha) {
+        return fichaVigenteEn(predioId, fecha)
+                .<InscripcionDelPredio>map(InscripcionDelPredio.ConFicha::new)
+                .orElseGet(InscripcionDelPredio.SinFicha::new);
+    }
 }

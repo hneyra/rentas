@@ -145,6 +145,8 @@ class RechazosDeLaBaseFronteraTest {
                 envolver(
                         new RegistrarActaFiscalizacion(
                                 new ActaFiscalizacionRepositoryJdbc(jdbc),
+                                new kamayuk.rentas.fiscalizacion.infraestructura
+                                        .MuestraDelProgramaRepositoryJdbc(jdbc),
                                 programas,
                                 new SinFichas(),
                                 padron,
