@@ -335,7 +335,7 @@ class LiquidacionYSusVersionesTest {
 
         @Test
         @DisplayName(
-                "un NOTIFICADA migrado sin numero se LEE sin reventar: el CHECK de V32 es NOT VALID")
+                "un NOTIFICADA migrado sin numero se LEE sin reventar: el CHECK de V34 es NOT VALID")
         void unaNotificacionMigradaSinNumeroSeLee() {
             MovimientoDeLiquidacion migrado =
                     new MovimientoDeLiquidacion(

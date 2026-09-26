@@ -37,7 +37,7 @@ import org.jspecify.annotations.Nullable;
  * {@code null} y la tabla no admite {@code UPDATE}. El número nace con el acto de notificar, así
  * que vive en el movimiento NOTIFICADA ({@link MovimientoDeLiquidacion#notificada}) y se lee de ahí
  * con {@link MovimientoDeLiquidacion#numeroDeNotificacionDe}. La columna {@code
- * liquidacion_fiscalizacion.numero_notificacion} se queda como vestigio documentado (V32).
+ * liquidacion_fiscalizacion.numero_notificacion} se queda como vestigio documentado (V34).
  *
  * <h2>Ni un importe</h2>
  *
