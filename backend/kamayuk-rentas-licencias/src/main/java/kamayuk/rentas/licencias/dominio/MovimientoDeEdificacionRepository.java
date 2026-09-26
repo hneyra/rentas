@@ -24,7 +24,11 @@ public interface MovimientoDeEdificacionRepository {
      */
     MovimientoDeEdificacion registrar(MovimientoDeEdificacion movimiento);
 
-    /** Concede un tramo de vigencia a la licencia. El orden lo calcula el repositorio. */
+    /**
+     * Concede un tramo de vigencia a la licencia. El orden lo calcula el repositorio, y quien llama
+     * tiene que haber tomado antes el candado de la licencia ({@link FueRepository#bloquear},
+     * #427): el orden y el dia en que empieza el tramo se apoyan en los tramos que ya tiene.
+     */
     VigenciaDeLaLicencia conceder(long licenciaId, long movimientoId, VigenciaDeLaLicencia tramo);
 
     /** Los movimientos de un expediente, ordenados por fecha. */

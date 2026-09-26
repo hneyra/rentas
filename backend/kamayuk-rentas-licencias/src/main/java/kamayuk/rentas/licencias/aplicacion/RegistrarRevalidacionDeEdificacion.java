@@ -87,7 +87,7 @@ public class RegistrarRevalidacionDeEdificacion {
     @Transactional(readOnly = true)
     public RevalidacionLista preparar(
             String expedienteDeRevalidacion, LocalDate fecha, LocalDate nuevaVigenciaHasta) {
-        return leerYComprobar(expedienteDeRevalidacion, fecha, nuevaVigenciaHasta);
+        return leerYComprobar(expedienteDeRevalidacion, fecha, nuevaVigenciaHasta, false);
     }
 
     /**
@@ -112,7 +112,7 @@ public class RegistrarRevalidacionDeEdificacion {
         Objects.requireNonNull(observacion, "Sin observacion no se guarda (regla 10, RNF-052)");
 
         RevalidacionLista lista =
-                leerYComprobar(expedienteDeRevalidacion, fecha, nuevaVigenciaHasta);
+                leerYComprobar(expedienteDeRevalidacion, fecha, nuevaVigenciaHasta, true);
         FueDeEdificacion revalidacion = lista.revalidacion();
         FueDeEdificacion original = lista.original();
         long originalId = original.identificador();
@@ -200,8 +200,18 @@ public class RegistrarRevalidacionDeEdificacion {
 
     // ------------------------------------------------------------------
 
+    /**
+     * Lee y comprueba la revalidacion.
+     *
+     * @param paraEscribir si la lectura es la de {@link #registrar}: entonces toma el candado de la
+     *     licencia original <b>antes</b> de leer sus tramos (#427). {@link #preparar} no lo toma:
+     *     no escribe, y lo que comprueba se vuelve a comprobar aqui con el candado puesto
+     */
     private RevalidacionLista leerYComprobar(
-            String expedienteDeRevalidacion, LocalDate fecha, LocalDate nuevaVigenciaHasta) {
+            String expedienteDeRevalidacion,
+            LocalDate fecha,
+            LocalDate nuevaVigenciaHasta,
+            boolean paraEscribir) {
 
         Objects.requireNonNull(fecha, "La fecha del acto entra como argumento (regla 6)");
         Objects.requireNonNull(nuevaVigenciaHasta, "La revalidacion dice hasta cuando prorroga");
@@ -227,6 +237,17 @@ public class RegistrarRevalidacionDeEdificacion {
                 Objects.requireNonNull(
                         revalidacion.licenciaOrigenId(),
                         "Una revalidacion siempre nombra su licencia original");
+        if (paraEscribir) {
+            // #427: el candado de la licencia ORIGINAL, antes de la primera lectura en que se
+            // apoya el tramo nuevo —su emision, sus tramos—, y no antes de `conceder`. Dos
+            // revalidaciones de la misma licencia por expedientes distintos se esperan una a otra,
+            // y la segunda decide con el tramo que la primera dejo: si ya no prorroga nada sale
+            // `ProrrogaQueNoProrroga`, y si prorroga empieza al dia siguiente. Sin el candado, con
+            // el contador de documentos serializando la emision, la segunda seguia con los tramos
+            // que habia leido ANTES y guardaba un tramo que empezaba el mismo dia que el de la
+            // primera: un 500 convertido en un estado imposible guardado en la base.
+            expedientes.bloquear(originalId);
+        }
         FueDeEdificacion original =
                 expedientes
                         .porId(originalId)

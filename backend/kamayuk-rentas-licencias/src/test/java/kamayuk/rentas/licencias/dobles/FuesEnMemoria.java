@@ -85,6 +85,13 @@ public final class FuesEnMemoria implements FueRepository {
         return Optional.ofNullable(expedientes.get(fueId));
     }
 
+    /**
+     * En memoria no hay concurrencia que ordenar: la carrera la mide {@code
+     * LicenciaDeEdificacionJdbcTest}.
+     */
+    @Override
+    public void bloquear(long fueId) {}
+
     @Override
     public Optional<FueDeEdificacion> porNumeroDeLicencia(String numeroDeLicencia) {
         String buscado = numeroDeLicencia == null ? "" : numeroDeLicencia.strip();

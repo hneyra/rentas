@@ -151,6 +151,11 @@ public class ActoCoactivoRepositoryJdbc extends RepositorioJdbc implements ActoC
                 .optional();
     }
 
+    @Override
+    public void bloquear(long actoId) {
+        bloquearElAgregado("acto_coactivo", actoId);
+    }
+
     private Optional<ActoCoactivo> porId(long id) {
         return jdbc().sql("SELECT " + COLUMNAS + " FROM acto_coactivo WHERE id = :id")
                 .param("id", id)

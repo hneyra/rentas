@@ -53,13 +53,16 @@ import org.springframework.stereotype.Repository;
  * UPDATE} de esta clase es el del contador de {@code edificacion_correlativo}, que es
  * infraestructura de numeracion y no un acto administrativo.
  *
- * <h2>La version de una seccion la calcula el SQL, no Java</h2>
+ * <h2>La version de una seccion la ordena el candado del expediente, no el SQL</h2>
  *
- * <p>{@code (SELECT coalesce(max(version), 0) + 1 ...)} dentro del propio {@code INSERT}.
- * Calcularla con un {@code SELECT} previo dejaria que dos peticiones simultaneas eligieran la misma
- * y las dos chocarian contra {@code edificacion_*_uq} con un error que no dice que paso; dentro del
- * {@code INSERT}, la segunda ve la fila de la primera o choca contra el indice, que es lo que ese
- * indice existe para hacer.
+ * <p>La version es un {@code (SELECT coalesce(max(version), 0) + 1 ...)}, dentro del propio {@code
+ * INSERT} o leido una vez antes de un lote. Hasta #427 este comentario decia que dentro del {@code
+ * INSERT} «la segunda ve la fila de la primera o choca contra el indice»; la primera mitad solo
+ * pasa si la primera ya confirmo, o sea cuando no son simultaneas. En {@code READ COMMITTED} la
+ * subconsulta no ve la fila sin confirmar de la otra transaccion: las dos eligen la misma version y
+ * la segunda choca en {@code edificacion_*_uq} con un 500. Lo que las ordena es {@link #bloquear},
+ * que quien completa una seccion toma antes de leer nada del expediente; el indice unico queda
+ * detras, para que un olvido del candado sea un error y no una version repetida.
  */
 @Repository
 public class FueRepositoryJdbc extends RepositorioJdbc implements FueRepository {
@@ -192,6 +195,11 @@ public class FueRepositoryJdbc extends RepositorioJdbc implements FueRepository 
                 .param("id", fueId)
                 .query(FueRepositoryJdbc::mapear)
                 .optional();
+    }
+
+    @Override
+    public void bloquear(long fueId) {
+        bloquearElAgregado("licencia_edificacion", fueId);
     }
 
     @Override
@@ -633,7 +641,10 @@ public class FueRepositoryJdbc extends RepositorioJdbc implements FueRepository 
 
     // ------------------------------------------------------------------
 
-    /** La version siguiente, como subconsulta dentro del propio {@code INSERT}. */
+    /**
+     * La version siguiente, como subconsulta dentro del propio {@code INSERT}. No serializa nada:
+     * lo hace el candado del expediente, tomado antes (#427).
+     */
     private static String siguienteVersion(String tabla) {
         return "(SELECT coalesce(max(version), 0) + 1 FROM "
                 + tabla
@@ -648,8 +659,9 @@ public class FueRepositoryJdbc extends RepositorioJdbc implements FueRepository 
      * <p>Las tres secciones de lista —valorizacion, profesionales y documentos— entran enteras, y
      * todas sus filas tienen que llevar la <b>misma</b> version; con la subconsulta dentro de cada
      * {@code INSERT}, la segunda fila veria la primera y se llevaria una version distinta. Se lee
-     * una vez dentro de la misma transaccion, y quien intente dos lotes simultaneos choca contra
-     * {@code edificacion_*_uq}.
+     * una vez dentro de la misma transaccion, con el candado del expediente ya tomado (#427): sin
+     * el, dos lotes simultaneos leerian la misma y el segundo chocaria contra {@code
+     * edificacion_*_uq}.
      */
     private int siguienteVersionDe(String tabla, long fueId) {
         Integer ultima =

@@ -43,6 +43,18 @@ public interface ActoCoactivoRepository {
     /** Un acto por el numero de su documento, tal como sale impreso. */
     Optional<ActoCoactivo> porNumero(String numero);
 
+    /**
+     * Toma el candado del acto hasta el fin de la transaccion (#427).
+     *
+     * <p>Se toma <b>antes</b> de leer lo que decide el numero de la diligencia siguiente: dos
+     * diligencias simultaneas sobre el mismo acto leian el mismo {@code max(intento)} y la segunda
+     * chocaba en {@code notificacion_intento_uq}. Con el candado, la segunda espera a que la
+     * primera confirme y lee su intento. No es un {@code FOR UPDATE}: V34 le retiro a {@code
+     * kamayuk_app} el {@code UPDATE} sobre {@code acto_coactivo}, y PostgreSQL lo exige para
+     * bloquear una fila.
+     */
+    void bloquear(long actoId);
+
     /** Ese expediente ya tenia su REC-1. */
     final class Rec1Duplicada extends RuntimeException {
 

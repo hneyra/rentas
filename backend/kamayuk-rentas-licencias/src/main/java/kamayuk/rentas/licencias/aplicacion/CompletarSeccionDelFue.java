@@ -243,6 +243,11 @@ public class CompletarSeccionDelFue {
                 expedientes
                         .porExpediente(expediente == null ? "" : expediente.strip())
                         .orElseThrow(() -> new ExpedienteInexistente(expediente));
+        // #427: el candado del expediente, ANTES de la primera lectura en que se apoya la
+        // decision —si ya esta emitido, que version toca—. La version siguiente es un `max() + 1`,
+        // y en READ COMMITTED no ve la fila sin confirmar de otra transaccion: dos operadores
+        // completando a la vez la misma seccion elegian la misma y el segundo salia con 500.
+        expedientes.bloquear(fue.identificador());
         if (movimientos.emisionDe(fue.identificador()).isPresent()) {
             throw new ExpedienteYaEmitido(fue.expediente(), seccion);
         }

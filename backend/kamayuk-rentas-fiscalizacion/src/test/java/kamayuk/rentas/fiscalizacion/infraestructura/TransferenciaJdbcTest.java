@@ -481,11 +481,12 @@ class TransferenciaJdbcTest {
         @DisplayName("el indice unico es el que lo impide, y se mide sin nada que lo disimule")
         void elIndiceUnicoEsElQueLoImpide() throws Exception {
             // ESTA es la prueba que mide `resolucion_determinacion_liquidacion_uq`, y hace falta
-            // aparte. En la de arriba, `DocumentoRepository.siguienteCorrelativo` es un
-            // `count(*) + 1`: los diez hilos calculan el MISMO numero de documento y
-            // `documento_numero_uq` rechaza a nueve antes de que ninguno llegue al indice que se
-            // quiere medir. Con esa serializacion de por medio, degradar el indice a normal
-            // dejaria la prueba de arriba en verde. Es el mismo hueco exacto que #44 destapo con
+            // aparte. En la de arriba, `DocumentoRepository.siguienteCorrelativo` serializa a los
+            // diez hilos antes de que ninguno llegue al indice que se quiere medir: hasta #427 era
+            // un `count(*) + 1` y `documento_numero_uq` rechazaba a nueve; desde #427 la fila de
+            // `documento_correlativo` los pone en fila hasta el COMMIT. Con esa serializacion de
+            // por medio, degradar el indice a normal dejaria la prueba de arriba en verde. Es el
+            // mismo hueco exacto que #44 destapo con
             // `licencia_duplicado_uq`.
             //
             // Aqui los diez hilos insertan filas que difieren en TODO —numero, documento— salvo

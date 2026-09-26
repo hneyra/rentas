@@ -123,6 +123,11 @@ public class NotificarActoCoactivo {
         ActoCoactivo acto =
                 actos.porNumero(numeroDelActo.strip().toUpperCase(Locale.ROOT))
                         .orElseThrow(() -> new ActoInexistente(numeroDelActo));
+        // #427: el candado del acto, ANTES de leer nada en que se apoye la diligencia —su intento,
+        // la direccion vigente, el estado del expediente—. Sin el, dos diligencias simultaneas
+        // leian el mismo `max(intento)` y la segunda chocaba en `notificacion_intento_uq` con un
+        // 500; con el, la segunda espera a que la primera confirme y se numera despues.
+        actos.bloquear(acto.identificador());
         if (fechaDeLaDiligencia.isBefore(acto.fecha())) {
             throw new DiligenciaAnteriorAlActo(acto, fechaDeLaDiligencia);
         }

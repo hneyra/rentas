@@ -1443,6 +1443,269 @@ class LicenciaDeEdificacionJdbcTest {
 
     // ==================================================================
 
+    /**
+     * #427 — Los numeros por entidad (el {@code orden} de un tramo, la {@code version} de una
+     * seccion) se calculan con el candado del expediente tomado <b>antes</b> de la primera lectura
+     * en que se apoya la decision.
+     *
+     * <p>Hasta #427 los dos se calculaban con un {@code max() + 1} sin candado —dentro del {@code
+     * INSERT} o justo antes—, y en {@code READ COMMITTED} la subconsulta no ve la fila sin
+     * confirmar de la otra transaccion: las dos elegian el mismo numero y la segunda chocaba en el
+     * indice unico con una {@code DuplicateKeyException}, un 500 con incidencia en el borde.
+     */
+    @Nested
+    @DisplayName("#427 — Los numeros por expediente, con el candado del expediente")
+    class ElCandadoDelExpediente {
+
+        /**
+         * Dos revalidaciones simultaneas de la misma licencia, con hastas <b>distintos</b>.
+         *
+         * <p>Con el mismo hasta en los dos hilos la prueba no distinguiria nada: la segunda saldria
+         * {@code ProrrogaQueNoProrroga} por cualquiera de los dos caminos. Con 2027-06-30 y
+         * 2027-03-31, si gana la larga la corta tiene que salir {@code ProrrogaQueNoProrroga}, y si
+         * gana la corta la larga entra como tercer tramo, desde el dia siguiente al de la corta. Lo
+         * que no puede pasar nunca es lo que pasaba con el contador de documentos puesto y sin el
+         * candado de la licencia: la segunda esperaba en el contador, seguia con los tramos que
+         * habia leido ANTES, y guardaba un segundo tramo que empezaba el mismo dia que el primero.
+         *
+         * <p>Tres rondas, cada una con su licencia: una sola carrera puede caer del lado inocente
+         * por casualidad.
+         */
+        @Test
+        @DisplayName(
+                "dos revalidaciones simultaneas de la misma licencia no dejan dos tramos que empiecen"
+                        + " el mismo dia")
+        @SuppressWarnings("checkstyle:IllegalCatch")
+        void dosRevalidacionesSimultaneas() throws Exception {
+            LocalDate larga = LocalDate.of(2027, 6, 30);
+            LocalDate corta = LocalDate.of(2027, 3, 31);
+            LocalDate finDelPrimerTramo = LocalDate.of(2026, 12, 31);
+
+            for (int ronda = 0; ronda < 3; ronda++) {
+                String original = expedienteCompleto(HOY);
+                EmitirLicenciaDeEdificacion.LicenciaEmitida primera =
+                        emitirLicencia(original, HOY, finDelPrimerTramo);
+                long originalId = identificadorDe(original);
+
+                List<LocalDate> hastas = List.of(larga, corta);
+                List<String> tramites = new ArrayList<>();
+                List<String> recibos = new ArrayList<>();
+                for (int i = 0; i < hastas.size(); i++) {
+                    tramites.add(
+                            presentarFue(
+                                    TipoDeTramiteDeEdificacion.REVALIDACION_DE_LICENCIA,
+                                    primera.numeroDeLicencia(),
+                                    HOY));
+                    recibos.add(cobrar(DERECHO_REVALIDACION));
+                }
+
+                java.util.Map<LocalDate, String> desenlace =
+                        new java.util.concurrent.ConcurrentHashMap<>();
+                AtomicInteger siguiente = new AtomicInteger();
+                aLaVez(
+                        hastas.size(),
+                        () -> {
+                            int i = siguiente.getAndIncrement();
+                            try {
+                                enContexto(
+                                        () ->
+                                                revalidar.revalidar(
+                                                        tramites.get(i),
+                                                        HOY,
+                                                        hastas.get(i),
+                                                        recibos.get(i),
+                                                        FormatoDeDocumento.PDF,
+                                                        PORQUE));
+                                desenlace.put(hastas.get(i), "CONCEDIDA");
+                                return true;
+                            } catch (RuntimeException rechazada) {
+                                desenlace.put(hastas.get(i), rechazada.getClass().getSimpleName());
+                                return false;
+                            }
+                        });
+
+                List<VigenciaDeLaLicencia> tramos =
+                        enContexto(
+                                () ->
+                                        transaccion.execute(
+                                                e -> movimientos.vigenciasDe(originalId)));
+
+                assertThat(desenlace.values())
+                        .as(
+                                "ronda %d: cada revalidacion se concede o se rechaza por no"
+                                        + " prorrogar; un choque del motor es un 500 (%s)",
+                                ronda, desenlace)
+                        .allMatch(d -> d.equals("CONCEDIDA") || d.equals("ProrrogaQueNoProrroga"));
+                assertThat(tramos)
+                        .extracting(VigenciaDeLaLicencia::desde)
+                        .as(
+                                "ronda %d: dos tramos que empiezan el mismo dia son un estado"
+                                        + " imposible guardado en la base (%s)",
+                                ronda, desenlace)
+                        .doesNotHaveDuplicates();
+                for (int t = 1; t < tramos.size(); t++) {
+                    assertThat(tramos.get(t).desde())
+                            .as(
+                                    "ronda %d: el tramo %d empieza despues de que acaba el anterior",
+                                    ronda, t + 1)
+                            .isEqualTo(tramos.get(t - 1).hasta().plusDays(1));
+                }
+                assertThat(tramos)
+                        .as(
+                                "ronda %d: un tramo por cada revalidacion concedida, mas el original",
+                                ronda)
+                        .hasSize(
+                                1
+                                        + (int)
+                                                desenlace.values().stream()
+                                                        .filter("CONCEDIDA"::equals)
+                                                        .count());
+                if ("CONCEDIDA".equals(desenlace.get(larga))
+                        && tramos.get(1).hasta().equals(larga)) {
+                    assertThat(desenlace.get(corta))
+                            .as("ronda %d: si gano la larga, la corta ya no prorroga nada", ronda)
+                            .isEqualTo("ProrrogaQueNoProrroga");
+                }
+            }
+        }
+
+        /**
+         * Ocho versiones simultaneas de los datos urbanos del mismo expediente: la version se
+         * calculaba dentro del {@code INSERT}, y eso no ganaba nada frente a calcularla en Java.
+         */
+        @Test
+        @DisplayName("ocho versiones simultaneas del terreno entran las ocho, versiones 1 a 8")
+        @SuppressWarnings("checkstyle:IllegalCatch")
+        void ochoVersionesDelTerreno() throws Exception {
+            String expediente =
+                    presentarFue(TipoDeTramiteDeEdificacion.LICENCIA_DE_OBRA, null, HOY);
+            long id = identificadorDe(expediente);
+            List<String> rechazos = java.util.Collections.synchronizedList(new ArrayList<>());
+            AtomicInteger siguiente = new AtomicInteger();
+
+            int exitos =
+                    aLaVez(
+                            8,
+                            () -> {
+                                String lote = String.valueOf(siguiente.incrementAndGet());
+                                try {
+                                    enContexto(
+                                            () ->
+                                                    completar.completarTerreno(
+                                                            expediente,
+                                                            terreno("A", lote),
+                                                            PORQUE));
+                                    return true;
+                                } catch (RuntimeException rechazada) {
+                                    rechazos.add(rechazada.getClass().getSimpleName());
+                                    return false;
+                                }
+                            });
+
+            assertThat(exitos)
+                    .as(
+                            "dos operadores completando la misma seccion es ventanilla normal"
+                                    + " (rechazos: %s)",
+                            rechazos)
+                    .isEqualTo(8);
+            assertThat(versionesDe("edificacion_terreno", id))
+                    .as("consecutivas, sin huecos y sin repetir")
+                    .containsExactly(1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L);
+        }
+
+        /**
+         * Lo mismo con una seccion de lista, cuya version se lee una vez antes del lote: la ventana
+         * era todavia mas ancha.
+         */
+        @Test
+        @DisplayName("ocho valorizaciones simultaneas entran las ocho, cada una con su version")
+        @SuppressWarnings("checkstyle:IllegalCatch")
+        void ochoVersionesDeLaValorizacion() throws Exception {
+            String expediente =
+                    presentarFue(TipoDeTramiteDeEdificacion.LICENCIA_DE_OBRA, null, HOY);
+            long id = identificadorDe(expediente);
+            List<String> rechazos = java.util.Collections.synchronizedList(new ArrayList<>());
+
+            int exitos =
+                    aLaVez(
+                            8,
+                            () -> {
+                                try {
+                                    enContexto(
+                                            () ->
+                                                    completar.completarValorizacion(
+                                                            expediente,
+                                                            List.of(
+                                                                    new CompletarSeccionDelFue
+                                                                            .Estructura(
+                                                                            1,
+                                                                            PartidaDeEdificacion
+                                                                                    .MUROS,
+                                                                            'A',
+                                                                            new AreaM2(
+                                                                                    new BigDecimal(
+                                                                                            "40.00"))),
+                                                                    new CompletarSeccionDelFue
+                                                                            .Estructura(
+                                                                            1,
+                                                                            PartidaDeEdificacion
+                                                                                    .TECHOS,
+                                                                            'B',
+                                                                            new AreaM2(
+                                                                                    new BigDecimal(
+                                                                                            "40.00")))),
+                                                            PORQUE));
+                                    return true;
+                                } catch (RuntimeException rechazada) {
+                                    rechazos.add(rechazada.getClass().getSimpleName());
+                                    return false;
+                                }
+                            });
+
+            assertThat(exitos).as("rechazos: %s", rechazos).isEqualTo(8);
+            assertThat(versionesDe("edificacion_estructura", id))
+                    .as("ocho versiones, y cada una con sus dos lineas enteras")
+                    .containsExactly(
+                            1L, 1L, 2L, 2L, 3L, 3L, 4L, 4L, 5L, 5L, 6L, 6L, 7L, 7L, 8L, 8L);
+        }
+
+        /**
+         * Por que el candado no es un {@code SELECT … FOR UPDATE}: V43 le retiro a {@code
+         * kamayuk_app} el {@code UPDATE} sobre la cabecera, y PostgreSQL exige ese privilegio para
+         * bloquear una fila. Devolverselo solo para poder bloquear dejaria la inmutabilidad del
+         * expediente en manos del escaner de fuentes, como ya pasa con {@code cierre_caja}.
+         */
+        @Test
+        @DisplayName("el candado no puede ser un FOR UPDATE: kamayuk_app no tiene UPDATE")
+        void noEsUnForUpdate() {
+            String expediente =
+                    presentarFue(TipoDeTramiteDeEdificacion.LICENCIA_DE_OBRA, null, HOY);
+            long id = identificadorDe(expediente);
+
+            assertThatThrownBy(
+                            () ->
+                                    ejecutar(
+                                            "SELECT id FROM licencia_edificacion WHERE id = "
+                                                    + id
+                                                    + " FOR UPDATE"))
+                    .hasStackTraceContaining("permission denied");
+        }
+    }
+
+    private static List<Long> versionesDe(String tabla, long fueId) {
+        return transaccion.execute(
+                estado ->
+                        jdbc.sql(
+                                        "SELECT version FROM "
+                                                + tabla
+                                                + " WHERE fue_id = :fue ORDER BY version")
+                                .param("fue", fueId)
+                                .query(Long.class)
+                                .list());
+    }
+
+    // ==================================================================
+
     @Nested
     @DisplayName("Consulta y aislamiento")
     class ConsultaYAislamiento {

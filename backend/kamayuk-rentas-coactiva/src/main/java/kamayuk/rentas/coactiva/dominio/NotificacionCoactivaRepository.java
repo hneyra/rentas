@@ -35,6 +35,12 @@ public interface NotificacionCoactivaRepository {
      */
     Optional<NotificacionCoactiva> queSurtioEfecto(long actoId);
 
-    /** Cuantas diligencias lleva el acto; el siguiente intento es esto mas uno. */
+    /**
+     * Cuantas diligencias lleva el acto; el siguiente intento es esto mas uno.
+     *
+     * <p>Es un {@code max(intento)} sin candado: quien numera con el tiene que haber tomado antes
+     * el del acto ({@link ActoCoactivoRepository#bloquear}, #427). Sin el, dos diligencias
+     * simultaneas leen el mismo y la segunda choca en {@code notificacion_intento_uq}.
+     */
     int intentosDe(long actoId);
 }

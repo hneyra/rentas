@@ -145,17 +145,46 @@ public class DocumentoRepositoryJdbc extends RepositorioJdbc implements Document
                 documento.observacion());
     }
 
+    /**
+     * El siguiente correlativo, repartido por la fila de {@code documento_correlativo} (#427, V39).
+     *
+     * <p>Hasta #427 era un {@code count(*) + 1} sobre {@code documento_emitido}, sin candado: dos
+     * emisiones simultaneas leian la misma cuenta, dibujaban las dos el papel y la segunda chocaba
+     * en {@code documento_numero_uq} con un 500. Ahora es el {@code UPSERT} de los otros diez
+     * contadores —el de {@code DeclaracionJuradaRepositoryJdbc}—: una sola sentencia que bloquea la
+     * fila hasta el {@code COMMIT}, asi que la segunda emision espera a la primera y sale con el
+     * numero siguiente.
+     *
+     * <p>La fila no se siembra en la migracion —{@code documento_emitido} tiene RLS con {@code
+     * FORCE} y el migrador corre sin contexto de tenant—, asi que la <b>primera</b> emision de cada
+     * tipo y ejercicio la crea arrancando por encima del <b>mayor sufijo numerico</b> ya emitido de
+     * ese tipo y ese ejercicio, y de esta municipalidad y de ninguna otra: la subconsulta la filtra
+     * la politica RLS. Si dos primeras llegan a la vez, una inserta y la otra choca e incrementa lo
+     * insertado. El {@code substring} lee la ultima corrida de digitos del numero y se limita a
+     * quince para no desbordar {@code bigint}, como en la declaracion jurada.
+     */
     @Override
     public long siguienteCorrelativo(String tipo, Ejercicio ejercicio) {
-        Long cuantos =
+        Long ultimo =
                 jdbc().sql(
-                                "SELECT count(*) FROM documento_emitido"
-                                        + " WHERE tipo = :tipo AND ejercicio = :ejercicio")
+                                "INSERT INTO documento_correlativo"
+                                        + " (municipalidad_id, tipo, ejercicio, ultimo)"
+                                        + " VALUES ("
+                                        + MUNICIPALIDAD_ACTUAL
+                                        + ", :tipo, :ejercicio,"
+                                        + "   (SELECT coalesce(max(coalesce(nullif(substring("
+                                        + "        d.numero from '([0-9]{1,15})$'), '')::bigint,"
+                                        + "        0)), 0) + 1"
+                                        + "      FROM documento_emitido d"
+                                        + "     WHERE d.tipo = :tipo AND d.ejercicio = :ejercicio))"
+                                        + " ON CONFLICT (municipalidad_id, tipo, ejercicio)"
+                                        + " DO UPDATE SET ultimo = documento_correlativo.ultimo + 1"
+                                        + " RETURNING ultimo")
                         .param("tipo", tipo)
                         .param("ejercicio", ejercicio.valor())
                         .query(Long.class)
                         .single();
-        return cuantos + 1;
+        return Objects.requireNonNull(ultimo);
     }
 
     private DocumentoEmitido mapear(ResultSet fila, int numeroDeFila) throws SQLException {

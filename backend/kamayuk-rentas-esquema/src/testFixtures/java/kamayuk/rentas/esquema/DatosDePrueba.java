@@ -744,6 +744,14 @@ public final class DatosDePrueba {
                         + " VALUES (?, ?, 1)",
                 muni,
                 EJERCICIO);
+        // Y el de los documentos emitidos (#427, V39), por lo mismo: en operacion lo crea la
+        // primera emision de cada tipo y ejercicio.
+        ejecutar(
+                app,
+                "INSERT INTO documento_correlativo (municipalidad_id, tipo, ejercicio, ultimo)"
+                        + " VALUES (?, 'DJ', ?, 1)",
+                muni,
+                EJERCICIO);
         ejecutar(
                 app,
                 "INSERT INTO beneficio (municipalidad_id, contribuyente_id, predio_id, tipo,"
