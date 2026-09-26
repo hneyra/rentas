@@ -160,6 +160,20 @@ public class RevalidarLicenciaDeEdificacion {
         }
     }
 
+    /** El expediente de revalidacion ya tuvo su acto (#449). */
+    public static final class YaEstabaRevalidada extends RuntimeException {
+
+        @java.io.Serial private static final long serialVersionUID = 1L;
+
+        YaEstabaRevalidada(String expediente) {
+            super(
+                    "El expediente "
+                            + expediente
+                            + " ya tiene su revalidacion resuelta: un tramite es un acto, y una"
+                            + " segunda prorroga la pide otro expediente");
+        }
+    }
+
     /** La licencia que se pretende revalidar nunca se otorgo. */
     public static final class OriginalSinLicencia extends RuntimeException {
 

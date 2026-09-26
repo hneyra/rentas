@@ -407,6 +407,11 @@ public class EdificacionController {
                             observacion);
         } catch (EmitirLicenciaDeEdificacion.ExpedienteInexistente noEsta) {
             throw new ProblemaDeNegocio(CodigoDeError.NO_ENCONTRADO, mensajeDe(noEsta));
+        } catch (RevalidarLicenciaDeEdificacion.YaEstabaRevalidada
+                | MovimientoDeEdificacionRepository.YaEstabaRevalidada yaEsta) {
+            // 409 como `YaEstabaEmitida` (#449): la peticion esta bien formada; lo que no la
+            // admite es que el expediente ya tuvo su acto.
+            throw new ProblemaDeNegocio(CodigoDeError.CONFLICTO, mensajeDe(yaEsta));
         } catch (RevalidarLicenciaDeEdificacion.NoEsUnaRevalidacion
                 | RevalidarLicenciaDeEdificacion.OriginalSinLicencia
                 | RevalidarLicenciaDeEdificacion.ProrrogaQueNoProrroga

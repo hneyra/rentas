@@ -92,6 +92,12 @@ public class MovimientoDeEdificacionRepositoryJdbc extends RepositorioJdbc
                                 + " dos numeros a la misma obra",
                         yaEstaba);
             }
+            if (choqueDe(yaEstaba, "edificacion_movimiento_revalidacion_uq")) {
+                throw new YaEstabaRevalidada(
+                        "El expediente ya tiene su revalidacion resuelta: un tramite es un acto, y"
+                                + " un segundo tramo lo concederia otro expediente",
+                        yaEstaba);
+            }
             if (choqueDe(yaEstaba, "edificacion_numero_licencia_uq")) {
                 throw new NumeroDeLicenciaDuplicado(
                         "Ese numero de licencia de edificacion ya existe en esta municipalidad: dos"
@@ -217,6 +223,18 @@ public class MovimientoDeEdificacionRepositoryJdbc extends RepositorioJdbc
                                 + COLUMNAS
                                 + " FROM edificacion_movimiento"
                                 + " WHERE fue_id = :fue AND tipo = 'EMISION'")
+                .param("fue", fueId)
+                .query(MovimientoDeEdificacionRepositoryJdbc::mapear)
+                .optional();
+    }
+
+    @Override
+    public Optional<MovimientoDeEdificacion> revalidacionDe(long fueId) {
+        return jdbc().sql(
+                        "SELECT "
+                                + COLUMNAS
+                                + " FROM edificacion_movimiento"
+                                + " WHERE fue_id = :fue AND tipo = 'REVALIDACION'")
                 .param("fue", fueId)
                 .query(MovimientoDeEdificacionRepositoryJdbc::mapear)
                 .optional();

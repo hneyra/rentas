@@ -67,6 +67,7 @@ import kamayuk.rentas.licencias.dominio.EstadoDelFue;
 import kamayuk.rentas.licencias.dominio.FueDeEdificacion;
 import kamayuk.rentas.licencias.dominio.ModalidadDeAprobacion;
 import kamayuk.rentas.licencias.dominio.MovimientoDeEdificacion;
+import kamayuk.rentas.licencias.dominio.MovimientoDeEdificacionRepository;
 import kamayuk.rentas.licencias.dominio.PartidaDeEdificacion;
 import kamayuk.rentas.licencias.dominio.PlantillaDeNumeroDeEdificacion;
 import kamayuk.rentas.licencias.dominio.RepresentanteLegal;
@@ -1057,6 +1058,62 @@ class LicenciaDeEdificacionJdbcTest {
                                     StandardCharsets.ISO_8859_1))
                     .contains(finDelPrimerTramo.toString())
                     .contains(finDelPrimerTramo.plusMonths(12).toString());
+        }
+
+        /**
+         * #449 — Un expediente de revalidacion produce UN acto, no uno por cada vez que se pida.
+         *
+         * <p>Hasta #449 las tres comprobaciones pasaban la segunda vez —el tramite es de
+         * revalidacion, la original tiene su emision y el tramo nuevo pasa del anterior— y el mismo
+         * expediente dejaba otra resolucion y otro tramo, en tablas que solo admiten {@code
+         * INSERT}. La siembra que distingue es repetir el MISMO expediente con otro recibo y un
+         * plazo mayor: cualquier otra cosa ya la rechazaba una comprobacion de las de antes.
+         */
+        @Test
+        @DisplayName(
+                "#449 — el mismo expediente no revalida dos veces: 409 y la vigencia sigue en 2")
+        void unExpedienteRevalidaUnaVez() {
+            String original = expedienteCompleto(HOY);
+            EmitirLicenciaDeEdificacion.LicenciaEmitida primera = emitirLicencia(original, HOY);
+            long originalId = identificadorDe(original);
+            String tramite =
+                    presentarFue(
+                            TipoDeTramiteDeEdificacion.REVALIDACION_DE_LICENCIA,
+                            primera.numeroDeLicencia(),
+                            HOY);
+            LocalDate fin = primera.vigencia().hasta();
+            String primerRecibo = cobrar(DERECHO_REVALIDACION);
+            enContexto(
+                    () ->
+                            revalidar.revalidar(
+                                    tramite,
+                                    HOY,
+                                    fin.plusYears(1),
+                                    primerRecibo,
+                                    FormatoDeDocumento.PDF,
+                                    PORQUE));
+            String segundoRecibo = cobrar(DERECHO_REVALIDACION);
+
+            assertThatThrownBy(
+                            () ->
+                                    enContexto(
+                                            () ->
+                                                    revalidar.revalidar(
+                                                            tramite,
+                                                            HOY,
+                                                            fin.plusYears(2),
+                                                            segundoRecibo,
+                                                            FormatoDeDocumento.PDF,
+                                                            PORQUE)))
+                    .as("un tramite, una resolucion")
+                    .isInstanceOfAny(
+                            RevalidarLicenciaDeEdificacion.YaEstabaRevalidada.class,
+                            MovimientoDeEdificacionRepository.YaEstabaRevalidada.class);
+            List<VigenciaDeLaLicencia> tramos =
+                    enContexto(() -> transaccion.execute(e -> movimientos.vigenciasDe(originalId)));
+            assertThat(tramos)
+                    .as("la obra no queda autorizada mas alla de lo que el expediente pidio")
+                    .hasSize(2);
         }
 
         @Test
@@ -2088,32 +2145,18 @@ class LicenciaDeEdificacionJdbcTest {
             EmitirLicenciaDeEdificacion.LicenciaEmitida original =
                     emitirLicencia(
                             revalidada, LocalDate.of(2026, 1, 15), LocalDate.of(2026, 2, 15));
-            String tramite =
-                    enContexto(
-                            () -> {
-                                String numero = "EXP-425-R" + CONTADOR.incrementAndGet();
-                                presentar.presentar(
-                                        solicitud(
-                                                numero,
-                                                TipoDeTramiteDeEdificacion.REVALIDACION_DE_LICENCIA,
-                                                original.numeroDeLicencia(),
-                                                presentado,
-                                                "C-" + titular),
-                                        PORQUE);
-                                return numero;
-                            });
-            String recibo = cobrar(DERECHO_REVALIDACION);
-            enContexto(
-                    () ->
-                            revalidar.revalidar(
-                                    tramite,
-                                    HOY.plusDays(2),
-                                    HOY.plusYears(3),
-                                    recibo,
-                                    FormatoDeDocumento.PDF,
-                                    PORQUE));
+            // Y el expediente de esa revalidacion, resuelto despues del corte: EN_TRAMITE.
+            String tramite = revalidarEl(original, presentado, HOY.plusDays(2));
             SEMBRADOS.add(revalidada);
             SEMBRADOS.add(tramite);
+            // RESUELTO (#449): una revalidacion resuelta el mismo dia del corte. Su original, con
+            // el tramo nuevo desde ese dia, esta VIGENTE.
+            String prorrogada = expedienteCompletoEn(municipalidad, titular, presentado);
+            EmitirLicenciaDeEdificacion.LicenciaEmitida suya =
+                    emitirLicencia(
+                            prorrogada, LocalDate.of(2026, 1, 20), LocalDate.of(2026, 2, 20));
+            SEMBRADOS.add(prorrogada);
+            SEMBRADOS.add(revalidarEl(suya, presentado, HOY));
             // VIGENTE al corte: la anulacion llega el dia siguiente.
             String anuladaDespues = expedienteCompletoEn(municipalidad, titular, presentado);
             anularEl(
@@ -2157,10 +2200,10 @@ class LicenciaDeEdificacionJdbcTest {
             }
 
             assertThat(medido)
-                    .as("el SQL y EstadoDelFue.derivarDe, FUE por FUE, en los cuatro estados")
+                    .as("el SQL y EstadoDelFue.derivarDe, FUE por FUE, en los cinco estados")
                     .containsExactlyElementsOf(esperado);
             assertThat(esperado)
-                    .as("y la siembra ejerce los cuatro: una muestra sin alguno no distingue nada")
+                    .as("y la siembra ejerce los cinco: una muestra sin alguno no distingue nada")
                     .noneMatch(celda -> celda.endsWith("[]"));
         }
 
@@ -2177,8 +2220,8 @@ class LicenciaDeEdificacionJdbcTest {
                     .hasSize(2)
                     .allSatisfy(fila -> assertThat(fila.estado()).isEqualTo(EstadoDelFue.VIGENTE));
             assertThat(primera.totalElementos())
-                    .as("hay tres vigentes al corte: la pagina no es la relacion")
-                    .isEqualTo(3);
+                    .as("hay cuatro vigentes al corte: la pagina no es la relacion")
+                    .isEqualTo(4);
             assertThat(primera.hayMas()).isTrue();
         }
 
@@ -2200,6 +2243,40 @@ class LicenciaDeEdificacionJdbcTest {
                                     estado,
                                     HOY,
                                     Paginacion.de(0, tamano, "expediente")));
+        }
+
+        /**
+         * Presenta la revalidacion de esa licencia y la resuelve con ese acto; da el expediente.
+         */
+        private static String revalidarEl(
+                EmitirLicenciaDeEdificacion.LicenciaEmitida original,
+                LocalDate presentado,
+                LocalDate acto) {
+            String tramite =
+                    enContexto(
+                            () -> {
+                                String numero = "EXP-425-R" + CONTADOR.incrementAndGet();
+                                presentar.presentar(
+                                        solicitud(
+                                                numero,
+                                                TipoDeTramiteDeEdificacion.REVALIDACION_DE_LICENCIA,
+                                                original.numeroDeLicencia(),
+                                                presentado,
+                                                "C-" + titular),
+                                        PORQUE);
+                                return numero;
+                            });
+            String recibo = cobrar(DERECHO_REVALIDACION);
+            enContexto(
+                    () ->
+                            revalidar.revalidar(
+                                    tramite,
+                                    acto,
+                                    HOY.plusYears(3),
+                                    recibo,
+                                    FormatoDeDocumento.PDF,
+                                    PORQUE));
+            return tramite;
         }
 
         /** No hay caso de uso que anule un FUE: el movimiento se escribe como lo haria el. */

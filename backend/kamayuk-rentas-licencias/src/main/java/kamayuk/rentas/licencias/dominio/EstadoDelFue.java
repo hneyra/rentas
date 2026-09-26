@@ -32,7 +32,16 @@ public enum EstadoDelFue {
     VENCIDA,
 
     /** Dejada sin efecto por resolucion (regla 4: no se borra, se anula). */
-    ANULADA;
+    ANULADA,
+
+    /**
+     * Un tramite resuelto que no otorga licencia propia (#449): hoy, la revalidacion, cuyo acto
+     * queda en su expediente y cuyo tramo va a la licencia original. Tomarle prestado el {@code
+     * VIGENTE} a la original no serviria: este expediente no es una licencia y no tiene tramos.
+     * Hasta #449 se quedaba {@link #EN_TRAMITE} para siempre, y la mesa de partes contaba como
+     * pendiente trabajo ya hecho.
+     */
+    RESUELTO;
 
     /**
      * El estado que dicen los movimientos y las vigencias a esa fecha.
@@ -60,6 +69,7 @@ public enum EstadoDelFue {
         Objects.requireNonNull(aLaFecha, "El estado se pregunta a una fecha (regla 6, regla 9)");
 
         boolean emitida = false;
+        boolean revalidada = false;
         for (MovimientoDeEdificacion movimiento : movimientos) {
             if (movimiento.fecha().isAfter(aLaFecha)) {
                 continue;
@@ -70,9 +80,13 @@ public enum EstadoDelFue {
             if (movimiento.tipo() == TipoDeMovimientoDeEdificacion.EMISION) {
                 emitida = true;
             }
+            if (movimiento.tipo() == TipoDeMovimientoDeEdificacion.REVALIDACION) {
+                revalidada = true;
+            }
         }
         if (!emitida) {
-            return EN_TRAMITE;
+            // Sin licencia propia: o espera su acto, o ya lo tuvo y no otorgaba licencia (#449).
+            return revalidada ? RESUELTO : EN_TRAMITE;
         }
         for (VigenciaDeLaLicencia vigencia : vigencias) {
             if (vigencia.cubre(aLaFecha)) {
