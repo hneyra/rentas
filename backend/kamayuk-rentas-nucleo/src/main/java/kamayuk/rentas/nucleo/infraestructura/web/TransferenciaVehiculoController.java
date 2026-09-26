@@ -1,6 +1,5 @@
 package kamayuk.rentas.nucleo.infraestructura.web;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.Objects;
@@ -16,6 +15,7 @@ import kamayuk.rentas.nucleo.dominio.TipoTransferencia;
 import kamayuk.rentas.nucleo.dominio.Vehiculo;
 import kamayuk.rentas.web.Api;
 import kamayuk.rentas.web.CodigoDeError;
+import kamayuk.rentas.web.EntradaNumerica;
 import kamayuk.rentas.web.ProblemaDeNegocio;
 import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpStatus;
@@ -136,12 +136,11 @@ public class TransferenciaVehiculoController {
     }
 
     private static Dinero dineroDe(@Nullable String texto) {
-        try {
-            return new Dinero(new BigDecimal(exigir(texto, "valorTransferencia")));
-        } catch (NumberFormatException noEsNumero) {
-            throw new ProblemaDeNegocio(
-                    CodigoDeError.VALIDACION, "El valor de transferencia no es un importe valido");
-        }
+        return new Dinero(
+                EntradaNumerica.leer(
+                        exigir(texto, "valorTransferencia"),
+                        "valorTransferencia",
+                        "El valor de transferencia no es un importe valido"));
     }
 
     private static LocalDate fechaDe(@Nullable String texto) {

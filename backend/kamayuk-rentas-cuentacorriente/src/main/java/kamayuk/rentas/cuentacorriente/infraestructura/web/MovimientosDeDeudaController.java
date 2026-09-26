@@ -1,6 +1,5 @@
 package kamayuk.rentas.cuentacorriente.infraestructura.web;
 
-import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
@@ -21,6 +20,7 @@ import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.web.Api;
 import kamayuk.rentas.web.CodigoDeError;
+import kamayuk.rentas.web.EntradaNumerica;
 import kamayuk.rentas.web.FiltroDeLaConsulta;
 import kamayuk.rentas.web.ProblemaDeNegocio;
 import org.jspecify.annotations.Nullable;
@@ -460,12 +460,9 @@ public class MovimientosDeDeudaController {
         if (texto == null || texto.isBlank()) {
             return Dinero.CERO;
         }
-        try {
-            return new Dinero(new BigDecimal(texto.strip()));
-        } catch (NumberFormatException noEsNumero) {
-            throw new ProblemaDeNegocio(
-                    CodigoDeError.VALIDACION, "El campo '" + campo + "' no es un importe valido");
-        }
+        return new Dinero(
+                EntradaNumerica.leer(
+                        texto, campo, "El campo '" + campo + "' no es un importe valido"));
     }
 
     private static Fase faseDe(@Nullable String texto) {

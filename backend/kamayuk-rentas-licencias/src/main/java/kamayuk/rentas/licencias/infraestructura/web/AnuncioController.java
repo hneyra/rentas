@@ -1,6 +1,5 @@
 package kamayuk.rentas.licencias.infraestructura.web;
 
-import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
@@ -25,6 +24,7 @@ import kamayuk.rentas.parametros.FaltaPublicar;
 import kamayuk.rentas.parametros.LectorDeParametros;
 import kamayuk.rentas.web.Api;
 import kamayuk.rentas.web.CodigoDeError;
+import kamayuk.rentas.web.EntradaNumerica;
 import kamayuk.rentas.web.ParametrosDePaginacion;
 import kamayuk.rentas.web.ProblemaDeNegocio;
 import kamayuk.rentas.web.RespuestaPaginada;
@@ -437,7 +437,11 @@ public class AnuncioController {
                     "El area del anuncio es obligatoria: es la medida que el acto consigna");
         }
         try {
-            return new AreaM2(new BigDecimal(texto));
+            return new AreaM2(
+                    EntradaNumerica.leer(
+                            texto,
+                            "area",
+                            "El area del anuncio va en metros cuadrados: '" + area + "'"));
         } catch (IllegalArgumentException invalida) {
             throw new ProblemaDeNegocio(
                     CodigoDeError.VALIDACION,

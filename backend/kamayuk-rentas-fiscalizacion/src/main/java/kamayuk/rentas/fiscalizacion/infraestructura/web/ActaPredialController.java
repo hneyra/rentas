@@ -16,6 +16,7 @@ import kamayuk.rentas.fiscalizacion.dominio.ActaFiscalizacionRepository;
 import kamayuk.rentas.fiscalizacion.dominio.Hallazgo;
 import kamayuk.rentas.web.Api;
 import kamayuk.rentas.web.CodigoDeError;
+import kamayuk.rentas.web.EntradaNumerica;
 import kamayuk.rentas.web.ProblemaDeNegocio;
 import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpStatus;
@@ -174,12 +175,7 @@ public class ActaPredialController {
         if (texto == null || texto.isBlank()) {
             return null;
         }
-        try {
-            return new BigDecimal(texto.strip());
-        } catch (NumberFormatException noEsNumero) {
-            throw new ProblemaDeNegocio(
-                    CodigoDeError.VALIDACION, "El area hallada no es un numero valido");
-        }
+        return EntradaNumerica.leer(texto, "areaHallada", "El area hallada no es un numero valido");
     }
 
     private static Observacion observacionDe(@Nullable String texto) {
