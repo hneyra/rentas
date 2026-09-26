@@ -24,6 +24,8 @@ import kamayuk.rentas.tesoreria.FraccionamientoCoactivo;
 import kamayuk.rentas.tesoreria.SolicitudDeConvenioCoactivo;
 import kamayuk.rentas.tesoreria.dobles.AcogimientoDeMentira;
 import kamayuk.rentas.tesoreria.dobles.ConveniosEnMemoria;
+import kamayuk.rentas.tesoreria.dominio.CondicionesDelConvenio;
+import kamayuk.rentas.tesoreria.dominio.Cronograma;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -168,6 +170,42 @@ class FraccionamientoCoactivoTesoreriaTest {
                 .isInstanceOf(FraccionamientoCoactivo.SinDeudaCoactivaQueFraccionar.class);
     }
 
+    @Test
+    @DisplayName("#433 — mas cuotas que el maximo vigente: CondicionesInadmisibles, no un 500")
+    void demasiadasCuotasSeTraduce() {
+        assertThatThrownBy(() -> puerto().simular(solicitud(7L, 2026, 13, "20")))
+                .as("el maximo sellado es 12: por tesoreria es 422, y por coactiva salia 500")
+                .isInstanceOf(FraccionamientoCoactivo.CondicionesInadmisibles.class)
+                .hasCauseInstanceOf(CondicionesDelConvenio.DemasiadasCuotas.class);
+    }
+
+    @Test
+    @DisplayName("#433 — una inicial del 100 %: nada que fraccionar, y se traduce igual")
+    void nadaQueFraccionarSeTraduce() {
+        assertThatThrownBy(
+                        () ->
+                                puerto().registrar(
+                                                solicitud(7L, 2026, 6, "100"),
+                                                null,
+                                                Observacion.de("Se registra el convenio coactivo")))
+                .isInstanceOf(FraccionamientoCoactivo.CondicionesInadmisibles.class)
+                .hasCauseInstanceOf(Cronograma.NadaQueFraccionar.class);
+    }
+
+    @Test
+    @DisplayName("#433 — la clave de otro obligado: ClaveEnConflicto, que sale 409")
+    void laClaveDeOtroSeTraduce() {
+        FraccionamientoCoactivo puerto = puerto();
+        Observacion porque = Observacion.de("Se registra el convenio coactivo");
+        puerto.registrar(solicitud(7L, 2026, 6, "20"), "CLAVE-433", porque);
+
+        assertThatThrownBy(
+                        () -> puerto.registrar(solicitud(8L, 2026, 6, "20"), "CLAVE-433", porque))
+                .as("la misma clave para otro contribuyente: por tesoreria 409, por coactiva 500")
+                .isInstanceOf(FraccionamientoCoactivo.ClaveEnConflicto.class)
+                .hasCauseInstanceOf(RegistrarPreconvenio.ClaveDeOtraPeticion.class);
+    }
+
     // ------------------------------------------------------------------
 
     private FraccionamientoCoactivo puerto() {
@@ -185,14 +223,19 @@ class FraccionamientoCoactivoTesoreriaTest {
     }
 
     private static SolicitudDeConvenioCoactivo solicitud(int ejercicioDelConvenio) {
+        return solicitud(7L, ejercicioDelConvenio, 6, "20");
+    }
+
+    private static SolicitudDeConvenioCoactivo solicitud(
+            long contribuyente, int ejercicioDelConvenio, int cuotas, String inicial) {
         LocalDate fecha = LocalDate.of(ejercicioDelConvenio, 3, 16);
         return new SolicitudDeConvenioCoactivo(
-                7L,
+                contribuyente,
                 List.of(PREDIAL),
                 fecha,
                 fecha,
-                6,
-                Alicuota.de("20"),
+                cuotas,
+                Alicuota.de(inicial),
                 fecha.plusMonths(1),
                 null);
     }

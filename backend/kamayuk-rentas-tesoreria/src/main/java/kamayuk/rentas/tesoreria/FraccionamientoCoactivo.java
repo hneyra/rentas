@@ -102,6 +102,38 @@ public interface FraccionamientoCoactivo {
     }
 
     /**
+     * Las condiciones pedidas no se pueden cumplir (#433): mas cuotas que el maximo vigente, o una
+     * inicial que no deja nada que fraccionar. Es un fallo de la peticion, no del servidor: 422,
+     * como por {@code POST /tesoreria/fraccionamientos}.
+     *
+     * <p>Existe porque {@code coactiva} no puede nombrar los tipos de {@code tesoreria.dominio}
+     * (Spring Modulith, #51): o el puerto los traduce a un tipo suyo, o cruzan sin traducir y salen
+     * 500 con incidencia.
+     */
+    final class CondicionesInadmisibles extends RuntimeException {
+
+        @java.io.Serial private static final long serialVersionUID = 1L;
+
+        public CondicionesInadmisibles(String mensaje, Throwable causa) {
+            super(mensaje, causa);
+        }
+    }
+
+    /**
+     * La clave de idempotencia ya registro el convenio de otra peticion, o dos envios con la misma
+     * clave chocaron (#433). La peticion esta bien formada; lo que no admite es el estado: 409,
+     * como por {@code POST /tesoreria/fraccionamientos}.
+     */
+    final class ClaveEnConflicto extends RuntimeException {
+
+        @java.io.Serial private static final long serialVersionUID = 1L;
+
+        public ClaveEnConflicto(String mensaje, Throwable causa) {
+            super(mensaje, causa);
+        }
+    }
+
+    /**
      * Falta publicar una de las cifras con que se arma el cronograma (#562).
      *
      * <p>Un convenio no se puede armar sin el interes de fraccionamiento, sin el maximo de cuotas y

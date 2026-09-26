@@ -2,6 +2,7 @@ package kamayuk.rentas.tesoreria.aplicacion;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Supplier;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.parametros.LectorDeParametros;
 import kamayuk.rentas.parametros.PoliticasDeRedondeoSelladas;
@@ -9,7 +10,9 @@ import kamayuk.rentas.tesoreria.ConvenioCoactivo;
 import kamayuk.rentas.tesoreria.CuotaDelConvenio;
 import kamayuk.rentas.tesoreria.FraccionamientoCoactivo;
 import kamayuk.rentas.tesoreria.SolicitudDeConvenioCoactivo;
+import kamayuk.rentas.tesoreria.dominio.CondicionesDelConvenio;
 import kamayuk.rentas.tesoreria.dominio.Convenio;
+import kamayuk.rentas.tesoreria.dominio.ConvenioRepository;
 import kamayuk.rentas.tesoreria.dominio.Cronograma;
 import kamayuk.rentas.tesoreria.dominio.CuotaDeConvenio;
 import kamayuk.rentas.tesoreria.dominio.EstadoDeConvenio;
@@ -63,20 +66,8 @@ public class FraccionamientoCoactivoTesoreria implements FraccionamientoCoactivo
 
     @Override
     public ConvenioCoactivo simular(SolicitudDeConvenioCoactivo solicitud) {
-        RegistrarPreconvenio.Simulacion simulada;
-        try {
-            simulada = preconvenios.simular(peticionDe(solicitud));
-        } catch (RegistrarPreconvenio.SinDeudaQueFraccionar sinDeuda) {
-            throw new SinDeudaCoactivaQueFraccionar(mensajeDe(sinDeuda), sinDeuda);
-        } catch (CondicionesParametrizadas.CondicionSinParametrizar
-                | LectorDeParametros.EjercicioSinSellar
-                | PoliticasDeRedondeoSelladas.SinPuntosObservados
-                | PoliticasDeRedondeoSelladas.MediaPolitica
-                | PoliticasDeRedondeoSelladas.EscalaNoEntera
-                | PoliticasDeRedondeoSelladas.ModoDesconocido
-                | PoliticasDeRedondeoSelladas.PuntoSinObservar falta) {
-            throw new CondicionesSinPublicar(mensajeDeLoQueFalta(falta), falta);
-        }
+        RegistrarPreconvenio.Simulacion simulada =
+                traducido(() -> preconvenios.simular(peticionDe(solicitud)));
 
         List<CuotaDelConvenio> cronograma = cronogramaDe(simulada.cronograma());
         return new ConvenioCoactivo(
@@ -100,26 +91,15 @@ public class FraccionamientoCoactivoTesoreria implements FraccionamientoCoactivo
             SolicitudDeConvenioCoactivo solicitud,
             @org.jspecify.annotations.Nullable String claveDeIdempotencia,
             Observacion observacion) {
-        Convenio guardado;
-        try {
-            // Con su clave (#606). El comentario que estaba aqui decia que este puerto no lo
-            // llama un cliente HTTP, y era falso: al final de esta cadena esta
-            // `ConvenioCoactivoController.fraccionar`, que es un `@PostMapping("/convenios")`.
-            // Un reenvio del mismo intento abria un segundo convenio sobre la misma deuda,
-            // que es el defecto entero de este issue en la otra ruta.
-            guardado =
-                    preconvenios.registrar(peticionDe(solicitud), claveDeIdempotencia, observacion);
-        } catch (RegistrarPreconvenio.SinDeudaQueFraccionar sinDeuda) {
-            throw new SinDeudaCoactivaQueFraccionar(mensajeDe(sinDeuda), sinDeuda);
-        } catch (CondicionesParametrizadas.CondicionSinParametrizar
-                | LectorDeParametros.EjercicioSinSellar
-                | PoliticasDeRedondeoSelladas.SinPuntosObservados
-                | PoliticasDeRedondeoSelladas.MediaPolitica
-                | PoliticasDeRedondeoSelladas.EscalaNoEntera
-                | PoliticasDeRedondeoSelladas.ModoDesconocido
-                | PoliticasDeRedondeoSelladas.PuntoSinObservar falta) {
-            throw new CondicionesSinPublicar(mensajeDeLoQueFalta(falta), falta);
-        }
+        // Con su clave (#606). El comentario que estaba aqui decia que este puerto no lo llama un
+        // cliente HTTP, y era falso: al final de esta cadena esta
+        // `ConvenioCoactivoController.fraccionar`, que es un `@PostMapping("/convenios")`. Un
+        // reenvio del mismo intento abria un segundo convenio sobre la misma deuda.
+        Convenio guardado =
+                traducido(
+                        () ->
+                                preconvenios.registrar(
+                                        peticionDe(solicitud), claveDeIdempotencia, observacion));
 
         return new ConvenioCoactivo(
                 guardado.numero().impreso(),
@@ -142,6 +122,40 @@ public class FraccionamientoCoactivoTesoreria implements FraccionamientoCoactivo
     // ------------------------------------------------------------------
 
     /** La misma peticion que la ventanilla, con el tipo fijado y sin garantia ni origen. */
+    /**
+     * La frontera traduce <b>cada</b> fallo de negocio a un tipo del puerto, una sola vez para las
+     * dos ramas (#433).
+     *
+     * <p>{@code coactiva} no puede nombrar los tipos de {@code tesoreria.aplicacion} ni de {@code
+     * tesoreria.dominio} (Spring Modulith, #51): lo que cruza sin traducir sale 500 con incidencia
+     * por {@code /coactiva/convenios} donde {@code /tesoreria/fraccionamientos} contesta 422 o 409.
+     * Hasta #433 los dos {@code catch} estaban copiados y traducian dos familias de siete; lo que
+     * no se nombra aqui —un fallo de verdad del servidor— sigue cruzando tal cual.
+     */
+    private static <T> T traducido(Supplier<T> accion) {
+        try {
+            return accion.get();
+        } catch (RegistrarPreconvenio.SinDeudaQueFraccionar sinDeuda) {
+            throw new SinDeudaCoactivaQueFraccionar(mensajeDe(sinDeuda), sinDeuda);
+        } catch (CondicionesParametrizadas.CondicionSinParametrizar
+                | LectorDeParametros.EjercicioSinSellar
+                | PoliticasDeRedondeoSelladas.SinPuntosObservados
+                | PoliticasDeRedondeoSelladas.MediaPolitica
+                | PoliticasDeRedondeoSelladas.EscalaNoEntera
+                | PoliticasDeRedondeoSelladas.ModoDesconocido
+                | PoliticasDeRedondeoSelladas.PuntoSinObservar falta) {
+            throw new CondicionesSinPublicar(mensajeDeLoQueFalta(falta), falta);
+        } catch (CondicionesDelConvenio.DemasiadasCuotas
+                | Cronograma.NadaQueFraccionar inadmisible) {
+            throw new FraccionamientoCoactivo.CondicionesInadmisibles(
+                    mensajeDe(inadmisible), inadmisible);
+        } catch (RegistrarPreconvenio.ClaveDeOtraPeticion
+                | ConvenioRepository.ClaveRepetida
+                | ConvenioRepository.CronogramaDuplicado conflicto) {
+            throw new FraccionamientoCoactivo.ClaveEnConflicto(mensajeDe(conflicto), conflicto);
+        }
+    }
+
     private static RegistrarPreconvenio.Peticion peticionDe(SolicitudDeConvenioCoactivo solicitud) {
         return new RegistrarPreconvenio.Peticion(
                 solicitud.contribuyenteId(),
