@@ -34,8 +34,8 @@ public class RegistrarBeneficio {
     }
 
     /**
-     * Da de alta un beneficio, rechazando el que se solape con otro vigente del mismo tipo para el
-     * mismo contribuyente.
+     * Da de alta un beneficio, rechazando el que se solape con otro vigente del mismo ambito para
+     * el mismo contribuyente.
      */
     @Transactional
     public Beneficio registrar(Beneficio beneficio, Observacion observacion) {
@@ -71,13 +71,16 @@ public class RegistrarBeneficio {
     }
 
     /**
-     * Rechaza el alta si ya hay un beneficio del mismo tipo, para el mismo contribuyente, con la
-     * vigencia solapada.
+     * Rechaza el alta si ya hay un beneficio del mismo ambito —tipo, tributo, predio y vehiculo—
+     * para el mismo contribuyente, con la vigencia solapada (#443).
      */
     private void rechazarSolapado(Beneficio beneficio) {
         List<Beneficio> delMismoTipo =
                 repositorio.delContribuyente(beneficio.contribuyenteId(), beneficio.tipo());
-        boolean haySolape = delMismoTipo.stream().anyMatch(beneficio::solapaCon);
+        boolean haySolape =
+                delMismoTipo.stream()
+                        .filter(beneficio::mismoAmbitoQue)
+                        .anyMatch(beneficio::solapaCon);
         if (haySolape) {
             throw new VigenciaSolapada(beneficio.contribuyenteId(), beneficio.tipo());
         }

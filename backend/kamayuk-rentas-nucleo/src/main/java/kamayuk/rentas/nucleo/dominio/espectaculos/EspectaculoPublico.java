@@ -7,12 +7,13 @@ import kamayuk.rentas.dominio.Dinero;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Un espectáculo público no deportivo (RF-028, #32; tabla {@code espectaculo} de V2).
+ * Un espectáculo público no deportivo (RF-028, #32; tabla {@code espectaculo} de {@code
+ * V1__baseline.sql}).
  *
- * <p>La tabla ya existía —V2 la dio de alta junto con el resto de {@code rentas}— con su propio
- * ciclo de vida: {@code REGISTRADO} al darse de alta, {@code LIQUIDADO} cuando se determina el
- * impuesto y {@code base_imponible} deja de ser nulo, {@code ANULADO} si el evento no se realiza.
- * {@link #liquidar} es la única transición que este contexto usa todavía.
+ * <p>La tabla ya existía —la baseline la dio de alta junto con el resto de {@code rentas}— con su
+ * propio ciclo de vida: {@code REGISTRADO} al darse de alta, {@code LIQUIDADO} cuando se determina
+ * el impuesto y {@code base_imponible} deja de ser nulo, {@code ANULADO} si el evento no se
+ * realiza. {@link #liquidar} es la única transición que este contexto usa todavía.
  *
  * <p>No calcula nada: {@code baseImponible} es la base que declara el organizador —o la que resulta
  * de {@code aforo × valorEntrada}, cuando se conocen—, y la alícuota por tipo de evento vive en el

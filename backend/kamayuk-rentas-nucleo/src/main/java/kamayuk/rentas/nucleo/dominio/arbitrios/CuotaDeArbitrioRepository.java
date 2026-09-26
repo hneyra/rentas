@@ -9,10 +9,10 @@ import kamayuk.rentas.dominio.Ejercicio;
  * del token y la aplica la política RLS.
  *
  * <p><b>No hay {@code actualizar} ni {@code delete}.</b> Una cuota no se corrige en el sitio: se
- * reversa el asiento que generó (regla 4). El {@code UNIQUE} de {@code determinacion_arbitrio}
- * (V23) es la garantía real de que determinar dos veces el mismo predio, servicio, periodo y
- * ejercicio no duplica la fila — no depende de que {@link #existe} se llame siempre antes de {@link
- * #insertar}.
+ * reversa el asiento que generó (regla 4). La restricción {@code det_arbitrio_uq} ({@code
+ * V1__baseline.sql}) es la garantía real de que determinar dos veces el mismo predio, servicio,
+ * periodo y ejercicio no duplica la fila — no depende de que {@link #existe} se llame siempre antes
+ * de {@link #insertar}.
  */
 public interface CuotaDeArbitrioRepository {
 

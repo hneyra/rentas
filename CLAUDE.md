@@ -222,6 +222,12 @@ es deliberado.** No es limpieza pendiente:
 **Asi que NO se hace una pasada de limpieza sobre la prosa.** Si estas aqui por un `grep sgtm` que
 devuelve cientos de lineas: casi todas son de este tipo y se quedan.
 
+**Y los numeros de migracion de los javadoc copiados son los de `sgtm`, no los de este arbol**
+(#443). «El `UNIQUE` de `determinacion_arbitrio` (V23)» nombra el `V23` del monolito; aqui `V23` es
+otro archivo que dice otra cosa. Una garantia del esquema se busca **por el nombre de la
+restriccion** —`grep -n det_arbitrio_uq backend/kamayuk-rentas-esquema/src/main/resources/db/migration/*.sql`—,
+que es estable con cualquier numeracion, y un javadoc nuevo la cita asi.
+
 **Lo que si esta prohibido es que la cadena vuelva al codigo**, y lo vigila **una sola guarda para
 los seis**: `sin-el-nombre-del-monolito.test.ts` de `infrastructure`, que barre este arbol y los
 cinco clones hermanos. Barre **solo codigo de produccion** —ni `docs/`, ni `*.md`, ni pruebas— y

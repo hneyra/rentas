@@ -241,8 +241,8 @@ public class ConsultaUnificada {
          * Solo los arbitrios municipales.
          *
          * <p>{@code ARBITRIO} en singular: es como {@code DeterminarArbitrios} asienta el tributo y
-         * como lo nombra el {@code CHECK} de {@code determinacion} (V2). El desplegable del
-         * prototipo dice «ARBITRIOS», y la traduccion se hace aqui, una vez.
+         * como lo nombra {@code determinacion_tributo_check} ({@code V1__baseline.sql}). El
+         * desplegable del prototipo dice «ARBITRIOS», y la traduccion se hace aqui, una vez.
          */
         ARBITRIOS(TributoDelLibro.ARBITRIO.texto()),
 

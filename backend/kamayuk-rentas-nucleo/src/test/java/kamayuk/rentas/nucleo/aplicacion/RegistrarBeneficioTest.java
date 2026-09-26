@@ -173,6 +173,77 @@ class RegistrarBeneficioTest {
 
             assertThat(segundo.id()).isNotNull();
         }
+
+        @Test
+        @DisplayName(
+                "#443 — el mismo SIN_SERVICIO de limpieza en OTRO predio del mismo contribuyente se"
+                        + " admite")
+        void otroPredioNoEsSolape() throws SQLException {
+            long titular = crearContribuyente("RB-0443", "80104431");
+
+            registrar.registrar(
+                    sinServicio(titular, 10L, "ARB_LIMPIEZA", LocalDate.of(2026, 1, 1)),
+                    Observacion.de("El predio 10 no tiene recojo de residuos"));
+
+            Beneficio otroPredio =
+                    registrar.registrar(
+                            sinServicio(titular, 11L, "ARB_LIMPIEZA", LocalDate.of(2026, 3, 1)),
+                            Observacion.de("El predio 11 tampoco tiene recojo de residuos"));
+
+            assertThat(otroPredio.id())
+                    .as(
+                            "hasta #443 el solape se medía solo por contribuyente y tipo: VigenciaSolapada")
+                    .isNotNull();
+            Beneficio parques =
+                    registrar.registrar(
+                            sinServicio(titular, 10L, "ARB_PARQUES", LocalDate.of(2026, 3, 1)),
+                            Observacion.de("El predio 10 tampoco tiene parques"));
+            assertThat(parques.id()).as("otro tributo, otro ambito").isNotNull();
+        }
+
+        @Test
+        @DisplayName("#443 — el mismo predio y vigencias cruzadas SI es solape")
+        void elMismoPredioSiEsSolape() throws SQLException {
+            long titular = crearContribuyente("RB-0444", "80104432");
+
+            registrar.registrar(
+                    sinServicio(titular, 10L, "ARB_LIMPIEZA", LocalDate.of(2026, 1, 1)),
+                    Observacion.de("El predio 10 no tiene recojo de residuos"));
+
+            assertThatThrownBy(
+                            () ->
+                                    registrar.registrar(
+                                            sinServicio(
+                                                    titular,
+                                                    10L,
+                                                    "ARB_LIMPIEZA",
+                                                    LocalDate.of(2026, 3, 1)),
+                                            Observacion.de("El mismo, otra vez")))
+                    .isInstanceOf(RegistrarBeneficio.VigenciaSolapada.class);
+        }
+
+        @Test
+        @DisplayName("#443 — «Pensionista» tras «PENSIONISTA» es el mismo tipo, y se rechaza")
+        void laGrafiaNoAbreOtroTipo() throws SQLException {
+            long titular = crearContribuyente("RB-0445", "80104433");
+
+            registrar.registrar(
+                    beneficioDe(titular, "PENSIONISTA", LocalDate.of(2026, 1, 1), null),
+                    Observacion.de("Primer registro del beneficio"));
+
+            assertThatThrownBy(
+                            () ->
+                                    registrar.registrar(
+                                            beneficioDe(
+                                                    titular,
+                                                    "Pensionista",
+                                                    LocalDate.of(2026, 6, 1),
+                                                    null),
+                                            Observacion.de(
+                                                    "La misma condicion, tecleada distinto")))
+                    .as("hasta #443 quedaban dos: la consulta comparaba con = y la grafia era otra")
+                    .isInstanceOf(RegistrarBeneficio.VigenciaSolapada.class);
+        }
     }
 
     @Nested
@@ -245,6 +316,23 @@ class RegistrarBeneficioTest {
             return nuevo;
         }
         return nuevo.cesadoEl(hasta);
+    }
+
+    private static Beneficio sinServicio(
+            long contribuyenteId, long predioId, String tributo, LocalDate desde) {
+        return Beneficio.nuevo(
+                contribuyenteId,
+                predioId,
+                null,
+                "SIN_SERVICIO",
+                tributo,
+                Clase.INAFECTACION,
+                null,
+                kamayuk.rentas.dominio.Dinero.CERO,
+                desde,
+                "Ordenanza de arbitrios",
+                "RESOLUCION-2026-0443",
+                Observacion.de("Se registra la inafectacion para la prueba"));
     }
 
     private static long crearMunicipalidad(String ubigeo, String nombre) throws SQLException {

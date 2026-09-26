@@ -2,9 +2,9 @@ package kamayuk.rentas.nucleo.dominio.arbitrios;
 
 /**
  * Los tres arbitrios que el manual determina por predio (#31): limpieza pública, parques y
- * jardines, y serenazgo. Los valores coinciden exactamente con el {@code CHECK} de {@code
- * determinacion_arbitrio.servicio} (V23): si aquí apareciera un cuarto, el insert fallaría en
- * tiempo de ejecución, que es tarde.
+ * jardines, y serenazgo. Los valores coinciden exactamente con {@code
+ * determinacion_arbitrio_servicio_check} ({@code V1__baseline.sql}): si aquí apareciera un cuarto,
+ * el insert fallaría en tiempo de ejecución, que es tarde.
  *
  * <p>Cada servicio se excluye por separado: un predio sin recojo de residuos puede seguir pagando
  * serenazgo, así que la exclusión de un beneficio (#27) se busca por {@link #codigoTributo()}, no
