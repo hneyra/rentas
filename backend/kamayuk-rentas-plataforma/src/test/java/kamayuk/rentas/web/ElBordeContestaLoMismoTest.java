@@ -93,6 +93,22 @@ class ElBordeContestaLoMismoTest {
     }
 
     @Test
+    @DisplayName("#456 — una pagina cuyo desplazamiento desborda el int: 422, no 500")
+    void unaPaginaQueDesbordaEs422() throws Exception {
+        MvcResult respuesta =
+                mvc.perform(
+                                get("/sonda/paginado")
+                                        .param("pagina", "4294968")
+                                        .param("tamano", "500"))
+                        .andReturn();
+
+        assertThat(respuesta.getResponse().getStatus())
+                .as("4 294 968 x 500 desbordaba a un OFFSET negativo: 500 con incidencia")
+                .isEqualTo(422);
+        assertThat(respuesta.getResponse().getContentAsString()).contains("4294968");
+    }
+
+    @Test
     @DisplayName("un valor que el enumerado no conoce: 422, no 500")
     void elEnumeradoNoLoConoce() throws Exception {
         MvcResult respuesta =

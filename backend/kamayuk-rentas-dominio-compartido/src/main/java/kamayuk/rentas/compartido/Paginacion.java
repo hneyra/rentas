@@ -33,6 +33,17 @@ public record Paginacion(int pagina, int tamano, String ordenarPor, Sentido sent
             throw new IllegalArgumentException(
                     "El tamano de pagina va de 1 a " + TAMANO_MAXIMO + ": " + tamano);
         }
+        // El desplazamiento tiene que caber en el OFFSET (#456): calculado en `int` sin tope,
+        // una pagina alta desbordaba a un OFFSET negativo (500 de PostgreSQL) o daba la vuelta
+        // entera y devolvia OTRA pagina con 200. Se rechaza como el resto de lo mal pedido: 422.
+        if ((long) pagina * tamano > Integer.MAX_VALUE) {
+            throw new IllegalArgumentException(
+                    "La pagina "
+                            + pagina
+                            + " de "
+                            + tamano
+                            + " filas salta mas filas de las que un listado puede tener");
+        }
         if (ordenarPor.isBlank()) {
             throw new IllegalArgumentException(
                     "Sin orden, dos paginas consecutivas pueden repetir y omitir filas: el motor no"
@@ -48,7 +59,8 @@ public record Paginacion(int pagina, int tamano, String ordenarPor, Sentido sent
      * Filas a saltar. Es {@code pagina * tamano} y esta aqui para no repetirlo en cada consulta.
      */
     public int desplazamiento() {
-        return pagina * tamano;
+        // El constructor ya garantiza que cabe; esto es el cinturon (#456).
+        return Math.multiplyExact(pagina, tamano);
     }
 
     /** Sentido del orden. */

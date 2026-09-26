@@ -1,6 +1,5 @@
 package kamayuk.rentas.web;
 
-import java.net.URI;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -45,9 +44,9 @@ public class ManejadorDeErrores {
     private static final Logger log = LoggerFactory.getLogger(ManejadorDeErrores.class);
 
     /** Campo de extension con el codigo del catalogo, que es a lo que reacciona la interfaz. */
-    static final String CAMPO_CODIGO = "codigo";
+    static final String CAMPO_CODIGO = CuerpoDelProblema.CAMPO_CODIGO;
 
-    static final String CAMPO_MENSAJE = "mensaje";
+    static final String CAMPO_MENSAJE = CuerpoDelProblema.CAMPO_MENSAJE;
     static final String CAMPO_DETALLES = "detalles";
     static final String CAMPO_INCIDENCIA = "incidencia";
 
@@ -375,15 +374,7 @@ public class ManejadorDeErrores {
     }
 
     private static ProblemDetail cuerpoDe(CodigoDeError codigo, String mensaje) {
-        ProblemDetail cuerpo = ProblemDetail.forStatus(codigo.estado());
-        cuerpo.setType(URI.create("https://kamayuk.gob.pe/errores/" + codigo.name().toLowerCase()));
-        cuerpo.setTitle(codigo.mensaje());
-        cuerpo.setDetail(mensaje);
-        // `codigo` y `mensaje` como extensiones: son los dos campos que el contrato
-        // generado (docs/50-api) declara para su esquema Error, y asi la respuesta
-        // cumple RFC 9457 sin dejar de cumplir el contrato.
-        cuerpo.setProperty(CAMPO_CODIGO, codigo.name());
-        cuerpo.setProperty(CAMPO_MENSAJE, mensaje);
-        return cuerpo;
+        // Una sola fuente del cuerpo con los escritores de fuera del DispatcherServlet (#456).
+        return CuerpoDelProblema.de(codigo, mensaje);
     }
 }
