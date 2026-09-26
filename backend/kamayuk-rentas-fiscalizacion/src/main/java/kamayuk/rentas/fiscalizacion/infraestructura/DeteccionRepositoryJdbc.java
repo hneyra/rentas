@@ -123,21 +123,7 @@ public class DeteccionRepositoryJdbc extends RepositorioJdbc implements Deteccio
      * planificador lo elimina solo, que es justo lo que no puede hacer con el {@code LATERAL}—.
      */
     private static final String Y_SU_DECLARACION =
-            """
-             LEFT JOIN LATERAL (
-                   SELECT d.id, d.fuera_de_plazo, d.ficha_catastral_id
-                     FROM declaracion_jurada d
-                    WHERE d.municipalidad_id = p.municipalidad_id
-                      AND d.predio_id = p.predio_id
-                      AND d.ejercicio = :ejercicio
-                      AND d.estado = ANY(:estados)
-                    ORDER BY d.fecha_presentacion DESC, d.id DESC
-                    LIMIT 1
-                 ) dj ON true
-             LEFT JOIN ficha_ref fd
-               ON fd.municipalidad_id = p.municipalidad_id
-              AND fd.ficha_id = dj.ficha_catastral_id
-            """;
+            LaDeclaracionDelEjercicio.unidaA("p.municipalidad_id", "p.predio_id", ":ejercicio");
 
     /** Lo que acota el conjunto, y lo hacen las dos formas por igual. */
     private static final String FILTRO_DEL_PADRON =
@@ -232,15 +218,6 @@ public class DeteccionRepositoryJdbc extends RepositorioJdbc implements Deteccio
             "SELECT count(*)" + DESDE_EL_PADRON + FILTRO_DEL_PADRON;
 
     /**
-     * Los dos estados en que una declaración sustenta algo, escritos aquí y no leídos de {@code
-     * EstadoDeDeclaracion}: ese enumerado es {@code rentas.dominio}, y este contexto sólo importa
-     * el paquete raíz de los demás (ARQ-01 §4 regla 1). Que los dos digan lo mismo lo comprueba
-     * {@code DeteccionDeOmisosJdbcTest}, que siembra una declaración {@code SUSTITUIDA} y otra
-     * {@code ANULADA} y exige que su predio salga OMISO.
-     */
-    private static final String[] ESTADOS_VIGENTES = {"PRESENTADA", "OBSERVADA"};
-
-    /**
      * Solo predios <b>activos</b>, por lo mismo y escrito aqui por lo mismo: {@code EstadoPredio}
      * es {@code catastro.dominio}. Un predio dado de baja no genera obligacion, asi que marcarlo
      * como omiso seria abrir una fiscalizacion sobre algo que ya no existe.
@@ -295,7 +272,7 @@ public class DeteccionRepositoryJdbc extends RepositorioJdbc implements Deteccio
         Map<String, Object> parametros = new HashMap<>();
         parametros.put("fecha", criterio.aLaFecha());
         parametros.put("ejercicio", criterio.ejercicio().valor());
-        parametros.put("estados", ESTADOS_VIGENTES);
+        parametros.put("estados", LaDeclaracionDelEjercicio.ESTADOS_VIGENTES);
         parametros.put("activo", PREDIO_ACTIVO);
         parametros.put("sector", sector == null ? "" : sector);
         parametros.put("conSector", sector != null);

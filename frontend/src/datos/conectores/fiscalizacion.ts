@@ -136,11 +136,12 @@ const SIN_DIFERENCIA_ESTIMADA =
  * «Declarado» y «Diferencia» del acta cuando el lado declarado **no consta** (#191, #215).
  *
  * No es «no publicado»: desde #191 la operacion publica las tres —`areaDeclarada`, `usoDeclarado` y
- * `diferenciaDeArea`—, resueltas desde la version de ficha que el acta referencia. Que lleguen
- * nulas significa que **no hay contra que contrastar**, y son dos casos de verdad: un acta
- * **vehicular** —un vehiculo no tiene area ni uso declarados— y una **predial de un predio sin
- * ficha registrada a la fecha de la visita**, que es justamente el predio que no consta en el
- * catastro.
+ * `diferenciaDeArea`—, resueltas desde la declaracion jurada del ejercicio del programa y la
+ * version de ficha que esa declaracion referencia (#344). Que lleguen nulas significa que **no hay
+ * contra que contrastar**, y son tres casos de verdad: un acta **vehicular** —un vehiculo no tiene
+ * area ni uso declarados—, una **predial de un predio sin declaracion en el ejercicio del
+ * programa** —el omiso, que no declaro nada, aunque su predio tenga ficha inscrita— y una de un
+ * **programa sin ejercicio**, del que no hay como saber que declaracion mirar.
  *
  * La distincion no es academica: esto se cierra con una ficha y no publicando un campo, o sea que
  * decirlo con la palabra de «no publicado» mandaria a quien mantiene el backend a buscar algo que
@@ -148,9 +149,10 @@ const SIN_DIFERENCIA_ESTIMADA =
  */
 const NO_CONSTA_LO_DECLARADO =
   'El acta publica su lado declarado desde #191, y en esta llega vacio: no hay contra que ' +
-  'contrastar. Pasa en un acta VEHICULAR —un vehiculo no tiene area ni uso declarados— y en una ' +
-  'predial de un predio sin ficha registrada a la fecha de la visita. No es que falte publicarlo: ' +
-  'es que no consta.';
+  'contrastar. Pasa en un acta VEHICULAR —un vehiculo no tiene area ni uso declarados—, en una ' +
+  'predial de un predio sin declaracion jurada en el ejercicio del programa —el omiso, que no ' +
+  'declaro nada aunque su predio tenga ficha— y en la de un programa sin ejercicio. No es que ' +
+  'falte publicarlo: es que no consta.';
 
 /** «Diferencia» de la fila del USO: no es un numero, y el artboard la dibuja con una raya. */
 const SIN_DIFERENCIA_DE_UN_USO =

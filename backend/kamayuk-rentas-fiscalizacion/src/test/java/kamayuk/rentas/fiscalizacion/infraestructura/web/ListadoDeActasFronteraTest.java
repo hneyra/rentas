@@ -88,11 +88,17 @@ class ListadoDeActasFronteraTest {
 
     private static final LocalDate VISITA = LocalDate.of(2026, 3, 15);
 
+    /** El ejercicio que el programa predial examina, y el de las declaraciones sembradas. */
+    private static final int EJERCICIO = 2026;
+
+    private static int siguienteDeclaracion = 1;
+
     private static final Pattern FISCALIZADOR = Pattern.compile("\"fiscalizador\":\"([^\"]+)\"");
 
     private static BaseDeDatosDePrueba base;
     private static long municipalidadA;
     private static long municipalidadB;
+    private static long municipalidadC;
     private static JdbcClient jdbc;
     private static MockMvc mvc;
 
@@ -130,8 +136,11 @@ class ListadoDeActasFronteraTest {
                 new ContribuyentesDeMentira()
                         .con(titularA, "A-000001", "TITULAR, PRUEBA", "Jr. Union de prueba")
                         .con(titularAdos, "A-000002", "SEGUNDA, TITULAR", "Jr. Union 2");
-        programaPredial = crearPrograma(municipalidadA, "PF-A-01", "PREDIAL");
-        programaVehicular = crearPrograma(municipalidadA, "PF-A-02", "VEHICULAR");
+        // El predial examina el ejercicio 2026: de su declaracion de ese ejercicio sale el lado
+        // declarado de sus actas (#344). El vehicular, como los programas anteriores, no guarda
+        // ninguno.
+        programaPredial = crearPrograma(municipalidadA, "PF-A-01", "PREDIAL", EJERCICIO);
+        programaVehicular = crearPrograma(municipalidadA, "PF-A-02", "VEHICULAR", null);
 
         // Tres actas prediales del mismo programa: son las que el embudo tiene que contar.
         // «A. UNO» midio lo mismo que consta declarado: diferencia cero, y eso es un dato.
@@ -162,12 +171,24 @@ class ListadoDeActasFronteraTest {
         sembrarVehicular(municipalidadA, programaVehicular, titularAdos, "A04", "V. CUATRO");
 
         long titularB = crearContribuyente(municipalidadB, "B-000001", "70900002");
-        long programaB = crearPrograma(municipalidadB, "PF-B-01", "PREDIAL");
+        long programaB = crearPrograma(municipalidadB, "PF-B-01", "PREDIAL", EJERCICIO);
         sembrarPredial(municipalidadB, programaB, titularB, "CONFORME", null, "B. VECINA");
+
+        // Los dos casos que distinguen «lo declarado» de «lo inscrito el dia de la visita» (#344),
+        // en una TERCERA municipalidad para no mover los conteos de A. «C. UNO» declaro 200 m2
+        // sobre la ficha v1; en febrero catastro inscribio la v2 con 260, y la visita de marzo
+        // midio 260. El acta referencia la v2, que es la vigente ese dia. «C. DOS» no declaro
+        // 2026, y su ficha inscrita dice 200: es un omiso, no un declarante.
+        municipalidadC = crearMunicipalidad("270103", "Municipalidad de lo declarado");
+        long titularC = crearContribuyente(municipalidadC, "C-000001", "70900003");
+        long programaC = crearPrograma(municipalidadC, "PF-C-01", "PREDIAL", EJERCICIO);
+        sembrarElAmpliadoPorCatastro(municipalidadC, programaC, titularC, "C. UNO");
+        sembrarElOmisoConFicha(municipalidadC, programaC, titularC, "C. DOS");
 
         // El paso que en produccion dispara un evento de `catastro`: sin el, `ficha_ref` esta
         // vacia y el lado declarado del contraste sale nulo aunque el escenario tenga fichas.
         ProyeccionDeCatastro.proyectar(base, municipalidadA);
+        ProyeccionDeCatastro.proyectar(base, municipalidadC);
 
         DriverManagerDataSource pool = new DriverManagerDataSource();
         pool.setUrl(base.url());
@@ -365,6 +386,31 @@ class ListadoDeActasFronteraTest {
                 "un acta vehicular no tiene lado declarado: un vehiculo no declara area ni uso")
         void unActaVehicularNoTieneLadoDeclarado() throws Exception {
             assertThat(actaDe("V. CUATRO"))
+                    .contains("\"areaDeclarada\":null")
+                    .contains("\"usoDeclarado\":null")
+                    .contains("\"diferenciaDeArea\":null");
+        }
+
+        @Test
+        @DisplayName(
+                "#344 — lo declarado es la ficha que referencia la DJ, no la inscrita el dia de la"
+                        + " visita")
+        void loDeclaradoEsLaFichaDeLaDeclaracion() throws Exception {
+            TenantContext.fijar(new MunicipalidadId(municipalidadC));
+            assertThat(actaDe("C. UNO"))
+                    .as(
+                            "la ficha vigente el dia de la visita (260) es lo que catastro inscribio;"
+                                    + " el titular declaro 200, y su liquidacion determina 60")
+                    .contains("\"areaDeclarada\":\"200.00\"")
+                    .contains("\"diferenciaDeArea\":\"60.00\"");
+        }
+
+        @Test
+        @DisplayName("#344 — un omiso no tiene lado declarado, aunque su predio tenga ficha")
+        void unOmisoNoTieneLadoDeclarado() throws Exception {
+            TenantContext.fijar(new MunicipalidadId(municipalidadC));
+            assertThat(actaDe("C. DOS"))
+                    .as("«Declarado 200» para quien no declaro nada atribuye una declaracion")
                     .contains("\"areaDeclarada\":null")
                     .contains("\"usoDeclarado\":null")
                     .contains("\"diferenciaDeArea\":null");
@@ -689,6 +735,84 @@ class ListadoDeActasFronteraTest {
                 areaDeclarada == null && usoDeclarado == null
                         ? null
                         : crearFicha(municipalidadId, predioId, areaDeclarada, usoDeclarado);
+        if (fichaId != null) {
+            // Lo declarado es la DJ del ejercicio y la ficha que referencia (#344): aqui las dos
+            // coinciden con la inscrita el dia de la visita, que es la muestra uniforme.
+            crearDeclaracion(municipalidadId, contribuyenteId, predioId, fichaId);
+        }
+        insertarActaPredial(
+                municipalidadId,
+                programaId,
+                contribuyenteId,
+                predioId,
+                fichaId,
+                hallazgo,
+                usoHallado,
+                fiscalizador,
+                areaHallada);
+    }
+
+    /**
+     * La DJ 2026 referencia la v1 (200 m2); la v2 (260 m2) la inscribe catastro en febrero y es la
+     * vigente el dia de la visita, que midio 260. Lo declarado son 200, y la diferencia 60 —la que
+     * la liquidacion de esta acta determina—, no 0 (#344).
+     */
+    private static void sembrarElAmpliadoPorCatastro(
+            long municipalidadId, long programaId, long contribuyenteId, String fiscalizador) {
+        long predioId = crearPredio(municipalidadId);
+        long declarada =
+                crearVersion(
+                        municipalidadId,
+                        predioId,
+                        1,
+                        "200.00",
+                        LocalDate.of(2025, 1, 1),
+                        LocalDate.of(2026, 1, 31));
+        long inscrita =
+                crearVersion(
+                        municipalidadId, predioId, 2, "260.00", LocalDate.of(2026, 2, 1), null);
+        crearDeclaracion(municipalidadId, contribuyenteId, predioId, declarada);
+        insertarActaPredial(
+                municipalidadId,
+                programaId,
+                contribuyenteId,
+                predioId,
+                inscrita,
+                "SUBVALUADOR",
+                null,
+                fiscalizador,
+                "260.00");
+    }
+
+    /** Sin DJ 2026 y con una ficha inscrita de 200 m2: el omiso, que no declaro nada (#344). */
+    private static void sembrarElOmisoConFicha(
+            long municipalidadId, long programaId, long contribuyenteId, String fiscalizador) {
+        long predioId = crearPredio(municipalidadId);
+        long inscrita =
+                crearVersion(
+                        municipalidadId, predioId, 1, "200.00", LocalDate.of(2025, 1, 1), null);
+        insertarActaPredial(
+                municipalidadId,
+                programaId,
+                contribuyenteId,
+                predioId,
+                inscrita,
+                "OMISO",
+                null,
+                fiscalizador,
+                "260.00");
+    }
+
+    private static void insertarActaPredial(
+            long municipalidadId,
+            long programaId,
+            long contribuyenteId,
+            long predioId,
+            @Nullable Long fichaId,
+            String hallazgo,
+            @Nullable String usoHallado,
+            String fiscalizador,
+            @Nullable String areaHallada) {
         ejecutarComoApp(
                 municipalidadId,
                 "INSERT INTO acta_fiscalizacion (municipalidad_id, programa_id, version,"
@@ -732,6 +856,49 @@ class ListadoDeActasFronteraTest {
                 areaTerreno == null ? null : new java.math.BigDecimal(areaTerreno),
                 uso,
                 VISITA.minusYears(1));
+    }
+
+    private static long crearVersion(
+            long municipalidadId,
+            long predioId,
+            int version,
+            String areaTerreno,
+            LocalDate desde,
+            @Nullable LocalDate hasta) {
+        return ejecutarComoApp(
+                municipalidadId,
+                "INSERT INTO ficha_catastral_de_prueba (municipalidad_id, predio_id, tipo, version,"
+                        + " area_terreno, uso, vigencia_desde, vigencia_hasta, origen,"
+                        + " documento_origen, observacion, usuario_registro)"
+                        + " VALUES (?, ?, 'UNICA', ?, ?, 'CASA HABITACION', ?, ?,"
+                        + "         'DECLARACION_JURADA', 'DJ-SIEMBRA', 'Siembra de la prueba',"
+                        + "         'prueba') RETURNING id",
+                municipalidadId,
+                predioId,
+                version,
+                new java.math.BigDecimal(areaTerreno),
+                desde,
+                hasta);
+    }
+
+    /** La DJ del ejercicio, presentada en plazo y referenciando esa version de ficha. */
+    private static void crearDeclaracion(
+            long municipalidadId, long contribuyenteId, long predioId, long fichaId) {
+        ejecutarComoApp(
+                municipalidadId,
+                "INSERT INTO declaracion_jurada (municipalidad_id, numero, ejercicio,"
+                        + " contribuyente_id, tipo, predio_id, ficha_catastral_id,"
+                        + " fecha_presentacion, fecha_limite, fuera_de_plazo, estado,"
+                        + " usuario_registro, observacion)"
+                        + " VALUES (?, ?, ?, ?, 'PU', ?, ?, DATE '2026-01-15', DATE '2026-02-28',"
+                        + "         false, 'PRESENTADA', 'siembra', 'Siembra de la prueba')"
+                        + " RETURNING id",
+                municipalidadId,
+                "DJ-ACTA-" + siguienteDeclaracion++,
+                (short) EJERCICIO,
+                contribuyenteId,
+                predioId,
+                fichaId);
     }
 
     private static void sembrarVehicular(
@@ -806,16 +973,18 @@ class ListadoDeActasFronteraTest {
                 contribuyenteId);
     }
 
-    private static long crearPrograma(long municipalidadId, String codigo, String tipo) {
+    private static long crearPrograma(
+            long municipalidadId, String codigo, String tipo, @Nullable Integer ejercicio) {
         return ejecutarComoApp(
                 municipalidadId,
                 "INSERT INTO programa_fiscalizacion (municipalidad_id, codigo, descripcion, tipo,"
-                        + " fecha_inicio)"
-                        + " VALUES (?, ?, 'Programa de prueba', ?, ?) RETURNING id",
+                        + " fecha_inicio, ejercicio)"
+                        + " VALUES (?, ?, 'Programa de prueba', ?, ?, ?) RETURNING id",
                 municipalidadId,
                 codigo,
                 tipo,
-                LocalDate.of(2026, 1, 1));
+                LocalDate.of(2026, 1, 1),
+                ejercicio == null ? null : ejercicio.shortValue());
     }
 
     private static long ejecutarComoApp(long municipalidadId, String sql, Object... valores) {

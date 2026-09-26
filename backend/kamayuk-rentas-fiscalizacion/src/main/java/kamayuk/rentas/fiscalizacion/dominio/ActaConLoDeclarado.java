@@ -10,61 +10,69 @@ import org.jspecify.annotations.Nullable;
  * <h2>Qué faltaba, medido</h2>
  *
  * <p>{@link ActaFiscalizacion} guarda lo que el fiscalizador <b>halló</b> —{@code areaHallada} y
- * {@code usoHallado}— y no guarda, ni debe, lo que el titular declaró: eso lo dice la versión de
- * ficha catastral que el acta referencia en {@code fichaId}, y copiarla en la fila dejaría dos
- * verdades sobre lo mismo. La consecuencia era que {@code GET /fiscalizacion/actas} publicaba
- * <b>una</b> de las dos mitades que su tabla contrasta —«Lo que el verificador midió frente a lo
- * que el titular declaró»— y la pantalla salía con las columnas «Declarado» y «Diferencia» en raya,
- * en todas sus filas.
+ * {@code usoHallado}— y no guarda, ni debe, lo que el titular declaró: eso lo dice su declaración
+ * jurada del ejercicio que el programa examina, y copiarla en la fila dejaría dos verdades sobre lo
+ * mismo. La consecuencia era que {@code GET /fiscalizacion/actas} publicaba <b>una</b> de las dos
+ * mitades que su tabla contrasta —«Lo que el verificador midió frente a lo que el titular declaró»—
+ * y la pantalla salía con las columnas «Declarado» y «Diferencia» en raya, en todas sus filas.
  *
  * <p>Este tipo es esa otra mitad, resuelta al leer y no guardada. Es el mismo reparto que {@code
  * ConsultaDeResoluciones.ResolucionConsultada} —la fila registrada más lo que su pantalla necesita
  * para explicarla— y que {@code MuestraResource.visitado}: <b>se deriva, no se duplica</b> (la
  * lección de #397 y #481).
  *
- * <h2>De dónde sale, y por qué de ahí y no del puerto de catastro</h2>
+ * <h2>De dónde sale: de la declaración, no de la ficha del día de la visita (#344)</h2>
  *
- * <p>De {@code ficha_ref}, la <b>proyección local</b> de las versiones de ficha catastral (V4, P5C)
- * — la misma tabla de la que la detección de omisos saca su lado declarado. Los dos motivos:
+ * <p>De la declaración jurada <b>vigente del ejercicio del programa</b> y de la versión de ficha
+ * que esa declaración referencia, leída de {@code ficha_ref}. Es la misma fila de la que la
+ * detección de omisos saca su lado declarado —el mismo fragmento SQL, no una copia— y la misma
+ * versión contra la que la liquidación de esa acta resta.
  *
- * <ul>
- *   <li><b>Es un listado.</b> {@code LectorDeFichas.areaDeLaVersion} y {@code
- *       LectorDeCaracteristicas.de} son puertos HTTP, y su propia implementación lo deja escrito:
- *       «cada método es una petición». Resolverlos fila a fila sería una petición a {@code
- *       catastro} por acta, hasta 500 en una página.
- *   <li><b>Lo que se pide es una versión cerrada, no el padrón de hoy.</b> {@code fichaId} es la
- *       versión que regía a la fecha de la visita, y una versión no cambia: leerla de la proyección
- *       no puede dar una respuesta distinta de la del origen salvo que la proyección todavía no la
- *       haya recibido, y entonces sale nula —que es lo honesto— en vez de tardar.
- * </ul>
+ * <p>#191 la leyó de {@code acta.fichaId}, que es la ficha que <b>catastro</b> tenía inscrita el
+ * día de la visita, y eso es otra cosa: a un omiso le publicaba un área «declarada», y a quien
+ * declaró 200 m² sobre una ficha que catastro amplió a 260 antes de la visita le publicaba
+ * diferencia cero mientras su liquidación determinaba 60. {@code fichaId} se queda en el acta
+ * —sirve para reproducir la visita y para la versión que la transferencia cierra—; sólo deja de
+ * llamarse «lo declarado».
  *
- * <p>Un acta <b>vehicular</b> sale siempre con los dos lados declarados nulos, y no es un hueco: un
- * vehículo no tiene área ni uso declarados contra los que contrastar. Lo mismo un acta predial de
- * un predio sin ficha registrada a la fecha de la visita, que es justamente el predio que no consta
- * en el catastro.
+ * <p>Tres casos salen sin lado declarado, y ninguno es un hueco: un acta <b>vehicular</b> —un
+ * vehículo no tiene área ni uso declarados—, un acta de un programa sin ejercicio —los anteriores a
+ * que el programa lo guardara, de los que no hay de dónde saber qué ejercicio examinaban— y un
+ * predio <b>sin declaración</b> en ese ejercicio, que es el omiso: {@code declarado} lo dice con
+ * {@link ComparacionHalladoDeclarado.LoDeclarado#nada()}, y su área y su uso salen nulos.
  *
  * @param acta la inspección registrada
- * @param areaDeclarada la superficie que consigna la versión de ficha que el acta referencia;
- *     {@code null} si el acta no referencia ninguna o la proyección no la tiene
- * @param usoDeclarado el uso que consigna esa misma versión; {@code null} por lo mismo
+ * @param declarado lo que consta declarado en el ejercicio del programa; {@code null} si no hay de
+ *     dónde saberlo (acta vehicular, o programa sin ejercicio)
  */
 public record ActaConLoDeclarado(
-        ActaFiscalizacion acta, @Nullable AreaM2 areaDeclarada, @Nullable String usoDeclarado) {
+        ActaFiscalizacion acta, ComparacionHalladoDeclarado.@Nullable LoDeclarado declarado) {
 
     public ActaConLoDeclarado {
         Objects.requireNonNull(acta, "El contraste es de un acta");
     }
 
-    /** El acta cuyo lado declarado no hay de dónde sacar: sin ficha referenciada, o vehicular. */
+    /**
+     * El acta cuyo lado declarado no hay de dónde sacar: vehicular, o de un programa sin ejercicio.
+     */
     public static ActaConLoDeclarado sinLadoDeclarado(ActaFiscalizacion acta) {
-        return new ActaConLoDeclarado(acta, null, null);
+        return new ActaConLoDeclarado(acta, null);
     }
 
-    /** El acta con lo que su versión de ficha consigna, si la proyección la tiene. */
-    public static ActaConLoDeclarado de(ActaFiscalizacion acta, @Nullable LoDeclarado ficha) {
-        return ficha == null
-                ? sinLadoDeclarado(acta)
-                : new ActaConLoDeclarado(acta, ficha.area(), ficha.uso());
+    /** El acta con lo que consta declarado, si hay de dónde saberlo. */
+    public static ActaConLoDeclarado de(
+            ActaFiscalizacion acta, ComparacionHalladoDeclarado.@Nullable LoDeclarado declarado) {
+        return new ActaConLoDeclarado(acta, declarado);
+    }
+
+    /** La superficie declarada; {@code null} si no declaró, o no hay de dónde saberlo. */
+    public @Nullable AreaM2 areaDeclarada() {
+        return declarado == null ? null : declarado.area();
+    }
+
+    /** El uso declarado; {@code null} por lo mismo. */
+    public @Nullable String usoDeclarado() {
+        return declarado == null ? null : declarado.uso();
     }
 
     /**
@@ -81,20 +89,6 @@ public record ActaConLoDeclarado(
      * la diferencia de un uso no es un número, y aquí no hay ninguna.
      */
     public @Nullable AreaM2 diferenciaDeArea() {
-        return ComparacionHalladoDeclarado.diferenciaDeArea(areaDeclarada, acta.areaHallada());
+        return ComparacionHalladoDeclarado.diferenciaDeArea(areaDeclarada(), acta.areaHallada());
     }
-
-    /**
-     * Lo que una versión de ficha consigna del lado declarado: su superficie y su uso.
-     *
-     * <p>Las dos columnas que {@code ficha_ref} proyecta de {@code ficha_catastral} (V4) y las
-     * únicas dos que el contraste de un acta necesita. No es {@link
-     * ComparacionHalladoDeclarado.LoDeclarado}: aquél lleva además si se presentó declaración
-     * jurada y si fue fuera de plazo, que es lo que decide {@code OMISO} y la multa del art. 176, y
-     * una ficha no sabe nada de eso.
-     *
-     * @param area la superficie de terreno de esa versión; {@code null} si la versión no la lleva
-     * @param uso el uso de esa versión; {@code null} si no lo lleva
-     */
-    public record LoDeclarado(@Nullable AreaM2 area, @Nullable String uso) {}
 }

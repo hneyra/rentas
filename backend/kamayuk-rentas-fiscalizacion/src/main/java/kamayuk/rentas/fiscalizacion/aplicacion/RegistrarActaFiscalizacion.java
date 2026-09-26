@@ -216,12 +216,11 @@ public class RegistrarActaFiscalizacion {
                                 guardada.observacion())
                         .con(null, descripcion(guardada)));
 
-        Long fichaId = guardada.fichaId();
-        return fichaId == null
-                ? ActaConLoDeclarado.sinLadoDeclarado(guardada)
-                : ActaConLoDeclarado.de(
-                        guardada,
-                        actas.loDeclaradoPorFicha(java.util.Set.of(fichaId)).get(fichaId));
+        long actaId =
+                java.util.Objects.requireNonNull(
+                        guardada.id(), "Un acta recien insertada vuelve con su identificador");
+        return ActaConLoDeclarado.de(
+                guardada, actas.loDeclaradoDeLasActas(java.util.Set.of(actaId)).get(actaId));
     }
 
     private static String descripcion(ActaFiscalizacion acta) {
