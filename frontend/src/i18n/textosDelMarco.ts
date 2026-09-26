@@ -243,6 +243,17 @@ export const FRASE_DEL_CONTEO = '{{cuantos}} de {{total}}';
 export const FRASE_DE_LA_FECHA = 'Las cifras son al {{fecha}}.';
 
 /**
+ * **«Actualizando»: las filas que se ven son de la pagina anterior mientras llega la pedida** (#393).
+ *
+ * Al pasar de pagina la tabla ya no se vacia —vaciarla desmontaba «Siguiente» con el foco dentro,
+ * y quien navega con teclado volvia a empezar desde el principio del documento en cada pagina—, asi
+ * que durante un instante la barra dice «Pagina 2» sobre las filas de la 1. Esa discordancia se
+ * dice aqui, arriba, en vez de esconderla.
+ */
+export const FRASE_DE_LA_PAGINA_QUE_LLEGA =
+  'Actualizando: las filas que se ven son de la pagina anterior, y se sustituyen en cuanto llega la pedida.';
+
+/**
  * **«Lo que se dibuja es de MEDINA SILVA, RUFINA (C-00025673)»: de quien es** (#239).
  *
  * Vive aqui por lo mismo que las dos de arriba: el conector entrega **las dos piezas crudas**
