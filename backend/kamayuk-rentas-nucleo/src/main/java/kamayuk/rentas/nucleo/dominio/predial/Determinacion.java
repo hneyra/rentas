@@ -57,6 +57,11 @@ import org.jspecify.annotations.Nullable;
  *     determinacion predial NUEVA no pueda quedarse sin ella lo garantiza {@link #nuevaPredial},
  *     que es la unica forma de construir una: la base no lo puede decir, porque un {@code CHECK} no
  *     distingue una fila de hoy de una de antes de la migracion
+ * @param origenDeLaBase de cual de los dos operandos del art. 32 salio la base vehicular —{@code
+ *     ADQUISICION}, {@code TABLA} o {@code TABLA_SIN_ADQUISICION}— (V37, #477). Es el nombre del
+ *     enumerado de {@code dominio.vehicular} y no el enumerado, porque ese paquete ya depende de
+ *     este y la referencia cerraria un ciclo; los valores los vigila {@code
+ *     determinacion_origen_base_ck}. Nulo fuera del vehicular y en las filas anteriores a V37
  */
 public record Determinacion(
         @Nullable Long id,
@@ -73,7 +78,8 @@ public record Determinacion(
         OrigenDeDeterminacion origen,
         EstadoDeDeterminacion estado,
         @Nullable String usuarioCalculo,
-        @Nullable ModalidadDelPredial modalidad) {
+        @Nullable ModalidadDelPredial modalidad,
+        @Nullable String origenDeLaBase) {
 
     private static final String PREDIAL = "PREDIAL";
     private static final String VEHICULAR = "VEHICULAR";
@@ -149,6 +155,13 @@ public record Determinacion(
                             + " no tiene modalidad que resolver aqui. Ver"
                             + " determinacion_modalidad_solo_predial_ck (V21)");
         }
+        if (origenDeLaBase != null && !VEHICULAR.equals(tributo)) {
+            throw new IllegalArgumentException(
+                    "El origen de la base es el del art. 32, que es del vehicular: un "
+                            + tributo
+                            + " no compara adquisicion y tabla. Ver"
+                            + " determinacion_origen_base_solo_vehicular_ck (V37)");
+        }
     }
 
     /**
@@ -191,7 +204,8 @@ public record Determinacion(
                 OrigenDeDeterminacion.ORDINARIA,
                 EstadoDeDeterminacion.BORRADOR,
                 null,
-                modalidad);
+                modalidad,
+                null);
     }
 
     /**
@@ -206,7 +220,11 @@ public record Determinacion(
             long conjuntoId,
             Dinero baseImponible,
             Dinero montoDeterminado,
-            List<String> reglasAplicadas) {
+            List<String> reglasAplicadas,
+            String origenDeLaBase) {
+        Objects.requireNonNull(
+                origenDeLaBase,
+                "Una determinacion vehicular dice de donde salio su base: adquisicion o tabla (#477)");
         return new Determinacion(
                 null,
                 ejercicio,
@@ -222,7 +240,8 @@ public record Determinacion(
                 OrigenDeDeterminacion.ORDINARIA,
                 EstadoDeDeterminacion.BORRADOR,
                 null,
-                null);
+                null,
+                origenDeLaBase);
     }
 
     /**
@@ -252,6 +271,7 @@ public record Determinacion(
                 OrigenDeDeterminacion.ORDINARIA,
                 EstadoDeDeterminacion.BORRADOR,
                 null,
+                null,
                 null);
     }
 
@@ -280,6 +300,7 @@ public record Determinacion(
                 reglasAplicadas,
                 OrigenDeDeterminacion.ORDINARIA,
                 EstadoDeDeterminacion.BORRADOR,
+                null,
                 null,
                 null);
     }

@@ -452,6 +452,87 @@ class RegistrarDeterminacionVehicularTest {
                     .isEqualByComparingTo("60000.00");
         }
 
+        /**
+         * #477 — De donde salio la base se guarda con la fila, y se relee.
+         *
+         * <p>El par que distingue: una adquisicion por encima de la tabla y un vehiculo sin
+         * adquisicion. Un origen fijo —o uno que no se escribiera— daria el mismo valor en los dos,
+         * o nulo; aqui cada fila tiene que decir el suyo.
+         */
+        @Test
+        @DisplayName(
+                "#477 — la fila guarda de donde salio la base: ADQUISICION y"
+                        + " TABLA_SIN_ADQUISICION")
+        void laFilaGuardaElOrigenDeLaBase() {
+            // Cada vehiculo se determina en cuanto se crea: crear el siguiente sella otro conjunto,
+            // que solo trae el valor referencial de su modelo.
+            long conAdquisicion = crearVehiculoConValorReferencial("W7D-704", "TOYOTA", "HILUX");
+            capturarAdquisicion(conAdquisicion, "30000.00", LocalDate.of(2024, 3, 2));
+            String delQueSeCompro = releida(determinar(conAdquisicion, EJERCICIO_AFECTO));
+            long sinAdquisicion = crearVehiculoConValorReferencial("W7E-705", "TOYOTA", "YARIS");
+            String delQueNoTieneElDato = releida(determinar(sinAdquisicion, EJERCICIO_AFECTO));
+
+            assertThat(java.util.Arrays.asList(delQueSeCompro, delQueNoTieneElDato))
+                    .as(
+                            "una determinacion reclamada tiene que decir si hubo comparacion con"
+                                    + " la adquisicion o solo el piso, y por que")
+                    .containsExactly("ADQUISICION", "TABLA_SIN_ADQUISICION");
+        }
+
+        @Test
+        @DisplayName("#477 — y la base no admite un origen del art. 32 en otro tributo")
+        void soloElVehicularLlevaOrigen() {
+            long vehiculoId = crearVehiculoConValorReferencial("W7F-706", "TOYOTA", "HILUX");
+            long id =
+                    java.util.Objects.requireNonNull(determinar(vehiculoId, EJERCICIO_AFECTO).id());
+
+            // La misma fila, como si fuera un PREDIAL: el origen no tiene sentido fuera del
+            // vehicular, y la base lo dice aunque el dominio no llegue a construirla.
+            assertThatThrownBy(
+                            () ->
+                                    transaccion.executeWithoutResult(
+                                            estado ->
+                                                    jdbc.sql(
+                                                                    "INSERT INTO determinacion"
+                                                                            + " (municipalidad_id,"
+                                                                            + " ejercicio, tributo,"
+                                                                            + " contribuyente_id,"
+                                                                            + " conjunto_id,"
+                                                                            + " base_imponible,"
+                                                                            + " monto_determinado,"
+                                                                            + " reglas_aplicadas,"
+                                                                            + " usuario_calculo,"
+                                                                            + " origen_base)"
+                                                                            + " SELECT"
+                                                                            + " municipalidad_id,"
+                                                                            + " ejercicio,"
+                                                                            + " 'PREDIAL',"
+                                                                            + " contribuyente_id,"
+                                                                            + " conjunto_id,"
+                                                                            + " base_imponible,"
+                                                                            + " monto_determinado,"
+                                                                            + " reglas_aplicadas,"
+                                                                            + " usuario_calculo,"
+                                                                            + " origen_base"
+                                                                            + " FROM determinacion"
+                                                                            + " WHERE id = :id")
+                                                            .param("id", id)
+                                                            .update()))
+                    .hasStackTraceContaining("determinacion_origen_base_solo_vehicular_ck");
+        }
+
+        /** El origen de la base, tal como quedo en la fila: se relee, no se toma del calculo. */
+        private String releida(Determinacion asentada) {
+            long id = java.util.Objects.requireNonNull(asentada.id());
+            return transaccion.execute(
+                    estado ->
+                            new kamayuk.rentas.nucleo.infraestructura.DeterminacionRepositoryJdbc(
+                                            jdbc)
+                                    .findById(id)
+                                    .orElseThrow()
+                                    .origenDeLaBase());
+        }
+
         private void capturarAdquisicion(long vehiculoId, String valor, LocalDate fecha) {
             transaccion.executeWithoutResult(
                     estado ->
