@@ -3,6 +3,7 @@ package kamayuk.rentas.coactiva.infraestructura.web;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.List;
@@ -20,10 +21,13 @@ import kamayuk.rentas.coactiva.dobles.FasesDeMentira;
 import kamayuk.rentas.coactiva.dobles.LibroDeMentira;
 import kamayuk.rentas.coactiva.dobles.MovimientosDelExpedienteEnMemoria;
 import kamayuk.rentas.coactiva.dobles.ValoresDeMentira;
+import kamayuk.rentas.coactiva.dominio.ExpedienteCoactivo;
+import kamayuk.rentas.coactiva.dominio.MovimientoDelExpediente;
 import kamayuk.rentas.contribuyentes.ResumenDeContribuyente;
 import kamayuk.rentas.cuentacorriente.ObligacionPublica;
 import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.dominio.Ejercicio;
+import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.valores.ObligacionDelValor;
 import kamayuk.rentas.valores.ValorParaCoactiva;
 import kamayuk.rentas.web.ConfiguracionDeJson;
@@ -475,6 +479,56 @@ class ExpedienteControllerTest {
 
         assertThat(resultado.getResponse().getStatus()).isEqualTo(422);
         assertThat(movimientos.cuantos()).isEqualTo(antes);
+    }
+
+    /**
+     * #439 — {@code ?ejecutor=} acota la grilla. Ninguna prueba web lo mandaba y el doble lo
+     * ignoraba; con dos ejecutores, cada uno ve solo el suyo, escrito como sea.
+     */
+    @Test
+    @DisplayName("#439 — ?ejecutor= acota la grilla: con dos ejecutores, cada uno ve el suyo")
+    void elEjecutorAcota() throws Exception {
+        abrir("EXP-2026-000011", "EJECUTOR UNO");
+        abrir("EXP-2026-000012", "EJECUTOR DOS");
+
+        String cuerpo =
+                mvc.perform(
+                                MockMvcRequestBuilders.get("/rentas/api/v1/coactiva/expedientes")
+                                        .param("ejecutor", "ejecutor dos"))
+                        .andReturn()
+                        .getResponse()
+                        .getContentAsString();
+
+        assertThat(cuerpo)
+                .contains("\"numero\":\"EXP-2026-000012\"")
+                .doesNotContain("EXP-2026-000011");
+    }
+
+    private void abrir(String numero, String ejecutor) {
+        Observacion porque = Observacion.de("Se registra para la prueba");
+        ExpedienteCoactivo expediente =
+                expedientes.abrir(
+                        new ExpedienteCoactivo(
+                                null,
+                                numero,
+                                EJERCICIO,
+                                Long.parseLong(numero.substring(numero.length() - 6)),
+                                7L,
+                                ejecutor,
+                                null,
+                                HOY,
+                                null,
+                                "AV. GRAU 100",
+                                Instant.parse("2026-06-15T09:00:00Z"),
+                                null,
+                                porque));
+        movimientos.registrar(
+                MovimientoDelExpediente.apertura(
+                        expediente.identificador(),
+                        HOY,
+                        "importacion de la prueba",
+                        Instant.parse("2026-06-15T09:00:00Z"),
+                        porque));
     }
 
     @Test

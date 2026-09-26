@@ -7,6 +7,7 @@ import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -178,6 +179,20 @@ public final class ExpedientesEnMemoria implements ExpedienteRepository {
             }
             if (criterio.contribuyenteId() != null
                     && expediente.contribuyenteId() != criterio.contribuyenteId()) {
+                continue;
+            }
+            // Los dos filtros que el repositorio real aplica (#439): un doble que ignora un
+            // criterio no sustituye al puerto, es otra implementacion, y deja en verde una prueba
+            // que no puede fallar. El ejecutor, en mayusculas como `upper(e.ejecutor)`.
+            if (criterio.ejecutor() != null
+                    && !expediente
+                            .ejecutor()
+                            .toUpperCase(Locale.ROOT)
+                            .equals(criterio.ejecutor())) {
+                continue;
+            }
+            if (criterio.ejercicio() != null
+                    && expediente.ejercicio().valor() != criterio.ejercicio()) {
                 continue;
             }
             List<MovimientoDelExpediente> historial =
