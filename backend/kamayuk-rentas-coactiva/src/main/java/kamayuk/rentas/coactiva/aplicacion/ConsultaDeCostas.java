@@ -57,12 +57,17 @@ public class ConsultaDeCostas {
     /**
      * Las liquidaciones que cumplen el criterio, con su pendiente y su estado a la fecha.
      *
+     * <p>Con {@code estado} el recuento que se publica es el <b>del criterio</b>, no el de las
+     * filas, y por eso sale como {@link PaginaDescartadaTrasPaginar} y no como una {@code Pagina}
+     * (#425): hasta #425 la grilla decia «2 de 45» sobre las dos ACTIVA de la primera pagina.
+     *
      * @param estado si se da, se descartan las filas que no lo tengan. Se filtra <b>despues</b> de
-     *     paginar y no en SQL, porque el estado se deriva del libro y filtrarlo antes exigiria
-     *     consultar la deuda de todas las liquidaciones de la municipalidad
+     *     paginar y no en SQL, porque el estado se deriva del libro de {@code cuentacorriente} y
+     *     filtrarlo antes exigiria nombrar sus tablas desde aqui (ARQ-01 §4 regla 2) o consultar la
+     *     deuda de todas las liquidaciones de la municipalidad
      */
     @Transactional(readOnly = true)
-    public Pagina<LiquidacionEnConsulta> buscar(
+    public PaginaDescartadaTrasPaginar<LiquidacionEnConsulta> buscar(
             CriterioDeLiquidaciones criterio,
             LocalDate aLaFecha,
             @Nullable EstadoDeLaLiquidacion estado,
@@ -74,15 +79,15 @@ public class ConsultaDeCostas {
         Pagina<LiquidacionDeCostas> pagina = liquidaciones.consultar(criterio, paginacion);
         Map<Long, List<ObligacionPublica>> porContribuyente = new HashMap<>();
 
-        Pagina<LiquidacionEnConsulta> compuesta =
-                pagina.mapear(fila -> componer(fila, aLaFecha, porContribuyente));
-        if (estado == null) {
-            return compuesta;
-        }
-        List<LiquidacionEnConsulta> filtradas =
-                compuesta.contenido().stream().filter(fila -> fila.estado() == estado).toList();
-        return new Pagina<>(
-                filtradas, compuesta.pagina(), compuesta.tamano(), compuesta.totalElementos());
+        List<LiquidacionEnConsulta> filas =
+                pagina
+                        .mapear(fila -> componer(fila, aLaFecha, porContribuyente))
+                        .contenido()
+                        .stream()
+                        .filter(fila -> estado == null || fila.estado() == estado)
+                        .toList();
+        return new PaginaDescartadaTrasPaginar<>(
+                filas, pagina.pagina(), pagina.tamano(), pagina.totalElementos());
     }
 
     /** Una liquidacion por su numero, con su detalle. */

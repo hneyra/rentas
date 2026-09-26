@@ -1,22 +1,10 @@
-import { coordenada, type CeldaDeLaTabla } from '@kamayuk/ui';
+import { coordenada, type CeldaDeLaTabla } from "@kamayuk/ui";
 
-import type { Conector, Reparto } from '../conectores.ts';
-import { NO_PUBLICADO, ejercicioDeLaRespuesta } from '../conectores.ts';
-import {
-  formatearEntero,
-  formatearFecha,
-  formatearImporte,
-  formatearImporteEnColumna,
-} from '../../dominio/formato.ts';
-import type {
-  ActoDelExpediente,
-  LiquidacionDeCostas,
-  Paginado,
-  PrescripcionDeclarada,
-  ProcesoDelExpediente,
-  ResumenDeLaCarteraCoactiva,
-} from '../lecturas.ts';
-import { RUTAS, pedirPagina, pedirUno } from '../lecturas.ts';
+import type { Conector, Reparto } from "../conectores.ts";
+import { NO_PUBLICADO, ejercicioDeLaRespuesta } from "../conectores.ts";
+import { formatearEntero, formatearFecha, formatearImporte, formatearImporteEnColumna } from "../../dominio/formato.ts";
+import type { ActoDelExpediente, LiquidacionDeCostas, Paginado, PrescripcionDeclarada, ProcesoDelExpediente, ResumenDeLaCarteraCoactiva } from "../lecturas.ts";
+import { RUTAS, pedirPagina, pedirPaginaDelCriterio, pedirUno } from "../lecturas.ts";
 
 /**
  * **Lo que las tres hojas de Coactiva sacan de sus operaciones** (#170).
@@ -60,12 +48,12 @@ const sinDato = (porQue: string): CeldaDeLaTabla => ({ texto: null, nota: porQue
 /** Lo que dice la celda de un acto en el que la operacion no publica en que quedo. */
 /** Lo que dice la celda «Cantidad» de `coa-cost`. El arancel tarifa el acto una vez. */
 const SIN_CANTIDAD =
-  'CostaResource no publica ninguna cantidad, y no es un olvido: el arancel tarifa el acto una ' +
-  'vez y «costa_acto_uq» impide liquidarlo dos, asi que una cantidad solo podria valer uno.';
+  "CostaResource no publica ninguna cantidad, y no es un olvido: el arancel tarifa el acto una " +
+  "vez y «costa_acto_uq» impide liquidarlo dos, asi que una cantidad solo podria valer uno.";
 
 const SIN_MEDIDA =
-  'El expediente solo publica en que quedo un acto cuando dicto una medida cautelar; de este no ' +
-  'publica ninguna. Escribir «Conforme» aqui seria afirmar que el acto surtio efecto.';
+  "El expediente solo publica en que quedo un acto cuando dicto una medida cautelar; de este no " +
+  "publica ninguna. Escribir «Conforme» aqui seria afirmar que el acto surtio efecto.";
 
 /** `"9412.15"` + `"2026-08-04"` -> `"S/ 9,412.15 · 04/08/2026"`. Regla 9. */
 function importeConSuFecha(importe: string, fecha: string): string {
@@ -124,9 +112,8 @@ function importeConSuFecha(importe: string, fecha: string): string {
  * llegaba y no se usaba, viaja por el `Reparto` como en `fis-panel`: la hoja dice de que dia es.
  */
 const COA_PANEL: Conector = {
-  clave: ['coa-panel', 'resumenDeLaCarteraCoactiva'],
-  pedir: ({ senal }) =>
-    pedirUno<ResumenDeLaCarteraCoactiva>(RUTAS.resumenDeLaCarteraCoactiva, senal),
+  clave: ["coa-panel", "resumenDeLaCarteraCoactiva"],
+  pedir: ({ senal }) => pedirUno<ResumenDeLaCarteraCoactiva>(RUTAS.resumenDeLaCarteraCoactiva, senal),
   repartir: (resumen: ResumenDeLaCarteraCoactiva): Reparto => ({
     valores: new Map([
       // `0|0` es el desplegable de ejercicio, no un campo de solo lectura: las coordenadas son las
@@ -234,9 +221,7 @@ interface ProcesoYSusCostas {
  * decir cual. Con un mapa vacio las dos se dirian igual, y la segunda es una averia disfrazada de
  * hecho del negocio.
  */
-type CostasDelExpediente =
-  | { readonly seSupo: true; readonly porActo: ReadonlyMap<number, string> }
-  | { readonly seSupo: false; readonly porQue: string };
+type CostasDelExpediente = { readonly seSupo: true; readonly porActo: ReadonlyMap<number, string> } | { readonly seSupo: false; readonly porQue: string };
 
 /**
  * **La costa de cada acto, cruzada por `actoId`** (#200).
@@ -274,9 +259,9 @@ function costasPorActo(liquidaciones: readonly LiquidacionDeCostas[]): CostasDel
     return {
       seSupo: false,
       porQue:
-        'Dos liquidaciones distintas tarifan el mismo acto, y «costa_acto_uq» dice que eso no ' +
-        `puede pasar (actos ${repetidos.join(', ')}). Elegir una de las dos pondria un importe ` +
-        'plausible donde hay una contradiccion, en una columna que es deuda del obligado.',
+        "Dos liquidaciones distintas tarifan el mismo acto, y «costa_acto_uq» dice que eso no " +
+        `puede pasar (actos ${repetidos.join(", ")}). Elegir una de las dos pondria un importe ` +
+        "plausible donde hay una contradiccion, en una columna que es deuda del obligado.",
     };
   }
   return { seSupo: true, porActo };
@@ -293,26 +278,20 @@ function costaDelActo(acto: ActoDelExpediente, costas: CostasDelExpediente): Cel
     return formatearImporteEnColumna(tarifada);
   }
   return sinDato(
-    'Ninguna liquidacion de costas de este expediente tarifa este acto todavia. **No es cero**: ' +
-      'cero seria que el arancel dice que no cuesta nada, y lo que pasa es que no se ha liquidado.',
+    "Ninguna liquidacion de costas de este expediente tarifa este acto todavia. **No es cero**: " +
+      "cero seria que el arancel dice que no cuesta nada, y lo que pasa es que no se ha liquidado.",
   );
 }
 
 const COA_EXP: Conector = {
-  clave: ['coa-exp', 'proceso'],
+  clave: ["coa-exp", "proceso"],
   pedir: async ({ senal }) => {
-    const cartera = await pedirPagina<{ readonly numero: string }>(
-      RUTAS.expedientesCoactivos,
-      senal,
-    );
+    const cartera = await pedirPagina<{ readonly numero: string }>(RUTAS.expedientesCoactivos, senal);
     const primero = cartera.contenido[0];
     // Sin expediente no hay proceso que pedir. `null` es «se pregunto y no hay», que la pantalla
     // dice distinto de un fallo.
     if (primero === undefined) return null;
-    const proceso = await pedirUno<ProcesoDelExpediente>(
-      RUTAS.procesoDelExpediente(primero.numero),
-      senal,
-    );
+    const proceso = await pedirUno<ProcesoDelExpediente>(RUTAS.procesoDelExpediente(primero.numero), senal);
     return { proceso, costas: await costasDe(primero.numero, senal) };
   },
   repartir: ({ proceso, costas }: ProcesoYSusCostas): Reparto => {
@@ -322,10 +301,7 @@ const COA_EXP: Conector = {
         [coordenada(0, 0), expediente.numero],
         [coordenada(0, 1), expediente.codContribuyente],
         [coordenada(0, 3), formatearFecha(expediente.fechaDeApertura)],
-        [
-          coordenada(0, 6),
-          importeConSuFecha(expediente.deudaMateriaDeCobranza, expediente.deudaAlDia),
-        ],
+        [coordenada(0, 6), importeConSuFecha(expediente.deudaMateriaDeCobranza, expediente.deudaAlDia)],
         [coordenada(0, 7), importeConSuFecha(expediente.costas, expediente.deudaAlDia)],
       ]),
       // Vacio: esta tabla lleva `clave` desde #195, asi que sus filas van por `tablas` — el unico
@@ -333,17 +309,11 @@ const COA_EXP: Conector = {
       filas: new Map(),
       tablas: new Map([
         [
-          'actos-del-expediente',
+          "actos-del-expediente",
           {
             filas: proceso.actuaciones.map((acto) => ({
               clave: String(acto.actoId),
-              celdas: [
-                acto.numero,
-                acto.titulo,
-                formatearFecha(acto.fecha),
-                costaDelActo(acto, costas),
-                acto.medida ?? sinDato(SIN_MEDIDA),
-              ],
+              celdas: [acto.numero, acto.titulo, formatearFecha(acto.fecha), costaDelActo(acto, costas), acto.medida ?? sinDato(SIN_MEDIDA)],
             })),
             // **Sin total**: `actuaciones[]` no es una pagina —el proceso las publica todas— asi
             // que no hay ningun `totalElementos` que enseñar, y el interprete cuenta las que hay.
@@ -369,17 +339,14 @@ const COA_EXP: Conector = {
  */
 async function costasDe(numero: string, senal: AbortSignal): Promise<CostasDelExpediente> {
   try {
-    const relacion = await pedirPagina<LiquidacionDeCostas>(
-      RUTAS.liquidacionesDelExpediente(numero),
-      senal,
-    );
+    const relacion = await pedirPaginaDelCriterio<LiquidacionDeCostas>(RUTAS.liquidacionesDelExpediente(numero), senal);
     if (relacion.hayMas) {
       return {
         seSupo: false,
         porQue:
           `Las liquidaciones de costas de ${numero} no caben en una pagina ` +
-          `(${String(relacion.totalElementos)} en total). Con solo las primeras, un acto ` +
-          'liquidado en la siguiente diria que no esta liquidado, que es un hueco falso.',
+          `de ${String(relacion.tamano)}. Con solo las primeras, un acto ` +
+          "liquidado en la siguiente diria que no esta liquidado, que es un hueco falso.",
       };
     }
     return costasPorActo(relacion.contenido);
@@ -387,9 +354,9 @@ async function costasDe(numero: string, senal: AbortSignal): Promise<CostasDelEx
     return {
       seSupo: false,
       porQue:
-        'No se pudieron pedir las liquidaciones de costas de este expediente' +
-        (fallo instanceof Error && fallo.message !== '' ? `: ${fallo.message}` : '.') +
-        ' Las otras cuatro columnas si llegaron, y por eso la tabla se dibuja igual.',
+        "No se pudieron pedir las liquidaciones de costas de este expediente" +
+        (fallo instanceof Error && fallo.message !== "" ? `: ${fallo.message}` : ".") +
+        " Las otras cuatro columnas si llegaron, y por eso la tabla se dibuja igual.",
     };
   }
 }
@@ -426,10 +393,7 @@ interface CostasYPrescripcion {
  *
  * Y `null` tambien cuando el obligado no declaro nada, que es lo que el campo decia ya.
  */
-function plazoDelObligado(
-  obligado: string,
-  declaradas: Paginado<PrescripcionDeclarada>,
-): string | null {
+function plazoDelObligado(obligado: string, declaradas: Paginado<PrescripcionDeclarada>): string | null {
   if (declaradas.hayMas) return null;
   if (declaradas.contenido.some((declaracion) => declaracion.codContribuyente !== obligado)) {
     return null;
@@ -498,17 +462,14 @@ function plazoDelObligado(
  * impide liquidarlo dos.
  */
 const COA_COST: Conector = {
-  clave: ['coa-cost', 'liquidacion-de-costas'],
+  clave: ["coa-cost", "liquidacion-de-costas"],
   pedir: async ({ senal }) => {
-    const relacion = await pedirPagina<LiquidacionDeCostas>(RUTAS.liquidacionesDeCostas, senal);
+    const relacion = await pedirPaginaDelCriterio<LiquidacionDeCostas>(RUTAS.liquidacionesDeCostas, senal);
     const liquidacion = relacion.contenido[0];
     if (liquidacion === undefined) return null;
     // El obligado sale del expediente de la liquidacion (#386): es el sujeto de la lectura de
     // abajo, y no el tributo.
-    const { expediente } = await pedirUno<ProcesoDelExpediente>(
-      RUTAS.procesoDelExpediente(liquidacion.expedCoact),
-      senal,
-    );
+    const { expediente } = await pedirUno<ProcesoDelExpediente>(RUTAS.procesoDelExpediente(liquidacion.expedCoact), senal);
     const declaradas = await pedirPagina<PrescripcionDeclarada>(
       RUTAS.prescripcionesDe({
         codContribuyente: expediente.codContribuyente,
@@ -529,7 +490,7 @@ const COA_COST: Conector = {
       filas: new Map(),
       tablas: new Map([
         [
-          'costas-por-acto',
+          "costas-por-acto",
           {
             filas: liquidacion.costas.map((costa) => ({
               clave: String(costa.actoId),
@@ -573,21 +534,10 @@ const COA_COST: Conector = {
  * Mientras tanto dice, entera y con una sola frase, que no esta conectada.
  */
 export const CONECTORES_DE_COACTIVA = {
-  'coa-panel': COA_PANEL,
-  'coa-exp': COA_EXP,
-  'coa-cost': COA_COST,
+  "coa-panel": COA_PANEL,
+  "coa-exp": COA_EXP,
+  "coa-cost": COA_COST,
 } as const;
 
-export {
-  COA_PANEL,
-  COA_EXP,
-  COA_COST,
-  SIN_CANTIDAD,
-  SIN_MEDIDA,
-  costaDelActo,
-  costasPorActo,
-  importeConSuFecha,
-  plazoDelObligado,
-  sinDato,
-};
+export { COA_PANEL, COA_EXP, COA_COST, SIN_CANTIDAD, SIN_MEDIDA, costaDelActo, costasPorActo, importeConSuFecha, plazoDelObligado, sinDato };
 export type { CostasDelExpediente, CostasYPrescripcion, ProcesoYSusCostas };

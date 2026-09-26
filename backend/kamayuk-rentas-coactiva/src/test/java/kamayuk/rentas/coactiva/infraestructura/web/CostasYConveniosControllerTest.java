@@ -442,6 +442,49 @@ class CostasYConveniosControllerTest {
                 .doesNotContain("totalElementos");
     }
 
+    // ---------------------------------------- #425: las costas, igual que las deudas
+
+    @Test
+    @DisplayName(
+            "#425 — filtrar las costas por estado publica «liquidacionesDelCriterio», no"
+                    + " «totalElementos»")
+    void elRecuentoDeLasCostasDiceQueCuenta() throws Exception {
+        String expediente = expedienteConRec1();
+        MvcResult liquidada =
+                costasMvc
+                        .perform(
+                                MockMvcRequestBuilders.post(
+                                                "/rentas/api/v1/coactiva/liquidaciones-costas")
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(
+                                                "{\"nroExpedCoact\":\""
+                                                        + expediente
+                                                        + "\",\"observacion\":\"Se liquidan las"
+                                                        + " costas del procedimiento\"}"))
+                        .andReturn();
+        assertThat(liquidada.getResponse().getStatus()).isEqualTo(201);
+
+        // Una liquidacion, y dos estados: en uno de los dos la consulta la descarta DESPUES de
+        // que la base la contara. Es la siembra que distingue: con las filas y el recuento
+        // coincidiendo, publicar cualquiera de los dos con cualquier nombre pasaria.
+        String activas = listarCostas("estado=ACTIVA").getResponse().getContentAsString();
+        String canceladas = listarCostas("estado=CANCELADA").getResponse().getContentAsString();
+
+        assertThat(List.of(activas, canceladas))
+                .as("en uno de los dos estados la unica liquidacion se descarta")
+                .anyMatch(cuerpo -> cuerpo.contains("\"contenido\":[]"));
+        assertThat(List.of(activas, canceladas))
+                .as(
+                        "y en los dos el recuento es la liquidacion del criterio, con su nombre:"
+                                + " «totalElementos» prometeria «las filas sin paginar» y aqui"
+                                + " dejaba la grilla en «2 de 45» sobre dos filas")
+                .allSatisfy(
+                        cuerpo ->
+                                assertThat(cuerpo)
+                                        .contains("\"liquidacionesDelCriterio\":1")
+                                        .doesNotContain("totalElementos"));
+    }
+
     // ---------------------------------------- #562: lo que falta publicar es 422, no 500
 
     @Test

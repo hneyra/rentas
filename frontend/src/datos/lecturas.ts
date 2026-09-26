@@ -1,4 +1,4 @@
-import { solicitar } from '../api/cliente.ts';
+import { solicitar } from "../api/cliente.ts";
 
 /**
  * Lo que las pantallas leen del backend, con la forma que el backend publica.
@@ -1837,9 +1837,9 @@ export interface SesionTrasElCambio {
  * pantalla. Las que llevan parametro son funciones, para que el parametro no se olvide.
  */
 export const RUTAS = {
-  sesion: '/seguridad/sesion',
-  municipalidadDeLaSesion: '/seguridad/sesion/municipalidad',
-  modulos: '/seguridad/modulos',
+  sesion: "/seguridad/sesion",
+  municipalidadDeLaSesion: "/seguridad/sesion/municipalidad",
+  modulos: "/seguridad/modulos",
   // `tamano` a 200 porque el catalogo tiene 134 accesos y el tamano por omision es 20.
   //
   // **Medido contra la instalacion, no supuesto**: sin el, `GET /seguridad/accesos` contesta
@@ -1848,10 +1848,10 @@ export const RUTAS = {
   // algun acceso conocido, y de los diez que este sistema sirve **se caerian cinco**: Inicio,
   // Fiscalización, Tránsito, Consultas y Valores. El sintoma no seria un error — seria un
   // panel con cinco modulos y ninguna pista de que faltan los otros.
-  accesos: '/seguridad/accesos?tamano=200',
-  permisosDeLaSesion: '/seguridad/sesion/permisos',
-  ejercicioDeLaSesion: '/seguridad/sesion/ejercicio',
-  padron: '/rentas/contribuyentes',
+  accesos: "/seguridad/accesos?tamano=200",
+  permisosDeLaSesion: "/seguridad/sesion/permisos",
+  ejercicioDeLaSesion: "/seguridad/sesion/ejercicio",
+  padron: "/rentas/contribuyentes",
   ficha: (id: number) => `/rentas/contribuyentes/${String(id)}/ficha`,
   /**
    * Los predios de UN contribuyente, por su codigo (#26).
@@ -1865,8 +1865,7 @@ export const RUTAS = {
    * Se manda el nombre canonico y no `contribuyente`: los dos valen, y elegir el que el
    * contrato declara primero deja una sola forma en la interfaz.
    */
-  prediosDe: (codigo: string) =>
-    `/rentas/predios?codContribuyente=${encodeURIComponent(codigo)}`,
+  prediosDe: (codigo: string) => `/rentas/predios?codContribuyente=${encodeURIComponent(codigo)}`,
   /**
    * Los beneficios de UN contribuyente, por su codigo.
    *
@@ -1880,14 +1879,12 @@ export const RUTAS = {
    * La deuda de UN contribuyente (#26). Aqui `codContribuyente` no tiene segundo nombre: es el
    * unico que `GET /consultas/deuda` admite, y sin el contesta 422.
    */
-  deudaDe: (codigo: string) =>
-    `/consultas/deuda?codContribuyente=${encodeURIComponent(codigo)}`,
+  deudaDe: (codigo: string) => `/consultas/deuda?codContribuyente=${encodeURIComponent(codigo)}`,
   /**
    * La ficha unificada de UN contribuyente (#169). `?contribuyente=` es **obligatorio** en el
    * contrato y en el controlador: sin el, ni siquiera se llega al metodo.
    */
-  fichaUnificadaDe: (codigo: string) =>
-    `/consultas/unificada?contribuyente=${encodeURIComponent(codigo)}`,
+  fichaUnificadaDe: (codigo: string) => `/consultas/unificada?contribuyente=${encodeURIComponent(codigo)}`,
   /**
    * La simulacion de acogimiento de UN contribuyente (#169).
    *
@@ -1900,8 +1897,7 @@ export const RUTAS = {
    * no tiene el desplegable que la haria; mandar una fija seria simular un descuento que nadie
    * pidio sobre la deuda de alguien.
    */
-  deudasConBeneficioDe: (codigo: string) =>
-    `/consultas/deudas-con-beneficio?contribuyente=${encodeURIComponent(codigo)}`,
+  deudasConBeneficioDe: (codigo: string) => `/consultas/deudas-con-beneficio?contribuyente=${encodeURIComponent(codigo)}`,
   /**
    * La constancia de no adeudo de UN contribuyente (#169).
    *
@@ -1909,9 +1905,8 @@ export const RUTAS = {
    * contrario que en las dos de arriba. Sin `?formato=`, que es lo que distingue el JSON que esta
    * pantalla pinta del archivo descargable de RF-132.
    */
-  constanciaDeNoAdeudoDe: (codigo: string) =>
-    `/consultas/constancias/no-adeudo?codContribuyente=${encodeURIComponent(codigo)}`,
-  coactiva: '/coactiva/deudas',
+  constanciaDeNoAdeudoDe: (codigo: string) => `/consultas/constancias/no-adeudo?codContribuyente=${encodeURIComponent(codigo)}`,
+  coactiva: "/coactiva/deudas",
   /**
    * El resumen de la cartera coactiva por etapa (#272).
    *
@@ -1921,7 +1916,7 @@ export const RUTAS = {
    * seria mandar uno que nadie eligio. La operacion lo admite y lo devuelve en la respuesta; el
    * dia que el mando publique su valor, lo que cambia es esta ruta.
    */
-  resumenDeLaCarteraCoactiva: '/coactiva/cartera/resumen',
+  resumenDeLaCarteraCoactiva: "/coactiva/cartera/resumen",
   /**
    * El primer expediente de la cartera coactiva (#170).
    *
@@ -1942,15 +1937,14 @@ export const RUTAS = {
    * en el estado de `<Pantalla>` y no lo publica por ningun lado— y #172. Escrito aqui para que no
    * haya que volver a medirlo.
    */
-  expedientesCoactivos: '/coactiva/expedientes?tamano=1',
+  expedientesCoactivos: "/coactiva/expedientes?tamano=1",
   /**
    * El seguimiento de UN expediente: su cabecera, su deuda a la fecha y sus actos.
    *
    * `{numero}` es el numero impreso del expediente, y sale de la lista de arriba. No se inventa:
    * sin un expediente elegido no hay proceso que pedir.
    */
-  procesoDelExpediente: (numero: string) =>
-    `/coactiva/expedientes/${encodeURIComponent(numero)}/proceso`,
+  procesoDelExpediente: (numero: string) => `/coactiva/expedientes/${encodeURIComponent(numero)}/proceso`,
   /**
    * La primera liquidacion de costas de la relacion. `tamano` esta publicado, como arriba.
    *
@@ -1963,7 +1957,7 @@ export const RUTAS = {
    * en el estado de `<Pantalla>` y no lo publica por ningun lado— y #172. Escrito aqui para que no
    * haya que volver a medirlo.
    */
-  liquidacionesDeCostas: '/coactiva/liquidaciones-costas?tamano=1',
+  liquidacionesDeCostas: "/coactiva/liquidaciones-costas?tamano=1",
   /**
    * **Las liquidaciones de costas de UN expediente** (#200).
    *
@@ -1982,8 +1976,7 @@ export const RUTAS = {
    *
    * El tope del backend es 500 (`Paginacion.TAMANO_MAXIMO`).
    */
-  liquidacionesDelExpediente: (numero: string) =>
-    `/coactiva/liquidaciones-costas?nroExpedCoact=${encodeURIComponent(numero)}&tamano=100`,
+  liquidacionesDelExpediente: (numero: string) => `/coactiva/liquidaciones-costas?nroExpedCoact=${encodeURIComponent(numero)}&tamano=100`,
   /**
    * Las prescripciones declaradas **por UN obligado sobre un tributo** (#386).
    *
@@ -2012,15 +2005,8 @@ export const RUTAS = {
    * prescripcion de un obligado sobre un tributo no existen— y **el conector comprueba `hayMas`**:
    * si alguna vez no cupieran, el campo dice «no publicado» en vez de afirmar un plazo.
    */
-  prescripcionesDe: ({
-    codContribuyente,
-    tributo,
-  }: {
-    readonly codContribuyente: string;
-    readonly tributo: string;
-  }) =>
-    `/coactiva/prescripcion?codContribuyente=${encodeURIComponent(codContribuyente)}` +
-    `&tributo=${encodeURIComponent(tributo)}&tamano=100`,
+  prescripcionesDe: ({ codContribuyente, tributo }: { readonly codContribuyente: string; readonly tributo: string }) =>
+    `/coactiva/prescripcion?codContribuyente=${encodeURIComponent(codContribuyente)}` + `&tributo=${encodeURIComponent(tributo)}&tamano=100`,
   /**
    * **La bitacora entera de declaraciones de prescripcion**, sin filtrar (#230).
    *
@@ -2034,7 +2020,7 @@ export const RUTAS = {
    * ventana; que no lleve mando para moverla esta dicho en el javadoc de su conector, con el
    * motivo —la fila de la tabla y el elemento de la pagina no son la misma cosa—.
    */
-  prescripciones: '/coactiva/prescripcion?tamano=20',
+  prescripciones: "/coactiva/prescripcion?tamano=20",
   /**
    * El primer programa de fiscalizacion de la relacion (#179).
    *
@@ -2047,7 +2033,7 @@ export const RUTAS = {
    * El dia que la pantalla tenga su caja de busqueda, lo que cambia es esta ruta: el criterio
    * tambien esta publicado (`nDePrograma`, `ejercicio`).
    */
-  programasDeFiscalizacion: '/fiscalizacion/programas?tamano=1',
+  programasDeFiscalizacion: "/fiscalizacion/programas?tamano=1",
   /**
    * Los predios sorteados en la muestra de UN programa.
    *
@@ -2064,8 +2050,7 @@ export const RUTAS = {
    * sino que sale de `paginacion.tamano` de su tabla (ver `datos/laVentana.ts`): en dos sitios
    * diverge, y entonces los mandos cuentan paginas de cien sobre respuestas de veinte.
    */
-  muestraDelPrograma: (id: number, ventana: Readonly<Record<string, string>> = {}) =>
-    conParametros(`/fiscalizacion/programas/${String(id)}/muestra`, ventana),
+  muestraDelPrograma: (id: number, ventana: Readonly<Record<string, string>> = {}) => conParametros(`/fiscalizacion/programas/${String(id)}/muestra`, ventana),
   /**
    * **El embudo de UN programa: las cuatro cifras de `fis-panel`, juntas y cuadradas** (#196).
    *
@@ -2105,7 +2090,7 @@ export const RUTAS = {
    * en el estado de `<Pantalla>` y no lo publica por ningun lado— y #172. Escrito aqui para que no
    * haya que volver a medirlo.
    */
-  actasDeFiscalizacion: '/fiscalizacion/actas?tamano=1',
+  actasDeFiscalizacion: "/fiscalizacion/actas?tamano=1",
   /**
    * **La primera resolucion de determinacion de la relacion** (#192, #215).
    *
@@ -2126,7 +2111,7 @@ export const RUTAS = {
    * elegido a alguien, y elegirlo aqui seria decidir por quien atiende de quien es la resolucion
    * que se mira. Ademas un codigo que no existe es **404** y no una relacion sin filtrar.
    */
-  resolucionesDeDeterminacion: '/fiscalizacion/resoluciones?tamano=1',
+  resolucionesDeDeterminacion: "/fiscalizacion/resoluciones?tamano=1",
   /**
    * La resolucion de determinacion de UN numero (#179).
    *
@@ -2139,8 +2124,7 @@ export const RUTAS = {
    * que esta pantalla dibuja. Es exactamente la distincion que #169 tuvo que hacer con
    * `constancias/no-adeudo`.
    */
-  resolucionDeDeterminacion: (numero: string) =>
-    `/fiscalizacion/resoluciones/${encodeURIComponent(numero)}`,
+  resolucionDeDeterminacion: (numero: string) => `/fiscalizacion/resoluciones/${encodeURIComponent(numero)}`,
   /**
    * **La ultima EMISION del ejercicio, y no la ultima corrida** (#357).
    *
@@ -2154,7 +2138,7 @@ export const RUTAS = {
    * `false` y no `true`: `true` es 422, porque «la ultima simulacion» no es una lectura que la
    * ruta publique. Lo declara `parametros-de-la-api.json`.
    */
-  ultimaEmision: '/rentas/predial/corridas/ultima?simulacion=false',
+  ultimaEmision: "/rentas/predial/corridas/ultima?simulacion=false",
   /**
    * La ultima determinacion predial GUARDADA de un contribuyente, de un ejercicio (#207, #237).
    *
@@ -2172,13 +2156,13 @@ export const RUTAS = {
    * «como si» fuera otra modalidad seria publicar uno que el contribuyente no recibio.
    */
   determinacionGuardada: (codigo: string, ejercicio: number) =>
-    conParametros('/rentas/predial/determinaciones', {
+    conParametros("/rentas/predial/determinaciones", {
       codContribuyente: codigo,
       ejercicio: String(ejercicio),
     }),
   observados: (corridaId: number) => `/rentas/predial/corridas/${String(corridaId)}/observados`,
-  recaudacion: '/indicadores/recaudacion',
-  trabajoParado: '/indicadores/trabajo-parado',
+  recaudacion: "/indicadores/recaudacion",
+  trabajoParado: "/indicadores/trabajo-parado",
   /**
    * La bitacora de UN ejercicio (#26, #181).
    *
@@ -2204,7 +2188,7 @@ export const RUTAS = {
    */
   bitacoraDe: (ejercicio: number, ventana: Readonly<Record<string, string>> = {}) =>
     conParametros(`/seguridad/auditoria?ejercicio=${encodeURIComponent(String(ejercicio))}`, ventana),
-  arbitrios: '/rentas/arbitrios',
+  arbitrios: "/rentas/arbitrios",
   /**
    * El catalogo CIIU, **una ventana y no la lista entera** (#168, #172, #186).
    *
@@ -2223,8 +2207,7 @@ export const RUTAS = {
    * («Buscar giro o actividad»). Los cinco los publica el contrato
    * (`docs/50-api/parametros-de-la-api.json`), que es la condicion para mandarlos (#26).
    */
-  ciiu: (ventana: Readonly<Record<string, string>> = {}) =>
-    conParametros('/licencias/ciiu', ventana),
+  ciiu: (ventana: Readonly<Record<string, string>> = {}) => conParametros("/licencias/ciiu", ventana),
   /**
    * El padron de licencias de funcionamiento (#168, #186).
    *
@@ -2242,8 +2225,7 @@ export const RUTAS = {
    * licencias cuya direccion contiene esa palabra. Desde #236 el sentido se llama `sentido` y el
    * choque no puede volver: la palabra del dominio es del dominio.
    */
-  licenciasDeFuncionamiento: (ventana: Readonly<Record<string, string>> = {}) =>
-    conParametros('/licencias/funcionamiento', ventana),
+  licenciasDeFuncionamiento: (ventana: Readonly<Record<string, string>> = {}) => conParametros("/licencias/funcionamiento", ventana),
   /**
    * La papeleta que `tra-pap` dibuja: **la primera de la relacion, sin filtrar** (#180).
    *
@@ -2266,7 +2248,7 @@ export const RUTAS = {
    * en el estado de `<Pantalla>` y no lo publica por ningun lado— y #172. Escrito aqui para que no
    * haya que volver a medirlo.
    */
-  papeletas: '/transito/papeletas?tamano=1',
+  papeletas: "/transito/papeletas?tamano=1",
   /**
    * Todos los documentos emitidos por UNA papeleta, con sus acuses.
    *
@@ -2274,8 +2256,7 @@ export const RUTAS = {
    * hay expediente que pedir. **Sin `?familia=`**, que es opcional y por omision vale
    * `TRANSITO` — que es justo la familia de esta hoja.
    */
-  actosDeLaPapeleta: (numero: string) =>
-    `/transito/papeletas/${encodeURIComponent(numero)}/actos`,
+  actosDeLaPapeleta: (numero: string) => `/transito/papeletas/${encodeURIComponent(numero)}/actos`,
   /**
    * La grilla «Vehiculos en deposito», **sin filtrar** (#180, #186).
    *
@@ -2288,8 +2269,7 @@ export const RUTAS = {
    * deposito y no su inventario. Desde #186 lo es de verdad: el tamano lo declara la tabla y la
    * pagina viene de la ruta.
    */
-  internamientos: (ventana: Readonly<Record<string, string>> = {}) =>
-    conParametros('/transito/internamientos', ventana),
+  internamientos: (ventana: Readonly<Record<string, string>> = {}) => conParametros("/transito/internamientos", ventana),
   /**
    * Los internamientos de UNA placa, para los campos que son de **ese** vehiculo (#180).
    *
@@ -2311,8 +2291,7 @@ export const RUTAS = {
    * contrato. Que el ultimo **siga dentro** no lo garantiza el orden: lo comprueba el conector
    * (`conectores/transito.ts`) antes de escribir nada con el.
    */
-  internamientosDe: (placa: string) =>
-    `/transito/internamientos?placa=${encodeURIComponent(placa)}&ordenarPor=fechaIngreso&sentido=DESCENDENTE&tamano=1`,
+  internamientosDe: (placa: string) => `/transito/internamientos?placa=${encodeURIComponent(placa)}&ordenarPor=fechaIngreso&sentido=DESCENDENTE&tamano=1`,
   /**
    * La ficha de UN vehiculo, por su placa (#180).
    *
@@ -2344,12 +2323,12 @@ export const RUTAS = {
    * El dia que el desplegable «Ejercicio» de la pantalla sepa pasarle lo elegido a su conector, lo
    * que cambia es esta linea: `desde` y `hasta` estan publicados, y el hueco es #172.
    */
-  resumenDePapeletas: '/transito/reportes/resumen-papeletas?agrupadoPor=ANO',
-  calculoIndividual: '/rentas/predial/calculo-individual',
-  calculoMasivo: '/rentas/predial/calculo-masivo',
-  calculoVehicular: '/rentas/vehicular/calculo',
-  alcabala: '/rentas/alcabala',
-  espectaculos: '/rentas/espectaculos',
+  resumenDePapeletas: "/transito/reportes/resumen-papeletas?agrupadoPor=ANO",
+  calculoIndividual: "/rentas/predial/calculo-individual",
+  calculoMasivo: "/rentas/predial/calculo-masivo",
+  calculoVehicular: "/rentas/vehicular/calculo",
+  alcabala: "/rentas/alcabala",
+  espectaculos: "/rentas/espectaculos",
   conjuntoSellado: (ejercicio: string) => `/seguridad/parametros/ejercicios/${ejercicio}`,
 } as const;
 
@@ -2363,15 +2342,12 @@ export const RUTAS = {
  *
  * Un parametro vacio **no viaja**: `?descripcion=` no es «buscar la cadena vacia», es no buscar.
  */
-export function conParametros(
-  ruta: string,
-  parametros: Readonly<Record<string, string>>,
-): string {
+export function conParametros(ruta: string, parametros: Readonly<Record<string, string>>): string {
   const partes = Object.entries(parametros)
-    .filter(([, valor]) => valor !== '')
+    .filter(([, valor]) => valor !== "")
     .map(([nombre, valor]) => `${nombre}=${encodeURIComponent(valor)}`);
   if (partes.length === 0) return ruta;
-  return `${ruta}${ruta.includes('?') ? '&' : '?'}${partes.join('&')}`;
+  return `${ruta}${ruta.includes("?") ? "&" : "?"}${partes.join("&")}`;
 }
 
 /** Pide una operacion paginada y devuelve solo su contenido. */
@@ -2390,6 +2366,30 @@ export async function pedirLista<T>(ruta: string, senal?: AbortSignal): Promise<
  */
 export async function pedirPagina<T>(ruta: string, senal?: AbortSignal): Promise<Paginado<T>> {
   return solicitar<Paginado<T>>(ruta, senal === undefined ? {} : { senal });
+}
+
+/**
+ * **Una relacion paginada cuyo recuento NO es el de sus filas** (#307, #425).
+ *
+ * La consulta descarta filas DESPUES de paginar —`GET /coactiva/deudas` las de los expedientes sin
+ * nada que cobrar, `GET /coactiva/liquidaciones-costas` las que no tienen el estado pedido—, asi
+ * que su recuento es el del criterio y no el de lo que llega, y el backend lo publica con el
+ * nombre de lo que cuenta (`expedientesDelCriterio`, `liquidacionesDelCriterio`) y no como
+ * `totalElementos`. Este tipo **no declara el recuento** a proposito: ningun conector puede
+ * copiarlo al total de una tabla, que es el error que el nombre existe para impedir.
+ * `totalPaginas` y `hayMas` si viajan, y son correctos: lo que se reparte en paginas es el criterio.
+ */
+export interface PaginaDelCriterio<T> {
+  readonly contenido: readonly T[];
+  readonly pagina: number;
+  readonly tamano: number;
+  readonly totalPaginas: number;
+  readonly hayMas: boolean;
+}
+
+/** Pide una operacion paginada cuyo recuento es el del criterio (#425): vease `PaginaDelCriterio`. */
+export async function pedirPaginaDelCriterio<T>(ruta: string, senal?: AbortSignal): Promise<PaginaDelCriterio<T>> {
+  return solicitar<PaginaDelCriterio<T>>(ruta, senal === undefined ? {} : { senal });
 }
 
 /**
@@ -2439,7 +2439,7 @@ export async function pedirUnoOVacio<T>(ruta: string, senal?: AbortSignal): Prom
  */
 export async function pedirCalculo<T>(ruta: string, senal?: AbortSignal): Promise<T> {
   return solicitar<T>(ruta, {
-    metodo: 'POST',
+    metodo: "POST",
     ...(senal === undefined ? {} : { senal }),
   });
 }
@@ -2478,12 +2478,9 @@ export async function pedirCalculo<T>(ruta: string, senal?: AbortSignal): Promis
  * @param ejercicio el ano de trabajo que se quiere fijar
  * @param observacion por que se cambia. Sin ella la operacion no se puede ni escribir
  */
-export async function cambiarElEjercicio(
-  ejercicio: number,
-  observacion: string,
-): Promise<SesionTrasElCambio> {
+export async function cambiarElEjercicio(ejercicio: number, observacion: string): Promise<SesionTrasElCambio> {
   return solicitar<SesionTrasElCambio>(RUTAS.ejercicioDeLaSesion, {
-    metodo: 'PUT',
+    metodo: "PUT",
     cuerpo: { ejercicio, observacion },
   });
 }

@@ -9,7 +9,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
-import java.util.function.Function;
 import kamayuk.rentas.coactiva.dominio.ActoCoactivo;
 import kamayuk.rentas.coactiva.dominio.ActoCoactivoRepository;
 import kamayuk.rentas.coactiva.dominio.CriterioDeExpedientes;
@@ -103,11 +102,40 @@ public class ConsultaDeDeudasCoactivas {
      * expediente sin nada que cobrar no es una deuda. Se descartan <b>despues</b> de componer la
      * pagina —la deuda se releee del libro y no hay columna por la que filtrar en SQL—, asi que lo
      * que se reparte en paginas son los <b>expedientes del criterio</b> y no las filas que salen.
-     * Eso es exactamente lo que {@link PaginaDeDeudas} publica, y por eso no es una {@link Pagina}:
-     * vease su javadoc (#307).
+     * Eso es exactamente lo que {@link PaginaDescartadaTrasPaginar} publica, y por eso no es una
+     * {@link Pagina}: vease su javadoc (#307).
+     *
+     * <h2>Por que el recuento no se puede ajustar a las filas, medido</h2>
+     *
+     * <p>Se midio antes de elegir, porque la otra salida —resolver «con deuda» <b>antes</b> de
+     * paginar— habria sido mejor:
+     *
+     * <ul>
+     *   <li><b>En SQL no se puede.</b> No hay columna: la deuda de un expediente se compone
+     *       cruzando lo que sus valores formalizan ({@code valores}) con lo que el libro dice a la
+     *       fecha ({@code cuentacorriente}), mas sus costas. Ponerlo en el {@code WHERE} de {@code
+     *       ExpedienteRepositoryJdbc} obligaria a nombrar ahi las tablas de otros dos contextos
+     *       —justo lo que ARQ-01 §4 regla 2 prohibe, y por lo que esas dos cifras se piden por API
+     *       publica— y ademas a transcribir {@code CalculoDeDeuda.deudaActualizadaA} a SQL, que es
+     *       una funcion pura con su {@code PoliticaDeMora} y su {@code PoliticaDeRedondeo} dentro
+     *       (regla 6). Dos escrituras de la misma regla divergen: es lo que #397 midio en el
+     *       «Estado» de la infraccion.
+     *   <li><b>En Java cuesta la cartera entera.</b> Componerla antes de paginar es una lectura del
+     *       libro por expediente —el precio que {@code ExpedientesSinRec} se nego a pagar (#549) y
+     *       que #272 volvio a medir para «Deuda en cartera» (#308)—, y ademas <b>en cada pagina que
+     *       alguien mire</b>. Medido el 2026-09-21 contra PostgreSQL 16.10, contando sentencias
+     *       preparadas: componer una pagina son <b>58 sentencias con tamano 5, 108 con 10 y 218 con
+     *       20</b> —lineal, 10,7 por expediente—, asi que sobre la cartera de 1 184 del artboard
+     *       serian unas <b>12 600 por pagina</b>, contra 218.
+     * </ul>
+     *
+     * <p>Asi que lo que se corrige es el <b>nombre</b> de lo que se publica, que es lo que estaba
+     * mal. {@link PaginaDescartadaTrasPaginar#totalPaginas()} y su {@code hayMas} siguen saliendo
+     * de este recuento, y eso es correcto: lo que se reparte en paginas son los expedientes del
+     * criterio. Contar las filas devueltas diria «no hay pagina siguiente» justo cuando la hay.
      */
     @Transactional(readOnly = true)
-    public PaginaDeDeudas<DeudaEnCoactiva> deudas(
+    public PaginaDescartadaTrasPaginar<DeudaEnCoactiva> deudas(
             CriterioDeExpedientes criterio, LocalDate aLaFecha, Paginacion paginacion) {
 
         Objects.requireNonNull(aLaFecha, "Toda cifra se pide a una fecha (regla 9)");
@@ -122,7 +150,7 @@ public class ConsultaDeDeudasCoactivas {
             }
             filas.add(componer(fila, aLaFecha, porContribuyente));
         }
-        return new PaginaDeDeudas<>(
+        return new PaginaDescartadaTrasPaginar<>(
                 filas, pagina.pagina(), pagina.tamano(), pagina.totalElementos());
     }
 
@@ -135,15 +163,17 @@ public class ConsultaDeDeudasCoactivas {
      *
      * <p><b>Descarta dos veces</b> —los expedientes sin deuda, y los obligados sin beneficio
      * registrado— sobre la pagina ya compuesta, asi que su {@link
-     * PaginaDeDeudas#expedientesDelCriterio()} se separa de las filas todavia mas que el de {@link
-     * #deudas}. Con mas razon se publica con su nombre y no como «total de elementos» (#307).
+     * PaginaDescartadaTrasPaginar#delCriterio()} se separa de las filas todavia mas que el de
+     * {@link #deudas}. Con mas razon se publica con su nombre y no como «total de elementos»
+     * (#307).
      */
     @Transactional(readOnly = true)
-    public PaginaDeDeudas<DeudaConBeneficio> enBeneficio(
+    public PaginaDescartadaTrasPaginar<DeudaConBeneficio> enBeneficio(
             CriterioDeExpedientes criterio, LocalDate aLaFecha, Paginacion paginacion) {
 
         Objects.requireNonNull(aLaFecha, "Toda cifra se pide a una fecha (regla 9)");
-        PaginaDeDeudas<DeudaEnCoactiva> conDeuda = deudas(criterio, aLaFecha, paginacion);
+        PaginaDescartadaTrasPaginar<DeudaEnCoactiva> conDeuda =
+                deudas(criterio, aLaFecha, paginacion);
 
         Map<Long, List<BeneficioRegistrado>> porContribuyente = new HashMap<>();
         List<DeudaConBeneficio> filas = new ArrayList<>();
@@ -157,8 +187,8 @@ public class ConsultaDeDeudasCoactivas {
             }
             filas.add(new DeudaConBeneficio(fila, suyos));
         }
-        return new PaginaDeDeudas<>(
-                filas, conDeuda.pagina(), conDeuda.tamano(), conDeuda.expedientesDelCriterio());
+        return new PaginaDescartadaTrasPaginar<>(
+                filas, conDeuda.pagina(), conDeuda.tamano(), conDeuda.delCriterio());
     }
 
     // ------------------------------------------------------------------
@@ -209,99 +239,6 @@ public class ConsultaDeDeudasCoactivas {
             }
         }
         return List.copyOf(tributos);
-    }
-
-    /**
-     * Una pagina de las dos consultas de deuda coactiva, y el numero de <b>expedientes</b> sobre el
-     * que se reparte (#307).
-     *
-     * <h2>Por que no es una {@link Pagina}, que es lo que era</h2>
-     *
-     * <p>{@link Pagina#totalElementos()} promete «las filas que devolveria la consulta sin
-     * paginar», y aqui esa promesa es <b>falsa</b>: la pagina se compone con {@link
-     * ConsultaDeExpedientes#buscar} y las filas sin deuda positiva se descartan <b>despues</b>, asi
-     * que el numero que la base conto son expedientes y las filas que salen son menos. Publicarlo
-     * como «total de elementos» deja a la grilla diciendo «20 de 1 184» sobre diecisiete filas, y
-     * repartiendo paginas cortas sin motivo visible — el mismo defecto que #25 midio en {@code
-     * consulta_valores} y que #272 encontro en «Expedientes abiertos».
-     *
-     * <p>El tipo es la correccion, y no el javadoc: {@code RespuestaPaginada.de(...)} <b>solo
-     * acepta una {@code Pagina}</b>, asi que mientras estas dos consultas devuelvan esto no hay
-     * forma de volver a publicar el numero bajo el nombre que no le toca. Un campo que no existe no
-     * se puede leer mal.
-     *
-     * <h2>Por que el recuento no se puede ajustar a las filas, medido</h2>
-     *
-     * <p>Se midio antes de elegir, porque la otra salida —resolver «con deuda» <b>antes</b> de
-     * paginar— habria sido mejor:
-     *
-     * <ul>
-     *   <li><b>En SQL no se puede.</b> No hay columna: la deuda de un expediente se compone
-     *       cruzando lo que sus valores formalizan ({@code valores}) con lo que el libro dice a la
-     *       fecha ({@code cuentacorriente}), mas sus costas. Ponerlo en el {@code WHERE} de {@code
-     *       ExpedienteRepositoryJdbc} obligaria a nombrar ahi las tablas de otros dos contextos
-     *       —justo lo que ARQ-01 §4 regla 2 prohibe, y por lo que esas dos cifras se piden por API
-     *       publica— y ademas a transcribir {@code CalculoDeDeuda.deudaActualizadaA} a SQL, que es
-     *       una funcion pura con su {@code PoliticaDeMora} y su {@code PoliticaDeRedondeo} dentro
-     *       (regla 6). Dos escrituras de la misma regla divergen: es lo que #397 midio en el
-     *       «Estado» de la infraccion.
-     *   <li><b>En Java cuesta la cartera entera.</b> Componerla antes de paginar es una lectura del
-     *       libro por expediente —el precio que {@code ExpedientesSinRec} se nego a pagar (#549) y
-     *       que #272 volvio a medir para «Deuda en cartera» (#308)—, y ademas <b>en cada pagina que
-     *       alguien mire</b>. Medido el 2026-09-21 contra PostgreSQL 16.10, contando sentencias
-     *       preparadas: componer una pagina son <b>58 sentencias con tamano 5, 108 con 10 y 218 con
-     *       20</b> —lineal, 10,7 por expediente—, asi que sobre la cartera de 1 184 del artboard
-     *       serian unas <b>12 600 por pagina</b>, contra 218.
-     * </ul>
-     *
-     * <p>Asi que lo que se corrige es el <b>nombre</b> de lo que se publica, que es lo que estaba
-     * mal. {@link #totalPaginas()} y {@link #hayMas()} siguen saliendo de este recuento, y eso es
-     * correcto: lo que se reparte en paginas son los expedientes del criterio. Contar las filas
-     * devueltas diria «no hay pagina siguiente» justo cuando la hay.
-     *
-     * @param contenido las filas de esta pagina, ya descartadas las que no tenian nada que cobrar
-     * @param pagina cual es, contada desde 0
-     * @param tamano cuantas filas se pidieron, no cuantas vinieron
-     * @param expedientesDelCriterio cuantos expedientes cumplen el criterio —que es lo que se
-     *     reparte en paginas—, y <b>no</b> cuantas filas devuelve la consulta
-     */
-    public record PaginaDeDeudas<T>(
-            List<T> contenido, int pagina, int tamano, long expedientesDelCriterio) {
-
-        public PaginaDeDeudas {
-            Objects.requireNonNull(contenido, "Una pagina sin filas es una lista vacia, no null");
-            contenido = List.copyOf(contenido);
-            if (pagina < 0) {
-                throw new IllegalArgumentException("La pagina se cuenta desde 0: " + pagina);
-            }
-            if (tamano < 1) {
-                throw new IllegalArgumentException("El tamano de pagina es al menos 1: " + tamano);
-            }
-            if (expedientesDelCriterio < 0) {
-                throw new IllegalArgumentException(
-                        "El recuento no puede ser negativo: " + expedientesDelCriterio);
-            }
-        }
-
-        /** Sobre los expedientes del criterio, que es lo que se reparte. */
-        public int totalPaginas() {
-            return expedientesDelCriterio == 0
-                    ? 0
-                    : (int) ((expedientesDelCriterio - 1) / tamano + 1);
-        }
-
-        public boolean hayMas() {
-            return pagina + 1 < totalPaginas();
-        }
-
-        /** La misma pagina con el contenido traducido. Es lo que hace la capa web con sus DTO. */
-        public <R> PaginaDeDeudas<R> mapear(Function<? super T, ? extends R> traduccion) {
-            return new PaginaDeDeudas<>(
-                    contenido.stream().<R>map(traduccion).toList(),
-                    pagina,
-                    tamano,
-                    expedientesDelCriterio);
-        }
     }
 
     /**

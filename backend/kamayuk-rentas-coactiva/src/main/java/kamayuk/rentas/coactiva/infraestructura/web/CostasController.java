@@ -11,11 +11,11 @@ import kamayuk.rentas.coactiva.aplicacion.ArancelDeCostasParametrizado;
 import kamayuk.rentas.coactiva.aplicacion.CambiarEstadoDelExpediente;
 import kamayuk.rentas.coactiva.aplicacion.ConsultaDeCostas;
 import kamayuk.rentas.coactiva.aplicacion.LiquidarCostas;
+import kamayuk.rentas.coactiva.aplicacion.PaginaDescartadaTrasPaginar;
 import kamayuk.rentas.coactiva.dominio.CriterioDeLiquidaciones;
 import kamayuk.rentas.coactiva.dominio.EstadoDeLaLiquidacion;
 import kamayuk.rentas.coactiva.dominio.LiquidacionDeCostas;
 import kamayuk.rentas.coactiva.dominio.LiquidacionDeCostasRepository;
-import kamayuk.rentas.compartido.Pagina;
 import kamayuk.rentas.contribuyentes.DirectorioDeContribuyentes;
 import kamayuk.rentas.contribuyentes.ResumenDeContribuyente;
 import kamayuk.rentas.dominio.Observacion;
@@ -26,7 +26,6 @@ import kamayuk.rentas.web.CodigoDeError;
 import kamayuk.rentas.web.FiltroDeLaConsulta;
 import kamayuk.rentas.web.ParametrosDePaginacion;
 import kamayuk.rentas.web.ProblemaDeNegocio;
-import kamayuk.rentas.web.RespuestaPaginada;
 import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -172,10 +171,14 @@ public class CostasController {
     /**
      * La grilla «Liquidaciones encontradas», con el pendiente y el estado de cada una a hoy
      * (RF-104).
+     *
+     * <p>No sale como {@code RespuestaPaginada}: con {@code estado}, el recuento es el del criterio
+     * y no el de las filas, y se publica con su nombre (#425, {@link
+     * RespuestaDeLiquidacionesDeCostas}).
      */
     @GetMapping("/liquidaciones-costas")
     @RequiereAcceso(acceso = ACCESO_COSTAS, privilegio = Privilegio.LECTURA)
-    public RespuestaPaginada<LiquidacionResource> listar(
+    public RespuestaDeLiquidacionesDeCostas<LiquidacionResource> listar(
             @RequestParam(required = false) @Nullable String nroLiquidacion,
             @RequestParam(required = false) @Nullable String nroExpedCoact,
             @RequestParam(required = false) @Nullable String contribuyente,
@@ -188,14 +191,14 @@ public class CostasController {
                         vacioAnulo(nroExpedCoact),
                         contribuyenteOpcional(contribuyente));
 
-        Pagina<ConsultaDeCostas.LiquidacionEnConsulta> pagina =
+        PaginaDescartadaTrasPaginar<ConsultaDeCostas.LiquidacionEnConsulta> pagina =
                 consulta.buscar(
                         criterio,
                         LocalDate.now(reloj),
                         estadoOpcional(estado),
                         paginacion.aPaginacion(ORDEN_POR_OMISION));
 
-        return RespuestaPaginada.de(pagina, LiquidacionResource::de);
+        return RespuestaDeLiquidacionesDeCostas.de(pagina, LiquidacionResource::de);
     }
 
     // ------------------------------------------------------------------

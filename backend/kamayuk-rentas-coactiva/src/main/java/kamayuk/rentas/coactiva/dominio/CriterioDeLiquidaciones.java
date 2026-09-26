@@ -11,8 +11,9 @@ import org.jspecify.annotations.Nullable;
  * <p><b>El estado no esta aqui</b>, y no es un olvido: {@link EstadoDeLaLiquidacion} se deriva del
  * libro a una fecha, no de una columna, asi que filtrar por el en SQL exigiria consultar la deuda
  * de cada fila <b>antes</b> de paginar. Se filtra despues de componer la pagina, en {@code
- * ConsultaDeCostas}, y la consulta dice cuantas descarto: es mas honesto que una grilla cuyo total
- * no coincide con lo que muestra.
+ * ConsultaDeCostas}, y lo que la consulta publica es cuantas liquidaciones cumplen <b>este</b>
+ * criterio —{@code liquidacionesDelCriterio}, no {@code totalElementos}—: el recuento que reparte
+ * las paginas, no el de las filas que quedaron (#425).
  *
  * @param numero el «Nro. Liquidacion», exacto
  * @param numeroDeExpediente el «Nro. Exped. Coact.», exacto

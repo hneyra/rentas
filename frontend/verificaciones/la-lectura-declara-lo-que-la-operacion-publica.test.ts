@@ -3,18 +3,14 @@
 // Lee `lecturas.ts` del disco y lo parsea con el compilador de TypeScript, y lee el contrato. No
 // hay DOM que necesitar.
 
-import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import ts from 'typescript';
-import { describe, expect, it } from 'vitest';
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import ts from "typescript";
+import { describe, expect, it } from "vitest";
 
-import { YA_SERVIDAS } from '../src/datos/servidas.ts';
-import {
-  fuentesDeLosConectores,
-  modulosDelArbol,
-  modulosQueElRepartoImporta,
-} from './los-conectores-del-arbol.ts';
+import { YA_SERVIDAS } from "../src/datos/servidas.ts";
+import { fuentesDeLosConectores, modulosDelArbol, modulosQueElRepartoImporta } from "./los-conectores-del-arbol.ts";
 
 /**
  * **Una lectura declara TODO lo que su operacion publica** (#239).
@@ -61,9 +57,9 @@ import {
  */
 
 const AQUI = dirname(fileURLToPath(import.meta.url));
-const FRONTEND = join(AQUI, '..');
-const FORMAS = join(FRONTEND, '../docs/50-api/formas-de-la-api.json');
-const LECTURAS = join(FRONTEND, 'src/datos/lecturas.ts');
+const FRONTEND = join(AQUI, "..");
+const FORMAS = join(FRONTEND, "../docs/50-api/formas-de-la-api.json");
+const LECTURAS = join(FRONTEND, "src/datos/lecturas.ts");
 
 /**
  * **Que tipo de `lecturas.ts` es la forma de que operacion del contrato.**
@@ -72,31 +68,31 @@ const LECTURAS = join(FRONTEND, 'src/datos/lecturas.ts');
  * `contenido[0]`, que es la forma de una fila.
  */
 const LA_FORMA_DE: Readonly<Record<string, string>> = {
-  ActaDeFiscalizacion: 'GET /fiscalizacion/actas',
-  ConstanciaDeNoAdeudo: 'GET /consultas/constancias/no-adeudo',
-  CorridaDelPredial: 'GET /rentas/predial/corridas/ultima',
-  DeterminacionGuardada: 'GET /rentas/predial/determinaciones',
-  DeudaConBeneficio: 'GET /consultas/deudas-con-beneficio',
-  EmbudoDelPrograma: 'GET /fiscalizacion/programas/{id}/embudo',
-  ExpedienteDeLaPapeleta: 'GET /transito/papeletas/{numero}/actos',
-  FichaUnificada: 'GET /consultas/unificada',
-  FilaDeLaMuestra: 'GET /fiscalizacion/programas/{id}/muestra',
-  GiroCiiu: 'GET /licencias/ciiu',
-  IndicadorDeRecaudacion: 'GET /indicadores/recaudacion',
-  InternamientoEnDeposito: 'GET /transito/internamientos',
-  LicenciaDeFuncionamiento: 'GET /licencias/funcionamiento',
-  LiquidacionDeCostas: 'GET /coactiva/liquidaciones-costas',
-  MovimientoDeLaBitacora: 'GET /seguridad/auditoria',
-  PapeletaDeTransito: 'GET /transito/papeletas',
-  PrescripcionDeclarada: 'GET /coactiva/prescripcion',
-  ProcesoDelExpediente: 'GET /coactiva/expedientes/{numero}/proceso',
-  ProgramaDeFiscalizacion: 'GET /fiscalizacion/programas',
-  ResolucionDeDeterminacion: 'GET /fiscalizacion/resoluciones/{numero}',
-  ResolucionEnLaRelacion: 'GET /fiscalizacion/resoluciones',
-  ResumenDeLaCarteraCoactiva: 'GET /coactiva/cartera/resumen',
-  ResumenDePapeletas: 'GET /transito/reportes/resumen-papeletas',
-  TrabajoParado: 'GET /indicadores/trabajo-parado',
-  VehiculoServido: 'GET /rentas/vehiculos/{placa}',
+  ActaDeFiscalizacion: "GET /fiscalizacion/actas",
+  ConstanciaDeNoAdeudo: "GET /consultas/constancias/no-adeudo",
+  CorridaDelPredial: "GET /rentas/predial/corridas/ultima",
+  DeterminacionGuardada: "GET /rentas/predial/determinaciones",
+  DeudaConBeneficio: "GET /consultas/deudas-con-beneficio",
+  EmbudoDelPrograma: "GET /fiscalizacion/programas/{id}/embudo",
+  ExpedienteDeLaPapeleta: "GET /transito/papeletas/{numero}/actos",
+  FichaUnificada: "GET /consultas/unificada",
+  FilaDeLaMuestra: "GET /fiscalizacion/programas/{id}/muestra",
+  GiroCiiu: "GET /licencias/ciiu",
+  IndicadorDeRecaudacion: "GET /indicadores/recaudacion",
+  InternamientoEnDeposito: "GET /transito/internamientos",
+  LicenciaDeFuncionamiento: "GET /licencias/funcionamiento",
+  LiquidacionDeCostas: "GET /coactiva/liquidaciones-costas",
+  MovimientoDeLaBitacora: "GET /seguridad/auditoria",
+  PapeletaDeTransito: "GET /transito/papeletas",
+  PrescripcionDeclarada: "GET /coactiva/prescripcion",
+  ProcesoDelExpediente: "GET /coactiva/expedientes/{numero}/proceso",
+  ProgramaDeFiscalizacion: "GET /fiscalizacion/programas",
+  ResolucionDeDeterminacion: "GET /fiscalizacion/resoluciones/{numero}",
+  ResolucionEnLaRelacion: "GET /fiscalizacion/resoluciones",
+  ResumenDeLaCarteraCoactiva: "GET /coactiva/cartera/resumen",
+  ResumenDePapeletas: "GET /transito/reportes/resumen-papeletas",
+  TrabajoParado: "GET /indicadores/trabajo-parado",
+  VehiculoServido: "GET /rentas/vehiculos/{placa}",
 };
 
 /**
@@ -114,20 +110,13 @@ const DECLARADO_QUE_NO_SE_DECLARA: Readonly<Record<string, readonly string[]>> =
   // Las seis secciones paginadas de la ficha unificada. El contrato las publica y `con-panel` **no
   // tiene ni una tabla** donde dibujarlas: declarar aqui seis tipos de fila seria escribir la forma
   // de lo que ninguna pantalla lee. Esta escrito en el javadoc del propio tipo.
-  FichaUnificada: [
-    'deudasPendientes',
-    'pagosRealizados',
-    'altasYBajas',
-    'fraccionamientos',
-    'valores',
-    'declaracionesJuradas',
-  ],
+  FichaUnificada: ["deudasPendientes", "pagosRealizados", "altasYBajas", "fraccionamientos", "valores", "declaracionesJuradas"],
 };
 
 /** Las propiedades declaradas por cada `export interface` de `lecturas.ts`. */
 function camposDeclarados(): ReadonlyMap<string, readonly string[]> {
-  const fuente = readFileSync(LECTURAS, 'utf8');
-  const arbol = ts.createSourceFile('lecturas.ts', fuente, ts.ScriptTarget.Latest, true);
+  const fuente = readFileSync(LECTURAS, "utf8");
+  const arbol = ts.createSourceFile("lecturas.ts", fuente, ts.ScriptTarget.Latest, true);
   const salida = new Map<string, readonly string[]>();
   for (const sentencia of arbol.statements) {
     if (!ts.isInterfaceDeclaration(sentencia)) continue;
@@ -141,29 +130,32 @@ function camposDeclarados(): ReadonlyMap<string, readonly string[]> {
 
 /** La forma de UNA respuesta: la del objeto, o la de una fila si la operacion pagina. */
 function formaDe(clave: string): Readonly<Record<string, unknown>> {
-  const contrato = JSON.parse(readFileSync(FORMAS, 'utf8')) as Record<string, unknown>;
+  const contrato = JSON.parse(readFileSync(FORMAS, "utf8")) as Record<string, unknown>;
   const suya = contrato[clave];
   if (suya === undefined) throw new Error(`El contrato no publica «${clave}»`);
   const forma = suya as Record<string, unknown>;
-  const contenido = forma['contenido'];
+  const contenido = forma["contenido"];
   if (Array.isArray(contenido)) return contenido[0] as Record<string, unknown>;
   return forma;
 }
 
-/** Los tipos que los conectores piden, por las cuatro puertas que hay para pedirlos. */
+/**
+ * Los tipos que los conectores piden, por las cinco puertas que hay para pedirlos. La quinta,
+ * `pedirPaginaDelCriterio`, es la de las relaciones cuyo recuento no es el de sus filas (#425).
+ */
 function tiposQueSePiden(): readonly string[] {
   const nombres = new Set<string>();
   for (const archivo of fuentesDeLosConectores()) {
-    const texto = readFileSync(archivo, 'utf8');
-    for (const uno of texto.matchAll(/\bpedir(?:UnoOVacio|Uno|Pagina|Lista)<(\w+)>/g)) {
-      nombres.add(uno[1] ?? '');
+    const texto = readFileSync(archivo, "utf8");
+    for (const uno of texto.matchAll(/\bpedir(?:UnoOVacio|Uno|PaginaDelCriterio|Pagina|Lista)<(\w+)>/g)) {
+      nombres.add(uno[1] ?? "");
     }
   }
   return [...nombres].sort();
 }
 
-describe('una lectura declara lo que su operacion publica (#239)', () => {
-  it('EL CENTINELA DEL CONJUNTO: los conectores salen del disco, y no encogen en silencio', () => {
+describe("una lectura declara lo que su operacion publica (#239)", () => {
+  it("EL CENTINELA DEL CONJUNTO: los conectores salen del disco, y no encogen en silencio", () => {
     // Este va primero porque los otros tres se miden SOBRE el: un conjunto que encoge los deja
     // comparando de menos y en verde, que es lo que paso con `valores` entre #230 y #277.
     //
@@ -171,25 +163,25 @@ describe('una lectura declara lo que su operacion publica (#239)', () => {
     // reparto— y por eso el cruce muerde por los dos lados: un modulo que el filtro deje de casar
     // desaparece de la primera, y uno que nadie ate a una hoja no aparece en la segunda.
     const delArbol = modulosDelArbol();
-    expect(delArbol.length, 'el arbol de conectores vino vacio: no hay nada que leer').toBeGreaterThan(0);
+    expect(delArbol.length, "el arbol de conectores vino vacio: no hay nada que leer").toBeGreaterThan(0);
     expect(
       delArbol,
-      'Los conectores del disco no son los que `src/datos/conectores.ts` importa.\n\n' +
-        '  Si falta uno del lado del arbol: el filtro de `los-conectores-del-arbol.ts` dejo de\n' +
-        '  casarlo, y sus tipos han dejado de compararse contra el contrato SIN que nada se ponga\n' +
-        '  rojo — que es como esta guarda se apaga sola.\n' +
-        '  Si falta uno del lado del reparto: hay un conector que ninguna hoja pide.',
+      "Los conectores del disco no son los que `src/datos/conectores.ts` importa.\n\n" +
+        "  Si falta uno del lado del arbol: el filtro de `los-conectores-del-arbol.ts` dejo de\n" +
+        "  casarlo, y sus tipos han dejado de compararse contra el contrato SIN que nada se ponga\n" +
+        "  rojo — que es como esta guarda se apaga sola.\n" +
+        "  Si falta uno del lado del reparto: hay un conector que ninguna hoja pide.",
     ).toEqual(modulosQueElRepartoImporta());
   });
 
-  it('EL CENTINELA: la tabla cubre todas las lecturas que los conectores piden', () => {
+  it("EL CENTINELA: la tabla cubre todas las lecturas que los conectores piden", () => {
     // Sin esto, un tipo nuevo que nadie anadiera aqui se quedaria sin comparar para siempre — que
     // es como una barrera se apaga sin que nadie la borre (#78, #80). Y al reves: una entrada que
     // ya no pide nadie es una linea que se queda vieja sin dar rojo.
     expect(tiposQueSePiden()).toEqual(Object.keys(LA_FORMA_DE).sort());
   });
 
-  it('EL CENTINELA: y cada entrada resuelve a un tipo y a una operacion SERVIDA', () => {
+  it("EL CENTINELA: y cada entrada resuelve a un tipo y a una operacion SERVIDA", () => {
     const declarados = camposDeclarados();
     const servidas = new Set(YA_SERVIDAS.map((una) => `${una.metodo} ${una.ruta}`));
     for (const [tipo, clave] of Object.entries(LA_FORMA_DE)) {
@@ -199,41 +191,37 @@ describe('una lectura declara lo que su operacion publica (#239)', () => {
     }
   });
 
-  it('LA IGUALDAD: ningun campo publicado se queda sin declarar', () => {
+  it("LA IGUALDAD: ningun campo publicado se queda sin declarar", () => {
     const declarados = camposDeclarados();
     const desfases: string[] = [];
     for (const [tipo, clave] of Object.entries(LA_FORMA_DE)) {
       const mios = new Set(declarados.get(tipo) ?? []);
       const aposta = new Set(DECLARADO_QUE_NO_SE_DECLARA[tipo] ?? []);
-      const faltan = Object.keys(formaDe(clave)).filter(
-        (campo) => !mios.has(campo) && !aposta.has(campo),
-      );
-      if (faltan.length > 0) desfases.push(`  ${tipo} (${clave}): ${faltan.join(', ')}`);
+      const faltan = Object.keys(formaDe(clave)).filter((campo) => !mios.has(campo) && !aposta.has(campo));
+      if (faltan.length > 0) desfases.push(`  ${tipo} (${clave}): ${faltan.join(", ")}`);
     }
     expect(
       desfases,
-      'El backend publica campos que la lectura de la interfaz no declara:\n' +
-        `${desfases.join('\n')}\n\n` +
-        '  Mientras no esten declarados, ningun conector puede leerlos —no compila— y la celda\n' +
-        '  que los ensenaria sigue diciendo «no publicado» de un dato que SI se publica. Eso no\n' +
-        '  rompe nada: se lee como una mentira con formato, y manda a arreglar un backend que ya\n' +
-        '  lo arreglo. Fue el defecto de `ActaDeFiscalizacion` entre #191 y #239.\n\n' +
-        '  Se corrige declarando el campo, o anadiendolo a `DECLARADO_QUE_NO_SE_DECLARA` CON SU\n' +
-        '  MOTIVO — nunca ampliando la excepcion a ojo.',
+      "El backend publica campos que la lectura de la interfaz no declara:\n" +
+        `${desfases.join("\n")}\n\n` +
+        "  Mientras no esten declarados, ningun conector puede leerlos —no compila— y la celda\n" +
+        "  que los ensenaria sigue diciendo «no publicado» de un dato que SI se publica. Eso no\n" +
+        "  rompe nada: se lee como una mentira con formato, y manda a arreglar un backend que ya\n" +
+        "  lo arreglo. Fue el defecto de `ActaDeFiscalizacion` entre #191 y #239.\n\n" +
+        "  Se corrige declarando el campo, o anadiendolo a `DECLARADO_QUE_NO_SE_DECLARA` CON SU\n" +
+        "  MOTIVO — nunca ampliando la excepcion a ojo.",
     ).toEqual([]);
   });
 
-  it('y la excepcion no tapa un campo que ya esta declarado', () => {
+  it("y la excepcion no tapa un campo que ya esta declarado", () => {
     // Una excepcion que sobra es una excepcion que ya no protege de nada y que oculta el dia que
     // el campo se retire del contrato.
     const declarados = camposDeclarados();
     for (const [tipo, campos] of Object.entries(DECLARADO_QUE_NO_SE_DECLARA)) {
       const mios = new Set(declarados.get(tipo) ?? []);
-      const publicados = new Set(Object.keys(formaDe(LA_FORMA_DE[tipo] ?? '')));
+      const publicados = new Set(Object.keys(formaDe(LA_FORMA_DE[tipo] ?? "")));
       for (const campo of campos) {
-        expect(mios.has(campo), `«${tipo}.${campo}» ya esta declarado: sobra la excepcion`).toBe(
-          false,
-        );
+        expect(mios.has(campo), `«${tipo}.${campo}» ya esta declarado: sobra la excepcion`).toBe(false);
         expect(publicados.has(campo), `«${tipo}.${campo}» ya no lo publica nadie`).toBe(true);
       }
     }

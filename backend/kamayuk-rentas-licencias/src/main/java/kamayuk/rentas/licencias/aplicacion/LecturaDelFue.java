@@ -14,6 +14,7 @@ import kamayuk.rentas.contribuyentes.DirectorioDeContribuyentes;
 import kamayuk.rentas.contribuyentes.ResumenDeContribuyente;
 import kamayuk.rentas.licencias.aplicacion.ConsultaDeFue.FueEnConsulta;
 import kamayuk.rentas.licencias.dominio.CriterioDeFue;
+import kamayuk.rentas.licencias.dominio.EstadoALaFecha;
 import kamayuk.rentas.licencias.dominio.EstadoDelFue;
 import kamayuk.rentas.licencias.dominio.EstructuraDelProyecto;
 import kamayuk.rentas.licencias.dominio.FueDeEdificacion;
@@ -105,7 +106,11 @@ public class LecturaDelFue {
             return Pagina.vacia(paginacion);
         }
 
-        Pagina<FueDeEdificacion> pagina = expedientes.buscar(conTitulares, paginacion);
+        Pagina<FueDeEdificacion> pagina =
+                expedientes.buscar(
+                        conTitulares,
+                        estado == null ? null : new EstadoALaFecha(estado, aLaFecha),
+                        paginacion);
         if (pagina.estaVacia()) {
             return Pagina.vacia(paginacion);
         }
@@ -132,15 +137,9 @@ public class LecturaDelFue {
                                         padron.get(fue.contribuyenteId()),
                                         aLaFecha));
 
-        if (estado == null) {
-            return resuelta;
-        }
-        // El estado no es una columna y no se puede filtrar en el WHERE: se deriva y se filtra
-        // aqui. El total de la pagina se recalcula sobre lo que queda, para que el reporte no
-        // prometa mas filas de las que ensena.
-        List<FueEnConsulta> filtradas =
-                resuelta.contenido().stream().filter(fila -> fila.estado() == estado).toList();
-        return Pagina.de(filtradas, paginacion, filtradas.size());
+        // El estado ya lo filtro el motor, antes de paginar (#425): aqui solo se deriva para
+        // pintarlo, con la misma tabla, y la pagina y su total son los que contesto la base.
+        return resuelta;
     }
 
     /**

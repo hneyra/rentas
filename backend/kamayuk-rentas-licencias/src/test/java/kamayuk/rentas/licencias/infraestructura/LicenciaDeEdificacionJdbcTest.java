@@ -16,6 +16,7 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
@@ -65,11 +66,13 @@ import kamayuk.rentas.licencias.dominio.CriterioDeFue;
 import kamayuk.rentas.licencias.dominio.EstadoDelFue;
 import kamayuk.rentas.licencias.dominio.FueDeEdificacion;
 import kamayuk.rentas.licencias.dominio.ModalidadDeAprobacion;
+import kamayuk.rentas.licencias.dominio.MovimientoDeEdificacion;
 import kamayuk.rentas.licencias.dominio.PartidaDeEdificacion;
 import kamayuk.rentas.licencias.dominio.PlantillaDeNumeroDeEdificacion;
 import kamayuk.rentas.licencias.dominio.RepresentanteLegal;
 import kamayuk.rentas.licencias.dominio.RevisionDelProyecto;
 import kamayuk.rentas.licencias.dominio.SeccionDelFue;
+import kamayuk.rentas.licencias.dominio.TipoDeMovimientoDeEdificacion;
 import kamayuk.rentas.licencias.dominio.TipoDeObra;
 import kamayuk.rentas.licencias.dominio.TipoDeProfesional;
 import kamayuk.rentas.licencias.dominio.TipoDeTramiteDeEdificacion;
@@ -1657,6 +1660,200 @@ class LicenciaDeEdificacionJdbcTest {
                     null,
                     corte,
                     Paginacion.de(0, 50, "expediente"));
+        }
+    }
+
+    /**
+     * #425 — El estado del FUE se filtra en el motor, antes de paginar, y el total es el de la
+     * relacion.
+     *
+     * <p>Hasta #425 {@code LecturaDelFue} derivaba el estado sobre la pagina ya cortada y publicaba
+     * como total lo que quedaba: pedir EN_TRAMITE con la primera pagina llena de vigentes decia
+     * «ninguno», y quien siguiera {@code hayMas} no llegaba nunca a las siguientes. La siembra no
+     * es uniforme a proposito: lleva los cuatro bordes que una muestra de «emitidas hoy» no ve —la
+     * anulacion y la emision posteriores al corte, el tramo que termina el mismo dia del corte y el
+     * que empieza despues—, y en cada FUE el SQL tiene que decir lo mismo que {@link
+     * EstadoDelFue#derivarDe}.
+     */
+    @Nested
+    @DisplayName("#425 — El estado del FUE se filtra antes de paginar")
+    class ElEstadoEnElMotor {
+
+        private static final LocalDate PRESENTADO = LocalDate.of(2025, 12, 29);
+        private static long titular;
+        private static final List<String> SEMBRADOS = new ArrayList<>();
+
+        @org.junit.jupiter.api.BeforeAll
+        static void sembrar() {
+            // El derecho lo paga el titular de la prueba (`cobrar`), asi que la siembra es suya; la
+            // aisla un dia de declaracion que ninguna otra prueba usa.
+            titular = contribuyente();
+            LocalDate presentado = PRESENTADO;
+
+            // EN_TRAMITE: nunca se emitio.
+            SEMBRADOS.add(expedienteCompletoEn(municipalidad, titular, presentado));
+            // EN_TRAMITE al corte: se emite el dia siguiente.
+            String emitidaDespues = expedienteCompletoEn(municipalidad, titular, presentado);
+            emitirLicencia(emitidaDespues, HOY.plusDays(1), HOY.plusYears(3));
+            SEMBRADOS.add(emitidaDespues);
+            // VIGENTE.
+            String vigente = expedienteCompletoEn(municipalidad, titular, presentado);
+            emitirLicencia(vigente, LocalDate.of(2026, 2, 2), HOY.plusYears(3));
+            SEMBRADOS.add(vigente);
+            // VIGENTE: el tramo termina el mismo dia del corte.
+            String venceElDia = expedienteCompletoEn(municipalidad, titular, presentado);
+            emitirLicencia(venceElDia, LocalDate.of(2026, 2, 2), HOY);
+            SEMBRADOS.add(venceElDia);
+            // VENCIDA: el tramo termino la vispera.
+            String vencida = expedienteCompletoEn(municipalidad, titular, presentado);
+            emitirLicencia(vencida, LocalDate.of(2026, 1, 15), HOY.minusDays(1));
+            SEMBRADOS.add(vencida);
+            // VENCIDA al corte: la revalidacion abre un tramo que empieza despues.
+            String revalidada = expedienteCompletoEn(municipalidad, titular, presentado);
+            EmitirLicenciaDeEdificacion.LicenciaEmitida original =
+                    emitirLicencia(
+                            revalidada, LocalDate.of(2026, 1, 15), LocalDate.of(2026, 2, 15));
+            String tramite =
+                    enContexto(
+                            () -> {
+                                String numero = "EXP-425-R" + CONTADOR.incrementAndGet();
+                                presentar.presentar(
+                                        solicitud(
+                                                numero,
+                                                TipoDeTramiteDeEdificacion.REVALIDACION_DE_LICENCIA,
+                                                original.numeroDeLicencia(),
+                                                presentado,
+                                                "C-" + titular),
+                                        PORQUE);
+                                return numero;
+                            });
+            String recibo = cobrar(DERECHO_REVALIDACION);
+            enContexto(
+                    () ->
+                            revalidar.revalidar(
+                                    tramite,
+                                    HOY.plusDays(2),
+                                    HOY.plusYears(3),
+                                    recibo,
+                                    FormatoDeDocumento.PDF,
+                                    PORQUE));
+            SEMBRADOS.add(revalidada);
+            SEMBRADOS.add(tramite);
+            // VIGENTE al corte: la anulacion llega el dia siguiente.
+            String anuladaDespues = expedienteCompletoEn(municipalidad, titular, presentado);
+            anularEl(
+                    emitirLicencia(anuladaDespues, LocalDate.of(2026, 2, 2), HOY.plusYears(3)),
+                    anuladaDespues,
+                    HOY.plusDays(1));
+            SEMBRADOS.add(anuladaDespues);
+            // ANULADA: la anulacion es de la vispera.
+            String anulada = expedienteCompletoEn(municipalidad, titular, presentado);
+            anularEl(
+                    emitirLicencia(anulada, LocalDate.of(2026, 2, 2), HOY.plusYears(3)),
+                    anulada,
+                    HOY.minusDays(1));
+            SEMBRADOS.add(anulada);
+        }
+
+        @Test
+        @DisplayName("en cada FUE de la siembra, el estado del motor es el de derivarDe")
+        void elMotorYElDominioDicenLoMismo() {
+            List<String> esperado = new ArrayList<>();
+            List<String> medido = new ArrayList<>();
+            for (EstadoDelFue estado : EstadoDelFue.values()) {
+                List<String> delDominio = new ArrayList<>();
+                for (String expediente : SEMBRADOS) {
+                    EstadoDelFue derivado =
+                            enContexto(() -> consulta.porExpediente(expediente, HOY))
+                                    .orElseThrow()
+                                    .fila()
+                                    .estado();
+                    if (derivado == estado) {
+                        delDominio.add(expediente);
+                    }
+                }
+                List<String> delMotor =
+                        pagina(estado, 50).contenido().stream()
+                                .map(fila -> fila.fue().expediente())
+                                .sorted()
+                                .toList();
+                esperado.add(estado + " " + delDominio.stream().sorted().toList());
+                medido.add(estado + " " + delMotor);
+            }
+
+            assertThat(medido)
+                    .as("el SQL y EstadoDelFue.derivarDe, FUE por FUE, en los cuatro estados")
+                    .containsExactlyElementsOf(esperado);
+            assertThat(esperado)
+                    .as("y la siembra ejerce los cuatro: una muestra sin alguno no distingue nada")
+                    .noneMatch(celda -> celda.endsWith("[]"));
+        }
+
+        @Test
+        @DisplayName(
+                "la primera pagina de VIGENTE trae vigentes, y el total es el de la relacion, no el"
+                        + " de la pagina")
+        void elTotalEsElDeLaRelacion() {
+            // Por expediente, los dos primeros FUE son EN_TRAMITE: el filtro en memoria sobre la
+            // pagina ya cortada no dejaba ninguno y contestaba «0 vigentes».
+            Pagina<ConsultaDeFue.FueEnConsulta> primera = pagina(EstadoDelFue.VIGENTE, 2);
+
+            assertThat(primera.contenido())
+                    .hasSize(2)
+                    .allSatisfy(fila -> assertThat(fila.estado()).isEqualTo(EstadoDelFue.VIGENTE));
+            assertThat(primera.totalElementos())
+                    .as("hay tres vigentes al corte: la pagina no es la relacion")
+                    .isEqualTo(3);
+            assertThat(primera.hayMas()).isTrue();
+        }
+
+        private static Pagina<ConsultaDeFue.FueEnConsulta> pagina(EstadoDelFue estado, int tamano) {
+            return enContexto(
+                    () ->
+                            consulta.buscar(
+                                    new CriterioDeFue(
+                                            null,
+                                            null,
+                                            null,
+                                            null,
+                                            null,
+                                            null,
+                                            PRESENTADO,
+                                            PRESENTADO,
+                                            java.util.Set.of(titular)),
+                                    null,
+                                    estado,
+                                    HOY,
+                                    Paginacion.de(0, tamano, "expediente")));
+        }
+
+        /** No hay caso de uso que anule un FUE: el movimiento se escribe como lo haria el. */
+        private static void anularEl(
+                EmitirLicenciaDeEdificacion.LicenciaEmitida emitida,
+                String expediente,
+                LocalDate fecha) {
+            long fueId = identificadorDe(expediente);
+            enContexto(
+                    () ->
+                            transaccion.execute(
+                                    estado ->
+                                            movimientos.registrar(
+                                                    new MovimientoDeEdificacion(
+                                                            null,
+                                                            fueId,
+                                                            TipoDeMovimientoDeEdificacion.ANULACION,
+                                                            fecha,
+                                                            null,
+                                                            "Se deja sin efecto, prueba de #425",
+                                                            null,
+                                                            Objects.requireNonNull(
+                                                                    emitida.documento()
+                                                                            .registro()
+                                                                            .id()),
+                                                            "RES-ANUL-425-" + fueId,
+                                                            RELOJ.instant(),
+                                                            null,
+                                                            PORQUE))));
         }
     }
 
