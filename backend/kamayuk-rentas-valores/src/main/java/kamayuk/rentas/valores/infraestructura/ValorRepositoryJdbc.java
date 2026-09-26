@@ -370,6 +370,13 @@ public class ValorRepositoryJdbc extends RepositorioJdbc implements ValorReposit
             condiciones.append(" AND ").append(condicionDe(criterio.situacion()));
             parametros.put("fechaSituacion", criterio.fecha());
         }
+        if (criterio.tributo() != null) {
+            // #441: un valor sale si tiene ALGUNA linea del tributo; uno mixto, con los dos.
+            condiciones.append(
+                    " AND EXISTS (SELECT 1 FROM valor_detalle vdt"
+                            + " WHERE vdt.valor_id = v.id AND vdt.tributo = :tributo)");
+            parametros.put("tributo", criterio.tributo());
+        }
 
         return " FROM valor v WHERE " + condiciones;
     }

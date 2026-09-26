@@ -290,6 +290,13 @@ public class ConvenioRepositoryJdbc extends RepositorioJdbc implements ConvenioR
             donde.append(" AND ").append(ESTADO_DERIVADO).append(" = :estado");
             parametros.put("estado", nombreEnLaBase(criterio.estado()));
         }
+        if (criterio.tributo() != null) {
+            // #441: un convenio sale si acoge ALGUNA deuda del tributo; uno mixto, con los dos.
+            donde.append(
+                    " AND EXISTS (SELECT 1 FROM convenio_deuda cdt"
+                            + " WHERE cdt.convenio_id = c.id AND cdt.tributo = :tributo)");
+            parametros.put("tributo", criterio.tributo());
+        }
 
         parametros.put("hoy", criterio.aLaFecha());
 

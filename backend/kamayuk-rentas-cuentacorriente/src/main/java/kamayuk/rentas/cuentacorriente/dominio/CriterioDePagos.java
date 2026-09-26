@@ -21,11 +21,28 @@ import org.jspecify.annotations.Nullable;
  * @param codigoContribuyente el titular; es lo que teclea quien atiende
  * @param desde fecha valor minima, inclusive; {@code null} trae desde el primer pago
  * @param hasta fecha valor maxima, inclusive; {@code null} trae hasta el ultimo pago
+ * @param tributo filtro opcional de tributo, como lo asienta el libro; {@code null} trae todos
+ *     (#441)
  */
 public record CriterioDePagos(
-        String codigoContribuyente, @Nullable LocalDate desde, @Nullable LocalDate hasta) {
+        String codigoContribuyente,
+        @Nullable LocalDate desde,
+        @Nullable LocalDate hasta,
+        @Nullable String tributo) {
+
+    /** Los pagos de todos los tributos: lo que pide {@code consulta_pagos}. */
+    public CriterioDePagos(
+            String codigoContribuyente, @Nullable LocalDate desde, @Nullable LocalDate hasta) {
+        this(codigoContribuyente, desde, hasta, null);
+    }
 
     public CriterioDePagos {
+        if (tributo != null) {
+            tributo = tributo.strip().toUpperCase(Locale.ROOT);
+            if (tributo.isEmpty()) {
+                tributo = null;
+            }
+        }
         Objects.requireNonNull(codigoContribuyente, "Los pagos son de un contribuyente");
         codigoContribuyente = codigoContribuyente.strip().toUpperCase(Locale.ROOT);
         if (codigoContribuyente.isEmpty()) {

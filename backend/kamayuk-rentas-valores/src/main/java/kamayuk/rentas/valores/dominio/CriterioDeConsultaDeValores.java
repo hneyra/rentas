@@ -25,6 +25,8 @@ import org.jspecify.annotations.Nullable;
  * @param ejercicio el ejercicio de emision de la cabecera
  * @param situacion en que punto de la cobranza; nulo es «todos»
  * @param fecha desde que dia se mira la situacion (regla 9): sin ella, «exigible» no significa nada
+ * @param tributo filtro opcional: solo los valores con alguna linea de ese tributo —uno mixto sale
+ *     con los dos filtros— (#441)
  */
 public record CriterioDeConsultaDeValores(
         @Nullable String numero,
@@ -32,10 +34,26 @@ public record CriterioDeConsultaDeValores(
         @Nullable TipoValor tipo,
         @Nullable Integer ejercicio,
         @Nullable SituacionDelValor situacion,
-        LocalDate fecha) {
+        LocalDate fecha,
+        @Nullable String tributo) {
+
+    /** Sin filtro de tributo: lo que pide la pantalla {@code consulta_valores}. */
+    public CriterioDeConsultaDeValores(
+            @Nullable String numero,
+            @Nullable Long contribuyenteId,
+            @Nullable TipoValor tipo,
+            @Nullable Integer ejercicio,
+            @Nullable SituacionDelValor situacion,
+            LocalDate fecha) {
+        this(numero, contribuyenteId, tipo, ejercicio, situacion, fecha, null);
+    }
 
     public CriterioDeConsultaDeValores {
         numero = limpio(numero);
+        tributo = limpio(tributo);
+        if (tributo != null) {
+            tributo = tributo.toUpperCase(java.util.Locale.ROOT);
+        }
         Objects.requireNonNull(
                 fecha,
                 "La situacion de un valor se mira a una fecha, nunca «ahora mismo» (regla 9)");

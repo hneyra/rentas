@@ -334,6 +334,7 @@ class ConsultaUnificadaControllerTest {
                 String codigoContribuyente,
                 @Nullable LocalDate desde,
                 @Nullable LocalDate hasta,
+                @Nullable String tributo,
                 Paginacion paginacion) {
             ultimaDePagos = paginacion;
             return Pagina.de(
@@ -369,7 +370,10 @@ class ConsultaUnificadaControllerTest {
 
         @Override
         public Pagina<ConvenioDelContribuyente> deTodoElContribuyente(
-                String codigoContribuyente, LocalDate aLaFecha, Paginacion paginacion) {
+                String codigoContribuyente,
+                LocalDate aLaFecha,
+                @Nullable String tributo,
+                Paginacion paginacion) {
             ultima = paginacion;
             return Pagina.de(
                     List.of(
@@ -396,7 +400,10 @@ class ConsultaUnificadaControllerTest {
 
         @Override
         public Pagina<ValorDelContribuyente> deTodoElContribuyente(
-                long contribuyenteId, LocalDate aLaFecha, Paginacion paginacion) {
+                long contribuyenteId,
+                LocalDate aLaFecha,
+                @Nullable String tributo,
+                Paginacion paginacion) {
             ultima = paginacion;
             return Pagina.de(
                     List.of(

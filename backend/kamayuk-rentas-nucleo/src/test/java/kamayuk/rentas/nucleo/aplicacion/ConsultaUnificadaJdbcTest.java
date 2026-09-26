@@ -514,6 +514,64 @@ class ConsultaUnificadaJdbcTest {
                     .isNotEqualTo(todo.resumen().total());
         }
 
+        /**
+         * #441 — El filtro acota las SEIS secciones, no tres. Hasta #441 pagos, fraccionamientos y
+         * valores soltaban el filtro: la cabecera decia «solo predial» y tres pestanas enseñaban
+         * arbitrios. La siembra de {@link #contribuyenteCompleto} ponia el pago, el convenio y el
+         * valor todos de PREDIAL, asi que el filtro PREDIAL no podia equivocarse en ellas; esta
+         * pone uno de cada tributo en cada seccion.
+         */
+        @Test
+        @DisplayName("#441 — PREDIAL y ARBITRIOS acotan tambien pagos, fraccionamientos y valores")
+        void elFiltroAcotaLasSeisSecciones() {
+            String codigo = crearContribuyente(municipalidad, "UNIF-441");
+            long id = idDe(codigo);
+            asentarCargo(id, "PREDIAL", Dinero.de("120.00"));
+            cobrarPorCaja(id, "PREDIAL", Dinero.de("120.00"));
+            asentarCargo(id, "ARBITRIO", Dinero.de("90.00"));
+            cobrarPorCaja(id, "ARBITRIO", Dinero.de("90.00"));
+            asentarCargo(id, "PREDIAL", Dinero.de("800.00"));
+            asentarCargo(id, "ARBITRIO", Dinero.de("300.00"));
+            registrarConvenio(id, "PREDIAL");
+            registrarConvenio(id, "ARBITRIO");
+            emitirValor(id, "PREDIAL");
+            emitirValor(id, "ARBITRIO");
+
+            ConsultaUnificada.Ficha todo = consulta.de(criterio(codigo), PAGINA);
+            ConsultaUnificada.Ficha predial =
+                    consulta.de(
+                            new ConsultaUnificada.Criterio(
+                                    codigo, HOY, ConsultaUnificada.Alcance.PREDIAL),
+                            PAGINA);
+            ConsultaUnificada.Ficha arbitrios =
+                    consulta.de(
+                            new ConsultaUnificada.Criterio(
+                                    codigo, HOY, ConsultaUnificada.Alcance.ARBITRIOS),
+                            PAGINA);
+
+            assertThat(todo.pagos().contenido()).as("sin filtro, los dos pagos").hasSize(2);
+            assertThat(todo.fraccionamientos().contenido()).hasSize(2);
+            assertThat(todo.valores().contenido()).hasSize(2);
+
+            assertThat(predial.pagos().contenido())
+                    .extracting(kamayuk.rentas.cuentacorriente.MovimientoDelLibro::tributo)
+                    .containsExactly("PREDIAL");
+            assertThat(predial.fraccionamientos().contenido())
+                    .as("solo el convenio de predial")
+                    .hasSize(1);
+            assertThat(predial.valores().contenido())
+                    .extracting(kamayuk.rentas.valores.ValorDelContribuyente::tributos)
+                    .containsExactly("PREDIAL");
+
+            assertThat(arbitrios.pagos().contenido())
+                    .extracting(kamayuk.rentas.cuentacorriente.MovimientoDelLibro::tributo)
+                    .containsExactly("ARBITRIO");
+            assertThat(arbitrios.fraccionamientos().contenido()).hasSize(1);
+            assertThat(arbitrios.valores().contenido())
+                    .extracting(kamayuk.rentas.valores.ValorDelContribuyente::tributos)
+                    .containsExactly("ARBITRIO");
+        }
+
         @Test
         @DisplayName("ARBITRIOS filtra por el tributo ARBITRIO, que es como se asienta")
         void arbitriosFiltraPorElTributoEnSingular() {
@@ -814,6 +872,10 @@ class ConsultaUnificadaJdbcTest {
      * lo que esta prueba necesita es que la seccion traiga una fila, no reproducir #35.
      */
     private void registrarConvenio(long contribuyenteId) {
+        registrarConvenio(contribuyenteId, "PREDIAL");
+    }
+
+    private void registrarConvenio(long contribuyenteId, String tributo) {
         transaccion.execute(
                 estado -> {
                     NumeroDeConvenio numero = convenios.siguienteNumero(EJERCICIO);
@@ -845,7 +907,7 @@ class ConsultaUnificadaJdbcTest {
                                             Alicuota.de("0.01"), 12, Alicuota.de("0.20"), 1L),
                                     List.of(
                                             new kamayuk.rentas.cuentacorriente.DeudaAcogida(
-                                                    "PREDIAL",
+                                                    tributo,
                                                     EJERCICIO,
                                                     0,
                                                     null,
@@ -869,6 +931,10 @@ class ConsultaUnificadaJdbcTest {
     }
 
     private void emitirValor(long contribuyenteId) {
+        emitirValor(contribuyenteId, "PREDIAL");
+    }
+
+    private void emitirValor(long contribuyenteId, String tributo) {
         transaccion.execute(
                 estado -> {
                     long correlativo =
@@ -898,7 +964,7 @@ class ConsultaUnificadaJdbcTest {
                                     new ValorDetalle(
                                             null,
                                             null,
-                                            "PREDIAL",
+                                            tributo,
                                             EJERCICIO,
                                             null,
                                             null,
