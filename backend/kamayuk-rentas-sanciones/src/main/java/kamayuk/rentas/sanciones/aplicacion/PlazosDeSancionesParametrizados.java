@@ -143,7 +143,10 @@ public class PlazosDeSancionesParametrizados {
         public PlazoConcedido queConcede(TipoDeResolucionDeGerencia tipo) {
             return switch (tipo) {
                 case ORDINARIA -> new PlazoConcedido(PlazoConcedido.DE_PAGO, leer(CLAVE_ORDINARIA));
-                case SANCIONADORA, ADMINISTRATIVA ->
+                // La que resuelve un recurso tambien se puede impugnar —la reconsideracion se
+                // apela—,
+                // y con el mismo plazo que las otras dos que no ordenan pagar (#412).
+                case SANCIONADORA, ADMINISTRATIVA, RECURSO ->
                         new PlazoConcedido("Plazo para impugnar", leer(CLAVE_RECURSO));
             };
         }

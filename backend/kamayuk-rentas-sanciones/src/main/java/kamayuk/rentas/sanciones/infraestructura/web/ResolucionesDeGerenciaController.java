@@ -89,6 +89,9 @@ public class ResolucionesDeGerenciaController {
 
     static final String ACCESO_ADMINISTRATIVA = "adm_resolucion_gerencia";
 
+    /** La accion «Resolver» de la pantalla de descargos (#412). */
+    static final String ACCESO_DESCARGOS = "transito_descargos";
+
     static final String ACCESO_NOTIFICACION = "adm_notificacion_resolucion";
 
     private final ResolverConResolucionDeGerencia resolver;
@@ -148,30 +151,72 @@ public class ResolucionesDeGerenciaController {
             Familia familia, TipoDeResolucionDeGerencia tipo, PeticionDeResolucion peticion) {
 
         Observacion observacion = PeticionesDeSanciones.observacionDe(peticion.observacion());
+        return traducir(
+                () ->
+                        resolver.dictar(
+                                new ResolverConResolucionDeGerencia.Peticion(
+                                        familia,
+                                        PeticionesDeSanciones.exigir(
+                                                peticion.papeleta(), "papeleta"),
+                                        tipo,
+                                        PeticionesDeSanciones.fechaDe(peticion.fecha(), "fecha"),
+                                        PeticionesDeSanciones.vacioEsNulo(peticion.nDeExpediente()),
+                                        PeticionesDeSanciones.enumeradoSiViene(
+                                                SentidoDelFallo.class,
+                                                peticion.sentidoDelFallo(),
+                                                "sentidoDelFallo"),
+                                        PeticionesDeSanciones.enumeradoSiViene(
+                                                EfectoSobreLaMulta.class,
+                                                peticion.efectoSobreLaMulta(),
+                                                "efectoSobreLaMulta"),
+                                        PeticionesDeSanciones.vacioEsNulo(
+                                                peticion.sancionAccesoria()),
+                                        PeticionesDeSanciones.exigir(
+                                                peticion.sustento(), "sustento"),
+                                        PeticionesDeSanciones.fechaSiViene(
+                                                peticion.proyectarDeudaAl(), "proyectarDeudaAl")),
+                                formatoDe(peticion.formato()),
+                                observacion));
+    }
+
+    /**
+     * Resuelve un recurso (#412): la accion «Resolver» de {@code transito_descargos}, para las dos
+     * familias. No ocupa el cupo de la ordinaria ni el de la sancionadora: un recurso presentado
+     * despues de las dos se resuelve aqui, y no se quedaba pendiente para siempre.
+     */
+    @PostMapping("/transito/descargos/{nDeExpediente}/resolucion")
+    @ResponseStatus(HttpStatus.CREATED)
+    @RequiereAcceso(acceso = ACCESO_DESCARGOS, privilegio = Privilegio.REGISTRO)
+    public ResolucionResource resolverRecurso(
+            @PathVariable String nDeExpediente,
+            @RequestBody PeticionDeResolucionDeRecurso peticion) {
+        Observacion observacion = PeticionesDeSanciones.observacionDe(peticion.observacion());
+        return traducir(
+                () ->
+                        resolver.resolverRecurso(
+                                nDeExpediente,
+                                PeticionesDeSanciones.fechaDe(peticion.fecha(), "fecha"),
+                                PeticionesDeSanciones.enumeradoDe(
+                                        SentidoDelFallo.class,
+                                        peticion.sentidoDelFallo(),
+                                        "sentidoDelFallo"),
+                                PeticionesDeSanciones.enumeradoDe(
+                                        EfectoSobreLaMulta.class,
+                                        peticion.efectoSobreLaMulta(),
+                                        "efectoSobreLaMulta"),
+                                PeticionesDeSanciones.exigir(peticion.sustento(), "sustento"),
+                                PeticionesDeSanciones.fechaSiViene(
+                                        peticion.proyectarDeudaAl(), "proyectarDeudaAl"),
+                                formatoDe(peticion.formato()),
+                                observacion));
+    }
+
+    /** Las dos rutas que dictan fallan por las mismas razones, y se traducen en un solo sitio. */
+    private static ResolucionResource traducir(
+            java.util.function.Supplier<ResolverConResolucionDeGerencia.ResolucionDictada>
+                    dictado) {
         try {
-            ResolverConResolucionDeGerencia.ResolucionDictada dictada =
-                    resolver.dictar(
-                            new ResolverConResolucionDeGerencia.Peticion(
-                                    familia,
-                                    PeticionesDeSanciones.exigir(peticion.papeleta(), "papeleta"),
-                                    tipo,
-                                    PeticionesDeSanciones.fechaDe(peticion.fecha(), "fecha"),
-                                    PeticionesDeSanciones.vacioEsNulo(peticion.nDeExpediente()),
-                                    PeticionesDeSanciones.enumeradoSiViene(
-                                            SentidoDelFallo.class,
-                                            peticion.sentidoDelFallo(),
-                                            "sentidoDelFallo"),
-                                    PeticionesDeSanciones.enumeradoSiViene(
-                                            EfectoSobreLaMulta.class,
-                                            peticion.efectoSobreLaMulta(),
-                                            "efectoSobreLaMulta"),
-                                    PeticionesDeSanciones.vacioEsNulo(peticion.sancionAccesoria()),
-                                    PeticionesDeSanciones.exigir(peticion.sustento(), "sustento"),
-                                    PeticionesDeSanciones.fechaSiViene(
-                                            peticion.proyectarDeudaAl(), "proyectarDeudaAl")),
-                            formatoDe(peticion.formato()),
-                            observacion);
-            return ResolucionResource.de(dictada);
+            return ResolucionResource.de(dictado.get());
         } catch (RegistrarDescargo.PapeletaInexistente
                 | ResolverConResolucionDeGerencia.DescargoInexistente noExiste) {
             throw new ProblemaDeNegocio(
@@ -269,6 +314,27 @@ public class ResolucionesDeGerenciaController {
         }
         return PeticionesDeSanciones.enumeradoDe(FormatoDeDocumento.class, texto, "formato");
     }
+
+    /**
+     * El cuerpo de la resolucion de un recurso (#412). <b>Lista blanca</b>: el recurso va en la
+     * ruta, y de el salen la papeleta y su familia; el fallo es obligatorio.
+     *
+     * @param observacion por que se registra (regla 10, RNF-052)
+     * @param fecha la fecha de la resolucion, no anterior a la presentacion del recurso
+     * @param sentidoDelFallo fundado, infundado o improcedente
+     * @param efectoSobreLaMulta que le pasa a la multa
+     * @param sustento el fundamento de la resolucion
+     * @param proyectarDeudaAl a que fecha se proyecta la deuda que el papel imprime
+     * @param formato en que formato sale el papel
+     */
+    public record PeticionDeResolucionDeRecurso(
+            @Nullable String observacion,
+            @Nullable String fecha,
+            @Nullable String sentidoDelFallo,
+            @Nullable String efectoSobreLaMulta,
+            @Nullable String sustento,
+            @Nullable String proyectarDeudaAl,
+            @Nullable String formato) {}
 
     /**
      * El cuerpo de una resolución. <b>Lista blanca</b>: lo que no está aquí no entra.

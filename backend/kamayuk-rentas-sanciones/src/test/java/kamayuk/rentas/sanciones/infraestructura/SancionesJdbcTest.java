@@ -647,6 +647,85 @@ class SancionesJdbcTest {
         }
     }
 
+    /**
+     * <b>El recurso presentado despues de las dos resoluciones de transito</b> (#412).
+     *
+     * <p>La siembra que distingue: el recurso es contra una papeleta que YA tiene la ordinaria y la
+     * sancionadora. Con solo la ordinaria, resolverlo con la sancionadora funcionaba, y esta prueba
+     * no morderia. Hasta #412 este recurso no se podia resolver por ninguna ruta: la sancionadora y
+     * la ordinaria contestaban 409 —los dos indices unicos por papeleta— y la ruta administrativa
+     * 404.
+     */
+    @Nested
+    @DisplayName("#412 — el recurso contra la sancionadora se resuelve con su propia resolucion")
+    class ElRecursoTardio {
+
+        @Test
+        @DisplayName(
+                "fundado y con la multa sin efecto: RECURSO, queResuelve lo encuentra, libro en 0")
+        void seResuelveConSuPropiaResolucion() {
+            Papeleta papeleta = papeletaDeTransito("R12");
+            ResolucionDeGerencia ordinaria =
+                    dictar(
+                                    papeleta,
+                                    TipoDeResolucionDeGerencia.ORDINARIA,
+                                    ORDINARIA,
+                                    null,
+                                    null,
+                                    null)
+                            .resolucion();
+            notificarResolucion(ordinaria.numero(), DILIGENCIA, ResultadoDeNotificacion.NOTIFICADO);
+            dictar(
+                    papeleta,
+                    TipoDeResolucionDeGerencia.SANCIONADORA,
+                    SANCIONADORA_DESDE,
+                    null,
+                    null,
+                    null);
+            RegistrarDescargo.Registrado recurso =
+                    enTransaccion(
+                            () ->
+                                    registrarDescargo.registrar(
+                                            Familia.TRANSITO,
+                                            papeleta.numero(),
+                                            new RegistrarDescargo.Peticion(
+                                                    "EXP-412",
+                                                    SANCIONADORA_DESDE.plusDays(1),
+                                                    TipoDeRecurso.RECONSIDERACION,
+                                                    "La sancionadora no valoro la prueba"),
+                                            PORQUE),
+                            "mesa.partes");
+
+            ResolverConResolucionDeGerencia.ResolucionDictada resuelta =
+                    enTransaccion(
+                            () ->
+                                    resolver.resolverRecurso(
+                                            "EXP-412",
+                                            SANCIONADORA_DESDE.plusDays(5),
+                                            SentidoDelFallo.FUNDADO,
+                                            EfectoSobreLaMulta.SE_DEJA_SIN_EFECTO,
+                                            "Se acredita que el vehiculo no circulaba",
+                                            null,
+                                            FormatoDeDocumento.PDF,
+                                            PORQUE),
+                            "gerente");
+
+            assertThat(resuelta.resolucion().tipo())
+                    .as("ni ORDINARIA ni SANCIONADORA: esas dos ya ocupan su unico cupo")
+                    .isEqualTo(TipoDeResolucionDeGerencia.RECURSO);
+            assertThat(
+                            enTransaccion(
+                                    () ->
+                                            resoluciones.queResuelve(
+                                                    recurso.descargo().identificador())))
+                    .map(ResolucionDeGerencia::numero)
+                    .contains(resuelta.resolucion().numero());
+            assertThat(deudaDe(papeleta, SANCIONADORA_DESDE.plusDays(5)))
+                    .as("fundado y sin efecto: la baja se asienta por el mismo camino que siempre")
+                    .isEqualTo(Dinero.CERO);
+        }
+    }
+
     @Nested
     @DisplayName("AC 2 — no hay sancionadora sin ordinaria notificada y sin plazo vencido")
     class LaSancionadora {

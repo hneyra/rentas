@@ -331,6 +331,53 @@ public class ResolverConResolucionDeGerencia {
         return new ResolucionDictada(registrada, emision, deuda, proyeccion, baja);
     }
 
+    /**
+     * Resuelve un recurso con su propia resolucion, de tipo {@code RECURSO} (#412).
+     *
+     * <p>La papeleta y su familia salen del recurso, que es lo que la ruta nombra. No ocupa el cupo
+     * de la ordinaria ni el de la sancionadora: en transito solo habia esas dos rutas que dictaban,
+     * las dos unicas por papeleta, y un recurso presentado despues de las dos no se podia resolver
+     * por ninguna. El mismo {@link #dictar}, con sus mismas guardas y su misma baja en el libro.
+     */
+    @Transactional
+    public ResolucionDictada resolverRecurso(
+            String expediente,
+            LocalDate fecha,
+            SentidoDelFallo sentido,
+            EfectoSobreLaMulta efecto,
+            String sustento,
+            @Nullable LocalDate proyectarDeudaAl,
+            FormatoDeDocumento formato,
+            Observacion observacion) {
+        Descargo recurso =
+                descargos
+                        .porNumeroDeExpediente(expediente)
+                        .orElseThrow(() -> new DescargoInexistente(expediente));
+        Papeleta papeleta =
+                papeletas
+                        .porId(recurso.papeletaId())
+                        .orElseThrow(
+                                () ->
+                                        new IllegalStateException(
+                                                "El recurso "
+                                                        + expediente
+                                                        + " cita una papeleta que no esta"));
+        return dictar(
+                new Peticion(
+                        papeleta.familia(),
+                        papeleta.numero(),
+                        TipoDeResolucionDeGerencia.RECURSO,
+                        fecha,
+                        expediente,
+                        sentido,
+                        efecto,
+                        null,
+                        sustento,
+                        proyectarDeudaAl),
+                formato,
+                observacion);
+    }
+
     // ------------------------------------------------------------------
 
     /** El recurso que la resolución resuelve, comprobando que es de esta papeleta. */

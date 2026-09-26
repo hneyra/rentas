@@ -82,6 +82,11 @@ public record ResolucionDeGerencia(
         sustento = exigido(sustento, SUSTENTO_MAXIMO, "El sustento de la resolucion");
         sancionAccesoria = recortado(sancionAccesoria, SANCION_MAXIMA, "La sancion accesoria");
 
+        // La que resuelve un recurso lo nombra (#412): sin descargo no hay nada que resolver.
+        if (tipo == TipoDeResolucionDeGerencia.RECURSO && descargoId == null) {
+            throw new IllegalArgumentException(
+                    "Una resolucion de recurso resuelve un descargo: falta cual");
+        }
         // resolucion_gerencia_fallo_ck: el fallo va con el recurso que resuelve.
         boolean conFallo = sentido != null && efecto != null;
         if ((descargoId != null) != conFallo) {
