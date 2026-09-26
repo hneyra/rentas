@@ -4914,11 +4914,21 @@ for (const [ruta, ops] of porRuta) {
         if (suya) escribirDescripcion(lineas, 10, suya);
         lineas.push('          schema: { type: string }');
       }
+      // Obligatorio SOLO donde el codigo lo exige (#436): `parametros-de-la-api.json` lo publica
+      // en `obligatorios`, y hasta #436 se leia y se descartaba para escribir `false` en los 760.
+      const delCodigo = DEL_CONTRATO[`${op.metodo.toUpperCase()} ${rutaRelativa}`] ?? {};
+      const obligatorios = delCodigo.obligatorios ?? [];
+      const algunoDeEstos = delCodigo.algunoDeEstos ?? [];
       for (const p of op.parametrosDeConsulta) {
         lineas.push(`        - name: ${p.nombre}`);
         lineas.push('          in: query');
-        lineas.push('          required: false');
-        if (p.descripcion) escribirDescripcion(lineas, 10, p.descripcion);
+        lineas.push(`          required: ${obligatorios.includes(p.nombre) ? 'true' : 'false'}`);
+        const nota = algunoDeEstos.includes(p.nombre)
+          ? `Hace falta al menos uno de: ${algunoDeEstos.map((n) => `\`${n}\``).join(', ')}.`
+          : null;
+        if (p.descripcion || nota) {
+          escribirDescripcion(lineas, 10, [p.descripcion, nota].filter(Boolean).join(' '));
+        }
         lineas.push(`          schema: ${p.esquema ?? '{ type: string }'}`);
         if (p.ejemplo) lineas.push(`          example: ${comillas(p.ejemplo)}`);
       }
@@ -4932,8 +4942,16 @@ for (const [ruta, ops] of porRuta) {
     }
     const respuestas = RESPUESTAS[op.operationId] ?? {};
     const principal = respuestas.principal ?? {};
+    // Lo que el codigo contesta, derivado y no escrito aqui (#732, #436): el 2xx de exito que el
+    // controlador pide y los errores que ningun otro mecanismo declara.
+    const derivadas = RESPUESTAS_DERIVADAS[`${op.metodo.toUpperCase()} ${rutaRelativa}`] ?? [];
+    const exitos = derivadas.filter((c) => c.startsWith('2'));
+    const codigoPrincipal =
+      principal.codigo ??
+      (exitos.includes('201') ? '201' : exitos[0] ?? (op.metodo === 'post' ? '201' : '200'));
+    const yaDeclarados = new Set([String(codigoPrincipal), ...(respuestas.extra ?? []).map((o) => String(o.codigo))]);
     lineas.push('      responses:');
-    lineas.push(`        ${principal.codigo ?? (op.metodo === 'post' ? '201' : '200')}:`);
+    lineas.push(`        ${codigoPrincipal}:`);
     lineas.push(
       principal.descripcion
         ? `          description: ${comillas(principal.descripcion)}`
@@ -4955,9 +4973,47 @@ for (const [ruta, ops] of porRuta) {
       lineas.push(`        ${comillas(otra.codigo)}:`);
       escribirDescripcion(lineas, 10, otra.descripcion);
     }
+    // El otro 2xx, cuando el controlador contesta dos (#436): el 200 del reintento idempotente
+    // junto al 201 de la creacion, por ejemplo.
+    for (const exito of exitos) {
+      if (yaDeclarados.has(exito)) continue;
+      lineas.push(`        ${comillas(exito)}:`);
+      escribirDescripcion(
+        lineas,
+        10,
+        exito === '200'
+          ? 'La operacion ya estaba hecha, o no crea nada: se contesta lo que hay (#436).'
+          : 'Operacion realizada (#436).',
+      );
+    }
+    // El 409 y el 503, derivados del codigo como el 404 (#436).
+    if (derivadas.includes('409') && !yaDeclarados.has('409')) {
+      lineas.push('        "409":');
+      escribirDescripcion(
+        lineas,
+        10,
+        'El estado actual no admite la operacion, o ya estaba hecha. **No es un fallo del' +
+          ' servidor**: el cuerpo (`problem+json`, `codigo: CONFLICTO`) dice que cambio o que ya' +
+          ' existia, y repetir la misma peticion da lo mismo (#436).',
+      );
+      lineas.push('          content:');
+      lineas.push('            application/problem+json:');
+      lineas.push('              schema: { $ref: "#/components/schemas/Error" }');
+    }
+    if (derivadas.includes('503') && !yaDeclarados.has('503')) {
+      lineas.push('        "503":');
+      escribirDescripcion(
+        lineas,
+        10,
+        'Un sistema del que esta operacion depende no contesta. **Reintentar SI puede cambiar el' +
+          ' resultado**, al reves que un 422 (#436).',
+      );
+      lineas.push('          content:');
+      lineas.push('            application/problem+json:');
+      lineas.push('              schema: { $ref: "#/components/schemas/Error" }');
+    }
     // El 404, derivado del codigo y no escrito aqui (#732).
-    const derivadas = RESPUESTAS_DERIVADAS[`${op.metodo.toUpperCase()} ${rutaRelativa}`] ?? [];
-    if (derivadas.includes('404')) {
+    if (derivadas.includes('404') && !yaDeclarados.has('404')) {
       lineas.push('        "404":');
       escribirDescripcion(
         lineas,

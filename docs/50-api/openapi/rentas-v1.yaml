@@ -1307,11 +1307,7 @@ paths:
         - name: activa
           in: query
           required: false
-          description: >-
-            Solo las vigentes («true»), solo las dadas de baja («false») o las dos (ausente).
-            Cualquier otra palabra es 422: un «si» tecleado que se leyera como «no filtres»
-            devolveria a la lista las vias que se dieron de baja, que es lo que este filtro existe
-            para impedir.
+          description: "[object Object]"
           schema: { type: string, enum: [true, false] }
           example: "true"
         - name: pagina
@@ -1739,12 +1735,7 @@ paths:
         - name: codigo
           in: query
           required: false
-          description: >-
-            Filtro «Código» de la pantalla. La comparacion es POR PREFIJO y no por igualdad (#35):
-            los codigos de un padron empiezan todos por la misma retahila de ceros, asi que una
-            igualdad solo sirve a quien ya sabe el codigo entero — medido contra Catacaos,
-            «?codigo=000000000» devolvia 0 de 10 603 filas y sin error ninguno. El codigo completo
-            sigue devolviendo una sola fila: es el prefijo mas largo que hay.
+          description: "[object Object]"
           schema: { type: string }
           example: "00000025673"
         - name: nombreRazonSocial
@@ -1755,23 +1746,13 @@ paths:
         - name: tipoDocumento
           in: query
           required: false
-          description: >-
-            Que clase de documento es, para acotar la busqueda. El vocabulario es el del enumerado
-            «TipoDocumento» y el del CHECK de «contribuyente.tipo_documento» (V1), letra por letra;
-            cualquier otra palabra se rechaza con 422 nombrando los seis, en vez de devolver una
-            pagina vacia. Es OPCIONAL: quien atiende teclea el numero que trae el carne y no se
-            detiene a clasificarlo. Sin «numeroDocumento» es 422, porque acotar solo por tipo
-            devolveria el padron entero de ese tipo.
+          description: "[object Object]"
           schema: { type: string, enum: [DNI, RUC, CE, PASAPORTE, PARTIDA, OTRO] }
           example: "CE"
         - name: numeroDocumento
           in: query
           required: false
-          description: >-
-            El numero del documento, tal como viene en el carne. Sustituye a «dNI» y «rUC» (#35): con
-            aquellos dos solo se podian comprobar dos de los seis tipos, de modo que un carne de
-            extranjeria no se podia buscar y el alta no tenia como saber si esa persona ya estaba en
-            el padron.
+          description: "[object Object]"
           schema: { type: string }
           example: "03593174"
         - name: pagina
@@ -1835,6 +1816,11 @@ paths:
           content:
             application/json:
               schema: { type: object }
+        "409":
+          description: "El estado actual no admite la operacion, o ya estaba hecha. **No es un fallo del servidor**: el cuerpo (`problem+json`, `codigo: CONFLICTO`) dice que cambio o que ya existia, y repetir la misma peticion da lo mismo (#436)."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
         "403":
           $ref: "#/components/responses/SinMunicipalidad"
         "422":
@@ -2018,11 +2004,7 @@ paths:
         - name: simulacion
           in: query
           required: false
-          description: >-
-            Con «false», la última EMISIÓN del ejercicio: las simulaciones no cuentan, y sin
-            ninguna emisión contesta 204 aunque haya simulaciones (#357). Ausente, la última
-            corrida, simulaciones incluidas. «true» es 422: «la última simulación» no es una
-            lectura que esta ruta publique.
+          description: "[object Object]"
           schema: { type: string, enum: [false] }
       responses:
         200:
@@ -2030,6 +2012,8 @@ paths:
           content:
             application/json:
               schema: { type: object }
+        "204":
+          description: "Operacion realizada (#436)."
         "403":
           $ref: "#/components/responses/SinMunicipalidad"
         "422":
@@ -2101,6 +2085,16 @@ paths:
           content:
             application/json:
               schema: { type: object }
+        "409":
+          description: "El estado actual no admite la operacion, o ya estaba hecha. **No es un fallo del servidor**: el cuerpo (`problem+json`, `codigo: CONFLICTO`) dice que cambio o que ya existia, y repetir la misma peticion da lo mismo (#436)."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
         "403":
           $ref: "#/components/responses/SinMunicipalidad"
         "422":
@@ -2131,6 +2125,16 @@ paths:
           content:
             application/json:
               schema: { type: object }
+        "409":
+          description: "El estado actual no admite la operacion, o ya estaba hecha. **No es un fallo del servidor**: el cuerpo (`problem+json`, `codigo: CONFLICTO`) dice que cambio o que ya existia, y repetir la misma peticion da lo mismo (#436)."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
         "403":
           $ref: "#/components/responses/SinMunicipalidad"
         "422":
@@ -2165,6 +2169,11 @@ paths:
           content:
             application/json:
               schema: { type: object }
+        "409":
+          description: "El estado actual no admite la operacion, o ya estaba hecha. **No es un fallo del servidor**: el cuerpo (`problem+json`, `codigo: CONFLICTO`) dice que cambio o que ya existia, y repetir la misma peticion da lo mismo (#436)."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
         "404":
           description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
           content:
@@ -2203,6 +2212,16 @@ paths:
           content:
             application/json:
               schema: { type: object }
+        "409":
+          description: "El estado actual no admite la operacion, o ya estaba hecha. **No es un fallo del servidor**: el cuerpo (`problem+json`, `codigo: CONFLICTO`) dice que cambio o que ya existia, y repetir la misma peticion da lo mismo (#436)."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
         "403":
           $ref: "#/components/responses/SinMunicipalidad"
         "422":
@@ -2353,10 +2372,7 @@ paths:
         - name: ejercicio
           in: query
           required: false
-          description: >-
-            El ejercicio que se determina, con el nombre que lleva en el cuerpo y en el
-            dominio. «ano» es el mismo dato con el rotulo del prototipo; si vienen los dos,
-            gana el del cuerpo (FiltroDeLaConsulta) y despues este.
+          description: "[object Object]"
           schema: { type: string }
           example: "2026"
       requestBody:
@@ -2442,6 +2458,8 @@ paths:
           content:
             application/json:
               schema: { type: object }
+        "204":
+          description: "Operacion realizada (#436)."
         "404":
           description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
           content:
@@ -2487,6 +2505,11 @@ paths:
           content:
             application/json:
               schema: { type: object }
+        "409":
+          description: "El estado actual no admite la operacion, o ya estaba hecha. **No es un fallo del servidor**: el cuerpo (`problem+json`, `codigo: CONFLICTO`) dice que cambio o que ya existia, y repetir la misma peticion da lo mismo (#436)."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
         "403":
           $ref: "#/components/responses/SinMunicipalidad"
         "422":
@@ -2514,7 +2537,7 @@ paths:
           schema: { type: string }
         - name: ano
           in: query
-          required: false
+          required: true
           description: "Filtro «Año» de la pantalla"
           schema: { type: string }
         - name: tipo
@@ -2593,7 +2616,7 @@ paths:
           schema: { type: string }
         - name: ano
           in: query
-          required: false
+          required: true
           description: "Ejercicio de la declaración"
           schema: { type: string }
           example: "2026"
@@ -2652,6 +2675,11 @@ paths:
           content:
             application/json:
               schema: { type: object }
+        "409":
+          description: "El estado actual no admite la operacion, o ya estaba hecha. **No es un fallo del servidor**: el cuerpo (`problem+json`, `codigo: CONFLICTO`) dice que cambio o que ya existia, y repetir la misma peticion da lo mismo (#436)."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
         "404":
           description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
           content:
@@ -2684,7 +2712,7 @@ paths:
           schema: { type: string }
         - name: ano
           in: query
-          required: false
+          required: true
           description: "Ejercicio de la declaración que se rectifica, como en el GET de la ruta"
           schema: { type: string }
           example: "2026"
@@ -2699,6 +2727,11 @@ paths:
           content:
             application/json:
               schema: { type: object }
+        "409":
+          description: "El estado actual no admite la operacion, o ya estaba hecha. **No es un fallo del servidor**: el cuerpo (`problem+json`, `codigo: CONFLICTO`) dice que cambio o que ya existia, y repetir la misma peticion da lo mismo (#436)."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
         "404":
           description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
           content:
@@ -2728,7 +2761,7 @@ paths:
           schema: { type: string }
         - name: ano
           in: query
-          required: false
+          required: true
           description: "Ejercicio de la declaración que se observa, como en el GET de la ruta"
           schema: { type: string }
           example: "2026"
@@ -2743,6 +2776,11 @@ paths:
           content:
             application/json:
               schema: { type: object }
+        "409":
+          description: "El estado actual no admite la operacion, o ya estaba hecha. **No es un fallo del servidor**: el cuerpo (`problem+json`, `codigo: CONFLICTO`) dice que cambio o que ya existia, y repetir la misma peticion da lo mismo (#436)."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
         "404":
           description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
           content:
@@ -2772,7 +2810,7 @@ paths:
           schema: { type: string }
         - name: ano
           in: query
-          required: false
+          required: true
           description: "Ejercicio de la declaración que se anula, como en el GET de la ruta"
           schema: { type: string }
           example: "2026"
@@ -2787,6 +2825,11 @@ paths:
           content:
             application/json:
               schema: { type: object }
+        "409":
+          description: "El estado actual no admite la operacion, o ya estaba hecha. **No es un fallo del servidor**: el cuerpo (`problem+json`, `codigo: CONFLICTO`) dice que cambio o que ya existia, y repetir la misma peticion da lo mismo (#436)."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
         "404":
           description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
           content:
@@ -3187,6 +3230,16 @@ paths:
           content:
             application/json:
               schema: { type: object }
+        "409":
+          description: "El estado actual no admite la operacion, o ya estaba hecha. **No es un fallo del servidor**: el cuerpo (`problem+json`, `codigo: CONFLICTO`) dice que cambio o que ya existia, y repetir la misma peticion da lo mismo (#436)."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
         "403":
           $ref: "#/components/responses/SinMunicipalidad"
         "422":
@@ -3224,6 +3277,16 @@ paths:
           content:
             application/json:
               schema: { type: object }
+        "409":
+          description: "El estado actual no admite la operacion, o ya estaba hecha. **No es un fallo del servidor**: el cuerpo (`problem+json`, `codigo: CONFLICTO`) dice que cambio o que ya existia, y repetir la misma peticion da lo mismo (#436)."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
         "403":
           $ref: "#/components/responses/SinMunicipalidad"
         "422":
@@ -3315,6 +3378,11 @@ paths:
           content:
             application/json:
               schema: { type: object }
+        "409":
+          description: "El estado actual no admite la operacion, o ya estaba hecha. **No es un fallo del servidor**: el cuerpo (`problem+json`, `codigo: CONFLICTO`) dice que cambio o que ya existia, y repetir la misma peticion da lo mismo (#436)."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
         "403":
           $ref: "#/components/responses/SinMunicipalidad"
         "422":
@@ -3394,6 +3462,11 @@ paths:
           content:
             application/json:
               schema: { type: object }
+        "409":
+          description: "El estado actual no admite la operacion, o ya estaba hecha. **No es un fallo del servidor**: el cuerpo (`problem+json`, `codigo: CONFLICTO`) dice que cambio o que ya existia, y repetir la misma peticion da lo mismo (#436)."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
         "404":
           description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
           content:
@@ -3425,6 +3498,11 @@ paths:
           content:
             application/json:
               schema: { type: object }
+        "409":
+          description: "El estado actual no admite la operacion, o ya estaba hecha. **No es un fallo del servidor**: el cuerpo (`problem+json`, `codigo: CONFLICTO`) dice que cambio o que ya existia, y repetir la misma peticion da lo mismo (#436)."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
         "404":
           description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
           content:
@@ -3459,6 +3537,13 @@ paths:
           content:
             application/json:
               schema: { type: object }
+        "200":
+          description: "La operacion ya estaba hecha, o no crea nada: se contesta lo que hay (#436)."
+        "409":
+          description: "El estado actual no admite la operacion, o ya estaba hecha. **No es un fallo del servidor**: el cuerpo (`problem+json`, `codigo: CONFLICTO`) dice que cambio o que ya existia, y repetir la misma peticion da lo mismo (#436)."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
         "404":
           description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
           content:
@@ -3530,6 +3615,11 @@ paths:
           content:
             application/json:
               schema: { type: object }
+        "409":
+          description: "El estado actual no admite la operacion, o ya estaba hecha. **No es un fallo del servidor**: el cuerpo (`problem+json`, `codigo: CONFLICTO`) dice que cambio o que ya existia, y repetir la misma peticion da lo mismo (#436)."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
         "404":
           description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
           content:
@@ -3570,6 +3660,13 @@ paths:
           content:
             application/json:
               schema: { type: object }
+        "200":
+          description: "La operacion ya estaba hecha, o no crea nada: se contesta lo que hay (#436)."
+        "409":
+          description: "El estado actual no admite la operacion, o ya estaba hecha. **No es un fallo del servidor**: el cuerpo (`problem+json`, `codigo: CONFLICTO`) dice que cambio o que ya existia, y repetir la misma peticion da lo mismo (#436)."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
         "404":
           description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
           content:
@@ -3830,6 +3927,11 @@ paths:
           content:
             application/json:
               schema: { type: object }
+        "409":
+          description: "El estado actual no admite la operacion, o ya estaba hecha. **No es un fallo del servidor**: el cuerpo (`problem+json`, `codigo: CONFLICTO`) dice que cambio o que ya existia, y repetir la misma peticion da lo mismo (#436)."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
         "404":
           description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
           content:
@@ -3861,6 +3963,11 @@ paths:
           content:
             application/json:
               schema: { type: object }
+        "409":
+          description: "El estado actual no admite la operacion, o ya estaba hecha. **No es un fallo del servidor**: el cuerpo (`problem+json`, `codigo: CONFLICTO`) dice que cambio o que ya existia, y repetir la misma peticion da lo mismo (#436)."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
         "404":
           description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
           content:
@@ -3887,6 +3994,11 @@ paths:
           content:
             application/json:
               schema: { type: object }
+        "409":
+          description: "El estado actual no admite la operacion, o ya estaba hecha. **No es un fallo del servidor**: el cuerpo (`problem+json`, `codigo: CONFLICTO`) dice que cambio o que ya existia, y repetir la misma peticion da lo mismo (#436)."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
         "404":
           description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
           content:
@@ -3923,6 +4035,11 @@ paths:
           content:
             application/json:
               schema: { type: object }
+        "409":
+          description: "El estado actual no admite la operacion, o ya estaba hecha. **No es un fallo del servidor**: el cuerpo (`problem+json`, `codigo: CONFLICTO`) dice que cambio o que ya existia, y repetir la misma peticion da lo mismo (#436)."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
         "404":
           description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
           content:
@@ -4014,6 +4131,11 @@ paths:
           content:
             application/json:
               schema: { type: object }
+        "404":
+          description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
         "403":
           $ref: "#/components/responses/SinMunicipalidad"
         "422":
@@ -4140,6 +4262,11 @@ paths:
           content:
             application/json:
               schema: { type: object }
+        "409":
+          description: "El estado actual no admite la operacion, o ya estaba hecha. **No es un fallo del servidor**: el cuerpo (`problem+json`, `codigo: CONFLICTO`) dice que cambio o que ya existia, y repetir la misma peticion da lo mismo (#436)."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
         "404":
           description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
           content:
@@ -4297,44 +4424,11 @@ paths:
           content:
             application/json:
               schema: { type: object }
-        "404":
-          description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
+        "409":
+          description: "El estado actual no admite la operacion, o ya estaba hecha. **No es un fallo del servidor**: el cuerpo (`problem+json`, `codigo: CONFLICTO`) dice que cambio o que ya existia, y repetir la misma peticion da lo mismo (#436)."
           content:
             application/problem+json:
               schema: { $ref: "#/components/schemas/Error" }
-        "403":
-          $ref: "#/components/responses/SinMunicipalidad"
-        "422":
-          $ref: "#/components/responses/ErrorDeValidacion"
-  "/transito/descargos/{nDeExpediente}/resolucion":
-    post:
-      operationId: resolver_recurso
-      summary: "Resolución de un recurso"
-      description: >-
-        Resuelve un recurso —descargo, reconsideración o apelación— con su propia resolución de
-        gerencia, de tipo `RECURSO` (#412), para las dos familias: la papeleta sale del recurso.
-        No ocupa el lugar de la ordinaria ni el de la sancionadora, así que un recurso presentado
-        después de las dos se resuelve aquí. El fallo es obligatorio; con `SE_DEJA_SIN_EFECTO` la
-        multa se da de baja en el libro por el mismo camino que siempre. Un segundo fallo sobre el
-        mismo recurso contesta 409.
-      tags: ["Tránsito"]
-      parameters:
-        - name: nDeExpediente
-          in: path
-          required: true
-          description: "El recurso, por el número de expediente con que se registró"
-          schema: { type: string }
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { type: object }
-      responses:
-        201:
-          description: Operacion realizada
-          content:
-            application/json:
-              schema: { type: object }
         "404":
           description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
           content:
@@ -4420,6 +4514,11 @@ paths:
           content:
             application/json:
               schema: { type: object }
+        "409":
+          description: "El estado actual no admite la operacion, o ya estaba hecha. **No es un fallo del servidor**: el cuerpo (`problem+json`, `codigo: CONFLICTO`) dice que cambio o que ya existia, y repetir la misma peticion da lo mismo (#436)."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
         "404":
           description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
           content:
@@ -4456,6 +4555,11 @@ paths:
           content:
             application/json:
               schema: { type: object }
+        "409":
+          description: "El estado actual no admite la operacion, o ya estaba hecha. **No es un fallo del servidor**: el cuerpo (`problem+json`, `codigo: CONFLICTO`) dice que cambio o que ya existia, y repetir la misma peticion da lo mismo (#436)."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
         "404":
           description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
           content:
@@ -4491,6 +4595,11 @@ paths:
           content:
             application/json:
               schema: { type: object }
+        "409":
+          description: "El estado actual no admite la operacion, o ya estaba hecha. **No es un fallo del servidor**: el cuerpo (`problem+json`, `codigo: CONFLICTO`) dice que cambio o que ya existia, y repetir la misma peticion da lo mismo (#436)."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
         "404":
           description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
           content:
@@ -4594,7 +4703,7 @@ paths:
           application/json:
             schema: { type: object }
       responses:
-        201:
+        200:
           description: Operacion realizada
           content:
             application/json:
@@ -4625,6 +4734,11 @@ paths:
           content:
             application/json:
               schema: { type: object }
+        "409":
+          description: "El estado actual no admite la operacion, o ya estaba hecha. **No es un fallo del servidor**: el cuerpo (`problem+json`, `codigo: CONFLICTO`) dice que cambio o que ya existia, y repetir la misma peticion da lo mismo (#436)."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
         "404":
           description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
           content:
@@ -4654,7 +4768,7 @@ paths:
           application/json:
             schema: { type: object }
       responses:
-        201:
+        200:
           description: Operacion realizada
           content:
             application/json:
@@ -4676,9 +4790,7 @@ paths:
         - name: licencia
           in: query
           required: false
-          description: >-
-            Licencia de conducir del infractor. Uno de los dos —esta o «documento»— es
-            obligatorio: sin ninguno, 422 (RecordsDeTransitoController).
+          description: "[object Object]"
           schema: { type: string }
         - name: documento
           in: query
@@ -4752,6 +4864,11 @@ paths:
           content:
             application/json:
               schema: { type: object }
+        "409":
+          description: "El estado actual no admite la operacion, o ya estaba hecha. **No es un fallo del servidor**: el cuerpo (`problem+json`, `codigo: CONFLICTO`) dice que cambio o que ya existia, y repetir la misma peticion da lo mismo (#436)."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
         "404":
           description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
           content:
@@ -4944,6 +5061,16 @@ paths:
           content:
             application/json:
               schema: { type: object }
+        "409":
+          description: "El estado actual no admite la operacion, o ya estaba hecha. **No es un fallo del servidor**: el cuerpo (`problem+json`, `codigo: CONFLICTO`) dice que cambio o que ya existia, y repetir la misma peticion da lo mismo (#436)."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
         "403":
           $ref: "#/components/responses/SinMunicipalidad"
         "422":
@@ -4965,6 +5092,16 @@ paths:
           content:
             application/json:
               schema: { type: object }
+        "409":
+          description: "El estado actual no admite la operacion, o ya estaba hecha. **No es un fallo del servidor**: el cuerpo (`problem+json`, `codigo: CONFLICTO`) dice que cambio o que ya existia, y repetir la misma peticion da lo mismo (#436)."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
         "403":
           $ref: "#/components/responses/SinMunicipalidad"
         "422":
@@ -5461,6 +5598,11 @@ paths:
           content:
             application/json:
               schema: { type: object }
+        "409":
+          description: "El estado actual no admite la operacion, o ya estaba hecha. **No es un fallo del servidor**: el cuerpo (`problem+json`, `codigo: CONFLICTO`) dice que cambio o que ya existia, y repetir la misma peticion da lo mismo (#436)."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
         "404":
           description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
           content:
@@ -5661,7 +5803,7 @@ paths:
           application/json:
             schema: { type: object }
       responses:
-        201:
+        200:
           description: Operacion realizada
           content:
             application/json:
@@ -5747,6 +5889,16 @@ paths:
           content:
             application/json:
               schema: { type: object }
+        "409":
+          description: "El estado actual no admite la operacion, o ya estaba hecha. **No es un fallo del servidor**: el cuerpo (`problem+json`, `codigo: CONFLICTO`) dice que cambio o que ya existia, y repetir la misma peticion da lo mismo (#436)."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
         "403":
           $ref: "#/components/responses/SinMunicipalidad"
         "422":
@@ -5799,7 +5951,7 @@ paths:
           application/json:
             schema: { type: object }
       responses:
-        201:
+        200:
           description: Operacion realizada
           content:
             application/json:
@@ -6080,6 +6232,11 @@ paths:
           content:
             application/json:
               schema: { type: object }
+        "503":
+          description: "Un sistema del que esta operacion depende no contesta. **Reintentar SI puede cambiar el resultado**, al reves que un 422 (#436)."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
         "404":
           description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
           content:
@@ -6167,6 +6324,16 @@ paths:
           content:
             application/json:
               schema: { type: object }
+        "409":
+          description: "El estado actual no admite la operacion, o ya estaba hecha. **No es un fallo del servidor**: el cuerpo (`problem+json`, `codigo: CONFLICTO`) dice que cambio o que ya existia, y repetir la misma peticion da lo mismo (#436)."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "503":
+          description: "Un sistema del que esta operacion depende no contesta. **Reintentar SI puede cambiar el resultado**, al reves que un 422 (#436)."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
         "403":
           $ref: "#/components/responses/SinMunicipalidad"
         "422":
@@ -6180,7 +6347,7 @@ paths:
       parameters:
         - name: fecha
           in: query
-          required: false
+          required: true
           description: "El día de caja que se concilia, en ISO. **Obligatorio para el servidor**: sin él habría que elegir uno —«hoy»— y una conciliación que se responde sola con la fecha del reloj no es reproducible al día siguiente (regla 6)."
           schema: { type: string, format: date }
       responses:
@@ -6252,6 +6419,13 @@ paths:
           content:
             application/json:
               schema: { type: object }
+        "200":
+          description: "La operacion ya estaba hecha, o no crea nada: se contesta lo que hay (#436)."
+        "409":
+          description: "El estado actual no admite la operacion, o ya estaba hecha. **No es un fallo del servidor**: el cuerpo (`problem+json`, `codigo: CONFLICTO`) dice que cambio o que ya existia, y repetir la misma peticion da lo mismo (#436)."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
         "404":
           description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
           content:
@@ -6433,19 +6607,12 @@ paths:
         - name: formato
           in: query
           required: false
-          description: >-
-            Sin el, la respuesta es el contenido del recibo en JSON: la vista previa, que
-            no emite nada. Con el, la respuesta es el duplicado como documento (#34,
-            RF-132).
+          description: "[object Object]"
           schema: { type: string, enum: [PDF, XLS, RTF] }
         - name: observacion
           in: query
           required: false
-          description: >-
-            Por que se pide el duplicado. Obligatoria cuando se pide con «formato»: cada
-            reimpresion queda registrada con quien la genero, y eso es una escritura
-            (regla 10, RNF-052). Va en la consulta y no en el cuerpo porque el verbo de
-            esta operacion lo fija el prototipo, y un GET no lleva cuerpo.
+          description: "[object Object]"
           schema: { type: string }
         - name: pagina
           in: query
@@ -6558,6 +6725,16 @@ paths:
           content:
             application/json:
               schema: { type: object }
+        "409":
+          description: "El estado actual no admite la operacion, o ya estaba hecha. **No es un fallo del servidor**: el cuerpo (`problem+json`, `codigo: CONFLICTO`) dice que cambio o que ya existia, y repetir la misma peticion da lo mismo (#436)."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "503":
+          description: "Un sistema del que esta operacion depende no contesta. **Reintentar SI puede cambiar el resultado**, al reves que un 422 (#436)."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
         "404":
           description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
           content:
@@ -6598,18 +6775,13 @@ paths:
         - name: caja
           in: query
           required: false
-          description: >-
-            Codigo de la ventanilla. Junto con «cajero», la respuesta trae ademas el arqueo
-            EN VIVO de su turno: lo que la pantalla de cierre llama «Cuadrar», mirado antes
-            de firmar el acta (#36, RF-087). Del backend, no de la pantalla.
+          description: "[object Object]"
           schema: { type: string }
           example: "C-01"
         - name: cajero
           in: query
           required: false
-          description: >-
-            Cajero del turno. Solo tiene efecto junto con «caja»; si ese cajero no abrio
-            turno ese dia, 404 —un arqueo en ceros haria pensar que abrio y no cobro—.
+          description: "[object Object]"
           schema: { type: string }
           example: "jperez"
         - name: ejercicio
@@ -6824,11 +6996,7 @@ paths:
         - name: porPeriodo
           in: query
           required: false
-          description: >-
-            Una fila por cuota («true») o una por obligacion con sus periodos agregados
-            (ausente o «false»). Cualquier otra palabra es 422: un «si» tecleado que se leyera
-            como «false» devolveria filas agregadas a quien pidio cuotas, y esa respuesta es
-            indistinguible de la correcta hasta que alguien intenta dar una de baja.
+          description: "[object Object]"
           schema: { type: string, enum: [true, false] }
           example: "true"
         - name: pagina
@@ -6878,7 +7046,7 @@ paths:
       parameters:
         - name: contribuyente
           in: query
-          required: false
+          required: true
           schema: { type: string }
           example: "codigo"
         - name: impresion
@@ -7046,13 +7214,7 @@ paths:
         - name: causal
           in: query
           required: false
-          description: >-
-            Por que se dio de baja la deuda. El vocabulario es el del desplegable «Causal» de la
-            pantalla de baja de deuda, letra por letra salvo la tilde y el espacio, que ningun
-            identificador lleva; cualquier otra palabra se rechaza con 422 nombrando lo admitido en
-            vez de devolver la relacion entera bajo un filtro que no acota. Acota a las bajas —un
-            alta no tiene causal— y deja fuera las anteriores a la migracion que estampa la
-            columna, que la tienen vacia y no se pueden reparar.
+          description: "[object Object]"
           schema: { type: string, enum: [PRESCRIPCION_DECLARADA, RESOLUCION_QUE_DEJA_SIN_EFECTO, ERROR_MATERIAL, COMPENSACION, DEUDA_DE_COBRANZA_DUDOSA, CONDONACION_POR_ORDENANZA] }
           example: "PRESCRIPCION_DECLARADA"
         - name: autoManual
@@ -7455,7 +7617,7 @@ paths:
       parameters:
         - name: codContribuyente
           in: query
-          required: false
+          required: true
           description: "Filtro «Cod. Contribuyente» de la pantalla"
           schema: { type: string }
         - name: fecha
@@ -7495,6 +7657,11 @@ paths:
           content:
             application/json:
               schema: { type: object }
+        "409":
+          description: "El estado actual no admite la operacion, o ya estaba hecha. **No es un fallo del servidor**: el cuerpo (`problem+json`, `codigo: CONFLICTO`) dice que cambio o que ya existia, y repetir la misma peticion da lo mismo (#436)."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
         "404":
           description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
           content:
@@ -7635,6 +7802,11 @@ paths:
           content:
             application/json:
               schema: { type: object }
+        "409":
+          description: "El estado actual no admite la operacion, o ya estaba hecha. **No es un fallo del servidor**: el cuerpo (`problem+json`, `codigo: CONFLICTO`) dice que cambio o que ya existia, y repetir la misma peticion da lo mismo (#436)."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
         "404":
           description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
           content:
@@ -7796,6 +7968,11 @@ paths:
           content:
             application/json:
               schema: { type: object }
+        "409":
+          description: "El estado actual no admite la operacion, o ya estaba hecha. **No es un fallo del servidor**: el cuerpo (`problem+json`, `codigo: CONFLICTO`) dice que cambio o que ya existia, y repetir la misma peticion da lo mismo (#436)."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
         "404":
           description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
           content:
@@ -7903,6 +8080,13 @@ paths:
           content:
             application/json:
               schema: { type: object }
+        "200":
+          description: "La operacion ya estaba hecha, o no crea nada: se contesta lo que hay (#436)."
+        "409":
+          description: "El estado actual no admite la operacion, o ya estaba hecha. **No es un fallo del servidor**: el cuerpo (`problem+json`, `codigo: CONFLICTO`) dice que cambio o que ya existia, y repetir la misma peticion da lo mismo (#436)."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
         "404":
           description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
           content:
@@ -8019,6 +8203,13 @@ paths:
           content:
             application/json:
               schema: { type: object }
+        "200":
+          description: "La operacion ya estaba hecha, o no crea nada: se contesta lo que hay (#436)."
+        "409":
+          description: "El estado actual no admite la operacion, o ya estaba hecha. **No es un fallo del servidor**: el cuerpo (`problem+json`, `codigo: CONFLICTO`) dice que cambio o que ya existia, y repetir la misma peticion da lo mismo (#436)."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
         "404":
           description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
           content:
@@ -8070,6 +8261,11 @@ paths:
           content:
             application/json:
               schema: { type: object }
+        "409":
+          description: "El estado actual no admite la operacion, o ya estaba hecha. **No es un fallo del servidor**: el cuerpo (`problem+json`, `codigo: CONFLICTO`) dice que cambio o que ya existia, y repetir la misma peticion da lo mismo (#436)."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
         "404":
           description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
           content:
@@ -8101,6 +8297,11 @@ paths:
           content:
             application/json:
               schema: { type: object }
+        "409":
+          description: "El estado actual no admite la operacion, o ya estaba hecha. **No es un fallo del servidor**: el cuerpo (`problem+json`, `codigo: CONFLICTO`) dice que cambio o que ya existia, y repetir la misma peticion da lo mismo (#436)."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
         "404":
           description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
           content:
@@ -8207,6 +8408,11 @@ paths:
           content:
             application/json:
               schema: { type: object }
+        "409":
+          description: "El estado actual no admite la operacion, o ya estaba hecha. **No es un fallo del servidor**: el cuerpo (`problem+json`, `codigo: CONFLICTO`) dice que cambio o que ya existia, y repetir la misma peticion da lo mismo (#436)."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
         "404":
           description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
           content:
@@ -8286,6 +8492,13 @@ paths:
           content:
             application/json:
               schema: { type: object }
+        "200":
+          description: "La operacion ya estaba hecha, o no crea nada: se contesta lo que hay (#436)."
+        "409":
+          description: "El estado actual no admite la operacion, o ya estaba hecha. **No es un fallo del servidor**: el cuerpo (`problem+json`, `codigo: CONFLICTO`) dice que cambio o que ya existia, y repetir la misma peticion da lo mismo (#436)."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
         "404":
           description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
           content:
@@ -8337,6 +8550,11 @@ paths:
           content:
             application/json:
               schema: { type: object }
+        "409":
+          description: "El estado actual no admite la operacion, o ya estaba hecha. **No es un fallo del servidor**: el cuerpo (`problem+json`, `codigo: CONFLICTO`) dice que cambio o que ya existia, y repetir la misma peticion da lo mismo (#436)."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
         "404":
           description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
           content:
@@ -8384,6 +8602,11 @@ paths:
           content:
             application/json:
               schema: { type: object }
+        "409":
+          description: "El estado actual no admite la operacion, o ya estaba hecha. **No es un fallo del servidor**: el cuerpo (`problem+json`, `codigo: CONFLICTO`) dice que cambio o que ya existia, y repetir la misma peticion da lo mismo (#436)."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
         "404":
           description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
           content:
@@ -8682,6 +8905,13 @@ paths:
           content:
             application/json:
               schema: { type: object }
+        "200":
+          description: "La operacion ya estaba hecha, o no crea nada: se contesta lo que hay (#436)."
+        "409":
+          description: "El estado actual no admite la operacion, o ya estaba hecha. **No es un fallo del servidor**: el cuerpo (`problem+json`, `codigo: CONFLICTO`) dice que cambio o que ya existia, y repetir la misma peticion da lo mismo (#436)."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
         "404":
           description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
           content:
@@ -8713,6 +8943,11 @@ paths:
           content:
             application/json:
               schema: { type: object }
+        "409":
+          description: "El estado actual no admite la operacion, o ya estaba hecha. **No es un fallo del servidor**: el cuerpo (`problem+json`, `codigo: CONFLICTO`) dice que cambio o que ya existia, y repetir la misma peticion da lo mismo (#436)."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
         "404":
           description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
           content:
@@ -8739,11 +8974,16 @@ paths:
           application/json:
             schema: { type: object }
       responses:
-        201:
+        200:
           description: Operacion realizada
           content:
             application/json:
               schema: { type: object }
+        "409":
+          description: "El estado actual no admite la operacion, o ya estaba hecha. **No es un fallo del servidor**: el cuerpo (`problem+json`, `codigo: CONFLICTO`) dice que cambio o que ya existia, y repetir la misma peticion da lo mismo (#436)."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
         "404":
           description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
           content:
@@ -8770,11 +9010,16 @@ paths:
           application/json:
             schema: { type: object }
       responses:
-        201:
+        200:
           description: Operacion realizada
           content:
             application/json:
               schema: { type: object }
+        "409":
+          description: "El estado actual no admite la operacion, o ya estaba hecha. **No es un fallo del servidor**: el cuerpo (`problem+json`, `codigo: CONFLICTO`) dice que cambio o que ya existia, y repetir la misma peticion da lo mismo (#436)."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
         "404":
           description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
           content:
@@ -8886,6 +9131,11 @@ paths:
           content:
             application/json:
               schema: { type: object }
+        "409":
+          description: "El estado actual no admite la operacion, o ya estaba hecha. **No es un fallo del servidor**: el cuerpo (`problem+json`, `codigo: CONFLICTO`) dice que cambio o que ya existia, y repetir la misma peticion da lo mismo (#436)."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
         "404":
           description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
           content:
@@ -8998,6 +9248,11 @@ paths:
           content:
             application/json:
               schema: { type: object }
+        "409":
+          description: "El estado actual no admite la operacion, o ya estaba hecha. **No es un fallo del servidor**: el cuerpo (`problem+json`, `codigo: CONFLICTO`) dice que cambio o que ya existia, y repetir la misma peticion da lo mismo (#436)."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
         "404":
           description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
           content:
@@ -9029,6 +9284,11 @@ paths:
           content:
             application/json:
               schema: { type: object }
+        "409":
+          description: "El estado actual no admite la operacion, o ya estaba hecha. **No es un fallo del servidor**: el cuerpo (`problem+json`, `codigo: CONFLICTO`) dice que cambio o que ya existia, y repetir la misma peticion da lo mismo (#436)."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
         "404":
           description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
           content:
@@ -9124,6 +9384,11 @@ paths:
           content:
             application/json:
               schema: { type: object }
+        "409":
+          description: "El estado actual no admite la operacion, o ya estaba hecha. **No es un fallo del servidor**: el cuerpo (`problem+json`, `codigo: CONFLICTO`) dice que cambio o que ya existia, y repetir la misma peticion da lo mismo (#436)."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
         "404":
           description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
           content:
@@ -9156,6 +9421,11 @@ paths:
           content:
             application/json:
               schema: { type: object }
+        "409":
+          description: "El estado actual no admite la operacion, o ya estaba hecha. **No es un fallo del servidor**: el cuerpo (`problem+json`, `codigo: CONFLICTO`) dice que cambio o que ya existia, y repetir la misma peticion da lo mismo (#436)."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
         "404":
           description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
           content:
@@ -9188,6 +9458,11 @@ paths:
           content:
             application/json:
               schema: { type: object }
+        "409":
+          description: "El estado actual no admite la operacion, o ya estaba hecha. **No es un fallo del servidor**: el cuerpo (`problem+json`, `codigo: CONFLICTO`) dice que cambio o que ya existia, y repetir la misma peticion da lo mismo (#436)."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
         "404":
           description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
           content:
@@ -9220,6 +9495,11 @@ paths:
           content:
             application/json:
               schema: { type: object }
+        "409":
+          description: "El estado actual no admite la operacion, o ya estaba hecha. **No es un fallo del servidor**: el cuerpo (`problem+json`, `codigo: CONFLICTO`) dice que cambio o que ya existia, y repetir la misma peticion da lo mismo (#436)."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
         "404":
           description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
           content:
@@ -9392,6 +9672,11 @@ paths:
           content:
             application/json:
               schema: { type: object }
+        "409":
+          description: "El estado actual no admite la operacion, o ya estaba hecha. **No es un fallo del servidor**: el cuerpo (`problem+json`, `codigo: CONFLICTO`) dice que cambio o que ya existia, y repetir la misma peticion da lo mismo (#436)."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
         "403":
           $ref: "#/components/responses/SinMunicipalidad"
         "422":
@@ -9488,6 +9773,13 @@ paths:
           content:
             application/json:
               schema: { type: object }
+        "200":
+          description: "La operacion ya estaba hecha, o no crea nada: se contesta lo que hay (#436)."
+        "409":
+          description: "El estado actual no admite la operacion, o ya estaba hecha. **No es un fallo del servidor**: el cuerpo (`problem+json`, `codigo: CONFLICTO`) dice que cambio o que ya existia, y repetir la misma peticion da lo mismo (#436)."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
         "404":
           description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
           content:
@@ -9520,6 +9812,11 @@ paths:
           content:
             application/octet-stream:
               schema: { type: string, format: binary }
+        "409":
+          description: "El estado actual no admite la operacion, o ya estaba hecha. **No es un fallo del servidor**: el cuerpo (`problem+json`, `codigo: CONFLICTO`) dice que cambio o que ya existia, y repetir la misma peticion da lo mismo (#436)."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
         "404":
           description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
           content:
@@ -9762,6 +10059,11 @@ paths:
           content:
             application/json:
               schema: { type: object }
+        "404":
+          description: "Lo que la peticion identifica no existe en esta municipalidad. **No es un fallo del servidor y reintentar no lo cambia**: el cuerpo es `problem+json` con `codigo: NO_ENCONTRADO` y dice que se buscaba."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Error" }
         "403":
           $ref: "#/components/responses/SinMunicipalidad"
         "422":
@@ -9775,7 +10077,7 @@ paths:
       parameters:
         - name: ejercicio
           in: query
-          required: false
+          required: true
           description: "Ejercicio de trabajo. Obligatorio: es la clave de particion de la bitacora"
           schema: { type: string }
           example: "2026"
@@ -9787,20 +10089,13 @@ paths:
         - name: operacion
           in: query
           required: false
-          description: >-
-            Que clase de acto se registro. El vocabulario es el del enumerado «Operacion» y el
-            del CHECK de «auditoria.operacion» (V5), letra por letra; cualquier otra palabra se
-            rechaza con 422 en vez de devolver una pagina vacia. No hay ELIMINACION: la
-            aplicacion no borra (RNF-051, regla 4), y lo que parece un borrado es una BAJA, una
-            ANULACION o una REVERSION.
+          description: "[object Object]"
           schema: { type: string, enum: [ALTA, MODIFICACION, BAJA, ANULACION, REVERSION, PERMISO, ACCESO] }
           example: "ANULACION"
         - name: tabla
           in: query
           required: false
-          description: >-
-            Sobre que tabla se actuo, tal como la bitacora la nombra —«recibo», «predio»,
-            «sesion»—. Es lo que la grilla dibuja en la columna «Opción».
+          description: "[object Object]"
           schema: { type: string }
           example: "recibo"
         - name: desde
@@ -9972,7 +10267,7 @@ paths:
           application/json:
             schema: { type: object }
       responses:
-        201:
+        200:
           description: Operacion realizada
           content:
             application/json:

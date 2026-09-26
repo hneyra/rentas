@@ -120,7 +120,10 @@ public class PagoController {
         } catch (RecibirPago.AnulacionAntesQueSuCobro todaviaNo) {
             throw new ProblemaDeNegocio(CodigoDeError.SERVICIO_NO_DISPONIBLE, mensajeDe(todaviaNo));
         }
-        HttpStatus estado = recibido.nuevo() ? HttpStatus.CREATED : HttpStatus.CONFLICT;
+        // La constante de CodigoDeError y no el literal (#436): es lo que el censo de respuestas
+        // reconoce, y sin ella el contrato callaba el 409 del reintento.
+        HttpStatus estado =
+                recibido.nuevo() ? HttpStatus.CREATED : CodigoDeError.CONFLICTO.estado();
         return ResponseEntity.status(estado)
                 .body(PagoResource.de(recibido.pago(), recibido.nuevo()));
     }
