@@ -1654,7 +1654,8 @@ class DeterminarPredialTest {
                             kamayuk.rentas.nucleo.dominio.OrigenDeDeterminacion.ORDINARIA,
                             EstadoDeDeterminacion.BORRADOR,
                             "siembra",
-                            ModalidadDelPredial.TRIMESTRAL));
+                            ModalidadDelPredial.TRIMESTRAL,
+                            null));
             detallePorId.put(id, List.of(detalle));
         }
 
@@ -1700,7 +1701,8 @@ class DeterminarPredialTest {
                     determinacion.origen(),
                     determinacion.estado(),
                     "cajero.ventanilla",
-                    determinacion.modalidad());
+                    determinacion.modalidad(),
+                    determinacion.origenDeLaBase());
         }
 
         @Override

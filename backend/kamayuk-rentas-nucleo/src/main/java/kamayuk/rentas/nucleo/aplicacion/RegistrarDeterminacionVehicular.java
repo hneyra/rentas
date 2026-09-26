@@ -184,7 +184,10 @@ public class RegistrarDeterminacionVehicular {
                         montoDeterminado,
                         java.util.List.of(
                                 LlavesDelConjunto.VEHICULAR_ALICUOTA,
-                                LlavesDelConjunto.VEHICULAR_MINIMO_UIT));
+                                LlavesDelConjunto.VEHICULAR_MINIMO_UIT),
+                        // Se guarda con la fila (#477): sin el, una determinacion asentada no
+                        // dice si hubo comparacion con la adquisicion o solo el piso de la tabla.
+                        base.origen().name());
 
         String conjunto = sellados.ejercicio() + " v" + sellados.version();
         Calculo calculado = new Calculo(nueva, conjunto, alicuota, minimoImponible, base.origen());

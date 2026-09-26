@@ -564,7 +564,8 @@ class EspectaculoControllerTest {
                     determinacion.origen(),
                     determinacion.estado(),
                     "cajero.ventanilla",
-                    determinacion.modalidad());
+                    determinacion.modalidad(),
+                    determinacion.origenDeLaBase());
         }
     }
 
