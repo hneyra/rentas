@@ -1191,25 +1191,22 @@ class ParametrosDeLaConsultaTest {
     private static Map<String, Path> fuentesDeProduccion() {
         if (FUENTES.isEmpty()) {
             Path backend = raizDelRepositorio().resolve("backend");
-            try (java.util.stream.Stream<Path> arbol = Files.walk(backend)) {
-                arbol.filter(ruta -> ruta.toString().endsWith(".java"))
-                        .filter(ruta -> ruta.toString().contains("/src/main/java/"))
-                        .forEach(
-                                ruta -> {
-                                    String texto = ruta.toString();
-                                    String relativa =
-                                            texto.substring(
-                                                    texto.indexOf("/src/main/java/")
-                                                            + "/src/main/java/".length());
-                                    FUENTES.put(
-                                            relativa.substring(
-                                                            0, relativa.length() - ".java".length())
-                                                    .replace('/', '.'),
-                                            ruta);
-                                });
-            } catch (IOException excepcion) {
-                throw new UncheckedIOException(excepcion);
-            }
+            // Sin entrar en `build/`, donde Spotless deja una copia del fuente (#474).
+            ArbolDeFuentes.archivos(backend).stream()
+                    .filter(ruta -> ruta.toString().endsWith(".java"))
+                    .filter(ruta -> ruta.toString().contains("/src/main/java/"))
+                    .forEach(
+                            ruta -> {
+                                String texto = ruta.toString();
+                                String relativa =
+                                        texto.substring(
+                                                texto.indexOf("/src/main/java/")
+                                                        + "/src/main/java/".length());
+                                FUENTES.put(
+                                        relativa.substring(0, relativa.length() - ".java".length())
+                                                .replace('/', '.'),
+                                        ruta);
+                            });
         }
         return FUENTES;
     }

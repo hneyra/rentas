@@ -13,7 +13,6 @@ import java.util.Set;
 import java.util.function.ToLongFunction;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
@@ -347,16 +346,13 @@ class LasCifrasMedidasCuadranConElDiscoTest {
         List<Path> fuentes = new ArrayList<>();
         for (String arbol : ARBOLES) {
             Path inicio = raiz.resolve(arbol);
-            try (Stream<Path> recorrido = Files.walk(inicio)) {
-                recorrido
-                        .filter(Files::isRegularFile)
-                        .filter(ruta -> FUENTE.matcher(ruta.getFileName().toString()).matches())
-                        .filter(ruta -> !fueraDelArbol(inicio.relativize(ruta)))
-                        .sorted()
-                        .forEach(fuentes::add);
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
-            }
+            // Sin entrar en lo que no es fuente de nadie (#474): filtrarlo despues de entrar
+            // recorria node_modules entero y revento en paralelo con los informes de build/.
+            ArbolDeFuentes.archivos(inicio, DIRECTORIOS_FUERA).stream()
+                    .filter(ruta -> FUENTE.matcher(ruta.getFileName().toString()).matches())
+                    .filter(ruta -> !fueraDelArbol(inicio.relativize(ruta)))
+                    .sorted()
+                    .forEach(fuentes::add);
         }
         return fuentes;
     }
@@ -424,27 +420,24 @@ class LasCifrasMedidasCuadranConElDiscoTest {
      */
     private static long lecturasDelDiaEnProduccion(Path raiz) {
         long cuenta = 0;
-        try (Stream<Path> recorrido = Files.walk(raiz.resolve("backend"))) {
-            List<Path> fuentes =
-                    recorrido
-                            .filter(ruta -> ruta.toString().endsWith(".java"))
-                            .filter(ruta -> ruta.toString().contains("/src/main/java/"))
-                            .toList();
-            for (Path fuente : fuentes) {
-                for (String linea : leer(fuente).lines().toList()) {
-                    String sin = linea.strip();
-                    if (sin.startsWith("*") || sin.startsWith("//") || sin.startsWith("/*")) {
-                        continue;
-                    }
-                    int desde = 0;
-                    while ((desde = sin.indexOf("LocalDate.now(reloj)", desde)) >= 0) {
-                        cuenta++;
-                        desde++;
-                    }
+        // Sin entrar en `build/` (#474): la copia de Spotless contaria cada llamada dos veces.
+        List<Path> fuentes =
+                ArbolDeFuentes.archivos(raiz.resolve("backend")).stream()
+                        .filter(ruta -> ruta.toString().endsWith(".java"))
+                        .filter(ruta -> ruta.toString().contains("/src/main/java/"))
+                        .toList();
+        for (Path fuente : fuentes) {
+            for (String linea : leer(fuente).lines().toList()) {
+                String sin = linea.strip();
+                if (sin.startsWith("*") || sin.startsWith("//") || sin.startsWith("/*")) {
+                    continue;
+                }
+                int desde = 0;
+                while ((desde = sin.indexOf("LocalDate.now(reloj)", desde)) >= 0) {
+                    cuenta++;
+                    desde++;
                 }
             }
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
         }
         return cuenta;
     }

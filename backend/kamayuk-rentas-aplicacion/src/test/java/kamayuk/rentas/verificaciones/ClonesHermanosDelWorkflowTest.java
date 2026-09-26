@@ -15,7 +15,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -309,11 +308,10 @@ class ClonesHermanosDelWorkflowTest {
     }
 
     private static List<Path> fuentes(Path raiz, String sufijo) throws IOException {
-        try (Stream<Path> archivos = Files.walk(raiz.resolve("backend"))) {
-            return archivos.filter(p -> p.toString().endsWith(sufijo))
-                    .filter(p -> !p.toString().contains("/build/"))
-                    .toList();
-        }
+        // Sin entrar en `build/` (#474): filtrarlo despues de entrar revento en paralelo.
+        return ArbolDeFuentes.archivos(raiz.resolve("backend")).stream()
+                .filter(p -> p.toString().endsWith(sufijo))
+                .toList();
     }
 
     private static String[] partir(String rutaConHermano) {

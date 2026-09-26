@@ -11,7 +11,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Stream;
 import kamayuk.rentas.dominio.Observacion;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -142,13 +141,11 @@ class NingunaEscrituraSeRompePorLaObservacionTest {
 
     private static List<Path> fuentesDeProduccion() {
         Path backend = RaizDelRepositorio.ruta().resolve("backend");
-        try (Stream<Path> arbol = Files.walk(backend)) {
-            return arbol.filter(p -> p.toString().endsWith(".java"))
-                    .filter(p -> p.toString().replace('\\', '/').contains("/src/main/"))
-                    .toList();
-        } catch (IOException fallo) {
-            throw new UncheckedIOException(fallo);
-        }
+        // Sin entrar en `build/`, donde Spotless deja una copia del fuente (#474).
+        return ArbolDeFuentes.archivos(backend).stream()
+                .filter(p -> p.toString().endsWith(".java"))
+                .filter(p -> p.toString().replace('\\', '/').contains("/src/main/"))
+                .toList();
     }
 
     private static String leer(Path archivo) {

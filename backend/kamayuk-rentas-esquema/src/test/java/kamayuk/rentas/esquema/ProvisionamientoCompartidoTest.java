@@ -170,18 +170,49 @@ class ProvisionamientoCompartidoTest {
         String sentencia = "ALTER" + " ROLE";
         String laClave = "PASS" + "WORD";
         List<String> archivos = new ArrayList<>();
-        try (var rutas = java.nio.file.Files.walk(java.nio.file.Path.of(".."))) {
-            for (java.nio.file.Path ruta : rutas.toList()) {
-                String nombre = ruta.toString();
-                if (!nombre.endsWith(".java") || nombre.contains("/build/")) {
-                    continue;
-                }
-                String fuente = java.nio.file.Files.readString(ruta);
-                if (fuente.contains(sentencia) && fuente.contains(laClave)) {
-                    archivos.add(ruta.getFileName().toString());
-                }
-            }
-        }
+        // Sin entrar en build/ (#474): filtrarlo despues de entrar revento con el build en
+        // paralelo, cuando otro modulo borra sus informes a mitad del recorrido.
+        java.nio.file.Path raiz = java.nio.file.Path.of("..");
+        java.nio.file.Files.walkFileTree(
+                raiz,
+                new java.nio.file.SimpleFileVisitor<>() {
+                    @Override
+                    public java.nio.file.FileVisitResult preVisitDirectory(
+                            java.nio.file.Path directorio,
+                            java.nio.file.attribute.BasicFileAttributes atributos) {
+                        java.nio.file.Path nombre = directorio.getFileName();
+                        return !directorio.equals(raiz)
+                                        && nombre != null
+                                        && java.util.Set.of("build", ".gradle", "node_modules")
+                                                .contains(nombre.toString())
+                                ? java.nio.file.FileVisitResult.SKIP_SUBTREE
+                                : java.nio.file.FileVisitResult.CONTINUE;
+                    }
+
+                    @Override
+                    public java.nio.file.FileVisitResult visitFile(
+                            java.nio.file.Path ruta,
+                            java.nio.file.attribute.BasicFileAttributes atributos)
+                            throws java.io.IOException {
+                        if (ruta.toString().endsWith(".java")) {
+                            String fuente = java.nio.file.Files.readString(ruta);
+                            if (fuente.contains(sentencia) && fuente.contains(laClave)) {
+                                archivos.add(ruta.getFileName().toString());
+                            }
+                        }
+                        return java.nio.file.FileVisitResult.CONTINUE;
+                    }
+
+                    @Override
+                    public java.nio.file.FileVisitResult visitFileFailed(
+                            java.nio.file.Path ruta, java.io.IOException fallo)
+                            throws java.io.IOException {
+                        if (fallo instanceof java.nio.file.NoSuchFileException) {
+                            return java.nio.file.FileVisitResult.CONTINUE;
+                        }
+                        throw fallo;
+                    }
+                });
 
         assertThat(archivos)
                 .as(

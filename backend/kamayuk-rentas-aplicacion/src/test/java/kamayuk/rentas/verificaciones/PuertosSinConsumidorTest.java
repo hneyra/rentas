@@ -464,21 +464,17 @@ class PuertosSinConsumidorTest {
     private static Set<Path> fuentesDeProduccion() {
         Path backend = RaizDelRepositorio.ruta().resolve("backend");
         Set<Path> fuentes = new LinkedHashSet<>();
-        try (Stream<Path> recorrido = Files.walk(backend)) {
-            recorrido
-                    .filter(ruta -> ruta.toString().endsWith(".java"))
-                    .filter(ruta -> ruta.toString().contains("/src/main/java/"))
-                    // Y NO lo que Gradle deja en `build/`. Sin esta linea el recorrido entra en
-                    // `build/spotless-clean/spotlessJava/src/main/java/...`, que es una COPIA del
-                    // fuente: el modulo que se deduce de esa ruta es «spotlessJava», asi que todo
-                    // puerto quedaba «consumido» por su propio adaptador copiado con otro nombre de
-                    // modulo. Medido: con el recorrido entero, `FrentesDelPredio` salia consumido y
-                    // su exencion «sobraba».
-                    .filter(ruta -> !ruta.toString().contains("/build/"))
-                    .forEach(fuentes::add);
-        } catch (IOException fallo) {
-            throw new UncheckedIOException(fallo);
-        }
+        // Sin entrar en `build/` (#474). Lo que Gradle deja ahi incluye
+        // `build/spotless-clean/spotlessJava/src/main/java/...`, una COPIA del fuente: el modulo
+        // que
+        // se deduce de esa ruta es «spotlessJava», y todo puerto quedaba «consumido» por su propio
+        // adaptador copiado. Filtrarla despues de entrar tampoco valia: con el build en paralelo
+        // otro modulo borra sus informes mientras tanto, y el recorrido revento con
+        // NoSuchFileException.
+        ArbolDeFuentes.archivos(backend).stream()
+                .filter(ruta -> ruta.toString().endsWith(".java"))
+                .filter(ruta -> ruta.toString().contains("/src/main/java/"))
+                .forEach(fuentes::add);
         return fuentes;
     }
 
