@@ -101,6 +101,14 @@ import tools.jackson.databind.json.JsonMapper;
  * es la de {@code kamayuk_app}, con su privilegio de columna ({@code V30}); los casos de uso van
  * envueltos obedeciendo a su {@code @Transactional}, como en {@link
  * ProgramarDesdeLaDeteccionFronteraTest}.
+ *
+ * <h2>Y el hermano #343: el programa que retenía sin poder visitar</h2>
+ *
+ * <p>La otra forma de que un predio quedara retenido para siempre no necesitaba ni un cierre: un
+ * programa {@code VEHICULAR} con criterio {@code OMISO} sorteaba los predios omisos —la detección
+ * es de predios y el sorteo no miraba el tipo—, no podía levantarles ni una acta predial, y la
+ * exclusión de #481 los apartaba de todo programa predial. Se mide aquí porque el recorrido es el
+ * mismo —registrar, sortear, sortear otro— sobre un sector propio con un omiso, «el 43».
  */
 @DisplayName("#341 — Un programa se cierra y deja de excluir, de HTTP a PostgreSQL")
 class CierreDelProgramaFronteraTest {
@@ -113,12 +121,18 @@ class CierreDelProgramaFronteraTest {
     private static final String SECTOR_DE_CONTROL = "CI-02";
     private static final String SECTOR_DE_LOS_RECHAZOS = "CI-03";
 
+    /** El del hermano #343: un programa VEHICULAR sobre un sector con un predio omiso. */
+    private static final String SECTOR_DEL_VEHICULAR = "CI-04";
+
     private static final int PRIMER_CODIGO = 3410;
 
     /** El omiso crónico de cada recorrido: sin declaración ni en 2025 ni en 2026. */
     private static final String EL_42 = codigoDe(42);
 
     private static final String EL_42_DE_CONTROL = codigoDe(142);
+
+    /** El omiso del sector del programa VEHICULAR (#343). */
+    private static final String EL_43 = codigoDe(43);
 
     private static final Pattern CODIGO_EN_LA_RESPUESTA =
             Pattern.compile("\"codRefCatastral\":\"(\\d+)\"");
@@ -142,8 +156,10 @@ class CierreDelProgramaFronteraTest {
         crearSector(municipalidad, SECTOR_QUE_SE_CIERRA);
         crearSector(municipalidad, SECTOR_DE_CONTROL);
         crearSector(municipalidad, SECTOR_DE_LOS_RECHAZOS);
+        crearSector(municipalidad, SECTOR_DEL_VEHICULAR);
         sembrarOmiso(municipalidad, EL_42, SECTOR_QUE_SE_CIERRA);
         sembrarOmiso(municipalidad, EL_42_DE_CONTROL, SECTOR_DE_CONTROL);
+        sembrarOmiso(municipalidad, EL_43, SECTOR_DEL_VEHICULAR);
 
         DriverManagerDataSource pool = new DriverManagerDataSource();
         pool.setUrl(base.url());
@@ -275,6 +291,39 @@ class CierreDelProgramaFronteraTest {
     }
 
     @Test
+    @DisplayName(
+            "#343 — un programa VEHICULAR no sortea predios: 422 nombrando el tipo, y el predial"
+                    + " que viene detras sortea al 43")
+    void unProgramaVehicularNoSecuestraElPadron() throws Exception {
+        long vehicular = registrarPrograma("PF-VEH-343", "VEHICULAR", "2026", SECTOR_DEL_VEHICULAR);
+
+        MvcResult sorteoVehicular = sorteo(vehicular);
+        assertThat(sorteoVehicular.getResponse().getStatus())
+                .as(
+                        "la deteccion es de predios y no existe una de vehiculos: hasta #343 esto"
+                                + " era 201 y el 43 entraba en una muestra sobre la que ningun acta"
+                                + " predial se puede levantar. Respuesta: "
+                                + sorteoVehicular.getResponse().getContentAsString())
+                .isEqualTo(422);
+        assertThat(sorteoVehicular.getResponse().getContentAsString())
+                .as("el 422 dice por que: el tipo, no un parametro que falte")
+                .contains("VEHICULAR")
+                .contains("PF-VEH-343");
+        assertThat(codigosDe(muestraDe(vehicular))).isEmpty();
+
+        long predial = registrarPrograma("PF-PRED-343", "PREDIAL", "2026", SECTOR_DEL_VEHICULAR);
+        assertThat(sortear(predial))
+                .as(
+                        "el 43 sigue en el padron de todo programa predial: hasta #343 salia en"
+                                + " excluidosPorOtroPrograma = 1 con predios = 0, retenido por un"
+                                + " programa que no lo podia visitar")
+                .contains("\"detectados\":1")
+                .contains("\"excluidosPorOtroPrograma\":0")
+                .contains("\"predios\":1");
+        assertThat(codigosDe(muestraDe(predial))).containsExactly(EL_43);
+    }
+
+    @Test
     @DisplayName("cerrar un programa ya cerrado es 409, y el segundo intento no deja auditoria")
     void cerrarDosVecesEs409() throws Exception {
         long programa = registrarPrograma("PF-341-DOS", "2026", SECTOR_DE_LOS_RECHAZOS);
@@ -396,9 +445,15 @@ class CierreDelProgramaFronteraTest {
                 .count();
     }
 
-    /** Registra un programa de omisos sobre un sector, empezado el 2025-03-01. */
+    /** Registra un programa PREDIAL de omisos sobre un sector, empezado el 2025-03-01. */
     private static long registrarPrograma(String codigo, String ejercicio, String sector)
             throws Exception {
+        return registrarPrograma(codigo, "PREDIAL", ejercicio, sector);
+    }
+
+    /** Lo mismo con el tipo a la vista: el de #343 es VEHICULAR. */
+    private static long registrarPrograma(
+            String codigo, String tipo, String ejercicio, String sector) throws Exception {
         MvcResult resultado =
                 mvc.perform(
                                 post("/rentas/api/v1/fiscalizacion/programas")
@@ -408,7 +463,9 @@ class CierreDelProgramaFronteraTest {
                                                         + "\"codigo\":\""
                                                         + codigo
                                                         + "\",\"descripcion\":\"Omisos\","
-                                                        + "\"tipo\":\"PREDIAL\",\"fechaInicio\":"
+                                                        + "\"tipo\":\""
+                                                        + tipo
+                                                        + "\",\"fechaInicio\":"
                                                         + "\"2025-03-01\",\"ejercicio\":\""
                                                         + ejercicio
                                                         + "\",\"sector\":\""
@@ -425,19 +482,21 @@ class CierreDelProgramaFronteraTest {
     }
 
     private static String sortear(long programaId) throws Exception {
-        ProyeccionDeLaPrueba.ingestar(base, municipalidad);
-        MvcResult resultado =
-                mvc.perform(
-                                post("/rentas/api/v1/fiscalizacion/programas/"
-                                                + programaId
-                                                + "/muestra")
-                                        .contentType(MediaType.APPLICATION_JSON)
-                                        .content("{\"observacion\":\"Sorteo de la prueba\"}"))
-                        .andReturn();
+        MvcResult resultado = sorteo(programaId);
         assertThat(resultado.getResponse().getStatus())
                 .as(resultado.getResponse().getContentAsString())
                 .isEqualTo(201);
         return resultado.getResponse().getContentAsString();
+    }
+
+    /** El sorteo tal cual responde, sin exigirle un 201: el de #343 tiene que dar 422. */
+    private static MvcResult sorteo(long programaId) throws Exception {
+        ProyeccionDeLaPrueba.ingestar(base, municipalidad);
+        return mvc.perform(
+                        post("/rentas/api/v1/fiscalizacion/programas/" + programaId + "/muestra")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"observacion\":\"Sorteo de la prueba\"}"))
+                .andReturn();
     }
 
     private static MvcResult muestraDe(long programaId) throws Exception {

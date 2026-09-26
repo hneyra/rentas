@@ -2,6 +2,7 @@ package kamayuk.rentas.fiscalizacion.aplicacion;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowable;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -60,6 +61,7 @@ class GenerarMuestraTest {
 
     private static final long OMISO_UNO = 21L;
     private static final long OMISO_DOS = 22L;
+    private static final long OMISO_TRES = 24L;
     private static final long CONFORME = 23L;
     private static final long FICHA = 700L;
 
@@ -309,6 +311,58 @@ class GenerarMuestraTest {
     }
 
     @Test
+    @DisplayName("#343 — un programa VEHICULAR no sortea predios: no tiene padron que sortear")
+    void unProgramaVehicularNoSorteaPredios() {
+        // La siembra que distingue: un programa VEHICULAR con TODOS sus parametros —ejercicio,
+        // criterio OMISO y fiscalizador—, de modo que `parametrosDeLaMuestra()` no tiene nada que
+        // objetar, y un padron con TRES predios omisos que la deteccion le entregaria. Hasta #343
+        // los tres entraban en su muestra, ningun acta predial podia levantarse sobre ellos
+        // (`ProgramaDeOtroTipo`) y la exclusion de #481 los apartaba de todo programa predial.
+        long programaId =
+                programas.sembrar(
+                        ProgramaFiscalizacion.nuevo(
+                                "PF-VEH-01",
+                                "Vehiculos omisos",
+                                TipoDePrograma.VEHICULAR,
+                                LocalDate.of(2026, 3, 1),
+                                null,
+                                E2026,
+                                null,
+                                CondicionFiscalizada.OMISO,
+                                "R. MENDOZA CRUZ"));
+        GenerarMuestra sorteo =
+                new GenerarMuestra(
+                        programas,
+                        muestras,
+                        actas,
+                        new DeteccionDeOmisos(
+                                new DeteccionDeMentira()
+                                        .con(fila(OMISO_UNO, CondicionFiscalizada.OMISO))
+                                        .con(fila(OMISO_DOS, CondicionFiscalizada.OMISO))
+                                        .con(fila(OMISO_TRES, CondicionFiscalizada.OMISO)),
+                                new TitularesDeMentira()),
+                        auditados::add,
+                        RELOJ);
+
+        Throwable lanzada = catchThrowable(() -> sorteo.generar(programaId, OBSERVACION));
+
+        assertThat(muestras.guardadas)
+                .as(
+                        "la deteccion es de predios: sortearlos para un programa que no puede"
+                                + " levantarles acta los secuestra del padron de todo programa"
+                                + " predial")
+                .isEmpty();
+        assertThat(auditados).as("lo que no se sorteo no se asienta").isEmpty();
+        assertThat(lanzada)
+                .as("y se rechaza, no se devuelve un sorteo vacio")
+                .isInstanceOf(GenerarMuestra.ProgramaSinPadronQueSortear.class)
+                .as("nombrando el tipo, que es lo que hay que cambiar: no falta ningun parametro")
+                .hasMessageContaining("PF-VEH-01")
+                .hasMessageContaining("VEHICULAR")
+                .hasMessageNotContaining("no declara");
+    }
+
+    @Test
     @DisplayName("sortear dos veces no se permite: hay actas levantadas sobre la foto")
     void sortearDosVecesNoSePermite() {
         long programaId = programas.sembrar(programa(CondicionFiscalizada.OMISO));
@@ -516,8 +570,8 @@ class GenerarMuestraTest {
 
         @Override
         public Set<Long> prediosEnProgramasAbiertos(long programaPropio, Set<Long> predios) {
-            // El doble sólo siembra programas abiertos: lo que el CERRADO cambia lo mide
-            // `MuestraDelProgramaRepositoryJdbcTest` contra PostgreSQL de verdad.
+            // El doble sólo siembra programas abiertos y PREDIAL: lo que cambian el CERRADO y el
+            // tipo (#343) lo mide `MuestraDelProgramaRepositoryJdbcTest` contra PostgreSQL.
             return guardadas.stream()
                     .filter(m -> m.programaId() != programaPropio)
                     .map(MuestraDelPrograma::predioId)

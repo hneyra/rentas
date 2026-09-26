@@ -116,6 +116,26 @@ public class GenerarMuestra {
         }
     }
 
+    /**
+     * El programa no sortea predios (#343): es {@code VEHICULAR}, y la detección de la que sale la
+     * muestra es el cruce del padrón de <b>predios</b>. Nombra el tipo porque es lo que hay que
+     * cambiar; no nombra un parámetro, porque no falta ninguno.
+     */
+    public static final class ProgramaSinPadronQueSortear extends RuntimeException {
+        @java.io.Serial private static final long serialVersionUID = 1L;
+
+        ProgramaSinPadronQueSortear(ProgramaFiscalizacion programa) {
+            super(
+                    "El programa "
+                            + programa.codigo()
+                            + " es "
+                            + programa.tipo()
+                            + ": la deteccion es de predios, y un programa "
+                            + programa.tipo()
+                            + " no tiene padron que sortear");
+        }
+    }
+
     /** Ya se sorteó. Una muestra es un acto y no se regenera: para otra muestra, otro programa. */
     public static final class MuestraYaSorteada extends RuntimeException {
         @java.io.Serial private static final long serialVersionUID = 1L;
@@ -138,6 +158,12 @@ public class GenerarMuestra {
                 programas
                         .findById(programaId)
                         .orElseThrow(() -> new ProgramaInexistente(programaId));
+
+        // Antes que los parametros (#343): a un programa VEHICULAR no le falta nada, es que la
+        // deteccion no es de su padron. Decirle «falta el criterio» seria mentirle.
+        if (!programa.sorteaPredios()) {
+            throw new ProgramaSinPadronQueSortear(programa);
+        }
 
         programa.parametrosDeLaMuestra()
                 .ifPresent(
