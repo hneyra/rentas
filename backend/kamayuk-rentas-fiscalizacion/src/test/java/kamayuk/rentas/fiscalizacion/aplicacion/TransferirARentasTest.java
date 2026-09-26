@@ -137,6 +137,41 @@ class TransferirARentasTest {
         }
 
         @Test
+        @DisplayName(
+                "#370 — inscribe el area de la LIQUIDACION, no la del acta: la reliquidacion llega")
+        void inscribeElAreaDeLaLiquidacionNoLaDelActa() {
+            // El acta dice 300 (una medida equivocada) y la linea de la version que se transfiere
+            // dice 250: es lo que corrige una reliquidacion. Hasta #370 el padron quedaba con 300.
+            Liquidacion liquidacion =
+                    liquidacionLista(List.of(lineaHallada(E2025, "250.00", "COMERCIO")));
+
+            transferir(liquidacion);
+
+            PadronQueVersiona.Inscrito inscrito = padron.vigenteDe(PREDIO);
+            assertThat(inscrito.area()).isEqualTo(AreaM2.de("250.00"));
+            assertThat(inscrito.uso()).isEqualTo("COMERCIO");
+        }
+
+        @Test
+        @DisplayName("#370 — con dos ejercicios, area y uso salen de la MISMA linea: la del ultimo")
+        void conDosEjerciciosGanaElUltimo() {
+            // La version del padron rige desde hoy: la describe el ejercicio mas reciente. Hasta
+            // #370 el area era la del acta y el uso el de la PRIMERA linea —el ejercicio mas
+            // antiguo—, y con esta siembra se inscribia 300 / CASA_HABITACION.
+            Liquidacion liquidacion =
+                    liquidacionLista(
+                            List.of(
+                                    lineaHallada(E2024, "300.00", "CASA_HABITACION"),
+                                    lineaHallada(E2025, "250.00", "COMERCIO")));
+
+            transferir(liquidacion);
+
+            PadronQueVersiona.Inscrito inscrito = padron.vigenteDe(PREDIO);
+            assertThat(inscrito.area()).isEqualTo(AreaM2.de("250.00"));
+            assertThat(inscrito.uso()).isEqualTo("COMERCIO");
+        }
+
+        @Test
         @DisplayName("la version nueva se sustenta en el numero de la liquidacion")
         void laVersionSeSustentaEnLaLiquidacion() {
             Liquidacion liquidacion = liquidacionLista(sinCifras());
@@ -823,6 +858,27 @@ class TransferirARentasTest {
                 AreaM2.de("300.00"),
                 "CASA_HABITACION",
                 "COMERCIO",
+                null,
+                null,
+                null,
+                null);
+    }
+
+    /** Una linea predial SUBVALUADOR con lo hallado que se pida y sin cifras (#370). */
+    private static LineaDeLiquidacion lineaHallada(
+            Ejercicio ejercicio, String areaHallada, String usoHallado) {
+        return new LineaDeLiquidacion(
+                null,
+                null,
+                ejercicio,
+                CONJUNTO,
+                PREDIO,
+                null,
+                CondicionFiscalizada.SUBVALUADOR,
+                AreaM2.de("120.00"),
+                AreaM2.de(areaHallada),
+                "CASA_HABITACION",
+                usoHallado,
                 null,
                 null,
                 null,

@@ -25,6 +25,7 @@ import kamayuk.rentas.fiscalizacion.dominio.EstadoDeLiquidacion;
 import kamayuk.rentas.fiscalizacion.dominio.LineaDeLiquidacion;
 import kamayuk.rentas.fiscalizacion.dominio.Liquidacion;
 import kamayuk.rentas.fiscalizacion.dominio.LiquidacionRepository;
+import kamayuk.rentas.fiscalizacion.dominio.LoHalladoQueSeInscribe;
 import kamayuk.rentas.fiscalizacion.dominio.MovimientoDeLiquidacionRepository;
 import kamayuk.rentas.fiscalizacion.dominio.ResolucionDeDeterminacion;
 import kamayuk.rentas.fiscalizacion.dominio.ResolucionDeDeterminacionRepository;
@@ -214,14 +215,17 @@ public class TransferirARentas {
 
         // 1. El padron. Unico camino de escritura hacia catastro, y va primero para que el papel
         //    imprima lo que quedo inscrito de verdad y no lo que se esperaba inscribir.
+        //    Lo que se inscribe es lo de la LIQUIDACION que se transfiere, area y uso de la misma
+        //    linea (#370): una reliquidacion que corrige el area tiene que llegar al padron.
+        LoHalladoQueSeInscribe hallado = LoHalladoQueSeInscribe.de(lineas);
         VersionTransferida version =
                 acta.esPredial()
                         ? padron.inscribirLoHallado(
                                 Objects.requireNonNull(acta.predioId()),
                                 peticion.fecha(),
                                 liquidacion.numero(),
-                                acta.areaHallada(),
-                                usoHalladoDe(lineas),
+                                hallado.area(),
+                                hallado.uso(),
                                 observacion)
                         : null;
 
@@ -450,23 +454,6 @@ public class TransferirARentas {
                 numeroDeLaResolucion,
                 observacion);
         return 1;
-    }
-
-    /**
-     * El uso hallado que la liquidacion consigno, si alguna linea lo trae.
-     *
-     * <p>Sale de la liquidacion y no del acta porque {@code acta_fiscalizacion} (V4) guarda el area
-     * medida en campo pero no el uso: el uso hallado entra al liquidar, y la liquidacion es la que
-     * lo conserva. Nulo si ninguna linea lo consigno, y entonces la version nueva conserva el uso
-     * que tenia.
-     */
-    private static @Nullable String usoHalladoDe(List<LineaDeLiquidacion> lineas) {
-        for (LineaDeLiquidacion linea : lineas) {
-            if (linea.usoHallado() != null) {
-                return linea.usoHallado();
-            }
-        }
-        return null;
     }
 
     private ResumenDeContribuyente obligadoDe(ActaFiscalizacion acta) {
