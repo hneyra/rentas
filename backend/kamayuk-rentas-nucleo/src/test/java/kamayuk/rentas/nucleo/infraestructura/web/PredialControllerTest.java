@@ -2455,7 +2455,8 @@ class PredialControllerTest {
                             OrigenDeDeterminacion.ORDINARIA,
                             estado,
                             "siembra",
-                            modalidad));
+                            modalidad,
+                            null));
             detallePorId.put(id, List.of(detalle));
         }
 
@@ -2509,7 +2510,8 @@ class PredialControllerTest {
                             determinacion.origen(),
                             determinacion.estado(),
                             "cajero.ventanilla",
-                            determinacion.modalidad());
+                            determinacion.modalidad(),
+                            determinacion.origenDeLaBase());
             // Lo que inserta queda guardado desde #207. Hasta entonces este doble aceptaba la
             // escritura y la olvidaba, asi que ninguna prueba podia determinar y volver a leer.
             cabeceras.add(guardada);

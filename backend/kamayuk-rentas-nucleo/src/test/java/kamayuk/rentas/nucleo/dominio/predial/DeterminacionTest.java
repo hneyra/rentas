@@ -27,7 +27,8 @@ class DeterminacionTest {
                         3L,
                         Dinero.de("1000"),
                         Dinero.de("10"),
-                        List.of("VEHICULAR_ALICUOTA"));
+                        List.of("VEHICULAR_ALICUOTA"),
+                        "TABLA");
 
         assertThat(vehicular.tributo()).isEqualTo("VEHICULAR");
         assertThat(vehicular.vehiculoId()).isEqualTo(2L);
@@ -54,6 +55,7 @@ class DeterminacionTest {
                                         List.of("VEHICULAR_ALICUOTA"),
                                         OrigenDeDeterminacion.ORDINARIA,
                                         EstadoDeDeterminacion.BORRADOR,
+                                        null,
                                         null,
                                         null))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -108,7 +110,8 @@ class DeterminacionTest {
                         3L,
                         Dinero.de("1000"),
                         Dinero.de("10"),
-                        List.of("VEHICULAR_ALICUOTA"));
+                        List.of("VEHICULAR_ALICUOTA"),
+                        "TABLA");
 
         assertThat(vehicular.reglasAplicadas()).containsExactly("VEHICULAR_ALICUOTA");
     }
@@ -125,7 +128,8 @@ class DeterminacionTest {
                                         3L,
                                         Dinero.de("1000"),
                                         Dinero.de("10"),
-                                        List.of(" ")))
+                                        List.of(" "),
+                                        "TABLA"))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -185,7 +189,8 @@ class DeterminacionTest {
                                         OrigenDeDeterminacion.ORDINARIA,
                                         EstadoDeDeterminacion.BORRADOR,
                                         null,
-                                        ModalidadDelPredial.TRIMESTRAL))
+                                        ModalidadDelPredial.TRIMESTRAL,
+                                        null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("determinacion_modalidad_solo_predial_ck");
     }

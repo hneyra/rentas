@@ -44,7 +44,7 @@ public class DeterminacionRepositoryJdbc extends RepositorioJdbc
             "d.id, d.ejercicio, d.tributo, d.periodo, d.contribuyente_id, d.predio_id,"
                     + " d.vehiculo_id, d.conjunto_id, d.base_imponible, d.monto_determinado,"
                     + " d.reglas_aplicadas, d.origen, d.estado, d.usuario_calculo,"
-                    + " d.modalidad";
+                    + " d.modalidad, d.origen_base";
 
     private static final String COLUMNAS_DETALLE =
             "t.id, t.predio_id, t.autovaluo, t.valuo_exonerado, t.porcentaje_propiedad,"
@@ -180,14 +180,14 @@ public class DeterminacionRepositoryJdbc extends RepositorioJdbc
                                 + " (municipalidad_id, ejercicio, tributo, periodo,"
                                 + "  contribuyente_id, predio_id, vehiculo_id, conjunto_id,"
                                 + "  base_imponible, monto_determinado, reglas_aplicadas,"
-                                + "  origen, estado, usuario_calculo, modalidad)"
+                                + "  origen, estado, usuario_calculo, modalidad, origen_base)"
                                 + " VALUES ("
                                 + MUNICIPALIDAD_ACTUAL
                                 + ", :ejercicio, :tributo, :periodo, :contribuyenteId,"
                                 + "  :predioId, :vehiculoId, :conjuntoId, :baseImponible,"
                                 + "  :montoDeterminado,"
                                 + "  string_to_array(:reglas, ',')::varchar(200)[],"
-                                + "  :origen, :estado, :usuario, :modalidad)"
+                                + "  :origen, :estado, :usuario, :modalidad, :origenBase)"
                                 + " RETURNING id, base_imponible, monto_determinado")
                 .param("ejercicio", determinacion.ejercicio().valor())
                 .param("tributo", determinacion.tributo())
@@ -208,6 +208,8 @@ public class DeterminacionRepositoryJdbc extends RepositorioJdbc
                 .param(
                         "modalidad",
                         determinacion.modalidad() == null ? null : determinacion.modalidad().name())
+                // De donde salio la base del art. 32 (#477): nula fuera del vehicular.
+                .param("origenBase", determinacion.origenDeLaBase())
                 .query(
                         (fila, numero) ->
                                 guardada(
@@ -249,7 +251,8 @@ public class DeterminacionRepositoryJdbc extends RepositorioJdbc
                 determinacion.origen(),
                 determinacion.estado(),
                 usuario,
-                determinacion.modalidad());
+                determinacion.modalidad(),
+                determinacion.origenDeLaBase());
     }
 
     private static Determinacion mapearCabecera(ResultSet fila, int numeroDeFila)
@@ -276,7 +279,8 @@ public class DeterminacionRepositoryJdbc extends RepositorioJdbc
                 OrigenDeDeterminacion.valueOf(fila.getString("origen")),
                 EstadoDeDeterminacion.valueOf(fila.getString("estado")),
                 fila.getString("usuario_calculo"),
-                modalidadDe(fila.getString("modalidad")));
+                modalidadDe(fila.getString("modalidad")),
+                fila.getString("origen_base"));
     }
 
     /**
