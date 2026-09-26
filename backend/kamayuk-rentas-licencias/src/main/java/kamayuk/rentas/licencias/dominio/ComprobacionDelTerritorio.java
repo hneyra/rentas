@@ -104,6 +104,20 @@ public record ComprobacionDelTerritorio(
     }
 
     /**
+     * Si emitir sobre esta comprobacion exige que una persona lo asuma por escrito (#43, #418).
+     *
+     * <p>No lo exige lo que el territorio respalda —las tres consultas contestaron y nada se opone—
+     * ni lo que no se pregunto, porque la solicitud no declara predio. Todo lo demas si: no consta,
+     * no se pudo preguntar, el giro no cabe en la zona o falta la ITSE previa. Es el unico sitio
+     * donde se decide, y lo leen dos: quien emite, para negar la emision sin autorizacion, y {@link
+     * TerritorioDeLaLicencia}, para guardar la autorizacion solo cuando fue ella la que sostuvo el
+     * acto.
+     */
+    public boolean exigeAutorizacion() {
+        return !todoComprobadoYFavorable() && zona != RespuestaDelTerritorio.NO_SE_PREGUNTO;
+    }
+
+    /**
      * Si las tres consultas contestaron y ninguna se opone: no hay riesgo no mitigable, el giro
      * cabe en la zona, y no falta la ITSE previa que su nivel de riesgo exige.
      *

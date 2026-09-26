@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.LocalDate;
 import kamayuk.rentas.catastro.prueba.TerritorioEnMemoria;
+import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.licencias.dominio.CompatibilidadConLaZona;
 import kamayuk.rentas.licencias.dominio.ComprobacionDelTerritorio;
 import kamayuk.rentas.licencias.dominio.OrigenDeLaZona;
@@ -263,7 +264,8 @@ class ElTerritorioDecideLaLicenciaTest {
                             comprobar(
                                     new TerritorioEnMemoria()
                                             .conTodoEnRegla(PREDIO, "CZ", "ORD-2024-01"),
-                                    "CZ"));
+                                    "CZ"),
+                            null);
 
             assertThat(guardado.origen()).isEqualTo(OrigenDeLaZona.TERRITORIO);
             assertThat(guardado.zonaDelTerritorio()).isEqualTo("CZ");
@@ -273,7 +275,8 @@ class ElTerritorioDecideLaLicenciaTest {
         @DisplayName("y cuando no contesto, sostiene la declarada — y queda dicho que no se pudo")
         void mandaLaDeclarada() {
             TerritorioDeLaLicencia guardado =
-                    TerritorioDeLaLicencia.de(comprobar(new TerritorioEnMemoria().caido(), "CZ"));
+                    TerritorioDeLaLicencia.de(
+                            comprobar(new TerritorioEnMemoria().caido(), "CZ"), null);
 
             assertThat(guardado.origen()).isEqualTo(OrigenDeLaZona.DECLARADA);
             assertThat(guardado.zonaDelTerritorio()).isNull();
@@ -290,9 +293,44 @@ class ElTerritorioDecideLaLicenciaTest {
             assertThatThrownBy(
                             () ->
                                     new TerritorioDeLaLicencia(
-                                            null, null, OrigenDeLaZona.TERRITORIO, null))
+                                            null, null, OrigenDeLaZona.TERRITORIO, null, null))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("sin el codigo con que se comprobo");
+        }
+
+        /**
+         * #418: la autorizacion se guarda cuando fue ella la que sostuvo el acto, y solo entonces.
+         *
+         * <p>La siembra que distingue es el par: la MISMA autorizacion sobre un territorio que no
+         * contesto y sobre uno en regla. Guardarla siempre pasaria el primero y fallaria el
+         * segundo; no guardarla nunca, al reves.
+         */
+        @Test
+        @DisplayName(
+                "#418 — la autorizacion se guarda si sostuvo el acto, y no sobre un predio en"
+                        + " regla")
+        void laAutorizacionSeGuardaSoloSiSostuvoElActo() {
+            Observacion autorizacion = Observacion.de("Autorizo segun informe tecnico 045-2026");
+
+            TerritorioDeLaLicencia porExcepcion =
+                    TerritorioDeLaLicencia.de(
+                            comprobar(new TerritorioEnMemoria().caido(), "CZ"), autorizacion);
+            TerritorioDeLaLicencia enRegla =
+                    TerritorioDeLaLicencia.de(
+                            comprobar(
+                                    new TerritorioEnMemoria()
+                                            .conTodoEnRegla(PREDIO, "CZ", "ORD-2024-01"),
+                                    "CZ"),
+                            autorizacion);
+
+            assertThat(porExcepcion.autorizacion())
+                    .as("el territorio no respaldo la emision: la sostiene lo que alguien firmo")
+                    .isEqualTo("Autorizo segun informe tecnico 045-2026");
+            assertThat(porExcepcion.porExcepcion()).isTrue();
+            assertThat(enRegla.autorizacion())
+                    .as("en regla no se emitio por excepcion, aunque alguien tecleara el texto")
+                    .isNull();
+            assertThat(enRegla.porExcepcion()).isFalse();
         }
     }
 

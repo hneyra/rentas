@@ -136,7 +136,8 @@ public class RegistrarLicenciaDeFuncionamiento {
                         null,
                         observacion,
                         giros,
-                        TerritorioDeLaLicencia.de(comprobada.territorio()));
+                        TerritorioDeLaLicencia.de(
+                                comprobada.territorio(), solicitud.autorizacionDelTerritorio()));
 
         EmitirDocumento.Emision emision =
                 documentos.emitir(
@@ -236,6 +237,11 @@ public class RegistrarLicenciaDeFuncionamiento {
                 + giros.size()
                 + ",\"fichaEconomica\":"
                 + (licencia.fichaId() == null ? "null" : licencia.fichaId())
+                // La marca y no el texto (#418): el texto de la autorizacion lo escribe una
+                // persona y puede nombrar a otras, y esta columna va sin datos personales. El
+                // texto esta en la licencia, que es donde se impugna.
+                + ",\"porExcepcion\":"
+                + licencia.territorio().porExcepcion()
                 + "}";
     }
 

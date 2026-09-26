@@ -60,6 +60,7 @@ import kamayuk.rentas.licencias.dominio.CriterioDeCiiu;
 import kamayuk.rentas.licencias.dominio.CriterioDeLicencias;
 import kamayuk.rentas.licencias.dominio.DuplicadoDeLicencia;
 import kamayuk.rentas.licencias.dominio.EstadoDeLicencia;
+import kamayuk.rentas.licencias.dominio.OrigenDeLaZona;
 import kamayuk.rentas.licencias.dominio.PlantillaDeNumeroDeLicencia;
 import kamayuk.rentas.licencias.dominio.RiesgoItse;
 import kamayuk.rentas.licencias.dominio.TipoDeLicencia;
@@ -175,6 +176,10 @@ class LicenciaDeFuncionamientoJdbcTest {
     private static MantenerCatalogoCiiu mantenerCatalogo;
     private static EmitirLicenciaDeFuncionamiento emitir;
     private static EmitirLicenciaDeFuncionamiento emitirSinParametro;
+
+    /** La emision contra un territorio donde ningun predio consta: hoy, el caso normal (#418). */
+    private static EmitirLicenciaDeFuncionamiento emitirSinTerritorio;
+
     private static CancelarLicencia cancelar;
     private static DuplicarLicencia duplicar;
     private static ConsultaDeLicencias consulta;
@@ -236,6 +241,16 @@ class LicenciaDeFuncionamientoJdbcTest {
 
         mantenerCatalogo = envolver(new MantenerCatalogoCiiu(catalogo, auditoria, RELOJ));
         emitir = emisionCon(recibos, padron, fichas, TERRITORIO_EN_REGLA, derechos, auditoria);
+        kamayuk.rentas.catastro.prueba.TerritorioEnMemoria vacio =
+                new kamayuk.rentas.catastro.prueba.TerritorioEnMemoria();
+        emitirSinTerritorio =
+                emisionCon(
+                        recibos,
+                        padron,
+                        fichas,
+                        new kamayuk.rentas.licencias.aplicacion.ComprobarElTerritorio(vacio, vacio),
+                        derechos,
+                        auditoria);
         // El mismo caso de uso, con un conjunto sellado que NO tiene el concepto del TUPA. Es la
         // demostracion de la regla 5: sin el dato, la operacion falla nombrando la llave.
         emitirSinParametro =
@@ -1093,6 +1108,161 @@ class LicenciaDeFuncionamientoJdbcTest {
                                     predioId, aLaFecha, List.of());
                         }
                     });
+        }
+    }
+
+    /**
+     * #418 — La autorizacion expresa del territorio se guarda, y se relee.
+     *
+     * <p>Hasta #418 se validaba como observacion y se tiraba: {@code zona_origen = DECLARADA}
+     * afirmaba un escrito que no estaba en ninguna tabla. La siembra que distingue es el par: un
+     * predio que NO CONSTA con una autorizacion reconocible, y uno en regla sin ella —sin este
+     * contraste, la prueba pasaria con la columna escrita siempre—.
+     */
+    @Nested
+    @DisplayName("#418 — La autorizacion del territorio queda escrita en la licencia")
+    class LaAutorizacionDelTerritorio {
+
+        private static final String AUTORIZO =
+                "Autorizo por excepcion segun informe tecnico 045-2026-GDU";
+
+        @Test
+        @DisplayName(
+                "predio que no consta: la autorizacion se relee, va al papel y la auditoria dice"
+                        + " que fue por excepcion")
+        void laAutorizacionSeRelee() {
+            giroDelCatalogo("47521", "COMERCIO AL POR MENOR");
+            long titular = crearContribuyente();
+            String recibo = cobrar(titular, DERECHO_LICENCIA);
+
+            EmitirLicenciaDeFuncionamiento.LicenciaEmitida emitida =
+                    enContexto(
+                            () ->
+                                    emitirSinTerritorio.emitir(
+                                            conPredio(
+                                                    solicitud(titular, recibo, "47521"),
+                                                    Observacion.de(AUTORIZO)),
+                                            FormatoDeDocumento.PDF,
+                                            PORQUE));
+
+            ConsultaDeLicencias.LicenciaEnConsulta releida =
+                    enContexto(
+                            () ->
+                                    consulta.porNumero(emitida.licencia().numero(), HOY)
+                                            .orElseThrow());
+            assertThat(releida.licencia().territorio().origen())
+                    .isEqualTo(OrigenDeLaZona.DECLARADA);
+            assertThat(releida.licencia().territorio().autorizacion())
+                    .as("el fundamento del acto emitido por excepcion es lo que alguien firmo")
+                    .isEqualTo(AUTORIZO);
+            assertThat(new String(emitida.documento().contenido(), StandardCharsets.ISO_8859_1))
+                    .as("y el papel que se impugna lo dice")
+                    .contains("Emitida por excepcion")
+                    .contains("045-2026-GDU");
+            assertThat(
+                            unicoTexto(
+                                    "SELECT datos_nuevos ->> 'porExcepcion' FROM auditoria"
+                                            + " WHERE tabla = 'licencia_funcionamiento'"
+                                            + " AND clave = ?",
+                                    String.valueOf(emitida.licencia().identificador())))
+                    .as("la auditoria lleva la marca, no el texto: va sin datos personales")
+                    .isEqualTo("true");
+        }
+
+        @Test
+        @DisplayName("predio en regla: la columna va nula, aunque la solicitud trajera el texto")
+        void enReglaNoHayAutorizacion() {
+            giroDelCatalogo("47522", "COMERCIO AL POR MENOR");
+            long titular = crearContribuyente();
+            String recibo = cobrar(titular, DERECHO_LICENCIA);
+
+            EmitirLicenciaDeFuncionamiento.LicenciaEmitida emitida =
+                    enContexto(
+                            () ->
+                                    emitir.emitir(
+                                            conPredio(
+                                                    solicitud(titular, recibo, "47522"),
+                                                    Observacion.de(AUTORIZO)),
+                                            FormatoDeDocumento.PDF,
+                                            PORQUE));
+
+            assertThat(
+                            filas(
+                                    "SELECT count(*) FROM licencia_funcionamiento"
+                                            + " WHERE id = ? AND autorizacion_territorio IS NULL"
+                                            + " AND zona_origen = 'TERRITORIO'",
+                                    emitida.licencia().identificador()))
+                    .as("el territorio respaldo la emision: no fue por excepcion")
+                    .isEqualTo(1);
+            assertThat(new String(emitida.documento().contenido(), StandardCharsets.ISO_8859_1))
+                    .doesNotContain("Emitida por excepcion");
+        }
+
+        @Test
+        @DisplayName("y la base no admite una autorizacion sobre un territorio que no se consulto")
+        void sinConsultaNoHayQueAutorizar() throws SQLException {
+            giroDelCatalogo("47523", "COMERCIO AL POR MENOR");
+            long titular = crearContribuyente();
+            String recibo = cobrar(titular, DERECHO_LICENCIA);
+            // Sin predio: no se pregunta, y la fila nace NO_COMPROBADA.
+            long id =
+                    enContexto(
+                                    () ->
+                                            emitir.emitir(
+                                                    solicitud(titular, recibo, "47523"),
+                                                    FormatoDeDocumento.PDF,
+                                                    PORQUE))
+                            .licencia()
+                            .identificador();
+
+            // `kamayuk_app` no tiene UPDATE sobre la tabla (REVOKE): la guarda se mide desde el
+            // dueno, que es quien podria tocar la fila en una migracion.
+            try (Connection owner = base.conexion(BaseDeDatosDePrueba.OWNER)) {
+                owner.setAutoCommit(false);
+                try (PreparedStatement tenant =
+                        owner.prepareStatement(
+                                "SELECT set_config('app.municipalidad_id', ?, true)")) {
+                    tenant.setString(1, String.valueOf(municipalidad));
+                    tenant.execute();
+                }
+                assertThatThrownBy(
+                                () -> {
+                                    try (PreparedStatement sentencia =
+                                            owner.prepareStatement(
+                                                    "UPDATE licencia_funcionamiento"
+                                                            + " SET autorizacion_territorio ="
+                                                            + " 'Autorizo algo que no se pregunto'"
+                                                            + " WHERE id = ?")) {
+                                        sentencia.setLong(1, id);
+                                        sentencia.executeUpdate();
+                                    }
+                                })
+                        .as("no habia nada que autorizar: el territorio no se consulto")
+                        .hasMessageContaining("licencia_autorizacion_territorio_ck");
+                owner.rollback();
+            }
+        }
+
+        /** La misma solicitud, con un predio que consultar y la autorizacion dada. */
+        private static EmitirLicenciaDeFuncionamiento.Solicitud conPredio(
+                EmitirLicenciaDeFuncionamiento.Solicitud base, Observacion autorizacion) {
+            return new EmitirLicenciaDeFuncionamiento.Solicitud(
+                    base.codigoContribuyente(),
+                    1234L,
+                    base.nombreComercial(),
+                    base.direccion(),
+                    base.areaSolicitada(),
+                    base.tipoLicencia(),
+                    base.zonificacion(),
+                    base.aforo(),
+                    base.fechaEmision(),
+                    base.vigenciaHasta(),
+                    base.numeroDeRecibo(),
+                    base.girosCiiu(),
+                    base.giroPrincipal(),
+                    base.expediente(),
+                    base.fechaExpediente(),
+                    autorizacion);
         }
     }
 

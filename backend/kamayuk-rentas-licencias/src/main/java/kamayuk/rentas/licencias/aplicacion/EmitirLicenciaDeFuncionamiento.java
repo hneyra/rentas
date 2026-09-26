@@ -246,12 +246,7 @@ public class EmitirLicenciaDeFuncionamiento {
             throw new RiesgoNoMitigable(solicitud.predioId(), comprobacion.aLaFecha());
         }
 
-        if (comprobacion.todoComprobadoYFavorable()
-                || comprobacion.zona() == RespuestaDelTerritorio.NO_SE_PREGUNTO) {
-            return;
-        }
-
-        if (solicitud.autorizacionDelTerritorio() != null) {
+        if (!comprobacion.exigeAutorizacion() || solicitud.autorizacionDelTerritorio() != null) {
             return;
         }
 
