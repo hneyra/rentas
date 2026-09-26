@@ -1506,6 +1506,43 @@ class LicenciaDeEdificacionJdbcTest {
             }
         }
 
+        /**
+         * #419 — El reporte con corte en marzo no trae el numero de una licencia de mayo.
+         *
+         * <p>El estado ya se derivaba al corte y el numero no: la fila decia {@code EN_TRAMITE} y a
+         * la vez llevaba {@code LE-...}. La siembra que distingue es una emision POSTERIOR al
+         * corte; con las de {@code HOY}, que es lo que las demas usan, el numero es el mismo.
+         */
+        @Test
+        @DisplayName("#419 — el reporte al corte no trae el numero de una licencia posterior")
+        void elNumeroEsElDeLaFecha() {
+            LocalDate declarado = LocalDate.of(2026, 2, 14);
+            String expediente = expedienteCompletoEn(municipalidad, contribuyente(), declarado);
+            emitirLicencia(expediente, LocalDate.of(2026, 5, 20), LocalDate.of(2029, 5, 20));
+
+            ConsultaDeFue.FueEnConsulta fila =
+                    enContexto(
+                                    () ->
+                                            consulta.reporte(
+                                                    new CriterioDeFue(
+                                                            null, null, null, null, null, null,
+                                                            declarado, declarado, null),
+                                                    null,
+                                                    null,
+                                                    LocalDate.of(2026, 3, 31),
+                                                    Paginacion.de(0, 50, "expediente")))
+                            .contenido()
+                            .stream()
+                            .map(ConsultaDeFue.FilaDelReporte::fila)
+                            .filter(una -> una.fue().expediente().equals(expediente))
+                            .findFirst()
+                            .orElseThrow();
+
+            assertThat(java.util.Arrays.asList(fila.estado(), fila.numeroDeLicencia()))
+                    .as("el 31 de marzo estaba en tramite y sin licencia: las dos cosas a la vez")
+                    .containsExactly(EstadoDelFue.EN_TRAMITE, null);
+        }
+
         @Test
         @DisplayName("el reporte general trae el area a construir y el valor de obra con su fecha")
         void reporte() {

@@ -1216,6 +1216,39 @@ class AnunciosYPropagandaJdbcTest {
                     .isEqualTo(Dinero.de(TARIFA_DEL_PANEL).mas(Dinero.de(TARIFA_DEL_PANEL)));
         }
 
+        /**
+         * #419 — Lo autorizado despues del corte no existia ese dia.
+         *
+         * <p>El devengado ya filtraba por fecha y el conteo no: reimprimir el padron de un dia
+         * pasado sumaba las autorizaciones nuevas, y las dos cifras del mismo resumen dejaban de
+         * cuadrar. La siembra que distingue es una autorizacion POSTERIOR al corte.
+         */
+        @Test
+        @DisplayName("#419 — una autorizacion posterior al corte no sale en el padron de ese dia")
+        void loAutorizadoDespuesDelCorteNoEstaba() {
+            long titular = crearContribuyente();
+            enContexto(() -> registrar.registrar(solicitud(titular), null, PORQUE));
+            CriterioDeAnuncios suyo = CriterioDeAnuncios.ninguno().conTitulares(Set.of(titular));
+
+            ConsultaDeAnuncios.Padron laVispera =
+                    enContexto(
+                            () ->
+                                    consulta.padron(
+                                            suyo,
+                                            null,
+                                            HOY.minusDays(1),
+                                            Paginacion.de(0, 20, "numero")));
+
+            assertThat(
+                            List.of(
+                                    laVispera.resumen().autorizaciones(),
+                                    (long) laVispera.pagina().contenido().size()))
+                    .as(
+                            "la vispera no habia ninguna autorizacion: ni en el resumen ni en la pagina")
+                    .containsExactly(0L, 0L);
+            assertThat(laVispera.resumen().devengado()).isEqualTo(Dinero.CERO);
+        }
+
         @Test
         @DisplayName("la busqueda por prefijo de expediente y direccion encuentra lo suyo")
         void laBusquedaPorPrefijo() {

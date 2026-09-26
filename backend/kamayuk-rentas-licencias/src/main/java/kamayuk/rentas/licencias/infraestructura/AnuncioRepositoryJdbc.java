@@ -171,9 +171,10 @@ public class AnuncioRepositoryJdbc extends RepositorioJdbc implements AnuncioRep
     }
 
     @Override
-    public Pagina<Anuncio> buscar(CriterioDeAnuncios criterio, Paginacion paginacion) {
+    public Pagina<Anuncio> buscar(
+            CriterioDeAnuncios criterio, LocalDate aLaFecha, Paginacion paginacion) {
         Map<String, Object> parametros = new HashMap<>();
-        String donde = donde(criterio, parametros);
+        String donde = donde(criterio, aLaFecha, parametros);
         return paginar(
                 "SELECT " + COLUMNAS + " FROM anuncio" + donde,
                 "SELECT count(*) FROM anuncio" + donde,
@@ -186,7 +187,7 @@ public class AnuncioRepositoryJdbc extends RepositorioJdbc implements AnuncioRep
     @Override
     public ResumenDelPadron resumen(CriterioDeAnuncios criterio, LocalDate aLaFecha) {
         Map<String, Object> parametros = new HashMap<>();
-        String donde = donde(criterio, parametros);
+        String donde = donde(criterio, aLaFecha, parametros);
 
         Long autorizaciones =
                 jdbc().sql("SELECT count(*) FROM anuncio" + donde)
@@ -219,8 +220,17 @@ public class AnuncioRepositoryJdbc extends RepositorioJdbc implements AnuncioRep
 
     // ------------------------------------------------------------------
 
-    private static String donde(CriterioDeAnuncios criterio, Map<String, Object> parametros) {
-        StringBuilder donde = new StringBuilder(" WHERE 1 = 1");
+    /**
+     * Los filtros del criterio, comunes a la pagina, al conteo y a la subconsulta del devengado.
+     *
+     * <p>El corte va aqui y no en cada consulta (#419): una autorizacion posterior a {@code
+     * aLaFecha} no existia ese dia. Hasta #419 solo el devengado lo miraba, y el conteo del mismo
+     * resumen crecia con cada reimpresion del padron de un dia pasado.
+     */
+    private static String donde(
+            CriterioDeAnuncios criterio, LocalDate aLaFecha, Map<String, Object> parametros) {
+        StringBuilder donde = new StringBuilder(" WHERE fecha_autorizacion <= :aLaFecha");
+        parametros.put("aLaFecha", aLaFecha);
         if (criterio.numero() != null) {
             donde.append(" AND numero = :numero");
             parametros.put("numero", criterio.numero());

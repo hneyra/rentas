@@ -92,8 +92,13 @@ public final class AnunciosEnMemoria implements AnuncioRepository {
     }
 
     @Override
-    public Pagina<Anuncio> buscar(CriterioDeAnuncios criterio, Paginacion paginacion) {
-        List<Anuncio> filtrados = filtrar(criterio);
+    public Pagina<Anuncio> buscar(
+            CriterioDeAnuncios criterio, LocalDate aLaFecha, Paginacion paginacion) {
+        // El mismo corte que la base (#419): lo autorizado despues no existia ese dia.
+        List<Anuncio> filtrados =
+                filtrar(criterio).stream()
+                        .filter(anuncio -> !anuncio.fechaAutorizacion().isAfter(aLaFecha))
+                        .toList();
         return Pagina.de(filtrados, paginacion, filtrados.size());
     }
 
@@ -101,7 +106,11 @@ public final class AnunciosEnMemoria implements AnuncioRepository {
     public ResumenDelPadron resumen(CriterioDeAnuncios criterio, LocalDate aLaFecha) {
         // El doble suma sobre TODAS las filas del criterio, igual que el agregado del motor: si
         // sumara la pagina, la prueba de que el resumen no es la pagina no probaria nada.
-        return new ResumenDelPadron(filtrar(criterio).size(), Dinero.CERO);
+        return new ResumenDelPadron(
+                filtrar(criterio).stream()
+                        .filter(anuncio -> !anuncio.fechaAutorizacion().isAfter(aLaFecha))
+                        .count(),
+                Dinero.CERO);
     }
 
     private List<Anuncio> filtrar(CriterioDeAnuncios criterio) {

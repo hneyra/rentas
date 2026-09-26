@@ -139,6 +139,9 @@ class CertificadosYPadronesJdbcTest {
     private static final LocalDate SE_CANCELA_EN_AGOSTO = LocalDate.of(2026, 8, 1);
     private static final LocalDate EN_SETIEMBRE = LocalDate.of(2026, 9, 1);
 
+    /** El corte del padron de #419: posterior a HOY y anterior a la segunda emision. */
+    private static final LocalDate CORTE_DE_MARZO = LocalDate.of(2026, 3, 31);
+
     /** El reloj de la emision, y otro muy posterior para la reimpresion (AC 2). */
     private static final Clock RELOJ =
             Clock.fixed(HOY.atStartOfDay(ZoneOffset.UTC).toInstant(), ZoneOffset.UTC);
@@ -524,6 +527,36 @@ class CertificadosYPadronesJdbcTest {
 
             assertThat(segunda.resumen()).isEqualTo(primera.resumen());
             assertThat(segunda.aLaFecha()).isEqualTo(primera.aLaFecha());
+        }
+
+        /**
+         * #419 — Lo emitido despues del corte no estaba ese dia, ni en la pagina ni en el resumen.
+         *
+         * <p>La prueba de arriba reimprime con {@code HOY} lo emitido {@code HOY}: nada es
+         * posterior al corte, y por eso no distinguia. Aqui la B se emite despues, y el padron al
+         * corte tiene que seguir diciendo lo que decia.
+         */
+        @Test
+        @DisplayName(
+                "#419 — una licencia emitida despues del corte no sale en el padron de ese dia")
+        void loEmitidoDespuesDelCorteNoEstaba() {
+            long titular = crearContribuyente();
+            String antes = emitirLicenciaDe(titular, null, LocalDate.of(2026, 3, 10));
+            ConsultaDeLicencias.Padron primera = padronDe(titular, null, CORTE_DE_MARZO);
+            emitirLicenciaDe(titular, null, LocalDate.of(2026, 8, 10));
+            ConsultaDeLicencias.Padron reimpreso = padronDe(titular, null, CORTE_DE_MARZO);
+
+            assertThat(
+                            List.of(
+                                    reimpreso.resumen().licencias(),
+                                    reimpreso.resumen().vigentes(),
+                                    (long) reimpreso.pagina().contenido().size()))
+                    .as(
+                            "la B no existia el 31 de marzo: ni se cuenta ni sale VIGENTE (licencias,"
+                                    + " vigentes, filas)")
+                    .containsExactly(1L, 1L, 1L);
+            assertThat(reimpreso.resumen()).isEqualTo(primera.resumen());
+            assertThat(estadoEn(reimpreso, antes)).isEqualTo(EstadoDeLicencia.VIGENTE);
         }
 
         @Test
@@ -1239,6 +1272,12 @@ class CertificadosYPadronesJdbcTest {
     }
 
     private static String emitirLicenciaDe(long titular, @Nullable LocalDate vigenciaHasta) {
+        return emitirLicenciaDe(titular, vigenciaHasta, HOY);
+    }
+
+    /** Emitida el dia que se le diga: #419 necesita una posterior al corte del padron. */
+    private static String emitirLicenciaDe(
+            long titular, @Nullable LocalDate vigenciaHasta, LocalDate emision) {
         String giro = "471" + String.format("%02d", CONTADOR.incrementAndGet() % 100);
         enContexto(
                 () ->
@@ -1264,7 +1303,7 @@ class CertificadosYPadronesJdbcTest {
                                                 TipoDeLicencia.DEFINITIVA,
                                                 "CV",
                                                 20,
-                                                HOY,
+                                                emision,
                                                 vigenciaHasta,
                                                 recibo,
                                                 List.of(giro),
