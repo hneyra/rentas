@@ -12,7 +12,7 @@ historial de por que se hizo algo vale mas que la coherencia del documento.
 
 | # | Decision | Estado |
 |---|---|---|
-| [0003](ADR-0003-monolito-modular.md) | Monolito modular con Spring Modulith | Aceptado |
+| [0003](ADR-0003-monolito-modular.md) | Monolito modular con Spring Modulith | Obsoleto — lo reemplaza ADR-0029 |
 | [0006](ADR-0006-cuenta-corriente-libro-de-asientos.md) | La cuenta corriente es un libro de asientos inmutable | Aceptado |
 | [0013](ADR-0013-permisos-de-la-sesion.md) | La interfaz aprende sus permisos del backend, no del token | Aceptado |
 | [0014](ADR-0014-navegacion-centrada-en-la-atencion.md) | Navegación centrada en la atención: la persona como inicio, los módulos detrás de un lanzador | Aceptado |

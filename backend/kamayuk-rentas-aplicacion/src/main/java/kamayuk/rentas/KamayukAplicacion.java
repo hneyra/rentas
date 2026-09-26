@@ -12,16 +12,24 @@ import org.springframework.context.annotation.Import;
 import org.springframework.modulith.Modulithic;
 
 /**
- * Artefacto unico del SGTM, desplegado en los perfiles {@code web} y {@code batch} (ADR-0003).
- * Mismo codigo y misma imagen; lo que cambia es la configuracion.
+ * Artefacto unico de {@code rentas}, desplegado en los perfiles {@code web} y {@code batch}
+ * (ADR-0029, que reemplaza a ADR-0003). Mismo codigo y misma imagen; lo que cambia es la
+ * configuracion.
  *
  * <p>Ocho modulos se declaran <b>compartidos</b>: {@code dominio} (el vocabulario comun), {@code
  * compartido} (el contexto de tenant), {@code plataforma} (el camino del token al {@code SET
  * LOCAL}), {@code persistencia} (el patron de repositorio), {@code auditoria}, {@code documentos}
  * (la generacion y reimpresion, RF-132), {@code carga} (lo comun a toda carga masiva desde archivo)
- * y {@code web}. Ninguno es un contexto acotado, y que cualquier contexto los use no es una
- * violacion de los limites sino su proposito: sin declararlos, cada contexto que use {@code Dinero}
- * o extienda {@code RepositorioJdbc} contaria como una dependencia que explicar.
+ * y {@code web}. Ninguno es un contexto acotado.
+ *
+ * <p><b>Hoy la lista no exime a nadie de nada</b> (#438). Spring Modulith solo suma los {@code
+ * sharedModules} a las dependencias permitidas de un modulo que <b>declara</b> {@code
+ * allowedDependencies}; sin esa declaracion, el modulo esta abierto antes de que se miren. Y aqui
+ * ningun modulo la declara: medido, quitar {@code plataforma} de la lista deja {@code
+ * verificarArquitectura} en verde, y {@code autorizacion}, que usan doce modulos, ni siquiera esta
+ * en ella. La lista empezaria a pesar el dia que un contexto declarara {@code allowedDependencies}
+ * —y no se declaran a proposito: la direccion del grafo ya la fija Gradle en cada {@code
+ * build.gradle.kts}, y dos listas de lo mismo acaban divergiendo—.
  */
 @Modulithic(
         systemName = "Kamayuk",
