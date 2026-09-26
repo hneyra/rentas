@@ -247,11 +247,9 @@ class ExigirNumeroSoloConLlavesDeclaradasTest {
     }
 
     private static Stream<Path> archivosJava(Path raiz) {
-        try (Stream<Path> todos = Files.walk(raiz)) {
-            return todos.filter(archivo -> archivo.toString().endsWith(".java")).toList().stream();
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
+        // Sin Files.walk (#474): recorre con poda, aunque aqui la raiz sea src/main/java.
+        return ArbolDeFuentes.archivos(raiz).stream()
+                .filter(archivo -> archivo.toString().endsWith(".java"));
     }
 
     private static String relativa(Path archivo) {

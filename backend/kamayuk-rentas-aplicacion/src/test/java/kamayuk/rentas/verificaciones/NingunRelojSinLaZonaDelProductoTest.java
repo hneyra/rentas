@@ -369,11 +369,8 @@ class NingunRelojSinLaZonaDelProductoTest {
     }
 
     private static Stream<Path> archivos(Path raiz) {
-        try (Stream<Path> todos = Files.walk(raiz)) {
-            return todos.filter(Files::isRegularFile).toList().stream();
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
+        // Sin Files.walk (#474): recorre con poda, aunque aqui la raiz sea src/main.
+        return ArbolDeFuentes.archivos(raiz).stream();
     }
 
     private static List<String> lineas(Path archivo) {

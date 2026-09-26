@@ -11,7 +11,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Stream;
 import kamayuk.comun.verificaciones.RevisorDeCodigoFuente.Hallazgo;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -295,18 +294,15 @@ class DiscriminadorDeLoQueFaltaPublicarTest {
     private static Map<String, String> fuentesDeProduccion() throws IOException {
         Path raiz = raizDelBackend();
         Map<String, String> fuentes = new LinkedHashMap<>();
-        try (Stream<Path> rutas = Files.walk(raiz)) {
-            for (Path ruta : rutas.filter(Files::isRegularFile).toList()) {
-                String texto = ruta.toString().replace('\\', '/');
-                if (!texto.contains("/src/main/")
-                        || texto.contains("/build/")
-                        || !texto.endsWith(".java")) {
-                    continue;
-                }
-                fuentes.put(
-                        raiz.relativize(ruta).toString(),
-                        Files.readString(ruta, StandardCharsets.UTF_8));
+        // Sin entrar en `build/` (#474): filtrarlo despues de entrar revento en paralelo.
+        for (Path ruta : ArbolDeFuentes.archivos(raiz)) {
+            String texto = ruta.toString().replace('\\', '/');
+            if (!texto.contains("/src/main/") || !texto.endsWith(".java")) {
+                continue;
             }
+            fuentes.put(
+                    raiz.relativize(ruta).toString(),
+                    Files.readString(ruta, StandardCharsets.UTF_8));
         }
         return fuentes;
     }
