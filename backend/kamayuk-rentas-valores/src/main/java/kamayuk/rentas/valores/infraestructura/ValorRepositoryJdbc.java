@@ -102,7 +102,17 @@ public class ValorRepositoryJdbc extends RepositorioJdbc implements ValorReposit
             "(SELECT max(d.ejercicio) FROM valor_detalle d WHERE d.valor_id = v.id)";
 
     /** Lo que ya no describe una cobranza en curso; ver {@link SituacionDelValor#de}. */
-    private static final String NO_TERMINAL = "v.estado NOT IN ('PAGADO', 'ANULADO', 'PRESCRITO')";
+    /**
+     * «Todavia describe una cobranza», en SQL: derivado de {@link EstadoDeValor#esCobrable} y no
+     * escrito otra vez (#444).
+     */
+    private static final String NO_TERMINAL =
+            "v.estado NOT IN ("
+                    + java.util.Arrays.stream(EstadoDeValor.values())
+                            .filter(estado -> !estado.esCobrable())
+                            .map(estado -> "'" + estado.name() + "'")
+                            .collect(java.util.stream.Collectors.joining(", "))
+                    + ")";
 
     /** Ni terminal ni en coactiva: el tramo donde la fecha decide. */
     private static final String EN_CURSO =

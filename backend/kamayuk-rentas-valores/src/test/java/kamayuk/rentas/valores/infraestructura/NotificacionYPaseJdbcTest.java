@@ -266,6 +266,7 @@ class NotificacionYPaseJdbcTest {
                                             () ->
                                                     movimientos.registrarPase(
                                                             pase(valor.id(), notificacion.id())))
+                                    .pase()
                                     .id();
                         });
             }
@@ -303,7 +304,10 @@ class NotificacionYPaseJdbcTest {
 
             MovimientoDeValor guardado =
                     enTransaccion(
-                            () -> movimientos.registrarPase(pase(valor.id(), notificacion.id())));
+                            () ->
+                                    movimientos
+                                            .registrarPase(pase(valor.id(), notificacion.id()))
+                                            .pase());
 
             assertThat(guardado.notificacionId()).isEqualTo(notificacion.id());
             assertThat(guardado.exigibleDesde()).isEqualTo(EXIGIBLE);
@@ -348,7 +352,10 @@ class NotificacionYPaseJdbcTest {
                                             notificada(valor.id(), "OP-2026-P00004/1", 1)));
             MovimientoDeValor guardado =
                     enTransaccion(
-                            () -> movimientos.registrarPase(pase(valor.id(), notificacion.id())));
+                            () ->
+                                    movimientos
+                                            .registrarPase(pase(valor.id(), notificacion.id()))
+                                            .pase());
 
             assertThat(
                             estadoSqlDelFallo(

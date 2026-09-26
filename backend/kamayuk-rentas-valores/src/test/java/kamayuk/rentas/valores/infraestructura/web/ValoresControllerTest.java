@@ -545,6 +545,24 @@ class ValoresControllerTest {
     }
 
     @Test
+    @DisplayName("#444 — un valor prescrito no se pasa ni se notifica: 409")
+    void unValorPrescritoEs409() throws Exception {
+        emitirUnValor();
+        notificar("NOTIFICADO", "2026-04-03");
+        repositorio.cambiarEstado(
+                repositorio.porNumero("OP-2026-000001").orElseThrow().id(),
+                kamayuk.rentas.valores.dominio.EstadoDeValor.PRESCRITO);
+
+        MvcResult pase = pasarACoactiva("2026-06-01");
+        MvcResult diligencia = notificar("NOTIFICADO", "2026-06-02");
+
+        assertThat(List.of(pase.getResponse().getStatus(), diligencia.getResponse().getStatus()))
+                .as("el estado no admite actos de cobranza: 409, no 201")
+                .containsExactly(409, 409);
+        assertThat(movimientos.cuantos()).isZero();
+    }
+
+    @Test
     @DisplayName("ACO y RCO se rechazan con un mensaje que dice de quien son")
     void aceptadoYRechazadoSeRechazan() throws Exception {
         emitirUnValor();
