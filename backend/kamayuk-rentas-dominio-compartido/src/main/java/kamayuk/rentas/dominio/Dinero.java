@@ -84,6 +84,37 @@ public record Dinero(BigDecimal valor) implements Comparable<Dinero> {
         return new Dinero(valor.multiply(factor));
     }
 
+    /**
+     * Una de las {@code partes} iguales del importe: el cociente <b>exacto</b>, redondeado <b>una
+     * sola vez</b> con la escala y el modo de la politica (#382).
+     *
+     * <p>Existe porque repartir no es multiplicar por el reciproco. {@code 1/N} casi nunca tiene
+     * expresion decimal finita, y truncarlo a cualquier ancho —16 digitos era el de los dos
+     * cronogramas— deja el producto un pelo a un lado del cociente: 1 234,50 × 0.08333333333333333
+     * es 102.8749999999999958850 y no 102.875, y un {@code HALF_UP} lo baja a 102,87 cuando la
+     * politica dicta 102,88; un {@code DOWN} deja 300,00 en tres en 99,99 aunque el reparto sea
+     * exacto. {@link BigDecimal#divide(BigDecimal, int, java.math.RoundingMode)} decide el redondeo
+     * sobre el cociente exacto, y ese es el unico redondeo que hay.
+     *
+     * <p>No es una excepcion a lo que este tipo no decide: la escala y el modo siguen llegando en
+     * la politica, igual que en {@link #redondeadoCon}. Lo que aqui se fija es la operacion, para
+     * que la division con redondeo viva en un sitio y ningun reparto elija su propio ancho
+     * intermedio. Lo que el redondeo deje sin repartir —el descuadre entre las partes y el todo— lo
+     * decide quien reparte, no este tipo.
+     *
+     * @param partes en cuantas partes iguales se divide; al menos una
+     * @param politica la escala y el modo de la parte, del punto de redondeo que corresponda
+     */
+    public Dinero repartidoEntre(int partes, PoliticaDeRedondeo politica) {
+        Objects.requireNonNull(politica, "Repartir redondea, y la politica se recibe (D-03)");
+        if (partes <= 0) {
+            throw new IllegalArgumentException(
+                    "Un importe se reparte entre una o mas partes, no entre " + partes);
+        }
+        return new Dinero(
+                valor.divide(BigDecimal.valueOf(partes), politica.escala(), politica.modo()));
+    }
+
     /** Valor absoluto. Util para presentar un abono, que en el libro va en negativo. */
     public Dinero absoluto() {
         return new Dinero(valor.abs());

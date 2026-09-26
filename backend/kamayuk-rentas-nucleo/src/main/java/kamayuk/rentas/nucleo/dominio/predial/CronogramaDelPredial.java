@@ -1,6 +1,5 @@
 package kamayuk.rentas.nucleo.dominio.predial;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -30,14 +29,6 @@ import kamayuk.rentas.dominio.PuntoDeRedondeo;
  */
 public final class CronogramaDelPredial {
 
-    /**
-     * Precision de los intermedios, como en {@code Cronograma} (#35): el cociente exacto de dividir
-     * entre tres no existe, y {@code MathContext} acota la precision sin escribir ningun modo de
-     * redondeo en el codigo —el unico redondeo con efecto es el de {@link PuntoDeRedondeo#CUOTA},
-     * que sale del conjunto sellado (D-03b, ADR-0018)—.
-     */
-    private static final java.math.MathContext INTERMEDIO = java.math.MathContext.DECIMAL64;
-
     private CronogramaDelPredial() {}
 
     /**
@@ -63,10 +54,11 @@ public final class CronogramaDelPredial {
         }
 
         int cuantas = vencimientos.size();
-        Dinero fraccion =
-                impuestoAnual
-                        .por(BigDecimal.ONE.divide(BigDecimal.valueOf(cuantas), INTERMEDIO))
-                        .redondeadoEn(PuntoDeRedondeo.CUOTA, redondeo);
+        // Se divide, no se multiplica por 1/N (#382): el cociente exacto, redondeado una sola vez
+        // con la politica de CUOTA del conjunto sellado (D-03b, ADR-0018). Con 4 o 1 cuotas el
+        // reciproco era exacto y el defecto no se veia; el numero de cuotas es dato, y con tres
+        // 300,00 en DOWN salia 99,99.
+        Dinero fraccion = impuestoAnual.repartidoEntre(cuantas, redondeo.en(PuntoDeRedondeo.CUOTA));
 
         List<CuotaDelPredial> cuotas = new ArrayList<>();
         Dinero repartido = Dinero.CERO;

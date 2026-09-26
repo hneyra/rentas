@@ -178,6 +178,86 @@ class ConvenioYSuCronogramaTest {
         }
     }
 
+    /**
+     * #382 — El capital de cada cuota es el cociente <b>exacto</b> redondeado una vez con la
+     * politica, no el producto por un 1/N truncado a 16 digitos.
+     *
+     * <p>Las muestras de {@link DelCronograma} —divisores 3, 4, 5 y 6, ningun cociente en medio
+     * centimo y siempre {@code HALF_UP}— pasan igual con las dos implementaciones, y por eso el
+     * defecto sobrevivio. Estas tres son las que distinguen: un cociente que cae <i>justo</i> en el
+     * medio centimo (1 234,50 / 12 = 102,875) y dos repartos exactos con un modo dirigido, que el
+     * error del reciproco —por debajo en 1/3, por encima en 1/6— manda al lado equivocado.
+     */
+    @Nested
+    @DisplayName("#382 — El capital por cuota es el cociente exacto, redondeado una vez")
+    class ElCocienteExacto {
+
+        @Test
+        @DisplayName("1 234,50 en 12 con HALF_UP: 102,875 sube a 102,88, no baja a 102,87")
+        void elMedioCentimoSubeConHalfUp() {
+            // 1/12 a 16 digitos es 0.08333333333333333, por debajo: el producto queda en
+            // 102.8749999999999958850 y HALF_UP lo baja. El cociente exacto es 102.875.
+            // El interes, de prueba (1,5 % mensual), se devenga sobre el saldo, asi que el
+            // centimo desplazado a la ultima cuota tambien movia el interes total.
+            List<CuotaDeConvenio> cronograma =
+                    Cronograma.de(
+                            Dinero.de("1234.50"),
+                            condiciones("1.5", 12, "0"),
+                            12,
+                            PRIMERA,
+                            REDONDEO);
+
+            assertThat(cronograma.subList(0, 11))
+                    .as("las once primeras cuotas llevan el cociente redondeado con la politica")
+                    .allSatisfy(
+                            cuota -> assertThat(cuota.capital()).isEqualTo(Dinero.de("102.88")));
+            assertThat(cronograma.get(11).capital())
+                    .as("la ultima absorbe el descuadre del cociente exacto")
+                    .isEqualTo(Dinero.de("102.82"));
+            Dinero interes = Dinero.CERO;
+            for (CuotaDeConvenio cuota : cronograma) {
+                interes = interes.mas(cuota.interes());
+            }
+            assertThat(interes).isEqualTo(Dinero.de("120.36"));
+            assertThat(Cronograma.total(cronograma)).isEqualTo(Dinero.de("1354.86"));
+        }
+
+        @Test
+        @DisplayName("300,00 en 3 con DOWN: 100,00 tres veces, no 99,99")
+        void unRepartoExactoConDownNoPierdeElCentimo() {
+            // 1/3 a 16 digitos queda por debajo: 300 x 0.3333333333333333 = 99.99999999999999,
+            // y DOWN lo deja en 99,99 aunque el reparto sea exacto.
+            List<CuotaDeConvenio> cronograma =
+                    Cronograma.de(
+                            Dinero.de("300.00"),
+                            condiciones("0", 12, "0"),
+                            3,
+                            PRIMERA,
+                            new PoliticaDeRedondeo(2, RoundingMode.DOWN));
+
+            assertThat(cronograma.stream().map(CuotaDeConvenio::capital).toList())
+                    .containsExactly(Dinero.de("100.00"), Dinero.de("100.00"), Dinero.de("100.00"));
+        }
+
+        @Test
+        @DisplayName("600,00 en 6 con UP: 100,00 seis veces, no 100,01")
+        void unRepartoExactoConUpNoAnadeElCentimo() {
+            // 1/6 a 16 digitos queda por encima: 600 x 0.1666666666666667 = 100.00000000000002,
+            // y UP lo sube a 100,01 aunque el reparto sea exacto.
+            List<CuotaDeConvenio> cronograma =
+                    Cronograma.de(
+                            Dinero.de("600.00"),
+                            condiciones("0", 12, "0"),
+                            6,
+                            PRIMERA,
+                            new PoliticaDeRedondeo(2, RoundingMode.UP));
+
+            assertThat(cronograma)
+                    .allSatisfy(
+                            cuota -> assertThat(cuota.capital()).isEqualTo(Dinero.de("100.00")));
+        }
+    }
+
     @Nested
     @DisplayName("El vencimiento de una cuota (#411)")
     class DelVencimiento {

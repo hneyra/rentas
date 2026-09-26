@@ -112,6 +112,76 @@ class DineroTest {
         }
     }
 
+    /**
+     * #382 — Repartir es dividir y redondear una vez, no multiplicar por un {@code 1/N} truncado.
+     *
+     * <p>Las siembras son las que distinguen las dos operaciones: un cociente justo en el medio
+     * centimo (1 234,50 / 12 = 102,875) y dos repartos exactos con un modo dirigido, donde el error
+     * del reciproco —por debajo en 1/3, por encima en 1/6— cruza el centimo. Un reparto sin medio
+     * centimo y con {@code HALF_UP} pasaria con las dos, que es como el defecto sobrevivio.
+     */
+    @Nested
+    @DisplayName("#382 — repartido entre N partes")
+    class RepartidoEntre {
+
+        @Test
+        @DisplayName("el medio centimo exacto va adonde dice la politica: 1 234,50 / 12 = 102,88")
+        void elMedioCentimoExacto() {
+            assertThat(
+                            Dinero.de("1234.50")
+                                    .repartidoEntre(
+                                            12, new PoliticaDeRedondeo(2, RoundingMode.HALF_UP)))
+                    .isEqualTo(Dinero.de("102.88"));
+            assertThat(
+                            Dinero.de("1234.50")
+                                    .repartidoEntre(
+                                            12, new PoliticaDeRedondeo(2, RoundingMode.HALF_DOWN)))
+                    .as("el mismo cociente con HALF_DOWN baja: el modo es de la politica")
+                    .isEqualTo(Dinero.de("102.87"));
+        }
+
+        @Test
+        @DisplayName("un reparto exacto es exacto con cualquier modo: 300 / 3 y 600 / 6")
+        void unRepartoExactoConModoDirigido() {
+            assertThat(
+                            Dinero.de("300.00")
+                                    .repartidoEntre(
+                                            3, new PoliticaDeRedondeo(2, RoundingMode.DOWN)))
+                    .isEqualTo(Dinero.de("100.00"));
+            assertThat(
+                            Dinero.de("600.00")
+                                    .repartidoEntre(6, new PoliticaDeRedondeo(2, RoundingMode.UP)))
+                    .isEqualTo(Dinero.de("100.00"));
+        }
+
+        @Test
+        @DisplayName("la escala de la parte es la de la politica, no la del importe")
+        void laEscalaEsLaDeLaPolitica() {
+            Dinero parte =
+                    Dinero.de("100.00")
+                            .repartidoEntre(3, new PoliticaDeRedondeo(0, RoundingMode.UP));
+
+            assertThat(parte).isEqualTo(Dinero.de("34"));
+            assertThat(parte.valor().scale()).isZero();
+        }
+
+        @Test
+        @DisplayName("no se reparte entre cero partes ni sin politica")
+        void sinPartesOSinPoliticaNoSeReparte() {
+            PoliticaDeRedondeo politica = new PoliticaDeRedondeo(2, RoundingMode.HALF_UP);
+
+            assertThatThrownBy(() -> Dinero.de("100.00").repartidoEntre(0, politica))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("no entre 0");
+            assertThatThrownBy(() -> Dinero.de("100.00").repartidoEntre(-2, politica))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("no entre -2");
+            assertThatThrownBy(() -> Dinero.de("100.00").repartidoEntre(3, null))
+                    .isInstanceOf(NullPointerException.class)
+                    .hasMessageContaining("D-03");
+        }
+    }
+
     @Test
     @DisplayName("no admite un valor nulo")
     void noAdmiteUnValorNulo() {
