@@ -2447,6 +2447,10 @@ export async function pedirCalculo<T>(ruta: string, senal?: AbortSignal): Promis
 /**
  * Fija el ejercicio de trabajo de la sesion. **Es la primera escritura de esta interfaz.**
  *
+ * La llama el mando de la barra, `sesion/MandoDelEjercicio.tsx` (#391). Entre #90 —que borro el de
+ * la V6— y #391 no la llamaba nadie, y `seg-aud` y `territorio` mandaban a fijar el ejercicio en
+ * una hoja que no escribe.
+ *
  * <h2>La observacion es del cuerpo, y no es un adorno</h2>
  *
  * Regla 10 y RNF-052: toda modificacion de datos exige observacion del usuario. Aqui no es una

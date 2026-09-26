@@ -46,6 +46,46 @@ export const DE_OTRO_SISTEMA: ReadonlyMap<string, string> = new Map([
 /** `Privilegio.LECTURA`. Lo minimo para ABRIR una pantalla. */
 export const PRIVILEGIO_LECTURA = 'lectura';
 
+/** `Privilegio.ESPECIAL`. El que pide un acto con privilegio propio, como fijar el ejercicio (#391). */
+export const PRIVILEGIO_ESPECIAL = 'especial';
+
+/**
+ * **La opcion con que se fija el ejercicio de trabajo, y el privilegio que pide** (#391).
+ *
+ * Es lo que declara `PUT /seguridad/sesion/ejercicio` en `SesionController`:
+ * `@RequiereAcceso(acceso = "cambiar_anio", privilegio = Privilegio.ESPECIAL)`. El `nombre` es el
+ * que `SembradorDelCatalogo` siembra desde `docs/10-negocio/catalogo-de-opciones.md`, y es con el
+ * que la encuentra quien administra los perfiles: por eso lo dice la barra a la cuenta que no lo
+ * tiene. Que los tres sigan siendo esos lo vigila
+ * `verificaciones/las-opciones-que-leen-el-catalogo-son-las-del-backend.test.ts`, igual que a las
+ * dos opciones del catalogo de #311.
+ */
+export const CAMBIAR_EL_EJERCICIO = {
+  codigo: 'cambiar_anio',
+  privilegio: PRIVILEGIO_ESPECIAL,
+  nombre: 'Cambiar el año de trabajo',
+} as const;
+
+/**
+ * **Si la cuenta tiene `privilegio` sobre `codigo`**, leido de `GET /seguridad/sesion/permisos`.
+ *
+ * Es el unico sitio donde se lee esa matriz, y lo usan los dos que la necesitan: el catalogo, que
+ * pregunta por `lectura` para saber que ofrecer, y el mando del ejercicio de la barra (#391), que
+ * pregunta por `especial` sobre `cambiar_anio` para saber si ofrecerse. Con dos lecturas a mano,
+ * una podria aceptar lo que la otra rechaza.
+ *
+ * `Array.isArray` y no un `as`: esto viene de la red, y lo que el contrato promete es «objeto».
+ * Un valor que no sea lista aqui no puede tumbar el arbol entero, ni ofrecer un mando.
+ */
+export function tieneElPrivilegio(
+  permisos: PermisosDeLaSesion,
+  codigo: string,
+  privilegio: string,
+): boolean {
+  const privilegios: unknown = permisos[codigo];
+  return Array.isArray(privilegios) && privilegios.includes(privilegio);
+}
+
 /** Lo que se sabe del catalogo despues de componerlo. */
 export interface CatalogoCompuesto {
   /** Lo que se ofrece, en el orden en que el backend publica sus modulos. */
@@ -58,17 +98,10 @@ export interface CatalogoCompuesto {
   readonly deOtroSistema: readonly string[];
 }
 
-/**
- * Los codigos de acceso que la cuenta puede LEER.
- *
- * `Array.isArray` y no un `as`: esto viene de la red, y lo que el contrato promete es «objeto».
- * Un valor que no sea lista aqui no puede tumbar el arbol entero.
- */
+/** Los codigos de acceso que la cuenta puede LEER. Ver `tieneElPrivilegio`. */
 function loQuePuedeLeer(permisos: PermisosDeLaSesion): ReadonlySet<string> {
   return new Set(
-    Object.entries(permisos)
-      .filter(([, privilegios]) => Array.isArray(privilegios) && privilegios.includes(PRIVILEGIO_LECTURA))
-      .map(([codigo]) => codigo),
+    Object.keys(permisos).filter((codigo) => tieneElPrivilegio(permisos, codigo, PRIVILEGIO_LECTURA)),
   );
 }
 

@@ -206,6 +206,21 @@ const VACIO: CatalogoCompuesto = {
   deOtroSistema: [],
 };
 
+/**
+ * **La matriz de permisos de la sesion, pedida una vez** (#391).
+ *
+ * Sale del gancho del catalogo porque ya no la lee solo el: el mando del ejercicio de la barra
+ * pregunta por `especial` sobre `cambiar_anio` para saber si ofrecerse. Es la misma consulta, con
+ * la misma llave, asi que los dos leen **la misma respuesta** y no sale una peticion mas.
+ */
+export function usePermisosDeLaSesion() {
+  return useQuery({
+    queryKey: LLAVES.permisos,
+    queryFn: ({ signal }) => pedirUno<PermisosDeLaSesion>(RUTAS.permisosDeLaSesion, signal),
+    retry: false,
+  });
+}
+
 export function useCatalogoPermitido(): CatalogoDeLaSesion {
   const { t } = useTranslation();
 
@@ -219,11 +234,7 @@ export function useCatalogoPermitido(): CatalogoDeLaSesion {
     queryFn: ({ signal }) => pedirPagina<AccesoDelSistema>(RUTAS.accesos, signal),
     retry: false,
   });
-  const permisos = useQuery({
-    queryKey: LLAVES.permisos,
-    queryFn: ({ signal }) => pedirUno<PermisosDeLaSesion>(RUTAS.permisosDeLaSesion, signal),
-    retry: false,
-  });
+  const permisos = usePermisosDeLaSesion();
 
   const compuesto = useMemo(() => {
     if (

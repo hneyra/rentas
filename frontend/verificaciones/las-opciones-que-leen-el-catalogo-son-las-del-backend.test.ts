@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { RAIZ } from './artboards.ts';
 import { ACCESOS_MEDIDOS } from '../src/datos/seguridadMedida.ts';
 import { OPCIONES_QUE_LEEN_EL_CATALOGO } from '../src/datos/useCatalogoPermitido.ts';
+import { CAMBIAR_EL_EJERCICIO } from '../src/permisos.ts';
 
 /**
  * **Las dos opciones que la pantalla del 403 nombra son las que el backend pide y siembra** (#311).
@@ -35,6 +36,11 @@ const CONTROLADOR = join(
   '../backend/kamayuk-rentas-seguridad/src/main/java/kamayuk/rentas/seguridad/infraestructura/web/SeguridadController.java',
 );
 const CATALOGO_DE_OPCIONES = join(RAIZ, '../docs/10-negocio/catalogo-de-opciones.md');
+/** Donde vive `PUT /seguridad/sesion/ejercicio`, la escritura del mando de la barra (#391). */
+const CONTROLADOR_DE_LA_SESION = join(
+  RAIZ,
+  '../backend/kamayuk-rentas-seguridad/src/main/java/kamayuk/rentas/seguridad/infraestructura/web/SesionController.java',
+);
 
 function leer(ruta: string): string {
   if (!existsSync(ruta)) {
@@ -90,4 +96,39 @@ describe('las opciones que leen el catalogo (#311)', () => {
       ).toBe(opcion.nombre);
     },
   );
+});
+
+/**
+ * **La opcion con que se fija el ejercicio es la que el `PUT` pide, con su privilegio** (#391).
+ *
+ * El mando de la barra se ofrece solo si la cuenta tiene `CAMBIAR_EL_EJERCICIO.privilegio` sobre
+ * `CAMBIAR_EL_EJERCICIO.codigo`, y a quien no lo tiene le nombra la opcion por su nombre del
+ * catalogo. Escritos sin esta guarda, el dia que el backend pidiera otra cosa el mando se ofreceria
+ * a quien recibe 403 —o se esconderia a quien si puede—, y la barra mandaria a pedir una opcion con
+ * un nombre que nadie encuentra. Las mismas tres fuentes que las dos de arriba.
+ */
+describe('la opcion que fija el ejercicio (#391)', () => {
+  const controlador = leer(CONTROLADOR_DE_LA_SESION);
+  const catalogo = leer(CATALOGO_DE_OPCIONES);
+
+  it('`PUT /seguridad/sesion/ejercicio` pide el codigo y el privilegio que el mando pregunta', () => {
+    const patron =
+      /@PutMapping\(Api\.RAIZ \+ "\/seguridad\/sesion\/ejercicio"\)\s*@RequiereAcceso\(acceso\s*=\s*"([a-z_]+)",\s*privilegio\s*=\s*Privilegio\.([A-Z]+)\)/;
+    const casa = patron.exec(controlador);
+    // Sin casar, las dos de abajo compararian `undefined` con algo y el mensaje no diria por que.
+    expect(casa, 'el patron ya no encuentra el `PUT` del ejercicio en `SesionController`').not.toBeNull();
+    expect(casa?.[1], '`PUT /seguridad/sesion/ejercicio` ya no pide ese codigo').toBe(
+      CAMBIAR_EL_EJERCICIO.codigo,
+    );
+    expect(casa?.[2]?.toLowerCase(), '`PUT /seguridad/sesion/ejercicio` ya no pide ese privilegio').toBe(
+      CAMBIAR_EL_EJERCICIO.privilegio,
+    );
+  });
+
+  it('y su nombre es el que se siembra y el que contesto la instalacion', () => {
+    expect(nombreEnElCatalogo(catalogo, CAMBIAR_EL_EJERCICIO.codigo)).toBe(CAMBIAR_EL_EJERCICIO.nombre);
+    expect(ACCESOS_MEDIDOS.find((a) => a.codigo === CAMBIAR_EL_EJERCICIO.codigo)?.nombre).toBe(
+      CAMBIAR_EL_EJERCICIO.nombre,
+    );
+  });
 });
