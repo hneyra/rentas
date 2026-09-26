@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.List;
 import kamayuk.rentas.dominio.ModalidadDeNotificacion;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.dominio.ResultadoDeNotificacion;
@@ -76,6 +77,44 @@ class ActosYNotificacionesTest {
                 assertThat(tipo.llevaMedida()).isEqualTo(tipo == TipoDeActoCoactivo.REC2);
                 assertThat(tipo.exigeRec1Vencida()).isEqualTo(tipo == TipoDeActoCoactivo.REC2);
             }
+        }
+
+        /**
+         * #405 — La cadena de la medida, tipo por tipo. Se escribe la tabla entera, y no solo los
+         * cuatro que exigen algo: que los otros seis no exijan nada tambien es una decision, y un
+         * tipo que ganara un requisito sin que nadie lo decidiera saldria aqui.
+         */
+        @Test
+        @DisplayName("#405 — que acto exige otro dictado antes: la REC-2, la medida, la tasacion")
+        void laCadenaDeLaMedida() {
+            assertThat(TipoDeActoCoactivo.EMBARGO.exigeDictadoAntes())
+                    .containsExactly(TipoDeActoCoactivo.REC2);
+            assertThat(TipoDeActoCoactivo.MEDIDA_CAUTELAR.exigeDictadoAntes())
+                    .containsExactly(TipoDeActoCoactivo.REC2);
+            assertThat(TipoDeActoCoactivo.TASACION.exigeDictadoAntes())
+                    .containsExactlyInAnyOrder(
+                            TipoDeActoCoactivo.EMBARGO, TipoDeActoCoactivo.MEDIDA_CAUTELAR);
+            assertThat(TipoDeActoCoactivo.REMATE.exigeDictadoAntes())
+                    .containsExactly(TipoDeActoCoactivo.TASACION);
+            for (TipoDeActoCoactivo tipo :
+                    List.of(
+                            TipoDeActoCoactivo.REC1,
+                            TipoDeActoCoactivo.REC2,
+                            TipoDeActoCoactivo.SUSPENSION,
+                            TipoDeActoCoactivo.LEVANTAMIENTO,
+                            TipoDeActoCoactivo.CONCLUSION,
+                            TipoDeActoCoactivo.OTRO)) {
+                assertThat(tipo.exigeDictadoAntes())
+                        .as("%s no exige ningun acto antes", tipo)
+                        .isEmpty();
+            }
+            assertThatThrownBy(
+                            () ->
+                                    TipoDeActoCoactivo.EMBARGO
+                                            .exigeDictadoAntes()
+                                            .add(TipoDeActoCoactivo.OTRO))
+                    .as("es un dato del tipo: nadie lo cambia desde fuera")
+                    .isInstanceOf(UnsupportedOperationException.class);
         }
 
         @Test

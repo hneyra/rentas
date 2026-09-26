@@ -677,21 +677,27 @@ class ActosCoactivosJdbcTest {
                         + " registran: el numero lleva el tipo del acto")
         void laDiligenciaDeUnActoDeTipoLargoCabe() {
             String expediente = expedienteConDeuda("N-0408");
-            dictarActo(expediente, TipoDeActoCoactivo.REC1, REC1, null);
+            ActoCoactivo rec1 = dictarActo(expediente, TipoDeActoCoactivo.REC1, REC1, null).acto();
+            // Desde #405 la medida no se dicta sin la REC-2 que la ordena: la cadena entera.
+            notificarActo(rec1.numero(), DILIGENCIA_REC1, ResultadoDeNotificacion.NOTIFICADO);
+            dictarActo(
+                    expediente,
+                    TipoDeActoCoactivo.REC2,
+                    REC2_DESDE,
+                    TipoDeMedidaCautelar.RETENCION);
 
             ActoCoactivo medida =
-                    dictarActo(expediente, TipoDeActoCoactivo.MEDIDA_CAUTELAR, REC1, null).acto();
+                    dictarActo(expediente, TipoDeActoCoactivo.MEDIDA_CAUTELAR, REC2_DESDE, null)
+                            .acto();
             NotificarActoCoactivo.Diligencia deLaMedida =
-                    notificarActo(
-                            medida.numero(), DILIGENCIA_REC1, ResultadoDeNotificacion.NOTIFICADO);
+                    notificarActo(medida.numero(), REC2_DESDE, ResultadoDeNotificacion.NOTIFICADO);
 
             ActoCoactivo conclusion =
-                    dictarActo(expediente, TipoDeActoCoactivo.CONCLUSION, DILIGENCIA_REC1, null)
-                            .acto();
+                    dictarActo(expediente, TipoDeActoCoactivo.CONCLUSION, REC2_DESDE, null).acto();
             NotificarActoCoactivo.Diligencia deLaConclusion =
                     notificarActo(
                             conclusion.numero(),
-                            DILIGENCIA_REC1.plusDays(1),
+                            REC2_DESDE.plusDays(1),
                             ResultadoDeNotificacion.NOTIFICADO);
 
             assertThat(deLaMedida.notificacion().numero())
@@ -891,6 +897,175 @@ class ActosCoactivosJdbcTest {
         private List<MovimientoDelExpediente> historialDe(String expediente) {
             long id = idDelExpediente(expediente);
             return enTransaccion(() -> movimientos.deExpediente(id));
+        }
+    }
+
+    /**
+     * #405 — Un acto que ordena o ejecuta la medida cautelar no se dicta sin el acto que lo
+     * sustenta.
+     *
+     * <p><b>La siembra que distingue</b> es la que ninguna otra prueba de esta clase hace: pedir el
+     * embargo <b>sin</b> dictar antes la REC-2. Todas las demas la dictan primero —la muestra
+     * uniforme—, y con ella la guarda buena y la ausente dan el mismo 201. Hasta #405 la unica
+     * guarda del plazo de la REC-1 estaba atada al tipo {@code REC2}: cambiar el tipo del acto a
+     * {@code EMBARGO} bastaba para saltarse el plazo del art. 14.1 de la Ley 26979.
+     *
+     * <p>El contraste mas fino es el primero: la REC-1 notificada y el plazo corriendo. La REC-2 ya
+     * salia rechazada por {@code PlazoDeLaRec1EnCurso}; el embargo del mismo dia tiene que salir
+     * rechazado tambien, y el expediente tiene que seguir donde estaba.
+     */
+    @Nested
+    @DisplayName("#405 — Ningun acto de la medida sin el acto que lo sustenta")
+    class ElActoPrevio {
+
+        @Test
+        @DisplayName(
+                "REC-1 notificada y plazo corriendo: la REC-2 se rechaza, y el EMBARGO del mismo"
+                        + " dia tambien")
+        void elEmbargoConElPlazoCorriendoSeRechaza() {
+            String expediente = expedienteConDeuda("P-4051");
+            ActoCoactivo rec1 = dictarActo(expediente, TipoDeActoCoactivo.REC1, REC1, null).acto();
+            notificarActo(rec1.numero(), DILIGENCIA_REC1, ResultadoDeNotificacion.NOTIFICADO);
+            LocalDate enPlazo = REC2_DESDE.minusDays(1);
+
+            assertThatThrownBy(
+                            () ->
+                                    dictarActo(
+                                            expediente,
+                                            TipoDeActoCoactivo.REC2,
+                                            enPlazo,
+                                            TipoDeMedidaCautelar.RETENCION))
+                    .as("el contraste que ya estaba probado: la REC-2 respeta el plazo")
+                    .isInstanceOf(RegistrarActoCoactivo.PlazoDeLaRec1EnCurso.class);
+            assertThatThrownBy(
+                            () -> dictarActo(expediente, TipoDeActoCoactivo.EMBARGO, enPlazo, null))
+                    .as(
+                            "el embargo sin REC-2 es la medida sin la resolucion que la ordena:"
+                                    + " cambiar el tipo del acto no salta el plazo")
+                    .isInstanceOf(RegistrarActoCoactivo.ActoPrevioSinDictar.class)
+                    .hasMessageContaining(TipoDeActoCoactivo.REC2.titulo());
+
+            assertThat(estadoDe(expediente))
+                    .as("el expediente sigue donde estaba: la cartera no lo cuenta con medida")
+                    .isEqualTo(EstadoDelExpediente.REC1_NOTIFICADA);
+            assertThat(tiposDictados(expediente))
+                    .as("y no queda ningun acto numerado de mas, ni su documento")
+                    .containsExactly(TipoDeActoCoactivo.REC1);
+        }
+
+        @Test
+        @DisplayName("expediente INICIADO, sin ninguna REC: ni EMBARGO ni MEDIDA_CAUTELAR")
+        void sobreUnExpedienteIniciadoNoHayMedida() {
+            String expediente = expedienteConDeuda("P-4052");
+
+            assertThatThrownBy(() -> dictarActo(expediente, TipoDeActoCoactivo.EMBARGO, REC1, null))
+                    .isInstanceOf(RegistrarActoCoactivo.ActoPrevioSinDictar.class)
+                    .hasMessageContaining(expediente);
+            assertThatThrownBy(
+                            () ->
+                                    dictarActo(
+                                            expediente,
+                                            TipoDeActoCoactivo.MEDIDA_CAUTELAR,
+                                            REC1,
+                                            null))
+                    .isInstanceOf(RegistrarActoCoactivo.ActoPrevioSinDictar.class);
+
+            assertThat(estadoDe(expediente)).isEqualTo(EstadoDelExpediente.INICIADO);
+            assertThat(tiposDictados(expediente)).isEmpty();
+        }
+
+        @Test
+        @DisplayName("la TASACION exige la medida trabada, y cualquiera de las dos formas la traba")
+        void laTasacionExigeLaMedidaTrabada() {
+            String expediente = expedienteConRec2("P-4053");
+            LocalDate despues = REC2_DESDE.plusDays(1);
+
+            assertThatThrownBy(
+                            () ->
+                                    dictarActo(
+                                            expediente, TipoDeActoCoactivo.TASACION, despues, null))
+                    .as("con la REC-2 dictada pero sin nada trabado, no hay bien que tasar")
+                    .isInstanceOf(RegistrarActoCoactivo.ActoPrevioSinDictar.class)
+                    .hasMessageContaining(TipoDeActoCoactivo.EMBARGO.titulo())
+                    .hasMessageContaining(TipoDeActoCoactivo.MEDIDA_CAUTELAR.titulo());
+
+            dictarActo(expediente, TipoDeActoCoactivo.MEDIDA_CAUTELAR, despues, null);
+            assertThat(dictarActo(expediente, TipoDeActoCoactivo.TASACION, despues, null).estado())
+                    .as("la constancia de la medida basta: no hace falta ademas el acta de embargo")
+                    .isEqualTo(EstadoDelExpediente.MEDIDA_CAUTELAR);
+        }
+
+        @Test
+        @DisplayName("el REMATE exige la TASACION: el embargo solo no basta")
+        void elRemateExigeLaTasacion() {
+            String iniciado = expedienteConDeuda("P-4054");
+            assertThatThrownBy(() -> dictarActo(iniciado, TipoDeActoCoactivo.REMATE, REC1, null))
+                    .as("el escenario del issue: REMATE sobre INICIADO, sin embargo ni tasacion")
+                    .isInstanceOf(RegistrarActoCoactivo.ActoPrevioSinDictar.class);
+
+            String expediente = expedienteConRec2("P-4055");
+            LocalDate despues = REC2_DESDE.plusDays(1);
+            dictarActo(expediente, TipoDeActoCoactivo.EMBARGO, despues, null);
+
+            assertThatThrownBy(
+                            () -> dictarActo(expediente, TipoDeActoCoactivo.REMATE, despues, null))
+                    .as("se remata el bien TASADO: sin tasacion no hay precio base")
+                    .isInstanceOf(RegistrarActoCoactivo.ActoPrevioSinDictar.class)
+                    .hasMessageContaining(TipoDeActoCoactivo.TASACION.titulo());
+
+            dictarActo(expediente, TipoDeActoCoactivo.TASACION, despues, null);
+            assertThat(dictarActo(expediente, TipoDeActoCoactivo.REMATE, despues, null).acto())
+                    .extracting(ActoCoactivo::tipo)
+                    .isEqualTo(TipoDeActoCoactivo.REMATE);
+            assertThat(tiposDictados(expediente))
+                    .containsExactly(
+                            TipoDeActoCoactivo.REC1,
+                            TipoDeActoCoactivo.REC2,
+                            TipoDeActoCoactivo.EMBARGO,
+                            TipoDeActoCoactivo.TASACION,
+                            TipoDeActoCoactivo.REMATE);
+        }
+
+        @Test
+        @DisplayName("los actos que no ejecutan la medida no exigen nada antes")
+        void losDemasNoExigenNada() {
+            String expediente = expedienteConDeuda("P-4056");
+
+            assertThat(dictarActo(expediente, TipoDeActoCoactivo.OTRO, REC1, null).acto().tipo())
+                    .as(
+                            "un OTRO sobre un expediente recien importado entra: la guarda es de"
+                                    + " los cuatro actos de la medida, no de todos")
+                    .isEqualTo(TipoDeActoCoactivo.OTRO);
+            assertThat(dictarActo(expediente, TipoDeActoCoactivo.SUSPENSION, REC1, null).estado())
+                    .isEqualTo(EstadoDelExpediente.SUSPENDIDO);
+        }
+
+        /**
+         * Un expediente con la REC-1 notificada y la REC-2 dictada el primer dia en que procede.
+         */
+        private String expedienteConRec2(String sufijo) {
+            String expediente = expedienteConDeuda(sufijo);
+            ActoCoactivo rec1 = dictarActo(expediente, TipoDeActoCoactivo.REC1, REC1, null).acto();
+            notificarActo(rec1.numero(), DILIGENCIA_REC1, ResultadoDeNotificacion.NOTIFICADO);
+            dictarActo(
+                    expediente,
+                    TipoDeActoCoactivo.REC2,
+                    REC2_DESDE,
+                    TipoDeMedidaCautelar.RETENCION);
+            return expediente;
+        }
+
+        private EstadoDelExpediente estadoDe(String expediente) {
+            long id = idDelExpediente(expediente);
+            return EstadoDelExpediente.delHistorial(
+                    enTransaccion(() -> movimientos.deExpediente(id)));
+        }
+
+        private List<TipoDeActoCoactivo> tiposDictados(String expediente) {
+            long id = idDelExpediente(expediente);
+            return enTransaccion(() -> actos.deExpediente(id)).stream()
+                    .map(ActoCoactivo::tipo)
+                    .toList();
         }
     }
 

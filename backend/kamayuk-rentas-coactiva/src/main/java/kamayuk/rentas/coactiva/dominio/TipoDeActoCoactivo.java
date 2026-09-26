@@ -1,6 +1,9 @@
 package kamayuk.rentas.coactiva.dominio;
 
+import java.util.Collections;
+import java.util.EnumSet;
 import java.util.Locale;
+import java.util.Set;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -30,6 +33,20 @@ import org.jspecify.annotations.Nullable;
  * los tres actos que <b>solo</b> tienen sentido cuando ya no hay deuda o cuando la cobranza se
  * detiene —conclusion, suspension y levantamiento—: si tambien los bloqueara, un expediente pagado
  * no se podria concluir nunca, que es exactamente lo contrario de lo que la regla busca.
+ *
+ * <h2>Que acto exige otro dictado antes (#405)</h2>
+ *
+ * <p>{@link #exigeDictadoAntes()} es la cadena de la medida cautelar, escrita una sola vez y como
+ * dato del tipo, igual que el estado que produce: el embargo y la constancia de la medida exigen la
+ * REC-2 que la ordena; la tasacion, la medida ya trabada; el remate, el bien tasado. Hasta #405 la
+ * unica guarda del plazo de la REC-1 estaba atada al tipo {@code REC2}, y bastaba con pedir un
+ * {@code EMBARGO} en su lugar para dictar la medida sin resolucion que la dispusiera —nula, segun
+ * el propio {@link ActoCoactivo}— y con el plazo del art. 14.1 de la Ley 26979 todavia corriendo.
+ *
+ * <p>Exigir la REC-2 arrastra el resto por transitividad: la REC-2 ya lleva dentro la notificacion
+ * eficaz de la REC-1 y el plazo vencido ({@link #exigeRec1Vencida()}), y la base lo repite en
+ * {@code acto_rec2_sustento_ck} y {@code acto_rec2_plazo_ck}. Por eso aqui no se vuelve a calcular
+ * ningun plazo.
  */
 public enum TipoDeActoCoactivo {
 
@@ -102,6 +119,46 @@ public enum TipoDeActoCoactivo {
     /** Si el acto necesita que la REC-1 este notificada y su plazo vencido. Solo la REC-2. */
     public boolean exigeRec1Vencida() {
         return this == REC2;
+    }
+
+    /**
+     * Los actos de los que el expediente tiene que tener <b>alguno</b> dictado antes de dictar este
+     * (#405); vacio si no exige ninguno.
+     *
+     * <p>Es una funcion pura, sin base: que acto sigue a cual es un dato del procedimiento, no de
+     * la municipalidad. La comprueba un solo sitio —{@code RegistrarActoCoactivo}—, con el ultimo
+     * acto de cada tipo que el expediente ya tenga.
+     *
+     * <ul>
+     *   <li>{@link #MEDIDA_CAUTELAR} y {@link #EMBARGO} exigen la {@link #REC2}: son la medida, y
+     *       sin la resolucion que la ordena es nula. Son tambien los dos que llevan el expediente a
+     *       {@code MEDIDA_CAUTELAR}, y los que el resumen de la cartera cuenta «con medida».
+     *   <li>{@link #TASACION} exige la medida trabada —{@link #EMBARGO} o {@link #MEDIDA_CAUTELAR},
+     *       cualquiera de las dos—: se tasa el bien embargado.
+     *   <li>{@link #REMATE} exige la {@link #TASACION}: se remata el bien tasado.
+     * </ul>
+     *
+     * <p>La {@link #REC2} no esta en la lista aunque exija la REC-1: su guarda es mas fina
+     * —dictada, notificada y con el plazo vencido, cada una con su propio rechazo— y vive en {@link
+     * #exigeRec1Vencida()}. La medida cautelar previa del art. 13 de la Ley 26979 no se modela:
+     * seria un tipo propio con sus requisitos, y eso lo decide negocio.
+     *
+     * <p>El {@code switch} nombra los diez sin {@code default} a proposito: un tipo nuevo no
+     * compila hasta que alguien decida que exige antes.
+     */
+    public Set<TipoDeActoCoactivo> exigeDictadoAntes() {
+        return switch (this) {
+            case MEDIDA_CAUTELAR, EMBARGO -> soloLectura(EnumSet.of(REC2));
+            case TASACION -> soloLectura(EnumSet.of(EMBARGO, MEDIDA_CAUTELAR));
+            case REMATE -> soloLectura(EnumSet.of(TASACION));
+            case REC1, REC2, SUSPENSION, LEVANTAMIENTO, CONCLUSION, OTRO -> Set.of();
+        };
+    }
+
+    private static Set<TipoDeActoCoactivo> soloLectura(EnumSet<TipoDeActoCoactivo> tipos) {
+        // EnumSet y no Set.of: recorre en el orden de declaracion, y el mensaje del rechazo nombra
+        // los actos que faltan siempre en el mismo orden.
+        return Collections.unmodifiableSet(tipos);
     }
 
     /**

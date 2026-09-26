@@ -59,8 +59,18 @@ import org.springframework.transaction.annotation.Transactional;
  *       cualquier {@code if}.
  *   <li><b>Este codigo</b>: que la notificacion que sustenta la REC-2 sea la de la REC-1 <b>de este
  *       expediente</b> y que haya surtido efecto —eso exige un {@code JOIN}, y un {@code CHECK} no
- *       puede hacerlo—, y que quede deuda viva.
+ *       puede hacerlo—, que quede deuda viva, y que el acto que la medida exige antes ya este
+ *       dictado ({@link TipoDeActoCoactivo#exigeDictadoAntes()}, #405).
  * </ul>
+ *
+ * <h2>La cadena de la medida se comprueba aqui, y en ningun otro sitio</h2>
+ *
+ * <p>Hasta #405 la guarda del plazo de la REC-1 solo protegia a la REC-2: un {@code EMBARGO} sobre
+ * un expediente recien importado se emitia, se numeraba y dejaba el expediente en {@code
+ * MEDIDA_CAUTELAR}, con el plazo del art. 14.1 de la Ley 26979 todavia corriendo. Que acto exige
+ * cual es un dato del tipo; lo que este caso de uso hace es preguntarlo con {@link
+ * ActoCoactivoRepository#ultimoDe}, junto al sustento de la REC-2. Exigir la REC-2 basta: ella ya
+ * lleva dentro la notificacion eficaz y el plazo vencido, y la base lo repite.
  *
  * <h2>El pago total cierra la puerta, menos a los actos que lo reconocen</h2>
  *
@@ -146,6 +156,8 @@ public class RegistrarActoCoactivo {
      *     exige deuda viva (#403)
      * @throws Rec1SinNotificar si se pide la REC-2 y la REC-1 no esta notificada
      * @throws PlazoDeLaRec1EnCurso si se pide la REC-2 y el plazo todavia corre
+     * @throws ActoPrevioSinDictar si el acto exige otro dictado antes —la REC-2 para la medida, la
+     *     medida para la tasacion, la tasacion para el remate— y el expediente no lo tiene (#405)
      */
     @Transactional
     public ActoDictado dictar(
@@ -186,6 +198,7 @@ public class RegistrarActoCoactivo {
             throw new DeudaExtinguida(expediente.numero(), peticion.tipo(), proyeccion);
         }
 
+        exigirActoPrevio(expediente, peticion.tipo());
         Sustento sustento = sustentoDe(expediente, peticion.tipo(), fecha);
         Instant ahora = reloj.instant();
 
@@ -256,6 +269,27 @@ public class RegistrarActoCoactivo {
     }
 
     // ------------------------------------------------------------------
+
+    /**
+     * Que el expediente ya tenga alguno de los actos que este exige antes (#405).
+     *
+     * <p>Basta con que exista uno: la tasacion procede tanto sobre el acta de embargo como sobre la
+     * constancia de la medida. Se pregunta tipo por tipo con {@link
+     * ActoCoactivoRepository#ultimoDe} en vez de leer el expediente entero, porque la respuesta es
+     * un si o un no.
+     */
+    private void exigirActoPrevio(ExpedienteCoactivo expediente, TipoDeActoCoactivo tipo) {
+        Set<TipoDeActoCoactivo> previos = tipo.exigeDictadoAntes();
+        if (previos.isEmpty()) {
+            return;
+        }
+        for (TipoDeActoCoactivo previo : previos) {
+            if (actos.ultimoDe(expediente.identificador(), previo).isPresent()) {
+                return;
+            }
+        }
+        throw new ActoPrevioSinDictar(expediente.numero(), tipo, previos);
+    }
 
     /**
      * El sustento de la REC-2: la diligencia que notifico la REC-1 y el dia desde el que la medida
@@ -546,6 +580,41 @@ public class RegistrarActoCoactivo {
                             + " no tiene REC-1: la medida cautelar se dicta despues de la"
                             + " resolucion que inicia el procedimiento (art. 14.1 de la Ley"
                             + " 26979), no antes");
+        }
+    }
+
+    /**
+     * Se pidio un acto de la medida cautelar sin el acto que lo sustenta (#405): un embargo sin
+     * REC-2, una tasacion sin medida trabada, un remate sin tasacion.
+     *
+     * <p>Es la hermana de {@link Rec1SinDictar} y sale con el mismo 409: la peticion esta bien
+     * formada, y lo que no la admite es el punto en que esta el procedimiento.
+     */
+    public static final class ActoPrevioSinDictar extends RuntimeException {
+
+        @java.io.Serial private static final long serialVersionUID = 1L;
+
+        ActoPrevioSinDictar(
+                String numero, TipoDeActoCoactivo pedido, Set<TipoDeActoCoactivo> previos) {
+            super(
+                    "El expediente "
+                            + numero
+                            + " no tiene "
+                            + titulos(previos)
+                            + ": "
+                            + pedido.titulo()
+                            + " se dicta despues, no antes. La medida cautelar la ordena la REC-2,"
+                            + " vencido el plazo de la REC-1 (art. 14.1 de la Ley 26979); se tasa"
+                            + " el bien embargado y se remata el tasado. Cambiar el tipo del acto"
+                            + " no salta ninguno de esos pasos");
+        }
+
+        private static String titulos(Set<TipoDeActoCoactivo> previos) {
+            List<String> titulos = new ArrayList<>();
+            for (TipoDeActoCoactivo previo : previos) {
+                titulos.add(previo.titulo());
+            }
+            return String.join(" ni ", titulos);
         }
     }
 

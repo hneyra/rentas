@@ -728,6 +728,72 @@ class ActoCoactivoControllerTest {
             assertThat(resultado.getResponse().getContentAsString()).contains(REC2_DESDE);
         }
 
+        /**
+         * #405 — El escenario del issue, por HTTP: el mismo expediente recien importado, sin
+         * ninguna REC. La REC-2 ya contestaba 409; el embargo contestaba 201, emitia y numeraba su
+         * acta y dejaba el expediente «MEDIDA CAUTELAR». Lo que se prueba aqui es el borde: que
+         * {@code ActoPrevioSinDictar} se traduzca a 409 y no suba como 500.
+         */
+        @Test
+        @DisplayName("#405 — EMBARGO sobre un expediente INICIADO, 409 como la REC-2, y no 201")
+        void elEmbargoSinRec2Da409() throws Exception {
+            MvcResult rec2 = dictarPorHttp("REC2", "\"medida\":\"RETENCION\",");
+            MvcResult embargo = dictarPorHttp("EMBARGO", "");
+
+            assertThat(rec2.getResponse().getStatus())
+                    .as("el contraste: Rec1SinDictar")
+                    .isEqualTo(409);
+            assertThat(embargo.getResponse().getStatus())
+                    .as(
+                            "la peticion esta bien formada: lo que no la admite es el"
+                                    + " procedimiento, que todavia no ordeno ninguna medida")
+                    .isEqualTo(409);
+            assertThat(embargo.getResponse().getContentAsString())
+                    .contains("RESOLUCION DE MEDIDA CAUTELAR (REC 2)")
+                    .doesNotContain("estadoDelExpediente");
+            assertThat(
+                            actos.deExpediente(
+                                    expedientes
+                                            .porNumero("EXP-2026-000001")
+                                            .orElseThrow()
+                                            .identificador()))
+                    .as("ni un acta numerada de mas")
+                    .isEmpty();
+        }
+
+        /** #405 — El contraste fino: REC-1 notificada ayer, el plazo corriendo. */
+        @Test
+        @DisplayName("#405 — con el plazo de la REC-1 corriendo, REC-2 y EMBARGO dan 409 los dos")
+        void elEmbargoConElPlazoCorriendoDa409() throws Exception {
+            emitirRec("REC1", null, null);
+            notificar("REC1-2026-000001", DILIGENCIA, "NOTIFICADO");
+
+            assertThat(dictarPorHttp("REC2", "\"medida\":\"RETENCION\",").getResponse().getStatus())
+                    .isEqualTo(409);
+            MvcResult embargo = dictarPorHttp("EMBARGO", "");
+            assertThat(embargo.getResponse().getStatus())
+                    .as("basta con cambiar el tipo del acto para saltarse el plazo del art. 14.1")
+                    .isEqualTo(409);
+        }
+
+        private MvcResult dictarPorHttp(String tipo, String medida) throws Exception {
+            return mvc.perform(
+                            MockMvcRequestBuilders.post(
+                                            "/rentas/api/v1/coactiva/expedientes/EXP-2026-000001"
+                                                    + "/actos")
+                                    .contentType(MediaType.APPLICATION_JSON)
+                                    .content(
+                                            "{\"tipo\":\""
+                                                    + tipo
+                                                    + "\",\"fecha\":\"2026-06-20\","
+                                                    + medida
+                                                    + "\"glosa\":\"Embargo en forma de"
+                                                    + " retencion\","
+                                                    + "\"observacion\":\"Se traba la"
+                                                    + " medida\"}"))
+                    .andReturn();
+        }
+
         @Test
         @DisplayName("una diligencia no hallada se reintenta sin perder la anterior")
         void elReintentoConservaLaAnterior() throws Exception {

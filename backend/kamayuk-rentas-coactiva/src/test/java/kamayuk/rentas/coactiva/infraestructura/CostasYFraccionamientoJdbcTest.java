@@ -676,8 +676,18 @@ class CostasYFraccionamientoJdbcTest {
         @DisplayName("con arancel publicado, el acto que la ordenanza no tarifa sigue sin llave")
         void loQueLaOrdenanzaNoTarifaSigueSiendoSinActos() {
             String expediente = expedienteConRec1("COSTA-10");
+            // Desde #405 el embargo exige la REC-2 que ordena la medida: hasta entonces esta
+            // prueba embargaba con la REC-1 sin notificar, que es justo lo que #405 cierra. La
+            // REC-2 SI esta tarifada, asi que se liquida antes del embargo: lo que queda
+            // pendiente despues es solo el acta que la ordenanza no tarifa.
+            notificarLaRec1(expediente);
+            dictarActo(
+                    expediente,
+                    TipoDeActoCoactivo.REC2,
+                    REC2_DESDE,
+                    TipoDeMedidaCautelar.RETENCION);
             liquidarTodo(expediente);
-            dictarActo(expediente, TipoDeActoCoactivo.EMBARGO, LIQUIDACION, null);
+            dictarActo(expediente, TipoDeActoCoactivo.EMBARGO, REC2_DESDE, null);
 
             assertThatThrownBy(() -> liquidarTodo(expediente))
                     .as(
