@@ -111,6 +111,50 @@ class CronogramaDelPredialTest {
     }
 
     @Test
+    @DisplayName(
+            "#382 — 300,00 en tres con DOWN son tres cuotas de 100,00: se divide, no se"
+                    + " multiplica por un tercio truncado")
+    void unRepartoExactoNoPierdeElCentimo() {
+        // Hoy el conjunto reparte en 4 o en 1, donde 1/4 y 1/1 son exactos; el numero de cuotas
+        // es dato, y con tres el reciproco a 16 digitos (0.3333333333333333) queda por debajo:
+        // 300 x 1/3 = 99.99999999999999, que DOWN deja en 99,99 aunque el reparto sea exacto.
+        List<LocalDate> tres =
+                List.of(
+                        LocalDate.parse("2026-03-31"),
+                        LocalDate.parse("2026-07-31"),
+                        LocalDate.parse("2026-11-30"));
+        PoliticasDeRedondeo haciaAbajo =
+                PoliticasDeRedondeo.construir()
+                        .en(PuntoDeRedondeo.CUOTA, new PoliticaDeRedondeo(2, RoundingMode.DOWN))
+                        .construir();
+
+        List<CuotaDelPredial> cuotas =
+                CronogramaDelPredial.repartir(Dinero.de("300.00"), tres, haciaAbajo);
+
+        assertThat(cuotas.stream().map(CuotaDelPredial::importe).toList())
+                .containsExactly(Dinero.de("100.00"), Dinero.de("100.00"), Dinero.de("100.00"));
+    }
+
+    @Test
+    @DisplayName("#382 — 1 234,50 en doce con HALF_UP: el medio centimo exacto sube")
+    void elMedioCentimoSube() {
+        // 1/12 a 16 digitos queda por debajo, el producto en 102.8749999999999958850, y HALF_UP
+        // lo baja a 102,87. El cociente exacto es 102.875, que HALF_UP sube a 102,88.
+        List<LocalDate> doce = new java.util.ArrayList<>();
+        for (int mes = 1; mes <= 12; mes++) {
+            doce.add(LocalDate.of(2026, mes, 28));
+        }
+
+        List<CuotaDelPredial> cuotas =
+                CronogramaDelPredial.repartir(Dinero.de("1234.50"), doce, REDONDEO);
+
+        assertThat(cuotas.subList(0, 11))
+                .allSatisfy(cuota -> assertThat(cuota.importe()).isEqualTo(Dinero.de("102.88")));
+        assertThat(cuotas.get(11).importe()).isEqualTo(Dinero.de("102.82"));
+        assertThat(sumaDe(cuotas)).isEqualTo(Dinero.de("1234.50"));
+    }
+
+    @Test
     @DisplayName("sin la politica de CUOTA no se reparte: no se redondea a lo que salga")
     void sinPoliticaNoHayCronograma() {
         // El conjunto trae politicas —parametrizarlo vacio ni siquiera se puede construir— pero no

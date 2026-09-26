@@ -48,13 +48,16 @@ public final class Cronograma {
     private static final BigDecimal CIEN = new BigDecimal("100");
 
     /**
-     * La division intermedia se hace con precision de sobra y se redondea despues, con la politica
-     * que entro: dividir ya con la escala final acumularia el error en cada cuota en vez de dejarlo
-     * en la ultima.
+     * El ancho con que se pasa un porcentaje a tanto por uno —el de la inicial y el del interes—.
+     * Dividir entre cien un porcentaje de hasta dieciseis cifras es exacto a este ancho, asi que
+     * aqui no se redondea nada: el unico redondeo con efecto es el de {@code redondeo}, donde D-03
+     * sigue viviendo.
      *
-     * <p>No es una decision de redondeo disfrazada —D-03 sigue viviendo en {@code redondeo}—: es el
-     * ancho del calculo intermedio, el mismo criterio con el que el esquema define el dominio
-     * {@code monto_calc numeric(18,6)} frente a {@code dinero numeric(15,2)}.
+     * <p><b>No se usa para repartir el capital</b> (#382). Multiplicar por {@code 1/N} truncado a
+     * 16 digitos no es dividir: el reciproco casi nunca es exacto, el producto queda un pelo a un
+     * lado del cociente y la politica lo manda al lado equivocado —1 234,50 en 12 con {@code
+     * HALF_UP} daba 102,87 en vez de 102,88—. El capital por cuota sale de {@link
+     * Dinero#repartidoEntre}, que divide y redondea una sola vez.
      */
     private static final java.math.MathContext INTERMEDIO = java.math.MathContext.DECIMAL64;
 
@@ -108,10 +111,8 @@ public final class Cronograma {
                     new CuotaDeConvenio(0, primeraCuotaVence, inicial, Dinero.CERO, Dinero.CERO));
         }
 
-        Dinero capitalPorCuota =
-                aFraccionar
-                        .por(BigDecimal.ONE.divide(BigDecimal.valueOf(cuotas), INTERMEDIO))
-                        .redondeadoCon(redondeo);
+        // El cociente exacto, redondeado una vez con la politica del punto CUOTA (#382).
+        Dinero capitalPorCuota = aFraccionar.repartidoEntre(cuotas, redondeo);
         BigDecimal tipo = condiciones.interesMensual().valor().divide(CIEN, INTERMEDIO);
 
         Dinero saldo = aFraccionar;
