@@ -66,7 +66,6 @@ public final class LiquidacionesEnMemoria implements LiquidacionRepository {
                         liquidacion.tipo(),
                         liquidacion.motivoDeterminante(),
                         liquidacion.fecha(),
-                        liquidacion.numeroNotificacion(),
                         "pruebas",
                         liquidacion.observacion());
         guardadas.add(guardada);

@@ -62,7 +62,6 @@ class LiquidacionYSusVersionesTest {
                                             "sin encadenar",
                                             HOY,
                                             null,
-                                            null,
                                             OBSERVACION))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("a cual sustituye");
@@ -215,12 +214,8 @@ class LiquidacionYSusVersionesTest {
                             MovimientoDeLiquidacion.apertura(1L, HOY, "emitida", OBSERVACION),
                             MovimientoDeLiquidacion.cambioDeEstado(
                                     1L, EstadoDeLiquidacion.LIQUIDADA, HOY, "cerrada", OBSERVACION),
-                            MovimientoDeLiquidacion.cambioDeEstado(
-                                    1L,
-                                    EstadoDeLiquidacion.NOTIFICADA,
-                                    HOY,
-                                    "entregada",
-                                    OBSERVACION));
+                            MovimientoDeLiquidacion.notificada(
+                                    1L, HOY, "entregada", "N-2026-0001", OBSERVACION));
 
             assertThat(EstadoDeLiquidacion.delHistorial(historial))
                     .isEqualTo(EstadoDeLiquidacion.NOTIFICADA);
@@ -239,6 +234,7 @@ class LiquidacionYSusVersionesTest {
                                             HOY,
                                             "motivo",
                                             null,
+                                            null,
                                             OBSERVACION))
                     .isInstanceOf(IllegalArgumentException.class);
         }
@@ -248,6 +244,146 @@ class LiquidacionYSusVersionesTest {
         void laEtiquetaDeLaPantallaSeAdmite() {
             assertThat(EstadoDeLiquidacion.porNombre("EN PROCESO"))
                     .isEqualTo(EstadoDeLiquidacion.EN_PROCESO);
+        }
+    }
+
+    /**
+     * #368 — El «Nº Notificación» nace con el acto de notificar. Hasta #368 vivía en la cabecera,
+     * que nacía con él en nulo y no admite {@code UPDATE}: no se escribía nunca.
+     */
+    @Nested
+    @DisplayName("#368 — El numero de notificacion es del movimiento NOTIFICADA")
+    class ElNumeroDeNotificacion {
+
+        @Test
+        @DisplayName("notificar exige el numero, y en blanco es como no traerlo")
+        void notificarExigeElNumero() {
+            assertThatThrownBy(
+                            () ->
+                                    MovimientoDeLiquidacion.notificada(
+                                            1L, HOY, "entregada", null, OBSERVACION))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("numeroNotificacion");
+            assertThatThrownBy(
+                            () ->
+                                    MovimientoDeLiquidacion.notificada(
+                                            1L, HOY, "entregada", "   ", OBSERVACION))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("numeroNotificacion");
+        }
+
+        @Test
+        @DisplayName("se normaliza como el numero de liquidacion y topa en los 40 de la columna")
+        void seNormalizaYTopa() {
+            assertThat(
+                            MovimientoDeLiquidacion.notificada(
+                                            1L, HOY, "entregada", "  n-2026-0001 ", OBSERVACION)
+                                    .numeroNotificacion())
+                    .isEqualTo("N-2026-0001");
+            assertThat(
+                            MovimientoDeLiquidacion.notificada(
+                                            1L, HOY, "entregada", "N".repeat(40), OBSERVACION)
+                                    .numeroNotificacion())
+                    .hasSize(MovimientoDeLiquidacion.NUMERO_MAXIMO);
+            assertThatThrownBy(
+                            () ->
+                                    MovimientoDeLiquidacion.notificada(
+                                            1L, HOY, "entregada", "N".repeat(41), OBSERVACION))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("40");
+        }
+
+        @Test
+        @DisplayName("cambioDeEstado no notifica: sin el numero del cargo no hay NOTIFICADA")
+        void cambioDeEstadoNoNotifica() {
+            assertThatThrownBy(
+                            () ->
+                                    MovimientoDeLiquidacion.cambioDeEstado(
+                                            1L,
+                                            EstadoDeLiquidacion.NOTIFICADA,
+                                            HOY,
+                                            "entregada",
+                                            OBSERVACION))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("numeroNotificacion");
+        }
+
+        @Test
+        @DisplayName("un numero en cualquier otro estado se rechaza: diria que se notifico")
+        void unNumeroFueraDeNotificadaSeRechaza() {
+            for (EstadoDeLiquidacion estado : EstadoDeLiquidacion.values()) {
+                if (estado == EstadoDeLiquidacion.NOTIFICADA) {
+                    continue;
+                }
+                assertThatThrownBy(
+                                () ->
+                                        new MovimientoDeLiquidacion(
+                                                null,
+                                                1L,
+                                                TipoDeMovimientoDeLiquidacion.ESTADO,
+                                                estado,
+                                                HOY,
+                                                "motivo",
+                                                "N-2026-0001",
+                                                null,
+                                                OBSERVACION))
+                        .as(estado.name())
+                        .isInstanceOf(IllegalArgumentException.class)
+                        .hasMessageContaining(estado.etiqueta());
+            }
+        }
+
+        @Test
+        @DisplayName(
+                "un NOTIFICADA migrado sin numero se LEE sin reventar: el CHECK de V34 es NOT VALID")
+        void unaNotificacionMigradaSinNumeroSeLee() {
+            MovimientoDeLiquidacion migrado =
+                    new MovimientoDeLiquidacion(
+                            7L,
+                            1L,
+                            TipoDeMovimientoDeLiquidacion.ESTADO,
+                            EstadoDeLiquidacion.NOTIFICADA,
+                            HOY,
+                            "del padron migrado",
+                            null,
+                            "migracion",
+                            OBSERVACION);
+
+            assertThat(MovimientoDeLiquidacion.numeroDeNotificacionDe(List.of(migrado))).isNull();
+        }
+
+        @Test
+        @DisplayName(
+                "el numero de una liquidacion es el de su NOTIFICADA, y la anulacion no lo borra")
+        void elNumeroEsElDeLaNotificada() {
+            MovimientoDeLiquidacion apertura =
+                    MovimientoDeLiquidacion.apertura(1L, HOY, "emitida", OBSERVACION);
+            MovimientoDeLiquidacion liquidada =
+                    MovimientoDeLiquidacion.cambioDeEstado(
+                            1L, EstadoDeLiquidacion.LIQUIDADA, HOY, "cerrada", OBSERVACION);
+
+            assertThat(MovimientoDeLiquidacion.numeroDeNotificacionDe(List.of(apertura, liquidada)))
+                    .as("sin notificar no hay numero")
+                    .isNull();
+            assertThat(
+                            MovimientoDeLiquidacion.numeroDeNotificacionDe(
+                                    List.of(
+                                            apertura,
+                                            liquidada,
+                                            MovimientoDeLiquidacion.notificada(
+                                                    1L,
+                                                    HOY,
+                                                    "entregada",
+                                                    "N-2026-0001",
+                                                    OBSERVACION),
+                                            MovimientoDeLiquidacion.cambioDeEstado(
+                                                    1L,
+                                                    EstadoDeLiquidacion.ANULADA,
+                                                    HOY,
+                                                    "sin efecto",
+                                                    OBSERVACION))))
+                    .as("el papel existe aunque se anule: es por el por lo que se busca")
+                    .isEqualTo("N-2026-0001");
         }
     }
 
@@ -350,7 +486,6 @@ class LiquidacionYSusVersionesTest {
                 liquidacion.tipo(),
                 liquidacion.motivoDeterminante(),
                 liquidacion.fecha(),
-                liquidacion.numeroNotificacion(),
                 "pruebas",
                 liquidacion.observacion());
     }
