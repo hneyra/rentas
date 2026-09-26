@@ -66,11 +66,13 @@ public interface MovimientosDelLibro {
      * @param codigoContribuyente el codigo del titular, tal como lo teclea la pantalla
      * @param desde fecha valor minima, inclusive; {@code null} trae desde el primer pago
      * @param hasta fecha valor maxima, inclusive; {@code null} trae hasta el ultimo
+     * @param tributo filtro opcional de tributo; {@code null} trae todos (#441)
      */
     Pagina<MovimientoDelLibro> pagosDe(
             String codigoContribuyente,
             @Nullable LocalDate desde,
             @Nullable LocalDate hasta,
+            @Nullable String tributo,
             Paginacion paginacion);
 
     /**

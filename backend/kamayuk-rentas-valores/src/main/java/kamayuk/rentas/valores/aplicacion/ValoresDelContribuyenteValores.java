@@ -8,6 +8,7 @@ import kamayuk.rentas.valores.ValoresDelContribuyente;
 import kamayuk.rentas.valores.dominio.CriterioDeConsultaDeValores;
 import kamayuk.rentas.valores.dominio.Valor;
 import kamayuk.rentas.valores.dominio.ValorEnConsulta;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -42,9 +43,13 @@ public class ValoresDelContribuyenteValores implements ValoresDelContribuyente {
     @Override
     @Transactional(readOnly = true)
     public Pagina<ValorDelContribuyente> deTodoElContribuyente(
-            long contribuyenteId, LocalDate aLaFecha, Paginacion paginacion) {
+            long contribuyenteId,
+            LocalDate aLaFecha,
+            @Nullable String tributo,
+            Paginacion paginacion) {
         CriterioDeConsultaDeValores criterio =
-                new CriterioDeConsultaDeValores(null, contribuyenteId, null, null, null, aLaFecha);
+                new CriterioDeConsultaDeValores(
+                        null, contribuyenteId, null, null, null, aLaFecha, tributo);
         return consulta.buscar(criterio, paginacion).mapear(fila -> aPublico(fila.valor()));
     }
 

@@ -43,8 +43,9 @@ public class MovimientosDelLibroCuentaCorriente implements MovimientosDelLibro {
             String codigoContribuyente,
             @Nullable LocalDate desde,
             @Nullable LocalDate hasta,
+            @Nullable String tributo,
             Paginacion paginacion) {
-        CriterioDePagos criterio = new CriterioDePagos(codigoContribuyente, desde, hasta);
+        CriterioDePagos criterio = new CriterioDePagos(codigoContribuyente, desde, hasta, tributo);
         return repositorio
                 .pagos(criterio, paginacion)
                 .mapear(MovimientosDelLibroCuentaCorriente::aPublico);

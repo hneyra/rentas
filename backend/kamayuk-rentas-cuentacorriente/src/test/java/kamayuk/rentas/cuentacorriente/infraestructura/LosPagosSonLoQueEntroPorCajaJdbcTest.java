@@ -228,7 +228,7 @@ class LosPagosSonLoQueEntroPorCajaJdbcTest {
 
         // Y por el puerto que lee la ficha unificada, que es el otro lector de la consulta.
         Pagina<MovimientoDelLibro> enLaFicha =
-                libro.pagosDe(codigo, null, null, Paginacion.de(0, 20, "fecha_valor"));
+                libro.pagosDe(codigo, null, null, null, Paginacion.de(0, 20, "fecha_valor"));
         assertThat(enLaFicha.contenido())
                 .as("la seccion de pagos de la ficha dice lo mismo que consulta_pagos")
                 .extracting(MovimientoDelLibro::documentoOrigen)

@@ -3,6 +3,7 @@ package kamayuk.rentas.tesoreria;
 import java.time.LocalDate;
 import kamayuk.rentas.compartido.Pagina;
 import kamayuk.rentas.compartido.Paginacion;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Los convenios de fraccionamiento de un contribuyente, publicados para otros contextos acotados
@@ -48,7 +49,12 @@ public interface ConveniosDelContribuyente {
      * @param aLaFecha la fecha con la que se responde lo que depende de hoy —cuantas cuotas han
      *     vencido y cuanto queda por cobrar—. Entra como argumento y no sale de un {@code now()}
      *     (regla 6, regla 9): dos filas de la misma pagina tienen que estar calculadas al mismo dia
+     * @param tributo filtro opcional: solo los que acogen alguna deuda de ese tributo; {@code null}
+     *     trae todos (#441)
      */
     Pagina<ConvenioDelContribuyente> deTodoElContribuyente(
-            String codigoContribuyente, LocalDate aLaFecha, Paginacion paginacion);
+            String codigoContribuyente,
+            LocalDate aLaFecha,
+            @Nullable String tributo,
+            Paginacion paginacion);
 }

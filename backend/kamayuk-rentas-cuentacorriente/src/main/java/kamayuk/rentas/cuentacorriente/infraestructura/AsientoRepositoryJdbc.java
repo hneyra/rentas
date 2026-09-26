@@ -335,6 +335,11 @@ public class AsientoRepositoryJdbc extends RepositorioJdbc implements AsientoRep
             condiciones.add("a.fecha_valor <= :hasta");
             parametros.put("hasta", criterio.hasta());
         }
+        if (criterio.tributo() != null) {
+            // #441: el filtro «Impresion» de la ficha unificada acota tambien los pagos.
+            condiciones.add("a.tributo = :tributo");
+            parametros.put("tributo", criterio.tributo());
+        }
 
         String desdeConContribuyente = DESDE + " JOIN contribuyente c ON c.id = a.contribuyente_id";
         String donde = " WHERE " + String.join(" AND ", condiciones);

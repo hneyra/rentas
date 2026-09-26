@@ -26,6 +26,8 @@ import org.jspecify.annotations.Nullable;
  *     y cuanto queda por cobrar—. Entra como argumento y no sale de un {@code now()} de la base
  *     (regla 6, regla 9): dos filas de la misma pagina tienen que estar calculadas al mismo dia, y
  *     un reporte de ayer tiene que poder repetirse
+ * @param tributo filtro opcional: solo los convenios que acogen alguna deuda de ese tributo —un
+ *     convenio mixto sale con los dos filtros, porque contiene los dos— (#441)
  */
 public record CriterioDeConvenios(
         @Nullable String numero,
@@ -33,12 +35,25 @@ public record CriterioDeConvenios(
         @Nullable EstadoDeConvenio estado,
         @Nullable LocalDate desde,
         @Nullable LocalDate hasta,
-        LocalDate aLaFecha) {
+        LocalDate aLaFecha,
+        @Nullable String tributo) {
+
+    /** Sin filtro de tributo: lo que pide la pantalla de convenios. */
+    public CriterioDeConvenios(
+            @Nullable String numero,
+            @Nullable String codigoContribuyente,
+            @Nullable EstadoDeConvenio estado,
+            @Nullable LocalDate desde,
+            @Nullable LocalDate hasta,
+            LocalDate aLaFecha) {
+        this(numero, codigoContribuyente, estado, desde, hasta, aLaFecha, null);
+    }
 
     public CriterioDeConvenios {
         Objects.requireNonNull(aLaFecha, "Toda cifra indica su fecha (RNF-075, regla 9)");
         numero = normalizar(numero);
         codigoContribuyente = normalizar(codigoContribuyente);
+        tributo = normalizar(tributo);
         if (desde != null && hasta != null && desde.isAfter(hasta)) {
             throw new IllegalArgumentException(
                     "El rango de fechas esta al reves: desde " + desde + " hasta " + hasta);

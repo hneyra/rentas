@@ -3,6 +3,7 @@ package kamayuk.rentas.valores;
 import java.time.LocalDate;
 import kamayuk.rentas.compartido.Pagina;
 import kamayuk.rentas.compartido.Paginacion;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Los valores emitidos a un contribuyente, publicados para otros contextos acotados (ARQ-01 §4,
@@ -44,7 +45,12 @@ public interface ValoresDelContribuyente {
      * @param aLaFecha desde que dia se mira la situacion de cada uno (regla 9): sin ella «exigible»
      *     no significa nada. <b>No</b> es la fecha de los importes, que vienen congelados con la
      *     suya
+     * @param tributo filtro opcional: solo los que tienen alguna linea de ese tributo; {@code null}
+     *     trae todos (#441)
      */
     Pagina<ValorDelContribuyente> deTodoElContribuyente(
-            long contribuyenteId, LocalDate aLaFecha, Paginacion paginacion);
+            long contribuyenteId,
+            LocalDate aLaFecha,
+            @Nullable String tributo,
+            Paginacion paginacion);
 }

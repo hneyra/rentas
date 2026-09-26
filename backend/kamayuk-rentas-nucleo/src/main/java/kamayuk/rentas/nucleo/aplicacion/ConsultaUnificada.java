@@ -169,6 +169,7 @@ public class ConsultaUnificada {
                         criterio.codigoContribuyente(),
                         null,
                         null,
+                        criterio.alcance().tributo(),
                         ordenadaPor(paginacion, "fecha_valor", Paginacion.Sentido.DESCENDENTE)),
                 libro.altasYBajasDe(
                         criterio.codigoContribuyente(),
@@ -177,10 +178,12 @@ public class ConsultaUnificada {
                 convenios.deTodoElContribuyente(
                         criterio.codigoContribuyente(),
                         criterio.aLaFecha(),
+                        criterio.alcance().tributo(),
                         ordenadaPor(paginacion, "fecha", Paginacion.Sentido.DESCENDENTE)),
                 valores.deTodoElContribuyente(
                         contribuyente.id(),
                         criterio.aLaFecha(),
+                        criterio.alcance().tributo(),
                         ordenadaPor(paginacion, "fecha_emision", Paginacion.Sentido.DESCENDENTE)),
                 declaraciones.deContribuyente(
                         contribuyente.id(),

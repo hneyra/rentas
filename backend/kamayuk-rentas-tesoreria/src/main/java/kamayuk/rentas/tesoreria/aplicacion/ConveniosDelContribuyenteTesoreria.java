@@ -7,6 +7,7 @@ import kamayuk.rentas.tesoreria.ConvenioDelContribuyente;
 import kamayuk.rentas.tesoreria.ConveniosDelContribuyente;
 import kamayuk.rentas.tesoreria.dominio.ConvenioEnConsulta;
 import kamayuk.rentas.tesoreria.dominio.CriterioDeConvenios;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -42,9 +43,13 @@ public class ConveniosDelContribuyenteTesoreria implements ConveniosDelContribuy
     @Override
     @Transactional(readOnly = true)
     public Pagina<ConvenioDelContribuyente> deTodoElContribuyente(
-            String codigoContribuyente, LocalDate aLaFecha, Paginacion paginacion) {
+            String codigoContribuyente,
+            LocalDate aLaFecha,
+            @Nullable String tributo,
+            Paginacion paginacion) {
         CriterioDeConvenios criterio =
-                new CriterioDeConvenios(null, codigoContribuyente, null, null, null, aLaFecha);
+                new CriterioDeConvenios(
+                        null, codigoContribuyente, null, null, null, aLaFecha, tributo);
         return consulta.listar(criterio, paginacion)
                 .mapear(ConveniosDelContribuyenteTesoreria::aPublico);
     }
