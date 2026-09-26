@@ -124,16 +124,18 @@ class RegistrarActaFiscalizacionTest {
     void resuelveLaFichaVigenteALaFechaDeLaVisita() {
         ActaConLoDeclarado guardada =
                 servicio.registrarPredial(
-                        PROGRAMA_PREDIAL,
-                        1L,
-                        100L,
-                        VISITA,
-                        "J. Perez",
-                        Hallazgo.CONFORME,
-                        null,
-                        null,
-                        null,
-                        OBSERVACION);
+                                PROGRAMA_PREDIAL,
+                                1L,
+                                100L,
+                                VISITA,
+                                "J. Perez",
+                                Hallazgo.CONFORME,
+                                null,
+                                null,
+                                null,
+                                null,
+                                OBSERVACION)
+                        .acta();
 
         assertThat(guardada.acta().fichaId()).isEqualTo(900L);
         assertThat(auditados).hasSize(1);
@@ -144,14 +146,16 @@ class RegistrarActaFiscalizacionTest {
     void unActaVehicularNuncaLlevaFicha() {
         ActaConLoDeclarado guardada =
                 servicio.registrarVehicular(
-                        PROGRAMA_VEHICULAR,
-                        1L,
-                        500L,
-                        VISITA,
-                        "J. Perez",
-                        Hallazgo.OMISO,
-                        null,
-                        OBSERVACION);
+                                PROGRAMA_VEHICULAR,
+                                1L,
+                                500L,
+                                VISITA,
+                                "J. Perez",
+                                Hallazgo.OMISO,
+                                null,
+                                null,
+                                OBSERVACION)
+                        .acta();
 
         assertThat(guardada.acta().fichaId()).isNull();
         assertThat(guardada.acta().esPredial()).isFalse();
@@ -172,6 +176,7 @@ class RegistrarActaFiscalizacionTest {
                                         null,
                                         null,
                                         null,
+                                        null,
                                         OBSERVACION))
                 .isInstanceOf(RegistrarActaFiscalizacion.ProgramaDeOtroTipo.class);
     }
@@ -187,6 +192,7 @@ class RegistrarActaFiscalizacionTest {
                                         500L,
                                         VISITA,
                                         "J. Perez",
+                                        null,
                                         null,
                                         null,
                                         OBSERVACION))
@@ -215,6 +221,7 @@ class RegistrarActaFiscalizacionTest {
                                         null,
                                         null,
                                         null,
+                                        null,
                                         OBSERVACION))
                 .isInstanceOf(RegistrarActaFiscalizacion.ContribuyenteInexistente.class)
                 .hasMessageContaining("999999");
@@ -235,6 +242,7 @@ class RegistrarActaFiscalizacionTest {
                                         "J. Perez",
                                         Hallazgo.OMISO,
                                         null,
+                                        null,
                                         OBSERVACION))
                 .isInstanceOf(RegistrarActaFiscalizacion.VehiculoInexistente.class)
                 .hasMessageContaining("999999");
@@ -247,28 +255,78 @@ class RegistrarActaFiscalizacionTest {
     void refiscalizarAgregaUnaVersion() {
         ActaConLoDeclarado primera =
                 servicio.registrarVehicular(
-                        PROGRAMA_VEHICULAR,
-                        1L,
-                        500L,
-                        VISITA,
-                        "J. Perez",
-                        Hallazgo.OMISO,
-                        null,
-                        OBSERVACION);
+                                PROGRAMA_VEHICULAR,
+                                1L,
+                                500L,
+                                VISITA,
+                                "J. Perez",
+                                Hallazgo.OMISO,
+                                null,
+                                null,
+                                OBSERVACION)
+                        .acta();
         ActaConLoDeclarado segunda =
                 servicio.registrarVehicular(
-                        PROGRAMA_VEHICULAR,
-                        1L,
-                        500L,
-                        VISITA.plusDays(30),
-                        "M. Ruiz",
-                        Hallazgo.CONFORME,
-                        null,
-                        OBSERVACION);
+                                PROGRAMA_VEHICULAR,
+                                1L,
+                                500L,
+                                VISITA.plusDays(30),
+                                "M. Ruiz",
+                                Hallazgo.CONFORME,
+                                null,
+                                null,
+                                OBSERVACION)
+                        .acta();
 
         assertThat(primera.acta().version()).isEqualTo(1);
         assertThat(segunda.acta().version()).isEqualTo(2);
         assertThat(actas.filas).hasSize(2);
+    }
+
+    @Test
+    @DisplayName("#347 — reenviar con la misma Idempotency-Key devuelve la misma acta, version 1")
+    void laMismaClaveEsLaMismaActa() {
+        RegistrarActaFiscalizacion.Registrada primera = vehicularConClave("K-347", Hallazgo.OMISO);
+        RegistrarActaFiscalizacion.Registrada reintento =
+                vehicularConClave("K-347", Hallazgo.OMISO);
+
+        assertThat(reintento.yaExistia())
+                .as("el reintento no creo nada: la ruta contesta 200 y no 201")
+                .isTrue();
+        assertThat(reintento.acta().acta().id()).isEqualTo(primera.acta().acta().id());
+        assertThat(reintento.acta().acta().version())
+                .as("una «version 2» afirmaria una reinspeccion que nunca ocurrio")
+                .isEqualTo(1);
+        assertThat(actas.filas).hasSize(1);
+        assertThat(auditados).as("y nada nuevo que auditar").hasSize(1);
+    }
+
+    @Test
+    @DisplayName("#347 — otra clave y otro contenido sobre la misma unidad SI es la version 2")
+    void otraClaveEsUnaCorreccion() {
+        // Es la correccion que V19 describe, y tiene que seguir pasando: sin este caso, una guarda
+        // que prohibiera la version 2 tambien saldria verde.
+        vehicularConClave("K-347-A", Hallazgo.OMISO);
+        RegistrarActaFiscalizacion.Registrada correccion =
+                vehicularConClave("K-347-B", Hallazgo.CONFORME);
+
+        assertThat(correccion.yaExistia()).isFalse();
+        assertThat(correccion.acta().acta().version()).isEqualTo(2);
+        assertThat(actas.filas).hasSize(2);
+    }
+
+    private RegistrarActaFiscalizacion.Registrada vehicularConClave(
+            String clave, Hallazgo hallazgo) {
+        return servicio.registrarVehicular(
+                PROGRAMA_VEHICULAR,
+                1L,
+                500L,
+                VISITA,
+                "J. Perez",
+                hallazgo,
+                null,
+                clave,
+                OBSERVACION);
     }
 
     private static final class ActasDeMentira implements ActaFiscalizacionRepository {
@@ -307,8 +365,21 @@ class RegistrarActaFiscalizacionTest {
             return Map.of();
         }
 
+        /** Las claves de idempotencia, como {@code acta_fisc_idempotencia_uq} (V42). */
+        private final Map<String, ActaFiscalizacion> porClave = new java.util.HashMap<>();
+
         @Override
-        public ActaFiscalizacion insertar(ActaFiscalizacion acta) {
+        public java.util.Optional<ActaFiscalizacion> porClaveDeIdempotencia(String clave) {
+            return java.util.Optional.ofNullable(porClave.get(clave));
+        }
+
+        @Override
+        public ActaFiscalizacion insertar(
+                ActaFiscalizacion acta,
+                @org.jspecify.annotations.Nullable String claveDeIdempotencia) {
+            if (claveDeIdempotencia != null && porClave.containsKey(claveDeIdempotencia)) {
+                throw new ClaveRepetida("clave repetida", new IllegalStateException());
+            }
             ActaFiscalizacion guardada =
                     new ActaFiscalizacion(
                             siguienteId++,
@@ -327,6 +398,9 @@ class RegistrarActaFiscalizacionTest {
                             acta.estado(),
                             acta.observacion());
             filas.add(guardada);
+            if (claveDeIdempotencia != null) {
+                porClave.put(claveDeIdempotencia, guardada);
+            }
             return guardada;
         }
 

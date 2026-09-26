@@ -76,7 +76,15 @@ class ActaPredialControllerTest {
                         }
 
                         @Override
-                        public ActaFiscalizacion insertar(ActaFiscalizacion acta) {
+                        public java.util.Optional<ActaFiscalizacion> porClaveDeIdempotencia(
+                                String clave) {
+                            return java.util.Optional.empty();
+                        }
+
+                        @Override
+                        public ActaFiscalizacion insertar(
+                                ActaFiscalizacion acta,
+                                @org.jspecify.annotations.Nullable String clave) {
                             ActaFiscalizacion guardada =
                                     new ActaFiscalizacion(
                                             siguiente++,

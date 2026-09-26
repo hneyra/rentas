@@ -3438,7 +3438,15 @@ paths:
     post:
       operationId: fisc_predial
       summary: "Fiscalización predial — acta de inspección"
-      description: "Formulario de campo optimizado para tablet. Contrasta lo verificado con lo declarado y determina si corresponde emitir resolución de determinación."
+      description: >-
+        Levanta el acta de una inspección predial: lo que el fiscalizador halló —área y uso— frente a la
+        ficha vigente el día de la visita. La versión es la siguiente de esa unidad dentro del programa.
+
+        **La cabecera `Idempotency-Key` se lee** (#347). Reenviar el mismo registro —el reintento
+        tras un tiempo de espera agotado, el doble clic— devuelve **200 con el acta de la primera vez**
+        en vez de **201** con una «versión 2», que afirmaría una reinspección que nunca ocurrió. Otra
+        clave sobre la misma unidad sí es la versión 2: es como se corrige un acta (V19). Dos registros
+        simultáneos que chocan —por la clave o por la versión— responden **409**, no 500.
       tags: ["Fiscalización"]
       requestBody:
         required: true
@@ -3535,7 +3543,15 @@ paths:
     post:
       operationId: fisc_vehicular
       summary: "Fiscalización vehicular"
-      description: "Cruce del padrón vehicular con la información registral y de SUNAT para detectar vehículos afectos no declarados o con valor subvaluado."
+      description: >-
+        Levanta el acta de una inspección vehicular. El hallazgo es obligatorio: un acta sin él se
+        liquidaría como CONFORME.
+
+        **La cabecera `Idempotency-Key` se lee** (#347). Reenviar el mismo registro —el reintento
+        tras un tiempo de espera agotado, el doble clic— devuelve **200 con el acta de la primera vez**
+        en vez de **201** con una «versión 2», que afirmaría una reinspección que nunca ocurrió. Otra
+        clave sobre la misma unidad sí es la versión 2: es como se corrige un acta (V19). Dos registros
+        simultáneos que chocan —por la clave o por la versión— responden **409**, no 500.
       tags: ["Fiscalización"]
       parameters:
         - name: hallazgo

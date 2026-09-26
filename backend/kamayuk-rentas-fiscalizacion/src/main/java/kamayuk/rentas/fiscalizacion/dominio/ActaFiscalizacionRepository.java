@@ -1,8 +1,58 @@
 package kamayuk.rentas.fiscalizacion.dominio;
 
+import org.jspecify.annotations.Nullable;
+
 public interface ActaFiscalizacionRepository {
 
-    ActaFiscalizacion insertar(ActaFiscalizacion acta);
+    /**
+     * Inserta el acta sin clave de idempotencia: la forma de las siembras y las actas historicas.
+     */
+    default ActaFiscalizacion insertar(ActaFiscalizacion acta) {
+        return insertar(acta, null);
+    }
+
+    /**
+     * Inserta el acta con la clave {@code Idempotency-Key} de quien la registra (#347).
+     *
+     * @throws ClaveRepetida si otra peticion con la misma clave la inserto a la vez
+     * @throws VersionConcurrente si otra acta de la misma unidad tomo esa version a la vez
+     */
+    ActaFiscalizacion insertar(ActaFiscalizacion acta, @Nullable String claveDeIdempotencia);
+
+    /** El acta registrada con esa clave de idempotencia, si la hay (#347). */
+    java.util.Optional<ActaFiscalizacion> porClaveDeIdempotencia(String clave);
+
+    /**
+     * Otra peticion con la misma clave de idempotencia gano la carrera (#347).
+     *
+     * <p>Lo decide {@code acta_fisc_idempotencia_uq} (V42). No es un defecto —el cliente reintento,
+     * que es lo que se espera de el—: lo que importa es que del reintento no salga una «version 2»,
+     * que afirmaria una reinspeccion que nunca ocurrio.
+     */
+    final class ClaveRepetida extends RuntimeException {
+
+        @java.io.Serial private static final long serialVersionUID = 1L;
+
+        public ClaveRepetida(String mensaje, Throwable causa) {
+            super(mensaje, causa);
+        }
+    }
+
+    /**
+     * Otra acta de la misma unidad se registro a la vez con la misma version (#347).
+     *
+     * <p>Lo decide {@code acta_fisc_version_uq}: la version es {@code max + 1}, y dos registros
+     * simultaneos calculan el mismo. Se contesta 409 y no se reintenta solo: quien registra tiene
+     * que mirar primero si la otra acta ya dice lo que iba a decir la suya.
+     */
+    final class VersionConcurrente extends RuntimeException {
+
+        @java.io.Serial private static final long serialVersionUID = 1L;
+
+        public VersionConcurrente(String mensaje, Throwable causa) {
+            super(mensaje, causa);
+        }
+    }
 
     /**
      * Un acta por su identificador (#49).

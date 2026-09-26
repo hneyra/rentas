@@ -10,6 +10,7 @@ import kamayuk.rentas.fiscalizacion.dominio.EstadoDeActa;
 import kamayuk.rentas.persistencia.OrdenSeguro;
 import kamayuk.rentas.persistencia.RepositorioJdbc;
 import org.jspecify.annotations.Nullable;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 
@@ -63,8 +64,10 @@ public class ActaFiscalizacionRepositoryJdbc extends RepositorioJdbc
     }
 
     @Override
-    public ActaFiscalizacion insertar(ActaFiscalizacion acta) {
+    public ActaFiscalizacion insertar(
+            ActaFiscalizacion acta, @Nullable String claveDeIdempotencia) {
         Map<String, Object> campos = new HashMap<>();
+        campos.put("clave", claveDeIdempotencia);
         campos.put("programaId", acta.programaId());
         campos.put("version", acta.version());
         campos.put("contribuyenteId", acta.contribuyenteId());
@@ -81,23 +84,42 @@ public class ActaFiscalizacionRepositoryJdbc extends RepositorioJdbc
         campos.put("observacion", acta.observacion().texto());
         campos.put("usuario", OrigenContext.actual().usuario());
 
-        Long id =
-                jdbc().sql(
-                                "INSERT INTO acta_fiscalizacion"
-                                        + " (municipalidad_id, programa_id, version, contribuyente_id,"
-                                        + "  predio_id, vehiculo_id, ficha_id, fecha_visita,"
-                                        + "  fiscalizador, hallazgo, area_hallada, uso_hallado,"
-                                        + "  detalle, estado, observacion, usuario_registro)"
-                                        + " VALUES ("
-                                        + MUNICIPALIDAD_ACTUAL
-                                        + ", :programaId, :version, :contribuyenteId, :predioId,"
-                                        + "  :vehiculoId, :fichaId, :fechaVisita, :fiscalizador,"
-                                        + "  :hallazgo, :areaHallada, :usoHallado, :detalle, :estado,"
-                                        + "  :observacion, :usuario)"
-                                        + " RETURNING id")
-                        .params(campos)
-                        .query(Long.class)
-                        .single();
+        Long id;
+        try {
+            id =
+                    jdbc().sql(
+                                    "INSERT INTO acta_fiscalizacion"
+                                            + " (municipalidad_id, programa_id, version, contribuyente_id,"
+                                            + "  predio_id, vehiculo_id, ficha_id, fecha_visita,"
+                                            + "  fiscalizador, hallazgo, area_hallada, uso_hallado,"
+                                            + "  detalle, estado, observacion, usuario_registro,"
+                                            + "  clave_idempotencia)"
+                                            + " VALUES ("
+                                            + MUNICIPALIDAD_ACTUAL
+                                            + ", :programaId, :version, :contribuyenteId, :predioId,"
+                                            + "  :vehiculoId, :fichaId, :fechaVisita, :fiscalizador,"
+                                            + "  :hallazgo, :areaHallada, :usoHallado, :detalle, :estado,"
+                                            + "  :observacion, :usuario, :clave)"
+                                            + " RETURNING id")
+                            .params(campos)
+                            .query(Long.class)
+                            .single();
+        } catch (DuplicateKeyException duplicada) {
+            // Las dos claves unicas del INSERT, y cada una dice otra cosa (#347). La lectura del
+            // caso de uso ahorra el trabajo; estos indices son los que impiden el duplicado cuando
+            // dos peticiones pasan las dos por ella.
+            if (String.valueOf(duplicada.getMessage()).contains("acta_fisc_idempotencia_uq")) {
+                throw new ClaveRepetida(
+                        "Otra peticion con la misma clave de idempotencia registro esta acta a la"
+                                + " vez: consulte el acta antes de volver a enviarla",
+                        duplicada);
+            }
+            throw new VersionConcurrente(
+                    "Otra acta de esta unidad se registro a la vez con la version "
+                            + acta.version()
+                            + ": consulte las actas del programa antes de volver a registrar",
+                    duplicada);
+        }
 
         return new ActaFiscalizacion(
                 id,
@@ -126,6 +148,14 @@ public class ActaFiscalizacionRepositoryJdbc extends RepositorioJdbc
     public java.util.Optional<ActaFiscalizacion> findById(long id) {
         return jdbc().sql("SELECT " + COLUMNAS + DESDE + " WHERE id = :id")
                 .param("id", id)
+                .query(ActaFiscalizacionRepositoryJdbc::mapear)
+                .optional();
+    }
+
+    @Override
+    public java.util.Optional<ActaFiscalizacion> porClaveDeIdempotencia(String clave) {
+        return jdbc().sql("SELECT " + COLUMNAS + DESDE + " WHERE clave_idempotencia = :clave")
+                .param("clave", clave)
                 .query(ActaFiscalizacionRepositoryJdbc::mapear)
                 .optional();
     }

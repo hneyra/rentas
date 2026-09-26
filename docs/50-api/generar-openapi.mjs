@@ -1149,6 +1149,28 @@ const DESCRIPCIONES = {
     Lo recaudado por multas administrativas, según el libro (#53, RF-074). Mismo criterio que
     el de tránsito: la suma exacta de los abonos vivos.
   `),
+  // Fiscalizacion · Actas (#347)
+  fisc_predial: bloque(`
+    Levanta el acta de una inspección predial: lo que el fiscalizador halló —área y uso— frente a la
+    ficha vigente el día de la visita. La versión es la siguiente de esa unidad dentro del programa.
+
+    **La cabecera \`Idempotency-Key\` se lee** (#347). Reenviar el mismo registro —el reintento
+    tras un tiempo de espera agotado, el doble clic— devuelve **200 con el acta de la primera vez**
+    en vez de **201** con una «versión 2», que afirmaría una reinspección que nunca ocurrió. Otra
+    clave sobre la misma unidad sí es la versión 2: es como se corrige un acta (V19). Dos registros
+    simultáneos que chocan —por la clave o por la versión— responden **409**, no 500.
+  `),
+  // Fiscalizacion · Actas (#347)
+  fisc_vehicular: bloque(`
+    Levanta el acta de una inspección vehicular. El hallazgo es obligatorio: un acta sin él se
+    liquidaría como CONFORME.
+
+    **La cabecera \`Idempotency-Key\` se lee** (#347). Reenviar el mismo registro —el reintento
+    tras un tiempo de espera agotado, el doble clic— devuelve **200 con el acta de la primera vez**
+    en vez de **201** con una «versión 2», que afirmaría una reinspección que nunca ocurrió. Otra
+    clave sobre la misma unidad sí es la versión 2: es como se corrige un acta (V19). Dos registros
+    simultáneos que chocan —por la clave o por la versión— responden **409**, no 500.
+  `),
   // Tesoreria · Convenios (#606)
   fraccionamiento: bloque(`
     Acoge la deuda marcada a pago fraccionado, o solo **simula** su cronograma: lo decide
