@@ -331,6 +331,107 @@ class LiquidacionJdbcTest {
                     .isZero();
         }
 
+        @Test
+        @DisplayName("#369 — una liquidacion ANULADA no sostiene nada: la unidad sale del embudo")
+        void laAnuladaNoCuenta() {
+            TenantContext.fijar(new MunicipalidadId(municipalidadA));
+            Escenario escenario = sembrar(municipalidadA);
+            Liquidacion guardada = omisoDe(escenario);
+            abrirYPasarA(guardada, EstadoDeLiquidacion.ANULADA);
+
+            assertThat(conDiferenciaDe(escenario))
+                    .as(
+                            "AnularActaFiscalizacion ya la da por cerrada: contarla inflaba la etapa"
+                                    + " entre la anulacion y la reliquidacion, o para siempre")
+                    .isZero();
+        }
+
+        @Test
+        @DisplayName("#369 — la gemela NOTIFICADA si cuenta: se excluye ANULADA, no «todo menos …»")
+        void laNotificadaSiCuenta() {
+            // Distingue «excluir ANULADA» de «contar solo LIQUIDADA»: las dos guardas pasarian
+            // el caso de arriba, y solo la primera pasa este.
+            TenantContext.fijar(new MunicipalidadId(municipalidadA));
+            Escenario escenario = sembrar(municipalidadA);
+            abrirYPasarA(omisoDe(escenario), EstadoDeLiquidacion.NOTIFICADA);
+
+            assertThat(conDiferenciaDe(escenario)).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("#369 — v1 ANULADA y v2 reliquidada con diferencia: la unidad cuenta UNA vez")
+        void laReliquidadaTrasAnularCuenta() {
+            TenantContext.fijar(new MunicipalidadId(municipalidadA));
+            Escenario escenario = sembrar(municipalidadA);
+            Liquidacion original = omisoDe(escenario);
+            abrirYPasarA(original, EstadoDeLiquidacion.ANULADA);
+
+            int numero = SIGUIENTE.getAndIncrement();
+            transaccion.execute(
+                    estado ->
+                            liquidaciones.insertar(
+                                    original.reliquidadaPor(
+                                            "LIQ-2026-" + String.format("%06d", numero),
+                                            E2026,
+                                            numero,
+                                            E2024,
+                                            E2024,
+                                            TipoDeFiscalizacion.CIERTA,
+                                            "Se vuelve a liquidar",
+                                            HOY,
+                                            OBSERVACION),
+                                    List.of(
+                                            lineaDe(
+                                                    escenario,
+                                                    E2024,
+                                                    CondicionFiscalizada.OMISO))));
+
+            assertThat(conDiferenciaDe(escenario))
+                    .as("la version viva es la v2, y esa si tiene diferencia")
+                    .isEqualTo(1);
+        }
+
+        private Liquidacion omisoDe(Escenario escenario) {
+            return transaccion.execute(
+                    estado ->
+                            liquidaciones.insertar(
+                                    primera(escenario),
+                                    List.of(
+                                            lineaDe(
+                                                    escenario,
+                                                    E2024,
+                                                    CondicionFiscalizada.OMISO))));
+        }
+
+        /** La apertura que escribe el caso de uso, y un cambio al estado pedido. */
+        private void abrirYPasarA(Liquidacion liquidacion, EstadoDeLiquidacion destino) {
+            transaccion.execute(
+                    estado ->
+                            movimientos.insertar(
+                                    MovimientoDeLiquidacion.apertura(
+                                            liquidacion.identificador(),
+                                            HOY,
+                                            "emitida",
+                                            OBSERVACION)));
+            // NOTIFICADA nace con el numero del cargo desde #562; los demas estados, sin el.
+            transaccion.execute(
+                    estado ->
+                            movimientos.insertar(
+                                    destino == EstadoDeLiquidacion.NOTIFICADA
+                                            ? MovimientoDeLiquidacion.notificada(
+                                                    liquidacion.identificador(),
+                                                    HOY,
+                                                    "cambio de la prueba",
+                                                    "N-369-" + liquidacion.identificador(),
+                                                    OBSERVACION)
+                                            : MovimientoDeLiquidacion.cambioDeEstado(
+                                                    liquidacion.identificador(),
+                                                    destino,
+                                                    HOY,
+                                                    "cambio de la prueba",
+                                                    OBSERVACION)));
+        }
+
         private int conDiferenciaDe(Escenario escenario) {
             return transaccion.execute(
                     estado ->

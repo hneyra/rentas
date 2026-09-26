@@ -201,6 +201,24 @@ public class LiquidacionRepositoryJdbc extends RepositorioJdbc implements Liquid
     }
 
     /**
+     * El estado de la liquidacion {@code l}: el de su <b>ultimo</b> movimiento (#369).
+     *
+     * <p>No es una columna, se deriva, y esta es su UNICA transcripcion al motor: la misma
+     * definicion que {@code EstadoDeLiquidacion.delHistorial} aplica sobre la lista. La usan la
+     * busqueda de las grillas y el embudo; hasta #369 el embudo no la usaba, y contaba como «con
+     * diferencia» una unidad cuya ultima liquidacion estaba ANULADA.
+     *
+     * <p>Una liquidacion sin movimientos da {@code NULL}: el de apertura lo escribe el caso de uso
+     * y no el repositorio. Por eso quien la compara con una exclusion usa {@code IS DISTINCT FROM}
+     * y no {@code <>}, que la dejaria fuera del recuento.
+     */
+    static final String ESTADO_DERIVADO =
+            "(SELECT m.estado FROM liquidacion_movimiento m"
+                    + "  WHERE m.municipalidad_id = l.municipalidad_id"
+                    + "    AND m.liquidacion_id = l.id"
+                    + "  ORDER BY m.id DESC LIMIT 1)";
+
+    /**
      * La búsqueda de las dos grillas.
      *
      * <p>{@code soloUltimaVersion} y el filtro de estado se resuelven con subconsultas correladas y
@@ -254,11 +272,7 @@ public class LiquidacionRepositoryJdbc extends RepositorioJdbc implements Liquid
             parametros.put("condicion", criterio.condicion().name());
         }
         if (criterio.estado() != null) {
-            donde.append(
-                    " AND (SELECT m.estado FROM liquidacion_movimiento m"
-                            + "        WHERE m.municipalidad_id = l.municipalidad_id"
-                            + "          AND m.liquidacion_id = l.id"
-                            + "        ORDER BY m.id DESC LIMIT 1) = :estado");
+            donde.append(" AND " + ESTADO_DERIVADO + " = :estado");
             parametros.put("estado", criterio.estado().name());
         }
         if (criterio.soloUltimaVersion()) {
@@ -281,7 +295,7 @@ public class LiquidacionRepositoryJdbc extends RepositorioJdbc implements Liquid
     /**
      * Cuantas unidades del programa sostienen una determinacion (#196).
      *
-     * <p>Las tres piezas, y cada una tiene su motivo:
+     * <p>Las cuatro piezas, y cada una tiene su motivo:
      *
      * <ul>
      *   <li>{@code DISTINCT d.predio_id, d.vehiculo_id} cuenta <b>unidades</b>. Un periodo
@@ -293,6 +307,9 @@ public class LiquidacionRepositoryJdbc extends RepositorioJdbc implements Liquid
      *   <li>El {@code NOT EXISTS} es el mismo {@code soloUltimaVersion} de {@link #consultar}: una
      *       reliquidacion sustituye a la version anterior, y contar las dos diria que un predio ya
      *       corregido sigue con diferencia.
+     *   <li>{@link #ESTADO_DERIVADO} {@code IS DISTINCT FROM 'ANULADA'} (#369): una ultima version
+     *       anulada no sostiene nada —{@code AnularActaFiscalizacion} la da por cerrada—, y
+     *       contarla inflaba la etapa entre la anulacion y la reliquidacion, o para siempre.
      * </ul>
      *
      * <p>No filtra por {@code municipalidad_id} en ninguna de las tres tablas: lo hace RLS.
@@ -328,6 +345,11 @@ public class LiquidacionRepositoryJdbc extends RepositorioJdbc implements Liquid
                                         + EstadoDeActa.ANULADA.name()
                                         + "'"
                                         + "   AND d.condicion IN (:condiciones)"
+                                        + "   AND "
+                                        + ESTADO_DERIVADO
+                                        + " IS DISTINCT FROM '"
+                                        + EstadoDeLiquidacion.ANULADA.name()
+                                        + "'"
                                         + "   AND NOT EXISTS (SELECT 1 FROM liquidacion_fiscalizacion s"
                                         + "                    WHERE s.municipalidad_id ="
                                         + "                          l.municipalidad_id"
