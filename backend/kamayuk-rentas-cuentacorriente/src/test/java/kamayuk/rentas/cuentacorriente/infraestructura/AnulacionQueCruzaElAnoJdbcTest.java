@@ -195,7 +195,7 @@ class AnulacionQueCruzaElAnoJdbcTest {
                 Observacion.de("Emision de arbitrios 2026, cuota 12"));
 
         // 2. Caja lo cobra el 2027-01-05: el abono lleva el ejercicio DE LA CUOTA y la fecha
-        //    DE PAGO, que es lo que ConciliacionDeCaja da por sentado.
+        //    DE PAGO, que es lo que la conciliacion del dia da por sentado.
         abonos.abonarPagoIntegro(
                 List.of(
                         new ObligacionDelDeudor(

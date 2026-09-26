@@ -6,12 +6,11 @@ import kamayuk.rentas.dominio.Observacion;
 /**
  * Extingue con asientos la deuda que una obligacion tiene a una fecha (#50, RF-064).
  *
- * <p>Es la septima API publica de este modulo —tras {@link ConsultaDeDeudaPublica}, {@link
- * GeneradorDeCargos}, {@link MovimientoDeFase}, {@link RegistroDeAbonos}, {@link
- * AcogimientoAConvenio} y {@link ConciliacionDeCaja}—, y vive en el paquete raiz por el mismo
- * motivo que las otras seis: Spring Modulith trata como interno todo lo que esta en un subpaquete,
- * asi que esto es exactamente lo que {@code sanciones} puede ver de {@code cuentacorriente}. Sus
- * tablas, no.
+ * <p>Es una de las API publicas de este modulo —con {@link ConsultaDeDeudaPublica}, {@link
+ * GeneradorDeCargos}, {@link MovimientoDeFase}, {@link RegistroDeAbonos} y {@link
+ * AcogimientoAConvenio}—, y vive en el paquete raiz por el mismo motivo que las otras: Spring
+ * Modulith trata como interno todo lo que esta en un subpaquete, asi que esto es exactamente lo que
+ * {@code sanciones} puede ver de {@code cuentacorriente}. Sus tablas, no.
  *
  * <h2>Por que existe, y por que no valia ninguna de las anteriores</h2>
  *

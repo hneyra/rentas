@@ -153,21 +153,7 @@ class PuertosSinConsumidorTest {
                                     + " por el dueno de ese contexto",
                             "HallazgosDelPredio#deLaCampania",
                             "Lo mismo que `HallazgosDelPredio#de`: el hallazgo de una campania no"
-                                    + " abre nada mientras no se decida que acto lo abre",
-                            // El cuadre del cierre de caja contra el libro. Su consumidor EXISTIO y
-                            // se midio: en `sgtm` era `tesoreria.aplicacion.ArqueoDeTurno`, que en
-                            // P5D se fue a `caja` con toda la ventanilla. El `ArqueoDeTurno` de
-                            // `caja` cuadra hoy contra su propio buzon de salida y no le pregunta
-                            // nada al libro, asi que este puerto quedo del lado de aca sin nadie
-                            // al otro. No se retira porque la pregunta sigue siendo la correcta
-                            // —un cierre firmado y el estado de cuenta tienen que decir la misma
-                            // cifra—; lo que falta es decidir si el cuadre vuelve, y por donde:
-                            // si vuelve, `caja` lo pedira por HTTP y no por este puerto de Java.
-                            "ConciliacionDeCaja#abonadoPor",
-                            "Su consumidor se fue a `caja` en P5D (`ArqueoDeTurno`), y el arqueo de"
-                                    + " `caja` cuadra hoy contra su buzon de salida. Sin decidir si"
-                                    + " el cierre vuelve a cuadrar contra el libro —y por que"
-                                    + " camino— no hay a quien cablearlo"));
+                                    + " abre nada mientras no se decida que acto lo abre"));
 
     @Test
     @DisplayName("todo metodo de puerto tiene consumidor, o esta en la lista con motivo")

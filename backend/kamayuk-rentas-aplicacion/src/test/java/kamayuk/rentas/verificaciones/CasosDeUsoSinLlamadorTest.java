@@ -72,9 +72,6 @@ class CasosDeUsoSinLlamadorTest {
                 "FormalizarConvenio#cuotaInicialDe(NumeroDeConvenio)",
                 "La leia `CobrarDeuda` para cobrar la cuota inicial en ventanilla, y se fue a `caja` en P5D (#430)");
         SIN_LLAMADOR_CON_MOTIVO.put(
-                "ConciliacionDeCajaCuentaCorriente#abonadoPor(Collection, LocalDate)",
-                "El cierre de caja ya no la pregunta desde P5D: el cierre vive en `caja` y no cuadra contra el libro (#280)");
-        SIN_LLAMADOR_CON_MOTIVO.put(
                 "ImprimirCorridaMasiva#imprimir(long, FormatoDeDocumento, Function)",
                 "#400 cerro el PROCESAMIENTO de la generacion masiva, no su impresion: no hay ruta ni proceso que imprima la corrida (#611)");
         SIN_LLAMADOR_CON_MOTIVO.put(

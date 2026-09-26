@@ -6,12 +6,12 @@ import kamayuk.rentas.dominio.Ejercicio;
 /**
  * Cuanto se puso a cobrar y cuanto sigue pendiente, por tributo (#56, RF-130).
  *
- * <p>Es la <b>novena</b> API publica de este modulo, despues de {@link ConsultaDeDeudaPublica},
+ * <p>Es la <b>octava</b> API publica de este modulo, despues de {@link ConsultaDeDeudaPublica},
  * {@link GeneradorDeCargos}, {@link MovimientoDeFase}, {@link RegistroDeAbonos}, {@link
- * AcogimientoAConvenio}, {@link ConciliacionDeCaja}, {@link MovimientosDelLibro} y {@link
- * RecaudacionDelLibro}. Vive en el paquete raiz por lo mismo que las otras ocho: Spring Modulith
- * trata como interno todo lo que esta en un subpaquete, asi que esto es exactamente lo que otro
- * contexto puede ver del libro. Sus tablas, no.
+ * AcogimientoAConvenio}, {@link MovimientosDelLibro} y {@link RecaudacionDelLibro} —era la novena
+ * hasta que #280 retiro {@code ConciliacionDeCaja}—. Vive en el paquete raiz por lo mismo que las
+ * otras siete: Spring Modulith trata como interno todo lo que esta en un subpaquete, asi que esto
+ * es exactamente lo que otro contexto puede ver del libro. Sus tablas, no.
  *
  * <h2>Para que existe</h2>
  *

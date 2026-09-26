@@ -9,11 +9,11 @@ import org.jspecify.annotations.Nullable;
  * Que se le ha cobrado a un contribuyente y que deuda se le ha dado de alta o de baja (#25, RF-045,
  * RF-046, RF-048).
  *
- * <p>Es la <b>septima</b> API publica de este modulo, despues de {@link ConsultaDeDeudaPublica},
- * {@link GeneradorDeCargos}, {@link MovimientoDeFase}, {@link RegistroDeAbonos}, {@link
- * AcogimientoAConvenio} y {@link ConciliacionDeCaja}. Vive en el paquete raiz por lo mismo que las
- * otras seis: Spring Modulith trata como interno todo lo que esta en un subpaquete, asi que esto es
- * exactamente lo que otro contexto puede ver del libro. Sus tablas, no.
+ * <p>Es una de las API publicas de este modulo, con {@link ConsultaDeDeudaPublica}, {@link
+ * GeneradorDeCargos}, {@link MovimientoDeFase}, {@link RegistroDeAbonos} y {@link
+ * AcogimientoAConvenio}. Vive en el paquete raiz por lo mismo que las otras: Spring Modulith trata
+ * como interno todo lo que esta en un subpaquete, asi que esto es exactamente lo que otro contexto
+ * puede ver del libro. Sus tablas, no.
  *
  * <h2>Para que existe</h2>
  *

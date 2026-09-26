@@ -21,12 +21,10 @@ import kamayuk.rentas.auditoria.AuditoriaJdbc;
 import kamayuk.rentas.auditoria.Origen;
 import kamayuk.rentas.auditoria.OrigenContext;
 import kamayuk.rentas.compartido.TenantContext;
-import kamayuk.rentas.cuentacorriente.ConciliacionDeCaja;
 import kamayuk.rentas.cuentacorriente.ConsultaDeDeudaPublica;
 import kamayuk.rentas.cuentacorriente.ObligacionPublica;
 import kamayuk.rentas.cuentacorriente.RegistroDeAbonos;
 import kamayuk.rentas.cuentacorriente.SeleccionDeObligacion;
-import kamayuk.rentas.cuentacorriente.aplicacion.ConciliacionDeCajaCuentaCorriente;
 import kamayuk.rentas.cuentacorriente.aplicacion.ConsultaDeDeudaCuentaCorriente;
 import kamayuk.rentas.cuentacorriente.aplicacion.ConsultarDeuda;
 import kamayuk.rentas.cuentacorriente.aplicacion.RegistrarAsiento;
@@ -129,7 +127,7 @@ class LoCobradoContraElLibroTest {
     private static RegistrarAsiento registrarAsiento;
     private static RecibirPago recibir;
     private static EmitirOrdenDeCobro emisor;
-    private static ConciliacionDeCaja conciliacionDelLibro;
+    private static JdbcClient jdbc;
     private static ConciliacionDePagos conciliacionDelBuzon;
     private static ConsultaDeDeudaPublica libro;
 
@@ -143,7 +141,7 @@ class LoCobradoContraElLibroTest {
         pool.setUsername(BaseDeDatosDePrueba.APP);
         pool.setPassword(base.clave(BaseDeDatosDePrueba.APP));
 
-        JdbcClient jdbc = JdbcClient.create(pool);
+        jdbc = JdbcClient.create(pool);
         gestor = new TenantTransactionManager(pool);
         transaccion = new TransactionTemplate(gestor);
 
@@ -170,7 +168,6 @@ class LoCobradoContraElLibroTest {
                         new ConsultaDeDeudaCuentaCorriente(
                                 new ConsultarDeuda(asientos, saldos, calculo, REDONDEO, RELOJ)));
         emisor = new EmitirOrdenDeCobro(libro, new CajaDeOrdenesDeMentira());
-        conciliacionDelLibro = envolver(new ConciliacionDeCajaCuentaCorriente(asientos));
 
         contribuyente = sembrarContribuyente();
     }
@@ -203,7 +200,7 @@ class LoCobradoContraElLibroTest {
             Emitido orden = emitirAl(predio, D1, "F39-A");
             recibir.recibir(pagoDe(orden, D2));
 
-            Dinero abonado = abonadoPor(orden.documento(), D2);
+            Dinero abonado = abonadoPor(orden.documento());
             assertThat(abonado.menos(orden.importe()))
                     .as(
                             "la caja cobro %s —lo que la orden congelo al %s— y el libro extinguio"
@@ -232,7 +229,7 @@ class LoCobradoContraElLibroTest {
                                     + " decidir")
                     .isEqualTo(EstadoDelPagoRecibido.RECHAZADO);
             assertThat(pago.asientos()).isZero();
-            assertThat(abonadoPor(orden.documento(), D2))
+            assertThat(abonadoPor(orden.documento()))
                     .as("y el libro no se movio ni un centimo")
                     .isEqualTo(Dinero.CERO);
             assertThat(pago.motivo())
@@ -257,7 +254,7 @@ class LoCobradoContraElLibroTest {
                                     + " imputa nunca, que es la forma mas comoda de no extinguir de"
                                     + " mas")
                     .isEqualTo(EstadoDelPagoRecibido.APLICADO);
-            assertThat(abonadoPor(orden.documento(), D1))
+            assertThat(abonadoPor(orden.documento()))
                     .as("y lo asentado es exactamente lo cobrado, al centimo")
                     .isEqualTo(orden.importe());
             // Saldada NO es lo mismo que ausente: `todasDe` sigue devolviendo la
@@ -306,7 +303,7 @@ class LoCobradoContraElLibroTest {
                     recibir.recibir(pagoInventado(predio, "350.00", D1, "F39-E")).pago();
 
             assertThat(pago.estado()).isEqualTo(EstadoDelPagoRecibido.RECHAZADO);
-            assertThat(abonadoPor("RECIBO 001-F39-E", D1))
+            assertThat(abonadoPor("RECIBO 001-F39-E"))
                     .as(
                             "abonar los 300,00 que el libro debe dejaria 50,00 cobrados y sin"
                                     + " contrapartida en ninguna fila; el exceso es un pago indebido"
@@ -528,9 +525,35 @@ class LoCobradoContraElLibroTest {
                                 Observacion.de("emision de la prueba de #39, " + sufijo)));
     }
 
-    /** Lo que el libro dice que ese documento abono. Se pregunta por el puerto, no por SQL. */
-    private static Dinero abonadoPor(String documento, LocalDate aLaFecha) {
-        return conciliacionDelLibro.abonadoPor(List.of(documento), aLaFecha).de(documento);
+    /**
+     * Lo que ese documento <b>sigue</b> abonando en el libro: sus asientos {@code ABONO} que nadie
+     * ha reversado.
+     *
+     * <p>Hasta #280 se preguntaba por {@code ConciliacionDeCaja}, un puerto que existio para el
+     * arqueo de turno y se quedo sin consumidor cuando la ventanilla se fue a {@code caja} (P5D):
+     * el cuadre contra el libro lo hace hoy la conciliacion del dia, por {@code GET
+     * /pagos/conciliacion}. El puerto se retiro, y esta prueba —que mide #39, no el arqueo— lee el
+     * libro con SQL, como {@code kamayuk_app} y con RLS, que es lo que afirma: filas, no objetos.
+     */
+    private static Dinero abonadoPor(String documento) {
+        return transaccion.execute(
+                estado ->
+                        new Dinero(
+                                jdbc.sql(
+                                                "SELECT coalesce(sum(a.monto), 0)"
+                                                        + "  FROM cuenta_corriente_asiento a"
+                                                        + " WHERE a.documento_origen = :documento"
+                                                        + "   AND a.tipo = 'ABONO'"
+                                                        + "   AND NOT EXISTS ("
+                                                        + "        SELECT 1"
+                                                        + "          FROM cuenta_corriente_asiento r"
+                                                        + "         WHERE r.municipalidad_id"
+                                                        + "               = a.municipalidad_id"
+                                                        + "           AND r.asiento_reversado_id"
+                                                        + "               = a.id)")
+                                        .param("documento", documento)
+                                        .query(java.math.BigDecimal.class)
+                                        .single()));
     }
 
     /** Lo que sigue debiendose de ese predio, leido por el mismo puerto que valora la orden. */
