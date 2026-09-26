@@ -582,6 +582,58 @@ class TransferirARentasTest {
         }
     }
 
+    /**
+     * #345 — Sin ninguna linea con diferencia no hay determinacion de oficio que emitir.
+     *
+     * <p>Las pruebas de la transferencia sembraban solo SUBVALUADOR, y con esa muestra no se
+     * distingue ni la guarda ausente ni una que rechace «alguna sin diferencia». La siembra que
+     * separa las tres es: solo CONFORME, solo NO_UBICADO y una mixta —CONFORME 2024, OMISO 2025—,
+     * que tiene que transferirse.
+     */
+    @Nested
+    @DisplayName("#345 — Sin diferencia hallada no se emite ninguna resolucion de determinacion")
+    class SinDiferencia {
+
+        @Test
+        @DisplayName("solo CONFORME: SinDiferenciaQueDeterminar, y ni papel ni resolucion")
+        void soloConformeNoSeDetermina() {
+            rechazaSinDiferencia(CondicionFiscalizada.CONFORME);
+        }
+
+        @Test
+        @DisplayName("solo NO_UBICADO: SinDiferenciaQueDeterminar, y ni papel ni resolucion")
+        void soloNoUbicadoNoSeDetermina() {
+            rechazaSinDiferencia(CondicionFiscalizada.NO_UBICADO);
+        }
+
+        private void rechazaSinDiferencia(CondicionFiscalizada hallada) {
+            Liquidacion liquidacion = liquidacionLista(List.of(lineaCon(E2025, hallada)));
+
+            assertThatThrownBy(() -> transferir(liquidacion))
+                    .isInstanceOf(TransferirARentas.SinDiferenciaQueDeterminar.class)
+                    .hasMessageContaining(hallada.name());
+            assertThat(documentos.cuantos())
+                    .as("una resolucion notificada abre el plazo de reclamacion: no sale ninguna")
+                    .isZero();
+            assertThat(resoluciones.cuantas()).isZero();
+            assertThat(padron.escrituras()).isZero();
+        }
+
+        @Test
+        @DisplayName("una mixta —CONFORME 2024 y OMISO 2025— si se transfiere")
+        void unaMixtaSiSeTransfiere() {
+            Liquidacion liquidacion =
+                    liquidacionLista(
+                            List.of(
+                                    lineaCon(E2024, CondicionFiscalizada.CONFORME),
+                                    lineaCon(E2025, CondicionFiscalizada.OMISO)));
+
+            TransferirARentas.Transferencia hecha = transferir(liquidacion);
+
+            assertThat(hecha.resolucion().numero()).startsWith("RDF-2026-");
+        }
+    }
+
     // ------------------------------------------------------------------
 
     private TransferirARentas.Transferencia transferir(Liquidacion liquidacion) {
@@ -750,6 +802,26 @@ class TransferirARentasTest {
         return List.of(
                 linea(E2024, Dinero.de("450.00"), Dinero.de("200.00")),
                 linea(E2025, Dinero.de("510.00"), Dinero.de("200.00")));
+    }
+
+    /** Una linea sin cifras con la condicion que se le diga (#345). */
+    private static LineaDeLiquidacion lineaCon(Ejercicio ejercicio, CondicionFiscalizada hallada) {
+        return new LineaDeLiquidacion(
+                null,
+                null,
+                ejercicio,
+                CONJUNTO,
+                PREDIO,
+                null,
+                hallada,
+                AreaM2.de("120.00"),
+                AreaM2.de("300.00"),
+                "CASA_HABITACION",
+                "COMERCIO",
+                null,
+                null,
+                null,
+                null);
     }
 
     private static LineaDeLiquidacion linea(

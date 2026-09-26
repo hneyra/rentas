@@ -142,7 +142,8 @@ public class ResolucionController {
             // no la admite es la situacion, y reintentarla no sirve de nada. La unidad ya
             // determinada por otra RDF (#462) tambien, y sin esta linea saldria como 500.
             throw new ProblemaDeNegocio(CodigoDeError.CONFLICTO, mensajeDe(enConflicto));
-        } catch (TransferirARentas.SinSustentoDocumental
+        } catch (TransferirARentas.SinDiferenciaQueDeterminar
+                | TransferirARentas.SinSustentoDocumental
                 | TransferenciaDeFiscalizacion.SinFichaQueVersionar
                 | IllegalArgumentException invalido) {
             throw new ProblemaDeNegocio(CodigoDeError.VALIDACION, mensajeDe(invalido));

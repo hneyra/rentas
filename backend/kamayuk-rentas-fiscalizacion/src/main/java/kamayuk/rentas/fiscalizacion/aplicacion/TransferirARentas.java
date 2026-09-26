@@ -191,6 +191,13 @@ public class TransferirARentas {
         // de la unidad, siempre en ese orden, y la anulacion solo toma este.
         liquidaciones.bloquear(liquidacionId);
         exigirSustento(liquidacion, peticion);
+        // #345: una resolucion de determinacion se notifica y abre el plazo de reclamacion. Sin
+        // ninguna linea con diferencia —todo CONFORME o NO_UBICADO— no hay nada que determinar,
+        // y el papel le anunciaria importes «pendientes» a quien la fiscalizacion hallo en regla.
+        List<LineaDeLiquidacion> lineas = liquidaciones.lineasDe(liquidacionId);
+        if (!LineaDeLiquidacion.algunaJustificaDeterminar(lineas)) {
+            throw new SinDiferenciaQueDeterminar(liquidacion.numero(), lineas);
+        }
 
         ActaFiscalizacion acta =
                 actas.findById(liquidacion.actaId())
@@ -204,8 +211,6 @@ public class TransferirARentas {
         acta.exigirViva();
 
         exigirQueNadieLaHayaDeterminado(liquidacion, acta);
-
-        List<LineaDeLiquidacion> lineas = liquidaciones.lineasDe(liquidacionId);
 
         // 1. El padron. Unico camino de escritura hacia catastro, y va primero para que el papel
         //    imprima lo que quedo inscrito de verdad y no lo que se esperaba inscribir.
@@ -558,6 +563,28 @@ public class TransferirARentas {
     }
 
     /** Falta el papel que respalda el acto, o el contraste todavia no es definitivo (AC 3). */
+    /**
+     * Ninguna linea de la liquidacion acusa diferencia (#345): la fiscalizacion hallo la unidad
+     * conforme, o no la ubico, y no hay determinacion de oficio que emitir.
+     */
+    public static final class SinDiferenciaQueDeterminar extends RuntimeException {
+
+        @java.io.Serial private static final long serialVersionUID = 1L;
+
+        SinDiferenciaQueDeterminar(String numero, List<LineaDeLiquidacion> lineas) {
+            super(
+                    "La liquidacion "
+                            + numero
+                            + " no acusa ninguna diferencia —"
+                            + lineas.stream()
+                                    .map(linea -> linea.condicion().name())
+                                    .distinct()
+                                    .toList()
+                            + "—: no hay determinacion de oficio que emitir. La fiscalizacion de"
+                            + " esa unidad se cierra sin resolucion");
+        }
+    }
+
     public static final class SinSustentoDocumental extends RuntimeException {
 
         @java.io.Serial private static final long serialVersionUID = 1L;

@@ -314,6 +314,25 @@ public record LineaDeLiquidacion(
         return insolutoOmitido == null;
     }
 
+    /**
+     * Si esta linea justifica una determinacion de oficio: la condicion hallada acusa diferencia
+     * ({@link CondicionFiscalizada#hayDiferencia}) (#345).
+     */
+    public boolean justificaDeterminar() {
+        return condicion.hayDiferencia();
+    }
+
+    /**
+     * Si alguna de las lineas justifica emitir la resolucion de determinacion (#345).
+     *
+     * <p>Es la pregunta que el embudo, el total «Con diferencia» de la pantalla y la transferencia
+     * se hacen sobre las mismas lineas; escrita aqui una vez. Basta una: la liquidacion mixta
+     * —CONFORME un ejercicio, OMISO otro— se determina por el que difiere.
+     */
+    public static boolean algunaJustificaDeterminar(List<LineaDeLiquidacion> lineas) {
+        return lineas.stream().anyMatch(LineaDeLiquidacion::justificaDeterminar);
+    }
+
     private static @Nullable String limpiar(@Nullable String texto, String campo) {
         if (texto == null) {
             return null;
