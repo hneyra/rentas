@@ -90,6 +90,13 @@ public class LicenciaRepositoryJdbc extends RepositorioJdbc implements LicenciaR
                     + "    AND m.licencia_id = l.id AND m.tipo = 'CANCELACION'"
                     + "    AND m.fecha <= :aLaFecha)";
 
+    /**
+     * «Ya existia a la fecha de corte», en SQL (#419): el corte se aplica a la existencia y no solo
+     * al estado. Sin esto, una licencia emitida en agosto salia VIGENTE en el padron de marzo
+     * reimpreso en septiembre, y el mismo corte daba otro papel cada vez que se imprimia.
+     */
+    private static final String EMITIDA_AL_CORTE = "l.fecha_emision <= :aLaFecha";
+
     /** «Su plazo ya paso a la fecha de corte», en SQL. Una licencia sin plazo nunca vence. */
     private static final String VENCIDA =
             "(l.vigencia_hasta IS NOT NULL AND l.vigencia_hasta < :aLaFecha)";
@@ -249,6 +256,7 @@ public class LicenciaRepositoryJdbc extends RepositorioJdbc implements LicenciaR
         Map<String, Object> parametros = new HashMap<>();
         condiciones(criterio, donde, parametros);
         parametros.put("aLaFecha", aLaFecha);
+        donde.append(" AND ").append(EMITIDA_AL_CORTE);
         estadoEnSql(estado, donde);
 
         // Los tres conteos salen de la MISMA consulta y de la MISMA expresion que filtra la
@@ -375,6 +383,8 @@ public class LicenciaRepositoryJdbc extends RepositorioJdbc implements LicenciaR
         condiciones(criterio, donde, parametros);
         if (aLaFecha != null) {
             parametros.put("aLaFecha", aLaFecha);
+            // La misma expresion que el resumen: la pagina y el agregado no pueden discrepar.
+            donde.append(" AND ").append(EMITIDA_AL_CORTE);
             estadoEnSql(estado, donde);
         }
 

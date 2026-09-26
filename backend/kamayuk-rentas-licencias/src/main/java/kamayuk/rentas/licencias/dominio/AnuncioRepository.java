@@ -42,8 +42,11 @@ public interface AnuncioRepository {
      */
     Optional<Anuncio> porClaveDeIdempotencia(String clave);
 
-    /** La grilla y el padron, paginados. */
-    Pagina<Anuncio> buscar(CriterioDeAnuncios criterio, Paginacion paginacion);
+    /**
+     * La grilla y el padron, paginados: las autorizaciones que ya existian a {@code aLaFecha}
+     * (#419).
+     */
+    Pagina<Anuncio> buscar(CriterioDeAnuncios criterio, LocalDate aLaFecha, Paginacion paginacion);
 
     /**
      * El resumen del padron: cuantas autorizaciones encuentra el criterio y cuanto han devengado

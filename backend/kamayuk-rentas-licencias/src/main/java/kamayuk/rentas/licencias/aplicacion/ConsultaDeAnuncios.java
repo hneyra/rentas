@@ -92,7 +92,7 @@ public class ConsultaDeAnuncios {
             return Pagina.vacia(paginacion);
         }
 
-        Pagina<Anuncio> pagina = anuncios.buscar(conTitulares, paginacion);
+        Pagina<Anuncio> pagina = anuncios.buscar(conTitulares, aLaFecha, paginacion);
         if (pagina.estaVacia()) {
             return Pagina.vacia(paginacion);
         }

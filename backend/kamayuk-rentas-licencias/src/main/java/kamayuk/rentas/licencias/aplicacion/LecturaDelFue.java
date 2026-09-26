@@ -257,9 +257,12 @@ public class LecturaDelFue {
             @Nullable ResumenDeContribuyente solicitante,
             LocalDate aLaFecha) {
 
+        // El numero es el de la emision que ya habia a la fecha (#419), la misma que cuenta
+        // `EstadoDelFue.derivarDe`: si no, la fila decia EN_TRAMITE y traia una licencia de mayo.
         String numero =
                 historial.stream()
                         .filter(m -> m.tipo() == TipoDeMovimientoDeEdificacion.EMISION)
+                        .filter(m -> !m.fecha().isAfter(aLaFecha))
                         .map(MovimientoDeEdificacion::numeroLicencia)
                         .filter(Objects::nonNull)
                         .findFirst()
