@@ -179,6 +179,10 @@ final class TablasDeRentas {
                     // mismo papel volveria a sacar una licencia o un vehiculo del deposito. Anular
                     // el acto no la borra: tampoco devuelve el dinero.
                     "recibo_aplicado",
+                    // Con #346: el sorteo de la muestra de un programa. Borrarlo dejaria volver a
+                    // sortear el mismo programa, que es exactamente lo que la fila existe para
+                    // impedir: la muestra es la respuesta a «¿por que me toco a mi?».
+                    "programa_sorteo",
                     "auditoria");
 
     /**
@@ -407,5 +411,8 @@ final class TablasDeRentas {
                     // Y con #383, la constancia de que un acto gasto un recibo. V28 la crea sin
                     // UPDATE: corregir las unidades en el sitio seria devolverle saldo a un pago
                     // que ya respaldo un acto, sin que nada lo delate.
-                    "recibo_aplicado");
+                    "recibo_aplicado",
+                    // Y con #346, el sorteo de la muestra. V41 la crea sin UPDATE: cambiar su
+                    // reparto en el sitio reescribiria sobre que padron se sorteo la muestra.
+                    "programa_sorteo");
 }

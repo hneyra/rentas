@@ -164,6 +164,8 @@ public final class ConfiguracionDeRentas implements ConfiguracionDeLasVerificaci
                     "prescripcion_hecho",
                     "programa_fiscalizacion",
                     "programa_muestra",
+                    // #346, V41: el sorteo de la muestra, como acto y no como sus filas.
+                    "programa_sorteo",
                     // #383, V28: que acto gasto que recibo. El recibo es de `caja`; la constancia
                     // de que se gasto es de quien emite los actos, y por eso esta aqui.
                     "recibo_aplicado",
