@@ -1,6 +1,5 @@
 package kamayuk.rentas.nucleo.infraestructura.web;
 
-import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
@@ -15,6 +14,7 @@ import kamayuk.rentas.parametros.ParametrosSellados;
 import kamayuk.rentas.parametros.PoliticasDeRedondeoSelladas;
 import kamayuk.rentas.web.Api;
 import kamayuk.rentas.web.CodigoDeError;
+import kamayuk.rentas.web.EntradaNumerica;
 import kamayuk.rentas.web.ProblemaDeNegocio;
 import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpStatus;
@@ -133,12 +133,11 @@ public class EspectaculoController {
     }
 
     private static Dinero dineroDe(@Nullable String texto, String campo) {
-        try {
-            return new Dinero(new BigDecimal(exigir(texto, campo)));
-        } catch (NumberFormatException noEsNumero) {
-            throw new ProblemaDeNegocio(
-                    CodigoDeError.VALIDACION, "El campo '" + campo + "' no es un importe valido");
-        }
+        return new Dinero(
+                EntradaNumerica.leer(
+                        exigir(texto, campo),
+                        campo,
+                        "El campo '" + campo + "' no es un importe valido"));
     }
 
     private static @Nullable Dinero dineroOpcionalDe(@Nullable String texto) {

@@ -390,6 +390,57 @@ class AltaDeDeudaRepetidaFronteraTest {
     }
 
     @Test
+    @DisplayName("#395 — un insoluto con tres decimales es 422 nombrando el campo, y no asienta")
+    void unTercerDecimalEs422() throws Exception {
+        // La siembra que distingue: un importe con TRES decimales. Con los de siempre —dos— la
+        // lectura vieja y la nueva dan lo mismo. Hasta #395 esto era 201: el libro guardaba 4 x
+        // 33,33 = 133,32 y la nota sellada decia «Total: 133.332».
+        String codigo = crearContribuyente(municipalidadA, "IDM-0395", "70303950");
+
+        MvcResult rechazada =
+                altaConInsoluto(
+                        codigo, "\"cuotaDesde\":1,\"cuotaHasta\":4,", "RES-395-1", "33.333");
+
+        assertThat(rechazada.getResponse().getStatus()).isEqualTo(422);
+        assertThat(rechazada.getResponse().getContentAsString())
+                .contains("insoluto")
+                .contains("3 decimales");
+        assertThat(cuantosAsientos(municipalidadA, "RES-395-1")).isZero();
+    }
+
+    @Test
+    @DisplayName("#395 — y un insoluto de 0.004 es 422, no el 500 del CHECK de la columna")
+    void unImporteQueRedondeaACeroEs422() throws Exception {
+        String codigo = crearContribuyente(municipalidadA, "IDM-0396", "70303960");
+
+        MvcResult rechazada = altaConInsoluto(codigo, "\"cuota\":1,", "RES-395-2", "0.004");
+
+        assertThat(rechazada.getResponse().getStatus())
+                .as("la columna lo redondeaba a 0,00 y su CHECK (monto > 0) salia como 500")
+                .isEqualTo(422);
+        assertThat(cuantosAsientos(municipalidadA, "RES-395-2")).isZero();
+    }
+
+    @Test
+    @DisplayName("#395 — los ceros de la derecha no son un decimal: \"33.330\" asienta 33,33")
+    void losCerosDeLaDerechaEntran() throws Exception {
+        String codigo = crearContribuyente(municipalidadA, "IDM-0397", "70303970");
+
+        MvcResult creada =
+                altaConInsoluto(
+                        codigo, "\"cuotaDesde\":1,\"cuotaHasta\":4,", "RES-395-3", "33.330");
+
+        assertThat(creada.getResponse().getStatus()).isEqualTo(201);
+        assertThat(
+                        columnaDeTexto(
+                                municipalidadA,
+                                "SELECT monto::text FROM cuenta_corriente_asiento"
+                                        + " WHERE documento_origen = ? ORDER BY id",
+                                "RES-395-3"))
+                .containsExactly("33.33", "33.33", "33.33", "33.33");
+    }
+
+    @Test
     @DisplayName("un alta con desglose sigue produciendo un asiento por concepto")
     void elDesgloseSigueEntrando() throws Exception {
         String codigo = crearContribuyente(municipalidadA, "IDM-0006", "70300006");
@@ -599,6 +650,19 @@ class AltaDeDeudaRepetidaFronteraTest {
                         post("/rentas/api/v1/rentas/deuda/altas")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(cuerpo(codigo, cuotas, documento)))
+                .andReturn();
+    }
+
+    private static MvcResult altaConInsoluto(
+            String codigo, String cuotas, String documento, String insoluto) throws Exception {
+        return mvc.perform(
+                        post("/rentas/api/v1/rentas/deuda/altas")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        cuerpo(codigo, cuotas, documento)
+                                                .replace(
+                                                        "\"insoluto\":\"100.00\"",
+                                                        "\"insoluto\":\"" + insoluto + "\"")))
                 .andReturn();
     }
 

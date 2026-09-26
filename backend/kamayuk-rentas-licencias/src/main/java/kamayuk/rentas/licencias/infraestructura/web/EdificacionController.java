@@ -1,6 +1,5 @@
 package kamayuk.rentas.licencias.infraestructura.web;
 
-import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
@@ -39,6 +38,7 @@ import kamayuk.rentas.parametros.LectorDeParametros;
 import kamayuk.rentas.tesoreria.ReciboYaAplicado;
 import kamayuk.rentas.web.Api;
 import kamayuk.rentas.web.CodigoDeError;
+import kamayuk.rentas.web.EntradaNumerica;
 import kamayuk.rentas.web.ParametrosDePaginacion;
 import kamayuk.rentas.web.ProblemaDeNegocio;
 import kamayuk.rentas.web.RespuestaPaginada;
@@ -771,7 +771,11 @@ public class EdificacionController {
                     CodigoDeError.VALIDACION, "Falta el campo obligatorio '" + campo + "'");
         }
         try {
-            return new AreaM2(new BigDecimal(texto));
+            return new AreaM2(
+                    EntradaNumerica.leer(
+                            texto,
+                            campo,
+                            "El campo '" + campo + "' va en metros cuadrados: '" + area + "'"));
         } catch (IllegalArgumentException | ArithmeticException invalida) {
             throw new ProblemaDeNegocio(
                     CodigoDeError.VALIDACION,

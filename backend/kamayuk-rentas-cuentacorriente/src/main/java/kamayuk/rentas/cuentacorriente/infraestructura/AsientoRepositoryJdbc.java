@@ -843,7 +843,11 @@ public class AsientoRepositoryJdbc extends RepositorioJdbc implements AsientoRep
     private Asiento insertar(Asiento asiento) {
         String usuario = OrigenContext.actual().usuario();
 
-        Long id =
+        // `RETURNING monto` (#395): lo que sigue —la nota sellada, la auditoria, la respuesta— se
+        // hace con el monto GUARDADO y no con el de memoria. `dinero` es `numeric(15,2)` y redondea
+        // al asignar; el borde ya rechaza un tercer decimal (`EntradaNumerica`), y esto es la
+        // defensa de al lado: si otro camino metiera escala 3, el papel y el libro no divergen.
+        Guardado guardado =
                 jdbc().sql(
                                 "INSERT INTO cuenta_corriente_asiento"
                                         + " (municipalidad_id, ejercicio, contribuyente_id,"
@@ -858,7 +862,7 @@ public class AsientoRepositoryJdbc extends RepositorioJdbc implements AsientoRep
                                         + "  :referenciaExterna, :monto, :fechaValor,"
                                         + "  :documentoOrigen, :asientoReversadoId, :usuario,"
                                         + "  :motivo, :acto, :deTitularAnterior, :causal)"
-                                        + " RETURNING id")
+                                        + " RETURNING id, monto")
                         .param("ejercicio", asiento.ejercicio().valor())
                         .param("contribuyenteId", asiento.contribuyenteId())
                         .param("tributo", asiento.tributo())
@@ -878,11 +882,14 @@ public class AsientoRepositoryJdbc extends RepositorioJdbc implements AsientoRep
                         .param("acto", asiento.acto() == null ? null : asiento.acto().name())
                         .param("deTitularAnterior", asiento.unidadDeTitularAnterior())
                         .param("causal", asiento.causal() == null ? null : asiento.causal().name())
-                        .query(Long.class)
+                        .query(
+                                (fila, numero) ->
+                                        new Guardado(
+                                                fila.getLong("id"), fila.getBigDecimal("monto")))
                         .single();
 
         return new Asiento(
-                id,
+                guardado.id(),
                 asiento.ejercicio(),
                 asiento.contribuyenteId(),
                 asiento.tributo(),
@@ -893,7 +900,7 @@ public class AsientoRepositoryJdbc extends RepositorioJdbc implements AsientoRep
                 asiento.predioId(),
                 asiento.vehiculoId(),
                 asiento.referenciaExterna(),
-                asiento.monto(),
+                new Dinero(guardado.monto()),
                 asiento.fechaValor(),
                 asiento.documentoOrigen(),
                 asiento.asientoReversadoId(),
@@ -903,6 +910,9 @@ public class AsientoRepositoryJdbc extends RepositorioJdbc implements AsientoRep
                 asiento.unidadDeTitularAnterior(),
                 asiento.causal());
     }
+
+    /** Lo que el {@code INSERT} devuelve: el identificador y el monto como quedo guardado. */
+    private record Guardado(long id, java.math.BigDecimal monto) {}
 
     private static Asiento mapear(ResultSet fila, int numeroDeFila) throws SQLException {
         long predio = fila.getLong("predio_id");

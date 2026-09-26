@@ -24,6 +24,7 @@ import kamayuk.rentas.parametros.ParametrosSellados;
 import kamayuk.rentas.parametros.PoliticasDeRedondeoSelladas;
 import kamayuk.rentas.web.Api;
 import kamayuk.rentas.web.CodigoDeError;
+import kamayuk.rentas.web.EntradaNumerica;
 import kamayuk.rentas.web.FiltroDeLaConsulta;
 import kamayuk.rentas.web.ParametrosDePaginacion;
 import kamayuk.rentas.web.ProblemaDeNegocio;
@@ -557,7 +558,11 @@ public class PredialController {
     private static Dinero importe(@Nullable String texto, String campo) {
         String pedido = exigir(texto, "Falta «" + campo + "»");
         try {
-            return Dinero.de(pedido.strip());
+            return new Dinero(
+                    EntradaNumerica.leer(
+                            pedido,
+                            campo,
+                            "El campo «" + campo + "» tiene que ser un importe: '" + pedido + "'"));
         } catch (IllegalArgumentException | ArithmeticException mal) {
             throw new ProblemaDeNegocio(
                     CodigoDeError.VALIDACION,

@@ -21,9 +21,12 @@ import kamayuk.rentas.dominio.Dinero;
  * resumen al reimprimir.
  *
  * <p><b>Aqui no se redondea nada.</b> Los importes se imprimen tal como se asentaron, con {@code
- * toPlainString}: decidir con cuantos decimales sale un papel oficial es D-03, y este formateador
- * no tiene por que decidirlo por la puerta de atras. El modelo de documento pide texto ya
- * formateado justamente para que la decision se vea donde se toma.
+ * toPlainString}. D-03 ya no esta abierta —ADR-0018 fijo escala 2 para todo importe que se
+ * asienta—, y lo que lo hace cumplir no es este formateador sino los dos lados de lo que imprime
+ * (#395): el borde rechaza un importe tecleado con tres decimales ({@code EntradaNumerica}), y el
+ * libro devuelve el monto GUARDADO ({@code RETURNING monto}), asi que el papel dice lo que dice el
+ * libro. El modelo de documento pide texto ya formateado justamente para que la decision se vea
+ * donde se toma.
  */
 public final class FormatoDelMovimiento {
 

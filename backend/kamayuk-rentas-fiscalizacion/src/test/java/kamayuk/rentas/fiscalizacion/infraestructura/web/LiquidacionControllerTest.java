@@ -252,6 +252,36 @@ class LiquidacionControllerTest {
     }
 
     @Test
+    @DisplayName("#395 — una correccion con area de tres decimales es 422, y no nace la version 2")
+    void unAreaConTresDecimalesEs422() throws Exception {
+        // Hasta #395 esto era 201: 120.004 contra 120.00 daba SUBVALUADOR en memoria, y la linea
+        // se guardaba con 120,00 y 120,00 —una condicion que justifica determinar con una
+        // diferencia que el dato guardado no muestra—.
+        liquidar();
+        String numero = liquidaciones.versionesDeActa(actaId).get(0).numero();
+
+        MvcResult resultado =
+                mvc.perform(
+                                post("/rentas/api/v1/fiscalizacion/liquidaciones/"
+                                                + numero
+                                                + "/reliquidaciones")
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(
+                                                "{\"observacion\":\"Reinspeccion\","
+                                                        + "\"periodoDesde\":\"2024\","
+                                                        + "\"periodoHasta\":\"2024\","
+                                                        + "\"tipoDeFiscalizacion\":\"CIERTA\","
+                                                        + "\"motivoDeterminante\":\"area corregida\","
+                                                        + "\"correcciones\":[{\"ejercicio\":\"2024\","
+                                                        + "\"areaHallada\":\"120.004\"}]}"))
+                        .andReturn();
+
+        assertThat(resultado.getResponse().getStatus()).isEqualTo(422);
+        assertThat(resultado.getResponse().getContentAsString()).contains("areaHallada");
+        assertThat(liquidaciones.versionesDeActa(actaId)).hasSize(1);
+    }
+
+    @Test
     @DisplayName("el historico de un numero devuelve el proceso completo")
     void elHistoricoDevuelveElProceso() throws Exception {
         liquidar();

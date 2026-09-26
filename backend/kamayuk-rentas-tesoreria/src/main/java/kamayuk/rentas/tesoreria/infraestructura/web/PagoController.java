@@ -22,6 +22,7 @@ import kamayuk.rentas.tesoreria.pagos.ReferenciaDeObligacion;
 import kamayuk.rentas.tesoreria.pagos.TipoDePagoRecibido;
 import kamayuk.rentas.web.Api;
 import kamayuk.rentas.web.CodigoDeError;
+import kamayuk.rentas.web.EntradaNumerica;
 import kamayuk.rentas.web.ProblemaDeNegocio;
 import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpStatus;
@@ -203,7 +204,13 @@ public class PagoController {
                     // El importe llega como CADENA (RNF-055): leerlo como numero de coma flotante
                     // volveria a introducir por la puerta de atras el defecto que el serializador
                     // evita.
-                    Dinero.de(exigir(peticion.total(), "total")),
+                    new Dinero(
+                            EntradaNumerica.leer(
+                                    exigir(peticion.total(), "total"),
+                                    "total",
+                                    "El total del recibo no es un importe: '"
+                                            + peticion.total()
+                                            + "'")),
                     obligaciones,
                     congelar(peticion),
                     reloj.instant());

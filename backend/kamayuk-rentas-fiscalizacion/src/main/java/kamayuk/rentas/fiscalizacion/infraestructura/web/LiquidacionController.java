@@ -28,6 +28,7 @@ import kamayuk.rentas.parametros.FaltaPublicar;
 import kamayuk.rentas.parametros.LectorDeParametros;
 import kamayuk.rentas.web.Api;
 import kamayuk.rentas.web.CodigoDeError;
+import kamayuk.rentas.web.EntradaNumerica;
 import kamayuk.rentas.web.ParametrosDePaginacion;
 import kamayuk.rentas.web.ProblemaDeNegocio;
 import kamayuk.rentas.web.RespuestaPaginada;
@@ -410,7 +411,15 @@ public class LiquidacionController {
             return null;
         }
         try {
-            return AreaM2.de(valor);
+            return new AreaM2(
+                    EntradaNumerica.leer(
+                            valor,
+                            campo,
+                            "El campo '"
+                                    + campo
+                                    + "' es un area en metros cuadrados: '"
+                                    + texto
+                                    + "'"));
         } catch (IllegalArgumentException invalida) {
             throw new ProblemaDeNegocio(
                     CodigoDeError.VALIDACION,
