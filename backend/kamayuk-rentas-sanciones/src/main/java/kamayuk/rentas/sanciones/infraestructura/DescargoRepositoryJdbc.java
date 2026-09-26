@@ -113,6 +113,22 @@ public class DescargoRepositoryJdbc extends RepositorioJdbc implements DescargoR
                 .list();
     }
 
+    @Override
+    public List<Descargo> pendientesDe(long papeletaId, java.time.LocalDate aLaFecha) {
+        return jdbc().sql(
+                        "SELECT "
+                                + COLUMNAS
+                                + " FROM descargo WHERE papeleta_id = :papeleta"
+                                + "   AND fecha <= :fecha"
+                                + "   AND NOT EXISTS (SELECT 1 FROM resolucion_gerencia rg"
+                                + "     WHERE rg.descargo_id = descargo.id AND rg.fecha <= :fecha)"
+                                + " ORDER BY fecha, id")
+                .param("papeleta", papeletaId)
+                .param("fecha", aLaFecha)
+                .query(DescargoRepositoryJdbc::mapear)
+                .list();
+    }
+
     private static Descargo mapear(ResultSet fila, int numeroDeFila) throws SQLException {
         return new Descargo(
                 fila.getLong("id"),

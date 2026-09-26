@@ -329,7 +329,12 @@ class ElPlazoQueConcedeCadaResolucionJdbcTest {
         ProcesarPapeletaDeLaCorrida procesar =
                 envolver(
                         new ProcesarPapeletaDeLaCorrida(
-                                papeletas, resoluciones, diligencias, emision, corridas));
+                                papeletas,
+                                resoluciones,
+                                diligencias,
+                                emision,
+                                corridas,
+                                new DescargoRepositoryJdbc(jdbc)));
         generar =
                 new GenerarCorridaDeValores(
                         envolver(new ConsultaDeLaCorridaDeValores(corridas)), procesar);
