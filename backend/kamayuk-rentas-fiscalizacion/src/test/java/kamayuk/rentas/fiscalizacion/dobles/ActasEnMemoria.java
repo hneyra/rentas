@@ -3,7 +3,6 @@ package kamayuk.rentas.fiscalizacion.dobles;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import kamayuk.rentas.fiscalizacion.dominio.ActaConLoDeclarado;
 import kamayuk.rentas.fiscalizacion.dominio.ActaFiscalizacion;
 import kamayuk.rentas.fiscalizacion.dominio.ActaFiscalizacionRepository;
 
@@ -26,8 +25,10 @@ public final class ActasEnMemoria implements ActaFiscalizacionRepository {
      * PostgreSQL.
      */
     @Override
-    public java.util.Map<Long, ActaConLoDeclarado.LoDeclarado> loDeclaradoPorFicha(
-            java.util.Set<Long> fichaIds) {
+    public java.util.Map<
+                    Long,
+                    kamayuk.rentas.fiscalizacion.dominio.ComparacionHalladoDeclarado.LoDeclarado>
+            loDeclaradoDeLasActas(java.util.Set<Long> actaIds) {
         return java.util.Map.of();
     }
 
