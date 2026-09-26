@@ -4,9 +4,9 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.util.List;
-import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
+import kamayuk.rentas.dominio.NumeroImpreso;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.persistencia.RepositorioJdbc;
 import kamayuk.rentas.sanciones.dominio.Descargo;
@@ -88,7 +88,7 @@ public class DescargoRepositoryJdbc extends RepositorioJdbc implements DescargoR
     @Override
     public Optional<Descargo> porNumeroDeExpediente(String numeroExpediente) {
         return jdbc().sql("SELECT " + COLUMNAS + " FROM descargo WHERE numero_expediente = :numero")
-                .param("numero", numeroExpediente.strip().toUpperCase(Locale.ROOT))
+                .param("numero", NumeroImpreso.formaDeBusqueda(numeroExpediente))
                 .query(DescargoRepositoryJdbc::mapear)
                 .optional();
     }

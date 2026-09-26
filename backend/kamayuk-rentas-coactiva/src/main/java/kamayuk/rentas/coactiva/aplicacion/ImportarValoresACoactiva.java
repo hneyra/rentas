@@ -27,6 +27,7 @@ import kamayuk.rentas.coactiva.dominio.ValorRechazado;
 import kamayuk.rentas.cuentacorriente.ClaveDeObligacionPublica;
 import kamayuk.rentas.cuentacorriente.MovimientoDeFase;
 import kamayuk.rentas.dominio.Ejercicio;
+import kamayuk.rentas.dominio.NumeroImpreso;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.valores.ObligacionDelValor;
 import kamayuk.rentas.valores.ValorParaCoactiva;
@@ -350,10 +351,7 @@ public class ImportarValoresACoactiva {
          */
         public Peticion {
             numerosDeValor =
-                    numerosDeValor.stream()
-                            .map(numero -> numero.strip().toUpperCase(Locale.ROOT))
-                            .distinct()
-                            .toList();
+                    numerosDeValor.stream().map(NumeroImpreso::formaDeBusqueda).distinct().toList();
         }
     }
 

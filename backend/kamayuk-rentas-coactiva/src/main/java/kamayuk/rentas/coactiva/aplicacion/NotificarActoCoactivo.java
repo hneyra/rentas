@@ -1,7 +1,6 @@
 package kamayuk.rentas.coactiva.aplicacion;
 
 import java.time.LocalDate;
-import java.util.Locale;
 import kamayuk.rentas.auditoria.Auditoria;
 import kamayuk.rentas.auditoria.Operacion;
 import kamayuk.rentas.auditoria.RegistroDeAuditoria;
@@ -121,7 +120,7 @@ public class NotificarActoCoactivo {
             Observacion observacion) {
 
         ActoCoactivo acto =
-                actos.porNumero(numeroDelActo.strip().toUpperCase(Locale.ROOT))
+                actos.porNumero(numeroDelActo)
                         .orElseThrow(() -> new ActoInexistente(numeroDelActo));
         // #427: el candado del acto, ANTES de leer nada en que se apoye la diligencia —su intento,
         // la direccion vigente, el estado del expediente—. Sin el, dos diligencias simultaneas

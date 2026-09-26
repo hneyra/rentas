@@ -5,7 +5,6 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Locale;
 import java.util.Optional;
 import kamayuk.rentas.autorizacion.Privilegio;
 import kamayuk.rentas.autorizacion.RequiereAcceso;
@@ -115,8 +114,7 @@ public class PrediosDeRentasController {
                     "Hay que decir de quien son los predios: falta «codContribuyente» (o su otro"
                             + " nombre, «contribuyente»)");
         }
-        Optional<ResumenDeContribuyente> encontrado =
-                directorio.porCodigo(codigo.toUpperCase(Locale.ROOT));
+        Optional<ResumenDeContribuyente> encontrado = directorio.porCodigo(codigo);
         if (encontrado.isEmpty()) {
             throw new ProblemaDeNegocio(
                     CodigoDeError.NO_ENCONTRADO,

@@ -1,8 +1,8 @@
 package kamayuk.rentas.fiscalizacion.dominio;
 
 import java.time.LocalDate;
-import java.util.Locale;
 import java.util.Objects;
+import kamayuk.rentas.dominio.NumeroImpreso;
 import kamayuk.rentas.dominio.Observacion;
 import org.jspecify.annotations.Nullable;
 
@@ -80,7 +80,7 @@ public record ResolucionDeDeterminacion(
 
     public ResolucionDeDeterminacion {
         Objects.requireNonNull(numero, "La resolucion necesita su numero");
-        numero = numero.strip().toUpperCase(Locale.ROOT);
+        numero = NumeroImpreso.formaDeBusqueda(numero);
         if (numero.isEmpty() || numero.length() > NUMERO_MAXIMO) {
             throw new IllegalArgumentException(
                     "El numero va de 1 a " + NUMERO_MAXIMO + " caracteres: '" + numero + "'");

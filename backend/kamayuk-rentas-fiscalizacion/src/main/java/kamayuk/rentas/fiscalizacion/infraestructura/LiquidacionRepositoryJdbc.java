@@ -13,6 +13,7 @@ import kamayuk.rentas.compartido.Paginacion;
 import kamayuk.rentas.dominio.AreaM2;
 import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.dominio.Ejercicio;
+import kamayuk.rentas.dominio.NumeroImpreso;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.fiscalizacion.dominio.CondicionFiscalizada;
 import kamayuk.rentas.fiscalizacion.dominio.CriterioDeLiquidaciones;
@@ -132,7 +133,7 @@ public class LiquidacionRepositoryJdbc extends RepositorioJdbc implements Liquid
     @Override
     public Optional<Liquidacion> porNumero(String numero) {
         return jdbc().sql("SELECT " + COLUMNAS + DESDE + " WHERE l.numero = :numero")
-                .param("numero", numero.strip().toUpperCase(java.util.Locale.ROOT))
+                .param("numero", NumeroImpreso.formaDeBusqueda(numero))
                 .query(LiquidacionRepositoryJdbc::mapear)
                 .optional();
     }
@@ -240,7 +241,7 @@ public class LiquidacionRepositoryJdbc extends RepositorioJdbc implements Liquid
 
         if (criterio.numero() != null) {
             donde.append(" AND l.numero = :numero");
-            parametros.put("numero", criterio.numero().strip().toUpperCase(java.util.Locale.ROOT));
+            parametros.put("numero", NumeroImpreso.formaDeBusqueda(criterio.numero()));
         }
         if (criterio.programaId() != null) {
             donde.append(" AND a.programa_id = :programa");
@@ -260,8 +261,7 @@ public class LiquidacionRepositoryJdbc extends RepositorioJdbc implements Liquid
                             + "'"
                             + "        ORDER BY m.id DESC LIMIT 1) = :notificacion");
             parametros.put(
-                    "notificacion",
-                    criterio.numeroNotificacion().strip().toUpperCase(java.util.Locale.ROOT));
+                    "notificacion", NumeroImpreso.formaDeBusqueda(criterio.numeroNotificacion()));
         }
         if (criterio.condicion() != null) {
             donde.append(

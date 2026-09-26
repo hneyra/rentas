@@ -145,6 +145,12 @@ class PapeletaRepositoryJdbcTest {
             assertThat(reimpresa.importeAPagar()).isEqualTo(Dinero.de("396"));
             assertThat(reimpresa.importeConBeneficio()).isEqualTo(Dinero.de("198"));
             assertThat(reimpresa.id()).isEqualTo(guardada.id());
+            // #515: como se teclea en ventanilla. La forma la pone el adaptador, no quien llama.
+            java.util.Optional<Papeleta> tecleada =
+                    transaccion.execute(estado -> repositorio.porNumero("  pt-0001 "));
+            assertThat(tecleada)
+                    .as("en minusculas y con espacios es la misma papeleta")
+                    .hasValueSatisfying(p -> assertThat(p.id()).isEqualTo(guardada.id()));
         }
 
         @Test

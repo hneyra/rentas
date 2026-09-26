@@ -2,10 +2,10 @@ package kamayuk.rentas.sanciones.dominio;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
-import java.util.Locale;
 import java.util.Objects;
 import kamayuk.rentas.dominio.Alicuota;
 import kamayuk.rentas.dominio.Dinero;
+import kamayuk.rentas.dominio.NumeroImpreso;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.dominio.OrdenDeLosActos;
 import kamayuk.rentas.dominio.Placa;
@@ -101,7 +101,7 @@ public record Papeleta(
     public Papeleta {
         Objects.requireNonNull(familia, "La papeleta necesita su familia");
         Objects.requireNonNull(numero, "La papeleta necesita su numero");
-        numero = numero.strip().toUpperCase(Locale.ROOT);
+        numero = NumeroImpreso.formaDeBusqueda(numero);
         if (numero.isEmpty() || numero.length() > NUMERO_MAXIMO) {
             throw new IllegalArgumentException(
                     "El numero va de 1 a " + NUMERO_MAXIMO + " caracteres: '" + numero + "'");

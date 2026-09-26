@@ -1658,6 +1658,10 @@ class SancionesJdbcTest {
             assertThat(expediente.descargos())
                     .extracting(Descargo::numeroExpediente)
                     .containsExactly("EXP-D01");
+            // #515: el expediente se busca como se teclea; la forma la pone el adaptador.
+            assertThat(enTransaccion(() -> descargos.porNumeroDeExpediente(" exp-d01 ")))
+                    .as("en minusculas y con espacios es el mismo descargo")
+                    .hasValueSatisfying(d -> assertThat(d.numeroExpediente()).isEqualTo("EXP-D01"));
             assertThat(expediente.actos())
                     .as("la resolucion, el acta de ingreso y la de salida: los tres papeles")
                     .hasSize(3)

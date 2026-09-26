@@ -2,7 +2,6 @@ package kamayuk.rentas.valores.aplicacion;
 
 import java.time.Clock;
 import java.time.LocalDate;
-import java.util.Locale;
 import kamayuk.rentas.auditoria.Auditoria;
 import kamayuk.rentas.auditoria.Operacion;
 import kamayuk.rentas.auditoria.RegistroDeAuditoria;
@@ -88,7 +87,7 @@ public class PasarACoactiva {
             String numeroDeValor, LocalDate fechaDelMovimiento, Observacion observacion) {
 
         Valor valor =
-                valores.porNumero(numeroDeValor.strip().toUpperCase(Locale.ROOT))
+                valores.porNumero(numeroDeValor)
                         .orElseThrow(() -> new ValorInexistente(numeroDeValor));
         long valorId = requireId(valor);
         // #444: un valor pagado, anulado o prescrito no admite actos de cobranza. Antes que nada:

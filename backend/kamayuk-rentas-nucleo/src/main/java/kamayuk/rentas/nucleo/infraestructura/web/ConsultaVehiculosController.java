@@ -81,7 +81,7 @@ public class ConsultaVehiculosController {
         // consulta, asi que puede faltar. Lo que no puede es traer un codigo que no existe y
         // contestar como si la persona no tuviera vehiculos (#622).
         String codigo = primeroNoVacio(codContribuyente, contribuyente);
-        if (codigo != null && directorio.porCodigo(codigo.toUpperCase(Locale.ROOT)).isEmpty()) {
+        if (codigo != null && directorio.porCodigo(codigo).isEmpty()) {
             throw noEstaEnElPadron(codigo);
         }
 
