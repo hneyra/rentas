@@ -54,6 +54,7 @@ import kamayuk.rentas.dominio.MunicipalidadId;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.esquema.BaseDeDatosDePrueba;
 import kamayuk.rentas.esquema.ContextoDeTenant;
+import kamayuk.rentas.fiscalizacion.aplicacion.CambiarEstadoDeLaLiquidacion;
 import kamayuk.rentas.fiscalizacion.aplicacion.ConsultaDeResoluciones;
 import kamayuk.rentas.fiscalizacion.aplicacion.TransferirARentas;
 import kamayuk.rentas.fiscalizacion.dominio.CondicionFiscalizada;
@@ -666,6 +667,101 @@ class TransferenciaJdbcTest {
                 assertThat(entroB).as("B se rechaza").isFalse();
                 assertThat(esperoElCandado)
                         .as("y se rechaza porque espero el candado de la unidad, no por otra cosa")
+                        .isTrue();
+            } finally {
+                soltar.countDown();
+                piscina.shutdownNow();
+            }
+        }
+
+        /**
+         * #484 — Anular y transferir la misma liquidacion a la vez: gana una, y la otra ve lo que
+         * la primera hizo.
+         *
+         * <p>Desde #338 no se anula una liquidacion con su RDF, pero la comprobacion era leer y
+         * despues escribir, sin candado: la transferencia registraba su RDF sin confirmar, la
+         * anulacion no la veia, escribia ANULADA y confirmaba, y la transferencia confirmaba
+         * despues. Quedaba el estado que #338 declaro imposible. Se reproduce en el instante
+         * exacto: A registro la RDF y retiene la transaccion; B anula.
+         */
+        @Test
+        // Se captura RuntimeException a proposito: B puede salir por la regla de #338, que es lo
+        // esperado; lo que se mide es el estado final.
+        @SuppressWarnings("checkstyle:IllegalCatch")
+        @DisplayName(
+                "#484 — anular mientras se transfiere la misma liquidacion: la anulacion espera y ve"
+                        + " la RDF")
+        void anularMientrasSeTransfiere() throws Exception {
+            Escenario escenario = sembrar(municipalidadA, null);
+            CountDownLatch registrada = new CountDownLatch(1);
+            CountDownLatch soltar = new CountDownLatch(1);
+            TransferirARentas queEspera =
+                    envolver(
+                            armar(
+                                    new ResolucionQueEsperaTrasRegistrar(
+                                            resoluciones, registrada, soltar)));
+            CambiarEstadoDeLaLiquidacion cambiar =
+                    envolver(
+                            new CambiarEstadoDeLaLiquidacion(
+                                    liquidaciones, movimientos, resoluciones));
+            ExecutorService piscina = Executors.newFixedThreadPool(2);
+
+            try {
+                Future<Boolean> transferencia =
+                        piscina.submit(
+                                () ->
+                                        comoFiscalizador(
+                                                () ->
+                                                        queEspera.transferir(
+                                                                peticion(escenario),
+                                                                FormatoDeDocumento.PDF,
+                                                                PORQUE)));
+                assertThat(registrada.await(60, TimeUnit.SECONDS))
+                        .as("la transferencia registro la RDF y retiene la transaccion")
+                        .isTrue();
+
+                Future<Boolean> anulacion =
+                        piscina.submit(
+                                () ->
+                                        comoFiscalizador(
+                                                () ->
+                                                        cambiar.cambiar(
+                                                                escenario.numeroDeLiquidacion,
+                                                                EstadoDeLiquidacion.ANULADA,
+                                                                HOY,
+                                                                "Se anula a pedido del"
+                                                                        + " fiscalizador",
+                                                                PORQUE)));
+                boolean esperoElCandado = esperarAQueAlguienEspereUnCandado(anulacion);
+                soltar.countDown();
+
+                assertThat(transferencia.get(60, TimeUnit.SECONDS))
+                        .as("la transferencia entra")
+                        .isTrue();
+                boolean anulo = anulacion.get(60, TimeUnit.SECONDS);
+                long anuladas =
+                        contarDonde(
+                                "liquidacion_movimiento",
+                                "liquidacion_id = "
+                                        + escenario.liquidacionId
+                                        + " AND estado = 'ANULADA'");
+                assertThat(
+                                List.of(
+                                        "RDF "
+                                                + contarDonde(
+                                                        "resolucion_determinacion",
+                                                        "liquidacion_id = "
+                                                                + escenario.liquidacionId),
+                                        "ANULADA " + anuladas))
+                        .as(
+                                "una RDF vigente sobre una liquidacion anulada es el estado que"
+                                        + " #338 declaro imposible")
+                        .containsExactly("RDF 1", "ANULADA 0");
+                assertThat(anulo)
+                        .as("la anulacion se rechaza: la liquidacion ya tiene RDF")
+                        .isFalse();
+                assertThat(esperoElCandado)
+                        .as("y se rechaza porque espero el candado de la liquidacion")
                         .isTrue();
             } finally {
                 soltar.countDown();

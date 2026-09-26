@@ -82,6 +82,10 @@ public class CambiarEstadoDeLaLiquidacion {
                         .porNumero(numero)
                         .orElseThrow(() -> new LiquidacionInexistente(numero));
 
+        // El candado ANTES de leer el estado (#484): sin el, una transferencia simultanea
+        // registra su RDF sin confirmar, aqui no se ve, y se anula una liquidacion que ya la
+        // tiene.
+        liquidaciones.bloquear(liquidacion.identificador());
         List<MovimientoDeLiquidacion> historial =
                 movimientos.deLiquidacion(liquidacion.identificador());
         EstadoDeLiquidacion actual = EstadoDeLiquidacion.delHistorial(historial);

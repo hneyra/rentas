@@ -136,6 +136,20 @@ public class LiquidacionRepositoryJdbc extends RepositorioJdbc implements Liquid
     }
 
     @Override
+    public void bloquear(long liquidacionId) {
+        // La misma forma que `bloquearLaUnidad` de las resoluciones: por municipalidad, y con su
+        // propio prefijo para no chocar con ningun otro candado de este modulo.
+        jdbc().sql(
+                        "SELECT count(*) FROM (SELECT pg_advisory_xact_lock(hashtextextended("
+                                + "'liquidacion|' || "
+                                + MUNICIPALIDAD_ACTUAL
+                                + " || '|' || :id, 0))) AS candado")
+                .param("id", liquidacionId)
+                .query(Long.class)
+                .single();
+    }
+
+    @Override
     public Optional<Liquidacion> findById(long id) {
         return jdbc().sql("SELECT " + COLUMNAS + DESDE + " WHERE l.id = :id")
                 .param("id", id)
