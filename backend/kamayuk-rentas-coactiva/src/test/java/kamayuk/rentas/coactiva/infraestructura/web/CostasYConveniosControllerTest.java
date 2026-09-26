@@ -442,6 +442,23 @@ class CostasYConveniosControllerTest {
                 .doesNotContain("totalElementos");
     }
 
+    // ---------------------------------------- #459: el plazo no se inventa
+
+    @Test
+    @DisplayName("#459 — sin primeraCuotaVence, 422 nombrando el campo: no se inventa el plazo")
+    void sinPrimeraCuotaNoSeInventaElPlazo() throws Exception {
+        String expediente = expedienteConRec1();
+
+        MvcResult resultado =
+                fraccionar(expediente, true, "Fraccionamiento en coactiva", null, false);
+
+        assertThat(resultado.getResponse().getStatus())
+                .as("hasta #459 el borde ponia la fecha de la firma y contestaba 200")
+                .isEqualTo(422);
+        assertThat(resultado.getResponse().getContentAsString())
+                .contains("Falta el campo 'primeraCuotaVence'");
+    }
+
     // ---------------------------------------- #425: las costas, igual que las deudas
 
     @Test
@@ -802,10 +819,22 @@ class CostasYConveniosControllerTest {
             String observacion,
             @org.jspecify.annotations.Nullable String clave)
             throws Exception {
+        return fraccionar(expediente, simular, observacion, clave, true);
+    }
+
+    private MvcResult fraccionar(
+            String expediente,
+            boolean simular,
+            String observacion,
+            @org.jspecify.annotations.Nullable String clave,
+            boolean conPrimeraCuota)
+            throws Exception {
         String cuerpo =
                 "{\"nroExpedCoact\":\""
                         + expediente
-                        + "\",\"nroDeCuotas\":6,\"cuotaInicial\":\"20 %\",\"simular\":"
+                        + "\",\"nroDeCuotas\":6,\"cuotaInicial\":\"20 %\""
+                        + (conPrimeraCuota ? ",\"primeraCuotaVence\":\"2026-07-18\"" : "")
+                        + ",\"simular\":"
                         + simular
                         + (observacion == null ? "" : ",\"observacion\":\"" + observacion + "\"")
                         + ",\"obligaciones\":[{\"tributo\":\"PREDIAL\",\"ejercicio\":2026}]}";

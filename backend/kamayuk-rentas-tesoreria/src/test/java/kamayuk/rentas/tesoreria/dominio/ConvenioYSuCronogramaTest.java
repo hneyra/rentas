@@ -35,6 +35,11 @@ class ConvenioYSuCronogramaTest {
 
     private static final LocalDate PRIMERA = LocalDate.of(2026, 4, 15);
 
+    /** El dia de la firma: un mes antes de la cuota 1, para que las dos fechas no coincidan. */
+    private static final LocalDate FIRMA = LocalDate.of(2026, 3, 15);
+
+    private static final PlazosDelConvenio PLAZOS = new PlazosDelConvenio(FIRMA, PRIMERA);
+
     /** Un interes de prueba, no normativo: 1 % mensual. */
     private static CondicionesDelConvenio condiciones(String interes, int maximo, String inicial) {
         return new CondicionesDelConvenio(Alicuota.de(interes), maximo, Alicuota.de(inicial), 7L);
@@ -52,7 +57,7 @@ class ConvenioYSuCronogramaTest {
             // convenio, para siempre.
             List<CuotaDeConvenio> cronograma =
                     Cronograma.de(
-                            Dinero.de("100.00"), condiciones("0", 12, "0"), 3, PRIMERA, REDONDEO);
+                            Dinero.de("100.00"), condiciones("0", 12, "0"), 3, PLAZOS, REDONDEO);
 
             Dinero capital = Dinero.CERO;
             for (CuotaDeConvenio cuota : cronograma) {
@@ -70,7 +75,7 @@ class ConvenioYSuCronogramaTest {
         void laInicialEsLaCero() {
             List<CuotaDeConvenio> cronograma =
                     Cronograma.de(
-                            Dinero.de("1000.00"), condiciones("1", 12, "20"), 4, PRIMERA, REDONDEO);
+                            Dinero.de("1000.00"), condiciones("1", 12, "20"), 4, PLAZOS, REDONDEO);
 
             assertThat(cronograma).hasSize(5);
             CuotaDeConvenio inicial = cronograma.get(0);
@@ -83,12 +88,31 @@ class ConvenioYSuCronogramaTest {
             assertThat(Cronograma.inicialDe(cronograma)).isEqualTo(Dinero.de("200.00"));
         }
 
+        /**
+         * #459 — La inicial vence el dia del convenio, y la cuota 1 el dia pactado.
+         *
+         * <p>La siembra lleva la firma y la cuota 1 en dias distintos: con los dos iguales —lo que
+         * el borde fabricaba cuando faltaba el campo— la implementacion buena y la que le ponia a
+         * la inicial el vencimiento de la cuota 1 dan la misma fecha.
+         */
+        @Test
+        @DisplayName("#459 — la inicial vence el dia de la firma, y la cuota 1 el dia pactado")
+        void laInicialVenceElDiaDelConvenio() {
+            List<CuotaDeConvenio> cronograma =
+                    Cronograma.de(
+                            Dinero.de("1000.00"), condiciones("1", 12, "20"), 4, PLAZOS, REDONDEO);
+
+            assertThat(cronograma.stream().map(CuotaDeConvenio::vencimiento).limit(2).toList())
+                    .as("la inicial se paga en el acto; la cuota 1, cuando se pacto")
+                    .containsExactly(FIRMA, PRIMERA);
+        }
+
         @Test
         @DisplayName("sin cuota inicial no hay cuota 0")
         void sinInicialNoHayCuotaCero() {
             List<CuotaDeConvenio> cronograma =
                     Cronograma.de(
-                            Dinero.de("600.00"), condiciones("0", 12, "0"), 6, PRIMERA, REDONDEO);
+                            Dinero.de("600.00"), condiciones("0", 12, "0"), 6, PLAZOS, REDONDEO);
 
             assertThat(cronograma).hasSize(6);
             assertThat(cronograma.get(0).numero()).isEqualTo(1);
@@ -103,7 +127,7 @@ class ConvenioYSuCronogramaTest {
             // financiamiento por el mismo dinero.
             List<CuotaDeConvenio> cronograma =
                     Cronograma.de(
-                            Dinero.de("800.00"), condiciones("1", 12, "0"), 4, PRIMERA, REDONDEO);
+                            Dinero.de("800.00"), condiciones("1", 12, "0"), 4, PLAZOS, REDONDEO);
 
             assertThat(cronograma.stream().map(CuotaDeConvenio::interes).toList())
                     .containsExactly(
@@ -121,7 +145,7 @@ class ConvenioYSuCronogramaTest {
         void losVencimientosVanMesAMes() {
             List<CuotaDeConvenio> cronograma =
                     Cronograma.de(
-                            Dinero.de("300.00"), condiciones("0", 12, "0"), 3, PRIMERA, REDONDEO);
+                            Dinero.de("300.00"), condiciones("0", 12, "0"), 3, PLAZOS, REDONDEO);
 
             assertThat(cronograma.stream().map(CuotaDeConvenio::vencimiento).toList())
                     .containsExactly(PRIMERA, PRIMERA.plusMonths(1), PRIMERA.plusMonths(2));
@@ -136,7 +160,7 @@ class ConvenioYSuCronogramaTest {
                                             Dinero.de("500.00"),
                                             condiciones("1", 6, "0"),
                                             7,
-                                            PRIMERA,
+                                            PLAZOS,
                                             REDONDEO))
                     .isInstanceOf(CondicionesDelConvenio.DemasiadasCuotas.class)
                     .hasMessageContaining("el maximo vigente es 6");
@@ -151,7 +175,7 @@ class ConvenioYSuCronogramaTest {
                                             Dinero.de("500.00"),
                                             condiciones("1", 12, "100"),
                                             3,
-                                            PRIMERA,
+                                            PLAZOS,
                                             REDONDEO))
                     .isInstanceOf(Cronograma.NadaQueFraccionar.class)
                     .hasMessageContaining("es un pago");
@@ -162,11 +186,7 @@ class ConvenioYSuCronogramaTest {
         void elMontoEsLaSuma() {
             List<CuotaDeConvenio> cronograma =
                     Cronograma.de(
-                            Dinero.de("777.77"),
-                            condiciones("2.5", 12, "10"),
-                            5,
-                            PRIMERA,
-                            REDONDEO);
+                            Dinero.de("777.77"), condiciones("2.5", 12, "10"), 5, PLAZOS, REDONDEO);
 
             for (CuotaDeConvenio cuota : cronograma) {
                 assertThat(cuota.monto())
@@ -204,7 +224,7 @@ class ConvenioYSuCronogramaTest {
                             Dinero.de("1234.50"),
                             condiciones("1.5", 12, "0"),
                             12,
-                            PRIMERA,
+                            PLAZOS,
                             REDONDEO);
 
             assertThat(cronograma.subList(0, 11))
@@ -232,7 +252,7 @@ class ConvenioYSuCronogramaTest {
                             Dinero.de("300.00"),
                             condiciones("0", 12, "0"),
                             3,
-                            PRIMERA,
+                            PLAZOS,
                             new PoliticaDeRedondeo(2, RoundingMode.DOWN));
 
             assertThat(cronograma.stream().map(CuotaDeConvenio::capital).toList())
@@ -249,7 +269,7 @@ class ConvenioYSuCronogramaTest {
                             Dinero.de("600.00"),
                             condiciones("0", 12, "0"),
                             6,
-                            PRIMERA,
+                            PLAZOS,
                             new PoliticaDeRedondeo(2, RoundingMode.UP));
 
             assertThat(cronograma)

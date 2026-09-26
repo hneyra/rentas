@@ -475,9 +475,11 @@ public class ConvenioController {
                     corte,
                     cuotas,
                     porcentajeDe(peticion.cuotaInicial()),
-                    peticion.primeraCuotaVence() == null || peticion.primeraCuotaVence().isBlank()
-                            ? fecha
-                            : fechaDe(peticion.primeraCuotaVence(), "primeraCuotaVence"),
+                    // Sin plazo por omision (#459): el dia de la firma dejaba la cuota 1 venciendo
+                    // el mismo dia que la inicial, y el que fije la ordenanza es D-02b.
+                    exigirFecha(
+                            exigir(peticion.primeraCuotaVence(), "primeraCuotaVence"),
+                            "primeraCuotaVence"),
                     garantiaDe(peticion.tipoDeGarantia()),
                     vacioAnulo(peticion.detalleDelOfrecimiento()),
                     vacioAnulo(peticion.resolucion()),

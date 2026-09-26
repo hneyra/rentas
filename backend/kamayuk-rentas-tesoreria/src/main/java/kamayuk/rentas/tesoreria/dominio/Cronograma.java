@@ -1,7 +1,6 @@
 package kamayuk.rentas.tesoreria.dominio;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -69,7 +68,8 @@ public final class Cronograma {
      * @param acogido la deuda que se fracciona, a su fecha de corte
      * @param condiciones el interes, el maximo de cuotas y el porcentaje de inicial (regla 5)
      * @param cuotas cuantas cuotas se piden, sin contar la inicial
-     * @param primeraCuotaVence el vencimiento de la cuota 1; las siguientes van mes a mes
+     * @param plazos el dia del convenio, en que vence la inicial, y el de la cuota 1; las
+     *     siguientes van mes a mes (#459)
      * @param redondeo la politica del punto {@code CUOTA}, resuelta del conjunto sellado (D-03)
      * @throws CondicionesDelConvenio.DemasiadasCuotas si se piden mas de las admitidas
      * @throws NadaQueFraccionar si lo acogido no es positivo
@@ -78,12 +78,12 @@ public final class Cronograma {
             Dinero acogido,
             CondicionesDelConvenio condiciones,
             int cuotas,
-            LocalDate primeraCuotaVence,
+            PlazosDelConvenio plazos,
             PoliticaDeRedondeo redondeo) {
 
         Objects.requireNonNull(acogido, "El cronograma fracciona un importe concreto");
         Objects.requireNonNull(condiciones, "El cronograma necesita sus condiciones (regla 5)");
-        Objects.requireNonNull(primeraCuotaVence, "La primera cuota vence en una fecha concreta");
+        Objects.requireNonNull(plazos, "El cronograma vence en fechas concretas");
         Objects.requireNonNull(redondeo, "La politica de redondeo se recibe, no se fija (D-03)");
         condiciones.exigirQueQuepa(cuotas);
         if (!acogido.esPositivo()) {
@@ -106,9 +106,10 @@ public final class Cronograma {
         List<CuotaDeConvenio> cronograma = new ArrayList<>(cuotas + 1);
         if (inicial.esPositivo()) {
             // La inicial vence el dia del convenio -se paga en el acto- y no devenga
-            // interes: no financia nada.
+            // interes: no financia nada. Hasta #459 vencia con la cuota 1.
             cronograma.add(
-                    new CuotaDeConvenio(0, primeraCuotaVence, inicial, Dinero.CERO, Dinero.CERO));
+                    new CuotaDeConvenio(
+                            0, plazos.vencimientoDe(0), inicial, Dinero.CERO, Dinero.CERO));
         }
 
         // El cociente exacto, redondeado una vez con la politica del punto CUOTA (#382).
@@ -123,11 +124,7 @@ public final class Cronograma {
             Dinero interes = saldo.por(tipo).redondeadoCon(redondeo);
             cronograma.add(
                     new CuotaDeConvenio(
-                            numero,
-                            primeraCuotaVence.plusMonths(numero - 1L),
-                            capital,
-                            interes,
-                            Dinero.CERO));
+                            numero, plazos.vencimientoDe(numero), capital, interes, Dinero.CERO));
             repartido = repartido.mas(capital);
             saldo = saldo.menos(capital);
         }

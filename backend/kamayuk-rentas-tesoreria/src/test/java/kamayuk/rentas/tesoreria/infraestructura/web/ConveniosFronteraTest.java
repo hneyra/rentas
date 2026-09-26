@@ -651,6 +651,22 @@ class ConveniosFronteraTest {
                 .doesNotContain("parametroQueFalta");
     }
 
+    /**
+     * #459 — Sin {@code primeraCuotaVence} no se inventa el plazo: hasta #459 el borde ponia la
+     * fecha de la firma, y la cuota 1 vencia el mismo dia que la inicial.
+     */
+    @Test
+    @DisplayName("#459 — sin primeraCuotaVence, 422 nombrando el campo: no se inventa el plazo")
+    void sinPrimeraCuotaNoSeInventaElPlazo() throws Exception {
+        MvcResult resultado = fraccionarSinPrimeraCuota();
+
+        assertThat(resultado.getResponse().getStatus())
+                .as("el plazo lo pacta quien firma, o lo fija la ordenanza (D-02b); no el borde")
+                .isEqualTo(422);
+        assertThat(resultado.getResponse().getContentAsString())
+                .contains("Falta el campo 'primeraCuotaVence'");
+    }
+
     @Test
     @DisplayName("#604 — CONTRASTE: un valor que no vale tampoco lo lleva")
     void unValorInvalidoTampocoLoLleva() throws Exception {
@@ -796,6 +812,7 @@ class ConveniosFronteraTest {
                         .content(
                                 """
                                 {"codContribuyente":"%s","fecha":"%d-03-16",
+                                 "primeraCuotaVence":"%d-04-16",
                                  "nroDeCuotas":6,"cuotaInicial":"20","simular":%s,
                                  "observacion":"Fraccionamiento pedido en ventanilla",
                                  "obligaciones":[{"tributo":"PREDIAL","ejercicio":2026}]}
@@ -803,11 +820,28 @@ class ConveniosFronteraTest {
                                         .formatted(
                                                 codigo,
                                                 ejercicioDelConvenio,
+                                                ejercicioDelConvenio,
                                                 Boolean.toString(simular)));
         if (clave != null) {
             peticion = peticion.header("Idempotency-Key", clave);
         }
         return mvc.perform(peticion).andReturn();
+    }
+
+    /** La misma peticion sin {@code primeraCuotaVence} (#459): no se inventa ningun plazo. */
+    private static MvcResult fraccionarSinPrimeraCuota() throws Exception {
+        return mvc.perform(
+                        post("/rentas/api/v1/tesoreria/fraccionamientos")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        """
+                                        {"codContribuyente":"%s","fecha":"2026-03-16",
+                                         "nroDeCuotas":6,"cuotaInicial":"20","simular":true,
+                                         "observacion":"Fraccionamiento pedido en ventanilla",
+                                         "obligaciones":[{"tributo":"PREDIAL","ejercicio":2026}]}
+                                        """
+                                                .formatted(CODIGO)))
+                .andReturn();
     }
 
     /** La misma peticion sin {@code nroDeCuotas}: el 422 que SI arregla quien atiende. */
@@ -818,6 +852,7 @@ class ConveniosFronteraTest {
                                 .content(
                                         """
                                         {"codContribuyente":"%s","fecha":"2026-03-16",
+                                         "primeraCuotaVence":"2026-04-16",
                                          "cuotaInicial":"20","simular":true,
                                          "observacion":"Fraccionamiento pedido en ventanilla",
                                          "obligaciones":[{"tributo":"PREDIAL","ejercicio":2026}]}
@@ -834,6 +869,7 @@ class ConveniosFronteraTest {
                                 .content(
                                         """
                                         {"codContribuyente":"%s","fecha":"2026-03-16",
+                                         "primeraCuotaVence":"2026-04-16",
                                          "nroDeCuotas":6,"cuotaInicial":"%s","simular":true,
                                          "observacion":"Fraccionamiento pedido en ventanilla",
                                          "obligaciones":[{"tributo":"PREDIAL","ejercicio":2026}]}
