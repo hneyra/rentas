@@ -8,6 +8,11 @@ package kamayuk.rentas.nucleo.dominio;
  * #26. {@code RECTIFICATORIA} es un formulario en si mismo —no una combinacion con los otros
  * cuatro— y siempre trae {@link DeclaracionJurada#djRectificaId} apuntando a la DJ que sustituye
  * (regla 4): la anterior no se modifica, queda intacta y sustituida.
+ *
+ * <p>Por ser un formulario y no un objeto, el tipo de una rectificatoria <b>no dice que
+ * declara</b>: lo hereda de la DJ que sustituye, y lo dicen su {@code predioId} o su {@code
+ * vehiculoId} (#399). Preguntar «¿es vehicular?» a una DJ es {@link
+ * DeclaracionJurada#esVehicular()}, no {@code tipo == VEHICULAR}.
  */
 public enum TipoDeDeclaracion {
     HR,

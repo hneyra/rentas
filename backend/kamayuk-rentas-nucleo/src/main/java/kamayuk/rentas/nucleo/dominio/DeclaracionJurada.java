@@ -25,8 +25,10 @@ import org.jspecify.annotations.Nullable;
  * @param ejercicio el ejercicio que declara
  * @param contribuyenteId el declarante
  * @param tipo el formulario
- * @param predioId el predio declarado, si el tipo es HR, PU o PR
- * @param vehiculoId el vehiculo declarado, si el tipo es VEHICULAR
+ * @param predioId el predio declarado, si el tipo es HR, PU o PR, o si es la RECTIFICATORIA de una
+ *     predial
+ * @param vehiculoId el vehiculo declarado, si el tipo es VEHICULAR o la RECTIFICATORIA de una
+ *     vehicular (#399)
  * @param fichaCatastralId la version de {@code ficha_catastral} vigente a {@code
  *     fechaPresentacion}; nulo si el predio no tiene ficha registrada todavia, o si el tipo no es
  *     predial
@@ -72,8 +74,18 @@ public record DeclaracionJurada(
         if (tipo == TipoDeDeclaracion.VEHICULAR && predioId != null) {
             throw new IllegalArgumentException("Una declaracion VEHICULAR no lleva predio");
         }
-        if (tipo != TipoDeDeclaracion.VEHICULAR && vehiculoId != null) {
-            throw new IllegalArgumentException("Solo una declaracion VEHICULAR lleva vehiculo");
+        // La rectificatoria de una VEHICULAR tambien lleva vehiculo (#399): RECTIFICATORIA es un
+        // formulario, no un objeto, y declara lo mismo que la DJ que sustituye —un predio o un
+        // vehiculo—. Que sea la misma clase de objeto que la anterior lo exige rectificadaPor;
+        // aqui solo se sostiene el «o uno o el otro», que vale para cualquier tipo.
+        if (tipo == TipoDeDeclaracion.RECTIFICATORIA) {
+            if (predioId != null && vehiculoId != null) {
+                throw new IllegalArgumentException(
+                        "Una rectificatoria declara un predio o un vehiculo, nunca los dos");
+            }
+        } else if (tipo != TipoDeDeclaracion.VEHICULAR && vehiculoId != null) {
+            throw new IllegalArgumentException(
+                    "Solo una declaracion VEHICULAR, o su rectificatoria, lleva vehiculo");
         }
         if (tipo == TipoDeDeclaracion.RECTIFICATORIA) {
             Objects.requireNonNull(
@@ -141,8 +153,30 @@ public record DeclaracionJurada(
     }
 
     /**
-     * La rectificatoria que sustituye a esta DJ, con los mismos datos de tipo y ejercicio salvo lo
-     * que la rectificatoria trae.
+     * Si lo que declara es un vehiculo: una VEHICULAR, o una RECTIFICATORIA que lleva vehiculo
+     * (#399).
+     *
+     * <p>Es un derivado y no una columna: {@code vehiculo_id} ya dice la naturaleza de una
+     * rectificatoria, porque el constructor no deja que lleve predio y vehiculo a la vez y {@link
+     * #rectificadaPor} no deja que una rectificatoria cambie de naturaleza.
+     */
+    public boolean esVehicular() {
+        return tipo == TipoDeDeclaracion.VEHICULAR
+                || (tipo == TipoDeDeclaracion.RECTIFICATORIA && vehiculoId != null);
+    }
+
+    /**
+     * La rectificatoria que sustituye a esta DJ: del mismo ejercicio y contribuyente, de tipo
+     * {@code RECTIFICATORIA}, y sobre la <b>misma clase de objeto</b> que esta —un vehiculo si esta
+     * es vehicular, un predio si no— (#399).
+     *
+     * <p>El objeto concreto si puede cambiar, con el mismo criterio para los dos: el predio o el
+     * vehiculo que se declaro por error deja de declararse por esta cadena y el que trae la
+     * rectificatoria pasa a hacerlo ({@code RegistrarDeclaracionJurada#rectificar}). Lo que no
+     * cambia es la naturaleza: una cadena vehicular que pasara a declarar un predio lo haria
+     * conciliar sin que nadie lo hubiera declarado nunca (ADR-0015), y una que se quedara sin
+     * vehiculo dejaria sin DJ vigente al que declaraba. Por eso, si esta es vehicular, la
+     * rectificatoria <b>exige</b> vehiculo y rechaza predio; y si no, rechaza vehiculo.
      *
      * <p>Esta DJ <b>no cambia</b>: {@code RegistrarDeclaracionJurada} es quien la marca {@code
      * SUSTITUIDA} con un {@code UPDATE} de estado, nunca del contenido —numero, fecha, tipo—. Ese
@@ -165,6 +199,25 @@ public record DeclaracionJurada(
         // este metodo.
         if (!estado.esVigente()) {
             throw new TransicionIlegal(this.numero, estado, EstadoDeDeclaracion.SUSTITUIDA);
+        }
+        if (esVehicular()) {
+            if (predioId != null) {
+                throw new IllegalArgumentException(
+                        "La declaracion jurada "
+                                + this.numero
+                                + " es vehicular: su rectificatoria no declara un predio");
+            }
+            if (vehiculoId == null) {
+                throw new IllegalArgumentException(
+                        "La declaracion jurada "
+                                + this.numero
+                                + " es vehicular: su rectificatoria declara el vehiculo");
+            }
+        } else if (vehiculoId != null) {
+            throw new IllegalArgumentException(
+                    "La declaracion jurada "
+                            + this.numero
+                            + " es predial: su rectificatoria no declara un vehiculo");
         }
         return new DeclaracionJurada(
                 null,
