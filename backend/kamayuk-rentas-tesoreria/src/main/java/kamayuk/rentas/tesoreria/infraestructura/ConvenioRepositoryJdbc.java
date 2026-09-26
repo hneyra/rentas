@@ -28,6 +28,7 @@ import kamayuk.rentas.tesoreria.dominio.CriterioDeConvenios;
 import kamayuk.rentas.tesoreria.dominio.CuotaDeConvenio;
 import kamayuk.rentas.tesoreria.dominio.EstadoDeConvenio;
 import kamayuk.rentas.tesoreria.dominio.NumeroDeConvenio;
+import kamayuk.rentas.tesoreria.dominio.SituacionDelCronograma;
 import kamayuk.rentas.tesoreria.dominio.TipoDeConvenio;
 import kamayuk.rentas.tesoreria.dominio.TipoDeGarantia;
 import org.jspecify.annotations.Nullable;
@@ -77,6 +78,15 @@ public class ConvenioRepositoryJdbc extends RepositorioJdbc implements ConvenioR
                     + " (SELECT 'FORMALIZACION' FROM convenio_movimiento m"
                     + "   WHERE m.convenio_id = c.id AND m.tipo = 'FORMALIZACION'),"
                     + " 'PRECONVENIO')";
+
+    /**
+     * La copia en SQL de {@link SituacionDelCronograma#a}: vencidas y saldo solo se calculan bajo
+     * un convenio vigente, y fuera de el salen {@code NULL} —no aplica—, no un cero (#460). Hasta
+     * #460 el listado contaba un preconvenio con su inicial vencida y el cronograma entero por
+     * cobrar, aunque un preconvenio no acoge deuda.
+     */
+    private static final String SOLO_SI_VIGENTE =
+            " CASE WHEN " + ESTADO_DERIVADO + " = 'FORMALIZACION' THEN";
 
     private static final OrdenSeguro ORDEN =
             OrdenSeguro.sobre("numero", "fecha", "monto_total", "contribuyente_id");
@@ -305,16 +315,18 @@ public class ConvenioRepositoryJdbc extends RepositorioJdbc implements ConvenioR
                         // pagina tienen que estar calculadas al mismo dia (regla 9).
                         // Y «vencida» es la del dominio, no una tercera escritura: el dia
                         // en que vence, la cuota todavia se puede pagar (#411).
-                        + " (SELECT count(*) FROM convenio_cuota q"
-                        + "   WHERE q.convenio_id = c.id AND "
+                        + SOLO_SI_VIGENTE
+                        + " (SELECT count(*)::int FROM convenio_cuota q"
+                        + "   WHERE q.convenio_id = c.id AND q.numero > 0 AND "
                         + CuotaDeConvenio.vencidaEnSql("q", "hoy")
                         + "     AND q.numero >= "
                         + CUOTAS_PAGADAS
-                        + ") AS vencidas,"
+                        + ") END AS vencidas,"
+                        + SOLO_SI_VIGENTE
                         + " COALESCE((SELECT sum(q.monto) FROM convenio_cuota q"
                         + "   WHERE q.convenio_id = c.id AND q.numero >= "
                         + CUOTAS_PAGADAS
-                        + "), 0) AS saldo"
+                        + "), 0) END AS saldo"
                         + desde;
         String conteo = "SELECT count(*)" + desde;
 
@@ -466,8 +478,10 @@ public class ConvenioRepositoryJdbc extends RepositorioJdbc implements ConvenioR
                 new Dinero(fila.getBigDecimal("monto_total")),
                 fila.getInt("numero_cuotas"),
                 fila.getInt("pagadas"),
-                fila.getInt("vencidas"),
-                new Dinero(fila.getBigDecimal("saldo")),
+                fila.getObject("vencidas", Integer.class),
+                fila.getBigDecimal("saldo") == null
+                        ? null
+                        : new Dinero(fila.getBigDecimal("saldo")),
                 aLaFecha,
                 estadoDe(fila.getString("estado_derivado")),
                 fila.getString("motivo"));

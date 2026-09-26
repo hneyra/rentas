@@ -8,16 +8,15 @@ import java.util.Optional;
 import kamayuk.rentas.compartido.Pagina;
 import kamayuk.rentas.compartido.Paginacion;
 import kamayuk.rentas.cuentacorriente.ClaveDeObligacionPublica;
-import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.tesoreria.dominio.Convenio;
 import kamayuk.rentas.tesoreria.dominio.ConvenioEnConsulta;
 import kamayuk.rentas.tesoreria.dominio.ConvenioRepository;
 import kamayuk.rentas.tesoreria.dominio.CriterioDeConvenios;
-import kamayuk.rentas.tesoreria.dominio.CuotaDeConvenio;
 import kamayuk.rentas.tesoreria.dominio.EstadoDeConvenio;
 import kamayuk.rentas.tesoreria.dominio.MovimientoDeConvenio;
 import kamayuk.rentas.tesoreria.dominio.MovimientoDeConvenioRepository;
 import kamayuk.rentas.tesoreria.dominio.NumeroDeConvenio;
+import kamayuk.rentas.tesoreria.dominio.SituacionDelCronograma;
 import kamayuk.rentas.tesoreria.dominio.TipoDeMovimientoDeConvenio;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
@@ -154,34 +153,13 @@ public class ConsultaDeConvenios {
                             .count();
         }
 
-        /** Las cuotas vencidas y no cobradas a {@link #aLaFecha}. */
-        public int cuotasVencidas() {
-            int pagadas = cuotasPagadas();
-            int vencidas = 0;
-            for (CuotaDeConvenio cuota : convenio.cronograma()) {
-                if (cuota.esInicial()) {
-                    continue;
-                }
-                // Sin cobrar es «numero >= pagadas», el mismo predicado que usa el saldo:
-                // con la inicial cobrada (pagadas = 1), la cuota 1 sigue pendiente. Y
-                // vencida es la del dominio: el dia en que vence todavia no (#411).
-                if (cuota.vencidaA(aLaFecha) && cuota.numero() >= pagadas) {
-                    vencidas++;
-                }
-            }
-            return vencidas;
-        }
-
-        /** Lo que queda por cobrar del cronograma, a {@link #aLaFecha}. */
-        public Dinero saldoDelCronograma() {
-            int pagadas = cuotasPagadas();
-            Dinero saldo = Dinero.CERO;
-            for (CuotaDeConvenio cuota : convenio.cronograma()) {
-                if (cuota.numero() >= pagadas) {
-                    saldo = saldo.mas(cuota.monto());
-                }
-            }
-            return saldo;
+        /**
+         * Las cuotas vencidas y el saldo del cronograma a {@link #aLaFecha}; vacio si el convenio
+         * no esta vigente, porque entonces no se debe nada del convenio (#460).
+         */
+        public Optional<SituacionDelCronograma> situacion() {
+            return SituacionDelCronograma.a(
+                    estado, convenio.cronograma(), cuotasPagadas(), aLaFecha);
         }
 
         /** El acta del cierre, si el convenio esta cerrado. */
