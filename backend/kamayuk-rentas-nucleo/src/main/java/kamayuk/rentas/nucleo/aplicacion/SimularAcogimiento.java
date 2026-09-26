@@ -98,6 +98,8 @@ public class SimularAcogimiento {
      * @throws ProblemaDeNegocio {@code NO_ENCONTRADO} si el codigo no identifica a nadie
      * @throws CampaniasDeBeneficioParametrizadas.CampaniaSinParametrizar si se pide simular contra
      *     una campana que el conjunto sellado no publica
+     * @throws CampaniasDeBeneficioParametrizadas.CampaniaFueraDeVigencia si la publica pero no rige
+     *     a la fecha de corte (#379)
      */
     public Simulacion de(Criterio criterio, Paginacion paginacion) {
         Objects.requireNonNull(criterio, "La simulacion es de un contribuyente concreto");
@@ -216,16 +218,22 @@ public class SimularAcogimiento {
                     + elegida.base().etiqueta()
                     + ". Es una simulación: no modifica la deuda registrada.";
         }
+        // #379: «publicada para el ejercicio» no basta. Una campana de marzo a junio esta en el
+        // conjunto de 2026 y en agosto no rige, asi que la frase dice el dia, que es lo que cuenta.
         if (publicadas.isEmpty()) {
-            return "No hay ninguna campaña de beneficio publicada para el ejercicio "
+            return "No hay ninguna campaña de beneficio publicada que rija el "
+                    + vigentes.fecha()
+                    + " (ejercicio "
                     + vigentes.ejercicio()
-                    + ": la deuda se muestra sin acogimiento.";
+                    + "): la deuda se muestra sin acogimiento.";
         }
         return "Sin campaña elegida: la deuda se muestra sin acogimiento. Hay "
                 + publicadas.size()
-                + " campaña(s) publicada(s) para el ejercicio "
+                + " campaña(s) publicada(s) que rigen el "
+                + vigentes.fecha()
+                + " (ejercicio "
                 + vigentes.ejercicio()
-                + ".";
+                + ").";
     }
 
     /**
@@ -285,7 +293,8 @@ public class SimularAcogimiento {
      * @param registrosAcogidos cuantas obligaciones son
      * @param campania la campana elegida, o nulo si no se eligio ninguna
      * @param acogimiento lo que la campana produce; nulo si no hay campana elegida
-     * @param campaniasPublicadas las que el conjunto sellado publica; vacia si no hay ninguna
+     * @param campaniasPublicadas las que el conjunto sellado publica y rigen a {@code aLaFecha}
+     *     (#379); vacia si no hay ninguna
      * @param obligaciones la pagina de obligaciones seleccionadas
      * @param estadoDeLaSimulacion la frase que explica lo anterior, redactada por el servidor
      */

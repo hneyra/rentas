@@ -9,6 +9,7 @@ import java.util.SortedSet;
 import java.util.TreeSet;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.ValorNormativo;
+import kamayuk.rentas.dominio.Vigencia;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -22,6 +23,16 @@ import org.jspecify.annotations.Nullable;
  * <p>Sellados, y no «los del ejercicio»: un conjunto abierto todavia se puede corregir, asi que
  * calcular con el produce una cifra que manana puede ser otra. {@link LectorDeParametros} solo
  * entrega sellados.
+ *
+ * <h2>«Del conjunto del ejercicio» no es «vigente cualquier dia del ejercicio» (#379)</h2>
+ *
+ * <p>Una fila entra en el conjunto de un ejercicio si su vigencia <b>se solapa</b> con el ano, y
+ * {@code normativa} lo hace asi a proposito: una campana de beneficio de marzo a junio es del
+ * ejercicio 2026 y desapareceria del conjunto sin que nada lo dijera. Para la UIT, los tramos y las
+ * alicuotas da igual —rigen el ano entero—; para las familias que rigen <b>parte</b> del ano, no.
+ * Por eso cada fila conserva su {@link Vigencia}, la misma que trae el snapshot, y {@link
+ * #vigenciaDe} la da a quien necesite saber si rige un dia concreto. Ninguna otra lectura la mira:
+ * {@link #numero} y {@link #texto} siguen contestando lo mismo que antes.
  */
 public final class ParametrosSellados {
 
@@ -29,16 +40,19 @@ public final class ParametrosSellados {
     private final int version;
     private final Map<String, ValorNormativo> numeros;
     private final Map<String, String> textos;
+    private final Map<String, Vigencia> vigencias;
 
     private ParametrosSellados(
             Ejercicio ejercicio,
             int version,
             Map<String, ValorNormativo> numeros,
-            Map<String, String> textos) {
+            Map<String, String> textos,
+            Map<String, Vigencia> vigencias) {
         this.ejercicio = ejercicio;
         this.version = version;
         this.numeros = Map.copyOf(numeros);
         this.textos = Map.copyOf(textos);
+        this.vigencias = Map.copyOf(vigencias);
     }
 
     /** Constructor para quien lee de la base y para las pruebas, que arman los suyos a mano. */
@@ -60,6 +74,26 @@ public final class ParametrosSellados {
 
     public Optional<String> texto(String tipo, @Nullable String clave) {
         return Optional.ofNullable(textos.get(llave(tipo, clave)));
+    }
+
+    /**
+     * Entre que fechas rige la fila de esa llave, tal como la sello {@code normativa} (#379).
+     *
+     * <p>Vacio si el conjunto no publica la llave —ni su mitad numerica ni la textual—: no hay
+     * vigencia de lo que no esta. Una fila publicada sin fechas rige {@link Vigencia#SIEMPRE}, que
+     * es lo que significan los dos extremos nulos, y es tambien lo que vale para un conjunto armado
+     * a mano sin declarar ninguna.
+     *
+     * <p>Existe para las familias que rigen <b>parte</b> del ejercicio —las campanas de beneficio,
+     * D-02b—, cuyo consumidor tiene que preguntar si la fila rige <b>ese dia</b> y no solo ese ano.
+     * Es la unica fuente de esa respuesta: nadie la reconstruye por su cuenta.
+     */
+    public Optional<Vigencia> vigenciaDe(String tipo, @Nullable String clave) {
+        String llave = llave(tipo, clave);
+        if (!numeros.containsKey(llave) && !textos.containsKey(llave)) {
+            return Optional.empty();
+        }
+        return Optional.of(vigencias.getOrDefault(llave, Vigencia.SIEMPRE));
     }
 
     /**
@@ -173,6 +207,7 @@ public final class ParametrosSellados {
         private final int version;
         private final Map<String, ValorNormativo> numeros = new LinkedHashMap<>();
         private final Map<String, String> textos = new LinkedHashMap<>();
+        private final Map<String, Vigencia> vigencias = new LinkedHashMap<>();
 
         private Constructor(Ejercicio ejercicio, int version) {
             this.ejercicio = Objects.requireNonNull(ejercicio);
@@ -189,8 +224,14 @@ public final class ParametrosSellados {
             return this;
         }
 
+        /** Entre que fechas rige la fila de esa llave (#379). Sin declararla, rige siempre. */
+        public Constructor vigencia(String tipo, @Nullable String clave, Vigencia vigencia) {
+            vigencias.put(llave(tipo, clave), Objects.requireNonNull(vigencia));
+            return this;
+        }
+
         public ParametrosSellados construir() {
-            return new ParametrosSellados(ejercicio, version, numeros, textos);
+            return new ParametrosSellados(ejercicio, version, numeros, textos, vigencias);
         }
     }
 }

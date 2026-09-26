@@ -35,7 +35,8 @@ import org.jspecify.annotations.Nullable;
  * @param deudaAcogida la parte que los filtros seleccionaron
  * @param registrosAcogidos cuantas obligaciones entran en lo acogido
  * @param simulacion lo que la campana produce; nulo si no se eligio ninguna
- * @param campaniasAplicables las campanas que el conjunto sellado publica; vacia si no hay ninguna
+ * @param campaniasAplicables las campanas que el conjunto sellado publica y que rigen a {@code
+ *     aLaFecha} (#379); vacia si no hay ninguna
  * @param estadoDeLaSimulacion la frase que explica lo anterior, redactada por el servidor
  * @param obligaciones la pagina de obligaciones acogidas
  */

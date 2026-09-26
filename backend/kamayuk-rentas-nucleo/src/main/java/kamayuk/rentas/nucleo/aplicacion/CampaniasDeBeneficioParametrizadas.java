@@ -13,6 +13,7 @@ import kamayuk.rentas.dominio.Alicuota;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.PoliticaDeRedondeo;
 import kamayuk.rentas.dominio.ValorNormativo;
+import kamayuk.rentas.dominio.Vigencia;
 import kamayuk.rentas.nucleo.dominio.beneficios.BaseDelBeneficio;
 import kamayuk.rentas.nucleo.dominio.beneficios.CampaniaDeBeneficio;
 import kamayuk.rentas.parametros.LectorDeParametros;
@@ -55,12 +56,21 @@ import org.springframework.stereotype.Service;
  * escala sin el modo—, y eso no falla al sellar. Produce media campana, que es peor que ninguna
  * porque aparenta estar resuelta. Si aun asi llega media, se rechaza nombrando la mitad que falta.
  *
- * <h2>«Vigente a la fecha de la consulta»</h2>
+ * <h2>«Vigente a la fecha»: el conjunto por el ano, la campana por el dia (#379)</h2>
  *
- * <p>El conjunto se resuelve por el ejercicio de la fecha con la que se consulta, y las cuatro
- * lecturas de una campana salen del <b>mismo</b> {@link ParametrosSellados}: resolverlas por
- * separado abriria la puerta a que un sellado ocurrido entre dos de ellas mezclara la alicuota de
- * una version con la base de otra.
+ * <p>Son dos pasos, y hasta #379 solo se daba el primero. El <b>conjunto</b> se resuelve por el
+ * ejercicio de la fecha con la que se consulta, y las cuatro lecturas de una campana salen del
+ * <b>mismo</b> {@link ParametrosSellados}: resolverlas por separado abriria la puerta a que un
+ * sellado ocurrido entre dos de ellas mezclara la alicuota de una version con la base de otra.
+ *
+ * <p>Pero estar en el conjunto del ejercicio no es regir ese dia. En el conjunto entra toda fila
+ * cuya vigencia <b>se solapa</b> con el ano —{@code normativa} lo hace asi a proposito, para que
+ * una campana de marzo a junio no desaparezca del de 2026—, asi que el 28 de agosto esa campana
+ * sigue dentro y ya no rige. El <b>segundo</b> paso es este: una campana se ofrece y se aplica solo
+ * si la vigencia de su fila {@code BENEFICIO:‹CAMPANIA›} ({@link ParametrosSellados#vigenciaDe})
+ * cubre la fecha de la consulta. Pedir una que no la cubre falla con {@link
+ * CampaniaFueraDeVigencia}, que dice cuando rigio: no es lo mismo que «no esta publicada», y
+ * decirlo asi mandaria a pedir una ordenanza que ya existe.
  */
 @Service
 public class CampaniasDeBeneficioParametrizadas {
@@ -90,6 +100,9 @@ public class CampaniasDeBeneficioParametrizadas {
      * una lista vacia de campanas, y quien pregunte por una campana concreta recibe el 422 con su
      * llave.
      *
+     * <p>El conjunto sale del <b>ejercicio</b> de la fecha; cual de sus campanas rige, de la
+     * <b>fecha</b> misma, que {@link Vigentes} guarda para eso (#379).
+     *
      * <p>Que {@code EjercicioSinSellar} se capture <b>aqui</b> y no en el caso de uso no es
      * cosmetico: {@code LectorDeParametrosSellados} es {@code @Transactional}, asi que si quien
      * llama tuviera una transaccion abierta la excepcion la marcaria <i>rollback-only</i> y la
@@ -100,30 +113,43 @@ public class CampaniasDeBeneficioParametrizadas {
     public Vigentes aLaFechaDe(LocalDate fechaDeConsulta) {
         Ejercicio ejercicio = Ejercicio.de(fechaDeConsulta);
         try {
-            return new Vigentes(ejercicio, parametros.vigenteEn(ejercicio));
+            return new Vigentes(ejercicio, fechaDeConsulta, parametros.vigenteEn(ejercicio));
         } catch (LectorDeParametros.EjercicioSinSellar sinSellar) {
-            return new Vigentes(ejercicio, null);
+            return new Vigentes(ejercicio, fechaDeConsulta, null);
         }
     }
 
-    /** Lo que el conjunto sellado dice de las campanas del ejercicio, ya resuelto. */
+    /** Lo que el conjunto sellado dice de las campanas que rigen a una fecha, ya resuelto. */
     public static final class Vigentes {
 
         private final Ejercicio ejercicio;
+        private final LocalDate fecha;
         private final @Nullable ParametrosSellados sellados;
 
-        private Vigentes(Ejercicio ejercicio, @Nullable ParametrosSellados sellados) {
+        private Vigentes(
+                Ejercicio ejercicio, LocalDate fecha, @Nullable ParametrosSellados sellados) {
             this.ejercicio = ejercicio;
+            this.fecha = Objects.requireNonNull(fecha, "Una campana rige a una fecha concreta");
             this.sellados = sellados;
         }
 
-        /** El ejercicio con el que se resolvio. */
+        /** El ejercicio con el que se resolvio el conjunto. */
         public Ejercicio ejercicio() {
             return ejercicio;
         }
 
+        /** La fecha contra la que se mira si cada campana rige (#379). */
+        public LocalDate fecha() {
+            return fecha;
+        }
+
         /**
-         * Las campanas publicadas, en orden alfabetico. Vacia si no hay ninguna.
+         * Las campanas publicadas que rigen a {@link #fecha()}, en orden alfabetico. Vacia si no
+         * hay ninguna.
+         *
+         * <p>Una campana del conjunto cuya vigencia no cubre la fecha <b>no se ofrece</b> (#379):
+         * el desplegable de la ventanilla se llena de aqui, y ofrecer una vencida es invitar a
+         * simular un descuento que ninguna norma respalda ese dia.
          *
          * @throws CampaniaIncompleta si alguna esta publicada a medias. No se oculta la campana
          *     rota: quien tiene la ordenanza delante la buscaria en la pantalla y no la
@@ -135,16 +161,19 @@ public class CampaniasDeBeneficioParametrizadas {
             }
             List<CampaniaDeBeneficio> campanias = new ArrayList<>();
             for (String nombre : sellados.clavesDe(TIPO_CAMPANIA)) {
-                campanias.add(armar(sellados, nombre));
+                if (vigenciaDe(sellados, nombre).vigenteEn(fecha)) {
+                    campanias.add(armar(sellados, nombre));
+                }
             }
             return List.copyOf(campanias);
         }
 
         /**
-         * La campana con ese nombre.
+         * La campana con ese nombre, si rige a {@link #fecha()}.
          *
          * @throws CampaniaSinParametrizar si el conjunto sellado no la publica —o si el ejercicio
          *     no tiene conjunto sellado, que es la misma respuesta vista desde mas lejos—
+         * @throws CampaniaFueraDeVigencia si la publica pero no rige a esa fecha (#379)
          * @throws CampaniaIncompleta si esta publicada a medias
          */
         public CampaniaDeBeneficio exigir(String nombre) {
@@ -152,7 +181,27 @@ public class CampaniasDeBeneficioParametrizadas {
             if (sellados == null || sellados.numero(TIPO_CAMPANIA, pedida).isEmpty()) {
                 throw new CampaniaSinParametrizar(ejercicio, pedida, sellados == null);
             }
+            Vigencia vigencia = vigenciaDe(sellados, pedida);
+            if (!vigencia.vigenteEn(fecha)) {
+                throw new CampaniaFueraDeVigencia(llave(TIPO_CAMPANIA, pedida), vigencia, fecha);
+            }
             return armar(sellados, pedida);
+        }
+
+        /**
+         * La vigencia de la fila {@code BENEFICIO:‹CAMPANIA›}: la de la campana (#379).
+         *
+         * <p>Siempre la hay para una clave que {@link ParametrosSellados#clavesDe} devolvio o que
+         * paso por {@code numero}: una llave publicada tiene vigencia, aunque sea sin fechas.
+         */
+        private static Vigencia vigenciaDe(ParametrosSellados sellados, String nombre) {
+            return sellados.vigenciaDe(TIPO_CAMPANIA, nombre)
+                    .orElseThrow(
+                            () ->
+                                    new IllegalStateException(
+                                            "El conjunto enumero "
+                                                    + llave(TIPO_CAMPANIA, nombre)
+                                                    + " y no le da vigencia"));
         }
 
         private CampaniaDeBeneficio armar(ParametrosSellados sellados, String nombre) {
@@ -299,6 +348,73 @@ public class CampaniasDeBeneficioParametrizadas {
         @Override
         public Optional<String> llave() {
             return Optional.of(llave);
+        }
+    }
+
+    /**
+     * La campana esta publicada, pero no rige a la fecha de la consulta (#379).
+     *
+     * <p>Es un motivo <b>distinto</b> de {@link CampaniaSinParametrizar}, y por eso es otra
+     * excepcion. Aquella dice que falta publicar una cifra —no se arregla desde la pantalla, y la
+     * respuesta lleva {@code parametroQueFalta}—; esta dice que la cifra esta publicada y que ese
+     * dia no rige: no hay nada que publicar, y lo que hay que corregir es la <b>peticion</b>. Por
+     * eso <b>no</b> declara {@code ParametroSinPublicar}: con el discriminador dentro, la interfaz
+     * mandaria a pedir una ordenanza que ya existe.
+     *
+     * <p>El mensaje dice cuando rigio —o desde cuando rige—, que es lo que quien atiende necesita
+     * para explicarselo al contribuyente.
+     */
+    public static final class CampaniaFueraDeVigencia extends RuntimeException {
+
+        @java.io.Serial private static final long serialVersionUID = 1L;
+
+        private final String llave;
+        private final String motivo;
+
+        CampaniaFueraDeVigencia(String llave, Vigencia vigencia, LocalDate fecha) {
+            this(
+                    llave,
+                    "La campaña "
+                            + llave
+                            + " no rige el "
+                            + fecha
+                            + ": "
+                            + cuandoRige(vigencia, fecha)
+                            + ". Simularla a esa fecha daria un descuento que ninguna ordenanza"
+                            + " respalda ese dia");
+        }
+
+        private CampaniaFueraDeVigencia(String llave, String motivo) {
+            super(motivo);
+            this.llave = llave;
+            this.motivo = motivo;
+        }
+
+        /** La llave de la campana pedida, {@code BENEFICIO:‹CAMPANIA›}. */
+        public String llave() {
+            return llave;
+        }
+
+        /**
+         * Por que no se aplica, con las fechas: el mensaje, sin la nulidad de {@code getMessage}.
+         */
+        public String motivo() {
+            return motivo;
+        }
+
+        private static String cuandoRige(Vigencia vigencia, LocalDate fecha) {
+            LocalDate desde = vigencia.desde();
+            LocalDate hasta = vigencia.hasta();
+            if (hasta != null && fecha.isAfter(hasta)) {
+                return desde == null
+                        ? "rigió hasta el " + hasta
+                        : "rigió del " + desde + " al " + hasta;
+            }
+            // Si no termino antes de la fecha, empieza despues: `vigenteEn` ya dijo que no la
+            // cubre, y sin principio ni fin la cubriria.
+            return hasta == null
+                    ? "regirá desde el " + desde + ", sin fecha de fin"
+                    : "regirá del " + desde + " al " + hasta;
         }
     }
 
