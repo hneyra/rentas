@@ -45,7 +45,7 @@ import { fuentesDeLosConectores } from './los-conectores-del-arbol.ts';
  *
  * Porque **el contrato no publica ningun tipo de dinero**: `docs/50-api/formas-de-la-api.json`
  * reduce cada hoja a `texto`, `entero`, `fecha`, `booleano`, `instante`, `objeto` o `archivo`, y
- * los `MEDIDO: 3 300 campos tipados de formas-de-la-api.json` no traen ni uno «importe» —un
+ * los `MEDIDO: 3 298 campos tipados de formas-de-la-api.json` no traen ni uno «importe» —un
  * `BigDecimal` sale como `texto`, igual que un nombre—. Del lado de TypeScript pasa lo mismo: `baseImponible` es `string`, y tambien lo es
  * `sujeto`. Asi que el nombre es la unica senal que hay, y se declara como lo que es: una
  * heuristica.
