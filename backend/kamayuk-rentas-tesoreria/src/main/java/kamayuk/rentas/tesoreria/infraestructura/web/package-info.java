@@ -1,6 +1,12 @@
 /**
- * El borde HTTP del convenio de fraccionamiento: {@code POST /tesoreria/fraccionamientos} y {@code
- * POST /tesoreria/convenios/&#123;numero&#125;/cierre}.
+ * El borde HTTP de tesoreria: {@code ConvenioController} —el fraccionamiento, el convenio, su
+ * listado y su anulacion—, {@code PagoController} —el buzon de pagos que publica la caja y su
+ * conciliacion— y {@code OrdenDeCobroController} —las ordenes de cobro que se emiten hacia la
+ * caja—.
+ *
+ * <p>Aqui no se copian rutas: las vigila {@code ContratoDeApiTest}, y un javadoc que las repite
+ * deriva sin que nada lo note. Este decia {@code /tesoreria/convenios/&#123;numero&#125;/cierre},
+ * una ruta que no existio nunca (#461).
  *
  * <p>Desde P5D no hay aqui ningun endpoint de caja: {@code /tesoreria/caja/cobranza}, {@code
  * .../tasas}, los recibos, el cierre y la recaudacion los publica el repositorio {@code caja} en su

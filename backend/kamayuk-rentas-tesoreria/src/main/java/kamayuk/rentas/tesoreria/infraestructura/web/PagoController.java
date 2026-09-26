@@ -186,7 +186,11 @@ public class PagoController {
                     esAnulacion
                             ? UUID.fromString(exigir(peticion.pagoOriginalId(), "pagoOriginalId"))
                             : null,
-                    Objects.requireNonNullElse(peticion.sistemaOrigen(), "caja"),
+                    // `sistema_caja` es QUIEN publica, y el guardia ya exige que sea la cuenta de
+                    // servicio de la caja (#429). No `sistemaOrigen`, que dice a que sistema iba la
+                    // orden y la caja no manda en las anulaciones: el cobro quedaba con «rentas» y
+                    // su anulacion con «caja» (#461). `sistemaOrigen` sigue en el cuerpo congelado.
+                    SISTEMA,
                     exigir(recibo.numero(), "recibo.numero"),
                     pagador.idExterno(),
                     LocalDate.parse(exigir(recibo.fechaDePago(), "recibo.fechaDePago")),

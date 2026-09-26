@@ -53,22 +53,6 @@ public interface PagoRecibidoRepository {
     void marcarAplicado(long id, int asientos, Instant cuando);
 
     /**
-     * Marca que el libro no lo admitio, con su motivo.
-     *
-     * <p><b>Corre en su PROPIA transaccion</b>, y no es una comodidad: cuando {@code
-     * RegistroDeAbonos} rechaza, la excepcion sale de un metodo {@code @Transactional} anidado y
-     * <b>marca la transaccion de fuera como rollback-only</b>. Atrapar la excepcion no la desmarca:
-     * el {@code commit} de la de fuera muere con {@code UnexpectedRollbackException} y se lleva por
-     * delante la marca del rechazo — el pago quedaria EN_TRANSITO para siempre y el publicador lo
-     * reintentaria hasta matarlo, por un motivo que ya se conoce.
-     *
-     * <p>Es el defecto que #328, #54, #72 y #430 midieron cuatro veces con distinta forma, y la
-     * quinta lo encontro la prueba de este buzon: la corrida entera reventaba con «Transaction
-     * rolled back because it has been marked as rollback-only».
-     */
-    void marcarRechazado(long id, String motivo);
-
-    /**
      * Los pagos de un contribuyente que todavia no se imputaron.
      *
      * <p>Es lo que la consulta de deuda lee para poder decir «hay un pago en camino» en vez de

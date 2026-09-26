@@ -13,6 +13,7 @@ import java.sql.SQLException;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
@@ -186,6 +187,52 @@ class PagoControllerTest {
         assertThat(resultado.getResponse().getContentAsString())
                 .contains("SERVICIO_NO_DISPONIBLE")
                 .contains("todavia no esta en el buzon");
+    }
+
+    /**
+     * #461 — {@code sistema_caja} dice QUIEN publica, y quien publica es la caja: la cuenta de
+     * servicio que el guardia ya exige. Hasta #461 el borde copiaba {@code sistemaOrigen}, que es
+     * otra cosa —«a que sistema iba la orden»—: el cobro quedaba con {@code rentas} y su anulacion,
+     * que la caja manda sin ese campo, con {@code caja}, y la pareja que se tiene que cancelar caia
+     * en dos grupos.
+     *
+     * <p>La siembra que distingue: un cobro CON {@code sistemaOrigen: rentas} y su anulacion SIN el
+     * campo. Con solo cobros, o solo peticiones sin el campo, el codigo de antes tambien pasaba.
+     */
+    @Test
+    @DisplayName("#461 — el cobro y su anulacion guardan el mismo sistema_caja: quien publica")
+    void sistemaCajaEsQuienPublica() throws Exception {
+        UUID cobro = UUID.randomUUID();
+        String referencia =
+                new ReferenciaDeObligacion("PREDIAL", new Ejercicio(2026), 7L, null, null, HOY)
+                        .texto();
+        entregar(
+                mvc,
+                "{\"pagoId\":\""
+                        + cobro
+                        + "\",\"tipo\":\"PAGO_REGISTRADO\",\"sistemaOrigen\":\"rentas\","
+                        + "\"recibo\":{\"numero\":\"001-000123\",\"fechaDePago\":\"2026-03-16\"},"
+                        + "\"pagador\":{\"idExterno\":7},\"total\":\"500.00\","
+                        + "\"ordenes\":[{\"referenciaExterna\":\""
+                        + referencia
+                        + "\"}]}");
+        entregar(
+                mvc,
+                "{\"pagoId\":\""
+                        + UUID.randomUUID()
+                        + "\",\"tipo\":\"PAGO_ANULADO\",\"pagoOriginalId\":\""
+                        + cobro
+                        + "\",\"total\":\"500.00\",\"motivo\":\"ERROR EN EL IMPORTE COBRADO\","
+                        + "\"fecha\":\"2026-03-16\","
+                        + "\"recibo\":{\"numero\":\"001-000123\",\"fechaDePago\":\"2026-03-16\"}}");
+
+        assertThat(caso.recibidos)
+                .extracting(PagoRecibido::sistemaCaja)
+                .as("los dos los publica la caja, lleven o no sistemaOrigen en el cuerpo")
+                .containsExactly("caja", "caja");
+        assertThat(caso.recibidos.get(0).cuerpo())
+                .as("sistemaOrigen no se pierde: viaja en el cuerpo congelado")
+                .contains("\"sistemaOrigen\":\"rentas\"");
     }
 
     @Test
@@ -711,6 +758,7 @@ class PagoControllerTest {
      */
     private static final class CasoDeUsoDeMentira extends RecibirPago {
         private boolean todaviaNo;
+        private final List<PagoRecibido> recibidos = new ArrayList<>();
 
         CasoDeUsoDeMentira() {
             super(null, null);
@@ -718,6 +766,7 @@ class PagoControllerTest {
 
         @Override
         public Recibido recibir(PagoRecibido pago) {
+            recibidos.add(pago);
             if (todaviaNo) {
                 throw new AnulacionAntesQueSuCobro(
                         "La anulacion "
