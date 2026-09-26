@@ -10,6 +10,7 @@ import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.persistencia.RepositorioJdbc;
 import kamayuk.rentas.valores.dominio.MovimientoDeValor;
 import kamayuk.rentas.valores.dominio.MovimientoDeValorRepository;
+import kamayuk.rentas.valores.dominio.PaseRegistrado;
 import kamayuk.rentas.valores.dominio.TipoDeMovimiento;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
@@ -35,7 +36,7 @@ public class MovimientoDeValorRepositoryJdbc extends RepositorioJdbc
     }
 
     @Override
-    public MovimientoDeValor registrarPase(MovimientoDeValor movimiento) {
+    public PaseRegistrado registrarPase(MovimientoDeValor movimiento) {
         if (!movimiento.esNuevo()) {
             throw new IllegalArgumentException(
                     "Un movimiento ya registrado no se vuelve a insertar ni se corrige: se"
@@ -72,15 +73,25 @@ public class MovimientoDeValorRepositoryJdbc extends RepositorioJdbc
 
         // Sin fila devuelta, el pase ya existia: se devuelve aquel. Repetir la peticion no crea
         // un segundo expediente, y quien la repitio recibe el mismo movimiento que la primera vez.
-        return insertado
-                .flatMap(this::porId)
-                .or(() -> paseDe(movimiento.valorId()))
-                .orElseThrow(
-                        () ->
-                                new IllegalStateException(
-                                        "El pase del valor "
-                                                + movimiento.valorId()
-                                                + " no se inserto ni existia"));
+        // Y se dice cual de las dos cosas paso: quien pasa audita solo lo que inserto (#444).
+        if (insertado.isPresent()) {
+            return new PaseRegistrado(
+                    porId(insertado.get())
+                            .orElseThrow(
+                                    () ->
+                                            new IllegalStateException(
+                                                    "El pase recien insertado no se relee")),
+                    true);
+        }
+        return new PaseRegistrado(
+                paseDe(movimiento.valorId())
+                        .orElseThrow(
+                                () ->
+                                        new IllegalStateException(
+                                                "El pase del valor "
+                                                        + movimiento.valorId()
+                                                        + " no se inserto ni existia")),
+                false);
     }
 
     @Override

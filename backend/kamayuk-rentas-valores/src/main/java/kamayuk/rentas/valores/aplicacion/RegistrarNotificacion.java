@@ -17,6 +17,7 @@ import kamayuk.rentas.valores.dominio.EstadoDeValor;
 import kamayuk.rentas.valores.dominio.Notificacion;
 import kamayuk.rentas.valores.dominio.NotificacionRepository;
 import kamayuk.rentas.valores.dominio.Valor;
+import kamayuk.rentas.valores.dominio.ValorNoCobrable;
 import kamayuk.rentas.valores.dominio.ValorRepository;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
@@ -108,6 +109,10 @@ public class RegistrarNotificacion {
             Observacion observacion) {
 
         Valor valor = valorDe(numeroDeValor);
+        // #444: una diligencia es un acto de cobranza; un valor que ya no se cobra no la admite.
+        if (!valor.estado().esCobrable()) {
+            throw new ValorNoCobrable(valor.numero(), valor.estado(), "notificarlo");
+        }
         // #402: la cota inferior ya estaba (una de las cinco copias de la regla); faltaba la de
         // hoy. Una diligencia futura que surte efecto deja el valor notificado y exigible desde
         // una fecha que nadie puede corregir: `queSurtioEfecto` toma la PRIMERA.

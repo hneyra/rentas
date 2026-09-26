@@ -37,6 +37,7 @@ import kamayuk.rentas.valores.dominio.TipoDeMovimiento;
 import kamayuk.rentas.valores.dominio.TipoValor;
 import kamayuk.rentas.valores.dominio.Valor;
 import kamayuk.rentas.valores.dominio.ValorMasivo;
+import kamayuk.rentas.valores.dominio.ValorNoCobrable;
 import kamayuk.rentas.web.Api;
 import kamayuk.rentas.web.CodigoDeError;
 import kamayuk.rentas.web.FiltroDeLaConsulta;
@@ -263,6 +264,8 @@ public class ValoresController {
                     .body(NotificacionResource.de(guardada, exigir(nro, "nro")));
         } catch (RegistrarNotificacion.ValorInexistente noExiste) {
             throw new ProblemaDeNegocio(CodigoDeError.NO_ENCONTRADO, mensajeDe(noExiste));
+        } catch (ValorNoCobrable noSeCobra) {
+            throw new ProblemaDeNegocio(CodigoDeError.CONFLICTO, mensajeDe(noSeCobra));
         } catch (PlazosParametrizados.PlazoSinParametrizar
                 | LectorDeParametros.EjercicioSinSellar falta) {
             // `EjercicioSinSellar` no es un fallo del servidor: es que nadie ha sellado todavia
@@ -310,6 +313,9 @@ public class ValoresController {
                     .body(MovimientoResource.de(pase, valor));
         } catch (PasarACoactiva.ValorInexistente noExiste) {
             throw new ProblemaDeNegocio(CodigoDeError.NO_ENCONTRADO, mensajeDe(noExiste));
+        } catch (ValorNoCobrable noSeCobra) {
+            // 409 (#444): la peticion esta bien formada; lo que no la admite es el estado.
+            throw new ProblemaDeNegocio(CodigoDeError.CONFLICTO, mensajeDe(noSeCobra));
         } catch (PasarACoactiva.ValorSinNotificar | PasarACoactiva.PlazoVigente invalido) {
             throw new ProblemaDeNegocio(CodigoDeError.VALIDACION, mensajeDe(invalido));
         }

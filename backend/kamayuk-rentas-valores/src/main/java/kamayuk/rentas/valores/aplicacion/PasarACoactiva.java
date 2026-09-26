@@ -13,8 +13,10 @@ import kamayuk.rentas.valores.dominio.MovimientoDeValor;
 import kamayuk.rentas.valores.dominio.MovimientoDeValorRepository;
 import kamayuk.rentas.valores.dominio.Notificacion;
 import kamayuk.rentas.valores.dominio.NotificacionRepository;
+import kamayuk.rentas.valores.dominio.PaseRegistrado;
 import kamayuk.rentas.valores.dominio.TipoDeMovimiento;
 import kamayuk.rentas.valores.dominio.Valor;
+import kamayuk.rentas.valores.dominio.ValorNoCobrable;
 import kamayuk.rentas.valores.dominio.ValorRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,7 +41,8 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>Pasarlo dos veces no crea dos expedientes (AC de #39). La garantia esta en la base -el indice
  * unico parcial de V28 y su {@code ON CONFLICT}-, no en una comprobacion previa: dos peticiones
  * simultaneas pasarian las dos por cualquier {@code if} escrito en Java. La segunda llamada
- * devuelve el movimiento de la primera, con su fecha y su usuario originales.
+ * devuelve el movimiento de la primera, con su fecha y su usuario originales, y no se audita otra
+ * vez (#444): la bitacora dice quien dio el pase, no quien lo repitio.
  */
 @Service
 public class PasarACoactiva {
@@ -88,6 +91,11 @@ public class PasarACoactiva {
                 valores.porNumero(numeroDeValor.strip().toUpperCase(Locale.ROOT))
                         .orElseThrow(() -> new ValorInexistente(numeroDeValor));
         long valorId = requireId(valor);
+        // #444: un valor pagado, anulado o prescrito no admite actos de cobranza. Antes que nada:
+        // el pase queda para siempre, y registrarlo despues de la prescripcion no se deshace.
+        if (!valor.estado().esCobrable()) {
+            throw new ValorNoCobrable(valor.numero(), valor.estado(), "pasarlo a coactiva");
+        }
 
         // #402: `PlazoVigente` solo mira `fecha >= exigibleDesde`, y el pase fechado el mismo dia
         // en que la deuda sera exigible —si ese dia todavia no llego— dejaba el valor HOY en
@@ -111,7 +119,7 @@ public class PasarACoactiva {
             throw new PlazoVigente(valor, exigibleDesde, fechaDelMovimiento);
         }
 
-        MovimientoDeValor pase =
+        PaseRegistrado registrado =
                 movimientos.registrarPase(
                         new MovimientoDeValor(
                                 null,
@@ -123,11 +131,16 @@ public class PasarACoactiva {
                                 null,
                                 observacion));
 
-        if (valor.estado() == EstadoDeValor.NOTIFICADO) {
-            valores.cambiarEstado(valorId, EstadoDeValor.COACTIVA);
+        MovimientoDeValor pase = registrado.pase();
+        // Solo lo que esta llamada inserto se audita y mueve el estado (#444): la repeticion
+        // devuelve el pase original, y un segundo ALTA a nombre de quien repitio diria que el
+        // pase lo dio dos veces gente distinta.
+        if (registrado.nuevo()) {
+            if (valor.estado() == EstadoDeValor.NOTIFICADO) {
+                valores.cambiarEstado(valorId, EstadoDeValor.COACTIVA);
+            }
+            auditar(valor, pase, observacion);
         }
-
-        auditar(valor, pase, observacion);
         return pase;
     }
 
