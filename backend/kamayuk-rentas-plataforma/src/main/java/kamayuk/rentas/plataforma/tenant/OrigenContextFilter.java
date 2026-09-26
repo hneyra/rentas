@@ -78,7 +78,7 @@ public final class OrigenContextFilter extends OncePerRequestFilter {
             // escritura sin atribuir es lo que OrigenContext existe para impedir. Se
             // corta aqui en vez de dejar que estalle mas adentro con un 500.
             log.warn("Token validado sin sub ni {}: no identifica a nadie", CLAIM_USUARIO);
-            RespuestaDeError.escribir(respuesta, CodigoDeError.NO_AUTENTICADO);
+            RespuestaDeError.escribir(peticion, respuesta, CodigoDeError.NO_AUTENTICADO);
             return;
         }
 

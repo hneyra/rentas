@@ -100,7 +100,7 @@ public final class DocumentoCiudadanoContextFilter extends OncePerRequestFilter 
                             + " valor por omision ni modo sin documento (ADR-0020)",
                     CLAIM_NUMERO,
                     e.getMessage());
-            RespuestaDeError.escribir(respuesta, CodigoDeError.SIN_DOCUMENTO);
+            RespuestaDeError.escribir(peticion, respuesta, CodigoDeError.SIN_DOCUMENTO);
             return;
         }
 

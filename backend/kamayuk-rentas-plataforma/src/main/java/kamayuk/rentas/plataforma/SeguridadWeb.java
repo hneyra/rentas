@@ -314,11 +314,11 @@ public class SeguridadWeb {
 
     private static AuthenticationEntryPoint entradaSinToken() {
         return (peticion, respuesta, excepcion) ->
-                RespuestaDeError.escribir(respuesta, CodigoDeError.NO_AUTENTICADO);
+                RespuestaDeError.escribir(peticion, respuesta, CodigoDeError.NO_AUTENTICADO);
     }
 
     private static AccessDeniedHandler accesoDenegado() {
         return (peticion, respuesta, excepcion) ->
-                RespuestaDeError.escribir(respuesta, CodigoDeError.SIN_PRIVILEGIO);
+                RespuestaDeError.escribir(peticion, respuesta, CodigoDeError.SIN_PRIVILEGIO);
     }
 }

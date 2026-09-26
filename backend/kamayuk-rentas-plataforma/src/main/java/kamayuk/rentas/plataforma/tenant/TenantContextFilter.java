@@ -105,7 +105,7 @@ public final class TenantContextFilter extends OncePerRequestFilter {
                             + " omision ni modo sin municipalidad (ADR-0005, RNF-032)",
                     CLAIM,
                     e.getMessage());
-            responderSinMunicipalidad(respuesta);
+            responderSinMunicipalidad(peticion, respuesta);
             return;
         }
 
@@ -128,9 +128,9 @@ public final class TenantContextFilter extends OncePerRequestFilter {
      * cadena de seguridad: dos formas distintas de decir «no puedes» serian dos formas que la
      * interfaz tendria que aprender por separado.
      */
-    private static void responderSinMunicipalidad(HttpServletResponse respuesta)
-            throws IOException {
-        RespuestaDeError.escribir(respuesta, CodigoDeError.SIN_MUNICIPALIDAD);
+    private static void responderSinMunicipalidad(
+            HttpServletRequest peticion, HttpServletResponse respuesta) throws IOException {
+        RespuestaDeError.escribir(peticion, respuesta, CodigoDeError.SIN_MUNICIPALIDAD);
     }
 
     private static @Nullable Jwt tokenDeLaAutenticacion() {
