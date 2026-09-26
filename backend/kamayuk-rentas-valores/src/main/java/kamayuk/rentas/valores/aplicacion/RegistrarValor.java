@@ -16,6 +16,7 @@ import kamayuk.rentas.cuentacorriente.ClaveDeObligacionPublica;
 import kamayuk.rentas.cuentacorriente.ConsultaDeDeudaPublica;
 import kamayuk.rentas.cuentacorriente.MovimientoDeFase;
 import kamayuk.rentas.cuentacorriente.ObligacionPublica;
+import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.valores.dominio.EstadoDeValor;
@@ -228,18 +229,22 @@ public class RegistrarValor {
             // dejaria en el libro dos salidas por una sola deuda. Que haya algo que mover ya no se
             // pregunta aqui: solo llega lo que `pendientesDe` devolvio (#401).
             if (!formalizaciones.get(i).yaEstaEnFaseValor()) {
-                movimiento.moverAValor(
-                        obligacion.ejercicio(),
-                        contribuyenteId,
-                        selector.tributo(),
-                        null,
-                        selector.predioId(),
-                        selector.vehiculoId(),
-                        "VALOR-" + guardado.numero(),
-                        obligacion.total(),
-                        hoy,
-                        guardado.numero(),
-                        observacion);
+                // Cuota por cuota, y las decide el libro (#448): aqui solo se sabe la obligacion
+                // agregada, y pasar periodo nulo con el total dejaba las cuotas en ORDINARIA.
+                Dinero movido =
+                        movimiento.moverAValor(
+                                contribuyenteId,
+                                obligacion.clave(),
+                                "VALOR-" + guardado.numero(),
+                                hoy,
+                                guardado.numero(),
+                                observacion);
+                // Lo que el libro movio tiene que ser lo que el valor congelo: si no, el libro no
+                // es el que se leyo —una cuota en otra fase, un asiento entre leer y mover— y el
+                // titulo diria una deuda que la fase VALOR no tiene. Se deshace todo.
+                if (movido.compareTo(obligacion.total()) != 0) {
+                    throw new LoMovidoNoEsLoCongelado(selector, obligacion.total(), movido);
+                }
             }
         }
 
@@ -380,6 +385,31 @@ public class RegistrarValor {
                                 ? " del vehiculo " + selector.vehiculoId()
                                 : "";
         return selector.tributo() + " del ejercicio " + selector.ejercicio().valor() + unidad;
+    }
+
+    /**
+     * El libro paso a VALOR otra cifra que la que el valor congelo (#448).
+     *
+     * <p>El valor congela la obligacion agregada que {@code pendientesDe} devolvio, y el libro
+     * mueve cuota por cuota lo que cada una debe en ORDINARIA. Si no coinciden, alguna cuota estaba
+     * en otra fase o el libro cambio entre leer y mover: emitir igual dejaria un titulo por una
+     * deuda que la fase VALOR no cuenta. No se emite, y la transaccion se deshace entera.
+     */
+    public static final class LoMovidoNoEsLoCongelado extends RuntimeException {
+
+        @java.io.Serial private static final long serialVersionUID = 1L;
+
+        LoMovidoNoEsLoCongelado(SelectorDeObligacion selector, Dinero congelado, Dinero movido) {
+            super(
+                    "La obligacion de "
+                            + descripcionDe(selector)
+                            + " debe "
+                            + congelado.valor().toPlainString()
+                            + ", y en fase ordinaria el libro solo tiene "
+                            + movido.valor().toPlainString()
+                            + ": alguna cuota esta en otra fase o el libro cambio mientras se"
+                            + " emitia. No se emite un titulo por una deuda que no pasa a VALOR");
+        }
     }
 
     /** El selector no coincide con ninguna obligacion con deuda del contribuyente, a hoy. */

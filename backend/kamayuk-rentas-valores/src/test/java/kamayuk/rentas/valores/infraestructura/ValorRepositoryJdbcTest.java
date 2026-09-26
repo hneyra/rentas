@@ -41,7 +41,6 @@ import kamayuk.rentas.valores.dominio.SelectorDeObligacion;
 import kamayuk.rentas.valores.dominio.TipoValor;
 import kamayuk.rentas.valores.dominio.Valor;
 import kamayuk.rentas.valores.dominio.ValorDetalle;
-import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -571,19 +570,18 @@ class ValorRepositoryJdbcTest {
                             },
                             new MovimientoDeFase() {
                                 @Override
-                                public void moverAValor(
-                                        Ejercicio ejercicio,
+                                public Dinero moverAValor(
                                         long contribuyenteId,
-                                        String tributo,
-                                        @Nullable Integer periodo,
-                                        @Nullable Long predioId,
-                                        @Nullable Long vehiculoId,
+                                        kamayuk.rentas.cuentacorriente.ClaveDeObligacionPublica
+                                                obligacion,
                                         String referenciaExterna,
-                                        Dinero monto,
                                         LocalDate fechaValor,
                                         String documentoOrigen,
                                         Observacion observacion) {
                                     pares.add(referenciaExterna);
+                                    // El libro mueve lo que la obligacion debe: los 100,00 que la
+                                    // consulta de arriba publica.
+                                    return Dinero.de("100.00");
                                 }
 
                                 @Override

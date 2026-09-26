@@ -8,7 +8,6 @@ import kamayuk.rentas.cuentacorriente.MovimientoDeFase;
 import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.Observacion;
-import org.jspecify.annotations.Nullable;
 
 /**
  * Lo minimo del libro que la importacion escribe: el paso de VALOR a COACTIVA (#407).
@@ -36,15 +35,10 @@ public final class FasesDeMentira implements MovimientoDeFase {
     }
 
     @Override
-    public void moverAValor(
-            Ejercicio ejercicio,
+    public Dinero moverAValor(
             long contribuyenteId,
-            String tributo,
-            @Nullable Integer periodo,
-            @Nullable Long predioId,
-            @Nullable Long vehiculoId,
+            kamayuk.rentas.cuentacorriente.ClaveDeObligacionPublica obligacion,
             String referenciaExterna,
-            Dinero monto,
             LocalDate fechaValor,
             String documentoOrigen,
             Observacion observacion) {
