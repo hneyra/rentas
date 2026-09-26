@@ -116,4 +116,15 @@ public final class MovimientosDeEdificacionEnMemoria implements MovimientoDeEdif
                                                 == TipoDeMovimientoDeEdificacion.EMISION)
                 .findFirst();
     }
+
+    @Override
+    public Optional<MovimientoDeEdificacion> revalidacionDe(long fueId) {
+        return movimientos.stream()
+                .filter(
+                        movimiento ->
+                                movimiento.fueId() == fueId
+                                        && movimiento.tipo()
+                                                == TipoDeMovimientoDeEdificacion.REVALIDACION)
+                .findFirst();
+    }
 }

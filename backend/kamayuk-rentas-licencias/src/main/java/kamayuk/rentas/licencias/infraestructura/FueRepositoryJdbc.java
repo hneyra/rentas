@@ -235,6 +235,15 @@ public class FueRepositoryJdbc extends RepositorioJdbc implements FueRepository 
                     + "    AND m.tipo = 'EMISION' AND m.fecha <= :estadoALaFecha)";
 
     /**
+     * «Su tramite ya se resolvio sin otorgar licencia propia» (#449): la revalidacion, cuyo acto
+     * queda en su expediente.
+     */
+    private static final String REVALIDADA =
+            "EXISTS (SELECT 1 FROM edificacion_movimiento m"
+                    + "  WHERE m.municipalidad_id = e.municipalidad_id AND m.fue_id = e.id"
+                    + "    AND m.tipo = 'REVALIDACION' AND m.fecha <= :estadoALaFecha)";
+
+    /**
      * «Algun tramo la cubre»: {@code VigenciaDeLaLicencia.cubre}, con los dos extremos dentro. El
      * tramo que termina el mismo dia del corte todavia la cubre.
      */
@@ -254,7 +263,8 @@ public class FueRepositoryJdbc extends RepositorioJdbc implements FueRepository 
     private static String estadoEnSql(EstadoDelFue estado) {
         return switch (estado) {
             case ANULADA -> ANULADA;
-            case EN_TRAMITE -> "NOT " + ANULADA + " AND NOT " + EMITIDA;
+            case EN_TRAMITE -> "NOT " + ANULADA + " AND NOT " + EMITIDA + " AND NOT " + REVALIDADA;
+            case RESUELTO -> "NOT " + ANULADA + " AND NOT " + EMITIDA + " AND " + REVALIDADA;
             case VIGENTE -> "NOT " + ANULADA + " AND " + EMITIDA + " AND " + CUBIERTA;
             case VENCIDA -> "NOT " + ANULADA + " AND " + EMITIDA + " AND NOT " + CUBIERTA;
         };

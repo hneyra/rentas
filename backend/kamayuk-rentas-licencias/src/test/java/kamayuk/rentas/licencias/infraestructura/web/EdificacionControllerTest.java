@@ -777,6 +777,16 @@ class EdificacionControllerTest {
             assertThat(revalidarEl("2026-09-01", 201)).contains("\"acto\":\"REVALIDACION\"");
         }
 
+        @Test
+        @DisplayName("#449 — el mismo expediente otra vez: 409, como una segunda emision")
+        void elMismoExpedienteOtraVez() throws Exception {
+            revalidarEl("2026-09-01", 201);
+
+            assertThat(revalidarEl("2026-09-02", 409))
+                    .as("un tramite es un acto: lo rechaza el expediente, no el recibo")
+                    .contains("ya tiene su revalidacion resuelta");
+        }
+
         private String revalidarEl(String fecha, int esperado) throws Exception {
             return envio(
                     del23DeSetiembre,
