@@ -50,12 +50,14 @@ import org.springframework.web.bind.annotation.RestController;
  *       anuncios de #51, y por el mismo motivo: <b>un descuento inventado perdona deuda que ninguna
  *       ordenanza condona</b>. Las cuatro opciones que dibuja el desplegable del prototipo son las
  *       ordenanzas de Sullana: contra una instalacion sin campanas cargadas, cualquiera de ellas da
- *       ese 422, que es exactamente lo que hay que decir.
+ *       ese 422, que es exactamente lo que hay que decir. Si la publica pero <b>no rige hoy</b>
+ *       —una campana de marzo a junio consultada en agosto—, tambien 422, con el motivo «rigio del
+ *       … al …» y <b>sin</b> {@code parametroQueFalta}: no falta publicar nada (#379).
  * </ul>
  *
  * <p>Lo que la respuesta anade y el contrato no pedia: {@code campaniasAplicables}, las campanas
- * que <b>esta</b> municipalidad publica. Sin ella, el desplegable del prototipo seria la unica
- * fuente y diria las de otra ciudad.
+ * que <b>esta</b> municipalidad publica y que rigen hoy (#379). Sin ella, el desplegable del
+ * prototipo seria la unica fuente y diria las de otra ciudad.
  *
  * <p>{@code pagina}, {@code tamano}, {@code ordenarPor} y {@code direccion} se aplican a la rejilla
  * de obligaciones. El resumen —total, acogida, ahorro— se calcula sobre <b>todas</b> las
@@ -123,6 +125,11 @@ public class DeudasConBeneficioController {
             // de las dos cosas —«corrige el formulario» o «hay que publicar una cifra»— y acaba
             // enumerando las dos, que es peor que no decir nada.
             throw FaltaPublicar.problema(falta);
+        } catch (CampaniasDeBeneficioParametrizadas.CampaniaFueraDeVigencia fueraDeVigencia) {
+            // #379 — 422 tambien, pero SIN `parametroQueFalta`: la campana esta publicada y no
+            // rige hoy, asi que no hay ninguna cifra que publicar. Lo que no vale es la peticion
+            // —se pidio una campana vencida, o que aun no empieza— y el mensaje dice cuando rige.
+            throw new ProblemaDeNegocio(CodigoDeError.VALIDACION, fueraDeVigencia.motivo());
         }
     }
 

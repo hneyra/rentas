@@ -6,6 +6,7 @@ import java.util.Map;
 import java.util.Optional;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.ValorNormativo;
+import kamayuk.rentas.dominio.Vigencia;
 import kamayuk.rentas.parametros.IdentificadorDeConjunto;
 import kamayuk.rentas.parametros.LectorDeParametros;
 import kamayuk.rentas.parametros.ParametrosSellados;
@@ -174,6 +175,12 @@ public class LectorDeParametrosCacheados implements LectorDeParametros {
      * <p>Si despues de resolver siguen sobrando dos filas de la misma llave, se falla nombrandola.
      * Dentro de un conjunto ya sellado son una contradiccion, y elegir una es el defecto que #659
      * cerro.
+     *
+     * <p><b>Y la vigencia de cada fila no se tira</b> (#379): entra en el conjunto toda fila que se
+     * solape con el ano, asi que una campana de marzo a junio esta en el de 2026 y el 28 de agosto
+     * no rige. Hasta #379 se descartaba aqui y cada consumidor suponia que «del conjunto» era
+     * «vigente cualquier dia del ano». Ahora viaja con la fila, y la pregunta por un dia concreto
+     * se hace con {@link ParametrosSellados#vigenciaDe}.
      */
     private ParametrosSellados armar(
             CacheDeSnapshots.IdentidadDelConjunto identidad,
@@ -197,6 +204,7 @@ public class LectorDeParametrosCacheados implements LectorDeParametros {
         }
 
         for (SnapshotDeNormativa.Parametro parametro : queRige.values()) {
+            constructor.vigencia(parametro.tipo(), parametro.clave(), vigenciaDe(parametro));
             String numerico = parametro.valorNumerico();
             if (numerico != null) {
                 constructor.numero(
@@ -212,16 +220,28 @@ public class LectorDeParametrosCacheados implements LectorDeParametros {
 
     /** La vigencia de la fila se solapa con el año del ejercicio. */
     private static boolean rigeEn(SnapshotDeNormativa.Parametro parametro, Ejercicio ejercicio) {
-        LocalDate desde =
-                parametro.vigenciaDesde() == null
-                        ? null
-                        : LocalDate.parse(parametro.vigenciaDesde());
-        LocalDate hasta =
-                parametro.vigenciaHasta() == null
-                        ? null
-                        : LocalDate.parse(parametro.vigenciaHasta());
+        Vigencia vigencia = vigenciaDe(parametro);
+        LocalDate desde = vigencia.desde();
+        LocalDate hasta = vigencia.hasta();
         return (desde == null || !desde.isAfter(ejercicio.ultimoDia()))
                 && (hasta == null || !hasta.isBefore(ejercicio.primerDia()));
+    }
+
+    /**
+     * La vigencia de la fila, leida una sola vez y del mismo sitio para las dos preguntas: si entra
+     * en el conjunto del ejercicio ({@link #rigeEn}) y si rige un dia concreto ({@link
+     * ParametrosSellados#vigenciaDe}, #379).
+     *
+     * <p>Una fila con el fin antes del principio no llega: {@code normativa} la rechaza al guardar
+     * ({@code parametro_vigencia_ck}), y si llegara, {@link Vigencia} fallaria nombrando las dos
+     * fechas en vez de dejarla solaparse con cualquier ano.
+     */
+    private static Vigencia vigenciaDe(SnapshotDeNormativa.Parametro parametro) {
+        String desde = parametro.vigenciaDesde();
+        String hasta = parametro.vigenciaHasta();
+        return new Vigencia(
+                desde == null ? null : LocalDate.parse(desde),
+                hasta == null ? null : LocalDate.parse(hasta));
     }
 
     private static String llave(SnapshotDeNormativa.Parametro parametro) {

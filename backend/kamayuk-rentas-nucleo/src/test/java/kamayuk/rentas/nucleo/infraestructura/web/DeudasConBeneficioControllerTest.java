@@ -19,6 +19,7 @@ import kamayuk.rentas.cuentacorriente.ObligacionPublica;
 import kamayuk.rentas.dominio.Dinero;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.ValorNormativo;
+import kamayuk.rentas.dominio.Vigencia;
 import kamayuk.rentas.nucleo.aplicacion.CampaniasDeBeneficioParametrizadas;
 import kamayuk.rentas.nucleo.aplicacion.SimularAcogimiento;
 import kamayuk.rentas.parametros.IdentificadorDeConjunto;
@@ -143,6 +144,72 @@ class DeudasConBeneficioControllerTest {
                         "\"parametroQueFalta\":{\"ejercicio\":2026,"
                                 + "\"llave\":\"BENEFICIO:AMNISTÍA ORDENANZA 018-2026\"}");
         assertThat(cuerpo).doesNotContain("\"simulacion\"");
+    }
+
+    /**
+     * #379 — La campana esta en el conjunto de 2026 y el reloj marca el 28 de agosto.
+     *
+     * <p>El 422 tiene que decir otra cosa que el de «no publicada»: aquel lleva {@code
+     * parametroQueFalta} porque hay que publicar una cifra, y aqui la cifra esta publicada. Con el
+     * miembro dentro, la interfaz mandaria a pedir una ordenanza que ya existe.
+     */
+    @Test
+    @DisplayName("#379 — una campana vencida es 422 diciendo cuando rigio, sin parametroQueFalta")
+    void campaniaVencida() throws Exception {
+        parametros.publicar(
+                "AMNISTIA",
+                "100",
+                "REAJUSTE_E_INTERES",
+                "2",
+                "HALF_UP",
+                new Vigencia(LocalDate.of(2026, 3, 1), LocalDate.of(2026, 6, 30)));
+
+        String cuerpo = pedir("?contribuyente=C-000021&benefAplicable=AMNISTIA", 422);
+
+        assertThat(cuerpo)
+                .contains("BENEFICIO:AMNISTIA")
+                .contains("rigió del 2026-03-01 al 2026-06-30")
+                .doesNotContain("parametroQueFalta")
+                .doesNotContain("\"simulacion\"");
+    }
+
+    @Test
+    @DisplayName("#379 — una campana que todavia no empieza tampoco se aplica, y dice desde cuando")
+    void campaniaQueTodaviaNoEmpieza() throws Exception {
+        parametros.publicar(
+                "PRONTO PAGO DE DICIEMBRE",
+                "10",
+                "INSOLUTO",
+                "2",
+                "HALF_UP",
+                new Vigencia(LocalDate.of(2026, 12, 1), null));
+
+        String cuerpo =
+                pedir("?contribuyente=C-000021&benefAplicable=PRONTO PAGO DE DICIEMBRE", 422);
+
+        assertThat(cuerpo)
+                .contains("regirá desde el 2026-12-01, sin fecha de fin")
+                .doesNotContain("parametroQueFalta");
+    }
+
+    @Test
+    @DisplayName("#379 — el desplegable no ofrece la vencida, y la frase dice el dia")
+    void laVencidaNoSeOfrece() throws Exception {
+        parametros.publicar(
+                "AMNISTIA",
+                "100",
+                "REAJUSTE_E_INTERES",
+                "2",
+                "HALF_UP",
+                new Vigencia(LocalDate.of(2026, 3, 1), LocalDate.of(2026, 6, 30)));
+        parametros.publicar("PRONTO PAGO", "10", "INSOLUTO", "2", "HALF_UP");
+
+        String cuerpo = pedir("?contribuyente=C-000021", 200);
+
+        assertThat(cuerpo)
+                .contains("\"nombre\":\"PRONTO PAGO\"")
+                .doesNotContain("\"nombre\":\"AMNISTIA\"")
+                .contains("Hay 1 campaña(s) publicada(s) que rigen el 2026-08-28 (ejercicio 2026)");
     }
 
     @Test
@@ -319,11 +386,22 @@ class DeudasConBeneficioControllerTest {
         private final List<Publicada> publicadas = new ArrayList<>();
 
         void publicar(String nombre, String alicuota, String base, String escala, String modo) {
-            publicadas.add(new Publicada(nombre, alicuota, base, escala, modo));
+            publicadas.add(new Publicada(nombre, alicuota, base, escala, modo, null));
+        }
+
+        /** Con la vigencia de sus dos filas: la que traeria el snapshot de {@code normativa}. */
+        void publicar(
+                String nombre,
+                String alicuota,
+                String base,
+                String escala,
+                String modo,
+                Vigencia vigencia) {
+            publicadas.add(new Publicada(nombre, alicuota, base, escala, modo, vigencia));
         }
 
         void publicarSoloAlicuota(String nombre, String alicuota) {
-            publicadas.add(new Publicada(nombre, alicuota, null, "2", "HALF_UP"));
+            publicadas.add(new Publicada(nombre, alicuota, null, "2", "HALF_UP", null));
         }
 
         @Override
@@ -344,6 +422,11 @@ class DeudasConBeneficioControllerTest {
                         campania.nombre(),
                         ValorNormativo.de(campania.escala()));
                 constructor.texto("BENEFICIO_REDONDEO", campania.nombre(), campania.modo());
+                Vigencia vigencia = campania.vigencia();
+                if (vigencia != null) {
+                    constructor.vigencia("BENEFICIO", campania.nombre(), vigencia);
+                    constructor.vigencia("BENEFICIO_REDONDEO", campania.nombre(), vigencia);
+                }
             }
             return constructor.construir();
         }
@@ -363,6 +446,7 @@ class DeudasConBeneficioControllerTest {
                 String alicuota,
                 @Nullable String base,
                 String escala,
-                String modo) {}
+                String modo,
+                @Nullable Vigencia vigencia) {}
     }
 }

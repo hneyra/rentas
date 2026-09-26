@@ -123,6 +123,23 @@ class DeudasConBeneficioJdbcTest {
     private static final String CAMPANIA_INSOLUTO = "PRONTO PAGO DE PRUEBA";
     private static final String CAMPANIA_ABIERTA = "AMNISTIA SIN SELLAR";
 
+    /**
+     * #379 — La campana que rige <b>parte</b> del ejercicio: de marzo a junio.
+     *
+     * <p>Es la siembra que distingue. Las otras dos rigen desde el 1 de enero y sin fin, y con esa
+     * forma resolver «lo del ejercicio» y resolver «lo que rige ese dia» dan lo mismo: por eso
+     * nadie vio que la simulacion ofrecia y aplicaba una campana vencida. {@code normativa} la mete
+     * en el conjunto de 2026 a proposito ({@code loQueRigeParteDelEjercicioSigueDentro}), asi que
+     * quien tiene que mirar la fecha es este lado.
+     */
+    private static final String CAMPANIA_DE_TEMPORADA = "AMNISTIA DE MARZO A JUNIO";
+
+    private static final LocalDate TEMPORADA_DESDE = LocalDate.of(2026, 3, 1);
+    private static final LocalDate TEMPORADA_HASTA = LocalDate.of(2026, 6, 30);
+
+    /** Un dia dentro de la ventana de la campana de temporada. {@link #HOY} cae fuera. */
+    private static final LocalDate DENTRO_DE_LA_TEMPORADA = LocalDate.of(2026, 4, 15);
+
     private static BaseDeDatosDePrueba base;
     private static JdbcClient jdbc;
 
@@ -213,7 +230,21 @@ class DeudasConBeneficioJdbcTest {
                 parametroDelCatalogo("BENEFICIO_REDONDEO", CAMPANIA_TOTAL, ESCALA, MODO),
                 parametroDelCatalogo(
                         "BENEFICIO", CAMPANIA_INSOLUTO, MITAD, BaseDelBeneficio.INSOLUTO.name()),
-                parametroDelCatalogo("BENEFICIO_REDONDEO", CAMPANIA_INSOLUTO, ESCALA, MODO));
+                parametroDelCatalogo("BENEFICIO_REDONDEO", CAMPANIA_INSOLUTO, ESCALA, MODO),
+                parametroDelCatalogo(
+                        "BENEFICIO",
+                        CAMPANIA_DE_TEMPORADA,
+                        MITAD,
+                        BaseDelBeneficio.TOTAL.name(),
+                        TEMPORADA_DESDE,
+                        TEMPORADA_HASTA),
+                parametroDelCatalogo(
+                        "BENEFICIO_REDONDEO",
+                        CAMPANIA_DE_TEMPORADA,
+                        ESCALA,
+                        MODO,
+                        TEMPORADA_DESDE,
+                        TEMPORADA_HASTA));
 
         crearConjunto(
                 otraMunicipalidad,
@@ -377,6 +408,68 @@ class DeudasConBeneficioJdbcTest {
         }
     }
 
+    /**
+     * #379 — Del conjunto del ejercicio no se sigue que rija cualquier dia del ejercicio.
+     *
+     * <p>Las dos consultas son a la misma campana y al mismo conjunto sellado; lo unico que cambia
+     * es la fecha de corte. Resolviendo solo con {@code Ejercicio.de(fecha)} las dos dan lo mismo,
+     * y la del 28 de agosto ofrecia y aplicaba un descuento que ninguna ordenanza respalda ese dia.
+     */
+    @Nested
+    @DisplayName("#379 — Una campana que rige parte del ejercicio")
+    class CampaniaDeTemporada {
+
+        @Test
+        @DisplayName("fuera de su ventana no se ofrece, aunque este en el conjunto del ejercicio")
+        void fueraDeSuVentanaNoSeOfrece() {
+            String codigo = contribuyenteConDeuda("BEN-379-A");
+
+            SimularAcogimiento.Simulacion resultado =
+                    simulacion.de(criterio(codigo, HOY, null, null), PAGINA);
+
+            assertThat(resultado.campaniasPublicadas())
+                    .as("la campana de marzo a junio no rige el 28 de agosto")
+                    .noneSatisfy(c -> assertThat(c.nombre()).isEqualTo(CAMPANIA_DE_TEMPORADA))
+                    .as("y el filtro no se lleva las que si rigen")
+                    .anySatisfy(c -> assertThat(c.nombre()).isEqualTo(CAMPANIA_TOTAL));
+        }
+
+        @Test
+        @DisplayName("pedirla fuera de su ventana falla diciendo cuando rigio, no que no existe")
+        void pedirlaFueraDeSuVentanaFalla() {
+            String codigo = contribuyenteConDeuda("BEN-379-B");
+
+            assertThatThrownBy(
+                            () ->
+                                    simulacion.de(
+                                            criterio(codigo, HOY, null, CAMPANIA_DE_TEMPORADA),
+                                            PAGINA))
+                    .as("una simulacion vencida es una cifra que ninguna norma respalda ese dia")
+                    .isInstanceOf(CampaniasDeBeneficioParametrizadas.CampaniaFueraDeVigencia.class)
+                    .hasMessageContaining("BENEFICIO:" + CAMPANIA_DE_TEMPORADA)
+                    .hasMessageContaining("rigió del 2026-03-01 al 2026-06-30");
+        }
+
+        @Test
+        @DisplayName("dentro de su ventana se ofrece y se aplica")
+        void dentroDeSuVentanaSeAplica() {
+            String codigo = contribuyenteConDeuda("BEN-379-C");
+
+            SimularAcogimiento.Simulacion ofrecidas =
+                    simulacion.de(criterio(codigo, DENTRO_DE_LA_TEMPORADA, null, null), PAGINA);
+            SimularAcogimiento.Simulacion acogida =
+                    simulacion.de(
+                            criterio(codigo, DENTRO_DE_LA_TEMPORADA, null, CAMPANIA_DE_TEMPORADA),
+                            PAGINA);
+
+            assertThat(ofrecidas.campaniasPublicadas())
+                    .anySatisfy(c -> assertThat(c.nombre()).isEqualTo(CAMPANIA_DE_TEMPORADA));
+            assertThat(acogida.acogimiento()).isNotNull();
+            assertThat(acogida.acogimiento().ahorro()).isEqualTo(Dinero.de("500.00"));
+            assertThat(acogida.estadoDeLaSimulacion()).contains(CAMPANIA_DE_TEMPORADA);
+        }
+    }
+
     @Nested
     @DisplayName("Con la campana en un conjunto ABIERTO")
     class ConCampaniaEnConjuntoAbierto {
@@ -526,7 +619,15 @@ class DeudasConBeneficioJdbcTest {
             String codigo,
             @org.jspecify.annotations.Nullable String tributo,
             @org.jspecify.annotations.Nullable String campania) {
-        return new SimularAcogimiento.Criterio(codigo, HOY, tributo, campania);
+        return criterio(codigo, HOY, tributo, campania);
+    }
+
+    private static SimularAcogimiento.Criterio criterio(
+            String codigo,
+            LocalDate aLaFecha,
+            @org.jspecify.annotations.Nullable String tributo,
+            @org.jspecify.annotations.Nullable String campania) {
+        return new SimularAcogimiento.Criterio(codigo, aLaFecha, tributo, campania);
     }
 
     private String contribuyenteConDeuda(String sufijo) {
@@ -586,21 +687,35 @@ class DeudasConBeneficioJdbcTest {
                                 Observacion.de("Se asienta la deuda de la prueba")));
     }
 
+    /** Una fila que rige desde el 1 de enero y sin fin: la forma de casi todas. */
     private static long parametroDelCatalogo(String tipo, String clave, String numero, String texto)
+            throws SQLException {
+        return parametroDelCatalogo(tipo, clave, numero, texto, EJERCICIO.primerDia(), null);
+    }
+
+    private static long parametroDelCatalogo(
+            String tipo,
+            String clave,
+            String numero,
+            String texto,
+            LocalDate desde,
+            @org.jspecify.annotations.Nullable LocalDate hasta)
             throws SQLException {
         try (Connection carga = base.conexion(BaseDeDatosDePrueba.CARGA_PARAMETROS);
                 PreparedStatement sentencia =
                         carga.prepareStatement(
                                 "INSERT INTO parametro_tributario_de_prueba (municipalidad_id, tipo, clave,"
                                         + " valor_numerico, valor_texto, vigencia_desde,"
-                                        + " documento_fuente, sellado, usuario_carga)"
-                                        + " VALUES (NULL, ?, ?, ?::numeric, ?, DATE '2026-01-01',"
+                                        + " vigencia_hasta, documento_fuente, sellado, usuario_carga)"
+                                        + " VALUES (NULL, ?, ?, ?::numeric, ?, ?, ?,"
                                         + " 'Ordenanza de la prueba', true, 'siembra')"
                                         + " RETURNING id")) {
             sentencia.setString(1, tipo);
             sentencia.setString(2, clave);
             sentencia.setString(3, numero);
             sentencia.setString(4, texto);
+            sentencia.setObject(5, desde);
+            sentencia.setObject(6, hasta, java.sql.Types.DATE);
             try (ResultSet resultado = sentencia.executeQuery()) {
                 resultado.next();
                 long id = resultado.getLong(1);
