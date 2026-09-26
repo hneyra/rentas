@@ -180,12 +180,11 @@ class ContratoDeApiTest {
                     // municipalidad sobre los datos de otra.
                     "GET /seguridad/sesion/municipalidad",
                     // #559 — quien es la sesion. Ninguna lectura publicaba el `usuario.id`
-                    // propio, asi que la interfaz no podia llamar a `PUT
-                    // /seguridad/usuarios/{id}/clave` —que solo admite la propia— sin
-                    // deducirlo del listado de usuarios, que exige un permiso mucho mayor.
+                    // propio; la interfaz lo declara en su lectura de la sesion. El cambio de
+                    // clave para el que nacio se retiro en #437: la clave se cambia en la
+                    // consola de cuenta del emisor.
                     "GET /seguridad/sesion",
                     "PUT /seguridad/sesion/ejercicio",
-                    "PUT /seguridad/usuarios/{id}/clave",
                     "GET /seguridad/auditoria",
                     "POST /seguridad/respaldos",
                     // «GET /seguridad/parametros» —el listado paginado de los conjuntos— SE FUE

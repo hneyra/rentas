@@ -167,6 +167,5 @@
   "PUT /rentas/contribuyentes/{id}": ["404"],
   "PUT /rentas/contribuyentes/{id}/contactos/{contactoId}": ["404"],
   "PUT /rentas/contribuyentes/{id}/responsables/{responsableId}": ["404"],
-  "PUT /seguridad/sesion/ejercicio": [],
-  "PUT /seguridad/usuarios/{id}/clave": ["404"]
+  "PUT /seguridad/sesion/ejercicio": []
 }

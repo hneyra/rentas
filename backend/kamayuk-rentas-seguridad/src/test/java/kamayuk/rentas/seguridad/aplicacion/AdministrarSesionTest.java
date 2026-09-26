@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.io.IOException;
-import java.lang.reflect.RecordComponent;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -34,8 +33,6 @@ import kamayuk.rentas.seguridad.dominio.RegistroAuditado;
 import kamayuk.rentas.seguridad.dominio.Sesion;
 import kamayuk.rentas.seguridad.infraestructura.LecturaDeLaCopiaLocalJdbc;
 import kamayuk.rentas.seguridad.infraestructura.SesionRepositoryJdbc;
-import kamayuk.rentas.seguridad.infraestructura.web.SesionController;
-import kamayuk.rentas.web.ProblemaDeNegocio;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -521,27 +518,9 @@ class AdministrarSesionTest {
     }
 
     @Nested
-    @DisplayName("RF-125 — El cambio de clave no guarda ni transporta ninguna clave")
-    class CambioDeClave {
-
-        @Test
-        @DisplayName("devuelve el destino del proveedor y deja constancia; no guarda nada")
-        void devuelveElDestinoDelProveedor() throws SQLException {
-            long usuarioId = idDeUsuario("operador.a");
-
-            String destino =
-                    sesion.iniciarCambioDeClave(
-                            usuarioId, Observacion.de("El usuario pidio cambiar su contrasena"));
-
-            assertThat(destino).isNotBlank();
-            assertThat(
-                            filas(
-                                    "SELECT operacion FROM auditoria WHERE tabla = 'usuario'"
-                                            + " AND clave = '"
-                                            + usuarioId
-                                            + "'"))
-                    .contains("ACCESO");
-        }
+    @DisplayName(
+            "RF-125 — Ninguna clave se guarda aqui: la credencial vive en el proveedor de identidad")
+    class NingunaClave {
 
         @Test
         @DisplayName("la tabla usuario no tiene ninguna columna donde guardar una clave")
@@ -558,30 +537,6 @@ class AdministrarSesionTest {
             assertThat(sospechosas)
                     .as("la autenticacion es del proveedor OIDC; aqui no hay donde guardarla")
                     .isEmpty();
-        }
-
-        @Test
-        @DisplayName("el cuerpo de la peticion no tiene ningun campo de contrasena")
-        void elCuerpoNoTieneCampoDeContrasena() {
-            // La garantia no es que no se guarde: es que no hay por donde llegue.
-            RecordComponent[] campos =
-                    SesionController.SolicitudDeCambioDeClave.class.getRecordComponents();
-
-            assertThat(campos).extracting(RecordComponent::getName).containsExactly("observacion");
-        }
-
-        @Test
-        @DisplayName("cambiar la clave de otro no es administrar: es suplantar, y se rechaza")
-        void laClaveDeOtroSeRechaza() throws SQLException {
-            long ajeno = idDeUsuario("operador.a");
-            OrigenContext.fijar(new Origen("otro.operador", null, null));
-
-            assertThatThrownBy(
-                            () ->
-                                    sesion.iniciarCambioDeClave(
-                                            ajeno, Observacion.de("Intento de cambiar la ajena")))
-                    .isInstanceOf(ProblemaDeNegocio.class)
-                    .hasMessageContaining("propia");
         }
     }
 

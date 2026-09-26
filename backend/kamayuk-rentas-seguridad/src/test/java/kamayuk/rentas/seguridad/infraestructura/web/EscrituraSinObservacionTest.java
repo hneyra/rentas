@@ -56,13 +56,6 @@ class EscrituraSinObservacionTest {
                             "Sin observacion no se guarda (regla 10): el caso de uso no tenia que"
                                     + " llegar a ejecutarse");
                 }
-
-                @Override
-                public String iniciarCambioDeClave(long usuarioId, Observacion observacion) {
-                    throw new AssertionError(
-                            "Sin observacion no se guarda (regla 10): el caso de uso no tenia que"
-                                    + " llegar a ejecutarse");
-                }
             };
 
     private final MockMvc mvc =
@@ -117,27 +110,6 @@ class EscrituraSinObservacionTest {
 
             assertThat(respuesta.getResponse().getStatus()).isEqualTo(422);
             assertThat(respuesta.getResponse().getContentAsString()).contains("'observacion'");
-        }
-    }
-
-    @Nested
-    @DisplayName("La otra escritura del mismo controlador, que tenia el mismo defecto")
-    class LaOtraEscritura {
-
-        @Test
-        @DisplayName("el cambio de clave sin observacion: 422 y nombra el campo")
-        void elCambioDeClave() throws Exception {
-            MvcResult respuesta =
-                    mvc.perform(
-                                    put("/rentas/api/v1/seguridad/usuarios/7/clave")
-                                            .contentType(MediaType.APPLICATION_JSON)
-                                            .content("{}"))
-                            .andReturn();
-
-            assertThat(respuesta.getResponse().getStatus()).isEqualTo(422);
-            assertThat(respuesta.getResponse().getContentAsString())
-                    .contains("'observacion'")
-                    .doesNotContain("ERROR_INTERNO");
         }
     }
 

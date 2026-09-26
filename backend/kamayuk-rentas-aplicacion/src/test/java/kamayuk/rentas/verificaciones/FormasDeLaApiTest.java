@@ -24,7 +24,7 @@ import org.junit.jupiter.api.Test;
  * proxy servia un {@code licenciaConducir} que ningun {@code Resource} modela— y la respuesta de
  * entonces fue un guardia con los veinte campos de <b>un</b> recurso, escrito a mano.
  *
- * <p>Esto es ese guardia para las {@code MEDIDO: 169 operaciones de formas-de-la-api.json} y sin
+ * <p>Esto es ese guardia para las {@code MEDIDO: 168 operaciones de formas-de-la-api.json} y sin
  * lista que mantener: los campos salen de los {@code record} del backend, y el archivo que produce
  * lo lee el frontend (`frontend/verificaciones/formas-del-backend.test.ts`) para comparar contra lo
  * que el proxy publica. Es lo que permite encender una ruta —#400— habiendo comprobado que la
