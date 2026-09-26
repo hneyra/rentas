@@ -3,12 +3,9 @@ package kamayuk.rentas.licencias.aplicacion;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.Set;
 import kamayuk.rentas.auditoria.Auditoria;
 import kamayuk.rentas.auditoria.Operacion;
@@ -20,18 +17,13 @@ import kamayuk.rentas.documentos.FormatoDeDocumento;
 import kamayuk.rentas.dominio.Ejercicio;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.dominio.OrdenDeLosActos;
-import kamayuk.rentas.licencias.dominio.EstructuraDelProyecto;
 import kamayuk.rentas.licencias.dominio.FueDeEdificacion;
 import kamayuk.rentas.licencias.dominio.FueRepository;
 import kamayuk.rentas.licencias.dominio.MovimientoDeEdificacion;
 import kamayuk.rentas.licencias.dominio.MovimientoDeEdificacionRepository;
 import kamayuk.rentas.licencias.dominio.PlantillaDeNumeroDeEdificacion;
-import kamayuk.rentas.licencias.dominio.ProfesionalDelFue;
-import kamayuk.rentas.licencias.dominio.ProyectoDelFue;
-import kamayuk.rentas.licencias.dominio.RequisitoDelFue;
 import kamayuk.rentas.licencias.dominio.SeccionDelFue;
-import kamayuk.rentas.licencias.dominio.TerrenoDelFue;
-import kamayuk.rentas.licencias.dominio.TipoDeProfesional;
+import kamayuk.rentas.licencias.dominio.SeccionesDelFue;
 import kamayuk.rentas.licencias.dominio.VigenciaDeLaLicencia;
 import kamayuk.rentas.tesoreria.AplicacionDeRecibos;
 import kamayuk.rentas.tesoreria.ReciboDeTramite;
@@ -135,7 +127,7 @@ public class RegistrarLicenciaDeEdificacion {
 
         ExpedienteListo listo = leerYComprobar(expediente, fechaDeEmision);
         FueDeEdificacion fue = listo.fue();
-        SeccionesDelExpediente secciones = listo.secciones();
+        SeccionesDelFue secciones = listo.secciones();
         ResumenDeContribuyente solicitante = listo.solicitante();
         ReciboDeTramite recibo = comprobada.recibo();
         ValorizacionDelFue.Resultado valorizacion = comprobada.valorizacion();
@@ -241,15 +233,19 @@ public class RegistrarLicenciaDeEdificacion {
                         "la declaracion del expediente " + fue.expediente(),
                         fue.fechaDeclaracion()));
 
-        SeccionesDelExpediente secciones = leerSecciones(fue);
-        secciones.exigirCompletas(fue.expediente());
+        SeccionesDelFue secciones = leerSecciones(fue);
+        // La regla es la de la ficha (#452): lo que ella dice que falta es lo que aqui se rechaza.
+        List<SeccionDelFue> faltantes = secciones.faltantes();
+        if (!faltantes.isEmpty()) {
+            throw new EmitirLicenciaDeEdificacion.SeccionesIncompletas(fue.expediente(), faltantes);
+        }
 
         return new ExpedienteListo(fue, secciones, solicitanteDe(fue));
     }
 
-    private SeccionesDelExpediente leerSecciones(FueDeEdificacion fue) {
+    private SeccionesDelFue leerSecciones(FueDeEdificacion fue) {
         long id = fue.identificador();
-        return new SeccionesDelExpediente(
+        return new SeccionesDelFue(
                 expedientes.terrenoVigente(id),
                 expedientes.proyectoVigente(id),
                 expedientes.valorizacionVigente(id),
@@ -298,9 +294,7 @@ public class RegistrarLicenciaDeEdificacion {
      *     traer
      */
     public record ExpedienteListo(
-            FueDeEdificacion fue,
-            SeccionesDelExpediente secciones,
-            ResumenDeContribuyente solicitante) {}
+            FueDeEdificacion fue, SeccionesDelFue secciones, ResumenDeContribuyente solicitante) {}
 
     /**
      * Lo que los vecinos contestaron, reunido fuera de toda transaccion por {@link
@@ -318,69 +312,6 @@ public class RegistrarLicenciaDeEdificacion {
             Objects.requireNonNull(concepto, "concepto");
             Objects.requireNonNull(recibo, "recibo");
             Objects.requireNonNull(valorizacion, "valorizacion");
-        }
-    }
-
-    /**
-     * Las cinco secciones leidas de una vez, con la comprobacion del AC 1 dentro.
-     *
-     * <p>Se leen las cinco antes de comprobar ninguna, a proposito: comprobar sobre la marcha
-     * dejaria el error diciendo solo la primera que falta.
-     */
-    public record SeccionesDelExpediente(
-            Optional<TerrenoDelFue> terrenoOpcional,
-            Optional<ProyectoDelFue> proyectoOpcional,
-            List<EstructuraDelProyecto> estructuras,
-            List<ProfesionalDelFue> profesionales,
-            List<RequisitoDelFue> requisitos) {
-
-        void exigirCompletas(String expediente) {
-            List<SeccionDelFue> faltan = new ArrayList<>();
-            if (terrenoOpcional.isEmpty()) {
-                faltan.add(SeccionDelFue.TERRENO);
-            }
-            if (proyectoOpcional.isEmpty()) {
-                faltan.add(SeccionDelFue.PROYECTO);
-            }
-            if (estructuras.isEmpty()) {
-                faltan.add(SeccionDelFue.VALORIZACION);
-            }
-            if (!tieneLosProfesionalesQueFirman()) {
-                faltan.add(SeccionDelFue.PROFESIONALES);
-            }
-            if (requisitos.stream().noneMatch(RequisitoDelFue::presentado)) {
-                faltan.add(SeccionDelFue.DOCUMENTOS);
-            }
-            if (!faltan.isEmpty()) {
-                throw new EmitirLicenciaDeEdificacion.SeccionesIncompletas(expediente, faltan);
-            }
-        }
-
-        /**
-         * Que esten el proyectista de arquitectura y el responsable de obra.
-         *
-         * <p>Son los dos que el issue nombra como secciones propias del FUE, y los dos que
-         * responden por la obra: sin proyectista no hay quien responda por el proyecto, y sin
-         * responsable de obra no hay a quien reclamar durante la ejecucion. Los otros dos
-         * proyectistas —estructuras e instalaciones— no se exigen aqui: cuando hacen falta lo dice
-         * el reglamento segun la modalidad, y eso son cifras y supuestos que este repositorio no
-         * tiene verificados.
-         */
-        private boolean tieneLosProfesionalesQueFirman() {
-            Set<TipoDeProfesional> presentes = EnumSet.noneOf(TipoDeProfesional.class);
-            for (ProfesionalDelFue profesional : profesionales) {
-                presentes.add(profesional.tipo());
-            }
-            return presentes.contains(TipoDeProfesional.PROYECTISTA_ARQUITECTURA)
-                    && presentes.contains(TipoDeProfesional.RESPONSABLE_OBRA);
-        }
-
-        TerrenoDelFue terreno() {
-            return terrenoOpcional.orElseThrow();
-        }
-
-        ProyectoDelFue proyecto() {
-            return proyectoOpcional.orElseThrow();
         }
     }
 }
