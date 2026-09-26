@@ -38,6 +38,7 @@ public final class MovimientosDeLiquidacionEnMemoria implements MovimientoDeLiqu
                         movimiento.estado(),
                         movimiento.fecha(),
                         movimiento.motivo(),
+                        movimiento.numeroNotificacion(),
                         "pruebas",
                         movimiento.observacion());
         guardados.add(guardado);

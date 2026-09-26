@@ -9,6 +9,7 @@ import kamayuk.rentas.fiscalizacion.dominio.LiquidacionRepository;
 import kamayuk.rentas.fiscalizacion.dominio.MovimientoDeLiquidacion;
 import kamayuk.rentas.fiscalizacion.dominio.MovimientoDeLiquidacionRepository;
 import kamayuk.rentas.fiscalizacion.dominio.ResolucionDeDeterminacionRepository;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -41,6 +42,13 @@ import org.springframework.transaction.annotation.Transactional;
  *       sin efecto la RDF, y ese acto —con la reversión de sus cargos— todavía no existe. Aquí sólo
  *       se impide llegar al estado imposible.
  * </ul>
+ *
+ * <h2>Notificar lleva el número del cargo (#368)</h2>
+ *
+ * <p>El paso a NOTIFICADA es el único que registra un papel entregado, y el número de ese papel se
+ * guarda en el mismo movimiento ({@link MovimientoDeLiquidacion#notificada}): sin él es 422, y con
+ * cualquier otro estado también, porque diría que se notificó. Hasta #368 el acto no recibía número
+ * y el filtro «Nº Notificación» del histórico no encontraba nunca nada.
  */
 @Service
 public class CambiarEstadoDeLaLiquidacion {
@@ -65,7 +73,10 @@ public class CambiarEstadoDeLaLiquidacion {
      * @param nuevo a qué estado pasa
      * @param fecha el día del acto
      * @param motivo por qué se mueve
+     * @param numeroNotificacion el «Nº Notificación» del cargo: obligatorio para NOTIFICADA y
+     *     rechazado con cualquier otro estado (#368)
      * @param observacion por qué se registra (regla 10)
+     * @throws IllegalArgumentException si falta el número al notificar, o llega con otro estado
      * @throws TransicionIlegal si la tabla de {@link EstadoDeLiquidacion#admiteIrA} no tiene el par
      * @throws LiquidacionConResolucion si se anula una liquidación que ya tiene su RDF
      */
@@ -75,12 +86,22 @@ public class CambiarEstadoDeLaLiquidacion {
             EstadoDeLiquidacion nuevo,
             LocalDate fecha,
             String motivo,
+            @Nullable String numeroNotificacion,
             Observacion observacion) {
 
         Liquidacion liquidacion =
                 liquidaciones
                         .porNumero(numero)
                         .orElseThrow(() -> new LiquidacionInexistente(numero));
+        // Antes que el estado: una peticion incompleta es 422 este donde este la liquidacion.
+        MovimientoDeLiquidacion movimiento =
+                movimientoHacia(
+                        liquidacion.identificador(),
+                        nuevo,
+                        fecha,
+                        motivo,
+                        numeroNotificacion,
+                        observacion);
 
         // El candado ANTES de leer el estado (#484): sin el, una transferencia simultanea
         // registra su RDF sin confirmar, aqui no se ve, y se anula una liquidacion que ya la
@@ -107,10 +128,34 @@ public class CambiarEstadoDeLaLiquidacion {
                             });
         }
 
-        movimientos.insertar(
-                MovimientoDeLiquidacion.cambioDeEstado(
-                        liquidacion.identificador(), nuevo, fecha, motivo, observacion));
+        movimientos.insertar(movimiento);
         return nuevo;
+    }
+
+    /**
+     * El movimiento que la petición describe: notificar con su número, o cualquier otro cambio sin
+     * él (#368).
+     */
+    private static MovimientoDeLiquidacion movimientoHacia(
+            long liquidacionId,
+            EstadoDeLiquidacion nuevo,
+            LocalDate fecha,
+            String motivo,
+            @Nullable String numeroNotificacion,
+            Observacion observacion) {
+        if (nuevo == EstadoDeLiquidacion.NOTIFICADA) {
+            return MovimientoDeLiquidacion.notificada(
+                    liquidacionId, fecha, motivo, numeroNotificacion, observacion);
+        }
+        if (numeroNotificacion != null) {
+            throw new IllegalArgumentException(
+                    "El campo 'numeroNotificacion' es el del cargo de notificacion y solo va con"
+                            + " NOTIFICADA: en "
+                            + nuevo.etiqueta()
+                            + " diria que se notifico");
+        }
+        return MovimientoDeLiquidacion.cambioDeEstado(
+                liquidacionId, nuevo, fecha, motivo, observacion);
     }
 
     /** No hay ninguna liquidacion con ese numero. */

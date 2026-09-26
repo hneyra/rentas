@@ -730,11 +730,11 @@ class LiquidacionJdbcTest {
             transaccion.execute(
                     estado ->
                             movimientos.insertar(
-                                    MovimientoDeLiquidacion.cambioDeEstado(
+                                    MovimientoDeLiquidacion.notificada(
                                             guardada.identificador(),
-                                            EstadoDeLiquidacion.NOTIFICADA,
                                             HOY,
                                             "entregada",
+                                            "N-2026-0001",
                                             OBSERVACION)));
 
             assertThat(

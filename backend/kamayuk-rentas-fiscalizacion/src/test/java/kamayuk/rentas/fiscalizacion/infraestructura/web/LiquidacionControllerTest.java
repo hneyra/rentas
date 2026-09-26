@@ -537,6 +537,10 @@ class LiquidacionControllerTest {
                                         "{\"nuevoEstado\":\""
                                                 + estado
                                                 + "\",\"motivo\":\"prueba\","
+                                                // Notificar lleva el numero del cargo (#368).
+                                                + ("NOTIFICADA".equals(estado)
+                                                        ? "\"numeroNotificacion\":\"N-1\","
+                                                        : "")
                                                 + "\"fecha\":\"2026-03-16\","
                                                 + "\"observacion\":\"Movimiento de la prueba\"}"))
                 .andReturn();
