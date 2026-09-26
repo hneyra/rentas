@@ -397,6 +397,39 @@ class EscrituraDeDeclaracionJuradaJdbcTest {
         }
 
         @Test
+        @DisplayName(
+                "#374 — condomino al 50 %: valuo afecto 80 000 SIN ponderar, y la base 40 000 aparte")
+        void elValuoAfectoNoEsLaBase() throws Exception {
+            // La siembra que distingue: tres cifras distintas. Con 100 % y exonerado 0 —la de
+            // arriba— autovaluo, valuo afecto y base salen iguales y ninguna implementacion se
+            // distingue de la otra.
+            String codigo = nuevoCodigoCatastral();
+            long predio = crearPredioConFicha(municipalidad, codigo);
+            String contribuyente = nuevoContribuyente(municipalidad);
+            long contribuyenteId = idDeContribuyente(contribuyente);
+            PrediosDeLaHoja.del(contribuyenteId, predio, codigo, "CALLE DEL CONDOMINIO 50");
+            String numero = numeroDe(presentar(contribuyente, predio));
+            determinarConCifras(
+                    contribuyenteId, predio, "100000.00", "20000.00", "50", "40000.00", "160.00");
+
+            JsonNode hoja = JSON.readTree(hojaDe(numero));
+            JsonNode fila = hoja.get("predios").get(0);
+
+            assertThat(new BigDecimal(fila.get("valuoAfecto").asString()))
+                    .as(
+                            "autovaluo menos exonerado, como la memoria del calculo: hasta #374 esta"
+                                    + " fila decia 40 000, y 100 000 − 20 000 no da 40 000")
+                    .isEqualByComparingTo("80000.00");
+            assertThat(new BigDecimal(fila.get("baseImponible").asString()))
+                    .as("lo ponderado por el 50 % es la base, y viaja con su nombre")
+                    .isEqualByComparingTo("40000.00");
+            assertThat(new BigDecimal(hoja.get("valuoAfectoTotal").asString()))
+                    .isEqualByComparingTo("80000.00");
+            assertThat(new BigDecimal(hoja.get("baseImponible").asString()))
+                    .isEqualByComparingTo("40000.00");
+        }
+
+        @Test
         @DisplayName("sin determinacion del ejercicio no inventa cifras: las nombra como ausentes")
         void sinDeterminacionNoInventaCifras() throws Exception {
             String codigo = nuevoCodigoCatastral();
@@ -1305,6 +1338,65 @@ class EscrituraDeDeclaracionJuradaJdbcTest {
                     detalle.setString(5, predio.getValue());
                     detalle.executeUpdate();
                 }
+            }
+            app.commit();
+        }
+    }
+
+    /**
+     * Una determinacion de UN predio con sus cuatro cifras distintas (#374): autovaluo, exonerado,
+     * % de propiedad y la base ya ponderada, que es tambien la base de la cabecera.
+     */
+    private static void determinarConCifras(
+            long contribuyenteId,
+            long predioId,
+            String autovaluo,
+            String exonerado,
+            String porcentaje,
+            String baseImponible,
+            String impuesto)
+            throws SQLException {
+        try (Connection app = base.conexion(BaseDeDatosDePrueba.APP)) {
+            ContextoDeTenant.fijar(app, municipalidad);
+            long determinacion;
+            try (PreparedStatement cabecera =
+                    app.prepareStatement(
+                            "INSERT INTO determinacion (municipalidad_id, ejercicio, tributo,"
+                                    + " contribuyente_id, conjunto_id, base_imponible,"
+                                    + " monto_determinado, reglas_aplicadas, usuario_calculo)"
+                                    + " SELECT ?, 2026, 'PREDIAL', ?, c.id, CAST(? AS dinero),"
+                                    + "        CAST(? AS dinero), ARRAY['RT-011'], 'siembra'"
+                                    + "   FROM conjunto_parametros_de_prueba c"
+                                    + "  WHERE c.municipalidad_id = ? AND c.ejercicio = 2026"
+                                    + "  ORDER BY c.id DESC LIMIT 1"
+                                    + " RETURNING id")) {
+                cabecera.setLong(1, municipalidad);
+                cabecera.setLong(2, contribuyenteId);
+                cabecera.setString(3, baseImponible);
+                cabecera.setString(4, impuesto);
+                cabecera.setLong(5, municipalidad);
+                try (ResultSet fila = cabecera.executeQuery()) {
+                    fila.next();
+                    determinacion = fila.getLong(1);
+                }
+            }
+            try (PreparedStatement detalle =
+                    app.prepareStatement(
+                            "INSERT INTO determinacion_predio_detalle (municipalidad_id,"
+                                    + " ejercicio, determinacion_id, predio_id, autovaluo,"
+                                    + " valuo_exonerado, porcentaje_propiedad,"
+                                    + " base_imponible_predio)"
+                                    + " VALUES (?, 2026, ?, ?, CAST(? AS dinero),"
+                                    + "         CAST(? AS dinero), CAST(? AS numeric),"
+                                    + "         CAST(? AS dinero))")) {
+                detalle.setLong(1, municipalidad);
+                detalle.setLong(2, determinacion);
+                detalle.setLong(3, predioId);
+                detalle.setString(4, autovaluo);
+                detalle.setString(5, exonerado);
+                detalle.setString(6, porcentaje);
+                detalle.setString(7, baseImponible);
+                detalle.executeUpdate();
             }
             app.commit();
         }
