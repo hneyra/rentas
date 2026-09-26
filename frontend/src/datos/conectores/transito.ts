@@ -1,6 +1,6 @@
 import { coordenada, type Ausencia, type CeldaDeLaTabla, type Coordenada } from '@kamayuk/ui';
 
-import { formatearFecha } from '../../dominio/formato.ts';
+import { formatearEntero, formatearFecha } from '../../dominio/formato.ts';
 import type {
   ExpedienteDeLaPapeleta,
   InternamientoEnDeposito,
@@ -314,8 +314,9 @@ const TRA_PANEL: Conector = {
       // ano sale del principio del rango —`desde`, ISO— porque esta operacion cuenta un rango y no
       // publica un `ejercicio`; lo que se afirma con el pasa por la regla de todos los paneles.
       [coordenada(0, 0), ejercicioDeLaRespuesta(resumen.desde.slice(0, 4))],
-      // El total, calculado en el servidor. No se suman las lineas aqui.
-      [coordenada(0, 1), String(resumen.papeletas)],
+      // El total, calculado en el servidor. No se suman las lineas aqui. Agrupado, como el artboard
+      // escribe «8,412» (#389).
+      [coordenada(0, 1), formatearEntero(resumen.papeletas)],
     ]);
     const noPublicados = new Map<Coordenada, PalabraDeHueco>([
       // «Canceladas»: `pagadas` cuenta `p.estado = 'PAGADA'`, y NADIE lo escribe — el unico
@@ -331,10 +332,10 @@ const TRA_PANEL: Conector = {
       noPublicados.set(coordenada(0, 5), NO_PUBLICADO);
     } else {
       // «Con multa notificada»: lo que consta es la diligencia de la RESOLUCION (#222).
-      valores.set(coordenada(0, 2), String(delEjercicio.conResolucionNotificada));
+      valores.set(coordenada(0, 2), formatearEntero(delEjercicio.conResolucionNotificada));
       // «Con resolucion de multa»: lo que consta de la etapa que el rotulo llamaba «En
       // coactiva» — la multa formalizada, que es de este contexto entero (#243).
-      valores.set(coordenada(0, 5), String(delEjercicio.conResolucionDeMulta));
+      valores.set(coordenada(0, 5), formatearEntero(delEjercicio.conResolucionDeMulta));
     }
     // Esta hoja no tiene tabla: su bloque son seis campos.
     return { valores, filas: new Map(), noPublicados };

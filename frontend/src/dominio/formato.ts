@@ -37,12 +37,28 @@ const IMPORTE_SERVIDO = /^-?\d+(\.\d{1,2})?$/;
 const FECHA_SERVIDA = /^(\d{4})-(\d{2})-(\d{2})$/;
 
 /**
- * `"1842.6"` -> `"S/ 1,842.60"`.
+ * Un importe ya partido en su signo y su cifra agrupada, **sin** el simbolo de la moneda.
  *
- * Agrupa de tres en tres y completa a dos decimales. Lo hace con texto, asi que
- * un importe de quince digitos sale igual de exacto que uno de tres.
+ * Es lo que tienen en comun el campo suelto —`S/ 1,842.60`— y la celda de una columna que ya dice
+ * «S/» en su rotulo —`1,842.60`— (#389). La cifra se construye UNA vez, aqui, y el simbolo se
+ * **anade o no** despues; no se quita de nada. Hasta #389 la columna se escribia recortando el
+ * prefijo con una expresion regular —`LA_MONEDA = /^S\/\s/`—, copiada en dos conectores, mientras
+ * las demas columnas «… S/» elegian otra politica cada una.
  */
-export function formatearImporte(valor: Importe): string {
+interface CifraDelImporte {
+  readonly signo: '' | '-';
+  readonly cifra: string;
+}
+
+/** Agrupa de tres en tres la parte entera, sin los ceros de la izquierda. */
+function agrupar(enteraCruda: string | undefined): string {
+  // `?? ''` y no `!`: con `noUncheckedIndexedAccess` el compilador no da por hecho que `split`
+  // devolvio algo, y tiene razon aunque la expresion regular ya lo garantice.
+  return (enteraCruda ?? '').replace(/^0+(?=\d)/, '').replace(/\B(?=(\d{3})+(?!\d))/g, MILES);
+}
+
+/** La cifra de un importe de CIERRE, completada a dos decimales. Revienta con lo que no lo es. */
+function cifraRedondeada(valor: Importe): CifraDelImporte {
   const limpio = valor.trim();
 
   if (!IMPORTE_SERVIDO.test(limpio)) {
@@ -59,15 +75,66 @@ export function formatearImporte(valor: Importe): string {
   const negativo = limpio.startsWith('-');
   const sinSigno = negativo ? limpio.slice(1) : limpio;
   const [enteraCruda, decimalesCrudos] = sinSigno.split(DECIMAL);
-
-  // `?? ''` y no `!`: con `noUncheckedIndexedAccess` el compilador no da por
-  // hecho que `split` devolvio algo, y tiene razon aunque la expresion regular
-  // ya lo garantice.
-  const entera = (enteraCruda ?? '').replace(/^0+(?=\d)/, '');
   const decimales = `${decimalesCrudos ?? ''}00`.slice(0, 2);
-  const agrupada = entera.replace(/\B(?=(\d{3})+(?!\d))/g, MILES);
 
-  return `${negativo ? '-' : ''}${MONEDA} ${agrupada}${DECIMAL}${decimales}`;
+  return { signo: negativo ? '-' : '', cifra: `${agrupar(enteraCruda)}${DECIMAL}${decimales}` };
+}
+
+/** La cifra de un importe INTERMEDIO, con todos los decimales que trae. Ver `formatearImporteSinRedondear`. */
+function cifraSinRedondear(valor: Importe): CifraDelImporte {
+  const limpio = valor.trim();
+
+  if (!/^-?\d+\.\d+$/.test(limpio)) {
+    throw new Error(
+      `Importe intermedio con una forma que el backend no sirve: «${valor}». ` +
+        'Se espera texto decimal con al menos un decimal y sin separador de miles. ' +
+        'Redondear aqui seria aritmetica sobre dinero (regla 1, RNF-055).',
+    );
+  }
+
+  const negativo = limpio.startsWith('-');
+  const sinSigno = negativo ? limpio.slice(1) : limpio;
+  const [enteraCruda, decimales] = sinSigno.split(DECIMAL);
+
+  return { signo: negativo ? '-' : '', cifra: `${agrupar(enteraCruda)}${DECIMAL}${decimales ?? ''}` };
+}
+
+/** Con el simbolo delante, como el artboard escribe un campo suelto: `-S/ 591.94`. */
+const conLaMoneda = ({ signo, cifra }: CifraDelImporte): string => `${signo}${MONEDA} ${cifra}`;
+
+/** Sin el simbolo, como el artboard escribe una celda bajo un rotulo «… S/»: `-591.94`. */
+const enLaColumna = ({ signo, cifra }: CifraDelImporte): string => `${signo}${cifra}`;
+
+/**
+ * `"1842.6"` -> `"S/ 1,842.60"`.
+ *
+ * Agrupa de tres en tres y completa a dos decimales. Lo hace con texto, asi que
+ * un importe de quince digitos sale igual de exacto que uno de tres.
+ */
+export function formatearImporte(valor: Importe): string {
+  return conLaMoneda(cifraRedondeada(valor));
+}
+
+/**
+ * `"1842.6"` -> `"1,842.60"`: el importe de una **celda cuya columna ya dice «S/»** (#389).
+ *
+ * <h2>La politica de la columna de soles, en un solo sitio</h2>
+ *
+ * Es como el artboard escribe una tabla —`9,418,204.60` bajo «Monto S/», `2,067.04` bajo «Total
+ * S/»— y como la escribe `formatearImporte` en un campo suelto, **menos el simbolo**: la cifra es la
+ * misma y sale de la misma funcion, asi que no hay dos formas de agrupar. Lo unico que cambia es
+ * que la columna no repita la moneda en cada fila.
+ *
+ * Hasta #389 habia **cuatro politicas** para esa columna: esta misma, recortando el prefijo con una
+ * expresion regular copiada en `inicio.ts` y en `fiscalizacion.ts`; el simbolo repetido bajo un
+ * rotulo que ya lo dice —`territorio`, `con-doc`—; el texto crudo y sin millares —«1250.00» en
+ * `coa-cost`—; y la celda en blanco de la etapa sin monto de `panel`. Que ningun conector vuelva a
+ * recortar la moneda por su cuenta lo vigila `verificaciones/la-moneda-se-quita-solo-en-el-formato.test.ts`.
+ *
+ * Revienta con lo mismo que `formatearImporte`: la columna no relaja la forma.
+ */
+export function formatearImporteEnColumna(valor: Importe): string {
+  return enLaColumna(cifraRedondeada(valor));
 }
 
 /**
@@ -92,23 +159,17 @@ export function formatearImporte(valor: Importe): string {
  * en texto: escribir `NaN` en una columna de soles se lee como un dato.
  */
 export function formatearImporteSinRedondear(valor: Importe): string {
-  const limpio = valor.trim();
+  return conLaMoneda(cifraSinRedondear(valor));
+}
 
-  if (!/^-?\d+\.\d+$/.test(limpio)) {
-    throw new Error(
-      `Importe intermedio con una forma que el backend no sirve: «${valor}». ` +
-        'Se espera texto decimal con al menos un decimal y sin separador de miles. ' +
-        'Redondear aqui seria aritmetica sobre dinero (regla 1, RNF-055).',
-    );
-  }
-
-  const negativo = limpio.startsWith('-');
-  const sinSigno = negativo ? limpio.slice(1) : limpio;
-  const [enteraCruda, decimales] = sinSigno.split(DECIMAL);
-  const entera = (enteraCruda ?? '').replace(/^0+(?=\d)/, '');
-  const agrupada = entera.replace(/\B(?=(\d{3})+(?!\d))/g, MILES);
-
-  return `${negativo ? '-' : ''}${MONEDA} ${agrupada}${DECIMAL}${decimales ?? ''}`;
+/**
+ * `"1485.00000000"` -> `"1,485.00000000"`: el aporte de un tramo bajo «Aporte S/» (#245, #389).
+ *
+ * `formatearImporteSinRedondear` sin el simbolo, por lo mismo que `formatearImporteEnColumna` es
+ * `formatearImporte` sin el: la columna ya dice la moneda en su rotulo.
+ */
+export function formatearImporteSinRedondearEnColumna(valor: Importe): string {
+  return enLaColumna(cifraSinRedondear(valor));
 }
 
 /**
@@ -154,7 +215,9 @@ export function formatearEntero(cuantos: number): string {
         'el tamano del padron.',
     );
   }
-  return String(cuantos).replace(/\B(?=(\d{3})+(?!\d))/g, MILES);
+  // La misma agrupacion que la de un importe: un conteo y una cifra de soles tienen que escribir
+  // sus millares igual en la misma pantalla (#389).
+  return agrupar(String(cuantos));
 }
 
 /**

@@ -1,7 +1,7 @@
 import { coordenada } from '@kamayuk/ui';
 
 import type { Conector, Reparto } from '../conectores.ts';
-import { formatearFecha } from '../../dominio/formato.ts';
+import { formatearEntero, formatearFecha } from '../../dominio/formato.ts';
 import type { Paginado, PrescripcionDeclarada } from '../lecturas.ts';
 import { RUTAS, pedirPagina } from '../lecturas.ts';
 
@@ -97,7 +97,8 @@ const VAL_TIP: Conector = {
     valores: new Map([
       // «Declaraciones»: el total que el SERVIDOR conto sobre la bitacora entera, no las filas que
       // llegaron. Ver el javadoc: el rotulo dice «declaraciones» porque eso es lo que cuenta.
-      [coordenada(0, 3), String(bitacora.totalElementos)],
+      // Agrupado como cualquier otro conteo del arbol (#389).
+      [coordenada(0, 3), formatearEntero(bitacora.totalElementos)],
     ]),
     // Vacio: esta tabla lleva `clave`, asi que sus filas van por `tablas`.
     filas: new Map(),

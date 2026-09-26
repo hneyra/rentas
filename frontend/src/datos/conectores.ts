@@ -20,7 +20,8 @@ import {
   formatearEntero,
   formatearFecha,
   formatearImporte,
-  formatearImporteSinRedondear,
+  formatearImporteEnColumna,
+  formatearImporteSinRedondearEnColumna,
 } from '../dominio/formato.ts';
 import { CONECTORES_DE_LICENCIAS } from './conectores/licencias.ts';
 import { CONECTORES_DE_COACTIVA } from './conectores/coactiva.ts';
@@ -543,6 +544,50 @@ function ejercicioDeLaRespuesta(ejercicio: string | number | null): string {
   return ejercicio === null ? TODOS_LOS_EJERCICIOS : String(ejercicio);
 }
 
+/** La celda que llego sin dato, con el motivo dentro (`kamayuk-lib`#87, #187). */
+const sinDato = (porQue: string): CeldaDeLaTabla => ({ texto: null, nota: porQue });
+
+/**
+ * Lo que dice la celda «Monto S/» de una etapa que no mueve dinero (#389).
+ *
+ * Es dato y no se traduce, igual que la celda —lo que se traduce es la palabra que la tabla declara
+ * en `sinDato`—, por lo mismo que `SIN_SITUACION_PUBLICADA` mas abajo.
+ */
+const SIN_MONTO_EN_LA_ETAPA =
+  'Esta etapa no mueve dinero: lee el padron y no emite nada. La operacion publica su monto vacio a ' +
+  'proposito, y no es un cero — «no se emitio nada» y «esta etapa no emite» no dicen lo mismo.';
+
+/**
+ * **Las filas de «Etapas de la corrida»: una por etapa, escritas como el artboard** (#389).
+ *
+ * <h2>Por que va por `tablas` y no por `filas`</h2>
+ *
+ * Porque la etapa «Padron leido» llega con `monto: ""` —`SIN_MONTO` de `CorridaGuardadaResource`—,
+ * y por la via `filas`, que solo admite cadenas, esa celda salia **en blanco**: el interprete solo
+ * dice «sin dato» cuando la celda es `null`. Con `clave`, la celda viaja como `{ texto: null, nota
+ * }`, la tabla escribe la raya que declara en `sinDato` y anuncia el motivo. `formatearImporte('')`
+ * reventaria, y con razon: la cadena vacia no es un importe.
+ *
+ * <h2>Y las cifras, como en cualquier otra hoja</h2>
+ *
+ * Los conteos con `formatearEntero` —«62,418», como el artboard— y el monto con
+ * `formatearImporteEnColumna` —«9,418,204.60», sin el simbolo que ya dice el rotulo—. Hasta #389
+ * esta tabla escribia «62418» y «9418204.60» mientras los campos de encima agrupaban.
+ *
+ * El estado va tal como llega —`"OK"` o `"CON OBSERVACIONES"`— y su tono lo decide `tono.ts`.
+ */
+function etapasDeLaCorrida(corrida: CorridaDelPredial): readonly FilaDeLaTabla[] {
+  return corrida.etapas.map((e) => ({
+    celdas: [
+      e.etapa,
+      formatearEntero(e.registros),
+      e.monto === '' ? sinDato(SIN_MONTO_EN_LA_ETAPA) : formatearImporteEnColumna(e.monto),
+      formatearEntero(e.observados),
+      e.estado,
+    ],
+  }));
+}
+
 /**
  * `panel` — el estado de la ultima corrida del padron.
  *
@@ -615,7 +660,10 @@ const PANEL: Conector = {
       // El ejercicio de la CORRIDA, no la primera opcion del desplegable (#390): se pide sin
       // ejercicio y el backend lo resuelve con el ano del reloj, asi que solo la respuesta lo sabe.
       [coordenada(0, 0), ejercicioDeLaRespuesta(corrida.ejercicio)],
-      [coordenada(0, 1), corrida.fechaCalculo],
+      // Por `formatearFecha`, como las fechas de las otras veinte hojas: hasta #389 era la unica que
+      // salia en ISO —«2026-09-01» donde el resto escribe «01/09/2026»—. Sin hora: el backend
+      // publica un `LocalDate`, y la del artboard no se inventa.
+      [coordenada(0, 1), formatearFecha(corrida.fechaCalculo)],
       // Los dos conteos con `formatearEntero` y no con `String`: el artboard escribe «61,350» con
       // millares, y una emision anual los tiene. Con `String` los observados salian sin agrupar
       // desde F-6 —invisible mientras fueran 534— y los dos campos del mismo bloque habrian
@@ -637,18 +685,10 @@ const PANEL: Conector = {
         ? []
         : [[coordenada(0, 5), formatearImporte(corrida.derechoDeEmision)] as const]),
     ]),
-    filas: new Map([
-      [
-        0,
-        corrida.etapas.map((e) => [
-          e.etapa,
-          String(e.registros),
-          e.monto,
-          String(e.observados),
-          e.estado,
-        ]),
-      ],
-    ]),
+    // Vacio: la tabla de etapas lleva `clave` desde #389, asi que sus filas van por `tablas` —el
+    // unico camino cuyas celdas pueden decir que no hay dato—. Ver `etapasDeLaCorrida`.
+    filas: new Map(),
+    tablas: new Map([['etapas-de-la-corrida', { filas: etapasDeLaCorrida(corrida) }]]),
     // **Vacio cuando la corrida es la emision del ejercicio y sello su derecho.** La palabra del
     // derecho no es `NO_PUBLICADO` —la operacion SI lo publica— sino la de «esa corrida no lo
     // guardo». Ver el javadoc de arriba: son dos ausencias distintas y el backend no puede arreglar
@@ -702,9 +742,6 @@ const SIN_SITUACION_PUBLICADA =
   'del calculo: ninguna operacion servida la publica. Deducirla del vencimiento —«vencida» ' +
   'porque la fecha paso— diria que hay deuda sin haber mirado un solo pago.';
 
-/** La celda que llego sin dato, con el motivo dentro (`kamayuk-lib`#87, #187). */
-const sinDato = (porQue: string): CeldaDeLaTabla => ({ texto: null, nota: porQue });
-
 /**
  * **Las filas del «Cronograma»: una por cuota, y ni una compuesta aqui** (#252).
  *
@@ -723,7 +760,8 @@ function cronogramaDe(determinacion: DeterminacionGuardada): readonly FilaDeLaTa
       formatearFecha(cuota.vencimiento),
       // Redondeado, al reves que el aporte de un tramo: la cuota es una cifra de cierre —el
       // conjunto sellado la redondea en `PuntoDeRedondeo.CUOTA`— y llega con sus dos decimales.
-      formatearImporte(cuota.importe),
+      // Sin el simbolo, que ya lo dice el rotulo «Importe S/» (#389).
+      formatearImporteEnColumna(cuota.importe),
       sinDato(SIN_SITUACION_PUBLICADA),
     ],
   }));
@@ -816,8 +854,9 @@ function cronogramaDe(determinacion: DeterminacionGuardada): readonly FilaDeLaTa
  * y el unico redondeo es el del cierre de la regla—, o sea con ocho decimales:
  * `porcionGravada.por(alicuota.movePointLeft(2))`. `formatearImporte` **revienta** con eso, y tiene
  * razon; recortarlo aqui seria aritmetica sobre dinero (regla 1). Va por
- * `formatearImporteSinRedondear`, que escribe lo que llego. La cifra que manda es
- * `impuestoInsoluto`, que si esta redondeada y esta arriba, en su campo.
+ * `formatearImporteSinRedondearEnColumna`, que escribe lo que llego —sin el simbolo, que ya lo dice
+ * el rotulo «Aporte S/» (#389)—. La cifra que manda es `impuestoInsoluto`, que si esta redondeada y
+ * esta arriba, en su campo.
  *
  * <h2>Exige las dos cosas: el sujeto y el ejercicio</h2>
  *
@@ -895,14 +934,16 @@ function tablasDe(determinacion: DeterminacionGuardada): ReadonlyMap<string, Tab
               // **Nulo en el ultimo tramo, y no es un hueco**: ese tramo no tiene tope. Por eso la
               // tabla declara `sinDato` con la palabra —«Sin tope»— y su motivo: una raya muda se
               // leeria como un campo que al backend se le paso publicar.
+              // Los tres importes sin el simbolo: los rotulos ya dicen «Límite superior S/»,
+              // «Porción gravada S/» y «Aporte S/» (#389).
               tramo.limiteSuperior === null
                 ? { texto: null }
-                : formatearImporte(tramo.limiteSuperior),
+                : formatearImporteEnColumna(tramo.limiteSuperior),
               formatearAlicuota(tramo.alicuota),
-              formatearImporte(tramo.porcionGravada),
+              formatearImporteEnColumna(tramo.porcionGravada),
               // Sin redondear: ver el javadoc. `formatearImporte` reventaria con sus ocho
               // decimales, y recortarlos aqui seria aritmetica sobre dinero.
-          formatearImporteSinRedondear(tramo.aporte),
+          formatearImporteSinRedondearEnColumna(tramo.aporte),
         ],
       })),
       // Sin `totalElementos`: la operacion no pagina tramos, los publica enteros. Lo que se ve

@@ -217,7 +217,8 @@ describe('`fis-panel` — el embudo del programa (#196)', () => {
 
     expect(reparto.valores.get(coordenada(0, 0))).toBe('2026');
     expect(reparto.valores.get(coordenada(0, 1))).toBe('PF-2026-014');
-    expect(reparto.valores.get(coordenada(0, 2))).toBe('3418');
+    // Agrupado, como el artboard escribe «3,418» y como cualquier conteo del arbol (#389).
+    expect(reparto.valores.get(coordenada(0, 2))).toBe('3,418');
     expect(reparto.valores.get(coordenada(0, 3))).toBe('96');
     expect(reparto.valores.get(coordenada(0, 4))).toBe('84');
     expect(reparto.valores.get(coordenada(0, 5))).toBe('61');
@@ -245,7 +246,7 @@ describe('`fis-panel` — el embudo del programa (#196)', () => {
     // La cifra es la etapa que el manual llama «Inspeccionados», y ahora el rotulo lo dice.
     const reparto = FIS_PANEL.repartir(EMBUDO as never);
 
-    expect(reparto.valores.get(coordenada(0, 4))).toBe(String(EMBUDO.conActa));
+    expect(reparto.valores.get(coordenada(0, 4))).toBe('84');
     expect(reparto.noPublicados.has(coordenada(0, 4))).toBe(false);
     expect(PANTALLAS['fis-panel'].bloques[0]?.campos[4]?.etiqueta).toBe('Con acta levantada');
     // Y la palabra que prometia un cierre no vuelve por ninguna de las dos hojas.
@@ -306,7 +307,7 @@ describe('`fis-panel` — el embudo del programa (#196)', () => {
       '/fiscalizacion/programas?': PROGRAMAS,
     });
     await waitFor(() => {
-      expect(screen.getByText('3418')).toBeInTheDocument();
+      expect(screen.getByText('3,418')).toBeInTheDocument();
     });
     expect(screen.getByRole('combobox', { name: 'Ejercicio' })).not.toHaveTextContent('2026');
   });
@@ -317,14 +318,14 @@ describe('`fis-panel` — el embudo del programa (#196)', () => {
       '/fiscalizacion/programas?': PROGRAMAS,
     });
     await waitFor(() => {
-      expect(screen.getByText('3418')).toBeInTheDocument();
+      expect(screen.getByText('3,418')).toBeInTheDocument();
     });
     expect(screen.getByRole('combobox', { name: 'Ejercicio' })).toHaveTextContent('2025');
   });
 
   it('LA ROTURA DEL AC3: con otro embudo, la pantalla ensena otras cifras', async () => {
     const { container } = await pintar('fis-panel', RUTAS_DE_PANEL);
-    expect(container.textContent).toContain('3418');
+    expect(container.textContent).toContain('3,418');
 
     const otro = { ...EMBUDO, detectadosPorCruce: 777, programados: 12 };
     const segunda = await pintar('fis-panel', {
@@ -333,7 +334,7 @@ describe('`fis-panel` — el embudo del programa (#196)', () => {
     });
 
     expect(segunda.container.textContent).toContain('777');
-    expect(segunda.container.textContent).not.toContain('3418');
+    expect(segunda.container.textContent).not.toContain('3,418');
   });
 });
 

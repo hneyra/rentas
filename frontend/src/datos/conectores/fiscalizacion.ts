@@ -1,6 +1,10 @@
 import { coordenada, type CeldaDeLaTabla, type Coordenada } from '@kamayuk/ui';
 
-import { formatearImporte } from '../../dominio/formato.ts';
+import {
+  formatearEntero,
+  formatearImporte,
+  formatearImporteEnColumna,
+} from '../../dominio/formato.ts';
 import type {
   ActaDeFiscalizacion,
   EmbudoDelPrograma,
@@ -169,12 +173,14 @@ const SIN_INTERES =
   'Ninguna de las dieciseis operaciones de fiscalizacion publica un interes: el cuadro que se ' +
   'imprime lleva «Multa» donde el prototipo decia «Interes». Cerrarlo es del backend.';
 
-/** El prefijo de moneda que `formatearImporte` pone siempre; la columna ya lo dice en su rotulo. */
-const LA_MONEDA = /^S\/\s/;
-
-/** Un importe para una columna que ya dice «S/»; «sin cifrar» cuando llega nulo (D-02a). */
+/**
+ * Un importe para una columna que ya dice «S/»; «sin cifrar» cuando llega nulo (D-02a).
+ *
+ * Aqui solo se decide el nulo: la cifra la escribe `formatearImporteEnColumna`. Hasta #389 este
+ * archivo recortaba el prefijo con su propia copia de `LA_MONEDA`, la segunda del arbol.
+ */
 function enColumnaDeSoles(importe: string | null): string {
-  return importe === null ? SIN_CIFRAR : formatearImporte(importe).replace(LA_MONEDA, '');
+  return importe === null ? SIN_CIFRAR : formatearImporteEnColumna(importe);
 }
 
 /** Las operaciones de este modulo que reciben parametros, escritas una vez (#172). */
@@ -694,9 +700,10 @@ const FIS_PANEL: Conector = {
   repartir: (embudo: EmbudoDelPrograma): Reparto => {
     const valores = new Map<Coordenada, string>([
       [coordenada(0, 1), embudo.codigo],
-      [coordenada(0, 3), String(embudo.programados)],
-      [coordenada(0, 4), String(embudo.conActa)],
-      [coordenada(0, 5), String(embudo.conDiferencia)],
+      // Los conteos agrupados, como el artboard escribe «3,418» (#389).
+      [coordenada(0, 3), formatearEntero(embudo.programados)],
+      [coordenada(0, 4), formatearEntero(embudo.conActa)],
+      [coordenada(0, 5), formatearEntero(embudo.conDiferencia)],
     ]);
     const noPublicados = new Map<Coordenada, PalabraDeHueco>();
 
@@ -708,7 +715,7 @@ const FIS_PANEL: Conector = {
     valores.set(coordenada(0, 0), ejercicioDeLaRespuesta(embudo.ejercicio));
 
     if (embudo.detectadosPorCruce !== null) {
-      valores.set(coordenada(0, 2), String(embudo.detectadosPorCruce));
+      valores.set(coordenada(0, 2), formatearEntero(embudo.detectadosPorCruce));
     } else {
       noPublicados.set(coordenada(0, 2), SIN_PARAMETROS_DEL_SORTEO);
     }
@@ -741,7 +748,6 @@ export {
   SIN_PARAMETROS_DEL_SORTEO,
   SIN_TITULAR,
   contrasteDelActa,
-  enColumnaDeSoles,
   filaDelEjercicio,
   sinDato,
   totalDeLaResolucion,

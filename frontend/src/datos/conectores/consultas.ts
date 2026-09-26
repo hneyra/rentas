@@ -1,6 +1,10 @@
 import { coordenada } from '@kamayuk/ui';
 
-import { formatearFecha, formatearImporte } from '../../dominio/formato.ts';
+import {
+  formatearFecha,
+  formatearImporte,
+  formatearImporteEnColumna,
+} from '../../dominio/formato.ts';
 import type {
   ConstanciaDeNoAdeudo,
   DeudaConBeneficio,
@@ -196,7 +200,9 @@ export const CON_DOC: Conector = {
             String(obligacion.ejercicio),
             obligacion.tributo,
             cuotasDe(obligacion),
-            importe(obligacion.deuda.total),
+            // «Total S/»: sin el simbolo, que ya lo dice el rotulo (#389). `importe()` es la de los
+            // campos sueltos, que si lo llevan.
+            formatearImporteEnColumna(obligacion.deuda.total.importe),
             obligacion.fase,
           ]),
         ],

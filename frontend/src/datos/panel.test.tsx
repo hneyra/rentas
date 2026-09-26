@@ -61,6 +61,17 @@ function arnes() {
     );
 }
 
+/**
+ * Los nodos cuyo texto entero es `texto` y que NO estan dentro de una celda de la tabla (#389).
+ *
+ * Es como se distingue un campo de una celda desde que las dos escriben los conteos igual. Hasta
+ * #389 la prueba de abajo lo hacia por la forma —la celda salia «sin separador, como la celda la
+ * trae»—, o sea que **dependia** de que la tabla no agrupara: justo la divergencia que #389 cierra.
+ */
+function fueraDeLaTabla(texto: string): readonly HTMLElement[] {
+  return screen.queryAllByText(texto).filter((nodo) => nodo.closest('td') === null);
+}
+
 /** Sustituye `fetch` por una respuesta unica: esta hoja pide una sola operacion. */
 function contesta(corrida: CorridaDelPredial) {
   vi.stubGlobal(
@@ -86,7 +97,9 @@ function corrida(cambios: Partial<CorridaDelPredial> = {}): CorridaDelPredial {
     simulacion: false,
     conjunto: '2026 v1',
     conjuntoId: 77,
-    fechaCalculo: '28/01/2026 02:14',
+    // ISO y sin hora, que es lo que publica `corrida.fechaCalculo().toString()` (#389). Hasta #389
+    // traia «28/01/2026 02:14» —el texto del artboard— y la pantalla lo pintaba tal cual.
+    fechaCalculo: '2026-01-28',
     determinados: 58_412,
     montoEmitido: '8772431.05',
     // El derecho que ESTA corrida sello (#312). No es el `S/ 4.50` del artboard a proposito: si la
@@ -95,7 +108,7 @@ function corrida(cambios: Partial<CorridaDelPredial> = {}): CorridaDelPredial {
     observados: 1204,
     // Las cifras del ARTBOARD, en la tabla. Si alguna sube a un campo, es que se dedujo de aqui.
     etapas: [
-      { etapa: 'Padron leido', registros: 62_418, monto: '', observados: 0, estado: 'OK' },
+      { etapa: 'Padrón leído', registros: 62_418, monto: '', observados: 0, estado: 'OK' },
       {
         etapa: 'Determinados',
         registros: 61_350,
@@ -122,15 +135,46 @@ describe('`panel` — el estado de la emision', () => {
     });
     expect(screen.getByText('S/ 8,772,431.05')).toBeInTheDocument();
     // Y lo que ya salia sigue saliendo: la fecha y los observados.
-    expect(screen.getByText('28/01/2026 02:14')).toBeInTheDocument();
-    expect(screen.getByText('1,204')).toBeInTheDocument();
+    expect(screen.getByText('28/01/2026')).toBeInTheDocument();
+    expect(fueraDeLaTabla('1,204')).toHaveLength(1);
     // Ninguna cifra del artboard sube a un campo. `61,350` esta EN LA TABLA de esta misma
-    // respuesta —sin separador, como la celda la trae—, asi que lo que se comprueba es que no
-    // aparezca la forma de campo, que es la que lleva millares.
+    // respuesta, y desde #389 la celda la escribe igual que un campo —con sus millares, como el
+    // artboard—, asi que el campo y la celda ya no se distinguen por la forma: se distinguen por
+    // DONDE estan. Lo que se comprueba es que ninguna aparezca fuera de una celda.
     for (const suya of DEL_ARTBOARD) {
-      expect(screen.queryByText(suya)).toBeNull();
+      expect(fueraDeLaTabla(suya), suya).toEqual([]);
     }
+    expect(screen.getByRole('cell', { name: '61,350' })).toBeInTheDocument();
     expect(container.textContent).not.toContain('S/ 9,418,204.60');
+  });
+
+  /**
+   * **La tabla de etapas se escribe como el artboard, y con lo que el backend manda de verdad**
+   * (#389).
+   *
+   * La muestra es la forma de `CorridaGuardadaResource`: `"OK"` y `"CON OBSERVACIONES"`, y
+   * `monto: ""` en «Padrón leído» —`SIN_MONTO`—. Hasta #389 la tabla escribia «62418» y
+   * «9418204.60», dejaba EN BLANCO el monto de la etapa que no mueve dinero —la via `filas` solo
+   * admite cadenas y el interprete solo dice «sin dato» con `null`— y pintaba «CON OBSERVACIONES»
+   * con el tono de «no se», el mismo que «OK».
+   */
+  it('la tabla de etapas agrupa, dice la etapa sin monto y pinta de rojo la que dejo gente fuera', async () => {
+    contesta(corrida());
+    arnes()();
+
+    await waitFor(() => {
+      expect(screen.getByRole('cell', { name: '62,418' })).toBeInTheDocument();
+    });
+    expect(screen.getByRole('cell', { name: '9,418,204.60' })).toBeInTheDocument();
+    expect(screen.getByRole('cell', { name: '534' })).toBeInTheDocument();
+    // La etapa sin monto DICE que no lo tiene, con su motivo: ni blanco ni cero.
+    const [padron] = screen.getAllByRole('row').filter((f) => f.textContent.includes('Padrón leído'));
+    const sinMonto = padron?.querySelector('[data-celda-sin-dato]');
+    expect(sinMonto?.textContent).toBe('—');
+    expect(sinMonto?.getAttribute('title')).toMatch(/no mueve dinero/);
+    // Y el estado se juzga: rojo la que dejo contribuyentes fuera, verde la que no.
+    expect(screen.getByText('CON OBSERVACIONES').className).toContain('bg-mal-fondo');
+    expect(screen.getByText('OK').className).toContain('bg-ok-fondo');
   });
 
   it('LA ROTURA: con otra corrida ensena OTRA cosa', async () => {
@@ -139,7 +183,7 @@ describe('`panel` — el estado de la emision', () => {
         determinados: 7,
         montoEmitido: '412.80',
         observados: 39,
-        fechaCalculo: '03/02/2027 18:40',
+        fechaCalculo: '2027-02-03',
       }),
     );
     arnes()();
@@ -149,7 +193,7 @@ describe('`panel` — el estado de la emision', () => {
     });
     expect(screen.getByText('S/ 412.80')).toBeInTheDocument();
     expect(screen.getByText('39')).toBeInTheDocument();
-    expect(screen.getByText('03/02/2027 18:40')).toBeInTheDocument();
+    expect(screen.getByText('03/02/2027')).toBeInTheDocument();
     // Y nada de la primera corrida sobrevive.
     expect(screen.queryByText('58,412')).toBeNull();
     expect(screen.queryByText('S/ 8,772,431.05')).toBeNull();
@@ -242,11 +286,11 @@ describe('`panel` — el estado de la emision', () => {
    * artboard.
    */
   it('una corrida de 2027 NO sale bajo «2026»: el control se queda en blanco', async () => {
-    contesta(corrida({ ejercicio: '2027', fechaCalculo: '15/01/2027 03:10' }));
+    contesta(corrida({ ejercicio: '2027', fechaCalculo: '2027-01-15' }));
     arnes()();
 
     await waitFor(() => {
-      expect(screen.getByText('15/01/2027 03:10')).toBeInTheDocument();
+      expect(screen.getByText('15/01/2027')).toBeInTheDocument();
     });
     expect(screen.getByRole('combobox', { name: 'Ejercicio' })).not.toHaveTextContent('2026');
   });
