@@ -342,11 +342,8 @@ public class PredialController {
                             observacion));
         } catch (DeterminarPredial.ContribuyenteInexistente noEsta) {
             throw new ProblemaDeNegocio(CodigoDeError.NO_ENCONTRADO, mensajeDe(noEsta));
-        } catch (DeterminarPredial.SinPrediosEnElPadron
-                | DeterminarPredial.PredioSinAutovaluo
+        } catch (DeterminarPredial.RechazoDelContribuyente
                 | DeterminarPredial.PredioRepetido
-                | DeterminarPredial.PredioAjeno
-                | DeterminarPredial.BeneficioPredialSinRegla
                 | MinimoImponible.BaseAfectaCero mal) {
             throw new ProblemaDeNegocio(CodigoDeError.VALIDACION, mensajeDe(mal));
         } catch (CuadroPredialParametrizado.ParametroDelPredialAusente

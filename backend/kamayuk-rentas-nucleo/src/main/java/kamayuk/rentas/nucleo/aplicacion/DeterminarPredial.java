@@ -406,6 +406,14 @@ public class DeterminarPredial {
                 autovaluo = Objects.requireNonNull(declarado).autovaluo();
                 origen = OrigenDelAutovaluo.DECLARADO;
             }
+            // El exonerado sigue siendo el DECLARADO aunque mande la sellada, y en la masiva sale
+            // de la determinacion anterior: un exonerado valido frente al autovaluo declarado
+            // puede superar al sellado que llego despues (#375). Es un dato de ESTE contribuyente,
+            // y se dice con nombre antes de construir la base: la `IllegalArgumentException` de
+            // `PredioEnLaBase` sigue siendo una invariante, no un rechazo.
+            if (mandaLaSellada && exonerado.esMayorQue(autovaluo)) {
+                throw new ExoneradoMayorQueLaValuacionSellada(predio, exonerado, autovaluo);
+            }
             Dinero afecto = autovaluo.menos(exonerado);
             Porcentaje cuota = predio.porcentajeTitularidad();
             Dinero ponderado =
@@ -576,13 +584,59 @@ public class DeterminarPredial {
     }
 
     /**
+     * Lo que los datos de UN contribuyente no dejan determinar (#375).
+     *
+     * <p>Es la categoria que la corrida masiva observa —anota al contribuyente y sigue con el
+     * siguiente— en vez de cortarse: hasta #375 existia solo como una lista escrita a mano en su
+     * {@code catch}, y la excepcion que faltaba en ella paraba la emision del padron entero, con lo
+     * anterior ya asentado y sin rastro. Lo que le pasa a TODOS por igual —un parametro del
+     * conjunto sin publicar— no es esto, y corta la corrida a proposito.
+     *
+     * <p>Es una clase y no una interfaz marcadora porque un {@code catch} solo admite tipos {@code
+     * Throwable}.
+     */
+    public abstract static class RechazoDelContribuyente extends RuntimeException {
+        @java.io.Serial private static final long serialVersionUID = 1L;
+
+        protected RechazoDelContribuyente(String mensaje) {
+            super(mensaje);
+        }
+    }
+
+    /**
+     * El valuo exonerado declarado supera el autovaluo que {@code catastro} sello (#375).
+     *
+     * <p>Que hacer con el —acotarlo, prorratearlo o exigir que se vuelva a declarar— es una
+     * decision de negocio que no se toma aqui (ADR-0024 deja las deducciones de este lado). Lo que
+     * se decide es que no se calcule con el: el afecto saldria negativo.
+     */
+    public static final class ExoneradoMayorQueLaValuacionSellada extends RechazoDelContribuyente {
+        @java.io.Serial private static final long serialVersionUID = 1L;
+
+        ExoneradoMayorQueLaValuacionSellada(
+                PredioDelContribuyente predio, Dinero exonerado, Dinero sellado) {
+            super(
+                    "El predio "
+                            + predio.codigoReferenciaCatastral()
+                            + " (id "
+                            + predio.predioId()
+                            + ") declara un valuo exonerado de "
+                            + exonerado
+                            + " y su autovaluo sellado por catastro es "
+                            + sellado
+                            + ": la parte exonerada no puede superar el autovaluo. Hay que volver a"
+                            + " declarar la parte exonerada frente a la valuacion sellada");
+        }
+    }
+
+    /**
      * El contribuyente existe y no tiene ningun predio a su nombre al 1 de enero del ejercicio,
      * antes de las transferencias de ese dia ({@link Ejercicio#fechaDeLaTitularidad()}).
      *
      * <p>Es lo que le pasa, por ejemplo, al que compra durante el ejercicio —tambien el mismo 1 de
      * enero—: su primer ejercicio es el siguiente (TUO LTM art. 10, #328).
      */
-    public static final class SinPrediosEnElPadron extends RuntimeException {
+    public static final class SinPrediosEnElPadron extends RechazoDelContribuyente {
         @java.io.Serial private static final long serialVersionUID = 1L;
 
         SinPrediosEnElPadron(String codigo, LocalDate fechaDeLaTitularidad) {
@@ -615,7 +669,7 @@ public class DeterminarPredial {
      * cuenta. Que pasa con uno concedido a mitad del ejercicio es el caso c03 de RT-012, sin
      * decidir, y lo decide #464 con el resto de la regla.
      */
-    public static final class BeneficioPredialSinRegla extends RuntimeException {
+    public static final class BeneficioPredialSinRegla extends RechazoDelContribuyente {
         @java.io.Serial private static final long serialVersionUID = 1L;
 
         BeneficioPredialSinRegla(
@@ -641,7 +695,7 @@ public class DeterminarPredial {
      * <b>conjunto</b>, asi que dejar un predio fuera no produce una determinacion incompleta sino
      * una <b>equivocada</b> y mas barata, sin ningun error de por medio (NEG-05 §1).
      */
-    public static final class PredioSinAutovaluo extends RuntimeException {
+    public static final class PredioSinAutovaluo extends RechazoDelContribuyente {
         @java.io.Serial private static final long serialVersionUID = 1L;
 
         private final long predioId;
@@ -709,7 +763,7 @@ public class DeterminarPredial {
      * <p>Una venta del propio ejercicio ya no lo dispara (#328): el que vende en marzo —o el mismo
      * 1 de enero— sigue siendo el sujeto del ejercicio.
      */
-    public static final class PredioAjeno extends RuntimeException {
+    public static final class PredioAjeno extends RechazoDelContribuyente {
         @java.io.Serial private static final long serialVersionUID = 1L;
 
         PredioAjeno(String codigo, long predioId, LocalDate fechaDeLaTitularidad) {

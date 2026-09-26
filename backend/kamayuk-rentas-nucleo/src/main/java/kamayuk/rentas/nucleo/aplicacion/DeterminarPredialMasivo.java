@@ -298,10 +298,7 @@ public class DeterminarPredialMasivo {
                 conjunto = calculada.nombreDelConjunto();
                 conjuntoId = calculada.cabecera().conjuntoId();
                 derechoDeEmision = calculada.derechoDeEmision();
-            } catch (DeterminarPredial.PredioSinAutovaluo
-                    | DeterminarPredial.SinPrediosEnElPadron
-                    | DeterminarPredial.PredioAjeno
-                    | DeterminarPredial.BeneficioPredialSinRegla
+            } catch (DeterminarPredial.RechazoDelContribuyente
                     | MinimoImponible.BaseAfectaCero motivo) {
                 // El padron AL 1 DE ENERO cambio entre la primera determinacion y esta corrida
                 // —algo registrado despues con fecha anterior al ejercicio—: un predio nuevo sin
@@ -311,6 +308,8 @@ public class DeterminarPredialMasivo {
                 // un beneficio del predial sin RT-012 (#331): queda fuera hasta #464, a la vista.
                 // Y el de base afecta cero (#332): NEG-05 no dice si paga el minimo o nada, y
                 // RegistrarDeterminacionPredial.calcular lo rechaza antes de que haya fila (#359).
+                // Y desde #375 no es una lista a mano: cualquier `RechazoDelContribuyente` —entre
+                // ellos el exonerado declarado mayor que la valuacion sellada— se observa.
                 observados.add(new Observado(codigo, nombre, String.valueOf(motivo.getMessage())));
             } catch (CuadroPredialParametrizado.ParametroDelPredialAusente falta) {
                 // Esta le pasa a TODOS por igual —es del conjunto, no del contribuyente—, asi que
