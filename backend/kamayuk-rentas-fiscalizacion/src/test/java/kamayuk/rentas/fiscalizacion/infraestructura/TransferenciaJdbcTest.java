@@ -732,6 +732,7 @@ class TransferenciaJdbcTest {
                                                                 HOY,
                                                                 "Se anula a pedido del"
                                                                         + " fiscalizador",
+                                                                null,
                                                                 PORQUE)));
                 boolean esperoElCandado = esperarAQueAlguienEspereUnCandado(anulacion);
                 soltar.countDown();
