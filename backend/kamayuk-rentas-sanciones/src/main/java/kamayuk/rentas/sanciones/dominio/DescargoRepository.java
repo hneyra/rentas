@@ -32,6 +32,14 @@ public interface DescargoRepository {
     List<Descargo> dePapeleta(long papeletaId);
 
     /**
+     * Los recursos contra la papeleta que estaban <b>sin resolver</b> a esa fecha (#414):
+     * presentados hasta {@code aLaFecha} y sin ninguna resolucion de gerencia que los resuelva
+     * fechada hasta ese dia. Uno presentado despues no cuenta, y uno resuelto despues sigue
+     * pendiente a esa fecha. Una sola consulta, y no {@code queResuelve} por descargo.
+     */
+    List<Descargo> pendientesDe(long papeletaId, java.time.LocalDate aLaFecha);
+
+    /**
      * Ya hay un descargo con ese numero de expediente en esta municipalidad (#422).
      *
      * <p>El numero de expediente es el de mesa de partes, y lo teclea quien atiende: un doble envio

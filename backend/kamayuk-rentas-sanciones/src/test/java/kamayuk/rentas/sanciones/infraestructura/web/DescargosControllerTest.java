@@ -422,6 +422,14 @@ class DescargosControllerTest {
         public List<Descargo> dePapeleta(long papeletaId) {
             return guardados.stream().filter(d -> d.papeletaId() == papeletaId).toList();
         }
+
+        /** Este borde no pasa por la corrida (#414): los presentados hasta ese dia, sin mas. */
+        @Override
+        public List<Descargo> pendientesDe(long papeletaId, java.time.LocalDate aLaFecha) {
+            return dePapeleta(papeletaId).stream()
+                    .filter(d -> !d.fecha().isAfter(aLaFecha))
+                    .toList();
+        }
     }
 
     /**

@@ -10,6 +10,8 @@ import kamayuk.rentas.cuentacorriente.SeleccionDeObligacion;
 import kamayuk.rentas.dominio.Observacion;
 import kamayuk.rentas.sanciones.dominio.CorridaDeValores;
 import kamayuk.rentas.sanciones.dominio.CorridaDeValoresRepository;
+import kamayuk.rentas.sanciones.dominio.Descargo;
+import kamayuk.rentas.sanciones.dominio.DescargoRepository;
 import kamayuk.rentas.sanciones.dominio.ItemDeCorrida;
 import kamayuk.rentas.sanciones.dominio.NotificacionDeResolucion;
 import kamayuk.rentas.sanciones.dominio.NotificacionDeResolucionRepository;
@@ -47,7 +49,7 @@ import org.springframework.transaction.annotation.Transactional;
  * dos procesos llegaran a la vez, quien lo impide es {@code papeleta_valor_unico_uq} (V47), no un
  * {@code if}: el segundo choca contra el índice y su transacción entera se deshace.
  *
- * <h2>Las tres razones por las que una papeleta no procede</h2>
+ * <h2>Las cuatro razones por las que una papeleta no procede</h2>
  *
  * <p>Se comprueban <b>a {@code fechaCriterio}</b>, la congelada de la corrida, nunca a «hoy»:
  *
@@ -59,10 +61,12 @@ import org.springframework.transaction.annotation.Transactional;
  *       CorridaDeValores#laQueOrdenaLaCobranza}.
  *   <li>La hay, pero ninguna diligencia surtió efecto. Se arregla notificándola.
  *   <li>Surtió efecto, pero el plazo que concedió todavía corre. Se arregla esperando.
+ *   <li>Hay un recurso contra la papeleta sin resolver (#414): la multa no es firme, y el art. 14
+ *       de la Ley 26979 no deja exigir un acto pendiente de recurso. Se arregla resolviéndolo.
  * </ol>
  *
- * <p>Las tres se guardan como {@code NO_PROCEDE} con su motivo, y no como un fallo: un candidato al
- * que le falta la notificación no es un error del proceso, es trabajo pendiente de otra área, y
+ * <p>Las cuatro se guardan como {@code NO_PROCEDE} con su motivo, y no como un fallo: un candidato
+ * al que le falta la notificación no es un error del proceso, es trabajo pendiente de otra área, y
  * quien opera necesita saber cuál de las tres le tocó. Un único «no procede» le dejaría adivinando.
  *
  * <h2>Y dos más que pone el libro (#371)</h2>
@@ -86,18 +90,21 @@ public class ProcesarPapeletaDeLaCorrida {
     private final NotificacionDeResolucionRepository diligencias;
     private final EmisionDeValoresDeMultas emision;
     private final CorridaDeValoresRepository corridas;
+    private final DescargoRepository descargos;
 
     public ProcesarPapeletaDeLaCorrida(
             PapeletaRepository papeletas,
             ResolucionDeGerenciaRepository resoluciones,
             NotificacionDeResolucionRepository diligencias,
             EmisionDeValoresDeMultas emision,
-            CorridaDeValoresRepository corridas) {
+            CorridaDeValoresRepository corridas,
+            DescargoRepository descargos) {
         this.papeletas = papeletas;
         this.resoluciones = resoluciones;
         this.diligencias = diligencias;
         this.emision = emision;
         this.corridas = corridas;
+        this.descargos = descargos;
     }
 
     /** Cómo terminó de resolverse el candidato. */
@@ -259,6 +266,23 @@ public class ProcesarPapeletaDeLaCorrida {
                     + "; al "
                     + fechaCriterio
                     + " todavia corre";
+        }
+
+        // #414: un recurso sin resolver a la fecha de criterio deja la multa sin firmeza. Con el
+        // art. 14 de la Ley 26979 no se exige un acto pendiente de recurso, y un RM emitido no se
+        // borra (regla 4): habria que anularlo.
+        List<Descargo> pendientes = descargos.pendientesDe(papeleta.identificador(), fechaCriterio);
+        if (!pendientes.isEmpty()) {
+            Descargo recurso = pendientes.get(0);
+            return "El recurso "
+                    + recurso.numeroExpediente()
+                    + " ("
+                    + recurso.tipoRecurso().name()
+                    + ") del "
+                    + recurso.fecha()
+                    + " esta sin resolver al "
+                    + fechaCriterio
+                    + ": la multa no es firme";
         }
         return null;
     }

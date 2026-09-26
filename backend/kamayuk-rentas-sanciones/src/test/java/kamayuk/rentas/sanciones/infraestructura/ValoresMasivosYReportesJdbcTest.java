@@ -428,7 +428,12 @@ class ValoresMasivosYReportesJdbcTest {
         procesar =
                 envolver(
                         new ProcesarPapeletaDeLaCorrida(
-                                papeletas, resoluciones, diligencias, emision, corridas));
+                                papeletas,
+                                resoluciones,
+                                diligencias,
+                                emision,
+                                corridas,
+                                repositorioDeDescargos));
         anularPapeleta =
                 envolver(
                         new AnularPapeleta(
@@ -596,6 +601,57 @@ class ValoresMasivosYReportesJdbcTest {
             ItemDeCorrida item = itemsDe(corrida).get(0);
             assertThat(item.estado()).isEqualTo(EstadoDeItemDeCorrida.NO_PROCEDE);
             assertThat(item.motivo()).contains("no consta notificada");
+        }
+
+        /**
+         * #414 — Un recurso sin resolver a la fecha de criterio deja la multa sin firmeza: la
+         * corrida no la formaliza. Hasta #414 se comprobaban tres cosas y ninguna miraba los
+         * descargos, y la suite que dice «resolucion firme» no sembraba ningun recurso.
+         */
+        @Test
+        @DisplayName("#414 — con un recurso sin resolver: NO_PROCEDE, nombrando el expediente")
+        void conUnRecursoSinResolver() {
+            Papeleta papeleta = papeletaExigible("np6");
+            presentarRecurso(papeleta, "EXP-414A", LocalDate.of(2026, 4, 6));
+            CorridaDeValores corrida = corridaDe(papeleta);
+
+            generar.generar(corrida.identificador());
+
+            ItemDeCorrida item = itemsDe(corrida).get(0);
+            assertThat(item.estado())
+                    .as("art. 14 de la Ley 26979: el acto no puede estar pendiente de recurso")
+                    .isEqualTo(EstadoDeItemDeCorrida.NO_PROCEDE);
+            assertThat(item.motivo()).contains("EXP-414A").contains("sin resolver");
+        }
+
+        /**
+         * La siembra que distingue: un recurso que la propia ordinaria resolvio antes de la fecha
+         * de criterio no bloquea nada. Una implementacion que parara cualquier papeleta con
+         * cualquier descargo pasaria el caso de arriba y fallaria este.
+         */
+        @Test
+        @DisplayName("#414 — con el recurso ya resuelto por la ordinaria: GENERADO")
+        void conElRecursoYaResuelto() {
+            Papeleta papeleta = papeletaExigibleQueResuelve("np7", "EXP-414B");
+            CorridaDeValores corrida = corridaDe(papeleta);
+
+            generar.generar(corrida.identificador());
+
+            assertThat(itemsDe(corrida).get(0).estado()).isEqualTo(EstadoDeItemDeCorrida.GENERADO);
+        }
+
+        @Test
+        @DisplayName("#414 — con el recurso presentado despues de la fecha de criterio: GENERADO")
+        void conElRecursoPosteriorALaFechaDeCriterio() {
+            Papeleta papeleta = papeletaExigible("np8");
+            presentarRecurso(papeleta, "EXP-414C", EXIGIBLE_DESDE.plusDays(2));
+            CorridaDeValores corrida = corridaDe(papeleta);
+
+            generar.generar(corrida.identificador());
+
+            assertThat(itemsDe(corrida).get(0).estado())
+                    .as("todo se mide a la fecha de criterio, como las otras tres razones")
+                    .isEqualTo(EstadoDeItemDeCorrida.GENERADO);
         }
 
         @Test
@@ -2313,7 +2369,8 @@ class ValoresMasivosYReportesJdbcTest {
                     repositorioDeResoluciones,
                     repositorioDeDiligencias,
                     emisionDeMultas,
-                    corridas);
+                    corridas,
+                    new DescargoRepositoryJdbc(jdbc));
             this.fallos = fallos;
         }
 
@@ -2980,6 +3037,77 @@ class ValoresMasivosYReportesJdbcTest {
                             + " sino el "
                             + diligencia.notificacion().exigibleDesde());
         }
+        return papeleta;
+    }
+
+    /** Una reconsideracion contra la papeleta, presentada ese dia y sin resolver (#414). */
+    private static void presentarRecurso(Papeleta papeleta, String expediente, LocalDate dia) {
+        enTransaccion(
+                () ->
+                        registrarDescargo.registrar(
+                                Familia.TRANSITO,
+                                papeleta.numero(),
+                                new RegistrarDescargo.Peticion(
+                                        expediente,
+                                        dia,
+                                        TipoDeRecurso.RECONSIDERACION,
+                                        "No estaba conduciendo"),
+                                PORQUE),
+                "mesa.partes");
+    }
+
+    /**
+     * Una papeleta exigible cuya ordinaria resuelve un descargo anterior como INFUNDADO y mantiene
+     * la multa (#414): el recurso existe, pero ya esta resuelto.
+     */
+    private static Papeleta papeletaExigibleQueResuelve(String sufijo, String expediente) {
+        Papeleta papeleta = papeletaDeTransito(sufijo, crearContribuyente(sufijo), MULTA);
+        enTransaccion(
+                () ->
+                        registrarDescargo.registrar(
+                                Familia.TRANSITO,
+                                papeleta.numero(),
+                                new RegistrarDescargo.Peticion(
+                                        expediente,
+                                        INFRACCION.plusDays(2),
+                                        TipoDeRecurso.DESCARGO,
+                                        "El vehiculo estaba en el taller"),
+                                PORQUE),
+                "mesa.partes");
+        ResolverConResolucionDeGerencia.ResolucionDictada dictada =
+                enTransaccion(
+                        () ->
+                                resolver.dictar(
+                                        new ResolverConResolucionDeGerencia.Peticion(
+                                                Familia.TRANSITO,
+                                                papeleta.numero(),
+                                                TipoDeResolucionDeGerencia.ORDINARIA,
+                                                ORDINARIA,
+                                                expediente,
+                                                SentidoDelFallo.INFUNDADO,
+                                                EfectoSobreLaMulta.SE_MANTIENE,
+                                                null,
+                                                "Sustento de la prueba",
+                                                null),
+                                        FormatoDeDocumento.PDF,
+                                        PORQUE),
+                        "gerente");
+        enTransaccion(
+                () ->
+                        notificar.registrar(
+                                dictada.resolucion().numero(),
+                                new NotificarResolucionDeGerencia.Peticion(
+                                        DILIGENCIA,
+                                        ModalidadDeNotificacion.PERSONAL,
+                                        ResultadoDeNotificacion.NOTIFICADO,
+                                        "V. RETO SANTOS",
+                                        "AV. JOSE DE LAMA 1180 - SULLANA",
+                                        "RUIZ INGA, FERNANDO",
+                                        "DNI 10027723",
+                                        "REPRESENTANTE",
+                                        "CARGO-RG"),
+                                PORQUE),
+                "notificador");
         return papeleta;
     }
 

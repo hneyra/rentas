@@ -156,7 +156,9 @@ class CorrerLasCorridasDePapeletasJdbcTest {
                                 new ResolucionDeGerenciaRepositoryJdbc(jdbc),
                                 new NotificacionDeResolucionRepositoryJdbc(jdbc),
                                 sinEmision,
-                                corridas));
+                                corridas,
+                                new kamayuk.rentas.sanciones.infraestructura.DescargoRepositoryJdbc(
+                                        jdbc)));
 
         lectura = envolver(new ConsultaDeLaCorridaDeValores(corridas));
         // El bucle NO se envuelve: el runner lo llama fuera de toda transaccion.
