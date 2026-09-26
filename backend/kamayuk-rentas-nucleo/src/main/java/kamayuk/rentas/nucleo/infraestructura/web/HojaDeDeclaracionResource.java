@@ -28,6 +28,13 @@ import org.jspecify.annotations.Nullable;
  * derecho de emision y el total a pagar, porque el derecho es una cifra de ordenanza local que
  * todavia no se carga (D-02b).
  *
+ * <p><b>{@code valuoAfecto} y {@code baseImponible} son dos cifras, y cada una con su nombre</b>
+ * (#374). El valuo afecto es autovaluo menos exonerado, <b>sin ponderar</b> por el % de propiedad
+ * —la misma definicion que la memoria del calculo—; la base es ese valuo ya ponderado, la que
+ * alimenta el impuesto. Hasta #374 las dos viajaban con el nombre de la primera, y en la fila de un
+ * condomino al 50 % 100 000 − 20 000 daba 40 000. Cual imprime el formulario lo decide la pantalla
+ * que lo conecte; el contrato ya no puede confundirlas.
+ *
  * <p>{@code faltan} es una lista de motivos y no un booleano: «no se puede imprimir» sin decir por
  * que es lo que hace que alguien lo imprima igual desde otro sitio.
  */
@@ -37,6 +44,7 @@ public record HojaDeDeclaracionResource(
         @Nullable DeclaranteResource declarante,
         List<PredioDeLaHojaResource> predios,
         @Nullable String valuoAfectoTotal,
+        @Nullable String baseImponible,
         @Nullable String impuestoInsoluto,
         List<String> faltan) {
 
@@ -53,6 +61,7 @@ public record HojaDeDeclaracionResource(
                                 hoja.domicilioFiscal()),
                 hoja.predios().stream().map(PredioDeLaHojaResource::de).toList(),
                 hoja.valuoAfectoTotal() == null ? null : hoja.valuoAfectoTotal().toString(),
+                hoja.baseImponible() == null ? null : hoja.baseImponible().toString(),
                 hoja.impuestoInsoluto() == null ? null : hoja.impuestoInsoluto().toString(),
                 hoja.faltan());
     }
@@ -90,6 +99,7 @@ public record HojaDeDeclaracionResource(
             @Nullable String autovaluo,
             @Nullable String valuoExonerado,
             @Nullable String valuoAfecto,
+            @Nullable String baseImponible,
             String condicion) {
 
         static PredioDeLaHojaResource de(ConsultaDeLaHojaDeDeclaracion.FilaDePredio fila) {
@@ -104,6 +114,7 @@ public record HojaDeDeclaracionResource(
                     fila.autovaluo() == null ? null : fila.autovaluo().toString(),
                     fila.valuoExonerado() == null ? null : fila.valuoExonerado().toString(),
                     fila.valuoAfecto() == null ? null : fila.valuoAfecto().toString(),
+                    fila.baseImponible() == null ? null : fila.baseImponible().toString(),
                     fila.condicion().name());
         }
     }

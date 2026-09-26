@@ -183,6 +183,7 @@ public class ConsultaDeLaHojaDeDeclaracion {
                         quien,
                         domicilio,
                         List.copyOf(filas),
+                        determinacion.isPresent() ? valuoAfectoDe(filas) : null,
                         determinacion.map(Determinacion::baseImponible).orElse(null),
                         determinacion.map(Determinacion::montoDeterminado).orElse(null),
                         List.copyOf(faltan)));
@@ -239,6 +240,24 @@ public class ConsultaDeLaHojaDeDeclaracion {
      * deja de ser la suma de las filas; lo que no sale es el codigo ni la direccion, que no hay de
      * donde leer, y se dice aqui en vez de inventarlos.
      */
+    /**
+     * La suma del valuo afecto de las filas de la base —SIN ponderar por el % de propiedad— (#374).
+     *
+     * <p>Hasta #374 este total era la base imponible de la determinacion, que es la misma cifra ya
+     * ponderada: en la hoja de un condomino al 50 % el «valuo afecto» salia la mitad de autovaluo
+     * menos exonerado, y el papel no cuadraba consigo mismo. La base viaja ahora aparte, con su
+     * nombre.
+     */
+    private static Dinero valuoAfectoDe(List<FilaDePredio> filas) {
+        Dinero total = Dinero.CERO;
+        for (FilaDePredio fila : filas) {
+            if (fila.valuoAfecto() != null) {
+                total = total.mas(fila.valuoAfecto());
+            }
+        }
+        return total;
+    }
+
     private static String noConstaEnElEjercicio(long predioId, LocalDate fechaDeLaTitularidad) {
         return "El predio "
                 + predioId
@@ -292,6 +311,7 @@ public class ConsultaDeLaHojaDeDeclaracion {
             @Nullable String domicilioFiscal,
             List<FilaDePredio> predios,
             @Nullable Dinero valuoAfectoTotal,
+            @Nullable Dinero baseImponible,
             @Nullable Dinero impuestoInsoluto,
             List<String> faltan) {}
 
@@ -338,11 +358,13 @@ public class ConsultaDeLaHojaDeDeclaracion {
             @Nullable Dinero autovaluo,
             @Nullable Dinero valuoExonerado,
             @Nullable Dinero valuoAfecto,
+            @Nullable Dinero baseImponible,
             Condicion condicion) {
 
         public FilaDePredio {
             Objects.requireNonNull(condicion, "Toda fila dice si es de la base del ejercicio");
-            if (condicion != Condicion.BASE_DEL_EJERCICIO && valuoAfecto != null) {
+            if (condicion != Condicion.BASE_DEL_EJERCICIO
+                    && (valuoAfecto != null || baseImponible != null)) {
                 throw new IllegalArgumentException(
                         "El predio declarado fuera de la base no lleva cifras: no suma (#472)");
             }
@@ -359,6 +381,9 @@ public class ConsultaDeLaHojaDeDeclaracion {
                     detalle.porcentajePropiedad(),
                     detalle.autovaluo(),
                     detalle.valuoExonerado(),
+                    // El valuo afecto es el del dominio, SIN ponderar (#374); lo ponderado es la
+                    // base, y viaja con su nombre.
+                    detalle.valuoAfecto(),
                     detalle.baseImponiblePredio(),
                     Condicion.BASE_DEL_EJERCICIO);
         }
@@ -371,6 +396,7 @@ public class ConsultaDeLaHojaDeDeclaracion {
                     predio.direccion(),
                     predio.tipo(),
                     predio.porcentajeTitularidad(),
+                    null,
                     null,
                     null,
                     null,
@@ -388,6 +414,7 @@ public class ConsultaDeLaHojaDeDeclaracion {
                     null,
                     null,
                     null,
+                    null,
                     condicion);
         }
 
@@ -395,6 +422,7 @@ public class ConsultaDeLaHojaDeDeclaracion {
         static FilaDePredio sinTitularidad(long predioId) {
             return new FilaDePredio(
                     predioId,
+                    null,
                     null,
                     null,
                     null,

@@ -2046,10 +2046,12 @@
         "autovaluo": "texto",
         "valuoExonerado": "texto",
         "valuoAfecto": "texto",
+        "baseImponible": "texto",
         "condicion": "texto"
       }
     ],
     "valuoAfectoTotal": "texto",
+    "baseImponible": "texto",
     "impuestoInsoluto": "texto",
     "faltan": [
       "texto"
